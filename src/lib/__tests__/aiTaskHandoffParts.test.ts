@@ -51,4 +51,11 @@ describe('buildBrief', () => {
     expect(text).not.toContain('1. 一句话结论');
     expect(text).toContain('2 个原件');
   });
+
+  it('single .md: says the data is in this file, never names a JSON file', () => {
+    const text = buildBrief({ ...base, categories: [...base.categories], hasQuestion: false, workoutCount: 1, format: 'md' });
+    expect(text).toContain('# Data');
+    expect(text).toContain('Selected workouts');
+    expect(text).not.toContain('x.json');
+  });
 });

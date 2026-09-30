@@ -123,6 +123,22 @@ export interface AiTaskPrepareOptions {
   promptOverride?: string | null;
   dataFileStem?: string | null;
   promptFileStem?: string | null;
+  /** 给了就交付成单个 `.md`（批次 ⑦）：预算决定曲线取几秒平均；guide 是「这份文件怎么读」。 */
+  tokenBudget?: number | null;
+  markdownGuide?: string | null;
+}
+
+/** 单个 `.md` 的体量与降级情况（批次 ⑦）。 */
+export interface AiTaskMarkdownEstimate {
+  approx_tokens: number;
+  byte_len: number;
+  /** 运动曲线按多少秒取了平均；没有曲线时为 null。 */
+  curve_average_seconds: number | null;
+  /** 为进预算只留了概要行的运动（最旧的先让）。 */
+  summarized_workouts: string[];
+  /** 降到最后一档仍超预算：提示缩短范围。 */
+  over_budget: boolean;
+  token_budget: number;
 }
 
 export interface AiTaskTemplate {
@@ -220,6 +236,8 @@ export interface AiTaskPreview {
   attachments: AiTaskAttachmentStatus[];
   estimated_bytes: number;
   warnings: AiTaskIssue[];
+  /** 按预算估的单个 `.md`；预览没带预算时为 null。 */
+  markdown?: AiTaskMarkdownEstimate | null;
 }
 
 export interface AiTaskPrepareResult {
@@ -234,6 +252,9 @@ export interface AiTaskPrepareResult {
   byte_len: number;
   /** 复制进 `attachments/` 的附件原件个数。 */
   copied_attachments?: number;
+  /** 交付成单个 `.md` 时它的路径（此时 json_path / prompt_path 为 null）。 */
+  md_path?: string | null;
+  markdown?: AiTaskMarkdownEstimate | null;
   attachments: AiTaskAttachmentStatus[];
   /** 非空即 `status='blocked'`：附件缺失等必须先处理。 */
   blocked: AiTaskIssue[];
@@ -347,7 +368,7 @@ export interface BridgeBackend {
   aiTemplateSave(template: AiTaskTemplate): Promise<AiTaskTemplate>;
   aiTemplateDelete(id: string): Promise<void>;
   /** 收完整 task 对象：未保存的草稿也能预览。 */
-  aiTaskPreview(task: AiTask): Promise<AiTaskPreview>;
+  aiTaskPreview(task: AiTask, tokenBudget?: number | null): Promise<AiTaskPreview>;
   /**
    * `coverageNote` 是前端按界面语言提供的「数据范围与缺失说明」段开头文本
    * （码 `ui.ai_task.prompt.coverage_note`）；`directionText` 是本地化好的

@@ -1981,7 +1981,6 @@ Réponds en Markdown.`,
       outputAt: (path: string) => `Fichiers dans : ${path}`,
       copiedFiles: (count: number) =>
         plural(count, { one: `inclut ${count} pièce jointe d’origine`, other: `inclut ${count} pièces jointes d’origine` }),
-      dragHint: 'Glissez les fichiers du dossier dans la conversation de l’IA, puis collez le prompt. Ouvrir le site n’envoie rien.',
       stale: 'La tâche a changé après l’export — les fichiers sur le bureau ne sont plus à jour. Exportez à nouveau.',
       desktopOnly: 'Connectez l’application de bureau pour exporter',
       go: (label: string) => `Confier à ${label}`,

@@ -2368,8 +2368,6 @@ Antworte in Markdown.`,
           other: `enthält ${count} Anhangsoriginale`,
         }),
       desktopOnly: 'Export erfordert die Desktop-App',
-      dragHint:
-        'Dateien in den KI-Chat ziehen und den Prompt aus der Zwischenablage einfügen – die Seite zu öffnen sendet noch nichts.',
       editHint: 'Klicken zum Bearbeiten',
       edited: 'Von dir geändert',
       exportOnly: 'Nur auf den Desktop exportieren',

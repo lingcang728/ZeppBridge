@@ -10,6 +10,7 @@ import { onBeforeUnmount, ref, watch, type Ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { AiTask, AiTaskPreview } from '../lib/bridge/types';
 import { taskSnapshot } from '../lib/aiTask/draft';
+import { tokenBudget } from '../lib/aiTask/budget';
 import { defineMessages, messagesOf } from '../i18n';
 
 const messages = defineMessages(
@@ -32,7 +33,7 @@ export function useAiTaskPreview() {
     previewLoading.value = true;
     previewError.value = null;
     try {
-      const result = await backend.aiTaskPreview(task);
+      const result = await backend.aiTaskPreview(task, tokenBudget.value);
       if (mine === seq) preview.value = result;
     } catch (error) {
       if (mine === seq) previewError.value = toUserMessage(error, messagesOf(messages).previewFailed);
@@ -45,8 +46,9 @@ export function useAiTaskPreview() {
   const watchDraft = (draft: Ref<AiTask>) => {
     if (!isDesktop()) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // 换了 AI 或勾了「我已订阅」：预算变了，`.md` 的估算跟着重算。
     watch(
-      () => taskSnapshot(draft.value),
+      () => `${taskSnapshot(draft.value)}|${tokenBudget.value}`,
       () => {
         clearTimeout(timer);
         timer = setTimeout(() => void loadPreview(draft.value), DEBOUNCE_MS);

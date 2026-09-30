@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 交付三步的状态：导出到桌面 → 复制提示词 → 打开网站。
+ * 交付三步的状态：准备文件 → 复制开场白 → 打开网站。
  * 每步如实显示结果，失败的可以单独重试；没有「已发送」这种状态。
  */
 import Icon, { type IconName } from '../Icon.vue';
@@ -12,22 +12,22 @@ const emit = defineEmits<{ (event: 'retry', id: HandoffStepId): void }>();
 
 const t = useMessages(defineMessages(
   {
-    prepare: '导出到桌面',
-    copy: '复制提示词',
+    prepare: '准备文件',
+    copy: '复制开场白',
     open: (label: string) => `打开 ${label}`,
     idle: '未开始', doing: '进行中', done: '完成', failed: '失败', blocked: '被拦下', skipped: '网页预览无法打开浏览器',
     retry: '重试',
   },
   {
-    prepare: 'Export to desktop',
-    copy: 'Copy the prompt',
+    prepare: 'Prepare the file',
+    copy: 'Copy the opening line',
     open: (label: string) => `Open ${label}`,
     idle: 'Not started', doing: 'Working', done: 'Done', failed: 'Failed', blocked: 'Blocked', skipped: 'Web preview cannot open a browser',
     retry: 'Retry',
   },
   {
-    prepare: 'Exportar al escritorio',
-    copy: 'Copiar la instrucción',
+    prepare: 'Preparar el archivo',
+    copy: 'Copiar el mensaje inicial',
     open: (label: string) => `Abrir ${label}`,
     idle: 'Sin iniciar', doing: 'En curso', done: 'Listo', failed: 'Fallo', blocked: 'Bloqueado', skipped: 'La vista previa web no puede abrir el navegador', retry: 'Reintentar',
   },

@@ -499,3 +499,54 @@ fn precise_gps_opt_in_gates_route_key() {
 }
 
 // ---------- MCP 授权窗口 ----------
+
+/// 批次 ⑦：给了 markdown 参数就只交出一个 `.md`——提示词在最前、读法说明随后、数据在下；
+/// 不再写 JSON + txt。预览按同一预算估出的体量与实写一致。
+#[test]
+fn markdown_handoff_writes_one_file_with_prompt_guide_and_data() {
+    use crate::ai_tasks::export::{AiTaskMarkdownParts, AiTaskPromptParts};
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("markdown");
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Sleep, 3, true)];
+    let parts = AiTaskPromptParts {
+        brief: Some("BRIEF"),
+        data_stem: Some("handoff"),
+        markdown: Some(AiTaskMarkdownParts {
+            guide: Some("GUIDE"),
+            token_budget: 30_000,
+        }),
+        ..Default::default()
+    };
+    let result = db
+        .ai_task_prepare_plan(&t, "COVERAGE", &parts, &dir)
+        .unwrap()
+        .finish()
+        .unwrap();
+    assert_eq!(result.status, AiTaskPrepareStatus::Ready);
+    assert!(result.json_path.is_none() && result.prompt_path.is_none());
+    let md_path = result.md_path.clone().unwrap();
+    assert!(md_path.ends_with("handoff.md"), "{md_path}");
+    let text = std::fs::read_to_string(&md_path).unwrap();
+    let brief = text.find("BRIEF").unwrap();
+    let guide = text.find("GUIDE").unwrap();
+    let data = text.find("# Data").unwrap();
+    assert!(brief < guide && guide < data, "{text}");
+    assert!(text.contains("### Selected workouts"));
+    let estimate = result.markdown.unwrap();
+    assert_eq!(estimate.byte_len, text.len() as i64);
+    assert!(!estimate.over_budget);
+    // 目录里只有这一个文件。
+    let files: Vec<_> = std::fs::read_dir(std::path::Path::new(&md_path).parent().unwrap())
+        .unwrap()
+        .collect();
+    assert_eq!(files.len(), 1);
+
+    let preview = db.ai_task_preview_with_budget(&t, Some(30_000)).unwrap();
+    let preview_md = preview.markdown.unwrap();
+    assert!(preview_md.approx_tokens <= estimate.approx_tokens);
+    assert!(db.ai_task_preview(&t).unwrap().markdown.is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}

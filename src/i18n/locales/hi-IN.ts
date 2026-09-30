@@ -1957,7 +1957,6 @@ Markdown में उत्तर दें।`,
       outputAt: (path: string) => `फ़ाइलें: ${path}`,
       copiedFiles: (count: number) =>
         plural(count, { one: `${count} अटैचमेंट शामिल`, other: `${count} अटैचमेंट शामिल` }),
-      dragHint: 'फ़ाइलें AI चैट में ड्रैग करें, फिर प्रॉम्प्ट पेस्ट करें। सिर्फ़ साइट खोलने से कुछ नहीं भेजा जाता।',
       stale: 'टास्क बदल गया है — दोबारा एक्सपोर्ट करें।',
       desktopOnly: 'एक्सपोर्ट के लिए डेस्कटॉप ऐप खोलें',
       go: (label: string) => `${label} को भेजें`,

@@ -1,10 +1,10 @@
 /**
  * 交付区的状态机：三步各自有状态、各自可重试。
  *
- *   1. `prepare` 后端把数据 JSON、提示词 txt（按命名规则起名）和附件原件写到桌面
- *                `ZeppBridge AI\<任务名>_<时间>\`（ai_task_prepare）。
- *   2. `copy`    前端把最终提示词写进剪贴板。
- *   3. `open`    打开所选 AI 的网站，并在资源管理器里选中那个文件夹。
+ *   1. `prepare` 后端把提示词 + 读法 + 数据写成**一个** `.md`（批次 ⑦；附件原件另放 attachments/）
+ *                到桌面 `ZeppBridge AI\<任务名>_<时间>\`（ai_task_prepare）。
+ *   2. `copy`    前端把一句开场白写进剪贴板（提示词已在文件里，不用再粘一遍）。
+ *   3. `open`    打开所选 AI 的网站；文件卡可以直接拖进对话框，也能在资源管理器里选中它。
  *
  * 没有任何一步叫「已发送」或「已上传」：打开的只是那个网站，文件要用户
  * 自己从桌面拖进对话框。
@@ -27,9 +27,18 @@ export interface HandoffStep {
 }
 
 const messages = defineMessages(
-  { prepareFailed: '准备文件失败', copyFailed: '复制提示词失败', openFailed: '无法打开 AI 网站' },
-  { prepareFailed: 'Could not prepare files', copyFailed: 'Could not copy the prompt', openFailed: 'Could not open the AI site' },
-  { prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar la instrucción', openFailed: 'No se pudo abrir el sitio de la IA' },
+  {
+    prepareFailed: '准备文件失败', copyFailed: '复制开场白失败', openFailed: '无法打开 AI 网站',
+    kickoff: '请读我附上的文件，按文件开头的说明直接开始分析。',
+  },
+  {
+    prepareFailed: 'Could not prepare files', copyFailed: 'Could not copy the opening message', openFailed: 'Could not open the AI site',
+    kickoff: 'Please read the attached file and start the analysis as described at the top of it.',
+  },
+  {
+    prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar el mensaje inicial', openFailed: 'No se pudo abrir el sitio de la IA',
+    kickoff: 'Lee el archivo adjunto y empieza el análisis como se indica al principio.',
+  },
   'composables/useAiTaskHandoff',
 );
 const copy = () => messagesOf(messages);
@@ -91,7 +100,8 @@ export function useAiTaskHandoff() {
     if (!result || result.status !== 'ready') return false;
     setStep('copy', 'doing');
     try {
-      await copyTextToClipboard(result.prompt_text);
+      // 单个 .md 时提示词已在文件里：只复制一句开场白，免得「上传一遍又粘贴一遍」。
+      await copyTextToClipboard(result.md_path ? copy().kickoff : result.prompt_text);
       setStep('copy', 'done');
       return true;
     } catch (error) {
@@ -100,9 +110,10 @@ export function useAiTaskHandoff() {
     }
   };
 
+  /** 在资源管理器里选中交出去的那个文件（单个 .md）；旧形态选中文件夹。 */
   const revealOutput = async () => {
-    const dir = prepareResult.value?.status === 'ready' ? prepareResult.value.output_dir : '';
-    await revealInFolder(dir).catch(() => undefined);
+    const result = prepareResult.value?.status === 'ready' ? prepareResult.value : null;
+    await revealInFolder(result?.md_path || result?.output_dir || '').catch(() => undefined);
   };
 
   const runOpen = async (provider: AiProvider): Promise<boolean> => {
@@ -119,13 +130,14 @@ export function useAiTaskHandoff() {
     }
   };
 
-  /** 主按钮：导出 → 复制 → 打开网站 + 选中文件夹。哪步失败停在哪步。 */
+  /** 主按钮：准备文件 → 复制开场白 → 打开网站。哪步失败停在哪步。文件卡在坞上，直接拖进对话框；
+      拖不了（或网页预览）时用「在资源管理器里显示」。 */
   const runAll = async (task: AiTask, provider: AiProvider, direction: string | null = null, options?: AiTaskPrepareOptions) => {
     const prepared = await runPrepare(task, direction, options);
     if (!prepared || prepared.status !== 'ready') return;
     if (!(await runCopy())) return;
     await runOpen(provider);
-    await revealOutput();
+    if (!prepared.md_path) await revealOutput();
   };
 
   /** 「只导出到桌面」：导出并选中文件夹，不复制、不打开网站。 */

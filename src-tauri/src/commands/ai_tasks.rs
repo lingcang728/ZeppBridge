@@ -14,7 +14,8 @@
 use super::{join_blocking, spawn_independent_read, with_write};
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
-use zeppbridge_core::ai_tasks::export::AiTaskPromptParts;
+use zeppbridge_core::ai_tasks::export::markdown::{DEFAULT_TOKEN_BUDGET, SUBSCRIBED_TOKEN_BUDGET};
+use zeppbridge_core::ai_tasks::export::{AiTaskMarkdownParts, AiTaskPromptParts};
 use zeppbridge_core::ai_tasks::{
     stat_attachment_paths, AiTask, AiTaskAttachmentStat, AiTaskPrepareResult, AiTaskPreview,
     AiTaskSummary, AiTaskTemplate,
@@ -104,8 +105,18 @@ pub async fn ai_template_delete(
 pub async fn ai_task_preview(
     state: tauri::State<'_, AppState>,
     task: AiTask,
+    token_budget: Option<usize>,
 ) -> std::result::Result<AiTaskPreview, AppError> {
-    spawn_independent_read(state.data_dir.clone(), move |db| db.ai_task_preview(&task)).await
+    let budget = token_budget.map(clamp_budget);
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.ai_task_preview_with_budget(&task, budget)
+    })
+    .await
+}
+
+/// 预算只收两档附近的合理值：界面传来的只有「免费版」「我已订阅」两种。
+fn clamp_budget(budget: usize) -> usize {
+    budget.clamp(DEFAULT_TOKEN_BUDGET / 3, SUBSCRIBED_TOKEN_BUDGET * 4)
 }
 
 /// 生成数据 JSON + 提示词 txt（+ 附件原件副本；文件名由前端按命名规则给）到
@@ -124,6 +135,9 @@ pub struct AiTaskPrepareOptions {
     prompt_override: Option<String>,
     data_file_stem: Option<String>,
     prompt_file_stem: Option<String>,
+    /// 给了就交付成单个 `.md`（批次 ⑦）；`markdown_guide` 是前端本地化好的「这份文件怎么读」。
+    token_budget: Option<usize>,
+    markdown_guide: Option<String>,
 }
 
 #[tauri::command]
@@ -145,6 +159,10 @@ pub async fn ai_task_prepare(
             override_text: options.prompt_override.as_deref(),
             data_stem: options.data_file_stem.as_deref(),
             prompt_stem: options.prompt_file_stem.as_deref(),
+            markdown: options.token_budget.map(|budget| AiTaskMarkdownParts {
+                guide: options.markdown_guide.as_deref(),
+                token_budget: clamp_budget(budget),
+            }),
         };
         db.ai_task_prepare_plan(&task, &coverage_note, &parts, &output_root)
     })

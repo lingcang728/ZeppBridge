@@ -2213,8 +2213,6 @@ Antwoord in Markdown.`,
       stale:
         'De taak is na het exporteren veranderd; de bestanden op het bureaublad zijn verouderd. Exporteer opnieuw.',
       finalPrompt: 'Definitieve prompt (dit wordt gekopieerd)',
-      dragHint:
-        'Sleep de bestanden uit deze map naar de AI-chat en plak daarna de prompt. De site openen is nog niet versturen.',
       desktopOnly: 'Verbind de desktop-app om te exporteren',
       go: (label: string) => `Overdragen aan ${label}`,
       goSub: 'Exporteren · prompt kopiëren · site openen',

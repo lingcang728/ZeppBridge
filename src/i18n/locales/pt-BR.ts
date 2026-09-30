@@ -1960,7 +1960,6 @@ Responda em Markdown.`,
       outputAt: (path: string) => `Arquivos salvos em: ${path}`,
       copiedFiles: (count: number) =>
         plural(count, { one: `inclui ${count} anexo original`, other: `inclui ${count} anexos originais` }),
-      dragHint: 'Arraste os arquivos da pasta para a conversa com a IA e cole o prompt. Abrir o site não envia os arquivos.',
       stale: 'A tarefa foi modificada após a exportação — gere um novo pacote para atualizar os arquivos.',
       desktopOnly: 'Requer o aplicativo de desktop para exportação',
       go: (label: string) => `Enviar para ${label}`,

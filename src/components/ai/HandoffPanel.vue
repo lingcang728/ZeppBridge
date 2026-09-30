@@ -8,9 +8,9 @@
  * 一张玻璃浮层，里面是最终提示词、去重后的提醒和逐类覆盖明细——以前这些
  * 平铺在右栏里，六条一模一样的「只有部分日期有数据」连着排。
  *
- * 主按钮一次做完：导出到桌面（JSON + 提示词 + 附件原件）→ 复制最终提示词
- * → 打开所选 AI → 在资源管理器里选中导出的文件夹。按下以后坞向上长出一截，
- * 显示每一步的进度和导出位置。导出前顺手保存任务。
+ * 主按钮一次做完（批次 ⑦）：准备**一个** `.md`（提示词 + 读法 + 数据；附件原件另放）→ 复制一句
+ * 开场白 → 打开所选 AI。坞向上长出一截，里面是那张文件卡：按住直接拖进 AI 的对话框；拖不了就
+ * 「在资源管理器里选中它」。文件按所选 AI 的预算控制在读得完的量以内（勾「我已订阅」放宽）。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
@@ -21,7 +21,10 @@ import type { AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop } from '../../lib/bridge';
 import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiProviders';
 import { aiTaskIssueText, coverageNoteText } from '../../lib/aiTask/copy';
-import { formatBytes } from '../../lib/aiTask/coverage';
+import { formatBytes } from '../../lib/format';
+import { currentProviderId, FREE_TOKEN_BUDGET, formatTokens, isSubscribed, setSubscribed } from '../../lib/aiTask/budget';
+import { markdownGuide } from '../../lib/aiTask/markdownGuide';
+import { startFileDrag } from '../../lib/dragOut';
 import { composePromptPreview } from '../../lib/aiTask/prompt';
 import { handoffParts } from '../../lib/aiTask/handoffParts';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
@@ -46,18 +49,33 @@ const t = useMessages(defineMessages(
   {
     title: '交给 AI',
     who: '交给谁',
-    finalPrompt: '最终提示词（复制的就是这段）',
-    run: (label: string) => `导出到桌面并打开 ${label}`,
+    finalPrompt: '最终提示词（写在文件开头）',
+    run: (label: string) => `准备文件并打开 ${label}`,
     exportOnly: '只导出到桌面',
     reveal: '在资源管理器中显示',
     lastExport: '上次导出 · 打开文件夹',
     outputAt: (path: string) => `文件在：${path}`,
     copiedFiles: (count: number) => `含 ${count} 个附件原件`,
-    dragHint: '把文件夹里的文件拖进 AI 对话框，再粘贴提示词。打开网站不等于已发送。',
+    dragFile: (label: string) => `按住这张卡拖进 ${label} 的对话框，再粘贴已复制的开场白发送。打开网站不等于已发送。`,
+    sideBySide: '先把浏览器和本窗口并排（Win + ← / →）再拖。',
+    revealFile: '在资源管理器里选中它',
+    dragFailed: '拖不出去时，用「在资源管理器里选中它」，再从那里拖。',
+    fileMeta: (size: string, tokens: string) => `${size} · 约 ${tokens} token`,
+    fileAria: (name: string) => `交给 AI 的文件 ${name}，按住拖动`,
+    tokensFree: (tokens: string) => `约 ${tokens} token · 免费版能读完`,
+    tokensNeedPaid: (tokens: string) => `约 ${tokens} token · 需要订阅版`,
+    tokensPaid: (tokens: string) => `约 ${tokens} token · 订阅版能读完`,
+    tooLong: '内容太多读不完：缩短日期范围或少选几类',
+    curveAveraged: (seconds: number) => `运动曲线按 ${seconds} 秒取平均`,
+    summarizedOnly: (count: number) => `最早 ${count} 次运动只留概要`,
+    subscribed: (label: string) => `我已订阅 ${label}`,
+    subscribedHint: '订阅版约能读 12 万 token，免费版一般只读得完约 3 万；勾上后运动曲线更细。',
+    noteDeepseek: 'DeepSeek 的专家模式不能传文件，用普通对话。',
+    noteChatgpt: 'ChatGPT 免费版每天只能传 3 个文件。',
     stale: '导出后任务又改过，桌面文件已旧，重新导出。',
     desktopOnly: '连接桌面应用后才能导出',
     go: (label: string) => `交给 ${label}`,
-    goSub: '导出 · 复制提示词 · 打开网站',
+    goSub: '准备文件 · 复制开场白 · 打开网站',
     goSubSyncing: '同步完成后再交给 AI',
     readiness: (categories: number, percent: number) => `${categories} 类数据 · ${percent}% 天有数据`,
     readinessLoading: '正在清点数据…',
@@ -76,18 +94,33 @@ const t = useMessages(defineMessages(
   {
     title: 'Send to AI',
     who: 'Send to',
-    finalPrompt: 'Final prompt (exactly what gets copied)',
-    run: (label: string) => `Export to desktop and open ${label}`,
+    finalPrompt: 'Final prompt (at the top of the file)',
+    run: (label: string) => `Prepare the file and open ${label}`,
     exportOnly: 'Export to desktop only',
     reveal: 'Show in Explorer',
     lastExport: 'Last export · Open folder',
     outputAt: (path: string) => `Files at: ${path}`,
     copiedFiles: (count: number) => `includes ${count} original attachment(s)`,
-    dragHint: 'Drag these files into the AI chat, then paste the prompt. Opening the site does not send anything.',
+    dragFile: (label: string) => `Hold and drag this card into the ${label} chat, then paste the copied opening line and send. Opening the site does not send anything.`,
+    sideBySide: 'Put the browser and this window side by side first (Win + ← / →).',
+    revealFile: 'Show it in Explorer',
+    dragFailed: 'If dragging does not work, use “Show it in Explorer” and drag it from there.',
+    fileMeta: (size: string, tokens: string) => `${size} · ≈ ${tokens} tokens`,
+    fileAria: (name: string) => `File for the AI, ${name} — hold to drag`,
+    tokensFree: (tokens: string) => `≈ ${tokens} tokens · fits free plans`,
+    tokensNeedPaid: (tokens: string) => `≈ ${tokens} tokens · needs a paid plan`,
+    tokensPaid: (tokens: string) => `≈ ${tokens} tokens · fits paid plans`,
+    tooLong: 'Too much to read: shorten the date range or pick fewer categories',
+    curveAveraged: (seconds: number) => `Workout curves averaged over ${seconds} s`,
+    summarizedOnly: (count: number) => `Oldest ${count} workout(s) as summary only`,
+    subscribed: (label: string) => `I pay for ${label}`,
+    subscribedHint: 'Paid plans read about 120k tokens; free plans usually only about 30k. Tick it for finer workout curves.',
+    noteDeepseek: 'DeepSeek’s expert mode cannot take files — use a normal chat.',
+    noteChatgpt: 'ChatGPT’s free plan allows 3 file uploads a day.',
     stale: 'Task changed after export — desktop files are outdated. Export again.',
     desktopOnly: 'Connect the desktop app to export',
     go: (label: string) => `Send to ${label}`,
-    goSub: 'Export · copy prompt · open site',
+    goSub: 'Prepare file · copy opening line · open site',
     goSubSyncing: 'Available once the sync finishes',
     readiness: (categories: number, percent: number) => `${categories} data types · ${percent}% of days covered`,
     readinessLoading: 'Counting your data…',
@@ -106,18 +139,33 @@ const t = useMessages(defineMessages(
   {
     title: 'Pasar a la IA',
     who: 'Pasar a',
-    finalPrompt: 'Instrucción final (lo que se copiará)',
-    run: (label: string) => `Exportar al escritorio y abrir ${label}`,
+    finalPrompt: 'Instrucción final (al principio del archivo)',
+    run: (label: string) => `Preparar el archivo y abrir ${label}`,
     exportOnly: 'Solo exportar al escritorio',
     reveal: 'Mostrar en el Explorador',
     lastExport: 'Última exportación · Abrir carpeta',
     outputAt: (path: string) => `Archivos en: ${path}`,
     copiedFiles: (count: number) => `Incluye ${count} archivo(s) original(es)`,
-    dragHint: 'Arrastra los archivos al chat de la IA y pega la instrucción. Abrir el sitio no envía nada.',
+    dragFile: (label: string) => `Mantén pulsada esta tarjeta y arrástrala al chat de ${label}; luego pega el mensaje inicial copiado y envía. Abrir el sitio no envía nada.`,
+    sideBySide: 'Primero pon el navegador y esta ventana lado a lado (Win + ← / →).',
+    revealFile: 'Mostrarlo en el Explorador',
+    dragFailed: 'Si no se puede arrastrar, usa «Mostrarlo en el Explorador» y arrástralo desde allí.',
+    fileMeta: (size: string, tokens: string) => `${size} · ≈ ${tokens} tokens`,
+    fileAria: (name: string) => `Archivo para la IA, ${name}: mantén pulsado para arrastrar`,
+    tokensFree: (tokens: string) => `≈ ${tokens} tokens · cabe en planes gratis`,
+    tokensNeedPaid: (tokens: string) => `≈ ${tokens} tokens · necesita un plan de pago`,
+    tokensPaid: (tokens: string) => `≈ ${tokens} tokens · cabe en planes de pago`,
+    tooLong: 'Demasiado para leer: acorta el rango de fechas o elige menos categorías',
+    curveAveraged: (seconds: number) => `Curvas promediadas cada ${seconds} s`,
+    summarizedOnly: (count: number) => `Los ${count} entrenamientos más antiguos solo en resumen`,
+    subscribed: (label: string) => `Pago ${label}`,
+    subscribedHint: 'Los planes de pago leen unos 120 000 tokens; los gratuitos, unos 30 000. Márcalo para curvas más finas.',
+    noteDeepseek: 'El modo experto de DeepSeek no admite archivos: usa un chat normal.',
+    noteChatgpt: 'El plan gratuito de ChatGPT permite 3 archivos al día.',
     stale: 'La tarea cambió tras exportar: los archivos del escritorio son antiguos. Vuelve a exportar.',
     desktopOnly: 'Requiere la app de escritorio para exportar',
     go: (label: string) => `Pasar a ${label}`,
-    goSub: 'Exportar · copiar instrucción · abrir sitio',
+    goSub: 'Preparar archivo · copiar mensaje · abrir sitio',
     readiness: (categories: number, percent: number) => `${categories} categorías · ${percent}% de días cubiertos`,
     readinessLoading: 'Verificando datos…',
     goSubSyncing: 'Disponible cuando termine la sincronización',
@@ -159,6 +207,31 @@ const pickProvider = (id: AiProviderId) => {
   const next = AI_PROVIDERS.find((item) => item.id === id);
   if (next) provider.value = next;
 };
+/* 预算跟着所选 AI 走：预览按它估 `.md` 的体量。 */
+watch(provider, (next) => { currentProviderId.value = next.id; }, { immediate: true });
+const subscribed = computed({
+  get: () => isSubscribed(provider.value.id),
+  set: (on: boolean) => setSubscribed(provider.value.id, on),
+});
+const providerNote = computed(() => ({ deepseek: t.value.noteDeepseek, chatgpt: t.value.noteChatgpt } as Partial<Record<AiProviderId, string>>)[provider.value.id] ?? null);
+
+/* —— 单个 .md 的体量：「约 2.8 万 token · 免费版能读完」「运动曲线按 30 秒取平均」 —— */
+const mdLine = computed(() => {
+  const md = props.preview?.markdown;
+  if (!md) return null;
+  if (md.over_budget) return t.value.tooLong;
+  const tokens = formatTokens(md.approx_tokens);
+  if (md.approx_tokens <= FREE_TOKEN_BUDGET) return t.value.tokensFree(tokens);
+  return subscribed.value ? t.value.tokensPaid(tokens) : t.value.tokensNeedPaid(tokens);
+});
+const mdDowngrade = computed(() => {
+  const md = props.preview?.markdown;
+  if (!md) return [];
+  const notes: string[] = [];
+  if (md.curve_average_seconds) notes.push(t.value.curveAveraged(md.curve_average_seconds));
+  if (md.summarized_workouts.length) notes.push(t.value.summarizedOnly(md.summarized_workouts.length));
+  return notes;
+});
 
 /* —— 就绪度：几类数据、总体多少天有数据 —— */
 const readiness = computed(() => {
@@ -181,7 +254,7 @@ const groupedWarnings = computed(() => {
 const issueTotal = computed(() => groupedWarnings.value.length + (props.previewError ? 1 : 0));
 
 /** 任务说明与文件名：预览和导出同一个函数，「复制出去的就是这段」才成立。 */
-const parts = computed(() => handoffParts(exportTask(), props.preview, { hasDirection: Boolean(props.direction) }));
+const parts = computed(() => handoffParts(exportTask(), props.preview, { hasDirection: Boolean(props.direction), format: 'md' }));
 /* 最终提示词单击即改：可改的是 任务说明 + 方向 + 问题 这一大段；覆盖说明由后端按实际
    覆盖附在最后，改不了，单独淡色列出。改过的全文随导出传给后端（prompt_override）。
    换了一个任务（草稿 id 变了）就丢掉手改，免得把上一个任务的话带过去。 */
@@ -233,8 +306,15 @@ const run = async (openSite: boolean) => {
   progressDismissed.value = false;
   await saveDraft(props.fallbackTitle).catch(() => undefined);
   const task = exportTask();
-  const now = handoffParts(task, props.preview, { hasDirection: Boolean(props.direction), now: new Date() });
-  const options = { briefText: now.brief, dataFileStem: now.dataStem, promptFileStem: now.promptStem, promptOverride: promptOverride.value };
+  const now = handoffParts(task, props.preview, { hasDirection: Boolean(props.direction), now: new Date(), format: 'md' });
+  const options = {
+    briefText: now.brief,
+    dataFileStem: now.dataStem,
+    promptFileStem: now.promptStem,
+    promptOverride: promptOverride.value,
+    tokenBudget: props.preview?.markdown?.token_budget ?? FREE_TOKEN_BUDGET,
+    markdownGuide: markdownGuide(),
+  };
   if (openSite) await handoff.runAll(task, provider.value, props.direction, options);
   else await handoff.exportOnly(task, props.direction, options);
 };
@@ -242,6 +322,16 @@ const run = async (openSite: boolean) => {
 const retry = (id: HandoffStepId) => {
   if (id === 'copy') void handoff.runCopy();
   else if (id === 'open') void handoff.runOpen(provider.value);
+};
+
+/* —— 文件卡：按住直接拖进浏览器里 AI 的对话框（系统拖放，tauri-plugin-drag） —— */
+const fileName = computed(() => ready.value?.md_path?.split(/[\\/]/).pop() ?? '');
+const dragFailed = ref(false);
+const onFileDrag = (event: MouseEvent) => {
+  const path = ready.value?.md_path;
+  if (!desktop || !path || event.button !== 0) return;
+  dragFailed.value = false;
+  startFileDrag(path, fileName.value).catch(() => { dragFailed.value = true; });
 };
 
 /* —— 就绪度浮层 —— */
@@ -277,6 +367,11 @@ onBeforeUnmount(() => {
           <p class="ai-label">{{ t.finalPrompt }}</p>
           <button type="button" class="sheet-close" :aria-label="t.closePanel" @click="details = false"><Icon name="x" :size="15" /></button>
         </div>
+        <label class="sub-row">
+          <input v-model="subscribed" type="checkbox" class="sub-check">
+          <span><strong>{{ t.subscribed(provider.label) }}</strong><small>{{ t.subscribedHint }}</small></span>
+        </label>
+        <p v-if="providerNote" class="ai-note warn provider-note"><Icon name="info" :size="13" />{{ providerNote }}</p>
         <textarea v-if="editingPrompt" ref="promptBox" class="prompt prompt-edit" :value="headText" :aria-label="t.finalPrompt"
           @input="onPromptInput" @blur="commitPrompt" @keydown.esc.prevent="($event.target as HTMLTextAreaElement).blur()"></textarea>
         <button v-else type="button" class="prompt prompt-view" :title="t.editHint" @click="startEditPrompt">{{ headText }}</button>
@@ -303,13 +398,25 @@ onBeforeUnmount(() => {
         </ul>
         <HandoffSteps :steps="steps" :provider-label="provider.label" @retry="retry" />
         <div v-if="ready" class="output">
-          <p class="ai-note ok"><Icon name="folder" :size="13" />
+          <!-- 一枚大文件卡（批次 ⑦）：名字、大小、约多少 token；按住直接拖进 AI 的对话框。 -->
+          <div v-if="ready.md_path" :class="['file-card', { draggable: desktop }]" role="button" tabindex="0"
+            :aria-label="t.fileAria(fileName)" @mousedown="onFileDrag" @keydown.enter.prevent="handoff.revealOutput()">
+            <Icon name="file" :size="28" class="file-icon" />
+            <span class="file-copy">
+              <strong>{{ fileName }}</strong>
+              <small>{{ t.fileMeta(formatBytes(ready.byte_len), formatTokens(ready.markdown?.approx_tokens ?? 0)) }}<template v-if="ready.copied_attachments"> · {{ t.copiedFiles(ready.copied_attachments) }}</template></small>
+            </span>
+            <Icon name="dots" :size="18" class="file-grip" />
+          </div>
+          <p v-else class="ai-note ok"><Icon name="folder" :size="13" />
             <span>{{ t.outputAt(ready.output_dir) }}<template v-if="ready.copied_attachments"> · {{ t.copiedFiles(ready.copied_attachments) }}</template></span>
           </p>
+          <p v-if="ready.md_path" class="ai-hint drag-hint">{{ t.dragFile(provider.label) }} {{ t.sideBySide }}</p>
           <div class="output-row">
-            <button type="button" class="ai-tool" @click="handoff.revealOutput()"><Icon name="folder" :size="13" />{{ t.reveal }}</button>
-            <p class="ai-hint">{{ t.dragHint }}</p>
+            <button type="button" class="ai-tool" @click="handoff.revealOutput()"><Icon name="folder" :size="13" />{{ ready.md_path ? t.revealFile : t.reveal }}</button>
+            <p v-if="providerNote" class="ai-hint">{{ providerNote }}</p>
           </div>
+          <p v-if="dragFailed" class="ai-note warn" role="status"><Icon name="warning" :size="13" />{{ t.dragFailed }}</p>
           <p v-if="stale" class="ai-note warn" role="status"><Icon name="warning" :size="13" />{{ t.stale }}</p>
         </div>
       </div>
@@ -333,7 +440,7 @@ onBeforeUnmount(() => {
         </span>
         <span v-else class="ready-copy">
           <span>{{ readiness ? t.readiness(readiness.categories, readiness.percent) : t.readinessLoading }}</span>
-          <small v-if="preview">{{ t.packageSize(formatBytes(preview.estimated_bytes)) }}<template v-if="issueTotal"> · {{ t.issueCount(issueTotal) }}</template></small>
+          <small v-if="preview">{{ mdLine ?? t.packageSize(formatBytes(preview.estimated_bytes)) }}<template v-if="mdDowngrade.length"> · {{ mdDowngrade.join(' · ') }}</template><template v-if="issueTotal"> · {{ t.issueCount(issueTotal) }}</template></small>
         </span>
         <Icon name="chevron-down" :size="14" :class="['ready-chevron', { up: !details }]" />
       </button>
@@ -470,6 +577,22 @@ onBeforeUnmount(() => {
 .issues .ai-note.bad { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .repeat { margin-left: auto; padding-left: 8px; font-size: var(--fs-2xs); }
 .output { margin-top: 10px; }
+.sub-row { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); cursor: pointer; }
+.sub-row span { display: grid; gap: 2px; }
+.sub-row strong { color: var(--ink); font-size: var(--fs-sm); }
+.sub-row small { color: var(--subtle); font-size: var(--fs-2xs); line-height: 1.5; }
+.sub-check { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
+.provider-note { margin: 8px 0 0; padding: 7px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 10%, transparent); }
+.file-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); user-select: none; }
+.file-card.draggable { cursor: grab; }
+.file-card.draggable:active { cursor: grabbing; }
+.file-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.file-icon { flex: none; color: var(--accent); }
+.file-copy { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.file-copy strong { overflow: hidden; color: var(--ink); font-size: var(--fs-md); text-overflow: ellipsis; white-space: nowrap; }
+.file-copy small { color: var(--subtle); font-size: var(--fs-xs); }
+.file-grip { flex: none; color: var(--subtle); }
+.drag-hint { margin: 8px 2px 0; }
 .output .ai-note span { overflow-wrap: anywhere; }
 .output-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
 .output-row .ai-hint { margin: 0; }

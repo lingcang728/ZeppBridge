@@ -19,6 +19,8 @@ export interface BriefInput {
   categories: AiTaskCategory[];
   /** 数据文件的文件名（含扩展名）。 */
   dataFile: string;
+  /** 交付形态：`md` = 提示词和数据在同一个 `.md` 里（批次 ⑦，AI 页默认）；`json` = 旧的 JSON + txt。 */
+  format?: 'json' | 'md';
   attachmentCount: number;
   hasPersonalNote: boolean;
   /** 关联了几条运动（0 = 按「最近 N 天」）。 */
@@ -37,6 +39,10 @@ const messages = defineMessages(
     fileWorkouts: (n: number) => `- 其中 workouts 是我专门挑出的 ${n} 条运动，是分析重点。`,
     fileAttachments: (n: number) => `- attachments/ 里是我另附的 ${n} 个原件（如体检报告、截图），一并参考。`,
     fileNote: '- 个人背景里有我的情况，结合判断。',
+    introMd: (range: string) => `这份文件是我从 Zepp 手表导出的个人健康数据（${range}，由 ZeppBridge 在本机整理，只含我自己的数据）。`,
+    fileDataMd: (labels: string) => `- 下面「# Data」之后是全部数据（${labels}），怎么读见紧接着的「读法」。`,
+    fileWorkoutsMd: (n: number) => `- Selected workouts 是我专门挑出的 ${n} 条运动，是分析重点。`,
+    fileAttachmentsMd: (n: number) => `- 我另外附了 ${n} 个原件（如体检报告、截图），一并参考。`,
     start: '直接开始分析，不用先问我要做什么。',
     followQuestion: '围绕下面的「分析方向」和我的问题回答。',
     defaultPlan: '我没指定具体问题，按下面的顺序给一份完整分析：',
@@ -56,6 +62,10 @@ const messages = defineMessages(
     fileWorkouts: (n: number) => `- "workouts" holds the ${n} workout(s) I picked on purpose — they are the focus.`,
     fileAttachments: (n: number) => `- The attachments/ folder holds ${n} original file(s) I added (e.g. lab reports, screenshots); please use them too.`,
     fileNote: '- I described my situation in the personal background; take it into account.',
+    introMd: (range: string) => `This file is my personal health data exported from my Zepp watch (${range}, organised locally by ZeppBridge; it only contains my own data).`,
+    fileDataMd: (labels: string) => `- Everything after "# Data" below is the data (${labels}); the "How to read" note right after this explains the tables.`,
+    fileWorkoutsMd: (n: number) => `- "Selected workouts" are the ${n} workout(s) I picked on purpose — they are the focus.`,
+    fileAttachmentsMd: (n: number) => `- I also attached ${n} original file(s) (e.g. lab reports, screenshots); please use them too.`,
     start: 'Please start the analysis right away — do not ask me what I want first.',
     followQuestion: 'Answer around the "analysis direction" and my question below.',
     defaultPlan: 'I have not asked a specific question, so give me a complete analysis in this order:',
@@ -75,6 +85,10 @@ const messages = defineMessages(
     fileWorkouts: (n: number) => `- "workouts" contiene los ${n} entrenamientos seleccionados: son el foco principal.`,
     fileAttachments: (n: number) => `- La carpeta attachments/ incluye ${n} archivo(s) original(es) adjunto(s) (informes, capturas); consúltalos también.`,
     fileNote: '- Mi contexto personal describe mi situación; tómalo en cuenta.',
+    introMd: (range: string) => `Este archivo contiene mis datos de salud de mi reloj Zepp (${range}, organizados localmente por ZeppBridge; solo contienen mis propios datos).`,
+    fileDataMd: (labels: string) => `- Todo lo que sigue a «# Data» son los datos (${labels}); la nota «Cómo leer» justo después explica las tablas.`,
+    fileWorkoutsMd: (n: number) => `- «Selected workouts» son los ${n} entrenamientos que elegí: son el foco principal.`,
+    fileAttachmentsMd: (n: number) => `- También adjunto ${n} archivo(s) original(es) (informes, capturas); consúltalos también.`,
     start: 'Inicia el análisis directamente, sin preguntarme primero qué hacer.',
     followQuestion: 'Responde enfocado en la «dirección de análisis» y mi pregunta.',
     defaultPlan: 'Sin pregunta específica: proporciona un análisis completo en este orden:',
@@ -92,9 +106,12 @@ export const buildBrief = (input: BriefInput): string => {
   const t = messagesOf(messages);
   const labels = input.categories.map(categoryLabel).join(' / ');
   const range = input.start && input.end ? t.range(input.start, input.end) : t.rangeUnknown;
-  const lines: string[] = [t.heading, t.intro(range), '', t.fileData(input.dataFile, labels || '—')];
-  if (input.workoutCount > 0) lines.push(t.fileWorkouts(input.workoutCount));
-  if (input.attachmentCount > 0) lines.push(t.fileAttachments(input.attachmentCount));
+  const md = input.format === 'md';
+  const lines: string[] = md
+    ? [t.heading, t.introMd(range), '', t.fileDataMd(labels || '—')]
+    : [t.heading, t.intro(range), '', t.fileData(input.dataFile, labels || '—')];
+  if (input.workoutCount > 0) lines.push(md ? t.fileWorkoutsMd(input.workoutCount) : t.fileWorkouts(input.workoutCount));
+  if (input.attachmentCount > 0) lines.push(md ? t.fileAttachmentsMd(input.attachmentCount) : t.fileAttachments(input.attachmentCount));
   if (input.hasPersonalNote) lines.push(t.fileNote);
   lines.push('', t.start);
   if (input.hasQuestion) {

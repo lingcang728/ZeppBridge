@@ -319,13 +319,21 @@ with three floating glass layers** (`views/AiComposer.vue`, pieces in
   screen without scrolling.
 - **Bottom — `HandoffPanel` dock**: the page's only primary button ("Hand to
   ChatGPT"), the provider `CapsuleWheel` (`AI_PROVIDERS` allow-list only), and
-  a readiness chip (categories · % of days covered · package size · notes)
-  that opens the final prompt, de-duplicated notes and `CoverageDetails`.
+  a readiness chip (categories · % of days covered · ≈ tokens and whether a
+  free plan can read it · curve averaging · notes) that opens an "I pay for X"
+  switch (remembered per provider; raises the budget to ~120k tokens), the
+  final prompt, de-duplicated notes and `CoverageDetails`.
   Preview errors stay visible above the dock. While an awaited sync is still
   running the chip says the latest data is on its way; the page reloads its
   workouts and preview on `dataRevision`.
-- `ai_task_prepare` builds the redacted package; precise GPS stays out unless
-  the user opts in. Previews are asynchronous; while computing they show `…`,
+- `ai_task_prepare` builds the redacted package as **one `.md` file**: prompt,
+  a localized "how to read" note, then the data as CSV tables rendered from the
+  same task document (`ai_tasks/export/markdown.rs`). Over budget it averages
+  workout curves over 10 → 30 → 60 s, then keeps only summary rows for the
+  oldest workouts. The dock then shows a file card the user drags straight into
+  the AI chat (`tauri-plugin-drag`), with "Show it in Explorer" as a fallback;
+  only a one-line opening message goes to the clipboard. Precise GPS stays out
+  unless the user opts in. Previews are asynchronous; while computing they show `…`,
   never `0`.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)

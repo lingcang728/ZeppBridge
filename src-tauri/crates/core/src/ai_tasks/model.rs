@@ -303,6 +303,24 @@ pub struct AiTaskPreview {
     /// 会写出的 `health-context.json` 的 UTF-8 字节数估算（构建同一文档实测）。
     pub estimated_bytes: i64,
     pub warnings: Vec<AiTaskIssue>,
+    /// 按给定预算渲染成单个 `.md` 的估算（批次 ⑦）；没给预算时为 `null`。
+    #[serde(default)]
+    pub markdown: Option<AiTaskMarkdownEstimate>,
+}
+
+/// 单个 `.md` 的体量与降级情况：界面据此写「约 N 万 token · 免费版能读完 / 需要订阅版」
+/// 「运动曲线已按 N 秒取平均」。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AiTaskMarkdownEstimate {
+    pub approx_tokens: i64,
+    pub byte_len: i64,
+    /// 运动曲线按多少秒取了平均；没有曲线时为 `null`。
+    pub curve_average_seconds: Option<u32>,
+    /// 为进预算只留了概要行的运动（最旧的先让）。
+    pub summarized_workouts: Vec<String>,
+    /// 降到最后一档仍超预算：界面提示缩短范围。
+    pub over_budget: bool,
+    pub token_budget: i64,
 }
 
 /// P2：准备结果。`status=blocked` 时不写任何文件，`json_path`/`prompt_path`
@@ -322,6 +340,12 @@ pub struct AiTaskPrepareResult {
     /// 复制进 `<output_dir>/attachments/` 的附件原件个数。
     #[serde(default)]
     pub copied_attachments: i64,
+    /// 交付成单个 `.md` 时它的路径（此时 `json_path` / `prompt_path` 为 `null`）。
+    #[serde(default)]
+    pub md_path: Option<String>,
+    /// `.md` 的体量与降级情况；不是 `.md` 交付时为 `null`。
+    #[serde(default)]
+    pub markdown: Option<AiTaskMarkdownEstimate>,
     pub attachments: Vec<AiTaskAttachmentStatus>,
     pub blocked: Vec<AiTaskIssue>,
 }

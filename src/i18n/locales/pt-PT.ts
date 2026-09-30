@@ -2118,8 +2118,6 @@ Responde em formato Markdown.`,
       run: (label: string) => `Exportar para o ambiente de trabalho e abrir ${label}`,
       exportOnly: 'Apenas exportar para o ambiente de trabalho',
       finalPrompt: 'Prompt final (conteúdo copiado para a área de transferência)',
-      dragHint:
-        'Arrasta os ficheiros desta pasta para o chat da IA e cola o prompt. Abrir o site não envia nada.',
       desktopOnly: 'Exportação disponível na aplicação para computador',
       outputAt: (path: string) => `Ficheiros em: ${path}`,
       copiedFiles: (count: number) =>

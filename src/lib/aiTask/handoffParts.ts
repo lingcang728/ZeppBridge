@@ -31,7 +31,7 @@ export const coveredRange = (preview: AiTaskPreview | null | undefined): { start
 export const handoffParts = (
   task: AiTask,
   preview: AiTaskPreview | null | undefined,
-  options: { hasDirection: boolean; rule?: FileNameRule; now?: Date },
+  options: { hasDirection: boolean; rule?: FileNameRule; now?: Date; format?: 'json' | 'md' },
 ): HandoffParts => {
   const categories = exportedCategories(task);
   const { start, end } = coveredRange(preview);
@@ -42,7 +42,8 @@ export const handoffParts = (
     start,
     end,
     categories,
-    dataFile: `${stems.data}.json`,
+    dataFile: `${stems.data}.${options.format === 'md' ? 'md' : 'json'}`,
+    format: options.format ?? 'json',
     attachmentCount: task.attachments.length,
     hasPersonalNote: task.personal_note.trim().length > 0,
     workoutCount: task.workout_ids.length,

@@ -418,8 +418,8 @@ export const tauriBackend: BridgeBackend = {
   aiTemplateDelete(id: string) {
     return call<void>('ai_template_delete', { id });
   },
-  aiTaskPreview(task: AiTask) {
-    return call<AiTaskPreview>('ai_task_preview', { task });
+  aiTaskPreview(task: AiTask, tokenBudget?: number | null) {
+    return call<AiTaskPreview>('ai_task_preview', { task, tokenBudget: tokenBudget ?? null });
   },
   aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null, options?: AiTaskPrepareOptions) {
     return call<AiTaskPrepareResult>('ai_task_prepare', { task, coverageNote, directionText: directionText || null, options: options ?? null });

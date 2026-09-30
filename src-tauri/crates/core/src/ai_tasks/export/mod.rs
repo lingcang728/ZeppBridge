@@ -30,6 +30,7 @@ use std::path::{Path, PathBuf};
 mod bundle;
 mod gather;
 mod helpers;
+pub mod markdown;
 
 pub(crate) use helpers::*;
 
@@ -80,6 +81,29 @@ pub struct AiTaskPromptParts<'a> {
     pub data_stem: Option<&'a str>,
     /// 提示词文件主名（不含扩展名）；空 = 旧名 `prompt`。
     pub prompt_stem: Option<&'a str>,
+    /// 给了就交付成单个 `.md`（提示词 + 读法说明 + 数据），不再写 JSON + txt 两个文件。
+    pub markdown: Option<AiTaskMarkdownParts<'a>>,
+}
+
+/// 单个 `.md` 交付的参数：读法说明由前端按界面语言给；预算按用户选的 AI 与「我已订阅」定。
+#[derive(Debug, Clone, Copy)]
+pub struct AiTaskMarkdownParts<'a> {
+    pub guide: Option<&'a str>,
+    pub token_budget: usize,
+}
+
+fn markdown_estimate(
+    render: &markdown::MarkdownRender,
+    token_budget: usize,
+) -> AiTaskMarkdownEstimate {
+    AiTaskMarkdownEstimate {
+        approx_tokens: render.approx_tokens as i64,
+        byte_len: render.text.len() as i64,
+        curve_average_seconds: render.curve_average_seconds,
+        summarized_workouts: render.summarized_workouts.clone(),
+        over_budget: render.over_budget,
+        token_budget: token_budget as i64,
+    }
 }
 
 /// `ai_task_prepare_plan` 的产物：读侧全部完成、只差文件落盘。
@@ -98,6 +122,8 @@ pub struct AiTaskPreparePlan {
     json_text: Option<String>,
     /// 要复制进 `attachments/` 的原件：`(本机源路径, 展示名)`。
     attachment_sources: Vec<(PathBuf, String)>,
+    /// 单个 `.md` 交付：`(文件名, 渲染结果, 预算)`。有它就不写 JSON + txt。
+    markdown: Option<(String, markdown::MarkdownRender, usize)>,
 }
 
 impl AiTaskPreparePlan {
@@ -114,8 +140,36 @@ impl AiTaskPreparePlan {
                 prompt_text: self.prompt_text,
                 byte_len: 0,
                 copied_attachments: 0,
+                md_path: None,
+                markdown: None,
                 attachments: self.attachments,
                 blocked: self.blocked,
+            });
+        }
+        if let Some((md_name, render, budget)) = self.markdown {
+            std::fs::create_dir_all(&self.output_dir).map_err(|error| {
+                AiTaskError::write_failed(format!(
+                    "创建交接目录 {} 失败: {error}",
+                    self.output_dir.display()
+                ))
+            })?;
+            let md_path = self.output_dir.join(&md_name);
+            write_file_atomically(&md_path, render.text.as_bytes())
+                .map_err(|error| AiTaskError::write_failed(format!("写入交接文件失败: {error}")))?;
+            let copied_attachments = copy_attachments(&self.output_dir, &self.attachment_sources)?;
+            return Ok(AiTaskPrepareResult {
+                status: AiTaskPrepareStatus::Ready,
+                task_id: self.task_id,
+                output_dir: output_dir_text,
+                json_path: None,
+                prompt_path: None,
+                prompt_text: self.prompt_text,
+                byte_len: render.text.len() as i64,
+                copied_attachments,
+                md_path: Some(md_path.to_string_lossy().into_owned()),
+                markdown: Some(markdown_estimate(&render, budget)),
+                attachments: self.attachments,
+                blocked: Vec::new(),
             });
         }
         // 不变式：blocked 为空 ⇒ plan 一定带了序列化好的文档。
@@ -147,6 +201,8 @@ impl AiTaskPreparePlan {
             prompt_text: self.prompt_text,
             byte_len,
             copied_attachments,
+            md_path: None,
+            markdown: None,
             attachments: self.attachments,
             blocked: Vec::new(),
         })
@@ -190,6 +246,14 @@ fn export_file_names(parts: &AiTaskPromptParts<'_>) -> (String, String) {
     (format!("{data}.json"), format!("{prompt}.txt"))
 }
 
+/// 单个 `.md` 的文件名：用数据文件的主名（前端按命名规则给，已清洗）。
+fn markdown_file_name(json_name: &str) -> String {
+    format!(
+        "{}.md",
+        json_name.strip_suffix(".json").unwrap_or(json_name)
+    )
+}
+
 fn unique_file_name(name: &str, used: &mut BTreeSet<String>) -> String {
     let lower = |value: &str| value.to_lowercase();
     if used.insert(lower(name)) {
@@ -212,6 +276,16 @@ impl Database {
     /// P3 `ai_task_preview`：草稿可预览——校验宽松（空标题/id 合法），
     /// 但 `workout_ids` 里不存在的运动仍是硬错误 `err.ai_task.workout_not_found`。
     pub fn ai_task_preview(&self, task: &AiTask) -> Result<AiTaskPreview> {
+        self.ai_task_preview_with_budget(task, None)
+    }
+
+    /// 同 [`Self::ai_task_preview`]，另按 `token_budget` 估一份单个 `.md` 的体量与降级情况
+    /// （不含提示词本身，界面写「约」）。
+    pub fn ai_task_preview_with_budget(
+        &self,
+        task: &AiTask,
+        token_budget: Option<usize>,
+    ) -> Result<AiTaskPreview> {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
         let attachments = stat_task_attachments(&task.attachments);
@@ -219,7 +293,14 @@ impl Database {
         // 估算必须和 `ai_task_prepare` 实写用同一种序列化（pretty）——
         // 不然界面预览的字节数跟落盘文件对不上。
         let estimated_bytes = serde_json::to_string_pretty(&bundle.document)?.len() as i64;
+        let markdown = token_budget.map(|budget| {
+            markdown_estimate(
+                &markdown::render_task_markdown(&bundle.document, "", budget),
+                budget,
+            )
+        });
         Ok(AiTaskPreview {
+            markdown,
             task_id: effective_task_id(&task),
             workouts: bundle.briefs,
             coverage: bundle.coverage,
@@ -313,10 +394,24 @@ impl Database {
                 blocked,
                 json_text: None,
                 attachment_sources: Vec::new(),
+                markdown: None,
             });
         }
 
         let bundle = self.build_ai_task_bundle(&task, &anchors, attachments)?;
+        let markdown = parts.markdown.map(|md| {
+            let guide = md.guide.map(str::trim).unwrap_or_default();
+            let header = [prompt_text.trim(), guide]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            (
+                markdown_file_name(&json_name),
+                markdown::render_task_markdown(&bundle.document, &header, md.token_budget),
+                md.token_budget,
+            )
+        });
         let json_text = serde_json::to_string_pretty(&bundle.document)
             .map_err(|error| AiTaskError::write_failed(format!("序列化交接数据失败: {error}")))?;
         let attachment_sources = task
@@ -340,6 +435,7 @@ impl Database {
             blocked: Vec::new(),
             json_text: Some(json_text),
             attachment_sources,
+            markdown,
         })
     }
 }
