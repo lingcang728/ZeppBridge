@@ -159,6 +159,7 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
                 }
             }
             request.categories = categories;
+            request.metrics = metrics;
             // 与 storage::metric_series 同一个窗口算法：含今天的本地日范围。
             let days = args
                 .get("days")

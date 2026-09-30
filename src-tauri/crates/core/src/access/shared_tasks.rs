@@ -67,6 +67,9 @@ pub(super) struct SharedCategoryRange {
     pub(super) days_before: i64,
     #[serde(default = "default_true")]
     pub(super) include_workout_day: bool,
+    /// 用户在关系网里拖出去的指标 / 字段。导出跳过它们，MCP 也必须跳过（R01）。
+    #[serde(default)]
+    pub(super) excluded_metrics: Vec<String>,
 }
 
 pub(super) fn default_days_before() -> i64 {
@@ -83,6 +86,10 @@ pub(super) fn default_true() -> bool {
 /// 为假时右端前移一天）。`local_days` 是 `workout_local_days` 批量查好的
 /// 开始日表；id 不在表里（记录已删/未同步）就跳过它，类别为假、窗口为空
 /// 同理——这些都不值得让整个授权失败。
+///
+/// 运动 id 有两种身份（代码审查 R01）：它一定是**锚点**（定日期窗）；
+/// 只有任务启用了 workout 类别，它才同时是**可读实体**。关掉 workout
+/// 类别的任务，MCP 读不到那条运动本身。
 pub(super) fn expand_task(
     task: SharedTaskPayload,
     local_days: &BTreeMap<String, NaiveDate>,
@@ -109,13 +116,25 @@ pub(super) fn expand_task(
             };
             let start = day - Duration::days(range.days_before.max(0));
             if let Some(window) = GrantWindow::new(category, start, end) {
-                windows.push(window);
+                windows.push(window.with_excluded(range.excluded_metrics.iter().cloned()));
             }
         }
     }
+    let workout_range = task.categories.iter().find(|range| {
+        range.enabled && AccessCategory::parse(&range.category) == Some(AccessCategory::Workout)
+    });
+    let (workout_ids, workout_excluded) = match workout_range {
+        Some(range) => (
+            task.workout_ids.clone(),
+            range.excluded_metrics.iter().cloned().collect(),
+        ),
+        None => (Vec::new(), BTreeSet::new()),
+    };
     TaskGrant {
         task_id: task.id,
-        workout_ids: task.workout_ids,
+        workout_ids,
+        anchor_workout_ids: task.workout_ids,
+        workout_excluded,
         windows,
     }
 }

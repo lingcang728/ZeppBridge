@@ -42,7 +42,12 @@ fn grant(task_id: &str, workout_ids: &[&str], windows: Vec<GrantWindow>) -> Task
         task_id: task_id.into(),
         workout_ids: workout_ids.iter().map(|id| id.to_string()).collect(),
         windows,
+        ..TaskGrant::default()
     }
+}
+
+fn excluding(window: GrantWindow, names: &[&str]) -> GrantWindow {
+    window.with_excluded(names.iter().map(|name| name.to_string()))
 }
 
 fn request(tool: &'static str) -> DataRequest {
@@ -636,7 +641,9 @@ fn shared_task_grants_expands_windows_per_workout() {
     let grants = shared_task_grants(&db).unwrap();
     assert_eq!(grants.len(), 1);
     assert_eq!(grants[0].task_id, "t1");
-    assert_eq!(grants[0].workout_ids, ["w1", "w2"]);
+    // workout 类别没开：两条运动只是锚点，不是可读实体（R01）。
+    assert_eq!(grants[0].anchor_workout_ids, ["w1", "w2"]);
+    assert!(grants[0].workout_ids.is_empty());
     // sleep: 每条运动一个窗，1/3..1/10 与 1/13..1/20
     let sleep: Vec<&GrantWindow> = grants[0]
         .windows
@@ -741,4 +748,133 @@ fn latest_sleep_in_windows_picks_the_newest_in_window_only() {
     );
     permit.windows = vec![window(AccessCategory::Sleep, day(2, 1), day(2, 6))];
     assert_eq!(latest_sleep_in_windows(&db, &permit).unwrap(), None);
+}
+
+/* ---------- 代码审查 R01：字段排除与类别开关 ---------- */
+
+#[test]
+fn excluded_metric_is_denied_even_though_its_category_has_a_window() {
+    let grants = [grant(
+        "t",
+        &[],
+        vec![excluding(
+            window(AccessCategory::Recovery, day(1, 1), day(1, 20)),
+            &["hrv"],
+        )],
+    )];
+    let mut hrv = request("get_metric_series");
+    hrv.categories = vec![AccessCategory::Recovery];
+    hrv.metrics = vec!["hrv".into()];
+    hrv.date_range = Some((day(1, 1), day(1, 20)));
+    let denied = authorize(&AccessScope::TaskScoped, &grants, &hrv).unwrap_err();
+    assert_eq!(denied.code, SCOPE_DENIED);
+
+    // 同类别没被排除的指标照常放行，序列裁剪也只留它。
+    let mut stress = hrv.clone();
+    stress.metrics = vec!["stress".into()];
+    let permit = authorize(&AccessScope::TaskScoped, &grants, &stress).unwrap();
+    let clipped = clip_metric_series(
+        vec![
+            series("hrv", &["2026-01-05"]),
+            series("stress", &["2026-01-05"]),
+        ],
+        &permit,
+    );
+    let names: Vec<&str> = clipped.iter().map(|s| s.metric.as_str()).collect();
+    assert_eq!(names, ["stress"]);
+}
+
+#[test]
+fn another_task_that_keeps_the_metric_opens_only_its_own_days() {
+    // t1 排除 hrv（1/1–1/20），t2 不排除（1/15–1/25）：并集授权下 hrv 只在
+    // t2 的日子里出得去；两个窗口排除集不同，不能被合并成一段。
+    let grants = [
+        grant(
+            "t1",
+            &[],
+            vec![excluding(
+                window(AccessCategory::Recovery, day(1, 1), day(1, 20)),
+                &["hrv"],
+            )],
+        ),
+        grant(
+            "t2",
+            &[],
+            vec![window(AccessCategory::Recovery, day(1, 15), day(1, 25))],
+        ),
+    ];
+    let mut req = request("get_metric_series");
+    req.categories = vec![AccessCategory::Recovery];
+    req.metrics = vec!["hrv".into()];
+    req.date_range = Some((day(1, 1), day(1, 31)));
+    let permit = authorize(&AccessScope::TaskScoped, &grants, &req).unwrap();
+    assert!(!permit.metric_permitted(AccessCategory::Recovery, "hrv", day(1, 5)));
+    assert!(permit.metric_permitted(AccessCategory::Recovery, "hrv", day(1, 18)));
+    assert!(permit.metric_permitted(AccessCategory::Recovery, "stress", day(1, 5)));
+    let clipped = clip_metric_series(vec![series("hrv", &["2026-01-05", "2026-01-18"])], &permit);
+    assert_eq!(clipped[0].points.len(), 1);
+    assert_eq!(clipped[0].points[0].date, "2026-01-18");
+    assert_eq!(clipped[0].window_days, 11);
+}
+
+#[test]
+fn workout_fields_stay_hidden_unless_some_task_shows_them() {
+    let mut t1 = grant("t1", &["w1"], Vec::new());
+    t1.workout_excluded = ["avg_hr".to_string(), "calories".to_string()].into();
+    let mut t2 = grant("t2", &["w1"], Vec::new());
+    t2.workout_excluded = ["avg_hr".to_string()].into();
+    let mut req = request("list_workouts");
+    req.categories = vec![AccessCategory::Workout];
+    let permit = authorize(&AccessScope::TaskScoped, &[t1, t2], &req).unwrap();
+    let excluded = permit.workout_excluded_fields("w1");
+    assert_eq!(excluded, ["avg_hr".to_string()].into());
+
+    let mut entry = serde_json::json!({"workoutId": "w1", "avgHr": 150, "calories": 500});
+    project_workout_list_entry(&mut entry, &excluded);
+    assert!(entry.get("avgHr").is_none());
+    assert_eq!(entry["calories"], 500);
+}
+
+#[test]
+fn excluded_sleep_stage_minutes_take_the_stage_timeline_with_them() {
+    let grants = [grant(
+        "t",
+        &[],
+        vec![excluding(
+            window(AccessCategory::Sleep, day(1, 1), day(1, 20)),
+            &["deep_minutes"],
+        )],
+    )];
+    let mut req = request("get_sleep_detail");
+    req.categories = vec![AccessCategory::Sleep];
+    let permit = authorize(&AccessScope::TaskScoped, &grants, &req).unwrap();
+    let excluded = permit.sleep_excluded_fields(day(1, 10));
+    let mut sleep = serde_json::json!({
+        "sleep_id": "s", "deep_minutes": 80, "light_minutes": 200, "stages": [{"stage": "deep"}]
+    });
+    project_sleep_fields(&mut sleep, &excluded);
+    assert!(sleep.get("deep_minutes").is_none());
+    assert!(sleep.get("stages").is_none(), "阶段片能算回深睡分钟数");
+    assert_eq!(sleep["light_minutes"], 200);
+}
+
+#[test]
+fn a_disabled_workout_category_keeps_the_anchor_but_not_the_entity() {
+    let (db, _dir) = library_with_tasks(&[(
+        true,
+        r#"{"id":"t","workout_ids":["w1"],"categories":[
+            {"category":"workout","enabled":false},
+            {"category":"recovery","enabled":true,"days_before":3,"excluded_metrics":["hrv"]}
+        ]}"#,
+    )]);
+    insert_run(&db, "w1", 1, 10);
+    let grants = shared_task_grants(&db).unwrap();
+    assert!(grants[0].workout_ids.is_empty());
+    assert_eq!(grants[0].windows.len(), 1, "锚点照样定出 recovery 窗口");
+    assert!(grants[0].windows[0].excluded.contains("hrv"));
+
+    let mut insight = request("get_workout_insight");
+    insight.categories = vec![AccessCategory::Workout];
+    insight.workout_ids = vec!["w1".into()];
+    assert!(authorize(&AccessScope::TaskScoped, &grants, &insight).is_err());
 }

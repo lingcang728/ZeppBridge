@@ -32,21 +32,35 @@ pub(super) fn run_list_workouts(
         db.get_recent_workouts(limit)
             .map_err(|error| CallFailure::plain(error.user_message()))?
     };
+    let entries: Vec<Value> = workouts
+        .iter()
+        .map(|workout| {
+            let mut entry = json!({
+                "workoutId": workout.workout_id,
+                "type": workout.effective_type,
+                "customLabel": workout.custom_label,
+                "startTime": workout.start_time.to_rfc3339(),
+                "endTime": workout.end_time.to_rfc3339(),
+                "distanceMeters": workout.distance_meters,
+                "calories": workout.calories,
+                "avgHr": workout.avg_hr,
+                "maxHr": workout.max_hr,
+                "sourceScope": workout.source_scope,
+                "gpsAvailable": workout.gps_available,
+                "sampleCount": workout.sample_count,
+            });
+            if scope.is_task_scoped() {
+                // 任务里拖出去的字段不出去（R01）。
+                access::project_workout_list_entry(
+                    &mut entry,
+                    &permit.workout_excluded_fields(&workout.workout_id),
+                );
+            }
+            entry
+        })
+        .collect();
     Ok(json!({
-        "workouts": workouts.iter().map(|workout| json!({
-            "workoutId": workout.workout_id,
-            "type": workout.effective_type,
-            "customLabel": workout.custom_label,
-            "startTime": workout.start_time.to_rfc3339(),
-            "endTime": workout.end_time.to_rfc3339(),
-            "distanceMeters": workout.distance_meters,
-            "calories": workout.calories,
-            "avgHr": workout.avg_hr,
-            "maxHr": workout.max_hr,
-            "sourceScope": workout.source_scope,
-            "gpsAvailable": workout.gps_available,
-            "sampleCount": workout.sample_count,
-        })).collect::<Vec<_>>(),
+        "workouts": entries,
         "units": { "distance": "m", "heartRate": "bpm", "calories": "kcal" },
         "missingValues": contract::MISSING_VALUE_CONVENTION,
     }))
@@ -80,6 +94,13 @@ pub(super) fn run_workout_insight(
                     .map(|entry| entry.workout_id.clone()),
             )
             .filter(|id| permit.workout_ids.contains(id))
+            // 基线按距离挑可比记录：排除了距离的运动不进基线，否则它的
+            // 距离会从基线均值里漏出去（R01）。
+            .filter(|id| {
+                !permit
+                    .workout_excluded_fields(id)
+                    .contains("distance_meters")
+            })
             .collect();
         let mut rows = BTreeMap::new();
         for workout_id in candidate_ids {
@@ -90,7 +111,9 @@ pub(super) fn run_workout_insight(
                 rows.insert(workout_id, access::GrantedRun::from_workout(&workout));
             }
         }
-        access::rescore_insight(&mut insight, &permit.workout_ids, &rows);
+        let baseline_ids: BTreeSet<String> = rows.keys().cloned().collect();
+        access::rescore_insight(&mut insight, &baseline_ids, &rows);
+        access::project_workout_insight(&mut insight, &permit.workout_excluded_fields(workout_id));
     }
     serde_json::to_value(&insight)
         .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))
@@ -189,12 +212,20 @@ pub(super) fn run_sleep_detail(
         }
     };
     Ok(match session {
-        Some(session) => json!({
-            "sleep": serde_json::to_value(&session)
-                .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))?,
-            "units": { "stageMinutes": "min", "heartRate": "bpm" },
-            "missingValues": contract::MISSING_VALUE_CONVENTION,
-        }),
+        Some(session) => {
+            let mut sleep = serde_json::to_value(&session)
+                .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))?;
+            if scope.is_task_scoped() {
+                // 任务里拖出去的睡眠字段不出去（R01）。
+                let day = session.end_time.with_timezone(&Local).date_naive();
+                access::project_sleep_fields(&mut sleep, &permit.sleep_excluded_fields(day));
+            }
+            json!({
+                "sleep": sleep,
+                "units": { "stageMinutes": "min", "heartRate": "bpm" },
+                "missingValues": contract::MISSING_VALUE_CONVENTION,
+            })
+        }
         // 「本机没有这一晚」和「这一晚没有数据」是同一句话：
         // 不返回一个各项为 0 的空壳。
         None => json!({ "sleep": Value::Null, "reason": "本机没有匹配的睡眠记录。" }),

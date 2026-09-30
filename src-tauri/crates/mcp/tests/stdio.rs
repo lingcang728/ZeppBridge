@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 use chrono::{Duration, TimeZone, Utc};
-use zeppbridge_core::models::{SleepSession, SourceScope, Workout};
+use zeppbridge_core::models::{MetricSample, SleepSession, SourceScope, Workout};
 use zeppbridge_core::storage::Database;
 
 #[test]
@@ -161,8 +161,10 @@ fn sleep_session(id: &str, end_days_ago: i64) -> SleepSession {
     }
 }
 
-/// 夹具库：granted 与 private 两条运动、授权窗内一晚 + 窗外一晚，
-/// 一条 `mcp_shared=1` 的任务授权 `granted` 的运动与它的 sleep 窗口。
+/// 夹具库：granted 与 private 两条运动、授权窗内一晚 + 窗外一晚、
+/// granted 那天的 HRV=42。两条 `mcp_shared=1` 的任务：
+/// - t1 锚 `granted`：sleep、workout（排除 avg_hr）、recovery（排除 hrv）；
+/// - t2 锚 `private`：只开 sleep，workout 类别关着——锚点不等于可读（R01）。
 fn scoped_library() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-mcp-scope-{}-{}",
@@ -181,26 +183,50 @@ fn scoped_library() -> PathBuf {
             .unwrap();
         db.insert_sleep_session(&sleep_session("outside", 1))
             .unwrap();
+        db.insert_metric_sample_with_raw(
+            &MetricSample {
+                metric: "hrv".into(),
+                timestamp: utc_noon(20),
+                value: 42.0,
+                unit: "ms".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            },
+            None,
+        )
+        .unwrap();
     }
     // `ai_tasks` 表由 v32 迁移建好（S1），这里只写授权判定关心的列。
     let conn = rusqlite::Connection::open(dir.join("zepp.db")).unwrap();
-    let payload = json!({
-        "id": "t1",
-        "workout_ids": ["granted"],
-        "categories": [{
-            "category": "sleep",
-            "enabled": true,
-            "days_before": 14,
-            "include_workout_day": true,
-        }],
-    })
-    .to_string();
-    conn.execute(
-        "INSERT INTO ai_tasks (id, payload, mcp_shared, created_at, updated_at)
-         VALUES ('t1', ?1, 1, '', '')",
-        [payload],
-    )
-    .unwrap();
+    let tasks = [
+        json!({
+            "id": "t1",
+            "workout_ids": ["granted"],
+            "categories": [
+                {"category": "sleep", "enabled": true, "days_before": 14, "include_workout_day": true},
+                {"category": "workout", "enabled": true, "days_before": 0, "include_workout_day": true,
+                 "excluded_metrics": ["avg_hr"]},
+                {"category": "recovery", "enabled": true, "days_before": 14, "include_workout_day": true,
+                 "excluded_metrics": ["hrv"]},
+            ],
+        }),
+        json!({
+            "id": "t2",
+            "workout_ids": ["private"],
+            "categories": [
+                {"category": "sleep", "enabled": true, "days_before": 0, "include_workout_day": true},
+                {"category": "workout", "enabled": false},
+            ],
+        }),
+    ];
+    for task in tasks {
+        conn.execute(
+            "INSERT INTO ai_tasks (id, payload, mcp_shared, created_at, updated_at)
+             VALUES (?1, ?2, 1, '', '')",
+            [task["id"].as_str().unwrap().to_string(), task.to_string()],
+        )
+        .unwrap();
+    }
     dir
 }
 
@@ -238,6 +264,10 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
                "params":{"name":"get_sleep_detail","arguments":{}}}),
         json!({"jsonrpc":"2.0","id":5,"method":"tools/call",
                "params":{"name":"get_data_health","arguments":{}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"tools/call",
+               "params":{"name":"get_metric_series","arguments":{"metrics":["hrv"],"days":60}}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"tools/call",
+               "params":{"name":"get_workout_insight","arguments":{"workoutId":"private"}}}),
     ];
 
     // 旧式零参数启动 = full-readonly：两条运动、最新一晚、数据健康都在。
@@ -251,7 +281,7 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(responses.len(), 5);
+        assert_eq!(responses.len(), 7);
         assert_eq!(responses[0]["result"]["scope"]["mode"], "full-readonly");
         assert_eq!(responses[1]["result"]["tools"].as_array().unwrap().len(), 5);
         let ids: Vec<&str> = responses[2]["result"]["structuredContent"]["workouts"]
@@ -267,6 +297,9 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
             "outside"
         );
         assert_eq!(responses[4]["result"]["isError"], false);
+        // 整库只读不看任务：HRV 照常可读。
+        let hrv = serde_json::to_string(&responses[5]["result"]["structuredContent"]).unwrap();
+        assert!(hrv.contains("42"), "{hrv}");
     }
 
     // --scope task：只有授权的运动、授权窗内最近一晚；数据健康整体拒绝。
@@ -280,21 +313,26 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(responses.len(), 5);
+        assert_eq!(responses.len(), 7);
         assert_eq!(responses[0]["result"]["scope"]["mode"], "task");
         assert!(responses[0]["result"]["instructions"]
             .as_str()
             .unwrap()
             .contains("task："));
         let list = &responses[2]["result"];
-        assert_eq!(list["scope"], json!({"mode": "task", "grants": 1}));
-        let ids: Vec<&str> = list["structuredContent"]["workouts"]
-            .as_array()
-            .unwrap()
+        assert_eq!(list["scope"], json!({"mode": "task", "grants": 2}));
+        let workouts = list["structuredContent"]["workouts"].as_array().unwrap();
+        let ids: Vec<&str> = workouts
             .iter()
             .filter_map(|workout| workout["workoutId"].as_str())
             .collect();
-        assert_eq!(ids, ["granted"], "task 范围只回授权运动");
+        assert_eq!(
+            ids,
+            ["granted"],
+            "task 范围只回可读运动；workout 类别关着的锚点运动不出现"
+        );
+        assert!(workouts[0].get("avgHr").is_none(), "被排除的 avg_hr 不出去");
+        assert_eq!(workouts[0]["maxHr"], 170);
         let sleep = &responses[3]["result"];
         assert_eq!(
             sleep["structuredContent"]["sleep"]["sleep_id"], "in-window",
@@ -309,6 +347,17 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
             "err.mcp.scope_denied"
         );
         assert_eq!(health["scope"]["mode"], "task");
+        // R01：被排除的 HRV 不返回读数，而是如实拒绝。
+        let hrv = &responses[5]["result"];
+        assert_eq!(hrv["isError"], true, "{hrv}");
+        assert!(!serde_json::to_string(hrv).unwrap().contains("42"));
+        // R01：锚点运动（workout 类别关着）读不到详情。
+        let insight = &responses[6]["result"];
+        assert_eq!(insight["isError"], true, "{insight}");
+        assert_eq!(
+            insight["structuredContent"]["error"]["code"],
+            "err.mcp.scope_denied"
+        );
     }
 
     let _ = std::fs::remove_dir_all(&dir);

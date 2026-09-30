@@ -550,3 +550,74 @@ fn markdown_handoff_writes_one_file_with_prompt_guide_and_data() {
     assert!(db.ai_task_preview(&t).unwrap().markdown.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// 代码审查 R01：分期分钟被排除时，detailed 的阶段时间轴也不出仓——
+/// 从阶段片能直接算回被排除的分钟数。MCP 走同一张表。
+#[test]
+fn excluded_stage_minutes_drop_the_stage_timeline_too() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 10);
+    insert_workout(&db, "w1", start);
+    let end = utc(2026, 9, 10, 6);
+    db.insert_sleep_session(&SleepSession {
+        sleep_id: "s1".into(),
+        start_time: end - Duration::hours(7),
+        end_time: end,
+        score: Some(82),
+        duration_minutes: 400,
+        deep_minutes: Some(90),
+        light_minutes: Some(220),
+        rem_minutes: Some(70),
+        awake_minutes: Some(20),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        synced_at: None,
+        time_in_bed_minutes: None,
+        stages: vec![crate::models::SleepStageSlice {
+            stage: "deep".into(),
+            start_time: end - Duration::hours(6),
+            end_time: end - Duration::hours(5),
+            raw_mode: None,
+        }],
+        wake_count: Some(2),
+    })
+    .unwrap();
+
+    let sessions = |excluded: Vec<String>| {
+        let mut sleep = range(AiTaskCategory::Sleep, 3, true);
+        sleep.excluded_metrics = excluded;
+        let mut t = task();
+        t.workout_ids = vec!["w1".into()];
+        t.detail_level = AiTaskDetailLevel::Detailed;
+        t.categories = vec![sleep];
+        let dir = temp_dir("stages");
+        let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+        let text = std::fs::read_to_string(result.json_path.unwrap()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let doc: serde_json::Value = serde_json::from_str(&text).unwrap();
+        doc["context"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["category"] == "sleep")
+            .unwrap()["days"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|d| d["sleeps"].as_array().cloned().unwrap_or_default())
+            .collect::<Vec<_>>()
+    };
+
+    let kept = sessions(Vec::new());
+    assert!(
+        kept.iter().any(|s| s.get("stages").is_some()),
+        "对照：不排除时有阶段"
+    );
+    let dropped = sessions(vec!["deep_minutes".into()]);
+    assert!(!dropped.is_empty());
+    for session in dropped {
+        assert!(session.get("deep_minutes").is_none());
+        assert!(session.get("stages").is_none(), "{session}");
+        assert!(session.get("light_minutes").is_some());
+    }
+}

@@ -49,6 +49,14 @@ impl Database {
                             object.remove(field);
                         }
                     }
+                    // 分期分钟被排除时阶段时间轴也不出去——从片段能算回分钟数。
+                    // 与 MCP 的 `access::project_sleep_fields` 同一张表。
+                    if crate::access::SLEEP_STAGE_FIELDS
+                        .iter()
+                        .any(|field| is_excluded(field))
+                    {
+                        object.remove("stages");
+                    }
                 }
                 gather.covered_days.insert(day.clone());
                 gather.sources.insert(source_scope);

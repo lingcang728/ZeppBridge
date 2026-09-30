@@ -127,6 +127,11 @@ pub struct GrantWindow {
     pub start_date: NaiveDate,
     #[serde(rename = "end")]
     pub end_date: NaiveDate,
+    /// 任务在这个类别里单独排除的指标名 / 字段名（`excluded_metrics`）。
+    /// 窗口放行的是「这些天的这个类别，减去这些名字」（代码审查 R01）。
+    /// 不进 `permittedRanges` 的对外形状。
+    #[serde(skip)]
+    pub excluded: BTreeSet<String>,
 }
 
 impl GrantWindow {
@@ -141,11 +146,23 @@ impl GrantWindow {
             category,
             start_date,
             end_date,
+            excluded: BTreeSet::new(),
         })
+    }
+
+    /// 带上这个窗口里被任务排除的名字。
+    pub fn with_excluded(mut self, excluded: impl IntoIterator<Item = String>) -> Self {
+        self.excluded = excluded.into_iter().collect();
+        self
     }
 
     pub fn contains(&self, day: NaiveDate) -> bool {
         self.start_date <= day && day <= self.end_date
+    }
+
+    /// 这个窗口放不放行某个指标 / 字段。
+    pub fn allows(&self, name: &str) -> bool {
+        !self.excluded.contains(name)
     }
 
     /// 与 `[start, end]` 求交，无交为空。
@@ -155,6 +172,7 @@ impl GrantWindow {
             self.start_date.max(start),
             self.end_date.min(end),
         )
+        .map(|window| window.with_excluded(self.excluded.iter().cloned()))
     }
 }
 
@@ -165,7 +183,12 @@ impl GrantWindow {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TaskGrant {
     pub task_id: String,
+    /// 可读的运动实体：任务启用了 workout 类别时才是它选的运动，否则为空。
     pub workout_ids: Vec<String>,
+    /// 只用来定日期窗的锚点运动。锚点不等于授权读取（代码审查 R01）。
+    pub anchor_workout_ids: Vec<String>,
+    /// workout 类别里被排除的字段名（`distance_meters`、`avg_hr` 等）。
+    pub workout_excluded: BTreeSet<String>,
     pub windows: Vec<GrantWindow>,
 }
 
@@ -176,6 +199,8 @@ pub struct DataRequest {
     pub tool: &'static str,
     /// 这次请求会碰到的类别。指标按 `metric_category()` 映射进来。
     pub categories: Vec<AccessCategory>,
+    /// 请求点名的指标（`get_metric_series`）。每一个都得在某个授权窗里没被排除。
+    pub metrics: Vec<String>,
     /// 请求覆盖的本地日范围（`get_metric_series` 的 days 换算结果）。
     pub date_range: Option<(NaiveDate, NaiveDate)>,
     /// 请求指定的运动 id。空 = 列举型请求（`list_workouts`）。
@@ -193,8 +218,11 @@ pub struct DataRequest {
 /// `windows` 之外的日期不存在。
 #[derive(Debug, Clone, Default)]
 pub struct Permit {
-    /// 全部开放任务的 workout_ids 并集。
+    /// 全部开放任务的可读 workout_ids 并集。
     pub workout_ids: BTreeSet<String>,
+    /// 运动 id → 仍被排除的字段。多个任务都放行同一条运动时取交集：
+    /// 只要有一个任务允许看某字段，它就能出去（并集授权）。空集不存。
+    pub workout_excluded: BTreeMap<String, BTreeSet<String>>,
     /// 已按请求类别与日期范围裁剪过的授权窗口。
     pub windows: Vec<GrantWindow>,
     /// 这次判定实际看到的开放任务数（`scope.grants` 的来源）。
@@ -214,19 +242,68 @@ impl Permit {
             .any(|window| window.category == category && window.contains(day))
     }
 
+    /// 某个指标在某个本地日是否被授权：该日有同类窗口且那个窗口没排除它。
+    pub fn metric_permitted(&self, category: AccessCategory, metric: &str, day: NaiveDate) -> bool {
+        self.windows.iter().any(|window| {
+            window.category == category && window.contains(day) && window.allows(metric)
+        })
+    }
+
+    /// 该类别有没有至少一个不排除这个指标的授权窗。
+    pub fn metric_has_window(&self, category: AccessCategory, metric: &str) -> bool {
+        self.windows
+            .iter()
+            .any(|window| window.category == category && window.allows(metric))
+    }
+
     /// 该类别授权窗的并集一共有多少天（重叠合并后计数，不重复算）。
     pub fn permitted_day_count(&self, category: AccessCategory) -> i64 {
-        let mut days = 0i64;
-        for window in merge_windows(
+        self.day_count_where(|window| window.category == category)
+    }
+
+    /// 某个指标实际放行的天数（排除了它的窗口不算）。
+    pub fn metric_day_count(&self, category: AccessCategory, metric: &str) -> i64 {
+        self.day_count_where(|window| window.category == category && window.allows(metric))
+    }
+
+    fn day_count_where(&self, keep: impl Fn(&GrantWindow) -> bool) -> i64 {
+        // 计天数只看日期：去掉排除集再合并，重叠的天不重复算。
+        let spans = merge_windows(
             self.windows
                 .iter()
-                .filter(|window| window.category == category)
-                .cloned()
+                .filter(|window| keep(window))
+                .filter_map(|window| {
+                    GrantWindow::new(window.category, window.start_date, window.end_date)
+                })
                 .collect(),
-        ) {
-            days += (window.end_date - window.start_date).num_days() + 1;
-        }
-        days
+        );
+        spans
+            .iter()
+            .map(|window| (window.end_date - window.start_date).num_days() + 1)
+            .sum()
+    }
+
+    /// 某一晚（按醒来本地日）仍被排除的睡眠字段：盖住这一天的睡眠窗各自的
+    /// 排除集取交集——任一窗口放行的字段就能出去。
+    pub fn sleep_excluded_fields(&self, day: NaiveDate) -> BTreeSet<String> {
+        let mut covering = self
+            .windows
+            .iter()
+            .filter(|window| window.category == AccessCategory::Sleep && window.contains(day));
+        let Some(first) = covering.next() else {
+            return BTreeSet::new();
+        };
+        covering.fold(first.excluded.clone(), |acc, window| {
+            acc.intersection(&window.excluded).cloned().collect()
+        })
+    }
+
+    /// 某条运动仍被排除的字段。
+    pub fn workout_excluded_fields(&self, workout_id: &str) -> BTreeSet<String> {
+        self.workout_excluded
+            .get(workout_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// 该类别是否至少有一个授权窗（不管请求范围有没有交上）。
@@ -295,6 +372,22 @@ fn authorize_task(
         .iter()
         .flat_map(|grant| grant.workout_ids.iter().cloned())
         .collect();
+    let mut workout_excluded = BTreeMap::new();
+    for workout_id in &workout_ids {
+        let mut excluded: Option<BTreeSet<String>> = None;
+        for grant in grants
+            .iter()
+            .filter(|grant| grant.workout_ids.contains(workout_id))
+        {
+            excluded = Some(match excluded {
+                None => grant.workout_excluded.clone(),
+                Some(acc) => acc.intersection(&grant.workout_excluded).cloned().collect(),
+            });
+        }
+        if let Some(excluded) = excluded.filter(|set| !set.is_empty()) {
+            workout_excluded.insert(workout_id.clone(), excluded);
+        }
+    }
 
     // 指名要的运动必须全部在授权并集里——有一个不在就整体拒绝，而不是
     // 悄悄跳过它（悄悄跳过会让人以为那条记录不存在）。
@@ -311,6 +404,7 @@ fn authorize_task(
     let windows = granted_windows(grants, &request.categories, request.date_range);
     let permit = Permit {
         workout_ids,
+        workout_excluded,
         windows,
         grants: grants.len(),
     };
@@ -331,6 +425,18 @@ fn authorize_task(
             return Err(denied(format!(
                 "请求的 {} 类数据不在任何已开放任务的授权范围内，或与授权窗口没有日期交集。错误数据的 permittedRanges 里是实际授权的窗口。",
                 category.as_str()
+            )));
+        }
+    }
+    // 点名的指标逐个核对：类别有窗还不够，窗口得没排除它（R01）。被排除的
+    // 指标如实拒绝，而不是回一个空序列让模型以为「没有数据」。
+    for metric in &request.metrics {
+        let Some(category) = metric_category(metric) else {
+            continue;
+        };
+        if !permit.metric_has_window(category, metric) {
+            return Err(denied(format!(
+                "指标 {metric} 被已开放的任务排除在外，或与授权窗口没有日期交集。"
             )));
         }
     }
@@ -358,10 +464,16 @@ pub fn granted_windows(
     merge_windows(windows)
 }
 
-/// 同类别窗口按起点排序后合并重叠与相邻（首尾相接也并成一段）。
+/// 同类别、同一排除集的窗口按起点排序后合并重叠与相邻（首尾相接也并成
+/// 一段）。排除集不同的窗口不合并——合并会让一边的排除吃掉另一边的放行。
 fn merge_windows(mut windows: Vec<GrantWindow>) -> Vec<GrantWindow> {
     windows.sort_by(|a, b| {
-        (a.category, a.start_date, a.end_date).cmp(&(b.category, b.start_date, b.end_date))
+        (a.category, &a.excluded, a.start_date, a.end_date).cmp(&(
+            b.category,
+            &b.excluded,
+            b.start_date,
+            b.end_date,
+        ))
     });
     let mut merged: Vec<GrantWindow> = Vec::with_capacity(windows.len());
     for window in windows {
@@ -369,7 +481,7 @@ fn merge_windows(mut windows: Vec<GrantWindow>) -> Vec<GrantWindow> {
             let adjacent = Duration::try_days(1)
                 .and_then(|one| last.end_date.checked_add_signed(one))
                 .is_some_and(|next| window.start_date <= next);
-            if last.category == window.category && adjacent {
+            if last.category == window.category && last.excluded == window.excluded && adjacent {
                 last.end_date = last.end_date.max(window.end_date);
                 continue;
             }
@@ -449,12 +561,13 @@ pub fn clip_metric_series(series: Vec<MetricSeries>, permit: &Permit) -> Vec<Met
         .into_iter()
         .filter_map(|mut series| {
             let category = metric_category(&series.metric)?;
-            if !permit.has_window(category) {
+            let metric = series.metric.clone();
+            if !permit.metric_has_window(category, &metric) {
                 return None;
             }
             series.points.retain(|point| {
                 NaiveDate::parse_from_str(&point.date, "%Y-%m-%d")
-                    .map(|day| permit.day_permitted(category, day))
+                    .map(|day| permit.metric_permitted(category, &metric, day))
                     .unwrap_or(false)
             });
             let values: Vec<f64> = series.points.iter().map(|point| point.value).collect();
@@ -463,10 +576,89 @@ pub fn clip_metric_series(series: Vec<MetricSeries>, permit: &Permit) -> Vec<Met
             series.minimum = values.iter().copied().reduce(f64::min);
             series.maximum = values.iter().copied().reduce(f64::max);
             series.days_with_data = series.points.len() as i64;
-            series.window_days = permit.permitted_day_count(category);
+            series.window_days = permit.metric_day_count(category, &metric);
             Some(series)
         })
         .collect()
+}
+
+/* ------------------------------ 字段级投影（R01） ------------------------------
+
+* 类别窗口决定「哪些天」，排除集决定「哪些字段」。字段名与任务模型
+* `excluded_metrics` 一致（`ai_tasks::coverage::category_units` 的键）。*/
+
+/// 睡眠分期分钟数字段：排除任一个时，阶段时间轴也不出去——
+/// 否则从阶段片段能直接算回被排除的分钟数。导出侧用同一张表。
+pub const SLEEP_STAGE_FIELDS: [&str; 4] = [
+    "deep_minutes",
+    "light_minutes",
+    "rem_minutes",
+    "awake_minutes",
+];
+
+/// 从一条睡眠记录的 JSON 里删掉被排除的字段（阶段分钟被排除时连 `stages` 一起）。
+pub fn project_sleep_fields(value: &mut serde_json::Value, excluded: &BTreeSet<String>) {
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    for field in excluded {
+        object.remove(field);
+    }
+    if SLEEP_STAGE_FIELDS
+        .iter()
+        .any(|field| excluded.contains(*field))
+    {
+        object.remove("stages");
+    }
+}
+
+/// `list_workouts` 出口的驼峰字段 ↔ 任务模型字段名。
+const WORKOUT_LIST_FIELDS: [(&str, &str); 4] = [
+    ("distance_meters", "distanceMeters"),
+    ("calories", "calories"),
+    ("avg_hr", "avgHr"),
+    ("max_hr", "maxHr"),
+];
+
+/// 从 `list_workouts` 的一条记录里删掉被排除的字段。
+pub fn project_workout_list_entry(value: &mut serde_json::Value, excluded: &BTreeSet<String>) {
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    for (field, key) in WORKOUT_LIST_FIELDS {
+        if excluded.contains(field) {
+            object.remove(key);
+        }
+    }
+}
+
+/// 洞察事实的 metric → 它依赖的运动字段。配速同时依赖距离和时长。
+fn insight_fact_fields(metric: &str) -> &'static [&'static str] {
+    match metric {
+        "distance" => &["distance_meters"],
+        "duration" => &["moving_seconds"],
+        "pace" => &["distance_meters", "moving_seconds"],
+        "avg_hr" => &["avg_hr"],
+        "training_load" => &["training_load"],
+        _ => &[],
+    }
+}
+
+/// 目标运动排除了哪些字段，就删掉依赖它们的洞察事实；心率被排除时
+/// 心率漂移也不出去。
+pub fn project_workout_insight(insight: &mut WorkoutInsight, excluded: &BTreeSet<String>) {
+    if excluded.is_empty() {
+        return;
+    }
+    insight.facts.retain(|fact| {
+        !insight_fact_fields(&fact.metric)
+            .iter()
+            .any(|field| excluded.contains(*field))
+    });
+    if excluded.contains("avg_hr") || excluded.contains("max_hr") {
+        insight.heart_rate_drift = None;
+        insight.heart_rate_drift_unavailable = None;
+    }
 }
 
 /// 递归剥掉身份字段。

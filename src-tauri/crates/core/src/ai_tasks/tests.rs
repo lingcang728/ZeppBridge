@@ -541,7 +541,9 @@ fn shared_grants_expand_only_shared_tasks() {
     assert_eq!(grants.len(), 1);
     let grant = &grants[0];
     assert_eq!(grant.task_id, shared.id);
-    assert_eq!(grant.workout_ids, vec!["w1".to_string()]);
+    // 没开 workout 类别：w1 只是定窗的锚点，不是可读实体（R01）。
+    assert_eq!(grant.anchor_workout_ids, vec!["w1".to_string()]);
+    assert!(grant.workout_ids.is_empty());
     let anchor_day = local_day(utc(2026, 9, 10, 10));
     // Recovery 开窗；PersonalNote 是任务内容不是时间序列，不产生授权窗。
     assert_eq!(grant.windows.len(), 1);
@@ -581,7 +583,7 @@ fn shared_grants_merge_adjacent_windows_across_anchors() {
     assert_eq!(merged[0].end_date, local_day(s2));
 
     // 引用了已删除的运动：宽授权不能因此整个挂掉——幽灵 id 留在
-    // workout_ids 原样清单里，只是不为它开窗（w1 的窗照常展开）。
+    // 锚点原样清单里，只是不为它开窗（w1 的窗照常展开）。
     let mut t = task();
     t.workout_ids = vec!["w1".into(), "ghost".into()];
     t.categories = vec![range(AiTaskCategory::Sleep, 1, true)];
@@ -590,7 +592,7 @@ fn shared_grants_merge_adjacent_windows_across_anchors() {
     let grants = shared_task_grants(&db).unwrap();
     let grant = grants
         .iter()
-        .find(|g| g.workout_ids.iter().any(|id| id == "ghost"))
+        .find(|g| g.anchor_workout_ids.iter().any(|id| id == "ghost"))
         .unwrap();
     assert!(
         !grant.windows.is_empty(),

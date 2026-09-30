@@ -233,8 +233,11 @@ The process accepts exactly one optional flag:
   existing configurations already have: read-only access to the whole local
   database. Configurations without the flag keep working unchanged.
 - **`task`** — still read-only, but limited to what the desktop app marks as
-  *shared with MCP* on its task page: only the listed workout IDs, plus health
-  data inside the per-category date windows those workouts open. Grants are
+  *shared with MCP* on its task page: health data inside the per-category date
+  windows those tasks open. A task's selected workouts are readable themselves
+  only when the task enables the workout category; otherwise they just anchor
+  the date windows. Metrics and fields dragged out of a task (HRV, average heart
+  rate, deep-sleep minutes, …) stay unreadable over MCP as well. Grants are
   re-read on every call, so flipping the share switch applies to the very next
   request — no restart needed.
 
@@ -248,8 +251,12 @@ not among the most recent), `get_workout_insight` re-computes its baseline over
 granted workouts alone, `get_metric_series` answers only days inside the
 granted windows, `get_sleep_detail` resolves "latest night" within the granted
 sleep windows, and `get_data_health` — a whole-library report that cannot be
-honestly clipped — is refused outright. Responses under `task` also drop
-identity fields such as `device_id`.
+honestly clipped — is refused outright. Naming a metric a task excludes is
+refused rather than answered with an empty series; excluded workout and sleep
+fields are simply absent, and excluding any sleep-stage minutes drops the stage
+timeline too. With several shared tasks the grants are a union: a metric or
+field any task allows can go out. Responses under `task` also drop identity
+fields such as `device_id`.
 
 Every `tools/call` result carries `"scope": {"mode": ..., "grants": N}` (inside
 `structuredContent` on success and at the top level on errors), and
