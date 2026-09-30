@@ -12,8 +12,11 @@ use super::export::WindowGather;
 use super::model::{AiTaskCategory, AiTaskCategoryRange, AiTaskCoverage};
 use super::AiTaskError;
 use crate::models::error::{Result, ZeppBridgeError};
-use crate::models::{HeartRateZoneBucket, SourceScope, Workout};
-use crate::storage::{local_day_range_utc_bounds, series_metric_spec, Database, MetricSource};
+use crate::models::{HeartRateZoneBucket, Workout};
+use crate::storage::{
+    local_day_range_utc_bounds, series_metric_spec, Database, MetricSource, WorkoutDetailExtras,
+    WorkoutDetailRow, WORKOUT_DETAIL_COLUMNS,
+};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use rusqlite::{params, params_from_iter};
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,18 +37,6 @@ pub(crate) fn parse_rfc3339_utc(value: &str, field: &str) -> Result<DateTime<Utc
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|error| ZeppBridgeError::ParseError(format!("{field} 无效: {error}")))
-}
-
-/// `storage::parse_scope` 的复刻（同为模块私有）：先认三种已知形态，
-/// 认不出再走 serde 的反序列化兜底。
-fn parse_source_scope(value: &str) -> Result<SourceScope> {
-    match value.trim_matches('"') {
-        "user_fused" | "UserFused" => Ok(SourceScope::UserFused),
-        "device" | "Device" => Ok(SourceScope::Device),
-        "unknown" | "Unknown" => Ok(SourceScope::Unknown),
-        other => serde_json::from_str::<SourceScope>(value)
-            .map_err(|_| ZeppBridgeError::ParseError(format!("source_scope 无效: {other}"))),
-    }
 }
 
 impl Database {
@@ -100,53 +91,9 @@ impl Database {
             .collect::<Vec<_>>()
             .join(",");
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT workout_id, workout_type, start_time, end_time,
-                    distance_meters, calories, avg_hr, max_hr,
-                    training_load, vo2max, source_scope, device_id,
-                    synced_at, gps_available, sample_count, zepp_type,
-                    workout_type_source, workout_type_override,
-                    min_hr, total_steps, moving_seconds,
-                    elevation_gain_m, elevation_loss_m,
-                    max_altitude_m, min_altitude_m,
-                    training_effect, anaerobic_training_effect, rpe,
-                    avg_cadence_spm, max_cadence_spm, avg_stride_cm
-             FROM workouts WHERE workout_id IN ({placeholders})"
+            "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts WHERE workout_id IN ({placeholders})"
         ))?;
-        let rows = stmt.query_map(params_from_iter(workout_ids.iter()), |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, Option<f64>>(4)?,
-                row.get::<_, Option<i32>>(5)?,
-                row.get::<_, Option<i32>>(6)?,
-                row.get::<_, Option<i32>>(7)?,
-                row.get::<_, Option<f64>>(8)?,
-                row.get::<_, Option<f64>>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<String>>(12)?,
-                row.get::<_, i64>(13)?,
-                row.get::<_, i64>(14)?,
-                row.get::<_, Option<i32>>(15)?,
-                row.get::<_, String>(16)?,
-                row.get::<_, Option<String>>(17)?,
-                row.get::<_, Option<i32>>(18)?,
-                row.get::<_, Option<i32>>(19)?,
-                row.get::<_, Option<i64>>(20)?,
-                row.get::<_, Option<f64>>(21)?,
-                row.get::<_, Option<f64>>(22)?,
-                row.get::<_, Option<f64>>(23)?,
-                row.get::<_, Option<f64>>(24)?,
-                row.get::<_, Option<f64>>(25)?,
-                row.get::<_, Option<f64>>(26)?,
-                row.get::<_, Option<i32>>(27)?,
-                row.get::<_, Option<f64>>(28)?,
-                row.get::<_, Option<f64>>(29)?,
-                row.get::<_, Option<f64>>(30)?,
-            ))
-        })?;
+        let rows = stmt.query_map(params_from_iter(workout_ids.iter()), WorkoutDetailRow::read)?;
         let mut flat_rows = Vec::new();
         for row in rows {
             flat_rows.push(row?);
@@ -191,94 +138,17 @@ impl Database {
         )?;
         let code_labels = self.workout_code_label_map()?;
 
-        for (
-            workout_id,
-            workout_type,
-            start,
-            end,
-            distance_meters,
-            calories,
-            avg_hr,
-            max_hr,
-            training_load,
-            vo2max,
-            scope,
-            device_id,
-            synced_at,
-            gps_available,
-            sample_count,
-            zepp_type,
-            type_source,
-            user_override,
-            min_hr,
-            total_steps,
-            moving_seconds,
-            elevation_gain_m,
-            elevation_loss_m,
-            max_altitude_m,
-            min_altitude_m,
-            training_effect,
-            anaerobic_training_effect,
-            rpe,
-            avg_cadence_spm,
-            max_cadence_spm,
-            avg_stride_cm,
-        ) in flat_rows
-        {
-            let hr_zones = zones.remove(&workout_id).unwrap_or_default();
-            let route_points = route_counts.get(&workout_id).copied().unwrap_or(0);
-            let stored_samples = sample_counts.get(&workout_id).copied().unwrap_or(0);
-            let effective_type = user_override
-                .clone()
-                .unwrap_or_else(|| workout_type.clone());
-            let custom_label = match zepp_type {
-                Some(code) => code_labels.get(&code).cloned(),
-                None => None,
+        for row in flat_rows {
+            let workout_id = row.workout_id.clone();
+            let extras = WorkoutDetailExtras {
+                hr_zones: zones.remove(&workout_id).unwrap_or_default(),
+                route_points: route_counts.get(&workout_id).copied().unwrap_or(0),
+                stored_samples: sample_counts.get(&workout_id).copied().unwrap_or(0),
+                custom_label: row
+                    .zepp_type
+                    .and_then(|code| code_labels.get(&code).cloned()),
             };
-            details.insert(
-                workout_id.clone(),
-                Workout {
-                    min_hr,
-                    total_steps,
-                    moving_seconds,
-                    elevation_gain_m,
-                    elevation_loss_m,
-                    max_altitude_m,
-                    min_altitude_m,
-                    training_effect,
-                    anaerobic_training_effect,
-                    rpe,
-                    avg_cadence_spm,
-                    max_cadence_spm,
-                    avg_stride_cm,
-                    hr_zones,
-                    workout_id,
-                    workout_type: workout_type.clone(),
-                    normalized_type: workout_type,
-                    type_source,
-                    user_override,
-                    effective_type,
-                    custom_label,
-                    start_time: parse_rfc3339_utc(&start, "workout.start_time")?,
-                    end_time: parse_rfc3339_utc(&end, "workout.end_time")?,
-                    distance_meters,
-                    calories,
-                    avg_hr,
-                    max_hr,
-                    training_load,
-                    vo2max,
-                    source_scope: parse_source_scope(&scope)?,
-                    device_id,
-                    synced_at: synced_at
-                        .as_deref()
-                        .map(|value| parse_rfc3339_utc(value, "workout.synced_at"))
-                        .transpose()?,
-                    gps_available: gps_available != 0 || route_points > 0,
-                    sample_count: sample_count.max(stored_samples),
-                    zepp_source: None,
-                    zepp_type,
-                },
-            );
+            details.insert(workout_id, row.into_workout(extras)?);
         }
         Ok(details)
     }
@@ -652,6 +522,7 @@ fn day_set(start: NaiveDate, end: NaiveDate) -> BTreeSet<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::SourceScope;
     use chrono::TimeZone;
 
     fn at(y: i32, m: u32, d: u32, h: u32) -> DateTime<Utc> {
@@ -753,5 +624,38 @@ mod tests {
         assert!(anchors[0].workout.gps_available);
         assert!(anchors[0].workout.sample_count >= 1);
         assert_eq!(anchors[1].workout.hr_zones.len(), 2);
+    }
+
+    /// 坏时间两条路径都报解析错误（err.core.parse），不吞掉、不补一个假时间。
+    #[test]
+    fn corrupt_start_time_is_a_parse_error_on_both_paths() {
+        let db = Database::in_memory().unwrap();
+        let start = at(2026, 9, 10, 10);
+        db.insert_workout(&Workout {
+            workout_id: "w-bad".into(),
+            workout_type: "running".into(),
+            normalized_type: "running".into(),
+            type_source: "string_field".into(),
+            effective_type: "running".into(),
+            start_time: start,
+            end_time: start + Duration::hours(1),
+            source_scope: SourceScope::Device,
+            ..Default::default()
+        })
+        .unwrap();
+        db.conn
+            .execute(
+                "UPDATE workouts SET start_time = 'not-a-time' WHERE workout_id = 'w-bad'",
+                [],
+            )
+            .unwrap();
+        assert!(matches!(
+            db.get_workout_detail("w-bad"),
+            Err(ZeppBridgeError::ParseError(_))
+        ));
+        assert!(matches!(
+            db.resolve_ai_task_anchors(&["w-bad".to_string()]),
+            Err(ZeppBridgeError::ParseError(_))
+        ));
     }
 }

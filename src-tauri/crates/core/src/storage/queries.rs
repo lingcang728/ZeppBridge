@@ -315,154 +315,38 @@ impl Database {
         let row = self
             .conn
             .query_row(
-                "SELECT workout_id, workout_type, start_time, end_time,
-                        distance_meters, calories, avg_hr, max_hr,
-                        training_load, vo2max, source_scope, device_id,
-                        synced_at, gps_available, sample_count, zepp_type,
-                        workout_type_source, workout_type_override,
-                        min_hr, total_steps, moving_seconds,
-                        elevation_gain_m, elevation_loss_m,
-                        max_altitude_m, min_altitude_m,
-                        training_effect, anaerobic_training_effect, rpe,
-                        avg_cadence_spm, max_cadence_spm, avg_stride_cm
-                 FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                &format!(
+                    "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts WHERE workout_id = ?1 LIMIT 1"
+                ),
                 [workout_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, Option<f64>>(4)?,
-                        row.get::<_, Option<i32>>(5)?,
-                        row.get::<_, Option<i32>>(6)?,
-                        row.get::<_, Option<i32>>(7)?,
-                        row.get::<_, Option<f64>>(8)?,
-                        row.get::<_, Option<f64>>(9)?,
-                        row.get::<_, String>(10)?,
-                        row.get::<_, Option<String>>(11)?,
-                        row.get::<_, Option<String>>(12)?,
-                        row.get::<_, i64>(13)?,
-                        row.get::<_, i64>(14)?,
-                        row.get::<_, Option<i32>>(15)?,
-                        row.get::<_, String>(16)?,
-                        row.get::<_, Option<String>>(17)?,
-                        (
-                            row.get::<_, Option<i32>>(18)?,
-                            row.get::<_, Option<i32>>(19)?,
-                            row.get::<_, Option<i64>>(20)?,
-                            row.get::<_, Option<f64>>(21)?,
-                            row.get::<_, Option<f64>>(22)?,
-                            row.get::<_, Option<f64>>(23)?,
-                            row.get::<_, Option<f64>>(24)?,
-                            row.get::<_, Option<f64>>(25)?,
-                            row.get::<_, Option<f64>>(26)?,
-                            row.get::<_, Option<i32>>(27)?,
-                            row.get::<_, Option<f64>>(28)?,
-                            row.get::<_, Option<f64>>(29)?,
-                            row.get::<_, Option<f64>>(30)?,
-                        ),
-                    ))
-                },
+                WorkoutDetailRow::read,
             )
             .optional()?;
-        let Some((
-            workout_id,
-            workout_type,
-            start,
-            end,
-            distance_meters,
-            calories,
-            avg_hr,
-            max_hr,
-            training_load,
-            vo2max,
-            scope,
-            device_id,
-            synced_at,
-            gps_available,
-            sample_count,
-            zepp_type,
-            type_source,
-            user_override,
-            (
-                min_hr,
-                total_steps,
-                moving_seconds,
-                elevation_gain_m,
-                elevation_loss_m,
-                max_altitude_m,
-                min_altitude_m,
-                training_effect,
-                anaerobic_training_effect,
-                rpe,
-                avg_cadence_spm,
-                max_cadence_spm,
-                avg_stride_cm,
-            ),
-        )) = row
-        else {
+        let Some(row) = row else {
             return Ok(None);
         };
-        let hr_zones = self.workout_hr_zones(&workout_id)?;
+        let hr_zones = self.workout_hr_zones(&row.workout_id)?;
         let route_points: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM route_points WHERE workout_id = ?1",
-            [&workout_id],
+            [&row.workout_id],
             |row| row.get(0),
         )?;
         let stored_samples: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM workout_samples WHERE workout_id = ?1",
-            [&workout_id],
+            [&row.workout_id],
             |row| row.get(0),
         )?;
-        let effective_type = user_override
-            .clone()
-            .unwrap_or_else(|| workout_type.clone());
-        let custom_label = match zepp_type {
+        let custom_label = match row.zepp_type {
             Some(code) => self.workout_code_label_map()?.get(&code).cloned(),
             None => None,
         };
-        Ok(Some(Workout {
-            min_hr,
-            total_steps,
-            moving_seconds,
-            elevation_gain_m,
-            elevation_loss_m,
-            max_altitude_m,
-            min_altitude_m,
-            training_effect,
-            anaerobic_training_effect,
-            rpe,
-            avg_cadence_spm,
-            max_cadence_spm,
-            avg_stride_cm,
+        row.into_workout(WorkoutDetailExtras {
             hr_zones,
-            workout_id,
-            workout_type: workout_type.clone(),
-            normalized_type: workout_type,
-            type_source,
-            user_override,
-            effective_type,
+            route_points,
+            stored_samples,
             custom_label,
-            start_time: parse_datetime(&start, "workout.start_time")?,
-            end_time: parse_datetime(&end, "workout.end_time")?,
-            distance_meters,
-            calories,
-            avg_hr,
-            max_hr,
-            training_load,
-            vo2max,
-            source_scope: parse_scope(&scope)?,
-            device_id,
-            synced_at: synced_at
-                .as_deref()
-                .map(|value| parse_datetime(value, "workout.synced_at"))
-                .transpose()?,
-            gps_available: gps_available != 0 || route_points > 0,
-            sample_count: sample_count.max(stored_samples),
-            zepp_source: None,
-            zepp_type,
-        }))
+        })
+        .map(Some)
     }
 
     pub fn get_health_overview(&self) -> Result<HealthOverview> {

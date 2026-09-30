@@ -161,6 +161,7 @@ mod payload;
 mod queries;
 mod replay;
 mod util;
+mod workout_row;
 mod workout_series;
 mod writes;
 
@@ -176,6 +177,7 @@ use payload::*;
 pub(crate) use queries::*;
 pub use replay::*;
 use util::*;
+pub(crate) use workout_row::*;
 
 pub struct Database {
     /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
