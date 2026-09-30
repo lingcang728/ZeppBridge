@@ -12,7 +12,6 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import HeartRateCard from '../components/overview/HeartRateCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
-import DataReadyCapsule from '../components/overview/DataReadyCapsule.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import WeekDigest from '../components/overview/WeekDigest.vue';
@@ -320,8 +319,6 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <h1 id="overview-title">{{ t.overviewTitle }}</h1>
         <p class="overview-date">{{ todayLabel }}</p>
       </div>
-      <!-- 取餐胶囊：同步在跑时报进度，用户等的那次同步落地后发光喊「交给 AI」。 -->
-      <DataReadyCapsule />
     </header>
 
     <!-- 认不出型号不是「坏了」，是可以自己指认的。不说这一句，用户只会以为
@@ -381,8 +378,6 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
 <style scoped>
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
-/* 页头行固定高度：取餐胶囊出现、消失都在这一行里，不推动下面的内容。
-   窄了取餐胶囊换到下一行，标题和日期不被挤成两截。 */
 .overview-header { flex-wrap: wrap; min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }
 .overview-title { display: grid; gap: 2px; }

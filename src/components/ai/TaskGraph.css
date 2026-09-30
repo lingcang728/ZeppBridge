@@ -58,6 +58,6 @@
 .dock-left { left: 14px; }
 .dock-right { right: 14px; gap: 2px; padding: 3px; border-radius: 999px; }
 
-.crumb-enter-active, .crumb-leave-active { transition: opacity .28s ease, translate .38s var(--ease-out), filter .28s ease; }
-.crumb-enter-from, .crumb-leave-to { opacity: 0; filter: blur(6px); }
+.crumb-enter-active, .crumb-leave-active { transition: opacity .28s ease, translate .38s var(--ease-out); }
+.crumb-enter-from, .crumb-leave-to { opacity: 0; }
 .crumb.crumb-enter-from, .crumb.crumb-leave-to { translate: -8px 0; }

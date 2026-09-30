@@ -181,7 +181,7 @@ const coverageText = computed(() => {
   overscroll-behavior: contain;
   animation: pop-in .26s var(--ease-out);
 }
-@keyframes pop-in { from { opacity: 0; scale: .96; filter: blur(4px); } }
+@keyframes pop-in { from { opacity: 0; scale: .96; } }
 .pop-head { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); }
 .pop-icon { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--accent); }
 .pop-title { display: grid; flex: 1; min-width: 0; gap: 2px; }

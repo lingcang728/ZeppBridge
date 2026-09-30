@@ -986,19 +986,6 @@ export default {
       daySuffix: '' as string,
     },
 
-    'components/overview/DataReadyCapsule': {
-      waitingEyebrow: 'Загружаем данные из облака',
-      waitingHint: 'сообщим, как только всё будет готово',
-      step: (current: number, total: number) => `${current}/${total}`,
-      readyTitle: 'Данные готовы',
-      readyNew: (records: string, clock: string) => `Новых записей: ${records} · на ${clock}`,
-      readyFresh: (clock: string) => `Все данные актуальны · на ${clock}`,
-      readyPartial: (streams: string, clock: string) =>
-        `${streams} не получены, остальное обновлено · на ${clock}`,
-      cta: 'Передать ИИ',
-      dismiss: 'Не сейчас',
-      streamSeparator: ', ',
-    },
 
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Открыть детали пульса за 24 часа',
@@ -1116,7 +1103,6 @@ export default {
       syncing: 'Синхронизация…',
       syncFailed: 'Синхронизация не удалась',
       syncPartial: 'Синхронизировано частично',
-      cancel: 'Отмена',
       themeTitle: 'Сменить тему',
       themeLight: 'Светлая',
       themeDark: 'Тёмная',

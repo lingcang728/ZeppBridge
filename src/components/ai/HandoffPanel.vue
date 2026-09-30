@@ -70,6 +70,9 @@ const t = useMessages(defineMessages(
     summarizedOnly: (count: number) => `最早 ${count} 次运动只留概要`,
     subscribed: (label: string) => `我已订阅 ${label}`,
     subscribedHint: '订阅版约能读 12 万 token，免费版一般只读得完约 3 万；勾上后运动曲线更细。',
+    planPaid: '已订阅',
+    planFree: '免费版',
+    planTitle: (label: string) => `你用的是 ${label} 的哪一档？点一下切换。`,
     noteDeepseek: 'DeepSeek 的专家模式不能传文件，用普通对话。',
     noteChatgpt: 'ChatGPT 免费版每天只能传 3 个文件。',
     stale: '导出后任务又改过，桌面文件已旧，重新导出。',
@@ -115,6 +118,9 @@ const t = useMessages(defineMessages(
     summarizedOnly: (count: number) => `Oldest ${count} workout(s) as summary only`,
     subscribed: (label: string) => `I pay for ${label}`,
     subscribedHint: 'Paid plans read about 120k tokens; free plans usually only about 30k. Tick it for finer workout curves.',
+    planPaid: 'Paid plan',
+    planFree: 'Free plan',
+    planTitle: (label: string) => `Which ${label} plan do you use? Click to switch.`,
     noteDeepseek: 'DeepSeek’s expert mode cannot take files — use a normal chat.',
     noteChatgpt: 'ChatGPT’s free plan allows 3 file uploads a day.',
     stale: 'Task changed after export — desktop files are outdated. Export again.',
@@ -160,6 +166,9 @@ const t = useMessages(defineMessages(
     summarizedOnly: (count: number) => `Los ${count} entrenamientos más antiguos solo en resumen`,
     subscribed: (label: string) => `Pago ${label}`,
     subscribedHint: 'Los planes de pago leen unos 120 000 tokens; los gratuitos, unos 30 000. Márcalo para curvas más finas.',
+    planPaid: 'De pago',
+    planFree: 'Gratis',
+    planTitle: (label: string) => `¿Qué plan de ${label} usas? Haz clic para cambiar.`,
     noteDeepseek: 'El modo experto de DeepSeek no admite archivos: usa un chat normal.',
     noteChatgpt: 'El plan gratuito de ChatGPT permite 3 archivos al día.',
     stale: 'La tarea cambió tras exportar: los archivos del escritorio son antiguos. Vuelve a exportar.',
@@ -223,6 +232,11 @@ const mdLine = computed(() => {
   const tokens = formatTokens(md.approx_tokens);
   if (md.approx_tokens <= FREE_TOKEN_BUDGET) return t.value.tokensFree(tokens);
   return subscribed.value ? t.value.tokensPaid(tokens) : t.value.tokensNeedPaid(tokens);
+});
+/** 内容超过免费版额度却标着免费版：档位开关带一圈警示色，提醒「要么订阅、要么缩范围」。 */
+const mdNeedsPaid = computed(() => {
+  const md = props.preview?.markdown;
+  return !!md && !md.over_budget && md.approx_tokens > FREE_TOKEN_BUDGET;
 });
 const mdDowngrade = computed(() => {
   const md = props.preview?.markdown;
@@ -336,6 +350,8 @@ const onFileDrag = (event: MouseEvent) => {
 
 /* —— 就绪度浮层 —— */
 const details = ref(false);
+/* 浮层开着时舞台其余部分要退到背景里（AiComposer 的遮罩），所以把开关交出去。 */
+defineExpose({ details });
 const dock = ref<HTMLElement | null>(null);
 const onDocPointer = (event: PointerEvent) => {
   if (!dock.value || dock.value.contains(event.target as Node)) return;
@@ -448,6 +464,14 @@ onBeforeUnmount(() => {
       <CapsuleWheel class="provider-wheel" loop :span="210" :items="providerItems" :model-value="provider.id"
         :aria-label="t.who" @update:model-value="pickProvider" />
 
+      <!-- 订阅档位就摆在主按钮旁边：用户习惯直接点交付，不会先点开就绪度浮层去找那个勾。
+           它决定导出的 .md 有多细，所以要一眼看得见、一下能改。 -->
+      <button type="button" role="switch" :aria-checked="subscribed" :class="['plan-toggle', { paid: subscribed, short: !subscribed && mdNeedsPaid }]"
+        :title="`${t.planTitle(provider.label)} ${t.subscribedHint}`" @click="subscribed = !subscribed">
+        <span class="plan-mark" aria-hidden="true"><Icon v-if="subscribed" name="check" :size="12" /></span>
+        <span class="plan-copy"><small>{{ provider.label }}</small><strong>{{ subscribed ? t.planPaid : t.planFree }}</strong></span>
+      </button>
+
       <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy || isSyncing" :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @click="run(true)">
         <Icon name="send" :size="17" />
         <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ isSyncing ? t.goSubSyncing : t.goSub }}</small></span>
@@ -502,6 +526,20 @@ onBeforeUnmount(() => {
 .ready-chevron { flex: 0 0 auto; color: var(--subtle); transition: rotate var(--dur-base) var(--ease-out); }
 .ready-chevron.up { rotate: 180deg; }
 .provider-wheel { flex: 0 0 auto; height: 44px; }
+.plan-toggle { display: inline-flex; flex: 0 0 auto; min-height: 44px; align-items: center; gap: 8px; padding: 4px 14px 4px 8px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted); font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur-base) ease, color var(--dur-base) ease, box-shadow var(--dur-base) ease; }
+.plan-toggle:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.plan-toggle:active { scale: .97; }
+.plan-mark { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 28%, transparent); transition: background var(--dur-base) ease, box-shadow var(--dur-base) ease; }
+.plan-copy { display: grid; line-height: 1.15; }
+.plan-copy small { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 500; white-space: nowrap; }
+.plan-copy strong { font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
+.plan-toggle.paid { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.plan-toggle.paid .plan-mark { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
+.plan-toggle.short { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 60%, transparent); }
+.plan-toggle.short strong { color: var(--warning); }
 
 /* 主按钮：整页唯一的实色。液态玻璃的高光压在品牌绿上。 */
 .go {
@@ -602,18 +640,20 @@ onBeforeUnmount(() => {
 .alert-pill { margin: 0; padding: 6px 14px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: var(--glass-rim); }
 
 .sheet-enter-active, .sheet-leave-active, .grow-enter-active, .grow-leave-active {
-  transition: opacity 240ms ease, translate 360ms var(--ease-out), filter 260ms ease, scale 360ms var(--ease-out);
+  transition: opacity 220ms ease, translate 320ms var(--ease-out), scale 320ms var(--ease-out);
   transform-origin: 50% 100%;
 }
-.sheet-enter-from, .sheet-leave-to, .grow-enter-from, .grow-leave-to { opacity: 0; translate: 0 14px; scale: .96; filter: blur(8px); }
+/* 只动合成属性：以前带 filter: blur 过渡，玻璃浮层淡出时整块发灰拖影（用户看到的「灰色残影」）。 */
+.sheet-enter-from, .sheet-leave-to, .grow-enter-from, .grow-leave-to { opacity: 0; translate: 0 14px; scale: .96; }
 
 /* 放不下一行时排成整齐的两行（按坞自己的宽度，不按窗口）：上面是就绪度 + 交给谁，下面是主按钮 + 只导出。
    以前是 flex-wrap 随手折行，只导出那枚圆钮会孤零零掉到第二行。 */
 @container (max-width: 780px) {
   /* 两行各自占满：第一行就绪度撑满、传送带定宽；第二行主按钮撑满、只导出定宽。 */
   .bar { width: 100%; flex-wrap: wrap; gap: 8px; border-radius: var(--radius-lg); }
+  /* 第二行：档位开关 + 主按钮 + 只导出——档位紧挨着主按钮，点交付前一眼就看见。 */
   .ready-chip { flex: 1 1 calc(100% - 226px); min-height: 44px; }
-  .go { flex: 1 1 calc(100% - 60px); min-width: 0; min-height: 48px; justify-content: center; padding-inline: 18px; }
+  .go { flex: 1 1 160px; min-width: 0; min-height: 48px; justify-content: center; padding-inline: 18px; }
   .go-copy { min-width: 0; }
   .go-copy strong, .go-copy small { overflow: hidden; text-overflow: ellipsis; }
 }

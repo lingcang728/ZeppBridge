@@ -882,18 +882,6 @@ export default {
       legendNeutral: '↑↓ = सिर्फ़ बदलाव, अच्छा या बुरा नहीं',
     },
 
-    'components/overview/DataReadyCapsule': {
-      waitingEyebrow: 'क्लाउड से डेटा लाया जा रहा है',
-      waitingHint: 'तैयार होते ही यहाँ दिखेगा',
-      step: (current: number, total: number) => `${current}/${total}`,
-      readyTitle: 'डेटा तैयार है',
-      readyNew: (records: string, clock: string) => `${records} नए रिकॉर्ड · ${clock} तक`,
-      readyFresh: (clock: string) => `पहले से अपडेट है · ${clock} तक`,
-      readyPartial: (streams: string, clock: string) => `${streams} छूटा, बाकी अपडेट हुआ · ${clock} तक`,
-      cta: 'AI को भेजें',
-      dismiss: 'हटाएँ',
-      streamSeparator: ', ',
-    },
 
     'components/overview/HeartRateCard': {
       hrTitle: 'हालिया हार्ट रेट',
@@ -1012,7 +1000,6 @@ export default {
       themeLight: 'लाइट',
       themeDark: 'डार्क',
       localeLabel: 'भाषा',
-      cancel: 'रद्द करें',
       readyPill: 'डेटा तैयार · AI को भेजें',
       readyTitle: 'डेटा तैयार है। AI को भेजने के लिए क्लिक करें।',
       connectPill: 'खाता जोड़ें',

@@ -60,6 +60,6 @@ useWidthMorph(pill, () => (shown.value ? props.hint : ''));
 .undo-hint { max-width: 280px; overflow: hidden; color: var(--muted); text-overflow: ellipsis; animation: undo-hint-in .32s var(--ease-out); }
 .undo-hint::after { content: '·'; margin-left: 7px; color: var(--subtle); }
 .undo-pill.has-hint .undo-word { color: var(--accent); font-weight: 600; }
-@keyframes undo-hint-in { from { opacity: 0; filter: blur(4px); } }
+@keyframes undo-hint-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .undo-hint { animation: none; } }
 </style>

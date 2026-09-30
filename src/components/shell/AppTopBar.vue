@@ -12,7 +12,7 @@ import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../../i18n';
 import { backDestination, historyBackPath, navigationBranch } from '../../lib/navigation';
 import type { Locale } from '../../i18n';
-import type { ResolvedTheme } from '../../composables/useTheme';
+import type { ThemeMode } from '../../composables/useTheme';
 
 const messages = defineMessages(
   {
@@ -30,7 +30,7 @@ const messages = defineMessages(
     syncingProgress: (current: number, total: number) => `同步中 ${current}/${total}`,
     syncFailed: '同步失败',
     syncPartial: '部分未完成',
-    cancel: '取消',
+    syncWait: '同步完成前请稍候',
     themeTitle: '切换主题',
     themeLight: '浅色',
     themeDark: '深色',
@@ -53,7 +53,7 @@ const messages = defineMessages(
     syncing: 'Syncing…',
     syncFailed: 'Sync failed',
     syncPartial: 'Partly synced',
-    cancel: 'Cancel',
+    syncWait: 'Please wait for the sync to finish',
     syncingProgress: (current: number, total: number) => `Syncing ${current}/${total}`,
     themeTitle: 'Switch theme',
     themeLight: 'Light',
@@ -77,7 +77,7 @@ const messages = defineMessages(
     syncing: 'Sincronizando…',
     syncFailed: 'Sincronización fallida',
     syncPartial: 'Sincronización parcial',
-    cancel: 'Cancelar',
+    syncWait: 'Espera a que termine la sincronización',
     syncingProgress: (current: number, total: number) => `Sincronizando ${current}/${total}`,
     themeTitle: 'Cambiar tema',
     themeLight: 'Claro',
@@ -136,13 +136,13 @@ const onEscapeBack = (event: KeyboardEvent) => {
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
-  isSyncing, canIncrementalSync, runSync, cancelSync, dataReady,
+  isSyncing, canIncrementalSync, runSync, dataReady,
 } = useSyncController();
 
 /* 用户在等的那次同步落地了：同步胶囊变成发光的「数据已备好 · 交给 AI」，
    点一下去取。又开始同步时让位给进度；进了交给 AI 就恢复成上次同步时间。 */
 const readyToHand = computed(() => dataReady.value.phase === 'ready' && !isSyncing.value);
-const { resolvedTheme, themeMode, pickTheme } = useTheme();
+const { themeMode, pickTheme } = useTheme();
 
 const accountRecognized = computed(() =>
   ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
@@ -203,7 +203,7 @@ const syncText = computed(() => {
 
 const syncTitle = computed(() => {
   if (readyToHand.value) return t.value.readyTitle;
-  if (isSyncing.value) return `${syncMessage.value} · ${t.value.cancel}`;
+  if (isSyncing.value) return `${syncMessage.value} · ${t.value.syncWait}`;
   return `${t.value.connectionTitle} · ${t.value.lastSyncPrefix}${lastSyncClock.value}`
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
 });
@@ -213,12 +213,13 @@ const syncTitle = computed(() => {
 const idleSyncable = computed(() => !isSyncing.value && !readyToHand.value && canIncrementalSync.value
   && syncState.value !== 'failed' && syncState.value !== 'partial');
 
-/* 点击行为和旧的同步按钮相同：能增量同步就发起；同步中点击则是取消；没连上就去「账号与设备」卡。 */
+/* 点击：能增量同步就发起；没连上就去「账号与设备」卡。同步中点了什么都不做——不给「取消」：
+   半路停下会留下一部分流更新了、另一部分没更新的库（用户 2026-09-30 定），等它跑完就好。 */
 const onSyncClick = () => {
   if (readyToHand.value) {
     void router.push('/ai');
   } else if (isSyncing.value) {
-    cancelSync();
+    return;
   } else if (canIncrementalSync.value) {
     void runSync('incremental');
   } else if (needsConnection.value) {
@@ -226,28 +227,24 @@ const onSyncClick = () => {
   }
 };
 
-/* 主题两格：点哪枚就固定哪一套（「跟随系统」在设置的「显示与语言」里）。默认跟随系统时，
-   亮着的那枚在提示里写明「跟随系统」；再点一下亮着的那枚就把它固定下来。 */
-const themeOptions = computed<{ value: ResolvedTheme; label: string; icon: IconName }[]>(() => [
+/* 主题三格，和设置「显示与语言」里的一模一样：深色 / 浅色 / 跟随系统，点哪格就是哪条规则。 */
+const themeOptions = computed<{ value: ThemeMode; label: string; icon: IconName }[]>(() => [
   { value: 'dark', label: t.value.themeDark, icon: 'moon' },
   { value: 'light', label: t.value.themeLight, icon: 'sun' },
-].map((option) => (themeMode.value === 'system' && option.value === resolvedTheme.value
-  ? { ...option, label: `${option.label} · ${t.value.themeSystem}` } : option)) as { value: ResolvedTheme; label: string; icon: IconName }[]);
+  { value: 'system', label: t.value.themeSystem, icon: 'monitor' },
+]);
 /* 新主题从被点的那枚图标处扩散开：按钮中心就是扩散的圆心（键盘切换也一样）。 */
 const themeTrack = ref<{ $el: HTMLElement } | null>(null);
 const onThemeChange = (value: string | number) => {
   const index = themeOptions.value.findIndex((option) => option.value === value);
   const button = themeTrack.value?.$el.querySelectorAll<HTMLElement>('.segment-item')[index];
   const rect = button?.getBoundingClientRect();
-  pickTheme(value as ResolvedTheme, rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined);
+  pickTheme(value as ThemeMode, rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined);
 };
 
-/* 语言列表跟着 LOCALES 注册表走——S6 扩到十种语言时这里自动变长。 */
-const LOCALE_SHORT: Record<Locale, string> = {
-  zh: '中', en: 'EN', es: 'ES', nl: 'NL', 'pt-BR': 'PT-BR', 'pt-PT': 'PT', de: 'DE', ru: 'RU', 'hi-IN': 'HI', fr: 'FR',
-};
-const localeOptions = computed(() =>
-  LOCALES.map((code) => ({ value: code, label: fit.value >= FIT_SHORT_LOCALE ? LOCALE_SHORT[code] : LOCALE_LABELS[code] })));
+/* 语言列表跟着 LOCALES 注册表走，一律写全名，和设置页一致（不用「PT-BR」「中」这类缩写）。
+   放不下时整枚让位（fit-5），设置里还有同一个开关。 */
+const localeOptions = computed(() => LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
 const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
@@ -257,7 +254,7 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
    品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
-     1 藏字标 → 2 语言改短码 → 3 同步胶囊只留圆点 → 4 导航紧凑 → 5 藏语言（设置里还有）。
+     1 藏字标 → 2 语言两侧少露一截 → 3 同步胶囊只留圆点 → 4 导航紧凑 → 5 藏语言（设置里还有）。
    每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。
    整轮量完都在同一个任务里（只 await nextTick，中间不出帧），画面上只看到最后那一档。
 
@@ -266,7 +263,7 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
    「PT-BR」和「Português (Brasil)」之间来回闪个不停，根本拖不动。现在只看顶栏本身
    （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊按「转到最宽那一项」
    的宽度留位置，拖动途中撑宽也不会压到导航。 */
-const FIT_SHORT_LOCALE = 2;
+const FIT_SHORT_LOCALE = 2; // 语言传送带两侧的露边收窄（不再换短码）
 const FIT_MAX = 5;
 const fit = ref(0);
 const bar = ref<HTMLElement | null>(null);
@@ -402,16 +399,14 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
         <Icon v-if="idleSyncable" name="refresh" :size="14" class="sync-icon" />
         <i v-else class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
         <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
-        <!-- 同步中这颗按钮的动作是取消：写出来，不只藏在 title 里（U19）。 -->
-        <span v-if="isSyncing" class="sync-cancel"><Icon name="x" :size="12" /><span class="sync-cancel-text">{{ t.cancel }}</span></span>
-        <Icon v-else-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
+        <Icon v-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
       <div class="icon-group glass-control">
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
-          :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
+          :model-value="themeMode" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
         <CapsuleWheel ref="localeWheel" class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
           :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
@@ -487,8 +482,9 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
   cursor: pointer;
   white-space: nowrap;
 }
-.sync-pill:hover:not(:disabled) { color: var(--ink); }
-.sync-pill:active:not(:disabled) { scale: .97; }
+.sync-pill:hover:not(:disabled):not(.syncing) { color: var(--ink); }
+.sync-pill:active:not(:disabled):not(.syncing) { scale: .97; }
+.sync-pill.syncing { cursor: progress; }
 .sync-pill:disabled { cursor: not-allowed; opacity: .6; }
 .sync-pill .dot {
   width: 8px;
@@ -510,13 +506,10 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 }
 .sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   animation: sync-text-in var(--dur-slow) var(--ease-out); }
-@keyframes sync-text-in { from { opacity: 0; filter: blur(4px); } }
+@keyframes sync-text-in { from { opacity: 0; } }
 .sync-pill.is-ready { color: var(--ink); font-weight: 600; }
 .sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .ready-arrow { color: var(--accent); }
-.sync-cancel { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; padding: 1px 7px 1px 5px; border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: var(--fs-2xs); }
-.sync-pill:hover .sync-cancel { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--ink); }
 .sync-icon { flex: none; color: var(--accent); }
 .sync-pill.tone-neutral .sync-icon { color: var(--muted); }
 
@@ -528,7 +521,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
-.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text, .fit-3 .sync-cancel-text, .fit-4 .sync-cancel-text, .fit-5 .sync-cancel-text { display: none; }
+.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
 .fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
 .fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
 
@@ -551,7 +544,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 }
 @media (max-width: 520px) {
   .topbar-actions { gap: 5px; }
-  .sync-text, .sync-cancel-text { display: none; }
+  .sync-text { display: none; }
   .sync-pill { padding-inline: 10px; }
   .wordmark { font-size: var(--fs-md); }
 }

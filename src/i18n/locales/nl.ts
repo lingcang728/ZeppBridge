@@ -589,20 +589,6 @@ export default {
       year: 'Jaar',
       yearSuffix: '' as string,
     },
-    'components/overview/DataReadyCapsule': {
-      cta: 'Naar de AI',
-      dismiss: 'Niet nu',
-      readyFresh: (clock: string) => `Al bijgewerkt · tot ${clock}`,
-      readyNew: (records: string, clock: string) =>
-        `${records} nieuwe items · tot ${clock}`,
-      readyPartial: (streams: string, clock: string) =>
-        `${streams} niet binnengekomen, de rest is bijgewerkt · tot ${clock}`,
-      readyTitle: 'Je gegevens staan klaar',
-      step: (current: number, total: number) => `${current}/${total}`,
-      streamSeparator: ', ',
-      waitingEyebrow: 'Gegevens worden uit de cloud opgehaald',
-      waitingHint: 'Je krijgt hier een seintje; kijk ondertussen gerust rond.',
-    },
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Open het hartslagdetail voor de volle 24 uur',
       hrTitle: 'Recente hartslag',
@@ -718,7 +704,6 @@ export default {
       syncing: 'Synchroniseren…',
       syncFailed: 'Synchronisatie mislukt',
       syncPartial: 'Deels gesynchroniseerd',
-      cancel: 'Annuleren',
       themeTitle: 'Thema wisselen',
       themeLight: 'Licht',
       themeDark: 'Donker',

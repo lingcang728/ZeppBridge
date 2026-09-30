@@ -943,7 +943,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       syncPartial: 'Partiellement synchronisé',
       syncFailed: 'Synchro échouée',
       verifyFirst: 'Faites d’abord la vérification de la connexion',
-      cancel: 'Annuler',
       themeTitle: 'Changer de thème',
       themeLight: 'Clair',
       themeDark: 'Sombre',
@@ -1210,19 +1209,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       legendNeutral: '↑↓ = simple variation, sans jugement',
     },
 
-    'components/overview/DataReadyCapsule': {
-      waitingEyebrow: 'Récupération des données depuis le cloud',
-      waitingHint: 'On vous prévient ici dès que c’est prêt — explorez les autres pages en attendant',
-      step: (current: number, total: number) => `${current}/${total}`,
-      readyTitle: 'Vos données sont prêtes',
-      readyNew: (records: string, clock: string) => `Nouveaux enregistrements : ${records} · à ${clock}`,
-      readyFresh: (clock: string) => `Déjà à jour · à ${clock}`,
-      readyPartial: (streams: string, clock: string) =>
-        `${streams} en échec, le reste est à jour · à ${clock}`,
-      cta: 'Confier à l’IA',
-      dismiss: 'Pas maintenant',
-      streamSeparator: ', ',
-    },
 
     'components/overview/HeartRateCard': {
       hrTitle: 'Fréquence cardiaque récente',

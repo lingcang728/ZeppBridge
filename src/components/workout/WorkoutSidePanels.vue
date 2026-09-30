@@ -109,6 +109,8 @@ const modeItems = computed(() => [
 .ai-provider { display: grid; gap: 6px; font-size: var(--fs-sm); color: var(--muted); }
 .action-note { display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: var(--fs-sm); }
 .action-note.ok { color: var(--accent); } .action-note.bad { color: var(--danger); }
-@media (max-width: 1180px) { .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
-@media (max-width: 760px) { .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } }
+/* 两列时解析明细跨两行：多出来的高度全给第二行（来源信息那一格），交付卡按内容高、不被拉长——
+   以前两行平分，「交给 AI / 导出与分享」按钮下面空出一大截。 */
+@media (max-width: 1180px) { .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); grid-template-rows: auto 1fr; align-items: start; } .decoded-card { grid-row: span 2; align-self: stretch; } }
+@media (max-width: 760px) { .side-col { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; } .decoded-card { grid-row: auto; } }
 </style>

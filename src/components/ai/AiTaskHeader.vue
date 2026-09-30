@@ -194,8 +194,8 @@ onBeforeUnmount(() => {
 .row-mark { display: grid; place-items: center; color: var(--accent); }
 .row-name { min-width: 0; overflow: hidden; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
 .row-when { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.history-enter-active, .history-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out), filter .22s ease; }
-.history-enter-from, .history-leave-to { opacity: 0; translate: 0 -6px; filter: blur(6px); }
+.history-enter-active, .history-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out); }
+.history-enter-from, .history-leave-to { opacity: 0; translate: 0 -6px; }
 /* 很窄的窗口：任务名自己占一行，天数和记录挪到第二行，谁也不被挤出画面。 */
 @media (max-width: 480px) {
   .head-task { flex-wrap: wrap; row-gap: 2px; border-radius: var(--radius-md); }

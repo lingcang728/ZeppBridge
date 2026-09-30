@@ -495,18 +495,6 @@ export default {
     },
 
 
-    'components/overview/DataReadyCapsule': {
-      waitingEyebrow: 'Buscando dados na nuvem',
-      waitingHint: 'Avisaremos assim que estiver pronto. Pode explorar à vontade.',
-      step: (current: number, total: number) => `${current}/${total}`,
-      readyTitle: 'Dados prontos',
-      readyNew: (records: string, clock: string) => `${records} novos registros · às ${clock}`,
-      readyFresh: (clock: string) => `Tudo em dia · às ${clock}`,
-      readyPartial: (streams: string, clock: string) => `Atualizado, exceto ${streams} · às ${clock}`,
-      cta: 'Enviar para IA',
-      dismiss: 'Agora não',
-      streamSeparator: ', ',
-    },
 
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Ver detalhes de FC de 24 horas',
@@ -620,7 +608,6 @@ export default {
       syncing: 'Sincronizando…',
       syncFailed: 'Falha na sincronização',
       syncPartial: 'Sincronizado parcialmente',
-      cancel: 'Cancelar',
       themeTitle: 'Alternar tema',
       themeLight: 'Claro',
       themeDark: 'Escuro',

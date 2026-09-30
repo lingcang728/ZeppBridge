@@ -965,20 +965,6 @@ export default {
       },
       legendNeutral: '↑↓ = apenas uma mudança, sem juízo',
     },
-    'components/overview/DataReadyCapsule': {
-      waitingEyebrow: 'A descarregar dados da nuvem',
-      waitingHint: 'avisamos aqui assim que estiver pronto — explora à vontade',
-      step: (current: number, total: number) => `${current}/${total}`,
-      readyTitle: 'Dados atualizados',
-      readyNew: (records: string, clock: string) =>
-        `${records} registos novos · às ${clock}`,
-      readyFresh: (clock: string) => `Tudo em dia · às ${clock}`,
-      readyPartial: (streams: string, clock: string) =>
-        `Falta ${streams}; restantes atualizados · às ${clock}`,
-      cta: 'Enviar à IA',
-      dismiss: 'Agora não',
-      streamSeparator: ', ',
-    },
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Abrir detalhe de frequência cardíaca das 24 horas completas',
       hrTitle: 'Frequência cardíaca recente',
@@ -1089,7 +1075,6 @@ export default {
       syncing: 'A sincronizar…',
       syncFailed: 'A sincronização falhou',
       syncPartial: 'Sincronização parcial',
-      cancel: 'Cancelar',
       themeTitle: 'Mudar tema',
       themeLight: 'Claro',
       themeDark: 'Escuro',

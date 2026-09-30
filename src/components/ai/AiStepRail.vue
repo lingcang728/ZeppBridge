@@ -96,10 +96,9 @@ defineSlots<Record<string, () => unknown>>();
 .step-body {
   padding: 0 14px 16px;
   opacity: 0;
-  filter: blur(4px);
-  transition: opacity 220ms ease, filter 260ms ease;
+  transition: opacity 220ms ease;
 }
-.is-open .step-body { opacity: 1; filter: none; transition-delay: 80ms; }
+.is-open .step-body { opacity: 1; transition-delay: 80ms; }
 
 /* 里面的面板本来各自是一张卡：放进步骤栏以后去掉卡的外壳和它自己的步骤标题。 */
 .step-body :deep(.ai-card) { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }

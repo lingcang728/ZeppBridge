@@ -1185,20 +1185,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Die Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, nur der aktuelle Wert.',
       legendNeutral: '↑↓ = nur eine Veränderung, keine Bewertung',
     },
-    'components/overview/DataReadyCapsule': {
-      cta: 'An die KI',
-      dismiss: 'Nicht jetzt',
-      readyFresh: (clock: string) => `Bereits aktuell · Stand ${clock}`,
-      readyNew: (records: string, clock: string) => `${records} neue Einträge · Stand ${clock}`,
-      readyPartial: (streams: string, clock: string) =>
-        `${streams} nicht angekommen, Rest aktualisiert · Stand ${clock}`,
-      readyTitle: 'Daten bereit',
-      step: (current: number, total: number) => `${current}/${total}`,
-      streamSeparator: ', ',
-      waitingEyebrow: 'Daten werden aus der Cloud abgerufen',
-      waitingHint:
-        'Wenn alles bereit ist, meldet es sich hier – schau dich solange ruhig um.',
-    },
     'components/overview/HeartRateCard': {
       bpm: 'bpm',
       cloudLag:
@@ -1299,7 +1285,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     'components/shell/AppTopBar': {
       today: 'Heute',
       brandHome: 'ZeppBridge 3 · Übersicht',
-      cancel: 'Abbrechen',
       connectionTitle: 'Cloud-Verbindungsstatus',
       lastSyncPrefix: 'Letzte Synchronisierung: ',
       localeLabel: 'Oberflächensprache',

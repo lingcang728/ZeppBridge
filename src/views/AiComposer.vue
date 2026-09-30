@@ -274,7 +274,9 @@ watch(
 );
 
 /* 交付坞的实际高度：宽度不够时它折成两行，画布上的撤销 / 缩放要跟着往上让。 */
-const dockRef = ref<{ $el?: Element } | null>(null);
+const dockRef = ref<{ $el?: Element; details?: boolean } | null>(null);
+/* 最终提示词浮层打开时，舞台其余部分磨砂变暗，视线落在浮层上（和运动页弹窗一样）。 */
+const focusDock = computed(() => !!dockRef.value?.details);
 const dockHeight = ref(0);
 let dockObserver: ResizeObserver | null = null;
 onMounted(() => {
@@ -285,28 +287,55 @@ onMounted(() => {
   dockObserver = new ResizeObserver(measure);
   dockObserver.observe(el);
 });
-onBeforeUnmount(() => dockObserver?.disconnect());
+/* 顶上一排（任务名胶囊 + 视图开关）的实际高度：多语言 / 窄窗口里视图开关折到第二行时，
+   画布上的提示、面包屑和「先问问题」的内容跟着往下让，谁也不压谁。 */
+const stageRef = ref<HTMLElement | null>(null);
+const topRef = ref<HTMLElement | null>(null);
+const topHeight = ref(0);
+let topObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const row = topRef.value;
+  if (!row || typeof ResizeObserver === 'undefined') return;
+  const measure = () => {
+    const stage = stageRef.value?.getBoundingClientRect();
+    if (!stage) return;
+    // 只量这一排里的控件本身：任务历史的下拉是浮层，打开它不该把画布推下去。
+    const bottoms = [...row.querySelectorAll<HTMLElement>('.head-task, .stage-view')].map((el) => el.getBoundingClientRect().bottom);
+    if (bottoms.length) topHeight.value = Math.round(Math.max(...bottoms) - stage.top);
+  };
+  measure();
+  topObserver = new ResizeObserver(measure);
+  for (const el of row.querySelectorAll('.head-task, .stage-view')) topObserver.observe(el);
+});
+onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); });
 </script>
 
 <template>
   <section class="page ai-page" aria-labelledby="ai-page-title">
-    <div class="stage" :style="dockHeight ? { '--dock-h': `${dockHeight}px` } : undefined">
-      <div v-if="view === 'ask'" class="stage-graph stage-ask">
+    <div ref="stageRef" class="stage" :style="{ '--dock-h': dockHeight ? `${dockHeight}px` : undefined, '--top-h': topHeight ? `${topHeight}px` : undefined }">
+      <!-- 两个视图之间交叉淡入：以前一帧硬换，关系网再从头排一遍，看上去整块跳了一下。 -->
+      <Transition name="view-swap">
+      <div v-if="view === 'ask'" key="ask" class="stage-graph stage-ask">
         <AiAskStart :draft="draft" :preview="preview" :templates="templates" :workout-count="draft.workout_ids.length"
           @template="applyTemplate" @pick-workout="pickWorkout" @ask="focusQuestion"
           @category="draftCtl.setCategoryEnabled" @days="draftCtl.setCategoryDays" @all-days="draftCtl.setWindowDays" />
       </div>
-      <div v-else class="stage-graph">
+      <div v-else key="graph" class="stage-graph">
         <TaskGraph :model="graphModel" :can-undo="canUndo" :undo-hint="undoHint" :undo-seq="lastChange?.seq ?? 0" @undo="draftCtl.undo()"
           @set-category="draftCtl.setCategoryEnabled"
           @set-metric="(category, metric, included) => draftCtl.setMetricExcluded(category, metric, !included)"
           @set-days="draftCtl.setCategoryDays" @set-include-day="draftCtl.setIncludeWorkoutDay"
           @toggle-expand="toggleExpand" />
       </div>
+      </Transition>
 
-      <AiTaskHeader class="stage-head" :fallback-title="fallbackTitle" />
-      <SegmentTrack class="stage-view" compact :items="viewItems" :model-value="view" :aria-label="t.viewAria"
-        @update:model-value="(value) => view = value === 'graph' ? 'graph' : 'ask'" />
+      <!-- 任务名胶囊和视图开关排在同一行的弹性布局里：以前两者各自绝对定位，任务名一长、
+           换成德语 / 俄语，开关就压在胶囊上。现在放不下时开关自己折到下一行。 -->
+      <div ref="topRef" class="stage-top">
+        <AiTaskHeader class="stage-head" :fallback-title="fallbackTitle" />
+        <SegmentTrack class="stage-view" compact :items="viewItems" :model-value="view" :aria-label="t.viewAria"
+          @update:model-value="(value) => view = value === 'graph' ? 'graph' : 'ask'" />
+      </div>
 
       <aside class="stage-rail glass-control">
         <AiStepRail v-model:open="openStep" :steps="railSteps">
@@ -319,6 +348,8 @@ onBeforeUnmount(() => dockObserver?.disconnect());
         </AiStepRail>
       </aside>
 
+      <!-- 遮罩本身只淡入淡出（opacity），模糊是静态的一层，不做逐帧模糊过渡。 -->
+      <Transition name="scrim"><div v-if="focusDock" class="stage-scrim" aria-hidden="true"></div></Transition>
       <HandoffPanel ref="dockRef" class="stage-dock" :preview="preview" :preview-error="previewError" :direction="direction" :fallback-title="fallbackTitle" />
     </div>
   </section>
@@ -341,10 +372,17 @@ onBeforeUnmount(() => dockObserver?.disconnect());
 }
 /* --graph-safe-*：画布四边被浮层挡住的宽度（上：任务名胶囊，下：交付坞和它上面那一排
    撤销 / 缩放胶囊）。关系网的节点弹层只摆在剩下看得见的那一块里，不会再被盖住半截。 */
-.stage-graph { --graph-safe-top: 70px; position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
-.stage-head { position: absolute; top: 16px; left: 16px; z-index: 4; max-width: calc(100% - var(--rail-w) - 240px); }
-.stage-view { position: absolute; top: 18px; right: calc(var(--rail-w) + 40px); z-index: 4; }
+.stage-graph { --graph-safe-top: calc(var(--top-h, 54px) + 16px); position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
+.stage-top { position: absolute; top: 16px; right: calc(var(--rail-w) + 40px); left: 16px; z-index: 4; display: flex; flex-wrap: wrap; align-items: flex-start;
+  justify-content: space-between; gap: 8px 12px; pointer-events: none; }
+.stage-top > * { pointer-events: auto; }
+.stage-head { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.stage-view { flex: none; margin-left: auto; margin-top: 2px; }
 .stage-ask { overflow: hidden; }
+.view-swap-enter-active { transition: opacity 240ms ease, translate 320ms var(--ease-out); }
+.view-swap-leave-active { transition: opacity 160ms ease; pointer-events: none; }
+.view-swap-enter-from { opacity: 0; translate: 0 6px; }
+.view-swap-leave-to { opacity: 0; }
 .stage-rail {
   position: absolute;
   top: 12px;
@@ -357,31 +395,29 @@ onBeforeUnmount(() => dockObserver?.disconnect());
   border-radius: calc(var(--radius-xl) - 8px);
   overscroll-behavior: contain;
 }
-.stage-dock { position: absolute; right: calc(var(--rail-w) + 36px); bottom: 16px; left: 16px; z-index: 5; }
+.stage-scrim { position: absolute; inset: 0; z-index: 5; border-radius: inherit; background: color-mix(in srgb, var(--canvas) 45%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.scrim-enter-active, .scrim-leave-active { transition: opacity 220ms ease; }
+.scrim-enter-from, .scrim-leave-to { opacity: 0; }
+.stage-dock { position: absolute; right: calc(var(--rail-w) + 36px); bottom: 16px; left: 16px; z-index: 6; }
 /* 关系网自己的撤销 / 缩放坞往上让出交付坞的高度；面包屑和提示让出左上角的任务名胶囊。
    交付坞的高度是量出来的（--dock-h）：窗口一窄它就折成两行，以前写死 92px，撤销和缩放
    正好被盖在下面、点不到。 */
 .stage-graph { --graph-safe-bottom: calc(var(--dock-h, 64px) + 78px); }
 .stage-graph :deep(.dock) { bottom: calc(var(--dock-h, 64px) + 28px); }
-.stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: 72px; }
+.stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: calc(var(--top-h, 54px) + 18px); }
+.stage-ask :deep(.ask-start) { padding-top: calc(var(--top-h, 54px) + 30px); }
 
 @media (max-width: 1100px) {
   .ai-page { --rail-w: 100%; padding: 4px 12px 16px; }
   .stage { height: auto; overflow: visible; background: none; box-shadow: none; }
   .stage-graph { position: relative; inset: auto; height: 62vh; min-height: 440px; border-radius: var(--radius-xl); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
-  .stage-head { top: 12px; left: 12px; max-width: calc(100% - 24px); }
-  /* 窄窗口：视图开关在任务名那一行下面靠右，问题入口再往下让一行。 */
-  .stage-view { top: 66px; right: 12px; }
+  .stage-top { top: 12px; right: 12px; left: 12px; }
   .stage-ask { height: auto; min-height: 0; }
-  .stage-ask :deep(.ask-start) { padding-top: 112px; }
+  .view-swap-leave-active { position: absolute; inset: 0 0 auto; }
   .stage-rail { position: static; width: auto; margin-top: 12px; }
   .stage-dock { position: sticky; right: auto; bottom: 12px; left: auto; margin-top: 12px; }
   .stage-graph :deep(.dock) { bottom: 14px; }
-  .stage-graph { --graph-safe-top: 64px; --graph-safe-bottom: 60px; }
-}
-/* 任务名胶囊在很窄时排成两行（见 AiTaskHeader），关系网的提示和面包屑再往下让一行。 */
-@media (max-width: 480px) {
-  .stage-graph { --graph-safe-top: 108px; }
-  .stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: 114px; }
+  .stage-graph { --graph-safe-bottom: 60px; }
 }
 </style>

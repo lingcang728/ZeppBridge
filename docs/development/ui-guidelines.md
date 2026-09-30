@@ -269,16 +269,7 @@ pages, reached from Overview's entry cards and its "view all" links.
 - Overview does no interpretation such as recovery scoring or training advice.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
-- Overview is **the waiting room** while the launch sync pulls from the cloud.
-  `components/overview/DataReadyCapsule.vue` sits in the otherwise empty right
-  half of the header row (fixed 58px, so nothing below moves): "fetching your
-  data · 3/8" with a progress ring, then a glowing "your data is ready · N new
-  records · hand to AI" once the sync the user was waiting for lands. The top
-  bar's sync capsule turns into the same call at the same moment. Only
-  awaited syncs light it (launch, top bar, tray, settings) — never the
-  15-minute background auto-sync; deferred keeps waiting; failure, cancel or
-  a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering
-  `/ai` or pressing × puts it out.
+- The launch sync reports progress in one place only: the top bar's sync capsule ("Syncing 3/8"). Once the sync the user was waiting for lands it turns into a glowing "data ready · send to AI". Only awaited syncs light it (launch, top bar, tray, settings) — never the 15-minute background auto-sync; failure or a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering `/ai` puts it out. A running sync cannot be cancelled from the UI: stopping halfway leaves some streams updated and others not.
 
 ### 2. Hand to AI (`/ai`)
 
