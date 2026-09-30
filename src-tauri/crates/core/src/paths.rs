@@ -562,20 +562,76 @@ fn relocate_sqlite_group(source_dir: &Path, data_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Move a still-unreadable SQLite group out of the live path so the next open
-/// can create a fresh library. Returns the quarantine directory.
-pub fn quarantine_sqlite_group(db_path: &Path) -> io::Result<PathBuf> {
+/// 损坏库恢复的第一步（代码审查 R07）：把 DB / WAL / SHM 整组**复制**进一个
+/// 新建的隔离目录，逐个核对字节一致后才返回。原位置的文件一个都不动。
+///
+/// - 隔离目录每次新建（同一秒两次恢复会带序号），绝不写进已有目录；
+/// - 任何一个文件没复制成功或核对不上就整体失败，调用方据此什么都不改。
+pub fn preserve_sqlite_group(db_path: &Path) -> io::Result<PathBuf> {
     let data_dir = db_path.parent().unwrap_or(db_path);
+    let backups = data_dir.join("backups");
+    std::fs::create_dir_all(&backups)?;
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-    let dest = data_dir.join("backups").join(format!("corrupt-{stamp}"));
-    std::fs::create_dir_all(&dest)?;
+    let mut dest = backups.join(format!("corrupt-{stamp}"));
+    let mut attempt = 1;
+    loop {
+        match std::fs::create_dir(&dest) {
+            Ok(()) => break,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists && attempt < 100 => {
+                attempt += 1;
+                dest = backups.join(format!("corrupt-{stamp}-{attempt}"));
+            }
+            Err(error) => return Err(error),
+        }
+    }
     for name in SQLITE_GROUP {
         let source = data_dir.join(name);
-        if path_exists(&source)? {
-            relocate_entry(&source, &dest.join(name))?;
+        if !path_exists(&source)? {
+            continue;
+        }
+        let copy = dest.join(name);
+        std::fs::copy(&source, &copy)?;
+        if !same_bytes(&source, &copy)? {
+            return Err(io::Error::other(format!("{name} 的隔离副本与原件不一致")));
         }
     }
     Ok(dest)
+}
+
+/// 原件已经保存好之后，把原位置的文件组删掉，让下一次打开建一个空库。
+/// 主库放在最后删：删到一半失败时，留下的是「坏主库 + 没删掉的伴生文件」
+/// 或「只剩坏主库」，不会出现「新库配上旧 WAL」这种一打开就坏的组合。
+pub fn remove_live_sqlite_group(db_path: &Path) -> io::Result<()> {
+    let data_dir = db_path.parent().unwrap_or(db_path);
+    for name in SQLITE_GROUP.iter().rev() {
+        let path = data_dir.join(name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+fn same_bytes(a: &Path, b: &Path) -> io::Result<bool> {
+    use std::io::Read;
+    if std::fs::metadata(a)?.len() != std::fs::metadata(b)?.len() {
+        return Ok(false);
+    }
+    let mut left = io::BufReader::new(std::fs::File::open(a)?);
+    let mut right = io::BufReader::new(std::fs::File::open(b)?);
+    let (mut x, mut y) = (vec![0u8; 64 * 1024], vec![0u8; 64 * 1024]);
+    loop {
+        let n = left.read(&mut x)?;
+        if n == 0 {
+            return Ok(right.read(&mut y)? == 0);
+        }
+        right.read_exact(&mut y[..n])?;
+        if x[..n] != y[..n] {
+            return Ok(false);
+        }
+    }
 }
 
 fn relocate_entry(source: &Path, destination: &Path) -> io::Result<()> {

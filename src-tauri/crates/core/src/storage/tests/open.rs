@@ -305,3 +305,90 @@ fn corrupt_library_is_quarantined_and_app_still_starts() {
     assert!(quarantined);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/* ---------- 代码审查 R07：恢复链先留原件、整组处理、失败就不动 ---------- */
+
+fn corrupt_dirs(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut dirs: Vec<_> = std::fs::read_dir(dir.join("backups"))
+        .map(|entries| {
+            entries
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.file_name()
+                        .is_some_and(|name| name.to_string_lossy().starts_with("corrupt-"))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    dirs.sort();
+    dirs
+}
+
+#[test]
+fn salvage_keeps_the_untouched_original_before_patching_the_header() {
+    let dir = temp_dir("salvage-original");
+    let path = dir.join("zepp.db");
+    {
+        let db = Database::new(path.clone()).unwrap();
+        db.insert_metric_sample(&MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: ts(),
+            value: 70.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Unknown,
+            device_id: None,
+        })
+        .unwrap();
+    }
+    let _ = std::fs::remove_file(dir.join("zepp.db-wal"));
+    let _ = std::fs::remove_file(dir.join("zepp.db-shm"));
+    inflate_page_count(&path, 24);
+    let before = std::fs::read(&path).unwrap();
+
+    let (db, warning) = Database::open_resilient(path.clone()).unwrap();
+    assert!(warning.unwrap().contains("原件"));
+    assert_eq!(db.count_metric_samples().unwrap(), 1);
+    let kept = corrupt_dirs(&dir);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(std::fs::read(kept[0].join("zepp.db")).unwrap(), before);
+    drop(db);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn two_recoveries_in_the_same_second_never_share_a_quarantine_directory() {
+    let dir = temp_dir("same-second");
+    let path = dir.join("zepp.db");
+    std::fs::write(&path, b"first broken file").unwrap();
+    let first = crate::paths::preserve_sqlite_group(&path).unwrap();
+    std::fs::write(&path, b"second broken file").unwrap();
+    let second = crate::paths::preserve_sqlite_group(&path).unwrap();
+    assert_ne!(first, second);
+    assert_eq!(
+        std::fs::read(first.join("zepp.db")).unwrap(),
+        b"first broken file"
+    );
+    assert_eq!(
+        std::fs::read(second.join("zepp.db")).unwrap(),
+        b"second broken file"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn a_corrupt_library_that_cannot_be_preserved_is_left_exactly_as_it_was() {
+    let dir = temp_dir("cannot-preserve");
+    let path = dir.join("zepp.db");
+    std::fs::write(&path, b"this is not a sqlite database").unwrap();
+    // backups 是个文件：隔离目录建不起来 = 原件保不住。
+    std::fs::write(dir.join("backups"), b"").unwrap();
+    let (db, warning) = Database::open_resilient(path.clone()).unwrap();
+    assert!(warning.unwrap().contains("没有动它"));
+    assert_eq!(db.count_metric_samples().unwrap(), 0, "临时空库照常能用");
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        b"this is not a sqlite database"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}

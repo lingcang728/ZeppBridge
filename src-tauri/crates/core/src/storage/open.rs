@@ -90,35 +90,94 @@ impl Database {
     pub fn open_resilient(db_path: PathBuf) -> Result<(Self, Option<String>)> {
         match Self::open_migrated(&db_path) {
             Ok(db) => Ok((db, None)),
-            Err(error) if is_corrupt_error(&error) => {
-                if salvage_truncated_page_count(&db_path).unwrap_or(false) {
-                    match Self::open_migrated(&db_path) {
-                        Ok(db) => {
-                            return Ok((
-                                db,
-                                Some(
-                                    "本地库文件被截断，已对齐页头。部分历史数据可能需要重新同步。"
-                                        .into(),
-                                ),
-                            ));
-                        }
-                        Err(salvage_error) if is_corrupt_error(&salvage_error) => {}
-                        Err(salvage_error) => return Err(salvage_error),
-                    }
-                }
-                let quarantined = crate::paths::quarantine_sqlite_group(&db_path);
-                let db = Self::open_migrated(&db_path)?;
-                let warning = match quarantined {
-                    Ok(dir) => format!(
-                        "本地库已损坏，已隔离到 {} 并重建空库。请重新同步。",
-                        dir.display()
-                    ),
-                    Err(_) => "本地库已损坏，已重建空库。请重新同步。".into(),
-                };
-                Ok((db, Some(warning)))
-            }
+            Err(error) if is_corrupt_error(&error) => Self::recover_corrupt(&db_path),
             Err(error) => Err(error),
         }
+    }
+
+    /// 损坏库恢复（代码审查 R07）：「保留原件 → 修页头 → 移开坏文件 → 重建」
+    /// 全程持同一把跨进程写锁，另一个 CLI / 桌面进程插不进来。
+    ///
+    /// 原件先整组复制进隔离目录并核对，之后才碰原位置的文件；保不住原件或
+    /// 移不开坏文件时，一个字节都不删，这次用临时空库启动（不保存任何东西），
+    /// 让用户处理完磁盘空间或占用后重启再试——启动本身绝不失败。
+    fn recover_corrupt(db_path: &Path) -> Result<(Self, Option<String>)> {
+        let _guard = Self::acquire_migration_lock(db_path)?;
+        // 锁内再看一眼：等锁的时候另一个进程可能已经修好或重建了。
+        match Self::open_migrated_locked(db_path) {
+            Ok(db) => return Ok((db, None)),
+            Err(error) if is_corrupt_error(&error) => {}
+            Err(error) => return Err(error),
+        }
+        let preserved = match crate::paths::preserve_sqlite_group(db_path) {
+            Ok(dir) => dir,
+            Err(_) => {
+                return Ok((
+                    Self::from_connection(Connection::open_in_memory()?)?,
+                    Some(
+                        "本地库已损坏，但没能先把原件另存一份（多半是磁盘空间不够），所以没有动它。这次先用临时空库启动，什么都不会保存；腾出空间后重启程序再试。"
+                            .into(),
+                    ),
+                ));
+            }
+        };
+        if salvage_truncated_page_count(db_path).unwrap_or(false) {
+            match Self::open_migrated_locked(db_path) {
+                Ok(db) => {
+                    return Ok((
+                        db,
+                        Some(format!(
+                            "本地库文件被截断，已对齐页头；修之前的原件留在 {}。部分历史数据可能需要重新同步。",
+                            preserved.display()
+                        )),
+                    ));
+                }
+                Err(error) if is_corrupt_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        if crate::paths::remove_live_sqlite_group(db_path).is_err() {
+            return Ok((
+                Self::from_connection(Connection::open_in_memory()?)?,
+                Some(format!(
+                    "本地库已损坏，原件已另存到 {}，但坏文件没能从原位置移开（可能被别的程序占用）。这次先用临时空库启动，什么都不会保存；关掉占用它的程序后重启再试。",
+                    preserved.display()
+                )),
+            ));
+        }
+        let db = Self::open_migrated_locked(db_path)?;
+        Ok((
+            db,
+            Some(format!(
+                "本地库已损坏，已隔离到 {} 并重建空库。请重新同步。",
+                preserved.display()
+            )),
+        ))
+    }
+
+    fn acquire_migration_lock(db_path: &Path) -> Result<Option<write_lock::ExclusiveWriteGuard>> {
+        let Some(data_dir) = db_path.parent() else {
+            return Ok(None);
+        };
+        write_lock::acquire_with_timeout(
+            data_dir,
+            write_lock::WritePurpose::Migration,
+            std::time::Duration::from_secs(30),
+        )
+        .map(Some)
+        .map_err(|error| match error {
+            error @ write_lock::WriteLockError::Busy { .. } => {
+                ZeppBridgeError::Busy(error.to_string())
+            }
+            error => ZeppBridgeError::ConfigError(error.to_string()),
+        })
+    }
+
+    /// `open_migrated` 去掉拿锁那一步：调用方已经持有迁移写锁。
+    fn open_migrated_locked(db_path: &Path) -> Result<Self> {
+        Self::backup_before_schema_change(db_path)?;
+        let conn = Connection::open(db_path)?;
+        Self::from_connection(conn)
     }
 
     /// 打开并迁移。失败就是失败——不做隔离重建。
@@ -129,24 +188,8 @@ impl Database {
     pub fn open_migrated(db_path: &std::path::Path) -> Result<Self> {
         // 迁移前备份和 DDL 必须在同一把跨进程锁下完成：两个进程同时升级同一个
         // 库，是这套系统里最危险的组合。拿不到锁就等，等不到就报可恢复错误。
-        let guard = match db_path.parent() {
-            Some(data_dir) => write_lock::acquire_with_timeout(
-                data_dir,
-                write_lock::WritePurpose::Migration,
-                std::time::Duration::from_secs(30),
-            )
-            .map(Some)
-            .map_err(|error| match error {
-                error @ write_lock::WriteLockError::Busy { .. } => {
-                    ZeppBridgeError::Busy(error.to_string())
-                }
-                error => ZeppBridgeError::ConfigError(error.to_string()),
-            })?,
-            None => None,
-        };
-        Self::backup_before_schema_change(db_path)?;
-        let conn = Connection::open(db_path)?;
-        let db = Self::from_connection(conn);
+        let guard = Self::acquire_migration_lock(db_path)?;
+        let db = Self::open_migrated_locked(db_path);
         drop(guard);
         db
     }
