@@ -251,7 +251,7 @@ const onThemeChange = (value: string | number) => {
 };
 
 /* 语言列表跟着 LOCALES 注册表走，一律写全名，和设置页一致（不用「PT-BR」「中」这类缩写）。
-   放不下时整枚让位（fit-4），设置里还有同一个开关。 */
+   桌面宽度下不让位：语言是看不懂当前界面的人唯一的出口，藏起来他就找不到设置页了（2026-10-01 反馈）。 */
 const localeOptions = computed(() => LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
 const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
 
@@ -262,9 +262,12 @@ useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.va
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
    品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
-     1 藏字标 → 2 语言两侧少露一截 → 3 导航紧凑 → 4 藏语言（设置里还有）→ 5 同步胶囊只留圆点。
-   同步文字排在最后才藏：同步进行到第几项（「同步中 3/8」）是用户在等的东西。语言改写全名以后右簇变宽，
-   以前第三档就先把同步文字藏了，于是自动同步时胶囊只剩一个点（2026-09-30 反馈）。
+     1 藏字标 → 2 语言两侧少露一截 → 3 导航紧凑 → 4 导航离开窗口正中（用掉品牌右边那块空地）
+     → 5 导航挪到底部（和手机宽度一样，导航本身一项不少）→ 6 同步胶囊只留圆点 → 7 实在放不下才藏语言。
+   以前第 4 档就藏语言：导航钉在窗口正中，左边品牌旁空着一大块，右簇一挤就先牺牲语言——英文 1280 宽、
+   中文 1180 宽语言就没了，看不懂当前语言的人只能自己摸到设置页（2026-10-01 反馈）。
+   同步文字排在语言之前：同步进行到第几项（「同步中 3/8」）是用户在等的东西，但它至少还留着圆点，
+   语言一藏就什么都没有了。以前第三档就先把同步文字藏了，于是自动同步时胶囊只剩一个点（2026-09-30 反馈）。
    每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。
    整轮量完都在同一个任务里（只 await nextTick，中间不出帧），画面上只看到最后那一档。
 
@@ -274,8 +277,12 @@ useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.va
    （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊按「转到最宽那一项」
    的宽度留位置，拖动途中撑宽也不会压到导航。 */
 const FIT_SHORT_LOCALE = 2; // 语言传送带两侧的露边收窄（不再换短码）
-const FIT_MAX = 5;
+const FIT_MAX = 7;
+/** 第 5 档起导航挪到底部：底部导航的样式在 shell.css，挂在 <html> 上。 */
+const FIT_NAV_BOTTOM = 5;
 const fit = ref(0);
+watch(fit, (level) => document.documentElement.classList.toggle('nav-at-bottom', level >= FIT_NAV_BOTTOM));
+onBeforeUnmount(() => document.documentElement.classList.remove('nav-at-bottom'));
 const bar = ref<HTMLElement | null>(null);
 const localeWheel = ref<{ $el: HTMLElement; measure: () => void; widestSpan: () => number } | null>(null);
 const overlaps = (): boolean => {
@@ -530,13 +537,14 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), () => {
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
-.fit-4 .locale-wheel, .fit-4 .group-divider, .fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
-.fit-5 .sync-text { display: none; }
-.fit-5 .sync-pill { padding-inline: 11px; }
+.app-topbar:is(.fit-4, .fit-5, .fit-6, .fit-7) { grid-template-columns: auto minmax(0, 1fr) auto; }
+:is(.fit-5, .fit-6, .fit-7) .pill-nav { display: none; }
+:is(.fit-6, .fit-7) .sync-text { display: none; }
+:is(.fit-6, .fit-7) .sync-pill { padding-inline: 11px; }
+.fit-7 .locale-wheel, .fit-7 .group-divider { display: none; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
-   （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给
-   设置页里的同一个开关。 */
+   （底部 tabbar 已经覆盖同一组导航）。语言选择不按宽度藏：由 refit 量，真放不下才让位（fit-6）。 */
 @media (max-width: 1100px) {
   .brand .wordmark { display: none; }
 }
@@ -547,9 +555,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), () => {
   .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }
   .pill-nav { display: none; }
   .sync-text { max-width: 120px; }
-}
-@media (max-width: 640px) {
-  .locale-wheel, .group-divider { display: none; }
 }
 @media (max-width: 520px) {
   .topbar-actions { gap: 5px; }

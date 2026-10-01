@@ -125,6 +125,8 @@
   --glass-tab-selected: rgba(0, 0, 0, .30);
   /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：里面清透不铺色；边是一圈极细的暗描边、
      左上和右下两道斜对角高光，外加很淡的浮起影子。 */
+  /* 透镜边上的散射光（lib/glassLens.ts 的乳白那一层）：深色底上要淡。 */
+  --lens-scatter: rgba(255, 255, 255, .45);
   --lens-glass-rim: 0 0 0 .6px rgba(0, 0, 0, .6), 0 8px 18px -8px rgba(0, 0, 0, .5);
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 70deg, rgba(255, 255, 255, .05) 100deg,
     rgba(255, 255, 255, .62) 140deg, rgba(255, 255, 255, .05) 185deg, rgba(255, 255, 255, .05) 265deg, rgba(255, 255, 255, .78) 310deg, rgba(255, 255, 255, .16));
@@ -279,6 +281,7 @@ html[data-theme="light"] {
   --glass-edge: linear-gradient(180deg, #FFFFFF, rgba(255, 255, 255, .6) 32%, rgba(255, 255, 255, .45) 68%, rgba(255, 255, 255, .9));
   --glass-outline: 0 0 0 .5px rgba(38, 52, 41, .12);
   --glass-tab-selected: rgba(38, 52, 41, .08);
+  --lens-scatter: #FFFFFF;
   --lens-glass-rim: 0 0 0 .6px rgba(38, 52, 41, .38), 0 8px 18px -8px rgba(38, 52, 41, .32);
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
     rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));

@@ -155,7 +155,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 <template>
   <div
     ref="root"
-    :class="['wheel-col', { moving }]"
+    :class="['wheel-col', { moving, 'has-lens': refract.active.value }]"
     :style="{ height: `${ROW * VISIBLE}px` }"
     role="spinbutton"
     tabindex="0"
@@ -202,7 +202,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
 }
-/* 折射玻璃带（lib/glassLens.ts）：四周多撑出 --lens-m 给往外的取样，再裁回胶囊；边在另一层，不被裁掉。 */
+/* 透镜（lib/glassLens.ts）和玻璃边：边停着时也在（玻璃带自己不再画边），静止和转动是同一块玻璃。 */
 .band-refract {
   position: absolute;
   top: 50%;
@@ -214,13 +214,10 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   opacity: 0;
   transition: opacity 160ms ease;
 }
-.band-refract:not(.band-refract-rim) {
-  box-sizing: content-box;
-  margin: 0 calc(-1 * var(--lens-m, 0px));
-  padding: var(--lens-m, 0px);
-  clip-path: inset(var(--lens-m, 0px) round 999px);
-}
-.band-refract-rim { box-shadow: var(--lens-glass-rim); }
+.band-refract-rim { box-shadow: var(--lens-glass-rim); opacity: 1; }
+.has-lens .band { box-shadow: none; transition: opacity 200ms ease; }
+.has-lens.moving .band { opacity: 0; transition: opacity 90ms ease; }
+.has-lens:focus-visible .band-refract-rim { box-shadow: 0 0 0 2px var(--focus), var(--lens-glass-rim); }
 .band-refract-rim::before {
   content: '';
   position: absolute;

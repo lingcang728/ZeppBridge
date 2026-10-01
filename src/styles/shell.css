@@ -190,11 +190,19 @@ a { color: inherit; }
 @media (max-width: 760px) {
   .sync-feedback { padding-inline: 16px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
+}
+/* 底部导航：手机宽度一律用；更宽时由顶栏量出来放不下（AppTopBar 的 fit-5，给 <html> 挂 .nav-at-bottom）
+   也挪下来——导航先让位，语言入口留在顶栏（2026-10-01）。两处写同一份。 */
+@media (max-width: 760px) {
   .main-content { padding-bottom: 64px; }
   .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
   .bottom-track { width: 100%; }
   .bottom-track .segment-item, .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 }
+:root.nav-at-bottom .main-content { padding-bottom: 64px; }
+:root.nav-at-bottom .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
+:root.nav-at-bottom .bottom-track { width: 100%; }
+:root.nav-at-bottom .bottom-track .segment-item, :root.nav-at-bottom .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 
 /* ── 页面通用 ───────────────────────────── */
 .page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; overflow-x: clip; }

@@ -48,8 +48,9 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 
 const root = ref<HTMLElement | null>(null);
-/* 折射（lib/glassLens.ts）：镜片上面盖一块同样大小的玻璃，转动时从镜片边上经过的字在外圈弯折，
-   中间原样清楚。只在拖动 / 吸附时浮起来。 */
+/* 玻璃（lib/glassLens.ts）：镜片是同一块玻璃——停着时是底色 + 一圈玻璃边，转动时底色化开、里面换成
+   会放大边缘的透镜（经过镜片边的字被拉开、微微糊、泛一点乳白），停稳后原样回来。边从头到尾是同一圈，
+   不再是「镜片自己的高光边 + 透镜的边」两层叠在一起（2026-10-01 反馈「像有两层透镜」）。 */
 const refractEl = ref<HTMLElement | null>(null);
 const refract = useGlassLens(refractEl, 'thumb');
 const itemEls = ref<HTMLElement[]>([]);
@@ -395,10 +396,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
       >
         <img v-if="item.image" :src="item.image" alt="" class="wheel-image" draggable="false" />
         <Icon v-else-if="item.icon" :name="item.icon" :size="iconOnly ? 16 : 14" />
-        <span v-if="!iconOnly" class="wheel-label">
-          <span class="wheel-label-regular">{{ item.label }}</span>
-          <span class="wheel-label-bold">{{ item.label }}</span>
-        </span>
+        <span v-if="!iconOnly" class="wheel-label">{{ item.label }}</span>
       </span>
     </div>
     <template v-if="refract.active.value">
@@ -461,9 +459,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 .capsule-wheel.is-bare .wheel-lens { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
-/* 折射玻璃（lib/glassLens.ts，照 iOS 26）：和镜片同位置、同大小，盖在转动的字上面，斜面把经过镜片边的字
-   往外折、拉长。玻璃本身不缩放（缩放会把透过它的字重采样得发糊），所以开着折射时镜片拖动也不放大。
-   玻璃四周多撑出 --lens-m 给往外的取样，再裁回胶囊；边（描边、高光、影子）在另一层，不被裁掉。 */
+/* 透镜和玻璃边：和镜片同位置、同大小，盖在转动的字上面。玻璃本身不缩放（缩放会把透过它的字重采样得发糊），
+   所以开着折射时镜片拖动也不放大。 */
 .wheel-refract {
   position: absolute;
   top: 3px;
@@ -476,13 +473,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   opacity: 0;
   transition: opacity 160ms ease;
 }
-.wheel-refract:not(.wheel-refract-rim) {
-  box-sizing: content-box;
-  margin: calc(-1 * var(--lens-m, 0px)) 0;
-  padding: var(--lens-m, 0px);
-  clip-path: inset(var(--lens-m, 0px) round 999px);
-}
-.wheel-refract-rim { box-shadow: var(--lens-glass-rim); }
+/* 玻璃边：停着时也在（镜片自己不再画边），所以静止和转动是同一块玻璃。 */
+.wheel-refract-rim { box-shadow: var(--lens-glass-rim); opacity: 1; }
 .wheel-refract-rim::before {
   content: '';
   position: absolute;
@@ -494,9 +486,10 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .is-vertical .wheel-refract { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
-.is-vertical .wheel-refract:not(.wheel-refract-rim) { margin: 0 calc(-1 * var(--lens-m, 0px)); }
 .capsule-wheel.is-dragging .wheel-refract, .capsule-wheel.is-animating .wheel-refract { opacity: 1; }
-.capsule-wheel.has-lens.is-dragging .wheel-lens { scale: none; }
+.capsule-wheel.has-lens .wheel-lens { box-shadow: none; transition: scale var(--dur-base) var(--ease-spring), opacity 200ms ease; }
+.capsule-wheel.has-lens:focus-visible .wheel-refract-rim { box-shadow: 0 0 0 2px var(--focus), var(--lens-glass-rim); }
+.capsule-wheel.has-lens:is(.is-dragging, .is-animating) .wheel-lens { scale: none; opacity: 0; transition: opacity 90ms ease; }
 
 .wheel-item {
   position: absolute;
@@ -517,12 +510,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 /* 不在拖动开始 / 结束时切 will-change：切一次整层文字重新栅格化（灰阶 ↔ 子像素抗锯齿），
    看上去就是「一按下字就闪一下」。项本身是 3D 变换，一直在合成层上。 */
 .is-icon-only .wheel-item { padding: 0 7px; }
-/* 常规体和粗体叠在同一格里、按 --on 交叉淡入淡出：宽度取两者较宽的那个（不再因为变粗
-   变宽而让传送带跳一下），粗细也是渐变的。 */
-.wheel-label { display: inline-grid; }
-.wheel-label > span { grid-area: 1 / 1; }
-.wheel-label-regular { opacity: calc(1 - var(--on)); }
-.wheel-label-bold { font-weight: 600; opacity: var(--on); }
+/* 选中只靠颜色，不换粗细（和 iOS 的滚轮一样）：以前常规体和粗体两份叠在一格里按 --on 交叉淡入淡出，
+   转到一半两份各半透明、粗体又更宽，词尾就分成两份——「Englissh」「Espaañol」（2026-10-01 反馈）。 */
+.wheel-label { display: inline-block; font-weight: 600; }
 .wheel-image { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px; pointer-events: none; }
 
 </style>
