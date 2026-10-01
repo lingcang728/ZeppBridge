@@ -174,6 +174,29 @@
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-rim), var(--glass-shadow);
 }
+/* 里面放着会浮起玻璃透镜的控件（SegmentTrack / CapsuleWheel）时：毛玻璃挪到垫在底下的一层上，控件自己不带
+   backdrop-filter。否则透镜只看得见这组按钮里面的东西、看不见背后的页面，浮起来是一块发暗的方块
+   （lib/glassLens.ts）。 */
+.glass-control.is-lens-host {
+  position: relative;
+  isolation: isolate;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--glass-shadow);
+}
+.glass-control.is-lens-host::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim);
+  pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .button, .mat-switch, .mat-switch::after { transition: none; }
@@ -186,6 +209,9 @@
 @property --thumb-w { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --thumb-t { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --thumb-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
+/* 浮起的玻璃透镜往四周长出的量（SegmentTrack）：注册成长度才能带弹簧过渡。 */
+@property --lens-x { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --lens-y { syntax: '<length>'; inherits: false; initial-value: 0px; }
 
 /* ── 换主题的扩散（useTheme.revealTheme）──────────
    新主题的整页快照套一个圆形 clip-path，从被点的按钮处长大；旧快照垫在底下不动。
@@ -199,7 +225,8 @@ html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-m
   .glass-control { box-shadow: inset 0 0 0 1px var(--ink), var(--glass-shadow); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .glass, .glass-control { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass, .glass-control, .glass-control.is-lens-host::before { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass-control.is-lens-host { background: none; }
 }
 
 /* ── 发光（「数据已备好」）──────────────────

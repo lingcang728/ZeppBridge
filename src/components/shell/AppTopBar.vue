@@ -415,7 +415,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), () => {
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
-      <div class="icon-group glass-control">
+      <div class="icon-group glass-control is-lens-host">
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
           :model-value="themeMode" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>

@@ -172,7 +172,10 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     <div class="drum" aria-hidden="true">
       <span v-for="(item, index) in items" :key="item.value" :class="['cell', { on: index === active }]" :style="itemStyle(index)">{{ item.label }}</span>
     </div>
-    <span v-if="refract.active.value" ref="refractEl" class="band-refract" aria-hidden="true" :style="[{ height: `${ROW}px` }, refract.style()]" />
+    <template v-if="refract.active.value">
+      <span ref="refractEl" class="band-refract" aria-hidden="true" :style="[{ height: `${ROW}px` }, refract.style()]" />
+      <span class="band-refract band-refract-rim" aria-hidden="true" :style="{ height: `${ROW}px` }" />
+    </template>
   </div>
 </template>
 
@@ -199,6 +202,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
 }
+/* 折射玻璃带（lib/glassLens.ts）：四周多撑出 --lens-m 给往外的取样，再裁回胶囊；边在另一层，不被裁掉。 */
 .band-refract {
   position: absolute;
   top: 50%;
@@ -206,10 +210,26 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   left: 4px;
   translate: 0 -50%;
   border-radius: 999px;
-  box-shadow: var(--lens-glass-rim);
   pointer-events: none;
   opacity: 0;
   transition: opacity 160ms ease;
+}
+.band-refract:not(.band-refract-rim) {
+  box-sizing: content-box;
+  margin: 0 calc(-1 * var(--lens-m, 0px));
+  padding: var(--lens-m, 0px);
+  clip-path: inset(var(--lens-m, 0px) round 999px);
+}
+.band-refract-rim { box-shadow: var(--lens-glass-rim); }
+.band-refract-rim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.2px;
+  border-radius: inherit;
+  background: var(--lens-glass-specular);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .moving .band-refract { opacity: 1; }
 .drum {

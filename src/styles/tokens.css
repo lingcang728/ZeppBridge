@@ -118,9 +118,16 @@
   --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .07));
   --cap-glass-thumb-rim: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(255, 255, 255, .04),
     0 2px 8px -3px rgba(0, 0, 0, .45);
-  /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：只有一圈细边和一点影子，里面清透。 */
-  --lens-glass-fill: rgba(255, 255, 255, .05);
-  --lens-glass-rim: inset 0 0 0 1px rgba(255, 255, 255, .14), inset 0 1px 0 rgba(255, 255, 255, .30), 0 4px 14px rgba(0, 0, 0, .18);
+  /* iOS 26 的玻璃（照 App Store 标签栏录屏，2026-10-01）。
+     胶囊的边：一圈极细高光，上下沿最亮、两端渐弱。停稳时的选中项：比玻璃略深的平胶囊。 */
+  --glass-edge: linear-gradient(180deg, rgba(255, 255, 255, .32), rgba(255, 255, 255, .09) 32%, rgba(255, 255, 255, .05) 68%, rgba(255, 255, 255, .18));
+  --glass-outline: 0 0 0 0 transparent;
+  --glass-tab-selected: rgba(0, 0, 0, .30);
+  /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：里面清透不铺色；边是一圈极细的暗描边、
+     左上和右下两道斜对角高光，外加很淡的浮起影子。 */
+  --lens-glass-rim: 0 0 0 .6px rgba(0, 0, 0, .6), 0 8px 18px -8px rgba(0, 0, 0, .5);
+  --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 70deg, rgba(255, 255, 255, .05) 100deg,
+    rgba(255, 255, 255, .62) 140deg, rgba(255, 255, 255, .05) 185deg, rgba(255, 255, 255, .05) 265deg, rgba(255, 255, 255, .78) 310deg, rgba(255, 255, 255, .16));
   --cap-ink: #A2C765;
 
   /* 动效 */
@@ -129,6 +136,9 @@
   --dur-slow: 420ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: cubic-bezier(.2, 1.15, .32, 1);
+  /* 玻璃透镜浮起（带一点回弹）/ 落下（不回弹）。 */
+  --lens-lift: cubic-bezier(.3, 1.45, .45, 1);
+  --lens-drop: cubic-bezier(.25, .8, .3, 1);
   /* 切页与形变统一用两档时长、两条缓动（D-1）：进场 / 展开用 std + enter，返回 / 收回用 back。
      回弹只留在导航胶囊的滑块上（SegmentTrack），切页和卡片收回一律不回弹。 */
   --dur-std: 320ms;
@@ -266,8 +276,12 @@ html[data-theme="light"] {
   --cap-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .16), 0 4px 12px -5px rgba(38, 52, 41, .28);
   --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .72));
   --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .14), 0 3px 10px -4px rgba(38, 52, 41, .22);
-  --lens-glass-fill: rgba(255, 255, 255, .28);
-  --lens-glass-rim: inset 0 0 0 1px rgba(38, 52, 41, .10), inset 0 1px 0 #FFFFFF, 0 4px 14px rgba(38, 52, 41, .16);
+  --glass-edge: linear-gradient(180deg, #FFFFFF, rgba(255, 255, 255, .6) 32%, rgba(255, 255, 255, .45) 68%, rgba(255, 255, 255, .9));
+  --glass-outline: 0 0 0 .5px rgba(38, 52, 41, .12);
+  --glass-tab-selected: rgba(38, 52, 41, .08);
+  --lens-glass-rim: 0 0 0 .6px rgba(38, 52, 41, .38), 0 8px 18px -8px rgba(38, 52, 41, .32);
+  --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
+    rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));
   --cap-ink: #2F6B4F;
 }
 

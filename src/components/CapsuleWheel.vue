@@ -401,7 +401,10 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
         </span>
       </span>
     </div>
-    <span v-if="refract.active.value" ref="refractEl" class="wheel-refract" aria-hidden="true" :style="[lensStyle, refract.style()]"></span>
+    <template v-if="refract.active.value">
+      <span ref="refractEl" class="wheel-refract" aria-hidden="true" :style="[lensStyle, refract.style()]"></span>
+      <span class="wheel-refract wheel-refract-rim" aria-hidden="true" :style="lensStyle"></span>
+    </template>
   </div>
 </template>
 
@@ -458,8 +461,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 .capsule-wheel.is-bare .wheel-lens { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
-/* 折射玻璃：和镜片同位置、同大小，盖在转动的字上面。玻璃本身不缩放（缩放会把透过它的字重采样得发糊），
-   所以开着折射时镜片拖动也不放大，两者对得齐。 */
+/* 折射玻璃（lib/glassLens.ts，照 iOS 26）：和镜片同位置、同大小，盖在转动的字上面，斜面把经过镜片边的字
+   往外折、拉长。玻璃本身不缩放（缩放会把透过它的字重采样得发糊），所以开着折射时镜片拖动也不放大。
+   玻璃四周多撑出 --lens-m 给往外的取样，再裁回胶囊；边（描边、高光、影子）在另一层，不被裁掉。 */
 .wheel-refract {
   position: absolute;
   top: 3px;
@@ -468,12 +472,29 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   min-width: 30px;
   border-radius: 999px;
   translate: -50% 0;
-  box-shadow: var(--lens-glass-rim);
   pointer-events: none;
   opacity: 0;
   transition: opacity 160ms ease;
 }
+.wheel-refract:not(.wheel-refract-rim) {
+  box-sizing: content-box;
+  margin: calc(-1 * var(--lens-m, 0px)) 0;
+  padding: var(--lens-m, 0px);
+  clip-path: inset(var(--lens-m, 0px) round 999px);
+}
+.wheel-refract-rim { box-shadow: var(--lens-glass-rim); }
+.wheel-refract-rim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.2px;
+  border-radius: inherit;
+  background: var(--lens-glass-specular);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
 .is-vertical .wheel-refract { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
+.is-vertical .wheel-refract:not(.wheel-refract-rim) { margin: 0 calc(-1 * var(--lens-m, 0px)); }
 .capsule-wheel.is-dragging .wheel-refract, .capsule-wheel.is-animating .wheel-refract { opacity: 1; }
 .capsule-wheel.has-lens.is-dragging .wheel-lens { scale: none; }
 

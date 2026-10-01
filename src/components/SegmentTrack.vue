@@ -91,11 +91,23 @@ let nextThumb: { left: number; width: number } | null = null;
 let suppressClick = false;
 let observer: ResizeObserver | null = null;
 
-/* —— 折射（lib/glassLens.ts）：滑块上面盖一块玻璃，拖动时把底下的字在外圈弯折；浮在内容上的玻璃导航
-   另外让整条胶囊的外沿对背后滚过的页面折射一圈。 —— */
+/* —— 折射（lib/glassLens.ts）：照 iOS 26 的标签栏，按住 / 拖动时滑块浮起来变成一块比胶囊还高的凸玻璃，
+   斜面把外面的东西折进来；浮在内容上的玻璃导航，整条胶囊的外沿也对背后滚过的页面折射一圈。
+   毛玻璃底画在轨道里的一层（.segment-glass）而不是轨道本身：轨道自己带 backdrop-filter 的话，
+   透镜只看得见轨道里的字，看不见胶囊外面的页面。 —— */
 const lensEl = ref<HTMLElement | null>(null);
+const glassEl = ref<HTMLElement | null>(null);
 const thumbLens = useGlassLens(lensEl, 'thumb');
-const rimLens = useGlassLens(track, 'rim', props.variant === 'glass');
+const rimLens = useGlassLens(glassEl, 'rim', props.variant === 'glass');
+/** 按住滑块（还没拖）：透镜先浮起来，和 iOS 一样手指一按就变成玻璃。 */
+const pressed = ref(false);
+/** 点了别的项、滑块滑过去的那一段：透镜浮着滑过去，到了再落下。 */
+const gliding = ref(false);
+let glideTimer = 0;
+/** 拖得快时透镜沿运动方向拉长一点（像一滴水），按速度平滑。 */
+const stretch = ref(0);
+/** 轨道宽：透镜横向长出去时不越过两端太多。 */
+const trackWidth = ref(0);
 
 const buttons = () => Array.from(track.value?.querySelectorAll<HTMLElement>('.segment-item') ?? []);
 const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({
@@ -118,17 +130,19 @@ const placeOn = (value: T) => {
 const checkWrap = () => {
   const el = track.value;
   if (!el || props.fill || props.variant !== 'inset') return;
-  if (!wrapped.value) {
-    if (el.scrollWidth > el.clientWidth + 1) wrapped.value = true;
-    return;
-  }
+  // 按各项原宽之和算，不看 scrollWidth：浮起来的透镜会伸出轨道，把 scrollWidth 撑大。
   const pad = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
   const natural = buttons().reduce((sum, button) => sum + button.offsetWidth, 0) + pad * 2;
+  if (!wrapped.value) {
+    if (natural > el.clientWidth + 1) wrapped.value = true;
+    return;
+  }
   if (natural <= el.clientWidth) wrapped.value = false;
 };
 
 const measure = () => {
   if (!track.value) return;
+  trackWidth.value = track.value.offsetWidth;
   checkWrap();
   stops.value = readStops();
   if (!gesture) placeOn(restingValue());
@@ -147,9 +161,11 @@ const trackStyle = computed(() => ({
   '--thumb-w': `${thumb.value.visible ? thumb.value.width : 0}px`,
   '--thumb-t': `${thumb.value.top}px`,
   '--thumb-h': `${thumb.value.height}px`,
-  // 先模糊、再折射：折射放在最后，边上弯折的轮廓不会又被糊掉。
-  ...rimLens.style('var(--glass-blur)'),
+  '--lens-stretch': `${stretch.value.toFixed(1)}px`,
+  '--track-w': `${trackWidth.value}px`,
 }));
+/** 透镜浮起来的时候：按住、拖动、松手后落位、点击后滑过去。 */
+const lifted = computed(() => thumbLens.active.value && (pressed.value || dragging.value || settling.value || gliding.value));
 /** 折行时不在滑块那一行的项：不挖空（挖空只按横坐标算，会误伤别的行）。 */
 const offRow = (index: number) => wrapped.value && (stops.value[index]?.top ?? 0) !== thumb.value.top;
 const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
@@ -189,6 +205,8 @@ const clearGesture = () => {
   const current = gesture;
   gesture = null;
   dragging.value = false;
+  pressed.value = false;
+  stretch.value = 0;
   lensValue.value = null;
   cancelAnimationFrame(fadeFrame);
   cancelAnimationFrame(frame);
@@ -217,6 +235,8 @@ const onDown = (event: PointerEvent) => {
     velocity: 0,
   };
   track.value.setPointerCapture(event.pointerId);
+  // 按在已选中的那一项上：透镜马上浮起来（按在别的项上是点击，滑过去时再浮）。
+  if (startValue === props.modelValue) pressed.value = true;
 };
 
 /** 指针移动的屏幕像素换算成布局像素（原生缩放下两者不同）。 */
@@ -243,6 +263,9 @@ const onMove = (event: PointerEvent) => {
   current.lastX = event.clientX;
   current.time = event.timeStamp;
   nextThumb = dragThumb(stops.value, current.center + dx, current.velocity);
+  // 速度（布局像素 / 毫秒）换成拉长量：最多拉长滑块宽的一成二，平滑着跟。
+  const target = Math.min(Math.abs(current.velocity) * 6, (nextThumb?.width ?? 0) * 0.12);
+  stretch.value += (target - stretch.value) * 0.35;
   if (!frame) {
     frame = requestAnimationFrame(() => {
       frame = 0;
@@ -287,14 +310,29 @@ const onUp = (event: PointerEvent) => {
   }
   placeOn(next);
   if (moved) commitAfterLanding(next);
-  else commit(next);
+  else {
+    if (next !== props.modelValue) glide();
+    commit(next);
+  }
   window.setTimeout(() => { suppressClick = false; }, 0);
+};
+
+/** 点到别的项：透镜浮着滑过去（指针点击在 onUp 里就交出了值，键盘不走这里）。 */
+const glide = () => {
+  if (!thumbLens.active.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  gliding.value = true;
+  window.clearTimeout(glideTimer);
+  glideTimer = window.setTimeout(() => { gliding.value = false; }, LAND_MS);
 };
 
 const onClick = (value: T) => {
   if (props.disabled || suppressClick) return;
-  if (value === props.modelValue) emit('reselect', value);
-  else commit(value);
+  if (value === props.modelValue) {
+    emit('reselect', value);
+    return;
+  }
+  glide();
+  commit(value);
 };
 
 const onKeydown = (event: KeyboardEvent) => {
@@ -349,6 +387,7 @@ onBeforeUnmount(() => {
   clearGesture();
   window.clearTimeout(settleTimer);
   window.clearTimeout(landTimer);
+  window.clearTimeout(glideTimer);
   cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
@@ -363,6 +402,7 @@ onBeforeUnmount(() => {
       'is-wrapped': wrapped,
       'is-icon-only': iconOnly,
       'has-lens': thumbLens.active.value,
+      'is-lifted': lifted,
     }]"
     :style="trackStyle"
     role="radiogroup"
@@ -375,6 +415,7 @@ onBeforeUnmount(() => {
     @lostpointercapture="onUp"
     @keydown="onKeydown"
   >
+    <span v-if="variant === 'glass'" ref="glassEl" class="segment-glass" aria-hidden="true" :style="rimLens.style('var(--glass-blur)')" />
     <span class="segment-thumb" aria-hidden="true" :style="{ opacity: thumb.visible ? 1 : 0 }" />
     <button
       v-for="(item, index) in items"
@@ -409,9 +450,13 @@ onBeforeUnmount(() => {
         </slot>
       </span>
     </span>
-    <!-- 透镜：盖在滑块和选中字上面，折射它底下画出来的东西（backdrop-filter 只取轨道里的内容）。
-         像 iOS 26 的标签栏：只在按住 / 拖动 / 吸附时浮起来，停稳后淡回平的滑块。 -->
-    <span v-if="thumbLens.active.value" ref="lensEl" class="segment-lens" aria-hidden="true" :style="thumbLens.style()" />
+    <!-- 透镜：盖在滑块和选中字上面，折射它底下画出来的一切（字、胶囊的毛玻璃、胶囊外面的页面）。
+         像 iOS 26 的标签栏：只在按住 / 拖动 / 吸附 / 滑过去时浮起来，停稳后缩回平的滑块。
+         玻璃（折射）和边（描边、高光、影子）分两层：玻璃要按胶囊形状裁，边的影子不能被裁掉。 -->
+    <template v-if="thumbLens.active.value">
+      <span ref="lensEl" class="segment-lens" aria-hidden="true" :style="thumbLens.style()" />
+      <span class="segment-lens-rim" aria-hidden="true" />
+    </template>
   </div>
 </template>
 
@@ -441,16 +486,42 @@ onBeforeUnmount(() => {
 }
 .segment-track.is-dragging { --seg-grow: calc(var(--thumb-w) * .04); transition: none; }
 .segment-track.is-inset { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
-/* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。 */
-.segment-track.is-glass {
+/* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。
+   毛玻璃画在里面的 .segment-glass 上，轨道自己只留影子——轨道带 backdrop-filter 的话，浮起来的透镜
+   就看不见胶囊外面的页面了（lib/glassLens.ts）。开着折射时 .segment-glass 四周多撑出 --lens-m 给外沿
+   往外取样，再裁回胶囊形状。 */
+.segment-track.is-glass { box-shadow: var(--glass-outline), var(--glass-shadow); }
+.segment-glass {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  margin: calc(-1 * var(--lens-m, 0px));
+  border-radius: 999px;
   background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-rim), var(--glass-shadow);
+  clip-path: inset(var(--lens-m, 0px) round 999px);
+  pointer-events: none;
+}
+/* 胶囊的边：iOS 26 的玻璃边是一圈很细的高光，上下沿最亮、两端渐弱（光从正上方来）。画在字下面、
+   透镜下面——透镜浮过来时，这圈边也被折进透镜里，和录屏里一样。 */
+.segment-track.is-glass::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--glass-edge);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
 }
 @media (prefers-reduced-transparency: reduce) {
-  .segment-track.is-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .segment-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+/* 开着折射：透镜浮起来时比胶囊还高，要伸出轨道。 */
+.segment-track.has-lens { overflow: visible; }
 .segment-track.is-fill { display: flex; }
 .segment-track.is-fill .segment-item { flex: 1 1 0; }
 /* 表单里的分段胶囊项不收缩（放不下就折行）；浮动导航和按钮组不折行，按原样收缩。 */
@@ -520,8 +591,9 @@ onBeforeUnmount(() => {
   pointer-events: none;
   transition: scale var(--seg-dur) var(--seg-ease), opacity var(--dur-fast) ease;
 }
-.segment-track.is-glass .segment-thumb,
 .segment-track.is-bare .segment-thumb { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
+/* 浮动导航停稳时的选中项：iOS 26 标签栏是一块比玻璃略深的平胶囊，不是凸起的白胶囊。 */
+.segment-track.is-glass .segment-thumb { background: var(--glass-tab-selected); box-shadow: none; }
 
 .segment-ink {
   position: absolute;
@@ -533,26 +605,60 @@ onBeforeUnmount(() => {
   clip-path: inset(calc(var(--thumb-t) - var(--seg-clip-extra)) calc(100% - var(--thumb-l) - var(--thumb-w) - var(--seg-grow))
     calc(100% - var(--thumb-t) - var(--thumb-h) - var(--seg-clip-extra)) calc(var(--thumb-l) - var(--seg-grow)) round 999px);
 }
-.segment-lens {
+/* 透镜（iOS 26 标签栏按住 / 拖动时那块玻璃）。停着时和滑块一样大、看不见；浮起来时往四周长：
+   横向多出滑块宽的一成四（录屏里 160 → 205），竖向比整条胶囊还高约两成（伸出上下沿）。拖得快时
+   沿运动方向再拉长一点、竖向略收。浮起带一点回弹，落下不回弹。
+   透镜本身绝不 scale：一缩放，透过它看到的东西就被重采样，整块发糊。尺寸变化靠宽高，滤镜跟着按帧重摆。 */
+.segment-lens, .segment-lens-rim {
+  --lens-x: 0px;
+  --lens-y: 0px;
+  /* 两端最多伸出轨道这么多（和上下伸出去的一样多）：停在第一项 / 最后一项时不往外长成一条舌头。 */
+  --lens-l: max(calc(var(--thumb-l) - var(--lens-x)), calc(var(--seg-pad) - var(--lens-y)));
+  --lens-r: min(calc(var(--thumb-l) + var(--thumb-w) + var(--lens-x)), calc(var(--track-w, 100vw) - var(--seg-pad) + var(--lens-y)));
   position: absolute;
   z-index: 3;
   top: 0;
   left: 0;
-  width: var(--thumb-w);
-  height: var(--thumb-h);
+  width: calc(var(--lens-r) - var(--lens-l));
+  height: calc(var(--thumb-h) + 2 * var(--lens-y));
   border-radius: 999px;
-  transform: translate(var(--thumb-l), var(--thumb-t));
+  transform: translate(var(--lens-l), calc(var(--thumb-t) - var(--lens-y)));
   pointer-events: none;
-  /* 一块清透的玻璃：只有一圈很细的亮边和一点浮起的影子，里面不铺任何颜色（铺了就像硅胶）。
-     透镜本身绝不缩放：一缩放，透过它看到的字就被重新采样，整块发糊。 */
-  box-shadow: var(--lens-glass-rim);
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: --lens-x 240ms var(--lens-drop), --lens-y 240ms var(--lens-drop), opacity 180ms ease 70ms;
 }
-.segment-track.is-dragging .segment-lens, .segment-track.is-settling .segment-lens { opacity: 1; }
-/* 开着折射时，拖动中的滑块变成那块玻璃：不放大（和透镜对不齐），底色淡到几乎透明。 */
-.segment-track.has-lens.is-dragging .segment-thumb,
-.segment-track.has-lens.is-settling .segment-thumb { scale: none; background: var(--lens-glass-fill); box-shadow: none; }
+.segment-track.is-lifted :is(.segment-lens, .segment-lens-rim) {
+  --lens-x: calc(var(--thumb-w) * .14 + var(--lens-stretch, 0px));
+  --lens-y: calc(var(--thumb-h) * .11 + var(--seg-pad) * 1.22 - var(--lens-stretch, 0px) * .3);
+  opacity: 1;
+  transition: --lens-x 420ms var(--lens-lift), --lens-y 420ms var(--lens-lift), opacity 90ms ease;
+}
+/* 拖动中拉长量逐帧在变：只给很短的跟随，不要回弹。 */
+.segment-track.is-lifted.is-dragging :is(.segment-lens, .segment-lens-rim) {
+  transition: --lens-x 110ms ease-out, --lens-y 110ms ease-out, opacity 90ms ease;
+}
+/* 玻璃本体：四周多撑出 --lens-m 给往外的取样，再裁回胶囊。里面不铺任何颜色——中间就是原样的胶囊。 */
+.segment-lens {
+  box-sizing: content-box;
+  margin: calc(-1 * var(--lens-m, 0px));
+  padding: var(--lens-m, 0px);
+  clip-path: inset(var(--lens-m, 0px) round 999px);
+}
+/* 玻璃的边：一圈极细的暗描边 + 斜对角的两道高光（左上、右下）+ 很淡的浮起影子。 */
+.segment-lens-rim { box-shadow: var(--lens-glass-rim); }
+.segment-lens-rim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.2px;
+  border-radius: inherit;
+  background: var(--lens-glass-specular);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* 透镜浮起来时，平的选中胶囊化进玻璃里：iOS 里浮起的那块玻璃里面是清的，不再有那块深色底。 */
+.segment-track.has-lens .segment-thumb { transition: scale var(--seg-dur) var(--seg-ease), opacity 160ms ease 120ms; }
+.segment-track.has-lens.is-lifted .segment-thumb { scale: none; opacity: 0 !important; transition: opacity 90ms ease; }
 .segment-track.has-lens.is-dragging { --seg-clip-extra: 0px; }
 .segment-ink-item {
   position: absolute;
