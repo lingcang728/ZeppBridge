@@ -155,7 +155,7 @@ const apply = async (next: string[]) => {
   background: transparent; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
   transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
-.pins-empty:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.pins-empty:hover { border-color: color-mix(in srgb, var(--ink) 24%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .pins-empty:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pins-plus { display: grid; flex: 0 0 auto; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .pins-empty-copy { display: grid; gap: 2px; }

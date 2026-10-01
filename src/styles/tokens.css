@@ -50,7 +50,8 @@
   --distance: var(--pace);
   --danger: #F0616A;
   --warning: #F5C33B;
-  --focus: #7DA33E;
+  /* 键盘焦点环：中性的浅灰，不用品牌绿（2026-10-01：「只要有绿色描边的地方，都帮我去掉」）。 */
+  --focus: rgba(226, 234, 242, .55);
   --route-neutral: #9AA1A9;
   --route-mint: #2FA96B;
   --route-cyan: #4AA8E8;
@@ -122,12 +123,14 @@
      胶囊的边：一圈极细高光，上下沿最亮、两端渐弱。停稳时的选中项：比玻璃略深的平胶囊。 */
   --glass-edge: linear-gradient(180deg, rgba(255, 255, 255, .32), rgba(255, 255, 255, .09) 32%, rgba(255, 255, 255, .05) 68%, rgba(255, 255, 255, .18));
   --glass-outline: 0 0 0 0 transparent;
-  --glass-tab-selected: rgba(0, 0, 0, .30);
-  /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：里面清透不铺色；边是一圈极细的暗描边、
+  /* 停稳时的选中项：比玻璃略亮的一块平胶囊，只有一道很淡的顶边高光（不再是压暗的「餐盒盖」）。 */
+  --glass-tab-selected: linear-gradient(180deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, .075));
+  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 0 0 .5px rgba(255, 255, 255, .05);
+  /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：里面清透不铺色；边是一圈极淡的亮描边（不用暗描边：「后面还有黑边」）、
      左上和右下两道斜对角高光，外加很淡的浮起影子。 */
   /* 透镜边上的散射光（lib/glassLens.ts 的乳白那一层）：深色底上要淡。 */
   --lens-scatter: rgba(255, 255, 255, .45);
-  --lens-glass-rim: 0 0 0 .6px rgba(0, 0, 0, .6), 0 8px 18px -8px rgba(0, 0, 0, .5);
+  --lens-glass-rim: 0 0 0 .5px rgba(255, 255, 255, .1), 0 8px 18px -8px rgba(0, 0, 0, .45);
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 70deg, rgba(255, 255, 255, .05) 100deg,
     rgba(255, 255, 255, .62) 140deg, rgba(255, 255, 255, .05) 185deg, rgba(255, 255, 255, .05) 265deg, rgba(255, 255, 255, .78) 310deg, rgba(255, 255, 255, .16));
   --cap-ink: #A2C765;
@@ -227,7 +230,7 @@ html[data-theme="light"] {
   --distance: var(--pace);
   --danger: #C43742;
   --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
-  --focus: #2F6B4F;
+  --focus: rgba(38, 52, 41, .42);
   --route-neutral: #6E7670;
   --route-mint: #22875C;
   --route-cyan: #2E7FC2;
@@ -280,9 +283,10 @@ html[data-theme="light"] {
   --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .14), 0 3px 10px -4px rgba(38, 52, 41, .22);
   --glass-edge: linear-gradient(180deg, #FFFFFF, rgba(255, 255, 255, .6) 32%, rgba(255, 255, 255, .45) 68%, rgba(255, 255, 255, .9));
   --glass-outline: 0 0 0 .5px rgba(38, 52, 41, .12);
-  --glass-tab-selected: rgba(38, 52, 41, .08);
+  --glass-tab-selected: linear-gradient(180deg, rgba(38, 52, 41, .085), rgba(38, 52, 41, .06));
+  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 0 0 .5px rgba(38, 52, 41, .04);
   --lens-scatter: #FFFFFF;
-  --lens-glass-rim: 0 0 0 .6px rgba(38, 52, 41, .38), 0 8px 18px -8px rgba(38, 52, 41, .32);
+  --lens-glass-rim: 0 0 0 .5px rgba(38, 52, 41, .14), 0 8px 18px -8px rgba(38, 52, 41, .28);
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
     rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));
   --cap-ink: #2F6B4F;

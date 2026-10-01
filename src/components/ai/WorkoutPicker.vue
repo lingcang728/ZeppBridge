@@ -160,7 +160,7 @@ const facts = (workout: Workout): string => {
 .row:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); translate: 0 -1px; }
 .row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .row.is-on { background: color-mix(in srgb, var(--accent) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 6px 18px -10px color-mix(in srgb, var(--accent) 60%, transparent); }
+  box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--accent) 60%, transparent); }
 .row-glyph { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%;
   background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--activity); }
 .row-copy { display: grid; flex: 1; min-width: 0; gap: 2px; overflow-wrap: anywhere; }

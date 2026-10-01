@@ -69,7 +69,7 @@
   box-shadow: var(--mat-raised-rim);
 }
 .button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 22%, transparent);
   color: var(--ink);
   background: var(--mat-raised-hover);
 }
@@ -108,7 +108,7 @@
   font: inherit;
   font-size: var(--fs-sm);
 }
-.mat-field:focus { outline: none; border-color: var(--accent); box-shadow: var(--mat-inset-shadow), 0 0 0 3px var(--accent-soft); }
+.mat-field:focus { outline: none; border-color: var(--focus); box-shadow: var(--mat-inset-shadow); }
 
 /* ── 开关 ─────────────────────────── */
 .mat-switch {
@@ -177,8 +177,9 @@
 /* 里面放着会浮起玻璃透镜的控件（SegmentTrack / CapsuleWheel）时：毛玻璃挪到垫在底下的一层上，控件自己不带
    backdrop-filter。否则透镜只看得见这组按钮里面的东西、看不见背后的页面，浮起来是一块发暗的方块
    （lib/glassLens.ts）。 */
+/* 定位用 :where 降到零优先级：本来就是 absolute 的浮层（关系网的节点浮层）保持自己的定位。 */
+:where(.glass-control.is-lens-host) { position: relative; }
 .glass-control.is-lens-host {
-  position: relative;
   isolation: isolate;
   background: none;
   -webkit-backdrop-filter: none;

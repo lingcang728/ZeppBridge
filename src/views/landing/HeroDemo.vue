@@ -195,7 +195,7 @@ const detailTitle = computed(() => (shown.value ? props.copy[shown.value].title 
 .demo-card { position: relative; display: grid; align-content: start; gap: 6px; padding: 16px; overflow: hidden; border: 0; border-radius: 18px; background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); color: var(--ink); text-align: left; font: inherit; cursor: pointer; transition: transform 180ms ease; }
 .demo-card:hover { transform: translateY(-2px); }
 .demo-card:active { transform: scale(.98); }
-.demo-card:focus-visible, .demo-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.demo-card:focus-visible, .demo-back:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .demo-card.wide { grid-column: 1 / -1; }
 .card-title { color: var(--muted); font-size: 12.5px; font-weight: 600; }
 .card-figure { display: flex; align-items: baseline; gap: 4px; }

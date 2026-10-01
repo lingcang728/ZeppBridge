@@ -27,7 +27,7 @@
   border: 1px solid var(--line-control); border-radius: var(--radius-sm);
   background: var(--mat-inset); color: var(--ink); font: inherit; font-size: var(--fs-md); resize: vertical; box-shadow: var(--mat-inset-shadow);
 }
-.ai-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.ai-input:focus { border-color: var(--focus); outline: none; }
 .ai-input::placeholder { color: var(--subtle); }
 /* 玻璃输入面：没有硬描边，标题写在面里，字数淡淡地压在右下角；聚焦时亮一圈品牌色。 */
 .ai-field {
@@ -35,7 +35,7 @@
   border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
   transition: box-shadow var(--dur-fast) ease;
 }
-.ai-field:focus-within { box-shadow: var(--mat-inset-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.ai-field:focus-within { box-shadow: var(--mat-inset-shadow), 0 0 0 1.5px var(--focus); }
 .ai-field-label { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .02em; }
 .ai-field-input {
   width: 100%; min-height: 1.6em; max-height: 240px; padding: 2px 0; border: 0; outline: none; resize: none; overflow-y: auto;
@@ -48,7 +48,7 @@
   border: 1px solid var(--line-control); border-radius: 9px;
   background: var(--mat-raised); color: var(--muted); font-size: var(--fs-sm); cursor: pointer; box-shadow: var(--mat-raised-rim);
 }
-.ai-tool:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); }
+.ai-tool:hover:not(:disabled) { color: var(--ink); border-color: var(--mat-line-hover); }
 .ai-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ai-tool:disabled { opacity: .45; cursor: not-allowed; }
 .ai-note { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: var(--fs-sm); color: var(--subtle); }

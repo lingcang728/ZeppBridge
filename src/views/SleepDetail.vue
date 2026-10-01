@@ -20,6 +20,7 @@ import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber 
 import { minutesToHours } from '../lib/missingValues';
 import type { DeviceProfile, SleepSession } from '../types';
 import { sleepDetailMessages as messages } from './SleepDetail.i18n';
+import { vEdgeSafe } from '../lib/edgeSafe';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -257,7 +258,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
             <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
             <span class="stage-help-anchor">
               <button class="stage-help-button" type="button" aria-describedby="stage-help-note">{{ t.stageHelpButton }}</button>
-              <span id="stage-help-note" class="stage-help" role="note">{{ t.stageHelp }}</span>
+              <span id="stage-help-note" v-edge-safe class="stage-help" role="note">{{ t.stageHelp }}</span>
             </span>
           </div>
         </div>

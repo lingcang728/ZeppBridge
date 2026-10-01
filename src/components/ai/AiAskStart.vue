@@ -203,7 +203,7 @@ const nothingInRange = computed(() => {
 .ask-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
 .ask-chip:active { scale: .97; }
 .ask-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
 .ask-icon { flex: none; color: var(--accent); }
 .ask-plain { margin: 0 0 2px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
 .ask-plain b { margin-right: 6px; color: var(--subtle); font-weight: 650; }

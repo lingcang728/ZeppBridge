@@ -129,7 +129,6 @@ const regionHost = computed(() => appStatus.value?.region_host || t.value.notPro
   place-items: center;
   border-radius: 11px;
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--accent);
   font-family: var(--font-display, inherit);
   font-size: var(--fs-lg);

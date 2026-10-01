@@ -49,8 +49,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 
 const root = ref<HTMLElement | null>(null);
 /* 玻璃（lib/glassLens.ts）：镜片是同一块玻璃——停着时是底色 + 一圈玻璃边，转动时底色化开、里面换成
-   会放大边缘的透镜（经过镜片边的字被拉开、微微糊、泛一点乳白），停稳后原样回来。边从头到尾是同一圈，
-   不再是「镜片自己的高光边 + 透镜的边」两层叠在一起（2026-10-01 反馈「像有两层透镜」）。 */
+   会放大边缘的透镜（经过镜片边的字被拉开、微微糊、泛一点乳白），停稳后原样回来。转动时只有透镜的那圈边，
+   镜片自己的边隐去，不会「两层透镜」叠在一起（2026-10-01 反馈）；停着时只有镜片自己的边，没有斜对角高光。 */
 const refractEl = ref<HTMLElement | null>(null);
 const refract = useGlassLens(refractEl, 'thumb');
 const itemEls = ref<HTMLElement[]>([]);
@@ -439,7 +439,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 .capsule-wheel.is-fit.is-dragging, .capsule-wheel.is-fit.is-animating { transition: none; }
 .capsule-wheel.is-dragging { cursor: grabbing; }
 .capsule-wheel.is-disabled { opacity: .5; cursor: not-allowed; }
-.capsule-wheel:focus-visible .wheel-lens { box-shadow: 0 0 0 2px var(--focus), var(--cap-thumb-rim); }
+/* 键盘焦点：镜片亮一点，不画描边（不要绿圈，2026-10-01）。 */
+.capsule-wheel:focus-visible .wheel-lens { filter: brightness(1.18); }
 
 /* 正中的镜片：选中项永远在它上面。宽度随拖动在两项之间插值。 */
 .wheel-lens {
@@ -473,8 +474,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   opacity: 0;
   transition: opacity 160ms ease;
 }
-/* 玻璃边：停着时也在（镜片自己不再画边），所以静止和转动是同一块玻璃。 */
-.wheel-refract-rim { box-shadow: var(--lens-glass-rim); opacity: 1; }
+/* 玻璃边：只在转动时浮现；停着时是镜片自己（底色 + 自己的边），和胶囊选择器停着时的平胶囊一样
+   （第五版，2026-10-01：停着时那圈斜对角高光描边「像个餐盒」）。 */
+.wheel-refract-rim { box-shadow: var(--lens-glass-rim); }
 .wheel-refract-rim::before {
   content: '';
   position: absolute;
@@ -487,8 +489,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 }
 .is-vertical .wheel-refract { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-refract, .capsule-wheel.is-animating .wheel-refract { opacity: 1; }
-.capsule-wheel.has-lens .wheel-lens { box-shadow: none; transition: scale var(--dur-base) var(--ease-spring), opacity 200ms ease; }
-.capsule-wheel.has-lens:focus-visible .wheel-refract-rim { box-shadow: 0 0 0 2px var(--focus), var(--lens-glass-rim); }
+.capsule-wheel.has-lens .wheel-lens { transition: scale var(--dur-base) var(--ease-spring), opacity 200ms ease; }
 .capsule-wheel.has-lens:is(.is-dragging, .is-animating) .wheel-lens { scale: none; opacity: 0; transition: opacity 90ms ease; }
 
 .wheel-item {

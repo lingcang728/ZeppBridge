@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
 }
 .locale-trigger:hover, .is-open .locale-trigger { color: var(--ink); border-color: var(--mat-line-hover); }
 .locale-trigger:active { transform: translateY(1px) scale(.99); }
-.locale-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.locale-trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .locale-caret { flex: 0 0 auto; transition: transform 160ms ease; }
 .is-open .locale-caret { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .locale-trigger, .locale-caret { transition: none; } }

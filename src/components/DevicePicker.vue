@@ -285,7 +285,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 
 <style scoped>
 .device-picker { display: grid; gap: 12px; outline: none; }
-.device-picker:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 12px; }
+.device-picker:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 12px; }
 
 .picker-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .filter-chip {
@@ -297,9 +297,9 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   font-size: var(--fs-xs);
   cursor: pointer;
 }
-.filter-chip.on { border-color: var(--accent); color: var(--accent); }
+.filter-chip.on { color: var(--accent); }
 .picker-search { flex: 1 1 190px; min-width: 140px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--mat-inset); color: var(--ink); outline: none; box-shadow: var(--mat-inset-shadow); }
-.picker-search:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.picker-search:focus-visible { border-color: var(--focus); }
 
 .picker-empty { padding: 24px 12px; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
 

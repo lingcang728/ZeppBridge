@@ -143,7 +143,7 @@ const recentItems = computed<RecentItem[]>(() => {
 .tl-when em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-style: normal; font-weight: 600; }
 /* 节点压在线上：底下垫一圈卡片底色，线从节点背后穿过去而不是从中间切开它。 */
 .tl-node { display: grid; padding: 3px; border-radius: 16px; background: var(--mat-card-solid); }
-.tl-item.newest .tl-node { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 18px -2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.tl-item.newest .tl-node { box-shadow: 0 0 18px -2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .tl-title { max-width: 100%; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .recent-empty { min-height: 120px; }

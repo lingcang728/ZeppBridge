@@ -11,6 +11,7 @@ import { sleepStageLabel } from '../../lib/sleepStages';
 import { stageMinutesForBar } from '../../lib/missingValues';
 import type { SleepSession } from '../../types';
 import { defineMessages, useMessages } from '../../i18n';
+import { vEdgeSafe } from '../../lib/edgeSafe';
 
 defineOptions({ name: 'OverviewSleepCard' });
 
@@ -122,7 +123,7 @@ const hoverStage = (event: PointerEvent) => {
     </div>
     <template v-if="sleep">
       <p class="panel-figure"><span class="figure-value"><template v-for="(part, index) in figureParts(hm(sleep.duration_minutes))" :key="index"><i v-if="part.unit">{{ part.text }}</i><template v-else>{{ part.text }}</template></template></span></p>
-      <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
+      <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" v-edge-safe class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
     </template>
     <div v-else class="panel-empty compact"><GlyphTile name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>

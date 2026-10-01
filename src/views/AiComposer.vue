@@ -302,7 +302,10 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
       <!-- 交付坞身后一段由下往上的渐隐磨砂：底下的节点、连线滚到坞后面时是柔和地淡出，不是被一条硬边截断。 -->
       <div class="stage-foot" aria-hidden="true"></div>
 
-      <aside class="stage-rail glass-control">
+      <!-- 右栏的毛玻璃垫在它身后的一层上，右栏自己不带 backdrop-filter：否则里面的胶囊挂不上折射玻璃
+           （lib/glassLens.ts；右栏会滚动，不能用 .is-lens-host 的伪元素，伪元素会跟着内容滚走）。 -->
+      <div class="stage-rail-glass glass-control" aria-hidden="true"></div>
+      <aside class="stage-rail">
         <AiStepRail v-model:open="openStep" :steps="railSteps">
           <template #target>
             <WorkoutPicker :workouts="workoutChoices" :selected-ids="draft.workout_ids" :recent-days="recentDays"
@@ -349,7 +352,7 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
   background: linear-gradient(to top, color-mix(in srgb, var(--mat-card) 88%, transparent) 30%, transparent);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   -webkit-mask-image: linear-gradient(to top, #000 45%, transparent); mask-image: linear-gradient(to top, #000 45%, transparent); }
-.stage-rail {
+.stage-rail, .stage-rail-glass {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -361,6 +364,7 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
   border-radius: calc(var(--radius-xl) - 8px);
   overscroll-behavior: contain;
 }
+.stage-rail-glass { overflow: visible; padding: 0; pointer-events: none; }
 .stage-scrim { position: absolute; inset: 0; z-index: 5; border-radius: inherit; background: color-mix(in srgb, var(--canvas) 45%, transparent);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .scrim-enter-active, .scrim-leave-active { transition: opacity 220ms ease; }
@@ -379,7 +383,8 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
   .stage-graph { position: relative; inset: auto; height: 62vh; min-height: 440px; border-radius: var(--radius-xl); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
   .stage-top { top: 12px; right: 12px; left: 12px; }
   .stage-foot { display: none; }
-  .stage-rail { position: static; width: auto; margin-top: 12px; }
+  .stage-rail { position: static; width: auto; margin-top: 12px; background: var(--mat-glass-strong); box-shadow: var(--glass-rim), var(--glass-shadow); }
+  .stage-rail-glass { display: none; }
   .stage-dock { position: sticky; right: auto; bottom: 12px; left: auto; margin-top: 12px; }
   .stage-graph :deep(.dock) { bottom: 14px; }
   .stage-graph { --graph-safe-bottom: 60px; }

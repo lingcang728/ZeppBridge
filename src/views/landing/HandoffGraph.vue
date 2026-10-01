@@ -231,7 +231,7 @@ const pickedLabel = computed(() => props.copy.picked.replace('{n}', String(picke
 .graph-hub strong { font-size: 15px; }
 .graph-hub small { font-size: 12px; opacity: .8; }
 .graph-node { position: absolute; top: 0; left: 0; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow), var(--mat-shadow); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: grab; will-change: transform; transition: background 160ms ease, color 160ms ease; }
-.graph-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.graph-node:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .graph-node.dragging { cursor: grabbing; z-index: 2; }
 .graph-node.picked { background: var(--accent); color: var(--accent-ink); }
 .graph-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--subtle); font-size: 13px; }

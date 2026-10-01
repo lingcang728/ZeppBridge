@@ -190,7 +190,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   touch-action: none;
   user-select: none;
 }
-.wheel-col:focus-visible .band { box-shadow: 0 0 0 2px var(--focus), var(--cap-thumb-rim); }
+/* 键盘焦点：玻璃带亮一点，不画描边（不要绿圈，2026-10-01）。 */
+.wheel-col:focus-visible .band { filter: brightness(1.18); }
 /* 正中的玻璃带：选中项停在它里面。 */
 .band {
   position: absolute;
@@ -202,7 +203,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
 }
-/* 透镜（lib/glassLens.ts）和玻璃边：边停着时也在（玻璃带自己不再画边），静止和转动是同一块玻璃。 */
+/* 透镜（lib/glassLens.ts）和玻璃边：只在转动时浮现；停着时是玻璃带自己（底色 + 自己的边），
+   和胶囊选择器停着时的平胶囊一样（第五版，2026-10-01：停着时那圈斜对角高光描边「像个餐盒」）。 */
 .band-refract {
   position: absolute;
   top: 50%;
@@ -214,10 +216,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   opacity: 0;
   transition: opacity 160ms ease;
 }
-.band-refract-rim { box-shadow: var(--lens-glass-rim); opacity: 1; }
-.has-lens .band { box-shadow: none; transition: opacity 200ms ease; }
+.band-refract-rim { box-shadow: var(--lens-glass-rim); }
+.has-lens .band { transition: opacity 200ms ease; }
 .has-lens.moving .band { opacity: 0; transition: opacity 90ms ease; }
-.has-lens:focus-visible .band-refract-rim { box-shadow: 0 0 0 2px var(--focus), var(--lens-glass-rim); }
 .band-refract-rim::before {
   content: '';
   position: absolute;

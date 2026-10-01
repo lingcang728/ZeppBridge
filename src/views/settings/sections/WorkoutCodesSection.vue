@@ -91,5 +91,5 @@ onMounted(() => { void loadCorrections(); });
 .code-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .code-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
 .code-suggestions .filter-chip { padding: 3px 10px; border: 1px solid var(--line-control); border-radius: 999px; background: transparent; color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
-.code-suggestions .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+.code-suggestions .filter-chip:hover { color: var(--accent); }
 </style>

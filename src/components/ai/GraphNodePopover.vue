@@ -123,8 +123,11 @@ const coverageText = computed(() => {
 </script>
 
 <template>
-  <div ref="root" class="popover glass-control" role="dialog" :aria-label="node.label"
+  <!-- 毛玻璃垫在外层的伪元素上（.is-lens-host），滚动放在里面一层：里面的天数胶囊才挂得上折射玻璃，
+       垫底的玻璃也不会跟着内容滚走。 -->
+  <div ref="root" class="popover glass-control is-lens-host" role="dialog" :aria-label="node.label"
     :style="{ left: `${pos.left}px`, top: `${pos.top}px`, maxHeight: `${maxHeight}px` }" @pointerdown.stop @wheel.stop>
+   <div class="pop-scroll">
     <div class="pop-head">
       <span v-if="node.icon" class="pop-icon"><Icon :name="node.icon" :size="16" /></span>
       <div class="pop-title">
@@ -165,6 +168,7 @@ const coverageText = computed(() => {
       <button type="button" class="mat-switch" role="switch" :aria-checked="node.included" :aria-label="node.included ? t.drop : t.keep"
         @click="emit('set-metric', !node.included)"></button>
     </div>
+   </div>
   </div>
 </template>
 
@@ -172,14 +176,21 @@ const coverageText = computed(() => {
 .popover {
   position: absolute;
   z-index: 6;
-  display: grid;
+  display: flex;
   width: 288px;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  animation: pop-in .26s var(--ease-out);
+}
+.pop-scroll {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   gap: 12px;
   overflow-y: auto;
   padding: 14px;
-  border-radius: var(--radius-md);
+  border-radius: inherit;
   overscroll-behavior: contain;
-  animation: pop-in .26s var(--ease-out);
 }
 @keyframes pop-in { from { opacity: 0; scale: .96; } }
 .pop-head { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); }

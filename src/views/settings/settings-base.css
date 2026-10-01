@@ -84,7 +84,7 @@
 .diagnostic-note em { font-style: normal; color: var(--subtle); }
 .diagnostic-note textarea { width: 100%; min-height: 68px; resize: vertical; }
 .diagnostic-note small { color: var(--subtle); font-size: var(--fs-xs); }
-.diagnostic-done { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent); border-radius: 10px; background: var(--accent-soft); color: var(--ink); font-size: var(--fs-sm); }
+.diagnostic-done { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 10px; background: var(--accent-soft); color: var(--ink); font-size: var(--fs-sm); }
 .diagnostic-done strong { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
 .diagnostic-done p { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 

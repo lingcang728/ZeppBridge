@@ -4,6 +4,7 @@ import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import { vEdgeSafe } from '../lib/edgeSafe';
 
 const messages = defineMessages(
   {
@@ -306,7 +307,7 @@ const tooltip = computed(() => {
         <span>{{ axisLabels.end }}</span>
       </div>
     </template>
-    <div v-if="hovered && !isHypnogram" class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
+    <div v-if="hovered && !isHypnogram" v-edge-safe class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">
         <span><i :class="stage.tone"></i>{{ stage.label }}</span>

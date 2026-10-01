@@ -108,7 +108,7 @@ const missingLine = computed(() => {
 .device-live { display: inline-flex; align-items: center; gap: 5px; max-width: 132px; overflow: hidden; color: var(--muted); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .device-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--readiness); box-shadow: 0 0 0 4px color-mix(in srgb, var(--readiness) 14%, transparent); }
 .hero-title-group { min-width: 0; }
-.source-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 3px 10px 3px 5px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: var(--fs-xs); }
+.source-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 3px 10px 3px 5px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: var(--fs-xs); }
 .sport-line { display: flex; align-items: center; gap: 12px; }
 .sport-line h1 { margin: 0; color: var(--ink); font-size: clamp(25px, 3vw, 38px); line-height: 1.1; letter-spacing: -.04em; }
 .sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: var(--fs-sm); }

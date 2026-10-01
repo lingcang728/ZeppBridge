@@ -31,6 +31,7 @@ import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskHandoff, type HandoffStepId } from '../../composables/useAiTaskHandoff';
 import { useSyncController } from '../../composables/useSyncController';
 import { defineMessages, useMessages } from '../../i18n';
+import { vEdgeSafe } from '../../lib/edgeSafe';
 
 const props = defineProps<{
   preview: AiTaskPreview | null;
@@ -472,7 +473,7 @@ onBeforeUnmount(() => {
     <!-- 预览出错不藏进浮层：它决定导出的东西对不对，要一直看得见。 -->
     <p v-if="previewError" class="ai-note bad alert-pill" role="alert"><Icon name="warning" :size="13" />{{ previewError }}</p>
 
-    <div class="bar glass-control">
+    <div class="bar glass-control is-lens-host">
       <button type="button" :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :aria-expanded="details" @click="details = !details">
         <i class="ready-dot" aria-hidden="true"></i>
         <span v-if="waitingForData" class="ready-copy" role="status">
@@ -499,7 +500,7 @@ onBeforeUnmount(() => {
         </button>
         <!-- 右上角的小注释：悬停 / 聚焦开关时展开说明两档的差别（以前这句话躲在最终提示词浮层里）。 -->
         <span class="plan-info" aria-hidden="true">?</span>
-        <span id="plan-note" class="plan-tip" role="tooltip">
+        <span id="plan-note" v-edge-safe class="plan-tip" role="tooltip">
           <strong>{{ t.planTitle(provider.label) }}</strong>{{ t.subscribedHint }}<template v-if="providerNote && provider.id === 'chatgpt'"><br>{{ providerNote }}</template>
         </span>
       </span>
@@ -563,7 +564,8 @@ onBeforeUnmount(() => {
   background: var(--mat-glass-strong); box-shadow: var(--glass-rim), 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
   color: var(--muted); font-size: 11px; font-weight: 800; line-height: 1; pointer-events: none; }
 .plan-tip { position: absolute; right: -8px; bottom: calc(100% + 12px); z-index: 3; width: max-content; max-width: 280px; padding: 10px 12px; border-radius: 14px;
-  background: var(--mat-glass-strong); box-shadow: var(--glass-rim), var(--mat-glass-shadow); color: var(--muted); font-size: var(--fs-xs); line-height: 1.55;
+  background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur);
+  box-shadow: var(--glass-rim), var(--mat-glass-shadow); color: var(--muted); font-size: var(--fs-xs); line-height: 1.55;
   opacity: 0; translate: 0 4px; pointer-events: none; transition: opacity 160ms ease, translate 200ms var(--ease-out); }
 .plan-tip strong { display: block; margin-bottom: 2px; color: var(--ink); font-size: var(--fs-sm); }
 .plan-wrap:hover .plan-tip, .plan-toggle:focus-visible ~ .plan-tip { opacity: 1; translate: 0 0; }
@@ -577,7 +579,7 @@ onBeforeUnmount(() => {
 .plan-copy { display: grid; line-height: 1.15; }
 .plan-copy small { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 500; white-space: nowrap; }
 .plan-copy strong { font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
-.plan-toggle.paid { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.plan-toggle.paid { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
 .plan-toggle.paid .plan-mark { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
 .plan-toggle.short { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 60%, transparent); }
 .plan-toggle.short strong { color: var(--warning); }
@@ -639,7 +641,7 @@ onBeforeUnmount(() => {
   color: var(--ink); font-family: inherit; font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: var(--mat-inset-shadow);
 }
 .prompt-view { display: block; width: 100%; max-height: 220px; border: 0; text-align: left; cursor: text; transition: box-shadow var(--dur-fast) ease; }
-.prompt-view:hover { box-shadow: var(--mat-inset-shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.prompt-view:hover { box-shadow: var(--mat-inset-shadow), 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent); }
 .prompt-edit { display: block; width: 100%; max-height: 320px; resize: none; border: 0; outline: none; box-shadow: var(--mat-inset-shadow), 0 0 0 2px var(--focus); }
 .prompt-meta { display: flex; align-items: center; gap: 12px; margin: 6px 2px 0; font-size: var(--fs-2xs); }
 .prompt-meta span, .prompt-meta button { display: inline-flex; align-items: center; gap: 4px; }

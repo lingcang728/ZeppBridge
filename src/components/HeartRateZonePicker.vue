@@ -334,7 +334,7 @@ watch(() => props.revision, () => { void load(); });
   transition: background var(--dur-fast) ease;
 }
 .basis-row:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); }
-.basis-row.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+.basis-row.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .basis-value { color: var(--ink); font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
 .basis-value i { margin-left: 4px; color: var(--subtle); font-family: inherit; font-size: var(--fs-2xs); font-style: normal; }
 .basis-copy { display: grid; gap: 1px; min-width: 0; }

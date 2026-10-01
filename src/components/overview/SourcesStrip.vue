@@ -179,7 +179,7 @@ const chips = computed(() => [
 .dot.on { background: var(--accent); }
 .chip-state { color: var(--subtle); }
 .source-chip.manage { padding: 5px 12px; color: var(--muted); gap: 6px; }
-.source-chip.manage:hover { color: var(--accent); border-color: var(--accent); }
+.source-chip.manage:hover { color: var(--accent); }
 @media (max-width: 760px) {
   .sources-strip { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px 14px; }
   .sources-row { width: 100%; }

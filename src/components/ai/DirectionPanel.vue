@@ -170,7 +170,7 @@ const useExample = (example: { text: string; template: string }) => {
 .dir-chip { min-height: 32px; padding: 5px 13px; border: 1px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; transition: background var(--dur-fast) ease, color var(--dur-fast) ease; }
 .dir-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
-.dir-chip.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-weight: 600; }
+.dir-chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-weight: 600; }
 .dir-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 2px 0; }
 .examples-label { color: var(--subtle); font-size: var(--fs-2xs); }

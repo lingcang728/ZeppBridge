@@ -148,7 +148,6 @@ const orderOf = (id: string) => draft.value.indexOf(id) + 1;
 .pp-fill {
   position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(0deg, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent) 16%, transparent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
   transform: scaleY(0); transform-origin: 50% 100%; opacity: 0;
   transition: transform 340ms cubic-bezier(.3, .7, .2, 1), opacity 200ms ease;
 }

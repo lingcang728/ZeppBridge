@@ -274,8 +274,7 @@ useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.va
    以前这里还盯着右簇自己的尺寸，结果是个回路：档位一变，语言标签在全名和短码之间换，
    传送带晚一帧才量出新宽度，右簇一变宽又触发重量、又从 0 档来一遍——语言胶囊就在
    「PT-BR」和「Português (Brasil)」之间来回闪个不停，根本拖不动。现在只看顶栏本身
-   （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊按「转到最宽那一项」
-   的宽度留位置，拖动途中撑宽也不会压到导航。 */
+   （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊拖动途中撑宽只留一小截（见 overlaps）。 */
 const FIT_SHORT_LOCALE = 2; // 语言传送带两侧的露边收窄（不再换短码）
 const FIT_MAX = 7;
 /** 第 5 档起导航挪到底部：底部导航的样式在 shell.css，挂在 <html> 上。 */
@@ -299,11 +298,14 @@ const overlaps = (): boolean => {
   const nav = box('.pill-nav');
   const actions = box('.topbar-actions');
   const wheelEl = localeWheel.value?.$el;
-  // 右簇靠右对齐：传送带撑到最宽时，右簇的左边沿往左多出这么多。同步胶囊正在伸缩（useWidthMorph）时，
-  // 按它伸完以后的宽度算（动画期间溢出被裁掉，scrollWidth 就是伸完的宽度）。
+  // 右簇靠右对齐：同步胶囊正在伸缩（useWidthMorph）时，按它伸完以后的宽度算（动画期间溢出被裁掉，
+  // scrollWidth 就是伸完的宽度）。语言传送带拖动途中会跟着中间那一项撑宽，只给它留一小截（最多 24px）：
+  // 以前按「转到最宽那一项」整段留，1400 宽的窗口一亮「数据已备好 · 交给 AI」就判成放不下，导航离开正中、
+  // 变紧凑，进了交给 AI 胶囊变回时间又回到正中——每次切页导航条都左右跳（2026-10-01 录屏）。
+  // 真换了语言会重新量（watch locale），拖动途中多撑出来的那一截只是一瞬间。
   const pill = syncPill.value;
   const pillGrow = pill?.offsetWidth ? Math.max(0, pill.scrollWidth - pill.offsetWidth) : 0;
-  const reserve = (wheelEl?.offsetWidth ? Math.max(0, localeWheel.value!.widestSpan() - wheelEl.offsetWidth) : 0) + pillGrow;
+  const reserve = (wheelEl?.offsetWidth ? Math.min(24, Math.max(0, localeWheel.value!.widestSpan() - wheelEl.offsetWidth)) : 0) + pillGrow;
   // 导航胶囊自己被挤窄（窄窗口里中间那一列只剩这么宽）：框没有相交，里面的字却已经叠在一起了。
   const squeezed = [...root.querySelectorAll<HTMLElement>('.pill-nav .segment-item')].some((el) => el.scrollWidth > el.clientWidth + 1);
   if (squeezed) return true;

@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
       <h1 id="ai-page-title">{{ t.pageTitle }}</h1>
       <p>{{ t.intro }}</p>
     </div>
-    <div class="head-task glass-control">
+    <div class="head-task glass-control is-lens-host">
       <input v-if="editing" ref="titleInput" class="ai-input title-input" type="text" :value="shownTitle"
         :aria-label="t.titleLabel" maxlength="120"
         @blur="commitRename" @keydown.enter.prevent="commitRename" @keydown.esc.prevent="cancelRename" />

@@ -151,7 +151,7 @@ const {
 .backup-row { gap: 4px; }
 .backup-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .backup-head strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
-.kind-tag.manual { border-color: color-mix(in srgb, var(--accent) 36%, transparent); color: var(--accent); }
+.kind-tag.manual { color: var(--accent); }
 .pin-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: var(--fs-2xs); }
 .good { color: var(--accent); }
 .bad { color: var(--danger); font-style: normal; }

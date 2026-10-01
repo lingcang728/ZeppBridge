@@ -58,7 +58,7 @@ and panel are a deliberate local exception).
 | Brand and actions | `--brand` `#7DA33E` = `--accent`, plus `--accent-hover` `#93B952`, `--accent-soft`, `--accent-ink` `#12170A`, `--action-green` |
 | Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#A3CC5C` (light `#4E8A2E`, same family as the brand lime), each with a translucent `*-wash` |
 | Sleep stages | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
-| Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` `#7DA33E` |
+| Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` neutral `rgba(226,234,242,.55)` (never brand green) |
 | Route pace spectrum | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | Spacing / radius | `--space-1…8`, `--radius-sm` 10px / `-md` 14px / `-lg` 18px |
 
@@ -117,8 +117,13 @@ forbidden. The provenance of the algorithms and percentages is in the
   top ink's clip and a mask that **hides the plain label under the thumb** move
   in lockstep. (A translucent glass thumb used to show the regular-weight label
   under the bold one — every Latin label ghosted after switching to German.)
-  The focus ring is drawn on the thumb, arrow / Home / End keys work, and
-  dragging turns the thumb into a glass lens.
+  Keyboard focus brightens the thumb (no ring), arrow / Home / End keys work,
+  and pressing / dragging lifts the thumb into a glass lens whose size follows
+  the item under it (`lib/segmentGlass.ts`). Dragging past either end
+  stretches the whole capsule like a rubber band (capped, never out of
+  bounds); a hard flick deforms it toward the flick and springs back.
+  At rest the thumb is an exact-size plate — nothing is scaled, so its ends
+  stay perfectly round.
 - **Secondary actions are `.pill-button`** ("Add event", "See all", "Manage",
   "Show 6 more"): the same raised capsule as a selected segment, icon in the
   brand colour; `.pill-button.quiet` has no fill. No bare text links, no
@@ -461,8 +466,13 @@ re-rendered blurred snapshots, which stuttered on collapse.)
 - A "skip to main content" link sits at the top; navigation and radio groups are
   annotated with `role` / `aria-*` / `aria-pressed`; charts carry `role="img"`
   and a localised `aria-label`.
-- Focus is a uniform `:focus-visible` 2px `--focus` outline. `outline: none` on
-  its own is forbidden.
+- Focus is a uniform `:focus-visible` 2px `--focus` outline in a neutral grey —
+  no green outlines anywhere, and selected chips are shown by fill, not by a
+  brand-coloured stroke. `outline: none` on its own is forbidden (capsules and
+  wheels brighten their thumb instead).
+- Hover tips and help popovers that can sit near an edge carry `v-edge-safe`
+  (`lib/edgeSafe.ts`): when shown they are nudged (and narrowed if needed) to
+  stay inside the window and every ancestor that clips them.
 - Touch targets are at least 44px (the mobile menu button, the bottom
   navigation, `RecordRow`).
 - The main breakpoint is 760px: the top bar's pill navigation hides and a
