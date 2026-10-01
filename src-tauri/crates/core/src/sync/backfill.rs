@@ -47,7 +47,7 @@ impl SyncManager {
             let db = self.db.lock().await;
             db.device_time_zone().unwrap_or(None)
         }
-        .unwrap_or_else(|| "UTC".to_string());
+        .unwrap_or_else(crate::official::fetch::system_time_zone);
 
         // 这一轮要做的块**一次取齐**，而不是每轮回数据库拿「当前第一块」。
         //
@@ -167,7 +167,8 @@ impl SyncManager {
             }
             Ok(records) => {
                 let incomplete = records.iter().any(|record| record.incomplete);
-                let report = self.persist_records(&chunk.stream, records).await?;
+                // 补拉的结果记在覆盖账本里，不写「数据健康」页那几行逐流状态。
+                let report = self.persist_records_quietly(&chunk.stream, records).await?;
                 Ok(classify_backfill_report(&report, incomplete))
             }
             Err(error) if error.is_cancelled() || error.needs_reauth() => Err(error),

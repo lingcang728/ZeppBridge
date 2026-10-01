@@ -51,6 +51,9 @@ impl Database {
         capability: CapabilityStatus,
         message: Option<String>,
     ) -> Result<()> {
+        if self.sync_state_is_quiet() {
+            return Ok(());
+        }
         let now = Utc::now().to_rfc3339();
         self.conn.execute(
             "INSERT INTO sync_state
@@ -154,6 +157,9 @@ impl Database {
         let _guard = CompactionGuard::enter();
         let mut report = RawPayloadCompaction::default();
         self.consolidate_event_windows(&mut report)?;
+        let (pruned, pruned_bytes) = self.prune_superseded_page_raws()?;
+        report.compacted += pruned;
+        report.bytes_before += pruned_bytes;
         let mut last_id: i64 = 0;
         loop {
             // 和重放同一个退出信号：批边界收手，把写锁尽快交还。
@@ -247,6 +253,59 @@ impl Database {
         Ok(uncompressed + self.pending_event_window_count()?)
     }
 
+    /// 删掉已经被接管的心率分页 / 运动历史报文：没有任何派生行指向、也没有被隔离。
+    ///
+    /// 这两条流以前的键带着每次同步的时间戳（`heart_rate_page:<起>:<止>`、
+    /// `sport_history:<种类>:<起>:<游标>`），一天新增几百条、从不清理：真实库里
+    /// 896 条心率分页全都没有任何样本指向，786 条运动历史里 777 条没有运动指向。
+    /// 新的键是稳定的（心率按 UTC 日、运动历史按内容），旧的那些在新报文接管了
+    /// 它们的行之后就只是重放时的负担。
+    ///
+    /// 只看「有没有派生行指向」：被隔离的（解析失败的）留着，修好解析器后重放还要
+    /// 用它；已有行指向的留着，它是那些行唯一的来源。每次同步后都跑一次（不受
+    /// 归档开关影响——这里删的不是任何人的数据），启动压缩时也跑。返回（条数，字节）。
+    pub fn prune_superseded_page_raws(&self) -> Result<(u64, u64)> {
+        const BATCH: i64 = 500;
+        let mut deleted = 0u64;
+        let mut bytes = 0u64;
+        loop {
+            if background_write_abort_requested() {
+                break;
+            }
+            let ids: Vec<(i64, i64)> = {
+                let mut stmt = self.conn.prepare(
+                    "SELECT r.id, LENGTH(r.payload) + COALESCE(LENGTH(r.payload_zip), 0)
+                     FROM raw_records r
+                     WHERE ((r.stream = 'heart_rate' AND r.source_key GLOB 'heart_rate_page:*')
+                         OR (r.stream = 'workouts' AND r.source_key GLOB 'sport_history:*'))
+                       AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)
+                       AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = r.id)
+                       AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = r.id)
+                       AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = r.id)
+                       AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = r.id)
+                     ORDER BY r.id
+                     LIMIT ?1",
+                )?;
+                let rows = stmt.query_map([BATCH], |row| Ok((row.get(0)?, row.get(1)?)))?;
+                rows.collect::<std::result::Result<Vec<_>, _>>()?
+            };
+            if ids.is_empty() {
+                break;
+            }
+            let transaction = self.conn.unchecked_transaction()?;
+            for (id, size) in &ids {
+                deleted +=
+                    transaction.execute("DELETE FROM raw_records WHERE id = ?1", [id])? as u64;
+                bytes += (*size).max(0) as u64;
+            }
+            transaction.commit()?;
+            if (ids.len() as i64) < BATCH {
+                break;
+            }
+        }
+        Ok((deleted, bytes))
+    }
+
     pub fn cleanup_old_data(&self, days: i64) -> Result<()> {
         if !(1..=365).contains(&days) {
             return Err(ZeppBridgeError::ConfigError(
@@ -254,8 +313,9 @@ impl Database {
             ));
         }
         let cutoff_timestamp = (Utc::now() - Duration::days(days)).to_rfc3339();
-        // daily_metrics.date 是本地日历日，切不能拿 UTC 的「今天」去比。
-        let cutoff_date = (Local::now().date_naive() - Duration::days(days))
+        // daily_metrics.date 是设备本地日历日，切不能拿 UTC 的「今天」去比。
+        let today = crate::contract::health_today(self.device_time_zone()?.as_deref(), Utc::now());
+        let cutoff_date = (today - Duration::days(days))
             .format("%Y-%m-%d")
             .to_string();
         self.conn.execute_batch("BEGIN IMMEDIATE;")?;
@@ -302,14 +362,29 @@ impl Database {
             // Raw responses are retained from their fetch time, not their query
             // window start. A 30-day request naturally starts near the retention
             // cutoff and must not be deleted seconds after it is fetched.
+            // 报文按两种时间过期，满足任一条且没有派生行指向就删：
+            // - 拉取时间早于保留期（老规矩）；
+            // - 报文覆盖的那段时间**整段**都早于保留期。只按拉取时间的话，最近才补拉回来的
+            //   几年前的报文会留下，派生行删了它还在——下一次修订号重放把删掉的历史原样
+            //   复活，再下一次同步又删掉。窗口跨过保留期的那条留着，它还管着保留期内的行。
             self.conn.execute(
                 "DELETE FROM raw_records
-                 WHERE fetched_at < ?1
+                 WHERE (fetched_at < ?1 OR COALESCE(end_utc, start_utc) < ?1)
                    AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
                    AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
                    AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
                    AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
                 [&cutoff_timestamp],
+            )?;
+            // 覆盖账本跟着改：被清掉了（哪怕一部分）的月份不能再说「已写入」。以前账本
+            // 仍是 persisted，补拉就把这些月份当成做完了跳过，「完整本地副本」也是假的。
+            // 云端本来就没有的月份（empty_from_cloud）什么都没丢，不动。
+            self.conn.execute(
+                "UPDATE coverage_ledger
+                 SET status = 'pending', records = 0, persisted_at = NULL, error = NULL,
+                     updated_at = ?2
+                 WHERE status IN ('persisted', 'partial') AND chunk_start < ?1",
+                params![cutoff_date, Utc::now().to_rfc3339()],
             )?;
             Ok(())
         })();

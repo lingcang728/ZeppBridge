@@ -55,7 +55,9 @@ pub(crate) async fn with_write<T>(
     mutation: impl FnOnce(&Database) -> zeppbridge_core::models::error::Result<T>,
 ) -> Result<T, AppError> {
     let _write_guard = acquire_quick_write(data_dir, purpose).await?;
-    let db = database.lock().await;
+    let mut db = database.lock().await;
+    // 启动时撞上别人的写锁、只拿到只读连接的话，锁空出来了就换成可写的。
+    db.reopen_writable_if_query_only(data_dir.join("zepp.db"))?;
     Ok(mutation(&db)?)
 }
 

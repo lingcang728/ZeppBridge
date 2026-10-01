@@ -350,6 +350,8 @@ impl Database {
     }
 
     pub fn get_health_overview(&self) -> Result<HealthOverview> {
+        // 日度指标是设备本地日：「今天」也按设备时区算（见 contract::health_today）。
+        let today = crate::contract::health_today(self.device_time_zone()?.as_deref(), Utc::now());
         let latest_heart_rate = self.get_latest_heart_rate_sample()?;
         let current_hr = latest_heart_rate.as_ref().map(|(value, _)| *value);
         let latest_heart_rate_at = latest_heart_rate.map(|(_, timestamp)| timestamp);
@@ -371,10 +373,10 @@ impl Database {
             hybrid_charge: self.latest_daily_f64("hybrid_charge")?,
             training_load: self.latest_daily_f64("training_load")?,
             vo2max: self.latest_daily_f64("vo2max")?,
-            steps_today: self.latest_daily_i32_for_date("steps", Local::now().date_naive())?,
+            steps_today: self.latest_daily_i32_for_date("steps", today)?,
             active_calories_today: self
-                .latest_daily_i32_for_date("active_calories", Local::now().date_naive())?
-                .or(self.latest_daily_i32_for_date("calories", Local::now().date_naive())?),
+                .latest_daily_i32_for_date("active_calories", today)?
+                .or(self.latest_daily_i32_for_date("calories", today)?),
             latest_heart_rate_at,
             last_updated,
             coverage,

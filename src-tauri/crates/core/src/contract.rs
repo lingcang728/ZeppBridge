@@ -257,6 +257,34 @@ pub const METRICS: [MetricContract; 38] = [
 ];
 
 /// 指标名列表，供 MCP schema 的 enum 使用。
+/// 「健康日」的今天：按设备的时区（同步时从设备信息里记下的 IANA 名）算；不知道设备
+/// 时区、或者名字认不出来时，退回这台电脑的本地时区——不退回 UTC。
+///
+/// 日度指标（`daily_metrics.date`）是设备本地日。以前「今日步数」拿电脑本地日去比：
+/// 电脑和手表不在同一个时区时（出差、远程桌面），午夜前后今日步数是空的或是昨天的。
+pub fn health_today(
+    device_time_zone: Option<&str>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> chrono::NaiveDate {
+    if let Some(name) = device_time_zone
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    {
+        if let (Ok(zone), Ok(timestamp)) = (
+            jiff::tz::TimeZone::get(name),
+            jiff::Timestamp::from_second(now.timestamp()),
+        ) {
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(
+                &timestamp.to_zoned(zone).date().to_string(),
+                "%Y-%m-%d",
+            ) {
+                return date;
+            }
+        }
+    }
+    now.with_timezone(&chrono::Local).date_naive()
+}
+
 pub fn metric_names() -> Vec<&'static str> {
     METRICS.iter().map(|item| item.metric).collect()
 }

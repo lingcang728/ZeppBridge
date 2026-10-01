@@ -411,6 +411,17 @@ pub fn run() {
                         }
                         app_handle.manage(local_api::LocalApi(local_api.clone()));
                         app_handle.manage(state);
+                        // 重放的旗也要在广播「就绪」之前举起：以前要等后台线程开起来、
+                        // 数完一遍报文才举，启动后的第一次自动同步可能抢在它前面开跑，
+                        // 联网抓到一半撞上重放的写入、白抓一趟。
+                        let replay_db = storage::Database::open_without_migration(
+                            init_data_dir.join("zepp.db"),
+                        )
+                        .ok();
+                        let replay_flag = replay_db
+                            .as_ref()
+                            .filter(|db| matches!(db.pending_replay_plan(), Ok(Some(_))))
+                            .map(|_| storage::ReplayGuard::enter());
                         // 先立旗再广播：前端先注册监听、再问一次 `app_is_ready`，
                         // 顺序不能反——反过来就有一个「事件已发、旗还没立」
                         // 的窗口期，那一页会等到 60 秒超时。
@@ -426,42 +437,27 @@ pub fn run() {
                         let compaction_handle = app_handle.clone();
                         let compaction_data_dir = init_data_dir.clone();
                         std::thread::spawn(move || {
-                            let Ok(db) = storage::Database::open_without_migration(
-                                init_data_dir.join("zepp.db"),
-                            ) else {
+                            let Some(db) = replay_db else {
                                 return;
                             };
-                            // 旗必须在拿锁之前举起。以前是拿到锁之后才进 ReplayGuard，于是
-                            // 启动后的自动同步会先干等 20 秒写锁，再把「另一个写入操作正在
-                            // 进行」画成红条——而库其实只是在自愈。
-                            let needs_replay = matches!(db.pending_replay_plan(), Ok(Some(_)));
-                            if needs_replay {
-                                let _replay_flag = storage::ReplayGuard::enter();
-                                match storage::write_lock::acquire_with_timeout(
-                                    &compaction_data_dir,
-                                    storage::write_lock::WritePurpose::Reprocess,
-                                    std::time::Duration::from_secs(30),
-                                ) {
-                                    Ok(_reprocess_guard) => {
-                                        match db.reprocess_raw_records_if_needed() {
-                                            Ok(Some(counts)) => {
-                                                let total: i64 = counts.values().sum();
-                                                diagnostics::log(&format!(
-                                    "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
-                                ));
-                                            }
-                                            Ok(None) => {}
-                                            Err(error) => diagnostics::log(&format!(
-                                                "本地报文重放失败: {error}"
-                                            )),
-                                        }
-                                    }
-                                    Err(error) => {
+                            // 写锁按批拿、批间放开（reprocess_raw_records_if_needed_batched）：
+                            // 十几分钟的整库重放期间，改设置、记生活事件这些短写入照常进得来。
+                            if let Some(replay_flag) = replay_flag {
+                                match db
+                                    .reprocess_raw_records_if_needed_batched(&compaction_data_dir)
+                                {
+                                    Ok(Some(counts)) => {
+                                        let total: i64 = counts.values().sum();
                                         diagnostics::log(&format!(
-                                            "跳过本次报文重放，没能拿到写锁: {error}"
-                                        ));
+                                        "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
+                                    ));
+                                    }
+                                    Ok(None) => {}
+                                    Err(error) => {
+                                        diagnostics::log(&format!("本地报文重放失败: {error}"))
                                     }
                                 }
+                                drop(replay_flag);
                             }
 
                             // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。

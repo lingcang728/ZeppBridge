@@ -617,3 +617,24 @@ fn epoch_day_uses_payload_timezone_when_present() {
         "缺时区保持原来的 UTC 切日，不编一个区"
     );
 }
+
+#[test]
+fn epoch_day_follows_dst_zones_by_name() {
+    // 2026-07-01 22:30 UTC = 柏林夏令时 7 月 2 日 00:30；冬天同一时刻是 23:30（7 月 1 日）。
+    // 以前带夏令时的区名查不到固定偏移，整批落回 UTC 日（7 月 1 日）。
+    let summer = json!({"timestamp": 1_782_945_000i64, "timeZone": "Europe/Berlin"});
+    let object = summer.as_object().unwrap();
+    assert_eq!(summary_date(object, None).as_deref(), Some("2026-07-02"));
+    let winter = json!({"timestamp": 1_798_756_200i64, "timeZone": "1,Europe/Berlin"});
+    // 2026-12-31 22:30 UTC = 柏林 23:30，仍是 12 月 31 日。
+    assert_eq!(
+        summary_date(winter.as_object().unwrap(), None).as_deref(),
+        Some("2026-12-31")
+    );
+    // 日期字符串不受时区字段影响。
+    let dated = json!({"date": "2026-07-01", "timeZone": "Europe/Berlin"});
+    assert_eq!(
+        summary_date(dated.as_object().unwrap(), None).as_deref(),
+        Some("2026-07-01")
+    );
+}

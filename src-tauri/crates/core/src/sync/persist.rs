@@ -35,8 +35,13 @@ impl SyncManager {
             {
                 Ok(record) => {
                     let db = self.write_db().await?;
-                    db.record_workout_detail_fetch_result(&item.workout_id, &item.source, true)?;
-                    reports.push(Self::persist_record(&db, record)?.report);
+                    let report = Self::persist_record(&db, record)?.report;
+                    // 拿到了但解不开（隔离）不算成功：以前在落库之前就记成功，这条明细
+                    // 从此不再算待拉取，下一轮同步把这一流报成绿色「没有待拉取」，这次
+                    // 跑步的轨迹和采样永远没有。现在按解析结果记，失败计数照常退避。
+                    let parsed = matches!(report.status, StreamStatus::Success);
+                    db.record_workout_detail_fetch_result(&item.workout_id, &item.source, parsed)?;
+                    reports.push(report);
                 }
                 Err(error) if error.is_cancelled() => return Err(error),
                 Err(error) if error.needs_reauth() => return Err(error),
@@ -104,6 +109,24 @@ impl SyncManager {
         stream: &str,
         records: Vec<FetchedRecord>,
     ) -> Result<StreamReport> {
+        self.persist_records_with(stream, records, false).await
+    }
+
+    /// 只落数据、不写用户可见的逐流同步状态（历史补拉用，见 `Database::quiet_sync_state`）。
+    pub(super) async fn persist_records_quietly(
+        &self,
+        stream: &str,
+        records: Vec<FetchedRecord>,
+    ) -> Result<StreamReport> {
+        self.persist_records_with(stream, records, true).await
+    }
+
+    async fn persist_records_with(
+        &self,
+        stream: &str,
+        records: Vec<FetchedRecord>,
+        quiet: bool,
+    ) -> Result<StreamReport> {
         let incomplete = records.iter().any(|record| record.incomplete);
         let reasons: std::collections::BTreeSet<_> = records
             .iter()
@@ -118,6 +141,7 @@ impl SyncManager {
         // 一条流的全部报文在同一段写锁里落库：已经拿到手的数据，写起来是毫秒到
         // 秒级的事，没有理由让别的写者跟着等整个联网过程。
         let db = self.write_db().await?;
+        let _quiet = quiet.then(|| db.quiet_sync_state());
         let mut reports = Vec::with_capacity(records.len());
         for record in records {
             reports.push(Self::persist_record(&db, record)?.report);
@@ -245,6 +269,17 @@ impl SyncManager {
             report.message.clone(),
         )?;
         Ok(PersistResult { report })
+    }
+
+    /// 时间预算用完、这一轮没来得及做的流。按失败记（这一流这次确实没更新，而且
+    /// 下一次定时同步要因此照旧整窗），但码是 `err.core.timed_out` 而不是配置错误，
+    /// 上次写入的条数照旧保留。
+    pub(super) async fn timed_out_report(&self, stream: &str) -> Result<StreamReport> {
+        self.failure_report(
+            stream,
+            &ZeppBridgeError::TimedOut("这一轮同步用完了时间，这条流下次接着做".into()),
+        )
+        .await
     }
 
     pub(super) async fn failure_report(

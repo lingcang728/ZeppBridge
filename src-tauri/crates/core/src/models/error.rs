@@ -161,6 +161,14 @@ pub enum ZeppBridgeError {
     #[error("配置错误: {0}")]
     ConfigError(String),
 
+    /// 一轮同步用完了时间预算，后面的流这次没来得及做。
+    ///
+    /// 以前借用 `ConfigError`：慢网络下心率、日度、睡眠都写进去了，界面却红字说
+    /// 「配置需要先修复」，而且这一轮的报告整个丢掉、同步时间不记——于是每 15 分钟的
+    /// 「快速」同步都变成 30 天整窗、再超时。它不是配置问题，下一轮接着做就好。
+    #[error("{0}")]
+    TimedOut(String),
+
     /// 另一个进程正在写同一个数据库。
     ///
     /// 和 `ConfigError` 分开，是因为调用方对这两件事的处理完全不同：
@@ -237,6 +245,7 @@ impl ZeppBridgeError {
             Self::CredentialStore(_) => "err.core.credential_store",
             Self::InvalidHost(_) => "err.core.invalid_host",
             Self::ConfigError(_) => "err.core.config",
+            Self::TimedOut(_) => "err.core.timed_out",
             Self::Busy(_) => "err.core.busy",
             Self::ParseError(_) => "err.core.parse",
             Self::DatabaseError(_) => "err.core.database",
@@ -275,6 +284,7 @@ impl ZeppBridgeError {
             | Self::CredentialStore(message)
             | Self::InvalidHost(message)
             | Self::ConfigError(message)
+            | Self::TimedOut(message)
             | Self::Busy(message) => sanitize_user_text(message),
             // 不过 `sanitize_user_text`：那一层有 140 字上限，而这几句的
             // 全部价值就在于把两个环境变量名和该跑哪条命令说完整。它们是

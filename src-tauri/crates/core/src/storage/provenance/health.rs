@@ -13,6 +13,10 @@ impl Database {
         stage: Stage,
         outcome: &StageOutcome,
     ) -> Result<()> {
+        // 补拉 / 官方补充不写用户可见的逐流状态（见 `Database::quiet_sync_state`）。
+        if self.sync_state_is_quiet() {
+            return Ok(());
+        }
         let now = Utc::now().to_rfc3339();
         let prefix = stage.column_prefix();
         self.conn.execute(
@@ -61,6 +65,9 @@ impl Database {
     /// 记录这一轮写入了多少条 canonical 行。与阶段状态分开，因为「写成功但
     /// 是 0 条」和「写失败」是两件事。
     pub fn record_stream_written(&self, stream: &str, records: i64) -> Result<()> {
+        if self.sync_state_is_quiet() {
+            return Ok(());
+        }
         let now = Utc::now().to_rfc3339();
         self.conn.execute(
             "INSERT INTO stream_provenance(stream, last_written_records, updated_at)

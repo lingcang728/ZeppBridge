@@ -101,8 +101,10 @@ const renderNotice = (value: SyncNotice): string => {
     case 'verifyFirst': return t.verifyFirst;
     case 'connectFirst': return t.connectFirst;
     case 'cancelling': return t.cancelling;
-    case 'report':
-      return renderReport(value.outcome, value.failedStreams, value.latestAt, value.backendMessage);
+    case 'report': {
+      const text = renderReport(value.outcome, value.failedStreams, value.latestAt, value.backendMessage);
+      return value.cleanupFailed ? `${text} · ${t.cleanupFailed}` : text;
+    }
   }
 };
 
@@ -121,6 +123,7 @@ export const noticeForReport = (report: SyncReport): SyncNotice => ({
   backendMessage: report.outcome === 'deferred'
     ? errorTextFor(report.message_code) ?? report.message ?? undefined
     : undefined,
+  cleanupFailed: report.notice_code === 'ui.sync.cleanup_failed',
 });
 
 export const lastOutcomeLabel = computed(() => {

@@ -200,6 +200,8 @@ export interface SyncReport {
   message?: string;
   /** `message` 那句话的稳定码（`err.sync.*`）。界面按它取自己语言的文案。 */
   message_code?: string | null;
+  /** 和结论并列的提醒码（`ui.sync.*`）：现在只有 `ui.sync.cleanup_failed`。 */
+  notice_code?: string | null;
 }
 
 export interface LocalApiStatus {

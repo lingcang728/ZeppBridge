@@ -27,6 +27,7 @@ export const syncControllerMessages = defineMessages(
     backfilling: (days: number) => `正在补拉最近 ${days} 天…`,
     syncDidNotFinish: '云端同步未完成',
     cancelling: '正在取消同步…',
+    cleanupFailed: '旧数据清理没有完成，库会继续变大',
     cancelFailed: '无法取消同步',
     /** 数据流的分隔符：中文用顿号，英文用逗号。 */
     streamSeparator: '、',
@@ -58,6 +59,7 @@ export const syncControllerMessages = defineMessages(
     backfilling: (days: number) => `Backfilling the last ${days} days…`,
     syncDidNotFinish: 'Cloud sync did not finish',
     cancelling: 'Cancelling sync…',
+    cleanupFailed: 'old-data cleanup didn’t finish, so the library will keep growing',
     cancelFailed: 'Could not cancel sync',
     streamSeparator: ', ',
     syncingStream: (stream: string) => `Syncing ${stream.toLowerCase()}`,
@@ -88,6 +90,7 @@ export const syncControllerMessages = defineMessages(
     backfilling: (days: number) => `Recuperando el historial de los últimos ${days} días…`,
     syncDidNotFinish: 'La sincronización con la nube no terminó',
     cancelling: 'Cancelando la sincronización…',
+    cleanupFailed: 'la limpieza de datos antiguos no terminó; la biblioteca seguirá creciendo',
     cancelFailed: 'No se pudo cancelar la sincronización',
     streamSeparator: ', ',
     syncingStream: (stream: string) => `Sincronizando ${stream.toLowerCase()}`,

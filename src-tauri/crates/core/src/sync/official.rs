@@ -152,11 +152,14 @@ impl OfficialSync {
         on_progress: &(dyn Fn(SyncProgress) + Send + Sync),
     ) -> Result<SyncReport> {
         self.cancel.store(false, Ordering::SeqCst);
-        let _lease = if mode == OfficialMode::Only {
-            self.lock(true).await?
-        } else {
-            None
-        };
+        // 补充模式也拿同步租约：以前不拿，它可能和 CLI 的同步、或者刚被排上的补拉
+        // 同时写同一批流。旧通道那一轮在这之前已经放开了租约。
+        let _lease = self.lock(true).await?;
+        // 补充同步只补数据：「数据健康」页的逐流状态归旧通道那一轮写（见
+        // `Database::quiet_sync_state`）。这条连接是这次补充专用的。
+        if mode == OfficialMode::Supplement {
+            self.db.lock().await.keep_sync_state_quiet();
+        }
         let Some(mut tokens) =
             fresh_tokens(&self.store, &self.client, Utc::now().timestamp()).await?
         else {
@@ -278,6 +281,7 @@ impl OfficialSync {
             }
         }
         Ok(SyncReport {
+            cleanup_failed: false,
             success: failed.is_empty(),
             core_ok,
             records_written: streams.iter().map(|report| report.records_written).sum(),

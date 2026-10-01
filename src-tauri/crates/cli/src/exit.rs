@@ -14,7 +14,8 @@ pub(super) fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
         ZeppBridgeError::NetworkError(_)
         | ZeppBridgeError::RetryExhausted { .. }
         | ZeppBridgeError::HttpStatus { .. }
-        | ZeppBridgeError::Unavailable(_) => (EXIT_CLOUD, "cloud"),
+        | ZeppBridgeError::Unavailable(_)
+        | ZeppBridgeError::TimedOut(_) => (EXIT_CLOUD, "cloud"),
         ZeppBridgeError::DataUnavailable(_) => (EXIT_FAILED, "data_unavailable"),
         ZeppBridgeError::Busy(_) => (EXIT_BUSY, "busy"),
         ZeppBridgeError::DatabaseError(_) => (EXIT_DATABASE, "database"),
@@ -49,6 +50,9 @@ pub(super) fn user_text(error: &ZeppBridgeError) -> String {
             data, so nothing was written for this account. To switch accounts, move or rename \
             the data folder, then connect again."
             .to_string(),
+        ZeppBridgeError::TimedOut(_) => {
+            "This sync ran out of time; the remaining streams will continue next time.".to_string()
+        }
         other => other.user_message(),
     }
 }

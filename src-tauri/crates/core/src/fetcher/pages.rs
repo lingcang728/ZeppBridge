@@ -3,7 +3,11 @@
 use super::*;
 
 /// Keep each response intact: pagination metadata and unknown fields belong to raw.
+///
+/// `window` 是 `day` 那一整个 UTC 日（见 `FetchWindow::utc_days`）；键是
+/// `heart_rate:day:<日期>:<页号>`，同一天同一页永远是同一条报文。
 pub(super) async fn fetch_heart_rate_pages_with<F, Fut>(
+    day: NaiveDate,
     window: FetchWindow,
     mut fetch: F,
 ) -> Result<Vec<FetchedRecord>>
@@ -14,6 +18,7 @@ where
     let end = window.end_utc.timestamp();
     let mut cursor = window.start_utc.timestamp();
     let mut records = Vec::new();
+    let mut page = 0usize;
     loop {
         let payload = fetch(cursor, end).await?;
         let items = heart_rate_items(&payload);
@@ -24,8 +29,7 @@ where
         };
         records.push(FetchedRecord::from_raw(RawRecord {
             stream: "heart_rate".into(),
-            // A page must not overwrite the legacy merged window payload.
-            source_key: format!("heart_rate_page:{cursor}:{end}"),
+            source_key: format!("heart_rate:day:{day}:{page}"),
             source_scope: SourceScope::UserFused,
             device_id: None,
             start_utc: DateTime::from_timestamp(cursor, 0).unwrap_or(window.start_utc),
@@ -35,6 +39,7 @@ where
         }));
         let Some(next) = next else { break };
         cursor = next;
+        page += 1;
     }
     Ok(records)
 }

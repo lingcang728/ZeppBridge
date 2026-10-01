@@ -37,7 +37,15 @@ export type SyncNotice =
   | { kind: 'verifyFirst' }
   | { kind: 'connectFirst' }
   | { kind: 'cancelling' }
-  | { kind: 'report'; outcome: SyncOutcome; failedStreams: string[]; latestAt?: string; backendMessage?: string };
+  | {
+    kind: 'report';
+    outcome: SyncOutcome;
+    failedStreams: string[];
+    latestAt?: string;
+    backendMessage?: string;
+    /** 同步本身好了，但旧数据清理没成功（后端 `ui.sync.cleanup_failed`）。 */
+    cleanupFailed?: boolean;
+  };
 
 export const appStatus = ref<AppStatus | null>(null);
 export const statusError = ref<string | null>(null);

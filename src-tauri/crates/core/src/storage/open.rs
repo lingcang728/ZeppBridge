@@ -257,7 +257,38 @@ impl Database {
     pub fn open_without_migration(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         conn.execute_batch(WRITABLE_PRAGMAS)?;
-        Ok(Self { conn })
+        Ok(Self::from_conn(conn))
+    }
+
+    /// 这条连接是不是只读的（`query_only`）。
+    pub fn is_query_only(&self) -> bool {
+        self.conn
+            .query_row("PRAGMA query_only", [], |row| row.get::<_, i64>(0))
+            .map(|value| value != 0)
+            .unwrap_or(false)
+    }
+
+    /// 只读连接换成可写连接。返回换没换。
+    ///
+    /// 桌面应用启动时如果别的进程（CLI 重解析、恢复）正攥着写锁，命令侧只能先拿一条
+    /// 只读连接。以前它就这样只读到底：之后整个会话里改设置、记生活事件都报
+    /// 「readonly database」，不重启不恢复。调用方拿到写锁之后调这个——锁在手里，
+    /// 就没有别人在写或在迁移；库的版本不对（还没升级）就不换，照旧报错。
+    pub fn reopen_writable_if_query_only(&mut self, db_path: PathBuf) -> Result<bool> {
+        if !self.is_query_only() {
+            return Ok(false);
+        }
+        let fresh = Self::open_without_migration(db_path)?;
+        let version: i64 = fresh
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if version != CURRENT_SCHEMA_VERSION {
+            return Err(ZeppBridgeError::Busy(format!(
+                "本地库版本是 v{version}，这个程序需要 v{CURRENT_SCHEMA_VERSION}；重启应用完成升级后再试"
+            )));
+        }
+        *self = fresh;
+        Ok(true)
     }
 
     /// Open a query-only connection.
@@ -281,7 +312,7 @@ impl Database {
             "PRAGMA busy_timeout = 30000;
              PRAGMA query_only = ON;",
         )?;
-        Ok(Self { conn })
+        Ok(Self::from_conn(conn))
     }
 
     /// 只读打开，并先确认 schema 版本对得上。
@@ -297,7 +328,7 @@ impl Database {
         let conn = db.conn;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
-            std::cmp::Ordering::Equal => Ok(Self { conn }),
+            std::cmp::Ordering::Equal => Ok(Self::from_conn(conn)),
             // 自己的错误码：撞上这一条的人几乎都在无头环境里，而命令行没有
             // i18n 层，只有按码才出得了英文。见 `HeadlessProblem`。
             std::cmp::Ordering::Less => Err(ZeppBridgeError::Headless(
@@ -321,7 +352,7 @@ impl Database {
         Self::reject_newer_schema(&conn)?;
         // These pragmas are set for every connection, including test databases.
         conn.execute_batch(WRITABLE_PRAGMAS)?;
-        let db = Self { conn };
+        let db = Self::from_conn(conn);
         db.migrate()?;
         Ok(db)
     }

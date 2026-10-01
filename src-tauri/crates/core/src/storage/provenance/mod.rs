@@ -140,9 +140,11 @@ impl StageErrorKind {
             E::Headless(HeadlessProblem::SchemaUpgradeRequired { .. }) => StageErrorKind::Storage,
             E::Headless(_) => StageErrorKind::Auth,
             E::Unavailable(_) | E::DataUnavailable(_) => StageErrorKind::NotAvailable,
-            E::NetworkError(_) | E::RetryExhausted { .. } | E::HttpStatus { .. } => {
-                StageErrorKind::Network
-            }
+            // 超时多半是网络慢：和网络同一类，重试就好。
+            E::NetworkError(_)
+            | E::RetryExhausted { .. }
+            | E::HttpStatus { .. }
+            | E::TimedOut(_) => StageErrorKind::Network,
             E::ParseError(_) => StageErrorKind::UnrecognizedPayload,
             // 传输层成功、业务层拒绝。单独一类而不是并进 `unknown`：诊断报告
             // 里这一格就是我们唯一能看到「云端到底给了哪个 code」的地方。

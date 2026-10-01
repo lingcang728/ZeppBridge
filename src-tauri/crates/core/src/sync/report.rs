@@ -76,135 +76,158 @@ impl SyncManager {
             }
         };
 
-        let check = || -> Result<()> {
-            self.abort_if_cancelled()?;
-            if Instant::now() > deadline {
-                return Err(ZeppBridgeError::ConfigError(
-                    "同步超时，已停止后续请求".into(),
-                ));
-            }
-            Ok(())
-        };
+        // 时间预算用完不是错误：已经写进去的照样算数，后面的流这一轮标成「超时、下次
+        // 接着做」（`timed_out_report`），报告照常交回去、同步时间照常记。以前这里返回
+        // ConfigError，整轮报告被 `?` 丢掉，界面红字「配置需要先修复」。
+        let past_deadline = || Instant::now() > deadline;
 
         emit("heart_rate", 1, 8, "正在同步心率");
-        check()?;
-        match self
-            .sync_chunked_stream(
-                "heart_rate",
-                window,
-                7,
-                OnChunkError::StopUnlessUnavailable,
-                |chunk| self.fetcher.fetch_heart_rate_records(chunk),
-                || chunk_committed("heart_rate", 1),
-            )
-            .await
-        {
-            Ok(report) => streams.push(report),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) => streams.push(self.heart_rate_fetch_error(&error).await?),
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("heart_rate").await?);
+        } else {
+            match self
+                .sync_chunked_stream(
+                    "heart_rate",
+                    window,
+                    7,
+                    OnChunkError::StopUnlessUnavailable,
+                    |chunk| self.fetcher.fetch_heart_rate_records(chunk),
+                    || chunk_committed("heart_rate", 1),
+                )
+                .await
+            {
+                Ok(report) => streams.push(report),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) => streams.push(self.heart_rate_fetch_error(&error).await?),
+            }
         }
         completed("heart_rate", 1);
         emit("daily_summary", 2, 8, "正在同步每日概览");
-        check()?;
-        match self
-            .sync_chunked_stream(
-                "daily_summary",
-                window,
-                30,
-                OnChunkError::Continue,
-                |chunk| self.fetcher.fetch_daily_statistics_records(chunk),
-                || chunk_committed("daily_summary", 2),
-            )
-            .await
-        {
-            Ok(report) => streams.push(report),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("daily_summary").await?);
+        } else {
+            match self
+                .sync_chunked_stream(
+                    "daily_summary",
+                    window,
+                    30,
+                    OnChunkError::Continue,
+                    |chunk| self.fetcher.fetch_daily_statistics_records(chunk),
+                    || chunk_committed("daily_summary", 2),
+                )
+                .await
+            {
+                Ok(report) => streams.push(report),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
+            }
         }
         completed("daily_summary", 2);
         // Optional streams are retained and reported, never promoted to a
         // verified empty success.
         emit("sleep", 3, 8, "正在同步睡眠");
-        check()?;
-        match self
-            .sync_chunked_stream(
-                "sleep",
-                window,
-                7,
-                OnChunkError::Continue,
-                |chunk| self.fetcher.fetch_sleep_records(chunk),
-                || chunk_committed("sleep", 3),
-            )
-            .await
-        {
-            Ok(report) => streams.push(report),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("sleep", &error).await?)
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("sleep").await?);
+        } else {
+            match self
+                .sync_chunked_stream(
+                    "sleep",
+                    window,
+                    7,
+                    OnChunkError::Continue,
+                    |chunk| self.fetcher.fetch_sleep_records(chunk),
+                    || chunk_committed("sleep", 3),
+                )
+                .await
+            {
+                Ok(report) => streams.push(report),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("sleep", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("sleep", &error).await?),
             }
-            Err(error) => streams.push(self.failure_report("sleep", &error).await?),
         }
         completed("sleep", 3);
         emit("workouts", 4, 8, "正在同步运动");
-        check()?;
-        match self.fetcher.fetch_workout_records(window).await {
-            Ok(records) => streams.push(self.persist_records("workouts", records).await?),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("workouts", &error).await?)
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("workouts").await?);
+        } else {
+            match self.fetcher.fetch_workout_records(window).await {
+                Ok(records) => streams.push(self.persist_records("workouts", records).await?),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("workouts", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("workouts", &error).await?),
             }
-            Err(error) => streams.push(self.failure_report("workouts", &error).await?),
         }
         completed("workouts", 4);
         emit("workout_detail", 5, 8, "正在同步跑步明细");
-        check()?;
-        match self.sync_pending_running_details(deadline).await {
-            Ok(reports) if reports.is_empty() => {
-                streams.push(self.persist_empty_pending_details().await?);
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("workout_detail").await?);
+        } else {
+            match self.sync_pending_running_details(deadline).await {
+                Ok(reports) if reports.is_empty() => {
+                    streams.push(self.persist_empty_pending_details().await?);
+                }
+                Ok(reports) => {
+                    let db = self.write_db().await?;
+                    streams.push(Self::finish_stream(&db, "workout_detail", &reports, None)?);
+                }
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("workout_detail", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("workout_detail", &error).await?),
             }
-            Ok(reports) => {
-                let db = self.write_db().await?;
-                streams.push(Self::finish_stream(&db, "workout_detail", &reports, None)?);
-            }
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("workout_detail", &error).await?)
-            }
-            Err(error) => streams.push(self.failure_report("workout_detail", &error).await?),
         }
 
         completed("workout_detail", 5);
         emit("hrv", 6, 8, "正在同步心率变异性");
-        check()?;
-        match self.fetcher.fetch_hrv_records(window).await {
-            Ok(records) => streams.push(self.persist_records("hrv", records).await?),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("hrv", &error).await?)
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("hrv").await?);
+        } else {
+            match self.fetcher.fetch_hrv_records(window).await {
+                Ok(records) => streams.push(self.persist_records("hrv", records).await?),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("hrv", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("hrv", &error).await?),
             }
-            Err(error) => streams.push(self.failure_report("hrv", &error).await?),
         }
         completed("hrv", 6);
         emit("wellness", 7, 8, "正在同步压力、血氧等可选指标");
-        check()?;
-        // The dateString surface needs an IANA zone name, and the devices
-        // already told us theirs.
-        let wellness_time_zone = {
-            let database = self.db.lock().await;
-            database.device_time_zone().unwrap_or(None)
-        }
-        .unwrap_or_else(|| "UTC".to_string());
-        match self
-            .fetcher
-            .fetch_wellness_records(window, &wellness_time_zone)
-            .await
-        {
-            Ok(records) => streams.push(self.persist_records("wellness", records).await?),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("wellness", &error).await?)
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("wellness").await?);
+        } else {
+            // The dateString surface needs an IANA zone name, and the devices
+            // already told us theirs.
+            let wellness_time_zone = {
+                let database = self.db.lock().await;
+                database.device_time_zone().unwrap_or(None)
             }
-            Err(error) => streams.push(self.failure_report("wellness", &error).await?),
+            .unwrap_or_else(crate::official::fetch::system_time_zone);
+            match self
+                .fetcher
+                .fetch_wellness_records(window, &wellness_time_zone)
+                .await
+            {
+                Ok(records) => streams.push(self.persist_records("wellness", records).await?),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("wellness", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("wellness", &error).await?),
+            }
         }
 
         // 体重 / 体成分。四个人问过它，而以前它一条都没取过：能力探针打的是
@@ -215,14 +238,18 @@ impl SyncManager {
         // 所以它不是「有秤才有用」的一条流。
         completed("wellness", 7);
         emit("weight", 8, 8, "正在同步体重与体成分");
-        check()?;
-        match self.fetcher.fetch_weight_records(window).await {
-            Ok(records) => streams.push(self.persist_records("weight", records).await?),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("weight", &error).await?)
+        self.abort_if_cancelled()?;
+        if past_deadline() {
+            streams.push(self.timed_out_report("weight").await?);
+        } else {
+            match self.fetcher.fetch_weight_records(window).await {
+                Ok(records) => streams.push(self.persist_records("weight", records).await?),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_unavailable() => {
+                    streams.push(self.unavailable_report("weight", &error).await?)
+                }
+                Err(error) => streams.push(self.failure_report("weight", &error).await?),
             }
-            Err(error) => streams.push(self.failure_report("weight", &error).await?),
         }
 
         completed("weight", 8);
@@ -273,6 +300,14 @@ impl SyncManager {
                 }
             }
         }
+        // 被新报文接管、再没有任何行指向的旧心率分页 / 运动历史报文（见
+        // `prune_superseded_page_raws`）。不受归档开关影响：删的不是任何人的数据。
+        // 失败只记日志，下一次同步或启动压缩会再来。
+        if let Ok(db) = self.write_db().await {
+            if let Err(error) = db.prune_superseded_page_raws() {
+                tracing::warn!("清理已被接管的旧分页报文失败: {error}");
+            }
+        }
         // 整窗、且没有任何流失败：记下来，接下来一天里的定时同步只需拉最近几天。
         // 有流失败就不记——下一次定时同步还得整窗，把缺的那几天补回来。
         if success && days >= crate::contract::INCREMENTAL_SYNC_DAYS {
@@ -280,11 +315,13 @@ impl SyncManager {
                 let _ = db.record_full_window_refresh(Utc::now());
             }
         }
+        let cleanup_failed = cleanup_warning.is_some();
         Ok(SyncReport {
             success,
             core_ok,
             streams,
             records_written: total_written,
+            cleanup_failed,
             message: if core_failed {
                 Some("至少一个核心数据流失败；同步未报告成功".into())
             } else if !failed.is_empty() {

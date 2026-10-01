@@ -26,6 +26,15 @@ pub struct ReplayPlan {
     pub raw_records: i64,
 }
 
+/// 一次重放怎么跑。
+#[derive(Debug, Clone, Copy, Default)]
+struct ReplayOptions<'a> {
+    /// 只补没按当前修订号盖过章的报文。
+    unstamped_only: bool,
+    /// 给了数据目录就每批拿一次写锁（见 `reprocess_raw_records_if_needed_batched`）。
+    batch_lock: Option<&'a Path>,
+}
+
 impl Database {
     /// 库里记着的解析器修订号。`None` = 这个库从来没有重放过。
     ///
@@ -103,14 +112,40 @@ impl Database {
     }
 
     pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
+        self.reprocess_if_needed_with(None)
+    }
+
+    /// 和 [`Self::reprocess_raw_records_if_needed`] 一样，但**每一批**才去拿一次跨进程写锁、
+    /// 批与批之间放开。
+    ///
+    /// 启动时的整库重放要跑十几分钟。以前整段都攥着写锁（尽管每 64 条就提交一次）：
+    /// 这期间改设置、记生活事件、重置账本统统在 5 秒后报「另一个写入操作正在进行」。
+    /// 现在短写入在批与批之间就能插进来。调用方不要再在外面拿写锁。
+    pub fn reprocess_raw_records_if_needed_batched(
+        &self,
+        data_dir: &Path,
+    ) -> Result<Option<BTreeMap<String, i64>>> {
+        self.reprocess_if_needed_with(Some(data_dir))
+    }
+
+    fn reprocess_if_needed_with(
+        &self,
+        batch_lock: Option<&Path>,
+    ) -> Result<Option<BTreeMap<String, i64>>> {
         let Some(plan) = self.pending_replay_plan()? else {
             return Ok(None);
         };
+        // 修订号没变、只是有几条报文缺章（崩溃在归一化之前、上一轮被退出打断）：只补
+        // 那几条。以前一条缺章就整库重放一遍。
+        let options = ReplayOptions {
+            unstamped_only: plan.stored_revision.as_deref() == Some(NORMALIZER_REVISION),
+            batch_lock,
+        };
         let counts = if plan.streams.is_empty() {
-            self.reprocess_raw_records_for_stream(None)?
+            self.reprocess_raw_records_with(None, options)?
         } else {
             let streams: Vec<&str> = plan.streams.iter().map(String::as_str).collect();
-            self.reprocess_raw_records_for_stream(Some(&streams))?
+            self.reprocess_raw_records_with(Some(&streams), options)?
         };
         // 本地重放有自己的时间线。它绝不改写云端同步时间：用户问「数据新
         // 不新」和「你什么时候连过云」是两个问题。
@@ -131,7 +166,22 @@ impl Database {
         &self,
         stream_filter: Option<&[&str]>,
     ) -> Result<BTreeMap<String, i64>> {
+        self.reprocess_raw_records_with(stream_filter, ReplayOptions::default())
+    }
+
+    fn reprocess_raw_records_with(
+        &self,
+        stream_filter: Option<&[&str]>,
+        options: ReplayOptions<'_>,
+    ) -> Result<BTreeMap<String, i64>> {
         let _replay_guard = ReplayGuard::enter();
+        // 只补缺章的那几条时，已经按这一版盖过章的跳过。
+        let stamp_filter = if options.unstamped_only {
+            " AND NOT EXISTS (SELECT 1 FROM raw_normalization n
+                              WHERE n.raw_record_id = r.id AND n.revision = ?1)"
+        } else {
+            ""
+        };
         // 先只取 id 和归一化要用的那两个短字段，报文留到循环里一条一条读。
         // 从前是连 payload 一起收进 Vec 的——那等于重放开始之前先把库里全部
         // 报文读进内存，而这段代码恰恰要在 NAS 和有内存上限的容器里跑 842 MB
@@ -152,8 +202,8 @@ impl Database {
                      SELECT 1 FROM raw_quarantine q
                      WHERE q.raw_record_id = r.id AND q.revision = ?1
                  )
-                   AND r.stream IN ({placeholders})
-                 ORDER BY r.id"
+                   AND r.stream IN ({placeholders}){stamp_filter}
+                 ORDER BY r.fetched_at, r.id"
             ))?;
             let mut bind: Vec<&str> = Vec::with_capacity(streams.len() + 1);
             bind.push(NORMALIZER_REVISION);
@@ -167,15 +217,18 @@ impl Database {
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            let mut stmt = self.conn.prepare(
+            // 按最后一次从云端拿到的先后重放：同一天的值有好几份报文时，最后写的那份
+            // 赢——它应该是最近拿到的那份。按 id 排的话，一条早就插入、后来被原地更新
+            // 的报文会排在前面，被更旧的快照盖掉（下次同步才自愈）。
+            let mut stmt = self.conn.prepare(&format!(
                 "SELECT r.id, r.stream, r.source_key
                  FROM raw_records r
                  WHERE NOT EXISTS (
                      SELECT 1 FROM raw_quarantine q
                      WHERE q.raw_record_id = r.id AND q.revision = ?1
-                 )
-                 ORDER BY r.id",
-            )?;
+                 ){stamp_filter}
+                 ORDER BY r.fetched_at, r.id"
+            ))?;
             let rows = stmt.query_map(params![NORMALIZER_REVISION], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
@@ -200,6 +253,22 @@ impl Database {
             if background_write_abort_requested() {
                 return Ok(counts);
             }
+            // 分批拿锁：拿不到就是别人在写（CLI 重解析、恢复、备份），这一轮到此为止，
+            // 修订号不推进，下次启动从断点继续——和退出请求同一个收法。
+            let batch_guard = match options.batch_lock {
+                Some(dir) => match write_lock::acquire_with_timeout(
+                    dir,
+                    write_lock::WritePurpose::Reprocess,
+                    std::time::Duration::from_secs(30),
+                ) {
+                    Ok(guard) => Some(guard),
+                    Err(error) => {
+                        tracing::warn!("重放让出写锁后没能再拿回来，下次启动继续: {error}");
+                        return Ok(counts);
+                    }
+                },
+                None => None,
+            };
             let transaction = ReplayBatch::begin(&self.conn)?;
             for (id, stream, source_key) in batch {
                 // 报文可能在这次重放开始之后被清理掉，跳过即可，不是错误。
@@ -250,6 +319,12 @@ impl Database {
                 }
             }
             transaction.commit()?;
+            if let Some(guard) = batch_guard {
+                drop(guard);
+                // 放开之后稍等一下：等锁的人每 120ms 才看一次，不让一让，下一批总是
+                // 先抢到。
+                std::thread::sleep(std::time::Duration::from_millis(150));
+            }
         }
         if band_heart_rate > 0 {
             counts.insert("heart_rate".to_string(), band_heart_rate);

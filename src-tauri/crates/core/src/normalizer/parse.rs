@@ -265,9 +265,19 @@ pub(super) fn summary_date(
     ) {
         return parse_date(value);
     }
-    let offset = timezone_offset_from(object, nested);
-    first_value_from(object, nested, &["timestamp", "time", "startTime"])
-        .and_then(|value| parse_date_with_zone(value, offset))
+    let value = first_value_from(object, nested, &["timestamp", "time", "startTime"])?;
+    let zone = first_value_from(object, nested, &["timeZone", "time_zone", "tz"]);
+    // 时区是带夏令时的 IANA 名（Europe/Berlin、America/New_York……）时，固定偏移表里
+    // 没有它：以前就退回 UTC，欧美用户的 Charge / 准备度 / 每日概览整体落到前一天。
+    // 按事件那一刻的规则算本地日期（和 food.rs 的餐次切日同一个做法）。
+    if let Some(zone) = zone.filter(|zone| timezone_offset_seconds(zone).is_none()) {
+        if is_epoch_value(value) {
+            if let Some(date) = parse_timestamp(value).and_then(|at| iana_local_date(zone, at)) {
+                return Some(date);
+            }
+        }
+    }
+    parse_date_with_zone(value, zone.and_then(timezone_offset_seconds))
 }
 
 /// Canonical 按插入覆盖：有明确日历日的条目必须排在 epoch 回退之后，
@@ -295,12 +305,23 @@ pub(super) fn daily_summary_sort_key(item: &Value) -> (u8, i64) {
     (u8::from(explicit), timestamp)
 }
 
-pub(super) fn timezone_offset_from(
-    object: &Map<String, Value>,
-    nested: Option<&Map<String, Value>>,
-) -> Option<i64> {
-    first_value_from(object, nested, &["timeZone", "time_zone", "tz"])
-        .and_then(timezone_offset_seconds)
+/// 是不是一个时间戳（而不是日期字符串、也不是 20260930 这种紧凑日期）。
+fn is_epoch_value(value: &Value) -> bool {
+    match parse_number(value) {
+        Some(number) => !(19000101..=21001231).contains(&(number as i64)),
+        None => false,
+    }
+}
+
+/// 时区字段里的 IANA 名（可能写成 `"1,Europe/Berlin"`）在 `instant` 那一刻的本地日期。
+pub(super) fn iana_local_date(zone: &Value, instant: DateTime<Utc>) -> Option<String> {
+    let name = zone.as_str()?.rsplit(',').next()?.trim();
+    if name.is_empty() {
+        return None;
+    }
+    let zone = jiff::tz::TimeZone::get(name).ok()?;
+    let timestamp = jiff::Timestamp::from_second(instant.timestamp()).ok()?;
+    Some(timestamp.to_zoned(zone).date().to_string())
 }
 
 pub(super) fn timezone_offset_seconds(value: &Value) -> Option<i64> {

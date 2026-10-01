@@ -692,3 +692,47 @@ fn bad_sleep_time_is_a_parse_error_in_list_and_detail() {
     let detail = db.get_sleep_detail("sleep-bad-time").unwrap_err();
     assert_eq!(detail.code(), "err.core.parse", "{detail}");
 }
+
+#[test]
+fn cleanup_resets_ledger_months_and_drops_raw_whose_window_expired() {
+    let db = Database::in_memory().unwrap();
+    let old = Utc::now().date_naive() - Duration::days(400);
+    db.plan_backfill(old, old + Duration::days(20)).unwrap();
+    db.conn
+        .execute(
+            "UPDATE coverage_ledger SET status = 'persisted', records = 5",
+            [],
+        )
+        .unwrap();
+    // 刚补拉回来（拉取时间是现在）、覆盖的却是一年多以前的报文。
+    let start = crate::storage::coverage::to_utc(old);
+    db.insert_raw_record(&RawRecord {
+        stream: "hrv".into(),
+        source_key: "events:hrv_sdnn:old".into(),
+        source_scope: SourceScope::UserFused,
+        device_id: None,
+        start_utc: start,
+        end_utc: Some(start + Duration::days(1)),
+        payload: serde_json::json!({"items": []}),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.cleanup_old_data(30).unwrap();
+    let raw: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM raw_records", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        raw, 0,
+        "整段早于保留期、没有行指向的报文要删，否则重放会把删掉的历史复活"
+    );
+    let persisted: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM coverage_ledger WHERE status = 'persisted'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(persisted, 0, "被清掉的月份不能还说已写入");
+}

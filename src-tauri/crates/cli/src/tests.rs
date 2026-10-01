@@ -37,6 +37,7 @@ fn sync_report_output_reports_failed_streams_without_discarding_results() {
     ] {
         let success = status != StreamStatus::Failed;
         let report = SyncReport {
+            cleanup_failed: false,
             success,
             core_ok: true,
             records_written: 12,

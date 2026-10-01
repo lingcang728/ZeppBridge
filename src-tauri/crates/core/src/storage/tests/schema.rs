@@ -178,9 +178,7 @@ fn future_schema_is_refused_without_changing_the_database() {
     assert!(Database::open_resilient(path.clone()).is_err());
     assert_eq!(std::fs::read(&path).unwrap(), before);
     // Also protect direct migration callers inside the transaction.
-    let db = Database {
-        conn: Connection::open(&path).unwrap(),
-    };
+    let db = Database::from_conn(Connection::open(&path).unwrap());
     assert!(db.migrate().is_err());
     assert!(db.conn.is_autocommit());
     drop(db);

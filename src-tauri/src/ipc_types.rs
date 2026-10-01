@@ -139,6 +139,11 @@ pub struct UiSyncReport {
     /// `message` 的中文原文——后端不按界面语言出文案。
     #[serde(default)]
     pub message_code: Option<String>,
+    /// 和结论并列的一句提醒（`ui.sync.*`）。现在只有一种：同步成功了，但旧数据清理
+    /// 没成功——以前它只拼进 `message`，而界面只在 deferred 时读 `message`，用户永远
+    /// 看不见。
+    #[serde(default)]
+    pub notice_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -173,6 +178,9 @@ pub fn ui_sync_report(
         .collect::<Vec<_>>();
 
     let total_records = streams.iter().map(|stream| stream.records_written).sum();
+    let notice_code = report
+        .cleanup_failed
+        .then(|| "ui.sync.cleanup_failed".to_string());
 
     // The report-level "last cloud sync at" must reflect the newest cloud
     // timestamp the streams actually carried, not the local completion time
@@ -194,6 +202,7 @@ pub fn ui_sync_report(
         streams,
         message: report.message,
         message_code: None,
+        notice_code,
     }
 }
 

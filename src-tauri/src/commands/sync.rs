@@ -360,9 +360,10 @@ async fn run_sync(
             // A user-initiated cancellation is a deliberate terminal outcome,
             // not a failure: report it as `cancelled` so the UI can show a
             // neutral banner instead of a red error.
-            record_cloud_sync_locked(state, &finished_at, "cancelled", 0).await?;
+            record_cloud_sync_locked(state, &finished_at, "cancelled", 0).await;
             return Ok(ui_sync_report(
                 SyncReport {
+                    cleanup_failed: false,
                     success: false,
                     core_ok: false,
                     streams: Vec::new(),
@@ -376,7 +377,7 @@ async fn run_sync(
             ));
         }
         Err(error) => {
-            record_cloud_sync_locked(state, &finished_at, "failed", 0).await?;
+            record_cloud_sync_locked(state, &finished_at, "failed", 0).await;
             // 只连官方时，令牌失效已经记在 official.json 里；旧通道的状态不动。
             if error.needs_reauth() && manager.is_some() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
@@ -386,7 +387,12 @@ async fn run_sync(
     };
     let (freshness, after) = {
         let database = state.db.lock().await;
-        let freshness = database.stream_freshness()?;
+        // 数据已经落库了：读新鲜度失败只让「有没有新样本」的判断退回保守的一边，
+        // 不该把这一轮成功的同步变成错误。
+        let freshness = database.stream_freshness().unwrap_or_else(|error| {
+            eprintln!("同步后读取新鲜度失败: {error}");
+            Default::default()
+        });
         let after = freshness
             .iter()
             .map(|(stream, value)| (stream.clone(), value.newest_sample_at.clone()))
@@ -394,7 +400,7 @@ async fn run_sync(
         (freshness, after)
     };
     let outcome = classify_outcome(&report, &before, &after);
-    record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await?;
+    record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await;
 
     if manager.is_none() {
         // 只连官方：下面两条改的是旧通道的认证状态，与这一轮无关。
@@ -471,21 +477,38 @@ fn emit_sync_progress(app: &AppHandle, progress: SyncProgress) {
     let _ = app.emit("sync://progress", progress);
 }
 
+/// 记下这一轮的同步时间和结论。
+///
+/// 两条改动：等写锁放到阻塞线程池里（以前在 async 里用 `std::thread::sleep` 轮询，
+/// 最多把一个 Tokio worker 冻住 10 秒）；记不上只写日志、不报错——走到这里时数据
+/// 已经全部落库，备份 / 压缩 / CLI 重解析正好占着锁，不该把一次成功的同步变成
+/// IPC 错误、连结论都丢掉。
 async fn record_cloud_sync_locked(
     state: &AppState,
     finished_at: &str,
     outcome: &str,
     records_written: i64,
-) -> std::result::Result<(), AppError> {
-    let _write_guard = write_lock::acquire_with_timeout(
-        &state.data_dir,
-        WritePurpose::Metadata,
-        Duration::from_secs(10),
-    )?;
+) {
+    let data_dir = state.data_dir.clone();
+    let guard = tokio::task::spawn_blocking(move || {
+        write_lock::acquire_with_timeout(&data_dir, WritePurpose::Metadata, Duration::from_secs(10))
+    })
+    .await;
+    let _write_guard = match guard {
+        Ok(Ok(guard)) => guard,
+        Ok(Err(error)) => {
+            eprintln!("没能记下这一轮同步的时间（写锁被占）: {error}");
+            return;
+        }
+        Err(error) => {
+            eprintln!("没能记下这一轮同步的时间: {error}");
+            return;
+        }
+    };
     let database = state.db.lock().await;
-    database
-        .record_cloud_sync(finished_at, outcome, records_written)
-        .map_err(AppError::from)
+    if let Err(error) = database.record_cloud_sync(finished_at, outcome, records_written) {
+        eprintln!("没能记下这一轮同步的时间: {error}");
+    }
 }
 
 fn local_maintenance_deferred() -> Option<(&'static str, &'static str)> {
@@ -520,6 +543,7 @@ fn deferred_ui_report(kind: (&'static str, &'static str)) -> UiSyncReport {
     let now = Utc::now().to_rfc3339();
     let mut deferred = ui_sync_report(
         SyncReport {
+            cleanup_failed: false,
             success: false,
             core_ok: false,
             streams: Vec::new(),
@@ -543,6 +567,7 @@ mod tests {
 
     fn report(statuses: &[StreamStatus], success: bool) -> SyncReport {
         SyncReport {
+            cleanup_failed: false,
             success,
             core_ok: success,
             streams: statuses
@@ -587,6 +612,7 @@ mod tests {
             .iter()
             .any(|(name, status)| is_core_stream(name) && *status == StreamStatus::Failed);
         SyncReport {
+            cleanup_failed: false,
             success: !any_failed,
             core_ok: !core_failed,
             streams: streams

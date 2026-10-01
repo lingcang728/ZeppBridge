@@ -165,9 +165,11 @@ impl Database {
              WHERE w.zepp_source IS NOT NULL
                AND TRIM(w.zepp_source) != ''
                AND NOT EXISTS (
-                   SELECT 1 FROM raw_records
-                   WHERE stream = 'workout_detail'
-                     AND source_key = 'workout_detail:' || w.workout_id || ':' || w.zepp_source
+                   -- 报文在、而且解开了才算拿到：被隔离的明细仍是待拉取（按失败次数退避）。
+                   SELECT 1 FROM raw_records r
+                   WHERE r.stream = 'workout_detail'
+                     AND r.source_key = 'workout_detail:' || w.workout_id || ':' || w.zepp_source
+                     AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)
                )
                AND (
                    a.attempts IS NULL

@@ -54,7 +54,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v31-official-sleep";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-10-v32-dst-days";
 
 /// A metric actually present in the local library. This inventory deliberately
 /// includes names outside the chart contract so new normalized data is findable.
@@ -185,6 +185,54 @@ pub struct Database {
     /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
     /// 而不是各自再开一条去争锁。crate 之外仍然只能走公开方法。
     pub(crate) conn: Connection,
+    /// 大于 0 时，逐流的同步状态（`sync_state`、阶段、写入计数）不写。见
+    /// [`Database::quiet_sync_state`]。
+    quiet_state: std::sync::atomic::AtomicU32,
+}
+
+/// 持有期间这条连接不写用户可见的逐流同步状态（只写数据）。
+pub struct QuietSyncState<'a> {
+    db: &'a Database,
+}
+
+impl Drop for QuietSyncState<'_> {
+    fn drop(&mut self) {
+        self.db
+            .quiet_state
+            .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl Database {
+    pub(super) fn from_conn(conn: Connection) -> Self {
+        Self {
+            conn,
+            quiet_state: std::sync::atomic::AtomicU32::new(0),
+        }
+    }
+
+    /// 接下来的写入只落数据，不碰「数据健康」页读的那几行逐流状态。
+    ///
+    /// 官方补充同步和历史补拉以前直接写 `sync_state`：旧连接器的睡眠失败了，官方补充
+    /// 一成功就翻绿；`daily_summary 已同步 N 条` 显示的是官方小时步数的条数；补拉一个
+    /// 2019 年的月份，心率那一行就显示那个月的计数或失败。用户可见的那几行只归常规
+    /// 同步写；补拉有自己的覆盖账本，补充同步的结果在它自己的报告里。
+    pub fn quiet_sync_state(&self) -> QuietSyncState<'_> {
+        self.quiet_state
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        QuietSyncState { db: self }
+    }
+
+    /// 和 [`Self::quiet_sync_state`] 一样，但一直保持到这条连接关掉。给只为一次补充同步
+    /// 开的连接用（跨 await 拿不住带借用的守卫）。
+    pub fn keep_sync_state_quiet(&self) {
+        self.quiet_state
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub(crate) fn sync_state_is_quiet(&self) -> bool {
+        self.quiet_state.load(std::sync::atomic::Ordering::SeqCst) > 0
+    }
 }
 
 #[cfg(test)]

@@ -78,6 +78,10 @@ pub struct SyncReport {
     pub streams: Vec<StreamReport>,
     pub records_written: i64,
     pub message: Option<String>,
+    /// 同步后的旧数据清理没成功（磁盘满、锁被占）。数据已经同步了，所以不改结论；
+    /// 但不告诉用户的话，库会一直涨而界面一直是绿的。
+    #[serde(default)]
+    pub cleanup_failed: bool,
 }
 
 /// 这三条是核心流。缺了它们这个应用没有存在意义；其余的是支流。
@@ -286,6 +290,13 @@ impl SyncManager {
     /// is yesterday, which is the most recent day a watch has certainly
     /// finished syncing.
     pub async fn probe_capabilities(&self) -> Result<Vec<CapabilityProbe>> {
+        // 和同步一样：拿到 run_lock 再清取消旗。以前探测不清它——取消过一次同步之后，
+        // 旗一直立着，连接器每个请求都直接回 Cancelled，探测静默地返回空、什么都不报。
+        // 同步正在跑就不排队等它（可能好几分钟），直接说忙；那一轮自己会顺带刷新能力。
+        let Ok(_run_guard) = self.run_lock.try_lock() else {
+            return Err(ZeppBridgeError::Busy("同步进行中，稍后再探测".into()));
+        };
+        self.cancel.store(false, Ordering::SeqCst);
         let day = (Utc::now() - Duration::days(1)).date_naive();
         // The dateString surface wants an IANA zone name; the devices already
         // told us theirs, so ask them rather than assuming UTC.
@@ -293,7 +304,7 @@ impl SyncManager {
             let database = self.db.lock().await;
             database.device_time_zone().unwrap_or(None)
         }
-        .unwrap_or_else(|| "UTC".to_string());
+        .unwrap_or_else(crate::official::fetch::system_time_zone);
         let probes = self
             .fetcher
             .probe_event_streams(day, &time_zone, None)
@@ -324,7 +335,7 @@ impl SyncManager {
             let database = self.db.lock().await;
             database.device_time_zone().unwrap_or(None)
         }
-        .unwrap_or_else(|| "UTC".to_string());
+        .unwrap_or_else(crate::official::fetch::system_time_zone);
         let probes = self
             .fetcher
             .probe_event_streams(

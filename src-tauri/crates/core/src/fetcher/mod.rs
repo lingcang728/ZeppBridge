@@ -62,6 +62,17 @@ impl FetchWindow {
             .to_string()
     }
 
+    /// 按「设备本地日」归档的接口要的终点日：UTC 终点日再往后一天。
+    ///
+    /// 睡眠（band_data detail）和 WatchSportStatistics 按设备本地的日期归档——睡眠记在
+    /// **醒来那天**。东八区早上 7 点醒，本地是 10 月 1 日，UTC 还是 9 月 30 日：按 UTC
+    /// 日期请求就拿不到昨晚的睡眠，要等到 8 点以后（同步报告还写着成功）。任何时区的
+    /// 本地日期最多比 UTC 早一天，所以终点多要一天就够；西半球多出来的那天是空的。
+    pub fn end_day_local_padded(&self) -> String {
+        let end = (self.end_utc - Duration::nanoseconds(1)).date_naive();
+        end.succ_opt().unwrap_or(end).format("%Y-%m-%d").to_string()
+    }
+
     /// Convert the half-open timestamp window to inclusive device-local dates.
     /// Use the zone's rules at each endpoint, including historical DST changes.
     fn local_days(&self, time_zone: &str) -> Result<(NaiveDate, NaiveDate)> {
@@ -100,6 +111,32 @@ impl FetchWindow {
             chunks.push(self);
         }
         chunks
+    }
+
+    /// 按 UTC 日切开，每一天都是**整天**：从当天零点到次日零点，今天到 `now`。
+    ///
+    /// 心率报文按这个切、按日起键（`heart_rate:day:<日期>:<页>`）。以前键里带着窗口
+    /// 两端的秒数，而窗口跟着「现在」走：每 15 分钟一次同步就多出几条新报文，一天几百
+    /// 条、永不清理，整库重放也跟着越来越慢。按整天取，过去的日子每次请求都一模一样，
+    /// 「内容不变就跳过」才对它生效；今天那一条随着时间变长，原地覆盖。
+    ///
+    /// 第一天也从零点取，不从窗口起点：同一天的键必须永远对应同一段时间，半天的报文
+    /// 不能盖掉整天的。
+    pub fn utc_days(self, now: DateTime<Utc>) -> Vec<(NaiveDate, Self)> {
+        let first = self.start_utc.date_naive();
+        let last = (self.end_utc - Duration::nanoseconds(1)).date_naive();
+        let mut out = Vec::new();
+        let mut day = first;
+        while day <= last {
+            let (start_utc, next) = crate::event_days::day_bounds(day);
+            let end_utc = next.min(now.max(start_utc + Duration::seconds(1)));
+            out.push((day, Self { start_utc, end_utc }));
+            let Some(following) = day.succ_opt() else {
+                break;
+            };
+            day = following;
+        }
+        out
     }
 
     /// 与 [`Self::chunks`] 同一组切片，但从最新一块排起。
@@ -152,8 +189,8 @@ impl DataFetcher {
     ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
-        for chunk in window.chunks(7) {
-            match fetch_heart_rate_pages_with(chunk, |cursor, end| {
+        for (day, chunk) in window.utc_days(Utc::now()) {
+            match fetch_heart_rate_pages_with(day, chunk, |cursor, end| {
                 self.connector
                     .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
             })
@@ -198,7 +235,13 @@ impl DataFetcher {
     pub async fn fetch_sleep_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
         let payload = self
             .connector
-            .fetch_band_data(&window.start_day(), &window.end_day(), "detail", 8, 0)
+            .fetch_band_data(
+                &window.start_day(),
+                &window.end_day_local_padded(),
+                "detail",
+                8,
+                0,
+            )
             .await?;
         let capability = crate::normalizer::Normalizer::band_capability(&payload);
         Ok(FetchedRecord::from_raw(RawRecord {
@@ -248,7 +291,7 @@ impl DataFetcher {
                             .unwrap_or(-1);
                         records.push(FetchedRecord::from_raw(RawRecord {
                             stream: "workouts".into(),
-                            source_key: format!("sport_history:{sport}:{start}:{stop_track_id}"),
+                            source_key: sport_history_key(sport, &payload),
                             source_scope: SourceScope::Device,
                             device_id: None,
                             start_utc: window.start_utc,
@@ -352,7 +395,7 @@ impl DataFetcher {
                 .fetch_watch_statistics(
                     statistic,
                     &window.start_day(),
-                    &window.end_day(),
+                    &window.end_day_local_padded(),
                     900,
                     true,
                 )
@@ -379,6 +422,21 @@ impl DataFetcher {
         }
         conclude_slices(records, last_error, "每日概览窗口没有可识别记录")
     }
+}
+
+/// 运动历史一页报文的键：按**内容**起，不按请求窗口。
+///
+/// 这个接口按 track ID 游标翻页，请求的起点跟着「现在」走。以前键里带着起点秒数，
+/// 每次同步都是一条新报文（开发库里 69 条里 67 条已经没有任何运动指向）。按内容起键：
+/// 云端回的一样，就是同一条、跳过归一化；有了新运动就是新的一条，旧那条里的运动被
+/// 新报文接管，没人指向了，由 `prune_superseded_page_raws` 清掉。流名前缀不变——
+/// 归一化从键里取种类（`sport_history:<种类>:`）。
+pub(crate) fn sport_history_key(sport: &str, payload: &Value) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(payload.to_string().as_bytes());
+    let digest = hex::encode(hasher.finalize());
+    format!("sport_history:{sport}:h{}", &digest[..16])
 }
 
 /// 一个每日事件窗口的响应 → 每个 UTC 日一条原始报文。

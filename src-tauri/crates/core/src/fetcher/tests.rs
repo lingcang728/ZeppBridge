@@ -7,7 +7,7 @@ async fn empty_heart_rate_page_is_kept_without_a_second_request() {
     let window = FetchWindow::between(start, start + Duration::hours(1)).unwrap();
     let original = json!({"code":200,"data":{"items":[]},"serverNote":"no samples"});
     let mut calls = 0;
-    let records = fetch_heart_rate_pages_with(window, |_, _| {
+    let records = fetch_heart_rate_pages_with(start.date_naive(), window, |_, _| {
         calls += 1;
         std::future::ready(if calls == 1 {
             Ok(original.clone())
@@ -31,7 +31,7 @@ async fn paginated_heart_rate_keeps_each_original_response_and_cursor() {
     let originals = vec![first, second];
     let mut pending = std::collections::VecDeque::from(originals.clone());
     let mut cursors = Vec::new();
-    let records = fetch_heart_rate_pages_with(window, |cursor, end| {
+    let records = fetch_heart_rate_pages_with(start.date_naive(), window, |cursor, end| {
         cursors.push((cursor, end));
         std::future::ready(
             pending
@@ -56,6 +56,15 @@ async fn paginated_heart_rate_keeps_each_original_response_and_cursor() {
         originals
     );
     assert_ne!(records[0].raw.source_key, records[1].raw.source_key);
+    // 键只由日期和页号决定：同一天再拉一次（窗口终点不同）还是同一条，不会每次同步多一条。
+    assert_eq!(
+        records[0].raw.source_key,
+        format!("heart_rate:day:{}:0", start.date_naive())
+    );
+    assert_eq!(
+        records[1].raw.source_key,
+        format!("heart_rate:day:{}:1", start.date_naive())
+    );
     assert_ne!(
         records[0].raw.source_key,
         format!(
@@ -550,4 +559,40 @@ fn daily_event_windows_become_one_record_per_utc_day() {
         empty[0].raw.source_key,
         "events:Charge:real_data:1790380800000:1790553599999"
     );
+}
+
+#[test]
+fn utc_days_cover_whole_days_and_stop_at_now() {
+    let start = DateTime::parse_from_rfc3339("2026-09-28T15:30:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let now = DateTime::parse_from_rfc3339("2026-09-30T08:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let days = FetchWindow::between(start, now).unwrap().utc_days(now);
+    let labels: Vec<_> = days.iter().map(|(day, _)| day.to_string()).collect();
+    assert_eq!(labels, ["2026-09-28", "2026-09-29", "2026-09-30"]);
+    // 第一天从零点取（同一天的键永远是同一段时间），过去的日子取到次日零点，今天取到现在。
+    assert_eq!(
+        days[0].1.start_utc.to_rfc3339(),
+        "2026-09-28T00:00:00+00:00"
+    );
+    assert_eq!(days[1].1.end_utc.to_rfc3339(), "2026-09-30T00:00:00+00:00");
+    assert_eq!(days[2].1.end_utc, now);
+}
+
+#[test]
+fn sport_history_key_depends_on_content_not_request_window() {
+    let page = json!({"data": {"summary": [{"trackid": "1700000000"}], "next": -1}});
+    let same = json!({"data": {"summary": [{"trackid": "1700000000"}], "next": -1}});
+    let more = json!({"data": {"summary": [{"trackid": "1700000000"}, {"trackid": "1700090000"}], "next": -1}});
+    assert_eq!(
+        sport_history_key("run", &page),
+        sport_history_key("run", &same)
+    );
+    assert_ne!(
+        sport_history_key("run", &page),
+        sport_history_key("run", &more)
+    );
+    assert!(sport_history_key("run", &page).starts_with("sport_history:run:"));
 }
