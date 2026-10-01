@@ -75,7 +75,11 @@ export const useSpringIndex = (options: {
     pos.value = target;
   };
 
-  onBeforeUnmount(stop);
+  // 吸附到一半被卸掉：目标已经定了，照样回调，不丢这次选择。
+  onBeforeUnmount(() => {
+    if (raf) options.onSettle?.(settleIndex(target));
+    stop();
+  });
 
   return { pos, animateTo, place, stop, target: () => target };
 };

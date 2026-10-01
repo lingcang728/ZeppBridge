@@ -57,13 +57,36 @@ type Morph = { animation: Animation; id: string; kind: 'open' | 'close'; closed?
 export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) => {
   let morph: Morph | null = null;
   let ghost: WindowMorph | null = null;
+  /* 开卡后半程把板交给真卡（release）的那个时刻。以前是墙钟 setTimeout，Esc 倒放时
+     它照样在 62% 那一刻触发，板在往回缩的途中被淡掉。倒放、移除时都要撤掉它。 */
+  let releaseTimer = 0;
+  const cancelRelease = () => {
+    window.clearTimeout(releaseTimer);
+    releaseTimer = 0;
+  };
   /** 窗口的全部动画一起倒着放（开到一半关、关到一半开）。 */
   const reverseGhost = () => {
-    const running = ghost?.animations().filter((animation) => animation.playState === 'running') ?? [];
+    cancelRelease();
+    const current = ghost;
+    const running = current?.animations().filter((animation) => animation.playState === 'running') ?? [];
     for (const animation of running) animation.reverse();
+    // 倒回起点时板里的拷贝和源卡重合：撤掉板，源卡原样接上（以前板会留在那里）。
+    // 又被正过来（关到一半再开）：走到终点时照常把板交给真卡。
+    if (current && running.includes(current.shape)) {
+      void current.shape.finished.then(() => {
+        if (ghost !== current) return;
+        if (current.shape.playbackRate < 0) {
+          current.remove();
+          ghost = null;
+        } else {
+          current.release();
+        }
+      }, () => undefined);
+    }
     return running.length > 0;
   };
   const dropGhost = () => {
+    cancelRelease();
     ghost?.remove();
     ghost = null;
   };
@@ -154,8 +177,25 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       replica: source ? { ...cardReplica(source), at: 'from' } : null,
     });
     const opened = ghost;
+    // 终点不是量一次就定死：卡里的内容（KeepAlive 的 CardBody）异步挂上后卡会变高，板落点
+    // 和真卡对不上。形状还在走时卡一变就改终点（时间轴不变，只换目标）。
+    if (typeof ResizeObserver === 'function') {
+      const resized = new ResizeObserver(() => {
+        if (ghost !== opened || opened.shape.playState !== 'running') {
+          resized.disconnect();
+          return;
+        }
+        opened.retarget(visibleBoxOf(el), radiusOf(el));
+      });
+      resized.observe(el);
+      void opened.arrived.then(() => resized.disconnect());
+    }
     const animation = el.animate(revealAfterGhost(0.62), { duration: OPEN_MS, fill: 'both' });
-    window.setTimeout(() => { if (ghost === opened) opened.release(OPEN_MS * 0.4, true); }, OPEN_MS * 0.62);
+    cancelRelease();
+    releaseTimer = window.setTimeout(() => {
+      releaseTimer = 0;
+      if (ghost === opened && opened.shape.playbackRate > 0) opened.release(OPEN_MS * 0.4, true);
+    }, OPEN_MS * 0.62);
     track({ animation, id, kind: 'open' });
   };
 

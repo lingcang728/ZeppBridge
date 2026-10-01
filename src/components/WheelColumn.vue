@@ -4,7 +4,11 @@
  *
  * 手势：鼠标滚轮——慢拨一格走一项，快拨逐级加速（lib/wheel/momentum.ts）；按住上下拖，
  * 松手按甩动速度继续滑一段再吸附；↑/↓ 一项、PageUp/PageDown 五项。
- * 位置是连续的浮点下标，所有项的形变都由它算；停稳后才提交值。 */
+ * 位置是连续的浮点下标，所有项的形变都由它算。
+ *
+ * 值在**定下目标的那一刻**提交（松手、按键、拨滚轮），不等停稳：以前停稳才提交，值要在
+ * 停手后 300–500ms 才变——转动中关对话框就丢了这次选择，快速选完立刻点保存存的是上一个值。
+ * 转动中外部改了值（日期选择器按月末 / 上下限钳位）就改道去那里，不再用旧目标覆盖回去。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { newWheelAccel, wheelSteps } from '../lib/wheel/momentum';
 import { useGlassLens } from '../composables/useGlassLens';
@@ -62,7 +66,8 @@ const tick = (ts: number) => {
 };
 const animateTo = (index: number) => {
   target = clamp(Math.round(index));
-  if (reducedMotion()) { pos.value = target; commit(); return; }
+  commit();
+  if (reducedMotion()) { pos.value = target; return; }
   if (!raf) { moving.value = true; raf = requestAnimationFrame(tick); }
 };
 
@@ -104,6 +109,11 @@ const onUp = (event: PointerEvent) => {
   if (!g || g.id !== event.pointerId) return;
   gesture = null;
   if (root.value?.hasPointerCapture(event.pointerId)) root.value.releasePointerCapture(event.pointerId);
+  // pointercancel（Alt+Tab 丢了捕获、系统手势抢走）不是点击：它的坐标不可信，回到最近的一项。
+  if (event.type !== 'pointerup') {
+    animateTo(pos.value);
+    return;
+  }
   if (!g.moved) {
     // 点上下的项：直接转过去。
     const rect = root.value!.getBoundingClientRect();
@@ -123,17 +133,23 @@ const onKey = (event: KeyboardEvent) => {
 };
 
 watch(() => props.modelValue, (value) => {
-  if (gesture || raf) return;
+  if (gesture) return;
   const index = indexOf(value);
   if (index !== Math.round(target)) animateTo(index);
 });
-// 项数变了（换月份后日子变少）：位置钳回范围内。
+// 项数变了（换月份后日子变少）：目标和位置都钳回范围内，不让弹簧停在一个不存在的空槽上。
 watch(() => props.items.length, () => {
-  if (pos.value > last()) { pos.value = last(); target = last(); commit(); }
+  if (target > last()) animateTo(last());
+  if (pos.value > last()) pos.value = last();
 });
 
 onMounted(() => root.value?.addEventListener('wheel', onWheel, { passive: false }));
 onBeforeUnmount(() => {
+  // 拖到一半关掉：按此刻停在正中的那一项提交。
+  if (gesture?.moved) {
+    target = clamp(Math.round(pos.value));
+    commit();
+  }
   cancelAnimationFrame(raf);
   root.value?.removeEventListener('wheel', onWheel);
 });

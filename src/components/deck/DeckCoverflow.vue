@@ -71,7 +71,7 @@ const offsetOf = (index: number) => {
   return d - n() * Math.round(d / n());
 };
 
-const { pos, animateTo, place, stop } = useSpringIndex({
+const { pos, animateTo, place, stop, target } = useSpringIndex({
   count: () => props.cards.length,
   wrap: true,
   initial: indexOf(props.modelValue),
@@ -188,10 +188,17 @@ const onWheel = (event: WheelEvent) => {
   if (Math.abs(wheelAcc) < 50) return;
   const steps = Math.sign(wheelAcc);
   wheelAcc = 0;
-  animateTo(Math.round(pos.value) + steps);
+  animateTo(target() + steps);
 };
 
-const go = (direction: -1 | 1) => animateTo(Math.round(pos.value) + direction);
+/* 从目标步进，不从此刻的位置：快按三下 → 走三张。以前按 round(pos) 算，弹簧还没走过半格，
+   三下只前进一张。 */
+const go = (direction: -1 | 1) => animateTo(target() + direction);
+/** 正在转向（或已经停在）的那一张。 */
+const targetCard = computed(() => {
+  void pos.value;
+  return props.cards[wrap(target())];
+});
 const onKeydown = (event: KeyboardEvent) => {
   if ((event.target as Element).closest(INTERACTIVE)) return;
   if (event.key === 'ArrowRight') { event.preventDefault(); go(1); }
@@ -200,7 +207,8 @@ const onKeydown = (event: KeyboardEvent) => {
   else if (event.key === 'End') { event.preventDefault(); turnTo(props.cards.length - 1); }
   else if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
-    if (centerCard.value) emit('open', centerCard.value.id);
+    // 打开要去的那一张，而不是弹簧此刻正经过的那张。
+    if (targetCard.value) emit('open', targetCard.value.id);
   }
 };
 
@@ -292,9 +300,12 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--canvas) 30%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  transition: opacity .3s ease;
+  /* 不拖的时候 visibility: hidden，把这层全屏背景滤镜从合成里摘掉（opacity: 0 时 Chromium
+     仍可能每帧处理它）。淡出放完才藏，淡入一开始就显。 */
+  visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
 }
-.cover-backdrop.on { opacity: 1; }
+.cover-backdrop.on { opacity: 1; visibility: visible; transition: opacity .3s ease, visibility 0s; }
 .cover-stage {
   position: relative;
   z-index: 1;

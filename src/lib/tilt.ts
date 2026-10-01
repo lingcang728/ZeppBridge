@@ -12,8 +12,9 @@ import type { Directive } from 'vue';
  * 现在只写两处内联 transform：卡自己的倾斜、高光层自己的位移。两者都不继承、
  * 都只走合成器；高光是一张画好一次的渐变，跟着指针平移，不重画。
  *
- * rect 在指针进卡时量一次（滚动、缩放时作废重量），不在每帧里量——每帧量会在
- * 样式脏的时候逼出一次同步布局。
+ * rect 在指针进卡时量一次（滚动、缩放、卡自己的入场 / 形变动画放完时作废重量），不在
+ * 每帧里量——每帧量会在样式脏的时候逼出一次同步布局。入场那 380ms 里量到的是还在往上浮
+ * 的卡（card-enter 的 translate），不作废的话高光一直偏一截。
  *
  * 倾角随卡片宽度收小：整行宽的大卡只斜一度左右，不会像一块翘起来的板。
  * 没有悬停能力的设备、开了减少动效时不启用。每帧最多算一次。
@@ -65,14 +66,20 @@ export const vTilt: Directive<TiltHost> = {
       window.removeEventListener('scroll', forget, { capture: true });
       window.removeEventListener('resize', forget);
     };
+    // 只认卡自己的动画（子元素的动画冒泡上来不影响卡的外框）。
+    const settled = (event: Event) => { if (event.target === el) forget(); };
     el.addEventListener('pointerenter', enter);
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerleave', leave);
+    el.addEventListener('animationend', settled);
+    el.addEventListener('transitionend', settled);
     el.__tiltOff = () => {
       leave();
       el.removeEventListener('pointerenter', enter);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerleave', leave);
+      el.removeEventListener('animationend', settled);
+      el.removeEventListener('transitionend', settled);
       glare.remove();
     };
   },

@@ -68,20 +68,25 @@ const shake = (id: string) => {
   window.setTimeout(() => { if (shaking.value === id) shaking.value = null; }, 420);
 };
 
-/* 一次只处理一枚：连点时后一枚等前一枚放完，槽位顺序不会乱。 */
-const toggle = async (id: string) => {
-  if (busy.value) return;
-  const selected = draft.value.includes(id);
-  if (!selected && full.value) {
-    shake(id);
-    return;
-  }
-  busy.value = true;
-  try {
-    await (selected ? remove(id) : add(id));
-  } finally {
-    busy.value = false;
-  }
+/* 一次只处理一枚：连点时后一枚**排队**等前一枚放完，槽位顺序不会乱。以前是忙时直接
+   丢掉这一下（和这句注释说的相反），快点两枚只选上一枚、也没有任何反馈。
+   选没选上、满没满在轮到它时再判断：前面那枚可能刚好把槽占满。 */
+let queue: Promise<void> = Promise.resolve();
+const toggle = (id: string): Promise<void> => {
+  queue = queue.then(async () => {
+    const selected = draft.value.includes(id);
+    if (!selected && full.value) {
+      shake(id);
+      return;
+    }
+    busy.value = true;
+    try {
+      await (selected ? remove(id) : add(id));
+    } finally {
+      busy.value = false;
+    }
+  }).catch(() => undefined);
+  return queue;
 };
 
 const clear = () => { draft.value = []; };

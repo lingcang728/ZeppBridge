@@ -159,9 +159,11 @@
   background: color-mix(in srgb, var(--canvas) 34%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  transition: opacity .26s ease;
+  /* 不动的时候摘出合成，见 DeckCoverflow 的 .cover-backdrop。 */
+  visibility: hidden;
+  transition: opacity .26s ease, visibility 0s linear .26s;
 }
-.deck-stage.is-moving .deck-backdrop { opacity: 1; }
+.deck-stage.is-moving .deck-backdrop { opacity: 1; visibility: visible; transition: opacity .26s ease, visibility 0s; }
 @media (prefers-reduced-motion: reduce) { .deck-backdrop { display: none; } }
 .open-head {
   padding: 18px 20px 16px 24px;

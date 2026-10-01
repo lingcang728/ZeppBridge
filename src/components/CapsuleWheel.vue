@@ -282,6 +282,11 @@ const onUp = (event: PointerEvent) => {
   gesture = null;
   dragging.value = false;
   if (root.value?.hasPointerCapture(event.pointerId)) root.value.releasePointerCapture(event.pointerId);
+  // pointercancel（Alt+Tab 丢了捕获）不是点击：以前按住语言再切走，语言就被换了。回到最近的一项。
+  if (event.type !== 'pointerup') {
+    animateTo(pos.value);
+    return;
+  }
   if (!g.moved) {
     // 点击：点到哪一项就转到哪一项；两项时点哪儿都是换到另一项。
     const current = looping() ? mod(Math.round(pos.value), count()) : Math.round(pos.value);
@@ -330,6 +335,10 @@ watch(() => props.modelValue, (value) => {
   const current = looping() ? mod(Math.round(target), count()) : Math.round(target);
   if (index !== current || Math.abs(pos.value - target) > 0.001) turnTo(index);
 });
+// 项数变少：目标钳回范围内，弹簧不会停在不存在的空槽上。
+watch(() => props.items.length, () => {
+  if (!looping() && target > count() - 1) animateTo(count() - 1);
+});
 watch(() => props.items.map((item) => item.label).join('\u0000'), async () => {
   await nextTick();
   measure();
@@ -344,6 +353,8 @@ onMounted(() => {
   root.value?.addEventListener('wheel', onWheel, { passive: false });
 });
 onBeforeUnmount(() => {
+  // 转到一半被卸掉（对话框关了、页面切走）：目标已经定了，照样提交，不丢这次选择。
+  if (raf) settle();
   cancelAnimationFrame(raf);
   observer?.disconnect();
   root.value?.removeEventListener('wheel', onWheel);

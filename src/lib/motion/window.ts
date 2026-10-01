@@ -285,14 +285,27 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   const arrived = shape.finished.then(() => undefined, () => undefined);
 
   let released = false;
+  /* 淡出也是可以倒放的：开到一半按 Esc 时它已经在跑，以前不在 animations() 里，
+     reverse 只倒了形状，板照样淡掉、被移除，「原路缩回」少了后一半。现在淡出进
+     animations()；倒放回到不透明时不移除，交还给倒放的形状。 */
+  let fades: Animation[] = [];
   const release = (fadeMs = 180, now = false) => {
     if (released) return;
     released = true;
     void (now ? Promise.resolve() : arrived).then(() => {
-      if (removed) return;
+      if (removed || !released) return;
       const fade = [plate, scrim].filter((el): el is HTMLElement => !!el)
         .map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' }));
-      Promise.all(fade.map((animation) => animation.finished)).then(remove, remove);
+      fades = fade;
+      Promise.all(fade.map((animation) => animation.finished)).then(() => {
+        if (fade.some((animation) => animation.playbackRate < 0)) {
+          fades = [];
+          released = false;
+          for (const animation of fade) animation.cancel();
+          return;
+        }
+        remove();
+      }, remove);
     });
   };
 
@@ -339,6 +352,6 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
     ));
   };
 
-  const animations = () => [shape, replicaAnim, scrimAnim, plateFade].filter((a): a is Animation => !!a);
+  const animations = () => [shape, replicaAnim, scrimAnim, plateFade, ...fades].filter((a): a is Animation => !!a);
   return { plate, shape, arrived, release, remove, retract, retarget, waiting, animations };
 }

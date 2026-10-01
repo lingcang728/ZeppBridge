@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 首页心率卡的曲线：轴、均值虚线、渐变面积、最新点、悬停读数。
    只画这些，所以不用 ECharts——首屏因此不必加载图表引擎（见 lib/miniChart.ts）。 */
-import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import type { TimedValue } from '../../lib/chartGaps';
 import type { ChartPalette } from '../../lib/echartsTheme';
 import { nearestByX, niceTicks, smoothPath, splitAtGaps, timeTicks, type PlotPoint } from '../../lib/miniChart';
@@ -90,11 +90,28 @@ onMounted(() => {
   apply();
   observer = new ResizeObserver(apply);
   observer.observe(host.value);
-  if (intro.value) {
-    introPlayed = true;
-    introTimer = window.setTimeout(() => { intro.value = false; }, 1000);
-  }
 });
+
+/* 入场画线从曲线真正画出来那一刻算起，不从挂载算：SVG 要等 ResizeObserver 量到非零宽才出现，
+   KeepAlive 页脱离文档、页面形变中布局未定时这一等可能很久——以前定时器先走完，intro 类在画线
+   中途被撤，线一下补全，而 introPlayed 早已置真，这次入场就算「放过了」。现在等线出现再开始，
+   放完（animationend）就撤；定时器只是兜底（窗口不可见时动画暂停、不会结束）。 */
+const endIntro = () => {
+  window.clearTimeout(introTimer);
+  intro.value = false;
+};
+const onAnimationEnd = (event: AnimationEvent) => {
+  if (intro.value && event.animationName.startsWith('hr-draw')) endIntro();
+};
+watch(
+  () => intro.value && width.value > 0 && lines.value.length > 0,
+  (drawing) => {
+    if (!drawing || introPlayed) return;
+    introPlayed = true;
+    introTimer = window.setTimeout(endIntro, 1600);
+  },
+  { immediate: true, flush: 'post' },
+);
 onBeforeUnmount(() => {
   observer?.disconnect();
   window.clearTimeout(introTimer);
@@ -102,7 +119,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" :class="['hr-mini', { intro }]" @pointermove="onMove" @pointerleave="hover = null">
+  <div ref="host" :class="['hr-mini', { intro }]" @pointermove="onMove" @pointerleave="hover = null" @animationend="onAnimationEnd">
     <!-- 曲线本体只在数据 / 尺寸变了才重画（v-memo）；悬停光标、圆点和读数在上面单独一层，只动 transform。
          以前光标画在同一张 SVG 里，指针每动一下整张图（上千个点的路径）重新栅格化一遍。 -->
     <svg v-if="width" v-memo="[width, lines, areas, average, latest, yTicks, xTicks, chrome, color]" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="label">

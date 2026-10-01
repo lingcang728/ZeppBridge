@@ -126,7 +126,10 @@ const apply = async (next: string[]) => {
       <span class="pins-empty-copy"><strong>{{ t.emptyCta }}</strong><small>{{ t.emptySub }}</small></span>
     </button>
 
-    <TransitionGroup v-else tag="div" name="pin" :appear="justPinned" :class="['pins-grid', { 'just-pinned': justPinned }]" :style="{ '--count': tiles.length }">
+    <!-- 灌色动画在 ::after 和子元素上，Vue 只看得见磁贴自己的 240ms 过渡，会在 27% 处撤掉
+         enter-active 把它截断：时长显式给 900。离场是 display:none，不用等。 -->
+    <TransitionGroup v-else tag="div" name="pin" :appear="justPinned" :duration="{ enter: 900, leave: 0 }"
+      :class="['pins-grid', { 'just-pinned': justPinned }]" :style="{ '--count': tiles.length }">
       <RouterLink v-for="tile in tiles" :key="tile.id" :to="tile.metric.route" data-morph-card
         :class="['pin-tile', { 'is-empty': tile.value === '—' }]" :style="{ '--tone': tile.tone }" :aria-label="t.tileAria(tile.label, tile.value)">
         <span class="pin-label"><i class="pin-dot" aria-hidden="true"></i>{{ tile.label }}</span>

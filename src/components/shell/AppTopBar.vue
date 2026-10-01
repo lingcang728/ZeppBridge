@@ -257,7 +257,8 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
-useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.value));
+// 伸缩放完再量一次放不放得下（变窄时回到该有的档位），见下面 watch 的注释。
+useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.value), undefined, () => scheduleFit());
 
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
@@ -352,7 +353,6 @@ const refit = async () => {
 };
 let fitObserver: ResizeObserver | null = null;
 let fitFrame = 0;
-let fitTimer = 0;
 const scheduleFit = () => {
   cancelAnimationFrame(fitFrame);
   fitFrame = requestAnimationFrame(() => { void refit(); });
@@ -368,16 +368,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onEscapeBack);
   fitObserver?.disconnect();
   cancelAnimationFrame(fitFrame);
-  window.clearTimeout(fitTimer);
 });
 watch([locale, () => props.backTo], scheduleFit);
-/* 同步胶囊换字：马上按伸完的宽度量一次（变宽时不会半路压到导航），420ms 的伸缩放完再量一次
-   （变窄时回到该有的档位）。 */
-watch(() => (readyToHand.value ? readyText.value : syncText.value), () => {
-  scheduleFit();
-  window.clearTimeout(fitTimer);
-  fitTimer = window.setTimeout(scheduleFit, 460);
-});
+/* 同步胶囊换字：马上按伸完的宽度量一次（变宽时不会半路压到导航）；伸缩放完的那一次由
+   useWidthMorph 的 onSettled 触发，不再按写死的时长猜。 */
+watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit);
 </script>
 
 <template>
