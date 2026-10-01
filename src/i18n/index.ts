@@ -240,6 +240,8 @@ const mergeOver = <T extends MessageTree>(
 const loadedPacks = new Map<Locale, LocalePack>();
 const packInflight = new Map<Locale, Promise<void>>();
 const packInjected = new Set<Locale>();
+/** 加载失败过的语言包。不自动重试：重试由用户再次切换语言触发。 */
+const packFailed = new Set<Locale>();
 const packRevision = ref(0);
 
 /** `errors:` 平铺表并入 `modules['i18n/errors']`（errors 节优先）。 */
@@ -259,7 +261,7 @@ const normalizePack = (pack: LocalePack): LocalePack => {
  * 已注入过（测试或未来的远程包）就不再去读文件。
  */
 export const ensureLocalePack = (value: Locale): Promise<void> => {
-  if (!isPackLocale(value) || loadedPacks.has(value) || packInjected.has(value)) {
+  if (!isPackLocale(value) || loadedPacks.has(value) || packInjected.has(value) || packFailed.has(value)) {
     return Promise.resolve();
   }
   const inflight = packInflight.get(value);
@@ -269,13 +271,16 @@ export const ensureLocalePack = (value: Locale): Promise<void> => {
       if (!packInjected.has(value)) {
         loadedPacks.set(value, normalizePack(module.default as LocalePack));
       }
+      packRevision.value += 1;
     })
     .catch(() => {
-      // 语言包加载失败不该让切换语言失败：所有键回落 en。
+      // 语言包加载失败不该让切换语言失败：所有键回落 en。也不 bump 版本——
+      // 界面本来就在显示英文，bump 只会让所有文案 computed 重算、再触发一次加载，
+      // 失败时就成了一个把 CPU 打满的循环。
+      packFailed.add(value);
     })
     .finally(() => {
       packInflight.delete(value);
-      packRevision.value += 1;
     });
   packInflight.set(value, task);
   return task;
@@ -315,6 +320,8 @@ export const setLocale = (value: Locale) => {
     // 存不下就只在本次会话里生效，比整个切换动作失败要好。
   }
   applyDocumentLanguage(value);
+  // 用户主动切过来：之前失败过的包再试一次。
+  packFailed.delete(value);
   void ensureLocalePack(value);
   syncBackendLocale(value);
 };
@@ -324,9 +331,9 @@ export const setLocale = (value: Locale) => {
  * 探测结果**不写** localStorage：用户没选过就不该被记成「选过了」，
  * 否则以后换系统语言反而不生效。
  */
-export const initializeLocale = () => {
+export const initializeLocale = (): Promise<void> => {
   applyDocumentLanguage(current.value);
-  void ensureLocalePack(current.value);
+  return ensureLocalePack(current.value);
 };
 
 /** 传给 `Intl.*` 的语言标记。日期和数字格式化都必须用它，不要再写死 `'zh-CN'`。 */
@@ -383,8 +390,9 @@ const resolveBundle = <T extends MessageTree>(bundle: MessageBundle<T>): T => {
   const tree = overlay
     ? mergeOver(mergeOver(bundle.zh, bundle.en), overlay)
     : bundle.en;
+  // 这里不再顺手触发加载：computed 里带副作用，失败时会自我循环。加载由
+  // initializeLocale / setLocale 负责。
   resolvedCache.set(bundle, { locale: value, rev, tree });
-  if (!loadedPacks.has(value)) void ensureLocalePack(value);
   return tree;
 };
 

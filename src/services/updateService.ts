@@ -85,11 +85,17 @@ async function isSelfUpdateSupported(): Promise<boolean> {
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     selfUpdateSupported = await invoke<boolean>('self_update_supported');
-  } catch {
-    // 老版本后端没有这个命令。那些构建全都是 Windows/macOS 的，能自己更新。
-    selfUpdateSupported = true;
+    return selfUpdateSupported;
+  } catch (error) {
+    // 老版本后端没有这个命令：那些构建全都是 Windows/macOS 的，能自己更新，记住它。
+    // 其它错误（启动早期的 IPC 抖动）只按「能」处理这一次，不缓存——缓存了的话
+    // Linux 包管理器版本会在一次瞬时错误之后一直去撞更新服务器。
+    // Tauri 对未注册的命令回的是一句英文字符串（不是给人看的，只拿来分类）。
+    if (/not found|unknown command/i.test(String(error))) {
+      selfUpdateSupported = true;
+    }
+    return true;
   }
-  return selfUpdateSupported;
 }
 
 let checkInFlight: Promise<void> | null = null;
@@ -119,7 +125,9 @@ async function doCheckForDesktopUpdate(manual: boolean): Promise<void> {
     }
     const lastCheck = Number(localStorage.getItem(AUTO_CHECK_KEY) ?? 0);
     if (!manual && Date.now() - lastCheck < AUTO_CHECK_INTERVAL) {
-      updateState.status = 'upToDate';
+      // 24 小时内查过、这次没联网：不能说「已是最新」——那是一句没核实过的话。
+      // 回到「还没查」，设置页照常给「检查更新」按钮。
+      updateState.status = 'idle';
       return;
     }
     const { check } = await import('@tauri-apps/plugin-updater');

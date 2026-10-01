@@ -1,12 +1,12 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
-import { onMounted, watch } from 'vue';
+import { onMounted } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
 import { tauriApi } from '../composables/useTauriApi';
 import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
@@ -60,10 +60,9 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
 const {
-  items: sessions, loading, loadingMore, error, total, hasMore, load: loadList, loadMore,
+  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore,
 } = usePagedRecords<SleepSession>({
   loadPage: (limit, offset) => tauriApi.getSleepPage(limit, offset),
   idOf: (item) => item.sleep_id,
@@ -72,7 +71,7 @@ const {
 const initialLoading = useFirstLoad(loading);
 
 onMounted(() => void loadList());
-watch(dataRevision, () => void loadList());
+useRevisionReload(() => void loadList());
 </script>
 
 <template>
@@ -102,6 +101,7 @@ watch(dataRevision, () => void loadList());
         :fact-label="t.scoreLabel"
       />
     </div>
+    <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
@@ -116,6 +116,7 @@ watch(dataRevision, () => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

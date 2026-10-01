@@ -1,5 +1,6 @@
 import type { HourlySteps } from '../types';
 import { localDateString } from './format';
+import { today as currentToday } from './currentDay';
 
 /**
  * 每小时步数按范围摊开：一行是一天（范围长时一行是一周），一行 24 格。
@@ -33,7 +34,7 @@ export const dateSpan = (start: string, end: string): string[] => {
 };
 
 /** 范围的首尾：今天往回数 `days` 天（含今天）。 */
-export const rangeBounds = (days: number, today = new Date()): { start: string; end: string } => {
+export const rangeBounds = (days: number, today = currentToday()): { start: string; end: string } => {
   const end = localDateString(today);
   return { start: addDays(end, -(Math.max(1, days) - 1)), end };
 };

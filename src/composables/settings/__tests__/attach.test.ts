@@ -16,6 +16,8 @@ vi.mock('../../../lib/bridge', () => ({
     getLoginStatus: vi.fn(async () => ({ state: 'idle', message: '', page_url: '' })),
   },
   toUserMessage: (_error: unknown, fallback: string) => fallback,
+  // 官方状态会顺带交给全局同步控制器刷新；测试里不是桌面，让它直接返回。
+  isDesktop: () => false,
 }));
 
 import { createOfficialAuth } from '../useOfficialAuth';

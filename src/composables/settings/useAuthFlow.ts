@@ -62,13 +62,22 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     return deviceStateLabel('unknown');
   });
 
-  const applyLoginStatus = async (status: LoginStatus) => {
+  /*
+   * `replay`：进设置页时补读的当前状态。后端的 login.status 在整个会话里粘在
+   * connected 上，而 0 条写入的账号 last_cloud_sync_at 永远是空——以前每进一次
+   * 设置页就会因为这次补读起一趟看得见的同步。首次同步只跟着真正的「刚连上」走：
+   * 实时事件，而且此前不是 connected（命令返回值和事件可能各送一次同一个结果）。
+   */
+  const applyLoginStatus = async (status: LoginStatus, opts?: { replay?: boolean }) => {
+    const justConnected = status.state === 'connected' && loginStatus.value.state !== 'connected';
     loginStatus.value = status;
     if (status.state === 'connected') {
       reconnecting.value = false;
       loginError.value = null;
       await refreshStatus();
-      if (!appStatus.value?.last_cloud_sync_at) void runSync('incremental');
+      if (justConnected && !opts?.replay && !appStatus.value?.last_cloud_sync_at) {
+        void runSync('incremental', undefined, { silent: true, waited: true });
+      }
     }
     if (status.state === 'failed') {
       // status.message 是后端的中文原文，只能兜底；先按码取当前语言的说法。
@@ -168,7 +177,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       if (gen !== attachGen) { off(); return; }
       unlistenLogin = off;
       const current = await backend.getLoginStatus();
-      if (gen === attachGen) await applyLoginStatus(current);
+      if (gen === attachGen) await applyLoginStatus(current, { replay: true });
     } catch {
       // Browser preview has no login IPC.
     }

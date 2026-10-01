@@ -224,10 +224,10 @@ const load = async (refresh = false): Promise<void> => {
  * 这里直接问一次后端，并照常抢 `requestId`：顺带让那条抢跑的后台刷新
  * 结果失效，免得它稍后再把旧数据盖回来。
  */
-const reloadAfterLocalWrite = async (): Promise<void> => {
+const reloadAfterLocalWrite = async (opts?: { quiet?: boolean }): Promise<void> => {
   if (!isDesktop()) return;
   const currentRequest = ++requestId;
-  loading.value = true;
+  if (!opts?.quiet) loading.value = true;
   error.value = null;
   try {
     const result = normalizeResult(await backend.getDeviceProfiles(false));
@@ -326,6 +326,8 @@ export const useDevices = () => ({
   error,
   initialized,
   load,
+  /** 同步写过库之后的重读：同样不能搭在飞的请求（它读的是写入前的库），也不转圈。 */
+  reloadAfterDataChange: () => reloadAfterLocalWrite({ quiet: true }),
   maskIdentifier,
   formatDeviceDate,
 });

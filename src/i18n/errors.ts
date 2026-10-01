@@ -53,6 +53,8 @@ const messages = defineMessages(
     'err.core.database': '本地数据库暂不可用',
     'err.core.io': '读写本地文件失败',
     'err.core.unknown': '出了点问题',
+    // 前端自己的码：后端就绪门等超过一分钟（大库恢复 / 迁移）。后端真就绪后页面会自己重读。
+    'err.app.starting': '本地数据还在准备，稍等片刻会自动刷新',
 
     /* —— 连接与认证 —— */
     'err.auth.sync_init_failed': '无法初始化同步，检查认证区域后重试',
@@ -213,6 +215,7 @@ const messages = defineMessages(
     'err.core.database': 'Local database temporarily unavailable',
     'err.core.io': 'Local file read/write failed',
     'err.core.unknown': 'Something went wrong',
+    'err.app.starting': 'Local data is still being prepared — this will refresh on its own shortly',
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': "Could not init sync — check the account region and retry",
@@ -390,6 +393,7 @@ const messages = defineMessages(
     'err.core.database': 'Base de datos local no disponible temporalmente',
     'err.core.io': 'Error al leer o escribir un archivo local',
     'err.core.unknown': 'Ocurrió un problema',
+    'err.app.starting': 'Los datos locales aún se están preparando; se actualizará solo en un momento',
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': 'No se pudo inicializar la sincronización: revisa tu región y reintenta',

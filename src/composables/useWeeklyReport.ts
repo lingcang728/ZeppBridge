@@ -12,16 +12,32 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 let started = false;
 let inflight: Promise<void> | null = null;
+/** 在飞的那次读的是写入之前的库：落地后要再读一次。 */
+let rerun = false;
 
-const load = (fallbackError: string): Promise<void> => {
+/**
+ * @param fresh 数据刚变过（dataRevision）。这时不能搭上在飞的请求——它读到的是
+ *   写入之前的库，「这一周」会落后一次同步。改成等它落地后再读一次。
+ */
+const load = (fallbackError: string, fresh = false): Promise<void> => {
   if (!isDesktop()) return Promise.resolve();
-  if (inflight) return inflight;
+  if (inflight) {
+    if (fresh) rerun = true;
+    return inflight;
+  }
   loading.value = true;
   error.value = null;
   inflight = backend.getWeeklyReport()
     .then((next) => { report.value = next; })
     .catch((cause) => { error.value = toUserMessage(cause, fallbackError); })
-    .finally(() => { loading.value = false; inflight = null; });
+    .finally(() => {
+      loading.value = false;
+      inflight = null;
+      if (rerun) {
+        rerun = false;
+        void load(fallbackError);
+      }
+    });
   return inflight;
 };
 
@@ -31,7 +47,7 @@ export function useWeeklyReport(fallbackError: () => string) {
     // 挂在独立的 effect scope 上：第一个用它的组件卸载了，重取也不能跟着停。
     effectScope(true).run(() => {
       const { dataRevision } = useSyncController();
-      watch(dataRevision, () => void load(fallbackError()));
+      watch(dataRevision, () => void load(fallbackError(), true));
     });
   }
   if (!report.value && !inflight) void load(fallbackError());

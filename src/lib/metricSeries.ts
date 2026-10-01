@@ -5,6 +5,7 @@ import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 import { resolvedTheme } from '../composables/useTheme';
 import { chartPalettes } from './echartsTheme';
+import { today as currentToday } from './currentDay';
 
 const messages = defineMessages(
   {
@@ -66,7 +67,7 @@ const shiftDate = (date: string, days: number): string => {
 };
 
 /** 范围第一天：今天往回数 `days` 天（含今天），本地日。和后端 `end - (days - 1)` 同一个算法。 */
-export const windowStartDate = (days: number, today = new Date()): string => {
+export const windowStartDate = (days: number, today = currentToday()): string => {
   const pad = (value: number) => String(value).padStart(2, '0');
   const end = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   return shiftDate(end, -(Math.max(1, Math.round(days)) - 1));
@@ -82,7 +83,7 @@ const round1 = (value: number) => Math.round(value * 10) / 10;
  * 出 7 天」和「直接取 7 天」逐字段相同（`get_metric_series` 的算法见 storage/metrics.rs）。
  * 切范围因此不用再走一趟 IPC + SQLite：点下去同一帧图表就开始换。
  */
-export const sliceSeries = (series: MetricSeries, days: number, today = new Date()): MetricSeries => {
+export const sliceSeries = (series: MetricSeries, days: number, today = currentToday()): MetricSeries => {
   const start = windowStartDate(days, today);
   const end = windowStartDate(1, today);
   const points = series.points.filter((point) => point.date >= start && point.date <= end);
@@ -103,7 +104,7 @@ export const sliceSeries = (series: MetricSeries, days: number, today = new Date
 export const sliceIndexed = (
   series: Record<string, MetricSeries>,
   days: number,
-  today = new Date(),
+  today = currentToday(),
 ): Record<string, MetricSeries> => {
   const out: Record<string, MetricSeries> = {};
   for (const [name, item] of Object.entries(series)) out[name] = sliceSeries(item, days, today);
@@ -111,7 +112,7 @@ export const sliceIndexed = (
 };
 
 /** 按日期的数组（训练负荷平衡、日最高心率）同样从尾部切。 */
-export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = new Date()): T[] => {
+export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = currentToday()): T[] => {
   const start = windowStartDate(days, today);
   return rows.filter((row) => row.date >= start);
 };

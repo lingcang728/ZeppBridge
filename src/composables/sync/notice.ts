@@ -5,7 +5,7 @@ import { failedStreamKeys } from '../../lib/syncDeferred';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
 import type { SyncOutcome, SyncReport } from '../../types';
-import { appStatus, copy, notice, type SyncNotice } from './state';
+import { appStatus, copy, notice, statusError, statusErrorFromSync, type SyncNotice } from './state';
 
 /* 把「发生了什么」渲染成当前语言的一句话（从 useSyncController.ts 搬出来）。 */
 
@@ -107,6 +107,10 @@ const renderNotice = (value: SyncNotice): string => {
 };
 
 export const syncMessage = computed(() => renderNotice(notice.value));
+
+/** 顶栏 / 设置页的红字：状态读取失败的原文，或者同步失败时横幅那句话（随语言重算）。 */
+export const statusErrorText = computed(() =>
+  statusError.value ?? (statusErrorFromSync.value ? syncMessage.value : null));
 
 export const noticeForReport = (report: SyncReport): SyncNotice => ({
   kind: 'report',

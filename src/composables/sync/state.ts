@@ -3,6 +3,7 @@ import { backend, isDesktop, toUserMessage } from '../../lib/bridge';
 import { readAutoSyncSettings } from '../../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../../types';
 import { IDLE, type DataReady } from '../../lib/dataReady';
+import { createLoadSeq } from '../../lib/loadSeq';
 import { messagesOf } from '../../i18n';
 import { syncControllerMessages } from '../useSyncController.i18n';
 
@@ -40,6 +41,9 @@ export type SyncNotice =
 
 export const appStatus = ref<AppStatus | null>(null);
 export const statusError = ref<string | null>(null);
+/* 同步命令抛错时，顶栏那条红字就是同步横幅那句话。存标记不存句子：存句子的话
+   切一次语言它还是上一种语言。渲染在 notice.ts 的 statusErrorText。 */
+export const statusErrorFromSync = ref(false);
 export const syncState = ref<SyncUiState>('idle');
 export const notice = ref<SyncNotice>({ kind: 'none' });
 export const syncReport = ref<SyncReport | null>(null);
@@ -66,13 +70,24 @@ export const applyLoginStatus = (status: LoginStatus) => {
   if (status.state === 'connected') void refreshStatus();
 };
 
+/* refreshStatus 有五六个并发入口（登录事件、同步收尾、偏好变更……）。响应乱序
+   回来时，旧的 AppStatus 不能盖掉新的——否则顶栏的「上次同步」会短暂退回同步前。 */
+const statusLoadSeq = createLoadSeq();
+
 export const refreshStatus = async (opts?: { preserveError?: boolean }): Promise<AppStatus | null> => {
   if (!isDesktop()) return null;
+  const seq = statusLoadSeq.next();
   try {
-    if (!opts?.preserveError) statusError.value = null;
-    appStatus.value = await backend.getAppStatus();
-    return appStatus.value;
+    if (!opts?.preserveError) {
+      statusError.value = null;
+      statusErrorFromSync.value = false;
+    }
+    const status = await backend.getAppStatus();
+    if (!statusLoadSeq.isCurrent(seq)) return appStatus.value;
+    appStatus.value = status;
+    return status;
   } catch (error) {
+    if (!statusLoadSeq.isCurrent(seq)) return appStatus.value;
     statusError.value = toUserMessage(error, copy().statusUnavailable);
     return null;
   }

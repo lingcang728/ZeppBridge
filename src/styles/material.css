@@ -265,8 +265,8 @@ html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-m
   .ready-glow::before, .ready-glow::after { animation: none; }
 }
 
-/* 窗口切到后台（最小化或失焦）时，装饰性的循环动画一律暂停；转圈类进度指示不停，
-   免得人在别的窗口看着它以为卡住了。开关由 main.ts 维护。 */
+/* 窗口看不见（最小化 / 被挡住）时动画一律暂停；转圈类进度指示不停。开关由 main.ts 维护，
+   只认 document.hidden——可见但失焦时暂停会把入场动画冻在透明的第一帧。 */
 html.is-backgrounded *, html.is-backgrounded ::before, html.is-backgrounded ::after { animation-play-state: paused; }
 html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-state: running; }
 

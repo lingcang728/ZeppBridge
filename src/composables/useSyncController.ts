@@ -5,20 +5,21 @@
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
 import { launchSyncIsDue, writeAutoSyncSettings } from '../lib/autoSync';
-import type { LoginStatus, SyncProgress } from '../types';
+import type { LoginStatus, OfficialStatus, SyncProgress } from '../types';
 import { readyOnPickUp } from '../lib/dataReady';
-import { formatClock, lastOutcomeLabel, syncMessage } from './sync/notice';
-import { cancelSync, clearRunTimers, isRunningSync, runSync } from './sync/run';
+import { formatClock, lastOutcomeLabel, statusErrorText, syncMessage } from './sync/notice';
+import {
+  applyOfficialStatus, cancelSync, clearRunTimers, isRunningSync, lastSyncAttemptAt, runSync,
+} from './sync/run';
 import {
   appStatus, applyLoginStatus, autoSyncEnabled, autoSyncInterval, compacting, compactingEvent, compactionPending,
-  compactionSaved, copy, dataReady, dataRevision, loginStatus, notice, refreshStatus, statusError, streamUpdate,
+  compactionSaved, copy, dataReady, dataRevision, loginStatus, notice, refreshStatus, streamUpdate,
   syncProgress, syncReport, syncState,
 } from './sync/state';
 
 export type { SyncUiState } from './sync/state';
 export { syncOutcomeLabel } from './sync/notice';
 
-let autoSyncTickCount = 0;
 const unlisteners: Array<() => void> = [];
 /**
  * 自动同步那个每分钟一跳的定时器。
@@ -29,6 +30,24 @@ const unlisteners: Array<() => void> = [];
  * 定时器却漏了——这里补上，并由 `dispose()` 统一收口。
  */
 let autoSyncTimer: number | null = null;
+let removeWakeListeners: (() => void) | null = null;
+
+/**
+ * 自动同步到没到点：看上一次成功同步和上一次尝试，不数定时器跳了几下。
+ *
+ * 以前是每分钟 +1、数满间隔就跑：手动同步完一分钟可能又来一趟；电脑睡一夜
+ * 醒来，计数器还停在睡前，数据最多再旧一整个间隔。现在每一跳、以及窗口重新
+ * 可见 / 拿到焦点时都按时间判断。「上一次尝试」那道门挡的是离线：失败不会写
+ * last_cloud_sync_at，只看它的话离线时会每分钟撞一次。
+ */
+const maybeAutoSync = () => {
+  if (!autoSyncEnabled.value || appStatus.value?.connection_state !== 'connected' || isRunningSync()) return;
+  const intervalMs = autoSyncInterval.value * 60_000;
+  if (lastSyncAttemptAt() && Date.now() - lastSyncAttemptAt() < intervalMs) return;
+  if (!launchSyncIsDue(appStatus.value?.last_cloud_sync_at, autoSyncInterval.value)) return;
+  // 定时同步只拉最近几天；每天第一次（或上次整窗有流失败）后端照旧整窗。
+  void runSync('incremental', undefined, { silent: true, quick: true });
+};
 let initializeEpoch = 0;
 let compactionSavedTimer = 0;
 /* 启动同步推迟到首屏画完之后：同步要抓网、要写库、要跑归一化，和首屏的
@@ -63,6 +82,8 @@ const clearHeldResources = () => {
     window.clearInterval(autoSyncTimer);
     autoSyncTimer = null;
   }
+  removeWakeListeners?.();
+  removeWakeListeners = null;
 };
 
 const dispose = () => {
@@ -123,6 +144,7 @@ const initialize = async () => {
         void runSync('incremental');
       }),
       safeListen<LoginStatus>('login://status', applyLoginStatus),
+      safeListen<OfficialStatus>('official://status', applyOfficialStatus),
       safeListen<number>('compaction://started', (pending) => {
         compactionPending.value = typeof pending === 'number' ? pending : 0;
         compactingEvent.value = true;
@@ -132,6 +154,8 @@ const initialize = async () => {
         'compaction://finished',
         (report) => {
           compactingEvent.value = false;
+          // appStatus.compacting 是开始前读的快照，不刷新的话横幅会一直转到下次读状态。
+          void refreshStatus({ preserveError: true });
           const saved = (report?.bytesBefore ?? 0) - (report?.bytesAfter ?? 0);
           compactionSaved.value = saved > 0 ? saved : null;
           window.clearTimeout(compactionSavedTimer);
@@ -142,18 +166,18 @@ const initialize = async () => {
     if (!stillMine()) return;
     if (initialLogin) applyLoginStatus(initialLogin);
     if (!stillMine()) return;
-    autoSyncTimer = window.setInterval(() => {
-      autoSyncTickCount += 1;
-      if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
-        if (autoSyncTickCount >= autoSyncInterval.value) {
-          autoSyncTickCount = 0;
-          // 定时同步只拉最近几天；每天第一次（或上次整窗有流失败）后端照旧整窗。
-          void runSync('incremental', undefined, { silent: true, quick: true });
-        }
-      } else {
-        autoSyncTickCount = 0;
-      }
-    }, 60_000);
+    autoSyncTimer = window.setInterval(maybeAutoSync, 60_000);
+    const onWake = () => {
+      if (document.visibilityState === 'visible') maybeAutoSync();
+    };
+    if (typeof document !== 'undefined' && typeof window.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', onWake);
+      window.addEventListener('focus', onWake);
+      removeWakeListeners = () => {
+        document.removeEventListener('visibilitychange', onWake);
+        window.removeEventListener('focus', onWake);
+      };
+    }
   }
   let status = await refreshStatus();
   if (!stillMine()) return;
@@ -194,7 +218,7 @@ const pickUpReady = (reason: 'pickup' | 'dismiss' = 'pickup') => {
 
 export const useSyncController = () => ({
   appStatus: readonly(appStatus),
-  statusError: readonly(statusError),
+  statusError: statusErrorText,
   syncState: readonly(syncState),
   syncMessage,
   syncReport: readonly(syncReport),

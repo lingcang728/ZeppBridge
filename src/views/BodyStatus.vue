@@ -3,7 +3,7 @@ import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 
 defineOptions({ name: 'BodyStatus' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
@@ -17,7 +17,7 @@ import Icon from '../components/Icon.vue';
 import TrendRangeBar from '../components/TrendRangeBar.vue';
 import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
-import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { SERIES_FETCH_DAYS, indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
@@ -30,7 +30,6 @@ import { useBodyCharts } from '../composables/useBodyCharts';
 
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
 
 const rangeDays = useTrendRange();
 /** 一次取最长那档（6 个月），切范围只在本地从尾部切（sliceIndexed）——不再每切一次查一次库。 */
@@ -95,29 +94,25 @@ const load = async () => {
     error.value = t.value.desktopOnly;
     return;
   }
-  try {
-    // 一次拉两样：按天的趋势，和最近 24 小时的压力曲线。曲线的时间窗
-    // 固定 24 小时，不跟着上面的范围切换器走——「最近一天」和「最近半年
-    // 的趋势」问的不是同一个问题。
-    const [daily, stress] = await Promise.all([
-      backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
-      backend.getStressSeries(24),
-    ]);
-    if (!loadSeq.isCurrent(seq)) return;
-    fullSeries.value = indexSeries(daily);
-    stressPoints.value = stress;
-  } catch (cause) {
-    if (!loadSeq.isCurrent(seq)) return;
-    fullSeries.value = {};
-    stressPoints.value = [];
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    if (loadSeq.isCurrent(seq)) loading.value = false;
-  }
+  // 一次拉两样：按天的趋势，和最近 24 小时的压力曲线。曲线的时间窗
+  // 固定 24 小时，不跟着上面的范围切换器走——「最近一天」和「最近半年
+  // 的趋势」问的不是同一个问题。
+  // 两样互不依赖：24 小时压力取失败不能连带清掉半年趋势；失败的那一样保留
+  // 上一次的结果，只在页头说一句。
+  const [daily, stress] = await Promise.allSettled([
+    backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
+    backend.getStressSeries(24),
+  ]);
+  if (!loadSeq.isCurrent(seq)) return;
+  if (daily.status === 'fulfilled') fullSeries.value = indexSeries(daily.value);
+  if (stress.status === 'fulfilled') stressPoints.value = stress.value;
+  const rejected = [daily, stress].find((result) => result.status === 'rejected');
+  if (rejected && rejected.status === 'rejected') error.value = toUserMessage(rejected.reason, t.value.loadFailed);
+  loading.value = false;
 };
 
 onMounted(() => { void load(); });
-watch(dataRevision, () => { void load(); });
+useRevisionReload(() => { void load(); });
 
 const labelsOf = (list: { label: string }[], empty: string) => list.map((card) => card.label).join(' · ') || empty;
 const groups = computed(() => ({

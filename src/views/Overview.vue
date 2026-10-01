@@ -19,6 +19,8 @@ import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
+import { today as currentToday } from '../lib/currentDay';
 import { resolvedTheme } from '../composables/useTheme';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { chartPalettes } from '../lib/echartsTheme';
@@ -128,10 +130,10 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision, streamUpdate } = useSyncController();
+const { streamUpdate } = useSyncController();
 /** 页头标题下面一行今天的日期（按界面语言），标题不再孤零零地占一整行。 */
-const todayLabel = computed(() => displayDateTimeFormatter({ month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()));
-const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
+const todayLabel = computed(() => displayDateTimeFormatter({ month: 'long', day: 'numeric', weekday: 'long' }).format(currentToday()));
+const { models: deviceModels, error: deviceError, load: loadDevices, reloadAfterDataChange } = useDevices();
 
 const overview = ref<HealthOverview | null>(null);
 const heartRateSeries = ref<HeartRatePoint[]>([]);
@@ -309,7 +311,7 @@ onMounted(() => {
   void loadOverview();
   void loadDevices();
 });
-watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
+useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 </script>
 
 <template>

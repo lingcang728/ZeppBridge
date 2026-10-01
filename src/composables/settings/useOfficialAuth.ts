@@ -6,6 +6,7 @@ import { backendText } from '../../i18n/backendText';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { OfficialStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
+import { applyOfficialStatus } from '../sync/run';
 
 const idle = (): OfficialStatus => ({
   state: 'idle', message_code: null, message: null, user_id_masked: null, nickname: null, connected_at: null,
@@ -33,6 +34,8 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
 
   const apply = (next: OfficialStatus) => {
     status.value = next;
+    // 全局状态（顶栏、自动同步、首次同步）由同步控制器统一处理，这里只渲染。
+    applyOfficialStatus(next);
     if (next.state === 'failed') {
       // 后端的中文原文只兜底；先按码取当前语言的说法。
       failureText.value = errorTextFor(next.message_code ?? undefined)

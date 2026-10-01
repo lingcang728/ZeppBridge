@@ -12,7 +12,7 @@
  * 指针停在柱子或格子上立刻浮出读数（和心率图一样），不用原生 title——那个要停一秒多才出来。
  */
 import { computed, onMounted, ref, watch } from 'vue';
-import { useSyncController } from '../../composables/useSyncController';
+import { useRevisionReload } from '../../composables/useRevisionReload';
 import { backend, isDesktop } from '../../lib/bridge';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { averageRow, hourRows, rangeBounds, type HourRow } from '../../lib/hourlySteps';
@@ -24,7 +24,6 @@ import { hourlyStepsMessages as messages } from './HourlyStepsCard.i18n';
 const props = defineProps<{ days: number }>();
 
 const t = useMessages(messages);
-const { dataRevision } = useSyncController();
 
 const rows = ref<HourlySteps[]>([]);
 const failed = ref(false);
@@ -49,15 +48,15 @@ const load = async () => {
     failed.value = false;
   } catch {
     if (mine !== seq) return;
-    rows.value = [];
-    failed.value = true;
+    // 已经画着的热力图保留；只有本来就没有数据时才换成「读不出来」。
+    failed.value = rows.value.length === 0;
   } finally {
     if (mine === seq) loaded.value = true;
   }
 };
 onMounted(() => { void load(); });
 watch(() => props.days, () => { picked.value = null; hover.value = null; });
-watch(dataRevision, () => { void load(); });
+useRevisionReload(() => { void load(); });
 
 const heat = computed(() => hourRows(rows.value, bounds.value.start, bounds.value.end, perWeek.value));
 const average = computed(() => averageRow(rows.value, bounds.value.start, bounds.value.end));

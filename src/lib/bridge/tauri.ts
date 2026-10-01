@@ -76,10 +76,21 @@ export const isTauriRuntime = (): boolean => {
    先注册 `app://ready` 监听，注册完再问一次 `app_is_ready`：后端是「先立旗
    再广播」，所以要么这一问看到旗，要么之后收到事件，没有漏掉的缝隙，也不用
    轮询 IPC。就绪以后 `ready` 置真，之后的命令直接 invoke，不再排队等 promise。
-   60 秒兜底只防死等：超时照常放行，让真实的错误到达界面，而不是一个说不清的
-   悬挂 promise。 */
+
+   60 秒兜底只防死等，**不放行**：以前超时就把 `ready` 置真、撤掉监听，大库恢复 /
+   迁移超过一分钟时，之后每个命令都撞上英文的「state not managed」，而且再也等不到
+   就绪——不重启不恢复。现在超时只让排着的命令带一个有码的「还在准备」错误返回，
+   门继续开着等 `app://ready`；真就绪时 `backendLate()` 为真，外壳据此让各页重读。 */
 let ready = false;
+let late = false;
 let backendReady: Promise<void> | null = null;
+const READY_WAIT_MS = 60_000;
+
+/** 就绪来得比兜底晚：期间有命令以「还在准备」失败过，页面需要重读。 */
+export const backendLate = (): boolean => late;
+
+// message 只是占位：toUserMessage 按 code 取当前语言的说法（i18n/errors.ts）。
+const startingError = () => ({ code: 'err.app.starting', message: 'backend starting' });
 
 export const whenBackendReady = (): Promise<void> => {
   if (ready || !isTauriRuntime()) return Promise.resolve();
@@ -89,12 +100,10 @@ export const whenBackendReady = (): Promise<void> => {
     const finish = () => {
       if (ready) return;
       ready = true;
-      window.clearTimeout(fallback);
       resolve();
       // 退订失败不影响放行，放在 resolve 之后。
       try { unlisten?.(); } catch { /* ignore */ }
     };
-    const fallback = window.setTimeout(finish, 60_000);
     void listen('app://ready', finish)
       .then((stop) => {
         if (ready) { try { stop(); } catch { /* ignore */ } }
@@ -109,10 +118,24 @@ export const whenBackendReady = (): Promise<void> => {
   return backendReady;
 };
 
+/* 后端还没把 AppState 挂上时 Tauri 回的是这句英文。它不是用户能看懂的错，换成有码的。 */
+const isStateNotManaged = (error: unknown): boolean => /state not managed/i.test(String(error));
+
 const call = <T>(command: string, args?: UnknownRecord): Promise<T> => {
   if (ready) return invoke<T>(command, args);
   if (!isTauriRuntime()) return Promise.reject(new DesktopUnavailableError());
-  return whenBackendReady().then(() => invoke<T>(command, args));
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      late = true;
+      reject(startingError());
+    }, READY_WAIT_MS);
+    void whenBackendReady().then(() => {
+      window.clearTimeout(timer);
+      invoke<T>(command, args).then(resolve, (error: unknown) => {
+        reject(isStateNotManaged(error) ? startingError() : error);
+      });
+    });
+  });
 };
 
 export const tauriBackend: BridgeBackend = {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
 import { tauriApi } from '../composables/useTauriApi';
 import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
@@ -64,7 +64,6 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
  * 注意这里有两个数字，不能混：`total` 是库里的**全部**运动记录数，
@@ -72,7 +71,7 @@ const { dataRevision } = useSyncController();
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
  * 把两者混成一句会让人以为应用丢了记录。 */
 const {
-  items: workouts, loading, loadingMore, error, total, hasMore, load: loadList, loadMore,
+  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore,
 } = usePagedRecords<Workout>({
   loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
   idOf: (item) => item.workout_id,
@@ -95,7 +94,7 @@ const workoutFact = (workout: Workout): string => {
 };
 
 onMounted(() => void loadList());
-watch(dataRevision, () => void loadList());
+useRevisionReload(() => void loadList());
 </script>
 
 <template>
@@ -124,6 +123,7 @@ watch(dataRevision, () => void loadList());
         :fact="workoutFact(workout)"
       />
     </div>
+    <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
@@ -137,6 +137,7 @@ watch(dataRevision, () => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;

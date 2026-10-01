@@ -1,18 +1,47 @@
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useSyncController } from './useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { isCancelledSyncError, isDeferredSyncError } from '../lib/syncDeferred';
 import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { useMessages } from '../i18n';
+import { messagesOf, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 import { formatBytes, localDateString } from '../lib/format';
 import { createLoadSeq } from '../lib/loadSeq';
 import { archiveMessages } from '../components/HistoryArchivePanel.i18n';
 
+/*
+ * 补拉循环的状态放在模块级，不跟着设置页走。
+ *
+ * 设置页不在 KeepAlive 缓存里，离开 /settings 面板就卸载。以前循环绑在组件上：
+ * 卸载时把循环停掉，还顺手发一次 cancelSync——而后端只有一个取消旗，命中的是
+ * 「此刻在跑的任何同步」：补拉正停在 15 秒让路等待里时，被取消的是顶栏的自动
+ * 同步。开了几年的补拉，切到概览就静默停了。
+ *
+ * 现在循环和顶栏的同步控制器一样是单例：离开页面照跑，回来看到的是同一份进度；
+ * 只有用户按「停止」才停，而且只在补拉命令真的在飞时才发后端取消。
+ */
+const ledger = ref<CoverageLedger | null>(null);
+const busy = ref(false);
+const error = ref<string | null>(null);
+const message = ref<string | null>(null);
+const autoContinue = ref(true);
+const stopRequested = ref(false);
+let loopGeneration = 0;
+/** 补拉命令此刻是否在飞。只有这时后端那面取消旗才属于补拉。 */
+let backfillCallInFlight = false;
+/** 补拉期间最多这么久让各页重查一次；结束时再补一次。 */
+const DATA_CHANGED_EVERY_MS = 30_000;
+/* 模块级：循环可能比组件活得久，组件作用域里的 computed 卸载后就停了。 */
+const remaining = computed(() => {
+  const value = ledger.value;
+  if (!value) return 0;
+  return Math.max(0, value.total_chunks - value.completed_chunks);
+});
+
 /**
- * 长期归档与历史补拉的状态和动作（从 HistoryArchivePanel 里搬出来，行为不变）。
+ * 长期归档与历史补拉的状态和动作（从 HistoryArchivePanel 里搬出来）。
  *
  * 两件事解决时间轴的两半：**归档**管右半边——从今天起不再自动清理；
  * **补拉**管左半边——把装 ZeppBridge 以前的历史取回来。覆盖账本按月记账，
@@ -30,10 +59,6 @@ export const useHistoryBackfill = (
 
   const { isSyncing, markDataChanged } = useSyncController();
 
-  const ledger = ref<CoverageLedger | null>(null);
-  const busy = ref(false);
-  const error = ref<string | null>(null);
-  const message = ref<string | null>(null);
   const estimate = ref<StorageEstimate | null>(null);
   const startChoice = ref<'1y' | '2y' | '3y' | 'all' | 'custom'>('1y');
   const customFrom = ref('');
@@ -77,12 +102,6 @@ export const useHistoryBackfill = (
   const wouldBeCleanedUp = computed(() => {
     const current = prefs();
     return Boolean(current && !current.archive_enabled && requestedDays.value > current.retention_days);
-  });
-
-  const remaining = computed(() => {
-    const value = ledger.value;
-    if (!value) return 0;
-    return Math.max(0, value.total_chunks - value.completed_chunks);
   });
 
   /** 有本机样本的流才有速率；其余显示「样本不足」，不编一个数字。 */
@@ -171,16 +190,6 @@ export const useHistoryBackfill = (
    * 所以循环放在这里，而不是把后端那一轮改成无限：可取消、可观察、失败时能停
    * 在原地，这三条都还是靠「一轮一轮来」保证的。
    */
-  const autoContinue = ref(true);
-  const stopRequested = ref(false);
-  let loopGeneration = 0;
-
-  onUnmounted(() => {
-    loopGeneration += 1;
-    stopRequested.value = true;
-    if (busy.value && isDesktop()) void backend.cancelSync();
-  });
-
   const sleepBackfill = async (ms: number, gen: number): Promise<boolean> => {
     const step = 200;
     let waited = 0;
@@ -195,7 +204,8 @@ export const useHistoryBackfill = (
   const stopBackfill = async () => {
     stopRequested.value = true;
     loopGeneration += 1;
-    if (!isDesktop()) return;
+    // 停在让路等待或轮间间隙里时，后端跑着的可能是顶栏的同步——那不归补拉管。
+    if (!isDesktop() || !backfillCallInFlight) return;
     try {
       await backend.cancelSync();
     } catch {
@@ -216,36 +226,55 @@ export const useHistoryBackfill = (
       error.value = t.value.outOfRetention;
       return;
     }
+    if (busy.value) return;
     const gen = loopGeneration;
+    const from = fromDate.value;
+    // 循环跑在模块级、可能比这个组件活得久：文案在每次用到时现取，不握组件的 computed。
+    const copy = () => messagesOf(archiveMessages);
     busy.value = true;
     stopRequested.value = false;
     error.value = null;
     message.value = null;
+    let unflushed = false;
+    let lastFlushAt = Date.now();
+    const flushDataChanged = () => {
+      unflushed = false;
+      lastFlushAt = Date.now();
+      markDataChanged();
+    };
     try {
       for (;;) {
         if (gen !== loopGeneration || stopRequested.value) {
-          message.value = t.value.stoppedByUser(remaining.value);
+          message.value = copy().stoppedByUser(remaining.value);
           break;
         }
         const before = remaining.value;
         try {
-          const next = await backend.startHistoryBackfill(fromDate.value);
+          backfillCallInFlight = true;
+          let next: CoverageLedger;
+          try {
+            next = await backend.startHistoryBackfill(from);
+          } finally {
+            backfillCallInFlight = false;
+          }
           if (gen !== loopGeneration) {
-            message.value = t.value.stoppedByUser(remaining.value);
+            message.value = copy().stoppedByUser(remaining.value);
             break;
           }
           ledger.value = next;
-          markDataChanged();
+          // 合批：补拉一轮几秒，每轮都让各页重查就是一直在和补拉自己的写入抢锁。
+          unflushed = true;
+          if (Date.now() - lastFlushAt >= DATA_CHANGED_EVERY_MS) flushDataChanged();
         } catch (cause) {
           if (gen !== loopGeneration || stopRequested.value || isCancelledSyncError(cause)) {
-            message.value = t.value.stoppedByUser(remaining.value);
+            message.value = copy().stoppedByUser(remaining.value);
             break;
           }
           if (isDeferredSyncError(cause) && autoContinue.value) {
-            message.value = t.value.deferredRetry;
+            message.value = copy().deferredRetry;
             const keepGoing = await sleepBackfill(15_000, gen);
             if (!keepGoing) {
-              message.value = t.value.stoppedByUser(remaining.value);
+              message.value = copy().stoppedByUser(remaining.value);
               break;
             }
             continue;
@@ -254,35 +283,36 @@ export const useHistoryBackfill = (
         }
 
         if (remaining.value <= 0) {
-          message.value = t.value.allChunksDone;
+          message.value = copy().allChunksDone;
           break;
         }
         if (!autoContinue.value) {
-          message.value = t.value.roundDone(remaining.value);
+          message.value = copy().roundDone(remaining.value);
           break;
         }
         if (stopRequested.value || gen !== loopGeneration) {
-          message.value = t.value.stoppedByUser(remaining.value);
+          message.value = copy().stoppedByUser(remaining.value);
           break;
         }
         // 一轮下来一块都没推进：再循环下去就是空转。可能是这些块反复失败，
         // 也可能是账本和云端对不上——两种情况都需要人看一眼，不该让应用
         // 自己转到天亮。
         if (before > 0 && remaining.value >= before) {
-          message.value = t.value.stalled(remaining.value);
+          message.value = copy().stalled(remaining.value);
           break;
         }
         // 让出一帧，进度文案和「停止」按钮才有机会真的更新和被点到。
-        message.value = t.value.roundProgress(
+        message.value = copy().roundProgress(
           ledger.value?.completed_chunks ?? 0,
           ledger.value?.total_chunks ?? 0,
         );
         await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
     } catch (cause) {
-      error.value = toUserMessage(cause, t.value.backfillFailed);
+      error.value = toUserMessage(cause, copy().backfillFailed);
       await loadLedger();
     } finally {
+      if (unflushed) flushDataChanged();
       busy.value = false;
       stopRequested.value = false;
     }

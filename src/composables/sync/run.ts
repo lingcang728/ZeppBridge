@@ -1,10 +1,12 @@
 import { backend, isDesktop, toUserMessage } from '../../lib/bridge';
-import type { SyncReport } from '../../types';
+import type { OfficialStatus, SyncReport } from '../../types';
 import { readyOnReport, readyOnStart } from '../../lib/dataReady';
-import { failedStreamKeys } from '../../lib/syncDeferred';
-import { noticeForReport, syncMessage } from './notice';
+import { failedStreamKeys, isCancelledSyncError, isDeferredSyncError } from '../../lib/syncDeferred';
+import { errorTextFor } from '../../i18n/errors';
+import { noticeForReport } from './notice';
 import {
-  appStatus, copy, dataReady, dataRevision, notice, refreshStatus, statusError, syncProgress, syncReport, syncState,
+  appStatus, copy, dataReady, dataRevision, notice, refreshStatus, statusError, statusErrorFromSync, streamUpdate,
+  syncProgress, syncReport, syncState,
 } from './state';
 
 /* 发起一次同步：前置检查、让路后的重试、首次连接后的历史补齐（从 useSyncController.ts 搬出来）。 */
@@ -21,11 +23,14 @@ const DEFERRED_RETRY_MS = 60_000;
 let deferredRetryTimer = 0;
 let firstRunTimer = 0;
 let runningSync: Promise<SyncReport | null> | null = null;
+/** 上一次真正发出同步命令的时刻（毫秒）。自动同步据此避开「刚同步过 / 刚失败过」。 */
+let lastAttemptAt = 0;
 
-const scheduleDeferredRetry = (mode: 'incremental' | 'initial' | 'history', days?: number) => {
+/* `quick` 要原样带过去：定时的快速同步让路之后，重试不能变成一次 30 天整窗。 */
+const scheduleDeferredRetry = (mode: 'incremental' | 'initial' | 'history', days?: number, quick?: boolean) => {
   window.clearTimeout(deferredRetryTimer);
   deferredRetryTimer = window.setTimeout(() => {
-    void runSync(mode, days, { silent: true });
+    void runSync(mode, days, { silent: true, quick });
   }, DEFERRED_RETRY_MS);
 };
 
@@ -111,12 +116,16 @@ export const runSync = (
       return null;
     }
     dataReady.value = readyOnStart(dataReady.value, waited);
+    lastAttemptAt = Date.now();
     syncState.value = 'syncing';
     syncProgress.value = null;
     notice.value = mode === 'incremental'
       ? { kind: 'syncingRecent', days: opts?.quick ? status?.auto_sync_days : undefined }
       : { kind: 'backfilling', days: days ?? status?.history_sync_days ?? 30 };
     statusError.value = null;
+    statusErrorFromSync.value = false;
+    // 记下进度事件的序号：命令最后抛错时，凭它判断这一趟是不是已经写进了数据。
+    const streamRevisionAtStart = streamUpdate.value.revision;
     try {
       const report = mode === 'incremental'
         ? await backend.startIncrementalSync(Boolean(opts?.quick))
@@ -127,12 +136,11 @@ export const runSync = (
       await refreshStatus();
       // 放在 refreshStatus 之后：「好了」亮起时，顶栏的同步时间和各页的数据已经是新的。
       settleReady(report, wasFirstSync && mode === 'incremental');
-      // deferred 且 0 条写入：页面不必为了让路整页重刷。真正写了派生数据
-      // 的重放结束之后，下一次成功同步会再 bump。
-      if (!(report.outcome === 'deferred' && report.total_records === 0)) {
-        dataRevision.value += 1;
-      }
-      if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days);
+      // 只有真的写了数据才让各页重查。以前 no_new_data / failed / cancelled 也 bump：
+      // 每 15 分钟一次自动同步（哪怕离线、一条没写）都让八九个查询排到同一把库锁
+      // 后面，图表整张重画——用户看到的是定时的一卡。
+      if (report.total_records > 0) dataRevision.value += 1;
+      if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days, opts?.quick);
       // 第一次拿到近 30 天之后，接着把 180 天补齐。
       // `deferred` 不算——那次根本没写进任何数据，补拉要等重试真的成功了再排。
       // `cancelled` 更不算：用户刚刚按了取消，紧接着自己排一个十分钟的任务，
@@ -148,10 +156,39 @@ export const runSync = (
       }
       return report;
     } catch (error) {
+      // 命令抛错不等于什么都没发生：后端可能在数据全部落库之后才在记账那一步失败。
+      // 收到过「某条流完成」的进度事件，就说明库里已经是新的了，页面要重查。
+      const wroteSomething = streamUpdate.value.revision !== streamRevisionAtStart;
+      if (isDeferredSyncError(error)) {
+        // 让路（重放 / 压缩 / 锁忙）不是失败：和报告里的 deferred 一样，静默地过一分钟再来。
+        syncState.value = 'deferred';
+        const code = (error as { code?: string }).code;
+        notice.value = {
+          kind: 'report',
+          outcome: 'deferred',
+          failedStreams: [],
+          backendMessage: errorTextFor(code) ?? undefined,
+        };
+        await refreshStatus();
+        if (wroteSomething) dataRevision.value += 1;
+        scheduleDeferredRetry(mode, days, opts?.quick);
+        // 不 settle：用户在等的结果还没出来，重试成功时才亮「好了」。
+        return null;
+      }
+      if (isCancelledSyncError(error)) {
+        syncState.value = 'cancelled';
+        notice.value = { kind: 'report', outcome: 'cancelled', failedStreams: [] };
+        await refreshStatus();
+        if (wroteSomething) dataRevision.value += 1;
+        settleReady(null);
+        return null;
+      }
       syncState.value = 'failed';
       notice.value = { kind: 'backend', text: toUserMessage(error, copy().syncDidNotFinish) };
-      statusError.value = syncMessage.value;
+      // 存「这条错误来自同步」而不是渲染好的句子：切语言时它跟着重算。
+      statusErrorFromSync.value = true;
       await refreshStatus({ preserveError: true });
+      if (wroteSomething) dataRevision.value += 1;
       settleReady(null);
       return null;
     } finally {
@@ -167,12 +204,44 @@ export const runSync = (
 
 export const cancelSync = async () => {
   if (!isDesktop()) return;
+  // 只给发起取消时正在跑的那一趟写「正在取消」：报告可能在取消命令往返途中先到，
+  // 那时再写这句就会把结果盖掉，而且再没有人替换它。
+  const target = runningSync;
   try {
     await backend.cancelSync();
-    notice.value = { kind: 'cancelling' };
+    if (target && runningSync === target) notice.value = { kind: 'cancelling' };
   } catch (error) {
     statusError.value = toUserMessage(error, copy().cancelFailed);
   }
+};
+
+/** 上一次发出同步命令的时刻（毫秒，0 = 本次会话还没有过）。 */
+export const lastSyncAttemptAt = () => lastAttemptAt;
+
+let officialState = '';
+
+/**
+ * Zepp 官方授权状态变了：全局状态跟着刷新，刚连上且从没同步过就起首次同步。
+ *
+ * 以前只有设置卡自己记着官方状态：连上后卡上说「已连接」，顶栏还说「先连接」、
+ * 不起首次同步；断开后 appStatus 仍是 connected，每个自动同步 tick 都红一次。
+ * 事件和命令返回值都走这里，所以同一个结果送两次也只处理一次。
+ */
+export const applyOfficialStatus = (next: OfficialStatus) => {
+  const previous = officialState;
+  officialState = next.state;
+  if (previous === next.state || next.state === 'waiting') return;
+  void refreshStatus().then((status) => {
+    // previous 为空是启动 / 进设置页时补读的当前状态，不是「刚连上」。
+    if (
+      next.state === 'connected'
+      && previous !== ''
+      && status?.connection_state === 'connected'
+      && !status.last_cloud_sync_at
+    ) {
+      void runSync('incremental', undefined, { silent: true, waited: true });
+    }
+  });
 };
 
 /** 顶栏只认控制器自己发起的同步；设置页的补拉也会发 sync://progress。 */

@@ -339,7 +339,11 @@ if (proseFindings.length) {
 }
 
 const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
-const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
+/* 前端自己产生的码（不来自 Rust）：bridge 在后端就绪门超时时给的「还在准备」。 */
+const FRONTEND_CODES = new Set(['err.app.starting']);
+const unusedCodes = [...translated.keys()]
+  .filter((code) => !declaredCodes.has(code) && !FRONTEND_CODES.has(code))
+  .sort();
 
 if (unhandledUiCodes.length) {
   console.error('后端声明了界面没有处理的文案码——界面会回落到后端那句中文：');

@@ -4,18 +4,19 @@
  * 一个都没固定时是一张引导卡，点开挑选面板（PinPicker）。
  *
  * 动效：挑完回来，新加的磁贴由下往上漫出类别色再显出内容；留下的原地不动（缓存页回场不重放）。 */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
 import Sparkline from '../Sparkline.vue';
 import PinPicker from './PinPicker.vue';
 import { backend, isDesktop } from '../../lib/bridge';
-import { useSyncController } from '../../composables/useSyncController';
+import { useRevisionReload } from '../../composables/useRevisionReload';
 import { resolvedTheme } from '../../composables/useTheme';
 import { chartPalettes } from '../../lib/echartsTheme';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { metricLabel } from '../../lib/aiTask/metrics';
 import { coverageLabel, indexSeries } from '../../lib/metricSeries';
+import { today as currentToday } from '../../lib/currentDay';
 import {
   pinLatestDate, pinnableMetric, pinSparkValues, pinToneColor, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
@@ -33,7 +34,6 @@ const series = ref<Record<string, MetricSeries>>({});
 const pickerOpen = ref(false);
 /** 刚从挑选面板回来：这一次让磁贴依次浮上来。 */
 const justPinned = ref(false);
-const { dataRevision } = useSyncController();
 
 const label = (id: string) => (id === 'sleep_score' ? t.value.sleepScore : metricLabel(id));
 const unitText = (metric: PinnableMetric) => ({
@@ -45,7 +45,7 @@ const dayText = (date: string | null): string | null => {
   if (!date) return null;
   const day = parseDisplayDate(`${date}T12:00:00`);
   if (Number.isNaN(day.getTime())) return null;
-  const today = new Date();
+  const today = currentToday();
   const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((start(today) - start(day)) / 86_400_000);
   if (diff === 0) return t.value.today;
@@ -66,28 +66,33 @@ const tiles = computed(() => pins.value.flatMap((id) => {
     unit: unitText(metric),
     when: dayText(pinLatestDate(data)),
     spark: pinSparkValues(data),
-    coverage: coverageLabel(data),
+    // 读失败和「真的没有记录」是两回事：前者不能写成「近 30 天无记录」。
+    coverage: !data && loadFailed.value ? t.value.loadFailed : coverageLabel(data),
     tone: pinToneColor(metric.tone, palette.value.series),
   }];
 }));
 
 let loadSeq = 0;
-const fetchSeries = async (ids: string[]): Promise<Record<string, MetricSeries>> => {
+/** 上一次读取失败了。已经显示着的数据保留，没有数据的磁贴说「读不出来」而不是「无记录」。 */
+const loadFailed = ref(false);
+/** 读失败返回 null：调用方保留上一次的结果，概览其余部分照常。 */
+const fetchSeries = async (ids: string[]): Promise<Record<string, MetricSeries> | null> => {
   if (!isDesktop() || !ids.length) return {};
   try {
     return indexSeries(await backend.getMetricSeries([...ids], WINDOW_DAYS));
   } catch {
-    // 读不出来就按「无记录」显示，概览其余部分照常。
-    return {};
+    return null;
   }
 };
 const load = async () => {
   const seq = ++loadSeq;
   const next = await fetchSeries(pins.value);
-  if (seq === loadSeq) series.value = next;
+  if (seq !== loadSeq) return;
+  loadFailed.value = next === null;
+  if (next) series.value = next;
 };
 onMounted(() => void load());
-watch(dataRevision, () => void load());
+useRevisionReload(() => void load());
 
 /* 挑完回来：先把新指标的数据读好，再一次换上。以前先换磁贴、数据晚一拍到，
    磁贴先是「—」再跳成数字加曲线，加上整排按新 key 重新挂载，就是「退出去闪一下」。
@@ -99,7 +104,8 @@ const apply = async (next: string[]) => {
   const data = await fetchSeries(next);
   if (seq !== loadSeq) return;
   justPinned.value = true;
-  series.value = data;
+  loadFailed.value = data === null;
+  if (data) series.value = data;
   pins.value = [...next];
   writePins(next);
   window.setTimeout(() => { justPinned.value = false; }, 1200);

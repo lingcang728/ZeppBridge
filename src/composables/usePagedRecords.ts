@@ -25,14 +25,23 @@ export function usePagedRecords<T>(options: {
   const loading = ref(true);
   const loadingMore = ref(false);
   const error = ref<string | null>(null);
+  /** 列表已经有内容时的重查失败：保留旧列表，只在旁边说一句。 */
+  const staleError = ref<string | null>(null);
   const total = ref(0);
   const epoch = createLoadSeq();
   const hasMore = computed(() => items.value.length < total.value);
 
+  /*
+   * 数据变了之后的重查也走这里：取回「至少已经加载过的那么多」条，而不是退回第一页。
+   * 这两页放进缓存就是为了保住滚动位置，以前任何一次同步都把 600 行退回 200 行。
+   * 失败时不把好好的列表换成错误卡（重放期间库忙是常态），只有本来就空才显示错误。
+   */
   const load = async () => {
     const seq = epoch.next();
+    const keep = Math.max(pageSize, items.value.length);
     loading.value = true;
     error.value = null;
+    staleError.value = null;
     if (!isTauri()) {
       items.value = [];
       total.value = 0;
@@ -40,13 +49,15 @@ export function usePagedRecords<T>(options: {
       return;
     }
     try {
-      const page = await options.loadPage(pageSize, 0);
+      const page = await options.loadPage(keep, 0);
       if (!epoch.isCurrent(seq)) return;
       items.value = page.items;
       total.value = page.total;
     } catch (cause) {
       if (!epoch.isCurrent(seq)) return;
-      error.value = toUserMessage(cause, options.failedText());
+      const text = toUserMessage(cause, options.failedText());
+      if (items.value.length) staleError.value = text;
+      else error.value = text;
     } finally {
       if (epoch.isCurrent(seq)) loading.value = false;
     }
@@ -64,7 +75,8 @@ export function usePagedRecords<T>(options: {
       total.value = page.total;
     } catch (cause) {
       if (!epoch.isCurrent(seq)) return;
-      error.value = toUserMessage(cause, options.failedText());
+      // 已经显示着的那几页不能因为「下一页」失败就整页换成错误卡。
+      staleError.value = toUserMessage(cause, options.failedText());
     } finally {
       // loadingMore 是这一次调用自己的标记，不像 loading 会被更新的 load() 接手——
       // 没有别人会清它，所以即使代次在等待中过期了也要在这里复位。
@@ -72,5 +84,5 @@ export function usePagedRecords<T>(options: {
     }
   };
 
-  return { items, loading, loadingMore, error, total, hasMore, load, loadMore };
+  return { items, loading, loadingMore, error, staleError, total, hasMore, load, loadMore };
 }

@@ -17,8 +17,9 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import type { DesignIconName } from '../components/DesignIcon.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
 import { createLoadSeq } from '../lib/loadSeq';
+import { today as currentToday } from '../lib/currentDay';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon, workoutTypeKey } from '../lib/workouts';
@@ -34,7 +35,6 @@ const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
 const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
-const { dataRevision } = useSyncController();
 const loadSeq = createLoadSeq();
 
 type Kind = 'all' | 'sleep' | 'workout';
@@ -58,7 +58,11 @@ const typeItems = computed(() => {
   });
   return [{ value: 'all', label: t.value.filterAll }, ...types.map((type) => ({ value: type, label: workoutLabel(type) }))];
 });
-watch(typeItems, (items) => { if (!items.some((item) => item.value === workoutType.value)) workoutType.value = 'all'; });
+// 列表还没回来（重查途中为空）时不动筛选：只有确实没有这一类了才退回「全部」。
+watch(typeItems, (items) => {
+  if (!recentWorkouts.value.length) return;
+  if (!items.some((item) => item.value === workoutType.value)) workoutType.value = 'all';
+});
 watch(kind, () => { workoutType.value = 'all'; });
 
 interface Entry {
@@ -77,7 +81,7 @@ interface Entry {
 
 const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const dayLabel = (date: Date) => {
-  const today = new Date();
+  const today = currentToday();
   const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((start(today) - start(date)) / 86_400_000);
   if (diff === 0) return t.value.today;
@@ -155,16 +159,19 @@ const loadRecent = async () => {
     tauriApi.getRecentWorkouts(150),
   ]);
   if (!loadSeq.isCurrent(seq)) return;
-  recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
-  recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
+  // 取失败的那一半保留上一次的结果：同步后库忙、重放进行中，一次失败不该把
+  // 已经显示着的多年记录说成「没有记录」。
+  if (sleep.status === 'fulfilled') recentSleep.value = sleep.value;
+  if (workouts.status === 'fulfilled') recentWorkouts.value = workouts.value;
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
-  if (rejected.length === 2) error.value = toUserMessage(rejected[0].reason, t.value.loadFailedTitle);
+  const hadData = recentSleep.value.length > 0 || recentWorkouts.value.length > 0;
+  if (rejected.length === 2 && !hadData) error.value = toUserMessage(rejected[0].reason, t.value.loadFailedTitle);
   else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   loading.value = false;
 };
 
 onMounted(() => void loadRecent());
-watch(dataRevision, () => void loadRecent());
+useRevisionReload(() => void loadRecent());
 </script>
 
 <template>

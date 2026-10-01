@@ -14,7 +14,7 @@ import { usePageMorph } from './composables/usePageMorph';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
-import { backend, isDesktop, whenBackendReady } from './lib/bridge';
+import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
@@ -52,7 +52,7 @@ const {
   statusError,
   compacting, compactionPending, compactionSaved,
   dataReady, pickUpReady,
-  initialize, dispose: disposeSyncController,
+  initialize, dispose: disposeSyncController, refreshStatus, markDataChanged,
 } = useSyncController();
 
 /* 「数据已备好」一进交给 AI 就算取走了：不管是点胶囊进来的、点导航进来的，
@@ -70,6 +70,7 @@ watch(
    启动感觉不到，但 HMR 和窗口重建会让同一个事件挂上第二个监听器，托盘提示
    就会连着弹两次。 */
 const ownUnlisteners: Array<() => void> = [];
+let unmounted = false;
 const { initializeScale, bumpScale, resetScale } = useUiScale();
 
 /* 「数据健康」不在主导航里。
@@ -109,7 +110,8 @@ const backLabel = computed(() => {
 const motion = ref<PageMotion>('none');
 const pageMorph = usePageMorph({ back: () => router.back() });
 let leavingScroll = 0;
-router.beforeEach((to, from) => {
+// 留着移除函数：HMR / 外壳重挂载时不卸掉，守卫会一层层叠上去。
+const removeBeforeEach = router.beforeEach((to, from) => {
   // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。
   settleMotion();
   motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
@@ -173,6 +175,11 @@ onMounted(() => {
   initializeScale();
   void whenBackendReady().then(() => {
     backendReady.value = true;
+    // 就绪晚于一分钟兜底：这期间各页和状态读取都以「还在准备」失败过，现在重读一遍。
+    if (backendLate()) {
+      void refreshStatus();
+      markDataChanged();
+    }
     // 更新检查走裸 `invoke`（不过 bridge 的门），得等后端真的管事了再发。
     void checkForDesktopUpdate(false);
   });
@@ -193,13 +200,18 @@ onMounted(() => {
       trayHint.value = true;
       window.setTimeout(() => { trayHint.value = false; }, 6000);
     }).then((unlisten) => {
-      if (typeof unlisten === 'function') ownUnlisteners.push(unlisten);
+      if (typeof unlisten !== 'function') return;
+      // 卸载之后才回来的监听立刻撤掉，不留孤儿订阅。
+      if (unmounted) unlisten();
+      else ownUnlisteners.push(unlisten);
     }).catch(() => {
       // 托盘提示不是关键路径。
     });
   }
 });
 onUnmounted(() => {
+  unmounted = true;
+  removeBeforeEach();
   document.removeEventListener('keydown', onDocumentKeydown);
   disposeMotionInterrupt?.();
   pageMorph.dispose();

@@ -2,7 +2,7 @@
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 defineOptions({ name: 'TrainingStatus' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
@@ -17,6 +17,7 @@ import TrendRangeBar from '../components/TrendRangeBar.vue';
 import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
+import { useRevisionReload } from '../composables/useRevisionReload';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import {
@@ -273,8 +274,9 @@ const load = async () => {
   ]);
   if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
-  fullSeries.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
-  fullBalance.value = trend.status === 'fulfilled' ? trend.value : [];
+  // 失败的那一样保留上一次的结果：真数据不能因为一次库忙被显示成「没有记录」。
+  if (metrics.status === 'fulfilled') fullSeries.value = indexSeries(metrics.value);
+  if (trend.status === 'fulfilled') fullBalance.value = trend.value;
   const rejected = results.find((result) => result.status === 'rejected');
   if (rejected && rejected.status === 'rejected') {
     error.value = toUserMessage(rejected.reason, t.value.loadFailed);
@@ -287,7 +289,7 @@ const shownThreshold = useQueuedOption(thresholdOption);
 const shownBalance = useQueuedOption(balanceOption);
 
 onMounted(() => { void load(); });
-watch(dataRevision, () => { void load(); });
+useRevisionReload(() => { void load(); });
 
 </script>
 

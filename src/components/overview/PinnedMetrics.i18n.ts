@@ -29,6 +29,7 @@ export const pinnedMetricsMessages = defineMessages(
     clear: '清空',
     done: '完成',
     close: '关闭',
+    loadFailed: '暂时读不出来',
   },
   {
     title: 'My metrics',
@@ -57,6 +58,7 @@ export const pinnedMetricsMessages = defineMessages(
     clear: 'Clear',
     done: 'Done',
     close: 'Close',
+    loadFailed: 'Couldn’t read right now',
   },
   {
     title: 'Mis métricas',
@@ -85,6 +87,7 @@ export const pinnedMetricsMessages = defineMessages(
     clear: 'Vaciar',
     done: 'Listo',
     close: 'Cerrar',
+    loadFailed: 'No se pudo leer ahora',
   },
   'components/overview/PinnedMetrics',
 );

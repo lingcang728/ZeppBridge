@@ -1,3 +1,4 @@
+import { today as currentToday } from './currentDay';
 import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import {
@@ -71,7 +72,7 @@ export const localDateString = (date: Date): string => {
  * 一个时刻的短说法：今天只写「今天 15:22」，昨天写「昨天 22:20」，更早的写「09-25 22:20」。
  * 给「最新一条样本在什么时候」这类提示用——比完整年月日时分好读，又不会把昨天说成今天。
  */
-export const formatWhen = (value?: string | null, now = new Date()): string | null => {
+export const formatWhen = (value?: string | null, now = currentToday()): string | null => {
   if (!value) return null;
   const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return null;
