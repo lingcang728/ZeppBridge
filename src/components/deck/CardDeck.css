@@ -79,6 +79,11 @@
   transition: translate .42s var(--ease-out), box-shadow var(--dur-base) ease;
 }
 .list-card + .list-card { margin-top: calc(var(--wallet-peek) - var(--wallet-card)); }
+/* 展开全部 / 收起的飞行途中，每张卡只露卡头那一段：下面 106px 的空白卡身被下一张盖着才不显眼，
+   飞起来位置一交错，它就盖住别的卡头——录屏里「整列空板」就是它。底边不圆：落定时下一张正好接上。 */
+.card-deck.is-switching .list-card:not(:last-child) {
+  clip-path: inset(0 0 calc(var(--wallet-card) - var(--wallet-peek)) 0 round var(--radius-lg) var(--radius-lg) 0 0);
+}
 .list-card:last-child { box-shadow: var(--mat-shadow); }
 .deck-list.is-armed .list-card:hover ~ .list-card, .list-card:focus-within ~ .list-card { translate: 0 44px; }
 .deck-list.is-armed .list-card:hover, .list-card:focus-within { translate: 0 -4px; }
@@ -137,12 +142,23 @@
   padding-bottom: 30px;
 }
 .card-deck.is-closing .deck-stage { pointer-events: none; }
-/* 打开的卡是磨砂的：半透明底透出身后已经糊掉的总览（见 .is-frosted）。 */
+/* 没打开时大卡层「停放」着：照常排版（预热的内容这时就把排版做掉），但高度为 0、看不见、点不到。
+   以前是 display: none，打开那一下要把整张卡的表单从头排一遍，CPU 降速 4× 时是 130ms 以上的长任务，
+   动画第一帧跟着晚到。宽度和打开时一样，LayoutNG 打开时能直接复用这次的排版。 */
+.deck-stage.is-parked {
+  height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* 打开的卡就是卡包里那张卡长大：圆角、底色和卡包里的卡一样，形变第一帧裁到小卡那一条时看上去就是它本身
+   （useDeckMorph 的裁切整段用这个圆角，半径一变 clip-path 动画就退回主线程）。 */
 .open-card {
   transform-origin: center top;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background:
-    radial-gradient(760px 220px at 0 0, color-mix(in srgb, var(--card-tone) 13%, transparent), transparent 70%),
+    radial-gradient(640px 200px at 0 0, color-mix(in srgb, var(--card-tone) 20%, transparent), transparent 72%),
     var(--mat-card-solid);
   box-shadow: var(--mat-shadow-lift);
 }
@@ -150,16 +166,18 @@
 /* 甩出去、下一张滑进来的途中也保持独立的合成层：以前松手那一刻 will-change 就撤了，大卡连同整段表单
    在飞的途中被降回普通层、逐帧重画——拖卡切换「很卡」的那一下。 */
 .deck-stage.is-moving .open-card { will-change: transform, opacity; box-shadow: var(--mat-shadow); }
+/* 拖着大卡时身后那一层变暗（往底色里淡），视线落在手里这张卡上。只盖卡组这一格、不盖页头
+   （以前全屏 backdrop-filter 把页头标题一起糊掉，拖动时左上角发虚，每帧还要重算整屏模糊）；
+   不模糊，上沿渐隐，没有一条硬边。 */
 .deck-backdrop {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  inset: -12px -24px 0;
   z-index: -1;
   pointer-events: none;
   opacity: 0;
-  background: color-mix(in srgb, var(--canvas) 34%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  /* 不动的时候摘出合成，见 DeckCoverflow 的 .cover-backdrop。 */
+  background: color-mix(in srgb, var(--canvas) 55%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 56px);
+  mask-image: linear-gradient(180deg, transparent, #000 56px);
   visibility: hidden;
   transition: opacity .26s ease, visibility 0s linear .26s;
 }

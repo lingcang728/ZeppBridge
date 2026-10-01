@@ -51,33 +51,79 @@ export function staggerOrder(ids: string[], center: string | null, reverse = fal
   return new Map(order.map((entry, rank) => [entry.id, rank]));
 }
 
-/** coverflow 舞台的透视距离（DeckCoverflow.vue 的 .cover-stage 是同一个数）：飞进卡包时透视写进变换里。 */
-export const COVER_PERSPECTIVE = 1500;
+/**
+ * 卡包里一张卡露在外面的那一段：下一张卡的顶边以上（`nextTop` 为空 = 最后一张，整张都露着）。
+ * 每张卡的盒子是 184px，只露 78px（悬停让位时多露 44px）——开卡的起点、关卡的落点、
+ * 飞行时的裁切都按露出的这一段算，不按整盒（2026-10-01 录屏「开卡一下 + 阴影」「落到过高的卡上」）。
+ */
+export const peekBox = (box: Box, nextTop: number | null): Box => {
+  if (nextTop === null || nextTop <= box.top || nextTop >= box.top + box.height) return box;
+  return { ...box, height: nextTop - box.top };
+};
 
-/** coverflow 里一张卡的姿态（DeckCoverflow 的 poseStyle 写进 style.transform 的那几个数）。 */
-export interface CoverPose {
-  x: number;
-  y: number;
-  z: number;
-  rotate: number;
-  scale: number;
+/** 大卡四周给投影留的余量：形变最后一帧把裁切放到卡外这么远，撤掉裁切时投影不会突然冒出来。 */
+export const SHADOW_BLEED = 100;
+
+/**
+ * 大卡在画面里看得见的那一段（竖向裁到视口），四周放出投影余量；某一边被视口截断时那一边不放
+ * （截断处本来就在屏幕外）。纯函数，方便测。
+ */
+export const shownRect = (card: Box, viewportHeight: number, bleed = SHADOW_BLEED): Box => {
+  const top = card.top < 0 ? 0 : card.top - bleed;
+  const bottom = card.top + card.height > viewportHeight ? viewportHeight : card.top + card.height + bleed;
+  return { left: card.left - bleed, top, width: card.width + bleed * 2, height: Math.max(1, bottom - top) };
+};
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const px = (value: number) => `${Number(value.toFixed(2))}px`;
+
+/** 形变的一个时刻：屏幕上看得见的矩形，以及卡内容左上角此刻在屏幕上的位置（内容跟着它走）。 */
+export interface CardPose {
+  rect: Box;
+  anchor: Point;
 }
 
 /**
- * 从 coverflow 卡的 `style.transform`（`translate3d(calc(-50% + Xpx), -50%, Zpx) rotateY(Rdeg) scale(S)`）
- * 读回姿态；认不出来返回 null（洗牌飞行就当它是平的）。
+ * 一个时刻换算成大卡自己的 transform + clip-path。`card` 是大卡的布局框（不含变换）。
+ * 裁切的圆角整段用同一个值：半径一变，clip-path 动画就退回主线程（lib/motion/window.ts 文件头的实测）。
  */
-export function coverPoseOf(transform: string): CoverPose | null {
-  const translate = /translate3d\(\s*(?:calc\(\s*-50%\s*([+-])\s*([\d.]+)px\s*\)|-50%)\s*,\s*(?:calc\(\s*-50%\s*([+-])\s*([\d.]+)px\s*\)|-50%)\s*,\s*(-?[\d.]+)px\s*\)/.exec(transform);
-  if (!translate) return null;
-  const signed = (sign?: string, value?: string) => (value === undefined ? 0 : (sign === '-' ? -1 : 1) * Number(value));
-  const rotate = /rotateY\(\s*(-?[\d.]+)deg\s*\)/.exec(transform);
-  const scale = /scale\(\s*([\d.]+)/.exec(transform);
+export const cardFrame = (pose: CardPose, card: Box, radius: number): Keyframe => {
+  const { rect, anchor } = pose;
+  const top = rect.top - anchor.y;
+  const left = rect.left - anchor.x;
+  const right = anchor.x + card.width - (rect.left + rect.width);
+  const bottom = anchor.y + card.height - (rect.top + rect.height);
   return {
-    x: signed(translate[1], translate[2]),
-    y: signed(translate[3], translate[4]),
-    z: Number(translate[5]),
-    rotate: rotate ? Number(rotate[1]) : 0,
-    scale: scale ? Number(scale[1]) : 1,
+    transform: `translate(${px(anchor.x - card.left)}, ${px(anchor.y - card.top)})`,
+    clipPath: `inset(${px(top)} ${px(right)} ${px(bottom)} ${px(left)} round ${px(radius)})`,
   };
-}
+};
+
+/**
+ * 大卡从 `from` 形变到 `to` 的关键帧：起点、终点，加一个走弧线的中点（竖直方向先走六成多、
+ * 水平刚过一半，和概览 ↔ 详情的窗口形变同一种手感）。纯函数，方便测。
+ */
+export const morphFrames = (from: CardPose, to: CardPose, card: Box, radius: number): Keyframe[] => {
+  const t = 0.5;
+  const tv = 0.64;
+  const mid: CardPose = {
+    rect: {
+      left: lerp(from.rect.left, to.rect.left, t),
+      width: lerp(from.rect.width, to.rect.width, t),
+      top: lerp(from.rect.top, to.rect.top, tv),
+      height: lerp(from.rect.height, to.rect.height, tv),
+    },
+    anchor: { x: lerp(from.anchor.x, to.anchor.x, t), y: lerp(from.anchor.y, to.anchor.y, tv) },
+  };
+  return [cardFrame(from, card, radius), { ...cardFrame(mid, card, radius), offset: 0.5 }, cardFrame(to, card, radius)];
+};
+
+/**
+ * 洗牌飞行里一张卡的 `translate` / `scale`（独立属性，叠在卡自己的 transform 外面，卡的侧转姿态一路不变）。
+ * 缩放是**等比**的、绕卡的变换原点（布局中心 `origin`）；`visual` 是卡在不加这两项时画面上的中心。
+ * 要让画面中心落到 `center`、宽度乘以 `k`：t = center − origin − k·(visual − origin)。纯函数，方便测。
+ */
+export const flightOffset = (center: Point, origin: Point, visual: Point, k: number): Point => ({
+  x: center.x - origin.x - k * (visual.x - origin.x),
+  y: center.y - origin.y - k * (visual.y - origin.y),
+});

@@ -66,6 +66,8 @@ const props = defineProps<{
   cards: C[];
   /** 展开的是哪一张；为空时显示总览。 */
   activeId: string | null;
+  /** 不预热的卡（挂载时有副作用、不该在用户没打开时就跑的）。默认全部预热。 */
+  warmExclude?: readonly string[];
 }>();
 const emit = defineEmits<{
   open: [id: string];
@@ -149,6 +151,43 @@ const closingId = ref<string | null>(null);
 const shownId = computed(() => props.activeId ?? closingId.value);
 const shownIndex = computed(() => props.cards.findIndex((card) => card.id === shownId.value));
 const shownCard = computed(() => (shownIndex.value >= 0 ? props.cards[shownIndex.value] : null));
+
+/* —— 卡体预热：大卡那一层常驻（没打开时「停放」：照常排版、高度 0、看不见），调用方在 body 插槽里
+   用 KeepAlive 缓存内容，空闲时把各张卡的内容一张张先挂进去。打开时就是激活一份已经挂好的内容，
+   不再在动画中途才挂载、长高；关上再开也不用重挂（以前关卡会把整层连同 KeepAlive 一起拆掉）。
+   试过把挂过的卡体全留在层里各自停放（省掉激活后的重新排版），结果每次样式重算都要扫全部表单，
+   CPU 降速 4× 下开合的长任务反而翻倍，所以只留当前那一份在文档里。 —— */
+const warmId = ref<string | null>(null);
+const warmed = ref<string[]>([]);
+const markWarm = (id: string) => {
+  if (!warmed.value.includes(id)) warmed.value = [...warmed.value, id];
+};
+const stageCard = computed(() => shownCard.value
+  ?? props.cards.find((card) => card.id === warmId.value)
+  ?? null);
+
+let warmHandle = 0;
+const idle = (fn: () => void) => (typeof window.requestIdleCallback === 'function'
+  ? window.requestIdleCallback(fn, { timeout: 1500 })
+  : window.setTimeout(fn, 120));
+const cancelIdle = (handle: number) => {
+  if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(handle);
+  else window.clearTimeout(handle);
+};
+const warmNext = () => {
+  warmHandle = 0;
+  if (shownCard.value) {
+    // 有卡开着就先不动：它要的是那一张，不是预热。关上以后接着来。
+    warmHandle = idle(warmNext);
+    return;
+  }
+  const skip = new Set(props.warmExclude ?? []);
+  const next = props.cards.find((card) => !warmed.value.includes(card.id) && !skip.has(card.id));
+  if (!next) return;
+  markWarm(next.id);
+  warmId.value = next.id;
+  warmHandle = idle(warmNext);
+};
 const activeIndex = computed(() => props.cards.findIndex((card) => card.id === props.activeId));
 
 const step = (direction: -1 | 1) => new Promise<void>((resolve) => {
@@ -187,10 +226,10 @@ const jumpTo = (id: string) => {
    所以要在路由真正换过去之前记下——关卡记大卡此刻的位置，开卡记每张小卡此刻的位置（卡包往下滚过以后
    点开一张，以前板是从「跳回顶部以后」那张卡的位置长出来的）。 */
 let closeFromTop: number | null = null;
-let openFrom: ReturnType<typeof morph.snapshot> | null = null;
+let openFrom: ReturnType<typeof morph.seenBoxes> | null = null;
 onBeforeRouteUpdate(() => {
   closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
-  openFrom = props.activeId ? null : morph.snapshot();
+  openFrom = props.activeId ? null : morph.seenBoxes();
 });
 
 const onListPointerMove = (event: PointerEvent) => {
@@ -205,7 +244,8 @@ watch(() => props.activeId, async (id, previous) => {
   if (id && !previous) {
     closingId.value = null;
     reset();
-    const from = openFrom?.get(id)?.box ?? null;
+    if (id) markWarm(id);
+    const from = openFrom?.get(id) ?? null;
     openFrom = null;
     await nextTick();
     morph.open(id, from);
@@ -284,12 +324,15 @@ onMounted(() => {
     return true;
   });
   deckWidth.value = root.value?.clientWidth ?? 0;
+  if (props.activeId) markWarm(props.activeId);
+  warmHandle = idle(warmNext);
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('pointerdown', onDocPointerDown, true);
   document.addEventListener('click', onDocClick);
 });
 onBeforeUnmount(() => {
   forgetEscape?.();
+  if (warmHandle) cancelIdle(warmHandle);
   document.removeEventListener('keydown', onKeydown);
   document.removeEventListener('pointerdown', onDocPointerDown, true);
   document.removeEventListener('click', onDocClick);
@@ -345,14 +388,20 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 打开：一张放大，从它在总览里的位置长出来。 -->
-    <div v-if="shownCard" ref="stage" :class="['deck-stage', { 'is-dragging': dragging, 'is-moving': dragging || flinging }]">
-      <!-- 拖着大卡、甩出去、下一张滑进来的这段时间，身后那一层蒙上磨砂：视线落在手里这张卡上。
-           模糊是遮罩上静态的一层，只动它的不透明度。 -->
+    <div
+      v-if="stageCard"
+      ref="stage"
+      :class="['deck-stage', { 'is-parked': !shownCard, 'is-dragging': dragging, 'is-moving': dragging || flinging }]"
+      :inert="shownCard ? undefined : true"
+      :aria-hidden="shownCard ? undefined : 'true'"
+    >
+      <!-- 拖着大卡、甩出去、下一张滑进来的这段时间，身后那一层变暗：视线落在手里这张卡上。
+           只盖卡组这一格、不模糊，只动它的不透明度。 -->
       <div class="deck-backdrop" aria-hidden="true"></div>
       <article
         ref="cardEl"
         class="deck-card open-card"
-        :style="{ '--card-tone': shownCard.tone }"
+        :style="{ '--card-tone': stageCard.tone }"
         :aria-roledescription="t.goTo(shownIndex + 1, cards.length)"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -361,13 +410,13 @@ onBeforeUnmount(() => {
       >
         <header class="deck-head open-head" :title="t.dragHint" @pointerdown="onPointerDown">
           <span class="deck-grip" aria-hidden="true"></span>
-          <slot name="head" :card="shownCard" :expanded="true" />
+          <slot name="head" :card="stageCard" :expanded="true" />
           <button type="button" class="deck-close" :aria-label="t.close" :title="t.close" @click="requestClose">
             <Icon name="x" :size="16" />
           </button>
         </header>
         <div class="deck-body">
-          <slot name="body" :card="shownCard" />
+          <slot name="body" :card="stageCard" />
         </div>
       </article>
       <nav class="deck-dots" :aria-label="t.stackLabel">
@@ -375,10 +424,10 @@ onBeforeUnmount(() => {
           v-for="(card, index) in cards"
           :key="card.id"
           type="button"
-          :class="['deck-dot', { on: card.id === shownCard.id }]"
+          :class="['deck-dot', { on: card.id === stageCard.id }]"
           :aria-label="t.goTo(index + 1, cards.length)"
           :title="card.title"
-          :aria-current="card.id === shownCard.id ? 'true' : undefined"
+          :aria-current="card.id === stageCard.id ? 'true' : undefined"
           @click="jumpTo(card.id)"
         ></button>
       </nav>

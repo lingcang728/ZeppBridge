@@ -2,7 +2,7 @@
 /* 设备：一台设备一行——设备图｜名称和昵称｜一行小标签（固件、最近数据、打码 ID）｜
    状态｜箭头。整行点进设备二级页（看详情、换型号）。
    以前是一格一格的小卡，每张卡里字段、状态、按钮各占一行，排得很乱。 */
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
@@ -69,7 +69,9 @@ const refreshDevices = async () => {
   }
 };
 
-onMounted(() => { void loadDevices(); });
+/* 列表由设置页进来时拉一次（Settings.vue），这里不再挂载时重拉：以前大卡打开到一半这里又发一次，
+   列表先变回骨架、数据回来卡再长高，形变的终点跟着跳。已有列表时刷新也不退回骨架。 */
+const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.length);
 </script>
 
 <template>
@@ -86,7 +88,7 @@ onMounted(() => { void loadDevices(); });
     <div v-if="deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
 
     <div class="s-list">
-      <template v-if="devicesLoading">
+      <template v-if="showSkeleton">
         <div class="s-row skeleton-row"></div>
         <div class="s-row skeleton-row"></div>
       </template>

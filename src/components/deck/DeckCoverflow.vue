@@ -241,8 +241,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="coverflow">
-    <!-- 拖着卡组转的时候，身后（页头、背景）蒙一层磨砂，视线落在卡上。静态模糊，只动不透明度。 -->
-    <div :class="['cover-backdrop', { on: dragging }]" aria-hidden="true"></div>
     <div
       ref="stage"
       :class="['cover-stage', { 'is-dragging': dragging, 'is-moving': moving }]"
@@ -291,21 +289,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .coverflow { display: grid; gap: 22px; min-width: 0; }
 
-.cover-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: color-mix(in srgb, var(--canvas) 30%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  /* 不拖的时候 visibility: hidden，把这层全屏背景滤镜从合成里摘掉（opacity: 0 时 Chromium
-     仍可能每帧处理它）。淡出放完才藏，淡入一开始就显。 */
-  visibility: hidden;
-  transition: opacity .3s ease, visibility 0s linear .3s;
-}
-.cover-backdrop.on { opacity: 1; visibility: visible; transition: opacity .3s ease, visibility 0s; }
+/* 拖动时不再给身后蒙全屏磨砂：那层 backdrop-filter 盖住页头（「设置」标题拖着拖着就糊了），
+   每帧还要重算整屏模糊；限定到卡组这一格又没有东西可盖（卡后面就是页面底色），所以整层去掉。 */
 .cover-stage {
   position: relative;
   z-index: 1;
