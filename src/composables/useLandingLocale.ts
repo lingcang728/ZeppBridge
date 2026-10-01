@@ -84,18 +84,18 @@ export interface LandingPack {
 /** zh/en 的 meta 和文案一样内联——首屏就要写对 title，不能等网络。 */
 const DOCUMENT_META: Record<'zh' | 'en', LandingMeta> = {
   zh: {
-    title: 'ZeppBridge · 本地数据桥梁',
-    description: 'ZeppBridge 是本地优先、开源的 Amazfit/Zepp 穿戴数据桥接与可视化工具。',
-    ogTitle: 'ZeppBridge · 把 Zepp 数据完整交还给你',
-    ogDescription: '在 Windows、macOS 与 Linux 本机连接、整理并可视化 Amazfit 穿戴数据，保留来源并按需交给 AI。',
+    title: 'ZeppBridge · 从手腕到你的电脑，从电脑到 AI',
+    description: 'ZeppBridge 把 Amazfit / Zepp 的心率、睡眠、运动从 Zepp 云端同步到你自己的电脑，再一键打包交给 AI。免费、开源、本地优先。',
+    ogTitle: 'ZeppBridge · 从手腕，到你的电脑。从电脑，直接到 AI。',
+    ogDescription: '在本机同步、查看 Amazfit 穿戴数据；想问 AI 时挑好范围，一个文件交出去。',
   },
   en: {
-    title: 'ZeppBridge · Local Data Bridge',
+    title: 'ZeppBridge · From your wrist to your desk, from your desk to your AI',
     description:
-      'ZeppBridge is a local-first, open-source bridge and viewer for Amazfit / Zepp wearable data. Runs on your own Windows, Mac or Linux machine.',
-    ogTitle: 'ZeppBridge · Your Zepp data, handed back in full',
+      'ZeppBridge syncs Amazfit / Zepp heart rate, sleep and workouts from the Zepp cloud to your own computer, then packs them for an AI in one click. Free, open source, local first.',
+    ogTitle: 'ZeppBridge · From your wrist to your desk. From your desk to your AI.',
     ogDescription:
-      'Connect, organize and visualize Amazfit wearable data on your own machine. Sources stay intact, and nothing leaves until you send it.',
+      'Sync and browse your Amazfit data on your own machine. When you have a question, hand the range you choose to an AI as a single file.',
   },
 };
 

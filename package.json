@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "site:preview": "node scripts/site/deploy-preview.mjs",
     "build:web": "vite build",
     "test:feedback": "node --test tests/feedback-function.test.mjs",
     "test:functions": "node --test tests/font-subset.test.mjs tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs tests/zepp-oauth-functions.test.mjs",

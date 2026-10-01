@@ -38,6 +38,11 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
+    file: 'views/landing/BentoGrid.vue',
+    text: 'const GREETINGS',
+    why: '落地页「十种界面语言」那一格滚动的是十种语言各自的问候语，每个词本来就该是它自己的文字。',
+  },
+  {
     file: 'views/settings/sections/DisplayPrefsSection.vue',
     text: '语言 · Language',
     why: '语言开关的标签刻意是双语的：看不懂中文的人必须能在中文界面上找到它。',
@@ -251,6 +256,9 @@ const isProseRisk = (line) => {
 };
 
 const ALLOWED_PROSE = [
+  { file: 'views/landing/AiHandoff.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
+  { file: 'views/landing/ConnectPaths.vue', text: 'copy.note', why: '同上，落地页文案。' },
+  { file: 'views/landing/FinalCta.vue', text: 'downloads.linux.note', why: '同上，落地页文案。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.message', why: '估算文案的唯一实现：按 message_code 分支，取不到才回落到原文。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.stop_reason', why: '同上，stop_reason 的兜底。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate?.stop_reason', why: '同上。' },

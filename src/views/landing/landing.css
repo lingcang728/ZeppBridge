@@ -1,0 +1,188 @@
+/*
+ * 落地页的共用样式（不 scoped：各段组件共用这些类和 token；类名一律 lp- 开头，不碰应用的样式）。
+ * 深色为主：默认深色，浅色是切换出来的另一套。颜色从 tokens.css 的品牌色 / 类别色派生，
+ * 落地页自己只多定义「更深的底」和几道光。
+ */
+.lp {
+  --lp-bg: #05070a;
+  --lp-bg-2: #0a0d11;
+  --lp-panel: #0e1217;
+  --lp-panel-2: #131820;
+  --lp-line: rgba(255, 255, 255, .07);
+  --lp-line-2: rgba(255, 255, 255, .12);
+  --lp-ink: #f3f5f0;
+  --lp-muted: #a3abb4;
+  --lp-subtle: #6f7882;
+  --lp-green: #8fc24a;
+  --lp-teal: #3fd0b4;
+  --lp-violet: #8b7cf6;
+  --lp-glow: rgba(143, 194, 74, .35);
+  --lp-glow-2: rgba(63, 208, 180, .22);
+  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 30px 80px -30px rgba(0, 0, 0, .8);
+  --lp-ease: cubic-bezier(.22, .8, .2, 1);
+  --lp-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--lp-bg);
+  color: var(--lp-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+:root[data-theme='light'] .lp {
+  --lp-bg: #f6f7f3;
+  --lp-bg-2: #eef1ea;
+  --lp-panel: #ffffff;
+  --lp-panel-2: #f7f9f4;
+  --lp-line: rgba(20, 30, 20, .08);
+  --lp-line-2: rgba(20, 30, 20, .14);
+  --lp-ink: #151a14;
+  --lp-muted: #4d574a;
+  --lp-subtle: #7a8576;
+  --lp-green: #3f7f2f;
+  --lp-teal: #13856f;
+  --lp-violet: #6a52d9;
+  --lp-glow: rgba(110, 170, 60, .28);
+  --lp-glow-2: rgba(40, 170, 140, .18);
+  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 30px 70px -36px rgba(30, 50, 30, .35);
+}
+.lp ::selection { background: color-mix(in srgb, var(--lp-green) 40%, transparent); }
+.lp a { color: inherit; }
+.lp :focus-visible { outline: 2px solid var(--lp-green); outline-offset: 3px; border-radius: 8px; }
+
+/* ── 段落骨架 ── */
+.lp-section { position: relative; width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 140px 0 0; }
+.lp-chapter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  color: var(--lp-green);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.lp-chapter::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: .6; }
+.lp-h2 {
+  max-width: 17em;
+  margin: 0;
+  font-size: clamp(32px, 4.4vw, 58px);
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.lp-lead { max-width: 38em; margin: 18px 0 0; color: var(--lp-muted); font-size: clamp(16px, 1.35vw, 18.5px); line-height: 1.65; text-wrap: pretty; }
+.lp-center { text-align: center; }
+.lp-center .lp-h2, .lp-center .lp-lead { margin-left: auto; margin-right: auto; }
+
+/* 强调：拉丁语系用衬线斜体；中文、印地文、俄文没有好看的斜体，改成渐变色。 */
+.lp-accent {
+  background: linear-gradient(100deg, var(--lp-green) 10%, var(--lp-teal) 60%, var(--lp-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp:lang(en) .lp-accent, .lp:lang(es) .lp-accent, .lp:lang(de) .lp-accent, .lp:lang(fr) .lp-accent,
+.lp:lang(nl) .lp-accent, .lp:lang(pt) .lp-accent {
+  font-family: var(--lp-serif);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -.01em;
+}
+
+/* 演示角标 */
+.lp-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--lp-line-2);
+  border-radius: 999px;
+  color: var(--lp-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.lp-sample::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--lp-violet); }
+
+/* 面板：深色玻璃感的卡（静态的高光和描边，不逐帧模糊）。 */
+.lp-panel {
+  position: relative;
+  border: 1px solid var(--lp-line);
+  border-radius: 26px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--lp-green) 6%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--lp-panel-2), var(--lp-panel));
+  box-shadow: var(--lp-shadow);
+}
+
+/* 追光：悬停时一圈跟着指针的高光。 */
+.lp-spot { isolation: isolate; }
+.lp-spot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lp-green) 12%, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+}
+.lp-spot:hover::after { opacity: 1; }
+
+/* ── 按钮 ── */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 15.5px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .5s var(--lp-ease), box-shadow .3s ease, background .3s ease;
+}
+.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: .7; }
+.lp-btn-primary {
+  background: linear-gradient(180deg, #a6d65f, #7fb13d);
+  color: #0b1305;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25) inset, 0 12px 40px -10px var(--lp-glow);
+}
+.lp-btn-primary:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, .3) inset, 0 16px 56px -8px var(--lp-glow); }
+:root[data-theme='light'] .lp-btn-primary { background: linear-gradient(180deg, #4f9a3a, #2f6b2f); color: #fff; }
+.lp-btn-ghost { border: 1px solid var(--lp-line-2); background: color-mix(in srgb, var(--lp-panel) 60%, transparent); color: var(--lp-ink); }
+.lp-btn-ghost:hover { background: var(--lp-panel-2); }
+.lp-btn:active { transition-duration: .1s; }
+
+/* ── 滚动显现：`data-reveal` 先藏着，进视口加 .is-in，按 --i 错开。 ── */
+.lp [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity .9s var(--lp-ease), transform .9s var(--lp-ease); transition-delay: calc(var(--i, 0) * 90ms); }
+.lp [data-reveal].is-in { opacity: 1; transform: none; }
+
+/* 循环动画离屏不跑：带 data-live 的块，看不见时暂停里面所有动画。 */
+.lp [data-live]:not(.is-live) *, .lp [data-live]:not(.is-live)::before, .lp [data-live]:not(.is-live)::after { animation-play-state: paused !important; }
+
+@media (max-width: 720px) {
+  .lp-section { width: calc(100% - 32px); padding-top: 96px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .lp *, .lp *::before, .lp *::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; transition-delay: 0s !important; }
+}
+
+/* 切主题的一圈扩散（theme.ts）：关掉默认的交叉淡化，只留新主题那层的圆形裁切。 */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* 应用骨架把 html / body / #app 锁成一屏高、不滚（滚动在 #main-content 里）。落地页要整页滚：
+   有 .lp 的时候放开（落地页 chunk 只在浏览器打开时加载，不影响桌面应用）。 */
+html:has(.lp), html:has(.lp) body, html:has(.lp) #app { height: auto; min-height: 100%; overflow: visible; }
+html:has(.lp) { scroll-behavior: smooth; background: #05070a; }
+:root[data-theme='light']:has(.lp) { background: #f6f7f3; }
+@media (prefers-reduced-motion: reduce) { html:has(.lp) { scroll-behavior: auto; } }

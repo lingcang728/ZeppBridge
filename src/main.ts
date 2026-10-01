@@ -3,6 +3,8 @@ import App from "./App.vue";
 import router from "./router";
 import { initializeLocale } from "./i18n";
 import { initializeTheme } from "./composables/useTheme";
+import { isLandingMode } from "./lib/landingMode";
+import { applyLandingTheme } from "./views/landing/theme";
 import "./styles/fonts.css";
 import "./styles/tokens.css";
 import "./styles/material.css";
@@ -12,7 +14,9 @@ import "./styles/material.css";
 
 // 主题在渲染前把解析结果写进 <html data-theme>，深浅两套 token
 // 都在 styles/tokens.css 里跟着这个属性走，不会先闪一帧另一套。
-initializeTheme();
+// 落地页（浏览器里打开）有自己的主题：默认深色，见 views/landing/theme.ts。
+if (isLandingMode()) applyLandingTheme();
+else initializeTheme();
 
 const mount = () => {
   const app = createApp(App);
