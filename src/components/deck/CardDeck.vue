@@ -183,11 +183,14 @@ const jumpTo = (id: string) => {
   emit('change', id, () => morph.swap(direction));
 };
 
-/* 关卡时大卡从人刚才看到的位置缩回去：路由一换，滚动区就被拉回顶部（lib/returnScroll.ts），
-   所以要在路由真正换过去之前记下大卡此刻在屏幕上的位置。 */
+/* 开卡、关卡都从人刚才看到的位置出发：路由一换，滚动区就被拉回顶部（lib/returnScroll.ts），
+   所以要在路由真正换过去之前记下——关卡记大卡此刻的位置，开卡记每张小卡此刻的位置（卡包往下滚过以后
+   点开一张，以前板是从「跳回顶部以后」那张卡的位置长出来的）。 */
 let closeFromTop: number | null = null;
+let openFrom: ReturnType<typeof morph.snapshot> | null = null;
 onBeforeRouteUpdate(() => {
   closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
+  openFrom = props.activeId ? null : morph.snapshot();
 });
 
 const onListPointerMove = (event: PointerEvent) => {
@@ -202,8 +205,10 @@ watch(() => props.activeId, async (id, previous) => {
   if (id && !previous) {
     closingId.value = null;
     reset();
+    const from = openFrom?.get(id)?.box ?? null;
+    openFrom = null;
     await nextTick();
-    morph.open(id);
+    morph.open(id, from);
   } else if (!id && previous) {
     reset();
     closingId.value = previous;

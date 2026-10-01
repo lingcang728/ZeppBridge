@@ -16,6 +16,12 @@
  * （板里只有一张卡的拷贝），拷贝的 transform / opacity，遮罩的 opacity。模糊是遮罩上静态的一层
  * backdrop-filter，不做逐帧模糊半径过渡。
  *
+ * **clip-path 的圆角在一段动画里必须是同一个值**（2026-10-01 在 Chrome / WebView2 154 上实测）：
+ * inset() 的四边怎么变、关键帧有几个都能交给合成器，但只要 round 的半径在关键帧之间变了，整段动画就退回
+ * 主线程——展开时新页挂载占着主线程，板就停在原地、等主线程空了再一下跳过去（「展开卡、收回顺」就是它：
+ * 收回时来处页是缓存的，主线程是空的）。所以整段只用卡那一端的圆角；整页那一端（圆角 0）把裁切矩形往外
+ * 多放一个圆角半径，圆弧落到板外面，四个角自然就方了，不用改半径。
+ *
  * 板的底色是页面自己的底（--ambient + --canvas），不是卡片色：长满以后它看上去就是「新页还没
  * 画出内容的那一瞬」，而不是一整屏深色卡片。以前板带着卡片的底色，还把卡片自己的背景留在原位，
  * 长满后整屏深色里多出一块浅色矩形——用户看到的「黑块残影」就是它。
@@ -32,13 +38,29 @@ export interface WindowRect {
 const r2 = (value: number) => Number(value.toFixed(2));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** `rect` 在 `frame` 上的 inset 裁切（纯函数，方便测）。 */
-export function windowInset(rect: WindowRect, frame: WindowRect, radius: number): string {
-  const top = Math.max(0, rect.top - frame.top);
-  const left = Math.max(0, rect.left - frame.left);
-  const right = Math.max(0, frame.left + frame.width - (rect.left + rect.width));
-  const bottom = Math.max(0, frame.top + frame.height - (rect.top + rect.height));
+/** `rect` 在 `frame` 上的 inset 裁切（纯函数，方便测）。`bleed`：矩形比板大时允许负的 inset（往板外伸）。 */
+export function windowInset(rect: WindowRect, frame: WindowRect, radius: number, bleed = false): string {
+  const clamp = (value: number) => (bleed ? value : Math.max(0, value));
+  const top = clamp(rect.top - frame.top);
+  const left = clamp(rect.left - frame.left);
+  const right = clamp(frame.left + frame.width - (rect.left + rect.width));
+  const bottom = clamp(frame.top + frame.height - (rect.top + rect.height));
   return `inset(${r2(top)}px ${r2(right)}px ${r2(bottom)}px ${r2(left)}px round ${r2(radius)}px)`;
+}
+
+/**
+ * 整段形变用的那一个圆角：卡那一端的圆角（另一端是整页、圆角 0 时）；两端都是卡（设置的小卡 ↔ 大卡）时
+ * 取小的那一端——形变落在小卡上时要严丝合缝地接上真卡，大卡那一端有交叉淡入盖着。纯函数，方便测。
+ */
+export function steadyRadius(from: WindowRect, fromRadius: number, to: WindowRect, toRadius: number): number {
+  if (fromRadius <= 0) return Math.max(0, toRadius);
+  if (toRadius <= 0) return fromRadius;
+  return from.width * from.height <= to.width * to.height ? fromRadius : toRadius;
+}
+
+/** 圆角为 0 的那一端：矩形往外多放一个圆角半径，圆弧落到板外，四个角就是方的。 */
+export function bleedRect(rect: WindowRect, radius: number): WindowRect {
+  return { left: rect.left - radius, top: rect.top - radius, width: rect.width + radius * 2, height: rect.height + radius * 2 };
 }
 
 /** 弧线的中点：竖直方向走得快一些（t 是中点处的整体进度）。纯函数，方便测。 */
@@ -68,9 +90,6 @@ export function windowRects(from: WindowRect, to: WindowRect): WindowRect[] {
     to,
   ];
 }
-
-/** 窗口在形变途中保持的圆角（不小于这个值）：两端各自是卡 / 页的圆角。 */
-export const WINDOW_MID_RADIUS = 26;
 
 /**
  * 那张卡的一份拷贝：只是用来「看」的——去掉可交互性、固定成卡此刻的尺寸，
@@ -198,16 +217,17 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   }
   host.appendChild(plate);
 
-  const midRadius = Math.max(WINDOW_MID_RADIUS, Math.min(options.fromRadius, options.toRadius));
-  /* 关键帧的偏移是「缓动后的进度」：先快后慢的曲线下，0.5 在头一百来毫秒就过去了。
-     所以圆角要在 0.9 那一帧还保持着（窗口已经长到九成多），最后一小段才收成终点的圆角。 */
+  /* 圆角整段不变（见文件头：变了就退回主线程）。整页那一端往外多放一个半径，圆角在最后一小段自然消失——
+     关键帧的偏移是「缓动后的进度」，0.9 那一帧窗口已经长到九成多，之后才把圆弧推出板外。 */
   const shapeFrames = (target: WindowRect, targetRadius: number): Keyframe[] => {
+    const radius = steadyRadius(from, options.fromRadius, target, targetRadius);
     const [a, mid, near, b] = windowRects(from, target);
+    const end = (rect: WindowRect, r: number) => (r <= 0 ? bleedRect(rect, radius) : rect);
     return [
-      { clipPath: windowInset(a, frame, options.fromRadius) },
-      { clipPath: windowInset(mid, frame, midRadius), offset: 0.5 },
-      { clipPath: windowInset(near, frame, Math.max(targetRadius, midRadius * 0.85)), offset: 0.9 },
-      { clipPath: windowInset(b, frame, targetRadius) },
+      { clipPath: windowInset(end(a, options.fromRadius), frame, radius, true) },
+      { clipPath: windowInset(mid, frame, radius), offset: 0.5 },
+      { clipPath: windowInset(near, frame, radius), offset: 0.9 },
+      { clipPath: windowInset(end(b, targetRadius), frame, radius, true) },
     ];
   };
   const timing: KeyframeAnimationOptions = { duration, easing, fill: 'both' };

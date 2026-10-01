@@ -1,5 +1,5 @@
 import { onBeforeUnmount, type Ref } from 'vue';
-import { flightFrom, unscaledBox, type Box } from '../lib/deck/morph';
+import { COVER_PERSPECTIVE as PERSPECTIVE, coverPoseOf, unscaledBox, type Box } from '../lib/deck/morph';
 import { SLIDE_IN_EASE, SLIDE_IN_MS, slideInFrames } from '../lib/deck/physics';
 import { revealAfterGhost } from '../lib/motion/ghost';
 import { cardReplica, morphWindow, type WindowMorph } from '../lib/motion/window';
@@ -33,6 +33,18 @@ const RETURN_EASE = 'cubic-bezier(.25, .85, .3, 1)';
 const FLIGHT_MS = 420;
 const FLIGHT_STAGGER_MS = 14;
 const FLIGHT_EASE = 'cubic-bezier(.22, .88, .26, 1)';
+
+const r2 = (value: number) => Number(value.toFixed(2));
+const r4 = (value: number) => Number(value.toFixed(4));
+
+/** 换形态前一张卡的样子：画面上的外接框、透明度，以及（coverflow 里的卡）侧转角和不含侧转的宽高。 */
+export interface Snapshot {
+  box: Box;
+  opacity: number;
+  rotate: number;
+  width: number;
+  height: number;
+}
 
 const boxOf = (el: Element): Box => {
   const rect = el.getBoundingClientRect();
@@ -98,7 +110,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
    * 以前直接对整张大卡逐帧动 clip-path，大卡里是整段设置表单，每帧都得整张重画。
    * 大卡本身只做淡入 + 一点上浮。
    */
-  const open = (id: string) => {
+  /** `seen`：路由换过去之前那张小卡在屏幕上的位置（滚动区随后会被拉回顶部）；没有就现量。 */
+  const open = (id: string, seen: Box | null = null) => {
     const el = card.value;
     if (!el || reducedMotion()) return;
     if (morph && morph.id === id && morph.kind === 'close' && !morph.plate && morph.animation.playState === 'running') {
@@ -117,7 +130,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     for (const animation of el.getAnimations()) animation.cancel();
     dropGhost();
     const source = sourceOf(id);
-    const from = source ? boxOf(source) : null;
+    const from = seen ?? (source ? boxOf(source) : null);
     const host = document.getElementById('main-content')?.parentElement;
     if (!from || !host || from.width < 24 || from.height < 24) {
       rise(el);
@@ -259,39 +272,72 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     };
   };
 
-  /** 换形态之前记下每张卡此刻在画面上的位置（半路打断时，这就是它们正在飞的位置）。 */
+  /** 换形态之前记下每张卡此刻在画面上的样子（半路打断时，这就是它们正在飞的样子）。
+      coverflow 里的卡还记下它的侧转角和缩放：飞到卡包时从那个侧转「转正」，而不是第一帧就被拍平。 */
   const snapshot = () => {
-    const out = new Map<string, { box: Box; opacity: number }>();
+    const out = new Map<string, Snapshot>();
     for (const el of overview.value?.querySelectorAll<HTMLElement>('[data-deck-card]') ?? []) {
       const id = el.dataset.deckCard;
-      if (id) out.set(id, { box: boxOf(el), opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0 });
+      if (!id) continue;
+      const pose = el.closest('.cover-stage') ? coverPoseOf(el.style.transform) : null;
+      out.set(id, {
+        box: boxOf(el),
+        opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0,
+        rotate: pose?.rotate ?? 0,
+        // 侧转的卡外接框比卡窄：转正时用卡自己（乘上它的缩放）的宽高，而不是外接框。
+        width: el.offsetWidth * (pose?.scale ?? 1),
+        height: el.offsetHeight * (pose?.scale ?? 1),
+      });
     }
     return out;
   };
 
   /**
-   * coverflow ↔ 卡包：像洗牌一样，每张卡从旧形态里它所在的位置飞到新形态，按 `order`
-   * 依次出发（抽出来从正中那张往两边，插回去反过来）。只动独立的 translate / scale /
-   * opacity 属性，叠在卡片自己的 transform（coverflow 的侧转）之外，全在合成器上。
-   * 返回全部落定的时刻。
+   * coverflow ↔ 卡包：像洗牌一样，每张卡从旧形态里它所在的样子飞到新形态，按 `order`
+   * 依次出发（抽出来从正中那张往两边，插回去反过来）。
+   *
+   * 动的是整条 transform，起点和终点写成**同一串变换函数**（平移、透视、侧转、缩放），浏览器逐个函数插值——
+   * 每一帧都在卡自己所在的 3D 空间里算。以前是在卡原有的 3D 变换外面再叠独立的 translate / scale，
+   * 它们按 2D 外接框算、却在透视投影之前生效：除了正中那张，每张卡的起点都是歪的，420ms 里再收敛到终点，
+   * 看上去就是「乱飞、忽大忽小」（2026-10-01 排查）。
+   * 飞行期间按出发顺序管层级（先出发的在上面），落定后交还给形态自己的层级。
+   * 全在合成器上（transform / opacity）。返回全部落定的时刻。
    */
-  const fly = (before: Map<string, { box: Box; opacity: number }>, order: Map<string, number>) => {
+  const fly = (before: Map<string, Snapshot>, order: Map<string, number>) => {
     for (const animation of flights) animation.cancel();
     flights = [];
     if (reducedMotion()) return Promise.resolve();
+    const total = order.size;
     for (const el of overview.value?.querySelectorAll<HTMLElement>('[data-deck-card]') ?? []) {
       const id = el.dataset.deckCard;
       const from = id ? before.get(id) : undefined;
       if (!id || !from) continue;
-      const flight = flightFrom(from.box, boxOf(el), layoutCenter(el));
+      const w = el.offsetWidth || 1;
+      const h = el.offsetHeight || 1;
+      const layout = layoutCenter(el);
+      const fromCenter = { x: from.box.left + from.box.width / 2, y: from.box.top + from.box.height / 2 };
       const opacity = Number.parseFloat(getComputedStyle(el).opacity) || 0;
-      flights.push(el.animate(
-        [
-          { translate: `${flight.translate.x}px ${flight.translate.y}px`, scale: `${flight.scale.x} ${flight.scale.y}`, opacity: Math.min(1, from.opacity + 0.25) },
-          { translate: '0px 0px', scale: '1 1', opacity },
-        ],
-        { duration: FLIGHT_MS, delay: (order.get(id) ?? 0) * FLIGHT_STAGGER_MS, easing: FLIGHT_EASE, fill: 'backwards' },
-      ));
+      const rank = order.get(id) ?? 0;
+      const zIndex = String(400 + total - rank);
+      const pose = el.closest('.cover-stage') ? coverPoseOf(el.style.transform) : null;
+      let keyframes: Keyframe[];
+      if (pose) {
+        // 飞进 coverflow：终点就是它的姿态；起点用同一串函数，只是不侧转、不往里推，中心和大小对上旧的样子。
+        // 姿态里先平移 -50%（卡的左上角钉在舞台中心），所以中心偏移要按布局框换算。
+        const x = fromCenter.x - layout.x + w / 2;
+        const y = fromCenter.y - layout.y + h / 2;
+        keyframes = [
+          { transform: `translate3d(calc(-50% + ${r2(x)}px), calc(-50% + ${r2(y)}px), 0px) rotateY(${r2(from.rotate)}deg) scale(${r4(from.width / w)}, ${r4(from.height / h)})`, opacity: Math.min(1, from.opacity + 0.25), zIndex },
+          { transform: `translate3d(calc(-50% + ${r2(pose.x)}px), calc(-50% + ${r2(pose.y)}px), ${r2(pose.z)}px) rotateY(${r2(pose.rotate)}deg) scale(${r4(pose.scale)}, ${r4(pose.scale)})`, opacity, zIndex },
+        ];
+      } else {
+        // 飞进卡包（卡自己没有 transform）：从旧的侧转转正。透视写进变换里（卡包没有透视舞台）。
+        keyframes = [
+          { transform: `translate(${r2(fromCenter.x - layout.x)}px, ${r2(fromCenter.y - layout.y)}px) perspective(${PERSPECTIVE}px) rotateY(${r2(from.rotate)}deg) scale(${r4(from.width / w)}, ${r4(from.height / h)})`, opacity: Math.min(1, from.opacity + 0.25), zIndex },
+          { transform: `translate(0px, 0px) perspective(${PERSPECTIVE}px) rotateY(0deg) scale(1, 1)`, opacity, zIndex },
+        ];
+      }
+      flights.push(el.animate(keyframes, { duration: FLIGHT_MS, delay: rank * FLIGHT_STAGGER_MS, easing: FLIGHT_EASE, fill: 'backwards' }));
     }
     return Promise.all(flights.map((animation) => animation.finished.then(() => undefined, () => undefined)))
       .then(() => undefined);

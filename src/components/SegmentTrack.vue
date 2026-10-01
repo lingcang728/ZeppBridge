@@ -28,6 +28,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
 import { useGlassLens } from '../composables/useGlassLens';
+import { exemptFromSettle } from '../lib/motion/interrupt';
 
 export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName };
 
@@ -93,13 +94,20 @@ let observer: ResizeObserver | null = null;
    边往四周长、底色化开、里面换成会放大边缘的透镜，落下时原路缩回。边（.segment-lens-rim）从头到尾是
    同一个元素，所以静止和运动是同一个东西，不再是两块不一样的玻璃（2026-10-01 反馈）。
    透镜（.segment-lens）浮起期间尺寸不变、只用 transform 移动：它的滤镜按尺寸摆，尺寸一变 Chromium 就要
-   重建整条滤镜，每帧变就是「一卡一卡」。浮起 / 落下靠 clip-path 把它从滑块大小打开到整块。
+   重建整条滤镜，每帧变就是「一卡一卡」。
+   一次动效只用一种机制、一条时钟（2026-10-01 重排）：位置（飞过去）和浮起 / 落下全是 Web Animations，
+   只动 translate / scale / opacity，全在合成器上；状态复位等动画的 finished，不用定时器。以前浮起靠
+   注册属性 --lift-p 的 CSS 过渡（主线程，切页时冻住再跳）、复位靠 setTimeout，三条时钟各走各的。
+   这些动画都登记成不被 settleMotion 快进：切页时路由钩子会把所有 ≥300ms 的动画压进 90ms，
+   滑块就「飞两帧、嗖地弹到终点」。
    毛玻璃底画在轨道里的一层（.segment-glass）而不是轨道本身：轨道自己带 backdrop-filter 的话，
    透镜只看得见轨道里的字，看不见胶囊外面的页面。 */
 const lensEl = ref<HTMLElement | null>(null);
 const glassEl = ref<HTMLElement | null>(null);
 const thumbEl = ref<HTMLElement | null>(null);
 const rimEl = ref<HTMLElement | null>(null);
+/** 玻璃边的形状层：浮起 / 落下缩放它；外面那层（rimEl）只管跟着滑块飞。两件事分在两层上，互不覆盖。 */
+const rimShape = ref<HTMLElement | null>(null);
 const thumbLens = useGlassLens(lensEl, 'thumb');
 const rimLens = useGlassLens(glassEl, 'rim', props.variant === 'glass');
 /** 按住已选中的那一项（还没拖）：透镜先浮起来，和 iOS 一样手指一按就变成玻璃。 */
@@ -115,7 +123,14 @@ const trackSize = ref({ w: 0, h: 0 });
 /** 飞行时长：松手后滑块落位、点击后滑过去。新值在起飞时就交出去（不再等落位），动画在合成器上跑，切页挂载卡不住它。 */
 const FLY_MS = 360;
 const FLY_EASE = 'cubic-bezier(.3, 1.22, .4, 1)';
-let flyTimer = 0;
+/** 每次起飞加一：上一次飞行的收尾（动画 finished 以后复位状态）发现自己过期了就不做。 */
+let flyToken = 0;
+let colorTimer = 0;
+/** 浮起（带一点回弹）/ 落下（不回弹）。 */
+const LIFT_MS = 380;
+const DROP_MS = 260;
+const LIFT_EASE = 'cubic-bezier(.3, 1.45, .45, 1)';
+const DROP_EASE = 'cubic-bezier(.25, .8, .3, 1)';
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -200,6 +215,10 @@ const trackStyle = computed(() => ({
   '--lift-h': `${liftSize.value.h}px`,
   '--lens-cx': `${lensCenter.value.x}px`,
   '--lens-cy': `${lensCenter.value.y}px`,
+  // 玻璃边停着时的缩放（边按浮起来的尺寸画，停着时缩回滑块大小）和浮起时相对滑块中心的偏移（两端被收住时）。
+  '--rest-sx': liftSize.value.w ? (thumb.value.width / liftSize.value.w).toFixed(4) : 1,
+  '--rest-sy': liftSize.value.h ? (thumb.value.height / liftSize.value.h).toFixed(4) : 1,
+  '--lens-off-x': `${(lensCenter.value.x - thumb.value.left - thumb.value.width / 2).toFixed(2)}px`,
 }));
 /** 透镜浮起来的时候：按住、拖动、浮着飞过去。 */
 const lifted = computed(() => thumbLens.active.value && (pressed.value || dragging.value || flyLift.value));
@@ -229,9 +248,16 @@ const layoutScale = () => {
    （以前位置是 CSS 自定义属性的过渡，跑在主线程上，一切页就卡；为了躲这一下又改成「先落位再交值」，于是
    松手总要先顿一下——2026-10-01 反馈）。透镜只平移、绝不缩放（缩放会把透过它的东西重采样得发糊）。 */
 const flying: Animation[] = [];
-const fly = async (value: T, lift: boolean) => {
-  const els = [thumbEl.value, rimEl.value, lensEl.value];
-  const before = els.map((el) => el?.getBoundingClientRect() ?? null);
+/**
+ * `fromColor`：起飞时整枚上色的是哪一项（拖着松手时是拖到的那一项；点击时是原来选中的那一项）。
+ * 点击切换时目标的字色不在起飞那一刻就换，而是滑块飞到三成时交叉淡入——色先到、形后到，看上去就是「跳」。
+ */
+const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
+  const token = (flyToken += 1);
+  const movers = [thumbEl.value, rimEl.value, lensEl.value];
+  // 量的是看得见的那一层（玻璃边量形状层），动的是外层。
+  const shown = [thumbEl.value, rimShape.value, lensEl.value];
+  const before = shown.map((el) => el?.getBoundingClientRect() ?? null);
   const wasVisible = thumb.value.visible;
   if (lift && thumbLens.active.value) {
     sizeLift();
@@ -239,34 +265,89 @@ const fly = async (value: T, lift: boolean) => {
   }
   placeOn(value);
   settling.value = true;
-  lensValue.value = value;
-  window.clearTimeout(flyTimer);
-  flyTimer = window.setTimeout(() => {
+  window.clearTimeout(colorTimer);
+  const startColor = fromColor ?? props.modelValue;
+  const quiet = !wasVisible || reducedMotion();
+  if (quiet || startColor === value) {
+    lensValue.value = value;
+  } else {
+    // 先按原来那一项上色（和停着时的画法一样，这一帧看不出变化），打开淡入淡出，飞到三成时换到目标。
+    lensValue.value = startColor;
+    lensFade.value = false;
+    cancelAnimationFrame(fadeFrame);
+    fadeFrame = requestAnimationFrame(() => { fadeFrame = requestAnimationFrame(() => { lensFade.value = true; }); });
+    colorTimer = window.setTimeout(() => { if (token === flyToken) lensValue.value = value; }, FLY_MS * 0.3);
+  }
+  const land = () => {
+    if (token !== flyToken) return;
     settling.value = false;
     flyLift.value = false;
     lensFade.value = false;
     lensValue.value = null;
-  }, FLY_MS);
-  if (!wasVisible || reducedMotion()) return;
+  };
   await nextTick();
+  if (quiet) {
+    land();
+    return;
+  }
   for (const animation of flying.splice(0)) animation.cancel();
   const scale = layoutScale();
-  els.forEach((el, index) => {
+  movers.forEach((el, index) => {
     const from = before[index];
-    if (!el || !from || !from.width) return;
-    const to = el.getBoundingClientRect();
-    if (!to.width) return;
+    const to = shown[index]?.getBoundingClientRect();
+    if (!el || !from || !from.width || !to || !to.width) return;
     const dx = (from.left + from.width / 2 - (to.left + to.width / 2)) / scale;
     const dy = (from.top + from.height / 2 - (to.top + to.height / 2)) / scale;
+    // 透镜只平移、绝不缩放（缩放会把透过它的东西重采样得发糊）；滑块和玻璃边连宽度一起从起点量过去。
     const keyframes: Keyframe[] = el === lensEl.value
       ? [{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }]
       : [{ translate: `${dx}px ${dy}px`, scale: `${from.width / to.width} ${from.height / to.height}` }, { translate: '0px 0px', scale: '1 1' }];
-    flying.push(el.animate(keyframes, { duration: FLY_MS, easing: FLY_EASE }));
+    flying.push(exemptFromSettle(el.animate(keyframes, { duration: FLY_MS, easing: FLY_EASE })));
   });
+  // 收尾跟着动画走（被新的一次起飞或拖动接住时，token 已经变了，不做）。
+  if (flying.length) void Promise.all(flying.map((animation) => animation.finished)).then(land, () => undefined);
+  else land();
   // 等动画真正交到合成器（画出一帧）以后再让调用方交出新值：交值会切页，新页挂载占住主线程的那一两百毫秒里，
   // 还没交到合成器的动画就停在起点、等主线程空了再一下跳到快结束的位置（降速 4× 逐帧录屏看到的）。
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 };
+
+/* —— 浮起 / 落下 ——
+   样式表里写好两头的样子（.is-lifted 与否），切换时先记下此刻的样子（包括正在放的半路），换过去以后用
+   Web Animations 从记下的样子动到新样子。玻璃边缩放形状层，透镜和滑块底色只动透明度——它们的位置另有
+   飞行动画在动，同一个属性不叠两段动画。 */
+type LiftProp = 'scale' | 'translate' | 'opacity';
+const lifting: Animation[] = [];
+watch(lifted, async (up) => {
+  const parts: Array<[HTMLElement | null, LiftProp[]]> = [
+    [rimShape.value, ['scale', 'translate']],
+    [lensEl.value, ['opacity']],
+    [thumbEl.value, ['opacity']],
+  ];
+  const read = (el: HTMLElement, keys: LiftProp[]): Keyframe => {
+    const style = getComputedStyle(el);
+    return Object.fromEntries(keys.map((key) => [key, style[key]]));
+  };
+  const before = parts.map(([el, keys]) => (el ? read(el, keys) : null));
+  for (const animation of lifting.splice(0)) animation.cancel();
+  if (reducedMotion()) return;
+  await nextTick();
+  parts.forEach(([el, keys], index) => {
+    const from = before[index];
+    if (!el || !from) return;
+    const to = read(el, keys);
+    // 透镜在边长到一半时才浮现；落下时滑块底色稍晚一点回来。都是短的透明度变化，不带回弹。
+    const timing: KeyframeAnimationOptions = keys.length === 1
+      ? {
+        duration: up ? 180 : 200,
+        delay: up ? (el === lensEl.value ? 60 : 0) : (el === thumbEl.value ? 60 : 0),
+        easing: 'ease',
+        fill: 'backwards',
+      }
+      : { duration: up ? LIFT_MS : DROP_MS, easing: up ? LIFT_EASE : DROP_EASE };
+    lifting.push(exemptFromSettle(el.animate([from, to], timing)));
+  });
+}, { flush: 'pre' });
 
 const clearGesture = () => {
   const current = gesture;
@@ -315,7 +396,8 @@ const onMove = (event: PointerEvent) => {
   if (!dragging.value) {
     // 正在飞的那一段被手指接住：停在此刻的位置上接着拖。
     for (const animation of flying.splice(0)) animation.cancel();
-    window.clearTimeout(flyTimer);
+    flyToken += 1;
+    window.clearTimeout(colorTimer);
     settling.value = false;
     flyLift.value = false;
     sizeLift();
@@ -326,7 +408,9 @@ const onMove = (event: PointerEvent) => {
   }
   dragging.value = true;
   suppressClick = true;
-  current.velocity = (event.clientX - current.lastX) / scale / Math.max(1, event.timeStamp - current.time);
+  // 一阶低通：原始差分在高回报率鼠标下每个事件都在跳，滑块宽度（按速度拉长）跟着一帧一抖。
+  const instant = (event.clientX - current.lastX) / scale / Math.max(1, event.timeStamp - current.time);
+  current.velocity += (instant - current.velocity) * 0.35;
   current.lastX = event.clientX;
   current.time = event.timeStamp;
   nextThumb = dragThumb(stops.value, current.center + dx, current.velocity);
@@ -364,6 +448,7 @@ const onUp = (event: PointerEvent) => {
   const velocity = event.timeStamp - current.time < 90 ? current.velocity : 0;
   const next = moved ? snapStop(stops.value, center, velocity).value : current.startValue;
   const keepFade = lensFade.value;
+  const colored = lensValue.value;
   const willFly = moved || next !== props.modelValue;
   // 要飞就先把「浮着」交给飞行再撤掉拖动状态：中间哪怕一瞬间不算浮着，fly 就会按拖到一半的滑块宽重定透镜尺寸，
   // 透镜被重摆、玻璃边和透镜对不上（2026-10-01 逐帧量出来的）。
@@ -378,7 +463,7 @@ const onUp = (event: PointerEvent) => {
     return;
   }
   // 松手就交出新值：飞行动画在合成器上，切页卡不住它，不用再等它落位。
-  void fly(next, true).then(() => commit(next));
+  void fly(next, true, colored).then(() => commit(next));
 };
 
 /** 键盘的 Enter / 空格（指针点击在 onUp 里处理）。 */
@@ -438,8 +523,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   clearGesture();
-  window.clearTimeout(flyTimer);
-  for (const animation of flying.splice(0)) animation.cancel();
+  flyToken += 1;
+  window.clearTimeout(colorTimer);
+  for (const animation of [...flying.splice(0), ...lifting.splice(0)]) animation.cancel();
   cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
@@ -507,7 +593,7 @@ onBeforeUnmount(() => {
          玻璃的边（描边、高光、影子）是单独一层，停着和浮着都是它：静止和运动是同一块玻璃。 -->
     <template v-if="thumbLens.active.value">
       <span ref="lensEl" class="segment-lens" aria-hidden="true" :style="thumbLens.style()" />
-      <span ref="rimEl" class="segment-lens-rim" aria-hidden="true" />
+      <span ref="rimEl" class="segment-lens-rim" aria-hidden="true"><span ref="rimShape" class="segment-rim-shape" /></span>
     </template>
   </div>
 </template>
@@ -532,10 +618,7 @@ onBeforeUnmount(() => {
   user-select: none;
   touch-action: none;
 }
-/* 滑块位置不再过渡：移动全是 SegmentTrack.fly 里的 Web Animations（合成器上跑），这里只过渡「浮起的程度」
-   --lift-p（0 = 平胶囊，1 = 整块透镜）：浮起带一点回弹，落下不回弹。 */
-.segment-track { --lift-p: 0; transition: --lift-p 260ms var(--lens-drop); }
-.segment-track.is-lifted { --lift-p: 1; transition: --lift-p 400ms var(--lens-lift); }
+/* 滑块位置和浮起 / 落下都不用 CSS 过渡：全是脚本里的 Web Animations（合成器上跑，见 fly 与 lifted 的 watch）。 */
 .segment-track.is-dragging { --seg-grow: calc(var(--thumb-w) * .04); }
 .segment-track.is-inset { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
 /* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。
@@ -656,37 +739,37 @@ onBeforeUnmount(() => {
     calc(100% - var(--thumb-t) - var(--thumb-h) - var(--seg-clip-extra)) calc(var(--thumb-l) - var(--seg-grow)) round 999px);
 }
 /* —— 玻璃（iOS 26 标签栏按住 / 拖动时那块）——
-   边（.segment-lens-rim）：停着时就是滑块那么大，浮起来往四周长到透镜那么大（--lift-p 插值），中心从滑块中心
-   移到透镜中心。透镜（.segment-lens）：浮着的时候尺寸固定（--lift-w × --lift-h，滤镜不用重摆），
-   用 clip-path 从滑块大小打开到整块；只用 transform 移动、绝不缩放。 */
+   玻璃边（.segment-lens-rim）按浮起来的尺寸画、中心跟着滑块；停着时形状层缩回滑块大小（--rest-sx/sy），
+   浮起时放开到 1，并挪到透镜中心（两端被收住时）。透镜（.segment-lens）一直是浮起来的尺寸（滤镜不用重摆），
+   停着时透明。两头的样子写在这里，中间的过程由脚本里的 Web Animations 放。 */
 .segment-lens, .segment-lens-rim {
   position: absolute;
   z-index: 3;
   top: 0;
   left: 0;
+  width: var(--lift-w);
+  height: var(--lift-h);
   border-radius: 999px;
   pointer-events: none;
 }
 .segment-lens {
-  width: var(--lift-w);
-  height: var(--lift-h);
   transform: translate(calc(var(--lens-cx) - var(--lift-w) / 2), calc(var(--lens-cy) - var(--lift-h) / 2));
-  clip-path: inset(calc((var(--lift-h) - var(--thumb-h)) / 2 * (1 - var(--lift-p))) calc((var(--lift-w) - var(--thumb-w)) / 2 * (1 - var(--lift-p))) round 999px);
-  opacity: min(1, calc(var(--lift-p) * 2.5));
+  opacity: 0;
 }
 .segment-lens-rim {
-  --ring-w: calc(var(--thumb-w) + (var(--lift-w) - var(--thumb-w)) * var(--lift-p));
-  --ring-h: calc(var(--thumb-h) + (var(--lift-h) - var(--thumb-h)) * var(--lift-p));
-  width: var(--ring-w);
-  height: var(--ring-h);
-  transform: translate(
-    calc(var(--thumb-l) + var(--thumb-w) / 2 + (var(--lens-cx) - var(--thumb-l) - var(--thumb-w) / 2) * var(--lift-p) - var(--ring-w) / 2),
-    calc(var(--thumb-t) + var(--thumb-h) / 2 + (var(--lens-cy) - var(--thumb-t) - var(--thumb-h) / 2) * var(--lift-p) - var(--ring-h) / 2));
+  transform: translate(calc(var(--thumb-l) + var(--thumb-w) / 2 - var(--lift-w) / 2), calc(var(--thumb-t) + var(--thumb-h) / 2 - var(--lift-h) / 2));
   opacity: var(--thumb-vis, 0);
+}
+.segment-rim-shape {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  scale: var(--rest-sx, 1) var(--rest-sy, 1);
+  translate: 0px 0px;
   /* 一圈极细的暗描边 + 斜对角的两道高光（左上、右下）+ 很淡的浮起影子。 */
   box-shadow: var(--lens-glass-rim);
 }
-.segment-lens-rim::before {
+.segment-rim-shape::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -696,14 +779,13 @@ onBeforeUnmount(() => {
   -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-/* 开着折射时滑块只剩底色（边由 .segment-lens-rim 画，静止和浮起是同一圈边）；浮起来时底色化开——
+.segment-track.is-lifted .segment-lens { opacity: 1; }
+.segment-track.is-lifted .segment-rim-shape { scale: 1 1; translate: var(--lens-off-x, 0px) 0px; }
+/* 开着折射时滑块只剩底色（边由玻璃边那一层画，静止和浮起是同一圈边）；浮起来时底色化开——
    iOS 里浮起的那块玻璃里面是清的。 */
-.segment-track.has-lens .segment-thumb {
-  box-shadow: none;
-  opacity: calc(var(--thumb-vis, 0) * (1 - min(1, var(--lift-p))));
-  transition: none;
-}
-.segment-track.has-lens:has(.segment-item:focus-visible) .segment-lens-rim { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus); }
+.segment-track.has-lens .segment-thumb { box-shadow: none; transition: none; }
+.segment-track.has-lens.is-lifted .segment-thumb { opacity: 0; }
+.segment-track.has-lens:has(.segment-item:focus-visible) .segment-rim-shape { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus); }
 .segment-track.has-lens.is-dragging { --seg-clip-extra: 0px; }
 .segment-ink-item {
   position: absolute;

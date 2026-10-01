@@ -209,8 +209,6 @@
 @property --thumb-w { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --thumb-t { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --thumb-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
-/* 玻璃浮起的程度（SegmentTrack：0 = 平胶囊，1 = 整块透镜）：注册成数字才能带弹簧过渡。 */
-@property --lift-p { syntax: '<number>'; inherits: true; initial-value: 0; }
 
 /* ── 换主题的扩散（useTheme.revealTheme）──────────
    新主题的整页快照套一个圆形 clip-path，从被点的按钮处长大；旧快照垫在底下不动。

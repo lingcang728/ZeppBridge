@@ -181,6 +181,11 @@ export const usePageMorph = (options: { back: () => void }) => {
     // .999 慢慢降到 0，板还没长满时新页就半透明地叠在旧页上——那也是「闪一下」。
     el.style.transition = 'none';
     el.style.opacity = '0';
+    // 板盖着的这段时间新页一像素都不画（visibility），卡片入场动画也不放（page-revisit）：以前新页在透明底下
+    // 照样逐张卡升层、光栅化、放 card-enter，用户看不见，却和板的动画抢同一条主线程——「展开卡、收回顺」的一半
+    // 原因（另一半是板的圆角在变，见 motion/window.ts）。揭开时那一下淡入就是它的入场。
+    el.style.visibility = 'hidden';
+    el.classList.add('page-revisit');
     // 被别的切页打断过：后面的揭开也一起快放。
     let hurry = false;
     const forget = onMotionSkip(() => { hurry = true; });
@@ -207,6 +212,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       if (mine.aborted) return;
       mine.revealed = true;
       el.style.opacity = '';
+      el.style.visibility = '';
       const reveal = el.animate(
         [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
         { duration: hurry ? 90 : 220, easing: 'cubic-bezier(.2, .8, .2, 1)' },

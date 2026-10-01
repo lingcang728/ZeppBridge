@@ -1,29 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { flightFrom, staggerOrder, unscaledBox } from '../morph';
+import { coverPoseOf, staggerOrder, unscaledBox } from '../morph';
 
-describe('flightFrom', () => {
-  it('starts a list row centred on the coverflow card it came out of', () => {
-    const from = { left: 500, top: 300, width: 420, height: 266 };
-    const to = { left: 100, top: 200, width: 540, height: 82 };
-    const origin = { x: 370, y: 241 };
-    const flight = flightFrom(from, to, origin);
-    // 宽、高各自缩到旧卡的宽、高：第一帧和旧卡严丝合缝，不会变成一条细带。
-    expect(flight.scale.x).toBeCloseTo(420 / 540, 4);
-    expect(flight.scale.y).toBeCloseTo(266 / 82, 4);
-    const { x: kx, y: ky } = flight.scale;
-    // 叠加 scale 绕原点，起始中心 = 原点 + 平移 + k ×（终点中心 − 原点）= 旧卡中心。
-    expect(origin.x + flight.translate.x + kx * (370 - origin.x)).toBeCloseTo(710, 1);
-    expect(origin.y + flight.translate.y + ky * (241 - origin.y)).toBeCloseTo(433, 1);
+describe('coverPoseOf', () => {
+  it('reads back the pose DeckCoverflow writes into style.transform', () => {
+    expect(coverPoseOf('translate3d(calc(-50% + 236.5px), -50%, -120px) rotateY(-38deg) scale(0.86)'))
+      .toEqual({ x: 236.5, y: 0, z: -120, rotate: -38, scale: 0.86 });
   });
-  it('compensates for an off-centre transform origin', () => {
-    // coverflow 的卡：布局框在舞台中心，transform 把它挪回中间，变换原点在布局框中心。
-    const to = { left: 490, top: 367, width: 420, height: 266 };
-    const origin = { x: 910, y: 633 };
-    const from = { left: 100, top: 100, width: 540, height: 82 };
-    const flight = flightFrom(from, to, origin);
-    const { x: kx, y: ky } = flight.scale;
-    expect(origin.x + flight.translate.x + kx * (700 - origin.x)).toBeCloseTo(370, 1);
-    expect(origin.y + flight.translate.y + ky * (500 - origin.y)).toBeCloseTo(141, 1);
+  it('handles the centre card and a negative offset', () => {
+    expect(coverPoseOf('translate3d(calc(-50% - 12px), -50%, 0px) rotateY(0deg) scale(1)'))
+      .toEqual({ x: -12, y: 0, z: 0, rotate: 0, scale: 1 });
+  });
+  it('returns null for a card that is not posed (list mode)', () => {
+    expect(coverPoseOf('')).toBeNull();
+    expect(coverPoseOf('none')).toBeNull();
   });
 });
 
