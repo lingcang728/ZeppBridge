@@ -4,12 +4,37 @@
 .canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .canvas:active { cursor: grabbing; }
 
-.zone { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 7 6; opacity: .75; }
-.ring-inner { fill: none; stroke: var(--line); stroke-dasharray: 2 6; }
-.zone-label { fill: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-anchor: middle; opacity: .85; pointer-events: none; }
+.zone { fill: none; stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; opacity: .7; transition: stroke .3s ease, opacity .3s ease; }
+.ring-inner { fill: none; stroke: var(--line); stroke-dasharray: 1 7; stroke-linecap: round; opacity: .7; }
+.zone-arc { fill: none; stroke: none; }
+.zone-label { fill: var(--accent); font-size: 12px; font-weight: 650; letter-spacing: .18em; text-anchor: middle; opacity: .8; pointer-events: none; }
 .scenery { transition: opacity .45s ease, filter .45s ease; }
+
+/* —— 表圈 —— 分刻度最淡，缺数据的天是灰刻度，有数据的天亮成品牌色；今天最长。 */
+.bz { fill: none; stroke-linecap: round; transition: stroke .3s ease, opacity .3s ease; }
+.bz.minor { stroke: color-mix(in srgb, var(--ink) 22%, transparent); stroke-width: 1.1; }
+.bz.off, .bz.plain { stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 1.8; }
+.bz.on, .bz.part { stroke: var(--accent); stroke-width: 2.2; }
+.bz.today { stroke-width: 3; }
+.bz.today.off, .bz.today.plain { stroke: color-mix(in srgb, var(--ink) 55%, transparent); }
+.bz.wake { stroke: var(--ink); transition: none; }
+.today-dot { fill: var(--accent); }
+.today-label { fill: var(--muted); font-size: 12px; font-weight: 650; text-anchor: middle; letter-spacing: .04em; pointer-events: none; }
+.pointer { pointer-events: none; }
+.pointer-tick { fill: none; stroke: var(--accent); stroke-width: 3.2; stroke-linecap: round; }
+.pointer-label { fill: var(--accent); font-size: 12.5px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+/* 按下拖动的那一刻整圈刻度亮一档（iOS 刻度尺被按住时也是先整条提亮）。 */
+.scenery.is-live .bz.minor { stroke: color-mix(in srgb, var(--ink) 36%, transparent); }
+.scenery.is-live .bz.off, .scenery.is-live .bz.plain { stroke: color-mix(in srgb, var(--ink) 45%, transparent); }
+/* 松手会加入：圈线和光晕亮起来；会移出：表圈暗下去。 */
+.scenery.is-include .zone { stroke: var(--accent); opacity: 1; }
+.scenery.is-include .bz.minor { stroke: color-mix(in srgb, var(--accent) 55%, transparent); }
+.scenery.is-exclude .bezel { opacity: .45; }
+.scenery.is-exclude .zone { stroke: color-mix(in srgb, var(--danger) 55%, transparent); }
+
 .link { stroke: var(--line); stroke-width: 1; transition: opacity .35s ease, stroke .2s ease; }
-.link.is-active { stroke: color-mix(in srgb, var(--accent) 55%, transparent); stroke-width: 1.6; }
+.link.is-active { stroke: color-mix(in srgb, var(--tint) 50%, transparent); stroke-width: 1.4; }
 /* 没交给 AI 的类别：连线只是一道虚的提示，不是横穿整个圈的实线。 */
 .link:not(.is-active) { stroke-dasharray: 2 7; stroke-linecap: round; opacity: .55; }
 .link.is-backdrop { opacity: .18; }

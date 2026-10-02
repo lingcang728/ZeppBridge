@@ -10,6 +10,8 @@ export const taskGraphMessages = defineMessages(
     zoomLevel: (percent: number) => `缩放 ${percent}%，点一下让整图装进画布`,
     backToAll: '全部类别',
     dismissHint: '知道了',
+    today: '今天',
+    daysUnit: '天',
   },
   {
     label: 'Task data graph',
@@ -19,6 +21,8 @@ export const taskGraphMessages = defineMessages(
     zoomLevel: (percent: number) => `Zoom ${percent}% — click to fit the whole graph`,
     backToAll: 'All categories',
     dismissHint: 'Got it',
+    today: 'Today',
+    daysUnit: 'DAYS',
   },
   {
     label: 'Grafo de datos',
@@ -28,6 +32,8 @@ export const taskGraphMessages = defineMessages(
     zoomLevel: (percent: number) => `Zoom ${percent}%: haz clic para encajar todo el grafo`,
     backToAll: 'Todas las categorías',
     dismissHint: 'Entendido',
+    today: 'Hoy',
+    daysUnit: 'DÍAS',
   },
   'components/ai/TaskGraph',
 );

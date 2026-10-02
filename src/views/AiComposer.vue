@@ -153,6 +153,7 @@ const graphModel = computed(() =>
     centerLabel: center.value.label,
     centerSublabel: center.value.sublabel,
     centerIcon: center.value.icon,
+    centerDays: selectedWorkouts.value.length ? null : recentWindowDays(draft.value),
     daysLabel: t.value.daysOption,
     coverageLabel: t.value.graphCoverage,
   }));

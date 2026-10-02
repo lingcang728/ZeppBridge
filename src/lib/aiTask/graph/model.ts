@@ -9,7 +9,7 @@ import type { IconName } from '../../../components/Icon.vue';
 import type { AiTask, AiTaskCategory, AiTaskPreview } from '../../bridge/types';
 import { AI_TASK_CATEGORY_META, AI_TASK_CATEGORY_ORDER, categoryLabel, categoryRangeOf } from '../categories';
 import { categoryCoverage } from '../coverage';
-import type { DayRing } from '../dayRing';
+import { windowDial, type DayRing, type WindowDial } from '../dayRing';
 import { CATEGORY_METRICS, metricLabel } from '../metrics';
 
 export type GraphNodeKind = 'center' | 'category' | 'metric';
@@ -57,6 +57,10 @@ export interface GraphLink {
 export interface GraphModel {
   nodes: GraphNode[];
   links: GraphLink[];
+  /** 大圈表圈：整个分析窗口一天一格；还没有预览时为 null（只画一圈细刻度）。 */
+  dial: WindowDial | null;
+  /** 中心是「最近 N 天」时的 N（圆盘里直接写数字）；中心是运动时为 null。 */
+  centerDays: number | null;
 }
 
 export interface GraphInput {
@@ -66,6 +70,8 @@ export interface GraphInput {
   centerLabel: string;
   centerSublabel: string | null;
   centerIcon: IconName;
+  /** 中心是「最近 N 天」时给 N。 */
+  centerDays?: number | null;
   /** 类别副标题（例如「14 天」），由组件按界面语言给。 */
   daysLabel: (days: number) => string;
   /** 有覆盖数据时副标题写「13/15 天有数据」（U07）：以前写的「14 天」是回溯设置，读起来像实际覆盖。 */
@@ -157,7 +163,15 @@ export const buildGraph = (input: GraphInput): GraphModel => {
       links.push({ id: `l:${metricId}`, source: id, target: metricId, active: included });
     });
   });
-  return { nodes, links };
+  // 表圈：圈里（交给 AI 的）窗口类别各取合并行，跨度取并集。
+  const dialRows = inside
+    .filter((category) => AI_TASK_CATEGORY_META[category].hasWindow)
+    .flatMap((category) => {
+      const rows = preview?.coverage.filter((row) => row.category === category) ?? [];
+      const row = rows.find((entry) => entry.workout_id === null) ?? rows[0];
+      return row ? [row] : [];
+    });
+  return { nodes, links, dial: windowDial(dialRows), centerDays: input.centerDays ?? null };
 };
 
 /** 悬停高亮用：一个节点和它直接相连的节点。 */

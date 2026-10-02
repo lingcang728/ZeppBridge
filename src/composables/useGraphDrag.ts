@@ -7,6 +7,10 @@ type Point = { x: number; y: number };
 
 /** 起拖的门槛：小于它算点击。指标点很小，手一抖就成了拖动，所以比以前的 6px 宽一些。 */
 const CLICK_TOLERANCE = 9;
+/** 松手时把手上的速度留给节点多少（弹簧再把它拉回家）：一点点惯性，像把它「放」回去而不是瞬间换成弹簧。 */
+const FLING_CARRY = 0.45;
+/** 惯性封顶（世界坐标 px / 帧），快甩也不会把节点甩出画布。 */
+const FLING_MAX = 10;
 
 /**
  * 关系网里拖一个节点：拖进 / 拖出「交给 AI」的圈，指标拖离 / 拖回父类别。
@@ -33,6 +37,8 @@ export const useGraphDrag = (options: {
 }) => {
   const drag = ref<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
   const dropHint = ref<'include' | 'exclude' | null>(null);
+  /** 手上的速度（世界坐标 px / 16.7ms），指数平滑，松手时交给节点。 */
+  let velocity = { x: 0, y: 0, at: 0 };
 
   const judge = (id: string) => {
     const node = options.nodeById.value.get(id);
@@ -49,8 +55,17 @@ export const useGraphDrag = (options: {
     if (!active.moved) return;
     const world = options.localToWorld(local);
     const item = options.pos(active.id);
-    item.x = world.x + active.grabX;
-    item.y = world.y + active.grabY;
+    const nextX = world.x + active.grabX;
+    const nextY = world.y + active.grabY;
+    const now = performance.now();
+    if (velocity.at) {
+      const frames = Math.max((now - velocity.at) / 16.7, 0.25);
+      velocity.x = velocity.x * 0.5 + ((nextX - item.x) / frames) * 0.5;
+      velocity.y = velocity.y * 0.5 + ((nextY - item.y) / frames) * 0.5;
+    }
+    velocity.at = now;
+    item.x = nextX;
+    item.y = nextY;
     const include = judge(active.id);
     dropHint.value = include === null ? null : include ? 'include' : 'exclude';
     options.redraw();
@@ -72,6 +87,13 @@ export const useGraphDrag = (options: {
       options.wake();
       return;
     }
+    // 停住了一会儿再松手就没有惯性（人已经把它放稳了）。
+    const item = options.pos(active.id);
+    const still = performance.now() - velocity.at > 90;
+    const speed = Math.hypot(velocity.x, velocity.y) * FLING_CARRY;
+    const scale = still || speed === 0 ? 0 : Math.min(1, FLING_MAX / speed) * FLING_CARRY;
+    item.vx = velocity.x * scale;
+    item.vy = velocity.y * scale;
     const include = judge(active.id);
     if (include !== null && include !== node.included) options.onDrop(node, include);
     options.wake();
@@ -82,6 +104,7 @@ export const useGraphDrag = (options: {
     const local = options.toLocal(event);
     const world = options.localToWorld(local);
     const item = options.pos(node.id);
+    velocity = { x: 0, y: 0, at: 0 };
     drag.value = { id: node.id, grabX: item.x - world.x, grabY: item.y - world.y, startX: local.x, startY: local.y, moved: false };
     item.dragging = true;
     options.wake();

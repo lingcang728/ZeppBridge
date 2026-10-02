@@ -28,10 +28,15 @@ import type { AiTaskCategory } from '../../lib/bridge/types';
 import type { GraphModel, GraphNode } from '../../lib/aiTask/graph/model';
 import { categoryNodeId, neighborIds } from '../../lib/aiTask/graph/model';
 import {
-  createLayout, fitZoom, focusFrame, graphRadii, snapLayout, stepLayout, syncLayout, wakeLayout,
+  NODE_RADIUS, createLayout, fitZoom, focusFrame, graphRadii, snapLayout, stepLayout, syncLayout, wakeLayout,
   type LayoutNode,
   type LayoutState,
 } from '../../lib/aiTask/graph/layout';
+import { dialMarks, dialPaths, dialSegment, type DialOptions } from '../../lib/aiTask/graph/dial';
+import { createWake, stepWake, wakePosition, type DialWake } from '../../lib/aiTask/graph/wake';
+import { AI_TASK_CATEGORY_META, AI_TASK_CATEGORY_ORDER } from '../../lib/aiTask/categories';
+import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
+import { localDateString } from '../../lib/format';
 import { useGraphCamera } from '../../composables/useGraphCamera';
 import { useGraphDrag } from '../../composables/useGraphDrag';
 import { useMessages } from '../../i18n';
@@ -87,8 +92,9 @@ const tick = (ts: number) => {
   const dt = lastTs ? ts - lastTs : 16.7;
   lastTs = ts;
   stepLayout(layout, props.model, radii.value, dt);
+  const wakeLive = advanceWake(dt);
   frame.value += 1;
-  if (!layout.settled || drag.value) {
+  if (!layout.settled || drag.value || wakeLive) {
     raf = requestAnimationFrame(tick);
   } else {
     raf = 0;
@@ -187,14 +193,140 @@ const positioned = computed(() => {
   return props.model.nodes.map((node) => ({ node, ...pos(node.id) }));
 });
 const nodeById = computed(() => new Map(props.model.nodes.map((node) => [node.id, node])));
+/* 连线从两头圆盘的边上出发，不穿过圆盘；颜色取下游那一类的类别色。 */
+const LINK_INSET = { center: NODE_RADIUS.center + 4, category: NODE_RADIUS.category + 4, metric: NODE_RADIUS.metric + 2 } as const;
 const linkLines = computed(() => {
   void frame.value;
   return props.model.links.map((link) => {
     const a = pos(link.source);
     const b = pos(link.target);
-    return { ...link, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+    const from = nodeById.value.get(link.source);
+    const to = nodeById.value.get(link.target);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const startInset = from ? LINK_INSET[from.kind] : 0;
+    const endInset = to ? LINK_INSET[to.kind] : 0;
+    const visible = length > startInset + endInset + 4;
+    const ux = dx / length;
+    const uy = dy / length;
+    return {
+      ...link,
+      visible,
+      tint: to?.category ? AI_TASK_CATEGORY_META[to.category].tint : 'var(--accent)',
+      x1: a.x + ux * startInset, y1: a.y + uy * startInset,
+      x2: b.x - ux * endInset, y2: b.y - uy * endInset,
+    };
   });
 });
+
+/* —— 表圈：交给 AI 的大圈本身就是一圈表盘刻度，一天一根，今天在 12 点 ——
+   刻度从圈线往里长（圈外留给不交的类别），周刻度长一截；整圈补分刻度到六十根上下，
+   7 天不显得空、90 天不密成毛边（见 lib/aiTask/graph/dial.ts）。 */
+const BEZEL = { inset: 14, length: 8, week: 12, minor: 4, minorTarget: 64 } as const;
+const bezelOptions = computed<DialOptions>(() => ({
+  radius: radii.value.boundary - BEZEL.inset,
+  length: BEZEL.length,
+  weekLength: BEZEL.week,
+  perCell: props.model.dial?.perCell ?? 1,
+  minorTarget: BEZEL.minorTarget,
+  minorLength: BEZEL.minor,
+}));
+/** 还没有预览时（第一次载入）只画一圈标尺。 */
+const bezelCount = computed(() => props.model.dial?.count ?? props.model.centerDays ?? 14);
+const bezel = computed(() => dialPaths(props.model.dial?.cells ?? null, bezelCount.value, bezelOptions.value));
+const bezelMarks = computed(() => dialMarks(bezelCount.value, bezelOptions.value));
+const shortDate = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
+/** 12 点那一根的标签：最后一天是今天就写「今天」，否则写日期（分析某次运动时窗口停在运动那天）。 */
+const bezelEndLabel = computed(() => {
+  const end = props.model.dial?.endDate;
+  if (!end || end === localDateString(new Date())) return t.value.today;
+  return shortDate(end);
+});
+const addDays = (date: string, days: number) => {
+  const moved = parseDisplayDate(date);
+  moved.setDate(moved.getDate() + days);
+  return localDateString(moved);
+};
+
+/* —— 尾迹：拖着节点绕圈走，节点的方位是指针，扫过的刻度竖起来再落回去（照 iOS 相机的刻度尺）——
+   见 lib/aiTask/graph/wake.ts。离圆心太近时方位不可靠，指针和尾迹都淡掉。 */
+const WAKE_BOOST = 16;
+let wakeState: DialWake = createWake(1);
+const wakeFrame = ref(0);
+const pointer = ref<{ angle: number; strength: number } | null>(null);
+const advanceWake = (dtMs: number): boolean => {
+  const total = bezelMarks.value.length;
+  if (wakeState.energy.length !== total) wakeState = createWake(total);
+  const active = drag.value?.moved ? drag.value.id : null;
+  let next: { angle: number; strength: number } | null = null;
+  if (active) {
+    const p = pos(active);
+    const boundary = radii.value.boundary;
+    const distance = Math.hypot(p.x, p.y);
+    const strength = Math.min(1, Math.max(0, (distance - boundary * 0.22) / (boundary * 0.28)));
+    if (strength > 0.04) next = { angle: Math.atan2(p.y, p.x), strength };
+  }
+  pointer.value = next;
+  const live = stepWake(wakeState, next ? wakePosition(next.angle, total) : null, dtMs, next?.strength ?? 0);
+  wakeFrame.value += 1;
+  return live || next !== null;
+};
+/** 竖起来的那几根：只画有能量的，一般十来根。 */
+const wakeTicks = computed(() => {
+  void wakeFrame.value;
+  const radius = bezelOptions.value.radius;
+  const out: { key: number; d: string; opacity: number; width: number }[] = [];
+  bezelMarks.value.forEach((mark, index) => {
+    const energy = wakeState.energy[index] ?? 0;
+    if (energy <= 0) return;
+    out.push({
+      key: index,
+      d: dialSegment(mark.angle, radius, radius + mark.length + energy * WAKE_BOOST),
+      opacity: Math.min(1, 0.35 + energy * 0.65),
+      width: 1.5 + energy * 1.1,
+    });
+  });
+  return out;
+});
+/** 指针：一根更长的品牌色刻度，外面写它指着的那一天。 */
+const pointerView = computed(() => {
+  const current = pointer.value;
+  if (!current) return null;
+  const radius = bezelOptions.value.radius;
+  const tip = radius + BEZEL.week + 9;
+  const dial = props.model.dial;
+  let label: string | null = null;
+  if (dial) {
+    const count = dial.count;
+    const turn = (((current.angle + Math.PI / 2) / (2 * Math.PI)) % 1 + 1) % 1;
+    const cell = (Math.round(turn * count) - 1 + count) % count;
+    const end = dial.endDate;
+    label = cell === count - 1 ? bezelEndLabel.value : shortDate(addDays(end, -(count - 1 - cell) * dial.perCell));
+  }
+  return {
+    d: dialSegment(current.angle, radius - 4, tip),
+    opacity: current.strength,
+    label,
+    lx: Math.cos(current.angle) * (tip + 16),
+    ly: Math.sin(current.angle) * (tip + 16) + 4,
+  };
+});
+/** 拖类别时表圈跟着「松手会怎样」变：会加入就亮起来，会移出就暗下去。 */
+const bezelMood = computed(() => {
+  const id = drag.value?.moved ? drag.value.id : null;
+  if (!id || nodeById.value.get(id)?.kind !== 'category') return drag.value?.moved ? 'live' : null;
+  return dropHint.value === 'include' ? 'include' : dropHint.value === 'exclude' ? 'exclude' : 'live';
+});
+/** 写「交给 AI」的那段弧：圆心在原点、比刻度再往里一点，中点在 -126°（左上的空当）。 */
+const zoneArc = computed(() => {
+  const r = radii.value.boundary - BEZEL.inset - 12;
+  const from = (-126 - 30) * (Math.PI / 180);
+  const to = (-126 + 30) * (Math.PI / 180);
+  const p = (a: number) => `${(r * Math.cos(a)).toFixed(1)} ${(r * Math.sin(a)).toFixed(1)}`;
+  return `M${p(from)}A${r.toFixed(1)} ${r.toFixed(1)} 0 0 1 ${p(to)}`;
+});
+const washCategories = AI_TASK_CATEGORY_ORDER.map((category) => ({ category, tint: AI_TASK_CATEGORY_META[category].tint }));
 
 /* 悬停高亮：停稳一小会儿才生效，离开也缓一下才撤。聚焦某一类时不做悬停高亮——
    层级已经由「聚焦 / 背景」表达了，再叠一层明暗只会更乱。 */
@@ -376,27 +508,70 @@ defineExpose({ focusCategory: (category: AiTaskCategory) => flyToFocus(categoryN
             <stop offset="70%" stop-color="var(--accent)" stop-opacity=".05" />
             <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
           </radialGradient>
+          <!-- 节点圆盘的微光：类别色从左上角透进来。每一类一份（渐变里的颜色不能跟着引用它的元素走）。 -->
+          <radialGradient v-for="wash in washCategories" :id="`gwash-${wash.category}`" :key="wash.category" cx="32%" cy="26%" r="85%">
+            <stop offset="0%" :style="{ stopColor: wash.tint }" stop-opacity=".42" />
+            <stop offset="55%" :style="{ stopColor: wash.tint }" stop-opacity=".12" />
+            <stop offset="100%" :style="{ stopColor: wash.tint }" stop-opacity=".04" />
+          </radialGradient>
+          <radialGradient id="gwash-center" cx="34%" cy="26%" r="90%">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity=".5" />
+            <stop offset="60%" stop-color="var(--accent)" stop-opacity=".16" />
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity=".06" />
+          </radialGradient>
+          <!-- 圆盘顶边的一道高光（玻璃的边），往下渐隐。 -->
+          <linearGradient id="grim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fff" stop-opacity=".5" />
+            <stop offset="45%" stop-color="#fff" stop-opacity=".06" />
+            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+          </linearGradient>
+          <radialGradient id="gshadow">
+            <stop offset="0%" stop-color="#000" stop-opacity=".32" />
+            <stop offset="100%" stop-color="#000" stop-opacity="0" />
+          </radialGradient>
         </defs>
         <g :transform="cameraTransform">
-          <g class="scenery">
+          <g :class="['scenery', bezelMood && `is-${bezelMood}`]">
             <circle class="zone-glow" :r="radii.boundary * 1.08" fill="url(#zone-fill)" />
             <circle class="zone" :r="radii.boundary" />
+            <!-- 表圈：一天一根，今天在 12 点；有数据的那天亮。 -->
+            <g class="bezel" aria-hidden="true">
+              <path class="bz minor" :d="bezel.minor" />
+              <path class="bz off" :d="bezel.ticks.off" />
+              <path class="bz plain" :d="bezel.ticks.plain" />
+              <path class="bz part" :d="bezel.ticks.part" :opacity="bezel.partOpacity" />
+              <path class="bz on" :d="bezel.ticks.on" />
+              <path :class="['bz', 'today', bezel.todayState]" :d="bezel.today" />
+              <circle class="today-dot" :cy="-radii.boundary - 5" r="2.4" />
+              <text class="today-label" :y="-radii.boundary + BEZEL.inset + 14">{{ bezelEndLabel }}</text>
+              <!-- 尾迹与指针（拖动时才有） -->
+              <path v-for="tick in wakeTicks" :key="tick.key" class="bz wake" :d="tick.d" :opacity="tick.opacity" :stroke-width="tick.width" />
+              <g v-if="pointerView" class="pointer" :opacity="pointerView.opacity">
+                <path class="pointer-tick" :d="pointerView.d" />
+                <text v-if="pointerView.label" class="pointer-label" :x="pointerView.lx" :y="pointerView.ly">{{ pointerView.label }}</text>
+              </g>
+            </g>
             <circle class="ring-inner" :r="radii.inner" />
-            <text class="zone-label" :y="-radii.boundary + 18">{{ t.zone }}</text>
+            <!-- 「交给 AI」沿着表圈内侧弯着写，落在 10 点半那一块空当里。 -->
+            <path id="zone-arc" class="zone-arc" :d="zoneArc" />
+            <text class="zone-label"><textPath href="#zone-arc" startOffset="50%">{{ t.zone }}</textPath></text>
           </g>
-          <line v-for="link in linkLines" :key="link.id"
-            :class="['link', { 'is-active': link.active, 'is-backdrop': linkBackdrop(link.source, link.target) }]"
-            :x1="link.x1" :y1="link.y1" :x2="link.x2" :y2="link.y2" />
+          <template v-for="link in linkLines" :key="link.id">
+            <line v-if="link.visible"
+              :class="['link', { 'is-active': link.active, 'is-backdrop': linkBackdrop(link.source, link.target) }]"
+              :style="{ '--tint': link.tint }" :x1="link.x1" :y1="link.y1" :x2="link.x2" :y2="link.y2" />
+          </template>
           <GraphNodeView v-for="entry in positioned" :key="entry.node.id" :node="entry.node" :x="entry.x" :y="entry.y"
             :hovered="hoverId === entry.node.id || dragParentId === entry.node.id"
             :dimmed="isDim(entry.node.id)" :backdrop="isBackdrop(entry.node.id)"
             :ghosted="drag?.id === entry.node.id && drag.moved"
-            :emphasis="focusId !== null && !isBackdrop(entry.node.id)"
+:emphasis="focusId !== null && !isBackdrop(entry.node.id)"
+            :center-days="model.centerDays" :days-unit="t.daysUnit"
             tabindex="0" role="button" :aria-pressed="entry.node.included"
             @pointerdown="onNodeDown($event, entry.node)" @keydown="onNodeKey($event, entry.node)"
             @pointerenter="onNodeEnter(entry.node.id)" @pointerleave="onNodeLeave" />
           <GraphNodeView v-if="ghostNode" :node="ghostNode.node" :x="ghostNode.x" :y="ghostNode.y"
-            :drop-hint="dropHint" class="ghost" />
+            :drop-hint="dropHint" :center-days="model.centerDays" :days-unit="t.daysUnit" lifted class="ghost" />
         </g>
       </svg>
 
