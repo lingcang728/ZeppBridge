@@ -8,7 +8,7 @@ defineProps<{ copy: LandingCopy['privacy'] }>();
 </script>
 
 <template>
-  <section id="privacy" class="lp-section privacy">
+  <section id="privacy" class="lp-section privacy lp-center">
     <div class="vault" data-reveal data-live>
       <div class="vault-head">
         <span class="lock"><LandingIcon name="lock" :size="26" /></span>
@@ -52,16 +52,15 @@ defineProps<{ copy: LandingCopy['privacy'] }>();
   padding: 72px 56px 56px;
   border-radius: 36px;
   background:
-    radial-gradient(70% 60% at 50% 0%, rgba(63, 208, 180, .16), transparent 70%),
-    radial-gradient(50% 50% at 90% 100%, rgba(143, 194, 74, .12), transparent 70%),
-    #071311;
+    radial-gradient(60% 50% at 50% 0%, rgba(125, 163, 62, .14), transparent 70%),
+    #0e120f;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .06) inset, 0 50px 100px -50px rgba(0, 0, 0, .8);
   color: var(--v-ink);
 }
 .vault .lp-lead { color: var(--v-muted); }
 .vault-head { display: grid; justify-items: center; text-align: center; }
 .vault-head .lp-h2, .vault-head .lp-lead { margin-left: auto; margin-right: auto; }
-.lock { display: grid; width: 60px; height: 60px; margin-bottom: 24px; place-items: center; border-radius: 20px; background: rgba(63, 208, 180, .14); color: #5fe0c4; box-shadow: 0 0 0 1px rgba(95, 224, 196, .25) inset, 0 0 40px rgba(63, 208, 180, .25); }
+.lock { display: grid; width: 60px; height: 60px; margin-bottom: 24px; place-items: center; border-radius: 20px; background: rgba(125, 163, 62, .16); color: #b4d66f; box-shadow: 0 0 0 1px rgba(147, 185, 82, .3) inset; }
 
 .path { display: grid; justify-items: center; gap: 0; margin: 64px auto 0; }
 .row { display: flex; align-items: center; justify-content: center; gap: 0; width: 100%; }
@@ -77,9 +76,9 @@ defineProps<{ copy: LandingCopy['privacy'] }>();
   font-weight: 600;
   white-space: nowrap;
 }
-.node.home { border-color: rgba(143, 194, 74, .45); background: rgba(143, 194, 74, .1); color: #b6e07a; box-shadow: 0 0 30px -6px rgba(143, 194, 74, .35); }
+.node.home { border-color: rgba(147, 185, 82, .5); background: rgba(125, 163, 62, .12); color: #c3df86; }
 .wire { position: relative; flex: 0 1 140px; min-width: 40px; height: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
-.wire i { position: absolute; top: 0; left: 0; width: 18px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #5fe0c4); animation: flow 2.2s linear infinite; }
+.wire i { position: absolute; top: 0; left: 0; width: 18px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #b4d66f); animation: flow 2.2s linear infinite; }
 .wire i:nth-child(2) { animation-delay: .73s; }
 .wire i:nth-child(3) { animation-delay: 1.46s; }
 @keyframes flow { from { transform: translateX(-18px); } to { transform: translateX(140px); } }
@@ -90,7 +89,7 @@ defineProps<{ copy: LandingCopy['privacy'] }>();
 .ghost-link { width: 1px; height: 26px; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .25) 0 4px, transparent 4px 8px); opacity: .5; }
 
 .points { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 64px 0 0; padding: 32px 0 0; border-top: 1px solid var(--v-line); list-style: none; }
-.points li { display: grid; align-content: start; gap: 10px; color: #8fd8c6; }
+.points li { display: grid; align-content: start; gap: 10px; color: #b4d66f; }
 .points h3 { margin: 4px 0 0; color: var(--v-ink); font-size: 17px; }
 .points p { margin: 0; color: var(--v-muted); font-size: 14.5px; line-height: 1.6; }
 
@@ -98,7 +97,7 @@ defineProps<{ copy: LandingCopy['privacy'] }>();
   .vault { padding: 56px 22px 40px; border-radius: 28px; }
   .row { flex-direction: column; }
   .wire { flex: 0 0 36px; width: 2px; height: 36px; min-width: 0; }
-  .wire i { width: 2px; height: 14px; background: linear-gradient(180deg, transparent, #5fe0c4); animation-name: flow-y; }
+  .wire i { width: 2px; height: 14px; background: linear-gradient(180deg, transparent, #b4d66f); animation-name: flow-y; }
   @keyframes flow-y { from { transform: translateY(-14px); } to { transform: translateY(36px); } }
   .points { grid-template-columns: 1fr; }
 }

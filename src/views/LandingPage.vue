@@ -1,29 +1,28 @@
 <script setup lang="ts">
 /**
- * 落地页（浏览器里打开 dist 时显示它；zeppbridge.com 预览站部署的也是它）。2026-10 整页重写。
+ * 落地页（浏览器里打开 dist 时显示它；zeppbridge.com 预览站部署的也是它）。2026-10 第二次重做。
  *
- * 两个亮点分量一样：**01 把手腕上的记录同步到你的电脑**、**02 把电脑里的数据直接交给 AI**。
- * 首屏两句对仗的标题把这两件事并排说出来，往下两章各自有能上手玩的演示（翻牌计数、应用窗口、
- * 打包进对话框）。深色为主，浅色可切（views/landing/theme.ts）。演示读数全是示例，页面上标着「示例」。
- * 首屏保留了原来那段两排手表并排滚动（components/DeviceMarquee.vue）。
+ * 这一版的想法只有一个：**页面就是软件**。右边那扇窗口里跑的是同一份前端（演示模式，数据全是合成的），
+ * 不是截图也不是仿制品；往下滚，应用自己换到另一页，文字在左边讲这一页是干什么的。导航那枚玻璃胶囊
+ * 用的就是应用顶栏的胶囊选择器，窗口里的转场、设置卡叠的飞入飞出、图上的拖动都是本体的。
+ *
+ * 版式是杂志：暖白的纸、一个橄榄绿、荧光笔划过的那一句、很大的字和很多留白（views/landing/landing.css）。
+ * 演示读数全是示例，页面上写明「示例」。
  *
  * 文案：zh / en 在 ./landing/copy.ts，其余八种语言懒加载（composables/useLandingLocale.ts）。
  * 动效约定见 ./landing/motion.ts：只动 transform / opacity，循环动画离屏暂停，减少动态时直接落终态。
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import BrandMark from '../components/BrandMark.vue';
+import DeviceMarquee from '../components/DeviceMarquee.vue';
 import { useLandingLocale } from '../composables/useLandingLocale';
-import AiHandoff from './landing/AiHandoff.vue';
-import AppDemo from './landing/AppDemo.vue';
-import BentoGrid from './landing/BentoGrid.vue';
 import ConnectPaths from './landing/ConnectPaths.vue';
 import { COPY } from './landing/copy';
 import FinalCta from './landing/FinalCta.vue';
-import FlapBoard from './landing/FlapBoard.vue';
-import HeroSection from './landing/HeroSection.vue';
 import { useScrollMotion } from './landing/motion';
 import PrivacyFlow from './landing/PrivacyFlow.vue';
-import SiteNav from './landing/SiteNav.vue';
+import SiteNav, { type NavTarget } from './landing/SiteNav.vue';
+import StorySection from './landing/StorySection.vue';
 import { GITHUB_URL, useDownloads } from './landing/useDownloads';
 
 const { locale, initializeLocale, setLocale, landingCopyFor } = useLandingLocale();
@@ -40,36 +39,72 @@ const showStarNudge = ref(false);
 const nudge = () => { showStarNudge.value = true; };
 
 const page = ref<HTMLElement | null>(null);
+const story = ref<InstanceType<typeof StorySection> | null>(null);
 useScrollMotion(page);
+
+/* 导航胶囊亮哪一项：在故事里就是「演示」（讲到交给 AI / 排计划那两段时是「交给 AI」），过了故事就是「隐私」。 */
+const storyIndex = ref(0);
+const pastStory = ref(false);
+const active = computed<NavTarget>(() => {
+  if (pastStory.value) return 'privacy';
+  return storyIndex.value === 3 || storyIndex.value === 4 ? 'ai' : 'story';
+});
+let frame = 0;
+const onScroll = () => {
+  if (frame) return;
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    const top = document.getElementById('devices')?.getBoundingClientRect().top ?? Infinity;
+    pastStory.value = top < window.innerHeight * 0.6;
+  });
+};
+const go = (target: NavTarget) => {
+  if (target === 'ai') story.value?.scrollToBeat(3);
+  else if (target === 'privacy') document.getElementById('privacy')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  else window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 onMounted(() => {
   initializeLocale();
   void downloads.load();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll);
+  cancelAnimationFrame(frame);
 });
 </script>
 
 <template>
-  <div ref="page" class="lp">
+  <div id="top" ref="page" class="lp">
     <SiteNav
       :copy="t.nav"
       :locale="locale"
       :download-href="downloads.primary.value.href"
       :github-href="GITHUB_URL"
+      :active="active"
       @locale="setLocale"
       @download="nudge"
+      @go="go"
     />
 
     <main>
-      <HeroSection
-        :copy="t.hero"
-        :sample="t.sample"
-        :download="downloads.primary.value"
+      <StorySection
+        ref="story"
+        :copy="t"
+        :locale="locale"
+        :primary="downloads.primary.value"
         :github-href="GITHUB_URL"
         @download="nudge"
+        @active="storyIndex = $event"
       />
-      <FlapBoard :copy="t.flap" :chapter="t.chapters.sync" :sample="t.sample" />
-      <AppDemo :copy="t.demo" :sample="t.sample" />
-      <AiHandoff :copy="t.ai" :chapter="t.chapters.ai" :sample="t.sample" />
-      <BentoGrid :copy="t.bento" />
+
+      <section id="devices" class="lp-section devices" data-reveal>
+        <p class="devices-label">{{ t.hero.devices }}</p>
+        <DeviceMarquee />
+      </section>
+
       <PrivacyFlow :copy="t.privacy" />
       <ConnectPaths :copy="t.connect" />
       <FinalCta
@@ -104,6 +139,9 @@ onMounted(() => {
 
 <style src="./landing/landing.css"></style>
 <style scoped>
+.devices { padding-top: 120px; width: 100%; max-width: none; }
+.devices-label { margin: 0 0 26px; color: var(--lp-subtle); font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; text-align: center; text-transform: uppercase; }
+
 .lp-footer { display: grid; justify-items: center; gap: 10px; width: min(1180px, calc(100% - 40px)); margin: 120px auto 0; padding: 40px 0 56px; border-top: 1px solid var(--lp-line); color: var(--lp-subtle); font-size: 14px; text-align: center; }
 .lp-footer p { margin: 0; }
 .lp-footer-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--lp-ink); text-decoration: none; }
@@ -124,15 +162,15 @@ onMounted(() => {
   padding: 16px 18px;
   border: 1px solid var(--lp-line-2);
   border-radius: 20px;
-  background: color-mix(in srgb, var(--lp-panel) 90%, transparent);
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .6);
+  background: color-mix(in srgb, var(--lp-panel) 92%, transparent);
+  box-shadow: 0 30px 60px -20px rgba(20, 30, 14, .45);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   font-size: 13.5px;
 }
 .lp-nudge strong { display: block; font-size: 14.5px; }
 .lp-nudge p { margin: 3px 0 0; color: var(--lp-muted); line-height: 1.5; }
-.lp-nudge a { padding: 8px 14px; border-radius: 999px; background: var(--lp-ink); color: var(--lp-bg); font-weight: 650; text-decoration: none; white-space: nowrap; }
+.lp-nudge a { padding: 8px 14px; border-radius: 999px; background: var(--lp-green); color: var(--lp-green-ink); font-weight: 650; text-decoration: none; white-space: nowrap; }
 .lp-nudge button { padding: 8px 10px; border: 0; background: transparent; color: var(--lp-subtle); font: inherit; cursor: pointer; white-space: nowrap; }
 .lp-nudge-enter-active, .lp-nudge-leave-active { transition: opacity .3s ease, transform .5s var(--lp-ease); }
 .lp-nudge-enter-from, .lp-nudge-leave-to { opacity: 0; transform: translateY(20px) scale(.97); }

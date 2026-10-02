@@ -1,3 +1,5 @@
+// 必须第一个：路由器和落地页开关在被导入时就要知道这次是不是演示（见 demo/early.ts）。
+import "./demo/early";
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
@@ -18,9 +20,12 @@ import "./styles/material.css";
 if (isLandingMode()) applyLandingTheme();
 else initializeTheme();
 
+const demo = window.__ZB_DEMO__?.demo === true;
+
 const mount = () => {
   const app = createApp(App);
   app.use(router).mount("#app");
+  if (demo) void import("./demo/bootstrap").then((module) => module.startDemoHost(router));
 };
 
 // 语言要在第一次渲染之前定下来，否则界面会先闪一下另一种语言。nl/de/fr/ru/pt/hi
@@ -32,8 +37,15 @@ const mountOnce = () => {
   mounted = true;
   mount();
 };
-void initializeLocale().then(mountOnce, mountOnce);
-window.setTimeout(mountOnce, 800);
+// 演示模式要先装好假运行时（动态 import 的 chunk），再定主题 / 语言，最后才能挂载；兜底时间也放宽。
+const ready = demo
+  ? import("./demo/runtime")
+    .then((module) => module.installDemoRuntime())
+    .then(() => import("./demo/bootstrap"))
+    .then((module) => module.prepareDemoAppearance())
+  : Promise.resolve();
+void ready.then(() => initializeLocale()).then(mountOnce, mountOnce);
+window.setTimeout(mountOnce, demo ? 6000 : 800);
 
 /* 窗口真的看不见（最小化 / 被完全挡住）时给 <html> 挂一个类，material.css 据此暂停动画。
    不再看焦点：以前窗口可见但没焦点（第二屏、系统另存为对话框、启动瞬间 WebView2 还没

@@ -1,22 +1,22 @@
 import { ref } from 'vue';
 
 /**
- * 落地页的主题：**默认深色**（网站以深色为主），访客自己切过才记住浅色。
+ * 落地页的主题：**默认浅色**（暖白的纸），访客自己切过才记住深色。
  * 和应用的主题（composables/useTheme.ts，默认跟随系统）分开存，互不影响。
- * main.ts 在落地模式下首帧前就调 `applyLandingTheme()`，不会先闪一帧浅色。
+ * main.ts 在落地模式下首帧前就调 `applyLandingTheme()`，不会先闪一帧另一套。
  */
 export type LandingTheme = 'dark' | 'light';
 const STORAGE_KEY = 'zeppbridge-landing-theme';
 
 const read = (): LandingTheme => {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'light' ? 'light' : 'dark';
+    return window.localStorage.getItem(STORAGE_KEY) === 'dark' ? 'dark' : 'light';
   } catch {
-    return 'dark';
+    return 'light';
   }
 };
 
-export const landingTheme = ref<LandingTheme>('dark');
+export const landingTheme = ref<LandingTheme>('light');
 
 export const applyLandingTheme = () => {
   landingTheme.value = read();

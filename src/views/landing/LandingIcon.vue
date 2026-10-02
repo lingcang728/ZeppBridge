@@ -2,7 +2,7 @@
 /* 落地页自己的一小套线性图标（24 网格、1.7 描边、圆角端点），不背应用那张大图标表。 */
 export type LandingIconName =
   | 'watch' | 'laptop' | 'sparkle' | 'arrow-right' | 'download' | 'github' | 'lock' | 'folder'
-  | 'terminal' | 'globe' | 'moon' | 'sun' | 'check' | 'key' | 'eye-off' | 'file' | 'cloud' | 'chevron-down';
+  | 'terminal' | 'globe' | 'moon' | 'sun' | 'check' | 'key' | 'eye-off' | 'file' | 'cloud' | 'chevron-down' | 'x';
 
 withDefaults(defineProps<{ name: LandingIconName; size?: number }>(), { size: 20 });
 </script>
@@ -23,6 +23,9 @@ withDefaults(defineProps<{ name: LandingIconName; size?: number }>(), { size: 20
     <template v-if="name === 'watch'">
       <rect x="6" y="6" width="12" height="12" rx="3.5" />
       <path d="M9 6 9.6 2.8h4.8L15 6M9 18l.6 3.2h4.8L15 18M12 9.5V12l1.6 1" />
+    </template>
+    <template v-else-if="name === 'x'">
+      <path d="M6 6l12 12M18 6 6 18" />
     </template>
     <template v-else-if="name === 'laptop'">
       <rect x="4" y="5" width="16" height="11" rx="2" />

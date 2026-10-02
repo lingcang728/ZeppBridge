@@ -88,6 +88,15 @@ components/plan/plan.unverifiedNote
 components/plan/plan.warmup
 components/plan/plan.wasName
 composables/useSyncController.cleanupFailed
+demo/texts.easyRun
+demo/texts.intervals
+demo/texts.lifeEvent
+demo/texts.longRun
+demo/texts.nickname
+demo/texts.recoveryRide
+demo/texts.taskFile
+demo/texts.taskTitle
+demo/texts.tempoRun
 i18n/errors.err.app.starting
 i18n/errors.err.core.timed_out
 lib/aiTask/planGuide.guide

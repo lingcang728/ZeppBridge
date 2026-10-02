@@ -38,6 +38,36 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
+    file: 'demo/ai.ts',
+    text: 'distance_meters:',
+    why: '演示数据复刻后端原样返回的单位键值（「步」「次/分」这类）；界面按单位表（lib/aiTask/metrics.ts 的 unitLabel）本地化，查不到才原样显示，和真后端的行为一致。',
+  },
+  {
+    file: 'demo/ai.ts',
+    text: "resting_hr: 'bpm'",
+    why: '同上，演示的单位键值。',
+  },
+  {
+    file: 'demo/ai.ts',
+    text: 'ui.ai_task.warn.',
+    why: '后端预览警告的「码 + 中文兜底原文」；界面先按码取自己语言的说法，英文界面里 backendText 闸门不会输出这段中文。演示只是照后端的形状给数据。',
+  },
+  {
+    file: 'demo/dataset.ts',
+    text: "hrv: 'ms', hrv_rmssd",
+    why: '演示日指标的单位键值，和真后端一致（「步」「次/分」）。',
+  },
+  {
+    file: 'demo/facts.ts',
+    text: "fact('workout_count'",
+    why: '一周对比里「次」是后端给的单位值，界面按指标 id 取自己语言的单位写法。',
+  },
+  {
+    file: 'demo/facts.ts',
+    text: "recordsUnit: '条'",
+    why: '能力看板的 recordsUnit 是后端的中文兜底，界面先按 recordsUnitCode 取自己语言的说法。',
+  },
+  {
     file: 'views/landing/BentoGrid.vue',
     text: 'const GREETINGS',
     why: '落地页「十种界面语言」那一格滚动的是十种语言各自的问候语，每个词本来就该是它自己的文字。',
@@ -256,6 +286,8 @@ const isProseRisk = (line) => {
 };
 
 const ALLOWED_PROSE = [
+  { file: 'views/landing/HandoffOverlay.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
+  { file: 'views/landing/StageWindow.vue', text: 'copy.note', why: '同上，落地页文案。' },
   { file: 'views/landing/AiHandoff.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
   { file: 'views/landing/ConnectPaths.vue', text: 'copy.note', why: '同上，落地页文案。' },
   { file: 'views/landing/FinalCta.vue', text: 'downloads.linux.note', why: '同上，落地页文案。' },

@@ -1,26 +1,28 @@
 /*
  * 落地页的共用样式（不 scoped：各段组件共用这些类和 token；类名一律 lp- 开头，不碰应用的样式）。
- * 深色为主：默认深色，浅色是切换出来的另一套。颜色从 tokens.css 的品牌色 / 类别色派生，
- * 落地页自己只多定义「更深的底」和几道光。
+ *
+ * 2026-10 重做的设计语言：**纸**。浅色是暖白的纸，深色是应用自己的冷灰黑；只有一个强调色（橄榄绿）,
+ * 不再有紫色和渐变字——强调靠一道荧光笔式的底色（.lp-mark），像杂志里被人划过的那一句。
+ * 版式靠留白、细线和很大的字号，不靠卡片堆叠。产品本身（页面里嵌的真应用）才是页面上最有色彩的东西。
+ *
+ * 色值从应用 tokens.css 派生（品牌色、暗色底），落地页只多定义「纸」。
  */
 .lp {
-  --lp-bg: #05070a;
-  --lp-bg-2: #0a0d11;
-  --lp-panel: #0e1217;
-  --lp-panel-2: #131820;
-  --lp-line: rgba(255, 255, 255, .07);
-  --lp-line-2: rgba(255, 255, 255, .12);
-  --lp-ink: #f3f5f0;
-  --lp-muted: #a3abb4;
-  --lp-subtle: #6f7882;
-  --lp-green: #8fc24a;
-  --lp-teal: #3fd0b4;
-  --lp-violet: #8b7cf6;
-  --lp-glow: rgba(143, 194, 74, .35);
-  --lp-glow-2: rgba(63, 208, 180, .22);
-  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 30px 80px -30px rgba(0, 0, 0, .8);
+  --lp-bg: #f3f0e7;
+  --lp-bg-2: #eae6d9;
+  --lp-panel: #fbfaf5;
+  --lp-panel-2: #f5f2e8;
+  --lp-line: rgba(30, 36, 26, .11);
+  --lp-line-2: rgba(30, 36, 26, .2);
+  --lp-ink: #1b2118;
+  --lp-muted: #4a5445;
+  --lp-subtle: #6b7564;
+  --lp-green: #2f6b4f;
+  --lp-green-ink: #ffffff;
+  --lp-mark: #cfe580;
+  --lp-glow: rgba(47, 107, 79, .22);
+  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .85) inset, 0 50px 90px -50px rgba(30, 40, 24, .5);
   --lp-ease: cubic-bezier(.22, .8, .2, 1);
-  --lp-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -30,70 +32,65 @@
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-:root[data-theme='light'] .lp {
-  --lp-bg: #f6f7f3;
-  --lp-bg-2: #eef1ea;
-  --lp-panel: #ffffff;
-  --lp-panel-2: #f7f9f4;
-  --lp-line: rgba(20, 30, 20, .08);
-  --lp-line-2: rgba(20, 30, 20, .14);
-  --lp-ink: #151a14;
-  --lp-muted: #4d574a;
-  --lp-subtle: #7a8576;
-  --lp-green: #3f7f2f;
-  --lp-teal: #13856f;
-  --lp-violet: #6a52d9;
-  --lp-glow: rgba(110, 170, 60, .28);
-  --lp-glow-2: rgba(40, 170, 140, .18);
-  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 30px 70px -36px rgba(30, 50, 30, .35);
+:root[data-theme='dark'] .lp {
+  --lp-bg: #0c0e11;
+  --lp-bg-2: #08090c;
+  --lp-panel: #16191e;
+  --lp-panel-2: #1d2128;
+  --lp-line: rgba(226, 234, 242, .09);
+  --lp-line-2: rgba(226, 234, 242, .18);
+  --lp-ink: #f2f4ee;
+  --lp-muted: #b4bbc3;
+  --lp-subtle: #8a929b;
+  --lp-green: #93b952;
+  --lp-green-ink: #12170a;
+  --lp-mark: rgba(125, 163, 62, .42);
+  --lp-glow: rgba(125, 163, 62, .28);
+  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset, 0 50px 100px -40px rgba(0, 0, 0, .85);
 }
-.lp ::selection { background: color-mix(in srgb, var(--lp-green) 40%, transparent); }
+.lp ::selection { background: color-mix(in srgb, var(--lp-green) 32%, transparent); }
 .lp a { color: inherit; }
 .lp :focus-visible { outline: 2px solid var(--lp-green); outline-offset: 3px; border-radius: 8px; }
 
-/* ── 段落骨架 ── */
-.lp-section { position: relative; width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 140px 0 0; }
-.lp-chapter {
+/* ── 版心与段落骨架 ── */
+.lp-wrap { width: min(1280px, calc(100% - 48px)); margin: 0 auto; }
+.lp-section { position: relative; width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 140px 0 0; }
+
+/* 小标：「03 · 交给 AI」——等宽字、大写、字距拉开，前面一条短线。像杂志的栏目标。 */
+.lp-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin: 0 0 18px;
   color: var(--lp-green);
   font-family: var(--font-mono);
   font-size: 12.5px;
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
-.lp-chapter::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: .6; }
+.lp-kicker::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: .55; }
 .lp-h2 {
-  max-width: 17em;
+  max-width: 16em;
   margin: 0;
-  font-size: clamp(32px, 4.4vw, 58px);
+  font-size: clamp(32px, 4.6vw, 62px);
   font-weight: 700;
-  letter-spacing: -.025em;
-  line-height: 1.08;
+  letter-spacing: -.03em;
+  line-height: 1.06;
   text-wrap: balance;
 }
-.lp-lead { max-width: 38em; margin: 18px 0 0; color: var(--lp-muted); font-size: clamp(16px, 1.35vw, 18.5px); line-height: 1.65; text-wrap: pretty; }
+.lp-lead { max-width: 38em; margin: 20px 0 0; color: var(--lp-muted); font-size: clamp(16px, 1.3vw, 18.5px); line-height: 1.7; text-wrap: pretty; }
 .lp-center { text-align: center; }
 .lp-center .lp-h2, .lp-center .lp-lead { margin-left: auto; margin-right: auto; }
 
-/* 强调：拉丁语系用衬线斜体；中文、印地文、俄文没有好看的斜体，改成渐变色。 */
-.lp-accent {
-  background: linear-gradient(100deg, var(--lp-green) 10%, var(--lp-teal) 60%, var(--lp-violet));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.lp:lang(en) .lp-accent, .lp:lang(es) .lp-accent, .lp:lang(de) .lp-accent, .lp:lang(fr) .lp-accent,
-.lp:lang(nl) .lp-accent, .lp:lang(pt) .lp-accent {
-  font-family: var(--lp-serif);
-  font-style: italic;
-  font-weight: 500;
-  letter-spacing: -.01em;
+/* 荧光笔：被划过的那一句。只是一道平的底色，不是渐变字。换行时每一行都有。 */
+.lp-mark {
+  background: linear-gradient(transparent 58%, var(--lp-mark) 58% 90%, transparent 90%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 .06em;
 }
 
-/* 演示角标 */
+/* 演示角标：「示例」。 */
 .lp-sample {
   display: inline-flex;
   align-items: center;
@@ -107,16 +104,14 @@
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.lp-sample::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--lp-violet); }
+.lp-sample::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--lp-green); }
 
-/* 面板：深色玻璃感的卡（静态的高光和描边，不逐帧模糊）。 */
+/* 面板：纸上的一张卡——实色、细边、一层深深的软影。 */
 .lp-panel {
   position: relative;
   border: 1px solid var(--lp-line);
   border-radius: 26px;
-  background:
-    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--lp-green) 6%, transparent), transparent 60%),
-    linear-gradient(180deg, var(--lp-panel-2), var(--lp-panel));
+  background: linear-gradient(180deg, var(--lp-panel), var(--lp-panel-2));
   box-shadow: var(--lp-shadow);
 }
 
@@ -128,7 +123,7 @@
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lp-green) 12%, transparent), transparent 60%);
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lp-green) 10%, transparent), transparent 60%);
   opacity: 0;
   transition: opacity .35s ease;
   pointer-events: none;
@@ -150,27 +145,27 @@
   cursor: pointer;
   transition: transform .5s var(--lp-ease), box-shadow .3s ease, background .3s ease;
 }
-.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: .7; }
+.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: .72; }
 .lp-btn-primary {
-  background: linear-gradient(180deg, #a6d65f, #7fb13d);
-  color: #0b1305;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25) inset, 0 12px 40px -10px var(--lp-glow);
+  background: var(--lp-green);
+  color: var(--lp-green-ink);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .22) inset, 0 14px 32px -14px var(--lp-glow);
 }
-.lp-btn-primary:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, .3) inset, 0 16px 56px -8px var(--lp-glow); }
-:root[data-theme='light'] .lp-btn-primary { background: linear-gradient(180deg, #4f9a3a, #2f6b2f); color: #fff; }
-.lp-btn-ghost { border: 1px solid var(--lp-line-2); background: color-mix(in srgb, var(--lp-panel) 60%, transparent); color: var(--lp-ink); }
+.lp-btn-primary:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, 0 20px 44px -12px var(--lp-glow); filter: brightness(1.05); }
+.lp-btn-ghost { border: 1px solid var(--lp-line-2); background: transparent; color: var(--lp-ink); }
 .lp-btn-ghost:hover { background: var(--lp-panel-2); }
 .lp-btn:active { transition-duration: .1s; }
 
 /* ── 滚动显现：`data-reveal` 先藏着，进视口加 .is-in，按 --i 错开。 ── */
-.lp [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity .9s var(--lp-ease), transform .9s var(--lp-ease); transition-delay: calc(var(--i, 0) * 90ms); }
+.lp [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--lp-ease), transform .9s var(--lp-ease); transition-delay: calc(var(--i, 0) * 90ms); }
 .lp [data-reveal].is-in { opacity: 1; transform: none; }
 
 /* 循环动画离屏不跑：带 data-live 的块，看不见时暂停里面所有动画。 */
 .lp [data-live]:not(.is-live) *, .lp [data-live]:not(.is-live)::before, .lp [data-live]:not(.is-live)::after { animation-play-state: paused !important; }
 
 @media (max-width: 720px) {
-  .lp-section { width: calc(100% - 32px); padding-top: 96px; }
+  .lp-wrap, .lp-section { width: calc(100% - 32px); }
+  .lp-section { padding-top: 96px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp [data-reveal] { opacity: 1; transform: none; transition: none; }
@@ -183,6 +178,7 @@
 /* 应用骨架把 html / body / #app 锁成一屏高、不滚（滚动在 #main-content 里）。落地页要整页滚：
    有 .lp 的时候放开（落地页 chunk 只在浏览器打开时加载，不影响桌面应用）。 */
 html:has(.lp), html:has(.lp) body, html:has(.lp) #app { height: auto; min-height: 100%; overflow: visible; }
-html:has(.lp) { scroll-behavior: smooth; background: #05070a; }
-:root[data-theme='light']:has(.lp) { background: #f6f7f3; }
+html:has(.lp) { scroll-behavior: smooth; }
+:root[data-theme='light']:has(.lp) { background: #f3f0e7; }
+:root[data-theme='dark']:has(.lp) { background: #0c0e11; }
 @media (prefers-reduced-motion: reduce) { html:has(.lp) { scroll-behavior: auto; } }

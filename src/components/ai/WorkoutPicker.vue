@@ -165,7 +165,7 @@ const facts = (workout: Workout): string => {
   background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--activity); }
 .row-copy { display: grid; flex: 1; min-width: 0; gap: 2px; overflow-wrap: anywhere; }
 .row-name { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.row-facts { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.row-facts { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: normal; }
 .row-check { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent); color: transparent;
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease, scale var(--dur-base) var(--ease-spring); }
