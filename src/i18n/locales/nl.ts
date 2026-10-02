@@ -2696,6 +2696,10 @@ Antwoord in Markdown.`,
     'err.mcp.scope_denied': 'Dat verzoek valt buiten de taken die met MCP zijn gedeeld',
     'err.mcp.scope_no_grants':
       'Nog geen taak is voor MCP opengesteld. Markeer op de takenpagina een taak als ‘open voor MCP’ en probeer opnieuw',
+    'err.training_plan.draft_not_found': 'Dit planconcept bestaat niet meer',
+    'err.training_plan.draft_closed': 'Dit planconcept is al verstuurd of weggegooid',
+    'err.training_plan.publish_not_found': 'Er is geen registratie van deze verzending',
+    'err.training_plan.rejected': 'Zepp heeft dit plan niet geaccepteerd; het plan op je horloge is niet veranderd',
     'err.prefs.retention_out_of_range': 'De bewaartermijn moet tussen 1 en 365 dagen liggen',
     'err.storage.worker_failed': 'De achtergrondtaak voor de database is onderbroken',
     'err.storage.write_busy':

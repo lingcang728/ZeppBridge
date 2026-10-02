@@ -176,6 +176,12 @@ const messages = defineMessages(
     /* —— MCP 访问范围（stdio 工具的调用方是模型；这两份是给人看的兜底） —— */
     'err.mcp.scope_denied': '这条查询超出了开放给 MCP 的任务范围',
     'err.mcp.scope_no_grants': '还没有任务开放给 MCP。在任务页把任务标为「开放给 MCP」后再试',
+
+    /* —— 训练计划 —— */
+    'err.training_plan.draft_not_found': '找不到这份计划草稿',
+    'err.training_plan.draft_closed': '这份计划草稿已经发过或丢掉了',
+    'err.training_plan.publish_not_found': '找不到这次推送的记录',
+    'err.training_plan.rejected': 'Zepp 没有接受这份计划，手表上的计划没有变',
   },
   {
     /* —— core —— */
@@ -354,6 +360,12 @@ const messages = defineMessages(
     /* —— MCP access scope (the caller is a model; these are the human fallback) —— */
     'err.mcp.scope_denied': 'That request is outside the tasks shared with MCP',
     'err.mcp.scope_no_grants': 'No task is open to MCP yet — mark a task "open to MCP" on its page and retry',
+
+    /* —— training plans —— */
+    'err.training_plan.draft_not_found': 'This plan draft no longer exists',
+    'err.training_plan.draft_closed': 'This plan draft was already sent or discarded',
+    'err.training_plan.publish_not_found': 'No record of that push',
+    'err.training_plan.rejected': 'Zepp did not accept this plan; the plan on your watch is unchanged',
   },
   {
     /* —— core —— */
@@ -533,6 +545,12 @@ const messages = defineMessages(
     /* —— MCP access scope —— */
     'err.mcp.scope_denied': 'Solicitud fuera de las tareas compartidas con MCP',
     'err.mcp.scope_no_grants': 'Ninguna tarea compartida con MCP todavía: habilita una en su página y reintenta',
+
+    /* —— planes de entrenamiento —— */
+    'err.training_plan.draft_not_found': 'Este borrador de plan ya no existe',
+    'err.training_plan.draft_closed': 'Este borrador ya se envió o se descartó',
+    'err.training_plan.publish_not_found': 'No hay registro de ese envío',
+    'err.training_plan.rejected': 'Zepp no aceptó este plan; el plan de tu reloj no cambió',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

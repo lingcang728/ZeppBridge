@@ -151,10 +151,12 @@ impl StageErrorKind {
             E::CloudRejected { code, .. } => StageErrorKind::CloudRejected { code: *code },
             E::Busy(_) => StageErrorKind::Busy,
             E::DatabaseError(_) | E::IoError(_) => StageErrorKind::Storage,
-            // ai_task 的错误不会出现在同步流水线上；真出现算「不知道是什么」。
-            E::InvalidHost(_) | E::ConfigError(_) | E::AiTask(_) | E::Unknown(_) => {
-                StageErrorKind::Unknown
-            }
+            // ai_task / 训练计划的错误不会出现在同步流水线上；真出现算「不知道是什么」。
+            E::InvalidHost(_)
+            | E::ConfigError(_)
+            | E::AiTask(_)
+            | E::TrainingPlan { .. }
+            | E::Unknown(_) => StageErrorKind::Unknown,
         }
     }
 }

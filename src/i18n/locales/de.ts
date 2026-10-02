@@ -152,6 +152,10 @@ export default {
     'err.mcp.scope_denied': 'Diese Anfrage liegt außerhalb der für MCP freigegebenen Aufgaben',
     'err.mcp.scope_no_grants':
       'Noch keine Aufgabe für MCP freigegeben. Markiere eine Aufgabe auf der Aufgabenseite als freigegeben und versuche es erneut',
+    'err.training_plan.draft_not_found': 'Dieser Planentwurf existiert nicht mehr',
+    'err.training_plan.draft_closed': 'Dieser Planentwurf wurde schon gesendet oder verworfen',
+    'err.training_plan.publish_not_found': 'Zu diesem Versand gibt es keinen Eintrag',
+    'err.training_plan.rejected': 'Zepp hat diesen Plan nicht angenommen; der Plan auf deiner Uhr ist unverändert',
   },
 
   // ── 后端 ui.* 散文码的兜底表 ──

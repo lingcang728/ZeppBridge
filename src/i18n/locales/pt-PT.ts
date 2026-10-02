@@ -2675,6 +2675,10 @@ Responde em formato Markdown.`,
     'err.mcp.scope_denied': 'Pedido fora do âmbito das tarefas partilhadas com o MCP',
     'err.mcp.scope_no_grants':
       'Nenhuma tarefa partilhada com o MCP. Ativa a partilha na página da tarefa',
+    'err.training_plan.draft_not_found': 'Este rascunho de plano já não existe',
+    'err.training_plan.draft_closed': 'Este rascunho já foi enviado ou descartado',
+    'err.training_plan.publish_not_found': 'Não há registo desse envio',
+    'err.training_plan.rejected': 'A Zepp não aceitou este plano; o plano do teu relógio não mudou',
   },
   backendText: {
     'ui.backup.file_missing': 'Ficheiro de cópia de segurança não encontrado na pasta',

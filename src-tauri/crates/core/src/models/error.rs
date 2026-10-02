@@ -190,6 +190,10 @@ pub enum ZeppBridgeError {
     #[error("{0}")]
     AiTask(#[from] crate::ai_tasks::AiTaskError),
 
+    /// 训练计划这一层的业务失败（`err.training_plan.*`）：草稿不存在、已经发过等。
+    #[error("{message}")]
+    TrainingPlan { code: &'static str, message: String },
+
     #[allow(dead_code)]
     #[error("未知错误: {0}")]
     Unknown(String),
@@ -251,6 +255,7 @@ impl ZeppBridgeError {
             Self::DatabaseError(_) => "err.core.database",
             Self::IoError(_) => "err.core.io",
             Self::AiTask(inner) => inner.code(),
+            Self::TrainingPlan { code, .. } => code,
             Self::AccountMismatch => "err.core.account_mismatch",
             Self::Unknown(_) => "err.core.unknown",
         }
@@ -294,6 +299,7 @@ impl ZeppBridgeError {
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),
             Self::AiTask(inner) => inner.user_message(),
+            Self::TrainingPlan { message, .. } => sanitize_user_text(message),
             Self::AccountMismatch => "这个数据库里已经是另一个 Zepp 账号的数据，没有写入当前账号。\
                 要换账号，请先关掉 ZeppBridge，把 data 文件夹移走或改名，再重新连接。"
                 .into(),

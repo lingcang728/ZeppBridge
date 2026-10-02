@@ -73,6 +73,7 @@ mod official;
 mod queries;
 mod replay;
 mod schema;
+mod training_plan;
 
 mod open;
 mod owner;

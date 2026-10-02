@@ -241,6 +241,31 @@ impl OfficialClient {
         bounded_json(response).await
     }
 
+    /// 官方写接口的一次 POST。只把状态码和报文交回去，怎么算成功由调用方定——
+    /// 训练计划接口对任何报文都回 success，不能在这里替它下结论。
+    ///
+    /// 网络层失败（断网、超时）原样作为错误返回：这时请求可能已经到了服务端，
+    /// 调用方要按「不确定」处理，不能当成没发。
+    pub async fn post_json(
+        &self,
+        access_token: &str,
+        path: &str,
+        query: &[(&str, String)],
+        body: &serde_json::Value,
+    ) -> Result<(u16, serde_json::Value)> {
+        let response = self
+            .http
+            .post(format!("{}{path}", self.api_base))
+            .query(query)
+            .bearer_auth(access_token)
+            .json(body)
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        let body = bounded_json(response).await.unwrap_or_default();
+        Ok((status, body))
+    }
+
     /// 在 Zepp 那边撤销授权。断开连接时调用；失败不影响本机清掉令牌。
     pub async fn revoke(&self, access_token: &str) -> Result<()> {
         let response = self

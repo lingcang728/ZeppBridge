@@ -2734,6 +2734,10 @@ export default {
     'err.ai_template.builtin_readonly': 'Встроенные шаблоны доступны только для чтения: сохраните копию',
     'err.mcp.scope_denied': 'Запрос не разрешён областью видимости MCP',
     'err.mcp.scope_no_grants': 'Ни одна задача пока не открыта для MCP. Отметьте задачу как «открыта для MCP» на её странице и повторите',
+    'err.training_plan.draft_not_found': 'Этого черновика плана больше нет',
+    'err.training_plan.draft_closed': 'Этот черновик уже отправлен или удалён',
+    'err.training_plan.publish_not_found': 'Нет записи об этой отправке',
+    'err.training_plan.rejected': 'Zepp не принял этот план; план на часах не изменился',
   },
 
   backendText: {

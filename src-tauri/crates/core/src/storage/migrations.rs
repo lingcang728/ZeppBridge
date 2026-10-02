@@ -1112,6 +1112,55 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(34, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v35：训练计划写入（官方 `POST /users/-/workouts`）。
+        //
+        // 官方没有读取接口，「手表上现在有什么」只能靠这里的发布账本：
+        // - `training_plan_drafts`：人、粘贴的 AI 回复、MCP 写进来的计划原文；
+        // - `training_plan_workouts`：发布后生效的逐条训练。行只增不改，`id` 就是
+        //   V2 的 `workoutId`；换计划只是翻 `active`，所以账本里的旧推送永远能还原；
+        // - `training_plan_publishes`：每一次推送的整窗快照、发出去的报文和结果。
+        //   **先写这一行再发请求**，发完再补结果。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS training_plan_drafts (
+                id TEXT PRIMARY KEY,
+                origin TEXT NOT NULL,
+                document TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS training_plan_workouts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                draft_id TEXT NOT NULL,
+                workout_date TEXT NOT NULL,
+                workout TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_training_plan_workouts_active
+                 ON training_plan_workouts(active, workout_date);
+             CREATE TABLE IF NOT EXISTS training_plan_publishes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                draft_id TEXT,
+                window_start TEXT NOT NULL,
+                window_ids TEXT NOT NULL DEFAULT '[]',
+                body TEXT NOT NULL,
+                activated TEXT NOT NULL DEFAULT '[]',
+                deactivated TEXT NOT NULL DEFAULT '[]',
+                state TEXT NOT NULL,
+                http_status INTEGER,
+                error_code TEXT,
+                undone INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                finished_at TEXT
+             );
+             PRAGMA user_version = 35;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(35, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // 全新建的库（进来时 user_version = 0）默认开长期归档：记录属于用户，默认不自动清理
         // （用户 2026-09-29 定：首次建库推荐长期保留）。已有的库不动——它们没写过这个键时
         // 一直是「只留最近 N 天」，改默认值等于替用户改了设置；2.x 共用的真实库也就不受影响。
