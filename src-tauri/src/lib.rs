@@ -37,7 +37,9 @@ use commands::{
     set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
     set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
     start_incremental_sync, start_official_login, start_web_login, submit_device_model_assignment,
-    submit_diagnostic_report, verify_auth, verify_backup,
+    submit_diagnostic_report, training_plan_discard, training_plan_preview, training_plan_publish,
+    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state, verify_auth,
+    verify_backup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -676,6 +678,12 @@ pub fn run() {
             get_coverage_ledger,
             reset_coverage_ledger,
             retry_failed_backfill_chunks,
+            training_plan_state,
+            training_plan_save_draft,
+            training_plan_preview,
+            training_plan_discard,
+            training_plan_set_ai_publish,
+            training_plan_publish,
             set_tray_locale,
             local_api::get_local_api_status,
             local_api::set_local_api_enabled,

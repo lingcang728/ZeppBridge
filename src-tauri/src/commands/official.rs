@@ -388,7 +388,11 @@ pub async fn disconnect_official(
     let store = OfficialStore::new(&data_dir);
     if let Ok(Some(tokens)) = store.load() {
         if let Ok(client) = OfficialClient::new() {
-            let _ = client.revoke(&tokens.access_token).await;
+            // 撤销成功时官方会一并删掉已同步的训练计划（不能再发空数组），
+            // 本地账本跟着清零；撤销没成功就不动账本——计划可能还在手表上。
+            if client.revoke(&tokens.access_token).await.is_ok() {
+                super::training_plan::forget_after_revoke(&state).await;
+            }
         }
     }
     store

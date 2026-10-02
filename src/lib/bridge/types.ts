@@ -1,6 +1,7 @@
 import type {
   HourlySteps,
   LifeEvent, LifeEventInput,
+  PlanDocument, PlanDraftPreview, PlanPublishAction, PlanPublishResult, TrainingPlanState,
   AppStatus,
   DailyHeartRateExtreme,
   Page,
@@ -264,6 +265,14 @@ export interface BridgeBackend {
   listLifeEvents(start?: string, end?: string): Promise<LifeEvent[]>;
   saveLifeEvent(input: LifeEventInput): Promise<number>;
   deleteLifeEvent(id: number): Promise<void>;
+
+  /** 训练计划：草稿 → 预览 → 发到手表 / 撤销 / 清空。见 core `training_plan`。 */
+  trainingPlanState(): Promise<TrainingPlanState>;
+  trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
+  trainingPlanPreview(id: string): Promise<PlanDraftPreview>;
+  trainingPlanDiscard(id: string): Promise<boolean>;
+  trainingPlanSetAiPublish(allowed: boolean): Promise<boolean>;
+  trainingPlanPublish(action: PlanPublishAction, confirmClear: boolean): Promise<PlanPublishResult>;
   getAppStatus(): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;

@@ -416,6 +416,12 @@ async fn run_sync(
         *state.auth_warning.write().await = None;
     }
 
+    // 窗口每天往前挪一格：同步完顺手把新进窗口的训练计划发出去（没连官方、窗口
+    // 为空或内容没变都不发）。
+    if official {
+        super::training_plan::roll_after_sync(state).await;
+    }
+
     Ok(ui_sync_report(
         report,
         started_at,

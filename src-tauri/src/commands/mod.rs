@@ -6,6 +6,7 @@ mod login;
 mod official;
 mod status;
 mod sync;
+mod training_plan;
 
 use crate::ipc_error::AppError;
 use std::path::{Path, PathBuf};
@@ -179,6 +180,11 @@ pub(crate) use sync::{
     cancel_sync, get_coverage_ledger, probe_data_capabilities, reset_coverage_ledger,
     retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
     start_incremental_sync,
+};
+
+pub(crate) use training_plan::{
+    training_plan_discard, training_plan_preview, training_plan_publish, training_plan_save_draft,
+    training_plan_set_ai_publish, training_plan_state,
 };
 
 mod life_events;

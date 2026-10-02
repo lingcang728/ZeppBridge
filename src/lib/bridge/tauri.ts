@@ -15,6 +15,9 @@ import type {
 import type {
   HourlySteps,
   LifeEvent,
+  PlanDraftPreview,
+  PlanPublishResult,
+  TrainingPlanState,
   DailyHeartRateExtreme,
   Page,
   AppStatus,
@@ -142,6 +145,14 @@ export const tauriBackend: BridgeBackend = {
   listLifeEvents(start, end) { return call<LifeEvent[]>('list_life_events', { start: start ?? null, end: end ?? null }); },
   saveLifeEvent(input) { return call<number>('save_life_event', { input }); },
   deleteLifeEvent(id) { return call<void>('delete_life_event', { id }); },
+  trainingPlanState() { return call<TrainingPlanState>('training_plan_state'); },
+  trainingPlanSaveDraft(document, pasted) { return call<string>('training_plan_save_draft', { document, pasted }); },
+  trainingPlanPreview(id) { return call<PlanDraftPreview>('training_plan_preview', { id }); },
+  trainingPlanDiscard(id) { return call<boolean>('training_plan_discard', { id }); },
+  trainingPlanSetAiPublish(allowed) { return call<boolean>('training_plan_set_ai_publish', { allowed }); },
+  trainingPlanPublish(action, confirmClear) {
+    return call<PlanPublishResult>('training_plan_publish', { action, confirmClear });
+  },
   getAppStatus() {
     return call<AppStatus>('get_app_status');
   },
