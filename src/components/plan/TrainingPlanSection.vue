@@ -59,8 +59,15 @@ const noticeTone = computed(() => (notice.value ? NOTICE_TONE[notice.value.kind]
 </script>
 
 <template>
-  <section v-if="isDesktop()" class="plan-section" aria-live="polite">
-    <PlanLedger v-if="showLedger && state" :state="state" :busy="busy" @undo="plan.undo()" @clear="plan.clear(false)" />
+  <section v-if="isDesktop()" class="plan-section" aria-labelledby="plan-section-title" aria-live="polite">
+    <!-- 段落标题在卡片外面，和概览页「我的指标」一样；上次推送的账本是标题右边的一行小字。 -->
+    <header class="section-head">
+      <div class="section-copy">
+        <h2 id="plan-section-title">{{ t.sectionTitle }}</h2>
+        <p>{{ t.sectionSub }}</p>
+      </div>
+      <PlanLedger v-if="showLedger && state" :state="state" :busy="busy" @undo="plan.undo()" @clear="plan.clear(false)" />
+    </header>
 
     <div v-if="noticeText" :class="['notice', noticeTone]" role="status">
       <Icon :name="noticeTone === 'ok' ? 'check' : 'warning'" :size="16" />
@@ -85,7 +92,11 @@ const noticeTone = computed(() => (notice.value ? NOTICE_TONE[notice.value.kind]
 </template>
 
 <style scoped>
-.plan-section { display: grid; gap: 14px; margin-top: 20px; }
+.plan-section { display: grid; gap: 14px; margin-top: 36px; }
+.section-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; padding: 0 6px; }
+.section-copy { display: grid; gap: 2px; }
+.section-copy h2 { margin: 0; font-size: var(--fs-2xl); }
+.section-copy p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
 .notice { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-radius: 18px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); font-size: var(--fs-xs); line-height: 1.5; }
 .notice.ok { color: var(--accent); }
 .notice.warn { color: var(--warning); }

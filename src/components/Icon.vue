@@ -64,6 +64,7 @@ export type IconName =
   | 'steps'
   | 'stress'
   | 'sun'
+  | 'swim'
   | 'sync'
   | 'terminal'
   | 'trash'
@@ -200,6 +201,10 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     </g>
     <path v-else-if="name === 'wifi'" d="M3.5 8.8a13.4 13.4 0 0 1 17 0M6.5 12a8.6 8.6 0 0 1 11 0M9.4 15.2a4 4 0 0 1 5.2 0M12 18.7v.1" :stroke-width="stroke" />
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" :stroke-width="stroke" />
+    <g v-else-if="name === 'swim'">
+      <circle cx="16.6" cy="6.4" r="1.9" fill="currentColor" stroke="none" />
+      <path d="m5.5 12.6 4.2-3.4 3.4 2.6 3.6-2.4M3 16.4c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0M3 20c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0" :stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
     <g v-else-if="name === 'bike'">
       <circle cx="6" cy="16" r="3.6" :stroke-width="stroke" />
       <circle cx="18" cy="16" r="3.6" :stroke-width="stroke" />

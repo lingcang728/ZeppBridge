@@ -128,3 +128,16 @@ lib/trainingPlan/issues.ui.training_plan.issue.too_many_steps
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_kind
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_sport
 lib/trainingPlan/issues.ui.training_plan.issue.workout_too_long
+components/ai/TaskGraph.today
+components/ai/TaskGraph.daysUnit
+components/plan/plan.sectionTitle
+components/plan/plan.sectionSub
+components/plan/plan.flowAsk
+components/plan/plan.flowPaste
+components/plan/plan.flowSend
+components/plan/plan.weekSessions
+components/plan/plan.weekTotal
+components/plan/plan.weekHard
+components/plan/plan.weekRest
+components/plan/plan.stepsTitle
+components/plan/plan.chartTitle

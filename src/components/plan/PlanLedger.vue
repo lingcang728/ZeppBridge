@@ -41,12 +41,14 @@ const empty = computed(() => !record.value && props.state.sent.length === 0);
 </template>
 
 <style scoped>
-.ledger { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px 8px 18px; border-radius: 20px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font-size: var(--fs-xs); }
-.lead { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 600; }
+/* 标题右边的一行小字：不再是一整条凹槽。 */
+.ledger { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: var(--fs-2xs); }
+.lead { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: var(--fs-xs); font-weight: 600; }
 .lead i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .lead.warn i { background: var(--warning); }
 .state { color: var(--ink); }
 .days { color: var(--subtle); }
-.acts { display: flex; gap: 2px; margin-left: auto; }
+.acts { display: flex; gap: 2px; }
+.acts .pill-button { min-height: 30px; padding-inline: 12px; font-size: var(--fs-2xs); }
 .pill-button.danger { color: var(--danger); }
 </style>

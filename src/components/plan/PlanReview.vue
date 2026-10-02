@@ -1,16 +1,20 @@
 <script setup lang="ts">
 /**
- * 贴回 AI 的计划之后的审阅卡：左边一天一行（改动一眼可见），右边是选中那天的区间图和步骤，
- * 底栏说清这次会改什么，唯一的主按钮「发到手表」。
+ * 贴回 AI 的计划之后的审阅卡：
+ *   顶上：标题 + 一周小结（几次训练、总时长、几次高强度）+ 改动计数；
+ *   中间：一周一排的日历格（PlanWeekStrip），点哪天下面就换成那天；
+ *   下面：选中那天的强度走势和步骤（PlanDetail）；
+ *   底栏：说清这次会改什么，唯一的主按钮「发到手表」。
  *
  * 默认要人确认，不自动发；有挡住发送的错误（`error`）时按钮不亮，并说还有几处要先改好。
  * `unverified` 只是提醒，可以发。
  */
 import { computed, ref, watch } from 'vue';
-import PlanWeekList from './PlanWeekList.vue';
+import PlanWeekStrip from './PlanWeekStrip.vue';
 import PlanDetail from './PlanDetail.vue';
 import { changeCounts, dayRows, issueDate } from '../../lib/trainingPlan/week';
 import { planIssueText } from '../../lib/trainingPlan/issues';
+import { weekStats } from '../../lib/trainingPlan/summary';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { localDateString } from '../../lib/format';
 import type { PlanDraftPreview } from '../../types/trainingPlan';
@@ -24,10 +28,21 @@ const props = defineProps<{
   busy: boolean;
 }>();
 const emit = defineEmits<{ send: []; discard: [] }>();
-const { t } = usePlanText();
+const { t, minutes } = usePlanText();
 
 const rows = computed(() => dayRows(props.preview, localDateString(new Date())));
 const counts = computed(() => changeCounts(rows.value));
+const stats = computed(() => weekStats(rows.value));
+const statLine = computed(() => {
+  const value = stats.value;
+  const total = minutes(Math.round(value.seconds / 60));
+  return [
+    t.value.weekSessions(value.sessions),
+    value.sessions ? t.value.weekTotal(value.approx ? t.value.totalAbout(total) : total) : '',
+    value.hard ? t.value.weekHard(value.hard) : '',
+    value.restDays ? t.value.weekRest(value.restDays) : '',
+  ].filter(Boolean);
+});
 
 /* 打开时先看最该看的一天：有改动的第一天，其次有训练的第一天。 */
 const selected = ref<string | null>(null);
@@ -61,7 +76,10 @@ const title = computed(() => {
 <template>
   <section class="review surface-card" :aria-label="title">
     <header class="head">
-      <h2>{{ title }}</h2>
+      <div class="title">
+        <h2>{{ title }}</h2>
+        <p class="stats"><span v-for="item in statLine" :key="item">{{ item }}</span></p>
+      </div>
       <span class="sums">
         <span v-if="counts.added" class="badge b-new">{{ t.added(counts.added) }}</span>
         <span v-if="counts.replaced" class="badge b-rep">{{ t.replaced(counts.replaced) }}</span>
@@ -77,10 +95,8 @@ const title = computed(() => {
       </li>
     </ul>
 
-    <div class="body">
-      <PlanWeekList :rows="rows" :selected="selected" @select="selected = $event" />
-      <PlanDetail :row="current" :issues="forDay" />
-    </div>
+    <PlanWeekStrip class="strip" :rows="rows" :selected="selected" @select="selected = $event" />
+    <PlanDetail class="detail" :row="current" :issues="forDay" />
 
     <footer class="foot">
       <p class="txt">
@@ -96,29 +112,30 @@ const title = computed(() => {
 </template>
 
 <style scoped>
-.review { overflow: hidden; border-radius: var(--radius-xl); }
-.head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 20px 24px 14px; }
-.head h2 { margin: 0; font-size: var(--fs-3xl); }
-.sums { display: flex; gap: 6px; }
-.head .discard { margin-left: auto; }
+.review { display: grid; gap: 22px; overflow: hidden; padding: 24px 26px 0; border-radius: var(--radius-xl); }
+.head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; }
+.title { display: grid; flex: 1 1 320px; gap: 6px; min-width: 0; }
+.head h2 { margin: 0; font-size: var(--fs-2xl); line-height: 1.25; }
+.stats { display: flex; flex-wrap: wrap; gap: 2px 0; margin: 0; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.stats span + span::before { content: '·'; margin: 0 8px; color: var(--subtle); }
+.sums { display: flex; gap: 6px; padding-top: 4px; }
+.discard { margin-top: -2px; }
 .badge { display: inline-flex; padding: 2px 10px; border-radius: 999px; font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; }
 .b-new { background: var(--accent-soft); color: var(--accent); }
 .b-rep { background: var(--pace-wash); color: var(--pace); }
 .b-del { background: var(--heart-wash); color: var(--heart); }
-.loose { display: grid; gap: 6px; margin: 0 24px 12px; padding: 0; list-style: none; }
+.loose { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .issue { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 14px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); font-size: var(--fs-xs); line-height: 1.5; }
 .issue .tag { flex: none; padding: 1px 9px; border-radius: 999px; box-shadow: inset 0 0 0 1px currentColor; font-size: 11.5px; font-weight: 700; }
 .issue.error .tag { color: var(--danger); }
 .issue.unverified .tag { color: var(--warning); }
 .issue .msg { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
 .issue .msg b { color: var(--ink); font-weight: 600; }
-.body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
-.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 24px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.strip { margin: 0 -4px; }
+.detail { padding: 22px 2px 4px; border-top: 1px solid var(--line); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 -26px; padding: 14px 26px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 55%, transparent); }
 .txt { flex: 1 1 320px; display: grid; gap: 2px; margin: 0; color: var(--ink); font-size: var(--fs-xs); }
 .txt b { display: inline-flex; align-items: center; gap: 6px; color: var(--warning); }
 .txt span { color: var(--subtle); font-size: var(--fs-2xs); }
 .go { min-height: 42px; margin-left: auto; padding-inline: 22px; border-radius: 999px; font-size: var(--fs-md); }
-@media (max-width: 1180px) {
-  .body { grid-template-columns: minmax(0, 1fr); }
-}
 </style>
