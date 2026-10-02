@@ -10,6 +10,7 @@
  *   右侧：步骤栏，一次只展开一步 —— ① 分析对象 ② 方向与背景 ③ 附件与选项；
  *         收起的步骤只露一行摘要，不用滚动就能看清整个任务。
  *   底部：问题条 + 交付坞。写字和交付在同一块视线里，整页唯一的主按钮「交给 ChatGPT」就在问题条下面。
+ *   舞台下面：训练计划（贴回 AI 的回复 → 检查 → 发到手表），向下滚才看到。
  *
  * 本组件只做编排：状态归 useAiTaskDraft / useAiTaskLibrary / useAiTaskPreview /
  * useAiTaskHandoff 四个 composable，纯逻辑归 src/lib/aiTask/*。
@@ -26,6 +27,7 @@ import HandoffPanel from '../components/ai/HandoffPanel.vue';
 import AiStepRail, { type RailStep } from '../components/ai/AiStepRail.vue';
 import AiAskStart from '../components/ai/AiAskStart.vue';
 import AiQuestionBar from '../components/ai/AiQuestionBar.vue';
+import TrainingPlanSection from '../components/plan/TrainingPlanSection.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useAiTaskPreview } from '../composables/useAiTaskPreview';
@@ -323,6 +325,9 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
         <AiQuestionBar ref="questionRef" />
       </HandoffPanel>
     </div>
+
+    <!-- 舞台下面：AI 回复了训练计划，贴回来检查再发到手表。首屏仍是整块舞台，向下滚才看到。 -->
+    <TrainingPlanSection />
   </section>
 </template>
 

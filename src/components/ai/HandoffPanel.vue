@@ -24,6 +24,7 @@ import { aiTaskIssueText, coverageNoteText } from '../../lib/aiTask/copy';
 import { formatBytes } from '../../lib/format';
 import { currentProviderId, FREE_TOKEN_BUDGET, formatTokens, isSubscribed, setSubscribed } from '../../lib/aiTask/budget';
 import { markdownGuide } from '../../lib/aiTask/markdownGuide';
+import { planGuide } from '../../lib/aiTask/planGuide';
 import { startFileDrag } from '../../lib/dragOut';
 import { composePromptPreview } from '../../lib/aiTask/prompt';
 import { handoffParts } from '../../lib/aiTask/handoffParts';
@@ -338,7 +339,9 @@ const run = (openSite: boolean) => {
       promptFileStem: now.promptStem,
       promptOverride: override,
       tokenBudget: preview?.markdown?.token_budget ?? FREE_TOKEN_BUDGET,
-      markdownGuide: markdownGuide(),
+      markdownGuide: `${markdownGuide()}
+
+${planGuide()}`,
     };
     if (openSite) await handoff.runAll(task, target, direction, options);
     else await handoff.exportOnly(task, direction, options);
