@@ -4,8 +4,9 @@
  * 同样的输入永远落在同样的位置——测试可以直接跑 `stepLayout`。
  *
  * 几何（世界坐标，中心在原点，单位 = 视图像素 @ 缩放 1）：
- *   - 交给 AI 的类别在内圈 `inner`，不交的在外圈 `outer`；
- *   - 两圈之间的 `boundary` 就是界面上那个「交给 AI」的圈；
+ *   - 交给 AI 的类别在内圈 `inner`，不交的在圈外（`outer` 一圈；画布够宽时摆在圈的左右两侧，
+ *     不占上下的高度——高度是最紧的那一边）；
+ *   - `boundary` 就是界面上那个「交给 AI」的圈；
  *   - 展开的指标从父类别向外排成几层同心弧（见 `metricSlot`），被排除的指标
  *     往外推出自己那一层。
  */
@@ -16,11 +17,16 @@ export interface GraphRadii {
   outer: number;
   boundary: number;
   metricLength: number;
+  /** 画布够宽：不交的类别摆在虚线圈的左右两侧，而不是沿圆周。 */
+  sideways?: boolean;
 }
 
-export const NODE_RADIUS = { center: 30, category: 20, metric: 9 } as const;
-/** 碰撞时额外预留的空间（标签占的地方）。 */
-const LABEL_PAD = { center: 18, category: 26, metric: 16 } as const;
+/** 类别节点外面还有一圈日环（再宽 13px）和两行标签，所以半径比画出来的圆大一圈。 */
+export const NODE_RADIUS = { center: 42, category: 27, metric: 10 } as const;
+/** 碰撞时额外预留的空间（日环 + 标签占的地方）。 */
+const LABEL_PAD = { center: 26, category: 38, metric: 18 } as const;
+/** 不交的类别离虚线圈多远（圆心到节点）：节点半径 + 日环 + 一点空。 */
+export const SIDE_GAP = 70;
 const SPRING_K = 0.08;
 const DAMPING = 0.8;
 const MAX_SPEED = 14;
@@ -38,9 +44,16 @@ export const METRIC_KEEP_MARGIN = 34;
 /** 一次变化最多模拟这么多帧就强制停下——宁可停在「差不多」也不空转耗电。 */
 const MAX_FRAMES_PER_CHANGE = 300;
 
+/**
+ * `width` / `height` 是**看得见的那一块**（扣掉浮在上面的任务名胶囊和交付坞）。
+ * 画布够宽时圈几乎占满高度，不交的类别摆在左右；窄了就退回沿圆周摆在外圈。
+ */
 export const graphRadii = (width: number, height: number): GraphRadii => {
-  const outer = Math.max(130, Math.min(width, height) / 2 - 60);
-  return { inner: outer * 0.42, outer, boundary: outer * 0.78, metricLength: outer * 0.28 };
+  const half = Math.min(width, height) / 2;
+  const sideways = width >= height * 1.35;
+  const boundary = Math.max(110, half - (sideways ? 46 : 96));
+  const outer = boundary + SIDE_GAP;
+  return { inner: boundary * 0.64, outer, boundary, metricLength: boundary * 0.3, sideways };
 };
 
 export interface LayoutNode {
@@ -93,6 +106,11 @@ export const targetOf = (node: GraphNode, parent: LayoutNode | undefined, radii:
   if (node.kind === 'center') return { x: 0, y: 0 };
   if (node.kind === 'category') {
     const angle = categoryAngle(node);
+    if (!node.included && radii.sideways) {
+      // 左右交替摆，竖直位置沿用它本来的角度，几个不交的类别不会叠在一起。
+      const side = node.index % 2 === 0 ? -1 : 1;
+      return { x: side * (radii.boundary + SIDE_GAP), y: Math.sin(angle) * radii.boundary * 0.62 };
+    }
     const r = node.included ? radii.inner : radii.outer;
     return { x: r * Math.cos(angle), y: r * Math.sin(angle) };
   }

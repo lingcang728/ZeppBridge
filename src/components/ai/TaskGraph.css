@@ -10,6 +10,8 @@
 .scenery { transition: opacity .45s ease, filter .45s ease; }
 .link { stroke: var(--line); stroke-width: 1; transition: opacity .35s ease, stroke .2s ease; }
 .link.is-active { stroke: color-mix(in srgb, var(--accent) 55%, transparent); stroke-width: 1.6; }
+/* 没交给 AI 的类别：连线只是一道虚的提示，不是横穿整个圈的实线。 */
+.link:not(.is-active) { stroke-dasharray: 2 7; stroke-linecap: round; opacity: .55; }
 .link.is-backdrop { opacity: .18; }
 .ghost { pointer-events: none; }
 
@@ -36,13 +38,14 @@
 .crumb-root { color: var(--muted); }
 .crumb-sep { color: var(--subtle); }
 .crumb:active { scale: .97; }
+/* 首次使用的提示放在画布底部中间：顶部左上角留给四个入口胶囊，底部两侧是撤销和缩放，中间正好空着。 */
 .hint {
   position: absolute;
-  top: 14px;
+  bottom: 14px;
   left: 50%;
   z-index: 3;
   display: flex;
-  max-width: calc(100% - 28px);
+  max-width: calc(100% - 340px);
   align-items: center;
   gap: 12px;
   padding: 7px 8px 7px 16px;

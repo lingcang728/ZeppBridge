@@ -38,6 +38,8 @@ const props = defineProps<{
   previewError: string | null;
   direction: string | null;
   fallbackTitle: string;
+  /** 「会交出去的数据：9/18–10/2 的睡眠、心率……；不含精确位置」——就绪度浮层的第一句话。 */
+  handover?: { title: string; text: string } | null;
 }>();
 
 const { draft, saveDraft } = useAiTaskDraft();
@@ -403,6 +405,7 @@ onBeforeUnmount(() => {
   <section ref="dock" class="dock" :aria-label="t.title">
     <Transition name="sheet">
       <div v-show="details" class="sheet glass-control" role="dialog" :aria-label="t.finalPrompt">
+        <p v-if="handover?.text" class="handover"><b>{{ handover.title }}</b>{{ handover.text }}</p>
         <div class="sheet-head">
           <p class="ai-label">{{ t.finalPrompt }}</p>
           <button type="button" class="sheet-close" :aria-label="t.closePanel" @click="details = false"><Icon name="x" :size="15" /></button>
@@ -473,6 +476,9 @@ onBeforeUnmount(() => {
     <!-- 预览出错不藏进浮层：它决定导出的东西对不对，要一直看得见。 -->
     <p v-if="previewError" class="ai-note bad alert-pill" role="alert"><Icon name="warning" :size="13" />{{ previewError }}</p>
 
+    <!-- 外面传进来的东西（问题条）紧贴在主按钮栏上方，和它一起量高度、一起贴底。 -->
+    <div class="core">
+      <slot />
     <div class="bar glass-control is-lens-host">
       <button type="button" :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :aria-expanded="details" @click="details = !details">
         <i class="ready-dot" aria-hidden="true"></i>
@@ -513,6 +519,7 @@ onBeforeUnmount(() => {
         <Icon name="export" :size="17" />
       </button>
     </div>
+    </div>
     <p v-if="!desktop" class="ai-note offline">{{ t.desktopOnly }}</p>
   </section>
 </template>
@@ -521,8 +528,10 @@ onBeforeUnmount(() => {
 .dock { position: relative; display: grid; justify-items: center; gap: 8px; pointer-events: none; container-type: inline-size; }
 .dock > * { pointer-events: auto; }
 
+.core { display: grid; width: 100%; gap: 8px; }
 .bar {
   display: flex;
+  width: 100%;
   max-width: 100%;
   align-items: center;
   gap: 10px;
@@ -531,6 +540,7 @@ onBeforeUnmount(() => {
 }
 .ready-chip {
   display: flex;
+  flex: 1 1 0;
   min-width: 0;
   align-items: center;
   gap: 10px;
@@ -632,6 +642,8 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--glass-sheen), transparent 40%), var(--mat-glass-strong);
 }
+.handover { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.55; }
+.handover b { margin-right: 6px; color: var(--subtle); font-weight: 650; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sheet-head .ai-label { margin: 0; }
 .sheet-close { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 50%; background: var(--glass-press); color: var(--ink); cursor: pointer; }

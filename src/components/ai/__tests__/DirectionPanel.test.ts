@@ -1,6 +1,7 @@
 /**
- * DirectionPanel 的 SSR 契约：方向胶囊单选（含「不指定」）、问题文本框
- * 与字符计数。草稿是模块单例，渲染前一律 resetDraft 归位。
+ * DirectionPanel 的 SSR 契约：方向胶囊单选（含「不指定」）、个人背景框。
+ * 问题输入框已经搬到底部的对话条（见 AiQuestionBar.test.ts），这里不再有。
+ * 草稿是模块单例，渲染前一律 resetDraft 归位。
  */
 import { createSSRApp } from 'vue';
 import { renderToString } from '@vue/server-renderer';
@@ -71,25 +72,20 @@ describe('DirectionPanel', () => {
     expect(html).toContain('长跑比较');
   });
 
-  it('空草稿：计数器 0/500，问题文本框为空', async () => {
-    const html = await render([]);
-    expect(html).toContain('0/500');
-    expect(html).toContain('id="ai-question"');
-  });
-
-  it('写过的问题进 textarea，计数器同步成 已用/上限', async () => {
+  it('问题输入框不在这里：只剩个人背景框；写过的问题也不会渲染进方向面板', async () => {
     draft.setPrompt('hello');
     const html = await render([]);
-    expect(html).toContain('hello');
-    expect(html).toContain('5/500');
+    expect(html).not.toContain('id="ai-question"');
+    expect(html).not.toContain('hello');
+    expect(html).toContain('id="ai-note"');
   });
 
   it('选中模板：它的 chip 打勾，用户写过的问题不被冲掉', async () => {
     draft.setPrompt('keep me');
     draft.setTemplate(template());
     const html = await render([template()]);
-    // 问题原样保留在 textarea 里。
-    expect(html).toContain('keep me');
+    // 问题不在这个面板里渲染，但草稿里的原样还在。
+    expect(draft.draft.value.prompt).toBe('keep me');
     // 唯一打勾的是模板那一格；选中后方向正文显示在胶囊下面。
     expect(count(html, /aria-checked="true"/g)).toBe(1);
     expect(html).toMatch(/aria-checked="true"[^>]*>[\s\S]*?恢复跑方向/);

@@ -220,6 +220,10 @@ pub struct AiTaskCoverage {
     pub end_date: String,
     pub days_in_range: i64,
     pub days_with_data: i64,
+    /// 窗口里有数据的本地日 `YYYY-MM-DD`，升序。界面用它画「哪几天有、哪几天缺」，
+    /// 只在预览里出现，不进导出文件。多窗口的合并行是各窗口的并集。
+    #[serde(default)]
+    pub covered_dates: Vec<String>,
     /// 命中的 `source_scope` 值（`user_fused` / `device` / `unknown`）。
     pub sources: Vec<String>,
     /// 该类别会查的指标→单位映射（对 workout/sleep 是固定字段单位）。

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * 交给 AI 的「你想知道什么」：一排四个入口，浮在关系网上方（U06 / U07 / 体验评估 #2 #9）。
+ * 交给 AI 的「你想知道什么」：一排四个入口胶囊，浮在关系网左上角（U06 / U07 / 体验评估 #2 #9）。
  *
- * 看看最近睡眠 / 回顾这周变化 / 分析一次运动 / 自由提问——选了就带上推荐的方向和数据范围，右边
- * 步骤栏跳到下一步。下面一句大白话说清会交出去什么（日期、哪几类、有没有位置、附件几个）。
+ * 看看最近睡眠 / 回顾这周变化 / 分析一次运动 / 自由提问——选了就带上推荐的方向和数据范围，
+ * 光标落到底部的问题条。会交出去什么那句大白话（日期、哪几类、有没有位置、附件几个）不再
+ * 铺在这里，由 `plain` 暴露出去，放进交付坞的就绪度浮层。
  *
  * 以前这里是和「图谱」二选一的一整页（四张大卡 + 一张逐类清单），用户希望两者融在一起
  * （2026-09-30）：清单和关系网本来就是同一份草稿，逐类的开关、天数、覆盖天数现在都在关系网的节点上。
@@ -166,6 +167,8 @@ const plain = computed(() => {
   if (props.draft.attachments.length) text += t.value.plainAttachments(props.draft.attachments.length);
   return `${text}${t.value.end}`;
 });
+/** 暴露给交付坞：就绪度浮层里第一句话。 */
+defineExpose({ handover: computed(() => ({ title: t.value.dataTitle, text: plain.value })) });
 const nothingInRange = computed(() => {
   const picked = rows.value.filter((row) => row.enabled);
   return picked.length > 0 && picked.every((row) => row.tone === 'missing');
@@ -173,18 +176,14 @@ const nothingInRange = computed(() => {
 </script>
 
 <template>
-  <section class="ask-strip glass-control" aria-labelledby="ai-ask-title">
-    <div class="ask-line">
-      <h2 id="ai-ask-title" class="ask-title">{{ t.title }}</h2>
-      <div class="ask-entries">
-        <button v-for="entry in entries" :key="entry.key" type="button" :class="['ask-chip', { on: activeEntry === entry.key }]"
-          :title="entry.sub" :aria-pressed="activeEntry === entry.key" @click="choose(entry)">
-          <Icon :name="entry.icon" :size="15" class="ask-icon" /><span>{{ entry.title }}</span>
-        </button>
-      </div>
+  <section class="ask-strip" :aria-label="t.title">
+    <div class="ask-entries" role="group" :aria-label="t.title">
+      <button v-for="entry in entries" :key="entry.key" type="button" :class="['ask-chip', { on: activeEntry === entry.key }]"
+        :title="entry.sub" :aria-pressed="activeEntry === entry.key" @click="choose(entry)">
+        <Icon :name="entry.icon" :size="16" class="ask-icon" /><span>{{ entry.title }}</span>
+      </button>
     </div>
-    <p class="ask-plain"><b>{{ t.dataTitle }}</b>{{ plain }}</p>
-    <p v-if="nothingInRange" class="ask-empty" role="status">
+    <p v-if="nothingInRange" class="ask-empty glass-control" role="status">
       <Icon name="info" :size="14" />{{ t.emptyRange }}
       <button type="button" class="ai-tool" @click="emit('allDays', 30)">{{ t.widen }}</button>
     </p>
@@ -192,20 +191,16 @@ const nothingInRange = computed(() => {
 </template>
 
 <style scoped>
-/* 一条浮在关系网上方的玻璃条：左边一句问题，右边四个入口胶囊；下面一行灰字说清会交出去什么。 */
-.ask-strip { display: grid; gap: 6px; width: fit-content; max-width: 100%; padding: 8px 10px 8px 16px; border-radius: var(--radius-lg); }
-.ask-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
-.ask-title { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 750; white-space: nowrap; }
-.ask-entries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.ask-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 14px 0 11px; border: 0; border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
-  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
-.ask-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
-.ask-chip:active { scale: .97; }
+/* 左上角一排胶囊，不再套玻璃盒子：画布上同时浮着任务名、四个入口、右栏、交付坞，盒子越少越安静。 */
+.ask-strip { display: grid; gap: 8px; width: fit-content; max-width: 100%; }
+.ask-entries { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.ask-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 15px 0 12px; border: 0; border-radius: 999px;
+  background: var(--mat-raised); box-shadow: var(--mat-raised-rim); color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, translate var(--dur-fast) var(--ease-out); }
+.ask-chip:hover { background: var(--mat-raised-hover, var(--mat-raised)); color: var(--ink); }
+.ask-chip:active { translate: 0 1px; }
 .ask-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
+.ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, var(--surface-raised)); color: var(--ink); }
 .ask-icon { flex: none; color: var(--accent); }
-.ask-plain { margin: 0 0 2px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
-.ask-plain b { margin-right: 6px; color: var(--subtle); font-weight: 650; }
-.ask-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--warning); font-size: var(--fs-xs); }
+.ask-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: fit-content; margin: 0; padding: 7px 14px; border-radius: 16px; color: var(--warning); font-size: var(--fs-xs); }
 </style>

@@ -13,6 +13,7 @@ import type {
 } from '../bridge/types';
 import { dataScopeLabel, workoutLabel } from '../labels';
 import { categoryLabel } from './categories';
+import { dayRing, type DayRing } from './dayRing';
 import { unitLabel } from './metrics';
 
 export interface CoverageRow {
@@ -64,6 +65,8 @@ export interface CategoryCoverage {
   metricDays: Record<string, number>;
   /** 该类别会查的指标（`units` 的键，字母序；展示顺序由调用方决定）。 */
   metrics: string[];
+  /** 逐天（或逐几天）有没有数据，画在节点外圈；对不上窗口时为 null。 */
+  ring: DayRing | null;
 }
 
 /**
@@ -83,6 +86,7 @@ export const categoryCoverage = (
     missing: row.missing,
     metricDays: row.metric_days ?? {},
     metrics: Object.keys(row.units),
+    ring: dayRing(row),
   };
 };
 

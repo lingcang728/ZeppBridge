@@ -233,6 +233,20 @@ describe('buildGraph · 覆盖与角标', () => {
     expect(rem.missing).toBe(true);
   });
 
+  it('日环：后端给了 covered_dates，类别节点带逐日格子；没给（旧载荷）就是 null，界面退回连续的覆盖圈', () => {
+    const withDates = coverageOf({ covered_dates: ['2026-03-01', '2026-03-02', '2026-03-10'], days_with_data: 3 });
+    const model = buildGraph(inputOf({ preview: previewOf([withDates]) }));
+    const ring = nodeById(model, categoryNodeId('sleep')).dayRing;
+    expect(ring?.cells).toHaveLength(10);
+    expect(ring?.cells[0]).toBe(1);
+    expect(ring?.cells[2]).toBe(0);
+    expect(ring?.cells[9]).toBe(1);
+    const legacy = buildGraph(inputOf({ preview: previewOf([coverageOf()]) }));
+    expect(nodeById(legacy, categoryNodeId('sleep')).dayRing).toBeNull();
+    // 中心没有日环。
+    expect(nodeById(model, CENTER_ID).dayRing).toBeNull();
+  });
+
   it('角标只在 attachment 上数附件个数', () => {
     const task: AiTask = { ...newTaskDraft(), attachments: [attachment('a1'), attachment('a2')] };
     const model = buildGraph(inputOf({ task }));

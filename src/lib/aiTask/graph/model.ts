@@ -9,6 +9,7 @@ import type { IconName } from '../../../components/Icon.vue';
 import type { AiTask, AiTaskCategory, AiTaskPreview } from '../../bridge/types';
 import { AI_TASK_CATEGORY_META, AI_TASK_CATEGORY_ORDER, categoryLabel, categoryRangeOf } from '../categories';
 import { categoryCoverage } from '../coverage';
+import type { DayRing } from '../dayRing';
 import { CATEGORY_METRICS, metricLabel } from '../metrics';
 
 export type GraphNodeKind = 'center' | 'category' | 'metric';
@@ -31,6 +32,8 @@ export interface GraphNode {
   /** 覆盖分母/分子（弹层里的「12/14 天」）；没有覆盖数据时为 null。 */
   daysHave: number | null;
   daysTotal: number | null;
+  /** 外圈的逐日格子（哪几天有数据）；没有逐日数据时为 null，界面退回连续弧。 */
+  dayRing: DayRing | null;
   missing: boolean;
   /** 类别上的数字角标（附件个数）。 */
   badge: number | null;
@@ -39,7 +42,7 @@ export interface GraphNode {
   /** 类别节点的窗口设置（弹层控件用）；无窗口类别为 null。 */
   daysBefore: number | null;
   includeDay: boolean | null;
-  /** 同一父节点下的序号与兄弟数，布局按它扇形展开。 */
+  /** 同一父节点下的序号与兄弟数，布局按它扇形展开。类别节点是在「圈里的」或「圈外的」那一组里的序号。 */
   index: number;
   siblings: number;
 }
@@ -91,15 +94,22 @@ export const buildGraph = (input: GraphInput): GraphModel => {
   const nodes: GraphNode[] = [{
     id: CENTER_ID, kind: 'center', parentId: null, category: null, metric: null,
     label: input.centerLabel, sublabel: input.centerSublabel, icon: input.centerIcon,
-    included: true, effective: true, coverage: null, daysHave: null, daysTotal: null,
+    included: true, effective: true, coverage: null, daysHave: null, daysTotal: null, dayRing: null,
     missing: false, badge: null, expandable: false, expanded: false,
     daysBefore: null, includeDay: null, index: 0, siblings: 1,
   }];
   const links: GraphLink[] = [];
 
-  AI_TASK_CATEGORY_ORDER.forEach((category, index) => {
+  // 圈里的类别在圈上均分角度，圈外的类别各自均分：关掉两类以后剩下的不会挤在半圈里、留一块空。
+  const enabledOf = (category: AiTaskCategory) => categoryRangeOf(task.categories, category).enabled;
+  const inside = AI_TASK_CATEGORY_ORDER.filter(enabledOf);
+  const outside = AI_TASK_CATEGORY_ORDER.filter((category) => !enabledOf(category));
+
+  AI_TASK_CATEGORY_ORDER.forEach((category) => {
     const meta = AI_TASK_CATEGORY_META[category];
     const range = categoryRangeOf(task.categories, category);
+    const group = range.enabled ? inside : outside;
+    const index = group.indexOf(category);
     const summary = categoryCoverage(preview, category);
     const id = categoryNodeId(category);
     const isExpanded = meta.hasWindow && range.enabled && expanded.has(category);
@@ -114,13 +124,14 @@ export const buildGraph = (input: GraphInput): GraphModel => {
       coverage: range.enabled && summary ? ratio(summary.daysWithData, summary.daysInRange) : null,
       daysHave: summary ? summary.daysWithData : null,
       daysTotal: summary ? summary.daysInRange : null,
+      dayRing: range.enabled && summary ? summary.ring : null,
       missing: range.enabled && Boolean(summary?.missing),
       badge: category === 'attachment' && task.attachments.length ? task.attachments.length : null,
       expandable: meta.hasWindow && range.enabled,
       expanded: isExpanded,
       daysBefore: meta.hasWindow ? range.days_before : null,
       includeDay: meta.hasWindow ? range.include_workout_day : null,
-      index, siblings: AI_TASK_CATEGORY_ORDER.length,
+      index, siblings: group.length,
     });
     links.push({ id: `l:${id}`, source: CENTER_ID, target: id, active: range.enabled });
     if (!isExpanded) return;
@@ -138,6 +149,7 @@ export const buildGraph = (input: GraphInput): GraphModel => {
         coverage: summary ? ratio(days, summary.daysInRange) : null,
         daysHave: summary ? days : null,
         daysTotal: summary ? summary.daysInRange : null,
+        dayRing: null,
         missing: Boolean(summary) && days === 0,
         badge: null, expandable: false, expanded: false,
         daysBefore: null, includeDay: null, index: metricIndex, siblings: metrics.length,

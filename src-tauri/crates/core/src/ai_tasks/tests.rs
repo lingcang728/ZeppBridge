@@ -386,6 +386,12 @@ fn coverage_windows_follow_p4_edges() {
     assert_eq!(row.end_date, anchor_day.to_string());
     assert_eq!(row.days_in_range, 4);
     assert_eq!(row.days_with_data, 2);
+    // 界面画「哪几天有数据」靠它：个数必须和 days_with_data 对得上，日期都落在窗口里、升序。
+    assert_eq!(row.covered_dates.len() as i64, row.days_with_data);
+    assert!(row.covered_dates.iter().all(
+        |day| day.as_str() >= row.start_date.as_str() && day.as_str() <= row.end_date.as_str()
+    ));
+    assert!(row.covered_dates.windows(2).all(|pair| pair[0] < pair[1]));
     assert!(!row.missing);
     assert!(row.sources.contains(&"user_fused".to_string()));
     assert!(row.units.contains_key("resting_hr"));
@@ -438,6 +444,11 @@ fn coverage_dedups_overlapping_windows_and_links_anchors() {
     assert_eq!(merged.end_date, d2.to_string());
     assert!(merged.days_in_range >= 4);
     assert!(merged.days_with_data >= 1);
+    assert_eq!(
+        merged.covered_dates.len() as i64,
+        merged.days_with_data,
+        "合并行的日期是各窗口的并集，去重后个数一致"
+    );
 
     // 出仓文档里重叠日的 (category,date) 只出现一次，linked 两个锚点。
     let dir = temp_dir("dedup");

@@ -134,8 +134,8 @@ const facts = (workout: Workout): string => {
   background: var(--cap-track); box-shadow: var(--cap-track-shadow); color: var(--muted); font-size: var(--fs-xs); }
 
 /* 按天的时间线：左边一条细竖线把同一天的运动串起来，日期是线上的一个小标签。 */
-.timeline { display: grid; gap: 12px; margin-top: 12px; }
-.day { position: relative; display: grid; gap: 6px; padding-left: 14px; }
+.timeline { display: grid; gap: 10px; margin-top: 10px; }
+.day { position: relative; display: grid; gap: 4px; padding-left: 14px; }
 .day::before { content: ''; position: absolute; top: 24px; bottom: 6px; left: 4px; width: 1.5px; border-radius: 2px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), transparent); }
 .day-label { position: relative; margin: 0 0 2px -14px; padding-left: 14px; color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .02em; }
@@ -147,7 +147,7 @@ const facts = (workout: Workout): string => {
   width: 100%;
   align-items: center;
   gap: 11px;
-  padding: 8px 10px 8px 8px;
+  padding: 6px 10px 6px 6px;
   border: 0;
   border-radius: 18px;
   background: color-mix(in srgb, var(--ink) 4%, transparent);

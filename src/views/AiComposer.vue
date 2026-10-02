@@ -1,14 +1,15 @@
 <script setup lang="ts">
 /**
- * 交给 AI —— 一块舞台，三层浮在上面的玻璃。
+ * 交给 AI —— 一块舞台，几层浮在上面的玻璃。
  *
- *   舞台：关系网（TaskGraph）铺满整页。中心是分析对象（某次运动或「最近 N 天」），
- *         圈内外就是交不交给 AI，展开的类别镜头俯冲进去看逐指标排除。
- *   左上：任务名胶囊（改名、切换已保存的任务、新建、保存）；下面一条「你想知道什么」——四个入口
- *         和一句「会交出去什么」。以前它和关系网是二选一的两个视图，现在融在同一块舞台上。
- *   右侧：步骤栏，一次只展开一步 —— ① 分析对象 ② 你想问什么 ③ 附件与选项；
+ *   舞台：关系网（TaskGraph）。中心是分析对象（某次运动或「最近 N 天」），圈内外就是交不交给 AI，
+ *         每个类别外面一圈日环——哪几天有数据一眼看见；展开的类别镜头俯冲进去看逐指标排除。
+ *         画布只占看得见的那一块（扣掉左上的任务名和底部的对话条），圈按它的大小算。
+ *   左上：任务名胶囊（改名、切换已保存的任务、新建、保存）；下面是四个入口胶囊——点一个就带上推荐的
+ *         方向和范围，光标落到底部的问题条。
+ *   右侧：步骤栏，一次只展开一步 —— ① 分析对象 ② 方向与背景 ③ 附件与选项；
  *         收起的步骤只露一行摘要，不用滚动就能看清整个任务。
- *   底部：交付坞，整页唯一的主按钮「交给 ChatGPT」。
+ *   底部：问题条 + 交付坞。写字和交付在同一块视线里，整页唯一的主按钮「交给 ChatGPT」就在问题条下面。
  *
  * 本组件只做编排：状态归 useAiTaskDraft / useAiTaskLibrary / useAiTaskPreview /
  * useAiTaskHandoff 四个 composable，纯逻辑归 src/lib/aiTask/*。
@@ -24,6 +25,7 @@ import TaskExtras from '../components/ai/TaskExtras.vue';
 import HandoffPanel from '../components/ai/HandoffPanel.vue';
 import AiStepRail, { type RailStep } from '../components/ai/AiStepRail.vue';
 import AiAskStart from '../components/ai/AiAskStart.vue';
+import AiQuestionBar from '../components/ai/AiQuestionBar.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useAiTaskPreview } from '../composables/useAiTaskPreview';
@@ -153,11 +155,10 @@ const graphModel = computed(() =>
     coverageLabel: t.value.graphCoverage,
   }));
 
-/* 入口动作：带上方向和推荐范围后，右边步骤栏跳到「你想问什么」，文本框拿到焦点。 */
-const focusQuestion = () => {
-  openStep.value = 'ask';
-  window.setTimeout(() => document.getElementById('ai-question')?.focus(), 360);
-};
+/* 入口动作：带上方向和推荐范围后，光标落到底部的问题条。 */
+const questionRef = ref<InstanceType<typeof AiQuestionBar> | null>(null);
+const askRef = ref<InstanceType<typeof AiAskStart> | null>(null);
+const focusQuestion = () => { window.setTimeout(() => questionRef.value?.focus(), 120); };
 const applyTemplate = (template: AiTaskTemplate) => {
   draftCtl.setTemplate(template);
   focusQuestion();
@@ -249,18 +250,18 @@ const focusDock = computed(() => !!dockRef.value?.details);
 const dockHeight = ref(0);
 let dockObserver: ResizeObserver | null = null;
 onMounted(() => {
-  // 只量底部那条按钮栏：以前量的是整个交付坞，最终提示词浮层、进度那一截一展开，坞就长高一大截，
+  // 只量底部那一块（问题条 + 按钮栏）：以前量的是整个交付坞，最终提示词浮层、进度那一截一展开，坞就长高一大截，
   // 关系网的安全区跟着变、镜头重新居中——用户看到的「交给 AI 页跳动」。浮层本来就浮在画布上面。
   const dock = dockRef.value?.$el;
-  const el = dock instanceof Element ? dock.querySelector('.bar') ?? dock : null;
+  const el = dock instanceof Element ? dock.querySelector('.core') ?? dock : null;
   if (!el || typeof ResizeObserver === 'undefined') return;
   const measure = () => { dockHeight.value = Math.round(el.getBoundingClientRect().height); };
   measure();
   dockObserver = new ResizeObserver(measure);
   dockObserver.observe(el);
 });
-/* 顶上一排（任务名胶囊 + 视图开关）的实际高度：多语言 / 窄窗口里视图开关折到第二行时，
-   画布上的提示、面包屑和「先问问题」的内容跟着往下让，谁也不压谁。 */
+/* 顶上任务名胶囊的实际高度：多语言 / 窄窗口里范围开关折到第二行时，画布跟着往下让。
+   四个入口胶囊浮在画布左上角的空角里（圈是圆的，角上本来就没东西），不占画布高度。 */
 const stageRef = ref<HTMLElement | null>(null);
 const topRef = ref<HTMLElement | null>(null);
 const topHeight = ref(0);
@@ -272,12 +273,12 @@ onMounted(() => {
     const stage = stageRef.value?.getBoundingClientRect();
     if (!stage) return;
     // 只量这一排里的控件本身：任务历史的下拉是浮层，打开它不该把画布推下去。
-    const bottoms = [...row.querySelectorAll<HTMLElement>('.head-task, .ask-strip')].map((el) => el.getBoundingClientRect().bottom);
+    const bottoms = [...row.querySelectorAll<HTMLElement>('.head-task')].map((el) => el.getBoundingClientRect().bottom);
     if (bottoms.length) topHeight.value = Math.round(Math.max(...bottoms) - stage.top);
   };
   measure();
   topObserver = new ResizeObserver(measure);
-  for (const el of row.querySelectorAll('.head-task, .ask-strip')) topObserver.observe(el);
+  for (const el of row.querySelectorAll('.head-task')) topObserver.observe(el);
 });
 onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); });
 </script>
@@ -293,14 +294,13 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
           @toggle-expand="toggleExpand" />
       </div>
 
-      <!-- 左上一列：任务名胶囊，下面一条「你想知道什么」。关系网按这一列量出来的高度让位。 -->
+      <!-- 左上一列：任务名胶囊，下面一排四个入口。展开某一类、镜头俯冲进去的时候入口让位给「全部类别」面包屑。 -->
       <div ref="topRef" class="stage-top">
         <AiTaskHeader class="stage-head" :fallback-title="fallbackTitle" />
-        <AiAskStart class="stage-ask" :draft="draft" :preview="preview" :templates="templates" :workout-count="draft.workout_ids.length"
-          @template="applyTemplate" @pick-workout="pickWorkout" @ask="focusQuestion" @all-days="draftCtl.setWindowDays" />
+        <AiAskStart v-show="!expanded.size" ref="askRef" class="stage-ask" :draft="draft" :preview="preview" :templates="templates"
+          :workout-count="draft.workout_ids.length" @template="applyTemplate" @pick-workout="pickWorkout" @ask="focusQuestion"
+          @all-days="draftCtl.setWindowDays" />
       </div>
-      <!-- 交付坞身后一段由下往上的渐隐磨砂：底下的节点、连线滚到坞后面时是柔和地淡出，不是被一条硬边截断。 -->
-      <div class="stage-foot" aria-hidden="true"></div>
 
       <!-- 右栏的毛玻璃垫在它身后的一层上，右栏自己不带 backdrop-filter：否则里面的胶囊挂不上折射玻璃
            （lib/glassLens.ts；右栏会滚动，不能用 .is-lens-host 的伪元素，伪元素会跟着内容滚走）。 -->
@@ -318,19 +318,23 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
 
       <!-- 遮罩本身只淡入淡出（opacity），模糊是静态的一层，不做逐帧模糊过渡。 -->
       <Transition name="scrim"><div v-if="focusDock" class="stage-scrim" aria-hidden="true"></div></Transition>
-      <HandoffPanel ref="dockRef" class="stage-dock" :preview="preview" :preview-error="previewError" :direction="direction" :fallback-title="fallbackTitle" />
+      <HandoffPanel ref="dockRef" class="stage-dock" :preview="preview" :preview-error="previewError" :direction="direction"
+        :fallback-title="fallbackTitle" :handover="askRef?.handover ?? null">
+        <AiQuestionBar ref="questionRef" />
+      </HandoffPanel>
     </div>
   </section>
 </template>
 
 <style scoped>
-/* 舞台贴满顶栏以下的整块视口；关系网在最底层，其余三块玻璃浮在上面。
-   关系网的画布右边让出步骤栏的宽度，镜头中心才落在看得见的那一片正中。 */
-.ai-page { --rail-w: min(420px, 34vw); padding: 4px 20px 20px; }
+/* 舞台贴满顶栏以下的整块视口；关系网在最底层，其余几块玻璃浮在上面。
+   关系网的画布只占「看得见的那一块」：上面让出任务名胶囊，下面让出对话条和按钮栏，右边让出步骤栏——
+   圈按这一块的大小算、圆心落在这一块正中，不再有一截被压在交付坞下面白占地方。 */
+.ai-page { --rail-w: min(380px, 30vw); padding: 4px 20px 20px; }
 .stage {
   position: relative;
   height: calc(100vh - 84px);
-  min-height: 560px;
+  min-height: 600px;
   overflow: hidden;
   border-radius: var(--radius-xl);
   background:
@@ -338,20 +342,22 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
     var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow-lift);
 }
-/* --graph-safe-*：画布四边被浮层挡住的宽度（上：任务名胶囊，下：交付坞和它上面那一排
-   撤销 / 缩放胶囊）。关系网的节点弹层只摆在剩下看得见的那一块里，不会再被盖住半截。 */
-/* 画布从左上那一列（任务名 + 提问条）下面开始：关系网的圆心落在看得见的那一块正中，上沿不被提问条压住。 */
-.stage-graph { --graph-safe-top: 14px; position: absolute; inset: calc(var(--top-h, 54px) + 4px) calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
-.stage-top { position: absolute; top: 16px; right: calc(var(--rail-w) + 40px); left: 16px; z-index: 4; display: grid; justify-items: start; gap: 8px;
+/* --graph-safe-*：节点弹层摆放时离画布四边留多远。 */
+.stage-graph {
+  --graph-safe-top: 14px;
+  --graph-safe-bottom: 14px;
+  position: absolute;
+  inset: calc(var(--top-h, 54px) + 4px) calc(var(--rail-w) + 24px) calc(var(--dock-h, 130px) + 30px) 0;
+  border-radius: inherit;
+  /* 节点被平移 / 放大推到边上时，用一道静态渐隐收尾，不是被一条硬边截断。 */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+}
+.stage-top { position: absolute; top: 16px; right: calc(var(--rail-w) + 40px); left: 16px; z-index: 4; display: grid; justify-items: start; gap: 10px;
   pointer-events: none; }
 .stage-top > * { pointer-events: auto; }
 .stage-head { min-width: 0; max-width: 100%; }
 .stage-ask { max-width: 100%; }
-.stage-foot { position: absolute; right: calc(var(--rail-w) + 24px); bottom: 0; left: 0; z-index: 5; height: calc(var(--dock-h, 64px) + 44px); pointer-events: none;
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-  background: linear-gradient(to top, color-mix(in srgb, var(--mat-card) 88%, transparent) 30%, transparent);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent); mask-image: linear-gradient(to top, #000 45%, transparent); }
 .stage-rail, .stage-rail-glass {
   position: absolute;
   top: 12px;
@@ -370,23 +376,15 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
 .scrim-enter-active, .scrim-leave-active { transition: opacity 220ms ease; }
 .scrim-enter-from, .scrim-leave-to { opacity: 0; }
 .stage-dock { position: absolute; right: calc(var(--rail-w) + 36px); bottom: 16px; left: 16px; z-index: 6; }
-/* 关系网自己的撤销 / 缩放坞往上让出交付坞的高度；面包屑和提示让出左上角的任务名胶囊。
-   交付坞的高度是量出来的（--dock-h）：窗口一窄它就折成两行，以前写死 92px，撤销和缩放
-   正好被盖在下面、点不到。 */
-.stage-graph { --graph-safe-bottom: calc(var(--dock-h, 64px) + 78px); }
-.stage-graph :deep(.dock) { bottom: calc(var(--dock-h, 64px) + 28px); }
-.stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: 10px; }
 
 @media (max-width: 1100px) {
   .ai-page { --rail-w: 100%; padding: 4px 12px 16px; }
   .stage { height: auto; overflow: visible; background: none; box-shadow: none; }
-  .stage-graph { position: relative; inset: auto; height: 62vh; min-height: 440px; border-radius: var(--radius-xl); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
+  .stage-graph { position: relative; inset: auto; height: 62vh; min-height: 440px; border-radius: var(--radius-xl); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+    -webkit-mask-image: none; mask-image: none; }
   .stage-top { top: 12px; right: 12px; left: 12px; }
-  .stage-foot { display: none; }
   .stage-rail { position: static; width: auto; margin-top: 12px; background: var(--mat-glass-strong); box-shadow: var(--glass-rim), var(--glass-shadow); }
   .stage-rail-glass { display: none; }
   .stage-dock { position: sticky; right: auto; bottom: 12px; left: auto; margin-top: 12px; }
-  .stage-graph :deep(.dock) { bottom: 14px; }
-  .stage-graph { --graph-safe-bottom: 60px; }
 }
 </style>

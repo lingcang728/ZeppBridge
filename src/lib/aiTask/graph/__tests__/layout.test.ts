@@ -17,6 +17,7 @@ import {
   graphRadii,
   METRIC_SLOT,
   metricSlot,
+  SIDE_GAP,
   snapLayout,
   stepLayout,
   syncLayout,
@@ -53,21 +54,38 @@ const layoutNode = (state: LayoutState, id: string): LayoutNode => {
 };
 
 describe('graphRadii', () => {
-  it('inner < boundary < outer；小画布外圈保底 130', () => {
-    // min/2 − 60 = 90 < 130 → 触发保底。
+  it('inner < boundary < outer；小画布圈保底 110，外圈比圈大一个节点的距离', () => {
     const small = graphRadii(300, 300);
-    expect(small.outer).toBe(130);
+    expect(small.boundary).toBe(110);
+    expect(small.outer).toBe(110 + SIDE_GAP);
     expect(small.inner).toBeLessThan(small.boundary);
     expect(small.boundary).toBeLessThan(small.outer);
     expect(small.metricLength).toBeGreaterThan(0);
     const mid = graphRadii(800, 600);
-    expect(mid.outer).toBe(240);
     expect(mid.inner).toBeLessThan(mid.boundary);
     expect(mid.boundary).toBeLessThan(mid.outer);
-    const large = graphRadii(2000, 1600);
-    expect(large.outer).toBe(740);
-    expect(large.inner).toBeLessThan(large.boundary);
-    expect(large.boundary).toBeLessThan(large.outer);
+  });
+
+  it('够宽（宽 ≥ 1.35 × 高）圈占满高度，不交的类别摆左右；不够宽就留出上下的位置', () => {
+    const wide = graphRadii(1000, 600);
+    expect(wide.sideways).toBe(true);
+    expect(wide.boundary).toBe(600 / 2 - 46);
+    const narrow = graphRadii(700, 600);
+    expect(narrow.sideways).toBe(false);
+    expect(narrow.boundary).toBe(600 / 2 - 96);
+    // 同样的高度，宽的画布里圈更大。
+    expect(wide.boundary).toBeGreaterThan(narrow.boundary);
+  });
+
+  it('不交的类别在宽画布上落在圈外的左右两侧，窄画布上沿圆周落在外圈', () => {
+    const model = modelOf();
+    const off = { ...graphNode(model, 'cat:body'), included: false };
+    const wide = targetOf(off, undefined, graphRadii(1000, 600));
+    expect(Math.abs(wide.x)).toBeCloseTo(graphRadii(1000, 600).boundary + SIDE_GAP, 5);
+    expect(Math.abs(wide.y)).toBeLessThan(graphRadii(1000, 600).boundary);
+    const narrowRadii = graphRadii(700, 600);
+    const narrow = targetOf(off, undefined, narrowRadii);
+    expect(Math.hypot(narrow.x, narrow.y)).toBeCloseTo(narrowRadii.outer, 5);
   });
 });
 

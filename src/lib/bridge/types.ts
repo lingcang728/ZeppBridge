@@ -196,6 +196,8 @@ export interface AiTaskCoverage {
   end_date: string;
   days_in_range: number;
   days_with_data: number;
+  /** 有数据的本地日 `YYYY-MM-DD`，升序；旧载荷没有这个字段。 */
+  covered_dates?: string[];
   sources: string[];
   /** 指标 → 单位。 */
   units: Record<string, string>;

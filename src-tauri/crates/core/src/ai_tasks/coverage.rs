@@ -509,6 +509,7 @@ pub(crate) fn window_coverage_rows(
             end_date: gather.end.to_string(),
             days_in_range: (gather.end - gather.start).num_days() + 1,
             days_with_data: gather.covered_days.len() as i64,
+            covered_dates: gather.covered_days.iter().cloned().collect(),
             sources: gather.sources.iter().cloned().collect(),
             units: units.clone(),
             metric_days: day_counts(&gather.metric_days),
@@ -526,6 +527,7 @@ pub(crate) fn window_coverage_rows(
                 // 并集覆盖天数——窗口可以不相连，所以不能拿跨度当天数。
                 days_in_range: union_days.len() as i64,
                 days_with_data: union_covered.len() as i64,
+                covered_dates: union_covered.iter().cloned().collect(),
                 sources: union_sources.into_iter().collect(),
                 units,
                 metric_days: day_counts(&union_metric_days),
