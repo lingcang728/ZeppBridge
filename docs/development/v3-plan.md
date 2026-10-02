@@ -4,15 +4,15 @@
 > （`docs/` 下其余文档的 `*.zh-CN.md` 配对约定不适用于它）。
 >
 > 基线：`main@b0d4b88`（2.2.2）+ v3 文档/门禁提交。核对日期 2026-09-05；
-> 2026-09-09 转为同仓库 `v3` 分支的 git worktree。
+> 2026-09-09 转为同仓库 `v3` 分支的 git worktree；2026-10-02 并回主目录 `MyProject\ZeppBridge`。
 
 ## 0. 接手前必读
 
-本目录是 `lingcang728/ZeppBridge` 的 git worktree，永远停在 `v3` 分支；旁边的
-`MyProject\ZeppBridge` 永远停在 `main`（2.x）。两边共享完整 Git 历史、Issue、
+本目录 `MyProject\ZeppBridge` 是 `lingcang728/ZeppBridge` 的仓库本体，当前检出 `v3` 分支；
+`main`（2.x）不再常驻本机，要出 hotfix 时 `git worktree add ..\ZeppBridge-main main` 临时开一份；两边共享完整 Git 历史、Issue、
 PR 和 origin。在这里正常 `git add` / `commit` / `push`，功能分支往 `v3` 提 PR，
 不要往 `main` 提 3.0 的拆建。其余隔离规则见 `CLAUDE.md` 顶部的「这是 v3
-worktree」一节，**动手前先读那一节**，尤其是 cargo target 必须走
+检出」一节，**动手前先读那一节**，尤其是 cargo target 必须走
 `pwsh scripts\v3-gates.ps1`。
 
 **Windows 测试包叫 `ZeppBridge`（2026-09-30 起，此前叫 ZeppBridge3）。**
@@ -37,8 +37,8 @@ Zepp 开放平台主动邀请 ZeppBridge 注册为正式 partner。开发者身�
 |---|---|
 | 数据源策略 | **官方为主，旧连接器降级为可选补充**——不是二选一，也不是纯替换 |
 | 重构半径 | **前后端都重构** |
-| 仓库形态 | 同仓库 git worktree，分支 `v3`（2026-09-09 从独立副本迁入） |
-| 开发库 | 主仓库根 `data/` 的 74 MB 开发库副本 |
+| 仓库形态 | 同仓库分支 `v3`（2026-09-09 从独立副本迁入 worktree，2026-10-02 并回主目录） |
+| 开发库 | 仓库根 `data/` 的开发库副本（约 220 MB） |
 
 ## 2. 官方接口的事实基础
 
