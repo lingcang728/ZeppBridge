@@ -29,6 +29,8 @@ const SHRINK_EASE = 'cubic-bezier(.25, .85, .3, 1)';
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。板不等它：先按记住的位置缩，
     这段时间里找到了就把终点换成真卡（D-2）；超过这个时长还没有就落在记住的位置上。 */
 const CARD_WAIT_MS = 300;
+/** 收回落地：窗口在真卡上面淡掉的时长（不是一帧撤掉）。 */
+const LAND_FADE_MS = 120;
 /** 收回途中按 Esc：剩下的部分在这么长里放完（沿用原来的曲线，不是跳到终点）。 */
 const ESC_FINISH_MS = 200;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
@@ -343,12 +345,13 @@ export const usePageMorph = (options: { back: () => void }) => {
         plate.retarget(replica.rect, radiusOf(found), replica);
       });
     }
-    // 落地：拷贝已经和真卡严丝合缝，撤掉窗口、真卡原样出现。不再「亮一下」——落地前那一帧本来就是卡。
+    // 落地：拷贝已经和真卡严丝合缝（lib/motion/replica.ts），真卡先露出来、窗口在它上面淡掉。
+    // 不是一帧撤掉：拷贝在合成层里，字的抗锯齿和真卡差一点点，一帧撤掉那一点就是一下跳；交叉淡过去看不出来。
     const land = () => {
       if (landed) return;
       landed = true;
       if (card) card.style.opacity = '';
-      plate.remove();
+      plate.dissolve(LAND_FADE_MS);
     };
     void plate.arrived.then(land);
     // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——窗口照样落到卡上，只是快一点。

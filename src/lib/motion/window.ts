@@ -91,36 +91,8 @@ export function windowRects(from: WindowRect, to: WindowRect): WindowRect[] {
   ];
 }
 
-/**
- * 那张卡的一份拷贝：只是用来「看」的——去掉可交互性、固定成卡此刻的尺寸，
- * 放进窗口里跟着缩放。画布（ECharts）拷贝出来是空白的，这无妨：它只在窗口的一端短暂出现。
- */
-export function cardReplica(card: HTMLElement): { el: HTMLElement; rect: WindowRect } {
-  const box = card.getBoundingClientRect();
-  const el = card.cloneNode(true) as HTMLElement;
-  el.setAttribute('aria-hidden', 'true');
-  el.setAttribute('inert', '');
-  el.removeAttribute('href');
-  el.classList.add('window-replica');
-  Object.assign(el.style, {
-    position: 'absolute',
-    left: '0px',
-    top: '0px',
-    width: `${box.width}px`,
-    height: `${box.height}px`,
-    margin: '0',
-    boxSizing: 'border-box',
-    pointerEvents: 'none',
-    transformOrigin: '50% 50%',
-    animation: 'none',
-    transition: 'none',
-    translate: 'none',
-    scale: 'none',
-    opacity: '1',
-    willChange: 'transform, opacity',
-  });
-  return { el, rect: { left: box.left, top: box.top, width: box.width, height: box.height } };
-}
+/** 那张卡的拷贝（带着祖先、身后的底和此刻的样子，和真卡一个像素都不差）：见 lib/motion/replica.ts。 */
+export { cardReplica } from './replica';
 
 /** 拷贝在「页」那一端的变换：中心对到窗口中心，按宽度等比放大（封顶，免得放得太夸张）。 */
 function replicaTransform(card: WindowRect, window: WindowRect): string {
@@ -161,8 +133,11 @@ export interface WindowMorph {
   arrived: Promise<void>;
   /** 板淡出、移除（遮罩一起）。默认等形状走完再淡；`now` = 立刻开始淡（和真内容交叉）。 */
   release: (fadeMs?: number, now?: boolean) => void;
-  /** 立刻移除（收回落地：真卡已经和拷贝重合，直接接上）。 */
+  /** 立刻移除。 */
   remove: () => void;
+  /** 收回落地：板这一帧撤掉，原位换一块静止的替身（同样的底、写死的裁切、里面是那张卡的拷贝），
+      替身在真卡上面淡掉。 */
+  dissolve: (fadeMs: number) => void;
   /** 原路倒回起点，然后淡出移除（展开到一半按 Esc）。 */
   retract: (fadeMs?: number) => Promise<void>;
   /** 终点换成另一块矩形（收回时真卡晚一点才找到）：时间轴不变，只换目标。 */
@@ -178,6 +153,7 @@ const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce
 export function morphWindow(options: WindowMorphOptions): WindowMorph {
   const { from, to, frame, host, duration, easing } = options;
   const zIndex = options.zIndex ?? 25;
+  const surface = options.surface === 'card' ? 'var(--mat-card)' : 'var(--ambient), var(--canvas)';
   const plate = document.createElement('div');
   plate.setAttribute('aria-hidden', 'true');
   plate.className = 'motion-window';
@@ -191,7 +167,7 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
     pointerEvents: 'none',
     overflow: 'hidden',
     contain: 'strict',
-    background: options.surface === 'card' ? 'var(--mat-card)' : 'var(--ambient), var(--canvas)',
+    background: surface,
     boxShadow: 'var(--mat-rim)',
   });
 
@@ -232,6 +208,9 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   };
   const timing: KeyframeAnimationOptions = { duration, easing, fill: 'both' };
   const shape = plate.animate(shapeFrames(to, options.toRadius), timing);
+  /** 此刻的落点（retarget 会换）：落地时替身摆在这里。 */
+  let target = to;
+  let targetRadius = options.toRadius;
 
   let replicaAnim: Animation | null = null;
   let replicaEl: HTMLElement | null = null;
@@ -284,6 +263,56 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   shape.addEventListener('cancel', remove);
   const arrived = shape.finished.then(() => undefined, () => undefined);
 
+  /* 收回落地：板这一帧撤掉，原位换一块静止的替身（正好是卡的位置和圆角、垫着和板一样的底、里面是那张卡的拷贝），
+     替身在真卡上面淡掉。替身用最普通的圆角 + overflow 裁成卡的形状，不用 clip-path、不给板本身再挂动画。
+     已知未解：落地前后偶尔有一帧整页内容没画出来（只剩顶栏的玻璃控件），原来直接撤板的代码也有（2026-10-02 无头
+     Chrome + 本机 GPU 扫描，约 2–4%）；撤板、离场页移除、遮罩撤掉都试过错开，不是它们单独引起的。 */
+  const dissolve = (fadeMs: number) => {
+    if (removed) return;
+    const replica = replicaEl;
+    if (!replica || reducedMotion()) {
+      remove();
+      return;
+    }
+    const radius = steadyRadius(from, options.fromRadius, target, targetRadius);
+    const still = document.createElement('div');
+    still.setAttribute('aria-hidden', 'true');
+    still.className = 'motion-window-still';
+    Object.assign(still.style, {
+      position: 'fixed',
+      left: `${target.left}px`,
+      top: `${target.top}px`,
+      width: `${target.width}px`,
+      height: `${target.height}px`,
+      zIndex: String(zIndex),
+      pointerEvents: 'none',
+      overflow: 'hidden',
+      borderRadius: `${radius}px`,
+    });
+    // 板的底按整块可视区画（环境光的色晕是按整页摆的）：垫一块整页大小的，挪到卡的位置上。
+    const floor = document.createElement('div');
+    Object.assign(floor.style, {
+      position: 'absolute',
+      left: `${frame.left - target.left}px`,
+      top: `${frame.top - target.top}px`,
+      width: `${frame.width}px`,
+      height: `${frame.height}px`,
+      background: surface,
+    });
+    // 拷贝的动画停在终点（不变换、不透明），撤掉以后就是它的静止样子；位置从相对板换成相对替身。
+    replicaAnim?.cancel();
+    replicaAnim = null;
+    replicaEl = null;
+    replica.style.left = `${r2(Number.parseFloat(replica.style.left) + frame.left - target.left)}px`;
+    replica.style.top = `${r2(Number.parseFloat(replica.style.top) + frame.top - target.top)}px`;
+    still.append(floor, replica);
+    host.appendChild(still);
+    remove();
+    const fade = still.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' });
+    const drop = () => still.remove();
+    fade.finished.then(drop, drop);
+  };
+
   let released = false;
   /* 淡出也是可以倒放的：开到一半按 Esc 时它已经在跑，以前不在 animations() 里，
      reverse 只倒了形状，板照样淡掉、被移除，「原路缩回」少了后一半。现在淡出进
@@ -294,8 +323,12 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
     released = true;
     void (now ? Promise.resolve() : arrived).then(() => {
       if (removed || !released) return;
+      // 从各自此刻的透明度淡起：收回落地时遮罩早已散到 0，从 1 起淡就是把磨砂重新拉满再散一遍——卡四周糊一下。
       const fade = [plate, scrim].filter((el): el is HTMLElement => !!el)
-        .map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' }));
+        .map((el) => el.animate(
+          [{ opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0 }, { opacity: 0 }],
+          { duration: fadeMs, easing: 'ease-out', fill: 'forwards' },
+        ));
       fades = fade;
       Promise.all(fade.map((animation) => animation.finished)).then(() => {
         if (fade.some((animation) => animation.playbackRate < 0)) {
@@ -330,6 +363,8 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   };
 
   const retarget = (next: WindowRect, radius: number, replica?: { el: HTMLElement; rect: WindowRect } | null) => {
+    target = next;
+    targetRadius = radius;
     (shape.effect as KeyframeEffect | null)?.setKeyframes(shapeFrames(next, radius));
     if (replica) attachReplica(replica, 'to', next);
   };
@@ -353,5 +388,5 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   };
 
   const animations = () => [shape, replicaAnim, scrimAnim, plateFade, ...fades].filter((a): a is Animation => !!a);
-  return { plate, shape, arrived, release, remove, retract, retarget, waiting, animations };
+  return { plate, shape, arrived, release, remove, dissolve, retract, retarget, waiting, animations };
 }

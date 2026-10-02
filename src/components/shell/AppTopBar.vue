@@ -295,7 +295,8 @@ const overlaps = (): boolean => {
     return el.getBoundingClientRect();
   };
   const outer = root.getBoundingClientRect();
-  const left = box('.brand, .quick-back');
+  // 返回键和品牌都常驻（见模板里的 .lead）：量看得见的那一个。
+  const left = box('.lead > :not(.is-off)');
   const nav = box('.pill-nav');
   const actions = box('.topbar-actions');
   const wheelEl = localeWheel.value?.$el;
@@ -377,16 +378,32 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
 <template>
   <header ref="bar" :class="['app-topbar', fit > 0 && `fit-${fit}`]">
-    <!-- 返回键和品牌换位时轻轻交接，不再一帧之内硬换（切页时左上角「闪一下」）。 -->
-    <Transition name="lead" mode="out-in">
-      <button v-if="backTo" key="back" type="button" class="quick-back glass-control" :title="backLabel" :aria-label="backLabel" @click="goBack">
+    <!-- 返回键和品牌叠在同一格里、都常驻，换位时交叉淡入淡出。以前是 <Transition mode="out-in">：旧的淡完、
+         下一帧才插进新的，切页挂载占着主线程时这中间空出一两百毫秒，新的再一下冒出来（2026-10-02 录屏的硬切）。
+         现在只切类名，过渡在合成器上跑，主线程忙时最多晚一点开始，不会空着。 -->
+    <div :class="['lead', { 'is-back': backTo }]">
+      <button
+        type="button"
+        :class="['quick-back', 'glass-control', { 'is-off': !backTo }]"
+        :title="backLabel"
+        :aria-label="backLabel"
+        :aria-hidden="backTo ? undefined : 'true'"
+        :inert="backTo ? undefined : true"
+        @click="goBack"
+      >
         <Icon name="arrow-left" :size="20" />
       </button>
-      <RouterLink v-else key="brand" to="/" class="brand" :title="versionTitle || t.brandHome">
+      <RouterLink
+        to="/"
+        :class="['brand', { 'is-off': backTo }]"
+        :title="versionTitle || t.brandHome"
+        :aria-hidden="backTo ? 'true' : undefined"
+        :inert="backTo ? true : undefined"
+      >
         <BrandMark :size="30" />
         <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
       </RouterLink>
-    </Transition>
+    </div>
 
     <SegmentTrack
       class="pill-nav"
@@ -462,10 +479,24 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   text-decoration: none;
 }
 .brand :deep(svg) { display: block; }
-.lead-enter-active { transition: opacity 160ms ease, scale 220ms var(--ease-out, ease); }
-.lead-leave-active { transition: opacity 90ms ease; }
-.lead-enter-from { opacity: 0; scale: .9; }
-.lead-leave-to { opacity: 0; }
+/* 左上角那一格：返回键和品牌叠在一起，看得见的那个占位置，另一个绝对定位叠在同一处、淡出。
+   新的晚 60ms 开始淡入：旧的先让一让，两个不会同时以半透明叠成一团。只淡透明度：
+   缩放留给返回键自己按下去的那一下（:active），不能被交接的延迟拖慢。 */
+.lead { position: relative; display: grid; min-width: 0; justify-self: start; align-items: center; }
+.lead > * {
+  grid-area: 1 / 1;
+  transition: opacity 180ms ease 60ms, visibility 0s linear 0s, scale var(--dur-fast, 140ms) var(--ease-out, ease);
+}
+.lead > .is-off {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease, visibility 0s linear 120ms, scale var(--dur-fast, 140ms) var(--ease-out, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lead > *, .lead > .is-off { transition: none; }
+}
 .wordmark {
   font-size: var(--fs-lg);
   font-weight: 600;

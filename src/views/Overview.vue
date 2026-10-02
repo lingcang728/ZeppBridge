@@ -25,6 +25,7 @@ import { resolvedTheme } from '../composables/useTheme';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { chartPalettes } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import { indexSeries, latestValue } from '../lib/metricSeries';
 import { vTilt } from '../lib/tilt';
 import { formatMetric, isFiniteNumber } from '../lib/format';
@@ -144,6 +145,10 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
 const loadSeq = createLoadSeq();
+/** 还什么都没有：首次加载显示骨架，失败显示空态。骨架换成内容时交叉淡化（模板里的 skeleton-out）。 */
+const nothingYet = computed(() => !overview.value && !heartRateSeries.value.length && !recentSleep.value.length);
+const showSkeleton = computed(() => loading.value && nothingYet.value);
+const showLoadError = computed(() => !showSkeleton.value && Boolean(error.value) && nothingYet.value);
 
 /* 没被认出来的设备。
  *
@@ -351,14 +356,16 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
     <!-- 「这一周」的事实摘要放进第一屏（体验评估 #3）：完整周报仍在下面。 -->
     <WeekDigest />
 
-    <div v-if="loading && !overview && !heartRateSeries.length && !recentSleep.length" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
-      <div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>
-    </div>
-    <div v-else-if="error && !overview && !heartRateSeries.length && !recentSleep.length" class="empty-wrap">
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="showSkeleton" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
+        <div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>
+      </div>
+    </Transition>
+    <div v-if="showLoadError" class="empty-wrap">
       <div class="empty-state" role="alert"><GlyphTile name="cloud-output" :size="72" /><strong>{{ t.loadFailedTitle }}</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">{{ t.retry }}</button></div>
     </div>
 
-    <div v-else class="dashboard-grid">
+    <div v-if="!showSkeleton && !showLoadError" class="dashboard-grid">
       <!-- 心率卡的格子由外壳持有：卡片是异步 chunk，骨架与本体占同一个格子。 -->
       <div class="hr-card-slot">
         <HeartRateCard v-tilt :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />

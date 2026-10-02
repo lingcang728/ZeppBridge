@@ -232,32 +232,44 @@ onUnmounted(() => {
       <div :class="['shell-head', { 'is-scrolled': contentUnderBar }]">
         <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="showBack ? navigationBranch(route.path) : undefined" :back-label="backLabel" />
 
-        <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
-          <Icon name="database" :size="14" class="spinning" />
-          <span>{{ t.preparingData }}</span>
-        </div>
-        <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
-          <Icon name="warning" :size="14" />
-          <span>{{ statusError }}</span>
-        </div>
+        <!-- 这几枚状态胶囊出现、消失、互换都淡入淡出，占的那一截高度跟着收放（shell.css 的 .notice-*）：
+             以前一帧冒出来把整页往下推一截、消失时整页往上弹一截——启动时的「正在准备数据…」每次都这样。 -->
+        <Transition name="notice">
+          <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
+            <Icon name="database" :size="14" class="spinning" />
+            <span>{{ t.preparingData }}</span>
+          </div>
+        </Transition>
+        <Transition name="notice">
+          <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
+            <Icon name="warning" :size="14" />
+            <span>{{ statusError }}</span>
+          </div>
+        </Transition>
         <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
-        <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
-          <Icon name="database" :size="14" class="spinning" />
-          <span>{{ t.compacting(compactionPending) }}</span>
-        </div>
-        <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
-          <Icon name="circle-check" :size="14" />
-          <span>{{ t.compacted(formatBytes(compactionSaved)) }}</span>
-        </div>
-        <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
+        <Transition name="notice" mode="out-in">
+          <div v-if="compacting" key="compacting" class="sync-feedback" role="status" aria-live="polite">
+            <Icon name="database" :size="14" class="spinning" />
+            <span>{{ t.compacting(compactionPending) }}</span>
+          </div>
+          <div v-else-if="compactionSaved" key="compacted" class="sync-feedback tone-updated" role="status">
+            <Icon name="circle-check" :size="14" />
+            <span>{{ t.compacted(formatBytes(compactionSaved)) }}</span>
+          </div>
+        </Transition>
+        <Transition name="notice">
+          <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
+        </Transition>
 
         <div v-if="browserPreview" class="preview-banner" role="status">
           <Icon name="terminal" :size="16" />
           <span>{{ t.browserPreview }}</span>
         </div>
-        <div v-if="routeNotice" class="route-notice" role="status">
-          <Icon name="info" :size="16" />{{ t.routeNotFound }}
-        </div>
+        <Transition name="notice">
+          <div v-if="routeNotice" class="route-notice" role="status">
+            <Icon name="info" :size="16" />{{ t.routeNotFound }}
+          </div>
+        </Transition>
       </div>
 
       <!-- 主要页面缓存起来，切回去不再重新查库。

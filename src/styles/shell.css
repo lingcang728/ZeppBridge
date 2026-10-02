@@ -86,6 +86,32 @@ a { color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .preview-banner, .route-notice { display: flex; width: fit-content; max-width: calc(100% - 32px); align-items: center; gap: 8px; margin: 2px auto 6px; padding: 7px 16px; border-radius: 999px; box-shadow: var(--glass-rim); color: var(--muted); font-size: var(--fs-sm); }
 .preview-banner { background: var(--accent-soft); }
+/* 顶栏下面的状态胶囊出现 / 消失 / 互换（AppShell.vue 的 <Transition name="notice">）：淡入淡出，占的那一截高度
+   跟着收放，下面的页面顺着滑上滑下，而不是一帧被推开、一帧弹回来。 */
+.notice-enter-active, .notice-leave-active {
+  overflow: hidden;
+  transition: opacity 200ms ease, max-height 260ms var(--ease-out), min-height 260ms var(--ease-out),
+    margin-top 260ms var(--ease-out), margin-bottom 260ms var(--ease-out),
+    padding-top 260ms var(--ease-out), padding-bottom 260ms var(--ease-out);
+}
+.notice-enter-from, .notice-leave-to {
+  opacity: 0;
+  max-height: 0;
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.notice-enter-to, .notice-leave-from { max-height: 64px; }
+/* 骨架屏换成内容（<Transition name="skeleton-out" @before-leave="holdInPlace">，lib/motion/holdInPlace.ts）：
+   骨架原地钉住、在上面淡掉，内容同时在它底下出现（卡片自己的 card-enter 淡入）——交叉淡化，中间没有空白的一帧。 */
+.skeleton-out-leave-active { z-index: 1; pointer-events: none; transition: opacity 240ms ease; }
+.skeleton-out-leave-to { opacity: 0; }
+/* 列表换筛选（最近记录的 睡眠 / 运动 / 全部）：旧列表原地钉住淡出，新列表同时淡入。 */
+.list-swap-enter-active { transition: opacity 200ms ease; }
+.list-swap-leave-active { z-index: 1; pointer-events: none; transition: opacity 140ms ease; }
+.list-swap-enter-from, .list-swap-leave-to { opacity: 0; }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: transparent; }
@@ -186,6 +212,9 @@ a { color: inherit; }
 [class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 80ms, transform var(--dur-std) var(--ease-enter) 80ms; }
 .page-dismiss-enter-from { opacity: 0; transform: scale(1.03) translateY(10px); }
 .page-host > * { transform-origin: 50% 30vh; }
+/* 窗口形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
+   不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
+.window-replica, .window-replica * { animation: none !important; transition: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

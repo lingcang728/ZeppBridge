@@ -19,6 +19,7 @@ import type { DesignIconName } from '../components/DesignIcon.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useRevisionReload } from '../composables/useRevisionReload';
 import { createLoadSeq } from '../lib/loadSeq';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import { today as currentToday } from '../lib/currentDay';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
@@ -196,6 +197,9 @@ useRevisionReload(() => void loadRecent());
       </div>
       <p v-if="kind !== 'sleep' && hiddenWorkoutsCount > 0" class="hidden-note"><Icon name="info" :size="13" />{{ t.hiddenIncomplete(hiddenWorkoutsCount) }}</p>
 
+      <!-- 换筛选（睡眠 / 运动 / 全部、运动类型）时旧列表原地钉住淡出、新列表同时淡入，不再整块一帧换掉。 -->
+      <Transition name="list-swap" @before-leave="holdInPlace">
+      <div :key="`${kind}:${workoutType}`" class="recent-list">
       <p v-if="!entries.length" class="hidden-note">{{ kind === 'sleep' ? t.noSleep : kind === 'workout' ? (workoutType === 'all' ? t.noWorkouts : t.noWorkoutsOfType) : t.noRecords }}</p>
 
       <div v-else class="timeline">
@@ -215,6 +219,8 @@ useRevisionReload(() => void loadRecent());
           <button type="button" class="pill-button" @click="visible += STEP"><Icon name="chevron-down" :size="14" />{{ t.showMore(Math.min(STEP, entries.length - visible)) }}</button>
         </div>
       </div>
+      </div>
+      </Transition>
     </template>
   </section>
 </template>
