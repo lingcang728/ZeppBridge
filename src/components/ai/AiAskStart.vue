@@ -194,10 +194,11 @@ const nothingInRange = computed(() => {
 /* 左上角一排胶囊，不再套玻璃盒子：画布上同时浮着任务名、四个入口、右栏、交付坞，盒子越少越安静。 */
 .ask-strip { display: grid; gap: 8px; width: fit-content; max-width: 100%; }
 .ask-entries { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.ask-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 15px 0 12px; border: 0; border-radius: 999px;
-  background: var(--mat-raised); box-shadow: var(--mat-raised-rim); color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+/* 入口是轻的：只有一道细边，悬停才浮起来——画布上已经浮着任务名、右栏和交付坞，再来四块实心胶囊太吵。 */
+.ask-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 13px 0 10px; border: 0; border-radius: 999px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
   transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, translate var(--dur-fast) var(--ease-out); }
-.ask-chip:hover { background: var(--mat-raised-hover, var(--mat-raised)); color: var(--ink); }
+.ask-chip:hover { background: var(--mat-raised); box-shadow: var(--mat-raised-rim); color: var(--ink); }
 .ask-chip:active { translate: 0 1px; }
 .ask-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, var(--surface-raised)); color: var(--ink); }

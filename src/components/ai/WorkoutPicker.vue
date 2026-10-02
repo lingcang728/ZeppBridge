@@ -134,7 +134,7 @@ const facts = (workout: Workout): string => {
   background: var(--cap-track); box-shadow: var(--cap-track-shadow); color: var(--muted); font-size: var(--fs-xs); }
 
 /* 按天的时间线：左边一条细竖线把同一天的运动串起来，日期是线上的一个小标签。 */
-.timeline { display: grid; gap: 10px; margin-top: 10px; }
+.timeline { display: grid; gap: 6px; margin-top: 10px; }
 .day { position: relative; display: grid; gap: 4px; padding-left: 14px; }
 .day::before { content: ''; position: absolute; top: 24px; bottom: 6px; left: 4px; width: 1.5px; border-radius: 2px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), transparent); }
@@ -146,10 +146,10 @@ const facts = (workout: Workout): string => {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 11px;
-  padding: 6px 10px 6px 6px;
+  gap: 10px;
+  padding: 5px 10px 5px 5px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--ink) 4%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
   color: var(--muted);
@@ -161,11 +161,11 @@ const facts = (workout: Workout): string => {
 .row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .row.is-on { background: color-mix(in srgb, var(--accent) 15%, transparent);
   box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--accent) 60%, transparent); }
-.row-glyph { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%;
+.row-glyph { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border-radius: 50%;
   background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--activity); }
-.row-copy { display: grid; flex: 1; min-width: 0; gap: 2px; overflow-wrap: anywhere; }
-.row-name { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.row-facts { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: normal; }
+.row-copy { display: grid; flex: 1; min-width: 0; gap: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.row-name { color: var(--ink); font-size: var(--fs-xs); font-weight: 650; }
+.row-facts { color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: normal; }
 .row-check { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent); color: transparent;
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease, scale var(--dur-base) var(--ease-spring); }

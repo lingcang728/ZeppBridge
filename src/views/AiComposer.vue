@@ -336,7 +336,7 @@ onBeforeUnmount(() => { dockObserver?.disconnect(); topObserver?.disconnect(); }
 /* 舞台贴满顶栏以下的整块视口；关系网在最底层，其余几块玻璃浮在上面。
    关系网的画布只占「看得见的那一块」：上面让出任务名胶囊，下面让出对话条和按钮栏，右边让出步骤栏——
    圈按这一块的大小算、圆心落在这一块正中，不再有一截被压在交付坞下面白占地方。 */
-.ai-page { --rail-w: min(380px, 30vw); padding: 4px 20px 20px; }
+.ai-page { --rail-w: min(344px, 27vw); padding: 4px 20px 20px; }
 .stage {
   position: relative;
   height: calc(100vh - 84px);

@@ -592,10 +592,10 @@ defineExpose({ focusCategory: (category: AiTaskCategory) => flyToFocus(categoryN
         </div>
       </Transition>
 
-      <div class="dock dock-left">
+      <div v-show="canUndo" class="dock dock-left">
         <GraphUndoPill :can-undo="canUndo" :label="t.undo" :hint="undoHint" :seq="undoSeq" @undo="emit('undo')" />
       </div>
-      <GraphZoomDock class="dock dock-right" :percent="zoomPercent" :pulse="fitPulse" :labels="zoomLabels"
+ <GraphZoomDock class="dock-right" vertical :percent="zoomPercent" :pulse="fitPulse" :labels="zoomLabels"
         @zoom="stepZoom" @fit="fit" />
 
       <GraphNodePopover v-if="openNode" :node="openNode" :anchor="openAnchor" :viewport="size" :safe="safe"

@@ -84,7 +84,7 @@
 .hint-close { flex: 0 0 auto; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--glass-press); color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
 .dock { position: absolute; bottom: 14px; z-index: 3; display: flex; align-items: center; }
 .dock-left { left: 14px; }
-.dock-right { right: 14px; gap: 2px; padding: 3px; border-radius: 999px; }
+.dock-right { position: absolute; top: 50%; right: 14px; z-index: 3; translate: 0 -50%; }
 
 .crumb-enter-active, .crumb-leave-active { transition: opacity .28s ease, translate .38s var(--ease-out); }
 .crumb-enter-from, .crumb-leave-to { opacity: 0; }
