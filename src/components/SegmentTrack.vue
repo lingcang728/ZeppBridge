@@ -306,12 +306,28 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
    两头的样子写在样式表里（.is-lifted 与否）；切换时平胶囊和玻璃边在同一段时间里互相「变成」对方：
    浮起时平胶囊放大到透镜的大小并淡出，玻璃边从平胶囊的大小长到 1 并淡入；落下反过来。两层都是正圆端头，
    只有这几百毫秒里被非等比缩放，停着的时候谁都不缩放。
-   半路换向（刚按下就松手）：正在放的动画原地倒放回去，起点就是此刻的样子，不跳。 */
+   半路换向（刚按下就松手；点别的项时浮起要 380ms、飞行 360ms 就落地了）：先读下三层此刻的样子
+   （计算样式里带着正在放的动画），撤掉旧动画，按新方向的时长和曲线从这个样子接着放。
+   以前是把旧动画 reverse()：已经放完的淡入淡出被倒放时，Chromium 要到下一帧才真正掉头，那一帧它们都不生效，
+   画面上只剩样式表里落下以后的样子——透镜和玻璃边一下没了、平胶囊按浮起的大小整块亮出来，下一帧又变回透镜；
+   倒放的浮起曲线还会先往外再鼓一下、最后一截猛地缩回（2026-10-02 录屏「点到最右边，玻璃合并以后闪一下」。
+   拖动不闪：松手时浮起早放完了，走的是重新起一段的路）。 */
 const morphing: Animation[] = [];
+type LayerPose = { scale: string; translate: string; opacity: string };
+const poseOf = (el: HTMLElement): LayerPose => {
+  const style = getComputedStyle(el);
+  return {
+    scale: style.scale === 'none' ? '1 1' : style.scale,
+    translate: style.translate === 'none' ? '0px 0px' : style.translate,
+    opacity: style.opacity,
+  };
+};
 watch(lifted, async (up) => {
-  if (morphing[0]?.playState === 'running') {
-    for (const animation of morphing) animation.reverse();
-    return;
+  // flush: 'pre'：这时类名还没换，读到的就是画面上此刻的样子。
+  const midway = morphing.some((animation) => animation.playState === 'running');
+  const poses = new Map<HTMLElement, LayerPose>();
+  if (midway) {
+    for (const el of [plateEl.value, rimShape.value, lensEl.value]) if (el) poses.set(el, poseOf(el));
   }
   for (const animation of morphing.splice(0)) animation.cancel();
   if (reducedMotion()) return;
@@ -346,7 +362,14 @@ watch(lifted, async (up) => {
       [plate, [{ opacity: 0 }, { opacity: 1 }], fade(180, 40)],
       [rim, [{ opacity: 1 }, { opacity: 0 }], fade(120, Math.max(0, DROP_MS - 120))],
     ];
-  for (const [el, keyframes, options] of parts) morphing.push(exemptFromSettle(el.animate(keyframes, options)));
+  // 半路换向：每段的起点换成那一层此刻的样子（只换这一段动的那几项）。
+  const from = (el: HTMLElement, frame: Keyframe): Keyframe => {
+    const pose = poses.get(el);
+    return pose ? Object.fromEntries(Object.keys(frame).map((key) => [key, pose[key as keyof LayerPose]])) : frame;
+  };
+  for (const [el, [first, ...after], options] of parts) {
+    morphing.push(exemptFromSettle(el.animate([from(el, first!), ...after], options)));
+  }
 }, { flush: 'pre' });
 
 /* —— 橡皮筋与形变 ——

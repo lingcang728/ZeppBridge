@@ -89,6 +89,10 @@ a { color: inherit; }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: transparent; }
+/* 滚动条那一条始终留着位置。顶栏和页面都在这个滚动区里：内容一变高、滚动条一出现，可用宽度就少一条——
+   居中的页面左移半条、顶栏右簇左移一整条；变矮时再弹回去。设置卡关上、大卡层收起的那一帧滚动条消失，
+   卡刚落定整页又往右跳一下；概览 ↔ 设置切页时导航胶囊也跟着横跳（2026-10-02 录屏「退回去闪一下的跳变」）。 */
+.main-content { scrollbar-gutter: stable; }
 /* 环境光：画布上两三团很淡的色晕，固定不随内容滚动。玻璃和模糊要有东西可折射，
    纯平的底色上毛玻璃看起来只是「半透明灰」。 */
 .app-body { position: relative; isolation: isolate; }
