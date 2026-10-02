@@ -10,12 +10,17 @@ struct TestLibrary(PathBuf);
 
 impl TestLibrary {
     fn empty() -> Self {
+        // 目录名不能只靠时间戳：macOS 的 `SystemTime` 只有微秒精度，并行起跑的
+        // 测试会撞上同一个名字，先结束的那个 `Drop` 把目录删了，另一个就在
+        // `open_migrated` 里报「无法建立写入锁：No such file or directory」。
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let serial = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let dir = std::env::temp_dir().join(format!(
-            "zeppbridge-mcp-test-{}-{nonce}",
+            "zeppbridge-mcp-test-{}-{nonce}-{serial}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
