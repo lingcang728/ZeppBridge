@@ -4,6 +4,7 @@ import {
 } from '../lib/deck/morph';
 import { SLIDE_IN_EASE, SLIDE_IN_MS, slideInFrames } from '../lib/deck/physics';
 import { exemptFromSettle } from '../lib/motion/interrupt';
+import { BODY_IN, BODY_OUT, CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS } from '../lib/motion/timing';
 
 /**
  * 设置卡组在三种形态之间的形变：coverflow ↔ 卡包（洗牌式飞出 / 收拢）、总览 ↔ 打开一张。
@@ -24,15 +25,7 @@ export interface DeckMorphRefs {
   reducedMotion: () => boolean;
 }
 
-const OPEN_MS = 330;
-const CLOSE_MS = 290;
-/* 不再那么靠前：旧曲线 35% 的时间就走完形状，剩下两百多毫秒板原地不动。中段仍有运动、末段收住、不回弹。 */
-const OPEN_EASE = 'cubic-bezier(.3, .7, .2, 1)';
-const CLOSE_EASE = 'cubic-bezier(.32, .62, .2, 1)';
-/** 卡身、× 和把手跟着形状一起出来（12%–50% 淡入；形状这时已走了大半），关上时在前 35% 淡出。
-    卡头全程不透明。不能等形状走完才淡入：那段时间里大卡长满了却一个字没有（第二版录屏的「空板」）。 */
-const BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.12 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }];
-const BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.35 }, { opacity: 0 }];
+/* 时长、曲线和卡身的分段淡入淡出在 lib/motion/timing.ts：概览 ↔ 详情页用的是同一份。 */
 /** coverflow 的卡正面和卡头长得不一样：从它打开时大卡在前 30% 里淡入盖上去，收回时在最后 30% 淡出露出它。 */
 const COVER_FADE = 0.3;
 /** 展开全部 / 收起：一张张飞出、收拢。 */

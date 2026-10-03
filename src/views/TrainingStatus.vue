@@ -32,6 +32,7 @@ import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
 import { coveredWindowValue } from '../lib/missingValues';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import { trainingStatusMessages as messages } from './TrainingStatus.i18n';
 
 const t = useMessages(messages);
@@ -309,11 +310,14 @@ useRevisionReload(() => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </p>
 
-    <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
-      <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
-    </div>
+    <!-- 骨架换成内容时交叉淡化：骨架原地钉住淡掉，内容同时在底下出现（从卡展开进来时不等数据）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
+        <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
+      </div>
+    </Transition>
 
-    <template v-else>
+    <template v-if="!initialLoading">
       <TrendRangeBar />
       <div v-if="shownCardCount" class="trend-grid" :style="trendGridStyle(shownCardCount)">
         <MetricTrendCard

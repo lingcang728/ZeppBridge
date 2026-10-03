@@ -17,6 +17,7 @@ import WorkoutProvenanceCard from '../components/workout/WorkoutProvenanceCard.v
 import { useWorkoutDetail } from '../composables/useWorkoutDetail';
 import { useWorkoutPresentation } from '../composables/useWorkoutPresentation';
 import { useMessages } from '../i18n';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import { workoutDetailMessages as messages } from './WorkoutDetail.i18n';
 
 defineOptions({ name: 'WorkoutDetail' });
@@ -76,8 +77,12 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
 
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
-    <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button></EmptyState>
+    <!-- 骨架换成内容时交叉淡化（从卡展开进来时，换的那一下等形变放完）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
+    </Transition>
+    <template v-if="!loading">
+    <EmptyState v-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button></EmptyState>
     <EmptyState v-else-if="!workout" icon="steps" :title="t.notFoundTitle" :message="t.notFoundMessage" />
 
     <template v-else>
@@ -132,6 +137,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         </WorkoutSidePanels>
       </div>
       <p class="page-foot"><GlyphTile name="secure" :size="18" />{{ t.pageFoot }}</p>
+    </template>
     </template>
   </section>
 </template>

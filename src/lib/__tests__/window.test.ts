@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { arcMidpoint, bleedRect, steadyRadius, windowInset } from '../motion/window';
+import { cardFrame } from '../deck/morph';
+import { arcMidpoint, bleedRect, steadyRadius, windowInset, windowPoses } from '../motion/window';
 
 describe('windowInset', () => {
   const frame = { left: 0, top: 60, width: 1000, height: 700 };
@@ -49,5 +50,34 @@ describe('arcMidpoint', () => {
   it('is symmetric in time: the same bend on the way back', () => {
     const mid = arcMidpoint(page, card);
     expect(mid.top).toBeCloseTo(500 * 0.64);
+  });
+});
+
+describe('windowPoses (page, backing plate and card copy share one set of keyframes)', () => {
+  const card = { left: 700, top: 500, width: 200, height: 100 };
+  const view = { left: 0, top: 0, width: 1000, height: 700 };
+  const page = { left: 0, top: 60, width: 1000, height: 2400 };
+  const from = { rect: card, anchor: { x: card.left, y: card.top } };
+  const to = { rect: bleedRect(view, 20), anchor: { x: page.left, y: page.top } };
+
+  it('starts on the card and ends on the page, with the page top-left riding from the card corner home', () => {
+    const poses = windowPoses(from, to);
+    expect(poses[0]).toEqual(from);
+    expect(poses[poses.length - 1]).toEqual(to);
+    expect(poses[1].anchor.y - card.top).toBeCloseTo((page.top - card.top) * 0.64);
+    expect(poses[1].anchor.x - card.left).toBeCloseTo((page.left - card.left) * 0.5);
+  });
+
+  it('crops the real page to exactly the same on-screen rectangle as the plate at every keyframe', () => {
+    for (const pose of windowPoses(from, to)) {
+      const frame = cardFrame(pose, page, 20);
+      const [tx, ty] = String(frame.transform).match(/-?[\d.]+/g)!.map(Number);
+      const [top, right, bottom, left] = String(frame.clipPath).match(/-?[\d.]+(?=px)/g)!.map(Number);
+      const shown = { left: page.left + tx + left, top: page.top + ty + top };
+      expect(shown.left).toBeCloseTo(pose.rect.left, 1);
+      expect(shown.top).toBeCloseTo(pose.rect.top, 1);
+      expect(page.left + tx + page.width - right).toBeCloseTo(pose.rect.left + pose.rect.width, 1);
+      expect(page.top + ty + page.height - bottom).toBeCloseTo(pose.rect.top + pose.rect.height, 1);
+    }
   });
 });

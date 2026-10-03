@@ -12,7 +12,7 @@ import { useMessages } from '../i18n';
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
-import { useFirstLoad } from '../composables/useFirstLoad';
+import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
@@ -21,6 +21,7 @@ import { minutesToHours } from '../lib/missingValues';
 import type { DeviceProfile, SleepSession } from '../types';
 import { sleepDetailMessages as messages } from './SleepDetail.i18n';
 import { vEdgeSafe } from '../lib/edgeSafe';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -29,8 +30,8 @@ const session = ref<SleepSession | null>(null);
 const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
-// 登记首次加载：从卡片展开进来时，动画等它有内容再揭开。
-useFirstLoad(loading);
+// 页面上看到的「加载中」：数据到了也等卡 ↔ 页的形变放完再换成内容（composables/useFirstLoad.ts）。
+const shownLoading = useLoadingAfterMotion(loading);
 const error = ref<string | null>(null);
 const sleepId = computed(() => String(route.params.sleepId || ''));
 
@@ -218,8 +219,11 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
       <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
     </header>
 
-    <div v-if="loading" class="muted-line" aria-live="polite">{{ t.loadingDetail }}</div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="shownLoading" class="muted-line" aria-live="polite">{{ t.loadingDetail }}</div>
+    </Transition>
+    <template v-if="!shownLoading">
+    <EmptyState v-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
       <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!session" icon="moon" :title="t.notFoundTitle" :message="t.notFoundMessage" />
@@ -322,6 +326,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
         </SectionGroup>
 
       <p class="note">{{ t.footnote }}</p>
+    </template>
     </template>
   </section>
 </template>

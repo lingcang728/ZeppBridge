@@ -1,32 +1,20 @@
 /**
- * 卡片 ↔ 整页（或设置大卡）的「窗口」形变，照 ColorOS 17 的做法（用户 2026-09-30 给的录屏逐帧看过）：
+ * 卡片 ↔ 整页的「窗口」形变的几何（2026-10-03 起和设置卡叠同一种做法，见 composables/usePageMorph.ts）：
  *
- * - **从哪里来回哪里去**：窗口从那张卡的矩形长出来，收回时落回同一张卡的矩形——大卡落回大卡、
- *   小格落回小格，宽高比一路从卡变成页（或反过来），终点就是卡此刻在屏幕上的位置和圆角。
- * - **全程圆角**：展开时圆角一直留到快长满才收掉；收回时一开始就变圆。以前收回的前一百多毫秒
- *   是详情页自己在缩，它没有圆角，看上去「缩成一个方块」。
+ * - **从哪里来回哪里去**：窗口从那张卡的矩形长出来，收回时落回同一张卡的矩形，宽高比一路从卡变成页。
  * - **轻微的抛物线**：竖直方向先走、水平方向稍晚（关键帧中点竖直走了六成多、水平刚过一半），
- *   窗口的中心走的是一段弧，而不是直线平移。曲线先快后慢、没有回弹。
- * - **内容跟着窗口走**：窗口里放一份那张卡的拷贝，跟窗口一起等比缩放。展开时它在前 45% 里淡掉，
- *   露出新页；收回时它在 25%–65% 之间淡入，**落地前的最后一帧窗口里就是那张卡本身**，
- *   撤掉窗口时真卡原样接上——没有空色板、没有亮一下。放大前的第一帧也同样就是那张卡。
- * - **背景退后**：窗口在动的时候，底下那一页蒙一层磨砂变暗；展开时渐起，收回时渐散。
- *
- * 性能（见记忆「动效只动合成属性」）：逐帧改的只有三样——一块没有子树重排的板的 clip-path
- * （板里只有一张卡的拷贝），拷贝的 transform / opacity，遮罩的 opacity。模糊是遮罩上静态的一层
- * backdrop-filter，不做逐帧模糊半径过渡。
+ *   窗口的中心走的是一段弧，而不是直线平移。曲线先快后慢、没有回弹（ColorOS 17 录屏逐帧看过）。
+ * - **窗口里是真的新页**，1:1 不缩放：页面的左上角跟着窗口从卡的左上角滑到原位，页头天然落在卡所在处，
+ *   像设置大卡的卡头；卡的拷贝叠在上面跟着走、淡掉（lib/motion/replica.ts）。垫底和拷贝都是页面的子元素，
+ *   一道裁切动画管三样（pageBackdrop）。
  *
  * **clip-path 的圆角在一段动画里必须是同一个值**（2026-10-01 在 Chrome / WebView2 154 上实测）：
  * inset() 的四边怎么变、关键帧有几个都能交给合成器，但只要 round 的半径在关键帧之间变了，整段动画就退回
- * 主线程——展开时新页挂载占着主线程，板就停在原地、等主线程空了再一下跳过去（「展开卡、收回顺」就是它：
- * 收回时来处页是缓存的，主线程是空的）。所以整段只用卡那一端的圆角；整页那一端（圆角 0）把裁切矩形往外
- * 多放一个圆角半径，圆弧落到板外面，四个角自然就方了，不用改半径。
+ * 主线程——新页挂载占着主线程时窗口就停在原地、等主线程空了再一下跳过去。所以整段只用卡那一端的圆角；
+ * 整页那一端（圆角 0）把裁切矩形往外多放一个圆角半径，圆弧落到板外面，四个角自然就方了，不用改半径。
  *
- * 板的底色是页面自己的底（--ambient + --canvas），不是卡片色：长满以后它看上去就是「新页还没
- * 画出内容的那一瞬」，而不是一整屏深色卡片。以前板带着卡片的底色，还把卡片自己的背景留在原位，
- * 长满后整屏深色里多出一块浅色矩形——用户看到的「黑块残影」就是它。
+ * 逐帧改的只有 transform / clip-path（定圆角）/ opacity，见记忆「动效只动合成属性」。
  */
-import { exemptFromSettle } from './interrupt';
 
 export interface WindowRect {
   left: number;
@@ -74,319 +62,77 @@ export function arcMidpoint(from: WindowRect, to: WindowRect, t = 0.5, lead = 0.
   };
 }
 
-/** 窗口在关键帧 0 / 0.5 / 0.9 / 1 处的矩形（和 morphWindow 的形状动画一一对应）。
-    离场页要跟着窗口一起缩，用同一组矩形、同一条缓动算它的 transform。 */
+/** 形变的关键帧位置（缓动后的进度）：0.9 那一帧窗口已经长到九成多，之后才把圆弧推出板外。 */
 export const WINDOW_OFFSETS = [0, 0.5, 0.9, 1] as const;
-export function windowRects(from: WindowRect, to: WindowRect): WindowRect[] {
-  return [
-    from,
-    arcMidpoint(from, to),
-    {
-      left: lerp(from.left, to.left, 0.94),
-      top: lerp(from.top, to.top, 0.96),
-      width: lerp(from.width, to.width, 0.94),
-      height: lerp(from.height, to.height, 0.96),
-    },
-    to,
-  ];
-}
 
 /** 那张卡的拷贝（带着祖先、身后的底和此刻的样子，和真卡一个像素都不差）：见 lib/motion/replica.ts。 */
 export { cardReplica } from './replica';
 
-/** 拷贝在「页」那一端的变换：中心对到窗口中心，按宽度等比放大（封顶，免得放得太夸张）。 */
-function replicaTransform(card: WindowRect, window: WindowRect): string {
-  const scale = Math.min(3, Math.max(0.2, window.width / card.width));
-  const dx = window.left + window.width / 2 - (card.left + card.width / 2);
-  const dy = window.top + window.height / 2 - (card.top + card.height / 2);
-  return `translate(${r2(dx)}px, ${r2(dy)}px) scale(${r2(scale)})`;
+/** 窗口形变的一个时刻：屏幕上看得见的矩形，以及页面（或卡拷贝）左上角此刻在屏幕上的位置。 */
+export interface WindowPose {
+  rect: WindowRect;
+  anchor: { x: number; y: number };
 }
 
-export interface WindowMorphOptions {
-  /** 窗口起点 / 终点矩形与圆角。 */
-  from: WindowRect;
-  to: WindowRect;
-  fromRadius: number;
-  toRadius: number;
-  /** 板铺在哪块矩形上（页面可视区）：裁切都相对它算。 */
-  frame: WindowRect;
-  /** 板挂在哪一层（要在顶栏下面，所以挂进应用骨架而不是 body）。 */
-  host: HTMLElement;
-  duration: number;
-  easing: string;
-  /** 那张卡的拷贝，以及它在哪一端：'from' = 展开（从卡出发）、'to' = 收回（落到卡上）。 */
-  replica?: { el: HTMLElement; rect: WindowRect; at: 'from' | 'to' } | null;
-  /** 底下那一页的磨砂遮罩：展开时渐起（'in'），收回时渐散（'out'）。 */
-  scrim?: 'in' | 'out' | null;
-  /** 窗口的底：'page' = 页面底色（卡 ↔ 整页）；'card' = 卡片材质（设置里小卡 ↔ 打开的大卡）。 */
-  surface?: 'page' | 'card';
-  /** 收回时：窗口先在这么长里从透明变实（盖住正在淡出的详情页）；遮罩同一段里渐起、之后渐散。 */
-  fadeIn?: number;
-  zIndex?: number;
+/** WINDOW_OFFSETS 各关键帧上，水平 / 竖直方向各走了多少（竖直先走：弧线）。和 windowRects 一一对应。 */
+const PROGRESS: ReadonlyArray<readonly [number, number]> = [[0, 0], [0.5, 0.64], [0.94, 0.96], [1, 1]];
+
+/**
+ * 窗口在 WINDOW_OFFSETS 各关键帧上的矩形和锚点（纯函数，方便测）。矩形和锚点按同一组进度插值：
+ * 页面、垫在它下面的底板、叠在上面的卡拷贝都用这一组，三层逐帧严丝合缝。
+ */
+export function windowPoses(from: WindowPose, to: WindowPose): WindowPose[] {
+  return PROGRESS.map(([px, py]) => ({
+    rect: {
+      left: lerp(from.rect.left, to.rect.left, px),
+      width: lerp(from.rect.width, to.rect.width, px),
+      top: lerp(from.rect.top, to.rect.top, py),
+      height: lerp(from.rect.height, to.rect.height, py),
+    },
+    anchor: { x: lerp(from.anchor.x, to.anchor.x, px), y: lerp(from.anchor.y, to.anchor.y, py) },
+  }));
 }
 
-export interface WindowMorph {
-  plate: HTMLElement;
-  /** 形状动画（时长 = duration）。 */
-  shape: Animation;
-  /** 形状走完的时刻。 */
-  arrived: Promise<void>;
-  /** 板淡出、移除（遮罩一起）。默认等形状走完再淡；`now` = 立刻开始淡（和真内容交叉）。 */
-  release: (fadeMs?: number, now?: boolean) => void;
-  /** 立刻移除。 */
-  remove: () => void;
-  /** 收回落地：板这一帧撤掉，原位换一块静止的替身（同样的底、写死的裁切、里面是那张卡的拷贝），
-      替身在真卡上面淡掉。 */
-  dissolve: (fadeMs: number) => void;
-  /** 原路倒回起点，然后淡出移除（展开到一半按 Esc）。 */
-  retract: (fadeMs?: number) => Promise<void>;
-  /** 终点换成另一块矩形（收回时真卡晚一点才找到）：时间轴不变，只换目标。 */
-  retarget: (next: WindowRect, radius: number, replica?: { el: HTMLElement; rect: WindowRect } | null) => void;
-  /** 板长满、新页还没到：板上扫过一道很淡的光，等待时没有一帧完全静止。 */
-  waiting: () => void;
-  /** 全部动画，Esc 快放时用。 */
-  animations: () => Animation[];
-}
-
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
-export function morphWindow(options: WindowMorphOptions): WindowMorph {
-  const { from, to, frame, host, duration, easing } = options;
-  const zIndex = options.zIndex ?? 25;
-  const surface = options.surface === 'card' ? 'var(--mat-card)' : 'var(--ambient), var(--canvas)';
-  const plate = document.createElement('div');
-  plate.setAttribute('aria-hidden', 'true');
-  plate.className = 'motion-window';
-  Object.assign(plate.style, {
-    position: 'fixed',
-    left: `${frame.left}px`,
-    top: `${frame.top}px`,
-    width: `${frame.width}px`,
-    height: `${frame.height}px`,
-    zIndex: String(zIndex),
+/**
+ * 垫在形变中页面底下的底：页面本身是透明的，没有它，窗口里会透出正在退后的来处页。
+ *
+ * 它是**页面自己的子元素**（层次 -1），和页面内容、卡拷贝吃同一道 clip-path 动画。以前底板是另一块 fixed 的板、
+ * 自己做一条一样的裁切动画：那条动画上不了合成器（2026-10-03 无头 Chrome 逐帧：页面已经滑出去一大截，
+ * 板还停在卡上），新页挂载一占主线程它就停住——改前录屏里「一下变成整屏黑板」也是它。
+ *
+ * 范围是页面的盒子并上整个可视区（四边各多放一个圆角半径）：形变途中窗口始终落在它里面。
+ * 底色分两层：实色 --canvas 铺满；环境光 --ambient 按 `glow`（应用骨架，即 .app-body::before 那一块）的大小和
+ * 位置摆——光晕是按盒子大小算的，摆错了落地那一帧颜色会跳。
+ */
+export function pageBackdrop(page: HTMLElement, box: WindowRect, view: WindowRect, glow: WindowRect, radius: number): HTMLElement {
+  const bleed = bleedRect(view, radius);
+  const left = Math.min(0, bleed.left - box.left);
+  const top = Math.min(0, bleed.top - box.top);
+  const right = Math.max(box.width, bleed.left + bleed.width - box.left);
+  const bottom = Math.max(box.height, bleed.top + bleed.height - box.top);
+  const backdrop = document.createElement('div');
+  backdrop.setAttribute('aria-hidden', 'true');
+  backdrop.dataset.morphLayer = '';
+  Object.assign(backdrop.style, {
+    position: 'absolute',
+    left: `${r2(left)}px`,
+    top: `${r2(top)}px`,
+    width: `${r2(right - left)}px`,
+    height: `${r2(bottom - top)}px`,
+    zIndex: '-1',
     pointerEvents: 'none',
-    overflow: 'hidden',
-    contain: 'strict',
-    background: surface,
-    boxShadow: 'var(--mat-rim)',
+    background: 'var(--canvas)',
   });
-
-  let scrim: HTMLElement | null = null;
-  if (options.scrim && !reducedMotion()) {
-    scrim = document.createElement('div');
-    scrim.setAttribute('aria-hidden', 'true');
-    scrim.className = 'motion-window-scrim';
-    Object.assign(scrim.style, {
-      position: 'fixed',
-      left: `${frame.left}px`,
-      top: `${frame.top}px`,
-      width: `${frame.width}px`,
-      height: `${frame.height}px`,
-      zIndex: String(zIndex - 1),
-      pointerEvents: 'none',
-      background: 'color-mix(in srgb, var(--canvas) 14%, transparent)',
-      backdropFilter: 'blur(6px)',
-      webkitBackdropFilter: 'blur(6px)',
-      willChange: 'opacity',
-    });
-    host.appendChild(scrim);
-  }
-  host.appendChild(plate);
-
-  /* 圆角整段不变（见文件头：变了就退回主线程）。整页那一端往外多放一个半径，圆角在最后一小段自然消失——
-     关键帧的偏移是「缓动后的进度」，0.9 那一帧窗口已经长到九成多，之后才把圆弧推出板外。 */
-  const shapeFrames = (target: WindowRect, targetRadius: number): Keyframe[] => {
-    const radius = steadyRadius(from, options.fromRadius, target, targetRadius);
-    const [a, mid, near, b] = windowRects(from, target);
-    const end = (rect: WindowRect, r: number) => (r <= 0 ? bleedRect(rect, radius) : rect);
-    return [
-      { clipPath: windowInset(end(a, options.fromRadius), frame, radius, true) },
-      { clipPath: windowInset(mid, frame, radius), offset: 0.5 },
-      { clipPath: windowInset(near, frame, radius), offset: 0.9 },
-      { clipPath: windowInset(end(b, targetRadius), frame, radius, true) },
-    ];
-  };
-  const timing: KeyframeAnimationOptions = { duration, easing, fill: 'both' };
-  const shape = plate.animate(shapeFrames(to, options.toRadius), timing);
-  /** 此刻的落点（retarget 会换）：落地时替身摆在这里。 */
-  let target = to;
-  let targetRadius = options.toRadius;
-
-  let replicaAnim: Animation | null = null;
-  let replicaEl: HTMLElement | null = null;
-  const attachReplica = (replica: { el: HTMLElement; rect: WindowRect }, at: 'from' | 'to', target: WindowRect) => {
-    replicaAnim?.cancel();
-    replicaEl?.remove();
-    replicaEl = replica.el;
-    // 拷贝放在卡原来的位置（相对板），变换原点是它自己的中心。
-    replica.el.style.left = `${r2(replica.rect.left - frame.left)}px`;
-    replica.el.style.top = `${r2(replica.rect.top - frame.top)}px`;
-    plate.appendChild(replica.el);
-    const far = replicaTransform(replica.rect, at === 'from' ? target : from);
-    const frames: Keyframe[] = at === 'from'
-      ? [
-        { transform: 'none', opacity: 1 },
-        { opacity: 0, offset: 0.45 },
-        { transform: far, opacity: 0 },
-      ]
-      : [
-        { transform: far, opacity: 0 },
-        { opacity: 0, offset: 0.25 },
-        { opacity: 1, offset: 0.65 },
-        { transform: 'none', opacity: 1 },
-      ];
-    replicaAnim = replica.el.animate(frames, timing);
-    replicaAnim.currentTime = shape.currentTime;
-  };
-  if (options.replica) attachReplica(options.replica, options.replica.at, to);
-
-  const fadeAt = options.fadeIn ? Math.min(0.5, options.fadeIn / duration) : 0;
-  let plateFade: Animation | null = null;
-  if (fadeAt) {
-    plateFade = plate.animate([{ opacity: 0 }, { opacity: 1, offset: fadeAt }, { opacity: 1 }], { duration, easing: 'linear', fill: 'both' });
-  }
-  let scrimAnim: Animation | null = null;
-  if (scrim) {
-    const frames: Keyframe[] = options.scrim === 'in'
-      ? [{ opacity: 0 }, { opacity: 1 }]
-      : fadeAt ? [{ opacity: 0 }, { opacity: 1, offset: fadeAt }, { opacity: 0 }] : [{ opacity: 1 }, { opacity: 0 }];
-    scrimAnim = scrim.animate(frames, { duration: options.scrim === 'in' ? duration : duration * 0.92, easing: 'ease-out', fill: 'both' });
-  }
-
-  let removed = false;
-  const remove = () => {
-    if (removed) return;
-    removed = true;
-    plate.remove();
-    scrim?.remove();
-  };
-  shape.addEventListener('cancel', remove);
-  const arrived = shape.finished.then(() => undefined, () => undefined);
-
-  /* 收回落地：板这一帧撤掉，原位换一块静止的替身（正好是卡的位置和圆角、垫着和板一样的底、里面是那张卡的拷贝），
-     替身在真卡上面淡掉。替身用最普通的圆角 + overflow 裁成卡的形状，不用 clip-path、不给板本身再挂动画。
-     已知未解：落地前后偶尔有一帧整页内容没画出来（只剩顶栏的玻璃控件），原来直接撤板的代码也有（2026-10-02 无头
-     Chrome + 本机 GPU 扫描，约 2–4%）；撤板、离场页移除、遮罩撤掉都试过错开，不是它们单独引起的。 */
-  const dissolve = (fadeMs: number) => {
-    if (removed) return;
-    const replica = replicaEl;
-    if (!replica || reducedMotion()) {
-      remove();
-      return;
-    }
-    const radius = steadyRadius(from, options.fromRadius, target, targetRadius);
-    const still = document.createElement('div');
-    still.setAttribute('aria-hidden', 'true');
-    still.className = 'motion-window-still';
-    Object.assign(still.style, {
-      position: 'fixed',
-      left: `${target.left}px`,
-      top: `${target.top}px`,
-      width: `${target.width}px`,
-      height: `${target.height}px`,
-      zIndex: String(zIndex),
-      pointerEvents: 'none',
-      overflow: 'hidden',
-      borderRadius: `${radius}px`,
-    });
-    // 板的底按整块可视区画（环境光的色晕是按整页摆的）：垫一块整页大小的，挪到卡的位置上。
-    const floor = document.createElement('div');
-    Object.assign(floor.style, {
-      position: 'absolute',
-      left: `${frame.left - target.left}px`,
-      top: `${frame.top - target.top}px`,
-      width: `${frame.width}px`,
-      height: `${frame.height}px`,
-      background: surface,
-    });
-    // 拷贝的动画停在终点（不变换、不透明），撤掉以后就是它的静止样子；位置从相对板换成相对替身。
-    replicaAnim?.cancel();
-    replicaAnim = null;
-    replicaEl = null;
-    replica.style.left = `${r2(Number.parseFloat(replica.style.left) + frame.left - target.left)}px`;
-    replica.style.top = `${r2(Number.parseFloat(replica.style.top) + frame.top - target.top)}px`;
-    still.append(floor, replica);
-    host.appendChild(still);
-    remove();
-    const fade = still.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' });
-    const drop = () => still.remove();
-    fade.finished.then(drop, drop);
-  };
-
-  let released = false;
-  /* 淡出也是可以倒放的：开到一半按 Esc 时它已经在跑，以前不在 animations() 里，
-     reverse 只倒了形状，板照样淡掉、被移除，「原路缩回」少了后一半。现在淡出进
-     animations()；倒放回到不透明时不移除，交还给倒放的形状。 */
-  let fades: Animation[] = [];
-  const release = (fadeMs = 180, now = false) => {
-    if (released) return;
-    released = true;
-    void (now ? Promise.resolve() : arrived).then(() => {
-      if (removed || !released) return;
-      // 从各自此刻的透明度淡起：收回落地时遮罩早已散到 0，从 1 起淡就是把磨砂重新拉满再散一遍——卡四周糊一下。
-      const fade = [plate, scrim].filter((el): el is HTMLElement => !!el)
-        .map((el) => el.animate(
-          [{ opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0 }, { opacity: 0 }],
-          { duration: fadeMs, easing: 'ease-out', fill: 'forwards' },
-        ));
-      fades = fade;
-      Promise.all(fade.map((animation) => animation.finished)).then(() => {
-        if (fade.some((animation) => animation.playbackRate < 0)) {
-          fades = [];
-          released = false;
-          for (const animation of fade) animation.cancel();
-          return;
-        }
-        remove();
-      }, remove);
-    });
-  };
-
-  const retract = async (fadeMs = 160) => {
-    if (released) return;
-    released = true;
-    // 撤回本身就是对 Esc 的回应：紧接着的切页会调 settleMotion，不能再被它快进成一下跳。
-    const all = [shape, replicaAnim, scrimAnim, plateFade].filter((a): a is Animation => !!a);
-    for (const animation of all) {
-      exemptFromSettle(animation);
-      animation.updatePlaybackRate(-1.25);
-      if (animation.playState !== 'running') animation.play();
-    }
-    try {
-      await shape.finished;
-    } catch {
-      return;
-    }
-    const fade = exemptFromSettle(plate.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' }));
-    scrim?.remove();
-    await fade.finished.then(remove, remove);
-  };
-
-  const retarget = (next: WindowRect, radius: number, replica?: { el: HTMLElement; rect: WindowRect } | null) => {
-    target = next;
-    targetRadius = radius;
-    (shape.effect as KeyframeEffect | null)?.setKeyframes(shapeFrames(next, radius));
-    if (replica) attachReplica(replica, 'to', next);
-  };
-
-  let sheen: HTMLElement | null = null;
-  const waiting = () => {
-    if (released || sheen) return;
-    sheen = document.createElement('div');
-    Object.assign(sheen.style, {
-      position: 'absolute',
-      inset: '0',
-      background: 'linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ink) 4%, transparent) 50%, transparent 70%)',
-      willChange: 'transform, opacity',
-    });
-    plate.appendChild(sheen);
-    exemptFromSettle(sheen.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out', fill: 'both' }));
-    exemptFromSettle(sheen.animate(
-      [{ transform: 'translateX(-70%)' }, { transform: 'translateX(70%)' }],
-      { duration: 900, easing: 'ease-in-out', iterations: Infinity },
-    ));
-  };
-
-  const animations = () => [shape, replicaAnim, scrimAnim, plateFade, ...fades].filter((a): a is Animation => !!a);
-  return { plate, shape, arrived, release, remove, dissolve, retract, retarget, waiting, animations };
+  const ambient = document.createElement('div');
+  Object.assign(ambient.style, {
+    position: 'absolute',
+    left: `${r2(glow.left - box.left - left)}px`,
+    top: `${r2(glow.top - box.top - top)}px`,
+    width: `${r2(glow.width)}px`,
+    height: `${r2(glow.height)}px`,
+    background: 'var(--ambient)',
+  });
+  backdrop.appendChild(ambient);
+  page.appendChild(backdrop);
+  return backdrop;
 }

@@ -32,6 +32,7 @@ import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { indexSeries, SERIES_FETCH_DAYS, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
 import { heartRateDetailMessages as messages } from './HeartRateDetail.i18n';
@@ -317,11 +318,14 @@ const daySpan = computed(() => {
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
-    <div v-if="initialLoading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
-      <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
-    </div>
+    <!-- 骨架换成内容时交叉淡化：骨架原地钉住淡掉，内容同时在底下出现（从卡展开进来时不等数据）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="initialLoading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
+        <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
+      </div>
+    </Transition>
 
-    <template v-else>
+    <template v-if="!initialLoading">
       <section class="surface-card day-card" :aria-label="t.dayCardAria">
         <header class="day-head">
           <div>

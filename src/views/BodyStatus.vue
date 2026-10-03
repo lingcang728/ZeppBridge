@@ -22,6 +22,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { SERIES_FETCH_DAYS, indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
 import { bodyStatusMessages as messages } from './BodyStatus.i18n';
@@ -139,10 +140,13 @@ const groups = computed(() => ({
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
-    <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
-      <SkeletonBlock v-for="index in 6" :key="index" height="268px" />
-    </div>
-    <template v-else>
+    <!-- 骨架换成内容时交叉淡化：骨架原地钉住淡掉，内容同时在底下出现（从卡展开进来时不等数据）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
+        <SkeletonBlock v-for="index in 6" :key="index" height="268px" />
+      </div>
+    </Transition>
+    <template v-if="!initialLoading">
       <section class="surface-card day-card" :aria-label="t.curveCardAria">
         <header class="day-head">
           <div>

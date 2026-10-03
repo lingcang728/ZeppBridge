@@ -172,6 +172,17 @@ forbidden. The provenance of the algorithms and percentages is in the
   direction — `forward` focuses into a detail page, `back` backs out, `left` /
   `right` slide between tabs in nav-capsule order — all with blur. The leaving
   page is pinned at its scroll position so it does not jump to the top.
+- **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`,
+  2026-10-03): the new page itself is cropped out of the card (`translate` + a
+  fixed-radius `clip-path`, 1:1, no scaling) and slides from the card's corner
+  home, so its header lands where the card was; a copy of the card fades out on
+  top, the header fades in at 6–34 %, the rest at 12–50 %, and the page it came
+  from recedes to .94 / .32. The backing surface and the card copy are children
+  of the page, so one clip animation carries all three. Going back is the exact
+  reverse and the last frame is the real card. Timing is shared with the deck
+  (`lib/motion/timing.ts`); while it runs, `lib/motion/budget.ts` holds back
+  chart mounting and skeleton-to-content swaps, and page chunks are prefetched
+  on link hover (`lib/motion/prefetch.ts`).
 - **`.ready-glow`** (rotating brand-gradient ring + breathing outer light) is
   reserved for one moment: "your data is ready — go hand it to the AI". Never
   two glowing things on one screen. Glass controls are stacking contexts, so

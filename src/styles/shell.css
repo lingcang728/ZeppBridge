@@ -191,18 +191,19 @@ a { color: inherit; }
 .page-left-leave-to { transform: translateX(-32px); }
 .page-right-leave-to { transform: translateX(32px); }
 .page-forward-leave-to, .page-back-leave-to, .page-left-leave-to, .page-right-leave-to { opacity: 0; }
-/* 展开：幽灵板（lib/motion/ghost.ts）从卡长到整屏盖住旧页，新页在它后半程淡入（usePageMorph.onEnter）。
-   这里只管层次和旧页淡出；enter-active 那条过渡是占位，让层次保持到 JS 动画放完。 */
-[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 440ms linear; }
+/* 展开 / 返回：新页自己从那张卡里长出来、返回时缩回那张卡（usePageMorph，和设置卡叠同一种做法）。
+   几何全在 JS 里（页面自己的 translate + clip-path，垫底和卡拷贝是它的子元素）；这里只管层次和占位：
+   退后的来处页 1 < 形变中的页面 3。两条离场过渡的 900ms 都是占位，真正的时长由形变定，
+   放完就提前收场（usePageMorph 的 endLeave）。 */
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: opacity 440ms linear; }
 .page-expand-enter-from { opacity: .999; }
-/* 旧页等幽灵板长满、完全盖住它以后才撤，免得板没盖到的地方先露出新页、叠成重影。 */
-[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 400ms; } /* 窗口（360ms）长满以后才撤，四周不先露出空底 */
-.page-expand-leave-to { opacity: 0; }
-/* 返回：详情页和幽灵板一起缩回当初那张卡（usePageMorph.onLeave），来处页一开始就在底下浮现。
-   离场那条 900ms 是占位：真正的时长由 JS 动画定，放完就提前结束（onLeave 里的 endLeave）。 */
-[class*='page-'].page-collapse-enter-active { transition: none; } /* 来处页一开始就在窗口底下、原样在场：以前它从透明淡入，窗口四周先露出一片深黑 */
+/* 来处页退到后面一层（缩到 .94、淡到 .32，JS 动画），窗口长满、完全盖住它以后才离场。 */
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 900ms linear; }
+.page-expand-leave-to { opacity: .999; }
+/* 来处页一开始就在底板下面，跟着窗口缩小从后面回到前面（JS 动画），不再从透明淡入。 */
+[class*='page-'].page-collapse-enter-active { transition: none; }
 .page-collapse-enter-from { opacity: 1; }
-[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 900ms linear; }
+[class*='page-'].page-collapse-leave-active { z-index: 3; transition: opacity 900ms linear; }
 .page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 /* 收起（详情页 → 别的入口）：详情页往纵深退——缩小淡出，像被收进去；
@@ -212,7 +213,7 @@ a { color: inherit; }
 [class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 80ms, transform var(--dur-std) var(--ease-enter) 80ms; }
 .page-dismiss-enter-from { opacity: 0; transform: scale(1.03) translateY(10px); }
 .page-host > * { transform-origin: 50% 30vh; }
-/* 窗口形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
+/* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
    不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
 .window-replica, .window-replica * { animation: none !important; transition: none !important; }
 

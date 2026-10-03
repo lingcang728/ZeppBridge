@@ -12,6 +12,7 @@ import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
+import { installPrefetch } from './lib/motion/prefetch';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
@@ -141,6 +142,8 @@ const routeNotice = computed(() => route.query.notice === 'not-found');
 
 /* 动效放到一半按 Esc：快进收尾（lib/motion/interrupt.ts）。全局只装这一处。 */
 let disposeMotionInterrupt: (() => void) | null = null;
+/* 指针移到页面里的链接上就先把那一页的代码块取回来：点下去时形变不用等 import()。 */
+let disposePrefetch: (() => void) | null = null;
 
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
@@ -186,6 +189,7 @@ onMounted(() => {
   void initialize();
   document.addEventListener('keydown', onDocumentKeydown);
   disposeMotionInterrupt = installMotionInterrupt();
+  disposePrefetch = installPrefetch(router);
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
       const query = { ...route.query };
@@ -214,6 +218,7 @@ onUnmounted(() => {
   removeBeforeEach();
   document.removeEventListener('keydown', onDocumentKeydown);
   disposeMotionInterrupt?.();
+  disposePrefetch?.();
   pageMorph.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在

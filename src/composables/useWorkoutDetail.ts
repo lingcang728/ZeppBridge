@@ -1,5 +1,5 @@
 import { computed, onMounted, ref, watch, type Ref } from 'vue';
-import { useFirstLoad } from './useFirstLoad';
+import { useLoadingAfterMotion } from './useFirstLoad';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { useAiHandoff } from './useAiHandoff';
 import { useSyncController } from './useSyncController';
@@ -31,8 +31,6 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   const series = ref<WorkoutSeries | null>(null);
   const device = ref<DeviceProfile>({});
   const loading = ref(true);
-  // 登记首次加载：从卡片展开进来时，动画等它有内容再揭开。
-  useFirstLoad(loading);
   const error = ref<string | null>(null);
   const actionError = ref<string | null>(null);
   const exportedNote = ref<string | null>(null);
@@ -235,7 +233,7 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true });
 
   return {
-    workout, series, device, loading, error, actionError, exportedNote, activeFormat, exportBusy, displayType,
+    workout, series, device, loading: useLoadingAfterMotion(loading), error, actionError, exportedNote, activeFormat, exportBusy, displayType,
     insight, insightLoading, insightError, seriesError,
     handoffState, handoffError, aiProviderId, aiProvider, aiProviderChoices, aiNote, sendWorkoutToAi,
     typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
