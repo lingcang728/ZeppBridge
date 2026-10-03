@@ -178,11 +178,16 @@ forbidden. The provenance of the algorithms and percentages is in the
   home, so its header lands where the card was; a copy of the card fades out on
   top, the header fades in at 6–34 %, the rest at 12–50 %, and the page it came
   from recedes to .94 / .32. The backing surface and the card copy are children
-  of the page, so one clip animation carries all three. Going back is the exact
-  reverse and the last frame is the real card. Timing is shared with the deck
-  (`lib/motion/timing.ts`); while it runs, `lib/motion/budget.ts` holds back
-  chart mounting and skeleton-to-content swaps, and page chunks are prefetched
-  on link hover (`lib/motion/prefetch.ts`).
+  of the page, so one clip animation carries all three. Card and page contents
+  take turns with only a short overlap (no double exposure). Going back is the
+  exact reverse and the last frame is the real card. **Prepared before it
+  opens**: page chunks and first-screen data are fetched on hover, press and
+  idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`,
+  invalidated by the data revision), the new page draws its first frame with
+  real content, and only then does the morph start. Timing is shared with the
+  deck (`lib/motion/timing.ts`; slowed on 2026-10-03 to 500 / 440 ms with
+  `cubic-bezier(.4, .6, .2, 1)`); while it runs, `lib/motion/budget.ts` holds
+  back late chart mounts and skeleton-to-content swaps.
 - **`.ready-glow`** (rotating brand-gradient ring + breathing outer light) is
   reserved for one moment: "your data is ready — go hand it to the AI". Never
   two glowing things on one screen. Glass controls are stacking contexts, so

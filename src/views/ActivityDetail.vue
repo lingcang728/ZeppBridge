@@ -20,10 +20,12 @@ import TrendRangeBar from '../components/TrendRangeBar.vue';
 import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { activityPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
-import { indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../lib/metricSeries';
+import { indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
@@ -109,7 +111,6 @@ interface ActivityCard {
   decimals?: number;
 }
 
-const METRICS = ['steps', 'distance', 'active_calories', 'active_minutes'] as const;
 
 const CARDS = computed<ActivityCard[]>(() => [
   {
@@ -148,6 +149,12 @@ const fullSeries = ref<Record<string, MetricSeries>>({});
 const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
 trackRangeSwap(rangeDays);
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(activityPageQueries()) : null;
+if (preloaded) {
+  fullSeries.value = indexSeries(preloaded[0]);
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
@@ -175,7 +182,7 @@ const load = async () => {
   }
   try {
     const next = indexSeries(
-      await backend.getMetricSeries([...METRICS], SERIES_FETCH_DAYS),
+      await cached(activityPageQueries()[0]),
     );
     if (!loadSeq.isCurrent(seq)) return;
     fullSeries.value = next;

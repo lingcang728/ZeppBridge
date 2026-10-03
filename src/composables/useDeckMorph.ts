@@ -29,7 +29,7 @@ export interface DeckMorphRefs {
 /** coverflow 的卡正面和卡头长得不一样：从它打开时大卡在前 30% 里淡入盖上去，收回时在最后 30% 淡出露出它。 */
 const COVER_FADE = 0.3;
 /** 展开全部 / 收起：一张张飞出、收拢。 */
-const FLIGHT_MS = 420;
+const FLIGHT_MS = 520;
 const FLIGHT_STAGGER_MS = 8;
 const FLIGHT_EASE = 'cubic-bezier(.3, .7, .2, 1)';
 

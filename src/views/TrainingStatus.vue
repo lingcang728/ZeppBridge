@@ -18,11 +18,12 @@ import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { useRevisionReload } from '../composables/useRevisionReload';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { trainingPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import {
   formatPaceSeconds,
-  SERIES_FETCH_DAYS,
   indexSeries,
   sliceByDate,
   sliceIndexed,
@@ -39,14 +40,6 @@ const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
-const METRICS = [
-  'vo2max',
-  'training_load',
-  'lactate_threshold_hr',
-  'lactate_threshold_pace',
-  'pai_daily',
-];
-
 const rangeDays = useTrendRange();
 /* 一次取最长那档，切范围只在本地切（见 lib/metricSeries.ts 的 sliceSeries）。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
@@ -56,6 +49,13 @@ const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
 const balance = computed(() => sliceByDate(fullBalance.value, Math.max(28, rangeDays.value)));
 trackRangeSwap(rangeDays);
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(trainingPageQueries()) : null;
+if (preloaded) {
+  fullSeries.value = indexSeries(preloaded[0]);
+  fullBalance.value = preloaded[1];
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
@@ -269,10 +269,8 @@ const load = async () => {
     error.value = t.value.desktopOnly;
     return;
   }
-  const results = await Promise.allSettled([
-    backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
-    backend.getTrainingBalance(Math.max(28, SERIES_FETCH_DAYS)),
-  ]);
+  const [metricsQuery, balanceQuery] = trainingPageQueries();
+  const results = await Promise.allSettled([cached(metricsQuery), cached(balanceQuery)]);
   if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
   // 失败的那一样保留上一次的结果：真数据不能因为一次库忙被显示成「没有记录」。

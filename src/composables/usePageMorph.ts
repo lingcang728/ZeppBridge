@@ -3,8 +3,10 @@ import type { PageMotion } from '../lib/navigation';
 import { unscaledBox } from '../lib/deck/morph';
 import { holdMotion } from '../lib/motion/budget';
 import { deferSettle, exemptFromSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
-import { BODY_IN, BODY_OUT, CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, RECEDE_OPACITY, RECEDE_SCALE } from '../lib/motion/timing';
-import { backdropFor, fly, HEAD_IN, HEAD_OUT, hide, REPLICA_IN, REPLICA_OUT } from '../lib/motion/pageFlight';
+import { CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, RECEDE_OPACITY, RECEDE_SCALE } from '../lib/motion/timing';
+import {
+  backdropFor, fly, HEAD_IN, HEAD_OUT, hide, PAGE_BODY_IN, PAGE_BODY_OUT, REPLICA_IN, REPLICA_OUT,
+} from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
 
 type Rect = WindowRect;
@@ -17,11 +19,13 @@ type Rect = WindowRect;
  *   左上角从卡的左上角滑回原位——页头天然落在卡所在处，像设置大卡的卡头。页面底下的垫底（页面本身是透明的）
  *   和上面那份卡的拷贝都是页面自己的子元素，吃同一道裁切：只有一道合成器动画，逐帧严丝合缝。
  *   （第一版垫底是另一块 fixed 的板，它的裁切动画上不了合成器，新页挂载时就停在卡上不动。）
- * - **全程有东西可看**：卡拷贝 0–38% 淡出，页头 6–34% 淡入，页面其余部分 12–50% 淡入（设置卡叠的 BODY_IN）。
+ * - **全程有东西可看，但不叠影**：卡拷贝 0–24% 淡出，页头 16–42% 淡入，页面其余部分 20–56% 淡入（pageFlight.ts 的分段）。
  *   不再「板长满了等数据」：数据晚到由页面自己的骨架交叉淡接住（shell.css 的 skeleton-out）。
+ * - **先备好再展开**（2026-10-03 第二轮，像手机打开 App 那样）：页面代码块和首屏数据在悬停、按下、应用空闲时
+ *   就读好了（lib/motion/prefetch.ts、lib/pageQueries.ts），切页前最多再等一小会儿；新页挂载时直接用读好的数据，
+ *   连图表一起画好第一帧，形变才开始放——窗口里从头到尾是真内容，没有骨架、没有「长满了再加载」。
  * - **来处页退后一层**：缩到 .94、淡到 .32（设置卡叠的 `.is-receded`），不是蒙一层再撤掉。
- * - **形变期间主线程空着**：决定要形变就 holdMotion()，图表等形变放完再挂载（lib/motion/budget.ts）；
- *   页面代码块在指针悬停时就预取好了（lib/motion/prefetch.ts）。
+ * - **形变期间主线程空着**：形变开跑时 holdMotion()，还没来得及挂的图表、晚到的骨架换内容都等它放完（lib/motion/budget.ts）。
  * - 收回完全对称：详情页裁回卡的矩形、页面内容先淡掉、页头和卡拷贝交叉，落地那一帧拷贝就是真卡。
  *
  * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
@@ -153,7 +157,8 @@ export const usePageMorph = (options: { back: () => void }) => {
           rect: expandFrom.rect,
           radius: expandFrom.radius,
         });
-        return morphing('expand');
+        // 展开不在这里就占住主线程：新页要先把第一帧（含图表）画好，形变开始时才 holdMotion（onEnter）。
+        return 'expand';
       }
     }
     // 不看方向，只看来路对不对得上：同一层之间（最近记录 → 睡眠详情）来回都算 forward，
@@ -220,7 +225,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       if (leaving) endLeave(leaving);
       return;
     }
-    const release = takeHold();
+    takeHold()();
     // 卡片入场动画不放：页面的出现就是这段形变（页头、其余部分各自淡入）。
     el.classList.add('page-revisit');
     const box = rectOf(el);
@@ -235,18 +240,29 @@ export const usePageMorph = (options: { back: () => void }) => {
       replica: origin.replica,
       replicaFade: REPLICA_OUT,
       head: HEAD_IN,
-      body: BODY_IN,
+      body: PAGE_BODY_IN,
     });
     const back = leaving ? recede(leaving, viewport, 'out', OPEN_MS, OPEN_EASE).animation : null;
     const hidden = origin.card.isConnected ? hide(origin.card) : null;
+    const all = () => [...flight.anims, ...(back ? [back] : [])];
 
     let landed = false;
+    // 先停在起点（窗口里就是那张卡），等新页的第一帧画完再放：新页挂载、排版、图表、首次光栅化都在这一两帧里，
+    // 以前形变和它们挤在同一帧开跑，放出来的前一截全被吞掉（「一下就长满」）。手机上打开新页也是先等新页第一帧。
+    // 形变真正开跑时才让重活让路（lib/motion/budget.ts）。
+    let release: () => void = () => undefined;
+    for (const animation of all()) animation.pause();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (landed || aborted.has(el)) return;
+      release = holdMotion();
+      for (const animation of all()) animation.play();
+    }));
     // 放到一半按 Esc：不进去了——所有动画原路倒回，路由退回来处。
     const forgetEscape = onMotionEscape(() => {
       if (landed || aborted.has(el)) return false;
       aborted.set(el, { done: false, leaving: false, settle: () => undefined });
       forgetEscape();
-      for (const animation of [...flight.anims, ...(back ? [back] : [])]) {
+      for (const animation of all()) {
         exemptFromSettle(animation);
         kept.add(animation);
         animation.updatePlaybackRate(-1.25);
@@ -366,7 +382,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       replica: present ? cardReplica(present) : null,
       replicaFade: REPLICA_IN,
       head: HEAD_OUT,
-      body: BODY_OUT,
+      body: PAGE_BODY_OUT,
     });
     const forward = staying ? recede(staying, viewport, 'in', CLOSE_MS, CLOSE_EASE) : null;
     let hidden = present ? hide(present) : null;

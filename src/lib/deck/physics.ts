@@ -100,5 +100,5 @@ export function slideInFrames(direction: -1 | 1, width: number, vertical = false
   ];
 }
 /** 滑进来的曲线和时长（和页面展开同一族：先快后慢、不回弹）。 */
-export const SLIDE_IN_MS = 380;
+export const SLIDE_IN_MS = 460;
 export const SLIDE_IN_EASE = 'cubic-bezier(.22, .88, .26, 1)';

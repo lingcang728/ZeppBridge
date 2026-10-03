@@ -12,11 +12,19 @@ const rectOf = (el: Element): Rect => {
   return { left: box.left, top: box.top, width: box.width, height: box.height };
 };
 
-/** 页头和卡拷贝的交叉（线性时间轴）。打开：拷贝先走、页头接上；收回反过来，落地前最后一段只剩拷贝。 */
-export const HEAD_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.06 }, { opacity: 1, offset: 0.34 }, { opacity: 1 }];
-export const HEAD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0, offset: 0.9 }, { opacity: 0 }];
-export const REPLICA_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.38 }, { opacity: 0 }];
-export const REPLICA_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 1, offset: 0.92 }, { opacity: 1 }];
+/**
+ * 卡和页的内容先后交替，只在交接处叠一小段（线性时间轴）。卡和详情页的排版本来就不一样（字、图都不在同一个地方），
+ * 两边同时半透明叠着就是一屏重影——2026-10-03 第二轮用户说的「表面是延伸，字完全不同」。所以：
+ * 打开时卡的拷贝先在前 24% 淡掉，页头 16%–42% 接上，页面其余部分 20%–56% 再出来；收回时页面内容前 28% 先走、
+ * 页头 24%–48% 淡掉、卡的拷贝 40%–68% 回来。收回的形状走得靠前（40% 的时间已经缩到卡上八成），卡要跟着它一起回来——
+ * 以前按 70%–95% 才回来，窗口早早落在卡上，中间一百多毫秒只剩一个页头标题，像一张空卡。落地那一帧就是卡本身。
+ */
+export const REPLICA_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.24 }, { opacity: 0 }];
+export const HEAD_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.16 }, { opacity: 1, offset: 0.42 }, { opacity: 1 }];
+export const PAGE_BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.2 }, { opacity: 1, offset: 0.56 }, { opacity: 1 }];
+export const PAGE_BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.28 }, { opacity: 0 }];
+export const HEAD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.24 }, { opacity: 0, offset: 0.48 }, { opacity: 0 }];
+export const REPLICA_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1, offset: 0.68 }, { opacity: 1 }];
 
 /** 页面的「卡头」（页头）和其余部分。没有页头的页（运动详情）拿第一块当卡头，免得中间有一段什么都没有。 */
 export const partsOf = (page: HTMLElement) => {
@@ -88,6 +96,7 @@ export const fly = (o: {
   const fadePart = (part: HTMLElement) => {
     const animation = part.animate(o.body, linear);
     animation.currentTime = main.currentTime;
+    if (main.playState === 'paused') animation.pause();
     parts.set(part, animation);
     anims.push(animation);
   };
@@ -96,7 +105,7 @@ export const fly = (o: {
   // 新页的内容晚一点长高（数据回来、骨架换成内容）：裁切的底边是相对页面算的，跟着换，时间轴不变。
   const resized = typeof ResizeObserver === 'function'
     ? new ResizeObserver(() => {
-      if (main.playState !== 'running') return;
+      if (disposed || main.playState === 'finished') return;
       box = { ...box, width: page.offsetWidth, height: page.offsetHeight };
       (main.effect as KeyframeEffect | null)?.setKeyframes(frames());
     })
@@ -106,7 +115,7 @@ export const fly = (o: {
   // （shell.css 的 skeleton-out）从此刻的透明度淡掉——这里的淡入盖着它自己那条 CSS 淡出。
   const added = typeof MutationObserver === 'function'
     ? new MutationObserver((records) => {
-      if (main.playState !== 'running') return;
+      if (disposed || main.playState === 'finished') return;
       for (const record of records) {
         for (const node of record.addedNodes) {
           if (node instanceof HTMLElement && node !== head && !parts.has(node) && !node.hasAttribute('data-morph-layer')) fadePart(node);
@@ -117,7 +126,7 @@ export const fly = (o: {
         leavingParts.add(part);
         const now = Number.parseFloat(getComputedStyle(part).opacity) || 0;
         animation.cancel();
-        anims.push(part.animate([{ opacity: now }, { opacity: 0 }], { duration: 240, easing: 'ease', fill: 'forwards' }));
+        anims.push(part.animate([{ opacity: now }, { opacity: 0 }], { duration: 320, easing: 'ease', fill: 'forwards' }));
       }
     })
     : null;

@@ -2,12 +2,15 @@
  * 「从卡打开 / 关回卡」的时长、曲线和分段淡入淡出：设置卡叠（composables/useDeckMorph.ts）和
  * 概览 ↔ 详情页（composables/usePageMorph.ts）共用同一份，两边的手感不再各走各的。
  *
- * 曲线不那么靠前：旧的概览曲线 35% 的时间就走完形状，剩下两百多毫秒原地不动。中段仍有运动、末段收住、不回弹。
+ * 2026-10-03 第二轮（用户：「太快了，傻快傻快的，参考 iOS 那种优雅一点的」）：330 / 290ms 拉到 500 / 440ms，
+ * 曲线也不再那么靠前：旧曲线前 100ms 就走完一半多，再拉长时长看上去还是「一下冲到位」；现在 100ms 走四成、
+ * 200ms 走八成，后半程长长地减速落定，不回弹（像 iOS）。
+ * 慢一点也给预加载和第一帧留出了时间。
  */
-export const OPEN_MS = 330;
-export const CLOSE_MS = 290;
-export const OPEN_EASE = 'cubic-bezier(.3, .7, .2, 1)';
-export const CLOSE_EASE = 'cubic-bezier(.32, .62, .2, 1)';
+export const OPEN_MS = 500;
+export const CLOSE_MS = 440;
+export const OPEN_EASE = 'cubic-bezier(.4, .6, .2, 1)';
+export const CLOSE_EASE = 'cubic-bezier(.4, .6, .2, 1)';
 
 /** 卡身跟着形状一起出来（12%–50% 淡入；形状这时已走了大半），关上时在前 35% 淡出。
     不能等形状走完才淡入：那段时间里窗口长满了却一个字没有（「空板」）。按线性时间轴放。 */

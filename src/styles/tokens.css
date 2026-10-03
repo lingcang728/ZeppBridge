@@ -137,18 +137,19 @@
 
   /* 动效 */
   --dur-fast: 140ms;
-  --dur-base: 240ms;
-  --dur-slow: 420ms;
+  --dur-base: 300ms;
+  --dur-slow: 520ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: cubic-bezier(.2, 1.15, .32, 1);
   /* 玻璃透镜浮起（带一点回弹）/ 落下（不回弹）。 */
   --lens-lift: cubic-bezier(.3, 1.45, .45, 1);
   --lens-drop: cubic-bezier(.25, .8, .3, 1);
   /* 切页与形变统一用两档时长、两条缓动（D-1）：进场 / 展开用 std + enter，返回 / 收回用 back。
-     回弹只留在导航胶囊的滑块上（SegmentTrack），切页和卡片收回一律不回弹。 */
-  --dur-std: 320ms;
-  --dur-back: 380ms;
-  --ease-enter: cubic-bezier(.2, .9, .25, 1);
+     回弹只留在导航胶囊的滑块上（SegmentTrack），切页和卡片收回一律不回弹。
+     2026-10-03 整体放慢（用户：「傻快傻快的」，参考 iOS）：320 / 380 → 420 / 460；悬停、按下这类即时反馈仍是 fast。 */
+  --dur-std: 420ms;
+  --dur-back: 460ms;
+  --ease-enter: cubic-bezier(.35, .65, .2, 1);
   --ease-leave: cubic-bezier(.4, 0, .2, 1);
 
   --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;

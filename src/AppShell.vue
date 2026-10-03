@@ -12,7 +12,7 @@ import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
-import { installPrefetch } from './lib/motion/prefetch';
+import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
@@ -112,11 +112,14 @@ const motion = ref<PageMotion>('none');
 const pageMorph = usePageMorph({ back: () => router.back() });
 let leavingScroll = 0;
 // 留着移除函数：HMR / 外壳重挂载时不卸掉，守卫会一层层叠上去。
-const removeBeforeEach = router.beforeEach((to, from) => {
+const removeBeforeEach = router.beforeEach(async (to, from) => {
   // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。
   settleMotion();
   motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
+  // 从卡片展开：先把新页首屏的数据备好（多半悬停时已经读好，立刻就过；最多等一小会儿），
+  // 新页第一帧就是真内容，而不是长成整页以后再停在骨架上。
+  if (motion.value === 'expand') await preloadBeforeOpen(to.fullPath);
 });
 const onPageBeforeLeave = (el: Element) => {
   (el as HTMLElement).style.top = `${-leavingScroll}px`;

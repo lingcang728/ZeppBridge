@@ -27,9 +27,11 @@ import TrendRangeBar from '../components/TrendRangeBar.vue';
 import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { heartPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { indexSeries, SERIES_FETCH_DAYS, sliceByDate, sliceIndexed } from '../lib/metricSeries';
+import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
 import { holdInPlace } from '../lib/motion/holdInPlace';
@@ -40,8 +42,6 @@ import { heartRateDetailMessages as messages } from './HeartRateDetail.i18n';
 const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
-
-const TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
 
 const rangeDays = useTrendRange();
 /* 趋势一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
@@ -65,6 +65,14 @@ const sparseDays = computed(
   () => dailyExtremes.value.filter((day) => day.samples < SPARSE_SAMPLE_THRESHOLD).length,
 );
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(heartPageQueries()) : null;
+if (preloaded) {
+  dayPoints.value = preloaded[0];
+  fullSeries.value = indexSeries(preloaded[1]);
+  fullExtremes.value = preloaded[2];
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const dayError = ref<string | null>(null);
@@ -190,10 +198,11 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
     error.value = t.value.desktopOnly;
     return;
   }
+  const [dayQuery, trendsQuery, extremesQuery] = heartPageQueries();
   const [day, trends, extremes] = await Promise.allSettled([
-    trendsOnly ? Promise.resolve(dayPoints.value) : backend.getHeartRateSeries(24),
-    backend.getMetricSeries([...TREND_METRICS], SERIES_FETCH_DAYS),
-    backend.getDailyHeartRateExtremes(SERIES_FETCH_DAYS),
+    trendsOnly ? Promise.resolve(dayPoints.value) : cached(dayQuery),
+    cached(trendsQuery),
+    cached(extremesQuery),
   ]);
   const dayCommitted = daySeq !== null && dayLoadSeq.isCurrent(daySeq);
   if (dayCommitted) {

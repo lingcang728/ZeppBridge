@@ -75,7 +75,7 @@ const DeferredChart = defineComponent({
     onBeforeUnmount(() => { alive = false; });
     const fadeIn = (vnode: VNode) => {
       const el = vnode.el as HTMLElement | null;
-      el?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+      el?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease-out' });
     };
     return () => (ready.value
       ? h(VChartBase as Component, late ? { ...attrs, onVnodeMounted: fadeIn } : { ...attrs }, slots)

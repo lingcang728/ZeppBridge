@@ -22,6 +22,8 @@ import type { DeviceProfile, SleepSession } from '../types';
 import { sleepDetailMessages as messages } from './SleepDetail.i18n';
 import { vEdgeSafe } from '../lib/edgeSafe';
 import { holdInPlace } from '../lib/motion/holdInPlace';
+import { sleepPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -30,10 +32,17 @@ const session = ref<SleepSession | null>(null);
 const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
-// 页面上看到的「加载中」：数据到了也等卡 ↔ 页的形变放完再换成内容（composables/useFirstLoad.ts）。
-const shownLoading = useLoadingAfterMotion(loading);
 const error = ref<string | null>(null);
 const sleepId = computed(() => String(route.params.sleepId || ''));
+// 从概览的睡眠卡点进来之前，这一条多半已经预先读好了（lib/pageQueries.ts）：第一帧就是它，不放「加载中」。
+const preloaded = isTauri() && sleepId.value ? peekAll(sleepPageQueries(sleepId.value)) : null;
+if (preloaded) {
+  session.value = preloaded[0];
+  weekSessions.value = preloaded[1];
+  loading.value = false;
+}
+// 页面上看到的「加载中」：数据到了也等卡 ↔ 页的形变放完再换成内容（composables/useFirstLoad.ts）。
+const shownLoading = useLoadingAfterMotion(loading);
 
 const stages = computed(() => session.value ? [
   { label: sleepStageLabel('deep'), minutes: session.value.deep_minutes, tone: 'deep' as const },
@@ -174,16 +183,18 @@ let detailSeq = 0;
 
 const loadDetail = async () => {
   const seq = ++detailSeq;
-  loading.value = true;
+  // 已经是这一条（预先读好的、或者只是数据版本变了重读）：内容留着，读完原地换，不退回「加载中」。
+  if (session.value?.sleep_id !== sleepId.value) loading.value = true;
   error.value = null;
   if (!isTauri()) {
     loading.value = false;
     return;
   }
   try {
+    const [detailQuery, recentQuery] = sleepPageQueries(sleepId.value);
     const [detail, recent] = await Promise.all([
-      tauriApi.getSleepDetail(sleepId.value),
-      tauriApi.getRecentSleep(7).catch(() => []),
+      cached(detailQuery),
+      cached(recentQuery).catch(() => []),
     ]);
     if (seq !== detailSeq) return;
     const profile = detail

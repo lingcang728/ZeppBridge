@@ -106,11 +106,11 @@ a { color: inherit; }
 .notice-enter-to, .notice-leave-from { max-height: 64px; }
 /* 骨架屏换成内容（<Transition name="skeleton-out" @before-leave="holdInPlace">，lib/motion/holdInPlace.ts）：
    骨架原地钉住、在上面淡掉，内容同时在它底下出现（卡片自己的 card-enter 淡入）——交叉淡化，中间没有空白的一帧。 */
-.skeleton-out-leave-active { z-index: 1; pointer-events: none; transition: opacity 240ms ease; }
+.skeleton-out-leave-active { z-index: 1; pointer-events: none; transition: opacity 320ms ease; }
 .skeleton-out-leave-to { opacity: 0; }
 /* 列表换筛选（最近记录的 睡眠 / 运动 / 全部）：旧列表原地钉住淡出，新列表同时淡入。 */
-.list-swap-enter-active { transition: opacity 200ms ease; }
-.list-swap-leave-active { z-index: 1; pointer-events: none; transition: opacity 140ms ease; }
+.list-swap-enter-active { transition: opacity 260ms ease; }
+.list-swap-leave-active { z-index: 1; pointer-events: none; transition: opacity 180ms ease; }
 .list-swap-enter-from, .list-swap-leave-to { opacity: 0; }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
@@ -181,10 +181,10 @@ a { color: inherit; }
 /* 换入口（点 / 拖顶栏胶囊）：新页顺着胶囊的方向从侧面滑进来，先快后慢地停住；旧页往反方向让一小段、
    很快淡掉（120ms，重叠只有一瞬，不成重影）。以前两边只挪 24px、一共 250ms，看上去就是硬切。 */
 [class*='page-'].page-left-enter-active, [class*='page-'].page-right-enter-active {
-  transition: opacity 260ms ease-out, transform 440ms cubic-bezier(.22, .88, .26, 1);
+  transition: opacity 340ms ease-out, transform 560ms cubic-bezier(.4, .6, .2, 1);
 }
 [class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active {
-  transition: opacity 120ms ease-in, transform 200ms ease-in;
+  transition: opacity 160ms ease-in, transform 260ms ease-in;
 }
 .page-left-enter-from { opacity: 0; transform: translateX(84px); }
 .page-right-enter-from { opacity: 0; transform: translateX(-84px); }
@@ -195,7 +195,8 @@ a { color: inherit; }
    几何全在 JS 里（页面自己的 translate + clip-path，垫底和卡拷贝是它的子元素）；这里只管层次和占位：
    退后的来处页 1 < 形变中的页面 3。两条离场过渡的 900ms 都是占位，真正的时长由形变定，
    放完就提前收场（usePageMorph 的 endLeave）。 */
-[class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: opacity 440ms linear; }
+/* 进场这条也是占位：层次要保持到形变放完（等第一帧 + 500ms），比它短的话页面中途掉到退后的来处页下面。 */
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: opacity 900ms linear; }
 .page-expand-enter-from { opacity: .999; }
 /* 来处页退到后面一层（缩到 .94、淡到 .32，JS 动画），窗口长满、完全盖住它以后才离场。 */
 [class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 900ms linear; }
@@ -208,9 +209,9 @@ a { color: inherit; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 /* 收起（详情页 → 别的入口）：详情页往纵深退——缩小淡出，像被收进去；
    新页从略近处落定，减速停住，不回弹。只动 transform / opacity。 */
-[class*='page-'].page-dismiss-leave-active { transition: opacity 200ms var(--ease-leave), transform 220ms var(--ease-leave); }
+[class*='page-'].page-dismiss-leave-active { transition: opacity 260ms var(--ease-leave), transform 300ms var(--ease-leave); }
 .page-dismiss-leave-to { opacity: 0; transform: scale(.94); }
-[class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 80ms, transform var(--dur-std) var(--ease-enter) 80ms; }
+[class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 100ms, transform var(--dur-std) var(--ease-enter) 100ms; }
 .page-dismiss-enter-from { opacity: 0; transform: scale(1.03) translateY(10px); }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——

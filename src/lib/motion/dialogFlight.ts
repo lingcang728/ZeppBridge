@@ -11,8 +11,8 @@ export interface FlightOrigin {
   rect: DOMRect | null;
 }
 
-const OPEN_MS = 320;
-const CLOSE_MS = 220;
+const OPEN_MS = 400;
+const CLOSE_MS = 280;
 const OPEN_EASE = 'cubic-bezier(.2, .9, .25, 1)';
 const CLOSE_EASE = 'cubic-bezier(.4, 0, .7, .2)';
 

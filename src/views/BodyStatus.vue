@@ -18,15 +18,17 @@ import TrendRangeBar from '../components/TrendRangeBar.vue';
 import MissingMetricsRow from '../components/MissingMetricsRow.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { useRevisionReload } from '../composables/useRevisionReload';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { SERIES_FETCH_DAYS, indexSeries, sliceIndexed } from '../lib/metricSeries';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { indexSeries, sliceIndexed } from '../lib/metricSeries';
+import { bodyPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
 import { bodyStatusMessages as messages } from './BodyStatus.i18n';
-import { METRICS, buildBodyCards, convertSeries, groupOf, type CardGroup } from './body/bodyCards';
+import { buildBodyCards, convertSeries, groupOf, type CardGroup } from './body/bodyCards';
 import { useBodyCharts } from '../composables/useBodyCharts';
 
 const t = useMessages(messages);
@@ -38,6 +40,12 @@ const fullSeries = ref<Record<string, MetricSeries>>({});
 const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
 trackRangeSwap(rangeDays);
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(bodyPageQueries()) : null;
+if (preloaded) {
+  fullSeries.value = indexSeries(preloaded[0]);
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
@@ -81,6 +89,7 @@ const intakeCards = computed(() => withData('intake'));
 const {
   macroSplit, macroChartOption, stressPoints, curve, curveLatest, curveLowest, curveHighest, curveAverage, curveChartOption,
 } = useBodyCharts(series);
+if (preloaded) stressPoints.value = preloaded[1];
 
 
 const load = async () => {
@@ -100,10 +109,8 @@ const load = async () => {
   // 的趋势」问的不是同一个问题。
   // 两样互不依赖：24 小时压力取失败不能连带清掉半年趋势；失败的那一样保留
   // 上一次的结果，只在页头说一句。
-  const [daily, stress] = await Promise.allSettled([
-    backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
-    backend.getStressSeries(24),
-  ]);
+  const [dailyQuery, stressQuery] = bodyPageQueries();
+  const [daily, stress] = await Promise.allSettled([cached(dailyQuery), cached(stressQuery)]);
   if (!loadSeq.isCurrent(seq)) return;
   if (daily.status === 'fulfilled') fullSeries.value = indexSeries(daily.value);
   if (stress.status === 'fulfilled') stressPoints.value = stress.value;
