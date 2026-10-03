@@ -1,6 +1,7 @@
 import { watch } from 'vue';
 import type { Router } from 'vue-router';
 import { dataRevision } from '../../composables/sync/state';
+import { whenMotionIdle } from './budget';
 
 /**
  * 点下去之前就把下一页备好（手机厂商的预加载）：代码块和首屏数据都先取回来。
@@ -23,9 +24,9 @@ const queries = () => import('../pageQueries');
 
 const main = () => document.getElementById('main-content');
 
-/** 那一页的首屏数据先读起来（不等）。 */
+/** 那一页的首屏数据先读起来（不等）。正在放形变就等它放完再读：读回来的那一下解析不压在动画上。 */
 const warmData = (href: string) => {
-  void queries().then((module) => module.preloadRoute(href)).catch(() => undefined);
+  void whenMotionIdle().then(queries).then((module) => module.preloadRoute(href)).catch(() => undefined);
 };
 
 /**
@@ -83,6 +84,7 @@ export const installPrefetch = (router: Router): (() => void) => {
         for (const href of hrefs) {
           if (mine !== pass || !module.queriesFor(href).length) continue;
           warmCode(href);
+          await whenMotionIdle();
           await module.preloadRoute(href);
           await new Promise<void>((resolve) => idle(resolve));
         }

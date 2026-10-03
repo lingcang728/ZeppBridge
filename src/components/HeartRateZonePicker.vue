@@ -5,6 +5,9 @@ import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { heartRateZonesQuery } from '../lib/pageQueries';
+import { cached, peek } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
 import { useMessages } from '../i18n';
@@ -44,6 +47,12 @@ const props = defineProps<{ days: number; revision: number }>();
 
 const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
+// 训练页的预加载连这张卡一起读好了（lib/pageQueries.ts）：第一帧就是它，不放骨架。
+const preloaded = isDesktop() ? peek(heartRateZonesQuery(props.days)) : null;
+if (preloaded) {
+  options.value = preloaded.value;
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const saving = ref(false);
 const error = ref<string | null>(null);
@@ -107,7 +116,7 @@ const load = async () => {
     return;
   }
   try {
-    const next = await backend.getHeartRateZones(props.days);
+    const next = await cached(heartRateZonesQuery(props.days));
     if (!loadSeq.isCurrent(seq)) return;
     options.value = next;
   } catch (cause) {
@@ -193,7 +202,8 @@ const measuredSeconds = computed(() => {
     + current.aboveZone5Seconds;
 });
 
-onMounted(() => { void load(); });
+// 第一帧用的是先前读好的：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(() => props.days, () => { void load(); });
 watch(() => props.revision, () => { void load(); });
 </script>

@@ -183,8 +183,12 @@ forbidden. The provenance of the algorithms and percentages is in the
   exact reverse and the last frame is the real card. **Prepared before it
   opens**: page chunks and first-screen data are fetched on hover, press and
   idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`,
-  invalidated by the data revision), the new page draws its first frame with
-  real content, and only then does the morph start. Timing is shared with the
+  stale-while-revalidate across syncs), the new page draws its first frame
+  with real content, and only then does the morph start. Small tiles that link
+  with `?focus=<metric>` (pinned metrics, the week digest) grow straight into
+  that trend card on the detail page, which gets a brief ring
+  (`lib/motion/focusTarget.ts`). Going back from a scrolled page shrinks the
+  part you are looking at, so it keeps the same pace. Timing is shared with the
   deck (`lib/motion/timing.ts`; slowed on 2026-10-03 to 500 / 440 ms with
   `cubic-bezier(.4, .6, .2, 1)`); while it runs, `lib/motion/budget.ts` holds
   back late chart mounts and skeleton-to-content swaps.

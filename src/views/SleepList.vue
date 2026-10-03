@@ -2,6 +2,8 @@
 defineOptions({ name: 'SleepList' });
 import { onMounted } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
+import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -62,15 +64,17 @@ const t = useMessages(messages);
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
 const {
-  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore,
+  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
 } = usePagedRecords<SleepSession>({
   loadPage: (limit, offset) => tauriApi.getSleepPage(limit, offset),
   idOf: (item) => item.sleep_id,
   failedText: () => t.value.loadFailed,
+  firstPage: pageQuery.sleepPage(LIST_PAGE_SIZE),
 });
 const initialLoading = useFirstLoad(loading);
 
-onMounted(() => void loadList());
+// 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
 useRevisionReload(() => void loadList());
 </script>
 

@@ -1,6 +1,7 @@
 import { computed, ref, type Ref } from 'vue';
 import { isTauri, toUserMessage } from './useTauriApi';
 import { createLoadSeq } from '../lib/loadSeq';
+import { cached, peek, type Query } from '../lib/readCache';
 
 /**
  * 睡眠列表和运动列表共用的分页状态（审计 R03）：首页、加载更多、请求代次、按 id 去重。
@@ -19,15 +20,24 @@ export function usePagedRecords<T>(options: {
   /** 取失败时的兜底文案（后端错误码取不到本地化文本时用）。 */
   failedText: () => string;
   pageSize?: number;
+  /** 首页（offset 0、一页大小）走的查询：预加载读好了的话，第一帧就是列表，不放骨架（lib/pageQueries.ts）。 */
+  firstPage?: Query<{ items: T[]; total: number }>;
 }) {
   const pageSize = options.pageSize ?? 200;
   const items = ref([]) as Ref<T[]>;
   const loading = ref(true);
+  const first = isTauri() && options.firstPage ? peek(options.firstPage) : null;
+  /** 第一帧用的是先前读好的首页（页面挂载时的重读可以等形变放完）。 */
+  const preloaded = Boolean(first);
   const loadingMore = ref(false);
   const error = ref<string | null>(null);
   /** 列表已经有内容时的重查失败：保留旧列表，只在旁边说一句。 */
   const staleError = ref<string | null>(null);
-  const total = ref(0);
+  const total = ref(first?.value.total ?? 0);
+  if (first) {
+    items.value = first.value.items;
+    loading.value = false;
+  }
   const epoch = createLoadSeq();
   const hasMore = computed(() => items.value.length < total.value);
 
@@ -39,7 +49,8 @@ export function usePagedRecords<T>(options: {
   const load = async () => {
     const seq = epoch.next();
     const keep = Math.max(pageSize, items.value.length);
-    loading.value = true;
+    // 列表已经在（预先读好的首页、或者上一次的结果）：留着原地换，不退回骨架。
+    if (!items.value.length) loading.value = true;
     error.value = null;
     staleError.value = null;
     if (!isTauri()) {
@@ -49,7 +60,7 @@ export function usePagedRecords<T>(options: {
       return;
     }
     try {
-      const page = await options.loadPage(keep, 0);
+      const page = await (keep === pageSize && options.firstPage ? cached(options.firstPage) : options.loadPage(keep, 0));
       if (!epoch.isCurrent(seq)) return;
       items.value = page.items;
       total.value = page.total;
@@ -84,5 +95,5 @@ export function usePagedRecords<T>(options: {
     }
   };
 
-  return { items, loading, loadingMore, error, staleError, total, hasMore, load, loadMore };
+  return { items, loading, loadingMore, error, staleError, total, hasMore, load, loadMore, preloaded };
 }

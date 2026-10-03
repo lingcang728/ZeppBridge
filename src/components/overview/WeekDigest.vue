@@ -61,14 +61,15 @@ const { report } = useWeeklyReport(() => w.value.loadFailed);
 const { open: openEvent } = useLifeEvents();
 const router = useRouter();
 
+/* 有对应趋势卡的，带上 ?focus=：点进去直接停在那张卡上（lib/motion/focusTarget.ts）。 */
 const ROUTE: Record<string, string> = {
-  'weekly.resting_hr': '/heart',
-  'weekly.hrv': '/body',
-  'weekly.stress': '/body',
+  'weekly.resting_hr': '/heart?focus=resting_hr',
+  'weekly.hrv': '/body?focus=hrv',
+  'weekly.stress': '/body?focus=stress',
   'weekly.sleep_duration': '/sleep',
   'weekly.sleep_start_regularity': '/sleep',
   'weekly.workout_count': '/workouts',
-  'weekly.training_load': '/training',
+  'weekly.training_load': '/training?focus=training_load',
 };
 /** 变化小于这个百分比不算「值得看」：日常波动。 */
 const NOTABLE_PERCENT = 5;

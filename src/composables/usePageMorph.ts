@@ -8,6 +8,7 @@ import {
   backdropFor, fly, HEAD_IN, HEAD_OUT, hide, PAGE_BODY_IN, PAGE_BODY_OUT, REPLICA_IN, REPLICA_OUT,
 } from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
+import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater, ringFocus } from '../lib/motion/focusTarget';
 
 type Rect = WindowRect;
 
@@ -90,7 +91,11 @@ const endLeave = (el: HTMLElement) => {
 type Trail = { back: string; href: string; index: number; rect: Rect; radius: number };
 type Origin = { card: HTMLElement; rect: Rect; radius: number; replica: { el: HTMLElement; rect: Rect } };
 /** 收回：详情页已经在离场，等来处页回到场上、滚动位置恢复以后的那一帧才开始缩。 */
-type Collapse = { el: HTMLElement; trail: Trail; backdrop: HTMLElement; staying: HTMLElement | null; release: () => void };
+type Collapse = {
+  el: HTMLElement; trail: Trail; backdrop: HTMLElement; staying: HTMLElement | null; release: () => void;
+  /** 离开时详情页滚下去了多少：返回时缩回卡的是此刻看得见的那一段，不是页面顶上。 */
+  lift: number;
+};
 
 export const usePageMorph = (options: { back: () => void }) => {
   let pressed: HTMLElement | null = null;
@@ -106,6 +111,10 @@ export const usePageMorph = (options: { back: () => void }) => {
   /** 展开时正在退场的来处页（onLeave 先于 onEnter 被调）：等窗口长满再让它走。 */
   let expandLeaving: HTMLElement | null = null;
   let collapseTo: Trail | null = null;
+  /** 返回时详情页此刻的滚动距离（decide 时量，切页后滚动区会被拉回顶上）。 */
+  let collapseLift = 0;
+  /** 这次切页要定位到的那张卡（链接上的 ?focus=，lib/motion/focusTarget.ts）。 */
+  let focusKey: string | null = null;
   let pendingCollapse: Collapse | null = null;
   /** decide() 决定要形变时登记的「主线程留给动画」：由接下来的 onEnter / onLeave 接手释放。 */
   let hold: (() => void) | null = null;
@@ -140,6 +149,8 @@ export const usePageMorph = (options: { back: () => void }) => {
     expandFrom = null;
     expandLeaving = null;
     collapseTo = null;
+    collapseLift = 0;
+    focusKey = focusKeyOf(to);
     hold?.();
     hold = null;
     if (reducedMotion()) return base;
@@ -166,6 +177,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     const trail = trails.get(from.fullPath);
     if (trail && trail.back === to.fullPath) {
       collapseTo = trail;
+      collapseLift = main()?.scrollTop ?? 0;
       return morphing('collapse');
     }
     // 设置里翻到另一张卡用的是 replace：来路跟着带过去，关掉时仍缩回当初那条。
@@ -199,6 +211,8 @@ export const usePageMorph = (options: { back: () => void }) => {
       来处页同时退后。窗口长满那一刻来处页离场，形变的痕迹全部撤掉——页面此刻就是它的静止样子。 */
   const onEnter = (el: Element) => {
     clean(el);
+    const focus = focusKey;
+    focusKey = null;
     // 缓存页回场：卡片入场动画（material.css 的 card-enter）不再从头放一遍——
     // 否则每回一次概览，所有卡片连同心率图都像重新加载了一次。
     if (entered.has(el)) el.classList.add('page-revisit');
@@ -223,24 +237,41 @@ export const usePageMorph = (options: { back: () => void }) => {
     if (!origin || !viewport || !host || !(el instanceof HTMLElement)) {
       if (origin) takeHold()();
       if (leaving) endLeave(leaving);
+      // 没有形变可借（减少动效、不是从卡点进来）：页面出来以后再滚到要定位的那张卡。
+      if (focus && el instanceof HTMLElement) revealFocusLater(el, focus);
       return;
     }
     takeHold()();
     // 卡片入场动画不放：页面的出现就是这段形变（页头、其余部分各自淡入）。
     el.classList.add('page-revisit');
+    // 要定位到某张卡（置顶指标 → 训练负荷那张趋势卡）：先把页面滚到它（来处页挪回同样的距离，原地不动），
+    // 窗口直接从小卡长成那张卡——第一帧那张卡就叠在小卡的位置上，卡拷贝也跟着它走。
+    const scroller = main();
+    const target = focus ? findFocusTarget(el, focus) : null;
+    if (target && scroller) {
+      const before = scroller.scrollTop;
+      scroller.scrollTop = before + focusScrollDelta(target, scroller);
+      const moved = scroller.scrollTop - before;
+      if (leaving && moved) leaving.style.top = `${(Number.parseFloat(leaving.style.top) || 0) + moved}px`;
+    }
     const box = rectOf(el);
+    const spot = target ? rectOf(target) : null;
+    const focusAt = spot ? { x: spot.left - box.left, y: spot.top - box.top } : { x: 0, y: 0 };
+    const focusPart = target ? [...el.children].find((child) => child.contains(target)) : undefined;
     const flight = fly({
       page: el,
       backdrop: backdropFor(el, viewport, host, origin.radius),
       radius: origin.radius,
-      from: { rect: origin.rect, anchor: { x: origin.rect.left, y: origin.rect.top } },
+      from: { rect: origin.rect, anchor: { x: origin.rect.left - focusAt.x, y: origin.rect.top - focusAt.y } },
       to: { rect: bleedRect(viewport, origin.radius), anchor: { x: box.left, y: box.top } },
       duration: OPEN_MS,
       easing: OPEN_EASE,
       replica: origin.replica,
+      replicaAt: focusAt,
       replicaFade: REPLICA_OUT,
       head: HEAD_IN,
       body: PAGE_BODY_IN,
+      early: focusPart ? (part) => part === focusPart : undefined,
     });
     const back = leaving ? recede(leaving, viewport, 'out', OPEN_MS, OPEN_EASE).animation : null;
     const hidden = origin.card.isConnected ? hide(origin.card) : null;
@@ -304,6 +335,9 @@ export const usePageMorph = (options: { back: () => void }) => {
       hidden?.cancel();
       flight.dispose();
       release();
+      // 定位的那张卡圈一下；数据晚到、那张卡这时才出来的，滚过去再圈。
+      if (target?.isConnected) ringFocus(target);
+      else if (focus) revealFocusLater(el, focus);
     };
     flight.main.finished.then(finish, () => {
       // 被别的切页整个取消了（页面又离场了）：形变的痕迹一并撤掉。
@@ -376,13 +410,21 @@ export const usePageMorph = (options: { back: () => void }) => {
       backdrop,
       radius: trail.radius,
       from: { rect: bleedRect(viewport, trail.radius), anchor: { x: box.left, y: box.top } },
-      to: { rect: target, anchor: { x: target.left, y: target.top } },
+      // 滚下去再返回：缩回卡的是此刻看得见的那一段（锚点抬高滚过的距离），走的路和没滚时一样长。
+      // 以前锚点是页面顶上，滚了两千像素就要在 440ms 里多走两千像素——用户看到的「滑到底再返回突然变快」。
+      to: { rect: target, anchor: { x: target.left, y: target.top - job.lift } },
       duration: CLOSE_MS,
       easing: CLOSE_EASE,
       replica: present ? cardReplica(present) : null,
+      replicaAt: { x: 0, y: job.lift },
       replicaFade: REPLICA_IN,
       head: HEAD_OUT,
       body: PAGE_BODY_OUT,
+      // 滚下去时页头早就不在画面里：此刻看得见的那几块按页头的节奏走（晚一点淡），窗口里一直有东西。
+      early: job.lift > 40 ? (part) => {
+        const shown = part.getBoundingClientRect();
+        return shown.bottom > viewport.top && shown.top < viewport.top + viewport.height;
+      } : undefined,
     });
     const forward = staying ? recede(staying, viewport, 'in', CLOSE_MS, CLOSE_EASE) : null;
     let hidden = present ? hide(present) : null;
@@ -396,7 +438,7 @@ export const usePageMorph = (options: { back: () => void }) => {
         const scale = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).a : 1;
         const settled = forward ? unscaledBox(rectOf(found), forward.origin, scale) : rectOf(found);
         hidden = hide(found);
-        flight.retarget({ rect: settled, anchor: { x: settled.left, y: settled.top } });
+        flight.retarget({ rect: settled, anchor: { x: settled.left, y: settled.top - job.lift } });
       });
     }
     const all = () => [...flight.anims, ...(forward ? [forward.animation] : [])];
@@ -455,7 +497,9 @@ export const usePageMorph = (options: { back: () => void }) => {
       return;
     }
     // 垫底这一帧就铺满可视区：页面本身是透明的，来处页回到场上时不能从它底下透出来。
-    const job: Collapse = { el, trail, backdrop: backdropFor(el, viewport, host, trail.radius), staying: null, release: takeHold() };
+    const job: Collapse = {
+      el, trail, backdrop: backdropFor(el, viewport, host, trail.radius), staying: null, release: takeHold(), lift: collapseLift,
+    };
     pendingCollapse = job;
     // 来处页这时还没插回文档，滚动区也要下一帧才恢复到离开时的位置（lib/returnScroll.ts 的 rAF 先登记、先跑）：
     // 那张卡要等到那时才量得准。这一帧详情页带着垫底原样盖着，看不出等了一帧。

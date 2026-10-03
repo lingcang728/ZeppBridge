@@ -19,6 +19,8 @@ const { feedback, auth, prefs } = useSettingsContext();
 const { clearAuth } = auth;
 const { retentionDays, historyDays, storageEstimate } = prefs;
 
+/** 压缩说明展开了没有：点一下文字展开 / 收起（不再悬停展开，见样式里的说明）。 */
+const compactNoteOpen = ref(false);
 const compactBusy = ref(false);
 const compactMessage = ref<string | null>(null);
 const compactError = ref<string | null>(null);
@@ -81,7 +83,15 @@ const openDataFolder = async () => {
       </section>
       <section class="s-tile s-fact">
         <span class="s-fact-head"><span class="s-fact-icon"><Icon name="box" :size="15" /></span><strong>{{ t.compactLabel }}</strong></span>
-        <p class="clamp">{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</p>
+        <p
+          :class="['clamp', { open: compactNoteOpen }]"
+          role="button"
+          tabindex="0"
+          :aria-expanded="compactNoteOpen"
+          @click="compactNoteOpen = !compactNoteOpen"
+          @keydown.enter.prevent="compactNoteOpen = !compactNoteOpen"
+          @keydown.space.prevent="compactNoteOpen = !compactNoteOpen"
+        >{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</p>
         <div class="s-fact-actions">
           <button class="pill-button" type="button" :disabled="compactBusy" @click="runCompactPayloads">
             <Icon name="box" :size="14" />{{ compactBusy ? t.compacting : t.compactRun }}
@@ -122,9 +132,20 @@ const openDataFolder = async () => {
 <style scoped>
 .advanced { display: grid; gap: 22px; min-width: 0; }
 .advanced > .s-section + .s-section { margin-top: 0; }
-/* 压缩说明很长：小板里先露五行，悬停或聚焦时全展开。 */
-.clamp { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
-.s-tile:hover .clamp, .s-tile:focus-within .clamp { display: block; }
+/* 压缩说明很长：小板里先露五行，点一下展开、再点收起，高度平滑过渡。
+   以前是悬停 / 聚焦就展开：鼠标一扫过这一格，它一下变高，下面整块内容跟着往下跳、移开又弹回来
+   （用户 2026-10-03 录屏「鼠标滑过画面突然跳一下」）。布局只在人主动点的时候变。 */
+.clamp {
+  max-height: 5lh;
+  overflow: hidden;
+  cursor: pointer;
+  interpolate-size: allow-keywords;
+  transition: max-height var(--dur-slow) var(--ease-out);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.4lh), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.4lh), transparent);
+}
+.clamp.open { max-height: max-content; -webkit-mask-image: none; mask-image: none; }
+@media (prefers-reduced-motion: reduce) { .clamp { transition: none; } }
 .s-fact-actions .danger-button { min-height: 34px; border-radius: 999px; }
 .diag-fold > summary { cursor: pointer; list-style: none; }
 .diag-fold > summary::-webkit-details-marker { display: none; }

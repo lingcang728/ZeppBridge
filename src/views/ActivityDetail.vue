@@ -23,6 +23,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isDesktop, toUserMessage } from '../lib/bridge';
 import { activityPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, sliceIndexed } from '../lib/metricSeries';
@@ -195,7 +196,8 @@ const load = async () => {
   }
 };
 
-onMounted(() => { void load(); });
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });
 </script>
 

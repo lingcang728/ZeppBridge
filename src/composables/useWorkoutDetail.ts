@@ -5,6 +5,9 @@ import { useAiHandoff } from './useAiHandoff';
 import { useSyncController } from './useSyncController';
 import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import { createLoadSeq } from '../lib/loadSeq';
+import { workoutPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import { workoutLabel } from '../lib/labels';
 import { isFiniteNumber } from '../lib/format';
@@ -31,6 +34,13 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   const series = ref<WorkoutSeries | null>(null);
   const device = ref<DeviceProfile>({});
   const loading = ref(true);
+  // 从最近记录 / 运动列表点进来之前，这一条多半已经预先读好了（lib/pageQueries.ts）：第一帧就是它，不放骨架。
+  const preloaded = isTauri() && workoutId.value ? peekAll(workoutPageQueries(workoutId.value)) : null;
+  if (preloaded) {
+    workout.value = preloaded[0] as WorkoutMetrics | null;
+    series.value = preloaded[1];
+    loading.value = false;
+  }
   const error = ref<string | null>(null);
   const actionError = ref<string | null>(null);
   const exportedNote = ref<string | null>(null);
@@ -129,15 +139,17 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   let detailSeq = 0;
   const loadDetail = async () => {
     const seq = ++detailSeq;
-    loading.value = true;
+    // 已经是这一条（预先读好的、或者数据版本变了重读）：内容留着，读完原地换，不退回骨架。
+    if (workout.value?.workout_id !== workoutId.value) loading.value = true;
     error.value = null;
     seriesError.value = null;
     if (!isTauri()) { loading.value = false; return; }
     try {
       const emptySeries: WorkoutSeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], laps: [], summary: {} };
+      const [detailQuery, seriesQuery] = workoutPageQueries(workoutId.value);
       const [detail, seriesResult] = await Promise.all([
-        tauriApi.getWorkoutDetail(workoutId.value),
-        tauriApi.getWorkoutSeries(workoutId.value).then(
+        cached(detailQuery),
+        cached(seriesQuery).then(
           (value) => ({ ok: true as const, value }),
           (cause) => ({ ok: false as const, cause }),
         ),
@@ -222,7 +234,9 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   };
 
   onMounted(() => {
-    void loadDetail();
+    // 第一帧用的是先前读好的数据：重读（含设备信息）等形变放完再做，晚到的结果不在形变途中改页面。
+    if (preloaded) afterMotion(() => { void loadDetail(); });
+    else void loadDetail();
     if (isTauri()) {
       void tauriApi.getWorkoutTypeOptions()
         .then((options) => { typeOverrideOptions.value = options; })

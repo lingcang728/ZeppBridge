@@ -22,6 +22,7 @@ import { isDesktop, toUserMessage } from '../lib/bridge';
 import { indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { bodyPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
 import { holdInPlace } from '../lib/motion/holdInPlace';
@@ -119,7 +120,8 @@ const load = async () => {
   loading.value = false;
 };
 
-onMounted(() => { void load(); });
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 useRevisionReload(() => { void load(); });
 
 const labelsOf = (list: { label: string }[], empty: string) => list.map((card) => card.label).join(' · ') || empty;

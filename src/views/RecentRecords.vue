@@ -16,7 +16,10 @@ import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import type { DesignIconName } from '../components/DesignIcon.vue';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { isTauri, toUserMessage } from '../composables/useTauriApi';
+import { recentPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { useRevisionReload } from '../composables/useRevisionReload';
 import { createLoadSeq } from '../lib/loadSeq';
 import { holdInPlace } from '../lib/motion/holdInPlace';
@@ -31,11 +34,18 @@ import { recentRecordsMessages as messages } from './RecentRecords.i18n';
 const t = useMessages(messages);
 
 const loading = ref(true);
-const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
 const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
+// 从卡 / 链接点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isTauri() ? peekAll(recentPageQueries()) : null;
+if (preloaded) {
+  recentSleep.value = preloaded[0];
+  recentWorkouts.value = preloaded[1];
+  loading.value = false;
+}
+const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
 
 type Kind = 'all' | 'sleep' | 'workout';
@@ -155,10 +165,8 @@ const loadRecent = async () => {
   }
   /* 各取最近 150 条：这一页是「最近」而不是全集，完整历史在 /sleep 与
      /workouts（那里有分页，见 getSleepPage）。 */
-  const [sleep, workouts] = await Promise.allSettled([
-    tauriApi.getRecentSleep(150),
-    tauriApi.getRecentWorkouts(150),
-  ]);
+  const [sleepQuery, workoutsQuery] = recentPageQueries();
+  const [sleep, workouts] = await Promise.allSettled([cached(sleepQuery), cached(workoutsQuery)]);
   if (!loadSeq.isCurrent(seq)) return;
   // 取失败的那一半保留上一次的结果：同步后库忙、重放进行中，一次失败不该把
   // 已经显示着的多年记录说成「没有记录」。
@@ -171,7 +179,8 @@ const loadRecent = async () => {
   loading.value = false;
 };
 
-onMounted(() => void loadRecent());
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadRecent(); }); else void loadRecent(); });
 useRevisionReload(() => void loadRecent());
 </script>
 

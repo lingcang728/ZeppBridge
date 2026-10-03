@@ -30,6 +30,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isDesktop, toUserMessage } from '../lib/bridge';
 import { heartPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
@@ -288,7 +289,8 @@ const dailyMaxChartOption = computed(() => {
 /* 和趋势卡同一条队：切范围时一帧只换一张图（见 useQueuedOption）。 */
 const shownDailyMax = useQueuedOption(dailyMaxChartOption);
 
-onMounted(() => { void load(); });
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });
 
 const trendsSummary = computed(() => trendCards.value.map((card) => card.label).join(' · '));

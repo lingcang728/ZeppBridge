@@ -2,6 +2,8 @@
 defineOptions({ name: 'WorkoutList' });
 import { computed, onMounted } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
+import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -71,11 +73,12 @@ const t = useMessages(messages);
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
  * 把两者混成一句会让人以为应用丢了记录。 */
 const {
-  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore,
+  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
 } = usePagedRecords<Workout>({
   loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
   idOf: (item) => item.workout_id,
   failedText: () => t.value.loadFailed,
+  firstPage: pageQuery.workoutPage(LIST_PAGE_SIZE),
 });
 const initialLoading = useFirstLoad(loading);
 const displayableList = computed(() => displayableWorkouts(workouts.value));
@@ -93,7 +96,8 @@ const workoutFact = (workout: Workout): string => {
   return parts.length ? parts.join(' · ') : t.value.notProvided;
 };
 
-onMounted(() => void loadList());
+// 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
 useRevisionReload(() => void loadList());
 </script>
 

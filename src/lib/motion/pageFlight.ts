@@ -7,6 +7,8 @@ import { pageBackdrop, WINDOW_OFFSETS, windowPoses, type WindowPose, type Window
  */
 type Rect = WindowRect;
 
+const r1 = (value: number) => Number(value.toFixed(1));
+
 const rectOf = (el: Element): Rect => {
   const box = el.getBoundingClientRect();
   return { left: box.left, top: box.top, width: box.width, height: box.height };
@@ -66,6 +68,11 @@ export const fly = (o: {
   duration: number;
   easing: string;
   replica: { el: HTMLElement; rect: Rect } | null;
+  /** 卡拷贝在页面里的位置（页面坐标）。默认左上角（锚点就是页面左上角）；定位到某张卡时是那张卡的位置，
+      滚下去再返回时是此刻看得见的那一段的顶上——拷贝和锚点一起走，落在卡上。 */
+  replicaAt?: { x: number; y: number };
+  /** 和页头一起早一点出来 / 晚一点走的那一块（定位的那张卡所在的块；滚下去时看得见的那几块）。 */
+  early?: (part: HTMLElement) => boolean;
   replicaFade: Keyframe[];
   head: Keyframe[];
   body: Keyframe[];
@@ -86,7 +93,7 @@ export const fly = (o: {
   if (o.replica) {
     const { el } = o.replica;
     el.dataset.morphLayer = '';
-    Object.assign(el.style, { left: '0px', top: '0px', zIndex: '50' });
+    Object.assign(el.style, { left: `${r1(o.replicaAt?.x ?? 0)}px`, top: `${r1(o.replicaAt?.y ?? 0)}px`, zIndex: '50' });
     page.appendChild(el);
     anims.push(el.animate(o.replicaFade, linear));
   }
@@ -94,7 +101,7 @@ export const fly = (o: {
   const parts = new Map<HTMLElement, Animation>();
   const leavingParts = new WeakSet<HTMLElement>();
   const fadePart = (part: HTMLElement) => {
-    const animation = part.animate(o.body, linear);
+    const animation = part.animate(o.early?.(part) ? o.head : o.body, linear);
     animation.currentTime = main.currentTime;
     if (main.playState === 'paused') animation.pause();
     parts.set(part, animation);

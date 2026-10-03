@@ -24,6 +24,7 @@ import { vEdgeSafe } from '../lib/edgeSafe';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import { sleepPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -215,7 +216,8 @@ const loadDetail = async () => {
   }
 };
 
-onMounted(() => void loadDetail());
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadDetail(); }); else void loadDetail(); });
 watch([dataRevision, sleepId], () => void loadDetail());
 
 /* 官方授权那一份（sleep_id 以 official: 开头）标成官方授权，不再笼统写「Zepp 云端」。 */

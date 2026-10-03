@@ -15,16 +15,19 @@ describe('detail-page read cache (preloaded data must be the data the page shows
     await cached(heart);
     await cached(heart);
     expect(heart.fetch).toHaveBeenCalledTimes(1);
-    expect(peek(heart)).toEqual({ value: [1, 2, 3] });
+    expect(peek(heart)).toEqual({ value: [1, 2, 3], fresh: true });
   });
 
-  it('drops everything once a sync lands new data, so a preload never shows stale numbers', async () => {
+  it('after a sync lands, still hands out the last result at once (marked stale) and re-reads on the next load', async () => {
     const heart = query('heart', 64);
     await cached(heart);
     dataRevision.value += 1;
-    expect(peek(heart)).toBeNull();
-    await cached(heart);
+    expect(peek(heart)).toEqual({ value: 64, fresh: false });
+    const reread = cached(heart);
+    expect(peek(heart)).toEqual({ value: 64, fresh: false });
+    await reread;
     expect(heart.fetch).toHaveBeenCalledTimes(2);
+    expect(peek(heart)).toEqual({ value: 64, fresh: true });
   });
 
   it('does not keep failures (the next open retries) and only peeks a complete set', async () => {

@@ -18,7 +18,7 @@ import { metricLabel } from '../../lib/aiTask/metrics';
 import { coverageLabel, indexSeries } from '../../lib/metricSeries';
 import { today as currentToday } from '../../lib/currentDay';
 import {
-  pinLatestDate, pinnableMetric, pinSparkValues, pinToneColor, pinValueText, readPins, writePins, type PinnableMetric,
+  pinHref, pinLatestDate, pinnableMetric, pinSparkValues, pinToneColor, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types';
 import { useMessages } from '../../i18n';
@@ -130,7 +130,7 @@ const apply = async (next: string[]) => {
          enter-active 把它截断：时长显式给 900。离场是 display:none，不用等。 -->
     <TransitionGroup v-else tag="div" name="pin" :appear="justPinned" :duration="{ enter: 900, leave: 0 }"
       :class="['pins-grid', { 'just-pinned': justPinned }]" :style="{ '--count': tiles.length }">
-      <RouterLink v-for="tile in tiles" :key="tile.id" :to="tile.metric.route" data-morph-card
+      <RouterLink v-for="tile in tiles" :key="tile.id" :to="pinHref(tile.metric)" data-morph-card
         :class="['pin-tile', { 'is-empty': tile.value === '—' }]" :style="{ '--tone': tile.tone }" :aria-label="t.tileAria(tile.label, tile.value)">
         <span class="pin-label"><i class="pin-dot" aria-hidden="true"></i>{{ tile.label }}</span>
         <span class="pin-value"><strong>{{ tile.value }}</strong><small v-if="tile.unit && tile.value !== '—'">{{ tile.unit }}</small></span>

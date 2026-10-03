@@ -1,8 +1,12 @@
 import { backend, isDesktop } from './bridge';
 import { SERIES_FETCH_DAYS } from './metricSeries';
-import { cached, type Query } from './readCache';
+import { cached, peek, type Query } from './readCache';
+import { useTrendRange } from '../composables/useTrendRange';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
-import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries, SleepSession, StressPoint, TrainingBalancePoint } from '../types';
+import type {
+  DailyHeartRateExtreme, DataHealth, HeartRateZoneOptions, HeartRatePoint, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
+  WorkoutSeries,
+} from '../types';
 
 /**
  * 各详情页首屏要读的东西，写在一处：页面自己读的时候用这里的查询，预加载（lib/motion/prefetch.ts）
@@ -45,6 +49,34 @@ export const pageQuery = {
     key: `recent_sleep:${limit}`,
     fetch: () => backend.getRecentSleep(limit),
   }),
+  recentWorkouts: (limit: number): Query<Workout[]> => ({
+    key: `recent_workouts:${limit}`,
+    fetch: () => backend.getRecentWorkouts(limit),
+  }),
+  workoutDetail: (workoutId: string): Query<Workout | null> => ({
+    key: `workout_detail:${workoutId}`,
+    fetch: () => backend.getWorkoutDetail(workoutId),
+  }),
+  workoutSeries: (workoutId: string): Query<WorkoutSeries> => ({
+    key: `workout_series:${workoutId}`,
+    fetch: () => backend.getWorkoutSeries(workoutId),
+  }),
+  sleepPage: (limit: number): Query<Page<SleepSession>> => ({
+    key: `sleep_page:${limit}:0`,
+    fetch: () => backend.getSleepPage(limit, 0),
+  }),
+  workoutPage: (limit: number): Query<Page<Workout>> => ({
+    key: `workout_page:${limit}:0`,
+    fetch: () => backend.getWorkoutPage(limit, 0),
+  }),
+  heartRateZones: (days: number): Query<HeartRateZoneOptions> => ({
+    key: `heart_rate_zones:${days}`,
+    fetch: () => backend.getHeartRateZones(days),
+  }),
+  dataHealth: (windowDays: number): Query<DataHealth> => ({
+    key: `data_health:${windowDays}`,
+    fetch: () => backend.getDataHealth(windowDays),
+  }),
 };
 
 /** 每个详情页首屏的那一组（顺序和页面里 Promise.allSettled 的顺序一致）。 */
@@ -58,15 +90,34 @@ export const trainingPageQueries = () => [
   pageQuery.metricSeries(TRAINING_METRICS),
   pageQuery.trainingBalance(TRAINING_BALANCE_DAYS),
 ] as const;
+/** 训练页底部的心率区间卡（components/HeartRateZonePicker.vue）：至少看一个月，跟着全局的趋势范围。 */
+export const heartRateZonesQuery = (rangeDays: number = useTrendRange().value) => pageQuery.heartRateZones(Math.max(30, rangeDays));
 export const activityPageQueries = () => [pageQuery.metricSeries(ACTIVITY_METRICS)] as const;
 export const sleepPageQueries = (sleepId: string) => [pageQuery.sleepDetail(sleepId), pageQuery.recentSleep(7)] as const;
+export const workoutPageQueries = (workoutId: string) => [pageQuery.workoutDetail(workoutId), pageQuery.workoutSeries(workoutId)] as const;
+/** 「最近记录」各取最近 150 条（完整历史在分页的 /sleep 与 /workouts）。 */
+export const RECENT_RECORDS_LIMIT = 150;
+export const recentPageQueries = () => [
+  pageQuery.recentSleep(RECENT_RECORDS_LIMIT),
+  pageQuery.recentWorkouts(RECENT_RECORDS_LIMIT),
+] as const;
+/** 睡眠 / 运动列表一页的条数（composables/usePagedRecords.ts 的默认值）。 */
+export const LIST_PAGE_SIZE = 200;
+/** 数据健康检查默认看最近 90 天。 */
+export const HEALTH_CHECK_DAYS = 90;
+export const healthCheckQueries = () => [pageQuery.dataHealth(HEALTH_CHECK_DAYS)] as const;
 
 const ROUTES: Array<[RegExp, (match: RegExpMatchArray) => readonly Query<unknown>[]]> = [
   [/^\/heart\/?$/, heartPageQueries],
   [/^\/body\/?$/, bodyPageQueries],
-  [/^\/training\/?$/, trainingPageQueries],
+  [/^\/training\/?$/, () => [...trainingPageQueries(), heartRateZonesQuery()]],
   [/^\/activity\/?$/, activityPageQueries],
   [/^\/sleep\/([^/?#]+)$/, (match) => sleepPageQueries(decodeURIComponent(match[1]))],
+  [/^\/workouts\/([^/?#]+)$/, (match) => workoutPageQueries(decodeURIComponent(match[1]))],
+  [/^\/recent\/?$/, recentPageQueries],
+  [/^\/sleep\/?$/, () => [pageQuery.sleepPage(LIST_PAGE_SIZE)]],
+  [/^\/workouts\/?$/, () => [pageQuery.workoutPage(LIST_PAGE_SIZE)]],
+  [/^\/health-check\/?$/, healthCheckQueries],
 ];
 
 /** 按路径找出那一页首屏的查询（没有登记的页返回空）。 */
@@ -87,6 +138,9 @@ export const preloadRoute = (path: string, waitMs = 0): Promise<void> => {
   if (!isDesktop()) return Promise.resolve();
   const queries = queriesFor(path);
   if (!queries.length) return Promise.resolve();
+  // 切页前：已经有能画第一帧的（哪怕是同步前读的旧结果）就不等、也不在这一刻重读——重读的结果要是
+  // 正好在形变途中回来，解析一大段数据会把主线程占住（掉帧）。页面放完形变会自己重读、原地换上。
+  if (waitMs > 0 && queries.every((query) => peek(query))) return Promise.resolve();
   const all = Promise.allSettled(queries.map((query) => cached(query))).then(() => undefined);
   if (waitMs <= 0) return all;
   return Promise.race([all, new Promise<void>((resolve) => { setTimeout(resolve, waitMs); })]);

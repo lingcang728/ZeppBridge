@@ -41,6 +41,22 @@ export const holdMotion = (maxMs = 1200): (() => void) => {
 export const whenMotionIdle = (): Promise<void> =>
   holds.value > 0 ? new Promise((resolve) => { waiters.push(resolve); }) : Promise.resolve();
 
+/**
+ * 等「这一次切页的形变」放完：新页挂载时形变还没开跑（它要先等新页第一帧画好，见 usePageMorph），
+ * 所以先让过三帧，再等它放完。页面用先前读好的数据画了第一帧以后，重读放在这之后——晚到的结果
+ * 不在形变途中改页面。
+ */
+export const afterMotion = (run: () => void): void => {
+  const frames = (left: number) => {
+    if (left <= 0) {
+      void whenMotionIdle().then(run);
+      return;
+    }
+    requestAnimationFrame(() => frames(left - 1));
+  };
+  frames(3);
+};
+
 /** 测试用：清空状态。 */
 export const resetMotionBudget = () => {
   holds.value = 0;

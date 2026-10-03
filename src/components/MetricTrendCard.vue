@@ -204,7 +204,7 @@ const hasEventMarks = computed(() => {
        卡片是父网格的 subgrid，同一行几张卡的这四块各自对齐（见 material.css 的 .trend-grid）。
        以前标题和说明挤在左边、最新读数占着右上角：葡语这种长标题被压成一列一个词竖着排，
        右边却空着一大块。现在标题独占一行、读数在它下面、说明铺满整宽。 -->
-  <section class="trend-card" :aria-label="label">
+  <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
       <strong class="trend-title">{{ label }}</strong>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月

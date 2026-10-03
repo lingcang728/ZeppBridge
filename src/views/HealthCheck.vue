@@ -23,6 +23,9 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { HEALTH_CHECK_DAYS, healthCheckQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
 import { formatBytes } from '../lib/format';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
@@ -42,12 +45,18 @@ const loadSeq = createLoadSeq();
 
 const health = ref<DataHealth | null>(null);
 const loading = ref(true);
+// 从卡 / 链接点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(healthCheckQueries()) : null;
+if (preloaded) {
+  health.value = preloaded[0];
+  loading.value = false;
+}
 const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const busyAction = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
 const actionError = ref<string | null>(null);
-const windowDays = ref(90);
+const windowDays = ref(HEALTH_CHECK_DAYS);
 
 const WINDOWS = computed(() => [
   { days: 30, label: t.value.window30 },
@@ -60,7 +69,7 @@ const load = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const next = await backend.getDataHealth(windowDays.value);
+    const next = await (windowDays.value === HEALTH_CHECK_DAYS ? cached(healthCheckQueries()[0]) : backend.getDataHealth(windowDays.value));
     if (!loadSeq.isCurrent(seq)) return;
     health.value = next;
   } catch (cause) {
@@ -195,7 +204,8 @@ const summary = computed(() => {
   return { ok, total: streams.length, failed, pending: streams.length - ok - failed };
 });
 
-onMounted(() => void load());
+// 第一帧用的是先前读好的数据：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 </script>
 
 <template>
