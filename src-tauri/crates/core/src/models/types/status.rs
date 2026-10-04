@@ -4,6 +4,10 @@ use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserPrefs {
+    #[serde(default)]
+    pub demo_mode: bool,
+    #[serde(default)]
+    pub ai_profile_note: String,
     /// 本机保留最近多少天。清理在每次成功同步之后执行。
     pub retention_days: i64,
     /// 一次历史补拉往回覆盖多少天。

@@ -73,6 +73,7 @@ mod official;
 mod queries;
 mod replay;
 mod schema;
+mod time_bridge;
 mod training_plan;
 
 mod open;

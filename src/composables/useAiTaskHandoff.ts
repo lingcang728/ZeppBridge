@@ -30,17 +30,17 @@ const messages = defineMessages(
   {
     prepareFailed: '准备文件失败', copyFailed: '复制开场白失败', openFailed: '无法打开 AI 网站',
     saveFailed: '任务没保存上：文件照常准备，但下次打开不会记得这次的选择，MCP 的任务授权也还是旧的。',
-    kickoff: '请读我附上的文件，按文件开头的说明直接开始分析。',
+    kickoff: '请读我附上的文件。先和我讨论，不要急着给计划；等我说「定稿」，再按文件末尾的格式给出 JSON。',
   },
   {
     prepareFailed: 'Could not prepare files', copyFailed: 'Could not copy the opening message', openFailed: 'Could not open the AI site',
     saveFailed: 'The task was not saved: the file is still prepared, but these choices will not be remembered next time and MCP task access stays as before.',
-    kickoff: 'Please read the attached file and start the analysis as described at the top of it.',
+    kickoff: 'Please read the attached file. Discuss it with me first; when I say “finalize”, return a JSON plan in the format at the end of the file.',
   },
   {
     prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar el mensaje inicial', openFailed: 'No se pudo abrir el sitio de la IA',
     saveFailed: 'La tarea no se guardó: el archivo se prepara igual, pero la próxima vez no se recordarán estas opciones y el acceso MCP de la tarea sigue como antes.',
-    kickoff: 'Lee el archivo adjunto y empieza el análisis como se indica al principio.',
+    kickoff: 'Lee el archivo adjunto. Primero hablemos; cuando diga «versión final», devuelve un plan JSON con el formato al final del archivo.',
   },
   'composables/useAiTaskHandoff',
 );

@@ -36,14 +36,14 @@ export interface AiTaskCategoryMeta {
 }
 
 export const AI_TASK_CATEGORY_META: Readonly<Record<AiTaskCategory, AiTaskCategoryMeta>> = {
-  workout: { category: 'workout', labelCode: 'ui.ai_task.cat.workout', icon: 'run', tint: 'var(--activity)', defaultDaysBefore: 14, hasWindow: true },
-  sleep: { category: 'sleep', labelCode: 'ui.ai_task.cat.sleep', icon: 'moon', tint: 'var(--sleep-light)', defaultDaysBefore: 14, hasWindow: true },
-  recovery: { category: 'recovery', labelCode: 'ui.ai_task.cat.recovery', icon: 'spark', tint: 'var(--readiness)', defaultDaysBefore: 14, hasWindow: true },
-  heart_rate: { category: 'heart_rate', labelCode: 'ui.ai_task.cat.heart_rate', icon: 'heart', tint: 'var(--heart)', defaultDaysBefore: 14, hasWindow: true },
-  training: { category: 'training', labelCode: 'ui.ai_task.cat.training', icon: 'training-load', tint: 'var(--training)', defaultDaysBefore: 14, hasWindow: true },
-  body: { category: 'body', labelCode: 'ui.ai_task.cat.body', icon: 'user', tint: 'var(--pace)', defaultDaysBefore: 14, hasWindow: true },
-  personal_note: { category: 'personal_note', labelCode: 'ui.ai_task.cat.personal_note', icon: 'edit', tint: 'var(--muted)', defaultDaysBefore: 14, hasWindow: false },
-  attachment: { category: 'attachment', labelCode: 'ui.ai_task.cat.attachment', icon: 'file', tint: 'var(--muted)', defaultDaysBefore: 14, hasWindow: false },
+  workout: { category: 'workout', labelCode: 'ui.ai_task.cat.workout', icon: 'run', tint: 'var(--activity)', defaultDaysBefore: 13, hasWindow: true },
+  sleep: { category: 'sleep', labelCode: 'ui.ai_task.cat.sleep', icon: 'moon', tint: 'var(--sleep-light)', defaultDaysBefore: 13, hasWindow: true },
+  recovery: { category: 'recovery', labelCode: 'ui.ai_task.cat.recovery', icon: 'spark', tint: 'var(--readiness)', defaultDaysBefore: 13, hasWindow: true },
+  heart_rate: { category: 'heart_rate', labelCode: 'ui.ai_task.cat.heart_rate', icon: 'heart', tint: 'var(--heart)', defaultDaysBefore: 13, hasWindow: true },
+  training: { category: 'training', labelCode: 'ui.ai_task.cat.training', icon: 'training-load', tint: 'var(--training)', defaultDaysBefore: 13, hasWindow: true },
+  body: { category: 'body', labelCode: 'ui.ai_task.cat.body', icon: 'user', tint: 'var(--pace)', defaultDaysBefore: 13, hasWindow: true },
+  personal_note: { category: 'personal_note', labelCode: 'ui.ai_task.cat.personal_note', icon: 'edit', tint: 'var(--muted)', defaultDaysBefore: 13, hasWindow: false },
+  attachment: { category: 'attachment', labelCode: 'ui.ai_task.cat.attachment', icon: 'file', tint: 'var(--muted)', defaultDaysBefore: 13, hasWindow: false },
 };
 
 /** 新建任务的默认类别表：数据类别开，内容类别等用户真加了内容再开。 */

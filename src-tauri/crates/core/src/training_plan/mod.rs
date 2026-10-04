@@ -75,10 +75,33 @@ pub const MAX_DAYS_AHEAD: i64 = 56;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlanDocument {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rest: Vec<PlanRest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
     pub workouts: Vec<PlanWorkout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PlanRest {
+    pub date: String,
+    pub bedtime: Option<String>,
+    pub sleep_target: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RestDay {
+    pub date: NaiveDate,
+    pub bedtime_minutes: Option<u16>,
+    pub sleep_target_seconds: Option<u32>,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

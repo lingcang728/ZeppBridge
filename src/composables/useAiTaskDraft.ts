@@ -157,6 +157,10 @@ const resetDraft = () => {
   replaceDraft(newTaskDraft());
   lastError.value = null;
   legacyNotice.value = false;
+  const gen = draftGen;
+  void backend.getUserPrefs().then(prefs => {
+    if (gen === draftGen && !draft.value.personal_note) setPersonalNote(prefs.ai_profile_note ?? '');
+  }).catch(() => undefined);
 };
 
 const showSavedNotice = () => {

@@ -145,6 +145,26 @@ async fn publish(
     request: PublishRequest,
     confirm_clear: bool,
 ) -> Result<PublishResult, AppError> {
+    // An isolated, explicitly seeded demo has no credentials and cannot send HTTP.
+    let demo = database.lock().await.is_demo_library()? && data_dir.join(".demo-library").is_file();
+    if demo {
+        return with_write(data_dir, database, WritePurpose::Metadata, |db| {
+            let outcome = db.prepare_plan_publish(&request, today(), confirm_clear)?;
+            let record = if let Prepared::Send { publish_id, .. } = &outcome {
+                db.finish_plan_publish(
+                    *publish_id,
+                    &zeppbridge_core::storage::training_plan::SendOutcome::Delivered,
+                )?;
+                db.plan_publishes(1)?
+                    .into_iter()
+                    .find(|r| r.id == *publish_id)
+            } else {
+                None
+            };
+            Ok(PublishResult { outcome, record })
+        })
+        .await;
+    }
     let store = OfficialStore::new(data_dir);
     let client = OfficialClient::new()?;
     // 没有能用的令牌就别动账本。
@@ -217,4 +237,31 @@ pub(crate) async fn forget_after_revoke(state: &AppState) {
     if let Err(error) = result {
         eprintln!("断开授权后清理训练计划账本失败: {}", error.code);
     }
+}
+
+#[tauri::command]
+pub async fn training_plan_adherence(
+    state: tauri::State<'_, AppState>,
+    from: String,
+    to: String,
+) -> Result<Vec<zeppbridge_core::storage::plan_adherence::AdherenceDay>, AppError> {
+    let from = NaiveDate::parse_from_str(&from, "%Y-%m-%d")
+        .map_err(|_| AppError::new("err.ai_task.invalid", "日期无效"))?;
+    let to = NaiveDate::parse_from_str(&to, "%Y-%m-%d")
+        .map_err(|_| AppError::new("err.ai_task.invalid", "日期无效"))?;
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.plan_adherence(from, to)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn training_plan_update_draft(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    document: PlanDocument,
+) -> Result<bool, AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.update_plan_draft(&id, &document)
+    })
+    .await
 }

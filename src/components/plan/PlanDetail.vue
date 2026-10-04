@@ -17,9 +17,12 @@ import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import type { PlanIssue } from '../../types/trainingPlan';
 import Icon from '../Icon.vue';
 import { usePlanText } from './usePlanText';
+import { useBridgeText } from '../ai/bridge/bridge.i18n';
 
 const props = defineProps<{ row: DayRow | null; issues: PlanIssue[] }>();
 const { t, sport, intensity, minutes, length, target } = usePlanText();
+const bridgeText = useBridgeText();
+const restTime = computed(() => { const n = props.row?.rest?.bedtime_minutes; return n == null ? null : `${String(Math.floor(n / 60)).padStart(2,'0')}:${String(n % 60).padStart(2,'0')}`; });
 
 const dateLine = computed(() => {
   if (!props.row) return '';
@@ -93,6 +96,7 @@ const stepTarget = (row: StepRow) => target(row.target);
         </div>
       </div>
       <p v-else class="empty"><Icon name="moon" :size="16" />{{ row.before[0] ? t.wasName(row.before[0].name) : t.noPlanDay }}</p>
+      <div v-if="row.rest" class="local-rest"><Icon name="moon" :size="18"/><div><p><span v-if="restTime">{{ bridgeText.bedtime }} {{ restTime }}</span><span v-if="row.rest.sleep_target_seconds != null">{{ bridgeText.sleepTarget }} {{ minutes(Math.round(row.rest.sleep_target_seconds / 60)) }}</span></p><p v-if="row.rest.note">{{ row.rest.note }}</p></div></div>
 
       <p v-if="!row.inWindow && workout" class="note">{{ t.outsideNote }}</p>
 
@@ -112,6 +116,9 @@ const stepTarget = (row: StepRow) => target(row.target);
 
 <style scoped>
 .detail { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.local-rest { display: flex; gap: 12px; padding: 14px 16px; background: var(--mat-inset); border-radius: 14px; color: var(--muted); font-size: var(--fs-xs); }
+.local-rest p { margin: 0; line-height: 1.7; }
+.local-rest p:first-child { display: flex; gap: 18px; color: var(--ink); }
 .head { display: grid; gap: 2px; }
 .date { margin: 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
 h3 { margin: 0; font-size: var(--fs-2xl); line-height: 1.25; }

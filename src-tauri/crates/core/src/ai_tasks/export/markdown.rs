@@ -124,6 +124,9 @@ fn render_with(
         .cloned()
         .unwrap_or_default();
     let mut out = String::new();
+    let (header, final_plan) = header
+        .split_once("<!-- zeppbridge-final-plan -->")
+        .unwrap_or((header, ""));
     let header = header.trim();
     if !header.is_empty() {
         out.push_str(header);
@@ -142,6 +145,21 @@ fn render_with(
     sleep_section(&mut out, document, &units);
     workouts_section(&mut out, document, &units, curve_average, summarized);
     attachments_section(&mut out, document);
+    for key in ["food"] {
+        if let Some(value) = document.get(key) {
+            let _ = writeln!(
+                out,
+                "## {key}\n\n```json\n{}\n```\n",
+                serde_json::to_string_pretty(value).unwrap_or_default()
+            );
+        }
+    }
+    adherence_section(&mut out, document);
+    if !final_plan.trim().is_empty() {
+        out.push_str("\n---\n\n");
+        out.push_str(final_plan.trim());
+        out.push('\n');
+    }
 
     let approx_tokens = estimate_tokens(&out);
     MarkdownRender {
@@ -151,6 +169,83 @@ fn render_with(
         summarized_workouts: summarized.iter().cloned().collect(),
         over_budget: false,
     }
+}
+
+/// Day + sport comparison. Only compatible actual workouts contribute to deltas.
+fn adherence_section(out: &mut String, document: &Value) {
+    let Some(rows) = document.get("plan_adherence").and_then(Value::as_array) else {
+        return;
+    };
+    if rows.is_empty() {
+        return;
+    }
+    out.push_str("## Plan vs actual\n\n");
+    let body = rows
+        .iter()
+        .map(|row| {
+            let planned = &row["planned"];
+            let actual = row["actual"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let matched: Vec<_> = actual
+                .iter()
+                .filter(|a| a["compatible"].as_bool() == Some(true))
+                .collect();
+            let actual_seconds = (!matched.is_empty()
+                && matched.iter().all(|a| a["seconds"].as_u64().is_some()))
+            .then(|| {
+                matched
+                    .iter()
+                    .filter_map(|a| a["seconds"].as_u64())
+                    .sum::<u64>()
+            });
+            let delta = planned["seconds"]
+                .as_u64()
+                .zip(actual_seconds)
+                .map(|(p, a)| (i128::from(a) - i128::from(p)).to_string())
+                .unwrap_or_default();
+            vec![
+                cell(&row["date"]),
+                cell(&planned["name"]),
+                cell(&planned["sport"]),
+                cell(&planned["seconds"]),
+                actual
+                    .iter()
+                    .map(|a| {
+                        format!(
+                            "{}: {}s, {}bpm, compatible={}",
+                            cell(&a["workout_id"]),
+                            cell(&a["seconds"]),
+                            cell(&a["avg_hr"]),
+                            cell(&a["compatible"])
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; "),
+                delta,
+                cell(&planned["hr_low"]),
+                cell(&planned["hr_high"]),
+                cell(&row["verdict"]),
+            ]
+        })
+        .collect();
+    csv_block(
+        out,
+        &[
+            "date",
+            "planned_name",
+            "planned_sport",
+            "planned_seconds (s)",
+            "actual_workouts (s; bpm)",
+            "duration_delta (s)",
+            "target_hr_low (bpm)",
+            "target_hr_high (bpm)",
+            "verdict",
+        ]
+        .map(String::from),
+        body,
+    );
 }
 
 // ---------------------------------------------------------------- 各节
@@ -169,6 +264,7 @@ fn summary_section(
         }
     };
     line(out, "schema", document.get("schema"));
+    line(out, "simulated_data", document.get("simulated_data"));
     line(out, "schema_version", document.get("schema_version"));
     line(out, "generated_at", document.get("generated_at"));
     line(out, "task", task.get("title"));

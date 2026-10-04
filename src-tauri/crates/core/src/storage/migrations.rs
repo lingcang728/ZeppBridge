@@ -1170,6 +1170,21 @@ impl Database {
                 params![super::ARCHIVE_ENABLED_KEY, Utc::now().to_rfc3339()],
             )?;
         }
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_exchanges (
+                id TEXT PRIMARY KEY, task_id TEXT NOT NULL, provider TEXT NOT NULL,
+                question TEXT NOT NULL, days_before INTEGER NOT NULL, categories TEXT NOT NULL,
+                workout_ids TEXT NOT NULL DEFAULT '[]', personal_note TEXT NOT NULL DEFAULT '',
+                sent_at TEXT NOT NULL, md_path TEXT NOT NULL, plan_draft_id TEXT,
+                received_at TEXT, publish_id INTEGER
+             );
+             CREATE INDEX IF NOT EXISTS idx_ai_exchanges_sent ON ai_exchanges(sent_at);
+             PRAGMA user_version = 36;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(36,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

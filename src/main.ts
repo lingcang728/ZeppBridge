@@ -25,6 +25,9 @@ const demo = window.__ZB_DEMO__?.demo === true;
 const mount = () => {
   const app = createApp(App);
   app.use(router).mount("#app");
+  if (!demo && '__TAURI_INTERNALS__' in window) void import("./lib/bridge").then(async ({ backend }) => {
+    if ((await backend.getUserPrefs()).demo_mode) await router.replace('/ai');
+  }).catch(() => undefined);
   if (demo) void import("./demo/bootstrap").then((module) => module.startDemoHost(router));
 };
 

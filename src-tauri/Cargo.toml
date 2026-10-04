@@ -63,6 +63,7 @@ directories = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
+tauri-plugin-clipboard-manager = "=2.3.3"
 
 # 开机时问系统要用户的界面语言。这一句以前是派生 powershell.exe 去跑
 # `(Get-Culture).Name`，在启动路径上要 0.5~2 秒；windows-sys 本来就在依赖树里

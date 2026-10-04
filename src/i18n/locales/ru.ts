@@ -18,33 +18,6 @@ export default {
       label: "Тренд по дням",
       aria: "Период тренда по дням",
     },
-    'components/ai/AiAskStart': {
-      title: "Что вы хотите узнать?",
-      sleepTitle: "Посмотреть на недавний сон",
-      sleepSub: "Достаточно ли я сплю и регулярно ли, и как это связано с восстановлением",
-      weekTitle: "Посмотреть, что изменилось за эту неделю",
-      weekSub: "Что изменилось на этой неделе по сравнению с обычным для меня",
-      workoutTitle: "Разобрать тренировку",
-      workoutSub: "Сначала выберите тренировку, затем изучите темп, пульс и восстановление",
-      freeTitle: "Задать свой вопрос",
-      freeSub: "Напишите свой вопрос; данные — те, что выбраны на графе",
-      dataTitle: "Данные, которые будут переданы",
-      plain: (range: string, categories: string) => `Данные за ${range}: ${categories}`,
-      plainWorkouts: (count: number) => plural(count, { one: `, в центре внимания — выбранная вами тренировка (${count})`, other: `, в центре внимания — выбранные вами тренировки (${count})`, few: `, в центре внимания — выбранные вами тренировки (${count})`, many: `, в центре внимания — выбранные вами тренировки (${count})` }),
-      plainNoGps: "; без точного местоположения",
-      plainGps: "; с точным местоположением",
-      plainAttachments: (count: number) => plural(count, { one: `; ещё ${count} прикреплённый файл`, other: `; ещё ${count} прикреплённых файла`, few: `; ещё ${count} прикреплённых файла`, many: `; ещё ${count} прикреплённых файлов` }),
-      plainNothing: "Данные пока не выбраны.",
-      emptyRange: "За этот период нет записей для анализа.",
-      widen: "Выбрать последние 30 дней",
-      rangeUnknown: "недавний период",
-      haveDays: (have: number, total: number) => `${have}/${total} дней с данными`,
-      noneInRange: "За этот период записей нет",
-      notPicked: "Не включено",
-      counting: "Подсчёт…",
-      separator: ", ",
-      end: ".",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Как читать этот файл:",
@@ -82,23 +55,6 @@ export default {
     'components/OfficialOnlyNote': {
       text: 'Подключена только официальная авторизация Zepp: синхронизируются сон, пульс, шаги, тренировки, PAI и вес. ВСР, кислород в крови, стресс, готовность и тренировочная нагрузка доступны через «Расширенные данные».',
       action: 'Подключить',
-    },
-    'components/ai/WorkoutPicker': {
-      title: 'Какую тренировку анализировать',
-      hint: 'Можно выбрать несколько или ни одной',
-      noneSelected: (days: number) =>
-        `Тренировка не выбрана: по умолчанию берутся все тренировки за ${plural(days, { one: `последний ${days} день`, few: `последние ${days} дня`, many: `последние ${days} дней`, other: `последние ${days} дня` })} по сегодняшний день включительно.`,
-      selectedCount: (count: number) => plural(count, {
-        one: `Выбрана ${count} тренировка`,
-        few: `Выбраны ${count} тренировки`,
-        many: `Выбрано ${count} тренировок`,
-        other: `Выбрано ${count} тренировок`,
-      }),
-      empty: 'Тренировок на устройстве пока нет',
-      remove: 'Снять выбор',
-      avgHr: (bpm: number) => `средний пульс ${bpm}`,
-      showMore: (count: number) => `Ещё ${count}`,
-      showLess: 'Свернуть',
     },
 
     'views/Settings': {
@@ -1448,20 +1404,6 @@ export default {
       minutesUnit: 'мин',
     },
 
-    'views/AiComposer': {
-      andMore: (count: number) =>
-        `и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
-      targetRecent: (days: number) =>
-        `Тренировка не выбрана · последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}`,
-      extrasNone: 'Без вложений · стандартные параметры',
-      extrasFiles: (count: number) =>
-        plural(count, { one: `${count} вложение`, few: `${count} вложения`, many: `${count} вложений`, other: `${count} вложения` }),
-      undoAdded: (name: string) => `Добавлено «${name}»`,
-      undoRemoved: (name: string) => `Удалено «${name}»`,
-      undoPicked: (name: string) => `Выбрано «${name}»`,
-      undoUnpicked: (name: string) => `Снят выбор «${name}»`,
-      undoDirection: 'Направление изменено',
-    },
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'Готовность и показатели организма',
@@ -2152,30 +2094,9 @@ export default {
       summary: (bytes: string) => `Покрытие данных (размер пакета ≈ ${bytes})`,
     },
 
-    'components/ai/DirectionPanel': {
-      title: 'Направление и вопрос',
-      directionLabel: 'Направление анализа (шаблон)',
-      directionHint:
-        'Выбор направления подбирает рекомендуемый набор данных на графе (действие можно отменить).',
-      noDirection: 'Без направления',
-      questionLabel: 'Ваш вопрос',
-      questionPlaceholder:
-        'На чём сосредоточиться? Например: была ли интенсивность восстановительной пробежки достаточной?',
-      noteLabel: 'Личный контекст (необязательно)',
-      notePlaceholder: 'Травмы, цели, самочувствие… попадут в экспорт для ИИ.',
-      hint: 'Направление задаёт рамки, вопрос — конкретный фокус; оба передаются ИИ',
-      counter: (used: number, max: number) => `${used}/${max}`,
-      examplesLabel: 'Примеры вопросов',
-      example1: 'Как изменилось качество моего сна за последнее время?',
-      example2: 'Подходит ли мне тренировочная нагрузка за эту неделю?',
-      example3: 'Моя готовность улучшается или снижается?',
-      groupDaily: 'Повседневное',
-      groupRun: 'Бег',
-      groupOther: 'Другое',
-    },
 
 
-    'components/ai/HandoffPanel': {
+    'components/ai/HandoffDock': {
       title: 'Передать ИИ',
       who: 'Кому передать',
       finalPrompt: "Итоговый запрос (в начале файла)",
@@ -2246,7 +2167,7 @@ export default {
       retry: 'Повторить',
     },
 
-    'components/ai/TaskExtras': {
+    'components/ai/HandoffTray': {
       advanced: 'Дополнительные параметры',
       detail: 'Уровень детализации',
       detailSummary: 'Краткий',

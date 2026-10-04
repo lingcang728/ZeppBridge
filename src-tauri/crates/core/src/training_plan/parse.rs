@@ -5,6 +5,42 @@
 
 use super::{StepLength, Target};
 
+pub fn parse_bedtime(text: &str) -> Option<u16> {
+    if text.len() != 5
+        || text.as_bytes()[2] != b':'
+        || !text
+            .as_bytes()
+            .iter()
+            .enumerate()
+            .all(|(i, b)| i == 2 || b.is_ascii_digit())
+    {
+        return None;
+    }
+    let (h, m) = text.split_once(':')?;
+    let h: u16 = h.parse().ok()?;
+    let m: u16 = m.parse().ok()?;
+    (h < 24 && m < 60).then_some(h * 60 + m)
+}
+
+pub fn parse_sleep_target(text: &str) -> Option<u32> {
+    let text = text.trim();
+    let seconds =
+        if let Some((hours, minutes)) = text.split_once('h').filter(|(_, m)| !m.is_empty()) {
+            let h: u32 = hours.parse().ok()?;
+            let m: u32 = minutes.strip_suffix('m')?.parse().ok()?;
+            if m >= 60 {
+                return None;
+            }
+            h.checked_mul(3600)?.checked_add(m.checked_mul(60)?)?
+        } else {
+            match parse_duration(text)? {
+                StepLength::Time { seconds } => seconds,
+                _ => return None,
+            }
+        };
+    (seconds > 0 && seconds <= 24 * 3600).then_some(seconds)
+}
+
 /// 时长：`<数字><单位>`，中间可以有空格。
 ///
 /// 时间单位 `s` / `sec` / `秒`、`min` / `分钟`、`h` / `小时`；距离单位 `m` / `米`、

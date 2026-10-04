@@ -16,6 +16,9 @@ import { backDestination, historyBackPath, navigationBranch } from '../../lib/na
 import { shownLocale } from '../../lib/motion/localeTarget';
 import type { Locale } from '../../i18n';
 import type { ThemeMode } from '../../composables/useTheme';
+import { backend } from '../../lib/bridge';
+import { useBridgeText } from '../ai/bridge/bridge.i18n';
+const demoLibrary = ref(false), bridgeText = useBridgeText();
 
 const messages = defineMessages(
   {
@@ -202,6 +205,7 @@ const needsConnection = computed(() => !!appStatus.value && !canIncrementalSync.
 
 /* 胶囊里只放一行短文字：同步中给进度，未连接给「连接账号」，失败给结果，空闲给上次同步时间。 */
 const syncText = computed(() => {
+  if (demoLibrary.value) return bridgeText.value.fullDemo;
   if (isSyncing.value) {
     return syncProgress.value
       ? t.value.syncingProgress(syncProgress.value.current, syncProgress.value.total)
@@ -367,6 +371,7 @@ const scheduleFit = () => {
   fitFrame = requestAnimationFrame(() => { void refit(); });
 };
 onMounted(() => {
+  void backend.getUserPrefs().then(prefs => { demoLibrary.value = !!prefs.demo_mode; }).catch(() => undefined);
   window.addEventListener('keydown', onEscapeBack);
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
@@ -435,7 +440,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
         ref="syncPill"
         :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
-        :disabled="!readyToHand && !isSyncing && !canIncrementalSync && !needsConnection"
+        :disabled="demoLibrary || (!readyToHand && !isSyncing && !canIncrementalSync && !needsConnection)"
         :title="syncTitle"
         :aria-label="syncTitle"
         @click="onSyncClick"

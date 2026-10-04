@@ -10,6 +10,7 @@ import type { PlanDayChange, PlanDayPreview, PlanDraftPreview, PlanIssue, PlanWo
 export const WINDOW_DAYS = 7;
 
 export interface DayRow {
+  rest?: import("../../types/trainingPlan").PlanRestDay | null;
   date: string;
   change: PlanDayChange;
   before: PlanWorkout[];
@@ -32,6 +33,7 @@ export const dayRows = (preview: PlanDraftPreview, today: string): DayRow[] => {
   const end = windowEnd(preview.window.start);
   return preview.days.map((day: PlanDayPreview) => ({
     date: day.date,
+    rest: day.rest,
     change: day.change,
     before: day.before,
     after: day.after,

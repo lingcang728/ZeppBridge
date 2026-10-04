@@ -18,6 +18,7 @@ import type {
   PlanPublishResult,
   PlanPublishRecord,
   TrainingPlanState,
+  PlanDocument,
 } from '../types/trainingPlan';
 
 /** 一次操作的结局，界面据此换成对应语言的一句话。 */
@@ -31,6 +32,7 @@ export type PlanNotice =
   | { kind: 'cleared' }
   | { kind: 'invalid' }
   | { kind: 'paste_failed'; failure: ExtractFailure }
+  | { kind: 'clipboard_not_a_plan' }
   | { kind: 'error'; text: string };
 
 const state = ref<TrainingPlanState | null>(null);
@@ -40,6 +42,11 @@ const busy = ref(false);
 const notice = ref<PlanNotice | null>(null);
 /** 「清空」要先问一遍：后端说需要确认时置真，界面弹确认，确认后带 confirm 再发。 */
 const clearPending = ref(false);
+let pendingAction: PlanPublishAction | null = null;
+const document = ref<PlanDocument | null>(null);
+const transcript = ref<{ lines: string[]; total: number } | null>(null);
+const accepted = ref(true);
+const revision = ref(0);
 
 let loadSeq = 0;
 
@@ -68,6 +75,8 @@ const resume = async () => {
   if (!open) return;
   try {
     await loadPreview(open.id);
+    document.value = open.document;
+    accepted.value = open.origin !== 'mcp';
   } catch {
     // 草稿读不出来就当没有。
   }
@@ -86,8 +95,11 @@ const paste = async (reply: string): Promise<boolean> => {
   busy.value = true;
   try {
     const id = await backend.trainingPlanSaveDraft(found.document, true);
+    document.value = found.document;
+    accepted.value = true;
     await loadPreview(id);
     await load();
+    revision.value++;
     return true;
   } catch (error) {
     notice.value = report(error);
@@ -97,6 +109,34 @@ const paste = async (reply: string): Promise<boolean> => {
   }
 };
 
+const receiveFromClipboard = async (): Promise<boolean> => {
+  if (busy.value) return false;
+  busy.value = true;
+  notice.value = null;
+  try {
+    const reply = await backend.readClipboardText();
+    if (!extractPlan(reply).ok) { notice.value = { kind: 'clipboard_not_a_plan' }; return false; }
+    const lines = reply.split(/\r?\n/);
+    transcript.value = { lines: lines.filter(line => line.trim()).slice(0, 5), total: lines.length };
+    const ok = await paste(reply);
+    if (!ok) transcript.value = null;
+    return ok;
+  } catch (error) { notice.value = report(error); return false; }
+  finally { busy.value = false; }
+};
+
+const reshape = async (next: PlanDocument) => {
+  if (busy.value || !draftId.value || !accepted.value) return;
+  busy.value = true;
+  try {
+    if (!(await backend.trainingPlanUpdateDraft(draftId.value, next))) throw new Error('');
+    document.value = next;
+    await loadPreview(draftId.value);
+    await load(); revision.value++;
+  } catch (error) { notice.value = report(error); }
+  finally { busy.value = false; }
+};
+
 const discard = async () => {
   const id = draftId.value;
   if (!id) return;
@@ -104,9 +144,11 @@ const discard = async () => {
   try {
     await backend.trainingPlanDiscard(id);
     draftId.value = null;
+    document.value = null;
     preview.value = null;
     notice.value = null;
     await load();
+    revision.value++;
   } catch (error) {
     notice.value = report(error);
   } finally {
@@ -149,6 +191,7 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
         notice.value = { kind: 'nothing_to_undo' };
         break;
       case 'needs_clear_confirmation':
+        pendingAction = action;
         clearPending.value = true;
         break;
       case 'invalid':
@@ -161,10 +204,12 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
   } finally {
     busy.value = false;
     await load();
+    revision.value++;
   }
 };
 
 const publish = () => {
+  if (busy.value || !accepted.value || preview.value?.check.issues.length) return Promise.resolve();
   const id = draftId.value;
   if (id) return run({ kind: 'draft', id }, false);
   return Promise.resolve();
@@ -173,13 +218,16 @@ const undo = () => run({ kind: 'undo' }, false);
 const clear = (confirmed = false) => run({ kind: 'clear' }, confirmed);
 
 const dismissNotice = () => { notice.value = null; };
-const cancelClear = () => { clearPending.value = false; };
+const cancelClear = () => { clearPending.value = false; pendingAction = null; };
+const confirmClear = () => { const action = pendingAction; pendingAction = null; return action ? run(action,true) : Promise.resolve(); };
 
-/** 有挡住发送的错误（`error`）就不能发；`unverified` 只是提醒，可以发。 */
+/** Errors and unverified shapes both block delivery; the backend enforces the same gate. */
 const blocking = computed(() => preview.value?.check.issues.filter((issue) => issue.severity === 'error') ?? []);
 const unverified = computed(() => preview.value?.check.issues.filter((issue) => issue.severity === 'unverified') ?? []);
 
 export const useTrainingPlan = () => ({
   state, draftId, preview, busy, notice, clearPending, blocking, unverified,
-  load, resume, paste, discard, publish, undo, clear, dismissNotice, cancelClear,
+  document, transcript, accepted, revision, receiveFromClipboard, reshape,
+  accept: () => { accepted.value = true; },
+  load, resume, paste, discard, publish, undo, clear, dismissNotice, cancelClear, confirmClear,
 });

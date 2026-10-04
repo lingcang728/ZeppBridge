@@ -12,8 +12,6 @@
 
 # Shared punctuation in translated lists and sentences
 components/MissingMetricsRow.separator
-components/ai/AiAskStart.separator
-components/ai/AiAskStart.end
 
 # pt-BR
 components/HeartRateZonePicker.basesSeparator
@@ -108,7 +106,6 @@ lib/units.short
 lib/units.shortImperial
 views/ActivityDetail.caloriesUnit
 views/ActivityDetail.distanceUnit
-views/AiComposer.detailStandard
 views/AiHandoffPreview.promptTitle
 views/BodyStatus.bmiLabel
 views/BodyStatus.stressLabel
@@ -137,7 +134,7 @@ views/TrainingStatus.paiLabel
 views/WorkoutDetail.eyebrowExport
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.unitKcal
-components/ai/TaskExtras.detailStandard
+components/ai/HandoffTray.detailStandard
 lib/aiTask/metrics.bmi
 lib/aiTask/metrics.hrv
 lib/aiTask/metrics.hrv_rmssd
@@ -163,8 +160,6 @@ components/orbit/OrbitCanvas.stateCandidate
 views/ActivityDetail.distanceLabel
 views/WorkoutList.labelDistance
 views/SleepDetail.sourceTitle
-views/AiComposer.optionsTitle
-views/AiComposer.detailStandard
 views/AiHandoffPreview.colSources
 views/HealthCheck.factSources
 views/OrbitLab.categories.personal_note

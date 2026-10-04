@@ -9,10 +9,12 @@ import { computed } from 'vue';
 import { formatWhen } from '../../lib/format';
 import type { TrainingPlanState } from '../../types/trainingPlan';
 import { usePlanText } from './usePlanText';
+import { useBridgeText } from '../ai/bridge/bridge.i18n';
 
-const props = defineProps<{ state: TrainingPlanState; busy: boolean }>();
+const props = defineProps<{ state: TrainingPlanState; busy: boolean; simulated?: boolean }>();
 const emit = defineEmits<{ undo: []; clear: [] }>();
 const { t } = usePlanText();
+const bt = useBridgeText();
 
 const record = computed(() => props.state.last_publish);
 const sentDays = computed(() => new Set(props.state.sent.map((workout) => workout.date)).size);
@@ -26,10 +28,10 @@ const empty = computed(() => !record.value && props.state.sent.length === 0);
 
 <template>
   <div class="ledger" :title="t.ledgerNote">
-    <span :class="['lead', { warn: !delivered && !empty }]"><i aria-hidden="true"></i>{{ t.ledgerTitle }}</span>
+    <span :class="['lead', { warn: !delivered && !empty }]"><i aria-hidden="true"></i>{{ simulated ? bt.demoLedger : t.ledgerTitle }}</span>
     <template v-if="!empty">
-      <span v-if="when" class="when">{{ t.ledgerWhen(when) }}</span>
-      <span class="state">{{ delivered ? t.ledgerDelivered : t.ledgerUncertain }}</span>
+      <span v-if="when" class="when">{{ simulated ? when : t.ledgerWhen(when) }}</span>
+      <span class="state">{{ record?.state === 'rejected' ? t.noticeRejected : delivered ? t.ledgerDelivered : t.ledgerUncertain }}</span>
       <span class="days">{{ t.ledgerDays(sentDays) }}</span>
     </template>
     <span v-else class="when">{{ t.ledgerNone }}</span>

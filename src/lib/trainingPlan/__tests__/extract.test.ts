@@ -62,3 +62,12 @@ describe('extractPlan', () => {
     expect(result.ok && result.document.workouts).toEqual([]);
   });
 });
+
+
+it('prefers the final plan/2 block over an earlier draft, while keeping source provenance', () => {
+ const final = { ...PLAN, format: 'zeppbridge-plan/2', summary: 'Final agreement' };
+ const reply = '```json\n'+json+'\n```\nFinal\n```json\n'+JSON.stringify(final)+'\n```';
+ expect(extractPlan(reply)).toEqual({ok:true,document:final,source:'fence'});
+ expect(extractPlan(JSON.stringify(final))).toEqual({ok:true,document:final,source:'whole'});
+ expect(extractPlan('Final: '+JSON.stringify(final))).toEqual({ok:true,document:final,source:'braces'});
+});

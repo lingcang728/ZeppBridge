@@ -45,7 +45,7 @@ describe('recentWindowDays', () => {
 
   it('取启用窗口类别里最长的回溯；禁用类别与无窗口类别不算', () => {
     let task = newTaskDraft();
-    task = setRange(task, 'sleep', { days_before: 30 });
+    task = setRange(task, 'sleep', { days_before: 29 });
     // 禁用的窗口类别不参与取 max。
     task = setRange(task, 'heart_rate', { enabled: false, days_before: 60 });
     // 内容类别没有窗口概念，启用了也不算。
@@ -88,7 +88,7 @@ describe('autoTaskTitle', () => {
     expect(autoTaskTitle(newTaskDraft(), [], null, now)).toBe(
       `最近 14 天 · ${formatDate(now.toISOString())}`,
     );
-    const task = setRange(newTaskDraft(), 'sleep', { days_before: 30 });
+    const task = setRange(newTaskDraft(), 'sleep', { days_before: 29 });
     const title = autoTaskTitle(task, [], null, now);
     expect(title.startsWith('最近 30 天')).toBe(true);
     expect(title.endsWith(`· ${formatDate(now.toISOString())}`)).toBe(true);

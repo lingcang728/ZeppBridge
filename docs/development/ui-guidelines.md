@@ -298,59 +298,15 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 2. Hand to AI (`/ai`)
 
-The core page of the app. One analysis task per screen, laid out as **one stage
-with three floating glass layers** (`views/AiComposer.vue`, pieces in
-`components/ai/`):
+The page consists of a time bridge, a composer, round-trip history and a floating glass dock.
 
-- **Stage — `TaskGraph`** fills the page (its canvas leaves room for the rail so
-  the camera centre sits in the visible area). Categories inside the dashed
-  circle go to the AI; each carries its own window (7 / 14 / 30 days).
-  Expanding a category **flies the camera down into it** (`useGraphCamera`,
-  `layout.ts#focusFrame`): the rest recede into a blurred backdrop, a glass
-  breadcrumb "All categories / Sleep" (or Esc) flies back. Hover focus waits
-  160ms and fades — instant full-graph dimming strobed when the pointer swept
-  across dense metric dots. Every node has an invisible hit halo; the drag
-  threshold is 9px. Undo and camera controls float as glass capsules.
-  Categories with many metrics (recovery has 20+) lay them out on **concentric
-  arcs** (`layout.ts#metricSlot`): each ring holds as many as its arc length
-  allows at one label width, inner rings fill first; drop-to-exclude follows
-  each metric's own ring.
-- **Node popover** measures its own height and stays inside the visible part
-  of the canvas: the page tells the graph which edges are covered through
-  `--graph-safe-top/-bottom` (task capsule above; the dock and the undo /
-  zoom row below). It flips above the node when needed and scrolls when even
-  that is not enough. Controls are a switch and a `SegmentTrack` for days.
-- **Camera dock** reads "⛶ 100%": the current zoom; clicking fits the graph
-  (or the focused category) and bounces when already there. **Undo** shows
-  what the last step did for five seconds ("Removed “Sleep” · Undo") from
-  `useAiTaskDraft.lastChange`.
-- **Top left — `AiTaskHeader`**: one glass capsule with the editable title,
-  a folder button with the saved-task count (opens a glass list; the current
-  task is ticked — the title is never repeated in a dropdown next to itself),
-  new and save (lit when there are unsaved changes).
-- **Right — `AiStepRail`**: ① what to analyse (`WorkoutPicker`, a day-grouped
-  timeline of workout capsules with "show 6 more" instead of pages) ② what to ask
-  (`DirectionPanel`) ③ attachments and options (`TaskExtras`), one open at a
-  time; collapsed steps show a one-line summary so the whole task fits one
-  screen without scrolling.
-- **Bottom — `HandoffPanel` dock**: the page's only primary button ("Hand to
-  ChatGPT"), the provider `CapsuleWheel` (`AI_PROVIDERS` allow-list only), and
-  a readiness chip (categories · % of days covered · ≈ tokens and whether a
-  free plan can read it · curve averaging · notes) that opens an "I pay for X"
-  switch (remembered per provider; raises the budget to ~120k tokens), the
-  final prompt, de-duplicated notes and `CoverageDetails`.
-  Preview errors stay visible above the dock. While an awaited sync is still
-  running the chip says the latest data is on its way; the page reloads its
-  workouts and preview on `dataRevision`.
-- `ai_task_prepare` builds the redacted package as **one `.md` file**: prompt,
-  a localized "how to read" note, then the data as CSV tables rendered from the
-  same task document (`ai_tasks/export/markdown.rs`). Over budget it averages
-  workout curves over 10 → 30 → 60 s, then keeps only summary rows for the
-  oldest workouts. The dock then shows a file card the user drags straight into
-  the AI chat (`tauri-plugin-drag`), with "Show it in Explorer" as a fallback;
-  only a one-line opening message goes to the clipboard. Precise GPS stays out
-  unless the user opts in. Previews are asynchronous; while computing they show `…`,
-  never `0`.
+- Six past rows show sleep, recovery, heart rate, workouts, load and body data. Dots toggle inclusion; workout columns allow multiple selections. Missing dates stay gaps. The handle snaps to 7 / 14 / 30 / 90 days, with three days per column at 90. Drag previews use cached readings; queries refresh on release.
+- The future receives an agreed final plan only after an explicit clipboard button press. Web preview provides a paste tray. Intensity profiles and local rest/sleep advice share calendar cells, with a seven-day delivery window.
+- Drag swaps whole days including rest advice. Left/right keys move days and Delete removes a day; edits are revalidated by the backend. Delivery requires a 600ms hold, cancelled on early release, blur or pointer cancellation. Unverified shapes cannot be sent.
+- Four intent pills set the question and range. A persistent local profile pre-fills new tasks. Round trips restore historical scope and plans read only. The ledger distinguishes delivered, unconfirmed, rejected and undone outcomes.
+- The dock contains provider, subscription, readiness, primary action, prepared file and More. More retains attachments, precise location, detail, MCP, prompt editing, coverage and export-only actions.
+- Plan vs actual matches local date and compatible sport only. Legacy formats remain readable; optional summary/rest in `zeppbridge-plan/2` never enter the watch V2 body.
+- Narrow layouts scroll horizontally and initially center Today; reduced motion disables decorative sequences. Isolated demo libraries label every record as synthetic and simulate delivery locally without watch requests.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 

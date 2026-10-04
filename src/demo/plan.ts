@@ -9,6 +9,7 @@ import { demoText } from './texts';
 import type {
   PlanDayPreview, PlanDraftPreview, PlanPublishAction, PlanPublishRecord, PlanPublishResult,
   PlanStepNode, PlanWorkout, TrainingPlanState,
+  PlanDocument,
 } from '../types/trainingPlan';
 
 const hr = (low: number, high: number) => ({ type: 'heart_rate' as const, low, high });
@@ -36,6 +37,7 @@ export interface DemoPlan {
   preview(): PlanDraftPreview;
   saveDraft(): string;
   discard(): boolean;
+  updateDraft(document: PlanDocument): boolean;
   publish(action: PlanPublishAction, confirmClear: boolean): PlanPublishResult;
 }
 
@@ -65,6 +67,11 @@ export const createDemoPlan = (now: Date): DemoPlan => {
   };
   let draftOpen = true;
   let canUndo = true;
+  let edited: PlanDocument | null = null;
+  const applyEdits = (b: ReturnType<typeof build>) => edited ? edited.workouts.flatMap(input => {
+    const original = b.proposed.find(w => w.name === input.name);
+    return original ? [{ ...original, date: input.date }] : [];
+  }) : b.proposed;
   const initialSent = (b: ReturnType<typeof build>): PlanWorkout[] => [b.easy1, b.oldIntervals3, b.oldEasy4];
 
   const days = (b: ReturnType<typeof build>): PlanDayPreview[] => [
@@ -91,7 +98,7 @@ export const createDemoPlan = (now: Date): DemoPlan => {
         ai_may_publish: false,
         drafts: draftOpen ? [{
           id: 'demo-draft', origin: 'ai_paste', status: 'open', created_at: iso(now), updated_at: iso(now),
-          document: { from: day(1), to: day(7), workouts: b.proposed.map((item) => ({ date: item.date, sport: item.sport, name: item.name, steps: [] })) },
+          document: edited ?? { from: day(1), to: day(7), workouts: b.proposed.map((item) => ({ date: item.date, sport: item.sport, name: item.name, steps: [] })) },
         }] : [],
       };
     },
@@ -99,15 +106,16 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       const b = build();
       return {
         check: {
-          from: day(1), to: day(7), workouts: b.proposed,
+          from: day(1), to: day(7), workouts: applyEdits(b),
           issues: [{ severity: 'unverified', workout: 4, step: '2', message: '', message_code: 'ui.training_plan.issue.distance_unverified', params: {} }],
         },
         window: { start: day(0) },
-        days: days(b),
+        days: edited ? days(b).map(d => ({ ...d, after: applyEdits(b).filter(w => w.date === d.date) })) : days(b),
       };
     },
     saveDraft: () => { draftOpen = true; return 'demo-draft'; },
     discard: () => { draftOpen = false; return true; },
+    updateDraft: (document) => { edited = JSON.parse(JSON.stringify(document)); return true; },
     publish: (action) => {
       const b = build();
       if (action.kind === 'undo') {

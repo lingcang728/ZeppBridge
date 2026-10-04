@@ -195,6 +195,59 @@ impl Database {
         document.insert("context".into(), Value::Array(context));
 
         document.insert("coverage".into(), serde_json::to_value(coverage)?);
+        if task
+            .categories
+            .iter()
+            .any(|r| r.category == AiTaskCategory::Body && r.enabled)
+        {
+            let windows: Vec<_> = coverage
+                .iter()
+                .filter(|r| r.category == AiTaskCategory::Body)
+                .collect();
+            let food: Vec<_> = self
+                .food_entries(1825)?
+                .into_iter()
+                .filter(|e| {
+                    windows
+                        .iter()
+                        .any(|w| e.date >= w.start_date && e.date <= w.end_date)
+                })
+                .collect();
+            if !food.is_empty() {
+                document.insert("food".into(), serde_json::to_value(food)?);
+            }
+        }
+        if task
+            .categories
+            .iter()
+            .any(|r| r.category == AiTaskCategory::Workout && r.enabled)
+        {
+            let mut comparisons = BTreeMap::new();
+            for window in coverage
+                .iter()
+                .filter(|r| r.category == AiTaskCategory::Workout)
+            {
+                let from = NaiveDate::parse_from_str(&window.start_date, "%Y-%m-%d");
+                let to = NaiveDate::parse_from_str(&window.end_date, "%Y-%m-%d");
+                if let (Ok(from), Ok(to)) = (from, to) {
+                    let rows = self.plan_adherence(from, to)?;
+                    if rows.iter().any(|r| r.planned.is_some()) {
+                        for row in rows.into_iter().filter(|r| r.verdict != "none") {
+                            comparisons.insert(row.date.clone(), row);
+                        }
+                    }
+                }
+            }
+            if !comparisons.is_empty() {
+                document.insert(
+                    "plan_adherence".into(),
+                    serde_json::to_value(comparisons.into_values().collect::<Vec<_>>())?,
+                );
+            }
+        }
+        if self.is_demo_library()? {
+            document.insert("simulated_data".into(), json!(true));
+        }
 
         // 附件只列出仓形态（display_name/kind/byte_len）。
         let public_refs: Vec<AiTaskAttachmentPublicRef> = task

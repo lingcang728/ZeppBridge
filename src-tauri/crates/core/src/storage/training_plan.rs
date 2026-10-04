@@ -214,11 +214,19 @@ impl Database {
     pub fn save_plan_draft(&self, origin: DraftOrigin, document: &PlanDocument) -> Result<String> {
         let id = format!("plan-{}", random_hex(8));
         let now = Utc::now().to_rfc3339();
-        self.conn.execute(
+        let transaction = self.conn.unchecked_transaction()?;
+        transaction.execute(
             "INSERT INTO training_plan_drafts(id, origin, document, status, created_at, updated_at)
              VALUES(?1, ?2, ?3, 'open', ?4, ?4)",
             params![id, origin.as_str(), serde_json::to_string(document)?, now],
         )?;
+        if origin == DraftOrigin::AiPaste {
+            self.link_ai_exchange(&id)?;
+        }
+        if origin == DraftOrigin::Mcp {
+            self.record_mcp_exchange(&id, document)?;
+        }
+        transaction.commit()?;
         Ok(id)
     }
 
@@ -452,6 +460,9 @@ impl Database {
                     .filter(|d| d.date <= last),
             );
             start = chunk.end() + chrono::Duration::days(1);
+        }
+        for day in &mut days {
+            day.rest = check.rest.iter().find(|r| r.date == day.date).cloned();
         }
         Ok(DraftPreview {
             check,
@@ -732,6 +743,7 @@ impl Database {
                 )?;
             }
         }
+        self.exchange_publish(publish_id)?;
         transaction.commit()?;
         Ok(())
     }

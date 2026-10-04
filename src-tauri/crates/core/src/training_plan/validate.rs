@@ -49,6 +49,8 @@ pub struct PlanIssue {
 /// 校验结果。`workouts` 只含整条都读懂了的训练；有任何问题就不能发。
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlanCheck {
+    pub summary: Option<String>,
+    pub rest: Vec<super::RestDay>,
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
     pub workouts: Vec<Workout>,
@@ -189,7 +191,53 @@ pub fn check_plan(document: &PlanDocument, context: PlanContext) -> PlanCheck {
     let workouts: Vec<Workout> = workouts.into_iter().map(|(_, workout)| workout).collect();
     let from = from.or_else(|| workouts.iter().map(|w| w.date).min());
     let to = to.or_else(|| workouts.iter().map(|w| w.date).max());
+    let mut rest = Vec::new();
+    let mut seen_rest = std::collections::BTreeSet::new();
+    for item in &document.rest {
+        let date = NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").ok();
+        let bedtime = item.bedtime.as_deref().map(super::parse::parse_bedtime);
+        let sleep = item
+            .sleep_target
+            .as_deref()
+            .map(super::parse::parse_sleep_target);
+        if date.is_none()
+            || bedtime == Some(None)
+            || sleep == Some(None)
+            || !seen_rest.insert(item.date.clone())
+        {
+            issues.push(
+                Severity::Error,
+                None,
+                None,
+                "err.training_plan.rest_unparsable",
+                "休息日的日期、就寝时间或睡眠目标无法解析",
+                json!({ "date": item.date }),
+            );
+            continue;
+        }
+        let date = date.unwrap();
+        if from.is_none_or(|from| date < from) || to.is_none_or(|to| date > to) {
+            issues.push(
+                Severity::Error,
+                None,
+                None,
+                "err.training_plan.rest_outside_range",
+                "休息日不在计划范围内",
+                json!({ "date": item.date }),
+            );
+            continue;
+        }
+        check_day(date, context.today, last_day, None, &mut issues);
+        rest.push(super::RestDay {
+            date,
+            bedtime_minutes: bedtime.flatten(),
+            sleep_target_seconds: sleep.flatten(),
+            note: item.note.clone(),
+        });
+    }
     PlanCheck {
+        summary: document.summary.clone(),
+        rest,
         from,
         to,
         workouts,

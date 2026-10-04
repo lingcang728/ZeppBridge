@@ -1,7 +1,12 @@
 /* 训练计划（发到 Zepp App 与手表）。形状与 core `training_plan` / `storage::training_plan` 一致。 */
 
 /** 书写格式：人和 AI 写的那一份。时长写 `20min` / `90s` / `5km`，目标写 `hr 135-150`。 */
+export interface PlanRestInput { date: string; bedtime?: string; sleepTarget?: string; note?: string }
+export interface PlanRestDay { date: string; bedtime_minutes: number | null; sleep_target_seconds: number | null; note: string | null }
 export interface PlanDocument {
+  format?: string;
+  summary?: string;
+  rest?: PlanRestInput[];
   from?: string;
   to?: string;
   workouts: PlanWorkoutInput[];
@@ -61,6 +66,8 @@ export interface PlanIssue {
 }
 
 export interface PlanCheck {
+  summary?: string | null;
+  rest?: PlanRestDay[];
   from: string | null;
   to: string | null;
   workouts: PlanWorkout[];
@@ -70,6 +77,7 @@ export interface PlanCheck {
 export type PlanDayChange = 'rest' | 'unchanged' | 'added' | 'replaced' | 'removed';
 
 export interface PlanDayPreview {
+  rest?: PlanRestDay | null;
   date: string;
   change: PlanDayChange;
   before: PlanWorkout[];

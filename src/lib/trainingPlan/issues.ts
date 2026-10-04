@@ -9,6 +9,7 @@
  * 的手表上核实过 Zepp 会怎么显示」，可以发，界面如实标出来。
  */
 import { backendText } from '../../i18n/backendText';
+import { errorTextFor } from '../../i18n/errors';
 import { defineMessages, messagesOf } from '../../i18n';
 import { displayDateTimeFormatter, parseDisplayDate } from '../dateTime';
 import type { PlanIssue } from '../../types/trainingPlan';
@@ -124,6 +125,8 @@ export const planIssueText = (issue: PlanIssue): string => {
   const table = copy();
   const render = table[issue.message_code];
   if (typeof render === 'function') return render(issue.params ?? {});
+  const error = errorTextFor(issue.message_code);
+  if (error) return error;
   const { message: backendFallback } = issue;
   return backendText(backendFallback, table.fallback({}));
 };

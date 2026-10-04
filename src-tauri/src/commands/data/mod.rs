@@ -371,6 +371,8 @@ pub async fn set_user_prefs(
                 .unwrap_or(false),
         };
         db.set_user_prefs(&UserPrefs {
+            demo_mode: db.is_demo_library()?,
+            ai_profile_note: db.ai_profile_note()?,
             retention_days,
             history_sync_days,
             archive_enabled,

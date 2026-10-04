@@ -19,33 +19,6 @@ export default {
       label: "दिन-वार रुझान",
       aria: "दिन-वार रुझान की समय अवधि",
     },
-    'components/ai/AiAskStart': {
-      title: "आप क्या जानना चाहते हैं?",
-      sleepTitle: "मेरी हाल की नींद देखें",
-      sleepSub: "क्या मैं पर्याप्त और नियमित सो रहा हूँ, और इसका रिकवरी से क्या संबंध है",
-      weekTitle: "इस हफ़्ते के बदलाव देखें",
-      weekSub: "इस हफ़्ते मेरी सामान्य स्थिति से क्या बदला",
-      workoutTitle: "एक वर्कआउट का विश्लेषण करें",
-      workoutSub: "पहले एक वर्कआउट चुनें, फिर गति, हार्ट रेट और रिकवरी देखें",
-      freeTitle: "अपना सवाल पूछें",
-      freeSub: "अपना सवाल लिखें; डेटा वही होगा जो ग्राफ़ में चुना गया है",
-      dataTitle: "जो डेटा साझा होगा",
-      plain: (range: string, categories: string) => `${range} के लिए ${categories}`,
-      plainWorkouts: (count: number) => plural(count, { one: `, खास फोकस आपका चुना हुआ ${count} वर्कआउट है`, other: `, खास फोकस आपके चुने हुए ${count} वर्कआउट हैं` }),
-      plainNoGps: "; सटीक लोकेशन शामिल नहीं है",
-      plainGps: "; सटीक लोकेशन शामिल है",
-      plainAttachments: (count: number) => plural(count, { one: `; साथ में ${count} फ़ाइल भी`, other: `; साथ में ${count} फ़ाइलें भी` }),
-      plainNothing: "अभी कोई डेटा नहीं चुना है।",
-      emptyRange: "इस अवधि में विश्लेषण के लिए कोई रिकॉर्ड नहीं है।",
-      widen: "पिछले 30 दिन चुनें",
-      rangeUnknown: "हाल की अवधि",
-      haveDays: (have: number, total: number) => `${total} दिनों में ${have} दिन डेटा है`,
-      noneInRange: "इस अवधि में कोई रिकॉर्ड नहीं",
-      notPicked: "शामिल नहीं",
-      counting: "गिनती हो रही है…",
-      separator: ", ",
-      end: "।",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "इसे पढ़ने का तरीका:",
@@ -81,18 +54,6 @@ export default {
     'components/OfficialOnlyNote': {
       text: 'सिर्फ़ Zepp आधिकारिक अनुमति जुड़ी है: हार्ट रेट, नींद, कदम, वर्कआउट, PAI और वज़न सिंक होते हैं। HRV, ब्लड ऑक्सीजन, स्ट्रेस, तैयारी और ट्रेनिंग लोड आधिकारिक API में नहीं हैं — "उन्नत डेटा" जोड़ें।',
       action: 'जोड़ें',
-    },
-    'components/ai/WorkoutPicker': {
-      title: 'वर्कआउट चुनें',
-      hint: 'एक या अधिक चुनें, या छोड़ दें',
-      noneSelected: (days: number) => `कोई वर्कआउट नहीं चुना: पिछले ${days} दिन का विश्लेषण होगा।`,
-      selectedCount: (count: number) =>
-        plural(count, { one: `${count} चुना गया`, other: `${count} चुने गए` }),
-      empty: 'यहाँ अभी कोई वर्कआउट नहीं है',
-      remove: 'हटाएँ',
-      avgHr: (bpm: number) => `औसत HR ${bpm}`,
-      showMore: (count: number) => `${count} और`,
-      showLess: 'कम दिखाएँ',
     },
 
     'views/Settings': {
@@ -1324,17 +1285,6 @@ export default {
       title: 'दैनिक एक्टिविटी',
     },
 
-    'views/AiComposer': {
-      andMore: (count: number) => `और ${count - 1} अन्य`,
-      targetRecent: (days: number) => `कोई वर्कआउट नहीं चुना · पिछले ${days} दिन`,
-      extrasNone: 'कोई अटैचमेंट नहीं · डिफ़ॉल्ट',
-      extrasFiles: (count: number) => (count === 1 ? '1 अटैचमेंट' : `${count} अटैचमेंट`),
-      undoAdded: (name: string) => `"${name}" जोड़ा गया`,
-      undoRemoved: (name: string) => `"${name}" हटाया गया`,
-      undoPicked: (name: string) => `"${name}" चुना गया`,
-      undoUnpicked: (name: string) => `"${name}" का चुनाव हटाया`,
-      undoDirection: 'दिशा बदली गई',
-    },
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'तैयारी और शारीरिक संकेत',
@@ -1964,28 +1914,9 @@ Markdown में उत्तर दें।`,
       days: (have: number, total: number) => `${have}/${total} दिन`,
     },
 
-    'components/ai/DirectionPanel': {
-      title: 'दिशा और सवाल',
-      hint: 'दिशा संदर्भ तय करती है, सवाल फ़ोकस — दोनों AI को भेजे जाते हैं',
-      directionLabel: 'विश्लेषण दिशा (टेम्पलेट)',
-      noDirection: 'कोई नहीं',
-      directionHint: 'दिशा चुनने पर सुझाई गई रेंज अपने आप लागू होती है; बदलाव ग्राफ़ में दिखता है, अनडू किया जा सकता है।',
-      questionLabel: 'आपका सवाल',
-      questionPlaceholder: 'किस बिंदु पर फ़ोकस करना है? जैसे: क्या मेरा पेस रिकवरी के अनुकूल था?',
-      counter: (used: number, max: number) => `${used}/${max}`,
-      noteLabel: 'निजी संदर्भ (वैकल्पिक)',
-      notePlaceholder: 'चोट, लक्ष्य, हाल की स्थिति… एक्सपोर्ट में शामिल होंगे, AI के लिए',
-      examplesLabel: 'उदाहरण सवाल',
-      example1: 'हालिया नींद कैसी रही, और क्या सुधार करें?',
-      example2: 'क्या इस हफ़्ते का लोड मेरे लिए ठीक था?',
-      example3: 'मेरी रिकवरी सुधर रही है या गिर रही है?',
-      groupDaily: 'रोज़मर्रा',
-      groupRun: 'दौड़',
-      groupOther: 'और',
-    },
 
 
-    'components/ai/HandoffPanel': {
+    'components/ai/HandoffDock': {
       title: 'AI को भेजें',
       who: 'किसे भेजें',
       finalPrompt: "अंतिम प्रॉम्प्ट (फ़ाइल की शुरुआत में लिखा है)",
@@ -2048,7 +1979,7 @@ Markdown में उत्तर दें।`,
       retry: 'फिर कोशिश करें',
     },
 
-    'components/ai/TaskExtras': {
+    'components/ai/HandoffTray': {
       attachTitle: 'फ़ाइलें (PDF / इमेज)',
       add: 'फ़ाइल जोड़ें',
       pickerTitle: 'AI को देने वाली फ़ाइलें चुनें',

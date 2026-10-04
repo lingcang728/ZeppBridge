@@ -44,7 +44,7 @@ describe('newTaskDraft', () => {
     expect(byCategory.get('sleep')?.enabled).toBe(true);
     expect(byCategory.get('personal_note')?.enabled).toBe(false);
     expect(byCategory.get('attachment')?.enabled).toBe(false);
-    expect(byCategory.get('sleep')?.days_before).toBe(14);
+    expect(byCategory.get('sleep')?.days_before).toBe(13);
   });
 });
 

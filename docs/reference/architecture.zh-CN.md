@@ -206,3 +206,5 @@ file:  second_heart_rate/real_data
 | 更多数据源 | 未开始 |
 | macOS（Apple Silicon）桌面端 | 已合入（#1）；CI 有编译/测试门禁，Release 自 v0.9.2 起提供 dmg 与 updater 产物；ad-hoc 签名，无 Apple 公证 |
 | 公开发布工程（签名、更新、SBOM、干净 VM） | 部分完成：updater 产物与 `latest.json` 已用 Tauri 密钥签名并经 GitHub Release 自动更新；安装包仍无 Authenticode 证书，也没有干净 VM 验收 |
+
+时间桥使用 schema 36：新增 `ai_exchanges` 保存数据寄出、计划接回与发送账本的关联。持久个人档案在 `app_meta`；逐日走势与计划对比复用 core 只读查询，休息建议只留本地。

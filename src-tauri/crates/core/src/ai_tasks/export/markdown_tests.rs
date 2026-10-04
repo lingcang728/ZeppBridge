@@ -251,3 +251,29 @@ fn token_estimate_counts_ascii_by_three_and_cjk_one_each() {
     assert_eq!(estimate_tokens(&"a".repeat(31)), 10);
     assert_eq!(estimate_tokens("中文"), 2);
 }
+
+#[test]
+fn final_format_follows_food_and_comparison_without_filling_unknowns() {
+    let mut document = sample_document(0);
+    document["food"] = json!([{"date":"2026-10-04","food_name":"Oats","protein":null}]);
+    document["plan_adherence"] = json!([
+    {"date":"2026-10-04","planned":{"name":"Easy","sport":"running","seconds":2700,"hr_low":130,"hr_high":145},"actual":[{"workout_id":"w-1","seconds":3000,"avg_hr":140,"compatible":true}],"verdict":"done"},
+    {"date":"2026-10-05","planned":{"name":"Easy","sport":"running","seconds":2700},"actual":[],"verdict":"missed"}
+    ]);
+    let render = render_task_markdown(
+        &document,
+        "Discuss first\n<!-- zeppbridge-final-plan -->\nFinal format",
+        usize::MAX,
+    );
+    assert!(render.text.find("Discuss first").unwrap() < render.text.find("# Data").unwrap());
+    assert!(render.text.find("## food").unwrap() < render.text.find("## Plan vs actual").unwrap());
+    assert!(
+        render.text.find("## Plan vs actual").unwrap() < render.text.find("Final format").unwrap()
+    );
+    assert!(!render.text.contains("zeppbridge-final-plan"));
+    let all = tables(&render.text);
+    let comparison = table(&all, "Plan vs actual");
+    assert_eq!(comparison.2[0][5], "300");
+    assert_eq!(comparison.2[1][5], "");
+    assert_eq!(comparison.2[1][6], "");
+}

@@ -138,6 +138,7 @@ pub struct AiTaskPrepareOptions {
     /// 给了就交付成单个 `.md`（批次 ⑦）；`markdown_guide` 是前端本地化好的「这份文件怎么读」。
     token_budget: Option<usize>,
     markdown_guide: Option<String>,
+    provider: Option<String>,
 }
 
 #[tauri::command]
@@ -151,6 +152,11 @@ pub async fn ai_task_prepare(
     let output_root = directories::UserDirs::new()
         .and_then(|dirs| dirs.desktop_dir().map(|path| path.join("ZeppBridge AI")))
         .unwrap_or_else(|| state.data_dir.join("exports").join("ai-tasks"));
+    let recorded_task = task.clone();
+    let provider = options
+        .as_ref()
+        .and_then(|o| o.provider.clone())
+        .unwrap_or_else(|| "export".into());
     let plan = spawn_independent_read(state.data_dir.clone(), move |db| {
         let options = options.unwrap_or_default();
         let parts = AiTaskPromptParts {
@@ -167,8 +173,15 @@ pub async fn ai_task_prepare(
         db.ai_task_prepare_plan(&task, &coverage_note, &parts, &output_root)
     })
     .await?;
-    join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)
-        .and_then(|result| result.map_err(AppError::from))
+    let result = join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)
+        .and_then(|result| result.map_err(AppError::from))?;
+    if let Some(path) = &result.md_path {
+        with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+            db.record_ai_exchange(&recorded_task, &provider, path)
+        })
+        .await?;
+    }
+    Ok(result)
 }
 
 /// 批量 stat 用户挑的附件路径——本机核对用，`path` 在这里合法返回。
@@ -183,4 +196,38 @@ pub async fn ai_task_attachment_stat(
         ));
     }
     join_blocking(tokio::task::spawn_blocking(move || stat_attachment_paths(&paths)).await)
+}
+
+#[tauri::command]
+pub async fn ai_task_day_strip(
+    state: tauri::State<'_, AppState>,
+    days_before: i64,
+    end: Option<String>,
+) -> Result<Vec<zeppbridge_core::storage::ai_strip::DayStripRow>, AppError> {
+    let end = match end {
+        Some(date) => chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+            .map_err(|_| AppError::new("err.ai_task.invalid", "日期无效"))?,
+        None => chrono::Local::now().date_naive(),
+    };
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.ai_task_day_strip(days_before, end)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn ai_exchange_list(
+    state: tauri::State<'_, AppState>,
+    limit: usize,
+) -> Result<Vec<zeppbridge_core::storage::ai_exchanges::AiExchange>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| db.ai_exchange_list(limit)).await
+}
+#[tauri::command]
+pub async fn ai_profile_save(
+    state: tauri::State<'_, AppState>,
+    note: String,
+) -> Result<(), AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_ai_profile_note(&note)
+    })
+    .await
 }

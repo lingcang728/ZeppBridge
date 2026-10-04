@@ -16,6 +16,7 @@ const templatesMock = vi.fn(async (): Promise<AiTaskTemplate[]> => []);
 
 vi.mock('../../lib/bridge', () => ({
   backend: {
+    getUserPrefs: async () => ({ ai_profile_note: '' }),
     aiTaskList: () => listMock(),
     aiTaskGet: (id: string) => getMock(id),
     aiTaskSave: (task: AiTask) => saveMock(task),

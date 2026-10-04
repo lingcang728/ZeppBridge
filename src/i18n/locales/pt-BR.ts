@@ -21,33 +21,6 @@ export default {
       label: "Tendência diária",
       aria: "Intervalo da tendência diária",
     },
-    'components/ai/AiAskStart': {
-      title: "O que você quer saber?",
-      sleepTitle: "Ver meu sono recente",
-      sleepSub: "Se estou dormindo o suficiente e com regularidade e como isso se relaciona à recuperação",
-      weekTitle: "Rever esta semana",
-      weekSub: "O que mudou nesta semana em comparação com o habitual",
-      workoutTitle: "Analisar um treino",
-      workoutSub: "Escolha um treino primeiro; depois veja o ritmo, a frequência cardíaca e a recuperação",
-      freeTitle: "Fazer uma pergunta livre",
-      freeSub: "Escreva sua pergunta; os dados seguem o que está selecionado no grafo",
-      dataTitle: "Dados que serão compartilhados",
-      plain: (range: string, categories: string) => `${categories} de ${range}`,
-      plainWorkouts: (count: number) => plural(count, { one: `, com foco no treino que você escolheu (${count})`, other: `, com foco nos ${count} treinos que você escolheu` }),
-      plainNoGps: "; sem localização precisa",
-      plainGps: "; com localização precisa",
-      plainAttachments: (count: number) => plural(count, { one: `; mais ${count} arquivo anexado`, other: `; mais ${count} arquivos anexados` }),
-      plainNothing: "Nenhum dado selecionado ainda.",
-      emptyRange: "Não há registros para analisar neste período.",
-      widen: "Usar os últimos 30 dias",
-      rangeUnknown: "um período recente",
-      haveDays: (have: number, total: number) => `${have} de ${total} dias com dados`,
-      noneInRange: "Nenhum registro neste período",
-      notPicked: "Não incluído",
-      counting: "Contando…",
-      separator: ", ",
-      end: ".",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Como ler este arquivo:",
@@ -83,22 +56,6 @@ export default {
     'components/OfficialOnlyNote': {
       text: 'Apenas a autorização oficial do Zepp está ativa: frequência cardíaca, sono, passos, treinos, PAI e peso são sincronizados. HRV, SpO2, estresse, prontidão e carga requerem "Dados avançados".',
       action: 'Conectar',
-    },
-    'components/ai/WorkoutPicker': {
-      title: 'Treinos',
-      hint: 'Selecione um, vários ou nenhum',
-      noneSelected: (days: number) =>
-        plural(days, {
-          one: 'Nenhum treino selecionado: análise cobre apenas hoje.',
-          other: `Nenhum treino selecionado: análise cobre os últimos ${days} dias.`,
-        }),
-      selectedCount: (count: number) =>
-        plural(count, { one: `${count} selecionado`, other: `${count} selecionados` }),
-      empty: 'Nenhum treino salvo nesta máquina',
-      remove: 'Desmarcar',
-      avgHr: (bpm: number) => `FC média ${bpm}`,
-      showMore: (count: number) => `Mais ${count}`,
-      showLess: 'Menos',
     },
 
     'App': {
@@ -993,17 +950,6 @@ export default {
       minutesUnit: 'min',
     },
 
-    'views/AiComposer': {
-      andMore: (count: number) => `e mais ${count - 1}`,
-      targetRecent: (days: number) => `Nenhum treino selecionado · últimos ${days} dias`,
-      extrasNone: 'Sem anexos · opções padrão',
-      extrasFiles: (count: number) => (count === 1 ? '1 anexo' : `${count} anexos`),
-      undoAdded: (name: string) => `"${name}" adicionado`,
-      undoRemoved: (name: string) => `"${name}" removido`,
-      undoPicked: (name: string) => `"${name}" selecionado`,
-      undoUnpicked: (name: string) => `"${name}" desmarcado`,
-      undoDirection: 'Direção alterada',
-    },
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'Recuperação e sinais vitais',
@@ -1967,28 +1913,9 @@ Responda em Markdown.`,
       days: (have: number, total: number) => `${have}/${total} dias`,
     },
 
-    'components/ai/DirectionPanel': {
-      title: 'Direção e pergunta',
-      hint: 'A direção define o contexto analítico e a pergunta define o foco — ambos são enviados à IA',
-      directionLabel: 'Direção de análise (modelo)',
-      noDirection: 'Nenhuma',
-      directionHint: 'Selecionar uma direção aplica automaticamente o intervalo de dados recomendado (reversível no grafo).',
-      questionLabel: 'Sua pergunta',
-      questionPlaceholder: 'Qual o foco da análise? Ex.: a intensidade da corrida de quarta foi adequada para recuperação?',
-      counter: (used: number, max: number) => `${used}/${max}`,
-      noteLabel: 'Contexto pessoal (opcional)',
-      notePlaceholder: 'Lesões, metas, sensações recentes… incluídas na exportação para a IA.',
-      examplesLabel: 'Sugestões de perguntas',
-      example1: 'Como tem sido a qualidade do meu sono recentemente e o que posso ajustar?',
-      example2: 'A carga de treino desta semana foi adequada para o meu nível?',
-      example3: 'Minha prontidão física está evoluindo ou em declínio?',
-      groupDaily: 'Dia a dia',
-      groupRun: 'Corrida',
-      groupOther: 'Mais',
-    },
 
 
-    'components/ai/HandoffPanel': {
+    'components/ai/HandoffDock': {
       title: 'Enviar para a IA',
       who: 'Destino',
       finalPrompt: "Prompt final (no início do arquivo)",
@@ -2051,7 +1978,7 @@ Responda em Markdown.`,
       retry: 'Tentar novamente',
     },
 
-    'components/ai/TaskExtras': {
+    'components/ai/HandoffTray': {
       attachTitle: 'Arquivos anexos (PDF / imagens)',
       add: 'Adicionar arquivos',
       pickerTitle: 'Selecione arquivos para anexar à tarefa',

@@ -455,7 +455,7 @@ fn builtin_payload(
 ///
 /// 用 `LazyLock` 而不是 `const`：payload 由 serde 生成，免去手维护一段
 /// 没人复查的 JSON 字面量。
-pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSeed; 6]> =
+pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSeed; 7]> =
     std::sync::LazyLock::new(|| {
         [
             BuiltinTemplateSeed {
@@ -588,6 +588,22 @@ pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSe
                     "请看看这一周：睡眠、恢复、心率和运动量相比平时有什么变化，哪些值得留意，哪些只是正常波动。只根据数据说话，不做诊断；数据缺失的日子请如实说明。",
                     &["sleep_score", "resting_hr", "training_load"],
                     &[],
+                ),
+            },
+            BuiltinTemplateSeed {
+                id: "next_week",
+                name: "排下周",
+                payload: builtin_payload(
+                    "next_week", "排下周",
+                    &[
+                        (AiTaskCategory::Workout, true, 29), (AiTaskCategory::Sleep, true, 29),
+                        (AiTaskCategory::Recovery, true, 29), (AiTaskCategory::HeartRate, true, 29),
+                        (AiTaskCategory::Training, true, 29), (AiTaskCategory::Body, true, 29),
+                        (AiTaskCategory::PersonalNote, true, 0), (AiTaskCategory::Attachment, true, 0),
+                    ],
+                    AiTaskDetailLevel::Standard,
+                    "结合最近的训练、睡眠、恢复与饮食，先讨论下周安排并允许多轮调整；只有我说定稿后，再按文件末尾的格式输出最终计划。",
+                    &["sleep_score", "resting_hr", "training_load"], &[],
                 ),
             },
         ]

@@ -21,33 +21,6 @@ export default {
       label: "Tendances par jour",
       aria: "Période des tendances par jour",
     },
-    'components/ai/AiAskStart': {
-      title: "Que voulez-vous savoir ?",
-      sleepTitle: "Voir mon sommeil récent",
-      sleepSub: "Si je dors assez et régulièrement, et le lien avec la récupération",
-      weekTitle: "Revoir cette semaine",
-      weekSub: "Ce qui a changé cette semaine par rapport à d’habitude",
-      workoutTitle: "Analyser une séance",
-      workoutSub: "Choisissez une séance, puis examinez l’allure, la fréquence cardiaque et la récupération",
-      freeTitle: "Poser ma question",
-      freeSub: "Écrivez votre question ; les données suivent ce qui est sélectionné dans le graphe",
-      dataTitle: "Données à transmettre",
-      plain: (range: string, categories: string) => `${categories} pour ${range}`,
-      plainWorkouts: (count: number) => plural(count, { one: `, avec votre séance choisie (${count}) comme priorité`, other: `, avec vos ${count} séances choisies comme priorité` }),
-      plainNoGps: "; sans position précise",
-      plainGps: "; avec position précise",
-      plainAttachments: (count: number) => plural(count, { one: `; plus ${count} fichier joint`, other: `; plus ${count} fichiers joints` }),
-      plainNothing: "Aucune donnée sélectionnée pour l’instant.",
-      emptyRange: "Aucun enregistrement à analyser sur cette période.",
-      widen: "Passer aux 30 derniers jours",
-      rangeUnknown: "une période récente",
-      haveDays: (have: number, total: number) => `${have}/${total} jours avec données`,
-      noneInRange: "Aucun enregistrement sur cette période",
-      notPicked: "Non transmis",
-      counting: "Décompte…",
-      separator: ", ",
-      end: ".",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Comment lire ce fichier :",
@@ -83,22 +56,6 @@ export default {
     'components/OfficialOnlyNote': {
       text: 'Seule l’autorisation officielle Zepp est connectée : fréquence cardiaque, sommeil, pas, séances, PAI et poids se synchronisent. VFC, SpO₂, stress, préparation et charge d’entraînement ne sont pas proposés par l’API officielle — connectez « Données avancées » pour les obtenir.',
       action: 'Connecter',
-    },
-    'components/ai/WorkoutPicker': {
-      title: 'Quelle séance analyser',
-      hint: 'Une, plusieurs ou aucune',
-      empty: 'Pas encore de séances sur cette machine',
-      noneSelected: (days: number) =>
-        plural(days, {
-          one: 'Aucune séance choisie : seule la journée d’aujourd’hui est analysée.',
-          other: `Aucune séance choisie : analyse des ${days} derniers jours jusqu’à aujourd’hui.`,
-        }),
-      selectedCount: (count: number) =>
-        plural(count, { one: `${count} sélectionnée`, other: `${count} sélectionnées` }),
-      remove: 'Désélectionner',
-      avgHr: (bpm: number) => `FC moy. ${bpm}`,
-      showMore: (count: number) => `Afficher ${count} de plus`,
-      showLess: 'Afficher moins',
     },
 
     'views/Settings': {
@@ -1668,17 +1625,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       deviceUndetermined: 'Appareil indéterminé',
     },
 
-    'views/AiComposer': {
-      andMore: (count: number) => `et ${count - 1} autres`,
-      targetRecent: (days: number) => `Aucune séance choisie · les ${days} derniers jours`,
-      extrasNone: 'Aucune pièce jointe · options par défaut',
-      extrasFiles: (count: number) => (count === 1 ? '1 pièce jointe' : `${count} pièces jointes`),
-      undoAdded: (name: string) => `« ${name} » ajouté`,
-      undoRemoved: (name: string) => `« ${name} » retiré`,
-      undoPicked: (name: string) => `« ${name} » sélectionné`,
-      undoUnpicked: (name: string) => `« ${name} » désélectionné`,
-      undoDirection: 'Direction d’analyse changée',
-    },
 
     'views/HealthCheck': {
       title: 'Contrôle de santé des données',
@@ -1986,28 +1932,9 @@ Réponds en Markdown.`,
       days: (have: number, total: number) => `${have}/${total} jours`,
     },
 
-    'components/ai/DirectionPanel': {
-      title: 'Direction et question',
-      hint: 'La direction fixe le cadre, la question fixe l’accent — les deux vont à l’IA',
-      directionLabel: 'Direction d’analyse (modèle)',
-      noDirection: 'Aucune',
-      directionHint: 'Choisir une direction applique sa plage de données recommandée — visible dans le graphe, annulable.',
-      questionLabel: 'Votre question',
-      questionPlaceholder: 'Que voulez-vous creuser cette fois ? Par exemple : le footing de récupération de mercredi était-il à la bonne intensité ?',
-      counter: (used: number, max: number) => `${used}/${max}`,
-      noteLabel: 'Contexte personnel (facultatif)',
-      notePlaceholder: 'Blessures, objectifs, forme récente… écrits dans l’export pour l’IA.',
-      examplesLabel: 'Exemples à essayer',
-      example1: 'Comment ai-je dormi dernièrement, et que devrais-je changer ?',
-      example2: 'La charge d’entraînement de cette semaine était-elle adaptée pour moi ?',
-      example3: 'Ma préparation s’améliore-t-elle ou se dégrade-t-elle ?',
-      groupDaily: 'Au quotidien',
-      groupRun: 'Course à pied',
-      groupOther: 'Autres',
-    },
 
 
-    'components/ai/HandoffPanel': {
+    'components/ai/HandoffDock': {
       title: 'Confier à l’IA',
       who: 'Confier à',
       finalPrompt: "Prompt final (au début du fichier)",
@@ -2072,7 +1999,7 @@ Réponds en Markdown.`,
       retry: 'Réessayer',
     },
 
-    'components/ai/TaskExtras': {
+    'components/ai/HandoffTray': {
       attachTitle: 'Fichiers d’origine (PDF / images)',
       add: 'Ajouter des fichiers',
       pickerTitle: 'Choisir les fichiers à remettre à l’IA avec la tâche',

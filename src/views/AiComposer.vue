@@ -1,339 +1,132 @@
 <script setup lang="ts">
-/**
- * 交给 AI —— 左流右结：左边是做事的流程，右边是粘住的结账栏。
- *
- *   左列（从上到下）：任务名 + 四个入口胶囊 → 包裹区（六块类别砖，点一下带/不带）
- *   → 分析对象（默认收起的折叠段）→ 问题区 → 方向与背景 → 附件与选项（折叠）。
- *   右列：sticky 的交付卡（就绪度、交给谁、订阅档、主按钮），主按钮永远不滚出视线。
- *   页面下方：训练计划（贴回 AI 的回复 → 检查 → 发到手表）。
- *
- * 关系网已经退役（2026-10-04 重做）：力导向布局位置不定、必须靠六色区分节点，
- * 是这个页面「乱」和「艳」的根因。包裹区用固定网格 + 水面填充代替它。
- *
- * 本组件只做编排：状态归 useAiTaskDraft / useAiTaskLibrary / useAiTaskPreview /
- * useAiTaskHandoff 四个 composable，纯逻辑归 src/lib/aiTask/*。
- */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import '../styles/ai-task.css';
 import Icon from '../components/Icon.vue';
 import AiTaskHeader from '../components/ai/AiTaskHeader.vue';
-import PackageZone from '../components/ai/PackageZone.vue';
-import WorkoutPicker from '../components/ai/WorkoutPicker.vue';
-import DirectionPanel from '../components/ai/DirectionPanel.vue';
-import TaskExtras from '../components/ai/TaskExtras.vue';
-import HandoffPanel from '../components/ai/HandoffPanel.vue';
-import AiAskStart from '../components/ai/AiAskStart.vue';
-import AiQuestionBar from '../components/ai/AiQuestionBar.vue';
-import TrainingPlanSection from '../components/plan/TrainingPlanSection.vue';
+import BridgeTimeline from '../components/ai/bridge/BridgeTimeline.vue';
+import ReceiveCapsule from '../components/ai/bridge/ReceiveCapsule.vue';
+import ComposeLine from '../components/ai/ComposeLine.vue';
+import ExchangeList from '../components/ai/ExchangeList.vue';
+import HandoffDock from '../components/ai/HandoffDock.vue';
+import PlanDetail from '../components/plan/PlanDetail.vue';
+import PlanLedger from '../components/plan/PlanLedger.vue';
+import ModalDialog from '../components/ModalDialog.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useAiTaskPreview } from '../composables/useAiTaskPreview';
 import { useSyncController } from '../composables/useSyncController';
 import { useTrainingPlan } from '../composables/useTrainingPlan';
-import type { AiTaskTemplate } from '../lib/bridge/types';
-import { categoryLabel } from '../lib/aiTask/categories';
+import { useBridgeStrip } from '../composables/useBridgeStrip';
+import { useExchanges } from '../composables/useExchanges';
+import { useBridgeText } from '../components/ai/bridge/bridge.i18n';
+import { usePlanText } from '../components/plan/usePlanText';
+import { backend } from '../lib/bridge';
+import { autoTaskTitle } from '../lib/aiTask/title';
 import { directionText } from '../lib/aiTask/prompt';
-import { autoTaskTitle, recentWindowDays } from '../lib/aiTask/title';
-import { displayableWorkouts, workoutDisplayLabel } from '../lib/workouts';
-import { defineMessages, useMessages } from '../i18n';
-
+import { displayableWorkouts } from '../lib/workouts';
+import { addDays, dayKey, daysBetween } from '../lib/aiTask/bridgeScale';
+import { dayRows, issueDate } from '../lib/trainingPlan/week';
+import { moveDay, deleteDay } from '../lib/trainingPlan/reshape';
+import { planIssueText } from '../lib/trainingPlan/issues';
+import type { PlanCheck, PlanDraftPreview } from '../types/trainingPlan';
+import type { AiExchange } from '../types/timeBridge';
 defineOptions({ name: 'AiComposer' });
-
-const t = useMessages(defineMessages(
-  {
-    andMore: (count: number) => `等 ${count} 次`,
-    targetFold: '分析哪次运动',
-    targetRecent: (days: number) => `没选运动 · 分析最近 ${days} 天`,
-    targetPicked: (count: number) => `已选 ${count} 次运动`,
-    questionTitle: '你想问什么',
-    extrasFold: '附件与选项',
-    extrasNone: '没有附件 · 默认选项',
-    extrasFiles: (count: number) => `${count} 个附件`,
-    undoAdded: (name: string) => `已加入「${name}」`,
-    undoRemoved: (name: string) => `已移出「${name}」`,
-    undoPicked: (name: string) => `已选「${name}」`,
-    undoUnpicked: (name: string) => `已取消「${name}」`,
-    undoDirection: '已换分析方向',
-    'ui.ai_task.metric_exclusions_dropped': '旧版任务里按单个指标的排除已自动去掉：现在按类别整类带或不带',
-    dismiss: '知道了',
-    planFold: '收到 AI 的计划？贴回来',
-    planIdle: '还没有贴回的计划',
-    planReview: '有计划在等你检查',
-    planSent: '之前发过计划到手表',
-  },
-  {
-    andMore: (count: number) => `and ${count - 1} more`,
-    targetFold: 'Which workouts',
-    targetRecent: (days: number) => `None picked · the last ${days} days`,
-    targetPicked: (count: number) => `${count} workout(s) picked`,
-    questionTitle: 'What to ask',
-    extrasFold: 'Attachments and options',
-    extrasNone: 'No attachments · default options',
-    extrasFiles: (count: number) => (count === 1 ? '1 attachment' : `${count} attachments`),
-    undoAdded: (name: string) => `Added “${name}”`,
-    undoRemoved: (name: string) => `Removed “${name}”`,
-    undoPicked: (name: string) => `Picked “${name}”`,
-    undoUnpicked: (name: string) => `Unpicked “${name}”`,
-    undoDirection: 'Direction changed',
-    'ui.ai_task.metric_exclusions_dropped': 'Per-metric exclusions saved by the old version were dropped: each category now goes as a whole or not at all',
-    dismiss: 'Got it',
-    planFold: 'Got a plan from the AI? Paste it back',
-    planIdle: 'No plan pasted back yet',
-    planReview: 'A plan is waiting for your review',
-    planSent: 'A plan was sent to the watch before',
-  },
-  {
-    andMore: (count: number) => `y ${count} más`,
-    targetFold: 'Qué entrenamientos',
-    targetRecent: (days: number) => `Sin elegir · los últimos ${days} días`,
-    targetPicked: (count: number) => `${count} entrenamiento(s) elegido(s)`,
-    questionTitle: 'Qué preguntar',
-    extrasFold: 'Adjuntos y opciones',
-    extrasNone: 'Sin adjuntos · opciones por defecto',
-    extrasFiles: (count: number) => `${count} adjuntos`,
-    undoAdded: (name: string) => `Se añadió «${name}»`,
-    undoRemoved: (name: string) => `Se quitó «${name}»`,
-    undoPicked: (name: string) => `Se eligió «${name}»`,
-    undoUnpicked: (name: string) => `Se deseleccionó «${name}»`,
-    undoDirection: 'Enfoque cambiado',
-    'ui.ai_task.metric_exclusions_dropped': 'Se quitaron las exclusiones por métrica guardadas por la versión anterior: cada categoría va entera o no va',
-    dismiss: 'Entendido',
-    planFold: '¿La IA te dio un plan? Pégalo aquí',
-    planIdle: 'Aún no has pegado ningún plan',
-    planReview: 'Hay un plan esperando tu revisión',
-    planSent: 'Ya enviaste un plan al reloj',
-  },
-  'views/AiComposer',
-));
-
-const route = useRoute();
-const draftCtl = useAiTaskDraft();
-const library = useAiTaskLibrary();
-const previewCtl = useAiTaskPreview();
-
-const { draft, canUndo, lastChange, legacyNotice } = draftCtl;
-const { templates, recentWorkouts } = library;
-const { preview, previewError } = previewCtl;
-
-const workoutChoices = computed(() => displayableWorkouts(recentWorkouts.value));
-const selectedWorkouts = computed(() =>
-  workoutChoices.value.filter((workout) => draft.value.workout_ids.includes(workout.workout_id)));
-const recentDays = computed(() => recentWindowDays(draft.value));
-
-/* 入口动作：带上方向和推荐范围后，光标落到问题区。 */
-const questionRef = ref<InstanceType<typeof AiQuestionBar> | null>(null);
-const askRef = ref<InstanceType<typeof AiAskStart> | null>(null);
-const focusQuestion = () => { window.setTimeout(() => questionRef.value?.focus(), 120); };
-const applyTemplate = (template: AiTaskTemplate) => {
-  draftCtl.setTemplate(template);
-  focusQuestion();
+const route = useRoute(), ctl = useAiTaskDraft(), library = useAiTaskLibrary(), coverage = useAiTaskPreview();
+const plan = useTrainingPlan(), history = useExchanges(), t = useBridgeText(), { t: pt } = usePlanText();
+const { draft } = ctl, { templates, recentWorkouts } = library;
+const selectedExchange = ref<AiExchange | null>(null), selectedDay = ref<string | null>(null), sentAnimation = ref(false), demo = ref(false);
+const today = ref(dayKey());
+const end = computed(() => selectedExchange.value ? dayKey(new Date(selectedExchange.value.sent_at)) : today.value);
+const days = computed(() => selectedExchange.value ? selectedExchange.value.days_before + 1 : Math.min(90, Math.max(7, ...draft.value.categories.filter(c => c.category !== 'workout').map(c => c.days_before + 1))));
+const strips = useBridgeStrip(days, end);
+const historical = computed(() => !!selectedExchange.value);
+const categories = computed(() => selectedExchange.value?.categories ?? draft.value.categories);
+const selectedIds = computed(() => selectedExchange.value?.workout_ids ?? draft.value.workout_ids);
+const choices = computed(() => displayableWorkouts(recentWorkouts.value));
+const picked = computed(() => choices.value.filter(w => draft.value.workout_ids.includes(w.workout_id)));
+const template = computed(() => templates.value.find(p => p.id === draft.value.template_id) ?? null);
+const title = computed(() => autoTaskTitle(draft.value, picked.value, template.value?.name ?? null));
+const direction = computed(() => directionText(template.value));
+const ready = computed(() => !historical.value && !!coverage.preview.value && coverage.preview.value.coverage.some(c => c.days_with_data > 0));
+const viewOf = (check: PlanCheck, start: string): PlanDraftPreview => {
+  const last = check.to && check.to > addDays(start,6) ? check.to : addDays(start,6);
+  const count = Math.min(57, Math.max(7, daysBetween(start,last) + 1));
+  return { check, window: { start }, days: Array.from({length: count}, (_,i) => {
+    const date = addDays(start,i), after = check.workouts.filter(w => w.date === date);
+    return { date, change: after.length ? 'unchanged' : 'rest', before: [], after, rest: check.rest?.find(r => r.date === date) ?? null };
+  }) };
 };
-
-/* 分析对象折叠段：默认收起；点了「分析一次运动」、或已经选过运动（旧任务）时展开。 */
-const workoutOpen = ref(false);
-const pickWorkout = () => { workoutOpen.value = true; };
-watch(() => draft.value.id, () => { workoutOpen.value = draft.value.workout_ids.length > 0; }, { immediate: true });
-const targetSummary = computed(() =>
-  selectedWorkouts.value.length ? t.value.targetPicked(selectedWorkouts.value.length) : t.value.targetRecent(recentDays.value));
-
-/* 附件折叠段摘要。 */
-const extrasOpen = ref(false);
-const extrasSummary = computed(() =>
-  draft.value.attachments.length ? t.value.extrasFiles(draft.value.attachments.length) : t.value.extrasNone);
-
-/* 训练计划折叠段（页面最下方）：摘要一行说清现状；AI 的计划贴回来、
-   审阅卡一出现就自己展开，别让人不知道下面在等。 */
-const planCtl = useTrainingPlan();
-const planOpen = ref(false);
-const planSummary = computed(() => {
-  if (planCtl.preview.value) return t.value.planReview;
-  const state = planCtl.state.value;
-  if (state?.last_publish || state?.sent.length) return t.value.planSent;
-  return t.value.planIdle;
+const future = computed(() => {
+  if (selectedExchange.value) return selectedExchange.value.plan ? viewOf(selectedExchange.value.plan, end.value) : null;
+  if (plan.preview.value) return plan.preview.value;
+  const active = plan.state.value?.planned.filter(w => w.date >= today.value) ?? [];
+  const latest = history.exchanges.value.find(e => e.publish_state === 'sent' && !e.undone && e.plan?.to && e.plan.to >= today.value);
+  if (!active.length && !latest) return null;
+  const endings = [active[active.length - 1]?.date, latest?.plan?.to, today.value].filter((d): d is string => !!d).sort();
+  const last = endings[endings.length - 1]!;
+  return viewOf({ from: today.value, to: last, workouts: active, issues: [], summary: latest?.plan?.summary, rest: latest?.plan?.rest?.filter(r => r.date >= today.value) }, today.value);
 });
-watch(planCtl.preview, (value) => { if (value) planOpen.value = true; });
-
-/* 撤销胶囊里那一句：刚才改了什么。 */
-const undoHint = computed(() => {
-  const change = lastChange.value;
-  if (!change) return null;
-  if (change.kind === 'category' && change.category) {
-    const name = categoryLabel(change.category);
-    return change.included ? t.value.undoAdded(name) : t.value.undoRemoved(name);
+const stamped = computed(() => selectedExchange.value ? selectedExchange.value.publish_state === 'sent' && !selectedExchange.value.undone : !plan.preview.value && plan.state.value?.last_publish?.state === 'sent');
+const rows = computed(() => future.value ? dayRows(future.value,today.value) : []);
+const detail = computed(() => rows.value.find(r => r.date === selectedDay.value) ?? null);
+const written = computed(() => selectedExchange.value?.document?.workouts ?? plan.document.value?.workouts ?? []);
+const issues = computed(() => future.value?.check.issues.filter(i => issueDate(i,written.value) === selectedDay.value) ?? []);
+const wholeIssues = computed(() => future.value?.check.issues ?? []);
+const notice = computed(() => {
+  const n = plan.notice.value;
+  if (!n) return null;
+  switch (n.kind) {
+    case 'sent': return demo.value ? t.value.demoDelivered : pt.value.noticeSent;
+    case 'undone': return pt.value.noticeUndone;
+    case 'cleared': return pt.value.noticeCleared;
+    case 'unconfirmed': return pt.value.noticeUnconfirmed;
+    case 'rejected': return pt.value.noticeRejected;
+    case 'not_needed': return pt.value.noticeNotNeeded;
+    case 'nothing_to_undo': return pt.value.noticeNothingToUndo;
+    case 'invalid': return pt.value.noticeInvalid;
+    case 'clipboard_not_a_plan': return t.value.receiveEmpty;
+    case 'paste_failed': return { empty: pt.value.pasteEmpty, no_json: pt.value.pasteNoJson, not_a_plan: pt.value.pasteNotPlan }[n.failure];
+    case 'error': return n.text || pt.value.noticeError;
   }
-  if (change.kind === 'workout') {
-    const workout = workoutChoices.value.find((item) => item.workout_id === change.workoutId);
-    const name = workout ? workoutDisplayLabel(workout) : '';
-    return change.included ? t.value.undoPicked(name) : t.value.undoUnpicked(name);
-  }
-  return t.value.undoDirection;
 });
-
-const selectedTemplate = computed(() => templates.value.find((template) => template.id === draft.value.template_id) ?? null);
-const direction = computed(() => directionText(selectedTemplate.value));
-const fallbackTitle = computed(() => autoTaskTitle(draft.value, selectedWorkouts.value, selectedTemplate.value ? selectedTemplate.value.name : null));
-
-/* —— 载入 —— */
-previewCtl.watchDraft(draft);
-/* 同步写进了新数据：运动列表和覆盖预览都重新取。以前人在这一页等同步，
-   同步完了这里还是旧的，要切出去再切回来才会变。 */
+const selectExchange = (item: AiExchange) => { selectedExchange.value = item; selectedDay.value = null; document.querySelector('#main-content')?.scrollTo({ top: 0, behavior: 'smooth' }); };
+const current = () => { selectedExchange.value = null; selectedDay.value = null; };
+const changeDay = (from: string, to: string) => { if (plan.document.value && !historical.value) { selectedDay.value = to; void plan.reshape(moveDay(plan.document.value,from,to)); } };
+const removeDay = (date: string) => { if (plan.document.value && !historical.value) void plan.reshape(deleteDay(plan.document.value,date)); };
+const received = () => { selectedDay.value = null; void history.load(); };
+const selectWorkout = () => { document.querySelector<HTMLElement>('.past-strips .bridge-row:nth-child(4) [role="button"]')?.focus(); };
+let animationTimer = 0, refreshTimer = 0;
+const prepared = () => { void history.load(); sentAnimation.value = false; requestAnimationFrame(() => { sentAnimation.value = true; }); window.clearTimeout(animationTimer); animationTimer = window.setTimeout(() => { sentAnimation.value = false; },1200); };
+coverage.watchDraft(draft);
 const { dataRevision } = useSyncController();
-watch(dataRevision, () => {
-  void library.loadRecentWorkouts();
-  void previewCtl.loadPreview(draft.value);
+watch(dataRevision, () => { void library.loadRecentWorkouts(); void coverage.loadPreview(draft.value); void plan.load(); });
+watch(plan.revision, () => { void history.load(); void strips.load(); });
+watch(() => route.query.task, id => { if (typeof id === 'string' && id && id !== draft.value.id) void ctl.loadTask(id).catch(() => undefined); }, { immediate: true });
+onMounted(async () => {
+  void history.load(); void library.loadTemplates(); void library.loadTaskList(); void library.loadRecentWorkouts(); void plan.resume();
+  try { const prefs = await backend.getUserPrefs(); demo.value = !!prefs.demo_mode; if (demo.value && !draft.value.id && !route.query.task) await ctl.loadTask('demo-full-task'); if (!draft.value.personal_note) ctl.setPersonalNote(prefs.ai_profile_note ?? ''); } catch { /* Profile tray exposes retryable failures. */ }
+  refreshTimer = window.setInterval(() => { const now = dayKey(); if (now !== today.value) today.value = now; if (!plan.busy.value) void plan.resume(); },15000);
 });
-onMounted(() => {
-  void library.loadTemplates();
-  void library.loadTaskList();
-  void library.loadRecentWorkouts();
-});
-watch(
-  () => route.query.task,
-  (taskId) => {
-    if (typeof taskId === 'string' && taskId && taskId !== draft.value.id) {
-      void draftCtl.loadTask(taskId).catch(() => undefined);
-    }
-  },
-  { immediate: true },
-);
+onBeforeUnmount(() => { window.clearInterval(refreshTimer); window.clearTimeout(animationTimer); });
 </script>
-
 <template>
-  <section class="page ai-page" aria-labelledby="ai-page-title">
-    <div class="ai-grid">
-      <div class="flow">
-        <div class="flow-head">
-          <AiTaskHeader :fallback-title="fallbackTitle" />
-          <AiAskStart ref="askRef" :draft="draft" :preview="preview" :templates="templates"
-            :workout-count="draft.workout_ids.length" @template="applyTemplate" @pick-workout="pickWorkout" @ask="focusQuestion"
-            @all-days="draftCtl.setWindowDays" />
-        </div>
-
-        <!-- 旧任务里带着已退役的指标级排除：载入时已丢，这里说一句。 -->
-        <p v-if="legacyNotice" class="ai-note warn legacy-note" role="status">
-          <Icon name="info" :size="13" />
-          <span class="legacy-text">{{ t['ui.ai_task.metric_exclusions_dropped'] }}</span>
-          <button type="button" class="legacy-dismiss" @click="draftCtl.dismissLegacyNotice()">{{ t.dismiss }}</button>
-        </p>
-
-        <PackageZone :preview="preview" :can-undo="canUndo" :undo-hint="undoHint" :undo-seq="lastChange?.seq ?? 0"
-          @undo="draftCtl.undo()" />
-
-        <!-- 分析对象：默认收起的折叠段，摘要一行说清现状。 -->
-        <section :class="['ai-card', 'fold', { 'is-open': workoutOpen }]">
-          <button type="button" class="fold-head" :aria-expanded="workoutOpen" aria-controls="ai-fold-workouts"
-            @click="workoutOpen = !workoutOpen">
-            <span class="fold-copy">
-              <span class="fold-title">{{ t.targetFold }}</span>
-              <span v-if="!workoutOpen" class="fold-summary">{{ targetSummary }}</span>
-            </span>
-            <Icon name="chevron-down" :size="16" class="fold-chevron" />
-          </button>
-          <div id="ai-fold-workouts" class="fold-body" :inert="!workoutOpen || undefined">
-            <div class="fold-inner">
-              <WorkoutPicker :workouts="workoutChoices" :selected-ids="draft.workout_ids" :recent-days="recentDays"
-                @toggle="draftCtl.toggleWorkout" />
-            </div>
-          </div>
-        </section>
-
-        <!-- 问题区：整页唯一写字的地方，模板选完光标就落在这里。 -->
-        <section class="ai-card ask" aria-labelledby="ai-ask-title">
-          <h2 id="ai-ask-title" class="ask-title">{{ t.questionTitle }}</h2>
-          <AiQuestionBar ref="questionRef" />
-        </section>
-
-        <DirectionPanel :templates="templates" />
-
-        <section :class="['ai-card', 'fold', { 'is-open': extrasOpen }]">
-          <button type="button" class="fold-head" :aria-expanded="extrasOpen" aria-controls="ai-fold-extras"
-            @click="extrasOpen = !extrasOpen">
-            <span class="fold-copy">
-              <span class="fold-title">{{ t.extrasFold }}</span>
-              <span v-if="!extrasOpen" class="fold-summary">{{ extrasSummary }}</span>
-            </span>
-            <Icon name="chevron-down" :size="16" class="fold-chevron" />
-          </button>
-          <div id="ai-fold-extras" class="fold-body" :inert="!extrasOpen || undefined">
-            <div class="fold-inner">
-              <TaskExtras :preview="preview" />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- 结账栏：sticky，主按钮一直在视线里。 -->
-      <aside class="rail">
-        <HandoffPanel rail :preview="preview" :preview-error="previewError" :direction="direction"
-          :fallback-title="fallbackTitle" :handover="askRef?.handover ?? null" />
-      </aside>
-    </div>
-
-    <!-- 页面最下方：AI 回复了训练计划，贴回来检查再发到手表。 -->
-    <section :class="['ai-card', 'fold', 'plan-fold', { 'is-open': planOpen }]">
-      <button type="button" class="fold-head" :aria-expanded="planOpen" aria-controls="ai-fold-plan"
-        @click="planOpen = !planOpen">
-        <span class="fold-copy">
-          <span class="fold-title">{{ t.planFold }}</span>
-          <span v-if="!planOpen" class="fold-summary">{{ planSummary }}</span>
-        </span>
-        <Icon name="chevron-down" :size="16" class="fold-chevron" />
-      </button>
-      <div id="ai-fold-plan" class="fold-body" :inert="!planOpen || undefined">
-        <div class="fold-inner">
-          <TrainingPlanSection />
-        </div>
-      </div>
-    </section>
+  <section class="page ai-bridge-page" aria-labelledby="ai-page-title">
+    <header class="bridge-page-head"><AiTaskHeader v-if="!historical" :fallback-title="title"/><p v-else class="history-view"><Icon name="clock" :size="14"/>{{ t.historical }}<button class="pill-button quiet" @click="current">{{ t.backCurrent }}</button></p><div v-if="demo" class="demo-banner" role="status"><Icon name="database" :size="14"/><div><strong>{{ t.fullDemo }}</strong><span>{{ t.demoHint }}</span></div></div><button v-if="ctl.canUndo.value && !historical" class="pill-button quiet undo-selection" @click="ctl.undo()"><Icon name="undo" :size="13"/>{{ t.undo }}</button></header>
+    <BridgeTimeline :rows="strips.rows.value" :days="days" :end="end" :categories="categories" :selected-ids="selectedIds" :adherence="strips.adherence.value" :preview="future" :selected="selectedDay" :loading="strips.loading.value" :ready="ready" :sent="sentAnimation" :readonly="historical" :future-readonly="!plan.preview.value || !plan.accepted.value" :stamped="stamped" @range="ctl.setWindowDays($event - 1)" @toggle="ctl.setCategoryEnabled($event, !draft.categories.find(c => c.category === $event)?.enabled)" @workout="ctl.toggleWorkout" @select="selectedDay = selectedDay === $event ? null : $event" @move="changeDay" @delete="removeDay" @publish="plan.publish()" @received="received">
+      <template #future-action><ReceiveCapsule v-if="!historical" :compact="!!future" @received="received"/></template>
+    </BridgeTimeline>
+    <p v-if="strips.error.value" class="bridge-message" role="alert"><Icon name="warning" :size="14"/>{{ strips.error.value }}<button class="pill-button quiet" @click="strips.load()">{{ t.retry }}</button></p>
+    <div v-if="plan.preview.value && !plan.accepted.value && !historical" class="mcp-arrival"><Icon name="spark" :size="16"/><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>
+    <div v-if="notice && !historical" class="bridge-message" role="status"><Icon name="info" :size="14"/><span>{{ notice }}</span><button class="pill-button quiet" @click="plan.dismissNotice()">{{ pt.dismiss }}</button></div>
+    <ul v-if="wholeIssues.length" class="whole-issues"><li v-for="(issue,i) in wholeIssues" :key="i"><Icon name="warning" :size="14"/>{{ planIssueText(issue) }}</li></ul>
+    <div v-if="detail" class="bridge-detail"><header><span>{{ t.detail }}</span><div><button v-if="plan.preview.value && !historical && plan.accepted.value" class="pill-button quiet" :disabled="plan.busy.value" @click="removeDay(detail.date)"><Icon name="trash" :size="13"/>{{ t.deleteDay }}</button><button class="pill-button quiet" @click="selectedDay = null">{{ t.close }}</button></div></header><PlanDetail :row="detail" :issues="issues"/></div>
+    <div v-if="!historical" class="plan-status-row"><PlanLedger v-if="plan.state.value?.last_publish" :state="plan.state.value" :busy="plan.busy.value" :simulated="demo" @undo="plan.undo()" @clear="plan.clear()"/><button v-if="plan.preview.value && plan.accepted.value" class="pill-button quiet discard-draft" :disabled="plan.busy.value" @click="plan.discard()">{{ t.discard }}</button></div>
+    <ComposeLine v-if="!historical" :templates="templates" @workout="selectWorkout"/>
+    <ExchangeList :items="history.exchanges.value" :active-id="selectedExchange?.id ?? null" @select="selectExchange"/>
+    <p v-if="history.error.value" class="bridge-message" role="alert">{{ history.error.value }}<button class="pill-button quiet" @click="history.load()">{{ t.retry }}</button></p>
+    <HandoffDock v-if="!historical" :preview="coverage.preview.value" :preview-error="coverage.previewError.value" :direction="direction" :fallback-title="title" @prepared="prepared"/>
+    <ModalDialog v-if="plan.clearPending.value" labelledby="bridge-clear-title" @close="plan.cancelClear()"><div class="clear-dialog"><h2 id="bridge-clear-title">{{ pt.clearTitle }}</h2><p>{{ pt.clearBody }}</p><footer><button class="pill-button quiet" @click="plan.cancelClear()">{{ pt.cancel }}</button><button class="pill-button danger" :disabled="plan.busy.value" @click="plan.confirmClear()">{{ pt.clearConfirm }}</button></footer></div></ModalDialog>
   </section>
 </template>
-
-<style scoped>
-/* 左流右结：左列是流程，右列粘住。 */
-.ai-page { --rail-w: min(344px, 28vw); padding: 8px 20px 20px; }
-.ai-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--rail-w); gap: 16px; align-items: start; }
-.flow { display: grid; min-width: 0; gap: 14px; align-content: start; }
-.flow-head { display: grid; gap: 10px; justify-items: start; }
-.rail { position: sticky; top: 12px; min-width: 0; }
-
-/* 折叠段：头是一行标题 + 摘要 + 箭头；体用 grid-rows 0fr→1fr 过渡，不用量高度。 */
-.fold { padding: 0; }
-.fold-head {
-  display: flex; width: 100%; align-items: center; gap: 12px; padding: 13px 16px;
-  border: 0; border-radius: inherit; background: transparent; color: inherit; text-align: left; cursor: pointer;
-}
-.fold-head:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.fold-copy { display: flex; flex: 1; min-width: 0; align-items: baseline; gap: 10px; }
-.fold-title { flex: 0 0 auto; color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
-.fold-summary { min-width: 0; overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
-.fold-chevron { flex: 0 0 auto; color: var(--subtle); transition: rotate var(--dur-base) var(--ease-out); }
-.fold.is-open .fold-chevron { rotate: 180deg; }
-.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 360ms var(--ease-out); }
-.fold.is-open .fold-body { grid-template-rows: 1fr; }
-.fold-inner { min-height: 0; overflow: hidden; }
-.fold-inner > :first-child { padding: 0 16px 16px; }
-
-/* 问题区：标题小一号，输入面是主角。 */
-.ask { display: grid; gap: 2px; }
-.ask-title { margin: 0; color: var(--muted); font-size: var(--fs-xs); font-weight: 650; }
-
-/* 旧任务提示：一行胶囊，可关掉。 */
-.legacy-note { align-items: center; margin: 0; padding: 7px 8px 7px 12px; border-radius: 999px; background: var(--mat-glass); }
-.legacy-text { flex: 1; min-width: 0; color: var(--ink); font-size: var(--fs-xs); }
-.legacy-dismiss { flex: 0 0 auto; min-height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
-.legacy-dismiss:hover { background: var(--glass-press); color: var(--ink); }
-.legacy-dismiss:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-
-/* 训练计划段：横跨整页宽，和上面的两列网格拉开一段。 */
-.plan-fold { margin-top: 24px; }
-
-@media (max-width: 1100px) {
-  .ai-page { --rail-w: 100%; padding: 4px 12px 16px; }
-  .ai-grid { grid-template-columns: minmax(0, 1fr); }
-  .rail { position: static; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fold-body, .fold-chevron { transition: none; }
-}
-</style>
+<style scoped src="./AiComposer.css"></style>

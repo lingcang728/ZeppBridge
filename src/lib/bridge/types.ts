@@ -120,6 +120,7 @@ export interface AiTask {
 
 /** `ai_task_prepare` 的可选段：本地化好的任务说明、手改的最终提示词、两个文件主名。 */
 export interface AiTaskPrepareOptions {
+  provider?: string;
   briefText?: string | null;
   promptOverride?: string | null;
   dataFileStem?: string | null;
@@ -269,6 +270,12 @@ export interface BridgeBackend {
   deleteLifeEvent(id: number): Promise<void>;
 
   /** 训练计划：草稿 → 预览 → 发到手表 / 撤销 / 清空。见 core `training_plan`。 */
+  readClipboardText(): Promise<string>;
+  aiTaskDayStrip(daysBefore: number, end?: string): Promise<import('../../types/timeBridge').DayStripRow[]>;
+  aiExchangeList(limit?: number): Promise<import('../../types/timeBridge').AiExchange[]>;
+  aiProfileSave(note: string): Promise<void>;
+  trainingPlanAdherence(from: string, to: string): Promise<import('../../types/timeBridge').AdherenceDay[]>;
+  trainingPlanUpdateDraft(id: string, document: PlanDocument): Promise<boolean>;
   trainingPlanState(): Promise<TrainingPlanState>;
   trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;

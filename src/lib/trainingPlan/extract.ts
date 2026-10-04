@@ -93,6 +93,13 @@ export const extractPlan = (reply: string): ExtractResult => {
     return document ? { ok: true, document, source } : null;
   };
 
+  const candidates = [
+    ...fencedBlocks(text).map(text => ({ text, source: 'fence' as const })),
+    { text, source: 'whole' as const },
+    ...bracketed(text).map(text => ({ text, source: 'braces' as const })),
+  ];
+  const final = candidates.map(c => ({ value: tryParse(c.text.trim()), source: c.source })).find(c => isRecord(c.value) && ['zeppbridge-plan/2', 'zeppbridge.plan/2'].includes(String(c.value.format)) && asPlan(c.value));
+  if (final) return { ok: true, document: asPlan(final.value)!, source: final.source };
   for (const block of fencedBlocks(text)) {
     const hit = attempt(block, 'fence');
     if (hit) return hit;

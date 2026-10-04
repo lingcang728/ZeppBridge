@@ -40,6 +40,70 @@ fn easy_run(date: &str) -> serde_json::Value {
 }
 
 #[test]
+fn plan_two_keeps_local_rest_advice_out_of_the_watch_body() {
+    let old = document(
+        json!({"from":"2026-10-02","to":"2026-10-08","workouts":[easy_run("2026-10-03")]}),
+    );
+    let mut next = serde_json::to_value(&old).unwrap();
+    next["format"] = json!("zeppbridge.plan/2");
+    next["summary"] = json!("Recover first");
+    next["rest"] =
+        json!([{"date":"2026-10-03","bedtime":"22:30","sleepTarget":"8h30m","note":"Early night"}]);
+    let check = check_plan(&document(next), context());
+    assert!(check.publishable());
+    assert_eq!(check.rest[0].bedtime_minutes, Some(1350));
+    assert_eq!(check.rest[0].sleep_target_seconds, Some(30600));
+    assert_eq!(check.workouts, check_plan(&old, context()).workouts);
+    let numbered = |workouts: Vec<Workout>| {
+        workouts
+            .into_iter()
+            .enumerate()
+            .map(|(i, workout)| NumberedWorkout {
+                id: i as i64 + 1,
+                workout,
+            })
+            .collect::<Vec<_>>()
+    };
+    let window = Window::starting(context().today);
+    assert_eq!(
+        window_body(window, &numbered(check.workouts)),
+        window_body(window, &numbered(check_plan(&old, context()).workouts))
+    );
+}
+
+#[test]
+fn malformed_or_out_of_range_rest_advice_blocks_the_whole_plan() {
+    for rest in [
+        json!({"date":"2026-10-03","bedtime":"24:00"}),
+        json!({"date":"2026-10-03","sleepTarget":"8h90m"}),
+        json!({"date":"2026-10-03","sleepTarget":"400m"}),
+        json!({"date":"2026-10-09","bedtime":"22:30"}),
+    ] {
+        let check = check_plan(
+            &document(json!({"from":"2026-10-02","to":"2026-10-08","workouts":[],"rest":[rest]})),
+            context(),
+        );
+        assert!(!check.publishable());
+        assert!(check
+            .issues
+            .iter()
+            .any(|i| i.message_code.contains("rest_")));
+    }
+}
+
+#[test]
+fn rest_only_plans_require_a_declared_window_and_old_plans_default_to_no_rest() {
+    let local = document(
+        json!({"from":"2026-10-02","to":"2026-10-08","workouts":[],"rest":[{"date":"2026-10-04","sleepTarget":"8h"}]}),
+    );
+    assert!(check_plan(&local, context()).publishable());
+    let old = document(json!({"workouts":[easy_run("2026-10-03")]}));
+    assert!(check_plan(&old, context()).rest.is_empty());
+    let missing = document(json!({"workouts":[],"rest":[{"date":"2026-10-04"}]}));
+    assert!(!check_plan(&missing, context()).publishable());
+}
+
+#[test]
 fn short_units_mean_what_runners_write() {
     // 400m 是 400 米，不是 400 分钟；分钟一律写 min。
     assert_eq!(

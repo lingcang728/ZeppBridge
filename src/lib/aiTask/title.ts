@@ -20,7 +20,7 @@ const messages = defineMessages(
 export const recentWindowDays = (task: Pick<AiTask, 'categories'>): number =>
   task.categories
     .filter((range) => range.enabled && AI_TASK_CATEGORY_META[range.category].hasWindow)
-    .reduce((max, range) => Math.max(max, range.days_before), 0) || 14;
+    .reduce((max, range) => Math.max(max, range.days_before + (range.include_workout_day ? 1 : 0)), 0) || 14;
 
 export const autoTaskTitle = (
   task: Pick<AiTask, 'categories'>,

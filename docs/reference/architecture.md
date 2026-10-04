@@ -452,3 +452,5 @@ read. Only statuses and field names are recorded.
 | More data sources | Not started |
 | macOS (Apple Silicon) desktop | Merged (#1); CI has compile/test gates and releases have shipped a dmg plus updater artifacts since v0.9.2; ad-hoc signed, no Apple notarisation |
 | Public-release engineering (signing, updates, SBOM, clean VM) | Partly done: updater artifacts and `latest.json` are signed with the Tauri key and auto-update through GitHub Releases; the installers still have no Authenticode certificate and there is no clean-VM acceptance |
+
+The time bridge uses schema 36: `ai_exchanges` links prepared context, received drafts and delivery records. The persistent profile lives in `app_meta`; daily strips and adherence reuse core read-only queries. Rest advice stays local.

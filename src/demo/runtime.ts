@@ -15,6 +15,7 @@
 import { buildDemoData, sleepStageSlices, metricSeries, type DemoData } from './dataset';
 import { demoPrepare, demoPreview, demoTaskList, demoTemplates } from './ai';
 import { createDemoPlan } from './plan';
+import { demoDayStrip } from './bridge';
 import { demoCapabilities, demoDevices, demoLedger, demoLocalApi, demoOverview, demoPrefs, demoStatus, demoWeeklyReport } from './facts';
 import { at, dayKey } from './rng';
 import { hostPost } from './host';
@@ -36,6 +37,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   const listeners = new Map<string, number[]>();
   let nextId = 1;
   let status = demoStatus(data);
+  let profileNote = '';
 
   const emit = (event: string, payload: unknown) => {
     for (const id of listeners.get(event) ?? []) callbacks.get(id)?.({ event, id: 0, payload });
@@ -86,7 +88,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     verify_auth: () => status,
     get_login_status: () => ({ state: 'connected', message: '', page_url: '' }),
     get_official_status: () => ({ state: 'connected', message_code: null, message: null, user_id_masked: '****0000', nickname: demoText().nickname, connected_at: Math.floor(data.now.getTime() / 1000) - 86_400 * 40, authorize_url: null }),
-    get_user_prefs: () => demoPrefs(),
+    get_user_prefs: () => ({ ...demoPrefs(), ai_profile_note: profileNote }),
     get_local_api_status: () => demoLocalApi(),
     get_device_profiles: () => demoDevices(data),
     get_capability_overview: () => demoCapabilities(data),
@@ -124,6 +126,12 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     start_history_sync: () => simulateSync(),
 
     ai_task_list: () => demoTaskList(data),
+    ai_task_day_strip: (args) => demoDayStrip(data,Number(args.daysBefore ?? 14),String(args.end ?? dayKey(data.now))),
+    ai_exchange_list: () => [],
+    ai_profile_save: (args) => { profileNote = String(args.note ?? ''); return null; },
+    training_plan_adherence: () => [],
+    training_plan_update_draft: (args) => plan.updateDraft(args.document as import('../types/trainingPlan').PlanDocument),
+    'plugin:clipboard-manager|read_text': () => '',
     ai_template_list: () => demoTemplates(),
     ai_task_save: (args) => ({ ...(args.task as AiTask), id: (args.task as AiTask)?.id || 'demo-task-1', updated_at: new Date().toISOString() }),
     ai_task_delete: () => null,

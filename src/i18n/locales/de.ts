@@ -183,33 +183,6 @@ export default {
       label: "Tagesverlauf",
       aria: "Zeitraum des Tagesverlaufs",
     },
-    'components/ai/AiAskStart': {
-      title: "Was möchtest du wissen?",
-      sleepTitle: "Meinen letzten Schlaf ansehen",
-      sleepSub: "Ob ich genug und regelmäßig schlafe und wie das mit der Erholung zusammenhängt",
-      weekTitle: "Diese Woche ansehen",
-      weekSub: "Was sich diese Woche gegenüber sonst verändert hat",
-      workoutTitle: "Ein Training analysieren",
-      workoutSub: "Wähle erst ein Training, dann sieh dir Tempo, Herzfrequenz und Erholung an",
-      freeTitle: "Eigene Frage stellen",
-      freeSub: "Schreib deine Frage; die Daten folgen dem, was im Diagramm ausgewählt ist",
-      dataTitle: "Daten, die du weitergibst",
-      plain: (range: string, categories: string) => `${categories} für ${range}`,
-      plainWorkouts: (count: number) => plural(count, { one: `, im Mittelpunkt steht dein ausgewähltes Training (${count})`, other: `, im Mittelpunkt stehen deine ${count} ausgewählten Trainings` }),
-      plainNoGps: "; ohne genaue Position",
-      plainGps: "; mit genauer Position",
-      plainAttachments: (count: number) => plural(count, { one: `; dazu ${count} angehängte Datei`, other: `; dazu ${count} angehängte Dateien` }),
-      plainNothing: "Noch keine Daten ausgewählt.",
-      emptyRange: "In diesem Zeitraum gibt es keine Aufzeichnungen zum Analysieren.",
-      widen: "Die letzten 30 Tage verwenden",
-      rangeUnknown: "einen kürzlichen Zeitraum",
-      haveDays: (have: number, total: number) => `${have} von ${total} Tagen mit Daten`,
-      noneInRange: "Keine Aufzeichnungen in diesem Zeitraum",
-      notPicked: "Nicht enthalten",
-      counting: "Wird gezählt…",
-      separator: ", ",
-      end: ".",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "So liest du diese Datei:",
@@ -245,18 +218,6 @@ export default {
     'components/OfficialOnlyNote': {
       text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingsbelastung bietet die offizielle API nicht an – verbinde dafür „Erweiterte Daten".',
       action: 'Verbinden',
-    },
-    'components/ai/WorkoutPicker': {
-      avgHr: (bpm: number) => `Ø HF ${bpm}`,
-      empty: 'Noch keine Trainings auf diesem Rechner',
-      hint: 'Mehrere möglich, keins auch',
-      noneSelected: (days: number) =>
-        `Kein Training gewählt – analysiert werden die letzten ${days} Tage bis heute.`,
-      remove: 'Auswahl aufheben',
-      selectedCount: (count: number) => `${count} ausgewählt`,
-      showLess: 'Weniger anzeigen',
-      showMore: (count: number) => `${count} weitere anzeigen`,
-      title: 'Welches Training analysieren',
     },
     // ── views/Settings ──
     // Mit en identisch und in allowlist-en.txt eingetragen:
@@ -1642,21 +1603,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stepsUnit: 'Schritte',
       title: 'Tägliche Aktivität',
     },
-    'views/AiComposer': {
-      andMore: (count: number) => `und ${count - 1} weitere`,
-      extrasFiles: (count: number) =>
-        plural(count, {
-          one: `${count} Anhang`,
-          other: `${count} Anhänge`,
-        }),
-      extrasNone: 'Keine Anhänge · Standardoptionen',
-      targetRecent: (days: number) => `Kein Training gewählt · die letzten ${days} Tage`,
-      undoAdded: (name: string) => `„${name}" hinzugefügt`,
-      undoDirection: 'Analyserichtung geändert',
-      undoPicked: (name: string) => `„${name}" ausgewählt`,
-      undoRemoved: (name: string) => `„${name}" entfernt`,
-      undoUnpicked: (name: string) => `Auswahl von „${name}" aufgehoben`,
-    },
     'views/BodyStatus': {
       vitalsGroupTitle: 'Erholung und Vitalwerte',
       bmiHint: 'Body-Mass-Index, von der Cloud zusammen mit dem Gewicht geliefert',
@@ -2370,28 +2316,7 @@ Antworte in Markdown.`,
       units: 'Einheiten',
       window: 'Zeitfenster',
     },
-    'components/ai/DirectionPanel': {
-      counter: (used: number, max: number) => `${used}/${max}`,
-      directionHint:
-        'Übernimmt den empfohlenen Datenbereich der Vorlage (im Graphen anpassbar).',
-      directionLabel: 'Analyserichtung (Vorlage)',
-      example1: 'Wie habe ich in letzter Zeit geschlafen, und was sollte ich ändern?',
-      example2: 'Passte die Trainingsbelastung dieser Woche für mich?',
-      example3: 'Wird meine Erholung besser oder schlechter?',
-      examplesLabel: 'Versuch es so',
-      hint: 'Richtung und Frage definieren den Kontext für die KI',
-      noDirection: 'Keine',
-      noteLabel: 'Persönlicher Hintergrund (optional)',
-      notePlaceholder: 'Verletzungen, Ziele, aktuelle Verfassung … fließen in den Export ein.',
-      questionLabel: 'Deine Frage',
-      questionPlaceholder:
-        'Worauf liegt dein Fokus? Z. B.: Passte die Intensität des Laufs am Mittwoch?',
-      title: 'Richtung und Frage',
-      groupDaily: 'Alltag',
-      groupRun: 'Laufen',
-      groupOther: 'Weitere',
-    },
-    'components/ai/HandoffPanel': {
+    'components/ai/HandoffDock': {
       closePanel: 'Einklappen',
       copiedFiles: (count: number) =>
         plural(count, {
@@ -2462,7 +2387,7 @@ Antworte in Markdown.`,
       retry: 'Wiederholen',
       skipped: 'Die Browser-Vorschau kann keinen Browser öffnen',
     },
-    'components/ai/TaskExtras': {
+    'components/ai/HandoffTray': {
       add: 'Dateien hinzufügen',
       advanced: 'Erweiterte Optionen',
       attachTitle: 'Originaldateien (PDF / Bilder)',

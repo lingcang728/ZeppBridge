@@ -45,6 +45,7 @@ pub enum DayChange {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DayPreview {
+    pub rest: Option<super::RestDay>,
     pub date: NaiveDate,
     pub change: DayChange,
     pub before: Vec<Workout>,
@@ -72,6 +73,7 @@ pub fn preview(window: Window, before: &[Workout], after: &[Workout]) -> Vec<Day
                 (false, false) => DayChange::Replaced,
             };
             DayPreview {
+                rest: None,
                 date,
                 change,
                 before,

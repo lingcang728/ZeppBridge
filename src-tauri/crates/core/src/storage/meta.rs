@@ -96,6 +96,8 @@ impl Database {
 
     pub fn user_prefs(&self) -> Result<UserPrefs> {
         Ok(UserPrefs {
+            demo_mode: self.is_demo_library()?,
+            ai_profile_note: self.ai_profile_note()?,
             retention_days: self
                 .read_pref_days(RETENTION_DAYS_KEY, UserPrefs::DEFAULT_RETENTION_DAYS)?,
             history_sync_days: self.read_history_days()?,
@@ -128,6 +130,8 @@ impl Database {
             if prefs.archive_enabled { "1" } else { "0" },
         )?;
         Ok(UserPrefs {
+            demo_mode: self.is_demo_library()?,
+            ai_profile_note: self.ai_profile_note()?,
             retention_days,
             history_sync_days,
             archive_enabled: prefs.archive_enabled,

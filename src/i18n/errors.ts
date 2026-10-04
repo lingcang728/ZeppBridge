@@ -179,6 +179,8 @@ const messages = defineMessages(
 
     /* —— 训练计划 —— */
     'err.training_plan.draft_not_found': '找不到这份计划草稿',
+    'err.training_plan.rest_unparsable': '休息日的日期、就寝时间或睡眠目标无法解析',
+    'err.training_plan.rest_outside_range': '休息日不在计划日期范围内',
     'err.training_plan.draft_closed': '这份计划草稿已经发过或丢掉了',
     'err.training_plan.publish_not_found': '找不到这次推送的记录',
     'err.training_plan.rejected': 'Zepp 没有接受这份计划，手表上的计划没有变',
@@ -363,6 +365,8 @@ const messages = defineMessages(
 
     /* —— training plans —— */
     'err.training_plan.draft_not_found': 'This plan draft no longer exists',
+    'err.training_plan.rest_unparsable': 'Cannot read the rest date, bedtime or sleep target',
+    'err.training_plan.rest_outside_range': 'The rest date is outside the plan range',
     'err.training_plan.draft_closed': 'This plan draft was already sent or discarded',
     'err.training_plan.publish_not_found': 'No record of that push',
     'err.training_plan.rejected': 'Zepp did not accept this plan; the plan on your watch is unchanged',

@@ -120,6 +120,8 @@ export interface StorageEstimate {
 }
 
 export interface UserPrefs {
+  demo_mode?: boolean;
+  ai_profile_note?: string;
   retention_days: number;
   /** 历史补拉往回覆盖多少天。和保留期解耦，上限 3650。 */
   history_sync_days: number;

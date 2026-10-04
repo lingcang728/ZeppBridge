@@ -85,7 +85,7 @@ const t = useMessages(defineMessages(
     mcp: 'Permitir que herramientas MCP locales consulten esta tarea',
     mcpHint: 'Para herramientas locales como Claude Desktop. Solo se aplica al MCP iniciado con --scope task, que entonces ve únicamente lo que cubre esta tarea; el modo predeterminado de solo lectura completa no se restringe con este interruptor.',
   },
-  'components/ai/TaskExtras',
+  'components/ai/HandoffTray',
 ));
 
 const notice = ref<string | null>(null);
@@ -152,23 +152,4 @@ const pick = async (replaceId?: string) => {
   </section>
 </template>
 
-<style scoped>
-.files { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
-.files li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
-.files li.is-missing { outline: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); }
-.file-name { flex: 1; min-width: 0; color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywhere; }
-.file-size { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }
-.file-flag { font-size: var(--fs-xs); }
-.file-flag.bad { color: var(--danger); }
-.file-flag.warn { color: var(--warning); }
-.add-file { min-height: 34px; padding: 0 14px; }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
-.toggle-copy { display: grid; min-width: 0; gap: 2px; }
-.toggle-copy strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.toggle-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
-.toggle-row .mat-switch { flex: 0 0 auto; }
-.advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.advanced > summary { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; list-style: none; }
-.advanced > summary::-webkit-details-marker { display: none; }
-.advanced[open] > summary { color: var(--ink); }
-</style>
+<style scoped src="./HandoffTray.css"></style>
