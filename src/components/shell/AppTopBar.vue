@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { fontsReady } from '../../lib/fontsReady';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { revealWeekDigest } from '../../lib/revealWeekDigest';
+import { revealWeeklyReport } from '../../lib/revealWeeklyReport';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
@@ -223,7 +224,7 @@ const syncTitle = computed(() => {
 const onSyncClick = () => {
   if (readyFirst.value) {
     pickUpReady('pickup');
-    void router.push('/').then(() => revealWeekDigest());
+    void router.push('/').then(() => revealWeeklyReport());
   } else if (readyToHand.value) {
     void router.push('/ai');
   } else if (isSyncing.value) {
@@ -362,7 +363,7 @@ onMounted(() => {
   window.addEventListener('keydown', onEscapeBack);
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
-  void document.fonts?.ready.then(() => { measuredKey = ''; scheduleFit(); });
+  void fontsReady().then(() => { measuredKey = ''; scheduleFit(); });
   scheduleFit();
 });
 onBeforeUnmount(() => {

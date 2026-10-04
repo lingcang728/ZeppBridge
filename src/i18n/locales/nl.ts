@@ -47,19 +47,6 @@ export default {
       separator: ", ",
       end: ".",
     },
-    'components/overview/WeekDigest': {
-      title: "Deze week",
-      window: (recent: string, baseline: string) => `${recent}, vergeleken met jouw eigen periode ${baseline}`,
-      higher: (label: string, percent: number) => `${label}: ${percent}% hoger dan normaal`,
-      lower: (label: string, percent: number) => `${label}: ${percent}% lager dan normaal`,
-      days: (count: number) => plural(count, { one: `${count} dag met registraties`, other: `${count} dagen met registraties` }),
-      steady: "Deze week geen duidelijke veranderingen ten opzichte van normaal.",
-      none: "Deze week nog geen gegevens om met je gebruikelijke waarden te vergelijken.",
-      curves: "Curves bekijken",
-      addEvent: "Levensgebeurtenis toevoegen",
-      toAi: "Vraag het aan AI",
-      full: "Volledig weekrapport",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Dit bestand lezen:",

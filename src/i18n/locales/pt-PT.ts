@@ -47,19 +47,6 @@ export default {
       separator: ", ",
       end: ".",
     },
-    'components/overview/WeekDigest': {
-      title: "Esta semana",
-      window: (recent: string, baseline: string) => `${recent}, em comparação com o teu período ${baseline}`,
-      higher: (label: string, percent: number) => `${label}: ${percent}% acima do habitual`,
-      lower: (label: string, percent: number) => `${label}: ${percent}% abaixo do habitual`,
-      days: (count: number) => plural(count, { one: `${count} dia com registos`, other: `${count} dias com registos` }),
-      steady: "Esta semana não houve alterações significativas em comparação com o habitual.",
-      none: "Ainda não há dados desta semana que possam ser comparados com o habitual.",
-      curves: "Ver curvas",
-      addEvent: "Adicionar um evento de vida",
-      toAi: "Perguntar à IA",
-      full: "Relatório semanal completo",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Como ler este ficheiro:",

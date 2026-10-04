@@ -75,13 +75,21 @@ onUnmounted(() => {
     <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
       <section ref="panel" class="dialog-panel" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
-        <slot />
+        <span class="dialog-glass" aria-hidden="true"></span>
+        <div class="dialog-scroll"><slot /></div>
       </section>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.dialog-panel { width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--mat-glass-line); border-radius: var(--radius-lg); background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); color: var(--ink); box-shadow: var(--mat-glass-shadow); overflow-wrap: anywhere; }
+/* 两层毛玻璃（全屏遮罩的模糊、面板的磨砂）都画在**垫底的一层**上，不画在遮罩 / 面板自己身上：
+   祖先只要带 backdrop-filter，里面胶囊和日期滚轮的液态玻璃透镜就看不见背后、挂不上（lib/glassLens.ts、
+   composables/useGlassLens.ts），弹窗里的选中块只剩一块不透明的深色胶囊（用户 2026-10-04：「添加事件」
+   里的分类和日期滚轮要做成液态玻璃）。和顶栏图标组的 .glass-control.is-lens-host 同一个做法。 */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .55); }
+.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); box-shadow: var(--mat-glass-shadow); overflow-wrap: anywhere; }
+.dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); pointer-events: none; }
+.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 </style>

@@ -14,7 +14,6 @@ import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
-import WeekDigest from '../components/overview/WeekDigest.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
@@ -353,8 +352,6 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 
     <!-- 用户自己固定的 3–4 个指标排在最上面：顺序由用户定，概览不替所有人排（评审 U10）。 -->
     <PinnedMetrics />
-    <!-- 「这一周」的事实摘要放进第一屏（体验评估 #3）：完整周报仍在下面。 -->
-    <WeekDigest />
 
     <Transition name="skeleton-out" @before-leave="holdInPlace">
       <div v-if="showSkeleton" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">

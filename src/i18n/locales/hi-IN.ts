@@ -46,19 +46,6 @@ export default {
       separator: ", ",
       end: "।",
     },
-    'components/overview/WeekDigest': {
-      title: "इस हफ़्ते",
-      window: (recent: string, baseline: string) => `${recent}, आपकी अपनी ${baseline} अवधि से तुलना`,
-      higher: (label: string, percent: number) => `${label} सामान्य से ${percent}% अधिक है`,
-      lower: (label: string, percent: number) => `${label} सामान्य से ${percent}% कम है`,
-      days: (count: number) => plural(count, { one: `${count} दिन का रिकॉर्ड`, other: `${count} दिनों का रिकॉर्ड` }),
-      steady: "इस हफ़्ते आपकी सामान्य स्थिति की तुलना में कोई स्पष्ट बदलाव नहीं है।",
-      none: "इस हफ़्ते सामान्य से तुलना के लिए अभी डेटा नहीं है।",
-      curves: "कर्व देखें",
-      addEvent: "जीवन की घटना जोड़ें",
-      toAi: "AI से पूछें",
-      full: "पूरी साप्ताहिक रिपोर्ट",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "इसे पढ़ने का तरीका:",

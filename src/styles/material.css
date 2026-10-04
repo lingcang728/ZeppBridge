@@ -89,6 +89,19 @@
 .pill-button > svg:first-child { color: var(--accent); }
 .pill-button.quiet { background: transparent; box-shadow: none; color: var(--muted); }
 .pill-button.quiet:hover { background: var(--glass-press); color: var(--ink); filter: none; }
+/* 液态玻璃那一档（用户 2026-10-04：生活事件卡上的「添加事件」）：不是一块实色凸起，而是一片透着底的玻璃——
+   清透的底、顶边一道镜面高光、底边回光和一圈极细亮边（--glass-rim），背后的卡面被轻轻磨砂。
+   按下时玻璃略压亮一点，和顶栏的玻璃控件同一套 token。 */
+.pill-button.is-glass {
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+.pill-button.is-glass:hover { filter: none; background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), linear-gradient(var(--glass-press), var(--glass-press)), var(--glass); }
+@media (prefers-reduced-transparency: reduce) {
+  .pill-button.is-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 
 /* ── 凹槽 ─────────────────────────── */
 .mat-inset {

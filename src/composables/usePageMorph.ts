@@ -9,6 +9,7 @@ import {
 } from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
 import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater, ringFocus } from '../lib/motion/focusTarget';
+import { whenFramesSteady } from '../lib/motion/steady';
 
 type Rect = WindowRect;
 
@@ -250,7 +251,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     const target = focus ? findFocusTarget(el, focus) : null;
     if (target && scroller) {
       const before = scroller.scrollTop;
-      scroller.scrollTop = before + focusScrollDelta(target, scroller);
+      scroller.scrollTop = before + focusScrollDelta(target, scroller, el);
       const moved = scroller.scrollTop - before;
       if (leaving && moved) leaving.style.top = `${(Number.parseFloat(leaving.style.top) || 0) + moved}px`;
     }
@@ -283,11 +284,12 @@ export const usePageMorph = (options: { back: () => void }) => {
     // 形变真正开跑时才让重活让路（lib/motion/budget.ts）。
     let release: () => void = () => undefined;
     for (const animation of all()) animation.pause();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    // 等帧节奏平稳（至少两帧）：新页首次光栅化让 GPU 卡住的那一两百毫秒落在起点上，不吞掉形变的开头。
+    void whenFramesSteady().then(() => {
       if (landed || aborted.has(el)) return;
       release = holdMotion();
       for (const animation of all()) animation.play();
-    }));
+    });
     // 放到一半按 Esc：不进去了——所有动画原路倒回，路由退回来处。
     const forgetEscape = onMotionEscape(() => {
       if (landed || aborted.has(el)) return false;
@@ -442,8 +444,19 @@ export const usePageMorph = (options: { back: () => void }) => {
       });
     }
     const all = () => [...flight.anims, ...(forward ? [forward.animation] : [])];
+    // 来处页刚从缓存插回文档，第一次上屏要整页重新光栅化：先停在起点（画面上就是详情页本身），等帧节奏平稳再缩。
+    // 以前一插回去就开跑，GPU 卡住的第一帧吞掉了七成路程——「返回时一下跳回去」。
+    let started = false;
+    const go = () => {
+      if (started || landed) return;
+      started = true;
+      for (const animation of all()) animation.play();
+    };
+    for (const animation of all()) animation.pause();
+    void whenFramesSteady().then(go);
     // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——照样落到卡上，只是快一点。
     const forgetEscape = onMotionEscape(() => {
+      go();
       for (const animation of all()) hurryAnimation(animation, ESC_FINISH_MS);
       return true;
     });

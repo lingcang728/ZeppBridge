@@ -12,6 +12,13 @@
  */
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { createLensFilter, lensEnabled, lensSupported, type LensFilter, type LensKind } from '../lib/glassLens';
+import { afterMotion } from '../lib/motion/budget';
+
+/** 空闲时再做（没有 requestIdleCallback 的内核退回一帧以后）。 */
+const whenIdle = (run: () => void) => {
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 400 });
+  else window.setTimeout(run, 16);
+};
 
 /** 从 from 往上，有没有会把透镜和背后页面隔开的东西（backdrop root）。透明度不算：页面切换的淡入淡出会误判。 */
 const isolatedFromPage = (from: HTMLElement | null): boolean => {
@@ -32,8 +39,14 @@ export const useGlassLens = (target: Ref<HTMLElement | null>, kind: LensKind = '
 
   const fit = (el: HTMLElement) => lens?.resize(el.offsetWidth, el.offsetHeight);
 
-  onMounted(() => {
-    if (!when || !lensEnabled.value || !lensSupported()) return;
+  let disposed = false;
+  let stopWatch: (() => void) | null = null;
+  /* 挂透镜要沿祖先一路读计算样式（isolatedFromPage），在刚插进文档的新页里每读一次都逼浏览器先把整页样式算完。
+     设置卡里有十几个胶囊和滚轮：以前它们在切页形变途中一起挂，主线程一卡 40–100ms，形变跟着一顿一跳
+     （用户 2026-10-04 录屏：从「数据来源」点进设置、设置里左右翻卡）。透镜只在拖动 / 转动时才浮起来，
+     晚一点挂看不出来：等形变放完、浏览器空下来再挂。 */
+  const attach = () => {
+    if (disposed) return;
     // 透镜元素多半要等 active 以后才挂上：那时还没有它，就从组件根往上查。
     const root = instance?.proxy?.$el as unknown;
     const from = target.value?.parentElement ?? (root instanceof HTMLElement ? root : null);
@@ -43,16 +56,23 @@ export const useGlassLens = (target: Ref<HTMLElement | null>, kind: LensKind = '
     observer = new ResizeObserver((entries) => {
       for (const entry of entries) fit(entry.target as HTMLElement);
     });
-    watch(target, (el, previous) => {
+    // 这时已经不在 setup 里了：watch 不会随组件自动停，卸载时手动停。
+    stopWatch = watch(target, (el, previous) => {
       if (previous) observer?.unobserve(previous);
       if (el) {
         observer?.observe(el);
         fit(el);
       }
     }, { immediate: true });
+  };
+  onMounted(() => {
+    if (!when || !lensEnabled.value || !lensSupported()) return;
+    afterMotion(() => whenIdle(attach));
   });
 
   onBeforeUnmount(() => {
+    disposed = true;
+    stopWatch?.();
     observer?.disconnect();
     lens?.dispose();
     lens = null;

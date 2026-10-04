@@ -13,6 +13,7 @@
  * 只改这一个数；选中值在动画停稳以后才提交——切语言会重绘整页，放在动画
  * 中途提交会让滚轮卡一下。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
 import { useGlassLens } from '../composables/useGlassLens';
 
@@ -347,7 +348,7 @@ watch(() => props.items.map((item) => item.label).join('\u0000'), async () => {
 let observer: ResizeObserver | null = null;
 onMounted(() => {
   measure();
-  void document.fonts?.ready.then(measure);
+  void fontsReady().then(measure);
   observer = new ResizeObserver(measure);
   for (const el of itemEls.value) observer.observe(el);
   root.value?.addEventListener('wheel', onWheel, { passive: false });

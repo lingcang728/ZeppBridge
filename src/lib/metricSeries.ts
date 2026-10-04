@@ -100,14 +100,44 @@ export const sliceSeries = (series: MetricSeries, days: number, today = currentT
   };
 };
 
-/** `sliceSeries` 作用到一整份按名字索引的序列上。 */
+/**
+ * 这段范围画不出曲线（没有记录、或只有一天）而更长的某一档画得出：最短的那一档；不用换就是 null。
+ *
+ * 用户 2026-10-04：VO₂max 一年只测几次，范围停在 7 天时那张卡只剩一句「这段范围没有记录」——
+ * 不要给人看一段空范围，自动跳到有记录的那一档。
+ */
+export const widerRangeWithData = (series: MetricSeries | null | undefined, days: number, today = currentToday()): SeriesRangeDays | null => {
+  if (!series?.points.length) return null;
+  const end = windowStartDate(1, today);
+  const count = (span: number) => {
+    const start = windowStartDate(span, today);
+    return series.points.filter((point) => point.date >= start && point.date <= end).length;
+  };
+  // 本来就画得出曲线（两天以上）就不换。只有一天的也往长里找一档画得出曲线的——一个孤零零的读数
+  // 加一句「画不出趋势」，和空着差不多；哪档都只有一天，就停在这里。
+  const here = count(days);
+  if (here >= 2) return null;
+  const longer = SERIES_RANGE_DAYS.filter((span) => span > days);
+  const trend = longer.find((span) => count(span) >= 2);
+  if (trend) return trend;
+  return here ? null : longer.find((span) => count(span) >= 1) ?? null;
+};
+
+/**
+ * `sliceSeries` 作用到一整份按名字索引的序列上。
+ *
+ * 某项在这段范围里画不出曲线、更长的一档里画得出的，那一项按那一档切（`window_days` 跟着变长，
+ * 卡片据此写明「这里显示的是 6 个月」，见 MetricTrendCard）；其余各项照常按 `days` 切。
+ */
 export const sliceIndexed = (
   series: Record<string, MetricSeries>,
   days: number,
   today = currentToday(),
 ): Record<string, MetricSeries> => {
   const out: Record<string, MetricSeries> = {};
-  for (const [name, item] of Object.entries(series)) out[name] = sliceSeries(item, days, today);
+  for (const [name, item] of Object.entries(series)) {
+    out[name] = sliceSeries(item, widerRangeWithData(item, days, today) ?? days, today);
+  }
   return out;
 };
 

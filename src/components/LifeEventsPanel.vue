@@ -46,7 +46,7 @@ onActivated(reload);
         <h2 id="life-events-title">{{ t.title }}</h2>
         <p>{{ empty ? t.empty : t.intro }}</p>
       </div>
-      <button type="button" class="pill-button" @click="open()"><Icon name="plus" :size="14" />{{ t.add }}</button>
+      <button type="button" class="pill-button is-glass" @click="open()"><Icon name="plus" :size="14" />{{ t.add }}</button>
     </header>
 
     <div v-if="events.length" class="le-filters">

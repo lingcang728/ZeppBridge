@@ -45,19 +45,6 @@ export default {
       separator: ", ",
       end: ".",
     },
-    'components/overview/WeekDigest': {
-      title: "Эта неделя",
-      window: (recent: string, baseline: string) => `${recent}, в сравнении с вашим собственным периодом ${baseline}`,
-      higher: (label: string, percent: number) => `${label}: на ${percent}% выше обычного уровня`,
-      lower: (label: string, percent: number) => `${label}: на ${percent}% ниже обычного уровня`,
-      days: (count: number) => plural(count, { one: `${count} день с записями`, other: `${count} дней с записями`, few: `${count} дня с записями`, many: `${count} дней с записями` }),
-      steady: "На этой неделе заметных отличий от обычного нет.",
-      none: "За эту неделю пока недостаточно данных для сравнения с обычными значениями.",
-      curves: "Посмотреть кривые",
-      addEvent: "Добавить событие из жизни",
-      toAi: "Спросить об этом ИИ",
-      full: "Полный недельный отчёт",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Как читать этот файл:",

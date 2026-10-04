@@ -2,9 +2,10 @@ import { backend, isDesktop } from './bridge';
 import { SERIES_FETCH_DAYS } from './metricSeries';
 import { cached, peek, type Query } from './readCache';
 import { useTrendRange } from '../composables/useTrendRange';
+import { deviceImageFor } from './deviceCatalog';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
 import type {
-  DailyHeartRateExtreme, DataHealth, HeartRateZoneOptions, HeartRatePoint, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
+  DailyHeartRateExtreme, DataHealth, DeviceProfile, HeartRateZoneOptions, HeartRatePoint, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
   WorkoutSeries,
 } from '../types';
 
@@ -19,6 +20,14 @@ export const TRAINING_METRICS = ['vo2max', 'training_load', 'lactate_threshold_h
 export const ACTIVITY_METRICS = ['steps', 'distance', 'active_calories', 'active_minutes'] as const;
 /** 训练负荷平衡至少看一个月：28 天窗口要先有这么长的跑道才算得出比值。 */
 export const TRAINING_BALANCE_DAYS = Math.max(28, SERIES_FETCH_DAYS);
+
+/** 图片先解码好：挂上去的第一帧就画得出来，不会空一两帧再闪出来。解不出来也不拦着（DeviceVisual 自己会藏起坏图）。 */
+const decodeImage = async (src: string): Promise<void> => {
+  if (!src || typeof Image === 'undefined') return;
+  const image = new Image();
+  image.src = src;
+  await image.decode().catch(() => undefined);
+};
 
 export const pageQuery = {
   metricSeries: (metrics: readonly string[], days = SERIES_FETCH_DAYS): Query<MetricSeries[]> => ({
@@ -57,6 +66,20 @@ export const pageQuery = {
     key: `workout_detail:${workoutId}`,
     fetch: () => backend.getWorkoutDetail(workoutId),
   }),
+  /* 运动详情左上角那块表：设备档案连同表的图片一起备好（图片解码完才算读好）。以前它不在预加载里，
+     第一帧没有表，形变放完才冒出来、把标题往右一挤（用户 2026-10-04 录屏：点进「健走」「户外骑行」都这样）。 */
+  workoutDevice: (workoutId: string): Query<DeviceProfile> => ({
+    key: `workout_device:${workoutId}`,
+    fetch: async () => {
+      const detail = await cached(pageQuery.workoutDetail(workoutId));
+      if (!detail) return {};
+      const profile: DeviceProfile = await backend
+        .getDeviceProfile({ deviceId: detail.device_id, sourceScope: detail.source_scope })
+        .catch(() => ({}));
+      await decodeImage(deviceImageFor(profile.kind, profile.image_key));
+      return profile;
+    },
+  }),
   workoutSeries: (workoutId: string): Query<WorkoutSeries> => ({
     key: `workout_series:${workoutId}`,
     fetch: () => backend.getWorkoutSeries(workoutId),
@@ -94,7 +117,11 @@ export const trainingPageQueries = () => [
 export const heartRateZonesQuery = (rangeDays: number = useTrendRange().value) => pageQuery.heartRateZones(Math.max(30, rangeDays));
 export const activityPageQueries = () => [pageQuery.metricSeries(ACTIVITY_METRICS)] as const;
 export const sleepPageQueries = (sleepId: string) => [pageQuery.sleepDetail(sleepId), pageQuery.recentSleep(7)] as const;
-export const workoutPageQueries = (workoutId: string) => [pageQuery.workoutDetail(workoutId), pageQuery.workoutSeries(workoutId)] as const;
+export const workoutPageQueries = (workoutId: string) => [
+  pageQuery.workoutDetail(workoutId),
+  pageQuery.workoutSeries(workoutId),
+  pageQuery.workoutDevice(workoutId),
+] as const;
 /** 「最近记录」各取最近 150 条（完整历史在分页的 /sleep 与 /workouts）。 */
 export const RECENT_RECORDS_LIMIT = 150;
 export const recentPageQueries = () => [

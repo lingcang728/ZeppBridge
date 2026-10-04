@@ -25,6 +25,7 @@
  * 放不下就折行（is-wrapped）：以前项被压窄、字互相叠在一起（葡语的生活事件分类、补拉
  * 起点）。折行后滑块按行定位（--thumb-t / --thumb-h），只能点、不能横拖。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
+import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, FLICK_VELOCITY, snapStop, type SegmentStop } from '../lib/navigation';
 import { flickDeform, liftRect, rubberStretch, squash, stretchLimit } from '../lib/segmentGlass';
@@ -578,7 +579,7 @@ onMounted(() => {
     observer = new ResizeObserver(() => measure());
     observeItems();
   });
-  void document.fonts?.ready.then(() => measure());
+  void fontsReady().then(() => measure());
   window.addEventListener('resize', measure);
 });
 onBeforeUnmount(() => {

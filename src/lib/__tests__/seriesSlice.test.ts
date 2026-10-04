@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MetricSeries } from '../../types';
-import { sliceByDate, sliceSeries, windowStartDate } from '../metricSeries';
+import { sliceByDate, sliceIndexed, sliceSeries, widerRangeWithData, windowStartDate } from '../metricSeries';
 
 const today = new Date(2026, 8, 29, 18, 0);
 const long: MetricSeries = {
@@ -41,5 +41,28 @@ describe('sliceSeries', () => {
 
   it('slices dated rows by the same first day', () => {
     expect(sliceByDate([{ date: '2026-09-22' }, { date: '2026-09-23' }], 7, today)).toEqual([{ date: '2026-09-23' }]);
+  });
+});
+
+describe('a card never sits on a range it cannot draw', () => {
+  // 用户 2026-10-04：VO₂max 7 天里没有、6 个月里有，就自动显示 6 个月。
+  const sparse: MetricSeries = { ...long, metric: 'vo2max', points: [{ date: '2026-04-10', value: 52 }, { date: '2026-09-10', value: 53 }] };
+
+  it('widens to the shortest range that can draw a line', () => {
+    expect(widerRangeWithData(sparse, 7, today)).toBe(180);
+    const shown = sliceIndexed({ vo2max: sparse }, 7, today).vo2max!;
+    expect(shown).toMatchObject({ window_days: 180, days_with_data: 2 });
+  });
+
+  it('keeps the asked range when it already draws, and when nothing longer does better', () => {
+    expect(widerRangeWithData(long, 7, today)).toBeNull();
+    const single = { ...long, points: [{ date: '2026-09-28', value: 51 }] };
+    expect(widerRangeWithData(single, 7, today)).toBeNull();
+    expect(widerRangeWithData({ ...long, points: [] }, 7, today)).toBeNull();
+  });
+
+  it('falls back to any range with a reading when the asked one is empty', () => {
+    const once = { ...long, points: [{ date: '2026-09-10', value: 51 }] };
+    expect(widerRangeWithData(once, 7, today)).toBe(30);
   });
 });

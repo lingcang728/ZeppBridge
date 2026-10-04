@@ -48,19 +48,6 @@ export default {
       separator: ", ",
       end: ".",
     },
-    'components/overview/WeekDigest': {
-      title: "Cette semaine",
-      window: (recent: string, baseline: string) => `${recent}, comparé à votre propre période ${baseline}`,
-      higher: (label: string, percent: number) => `${label} : ${percent}% au-dessus de votre niveau habituel`,
-      lower: (label: string, percent: number) => `${label} : ${percent}% en dessous de votre niveau habituel`,
-      days: (count: number) => plural(count, { one: `${count} jour enregistré`, other: `${count} jours enregistrés` }),
-      steady: "Pas de changement notable cette semaine par rapport à d’habitude.",
-      none: "Pas encore de données cette semaine à comparer à vos habitudes.",
-      curves: "Voir les courbes",
-      addEvent: "Ajouter un événement de vie",
-      toAi: "En parler à l’IA",
-      full: "Rapport complet",
-    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Comment lire ce fichier :",

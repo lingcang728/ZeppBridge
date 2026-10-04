@@ -9,7 +9,7 @@ import { useSettingsContext } from '../../../composables/settings/context';
 import { useSettingsFormat } from '../../../composables/settings/useSettingsFormat';
 import { useSyncController } from '../../../composables/useSyncController';
 import { regionShortName } from '../../../lib/deviceCopy';
-import { revealWeekDigest } from '../../../lib/revealWeekDigest';
+import { revealWeeklyReport } from '../../../lib/revealWeeklyReport';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
@@ -30,7 +30,7 @@ const firstLine = computed(() => {
 });
 const goOverview = () => {
   if (firstReady.value) pickUpReady('pickup');
-  void router.push('/').then(() => revealWeekDigest());
+  void router.push('/').then(() => revealWeeklyReport());
 };
 const { formatDateTime } = useSettingsFormat();
 const {

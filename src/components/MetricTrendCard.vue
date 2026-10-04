@@ -25,6 +25,8 @@ const chartClick = (event: ChartEvent) => {
 };
 import { chartPalette } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
+import { rangeLabel, type RangeDays } from '../lib/rangeOptions';
+import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -35,6 +37,7 @@ const messages = defineMessages(
     measuredOn: (date: string) => `测于 ${date}`,
     focusValue: (date: string, value: string) => `${date}：${value}`,
     focusMissing: (date: string) => `${date} 没有记录`,
+    widened: (asked: string, shown: string) => `${asked}内记录不足 · 这里显示 ${shown}`,
     trendAria: (label: string) => `${label}趋势曲线`,
     onlyOneDay: '这段范围只有 1 天记录，画不出趋势。',
     defaultEmpty: '同步后展示这项指标的趋势。',
@@ -47,6 +50,7 @@ const messages = defineMessages(
     measuredOn: (date: string) => `measured ${date}`,
     focusValue: (date: string, value: string) => `${date}: ${value}`,
     focusMissing: (date: string) => `${date}: no record`,
+    widened: (asked: string, shown: string) => `Too few records in ${asked} · showing ${shown}`,
     trendAria: (label: string) => `${label} trend line`,
     onlyOneDay: 'Only one day of data in this range — no trend to draw yet.',
     defaultEmpty: 'Trend appears here after a sync.',
@@ -59,6 +63,7 @@ const messages = defineMessages(
     measuredOn: (date: string) => `medido el ${date}`,
     focusValue: (date: string, value: string) => `${date}: ${value}`,
     focusMissing: (date: string) => `${date}: sin registro`,
+    widened: (asked: string, shown: string) => `Pocos registros en ${asked} · mostrando ${shown}`,
     trendAria: (label: string) => `Línea de tendencia de ${label}`,
     onlyOneDay: 'Solo hay 1 día de datos en este rango; no hay tendencia que trazar.',
     defaultEmpty: 'Esta métrica muestra su tendencia una vez sincronizada.',
@@ -116,6 +121,14 @@ const latest = computed(() => {
 });
 const latestDate = computed(() => props.series?.latest?.date ?? null);
 const coverage = computed(() => coverageLabel(props.series));
+/* 页面范围里画不出曲线、自动换成了更长一档（lib/metricSeries.ts 的 sliceIndexed）：写明这里是哪一段，
+   别让人以为它跟着页面的范围。 */
+const range = useTrendRange();
+const widened = computed(() => {
+  const shown = props.series?.window_days ?? 0;
+  if (!hasPoints.value || shown <= range.value) return null;
+  return t.value.widened(rangeLabel(range.value as RangeDays), rangeLabel(shown as RangeDays));
+});
 
 const stats = computed(() => {
   const series = props.series;
@@ -225,6 +238,7 @@ const hasEventMarks = computed(() => {
          以前读数换掉覆盖说明，字一长就折行，同一排卡片（subgrid）的曲线跟着整体上下跳。 -->
     <p :class="['trend-meta', { 'is-focused': focusLine && hasPoints }]">
       <strong v-if="focusLine && hasPoints" class="trend-focus">{{ focusLine }}</strong>
+      <span v-if="widened" class="trend-widened">{{ widened }}</span>
       <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
@@ -293,6 +307,7 @@ const hasEventMarks = computed(() => {
 }
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
+.trend-widened { color: var(--muted); font-weight: 600; }
 .trend-focus { position: absolute; top: 0; right: 0; left: 0; overflow: hidden; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
   text-overflow: ellipsis; white-space: nowrap; }
 .trend-meta.is-focused > :not(.trend-focus) { visibility: hidden; }

@@ -17,12 +17,23 @@ export const findFocusTarget = (page: Element, key: string): HTMLElement | null 
 /** 目标卡停在可视区里的位置：顶栏下面留一点（可视区包括顶栏那一条）。 */
 const TOP_GAP = 96;
 
-/** 把目标卡滚到可视区上方要滚多少（正数往下）；已经在合适位置就是 0。 */
-export const focusScrollDelta = (target: HTMLElement, scroller: HTMLElement): number => {
+/**
+ * 把目标卡滚到可视区上方要滚多少（正数往下）；已经在合适位置就是 0。
+ *
+ * 能滚多远按**这一页自己**的底算（`page`），不按滚动区的 scrollHeight：切页时离场的来处页还绝对定位地
+ * 叠在里面（概览很长），scrollHeight 是两页里长的那个。按它滚到底，来处页一离场滚动区变短，浏览器把
+ * scrollTop 夹回来——形变刚落定整页就往下一沉（用户 2026-10-04 录屏：睡眠 HRV、静息心率、训练负荷点进去都这样）。
+ */
+export const focusScrollDelta = (target: HTMLElement, scroller: HTMLElement, page?: HTMLElement): number => {
   const box = target.getBoundingClientRect();
   const view = scroller.getBoundingClientRect();
   const wanted = box.top - (view.top + TOP_GAP);
-  const max = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+  let bottom = scroller.scrollHeight;
+  if (page) {
+    const pad = Number.parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
+    bottom = Math.min(bottom, page.getBoundingClientRect().bottom - view.top - scroller.clientTop + scroller.scrollTop + pad);
+  }
+  const max = Math.max(0, bottom - scroller.clientHeight - scroller.scrollTop);
   return Math.max(-scroller.scrollTop, Math.min(wanted, max));
 };
 
@@ -69,7 +80,7 @@ export const revealFocusLater = (page: HTMLElement, key: string, waitMs = 1500):
       if (performance.now() - started < waitMs) requestAnimationFrame(look);
       return;
     }
-    const delta = focusScrollDelta(target, scroller);
+    const delta = focusScrollDelta(target, scroller, page);
     if (Math.abs(delta) > 4) scroller.scrollBy({ top: delta, behavior: reducedMotion() ? 'auto' : 'smooth' });
     window.setTimeout(() => ringFocus(target), Math.abs(delta) > 4 && !reducedMotion() ? 420 : 0);
   };

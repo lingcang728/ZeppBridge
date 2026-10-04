@@ -41,22 +41,24 @@ const reasonText = (fact: InsightFact): string => {
   return fact.reason || t.value.noBaseline;
 };
 
-/* 每一格都能点进对应的详情页：有悬停反馈的东西就该能点进去。 */
+/* 每一格都能点进对应的详情页：有悬停反馈的东西就该能点进去。有对应趋势卡的带上 ?focus=，
+   点进去直接停在那张卡上并圈一下（lib/motion/focusTarget.ts）——和置顶指标同一套。
+   概览顶上原来还有一份「这一周」摘要，和这张周报上下重叠，用户 2026-10-04 定只留这一张。 */
 const DETAIL_ROUTE: Record<string, string> = {
-  'weekly.resting_hr': '/heart',
-  'weekly.hrv': '/body',
-  'weekly.stress': '/body',
+  'weekly.resting_hr': '/heart?focus=resting_hr',
+  'weekly.hrv': '/body?focus=hrv',
+  'weekly.stress': '/body?focus=stress',
   'weekly.sleep_duration': '/sleep',
   'weekly.sleep_start_regularity': '/sleep',
   'weekly.workout_count': '/workouts',
-  'weekly.training_load': '/training',
+  'weekly.training_load': '/training?focus=training_load',
 };
 const detailRoute = (factId: string): string => DETAIL_ROUTE[factId] ?? '/recent';
 
 const metricLabel = (factId: string, fallback: string): string =>
   (t.value.metric as Record<string, string | undefined>)[factId] ?? fallback;
 
-/* 和概览顶上的「这一周」摘要读同一份（useWeeklyReport），只查一次库。 */
+/* 本地周报的共享数据（useWeeklyReport）：同步落地后自己重读。 */
 const { report, loading, error } = useWeeklyReport(() => t.value.loadFailed);
 const initialLoading = useFirstLoad(loading);
 

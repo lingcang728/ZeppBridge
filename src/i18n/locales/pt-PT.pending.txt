@@ -141,3 +141,4 @@ components/plan/plan.weekHard
 components/plan/plan.weekRest
 components/plan/plan.stepsTitle
 components/plan/plan.chartTitle
+components/MetricTrendCard.widened

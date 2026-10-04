@@ -39,6 +39,7 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   if (preloaded) {
     workout.value = preloaded[0] as WorkoutMetrics | null;
     series.value = preloaded[1];
+    device.value = preloaded[2];
     loading.value = false;
   }
   const error = ref<string | null>(null);
@@ -146,18 +147,15 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
     if (!isTauri()) { loading.value = false; return; }
     try {
       const emptySeries: WorkoutSeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], laps: [], summary: {} };
-      const [detailQuery, seriesQuery] = workoutPageQueries(workoutId.value);
-      const [detail, seriesResult] = await Promise.all([
+      const [detailQuery, seriesQuery, deviceQuery] = workoutPageQueries(workoutId.value);
+      const [detail, seriesResult, profile] = await Promise.all([
         cached(detailQuery),
         cached(seriesQuery).then(
           (value) => ({ ok: true as const, value }),
           (cause) => ({ ok: false as const, cause }),
         ),
+        cached(deviceQuery).catch(() => ({})),
       ]);
-      if (seq !== detailSeq) return;
-      const profile = detail
-        ? await tauriApi.getDeviceProfile({ deviceId: detail.device_id, sourceScope: detail.source_scope }).catch(() => ({}))
-        : {};
       if (seq !== detailSeq) return;
       workout.value = detail as WorkoutMetrics | null;
       if (!detail) {
