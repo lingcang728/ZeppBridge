@@ -246,3 +246,13 @@ components/overview/DataReadyCapsule.streamSeparator
 # 生活事件分类短名：荷兰语、德语里 Routine / Training 本来就这么写
 lib/lifeEvents.categoryShort.routine
 lib/lifeEvents.categoryShort.training
+
+# 置顶指标的名字和单位：和详情页卡片同一个说法（views/* 里同名的叶子也在本清单里）
+components/overview/PinnedMetrics.names.hrv
+components/overview/PinnedMetrics.names.hrv_rmssd
+components/overview/PinnedMetrics.names.vo2max
+components/overview/PinnedMetrics.names.pai_total
+components/overview/PinnedMetrics.names.stress
+components/overview/PinnedMetrics.names.bmi
+components/overview/PinnedMetrics.unitPai
+components/overview/PinnedMetrics.unitScore

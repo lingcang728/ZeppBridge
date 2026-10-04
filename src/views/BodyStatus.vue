@@ -29,7 +29,7 @@ import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
 import { bodyStatusMessages as messages } from './BodyStatus.i18n';
-import { buildBodyCards, convertSeries, groupOf, type CardGroup } from './body/bodyCards';
+import { buildBodyCards, convertSeries, groupOf, METRICS, type CardGroup } from './body/bodyCards';
 import { useBodyCharts } from '../composables/useBodyCharts';
 
 const t = useMessages(messages);
@@ -85,6 +85,9 @@ const missingVitals = computed(() => missingIn('vitals', vitalsCards.value.lengt
 const missingBody = computed(() => missingIn('body', bodyCards.value.length));
 const missingIntake = computed(() => missingIn('intake', intakeCards.value.length));
 const bodyCards = computed(() => withData('body'));
+/* 整组都空时只剩一句说明：从概览点「体重」进来，就定位到这句话（lib/motion/focusTarget.ts）。 */
+const groupKeys = { body: METRICS.filter((metric) => groupOf(metric) === 'body').join(' '),
+  intake: METRICS.filter((metric) => groupOf(metric) === 'intake').join(' ') };
 const intakeCards = computed(() => withData('intake'));
 
 const {
@@ -213,7 +216,7 @@ const groups = computed(() => ({
           <MissingMetricsRow :items="missingVitals" />
       </SectionGroup>
       <SectionGroup :title="groups.body.title" :summary="groups.body.summary" icon="body-activity" tone="activity">
-          <p v-if="!bodyCards.length" class="inline-alert" role="status">
+          <p v-if="!bodyCards.length" class="inline-alert" role="status" :data-focus-keys="groupKeys.body">
             <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
           </p>
           <div v-else class="trend-grid" :style="trendGridStyle(bodyCards.length)">
@@ -233,7 +236,7 @@ const groups = computed(() => ({
           <MissingMetricsRow :items="missingBody" />
       </SectionGroup>
       <SectionGroup :title="groups.intake.title" :summary="groups.intake.summary" icon="manual-entry" tone="training">
-          <p v-if="!intakeCards.length" class="inline-alert" role="status">
+          <p v-if="!intakeCards.length" class="inline-alert" role="status" :data-focus-keys="groupKeys.intake">
             <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
           </p>
           <template v-else>

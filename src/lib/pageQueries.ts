@@ -16,7 +16,7 @@ import type {
  * 这个模块不进首屏：prefetch.ts 第一次用到时才动态 import（它带着身体页的指标清单）。
  */
 export const HEART_TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
-export const TRAINING_METRICS = ['vo2max', 'training_load', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_daily'] as const;
+export const TRAINING_METRICS = ['vo2max', 'training_load', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_total'] as const;
 export const ACTIVITY_METRICS = ['steps', 'distance', 'active_calories', 'active_minutes'] as const;
 /** 训练负荷平衡至少看一个月：28 天窗口要先有这么长的跑道才算得出比值。 */
 export const TRAINING_BALANCE_DAYS = Math.max(28, SERIES_FETCH_DAYS);

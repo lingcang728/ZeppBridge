@@ -8,7 +8,7 @@ import {
   backdropFor, fly, HEAD_IN, HEAD_OUT, hide, PAGE_BODY_IN, PAGE_BODY_OUT, REPLICA_IN, REPLICA_OUT,
 } from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
-import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater, ringFocus } from '../lib/motion/focusTarget';
+import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater } from '../lib/motion/focusTarget';
 import { whenFramesSteady } from '../lib/motion/steady';
 
 type Rect = WindowRect;
@@ -337,9 +337,9 @@ export const usePageMorph = (options: { back: () => void }) => {
       hidden?.cancel();
       flight.dispose();
       release();
-      // 定位的那张卡圈一下；数据晚到、那张卡这时才出来的，滚过去再圈。
-      if (target?.isConnected) ringFocus(target);
-      else if (focus) revealFocusLater(el, focus);
+      // 定位的那张卡：等页面排版落定（形变放完图表才挂、有的卡读完数据才长高），还差多少就平滑滚过去，再圈一下。
+      // 形变开始前那次滚动是按当时的页面高度算的，常常滚不够——不能只圈不滚。
+      if (focus) revealFocusLater(el, focus);
     };
     flight.main.finished.then(finish, () => {
       // 被别的切页整个取消了（页面又离场了）：形变的痕迹一并撤掉。

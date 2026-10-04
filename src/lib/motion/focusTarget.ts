@@ -7,12 +7,17 @@ import type { RouteLocationNormalized } from 'vue-router';
  * 链接带 `?focus=指标名`，目标卡标着 `data-focus-key`（MetricTrendCard 用它的指标名）。从卡片展开时
  * usePageMorph 先把页面滚到那张卡、让窗口直接从小卡长成那张卡；没有形变（减少动效、数据还没到）时
  * 页面出来以后平滑滚过去。落定后圈一下。
+ *
+ * 没有卡的指标（近 6 个月一条读数都没有，收进了「近 6 个月没有读数」那一行，或者整组只剩一句说明）：
+ * 那一行 / 那句话标着 `data-focus-keys="指标名 指标名…"`，定位到它（用户 2026-10-04：体重、体脂率、BMI
+ * 没有数据，点进去停在页顶不动）。
  */
 export const focusKeyOf = (route: RouteLocationNormalized): string | null =>
   (typeof route.query.focus === 'string' && route.query.focus ? route.query.focus : null);
 
 export const findFocusTarget = (page: Element, key: string): HTMLElement | null =>
-  page.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`);
+  page.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`)
+  ?? page.querySelector<HTMLElement>(`[data-focus-keys~="${CSS.escape(key)}"]`);
 
 /** 目标卡停在可视区里的位置：顶栏下面留一点（可视区包括顶栏那一条）。 */
 const TOP_GAP = 96;
@@ -67,22 +72,66 @@ export const ringFocus = (target: HTMLElement): void => {
   animation.finished.then(drop, drop);
 };
 
+/** 页面高度连续这么多帧不变，才算排版落定。 */
+const STEADY_FRAMES = 6;
+/** 平滑滚动最多等这么久再圈（没有 scrollend 的情况）。 */
+const SCROLL_SETTLE_MS = 700;
+
 /**
- * 没有形变可以借（减少动效、目标卡要等数据才出现）：等目标出现（最多 `waitMs`），平滑滚过去再圈一下。
+ * 等目标出现、页面排版落定，再平滑滚过去、圈一下。形变落地后也走这里补一次。
+ *
+ * 不能在页面刚挂上时量一次就算：形变放完以后图表才一帧挂一张、每小时步数卡读完数据才从一行长成
+ * 一整块（高四百多像素），那一刻量的「能滚多远」只有最后的一半。以前按那时的高度算出来要滚 0，
+ * 日常活动页的步数 / 活动热量点进去就停在页顶不动（用户 2026-10-04 录屏）。
+ *
+ * 等待期间用户自己动了滚动条，就不替他滚了（只圈一下）。
  */
-export const revealFocusLater = (page: HTMLElement, key: string, waitMs = 1500): void => {
+export const revealFocusLater = (page: HTMLElement, key: string, waitMs = 2500): void => {
   const scroller = document.getElementById('main-content');
+  if (!scroller) return;
   const started = performance.now();
+  const startTop = scroller.scrollTop;
+  let lastHeight = -1;
+  let steady = 0;
+  let opened = false;
   const look = () => {
-    if (!page.isConnected || !scroller) return;
+    if (!page.isConnected) return;
+    const late = performance.now() - started > waitMs;
     const target = findFocusTarget(page, key);
     if (!target) {
-      if (performance.now() - started < waitMs) requestAnimationFrame(look);
+      if (!late) requestAnimationFrame(look);
       return;
     }
-    const delta = focusScrollDelta(target, scroller, page);
-    if (Math.abs(delta) > 4) scroller.scrollBy({ top: delta, behavior: reducedMotion() ? 'auto' : 'smooth' });
-    window.setTimeout(() => ringFocus(target), Math.abs(delta) > 4 && !reducedMotion() ? 420 : 0);
+    // 收起来的「没有读数」那一行：展开，让人直接看到这项为什么没有。
+    if (!opened && target instanceof HTMLDetailsElement) target.open = true;
+    opened = true;
+    const height = page.getBoundingClientRect().height;
+    steady = Math.abs(height - lastHeight) < 1 ? steady + 1 : 0;
+    lastHeight = height;
+    if (steady < STEADY_FRAMES && !late) {
+      requestAnimationFrame(look);
+      return;
+    }
+    const userScrolled = Math.abs(scroller.scrollTop - startTop) > 4;
+    const delta = userScrolled ? 0 : focusScrollDelta(target, scroller, page);
+    if (Math.abs(delta) <= 4) {
+      ringFocus(target);
+      return;
+    }
+    const smooth = !reducedMotion();
+    let rung = false;
+    const ring = () => {
+      if (rung) return;
+      rung = true;
+      scroller.removeEventListener('scrollend', ring);
+      if (target.isConnected) ringFocus(target);
+    };
+    if (smooth) {
+      scroller.addEventListener('scrollend', ring, { once: true });
+      window.setTimeout(ring, SCROLL_SETTLE_MS);
+    }
+    scroller.scrollBy({ top: delta, behavior: smooth ? 'smooth' : 'auto' });
+    if (!smooth) ring();
   };
   requestAnimationFrame(look);
 };

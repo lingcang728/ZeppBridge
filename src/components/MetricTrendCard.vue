@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import { eventChartTone, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
-import { displayDateTimeFormatter, parseDisplayDate } from '../lib/dateTime';
 const { open: openEvent, events: lifeEvents, chipFocus, chartFocus, ensureLoaded } = useLifeEvents();
 ensureLoaded();
 const eventWords = useMessages(lifeEventMessages);
@@ -24,6 +23,7 @@ const chartClick = (event: ChartEvent) => {
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
 };
 import { chartPalette } from '../lib/echartsSetup';
+import { formatMetric } from '../lib/format';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import { rangeLabel, type RangeDays } from '../lib/rangeOptions';
 import { useTrendRange } from '../composables/useTrendRange';
@@ -35,8 +35,6 @@ const messages = defineMessages(
   {
     latestTag: '最新',
     measuredOn: (date: string) => `测于 ${date}`,
-    focusValue: (date: string, value: string) => `${date}：${value}`,
-    focusMissing: (date: string) => `${date} 没有记录`,
     widened: (asked: string, shown: string) => `${asked}内记录不足 · 这里显示 ${shown}`,
     trendAria: (label: string) => `${label}趋势曲线`,
     onlyOneDay: '这段范围只有 1 天记录，画不出趋势。',
@@ -48,8 +46,6 @@ const messages = defineMessages(
   {
     latestTag: 'Latest',
     measuredOn: (date: string) => `measured ${date}`,
-    focusValue: (date: string, value: string) => `${date}: ${value}`,
-    focusMissing: (date: string) => `${date}: no record`,
     widened: (asked: string, shown: string) => `Too few records in ${asked} · showing ${shown}`,
     trendAria: (label: string) => `${label} trend line`,
     onlyOneDay: 'Only one day of data in this range — no trend to draw yet.',
@@ -61,8 +57,6 @@ const messages = defineMessages(
   {
     latestTag: 'Último',
     measuredOn: (date: string) => `medido el ${date}`,
-    focusValue: (date: string, value: string) => `${date}: ${value}`,
-    focusMissing: (date: string) => `${date}: sin registro`,
     widened: (asked: string, shown: string) => `Pocos registros en ${asked} · mostrando ${shown}`,
     trendAria: (label: string) => `Línea de tendencia de ${label}`,
     onlyOneDay: 'Solo hay 1 día de datos en este rango; no hay tendencia que trazar.',
@@ -75,6 +69,9 @@ const messages = defineMessages(
   'components/MetricTrendCard',
 );
 const t = useMessages(messages);
+
+/** 事件名是用户自己写的，进 tooltip 的 HTML 前转义。 */
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 const props = withDefaults(defineProps<{
   label: string;
@@ -110,7 +107,8 @@ const props = withDefaults(defineProps<{
 const emptyMessage = computed(() => props.emptyText
   || (props.series ? coverageLabel(props.series) : t.value.defaultEmpty));
 
-const render = computed(() => props.format ?? ((value: number) => value.toFixed(props.decimals)));
+// 和概览置顶磁贴同一个格式（千分位跟着界面语言）：同一个数在两处不能一处「1,156」一处「1156」。
+const render = computed(() => props.format ?? ((value: number) => formatMetric(value, props.decimals)));
 const hasPoints = computed(() => (props.series?.points.length ?? 0) > 0);
 // One point is a reading, not a trend: show the number and say so rather than
 // drawing a one-pixel line that implies a shape.
@@ -152,19 +150,23 @@ const option = computed(() => {
     chart: props.chart,
     calendarAxis: props.calendarAxis,
   });
-  /* 生活事件画成竖向浅色区带（一天的画成一根竖线），颜色跟事件分类走、和页头胶囊同色；
-     悬停显示事件名，点一下打开编辑。以前是 9px 无标签的品牌绿圆点，新用户会当成数据点样式（U24）。 */
+  /* 生活事件画成竖向浅色区带（一天的画成一根竖线），颜色跟事件分类走、和页头胶囊同色；点一下打开编辑。
+     以前是 9px 无标签的品牌绿圆点，新用户会当成数据点样式（U24）。
+     事件名写进悬停浮出的那块读数里（日期、数值下面），不再画在图上：竖线的标签落在画布顶边外，
+     字被裁掉一半（用户 2026-10-04 截图「模拟：进入半马准备期」）。 */
   const palette = chartPalette.value;
   const axisDates = ((result.xAxis as { data?: string[] }).data ?? []);
   const areas: unknown[] = [];
   const lines: unknown[] = [];
+  const marked: { event: (typeof lifeEvents.value)[number]; color: string }[] = [];
   for (const event of lifeEvents.value) {
     const covered = axisDates.filter((date) => overlapsEvent(event, date, date));
     if (!covered.length) continue;
     const color = eventChartTone(event.category, palette);
+    marked.push({ event, color });
     const lit = chipFocus.value === event.id;
-    const label = { show: false, position: 'insideTop', color: palette.legend, fontSize: 12, formatter: event.title };
-    const emphasis = { label: { show: true } };
+    const label = { show: false };
+    const emphasis = { label: { show: false } };
     if (covered.length === 1) {
       lines.push({ xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
         lineStyle: { color, width: lit ? 3 : 2, type: 'solid', opacity: lit ? 0.85 : 0.5 } });
@@ -180,28 +182,22 @@ const option = computed(() => {
   const last = chartSeries[chartSeries.length - 1];
   if (areas.length) Object.assign(last, { markArea: { silent: false, data: areas } });
   if (lines.length) Object.assign(last, { markLine: { silent: false, symbol: 'none', data: lines } });
+  const tooltip = result.tooltip as { formatter?: (params: Array<{ axisValue: string }>) => string } | undefined;
+  const base = tooltip?.formatter;
+  if (tooltip && base && marked.length) {
+    tooltip.formatter = (params) => {
+      const text = base(params);
+      const day = Array.isArray(params) ? params[0]?.axisValue : undefined;
+      if (!text || !day) return text;
+      const names = marked.filter(({ event }) => overlapsEvent(event, day, day))
+        .map(({ event, color }) => `<br><span style="display:inline-block;width:7px;height:11px;margin-right:6px;border-radius:2px;background:${color};vertical-align:-1px"></span>${escapeHtml(event.title)}`);
+      return text + names.join('');
+    };
+  }
   return result;
 });
 /* 切范围时十来张图同时换数据：排队，一帧只换一张（见 useQueuedOption）。 */
 const shownOption = useQueuedOption(option);
-/* 指针停在这张图的某一天：只有这张卡写出那天的值（没有就说没有，不插值）。
-   以前同页所有卡跟着一起跳到同一天（U13 联动），用户觉得没必要、还干扰——点「距离」的一个点，
-   步数、活动量都变成那天（2026-09-30 反馈）。 */
-const focusDate = ref<string | null>(null);
-const onAxis = (index: number | null) => {
-  const dates = ((shownOption.value?.xAxis as { data?: string[] } | undefined)?.data) ?? [];
-  const date = index === null ? null : dates[index] ?? null;
-  if (focusDate.value !== date) focusDate.value = date;
-};
-const focusLine = computed(() => {
-  const date = focusDate.value;
-  if (!date || !props.series) return null;
-  const label = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
-  const point = props.series.points.find((item) => item.date === date);
-  if (!point || !Number.isFinite(point.value)) return t.value.focusMissing(label);
-  return t.value.focusValue(label, `${render.value(point.value)}${props.unit ? ` ${props.unit}` : ''}`);
-});
-
 /* 图上有事件区带时，覆盖行末尾给一个图例（颜色跟着分类，这里只说明「色带 = 生活事件」）。 */
 const hasEventMarks = computed(() => {
   const points = props.series?.points ?? [];
@@ -234,10 +230,9 @@ const hasEventMarks = computed(() => {
       <small v-if="hint" class="trend-hint">{{ hint }}</small>
     </header>
 
-    <!-- 悬停读数叠在这一行上面，不替换它：原来那几段一直占着位置（只是藏起来），行高不变。
-         以前读数换掉覆盖说明，字一长就折行，同一排卡片（subgrid）的曲线跟着整体上下跳。 -->
-    <p :class="['trend-meta', { 'is-focused': focusLine && hasPoints }]">
-      <strong v-if="focusLine && hasPoints" class="trend-focus">{{ focusLine }}</strong>
+    <!-- 悬停读数只在图上浮出的那块里（日期、数值、当天的生活事件）。以前这一行还会叠一份同样的
+         「9/20：110 克」，两处说同一件事（用户 2026-10-04）。 -->
+    <p class="trend-meta">
       <span v-if="widened" class="trend-widened">{{ widened }}</span>
       <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
@@ -254,7 +249,6 @@ const hasEventMarks = computed(() => {
       @click="chartClick"
       @mouseover="chartHover"
       @mouseout="chartLeave"
-      @axis="onAxis"
     />
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
@@ -296,7 +290,6 @@ const hasEventMarks = computed(() => {
 .trend-latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
 .trend-hint { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
 .trend-meta {
-  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-content: start;
@@ -308,9 +301,6 @@ const hasEventMarks = computed(() => {
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
 .trend-widened { color: var(--muted); font-weight: 600; }
-.trend-focus { position: absolute; top: 0; right: 0; left: 0; overflow: hidden; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis; white-space: nowrap; }
-.trend-meta.is-focused > :not(.trend-focus) { visibility: hidden; }
 .trend-event-key { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); }
 .trend-event-key i { width: 7px; height: 11px; border-radius: 2px; background: color-mix(in srgb, var(--subtle) 45%, transparent); }
 .trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }

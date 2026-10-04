@@ -23,6 +23,7 @@ import { trainingPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { metricColor } from '../lib/metricTone';
 import {
   formatPaceSeconds,
   indexSeries,
@@ -63,7 +64,9 @@ const error = ref<string | null>(null);
 
 const vo2max = computed(() => series.value.vo2max ?? null);
 const trainingLoad = computed(() => series.value.training_load ?? null);
-const pai = computed(() => series.value.pai_daily ?? null);
+/* PAI 是滚动 7 天的总值（pai_total）：卡片说明一直这么写，概览磁贴也是它。以前这里画的是当天新挣的
+   pai_daily（1 左右），和概览的 12 对不上，用户不知道信哪个（2026-10-04）。 */
+const pai = computed(() => series.value.pai_total ?? null);
 const thresholdHr = computed(() => series.value.lactate_threshold_hr ?? null);
 const thresholdPace = computed(() => series.value.lactate_threshold_pace ?? null);
 
@@ -85,17 +88,18 @@ const everMeasured = (...metrics: string[]) => metrics.some((metric) => (fullSer
 const show = computed(() => ({
   vo2: everMeasured('vo2max'),
   load: everMeasured('training_load'),
-  pai: everMeasured('pai_daily'),
+  pai: everMeasured('pai_total'),
   threshold: everMeasured('lactate_threshold_hr', 'lactate_threshold_pace'),
   balance: fullBalance.value.some((point) => point.acute_days_with_data > 0),
 }));
 const shownCardCount = computed(() => [show.value.vo2, show.value.load, show.value.pai, show.value.threshold].filter(Boolean).length);
 const missing = computed(() => [
-  !show.value.vo2 && { key: 'vo2', label: 'VO₂max', detail: t.value.vo2Hint },
-  !show.value.load && { key: 'load', label: t.value.loadLabel, detail: t.value.loadHint },
-  !show.value.pai && { key: 'pai', label: t.value.paiLabel, detail: t.value.paiHint },
-  !show.value.threshold && { key: 'threshold', label: t.value.thresholdLabel, detail: t.value.thresholdHint },
-  !show.value.balance && { key: 'balance', label: t.value.balanceLabel, detail: t.value.balanceEmpty },
+  // key 是指标名：从概览点进来定位到这一项（lib/motion/focusTarget.ts）。
+  !show.value.vo2 && { key: 'vo2max', label: 'VO₂max', detail: t.value.vo2Hint },
+  !show.value.load && { key: 'training_load', label: t.value.loadLabel, detail: t.value.loadHint },
+  !show.value.pai && { key: 'pai_total', label: t.value.paiLabel, detail: t.value.paiHint },
+  !show.value.threshold && { key: 'lactate_threshold_hr', label: t.value.thresholdLabel, detail: t.value.thresholdHint },
+  !show.value.balance && { key: 'training_balance', label: t.value.balanceLabel, detail: t.value.balanceEmpty },
 ].filter((item): item is { key: string; label: string; detail: string } => Boolean(item)));
 
 const thresholdOption = computed(() => {
@@ -325,7 +329,7 @@ useRevisionReload(() => { void load(); });
           label="VO₂max"
           :hint="t.vo2Hint"
           :series="vo2max"
-          :color="zeppSemanticColors.vo2"
+          :color="metricColor('vo2max')"
           unit="ml/kg/min"
           :decimals="1"
           :empty-text="t.vo2Empty"
@@ -335,7 +339,7 @@ useRevisionReload(() => { void load(); });
           :label="t.loadLabel"
           :hint="t.loadHint"
           :series="trainingLoad"
-          :color="zeppSemanticColors.training"
+          :color="metricColor('training_load')"
           :unit="t.loadUnit"
           :empty-text="t.loadEmpty"
         />
@@ -344,7 +348,7 @@ useRevisionReload(() => { void load(); });
           :label="t.paiLabel"
           :hint="t.paiHint"
           :series="pai"
-          :color="zeppSemanticColors.calories"
+          :color="metricColor('pai_total')"
           unit="PAI"
           :empty-text="t.paiEmpty"
         />

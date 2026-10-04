@@ -9,6 +9,11 @@ describe('pinnedMetrics', () => {
     expect(MAX_PINS).toBe(4);
   });
 
+  it('旧的「睡眠 HRV」换成同一个数的 HRV (RMSSD)，不重复', () => {
+    expect(normalizePins(['sleep_hrv', 'steps'])).toEqual(['hrv_rmssd', 'steps']);
+    expect(normalizePins(['hrv_rmssd', 'sleep_hrv'])).toEqual(['hrv_rmssd']);
+  });
+
   it('没有记录就是「—」，不补 0', () => {
     const metric = pinnableMetric('resting_hr')!;
     expect(pinValueText(metric, null)).toBe('—');

@@ -1,24 +1,26 @@
 <script setup lang="ts">
 /* 概览最上面的「我的指标」：用户固定的 3–4 个指标，每个一块磁贴——最新值、测于哪天、
- * 近 30 天的迷你曲线和覆盖天数。没有记录就写「—」和「近 30 天无记录」，不补 0。
+ * 迷你曲线和覆盖天数。没有记录就写「—」和「近 N 天无记录」，不补 0。
+ *
+ * 磁贴和点进去的那张趋势卡是**同一个东西**：同名（PinnedMetrics.i18n.ts 的 names）、同色（lib/metricTone.ts）、
+ * 同一段范围（详情页顶上的 7 天 / 1 个月 / 6 个月，useTrendRange），数值和曲线形状也就一样。
  * 一个都没固定时是一张引导卡，点开挑选面板（PinPicker）。
  *
  * 动效：挑完回来，新加的磁贴由下往上漫出类别色再显出内容；留下的原地不动（缓存页回场不重放）。 */
-import { computed, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
 import Sparkline from '../Sparkline.vue';
-import PinPicker from './PinPicker.vue';
 import { backend, isDesktop } from '../../lib/bridge';
 import { useRevisionReload } from '../../composables/useRevisionReload';
-import { resolvedTheme } from '../../composables/useTheme';
-import { chartPalettes } from '../../lib/echartsTheme';
+import { useTrendRange } from '../../composables/useTrendRange';
+import { distanceUnit } from '../../lib/units';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
-import { metricLabel } from '../../lib/aiTask/metrics';
-import { coverageLabel, indexSeries } from '../../lib/metricSeries';
+import { metricColor } from '../../lib/metricTone';
+import { coverageLabel, indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../../lib/metricSeries';
 import { today as currentToday } from '../../lib/currentDay';
 import {
-  pinHref, pinLatestDate, pinnableMetric, pinSparkValues, pinToneColor, pinValueText, readPins, writePins, type PinnableMetric,
+  pinHref, pinLatestDate, pinMassUnit, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types';
 import { useMessages } from '../../i18n';
@@ -27,19 +29,26 @@ import { pinnedMetricsMessages } from './PinnedMetrics.i18n';
 defineOptions({ name: 'OverviewPinnedMetrics' });
 
 const t = useMessages(pinnedMetricsMessages);
-const WINDOW_DAYS = 30;
+/* 挑选面板只在点「调整」时才用：不放进概览首屏那一块（首屏 CSS 预算）。本机读 chunk 是同一帧的事。 */
+const PinPicker = defineAsyncComponent(() => import('./PinPicker.vue'));
+const range = useTrendRange();
 
 const pins = ref<string[]>(readPins());
-const series = ref<Record<string, MetricSeries>>({});
+/** 一次取最长那档（和详情页一样），按页面范围在本地切：切范围不查库，切法也和详情页同一个。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, range.value));
 const pickerOpen = ref(false);
 /** 刚从挑选面板回来：这一次让磁贴依次浮上来。 */
 const justPinned = ref(false);
 
-const label = (id: string) => (id === 'sleep_score' ? t.value.sleepScore : metricLabel(id));
-const unitText = (metric: PinnableMetric) => ({
-  bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, kcal: t.value.unitKcal, min: t.value.unitMin,
-  ms: 'ms', percent: '%', kg: 'kg', vo2: 'ml/kg/min', '': '',
-} as Record<string, string>)[metric.unit] ?? '';
+const label = (id: string) => (t.value.names as Record<string, string>)[id] ?? id;
+const unitText = (metric: PinnableMetric) => {
+  void distanceUnit.value; // kg / lb 跟着单位制切换重算（和身体页一样显式依赖一次）
+  return ({
+    bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, kcal: t.value.unitKcal, min: t.value.unitMin,
+    pai: t.value.unitPai, ms: 'ms', percent: '%', mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
+  } as Record<string, string>)[metric.unit] ?? '';
+};
 
 const dayText = (date: string | null): string | null => {
   if (!date) return null;
@@ -53,7 +62,6 @@ const dayText = (date: string | null): string | null => {
   return t.value.measuredOn(displayDateTimeFormatter({ month: 'short', day: 'numeric' }).format(day));
 };
 
-const palette = computed(() => chartPalettes[resolvedTheme.value]);
 const tiles = computed(() => pins.value.flatMap((id) => {
   const metric = pinnableMetric(id);
   if (!metric) return [];
@@ -68,7 +76,7 @@ const tiles = computed(() => pins.value.flatMap((id) => {
     spark: pinSparkValues(data),
     // 读失败和「真的没有记录」是两回事：前者不能写成「近 30 天无记录」。
     coverage: !data && loadFailed.value ? t.value.loadFailed : coverageLabel(data),
-    tone: pinToneColor(metric.tone, palette.value.series),
+    tone: metricColor(id),
   }];
 }));
 
@@ -79,7 +87,7 @@ const loadFailed = ref(false);
 const fetchSeries = async (ids: string[]): Promise<Record<string, MetricSeries> | null> => {
   if (!isDesktop() || !ids.length) return {};
   try {
-    return indexSeries(await backend.getMetricSeries([...ids], WINDOW_DAYS));
+    return indexSeries(await backend.getMetricSeries([...ids], SERIES_FETCH_DAYS));
   } catch {
     return null;
   }
@@ -89,7 +97,7 @@ const load = async () => {
   const next = await fetchSeries(pins.value);
   if (seq !== loadSeq) return;
   loadFailed.value = next === null;
-  if (next) series.value = next;
+  if (next) fullSeries.value = next;
 };
 onMounted(() => void load());
 useRevisionReload(() => void load());
@@ -105,7 +113,7 @@ const apply = async (next: string[]) => {
   if (seq !== loadSeq) return;
   justPinned.value = true;
   loadFailed.value = data === null;
-  if (data) series.value = data;
+  if (data) fullSeries.value = data;
   pins.value = [...next];
   writePins(next);
   window.setTimeout(() => { justPinned.value = false; }, 1200);

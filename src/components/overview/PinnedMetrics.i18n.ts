@@ -1,6 +1,9 @@
 import { defineMessages } from '../../i18n';
 
-/* 概览「我的指标」条和挑选面板共用的文案。7 种语言登记在 locales/*.pending.txt，由文案那边翻。 */
+/* 概览「我的指标」条和挑选面板共用的文案。7 种语言登记在 locales/*.pending.txt，由文案那边翻。
+ *
+ * names / 单位必须和详情页那张趋势卡的标题、单位逐字一样（首页叫「活动消耗」、点进去叫「活动热量」，
+ * 用户不知道是不是同一个东西）。__tests__/pinnedMetricNames.test.ts 拿详情页的文案逐个比对。 */
 export const pinnedMetricsMessages = defineMessages(
   {
     title: '我的指标',
@@ -11,12 +14,17 @@ export const pinnedMetricsMessages = defineMessages(
     yesterday: '昨天',
     measuredOn: (date: string) => `测于 ${date}`,
     tileAria: (label: string, value: string) => `${label} ${value}，打开详情`,
-    sleepScore: '睡眠评分',
-    unitBpm: '次/分',
+    names: {
+      resting_hr: '静息心率', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: '睡眠评分', readiness: '恢复状态',
+      stress: '压力', spo2: '血氧', steps: '步数', active_calories: '活动热量', active_minutes: '活动时长',
+      training_load: '训练负荷', vo2max: 'VO₂max', pai_total: 'PAI 活力指数', weight: '体重', body_fat_rate: '体脂率', bmi: 'BMI',
+    },
+    unitBpm: 'bpm',
     unitScore: '分',
     unitSteps: '步',
     unitKcal: '千卡',
     unitMin: '分钟',
+    unitPai: 'PAI',
     pickerTitle: '固定哪几个指标',
     pickerHint: '最多 4 个，按点选的顺序排在概览最上面',
     pickerFull: '已经 4 个了，先去掉一个再换',
@@ -40,12 +48,17 @@ export const pinnedMetricsMessages = defineMessages(
     yesterday: 'Yesterday',
     measuredOn: (date: string) => `Measured ${date}`,
     tileAria: (label: string, value: string) => `${label} ${value}, open details`,
-    sleepScore: 'Sleep score',
+    names: {
+      resting_hr: 'Resting heart rate', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: 'Sleep score', readiness: 'Readiness',
+      stress: 'Stress', spo2: 'Blood oxygen', steps: 'Steps', active_calories: 'Active burn', active_minutes: 'Active minutes',
+      training_load: 'Training load', vo2max: 'VO₂max', pai_total: 'PAI', weight: 'Weight', body_fat_rate: 'Body fat', bmi: 'BMI',
+    },
     unitBpm: 'bpm',
-    unitScore: '',
+    unitScore: 'pts',
     unitSteps: 'steps',
     unitKcal: 'kcal',
     unitMin: 'min',
+    unitPai: 'PAI',
     pickerTitle: 'Choose metrics to pin',
     pickerHint: 'Up to 4, shown at the top of the overview in the order you pick them',
     pickerFull: 'That’s 4 — remove one first',
@@ -69,12 +82,18 @@ export const pinnedMetricsMessages = defineMessages(
     yesterday: 'Ayer',
     measuredOn: (date: string) => `Medido el ${date}`,
     tileAria: (label: string, value: string) => `${label} ${value}, abrir detalle`,
-    sleepScore: 'Puntuación de sueño',
-    unitBpm: 'lpm',
-    unitScore: '',
+    names: {
+      resting_hr: 'Frecuencia cardíaca en reposo', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: 'Puntuación de sueño',
+      readiness: 'Recuperación', stress: 'Estrés', spo2: 'Oxígeno en sangre', steps: 'Pasos', active_calories: 'Calorías activas',
+      active_minutes: 'Minutos activos', training_load: 'Carga de entrenamiento', vo2max: 'VO₂max', pai_total: 'PAI', weight: 'Peso',
+      body_fat_rate: 'Grasa corporal', bmi: 'IMC',
+    },
+    unitBpm: 'bpm',
+    unitScore: 'pts',
     unitSteps: 'pasos',
     unitKcal: 'kcal',
     unitMin: 'min',
+    unitPai: 'PAI',
     pickerTitle: 'Elige las métricas fijas',
     pickerHint: 'Hasta 4 métricas, arriba del resumen en el orden en que las elijas',
     pickerFull: 'Ya hay 4: quita una primero',

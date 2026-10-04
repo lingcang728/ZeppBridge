@@ -2,7 +2,11 @@
 /* 「我的指标」的挑选面板。
  *
  * 上面四个固定的槽，下面按目的分组的候选胶囊。点一枚胶囊，下一个空槽从底边往上漫满绿色，
- * 满了以后名字浮出来；点已选的胶囊或槽上的 ×，那一槽的绿色往下退回灰色，后面的槽顺次前移。
+ * 满了以后名字浮出来；点已选的胶囊或槽上的 ×：
+ *   - 去掉的是最后一个：那一槽的绿色往下退回灰色，「空位」同时淡入；
+ *   - 去掉的在中间：它的名字淡掉，后面的名字各自**滑**进前一槽（FLIP，只动 transform），
+ *     空出来的是最后一槽——绿色往下退、「空位」淡入。
+ *   以前是退完色停一下，然后名字和「空位」一帧换好（用户 2026-10-04 录屏：水位降完是硬切）。
  * 胶囊自己的选中态也是同一种由下往上的填色。
  *
  * 以前是一枚替身从胶囊飞进槽里：新槽先藏着、空槽立刻消失、替身落地再换回真内容——
@@ -25,13 +29,19 @@ const t = useMessages(pinnedMetricsMessages);
 const draft = ref<string[]>([...props.pins]);
 /** 正在退色的那一槽（下标）：颜色退完才真正从草稿里拿掉。 */
 const draining = ref<number | null>(null);
-/** 前移那一帧不放填色过渡：被顶上来的名字换进已经满着的槽里，槽不该再漫一遍。 */
+/** 名字正在淡掉的那一槽（去掉的在中间：槽不退色，后面的名字滑过来补上）。 */
+const vanishing = ref<number | null>(null);
+/** 前移那一帧不放名字的淡入淡出：滑过来的名字是用 transform 动画带过去的。 */
 const shifting = ref(false);
 const shaking = ref<string | null>(null);
 const busy = ref(false);
+const slotList = ref<HTMLElement | null>(null);
 
 /** 槽里的颜色漫满 / 退掉的时长，和 CSS 里 .pp-fill 的过渡一致。 */
 const FILL_MS = 340;
+/** 中间那一槽的名字淡掉、后面的名字滑过去的时长。 */
+const FADE_MS = 160;
+const SLIDE_MS = 360;
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const wait = (ms: number) => new Promise<void>((resolve) => { window.setTimeout(resolve, reducedMotion() ? 0 : ms); });
 
@@ -49,17 +59,42 @@ const add = async (id: string) => {
   await wait(FILL_MS);
 };
 
+/** 每个名字此刻在屏幕上的位置（按指标 id）。 */
+const namePositions = () => new Map([...(slotList.value?.querySelectorAll<HTMLElement>('strong.pp-name[data-id]') ?? [])]
+  .map((el) => [el.dataset.id!, el.getBoundingClientRect()] as const));
+
 const remove = async (id: string) => {
   const index = draft.value.indexOf(id);
   if (index < 0) return;
-  draining.value = index;
-  await wait(FILL_MS);
+  if (index === draft.value.length - 1 || reducedMotion()) {
+    // 最后一个：退色和「空位」淡入同时放完，放完再从草稿里拿掉（那时名字已经透明，换掉看不出来）。
+    draining.value = index;
+    await wait(FILL_MS);
+    draining.value = null;
+    draft.value = draft.value.filter((item) => item !== id);
+    return;
+  }
+  // 中间的：名字先淡掉（槽的绿色留着，马上有人补进来）……
+  vanishing.value = index;
+  await wait(FADE_MS);
+  const before = namePositions();
   shifting.value = true;
-  draining.value = null;
+  vanishing.value = null;
   draft.value = draft.value.filter((item) => item !== id);
   await nextTick();
-  // 等这一帧画完（前移的名字已经就位）再把过渡还回去。
+  // ……后面的名字从原来的槽滑进前一槽；最后一槽此刻空了，绿色往下退、「空位」淡入（CSS 过渡）。
+  for (const el of slotList.value?.querySelectorAll<HTMLElement>('strong.pp-name[data-id]') ?? []) {
+    const from = before.get(el.dataset.id!);
+    if (!from) continue;
+    const to = el.getBoundingClientRect();
+    const dx = from.left - to.left;
+    const dy = from.top - to.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+      { duration: SLIDE_MS, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+  }
   requestAnimationFrame(() => requestAnimationFrame(() => { shifting.value = false; }));
+  await wait(Math.max(SLIDE_MS, FILL_MS));
 };
 
 const shake = (id: string) => {
@@ -104,14 +139,19 @@ const orderOf = (id: string) => draft.value.indexOf(id) + 1;
         {{ shaking ? t.pickerFull : t.pickerHint }}<span class="pp-count">{{ t.pickerCount(draft.length, MAX_PINS) }}</span>
       </p>
 
-      <ol :class="['pp-slots', { shifting }]">
+      <ol ref="slotList" :class="['pp-slots', { shifting }]">
         <li v-for="(id, index) in slots" :key="index"
-          :class="['pp-slot', { filled: id && draining !== index }]">
+          :class="['pp-slot', { filled: id && draining !== index, vanishing: vanishing === index }]">
           <span class="pp-fill" aria-hidden="true"></span>
           <span class="pp-no">{{ index + 1 }}</span>
-          <strong v-if="id" class="pp-name">{{ label(id) }}</strong>
-          <span v-else class="pp-name pp-empty-text">{{ t.slotEmpty }}</span>
-          <button v-if="id" type="button" class="pp-remove" :aria-label="t.remove(label(id))" :disabled="busy" @click="toggle(id)">
+          <!-- 名字和「空位」叠在同一格里交叉淡入淡出，不再 v-if 一帧换掉。 -->
+          <span class="pp-label">
+            <strong v-if="id" class="pp-name" :data-id="id">{{ label(id) }}</strong>
+            <span class="pp-name pp-empty-text" aria-hidden="true">{{ t.slotEmpty }}</span>
+          </span>
+          <!-- 空槽也留着这颗 ×（透明、不可点）：它跟着退色淡掉，而不是在某一帧凭空消失。 -->
+          <button type="button" class="pp-remove" :aria-label="id ? t.remove(label(id)) : undefined" :aria-hidden="!id"
+            :tabindex="id ? 0 : -1" :disabled="busy || !id" @click="id && toggle(id)">
             <Icon name="x" :size="13" />
           </button>
         </li>
@@ -121,7 +161,7 @@ const orderOf = (id: string) => draft.value.indexOf(id) + 1;
         <h3>{{ group.title }}</h3>
         <div class="pp-chips">
           <button v-for="metric in group.metrics" :key="metric.id" type="button"
-            :class="['pp-chip', { on: draft.includes(metric.id) && draining !== orderOf(metric.id) - 1, dim: full && !draft.includes(metric.id), shake: shaking === metric.id }]"
+            :class="['pp-chip', { on: draft.includes(metric.id) && draining !== orderOf(metric.id) - 1 && vanishing !== orderOf(metric.id) - 1, dim: full && !draft.includes(metric.id), shake: shaking === metric.id }]"
             :aria-pressed="draft.includes(metric.id)" @click="toggle(metric.id)">
             <span class="pp-fill" aria-hidden="true"></span>
             <span v-if="draft.includes(metric.id)" class="pp-order" aria-hidden="true">{{ orderOf(metric.id) }}</span>
@@ -159,20 +199,30 @@ const orderOf = (id: string) => draft.value.indexOf(id) + 1;
 .filled > .pp-fill, .pp-chip.on > .pp-fill { transform: scaleY(1); opacity: 1; }
 /* 退色：先往下退，最后才淡掉。 */
 .pp-slot:not(.filled) > .pp-fill, .pp-chip:not(.on) > .pp-fill { transition: transform 340ms cubic-bezier(.4, 0, .6, 1), opacity 160ms ease 180ms; }
-.shifting .pp-fill, .shifting .pp-name { transition: none !important; }
+.shifting strong.pp-name { transition: none !important; }
 
 .pp-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
-.pp-slot { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 46px; padding: 8px 10px; overflow: hidden;
+/* 不裁切：前移时名字要从后一槽滑过来，裁了就只看得见一截（颜色层自己带圆角，不靠这里裁）。 */
+.pp-slot { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 46px; padding: 8px 10px;
   border-radius: var(--radius-md); background: color-mix(in srgb, var(--ink) 5%, transparent); font-size: var(--fs-sm); }
 .pp-slot > :not(.pp-fill) { position: relative; z-index: 1; }
-.pp-name { flex: 1; min-width: 0; overflow: hidden; color: var(--ink); font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
+.pp-label { z-index: 2; }
+.pp-label { display: grid; flex: 1; min-width: 0; }
+.pp-label > * { grid-area: 1 / 1; }
+.pp-name { min-width: 0; overflow: hidden; color: var(--ink); font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
   transition: opacity 200ms ease 140ms, translate 260ms var(--ease-out) 140ms; }
-.pp-slot:not(.filled) strong.pp-name { opacity: 0; translate: 0 4px; transition: opacity 140ms ease, translate 140ms ease; }
-.pp-empty-text { color: var(--subtle); font-weight: 400; }
+.pp-slot:not(.filled) strong.pp-name, .pp-slot.vanishing strong.pp-name { opacity: 0; translate: 0 4px; transition: opacity 140ms ease, translate 140ms ease; }
+/* 「空位」：槽空着时淡入（跟着退色一起放），槽满着时让开。 */
+.pp-empty-text { color: var(--subtle); font-weight: 400; opacity: 0; transition: opacity 120ms ease; }
+.pp-slot:not(.filled) .pp-empty-text { opacity: 1; transition: opacity 220ms ease 140ms; }
+.pp-slot.vanishing .pp-remove { opacity: 0; }
 .pp-no { display: grid; flex: 0 0 auto; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums;
   transition: background 200ms ease 120ms, color 200ms ease 120ms; }
 .filled .pp-no { background: var(--accent); color: var(--accent-ink); }
-.pp-remove { display: grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; margin: -4px -4px -4px 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+.pp-remove { display: grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; margin: -4px -4px -4px 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer;
+  transition: opacity 140ms ease; }
+/* 退色途中 × 一起淡掉，退完那一帧它被拿掉时已经看不见。 */
+.pp-slot:not(.filled) .pp-remove { opacity: 0; pointer-events: none; }
 .pp-remove:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 
 .pp-group h3 { margin: 0 0 8px; color: var(--subtle); font-size: var(--fs-xs); font-weight: 650; }

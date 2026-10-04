@@ -8,6 +8,7 @@ import Icon from './Icon.vue';
 import { defineMessages, useMessages } from '../i18n';
 
 export interface MissingMetric {
+  /** 指标名：从概览点进来要定位到这一项时，按它找到这一行（lib/motion/focusTarget.ts）。 */
   key: string;
   label: string;
   /** 为什么没有（页面给的专门说明，没有就用这项的一句话简介）。 */
@@ -33,11 +34,12 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
+const focusKeys = computed(() => props.items.map((item) => item.key).join(' '));
 const summary = computed(() => t.value.summary(props.items.map((item) => item.label).join(t.value.separator)));
 </script>
 
 <template>
-  <details v-if="items.length" class="missing-row">
+  <details v-if="items.length" class="missing-row" :data-focus-keys="focusKeys">
     <summary>
       <Icon name="info" :size="14" />
       <span>{{ summary }}</span>

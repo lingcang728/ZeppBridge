@@ -24,82 +24,16 @@ import { isDesktop, toUserMessage } from '../lib/bridge';
 import { activityPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
-import { zeppSemanticColors } from '../lib/echartsTheme';
+import { metricColor } from '../lib/metricTone';
 import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
-import { defineMessages, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
+import { activityDetailMessages } from './ActivityDetail.i18n';
 
-const messages = defineMessages(
-  {
-    title: '日常活动',
-    intro: '步数、距离、活动热量与活动时长的按天趋势。只和你此前的记录比，没记录的日期不补 0。',
-    desktopOnly: '浏览器预览不读账户数据，用桌面应用打开。',
-    loadFailed: '日常活动数据暂不可用',
-    retry: '重试',
-    loadingAria: '正在加载日常活动',
-    noneInRange: '这段范围没有日常活动记录。换个更长的范围，或先同步一次。',
-    stepsLabel: '步数',
-    stepsHint: '手表按天汇总的步数',
-    stepsUnit: '步',
-    distanceLabel: '距离',
-    distanceHint: '当天累计移动距离',
-    distanceUnit: '米',
-    caloriesLabel: '活动热量',
-    caloriesHint: '不含基础代谢，只算活动消耗',
-    caloriesUnit: '千卡',
-    minutesLabel: '活动时长',
-    minutesHint: '手表判定为「在活动」的分钟数',
-    minutesUnit: '分钟',
-  },
-  {
-    title: 'Daily activity',
-    intro: 'Daily steps, distance, active burn and active minutes. Compared only to your own past; days without data stay empty, never zero-filled.',
-    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
-    loadFailed: 'Activity data unavailable right now',
-    retry: 'Retry',
-    loadingAria: 'Loading daily activity',
-    noneInRange: 'No activity records in this range. Pick a longer range or sync first.',
-    stepsLabel: 'Steps',
-    stepsHint: 'Daily step total from the watch',
-    stepsUnit: 'steps',
-    distanceLabel: 'Distance',
-    distanceHint: 'Distance covered that day',
-    distanceUnit: 'm',
-    caloriesLabel: 'Active burn',
-    caloriesHint: 'Activity only, basal metabolism excluded',
-    caloriesUnit: 'kcal',
-    minutesLabel: 'Active minutes',
-    minutesHint: 'Minutes the watch counted as active',
-    minutesUnit: 'min',
-  },
-  {
-    title: 'Actividad diaria',
-    intro: 'Pasos, distancia, calorías activas y minutos activos por día. Solo se compara con tus registros anteriores; los días sin registro no se rellenan con 0: quedan vacíos.',
-    desktopOnly: 'La vista previa del navegador no lee datos de la cuenta; usa la app de escritorio.',
-    loadFailed: 'Datos de actividad diaria no disponibles de momento',
-    retry: 'Reintentar',
-    loadingAria: 'Cargando la actividad diaria',
-    noneInRange: 'Sin registros de actividad en este rango. Prueba un rango más largo o sincroniza primero.',
-    stepsLabel: 'Pasos',
-    stepsHint: 'Total diario de pasos del reloj',
-    stepsUnit: 'pasos',
-    distanceLabel: 'Distancia',
-    distanceHint: 'Distancia recorrida ese día',
-    distanceUnit: 'm',
-    caloriesLabel: 'Calorías activas',
-    caloriesHint: 'Solo actividad, sin el metabolismo basal',
-    caloriesUnit: 'kcal',
-    minutesLabel: 'Minutos activos',
-    minutesHint: 'Minutos que el reloj contó como activos',
-    minutesUnit: 'min',
-  },
-  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
-  'views/ActivityDetail',
-);
-const t = useMessages(messages);
+const t = useMessages(activityDetailMessages);
 
 const { dataRevision } = useSyncController();
 
@@ -118,28 +52,28 @@ const CARDS = computed<ActivityCard[]>(() => [
     metric: 'steps',
     label: t.value.stepsLabel,
     hint: t.value.stepsHint,
-    color: zeppSemanticColors.brand,
+    color: metricColor('steps'),
     unit: t.value.stepsUnit,
   },
   {
     metric: 'distance',
     label: t.value.distanceLabel,
     hint: t.value.distanceHint,
-    color: zeppSemanticColors.distance,
+    color: metricColor('distance'),
     unit: t.value.distanceUnit,
   },
   {
     metric: 'active_calories',
     label: t.value.caloriesLabel,
     hint: t.value.caloriesHint,
-    color: zeppSemanticColors.calories,
+    color: metricColor('active_calories'),
     unit: t.value.caloriesUnit,
   },
   {
     metric: 'active_minutes',
     label: t.value.minutesLabel,
     hint: t.value.minutesHint,
-    color: zeppSemanticColors.readiness,
+    color: metricColor('active_minutes'),
     unit: t.value.minutesUnit,
   },
 ]);

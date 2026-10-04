@@ -32,6 +32,7 @@ import { heartPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
+import { metricColor } from '../lib/metricTone';
 import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
@@ -153,7 +154,7 @@ const trendCards = computed(() => [
     metric: 'resting_hr',
     label: t.value.restingLabel,
     hint: t.value.restingHint,
-    color: chartPalette.value.series.readiness,
+    color: metricColor('resting_hr'),
     unit: 'bpm',
     series: series.value.resting_hr ?? null,
   },
@@ -161,7 +162,7 @@ const trendCards = computed(() => [
     metric: 'hrv',
     label: 'HRV (SDNN)',
     hint: t.value.hrvHint,
-    color: chartPalette.value.series.pace,
+    color: metricColor('hrv'),
     unit: 'ms',
     series: series.value.hrv ?? null,
   },
@@ -169,7 +170,7 @@ const trendCards = computed(() => [
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
     hint: t.value.rmssdHint,
-    color: chartPalette.value.series.calories,
+    color: metricColor('hrv_rmssd'),
     unit: 'ms',
     series: series.value.hrv_rmssd ?? null,
   },
