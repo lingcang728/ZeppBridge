@@ -247,3 +247,7 @@ components/overview/DataReadyCapsule.streamSeparator
 
 # hi-IN
 components/overview/DataReadyCapsule.streamSeparator
+
+# 生活事件分类短名：荷兰语、德语里 Routine / Training 本来就这么写
+lib/lifeEvents.categoryShort.routine
+lib/lifeEvents.categoryShort.training

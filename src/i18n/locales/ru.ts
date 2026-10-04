@@ -1339,6 +1339,13 @@ export default {
         training: 'Тренировки и старты',
         other: 'Прочее',
       },
+      categoryShort: {
+        health: 'Здоровье',
+        travel: 'Поездки',
+        routine: 'Режим',
+        training: 'Тренировки',
+        other: 'Прочее',
+      },
       since: (date: string) => `С ${date}`,
       chartKey: "События жизни",
       today: "Сегодня",

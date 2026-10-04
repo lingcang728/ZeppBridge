@@ -14,7 +14,12 @@ const busy = ref(false);
 const error = ref('');
 const confirmingDelete = ref(false);
 const categoryOptions = computed(() =>
-  eventCategories.map((category) => ({ value: category, label: t.value.categories[category] })),
+  // 胶囊上写短名（五项一行放得下才能拖），全名进悬停提示；两者一样（中文）时不重复提示。
+  eventCategories.map((category) => {
+    const label = t.value.categoryShort[category];
+    const full = t.value.categories[category];
+    return { value: category, label, title: full !== label ? full : undefined };
+  }),
 );
 watch(draft, () => { error.value = ''; confirmingDelete.value = false; });
 // 开始日期滚过了结束日期：结束日期跟着走，不让两者倒挂（保存时才报错太晚了）。

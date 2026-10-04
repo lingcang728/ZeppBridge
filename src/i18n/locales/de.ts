@@ -1507,6 +1507,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         training: 'Training & Wettkämpfe',
         travel: 'Reisen',
       },
+      categoryShort: {
+        health: 'Gesundheit',
+        travel: 'Reisen',
+        routine: 'Alltag',
+        training: 'Training',
+        other: 'Sonstiges',
+      },
       category: 'Kategorie',
       deleteHint: 'Wird aus der lokalen Datenbank gelöscht.',
       deleteTitle: 'Dieses Lebensereignis löschen?',

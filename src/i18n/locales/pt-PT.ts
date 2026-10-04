@@ -1308,6 +1308,13 @@ export default {
         training: 'Treino e provas',
         other: 'Outro',
       },
+      categoryShort: {
+        health: 'Saúde',
+        travel: 'Viagens',
+        routine: 'Rotina',
+        training: 'Treino',
+        other: 'Outro',
+      },
       all: 'Todos',
       showMore: (count: number) => `Ver mais ${count}`,
       showLess: 'Ver menos',

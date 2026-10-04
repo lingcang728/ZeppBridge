@@ -1195,6 +1195,13 @@ export default {
         training: 'ट्रेनिंग और रेस',
         travel: 'यात्रा',
       },
+      categoryShort: {
+        health: 'स्वास्थ्य',
+        travel: 'यात्रा',
+        routine: 'दिनचर्या',
+        training: 'ट्रेनिंग',
+        other: 'अन्य',
+      },
       category: 'श्रेणी',
       deleteHint: 'यह इवेंट लोकल डेटाबेस से हटा दिया जाएगा।',
       deleteTitle: 'यह लाइफ़ इवेंट मिटाएँ?',

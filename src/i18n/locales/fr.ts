@@ -796,6 +796,13 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
         travel: 'Voyages et déplacements',
         other: 'Autre',
       },
+      categoryShort: {
+        health: 'Corps',
+        travel: 'Voyages',
+        routine: 'Quotidien',
+        training: 'Entraînement',
+        other: 'Autre',
+      },
       add: 'Ajouter un événement',
       edit: 'Modifier l’événement',
       name: 'Titre',

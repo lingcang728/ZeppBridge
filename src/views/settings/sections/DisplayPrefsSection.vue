@@ -22,7 +22,8 @@ import {
   setDistanceUnit,
   type DistanceUnit,
 } from '../../../lib/units';
-import { locale, LOCALES, LOCALE_LABELS, useMessages, type Locale } from '../../../i18n';
+import { LOCALES, LOCALE_LABELS, useMessages, type Locale } from '../../../i18n';
+import { shownLocale } from '../../../lib/motion/localeTarget';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 
@@ -48,8 +49,12 @@ const themeOptions = computed(() => [
   { value: 'system' as ThemeMode, label: d.value.themeSystem, icon: 'monitor' as const },
 ]);
 const themeTrack = ref<{ $el: HTMLElement } | null>(null);
+/* 换语言的涟漪从这只语言轮处扩散开（和主题从被点的图标处扩散同理）。 */
+const localeWheel = ref<{ $el: HTMLElement } | null>(null);
 const chooseLocale = (value: string | number) => {
-  void import('../../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale));
+  const rect = localeWheel.value?.$el.getBoundingClientRect();
+  const origin = rect?.width ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
+  void import('../../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale, origin));
 };
 const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
 const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
@@ -71,7 +76,7 @@ const chooseTheme = (value: string | number) => {
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">语言 · Language</span></div>
           <div class="s-row-control">
-            <CapsuleWheel loop :span="236" :items="localeOptions" :model-value="locale" aria-label="语言 · Language" @update:model-value="chooseLocale" />
+            <CapsuleWheel loop :span="236" :items="localeOptions" :model-value="shownLocale" aria-label="语言 · Language" @update:model-value="chooseLocale" ref="localeWheel" />
           </div>
         </div>
         <div class="s-row">

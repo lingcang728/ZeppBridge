@@ -19,6 +19,8 @@ export const lifeEventMessages = defineMessages(
     all: '全部', showMore: (count: number) => `再看 ${count} 件`, showLess: '收起', manage: '管理生活事件', related: '相关事件',
     local: '只存本机，随数据库备份；交给 AI 时可勾选带上。',
     categories: { health: '身体与恢复', travel: '旅行与出差', routine: '作息与生活', training: '训练与比赛', other: '其他' },
+    // 编辑器里的分类胶囊用短名：五项一行放得下才能拖（全名太长的语言会折成两行）；全名进悬停提示和列表。
+    categoryShort: { health: '身体与恢复', travel: '旅行与出差', routine: '作息与生活', training: '训练与比赛', other: '其他' },
   },
   {
     title: 'Life events', intro: 'Record what happened alongside your health data.',
@@ -34,6 +36,7 @@ export const lifeEventMessages = defineMessages(
     all: 'All', showMore: (count: number) => `Show ${count} more`, showLess: 'Show less', manage: 'Manage life events', related: 'Related events',
     local: 'Saved locally, included in backups. Optional in AI handoffs.',
     categories: { health: 'Health & recovery', travel: 'Travel', routine: 'Routine & lifestyle', training: 'Training & races', other: 'Other' },
+    categoryShort: { health: 'Health', travel: 'Travel', routine: 'Routine', training: 'Training', other: 'Other' },
   },
   {
     title: 'Eventos de vida', intro: 'Registra lo ocurrido junto a tus datos de salud.',
@@ -49,6 +52,7 @@ export const lifeEventMessages = defineMessages(
     all: 'Todos', showMore: (count: number) => `Ver ${count} más`, showLess: 'Ver menos', manage: 'Administrar eventos', related: 'Eventos relacionados',
     local: 'Solo local, incluido en copias; opcional al pasar a la IA.',
     categories: { health: 'Salud y recuperación', travel: 'Viajes', routine: 'Rutina y estilo de vida', training: 'Entrenamiento y carreras', other: 'Otros' },
+    categoryShort: { health: 'Salud', travel: 'Viajes', routine: 'Rutina', training: 'Entreno', other: 'Otros' },
   },
   'lib/lifeEvents',
 );

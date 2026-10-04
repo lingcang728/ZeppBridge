@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { whenFramesSteady } from '../lib/motion/steady';
-import { OPEN_EASE } from '../lib/motion/timing';
+import { OPEN_EASE, REVEAL_MS } from '../lib/motion/timing';
 
 /**
  * 界面主题：深色 / 浅色 / 跟随系统。
@@ -71,9 +71,6 @@ type ViewTransitionHandle = { ready: Promise<void>; finished: Promise<void>; ski
 type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => ViewTransitionHandle;
 };
-
-/** 扩散的时长：和卡片展开同一条曲线，整屏的圆比卡大得多，再慢一点。 */
-const REVEAL_MS = 640;
 
 /** 正在放的那次换主题动画。 */
 let revealing: ViewTransitionHandle | null = null;

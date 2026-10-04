@@ -889,6 +889,13 @@ export default {
         training: 'Treinos e provas',
         other: 'Outros',
       },
+      categoryShort: {
+        health: 'Saúde',
+        travel: 'Viagens',
+        routine: 'Rotina',
+        training: 'Treinos',
+        other: 'Outros',
+      },
       since: (date: string) => `Desde ${date}`,
       chartKey: "Eventos de vida",
       today: "Hoje",

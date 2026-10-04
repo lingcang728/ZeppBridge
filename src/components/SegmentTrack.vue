@@ -23,7 +23,8 @@
  * 那一项的粗体比按钮宽，两头被裁掉（葡语「Zonas de reserva de frequência cardíaca」）。
  *
  * 放不下就折行（is-wrapped）：以前项被压窄、字互相叠在一起（葡语的生活事件分类、补拉
- * 起点）。折行后滑块按行定位（--thumb-t / --thumb-h），只能点、不能横拖。 */
+ * 起点）。折行后滑块按行定位（--thumb-t / --thumb-h）：横拖在手指那一行里吸附，上下越过行中线换行；
+ * 点到别的行时平胶囊原处缩小、目标处长出来，不斜穿两行字（rowAt / slideRow / fly 的 hop）。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
@@ -32,7 +33,8 @@ import { flickDeform, liftRect, rubberStretch, squash, stretchLimit } from '../l
 import { useGlassLens } from '../composables/useGlassLens';
 import { exemptFromSettle } from '../lib/motion/interrupt';
 
-export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName };
+/** `title`：标签是缩写时的全名（悬停提示和读屏用）。 */
+export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName; title?: string };
 
 const props = withDefaults(defineProps<{
   items: SegmentItem<T>[];
@@ -84,6 +86,8 @@ type Gesture = {
   lastX: number;
   time: number;
   velocity: number;
+  /** 折行时手指所在的那一行（该行各项的 offsetTop）；不折行是 null。 */
+  row: number | null;
 };
 let gesture: Gesture | null = null;
 let frame = 0;
@@ -128,6 +132,9 @@ const stretch = ref(0);
 /** 飞行时长：松手后滑块落位、点击后滑过去。新值在起飞时就交出去（不再等落位），动画在合成器上跑，切页挂载卡不住它。 */
 const FLY_MS = 360;
 const FLY_EASE = 'cubic-bezier(.3, 1.22, .4, 1)';
+/** 折行时换行：原处缩到这么大淡出，目标处从这么大长回来（见 fly 里的 hop）。 */
+const HOP_MS = 380;
+const HOP_SHRINK = 0.6;
 /** 每次起飞加一：上一次飞行的收尾（动画 finished 以后复位状态）发现自己过期了就不做。 */
 let flyToken = 0;
 let colorTimer = 0;
@@ -254,6 +261,11 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
   const movers = [thumbEl.value, rimEl.value, lensEl.value];
   const before = movers.map((el) => el?.getBoundingClientRect() ?? null);
   const wasVisible = thumb.value.visible;
+  // 折行时换到别的行：不斜着飞过去（玻璃斜穿两行字，把路过的字放大扭曲，2026-10-04 葡语录屏），
+  // 改成平胶囊在原处缩小淡出、在目标处长出来，透镜不浮起（也省掉一路逐帧重画折射滤镜）。
+  const targetTop = stops.value.find((stop) => stop.value === value)?.top ?? 0;
+  const hop = wrapped.value && wasVisible && targetTop !== thumb.value.top;
+  if (hop) lift = false;
   if (lift && thumbLens.active.value) flyLift.value = true;
   placeOn(value);
   settling.value = true;
@@ -268,7 +280,7 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
     lensFade.value = false;
     cancelAnimationFrame(fadeFrame);
     fadeFrame = requestAnimationFrame(() => { fadeFrame = requestAnimationFrame(() => { lensFade.value = true; }); });
-    colorTimer = window.setTimeout(() => { if (token === flyToken) lensValue.value = value; }, FLY_MS * 0.3);
+    colorTimer = window.setTimeout(() => { if (token === flyToken) lensValue.value = value; }, hop ? HOP_MS * 0.5 : FLY_MS * 0.3);
   }
   const land = () => {
     if (token !== flyToken) return;
@@ -284,7 +296,25 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
   }
   for (const animation of flying.splice(0)) animation.cancel();
   const scale = layoutScale();
-  movers.forEach((el, index) => {
+  if (hop) {
+    const el = thumbEl.value;
+    const from = before[0];
+    const to = el?.getBoundingClientRect();
+    if (el && from?.width && to?.width) {
+      const dx = (from.left + from.width / 2 - (to.left + to.width / 2)) / scale;
+      const dy = (from.top + from.height / 2 - (to.top + to.height / 2)) / scale;
+      const sw = from.width / to.width;
+      const sh = from.height / to.height;
+      const at = `${dx}px ${dy}px`;
+      flying.push(exemptFromSettle(el.animate([
+        { translate: at, scale: `${sw} ${sh}`, opacity: 1, easing: 'cubic-bezier(.4, 0, .7, .4)' },
+        { translate: at, scale: `${sw * HOP_SHRINK} ${sh * HOP_SHRINK}`, opacity: 0, offset: 0.4 },
+        { translate: '0px 0px', scale: `${HOP_SHRINK} ${HOP_SHRINK}`, opacity: 0, offset: 0.44, easing: 'cubic-bezier(.3, .6, .3, 1.15)' },
+        { translate: '0px 0px', scale: '1 1', opacity: 1 },
+      ], { duration: HOP_MS })));
+    }
+  }
+  if (!hop) movers.forEach((el, index) => {
     const from = before[index];
     const to = el?.getBoundingClientRect();
     if (!el || !from || !from.width || !to || !to.width) return;
@@ -410,7 +440,7 @@ const clearGesture = () => {
 };
 
 const onDown = (event: PointerEvent) => {
-  if (props.disabled || event.button !== 0 || !event.isPrimary || !track.value || wrapped.value) return;
+  if (props.disabled || event.button !== 0 || !event.isPrimary || !track.value) return;
   measure();
   elastic?.cancel();
   elastic = null;
@@ -427,10 +457,47 @@ const onDown = (event: PointerEvent) => {
     lastX: event.clientX,
     time: event.timeStamp,
     velocity: 0,
+    row: wrapped.value ? active.top ?? 0 : null,
   };
   track.value.setPointerCapture(event.pointerId);
   // 按在已选中的那一项上：透镜马上浮起来（按在别的项上是点击，飞过去时再浮）。
   if (startValue === props.modelValue) pressed.value = true;
+};
+
+/* —— 折行时的拖动 ——
+   以前折行就只能点（2026-10-04 反馈：葡语的生活事件分类拖不动）。现在横拖在手指所在的那一行里吸附，
+   手指上下越过行中线就换到那一行：滑块竖直滑过去一行（短短一段，见 slideRow），横向接着跟手。
+   拖过两端不拉长整条胶囊（多行的胶囊被拉长很怪）。 */
+/** 手指（视口纵坐标）离哪一行的中线最近，返回那一行的 offsetTop。 */
+const rowAt = (clientY: number): number => {
+  const rect = track.value!.getBoundingClientRect();
+  const y = (clientY - rect.top) / layoutScale();
+  let best = stops.value[0]?.top ?? 0;
+  for (const stop of stops.value) {
+    const top = stop.top ?? 0;
+    if (Math.abs(top + (stop.height ?? 0) / 2 - y) < Math.abs(best + (stop.height ?? 0) / 2 - y)) best = top;
+  }
+  return best;
+};
+/** 拖动时参与吸附的项：折行时只有手指那一行。 */
+const stopsIn = (row: number | null) => (row === null ? stops.value : stops.value.filter((stop) => (stop.top ?? 0) === row));
+const ROW_SLIDE_MS = 200;
+/** 拖着换行：滑块、玻璃边、透镜从上一行竖直滑到这一行（FLIP，只动 translate）。 */
+const slideRow = async (apply: () => void) => {
+  const movers = [thumbEl.value, rimEl.value, lensEl.value];
+  const before = movers.map((el) => el?.getBoundingClientRect() ?? null);
+  apply();
+  await nextTick();
+  if (reducedMotion()) return;
+  const scale = layoutScale();
+  movers.forEach((el, index) => {
+    const from = before[index];
+    const to = el?.getBoundingClientRect();
+    if (!el || !from || !to || !to.height) return;
+    const dy = (from.top - to.top) / scale;
+    if (Math.abs(dy) < 1) return;
+    exemptFromSettle(el.animate([{ translate: `0px ${dy}px` }, { translate: '0px 0px' }], { duration: ROW_SLIDE_MS, easing: DROP_EASE }));
+  });
 };
 
 /** 手指拖到的中心（布局像素）越过第一项 / 最后一项中心多远（带方向）。 */
@@ -469,15 +536,24 @@ const onMove = (event: PointerEvent) => {
   current.lastX = event.clientX;
   current.time = event.timeStamp;
   const center = current.center + dx;
-  nextThumb = dragThumb(stops.value, center, current.velocity);
-  const pull = rubberStretch(overshoot(center), stretchLimit(trackSize.value.w));
+  if (current.row !== null) current.row = rowAt(event.clientY);
+  const pool = stopsIn(current.row);
+  nextThumb = dragThumb(pool, center, current.velocity);
+  const pull = current.row === null ? rubberStretch(overshoot(center), stretchLimit(trackSize.value.w)) : 0;
   if (!frame) {
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (!nextThumb) return;
-      thumb.value = { ...thumb.value, ...nextThumb, visible: true };
-      stretch.value = gesture ? pull : 0;
-      lensValue.value = snapStop(stops.value, nextThumb.left + nextThumb.width / 2, 0).value;
+      const live = gesture;
+      if (!nextThumb || !live) return;
+      const rowStops = stopsIn(live.row);
+      const row = rowStops[0];
+      const apply = () => {
+        thumb.value = { ...thumb.value, ...nextThumb!, top: row?.top ?? thumb.value.top, height: row?.height ?? thumb.value.height, visible: true };
+      };
+      if (row && (row.top ?? 0) !== thumb.value.top) void slideRow(apply);
+      else apply();
+      stretch.value = pull;
+      lensValue.value = snapStop(rowStops, nextThumb.left + nextThumb.width / 2, 0).value;
     });
   }
   event.preventDefault();
@@ -491,7 +567,7 @@ const onUp = (event: PointerEvent) => {
     // 拖到一半指针被系统收走（pointercancel / 捕获丢失）：已经拖动过就按此刻滑块所在的那一项落定，
     // 没拖动就原样放回。「禁止点击」的标记也要复位——以前它一直留着，之后点胶囊毫无反应，
     // 这就是「快速切换会卡住」。
-    const landing = dragging.value ? snapStop(stops.value, thumb.value.left + thumb.value.width / 2, 0).value : null;
+    const landing = dragging.value ? snapStop(stopsIn(current.row), thumb.value.left + thumb.value.width / 2, 0).value : null;
     clearGesture();
     springBack(pulled, 0);
     window.setTimeout(() => { suppressClick = false; }, 0);
@@ -506,7 +582,7 @@ const onUp = (event: PointerEvent) => {
   const moved = dragging.value;
   const center = current.center + (event.clientX - current.x) / layoutScale();
   const velocity = event.timeStamp - current.time < 90 ? current.velocity : 0;
-  const next = moved ? snapStop(stops.value, center, velocity).value : current.startValue;
+  const next = moved ? snapStop(stopsIn(current.row), center, velocity).value : current.startValue;
   const keepFade = lensFade.value;
   const colored = lensValue.value;
   const willFly = moved || next !== props.modelValue;
@@ -625,8 +701,8 @@ onBeforeUnmount(() => {
       :class="['segment-item', { 'is-lensed': lensValue !== null && item.value === lensValue, 'is-offrow': offRow(index) }]"
       :style="itemLeft(index)"
       :aria-checked="item.value === modelValue"
-      :aria-label="iconOnly ? item.label : undefined"
-      :title="iconOnly ? item.label : undefined"
+      :aria-label="iconOnly ? item.label : item.title"
+      :title="iconOnly ? item.label : item.title"
       :disabled="disabled"
       :tabindex="item.value === modelValue ? 0 : -1"
       @click="onClick(item.value)"
@@ -721,7 +797,6 @@ onBeforeUnmount(() => {
 /* 表单里的分段胶囊项不收缩（放不下就折行）；浮动导航和按钮组不折行，按原样收缩。 */
 .segment-track.is-inset:not(.is-fill) .segment-item { flex: 0 0 auto; }
 .segment-track.is-wrapped { display: flex; width: 100%; flex-wrap: wrap; border-radius: 20px; }
-.segment-track.is-wrapped .segment-item { cursor: pointer; }
 
 .segment-item {
   position: relative;

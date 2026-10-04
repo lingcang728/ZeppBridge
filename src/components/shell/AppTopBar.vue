@@ -13,6 +13,7 @@ import { useWidthMorph } from '../../composables/useWidthMorph';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, locale, LOCALES, LOCALE_LABELS, useMessages } from '../../i18n';
 import { backDestination, historyBackPath, navigationBranch } from '../../lib/navigation';
+import { shownLocale } from '../../lib/motion/localeTarget';
 import type { Locale } from '../../i18n';
 import type { ThemeMode } from '../../composables/useTheme';
 
@@ -254,10 +255,12 @@ const onThemeChange = (value: string | number) => {
 /* 语言列表跟着 LOCALES 注册表走，一律写全名，和设置页一致（不用「PT-BR」「中」这类缩写）。
    桌面宽度下不让位：语言是看不懂当前界面的人唯一的出口，藏起来他就找不到设置页了（2026-10-01 反馈）。 */
 const localeOptions = computed(() => LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
-// 换语言放「响指」：旧语言的字化成灰被风吹走（lib/motion/ashSwitch.ts）。
+// 换语言放「响指」：从语言轮处扩散一圈涟漪，旧语言的字化成灰被吹走（lib/motion/ashSwitch.ts）。
 // 模块第一次换语言时才取（带着 WebGL 着色器，不进首屏）。
 const onLocaleChange = (value: string | number) => {
-  void import('../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale));
+  const rect = localeWheel.value?.$el.getBoundingClientRect();
+  const origin = rect?.width ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
+  void import('../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale, origin));
 };
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
@@ -416,6 +419,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
     <SegmentTrack
       class="pill-nav"
+      data-ash-skip
       :compact="fit >= 3"
       variant="glass"
       :items="navItems"
@@ -450,7 +454,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
           :model-value="themeMode" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
         <CapsuleWheel ref="localeWheel" class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
-          :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
+          :model-value="shownLocale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>
   </header>

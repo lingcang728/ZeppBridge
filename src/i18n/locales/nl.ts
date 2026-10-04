@@ -985,6 +985,13 @@ export default {
         training: 'Training en wedstrijden',
         other: 'Overig',
       },
+      categoryShort: {
+        health: 'Gezondheid',
+        travel: 'Reizen',
+        routine: 'Routine',
+        training: 'Training',
+        other: 'Overig',
+      },
       since: (date: string) => `Vanaf ${date}`,
       chartKey: "Levensgebeurtenissen",
       today: "Vandaag",

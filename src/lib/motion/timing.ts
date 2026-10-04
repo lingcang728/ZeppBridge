@@ -12,6 +12,9 @@ export const CLOSE_MS = 440;
 export const OPEN_EASE = 'cubic-bezier(.4, .6, .2, 1)';
 export const CLOSE_EASE = 'cubic-bezier(.4, .6, .2, 1)';
 
+/** 整屏从一个按钮处扩散开（换主题、换语言共用）：和卡片展开同一条曲线，整屏的圆比卡大得多，再慢一点。 */
+export const REVEAL_MS = 640;
+
 /** 卡身跟着形状一起出来（12%–50% 淡入；形状这时已走了大半），关上时在前 35% 淡出。
     不能等形状走完才淡入：那段时间里窗口长满了却一个字没有（「空板」）。按线性时间轴放。 */
 export const BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.12 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }];
