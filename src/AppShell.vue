@@ -317,3 +317,6 @@ onUnmounted(() => {
   </div>
 </template>
 
+
+<!-- 外壳布局、切页过渡、底部导航：跟着外壳一起懒加载，不进落地页的首屏（见 shell.css 头注释）。 -->
+<style src="./styles/shell.css"></style>

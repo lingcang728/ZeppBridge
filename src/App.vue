@@ -17,5 +17,5 @@ const showLanding = isLandingMode();
   <AppShell v-else />
 </template>
 
-<!-- html / body / #app 的基础规则两种形态都要，所以留在根组件（全局样式）。 -->
-<style src="./styles/shell.css"></style>
+<!-- html / body / #app 的基础规则两种形态都要，所以留在根组件（全局样式）；外壳布局在 AppShell.vue 里引入。 -->
+<style src="./styles/base.css"></style>
