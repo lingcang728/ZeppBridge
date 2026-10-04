@@ -1,4 +1,6 @@
 import { computed, ref } from 'vue';
+import { whenFramesSteady } from '../lib/motion/steady';
+import { OPEN_EASE } from '../lib/motion/timing';
 
 /**
  * 界面主题：深色 / 浅色 / 跟随系统。
@@ -70,6 +72,9 @@ type ViewTransitionDocument = Document & {
   startViewTransition?: (update: () => void) => ViewTransitionHandle;
 };
 
+/** 扩散的时长：和卡片展开同一条曲线，整屏的圆比卡大得多，再慢一点。 */
+const REVEAL_MS = 640;
+
 /** 正在放的那次换主题动画。 */
 let revealing: ViewTransitionHandle | null = null;
 
@@ -110,10 +115,15 @@ const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
   const transition = doc.startViewTransition(update);
   revealing = transition;
   void transition.ready.then(() => {
-    root.animate(
-      { clipPath: [`circle(0px ${at})`, `circle(${reach}px ${at})`] },
-      { duration: 520, easing: 'cubic-bezier(.4, 0, .2, 1)', pseudoElement: '::view-transition-new(root)' },
+    const grow = root.animate(
+      { clipPath: [`circle(2px ${at})`, `circle(${reach}px ${at})`] },
+      { duration: REVEAL_MS, easing: OPEN_EASE, fill: 'both', pseudoElement: '::view-transition-new(root)' },
     );
+    // 先停在半径 0（画面上还是旧主题），等帧节奏平稳再长：换主题要整页重算样式、两张整屏快照上 GPU，
+    // 头一两帧卡一百多毫秒。以前圆一开跑就被这一下吞掉大半，用户看到的是「卡一下、整屏一闪就换了」
+    // （2026-10-04 录屏：520ms 的扩散只看得到六七帧）。
+    grow.pause();
+    void whenFramesSteady().then(() => { if (grow.playState === 'paused') grow.play(); });
   }).catch(() => undefined);
   void transition.finished.catch(() => undefined).finally(() => {
     if (revealing === transition) revealing = null;

@@ -22,7 +22,7 @@ import {
   setDistanceUnit,
   type DistanceUnit,
 } from '../../../lib/units';
-import { locale, LOCALES, LOCALE_LABELS, setLocale, useMessages, type Locale } from '../../../i18n';
+import { locale, LOCALES, LOCALE_LABELS, useMessages, type Locale } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 
@@ -48,7 +48,9 @@ const themeOptions = computed(() => [
   { value: 'system' as ThemeMode, label: d.value.themeSystem, icon: 'monitor' as const },
 ]);
 const themeTrack = ref<{ $el: HTMLElement } | null>(null);
-const chooseLocale = (value: string | number) => setLocale(String(value) as Locale);
+const chooseLocale = (value: string | number) => {
+  void import('../../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale));
+};
 const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
 const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
 const chooseDateOrder = (value: string | number) => setDateOrder(String(value) as DateOrder);

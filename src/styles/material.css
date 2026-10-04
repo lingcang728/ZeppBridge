@@ -231,6 +231,13 @@
 html[data-theme-morph]::view-transition { pointer-events: none; }
 html[data-theme-morph]::view-transition-old(root),
 html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* 换语言的「响指」（lib/motion/ashSwitch.ts）：同样不接指针、不放默认的交叉淡化；灰的画布是单独一层，
+   只有新的一侧、不要默认的淡入。 */
+html[data-ash-morph]::view-transition { pointer-events: none; }
+html[data-ash-morph]::view-transition-old(root),
+html[data-ash-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-group(ash-dust), ::view-transition-new(ash-dust) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(ash-dust) { display: none; }
 /* 系统设置「提高对比度」：玻璃加一圈实边。 */
 @media (prefers-contrast: more) {
   .glass-control { box-shadow: inset 0 0 0 1px var(--ink), var(--glass-shadow); }

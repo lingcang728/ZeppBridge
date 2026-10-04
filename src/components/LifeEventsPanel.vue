@@ -58,7 +58,9 @@ onActivated(reload);
     </div>
 
     <p v-if="failed" class="le-note" role="alert">{{ t.failed }} <button type="button" class="pill-button quiet" @click="reload">{{ t.retry }}</button></p>
-    <p v-else-if="loading && !events.length" class="le-note" role="status">{{ t.loading }}</p>
+    <!-- 只在第一次读完之前说「正在读取」。以前每回到概览都重读一次，还没有事件时这一行一冒一收，
+         把下面的「数据来源」条往下推一截再弹回来——卡片收回到那条上时稳定地跳一下（用户 2026-10-04 录屏）。 -->
+    <p v-else-if="loading && !loaded && !events.length" class="le-note" role="status">{{ t.loading }}</p>
     <p v-else-if="!rows.length && !empty" class="le-note">{{ events.length ? t.noMatch : t.empty }}</p>
 
     <ol v-if="rows.length" class="le-timeline">

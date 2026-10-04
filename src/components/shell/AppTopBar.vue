@@ -11,7 +11,7 @@ import { useSyncController } from '../../composables/useSyncController';
 import { useTheme } from '../../composables/useTheme';
 import { useWidthMorph } from '../../composables/useWidthMorph';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
-import { defineMessages, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../../i18n';
+import { defineMessages, locale, LOCALES, LOCALE_LABELS, useMessages } from '../../i18n';
 import { backDestination, historyBackPath, navigationBranch } from '../../lib/navigation';
 import type { Locale } from '../../i18n';
 import type { ThemeMode } from '../../composables/useTheme';
@@ -254,7 +254,11 @@ const onThemeChange = (value: string | number) => {
 /* 语言列表跟着 LOCALES 注册表走，一律写全名，和设置页一致（不用「PT-BR」「中」这类缩写）。
    桌面宽度下不让位：语言是看不懂当前界面的人唯一的出口，藏起来他就找不到设置页了（2026-10-01 反馈）。 */
 const localeOptions = computed(() => LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
-const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
+// 换语言放「响指」：旧语言的字化成灰被风吹走（lib/motion/ashSwitch.ts）。
+// 模块第一次换语言时才取（带着 WebGL 着色器，不进首屏）。
+const onLocaleChange = (value: string | number) => {
+  void import('../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale));
+};
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
@@ -371,7 +375,10 @@ onBeforeUnmount(() => {
   fitObserver?.disconnect();
   cancelAnimationFrame(fitFrame);
 });
-watch([locale, () => props.backTo], scheduleFit);
+watch(() => props.backTo, scheduleFit);
+/* 换语言：新标签一上 DOM 就量（post flush），同一帧里定好档位，不等下一帧——
+   语言轮在 rAF 里提交选择时，等一帧就会先画出一帧放不下的顶栏再收（「闪一下」）。 */
+watch(locale, () => { cancelAnimationFrame(fitFrame); void refit(); }, { flush: 'post' });
 /* 同步胶囊换字：马上按伸完的宽度量一次（变宽时不会半路压到导航）；伸缩放完的那一次由
    useWidthMorph 的 onSettled 触发，不再按写死的时长猜。 */
 watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit);
@@ -401,8 +408,9 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
         :aria-hidden="backTo ? 'true' : undefined"
         :inert="backTo ? true : undefined"
       >
+        <!-- 只留标志（用户 2026-10-04）：以前旁边还有「ZeppBridge 3」字标，英文等标签长的语言里顶栏放不下，
+             字标先画出来、量完再被收掉，切语言时闪一下。 -->
         <BrandMark :size="30" />
-        <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
       </RouterLink>
     </div>
 
@@ -498,13 +506,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 @media (prefers-reduced-motion: reduce) {
   .lead > *, .lead > .is-off { transition: none; }
 }
-.wordmark {
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  letter-spacing: .01em;
-  white-space: nowrap;
-}
-.wordmark b { font-weight: 700; color: var(--accent); }
 
 .pill-nav { justify-self: center; max-width: 100%; }
 
@@ -565,7 +566,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
-.app-topbar[class*='fit-'] .wordmark { display: none; }
 .app-topbar:is(.fit-4, .fit-5, .fit-6, .fit-7) { grid-template-columns: auto minmax(0, 1fr) auto; }
 :is(.fit-5, .fit-6, .fit-7) .pill-nav { display: none; }
 :is(.fit-6, .fit-7) .sync-text { display: none; }
@@ -574,9 +574,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择不按宽度藏：由 refit 量，真放不下才让位（fit-6）。 */
-@media (max-width: 1100px) {
-  .brand .wordmark { display: none; }
-}
 @media (max-width: 980px) {
   .app-topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
 }
@@ -589,7 +586,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   .topbar-actions { gap: 5px; }
   .sync-text { display: none; }
   .sync-pill { padding-inline: 10px; }
-  .wordmark { font-size: var(--fs-md); }
 }
 @media (max-width: 380px) {
   .brand { display: none; }
