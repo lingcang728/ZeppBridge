@@ -34,14 +34,16 @@ import { useSyncController } from '../../composables/useSyncController';
 import { defineMessages, useMessages } from '../../i18n';
 import { vEdgeSafe } from '../../lib/edgeSafe';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   preview: AiTaskPreview | null;
   previewError: string | null;
   direction: string | null;
   fallbackTitle: string;
   /** 「会交出去的数据：9/18–10/2 的睡眠、心率……；不含精确位置」——就绪度浮层的第一句话。 */
   handover?: { title: string; text: string } | null;
-}>();
+  /** 右列竖卡形态（左流右结布局）：控件纵向排满整列，不再是底部一条横胶囊。 */
+  rail?: boolean;
+}>(), { rail: false });
 
 const { draft, saveDraft } = useAiTaskDraft();
 const handoff = useAiTaskHandoff();
@@ -405,7 +407,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="dock" class="dock" :aria-label="t.title">
+  <section ref="dock" :class="['dock', { rail }]" :aria-label="t.title">
     <Transition name="sheet">
       <div v-show="details" class="sheet glass-control" role="dialog" :aria-label="t.finalPrompt">
         <p v-if="handover?.text" class="handover"><b>{{ handover.title }}</b>{{ handover.text }}</p>
@@ -482,7 +484,7 @@ onBeforeUnmount(() => {
     <!-- 外面传进来的东西（问题条）紧贴在主按钮栏上方，和它一起量高度、一起贴底。 -->
     <div class="core">
       <slot />
-    <div class="bar glass-control is-lens-host">
+    <div :class="['bar', { 'glass-control is-lens-host': !rail }]">
       <button type="button" :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :aria-expanded="details" @click="details = !details">
         <i class="ready-dot" aria-hidden="true"></i>
         <span v-if="waitingForData" class="ready-copy" role="status">
@@ -514,6 +516,7 @@ onBeforeUnmount(() => {
         </span>
       </span>
 
+      <div class="go-row">
       <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy || isSyncing" :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @click="run(true)">
         <Icon name="send" :size="17" />
         <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ isSyncing ? t.goSubSyncing : t.goSub }}</small></span>
@@ -521,6 +524,7 @@ onBeforeUnmount(() => {
       <button type="button" class="export-only" :disabled="!desktop || busy || isSyncing" :title="t.exportOnly" :aria-label="t.exportOnly" @click="run(false)">
         <Icon name="export" :size="17" />
       </button>
+      </div>
     </div>
     </div>
     <p v-if="!desktop" class="ai-note offline">{{ t.desktopOnly }}</p>
@@ -532,6 +536,8 @@ onBeforeUnmount(() => {
 .dock > * { pointer-events: auto; }
 
 .core { display: grid; width: 100%; gap: 8px; }
+/* 横排时主按钮和只导出直接并排；竖卡里它们组一行（见下方 rail 规则）。 */
+.go-row { display: contents; }
 .bar {
   display: flex;
   width: 100%;
@@ -716,4 +722,25 @@ onBeforeUnmount(() => {
 @container (max-width: 460px) {
   .go-copy small { display: none; }
 }
+
+/* ── 右列竖卡形态（左流右结布局）────────────────────────────
+   控件纵向排满整列：就绪度 → 交给谁 → 订阅档 → 主按钮行。
+   卡片本身是实卡材质（mat-card），不再是浮在舞台上的玻璃条。 */
+.dock.rail { justify-items: stretch; }
+.dock.rail .bar {
+  flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 10px; padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.dock.rail .ready-chip { flex: none; width: 100%; min-height: 44px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.dock.rail .provider-wheel { width: 100%; }
+.dock.rail .plan-wrap { width: 100%; }
+.dock.rail .plan-toggle { width: 100%; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.dock.rail .go-row { display: flex; width: 100%; gap: 8px; }
+.dock.rail .go { flex: 1 1 auto; min-width: 0; justify-content: center; padding-inline: 18px; }
+.dock.rail .go-copy small { display: block; }
+.dock.rail .export-only { flex: 0 0 44px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.dock.rail .export-only:hover:not(:disabled) { background: var(--surface-hover); }
+.dock.rail .sheet, .dock.rail .progress { width: 100%; }
 </style>

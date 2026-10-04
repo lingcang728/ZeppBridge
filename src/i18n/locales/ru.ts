@@ -1449,30 +1449,18 @@ export default {
     },
 
     'views/AiComposer': {
-      daysOption: (days: number) =>
-        plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
-      recentDays: (days: number) =>
-        plural(days, { one: `Последний ${days} день`, few: `Последние ${days} дня`, many: `Последние ${days} дней`, other: `Последние ${days} дня` }),
       andMore: (count: number) =>
         `и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
-      stepTarget: 'Что анализировать',
-      stepAsk: 'Что спросить',
-      stepExtras: 'Параметры и вложения',
       targetRecent: (days: number) =>
         `Тренировка не выбрана · последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}`,
-      askEmpty: 'Вопрос не задан · достаточно направления',
-      askTemplate: (name: string) => `Направление: ${name}`,
       extrasNone: 'Без вложений · стандартные параметры',
       extrasFiles: (count: number) =>
         plural(count, { one: `${count} вложение`, few: `${count} вложения`, many: `${count} вложений`, other: `${count} вложения` }),
       undoAdded: (name: string) => `Добавлено «${name}»`,
       undoRemoved: (name: string) => `Удалено «${name}»`,
-      undoKept: (name: string) => `Оставлено «${name}»`,
-      undoExcluded: (name: string) => `Исключено «${name}»`,
       undoPicked: (name: string) => `Выбрано «${name}»`,
       undoUnpicked: (name: string) => `Снят выбор «${name}»`,
       undoDirection: 'Направление изменено',
-      graphCoverage: (have: number, total: number) => `Дней с данными: ${have}/${total}`,
     },
 
     'views/BodyStatus': {
@@ -2147,9 +2135,6 @@ export default {
         'Выберите тренировку, отметьте данные и напишите вопрос — экспортируйте на рабочий стол и перетащите файл в окно ИИ.',
       titleLabel: 'Название задачи',
       rename: 'Нажмите для переименования',
-      rangeLabel: 'Период обзора',
-      days: (n: number) =>
-        plural(n, { one: `${n} день`, few: `${n} дня`, many: `${n} дней`, other: `${n} дня` }),
       history: 'Сохранённые задачи',
       historyCount: (count: number) => `Сохранённые задачи (${count})`,
       historyEmpty: 'Сохранённых задач пока нет',
@@ -2189,24 +2174,6 @@ export default {
       groupOther: 'Другое',
     },
 
-    'components/ai/GraphNodePopover': {
-      close: 'Закрыть',
-      days: 'Дней назад',
-      daysOption: (days: number) =>
-        plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
-      coverage: (have: number, total: number) => `${have}/${total} дн. с данными`,
-      noData: 'В этом периоде нет данных',
-      expand: 'Показать метрики',
-      collapse: 'Скрыть метрики',
-      include: 'Передать ИИ',
-      exclude: 'Не передавать ИИ',
-      includeDay: 'Включить день тренировки',
-      keep: 'Оставить метрику',
-      drop: 'Исключить метрику',
-      attachments: (count: number) =>
-        plural(count, { one: `${count} файл`, few: `${count} файла`, many: `${count} файлов`, other: `${count} файла` }),
-      noteHint: 'Заметку можно добавить на шаге ② справа.',
-    },
 
     'components/ai/HandoffPanel': {
       title: 'Передать ИИ',
@@ -2307,20 +2274,6 @@ export default {
       desktopOnly: 'Выбор файлов доступен в настольном приложении',
     },
 
-    'components/ai/TaskGraph': {
-      label: 'Граф данных задачи',
-      hint:
-        'Перетащите в круг для добавления, наружу — для удаления · клик по узлу открывает '
-        + 'настройки · перетаскивание фона перемещает холст',
-      zone: 'К ИИ',
-      undo: 'Отменить',
-      fit: 'Вписать',
-      zoomIn: 'Приблизить',
-      zoomOut: 'Отдалить',
-      backToAll: 'Все категории',
-      dismissHint: 'Понятно',
-      zoomLevel: (percent: number) => `Масштаб ${percent}% — кликните, чтобы вписать граф`,
-    },
 
     'components/deck/CardDeck': {
       stackLabel: 'Группы настроек',

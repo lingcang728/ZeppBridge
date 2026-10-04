@@ -116,7 +116,7 @@ const pick = async (replaceId?: string) => {
 </script>
 
 <template>
-  <section class="ai-card extras">
+  <section class="extras" :aria-label="t.attachTitle">
     <p class="ai-label">{{ t.attachTitle }}</p>
     <ul v-if="rows.length" class="files">
       <li v-for="row in rows" :key="row.id" :class="{ 'is-missing': row.status === 'missing' }">

@@ -81,12 +81,7 @@ const facts = (workout: Workout): string => {
 </script>
 
 <template>
-  <section class="ai-card picker" aria-labelledby="ai-step-workouts">
-    <div class="ai-step-head">
-      <span class="ai-step-no">1</span>
-      <h2 id="ai-step-workouts" class="ai-step-title">{{ t.title }}</h2>
-      <p class="ai-step-hint">{{ t.hint }}</p>
-    </div>
+  <section class="picker" :aria-label="t.title">
 
     <div v-if="selected.length" class="chosen">
       <span class="chosen-count">{{ t.selectedCount(selected.length) }}</span>

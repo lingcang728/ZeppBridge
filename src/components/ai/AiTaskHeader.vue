@@ -1,24 +1,21 @@
 <script setup lang="ts">
 /**
- * 页头：一枚浮在关系网左上角的玻璃胶囊——任务名、回溯范围、已保存的任务。
+ * 页头：任务名胶囊——任务名、已保存的任务。
  *
  * 没有「+」和「✓」：只想把数据交给 AI 的人不需要先「新建」「保存」，导出时自动存；
  * 同名的草稿再导出会更新原来那条，已保存的任务里不会出现两条一模一样的。
- * 任务名单击就地改；「最近 N 天」直接在胶囊里拨，一次改所有数据类别的窗口。
+ * 任务名单击就地改。回溯范围挪到了包裹区（PackageZone）标题行，贴着它管的那六块砖。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from '../Icon.vue';
-import SegmentTrack from '../SegmentTrack.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
-import { recentWindowDays } from '../../lib/aiTask/title';
-import { shownDayChoice } from '../../lib/aiTask/categories';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{ fallbackTitle: string }>();
 
-const { draft, lastError, savedNotice, setTitle, setWindowDays, resetDraft, loadTask } = useAiTaskDraft();
+const { draft, lastError, savedNotice, setTitle, resetDraft, loadTask } = useAiTaskDraft();
 const { taskList, libraryError } = useAiTaskLibrary();
 
 const t = useMessages(defineMessages(
@@ -27,8 +24,6 @@ const t = useMessages(defineMessages(
     intro: '选运动、挑数据、写明想问什么，导出到桌面拖给 AI。',
     titleLabel: '任务名',
     rename: '点一下改名',
-    rangeLabel: '回溯范围',
-    days: (n: number) => `${n} 天`,
     history: '已保存的任务',
     historyCount: (count: number) => `已保存的任务（${count}）`,
     historyEmpty: '还没有保存的任务',
@@ -40,8 +35,6 @@ const t = useMessages(defineMessages(
     intro: 'Pick workouts, choose data, say what you want to know — export to desktop and drag into the AI.',
     titleLabel: 'Task name',
     rename: 'Click to rename',
-    rangeLabel: 'Look-back range',
-    days: (n: number) => `${n} days`,
     history: 'Saved tasks',
     historyCount: (count: number) => `Saved tasks (${count})`,
     historyEmpty: 'No saved tasks yet',
@@ -53,8 +46,6 @@ const t = useMessages(defineMessages(
     intro: 'Elige entrenamientos, selecciona datos, escribe qué consultar: exporta al escritorio y arrástralo a la IA.',
     titleLabel: 'Nombre de la tarea',
     rename: 'Clic para renombrar',
-    rangeLabel: 'Periodo anterior',
-    days: (n: number) => `${n} días`,
     history: 'Tareas guardadas',
     historyCount: (count: number) => `Tareas guardadas (${count})`,
     historyEmpty: 'Aún no hay tareas guardadas',
@@ -81,11 +72,6 @@ const commitRename = (event: Event) => {
   editing.value = false;
 };
 const cancelRename = () => { editing.value = false; };
-
-/* —— 回溯范围：一次改全部数据类别 —— */
-const RANGE_CHOICES = [7, 14, 30, 90];
-const rangeItems = computed(() => RANGE_CHOICES.map((days) => ({ value: days, label: t.value.days(days) })));
-const windowDays = computed(() => shownDayChoice(recentWindowDays(draft.value), RANGE_CHOICES));
 
 /* —— 已保存的任务 —— */
 const historyOpen = ref(false);
@@ -133,9 +119,6 @@ onBeforeUnmount(() => {
         <span class="title-text">{{ shownTitle }}</span><Icon name="edit" :size="13" class="title-glyph" />
       </button>
       <span class="divider" aria-hidden="true"></span>
-      <SegmentTrack compact variant="bare" class="range-track" :items="rangeItems" :model-value="windowDays"
-        :aria-label="t.rangeLabel" @update:model-value="(value) => setWindowDays(Number(value))" />
-      <span class="divider" aria-hidden="true"></span>
       <button type="button" :class="['history-btn', { on: historyOpen }]" :title="t.historyCount(taskList.length)"
         :aria-label="t.historyCount(taskList.length)" :aria-expanded="historyOpen" aria-controls="ai-task-history"
         @click="historyOpen = !historyOpen">
@@ -176,7 +159,6 @@ onBeforeUnmount(() => {
 .title-input { width: 280px; min-width: 0; padding: 7px 14px; border: 0; border-radius: 999px; background: var(--glass-press); box-shadow: none; font-size: var(--fs-md); font-weight: 650; }
 .title-input:focus { box-shadow: 0 0 0 2px var(--focus); }
 .divider { width: 1px; height: 20px; margin: 0 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
-.range-track { flex: 0 0 auto; }
 .history-btn { display: inline-flex; min-width: 36px; height: 36px; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 999px;
   background: transparent; color: var(--ink); cursor: pointer; }
 .history-btn:hover, .history-btn.on { background: var(--glass-press); }

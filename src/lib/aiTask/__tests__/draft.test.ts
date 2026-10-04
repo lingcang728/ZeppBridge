@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_TASK_PROMPT_MAX,
   applyTemplateToDraft,
+  dropLegacyMetricExclusions,
   isTaskDirty,
   newTaskDraft,
   taskSnapshot,
@@ -96,6 +97,26 @@ describe('taskSnapshot / isTaskDirty', () => {
     expect(isTaskDirty(task, baseline)).toBe(false);
     expect(isTaskDirty({ ...task, prompt: 'x' }, baseline)).toBe(true);
     expect(isTaskDirty({ ...task, id: 'server-set', created_at: 't', updated_at: 't' }, baseline)).toBe(false);
+  });
+});
+
+describe('dropLegacyMetricExclusions', () => {
+  it('旧任务的 excluded_metrics 清空并计数；其余字段不动', () => {
+    const task = newTaskDraft();
+    task.categories = task.categories.map((range) =>
+      range.category === 'sleep' ? { ...range, excluded_metrics: ['rem_minutes', 'deep_minutes'] } : range);
+    const { task: cleaned, droppedCount } = dropLegacyMetricExclusions(task);
+    expect(droppedCount).toBe(2);
+    expect(cleaned.categories.find((range) => range.category === 'sleep')?.excluded_metrics).toEqual([]);
+    expect(cleaned.title).toBe(task.title);
+    expect(cleaned.workout_ids).toBe(task.workout_ids);
+  });
+
+  it('没有排除时原样返回同一对象（droppedCount = 0）', () => {
+    const task = newTaskDraft();
+    const { task: cleaned, droppedCount } = dropLegacyMetricExclusions(task);
+    expect(droppedCount).toBe(0);
+    expect(cleaned).toBe(task);
   });
 });
 

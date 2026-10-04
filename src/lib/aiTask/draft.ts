@@ -60,6 +60,22 @@ export const applyTemplateToDraft = (task: AiTask, template: AiTaskTemplate): Ai
 };
 
 /**
+ * 旧版任务可能带着「按单个指标排除」的 `excluded_metrics`。指标级排除已退役
+ * （只剩类别级开关 + 全局「不含精确位置」）：载入即丢弃。类型字段保留——后端
+ * 契约不动，只是前端不再编辑。返回丢了几条，让界面可以说一句。
+ */
+export const dropLegacyMetricExclusions = (task: AiTask): { task: AiTask; droppedCount: number } => {
+  let droppedCount = 0;
+  const categories = task.categories.map((range) => {
+    const excluded = range.excluded_metrics ?? [];
+    if (!excluded.length) return range;
+    droppedCount += excluded.length;
+    return { ...range, excluded_metrics: [] };
+  });
+  return droppedCount ? { task: { ...task, categories }, droppedCount } : { task, droppedCount };
+};
+
+/**
  * 稳定序列化，用于脏标记比对。字段顺序固定写死，不依赖构造顺序——
  * 从后端读回来的对象 key 顺序可能不一样，逐字段取才比得准。
  */

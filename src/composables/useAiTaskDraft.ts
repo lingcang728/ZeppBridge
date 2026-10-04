@@ -5,7 +5,7 @@
  * 运动）归 `useAiTaskLibrary`；预览覆盖归 `useAiTaskPreview`；交付归
  * `useAiTaskHandoff`。
  *
- * 撤销栈管「选择」：类别进出、指标排除、运动勾选、模板套用。每次存的是
+ * 撤销栈管「选择」：类别进出、运动勾选、模板套用。每次存的是
  * 动作前那一刻的选择快照，撤销就是整块还原——不用为每种动作写反向操作。
  * 天数、文字这类连续编辑不进栈。
  */
@@ -19,7 +19,13 @@ import type {
   AiTaskDetailLevel,
   AiTaskTemplate,
 } from '../lib/bridge/types';
-import { applyTemplateToDraft, isTaskDirty, newTaskDraft, taskSnapshot } from '../lib/aiTask/draft';
+import {
+  applyTemplateToDraft,
+  dropLegacyMetricExclusions,
+  isTaskDirty,
+  newTaskDraft,
+  taskSnapshot,
+} from '../lib/aiTask/draft';
 import { AI_TASK_CATEGORY_META, categoryRangeOf, withCategoryRange } from '../lib/aiTask/categories';
 import { createUndoStack } from '../lib/aiTask/undoStack';
 import { useAiTaskLibrary } from './useAiTaskLibrary';
@@ -38,9 +44,8 @@ type Selection = Pick<AiTask, 'categories' | 'workout_ids' | 'template_id' | 'de
 /** 最近一次进撤销栈的改动：撤销胶囊用它说「已移出『睡眠』」。 */
 export interface DraftChange {
   seq: number;
-  kind: 'category' | 'metric' | 'workout' | 'template';
+  kind: 'category' | 'workout' | 'template';
   category?: AiTaskCategory;
-  metric?: string;
   workoutId?: string;
   /** 改完以后它是不是在交付范围里（加入 / 保留 / 选中为 true）。 */
   included: boolean;
@@ -62,6 +67,8 @@ const noteChange = (change: Omit<DraftChange, 'seq'>) => {
 const busy = ref<false | 'load' | 'save' | 'delete'>(false);
 const lastError = ref<string | null>(null);
 const savedNotice = ref(false);
+/** 载入的旧任务带指标级排除（已弃）：丢掉它们时置真，界面说一句。 */
+const legacyNotice = ref(false);
 let savedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const dirty = computed(() => isTaskDirty(draft.value, baseline.value));
@@ -133,7 +140,9 @@ const loadTask = async (id: string) => {
   try {
     const task = await backend.aiTaskGet(id);
     if (gen !== draftGen) return; // 等待期间切到了别的任务或新建：丢掉旧回执
-    replaceDraft(task);
+    const cleaned = dropLegacyMetricExclusions(task);
+    legacyNotice.value = cleaned.droppedCount > 0;
+    replaceDraft(cleaned.task);
     await library.ensureWorkouts(task.workout_ids);
   } catch (error) {
     if (gen === draftGen) lastError.value = toUserMessage(error, copy().loadFailed);
@@ -147,6 +156,7 @@ const resetDraft = () => {
   draftGen += 1;
   replaceDraft(newTaskDraft());
   lastError.value = null;
+  legacyNotice.value = false;
 };
 
 const showSavedNotice = () => {
@@ -249,16 +259,6 @@ const setWindowDays = (days: number) => {
   });
 };
 
-const setMetricExcluded = (category: AiTaskCategory, metric: string, excluded: boolean) => {
-  const current = categoryRangeOf(draft.value.categories, category).excluded_metrics ?? [];
-  if (current.includes(metric) === excluded) return;
-  rememberSelection();
-  patchRange(category, {
-    excluded_metrics: excluded ? [...current, metric] : current.filter((name) => name !== metric),
-  });
-  noteChange({ kind: 'metric', category, metric, included: !excluded });
-};
-
 const setWorkoutSelected = (workoutId: string, selected: boolean) => {
   const ids = draft.value.workout_ids;
   if (ids.includes(workoutId) === selected) return;
@@ -317,7 +317,8 @@ export function useAiTaskDraft() {
     setWindowDays,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>
       patchRange(category, { include_workout_day: include }),
-    setMetricExcluded,
+    legacyNotice,
+    dismissLegacyNotice: () => { legacyNotice.value = false; },
     setWorkoutSelected,
     toggleWorkout: (workoutId: string) => setWorkoutSelected(workoutId, !draft.value.workout_ids.includes(workoutId)),
     undo,

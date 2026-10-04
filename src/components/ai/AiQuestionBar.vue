@@ -1,12 +1,8 @@
 <script setup lang="ts">
 /**
- * 舞台底部的问题条：整页唯一写字的地方，紧挨着主按钮——像对话框的输入栏，
- * 写完问题，点旁边的「交给 ChatGPT」就走。
- *
- * 以前问题藏在右栏第二步的折叠里，还和方向、个人背景挤在一起；人要先找到它，
- * 再回到左下角去按交付。现在写字和交付在同一块视线里。
- *
- * 文本框随内容长高（最多四行），超出再滚；文案和方向面板共用一份（DirectionPanel.i18n）。
+ * 问题区：整页唯一写字的地方。玻璃输入面（ai-field），标题写在面里，
+ * 字数淡淡地压在右下角；文本框随内容长高（最多四行），超出再滚。
+ * 文案和方向面板共用一份（DirectionPanel.i18n）。
  */
 import { nextTick, ref, watch } from 'vue';
 import { AI_TASK_PROMPT_MAX } from '../../lib/aiTask/draft';
@@ -18,7 +14,7 @@ const { draft, setPrompt } = useAiTaskDraft();
 const t = useMessages(directionMessages);
 
 const box = ref<HTMLTextAreaElement | null>(null);
-const MAX_HEIGHT = 128;
+const MAX_HEIGHT = 160;
 const grow = () => {
   const el = box.value;
   if (!el) return;
@@ -36,31 +32,26 @@ defineExpose({ focus: () => box.value?.focus() });
 </script>
 
 <template>
-  <div class="qbar glass-control">
+  <div class="qfield">
     <label class="sr-only" for="ai-question">{{ t.questionLabel }}</label>
-    <textarea id="ai-question" ref="box" rows="1" :maxlength="AI_TASK_PROMPT_MAX" :value="draft.prompt"
+    <textarea id="ai-question" ref="box" rows="2" :maxlength="AI_TASK_PROMPT_MAX" :value="draft.prompt"
       :placeholder="t.questionPlaceholder" @input="onInput"></textarea>
     <span v-if="draft.prompt.length > AI_TASK_PROMPT_MAX * 0.8" class="count">{{ t.counter(draft.prompt.length, AI_TASK_PROMPT_MAX) }}</span>
   </div>
 </template>
 
 <style scoped>
-.qbar { display: flex; width: 100%; align-items: flex-end; gap: 10px; padding: 5px 16px 5px 8px; border-radius: 26px; }
+/* 凹槽输入面：比卡片更暗 + 内阴影；聚焦时亮一圈中性焦点色。 */
+.qfield {
+  display: grid; gap: 2px; padding: 4px 12px 8px;
+  border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  transition: box-shadow var(--dur-fast) ease;
+}
+.qfield:focus-within { box-shadow: var(--mat-inset-shadow), 0 0 0 1.5px var(--focus); }
 textarea {
-  flex: 1;
-  min-width: 0;
-  min-height: 46px;
-  padding: 11px 10px;
-  border: 0;
-  outline: 0;
-  resize: none;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: var(--fs-xl);
-  line-height: 1.45;
+  width: 100%; min-height: 3.2em; padding: 6px 0 2px; border: 0; outline: 0; resize: none; overflow-y: auto;
+  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); line-height: 1.55;
 }
 textarea::placeholder { color: var(--subtle); }
-.qbar:focus-within { box-shadow: var(--glass-rim), var(--glass-shadow), 0 0 0 2px var(--focus); }
-.count { padding-bottom: 14px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.count { justify-self: end; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; opacity: .7; }
 </style>

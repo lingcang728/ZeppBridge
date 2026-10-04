@@ -1669,26 +1669,15 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'views/AiComposer': {
-      daysOption: (days: number) => plural(days, { one: `${days} jour`, other: `${days} jours` }),
-      recentDays: (days: number) =>
-        plural(days, { one: 'Dernier jour', other: `${days} derniers jours` }),
       andMore: (count: number) => `et ${count - 1} autres`,
-      stepTarget: 'Quoi analyser',
-      stepAsk: 'Que demander',
-      stepExtras: 'Pièces jointes et options',
       targetRecent: (days: number) => `Aucune séance choisie · les ${days} derniers jours`,
-      askEmpty: 'Pas de question écrite · une direction seule suffit',
-      askTemplate: (name: string) => `Direction : ${name}`,
       extrasNone: 'Aucune pièce jointe · options par défaut',
       extrasFiles: (count: number) => (count === 1 ? '1 pièce jointe' : `${count} pièces jointes`),
       undoAdded: (name: string) => `« ${name} » ajouté`,
       undoRemoved: (name: string) => `« ${name} » retiré`,
-      undoKept: (name: string) => `« ${name} » gardé`,
-      undoExcluded: (name: string) => `« ${name} » exclu`,
       undoPicked: (name: string) => `« ${name} » sélectionné`,
       undoUnpicked: (name: string) => `« ${name} » désélectionné`,
       undoDirection: 'Direction d’analyse changée',
-      graphCoverage: (have: number, total: number) => `${have}/${total} jours avec des données`,
     },
 
     'views/HealthCheck': {
@@ -1980,8 +1969,6 @@ Réponds en Markdown.`,
       intro: 'Choisissez une séance, sélectionnez les données, écrivez ce que vous voulez savoir — exportez sur le bureau et glissez le tout dans l’IA.',
       titleLabel: 'Nom de la tâche',
       rename: 'Cliquez pour renommer',
-      rangeLabel: 'Jours d’historique',
-      days: (n: number) => plural(n, { one: `${n} jour`, other: `${n} jours` }),
       history: 'Tâches enregistrées',
       historyCount: (count: number) => `Tâches enregistrées (${count})`,
       historyEmpty: 'Pas encore de tâche enregistrée',
@@ -2019,23 +2006,6 @@ Réponds en Markdown.`,
       groupOther: 'Autres',
     },
 
-    'components/ai/GraphNodePopover': {
-      include: 'Confier à l’IA',
-      exclude: 'Ne pas confier à l’IA',
-      keep: 'Garder cette métrique',
-      drop: 'Exclure cette métrique',
-      days: 'Jours d’historique',
-      daysOption: (days: number) => plural(days, { one: `${days} jour`, other: `${days} jours` }),
-      includeDay: 'Inclure le jour de la séance',
-      expand: 'Afficher les métriques',
-      collapse: 'Masquer les métriques',
-      coverage: (have: number, total: number) => `${have}/${total} jours avec données`,
-      noData: 'Pas de données sur cette fenêtre',
-      attachments: (count: number) =>
-        plural(count, { one: `${count} fichier d’origine`, other: `${count} fichiers d’origine` }),
-      noteHint: 'La note s’écrit dans l’étape ② à droite.',
-      close: 'Fermer',
-    },
 
     'components/ai/HandoffPanel': {
       title: 'Confier à l’IA',
@@ -2126,18 +2096,6 @@ Réponds en Markdown.`,
       mcpHint: "Pour des outils locaux comme Claude Desktop. Ne s’applique qu’au MCP lancé avec --scope task, qui ne voit alors que ce que couvre cette tâche ; le mode par défaut en lecture seule sur toute la base n’est pas restreint par ce bouton.",
     },
 
-    'components/ai/TaskGraph': {
-      label: 'Graphe des données de la tâche',
-      zone: 'Vers l’IA',
-      hint: 'Glissez dans le cercle pour inclure, hors du cercle pour retirer · cliquez sur un nœud pour ses options · glissez le fond pour déplacer la vue',
-      undo: 'Annuler',
-      fit: 'Cadrer',
-      zoomIn: 'Zoom avant',
-      zoomOut: 'Zoom arrière',
-      zoomLevel: (percent: number) => `Zoom ${percent} % — cliquez pour que tout le graphe tienne dans le cadre`,
-      backToAll: 'Toutes les catégories',
-      dismissHint: 'Compris',
-    },
 
     'components/deck/CardDeck': {
       stackLabel: 'Groupes de réglages',

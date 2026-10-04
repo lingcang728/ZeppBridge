@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * 「交给 AI」页舞台下面的训练计划：AI 的回复贴回来 → 检查 → 发到手表。
+ * 「交给 AI」页下方的训练计划段：AI 的回复贴回来 → 检查 → 发到手表。
  *
- * 首屏仍是整块舞台，向下滚才看到这一段：问 AI 和收 AI 的计划在同一页，来回不用跳。
- *   - 上面一行「上次发到手表的计划」（有过推送才出现）：撤销上一次 / 清空 7 天；
+ * 收在页面的「收到 AI 的计划？贴回来」折叠段里（AiComposer 供标题与摘要），
+ * 问 AI 和收 AI 的计划在同一页，来回不用跳。
+ *   - 顶上一行「上次发到手表的计划」账本（有过推送才出现）：撤销上一次 / 清空 7 天；
  *   - 贴回来之前是「AI 给了训练计划？」入口；贴回来之后换成审阅卡；
  *   - 每次操作的结局用一句话说清（已送达 / 没有确认 / 被拒绝），不报没验证过的成功。
  */
@@ -59,15 +60,9 @@ const noticeTone = computed(() => (notice.value ? NOTICE_TONE[notice.value.kind]
 </script>
 
 <template>
-  <section v-if="isDesktop()" class="plan-section" aria-labelledby="plan-section-title" aria-live="polite">
-    <!-- 段落标题在卡片外面，和概览页「我的指标」一样；上次推送的账本是标题右边的一行小字。 -->
-    <header class="section-head">
-      <div class="section-copy">
-        <h2 id="plan-section-title">{{ t.sectionTitle }}</h2>
-        <p>{{ t.sectionSub }}</p>
-      </div>
-      <PlanLedger v-if="showLedger && state" :state="state" :busy="busy" @undo="plan.undo()" @clear="plan.clear(false)" />
-    </header>
+  <!-- 无段头：标题与摘要在 AiComposer 的折叠头上；账本是内容里的第一行。 -->
+  <div v-if="isDesktop()" class="plan-section" aria-live="polite">
+    <PlanLedger v-if="showLedger && state" :state="state" :busy="busy" @undo="plan.undo()" @clear="plan.clear(false)" />
 
     <div v-if="noticeText" :class="['notice', noticeTone]" role="status">
       <Icon :name="noticeTone === 'ok' ? 'check' : 'warning'" :size="16" />
@@ -88,15 +83,11 @@ const noticeTone = computed(() => (notice.value ? NOTICE_TONE[notice.value.kind]
         </div>
       </div>
     </ModalDialog>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.plan-section { display: grid; gap: 14px; margin-top: 36px; }
-.section-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; padding: 0 6px; }
-.section-copy { display: grid; gap: 2px; }
-.section-copy h2 { margin: 0; font-size: var(--fs-2xl); }
-.section-copy p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.plan-section { display: grid; gap: 14px; }
 .notice { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-radius: 18px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); font-size: var(--fs-xs); line-height: 1.5; }
 .notice.ok { color: var(--accent); }
 .notice.warn { color: var(--warning); }

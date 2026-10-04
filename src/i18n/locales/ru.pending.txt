@@ -1,5 +1,22 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
+components/MetricTrendCard.widened
+components/ai/PackageZone.close
+components/ai/PackageZone.counting
+components/ai/PackageZone.coverage
+components/ai/PackageZone.days
+components/ai/PackageZone.daysLabel
+components/ai/PackageZone.exclude
+components/ai/PackageZone.include
+components/ai/PackageZone.includeDay
+components/ai/PackageZone.noData
+components/ai/PackageZone.offTag
+components/ai/PackageZone.rangeLabel
+components/ai/PackageZone.restore
+components/ai/PackageZone.settings
+components/ai/PackageZone.shelf
+components/ai/PackageZone.title
+components/ai/PackageZone.undo
 components/overview/PinnedMetrics.loadFailed
 components/plan/plan.active
 components/plan/plan.added
@@ -13,6 +30,7 @@ components/plan/plan.chartApprox
 components/plan/plan.chartAria
 components/plan/plan.chartAxis
 components/plan/plan.chartNoHr
+components/plan/plan.chartTitle
 components/plan/plan.clearBody
 components/plan/plan.clearConfirm
 components/plan/plan.clearTitle
@@ -20,6 +38,9 @@ components/plan/plan.clearWindow
 components/plan/plan.cooldown
 components/plan/plan.discard
 components/plan/plan.dismiss
+components/plan/plan.flowAsk
+components/plan/plan.flowPaste
+components/plan/plan.flowSend
 components/plan/plan.footBlocked
 components/plan/plan.footNote
 components/plan/plan.footSummary
@@ -70,6 +91,8 @@ components/plan/plan.restStep
 components/plan/plan.reviewTitle
 components/plan/plan.reviewTitleOne
 components/plan/plan.seconds
+components/plan/plan.sectionSub
+components/plan/plan.sectionTitle
 components/plan/plan.send
 components/plan/plan.sending
 components/plan/plan.sportCycling
@@ -77,6 +100,7 @@ components/plan/plan.sportOpenWaterSwim
 components/plan/plan.sportPoolSwim
 components/plan/plan.sportRunning
 components/plan/plan.stepNumber
+components/plan/plan.stepsTitle
 components/plan/plan.targetHr
 components/plan/plan.targetOpen
 components/plan/plan.targetPace
@@ -87,6 +111,10 @@ components/plan/plan.undoLast
 components/plan/plan.unverifiedNote
 components/plan/plan.warmup
 components/plan/plan.wasName
+components/plan/plan.weekHard
+components/plan/plan.weekRest
+components/plan/plan.weekSessions
+components/plan/plan.weekTotal
 composables/useSyncController.cleanupFailed
 demo/texts.easyRun
 demo/texts.intervals
@@ -128,17 +156,13 @@ lib/trainingPlan/issues.ui.training_plan.issue.too_many_steps
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_kind
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_sport
 lib/trainingPlan/issues.ui.training_plan.issue.workout_too_long
-components/ai/TaskGraph.today
-components/ai/TaskGraph.daysUnit
-components/plan/plan.sectionTitle
-components/plan/plan.sectionSub
-components/plan/plan.flowAsk
-components/plan/plan.flowPaste
-components/plan/plan.flowSend
-components/plan/plan.weekSessions
-components/plan/plan.weekTotal
-components/plan/plan.weekHard
-components/plan/plan.weekRest
-components/plan/plan.stepsTitle
-components/plan/plan.chartTitle
-components/MetricTrendCard.widened
+views/AiComposer.dismiss
+views/AiComposer.extrasFold
+views/AiComposer.planFold
+views/AiComposer.planIdle
+views/AiComposer.planReview
+views/AiComposer.planSent
+views/AiComposer.questionTitle
+views/AiComposer.targetFold
+views/AiComposer.targetPicked
+views/AiComposer.ui.ai_task.metric_exclusions_dropped

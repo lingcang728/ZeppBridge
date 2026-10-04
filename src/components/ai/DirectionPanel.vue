@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * 第 ② 步：方向和个人背景。
+ * 方向和个人背景。
  *
  * 模板 = 分析方向（全局框架，带推荐的数据范围）；问题 = 这次想重点问的。
- * 两者并存，最终提示词里方向在前、问题在后。问题输入框已经搬到舞台底部的对话条
- * （AiQuestionBar，挨着主按钮），这里只留方向、示例问题和个人背景。
+ * 两者并存，最终提示词里方向在前、问题在后。问题输入区在它上面那张卡
+ * （AiQuestionBar），这里只留方向、示例问题和个人背景。
  *
- * 方向按目的分组平铺（日常状态 / 跑步训练 / 其他），一眼看完、一点就选——以前是一枚
- * 胶囊滚轮，里面只有三道跑步题，关心睡眠的人在这一步以为这是跑步软件。个人背景是
- * 无硬框的玻璃输入面，随内容长高；示例问题一点就填进对话条，并选上对应的方向。
+ * 方向按目的分组平铺（日常状态 / 跑步训练 / 其他），一眼看完、一点就选。个人背景是
+ * 无硬框的玻璃输入面，随内容长高；示例问题一点就填进问题区，并选上对应的方向。
  */
 import { computed } from 'vue';
 import type { AiTaskTemplate } from '../../lib/bridge/types';
@@ -68,7 +67,6 @@ const useExample = (example: { text: string; template: string }) => {
 <template>
   <section class="ai-card" aria-labelledby="ai-step-direction">
     <div class="ai-step-head">
-      <span class="ai-step-no">2</span>
       <h2 id="ai-step-direction" class="ai-step-title">{{ t.title }}</h2>
     </div>
     <p class="ai-step-hint">{{ t.hint }}</p>

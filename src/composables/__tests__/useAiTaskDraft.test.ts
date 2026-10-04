@@ -109,12 +109,31 @@ describe('useAiTaskDraft', () => {
     expect(draft.draft.value.detail_level).toBe('standard');
   });
 
-  it('单独排除一个指标，撤销后恢复', () => {
-    draft.setMetricExcluded('recovery', 'stress', true);
-    draft.setMetricExcluded('recovery', 'stress', true);
-    expect(draft.draft.value.categories.find((r) => r.category === 'recovery')?.excluded_metrics).toEqual(['stress']);
-    draft.undo();
+  it('载入带旧指标排除的任务：排除丢弃、提示置真，不算脏', async () => {
+    const stored = newTaskDraft();
+    stored.id = 't-legacy';
+    stored.categories = stored.categories.map((range) =>
+      range.category === 'recovery' ? { ...range, excluded_metrics: ['stress'] } : range);
+    getMock.mockResolvedValue(stored);
+    await draft.loadTask('t-legacy');
     expect(draft.draft.value.categories.find((r) => r.category === 'recovery')?.excluded_metrics).toEqual([]);
+    expect(draft.legacyNotice.value).toBe(true);
+    expect(draft.dirty.value).toBe(false);
+    draft.dismissLegacyNotice();
+    expect(draft.legacyNotice.value).toBe(false);
+  });
+
+  it('干净任务不提示；再载入干净任务时提示消失', async () => {
+    const legacy = newTaskDraft();
+    legacy.id = 't-old';
+    legacy.categories = legacy.categories.map((range) =>
+      range.category === 'sleep' ? { ...range, excluded_metrics: ['rem_minutes'] } : range);
+    getMock.mockResolvedValue(legacy);
+    await draft.loadTask('t-old');
+    expect(draft.legacyNotice.value).toBe(true);
+    getMock.mockResolvedValue({ ...newTaskDraft(), id: 't-clean' });
+    await draft.loadTask('t-clean');
+    expect(draft.legacyNotice.value).toBe(false);
   });
 
   it('写个人说明自动把 personal_note 类别带进任务', () => {
