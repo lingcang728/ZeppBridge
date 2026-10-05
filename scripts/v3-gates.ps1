@@ -60,7 +60,9 @@ foreach ($gate in $gates) {
 if ($Frontend) {
     Push-Location $repoRoot
     try {
-        foreach ($script in @('build', 'test', 'i18n:check', 'version:check')) {
+        # 与 CI 对齐：字体覆盖在 test:functions 中，首屏体积在 budget:check 中。
+        # 只做 build / Vitest 会漏掉这两类曾连续失败的门禁。
+        foreach ($script in @('build', 'test', 'test:functions', 'i18n:check', 'version:check', 'docs:check', 'budget:check', 'icons:verify')) {
             Write-Host "==> npm run $script" -ForegroundColor Yellow
             & npm run $script
             if ($LASTEXITCODE -ne 0) {

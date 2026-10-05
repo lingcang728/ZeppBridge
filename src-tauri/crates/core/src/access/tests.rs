@@ -18,8 +18,15 @@ impl TestDir {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        Self::with_nonce(tag, nonce)
+    }
+
+    fn with_nonce(tag: &str, nonce: u128) -> Self {
+        // macOS 的时钟精度不足以区分并行测试；序号保证同一时间戳下也不共用目录。
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let serial = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
-            "zeppbridge-access-{tag}-{}-{nonce}",
+            "zeppbridge-access-{tag}-{}-{nonce}-{serial}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -31,6 +38,28 @@ impl Drop for TestDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+#[test]
+fn parallel_test_directories_with_the_same_timestamp_are_independent() {
+    let mut dirs: Vec<TestDir> = std::thread::scope(|scope| {
+        let threads: Vec<_> = (0..32)
+            .map(|_| scope.spawn(|| TestDir::with_nonce("same-clock", 0)))
+            .collect();
+        threads
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect()
+    });
+    let paths: BTreeSet<_> = dirs.iter().map(|dir| dir.0.clone()).collect();
+    assert_eq!(paths.len(), dirs.len());
+    dirs.truncate(16);
+    for dir in &dirs {
+        assert!(dir.0.is_dir(), "另一个测试结束不能删除仍在使用的目录");
+        Database::open_migrated(&dir.0.join("zepp.db")).unwrap();
+    }
+    drop(dirs);
+    assert!(paths.iter().all(|path| !path.exists()));
 }
 
 fn window(category: AccessCategory, start: NaiveDate, end: NaiveDate) -> GrantWindow {

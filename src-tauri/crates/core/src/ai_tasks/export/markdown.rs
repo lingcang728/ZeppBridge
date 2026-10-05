@@ -145,14 +145,12 @@ fn render_with(
     sleep_section(&mut out, document, &units);
     workouts_section(&mut out, document, &units, curve_average, summarized);
     attachments_section(&mut out, document);
-    for key in ["food"] {
-        if let Some(value) = document.get(key) {
-            let _ = writeln!(
-                out,
-                "## {key}\n\n```json\n{}\n```\n",
-                serde_json::to_string_pretty(value).unwrap_or_default()
-            );
-        }
+    if let Some(value) = document.get("food") {
+        let _ = writeln!(
+            out,
+            "## food\n\n```json\n{}\n```\n",
+            serde_json::to_string_pretty(value).unwrap_or_default()
+        );
     }
     adherence_section(&mut out, document);
     if !final_plan.trim().is_empty() {
