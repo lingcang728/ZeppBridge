@@ -232,22 +232,35 @@ html[data-theme-morph]::view-transition { pointer-events: none; }
 html[data-theme-morph]::view-transition-old(root),
 html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 /* 换语言的「响指」（lib/motion/ashSwitch.ts）：同样不接指针、不放默认的交叉淡化；灰的画布是单独一层，
-   只有新的一侧、不要默认的淡入。导航胶囊在两种语言里位置、宽度都可能不同（中文居中，英文让到左边）：
-   换场期间单独成一层，和涟漪同一条曲线从旧位置滑到新位置；两张快照按原尺寸居中、先后交替淡入淡出，不拉伸文字。 */
+   只有新的一侧、不要默认的淡入。
+   导航胶囊在两种语言里位置、宽度都不同（中文居中，英文让到左边、更宽）：换场期间单独成一层（ash-nav），
+   **胶囊的玻璃底由这一层自己画**——快照里只留字和选中块，组框从旧位置、旧宽度平滑伸缩到新的，圆角是真圆角、
+   不会被拉伸。以前两张快照各带一只宽窄不同的胶囊叠着淡入淡出，边缘左右闪（2026-10-06 修）。
+   字照常化灰：旧字在前三成淡出（灰已经飞起来了），新字从两成开始淡入。时长和 LOCALE_REVEAL_MS 一致。 */
 html[data-ash-morph]::view-transition { pointer-events: none; }
 html[data-ash-morph]::view-transition-old(root),
 html[data-ash-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-group(ash-dust), ::view-transition-new(ash-dust) { animation: none; mix-blend-mode: normal; }
 ::view-transition-old(ash-dust) { display: none; }
 html[data-ash-morph] .pill-nav { view-transition-name: ash-nav; }
-html[data-ash-morph]::view-transition-group(ash-nav) { animation-duration: 640ms; animation-timing-function: cubic-bezier(.4, .6, .2, 1); }
+html[data-ash-morph] .pill-nav,
+html[data-ash-morph] .pill-nav::after { box-shadow: none; background: none; }
+html[data-ash-morph] .pill-nav .segment-glass { opacity: 0; }
+html[data-ash-morph]::view-transition-group(ash-nav) {
+  animation-duration: 1050ms;
+  animation-timing-function: cubic-bezier(.4, .6, .2, 1);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  box-shadow: inset 0 0 0 1px var(--mat-glass-line), var(--glass-outline), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
 html[data-ash-morph]::view-transition-old(ash-nav),
 html[data-ash-morph]::view-transition-new(ash-nav) { height: 100%; object-fit: none; mix-blend-mode: normal; }
-/* 先后交替、不叠成重影：旧的在前四成淡出，新的从两成开始淡入。 */
-html[data-ash-morph]::view-transition-old(ash-nav) { animation: ash-nav-out 640ms linear both; }
-html[data-ash-morph]::view-transition-new(ash-nav) { animation: ash-nav-in 640ms linear both; }
-@keyframes ash-nav-out { 0% { opacity: 1; } 40%, 100% { opacity: 0; } }
-@keyframes ash-nav-in { 0%, 20% { opacity: 0; } 60%, 100% { opacity: 1; } }
+html[data-ash-morph]::view-transition-old(ash-nav) { animation: ash-nav-out 1050ms linear both; }
+html[data-ash-morph]::view-transition-new(ash-nav) { animation: ash-nav-in 1050ms linear both; }
+@keyframes ash-nav-out { 0% { opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes ash-nav-in { 0%, 20% { opacity: 0; } 55%, 100% { opacity: 1; } }
 /* 系统设置「提高对比度」：玻璃加一圈实边。 */
 @media (prefers-contrast: more) {
   .glass-control { box-shadow: inset 0 0 0 1px var(--ink), var(--glass-shadow); }

@@ -1,10 +1,11 @@
 import { nextTick } from 'vue';
 import { ensureLocalePack, locale, setLocale, type Locale } from '../../i18n';
 import { dustLayer } from './ashDust';
-import { CHART_INK, drawCharts, drawVisibleText, grainsOf, TEXT_INK, type AshOrigin } from './ashGlyphs';
+import { drawVisibleText, grainsOf, TEXT_INK, type AshOrigin } from './ashGlyphs';
+import { breatheCharts, settleNewText } from './ashReveal';
 import { localeTarget } from './localeTarget';
 import { whenFramesSteady } from './steady';
-import { OPEN_EASE, REVEAL_MS } from './timing';
+import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
 
 /**
  * 换语言的「响指」（用户 2026-10-04 提的点子：像《复联 4》灭霸打响指，旧语言的字化成灰被吹走，底下露出新语言）。
@@ -30,6 +31,14 @@ import { OPEN_EASE, REVEAL_MS } from './timing';
  *    连拨时几圈的灰画在同一张画布上，上一圈没飘完的灰不会被下一次换场冻住。
  *
  * 系统要求减少动效、内核没有 View Transitions 时直接换；没有 WebGL 时只放涟漪、不放灰。
+ *
+ * 第三版（2026-10-06 精修纲领 2.2）：
+ *   - 慢下来、柔一点：涟漪 1050ms（timing.ts 的 LOCALE_REVEAL_MS，换主题仍是 640），灰飘得更远、更久，三次方收尾；
+ *   - 新字不是「啪」地出现：圆扫过的地方先蒙着一层预先模糊好的新字，按圈分四环依次淡掉，像卡片那样由糊到清
+ *     （ashReveal.ts，模糊只做一次、是静态层，逐帧只动透明度）；
+ *   - 顶栏导航胶囊的字也化灰；胶囊的玻璃底交给换场那一层自己画，宽度从旧到新平滑伸缩，不再两只宽窄不同的
+ *     胶囊叠着闪（material.css 的 ash-nav）；
+ *   - 图表的线和柱子不化灰，圆扫过时轻轻糊一下再变清楚，不重画。
  */
 
 export type { AshOrigin };
@@ -58,10 +67,8 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
   const height = window.innerHeight;
   const reach = Math.ceil(Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y)));
   const layer = dustLayer(width, height);
-  const grains = grainsOf(
-    [[drawVisibleText(width, height), TEXT_INK], [drawCharts(width, height, layer?.canvas ?? null), CHART_INK]],
-    width, height, origin, reach,
-  );
+  const grains = grainsOf([[drawVisibleText(width, height), TEXT_INK]], width, height, origin, reach);
+  let settle = null as ReturnType<typeof settleNewText>;
   const batch = layer && grains ? layer.add(grains, origin) : null;
 
   const root = document.documentElement;
@@ -71,18 +78,21 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
     if (batch) layer!.mount();
     // 顶栏换语言后要重新量档位（AppTopBar 的 refit，一串 nextTick）：等它落定再拍新快照，换场途中顶栏不再变。
     for (let i = 0; i < 6; i += 1) await nextTick();
+    // 新字的「糊」底：在新快照里，所以只在圆里面看得见。
+    settle = settleNewText(width, height, origin, reach, layer?.canvas ?? null);
   });
   try {
     await transition.ready;
   } catch {
     if (batch) layer!.drop(batch);
+    settle?.dispose();
     delete root.dataset.ashMorph;
     return;
   }
   const at = `at ${Math.round(origin.x)}px ${Math.round(origin.y)}px`;
   const grow = root.animate(
     { clipPath: [`circle(2px ${at})`, `circle(${reach}px ${at})`] },
-    { duration: REVEAL_MS, easing: OPEN_EASE, fill: 'both', pseudoElement: '::view-transition-new(root)' },
+    { duration: LOCALE_REVEAL_MS, easing: OPEN_EASE, fill: 'both', pseudoElement: '::view-transition-new(root)' },
   );
   // 导航胶囊那一层（material.css 的 ash-nav）和圆同一刻开跑。
   const parts = [grow, ...document.getAnimations().filter((animation) =>
@@ -93,6 +103,8 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
   await whenFramesSteady();
   for (const animation of parts) if (animation.playState === 'paused') animation.play();
   if (batch) layer!.start(batch, grow);
+  settle?.start();
+  breatheCharts(width, height, origin, reach, layer?.canvas ?? null);
   await transition.finished.catch(() => undefined);
   delete root.dataset.ashMorph;
 };

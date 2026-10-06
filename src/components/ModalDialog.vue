@@ -49,7 +49,7 @@ onMounted(() => {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   // 从打开它的那个按钮里长出来，关的时候缩回去（lib/motion/dialogFlight.ts）。
   origin = originOf(returnFocus);
-  if (backdrop.value && panel.value) dialogFlight.open(backdrop.value, panel.value, origin);
+  if (backdrop.value && panel.value) void dialogFlight.open(backdrop.value, panel.value, origin, () => emit('close'));
   // Start at the heading/content instead of scrolling a long dialog to its first action.
   panel.value?.focus({ preventScroll: true });
   document.addEventListener('keydown', onKeydown, true);
@@ -87,8 +87,14 @@ onUnmounted(() => {
    祖先只要带 backdrop-filter，里面胶囊和日期滚轮的液态玻璃透镜就看不见背后、挂不上（lib/glassLens.ts、
    composables/useGlassLens.ts），弹窗里的选中块只剩一块不透明的深色胶囊（用户 2026-10-04：「添加事件」
    里的分类和日期滚轮要做成液态玻璃）。和顶栏图标组的 .glass-control.is-lens-host 同一个做法。 */
-.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .55); }
-.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* 暗色和模糊都在 ::before 上、淡入淡出也只动它：遮罩自己一旦带 opacity，就成了模糊的取样边界，
+   淡入期间页面清楚、结束才「啪」地糊掉（lib/motion/dialogFlight.ts 头注释）。 */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
+.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* 等画面跟得上的那一小会儿：遮罩和面板都隐身（不用 0，免得这一层不合成）。 */
+.dialog-backdrop.is-entering::before,
+.dialog-backdrop.is-entering .dialog-glass,
+.dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
 .dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); box-shadow: var(--mat-glass-shadow); overflow-wrap: anywhere; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); pointer-events: none; }
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }

@@ -713,7 +713,8 @@ onBeforeUnmount(() => {
       </slot>
     </button>
     <!-- 选中字：同样的标签按量好的位置摆一遍，只露出滑块覆盖的那一段。 -->
-    <span class="segment-ink" aria-hidden="true">
+    <!-- data-ash-skip：这一层是按滑块裁出来的「选中字」，换语言取字形时不裁切，会把每一项都画成一份绿字。 -->
+    <span class="segment-ink" aria-hidden="true" data-ash-skip>
       <span
         v-for="(stop, index) in stops"
         :key="String(stop.value)"

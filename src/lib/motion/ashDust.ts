@@ -1,5 +1,5 @@
 import { LIFE_MIN, LIFE_SPAN, type AshOrigin, type Grains } from './ashGlyphs';
-import { REVEAL_MS } from './timing';
+import { LOCALE_REVEAL_MS } from './timing';
 
 /** 换语言「响指」的灰：一张整屏 WebGL 画布，连拨时几圈的灰都画在它上面（lib/motion/ashSwitch.ts）。 */
 
@@ -10,21 +10,23 @@ varying vec4 v_color;
 void main() {
   float age = (u_now - a_time.x) / a_time.y;
   if (age < 0.0 || age > 1.0) { gl_Position = vec4(2.0, 2.0, 0.0, 1.0); gl_PointSize = 0.0; v_color = vec4(0.0); return; }
-  float out_ = 1.0 - (1.0 - age) * (1.0 - age);
+  // 三次方缓出：起飞快、越飘越慢，收尾几乎停住（2026-10-06：「漂得更慢、更远，收尾减速」）。
+  float rest = 1.0 - age;
+  float out_ = 1.0 - rest * rest * rest;
   // 顺着涟漪往外吹（离开语言轮的方向），两侧散开一点；灰轻，往上飘一点；再叠一点打旋。
   vec2 dir = a_pos - u_origin;
   float len = length(dir);
   dir = len > 1.0 ? dir / len : vec2(-0.7, 0.7);
   vec2 side = vec2(-dir.y, dir.x);
-  vec2 drift = dir * (80.0 + 200.0 * a_seed.x) * out_ + side * (a_seed.y - 0.5) * 90.0 * out_;
-  drift.y -= (16.0 + 56.0 * a_seed.y) * age * age;
-  vec2 swirl = vec2(sin(age * 7.0 + a_seed.y * 31.0), cos(age * 6.0 + a_seed.x * 29.0)) * (3.0 + 10.0 * a_seed.y) * age;
+  vec2 drift = dir * (120.0 + 260.0 * a_seed.x) * out_ + side * (a_seed.y - 0.5) * 130.0 * out_;
+  drift.y -= (20.0 + 60.0 * a_seed.y) * out_ * age;
+  vec2 swirl = vec2(sin(age * 5.0 + a_seed.y * 31.0), cos(age * 4.5 + a_seed.x * 29.0)) * (3.0 + 10.0 * a_seed.y) * out_;
   vec2 p = a_pos + drift + swirl;
   gl_Position = vec4(p.x / u_view.x * 2.0 - 1.0, 1.0 - p.y / u_view.y * 2.0, 0.0, 1.0);
   gl_PointSize = max(1.0, mix(u_size * (0.9 + 0.8 * a_seed.x), 0.5, age));
   float grey = dot(a_color.rgb, vec3(0.3, 0.59, 0.11));
   vec3 ash = mix(a_color.rgb, vec3(grey * 0.85 + 0.08), smoothstep(0.05, 0.6, age));
-  v_color = vec4(ash, a_color.a * (1.0 - smoothstep(0.3, 1.0, age)));
+  v_color = vec4(ash, a_color.a * (1.0 - smoothstep(0.25, 1.0, age)));
 }`;
 const GRAIN_FS = `
 precision mediump float;
@@ -65,7 +67,7 @@ export type DustLayer = {
   dispose: () => void;
 };
 
-const BATCH_MS = REVEAL_MS + 60 + LIFE_MIN + LIFE_SPAN;
+const BATCH_MS = LOCALE_REVEAL_MS + 60 + LIFE_MIN + LIFE_SPAN;
 
 let dust: DustLayer | null = null;
 

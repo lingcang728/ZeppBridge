@@ -424,7 +424,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
     <SegmentTrack
       class="pill-nav"
-      data-ash-skip
       :compact="fit >= 3"
       variant="glass"
       :items="navItems"
