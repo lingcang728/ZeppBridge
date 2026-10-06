@@ -1,16 +1,17 @@
 //! 发之前的全部校验。官方接口对任何 body 都回 success，所以这里是唯一的关口。
 //!
-//! 问题分两级：`error` 是写错了（日期不对、心率超过上限），`unverified` 是写法
-//! 没错、但我们还没在手表上核实过它会被正确显示（见 [`super::VERIFIED`]）。两种都
-//! 挡发布；预览照常给，界面按码说明是哪一种。
+//! 问题分三级：`error` 是写错了（日期不对、心率超过上限、缺目的或描述、发不到手表
+//! 的运动），`unverified` 是写法没错、但我们还没在手表上核实过它会被正确显示（见
+//! [`super::VERIFIED`]），`warning` 只是提醒（名字太长、手表列表里会被截断）。前两种
+//! 挡发布，`warning` 不挡；预览照常给，界面按码说明是哪一种。
 //!
 //! 后端不出界面文案：每条问题带 `message_code`（`ui.training_plan.issue.*`）和
 //! 填空用的 `params`，`message` 只是 CLI / MCP / 日志用的中文兜底。
 
 use super::parse::{parse_duration, parse_target};
 use super::{
-    Intensity, PlanDocument, PlanStep, PlanWorkout, Sport, Step, StepLength, StepNode, Target,
-    Workout, MAX_DAYS_AHEAD, VERIFIED,
+    Activity, Intensity, PlanDocument, PlanStep, PlanWorkout, Sport, Step, StepLength, StepNode,
+    Target, Variant, Workout, MAX_DAYS_AHEAD, VERIFIED, WATCH_NAME_CHARS,
 };
 use chrono::{Duration, NaiveDate};
 use serde::Serialize;
@@ -30,6 +31,14 @@ pub struct PlanContext {
 pub enum Severity {
     Error,
     Unverified,
+    /// 不挡发布的提醒。
+    Warning,
+}
+
+impl Severity {
+    pub fn blocks(self) -> bool {
+        !matches!(self, Self::Warning)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -46,7 +55,7 @@ pub struct PlanIssue {
     pub params: Value,
 }
 
-/// 校验结果。`workouts` 只含整条都读懂了的训练；有任何问题就不能发。
+/// 校验结果。`workouts` 只含整条都读懂了的训练；有任何阻断级的问题就不能发。
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlanCheck {
     pub summary: Option<String>,
@@ -54,16 +63,67 @@ pub struct PlanCheck {
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
     pub workouts: Vec<Workout>,
+    /// 读懂了、但手表收不下的训练（走路、徒步、力量……）。界面照原样显示（绝不画成
+    /// 休息日），同时它们一定带着发布阻断的 `sport_not_deliverable`。
+    pub held: Vec<HeldWorkout>,
     pub issues: Vec<PlanIssue>,
+}
+
+/// 一条发不到手表的训练，原样留着给界面显示。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct HeldWorkout {
+    /// 草稿原文里第几条（从 0 起），界面据此就地删掉或改类型。
+    pub index: usize,
+    pub date: NaiveDate,
+    pub activity: Activity,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// 步骤读得懂就带上（画时长用）；读不懂为空，不编。
+    pub steps: Vec<StepNode>,
+}
+
+/// 运动写的是走路这类能读懂、发不出去的活动时，把它原样留下来。
+fn held_workout(index: usize, workout: &PlanWorkout, context: PlanContext) -> Option<HeldWorkout> {
+    if Sport::parse(&workout.sport).is_some() {
+        return None;
+    }
+    let activity = Activity::parse(&workout.sport)?;
+    let date = NaiveDate::parse_from_str(workout.date.trim(), "%Y-%m-%d").ok()?;
+    // 步骤的问题已经在正式校验里报过了，这里只取读得懂的结构。
+    let mut scratch = Issues { list: Vec::new() };
+    let steps = check_steps(index, &workout.steps, context, &mut scratch).unwrap_or_default();
+    let text = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
+    Some(HeldWorkout {
+        index,
+        date,
+        activity,
+        name: workout.name.trim().to_string(),
+        focus: text(&workout.focus),
+        description: text(&workout.description),
+        steps,
+    })
 }
 
 impl PlanCheck {
     pub fn publishable(&self) -> bool {
-        self.issues.is_empty() && self.from.is_some() && self.to.is_some()
+        !self.issues.iter().any(|issue| issue.severity.blocks())
+            && self.from.is_some()
+            && self.to.is_some()
     }
 }
 
 const MAX_NAME_CHARS: usize = 60;
+/// 目的是个短词（「强化耐力」），写进描述第一行。
+const MAX_FOCUS_CHARS: usize = 20;
 const MAX_DESCRIPTION_CHARS: usize = 1000;
 const MAX_LEAF_STEPS: usize = 40;
 const MAX_REPEAT: u32 = 50;
@@ -83,6 +143,13 @@ struct Issues {
 }
 
 impl Issues {
+    /// 从第 `since` 条起有没有阻断级的问题。
+    fn blocked_since(&self, since: usize) -> bool {
+        self.list[since..]
+            .iter()
+            .any(|issue| issue.severity.blocks())
+    }
+
     fn push(
         &mut self,
         severity: Severity,
@@ -235,12 +302,19 @@ pub fn check_plan(document: &PlanDocument, context: PlanContext) -> PlanCheck {
             note: item.note.clone(),
         });
     }
+    let held = document
+        .workouts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, workout)| held_workout(index, workout, context))
+        .collect();
     PlanCheck {
         summary: document.summary.clone(),
         rest,
         from,
         to,
         workouts,
+        held,
         issues: issues.list,
     }
 }
@@ -306,15 +380,52 @@ fn check_workout(
     };
     let sport = Sport::parse(&workout.sport);
     if sport.is_none() {
-        issues.push(
-            Severity::Error,
-            at,
-            None,
-            "ui.training_plan.issue.unknown_sport",
-            format!("不认识的运动类型：{}", workout.sport),
-            json!({ "value": workout.sport }),
-        );
+        match Activity::parse(&workout.sport) {
+            // R1 实测：V2 只认 4 个大类，别的值单条静默丢弃。读得懂，但发不出去。
+            Some(activity) => issues.push(
+                Severity::Error,
+                at,
+                None,
+                "ui.training_plan.issue.sport_not_deliverable",
+                format!(
+                    "手表只收跑步、骑行、泳池游泳、开放水域游泳；这条是 {}",
+                    workout.sport
+                ),
+                json!({ "value": workout.sport, "activity": activity }),
+            ),
+            None => issues.push(
+                Severity::Error,
+                at,
+                None,
+                "ui.training_plan.issue.unknown_sport",
+                format!("不认识的运动类型：{}", workout.sport),
+                json!({ "value": workout.sport }),
+            ),
+        }
     }
+    let variant = match (workout.variant.as_deref().map(str::trim), sport) {
+        (None | Some(""), _) => None,
+        (Some(text), sport) => {
+            let parsed = Variant::parse(text);
+            let fits = match (parsed, sport) {
+                (Some(variant), Some(sport)) => sport.variants().contains(&variant),
+                // 运动本身就不对时，问题已经报过了，子类型不再追究。
+                (Some(_), None) => true,
+                (None, _) => false,
+            };
+            if !fits {
+                issues.push(
+                    Severity::Error,
+                    at,
+                    None,
+                    "ui.training_plan.issue.bad_variant",
+                    format!("这个运动没有「{text}」这种子类型"),
+                    json!({ "value": text, "sport": workout.sport }),
+                );
+            }
+            parsed
+        }
+    };
     let name = workout.name.trim();
     if name.is_empty() || name.chars().count() > MAX_NAME_CHARS {
         issues.push(
@@ -326,11 +437,45 @@ fn check_workout(
             json!({ "max": MAX_NAME_CHARS }),
         );
     }
+    let focus = workout
+        .focus
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty());
+    match focus {
+        None => issues.push(
+            Severity::Error,
+            at,
+            None,
+            "ui.training_plan.issue.missing_focus",
+            "每条训练都要写训练目的（例如「强化耐力」）",
+            json!({}),
+        ),
+        Some(text) if text.chars().count() > MAX_FOCUS_CHARS || text.contains('\n') => issues.push(
+            Severity::Error,
+            at,
+            None,
+            "ui.training_plan.issue.focus_too_long",
+            format!("训练目的是一个短词，不超过 {MAX_FOCUS_CHARS} 个字、不换行"),
+            json!({ "max": MAX_FOCUS_CHARS }),
+        ),
+        Some(_) => {}
+    }
     let description = workout
         .description
         .as_deref()
         .map(str::trim)
         .filter(|text| !text.is_empty());
+    if description.is_none() {
+        issues.push(
+            Severity::Error,
+            at,
+            None,
+            "ui.training_plan.issue.missing_description",
+            "每条训练都要写要点描述",
+            json!({}),
+        );
+    }
     if description.is_some_and(|text| text.chars().count() > MAX_DESCRIPTION_CHARS) {
         issues.push(
             Severity::Error,
@@ -374,13 +519,26 @@ fn check_workout(
         }
     }
 
-    if issues.list.len() != before {
+    if issues.blocked_since(before) {
         return None;
+    }
+    // 只提醒：手表列表里约 14 个汉字后截断，详情页仍显示全名（R3 实测）。
+    if name.chars().count() > WATCH_NAME_CHARS {
+        issues.push(
+            Severity::Warning,
+            at,
+            None,
+            "ui.training_plan.issue.name_truncated",
+            format!("名字超过 {WATCH_NAME_CHARS} 个字，手表列表里会被截断"),
+            json!({ "max": WATCH_NAME_CHARS }),
+        );
     }
     Some(Workout {
         date: date?,
         sport: sport?,
+        variant,
         name: name.to_string(),
+        focus: focus.map(str::to_string),
         description: description.map(str::to_string),
         steps: steps?,
     })

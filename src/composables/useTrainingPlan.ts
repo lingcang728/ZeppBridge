@@ -11,6 +11,7 @@
  */
 import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { locale } from '../i18n';
 import { extractPlan, type ExtractFailure } from '../lib/trainingPlan/extract';
 import type {
   PlanDraftPreview,
@@ -26,6 +27,8 @@ export type PlanNotice =
   | { kind: 'sent' }
   | { kind: 'unconfirmed' }
   | { kind: 'rejected'; errorCode: string | null }
+  /** 有的周送到了、有的没有：`weeks` 是没送达那几周的起始日。 */
+  | { kind: 'partial'; weeks: string[] }
   | { kind: 'not_needed' }
   | { kind: 'nothing_to_undo' }
   | { kind: 'undone' }
@@ -156,10 +159,15 @@ const discard = async () => {
   }
 };
 
-const recordNotice = (record: PlanPublishRecord | null, fallback: PlanNotice): PlanNotice => {
+const recordNotice = (record: PlanPublishRecord | null, records: PlanPublishRecord[], fallback: PlanNotice): PlanNotice => {
   if (!record) return fallback;
   if (record.state === 'sent') return fallback;
   if (record.state === 'rejected') return { kind: 'rejected', errorCode: record.error_code };
+  if (record.state === 'partial') {
+    // 占位那一行不是用户的一周，不单独报；它没送到时前一周的重推会补上。
+    const weeks = records.filter((row) => row.state === 'rejected' && row.role !== 'placeholder').map((row) => row.window_start);
+    return { kind: 'partial', weeks: [...new Set(weeks)].sort() };
+  }
   return { kind: 'unconfirmed' };
 };
 
@@ -168,12 +176,13 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
   notice.value = null;
   clearPending.value = false;
   try {
-    const result: PlanPublishResult = await backend.trainingPlanPublish(action, confirmClear);
+    const result: PlanPublishResult = await backend.trainingPlanPublish(action, confirmClear, locale.value);
     const { outcome, record } = result;
+    const records = result.records ?? [];
     switch (outcome.outcome) {
       case 'send': {
         const done: PlanNotice = action.kind === 'undo' ? { kind: 'undone' } : action.kind === 'clear' ? { kind: 'cleared' } : { kind: 'sent' };
-        notice.value = recordNotice(record, done);
+        notice.value = recordNotice(record, records, done);
         // 发成功（或结果不确定、已按已发记下）以后这份草稿就办完了；被拒绝则草稿重新打开，留着让人改了再发。
         if (action.kind === 'draft' && record?.state !== 'rejected') {
           draftId.value = null;
@@ -209,7 +218,7 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
 };
 
 const publish = () => {
-  if (busy.value || !accepted.value || preview.value?.check.issues.length) return Promise.resolve();
+  if (busy.value || !accepted.value || blocking.value.length) return Promise.resolve();
   const id = draftId.value;
   if (id) return run({ kind: 'draft', id }, false);
   return Promise.resolve();
@@ -221,8 +230,8 @@ const dismissNotice = () => { notice.value = null; };
 const cancelClear = () => { clearPending.value = false; pendingAction = null; };
 const confirmClear = () => { const action = pendingAction; pendingAction = null; return action ? run(action,true) : Promise.resolve(); };
 
-/** Errors and unverified shapes both block delivery; the backend enforces the same gate. */
-const blocking = computed(() => preview.value?.check.issues.filter((issue) => issue.severity === 'error') ?? []);
+/** Errors and unverified shapes both block delivery; warnings do not. The backend enforces the same gate. */
+const blocking = computed(() => preview.value?.check.issues.filter((issue) => issue.severity !== 'warning') ?? []);
 const unverified = computed(() => preview.value?.check.issues.filter((issue) => issue.severity === 'unverified') ?? []);
 
 export const useTrainingPlan = () => ({

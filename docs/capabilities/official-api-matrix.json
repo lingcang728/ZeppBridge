@@ -1,13 +1,174 @@
 {
   "schemaVersion": 1,
-  "lastVerified": "2026-09-09",
+  "lastVerified": "2026-10-06",
   "capabilities": [
-    {"id":"sleep","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"webhook", "units":"seconds unless documented", "timeSemantics":"sample occurrence separate from receipt"},
-    {"id":"activity_fit","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"ping-pull", "units":"FIT native units", "timeSemantics":"FIT timestamps plus receipt"},
-    {"id":"hrv_last_night_avg","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"webhook", "units":"undocumented", "timeSemantics":"night statistic; window undocumented"},
-    {"id":"legacy_metrics","documentation":"implemented", "applicationPermission":"available", "realSampleValidation":"local database", "source":"legacy", "deliveryModel":"pull", "units":"canonical contract", "timeSemantics":"provider fetch time separate"},
-    {"id":"official_webhook","documentation":"documented unsigned", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"push", "units":"payload-defined", "timeSemantics":"event time separate from receipt"},
-    {"id":"backfill","documentation":"documented", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"async-202", "units":"30-day maximum window", "timeSemantics":"accepted is not completion"},
-    {"id":"training_plan_write","documentation":"partner access stated", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"write", "units":"must validate before publish", "timeSemantics":"seven-day plan window"}
+    {
+      "id": "sleep",
+      "documentation": "official",
+      "applicationPermission": "unknown",
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "webhook",
+      "units": "seconds unless documented",
+      "timeSemantics": "sample occurrence separate from receipt"
+    },
+    {
+      "id": "activity_fit",
+      "documentation": "official",
+      "applicationPermission": "unknown",
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "ping-pull",
+      "units": "FIT native units",
+      "timeSemantics": "FIT timestamps plus receipt"
+    },
+    {
+      "id": "hrv_last_night_avg",
+      "documentation": "official",
+      "applicationPermission": "unknown",
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "webhook",
+      "units": "undocumented",
+      "timeSemantics": "night statistic; window undocumented"
+    },
+    {
+      "id": "legacy_metrics",
+      "documentation": "implemented",
+      "applicationPermission": "available",
+      "realSampleValidation": "local database",
+      "source": "legacy",
+      "deliveryModel": "pull",
+      "units": "canonical contract",
+      "timeSemantics": "provider fetch time separate"
+    },
+    {
+      "id": "official_webhook",
+      "documentation": "documented unsigned",
+      "applicationPermission": "unknown",
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "push",
+      "units": "payload-defined",
+      "timeSemantics": "event time separate from receipt"
+    },
+    {
+      "id": "backfill",
+      "documentation": "documented",
+      "applicationPermission": "unknown",
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "async-202",
+      "units": "30-day maximum window",
+      "timeSemantics": "accepted is not completion"
+    },
+    {
+      "id": "training_plan_write",
+      "documentation": "official V2 schema (version=2.0.0)",
+      "applicationPermission": "available",
+      "realSampleValidation": "real account + watch, 2026-09-30 and 2026-10-06 (six rounds)",
+      "source": "official",
+      "deliveryModel": "write",
+      "units": "DISTANCE in meters; PACE_LAP is speed in m/s (decimals allowed); TIME in seconds",
+      "timeSemantics": "seven-day window replaced as a whole; future windows accepted; [] always clears today + 7 days",
+      "verified": [
+        {
+          "date": "2026-09-30",
+          "evidence": "2026-09-30 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "TIME steps + HEART_RATE_LAP",
+          "result": "shown correctly (30 min, 130-150); re-pushing a window replaces its entries; plans the user created in Zepp App are untouched"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R1 V2 sport WALKING / OUTDOOR_CYCLING / INDOOR_CYCLING / TREADMILL / ROWING / HIKING",
+          "result": "each such workout is silently dropped while RUNNING in the same request still appears and the server answers success; V2 only accepts RUNNING / CYCLING / LAP_SWIMMING / OPEN_WATER_SWIMMING"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R1 how third-party plans show on the watch",
+          "result": "only the sport family is shown; the watch asks the user to pick the sub type again (outdoor run / treadmill / track; outdoor / indoor cycling / BMX). One-tap start is not possible through the API"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R1 newline in description",
+          "result": "line breaks render correctly on phone and watch"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R2, R6 V1 (version=1.0.0, WorkoutType)",
+          "result": "not usable: targets render as 00'00, the phone Zepp App crashes when opening the detail, Walk / Walking never shows; V1 and V2 share and overwrite the same seven-day window"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 DISTANCE 1000",
+          "result": "shown as 1.00 km: the unit is meters (documentation says seconds)"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3, R4 PACE_LAP",
+          "result": "value is speed in m/s with decimals: 3.03-3.33 shows 5'00\"-5'30\"/km; reversed low/high is corrected; 300-330 shows 0'03\" (not seconds per km)"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 OPEN target (low = high = 0)",
+          "result": "shown with no target"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 two workouts on one day",
+          "result": "both shown"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 POWER_LAP 150-180",
+          "result": "shown as 150-180 W"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 WorkoutRepeatStep x3",
+          "result": "shown as repeat x3 with the correct total duration"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R3 long workout name",
+          "result": "watch list wraps to two lines then truncates; detail shows the full name; phone list truncates to one line. Keep names within about 14 CJK characters"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R4 push the next window (startDate = today + 7)",
+          "result": "accepted and visible in the phone calendar without touching the current window; the watch itself only shows the next seven days and receives later ones as the Zepp App syncs"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R5 workouts: [] sent for the next window",
+          "result": "clears today + 7 days (the current window) and leaves the next window untouched: [] ignores startDate"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "R5 next window + one placeholder workout dated outside the window",
+          "result": "the workouts inside the window are cleared; re-pushing the window the placeholder fell into overwrites it, leaving nothing behind. Relies on undocumented server behaviour (out-of-window dates are documented as invalid)"
+        },
+        {
+          "date": "2026-10-06",
+          "evidence": "2026-10-06 real account + watch / phone Zepp App screenshots (kept on the user machine, not in any repository)",
+          "case": "all rounds",
+          "result": "plans the user created by hand in the Zepp App are never affected by our pushes"
+        }
+      ]
+    }
   ]
 }

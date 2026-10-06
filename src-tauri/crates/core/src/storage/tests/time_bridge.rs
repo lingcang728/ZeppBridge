@@ -7,19 +7,21 @@ fn day(s: &str) -> NaiveDate {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
 }
 fn document() -> PlanDocument {
-    serde_json::from_value(serde_json::json!({"from":"2026-10-02","to":"2026-10-08","workouts":[{"date":"2026-10-03","sport":"running","name":"Run","steps":[{"kind":"active","duration":"30min","target":"hr 120-140"}]}]})).unwrap()
+    serde_json::from_value(serde_json::json!({"from":"2026-10-02","to":"2026-10-08","workouts":[{"date":"2026-10-03","sport":"running","name":"Run","focus":"Base","description":"Easy","steps":[{"kind":"active","duration":"30min","target":"hr 120-140"}]}]})).unwrap()
 }
 fn sent(db: &Database) -> i64 {
     let id = db.save_plan_draft(DraftOrigin::User, &document()).unwrap();
-    let Prepared::Send { publish_id, .. } = db
+    let Prepared::Send { batch_id, sends } = db
         .prepare_plan_publish(&PublishRequest::Draft { id }, day("2026-10-02"), false)
         .unwrap()
     else {
         panic!()
     };
-    db.finish_plan_publish(publish_id, &SendOutcome::Delivered)
-        .unwrap();
-    publish_id
+    for send in sends {
+        db.finish_plan_publish(send.publish_id, &SendOutcome::Delivered)
+            .unwrap();
+    }
+    batch_id
 }
 #[test]
 fn strips_distinguish_record_presence_missing_value_and_incomplete_daily_duration() {

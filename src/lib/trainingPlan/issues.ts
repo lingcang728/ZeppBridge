@@ -5,8 +5,8 @@
  * 后端自带的中文 `message` 只给 CLI / MCP / 日志用。取不到码（后端新增了而这里还不认识）才回落
  * 到后端原文，并过 `backendText` 闸门——英文界面下不会冒出中文。
  *
- * 严重程度（`severity`）决定能不能发：`error` 挡住发送，`unverified` 是「格式没问题，但还没在你
- * 的手表上核实过 Zepp 会怎么显示」，可以发，界面如实标出来。
+ * 严重程度（`severity`）决定能不能发：`error` 和 `unverified` 挡住发送，`warning` 只是提醒
+ * （比如名字太长、手表列表里会被截断），可以发。
  */
 import { backendText } from '../../i18n/backendText';
 import { errorTextFor } from '../../i18n/errors';
@@ -23,6 +23,10 @@ const day = (value: unknown): string => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
   return displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(text));
 };
+
+/** 发不到手表的活动叫什么（问题文案里要叫出名字）。显式标类型：它在下面的表里被引用，又读那张表。 */
+const activity: (value: unknown) => string = (value) =>
+  (messagesOf(messages).activity as Record<string, string>)[str(value)] ?? str(value);
 
 const messages = defineMessages(
   {
@@ -53,7 +57,14 @@ const messages = defineMessages(
     'ui.training_plan.issue.pace_unverified': () => '配速目标的单位还没在你的手表上核实过，先给一个心率区间',
     'ui.training_plan.issue.power_out_of_range': (p: Params) => `功率要在合理范围内（${str(p.low)}–${str(p.high)} 瓦），且两端不相等`,
     'ui.training_plan.issue.note_too_long': (p: Params) => `步骤备注不超过 ${str(p.max)} 个字`,
+    'ui.training_plan.issue.sport_not_deliverable': (p: Params) => `手表只收跑步、骑行、泳池游泳和开放水域游泳，「${activity(p.activity)}」发不到手表。删掉这天，或改成能发的类型`,
+    'ui.training_plan.issue.bad_variant': (p: Params) => `「${str(p.value)}」不是这个运动的子类型（跑步：outdoor、treadmill、track；骑行：outdoor、indoor）`,
+    'ui.training_plan.issue.missing_focus': () => '要写训练目的（例如「强化耐力」），它会显示在手表描述的第一行',
+    'ui.training_plan.issue.focus_too_long': (p: Params) => `训练目的写一个短词，不超过 ${str(p.max)} 个字、不换行`,
+    'ui.training_plan.issue.missing_description': () => '要写训练要点，手表上会显示在描述里',
+    'ui.training_plan.issue.name_truncated': (p: Params) => `名字超过 ${str(p.max)} 个字，手表列表里会被截断（点开详情仍是全名）`,
     fallback: () => '这条计划有一处无法识别的问题',
+    activity: { walking: '步行', hiking: '徒步', strength: '力量训练', yoga: '瑜伽 / 拉伸', rowing: '划船', elliptical: '椭圆机' },
   },
   {
     'ui.training_plan.issue.bad_date': (p: Params) => `Write dates as year-month-day (for example 2026-10-07); this one is “${str(p.value)}”`,
@@ -83,7 +94,14 @@ const messages = defineMessages(
     'ui.training_plan.issue.pace_unverified': () => 'The unit of pace targets has not been verified on your watch yet; give a heart-rate range instead',
     'ui.training_plan.issue.power_out_of_range': (p: Params) => `The power range ${str(p.low)}–${str(p.high)} W is not usable; keep it in a sensible range with the two ends different`,
     'ui.training_plan.issue.note_too_long': (p: Params) => `A step note can be at most ${str(p.max)} characters`,
+    'ui.training_plan.issue.sport_not_deliverable': (p: Params) => `The watch only accepts running, cycling, pool and open-water swimming, so ${activity(p.activity)} cannot be sent. Remove the day or change it to a type that can be sent`,
+    'ui.training_plan.issue.bad_variant': (p: Params) => `“${str(p.value)}” is not a sub type of this sport (running: outdoor, treadmill, track; cycling: outdoor, indoor)`,
+    'ui.training_plan.issue.missing_focus': () => 'Add a purpose (for example “Build endurance”); it becomes the first line of the description on the watch',
+    'ui.training_plan.issue.focus_too_long': (p: Params) => `Keep the purpose to a short phrase of at most ${str(p.max)} characters on one line`,
+    'ui.training_plan.issue.missing_description': () => 'Add the key points; the watch shows them in the description',
+    'ui.training_plan.issue.name_truncated': (p: Params) => `The name is longer than ${str(p.max)} characters and will be cut off in the watch list (the detail view still shows it in full)`,
     fallback: () => 'Something in this plan could not be recognised',
+    activity: { walking: 'walking', hiking: 'hiking', strength: 'strength training', yoga: 'yoga / stretching', rowing: 'rowing', elliptical: 'elliptical' },
   },
   {
     'ui.training_plan.issue.bad_date': (p: Params) => `Escribe las fechas como año-mes-día (por ejemplo 2026-10-07); esta es «${str(p.value)}»`,
@@ -113,7 +131,14 @@ const messages = defineMessages(
     'ui.training_plan.issue.pace_unverified': () => 'La unidad de los objetivos de ritmo aún no se ha verificado en tu reloj; indica un rango de frecuencia cardíaca',
     'ui.training_plan.issue.power_out_of_range': (p: Params) => `El rango de potencia ${str(p.low)}–${str(p.high)} W no es válido; mantenlo en un rango razonable con los extremos distintos`,
     'ui.training_plan.issue.note_too_long': (p: Params) => `La nota de un paso puede tener como máximo ${str(p.max)} caracteres`,
+    'ui.training_plan.issue.sport_not_deliverable': (p: Params) => `El reloj solo acepta carrera, ciclismo, natación en piscina y en aguas abiertas; ${activity(p.activity)} no se puede enviar. Elimina el día o cámbialo a un tipo que sí se envíe`,
+    'ui.training_plan.issue.bad_variant': (p: Params) => `«${str(p.value)}» no es un subtipo de este deporte (carrera: outdoor, treadmill, track; ciclismo: outdoor, indoor)`,
+    'ui.training_plan.issue.missing_focus': () => 'Añade el objetivo (por ejemplo «Mejorar resistencia»); será la primera línea de la descripción en el reloj',
+    'ui.training_plan.issue.focus_too_long': (p: Params) => `El objetivo debe ser una frase corta de máximo ${str(p.max)} caracteres en una sola línea`,
+    'ui.training_plan.issue.missing_description': () => 'Añade los puntos clave; el reloj los muestra en la descripción',
+    'ui.training_plan.issue.name_truncated': (p: Params) => `El nombre supera ${str(p.max)} caracteres y se cortará en la lista del reloj (el detalle lo muestra completo)`,
     fallback: () => 'No se pudo reconocer algo de este plan',
+    activity: { walking: 'caminata', hiking: 'senderismo', strength: 'fuerza', yoga: 'yoga / estiramientos', rowing: 'remo', elliptical: 'elíptica' },
   },
   'lib/trainingPlan/issues',
 );

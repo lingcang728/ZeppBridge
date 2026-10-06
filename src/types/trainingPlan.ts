@@ -15,7 +15,11 @@ export interface PlanDocument {
 export interface PlanWorkoutInput {
   date: string;
   sport: string;
+  /** 子类型：跑步 outdoor / treadmill / track，骑行 outdoor / indoor。只进手表描述第一行。 */
+  variant?: string;
   name: string;
+  /** 训练目的（短词）。zeppbridge-plan/3 起必填。 */
+  focus?: string;
   description?: string;
   steps: PlanStepInput[];
 }
@@ -25,6 +29,9 @@ export type PlanStepInput =
   | { kind: string; duration: string; target?: string; note?: string };
 
 export type PlanSport = 'running' | 'cycling' | 'pool_swim' | 'open_water_swim';
+export type PlanVariant = 'outdoor' | 'indoor' | 'treadmill' | 'track';
+/** 读得懂、但手表收不下的活动（V2 只认四个大类，其余单条静默丢弃）。 */
+export type PlanActivity = 'walking' | 'hiking' | 'strength' | 'yoga' | 'rowing' | 'elliptical';
 export type PlanIntensity = 'warmup' | 'active' | 'interval' | 'recovery' | 'rest' | 'cooldown';
 
 export type PlanStepLength = { type: 'time'; seconds: number } | { type: 'distance'; meters: number };
@@ -50,13 +57,28 @@ export type PlanStepNode =
 export interface PlanWorkout {
   date: string;
   sport: PlanSport;
+  variant?: PlanVariant;
   name: string;
+  focus?: string;
+  description?: string;
+  steps: PlanStepNode[];
+}
+
+/** 发不到手表的一条训练，原样留给界面显示（绝不画成休息日）。 */
+export interface PlanHeldWorkout {
+  /** 草稿原文里第几条。 */
+  index: number;
+  date: string;
+  activity: PlanActivity;
+  name: string;
+  focus?: string;
   description?: string;
   steps: PlanStepNode[];
 }
 
 export interface PlanIssue {
-  severity: 'error' | 'unverified';
+  /** `error` / `unverified` 挡住发送；`warning` 只提醒（名字太长会被手表截断）。 */
+  severity: 'error' | 'unverified' | 'warning';
   workout?: number;
   step?: string;
   /** 中文兜底；界面按 message_code 取文案。 */
@@ -71,6 +93,7 @@ export interface PlanCheck {
   from: string | null;
   to: string | null;
   workouts: PlanWorkout[];
+  held?: PlanHeldWorkout[];
   issues: PlanIssue[];
 }
 
@@ -105,10 +128,14 @@ export interface PlanDraft {
 
 export interface PlanPublishRecord {
   id: number;
+  /** 同一批推送（计划覆盖到的每个 7 天窗口各一行）共用的编号。 */
+  batch_id: number;
   kind: 'publish' | 'roll' | 'undo' | 'clear' | 'revoked';
+  role: 'window' | 'clear' | 'placeholder';
   window_start: string;
   workout_count: number;
-  state: 'pending' | 'sent' | 'rejected' | 'unknown';
+  /** 整批汇总时还有 `partial`：有的周送到了、有的没有。 */
+  state: 'pending' | 'sent' | 'rejected' | 'unknown' | 'partial';
   http_status: number | null;
   error_code: string | null;
   undone: boolean;
@@ -123,15 +150,28 @@ export interface TrainingPlanState {
   planned: PlanWorkout[];
   uncertain: boolean;
   last_publish: PlanPublishRecord | null;
+  /** 最近一批推送的逐窗口结果。 */
+  last_batch: PlanPublishRecord[];
+  /** 从今天起每个有训练（或发过训练）的 7 天窗口。 */
+  weeks: PlanWeekStatus[];
   can_undo: boolean;
   drafts: PlanDraft[];
   ai_may_publish: boolean;
 }
 
+export interface PlanWeekStatus {
+  start: string;
+  planned: number;
+  sent: number;
+  /** in_sync：账本上发过去的和计划一致；uncertain：一致但结果没确认；not_sent：没送达或还没发。 */
+  state: 'in_sync' | 'uncertain' | 'not_sent';
+  error_code: string | null;
+}
+
 export type PlanPublishAction = { kind: 'draft'; id: string } | { kind: 'undo' } | { kind: 'clear' };
 
 export type PlanPrepared =
-  | { outcome: 'send'; publish_id: number; body: unknown }
+  | { outcome: 'send'; batch_id: number; sends: { publish_id: number; window_start: string; role: PlanPublishRecord['role'] }[] }
   | { outcome: 'not_needed' }
   | { outcome: 'needs_clear_confirmation' }
   | { outcome: 'invalid'; check: PlanCheck }
@@ -139,5 +179,8 @@ export type PlanPrepared =
 
 export interface PlanPublishResult {
   outcome: PlanPrepared;
+  /** 这一批的汇总。 */
   record: PlanPublishRecord | null;
+  /** 这一批的逐窗口结果。 */
+  records: PlanPublishRecord[];
 }

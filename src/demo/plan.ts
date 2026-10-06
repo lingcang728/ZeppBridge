@@ -1,8 +1,8 @@
 /**
  * 演示里的训练计划：一份「AI 排的下一周」草稿 + 手表上已经发过的几天，日期都从今天往后排。
  *
- * 校验不在这里重做（那是 Rust 的事）：草稿预览是写好的——其中一天带一条「未核实」提示，
- * 为的是让访客看到界面怎么说清「格式没问题，但还没在你的手表上核实过」。
+ * 校验不在这里重做（那是 Rust 的事）：草稿预览是写好的——其中一天带一条「名字太长」的提醒，
+ * 为的是让访客看到界面怎么说清「能发，但手表列表里会被截断」。
  */
 import { at, dayKey, iso } from './rng';
 import { demoText } from './texts';
@@ -43,7 +43,8 @@ export interface DemoPlan {
 
 export const createDemoPlan = (now: Date): DemoPlan => {
   const day = (offset: number) => dayKey(at(now, offset));
-  const w = (offset: number, sport: PlanWorkout['sport'], name: string, steps: PlanStepNode[]): PlanWorkout => ({ date: day(offset), sport, name, steps });
+  const w = (offset: number, sport: PlanWorkout['sport'], name: string, steps: PlanStepNode[]): PlanWorkout =>
+    ({ date: day(offset), sport, variant: 'outdoor', name, steps });
 
   /* 训练名取自"被问到的那一刻"的界面语言：访客中途换了语言，下一次读到的就是新语言。
      已经"发出去"的那几条停在发出去那一刻的名字，和真账本一样。 */
@@ -62,7 +63,7 @@ export const createDemoPlan = (now: Date): DemoPlan => {
 
   let sent: PlanWorkout[] | null = null;
   let record: PlanPublishRecord | null = {
-    id: 1, kind: 'publish', window_start: day(0), workout_count: 3, state: 'sent', http_status: 200, error_code: null,
+    id: 1, batch_id: 1, kind: 'publish', role: 'window', window_start: day(0), workout_count: 3, state: 'sent', http_status: 200, error_code: null,
     undone: false, created_at: iso(new Date(now.getTime() - 3_700_000)), finished_at: iso(new Date(now.getTime() - 3_690_000)),
   };
   let draftOpen = true;
@@ -94,6 +95,8 @@ export const createDemoPlan = (now: Date): DemoPlan => {
         planned: [],
         uncertain: false,
         last_publish: record,
+        last_batch: record ? [record] : [],
+        weeks: [{ start: day(0), planned: (sent ?? initialSent(b)).length, sent: (sent ?? initialSent(b)).length, state: 'in_sync', error_code: null }],
         can_undo: canUndo,
         ai_may_publish: false,
         drafts: draftOpen ? [{
@@ -107,7 +110,7 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       return {
         check: {
           from: day(1), to: day(7), workouts: applyEdits(b),
-          issues: [{ severity: 'unverified', workout: 4, step: '2', message: '', message_code: 'ui.training_plan.issue.distance_unverified', params: {} }],
+          issues: [{ severity: 'warning', workout: 4, message: '', message_code: 'ui.training_plan.issue.name_truncated', params: { max: 14 } }],
         },
         window: { start: day(0) },
         days: edited ? days(b).map(d => ({ ...d, after: applyEdits(b).filter(w => w.date === d.date) })) : days(b),
@@ -121,22 +124,22 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       if (action.kind === 'undo') {
         canUndo = false;
         sent = initialSent(b);
-        record = record && { ...record, id: 3, kind: 'undo' };
-        return { outcome: { outcome: 'send', publish_id: 3, body: {} }, record };
+        record = record && { ...record, id: 3, batch_id: 3, kind: 'undo' };
+        return { outcome: { outcome: 'send', batch_id: 3, sends: [] }, record, records: record ? [record] : [] };
       }
       if (action.kind === 'clear') {
         sent = [];
-        record = record && { ...record, id: 4, kind: 'clear', workout_count: 0 };
-        return { outcome: { outcome: 'send', publish_id: 4, body: {} }, record };
+        record = record && { ...record, id: 4, batch_id: 4, kind: 'clear', role: 'clear', workout_count: 0 };
+        return { outcome: { outcome: 'send', batch_id: 4, sends: [] }, record, records: record ? [record] : [] };
       }
       draftOpen = false;
       canUndo = true;
       sent = b.proposed.filter((item) => item.date <= day(6));
       record = {
-        id: 2, kind: 'publish', window_start: day(0), workout_count: sent.length, state: 'sent', http_status: 200, error_code: null,
+        id: 2, batch_id: 2, kind: 'publish', role: 'window', window_start: day(0), workout_count: sent.length, state: 'sent', http_status: 200, error_code: null,
         undone: false, created_at: iso(new Date()), finished_at: iso(new Date()),
       };
-      return { outcome: { outcome: 'send', publish_id: 2, body: {} }, record };
+      return { outcome: { outcome: 'send', batch_id: 2, sends: [] }, record, records: [record] };
     },
   };
 };

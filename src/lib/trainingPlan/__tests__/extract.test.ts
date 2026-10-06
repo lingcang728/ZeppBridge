@@ -71,3 +71,16 @@ it('prefers the final plan/2 block over an earlier draft, while keeping source p
  expect(extractPlan(JSON.stringify(final))).toEqual({ok:true,document:final,source:'whole'});
  expect(extractPlan('Final: '+JSON.stringify(final))).toEqual({ok:true,document:final,source:'braces'});
 });
+
+it('plan/3 定稿（带目的、子类型、描述）优先；旧的 plan/2 照样读得进来', () => {
+  const v3 = { format: 'zeppbridge-plan/3', from: '2026-10-03', to: '2026-10-09', workouts: [{
+    date: '2026-10-04', sport: 'cycling', variant: 'outdoor', name: '长距离骑行', focus: '强化耐力',
+    description: '踏频 85–95', steps: [{ kind: 'active', duration: '90min', target: 'hr 120-140' }],
+  }] };
+  const old = { ...PLAN, format: 'zeppbridge-plan/2' };
+  const reply = ['```json', JSON.stringify(old), '```', '定稿：', '```json', JSON.stringify(v3), '```'].join('\n');
+  const result = extractPlan(reply);
+  expect(result.ok && result.document).toEqual(v3);
+  expect(extractPlan(JSON.stringify(old))).toEqual({ ok: true, document: old, source: 'whole' });
+  expect(result.ok && result.document.workouts[0].focus).toBe('强化耐力');
+});

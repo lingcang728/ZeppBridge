@@ -12,6 +12,9 @@
  */
 import type { PlanDocument, PlanWorkoutInput } from '../../types/trainingPlan';
 
+/** 认得的定稿格式标记。 */
+export const FINAL_FORMATS = ['zeppbridge-plan/3', 'zeppbridge-plan/2', 'zeppbridge.plan/2'];
+
 export type ExtractFailure = 'empty' | 'no_json' | 'not_a_plan';
 
 export type ExtractResult =
@@ -98,7 +101,18 @@ export const extractPlan = (reply: string): ExtractResult => {
     { text, source: 'whole' as const },
     ...bracketed(text).map(text => ({ text, source: 'braces' as const })),
   ];
-  const final = candidates.map(c => ({ value: tryParse(c.text.trim()), source: c.source })).find(c => isRecord(c.value) && ['zeppbridge-plan/2', 'zeppbridge.plan/2'].includes(String(c.value.format)) && asPlan(c.value));
+  // 带了格式标记的就是 AI 说的「定稿」：优先于前面讨论时贴过的草稿。新格式优先于旧格式（plan/3 起
+  // 每条训练要写目的和描述；plan/2 照样认，缺的字段交给后端校验去拦）；同一种格式、同一种来源里
+  // 取最后一份——多轮讨论里越往后越接近定稿。
+  let final: { value: unknown; source: 'fence' | 'whole' | 'braces'; rank: number } | null = null;
+  for (const candidate of candidates) {
+    const value = tryParse(candidate.text.trim());
+    const rank = isRecord(value) && asPlan(value) ? FINAL_FORMATS.indexOf(String(value.format)) : -1;
+    if (rank < 0) continue;
+    if (!final || rank < final.rank || (rank === final.rank && candidate.source === final.source)) {
+      final = { value, source: candidate.source, rank };
+    }
+  }
   if (final) return { ok: true, document: asPlan(final.value)!, source: final.source };
   for (const block of fencedBlocks(text)) {
     const hit = attempt(block, 'fence');

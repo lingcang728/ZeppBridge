@@ -156,8 +156,8 @@ export const tauriBackend: BridgeBackend = {
   trainingPlanPreview(id) { return call<PlanDraftPreview>('training_plan_preview', { id }); },
   trainingPlanDiscard(id) { return call<boolean>('training_plan_discard', { id }); },
   trainingPlanSetAiPublish(allowed) { return call<boolean>('training_plan_set_ai_publish', { allowed }); },
-  trainingPlanPublish(action, confirmClear) {
-    return call<PlanPublishResult>('training_plan_publish', { action, confirmClear });
+  trainingPlanPublish(action, confirmClear, locale) {
+    return call<PlanPublishResult>('training_plan_publish', { action, confirmClear, locale: locale ?? null });
   },
   getAppStatus() {
     return call<AppStatus>('get_app_status');

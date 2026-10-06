@@ -27,9 +27,9 @@ import { directionText } from '../lib/aiTask/prompt';
 import { displayableWorkouts } from '../lib/workouts';
 import { addDays, dayKey, daysBetween } from '../lib/aiTask/bridgeScale';
 import { dayRows, issueDate } from '../lib/trainingPlan/week';
-import { moveDay, deleteDay } from '../lib/trainingPlan/reshape';
+import { moveDay, deleteDay, deleteWorkout, retypeWorkout } from '../lib/trainingPlan/reshape';
 import { planIssueText } from '../lib/trainingPlan/issues';
-import type { PlanCheck, PlanDraftPreview } from '../types/trainingPlan';
+import type { PlanCheck, PlanDraftPreview, PlanSport } from '../types/trainingPlan';
 import type { AiExchange } from '../types/timeBridge';
 defineOptions({ name: 'AiComposer' });
 const route = useRoute(), ctl = useAiTaskDraft(), library = useAiTaskLibrary(), coverage = useAiTaskPreview();
@@ -82,6 +82,7 @@ const notice = computed(() => {
     case 'cleared': return pt.value.noticeCleared;
     case 'unconfirmed': return pt.value.noticeUnconfirmed;
     case 'rejected': return pt.value.noticeRejected;
+    case 'partial': return pt.value.noticePartial(n.weeks.map(w => w.slice(5).replace('-', '/')).join('、'));
     case 'not_needed': return pt.value.noticeNotNeeded;
     case 'nothing_to_undo': return pt.value.noticeNothingToUndo;
     case 'invalid': return pt.value.noticeInvalid;
@@ -94,6 +95,9 @@ const selectExchange = (item: AiExchange) => { selectedExchange.value = item; se
 const current = () => { selectedExchange.value = null; selectedDay.value = null; };
 const changeDay = (from: string, to: string) => { if (plan.document.value && !historical.value) { selectedDay.value = to; void plan.reshape(moveDay(plan.document.value,from,to)); } };
 const removeDay = (date: string) => { if (plan.document.value && !historical.value) void plan.reshape(deleteDay(plan.document.value,date)); };
+const editable = computed(() => !!plan.preview.value && !historical.value && plan.accepted.value);
+const retype = (index: number, sport: PlanSport) => { if (plan.document.value && editable.value) void plan.reshape(retypeWorkout(plan.document.value, index, sport)); };
+const removeWorkout = (index: number) => { if (plan.document.value && editable.value) void plan.reshape(deleteWorkout(plan.document.value, index)); };
 const received = () => { selectedDay.value = null; void history.load(); };
 const selectWorkout = () => { document.querySelector<HTMLElement>('.past-strips .bridge-row:nth-child(4) [role="button"]')?.focus(); };
 let animationTimer = 0, refreshTimer = 0;
@@ -120,7 +124,7 @@ onBeforeUnmount(() => { window.clearInterval(refreshTimer); window.clearTimeout(
     <div v-if="plan.preview.value && !plan.accepted.value && !historical" class="mcp-arrival"><Icon name="spark" :size="16"/><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>
     <div v-if="notice && !historical" class="bridge-message" role="status"><Icon name="info" :size="14"/><span>{{ notice }}</span><button class="pill-button quiet" @click="plan.dismissNotice()">{{ pt.dismiss }}</button></div>
     <ul v-if="wholeIssues.length" class="whole-issues"><li v-for="(issue,i) in wholeIssues" :key="i"><Icon name="warning" :size="14"/>{{ planIssueText(issue) }}</li></ul>
-    <div v-if="detail" class="bridge-detail"><header><span>{{ t.detail }}</span><div><button v-if="plan.preview.value && !historical && plan.accepted.value" class="pill-button quiet" :disabled="plan.busy.value" @click="removeDay(detail.date)"><Icon name="trash" :size="13"/>{{ t.deleteDay }}</button><button class="pill-button quiet" @click="selectedDay = null">{{ t.close }}</button></div></header><PlanDetail :row="detail" :issues="issues"/></div>
+    <div v-if="detail" class="bridge-detail"><header><span>{{ t.detail }}</span><div><button v-if="plan.preview.value && !historical && plan.accepted.value" class="pill-button quiet" :disabled="plan.busy.value" @click="removeDay(detail.date)"><Icon name="trash" :size="13"/>{{ t.deleteDay }}</button><button class="pill-button quiet" @click="selectedDay = null">{{ t.close }}</button></div></header><PlanDetail :row="detail" :issues="issues" :editable="editable" @retype="retype" @remove="removeWorkout"/></div>
     <div v-if="!historical" class="plan-status-row"><PlanLedger v-if="plan.state.value?.last_publish" :state="plan.state.value" :busy="plan.busy.value" :simulated="demo" @undo="plan.undo()" @clear="plan.clear()"/><button v-if="plan.preview.value && plan.accepted.value" class="pill-button quiet discard-draft" :disabled="plan.busy.value" @click="plan.discard()">{{ t.discard }}</button></div>
     <ComposeLine v-if="!historical" :templates="templates" @workout="selectWorkout"/>
     <ExchangeList :items="history.exchanges.value" :active-id="selectedExchange?.id ?? null" @select="selectExchange"/>

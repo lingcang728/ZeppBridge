@@ -4,7 +4,7 @@
  */
 import { useMessages } from '../../i18n';
 import { planMessages } from './plan.i18n';
-import type { PlanIntensity, PlanSport, PlanStep } from '../../types/trainingPlan';
+import type { PlanActivity, PlanIntensity, PlanSport, PlanStep, PlanVariant } from '../../types/trainingPlan';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 /** 秒 / 公里 → `5:30`。 */
@@ -28,6 +28,24 @@ export const usePlanText = () => {
     rest: t.value.restStep,
     cooldown: t.value.cooldown,
   })[value];
+
+  /** 发不到手表的活动（走路、徒步……）照原样叫出名字。 */
+  const activity = (value: PlanActivity): string => ({
+    walking: t.value.activityWalking,
+    hiking: t.value.activityHiking,
+    strength: t.value.activityStrength,
+    yoga: t.value.activityYoga,
+    rowing: t.value.activityRowing,
+    elliptical: t.value.activityElliptical,
+  })[value] ?? value;
+
+  /** 子类型在当前语言里的叫法，尽量和手表上让用户选的那一项同名。 */
+  const variant = (sportValue: PlanSport, value: PlanVariant | undefined): string | null => {
+    if (!value) return null;
+    if (sportValue === 'running') return ({ outdoor: t.value.variantOutdoorRun, treadmill: t.value.variantTreadmill, track: t.value.variantTrack } as Record<string, string>)[value] ?? null;
+    if (sportValue === 'cycling') return ({ outdoor: t.value.variantOutdoorRide, indoor: t.value.variantIndoorRide } as Record<string, string>)[value] ?? null;
+    return null;
+  };
 
   /** 总分钟 → 「45 分钟」「1 小时 28 分钟」。 */
   const minutes = (value: number): string => {
@@ -54,5 +72,5 @@ export const usePlanText = () => {
     }
   };
 
-  return { t, sport, intensity, minutes, length, target };
+  return { t, sport, activity, variant, intensity, minutes, length, target };
 };

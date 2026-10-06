@@ -1185,6 +1185,29 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(36,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v37：训练计划多窗口推送（2026-10 精修批次 1）。
+        //
+        // 一次发布要把计划覆盖到的每个 7 天窗口都推一遍，每个窗口一行：
+        // - `batch_id`：同一批共用批里第一行的 `id`；更早的行是 NULL（一行就是一批）。
+        // - `role`：`window` 正常整窗 / `clear` 当前窗口发空数组 / `placeholder` 未来窗口
+        //   的占位清空。占位行要单独认出来：它在窗口前一天留了一条占位训练。
+        // 只加列，不改已发布的 DDL；旧行读出来 batch_id 为 NULL、role 为 'window'。
+        self.ensure_table_columns(
+            "training_plan_publishes",
+            &[
+                ("batch_id", "INTEGER"),
+                ("role", "TEXT NOT NULL DEFAULT 'window'"),
+            ],
+        )?;
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_training_plan_publishes_batch
+                 ON training_plan_publishes(batch_id);
+             PRAGMA user_version = 37;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(37,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

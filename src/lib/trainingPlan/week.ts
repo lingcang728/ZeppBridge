@@ -5,7 +5,7 @@
  * 窗口外的日子这次不发，等同步后滚动进窗口再发——界面把它们标成「窗口外」，不说成已发。
  * 纯函数，不出文案。
  */
-import type { PlanDayChange, PlanDayPreview, PlanDraftPreview, PlanIssue, PlanWorkout } from '../../types/trainingPlan';
+import type { PlanDayChange, PlanDayPreview, PlanDraftPreview, PlanHeldWorkout, PlanIssue, PlanWorkout } from '../../types/trainingPlan';
 
 export const WINDOW_DAYS = 7;
 
@@ -15,6 +15,8 @@ export interface DayRow {
   change: PlanDayChange;
   before: PlanWorkout[];
   after: PlanWorkout[];
+  /** 这天写了、但手表收不下的训练（走路、徒步……）。照原样显示，绝不当休息日。 */
+  held: PlanHeldWorkout[];
   /** 这天在这次要发的 7 天窗口里。 */
   inWindow: boolean;
   isToday: boolean;
@@ -37,6 +39,7 @@ export const dayRows = (preview: PlanDraftPreview, today: string): DayRow[] => {
     change: day.change,
     before: day.before,
     after: day.after,
+    held: preview.check.held?.filter((item) => item.date === day.date) ?? [],
     inWindow: day.date >= preview.window.start && day.date <= end,
     isToday: day.date === today,
   }));

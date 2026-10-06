@@ -281,7 +281,8 @@ export interface BridgeBackend {
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;
   trainingPlanDiscard(id: string): Promise<boolean>;
   trainingPlanSetAiPublish(allowed: boolean): Promise<boolean>;
-  trainingPlanPublish(action: PlanPublishAction, confirmClear: boolean): Promise<PlanPublishResult>;
+  /** `locale`：界面语言，手表描述第一行的子类型按它写。 */
+  trainingPlanPublish(action: PlanPublishAction, confirmClear: boolean, locale?: string): Promise<PlanPublishResult>;
   getAppStatus(): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;

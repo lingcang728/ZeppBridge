@@ -16,10 +16,20 @@
 //! `"hr 135-150"`、`"pace 5:30-5:50"`，比 V2 的数字字段好写。[`parse`] 负责把它读成
 //! 结构，[`v2`] 负责转成官方报文。
 //!
-//! **没在手表上核实过的写法不许发。** 官方文档把 DISTANCE 的单位写成「秒」（明显
-//! 不对），配速目标的单位没写，「不设目标」怎么表达也没写。这些写法照样能解析、
-//! 能预览，但 [`validate`] 会给出 `unverified` 级别的问题，发布时被挡住；等实测
-//! 校准后再把 [`VERIFIED`] 里对应的开关打开。
+//! **没在手表上核实过的写法不许发。** 2026-10-06 用真账号 + 手表 + 手机 Zepp App
+//! 六轮实测（结论见 `docs/capabilities/official-api-matrix.json`）之后，距离、配速、
+//! 不设目标、同一天两条都已核实，[`VERIFIED`] 全部打开；以后再加新写法，仍然先在
+//! 这里关着、实测后再开。
+//!
+//! 另外两条实测出来的硬限制：
+//!
+//! - V2 的 `sport` 只认 4 个大类，其余值（WALKING、HIKING……）会被**单条静默丢弃**，
+//!   服务端照样回 success。所以走路、徒步、力量这类活动能解析、能显示，但校验给出
+//!   发布阻断的 `sport_not_deliverable`。
+//! - 第三方计划在手表上只到大类，手表会让用户再选一次子类型（户外跑 / 跑步机……）。
+//!   我们能做的只是把子类型写进描述第一行（见 [`v2`]），界面如实说明。
+//!
+//! V1（`version=1.0.0`）**不用**：目标显示成乱码，手机 Zepp App 点详情会闪退。
 
 pub mod parse;
 pub mod publish;
@@ -33,31 +43,41 @@ mod tests;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-pub use validate::{check_plan, PlanCheck, PlanContext, PlanIssue, Severity};
+pub use validate::{check_plan, HeldWorkout, PlanCheck, PlanContext, PlanIssue, Severity};
 
 /// 已经在真实账号 + Zepp App 上核实过的写法。
 ///
 /// 只有这里为 `true` 的写法能发出去。改它之前必须有实测记录（写进
 /// `docs/capabilities/official-api-matrix.json`）。
 pub struct Verified {
-    /// 按距离计的步骤（`"5km"`）。官方文档写「单位：秒」，需要实测。
+    /// 按距离计的步骤（`"5km"`）。官方文档写「单位：秒」，实测是米。
     pub distance_steps: bool,
-    /// 配速目标。官方没写单位。
+    /// 配速目标。官方没写单位，实测是速度（米/秒）。
     pub pace_target: bool,
-    /// 不设目标的步骤。V2 的 `targetType` 是必填，「开放目标」怎么写没写。
+    /// 不设目标的步骤（`OPEN`，low = high = 0）。
     pub open_target: bool,
     /// 同一天两条训练。
     pub same_day_workouts: bool,
 }
 
-/// 2026-09-30 实测：按时间计的步骤 + 心率区间目标正确显示（30 分钟、130–150），
-/// 同窗重推会替换旧条目、不动其他来源的计划。其余写法还没测。
+/// 实测记录（真账号 + 手表 + 手机 Zepp App，截图留在用户本机、不进仓库）：
+///
+/// - 2026-09-30：按时间计的步骤 + 心率区间目标正确显示（30 分钟、130–150），同窗重推
+///   会替换旧条目、不动其他来源的计划。
+/// - 2026-10-06 第 3 轮：`DISTANCE` 1000 显示「1.00 公里」（单位是米）；`OPEN`
+///   正常显示为没有目标；同一天两条都显示；`POWER_LAP` 150–180 显示「150-180 瓦特」；
+///   重复组 ×3 显示「循环次数 ×3」且总时长正确。
+/// - 2026-10-06 第 3、4 轮：`PACE_LAP` 的值是**速度（米/秒）**，支持小数：3.03–3.33
+///   显示 5'00"–5'30"/公里；高低值写反会被自动纠正。
 pub const VERIFIED: Verified = Verified {
-    distance_steps: false,
-    pace_target: false,
-    open_target: false,
-    same_day_workouts: false,
+    distance_steps: true,
+    pace_target: true,
+    open_target: true,
+    same_day_workouts: true,
 };
+
+/// 训练名字在手表列表里约 14 个汉字后会被截断（2026-10-06 第 3 轮实测）。超过只提醒、不阻断。
+pub const WATCH_NAME_CHARS: usize = 14;
 
 /// 一次推送覆盖的天数（含首尾）。
 pub const WINDOW_DAYS: i64 = 7;
@@ -109,9 +129,19 @@ pub struct RestDay {
 pub struct PlanWorkout {
     /// `YYYY-MM-DD`，本地日期。
     pub date: String,
-    /// `running` / `cycling` / `pool_swim` / `open_water_swim`。
+    /// `running` / `cycling` / `pool_swim` / `open_water_swim`。走路、徒步、力量等
+    /// 也能读，但发不到手表（见 [`Activity`]）。
     pub sport: String,
+    /// 子类型：跑步 `outdoor` / `treadmill` / `track`，骑行 `outdoor` / `indoor`。
+    /// 手表上只到大类，子类型只写进描述第一行提醒用户。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
     pub name: String,
+    /// 训练目的（短词，例如「强化耐力」）。zeppbridge-plan/3 起必填；旧格式读得进来，
+    /// 校验报 `missing_focus`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus: Option<String>,
+    /// 训练要点。必填（`missing_description`）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub steps: Vec<PlanStep>,
@@ -158,6 +188,66 @@ impl Sport {
             "cycling" | "ride" | "bike" => Self::Cycling,
             "pool_swim" | "lap_swimming" | "pool_swimming" => Self::PoolSwim,
             "open_water_swim" | "open_water_swimming" => Self::OpenWaterSwim,
+            _ => return None,
+        })
+    }
+
+    /// 这个大类允许的子类型。游泳不分。
+    pub fn variants(self) -> &'static [Variant] {
+        match self {
+            Self::Running => &[Variant::Outdoor, Variant::Treadmill, Variant::Track],
+            Self::Cycling => &[Variant::Outdoor, Variant::Indoor],
+            Self::PoolSwim | Self::OpenWaterSwim => &[],
+        }
+    }
+}
+
+/// 子类型。手表上第三方计划只到大类（R1 实测），所以它只进描述，不进 `sport`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Variant {
+    Outdoor,
+    Indoor,
+    Treadmill,
+    Track,
+}
+
+impl Variant {
+    pub fn parse(text: &str) -> Option<Self> {
+        Some(match text.trim().to_ascii_lowercase().as_str() {
+            "outdoor" | "road" | "outside" => Self::Outdoor,
+            "indoor" | "trainer" | "turbo" => Self::Indoor,
+            "treadmill" => Self::Treadmill,
+            "track" => Self::Track,
+            _ => return None,
+        })
+    }
+}
+
+/// 能读懂、但手表收不下的活动（R1 实测：V2 对这些 `sport` 单条静默丢弃）。
+///
+/// 解析时认出来是为了**照原样显示**（步行就是步行，绝不渲染成休息日），校验给出
+/// 发布阻断的 `sport_not_deliverable`，让用户删掉或换成能发的大类。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Activity {
+    Walking,
+    Hiking,
+    Strength,
+    Yoga,
+    Rowing,
+    Elliptical,
+}
+
+impl Activity {
+    pub fn parse(text: &str) -> Option<Self> {
+        Some(match text.trim().to_ascii_lowercase().as_str() {
+            "walking" | "walk" | "long_walk" | "brisk_walk" => Self::Walking,
+            "hiking" | "hike" | "trekking" => Self::Hiking,
+            "strength" | "strength_training" | "weights" | "gym" => Self::Strength,
+            "yoga" | "pilates" | "mobility" | "stretching" => Self::Yoga,
+            "rowing" | "row" => Self::Rowing,
+            "elliptical" => Self::Elliptical,
             _ => return None,
         })
     }
@@ -241,11 +331,17 @@ impl StepNode {
 }
 
 /// 一条校验过的训练。
+///
+/// `variant` / `focus` 是 2026-10 加的：账本里更早的训练没有它们，读进来是 `None`。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Workout {
     pub date: NaiveDate,
     pub sport: Sport,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<Variant>,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub steps: Vec<StepNode>,

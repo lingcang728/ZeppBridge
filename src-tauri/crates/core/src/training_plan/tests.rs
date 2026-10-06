@@ -3,7 +3,7 @@
 
 use super::parse::{parse_duration, parse_target};
 use super::publish::classify;
-use super::v2::{window_body, NumberedWorkout};
+use super::v2::{clear_future_window, window_body, NumberedWorkout, WatchLocale};
 use super::window::{preview, DayChange, Window};
 use super::*;
 use crate::models::ZeppBridgeError;
@@ -28,6 +28,7 @@ fn document(value: serde_json::Value) -> PlanDocument {
 fn easy_run(date: &str) -> serde_json::Value {
     json!({
         "date": date, "sport": "running", "name": "轻松跑",
+        "focus": "强化耐力", "description": "全程放松",
         "steps": [
             { "kind": "warmup", "duration": "10min", "target": "hr 110-130" },
             { "repeat": 3, "steps": [
@@ -66,8 +67,12 @@ fn plan_two_keeps_local_rest_advice_out_of_the_watch_body() {
     };
     let window = Window::starting(context().today);
     assert_eq!(
-        window_body(window, &numbered(check.workouts)),
-        window_body(window, &numbered(check_plan(&old, context()).workouts))
+        window_body(window, &numbered(check.workouts), WatchLocale::Zh),
+        window_body(
+            window,
+            &numbered(check_plan(&old, context()).workouts),
+            WatchLocale::Zh
+        )
     );
 }
 
@@ -176,33 +181,47 @@ fn writing_mistakes_block_publishing_and_name_where_they_are() {
 }
 
 #[test]
-fn unverified_shapes_preview_but_never_publish() {
+fn shapes_verified_on_the_watch_publish_and_speak_the_watch_units() {
+    // 2026-10-06 R3、R4 实测：距离是米，配速是速度（米/秒），不设目标、同一天两条都能显示。
     let plan = json!({ "workouts": [
-        { "date": "2026-10-04", "sport": "running", "name": "节奏跑", "steps": [
-            { "kind": "active", "duration": "5km", "target": "pace 5:00-5:10" },
+        { "date": "2026-10-04", "sport": "running", "variant": "outdoor", "name": "节奏跑",
+          "focus": "提升乳酸阈", "description": "后半程保持节奏", "steps": [
+            { "kind": "active", "duration": "5km", "target": "pace 5:00-5:30" },
             { "kind": "cooldown", "duration": "10min" }
         ]},
         easy_run("2026-10-04")
     ]});
     let check = check_plan(&document(plan), context());
-    assert!(!check.publishable());
-    let unverified: Vec<&str> = check
-        .issues
-        .iter()
-        .filter(|issue| issue.severity == Severity::Unverified)
-        .map(|issue| issue.message_code)
+    assert!(check.publishable(), "{:?}", check.issues);
+    assert!(check.issues.is_empty(), "{:?}", check.issues);
+    let numbered: Vec<NumberedWorkout> = check
+        .workouts
+        .into_iter()
+        .enumerate()
+        .map(|(index, workout)| NumberedWorkout {
+            id: index as i64 + 1,
+            workout,
+        })
         .collect();
-    for code in [
-        "ui.training_plan.issue.distance_unverified",
-        "ui.training_plan.issue.pace_unverified",
-        "ui.training_plan.issue.open_target_unverified",
-    ] {
-        assert!(unverified.contains(&code), "{code}: {unverified:?}");
-    }
-    assert!(check
-        .issues
-        .iter()
-        .all(|i| i.severity == Severity::Unverified));
+    let body = window_body(
+        Window::starting(day("2026-10-02")),
+        &numbered,
+        WatchLocale::Zh,
+    );
+    assert_eq!(body["workouts"].as_array().unwrap().len(), 2);
+    let steps = &body["workouts"][0]["steps"];
+    assert_eq!(steps[0]["durationType"], "DISTANCE");
+    assert_eq!(steps[0]["durationValue"], 5000, "距离单位是米");
+    assert_eq!(steps[0]["targetType"], "PACE_LAP");
+    // 5:30/公里 = 3.03 米/秒（慢、低端），5:00/公里 = 3.33 米/秒（快、高端）。
+    // 填成每公里秒数（300–330）手表上会显示成 0'03"。
+    assert_eq!(steps[0]["targetValueLow"], json!(3.03));
+    assert_eq!(steps[0]["targetValueHigh"], json!(3.33));
+    assert_eq!(steps[1]["targetType"], "OPEN");
+    assert_eq!(
+        (&steps[1]["targetValueLow"], &steps[1]["targetValueHigh"]),
+        (&json!(0), &json!(0))
+    );
 }
 
 #[test]
@@ -256,7 +275,11 @@ fn the_v2_body_is_one_full_window_in_the_documented_shape() {
             workout,
         })
         .collect();
-    let body = window_body(Window::starting(day("2026-10-02")), &numbered);
+    let body = window_body(
+        Window::starting(day("2026-10-02")),
+        &numbered,
+        WatchLocale::Zh,
+    );
     assert_eq!(body["startDate"], "2026-10-02");
     assert_eq!(
         body["endDate"], "2026-10-08",
@@ -329,4 +352,115 @@ fn success_is_only_delivery_and_doubt_is_never_success() {
         classify(Err(ZeppBridgeError::TimedOut("超时".into()))),
         SendOutcome::Unknown { .. }
     ));
+}
+
+#[test]
+fn a_long_walk_reads_as_walking_but_never_reaches_the_watch() {
+    // R1 实测：V2 收到 WALKING 会单条静默丢弃、照回 success。读得懂，但必须挡住。
+    let mut walk = easy_run("2026-10-04");
+    walk["sport"] = json!("walking");
+    let mut wrong_variant = easy_run("2026-10-05");
+    wrong_variant["variant"] = json!("indoor");
+    let check = check_plan(
+        &document(json!({ "workouts": [walk, wrong_variant] })),
+        context(),
+    );
+    assert!(!check.publishable());
+    assert!(check.workouts.is_empty(), "发不出去的训练不能进可发列表");
+    let walking = check
+        .issues
+        .iter()
+        .find(|i| i.message_code == "ui.training_plan.issue.sport_not_deliverable")
+        .expect("走路要给出发布阻断的问题码");
+    assert_eq!(walking.severity, Severity::Error);
+    assert_eq!(walking.params["activity"], "walking");
+    // 界面要能照原样画出这次长走：日期、类型、时长都在，不变成休息日。
+    assert_eq!(check.held.len(), 1);
+    assert_eq!(check.held[0].index, 0);
+    assert_eq!(check.held[0].activity, Activity::Walking);
+    assert_eq!(check.held[0].date, day("2026-10-04"));
+    assert!(!check.held[0].steps.is_empty());
+    assert!(check
+        .issues
+        .iter()
+        .any(|i| i.message_code == "ui.training_plan.issue.bad_variant"));
+}
+
+#[test]
+fn focus_and_description_are_required_and_a_long_name_only_warns() {
+    let mut bare = easy_run("2026-10-04");
+    bare.as_object_mut().unwrap().remove("focus");
+    bare.as_object_mut().unwrap().remove("description");
+    // 旧格式（zeppbridge-plan/2）读得进来，校验挡住。
+    let check = check_plan(
+        &document(json!({ "format": "zeppbridge-plan/2", "workouts": [bare] })),
+        context(),
+    );
+    assert!(!check.publishable());
+    let codes: Vec<&str> = check.issues.iter().map(|i| i.message_code).collect();
+    assert!(codes.contains(&"ui.training_plan.issue.missing_focus"));
+    assert!(codes.contains(&"ui.training_plan.issue.missing_description"));
+
+    let mut long = easy_run("2026-10-04");
+    long["name"] = json!("周末长距离有氧耐力跑加最后两公里提速");
+    let check = check_plan(&document(json!({ "workouts": [long] })), context());
+    assert!(check.publishable(), "名字太长只提醒，不阻断");
+    assert_eq!(check.workouts.len(), 1);
+    assert_eq!(check.issues.len(), 1);
+    assert_eq!(check.issues[0].severity, Severity::Warning);
+    assert_eq!(
+        check.issues[0].message_code,
+        "ui.training_plan.issue.name_truncated"
+    );
+}
+
+#[test]
+fn the_watch_description_leads_with_purpose_and_the_sub_type_to_pick() {
+    let mut ride = easy_run("2026-10-04");
+    ride["sport"] = json!("cycling");
+    ride["variant"] = json!("outdoor");
+    ride["description"] = json!("踏频 85–95\n别冲坡");
+    let check = check_plan(&document(json!({ "workouts": [ride] })), context());
+    assert!(check.publishable(), "{:?}", check.issues);
+    let numbered = vec![NumberedWorkout {
+        id: 7,
+        workout: check.workouts[0].clone(),
+    }];
+    let window = Window::starting(day("2026-10-02"));
+    let body = window_body(window, &numbered, WatchLocale::Zh);
+    assert_eq!(body["workouts"][0]["sport"], "CYCLING");
+    assert_eq!(
+        body["workouts"][0]["description"],
+        "强化耐力 · 户外骑行\n踏频 85–95\n别冲坡"
+    );
+    let english = window_body(window, &numbered, WatchLocale::En);
+    assert_eq!(
+        english["workouts"][0]["description"],
+        "强化耐力 · Outdoor cycling\n踏频 85–95\n别冲坡"
+    );
+    // 账本里更早的训练没有目的和子类型：只发要点，不编一行出来。
+    let mut legacy = check.workouts[0].clone();
+    legacy.focus = None;
+    legacy.variant = None;
+    let body = window_body(
+        window,
+        &[NumberedWorkout {
+            id: 7,
+            workout: legacy,
+        }],
+        WatchLocale::Zh,
+    );
+    assert_eq!(body["workouts"][0]["description"], "踏频 85–95\n别冲坡");
+}
+
+#[test]
+fn clearing_a_future_window_parks_one_placeholder_the_day_before() {
+    let window = Window::starting(day("2026-10-09"));
+    let body = clear_future_window(window, 1_000_000_042);
+    assert_eq!(body["startDate"], "2026-10-09");
+    assert_eq!(body["endDate"], "2026-10-15");
+    let workouts = body["workouts"].as_array().unwrap();
+    assert_eq!(workouts.len(), 1, "绝不能对未来窗口发空数组：那清的是本周");
+    assert_eq!(workouts[0]["workoutDate"], "2026-10-08");
+    assert_eq!(workouts[0]["workoutId"], 1_000_000_042);
 }
