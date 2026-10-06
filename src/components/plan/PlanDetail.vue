@@ -27,7 +27,7 @@ import Icon from '../Icon.vue';
 import { usePlanText } from './usePlanText';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
 
-const props = defineProps<{ row: DayRow | null; issues: PlanIssue[]; editable?: boolean }>();
+const props = withDefaults(defineProps<{ row: DayRow | null; issues: PlanIssue[]; editable?: boolean; showDate?: boolean }>(), { showDate: true });
 const emit = defineEmits<{ retype: [index: number, sport: PlanSport]; remove: [index: number] }>();
 const { t, sport, activity, variant, intensity, minutes, length, target } = usePlanText();
 const bridgeText = useBridgeText();
@@ -83,7 +83,7 @@ const stepTarget = (row: StepRow) => target(row.target);
   <section class="detail" :aria-label="dateLine">
     <template v-if="row">
       <header class="head">
-        <p class="date">{{ dateLine }}</p>
+        <p v-if="showDate" class="date">{{ dateLine }}</p>
         <h3>{{ workout?.name ?? held[0]?.name ?? t.rest }}</h3>
         <p v-if="facts.length" class="facts"><span v-for="fact in facts" :key="fact">{{ fact }}</span></p>
         <p v-if="workout?.focus || workout?.description" class="brief">

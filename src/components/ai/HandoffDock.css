@@ -26,6 +26,7 @@
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 .ready-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
@@ -43,7 +44,6 @@
 .ready-copy span, .ready-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ready-copy small { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 500; }
 .ready-chevron { flex: 0 0 auto; color: var(--subtle); transition: rotate var(--dur-base) var(--ease-out); }
-.ready-chevron.up { rotate: 180deg; }
 .provider-wheel { flex: 0 0 auto; height: 44px; }
 .plan-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
 .plan-info { position: absolute; top: -5px; right: -5px; display: grid; width: 17px; height: 17px; place-items: center; border-radius: 50%;

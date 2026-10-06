@@ -4,18 +4,18 @@
  *
  * 没有「+」和「✓」：只想把数据交给 AI 的人不需要先「新建」「保存」，导出时自动存；
  * 同名的草稿再导出会更新原来那条，已保存的任务里不会出现两条一模一样的。
- * 任务名单击就地改。回溯范围挪到了包裹区（PackageZone）标题行，贴着它管的那六块砖。
+ * 任务名单击就地改。右边那一格（钟 + 数量）是去「已保存的任务」二级页的入口（/ai/tasks，
+ * 2026-10 起从下拉列表改成单独一页，从这枚胶囊长出来）。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import Icon from '../Icon.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
-import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{ fallbackTitle: string }>();
 
-const { draft, lastError, savedNotice, setTitle, resetDraft, loadTask } = useAiTaskDraft();
+const { draft, lastError, savedNotice, setTitle } = useAiTaskDraft();
 const { taskList, libraryError } = useAiTaskLibrary();
 
 const t = useMessages(defineMessages(
@@ -24,10 +24,7 @@ const t = useMessages(defineMessages(
     intro: '选运动、挑数据、写明想问什么，导出到桌面拖给 AI。',
     titleLabel: '任务名',
     rename: '点一下改名',
-    history: '已保存的任务',
     historyCount: (count: number) => `已保存的任务（${count}）`,
-    historyEmpty: '还没有保存的任务',
-    newTask: '新任务',
     saved: '已保存',
   },
   {
@@ -35,10 +32,7 @@ const t = useMessages(defineMessages(
     intro: 'Pick workouts, choose data, say what you want to know — export to desktop and drag into the AI.',
     titleLabel: 'Task name',
     rename: 'Click to rename',
-    history: 'Saved tasks',
     historyCount: (count: number) => `Saved tasks (${count})`,
-    historyEmpty: 'No saved tasks yet',
-    newTask: 'New task',
     saved: 'Saved',
   },
   {
@@ -46,10 +40,7 @@ const t = useMessages(defineMessages(
     intro: 'Elige entrenamientos, selecciona datos, escribe qué consultar: exporta al escritorio y arrástralo a la IA.',
     titleLabel: 'Nombre de la tarea',
     rename: 'Clic para renombrar',
-    history: 'Tareas guardadas',
     historyCount: (count: number) => `Tareas guardadas (${count})`,
-    historyEmpty: 'Aún no hay tareas guardadas',
-    newTask: 'Nueva tarea',
     saved: 'Guardado',
   },
   'components/ai/AiTaskHeader',
@@ -73,40 +64,10 @@ const commitRename = (event: Event) => {
 };
 const cancelRename = () => { editing.value = false; };
 
-/* —— 已保存的任务 —— */
-const historyOpen = ref(false);
-const root = ref<HTMLElement | null>(null);
-const whenText = (iso: string) => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso.slice(0, 16).replace('T', ' ');
-  return displayDateTimeFormatter({ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
-};
-const openTask = (id: string) => {
-  historyOpen.value = false;
-  if (id !== draft.value.id) void loadTask(id).catch(() => undefined);
-};
-const startNew = () => {
-  historyOpen.value = false;
-  resetDraft();
-};
-const onOutside = (event: PointerEvent) => {
-  if (historyOpen.value && !root.value?.contains(event.target as Node)) historyOpen.value = false;
-};
-const onKey = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && historyOpen.value) historyOpen.value = false;
-};
-onMounted(() => {
-  document.addEventListener('pointerdown', onOutside, true);
-  document.addEventListener('keydown', onKey);
-});
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onOutside, true);
-  document.removeEventListener('keydown', onKey);
-});
 </script>
 
 <template>
-  <header ref="root" class="head">
+  <header class="head">
     <div class="sr-only">
       <h1 id="ai-page-title">{{ t.pageTitle }}</h1>
       <p>{{ t.intro }}</p>
@@ -119,28 +80,10 @@ onBeforeUnmount(() => {
         <span class="title-text">{{ shownTitle }}</span><Icon name="edit" :size="13" class="title-glyph" />
       </button>
       <span class="divider" aria-hidden="true"></span>
-      <button type="button" :class="['history-btn', { on: historyOpen }]" :title="t.historyCount(taskList.length)"
-        :aria-label="t.historyCount(taskList.length)" :aria-expanded="historyOpen" aria-controls="ai-task-history"
-        @click="historyOpen = !historyOpen">
+      <RouterLink to="/ai/tasks" class="history-btn" data-morph-card :title="t.historyCount(taskList.length)" :aria-label="t.historyCount(taskList.length)">
         <Icon name="clock" :size="15" /><span v-if="taskList.length" class="count">{{ taskList.length }}</span>
-      </button>
+      </RouterLink>
     </div>
-
-    <Transition name="history">
-      <div v-if="historyOpen" id="ai-task-history" class="history glass-control" role="listbox" :aria-label="t.history">
-        <div class="history-head">
-          <p class="history-title">{{ t.history }}</p>
-          <button type="button" class="pill-button quiet new-task" @click="startNew"><Icon name="plus" :size="13" />{{ t.newTask }}</button>
-        </div>
-        <p v-if="!taskList.length" class="history-empty">{{ t.historyEmpty }}</p>
-        <button v-for="task in taskList" :key="task.id" type="button" role="option" :aria-selected="task.id === draft.id"
-          :class="['history-row', { current: task.id === draft.id }]" @click="openTask(task.id)">
-          <span class="row-mark" aria-hidden="true"><Icon v-if="task.id === draft.id" name="check" :size="13" /></span>
-          <span class="row-name">{{ task.title }}</span>
-          <span class="row-when">{{ whenText(task.updated_at) }}</span>
-        </button>
-      </div>
-    </Transition>
     <p v-if="savedNotice" class="ai-note ok status" role="status"><Icon name="circle-check" :size="13" />{{ t.saved }}</p>
     <p v-if="lastError || libraryError" class="ai-note bad status" role="alert"><Icon name="warning" :size="13" />{{ lastError || libraryError }}</p>
   </header>
@@ -161,24 +104,10 @@ onBeforeUnmount(() => {
 .divider { width: 1px; height: 20px; margin: 0 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .history-btn { display: inline-flex; min-width: 36px; height: 36px; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 999px;
   background: transparent; color: var(--ink); cursor: pointer; }
-.history-btn:hover, .history-btn.on { background: var(--glass-press); }
+.history-btn { text-decoration: none; }
+.history-btn:hover { background: var(--glass-press); }
 .history-btn .count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
-/* 已保存的任务：三列对齐——当前标记、任务名、时间；时间右对齐、等宽数字。 */
-.history { display: grid; width: min(420px, 100%); max-height: 340px; gap: 2px; overflow-y: auto; padding: 8px; border-radius: var(--radius-md); overscroll-behavior: contain; }
-.history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 4px 6px 8px; }
-.history-title { margin: 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
-.new-task { min-height: 30px; padding: 0 12px; font-size: var(--fs-xs); }
-.history-empty { margin: 4px 8px 8px; color: var(--subtle); font-size: var(--fs-xs); }
-.history-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border: 0; border-radius: 14px;
-  background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-.history-row:hover { background: var(--glass-press); }
-.history-row.current { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.row-mark { display: grid; place-items: center; color: var(--accent); }
-.row-name { min-width: 0; overflow: hidden; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
-.row-when { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.history-enter-active, .history-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out); }
-.history-enter-from, .history-leave-to { opacity: 0; translate: 0 -6px; }
 /* 很窄的窗口：任务名自己占一行，天数和记录挪到第二行，谁也不被挤出画面。 */
 @media (max-width: 480px) {
   .head-task { flex-wrap: wrap; row-gap: 2px; border-radius: var(--radius-md); }

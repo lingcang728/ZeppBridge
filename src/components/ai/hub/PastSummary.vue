@@ -1,0 +1,57 @@
+<script setup lang="ts">
+/**
+ * 总页上「你的过去」的缩略卡：只说一句「最近 N 天 · 几类数据会交给 AI」，再画六行细条一眼看出哪几类亮着。
+ * 整张卡是去 /ai/past 的入口，点开从这张卡长出来（usePageMorph）。要勾选、改范围都在二级页里做。
+ */
+import { computed } from 'vue';
+import Icon from '../../Icon.vue';
+import { AI_TASK_CATEGORY_META, categoryLabel } from '../../../lib/aiTask/categories';
+import { stripColumns } from '../../../lib/aiTask/strip';
+import type { AiTaskCategory, AiTaskCategoryRange } from '../../../lib/bridge/types';
+import type { DayStripRow } from '../../../types/timeBridge';
+import { useBridgeText } from '../bridge/bridge.i18n';
+import { useHubText } from './hub.i18n';
+
+const props = defineProps<{ rows: DayStripRow[]; categories: AiTaskCategoryRange[]; days: number; sent?: boolean }>();
+const t = useBridgeText();
+const h = useHubText();
+const ORDER: AiTaskCategory[] = ['sleep', 'recovery', 'heart_rate', 'workout', 'training', 'body'];
+const W = 160;
+const H = 18;
+const lines = computed(() => ORDER.map((category) => {
+  const row = props.rows.find((r) => r.category === category);
+  const columns = stripColumns(row?.cells ?? [], props.days);
+  const slot = W / Math.max(1, columns.length);
+  return {
+    category,
+    meta: AI_TASK_CATEGORY_META[category],
+    enabled: props.categories.find((c) => c.category === category)?.enabled ?? false,
+    bars: columns.map((c, i) => ({ x: slot * i + slot * 0.2, w: Math.max(1, slot * 0.6), h: c.value !== null ? Math.max(1.5, (c.height / 29) * (H - 2)) : c.has ? 1.5 : 0 })),
+  };
+}));
+const enabledCount = computed(() => lines.value.filter((line) => line.enabled).length);
+</script>
+
+<template>
+  <RouterLink to="/ai/past" class="hub-card past-card" :class="{ sent }" data-morph-card>
+    <header class="hub-card-head">
+      <span class="hub-number">01</span>
+      <div>
+        <h2>{{ t.past }}</h2>
+        <p>{{ enabledCount ? h.pastLine(days, enabledCount) : h.pastNone }}</p>
+      </div>
+      <span class="hub-open">{{ h.pastOpen }}<Icon name="chevron-right" :size="14" /></span>
+    </header>
+    <ul class="past-lines">
+      <li v-for="line in lines" :key="line.category" :class="{ off: !line.enabled }" :style="{ '--tint': line.meta.tint }">
+        <Icon :name="line.meta.icon" :size="12" />
+        <span class="name">{{ categoryLabel(line.category) }}</span>
+        <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
+          <rect v-for="(bar, i) in line.bars" :key="i" :x="bar.x" :y="H - bar.h" :width="bar.w" :height="bar.h" rx="1" />
+        </svg>
+      </li>
+    </ul>
+  </RouterLink>
+</template>
+
+<style scoped src="./hub.css"></style>

@@ -29,6 +29,14 @@ const routes = [
     name: 'AiComposer',
     component: () => import('../views/AiComposer.vue'),
   },
+  // 交给 AI 的下钻全是路由（2026-10 精修批次 3）：点开从被点的卡 / 行长出来，返回缩回去（usePageMorph）。
+  { path: '/ai/past', name: 'AiPast', component: () => import('../views/ai/AiPast.vue') },
+  { path: '/ai/past/:category', name: 'AiPastCategory', component: () => import('../views/ai/AiPastCategory.vue') },
+  { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
+  { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
+  { path: '/ai/check', name: 'AiCheck', component: () => import('../views/ai/AiCheck.vue') },
+  { path: '/ai/tasks', name: 'AiTasks', component: () => import('../views/ai/AiTasks.vue') },
+  { path: '/ai/exchanges/:id', name: 'AiExchange', component: () => import('../views/ai/AiExchange.vue') },
   {
     path: '/body',
     name: 'BodyStatus',

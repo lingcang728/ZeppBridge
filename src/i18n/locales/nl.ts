@@ -2163,11 +2163,8 @@ Antwoord in Markdown.`,
       intro:
         'Kies een training, selecteer de gewenste gegevens en vraag wat je wilt weten. Exporteer naar je bureaublad en sleep het bestand in de AI-chat.',
       titleLabel: 'Taaknaam',
-      newTask: 'Nieuw',
       saved: 'Opgeslagen',
-      history: 'Opgeslagen taken',
       historyCount: (count: number) => `Opgeslagen taken (${count})`,
-      historyEmpty: 'Nog geen opgeslagen taken',
       rename: 'Klik om te hernoemen',
     },
     'components/ai/CoverageDetails': {

@@ -60,6 +60,8 @@ const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce
 
 /** 被点的链接所在的那张卡：链接本身够大就是它，否则往外找最近的一块板。 */
 const cardOfLink = (link: HTMLElement): HTMLElement | null => {
+  // 同一层里平移（单天页的「前一天 / 后一天」）：不是从哪张卡打开，不形变。
+  if (link.closest('[data-no-morph]')) return null;
   // 显式标了 data-morph-card 的一整条（概览底部的「数据来源」）：比一般的卡矮，也按卡算。
   const marked = link.closest<HTMLElement>('[data-morph-card]');
   if (marked) return marked;
@@ -67,12 +69,14 @@ const cardOfLink = (link: HTMLElement): HTMLElement | null => {
   return box && bigEnough(box) ? box : null;
 };
 
-/** 按下的是页面内容里的一个链接（顶栏、底部导航里的不算）。 */
+/** 按下的是页面内容里的一个链接（顶栏、底部导航里的不算）。浮在页面外面、挂在 body 上的控件
+    （交给 AI 的底栏）显式标了 data-morph-card 的也算：寄出前检查从那枚胶囊长出来。 */
 const linkOf = (target: EventTarget | null): HTMLElement | null => {
   const el = target instanceof Element ? target : null;
   const link = el?.closest<HTMLElement>('a[href]');
   if (!link || link.closest('.shell-head, .bottom-nav')) return null;
-  return main()?.contains(link) ? link : null;
+  if (main()?.contains(link)) return link;
+  return link.closest('[data-morph-card]') ? link : null;
 };
 
 /** 当前页里指向 `href` 的所有链接，按文档顺序。同一页常有好几个（「本周」里的「训练」小格和
@@ -183,6 +187,10 @@ export const usePageMorph = (options: { back: () => void }) => {
     }
     // 设置里翻到另一张卡用的是 replace：来路跟着带过去，关掉时仍缩回当初那条。
     if (trail && from.path.startsWith('/settings/') && to.path.startsWith('/settings/')) trails.set(to.fullPath, trail);
+    // 单天页翻到前一天 / 后一天（也是 replace）：返回时缩回周视图里**这一天**那一格。
+    if (trail && from.path.startsWith('/ai/plan/') && to.path.startsWith('/ai/plan/')) {
+      trails.set(to.fullPath, { ...trail, href: to.fullPath, index: 0 });
+    }
     return base;
   };
 
@@ -352,9 +360,11 @@ export const usePageMorph = (options: { back: () => void }) => {
     });
   };
 
-  /** 来处页此刻已经在场的话，当初那张卡。 */
+  /** 来处页此刻已经在场的话，当初那张卡。页面里没有就看页面外面标了 data-morph-card 的（底栏）。 */
   const currentCard = (trail: Trail): HTMLElement | null => {
-    const link = linksTo(trail.href, STAYING)[trail.index] ?? null;
+    const link = linksTo(trail.href, STAYING)[trail.index]
+      ?? document.querySelector<HTMLElement>(`body > :not(#app) a[data-morph-card][href="${CSS.escape(trail.href)}"]`)
+      ?? null;
     return link ? cardOfLink(link) : null;
   };
 

@@ -2312,12 +2312,9 @@ Antworte in Markdown.`,
       yearSuffix: '' as string,
     },
     'components/ai/AiTaskHeader': {
-      history: 'Gespeicherte Aufgaben',
       historyCount: (count: number) => `Gespeicherte Aufgaben (${count})`,
-      historyEmpty: 'Noch keine gespeicherten Aufgaben',
       intro:
         'Wähle Daten und Trainings aus, formuliere deine Frage und exportiere das Paket für deine KI.',
-      newTask: 'Neu',
       pageTitle: 'An die KI',
       rename: 'Klicken zum Umbenennen',
       saved: 'Gespeichert',

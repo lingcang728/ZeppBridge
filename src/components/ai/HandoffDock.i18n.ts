@@ -1,7 +1,7 @@
 import { defineMessages, useMessages } from '../../i18n';
 export const useHandoffText = () => useMessages(defineMessages(
   {
-    title: '交给 AI', more: '更多',
+    title: '交给 AI', more: '更多', checkHint: '寄出前检查：带了哪些数据、附件和选项、完整提示词',
     who: '交给谁',
     finalPrompt: '最终提示词（写在文件开头）',
     run: (label: string) => `准备文件并打开 ${label}`,
@@ -49,7 +49,7 @@ export const useHandoffText = () => useMessages(defineMessages(
     readinessWaitingSub: '同步完成后这里自动刷新',
   },
   {
-    title: 'Send to AI', more: 'More',
+    title: 'Send to AI', more: 'More', checkHint: 'Check before sending: the data included, attachments and options, the full prompt',
     who: 'Send to',
     finalPrompt: 'Final prompt (at the top of the file)',
     run: (label: string) => `Prepare the file and open ${label}`,
@@ -97,7 +97,7 @@ export const useHandoffText = () => useMessages(defineMessages(
     readinessWaitingSub: 'Auto-refreshes when sync finishes',
   },
   {
-    title: 'Pasar a la IA', more: 'Más',
+    title: 'Pasar a la IA', more: 'Más', checkHint: 'Revisar antes de enviar: datos incluidos, adjuntos y opciones, el texto completo',
     who: 'Pasar a',
     finalPrompt: 'Instrucción final (al principio del archivo)',
     run: (label: string) => `Preparar el archivo y abrir ${label}`,

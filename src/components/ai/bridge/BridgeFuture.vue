@@ -1,5 +1,13 @@
 <script setup lang="ts">
+/**
+ * 一周一页的计划：每天一格（训练形状、名字、时长），长按「发到手表」。
+ *
+ * 2026-10 起每一格是去单天页（/ai/plan/:date）的链接，点开从这一格长出来（usePageMorph）；
+ * 往返记录里的旧计划只读，格子不是链接（`linkDays = false`）。拖一格放到另一格上交换两天，
+ * 选中后用 ← → 挪一天，Delete 删掉这天。走路这类发不到手表的训练照原样占住那一天。
+ */
 import { computed, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import PlanShape from '../../plan/PlanShape.vue';
 import Icon from '../../Icon.vue';
 import { workoutProfile } from '../../../lib/trainingPlan/profile';
@@ -10,8 +18,11 @@ import { usePressHold } from '../../../composables/usePressHold';
 import { useTrainingPlan } from '../../../composables/useTrainingPlan';
 import type { PlanDraftPreview } from '../../../types/trainingPlan';
 import { addDays } from '../../../lib/aiTask/bridgeScale';
-const props = defineProps<{ preview: PlanDraftPreview | null; readonly?: boolean; stamped?: boolean; selected: string | null }>();
-const emit = defineEmits<{ select: [string]; move: [string,string]; delete: [string]; publish: []; received: [] }>();
+
+const props = withDefaults(defineProps<{
+  preview: PlanDraftPreview | null; readonly?: boolean; stamped?: boolean; linkDays?: boolean; showSummary?: boolean;
+}>(), { linkDays: true, showSummary: true });
+const emit = defineEmits<{ move: [string, string]; delete: [string]; publish: [] }>();
 const t = useBridgeText(), plan = useTrainingPlan(), { t: pt, activity } = usePlanText();
 /* 走路这类发不到手表的训练：照原样占住那一天，绝不画成休息日。 */
 const heldOn = (date: string) => props.preview?.check.held?.filter(item => item.date === date) ?? [];
@@ -32,13 +43,19 @@ const key = (event: KeyboardEvent, date: string) => {
   if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); emit('delete',date); }
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); emit('move',date,addDays(date,event.key === 'ArrowLeft' ? -1 : 1)); }
 };
+const canDrag = computed(() => !props.readonly && !plan.busy.value && plan.accepted.value);
 </script>
 <template>
-  <div class="bridge-future" :class="{ 'is-empty': !preview, stamped }">
+  <div class="bridge-future" :class="{ 'is-empty': !preview, stamped, 'no-summary': !showSummary }">
     <template v-if="preview">
-      <p class="plan-summary">{{ preview.check.summary }}</p>
+      <p v-if="showSummary" class="plan-summary">{{ preview.check.summary }}</p>
       <div class="future-days">
-        <button v-for="(day,i) in days" :key="day.date" type="button" :class="['future-day',{ picked: selected === day.date, dragging: dragging === day.date, over: over === day.date }]" :style="{ '--i': i }" :aria-label="`${day.date} · ${dayName(day)}`" :title="t.shape" :draggable="!readonly && !plan.busy.value && plan.accepted.value" @click="emit('select',day.date)" @keydown="key($event, day.date)" @dragstart="dragging = day.date; $event.dataTransfer?.setData('text/plain',day.date)" @dragend="dragging = null; over = null" @dragover.prevent="over = day.date" @dragleave="over = null" @drop.prevent="drop(day.date)">
+        <component :is="linkDays ? RouterLink : 'div'" v-for="(day,i) in days" :key="day.date"
+          v-bind="linkDays ? { to: `/ai/plan/${day.date}`, 'data-morph-card': '' } : { tabindex: 0 }"
+          :class="['future-day',{ dragging: dragging === day.date, over: over === day.date }]" :style="{ '--i': i }"
+          :aria-label="`${day.date} · ${dayName(day)}`" :title="t.shape" :draggable="canDrag"
+          @keydown="key($event, day.date)" @dragstart="dragging = day.date; $event.dataTransfer?.setData('text/plain',day.date)"
+          @dragend="dragging = null; over = null" @dragover.prevent="over = day.date" @dragleave="over = null" @drop.prevent="drop(day.date)">
           <span v-if="!day.after.length && heldOn(day.date).length" class="held-mark" :title="pt.heldBadge"><Icon name="steps" :size="16"/><small>{{ activity(heldOn(day.date)[0]!.activity) }}</small><em>{{ pt.heldBadge }}</em></span>
           <span v-else-if="day.rest || !day.after.length" class="rest-moon"><Icon name="moon" :size="18"/><small>{{ bedtime(day.rest?.bedtime_minutes) }}</small></span>
           <span class="workout-shape"><PlanShape v-if="day.after[0]" :profile="workoutProfile(day.after[0])" :scale-seconds="scale" :domain="domain"/><i v-else-if="!heldOn(day.date).length" class="rest-line"></i></span>
@@ -46,7 +63,7 @@ const key = (event: KeyboardEvent, date: string) => {
           <span v-if="day.after[0]" class="day-duration">{{ Math.round(workoutProfile(day.after[0]).seconds / 60) }} <small>min</small></span>
           <span v-if="stamped && day.after.length" class="stamp"><Icon name="watch" :size="11"/></span>
           <span class="day-date">{{ day.date.slice(5).replace('-',' / ') }}</span>
-        </button>
+        </component>
       </div>
       <footer class="future-footer">
         <span class="window-note"><i></i>{{ page === 0 ? t.watchWindow : stamped ? pt.laterDelivered : t.laterWindow }}</span>

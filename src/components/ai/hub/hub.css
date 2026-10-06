@@ -1,0 +1,41 @@
+/* 交给 AI 总页的缩略卡（PastSummary / NextSummary）。材质走 tokens.css 的 --mat-*，类别色只做细条的颜色。 */
+.hub-card { position: relative; display: grid; align-content: start; gap: 14px; min-width: 0; min-height: 188px; padding: 18px 22px 20px;
+  border: 1px solid var(--mat-line); border-radius: 22px; background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  color: var(--ink); text-decoration: none; }
+a.hub-card, .next-link { cursor: pointer; transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
+a.hub-card:hover { background: color-mix(in srgb, var(--ink) 3%, var(--mat-card)); }
+a.hub-card:focus-visible, .next-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.next-link { display: grid; gap: 14px; margin: -6px -10px -8px; padding: 6px 10px 8px; border-radius: 16px; color: inherit; text-decoration: none; }
+.next-link:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.hub-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.hub-card-head > div { flex: 1 1 auto; min-width: 0; }
+.hub-number { align-self: flex-start; padding-top: 3px; color: var(--subtle); font: 10px var(--font-mono); opacity: .6; }
+.hub-card h2 { margin: 0; font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
+.hub-card-head p { margin: 3px 0 0; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.hub-open { display: inline-flex; flex: none; align-items: center; gap: 2px; color: var(--subtle); font-size: var(--fs-2xs); }
+.hub-status { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--mat-inset); color: var(--muted); font-size: var(--fs-2xs); white-space: nowrap; }
+.hub-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+.hub-status.ok i { background: var(--accent); }
+.hub-status.warn i { background: var(--warning); }
+.hub-status.draft i { background: var(--pace); }
+
+.past-lines { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.past-lines li { display: grid; grid-template-columns: 14px 86px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--tint); font-size: var(--fs-2xs); }
+.past-lines .name { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.past-lines svg { width: 100%; height: 18px; fill: var(--tint); }
+.past-lines li.off { color: var(--subtle); }
+.past-lines li.off .name { color: var(--subtle); }
+.past-lines li.off svg { fill: var(--line-strong); opacity: .7; }
+.past-card.sent svg { animation: hub-fold 950ms var(--ease-spring) both; transform-origin: right center; }
+@keyframes hub-fold { 0% { transform: none; opacity: 1; } 40% { transform: scaleX(.05); opacity: .05; } 100% { transform: none; opacity: 1; } }
+
+.next-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.next-week li { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.next-week small { color: var(--subtle); font-size: var(--fs-2xs); }
+.next-week li.today small { color: var(--accent); font-weight: 700; }
+.next-week .shape { display: grid; width: 100%; height: 34px; align-items: end; justify-items: center; }
+.next-week .shape :deep(.shape) { width: 100%; }
+.next-week li.rest .shape::after { content: ''; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.held-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); }
+.next-receive { justify-self: center; margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .past-card.sent svg { animation: none; } }

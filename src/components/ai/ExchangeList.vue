@@ -8,8 +8,8 @@ import { sharedHrDomain } from '../../lib/trainingPlan/summary';
 import { useBridgeText } from './bridge/bridge.i18n';
 import { AI_PROVIDERS } from '../../lib/aiProviders';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
-const props = defineProps<{ items: AiExchange[]; activeId?: string | null }>();
-const emit = defineEmits<{ select: [AiExchange] }>();
+/* 每一条往返点开是它自己的二级页（/ai/exchanges/:id，从这一行长出来）；以前是整页切到「正在查看历史 · 只读」。 */
+const props = defineProps<{ items: AiExchange[] }>();
 const t = useBridgeText();
 const rows = computed(() => props.items.map(item => {
   const profiles = (item.plan?.workouts ?? []).slice(0,7).map(workoutProfile);
@@ -22,7 +22,7 @@ const rows = computed(() => props.items.map(item => {
 <template>
   <section class="exchange-list" aria-labelledby="bridge-exchanges-title"><header><h2 id="bridge-exchanges-title">{{ t.history }}</h2><p>{{ t.historyHint }}</p></header>
     <div v-if="!rows.length" class="history-empty"><Icon name="arrow-right" :size="14"/><span>{{ t.emptyHistory }}</span></div>
-    <button v-for="row in rows" :key="row.item.id" type="button" :class="['exchange-row',{ active: activeId === row.item.id }]" @click="emit('select',row.item)"><time>{{ row.date }}</time><span class="provider"><img v-if="row.icon" :src="row.icon" alt=""/>{{ row.item.provider === 'mcp' ? 'MCP' : row.provider }}</span><span class="question">{{ row.item.question || (row.item.provider === 'mcp' ? t.mcp : t.exported) }}</span><span v-if="row.profiles.length" class="mini-plan"><PlanShape v-for="(profile,i) in row.profiles" :key="i" :profile="profile" :scale-seconds="row.scale" :domain="row.domain"/></span><span class="exchange-state">{{ row.state }}</span><Icon name="chevron-right" :size="14"/></button>
+    <RouterLink v-for="row in rows" :key="row.item.id" :to="`/ai/exchanges/${encodeURIComponent(row.item.id)}`" class="exchange-row" data-morph-card><time>{{ row.date }}</time><span class="provider"><img v-if="row.icon" :src="row.icon" alt=""/>{{ row.item.provider === 'mcp' ? 'MCP' : row.provider }}</span><span class="question">{{ row.item.question || (row.item.provider === 'mcp' ? t.mcp : t.exported) }}</span><span v-if="row.profiles.length" class="mini-plan"><PlanShape v-for="(profile,i) in row.profiles" :key="i" :profile="profile" :scale-seconds="row.scale" :domain="row.domain"/></span><span class="exchange-state">{{ row.state }}</span><Icon name="chevron-right" :size="14"/></RouterLink>
   </section>
 </template>
 <style scoped src="./ExchangeList.css"></style>

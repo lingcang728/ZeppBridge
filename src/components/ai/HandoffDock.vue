@@ -4,35 +4,32 @@
  *
  *   [ 数据就绪度 ]  [ 交给谁（传送带） ]  [ 交给 ChatGPT ]  [ 只导出 ]
  *
- * 就绪度是一枚小胶囊：几类数据、平均多少天有数据、有没有要注意的；点开是
- * 一张玻璃浮层，里面是最终提示词、去重后的提醒和逐类覆盖明细——以前这些
- * 平铺在右栏里，六条一模一样的「只有部分日期有数据」连着排。
+ * 就绪度是一枚小胶囊：几类数据、平均多少天有数据、有没有要注意的；点它进「寄出前检查」
+ * 二级页（/ai/check，从这枚胶囊长出来）：带了哪些数据、提醒、附件和选项、完整提示词的预览。
+ * 2026-10 起这里不再有可以改的「最终提示词」——能改的只有总页那一个输入框。
  *
  * 主按钮一次做完（批次 ⑦）：准备**一个** `.md`（提示词 + 读法 + 数据；附件原件另放）→ 复制一句
  * 开场白 → 打开所选 AI。坞向上长出一截，里面是那张文件卡：按住直接拖进 AI 的对话框；拖不了就
  * 「在资源管理器里选中它」。文件按所选 AI 的预算控制在读得完的量以内（勾「我已订阅」放宽）。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
 import HandoffSteps from './HandoffSteps.vue';
-import CoverageDetails from './CoverageDetails.vue';
 import type { AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop } from '../../lib/bridge';
 import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiProviders';
-import { aiTaskIssueText, coverageNoteText } from '../../lib/aiTask/copy';
+import { aiTaskIssueText } from '../../lib/aiTask/copy';
 import { formatBytes } from '../../lib/format';
 import { currentProviderId, FREE_TOKEN_BUDGET, formatTokens, isSubscribed, setSubscribed } from '../../lib/aiTask/budget';
 import { markdownGuide } from '../../lib/aiTask/markdownGuide';
 import { planGuide } from '../../lib/aiTask/planGuide';
 import { startFileDrag } from '../../lib/dragOut';
-import { composePromptPreview } from '../../lib/aiTask/prompt';
 import { handoffParts } from '../../lib/aiTask/handoffParts';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskHandoff, type HandoffStepId } from '../../composables/useAiTaskHandoff';
 import { useSyncController } from '../../composables/useSyncController';
 import { useHandoffText } from './HandoffDock.i18n';
-import HandoffTray from './HandoffTray.vue';
 import { vEdgeSafe } from '../../lib/edgeSafe';
 
 const props = withDefaults(defineProps<{
@@ -40,8 +37,6 @@ const props = withDefaults(defineProps<{
   previewError: string | null;
   direction: string | null;
   fallbackTitle: string;
-  /** 「会交出去的数据：9/18–10/2 的睡眠、心率……；不含精确位置」——就绪度浮层的第一句话。 */
-  handover?: { title: string; text: string } | null;
   /** 右列竖卡形态（左流右结布局）：控件纵向排满整列，不再是底部一条横胶囊。 */
   rail?: boolean;
 }>(), { rail: false });
@@ -120,37 +115,6 @@ const groupedWarnings = computed(() => {
 });
 const issueTotal = computed(() => groupedWarnings.value.length + (props.previewError ? 1 : 0));
 
-/** 任务说明与文件名：预览和导出同一个函数，「复制出去的就是这段」才成立。 */
-const parts = computed(() => handoffParts(exportTask(), props.preview, { hasDirection: Boolean(props.direction), format: 'md' }));
-/* 最终提示词单击即改：可改的是 任务说明 + 方向 + 问题 这一大段；覆盖说明由后端按实际
-   覆盖附在最后，改不了，单独淡色列出。改过的全文随导出传给后端（prompt_override）。
-   换了一个任务（草稿 id 变了）就丢掉手改，免得把上一个任务的话带过去。 */
-const autoHead = computed(() => composePromptPreview({ brief: parts.value.brief, direction: props.direction, question: draft.value.prompt, coverageNote: '' }));
-const coverageTail = computed(() => coverageNoteText());
-const promptOverride = ref<string | null>(null);
-const editingPrompt = ref(false);
-const promptBox = ref<HTMLTextAreaElement | null>(null);
-const headText = computed(() => promptOverride.value ?? autoHead.value);
-const startEditPrompt = async () => {
-  editingPrompt.value = true;
-  await nextTick();
-  const box = promptBox.value;
-  if (!box) return;
-  box.style.height = `${box.scrollHeight}px`;
-  box.focus();
-};
-const onPromptInput = (event: Event) => {
-  const box = event.target as HTMLTextAreaElement;
-  box.style.height = 'auto';
-  box.style.height = `${box.scrollHeight}px`;
-};
-const commitPrompt = (event: Event) => {
-  const value = (event.target as HTMLTextAreaElement).value;
-  promptOverride.value = value.trim() && value.trim() !== autoHead.value.trim() ? value : null;
-  editingPrompt.value = false;
-};
-const resetPrompt = () => { promptOverride.value = null; };
-watch(() => draft.value.id, () => { promptOverride.value = null; });
 const blocked = computed(() => (prepareResult.value?.status === 'blocked' && !stale.value ? prepareResult.value.blocked : []));
 const ready = computed(() => (prepareResult.value?.status === 'ready' ? prepareResult.value : null));
 const stale = computed(() => handoff.isStale(exportTask()));
@@ -169,13 +133,11 @@ function exportTask() {
    两个按钮都等同步落地再亮（用户 2026-09-29 定）。 */
 const run = (openSite: boolean) => {
   if (!desktop || busy.value || isSyncing.value) return;
-  details.value = false;
   progressDismissed.value = false;
   // 按下那一刻的交给谁、方向、预览、改过的提示词：保存那段等待里别处再改，也交出按下时的那一版。
   const target = provider.value;
   const direction = props.direction;
   const preview = props.preview;
-  const override = promptOverride.value;
   void handoff.start(() => saveDraft(props.fallbackTitle), async () => {
     // 任务在保存之后取：新任务要带上刚拿到的 id。
     const task = exportTask();
@@ -184,7 +146,7 @@ const run = (openSite: boolean) => {
       briefText: now.brief,
       dataFileStem: now.dataStem,
       promptFileStem: now.promptStem,
-      promptOverride: override,
+      promptOverride: null,
       provider: target.id,
       tokenBudget: preview?.markdown?.token_budget ?? FREE_TOKEN_BUDGET,
       markdownGuide: `${markdownGuide()}
@@ -226,20 +188,14 @@ const onFileDrag = (event: MouseEvent) => {
   startFileDrag(path, fileName.value).catch(() => { dragFailed.value = true; });
 };
 
-/* —— 就绪度浮层 —— */
-const details = ref(false);
-/* 浮层开着时舞台其余部分要退到背景里（AiComposer 的遮罩），所以把开关交出去。 */
-defineExpose({ details });
 const dock = ref<HTMLElement | null>(null);
 const onDocPointer = (event: PointerEvent) => {
   if (!dock.value || dock.value.contains(event.target as Node)) return;
-  if (details.value) details.value = false;
   if (started.value || blocked.value.length) progressDismissed.value = true;
 };
 const onDocKey = (event: KeyboardEvent) => {
   if (event.key !== 'Escape') return;
-  if (details.value) details.value = false;
-  else if (started.value || blocked.value.length) progressDismissed.value = true;
+  if (started.value || blocked.value.length) progressDismissed.value = true;
 };
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer);
@@ -254,39 +210,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Teleport to="body">
   <section ref="dock" :class="['dock', { rail }]" :aria-label="t.title">
-    <Transition name="sheet">
-      <div v-show="details" class="sheet glass-control" role="dialog" :aria-label="t.more">
-        <p v-if="handover?.text" class="handover"><b>{{ handover.title }}</b>{{ handover.text }}</p>
-        <div class="sheet-head">
-          <p class="ai-label">{{ t.finalPrompt }}</p>
-          <button type="button" class="sheet-close" :aria-label="t.closePanel" @click="details = false"><Icon name="x" :size="15" /></button>
-        </div>
-        <!-- 订阅档位只在底部那枚开关上改（它右上角的小注释说明两档的差别）。这里以前还有一个
-             「我已订阅」的勾，和开关重复、还叠在一起，已删。 -->
-        <p v-if="freeNote" class="ai-note warn provider-note"><Icon name="info" :size="13" />{{ freeNote }}</p>
-        <textarea v-if="editingPrompt" ref="promptBox" class="prompt prompt-edit" :value="headText" :aria-label="t.finalPrompt"
-          @input="onPromptInput" @blur="commitPrompt" @keydown.esc.prevent="($event.target as HTMLTextAreaElement).blur()"></textarea>
-        <button v-else type="button" class="prompt prompt-view" :title="t.editHint" @click="startEditPrompt">{{ headText }}</button>
-        <p class="prompt-meta">
-          <span v-if="promptOverride !== null" class="edited"><Icon name="edit" :size="12" />{{ t.edited }}</span>
-          <span v-else class="hint"><Icon name="edit" :size="12" />{{ t.editHint }}</span>
-          <button v-if="promptOverride !== null" type="button" class="reset" @click="resetPrompt"><Icon name="undo" :size="12" />{{ t.resetPrompt }}</button>
-        </p>
-        <p class="prompt-tail"><span>{{ t.fixedTail }}</span>{{ coverageTail }}</p>
-        <ul v-if="groupedWarnings.length" class="issues">
-          <li v-for="issue in groupedWarnings" :key="issue.text" class="ai-note warn">
-            <Icon name="warning" :size="13" /><span>{{ issue.text }}</span>
-            <b v-if="issue.count > 1" class="repeat">{{ t.repeat(issue.count) }}</b>
-          </li>
-        </ul>
-        <button type="button" class="pill-button quiet" :disabled="!desktop || busy || isSyncing" @click="details = false; run(false)"><Icon name="export" :size="13"/>{{ t.exportOnly }}</button>
-        <HandoffTray :preview="preview" />
-        <CoverageDetails v-if="preview && preview.coverage.length" :preview="preview" />
-      </div>
-    </Transition>
-
     <Transition name="grow">
       <div v-show="(started || blocked.length) && !progressDismissed" class="progress glass-control">
         <ul v-if="blocked.length" class="issues" role="alert">
@@ -335,7 +259,7 @@ onBeforeUnmount(() => {
     <div class="core">
       <slot />
     <div :class="['bar', { 'glass-control is-lens-host': !rail }]">
-      <button type="button" :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :aria-expanded="details" @click="details = !details">
+      <RouterLink to="/ai/check" data-morph-card :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :title="t.checkHint">
         <i class="ready-dot" aria-hidden="true"></i>
         <span v-if="waitingForData" class="ready-copy" role="status">
           <span>{{ t.readinessWaiting }}</span>
@@ -345,8 +269,8 @@ onBeforeUnmount(() => {
           <span>{{ readiness ? t.readiness(readiness.categories, readiness.percent) : t.readinessLoading }}</span>
           <small v-if="preview">{{ mdLine ?? t.packageSize(formatBytes(preview.estimated_bytes)) }}<template v-if="mdDowngrade.length"> · {{ mdDowngrade.join(' · ') }}</template><template v-if="issueTotal"> · {{ t.issueCount(issueTotal) }}</template></small>
         </span>
-        <Icon name="chevron-down" :size="14" :class="['ready-chevron', { up: !details }]" />
-      </button>
+        <Icon name="chevron-right" :size="14" class="ready-chevron" />
+      </RouterLink>
 
       <CapsuleWheel class="provider-wheel" loop :span="210" :items="providerItems" :model-value="provider.id"
         :aria-label="t.who" @update:model-value="pickProvider" />
@@ -375,12 +299,10 @@ onBeforeUnmount(() => {
         <Icon name="export" :size="17" />
       </button>
       </div>
-      <button type="button" class="more-button" :aria-label="t.more" :aria-expanded="details" @click="details = !details"><Icon name="dots" :size="19" /></button>
     </div>
     </div>
     <p v-if="!desktop" class="ai-note offline">{{ t.desktopOnly }}</p>
   </section>
-  </Teleport>
 </template>
 
 <style scoped src="./HandoffDock.css"></style>

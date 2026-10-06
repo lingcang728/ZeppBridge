@@ -2074,11 +2074,8 @@ Responde em formato Markdown.`,
       intro:
         'Escolhe treinos e dados, escreve o que queres perguntar, exporta para o ambiente de trabalho e arrasta para a IA.',
       titleLabel: 'Nome da tarefa',
-      newTask: 'Nova',
       saved: 'Guardada',
-      history: 'Tarefas guardadas',
       historyCount: (count: number) => `Tarefas guardadas (${count})`,
-      historyEmpty: 'Ainda sem tarefas guardadas',
       rename: 'Clica para renomear',
     },
     'components/ai/CoverageDetails': {

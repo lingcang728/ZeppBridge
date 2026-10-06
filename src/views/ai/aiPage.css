@@ -1,0 +1,13 @@
+/* 「交给 AI」的二级 / 三级页共用的版式：和总页同一套材质，内容区窄一点，读起来不费劲。 */
+.ai-sub-page { max-width: 1240px; margin-inline: auto; padding: 16px 32px 96px; }
+.ai-sub-page .page-header { margin-bottom: 18px; }
+.ai-panel { display: grid; gap: 14px; min-width: 0; padding: 20px 22px; border: 1px solid var(--mat-line); border-radius: 22px;
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.ai-panel + .ai-panel { margin-top: 16px; }
+.ai-panel > h2 { margin: 0; color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .02em; }
+.ai-panel-note { margin: 0; color: var(--subtle); font-size: var(--fs-2xs); line-height: 1.6; }
+.ai-message { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); color: var(--muted); font-size: var(--fs-xs); }
+.ai-message span { flex: 1; }
+.ai-empty { display: grid; justify-items: center; gap: 14px; padding: 36px 16px; color: var(--subtle); font-size: var(--fs-sm); text-align: center; }
+@media (max-width: 1100px) { .ai-sub-page { padding: 12px 20px 96px; } }
+@media (max-width: 700px) { .ai-sub-page { padding-inline: 12px; } .ai-panel { padding: 16px; } }
