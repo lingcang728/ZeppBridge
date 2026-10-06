@@ -117,6 +117,9 @@ export const pinValueText = (metric: PinnableMetric, series?: MetricSeries | nul
   return typeof value === 'number' && Number.isFinite(value) ? formatMetric(shown(metric, value), metric.digits) : '—';
 };
 
+/** 一个数按这项指标的单位与小数位写出来（「比平时高 / 低」的差值、中位数也用它，和磁贴上的读数一个格式）。 */
+export const pinNumberText = (metric: PinnableMetric, value: number): string => formatMetric(shown(metric, value), metric.digits);
+
 /** 质量单位此刻写 kg 还是 lb。 */
 export const pinMassUnit = (): string => bodyMassUnitLabel();
 

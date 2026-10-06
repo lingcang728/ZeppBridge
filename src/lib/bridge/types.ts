@@ -162,6 +162,22 @@ export interface AiTaskTemplate {
 }
 
 /** `ai_task_list` 的轻量行：不带载荷。 */
+/** 「比平时高 / 低」：和用户自己最新读数之前 28 天比（core insight::anomaly）。少于 14 天不给。 */
+export interface MetricBaseline {
+  metric: string;
+  latest_date: string;
+  latest: number;
+  /** 前 28 天的中位数。 */
+  median: number;
+  spread: number;
+  /** 基线里有读数的天数。 */
+  days: number;
+  direction: 'above' | 'below' | 'usual';
+  /** 最新读数 − 中位数。 */
+  delta: number;
+  message_code: 'ui.metric_baseline.above' | 'ui.metric_baseline.below' | 'ui.metric_baseline.usual';
+}
+
 export interface AiTaskSummary {
   id: string;
   title: string;
@@ -385,6 +401,8 @@ export interface BridgeBackend {
   aiTaskSave(task: AiTask): Promise<AiTask>;
   /** 只删任务记录，不删任何附件原件。 */
   aiTaskDelete(id: string): Promise<void>;
+  /** 这几项指标「比平时高 / 低」的结论（数据不够的不返回）。 */
+  getMetricBaselines(metrics: string[]): Promise<MetricBaseline[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
   aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
   aiTemplateList(): Promise<AiTaskTemplate[]>;

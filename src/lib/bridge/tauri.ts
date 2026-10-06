@@ -5,6 +5,7 @@ import type {
   AiTask,
   AiTaskAttachmentStat,
   AiTaskPrepareOptions,
+  MetricBaseline,
   AiTaskPrepareResult,
   AiTaskPreview,
   AiTaskSummary,
@@ -448,6 +449,9 @@ export const tauriBackend: BridgeBackend = {
   },
   aiTaskDelete(id: string) {
     return call<void>('ai_task_delete', { id });
+  },
+  getMetricBaselines(metrics: string[]) {
+    return call<MetricBaseline[]>('get_metric_baselines', { metrics });
   },
   aiTaskSetPinned(id: string, pinned: boolean) {
     return call<void>('ai_task_set_pinned', { id, pinned });

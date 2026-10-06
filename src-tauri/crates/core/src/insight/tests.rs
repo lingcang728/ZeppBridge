@@ -764,3 +764,52 @@ fn hrv_samples_stored_under_the_rmssd_name_feed_the_weekly_report() {
         "有 HRV 数据的日子不该报「没数据」"
     );
 }
+
+mod baseline_marks {
+    use super::super::anomaly::{metric_baseline, BaselineDirection};
+    use chrono::{Duration, NaiveDate};
+
+    fn day(n: i64) -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 10, 6).unwrap() + Duration::days(n)
+    }
+
+    /// 前 28 天在 50 上下小幅波动，最新一天是 `latest`。
+    fn series(days: i64, latest: f64) -> Vec<(NaiveDate, f64)> {
+        let mut points: Vec<(NaiveDate, f64)> = (1..=days)
+            .map(|i| (day(-i), 50.0 + ((i % 5) as f64 - 2.0) * 0.5))
+            .collect();
+        points.push((day(0), latest));
+        points
+    }
+
+    #[test]
+    fn only_compares_with_your_own_recent_month_and_says_how_far() {
+        let high = metric_baseline("resting_hr", &series(28, 58.0), day(0)).unwrap();
+        assert_eq!(high.direction, BaselineDirection::Above);
+        assert_eq!(high.message_code, "ui.metric_baseline.above");
+        assert_eq!(high.median, 50.0);
+        assert!((high.delta - 8.0).abs() < 1e-9);
+        assert_eq!(high.days, 28);
+        let low = metric_baseline("hrv", &series(28, 40.0), day(0)).unwrap();
+        assert_eq!(low.direction, BaselineDirection::Below);
+        let usual = metric_baseline("hrv", &series(28, 50.5), day(0)).unwrap();
+        assert_eq!(usual.direction, BaselineDirection::Usual);
+    }
+
+    #[test]
+    fn too_few_days_or_a_stale_reading_gets_no_mark() {
+        assert!(
+            metric_baseline("hrv", &series(13, 80.0), day(0)).is_none(),
+            "不到 14 天不标"
+        );
+        assert!(
+            metric_baseline("hrv", &series(28, 80.0), day(4)).is_none(),
+            "最新读数太旧不算现在"
+        );
+        // 一两天的极端值不该把「平时」拉走（中位数 + MAD）。
+        let mut spiky = series(28, 50.0);
+        spiky[3].1 = 500.0;
+        let mark = metric_baseline("hrv", &spiky, day(0)).unwrap();
+        assert_eq!(mark.direction, BaselineDirection::Usual);
+    }
+}

@@ -6,8 +6,37 @@ use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 
 use serde::{Deserialize, Serialize};
 
+pub mod anomaly;
 mod weekly_report;
 mod workout_insight;
+
+impl Database {
+    /// 这几项指标「比平时高 / 低」的结论（只和用户自己比，见 [`anomaly`]）。数据不够的不返回。
+    pub fn metric_baselines(
+        &self,
+        metrics: &[String],
+        today: NaiveDate,
+    ) -> Result<Vec<anomaly::MetricBaseline>> {
+        // 最新读数要在 3 天内，基线是它之前 28 天：取 45 天足够。
+        let series = self.metric_series(metrics, 45)?;
+        Ok(series
+            .iter()
+            .filter_map(|s| {
+                let points: Vec<(NaiveDate, f64)> = s
+                    .points
+                    .iter()
+                    .filter_map(|p| {
+                        Some((
+                            NaiveDate::parse_from_str(&p.date, "%Y-%m-%d").ok()?,
+                            p.value,
+                        ))
+                    })
+                    .collect();
+                anomaly::metric_baseline(&s.metric, &points, today)
+            })
+            .collect())
+    }
+}
 
 /// 单次跑步洞察的基线规则。全部是常量而不是散落在 SQL 里的字面量，
 /// 因为它们决定结论，必须能被测试钉住。

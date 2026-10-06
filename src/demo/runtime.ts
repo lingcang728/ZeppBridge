@@ -109,6 +109,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
       return data.stress.filter((point) => new Date(point.timestamp).getTime() >= from);
     },
     get_metric_series: (args) => metricSeries(data, Number(args.days ?? 7), (args.metrics as string[] | null) ?? null),
+    get_metric_baselines: () => [],
     get_daily_heart_rate_extremes: () => [],
     get_hourly_steps: () => [],
     get_training_balance: () => [],

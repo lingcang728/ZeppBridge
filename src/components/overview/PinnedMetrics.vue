@@ -11,6 +11,7 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
 import Sparkline from '../Sparkline.vue';
+import BaselineTag from '../ask/BaselineTag.vue';
 import { backend, isDesktop } from '../../lib/bridge';
 import { useRevisionReload } from '../../composables/useRevisionReload';
 import { useTrendRange } from '../../composables/useTrendRange';
@@ -20,7 +21,7 @@ import { metricColor } from '../../lib/metricTone';
 import { coverageLabel, indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../../lib/metricSeries';
 import { today as currentToday } from '../../lib/currentDay';
 import {
-  pinHref, pinLatestDate, pinMassUnit, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
+  pinHref, pinLatestDate, pinMassUnit, pinNumberText, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types';
 import { useMessages } from '../../i18n';
@@ -142,7 +143,7 @@ const apply = async (next: string[]) => {
         :class="['pin-tile', { 'is-empty': tile.value === '—' }]" :style="{ '--tone': tile.tone }" :aria-label="t.tileAria(tile.label, tile.value)">
         <span class="pin-label"><i class="pin-dot" aria-hidden="true"></i>{{ tile.label }}</span>
         <span class="pin-value"><strong>{{ tile.value }}</strong><small v-if="tile.unit && tile.value !== '—'">{{ tile.unit }}</small></span>
-        <span class="pin-when">{{ tile.when ?? tile.coverage }}</span>
+        <span class="pin-when">{{ tile.when ?? tile.coverage }}<BaselineTag class="pin-baseline" :metric="tile.id" :format="(v: number) => pinNumberText(tile.metric, v)" :unit="tile.unit" /></span>
         <Sparkline v-if="tile.spark.length > 1" class="pin-spark" :values="tile.spark" :color="tile.tone" :label="`${tile.label} · ${tile.coverage}`" />
         <!-- 没有记录不画线（不编数据），留一块和曲线同高的浅槽，几块磁贴照样齐平。 -->
         <span v-else class="pin-spark pin-spark-empty" aria-hidden="true"></span>
@@ -230,4 +231,6 @@ const apply = async (next: string[]) => {
 @media (max-width: 760px) {
   .pins-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* 「比平时高 / 低」（只和自己比，精修批次 6.2）跟在测量时间后面。 */
+.pin-baseline { margin-left: 6px; vertical-align: 1px; }
 </style>

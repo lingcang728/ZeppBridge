@@ -28,6 +28,8 @@ import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import { rangeLabel, type RangeDays } from '../lib/rangeOptions';
 import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
+import AskAiButton from './ask/AskAiButton.vue';
+import BaselineTag from './ask/BaselineTag.vue';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -215,6 +217,8 @@ const hasEventMarks = computed(() => {
        右边却空着一大块。现在标题独占一行、读数在它下面、说明铺满整宽。 -->
   <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
+      <!-- 右上角：「比平时高 / 低」的标记（只和自己比）和「问 AI」（精修批次 6）。 -->
+      <span class="trend-ask"><BaselineTag :metric="series?.metric" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
       <strong class="trend-title">{{ label }}</strong>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
            / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
@@ -281,7 +285,10 @@ const hasEventMarks = computed(() => {
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }
-.trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; position: relative; }
+/* 标题右边的一小块：标记 + 问 AI。浮在右上角，不占标题那一行的宽度（长标题照样能排满）。 */
+.trend-ask { position: absolute; top: -4px; right: -6px; z-index: 1; display: inline-flex; align-items: center; gap: 4px; }
+.trend-title { padding-right: 72px; }
 .trend-title { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .trend-latest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
 .trend-latest :deep(strong), .trend-latest strong { font-family: var(--font-mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.15; }

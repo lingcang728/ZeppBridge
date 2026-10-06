@@ -247,6 +247,19 @@ pub async fn get_metric_series(
     .await
 }
 
+/// 这几项指标「比平时高 / 低」（只和用户自己近 28 天比；数据不够的不返回）。
+#[tauri::command]
+pub async fn get_metric_baselines(
+    state: tauri::State<'_, AppState>,
+    metrics: Vec<String>,
+) -> std::result::Result<Vec<zeppbridge_core::insight::anomaly::MetricBaseline>, AppError> {
+    let today = chrono::Local::now().date_naive();
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.metric_baselines(&metrics, today)
+    })
+    .await
+}
+
 /// 一段本地日（含首尾）的逐日每小时步数（Zepp 官方授权才有）。没有官方数据时是空数组。
 #[tauri::command]
 pub async fn get_hourly_steps(
