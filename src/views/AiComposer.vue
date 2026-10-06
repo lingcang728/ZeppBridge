@@ -21,6 +21,7 @@ import AiTaskHeader from '../components/ai/AiTaskHeader.vue';
 import PastSummary from '../components/ai/hub/PastSummary.vue';
 import NextSummary from '../components/ai/hub/NextSummary.vue';
 import ComposeLine from '../components/ai/ComposeLine.vue';
+import GraphUndoPill from '../components/ai/GraphUndoPill.vue';
 import ExchangeList from '../components/ai/ExchangeList.vue';
 import PlanLedger from '../components/plan/PlanLedger.vue';
 import PlanClearDialog from '../components/plan/PlanClearDialog.vue';
@@ -69,7 +70,7 @@ const selectWorkout = () => { document.querySelector<HTMLElement>('.past-card')?
     <header class="bridge-page-head">
       <AiTaskHeader :fallback-title="hub.title.value" />
       <div v-if="hub.demo.value" class="demo-banner" role="status"><Icon name="database" :size="14" /><div><strong>{{ t.fullDemo }}</strong><span>{{ t.demoHint }}</span></div></div>
-      <button v-if="ctl.canUndo.value" class="pill-button quiet undo-selection" @click="ctl.undo()"><Icon name="undo" :size="13" />{{ t.undo }}</button>
+      <Transition name="undo-fade"><GraphUndoPill v-if="ctl.canUndo.value" class="undo-selection" :can-undo="ctl.canUndo.value" :label="t.undo" @undo="ctl.undo()" /></Transition>
     </header>
 
     <div class="hub-grid">

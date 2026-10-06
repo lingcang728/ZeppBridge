@@ -177,8 +177,8 @@ impl Database {
     /// P3 `ai_task_list`：只走索引列，不解析 payload。
     pub fn list_ai_tasks(&self) -> Result<Vec<AiTaskSummary>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, template_id, workout_count, mcp_shared, updated_at
-             FROM ai_tasks ORDER BY updated_at DESC, id",
+            "SELECT id, title, template_id, workout_count, mcp_shared, updated_at, pinned
+             FROM ai_tasks ORDER BY pinned DESC, updated_at DESC, id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(AiTaskSummary {
@@ -188,6 +188,7 @@ impl Database {
                 workout_count: row.get(3)?,
                 mcp_shared: row.get::<_, i64>(4)? != 0,
                 updated_at: row.get(5)?,
+                pinned: row.get::<_, i64>(6)? != 0,
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
@@ -222,6 +223,13 @@ impl Database {
     pub fn save_ai_task(&self, task: &AiTask) -> Result<AiTask> {
         let mut task = normalize_task(task)?;
         let now = Utc::now().to_rfc3339();
+        // 自动去重（批次 5.3）：新任务和已有的某条「同模板、同时间范围、同一句问题」就更新那一条，
+        // 已保存的任务里不出现两条一模一样的。
+        if task.id.is_empty() {
+            if let Some(existing) = self.same_ai_task(&task)? {
+                task.id = existing;
+            }
+        }
         if task.id.is_empty() {
             task.id = self.new_ai_task_id()?;
             task.created_at = now.clone();
@@ -262,6 +270,52 @@ impl Database {
     }
 
     /// P3 `ai_task_delete`：只删任务行，附件原件不动。
+    /// 「同一个任务」：模板、启用的类别和各自的回溯天数、问题（去掉首尾空白）都一样。
+    fn same_ai_task(&self, task: &AiTask) -> Result<Option<String>> {
+        let key = |task: &AiTask| {
+            let mut ranges: Vec<(String, i64)> = task
+                .categories
+                .iter()
+                .filter(|range| range.enabled)
+                .map(|range| (format!("{:?}", range.category), range.days_before))
+                .collect();
+            ranges.sort();
+            (
+                task.template_id.clone(),
+                ranges,
+                task.prompt.trim().to_string(),
+            )
+        };
+        let wanted = key(task);
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, payload FROM ai_tasks ORDER BY updated_at DESC")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (id, payload) = row?;
+            if let Ok(existing) = serde_json::from_str::<AiTask>(&payload) {
+                if key(&existing) == wanted {
+                    return Ok(Some(id));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// 置顶 / 取消置顶。不动 `updated_at`：置顶不算「用过」。
+    pub fn set_ai_task_pinned(&self, id: &str, pinned: bool) -> Result<()> {
+        let changed = self.conn.execute(
+            "UPDATE ai_tasks SET pinned = ?2 WHERE id = ?1",
+            params![id, pinned as i64],
+        )?;
+        if changed == 0 {
+            return Err(AiTaskError::task_not_found(id));
+        }
+        Ok(())
+    }
+
     pub fn delete_ai_task(&self, id: &str) -> Result<()> {
         let removed = self
             .conn

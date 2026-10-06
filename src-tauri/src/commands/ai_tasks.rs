@@ -55,6 +55,22 @@ pub async fn ai_task_save(
     .await
 }
 
+/// 置顶 / 取消置顶一个已保存的任务。
+#[tauri::command]
+pub async fn ai_task_set_pinned(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    pinned: bool,
+) -> std::result::Result<(), AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.set_ai_task_pinned(&id, pinned),
+    )
+    .await
+}
+
 /// 删除任务行；附件原件不动。
 #[tauri::command]
 pub async fn ai_task_delete(

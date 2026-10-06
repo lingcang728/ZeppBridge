@@ -2,7 +2,7 @@
 /**
  * 交付坞：浮在时间桥底部的一条玻璃胶囊，整页只有这一个主按钮。
  *
- *   [ 数据就绪度 ]  [ 交给谁（传送带） ]  [ 交给 ChatGPT ]  [ 只导出 ]
+ *   [ 数据就绪度 → 寄出前检查 ]                [ 交给 ChatGPT（横拨换一家，角标是档位） ]  [ 只导出 ]
  *
  * 就绪度是一枚小胶囊：几类数据、平均多少天有数据、有没有要注意的；点它进「寄出前检查」
  * 二级页（/ai/check，从这枚胶囊长出来）：带了哪些数据、提醒、附件和选项、完整提示词的预览。
@@ -14,7 +14,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
-import CapsuleWheel from '../CapsuleWheel.vue';
+import ProviderGoCapsule from './ProviderGoCapsule.vue';
 import HandoffSteps from './HandoffSteps.vue';
 import type { AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop } from '../../lib/bridge';
@@ -30,7 +30,6 @@ import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskHandoff, type HandoffStepId } from '../../composables/useAiTaskHandoff';
 import { useSyncController } from '../../composables/useSyncController';
 import { useHandoffText } from './HandoffDock.i18n';
-import { vEdgeSafe } from '../../lib/edgeSafe';
 
 const props = withDefaults(defineProps<{
   preview: AiTaskPreview | null;
@@ -57,11 +56,6 @@ const { dataReady, isSyncing, syncProgress } = useSyncController();
 const waitingForData = computed(() => dataReady.value.phase === 'waiting');
 
 /* —— 交给谁：传送带胶囊，带各家的图标 —— */
-const providerItems = computed(() => AI_PROVIDERS.map((item) => ({ value: item.id, label: item.label, image: item.localIcon })));
-const pickProvider = (id: AiProviderId) => {
-  const next = AI_PROVIDERS.find((item) => item.id === id);
-  if (next) provider.value = next;
-};
 /* 预算跟着所选 AI 走：预览按它估 `.md` 的体量。 */
 watch(provider, (next) => { currentProviderId.value = next.id; }, { immediate: true });
 const subscribed = computed({
@@ -80,11 +74,6 @@ const mdLine = computed(() => {
   const tokens = formatTokens(md.approx_tokens);
   if (md.approx_tokens <= FREE_TOKEN_BUDGET) return t.value.tokensFree(tokens);
   return subscribed.value ? t.value.tokensPaid(tokens) : t.value.tokensNeedPaid(tokens);
-});
-/** 内容超过免费版额度却标着免费版：档位开关带一圈警示色，提醒「要么订阅、要么缩范围」。 */
-const mdNeedsPaid = computed(() => {
-  const md = props.preview?.markdown;
-  return !!md && !md.over_budget && md.approx_tokens > FREE_TOKEN_BUDGET;
 });
 const mdDowngrade = computed(() => {
   const md = props.preview?.markdown;
@@ -272,32 +261,13 @@ onBeforeUnmount(() => {
         <Icon name="chevron-right" :size="14" class="ready-chevron" />
       </RouterLink>
 
-      <CapsuleWheel class="provider-wheel" loop :span="210" :items="providerItems" :model-value="provider.id"
-        :aria-label="t.who" @update:model-value="pickProvider" />
-
-      <!-- 订阅档位就摆在主按钮旁边：用户习惯直接点交付，不会先点开就绪度浮层去找那个勾。
-           它决定导出的 .md 有多细，所以要一眼看得见、一下能改。 -->
-      <span class="plan-wrap">
-        <button type="button" role="switch" :aria-checked="subscribed" :class="['plan-toggle', { paid: subscribed, short: !subscribed && mdNeedsPaid }]"
-          :aria-label="`${t.planTitle(provider.label)} ${t.subscribedHint}`" aria-describedby="plan-note" @click="subscribed = !subscribed">
-          <span class="plan-mark" aria-hidden="true"><Icon v-if="subscribed" name="check" :size="12" /></span>
-          <span class="plan-copy"><small>{{ provider.label }}</small><strong>{{ subscribed ? t.planPaid : t.planFree }}</strong></span>
-        </button>
-        <!-- 右上角的小注释：悬停 / 聚焦开关时展开说明两档的差别（以前这句话躲在最终提示词浮层里）。 -->
-        <span class="plan-info" aria-hidden="true">?</span>
-        <span id="plan-note" v-edge-safe class="plan-tip" role="tooltip">
-          <strong>{{ t.planTitle(provider.label) }}</strong>{{ t.subscribedHint }}<template v-if="providerNote && provider.id === 'chatgpt'"><br>{{ providerNote }}</template>
-        </span>
-      </span>
-
+      <!-- 主按钮就是选 AI 的胶囊：单击寄出，横着拨换一家；角标是这一家的免费版 / 已订阅（在寄出前检查里改）。 -->
       <div class="go-row">
-      <button type="button" :class="['go', 'cta', {}]" :disabled="!desktop || busy || isSyncing" :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @click="run(true)">
-        <Icon name="send" :size="17" />
-        <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ isSyncing ? t.goSubSyncing : t.goSub }}</small></span>
-      </button>
-      <button type="button" class="export-only" :disabled="!desktop || busy || isSyncing" :title="t.exportOnly" :aria-label="t.exportOnly" @click="run(false)">
-        <Icon name="export" :size="17" />
-      </button>
+        <ProviderGoCapsule :provider="provider" :disabled="!desktop || busy || isSyncing" :sub="isSyncing ? t.goSubSyncing : t.goSub"
+          :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @go="run(true)" @pick="provider = $event" />
+        <button type="button" class="export-only" :disabled="!desktop || busy || isSyncing" :title="t.exportOnly" :aria-label="t.exportOnly" @click="run(false)">
+          <Icon name="export" :size="17" />
+        </button>
       </div>
     </div>
     </div>

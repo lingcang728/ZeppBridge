@@ -11,6 +11,8 @@ const t = useBridgeText(), ctl = useAiTaskDraft(), box = ref<HTMLTextAreaElement
 const intents = ['sleep','week','workout','next'] as const;
 type Intent = typeof intents[number];
 const labels = () => ({ sleep: t.value.sleepIntent, week: t.value.weekIntent, workout: t.value.workoutIntent, next: t.value.nextIntent });
+/* 模板胶囊点一下做什么：悬停写清楚（新手看名字猜不出「排下周」会带上 30 天的数据、等你说定稿才出计划）。 */
+const hints = () => ({ sleep: t.value.sleepIntentHint, week: t.value.weekIntentHint, workout: t.value.workoutIntentHint, next: t.value.nextIntentHint });
 const pick = async (intent: Intent) => {
   if (props.disabled) return;
   const id = {sleep:'sleep_review',week:'week_review',workout:'recovery_run',next:'next_week'}[intent];
@@ -23,7 +25,7 @@ const pick = async (intent: Intent) => {
 </script>
 <template>
   <section class="compose-line">
-    <div class="intent-row"><button v-for="intent in intents" :key="intent" type="button" class="intent" :disabled="disabled" @click="pick(intent)"><Icon :name="({ sleep:'moon',week:'clock',workout:'run',next:'grid' } as const)[intent]" :size="13"/>{{ labels()[intent] }}</button><button type="button" class="profile-entry" :class="{ filled: ctl.draft.value.personal_note.trim() }" :disabled="disabled" @click="profile = true"><Icon name="user" :size="13"/>{{ t.profile }}</button></div>
+    <div class="intent-row"><button v-for="intent in intents" :key="intent" type="button" class="intent" :disabled="disabled" :title="hints()[intent]" @click="pick(intent)"><Icon :name="({ sleep:'moon',week:'bars',workout:'run',next:'compass' } as const)[intent]" :size="13"/>{{ labels()[intent] }}</button><button type="button" class="profile-entry" :class="{ filled: ctl.draft.value.personal_note.trim() }" :disabled="disabled" @click="profile = true"><Icon name="user" :size="13"/>{{ t.profile }}</button></div>
     <label class="compose-box"><span>{{ t.composer }}</span><textarea ref="box" :value="ctl.draft.value.prompt" :placeholder="t.placeholder" :disabled="disabled" rows="2" @input="ctl.setPrompt(($event.target as HTMLTextAreaElement).value)"></textarea></label>
     <ProfileTray v-if="profile" @close="profile = false"/>
   </section>

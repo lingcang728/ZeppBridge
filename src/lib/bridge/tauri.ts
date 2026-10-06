@@ -449,6 +449,9 @@ export const tauriBackend: BridgeBackend = {
   aiTaskDelete(id: string) {
     return call<void>('ai_task_delete', { id });
   },
+  aiTaskSetPinned(id: string, pinned: boolean) {
+    return call<void>('ai_task_set_pinned', { id, pinned });
+  },
   aiTemplateList() {
     return call<AiTaskTemplate[]>('ai_template_list');
   },

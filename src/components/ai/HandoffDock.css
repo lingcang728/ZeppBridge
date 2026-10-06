@@ -194,8 +194,14 @@
 .dock{position:fixed;z-index:var(--z-popover,40);left:50%;bottom:20px;width:min(1100px,calc(100vw - 48px));transform:translateX(-50%);container-type:inline-size;gap:8px}
 .bar{gap:8px;padding:8px 10px;background:var(--mat-glass-strong);backdrop-filter:var(--mat-glass-blur);box-shadow:var(--glass-rim),var(--mat-glass-shadow)}
 .ready-chip{order:2;padding:6px 10px;background:none}.provider-wheel{order:0}.plan-wrap{order:1}.go-row{order:3;display:flex;flex:none}.more-button{order:4;flex:none;display:grid;place-items:center;height:42px;width:38px;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer}
-.go{box-shadow:var(--mat-raised-rim);min-height:44px;padding-inline:20px}.go:hover:not(:disabled){box-shadow:var(--mat-raised-rim)}.go-copy strong{font-size:14px}.go-copy small{font-size:9px}.ready-copy{font-size:11px}.ready-copy small{font-size:9px}.ready-dot,.ready-chip.has-issues .ready-dot{box-shadow:none;background:var(--accent);width:6px;height:6px;flex-basis:6px}.ready-chip.has-issues .ready-dot{background:var(--subtle)}
+.go{box-shadow:var(--mat-raised-rim);min-height:44px;padding-inline:20px}.go:hover:not(:disabled){box-shadow:var(--mat-raised-rim)}.go-copy strong{font-size:14px}.go-copy small{font-size:9px}.ready-copy{font-size:13px}.ready-copy small{font-size:11px}.ready-dot,.ready-chip.has-issues .ready-dot{box-shadow:none;background:var(--accent);width:6px;height:6px;flex-basis:6px}.ready-chip.has-issues .ready-dot{background:var(--subtle)}
 .plan-toggle{min-height:38px;padding-right:12px;gap:5px;background:none}.plan-mark{width:17px;height:17px}.plan-copy small{display:none}.plan-copy strong{font-size:11px}.plan-info{display:none}.export-only{display:none}.more-button:hover{background:var(--glass-press)}
 .sheet{max-height:min(65vh,650px);width:min(640px,100%)}.progress{max-height:55vh}.sheet:deep(.extras){margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
 @media(max-width:1100px){.dock{bottom:12px;width:calc(100vw - 24px)}.bar{flex-wrap:wrap;justify-content:center;border-radius:22px}.provider-wheel{flex:0 0 200px}.ready-chip{flex:1 1 160px}.go-row{display:flex;flex:1 1 220px;justify-content:flex-end}.go{min-height:42px;flex:initial}.more-button{order:4}.go-copy small{display:none}}
 @media(prefers-reduced-motion:reduce){.dock *, .sheet-enter-active,.sheet-leave-active{animation:none!important;transition:none!important}}
+/* 2026-10 精修 5.1：中间的数据摘要一行一句、不折行，字号跟正文走；放不下就省略，点进寄出前检查看全。 */
+.ready-copy > span, .ready-copy > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ready-copy > span { font-weight: 650; letter-spacing: 0; }
+.ready-copy > small { color: var(--muted); }
+.go-row :deep(.go-capsule) { flex: none; }
+

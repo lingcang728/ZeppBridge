@@ -6,6 +6,7 @@
  * 将复制的提示词默认收起，想先看看的人点开就行。 */
 import { computed, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
+import McpTaskScopes from './McpTaskScopes.vue';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
@@ -87,6 +88,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
           <code v-for="tool in MCP_TOOLS" :key="tool.name" class="chip" :title="tool.detail">{{ tool.name }}</code>
         </div>
       </div>
+      <McpTaskScopes />
     </div>
   </section>
 </template>

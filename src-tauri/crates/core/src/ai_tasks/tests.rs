@@ -613,3 +613,34 @@ fn shared_grants_merge_adjacent_windows_across_anchors() {
 }
 
 mod prepare;
+
+#[test]
+fn the_same_question_again_updates_the_saved_task_and_pins_survive() {
+    let db = Database::in_memory().unwrap();
+    let mut first = task();
+    first.categories = vec![range(AiTaskCategory::Sleep, 13, true)];
+    let saved = db.save_ai_task(&first).unwrap();
+    // 同模板、同时间范围、同一句问题（首尾空白不算）：更新原来那一条，不新建。
+    let mut again = task();
+    again.categories = vec![range(AiTaskCategory::Sleep, 13, true)];
+    again.prompt = "  看看最近状态 ".into();
+    again.title = "又问了一次".into();
+    assert_eq!(db.save_ai_task(&again).unwrap().id, saved.id);
+    assert_eq!(db.list_ai_tasks().unwrap().len(), 1);
+    // 换了回溯范围就是另一个任务。
+    let mut other = again.clone();
+    other.categories = vec![range(AiTaskCategory::Sleep, 29, true)];
+    let other = db.save_ai_task(&other).unwrap();
+    assert_ne!(other.id, saved.id);
+    // 置顶的排在最前；置顶不改 updated_at。
+    let before = db.require_ai_task(&saved.id).unwrap().updated_at;
+    db.set_ai_task_pinned(&saved.id, true).unwrap();
+    let list = db.list_ai_tasks().unwrap();
+    assert_eq!(list[0].id, saved.id);
+    assert!(list[0].pinned && !list[1].pinned);
+    assert_eq!(db.require_ai_task(&saved.id).unwrap().updated_at, before);
+    assert_eq!(
+        err_code(&db.set_ai_task_pinned("task-missing", true).unwrap_err()),
+        "err.ai_task.not_found"
+    );
+}

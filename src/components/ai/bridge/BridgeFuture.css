@@ -9,3 +9,7 @@
 @keyframes week-in{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
 @media(prefers-reduced-motion:reduce){.future-days{animation:none}}
 .held-mark.fix{color:var(--danger)}
+/* 2026-10 精修 5.4：格子之间不再画竖线、休息日不再画一道短横——每天是一张浅底的圆角格，休息日只有月亮。 */
+.future-days{gap:6px}.future-day{border-radius:14px;background:color-mix(in srgb,var(--ink) 2.5%,transparent)}.future-day::after{display:none}.rest-line{display:none}
+.future-day:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+

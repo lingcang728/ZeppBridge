@@ -3,6 +3,7 @@
 components/MetricTrendCard.widened
 components/ai/HandoffDock.checkHint
 components/ai/HandoffDock.more
+components/ai/HandoffTray.detailHint
 components/ai/bridge/bridge.accept
 components/ai/bridge/bridge.actual
 components/ai/bridge/bridge.backCurrent
@@ -40,6 +41,7 @@ components/ai/bridge/bridge.mean
 components/ai/bridge/bridge.missed
 components/ai/bridge/bridge.missing
 components/ai/bridge/bridge.nextIntent
+components/ai/bridge/bridge.nextIntentHint
 components/ai/bridge/bridge.nextQuestion
 components/ai/bridge/bridge.noPlan
 components/ai/bridge/bridge.nutrition
@@ -69,6 +71,7 @@ components/ai/bridge/bridge.saving
 components/ai/bridge/bridge.selected
 components/ai/bridge/bridge.shape
 components/ai/bridge/bridge.sleepIntent
+components/ai/bridge/bridge.sleepIntentHint
 components/ai/bridge/bridge.sleepQuestion
 components/ai/bridge/bridge.sleepTarget
 components/ai/bridge/bridge.today
@@ -78,8 +81,10 @@ components/ai/bridge/bridge.undone
 components/ai/bridge/bridge.unknown
 components/ai/bridge/bridge.watchWindow
 components/ai/bridge/bridge.weekIntent
+components/ai/bridge/bridge.weekIntentHint
 components/ai/bridge/bridge.weekQuestion
 components/ai/bridge/bridge.workoutIntent
+components/ai/bridge/bridge.workoutIntentHint
 components/ai/bridge/bridge.workoutQuestion
 components/ai/hub/hub.categoryExcluded
 components/ai/hub/hub.categoryIncluded
@@ -93,6 +98,8 @@ components/ai/hub/hub.dayIntro
 components/ai/hub/hub.daysBefore
 components/ai/hub/hub.delivered
 components/ai/hub/hub.draftPending
+components/ai/hub/hub.earlier
+components/ai/hub/hub.earlierHint
 components/ai/hub/hub.exchangeMissing
 components/ai/hub/hub.exchangeTitle
 components/ai/hub/hub.exclude
@@ -108,6 +115,7 @@ components/ai/hub/hub.pastIntro
 components/ai/hub/hub.pastLine
 components/ai/hub/hub.pastNone
 components/ai/hub/hub.pastOpen
+components/ai/hub/hub.pin
 components/ai/hub/hub.planBack
 components/ai/hub/hub.planEmpty
 components/ai/hub/hub.planIntro
@@ -118,13 +126,19 @@ components/ai/hub/hub.promptTitle
 components/ai/hub/hub.question
 components/ai/hub/hub.rangeTitle
 components/ai/hub/hub.recorded
+components/ai/hub/hub.remove
+components/ai/hub/hub.removed
+components/ai/hub/hub.rename
 components/ai/hub/hub.resync
 components/ai/hub/hub.revealFile
 components/ai/hub/hub.sentTo
+components/ai/hub/hub.subscriptionTitle
 components/ai/hub/hub.tasksEmpty
 components/ai/hub/hub.tasksIntro
 components/ai/hub/hub.tasksTitle
 components/ai/hub/hub.unconfirmed
+components/ai/hub/hub.undo
+components/ai/hub/hub.unpin
 components/ai/hub/hub.warningsTitle
 components/ai/hub/hub.weekLine
 components/ai/hub/hub.weekOf
@@ -343,3 +357,6 @@ lib/trainingPlan/issues.ui.training_plan.issue.too_many_steps
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_kind
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_sport
 lib/trainingPlan/issues.ui.training_plan.issue.workout_too_long
+views/settings/sections/McpTaskScopes.empty
+views/settings/sections/McpTaskScopes.hint
+views/settings/sections/McpTaskScopes.title

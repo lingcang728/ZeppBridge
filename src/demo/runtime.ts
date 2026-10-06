@@ -135,6 +135,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     ai_template_list: () => demoTemplates(),
     ai_task_save: (args) => ({ ...(args.task as AiTask), id: (args.task as AiTask)?.id || 'demo-task-1', updated_at: new Date().toISOString() }),
     ai_task_delete: () => null,
+    ai_task_set_pinned: () => null,
     ai_task_preview: (args) => demoPreview(data, args.task as AiTask),
     ai_task_prepare: (args) => {
       hostPost('handoff', { stage: 'prepared' });

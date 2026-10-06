@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * 附件原件 + 高级选项（精确 GPS、详细程度、任务限定 MCP）。
- * 附件状态（找不到 / 改过）来自预览；找不到的可以就地重新选择。
+ * 附件原件 + 选项（详细程度、精确路线），平铺在「寄出前检查」里（2026-10 起不再有「高级选项」折叠）。
+ * 「允许本机 MCP 查询这个任务」挪到了设置 → MCP（按任务开关），这里不再放。
+ * 附件状态（找不到 / 改过）来自预览；找不到的可以就地重新选择。添加文件是一枚显眼的按钮。
  */
 import { computed, ref } from 'vue';
 import Icon from '../Icon.vue';
@@ -16,7 +17,7 @@ import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{ preview: AiTaskPreview | null }>();
 
-const { draft, addAttachments, removeAttachment, replaceAttachment, setPreciseGps, setDetailLevel, setMcpShared } = useAiTaskDraft();
+const { draft, addAttachments, removeAttachment, replaceAttachment, setPreciseGps, setDetailLevel } = useAiTaskDraft();
 
 const t = useMessages(defineMessages(
   {
@@ -38,6 +39,7 @@ const t = useMessages(defineMessages(
     detailSummary: '摘要',
     detailStandard: '标准',
     detailDetailed: '详细（含逐点序列）',
+    detailHint: '摘要最省篇幅；详细会带上每一次运动的逐点曲线，AI 能看得更细，文件也更大。',
     mcp: '允许本机 MCP 工具查询这个任务',
     mcpHint: '给 Claude Desktop 这类本机工具用。只对以 --scope task 启动的 MCP 生效：它只能查这个任务覆盖的范围；默认的全库只读模式不受这个开关限制。',
   },
@@ -60,6 +62,7 @@ const t = useMessages(defineMessages(
     detailSummary: 'Summary',
     detailStandard: 'Standard',
     detailDetailed: 'Detailed (per-point series)',
+    detailHint: 'Summary is shortest; Detailed adds every workout’s point-by-point curves so the AI can look closer, at the cost of a bigger file.',
     mcp: 'Let local MCP tools query this task',
     mcpHint: 'For local tools such as Claude Desktop. Only applies to MCP started with --scope task, which then sees just what this task covers; the default full read-only mode is not narrowed by this switch.',
   },
@@ -82,6 +85,7 @@ const t = useMessages(defineMessages(
     detailSummary: 'Resumen',
     detailStandard: 'Estándar',
     detailDetailed: 'Detallado (series punto a punto)',
+    detailHint: 'Resumen ocupa menos; Detallado añade las curvas punto a punto de cada actividad para que la IA vea más, con un archivo más grande.',
     mcp: 'Permitir que herramientas MCP locales consulten esta tarea',
     mcpHint: 'Para herramientas locales como Claude Desktop. Solo se aplica al MCP iniciado con --scope task, que entonces ve únicamente lo que cubre esta tarea; el modo predeterminado de solo lectura completa no se restringe con este interruptor.',
   },
@@ -129,26 +133,20 @@ const pick = async (replaceId?: string) => {
         <button type="button" class="ai-tool" @click="removeAttachment(row.id)">{{ t.remove }}</button>
       </li>
     </ul>
-    <button type="button" class="pill-button quiet add-file" :disabled="!desktop" @click="pick()"><Icon name="plus" :size="14" />{{ t.add }}</button>
+    <button type="button" class="pill-button add-file" :disabled="!desktop" @click="pick()"><Icon name="plus" :size="14" />{{ t.add }}</button>
     <p class="ai-note"><Icon name="shield" :size="13" />{{ attachmentPlainReferenceNote() }}</p>
     <p v-if="notice" class="ai-note warn" role="status">{{ notice }}</p>
 
-    <details class="advanced">
-      <summary><Icon name="sliders" :size="14" />{{ t.advanced }}</summary>
-      <div class="toggle-row">
-        <span class="toggle-copy"><strong>{{ t.preciseGps }}</strong><small>{{ t.preciseGpsHint }}</small></span>
-        <button type="button" class="mat-switch" role="switch" :aria-checked="draft.include_precise_gps" :aria-label="t.preciseGps"
-          @click="setPreciseGps(!draft.include_precise_gps)"></button>
-      </div>
-      <div class="toggle-row">
-        <span class="toggle-copy"><strong>{{ t.mcp }}</strong><small>{{ t.mcpHint }}</small></span>
-        <button type="button" class="mat-switch" role="switch" :aria-checked="draft.mcp_shared" :aria-label="t.mcp"
-          @click="setMcpShared(!draft.mcp_shared)"></button>
-      </div>
-      <p class="ai-label">{{ t.detail }}</p>
+    <div class="option">
+      <span class="toggle-copy"><strong>{{ t.detail }}</strong><small>{{ t.detailHint }}</small></span>
       <SegmentTrack compact :model-value="draft.detail_level" :items="detailOptions" :aria-label="t.detail"
         @update:model-value="setDetailLevel($event as AiTaskDetailLevel)" />
-    </details>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-copy"><strong>{{ t.preciseGps }}</strong><small>{{ t.preciseGpsHint }}</small></span>
+      <button type="button" class="mat-switch" role="switch" :aria-checked="draft.include_precise_gps" :aria-label="t.preciseGps"
+        @click="setPreciseGps(!draft.include_precise_gps)"></button>
+    </div>
   </section>
 </template>
 

@@ -1208,6 +1208,14 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(37,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v38：已保存的任务能置顶（2026-10 精修批次 5.3）。只加一列，旧行默认不置顶；
+        // 「30 天没动过收进更早」按 updated_at 现算，不落库。
+        self.ensure_table_columns("ai_tasks", &[("pinned", "INTEGER NOT NULL DEFAULT 0")])?;
+        self.conn.execute_batch("PRAGMA user_version = 38;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(38,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

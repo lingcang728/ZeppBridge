@@ -169,6 +169,8 @@ export interface AiTaskSummary {
   workout_count: number;
   updated_at: string;
   mcp_shared: boolean;
+  /** 置顶的排在最前，也不会因为久没动收进「更早」。 */
+  pinned?: boolean;
 }
 
 /** `ai_task_preview` 的运动摘要行；字段与 Rust `AiTaskWorkoutBrief` 一一对应。 */
@@ -383,6 +385,8 @@ export interface BridgeBackend {
   aiTaskSave(task: AiTask): Promise<AiTask>;
   /** 只删任务记录，不删任何附件原件。 */
   aiTaskDelete(id: string): Promise<void>;
+  /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
+  aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
   aiTemplateList(): Promise<AiTaskTemplate[]>;
   aiTemplateSave(template: AiTaskTemplate): Promise<AiTaskTemplate>;
   aiTemplateDelete(id: string): Promise<void>;

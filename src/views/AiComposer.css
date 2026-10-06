@@ -12,3 +12,7 @@
 @media (max-width: 1100px) { .ai-bridge-page { padding: 8px 20px 200px; } }
 @media (max-width: 860px) { .hub-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 700px) { .ai-bridge-page { padding-inline: 12px; } .plan-status-row { flex-wrap: wrap; } }
+/* 右上角的撤销：和图里的撤销胶囊同一枚小玻璃胶囊（GraphUndoPill），进出淡入淡出。 */
+.undo-selection { margin-left: auto; }
+.undo-fade-enter-active, .undo-fade-leave-active { transition: opacity 260ms ease, scale 320ms cubic-bezier(.4, .6, .2, 1); }
+.undo-fade-enter-from, .undo-fade-leave-to { opacity: 0; scale: .92; }

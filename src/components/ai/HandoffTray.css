@@ -17,3 +17,6 @@
 .advanced > summary { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; list-style: none; }
 .advanced > summary::-webkit-details-marker { display: none; }
 .advanced[open] > summary { color: var(--ink); }
+.option { display: grid; gap: 8px; margin-top: 14px; }
+.add-file { justify-self: start; }
+

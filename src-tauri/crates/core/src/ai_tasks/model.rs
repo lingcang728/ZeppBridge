@@ -205,6 +205,9 @@ pub struct AiTaskSummary {
     pub workout_count: i64,
     pub updated_at: String,
     pub mcp_shared: bool,
+    /// 用户置顶的任务排在最前、也不会因为久没动收进「更早」。
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 /// P2：一个类别在一个窗口里的覆盖事实。

@@ -6,7 +6,8 @@
  *   下半：附件原件和选项（HandoffTray）、完整提示词的只读预览——你写的那一句高亮，点它回到总页的输入框去改。
  *
  * 能改的永远只有一处（总页的输入框）：这里不再有可以改的「最终提示词」。
- * （批次 5 会把选项改成大白话的玻璃开关、订阅状态挪到这里。）
+ * 选项全部平铺、大白话：详细程度玻璃三档、精确路线玻璃开关、每个 AI 各自的「免费版 / 已订阅」玻璃两档。
+ * 「允许本机 MCP 查询这个任务」挪到了设置 → MCP。
  */
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
@@ -14,6 +15,7 @@ import PageHeader from '../../components/PageHeader.vue';
 import Icon from '../../components/Icon.vue';
 import HandoffTray from '../../components/ai/HandoffTray.vue';
 import CoverageDetails from '../../components/ai/CoverageDetails.vue';
+import SubscriptionList from '../../components/ai/SubscriptionList.vue';
 import { useAiHub } from '../../composables/ai/useAiHub';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskPreview } from '../../composables/useAiTaskPreview';
@@ -90,6 +92,10 @@ const editQuestion = async () => {
         <HandoffTray :preview="preview" />
       </div>
     </div>
+    <div class="ai-panel subs-panel">
+      <h2>{{ h.subscriptionTitle }}</h2>
+      <SubscriptionList />
+    </div>
     <div class="ai-panel prompt-panel">
       <h2>{{ h.promptTitle }}</h2>
       <p class="ai-panel-note">{{ h.promptHint }}</p>
@@ -108,7 +114,7 @@ const editQuestion = async () => {
 <style scoped>
 .check-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .check-grid .ai-panel + .ai-panel { margin-top: 0; }
-.prompt-panel { margin-top: 16px; }
+.prompt-panel, .subs-panel { margin-top: 16px; }
 .readiness { display: grid; gap: 2px; margin: 0; }
 .readiness strong { font-size: var(--fs-lg); }
 .readiness small { color: var(--subtle); font-size: var(--fs-2xs); }
