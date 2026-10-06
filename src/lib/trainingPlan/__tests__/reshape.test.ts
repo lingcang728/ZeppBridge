@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { reactive } from 'vue';
-import { moveDay, deleteDay, retypeWorkout, deleteWorkout } from '../reshape';
+import { moveDay, deleteDay, retypeWorkout, deleteWorkout, insertDay } from '../reshape';
 import type { PlanDocument } from '../../../types/trainingPlan';
 const document = (): PlanDocument => ({ from:'2026-10-04',to:'2026-10-10',summary:'A week',workouts:[{date:'2026-10-05',name:'Run',sport:'running',steps:[{kind:'active',duration:'30min',target:'hr 120-140'}]}],rest:[{date:'2026-10-04',bedtime:'22:30',sleepTarget:'8h30m',note:'Recover'}] });
 describe('whole-day reshaping', () => {
@@ -37,5 +37,26 @@ describe('fixing a workout the watch cannot take', () => {
     const next = deleteWorkout(walk(), 0);
     expect(next.workouts).toHaveLength(1);
     expect(next.workouts[0].name).toBe('Strides');
+  });
+});
+describe('inserting a day into a gap', () => {
+  const week = (): PlanDocument => ({ from: '2026-10-05', to: '2026-10-11', workouts: [
+    { date: '2026-10-05', sport: 'running', name: 'A', steps: [] },
+    { date: '2026-10-06', sport: 'running', name: 'B', steps: [] },
+    { date: '2026-10-08', sport: 'running', name: 'C', steps: [] },
+  ], rest: [{ date: '2026-10-07', note: 'rest' }] });
+  const byDate = (doc: PlanDocument) => Object.fromEntries(doc.workouts.map(w => [w.name, w.date]));
+  it('moving later shifts the days in between one day earlier, rest notes included', () => {
+    const next = insertDay(week(), '2026-10-05', '2026-10-07');
+    expect(byDate(next)).toEqual({ A: '2026-10-07', B: '2026-10-05', C: '2026-10-08' });
+    expect(next.rest?.[0]?.date).toBe('2026-10-06');
+  });
+  it('moving earlier shifts the days in between one day later', () => {
+    const next = insertDay(week(), '2026-10-08', '2026-10-05');
+    expect(byDate(next)).toEqual({ A: '2026-10-06', B: '2026-10-07', C: '2026-10-05' });
+    expect(next.rest?.[0]?.date).toBe('2026-10-08');
+  });
+  it('refuses to push a day outside the declared range', () => {
+    expect(insertDay(week(), '2026-10-05', '2026-10-12')).toEqual(week());
   });
 });

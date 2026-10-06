@@ -98,6 +98,23 @@ impl Database {
         self.set_app_meta(WATCH_LOCALE_KEY, WatchLocale::from_tag(tag).tag())
     }
 
+    /// 这些行存的训练原文（按编号顺序）。
+    fn workout_texts(&self, ids: &[i64]) -> Result<Vec<(i64, String)>> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT workout FROM training_plan_workouts WHERE id = ?1")?;
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(text) = statement
+                .query_row([id], |row| row.get::<_, String>(0))
+                .optional()?
+            {
+                out.push((*id, text));
+            }
+        }
+        Ok(out)
+    }
+
     fn workout_dates(&self, ids: &[i64]) -> Result<Vec<(i64, NaiveDate)>> {
         let mut statement = self
             .conn
@@ -324,16 +341,29 @@ impl Database {
                 if !check.publishable() {
                     return Ok(Prepared::Invalid { check });
                 }
-                deactivated = self.active_ids_between(from, to)?;
-                self.set_active(&deactivated, false)?;
+                let replaced = self.active_ids_between(from, to)?;
+                // 和原来一模一样的训练（发出后再改、只动了其中几天）沿用原来那一行：编号不变，
+                // 账本上这几天就和上次发过去的一致，没动过的那几周不用重推。
+                let mut keep: Vec<(i64, String)> = self.workout_texts(&replaced)?;
+                let mut kept: Vec<i64> = Vec::new();
                 for workout in &check.workouts {
+                    let text = serde_json::to_string(workout)?;
+                    if let Some(at) = keep.iter().position(|(_, old)| *old == text) {
+                        kept.push(keep.remove(at).0);
+                        continue;
+                    }
                     self.conn.execute(
                         "INSERT INTO training_plan_workouts(draft_id, workout_date, workout, active, created_at)
                          VALUES(?1, ?2, ?3, 1, ?4)",
-                        params![id, workout.date.to_string(), serde_json::to_string(workout)?, now],
+                        params![id, workout.date.to_string(), text, now],
                     )?;
                     activated.push(self.conn.last_insert_rowid());
                 }
+                deactivated = replaced
+                    .into_iter()
+                    .filter(|old| !kept.contains(old))
+                    .collect();
+                self.set_active(&deactivated, false)?;
                 self.conn.execute(
                     "UPDATE training_plan_drafts SET status = 'published', updated_at = ?2 WHERE id = ?1",
                     params![id, now],

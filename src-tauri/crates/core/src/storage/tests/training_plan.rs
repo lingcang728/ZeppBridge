@@ -440,3 +440,39 @@ fn an_invalid_draft_changes_nothing() {
     assert!(!preview.check.issues.is_empty());
     assert_eq!(preview.days.len(), 7);
 }
+
+#[test]
+fn editing_a_sent_plan_repushes_only_the_weeks_that_changed() {
+    let db = Database::in_memory().unwrap();
+    deliver(
+        &db,
+        publish(
+            &db,
+            PublishRequest::Draft {
+                id: draft(
+                    &db,
+                    json!({ "workouts": [run("2026-10-03", "A"), run("2026-10-11", "B")] }),
+                ),
+            },
+            false,
+        ),
+    );
+    // 把发出去的计划拿回来改：只改第二周那一天的名字。
+    let edited = draft(
+        &db,
+        json!({ "from": TODAY, "to": "2026-10-11",
+                "workouts": [run("2026-10-03", "A"), run("2026-10-11", "B2")] }),
+    );
+    let batch = sends(publish(&db, PublishRequest::Draft { id: edited }, false));
+    let starts: Vec<String> = batch.iter().map(|s| s.window_start.to_string()).collect();
+    assert_eq!(starts, ["2026-10-09"], "没改的那一周不该重推");
+    for send in &batch {
+        db.finish_plan_publish(send.publish_id, &SendOutcome::Delivered)
+            .unwrap();
+    }
+    // 撤销回到上一版：只翻改过的那一行。
+    let undo = sends(publish(&db, PublishRequest::UndoLast, false));
+    assert_eq!(undo.len(), 1);
+    assert_eq!(dates(&undo[0].body), ["2026-10-11"]);
+    assert_eq!(undo[0].body["workouts"][0]["workoutName"], "B");
+}

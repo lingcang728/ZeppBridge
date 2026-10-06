@@ -27,7 +27,8 @@ import Icon from '../Icon.vue';
 import { usePlanText } from './usePlanText';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
 
-const props = withDefaults(defineProps<{ row: DayRow | null; issues: PlanIssue[]; editable?: boolean; showDate?: boolean }>(), { showDate: true });
+/* `showWorkout = false`：单天页里训练本身由 PlanWorkoutEditor 画（可以改），这里只留走路这类、休息建议和问题清单。 */
+const props = withDefaults(defineProps<{ row: DayRow | null; issues: PlanIssue[]; editable?: boolean; showDate?: boolean; showWorkout?: boolean }>(), { showDate: true, showWorkout: true });
 const emit = defineEmits<{ retype: [index: number, sport: PlanSport]; remove: [index: number] }>();
 const { t, sport, activity, variant, intensity, minutes, length, target } = usePlanText();
 const bridgeText = useBridgeText();
@@ -53,7 +54,8 @@ const pickNote = computed(() => {
   const name = variant(current.sport, current.variant);
   return name ? t.value.variantPick(name) : t.value.variantPickAny;
 });
-const held = computed<PlanHeldWorkout[]>(() => props.row?.held ?? []);
+/* 只管手表收不下的（走路这类）；能发的大类只是缺东西的，在单天页的编辑器里补。 */
+const held = computed<PlanHeldWorkout[]>(() => props.row?.held.filter((item) => item.activity) ?? []);
 const heldMinutes = (item: PlanHeldWorkout) => {
   const seconds = item.steps.length ? workoutProfile({ date: item.date, sport: 'running', name: item.name, steps: item.steps }).seconds : 0;
   return seconds ? minutes(Math.round(seconds / 60)) : '';
@@ -82,19 +84,19 @@ const stepTarget = (row: StepRow) => target(row.target);
 <template>
   <section class="detail" :aria-label="dateLine">
     <template v-if="row">
-      <header class="head">
+      <header v-if="showWorkout || showDate" class="head">
         <p v-if="showDate" class="date">{{ dateLine }}</p>
-        <h3>{{ workout?.name ?? held[0]?.name ?? t.rest }}</h3>
-        <p v-if="facts.length" class="facts"><span v-for="fact in facts" :key="fact">{{ fact }}</span></p>
-        <p v-if="workout?.focus || workout?.description" class="brief">
+        <h3 v-if="showWorkout">{{ workout?.name ?? held[0]?.name ?? t.rest }}</h3>
+        <p v-if="showWorkout && facts.length" class="facts"><span v-for="fact in facts" :key="fact">{{ fact }}</span></p>
+        <p v-if="showWorkout && (workout?.focus || workout?.description)" class="brief">
           <b v-if="workout?.focus">{{ workout.focus }}</b><span v-if="workout?.description">{{ workout.description }}</span>
         </p>
-        <p v-if="pickNote" class="note pick"><Icon name="watch" :size="13" />{{ pickNote }}</p>
+        <p v-if="showWorkout && pickNote" class="note pick"><Icon name="watch" :size="13" />{{ pickNote }}</p>
       </header>
 
       <section v-for="item in held" :key="item.index" class="held" :aria-label="t.heldBadge">
         <p class="held-head">
-          <span class="held-kind">{{ activity(item.activity) }}</span>
+          <span class="held-kind">{{ activity(item.activity!) }}</span>
           <span v-if="heldMinutes(item)" class="held-dur">{{ heldMinutes(item) }}</span>
           <span class="held-badge"><Icon name="warning" :size="12" />{{ t.heldBadge }}</span>
         </p>
@@ -109,7 +111,7 @@ const stepTarget = (row: StepRow) => target(row.target);
         </template>
       </section>
 
-      <div v-if="workout && profile" class="grid">
+      <div v-if="showWorkout && workout && profile" class="grid">
         <div class="chart-col">
           <p class="col-label">{{ t.chartTitle }}</p>
           <PlanChart :profile="profile" />
@@ -143,7 +145,7 @@ const stepTarget = (row: StepRow) => target(row.target);
           </ol>
         </div>
       </div>
-      <p v-else-if="!held.length" class="empty"><Icon name="moon" :size="16" />{{ row.before[0] ? t.wasName(row.before[0].name) : t.noPlanDay }}</p>
+      <p v-else-if="showWorkout && !held.length" class="empty"><Icon name="moon" :size="16" />{{ row.before[0] ? t.wasName(row.before[0].name) : t.noPlanDay }}</p>
       <div v-if="row.rest" class="local-rest"><Icon name="moon" :size="18"/><div><p><span v-if="restTime">{{ bridgeText.bedtime }} {{ restTime }}</span><span v-if="row.rest.sleep_target_seconds != null">{{ bridgeText.sleepTarget }} {{ minutes(Math.round(row.rest.sleep_target_seconds / 60)) }}</span></p><p v-if="row.rest.note">{{ row.rest.note }}</p></div></div>
 
       <p v-if="!row.inWindow && workout" class="note">{{ t.outsideNote }}</p>

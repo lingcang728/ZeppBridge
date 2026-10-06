@@ -63,19 +63,24 @@ pub struct PlanCheck {
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
     pub workouts: Vec<Workout>,
-    /// 读懂了、但手表收不下的训练（走路、徒步、力量……）。界面照原样显示（绝不画成
-    /// 休息日），同时它们一定带着发布阻断的 `sport_not_deliverable`。
+    /// 日期读得懂、但没通过校验的训练：走路这类手表收不下的（`activity` 有值，带着
+    /// `sport_not_deliverable`），以及缺目的、缺描述、步骤写错的。界面照原样显示（绝不画成
+    /// 休息日、也不让它从周视图里消失），在单天页里就地补齐或改掉。
     pub held: Vec<HeldWorkout>,
     pub issues: Vec<PlanIssue>,
 }
 
-/// 一条发不到手表的训练，原样留着给界面显示。
+/// 一条还发不出去的训练，原样留着给界面显示和就地修改。
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct HeldWorkout {
-    /// 草稿原文里第几条（从 0 起），界面据此就地删掉或改类型。
+    /// 草稿原文里第几条（从 0 起），界面据此就地删掉、改类型、补目的。
     pub index: usize,
     pub date: NaiveDate,
-    pub activity: Activity,
+    /// 原文写的运动。
+    pub sport: String,
+    /// 写的是走路这类读得懂、但手表收不下的活动；能发的大类（只是缺东西）为空。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity: Option<Activity>,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub focus: Option<String>,
@@ -85,12 +90,12 @@ pub struct HeldWorkout {
     pub steps: Vec<StepNode>,
 }
 
-/// 运动写的是走路这类能读懂、发不出去的活动时，把它原样留下来。
+/// 没通过校验、但日期读得懂的训练，把它原样留下来（步骤只取读得懂的结构，不编）。
 fn held_workout(index: usize, workout: &PlanWorkout, context: PlanContext) -> Option<HeldWorkout> {
-    if Sport::parse(&workout.sport).is_some() {
-        return None;
-    }
-    let activity = Activity::parse(&workout.sport)?;
+    let activity = match Sport::parse(&workout.sport) {
+        Some(_) => None,
+        None => Activity::parse(&workout.sport),
+    };
     let date = NaiveDate::parse_from_str(workout.date.trim(), "%Y-%m-%d").ok()?;
     // 步骤的问题已经在正式校验里报过了，这里只取读得懂的结构。
     let mut scratch = Issues { list: Vec::new() };
@@ -105,6 +110,7 @@ fn held_workout(index: usize, workout: &PlanWorkout, context: PlanContext) -> Op
     Some(HeldWorkout {
         index,
         date,
+        sport: workout.sport.trim().to_string(),
         activity,
         name: workout.name.trim().to_string(),
         focus: text(&workout.focus),
@@ -255,6 +261,8 @@ pub fn check_plan(document: &PlanDocument, context: PlanContext) -> PlanCheck {
     }
 
     // 没写 from / to 就取训练日期的两端；一条可用的训练都没有就没有范围。
+    let valid: std::collections::BTreeSet<usize> =
+        workouts.iter().map(|(index, _)| *index).collect();
     let workouts: Vec<Workout> = workouts.into_iter().map(|(_, workout)| workout).collect();
     let from = from.or_else(|| workouts.iter().map(|w| w.date).min());
     let to = to.or_else(|| workouts.iter().map(|w| w.date).max());
@@ -306,6 +314,7 @@ pub fn check_plan(document: &PlanDocument, context: PlanContext) -> PlanCheck {
         .workouts
         .iter()
         .enumerate()
+        .filter(|(index, _)| !valid.contains(index))
         .filter_map(|(index, workout)| held_workout(index, workout, context))
         .collect();
     PlanCheck {

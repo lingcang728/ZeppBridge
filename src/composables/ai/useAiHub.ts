@@ -14,8 +14,8 @@ import { directionText } from '../../lib/aiTask/prompt';
 import { displayableWorkouts } from '../../lib/workouts';
 import { addDays, dayKey, daysBetween } from '../../lib/aiTask/bridgeScale';
 import { dayRows } from '../../lib/trainingPlan/week';
-import { deleteDay, deleteWorkout, moveDay, retypeWorkout } from '../../lib/trainingPlan/reshape';
-import type { PlanCheck, PlanDraftPreview, PlanSport } from '../../types/trainingPlan';
+import { deleteDay, deleteWorkout, insertDay, moveDay, retypeWorkout } from '../../lib/trainingPlan/reshape';
+import type { PlanCheck, PlanDocument, PlanDraftPreview, PlanSport } from '../../types/trainingPlan';
 import { useAiTaskDraft } from '../useAiTaskDraft';
 import { useAiTaskLibrary } from '../useAiTaskLibrary';
 import { useAiTaskPreview } from '../useAiTaskPreview';
@@ -30,6 +30,10 @@ const today = ref(dayKey());
 const demo = ref(false);
 /** 刚交出去一份：「你的过去」那张卡的细条折一下（底栏在外壳上，卡在总页上，借这个信号）。 */
 const handedOff = ref(0);
+/** 连着拨滚轮、拖图时攒下的改动：停手 350ms 后一次交给后端（每一下都去改草稿、重新校验太密了）。 */
+let pendingEdits: Array<(document: PlanDocument) => PlanDocument> = [];
+let editTimer = 0;
+const editWaiters: Array<() => void> = [];
 let started = false;
 let mounted = 0;
 let timer = 0;
@@ -140,13 +144,38 @@ export const useAiHub = () => {
   const stamped = computed(() => !plan.preview.value && ['sent', 'partial'].includes(plan.state.value?.last_publish?.state ?? ''));
   /** 草稿原文里每条训练写的日期：校验问题带的是原文里第几条。 */
   const written = computed(() => plan.document.value?.workouts ?? []);
-  /** 能就地改：手上有草稿、而且不是 MCP 送来还没接受的。 */
-  const editable = computed(() => !!plan.preview.value && plan.accepted.value);
+  /** 能就地改：手上有草稿（不是 MCP 送来还没接受的），或者有已经生效的计划（改的时候先拿回来变成草稿）。 */
+  const editable = computed(() => (plan.preview.value ? plan.accepted.value : !!plan.state.value?.planned.length));
 
-  const changeDay = (from: string, to: string) => { if (plan.document.value && editable.value) void plan.reshape(moveDay(plan.document.value, from, to)); };
-  const removeDay = (date: string) => { if (plan.document.value && editable.value) void plan.reshape(deleteDay(plan.document.value, date)); };
-  const retype = (index: number, sport: PlanSport) => { if (plan.document.value && editable.value) void plan.reshape(retypeWorkout(plan.document.value, index, sport)); };
-  const removeWorkout = (index: number) => { if (plan.document.value && editable.value) void plan.reshape(deleteWorkout(plan.document.value, index)); };
+  /** 改草稿：手上没有草稿、但有已经发出去的计划时，先把它拿回来变成草稿（发出后还能改，批次 4.3）。 */
+  const edit = async (change: (document: PlanDocument) => PlanDocument): Promise<void> => {
+    if (!plan.document.value && !(await plan.editActive(today.value))) return;
+    if (!plan.document.value || !plan.accepted.value) return;
+    await plan.reshape(change(plan.document.value));
+  };
+  /** 攒一下再改：返回的 Promise 在这批改动落定（新预览画上来）以后才 resolve。 */
+  const queueEdit = (change: (document: PlanDocument) => PlanDocument): Promise<void> => {
+    pendingEdits.push(change);
+    window.clearTimeout(editTimer);
+    const flush = async () => {
+      if (plan.busy.value) { editTimer = window.setTimeout(() => void flush(), 120); return; }
+      const batch = pendingEdits;
+      pendingEdits = [];
+      const waiters = editWaiters.splice(0);
+      try {
+        if (batch.length) await edit((doc) => batch.reduce((current, step) => step(current), doc));
+      } finally {
+        for (const done of waiters) done();
+      }
+    };
+    editTimer = window.setTimeout(() => void flush(), 350);
+    return new Promise((resolve) => { editWaiters.push(resolve); });
+  };
+  const changeDay = (from: string, to: string) => edit((doc) => moveDay(doc, from, to));
+  const insertAt = (from: string, to: string) => edit((doc) => insertDay(doc, from, to));
+  const removeDay = (date: string) => edit((doc) => deleteDay(doc, date));
+  const retype = (index: number, sport: PlanSport) => edit((doc) => retypeWorkout(doc, index, sport));
+  const removeWorkout = (index: number) => edit((doc) => deleteWorkout(doc, index));
 
   /** 训练计划操作的结局，按当前语言说一句。 */
   const notice = computed(() => {
@@ -172,6 +201,6 @@ export const useAiHub = () => {
   return {
     ...derived, today, demo, pastDays,
     future, rows, stamped, written, editable, notice,
-    changeDay, removeDay, retype, removeWorkout,
+    edit, queueEdit, changeDay, insertAt, removeDay, retype, removeWorkout,
   };
 };

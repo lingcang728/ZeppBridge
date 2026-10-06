@@ -9,6 +9,30 @@ export const moveDay = (document: PlanDocument, from: string, to: string): PlanD
   return { ...clone(document), workouts: document.workouts.map(w => ({ ...clone(w), date: swap(w.date) })),
     rest: document.rest?.map(r => ({ ...r, date: swap(r.date) })) };
 };
+const shiftDate = (date: string, days: number): string => {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! + days)).toISOString().slice(0, 10);
+};
+
+/**
+ * 把 `from` 这一天整天挪到 `to`，中间的日子顺移一天让位（拖到两张卡之间的缝隙）。
+ * 往后挪：from+1 … to 各提前一天；往前挪：to … from-1 各推后一天。休息建议跟着各自的那天走。
+ * 落点超出计划写明的范围就原样返回（不往范围外挤）。
+ */
+export const insertDay = (document: PlanDocument, from: string, to: string): PlanDocument => {
+  if (from === to) return clone(document);
+  if (document.from && to < document.from || document.to && to > document.to) return clone(document);
+  const forward = to > from;
+  const move = (date: string) => {
+    if (date === from) return to;
+    if (forward && date > from && date <= to) return shiftDate(date, -1);
+    if (!forward && date >= to && date < from) return shiftDate(date, 1);
+    return date;
+  };
+  return { ...clone(document), workouts: document.workouts.map(w => ({ ...clone(w), date: move(w.date) })),
+    rest: document.rest?.map(r => ({ ...r, date: move(r.date) })) };
+};
+
 /** 能发到手表的大类和各自的子类型（游泳不分）。和 core `Sport::variants` 一致。 */
 export const SPORT_VARIANTS: Record<PlanSport, PlanVariant[]> = {
   running: ['outdoor', 'treadmill', 'track'],

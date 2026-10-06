@@ -64,12 +64,15 @@ export interface PlanWorkout {
   steps: PlanStepNode[];
 }
 
-/** 发不到手表的一条训练，原样留给界面显示（绝不画成休息日）。 */
+/** 还发不出去的一条训练（走路这类收不下的，或缺目的 / 缺描述 / 步骤写错的），原样留给界面显示和就地修改。 */
 export interface PlanHeldWorkout {
   /** 草稿原文里第几条。 */
   index: number;
   date: string;
-  activity: PlanActivity;
+  /** 原文写的运动。 */
+  sport: string;
+  /** 写的是走路这类手表收不下的活动；能发的大类只是缺东西时没有这个字段。 */
+  activity?: PlanActivity;
   name: string;
   focus?: string;
   description?: string;

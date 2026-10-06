@@ -13,6 +13,7 @@ import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { locale } from '../i18n';
 import { extractPlan, type ExtractFailure } from '../lib/trainingPlan/extract';
+import { workoutToInput } from '../lib/trainingPlan/edit';
 import type {
   PlanDraftPreview,
   PlanPublishAction,
@@ -49,6 +50,8 @@ let pendingAction: PlanPublishAction | null = null;
 const document = ref<PlanDocument | null>(null);
 const transcript = ref<{ lines: string[]; total: number } | null>(null);
 const accepted = ref(true);
+/** 手上这份草稿是从已经发出去的计划拿回来改的（批次 4.3）：界面说「有 N 处改动 · 重新同步到手表」。 */
+const editingSent = ref(false);
 const revision = ref(0);
 
 let loadSeq = 0;
@@ -128,6 +131,35 @@ const receiveFromClipboard = async (): Promise<boolean> => {
   finally { busy.value = false; }
 };
 
+/**
+ * 发出后还能改：把生效计划里今天及以后的训练变回书写格式，存成一份草稿（范围是今天到最后一条训练），
+ * 之后的拖拽、微调都在这份草稿上做；发出去时只重推内容变了的那几周（后端按天比对账本）。
+ * 已经过去的日子不在范围里，改不到。
+ */
+const editActive = async (today: string): Promise<boolean> => {
+  if (busy.value || draftId.value) return !!draftId.value;
+  const planned = state.value?.planned.filter((workout) => workout.date >= today) ?? [];
+  if (!planned.length) return false;
+  const last = planned.map((workout) => workout.date).sort().pop()!;
+  const next: PlanDocument = { format: 'zeppbridge-plan/3', from: today, to: last, workouts: planned.map(workoutToInput) };
+  busy.value = true;
+  try {
+    const id = await backend.trainingPlanSaveDraft(next, false);
+    document.value = next;
+    accepted.value = true;
+    editingSent.value = true;
+    await loadPreview(id);
+    await load();
+    revision.value++;
+    return true;
+  } catch (error) {
+    notice.value = report(error);
+    return false;
+  } finally {
+    busy.value = false;
+  }
+};
+
 const reshape = async (next: PlanDocument) => {
   if (busy.value || !draftId.value || !accepted.value) return;
   busy.value = true;
@@ -150,6 +182,7 @@ const discard = async () => {
     document.value = null;
     preview.value = null;
     notice.value = null;
+    editingSent.value = false;
     await load();
     revision.value++;
   } catch (error) {
@@ -187,6 +220,8 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
         if (action.kind === 'draft' && record?.state !== 'rejected') {
           draftId.value = null;
           preview.value = null;
+          document.value = null;
+          editingSent.value = false;
         } else if (action.kind === 'draft' && draftId.value) {
           await loadPreview(draftId.value);
         }
@@ -194,7 +229,7 @@ const run = async (action: PlanPublishAction, confirmClear: boolean): Promise<vo
       }
       case 'not_needed':
         notice.value = { kind: 'not_needed' };
-        if (action.kind === 'draft') { draftId.value = null; preview.value = null; }
+        if (action.kind === 'draft') { draftId.value = null; preview.value = null; document.value = null; editingSent.value = false; }
         break;
       case 'nothing_to_undo':
         notice.value = { kind: 'nothing_to_undo' };
@@ -236,7 +271,7 @@ const unverified = computed(() => preview.value?.check.issues.filter((issue) => 
 
 export const useTrainingPlan = () => ({
   state, draftId, preview, busy, notice, clearPending, blocking, unverified,
-  document, transcript, accepted, revision, receiveFromClipboard, reshape,
+  document, transcript, accepted, revision, editingSent, receiveFromClipboard, reshape, editActive,
   accept: () => { accepted.value = true; },
   load, resume, paste, discard, publish, undo, clear, dismissNotice, cancelClear, confirmClear,
 });

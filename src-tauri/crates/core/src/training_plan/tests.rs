@@ -374,10 +374,11 @@ fn a_long_walk_reads_as_walking_but_never_reaches_the_watch() {
         .expect("走路要给出发布阻断的问题码");
     assert_eq!(walking.severity, Severity::Error);
     assert_eq!(walking.params["activity"], "walking");
-    // 界面要能照原样画出这次长走：日期、类型、时长都在，不变成休息日。
-    assert_eq!(check.held.len(), 1);
+    // 界面要能照原样画出这次长走：日期、类型、时长都在，不变成休息日。子类型写错的那条也留着。
+    assert_eq!(check.held.len(), 2);
+    assert_eq!(check.held[1].activity, None);
     assert_eq!(check.held[0].index, 0);
-    assert_eq!(check.held[0].activity, Activity::Walking);
+    assert_eq!(check.held[0].activity, Some(Activity::Walking));
     assert_eq!(check.held[0].date, day("2026-10-04"));
     assert!(!check.held[0].steps.is_empty());
     assert!(check
@@ -398,6 +399,11 @@ fn focus_and_description_are_required_and_a_long_name_only_warns() {
     );
     assert!(!check.publishable());
     let codes: Vec<&str> = check.issues.iter().map(|i| i.message_code).collect();
+    // 缺目的的训练不能从界面上消失：它留在 held 里，单天页就地补。
+    assert_eq!(check.held.len(), 1);
+    assert_eq!(check.held[0].activity, None);
+    assert_eq!(check.held[0].sport, "running");
+    assert!(!check.held[0].steps.is_empty());
     assert!(codes.contains(&"ui.training_plan.issue.missing_focus"));
     assert!(codes.contains(&"ui.training_plan.issue.missing_description"));
 

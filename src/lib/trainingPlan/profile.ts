@@ -31,6 +31,8 @@ export interface ProfileSegment {
   high: number | null;
   /** 所在重复组的第几组（0 起）；单步为 null。 */
   round: number | null;
+  /** 原文里的步骤路径：`[i]` 或重复组里的 `[i, j]`。拖强度图改的就是这一步（重复组每一轮跟着变）。 */
+  path: number[];
 }
 
 export interface StepRow {
@@ -56,7 +58,7 @@ export interface WorkoutProfile {
   groups: StepGroup[];
 }
 
-const segmentOf = (step: PlanStep, round: number | null): ProfileSegment => {
+const segmentOf = (step: PlanStep, round: number | null, path: number[]): ProfileSegment => {
   const approx = step.length.type === 'distance';
   const seconds = step.length.type === 'time'
     ? step.length.seconds
@@ -70,6 +72,7 @@ const segmentOf = (step: PlanStep, round: number | null): ProfileSegment => {
     low: hr ? hr.low : null,
     high: hr ? hr.high : null,
     round,
+    path,
   };
 };
 
@@ -81,14 +84,14 @@ const rowOf = (step: PlanStep): StepRow => {
 export const workoutProfile = (workout: PlanWorkout): WorkoutProfile => {
   const segments: ProfileSegment[] = [];
   const groups: StepGroup[] = [];
-  const walk = (node: PlanStepNode) => {
+  const walk = (node: PlanStepNode, index: number) => {
     if (node.type === 'step') {
-      segments.push(segmentOf(node, null));
+      segments.push(segmentOf(node, null, [index]));
       groups.push({ kind: 'step', row: rowOf(node) });
       return;
     }
     for (let round = 0; round < node.times; round += 1) {
-      for (const step of node.steps) segments.push(segmentOf(step, round));
+      node.steps.forEach((step, inner) => segments.push(segmentOf(step, round, [index, inner])));
     }
     groups.push({ kind: 'repeat', times: node.times, rows: node.steps.map(rowOf) });
   };
