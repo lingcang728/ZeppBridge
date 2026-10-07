@@ -33,13 +33,17 @@ export const tableLayerStyle = (level: DeckLevel, stage: StageBox) => {
   return { '--card-w': `${w}px`, maxWidth: `${perRow * w + (perRow - 1) * GAP + 24}px` };
 };
 
-/** 扇面：一行里越靠边越往下、往外歪一点；多排时不拱。 */
+/**
+ * 扇面：一行里越靠边越往下、往外歪一点；多排时不拱。
+ * 整道扇面往上提半个下沉量（1A·A4）：中间那张高、两头低，不提的话看上去整副牌偏在标题栏和底部提示之间靠下的位置。
+ */
 export const tableSlotStyle = (level: DeckLevel, i: number, stage: StageBox): Record<string, string> => {
   const { perRow, rows } = tableLayout(level, stage);
   if (rows > 1 || perRow < 3) return {};
   const mid = (perRow - 1) / 2;
   const off = (i - mid) / mid;
   const tilt = off * Math.min(5, 26 / perRow);
-  const drop = off * off * Math.min(28, 6 + perRow * 3);
+  const sag = Math.min(28, 6 + perRow * 3);
+  const drop = off * off * sag - sag / 2;
   return { transform: `translateY(${drop.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)` };
 };

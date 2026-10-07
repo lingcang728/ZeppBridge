@@ -11,7 +11,10 @@ import { useCardCollection } from '../../composables/useCardCollection';
 import { useTrendRange } from '../../composables/useTrendRange';
 import { askCategoryOf } from '../../lib/metricAsk';
 import { deckRangeOf } from '../../lib/cards/deck';
-import { categorySource, metricSource, type DeckSource } from '../../lib/cards/sources';
+import { categorySource, metricSource, PAIRED_METRICS, type DeckSource } from '../../lib/cards/sources';
+import { metricColor } from '../../lib/metricTone';
+import { formatPaceSeconds } from '../../lib/metricSeries';
+import { paceUnitLabel } from '../../lib/units';
 import type { AiTaskCategory } from '../../lib/bridge/types';
 
 const CardTable = defineAsyncComponent(() => import('./CardTable.vue'));
@@ -44,6 +47,8 @@ const source = computed<DeckSource>(() => (props.category
     tint: props.tint,
     format: props.format ?? ((value: number) => String(value)),
     unit: props.unit,
+    // 乳酸阈值：心率牌面带上同一天的阈值配速（对角斜切双色，1A·A8）。
+    second: PAIRED_METRICS[props.metric ?? ''] ? { tint: metricColor(PAIRED_METRICS[props.metric ?? '']!), format: (seconds: number) => formatPaceSeconds(seconds), unit: paceUnitLabel() } : undefined,
   })));
 
 const show = (event: MouseEvent) => {

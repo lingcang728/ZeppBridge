@@ -8,6 +8,11 @@
   background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 70%), var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 14%, transparent), 0 24px 40px -24px rgba(0, 0, 0, .8);
   transition: transform 260ms cubic-bezier(.3, 1.3, .5, 1), box-shadow var(--dur-base) ease; }
+/* 双读数（乳酸阈值）：对角斜切双色——左上 tint（阈值心率红）、右下 tint2（阈值配速蓝）；两行读数各用各的颜色。 */
+.pcard.duo .pcard-face:not(.back):not(.outline) { background:
+  linear-gradient(135deg, color-mix(in srgb, var(--tint) 20%, transparent) 0 50%, color-mix(in srgb, var(--tint2) 20%, transparent) 50% 100%), var(--mat-raised); }
+.pcard.duo .pcard-value.second { color: var(--tint2); }
+.pcard.duo.day .pcard-value { font-size: min(calc(var(--w) * .15), calc(var(--w) * .8 / var(--fit, 2))); }
 .pcard:not(.disabled):not(.confirm):not(.boxed):hover .pcard-face { transform: translateY(-8px); box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 34px 50px -26px rgba(0, 0, 0, .85); }
 .pcard.focused .pcard-face { box-shadow: var(--mat-raised-rim), inset 0 0 0 2px color-mix(in srgb, var(--tint) 70%, transparent), 0 30px 50px -24px color-mix(in srgb, var(--tint) 40%, rgba(0, 0, 0, .8)); }
 .pcard:focus-visible { outline: none; }
@@ -43,6 +48,9 @@
 .pcard-dots { display: grid; grid-template-columns: repeat(var(--cols, 7), auto); gap: calc(var(--w) * .022); }
 .pcard-dots i { width: max(4px, calc(var(--w) * .034)); height: max(4px, calc(var(--w) * .034)); border-radius: 50%; background: color-mix(in srgb, var(--ink) 16%, transparent); }
 .pcard-dots i.on { background: var(--tint); }
+/* 已挑进收集箱的日子点亮（放大一圈、描一道亮边）；有已挑的时候，没挑的有记录的点退一档，一眼看出挑了哪几天。 */
+.pcard-dots.has-picked i.on { background: color-mix(in srgb, var(--tint) 42%, transparent); }
+.pcard-dots i.picked { background: var(--tint); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ink) 75%, transparent), 0 0 6px color-mix(in srgb, var(--tint) 70%, transparent); scale: 1.3; }
 .pcard-badge { position: absolute; top: -9px; right: -9px; padding: 3px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140a);
   font-size: var(--fs-2xs); font-style: normal; font-weight: 750; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .6); }
 /* 背面：翻过来等确认——牌抬起来、阴影加深；点大圆勾放进收集箱，点「放回」翻回去。 */
@@ -73,7 +81,10 @@
 /* 长按：边框描一圈，按住时往下沉一点，松手弹回。 */
 .pcard.holding { scale: .97; }
 .pcard-ring { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; overflow: visible; opacity: 0; pointer-events: none; }
-.pcard-ring rect { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; vector-effect: non-scaling-stroke; }
+/* 描边压在牌边上：内缩半个线宽，圆角 = 牌面圆角减半个线宽，四边与牌边重合。 */
+.pcard-ring rect { --sw: 2.5px; x: calc(var(--sw) / 2); y: calc(var(--sw) / 2); width: calc(100% - var(--sw)); height: calc(100% - var(--sw));
+  rx: calc(var(--w) * .1 - var(--sw) / 2); ry: calc(var(--w) * .1 - var(--sw) / 2);
+  fill: none; stroke: var(--accent); stroke-width: var(--sw); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
 .pcard.holding .pcard-ring { opacity: 1; }
 .pcard.holding .pcard-ring rect { animation: pcard-hold 450ms linear forwards; }
 @keyframes pcard-hold { to { stroke-dashoffset: 0; } }

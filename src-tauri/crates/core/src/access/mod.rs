@@ -74,6 +74,8 @@ pub enum AccessCategory {
     PersonalNote,
     /// 附件元信息。同上，首批只进枚举不进授权窗。
     Attachment,
+    /// 静息心率（1A·A10 从 `heart_rate` 拆出来；`heart_rate` 现在只管全天心率采样）。
+    RestingHr,
 }
 
 impl AccessCategory {
@@ -87,6 +89,7 @@ impl AccessCategory {
             "body" => Self::Body,
             "personal_note" => Self::PersonalNote,
             "attachment" => Self::Attachment,
+            "resting_hr" => Self::RestingHr,
             _ => return None,
         })
     }
@@ -101,6 +104,7 @@ impl AccessCategory {
             Self::Body => "body",
             Self::PersonalNote => "personal_note",
             Self::Attachment => "attachment",
+            Self::RestingHr => "resting_hr",
         }
     }
 
@@ -109,7 +113,12 @@ impl AccessCategory {
     pub fn is_windowed(&self) -> bool {
         matches!(
             self,
-            Self::Sleep | Self::Recovery | Self::HeartRate | Self::Training | Self::Body
+            Self::Sleep
+                | Self::Recovery
+                | Self::HeartRate
+                | Self::RestingHr
+                | Self::Training
+                | Self::Body
         )
     }
 }
@@ -514,7 +523,7 @@ pub fn metric_category(metric: &str) -> Option<AccessCategory> {
         | "sleep_rhr" | "hrv" | "hrv_rmssd" | "hrv_baseline" | "rhr_baseline" | "ahi_baseline" => {
             AccessCategory::Recovery
         }
-        "resting_hr" => AccessCategory::HeartRate,
+        "resting_hr" => AccessCategory::RestingHr,
         // 训练负荷与按日活动量同归一类：它们是「练了多少」的同一份账。
         "training_load"
         | "vo2max"

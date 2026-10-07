@@ -15,6 +15,8 @@ const picks = ref<CardPick[]>([]);
 const handedToTask = ref(false);
 /** 开着几张牌桌（第三轮 A4）：开着的时候箱子哪怕是空的也跟着牌桌滑进来，等着接牌。 */
 const tables = ref(0);
+/** 有一张（或一叠）牌正被拖着悬在箱子上方（1B·B2）：箱子亮起「松手放进来」。 */
+const dropHover = ref(false);
 let loaded = false;
 let saveTimer = 0;
 
@@ -117,6 +119,7 @@ export const useCardCollection = () => {
     handedToTask,
     /** 有牌桌开着（箱子空的也要露面接牌）。 */
     tableOpen: computed(() => tables.value > 0),
+    dropHover,
     /** 牌桌开 / 收：成对调用。 */
     setTableOpen: (open: boolean) => { tables.value = Math.max(0, tables.value + (open ? 1 : -1)); },
     /** 任务真的交出去了：如果它是从收集箱开的，清空箱子。 */

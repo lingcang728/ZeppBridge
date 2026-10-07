@@ -72,6 +72,37 @@ pub(super) struct SharedCategoryRange {
     pub(super) excluded_metrics: Vec<String>,
 }
 
+/// 拆类之前的任务（只有 `heart_rate` 一行，管着全天心率和静息心率）：补一行同设置的 `resting_hr`，
+/// 授权窗口与拆类前完全一致（与 `ai_tasks::upgrade_heart_rate_split` 同一条规则）。
+fn upgrade_heart_rate_split(categories: &mut Vec<SharedCategoryRange>) {
+    if categories
+        .iter()
+        .any(|range| range.category == "resting_hr")
+    {
+        return;
+    }
+    let Some(at) = categories
+        .iter()
+        .position(|range| range.category == "heart_rate")
+    else {
+        return;
+    };
+    let legacy = &mut categories[at];
+    let (resting, rest): (Vec<String>, Vec<String>) = legacy
+        .excluded_metrics
+        .drain(..)
+        .partition(|metric| metric == "resting_hr");
+    legacy.excluded_metrics = rest;
+    let split = SharedCategoryRange {
+        category: "resting_hr".into(),
+        enabled: legacy.enabled,
+        days_before: legacy.days_before,
+        include_workout_day: legacy.include_workout_day,
+        excluded_metrics: resting,
+    };
+    categories.insert(at, split);
+}
+
 pub(super) fn default_days_before() -> i64 {
     14
 }
@@ -94,10 +125,11 @@ pub(super) fn default_true() -> bool {
 /// 只有任务启用了 workout 类别，它才同时是**可读实体**。关掉 workout
 /// 类别的任务，MCP 读不到那条运动本身。
 pub(super) fn expand_task(
-    task: SharedTaskPayload,
+    mut task: SharedTaskPayload,
     local_days: &BTreeMap<String, NaiveDate>,
     today: NaiveDate,
 ) -> TaskGrant {
+    upgrade_heart_rate_split(&mut task.categories);
     let mut windows = Vec::new();
     let anchor_days: Vec<Option<NaiveDate>> = if task.workout_ids.is_empty() {
         vec![None]

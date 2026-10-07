@@ -56,6 +56,8 @@ pub(crate) fn normalize_task_draft(task: &AiTask) -> Result<AiTask> {
 fn normalize_task_impl(task: &AiTask, require_title: bool) -> Result<AiTask> {
     let invalid = |message: &str| AiTaskError::invalid_task(message);
     let mut task = task.clone();
+    // 老界面 / 老 MCP 客户端交来的草稿只有 `heart_rate`：先补上 `resting_hr`，规则一致。
+    upgrade_heart_rate_split(&mut task.categories);
 
     if require_title && task.title.trim().is_empty() {
         return Err(invalid("任务标题不能为空"));
@@ -223,9 +225,16 @@ impl Database {
             .optional()?;
         payload
             .map(|payload| {
-                serde_json::from_str::<AiTask>(&payload).map_err(|error| {
-                    ZeppBridgeError::ParseError(format!("ai_tasks[{id}] 的 payload 损坏: {error}"))
-                })
+                serde_json::from_str::<AiTask>(&payload)
+                    .map(|mut task| {
+                        upgrade_heart_rate_split(&mut task.categories);
+                        task
+                    })
+                    .map_err(|error| {
+                        ZeppBridgeError::ParseError(format!(
+                            "ai_tasks[{id}] 的 payload 损坏: {error}"
+                        ))
+                    })
             })
             .transpose()
     }
@@ -355,9 +364,13 @@ impl Database {
         let mut templates = Vec::new();
         for row in rows {
             let payload = row?;
-            let template = serde_json::from_str::<AiTaskTemplate>(&payload).map_err(|error| {
-                ZeppBridgeError::ParseError(format!("ai_task_templates 的 payload 损坏: {error}"))
-            })?;
+            let mut template =
+                serde_json::from_str::<AiTaskTemplate>(&payload).map_err(|error| {
+                    ZeppBridgeError::ParseError(format!(
+                        "ai_task_templates 的 payload 损坏: {error}"
+                    ))
+                })?;
+            upgrade_heart_rate_split(&mut template.categories);
             templates.push(template);
         }
         Ok(templates)
@@ -374,11 +387,16 @@ impl Database {
             .optional()?;
         payload
             .map(|payload| {
-                serde_json::from_str::<AiTaskTemplate>(&payload).map_err(|error| {
-                    ZeppBridgeError::ParseError(format!(
-                        "ai_task_templates[{id}] 的 payload 损坏: {error}"
-                    ))
-                })
+                serde_json::from_str::<AiTaskTemplate>(&payload)
+                    .map(|mut template| {
+                        upgrade_heart_rate_split(&mut template.categories);
+                        template
+                    })
+                    .map_err(|error| {
+                        ZeppBridgeError::ParseError(format!(
+                            "ai_task_templates[{id}] 的 payload 损坏: {error}"
+                        ))
+                    })
             })
             .transpose()
     }

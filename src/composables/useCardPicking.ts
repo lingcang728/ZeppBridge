@@ -25,6 +25,10 @@ export const useCardPicking = (options: {
   busy: Ref<boolean>;
   /** 按牌的 id（日期 / 叠的 id）找到它的元素。 */
   cardOf: (id: string) => HTMLElement | null;
+  /** 打断接力：还在发的牌先在很短时间里落定（点一张正在飞的牌，等它落下再翻面）。 */
+  settle?: () => Promise<void>;
+  /** 一张牌 / 一叠开始飞向箱子（牌桌让背景深一下，1A·A6）。 */
+  onFly?: () => void;
 }) => {
   const box = useCardCollection();
   const boxEl = () => document.getElementById('card-collection-box');
@@ -84,6 +88,7 @@ export const useCardPicking = (options: {
   const sendDay = async (day: DeckDay, el: HTMLElement) => {
     const { key: k, category } = options.source();
     const id = cardIdOf(day);
+    options.onFly?.();
     const landed = flyCardHome(el, boxEl(), () => {
       box.add(day.pickKey ?? k, category, [day.date]);
       flying.delete(id);
@@ -93,6 +98,29 @@ export const useCardPicking = (options: {
     await nextTick();
     el.style.visibility = '';
     if (!(await landed)) flying.delete(id);
+  };
+
+  /**
+   * 一叠日牌一起进箱子（拖成的一叠长按、1B·B3）：最上面那张替整叠飞，其余的同一刻隐身；落地才一起算数。
+   */
+  const sendDays = async (days: DeckDay[], el: HTMLElement) => {
+    const { key: k, category } = options.source();
+    const todo = days.filter((day) => day.has && stateOf(cardIdOf(day)) === 'front');
+    if (!todo.length) return;
+    const ids = todo.map(cardIdOf);
+    const others = ids.map((id) => options.cardOf(id)).filter((card): card is HTMLElement => !!card && card !== el);
+    options.onFly?.();
+    for (const card of others) card.style.visibility = 'hidden';
+    const landed = flyCardHome(el, boxEl(), () => {
+      for (const day of todo) box.add(day.pickKey ?? k, category, [day.date]);
+      for (const id of ids) flying.delete(id);
+    });
+    for (const id of ids) flying.add(id);
+    if (confirmId.value && ids.includes(confirmId.value)) confirmId.value = null;
+    await nextTick();
+    el.style.visibility = '';
+    for (const card of others) card.style.visibility = '';
+    if (!(await landed)) for (const id of ids) flying.delete(id);
   };
 
   /** 从箱子拿回来：离开箱子那一刻 −1，飞回牌位后翻回正面。 */
@@ -107,14 +135,28 @@ export const useCardPicking = (options: {
     await flipCard(el, async () => { returning.delete(id); await nextTick(); });
   };
 
-  const onDayClick = (day: DeckDay, event: MouseEvent) => {
+  /** 牌自己身上有没有正在放的动画（发牌、扇回）。 */
+  const inMotion = (el: HTMLElement) => el.getAnimations().some((a) => a.playState === 'running' || a.pending);
+
+  const onDayClick = async (day: DeckDay, event: MouseEvent) => {
     const el = event.currentTarget as HTMLElement;
     const id = cardIdOf(day);
+    // 同一张牌飞进 / 飞出箱子途中再点无效；发牌途中点它：先让它落定（≈120ms），再照常翻面。
     if (!day.has || options.busy.value || flying.has(id) || returning.has(id)) return;
+    if (inMotion(el) && options.settle) {
+      const target = (event.target as Element | null);
+      await options.settle();
+      if (options.busy.value) return;
+      handleDay(day, el, id, target);
+      return;
+    }
+    handleDay(day, el, id, event.target as Element | null);
+  };
+  const handleDay = (day: DeckDay, el: HTMLElement, id: string, target: Element | null) => {
     const state = stateOf(id);
     if (state === 'boxed') { void takeBack(day, el); return; }
     if (state === 'confirm') {
-      if ((event.target as Element | null)?.closest('.back-cancel')) void cancelConfirm();
+      if (target?.closest('.back-cancel')) void cancelConfirm();
       else void sendDay(day, el);
       return;
     }
@@ -132,6 +174,7 @@ export const useCardPicking = (options: {
       await flyFromBox(boxEl(), el);
       return;
     }
+    options.onFly?.();
     const landed = await flyCardHome(el, boxEl(), () => box.add(k, category, dates));
     // 那一叠还在原处（带着「已挑 7/7」）：等替身进了箱子再淡回来。
     el.style.visibility = '';
@@ -160,7 +203,8 @@ export const useCardPicking = (options: {
 
   /* 长按一叠：450ms 后整叠收进箱子；没按满就是普通的点（展开）。 */
   let hold: { id: string; x: number; y: number; timer: number; done: boolean } | null = null;
-  const holdStart = (group: DeckGroup, event: PointerEvent) => {
+  /** 按住一叠（周 / 月叠，或拖成的一叠日牌）：`action` 默认是整叠进箱子。 */
+  const holdStart = (group: DeckGroup | { id: string }, event: PointerEvent, action?: (el: HTMLElement) => void) => {
     if (event.button !== 0 || options.busy.value) return;
     const el = event.currentTarget as HTMLElement;
     holdId.value = group.id;
@@ -168,7 +212,8 @@ export const useCardPicking = (options: {
       if (!hold) return;
       hold.done = true;
       holdId.value = null;
-      void pickGroup(group, el);
+      if (action) action(el);
+      else void pickGroup(group as DeckGroup, el);
     }, HOLD_MS) };
   };
   const holdMove = (event: PointerEvent) => {
@@ -187,7 +232,7 @@ export const useCardPicking = (options: {
 
   return {
     confirmId, liftId, raisedId, holdId, stateOf,
-    onDayClick, cancelConfirm, pickGroup, pickAll,
+    onDayClick, cancelConfirm, pickGroup, pickAll, sendDay, sendDays,
     holdStart, holdMove, holdEnd, consumeHold,
   };
 };

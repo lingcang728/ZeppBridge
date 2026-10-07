@@ -8,8 +8,9 @@
  * - 收牌成叠再飞走 `gatherCards`：送达动画（训练计划发到手表）；
  * - 飞进 / 飞出收集箱 `flyCardHome` / `flyFromBox`：真牌本身离开牌位（替身摆在完全相同的位置），到了才算数；
  *   来处接住 `receive`、光圈 `landPulse`、顶一下 `bump`；
+ * - 小丑盒 `box.ts`：盖子弹开接住飞来的牌（`catchCard`）、铺开 / 收起时弹起 / 合上（`lidOpen` / `lidClose`）；
  * - 镜头推进 `recedeLayer`：上一层收拢进被点的那一叠、退到后面压暗，不拷贝文字；
- * - 打断 `reversible.ts`：从此刻的计算样式原路放回、编排发号。
+ * - 打断 `reversible.ts`：从此刻的计算样式原路放回、编排发号；`relay()` 打断接力（新点击立刻生效，旧动画收尾）。
  * 全部只动 transform / opacity，弹簧缓动见 `spring.ts`；减少动效时退化成淡入淡出或不放。
  */
 export { dealCards, stackCards, returnStack, stackAndReturn, fanBack, type Landing } from './deal';
@@ -18,5 +19,6 @@ export { shuffleCards, cutDeck } from './shuffle';
 export { gatherCards, type CardFlight } from './gather';
 export { flyCardHome, flyFromBox, receive, landPulse, bump } from './fly';
 export { recedeLayer, type Receded } from './camera';
-export { animateFromNow, fromNow, cancelOn, sequence, type Sequence } from './reversible';
+export { catchCard, lidOpen, lidClose } from './box';
+export { animateFromNow, fromNow, cancelOn, sequence, relay, HANDOFF_MS, type Sequence, type Relay } from './reversible';
 export { springCurve, SPRINGS, reducedMotion, settled, type Spring } from './spring';

@@ -19,8 +19,9 @@ import CoachTip from './CoachTip.vue';
 import { useCardsText } from './cards.i18n';
 import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
+import { useCardTableDrag } from '../../composables/useCardTableDrag';
 import {
-  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, returnStack, sequence, shuffleCards, stackCards, type Landing, type Receded,
+  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, shuffleCards, stackCards, type Landing, type Receded,
 } from '../../lib/motion/cards';
 import { CLOSE_EASE, OPEN_EASE } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
@@ -46,12 +47,14 @@ const head = ref<HTMLElement | null>(null);
 const mark = ref<HTMLElement | null>(null);
 const foot = ref<HTMLElement | null>(null);
 const stageBox = ref({ width: 1000, height: 560 });
+/** 结构在变（推镜头、退层、收牌、换范围时理牌）：这一段里点牌不算挑牌。发牌不算——发牌途中的点击走打断接力。 */
 const busy = ref(false);
 const closing = ref(false);
 const loadFailed = ref(false);
 const focusDate = ref<string | null>(props.focus);
 const titleId = `card-table-${Math.random().toString(36).slice(2, 8)}`;
-const seq = sequence();
+/** 打断接力（1A·A2）：新指令立刻生效，在飞的发牌从此刻收尾。 */
+const seq = relay();
 let returnFocus: HTMLElement | null = null;
 let entrySeq = 0;
 let popping = false;
@@ -61,7 +64,18 @@ const setLayer = (depth: number, el: unknown) => { if (el instanceof HTMLElement
 const top = computed(() => stack.value[stack.value.length - 1] ?? null);
 const cardsOf = (depth: number): HTMLElement[] => [...(layers[depth]?.querySelectorAll<HTMLElement>('.pcard') ?? [])];
 const cardOf = (id: string) => layers[stack.value.length - 1]?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(id)}"]`) ?? null;
-const picking = useCardPicking({ source: () => props.source, busy, cardOf });
+/** 牌飞进箱子时背景深一下（预先模糊好的那一层只淡入淡出，1A·A6）。连着挑几张时从此刻接着放，不叠。 */
+const deep = ref<HTMLElement | null>(null);
+const deepen = () => {
+  if (!deep.value || reducedMotion()) return;
+  animateFromNow(deep.value, [{ opacity: 1, offset: 0.35 }, { opacity: 0 }], { duration: 760, easing: 'ease-in-out' }, ['opacity']);
+};
+const picking = useCardPicking({ source: () => props.source, busy, cardOf, settle: () => seq.settle(), onFly: deepen });
+
+/* ---------- 拖牌、叠牌（1B·B3，composables/useCardTableDrag.ts） ---------- */
+const { drag, scatter, onDayDown, onDayMove, onDayUp, onDayCancel, onDayTap } = useCardTableDrag({
+  level: () => top.value?.level ?? null, cardOf, picking, blocked: () => busy.value || closing.value, has: (date) => box.has(props.source.key, date),
+});
 
 /* ---------- 文案 ---------- */
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
@@ -134,14 +148,15 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
 };
 const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : workouts.value ? t.value.recentWorkouts : rangeLabel(range.value));
 
-const deal = async (id: number) => {
-  const level = await loadLevel();
+/** 进场（1A·A3）：图标先从来处飞到左上角落定，再发牌——两段串行，最多重叠 80ms。数据在图标飞的时候并行取。 */
+const deal = async (id: number, intro: Promise<void>) => {
+  const [level] = await Promise.all([loadLevel(), intro]);
   if (!level || !seq.live(id)) return;
   layers.length = 0;
   stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
-  await dealCards(cards, anchorLanding());
+  await dealCards(cards, anchorLanding(), { track: seq.track });
   if (!seq.live(id)) return;
   const first = firstPickable(cards);
   first?.focus({ preventScroll: true });
@@ -150,7 +165,8 @@ const deal = async (id: number) => {
 
 const push = async (group: DeckGroup, card: HTMLElement) => {
   if (busy.value || closing.value) return;
-  const id = seq.next();
+  const id = seq.handoff();
+  scatter();
   busy.value = true;
   await picking.cancelConfirm();
   const depth = stack.value.length - 1;
@@ -163,9 +179,9 @@ const push = async (group: DeckGroup, card: HTMLElement) => {
   stack.value = [...stack.value.slice(0, depth + 1), { ...entry, pending: false }];
   await nextTick();
   const cards = cardsOf(depth + 1);
-  await dealCards(cards, receded.now());
-  if (!seq.live(id)) return;
   busy.value = false;
+  await dealCards(cards, receded.now(), { track: seq.track });
+  if (!seq.live(id)) return;
   firstPickable(cards)?.focus({ preventScroll: true });
 };
 
@@ -173,7 +189,8 @@ const pop = async () => {
   if (popping || closing.value) return;
   const depth = stack.value.length - 1;
   if (depth <= 0) { await close(); return; }
-  const id = seq.next();
+  const id = seq.handoff();
+  scatter();
   popping = true;
   busy.value = true;
   await picking.cancelConfirm();
@@ -205,7 +222,8 @@ const setBoxOpen = (open: boolean) => {
 
 const close = async () => {
   if (closing.value) return;
-  const id = seq.next();
+  const id = seq.handoff();
+  scatter();
   closing.value = true;
   busy.value = true;
   picking.holdEnd();
@@ -236,23 +254,32 @@ const reopen = () => {
   void fanBack(cardsOf(stack.value.length - 1));
 };
 
+/**
+ * 换范围（1A·A1）：以前在忙就直接 return，可分段控件的滑块已经移过去了——右上角写着「6 个月」，桌上还是 7 天。
+ * 现在走打断接力：范围先改（分段控件永远和 `range` 一致），在飞的牌从此刻的样子理成一叠，再从这一叠发出新的一副；
+ * 半路又换，旧的那次自己停下，新的接着从此刻的样子理牌（被打断时跳过洗牌，直接理）。
+ */
 const switchRange = async (value: string) => {
   const next = Number(value) as DeckRange;
-  if ((next === range.value && !focusDate.value) || busy.value || closing.value) return;
-  const id = seq.next();
-  busy.value = true;
-  await picking.cancelConfirm();
+  if ((next === range.value && !focusDate.value) || closing.value) return;
+  const interrupted = busy.value || seq.moving;
+  const id = seq.handoff();
+  scatter();
   range.value = next;
   focusDate.value = null;
+  busy.value = true;
   const loading = loadLevel();
+  await picking.cancelConfirm();
+  if (!seq.live(id)) return;
   const old = cardsOf(stack.value.length - 1);
   for (const layer of layers.slice(0, -1)) animateFromNow(layer, { opacity: 0 }, { duration: 260, fill: 'forwards' }, ['opacity']);
-  await shuffleCards(old);
+  if (!interrupted) await shuffleCards(old);
   if (!seq.live(id)) return;
   const center = stageCenter();
   await stackCards(old, center);
   const level = await loading;
-  if (!seq.live(id) || !level) { busy.value = false; return; }
+  if (!seq.live(id)) return;
+  if (!level) { busy.value = false; return; }
   // 这一叠就是落点：新的一副从同一个位置、同样大小发出来。
   const topCard = old[old.length - 1];
   const width = (topCard?.offsetWidth ?? 120);
@@ -263,18 +290,20 @@ const switchRange = async (value: string) => {
   stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
-  await dealCards(cards, from, { fromStack: true });
-  if (!seq.live(id)) return;
   busy.value = false;
+  await dealCards(cards, from, { fromStack: true, track: seq.track });
+  if (!seq.live(id)) return;
   firstPickable(cards)?.focus({ preventScroll: true });
 };
 
 const onBlank = () => {
+  // 长按刚放完：那张牌正隐身飞向箱子，松手的 click 落到了空白处——不是「点空白收牌」。
+  if (picking.consumeHold() || drag.consumeClick()) return;
   if (picking.confirmId.value) { void picking.cancelConfirm(); return; }
   void pop();
 };
 const tapGroup = (group: DeckGroup, event: MouseEvent) => {
-  if (picking.consumeHold()) return;
+  if (drag.consumeClick() || picking.consumeHold()) return;
   void push(group, event.currentTarget as HTMLElement);
 };
 const onCardKey = (event: KeyboardEvent, item: { group?: DeckGroup }) => {
@@ -288,21 +317,27 @@ const onCardKey = (event: KeyboardEvent, item: { group?: DeckGroup }) => {
 };
 
 /* ---------- 头部入场：图标从来处飞到左上角，标题、范围依次浮上 ---------- */
-const introHead = () => {
-  if (reducedMotion()) return;
+const INTRO_MS = 520;
+const INTRO_OVERLAP_MS = 80;
+/** 返回「图标落定（减去允许的重叠）」的时刻；没有来处或减少动效时立刻。 */
+const introHead = (): Promise<void> => {
+  if (reducedMotion()) return Promise.resolve();
   const icon = props.anchor?.querySelector('svg')?.getBoundingClientRect() ?? props.origin;
   const target = mark.value?.getBoundingClientRect();
+  let landed = Promise.resolve();
   if (icon && target && mark.value) {
     const dx = icon.left + icon.width / 2 - (target.left + target.width / 2);
     const dy = icon.top + icon.height / 2 - (target.top + target.height / 2);
     const s = Math.max(0.3, Math.min(1, icon.width / Math.max(target.width, 1)));
     mark.value.animate([{ transform: `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${s.toFixed(2)})`, opacity: 0.4 }, { transform: 'none', opacity: 1 }],
-      { duration: 520, easing: OPEN_EASE, fill: 'backwards' });
+      { duration: INTRO_MS, easing: OPEN_EASE, fill: 'backwards' });
+    landed = new Promise((resolve) => window.setTimeout(resolve, INTRO_MS - INTRO_OVERLAP_MS));
   }
   [...(head.value?.querySelectorAll<HTMLElement>('[data-intro]') ?? [])].forEach((el, i) => el.animate(
     [{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }],
     { duration: 380, delay: 140 + i * 70, easing: OPEN_EASE, fill: 'backwards' },
   ));
+  return landed;
 };
 
 /* ---------- 生命周期 ---------- */
@@ -311,10 +346,12 @@ let resize: ResizeObserver | null = null;
 const measure = () => {
   const el = stage.value;
   if (el) stageBox.value = { width: el.clientWidth - 16, height: el.clientHeight - 24 };
+  if (drag.piles.value.length) void nextTick(() => drag.layoutPiles(false));
 };
 onMounted(() => {
   returnFocus = document.activeElement as HTMLElement | null;
   releaseEscape = onMotionEscape(() => {
+    if (drag.cancel()) return true;
     if (picking.confirmId.value) { void picking.cancelConfirm(); return true; }
     if (!closing.value) void pop();
     return true;
@@ -324,8 +361,7 @@ onMounted(() => {
   if (stage.value) resize.observe(stage.value);
   setBoxOpen(true);
   backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
-  introHead();
-  void deal(seq.next());
+  void deal(seq.next(), introHead());
 });
 onBeforeUnmount(() => {
   releaseEscape?.();
@@ -341,6 +377,7 @@ defineExpose({ reopen, isClosing: () => closing.value });
   <Teleport to="body">
     <div :class="['card-table', { closing }]" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="`${titleId}-keys`" :style="{ '--tint': source.tint }">
       <div ref="backdrop" class="table-backdrop" aria-hidden="true" @click="onBlank"></div>
+      <div ref="deep" class="table-backdrop deep" aria-hidden="true"></div>
       <header ref="head" class="table-head">
         <button v-if="stack.length > 1" type="button" class="table-icon" :aria-label="t.back" @click="pop"><Icon name="arrow-left" :size="17" /></button>
         <span v-else ref="mark" class="table-mark" aria-hidden="true"><Icon name="cards" :size="18" /></span>
@@ -358,18 +395,23 @@ defineExpose({ reopen, isClosing: () => closing.value });
             <template v-if="entry.level.kind === 'days'">
               <span v-for="(day, i) in entry.level.days" :key="cardIdOf(day)" :class="['pslot', slotClass(depth, entry.level.days.map(cardIdOf), i)]" :style="slotStyle(entry.level, i)">
                 <PlayingCard kind="day" :data-card-id="cardIdOf(day)" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
-                  :value="dayValue(day)" :unit="!day.text && numberText(day.value) ? source.unit : null" :icon="day.icon" :state="day.has ? picking.stateOf(cardIdOf(day)) : 'front'"
-                  :class="{ lifting: picking.liftId.value === cardIdOf(day) }" :disabled="!day.has" :focused="day.date === focusDate && (!workouts || i === entry.level.days.findIndex((d) => d.date === focusDate))" :tint="source.tint"
+                  :value="source.second ? numberText(day.value) : dayValue(day)" :unit="!day.text && numberText(day.value) ? source.unit : null"
+                  :value2="source.second && day.value2 != null ? source.second.format(day.value2) : null" :unit2="source.second?.unit ?? null" :tint2="source.second?.tint ?? null" :icon="day.icon" :state="day.has ? picking.stateOf(cardIdOf(day)) : 'front'"
+                  :class="{ lifting: picking.liftId.value === cardIdOf(day), buried: drag.buried(cardIdOf(day)), 'drop-target': drag.targetId.value === cardIdOf(day) }"
+                  :disabled="!day.has" :focused="day.date === focusDate && (!workouts || i === entry.level.days.findIndex((d) => d.date === focusDate))" :tint="source.tint"
+                  :badge="drag.pileCount(cardIdOf(day)) ? `×${drag.pileCount(cardIdOf(day))}` : null" :holding="picking.holdId.value === cardIdOf(day)"
                   :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(cardIdOf(day)) === 'boxed'"
-                  @click="picking.onDayClick(day, $event)" @keydown="onCardKey($event, {})" />
+                  @pointerdown="onDayDown($event, day)" @pointermove="onDayMove" @pointerup="onDayUp" @pointercancel="onDayCancel"
+                  @click="onDayTap(day, $event)" @keydown="onCardKey($event, {})" />
               </span>
             </template>
             <template v-else>
               <span v-for="(group, i) in entry.level.groups" :key="group.id" :class="['pslot', { 'is-holding': picking.holdId.value === group.id }]" :style="slotStyle(entry.level, i)">
                 <PlayingCard kind="group" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
-                  :dots="group.days.map((d) => d.has)" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
+                  :dots="group.days.map((d) => (d.has && box.has(source.key, d.date) ? 'picked' : d.has))" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
                   :aria-label="t.groupAria(groupTitle(group), groupSub(group))" :aria-description="pickedIn(group) === pickableDates(group).length && pickedIn(group) ? t.holdToUnpick : t.holdToPick"
-                  @pointerdown="picking.holdStart(group, $event)" @pointermove="picking.holdMove" @pointerup="picking.holdEnd" @pointercancel="picking.holdEnd" @pointerleave="picking.holdEnd"
+                  @pointerdown="picking.holdStart(group, $event); drag.down($event, group.id)" @pointermove="picking.holdMove($event); drag.move($event)"
+                  @pointerup="picking.holdEnd(); drag.up($event)" @pointercancel="picking.holdEnd(); drag.cancelEvent($event)"
                   @click="tapGroup(group, $event)" @keydown="onCardKey($event, { group })" />
               </span>
             </template>

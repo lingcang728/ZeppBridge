@@ -23,6 +23,8 @@ export interface DeckDay {
   icon?: 'run' | 'bike' | 'activity';
   /** 已经排好的读数（运动牌：时长 · 距离）。 */
   text?: string;
+  /** 双读数牌的第二个读数（乳酸阈值：配速，1A·A8）。没有就是 null，不补零。 */
+  value2?: number | null;
 }
 
 /** 运动牌在收集箱里的键前缀：`workout:<运动 id>`。 */

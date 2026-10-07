@@ -10,7 +10,8 @@
  * 只动 transform / opacity / scale；减少动效时不飞，直接算数。
  */
 import { CLOSE_EASE } from '../timing';
-import { restOf } from './pose';
+import { catchCard, lidClose, lidOpen } from './box';
+import { restOf, toLocal } from './pose';
 import { reducedMotion, settled, SPRINGS, springCurve } from './spring';
 
 const FLY_MS = 560;
@@ -54,10 +55,18 @@ export const receive = (target: Element | null | undefined) => {
   };
 };
 
+/** 牌自己的 `translate`（被拖着、叠在别的牌上，1B·B3）折成屏幕上的位移：它是在牌位歪着的坐标系里写的。 */
+const draggedOffset = (card: HTMLElement, angle: number) => {
+  const m = /(-?[\d.]+)px(?:\s+(-?[\d.]+)px)?/.exec(card.style.translate || '');
+  return m ? toLocal(Number(m[1]), Number(m[2] ?? 0), -angle) : { x: 0, y: 0 };
+};
+
 /** 拷一份整个牌位，摆在真牌此刻的位置、角度、大小上（fixed，挂在 body 上）。 */
 const ghostOf = (card: HTMLElement) => {
   const slot = card.parentElement?.classList.contains('pslot') ? card.parentElement : card;
-  const rest = restOf(card);
+  const resting = restOf(card);
+  const shift = draggedOffset(card, resting.angle);
+  const rest = { ...resting, center: { x: resting.center.x + shift.x, y: resting.center.y + shift.y } };
   const w = slot.offsetWidth || card.offsetWidth;
   const h = slot.offsetHeight || card.offsetHeight;
   const ghost = slot.cloneNode(true) as HTMLElement;
@@ -70,6 +79,8 @@ const ghostOf = (card: HTMLElement) => {
   ghost.style.setProperty('--card-w', getComputedStyle(card).getPropertyValue('--card-w') || `${card.offsetWidth}px`);
   ghostCard.style.transform = getComputedStyle(card).transform === 'none' ? '' : getComputedStyle(card).transform;
   ghostCard.style.visibility = '';
+  ghostCard.style.translate = 'none';
+  ghostCard.style.rotate = card.style.rotate;
   Object.assign(ghost.style, {
     position: 'fixed', left: `${(rest.center.x - w / 2).toFixed(1)}px`, top: `${(rest.center.y - h / 2).toFixed(1)}px`,
     width: `${w}px`, height: `${h}px`, margin: '0', zIndex: '3000', pointerEvents: 'none', transformOrigin: '50% 50%',
@@ -105,6 +116,8 @@ export const flyCardHome = async (card: HTMLElement, target: HTMLElement | null,
   const { ghost, rest, w } = ghostOf(card);
   card.style.visibility = 'hidden';
   const path = arcTo(rest, target.getBoundingClientRect(), w);
+  // 小丑盒：飞到一半盖子弹开接住，落进去再合上（1B·B1）。
+  const caught = catchCard(target, FLY_MS);
   const flight = ghost.animate(
     [
       { transform: path.home, opacity: 1 },
@@ -116,6 +129,7 @@ export const flyCardHome = async (card: HTMLElement, target: HTMLElement | null,
   );
   await settled([flight]);
   const landed = flight.playState === 'finished';
+  caught(landed);
   ghost.remove();
   if (landed) {
     onLand();
@@ -138,6 +152,9 @@ export const flyFromBox = async (source: HTMLElement | null, card: HTMLElement):
   card.style.visibility = 'hidden';
   const path = arcTo(rest, source.getBoundingClientRect(), w);
   bump(source);
+  // 盖子弹开、牌蹦出来，离开盒口就合上。
+  lidOpen(source);
+  lidClose(source, BACK_MS * 0.3);
   const flight = ghost.animate(
     [
       { transform: path.end, opacity: 0 },

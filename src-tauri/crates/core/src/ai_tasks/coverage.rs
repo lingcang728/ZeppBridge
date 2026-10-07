@@ -273,7 +273,9 @@ pub(crate) fn category_metric_specs(category: AiTaskCategory) -> Vec<CategoryMet
             "hrv_rmssd",
             "spo2",
         ],
-        AiTaskCategory::HeartRate => &["heart_rate", "resting_hr"],
+        // 拆类（1A·A10）：全天心率只有逐点采样，静息心率单列一类。
+        AiTaskCategory::HeartRate => &["heart_rate"],
+        AiTaskCategory::RestingHr => &["resting_hr"],
         AiTaskCategory::Training => &[
             "training_load",
             "vo2max",

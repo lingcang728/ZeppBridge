@@ -4,11 +4,11 @@ import type { DayStripRow } from '../types/timeBridge';
 import { addDays } from '../lib/aiTask/bridgeScale';
 import { dayKey } from './rng';
 
-/** Browser demo adapter: derive the same six rows from its existing synthetic dataset. */
+/** Browser demo adapter: derive the same seven rows from its existing synthetic dataset. */
 export const demoDayStrip = (data: DemoData, count: number, end: string): DayStripRow[] => {
   const specs: [AiTaskCategory, string, string][] = [
     ['sleep','duration_minutes','min'], ['recovery','readiness','score'],
-    ['heart_rate','resting_hr','bpm'], ['workout','moving_seconds','min'],
+    ['resting_hr','resting_hr','bpm'], ['heart_rate','heart_rate','bpm'], ['workout','moving_seconds','min'],
     ['training','training_load','load'], ['body','weight','kg'],
   ];
   return specs.map(([category,metric,unit]) => ({ category, metric, cells: Array.from({ length: Math.min(90,Math.max(1,count)) },(_,i) => {

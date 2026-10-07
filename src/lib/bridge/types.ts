@@ -58,6 +58,7 @@ export type AiTaskCategory =
   | 'workout'
   | 'sleep'
   | 'recovery'
+  | 'resting_hr'
   | 'heart_rate'
   | 'training'
   | 'body'

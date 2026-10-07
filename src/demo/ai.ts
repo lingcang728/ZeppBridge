@@ -18,9 +18,13 @@ const STAMP = '2026-09-23T00:00:00Z';
 const range = (category: AiTaskCategory, days: number, enabled = true): AiTaskCategoryRange => ({
   category, enabled, days_before: days, include_workout_day: true, excluded_metrics: [],
 });
-const DATA_CATEGORIES: AiTaskCategory[] = ['workout', 'sleep', 'recovery', 'heart_rate', 'training', 'body'];
+const DATA_CATEGORIES: AiTaskCategory[] = ['workout', 'sleep', 'recovery', 'resting_hr', 'heart_rate', 'training', 'body'];
+/** 内置模板按拆类之前的写法给「心率」：静息心率跟着它（与后端 builtin_categories 同一条规则）。 */
 const categories = (days: Partial<Record<AiTaskCategory, number>>, off: AiTaskCategory[] = ['body']): AiTaskCategoryRange[] => [
-  ...DATA_CATEGORIES.map((category) => range(category, days[category] ?? 14, !off.includes(category))),
+  ...DATA_CATEGORIES.map((category) => {
+    const as = category === 'resting_hr' ? 'heart_rate' : category;
+    return range(category, days[as] ?? 14, !off.includes(as));
+  }),
   range('personal_note', 0, false),
   range('attachment', 0, false),
 ];
@@ -59,6 +63,7 @@ const daysOf = (data: DemoData, category: AiTaskCategory): Set<string> => {
     case 'workout': return data.workoutDays;
     case 'sleep': return data.sleepDays;
     case 'recovery': return new Set(data.metrics.readiness.map((point) => point.date));
+    case 'resting_hr': return new Set((data.metrics.resting_hr ?? []).map((point) => point.date));
     case 'heart_rate': return new Set(data.metrics.steps.map((point) => point.date));
     case 'training': return new Set(data.metrics.training_load.map((point) => point.date));
     default: return new Set(); // 没有体成分秤：身体状态一天都没有，如实空着

@@ -23,6 +23,12 @@ const TONES: Record<string, MetricTone> = {
   spo2: 'pace',
   spo2_odi: 'altitude',
   respiratory_rate: 'sleepRem',
+  // 心率（AI 页「静息心率 / 全天心率」两类，1A·A10）：都是心率页那条红线的颜色
+  heart_rate: 'heart',
+  // 本地周报（这一周）里的几项：与睡眠页 / 运动列表同色
+  sleep_duration: 'sleepLight',
+  sleep_start_regularity: 'sleepRem',
+  workout_count: 'stride',
   // 活动与训练
   steps: 'brand',
   distance: 'distance',
@@ -30,6 +36,9 @@ const TONES: Record<string, MetricTone> = {
   active_minutes: 'altitude',
   training_load: 'training',
   vo2max: 'vo2',
+  // 乳酸阈值：阈值心率红、阈值配速蓝（牌面对角斜切双色，1A·A8）
+  lactate_threshold_hr: 'heart',
+  lactate_threshold_pace: 'pace',
   pai_total: 'calories',
   // 身体
   weight: 'distance',

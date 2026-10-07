@@ -1,36 +1,42 @@
-/* 收集箱（精修批次 7.3，10-07 第二轮：手里的一把牌；第三轮 A4 / A5：滑进滑出、空箱、拖拽）。箱子比牌桌高一层：挑牌时能看着牌飞进去。 */
-.collection-box { position: fixed; right: 24px; bottom: 24px; z-index: 2060; display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px 0 12px;
+/* 收集箱（精修批次 7.3；第四轮 1B·B1：合盖的小丑盒，侧面印数量）。箱子比牌桌高一层：挑牌时能看着牌飞进去。 */
+.collection-box { position: fixed; right: 24px; bottom: 24px; z-index: 2060; display: inline-flex; align-items: center; gap: 15px; height: 54px; padding: 0 16px 0 10px;
   border: 1px solid var(--mat-glass-line); border-radius: 999px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur);
-  box-shadow: var(--mat-glass-shadow); color: var(--ink); font: inherit; cursor: pointer; transition: transform 420ms cubic-bezier(.4, .6, .2, 1); }
+  box-shadow: var(--mat-glass-shadow); color: var(--ink); font: inherit; cursor: pointer; transition: transform 420ms cubic-bezier(.4, .6, .2, 1), box-shadow 220ms ease; }
 .collection-box.lifted { transform: translateY(-88px); }
-.collection-box:hover .box-stack i:nth-child(1) { transform: rotate(-18deg) translate(-5px, 1px); }
-.collection-box:hover .box-stack i:nth-child(2) { transform: rotate(10deg) translate(4px, -1px); }
 .collection-box:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.box-copy { display: grid; justify-items: start; line-height: 1.1; }
-.box-copy small { color: var(--muted); font-size: var(--fs-2xs); }
-.box-count { position: relative; display: block; min-width: 2ch; height: 1.15em; overflow: hidden; font-size: var(--fs-md); }
-.box-count em { position: absolute; left: 0; top: 0; color: var(--accent); font-family: var(--font-mono); font-style: normal; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.collection-box.empty { cursor: default; }
+.box-copy { color: var(--muted); font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; transition: color 180ms ease; }
+.collection-box:not(.empty) .box-copy { color: var(--ink); }
+/* 小盒：盒身（正面印着张数）+ 盖子（铰链在左下角，box.ts 只动它的 transform）。 */
+.jack { position: relative; display: block; width: 38px; height: 36px; flex: 0 0 auto; }
+.jack-body { position: absolute; left: 2px; right: 2px; bottom: 0; height: 27px; overflow: hidden; border-radius: 4px 4px 7px 7px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 46%, transparent), color-mix(in srgb, var(--accent) 24%, transparent)), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), inset 0 -3px 0 color-mix(in srgb, #000 16%, transparent), 0 6px 12px -6px rgba(0, 0, 0, .6); }
+/* 侧面的小摇把：一眼看出是小丑盒，不是垃圾桶。 */
+.jack::after { content: ''; position: absolute; right: -4px; top: 19px; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 70%, var(--ink));
+  box-shadow: 3px -4px 0 -1px color-mix(in srgb, var(--accent) 70%, var(--ink)); }
+.box-lid { position: absolute; z-index: 1; left: 0; right: 0; top: 2px; height: 9px; border-radius: 4px 4px 2px 2px; transform-origin: 2px 100%;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 78%, transparent), color-mix(in srgb, var(--accent) 56%, transparent)), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), 0 2px 4px -2px rgba(0, 0, 0, .55);
+  transition: translate 220ms cubic-bezier(.3, 1.4, .5, 1), rotate 220ms cubic-bezier(.3, 1.4, .5, 1); }
+/* 盖面上印一枚花色（◆），跟牌角同一种记号。 */
+.box-lid::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 1px; background: var(--accent-ink, #10140a); opacity: .55; transform: rotate(45deg); }
+.jack-body em { position: absolute; inset: 0; display: grid; place-items: center; padding-top: 3px; color: var(--ink); font-family: var(--font-mono); font-size: 14px; font-style: normal; font-weight: 750;
+  font-variant-numeric: tabular-nums; line-height: 1; }
+.collection-box.empty .jack-body, .collection-box.empty .box-lid { filter: saturate(.25); opacity: .75; }
 /* 数字换了：旧的往上走、新的从下面翻上来。 */
 .count-roll-enter-active, .count-roll-leave-active { transition: transform 320ms cubic-bezier(.3, 1.3, .5, 1), opacity 220ms ease; }
 .count-roll-enter-from { transform: translateY(80%); opacity: 0; }
 .count-roll-leave-to { transform: translateY(-80%); opacity: 0; }
-/* 空箱：虚线空槽「放到这里」，等第一张牌飞来；接住以后变实。 */
-.collection-box.empty { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--mat-glass-line)); cursor: default; }
-.collection-box.empty .box-stack i { opacity: .28; }
-.collection-box.empty .box-stack i:nth-child(3) { background: none; outline: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -1.5px; opacity: 1; }
-.collection-box.empty .box-stack i:nth-child(3)::after { opacity: 0; }
-.collection-box.empty .box-count em { color: var(--muted); }
-/* 小图标：三张扇开的小牌，最上面那张带强调色和一个花色点。 */
-.box-stack { position: relative; width: 26px; height: 32px; }
-.box-stack i { position: absolute; inset: 0; border-radius: 5px; background: var(--mat-raised); box-shadow: var(--mat-raised-rim), 0 4px 8px -4px rgba(0, 0, 0, .6);
-  transform-origin: 50% 90%; transition: transform 300ms cubic-bezier(.3, 1.4, .5, 1); }
-.box-stack i:nth-child(1) { transform: rotate(-12deg) translateX(-3px); opacity: .7; }
-.box-stack i:nth-child(2) { transform: rotate(7deg) translateX(2px); opacity: .85; }
-.box-stack i:nth-child(3) { background: linear-gradient(color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 34%, transparent)), var(--mat-raised); }
-.box-stack i:nth-child(3)::after { content: ''; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 1.5px; background: var(--accent); transform: rotate(45deg); }
+/* 悬停：盖子微微掀起一条缝。 */
+.collection-box:not(.empty):not(.open):hover .box-lid { translate: 0 -1px; rotate: -6deg; }
+/* 有牌悬在箱子上方（1B·B2）：箱子亮起、盖子张开一点，写「松手放进来」。 */
+.collection-box.hover { box-shadow: var(--mat-glass-shadow), 0 0 0 2px var(--accent), 0 0 26px 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.collection-box.hover .box-copy { color: var(--accent); }
+.collection-box.hover .box-lid { translate: 0 -3px; rotate: -22deg; }
+.collection-box.hover .jack-body, .collection-box.hover .box-lid { opacity: 1; }
 /* 牌桌收牌途中「张开接住」那一下也给箱子用（fly.ts 的 receive）。 */
-.collection-box.is-receiving .box-stack i:nth-child(1) { transform: rotate(-18deg) translate(-5px, 1px); }
-.collection-box.is-receiving .box-stack i:nth-child(2) { transform: rotate(10deg) translate(4px, -1px); }
+.collection-box.is-receiving .box-lid { translate: 0 -3px; rotate: -18deg; }
 
 /* 铺开：整屏一层静态模糊 + 暗色，只淡入淡出它自己。 */
 .box-spread { position: fixed; inset: 0; z-index: 2050; }
@@ -40,29 +46,38 @@
 .hand { position: absolute; inset: 0; pointer-events: none; }
 .hand-card { position: absolute; pointer-events: auto; transform-origin: 50% 50%; touch-action: none; cursor: grab;
   transition: translate 300ms cubic-bezier(.3, 1.3, .5, 1); }
-.hand-card.dragging { cursor: grabbing; transition: none; z-index: 999 !important; scale: 1.04; will-change: translate, rotate; }
-.hand-card.dragging .hand-face { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 34px 40px -22px rgba(0, 0, 0, .9); }
-/* 越过阈值：牌变半透明，底下写「松手拿出去」。 */
-.hand-card.will-remove .hand-face { opacity: .55; }
-.hand-drop { position: absolute; left: 50%; bottom: -30px; padding: 3px 10px; border-radius: 999px; background: var(--ink); color: var(--bg, #000); font-size: var(--fs-2xs); font-weight: 700;
-  white-space: nowrap; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-4px); transition: opacity 160ms ease, transform 200ms ease; }
-.hand-card.will-remove .hand-drop { opacity: 1; transform: translateX(-50%); }
-/* 悬停：沿这张牌自己的方向抽高一截（--lx / --ly），像从手里抽出一张。 */
-.hand-card:hover:not(.dragging), .hand-card:focus-within:not(.dragging) { translate: var(--lx) var(--ly); }
-.hand-face { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; padding: 9px 10px 11px; border-radius: 12px;
+.hand-card.dragging { cursor: grabbing; transition: none; z-index: 999 !important; scale: 1.05; will-change: translate, rotate; filter: var(--motion-blur, none); }
+/* 拖着：投影加深；运动模糊只在动得快时开两档（useHandGestures 写 --motion-blur，停下就清）。 */
+.hand-card.dragging .hand-face { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 44px 54px -24px rgba(0, 0, 0, .95), 0 10px 18px -10px rgba(0, 0, 0, .6); }
+/* 悬停：抽高一截、压到同组下一排之上，露出整张。 */
+.hand-card:hover:not(.dragging), .hand-card:focus-within:not(.dragging) { translate: 0 -12px; z-index: 900 !important; }
+.hand-face { position: absolute; inset: 0; display: grid; grid-template-rows: auto auto 1fr auto; align-content: start; padding: 8px 9px 10px; border-radius: 12px;
   background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 18%, transparent), transparent 70%), var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 18%, transparent), -6px 14px 26px -16px rgba(0, 0, 0, .85); }
 .hand-corner { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 650; }
 .hand-corner i { width: 6px; height: 6px; border-radius: 1.5px; background: var(--tint); transform: rotate(45deg); }
-.hand-face strong { align-self: center; justify-self: center; font-size: calc(var(--card-w) * .2); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.hand-face small { overflow: hidden; color: var(--tint); font-size: 11px; font-weight: 650; line-height: 1.25; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* 上沿（被下一排压住时露出来的那一截）就是星期和日期。 */
+.hand-face strong { margin-top: 2px; font-size: max(13px, calc(var(--card-w) * .19)); font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.1; }
+.hand-face small { grid-row: 4; overflow: hidden; color: var(--tint); font-size: 11px; font-weight: 650; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* 乳酸阈值：对角斜切双色（左上心率红、右下配速蓝）。 */
+.hand-card.duo .hand-face { background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 22%, transparent) 0 50%, color-mix(in srgb, var(--tint2) 22%, transparent) 50% 100%), var(--mat-raised); }
+/* 月牌：月份、天数、一张日历点阵（挑了的那几天点亮）。 */
+.hand-card.month { cursor: pointer; }
+.hand-card.month .hand-face { background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 26%, transparent), transparent 70%), var(--mat-raised); }
+.hand-card.month .hand-face strong { color: var(--tint); }
+.month-dots { grid-row: 4; display: grid; grid-template-columns: repeat(7, 1fr); gap: max(2px, calc(var(--card-w) * .03)); align-self: end; justify-self: center; width: 78%; }
+.month-dots i { aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.month-dots i.on { background: var(--tint); }
+.month-dots i.pad { visibility: hidden; }
+.hand-card.month:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 12px; }
 .hand-remove { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px;
   background: var(--ink); color: var(--bg, #000); opacity: 0; cursor: pointer; transition: opacity 160ms ease, transform 160ms ease; }
 .hand-card:hover .hand-remove, .hand-remove:focus-visible { opacity: 1; }
 .hand-remove:hover { transform: scale(1.12); }
-.hand-label { position: absolute; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid var(--mat-glass-line); border-radius: 999px;
-  background: var(--mat-glass-strong); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; cursor: pointer; pointer-events: auto;
-  transform: translate(-50%, -50%); opacity: 0; translate: 0 10px; transition: opacity 260ms cubic-bezier(.2, .8, .2, 1), translate 320ms cubic-bezier(.2, .8, .2, 1); }
+/* 组标签：画在这一组上方、牌之外，层级在所有牌之上（1A·A9：以前标签被牌盖住）。 */
+.hand-label { position: absolute; z-index: 1000; display: inline-flex; align-items: center; gap: 6px; max-width: calc(var(--card-w) * 7); padding: 5px 11px; border: 1px solid var(--mat-glass-line); border-radius: 999px;
+  background: var(--mat-glass-strong); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; pointer-events: auto;
+  opacity: 0; translate: 0 10px; transition: opacity 260ms cubic-bezier(.2, .8, .2, 1), translate 320ms cubic-bezier(.2, .8, .2, 1); }
 .hand-label i { width: 7px; height: 7px; border-radius: 2px; background: var(--tint); transform: rotate(45deg); }
 .hand-label :deep(svg) { opacity: .45; }
 .hand-label:hover :deep(svg) { opacity: 1; }
@@ -91,12 +106,16 @@
 .box-spread.chrome-in .go-arrow { animation: go-arrow 620ms 200ms both; }
 @keyframes go-box { from { opacity: 1; transform: none; } to { opacity: 0; transform: rotate(-90deg) scale(.6); } }
 @keyframes go-arrow { from { opacity: 0; transform: rotate(90deg) scale(.6); } to { opacity: 1; transform: none; } }
+/* 窄窗口：箱子在右下角占着一块，底部按钮和提示整体抬到箱子上方（elementFromPoint 验过不再互相盖住）。 */
+@media (max-width: 700px) {
+  .spread-foot { bottom: 92px; }
+}
 @media (max-width: 640px) {
   .foot-row { flex-wrap: wrap; justify-content: center; }
   .hand-label { font-size: var(--fs-2xs); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .collection-box, .hand-card, .box-stack i { transition: none; }
+  .collection-box, .hand-card, .box-lid { transition: none; }
   .go-box, .go-arrow { animation-duration: 1ms; }
   .hand-label, .spread-foot, .count-roll-enter-active, .count-roll-leave-active { transition-duration: 1ms !important; }
 }

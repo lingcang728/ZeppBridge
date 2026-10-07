@@ -20,6 +20,7 @@ import { useMessages } from '../i18n';
 import { weeklyReportMessages as messages } from './WeeklyReportCard.i18n';
 import { finiteOrNull } from '../lib/missingValues';
 import { changeArrow, reportTone as tone } from '../lib/changeTone';
+import { metricColor } from '../lib/metricTone';
 
 
 const t = useMessages(messages);
@@ -147,7 +148,7 @@ function formatNumber(fact: InsightFact, value: number): string {
           <template v-if="chartFor(fact)">
             <ComparisonBars :current="fact.value!" :baseline="fact.comparison!.baseline_value"
               :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
-              :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" />
+              :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" :color="metricColor(fact.metric)" />
             <span :class="['weekly-delta', tone(fact)]">
               <template v-if="tone(fact) === 'up' || tone(fact) === 'down'">{{ changeArrow(fact) }}&nbsp;</template>{{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
             </span>

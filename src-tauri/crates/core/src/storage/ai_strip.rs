@@ -35,7 +35,8 @@ impl Database {
         for (category, representative) in [
             (AiTaskCategory::Sleep, "duration_minutes"),
             (AiTaskCategory::Recovery, "readiness"),
-            (AiTaskCategory::HeartRate, "resting_hr"),
+            (AiTaskCategory::RestingHr, "resting_hr"),
+            (AiTaskCategory::HeartRate, "heart_rate"),
             (AiTaskCategory::Workout, "moving_seconds"),
             (AiTaskCategory::Training, "training_load"),
             (AiTaskCategory::Body, "weight"),

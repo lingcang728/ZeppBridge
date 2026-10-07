@@ -17,7 +17,7 @@ import { useHubText } from './hub.i18n';
 const props = defineProps<{ rows: DayStripRow[]; categories: AiTaskCategoryRange[]; days: number; sent?: boolean }>();
 const t = useBridgeText();
 const h = useHubText();
-const ORDER: AiTaskCategory[] = ['sleep', 'recovery', 'heart_rate', 'workout', 'training', 'body'];
+const ORDER: AiTaskCategory[] = ['sleep', 'recovery', 'resting_hr', 'heart_rate', 'workout', 'training', 'body'];
 const W = 160;
 const H = 18;
 const lines = computed(() => ORDER.map((category) => {

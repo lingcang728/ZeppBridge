@@ -30,10 +30,19 @@ export interface DeckSource {
   extraBoxed?: () => string[];
   /** 把一张「已经选上」的牌拿出来时，顺带从别处撤掉（运动：从任务的运动列表里去掉）。 */
   release?: (id: string) => void;
+  /**
+   * 双读数（乳酸阈值：心率 + 配速，用户 10-07 拍板「对角斜切双色」）：牌面左上 `tint`、右下 `second.tint`，
+   * 数值上下两行各用各的颜色。第二个读数在 `DeckDay.value2`。
+   */
+  second?: { tint: string; format: (value: number) => string; unit?: string };
 }
+
+/** 成对出现的指标：挑第一个时，牌面一并给第二个（同一天测的）。 */
+export const PAIRED_METRICS: Readonly<Record<string, string>> = { lactate_threshold_hr: 'lactate_threshold_pace' };
 
 export const metricSource = (options: {
   metric: string; category: AiTaskCategory; label: string; tint: string; format: (value: number) => string; unit?: string;
+  second?: DeckSource['second'];
 }): DeckSource => ({
   key: options.metric,
   category: options.category,
@@ -41,11 +50,16 @@ export const metricSource = (options: {
   tint: options.tint,
   format: options.format,
   unit: options.unit,
+  second: options.second,
   loadDays: async (start, end) => {
     // 指标序列只能「从今天往回 N 天」地取：取到 start 为止，再截到 end。
-    const [series] = await backend.getMetricSeries([options.metric], daysBetween(start, deckToday()) + 1);
-    const byDate = new Map((series?.points ?? []).filter((p) => Number.isFinite(p.value)).map((p) => [p.date, p.value]));
-    return daysBetweenInclusive(start, end, (date) => (byDate.has(date) ? { value: byDate.get(date)!, has: true } : null));
+    const pair = options.second ? PAIRED_METRICS[options.metric] : undefined;
+    const series = await backend.getMetricSeries(pair ? [options.metric, pair] : [options.metric], daysBetween(start, deckToday()) + 1);
+    const pointsOf = (metric: string) => new Map((series.find((s) => s.metric === metric)?.points ?? []).filter((p) => Number.isFinite(p.value)).map((p) => [p.date, p.value]));
+    const byDate = pointsOf(options.metric);
+    const second = pair ? pointsOf(pair) : null;
+    const days = daysBetweenInclusive(start, end, (date) => (byDate.has(date) || second?.has(date) ? { value: byDate.get(date) ?? null, has: true } : null));
+    return second ? days.map((day) => ({ ...day, value2: second.get(day.date) ?? null })) : days;
   },
 });
 

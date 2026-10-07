@@ -3,13 +3,15 @@ import { computed } from 'vue';
 const props = defineProps<{
   current: number; baseline: number; currentLabel: string; baselineLabel: string;
   currentText: string; baselineText: string; tone: 'good' | 'bad' | 'neutral' | 'flat' | 'up' | 'down';
+  /** 指标色（1A·A11，用户 10-07：全局颜色只表达「是哪项指标」）：给了就两条都用它，好坏只靠旁边的 ✓ / ! 角标。 */
+  color?: string | null;
 }>();
 const maximum = computed(() => Math.max(props.current, props.baseline, 1));
 const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%`;
 </script>
 
 <template>
-  <div class="comparison-bars">
+  <div :class="['comparison-bars', { tinted: !!color }]" :style="color ? { '--bar': color } : undefined">
     <div class="comparison-row">
       <span>{{ currentLabel }}</span><span class="comparison-number">{{ currentText }}</span>
       <span :class="['comparison-track', 'track-' + tone]"><i :class="tone" :style="{ width: percent(current) }"></i></span>
@@ -43,6 +45,10 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .track-bad, .track-down { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .track-good .baseline, .track-up .baseline { background: color-mix(in srgb, var(--accent) 34%, transparent); }
 .track-bad .baseline, .track-down .baseline { background: color-mix(in srgb, var(--danger) 34%, transparent); }
+/* 指标色：这一周用指标自己的颜色画两条，参照那条是同色淡版，轨道一点同色；斜纹流动照旧只给好 / 坏。 */
+.tinted .comparison-track, .tinted .comparison-track[class*='track-'] { background: color-mix(in srgb, var(--bar) 10%, transparent); }
+.tinted .comparison-track i:not(.baseline) { background-color: var(--bar); }
+.tinted .comparison-track .baseline { background: color-mix(in srgb, var(--bar) 36%, transparent); }
 @keyframes comparison-flow { to { transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) { .comparison-track .good::before, .comparison-track .bad::before { animation: none; } }
 </style>

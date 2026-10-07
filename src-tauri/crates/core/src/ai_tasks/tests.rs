@@ -186,8 +186,23 @@ fn v32_migration_creates_tables_and_seeds_three_builtins() {
             template.prompt_code.as_deref(),
             Some(format!("ui.ai_template.{}.prompt", template.id).as_str())
         );
-        // 内置 payload 的类别列表总是完整八项。
-        assert_eq!(template.categories.len(), 8);
+        // 内置 payload 的类别列表总是完整九项（1A·A10 起静息心率单列），静息心率跟着「心率」那一项。
+        assert_eq!(template.categories.len(), 9);
+        let of = |c: AiTaskCategory| {
+            template
+                .categories
+                .iter()
+                .find(|r| r.category == c)
+                .unwrap()
+        };
+        assert_eq!(
+            of(AiTaskCategory::RestingHr).enabled,
+            of(AiTaskCategory::HeartRate).enabled
+        );
+        assert_eq!(
+            of(AiTaskCategory::RestingHr).days_before,
+            of(AiTaskCategory::HeartRate).days_before
+        );
     }
 }
 
@@ -569,6 +584,67 @@ fn shared_grants_expand_only_shared_tasks() {
     off.mcp_shared = false;
     db.save_ai_task(&off).unwrap();
     assert!(shared_task_grants(&db).unwrap().is_empty());
+}
+
+/// 拆类（1A·A10）之前存下的任务只有 `heart_rate` 一行：读出来补上同设置的 `resting_hr`，
+/// 拖出去的静息心率跟着走；MCP 授权窗口两类都有——旧任务交出去的数据与拆类前一样，不丢静息心率。
+#[test]
+fn legacy_heart_rate_task_reads_back_split_and_still_grants_resting_hr() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.mcp_shared = true;
+    let saved = db.save_ai_task(&t).unwrap();
+    let mut legacy = range(AiTaskCategory::HeartRate, 5, true);
+    legacy.excluded_metrics = vec!["resting_hr".into(), "heart_rate".into()];
+    let mut doc = serde_json::to_value(&saved).unwrap();
+    doc["categories"] = serde_json::to_value(vec![legacy]).unwrap();
+    db.conn
+        .execute(
+            "UPDATE ai_tasks SET payload = ?2 WHERE id = ?1",
+            rusqlite::params![saved.id, doc.to_string()],
+        )
+        .unwrap();
+
+    let read = db.require_ai_task(&saved.id).unwrap();
+    let cats: Vec<_> = read
+        .categories
+        .iter()
+        .map(|r| {
+            (
+                r.category,
+                r.enabled,
+                r.days_before,
+                r.excluded_metrics.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        cats,
+        vec![
+            (
+                AiTaskCategory::RestingHr,
+                true,
+                5,
+                vec!["resting_hr".to_string()]
+            ),
+            (
+                AiTaskCategory::HeartRate,
+                true,
+                5,
+                vec!["heart_rate".to_string()]
+            ),
+        ]
+    );
+
+    let grants = shared_task_grants(&db).unwrap();
+    let mut granted: Vec<_> = grants[0].windows.iter().map(|w| w.category).collect();
+    granted.sort();
+    assert_eq!(
+        granted,
+        vec![AccessCategory::HeartRate, AccessCategory::RestingHr]
+    );
 }
 
 #[test]

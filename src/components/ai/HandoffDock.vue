@@ -95,7 +95,7 @@ const readiness = computed(() => {
   return { categories, percent: total > 0 ? Math.round((have / total) * 100) : 0 };
 });
 /** 底栏中间一排小牌：交出去的每一类、多少天里有几天有数据（合并行优先）。按类别的固定顺序排。 */
-const CATEGORY_ORDER = ['sleep', 'recovery', 'heart_rate', 'workout', 'training', 'body'] as const;
+const CATEGORY_ORDER = ['sleep', 'recovery', 'resting_hr', 'heart_rate', 'workout', 'training', 'body'] as const;
 const categoryTiles = computed(() => {
   const rows = props.preview?.coverage ?? [];
   return CATEGORY_ORDER.flatMap((category) => {

@@ -49,6 +49,8 @@ const landingScale = (landing: Landing, cardWidth: number): number => {
 export interface DealOptions {
   /** 起点就是此刻停在 `origin` 的一叠（换范围）：不抽、不淡入。 */
   fromStack?: boolean;
+  /** 放出去的动画交给调用方登记（打断接力 `relay().track`）。 */
+  track?: (animations: Animation[]) => void;
 }
 
 /** 发牌。`origin` 为空时从牌桌下沿中间发出。 */
@@ -75,19 +77,24 @@ export const dealCards = async (cards: HTMLElement[], origin: Landing | null, op
     [{ transform: pulled(rest, i), opacity: 1 }, { transform: 'none', opacity: 1 }],
     { duration, delay: Math.abs(i - (n - 1) / 2) * STAGGER_MS, easing, fill: 'backwards' },
   );
+  const track = options.track ?? (() => undefined);
   if (options.fromStack) {
-    await settled(cards.map((card, i) => fan(card, i, rests[i]!)));
+    const fans = cards.map((card, i) => fan(card, i, rests[i]!));
+    track(fans);
+    await settled(fans);
     return;
   }
   const draws = cards.map((card, i) => card.animate(
     [{ transform: start(rests[i]!, i), opacity: 0 }, { opacity: 1, offset: 0.45 }, { transform: pulled(rests[i]!, i), opacity: 1 }],
     { duration: DRAW_MS, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'both' },
   ));
+  track(draws);
   await settled(draws);
   if (draws.some((a) => a.playState !== 'finished')) return;
   // 新动画先起、旧的再取消：同一个任务里，中间不出帧。
   const fans = cards.map((card, i) => fan(card, i, rests[i]!));
   for (const a of draws) a.cancel();
+  track(fans);
   await settled(fans);
 };
 

@@ -94,7 +94,8 @@ export const CATEGORY_METRICS: Readonly<Partial<Record<AiTaskCategory, readonly 
   workout: ['distance_meters', 'moving_seconds', 'calories', 'avg_hr', 'max_hr', 'min_hr', 'training_load', 'vo2max', 'total_steps', 'elevation_gain_m', 'elevation_loss_m'],
   sleep: ['duration_minutes', 'score', 'deep_minutes', 'light_minutes', 'rem_minutes', 'awake_minutes', 'wake_count'],
   recovery: ['resting_hr', 'readiness', 'stress', 'respiratory_rate', 'sleep_hrv', 'hrv', 'hrv_rmssd', 'spo2'],
-  heart_rate: ['heart_rate', 'resting_hr'],
+  resting_hr: ['resting_hr'],
+  heart_rate: ['heart_rate'],
   training: ['training_load', 'vo2max', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_daily', 'steps', 'active_calories', 'active_minutes'],
   body: ['weight', 'bmi', 'body_fat_rate', 'body_water_rate', 'muscle_mass', 'bone_mass', 'visceral_fat', 'bmr'],
 };

@@ -7,7 +7,12 @@
 .table-backdrop { position: absolute; inset: 0; z-index: -1;
   background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 70%), rgba(6, 8, 12, .62);
   -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
-:root[data-theme='light'] .table-backdrop { background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%), rgba(236, 240, 233, .62); }
+/* 深一层：更重的静态模糊 + 更暗，平时透明；牌飞进箱子时淡进来再淡回去（只动 opacity）。 */
+.table-backdrop.deep { opacity: 0; pointer-events: none; background: rgba(6, 8, 12, .32); -webkit-backdrop-filter: blur(40px) saturate(1.1); backdrop-filter: blur(40px) saturate(1.1); }
+:root[data-theme='light'] .table-backdrop.deep { background: rgba(236, 240, 233, .3); }
+/* 退到后面的那一层换成的静态模糊拷贝（lib/motion/cards/camera.ts）。 */
+.table-layer.blurred-copy { pointer-events: none; }
+:root[data-theme='light'] .table-backdrop:not(.deep) { background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%), rgba(236, 240, 233, .62); }
 .table-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .table-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 13px;
   background: color-mix(in srgb, var(--tint) 18%, var(--mat-inset)); color: var(--tint); box-shadow: var(--mat-inset-shadow); }
@@ -32,10 +37,19 @@
 /* 按住一叠时其余的叠微微变暗。 */
 .table-layer.holding .pslot:not(.is-holding) :deep(.pcard) { opacity: .62; }
 :deep(.pcard.lifting .pcard-face) { transform: translateY(-14px) scale(1.06); }
+/* 拖着的牌（1B·B3）：抬起一点、投影加深；叠在下面的牌不接点击；悬在能叠的牌上时那张亮一圈。 */
+:deep(.pcard.dragging) { cursor: grabbing; scale: 1.05; will-change: translate; }
+:deep(.pcard.dragging .pcard-face) { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 44px 56px -24px rgba(0, 0, 0, .95); }
+:deep(.pcard.buried) { pointer-events: none; }
+:deep(.pcard.drop-target .pcard-face) { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--tint), 0 0 26px 2px color-mix(in srgb, var(--tint) 45%, transparent); }
 .table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
 .table-foot { min-height: 0; }
+/* 窄窗口：收集箱在右下角，底部提示抬到它上方。 */
+@media (max-width: 700px) {
+  .card-table { padding-bottom: 88px; }
+}
 @media (max-width: 640px) {
-  .card-table { padding: 18px 16px 18px; }
+  .card-table { padding: 18px 16px 88px; }
   .table-head { flex-wrap: wrap; }
   .table-layer { gap: 12px; }
 }

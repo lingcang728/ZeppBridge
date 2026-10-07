@@ -26,6 +26,11 @@ fn default_true() -> bool {
 
 /// 分析任务覆盖的数据类别。`personal_note` / `attachment` 是任务级内容，
 /// 不参与「按运动开始日回溯」的窗口数据取数。
+///
+/// `heart_rate` 自 3.0 beta.48 起只表示**全天心率**（逐点采样）；静息心率单列为
+/// `resting_hr`（用户 10-07 拍板：AI 页「心率」拆成「静息心率」与「全天心率」两类）。
+/// 枚举只追加不改名；旧任务文档里只有 `heart_rate` 的，读入时由
+/// [`upgrade_heart_rate_split`] 补一行同设置的 `resting_hr`，导出的数据与以前完全一样。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AiTaskCategory {
@@ -37,6 +42,37 @@ pub enum AiTaskCategory {
     Body,
     PersonalNote,
     Attachment,
+    RestingHr,
+}
+
+/// 旧文档（拆类之前）只有 `heart_rate` 一行、管着全天心率和静息心率两样：补一行 `resting_hr`，
+/// 照抄开关、窗口、挑的日子；拖出去的指标按归属分开（`resting_hr` 归新行，其余留在原行）。
+/// 已经有 `resting_hr` 行（新文档）就不动。幂等。
+pub fn upgrade_heart_rate_split(categories: &mut Vec<AiTaskCategoryRange>) {
+    if categories
+        .iter()
+        .any(|range| range.category == AiTaskCategory::RestingHr)
+    {
+        return;
+    }
+    let Some(at) = categories
+        .iter()
+        .position(|range| range.category == AiTaskCategory::HeartRate)
+    else {
+        return;
+    };
+    let legacy = &mut categories[at];
+    let (resting, rest): (Vec<String>, Vec<String>) = legacy
+        .excluded_metrics
+        .drain(..)
+        .partition(|metric| metric == "resting_hr");
+    legacy.excluded_metrics = rest;
+    let split = AiTaskCategoryRange {
+        category: AiTaskCategory::RestingHr,
+        excluded_metrics: resting,
+        ..legacy.clone()
+    };
+    categories.insert(at, split);
 }
 
 impl AiTaskCategory {
@@ -405,6 +441,7 @@ fn builtin_categories(entries: &[(AiTaskCategory, bool, i64)]) -> Vec<AiTaskCate
         AiTaskCategory::Workout,
         AiTaskCategory::Sleep,
         AiTaskCategory::Recovery,
+        AiTaskCategory::RestingHr,
         AiTaskCategory::HeartRate,
         AiTaskCategory::Training,
         AiTaskCategory::Body,
@@ -413,9 +450,15 @@ fn builtin_categories(entries: &[(AiTaskCategory, bool, i64)]) -> Vec<AiTaskCate
     ]
     .into_iter()
     .map(|category| {
+        // 内置模板按拆类之前写的三元组：静息心率跟着「心率」那一项走。
+        let lookup = if category == AiTaskCategory::RestingHr {
+            AiTaskCategory::HeartRate
+        } else {
+            category
+        };
         let (enabled, days_before) = entries
             .iter()
-            .find(|(c, _, _)| *c == category)
+            .find(|(c, _, _)| *c == lookup)
             .map(|(_, e, d)| (*e, *d))
             .unwrap_or((false, 14));
         AiTaskCategoryRange {
