@@ -227,7 +227,7 @@ style choice; the open list of pages that still do is
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.
 
-Check before merging: open and close each new layer at 4× CPU throttle and
+Check before merging: run `python scripts/verify/text_overlap.py` (every interface language × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did). Open and close each new layer at 4× CPU throttle and
 DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
 through the frames — no bright frame, no blank frame, no jump at the start.
 

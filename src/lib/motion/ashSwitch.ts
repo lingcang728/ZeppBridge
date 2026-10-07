@@ -2,7 +2,7 @@ import { nextTick } from 'vue';
 import { ensureLocalePack, locale, setLocale, type Locale } from '../../i18n';
 import { dustLayer } from './ashDust';
 import { drawVisibleText, grainsOf, TEXT_INK, type AshOrigin } from './ashGlyphs';
-import { breatheCharts, settleNewText } from './ashReveal';
+import { breatheCharts, closeSweep, openSweep, settleNewText, startSweep } from './ashReveal';
 import { localeTarget } from './localeTarget';
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
@@ -73,6 +73,7 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
 
   const root = document.documentElement;
   root.dataset.ashMorph = '';
+  openSweep(origin, reach);
   const transition = doc.startViewTransition!(async () => {
     setLocale(value);
     if (batch) layer!.mount();
@@ -86,6 +87,7 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
   } catch {
     if (batch) layer!.drop(batch);
     settle?.dispose();
+    closeSweep();
     delete root.dataset.ashMorph;
     return;
   }
@@ -103,9 +105,11 @@ const ripple = async (value: Locale, origin: AshOrigin) => {
   await whenFramesSteady();
   for (const animation of parts) if (animation.playState === 'paused') animation.play();
   if (batch) layer!.start(batch, grow);
+  startSweep();
   settle?.start();
   breatheCharts(width, height, origin, reach, layer?.canvas ?? null);
   await transition.finished.catch(() => undefined);
+  closeSweep();
   delete root.dataset.ashMorph;
 };
 

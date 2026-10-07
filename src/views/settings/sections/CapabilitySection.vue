@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Icon from '../../../components/Icon.vue';
+import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
@@ -28,9 +29,11 @@ const {
       <span v-if="capabilityCheckedAt" class="s-meta">{{ capabilityCheckedAt }}</span>
     </div>
     <p class="s-note">{{ t.capabilityIntro }}</p>
+    <FoldTransition>
     <div v-if="capabilityError" class="alert danger" role="alert">
       <Icon name="warning" :size="14" />{{ capabilityError }}
     </div>
+    </FoldTransition>
 
     <!-- 三列竖排会让最长的那一列决定整块高度，右边两列下面全是空的。
          改成一格一条数据流的指示灯：亮 = 本机已有，暗 = 还没拿到。

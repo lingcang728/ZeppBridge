@@ -53,7 +53,9 @@ const modeItems = computed(() => [
         <GlyphTile :name="mode === 'ai' ? 'handoff' : 'document'" :tone="mode === 'ai' ? undefined : 'sleep'" :size="40" />
         <SegmentTrack v-model="mode" class="deliver-tabs" :items="modeItems" :aria-label="t.exportAria" />
       </div>
-      <div v-if="mode === 'ai'" class="deliver-body">
+      <!-- 两块叠在同一格里交叉淡化（审计 B1，2026-10-07；以前 v-if 硬换）：高度取两块里高的那块，切换时不跳。 -->
+      <div class="deliver-stack">
+      <div :class="['deliver-body', { shown: mode === 'ai' }]" :inert="mode !== 'ai' || undefined">
         <p class="card-sub">{{ t.handoffSub }}</p>
         <div class="ai-provider">
           <span>{{ t.handoffTarget }}</span>
@@ -66,7 +68,7 @@ const modeItems = computed(() => [
         <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
       </div>
-      <div v-else class="deliver-body">
+      <div :class="['deliver-body', { shown: mode !== 'ai' }]" :inert="mode === 'ai' || undefined">
         <p class="card-sub">{{ t.exportSub }}</p>
         <SegmentTrack
           fill
@@ -80,6 +82,7 @@ const modeItems = computed(() => [
         <button class="button primary wide" type="button" :disabled="exportBusy" @click="emit('export')"><GlyphTile name="cloud-output" :size="20" />{{ format === 'fit' ? t.saveFit : t.exportGo(format.toUpperCase()) }}</button>
         <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p>
         <p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
+      </div>
       </div>
     </section>
 
@@ -95,7 +98,10 @@ const modeItems = computed(() => [
 .cta-icon { flex: 0 0 auto; color: currentColor; }
 /* 按内容收紧、靠右：以前铺满整行，两枚标签挤在左边、右边拖着一大段空胶囊。 */
 .deliver-tabs { flex: 0 1 auto; min-width: 0; margin-left: auto; }
-.deliver-body { display: grid; }
+.deliver-stack { display: grid; }
+.deliver-body { display: grid; grid-area: 1 / 1; align-content: start; opacity: 0; visibility: hidden; transform: translateY(4px);
+  transition: opacity 260ms ease, transform 320ms cubic-bezier(.4, .6, .2, 1), visibility 0s linear 320ms; }
+.deliver-body.shown { opacity: 1; visibility: visible; transform: none; transition: opacity 320ms ease 60ms, transform 320ms cubic-bezier(.4, .6, .2, 1) 60ms, visibility 0s; }
 .deliver-body > .wide { margin-top: 12px; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }
 .card-sub { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-sm); }

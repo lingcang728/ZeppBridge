@@ -4,6 +4,7 @@ import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import SegmentTrack from './SegmentTrack.vue';
+import CapsuleWheel from './CapsuleWheel.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { heartRateZonesQuery } from '../lib/pageQueries';
 import { cached, peek } from '../lib/readCache';
@@ -97,6 +98,11 @@ const basisSlots = computed(() => {
     candidates: bases.value.filter((basis) => basis.kind === kind),
   }));
 });
+/** 依据的选项：读数 + 名字放进玻璃分段 / 滚轮（审计 A3，2026-10-07；以前是一张张卡片式的行）。 */
+const basisItems = (candidates: HeartRateBasis[]) => candidates.map((basis) => ({
+  value: basis.id, label: `${Math.round(basis.value)} ${basis.unit} · ${basisLabel(basis)}`, title: basisSummary(basis) || undefined,
+}));
+const chosenOf = (slot: { chosen: string | null; candidates: HeartRateBasis[] }) => slot.candidates.find((basis) => basis.id === slot.chosen) ?? null;
 
 const unavailableReason = (requires: string[]): string => {
   const missing = requires
@@ -270,25 +276,14 @@ watch(() => props.revision, () => { void load(); });
       <template v-if="selectedModel">
         <div v-for="slot in basisSlots" :key="slot.kind" class="basis-block">
           <p class="group-label">{{ slot.label }}</p>
-          <div class="basis-list" role="group" :aria-label="slot.label">
-            <button
-              v-for="basis in slot.candidates"
-              :key="basis.id"
-              type="button"
-              :aria-pressed="slot.chosen === basis.id"
-              :disabled="saving"
-              :class="['basis-row', { 'is-on': slot.chosen === basis.id }]"
-              @click="chooseBasis(slot.kind, basis.id)"
-            >
-              <span class="basis-value">{{ Math.round(basis.value) }}<i>{{ basis.unit }}</i></span>
-              <span class="basis-copy">
-                <strong>{{ basisLabel(basis) }}</strong>
-                <span v-if="basisSummary(basis)" class="basis-source">{{ basisSummary(basis) }}</span>
-                <span v-if="basisNote(basis)" class="basis-note">{{ basisNote(basis) }}</span>
-              </span>
-              <Icon v-if="slot.chosen === basis.id" name="circle-check" :size="15" class="basis-check" />
-            </button>
-          </div>
+          <SegmentTrack v-if="slot.candidates.length <= 5" class="basis-track" :items="basisItems(slot.candidates)" :model-value="slot.chosen ?? ''" :disabled="saving"
+            :aria-label="slot.label" @update:model-value="chooseBasis(slot.kind, String($event))" />
+          <CapsuleWheel v-else :span="320" :items="basisItems(slot.candidates)" :model-value="slot.chosen ?? slot.candidates[0]!.id" :disabled="saving"
+            :aria-label="slot.label" @update:model-value="chooseBasis(slot.kind, String($event))" />
+          <p v-if="chosenOf(slot)" class="basis-line">
+            <span v-if="basisSummary(chosenOf(slot)!)" class="basis-source">{{ basisSummary(chosenOf(slot)!) }}</span>
+            <span v-if="basisNote(chosenOf(slot)!)" class="basis-note">{{ basisNote(chosenOf(slot)!) }}</span>
+          </p>
         </div>
       </template>
       </details>
@@ -327,31 +322,10 @@ watch(() => props.revision, () => { void load(); });
 .model-missing { color: var(--warning); }
 
 .basis-block { display: grid; gap: var(--space-2); }
-.basis-list { display: grid; gap: 6px; }
-.basis-row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 52px;
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dur-fast) ease;
-}
-.basis-row:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); }
-.basis-row.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.basis-value { color: var(--ink); font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
-.basis-value i { margin-left: 4px; color: var(--subtle); font-family: inherit; font-size: var(--fs-2xs); font-style: normal; }
-.basis-copy { display: grid; gap: 1px; min-width: 0; }
-.basis-copy strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }
+.basis-track { max-width: 100%; }
+.basis-line { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 4px 0; }
 .basis-source { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .basis-note { color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
-.basis-check { color: var(--accent); }
 
 .zone-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-top: 6px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .zone-window { color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }

@@ -7,6 +7,7 @@
  */
 import WheelDatePicker from './WheelDatePicker.vue';
 import SegmentTrack from './SegmentTrack.vue';
+import FoldTransition from './FoldTransition.vue';
 import CoverageLedger from './archive/CoverageLedger.vue';
 import { useHistoryBackfill } from '../composables/useHistoryBackfill';
 import type { UserPrefs } from '../types';
@@ -58,12 +59,14 @@ const {
             <SegmentTrack v-model="startChoice" compact :items="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
           </div>
         </div>
+        <FoldTransition>
         <div v-if="startChoice === 'custom'" class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ t.customDateLabel }}</span></div>
           <div class="s-row-control">
             <WheelDatePicker v-model="customFrom" :aria-label="t.customDateAria" />
           </div>
         </div>
+        </FoldTransition>
         <div class="s-row">
           <div class="s-row-main">
             <span class="s-row-title">{{ t.autoContinueTitle }}</span>
@@ -130,12 +133,11 @@ const {
           </div>
         </div>
       </div>
-      <p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ stopReasonText }}</p>
-      <p v-if="wouldBeCleanedUp" class="api-error" role="alert">
+      <FoldTransition><p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ stopReasonText }}</p></FoldTransition>
+      <FoldTransition><p v-if="wouldBeCleanedUp" class="api-error" role="alert">
         {{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}
-      </p>
-      <p v-if="error" class="api-error" role="alert">{{ error }}</p>
-      <p v-else-if="message" class="hint-line ok" role="status">{{ message }}</p>
+      </p></FoldTransition>
+      <FoldTransition><p v-if="error" class="api-error" role="alert">{{ error }}</p><p v-else-if="message" class="hint-line ok" role="status">{{ message }}</p></FoldTransition>
     </section>
 
     <CoverageLedger

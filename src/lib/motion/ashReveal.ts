@@ -97,7 +97,8 @@ export const breatheCharts = (
   skip: HTMLCanvasElement | null,
 ): void => {
   const charts = [...document.querySelectorAll<HTMLElement | SVGSVGElement>('canvas, svg')].filter((el) => {
-    if (el === skip || el.closest('[data-ash-skip]')) return false;
+    // SwapChart 的画布自己跟着涟漪交叉溶解（见下面的 openSweep）；这里再逐帧改它的 blur 就是动滤镜了。
+    if (el === skip || el.closest('[data-ash-skip], .swap-chart')) return false;
     const r = el.getBoundingClientRect();
     return r.width >= CHART_MIN_W && r.height >= CHART_MIN_H && r.right > 0 && r.bottom > 0 && r.left < width && r.top < height;
   });
@@ -109,4 +110,34 @@ export const breatheCharts = (
       { duration: 320, delay: LOCALE_REVEAL_MS * timeAt(Math.min(1, distance / reach)), easing: 'ease-in-out' },
     );
   }
+};
+
+/* ── 图表跟着涟漪交叉溶解（10-07 第二轮） ─────────────────
+ * 换语言时图表的坐标文字（画在画布里）跟着变，以前是原地一下换掉——用户看到「图表直接跳变」。
+ * 现在：换的那一刻 SwapChart 把旧图拷一份盖住、新图先藏着；涟漪真正开跑后，按这张图离起点多远算出圆扫到它的时刻，
+ * 到点交叉溶解（只动两块画布的 opacity）。 */
+export interface AshSweep {
+  origin: AshOrigin;
+  reach: number;
+  /** 涟漪开跑的时刻（performance.now()）；换场被取消时也会 resolve，图表照样淡过去。 */
+  started: Promise<number>;
+}
+let sweep: (AshSweep & { resolve: (at: number) => void }) | null = null;
+
+export const openSweep = (origin: AshOrigin, reach: number): void => {
+  let resolve: (at: number) => void = () => undefined;
+  const started = new Promise<number>((done) => { resolve = done; });
+  sweep = { origin, reach, started, resolve };
+};
+export const startSweep = (): void => { sweep?.resolve(performance.now()); };
+export const closeSweep = (): void => {
+  sweep?.resolve(performance.now());
+  sweep = null;
+};
+/** 正在换语言：图表换数据时用它算自己什么时候溶解。 */
+export const currentSweep = (): AshSweep | null => sweep;
+/** 圆扫到这块矩形中心的时刻，相对涟漪开跑（ms）。 */
+export const sweepDelay = (active: AshSweep, rect: DOMRect): number => {
+  const distance = Math.hypot(rect.left + rect.width / 2 - active.origin.x, rect.top + rect.height / 2 - active.origin.y);
+  return LOCALE_REVEAL_MS * timeAt(Math.min(1, distance / active.reach));
 };

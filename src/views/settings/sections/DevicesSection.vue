@@ -6,6 +6,7 @@ import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
+import FoldTransition from '../../../components/FoldTransition.vue';
 import DiagnosticReportForm from '../DiagnosticReportForm.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
@@ -83,9 +84,9 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
         {{ deviceRefreshBusy ? t.identifying : t.identifyDevices }}
       </button>
     </div>
-    <div v-if="deviceRefreshError" class="alert danger" role="alert"><Icon name="warning" :size="14" />{{ deviceRefreshError }}</div>
-    <div v-if="deviceRefreshMessage" class="alert success" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div>
-    <div v-if="deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
+    <FoldTransition><div v-if="deviceRefreshError" class="alert danger" role="alert"><Icon name="warning" :size="14" />{{ deviceRefreshError }}</div></FoldTransition>
+    <FoldTransition><div v-if="deviceRefreshMessage" class="alert success" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div></FoldTransition>
+    <FoldTransition><div v-if="deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div></FoldTransition>
 
     <div class="s-list">
       <template v-if="showSkeleton">

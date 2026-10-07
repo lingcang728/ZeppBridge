@@ -18,6 +18,7 @@ import { useFirstLoad } from '../composables/useFirstLoad';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import FoldTransition from '../components/FoldTransition.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -223,10 +224,12 @@ onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void 
       />
     </PageHeader>
 
+    <FoldTransition>
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
+    </FoldTransition>
 
     <div v-if="initialLoading" class="health-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="180px" />
@@ -372,8 +375,11 @@ onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void 
             >{{ busyAction === action.id ? t.actionRunning : t.actionRun }}</button>
           </div>
         </div>
-        <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
-        <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
+        <!-- 「立即执行」的结果从下面平滑展开（审计 B6 / C2，2026-10-07），不再一下把页面推长。 -->
+        <FoldTransition>
+          <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
+          <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
+        </FoldTransition>
       </section>
     </template>
   </section>

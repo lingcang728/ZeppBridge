@@ -356,3 +356,26 @@ html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-
     animation: none;
   }
 }
+
+/* 折叠（<details>）展开 / 收起不硬切（审计 B5，2026-10-07）：内容区的高度从 0 平滑到自身高度、同时淡入，
+   收起反过来。全应用十来处折叠一起生效，不用逐个改组件。只在支持 ::details-content 的内核上生效
+   （WebView2 / Chromium 131+），不支持时照旧瞬间展开。 */
+details { interpolate-size: allow-keywords; }
+details::details-content {
+  block-size: 0;
+  overflow: clip;
+  opacity: 0;
+  transition: block-size 300ms cubic-bezier(.4, .6, .2, 1), opacity 240ms ease, content-visibility 300ms allow-discrete;
+}
+details[open]::details-content { block-size: auto; opacity: 1; }
+summary { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  details::details-content { transition: none; }
+}
+
+/* 「再显示 N 条」新出现的行淡入、轻轻浮上来（审计 B7，2026-10-07；以前一下全冒出来）。行一挂上就放一次，
+   已经在的行不动；缓存页回到场上不重放（下面的 page-revisit）。只动 opacity / transform。 */
+@keyframes row-in { from { opacity: 0; transform: translateY(8px); } }
+.tl-row, .le-timeline > li { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.page-revisit :is(.tl-row, .le-timeline > li) { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }

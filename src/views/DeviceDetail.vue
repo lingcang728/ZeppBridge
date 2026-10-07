@@ -16,6 +16,7 @@ import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
+import FoldTransition from '../components/FoldTransition.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
 import { defineMessages, useMessages } from '../i18n';
@@ -197,6 +198,8 @@ onMounted(() => {
         <h2>{{ t.assignTitle }}</h2>
         <p class="assign-sub">{{ t.assignSub }}</p>
 
+        <!-- 「指认型号」：选择器从这枚按钮所在的左上角长出来，取消时缩回去、按钮行淡回来（审计 B2 / C1，2026-10-07）。 -->
+        <FoldTransition origin="top left" :scale="0.94">
         <div v-if="!pickerOpen" class="inline-actions">
           <button class="button primary" type="button" :disabled="assignBusy || !model.deviceKey" @click="openPicker">
             <Icon name="watch" :size="15" />{{ model.userAssigned ? t.changeModel : t.pickModel }}
@@ -209,11 +212,13 @@ onMounted(() => {
             @click="clearPick"
           >{{ t.clearAssignment }}</button>
         </div>
+        </FoldTransition>
 
         <p v-if="!model.deviceKey" class="hint-line">{{ t.noLocalIdentifier }}</p>
         <p v-if="assignError" class="api-error" role="alert">{{ assignError }}</p>
         <p v-else-if="assignMessage" class="hint-line ok" role="status">{{ assignMessage }}</p>
 
+        <FoldTransition origin="top left" :scale="0.94" :duration="420">
         <DevicePicker
           v-if="pickerOpen"
           :model-value="model.profile.catalog_id"
@@ -222,6 +227,7 @@ onMounted(() => {
           @clear="clearPick"
           @cancel="pickerOpen = false"
         />
+        </FoldTransition>
       </section>
     </template>
   </section>

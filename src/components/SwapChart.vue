@@ -19,6 +19,7 @@ import { onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { SMOOTH_CHART_UPDATE } from '../lib/metricSeries';
 import { chartSwapIntent } from '../lib/chartSwap';
+import { currentSweep, sweepDelay, type AshSweep } from '../lib/motion/ashReveal';
 
 defineOptions({ inheritAttrs: false });
 
@@ -75,8 +76,35 @@ const dropGhost = (ghost: HTMLCanvasElement) => {
   ghost.remove();
 };
 
+/** 换语言：旧图（旧语言的坐标字）先盖着，涟漪扫到这张图时交叉溶解成新图。 */
+const LOCALE_FADE_MS = 460;
+/** 这一圈涟漪里已经盖好旧图了：同一圈里又来新数据（排队更新）只换底下的新图，不再拷一份（那时画布上已是新图）。 */
+let pendingSweep: AshSweep | null = null;
+const localeCrossfade = (active: AshSweep, el: HTMLElement, chart: HTMLElement, next: Record<string, unknown>) => {
+  if (pendingSweep === active) { shown.value = still(next); return; }
+  const ghost = snapshot(el);
+  shown.value = still(next);
+  if (!ghost) return;
+  pendingSweep = active;
+  incoming?.cancel();
+  const hold = chart.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 60_000, fill: 'forwards' });
+  void active.started.then((t0) => {
+    const delay = Math.max(0, t0 + sweepDelay(active, el.getBoundingClientRect()) - performance.now());
+    hold.cancel();
+    if (pendingSweep === active) pendingSweep = null;
+    incoming = chart.animate([{ opacity: 0 }, { opacity: 1 }], { duration: LOCALE_FADE_MS, delay, easing: EASE, fill: 'backwards' });
+    ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LOCALE_FADE_MS, delay, easing: EASE, fill: 'both' })
+      .finished.then(() => dropGhost(ghost), () => dropGhost(ghost));
+  });
+};
+
 watch(() => props.option, (next) => {
   const el = host.value;
+  const sweeping = currentSweep();
+  if (sweeping && el && canvasHost.value && !reduced()) {
+    localeCrossfade(sweeping, el, canvasHost.value, next);
+    return;
+  }
   const intent = chartSwapIntent();
   const chart = canvasHost.value;
   if (!el || !chart || !intent || reduced()) {

@@ -2,7 +2,9 @@
 
 对照 [ui-guidelines.md](ui-guidelines.md)「Hard rules」四条（从哪来回哪去、切换渐变加模糊、二到五选一用玻璃分段、
 不用下拉 / 卡片式选择 / 裸复选框），审计「交给 AI」以外的页面。「交给 AI」与训练计划在精修批次 1–7 已经改过，
-不在这张表里。**本次只列不改**，后续按优先级逐条修，修完把这一行划掉并写提交号。
+不在这张表里。
+
+> **2026-10-07 第二轮：13 项全部修完**（见文末「修复记录」）。新增的同类问题照这里的做法修，别再另写一套。
 
 审计方法：搜 `<select`、`<details`、`type="checkbox"` / `type="radio"`、带 `aria-pressed` 的按钮组、
 `role="listbox"`、点击切换的 `v-if` 面板，再逐个读组件确认是不是用户点出来的。弹窗统一走
@@ -50,3 +52,20 @@
 4. B3、B4、B6、B7、C2、A4。
 
 每修一条都要在 CPU 降速 4× + DPR 2 下逐帧看一遍（见 ui-guidelines 的「Check before merging」）。
+
+## 修复记录（2026-10-07，交给 AI 精修第二轮 R7）
+
+| # | 怎么修的 |
+|---|---|
+| A1 | 设备类型筛选 → `CapsuleWheel`（六项，超过五项用滚轮） |
+| A2 | 「贡献给设备目录」→ `.mat-switch` 玻璃开关 |
+| A3 | 心率区间依据 → 每一槽一条 `SegmentTrack`（超过五个候选用 `CapsuleWheel`），来源和说明写在下面一行 |
+| A4 | 落地页语言 → `CapsuleWheel`（和应用顶栏的语言轮同一个组件） |
+| B1 | 运动详情「交给 AI / 导出」两块叠在同一格里交叉淡化，高度取高的那块 |
+| B2 / C1 | 设备详情「指认型号」：`FoldTransition origin="top left"`，选择器从按钮所在的角长出、取消时缩回 |
+| B3 / B4 / B6 / C2 | 新组件 `components/FoldTransition.vue`（高度 + 淡入，小块专用）：手动凭据表单、补拉自定义起点、各处提示条、健康检查「立即执行」的结果、数据能力的错误 |
+| B5 | `material.css` 一条全局规则：`details::details-content` 高度 + 透明度过渡（`interpolate-size: allow-keywords`），十处折叠一起生效 |
+| B7 | `material.css` 的 `row-in`：新出现的行淡入上浮，缓存页回场不重放 |
+
+防再犯：`scripts/verify/text_overlap.py`（十种语言 × 九页，任何两段可见文字压在一起就失败）和
+`scripts/verify/topbar_collision.py`（顶栏）。改了页面头部、胶囊、按钮的排版就跑一遍。

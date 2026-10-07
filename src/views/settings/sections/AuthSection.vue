@@ -2,6 +2,7 @@
 /* 登录方式：平时用不上，默认收起；登录失败或正在登录时自动展开。 */
 import { computed } from 'vue';
 import Icon from '../../../components/Icon.vue';
+import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
@@ -83,6 +84,7 @@ const needsAttention = computed(() =>
         </div>
       </div>
 
+      <FoldTransition>
       <div v-if="showManualAuth" class="s-row is-block manual-auth-form">
         <p class="s-row-sub">{{ t.manualFormHint }}</p>
         <label class="form-group">
@@ -104,14 +106,17 @@ const needsAttention = computed(() =>
           <button class="button secondary" type="button" :disabled="manualAuthBusy" @click="showManualAuth = false">{{ t.cancel }}</button>
         </div>
       </div>
+      </FoldTransition>
     </details>
-    <p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p>
-    <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
+    <FoldTransition><p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p></FoldTransition>
     <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
          用手动填写，而不是反复重试网页登录。 -->
-    <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert">
-      <Icon name="info" :size="13" />{{ loginMessage }}
-    </p>
+    <FoldTransition>
+      <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
+      <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert">
+        <Icon name="info" :size="13" />{{ loginMessage }}
+      </p>
+    </FoldTransition>
   </section>
 </template>
 

@@ -10,6 +10,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import GlyphTile from './GlyphTile.vue';
+import CapsuleWheel from './CapsuleWheel.vue';
 import DeviceVisual from './DeviceVisual.vue';
 import { catalogEntryMatchesId, deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
 import { defineMessages, locale, useMessages } from '../i18n';
@@ -193,14 +194,8 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
     @keydown="onPickerKeydown"
   >
     <div class="picker-filters">
-      <button
-        v-for="filter in KIND_FILTERS"
-        :key="filter.key"
-        type="button"
-        :class="['filter-chip', { on: kind === filter.key }]"
-        :aria-pressed="kind === filter.key"
-        @click="kind = filter.key"
-      >{{ filter.label }}</button>
+      <!-- 六种设备类型：玻璃滚轮（审计 A1，2026-10-07；以前是一排自己画选中态的小胶囊）。 -->
+      <CapsuleWheel v-model="kind" :span="260" :items="KIND_FILTERS.map((filter) => ({ value: filter.key, label: filter.label }))" :aria-label="t.pickerAria" />
       <input
         v-model="query"
         type="search"
@@ -272,13 +267,14 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
       </button>
       <button class="button secondary" type="button" :disabled="busy" @click="emit('cancel')">{{ t.later }}</button>
     </div>
-    <label class="picker-contribute">
-      <input v-model="contribute" type="checkbox" :disabled="busy" />
+    <!-- 贡献给设备目录：玻璃开关（审计 A2；以前是原生复选框）。 -->
+    <div class="picker-contribute">
       <span>
         <strong>{{ t.contributeTitle }}</strong>
         {{ t.contributeBody }}
       </span>
-    </label>
+      <button type="button" class="mat-switch" role="switch" :aria-checked="contribute" :aria-label="t.contributeTitle" :disabled="busy" @click="contribute = !contribute"></button>
+    </div>
     <p class="picker-note">{{ t.note }}</p>
   </div>
 </template>
@@ -288,16 +284,6 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .device-picker:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 12px; }
 
 .picker-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.filter-chip {
-  padding: 4px 12px;
-  border: 1px solid var(--line-control);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.filter-chip.on { color: var(--accent); }
 .picker-search { flex: 1 1 190px; min-width: 140px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--mat-inset); color: var(--ink); outline: none; box-shadow: var(--mat-inset-shadow); }
 .picker-search:focus-visible { border-color: var(--focus); }
 
@@ -344,9 +330,9 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .picker-contribute {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--line-control);
   border-radius: 12px;
@@ -354,9 +340,8 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   color: var(--subtle);
   font-size: var(--fs-xs);
   line-height: 1.6;
-  cursor: pointer; box-shadow: var(--mat-raised-rim);
+  box-shadow: var(--mat-raised-rim);
 }
-.picker-contribute input { margin-top: 2px; }
 .picker-contribute strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 600; }
 .picker-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 
