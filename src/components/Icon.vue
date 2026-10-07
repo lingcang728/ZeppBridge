@@ -272,9 +272,11 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <circle cx="12" cy="12" r="8" :stroke-width="stroke" />
       <circle cx="12" cy="12" r="4.4" :stroke-width="stroke" />
     </g>
+    <!-- 一叠牌：前面一张带方块花色，后面一张只露出左边和底边（线不交叉，小尺寸也干净）。 -->
     <g v-else-if="name === 'cards'" :stroke-width="stroke">
-      <rect x="3.5" y="6" width="10" height="14" rx="2" transform="rotate(-10 8.5 13)" />
-      <rect x="10" y="4" width="10" height="14" rx="2" transform="rotate(8 15 11)" />
+      <rect x="8.5" y="3.5" width="11.5" height="15" rx="2.2" />
+      <path d="M8.5 7H6.2A2.2 2.2 0 0 0 4 9.2v10.6A2.2 2.2 0 0 0 6.2 22H14a2.2 2.2 0 0 0 2.2-2.2v-1.3" />
+      <path d="m14.25 7.6 2.1 3.4-2.1 3.4-2.1-3.4 2.1-3.4Z" />
     </g>
     <g v-else-if="name === 'box'">
       <path d="M12 3.3 20 7.5v9L12 20.7 4 16.5v-9L12 3.3Zm-8 4.2 8 4.2 8-4.2M12 11.7v9" :stroke-width="stroke" />

@@ -36,6 +36,8 @@ const props = withDefaults(defineProps<{
   fitPeek?: number;
   /** `inset` 表单里的凹槽底；`bare` 放进已经是玻璃的按钮组里（没有自己的底）。 */
   variant?: 'inset' | 'bare';
+  /** 镜片里那一项本身是个按钮（「交给 ChatGPT」）：单击它、或按 Enter / 空格，发出 `activate`。 */
+  activatable?: boolean;
 }>(), {
   orientation: 'horizontal',
   span: 148,
@@ -44,9 +46,10 @@ const props = withDefaults(defineProps<{
   loop: false,
   fitPeek: undefined,
   variant: 'inset',
+  activatable: false,
 });
 
-const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: T]; activate: [] }>();
 
 const root = ref<HTMLElement | null>(null);
 /* 玻璃（lib/glassLens.ts）：镜片是同一块玻璃——停着时是底色 + 一圈玻璃边，转动时底色化开、里面换成
@@ -292,6 +295,7 @@ const onUp = (event: PointerEvent) => {
     // 点击：点到哪一项就转到哪一项；两项时点哪儿都是换到另一项。
     const current = looping() ? mod(Math.round(pos.value), count()) : Math.round(pos.value);
     if (g.hit >= 0 && g.hit !== current) turnTo(g.hit);
+    else if (props.activatable && (g.hit === current || g.hit < 0)) { animateTo(pos.value); emit('activate'); }
     else if (count() === 2) turnTo(1 - current);
     else animateTo(pos.value);
     return;
@@ -320,6 +324,11 @@ const onWheel = (event: WheelEvent) => {
 const onKeydown = (event: KeyboardEvent) => {
   if (props.disabled) return;
   const current = Math.round(target);
+  if (props.activatable && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    emit('activate');
+    return;
+  }
   const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
   if (step !== undefined) {
     event.preventDefault();

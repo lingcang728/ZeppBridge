@@ -18,7 +18,9 @@ const route = useRoute();
 const derived = useAiDerived();
 const coverage = useAiTaskPreview();
 const history = useExchanges();
-const shown = computed(() => route.path === '/ai');
+/* 寄出前检查也留着底栏：它是从底栏的就绪度胶囊长出来的，返回时要原路缩回那枚胶囊——底栏要是先滑走再滑回来，
+   返回那一下胶囊上的字会先消失再出现、形变也找不到落点（用户 10-07 录屏）。在检查页上也能直接寄出。 */
+const shown = computed(() => route.path === '/ai' || route.path === '/ai/check');
 const prepared = () => {
   void history.load();
   derived.handedOff.value += 1;

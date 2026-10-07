@@ -20,6 +20,7 @@ import type { AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop } from '../../lib/bridge';
 import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiProviders';
 import { aiTaskIssueText } from '../../lib/aiTask/copy';
+import { AI_TASK_CATEGORY_META, categoryLabel } from '../../lib/aiTask/categories';
 import { formatBytes } from '../../lib/format';
 import { currentProviderId, FREE_TOKEN_BUDGET, formatTokens, isSubscribed, setSubscribed } from '../../lib/aiTask/budget';
 import { markdownGuide } from '../../lib/aiTask/markdownGuide';
@@ -93,6 +94,20 @@ const readiness = computed(() => {
   const have = rows.reduce((sum, row) => sum + row.days_with_data, 0);
   return { categories, percent: total > 0 ? Math.round((have / total) * 100) : 0 };
 });
+/** 底栏中间一排小牌：交出去的每一类、多少天里有几天有数据（合并行优先）。按类别的固定顺序排。 */
+const CATEGORY_ORDER = ['sleep', 'recovery', 'heart_rate', 'workout', 'training', 'body'] as const;
+const categoryTiles = computed(() => {
+  const rows = props.preview?.coverage ?? [];
+  return CATEGORY_ORDER.flatMap((category) => {
+    const mine = rows.filter((row) => row.category === category);
+    if (!mine.length) return [];
+    const row = mine.find((entry) => entry.workout_id === null) ?? mine[0]!;
+    const meta = AI_TASK_CATEGORY_META[category];
+    return [{ category, icon: meta.icon, tint: meta.tint, have: row.days_with_data, total: row.days_in_range, label: categoryLabel(category), missing: row.missing }];
+  });
+});
+/** 就绪度圆环：周长 2πr，r = 15。 */
+const RING = 2 * Math.PI * 15;
 /** 同一句提醒只出现一次，后面标次数。 */
 const groupedWarnings = computed(() => {
   const counts = new Map<string, number>();
@@ -249,7 +264,11 @@ onBeforeUnmount(() => {
       <slot />
     <div :class="['bar', { 'glass-control is-lens-host': !rail }]">
       <RouterLink to="/ai/check" data-morph-card :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :title="t.checkHint">
-        <i class="ready-dot" aria-hidden="true"></i>
+        <i v-if="waitingForData || !readiness" class="ready-dot" aria-hidden="true"></i>
+        <span v-else class="ready-ring" aria-hidden="true">
+          <svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="meter" cx="18" cy="18" r="15" :stroke-dasharray="`${(readiness.percent / 100) * RING} ${RING}`" /></svg>
+          <b>{{ readiness.percent }}</b>
+        </span>
         <span v-if="waitingForData" class="ready-copy" role="status">
           <span>{{ t.readinessWaiting }}</span>
           <small>{{ syncProgress && isSyncing ? t.readinessWaitingStep(syncProgress.current, syncProgress.total) : t.readinessWaitingSub }}</small>
@@ -257,6 +276,11 @@ onBeforeUnmount(() => {
         <span v-else class="ready-copy">
           <span>{{ readiness ? t.readiness(readiness.categories, readiness.percent) : t.readinessLoading }}</span>
           <small v-if="preview">{{ mdLine ?? t.packageSize(formatBytes(preview.estimated_bytes)) }}<template v-if="mdDowngrade.length"> · {{ mdDowngrade.join(' · ') }}</template><template v-if="issueTotal"> · {{ t.issueCount(issueTotal) }}</template></small>
+        </span>
+        <span v-if="!waitingForData && categoryTiles.length" class="ready-cats">
+          <span v-for="tile in categoryTiles" :key="tile.category" :class="['cat-tile', { missing: tile.missing }]" :style="{ '--tint': tile.tint }" :title="`${tile.label} · ${tile.have}/${tile.total}`">
+            <Icon :name="tile.icon" :size="14" /><b>{{ tile.have }}</b><small>/{{ tile.total }}</small>
+          </span>
         </span>
         <Icon name="chevron-right" :size="14" class="ready-chevron" />
       </RouterLink>

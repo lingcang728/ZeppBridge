@@ -117,3 +117,14 @@ export const groupSummary = (group: DeckGroup): { recorded: number; total: numbe
 
 /** 一叠里能勾的日子（有记录的）。 */
 export const pickableDates = (group: DeckGroup): string[] => group.days.filter((day) => day.has).map((day) => day.date);
+
+/**
+ * 从某一天点开（「你的过去」的一格）：以它为中心的 `size` 天，最后一天不超过今天。
+ * 返回 `[start, end]`。
+ */
+export const focusWindow = (focus: string, today: string, size = 7): [string, string] => {
+  const half = Math.floor(size / 2);
+  let end = addDays(focus, size - 1 - half);
+  if (end > today) end = today;
+  return [addDays(end, -(size - 1)), end];
+};

@@ -4,6 +4,7 @@ import { defineMessages } from '../i18n';
 export const sleepDetailMessages = defineMessages(
   {
     title: '睡眠记录详情',
+    askLabel: '睡眠',
     loadingDetail: '正在读取睡眠详情…',
     loadFailedTitle: '无法读取这条睡眠',
     loadFailed: '睡眠详情暂不可用',
@@ -47,6 +48,7 @@ export const sleepDetailMessages = defineMessages(
   },
   {
     title: 'Sleep record',
+    askLabel: 'Sleep',
     loadingDetail: 'Loading sleep record…',
     loadFailedTitle: 'Could not load this sleep record',
     loadFailed: 'Sleep detail unavailable right now',
@@ -90,6 +92,7 @@ export const sleepDetailMessages = defineMessages(
   },
   {
     title: 'Registro de sueño',
+    askLabel: 'Sueño',
     loadingDetail: 'Leyendo el registro de sueño…',
     loadFailedTitle: 'No se pudo leer este registro de sueño',
     loadFailed: 'Detalle de sueño no disponible ahora',

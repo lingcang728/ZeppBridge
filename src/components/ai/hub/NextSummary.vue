@@ -5,6 +5,7 @@
  */
 import { computed } from 'vue';
 import Icon from '../../Icon.vue';
+import TintIcon from '../TintIcon.vue';
 import PlanShape from '../../plan/PlanShape.vue';
 import ReceiveCapsule from '../bridge/ReceiveCapsule.vue';
 import { workoutProfile } from '../../../lib/trainingPlan/profile';
@@ -39,7 +40,7 @@ const weekday = (date: string) => displayDateTimeFormatter({ weekday: 'narrow' }
   <section class="hub-card next-card" data-morph-card>
     <RouterLink v-if="rows.length" to="/ai/plan" class="next-link">
       <header class="hub-card-head">
-        <span class="hub-number">02</span>
+        <TintIcon name="compass" tint="var(--accent)" :size="34" />
         <div>
           <h2>{{ t.future }}</h2>
           <p>{{ h.weekLine(training, 7 - training) }}</p>
@@ -56,7 +57,7 @@ const weekday = (date: string) => displayDateTimeFormatter({ weekday: 'narrow' }
     </RouterLink>
     <template v-else>
       <header class="hub-card-head">
-        <span class="hub-number">02</span>
+        <TintIcon name="compass" tint="var(--accent)" :size="34" />
         <div>
           <h2>{{ t.future }}</h2>
           <p>{{ h.noPlan }}</p>

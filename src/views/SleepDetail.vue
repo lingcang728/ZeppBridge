@@ -11,6 +11,8 @@ import { useMessages } from '../i18n';
 
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
+import AskAiButton from '../components/ask/AskAiButton.vue';
+import PickDaysButton from '../components/cards/PickDaysButton.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
@@ -228,8 +230,15 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
     <header class="page-heading">
-      <h1 id="sleep-detail-title">{{ t.title }}</h1>
-      <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
+      <div>
+        <h1 id="sleep-detail-title">{{ t.title }}</h1>
+        <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
+      </div>
+      <!-- 睡眠也能单独问 AI、挑几晚交给 AI（10-07 用户反馈：点进来没有入口）。 -->
+      <span class="heading-actions">
+        <PickDaysButton category="sleep" :label="t.askLabel" tint="var(--sleep)" :format="(minutes: number) => formatDuration(minutes)" />
+        <AskAiButton metric="sleep_score" :label="t.askLabel" card=".sleep-hero" />
+      </span>
     </header>
 
     <Transition name="skeleton-out" @before-leave="holdInPlace">

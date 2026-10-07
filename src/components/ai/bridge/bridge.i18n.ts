@@ -4,7 +4,7 @@ const messages = defineMessages(
   {
     past: '你的过去', pastNote: '点亮的行会交给 AI', future: '你的下一步', futureNote: '把谈妥的计划，接回这里', today: '今天',
     days: (n: number) => `${n} 天`, lookback: '回溯范围', rangeHint: '拖动把手，改变回溯范围', missing: '没有数据', presence: '有记录 · 无代表数值',
-    included: '会交给 AI', excluded: '不交给 AI', selected: (n: number) => `已选 ${n} 次运动`, mean: '有值日期的均值',
+    included: '会交给 AI', excluded: '不交给 AI', selected: (n: number) => `已选 ${n} 次运动`, pickDays: (label: string) => `挑几天${label}交给 AI`, mean: '有值日期的均值',
     receive: '接回定稿', receiveHint: '复制 AI 的最终回复，再按这里', receiveEmpty: '剪贴板里不是定稿，请复制包含计划 JSON 的最终回复',
     received: '定稿已接回', receiveAnother: '接回另一份定稿', receiving: '正在接回…', transcript: (n: number) => `${n} 行文字 → 一份计划`,
     shape: '拖换日子，或选中后用 ← →；Delete 删除当天', rest: '休息', bedtime: '就寝', sleepTarget: '睡眠目标',
@@ -27,7 +27,7 @@ const messages = defineMessages(
   {
     past: 'Your past', pastNote: 'Lit rows go to the AI', future: 'Your next step', futureNote: 'Bring your agreed plan home', today: 'Today',
     days: (n: number) => `${n} days`, lookback: 'Lookback range', rangeHint: 'Drag to change the lookback range', missing: 'No data', presence: 'Record present · no representative value',
-    included: 'Included for AI', excluded: 'Excluded from AI', selected: (n: number) => `${n} workouts selected`, mean: 'Mean of recorded days',
+    included: 'Included for AI', excluded: 'Excluded from AI', selected: (n: number) => `${n} workouts selected`, pickDays: (label: string) => `Pick ${label} days for the AI`, mean: 'Mean of recorded days',
     receive: 'Receive final plan', receiveHint: 'Copy the AI’s final reply, then press here', receiveEmpty: 'The clipboard does not contain a final plan. Copy the final reply containing plan JSON.',
     received: 'Final plan received', receiveAnother: 'Receive another plan', receiving: 'Receiving…', transcript: (n: number) => `${n} lines → a plan`,
     shape: 'Drag to swap days, or use ← → after selecting; Delete removes the day', rest: 'Rest', bedtime: 'Bedtime', sleepTarget: 'Sleep target',
@@ -50,7 +50,7 @@ const messages = defineMessages(
   {
     past: 'Tu pasado', pastNote: 'Las filas activas van a la IA', future: 'Tu siguiente paso', futureNote: 'Trae el plan acordado a casa', today: 'Hoy',
     days: (n: number) => `${n} días`, lookback: 'Rango de historial', rangeHint: 'Arrastra para cambiar el rango', missing: 'Sin datos', presence: 'Hay registro · sin valor representativo',
-    included: 'Incluido para la IA', excluded: 'Excluido de la IA', selected: (n: number) => `${n} entrenamientos elegidos`, mean: 'Media de días registrados',
+    included: 'Incluido para la IA', excluded: 'Excluido de la IA', selected: (n: number) => `${n} entrenamientos elegidos`, pickDays: (label: string) => `Elegir días de ${label} para la IA`, mean: 'Media de días registrados',
     receive: 'Recibir plan final', receiveHint: 'Copia la respuesta final de la IA y pulsa aquí', receiveEmpty: 'El portapapeles no contiene un plan final. Copia la respuesta final con el JSON del plan.',
     received: 'Plan final recibido', receiveAnother: 'Recibir otro plan', receiving: 'Recibiendo…', transcript: (n: number) => `${n} líneas → un plan`,
     shape: 'Arrastra para intercambiar días o usa ← →; Supr elimina el día', rest: 'Descanso', bedtime: 'Acostarse', sleepTarget: 'Objetivo de sueño',

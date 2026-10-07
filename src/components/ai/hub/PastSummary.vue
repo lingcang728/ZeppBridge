@@ -5,6 +5,7 @@
  */
 import { computed } from 'vue';
 import Icon from '../../Icon.vue';
+import TintIcon from '../TintIcon.vue';
 import { AI_TASK_CATEGORY_META, categoryLabel } from '../../../lib/aiTask/categories';
 import { stripColumns } from '../../../lib/aiTask/strip';
 import { pickedDayCount } from '../../../lib/aiTask/pickedDays';
@@ -42,7 +43,7 @@ const summary = computed(() => {
 <template>
   <RouterLink to="/ai/past" class="hub-card past-card" :class="{ sent }" data-morph-card>
     <header class="hub-card-head">
-      <span class="hub-number">01</span>
+      <TintIcon name="clock" tint="var(--sleep-light)" :size="34" />
       <div>
         <h2>{{ t.past }}</h2>
         <p>{{ summary }}</p>
@@ -51,7 +52,7 @@ const summary = computed(() => {
     </header>
     <ul class="past-lines">
       <li v-for="line in lines" :key="line.category" :class="{ off: !line.enabled }" :style="{ '--tint': line.meta.tint }">
-        <Icon :name="line.meta.icon" :size="12" />
+        <TintIcon :name="line.meta.icon" :tint="line.meta.tint" :size="22" :off="!line.enabled" />
         <span class="name">{{ categoryLabel(line.category) }}</span>
         <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
           <rect v-for="(bar, i) in line.bars" :key="i" :x="bar.x" :y="H - bar.h" :width="bar.w" :height="bar.h" rx="1" />

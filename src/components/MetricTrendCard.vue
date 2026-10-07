@@ -218,9 +218,12 @@ const hasEventMarks = computed(() => {
        右边却空着一大块。现在标题独占一行、读数在它下面、说明铺满整宽。 -->
   <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
-      <!-- 右上角：「比平时高 / 低」的标记（只和自己比）和「问 AI」（精修批次 6）。 -->
-      <span class="trend-ask"><BaselineTag :metric="series?.metric" :format="render" :unit="unit" /><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
-      <strong class="trend-title">{{ label }}</strong>
+      <!-- 第一行：标题 + 右边的「挑日子」「问 AI」。放不下时按钮整组换到下一行靠右，
+           不再浮在标题上面——法语、葡语的长标题曾经和「比平时高」叠在一起（2026-10-07）。 -->
+      <div class="trend-top">
+        <strong class="trend-title">{{ label }}</strong>
+        <span class="trend-actions"><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
+      </div>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
            / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
            的平均/最低/最高和覆盖天数。以前它没有标签，读起来像「这个范围的
@@ -231,6 +234,8 @@ const hasEventMarks = computed(() => {
           <strong :style="{ color }">{{ latest }}</strong>
           <small v-if="unit">{{ unit }}</small>
         </slot>
+        <!-- 「比平时高 / 低」说的是这个读数，跟在它后面（只和自己比，精修批次 6）。 -->
+        <BaselineTag class="trend-baseline" :metric="series?.metric" :format="render" :unit="unit" />
       </span>
       <small v-if="hint" class="trend-hint">{{ hint }}</small>
     </header>
@@ -286,10 +291,12 @@ const hasEventMarks = computed(() => {
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }
-.trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; position: relative; }
-/* 标题右边的一小块：标记 + 问 AI。浮在右上角，不占标题那一行的宽度（长标题照样能排满）。 */
-.trend-ask { position: absolute; top: -4px; right: -6px; z-index: 1; display: inline-flex; align-items: center; gap: 4px; }
-.trend-title { padding-right: 100px; }
+.trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; }
+/* 标题至少留 9em：再窄就让按钮整组换行，标题不会被压成一列一个词。 */
+.trend-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; min-width: 0; }
+.trend-top .trend-title { flex: 1 1 9em; padding-top: 3px; }
+.trend-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin: -2px -4px 0 auto; }
+.trend-baseline { align-self: center; margin-left: 4px; }
 .trend-title { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .trend-latest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
 .trend-latest :deep(strong), .trend-latest strong { font-family: var(--font-mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.15; }

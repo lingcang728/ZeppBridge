@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * 「你的过去」二级页（/ai/past）：六类数据各一行——点亮的那几类会交给 AI，细条是逐天的数据，
- * 右边的箭头进这一类的逐天页（/ai/past/:category，从这一行长出来）。底下拖动回溯范围。
- * 运动那一行的柱子可以点：选中的那几次运动一起交给 AI。
+ * 「你的过去」二级页（/ai/past）：六类数据各一行——点亮的那几类会交给 AI，细条是逐天的数据。
+ * 点某一格：这一类的牌从那一格飞出来铺满全屏，那一天落在正中（10-07 第二轮，取代了 /ai/past/:category 二级页）；
+ * 行尾的牌堆按钮也一样，从今天发起。底下拖动回溯范围。运动那一行的柱子可以点：选中的那几次运动一起交给 AI。
  */
-import { computed, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, ref, shallowRef, watch } from 'vue';
 import PageHeader from '../../components/PageHeader.vue';
 import Icon from '../../components/Icon.vue';
 import BridgeRow from '../../components/ai/bridge/BridgeRow.vue';
@@ -15,7 +15,10 @@ import { useBridgeStrip } from '../../composables/useBridgeStrip';
 import { useBridgeText } from '../../components/ai/bridge/bridge.i18n';
 import { useHubText } from '../../components/ai/hub/hub.i18n';
 import { addDays } from '../../lib/aiTask/bridgeScale';
-import { categoryLabel } from '../../lib/aiTask/categories';
+import { AI_TASK_CATEGORY_META, categoryLabel } from '../../lib/aiTask/categories';
+import { unitLabel } from '../../lib/aiTask/metrics';
+import { formatDuration } from '../../lib/format';
+import { categorySource, type DeckSource } from '../../lib/cards/sources';
 import type { AiTaskCategory } from '../../lib/bridge/types';
 import '../../styles/ai-task.css';
 
@@ -35,6 +38,28 @@ const marks = computed(() => [addDays(end.value, 1 - days.value), addDays(end.va
 const enabled = (category: AiTaskCategory) => draft.value.categories.find((c) => c.category === category)?.enabled ?? false;
 const toggle = (category: AiTaskCategory) => ctl.setCategoryEnabled(category, !enabled(category));
 const commit = (n: number) => { days.value = n; ctl.setWindowDays(n - 1); };
+
+/* ---------- 牌桌：从被点的那一格发牌 ---------- */
+const CardTable = defineAsyncComponent(() => import('../../components/cards/CardTable.vue'));
+const deck = shallowRef<{ source: DeckSource; origin: DOMRect; focus: string } | null>(null);
+/** 牌面读数和这一行行尾同一个写法；睡眠按「几小时几分」。 */
+const formatFor = (category: AiTaskCategory, unit: string | null) => (value: number) => (category === 'sleep'
+  ? formatDuration(value)
+  : `${value.toFixed(unit === 'kg' || unit === 'h' ? 1 : 0)}`);
+const openDeck = (category: AiTaskCategory, date: string, origin: DOMRect) => {
+  const unit = strips.rows.value.find((r) => r.category === category)?.cells.find((cell) => cell.unit)?.unit ?? null;
+  deck.value = {
+    source: categorySource({
+      category, label: categoryLabel(category), tint: AI_TASK_CATEGORY_META[category].tint,
+      format: formatFor(category, unit), unit: category === 'sleep' || !unit ? undefined : unitLabel(unit),
+    }),
+    origin,
+    focus: date,
+  };
+};
+const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
+  openDeck(category, end.value, (event.currentTarget as HTMLElement).getBoundingClientRect());
+};
 </script>
 
 <template>
@@ -44,8 +69,10 @@ const commit = (n: number) => { days.value = n; ctl.setWindowDays(n - 1); };
       <ul class="past-rows">
         <li v-for="(row, i) in rows" :key="row.category" class="past-row" data-morph-card :style="{ '--row-index': i }">
           <BridgeRow :row="row" :days="days" :enabled="enabled(row.category)" :selected-ids="draft.workout_ids" :adherence="strips.adherence.value"
-            @toggle="toggle(row.category)" @workout="ctl.toggleWorkout" />
-          <RouterLink :to="`/ai/past/${row.category}`" class="row-open" :aria-label="categoryLabel(row.category)"><Icon name="chevron-right" :size="16" /></RouterLink>
+            @toggle="toggle(row.category)" @workout="ctl.toggleWorkout" @day="openDeck(row.category, $event.date, $event.rect)" />
+          <button v-if="row.category !== 'workout'" type="button" class="row-open" :aria-label="t.pickDays(categoryLabel(row.category))" :title="t.pickDays(categoryLabel(row.category))"
+            @click="openFromRow(row.category, $event)"><Icon name="cards" :size="16" /></button>
+          <span v-else class="row-open" aria-hidden="true"></span>
         </li>
       </ul>
       <div class="past-dates"><span v-for="date in marks" :key="date">{{ date.slice(5).replace('-', ' / ') }}</span></div>
@@ -55,6 +82,7 @@ const commit = (n: number) => { days.value = n; ctl.setWindowDays(n - 1); };
         <span v-if="draft.workout_ids.length" class="selection-count">{{ t.selected(draft.workout_ids.length) }}</span>
       </footer>
     </div>
+    <CardTable v-if="deck" :source="deck.source" :range="7" :origin="deck.origin" :focus="deck.focus" @close="deck = null" />
     <p v-if="strips.error.value" class="ai-message" role="alert"><Icon name="warning" :size="14" /><span>{{ strips.error.value }}</span><button class="pill-button quiet" @click="strips.load()">{{ t.retry }}</button></p>
   </section>
 </template>
@@ -64,10 +92,11 @@ const commit = (n: number) => { days.value = n; ctl.setWindowDays(n - 1); };
 .past-rows { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .past-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 4px; border-radius: 14px; transition: background var(--dur-base) ease; }
 .past-row:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
-.row-open { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; color: var(--subtle); }
+.row-open { display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--subtle); cursor: pointer; }
+span.row-open { cursor: default; }
 .row-open:hover { background: var(--glass-press); color: var(--ink); }
 .row-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.past-dates { display: flex; justify-content: space-between; margin: 0 118px 0 126px; color: var(--subtle); font: 10px var(--font-mono); }
+.past-dates { display: flex; justify-content: space-between; margin: 0 118px 0 148px; color: var(--subtle); font: 10px var(--font-mono); }
 .past-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding-top: 6px; color: var(--subtle); font-size: var(--fs-2xs); }
 .range-title { color: var(--muted); font-size: var(--fs-xs); }
 .selection-count { margin-left: auto; color: var(--accent); }

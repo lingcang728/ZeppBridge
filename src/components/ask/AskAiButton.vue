@@ -1,25 +1,37 @@
 <script setup lang="ts">
 /**
- * 指标卡右上角的「问 AI」（精修批次 6.1）。点开是从这枚按钮长出来的玻璃浮层（ModalDialog 的 dialogFlight），
- * 给 2–3 个按这一项配好的问题；选一个就新开一个任务——只带这一项所属那一类近期的数据、问题填好——
- * 然后从被点的那一行形变进「交给 AI」（链接标了 data-morph-card）。有「比平时高 / 低」标记的卡，这枚按钮更显眼。
+ * 指标卡上的「问 AI」（精修批次 6.1，10-07 第二轮重做）。
+ *
+ * - 点开：一块玻璃浮层从这枚按钮里弹出来（GlassPopover），给 2–3 个按这一项配好的问题；点空白 / Esc 缩回按钮。
+ * - 选一个：浮层缩回按钮的同时，这张指标卡长成「交给 AI」整页（armPageMorph → usePageMorph 的 expand）——
+ *   新开一个任务，只带这一项所属那一类近期的数据、问题填好。返回时缩回同一张卡。
+ *   以前问题行在弹窗里、弹窗一关来源就没了，只能硬切进去（用户 10-07 录屏）。
+ * 有「比平时高 / 低」标记的卡，这枚按钮更显眼。
  */
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
-import ModalDialog from '../ModalDialog.vue';
+import GlassPopover from '../GlassPopover.vue';
 import { askPresets, type AskPreset } from '../../lib/metricAsk';
 import { AI_TASK_CATEGORY_META } from '../../lib/aiTask/categories';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useMetricBaselines } from '../../composables/useMetricBaselines';
+import { armPageMorph } from '../../composables/usePageMorph';
 import { useAskText } from './ask.i18n';
 
-const props = defineProps<{ metric: string | null | undefined; label: string }>();
+const props = defineProps<{
+  metric: string | null | undefined;
+  label: string;
+  /** 形变的来源卡（CSS 选择器，在页面里找）；不给就用按钮所在的那张卡（.trend-card / section）。 */
+  card?: string;
+}>();
 const a = useAskText();
 const router = useRouter();
 const ctl = useAiTaskDraft();
 const { baselineOf } = useMetricBaselines();
 const open = ref(false);
+const button = ref<HTMLElement | null>(null);
+const popover = ref<InstanceType<typeof GlassPopover> | null>(null);
 const direction = computed(() => baselineOf(props.metric)?.direction ?? null);
 const titleId = computed(() => `ask-${props.metric ?? 'metric'}`);
 const questions = computed(() => (props.metric ? askPresets(props.metric) : []).map((preset) => ({ preset, text: questionText(preset) })));
@@ -35,7 +47,16 @@ function questionText(preset: AskPreset): string {
     default: return t.firstUsual(props.label);
   }
 }
-/** 新开一个任务：只开这几类、看这么多天、问题填好，再去交给 AI。 */
+/** 打开浮层时就把「交给 AI」页的代码块取回来：选完问题形变时第一帧就是真页面。 */
+const show = () => {
+  open.value = true;
+  void import('../../views/AiComposer.vue').catch(() => undefined);
+};
+const sourceCard = (): HTMLElement | null => {
+  if (props.card) return document.getElementById('main-content')?.querySelector<HTMLElement>(props.card) ?? null;
+  return button.value?.closest<HTMLElement>('.trend-card, .surface-card, section') ?? null;
+};
+/** 新开一个任务：只开这几类、看这么多天、问题填好；浮层缩回按钮，同时卡长成「交给 AI」。 */
 const choose = async (preset: AskPreset, text: string) => {
   ctl.resetDraft();
   for (const range of ctl.draft.value.categories) {
@@ -44,37 +65,45 @@ const choose = async (preset: AskPreset, text: string) => {
   }
   ctl.setWindowDays(preset.days - 1);
   ctl.setPrompt(text);
-  open.value = false;
+  void popover.value?.close();
+  armPageMorph(sourceCard(), '/ai');
   await router.push('/ai');
 };
 </script>
 
 <template>
-  <button v-if="metric" type="button" :class="['ask-ai', { lit: direction === 'above' || direction === 'below' }]" :title="a.ask" :aria-label="a.askTitle(label)" @click="open = true">
-    <Icon name="spark" :size="13" /><span>{{ a.ask }}</span>
+  <button v-if="metric" ref="button" type="button" :class="['ask-ai', { lit: direction === 'above' || direction === 'below', open }]" :title="a.ask" :aria-label="a.askTitle(label)"
+    aria-haspopup="dialog" :aria-expanded="open" @click="show">
+    <Icon name="spark" :size="15" /><span>{{ a.ask }}</span>
   </button>
-  <ModalDialog v-if="open" :labelledby="titleId" @close="open = false">
-    <div class="ask-sheet">
-      <h2 :id="titleId">{{ a.askTitle(label) }}</h2>
-      <p>{{ a.askHint }}</p>
-      <a v-for="item in questions" :key="item.preset.key" href="/ai" class="question" data-morph-card @click.prevent="choose(item.preset, item.text)">
-        <Icon name="spark" :size="14" /><span>{{ item.text }}</span><Icon name="chevron-right" :size="14" />
-      </a>
-    </div>
-  </ModalDialog>
+  <GlassPopover v-if="open" ref="popover" :anchor="button" :labelledby="titleId" @close="open = false">
+    <h2 :id="titleId" class="ask-title" data-pop-item><Icon name="spark" :size="16" />{{ a.askTitle(label) }}</h2>
+    <p class="ask-hint" data-pop-item>{{ a.askHint }}</p>
+    <button v-for="item in questions" :key="item.preset.key" type="button" class="question" data-pop-item @click="choose(item.preset, item.text)">
+      <span>{{ item.text }}</span><Icon name="arrow-right" :size="15" />
+    </button>
+  </GlassPopover>
 </template>
 
 <style scoped>
-.ask-ai { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border: 0; border-radius: 999px; background: transparent; color: var(--subtle);
-  font: inherit; font-size: var(--fs-2xs); cursor: pointer; transition: background var(--dur-base) ease, color var(--dur-base) ease; }
-.ask-ai:hover { background: var(--glass-press); color: var(--ink); }
-.ask-ai.lit { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+/* 一枚小玻璃胶囊：比正文显眼，但不抢读数。有「比平时高 / 低」标记时染上强调色、带一圈细光。 */
+.ask-ai { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px 0 10px; border: 0; border-radius: 999px;
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 650;
+  white-space: nowrap; cursor: pointer; transition: background var(--dur-base) ease, color var(--dur-base) ease, box-shadow var(--dur-base) ease, transform 160ms ease; }
+.ask-ai :deep(svg) { color: var(--accent); }
+.ask-ai:hover, .ask-ai.open { background: color-mix(in srgb, var(--accent) 12%, var(--mat-inset)); }
+.ask-ai:active { transform: scale(.96); }
+.ask-ai.lit { background: color-mix(in srgb, var(--accent) 20%, var(--mat-inset)); box-shadow: var(--mat-inset-shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent); }
 .ask-ai:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.ask-sheet { display: grid; gap: 10px; }
-.ask-sheet h2 { margin: 0; font-size: var(--fs-xl); }
-.ask-sheet p { margin: 0 0 4px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
-.question { display: grid; grid-template-columns: 16px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px;
-  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font-size: var(--fs-sm); text-decoration: none; transition: background var(--dur-base) ease; }
-.question:hover { background: color-mix(in srgb, var(--accent) 10%, var(--mat-inset)); }
-.question :first-child { color: var(--accent); }
+.ask-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-md); line-height: 1.3; }
+.ask-title :deep(svg) { flex: 0 0 auto; color: var(--accent); }
+.ask-hint { margin: 0 0 4px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.55; }
+.question { display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 12px 14px; border: 0; border-radius: 14px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); font: inherit; font-size: var(--fs-sm); line-height: 1.4; text-align: left; cursor: pointer;
+  transition: background var(--dur-base) ease, transform 160ms ease; }
+.question :deep(svg) { color: var(--subtle); transition: transform var(--dur-base) ease, color var(--dur-base) ease; }
+.question:hover, .question:focus-visible { outline: none; background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.question:hover :deep(svg), .question:focus-visible :deep(svg) { color: var(--accent); transform: translateX(3px); }
+.question:active { transform: scale(.985); }
 </style>

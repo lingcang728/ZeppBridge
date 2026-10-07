@@ -93,7 +93,28 @@ const endLeave = (el: HTMLElement) => {
   el.dispatchEvent(new TransitionEvent('transitionend', { propertyName: 'opacity' }));
 };
 
-type Trail = { back: string; href: string; index: number; rect: Rect; radius: number };
+/** `source`：不是从链接、而是从一张卡直接开的（armPageMorph）：返回时按这个标记找回那张卡。 */
+type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; source?: string };
+
+/**
+ * 从一张卡直接形变进某一页（不是点卡里的链接）：指标卡上的「问 AI」选了问题以后从这张卡长进「交给 AI」，
+ * 返回时缩回这张卡（2026-10-07 第二轮）。先 arm，再 router.push；下一次切页的 decide() 用掉它。
+ * 卡上会留一个 data-morph-source 标记，返回时靠它找回卡（来处页是 KeepAlive 缓存的，卡还是那一张）。
+ */
+let armed: { card: HTMLElement; href: string; id: string; at: number } | null = null;
+let armSeq = 0;
+export const armPageMorph = (card: HTMLElement | null, href: string): void => {
+  if (!card) { armed = null; return; }
+  const id = card.dataset.morphSource || `m${(armSeq += 1)}`;
+  card.dataset.morphSource = id;
+  armed = { card, href, id, at: performance.now() };
+};
+/** 被 arm 的卡：只在 arm 之后一小会儿内有效（选完问题就切页；别让一个过期的 arm 劫持之后不相干的切页）。 */
+const takeArmed = (to: RouteLocationNormalized) => {
+  const hit = armed && performance.now() - armed.at < 1500 && (armed.href === to.fullPath || armed.href === to.path) && armed.card.isConnected ? armed : null;
+  armed = null;
+  return hit;
+};
 type Origin = { card: HTMLElement; rect: Rect; radius: number; replica: { el: HTMLElement; rect: Rect } };
 /** 收回：详情页已经在离场，等来处页回到场上、滚动位置恢复以后的那一帧才开始缩。 */
 type Collapse = {
@@ -158,7 +179,13 @@ export const usePageMorph = (options: { back: () => void }) => {
     focusKey = focusKeyOf(to);
     hold?.();
     hold = null;
+    const direct = takeArmed(to);
     if (reducedMotion()) return base;
+    if (direct && bigEnough(direct.card)) {
+      expandFrom = { card: direct.card, rect: rectOf(direct.card), radius: radiusOf(direct.card), replica: cardReplica(direct.card) };
+      trails.set(to.fullPath, { back: from.fullPath, href: direct.href, index: 0, rect: expandFrom.rect, radius: expandFrom.radius, source: direct.id });
+      return 'expand';
+    }
     // 标了 data-morph-card 的条带跨入口（概览 → 设置卡）也展开：从哪里来回哪里去。
     if (link && (base === 'forward' || link.closest('[data-morph-card]'))) {
       const href = link.getAttribute('href') ?? '';
@@ -283,7 +310,8 @@ export const usePageMorph = (options: { back: () => void }) => {
       early: focusPart ? (part) => part === focusPart : undefined,
     });
     const back = leaving ? recede(leaving, viewport, 'out', OPEN_MS, OPEN_EASE).animation : null;
-    const hidden = origin.card.isConnected ? hide(origin.card) : null;
+    // 页面外面的来源（底栏里的就绪度胶囊）浮在形变上面，窗口从它底下长出来：它不用藏，藏了只会空一下（10-07 录屏）。
+    const hidden = origin.card.isConnected && main()?.contains(origin.card) ? hide(origin.card) : null;
     const all = () => [...flight.anims, ...(back ? [back] : [])];
 
     let landed = false;
@@ -362,6 +390,7 @@ export const usePageMorph = (options: { back: () => void }) => {
 
   /** 来处页此刻已经在场的话，当初那张卡。页面里没有就看页面外面标了 data-morph-card 的（底栏）。 */
   const currentCard = (trail: Trail): HTMLElement | null => {
+    if (trail.source) return main()?.querySelector<HTMLElement>(`${STAYING} [data-morph-source="${CSS.escape(trail.source)}"]`) ?? null;
     const link = linksTo(trail.href, STAYING)[trail.index]
       ?? document.querySelector<HTMLElement>(`body > :not(#app) a[data-morph-card][href="${CSS.escape(trail.href)}"]`)
       ?? null;
@@ -439,7 +468,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       } : undefined,
     });
     const forward = staying ? recede(staying, viewport, 'in', CLOSE_MS, CLOSE_EASE) : null;
-    let hidden = present ? hide(present) : null;
+    let hidden = present && main()?.contains(present) ? hide(present) : null;
     let landed = false;
     if (!present) {
       // 来处页还在重读库：卡出现了就把终点换成它（它此刻跟着来处页缩着，按缩放原点算回原大）。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysBetweenInclusive, deckRangeOf, expandGroup, groupSummary, monthsOf, pickableDates, rangeStart, rootLevel, weeksOf } from '../deck';
+import { daysBetweenInclusive, deckRangeOf, expandGroup, focusWindow, groupSummary, monthsOf, pickableDates, rangeStart, rootLevel, weeksOf } from '../deck';
 
 const lookup = (date: string) => (date.endsWith('3') ? null : { value: Number(date.slice(8)), has: true });
 
@@ -53,5 +53,11 @@ describe('扑克牌的层级', () => {
     expect(summary).toEqual({ recorded: 6, total: 7, average: (21 + 22 + 24 + 25 + 26 + 27) / 6 });
     const empty = weeksOf(daysBetweenInclusive('2026-09-21', '2026-09-22', () => null))[0]!;
     expect(groupSummary(empty).average).toBeNull();
+  });
+
+  it('从某一天点开：以它为中心的 7 天，不超过今天', () => {
+    expect(focusWindow('2026-09-20', '2026-10-06')).toEqual(['2026-09-17', '2026-09-23']);
+    // 离今天不到 3 天：整段往前挪，最后一天停在今天，被点的那天不一定在正中。
+    expect(focusWindow('2026-10-05', '2026-10-06')).toEqual(['2026-09-30', '2026-10-06']);
   });
 });

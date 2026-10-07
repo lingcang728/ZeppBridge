@@ -10,7 +10,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { backend } from '../../lib/bridge';
 import { autoTaskTitle } from '../../lib/aiTask/title';
-import { directionText } from '../../lib/aiTask/prompt';
+import { directionText, templateName } from '../../lib/aiTask/prompt';
 import { displayableWorkouts } from '../../lib/workouts';
 import { addDays, dayKey, daysBetween } from '../../lib/aiTask/bridgeScale';
 import { dayRows } from '../../lib/trainingPlan/week';
@@ -93,7 +93,8 @@ export const useAiDerived = () => {
   const choices = computed(() => displayableWorkouts(recentWorkouts.value));
   const picked = computed(() => choices.value.filter((w) => draft.value.workout_ids.includes(w.workout_id)));
   const template = computed(() => templates.value.find((p) => p.id === draft.value.template_id) ?? null);
-  const title = computed(() => autoTaskTitle(draft.value, picked.value, template.value?.name ?? null));
+  // 模板名按界面语言取（name_code），不直接用存储的中文名：英文界面的任务名曾经是中文。
+  const title = computed(() => autoTaskTitle(draft.value, picked.value, template.value ? templateName(template.value) : null));
   const direction = computed(() => directionText(template.value));
   return { choices, picked, template, title, direction, handedOff };
 };

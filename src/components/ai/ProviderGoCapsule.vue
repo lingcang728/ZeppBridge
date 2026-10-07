@@ -1,115 +1,57 @@
 <script setup lang="ts">
 /**
- * 底栏右边那一枚主按钮（批次 5.1）：「交给 ChatGPT」本身就是选 AI 的玻璃胶囊——
- *   - 单击：寄出；
- *   - 横着拨（按住左右拖、触控板横滑、← / →）：换下一家 / 上一家，循环；名字跟着手滑，松手吸附；
- *   - 右上角一枚小角标说这家是「免费版」还是「已订阅」（改在寄出前检查里改，每家各自记住）。
- * 以前左边还有一只单独的 AI 滚轮和一枚订阅开关，和主按钮挤在一起，现在都收进这一枚。
- * 只动 translate / opacity（合成器上跑）；玻璃底是静态的。
+ * 底栏右边那一枚主按钮（批次 5.1，10-07 第二轮改成真正的 Liquid Glass 滚轮）：
+ * 「交给 ChatGPT」本身就是一只横向的玻璃滚轮（CapsuleWheel）——
+ *   - 左右拖、触控板横滑、滚轮、← / →：换一家，邻近的几家在两侧沿圆柱侧转、露出半截，玻璃镜片跟手；
+ *   - 单击镜片里的那一家（或 Enter / 空格）：寄出；点两侧露出的那一家：先转过去；
+ *   - 镜片染成品牌绿，是整页唯一的实色；右上角一枚小角标说这家是「免费版」还是「已订阅」（在寄出前检查里改）。
  */
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import CapsuleWheel from '../CapsuleWheel.vue';
 import Icon from '../Icon.vue';
-import { AI_PROVIDERS, type AiProvider } from '../../lib/aiProviders';
+import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiProviders';
 import { isSubscribed } from '../../lib/aiTask/budget';
 import { useHandoffText } from './HandoffDock.i18n';
 
 const props = defineProps<{ provider: AiProvider; disabled: boolean; sub: string; title: string }>();
 const emit = defineEmits<{ go: []; pick: [AiProvider] }>();
 const t = useHandoffText();
-const index = computed(() => Math.max(0, AI_PROVIDERS.findIndex((p) => p.id === props.provider.id)));
-const neighbour = (step: number) => AI_PROVIDERS[(index.value + step + AI_PROVIDERS.length) % AI_PROVIDERS.length]!;
 const paid = computed(() => isSubscribed(props.provider.id));
-const shift = ref(0);
-const settling = ref(false);
-/** 换家时名字从拨的方向滑进来：-1 往左拨（下一家从右边进来），1 往右拨。 */
-const enter = ref<0 | 1 | -1>(0);
-let start: { x: number; moved: boolean } | null = null;
-let swallow = false;
-
-const step = (by: 1 | -1) => {
-  emit('pick', neighbour(by));
-  enter.value = by === 1 ? -1 : 1;
-  requestAnimationFrame(() => { enter.value = 0; });
+const items = computed(() => AI_PROVIDERS.map((p) => ({ value: p.id, label: t.value.go(p.label), image: p.localIcon })));
+const pick = (id: AiProviderId) => {
+  const next = AI_PROVIDERS.find((p) => p.id === id);
+  if (next && next.id !== props.provider.id) emit('pick', next);
 };
-const onDown = (event: PointerEvent) => {
-  if (props.disabled || event.button !== 0) return;
-  (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-  start = { x: event.clientX, moved: false };
-  settling.value = false;
-};
-const onMove = (event: PointerEvent) => {
-  if (!start) return;
-  const dx = event.clientX - start.x;
-  if (!start.moved && Math.abs(dx) < 6) return;
-  start.moved = true;
-  shift.value = Math.max(-90, Math.min(90, dx));
-};
-const onUp = () => {
-  const began = start;
-  start = null;
-  if (!began) return;
-  settling.value = true;
-  if (began.moved) {
-    swallow = true;
-    if (shift.value <= -36) step(1);
-    else if (shift.value >= 36) step(-1);
-  }
-  shift.value = 0;
-};
-const onClick = () => {
-  if (swallow) { swallow = false; return; }
-  if (!props.disabled) emit('go');
-};
-let wheelAt = 0;
-const onWheel = (event: WheelEvent) => {
-  if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || props.disabled) return;
-  event.preventDefault();
-  const now = performance.now();
-  if (now - wheelAt < 380 || Math.abs(event.deltaX) < 8) return;
-  wheelAt = now;
-  step(event.deltaX > 0 ? 1 : -1);
-};
-const onKey = (event: KeyboardEvent) => {
-  if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
-  if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
-};
+const go = () => { if (!props.disabled) emit('go'); };
 </script>
 
 <template>
-  <button type="button" class="go-capsule cta" :disabled="disabled" :title="title"
-    :aria-label="`${t.go(provider.label)} · ${paid ? t.planPaid : t.planFree}`" aria-roledescription="carousel"
-    @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @click="onClick" @wheel="onWheel" @keydown="onKey">
-    <span class="peek prev" aria-hidden="true"><img v-if="neighbour(-1).localIcon" :src="neighbour(-1).localIcon" alt="" /></span>
-    <span :key="provider.id" :class="['face', { settling, [`from-${enter === 1 ? 'left' : enter === -1 ? 'right' : 'none'}`]: true }]" :style="{ translate: `${shift}px 0` }">
-      <img v-if="provider.localIcon" :src="provider.localIcon" alt="" class="logo" />
-      <span class="copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ sub }}</small></span>
-    </span>
-    <span class="peek next" aria-hidden="true"><img v-if="neighbour(1).localIcon" :src="neighbour(1).localIcon" alt="" /></span>
+  <div :class="['go-capsule', { disabled }]" :title="title">
+    <CapsuleWheel class="go-wheel" loop activatable :span="300" :items="items" :model-value="provider.id" :disabled="disabled"
+      :aria-label="`${t.go(provider.label)} · ${paid ? t.planPaid : t.planFree}`" @update:model-value="pick" @activate="go" />
     <span :class="['badge', { paid }]" aria-hidden="true">{{ paid ? t.planPaid : t.planFree }}</span>
-    <Icon name="send" :size="15" class="send" />
-  </button>
+    <button type="button" class="send" :disabled="disabled" :aria-label="t.go(provider.label)" @click="go"><Icon name="send" :size="17" /></button>
+  </div>
 </template>
 
 <style scoped>
-.go-capsule { position: relative; display: flex; align-items: center; gap: 8px; min-width: 250px; min-height: 48px; padding: 0 18px 0 12px; overflow: hidden;
-  border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140c); font: inherit; cursor: pointer; touch-action: pan-y; user-select: none;
-  box-shadow: var(--mat-raised-rim), 0 8px 22px -12px color-mix(in srgb, var(--accent) 70%, transparent); }
-.go-capsule:disabled { opacity: .5; cursor: default; }
-.go-capsule:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.face { display: flex; flex: 1 1 auto; align-items: center; gap: 10px; min-width: 0; }
-.face.settling { transition: translate 300ms cubic-bezier(.34, 1.36, .64, 1); }
-.face.from-right { animation: face-in-right 320ms cubic-bezier(.4, .6, .2, 1); }
-.face.from-left { animation: face-in-left 320ms cubic-bezier(.4, .6, .2, 1); }
-.logo { width: 22px; height: 22px; flex: none; border-radius: 6px; object-fit: contain; }
-.copy { display: grid; min-width: 0; line-height: 1.15; text-align: left; }
-.copy strong { overflow: hidden; font-size: var(--fs-md); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.copy small { overflow: hidden; font-size: 10px; opacity: .72; text-overflow: ellipsis; white-space: nowrap; }
-.peek { display: grid; width: 14px; flex: none; place-items: center; opacity: .35; }
-.peek img { width: 14px; height: 14px; object-fit: contain; filter: grayscale(1); }
-.send { flex: none; opacity: .85; }
-.badge { position: absolute; top: 3px; right: 12px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, #000 22%, transparent); color: inherit; font-size: 9px; font-weight: 700; line-height: 14px; }
-.badge.paid { background: color-mix(in srgb, #fff 55%, transparent); }
-@keyframes face-in-right { from { opacity: 0; translate: 26px 0; } to { opacity: 1; translate: 0 0; } }
-@keyframes face-in-left { from { opacity: 0; translate: -26px 0; } to { opacity: 1; translate: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .face.settling, .face.from-right, .face.from-left { transition: none; animation: none; } }
+.go-capsule { position: relative; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+.go-capsule.disabled { opacity: .55; }
+/* 滚轮放大一号；镜片是品牌绿的实心胶囊，镜片里的字用绿底上的深色。 */
+.go-wheel { --cap-ink: var(--accent-ink, #10140c); height: 48px; background: none !important; box-shadow: none !important; }
+.go-wheel :deep(.wheel-lens) { top: 2px; bottom: 2px; background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%), var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -2px 6px rgba(0, 0, 0, .16), 0 8px 22px -10px color-mix(in srgb, var(--accent) 75%, transparent); }
+.go-wheel :deep(.wheel-refract) { top: 2px; bottom: 2px; }
+.go-wheel :deep(.wheel-item) { font-size: var(--fs-md); padding: 0 14px; }
+.go-wheel :deep(.wheel-label) { font-weight: 700; }
+.go-wheel :deep(.wheel-image) { width: 22px; height: 22px; flex-basis: 22px; border-radius: 6px; }
+.badge { position: absolute; top: -7px; right: 46px; z-index: 2; padding: 1px 7px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: var(--glass-rim);
+  color: var(--muted); font-size: 10px; font-weight: 700; line-height: 15px; pointer-events: none; }
+.badge.paid { background: var(--accent); color: var(--accent-ink, #10140c); box-shadow: none; }
+.send { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent); cursor: pointer; transition: transform 160ms ease, background var(--dur-base) ease; }
+.send:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 28%, transparent); transform: translateX(2px); }
+.send:active:not(:disabled) { transform: scale(.94); }
+.send:disabled { cursor: default; }
+.send:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 </style>

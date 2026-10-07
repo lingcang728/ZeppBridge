@@ -205,3 +205,23 @@
 .ready-copy > small { color: var(--muted); }
 .go-row :deep(.go-capsule) { flex: none; }
 
+
+/* 10-07 第二轮：底栏中间不再一行小字配一大块空。就绪度圆环 + 两行正文字号 + 每类一枚小牌（几天有数据）。 */
+.ready-chip { gap: 12px; padding: 6px 14px 6px 8px; }
+.ready-ring { position: relative; display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; }
+.ready-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ready-ring circle { fill: none; stroke-width: 3.2; }
+.ready-ring .track { stroke: color-mix(in srgb, var(--ink) 12%, transparent); }
+.ready-ring .meter { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 420ms cubic-bezier(.4, .6, .2, 1); }
+.ready-chip.has-issues .ready-ring .meter { stroke: var(--warning); }
+.ready-ring b { position: relative; font-family: var(--font-mono); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.ready-copy { flex: 0 1 auto; min-width: 150px; font-size: 15px; }
+.ready-copy > small { font-size: 12.5px; }
+.ready-cats { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; justify-content: flex-start; gap: 6px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); }
+.cat-tile { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; height: 30px; padding: 0 10px 0 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--tint) 14%, transparent); color: var(--tint); font-size: 13px; font-variant-numeric: tabular-nums; }
+.cat-tile b { color: var(--ink); font-weight: 700; }
+.cat-tile small { color: var(--subtle); font-size: 11px; }
+.cat-tile.missing { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--subtle); }
+@container (max-width: 980px) { .ready-cats { display: none; } }

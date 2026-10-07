@@ -110,6 +110,22 @@ describe('useAiTaskDraft', () => {
     expect(draft.draft.value.detail_level).toBe('standard');
   });
 
+  it('问题删空：整个回到点模板之前（类别、天数、模板都恢复）；有字时不动', () => {
+    const days = draft.draft.value.categories.map((range) => range.days_before);
+    draft.setTemplate(template({ detail_level: 'detailed' }));
+    draft.setWindowDays(29);
+    draft.setPrompt('排下周');
+    draft.setPrompt('排下');
+    expect(draft.draft.value.template_id).toBe('tpl-1');
+    draft.setPrompt('   ');
+    expect(draft.draft.value.template_id).toBeNull();
+    expect(draft.draft.value.detail_level).toBe('standard');
+    expect(draft.draft.value.categories.map((range) => range.days_before)).toEqual(days);
+    // 恢复这一下可以撤销：回到删空前的模板状态。
+    draft.undo();
+    expect(draft.draft.value.template_id).toBe('tpl-1');
+  });
+
   it('载入带旧指标排除的任务：排除丢弃、提示置真，不算脏', async () => {
     const stored = newTaskDraft();
     stored.id = 't-legacy';

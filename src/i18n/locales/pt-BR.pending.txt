@@ -48,6 +48,7 @@ components/ai/bridge/bridge.noPlan
 components/ai/bridge/bridge.nutrition
 components/ai/bridge/bridge.past
 components/ai/bridge/bridge.pastNote
+components/ai/bridge/bridge.pickDays
 components/ai/bridge/bridge.placeholder
 components/ai/bridge/bridge.planBack
 components/ai/bridge/bridge.planned
@@ -87,9 +88,6 @@ components/ai/bridge/bridge.weekQuestion
 components/ai/bridge/bridge.workoutIntent
 components/ai/bridge/bridge.workoutIntentHint
 components/ai/bridge/bridge.workoutQuestion
-components/ai/hub/hub.categoryExcluded
-components/ai/hub/hub.categoryIncluded
-components/ai/hub/hub.categoryIntro
 components/ai/hub/hub.checkIntro
 components/ai/hub/hub.checkTitle
 components/ai/hub/hub.current
@@ -103,13 +101,10 @@ components/ai/hub/hub.earlier
 components/ai/hub/hub.earlierHint
 components/ai/hub/hub.exchangeMissing
 components/ai/hub/hub.exchangeTitle
-components/ai/hub/hub.exclude
-components/ai/hub/hub.include
 components/ai/hub/hub.newTask
 components/ai/hub/hub.nextDay
 components/ai/hub/hub.noPlan
 components/ai/hub/hub.noQuestion
-components/ai/hub/hub.noRecord
 components/ai/hub/hub.optionsTitle
 components/ai/hub/hub.partial
 components/ai/hub/hub.pastIntro
@@ -127,7 +122,6 @@ components/ai/hub/hub.promptHint
 components/ai/hub/hub.promptTitle
 components/ai/hub/hub.question
 components/ai/hub/hub.rangeTitle
-components/ai/hub/hub.recorded
 components/ai/hub/hub.remove
 components/ai/hub/hub.removed
 components/ai/hub/hub.rename
@@ -161,6 +155,7 @@ components/ask/ask.sleepWithTraining
 components/ask/ask.trainingNext
 components/ask/ask.withSleep
 components/ask/ask.withTraining
+components/cards/cards.aroundDay
 components/cards/cards.average
 components/cards/cards.back
 components/cards/cards.boxAria
@@ -183,8 +178,10 @@ components/cards/cards.keyboardHint
 components/cards/cards.more
 components/cards/cards.noRecord
 components/cards/cards.pick
+components/cards/cards.pickSubtitle
 components/cards/cards.pickTitle
 components/cards/cards.picked
+components/cards/cards.pickedHere
 components/cards/cards.pickedOf
 components/cards/cards.range180
 components/cards/cards.range30
@@ -193,7 +190,6 @@ components/cards/cards.rangeAria
 components/cards/cards.recorded
 components/cards/cards.recordedOf
 components/cards/cards.removeCard
-components/cards/cards.tableTitle
 components/cards/cards.weekRange
 components/overview/PinnedMetrics.loadFailed
 components/plan/editor.byDistance
@@ -408,6 +404,7 @@ lib/trainingPlan/issues.ui.training_plan.issue.too_many_steps
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_kind
 lib/trainingPlan/issues.ui.training_plan.issue.unknown_sport
 lib/trainingPlan/issues.ui.training_plan.issue.workout_too_long
+views/SleepDetail.askLabel
 views/settings/sections/McpTaskScopes.empty
 views/settings/sections/McpTaskScopes.hint
 views/settings/sections/McpTaskScopes.title

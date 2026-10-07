@@ -102,7 +102,11 @@ const patchRange = (category: AiTaskCategory, patch: Partial<AiTaskCategoryRange
   patchDraft({ categories: withCategoryRange(draft.value.categories, next) });
 };
 
+/** 点模板之前的样子（类别、天数、运动、详细程度）：问题被删空时整个回到这里（10-07 用户拍板）。 */
+let beforeTemplate: Selection | null = null;
+
 const replaceDraft = (task: AiTask) => {
+  beforeTemplate = null;
   draft.value = task;
   clearUndo();
   markBaseline();
@@ -239,6 +243,12 @@ const deleteTask = async (id: string) => {
 const setTemplate = (template: AiTaskTemplate | null) => {
   if ((template?.id ?? null) === draft.value.template_id) return;
   rememberSelection();
+  // 从「没有模板」点进一个模板时记住原样；在模板之间换来换去，原样还是第一次点之前的那一份。
+  if (template && draft.value.template_id === null) {
+    const { categories, workout_ids, template_id, detail_level } = draft.value;
+    beforeTemplate = { categories: cloneRanges(categories), workout_ids: [...workout_ids], template_id, detail_level };
+  }
+  if (!template) beforeTemplate = null;
   draft.value = template ? applyTemplateToDraft(draft.value, template) : { ...draft.value, template_id: null };
   noteChange({ kind: 'template', included: template !== null });
 };
@@ -286,6 +296,20 @@ const setWorkoutSelected = (workoutId: string, selected: boolean) => {
   rememberSelection();
   patchDraft({ workout_ids: selected ? [...ids, workoutId] : ids.filter((id) => id !== workoutId) });
   noteChange({ kind: 'workout', workoutId, included: selected });
+};
+
+/**
+ * 改问题。问题被删空、而当前用着模板：整个回到点模板之前——模板胶囊不再亮、任务名回到自动的「最近 N 天」、
+ * 「你的过去」勾的类别和天数恢复原样（用户 10-07：「把框删掉后，上面的内容依然不会联动更改」）。这一下也进撤销栈。
+ */
+const setPrompt = (prompt: string) => {
+  patchDraft({ prompt });
+  if (prompt.trim() || draft.value.template_id === null || !beforeTemplate) return;
+  const restore = beforeTemplate;
+  beforeTemplate = null;
+  rememberSelection();
+  patchDraft({ ...restore, categories: cloneRanges(restore.categories), workout_ids: [...restore.workout_ids], template_id: null });
+  noteChange({ kind: 'template', included: false });
 };
 
 const undo = () => {
@@ -344,7 +368,7 @@ export function useAiTaskDraft() {
     setWorkoutSelected,
     toggleWorkout: (workoutId: string) => setWorkoutSelected(workoutId, !draft.value.workout_ids.includes(workoutId)),
     undo,
-    setPrompt: (prompt: string) => patchDraft({ prompt }),
+    setPrompt,
     setPersonalNote,
     setTitle: (title: string) => patchDraft({ title }),
     setDetailLevel: (detail_level: AiTaskDetailLevel) => patchDraft({ detail_level }),
