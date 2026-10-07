@@ -192,6 +192,14 @@ forbidden. The provenance of the algorithms and percentages is in the
   deck (`lib/motion/timing.ts`; slowed on 2026-10-03 to 500 / 440 ms with
   `cubic-bezier(.4, .6, .2, 1)`); while it runs, `lib/motion/budget.ts` holds
   back late chart mounts and skeleton-to-content swaps.
+- **Floating top bar** (round 4, after iPadOS / macOS 26): the bar sits about
+  12 px below the window edge with inset sides; content scrolls under it and a
+  fading "scroll edge" mask sits below it. Each control stays its own piece of
+  glass (merging them was rejected); refraction is only a thin outer ring
+  (`lib/glassLens.ts`), the middle is plain blur. A one-off notice that belongs
+  to a control (the "cloud has nothing newer yet" tip under the sync pill)
+  hangs below the action group as its own glass and never covers page
+  controls (`elementFromPoint` check).
 - **`.ready-glow`** (rotating brand-gradient ring + breathing outer light) is
   reserved for one moment: "your data is ready — go hand it to the AI". Never
   two glowing things on one screen. Glass controls are stacking contexts, so
@@ -221,8 +229,11 @@ style choice; the open list of pages that still do is
    users open often needs a transition wrapper.
 3. **Two to five options are a glass `SegmentTrack`; longer lists are a
    `CapsuleWheel`; numbers are wheel columns (`WheelColumn`,
-   `WheelDatePicker`).** Drag, keyboard and click all work; the lens follows
-   the finger (`useGlassLens`, `lib/segmentGlass.ts`).
+   `WheelDatePicker`); an on / off choice is a `GlassSwitch`.** Drag,
+   keyboard and click all work; the lens follows the finger (`useGlassLens`,
+   `lib/segmentGlass.ts`). All three lift into Liquid Glass under the finger;
+   the 2026-10-07 audit (round 3 in `motion-audit.md`) found no other
+   choice control left.
 4. **No dropdowns, no traditional card-style pickers, no bare checkboxes or
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.
@@ -272,12 +283,15 @@ the AI.
   counts it only when it lands; a cancelled flight rolls back. The slot keeps
   a dashed outline "In the box"; tapping it flies a card back and turns it
   face up. Piles (week / month) fly as one piece on long-press.
-- **Interrupting**: every layer (card table, collection box, glass popover)
-  reverses from the *current* computed style when an opposite action arrives
-  mid-animation (`reversible.ts`: read computed style, cancel, animate from
-  there — never `reverse()` a finished animation, Chromium flashes a frame).
-  Nothing is unmounted half-way; clicking the origin again while cards are
-  being put away fans them back out.
+- **Interrupting is a relay, not a lock** (round 4): a new click takes effect
+  at once. Animations in flight finish from their current computed pose in
+  about 120 ms and the new one starts from there (`relay()` in
+  `lib/motion/cards/reversible.ts`, built on `animateFromNow`). Never swallow
+  a click with a `busy` flag (the range segment once showed "6 months" over a
+  7-day table); the only clicks ignored are on the very card that is flying.
+  An opposite action reverses from the current computed style — never
+  `reverse()` a finished animation, Chromium flashes a frame. Nothing is
+  unmounted half-way.
 - **Card table** (`components/cards/CardTable.vue`, picking logic in
   `composables/useCardPicking.ts`): 7 days → seven day cards; 1 month → 4–5
   piles by calendar week; 6 months → six month piles (empty piles are dimmed,
@@ -287,15 +301,33 @@ the AI.
   units and never wrap (`lib/cards/faceValue.ts`). The range segment always
   has a selection. The "Your past" workout row deals one card per workout
   (key `workout:<id>`, handed over as `workout_ids`).
-- **Collection box** (`components/cards/CollectionBox.vue`): bottom right,
-  above everything. While a card table is open it slides in even when empty
-  (a dashed "Drop here" slot) and slides out with the table if still empty —
-  it never pops up from nowhere. Opening deals the hand out of the box, then
-  the group labels and buttons float in last; closing runs backwards. Drag a
-  card up to take it out (rAF-throttled, fling with release velocity, the
-  rest close the gap with FLIP). The arrow opens a **new** task with exactly
-  those categories × days (`picked_days`). Stored locally, emptied only once
-  the task is handed to the AI.
+- **Collection box = a jack-in-the-box** (`components/cards/CollectionBox.vue`,
+  lid motion in `lib/motion/cards/box.ts`): a closed little box bottom right with
+  the count on its side. A card flying in pops the lid open, is caught, and the
+  lid shuts (`catchCard`); opening pops the lid and the cards spring out, then
+  fan; closing runs backwards. Empty, it just says "Collection box · empty" (no
+  dashed slot); while a card is dragged over it, it lights up "Let go to drop
+  it in" and really accepts the drop (rectangle hit test). It slides in with
+  the card table and out with it if still empty — never pops up from nowhere.
+- **Spread-out hand**: grouped by metric, one row per week aligned to weekdays
+  and offset like Spider Solitaire (`lib/cards/hand.ts`), centred between the
+  header and the buttons; group labels sit above the cards in a safe area. A
+  metric with a whole month picked shows as one month card (dot grid lights the
+  picked days); tap it to spread its weeks. Colour is always
+  `metricColor(metric)` (`lib/metricTone.ts`), the same as the chart.
+- **Taking cards out / dragging**: flick a card up off the screen to take it
+  out (velocity threshold in `useHandGestures.ts`; light motion blur and a
+  deeper shadow only while moving). On the card table a card can be dragged
+  (`useCardDrag.ts`, a drag starts after 6 px so it never fights tap or
+  long-press): onto another card to stack them (offset, count badge, can be
+  pulled apart), onto the box to drop it in; long-press a stack (450 ms ring
+  drawn on the card's real size and radius) to send the whole stack. Esc
+  undoes the drag.
+- **Layered backdrops**: each level deeper, the previous one is swapped for a
+  *pre-blurred static* layer and cross-faded — never a per-frame blur.
+- The arrow on the open box starts a **new** task with exactly those
+  categories × days (`picked_days`). Picks are stored locally and cleared only
+  once the task is handed to the AI.
 - **One-off tips**: operating hints appear once as a floating bar with
   "Got it" (`composables/useCoachTips.ts`, localStorage wrapped in try/catch);
   the keyboard hint lives in `aria-describedby`, not on screen.
