@@ -156,9 +156,28 @@ const loadTask = async (id: string) => {
   }
 };
 
+/**
+ * 最近 90 天一天记录都没有的类别（useBridgeStrip 每次读完条带告诉这里，1D·D8）：没存过、也没动过的新草稿默认不勾它们。
+ * 每份草稿只套一次——用户自己勾回来以后，同步出新条带也不会再被取消。悄悄改、不进撤销栈、不算「有改动未保存」。
+ */
+let emptyCategories = new Set<AiTaskCategory>();
+let emptyAppliedGen = -1;
+const applyEmptyDefaults = () => {
+  if (draft.value.id || dirty.value || emptyAppliedGen === draftGen || !emptyCategories.size) return;
+  emptyAppliedGen = draftGen;
+  if (!draft.value.categories.some((range) => range.enabled && emptyCategories.has(range.category))) return;
+  draft.value = { ...draft.value, categories: draft.value.categories.map((range) => (emptyCategories.has(range.category) ? { ...range, enabled: false } : range)) };
+  markBaseline();
+};
+const setEmptyCategories = (next: Set<AiTaskCategory>) => {
+  emptyCategories = next;
+  applyEmptyDefaults();
+};
+
 const resetDraft = () => {
   draftGen += 1;
   replaceDraft(newTaskDraft());
+  applyEmptyDefaults();
   lastError.value = null;
   legacyNotice.value = false;
   const gen = draftGen;
@@ -355,6 +374,7 @@ export function useAiTaskDraft() {
     savedNotice,
     loadTask,
     resetDraft,
+    setEmptyCategories,
     saveDraft,
     deleteTask,
     setTemplate,

@@ -4,8 +4,8 @@
  *
  * 没有「+」和「✓」：只想把数据交给 AI 的人不需要先「新建」「保存」，导出时自动存；
  * 同名的草稿再导出会更新原来那条，已保存的任务里不会出现两条一模一样的。
- * 任务名单击就地改。右边那一格（钟 + 数量）是去「已保存的任务」二级页的入口（/ai/tasks，
- * 2026-10 起从下拉列表改成单独一页，从这枚胶囊长出来）。
+ * 任务名单击就地改（第四轮 1D·D6：胶囊里只留任务名，去掉铅笔——以前左上角那枚「⏱ 5」看不懂）。
+ * 右边另起一枚小玻璃胶囊「已保存 N 个 ›」，是去「已保存的任务」二级页的入口（/ai/tasks，从这枚胶囊长出来）。
  */
 import { computed, nextTick, ref } from 'vue';
 import Icon from '../Icon.vue';
@@ -25,6 +25,7 @@ const t = useMessages(defineMessages(
     titleLabel: '任务名',
     rename: '点一下改名',
     historyCount: (count: number) => `已保存的任务（${count}）`,
+    savedCount: (count: number) => `已保存 ${count} 个`,
     saved: '已保存',
   },
   {
@@ -33,6 +34,7 @@ const t = useMessages(defineMessages(
     titleLabel: 'Task name',
     rename: 'Click to rename',
     historyCount: (count: number) => `Saved tasks (${count})`,
+    savedCount: (count: number) => `${count} saved`,
     saved: 'Saved',
   },
   {
@@ -41,6 +43,7 @@ const t = useMessages(defineMessages(
     titleLabel: 'Nombre de la tarea',
     rename: 'Clic para renombrar',
     historyCount: (count: number) => `Tareas guardadas (${count})`,
+    savedCount: (count: number) => (count === 1 ? '1 guardada' : `${count} guardadas`),
     saved: 'Guardado',
   },
   'components/ai/AiTaskHeader',
@@ -72,17 +75,18 @@ const cancelRename = () => { editing.value = false; };
       <h1 id="ai-page-title">{{ t.pageTitle }}</h1>
       <p>{{ t.intro }}</p>
     </div>
+    <div class="head-row">
     <div class="head-task glass-control is-lens-host">
       <input v-if="editing" ref="titleInput" class="ai-input title-input" type="text" :value="shownTitle"
         :aria-label="t.titleLabel" maxlength="120"
         @blur="commitRename" @keydown.enter.prevent="commitRename" @keydown.esc.prevent="cancelRename" />
       <button v-else type="button" class="title-button" :title="t.rename" :aria-label="`${t.titleLabel}: ${shownTitle}`" @click="startRename">
-        <span class="title-text">{{ shownTitle }}</span><Icon name="edit" :size="13" class="title-glyph" />
+        <span class="title-text">{{ shownTitle }}</span>
       </button>
-      <span class="divider" aria-hidden="true"></span>
-      <RouterLink to="/ai/tasks" class="history-btn" data-morph-card :title="t.historyCount(taskList.length)" :aria-label="t.historyCount(taskList.length)">
-        <Icon name="clock" :size="15" /><span v-if="taskList.length" class="count">{{ taskList.length }}</span>
-      </RouterLink>
+    </div>
+    <RouterLink v-if="taskList.length" to="/ai/tasks" class="saved-link glass-control is-lens-host" data-morph-card :title="t.historyCount(taskList.length)">
+      <span>{{ t.savedCount(taskList.length) }}</span><Icon name="chevron-right" :size="14" />
+    </RouterLink>
     </div>
     <p v-if="savedNotice" class="ai-note ok status" role="status"><Icon name="circle-check" :size="13" />{{ t.saved }}</p>
     <p v-if="lastError || libraryError" class="ai-note bad status" role="alert"><Icon name="warning" :size="13" />{{ lastError || libraryError }}</p>
@@ -98,21 +102,20 @@ const cancelRename = () => { editing.value = false; };
   background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); font-weight: 650; cursor: text; }
 .title-button:hover { background: var(--glass-press); }
 .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.title-glyph { flex: 0 0 auto; color: var(--subtle); }
+/* 任务名胶囊和「已保存 N 个」各是一块玻璃，并排；放不下时「已保存」换到下一行。 */
+.head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
+.saved-link { display: inline-flex; height: 36px; align-items: center; gap: 4px; padding: 0 10px 0 14px; border-radius: 999px; color: var(--muted);
+  font-size: var(--fs-xs); font-weight: 650; text-decoration: none; white-space: nowrap; transition: color var(--dur-base) ease, scale var(--dur-fast, 140ms) ease; }
+.saved-link:hover { color: var(--ink); }
+.saved-link:active { scale: .96; }
+.saved-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .title-input { width: 280px; min-width: 0; padding: 7px 14px; border: 0; border-radius: 999px; background: var(--glass-press); box-shadow: none; font-size: var(--fs-md); font-weight: 650; }
 .title-input:focus { box-shadow: 0 0 0 2px var(--focus); }
-.divider { width: 1px; height: 20px; margin: 0 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
-.history-btn { display: inline-flex; min-width: 36px; height: 36px; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 999px;
-  background: transparent; color: var(--ink); cursor: pointer; }
-.history-btn { text-decoration: none; }
-.history-btn:hover { background: var(--glass-press); }
-.history-btn .count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
 /* 很窄的窗口：任务名自己占一行，天数和记录挪到第二行，谁也不被挤出画面。 */
 @media (max-width: 480px) {
   .head-task { flex-wrap: wrap; row-gap: 2px; border-radius: var(--radius-md); }
   .title-button { flex: 1 1 100%; max-width: none; }
-  .head-task > .divider:first-of-type { display: none; }
 }
 .status { margin: 0; padding: 3px 12px; border-radius: 999px; background: var(--mat-glass); }
 </style>

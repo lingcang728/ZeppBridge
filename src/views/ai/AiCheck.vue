@@ -3,14 +3,14 @@
  * 寄出前检查（/ai/check，从底栏的就绪度胶囊长出来）。以前这些挤在底栏的玻璃浮层里：
  *
  *   上半：带了哪些数据（几类、多少天有数据）、要注意的提醒（同一句只出现一次）、逐类覆盖明细；
- *   下半：附件原件和选项（HandoffTray）、完整提示词的只读预览——你写的那一句高亮，点它回到总页的输入框去改。
+ *   下半：附件原件和选项（HandoffTray）、完整提示词——你写的那一句高亮。
  *
- * 能改的永远只有一处（总页的输入框）：这里不再有可以改的「最终提示词」。
+ * 就地改（第四轮 1D·D5，用户 10-07）：点「完整提示词」任意处，「你写的这一句」那段就地变成输入框并聚焦；
+ * 它和总页的输入框是**同一份草稿**（useAiTaskDraft.setPrompt），两边改哪边都一样。系统自动加的段落仍只读。
  * 选项全部平铺、大白话：详细程度玻璃三档、精确路线玻璃开关、每个 AI 各自的「免费版 / 已订阅」玻璃两档。
  * 「允许本机 MCP 查询这个任务」挪到了设置 → MCP。
  */
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, ref } from 'vue';
 import PageHeader from '../../components/PageHeader.vue';
 import Icon from '../../components/Icon.vue';
 import HandoffTray from '../../components/ai/HandoffTray.vue';
@@ -21,15 +21,17 @@ import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskPreview } from '../../composables/useAiTaskPreview';
 import { useHubText } from '../../components/ai/hub/hub.i18n';
 import { useHandoffText } from '../../components/ai/HandoffDock.i18n';
+import { useBridgeText } from '../../components/ai/bridge/bridge.i18n';
 import { aiTaskIssueText, coverageNoteText } from '../../lib/aiTask/copy';
 import { handoffParts } from '../../lib/aiTask/handoffParts';
 import { formatBytes } from '../../lib/format';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiCheck' });
-const router = useRouter();
 const hub = useAiHub();
-const { draft } = useAiTaskDraft();
+const ctl = useAiTaskDraft();
+const { draft } = ctl;
+const bt = useBridgeText();
 const coverage = useAiTaskPreview();
 const h = useHubText();
 const t = useHandoffText();
@@ -57,15 +59,26 @@ const parts = computed(() => {
   return [
     { key: 'brief', text: brief.trim(), mine: false },
     { key: 'direction', text: (hub.direction.value ?? '').trim(), mine: false },
+    // 你写的那一句：空着也留一格（写着占位提示），点进来就能写。
     { key: 'question', text: draft.value.prompt.trim(), mine: true },
-  ].filter((part) => part.text);
+  ].filter((part) => part.text || part.mine);
 });
 const tail = computed(() => coverageNoteText());
-/** 点你写的那一句：回到总页，光标落在输入框里。 */
-const editQuestion = async () => {
-  await router.push('/ai');
-  requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.compose-box textarea')?.focus());
+/** 点完整提示词任意处：你写的那一句就地变成输入框，光标落在末尾。 */
+const editing = ref(false);
+const box = ref<HTMLTextAreaElement | null>(null);
+/* 输入框在 v-for 里：用函数 ref，拿到的是元素本身而不是数组。 */
+const setBox = (el: unknown) => { box.value = el instanceof HTMLTextAreaElement ? el : null; };
+const startEdit = async () => {
+  if (editing.value) return;
+  editing.value = true;
+  await nextTick();
+  const el = box.value;
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.setSelectionRange(el.value.length, el.value.length);
 };
+const stopEdit = () => { editing.value = false; };
 </script>
 
 <template>
@@ -99,9 +112,13 @@ const editQuestion = async () => {
     <div class="ai-panel prompt-panel">
       <h2>{{ h.promptTitle }}</h2>
       <p class="ai-panel-note">{{ h.promptHint }}</p>
-      <div class="prompt">
+      <div :class="['prompt', { editing }]" @click="startEdit">
         <template v-for="part in parts" :key="part.key">
-          <button v-if="part.mine" type="button" class="mine" :title="h.yourWords" @click="editQuestion"><small>{{ h.yourWords }}</small>{{ part.text }}</button>
+          <label v-if="part.mine && editing" class="mine is-editing" @click.stop><small>{{ h.yourWords }}</small>
+            <textarea :ref="setBox" :value="draft.prompt" :placeholder="bt.placeholder" rows="2"
+              @input="ctl.setPrompt(($event.target as HTMLTextAreaElement).value)" @blur="stopEdit" @keydown.esc.stop.prevent="($event.target as HTMLTextAreaElement).blur()"></textarea>
+          </label>
+          <button v-else-if="part.mine" type="button" :class="['mine', { empty: !part.text }]" :title="h.yourWords" @click.stop="startEdit"><small>{{ h.yourWords }}</small>{{ part.text || bt.placeholder }}</button>
           <p v-else>{{ part.text }}</p>
         </template>
         <p class="tail"><small>{{ t.fixedTail }}</small>{{ tail }}</p>
@@ -120,12 +137,17 @@ const editQuestion = async () => {
 .readiness small { color: var(--subtle); font-size: var(--fs-2xs); }
 .warnings { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .warnings b { margin-left: auto; color: var(--subtle); font-weight: 600; }
-.prompt { display: grid; gap: 12px; padding: 16px 18px; border-radius: 16px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); font-size: var(--fs-sm); line-height: 1.7; white-space: pre-wrap; }
+.prompt { display: grid; gap: 12px; padding: 16px 18px; border-radius: 16px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); font-size: var(--fs-sm); line-height: 1.7; white-space: pre-wrap; cursor: text; }
+/* 整块是热区：悬停时你那一段先亮一点，告诉人「点这里就能改」。 */
+.prompt:not(.editing):hover .mine { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .prompt p { margin: 0; color: var(--muted); }
 .prompt small { display: block; margin-bottom: 2px; color: var(--subtle); font-size: var(--fs-2xs); }
 .mine { display: grid; padding: 10px 12px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); font: inherit; text-align: left; white-space: pre-wrap; cursor: text; transition: background var(--dur-base) ease; }
 .mine:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .mine small { color: var(--accent); }
+.mine.empty { color: var(--subtle); }
+.mine.is-editing { cursor: text; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
+.mine textarea { width: 100%; min-height: 3.4em; padding: 0; border: 0; outline: none; background: none; color: var(--ink); font: inherit; line-height: inherit; resize: none; field-sizing: content; }
 .tail { opacity: .8; }
 @media (max-width: 980px) { .check-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>

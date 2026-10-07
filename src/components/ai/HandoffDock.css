@@ -192,7 +192,11 @@
 
 
 .dock{position:fixed;z-index:var(--z-popover,40);left:50%;bottom:20px;width:min(1100px,calc(100vw - 48px));transform:translateX(-50%);container-type:inline-size;gap:8px}
-.bar{gap:8px;padding:8px 10px;background:var(--mat-glass-strong);backdrop-filter:var(--mat-glass-blur);box-shadow:var(--glass-rim),var(--mat-glass-shadow)}
+/* 底栏的毛玻璃画在垫底的 ::before 上（is-lens-host），底栏自己不带 backdrop-filter：发送胶囊里的折射镜片（1D·D3）
+   才看得见滚轮里的字，而不是只取样到一块暗色。竖卡（rail）没有这一层，照旧画在自己身上。 */
+.bar{gap:8px;padding:8px 10px;box-shadow:var(--glass-rim),var(--mat-glass-shadow)}
+.bar:not(.is-lens-host){background:var(--mat-glass-strong);backdrop-filter:var(--mat-glass-blur)}
+.bar.is-lens-host::before{background:var(--mat-glass-strong);-webkit-backdrop-filter:var(--mat-glass-blur);backdrop-filter:var(--mat-glass-blur)}
 .ready-chip{order:2;padding:6px 10px;background:none}.provider-wheel{order:0}.plan-wrap{order:1}.go-row{order:3;display:flex;flex:none}.more-button{order:4;flex:none;display:grid;place-items:center;height:42px;width:38px;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer}
 .go{box-shadow:var(--mat-raised-rim);min-height:44px;padding-inline:20px}.go:hover:not(:disabled){box-shadow:var(--mat-raised-rim)}.go-copy strong{font-size:14px}.go-copy small{font-size:9px}.ready-copy{font-size:13px}.ready-copy small{font-size:11px}.ready-dot,.ready-chip.has-issues .ready-dot{box-shadow:none;background:var(--accent);width:6px;height:6px;flex-basis:6px}.ready-chip.has-issues .ready-dot{background:var(--subtle)}
 .plan-toggle{min-height:38px;padding-right:12px;gap:5px;background:none}.plan-mark{width:17px;height:17px}.plan-copy small{display:none}.plan-copy strong{font-size:11px}.plan-info{display:none}.export-only{display:none}.more-button:hover{background:var(--glass-press)}

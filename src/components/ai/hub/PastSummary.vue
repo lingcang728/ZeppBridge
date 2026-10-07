@@ -8,6 +8,7 @@ import Icon from '../../Icon.vue';
 import TintIcon from '../TintIcon.vue';
 import { AI_TASK_CATEGORY_META, categoryLabel } from '../../../lib/aiTask/categories';
 import { stripColumns } from '../../../lib/aiTask/strip';
+import { emptyCategories } from '../../../lib/aiTask/emptyCategories';
 import { pickedDayCount } from '../../../lib/aiTask/pickedDays';
 import type { AiTaskCategory, AiTaskCategoryRange } from '../../../lib/bridge/types';
 import type { DayStripRow } from '../../../types/timeBridge';
@@ -20,6 +21,9 @@ const h = useHubText();
 const ORDER: AiTaskCategory[] = ['sleep', 'recovery', 'resting_hr', 'heart_rate', 'workout', 'training', 'body'];
 const W = 160;
 const H = 18;
+/* 90 天一天记录都没有的类别：一行灰字，不画空格子（1D·D8）。 */
+const empty = computed(() => emptyCategories(props.rows));
+const emptyText = (category: AiTaskCategory) => (category === 'body' ? h.value.emptyBody : h.value.emptyCategory);
 const lines = computed(() => ORDER.map((category) => {
   const row = props.rows.find((r) => r.category === category);
   const columns = stripColumns(row?.cells ?? [], props.days);
@@ -54,7 +58,8 @@ const summary = computed(() => {
       <li v-for="line in lines" :key="line.category" :class="{ off: !line.enabled }" :style="{ '--tint': line.meta.tint }">
         <TintIcon :name="line.meta.icon" :tint="line.meta.tint" :size="22" :off="!line.enabled" />
         <span class="name">{{ categoryLabel(line.category) }}</span>
-        <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
+        <span v-if="empty.has(line.category)" class="empty-note">{{ emptyText(line.category) }}</span>
+        <svg v-else :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
           <rect v-for="(bar, i) in line.bars" :key="i" :x="bar.x" :y="H - bar.h" :width="bar.w" :height="bar.h" rx="1" />
         </svg>
       </li>

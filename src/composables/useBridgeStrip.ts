@@ -8,6 +8,8 @@ import { backend, toUserMessage } from '../lib/bridge';
 import { useSyncController } from './useSyncController';
 import type { DayStripRow, AdherenceDay } from '../types/timeBridge';
 import { addDays, dayKey } from '../lib/aiTask/bridgeScale';
+import { emptyCategories } from '../lib/aiTask/emptyCategories';
+import { useAiTaskDraft } from './useAiTaskDraft';
 
 const rows = ref<DayStripRow[]>([]);
 const adherence = ref<AdherenceDay[]>([]);
@@ -25,6 +27,8 @@ const load = async () => {
     const [next, compared] = await Promise.all([backend.aiTaskDayStrip(90, end.value), backend.trainingPlanAdherence(addDays(end.value, -89), end.value)]);
     if (mine !== sequence) return;
     rows.value = next; adherence.value = compared;
+    // 90 天一天都没有的类别：新草稿默认不勾（1D·D8）。
+    useAiTaskDraft().setEmptyCategories(emptyCategories(next));
   } catch (e) { if (mine === sequence) error.value = toUserMessage(e, ''); }
   finally { if (mine === sequence) loading.value = false; }
 };

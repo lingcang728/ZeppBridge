@@ -31,6 +31,7 @@ a.hub-card:focus-visible, .next-link:focus-visible { outline: 2px solid var(--fo
 .past-lines li.off { color: var(--subtle); }
 .past-lines li.off .name { color: var(--subtle); }
 .past-lines li.off svg { fill: var(--line-strong); opacity: .7; }
+.past-lines .empty-note { overflow: hidden; color: var(--subtle); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .past-card.sent svg { animation: hub-fold 950ms var(--ease-spring) both; transform-origin: right center; }
 @keyframes hub-fold { 0% { transform: none; opacity: 1; } 40% { transform: scaleX(.05); opacity: .05; } 100% { transform: none; opacity: 1; } }
 
