@@ -6754,7 +6754,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge"
-version = "3.0.0-beta.43"
+version = "3.0.0-beta.44"
 dependencies = [
  "anyhow",
  "chrono",
@@ -6778,7 +6778,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-cli"
-version = "3.0.0-beta.43"
+version = "3.0.0-beta.44"
 dependencies = [
  "chrono",
  "serde_json",
@@ -6788,7 +6788,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-core"
-version = "3.0.0-beta.43"
+version = "3.0.0-beta.44"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -6813,7 +6813,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-mcp"
-version = "3.0.0-beta.43"
+version = "3.0.0-beta.44"
 dependencies = [
  "chrono",
  "rusqlite",
