@@ -11,13 +11,18 @@ a.hub-card:focus-visible, .next-link:focus-visible { outline: 2px solid var(--fo
 .hub-card-head > div { flex: 1 1 auto; min-width: 0; }
 .hub-number { align-self: flex-start; padding-top: 3px; color: var(--subtle); font: 10px var(--font-mono); opacity: .6; }
 .hub-card h2 { margin: 0; font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
-.hub-card-head p { margin: 3px 0 0; font-size: var(--fs-sm) !important; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.hub-card-head p { margin: 3px 0 0; font-size: var(--fs-sm) !important; color: var(--muted); font-size: var(--fs-xs); line-height: 1.35; }
 .hub-open { display: inline-flex; flex: none; align-items: center; gap: 2px; color: var(--subtle); font-size: var(--fs-2xs); }
 .hub-status { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--mat-inset); color: var(--muted); font-size: var(--fs-2xs); white-space: nowrap; }
 .hub-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
 .hub-status.ok i { background: var(--accent); }
 .hub-status.warn i { background: var(--warning); }
 .hub-status.draft i { background: var(--pace); }
+.next-card .hub-card-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: start; }
+.next-card .hub-card-head > :first-child { grid-column: 1; grid-row: 1 / span 2; }
+.next-card .hub-card-head > div { grid-column: 2; grid-row: 1; }
+.next-card .hub-card-head > .hub-status { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 6px; }
+.next-card .hub-card-head > .hub-open { grid-column: 3; grid-row: 1; }
 
 .past-lines { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .past-lines li { display: grid; grid-template-columns: 22px 92px minmax(0, 1fr); align-items: center; gap: 10px; color: var(--tint); font-size: var(--fs-xs); }

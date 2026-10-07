@@ -49,6 +49,7 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.chartAltitude
 views/WorkoutDetail.unitKcal
+components/plan/plan.minuteUnit
 lib/aiTask/metrics.hrv
 lib/aiTask/metrics.hrv_rmssd
 lib/aiTask/metrics.rem_minutes
@@ -227,6 +228,7 @@ components/overview/DataReadyCapsule.streamSeparator
 components/overview/PinnedMetrics.unitBpm
 components/overview/PinnedMetrics.unitKcal
 components/overview/PinnedMetrics.unitMin
+components/plan/plan.minuteUnit
 
 # ru
 components/HeartRateZonePicker.basesSeparator
