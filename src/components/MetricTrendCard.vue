@@ -264,11 +264,14 @@ const hasEventMarks = computed(() => {
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
 
 
+    <!-- 统计一行横排（平均 · 最低 · 最高），单位只在末尾写一次（第三轮 B7）：以前每个数后面都跟着单位，
+         VO₂max 的「ml/kg/min」把这一行撑成三行，同一行别的卡底下空出一截。放不下才折。 -->
     <dl v-if="stats.length && !hideStats" class="trend-stats">
       <div v-for="row in stats" :key="row.label">
         <dt>{{ row.label }}</dt>
-        <dd>{{ row.value }}<i v-if="unit">{{ unit }}</i></dd>
+        <dd>{{ row.value }}</dd>
       </div>
+      <span v-if="unit" class="trend-stats-unit">{{ unit }}</span>
     </dl>
     <!-- 没有统计也占住第四行：subgrid 要求每张卡的行数一样。 -->
     <span v-else class="trend-stats-empty" aria-hidden="true"></span>
@@ -318,7 +321,8 @@ const hasEventMarks = computed(() => {
 .trend-widened { color: var(--muted); font-weight: 600; }
 .trend-event-key { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); }
 .trend-event-key i { width: 7px; height: 11px; border-radius: 2px; background: color-mix(in srgb, var(--subtle) 45%, transparent); }
-.trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }
+/* 图表行随这一行的剩余高度伸展（同一行别的卡高一点，它也跟着高，不在底下空一截）。 */
+.trend-chart, .trend-slot { width: 100%; height: auto; min-height: 150px; align-self: stretch; }
 .trend-slot > :deep(*) { width: 100%; height: 100%; }
 .trend-empty {
   display: flex;
@@ -331,8 +335,9 @@ const hasEventMarks = computed(() => {
 .trend-stats {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   align-self: start;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-1) var(--space-3);
   margin: 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--line);
@@ -346,5 +351,6 @@ const hasEventMarks = computed(() => {
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
-.trend-stats dd i { margin-left: 4px; color: var(--subtle); font-family: var(--font-sans, inherit); font-size: var(--fs-2xs); font-style: normal; }
+.trend-stats > div { white-space: nowrap; }
+.trend-stats-unit { margin-left: auto; color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
 </style>

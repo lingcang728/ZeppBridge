@@ -2,7 +2,7 @@
 /**
  * 「你的过去」二级页（/ai/past）：六类数据各一行——点亮的那几类会交给 AI，细条是逐天的数据。
  * 点某一格：这一类的牌从那一格飞出来铺满全屏，那一天落在正中（10-07 第二轮，取代了 /ai/past/:category 二级页）；
- * 行尾的牌堆按钮也一样，从今天发起。底下拖动回溯范围。运动那一行的柱子可以点：选中的那几次运动一起交给 AI。
+ * 行尾的牌堆按钮也一样，从今天发起。底下拖动回溯范围。运动那一行是一次运动一张牌（第三轮 B3）：挑进收集箱的那几次运动一起交给 AI。
  */
 import { computed, defineAsyncComponent, ref, shallowRef, watch } from 'vue';
 import PageHeader from '../../components/PageHeader.vue';
@@ -18,7 +18,7 @@ import { addDays } from '../../lib/aiTask/bridgeScale';
 import { AI_TASK_CATEGORY_META, categoryLabel } from '../../lib/aiTask/categories';
 import { unitLabel } from '../../lib/aiTask/metrics';
 import { formatDuration } from '../../lib/format';
-import { categorySource, type DeckSource } from '../../lib/cards/sources';
+import { categorySource, workoutSource, type DeckSource } from '../../lib/cards/sources';
 import type { AiTaskCategory } from '../../lib/bridge/types';
 import '../../styles/ai-task.css';
 
@@ -51,11 +51,15 @@ const openDeck = (category: AiTaskCategory, date: string, origin: DOMRect, ancho
   // 牌正往回收的时候又点了：从此刻原路扇回来。
   if (deck.value && table.value?.isClosing()) { table.value.reopen(); return; }
   const unit = strips.rows.value.find((r) => r.category === category)?.cells.find((cell) => cell.unit)?.unit ?? null;
+  const tint = AI_TASK_CATEGORY_META[category].tint;
   deck.value = {
-    source: categorySource({
-      category, label: categoryLabel(category), tint: AI_TASK_CATEGORY_META[category].tint,
-      format: formatFor(category, unit), unit: category === 'sleep' || !unit ? undefined : unitLabel(unit),
-    }),
+    // 运动那一行：一次运动一张牌（第三轮 B3）；任务里已经勾上的几次在牌上显示为「已在箱中」。
+    source: category === 'workout'
+      ? workoutSource({ label: categoryLabel(category), tint, picked: () => draft.value.workout_ids, release: (id) => ctl.setWorkoutSelected(id, false) })
+      : categorySource({
+        category, label: categoryLabel(category), tint,
+        format: formatFor(category, unit), unit: category === 'sleep' || !unit ? undefined : unitLabel(unit),
+      }),
     origin,
     anchor,
     focus: date,
@@ -74,10 +78,9 @@ const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
       <ul class="past-rows">
         <li v-for="(row, i) in rows" :key="row.category" class="past-row" data-morph-card :style="{ '--row-index': i }">
           <BridgeRow :row="row" :days="days" :enabled="enabled(row.category)" :selected-ids="draft.workout_ids" :adherence="strips.adherence.value"
-            @toggle="toggle(row.category)" @workout="ctl.toggleWorkout" @day="openDeck(row.category, $event.date, $event.rect, $event.el)" />
-          <button v-if="row.category !== 'workout'" type="button" class="row-open" :aria-label="t.pickDays(categoryLabel(row.category))" :title="t.pickDays(categoryLabel(row.category))"
+            @toggle="toggle(row.category)" @day="openDeck(row.category, $event.date, $event.rect, $event.el)" />
+          <button type="button" class="row-open" :aria-label="t.pickDays(categoryLabel(row.category))" :title="t.pickDays(categoryLabel(row.category))"
             @click="openFromRow(row.category, $event)"><Icon name="cards" :size="16" /></button>
-          <span v-else class="row-open" aria-hidden="true"></span>
         </li>
       </ul>
       <div class="past-dates"><span v-for="date in marks" :key="date">{{ date.slice(5).replace('-', ' / ') }}</span></div>
@@ -98,7 +101,6 @@ const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
 .past-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 4px; border-radius: 14px; transition: background var(--dur-base) ease; }
 .past-row:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
 .row-open { display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--subtle); cursor: pointer; }
-span.row-open { cursor: default; }
 .row-open:hover { background: var(--glass-press); color: var(--ink); }
 .row-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .past-dates { display: flex; justify-content: space-between; margin: 0 118px 0 148px; color: var(--subtle); font: 10px var(--font-mono); }

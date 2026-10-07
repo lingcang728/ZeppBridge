@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import DurationText from './DurationText.vue';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -311,7 +312,7 @@ const tooltip = computed(() => {
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">
         <span><i :class="stage.tone"></i>{{ stage.label }}</span>
-        <strong>{{ labelFor(stage.minutes) }}</strong>
+        <strong><DurationText v-if="isFiniteNumber(stage.minutes) && stage.minutes > 0" :minutes="stage.minutes" /><template v-else>{{ labelFor(stage.minutes) }}</template></strong>
         <small>{{ isFiniteNumber(stage.minutes) ? `${Math.round(percent(stage.minutes))}%` : '—' }}</small>
       </div>
     </div>
@@ -380,8 +381,9 @@ const tooltip = computed(() => {
   border-radius: var(--radius-md);
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
-.stage-list span, .stage-list strong, .stage-list small { display: block; }
-.stage-list span { color: var(--muted); font-size: var(--fs-sm); }
+.stage-list span:not(.duration-text), .stage-list strong, .stage-list small { display: block; }
+.stage-list :deep(.duration-text small) { display: inline; font-size: .74em; }
+.stage-list span:not(.duration-text) { color: var(--muted); font-size: var(--fs-sm); }
 .stage-list i {
   display: inline-block;
   width: 7px;

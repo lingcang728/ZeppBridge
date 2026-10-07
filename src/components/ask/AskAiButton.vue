@@ -12,7 +12,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
 import GlassPopover from '../GlassPopover.vue';
-import { askPresets, type AskPreset } from '../../lib/metricAsk';
+import { askPresets, workoutAskPresets, type AskPreset } from '../../lib/metricAsk';
 import { AI_TASK_CATEGORY_META } from '../../lib/aiTask/categories';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useMetricBaselines } from '../../composables/useMetricBaselines';
@@ -20,7 +20,9 @@ import { armPageMorph } from '../../composables/usePageMorph';
 import { useAskText } from './ask.i18n';
 
 const props = defineProps<{
-  metric: string | null | undefined;
+  metric?: string | null;
+  /** 单次运动（运动详情头部，第三轮 B6）：问题按运动配，交出去时带上这次运动。和 `metric` 二选一。 */
+  workout?: { id: string; label: string } | null;
   label: string;
   /** 形变的来源卡（CSS 选择器，在页面里找）；不给就用按钮所在的那张卡（.trend-card / section）。 */
   card?: string;
@@ -33,8 +35,10 @@ const open = ref(false);
 const button = ref<HTMLElement | null>(null);
 const popover = ref<InstanceType<typeof GlassPopover> | null>(null);
 const direction = computed(() => baselineOf(props.metric)?.direction ?? null);
-const titleId = computed(() => `ask-${props.metric ?? 'metric'}`);
-const questions = computed(() => (props.metric ? askPresets(props.metric) : []).map((preset) => ({ preset, text: questionText(preset) })));
+const titleId = computed(() => `ask-${props.workout ? `workout-${props.workout.id}` : props.metric ?? 'metric'}`);
+const shown = computed(() => !!props.metric || !!props.workout);
+const presets = computed(() => (props.workout ? workoutAskPresets() : props.metric ? askPresets(props.metric) : []));
+const questions = computed(() => presets.value.map((preset) => ({ preset, text: questionText(preset) })));
 function questionText(preset: AskPreset): string {
   const t = a.value;
   switch (preset.key) {
@@ -44,6 +48,9 @@ function questionText(preset: AskPreset): string {
     case 'sleepWithTraining': return t.sleepWithTraining;
     case 'trainingNext': return t.trainingNext;
     case 'bodyFood': return t.bodyFood(props.label);
+    case 'workoutReview': return t.workoutReview(props.label);
+    case 'workoutRecovery': return t.workoutRecovery(props.label);
+    case 'workoutNext': return t.workoutNext(props.label);
     default: return t.firstUsual(props.label);
   }
 }
@@ -54,7 +61,7 @@ const show = () => {
 };
 const sourceCard = (): HTMLElement | null => {
   if (props.card) return document.getElementById('main-content')?.querySelector<HTMLElement>(props.card) ?? null;
-  return button.value?.closest<HTMLElement>('.trend-card, .surface-card, section') ?? null;
+  return button.value?.closest<HTMLElement>('.workout-hero, .trend-card, .surface-card, section') ?? null;
 };
 /** 新开一个任务：只开这几类、看这么多天、问题填好；浮层缩回按钮，同时卡长成「交给 AI」。 */
 const choose = async (preset: AskPreset, text: string) => {
@@ -64,6 +71,7 @@ const choose = async (preset: AskPreset, text: string) => {
     ctl.setCategoryEnabled(range.category, preset.categories.includes(range.category));
   }
   ctl.setWindowDays(preset.days - 1);
+  if (props.workout) ctl.setWorkoutSelected(props.workout.id, true);
   ctl.setPrompt(text);
   void popover.value?.close();
   armPageMorph(sourceCard(), '/ai');
@@ -72,13 +80,13 @@ const choose = async (preset: AskPreset, text: string) => {
 </script>
 
 <template>
-  <button v-if="metric" ref="button" type="button" :class="['ask-ai', { lit: direction === 'above' || direction === 'below', open }]" :title="a.ask" :aria-label="a.askTitle(label)"
+  <button v-if="shown" ref="button" type="button" :class="['ask-ai', { lit: direction === 'above' || direction === 'below', open }]" :title="a.ask" :aria-label="a.askTitle(label)"
     aria-haspopup="dialog" :aria-expanded="open" @click="show">
     <Icon name="spark" :size="15" /><span>{{ a.ask }}</span>
   </button>
   <GlassPopover v-if="open" ref="popover" :anchor="button" :labelledby="titleId" @close="open = false">
     <h2 :id="titleId" class="ask-title" data-pop-item><Icon name="spark" :size="16" />{{ a.askTitle(label) }}</h2>
-    <p class="ask-hint" data-pop-item>{{ a.askHint }}</p>
+    <p class="ask-hint" data-pop-item>{{ workout ? a.workoutHint : a.askHint }}</p>
     <button v-for="item in questions" :key="item.preset.key" type="button" class="question" data-pop-item @click="choose(item.preset, item.text)">
       <span>{{ item.text }}</span><Icon name="arrow-right" :size="15" />
     </button>

@@ -8,6 +8,7 @@
 import { computed, ref } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
 import type { AiTaskCategory, CardPick } from '../lib/bridge/types';
+import { WORKOUT_PREFIX } from '../lib/cards/deck';
 
 const picks = ref<CardPick[]>([]);
 /** 这个任务是从收集箱开的：交出去后清空箱子。 */
@@ -68,7 +69,7 @@ const clear = () => {
 };
 
 /** 运动牌：一次运动一张，键是 `workout:<运动 id>`（第三轮 B3），日期是那次运动的本地日。 */
-export const WORKOUT_PREFIX = 'workout:';
+export { WORKOUT_PREFIX } from '../lib/cards/deck';
 const isWorkout = (key: string) => key.startsWith(WORKOUT_PREFIX);
 
 /** 按项归拢：每一项一组（运动牌合成一组「运动」），组内按天升序；组按第一次放进来的顺序。 */

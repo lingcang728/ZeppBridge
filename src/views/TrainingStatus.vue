@@ -108,13 +108,14 @@ const thresholdOption = computed(() => {
   const pick = (source: MetricSeries | null, date: string) =>
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
-    grid: { left: 8, right: 12, top: 34, bottom: 8, containLabel: true },
+    // 左右两根轴各占自己一列（containLabel），字号收小、轴上不再写 bpm（图例和悬停里有），曲线不被两边的字挤窄（第三轮 B7）。
+    grid: { left: 4, right: 4, top: 30, bottom: 6, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
-      textStyle: { fontSize: 14.5 },
+      textStyle: { fontSize: 12.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -130,10 +131,10 @@ const thresholdOption = computed(() => {
         return [params[0].axisValue, ...lines].join('<br>');
       },
     },
-    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 14.5, hideOverlap: true } },
+    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 12, hideOverlap: true } },
     yAxis: [
       // 两根轴刻度对齐（alignTicks）：左右两列数字落在同一条网格线上，不再一边 5 格一边 4 格。
-      { type: 'value', scale: true, splitNumber: 3, alignTicks: true, axisLabel: { fontSize: 14.5, formatter: '{value} bpm' } },
+      { type: 'value', scale: true, splitNumber: 3, alignTicks: true, axisLabel: { fontSize: 12, color: zeppSemanticColors.heart } },
       {
         type: 'value',
         scale: true,
@@ -143,7 +144,7 @@ const thresholdOption = computed(() => {
         // keep "better" pointing up like every other chart here.
         inverse: true,
         splitLine: { show: false },
-        axisLabel: { fontSize: 14.5, formatter: (value: number) => formatPaceSeconds(value) },
+        axisLabel: { fontSize: 12, color: zeppSemanticColors.pace, formatter: (value: number) => formatPaceSeconds(value) },
       },
     ],
     series: [

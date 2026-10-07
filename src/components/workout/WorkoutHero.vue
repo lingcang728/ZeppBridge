@@ -39,6 +39,8 @@ const missingLine = computed(() => {
 
 <template>
   <section class="workout-hero" :aria-label="t.heroAria">
+    <!-- 右上角：问 AI（和睡眠详情同一个组件、同一个位置）。 -->
+    <div v-if="$slots.actions" class="hero-actions"><slot name="actions" /></div>
     <div class="hero-copy">
       <div class="hero-device">
         <DeviceVisual v-if="deviceImage" :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
@@ -88,6 +90,7 @@ const missingLine = computed(() => {
 <style scoped>
 /* 头图是一张带类别微光的材质卡；指标卡是凹下去的小格，底色带一点各自类别的颜色。
    颜色全部来自 token，深浅两套主题不用再单独打补丁。 */
+.hero-actions { position: absolute; top: 16px; right: 16px; z-index: 3; display: inline-flex; gap: 8px; }
 .workout-hero {
   position: relative;
   overflow: hidden;

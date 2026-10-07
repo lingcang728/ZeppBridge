@@ -15,7 +15,21 @@ export interface DeckDay {
   value: number | null;
   /** 这一天有没有记录（有读数一定有记录）。 */
   has: boolean;
+  /** 一张牌不是「一天」而是「一次运动」时（第三轮 B3）：牌的 id（默认就是日期）。 */
+  id?: string;
+  /** 放进收集箱的键（默认是这一项的键）。运动牌是 `workout:<id>`。 */
+  pickKey?: string;
+  /** 牌面上的图标（运动类型）。 */
+  icon?: 'run' | 'bike' | 'activity';
+  /** 已经排好的读数（运动牌：时长 · 距离）。 */
+  text?: string;
 }
+
+/** 运动牌在收集箱里的键前缀：`workout:<运动 id>`。 */
+export const WORKOUT_PREFIX = 'workout:';
+
+/** 牌的 id：运动牌是运动 id，日牌是日期。 */
+export const cardIdOf = (day: DeckDay): string => day.id ?? day.date;
 
 export type GroupKind = 'week' | 'month';
 

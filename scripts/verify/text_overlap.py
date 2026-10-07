@@ -19,6 +19,8 @@ from playwright.async_api import async_playwright
 
 LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr']
 PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/past', '/ai/check', '/settings']
+# 点开以后才出现的整屏层（第三轮 A8：牌桌展开后头部、范围胶囊、提示条不能和牌压在一起）。
+OVERLAYS = {'/body': ('.pick-days', '牌桌')}
 
 PROBE = """() => {
   const boxes = [];
@@ -100,6 +102,21 @@ async def main():
                     print(f'✗ {loc:6} {path:12} ' + '；'.join(found))
                 else:
                     print(f'✓ {loc:6} {path}')
+                if path in OVERLAYS:
+                    selector, label = OVERLAYS[path]
+                    trigger = page.locator(selector).first
+                    if await trigger.count():
+                        await trigger.click()
+                        await page.wait_for_timeout(2200)
+                        found = await page.evaluate(PROBE)
+                        name = f'{path}+{label}'
+                        if found:
+                            failures += 1
+                            print(f'✗ {loc:6} {name:12} ' + '；'.join(found))
+                        else:
+                            print(f'✓ {loc:6} {name}')
+                        await page.keyboard.press('Escape')
+                        await page.wait_for_timeout(1500)
             await page.close()
         await browser.close()
     print(f'\n{failures} 处页面有文字重叠' if failures else '\n全部通过：没有文字压在一起')

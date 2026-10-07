@@ -13,6 +13,7 @@ const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
 import AskAiButton from '../components/ask/AskAiButton.vue';
 import PickDaysButton from '../components/cards/PickDaysButton.vue';
+import DurationText from '../components/DurationText.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
@@ -254,7 +255,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
       <article class="sleep-hero" :aria-label="t.heroAria">
         <div class="hero-duration">
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}</p>
-          <p class="value">{{ formatDuration(session.duration_minutes, t.notProvided) }}</p>
+          <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
           <p class="meta">{{ t.heroMeta(formatTime(session.start_time), formatTime(session.end_time), timeInBedLabel) }}</p>
         </div>
         <div class="hero-score">

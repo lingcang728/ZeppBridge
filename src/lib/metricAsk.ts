@@ -46,3 +46,10 @@ export const askPresets = (metric: string): AskPreset[] => {
   }
   return [first, { key: 'withTraining', categories: [category, 'training'], days: 28 }, { key: 'withSleep', categories: [category, 'sleep'], days: 28 }];
 };
+
+/** 单次运动的三个问题（第三轮 B6）：这次练得怎么样、恢复够不够、下一次怎么安排。都带上这次运动本身。 */
+export const workoutAskPresets = (): AskPreset[] => [
+  { key: 'workoutReview', categories: ['training', 'heart_rate'], days: 7 },
+  { key: 'workoutRecovery', categories: ['recovery', 'sleep'], days: 7 },
+  { key: 'workoutNext', categories: ['training', 'recovery'], days: 28 },
+];

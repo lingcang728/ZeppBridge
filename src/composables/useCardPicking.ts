@@ -10,7 +10,7 @@
 import { computed, nextTick, reactive, ref, watch, type Ref } from 'vue';
 import { useCardCollection } from './useCardCollection';
 import { flipCard, flyCardHome, flyFromBox, reducedMotion } from '../lib/motion/cards';
-import { pickableDates, type DeckDay, type DeckGroup } from '../lib/cards/deck';
+import { cardIdOf, pickableDates, type DeckDay, type DeckGroup } from '../lib/cards/deck';
 import type { DeckSource } from '../lib/cards/sources';
 
 const HOLD_MS = 450;
@@ -37,7 +37,12 @@ export const useCardPicking = (options: {
   /** 正在从箱子飞回来的牌（背面朝上，落定后翻回正面）。 */
   const returning = reactive(new Set<string>());
   /** 箱子里有的这一项的日子，慢一拍：箱子那边拿走一张，这里先翻面再换。 */
-  const mine = computed(() => box.picks.value.filter((pick) => pick.key === key()).map((pick) => pick.date));
+  const mine = computed(() => {
+    const source = options.source();
+    const idOf = source.idOfPick ?? ((pick: { key: string; date: string }) => (pick.key === source.key ? pick.date : null));
+    const ids = box.picks.value.map(idOf).filter((id): id is string => !!id);
+    return [...new Set([...ids, ...(source.extraBoxed?.() ?? [])])];
+  });
   const lagBoxed = reactive(new Set<string>(mine.value));
 
   watch(mine, (now, before) => {
@@ -78,9 +83,9 @@ export const useCardPicking = (options: {
   /** 真牌飞进箱子；落地才算数。 */
   const sendDay = async (day: DeckDay, el: HTMLElement) => {
     const { key: k, category } = options.source();
-    const id = day.date;
+    const id = cardIdOf(day);
     const landed = flyCardHome(el, boxEl(), () => {
-      box.add(k, category, [day.date]);
+      box.add(day.pickKey ?? k, category, [day.date]);
       flying.delete(id);
     });
     flying.add(id);
@@ -92,9 +97,10 @@ export const useCardPicking = (options: {
 
   /** 从箱子拿回来：离开箱子那一刻 −1，飞回牌位后翻回正面。 */
   const takeBack = async (day: DeckDay, el: HTMLElement) => {
-    const id = day.date;
+    const id = cardIdOf(day);
     returning.add(id);
-    box.remove(key(), [day.date]);
+    box.remove(day.pickKey ?? key(), [day.date]);
+    options.source().release?.(id);
     lagBoxed.delete(id);
     await nextTick();
     await flyFromBox(boxEl(), el);
@@ -103,8 +109,9 @@ export const useCardPicking = (options: {
 
   const onDayClick = (day: DeckDay, event: MouseEvent) => {
     const el = event.currentTarget as HTMLElement;
-    if (!day.has || options.busy.value || flying.has(day.date) || returning.has(day.date)) return;
-    const state = stateOf(day.date);
+    const id = cardIdOf(day);
+    if (!day.has || options.busy.value || flying.has(id) || returning.has(id)) return;
+    const state = stateOf(id);
     if (state === 'boxed') { void takeBack(day, el); return; }
     if (state === 'confirm') {
       if ((event.target as Element | null)?.closest('.back-cancel')) void cancelConfirm();
@@ -112,7 +119,7 @@ export const useCardPicking = (options: {
       return;
     }
     if (confirmId.value) void cancelConfirm();
-    void turnOver(day.date, el);
+    void turnOver(id, el);
   };
 
   /** 整叠飞进箱子（或整叠拿回来）。 */
@@ -135,9 +142,9 @@ export const useCardPicking = (options: {
   const pickAll = async (days: DeckDay[] | null, groups: DeckGroup[] | null) => {
     if (options.busy.value) return;
     if (days) {
-      const todo = days.filter((day) => day.has && stateOf(day.date) !== 'boxed');
+      const todo = days.filter((day) => day.has && stateOf(cardIdOf(day)) !== 'boxed');
       for (const [i, day] of todo.entries()) {
-        const el = options.cardOf(day.date);
+        const el = options.cardOf(cardIdOf(day));
         if (!el) continue;
         if (i) await wait(70);
         void sendDay(day, el);

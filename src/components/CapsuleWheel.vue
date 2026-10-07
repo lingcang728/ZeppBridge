@@ -38,7 +38,10 @@ const props = withDefaults(defineProps<{
   variant?: 'inset' | 'bare';
   /** 镜片里那一项本身是个按钮（「交给 ChatGPT」）：单击它、或按 Enter / 空格，发出 `activate`。 */
   activatable?: boolean;
+  /** 不挂折射透镜：放在毛玻璃底栏里的滚轮（祖先有背景滤镜时透镜只取样得到一块暗色，悬停 / 转动时整块发黑）。 */
+  plain?: boolean;
 }>(), {
+  plain: false,
   orientation: 'horizontal',
   span: 148,
   iconOnly: false,
@@ -56,7 +59,7 @@ const root = ref<HTMLElement | null>(null);
    会放大边缘的透镜（经过镜片边的字被拉开、微微糊、泛一点乳白），停稳后原样回来。转动时只有透镜的那圈边，
    镜片自己的边隐去，不会「两层透镜」叠在一起（2026-10-01 反馈）；停着时只有镜片自己的边，没有斜对角高光。 */
 const refractEl = ref<HTMLElement | null>(null);
-const refract = useGlassLens(refractEl, 'thumb');
+const refract = useGlassLens(refractEl, 'thumb', !props.plain);
 const itemEls = ref<HTMLElement[]>([]);
 const sizes = ref<number[]>([]);
 const vertical = computed(() => props.orientation === 'vertical');

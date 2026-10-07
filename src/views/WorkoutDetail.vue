@@ -14,6 +14,9 @@ import WorkoutHero from '../components/workout/WorkoutHero.vue';
 import WorkoutRouteCard from '../components/workout/WorkoutRouteCard.vue';
 import WorkoutSidePanels from '../components/workout/WorkoutSidePanels.vue';
 import WorkoutProvenanceCard from '../components/workout/WorkoutProvenanceCard.vue';
+import AskAiButton from '../components/ask/AskAiButton.vue';
+import { workoutLabel } from '../lib/labels';
+import { workoutDisplayLabel } from '../lib/workouts';
 import { useWorkoutDetail } from '../composables/useWorkoutDetail';
 import { useWorkoutPresentation } from '../composables/useWorkoutPresentation';
 import { useMessages } from '../i18n';
@@ -29,7 +32,7 @@ const workoutId = computed(() => String(route.params.workoutId || ''));
 const {
   workout, series, device, loading, error, actionError, exportedNote, activeFormat, exportBusy, displayType,
   insight, insightLoading, insightError, seriesError,
-  handoffState, handoffError, aiProviderId, aiProvider, aiProviderChoices, aiNote, sendWorkoutToAi,
+  sendWorkoutToAi,
   typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
   loadDetail, exportRecord,
 } = useWorkoutDetail(workoutId);
@@ -38,6 +41,7 @@ const {
   durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,
   heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge,
 } = useWorkoutPresentation(workout, series, device, displayType);
+const sportName = computed(() => (workout.value ? workoutDisplayLabel(workout.value) || workoutLabel(displayType.value) : ''));
 
 /* 两列底部尽量齐平：「来源信息」放进（不算它自己时）更矮的那一列。没有轨迹的运动
    左列很短，以前右列的解析明细、导出、交给 AI、来源一路排下去，左下角空出一大片。 */
@@ -98,7 +102,11 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         :override-choices="typeOverrideChoices"
         :override-busy="typeOverrideBusy"
         @override="changeWorkoutOverride"
-      />
+      >
+        <template #actions>
+          <AskAiButton :workout="{ id: workout.workout_id, label: sportName }" :label="sportName" card=".workout-hero" />
+        </template>
+      </WorkoutHero>
 
       <!-- 不支持这类运动的洞察时整块不渲染：一张只会说「暂不支持」的卡片
            除了占地方和让人困惑之外没有别的作用。 -->
@@ -118,18 +126,11 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         </div>
         <WorkoutSidePanels
           v-model:format="activeFormat"
-          v-model:provider="aiProviderId"
           :decoded="decodedMetrics"
           :export-busy="exportBusy"
           :exported-note="exportedNote"
           :action-error="actionError"
-          :ai-provider-choices="aiProviderChoices"
-          :ai-provider-label="aiProvider.label"
-          :handoff-busy="handoffState === 'preparing'"
-          :ai-note="aiNote"
-          :handoff-error="handoffError"
           @export="exportRecord"
-          @handoff="sendWorkoutToAi"
         >
           <template #after>
             <WorkoutProvenanceCard v-if="!metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" />

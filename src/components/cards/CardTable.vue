@@ -24,15 +24,15 @@ import {
 } from '../../lib/motion/cards';
 import { CLOSE_EASE, OPEN_EASE } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
-import { expandGroup, focusWindow, groupSummary, pickableDates, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
+import { cardIdOf, expandGroup, focusWindow, groupSummary, pickableDates, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
 import { deckToday, type DeckSource } from '../../lib/cards/sources';
+import { tableLayerStyle, tableSlotStyle } from '../../lib/cards/tableLayout';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 
 const props = withDefaults(defineProps<{ source: DeckSource; range: DeckRange; origin?: DOMRect | null; anchor?: Element | null; focus?: string | null }>(), { origin: null, anchor: null, focus: null });
 const emit = defineEmits<{ close: [] }>();
 const t = useCardsText();
 const box = useCardCollection();
-const GAP = 18;
 const RETURN_MS = 440;
 
 interface Entry { id: string; level: DeckLevel; title: string; receded: (Receded & { ready: Promise<void> }) | null; pending: boolean }
@@ -69,13 +69,14 @@ const weekday = (date: string) => displayDateTimeFormatter({ weekday: 'short' })
 const monthName = (date: string) => displayDateTimeFormatter({ month: 'long' }).format(parseDisplayDate(date));
 const yearMonth = (date: string) => displayDateTimeFormatter({ year: 'numeric', month: 'short' }).format(parseDisplayDate(date));
 const numberText = (value: number | null) => (value === null || !props.source.format ? null : props.source.format(value));
-const dayValue = (day: DeckDay) => numberText(day.value) ?? (day.has ? t.value.recorded : null);
+const dayValue = (day: DeckDay) => day.text ?? numberText(day.value) ?? (day.has ? t.value.recorded : null);
+const workouts = computed(() => props.source.kind === 'workouts');
 const dayAriaValue = (day: DeckDay) => { const n = numberText(day.value); return n ? `${n}${props.source.unit ? ` ${props.source.unit}` : ''}` : day.has ? t.value.recorded : t.value.noRecord; };
 const dayAria = (day: DeckDay) => {
-  const state = picking.stateOf(day.date);
+  const state = picking.stateOf(cardIdOf(day));
   if (state === 'boxed') return t.value.boxedAria(md(day.date));
   if (state === 'confirm') return t.value.confirmAria(md(day.date));
-  return t.value.dayAria(md(day.date), dayAriaValue(day), false);
+  return t.value.dayAria(md(day.date), day.text ?? dayAriaValue(day), false);
 };
 const groupTitle = (group: DeckGroup) => (group.kind === 'month' ? monthName(group.start) : t.value.weekRange(md(group.start), md(group.end)));
 const groupTop = (group: DeckGroup) => (group.kind === 'month' ? group.start.slice(0, 4) : yearMonth(group.start));
@@ -89,35 +90,9 @@ const crumbs = computed(() => stack.value.map((entry) => entry.title).join(' ›
 const hint = computed(() => (top.value?.level.kind === 'groups' ? t.value.hintGroups : t.value.tipDays));
 const pickedCount = computed(() => box.picks.value.filter((pick) => pick.key === props.source.key).length);
 
-/* ---------- 版式：牌按桌面大小排开，一层一道微拱的扇面 ---------- */
-const countOf = (level: DeckLevel) => (level.kind === 'days' ? level.days.length : level.groups.length);
-const layout = (level: DeckLevel) => {
-  const n = Math.max(1, countOf(level));
-  const { width, height } = stageBox.value;
-  const byHeight = (rows: number) => ((height - GAP * (rows - 1)) / rows) * 0.84 * (5 / 7);
-  let perRow = n;
-  let w = Math.min(232, byHeight(1), (width - GAP * (perRow - 1)) / perRow);
-  if (w < 104 && n > 4) {
-    perRow = Math.ceil(n / 2);
-    w = Math.min(200, byHeight(2), (width - GAP * (perRow - 1)) / perRow);
-  }
-  return { w: Math.max(72, Math.floor(w)), perRow, rows: Math.ceil(n / perRow) };
-};
-const layerStyle = (level: DeckLevel) => {
-  const { w, perRow } = layout(level);
-  // 层自己左右各有 8px 内边距（border-box）：算宽度时带上，不然最后一张会被挤到第二行。
-  return { '--card-w': `${w}px`, maxWidth: `${perRow * w + (perRow - 1) * GAP + 24}px` };
-};
-/** 扇面：一行里越靠边越往下、往外歪一点；两行时不拱。 */
-const slotStyle = (level: DeckLevel, i: number) => {
-  const { perRow, rows } = layout(level);
-  if (rows > 1 || perRow < 3 || reducedMotion()) return {};
-  const mid = (perRow - 1) / 2;
-  const off = (i - mid) / mid;
-  const tilt = off * Math.min(5, 26 / perRow);
-  const drop = off * off * Math.min(28, 6 + perRow * 3);
-  return { transform: `translateY(${drop.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)` };
-};
+/* ---------- 版式（lib/cards/tableLayout.ts）---------- */
+const layerStyle = (level: DeckLevel) => tableLayerStyle(level, stageBox.value);
+const slotStyle = (level: DeckLevel, i: number) => (reducedMotion() ? {} : tableSlotStyle(level, i, stageBox.value));
 /** 翻面确认的那张左右的牌往两边让一点。 */
 const slotClass = (depth: number, ids: string[], i: number) => {
   if (depth !== stack.value.length - 1 || !picking.raisedId.value) return null;
@@ -146,8 +121,9 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
   try {
     loadFailed.value = false;
     const today = deckToday();
-    if (focusDate.value) {
-      const [start, end] = focusWindow(focusDate.value, today);
+    if (focusDate.value || workouts.value) {
+      // 运动牌：以那一天为中心的七天里的每一次运动；日牌：以那一天为中心的七天。
+      const [start, end] = focusWindow(focusDate.value ?? today, today);
       return { kind: 'days', days: await props.source.loadDays(start, end) };
     }
     return rootLevel(await props.source.loadDays(rangeStart(today, range.value), today), range.value);
@@ -156,7 +132,7 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
     return null;
   }
 };
-const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : rangeLabel(range.value));
+const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : workouts.value ? t.value.recentWorkouts : rangeLabel(range.value));
 
 const deal = async (id: number) => {
   const level = await loadLevel();
@@ -372,19 +348,19 @@ defineExpose({ reopen, isClosing: () => closing.value });
           <h2 :id="titleId">{{ source.label }}</h2>
           <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template></p>
         </div>
-        <span data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
+        <span v-if="!workouts" data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
         <button type="button" class="table-icon" data-intro :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
       </header>
       <div ref="stage" class="table-stage" @click.self="onBlank">
-        <p v-if="loadFailed" class="table-empty">{{ t.noRecord }}</p>
+        <p v-if="loadFailed || (top && top.level.kind === 'days' && !top.level.days.length)" class="table-empty">{{ workouts ? t.noWorkouts : t.noRecord }}</p>
         <template v-for="(entry, depth) in stack" :key="entry.id">
           <div :ref="(el) => setLayer(depth, el)" :class="['table-layer', { pending: entry.pending, holding: !!picking.holdId.value }]" :style="layerStyle(entry.level)" @click.self="onBlank">
             <template v-if="entry.level.kind === 'days'">
-              <span v-for="(day, i) in entry.level.days" :key="day.date" :class="['pslot', slotClass(depth, entry.level.days.map((d) => d.date), i)]" :style="slotStyle(entry.level, i)">
-                <PlayingCard kind="day" :data-card-id="day.date" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
-                  :value="dayValue(day)" :unit="numberText(day.value) ? source.unit : null" :state="day.has ? picking.stateOf(day.date) : 'front'"
-                  :class="{ lifting: picking.liftId.value === day.date }" :disabled="!day.has" :focused="day.date === focusDate" :tint="source.tint"
-                  :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(day.date) === 'boxed'"
+              <span v-for="(day, i) in entry.level.days" :key="cardIdOf(day)" :class="['pslot', slotClass(depth, entry.level.days.map(cardIdOf), i)]" :style="slotStyle(entry.level, i)">
+                <PlayingCard kind="day" :data-card-id="cardIdOf(day)" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
+                  :value="dayValue(day)" :unit="!day.text && numberText(day.value) ? source.unit : null" :icon="day.icon" :state="day.has ? picking.stateOf(cardIdOf(day)) : 'front'"
+                  :class="{ lifting: picking.liftId.value === cardIdOf(day) }" :disabled="!day.has" :focused="day.date === focusDate && (!workouts || i === entry.level.days.findIndex((d) => d.date === focusDate))" :tint="source.tint"
+                  :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(cardIdOf(day)) === 'boxed'"
                   @click="picking.onDayClick(day, $event)" @keydown="onCardKey($event, {})" />
               </span>
             </template>
