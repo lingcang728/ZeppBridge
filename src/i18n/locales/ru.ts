@@ -1,5 +1,7 @@
 import { plural, type LocalePack } from '../index';
 
+type IssueParams = { activity?: string; value?: string; max?: number };
+
 /**
  * Языковой пакет Русский (ru).
  *
@@ -1801,6 +1803,7 @@ export default {
 
     'views/SleepDetail': {
       title: 'Запись сна',
+      askLabel: 'Сон',
       loadingDetail: 'Читается запись сна…',
       loadFailedTitle: 'Не удалось прочитать запись сна',
       loadFailed: 'Детали сна пока недоступны',
@@ -2105,12 +2108,14 @@ export default {
       sources: 'Источники',
       days: (have: number, total: number) => `${have}/${total} дн.`,
       summary: (bytes: string) => `Покрытие данных (размер пакета ≈ ${bytes})`,
+      picked: (days: number) => `Выбрано дней: ${days}`,
     },
 
 
 
     'components/ai/HandoffDock': {
       title: 'Передать ИИ',
+      checkHint: 'Перед отправкой проверьте, какие данные и вложения будут переданы, какие параметры выбраны и что написано в полном запросе.',
       who: 'Кому передать',
       finalPrompt: "Итоговый запрос (в начале файла)",
       run: (label: string) => `Подготовить файл и открыть ${label}`,
@@ -2159,7 +2164,7 @@ export default {
       tooLong: "Слишком много данных для полного чтения: сократите период или выберите меньше категорий",
       curveAveraged: (seconds: number) => plural(seconds, { one: `Кривые тренировок усреднены с интервалом в ${seconds} секунду`, other: `Кривые тренировок усреднены с интервалом в ${seconds} секунд`, few: `Кривые тренировок усреднены с интервалом в ${seconds} секунды`, many: `Кривые тренировок усреднены с интервалом в ${seconds} секунд` }),
       summarizedOnly: (count: number) => plural(count, { one: `Для самой ранней тренировки (${count}) оставлена только сводка`, other: `Для ${count} самых ранних тренировок оставлены только сводки`, few: `Для ${count} самых ранних тренировок оставлены только сводки`, many: `Для ${count} самых ранних тренировок оставлены только сводки` }),
-      subscribedHint: "Версия с подпиской может прочитать около 120 000 токенов, бесплатная — обычно около 30 000. Отметьте этот пункт, чтобы сохранить более подробные кривые тренировок.",
+      subscribedHint: "Тариф с подпиской обычно обрабатывает около 120 000 токенов, бесплатный — около 30 000. Выберите «Подписка», чтобы передавать более подробные кривые тренировок.",
       planPaid: "Подписка",
       planFree: "Бесплатно",
       planTitle: (label: string) => `Какой тариф ${label} вы используете? Нажмите, чтобы переключить.`,
@@ -2186,6 +2191,7 @@ export default {
       detailSummary: 'Краткий',
       detailStandard: 'Стандартный',
       detailDetailed: 'Подробный (поточечные ряды)',
+      detailHint: 'Краткий вариант занимает меньше места. Подробный включает покомпонентные кривые каждой тренировки: ИИ увидит больше, но файл будет крупнее.',
       preciseGps: 'Точный маршрут (координаты GPS)',
       preciseGpsHint: 'По умолчанию выключено. При включении экспортируются исходные координаты GPS.',
       mcp: 'Разрешить локальным MCP-клиентам читать эту задачу',
@@ -2206,6 +2212,99 @@ export default {
       }),
       pickFailed: 'Не удалось добавить вложения',
       desktopOnly: 'Выбор файлов доступен в настольном приложении',
+    },
+
+    'components/plan/plan': {
+      activityWalking: 'Ходьба', activityHiking: 'Пеший поход', activityStrength: 'Силовая тренировка', activityYoga: 'Йога / растяжка', activityRowing: 'Гребля', activityElliptical: 'Эллиптический тренажёр',
+      variantOutdoorRun: 'Бег на улице', variantTreadmill: 'Беговая дорожка', variantTrack: 'Бег на стадионе', variantOutdoorRide: 'Велопрогулка на улице', variantIndoorRide: 'Велотренажёр',
+      variantPick: (name: string) => `Часы снова попросят выбрать тип. Выберите «${name}».`,
+      variantPickAny: 'Часы снова попросят выбрать точный тип: сторонний план передаёт только категорию спорта — это ограничение Zepp.',
+      heldBadge: 'Нельзя отправить на часы',
+      heldNote: 'Часы принимают только бег, велосипед и плавание. Удалите этот день или замените вид активности на поддерживаемый:',
+      retypeLabel: 'Заменить на', focusLabel: 'Цель', issueWarning: 'Примечание',
+      laterPending: 'При публикации отправится в Zepp вместе с остальным; на часы попадёт ближе к нужному дню',
+      laterDelivered: 'Отправлено в Zepp; на часы попадёт ближе к нужному дню', weekNotSent: 'Эта неделя не отправлена',
+      noticePartial: (weeks: string) => `Не всё доставлено: неделя, начинающаяся ${weeks}. Остальное доставлено; недостающая неделя будет отправлена после следующей синхронизации.`,
+    },
+    'components/plan/editor': {
+      byTime: 'По времени', byDistance: 'По расстоянию', targetHr: 'Пульс', targetPace: 'Темп', targetPower: 'Мощность', targetOpen: 'Без цели',
+      minutes: 'мин', seconds: 'с', km: 'км', hundredMeters: '×100 м', low: 'Нижняя граница', high: 'Верхняя граница', fast: 'Быстро', slow: 'Медленно', rounds: 'кругов',
+      roundsHint: 'Проведите в сторону, чтобы изменить число кругов. Изменение шага внутри повтора применится ко всем кругам.',
+      nameLabel: 'Название', focusLabel: 'Цель тренировки', focusPlaceholder: 'Коротко, например «Развить выносливость»', descriptionLabel: 'Основные моменты', descriptionPlaceholder: 'Что важно в этой тренировке; это увидите на часах', required: 'Обязательно для отправки', sportLabel: 'Вид спорта', variantLabel: 'Что выбрать на часах', editStep: 'Изменить этот шаг',
+      chartHint: 'Перетащите правый край столбца, чтобы изменить длительность; двигайте вверх или вниз, чтобы изменить диапазон пульса', held: 'Пока нельзя отправить: заполните отмеченные красным поля',
+    },
+    'components/ask/ask': {
+      ask: 'Спросить ИИ', askTitle: (label: string) => `Спросить ИИ · ${label}`,
+      askHint: 'Выберите вопрос для начала: откроется новая задача только с недавними данными этого показателя и готовым вопросом. Перед отправкой его можно изменить.',
+      firstAbove: (label: string) => `В последнее время ${label} выше обычного. Что это может значить?`,
+      firstBelow: (label: string) => `В последнее время ${label} ниже обычного. Что это может значить?`,
+      firstUsual: (label: string) => `Нормально ли недавнее изменение показателя «${label}»?`,
+      withTraining: (label: string) => `Соответствует ли ${label} моей недавней тренировочной нагрузке?`,
+      withSleep: 'Посмотри также на мой сон', sleepWithTraining: 'Посмотри на сон вместе с тренировками', trainingNext: 'С таким состоянием на следующей неделе увеличить или снизить нагрузку?',
+      bodyFood: (label: string) => `Связано ли изменение ${label} с питанием и тренировками?`, above: (delta: string) => `Выше обычного на ${delta}`, below: (delta: string) => `Ниже обычного на ${delta}`,
+      baselineHint: (median: string, days: number) => `Сравнение с вашими данными: медиана за предыдущие ${days} дн. — ${median}. Это не диагноз.`,
+    },
+    'components/cards/cards': {
+      pick: 'Выбрать дни', pickTitle: (label: string) => `Выберите дни для ИИ · ${label}`, pickSubtitle: 'Выберите дни для ИИ',
+      aroundDay: (date: string) => `Около ${date}`, pickedHere: (count: number) => `Выбрано дней: ${count}`,
+      tipDays: 'Нажмите на карточку, чтобы перевернуть её, затем нажмите на галочку, чтобы добавить в коробку. Нажмите на пустое место, чтобы убрать карточки.',
+      hintGroups: 'Нажмите на стопку, чтобы раскрыть её; удерживайте, чтобы добавить всю стопку в коробку; нажмите на пустое место, чтобы вернуться.',
+      keyboardTip: 'Пробел переворачивает карточку; повторное нажатие добавляет её в коробку. Enter раскрывает стопку; Shift+Enter добавляет всю группу; Esc возвращает назад.',
+      inBox: 'В коробке', putBack: 'Вернуть', confirmAria: (date: string) => `${date}, нажмите ещё раз, чтобы добавить в коробку`, boxedAria: (date: string) => `${date} в коробке; нажмите, чтобы вернуть`, boxDrop: 'Перетащите сюда', dragOut: 'Отпустите, чтобы убрать', gotIt: 'Понятно',
+      tipBox: 'Наведите курсор, чтобы выдвинуть карточку; перетащите вверх или нажмите ×, чтобы убрать. Нажмите стрелку, чтобы создать задачу по этим дням.', close: 'Закрыть стол', back: 'Назад', range7: '7 дней', range30: '1 месяц', range180: '6 месяцев', rangeAria: 'Период карточного стола', picked: 'Передать ИИ', noRecord: 'Нет записей', recorded: 'Есть запись',
+      recordedOf: (recorded: number, total: number) => `Дней с записями: ${recorded} из ${total}`, average: (value: string) => `Среднее ${value}`, pickedOf: (picked: number, total: number) => `Выбрано ${picked}/${total}`,
+      holdToPick: 'Удерживайте, чтобы добавить всю стопку', holdToUnpick: 'Удерживайте, чтобы убрать всю стопку', weekRange: (start: string, end: string) => `${start}–${end}`,
+      dayAria: (date: string, value: string, picked: boolean) => `${date}, ${value}${picked ? ', выбрано' : ''}`, groupAria: (label: string, summary: string) => `${label}, ${summary}`,
+      boxTitle: 'Коробка', boxAria: (count: number) => `Коробка, карточек: ${count}`, boxEmpty: 'Коробка пуста. Выберите «Дни» в карточке показателя или разделе «Ваше прошлое», чтобы добавить нужные дни.',
+      boxGroup: (label: string, days: number) => `${label}, дней: ${days}`, boxHint: 'Наведите курсор, чтобы выдвинуть карточку; перетащите вверх или нажмите ×, чтобы убрать.', boxGo: 'Создать задачу по этим дням', boxClear: 'Очистить', boxClose: 'Закрыть',
+      boxWorkouts: (label: string, count: number) => `${label} · ${count}`,
+      removeCard: (label: string, date: string) => `Убрать ${label} за ${date}`, more: (count: number) => `Ещё карточек: ${count}`, categoryWhole: (label: string) => `${label} (вся категория)`,
+    },
+    'components/ai/hub/hub': {
+      pastLine: (days: number, count: number) => `Последние ${days} дн. · типов данных для ИИ: ${count}`,
+      pastPicked: (days: number, count: number) => `Выбрано дней: ${days} · типов данных для ИИ: ${count}`,
+      pastNone: 'Данные для ИИ ещё не выбраны', pastOpen: 'Посмотреть категории',
+      weekLine: (train: number, rest: number) => `Следующие 7 дней: тренировок ${train}, отдыха ${rest}`,
+      planOpen: 'Открыть эту неделю', draftPending: 'Черновик не отправлен', delivered: 'На часах', partial: 'Одна неделя не доставлена', unconfirmed: 'Доставка не подтверждена', noPlan: 'План ещё не получен',
+      pastIntro: 'Выбранные категории отправятся ИИ; откройте категорию, чтобы посмотреть данные по дням.', rangeTitle: 'Период анализа', workoutsOn: (count: number) => `Тренировок: ${count}`,
+      planIntro: 'Одна неделя на странице. Откройте день, чтобы посмотреть шаги и изменить их; перетаскивайте дни, чтобы поменять местами.',
+      planEmpty: 'Плана пока нет. Когда вы договоритесь с ИИ, скопируйте его итоговый ответ и вставьте сюда.', weekOf: (from: string, to: string) => `${from} – ${to}`,
+      dayIntro: 'Тренировка за этот день: интенсивность, шаги и заметка для часов.', resync: (count: number) => `Изменений: ${count} · удерживайте для повторной синхронизации`, prevDay: 'Предыдущий день', nextDay: 'Следующий день',
+      checkTitle: 'Проверка перед отправкой', checkIntro: 'Перед отправкой проверьте, что именно получит ИИ.', dataTitle: 'Передаваемые данные', promptTitle: 'Полный запрос', promptHint: 'Только для чтения. Чтобы изменить текст, вернитесь к полю ввода на главной странице.', yourWords: 'Ваш текст', warningsTitle: 'Обратите внимание', optionsTitle: 'Вложения и параметры', subscriptionTitle: 'Ваш тариф',
+      tasksTitle: 'Сохранённые задачи', tasksIntro: 'Задачи, отправленные ИИ, остаются здесь. Откройте задачу, чтобы продолжить.', newTask: 'Новая задача', current: 'Текущая', tasksEmpty: 'Сохранённых задач пока нет. Отправьте что-нибудь ИИ — задача появится здесь.',
+      rename: 'Переименовать', pin: 'Закрепить', unpin: 'Открепить', remove: 'Удалить', removed: (title: string) => `Удалено: «${title}»`, undo: 'Отменить', earlier: (count: number) => `Ранее (${count})`, earlierHint: 'Задачи без изменений за 30 дней и без закрепления хранятся здесь; они не удаляются.',
+      exchangeTitle: 'Этот обмен', exchangeMissing: 'Обмен не найден; возможно, он был очищен.', sentTo: (provider: string, when: string) => `Отправлено в ${provider} · ${when}`, question: 'Ваш вопрос', noQuestion: 'Без вопроса', dataSent: 'Переданные данные', daysBefore: (days: number) => `${days} дн. назад`, workoutsSent: (count: number) => `Тренировок: ${count}`, planBack: 'Полученный план', revealFile: 'Показать файл в Проводнике',
+    },
+    'components/ai/bridge/bridge': {
+      pickDays: (label: string) => `Выбрать дни ${label} для ИИ`,
+      sleepIntentHint: 'Передать данные о сне за последние 14 дней и спросить, как вы спали и что можно улучшить',
+      weekIntentHint: 'Передать данные за последние 7 дней и спросить, подходит ли нагрузка и как меняется восстановление',
+      workoutIntentHint: 'Выберите тренировки в разделе «Ваше прошлое» и спросите, подходят ли интенсивность и восстановление',
+      nextIntentHint: 'Передать данные за последние 30 дней и обсудить план на следующую неделю; ИИ составит план, только когда вы скажете «итоговый вариант»',
+    },
+    'lib/aiTask/planGuide': {
+      example: {
+        summary: 'Одна интенсивная тренировка, остальные — аэробные и восстановительные',
+        restNote: 'Лечь пораньше накануне интенсивной тренировки',
+        intervalName: 'Интервалы 3×1 км', intervalFocus: 'Скоростная выносливость',
+        intervalDescription: 'Бегите каждый отрезок ровно, последний не ускоряйте до спринта\nВосстановление — лёгкий бег или ходьба',
+        rideName: 'Длительная аэробная велотренировка', rideFocus: 'Развитие выносливости',
+        rideDescription: 'Каденс 85–95; на подъёмах не стремитесь удерживать пульс',
+      },
+    },
+    'views/settings/sections/McpTaskScopes': {
+      title: 'Открыть задачи для MCP',
+      hint: 'Действует только для MCP, запущенного с --scope task: он сможет видеть только данные открытых задач. Переключатели не ограничивают режим чтения всей базы по умолчанию.',
+      empty: 'Сохранённых задач пока нет. Отправьте что-нибудь ИИ — задача появится здесь.',
+    },
+    'lib/trainingPlan/issues': {
+      activity: { walking: 'Ходьба', hiking: 'Пеший поход', strength: 'Силовая тренировка', yoga: 'Йога / растяжка', rowing: 'Гребля', elliptical: 'Эллиптический тренажёр' },
+      'ui.training_plan.issue.sport_not_deliverable': (p: IssueParams) => `Часы принимают только бег, велосипед, плавание в бассейне и на открытой воде. «${String(p.activity ?? '')}» отправить нельзя. Удалите этот день или выберите поддерживаемый вид спорта.`,
+      'ui.training_plan.issue.bad_variant': (p: IssueParams) => `«${String(p.value ?? '')}» не является допустимым вариантом этого вида спорта (бег: outdoor, treadmill, track; велосипед: outdoor, indoor).`,
+      'ui.training_plan.issue.missing_focus': () => 'Укажите цель тренировки (например, «Развить выносливость»); она будет первой строкой описания на часах.',
+      'ui.training_plan.issue.focus_too_long': (p: IssueParams) => `Цель должна быть короткой: не более ${String(p.max ?? '')} символов и без переноса строки.`,
+      'ui.training_plan.issue.missing_description': () => 'Укажите основные моменты тренировки; они появятся в описании на часах.',
+      'ui.training_plan.issue.name_truncated': (p: IssueParams) => `Название длиннее ${String(p.max ?? '')} символов и будет обрезано в списке часов (в подробностях оно отображается полностью).`,
     },
 
 
@@ -2364,6 +2463,7 @@ export default {
         plural(days, { one: `Последний ${days} день`, few: `Последние ${days} дня`, many: `Последние ${days} дней`, other: `Последние ${days} дня` }),
       andMore: (count: number) =>
         ` и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
+      pickedDays: (days: number) => `Выбрано дней: ${days}`,
     },
 
     'views/settings/deck': {

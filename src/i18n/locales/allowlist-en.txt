@@ -256,3 +256,10 @@ components/overview/PinnedMetrics.names.stress
 components/overview/PinnedMetrics.names.bmi
 components/overview/PinnedMetrics.unitPai
 components/overview/PinnedMetrics.unitScore
+# Shared unit abbreviations and cognates kept identical across locales
+components/plan/editor.minutes
+components/plan/editor.seconds
+components/plan/editor.km
+components/plan/editor.hundredMeters
+components/plan/editor.sportLabel
+components/plan/editor.nameLabel
