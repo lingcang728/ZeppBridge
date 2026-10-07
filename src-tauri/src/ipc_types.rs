@@ -144,6 +144,9 @@ pub struct UiSyncReport {
     /// 看不见。
     #[serde(default)]
     pub notice_code: Option<String>,
+    /// 结论是 `cloud_stale`（同步前探云端，1E）时：云端最新一条数据的时刻。界面写「云端最新 08:12」。
+    #[serde(default)]
+    pub cloud_latest_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -203,6 +206,7 @@ pub fn ui_sync_report(
         message: report.message,
         message_code: None,
         notice_code,
+        cloud_latest_at: None,
     }
 }
 

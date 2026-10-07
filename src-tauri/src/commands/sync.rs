@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tauri::{AppHandle, Emitter};
 
 use crate::app_state::AppState;
@@ -7,7 +7,8 @@ use crate::ipc_types::{ui_sync_report, UiSyncReport};
 use crate::models::{CapabilityProbe, UserPrefs};
 use crate::storage::coverage::CoverageLedger;
 use crate::sync::{
-    OfficialMode, OfficialSync, StreamStatus, SyncManager, SyncProgress, SyncReport,
+    probe_since, CloudProbe, OfficialMode, OfficialSync, StreamStatus, SyncManager, SyncProgress,
+    SyncReport,
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -319,10 +320,24 @@ async fn run_sync(
     if let Some(kind) = local_maintenance_deferred() {
         return Ok(deferred_ui_report(kind));
     }
-    let before = {
+    let (before, full_refresh_due) = {
         let database = state.db.lock().await;
-        database.newest_samples()?
+        // 读不出来就当到期：宁可多跑一次整窗，也不能被探针挡掉。
+        let due = database.full_window_refresh_due(Utc::now()).unwrap_or(true);
+        (database.newest_samples()?, due)
     };
+    // 同步前先探云端新不新（1E）：手机还没把手表的新数据传上去时，不跑整套流（十几到几十秒），
+    // 直接告诉用户去手机上下拉一下。只在快 / 增量同步时探；探不出结论照常同步。
+    // 「不新」时不写库，也不记这一轮的云端同步时间——什么都没拉。
+    if let Some(since) = probe_window(&window, &before, full_refresh_due) {
+        let probe = match &manager {
+            Some(manager) => manager.probe_cloud(since).await,
+            None => official_probe(state, since).await,
+        };
+        if let CloudProbe::Stale { cloud_latest_at } = probe {
+            return Ok(cloud_stale_ui_report(cloud_latest_at));
+        }
+    }
     let started_at = Utc::now().to_rfc3339();
     let on_progress = |progress| emit_sync_progress(app, progress);
     let report_result = match &manager {
@@ -517,6 +532,66 @@ async fn record_cloud_sync_locked(
     }
 }
 
+/// 这一轮要不要先探云端、从哪一刻往后探。明确要补历史（`History`）时不探。
+fn probe_window(
+    window: &SyncWindow,
+    before: &BTreeMap<String, Option<String>>,
+    full_refresh_due: bool,
+) -> Option<DateTime<Utc>> {
+    if matches!(window, SyncWindow::History(_)) {
+        return None;
+    }
+    let newest = before.get("heart_rate").and_then(|value| value.as_deref());
+    probe_since(newest, Utc::now(), full_refresh_due)
+}
+
+/// 只连官方时的探针：和正式同步用同一份令牌存储与时区。
+async fn official_probe(state: &AppState, since: DateTime<Utc>) -> CloudProbe {
+    let Ok(db) = Database::open_without_migration(state.data_dir.join("zepp.db")) else {
+        return CloudProbe::Unknown;
+    };
+    let time_zone = db
+        .device_time_zone()
+        .ok()
+        .flatten()
+        .unwrap_or_else(zeppbridge_core::official::fetch::system_time_zone);
+    match OfficialSync::new(
+        &state.data_dir,
+        db,
+        Arc::new(AtomicBool::new(false)),
+        time_zone,
+    ) {
+        Ok(sync) => sync.probe_cloud(since).await,
+        Err(_) => CloudProbe::Unknown,
+    }
+}
+
+/// 云端还没有新数据：一行都没拉，界面说「手表的新数据还没传到云端」。
+fn cloud_stale_ui_report(cloud_latest_at: DateTime<Utc>) -> UiSyncReport {
+    let now = Utc::now().to_rfc3339();
+    let mut report = ui_sync_report(
+        SyncReport {
+            cleanup_failed: false,
+            success: true,
+            core_ok: true,
+            streams: Vec::new(),
+            records_written: 0,
+            message: Some(
+                "手表的新数据还没传到云端。在手机上打开 Zepp 下拉同步后，再点同步".into(),
+            ),
+        },
+        now.clone(),
+        now,
+        "cloud_stale".to_string(),
+        &BTreeMap::new(),
+    );
+    report.message_code = Some("ui.sync.cloud_stale".to_string());
+    // 这一轮什么都没拉：报告里的「上次云端同步」不能写成现在（ui_sync_report 没有流时会回落到完成时间）。
+    report.last_cloud_sync_at = String::new();
+    report.cloud_latest_at = Some(cloud_latest_at.to_rfc3339());
+    report
+}
+
 fn local_maintenance_deferred() -> Option<(&'static str, &'static str)> {
     if crate::storage::compaction_in_progress() {
         Some((
@@ -688,6 +763,35 @@ mod tests {
             ),
             "failed"
         );
+    }
+
+    #[test]
+    fn a_stale_cloud_reports_nothing_written_and_no_sync_time() {
+        let latest = DateTime::parse_from_rfc3339("2026-10-07T08:12:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let report = cloud_stale_ui_report(latest);
+        assert_eq!(report.outcome, "cloud_stale");
+        assert_eq!(report.total_records, 0);
+        assert!(report.streams.is_empty());
+        // 这一轮什么都没拉：不能把「上次云端同步」写成现在。
+        assert!(report.last_cloud_sync_at.is_empty());
+        assert_eq!(report.message_code.as_deref(), Some("ui.sync.cloud_stale"));
+        assert_eq!(
+            report.cloud_latest_at.as_deref(),
+            Some("2026-10-07T08:12:00+00:00")
+        );
+    }
+
+    #[test]
+    fn history_backfills_never_probe_the_cloud_first() {
+        let recent = (Utc::now() - chrono::Duration::minutes(30)).to_rfc3339();
+        let before = BTreeMap::from([("heart_rate".to_string(), Some(recent))]);
+        assert!(probe_window(&SyncWindow::History(180), &before, false).is_none());
+        assert!(probe_window(&SyncWindow::Incremental, &before, false).is_some());
+        assert!(probe_window(&SyncWindow::Quick, &before, false).is_some());
+        // 整窗刷新到期：照常同步。
+        assert!(probe_window(&SyncWindow::Quick, &before, true).is_none());
     }
 
     #[test]

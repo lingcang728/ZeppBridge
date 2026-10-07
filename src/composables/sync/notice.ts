@@ -39,6 +39,7 @@ const KNOWN_SYNC_OUTCOMES: readonly SyncOutcome[] = [
   'failed',
   'cancelled',
   'deferred',
+  'cloud_stale',
 ];
 
 /** 把后端存的 outcome 码写成当前语言的一句话。不认识的码不原样吐出去。 */
@@ -52,6 +53,7 @@ const renderReport = (
   failedStreams: string[],
   latestAt?: string,
   backendMessage?: string,
+  cloudLatestAt?: string,
 ): string => {
   const t = copy();
   const latest = latestAt ? formatTime(latestAt) : null;
@@ -64,6 +66,10 @@ const renderReport = (
   }
   if (outcome === 'cancelled') return t.cancelled;
   if (outcome === 'deferred') return backendMessage ?? t.deferred;
+  if (outcome === 'cloud_stale') {
+    const clock = cloudLatestAt ? formatTime(cloudLatestAt) : null;
+    return clock ? t.cloudStale(clock) : t.cloudStaleNoTime;
+  }
   return t.failed;
 };
 
@@ -102,7 +108,7 @@ const renderNotice = (value: SyncNotice): string => {
     case 'connectFirst': return t.connectFirst;
     case 'cancelling': return t.cancelling;
     case 'report': {
-      const text = renderReport(value.outcome, value.failedStreams, value.latestAt, value.backendMessage);
+      const text = renderReport(value.outcome, value.failedStreams, value.latestAt, value.backendMessage, value.cloudLatestAt);
       return value.cleanupFailed ? `${text} · ${t.cleanupFailed}` : text;
     }
   }
@@ -124,6 +130,8 @@ export const noticeForReport = (report: SyncReport): SyncNotice => ({
     ? errorTextFor(report.message_code) ?? report.message ?? undefined
     : undefined,
   cleanupFailed: report.notice_code === 'ui.sync.cleanup_failed',
+  // 同步前探云端「不新」（后端 ui.sync.cloud_stale）：句子按界面语言自己写，时刻由后端给。
+  cloudLatestAt: report.message_code === 'ui.sync.cloud_stale' ? report.cloud_latest_at ?? undefined : undefined,
 });
 
 export const lastOutcomeLabel = computed(() => {

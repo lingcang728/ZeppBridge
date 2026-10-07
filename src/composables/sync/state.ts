@@ -45,6 +45,8 @@ export type SyncNotice =
     backendMessage?: string;
     /** 同步本身好了，但旧数据清理没成功（后端 `ui.sync.cleanup_failed`）。 */
     cleanupFailed?: boolean;
+    /** `cloud_stale`：云端最新一条数据的时刻。 */
+    cloudLatestAt?: string;
   };
 
 export const appStatus = ref<AppStatus | null>(null);
@@ -55,6 +57,9 @@ export const statusErrorFromSync = ref(false);
 export const syncState = ref<SyncUiState>('idle');
 export const notice = ref<SyncNotice>({ kind: 'none' });
 export const syncReport = ref<SyncReport | null>(null);
+/* 手动点「同步」而云端还没有新数据（1E）：同步胶囊下面弹一条提示，教人去手机上下拉一下，带「再试」。
+   自动同步探到同样的结果时不弹（没人在等）。下一次同步开始就收起。 */
+export const cloudStaleTip = ref<{ latestAt: string | null } | null>(null);
 export const syncProgress = ref<SyncProgress | null>(null);
 export const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
 export const dataRevision = ref(0);

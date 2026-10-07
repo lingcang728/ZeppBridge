@@ -54,9 +54,9 @@ pub struct OfficialSync {
     db: Mutex<Database>,
     data_dir: Option<std::path::PathBuf>,
     cancel: Arc<AtomicBool>,
-    client: OfficialClient,
-    store: OfficialStore,
-    time_zone: String,
+    pub(super) client: OfficialClient,
+    pub(super) store: OfficialStore,
+    pub(super) time_zone: String,
 }
 
 impl OfficialSync {

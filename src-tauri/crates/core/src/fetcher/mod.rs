@@ -205,6 +205,23 @@ impl DataFetcher {
         conclude_slices(records, last_error, "心率窗口没有可识别记录")
     }
 
+    /// 同步前探云端（`sync/probe.rs`）：`since` 之后云端最早的那一条心率是什么时刻；一条都没有是 `None`。
+    ///
+    /// 只要一条（`limit=1`）：接口按时间升序翻页，有没有比本地新的，一条就够回答。不落库、不留报文。
+    pub async fn heart_rate_after(&self, since: DateTime<Utc>) -> Result<Option<DateTime<Utc>>> {
+        let start = since.timestamp() + 1;
+        let end = Utc::now().timestamp();
+        if end <= start {
+            return Ok(None);
+        }
+        let payload = self
+            .connector
+            .fetch_heart_rate_with_options(start, end, 1, 2)
+            .await?;
+        let items = heart_rate_items(&payload);
+        Ok(heart_rate_cursor(&items).and_then(|next| DateTime::from_timestamp(next - 1, 0)))
+    }
+
     pub async fn fetch_sport_detail_record(
         &self,
         workout_id: &str,

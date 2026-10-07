@@ -213,6 +213,18 @@ fn text(item: &Value, key: &str) -> Option<String> {
     }
 }
 
+/// 官方逐分钟心率里最新一条真读数的时刻。没戴表的分钟官方给 0，和 normalizer 一样只认 25–250。
+pub fn newest_heart_rate_at(items: &[Value]) -> Option<DateTime<Utc>> {
+    items
+        .iter()
+        .filter(|item| {
+            number(item, "heartRateData").is_some_and(|value| (25..=250).contains(&value))
+        })
+        .filter_map(|item| number(item, "timestamp"))
+        .max()
+        .and_then(|seconds| DateTime::from_timestamp(seconds, 0))
+}
+
 /// 一条记录属于哪一天。
 pub fn item_day(kind: OfficialKind, item: &Value, time_zone: &str) -> Option<NaiveDate> {
     match kind {
@@ -419,6 +431,20 @@ impl OfficialFetcher<'_> {
             });
         }
         Ok(ChunkOutcome { records, gap })
+    }
+
+    /// 同步前探云端（`sync/probe.rs`）：这一天官方心率里最新的那一刻。不落库、不留报文。
+    pub async fn newest_heart_rate(&self, day: NaiveDate) -> Result<Option<DateTime<Utc>>> {
+        let kind = OfficialKind::HeartRate;
+        let date = day.format("%Y-%m-%d").to_string();
+        let mut query = vec![("startDate", date.clone()), ("endDate", date)];
+        query.extend(kind.extra_query(&self.time_zone));
+        let items = items_of(
+            self.client
+                .get_json(self.access_token, kind.path(), &query)
+                .await?,
+        )?;
+        Ok(newest_heart_rate_at(&items))
     }
 
     /// 一条运动的明细（逐秒序列、轨迹、暂停）。

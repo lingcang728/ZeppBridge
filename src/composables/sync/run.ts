@@ -5,7 +5,7 @@ import { failedStreamKeys, isCancelledSyncError, isDeferredSyncError } from '../
 import { errorTextFor } from '../../i18n/errors';
 import { noticeForReport } from './notice';
 import {
-  appStatus, copy, dataReady, dataRevision, notice, refreshStatus, statusError, statusErrorFromSync, streamUpdate,
+  appStatus, cloudStaleTip, copy, dataReady, dataRevision, notice, refreshStatus, statusError, statusErrorFromSync, streamUpdate,
   syncProgress, syncReport, syncState,
 } from './state';
 
@@ -117,6 +117,7 @@ export const runSync = (
     }
     dataReady.value = readyOnStart(dataReady.value, waited);
     lastAttemptAt = Date.now();
+    cloudStaleTip.value = null;
     syncState.value = 'syncing';
     syncProgress.value = null;
     notice.value = mode === 'incremental'
@@ -140,6 +141,8 @@ export const runSync = (
       // 每 15 分钟一次自动同步（哪怕离线、一条没写）都让八九个查询排到同一把库锁
       // 后面，图表整张重画——用户看到的是定时的一卡。
       if (report.total_records > 0) dataRevision.value += 1;
+      // 云端还没有新数据：用户自己点的同步才弹提示（教他去手机上下拉一下）；定时同步不打扰。
+      if (report.outcome === 'cloud_stale' && waited && !opts?.quick) cloudStaleTip.value = { latestAt: report.cloud_latest_at ?? null };
       if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days, opts?.quick);
       // 第一次拿到近 30 天之后，接着把 180 天补齐。
       // `deferred` 不算——那次根本没写进任何数据，补拉要等重试真的成功了再排。

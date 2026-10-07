@@ -189,7 +189,9 @@ export type SyncOutcome =
   | 'partial'
   | 'failed'
   | 'cancelled'
-  | 'deferred';
+  | 'deferred'
+  /** 同步前探云端（1E）：云端没有比本地新的数据，这一轮什么都没拉。 */
+  | 'cloud_stale';
 
 export interface SyncReport {
   success: boolean;
@@ -204,6 +206,8 @@ export interface SyncReport {
   message_code?: string | null;
   /** 和结论并列的提醒码（`ui.sync.*`）：现在只有 `ui.sync.cleanup_failed`。 */
   notice_code?: string | null;
+  /** 结论是 `cloud_stale` 时：云端最新一条数据的时刻。 */
+  cloud_latest_at?: string | null;
 }
 
 export interface LocalApiStatus {

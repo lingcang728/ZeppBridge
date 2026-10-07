@@ -19,6 +19,7 @@ import type { Locale } from '../../i18n';
 import type { ThemeMode } from '../../composables/useTheme';
 import { backend } from '../../lib/bridge';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
+import { syncControllerMessages } from '../../composables/useSyncController.i18n';
 const demoLibrary = ref(false), bridgeText = useBridgeText();
 
 const messages = defineMessages(
@@ -149,8 +150,9 @@ const onEscapeBack = (event: KeyboardEvent) => {
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
-  isSyncing, canIncrementalSync, runSync, dataReady, pickUpReady,
+  isSyncing, canIncrementalSync, runSync, dataReady, pickUpReady, cloudStaleText, dismissCloudStale,
 } = useSyncController();
+const syncCopy = useMessages(syncControllerMessages);
 
 /* 用户在等的那次同步落地了：同步胶囊变成发光的「数据已备好 · 交给 AI」，
    点一下去取。又开始同步时让位给进度；进了交给 AI 就恢复成上次同步时间。 */
@@ -453,6 +455,16 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
         <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? readyText : syncText }}</span>
         <Icon v-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
+      <!-- 手动同步时云端还没有新数据（1E）：教人去手机上下拉一下，带「再试」。下一次同步开始就收起。 -->
+      <Transition name="stale-tip">
+        <div v-if="cloudStaleText && !isSyncing" class="cloud-stale-tip glass-control" role="status">
+          <p>{{ cloudStaleText }}</p>
+          <div class="stale-actions">
+            <button type="button" class="pill-button quiet" @click="dismissCloudStale()">{{ syncCopy.cloudStaleDismiss }}</button>
+            <button type="button" class="pill-button" @click="runSync('incremental')">{{ syncCopy.cloudStaleRetry }}</button>
+          </div>
+        </div>
+      </Transition>
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
@@ -525,6 +537,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 .pill-nav { justify-self: center; max-width: 100%; }
 
 .topbar-actions {
+  position: relative;
   display: flex;
   min-width: 0;
   justify-self: end;
@@ -605,4 +618,13 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 @media (max-width: 380px) {
   .brand { display: none; }
 }
+/* 云端还没有新数据（1E）：挂在右边这组控件下面的一块玻璃，不盖住页面主体的控件；只动透明度和位移。 */
+.cloud-stale-tip { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; display: grid; gap: 10px; width: min(380px, calc(100vw - 32px));
+  padding: 12px 12px 10px 16px; border-radius: 20px; color: var(--ink); font-size: var(--fs-sm); line-height: 1.55; }
+.cloud-stale-tip p { margin: 0; }
+.stale-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.stale-tip-enter-active { transition: opacity 260ms ease, translate 360ms cubic-bezier(.2, .8, .2, 1); }
+.stale-tip-leave-active { transition: opacity 180ms ease, translate 200ms ease-in; }
+.stale-tip-enter-from, .stale-tip-leave-to { opacity: 0; translate: 0 -6px; }
+@media (prefers-reduced-motion: reduce) { .stale-tip-enter-active, .stale-tip-leave-active { transition: none; } }
 </style>

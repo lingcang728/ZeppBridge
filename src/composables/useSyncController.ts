@@ -7,12 +7,12 @@ import { backend, isDesktop } from '../lib/bridge';
 import { launchSyncIsDue, writeAutoSyncSettings } from '../lib/autoSync';
 import type { LoginStatus, OfficialStatus, SyncProgress } from '../types';
 import { readyOnPickUp } from '../lib/dataReady';
-import { formatClock, lastOutcomeLabel, statusErrorText, syncMessage } from './sync/notice';
+import { formatClock, formatTime, lastOutcomeLabel, statusErrorText, syncMessage } from './sync/notice';
 import {
   applyOfficialStatus, cancelSync, clearRunTimers, isRunningSync, lastSyncAttemptAt, runSync,
 } from './sync/run';
 import {
-  appStatus, applyLoginStatus, autoSyncEnabled, autoSyncInterval, compacting, compactingEvent, compactionPending,
+  appStatus, applyLoginStatus, autoSyncEnabled, cloudStaleTip, autoSyncInterval, compacting, compactingEvent, compactionPending,
   compactionSaved, copy, dataReady, dataRevision, loginStatus, notice, refreshStatus, streamUpdate,
   syncProgress, syncReport, syncState,
 } from './sync/state';
@@ -222,6 +222,13 @@ export const useSyncController = () => ({
   syncState: readonly(syncState),
   syncMessage,
   syncReport: readonly(syncReport),
+  /** 手动同步时云端还没有新数据（1E）：同步胶囊下面那条提示的文字；没有提示时是 null。 */
+  cloudStaleText: computed(() => {
+    const tip = cloudStaleTip.value;
+    if (!tip) return null;
+    return tip.latestAt ? copy().cloudStale(formatTime(tip.latestAt)) : copy().cloudStaleNoTime;
+  }),
+  dismissCloudStale: () => { cloudStaleTip.value = null; },
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),

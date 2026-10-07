@@ -33,10 +33,12 @@ mod backfill;
 mod chunked;
 mod official;
 mod persist;
+mod probe;
 mod report;
 
 use chunked::OnChunkError;
 pub use official::{OfficialMode, OfficialSync};
+pub use probe::{conclude as conclude_cloud_probe, probe_since, CloudProbe, PROBE_TIMEOUT};
 use report::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
