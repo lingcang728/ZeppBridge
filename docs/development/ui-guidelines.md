@@ -198,6 +198,75 @@ forbidden. The provenance of the algorithms and percentages is in the
   the ring is masked to the edge and the light is an outer `box-shadow`;
   neither may tint the inside of the capsule.
 
+### Hard rules: where things come from, how choices look (2026-10-07)
+
+These four rules apply to every page. A page that breaks one is a bug, not a
+style choice; the open list of pages that still do is
+[`motion-audit.md`](motion-audit.md).
+
+1. **Anything a click brings up grows out of what was clicked, and shrinks
+   back into it.** Secondary pages, dialogs, popovers, menus, detail panes: a
+   page goes through a route and `usePageMorph` (mark the source with
+   `data-morph-card`; rows and capsules smaller than 140×56 work too), a
+   dialog goes through `ModalDialog` + `lib/motion/dialogFlight.ts`, a card
+   table through `lib/motion/cards`. Timing is `lib/motion/timing.ts` (open
+   500 ms, close 440 ms, `cubic-bezier(.4, .6, .2, 1)`). Esc halfway reverses
+   from the current computed style — never jump to "fully open" first, never
+   `reverse()` a finished animation. Do not write a second morph engine.
+2. **Every switch fades with a blur; nothing hard-cuts.** Toggling a panel,
+   swapping tab contents, replacing a skeleton: cross-fade plus a short blur
+   on a *static* layer (blur is set once, only opacity / transform animate —
+   per-frame `filter` / `mask` keeps the fans spinning). Width changes go
+   through `useWidthMorph`. Native `<details>` opens instantly, so a fold that
+   users open often needs a transition wrapper.
+3. **Two to five options are a glass `SegmentTrack`; longer lists are a
+   `CapsuleWheel`; numbers are wheel columns (`WheelColumn`,
+   `WheelDatePicker`).** Drag, keyboard and click all work; the lens follows
+   the finger (`useGlassLens`, `lib/segmentGlass.ts`).
+4. **No dropdowns, no traditional card-style pickers, no bare checkboxes or
+   radio buttons.** The one exception is the workout-type correction on the
+   workout detail page (`TypePicker`): there are too many types for a wheel.
+
+Check before merging: open and close each new layer at 4× CPU throttle and
+DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
+through the frames — no bright frame, no blank frame, no jump at the start.
+
+### Playing cards and the collection box (2026-10-07)
+
+A day of one metric is a card. Cards are how the user picks *which days* go to
+the AI.
+
+- **Motion kit** (`src/lib/motion/cards/`): `dealCards` fans cards out of where
+  they came from (middle first), `collectCards` gathers them back, `flipCard`
+  squeezes a card to a line and opens it on the other face (2D `scaleX` —
+  a 3D turn rasterises the text and it blurs halfway), `shuffleCards` /
+  `cutDeck` say "this is a different deck" / "re-sorted", `flyToTarget` throws
+  a ghost along an arc into the box, `recedeLayer` pushes the camera in (the
+  layer above shrinks back and is replaced by a pre-blurred static copy),
+  `gatherCards` stacks a week and flies it into the watch icon (plan
+  delivery). Springs are sampled into CSS `linear()` once and played by
+  WAAPI on the compositor (`spring.ts`, `SPRINGS`). Only transform and
+  opacity move; with reduced motion everything becomes a short fade.
+- **Card table** (`components/cards/CardTable.vue`): 7 days → seven day
+  cards; 1 month → 4–5 piles by calendar week (a first week with fewer than
+  three days in range joins the next pile); 6 months → six month piles. Tap a
+  pile to drill in, long-press 450 ms (with a progress ring) to put the whole
+  pile in the box, tap empty space or Esc to step back out. Keyboard: Space
+  picks, Enter opens a pile, Shift+Enter picks the whole level. Days without a
+  record are dealt with "—" and cannot be picked — never a zero.
+  It opens as an overlay from a metric card's "pick days" button
+  (`PickDaysButton`) or embedded in `/ai/past/:category`.
+- **Collection box** (`components/cards/CollectionBox.vue`): bottom right,
+  floating above everything, hidden when empty, lifted above the dock on
+  `/ai`. Tapping it deals the cards into a ring grouped by metric ("Sleep ·
+  3 days"); hovered cards slide out along the radius; × takes one out. The
+  box in the middle turns into an arrow: it opens a **new** task that includes
+  exactly those categories × days (`picked_days`) and goes to `/ai`. The box
+  is stored locally (`card_collection_get/set`), survives a restart, and is
+  emptied only once the task is actually handed to the AI.
+- Wherever a picked task is described, say "N picked days", not "last N days"
+  (`lib/aiTask/pickedDays.ts` is the single count).
+
 ### Interface copy: two languages, never hardcoded
 
 - **Every word on screen needs a Chinese and an English version.** Write it as
@@ -298,15 +367,35 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 2. Hand to AI (`/ai`)
 
-The page consists of a time bridge, a composer, round-trip history and a floating glass dock.
+The hub only summarises; every drill-down is a route that grows out of its
+summary card (`usePageMorph`), and drafts survive moving between them
+(module-level singletons).
 
-- Six past rows show sleep, recovery, heart rate, workouts, load and body data. Dots toggle inclusion; workout columns allow multiple selections. Missing dates stay gaps. The handle snaps to 7 / 14 / 30 / 90 days, with three days per column at 90. Drag previews use cached readings; queries refresh on release.
-- The future receives an agreed final plan only after an explicit clipboard button press. Web preview provides a paste tray. Intensity profiles and local rest/sleep advice share calendar cells, with a seven-day delivery window.
-- Drag swaps whole days including rest advice. Left/right keys move days and Delete removes a day; edits are revalidated by the backend. Delivery requires a 600ms hold, cancelled on early release, blur or pointer cancellation. Unverified shapes cannot be sent.
-- Four intent pills set the question and range. A persistent local profile pre-fills new tasks. Round trips restore historical scope and plans read only. The ledger distinguishes delivered, unconfirmed, rejected and undone outcomes.
-- The dock contains provider, subscription, readiness, primary action, prepared file and More. More retains attachments, precise location, detail, MCP, prompt editing, coverage and export-only actions.
-- Plan vs actual matches local date and compatible sport only. Legacy formats remain readable; optional summary/rest in `zeppbridge-plan/2` never enter the watch V2 body.
-- Narrow layouts scroll horizontally and initially center Today; reduced motion disables decorative sequences. Isolated demo libraries label every record as synthetic and simulate delivery locally without watch requests.
+- **Hub** (`/ai`): task-name capsule (→ `/ai/tasks`), "Your past" summary
+  card (→ `/ai/past`), "Your next step" summary card with this week's
+  training / rest and delivery state (→ `/ai/plan`), the "last sent to the
+  watch" status bar, template capsules plus the single question box, the
+  round-trip list (each row → `/ai/exchanges/:id`) and the dock.
+- **Your past** (`/ai/past`, `/ai/past/:category`): six categories with their
+  daily strips and a range handle; a category page deals its days as a card
+  table and lists them one row per day. Missing days stay "—".
+- **Plan** (`/ai/plan`, `/ai/plan/:date`): week view with free drag (drop on a
+  card swaps, drop in a gap inserts and shifts, past days are locked, keyboard
+  alternatives), day view with the intensity chart editable in place
+  (duration on the right edge, heart-rate band vertically) and wheel rows for
+  fine values. Sport class and variant are glass segments, with one line
+  saying the watch will ask for the sub-type again (official limitation).
+  Focus and description are required before publishing. A sent plan stays
+  editable except for past days; re-sync pushes every affected 7-day window.
+- **Check before sending** (`/ai/check`): what data goes and how complete it
+  is, attachments, detail level, precise route, per-provider subscription,
+  and a read-only preview of the full prompt (tap the user's sentence to fly
+  back to the question box). No "advanced" fold.
+- **Dock**: readiness summary (→ `/ai/check`) and one provider capsule you can
+  swipe between models; tap sends. Subscription is a badge.
+- Plan vs actual matches local date and compatible sport only. Demo libraries
+  label every record as synthetic and simulate delivery without watch
+  requests.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
@@ -405,6 +494,7 @@ re-rendered blurred snapshots, which stuttered on collapse.)
   `BrandMark`, `CapsuleWheel`, `CategoryMark`, `CircularProgress`, `CardDeck`
   (`deck/`), `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`,
   `GlyphTile`, `HeartRateZonePicker`, `Icon`, `MetricTrendCard`,
+  `cards/` (`CardTable`, `PlayingCard`, `CollectionBox`, `PickDaysButton`),
   `ModalDialog`, `PageHeader`, `RecordRow`, `SegmentTrack`, `SkeletonBlock`,
   `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
   (`overview/`, `workout/`, `archive/`, `ai/`, `deck/`, `shell/`). Check

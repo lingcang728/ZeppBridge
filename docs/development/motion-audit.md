@@ -1,0 +1,52 @@
+# 动效与选择控件审计（2026-10-07）
+
+对照 [ui-guidelines.md](ui-guidelines.md)「Hard rules」四条（从哪来回哪去、切换渐变加模糊、二到五选一用玻璃分段、
+不用下拉 / 卡片式选择 / 裸复选框），审计「交给 AI」以外的页面。「交给 AI」与训练计划在精修批次 1–7 已经改过，
+不在这张表里。**本次只列不改**，后续按优先级逐条修，修完把这一行划掉并写提交号。
+
+审计方法：搜 `<select`、`<details`、`type="checkbox"` / `type="radio"`、带 `aria-pressed` 的按钮组、
+`role="listbox"`、点击切换的 `v-if` 面板，再逐个读组件确认是不是用户点出来的。弹窗统一走
+`ModalDialog` + `dialogFlight`，已经从触发处长出（隐私说明、更新说明、置顶指标选择、运动类型纠正、生活事件、
+清空计划都达标）。没有任何页面还在用 `<select>`。
+
+## 一、违反「不用下拉 / 卡片式选择 / 裸复选框」
+
+| # | 位置 | 现状 | 应改成 | 优先级 |
+|---|---|---|---|---|
+| A1 | `components/DevicePicker.vue` 顶部类型筛选（设置 → 设备、设备详情的「指认型号」） | 一排 `filter-chip` + `aria-pressed`，自己画的选中态 | `SegmentTrack compact`（项数 ≤ 5） | 中 |
+| A2 | `components/DevicePicker.vue` 「把这次指认贡献给设备目录」 | 原生 `<input type="checkbox">` | 玻璃两档开关（`SegmentTrack` 两项，或和「精确路线」同款） | 中 |
+| A3 | `components/HeartRateZonePicker.vue` 心率区间依据（最大心率 / 静息心率…候选） | 卡片式行列表，点一行选中 | 候选 ≤ 5 时用 `SegmentTrack`，数值写在标签里；更多时 `CapsuleWheel` | 中 |
+| A4 | `views/landing/LocalePicker.vue` 落地页语言 | 下拉列表（`role="listbox"` 弹层） | `CapsuleWheel loop`（和设置里的语言滚轮一致）。落地页不在桌面应用里，优先级最低 | 低 |
+
+例外（保留）：`components/workout/TypePicker.vue` 运动类型纠正——类型太多，规范明确允许。
+
+## 二、违反「切换渐变加模糊，不许硬切」
+
+| # | 位置 | 现状 | 应改成 | 优先级 |
+|---|---|---|---|---|
+| B1 | `components/workout/WorkoutSidePanels.vue` 「交给 AI / 导出」两档 | 分段本身是玻璃的，但下面两块内容用 `v-if` 硬换 | 两块交叉淡化 + 静态模糊，高度用 `useWidthMorph` 同款思路平滑 | 高 |
+| B2 | `views/DeviceDetail.vue` 「指认型号」 | 按钮行和 `DevicePicker` 用 `v-if` 互换，瞬间出现一大块 | 选择器从「指认型号」按钮长出来（`dialogFlight` 或页面内展开过渡），取消时缩回 | 高 |
+| B3 | `views/settings/sections/AuthSection.vue` 「手动填写凭据」 | 点按钮后表单 `v-if` 瞬间插入，下面的内容被推下去 | 展开过渡（高度 + 淡入），收起反向 | 中 |
+| B4 | `components/HistoryArchivePanel.vue` 起点选「自定义」 | 日期行 `v-if` 瞬间出现 | 同 B3 | 中 |
+| B5 | 原生 `<details>` 折叠：`HistoryArchivePanel`（估算明细）、`InsightCard`（基线说明）、`MissingMetricsRow`、`WorkoutHero`（类型说明）、`HeartRateZonePicker`（设定区）、设置 `AdvancedSection`（诊断）、`AuthSection`、`CapabilitySection`（探测诊断）、`McpSection`（提示词）、`ai/CoverageDetails` | 原生展开是瞬间的 | 抽一个共享的折叠组件（`<details>` 语义 + `::details-content` / 高度过渡 + 淡入），十处换成它 | 中 |
+| B6 | `views/HealthCheck.vue`、`settings/sections/DevicesSection.vue` 等处的提示条（`inline-alert`、`alert`、`api-error`） | 状态一变就 `v-if` 冒出来，把下面的内容推下去 | 统一走一个提示条过渡（淡入 + 高度），和顶栏状态胶囊的 `.notice-*` 同一套 | 低 |
+| B7 | `components/LifeEventsPanel.vue`、`views/RecentRecords.vue` 「再显示 N 条」 | 新的行瞬间出现 | 新行逐条淡入（`TransitionGroup`，只动 opacity / transform） | 低 |
+
+## 三、违反「从哪来回哪去」
+
+| # | 位置 | 现状 | 应改成 | 优先级 |
+|---|---|---|---|---|
+| C1 | `views/DeviceDetail.vue` 指认型号（同 B2） | 见上 | 见上 | 高 |
+| C2 | 健康检查（`/health-check`）的「重试」、设置「数据能力」卡的「重新探测」结果 | 结果区原地替换 | 结果从被点的按钮处展开；骨架换内容交叉淡化 | 低 |
+
+设置卡叠（`/settings` ↔ `/settings/:card`）、概览卡 → 二级页、运动 / 睡眠列表 → 详情都已经走 `usePageMorph`
+或卡叠形变，达标。
+
+## 修的顺序建议
+
+1. B1、B2/C1：用户最常点、硬切最明显。
+2. B5：一个共享折叠组件一次修十处。
+3. A1–A3：换控件，顺带删掉各自的选中态样式。
+4. B3、B4、B6、B7、C2、A4。
+
+每修一条都要在 CPU 降速 4× + DPR 2 下逐帧看一遍（见 ui-guidelines 的「Check before merging」）。

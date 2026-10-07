@@ -1,5 +1,5 @@
 /**
- * 扑克牌动效素材库（精修批次 7.1）。用法写在 docs/development/ui-guidelines.md 的「扑克牌素材」一节。
+ * 扑克牌动效素材库（精修批次 7.1）。用法写在 docs/development/ui-guidelines.md 的「Playing cards and the collection box」一节（中文版「扑克牌与收集箱」）。
  *
  * - 发牌 `dealCards` / 收牌 `collectCards`：一层牌从来处扇出、收回来处；
  * - 翻面 `flipCard`：2D 压扁换面（不做 3D，字不糊）；
