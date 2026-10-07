@@ -1116,6 +1116,9 @@ export default {
     },
 
     'lib/format': {
+      hourUnit: 'घं',
+      minuteUnit: 'मि',
+      minutesUnit: 'मिनट',
       dateUnknown: 'तारीख़ अज्ञात',
       duration: (hours: number, minutes: number) =>
         (hours > 0 ? `${hours} घंटे ${minutes} मिनट` : `${minutes} मिनट`),
@@ -1932,6 +1935,9 @@ Markdown में उत्तर दें।`,
 
 
     'components/ai/HandoffDock': {
+      goPrefix: 'भेजें',
+      planFreeShort: 'मुफ़्त',
+      planPaidShort: 'सदस्यता',
       title: 'AI को भेजें',
       who: 'किसे भेजें',
       finalPrompt: "अंतिम प्रॉम्प्ट (फ़ाइल की शुरुआत में लिखा है)",
@@ -2285,12 +2291,18 @@ Markdown में उत्तर दें।`,
       pickDays: (label: string) => `${label} के दिन चुनकर AI को दें`, sleepIntentHint: 'पिछले 14 दिनों की नींद भेजकर पूछें कि नींद कैसी रही और क्या सुधारें', weekIntentHint: 'पिछले 7 दिन भेजकर पूछें कि प्रशिक्षण भार उचित है और रिकवरी कैसी चल रही है', workoutIntentHint: '“आपका इतिहास” में वर्कआउट चुनें, फिर पूछें कि तीव्रता और रिकवरी सही थीं या नहीं', nextIntentHint: 'अगले सप्ताह की योजना के लिए पिछले 30 दिन भेजें; AI प्लान तभी देगा जब आप “अंतिम रूप दें” कहेंगे',
     },
     'components/ask/ask': {
+      workoutHint: 'शुरुआत के लिए सवाल चुनें: नया टास्क खुलेगा, जिसमें इस वर्कआउट और उसके आसपास के दिनों का डेटा और भरा हुआ सवाल होगा। भेजने से पहले इसे बदल सकते हैं।',
+      workoutReview: (label: string) => `इस बार ${label} कैसा रहा?`,
+      workoutRecovery: (label: string) => `क्या इस ${label} के बाद मेरी पर्याप्त रिकवरी हुई?`,
+      workoutNext: (label: string) => `अगली बार ${label} की योजना कैसे बनाऊँ?`,
       ask: 'AI से पूछें', askTitle: (label: string) => `AI से पूछें · ${label}`, askHint: 'शुरुआत के लिए सवाल चुनें: नया टास्क खुलेगा, जिसमें केवल इस मेट्रिक का हालिया डेटा और भरा हुआ सवाल होगा। भेजने से पहले इसे बदल सकते हैं।',
       firstAbove: (label: string) => `${label} हाल में सामान्य से ज़्यादा है। इसका क्या मतलब हो सकता है?`, firstBelow: (label: string) => `${label} हाल में सामान्य से कम है। इसका क्या मतलब हो सकता है?`, firstUsual: (label: string) => `${label} में हालिया बदलाव सामान्य है?`,
       withTraining: (label: string) => `क्या ${label} मेरे हालिया प्रशिक्षण भार से मेल खाता है?`, withSleep: 'मेरी नींद भी देखें', sleepWithTraining: 'प्रशिक्षण के साथ मेरी नींद भी देखें', trainingNext: 'इस स्थिति में अगले सप्ताह प्रशिक्षण बढ़ाऊँ या घटाऊँ?', bodyFood: (label: string) => `क्या ${label} का बदलाव मेरे भोजन और प्रशिक्षण से मेल खाता है?`,
       above: (delta: string) => `सामान्य से ${delta} अधिक`, below: (delta: string) => `सामान्य से ${delta} कम`, baselineHint: (median: string, days: number) => `आपके अपने आँकड़ों से तुलना: पिछले ${days} दिनों का मध्यिका ${median} है। यह निदान नहीं है।`,
     },
     'components/cards/cards': {
+      noWorkouts: 'इस अवधि में कोई वर्कआउट नहीं',
+      recentWorkouts: 'पिछला सप्ताह',
       pick: 'दिन चुनें', pickTitle: (label: string) => `AI के लिए दिन चुनें · ${label}`, pickSubtitle: 'AI के लिए कुछ दिन चुनें', aroundDay: (date: string) => `${date} के आसपास`, pickedHere: (count: number) => `${count} दिन चुने गए`,
       tipDays: 'कार्ड पलटने के लिए टैप करें, फिर चेक पर टैप करके बॉक्स में रखें; कार्ड समेटने के लिए खाली जगह टैप करें।', hintGroups: 'ढेर खोलने के लिए टैप करें; पूरा ढेर बॉक्स में रखने के लिए दबाकर रखें; लौटने के लिए खाली जगह टैप करें।', keyboardTip: 'कार्ड पलटने के लिए Space; बॉक्स में रखने के लिए फिर Space; ढेर खोलने के लिए Enter; पूरा समूह रखने के लिए Shift+Enter; लौटने के लिए Esc।',
       inBox: 'बॉक्स में', putBack: 'वापस रखें', confirmAria: (date: string) => `${date}, बॉक्स में रखने के लिए फिर दबाएँ`, boxedAria: (date: string) => `${date} बॉक्स में है; वापस लेने के लिए दबाएँ`, boxDrop: 'यहाँ छोड़ें', dragOut: 'बाहर निकालने के लिए छोड़ें', gotIt: 'समझ गया', tipBox: 'कार्ड को ऊपर खींचें या × दबाकर निकालें। इन दिनों के साथ टास्क शुरू करने के लिए तीर दबाएँ।', close: 'कार्ड समेटें', back: 'एक स्तर पीछे',

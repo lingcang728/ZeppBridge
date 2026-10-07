@@ -694,6 +694,9 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'lib/format': {
+      hourUnit: 'h',
+      minuteUnit: 'min',
+      minutesUnit: 'min',
       dateUnknown: 'Date inconnue',
       duration: (hours: number, minutes: number) =>
         (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
@@ -1950,6 +1953,9 @@ Réponds en Markdown.`,
 
 
     'components/ai/HandoffDock': {
+      goPrefix: 'Confier à',
+      planFreeShort: 'Gratuit',
+      planPaidShort: 'Payant',
       checkHint: 'À vérifier avant l’envoi : données incluses, pièces jointes et options, texte complet',
       title: 'Confier à l’IA',
       who: 'Confier à',
@@ -2250,6 +2256,10 @@ Réponds en Markdown.`,
       nextIntentHint: 'Transmet les 30 derniers jours pour préparer ensemble la semaine prochaine ; l’IA ne proposera un plan que lorsque vous direz « version finale ».',
     },
     'components/ask/ask': {
+      workoutHint: 'Choisissez une question pour démarrer : une nouvelle tâche sera créée avec cette séance et les données des jours autour, ainsi que la question préremplie. Vous pourrez la modifier avant l’envoi.',
+      workoutReview: (label: string) => `Comment s’est passée cette séance de ${label} ?`,
+      workoutRecovery: (label: string) => `Ai-je assez récupéré après cette séance de ${label} ?`,
+      workoutNext: (label: string) => `Comment organiser ma prochaine séance de ${label} ?`,
       ask: 'Demander à l’IA', askTitle: (label: string) => `Demander à l’IA · ${label}`,
       askHint: 'Choisissez une question pour démarrer : une nouvelle tâche sera créée avec les données récentes de cette mesure et la question préremplie. Vous pourrez la modifier avant l’envoi.',
       firstAbove: (label: string) => `${label} est plus élevé que d’habitude ces derniers temps. Qu’est-ce que cela peut signifier ?`,
@@ -2284,6 +2294,8 @@ Réponds en Markdown.`,
       workoutsSent: (count: number) => `${count} séance(s)`, planBack: 'Plan reçu', revealFile: 'Afficher le fichier dans l’Explorateur',
     },
     'components/cards/cards': {
+      noWorkouts: 'Aucune séance sur cette période',
+      recentWorkouts: 'La semaine dernière',
       pick: 'Choisir des jours', pickTitle: (label: string) => `Choisir des jours à transmettre à l’IA · ${label}`,
       pickSubtitle: 'Choisir des jours à transmettre à l’IA', aroundDay: (date: string) => `Autour du ${date}`,
       pickedHere: (count: number) => `${count} jour(s) choisi(s)`, tipDays: 'Touchez une carte pour la retourner, puis la coche pour la mettre dans la boîte ; touchez un espace vide pour ranger les cartes.',

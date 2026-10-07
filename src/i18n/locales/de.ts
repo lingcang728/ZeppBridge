@@ -1430,6 +1430,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       noReason: 'Kein Grund aufgezeichnet',
     },
     'lib/format': {
+      hourUnit: 'Std.',
+      minuteUnit: 'Min.',
+      minutesUnit: 'Min.',
       dateUnknown: 'Datum unbekannt',
       duration: (hours: number, minutes: number) =>
         hours > 0 ? `${hours} Std. ${minutes} Min.` : `${minutes} Min.`,
@@ -2332,6 +2335,9 @@ Antworte in Markdown.`,
       picked: (count: number) => plural(count, { one: '1 ausgewählter Tag', other: count + ' ausgewählte Tage' }),
     },
     'components/ai/HandoffDock': {
+      goPrefix: 'An',
+      planFreeShort: 'Gratis',
+      planPaidShort: 'Abo',
       closePanel: 'Einklappen',
       copiedFiles: (count: number) =>
         plural(count, {
@@ -2701,6 +2707,10 @@ Antworte in Markdown.`,
       planBack: 'Übernommener Plan', revealFile: 'Datei im Explorer anzeigen',
     },
     'components/ask/ask': {
+      workoutHint: 'Wähle eine Frage als Einstieg: Es wird eine neue Aufgabe mit diesem Training und den Daten der Tage davor und danach geöffnet. Die Frage ist schon ausgefüllt; vor dem Senden kannst du sie noch bearbeiten.',
+      workoutReview: (label: string) => `Wie lief dieses Training (${label})?`,
+      workoutRecovery: (label: string) => `Habe ich mich nach diesem Training (${label}) ausreichend erholt?`,
+      workoutNext: (label: string) => `Wie sollte ich mein nächstes Training (${label}) planen?`,
       ask: 'KI fragen', askTitle: (label: string) => 'KI fragen · ' + label,
       askHint: 'Wähle eine Frage als Einstieg: Es wird eine neue Aufgabe mit nur den aktuellen Daten dieser Messgröße und der vorausgefüllten Frage geöffnet. Vor dem Senden kannst du sie noch bearbeiten.',
       firstAbove: (label: string) => label + ' liegt in letzter Zeit über dem üblichen Wert. Was könnte das bedeuten?',
@@ -2736,6 +2746,8 @@ Antworte in Markdown.`,
       nextIntentHint: 'Übergibt die letzten 30 Tage, um gemeinsam die nächste Woche zu planen. Einen Plan erstellt die KI erst, wenn du „Endfassung“ sagst.',
     },
     'components/cards/cards': {
+      noWorkouts: 'Keine Trainings in diesem Zeitraum',
+      recentWorkouts: 'Letzte Woche',
       pick: 'Tage auswählen', pickTitle: (label: string) => 'Tage für die KI auswählen · ' + label,
       pickSubtitle: 'Tage für die KI auswählen', aroundDay: (date: string) => 'Um den ' + date + ' herum',
       pickedHere: (count: number) => plural(count, { one: '1 Tag ausgewählt', other: count + ' Tage ausgewählt' }),

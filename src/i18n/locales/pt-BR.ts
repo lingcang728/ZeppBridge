@@ -780,6 +780,9 @@ export default {
     },
 
     'lib/format': {
+      hourUnit: 'h',
+      minuteUnit: 'min',
+      minutesUnit: 'min',
       noUpdates: 'Nenhuma atualização',
       noRecords: 'Nenhum registro',
       timeUnknown: 'Horário desconhecido',
@@ -1931,6 +1934,9 @@ Responda em Markdown.`,
 
 
     'components/ai/HandoffDock': {
+      goPrefix: 'Enviar para',
+      planFreeShort: 'Grátis',
+      planPaidShort: 'Pago',
       title: 'Enviar para a IA',
       checkHint: 'Confira antes de enviar: dados incluídos, anexos e opções, e o prompt completo',
       who: 'Destino',
@@ -2246,6 +2252,10 @@ Responda em Markdown.`,
       held: 'Ainda não pode enviar: preencha os campos marcados em vermelho abaixo',
     },
     'components/ask/ask': {
+      workoutHint: 'Escolha uma pergunta para começar: uma nova tarefa será criada com este treino, os dados dos dias próximos e a pergunta preenchida. Você ainda poderá editá-la antes de enviar.',
+      workoutReview: (label: string) => `Como foi meu treino de ${label}?`,
+      workoutRecovery: (label: string) => `Me recuperei o suficiente depois deste treino de ${label}?`,
+      workoutNext: (label: string) => `Como devo planejar meu próximo treino de ${label}?`,
       ask: 'Perguntar à IA', askTitle: (label: string) => `Perguntar à IA · ${label}`,
       askHint: 'Escolha uma pergunta para começar: uma nova tarefa será criada apenas com os dados recentes desta métrica e a pergunta preenchida. Você ainda poderá editá-la antes de enviar.',
       firstAbove: (label: string) => `${label} tem ficado acima do normal. O que isso pode significar?`,
@@ -2259,6 +2269,8 @@ Responda em Markdown.`,
       baselineHint: (median: string, days: number) => `Comparação com você: a mediana dos ${days} dias anteriores é ${median}. Isto não é um diagnóstico.`,
     },
     'components/cards/cards': {
+      noWorkouts: 'Nenhum treino neste período',
+      recentWorkouts: 'Última semana',
       pick: 'Escolher dias', pickTitle: (label: string) => `Escolha dias para a IA · ${label}`, pickSubtitle: 'Escolha dias para a IA',
       aroundDay: (date: string) => `Em torno de ${date}`, pickedHere: (count: number) => `${count} ${count === 1 ? 'dia escolhido' : 'dias escolhidos'}`,
       tipDays: 'Toque em uma carta para virá-la e, depois, no sinal de confirmação para colocá-la na caixa; toque em uma área vazia para recolher as cartas.',

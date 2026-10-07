@@ -263,3 +263,6 @@ components/plan/editor.km
 components/plan/editor.hundredMeters
 components/plan/editor.sportLabel
 components/plan/editor.nameLabel
+# Shared duration abbreviations used across locales
+lib/format.hourUnit
+lib/format.minutesUnit
