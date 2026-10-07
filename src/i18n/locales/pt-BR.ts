@@ -2253,7 +2253,7 @@ Responda em Markdown.`,
     },
     'components/ask/ask': {
       workoutHint: 'Escolha uma pergunta para começar: uma nova tarefa será criada com este treino, os dados dos dias próximos e a pergunta preenchida. Você ainda poderá editá-la antes de enviar.',
-      workoutReview: (label: string) => `Como foi meu treino de ${label}?`,
+      workoutReview: (label: string) => `Como foi este treino de ${label}?`,
       workoutRecovery: (label: string) => `Me recuperei o suficiente depois deste treino de ${label}?`,
       workoutNext: (label: string) => `Como devo planejar meu próximo treino de ${label}?`,
       ask: 'Perguntar à IA', askTitle: (label: string) => `Perguntar à IA · ${label}`,

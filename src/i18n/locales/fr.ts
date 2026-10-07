@@ -2295,7 +2295,7 @@ Réponds en Markdown.`,
     },
     'components/cards/cards': {
       noWorkouts: 'Aucune séance sur cette période',
-      recentWorkouts: 'La semaine dernière',
+      recentWorkouts: 'Les 7 derniers jours',
       pick: 'Choisir des jours', pickTitle: (label: string) => `Choisir des jours à transmettre à l’IA · ${label}`,
       pickSubtitle: 'Choisir des jours à transmettre à l’IA', aroundDay: (date: string) => `Autour du ${date}`,
       pickedHere: (count: number) => `${count} jour(s) choisi(s)`, tipDays: 'Touchez une carte pour la retourner, puis la coche pour la mettre dans la boîte ; touchez un espace vide pour ranger les cartes.',

@@ -2256,7 +2256,7 @@ export default {
     },
     'components/cards/cards': {
       noWorkouts: 'За этот период нет тренировок',
-      recentWorkouts: 'Последняя неделя',
+      recentWorkouts: 'Последние 7 дней',
       pick: 'Выбрать дни', pickTitle: (label: string) => `Выберите дни для ИИ · ${label}`, pickSubtitle: 'Выберите дни для ИИ',
       aroundDay: (date: string) => `Около ${date}`, pickedHere: (count: number) => `Выбрано дней: ${count}`,
       tipDays: 'Нажмите на карточку, чтобы перевернуть её, затем нажмите на галочку, чтобы добавить в коробку. Нажмите на пустое место, чтобы убрать карточки.',

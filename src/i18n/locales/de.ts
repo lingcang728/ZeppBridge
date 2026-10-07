@@ -2747,7 +2747,7 @@ Antworte in Markdown.`,
     },
     'components/cards/cards': {
       noWorkouts: 'Keine Trainings in diesem Zeitraum',
-      recentWorkouts: 'Letzte Woche',
+      recentWorkouts: 'Letzte 7 Tage',
       pick: 'Tage auswählen', pickTitle: (label: string) => 'Tage für die KI auswählen · ' + label,
       pickSubtitle: 'Tage für die KI auswählen', aroundDay: (date: string) => 'Um den ' + date + ' herum',
       pickedHere: (count: number) => plural(count, { one: '1 Tag ausgewählt', other: count + ' Tage ausgewählt' }),

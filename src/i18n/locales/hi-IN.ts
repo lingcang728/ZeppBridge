@@ -2302,7 +2302,7 @@ Markdown में उत्तर दें।`,
     },
     'components/cards/cards': {
       noWorkouts: 'इस अवधि में कोई वर्कआउट नहीं',
-      recentWorkouts: 'पिछला सप्ताह',
+      recentWorkouts: 'पिछले 7 दिन',
       pick: 'दिन चुनें', pickTitle: (label: string) => `AI के लिए दिन चुनें · ${label}`, pickSubtitle: 'AI के लिए कुछ दिन चुनें', aroundDay: (date: string) => `${date} के आसपास`, pickedHere: (count: number) => `${count} दिन चुने गए`,
       tipDays: 'कार्ड पलटने के लिए टैप करें, फिर चेक पर टैप करके बॉक्स में रखें; कार्ड समेटने के लिए खाली जगह टैप करें।', hintGroups: 'ढेर खोलने के लिए टैप करें; पूरा ढेर बॉक्स में रखने के लिए दबाकर रखें; लौटने के लिए खाली जगह टैप करें।', keyboardTip: 'कार्ड पलटने के लिए Space; बॉक्स में रखने के लिए फिर Space; ढेर खोलने के लिए Enter; पूरा समूह रखने के लिए Shift+Enter; लौटने के लिए Esc।',
       inBox: 'बॉक्स में', putBack: 'वापस रखें', confirmAria: (date: string) => `${date}, बॉक्स में रखने के लिए फिर दबाएँ`, boxedAria: (date: string) => `${date} बॉक्स में है; वापस लेने के लिए दबाएँ`, boxDrop: 'यहाँ छोड़ें', dragOut: 'बाहर निकालने के लिए छोड़ें', gotIt: 'समझ गया', tipBox: 'कार्ड को ऊपर खींचें या × दबाकर निकालें। इन दिनों के साथ टास्क शुरू करने के लिए तीर दबाएँ।', close: 'कार्ड समेटें', back: 'एक स्तर पीछे',
