@@ -33,6 +33,7 @@ const {
   workout, series, device, loading, error, actionError, exportedNote, activeFormat, exportBusy, displayType,
   insight, insightLoading, insightError, seriesError,
   sendWorkoutToAi,
+  aiWithRecovery,
   typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
   loadDetail, exportRecord,
 } = useWorkoutDetail(workoutId);
@@ -115,6 +116,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         :insight="insight"
         :loading="insightLoading"
         :error="insightError"
+        v-model:with-recovery="aiWithRecovery"
         @handoff="sendWorkoutToAi"
       />
 

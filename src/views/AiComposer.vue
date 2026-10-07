@@ -2,10 +2,12 @@
 /**
  * 交给 AI 的总页：只留概括（2026-10 精修批次 3）。
  *
+ * 单列叙事（第四轮 1D·D2，用户 10-07 在三版样稿里选了 B）：一条从上往下读的线，内容收窄到 860。
+ *
  *   任务名胶囊（→ 已保存的任务）
- *   「你的过去」缩略卡（→ /ai/past）   「你的下一步」缩略卡（→ /ai/plan）
- *   上次发到手表的状态栏
- *   模板胶囊 + 唯一的输入框
+ *   「你的过去」缩略卡（→ /ai/past）
+ *   这次想问什么：模板胶囊 + 唯一的输入框
+ *   「你的下一步」缩略卡（→ /ai/plan） + 上次发到手表的状态栏
  *   往返记录（每一行 → /ai/exchanges/:id）
  *   底栏（就绪度 → /ai/check，交给某个 AI）——挂在外壳上（components/ai/AiDockHost.vue），不跟着总页卸载
  *
@@ -73,17 +75,16 @@ const selectWorkout = () => { document.querySelector<HTMLElement>('.past-card')?
       <Transition name="undo-fade"><GraphUndoPill v-if="ctl.canUndo.value" class="undo-selection" :can-undo="ctl.canUndo.value" :label="t.undo" @undo="ctl.undo()" /></Transition>
     </header>
 
-    <div class="hub-grid">
-      <PastSummary :rows="strips.rows.value" :categories="draft.categories" :days="hub.pastDays.value" :sent="sentAnimation" />
-      <NextSummary :rows="hub.rows.value" :drafting="!!plan.preview.value" :state="plan.state.value" @received="received" />
-    </div>
+    <PastSummary :rows="strips.rows.value" :categories="draft.categories" :days="hub.pastDays.value" :sent="sentAnimation" />
     <p v-if="strips.error.value" class="bridge-message" role="alert"><Icon name="warning" :size="14" />{{ strips.error.value }}<button class="pill-button quiet" @click="strips.load()">{{ t.retry }}</button></p>
+
+    <ComposeLine :templates="templates" @workout="selectWorkout" />
 
     <div v-if="plan.preview.value && !plan.accepted.value" class="mcp-arrival"><Icon name="spark" :size="16" /><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>
     <div v-if="hub.notice.value" class="bridge-message" role="status"><Icon name="info" :size="14" /><span>{{ hub.notice.value }}</span><button class="pill-button quiet" @click="plan.dismissNotice()">{{ pt.dismiss }}</button></div>
-    <div class="plan-status-row"><PlanLedger v-if="plan.state.value?.last_publish" :state="plan.state.value" :busy="plan.busy.value" :simulated="hub.demo.value" @undo="plan.undo()" @clear="plan.clear()" /></div>
+    <NextSummary :rows="hub.rows.value" :drafting="!!plan.preview.value" :state="plan.state.value" @received="received" />
+    <div v-if="plan.state.value?.last_publish" class="plan-status-row"><PlanLedger :state="plan.state.value" :busy="plan.busy.value" :simulated="hub.demo.value" @undo="plan.undo()" @clear="plan.clear()" /></div>
 
-    <ComposeLine :templates="templates" @workout="selectWorkout" />
     <ExchangeList :items="history.exchanges.value" />
     <p v-if="history.error.value" class="bridge-message" role="alert">{{ history.error.value }}<button class="pill-button quiet" @click="history.load()">{{ t.retry }}</button></p>
     <PlanClearDialog />

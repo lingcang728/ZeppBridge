@@ -5,5 +5,5 @@
 .intent:hover{background:color-mix(in srgb,var(--tint) 10%,var(--mat-inset))}
 .intent.on{background:color-mix(in srgb,var(--tint) 20%,var(--mat-inset));box-shadow:var(--mat-inset-shadow),0 0 0 1px color-mix(in srgb,var(--tint) 50%,transparent)}
 .profile-entry{min-height:38px;font-size:13px}
-.compose-box>span{font-size:12px}.compose-box textarea{font-size:15px}
+.compose-box>span{font-size:12px}.compose-box textarea{min-height:96px;font-size:15px}
 .intent svg{opacity:1}

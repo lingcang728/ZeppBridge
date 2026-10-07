@@ -2280,7 +2280,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       cat_heart_rate: 'FC',
       cat_personal_note: 'notas',
       cat_recovery: 'recuperação',
-      cat_resting_hr: 'fc_repouso',
+      cat_resting_hr: 'FC repouso',
       cat_sleep: 'sono',
       cat_training: 'carga',
       cat_workout: 'treinos',

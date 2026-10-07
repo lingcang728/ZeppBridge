@@ -11,3 +11,10 @@
 .ai-empty { display: grid; justify-items: center; gap: 14px; padding: 36px 16px; color: var(--subtle); font-size: var(--fs-sm); text-align: center; }
 @media (max-width: 1100px) { .ai-sub-page { padding: 12px 20px 96px; } }
 @media (max-width: 700px) { .ai-sub-page { padding-inline: 12px; } .ai-panel { padding: 16px; } }
+/* 单列叙事（1D·D2 方案 B）：寄出前检查、已保存任务、往返详情收窄到 860，分区用细线不用卡片。
+   周视图 / 单天 / 你的过去仍是面板（要横向放七天、要勾选）。 */
+.ai-sub-page.story { max-width: 860px; }
+.story .ai-panel { padding: 20px 4px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.story .ai-panel + .ai-panel { margin-top: 0; }
+.story .ai-panel.ai-empty { border-top: 0; }
+@media (max-width: 700px) { .story .ai-panel { padding: 16px 2px; } }

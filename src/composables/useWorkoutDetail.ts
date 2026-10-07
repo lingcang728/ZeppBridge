@@ -2,6 +2,8 @@ import { computed, onMounted, ref, watch, type Ref } from 'vue';
 import { useLoadingAfterMotion } from './useFirstLoad';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { useAiHandoff } from './useAiHandoff';
+import { useWorkoutRecoveryHandoff } from './useWorkoutRecoveryHandoff';
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { useSyncController } from './useSyncController';
 import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import { createLoadSeq } from '../lib/loadSeq';
@@ -88,12 +90,27 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   const aiProviderChoices = computed(() =>
     AI_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label, image: provider.localIcon })));
   const aiNote = ref<string | null>(null);
+  /** 「带上前 7 天睡眠和恢复」：默认勾上（1D·D10）。去掉勾选时和以前一样只交这一次运动。 */
+  const aiWithRecovery = ref(true);
+  const recoveryHandoff = useWorkoutRecoveryHandoff();
+
+  const sendWithRecovery = async (current: Workout) => {
+    const label = workoutDisplayLabel(current);
+    const day = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(new Date(current.start_time));
+    const ready = await recoveryHandoff.send(current, aiProvider.value, t.value.aiRecoveryTitle(label, day), (gap) => t.value.aiRecoveryPrompt(label, gap));
+    const failed = recoveryHandoff.failure();
+    aiNote.value = failed ?? (ready ? t.value.aiRecoveryDone(aiProvider.value.label) : null);
+  };
 
   const sendWorkoutToAi = async () => {
     aiNote.value = null;
     if (!workout.value) return;
     if (!isTauri()) {
       aiNote.value = t.value.needDesktop;
+      return;
+    }
+    if (aiWithRecovery.value) {
+      await sendWithRecovery(workout.value);
       return;
     }
     try {
@@ -247,7 +264,7 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   return {
     workout, series, device, loading: useLoadingAfterMotion(loading), error, actionError, exportedNote, activeFormat, exportBusy, displayType,
     insight, insightLoading, insightError, seriesError,
-    handoffState, handoffError, aiProviderId, aiProvider, aiProviderChoices, aiNote, sendWorkoutToAi,
+    handoffState, handoffError, aiProviderId, aiProvider, aiProviderChoices, aiNote, sendWorkoutToAi, aiWithRecovery,
     typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
     loadDetail, exportRecord,
   };

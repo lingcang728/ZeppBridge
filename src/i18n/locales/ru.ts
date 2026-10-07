@@ -2657,7 +2657,7 @@ export default {
       cat_workout: 'тренировки',
       cat_sleep: 'сон',
       cat_recovery: 'готовность',
-      cat_resting_hr: 'puls_v_pokoe',
+      cat_resting_hr: 'пульс покоя',
       cat_heart_rate: 'пульс',
       cat_training: 'нагрузка',
       cat_body: 'тело',

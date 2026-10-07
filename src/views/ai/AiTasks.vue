@@ -127,7 +127,7 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 </script>
 
 <template>
-  <section class="page ai-sub-page" aria-labelledby="ai-tasks-title">
+  <section class="page ai-sub-page story" aria-labelledby="ai-tasks-title">
     <PageHeader title-id="ai-tasks-title" :title="h.tasksTitle" :intro="h.tasksIntro">
       <button type="button" class="pill-button" @click="fresh"><Icon name="plus" :size="13" />{{ h.newTask }}</button>
     </PageHeader>
@@ -181,12 +181,14 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 <style scoped src="./aiPage.css"></style>
 <style scoped>
 .task-group + .task-group { margin-top: 18px; }
-.task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.task-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; min-height: 96px; padding: 14px 12px 14px 18px;
-  border: 1px solid var(--mat-line); border-radius: 18px; background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
-.task-card.current { box-shadow: var(--mat-rim), 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent), var(--mat-shadow); }
-.task-card.pinned::before { content: ''; position: absolute; top: 14px; left: 0; width: 3px; height: 22px; border-radius: 0 3px 3px 0; background: var(--accent); }
-.open { display: grid; gap: 10px; min-width: 0; padding: 2px 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+/* 单列列表（方案 B）：一行一个任务，行与行之间一条细线；正在用的那个标题是品牌绿。 */
+.task-grid { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }
+.task-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 14px 8px 14px 16px;
+  border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.task-card:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.task-card.current .open strong { color: var(--accent); }
+.task-card.pinned::before { content: ''; position: absolute; top: 16px; left: 0; width: 3px; height: 22px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.open { display: grid; gap: 6px; min-width: 0; padding: 2px 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .open strong { overflow: hidden; font-size: var(--fs-md); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .rename { width: 100%; font-weight: 650; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
@@ -209,8 +211,8 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 .select-hint { margin: -6px 0 14px; color: var(--subtle); font-size: var(--fs-2xs); }
 .task-card { transition: translate 260ms cubic-bezier(.3, 1.3, .5, 1), scale 260ms cubic-bezier(.3, 1.3, .5, 1), opacity 200ms ease, box-shadow 200ms ease; touch-action: pan-y; }
 .task-card.selecting { scale: .97; opacity: .72; cursor: pointer; user-select: none; }
-.task-card.selecting.selected { scale: 1; translate: 0 -4px; opacity: 1;
-  box-shadow: var(--mat-rim), 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 18px 34px -16px color-mix(in srgb, var(--accent) 55%, rgba(0, 0, 0, .7)); }
+.task-card.selecting.selected { scale: 1; translate: 0 -3px; opacity: 1; border-radius: 14px; background: color-mix(in srgb, var(--accent) 10%, var(--mat-card));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 18px 34px -16px color-mix(in srgb, var(--accent) 55%, rgba(0, 0, 0, .7)); }
 .select-bar { position: fixed; z-index: 60; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 999px; translate: -50% 0; }
 .pill-button.danger { color: var(--danger); }
 .pill-button.danger:disabled { opacity: .45; }

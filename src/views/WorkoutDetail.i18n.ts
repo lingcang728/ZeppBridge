@@ -29,6 +29,16 @@ export const workoutDetailMessages = defineMessages(
       `数据包已导出到桌面（zeppbridge-ai-handoff.json）；提示词已复制，可手动打开 ${provider}。`,
     copiedAndOpened: (provider: string) => `已复制这条运动的脱敏数据并打开 ${provider}，粘贴即可。`,
     copiedOnly: (provider: string) => `已复制这条运动的脱敏数据，可手动打开 ${provider} 粘贴。`,
+    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · 带恢复背景`,
+    aiRecoveryPrompt: (label: string, gap: number | null) => `这是我的一次${label}${gap === null ? '（这之前没有记录到运动）' : `，距上一次运动 ${gap} 天`}。文件里还有这次运动之前 30 天的睡眠、静息心率、HRV、压力和准备度（有就带，缺的写「未提供」）。
+
+请按这个顺序说：
+1. 先判断这次运动前的身体状态：前 7 天的均值和之前 30 天的基线比，恢复得好还是差；
+2. 再结合这个状态评价这次的强度和表现，分清是状态问题还是练得不好；
+3. 最后说${gap === null ? '下一次' : `隔了 ${gap} 天，下一次`}该回到什么强度。
+
+约束：只和我自己的历史比，不和人群平均比；缺的数据直接说缺，不估算；不做医学诊断。`,
+    aiRecoveryDone: (provider: string) => `已把这次运动和之前 30 天的睡眠与恢复整理成一个文件放到桌面，开场白已复制，${provider} 已打开；把文件拖进对话框即可。`,
     noCorrection: '不纠正',
     deviceNameMissing: '设备名称未提供',
     notFetchedYet: '尚未获取',
@@ -178,6 +188,16 @@ Answer in Markdown.`,
       `Data package saved to desktop (zeppbridge-ai-handoff.json); prompt copied. Open ${provider} yourself.`,
     copiedAndOpened: (provider: string) => `De-identified data for this workout copied and ${provider} opened. Paste it in.`,
     copiedOnly: (provider: string) => `De-identified data for this workout copied. Open ${provider} yourself and paste it in.`,
+    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · with recovery`,
+    aiRecoveryPrompt: (label: string, gap: number | null) => `This is one ${label} of mine${gap === null ? ' (no earlier workout is recorded)' : `, ${gap} days after my previous workout`}. The file also has my sleep, resting HR, HRV, stress and readiness for the 30 days before it (included where recorded; missing ones say “not provided”).
+
+Please answer in this order:
+1. First judge my condition before this workout: compare the last 7 days with the 30-day baseline before them — am I well recovered or not?
+2. Then assess this session's intensity and performance in light of that, and tell a recovery issue apart from a bad session.
+3. Finally, ${gap === null ? 'what intensity to aim for next time' : `after a ${gap}-day gap, what intensity to return to next time`}.
+
+Rules: compare me only with my own history, not with population averages; say plainly when data is missing instead of estimating; no medical diagnosis.`,
+    aiRecoveryDone: (provider: string) => `This workout and the 30 days of sleep and recovery before it are in one file on your desktop. The opening message is copied and ${provider} is open — drag the file into the chat.`,
     noCorrection: 'No correction',
     deviceNameMissing: 'Device name not provided',
     notFetchedYet: 'Not fetched yet',
@@ -327,6 +347,16 @@ Responde en español, en Markdown.`,
       `El paquete de datos se guardó en tu escritorio (zeppbridge-ai-handoff.json). La instrucción está en tu portapapeles; abre ${provider} tú mismo.`,
     copiedAndOpened: (provider: string) => `Se copiaron los datos anonimizados de este entrenamiento y se abrió ${provider}. Pégalos ahí.`,
     copiedOnly: (provider: string) => `Se copiaron los datos anonimizados de este entrenamiento. Abre ${provider} tú mismo y pégalos.`,
+    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · con recuperación`,
+    aiRecoveryPrompt: (label: string, gap: number | null) => `Esta es una sesión de ${label}${gap === null ? ' (no hay entrenamientos registrados antes)' : `, ${gap} días después de mi entrenamiento anterior`}. El archivo también incluye mi sueño, FC en reposo, HRV, estrés y preparación de los 30 días previos (lo que esté registrado; lo que falte aparece como «no proporcionado»).
+
+Responde en este orden:
+1. Primero evalúa mi estado antes de esta sesión: compara los últimos 7 días con la referencia de los 30 días anteriores: ¿estoy bien recuperado o no?
+2. Luego valora la intensidad y el rendimiento de esta sesión según ese estado, y distingue un problema de recuperación de una mala sesión.
+3. Por último, ${gap === null ? 'a qué intensidad apuntar la próxima vez' : `tras ${gap} días sin entrenar, a qué intensidad volver la próxima vez`}.
+
+Reglas: compárame solo con mi propio historial, no con promedios de la población; si faltan datos, dilo en lugar de estimar; sin diagnósticos médicos.`,
+    aiRecoveryDone: (provider: string) => `Esta sesión y los 30 días de sueño y recuperación previos están en un archivo en tu escritorio. El mensaje inicial está copiado y ${provider} está abierto: arrastra el archivo al chat.`,
     noCorrection: 'Sin corrección',
     deviceNameMissing: 'Nombre del dispositivo no disponible',
     notFetchedYet: 'Aún sin datos',

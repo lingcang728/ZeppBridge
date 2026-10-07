@@ -43,6 +43,8 @@ const props = defineProps<{
   error?: string | null;
 }>();
 const emit = defineEmits<{ (event: 'handoff'): void }>();
+/** 「带上前 7 天睡眠和恢复」（1D·D10），默认勾上；在运动页的 useWorkoutDetail 里决定交什么。 */
+const withRecovery = defineModel<boolean>('withRecovery', { default: true });
 
 /* 好 / 坏 / 只是变化：和周报同一套规则（lib/changeTone.ts）。距离、时长、训练负荷
    多了不等于更好，只给方向箭头。 */
@@ -145,12 +147,13 @@ const exclusionSummary = computed(() => {
   <section class="insight-card" aria-labelledby="insight-title">
     <header>
       <h2 id="insight-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
-      <button
-        v-if="insight?.supported"
-        class="button secondary"
-        type="button"
-        @click="emit('handoff')"
-      ><Icon name="send" :size="14" />{{ t.handoff }}</button>
+      <span v-if="insight?.supported" class="insight-handoff">
+        <label class="recovery-toggle" :title="t.withRecoveryHint">
+          <button type="button" class="mat-switch" role="switch" :aria-checked="withRecovery" :aria-label="t.withRecovery" @click="withRecovery = !withRecovery"></button>
+          <span>{{ t.withRecovery }}</span>
+        </label>
+        <button class="button secondary" type="button" @click="emit('handoff')"><Icon name="send" :size="14" />{{ t.handoff }}</button>
+      </span>
     </header>
 
     <p v-if="loading" class="insight-note">{{ t.reading }}</p>
@@ -246,6 +249,8 @@ const exclusionSummary = computed(() => {
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-handoff { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
+.recovery-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
 .insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }

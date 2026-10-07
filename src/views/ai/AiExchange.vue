@@ -44,7 +44,7 @@ const reveal = () => { if (item.value?.md_path && isDesktop()) void revealInFold
 </script>
 
 <template>
-  <section class="page ai-sub-page" aria-labelledby="ai-exchange-title">
+  <section class="page ai-sub-page story" aria-labelledby="ai-exchange-title">
     <PageHeader title-id="ai-exchange-title" :title="h.exchangeTitle" :intro="item ? h.sentTo(provider, when) : ''" />
     <div v-if="!item" class="ai-panel ai-empty">{{ history.loaded.value ? h.exchangeMissing : '…' }}</div>
     <template v-else>

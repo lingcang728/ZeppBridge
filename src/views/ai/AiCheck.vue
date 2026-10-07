@@ -82,7 +82,7 @@ const stopEdit = () => { editing.value = false; };
 </script>
 
 <template>
-  <section class="page ai-sub-page" aria-labelledby="ai-check-title">
+  <section class="page ai-sub-page story" aria-labelledby="ai-check-title">
     <PageHeader title-id="ai-check-title" :title="h.checkTitle" :intro="h.checkIntro" />
     <div class="check-grid">
       <div class="ai-panel">
@@ -129,9 +129,8 @@ const stopEdit = () => { editing.value = false; };
 
 <style scoped src="./aiPage.css"></style>
 <style scoped>
-.check-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.check-grid .ai-panel + .ai-panel { margin-top: 0; }
-.prompt-panel, .subs-panel { margin-top: 16px; }
+/* 单列（方案 B）：带了哪些数据 → 附件与选项 → 你用的是哪一档 → 完整提示词，从上往下读。 */
+.check-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 .readiness { display: grid; gap: 2px; margin: 0; }
 .readiness strong { font-size: var(--fs-lg); }
 .readiness small { color: var(--subtle); font-size: var(--fs-2xs); }
@@ -149,5 +148,4 @@ const stopEdit = () => { editing.value = false; };
 .mine.is-editing { cursor: text; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
 .mine textarea { width: 100%; min-height: 3.4em; padding: 0; border: 0; outline: none; background: none; color: var(--ink); font: inherit; line-height: inherit; resize: none; field-sizing: content; }
 .tail { opacity: .8; }
-@media (max-width: 980px) { .check-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>

@@ -1,16 +1,16 @@
-.ai-bridge-page { max-width: 1540px; margin-inline: auto; padding: 12px 32px 170px; }
-.bridge-page-head { display: flex; justify-content: space-between; align-items: center; min-height: 42px; margin-bottom: 16px; }
+/* 单列叙事（1D·D2 方案 B）：从上往下一条线，内容收窄到 860、字大一号；各段之间同一个间距。 */
+.ai-bridge-page { display: flex; flex-direction: column; gap: 18px; max-width: 860px; margin-inline: auto; padding: 12px 32px 170px; }
+.bridge-page-head { display: flex; justify-content: space-between; align-items: center; min-height: 42px; }
 .demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
 .demo-banner div { display: flex; flex-direction: column; gap: 2px; }
 .demo-banner strong { color: var(--accent); font-size: 12px; font-weight: 650; }
 .demo-banner span { font-size: 11px; }
-.bridge-message, .mcp-arrival { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); font-size: var(--fs-xs); color: var(--muted); }
+.bridge-message, .mcp-arrival { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); font-size: var(--fs-xs); color: var(--muted); }
 .bridge-message span, .mcp-arrival span { flex: 1; }
-/* 两张缩略卡并排：「你的过去」「你的下一步」。 */
-.hub-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 12px; }
-.plan-status-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; margin: 6px 0 14px; }
+/* 上次发到手表的状态栏紧贴在「你的下一步」下面，属于同一段。 */
+.plan-status-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; margin-top: -8px; }
+.ai-bridge-page > .exchange-list { margin-top: 6px; }
 @media (max-width: 1100px) { .ai-bridge-page { padding: 8px 20px 200px; } }
-@media (max-width: 860px) { .hub-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 700px) { .ai-bridge-page { padding-inline: 12px; } .plan-status-row { flex-wrap: wrap; } }
 /* 右上角的撤销：和图里的撤销胶囊同一枚小玻璃胶囊（GraphUndoPill），进出淡入淡出。 */
 .undo-selection { margin-left: auto; }

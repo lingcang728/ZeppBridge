@@ -2123,7 +2123,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       cat_workout: 'treinos',
       cat_sleep: 'sono',
       cat_recovery: 'prontidão',
-      cat_resting_hr: 'fc_repouso',
+      cat_resting_hr: 'FC em repouso',
       cat_heart_rate: 'frequência cardíaca',
       cat_training: 'carga de treino',
       cat_body: 'corpo',
