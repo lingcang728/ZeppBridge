@@ -1,18 +1,2 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
-components/ai/AiTaskHeader.savedCount
-components/ai/hub/hub.deleteMany
-components/ai/hub/hub.doneSelecting
-components/ai/hub/hub.emptyBody
-components/ai/hub/hub.emptyCategory
-components/ai/hub/hub.promptHint
-components/ai/hub/hub.removedMany
-components/ai/hub/hub.selectEarlier
-components/ai/hub/hub.selectHint
-components/cards/cards.boxDropHere
-components/cards/cards.boxEmptyLabel
-components/cards/cards.monthAria
-components/cards/cards.monthDays
-components/cards/cards.tipBox
-components/cards/cards.tipDays
-lib/aiTask/fileName.cat_resting_hr
