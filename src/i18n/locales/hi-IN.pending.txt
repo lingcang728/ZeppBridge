@@ -1,7 +1,10 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
 components/MetricTrendCard.widened
+components/ai/HandoffDock.goPrefix
 components/ai/HandoffDock.more
+components/ai/HandoffDock.planFreeShort
+components/ai/HandoffDock.planPaidShort
 components/ai/bridge/bridge.accept
 components/ai/bridge/bridge.actual
 components/ai/bridge/bridge.backCurrent
@@ -80,6 +83,12 @@ components/ai/bridge/bridge.weekIntent
 components/ai/bridge/bridge.weekQuestion
 components/ai/bridge/bridge.workoutIntent
 components/ai/bridge/bridge.workoutQuestion
+components/ask/ask.workoutHint
+components/ask/ask.workoutNext
+components/ask/ask.workoutRecovery
+components/ask/ask.workoutReview
+components/cards/cards.noWorkouts
+components/cards/cards.recentWorkouts
 components/overview/PinnedMetrics.loadFailed
 components/plan/plan.active
 components/plan/plan.added

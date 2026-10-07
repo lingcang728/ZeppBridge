@@ -61,7 +61,7 @@
 | A2 | 「贡献给设备目录」→ `.mat-switch` 玻璃开关 |
 | A3 | 心率区间依据 → 每一槽一条 `SegmentTrack`（超过五个候选用 `CapsuleWheel`），来源和说明写在下面一行 |
 | A4 | 落地页语言 → `CapsuleWheel`（和应用顶栏的语言轮同一个组件） |
-| B1 | 运动详情「交给 AI / 导出」两块叠在同一格里交叉淡化，高度取高的那块 |
+| B1 | 运动详情「交给 AI / 导出」两块叠在同一格里交叉淡化，高度取高的那块（第三轮起「交给 AI」挪到头部的「问 AI」胶囊，这里只剩导出） |
 | B2 / C1 | 设备详情「指认型号」：`FoldTransition origin="top left"`，选择器从按钮所在的角长出、取消时缩回 |
 | B3 / B4 / B6 / C2 | 新组件 `components/FoldTransition.vue`（高度 + 淡入，小块专用）：手动凭据表单、补拉自定义起点、各处提示条、健康检查「立即执行」的结果、数据能力的错误 |
 | B5 | `material.css` 一条全局规则：`details::details-content` 高度 + 透明度过渡（`interpolate-size: allow-keywords`），十处折叠一起生效 |

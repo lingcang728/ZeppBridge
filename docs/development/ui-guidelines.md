@@ -231,39 +231,74 @@ Check before merging: run `python scripts/verify/text_overlap.py` (every interfa
 DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
 through the frames — no bright frame, no blank frame, no jump at the start.
 
-### Playing cards and the collection box (2026-10-07)
+### Playing cards and the collection box (2026-10-07, reworked in round 3)
 
 A day of one metric is a card. Cards are how the user picks *which days* go to
 the AI.
 
-- **Motion kit** (`src/lib/motion/cards/`): `dealCards` fans cards out of where
-  they came from (middle first), `collectCards` gathers them back, `flipCard`
-  squeezes a card to a line and opens it on the other face (2D `scaleX` —
-  a 3D turn rasterises the text and it blurs halfway), `shuffleCards` /
-  `cutDeck` say "this is a different deck" / "re-sorted", `flyToTarget` throws
-  a ghost along an arc into the box, `recedeLayer` pushes the camera in (the
-  layer above shrinks back and is replaced by a pre-blurred static copy),
-  `gatherCards` stacks a week and flies it into the watch icon (plan
-  delivery). Springs are sampled into CSS `linear()` once and played by
-  WAAPI on the compositor (`spring.ts`, `SPRINGS`). Only transform and
-  opacity move; with reduced motion everything becomes a short fade.
-- **Card table** (`components/cards/CardTable.vue`): 7 days → seven day
-  cards; 1 month → 4–5 piles by calendar week (a first week with fewer than
-  three days in range joins the next pile); 6 months → six month piles. Tap a
-  pile to drill in, long-press 450 ms (with a progress ring) to put the whole
-  pile in the box, tap empty space or Esc to step back out. Keyboard: Space
-  picks, Enter opens a pile, Shift+Enter picks the whole level. Days without a
-  record are dealt with "—" and cannot be picked — never a zero.
-  It opens as an overlay from a metric card's "pick days" button
-  (`PickDaysButton`) or embedded in `/ai/past/:category`.
+- **Motion kit** (`src/lib/motion/cards/`): `dealCards` first **draws a pile
+  out** of where it came from (0.12 s, the whole pile together), then fans it
+  out (middle first); `stackCards` + `returnStack` (= `stackAndReturn`)
+  gather cards the way a real deck is put away; `flipCard` squeezes a card to
+  a line and opens it on the other face (2D `scaleX` — a 3D turn rasterises
+  the text and it blurs halfway); `shuffleCards` / `cutDeck` say "a different
+  deck" / "re-sorted"; `flyCardHome` / `flyFromBox` move the real card in and
+  out of the box; `receive` / `landPulse` / `bump` let the origin catch a
+  returning pile; `recedeLayer` pushes the camera in; `gatherCards` stacks a
+  week and flies it into the watch icon (plan delivery). `pose.ts` turns
+  "where on screen, which angle, how big" into the card's own transform
+  (cards sit in tilted slots — skip that and a pile lands a few degrees off).
+  Springs are sampled into CSS `linear()` once and played by WAAPI on the
+  compositor (`spring.ts`). Only transform and opacity move; with reduced
+  motion everything becomes a short fade.
+- **Putting cards away is three beats**: (1) *stack* — from the current
+  computed pose, cards slide from the edges inward into one pile at the
+  centre, each tilted 1–4° and offset 1.5 px, fully opaque; (2) *return* —
+  the pile travels along an arc back to where it came from: into the button
+  (which fans its icon open to catch it, then bumps and glows once) or onto
+  the pile that was tapped, matching its position, size and angle on the last
+  frame before cross-fading into it; (3) the backdrop blur, header and range
+  fade back over exactly the same time as the return. Never shrink cards one
+  by one into a point, never let them vanish in mid-air.
+- **Drilling in alternates, never overlaps**: the layer's cards gather into
+  the tapped pile, that pile shrinks back and dims to 0.35, and only then is
+  the next layer drawn out of it. No blurred clone of a layer with text in it
+  (it doubled "9/14–9/20" over "9/16"). Switching range: shuffle → stack in
+  the centre → deal the new deck from that same pile.
+- **Picking a card takes two steps**: the first tap lifts the card (160 ms)
+  and turns it to the back ("For AI ✓", neighbours step aside); tapping the
+  check sends **the real card** — a ghost placed on exactly the same pose,
+  the real one hidden in the same task — along an arc into the box. The box
+  counts it only when it lands; a cancelled flight rolls back. The slot keeps
+  a dashed outline "In the box"; tapping it flies a card back and turns it
+  face up. Piles (week / month) fly as one piece on long-press.
+- **Interrupting**: every layer (card table, collection box, glass popover)
+  reverses from the *current* computed style when an opposite action arrives
+  mid-animation (`reversible.ts`: read computed style, cancel, animate from
+  there — never `reverse()` a finished animation, Chromium flashes a frame).
+  Nothing is unmounted half-way; clicking the origin again while cards are
+  being put away fans them back out.
+- **Card table** (`components/cards/CardTable.vue`, picking logic in
+  `composables/useCardPicking.ts`): 7 days → seven day cards; 1 month → 4–5
+  piles by calendar week; 6 months → six month piles (empty piles are dimmed,
+  slightly smaller, with a "No record" pill). Card faces: weekday + suit at
+  the top left, only the suit and the day number (upside down, like a real
+  card) at the bottom right; readings are split into big numbers and small
+  units and never wrap (`lib/cards/faceValue.ts`). The range segment always
+  has a selection. The "Your past" workout row deals one card per workout
+  (key `workout:<id>`, handed over as `workout_ids`).
 - **Collection box** (`components/cards/CollectionBox.vue`): bottom right,
-  floating above everything, hidden when empty, lifted above the dock on
-  `/ai`. Tapping it deals the cards into a ring grouped by metric ("Sleep ·
-  3 days"); hovered cards slide out along the radius; × takes one out. The
-  box in the middle turns into an arrow: it opens a **new** task that includes
-  exactly those categories × days (`picked_days`) and goes to `/ai`. The box
-  is stored locally (`card_collection_get/set`), survives a restart, and is
-  emptied only once the task is actually handed to the AI.
+  above everything. While a card table is open it slides in even when empty
+  (a dashed "Drop here" slot) and slides out with the table if still empty —
+  it never pops up from nowhere. Opening deals the hand out of the box, then
+  the group labels and buttons float in last; closing runs backwards. Drag a
+  card up to take it out (rAF-throttled, fling with release velocity, the
+  rest close the gap with FLIP). The arrow opens a **new** task with exactly
+  those categories × days (`picked_days`). Stored locally, emptied only once
+  the task is handed to the AI.
+- **One-off tips**: operating hints appear once as a floating bar with
+  "Got it" (`composables/useCoachTips.ts`, localStorage wrapped in try/catch);
+  the keyboard hint lives in `aria-describedby`, not on screen.
 - Wherever a picked task is described, say "N picked days", not "last N days"
   (`lib/aiTask/pickedDays.ts` is the single count).
 
