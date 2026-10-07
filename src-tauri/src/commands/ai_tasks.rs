@@ -18,7 +18,7 @@ use zeppbridge_core::ai_tasks::export::markdown::{DEFAULT_TOKEN_BUDGET, SUBSCRIB
 use zeppbridge_core::ai_tasks::export::{AiTaskMarkdownParts, AiTaskPromptParts};
 use zeppbridge_core::ai_tasks::{
     stat_attachment_paths, AiTask, AiTaskAttachmentStat, AiTaskPrepareResult, AiTaskPreview,
-    AiTaskSummary, AiTaskTemplate,
+    AiTaskSummary, AiTaskTemplate, DeletedAiTask,
 };
 use zeppbridge_core::storage::card_collection::CardPick;
 use zeppbridge_core::storage::write_lock::WritePurpose;
@@ -81,6 +81,21 @@ pub async fn ai_task_delete(
     with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
         db.delete_ai_task(&id)
     })
+    .await
+}
+
+/// 批量删除任务（1D·D7）：一次写锁、一个事务；返回删掉的那几份，界面撤销时原样存回。
+#[tauri::command]
+pub async fn ai_task_delete_many(
+    state: tauri::State<'_, AppState>,
+    ids: Vec<String>,
+) -> std::result::Result<Vec<DeletedAiTask>, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.delete_ai_tasks(&ids),
+    )
     .await
 }
 

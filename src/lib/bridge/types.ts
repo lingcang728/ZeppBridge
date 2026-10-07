@@ -413,6 +413,8 @@ export interface BridgeBackend {
   aiTaskSave(task: AiTask): Promise<AiTask>;
   /** 只删任务记录，不删任何附件原件。 */
   aiTaskDelete(id: string): Promise<void>;
+  /** 批量删除（一个事务）；返回删掉的那几份，撤销时原样存回。 */
+  aiTaskDeleteMany(ids: string[]): Promise<Array<{ task: AiTask; pinned: boolean }>>;
   /** 这几项指标「比平时高 / 低」的结论（数据不够的不返回）。 */
   getMetricBaselines(metrics: string[]): Promise<MetricBaseline[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */

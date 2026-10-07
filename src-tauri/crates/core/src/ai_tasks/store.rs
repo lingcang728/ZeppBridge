@@ -354,6 +354,40 @@ impl Database {
         Ok(())
     }
 
+    /// 批量删除（第四轮 1D·D7「长按挑选 → 删除 N 个」）：一个事务里删完，返回删掉的那几份原样和置顶状态，
+    /// 界面的「撤销」就是把它们原样存回去。已经不在的 id 跳过、不让整批失败；同一个 id 只算一次。
+    pub fn delete_ai_tasks(&self, ids: &[String]) -> Result<Vec<DeletedAiTask>> {
+        let transaction = self.conn.unchecked_transaction()?;
+        let mut seen = BTreeSet::new();
+        let mut deleted = Vec::new();
+        for id in ids {
+            if !seen.insert(id.as_str()) {
+                continue;
+            }
+            let row: Option<(String, i64)> = transaction
+                .query_row(
+                    "SELECT payload, pinned FROM ai_tasks WHERE id = ?1",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?;
+            let Some((payload, pinned)) = row else {
+                continue;
+            };
+            let mut task = serde_json::from_str::<AiTask>(&payload).map_err(|error| {
+                ZeppBridgeError::ParseError(format!("ai_tasks[{id}] 的 payload 损坏: {error}"))
+            })?;
+            upgrade_heart_rate_split(&mut task.categories);
+            transaction.execute("DELETE FROM ai_tasks WHERE id = ?1", [id])?;
+            deleted.push(DeletedAiTask {
+                task,
+                pinned: pinned != 0,
+            });
+        }
+        transaction.commit()?;
+        Ok(deleted)
+    }
+
     /// P3 `ai_template_list`：内置模板在前。
     pub fn list_ai_task_templates(&self) -> Result<Vec<AiTaskTemplate>> {
         let mut stmt = self.conn.prepare(

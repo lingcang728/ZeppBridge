@@ -4,6 +4,8 @@
  *
  * - 每个任务一张卡：点卡接着用这个任务、回到总页；卡上改名（就地输入框）、置顶、删除。
  * - 删除后底部出一枚「撤销」胶囊（6 秒），撤销就是把删掉的那份原样存回去。
+ * - 批量删除（第四轮 1D·D7）：长按一张卡进入挑选——没选的卡沉下去、选上的浮起发亮，按住拖过连着选，Esc / 「完成」退出；
+ *   底部玻璃条「删除 N 个」「全选更早的」。一次写锁、一个事务删完（ai_task_delete_many），撤销把删掉的几份原样存回。
  * - 置顶的排在最前；没置顶、30 天没动过的收进「更早」折叠组，不删除。
  * - 只有交给过 AI 的任务才会被保存（交给 AI 那一下才存），同模板、同范围、同一句问题会更新原来那一条
  *   （后端 save_ai_task 去重）。
@@ -15,6 +17,7 @@ import Icon from '../../components/Icon.vue';
 import { useAiHub } from '../../composables/ai/useAiHub';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
+import { useTaskSelection } from '../../composables/ai/useTaskSelection';
 import { useHubText } from '../../components/ai/hub/hub.i18n';
 import { backend, toUserMessage } from '../../lib/bridge';
 import type { AiTask, AiTaskSummary } from '../../lib/bridge/types';
@@ -37,6 +40,14 @@ const stale = (task: AiTaskSummary) => !task.pinned && Date.now() - new Date(tas
 const recent = computed(() => taskList.value.filter((task) => !stale(task)));
 const earlier = computed(() => taskList.value.filter(stale));
 const error = ref<string | null>(null);
+
+const sel = useTaskSelection();
+const onCardClick = (id: string) => {
+  if (sel.consumeClick()) return;
+  // 挑选中用键盘按 Enter / 空格：选上 / 取消。
+  if (sel.selecting.value) { sel.toggle(id); return; }
+  void open(id);
+};
 
 const open = async (id: string) => {
   if (id !== draft.value.id) await loadTask(id).catch(() => undefined);
@@ -69,26 +80,46 @@ const togglePin = async (task: AiTaskSummary) => {
   } catch (e) { error.value = toUserMessage(e, ''); }
 };
 
-/* —— 删除 + 撤销 —— */
-const removed = ref<{ task: AiTask; pinned: boolean } | null>(null);
+/* —— 删除 + 撤销（一张或一批，撤销都是原样存回去） —— */
+const removed = ref<Array<{ task: AiTask; pinned: boolean }> | null>(null);
 let undoTimer = 0;
+const offerUndo = (items: Array<{ task: AiTask; pinned: boolean }>) => {
+  removed.value = items.length ? items : null;
+  window.clearTimeout(undoTimer);
+  undoTimer = window.setTimeout(() => { removed.value = null; }, 6000);
+};
+const removedText = computed(() => {
+  const items = removed.value ?? [];
+  return items.length === 1 ? h.value.removed(items[0]!.task.title) : h.value.removedMany(items.length);
+});
 const remove = async (task: AiTaskSummary) => {
   try {
     const full = await backend.aiTaskGet(task.id);
     await deleteTask(task.id);
-    removed.value = { task: full, pinned: !!task.pinned };
-    window.clearTimeout(undoTimer);
-    undoTimer = window.setTimeout(() => { removed.value = null; }, 6000);
+    offerUndo([{ task: full, pinned: !!task.pinned }]);
+  } catch (e) { error.value = toUserMessage(e, ''); }
+};
+const removeSelected = async () => {
+  const ids = [...sel.selected.value];
+  if (!ids.length) return;
+  try {
+    const gone = await backend.aiTaskDeleteMany(ids);
+    if (gone.some((item) => item.task.id === draft.value.id)) resetDraft();
+    sel.exit();
+    await loadTaskList();
+    offerUndo(gone);
   } catch (e) { error.value = toUserMessage(e, ''); }
 };
 const undo = async () => {
-  const item = removed.value;
+  const items = removed.value;
   removed.value = null;
   window.clearTimeout(undoTimer);
-  if (!item) return;
+  if (!items) return;
   try {
-    await backend.aiTaskSave(item.task);
-    if (item.pinned) await backend.aiTaskSetPinned(item.task.id, true);
+    for (const item of items) {
+      await backend.aiTaskSave(item.task);
+      if (item.pinned) await backend.aiTaskSetPinned(item.task.id, true);
+    }
     await loadTaskList();
   } catch (e) { error.value = toUserMessage(e, ''); }
 };
@@ -100,16 +131,19 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
     <PageHeader title-id="ai-tasks-title" :title="h.tasksTitle" :intro="h.tasksIntro">
       <button type="button" class="pill-button" @click="fresh"><Icon name="plus" :size="13" />{{ h.newTask }}</button>
     </PageHeader>
+    <p v-if="taskList.length > 1 && !sel.selecting.value" class="select-hint">{{ h.selectHint }}</p>
     <p v-if="libraryError || error" class="ai-message" role="alert"><Icon name="warning" :size="14" /><span>{{ libraryError || error }}</span></p>
     <div v-if="!taskList.length" class="ai-panel ai-empty">{{ h.tasksEmpty }}</div>
     <template v-for="(group, gi) in [recent, earlier]" :key="gi">
       <component :is="gi === 0 ? 'div' : 'details'" v-if="group.length" :class="['task-group', { earlier: gi === 1 }]">
         <summary v-if="gi === 1"><Icon name="chevron-right" :size="14" />{{ h.earlier(group.length) }}<small>{{ h.earlierHint }}</small></summary>
         <TransitionGroup tag="ul" name="task" class="task-grid">
-          <li v-for="task in group" :key="task.id" :class="['task-card', { current: task.id === draft.id, pinned: task.pinned }]">
+          <li v-for="task in group" :key="task.id" :data-task-id="task.id"
+            :class="['task-card', { current: task.id === draft.id, pinned: task.pinned, selecting: sel.selecting.value, selected: sel.selected.value.has(task.id) }]"
+            @pointerdown="sel.down($event, task.id)">
             <input v-if="renaming === task.id" class="ai-input rename" type="text" :value="task.title" maxlength="120" :aria-label="h.rename"
               @blur="commitRename(task, $event)" @keydown.enter.prevent="commitRename(task, $event)" @keydown.esc.prevent="renaming = null" />
-            <button v-else type="button" class="open" @click="open(task.id)">
+            <button v-else type="button" class="open" :aria-pressed="sel.selecting.value ? sel.selected.value.has(task.id) : undefined" @click="onCardClick(task.id)">
               <strong>{{ task.title }}</strong>
               <span class="meta">
                 <time>{{ when(task.updated_at) }}</time>
@@ -117,7 +151,7 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
                 <span v-if="task.id === draft.id" class="tag current-tag"><Icon name="check" :size="12" />{{ h.current }}</span>
               </span>
             </button>
-            <span class="acts">
+            <span v-if="!sel.selecting.value" class="acts">
               <button type="button" :class="['act', { on: task.pinned }]" :title="task.pinned ? h.unpin : h.pin" :aria-label="task.pinned ? h.unpin : h.pin" :aria-pressed="!!task.pinned" @click="togglePin(task)"><Icon name="pin" :size="14" /></button>
               <button type="button" class="act" :title="h.rename" :aria-label="h.rename" @click="renaming = task.id"><Icon name="edit" :size="14" /></button>
               <button type="button" class="act danger" :title="h.remove" :aria-label="h.remove" @click="remove(task)"><Icon name="trash" :size="14" /></button>
@@ -128,8 +162,15 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
     </template>
     <Teleport to="body">
       <Transition name="undo-pill">
+        <div v-if="sel.selecting.value" class="select-bar glass-control" role="toolbar">
+          <button v-if="earlier.length" type="button" class="pill-button quiet" @click="sel.selectAll(earlier.map((task) => task.id))">{{ h.selectEarlier }}</button>
+          <button type="button" class="pill-button danger" :disabled="!sel.count.value" @click="removeSelected"><Icon name="trash" :size="13" />{{ h.deleteMany(sel.count.value) }}</button>
+          <button type="button" class="pill-button quiet" @click="sel.exit()">{{ h.doneSelecting }}</button>
+        </div>
+      </Transition>
+      <Transition name="undo-pill">
         <div v-if="removed" class="undo-toast glass-control" role="status">
-          <span>{{ h.removed(removed.task.title) }}</span>
+          <span>{{ removedText }}</span>
           <button type="button" class="pill-button" @click="undo"><Icon name="undo" :size="13" />{{ h.undo }}</button>
         </div>
       </Transition>
@@ -164,6 +205,16 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 .task-enter-active, .task-leave-active, .task-move { transition: opacity 300ms ease, translate 420ms cubic-bezier(.4, .6, .2, 1); }
 .task-enter-from, .task-leave-to { opacity: 0; translate: 0 8px; }
 .task-leave-active { position: absolute; }
+/* 挑选中：没选的卡沉下去一点、淡一点，选上的浮起发亮（只动 transform / opacity / 阴影）。 */
+.select-hint { margin: -6px 0 14px; color: var(--subtle); font-size: var(--fs-2xs); }
+.task-card { transition: translate 260ms cubic-bezier(.3, 1.3, .5, 1), scale 260ms cubic-bezier(.3, 1.3, .5, 1), opacity 200ms ease, box-shadow 200ms ease; touch-action: pan-y; }
+.task-card.selecting { scale: .97; opacity: .72; cursor: pointer; user-select: none; }
+.task-card.selecting.selected { scale: 1; translate: 0 -4px; opacity: 1;
+  box-shadow: var(--mat-rim), 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 18px 34px -16px color-mix(in srgb, var(--accent) 55%, rgba(0, 0, 0, .7)); }
+.select-bar { position: fixed; z-index: 60; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 999px; translate: -50% 0; }
+.pill-button.danger { color: var(--danger); }
+.pill-button.danger:disabled { opacity: .45; }
+@media (prefers-reduced-motion: reduce) { .task-card { transition: none; } }
 .undo-toast { position: fixed; z-index: 60; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; border-radius: 999px; color: var(--ink); font-size: var(--fs-sm); translate: -50% 0; }
 .undo-pill-enter-active { transition: translate 420ms cubic-bezier(.4, .6, .2, 1); }
 .undo-pill-leave-active { transition: translate 260ms ease-in; }

@@ -420,6 +420,13 @@ pub struct AiTaskAttachmentStat {
     pub mtime: Option<String>,
 }
 
+/// 批量删除时删掉的一份任务（撤销 = 原样存回去，再按 `pinned` 置顶）。
+#[derive(Debug, Clone, Serialize)]
+pub struct DeletedAiTask {
+    pub task: AiTask,
+    pub pinned: bool,
+}
+
 /// 迁移 v32 种入的内置模板。
 pub(crate) struct BuiltinTemplateSeed {
     pub id: &'static str,

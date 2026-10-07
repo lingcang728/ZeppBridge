@@ -647,6 +647,47 @@ fn legacy_heart_rate_task_reads_back_split_and_still_grants_resting_hr() {
     );
 }
 
+/// 批量删除（1D·D7）：一个事务删完；返回原样和置顶，存回去就是撤销；不在的 id 跳过不报错。
+#[test]
+fn batch_delete_returns_what_undo_needs_and_skips_missing_ids() {
+    let db = Database::in_memory().unwrap();
+    let mut a = task();
+    a.title = "甲".into();
+    let a = db.save_ai_task(&a).unwrap();
+    let mut b = task();
+    b.title = "乙".into();
+    b.prompt = "另一句".into();
+    let b = db.save_ai_task(&b).unwrap();
+    db.set_ai_task_pinned(&b.id, true).unwrap();
+
+    let gone = db
+        .delete_ai_tasks(&[
+            a.id.clone(),
+            "task-missing".into(),
+            b.id.clone(),
+            a.id.clone(),
+        ])
+        .unwrap();
+    assert_eq!(
+        gone.iter()
+            .map(|d| (d.task.title.as_str(), d.pinned))
+            .collect::<Vec<_>>(),
+        vec![("甲", false), ("乙", true)]
+    );
+    assert!(db.list_ai_tasks().unwrap().is_empty());
+
+    for item in &gone {
+        let back = db.save_ai_task(&item.task).unwrap();
+        assert_eq!(back.id, item.task.id);
+        if item.pinned {
+            db.set_ai_task_pinned(&back.id, true).unwrap();
+        }
+    }
+    let list = db.list_ai_tasks().unwrap();
+    assert_eq!(list.len(), 2);
+    assert!(list.iter().any(|t| t.id == b.id && t.pinned));
+}
+
 #[test]
 fn shared_grants_merge_adjacent_windows_across_anchors() {
     let db = Database::in_memory().unwrap();
