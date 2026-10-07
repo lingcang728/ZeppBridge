@@ -1343,6 +1343,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       cancelFailed: 'Die Synchronisierung ließ sich nicht abbrechen',
       cancelled: 'Synchronisierung abgebrochen',
       cancelling: 'Synchronisierung wird abgebrochen…',
+      cloudStale: (clock: string) =>
+        `Neue Daten deiner Uhr sind noch nicht in der Cloud angekommen (letzter Stand dort: ${clock}). Öffne Zepp auf deinem Smartphone, ziehe zum Synchronisieren nach unten und klicke dann auf „Erneut versuchen“.`,
+      cloudStaleDismiss: 'Ausblenden',
+      cloudStaleNoTime:
+        'Neue Daten deiner Uhr sind noch nicht in der Cloud angekommen. Öffne Zepp auf deinem Smartphone, ziehe zum Synchronisieren nach unten und klicke dann auf „Erneut versuchen“.',
+      cloudStaleRetry: 'Erneut versuchen',
       cloudSyncClock: (clock: string) => `Cloud-Synchronisierung ${clock}`,
       cloudSyncClockUnknown: 'Cloud-Synchronisierung —',
       connectFirst: 'Zuerst mit Zepp verbinden',

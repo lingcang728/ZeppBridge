@@ -1120,6 +1120,12 @@ export default {
       partial: 'Sincronização concluída com falhas parciais',
       cancelled: 'Sincronização cancelada',
       deferred: 'A recalcular dados derivados. A sincronização tentará novamente.',
+      cloudStale: (clock: string) =>
+        `Os novos dados do relógio ainda não chegaram à nuvem (o mais recente na nuvem: ${clock}). Abre a app Zepp no telemóvel, puxa para baixo para sincronizar e depois clica em «Tentar novamente».`,
+      cloudStaleNoTime:
+        'Os novos dados do relógio ainda não chegaram à nuvem. Abre a app Zepp no telemóvel, puxa para baixo para sincronizar e depois clica em «Tentar novamente».',
+      cloudStaleRetry: 'Tentar novamente',
+      cloudStaleDismiss: 'Dispensar',
       failed: 'A sincronização falhou. Verifica a ligação e tenta novamente.',
       lastCloudSync: (clock: string) => `Última sincronização da nuvem: ${clock}`,
       cloudSyncClock: (clock: string) => `Sincronização da nuvem: ${clock}`,

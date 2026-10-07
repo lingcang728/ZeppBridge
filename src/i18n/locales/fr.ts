@@ -1003,6 +1003,12 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       cancelled: 'Synchro annulée',
       cancelFailed: 'Impossible d’annuler la synchro',
       deferred: 'Reconstruction locale en cours, nouvelle tentative automatique',
+      cloudStale: (clock: string) =>
+        `Les nouvelles données de votre montre ne sont pas encore arrivées dans le cloud (dernières données dans le cloud : ${clock}). Ouvrez Zepp sur votre téléphone, tirez vers le bas pour synchroniser, puis appuyez sur « Réessayer ».`,
+      cloudStaleNoTime:
+        'Les nouvelles données de votre montre ne sont pas encore arrivées dans le cloud. Ouvrez Zepp sur votre téléphone, tirez vers le bas pour synchroniser, puis appuyez sur « Réessayer ».',
+      cloudStaleRetry: 'Réessayer',
+      cloudStaleDismiss: 'Masquer',
       updated: 'Nouvelles données synchronisées',
       updatedWithLatest: (clock: string) => `Nouvelles données synchronisées · dernière fréquence cardiaque ${clock}`,
       noNewData: 'Synchro terminée. Le cloud n’avait rien de nouveau',

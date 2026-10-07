@@ -754,6 +754,12 @@ export default {
       cancelled: 'Synchronisatie geannuleerd',
       deferred:
         'Lokale afgeleide gegevens worden opgebouwd. De synchronisatie probeert het vanzelf opnieuw',
+      cloudStale: (clock: string) =>
+        `De nieuwe gegevens van je horloge hebben de cloud nog niet bereikt (laatste daar: ${clock}). Open Zepp op je telefoon, veeg omlaag om te synchroniseren en klik daarna op ‘Opnieuw proberen’.`,
+      cloudStaleNoTime:
+        'De nieuwe gegevens van je horloge hebben de cloud nog niet bereikt. Open Zepp op je telefoon, veeg omlaag om te synchroniseren en klik daarna op ‘Opnieuw proberen’.',
+      cloudStaleRetry: 'Opnieuw proberen',
+      cloudStaleDismiss: 'Inklappen',
       failed: 'Synchroniseren mislukt — controleer de verbinding en probeer opnieuw',
       lastCloudSync: (clock: string) => `Laatste cloudsynchronisatie ${clock}`,
       cloudSyncClock: (clock: string) => `Cloudsync ${clock}`,
