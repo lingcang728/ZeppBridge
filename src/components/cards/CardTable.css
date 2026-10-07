@@ -1,0 +1,35 @@
+/* 牌桌（精修批次 7.2）。浮层形态：整屏，底下一层静态毛玻璃（只淡入淡出它自己，不动 blur）；
+   嵌入形态（「你的过去」的某一类）：就是页面里的一块，没有底板、不收起。 */
+.card-table { position: fixed; inset: 0; z-index: 2000; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 6px;
+  padding: 28px clamp(16px, 4vw, 48px) 32px; color: var(--ink); }
+.card-table.inline { position: relative; inset: auto; z-index: auto; padding: 0; min-height: 420px; }
+.table-backdrop { position: absolute; inset: 0; z-index: -1; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1);
+  animation: table-in 320ms ease both; }
+.card-table.closing .table-backdrop { animation: table-out 300ms ease both; }
+.card-table.closing .table-head, .card-table.closing .table-hint { opacity: 0; transition: opacity 200ms ease; }
+@keyframes table-in { from { opacity: 0; } }
+@keyframes table-out { to { opacity: 0; } }
+.table-head { display: flex; align-items: center; gap: 12px; min-width: 0; animation: table-in 320ms ease both; }
+.card-table.inline .table-head { animation: none; }
+.table-titles { flex: 1 1 auto; min-width: 0; }
+.table-titles h2 { margin: 0; font-size: var(--fs-xl); line-height: 1.25; }
+.card-table.inline .table-titles h2 { font-size: var(--fs-md); }
+.table-titles p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); }
+.table-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 0; border-radius: 999px; background: var(--mat-inset);
+  box-shadow: var(--mat-inset-shadow); color: var(--ink); cursor: pointer; }
+.table-icon:hover { background: var(--glass-press); }
+.table-icon:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.table-hint { margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
+.table-hint span { color: var(--subtle); }
+.table-stage { position: relative; min-height: 0; overflow: hidden; }
+.table-layer { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 18px 16px; padding: 24px 8px; }
+.table-layer[inert] { pointer-events: none; }
+.table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
+@media (max-width: 640px) {
+  .card-table { --card-w: 88px; padding: 18px 16px 22px; }
+  .table-layer { gap: 14px 10px; }
+  .table-head { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-backdrop, .table-head { animation-duration: 1ms; }
+}

@@ -16,16 +16,19 @@ const t = useMessages(defineMessages(
     summary: (bytes: string) => `详细覆盖（数据包约 ${bytes}）`,
     category: '类别', window: '时间窗', coverage: '有数据', sources: '来源', units: '单位',
     days: (have: number, total: number) => `${have}/${total} 天`,
+    picked: (count: number) => `挑了 ${count} 天`,
   },
   {
     summary: (bytes: string) => `Coverage details (package ≈ ${bytes})`,
     category: 'Category', window: 'Window', coverage: 'With data', sources: 'Sources', units: 'Units',
     days: (have: number, total: number) => `${have}/${total} days`,
+    picked: (count: number) => `${count} picked ${count === 1 ? 'day' : 'days'}`,
   },
   {
     summary: (bytes: string) => `Cobertura detallada (paquete ≈ ${bytes})`,
     category: 'Categoría', window: 'Ventana', coverage: 'Con datos', sources: 'Fuentes', units: 'Unidades',
     days: (have: number, total: number) => `${have}/${total} días`,
+    picked: (count: number) => `${count} ${count === 1 ? 'día elegido' : 'días elegidos'}`,
   },
   'components/ai/CoverageDetails',
 ));
@@ -44,7 +47,7 @@ const rows = computed(() => coverageRows(props.preview.coverage, props.preview.w
         <tbody>
           <tr v-for="row in rows" :key="row.key" :class="{ 'is-missing': row.missing }">
             <td>{{ row.categoryLabel }}<small v-if="row.workoutTitle"> · {{ row.workoutTitle }}</small></td>
-            <td class="mono">{{ row.start_date }} ~ {{ row.end_date }}</td>
+            <td class="mono">{{ row.start_date }} ~ {{ row.end_date }}<small v-if="row.pickedDays"> · {{ t.picked(row.pickedDays) }}</small></td>
             <td class="mono">{{ t.days(row.days_with_data, row.days_in_range) }}</td>
             <td>{{ row.sources.join(', ') || '—' }}</td>
             <td>{{ row.units.join(', ') || '—' }}</td>

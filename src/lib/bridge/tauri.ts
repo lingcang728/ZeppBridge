@@ -6,6 +6,7 @@ import type {
   AiTaskAttachmentStat,
   AiTaskPrepareOptions,
   MetricBaseline,
+  CardPick,
   AiTaskPrepareResult,
   AiTaskPreview,
   AiTaskSummary,
@@ -455,6 +456,12 @@ export const tauriBackend: BridgeBackend = {
   },
   aiTaskSetPinned(id: string, pinned: boolean) {
     return call<void>('ai_task_set_pinned', { id, pinned });
+  },
+  cardCollectionGet() {
+    return call<CardPick[]>('card_collection_get');
+  },
+  cardCollectionSet(picks: CardPick[]) {
+    return call<CardPick[]>('card_collection_set', { picks });
   },
   aiTemplateList() {
     return call<AiTaskTemplate[]>('ai_template_list');

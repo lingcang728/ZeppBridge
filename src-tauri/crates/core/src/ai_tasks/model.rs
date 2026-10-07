@@ -77,6 +77,12 @@ pub struct AiTaskCategoryRange {
     /// 覆盖统计 `metric_days` 仍然给出它们的天数，界面才能显示「拖回来会有多少」。
     #[serde(default)]
     pub excluded_metrics: Vec<String>,
+    /// 收集箱挑出来的具体日子（本地日 `YYYY-MM-DD`，精修批次 7.4）。非空时这一类只交这几天：
+    /// 窗口收成 `[最早, 最晚]`，中间没挑的日子不出仓、也不算进覆盖天数；`days_before` 只剩
+    /// MCP 任务授权在用（授权按连续窗口算，比挑的日子宽，见 `access::shared_tasks`）。
+    /// 空 = 照旧按 `days_before` 取连续的一段。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub picked_days: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -236,6 +242,9 @@ pub struct AiTaskCoverage {
     pub metric_days: std::collections::BTreeMap<String, i64>,
     /// 窗口内一天数据都没有。
     pub missing: bool,
+    /// 这一类是挑日子交的（收集箱）：挑了哪几天，升序。连续窗口时为空、不出现在 JSON 里。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub picked_dates: Vec<String>,
 }
 
 /// 预览里列给前端的运动摘要。比 [`crate::models::Workout`] 瘦：
@@ -415,6 +424,7 @@ fn builtin_categories(entries: &[(AiTaskCategory, bool, i64)]) -> Vec<AiTaskCate
             days_before,
             include_workout_day: true,
             excluded_metrics: Vec::new(),
+            picked_days: Vec::new(),
         }
     })
     .collect()

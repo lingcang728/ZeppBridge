@@ -1,6 +1,7 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
 components/MetricTrendCard.widened
+components/ai/CoverageDetails.picked
 components/ai/HandoffDock.checkHint
 components/ai/HandoffDock.more
 components/ai/HandoffTray.detailHint
@@ -115,6 +116,7 @@ components/ai/hub/hub.pastIntro
 components/ai/hub/hub.pastLine
 components/ai/hub/hub.pastNone
 components/ai/hub/hub.pastOpen
+components/ai/hub/hub.pastPicked
 components/ai/hub/hub.pin
 components/ai/hub/hub.planBack
 components/ai/hub/hub.planEmpty
@@ -159,6 +161,40 @@ components/ask/ask.sleepWithTraining
 components/ask/ask.trainingNext
 components/ask/ask.withSleep
 components/ask/ask.withTraining
+components/cards/cards.average
+components/cards/cards.back
+components/cards/cards.boxAria
+components/cards/cards.boxClear
+components/cards/cards.boxClose
+components/cards/cards.boxEmpty
+components/cards/cards.boxGo
+components/cards/cards.boxGroup
+components/cards/cards.boxHint
+components/cards/cards.boxTitle
+components/cards/cards.categoryWhole
+components/cards/cards.close
+components/cards/cards.dayAria
+components/cards/cards.groupAria
+components/cards/cards.hintDays
+components/cards/cards.hintGroups
+components/cards/cards.holdToPick
+components/cards/cards.holdToUnpick
+components/cards/cards.keyboardHint
+components/cards/cards.more
+components/cards/cards.noRecord
+components/cards/cards.pick
+components/cards/cards.pickTitle
+components/cards/cards.picked
+components/cards/cards.pickedOf
+components/cards/cards.range180
+components/cards/cards.range30
+components/cards/cards.range7
+components/cards/cards.rangeAria
+components/cards/cards.recorded
+components/cards/cards.recordedOf
+components/cards/cards.removeCard
+components/cards/cards.tableTitle
+components/cards/cards.weekRange
 components/overview/PinnedMetrics.loadFailed
 components/plan/editor.byDistance
 components/plan/editor.byTime
@@ -331,6 +367,7 @@ lib/aiTask/planGuide.example.rideFocus
 lib/aiTask/planGuide.example.rideName
 lib/aiTask/planGuide.example.summary
 lib/aiTask/planGuide.guide
+lib/aiTask/title.pickedDays
 lib/trainingPlan/issues.activity.elliptical
 lib/trainingPlan/issues.activity.hiking
 lib/trainingPlan/issues.activity.rowing

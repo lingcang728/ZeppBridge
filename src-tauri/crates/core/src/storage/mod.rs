@@ -161,6 +161,7 @@ mod owner;
 pub use owner::configured_accounts;
 pub mod ai_exchanges;
 pub mod ai_strip;
+pub mod card_collection;
 mod payload;
 pub mod plan_adherence;
 mod queries;

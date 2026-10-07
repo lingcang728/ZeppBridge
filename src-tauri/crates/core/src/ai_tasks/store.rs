@@ -8,7 +8,7 @@ use super::model::*;
 use super::AiTaskError;
 use crate::models::error::{Result, ZeppBridgeError};
 use crate::storage::Database;
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use rusqlite::{params, OptionalExtension};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -26,6 +26,8 @@ const MAX_PATH_CHARS: usize = 1_024;
 const MAX_CATEGORIES: usize = 16;
 const MAX_DAYS_BEFORE: i64 = 365;
 const MAX_EXCLUDED_METRICS: usize = 64;
+/// 一类最多挑多少天：六个月的牌全挑满也够。
+const MAX_PICKED_DAYS: usize = 400;
 
 fn random_hex(bytes: usize) -> String {
     let mut buffer = vec![0u8; bytes];
@@ -159,6 +161,16 @@ fn normalize_categories(
                     && seen_metrics.insert(metric.clone())
             })
             .collect();
+        if range.picked_days.len() > MAX_PICKED_DAYS {
+            return Err("挑选的日期过多".to_string());
+        }
+        let mut picked = BTreeSet::new();
+        for day in &range.picked_days {
+            let parsed = NaiveDate::parse_from_str(day.trim(), "%Y-%m-%d")
+                .map_err(|_| format!("挑选的日期无效：{day}"))?;
+            picked.insert(parsed.to_string());
+        }
+        range.picked_days = picked.into_iter().collect();
         if !(0..=MAX_DAYS_BEFORE).contains(&range.days_before) {
             return Err(format!(
                 "回溯天数必须在 0–{MAX_DAYS_BEFORE} 之间（{:?} = {}）",
@@ -273,11 +285,18 @@ impl Database {
     /// 「同一个任务」：模板、启用的类别和各自的回溯天数、问题（去掉首尾空白）都一样。
     fn same_ai_task(&self, task: &AiTask) -> Result<Option<String>> {
         let key = |task: &AiTask| {
-            let mut ranges: Vec<(String, i64)> = task
+            // 挑日子交的（收集箱）也算进来：同一句问题挑了不同的日子是不同的任务。
+            let mut ranges: Vec<(String, i64, Vec<String>)> = task
                 .categories
                 .iter()
                 .filter(|range| range.enabled)
-                .map(|range| (format!("{:?}", range.category), range.days_before))
+                .map(|range| {
+                    (
+                        format!("{:?}", range.category),
+                        range.days_before,
+                        range.picked_days.clone(),
+                    )
+                })
                 .collect();
             ranges.sort();
             (

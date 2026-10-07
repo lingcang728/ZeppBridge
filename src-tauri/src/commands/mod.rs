@@ -153,7 +153,8 @@ where
 pub(crate) use ai_tasks::{
     ai_exchange_list, ai_profile_save, ai_task_attachment_stat, ai_task_day_strip, ai_task_delete,
     ai_task_get, ai_task_list, ai_task_prepare, ai_task_preview, ai_task_save, ai_task_set_pinned,
-    ai_template_delete, ai_template_list, ai_template_save,
+    ai_template_delete, ai_template_list, ai_template_save, card_collection_get,
+    card_collection_set,
 };
 pub(crate) use auth::{clear_auth, manual_auth, verify_auth};
 pub(crate) use backup::{

@@ -137,6 +137,7 @@ fn exchanges_link_the_pasted_draft_and_persist_profile_independently() {
             days_before: 13,
             include_workout_day: true,
             excluded_metrics: vec![],
+            picked_days: vec![],
         }],
         detail_level: AiTaskDetailLevel::Standard,
         prompt: "Question".into(),

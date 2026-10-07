@@ -2,7 +2,8 @@
 /**
  * 「你的过去」里某一类的逐天页（/ai/past/:category）：最近 N 天一天一行，有数值写数值，有记录没数值写
  * 「有记录」，没有记录写「—」，不补零。顶上一枚玻璃两档决定这一类交不交给 AI；运动这一类每天的那几次
- * 可以单独勾选。（批次 7 会把这一页换成一张张可以翻、可以收进收集箱的牌。）
+ * 可以单独勾选。上面是这一类的牌桌（精修批次 7.2，嵌在页面里）：一天一张牌，挑中的飞进收集箱；
+ * 一个月 / 六个月发成一叠叠的周 / 月，点开往下钻。
  */
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
@@ -18,6 +19,9 @@ import { unitLabel } from '../../lib/aiTask/metrics';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { workoutDisplayLabel } from '../../lib/workouts';
 import type { AiTaskCategory } from '../../lib/bridge/types';
+import CardTable from '../../components/cards/CardTable.vue';
+import { deckRangeOf } from '../../lib/cards/deck';
+import { categorySource } from '../../lib/cards/sources';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiPastCategory' });
@@ -43,6 +47,12 @@ const days = computed(() => {
 const workoutsById = computed(() => new Map(hub.choices.value.map((w) => [w.workout_id, w])));
 const dayLabel = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric', weekday: 'short' }).format(parseDisplayDate(date));
 const valueText = (value: number, unit: string | null) => `${value.toFixed(unit === 'kg' || unit === 'h' ? 1 : 0)} ${unitLabel(unit ?? '')}`.trim();
+/* 牌面读数和下面的逐天列表同一个写法（同一个 valueText）。 */
+const deckSource = computed(() => {
+  if (!category.value || !meta.value) return null;
+  const unit = strips.rows.value.find((r) => r.category === category.value)?.cells.find((cell) => cell.unit)?.unit ?? null;
+  return categorySource({ category: category.value, label: categoryLabel(category.value), tint: meta.value.tint, format: (value: number) => valueText(value, unit) });
+});
 </script>
 
 <template>
@@ -50,6 +60,9 @@ const valueText = (value: number, unit: string | null) => `${value.toFixed(unit 
     <PageHeader title-id="ai-category-title" :title="category ? categoryLabel(category) : '—'" :intro="h.categoryIntro(hub.pastDays.value)">
       <SegmentTrack v-if="category" compact :items="includeItems" :model-value="enabled ? 'in' : 'out'" :aria-label="enabled ? h.categoryIncluded : h.categoryExcluded" @update:model-value="setIncluded" />
     </PageHeader>
+    <div v-if="deckSource" class="ai-panel deck-panel">
+      <CardTable inline :source="deckSource" :range="deckRangeOf(hub.pastDays.value)" />
+    </div>
     <div v-if="category && meta" class="ai-panel" :style="{ '--tint': meta.tint }">
       <ol class="day-list" :class="{ off: !enabled }">
         <li v-for="cell in days" :key="cell.date">
@@ -71,6 +84,7 @@ const valueText = (value: number, unit: string | null) => `${value.toFixed(unit 
 
 <style scoped src="./aiPage.css"></style>
 <style scoped>
+.deck-panel { margin-bottom: 16px; }
 .day-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .day-list li { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 4px 16px; padding: 10px 4px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: var(--fs-sm); }
 .day-list li:last-child { border-bottom: 0; }

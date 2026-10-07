@@ -7,6 +7,7 @@ import { computed } from 'vue';
 import Icon from '../../Icon.vue';
 import { AI_TASK_CATEGORY_META, categoryLabel } from '../../../lib/aiTask/categories';
 import { stripColumns } from '../../../lib/aiTask/strip';
+import { pickedDayCount } from '../../../lib/aiTask/pickedDays';
 import type { AiTaskCategory, AiTaskCategoryRange } from '../../../lib/bridge/types';
 import type { DayStripRow } from '../../../types/timeBridge';
 import { useBridgeText } from '../bridge/bridge.i18n';
@@ -30,6 +31,12 @@ const lines = computed(() => ORDER.map((category) => {
   };
 }));
 const enabledCount = computed(() => lines.value.filter((line) => line.enabled).length);
+/* 从收集箱开的任务只交挑的那几天：说「挑了 N 天」，不说「最近 N 天」。 */
+const picked = computed(() => pickedDayCount(props.categories));
+const summary = computed(() => {
+  if (!enabledCount.value) return h.value.pastNone;
+  return picked.value ? h.value.pastPicked(picked.value, enabledCount.value) : h.value.pastLine(props.days, enabledCount.value);
+});
 </script>
 
 <template>
@@ -38,7 +45,7 @@ const enabledCount = computed(() => lines.value.filter((line) => line.enabled).l
       <span class="hub-number">01</span>
       <div>
         <h2>{{ t.past }}</h2>
-        <p>{{ enabledCount ? h.pastLine(days, enabledCount) : h.pastNone }}</p>
+        <p>{{ summary }}</p>
       </div>
       <span class="hub-open">{{ h.pastOpen }}<Icon name="chevron-right" :size="14" /></span>
     </header>

@@ -97,6 +97,7 @@ fn range(category: AiTaskCategory, days_before: i64, include_day: bool) -> AiTas
         days_before,
         include_workout_day: include_day,
         excluded_metrics: Vec::new(),
+        picked_days: Vec::new(),
     }
 }
 
@@ -643,4 +644,80 @@ fn the_same_question_again_updates_the_saved_task_and_pins_survive() {
         err_code(&db.set_ai_task_pinned("task-missing", true).unwrap_err()),
         "err.ai_task.not_found"
     );
+}
+
+#[test]
+fn picked_days_export_only_those_days_and_the_collection_survives_a_reopen() {
+    let db = Database::in_memory().unwrap();
+    let today = Local::now().date_naive();
+    for offset in 0..5 {
+        insert_daily(
+            &db,
+            "resting_hr",
+            today - Duration::days(offset),
+            50.0 + offset as f64,
+        );
+    }
+    let mut whole = task();
+    whole.categories = vec![range(AiTaskCategory::Recovery, 4, true)];
+    let whole = db.ai_task_preview(&whole).unwrap();
+
+    // 收集箱挑了三天（故意乱序、带重复）：只交这三天，中间没挑的不算进范围、不出仓。
+    let picked = [today, today - Duration::days(4), today - Duration::days(2)];
+    let mut t = task();
+    let mut picked_range = range(AiTaskCategory::Recovery, 4, true);
+    picked_range.picked_days = picked
+        .iter()
+        .chain(picked.iter().take(1))
+        .map(|day| day.to_string())
+        .collect();
+    t.categories = vec![picked_range];
+    let preview = db.ai_task_preview(&t).unwrap();
+    let row = &preview.coverage[0];
+    let mut expected: Vec<String> = picked.iter().map(|day| day.to_string()).collect();
+    expected.sort();
+    expected.dedup();
+    assert_eq!(row.start_date, expected[0]);
+    assert_eq!(row.end_date, expected[2]);
+    assert_eq!(row.days_in_range, 3);
+    assert_eq!(row.days_with_data, 3);
+    assert_eq!(row.covered_dates, expected);
+    assert_eq!(row.picked_dates, expected);
+    assert_eq!(row.metric_days.get("resting_hr"), Some(&3));
+    assert!(
+        preview.estimated_bytes < whole.estimated_bytes,
+        "没挑的日子不能跟着出去"
+    );
+    assert!(whole.coverage[0].picked_dates.is_empty());
+
+    // 存下来的任务：日期排好去重；挑了不同的日子是另一个任务；坏日期直接拒绝。
+    let saved = db.save_ai_task(&t).unwrap();
+    assert_eq!(saved.categories[0].picked_days, expected);
+    let mut other = t.clone();
+    other.categories[0].picked_days = vec![today.to_string()];
+    assert_ne!(db.save_ai_task(&other).unwrap().id, saved.id);
+    let mut bad = t.clone();
+    bad.categories[0].picked_days = vec!["2026-13-40".into()];
+    assert!(db.save_ai_task(&bad).is_err());
+
+    // 收集箱：去重排好，读回来一样；坏日期整份拒绝、原来的不动。
+    use crate::storage::card_collection::CardPick;
+    let pick = |key: &str, date: NaiveDate| CardPick {
+        key: key.into(),
+        category: AiTaskCategory::Recovery,
+        date: date.to_string(),
+    };
+    let stored = db
+        .set_card_collection(&[
+            pick("hrv", today),
+            pick("hrv", today),
+            pick("cat:sleep", today),
+        ])
+        .unwrap();
+    assert_eq!(stored.len(), 2);
+    assert_eq!(db.card_collection().unwrap(), stored);
+    let mut broken = pick("hrv", today);
+    broken.date = "昨天".into();
+    assert!(db.set_card_collection(&[broken]).is_err());
+    assert_eq!(db.card_collection().unwrap(), stored);
 }

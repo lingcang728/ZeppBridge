@@ -4,6 +4,7 @@ import { defineMessages, useMessages } from '../../../i18n';
 const messages = defineMessages(
   {
     pastLine: (days: number, count: number) => `最近 ${days} 天 · ${count} 类数据会交给 AI`,
+    pastPicked: (days: number, count: number) => `挑了 ${days} 天 · ${count} 类数据会交给 AI`,
     pastNone: '还没有选要交给 AI 的数据',
     pastOpen: '看看每一类',
     weekLine: (train: number, rest: number) => `接下来 7 天：${train} 天训练、${rest} 天休息`,
@@ -65,6 +66,7 @@ const messages = defineMessages(
   },
   {
     pastLine: (days: number, count: number) => `Last ${days} days · ${count} kinds of data go to the AI`,
+    pastPicked: (days: number, count: number) => `${days} picked ${days === 1 ? 'day' : 'days'} · ${count} kinds of data go to the AI`,
     pastNone: 'No data chosen for the AI yet',
     pastOpen: 'See each kind',
     weekLine: (train: number, rest: number) => `Next 7 days: ${train} training, ${rest} rest`,
@@ -126,6 +128,7 @@ const messages = defineMessages(
   },
   {
     pastLine: (days: number, count: number) => `Últimos ${days} días · ${count} tipos de datos van a la IA`,
+    pastPicked: (days: number, count: number) => `${days} ${days === 1 ? 'día elegido' : 'días elegidos'} · ${count} tipos de datos van a la IA`,
     pastNone: 'Aún no has elegido datos para la IA',
     pastOpen: 'Ver cada tipo',
     weekLine: (train: number, rest: number) => `Próximos 7 días: ${train} de entrenamiento, ${rest} de descanso`,

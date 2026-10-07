@@ -75,6 +75,15 @@ export interface AiTaskCategoryRange {
   include_workout_day: boolean;
   /** 单独拖出去、不交给 AI 的指标名（或运动/睡眠的字段名）。 */
   excluded_metrics?: string[];
+  /** 收集箱挑出来的具体日子（YYYY-MM-DD）。非空时这一类只交这几天，days_before 只剩 MCP 授权在用。 */
+  picked_days?: string[];
+}
+
+/** 收集箱里的一张牌：哪一项（指标名，或 `cat:<类别>` 表示整类）、属于哪一类、哪一天。 */
+export interface CardPick {
+  key: string;
+  category: AiTaskCategory;
+  date: string;
 }
 
 /** 存储形态：带本机绝对路径。绝不出现在导出/MCP 输出里。 */
@@ -223,6 +232,8 @@ export interface AiTaskCoverage {
   /** 指标 → 有数据的天数（含被排除的指标）。 */
   metric_days?: Record<string, number>;
   missing: boolean;
+  /** 挑日子交的：挑了哪几天（升序）；连续窗口时没有这个字段。 */
+  picked_dates?: string[];
 }
 
 export type AiTaskAttachmentState = 'ok' | 'missing' | 'changed';
@@ -405,6 +416,8 @@ export interface BridgeBackend {
   getMetricBaselines(metrics: string[]): Promise<MetricBaseline[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
   aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
+  cardCollectionGet(): Promise<CardPick[]>;
+  cardCollectionSet(picks: CardPick[]): Promise<CardPick[]>;
   aiTemplateList(): Promise<AiTaskTemplate[]>;
   aiTemplateSave(template: AiTaskTemplate): Promise<AiTaskTemplate>;
   aiTemplateDelete(id: string): Promise<void>;

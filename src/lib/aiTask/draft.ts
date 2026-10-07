@@ -91,6 +91,8 @@ export const taskSnapshot = (task: AiTask): string =>
         days_before: range.days_before,
         include_workout_day: range.include_workout_day,
         excluded_metrics: [...(range.excluded_metrics ?? [])].sort(),
+        // 收集箱挑的日子：没挑时不出现，老任务的快照不变。
+        ...(range.picked_days?.length ? { picked_days: [...range.picked_days].sort() } : {}),
       }))
       .sort((a, b) => a.category.localeCompare(b.category)),
     detail_level: task.detail_level,

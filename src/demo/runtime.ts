@@ -38,6 +38,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   let nextId = 1;
   let status = demoStatus(data);
   let profileNote = '';
+  let demoPicks: unknown[] = [];
 
   const emit = (event: string, payload: unknown) => {
     for (const id of listeners.get(event) ?? []) callbacks.get(id)?.({ event, id: 0, payload });
@@ -137,6 +138,8 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     ai_task_save: (args) => ({ ...(args.task as AiTask), id: (args.task as AiTask)?.id || 'demo-task-1', updated_at: new Date().toISOString() }),
     ai_task_delete: () => null,
     ai_task_set_pinned: () => null,
+    card_collection_get: () => demoPicks,
+    card_collection_set: (args) => { demoPicks = (args.picks as unknown[]) ?? []; return demoPicks; },
     ai_task_preview: (args) => demoPreview(data, args.task as AiTask),
     ai_task_prepare: (args) => {
       hostPost('handoff', { stage: 'prepared' });

@@ -54,6 +54,8 @@ pub(crate) struct AiTaskBundle {
 pub(crate) struct WindowGather {
     /// `None` = 任务没有关联运动，窗口锚在今天。
     pub workout_id: Option<String>,
+    /// 挑日子交的（收集箱）：只留这几天。`None` = 连续窗口。
+    pub picked: Option<BTreeSet<String>>,
     pub start: NaiveDate,
     pub end: NaiveDate,
     /// 窗口内「有数据的本地日」集合与命中的 `source_scope` 集合，

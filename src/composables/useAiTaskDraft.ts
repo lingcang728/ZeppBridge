@@ -250,16 +250,33 @@ const setCategoryEnabled = (category: AiTaskCategory, enabled: boolean) => {
   noteChange({ kind: 'category', category, included: enabled });
 };
 
-/** 一次改所有数据类别的回溯天数（任务头的「最近 N 天」胶囊）。 */
+/** 一次改所有数据类别的回溯天数（任务头的「最近 N 天」胶囊）。改了就回到连续的一段：收集箱挑的日子作废。 */
 const setWindowDays = (days: number) => {
   const next = Math.max(0, Math.floor(days));
   const windows = draft.value.categories.filter((range) => AI_TASK_CATEGORY_META[range.category].hasWindow);
-  if (windows.every((range) => range.days_before === next)) return;
+  if (windows.every((range) => range.days_before === next && !range.picked_days?.length)) return;
   rememberSelection();
   patchDraft({
     categories: draft.value.categories.map((range) => (
-      AI_TASK_CATEGORY_META[range.category].hasWindow ? { ...range, days_before: next } : range
+      AI_TASK_CATEGORY_META[range.category].hasWindow ? { ...range, days_before: next, picked_days: [] } : range
     )),
+  });
+};
+
+/**
+ * 收集箱交过来的「这一类 × 这几天」（精修批次 7.3）：只开挑了的类别，每类只交挑的那几天。
+ * `days_before` 设成从最早那天到今天，MCP 授权和「最近 N 天」的说法仍然说得通。
+ */
+const applyPicks = (byCategory: Map<AiTaskCategory, string[]>, today: string) => {
+  rememberSelection();
+  patchDraft({
+    categories: draft.value.categories.map((range) => {
+      if (!AI_TASK_CATEGORY_META[range.category].hasWindow) return range;
+      const days = [...new Set(byCategory.get(range.category) ?? [])].sort();
+      if (!days.length) return { ...range, enabled: false, picked_days: [] };
+      const span = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${days[0]}T00:00:00Z`)) / 86_400_000));
+      return { ...range, enabled: true, days_before: span, picked_days: days };
+    }),
   });
 };
 
@@ -319,6 +336,7 @@ export function useAiTaskDraft() {
     setCategoryDays: (category: AiTaskCategory, days: number) =>
       patchRange(category, { days_before: Math.max(0, Math.floor(days)) }),
     setWindowDays,
+    applyPicks,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>
       patchRange(category, { include_workout_day: include }),
     legacyNotice,

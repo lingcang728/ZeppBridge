@@ -1,0 +1,62 @@
+/* 收集箱（精修批次 7.3）。箱子比牌桌高一层：挑牌时能看着牌飞进去。 */
+.collection-box { position: fixed; right: 24px; bottom: 24px; z-index: 2060; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px 0 14px;
+  border: 1px solid var(--mat-glass-line); border-radius: 999px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur);
+  box-shadow: var(--mat-glass-shadow); color: var(--ink); font: inherit; cursor: pointer; transition: transform 420ms cubic-bezier(.4, .6, .2, 1); }
+.collection-box.lifted { transform: translateY(-84px); }
+.collection-box:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.collection-box em { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140a); font-size: var(--fs-2xs); font-style: normal;
+  font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.box-stack { position: relative; width: 22px; height: 26px; }
+.box-stack i { position: absolute; inset: 0; border-radius: 4px; background: var(--mat-raised); box-shadow: var(--mat-raised-rim); }
+.box-stack i:nth-child(1) { transform: rotate(-10deg) translateX(-3px); opacity: .6; }
+.box-stack i:nth-child(2) { transform: rotate(6deg) translateX(2px); opacity: .8; }
+.box-stack i:nth-child(3) { background: linear-gradient(color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent) 30%, transparent)), var(--mat-raised); }
+.box-pop-enter-active, .box-pop-leave-active { transition: opacity 260ms ease, transform 360ms cubic-bezier(.3, 1.4, .5, 1); }
+.box-pop-enter-from, .box-pop-leave-to { opacity: 0; transform: scale(.6); }
+.box-pop-enter-from.lifted, .box-pop-leave-to.lifted { transform: translateY(-84px) scale(.6); }
+
+/* 铺开：整屏静态毛玻璃，牌围成一圈。 */
+.box-spread { position: fixed; inset: 0; z-index: 2050; display: grid; place-items: center; }
+.spread-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); animation: spread-in 300ms ease both; }
+@keyframes spread-in { from { opacity: 0; } }
+.ring { position: relative; width: 0; height: 0; }
+.ring-card { --w: 66px; --h: 92px; position: absolute; left: calc(var(--w) / -2); top: calc(var(--h) / -2); width: var(--w); height: var(--h);
+  transition: transform 420ms cubic-bezier(.4, .6, .2, 1); }
+.ring-face { position: absolute; inset: 0; display: grid; align-content: space-between; padding: 7px 7px 8px; border-radius: 10px; background: var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), 0 14px 26px -18px rgba(0, 0, 0, .75); transition: translate 260ms cubic-bezier(.3, 1.3, .5, 1); }
+.ring-face small { overflow: hidden; color: var(--tint); font-size: 10px; font-weight: 650; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ring-face strong { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+/* 悬停：沿半径往圈外抽出一截（--ox / --oy 是这张牌朝外的方向 × 18px）。 */
+.ring-card:hover .ring-face, .ring-card:focus-within .ring-face { translate: var(--ox, 0) var(--oy, -18px); }
+.ring-remove { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 999px;
+  background: var(--ink); color: var(--bg, #000); opacity: 0; cursor: pointer; transition: opacity 160ms ease, translate 260ms cubic-bezier(.3, 1.3, .5, 1); }
+.ring-card:hover .ring-remove, .ring-remove:focus-visible { opacity: 1; translate: var(--ox, 0) var(--oy, -18px); }
+.ring-label { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--tint) 18%, var(--mat-inset)); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; cursor: pointer;
+  animation: spread-in 420ms 200ms ease both; }
+.ring-label :deep(svg) { opacity: .5; }
+.ring-label:hover :deep(svg) { opacity: 1; }
+.ring-go { position: absolute; left: -44px; top: -44px; display: grid; place-items: center; width: 88px; height: 88px; border: 0; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink, #10140a); box-shadow: 0 18px 40px -16px color-mix(in srgb, var(--accent) 70%, transparent); cursor: pointer; }
+.ring-go:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+/* 箱子变箭头：两枚图标交叉淡化 + 转一下（只动 opacity / transform）。 */
+.ring-go > span { position: absolute; display: grid; place-items: center; transition: opacity 260ms ease, transform 420ms cubic-bezier(.4, .6, .2, 1); }
+.go-box { animation: go-box 620ms 180ms both; }
+.go-arrow { animation: go-arrow 620ms 180ms both; }
+@keyframes go-box { from { opacity: 1; transform: none; } to { opacity: 0; transform: rotate(-90deg) scale(.6); } }
+@keyframes go-arrow { from { opacity: 0; transform: rotate(90deg) scale(.6); } to { opacity: 1; transform: none; } }
+.ring-go:hover .go-arrow { transform: translateX(4px); }
+.ring-more { position: absolute; left: 50%; top: calc(var(--radius) + 70px); margin: 0; color: var(--muted); font-size: var(--fs-xs); transform: translateX(-50%); white-space: nowrap; }
+.spread-foot { position: absolute; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 10px; width: min(760px, calc(100vw - 32px)); transform: translateX(-50%); }
+.spread-foot p { flex: 1 1 auto; margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
+.foot-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  color: var(--ink); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.foot-button:hover { background: var(--glass-press); }
+@media (max-width: 640px) {
+  .ring-card { --w: 52px; --h: 74px; }
+  .ring-label { font-size: var(--fs-2xs); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collection-box, .ring-card, .ring-face, .ring-go > span { transition: none; }
+  .go-box, .go-arrow, .ring-label, .spread-backdrop { animation-duration: 1ms; }
+}

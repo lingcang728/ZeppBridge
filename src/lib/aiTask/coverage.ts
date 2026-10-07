@@ -27,6 +27,8 @@ export interface CoverageRow {
   end_date: string;
   days_in_range: number;
   days_with_data: number;
+  /** 挑日子交的（收集箱）：挑了几天；连续窗口为 0。 */
+  pickedDays: number;
   /** 去重、本地化后的来源表与单位表，界面直接 join 展示。 */
   sources: string[];
   units: string[];
@@ -50,6 +52,7 @@ export const coverageRows = (
       end_date: entry.end_date,
       days_in_range: entry.days_in_range,
       days_with_data: entry.days_with_data,
+      pickedDays: entry.picked_dates?.length ?? 0,
       sources: [...new Set(entry.sources.map((scope) => dataScopeLabel(scope)))],
       units: [...new Set(Object.values(entry.units).map(unitLabel))],
       missing: entry.missing,

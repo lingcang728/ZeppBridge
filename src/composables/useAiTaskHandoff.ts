@@ -17,6 +17,7 @@ import { coverageNoteText } from '../lib/aiTask/copy';
 import { copyTextToClipboard, openProviderSite, revealInFolder } from './useAiHandoff';
 import { AI_PROVIDER_BY_ID, type AiProvider, type AiProviderId } from '../lib/aiProviders';
 import { defineMessages, messagesOf } from '../i18n';
+import { useCardCollection } from './useCardCollection';
 
 export type HandoffStepId = 'prepare' | 'copy' | 'open';
 export type HandoffStepState = 'idle' | 'doing' | 'done' | 'failed' | 'blocked' | 'skipped';
@@ -95,6 +96,8 @@ export function useAiTaskHandoff() {
       prepareResult.value = result;
       preparedSnapshot.value = taskSnapshot(task);
       setStep('prepare', result.status === 'blocked' ? 'blocked' : 'done');
+      // 从收集箱开的任务真的交出去了：箱子清空（中途反悔回来，牌还在）。
+      if (result.status === 'ready' && task.categories.some((range) => range.picked_days?.length)) useCardCollection().clearAfterHandoff();
       return result;
     } catch (error) {
       setStep('prepare', 'failed', toUserMessage(error, copy().prepareFailed));

@@ -26,7 +26,8 @@ pub struct DayStripRow {
 
 impl Database {
     pub fn ai_task_day_strip(&self, days_before: i64, end: NaiveDate) -> Result<Vec<DayStripRow>> {
-        let count = days_before.clamp(1, 90);
+        // 时间桥只要 90 天；牌桌的「6 个月」要从五个月前的 1 号起，最多 184 天。
+        let count = days_before.clamp(1, 186);
         let start = end - Duration::days(count - 1);
         let first = start.to_string();
         let last = end.to_string();

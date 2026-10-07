@@ -20,6 +20,7 @@ use zeppbridge_core::ai_tasks::{
     stat_attachment_paths, AiTask, AiTaskAttachmentStat, AiTaskPrepareResult, AiTaskPreview,
     AiTaskSummary, AiTaskTemplate,
 };
+use zeppbridge_core::storage::card_collection::CardPick;
 use zeppbridge_core::storage::write_lock::WritePurpose;
 
 /// `ai_task_attachment_stat` 的单次路径数上限——它只是个 stat 批量接口，
@@ -245,5 +246,28 @@ pub async fn ai_profile_save(
     with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
         db.set_ai_profile_note(&note)
     })
+    .await
+}
+
+/// 收集箱里现在的牌（精修批次 7.3）。
+#[tauri::command]
+pub async fn card_collection_get(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<CardPick>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), |db| db.card_collection()).await
+}
+
+/// 整份替换收集箱；返回去重排好的那一份。
+#[tauri::command]
+pub async fn card_collection_set(
+    state: tauri::State<'_, AppState>,
+    picks: Vec<CardPick>,
+) -> std::result::Result<Vec<CardPick>, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.set_card_collection(&picks),
+    )
     .await
 }

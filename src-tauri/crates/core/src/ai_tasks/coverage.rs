@@ -204,6 +204,15 @@ pub(crate) fn category_windows(
     anchors: &[AnchorWorkout],
     today: NaiveDate,
 ) -> Vec<(Option<String>, NaiveDate, NaiveDate)> {
+    // 挑日子交的：一个窗口，从挑的最早一天到最晚一天，与运动锚点无关（行在 gather 里按集合筛）。
+    let picked: Vec<NaiveDate> = range
+        .picked_days
+        .iter()
+        .filter_map(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
+        .collect();
+    if let (Some(start), Some(end)) = (picked.iter().min(), picked.iter().max()) {
+        return vec![(None, *start, *end)];
+    }
     if anchors.is_empty() {
         return task_window(range.days_before, range.include_workout_day, None, today)
             .map(|(start, end)| (None, start, end))
@@ -491,7 +500,10 @@ pub(crate) fn window_coverage_rows(
     };
 
     for gather in gathers {
-        union_days.extend(day_set(gather.start, gather.end));
+        match &gather.picked {
+            Some(picked) => union_days.extend(picked.iter().cloned()),
+            None => union_days.extend(day_set(gather.start, gather.end)),
+        }
         union_covered.extend(gather.covered_days.iter().cloned());
         union_sources.extend(gather.sources.iter().cloned());
         for (metric, days) in &gather.metric_days {
@@ -507,13 +519,24 @@ pub(crate) fn window_coverage_rows(
             workout_id: gather.workout_id.clone(),
             start_date: gather.start.to_string(),
             end_date: gather.end.to_string(),
-            days_in_range: (gather.end - gather.start).num_days() + 1,
+            // 挑日子交的：范围就是挑的那几天，不是首尾跨度。
+            days_in_range: gather
+                .picked
+                .as_ref()
+                .map_or((gather.end - gather.start).num_days() + 1, |picked| {
+                    picked.len() as i64
+                }),
             days_with_data: gather.covered_days.len() as i64,
             covered_dates: gather.covered_days.iter().cloned().collect(),
             sources: gather.sources.iter().cloned().collect(),
             units: units.clone(),
             metric_days: day_counts(&gather.metric_days),
             missing: gather.covered_days.is_empty(),
+            picked_dates: gather
+                .picked
+                .as_ref()
+                .map(|picked| picked.iter().cloned().collect())
+                .unwrap_or_default(),
         });
     }
 
@@ -532,6 +555,7 @@ pub(crate) fn window_coverage_rows(
                 units,
                 metric_days: day_counts(&union_metric_days),
                 missing: union_covered.is_empty(),
+                picked_dates: Vec::new(),
             });
         }
     }

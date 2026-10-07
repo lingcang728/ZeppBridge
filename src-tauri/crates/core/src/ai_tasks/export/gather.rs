@@ -16,12 +16,16 @@ impl Database {
         let excluded = &range.excluded_metrics;
         let is_excluded = |name: &str| excluded.iter().any(|metric| metric == name);
         let field_units = category_units(range.category);
+        // 挑日子交的：窗口是首尾跨度，中间没挑的日子在下面整窗取完后筛掉（行、覆盖、逐指标天数一起筛）。
+        let picked: Option<BTreeSet<String>> =
+            (!range.picked_days.is_empty()).then(|| range.picked_days.iter().cloned().collect());
         for (workout_id, start, end) in category_windows(range, anchors, Local::now().date_naive())
         {
             let start_text = start.to_string();
             let end_text = end.to_string();
             let mut gather = WindowGather {
                 workout_id,
+                picked: picked.clone(),
                 start,
                 end,
                 covered_days: BTreeSet::new(),
@@ -136,6 +140,14 @@ impl Database {
                         }
                     }
                 }
+            }
+            if let Some(picked) = &picked {
+                gather.rows.retain(|(day, _, _)| picked.contains(day));
+                gather.covered_days.retain(|day| picked.contains(day));
+                for days in gather.metric_days.values_mut() {
+                    days.retain(|day| picked.contains(day));
+                }
+                gather.metric_days.retain(|_, days| !days.is_empty());
             }
             gathers.push(gather);
         }

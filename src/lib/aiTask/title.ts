@@ -8,11 +8,12 @@ import { defineMessages, messagesOf } from '../../i18n';
 import { formatDate } from '../format';
 import { workoutDisplayLabel } from '../workouts';
 import { AI_TASK_CATEGORY_META } from './categories';
+import { pickedDayCount } from './pickedDays';
 
 const messages = defineMessages(
-  { recentDays: (days: number) => `最近 ${days} 天`, andMore: (count: number) => ` 等 ${count} 次` },
-  { recentDays: (days: number) => `Last ${days} days`, andMore: (count: number) => ` +${count - 1} more` },
-  { recentDays: (days: number) => `Últimos ${days} días`, andMore: (count: number) => ` y ${count - 1} más` },
+  { recentDays: (days: number) => `最近 ${days} 天`, pickedDays: (days: number) => `挑了 ${days} 天`, andMore: (count: number) => ` 等 ${count} 次` },
+  { recentDays: (days: number) => `Last ${days} days`, pickedDays: (days: number) => `${days} picked ${days === 1 ? 'day' : 'days'}`, andMore: (count: number) => ` +${count - 1} more` },
+  { recentDays: (days: number) => `Últimos ${days} días`, pickedDays: (days: number) => `${days} ${days === 1 ? 'día elegido' : 'días elegidos'}`, andMore: (count: number) => ` y ${count - 1} más` },
   'lib/aiTask/title',
 );
 
@@ -30,9 +31,11 @@ export const autoTaskTitle = (
 ): string => {
   const t = messagesOf(messages);
   const [first] = [...selectedWorkouts].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // 收集箱开的任务只交挑的那几天：叫「挑了 N 天」，不叫「最近 N 天」。
+  const picked = pickedDayCount(task.categories);
   const subject = first
     ? `${workoutDisplayLabel(first)}${selectedWorkouts.length > 1 ? t.andMore(selectedWorkouts.length) : ''}`
-    : t.recentDays(recentWindowDays(task));
+    : picked ? t.pickedDays(picked) : t.recentDays(recentWindowDays(task));
   const head = templateLabel ?? subject;
   const date = formatDate(first ? first.start_time : now.toISOString());
   return `${head} · ${date}`;
