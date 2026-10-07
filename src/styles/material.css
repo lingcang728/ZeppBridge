@@ -199,7 +199,7 @@
   backdrop-filter: none;
   box-shadow: var(--glass-shadow);
 }
-.glass-control.is-lens-host::before {
+.glass-control.is-lens-host:not(.has-rim)::before {
   content: '';
   position: absolute;
   z-index: -1;

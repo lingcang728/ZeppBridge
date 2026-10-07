@@ -7,6 +7,7 @@ import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
+import GlassRim from './GlassRim.vue';
 import { useSyncController } from '../../composables/useSyncController';
 import { useTheme } from '../../composables/useTheme';
 import { useWidthMorph } from '../../composables/useWidthMorph';
@@ -400,13 +401,14 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
     <div :class="['lead', { 'is-back': backTo }]">
       <button
         type="button"
-        :class="['quick-back', 'glass-control', { 'is-off': !backTo }]"
+        :class="['quick-back', 'glass-control', 'is-lens-host', 'has-rim', { 'is-off': !backTo }]"
         :title="backLabel"
         :aria-label="backLabel"
         :aria-hidden="backTo ? undefined : 'true'"
         :inert="backTo ? undefined : true"
         @click="goBack"
       >
+        <GlassRim />
         <Icon name="arrow-left" :size="20" />
       </button>
       <RouterLink
@@ -437,7 +439,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
       <button
         ref="syncPill"
-        :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
+        :class="['sync-pill', 'glass-control', 'is-lens-host', 'has-rim', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
         :disabled="demoLibrary || (!readyToHand && !isSyncing && !canIncrementalSync && !needsConnection)"
         :title="syncTitle"
@@ -446,6 +448,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       >
         <!-- 前面一律是带色的小圆点（已连接绿、部分未完成黄、失败红、同步中呼吸）。U19 一度换成刷新图标，
              用户觉得不如圆点好看（2026-09-30），换回来。 -->
+        <GlassRim />
         <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
         <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? readyText : syncText }}</span>
         <Icon v-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
@@ -453,7 +456,8 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
-      <div class="icon-group glass-control is-lens-host">
+      <div class="icon-group glass-control is-lens-host has-rim">
+        <GlassRim />
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
           :model-value="themeMode" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
@@ -467,7 +471,9 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 <style scoped>
 /* 顶栏本身透明、没有分界线：浮在内容上的是一个个玻璃控件（返回、导航胶囊、
    同步状态、图标组），内容滚到下面时由 .shell-head 的滚动边缘效果负责可读性。
-   整条再套一层玻璃就成了「玻璃叠玻璃」。 */
+   整条再套一层玻璃就成了「玻璃叠玻璃」。
+   第四轮 1C（参考 iPadOS / macOS 26 App Store 的悬浮标签栏）：整条下沉、离窗口上沿 12px，左右再往里收，
+   内容从上下都看得见地滚过去；每个控件的玻璃外圈一窄条折射（GlassRim），中间只模糊。 */
 .app-topbar {
   position: sticky;
   top: 0;
@@ -479,7 +485,8 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   flex: 0 0 auto;
   align-items: center;
   gap: 12px;
-  padding: 0 20px;
+  margin-top: 12px;
+  padding: 0 32px;
 }
 
 .quick-back { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 40px;
@@ -586,7 +593,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   .app-topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
 }
 @media (max-width: 760px) {
-  .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }
+  .app-topbar { height: 56px; margin-top: 8px; padding: 0 16px; gap: 10px; }
   .pill-nav { display: none; }
   .sync-text { max-width: 120px; }
 }

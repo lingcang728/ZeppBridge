@@ -87,7 +87,8 @@
 .shell-head { position: sticky; top: 0; z-index: 30; }
 /* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
    被轻轻模糊、向下淡出，代替硬分界线。页面在顶部静止时不出现——那时没有
-   内容在控件底下，它就没有要做的事。 */
+   内容在控件底下，它就没有要做的事。顶栏下沉 12px（1C）以后，这一层从窗口上沿一直盖到顶栏下面 28px：
+   顶栏上方那一条缝里滚过去的内容也是糊的，不和控件抢。 */
 .shell-head::before {
   content: '';
   position: absolute;
@@ -189,7 +190,8 @@
 :root.nav-at-bottom .bottom-track .segment-item, :root.nav-at-bottom .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 
 /* ── 页面通用 ───────────────────────────── */
-.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; overflow-x: clip; }
+/* 顶栏下沉了 12px（1C）：页面上沿少留 8px，标题到窗口上沿的距离只比以前多 4px。 */
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 12px 28px 24px; overflow-x: clip; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }
@@ -197,5 +199,5 @@ h1, h2, p { margin-top: 0; }
 .page-intro { margin-bottom: 0; color: var(--muted); font-size: var(--fs-md); }
 /* 按钮与卡片的全局样式在 styles/material.css。 */
 @media (max-width: 760px) {
-  .page { padding: 24px 16px 38px; }
+  .page { padding: 18px 16px 38px; }
 }
