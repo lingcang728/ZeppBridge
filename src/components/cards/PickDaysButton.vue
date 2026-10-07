@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 「挑日子」（精修批次 7.2，第二轮 10-07 重做）：点一下，牌从这枚按钮飞出来铺满全屏（CardTable 浮层），
- * 收牌时飞回这里。可以是一项指标（指标卡），也可以是一整类（睡眠详情）。
+ * 收牌时理成一叠飞回这里：牌图标先张开一下接住（`.is-receiving`），落定时顶一下、亮一圈。可以是一项指标（指标卡），也可以是一整类（睡眠详情）。
  * 范围跟着页面的 7 天 / 1 个月 / 6 个月走，牌桌上还能再换。挑中的牌飞进右下角的收集箱。
  */
 import { computed, defineAsyncComponent, ref, shallowRef } from 'vue';
@@ -31,6 +31,8 @@ const box = useCardCollection();
 const range = useTrendRange();
 const open = ref(false);
 const origin = shallowRef<DOMRect | null>(null);
+const button = ref<HTMLElement | null>(null);
+const table = ref<{ reopen: () => void; isClosing: () => boolean } | null>(null);
 const key = computed(() => (props.category ? `cat:${props.category}` : props.metric ?? ''));
 const pickedHere = computed(() => (key.value ? box.picks.value.filter((pick) => pick.key === key.value).length : 0));
 const source = computed<DeckSource>(() => (props.category
@@ -45,16 +47,18 @@ const source = computed<DeckSource>(() => (props.category
   })));
 
 const show = (event: MouseEvent) => {
+  // 牌正往回收的时候又点了：从此刻原路扇回来，不重开一桌。
+  if (open.value && table.value?.isClosing()) { table.value.reopen(); return; }
   origin.value = (event.currentTarget as HTMLElement).getBoundingClientRect();
   open.value = true;
 };
 </script>
 
 <template>
-  <button v-if="key" type="button" :class="['pick-days', { lit: pickedHere > 0 }]" :title="t.pickTitle(label)" :aria-label="t.pickTitle(label)" aria-haspopup="dialog" @click="show">
+  <button v-if="key" ref="button" type="button" :class="['pick-days', { lit: pickedHere > 0 }]" :title="t.pickTitle(label)" :aria-label="t.pickTitle(label)" aria-haspopup="dialog" @click="show">
     <Icon name="cards" :size="16" /><span>{{ t.pick }}</span><b v-if="pickedHere">{{ pickedHere }}</b>
   </button>
-  <CardTable v-if="open" :source="source" :range="deckRangeOf(range)" :origin="origin" @close="open = false" />
+  <CardTable v-if="open" ref="table" :source="source" :range="deckRangeOf(range)" :origin="origin" :anchor="button" @close="open = false" />
 </template>
 
 <style scoped>
@@ -66,4 +70,6 @@ const show = (event: MouseEvent) => {
 .pick-days.lit { background: color-mix(in srgb, var(--accent) 18%, var(--mat-inset)); color: var(--accent); }
 .pick-days b { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140a); font-size: var(--fs-2xs); text-align: center; }
 .pick-days:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pick-days :deep(svg) { transition: transform 260ms cubic-bezier(.3, 1.4, .5, 1); }
+.pick-days.is-receiving :deep(svg) { transform: rotate(-14deg) scale(1.25); }
 </style>

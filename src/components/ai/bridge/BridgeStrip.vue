@@ -6,7 +6,7 @@ import type { DayStripRow, AdherenceDay } from '../../../types/timeBridge';
 import { useBridgeText } from './bridge.i18n';
 import { unitLabel } from '../../../lib/aiTask/metrics';
 const props = defineProps<{ row: DayStripRow; days: number; selectedIds: string[]; adherence: AdherenceDay[]; disabled?: boolean }>();
-const emit = defineEmits<{ workout: [string]; day: [{ date: string; rect: DOMRect }] }>();
+const emit = defineEmits<{ workout: [string]; day: [{ date: string; rect: DOMRect; el: Element | null }] }>();
 const t = useBridgeText();
 const columns = computed(() => stripColumns(props.row.cells, props.days));
 const W = 600, H = 36;
@@ -37,7 +37,7 @@ const click = (index: number, event?: Event) => {
   if (daysRow.value) {
     const target = (event?.currentTarget as Element | null) ?? null;
     const rect = target?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0);
-    emit('day', { date: column.dates[column.dates.length - 1]!, rect });
+    emit('day', { date: column.dates[column.dates.length - 1]!, rect, el: target });
     return;
   }
   if (!props.disabled) for (const id of column.ids) emit('workout', id);

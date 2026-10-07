@@ -41,12 +41,15 @@ const commit = (n: number) => { days.value = n; ctl.setWindowDays(n - 1); };
 
 /* ---------- 牌桌：从被点的那一格发牌 ---------- */
 const CardTable = defineAsyncComponent(() => import('../../components/cards/CardTable.vue'));
-const deck = shallowRef<{ source: DeckSource; origin: DOMRect; focus: string } | null>(null);
+const deck = shallowRef<{ source: DeckSource; origin: DOMRect; anchor: Element | null; focus: string } | null>(null);
+const table = ref<{ reopen: () => void; isClosing: () => boolean } | null>(null);
 /** 牌面读数和这一行行尾同一个写法；睡眠按「几小时几分」。 */
 const formatFor = (category: AiTaskCategory, unit: string | null) => (value: number) => (category === 'sleep'
   ? formatDuration(value)
   : `${value.toFixed(unit === 'kg' || unit === 'h' ? 1 : 0)}`);
-const openDeck = (category: AiTaskCategory, date: string, origin: DOMRect) => {
+const openDeck = (category: AiTaskCategory, date: string, origin: DOMRect, anchor: Element | null = null) => {
+  // 牌正往回收的时候又点了：从此刻原路扇回来。
+  if (deck.value && table.value?.isClosing()) { table.value.reopen(); return; }
   const unit = strips.rows.value.find((r) => r.category === category)?.cells.find((cell) => cell.unit)?.unit ?? null;
   deck.value = {
     source: categorySource({
@@ -54,11 +57,13 @@ const openDeck = (category: AiTaskCategory, date: string, origin: DOMRect) => {
       format: formatFor(category, unit), unit: category === 'sleep' || !unit ? undefined : unitLabel(unit),
     }),
     origin,
+    anchor,
     focus: date,
   };
 };
 const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
-  openDeck(category, end.value, (event.currentTarget as HTMLElement).getBoundingClientRect());
+  const el = event.currentTarget as HTMLElement;
+  openDeck(category, end.value, el.getBoundingClientRect(), el);
 };
 </script>
 
@@ -69,7 +74,7 @@ const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
       <ul class="past-rows">
         <li v-for="(row, i) in rows" :key="row.category" class="past-row" data-morph-card :style="{ '--row-index': i }">
           <BridgeRow :row="row" :days="days" :enabled="enabled(row.category)" :selected-ids="draft.workout_ids" :adherence="strips.adherence.value"
-            @toggle="toggle(row.category)" @workout="ctl.toggleWorkout" @day="openDeck(row.category, $event.date, $event.rect)" />
+            @toggle="toggle(row.category)" @workout="ctl.toggleWorkout" @day="openDeck(row.category, $event.date, $event.rect, $event.el)" />
           <button v-if="row.category !== 'workout'" type="button" class="row-open" :aria-label="t.pickDays(categoryLabel(row.category))" :title="t.pickDays(categoryLabel(row.category))"
             @click="openFromRow(row.category, $event)"><Icon name="cards" :size="16" /></button>
           <span v-else class="row-open" aria-hidden="true"></span>
@@ -82,7 +87,7 @@ const openFromRow = (category: AiTaskCategory, event: MouseEvent) => {
         <span v-if="draft.workout_ids.length" class="selection-count">{{ t.selected(draft.workout_ids.length) }}</span>
       </footer>
     </div>
-    <CardTable v-if="deck" :source="deck.source" :range="7" :origin="deck.origin" :focus="deck.focus" @close="deck = null" />
+    <CardTable v-if="deck" ref="table" :source="deck.source" :range="7" :origin="deck.origin" :anchor="deck.anchor" :focus="deck.focus" @close="deck = null" />
     <p v-if="strips.error.value" class="ai-message" role="alert"><Icon name="warning" :size="14" /><span>{{ strips.error.value }}</span><button class="pill-button quiet" @click="strips.load()">{{ t.retry }}</button></p>
   </section>
 </template>

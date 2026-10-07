@@ -277,9 +277,11 @@ const setWindowDays = (days: number) => {
  * 收集箱交过来的「这一类 × 这几天」（精修批次 7.3）：只开挑了的类别，每类只交挑的那几天。
  * `days_before` 设成从最早那天到今天，MCP 授权和「最近 N 天」的说法仍然说得通。
  */
-const applyPicks = (byCategory: Map<AiTaskCategory, string[]>, today: string) => {
+const applyPicks = (byCategory: Map<AiTaskCategory, string[]>, today: string, workoutIds: string[] = []) => {
   rememberSelection();
   patchDraft({
+    // 运动牌（一次运动一张，第三轮 B3）：这几次运动单独交给 AI。
+    ...(workoutIds.length ? { workout_ids: [...new Set(workoutIds)] } : {}),
     categories: draft.value.categories.map((range) => {
       if (!AI_TASK_CATEGORY_META[range.category].hasWindow) return range;
       const days = [...new Set(byCategory.get(range.category) ?? [])].sort();

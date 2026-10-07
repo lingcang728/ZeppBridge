@@ -1,6 +1,7 @@
 import { today as currentToday } from './currentDay';
 import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import type { FacePart } from './cards/faceValue';
 import {
   bigDistanceThresholdMeters,
   distanceUnitLabel,
@@ -28,6 +29,9 @@ const messages = defineMessages(
     yesterday: '昨天',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`),
+    hourUnit: '小时',
+    minuteUnit: '分',
+    minutesUnit: '分钟',
   },
   {
     noUpdates: 'No updates yet',
@@ -40,6 +44,9 @@ const messages = defineMessages(
     yesterday: 'Yesterday',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`),
+    hourUnit: 'h',
+    minuteUnit: 'm',
+    minutesUnit: 'min',
   },
   {
     noUpdates: 'Sin actualizaciones',
@@ -52,6 +59,9 @@ const messages = defineMessages(
     yesterday: 'Ayer',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
+    hourUnit: 'h',
+    minuteUnit: 'min',
+    minutesUnit: 'min',
   },
   'lib/format',
 );
@@ -139,6 +149,21 @@ export const formatDuration = (minutes?: number | null, empty = copy().durationU
   if (!isFiniteNumber(minutes) || minutes < 0) return empty;
   const total = Math.round(minutes);
   return copy().duration(Math.floor(total / 60), total % 60);
+};
+
+/**
+ * 时长拆成数字段 / 单位段（第三轮精修 B4）：`<DurationText>`、牌面、睡眠详情头部共用——数字大、单位小一号、不折行。
+ * 英文写成 `8h 11m`。没有值返回 null（界面写「—」，不写 0）。
+ */
+export const formatDurationParts = (minutes?: number | null): FacePart[] | null => {
+  if (!isFiniteNumber(minutes) || minutes < 0) return null;
+  const total = Math.round(minutes);
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  const c = copy();
+  return hours > 0
+    ? [{ n: String(hours) }, { u: c.hourUnit }, { n: String(rest) }, { u: c.minuteUnit }]
+    : [{ n: String(rest) }, { u: c.minutesUnit }];
 };
 
 export const formatDistance = (meters?: number, empty = copy().notRecorded): string => {

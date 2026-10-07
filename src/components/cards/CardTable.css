@@ -2,6 +2,8 @@
    不逐帧改 blur；模糊画在这一层自己身上，祖先不做 opacity 动画——否则 Chromium 会把它当成取样边界，淡入期间看不到模糊）。 */
 .card-table { position: fixed; inset: 0; z-index: 2000; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px;
   padding: 26px clamp(16px, 4vw, 56px) 22px; color: var(--ink); }
+/* 收牌途中让点击落到底下的页面：再点一下来处 = 原路扇回来（reopen）。 */
+.card-table.closing { pointer-events: none; }
 .table-backdrop { position: absolute; inset: 0; z-index: -1;
   background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 70%), rgba(6, 8, 12, .62);
   -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
@@ -22,10 +24,16 @@
 .table-stage { position: relative; min-height: 0; }
 .table-layer { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 18px; margin: auto; padding: 12px 8px; }
 .table-layer[inert] { pointer-events: none; }
-.pslot { display: block; flex: 0 0 auto; }
+.table-layer.pending { visibility: hidden; }
+/* 牌位：翻面确认的那张左右的牌往两边让一点（独立的 translate，不冲掉扇面的 transform）。 */
+.pslot { position: relative; display: block; flex: 0 0 auto; transition: translate 280ms cubic-bezier(.3, 1.2, .5, 1); }
+.pslot.shift-l { translate: -14px 0; }
+.pslot.shift-r { translate: 14px 0; }
+/* 按住一叠时其余的叠微微变暗。 */
+.table-layer.holding .pslot:not(.is-holding) :deep(.pcard) { opacity: .62; }
+:deep(.pcard.lifting .pcard-face) { transform: translateY(-14px) scale(1.06); }
 .table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
-.table-hint { margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; text-align: center; }
-.table-hint span { color: var(--subtle); }
+.table-foot { min-height: 0; }
 @media (max-width: 640px) {
   .card-table { padding: 18px 16px 18px; }
   .table-head { flex-wrap: wrap; }

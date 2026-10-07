@@ -16,6 +16,8 @@ export const SPRINGS = {
   flip: { stiffness: 420, damping: 32 },
   settle: { stiffness: 170, damping: 24 },
   pop: { stiffness: 520, damping: 26 },
+  /** 理牌：利落地叠齐，几乎不回弹（第三轮 A1）。 */
+  stack: { stiffness: 340, damping: 34 },
 } as const satisfies Record<string, Spring>;
 
 export interface SpringCurve {

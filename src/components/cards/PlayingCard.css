@@ -1,0 +1,84 @@
+/* 一张牌（第三轮 A2）。字号跟着牌宽走（--w）；读数整串不折行，放不下按 --fit（估出来的 em 宽）一起缩。 */
+.pcard { --w: var(--card-w, 150px); position: relative; isolation: isolate; width: var(--w); aspect-ratio: 5 / 7; flex: 0 0 auto; padding: 0; border: 0; background: none;
+  color: var(--ink); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: scale 220ms cubic-bezier(.3, 1.3, .5, 1), opacity var(--dur-base) ease; }
+.pcard.disabled { cursor: default; }
+/* 牌面：有厚度的一块板，顶上一抹这一项的颜色，像印上去的花色底纹。 */
+.pcard-face { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; padding: calc(var(--w) * .07); border-radius: calc(var(--w) * .1);
+  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 70%), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 14%, transparent), 0 24px 40px -24px rgba(0, 0, 0, .8);
+  transition: transform 260ms cubic-bezier(.3, 1.3, .5, 1), box-shadow var(--dur-base) ease; }
+.pcard:not(.disabled):not(.confirm):not(.boxed):hover .pcard-face { transform: translateY(-8px); box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 34px 50px -26px rgba(0, 0, 0, .85); }
+.pcard.focused .pcard-face { box-shadow: var(--mat-raised-rim), inset 0 0 0 2px color-mix(in srgb, var(--tint) 70%, transparent), 0 30px 50px -24px color-mix(in srgb, var(--tint) 40%, rgba(0, 0, 0, .8)); }
+.pcard:focus-visible { outline: none; }
+.pcard:focus-visible .pcard-face { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--focus), 0 24px 40px -24px rgba(0, 0, 0, .8); }
+.pcard.disabled .pcard-face { background: var(--mat-raised); opacity: .45; }
+/* 一叠：后面垫两张歪着的牌。一天都没记录的叠：压暗、缩小一点（稀疏指标的 6 个月不再一排大块）。 */
+.pcard.group::before, .pcard.group::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--w) * .1); background: var(--mat-raised); box-shadow: var(--mat-raised-rim), 0 18px 30px -22px rgba(0, 0, 0, .7); }
+.pcard.group::before { transform: translate(6px, 6px) rotate(4deg); opacity: .8; }
+.pcard.group::after { transform: translate(-5px, 9px) rotate(-5deg); opacity: .55; }
+.pcard.group.empty { scale: .86; }
+.pcard.group.empty .pcard-face { background: var(--mat-raised); opacity: .62; }
+.pcard.group.empty::before, .pcard.group.empty::after { opacity: .3; }
+/* 角标：左上「周四 ◆」；右下只有花色点和日期数字，整枚倒过来（数字倒放像真扑克，汉字不倒放）。 */
+.corner { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-weight: 650; line-height: 1; white-space: nowrap; }
+.corner i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; background: var(--tint); transform: rotate(45deg); }
+.corner.br { justify-self: end; transform: rotate(180deg); }
+.corner.br b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pcard-main { display: grid; align-content: center; justify-items: center; gap: calc(var(--w) * .04); min-width: 0; text-align: center; }
+.pcard-icon { color: var(--tint); }
+.pcard-title { max-width: 100%; font-size: min(max(13px, calc(var(--w) * .15)), calc(var(--w) * .8 / var(--tfit, 4))); font-weight: 750; font-variant-numeric: tabular-nums;
+  line-height: 1.1; letter-spacing: -.01em; white-space: nowrap; }
+.pcard.group .pcard-title { font-size: min(max(12px, calc(var(--w) * .12)), calc(var(--w) * .8 / var(--tfit, 4))); }
+/* 读数：数字等宽大字，单位正文字体小一号、灰一级；整串一行。 */
+.pcard-value { display: inline-flex; align-items: baseline; justify-content: center; gap: .14em; max-width: 100%; color: var(--tint); white-space: nowrap; line-height: 1.05;
+  font-size: min(calc(var(--w) * .19), calc(var(--w) * .8 / var(--fit, 2))); }
+.pcard.group .pcard-value { font-size: min(calc(var(--w) * .13), calc(var(--w) * .8 / var(--fit, 2))); }
+.pcard-value b { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pcard-value small { color: var(--muted); font-family: var(--font-sans, inherit); font-size: .52em; font-weight: 600; }
+.pcard-value.none { color: var(--subtle); font-size: calc(var(--w) * .12); font-weight: 500; }
+.pcard-none-pill { padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--muted); font-size: max(10px, calc(var(--w) * .07));
+  font-weight: 650; white-space: nowrap; }
+/* 一叠里哪几天有记录：一排小点（7 个一行）。 */
+.pcard-dots { display: grid; grid-template-columns: repeat(var(--cols, 7), auto); gap: calc(var(--w) * .022); }
+.pcard-dots i { width: max(4px, calc(var(--w) * .034)); height: max(4px, calc(var(--w) * .034)); border-radius: 50%; background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.pcard-dots i.on { background: var(--tint); }
+.pcard-badge { position: absolute; top: -9px; right: -9px; padding: 3px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140a);
+  font-size: var(--fs-2xs); font-style: normal; font-weight: 750; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .6); }
+/* 背面：翻过来等确认——牌抬起来、阴影加深；点大圆勾放进收集箱，点「放回」翻回去。 */
+.pcard.confirm .pcard-face { transform: translateY(-14px) scale(1.06); }
+.pcard-face.back { grid-template-rows: auto auto auto auto; place-items: center; align-content: center; gap: calc(var(--w) * .045); text-align: center;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 40px 56px -26px color-mix(in srgb, var(--accent) 45%, rgba(0, 0, 0, .85));
+  color: var(--accent); }
+.back-mark { display: grid; place-items: center; width: calc(var(--w) * .42); height: calc(var(--w) * .42); border-radius: 50%; background: var(--accent); color: var(--accent-ink, #10140a);
+  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--accent) 80%, transparent); transition: transform 160ms ease; }
+.pcard.confirm:hover .back-mark { transform: scale(1.06); }
+.pcard-face.back strong { font-size: max(13px, calc(var(--w) * .1)); }
+.back-title { color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-variant-numeric: tabular-nums; }
+.back-cancel { padding: 3px 10px; border-radius: 999px; color: var(--muted); font-size: max(10px, calc(var(--w) * .07)); }
+.back-cancel:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+/* 已在收集箱里：牌位只剩一圈虚线轮廓；点它把牌从箱子里拿回来。 */
+.pcard-face.outline { grid-template-rows: auto auto auto; place-items: center; align-content: center; gap: calc(var(--w) * .04); text-align: center;
+  background: color-mix(in srgb, var(--ink) 3%, transparent); box-shadow: none; outline: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -1.5px;
+  color: var(--muted); animation: pcard-outline-in 280ms 140ms cubic-bezier(.2, .8, .2, 1) both; }
+.pcard-face.outline :deep(svg) { color: var(--accent); }
+.pcard-face.outline small { font-size: max(10px, calc(var(--w) * .075)); }
+.pcard-face.outline b { font-size: max(12px, calc(var(--w) * .1)); font-variant-numeric: tabular-nums; }
+.pcard.boxed:hover .pcard-face.outline { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+@keyframes pcard-outline-in { from { opacity: 0; } }
+/* 闪一下：一圈光，只淡入淡出它自己（牌桌落定后、从箱子拿回来时）。 */
+.pcard-glow { position: absolute; inset: -3px; z-index: 2; border-radius: calc(var(--w) * .1 + 3px); opacity: 0; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--tint), 0 0 30px 6px color-mix(in srgb, var(--tint) 45%, transparent); }
+/* 长按：边框描一圈，按住时往下沉一点，松手弹回。 */
+.pcard.holding { scale: .97; }
+.pcard-ring { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; overflow: visible; opacity: 0; pointer-events: none; }
+.pcard-ring rect { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; vector-effect: non-scaling-stroke; }
+.pcard.holding .pcard-ring { opacity: 1; }
+.pcard.holding .pcard-ring rect { animation: pcard-hold 450ms linear forwards; }
+@keyframes pcard-hold { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pcard, .pcard-face { transition: none; }
+  .pcard.holding .pcard-ring rect { animation-duration: 1ms; }
+  .pcard-face.outline { animation-duration: 1ms; }
+}

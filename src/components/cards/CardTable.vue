@@ -1,56 +1,67 @@
 <script setup lang="ts">
 /**
- * 牌桌（精修批次 7.2，10-07 第二轮重做）：点哪里，一桌牌就从哪里飞出来铺满整个界面，背后整页静态模糊。
+ * 牌桌（精修批次 7.2，第三轮 A 重做）：点哪里，一桌牌就从哪里抽出来铺满整个界面，背后整页静态模糊。
  *
- * - 7 天：七张大日牌排成一道微微拱起的扇面；点一张翻到背面「交给 AI ✓」并飞进收集箱，再点放回去；
- * - 1 个月 / 6 个月：一叠叠自然周 / 月。点一叠 → 镜头往前推（上一层退后、换成预先模糊好的静态拷贝），
- *   这一叠在正中发开；长按 450ms（带进度环）整叠收进箱子；
- * - 从「你的过去」的某一格点开（`focus`）：以那一天为中心发七张，那一张落在正中、描一圈这一项的颜色；
- * - 点空白 / Esc：收牌，原路拉回上一层；最上层再收就整桌收回点开它的地方，背景跟着牌一起淡回去（不硬切）。
- * - 键盘：空格挑这一张（一叠就是整叠），Enter 展开一叠，Shift+Enter 整层都挑。
+ * - 7 天：七张大日牌排成一道微拱的扇面；点一张翻到背面等确认，点勾整张飞进收集箱（两步，见 useCardPicking）；
+ * - 1 个月 / 6 个月：一叠叠自然周 / 月。点一叠 → 这一层的牌先收拢进那一叠、那一叠退到后面压暗，
+ *   新一层再从那一叠里抽出来扇开（先后交替，不叠影）；长按整叠飞进箱子；
+ * - 从「你的过去」的某一格点开（`focus`）：以那一天为中心发七张，那一张落在正中、落定后闪一下；
+ * - 收牌（点空白 / Esc / ×）：先理成一叠，再整叠放回来处——下钻层落进被点的那一叠，最上层缩回按钮（按钮接住、亮一圈）；
+ *   背景模糊、标题和放回同起同止。任何阶段再按 Esc 都是从此刻原路放回，不会半路消失。
+ * - 换范围：洗牌 → 理成一叠停在正中 → 从这同一叠发出新的一副。
  * 没有记录的日子照样发牌、写「—」，但不能挑；减少动效时一律淡入淡出（见 lib/motion/cards）。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import Icon from '../Icon.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import PlayingCard from './PlayingCard.vue';
+import CoachTip from './CoachTip.vue';
 import { useCardsText } from './cards.i18n';
 import { useCardCollection } from '../../composables/useCardCollection';
-import { collectCards, dealCards, flipCard, flyToTarget, recedeLayer, reducedMotion, shuffleCards, type Receded } from '../../lib/motion/cards';
+import { useCardPicking } from '../../composables/useCardPicking';
+import {
+  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, returnStack, sequence, shuffleCards, stackCards, type Landing, type Receded,
+} from '../../lib/motion/cards';
+import { CLOSE_EASE, OPEN_EASE } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
 import { expandGroup, focusWindow, groupSummary, pickableDates, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
 import { deckToday, type DeckSource } from '../../lib/cards/sources';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 
-const props = withDefaults(defineProps<{ source: DeckSource; range: DeckRange; origin?: DOMRect | null; focus?: string | null }>(), { origin: null, focus: null });
+const props = withDefaults(defineProps<{ source: DeckSource; range: DeckRange; origin?: DOMRect | null; anchor?: Element | null; focus?: string | null }>(), { origin: null, anchor: null, focus: null });
 const emit = defineEmits<{ close: [] }>();
 const t = useCardsText();
 const box = useCardCollection();
-const HOLD_MS = 450;
 const GAP = 18;
+const RETURN_MS = 440;
 
-interface Entry { id: string; level: DeckLevel; title: string; origin: DOMRect | null; receded: Receded | null }
+interface Entry { id: string; level: DeckLevel; title: string; receded: (Receded & { ready: Promise<void> }) | null; pending: boolean }
 const range = ref<DeckRange>(props.focus ? 7 : props.range);
 const stack = shallowRef<Entry[]>([]);
 const layers: HTMLElement[] = [];
 
 const stage = ref<HTMLElement | null>(null);
 const backdrop = ref<HTMLElement | null>(null);
-const chrome = ref<HTMLElement[]>([]);
+const head = ref<HTMLElement | null>(null);
+const mark = ref<HTMLElement | null>(null);
+const foot = ref<HTMLElement | null>(null);
 const stageBox = ref({ width: 1000, height: 560 });
 const busy = ref(false);
+const closing = ref(false);
 const loadFailed = ref(false);
-const holdId = ref<string | null>(null);
 const focusDate = ref<string | null>(props.focus);
 const titleId = `card-table-${Math.random().toString(36).slice(2, 8)}`;
+const seq = sequence();
 let returnFocus: HTMLElement | null = null;
 let entrySeq = 0;
-let backdropIn: Animation | null = null;
+let popping = false;
+let boxOpen = false;
 
 const setLayer = (depth: number, el: unknown) => { if (el instanceof HTMLElement) layers[depth] = el; };
 const top = computed(() => stack.value[stack.value.length - 1] ?? null);
 const cardsOf = (depth: number): HTMLElement[] => [...(layers[depth]?.querySelectorAll<HTMLElement>('.pcard') ?? [])];
-const boxEl = () => document.getElementById('card-collection-box');
+const cardOf = (id: string) => layers[stack.value.length - 1]?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(id)}"]`) ?? null;
+const picking = useCardPicking({ source: () => props.source, busy, cardOf });
 
 /* ---------- 文案 ---------- */
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
@@ -60,6 +71,12 @@ const yearMonth = (date: string) => displayDateTimeFormatter({ year: 'numeric', 
 const numberText = (value: number | null) => (value === null || !props.source.format ? null : props.source.format(value));
 const dayValue = (day: DeckDay) => numberText(day.value) ?? (day.has ? t.value.recorded : null);
 const dayAriaValue = (day: DeckDay) => { const n = numberText(day.value); return n ? `${n}${props.source.unit ? ` ${props.source.unit}` : ''}` : day.has ? t.value.recorded : t.value.noRecord; };
+const dayAria = (day: DeckDay) => {
+  const state = picking.stateOf(day.date);
+  if (state === 'boxed') return t.value.boxedAria(md(day.date));
+  if (state === 'confirm') return t.value.confirmAria(md(day.date));
+  return t.value.dayAria(md(day.date), dayAriaValue(day), false);
+};
 const groupTitle = (group: DeckGroup) => (group.kind === 'month' ? monthName(group.start) : t.value.weekRange(md(group.start), md(group.end)));
 const groupTop = (group: DeckGroup) => (group.kind === 'month' ? group.start.slice(0, 4) : yearMonth(group.start));
 const groupValue = (group: DeckGroup) => { const average = numberText(groupSummary(group).average); return average === null ? null : t.value.average(average); };
@@ -69,7 +86,7 @@ const groupBadge = (group: DeckGroup) => { const n = pickedIn(group); return n ?
 const rangeLabel = (value: DeckRange) => (value === 7 ? t.value.range7 : value === 30 ? t.value.range30 : t.value.range180);
 const rangeItems = computed(() => ([7, 30, 180] as DeckRange[]).map((value) => ({ value: String(value), label: rangeLabel(value) })));
 const crumbs = computed(() => stack.value.map((entry) => entry.title).join(' › '));
-const hint = computed(() => (top.value?.level.kind === 'groups' ? t.value.hintGroups : t.value.hintDays));
+const hint = computed(() => (top.value?.level.kind === 'groups' ? t.value.hintGroups : t.value.tipDays));
 const pickedCount = computed(() => box.picks.value.filter((pick) => pick.key === props.source.key).length);
 
 /* ---------- 版式：牌按桌面大小排开，一层一道微拱的扇面 ---------- */
@@ -77,7 +94,7 @@ const countOf = (level: DeckLevel) => (level.kind === 'days' ? level.days.length
 const layout = (level: DeckLevel) => {
   const n = Math.max(1, countOf(level));
   const { width, height } = stageBox.value;
-  const byHeight = (rows: number) => ((height - GAP * (rows - 1)) / rows) * 0.86 * (5 / 7);
+  const byHeight = (rows: number) => ((height - GAP * (rows - 1)) / rows) * 0.84 * (5 / 7);
   let perRow = n;
   let w = Math.min(232, byHeight(1), (width - GAP * (perRow - 1)) / perRow);
   if (w < 104 && n > 4) {
@@ -101,6 +118,28 @@ const slotStyle = (level: DeckLevel, i: number) => {
   const drop = off * off * Math.min(28, 6 + perRow * 3);
   return { transform: `translateY(${drop.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)` };
 };
+/** 翻面确认的那张左右的牌往两边让一点。 */
+const slotClass = (depth: number, ids: string[], i: number) => {
+  if (depth !== stack.value.length - 1 || !picking.raisedId.value) return null;
+  const at = ids.indexOf(picking.raisedId.value);
+  return at < 0 || at === i ? null : i < at ? 'shift-l' : 'shift-r';
+};
+
+/* ---------- 来处 ---------- */
+const anchorLanding = (): Landing | null => {
+  const rect = props.anchor?.isConnected ? props.anchor.getBoundingClientRect() : props.origin;
+  return rect ? { rect, kind: 'button' } : null;
+};
+const stageCenter = () => {
+  const r = stage.value?.getBoundingClientRect();
+  return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined;
+};
+const firstPickable = (cards: HTMLElement[]) => cards.find((card) => card.classList.contains('focused'))
+  ?? cards.find((card) => card.getAttribute('aria-disabled') !== 'true');
+const pulse = (card: HTMLElement | undefined) => {
+  if (!card || reducedMotion()) return;
+  card.querySelector('.pcard-glow')?.animate([{ opacity: 0 }, { opacity: 1, offset: 0.35 }, { opacity: 0 }], { duration: 600, easing: 'ease-out' });
+};
 
 /* ---------- 发牌、推镜头、收牌 ---------- */
 const loadLevel = async (): Promise<DeckLevel | null> => {
@@ -117,48 +156,58 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
     return null;
   }
 };
-const stageOrigin = (): DOMRect | null => {
-  const box = stage.value?.getBoundingClientRect();
-  return box ? new DOMRect(box.left + box.width / 2 - 50, box.bottom - 40, 100, 140) : null;
-};
-const firstPickable = (cards: HTMLElement[]) => cards.find((card) => card.classList.contains('focused'))
-  ?? cards.find((card) => card.getAttribute('aria-disabled') !== 'true');
+const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : rangeLabel(range.value));
 
-const deal = async (origin: DOMRect | null) => {
+const deal = async (id: number) => {
   const level = await loadLevel();
-  if (!level) return;
+  if (!level || !seq.live(id)) return;
   layers.length = 0;
-  const title = focusDate.value ? t.value.aroundDay(md(focusDate.value)) : rangeLabel(range.value);
-  stack.value = [{ id: `e${entrySeq++}`, level, title, origin, receded: null }];
+  stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
-  await dealCards(cards, origin ?? stageOrigin());
-  firstPickable(cards)?.focus({ preventScroll: true });
+  await dealCards(cards, anchorLanding());
+  if (!seq.live(id)) return;
+  const first = firstPickable(cards);
+  first?.focus({ preventScroll: true });
+  if (focusDate.value) pulse(cards.find((card) => card.classList.contains('focused')));
 };
 
 const push = async (group: DeckGroup, card: HTMLElement) => {
-  if (busy.value) return;
+  if (busy.value || closing.value) return;
+  const id = seq.next();
   busy.value = true;
+  await picking.cancelConfirm();
   const depth = stack.value.length - 1;
-  const rect = card.getBoundingClientRect();
-  const receded = recedeLayer(layers[depth]!, rect);
-  const current = stack.value[depth]!;
-  stack.value = [...stack.value.slice(0, depth), { ...current, receded }, { id: `e${entrySeq++}`, level: expandGroup(group), title: groupTitle(group), origin: rect, receded: null }];
+  const entry: Entry = { id: `e${entrySeq++}`, level: expandGroup(group), title: groupTitle(group), receded: null, pending: true };
+  const receded = recedeLayer(layers[depth]!, card, () => seq.live(id));
+  const below = { ...stack.value[depth]!, receded };
+  stack.value = [...stack.value.slice(0, depth), below, entry];
+  await receded.ready;
+  if (!seq.live(id)) return;
+  stack.value = [...stack.value.slice(0, depth + 1), { ...entry, pending: false }];
   await nextTick();
   const cards = cardsOf(depth + 1);
-  await dealCards(cards, rect);
-  firstPickable(cards)?.focus({ preventScroll: true });
+  await dealCards(cards, receded.now());
+  if (!seq.live(id)) return;
   busy.value = false;
+  firstPickable(cards)?.focus({ preventScroll: true });
 };
 
 const pop = async () => {
-  if (busy.value) return;
+  if (popping || closing.value) return;
   const depth = stack.value.length - 1;
   if (depth <= 0) { await close(); return; }
+  const id = seq.next();
+  popping = true;
   busy.value = true;
+  await picking.cancelConfirm();
   const leaving = stack.value[depth]!;
   const below = stack.value[depth - 1]!;
-  await Promise.all([collectCards(cardsOf(depth), leaving.origin), below.receded?.restore()]);
+  const cards = leaving.pending ? [] : cardsOf(depth);
+  if (cards.length) await stackCards(cards);
+  if (seq.live(id)) await Promise.all([returnStack(cards, below.receded?.pile ?? null), below.receded?.restore()]);
+  popping = false;
+  if (!seq.live(id)) return;
   layers.length = depth;
   stack.value = [...stack.value.slice(0, depth - 1), { ...below, receded: null }];
   await nextTick();
@@ -166,110 +215,118 @@ const pop = async () => {
   firstPickable(cardsOf(depth - 1))?.focus({ preventScroll: true });
 };
 
-/** 从此刻的样子淡到 0（开到一半就收，也不会先跳到「开好」）。 */
-const fadeOut = (el: HTMLElement | null | undefined, duration: number) => {
-  if (!el) return null;
-  const from = getComputedStyle(el).opacity;
-  return el.animate([{ opacity: from }, { opacity: 0 }], { duration, easing: 'ease-in', fill: 'forwards' });
+/** 背景、标题、底下的提示、退在后面的几层：从此刻的样子淡到 `to`，和放回同起同止。 */
+const fadeChrome = (to: number, duration: number) => {
+  const easing = to ? OPEN_EASE : CLOSE_EASE;
+  const els = [backdrop.value, head.value, foot.value, ...layers.slice(0, -1)].filter((el): el is HTMLElement => !!el);
+  return els.map((el) => animateFromNow(el, { opacity: to }, { duration, easing, fill: 'forwards' }, ['opacity']));
+};
+const setBoxOpen = (open: boolean) => {
+  if (boxOpen === open) return;
+  boxOpen = open;
+  box.setTableOpen(open);
 };
 
-const closing = ref(false);
 const close = async () => {
   if (closing.value) return;
+  const id = seq.next();
   closing.value = true;
   busy.value = true;
-  const depth = stack.value.length - 1;
-  const target = depth === 0 ? props.origin : stack.value[depth]!.origin;
-  // 牌往回飞的同时，背景模糊和标题一起淡回去——牌落地那一刻页面正好清楚（以前牌还在半空背景就啪地没了）。
-  backdropIn?.cancel();
-  const fades = [fadeOut(backdrop.value, 380), ...chrome.value.map((el) => fadeOut(el, 220))];
-  for (const entry of stack.value.slice(0, -1)) {
-    const layer = layers[stack.value.indexOf(entry)];
-    fadeOut(layer?.nextElementSibling as HTMLElement | null, 260);
-  }
-  await Promise.all([collectCards(cardsOf(depth), target), ...fades.map((a) => a?.finished.catch(() => undefined))]);
+  picking.holdEnd();
+  const cards = cardsOf(stack.value.length - 1).filter((card) => card.style.visibility !== 'hidden');
+  const receiver = receive(props.anchor);
+  await stackCards(cards, stageCenter());
+  if (!seq.live(id)) { receiver.cancel(); return; }
+  // 放回：整叠缩回来处，背景模糊、标题、箱子（空的话）同一段时间里淡回去，牌落地那一刻页面正好清楚。
+  setBoxOpen(false);
+  const fades = fadeChrome(0, reducedMotion() ? 160 : RETURN_MS);
+  await Promise.all([returnStack(cards, anchorLanding()), ...fades.map((a) => a.finished.catch(() => undefined))]);
+  if (!seq.live(id)) { receiver.cancel(); return; }
+  receiver.land(props.source.tint);
   for (const entry of stack.value) entry.receded?.drop();
   emit('close');
   returnFocus?.focus({ preventScroll: true });
 };
 
+/** 收到一半又点了来处：从此刻原路扇回来，背景淡回去。 */
+const reopen = () => {
+  if (!closing.value) return;
+  seq.next();
+  closing.value = false;
+  busy.value = false;
+  props.anchor?.classList.remove('is-receiving');
+  setBoxOpen(true);
+  fadeChrome(1, 360);
+  void fanBack(cardsOf(stack.value.length - 1));
+};
+
 const switchRange = async (value: string) => {
   const next = Number(value) as DeckRange;
-  if ((next === range.value && !focusDate.value) || busy.value) return;
+  if ((next === range.value && !focusDate.value) || busy.value || closing.value) return;
+  const id = seq.next();
   busy.value = true;
+  await picking.cancelConfirm();
   range.value = next;
   focusDate.value = null;
-  for (const entry of stack.value) entry.receded?.drop();
+  const loading = loadLevel();
   const old = cardsOf(stack.value.length - 1);
+  for (const layer of layers.slice(0, -1)) animateFromNow(layer, { opacity: 0 }, { duration: 260, fill: 'forwards' }, ['opacity']);
   await shuffleCards(old);
-  await collectCards(old, stageOrigin());
-  await deal(stageOrigin());
-  busy.value = false;
-};
-
-/* ---------- 挑牌 ---------- */
-const toggleDay = async (day: DeckDay, card: HTMLElement) => {
-  if (!day.has || busy.value) return;
-  const picked = box.has(props.source.key, day.date);
-  await flipCard(card, async () => {
-    if (picked) box.remove(props.source.key, [day.date]);
-    else box.add(props.source.key, props.source.category, [day.date]);
-    await nextTick();
-  });
-  if (!picked) void flyToTarget(card, boxEl());
-};
-
-const pickDates = async (dates: string[], from: HTMLElement[]) => {
-  if (!dates.length) return;
-  const all = dates.every((date) => box.has(props.source.key, date));
-  if (all) { box.remove(props.source.key, dates); return; }
-  box.add(props.source.key, props.source.category, dates);
+  if (!seq.live(id)) return;
+  const center = stageCenter();
+  await stackCards(old, center);
+  const level = await loading;
+  if (!seq.live(id) || !level) { busy.value = false; return; }
+  // 这一叠就是落点：新的一副从同一个位置、同样大小发出来。
+  const topCard = old[old.length - 1];
+  const width = (topCard?.offsetWidth ?? 120);
+  const at = center ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const from: Landing = { rect: new DOMRect(at.x - width / 2, at.y - width * 0.7, width, width * 1.4), kind: 'pile', angle: 0, width };
+  for (const entry of stack.value) entry.receded?.drop();
+  layers.length = 0;
+  stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
-  // 整组飞：最多飞六张替身，再多只是在屏幕上撒一把。
-  for (const card of from.slice(0, 6)) void flyToTarget(card, boxEl());
+  const cards = cardsOf(0);
+  await dealCards(cards, from, { fromStack: true });
+  if (!seq.live(id)) return;
+  busy.value = false;
+  firstPickable(cards)?.focus({ preventScroll: true });
 };
 
-const pickGroup = (group: DeckGroup, card: HTMLElement) => pickDates(pickableDates(group), [card]);
-
-const pickLayer = () => {
-  const entry = top.value;
-  if (!entry || busy.value) return;
-  const cards = cardsOf(stack.value.length - 1).filter((card) => card.getAttribute('aria-disabled') !== 'true');
-  const dates = entry.level.kind === 'days'
-    ? entry.level.days.filter((day) => day.has).map((day) => day.date)
-    : entry.level.groups.flatMap(pickableDates);
-  void pickDates(dates, cards);
-};
-
-/* 长按一叠：450ms 后整叠收进箱子；没按满就是普通的点（展开）。 */
-let hold: { id: string; x: number; y: number; timer: number; done: boolean } | null = null;
-const holdStart = (group: DeckGroup, event: PointerEvent) => {
-  if (event.button !== 0 || busy.value) return;
-  const card = event.currentTarget as HTMLElement;
-  holdId.value = group.id;
-  hold = { id: group.id, x: event.clientX, y: event.clientY, done: false, timer: window.setTimeout(() => {
-    if (!hold) return;
-    hold.done = true;
-    holdId.value = null;
-    void pickGroup(group, card);
-  }, HOLD_MS) };
-};
-const holdMove = (event: PointerEvent) => {
-  if (hold && !hold.done && Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > 8) holdEnd();
-};
-const holdEnd = () => {
-  if (hold && !hold.done) { clearTimeout(hold.timer); hold = null; }
-  holdId.value = null;
+const onBlank = () => {
+  if (picking.confirmId.value) { void picking.cancelConfirm(); return; }
+  void pop();
 };
 const tapGroup = (group: DeckGroup, event: MouseEvent) => {
-  if (hold?.done) { hold = null; return; }
-  hold = null;
+  if (picking.consumeHold()) return;
   void push(group, event.currentTarget as HTMLElement);
 };
+const onCardKey = (event: KeyboardEvent, item: { group?: DeckGroup }) => {
+  const level = top.value?.level;
+  if (event.key === 'Enter' && event.shiftKey && level) {
+    event.preventDefault();
+    void picking.pickAll(level.kind === 'days' ? level.days : null, level.kind === 'groups' ? level.groups : null);
+    return;
+  }
+  if (item.group && event.key === ' ') { event.preventDefault(); void picking.pickGroup(item.group, event.currentTarget as HTMLElement); }
+};
 
-const onCardKey = (event: KeyboardEvent, item: { day?: DeckDay; group?: DeckGroup }) => {
-  if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); pickLayer(); return; }
-  if (item.group && event.key === ' ') { event.preventDefault(); void pickGroup(item.group, event.currentTarget as HTMLElement); }
+/* ---------- 头部入场：图标从来处飞到左上角，标题、范围依次浮上 ---------- */
+const introHead = () => {
+  if (reducedMotion()) return;
+  const icon = props.anchor?.querySelector('svg')?.getBoundingClientRect() ?? props.origin;
+  const target = mark.value?.getBoundingClientRect();
+  if (icon && target && mark.value) {
+    const dx = icon.left + icon.width / 2 - (target.left + target.width / 2);
+    const dy = icon.top + icon.height / 2 - (target.top + target.height / 2);
+    const s = Math.max(0.3, Math.min(1, icon.width / Math.max(target.width, 1)));
+    mark.value.animate([{ transform: `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${s.toFixed(2)})`, opacity: 0.4 }, { transform: 'none', opacity: 1 }],
+      { duration: 520, easing: OPEN_EASE, fill: 'backwards' });
+  }
+  [...(head.value?.querySelectorAll<HTMLElement>('[data-intro]') ?? [])].forEach((el, i) => el.animate(
+    [{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }],
+    { duration: 380, delay: 140 + i * 70, easing: OPEN_EASE, fill: 'backwards' },
+  ));
 };
 
 /* ---------- 生命周期 ---------- */
@@ -282,65 +339,71 @@ const measure = () => {
 onMounted(() => {
   returnFocus = document.activeElement as HTMLElement | null;
   releaseEscape = onMotionEscape(() => {
-    if (!busy.value) void pop();
+    if (picking.confirmId.value) { void picking.cancelConfirm(); return true; }
+    if (!closing.value) void pop();
     return true;
   });
   measure();
   resize = new ResizeObserver(measure);
   if (stage.value) resize.observe(stage.value);
-  backdropIn = backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' }) ?? null;
-  for (const [i, el] of chrome.value.entries()) {
-    el.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 120 + i * 60, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
-  }
-  void deal(props.origin);
+  setBoxOpen(true);
+  backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
+  introHead();
+  void deal(seq.next());
 });
 onBeforeUnmount(() => {
   releaseEscape?.();
   resize?.disconnect();
-  holdEnd();
+  picking.holdEnd();
+  setBoxOpen(false);
   for (const entry of stack.value) entry.receded?.drop();
 });
+defineExpose({ reopen, isClosing: () => closing.value });
 </script>
 
 <template>
   <Teleport to="body">
-    <div :class="['card-table', { closing }]" role="dialog" aria-modal="true" :aria-labelledby="titleId" :style="{ '--tint': source.tint }">
-      <div ref="backdrop" class="table-backdrop" aria-hidden="true" @click="pop"></div>
-      <header :ref="(el) => { if (el) chrome[0] = el as HTMLElement; }" class="table-head">
+    <div :class="['card-table', { closing }]" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="`${titleId}-keys`" :style="{ '--tint': source.tint }">
+      <div ref="backdrop" class="table-backdrop" aria-hidden="true" @click="onBlank"></div>
+      <header ref="head" class="table-head">
         <button v-if="stack.length > 1" type="button" class="table-icon" :aria-label="t.back" @click="pop"><Icon name="arrow-left" :size="17" /></button>
-        <span v-else class="table-mark" aria-hidden="true"><Icon name="cards" :size="18" /></span>
-        <div class="table-titles">
+        <span v-else ref="mark" class="table-mark" aria-hidden="true"><Icon name="cards" :size="18" /></span>
+        <div class="table-titles" data-intro>
           <h2 :id="titleId">{{ source.label }}</h2>
           <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template></p>
         </div>
-        <SegmentTrack compact :items="rangeItems" :model-value="focusDate ? '' : String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" />
-        <button type="button" class="table-icon" :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
+        <span data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
+        <button type="button" class="table-icon" data-intro :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
       </header>
-      <div ref="stage" class="table-stage" @click.self="pop">
+      <div ref="stage" class="table-stage" @click.self="onBlank">
         <p v-if="loadFailed" class="table-empty">{{ t.noRecord }}</p>
         <template v-for="(entry, depth) in stack" :key="entry.id">
-          <div :ref="(el) => setLayer(depth, el)" class="table-layer" :style="layerStyle(entry.level)" @click.self="pop">
+          <div :ref="(el) => setLayer(depth, el)" :class="['table-layer', { pending: entry.pending, holding: !!picking.holdId.value }]" :style="layerStyle(entry.level)" @click.self="onBlank">
             <template v-if="entry.level.kind === 'days'">
-              <span v-for="(day, i) in entry.level.days" :key="day.date" class="pslot" :style="slotStyle(entry.level, i)">
-                <PlayingCard kind="day" :top="weekday(day.date)" :title="md(day.date)" :value="dayValue(day)" :unit="numberText(day.value) ? source.unit : null"
-                  :picked="box.has(source.key, day.date)" :disabled="!day.has" :focused="day.date === focusDate" :tint="source.tint"
-                  :aria-label="t.dayAria(md(day.date), dayAriaValue(day), box.has(source.key, day.date))" :aria-pressed="box.has(source.key, day.date)"
-                  @click="toggleDay(day, $event.currentTarget as HTMLElement)" @keydown="onCardKey($event, { day })" />
+              <span v-for="(day, i) in entry.level.days" :key="day.date" :class="['pslot', slotClass(depth, entry.level.days.map((d) => d.date), i)]" :style="slotStyle(entry.level, i)">
+                <PlayingCard kind="day" :data-card-id="day.date" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
+                  :value="dayValue(day)" :unit="numberText(day.value) ? source.unit : null" :state="day.has ? picking.stateOf(day.date) : 'front'"
+                  :class="{ lifting: picking.liftId.value === day.date }" :disabled="!day.has" :focused="day.date === focusDate" :tint="source.tint"
+                  :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(day.date) === 'boxed'"
+                  @click="picking.onDayClick(day, $event)" @keydown="onCardKey($event, {})" />
               </span>
             </template>
             <template v-else>
-              <span v-for="(group, i) in entry.level.groups" :key="group.id" class="pslot" :style="slotStyle(entry.level, i)">
-                <PlayingCard kind="group" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
-                  :sub="groupSub(group)" :badge="groupBadge(group)" :holding="holdId === group.id" :tint="source.tint"
+              <span v-for="(group, i) in entry.level.groups" :key="group.id" :class="['pslot', { 'is-holding': picking.holdId.value === group.id }]" :style="slotStyle(entry.level, i)">
+                <PlayingCard kind="group" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
+                  :dots="group.days.map((d) => d.has)" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
                   :aria-label="t.groupAria(groupTitle(group), groupSub(group))" :aria-description="pickedIn(group) === pickableDates(group).length && pickedIn(group) ? t.holdToUnpick : t.holdToPick"
-                  @pointerdown="holdStart(group, $event)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd" @pointerleave="holdEnd"
+                  @pointerdown="picking.holdStart(group, $event)" @pointermove="picking.holdMove" @pointerup="picking.holdEnd" @pointercancel="picking.holdEnd" @pointerleave="picking.holdEnd"
                   @click="tapGroup(group, $event)" @keydown="onCardKey($event, { group })" />
               </span>
             </template>
           </div>
         </template>
       </div>
-      <p :ref="(el) => { if (el) chrome[1] = el as HTMLElement; }" class="table-hint">{{ hint }} <span>{{ t.keyboardHint }}</span></p>
+      <footer ref="foot" class="table-foot">
+        <CoachTip id="card-table" :text="hint" />
+        <p :id="`${titleId}-keys`" class="sr-only">{{ hint }} {{ t.keyboardTip }}</p>
+      </footer>
     </div>
   </Teleport>
 </template>

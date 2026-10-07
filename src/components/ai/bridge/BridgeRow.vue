@@ -7,7 +7,7 @@ import { AI_TASK_CATEGORY_META, categoryLabel } from '../../../lib/aiTask/catego
 import { unitLabel } from '../../../lib/aiTask/metrics';
 import { useBridgeText } from './bridge.i18n';
 const props = defineProps<{ row: DayStripRow; enabled: boolean; days: number; selectedIds: string[]; adherence: AdherenceDay[]; disabled?: boolean }>();
-const emit = defineEmits<{ toggle: []; workout: [string]; day: [{ date: string; rect: DOMRect }] }>();
+const emit = defineEmits<{ toggle: []; workout: [string]; day: [{ date: string; rect: DOMRect; el: Element | null }] }>();
 const t = useBridgeText();
 const meta = computed(() => AI_TASK_CATEGORY_META[props.row.category]);
 const latest = computed(() => [...props.row.cells].reverse().find(c => c.value !== null));

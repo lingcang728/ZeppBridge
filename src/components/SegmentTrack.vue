@@ -48,7 +48,13 @@ const props = withDefaults(defineProps<{
   iconOnly?: boolean;
   /** `inset` 表单里的凹槽底；`glass` 浮在内容上的导航；`bare` 放进已经是玻璃的按钮组里。 */
   variant?: 'inset' | 'glass' | 'bare';
+  /** 挂载后滑块从最左一项滑到选中项（牌桌头部入场，第三轮 A6）。 */
+  intro?: boolean;
+  /** 永不折行：放不下由父布局让位（两项的分段，第三轮 B1）。 */
+  noWrap?: boolean;
 }>(), {
+  intro: false,
+  noWrap: false,
   disabled: false,
   compact: false,
   fill: false,
@@ -171,7 +177,7 @@ const restsOn = (value: T) => {
    所以两种状态下量出来的是同一个数，不会来回翻。铺满型（fill）和浮动导航 / 按钮组不折。 */
 const checkWrap = () => {
   const el = track.value;
-  if (!el || props.fill || props.variant !== 'inset') return;
+  if (!el || props.fill || props.noWrap || props.variant !== 'inset') return;
   // 按各项原宽之和算，不看 scrollWidth：浮起来的透镜会伸出轨道，把 scrollWidth 撑大。
   const pad = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
   const natural = buttons().reduce((sum, button) => sum + button.offsetWidth, 0) + pad * 2;
@@ -654,6 +660,12 @@ onMounted(() => {
     measure();
     observer = new ResizeObserver(() => measure());
     observeItems();
+    // 入场：先停在最左一项，下一拍飞到选中项（复用点击的飞行，不另写一套）。
+    const first = props.items[0]?.value;
+    if (props.intro && first !== undefined && first !== props.modelValue && !reducedMotion()) {
+      placeOn(first);
+      void nextTick(() => requestAnimationFrame(() => { void fly(props.modelValue, false, first); }));
+    }
   });
   void fontsReady().then(() => measure());
   window.addEventListener('resize', measure);

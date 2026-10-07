@@ -1,67 +1,81 @@
 /**
- * 镜头推进（精修批次 7.1 / 7.2）：往下一层时，上一层朝被点的那叠缩小退到后面、换成一份**预先模糊好的**
- * 静态拷贝；返回时原路拉回来。
+ * 镜头推进（第三轮精修 A10，取代第二轮「清晰层淡出 + 模糊拷贝淡入」）：往下一层时，上一层的牌先收拢进
+ * 被点的那一叠（理牌），这一叠再缩小退到后面、压暗到 0.35；新一层等它完全退好了才从那一叠里抽出来扇开。
+ * 返回反之：新一层理成一叠落回那一叠，那一叠走回前面，其余的牌再从它底下扇回原位。
  *
- * 模糊只做一次：拷贝挂上时就带着 `filter: blur()`，之后只交叉淡化两份的 opacity、一起缩放——不逐帧改 blur
- * （逐帧 blur / mask 会让风扇狂转，见动效只动合成属性的约定）。
- * 拉回时从「此刻的计算样式」起放，而不是 reverse() 旧动画：倒放一段已经放完的动画，Chromium 会闪一帧。
+ * 第二轮把整层（连字）克隆一份加模糊、两份交叉淡化，「9/14–9/20」和「9/16」叠成双影十几帧
+ * （110910 f14–f22），违反「内容先后交替不叠影」。现在不拷贝任何文字：背景虚靠牌桌底下那层本来就有的静态模糊。
+ * 只动 transform / opacity；每段都从此刻的计算样式起放，半路被打断是原路。
  */
 import { CLOSE_EASE, OPEN_EASE } from '../timing';
+import { fanBack, stackCards, type Landing } from './deal';
+import { angleOf, centerOfRect, restOf } from './pose';
+import { animateFromNow, cancelOn } from './reversible';
 import { reducedMotion, settled } from './spring';
 
-const PUSH_MS = 460;
-const PULL_MS = 420;
+const RECEDE_MS = 340;
+const PULL_MS = 440;
 const RECEDE_SCALE = 0.82;
-const BLURRED_OPACITY = 0.42;
+const RECEDE_OPACITY = 0.35;
 
 export interface Receded {
-  /** 原路拉回来（拷贝淡掉、移除，这一层恢复可点）。 */
+  /** 被点的那一叠歇着（没退后）时的样子：返回时新一层整叠落进这里。 */
+  pile: Landing;
+  /** 那一叠此刻（退在后面）的样子：新一层从这里抽出来。 */
+  now: () => Landing;
+  /** 走回前面、其余的牌扇回原位；这一层恢复可点。 */
   restore: () => Promise<void>;
   /** 不放动画，直接复原（牌桌整个关掉时用）。 */
   drop: () => void;
 }
 
-/** 让 `layer` 朝 `focus` 退到后面。`layer` 必须是定位祖先里的绝对定位层。 */
-export const recedeLayer = (layer: HTMLElement, focus: DOMRect | null): Receded => {
+/**
+ * 让 `layer` 收拢进 `pileCard`（这一层里被点的那一叠）并退到后面。立刻返回句柄，动画在 `ready` 里放：
+ * `live()` 返回 false 时（被打断）提前停下，退到哪儿算哪儿——调用方随即 `restore()` 原路拉回。
+ */
+export const recedeLayer = (layer: HTMLElement, pileCard: HTMLElement, live: () => boolean = () => true): Receded & { ready: Promise<void> } => {
+  const slot = pileCard.parentElement as HTMLElement | null;
+  const rest = restOf(pileCard);
+  const pile: Landing = { rect: new DOMRect(rest.center.x - rest.width / 2, rest.center.y - (rest.width * 1.4) / 2, rest.width, rest.width * 1.4), kind: 'pile', angle: rest.angle, width: rest.width };
+  const others = [...layer.querySelectorAll<HTMLElement>('.pcard')].filter((card) => card !== pileCard);
   const box = layer.getBoundingClientRect();
-  const origin = focus
-    ? `${(focus.left + focus.width / 2 - box.left).toFixed(1)}px ${(focus.top + focus.height / 2 - box.top).toFixed(1)}px`
-    : '50% 50%';
-  const blurred = layer.cloneNode(true) as HTMLElement;
-  blurred.removeAttribute('id');
-  blurred.setAttribute('aria-hidden', 'true');
-  blurred.inert = true;
-  blurred.classList.add('is-blurred-copy');
-  Object.assign(blurred.style, { pointerEvents: 'none', filter: 'blur(9px)', transformOrigin: origin, opacity: '0' });
-  layer.after(blurred);
-  layer.style.transformOrigin = origin;
+  const origin = `${(rest.center.x - box.left).toFixed(1)}px ${(rest.center.y - box.top).toFixed(1)}px`;
+  if (slot) slot.style.zIndex = '5';
   layer.inert = true;
+  layer.style.transformOrigin = origin;
   const reduced = reducedMotion();
-  const shrink = reduced ? 'none' : `scale(${RECEDE_SCALE})`;
-  const timing: KeyframeAnimationOptions = { duration: reduced ? 160 : PUSH_MS, easing: OPEN_EASE, fill: 'forwards' };
-  let sharp = layer.animate([{ transform: 'none', opacity: 1 }, { transform: shrink, opacity: 0 }], timing);
-  let soft = blurred.animate([{ transform: 'none', opacity: 0 }, { transform: shrink, opacity: BLURRED_OPACITY }], timing);
+  let restoring = false;
 
   const drop = () => {
-    sharp.cancel(); soft.cancel();
-    blurred.remove();
+    cancelOn(layer);
+    for (const card of others) cancelOn(card);
     layer.inert = false;
     layer.style.transformOrigin = '';
+    if (slot) slot.style.zIndex = '';
   };
   const restore = async () => {
-    const pull: KeyframeAnimationOptions = { duration: reduced ? 160 : PULL_MS, easing: CLOSE_EASE, fill: 'forwards' };
-    const now = (element: HTMLElement) => {
-      const style = getComputedStyle(element);
-      return { transform: style.transform === 'none' ? 'none' : style.transform, opacity: style.opacity };
-    };
-    const sharpFrom = now(layer);
-    const softFrom = now(blurred);
-    const nextSharp = layer.animate([sharpFrom, { transform: 'none', opacity: 1 }], pull);
-    const nextSoft = blurred.animate([softFrom, { transform: 'none', opacity: 0 }], pull);
-    sharp.cancel(); soft.cancel();
-    sharp = nextSharp; soft = nextSoft;
-    await settled([nextSharp, nextSoft]);
+    restoring = true;
+    const forward = animateFromNow(layer, { transform: 'none', opacity: 1 }, { duration: reduced ? 160 : PULL_MS, easing: CLOSE_EASE, fill: 'forwards' });
+    await settled([forward]);
+    if (!reduced) await fanBack(others);
     drop();
   };
-  return { restore, drop };
+  const now = (): Landing => {
+    const rect = pileCard.getBoundingClientRect();
+    const scale = layer.getBoundingClientRect().width / Math.max(1, layer.offsetWidth);
+    const width = rest.width * scale;
+    const c = centerOfRect(rect);
+    return { rect: new DOMRect(c.x - width / 2, c.y - (width * 1.4) / 2, width, width * 1.4), kind: 'pile', angle: angleOf(slot), width };
+  };
+  const ready = (async () => {
+    if (reduced) {
+      await settled([layer.animate([{ opacity: 1 }, { opacity: RECEDE_OPACITY }], { duration: 160, fill: 'forwards' })]);
+      return;
+    }
+    await stackCards(others, rest.center, rest.angle);
+    if (!live() || restoring) return;
+    const back = animateFromNow(layer, { transform: `scale(${RECEDE_SCALE})`, opacity: RECEDE_OPACITY }, { duration: RECEDE_MS, easing: OPEN_EASE, fill: 'forwards' });
+    await settled([back]);
+  })();
+  return { pile, now, restore, drop, ready };
 };

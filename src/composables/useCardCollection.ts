@@ -12,6 +12,8 @@ import type { AiTaskCategory, CardPick } from '../lib/bridge/types';
 const picks = ref<CardPick[]>([]);
 /** 这个任务是从收集箱开的：交出去后清空箱子。 */
 const handedToTask = ref(false);
+/** 开着几张牌桌（第三轮 A4）：开着的时候箱子哪怕是空的也跟着牌桌滑进来，等着接牌。 */
+const tables = ref(0);
 let loaded = false;
 let saveTimer = 0;
 
@@ -65,24 +67,39 @@ const clear = () => {
   save();
 };
 
-/** 按项归拢：每一项一组，天数升序；组按第一次放进来的顺序。 */
+/** 运动牌：一次运动一张，键是 `workout:<运动 id>`（第三轮 B3），日期是那次运动的本地日。 */
+export const WORKOUT_PREFIX = 'workout:';
+const isWorkout = (key: string) => key.startsWith(WORKOUT_PREFIX);
+
+/** 按项归拢：每一项一组（运动牌合成一组「运动」），组内按天升序；组按第一次放进来的顺序。 */
 const groups = computed(() => {
-  const byKey = new Map<string, { key: string; category: AiTaskCategory; dates: string[] }>();
+  const byKey = new Map<string, { key: string; category: AiTaskCategory; dates: string[]; items: Array<{ key: string; date: string }> }>();
   for (const pick of picks.value) {
-    const group = byKey.get(pick.key) ?? { key: pick.key, category: pick.category, dates: [] };
+    const groupKey = isWorkout(pick.key) ? 'workout' : pick.key;
+    const group = byKey.get(groupKey) ?? { key: groupKey, category: pick.category, dates: [], items: [] };
     group.dates.push(pick.date);
-    byKey.set(pick.key, group);
+    group.items.push({ key: pick.key, date: pick.date });
+    byKey.set(groupKey, group);
   }
-  for (const group of byKey.values()) group.dates.sort();
+  for (const group of byKey.values()) {
+    group.dates.sort();
+    group.items.sort((a, b) => a.date.localeCompare(b.date));
+  }
   return [...byKey.values()];
 });
 
-/** 交给任务时用：每一类挑了哪几天（同一类的几项合在一起）。 */
+/** 交给任务时用：每一类挑了哪几天（同一类的几项合在一起；运动牌不在这里，见 workoutIds）。 */
 const byCategory = (): Map<AiTaskCategory, string[]> => {
   const out = new Map<AiTaskCategory, string[]>();
-  for (const pick of picks.value) out.set(pick.category, [...(out.get(pick.category) ?? []), pick.date]);
+  for (const pick of picks.value) {
+    if (isWorkout(pick.key)) continue;
+    out.set(pick.category, [...(out.get(pick.category) ?? []), pick.date]);
+  }
   return out;
 };
+
+/** 箱子里的运动牌：交给任务时写进 `workout_ids`。 */
+const workoutIds = (): string[] => picks.value.filter((pick) => isWorkout(pick.key)).map((pick) => pick.key.slice(WORKOUT_PREFIX.length));
 
 export const useCardCollection = () => {
   void load();
@@ -95,7 +112,12 @@ export const useCardCollection = () => {
     remove,
     clear,
     byCategory,
+    workoutIds,
     handedToTask,
+    /** 有牌桌开着（箱子空的也要露面接牌）。 */
+    tableOpen: computed(() => tables.value > 0),
+    /** 牌桌开 / 收：成对调用。 */
+    setTableOpen: (open: boolean) => { tables.value = Math.max(0, tables.value + (open ? 1 : -1)); },
     /** 任务真的交出去了：如果它是从收集箱开的，清空箱子。 */
     clearAfterHandoff: () => {
       if (!handedToTask.value) return;
