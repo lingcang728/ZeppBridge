@@ -48,7 +48,7 @@
 - 分类色两套之间只调明度饱和、不换色相（浅色心率红 `#C93F49`、品牌绿 `#2F6B4F`……）；同一个 token 在两套里角色一致，语义不漂移。
 ### 材质：克制玻璃（2026-09-26）
 
-- 全应用只有**一种卡片材质**：两色渐变底 + 顶边高光（`inset 0 1px 0`）+ 两层柔和投影。token 在 `tokens.css` 的 `--mat-*`（`--mat-card`、`--mat-line`、`--mat-rim`、`--mat-shadow`，凸起件 `--mat-raised*`，凹槽 `--mat-inset*`，浮层 `--mat-glass*`），深浅各一份；基元类在 `src/styles/material.css`：`.surface-card` / `.mat-card`、`.button` 各变体（按下沉 1px）、`.mat-inset`、`.mat-field`、`.mat-switch`、`.chip`、`.glass`。
+- 全应用只有**一种卡片材质**：两色渐变底 + 顶边高光（`inset 0 1px 0`）+ 两层柔和投影。token 在 `tokens.css` 的 `--mat-*`（`--mat-card`、`--mat-line`、`--mat-rim`、`--mat-shadow`，凸起件 `--mat-raised*`，凹槽 `--mat-inset*`，浮层 `--mat-glass*`），深浅各一份；基元类在 `src/styles/material.css`：`.surface-card` / `.mat-card`、`.button` 各变体（按下沉 1px）、`.mat-inset`、`.mat-field`、`.chip`、`.glass`。开关只有一个组件 `components/GlassSwitch.vue`（Liquid Glass：停着是白钮，一按浮起成会折射的透镜，可以按住拖）。
 - **真正的毛玻璃（`backdrop-filter`）只给浮在上层的东西**：顶栏、导航胶囊、下拉菜单、日期选择、弹窗。普通卡片不模糊。
 - 类别色只在卡片角落留一点微光（`color-mix` 约 5%，`--entry-tone` / `--card-tone`），**不给卡片写死背景色**；卡片里图形和曲线用同一个类别色（身体 = 心率红、训练 = 青柠、睡眠 = 靛紫、活动 = 青）。
 - 动效用 `--dur-*` / `--ease-*`，并尊重 `prefers-reduced-motion`。

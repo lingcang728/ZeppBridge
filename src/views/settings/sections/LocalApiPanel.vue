@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlassSwitch from '../../../components/GlassSwitch.vue';
 import { onMounted } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import { useLocalApi } from '../../../composables/settings/useLocalApi';
@@ -37,15 +38,12 @@ onMounted(() => { void loadLocalApiStatus(); });
         <span :class="['state-dot', { on: localApiStatus?.running }]">
           {{ localApiStatus?.running ? t.apiListening : (localApiStatus?.enabled ? t.apiEnabledNotListening : t.apiOff) }}
         </span>
-        <button
-          class="mat-switch"
-          type="button"
-          role="switch"
+        <GlassSwitch
           :aria-label="t.apiToggleAria"
-          :aria-checked="Boolean(localApiStatus?.enabled)"
+          :model-value="Boolean(localApiStatus?.enabled)"
           :disabled="localApiBusy"
-          @click="toggleLocalApi"
-        ></button>
+          @update:model-value="toggleLocalApi"
+        />
       </div>
     </div>
 

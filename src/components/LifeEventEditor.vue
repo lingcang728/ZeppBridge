@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlassSwitch from './GlassSwitch.vue';
 import { computed, ref, watch } from 'vue';
 import WheelDatePicker from './WheelDatePicker.vue';
 import ModalDialog from './ModalDialog.vue';
@@ -95,7 +96,7 @@ async function remove() {
         </div>
         <div class="check">
           <span>{{ t.ongoing }}</span>
-          <button type="button" class="mat-switch" role="switch" :aria-checked="ongoing" :aria-label="t.ongoing" @click="ongoing = !ongoing"></button>
+          <GlassSwitch :model-value="ongoing" :aria-label="t.ongoing" @update:model-value="ongoing = !ongoing" />
         </div>
         <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="4" data-event-notes /></label>
       </fieldset>

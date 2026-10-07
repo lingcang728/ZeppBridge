@@ -69,3 +69,19 @@
 
 防再犯：`scripts/verify/text_overlap.py`（十种语言 × 九页，任何两段可见文字压在一起就失败）和
 `scripts/verify/topbar_collision.py`（顶栏）。改了页面头部、胶囊、按钮的排版就跑一遍。
+
+## 第三轮：全局玻璃审计（2026-10-07 晚，阶段一 1D·D4）
+
+用户 10-07（11.txt 第 8 条）：凡是拖动、二到五选一、开关都换成 Liquid Glass，唯一例外是运动类型纠正。逐个搜了
+`role="switch"`、`.mat-switch`、`type="checkbox"` / `type="radio"` / `type="range"`、`role="slider"`、带 `aria-pressed` 的按钮组。
+
+| 控件 | 结论 |
+|---|---|
+| 二到五选一（`SegmentTrack`）：牌桌周期、回溯范围（`BridgeHandle`）、订阅两档（`SubscriptionList`）、详细程度、同步频率、趋势范围、设置各卡里的分段、顶栏导航与主题 | 已经是 Liquid Glass：`inset` / `glass` / `bare` 三种底都挂了 `thumbLens`，按住浮起成透镜、可拖、可甩 |
+| 更多项（`CapsuleWheel`）：语言、AI 服务商、设备类型、心率区间候选 | 已经是 Liquid Glass（镜片折射） |
+| **开关**：同步（卡面快捷 + 卡内）、本机 API、MCP 任务共享、精确路线（GPS）、历史补拉两处、生活事件「仍在持续」、设备目录贡献、运动页「带上前 7 天恢复」——共 10 处 | **改了**：新组件 `components/GlassSwitch.vue`。停着白钮；按下白钮化开、同处浮起一块比它宽的折射玻璃（`useGlassLens('thumb')`，透镜按浮起尺寸常驻、停着时缩小隐去，不重建滤镜）；可按住左右拖，轨道颜色按位置淡入，过半松手换档；点一下照常切换；键盘走原生按钮。弹窗里（祖先有毛玻璃）不挂折射，浮起的是一块乳白玻璃边。`material.css` 的 `.mat-switch` 已删 |
+| 多选标签 / 置顶 / 牌面勾选（`aria-pressed` 按钮） | 不属于「二到五选一」，保持按钮 |
+| `StageBar` 的 `role="slider"` | 睡眠阶段图上的游标，不是选择控件，保持 |
+| `components/workout/TypePicker.vue` 运动类型纠正 | 例外（类型太多），保持 |
+
+抽帧验证：`/ai/check` 的精确路线开关，深浅两套 × 停着 / 按住 / 拖到一半 / 松手四帧（DPR 2），按住时透镜折射底下的轨道、拖动时绿色按位置淡入、松手落回白钮。

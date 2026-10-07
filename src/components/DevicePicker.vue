@@ -8,6 +8,7 @@
  *
  * 这里选出来的结果会被如实标注成「你指认的型号」，不会伪装成自动识别。
  */
+import GlassSwitch from './GlassSwitch.vue';
 import { computed, ref, watch } from 'vue';
 import GlyphTile from './GlyphTile.vue';
 import CapsuleWheel from './CapsuleWheel.vue';
@@ -273,7 +274,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         <strong>{{ t.contributeTitle }}</strong>
         {{ t.contributeBody }}
       </span>
-      <button type="button" class="mat-switch" role="switch" :aria-checked="contribute" :aria-label="t.contributeTitle" :disabled="busy" @click="contribute = !contribute"></button>
+      <GlassSwitch :model-value="contribute" :aria-label="t.contributeTitle" :disabled="busy" @update:model-value="contribute = !contribute" />
     </div>
     <p class="picker-note">{{ t.note }}</p>
   </div>

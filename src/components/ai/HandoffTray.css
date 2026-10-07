@@ -12,7 +12,7 @@
 .toggle-copy { display: grid; min-width: 0; gap: 2px; }
 .toggle-copy strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .toggle-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
-.toggle-row .mat-switch { flex: 0 0 auto; }
+.toggle-row .glass-switch { flex: 0 0 auto; }
 .advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .advanced > summary { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; list-style: none; }
 .advanced > summary::-webkit-details-marker { display: none; }

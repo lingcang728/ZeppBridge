@@ -6,6 +6,7 @@
  * 历史记录，样本不够就说不够。这里不调用任何 AI，也不做健康建议——AI 是加分，
  * 不是前提。
  */
+import GlassSwitch from './GlassSwitch.vue';
 import { computed } from 'vue';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
@@ -149,7 +150,7 @@ const exclusionSummary = computed(() => {
       <h2 id="insight-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
       <span v-if="insight?.supported" class="insight-handoff">
         <label class="recovery-toggle" :title="t.withRecoveryHint">
-          <button type="button" class="mat-switch" role="switch" :aria-checked="withRecovery" :aria-label="t.withRecovery" @click="withRecovery = !withRecovery"></button>
+          <GlassSwitch :model-value="withRecovery" :aria-label="t.withRecovery" @update:model-value="withRecovery = !withRecovery" />
           <span>{{ t.withRecovery }}</span>
         </label>
         <button class="button secondary" type="button" @click="emit('handoff')"><Icon name="send" :size="14" />{{ t.handoff }}</button>

@@ -4,6 +4,7 @@
  * 总览（/settings）是八张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
  * 那张升到最上面摊开，展开后可以左右拖、按按钮或方向键翻到相邻的一张，Esc 回到总览。
  * 各区块的界面和逻辑在 views/settings/sections/，共享状态在 composables/settings/context.ts。 */
+import GlassSwitch from '../components/GlassSwitch.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CardDeck from '../components/deck/CardDeck.vue';
@@ -167,15 +168,12 @@ onUnmounted(() => {
       </template>
 
       <template #quick="{ card }">
-        <button
+        <GlassSwitch
           v-if="card.id === 'sync'"
-          class="mat-switch"
-          type="button"
-          role="switch"
           :aria-label="d.autoSyncToggle"
-          :aria-checked="autoSyncEnabled"
-          @click.stop="setAutoSyncEnabled(!autoSyncEnabled)"
-        ></button>
+          :model-value="autoSyncEnabled"
+          @update:model-value="setAutoSyncEnabled(!autoSyncEnabled)"
+        />
       </template>
 
       <template #body="{ card }">

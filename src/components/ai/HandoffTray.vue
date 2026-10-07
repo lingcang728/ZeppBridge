@@ -4,6 +4,7 @@
  * 「允许本机 MCP 查询这个任务」挪到了设置 → MCP（按任务开关），这里不再放。
  * 附件状态（找不到 / 改过）来自预览；找不到的可以就地重新选择。添加文件是一枚显眼的按钮。
  */
+import GlassSwitch from '../GlassSwitch.vue';
 import { computed, ref } from 'vue';
 import Icon from '../Icon.vue';
 import SegmentTrack from '../SegmentTrack.vue';
@@ -144,8 +145,8 @@ const pick = async (replaceId?: string) => {
     </div>
     <div class="toggle-row">
       <span class="toggle-copy"><strong>{{ t.preciseGps }}</strong><small>{{ t.preciseGpsHint }}</small></span>
-      <button type="button" class="mat-switch" role="switch" :aria-checked="draft.include_precise_gps" :aria-label="t.preciseGps"
-        @click="setPreciseGps(!draft.include_precise_gps)"></button>
+      <GlassSwitch :model-value="draft.include_precise_gps" :aria-label="t.preciseGps"
+        @update:model-value="setPreciseGps(!draft.include_precise_gps)" />
     </div>
   </section>
 </template>

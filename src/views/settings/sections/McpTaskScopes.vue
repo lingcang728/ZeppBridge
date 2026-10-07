@@ -3,6 +3,7 @@
  * 「允许本机 MCP 查询这个任务」从交给 AI 的选项里挪到这里（精修批次 5.2）：它管的是 MCP，不是这一次交给 AI。
  * 每个已保存的任务一个开关，只对以 `--scope task` 启动的 MCP 生效；默认的全库只读模式不受它限制。
  */
+import GlassSwitch from '../../../components/GlassSwitch.vue';
 import { onMounted, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../../../lib/bridge';
 import type { AiTaskSummary } from '../../../lib/bridge/types';
@@ -59,8 +60,8 @@ const toggle = async (task: AiTaskSummary) => {
     <ul v-else class="scopes">
       <li v-for="task in taskList" :key="task.id">
         <span class="name">{{ task.title }}</span>
-        <button type="button" class="mat-switch" role="switch" :aria-checked="task.mcp_shared" :aria-label="task.title"
-          :disabled="busy === task.id" @click="toggle(task)"></button>
+        <GlassSwitch :model-value="task.mcp_shared" :aria-label="task.title"
+          :disabled="busy === task.id" @update:model-value="toggle(task)" />
       </li>
     </ul>
     <p v-if="error" class="hint-line" role="alert">{{ error }}</p>

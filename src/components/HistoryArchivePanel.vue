@@ -5,6 +5,7 @@
  * 三块，从上到下：归档开关 → 补拉以前的历史 → 覆盖账本。
  * 状态和动作在 composables/useHistoryBackfill.ts，账本视图在 archive/CoverageLedger.vue。
  */
+import GlassSwitch from './GlassSwitch.vue';
 import WheelDatePicker from './WheelDatePicker.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import FoldTransition from './FoldTransition.vue';
@@ -36,15 +37,12 @@ const {
             <span class="s-row-sub">{{ t.archiveBody }}</span>
           </div>
           <div class="s-row-control">
-            <button
-              class="mat-switch"
-              type="button"
-              role="switch"
+            <GlassSwitch
               :aria-label="t.archiveAria"
-              :aria-checked="Boolean(prefs?.archive_enabled)"
+              :model-value="Boolean(prefs?.archive_enabled)"
               :disabled="busy || !prefs"
-              @click="toggleArchive"
-            ></button>
+              @update:model-value="toggleArchive"
+            />
           </div>
         </div>
       </div>
@@ -73,15 +71,12 @@ const {
             <span class="s-row-sub">{{ t.autoContinueHint }}</span>
           </div>
           <div class="s-row-control">
-            <button
-              class="mat-switch"
-              type="button"
-              role="switch"
+            <GlassSwitch
               :aria-label="t.autoContinue"
-              :aria-checked="autoContinue"
+              :model-value="autoContinue"
               :disabled="busy"
-              @click="autoContinue = !autoContinue"
-            ></button>
+              @update:model-value="autoContinue = !autoContinue"
+            />
           </div>
         </div>
         <details v-if="estimate" class="s-row is-block estimate">
@@ -147,7 +142,7 @@ const {
       :stream-label="streamLabel"
       :chunk-error-text="chunkErrorText"
       :t="t"
-    />
+   />
   </div>
 </template>
 

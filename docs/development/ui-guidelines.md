@@ -101,7 +101,7 @@ forbidden. The provenance of the algorithms and percentages is in the
   `--mat-glass*`), defined for both schemes. Primitives live in
   `src/styles/material.css`: `.surface-card` / `.mat-card`, `.button`
   variants (sink 1px when pressed), `.mat-inset`, `.mat-field`,
-  `.mat-switch`, `.chip`, `.glass`.
+  `.chip`, `.glass`. Switches are one component, `components/GlassSwitch.vue` (Liquid Glass: a white knob at rest that lifts into a refracting lens on press and can be dragged).
 - **Real frosted glass (`backdrop-filter`) is only for floating layers**: the
   top bar, the navigation capsule, dropdowns, the date picker and dialogs.
   Ordinary cards are not blurred.

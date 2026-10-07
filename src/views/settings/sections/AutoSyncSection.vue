@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlassSwitch from '../../../components/GlassSwitch.vue';
 import { computed } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
@@ -28,7 +29,7 @@ const intervalItems = computed(() => AUTO_SYNC_INTERVALS.map((minutes) => ({ val
           <span class="s-row-sub">{{ t.syncDescA(autoSyncInterval) }} {{ t.syncDescB }}</span>
         </div>
         <div class="s-row-control">
-          <button class="mat-switch" type="button" role="switch" aria-labelledby="sync-title" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"></button>
+          <GlassSwitch aria-labelledby="sync-title" :model-value="autoSyncEnabled" @update:model-value="setAutoSyncEnabled(!autoSyncEnabled)" />
         </div>
       </div>
       <div class="s-row">
