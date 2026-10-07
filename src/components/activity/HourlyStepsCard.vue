@@ -15,6 +15,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRevisionReload } from '../../composables/useRevisionReload';
 import { backend, isDesktop } from '../../lib/bridge';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
+import { formatNumber } from '../../lib/format';
 import { averageRow, hourRows, rangeBounds, type HourRow } from '../../lib/hourlySteps';
 import { SERIES_FETCH_DAYS } from '../../lib/metricSeries';
 import type { HourlySteps } from '../../types';
@@ -84,7 +85,7 @@ const shownNote = computed(() => {
   const row = heat.value.find((item) => item.start === picked.value);
   return row ? (perWeek.value ? t.value.weekNote(rowLabel(row), row.covered) : t.value.dayNote(rowLabel(row))) : '';
 });
-const format = (value: number) => Math.round(value).toLocaleString();
+const format = (value: number) => formatNumber(Math.round(value));
 /* —— 悬停读数 —— */
 const card = ref<HTMLElement | null>(null);
 const hover = ref<{ x: number; y: number; text: string; hour: number; row: string | null } | null>(null);

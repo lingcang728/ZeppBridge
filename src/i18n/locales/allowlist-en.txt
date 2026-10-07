@@ -268,3 +268,4 @@ components/plan/editor.nameLabel
 # Shared duration abbreviations used across locales
 lib/format.hourUnit
 lib/format.minutesUnit
+components/ai/bridge/bridge.unitMin

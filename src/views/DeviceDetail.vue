@@ -23,6 +23,7 @@ import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
+    heroEyebrow: '设备',
     notFoundTitle: '找不到这台设备',
     notFoundMessage: '可能已从账号移除，或本机还没识别到。',
     reidentify: '重新识别设备',
@@ -51,6 +52,7 @@ const messages = defineMessages(
     originNoMatch: '没有匹配到',
   },
   {
+    heroEyebrow: 'Device',
     notFoundTitle: 'Device not found',
     notFoundMessage: 'Removed from the account, or not identified on this machine yet.',
     reidentify: 'Re-identify devices',
@@ -79,6 +81,7 @@ const messages = defineMessages(
     originNoMatch: 'No match',
   },
   {
+    heroEyebrow: 'Dispositivo',
     notFoundTitle: 'Este dispositivo no está aquí',
     notFoundMessage: 'Puede que ya no esté en la cuenta o que este equipo aún no lo haya identificado.',
     reidentify: 'Volver a identificar dispositivos',
@@ -173,7 +176,7 @@ onMounted(() => {
       <section class="device-hero">
         <DeviceVisual v-if="model.image" :src="model.image" :alt="model.canonicalName" :kind="model.kind" />
         <div class="hero-copy">
-          <p class="hero-eyebrow">DEVICE</p>
+          <p class="hero-eyebrow">{{ t.heroEyebrow }}</p>
           <h1 id="device-detail-title">{{ model.canonicalName }}</h1>
           <p class="hero-sub">{{ model.displayName }}</p>
           <span :class="['hero-state', { on: model.state !== 'unknown' }]"><i></i>{{ deviceStateLabel(model.state) }}</span>
@@ -244,7 +247,7 @@ onMounted(() => {
   border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 .hero-copy { display: grid; gap: 4px; min-width: 0; }
-.hero-eyebrow { margin: 0; color: var(--subtle); font-size: var(--fs-xs); letter-spacing: .12em; }
+.hero-eyebrow { margin: 0; color: var(--subtle); font-size: var(--fs-xs); letter-spacing: .12em; text-transform: uppercase; }
 .hero-copy h1 { margin: 0; font-size: 24px; font-weight: 700; color: var(--ink); }
 .hero-sub { margin: 0; color: var(--muted); font-size: var(--fs-md); }
 .hero-state { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--muted); font-size: var(--fs-sm); }

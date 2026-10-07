@@ -7,7 +7,7 @@
  */
 import { computed, ref } from 'vue';
 import type { AiProviderId } from '../aiProviders';
-import { intlLocale } from '../../i18n';
+import { formatNumber } from '../format';
 
 export const FREE_TOKEN_BUDGET = 30_000;
 export const SUBSCRIBED_TOKEN_BUDGET = 120_000;
@@ -43,4 +43,4 @@ export const tokenBudget = computed(() =>
 
 /** 「2.8 万」「28K」：按界面语言的紧凑写法。 */
 export const formatTokens = (tokens: number): string =>
-  new Intl.NumberFormat(intlLocale(), { notation: 'compact', maximumFractionDigits: 1 }).format(Math.max(0, tokens));
+  formatNumber(Math.max(0, tokens), { notation: 'compact', maximumFractionDigits: 1 });

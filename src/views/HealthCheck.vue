@@ -28,10 +28,10 @@ import { HEALTH_CHECK_DAYS, healthCheckQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
-import { formatBytes } from '../lib/format';
+import { formatBytes, formatNumber } from '../lib/format';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { intlLocale, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
 import { backendText } from '../i18n/backendText';
 import { healthCheckMessages as messages } from './HealthCheck.i18n';
 
@@ -168,7 +168,7 @@ const runAction = async (action: HealthAction) => {
       }
     } else if (action.id === 'reprocess') {
       const result = await backend.reprocessLocalData();
-      actionMessage.value = t.value.actionReplayed(result.total_records.toLocaleString(intlLocale()));
+      actionMessage.value = t.value.actionReplayed(formatNumber(result.total_records));
       markDataChanged();
     } else if (action.id === 'integrity_check') {
       const result = await backend.runDatabaseIntegrityCheck();
@@ -275,8 +275,8 @@ onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void 
               {{ unknownStageDetail(stream) }}
             </p>
             <dl class="stream-facts">
-              <div><dt>{{ t.factRaw }}</dt><dd>{{ stream.raw_records.toLocaleString(intlLocale()) }}</dd></div>
-              <div><dt>{{ t.factCanonical }}</dt><dd>{{ stream.canonical_records.toLocaleString(intlLocale()) }}</dd></div>
+              <div><dt>{{ t.factRaw }}</dt><dd>{{ formatNumber(stream.raw_records) }}</dd></div>
+              <div><dt>{{ t.factCanonical }}</dt><dd>{{ formatNumber(stream.canonical_records) }}</dd></div>
               <div><dt>{{ t.factSources }}</dt><dd>{{ sourceSummary(stream) }}</dd></div>
               <div><dt>{{ t.factObservedDays }}</dt><dd>{{ t.days(stream.coverage.observed_days) }}</dd></div>
             </dl>
@@ -323,12 +323,12 @@ onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void 
         <h2 id="db-title">{{ t.dbTitle }}</h2>
         <div class="fact-grid">
           <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes, t.notProvided) }}</strong></div>
-          <div><span>{{ t.dbRaw }}</span><strong>{{ health.database.raw_records.toLocaleString(intlLocale()) }}</strong></div>
-          <div><span>{{ t.dbCanonical }}</span><strong>{{ health.database.canonical_records.toLocaleString(intlLocale()) }}</strong></div>
+          <div><span>{{ t.dbRaw }}</span><strong>{{ formatNumber(health.database.raw_records) }}</strong></div>
+          <div><span>{{ t.dbCanonical }}</span><strong>{{ formatNumber(health.database.canonical_records) }}</strong></div>
           <div>
             <span>{{ t.dbPending }}</span>
             <strong :class="{ warn: health.database.pending_normalization > 0 }">
-              {{ health.database.pending_normalization.toLocaleString(intlLocale()) }}
+              {{ formatNumber(health.database.pending_normalization) }}
             </strong>
           </div>
           <div><span>{{ t.dbSchema }}</span><strong>{{ health.database.schema_version }}</strong></div>
@@ -351,7 +351,7 @@ onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void 
         <div class="occasional-list">
           <div v-for="metric in occasional" :key="metric.stream" class="occasional-row">
             <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
-            <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
+            <span>{{ t.occasionalLine(formatNumber(metric.canonical_records), metric.coverage.observed_days) }}</span>
             <span class="muted">
               {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
             </span>

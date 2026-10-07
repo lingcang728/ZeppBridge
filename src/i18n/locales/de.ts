@@ -2772,6 +2772,7 @@ Antworte in Markdown.`,
       empty: 'Noch keine Aufgaben gespeichert. Sobald du einmal etwas an eine KI übergibst, erscheint die Aufgabe hier.',
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'Min.',
       accept: 'Diesen Plan übernehmen',
       actual: 'Absolviert',
       backCurrent: 'Zur aktuellen Aufgabe',

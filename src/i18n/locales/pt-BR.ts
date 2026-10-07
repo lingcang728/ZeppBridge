@@ -2342,6 +2342,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       monthAria: (month: string, label: string, days: number) => `${label}, ${days} dias escolhidos em ${month}. Toque para expandir por semana`,
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'min',
       accept: 'Aceitar este plano',
       actual: 'Realizado',
       backCurrent: 'Voltar à tarefa atual',

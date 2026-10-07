@@ -219,8 +219,10 @@
 .ready-ring .meter { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 420ms cubic-bezier(.4, .6, .2, 1); }
 .ready-chip.has-issues .ready-ring .meter { stroke: var(--warning); }
 .ready-ring b { position: relative; font-family: var(--font-mono); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.ready-copy { flex: 0 1 auto; min-width: 150px; font-size: 15px; }
+/* 文字先放全（俄 / 德一句话比中文长一倍），每类小牌让位：放不下的小牌在右边淡出（D9）。小牌藏起来的窄底栏里才允许省略。 */
+.ready-copy { flex: 0 0 auto; min-width: 150px; max-width: 100%; font-size: 15px; }
 .ready-copy > small { font-size: 12.5px; }
+@container (max-width: 980px) { .ready-copy { flex: 0 1 auto; } }
 .ready-cats { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; justify-content: flex-start; gap: 6px; overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); }
 .cat-tile { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; height: 30px; padding: 0 10px 0 8px; border-radius: 999px;

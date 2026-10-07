@@ -38,6 +38,11 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
+    file: 'lib/aiTask/metrics.ts',
+    text: "'分钟': 'unit_min'",
+    why: '后端 storage/metric_spec.rs 的单位键本身是中文（稳定键，CLI / MCP 契约，不随界面语言变）；这一行是「键 → 各语言说法」的查表，不是文案。',
+  },
+  {
     file: 'demo/ai.ts',
     text: 'distance_meters:',
     why: '演示数据复刻后端原样返回的单位键值（「步」「次/分」这类）；界面按单位表（lib/aiTask/metrics.ts 的 unitLabel）本地化，查不到才原样显示，和真后端的行为一致。',

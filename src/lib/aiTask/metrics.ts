@@ -26,7 +26,7 @@ const metricMessages = defineMessages(
     duration_minutes: '睡眠时长', score: '睡眠评分', deep_minutes: '深睡', light_minutes: '浅睡', rem_minutes: 'REM',
     awake_minutes: '清醒', wake_count: '醒来次数',
     unit_min: '分钟', unit_s: '秒', unit_score: '分', unit_count: '次', unit_kcal: '千卡', unit_m: '米',
-    unit_load: '负荷值', unit_steps: '步',
+    unit_load: '负荷值', unit_steps: '步', unit_per_min: '次/分', unit_s_per_km: '秒/公里',
   },
   {
     resting_hr: 'Resting HR', readiness: 'Readiness', physical_readiness: 'Physical readiness', mental_readiness: 'Mental readiness',
@@ -44,7 +44,7 @@ const metricMessages = defineMessages(
     duration_minutes: 'Sleep duration', score: 'Sleep score', deep_minutes: 'Deep', light_minutes: 'Light', rem_minutes: 'REM',
     awake_minutes: 'Awake', wake_count: 'Wake-ups',
     unit_min: 'min', unit_s: 's', unit_score: 'pts', unit_count: 'times', unit_kcal: 'kcal', unit_m: 'm',
-    unit_load: 'load', unit_steps: 'steps',
+    unit_load: 'load', unit_steps: 'steps', unit_per_min: '/min', unit_s_per_km: 's/km',
   },
   {
     resting_hr: 'FC en reposo', readiness: 'Preparación', physical_readiness: 'Preparación física', mental_readiness: 'Preparación mental',
@@ -62,7 +62,7 @@ const metricMessages = defineMessages(
     duration_minutes: 'Duración del sueño', score: 'Puntuación de sueño', deep_minutes: 'Profundo', light_minutes: 'Ligero', rem_minutes: 'REM',
     awake_minutes: 'Despierto', wake_count: 'Despertares',
     unit_min: 'min', unit_s: 's', unit_score: 'pts', unit_count: 'veces', unit_kcal: 'kcal', unit_m: 'm',
-    unit_load: 'carga', unit_steps: 'pasos',
+    unit_load: 'carga', unit_steps: 'pasos', unit_per_min: '/min', unit_s_per_km: 's/km',
   },
   'lib/aiTask/metrics',
 );
@@ -78,6 +78,8 @@ export const metricLabel = (metric: string): string => lookup(messagesOf(metricM
 const UNIT_KEYS: Record<string, string> = {
   min: 'unit_min', s: 'unit_s', score: 'unit_score', count: 'unit_count', kcal: 'unit_kcal',
   m: 'unit_m', load: 'unit_load', '步': 'unit_steps',
+  // 后端 storage/metric_spec.rs 有几项单位键本身是中文（稳定键，不是文案），在这里按键换成各语言说法。
+  '分钟': 'unit_min', '米': 'unit_m', '千卡': 'unit_kcal', '次/分': 'unit_per_min', '秒/公里': 'unit_s_per_km',
 };
 
 export const unitLabel = (unit: string): string => {

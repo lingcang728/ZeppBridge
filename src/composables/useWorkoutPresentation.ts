@@ -4,14 +4,14 @@ import type { GlyphTone } from '../lib/glyphs';
 import { useSyncController } from './useSyncController';
 import { chartPalette } from '../lib/echartsSetup';
 import { displayDateTimeFormatter } from '../lib/dateTime';
-import { formatDistance, isFiniteNumber } from '../lib/format';
+import { formatDistance, formatNumber, isFiniteNumber } from '../lib/format';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { elevationUnitLabel, paceAxisLabel, paceMinutesPerBigUnit, paceUnitLabel, toElevation } from '../lib/units';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import { workoutTiming } from '../lib/workoutTiming';
 import { buildRouteCanvas } from '../lib/workoutRoute';
 import { lineOption, sampleSeries, type ChartPoint } from '../lib/workoutCharts';
-import { intlLocale, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
 import { workoutDetailMessages } from '../views/WorkoutDetail.i18n';
 import type { DeviceProfile, WorkoutSeries } from '../types';
 import type { WorkoutMetrics } from './useWorkoutDetail';
@@ -59,7 +59,7 @@ export const useWorkoutPresentation = (
     return clock === t.value.notProvided ? clock : `${clock} ${paceUnitLabel()}`;
   };
   const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value)
-    ? value.toLocaleString(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    ? formatNumber(value, { minimumFractionDigits: digits, maximumFractionDigits: digits })
     : t.value.notProvided;
 
   const paceLabel = computed(() => {

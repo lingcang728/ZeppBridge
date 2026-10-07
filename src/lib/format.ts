@@ -173,9 +173,17 @@ export const formatDistance = (meters?: number, empty = copy().notRecorded): str
     : `${Math.round(toShortDistance(meters))} ${shortDistanceUnitLabel()}`;
 };
 
+/**
+ * 全应用唯一的数字写法（按界面语言分组）。俄语用 U+00A0、法语用 U+202F 当千位分隔，前者在 MiSans 里
+ * 和普通空格一样宽，「1 709」看着像两个数；后者 MiSans 原本没有字形。统一换成 U+202F（窄不换行空格，
+ * 字体子集借了细空格的字形，见 scripts/assets/subset-fonts.py）。
+ */
+export const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string =>
+  value.toLocaleString(intlLocale(), options).replace(/[  ]/g, ' ');
+
 export const formatMetric = (value: number | undefined, digits = 0): string => {
   if (!isFiniteNumber(value)) return '—';
-  return value.toLocaleString(intlLocale(), {
+  return formatNumber(value, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });

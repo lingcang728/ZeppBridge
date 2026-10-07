@@ -24,8 +24,9 @@ a.hub-card:focus-visible, .next-link:focus-visible { outline: 2px solid var(--fo
 .next-card .hub-card-head > .hub-status { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 6px; }
 .next-card .hub-card-head > .hub-open { grid-column: 3; grid-row: 1; }
 
-.past-lines { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
-.past-lines li { display: grid; grid-template-columns: 22px 120px minmax(0, 1fr); align-items: center; gap: 10px; color: var(--tint); font-size: var(--fs-sm); }
+/* 名字一列按最长的那个名字定宽（俄 / 德「全天心率」很长，D9），上限 210px；各行 subgrid 共用这三列。 */
+.past-lines { display: grid; grid-template-columns: 22px fit-content(210px) minmax(0, 1fr); gap: 7px 10px; margin: 0; padding: 0; list-style: none; }
+.past-lines li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; color: var(--tint); font-size: var(--fs-sm); }
 .past-lines .name { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
 .past-lines svg { width: 100%; height: 22px; fill: var(--tint); }
 .past-lines li.off { color: var(--subtle); }
@@ -45,4 +46,4 @@ a.hub-card:focus-visible, .next-link:focus-visible { outline: 2px solid var(--fo
 .held-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); }
 .next-receive { justify-self: center; margin-top: 4px; }
 @media (prefers-reduced-motion: reduce) { .past-card.sent svg { animation: none; } }
-@media (max-width: 700px) { .past-lines li { grid-template-columns: 22px 92px minmax(0, 1fr); font-size: var(--fs-xs); } }
+@media (max-width: 700px) { .past-lines { grid-template-columns: 22px fit-content(132px) minmax(0, 1fr); } .past-lines li { font-size: var(--fs-xs); } .past-lines .name, .past-lines .empty-note { white-space: normal; line-height: 1.2; } }

@@ -100,6 +100,7 @@ let frame = 0;
 let nextThumb: { left: number; width: number } | null = null;
 let suppressClick = false;
 let observer: ResizeObserver | null = null;
+let staleStops = false;
 
 /* —— 玻璃（lib/glassLens.ts，照 iOS 26 的标签栏；第五版，2026-10-01）——
    停着时选中项是一块平胶囊（.segment-plate：底色 + 一道很淡的顶边高光，尺寸就是滑块本身，端头是正圆）。
@@ -195,6 +196,9 @@ const measure = () => {
   checkWrap();
   stops.value = readStops();
   if (!gesture && !settling.value) placeOn(props.modelValue);
+  // 飞行途中量到新尺寸（典型是字体刚加载完、各项变宽）：落地后再按新尺寸摆一次，否则滑块停在旧宽度上，
+  // 粗体选中字被裁掉一截（英文「Send to AI」的 I，D9）。
+  else if (settling.value) staleStops = true;
 };
 
 const observeItems = () => {
@@ -291,6 +295,7 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
   const land = () => {
     if (token !== flyToken) return;
     settling.value = false;
+    if (staleStops && !gesture) { staleStops = false; stops.value = readStops(); placeOn(props.modelValue); }
     flyLift.value = false;
     lensFade.value = false;
     lensValue.value = null;

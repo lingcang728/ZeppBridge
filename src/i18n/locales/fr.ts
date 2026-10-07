@@ -2263,6 +2263,7 @@ Réponds en Markdown.`,
       empty: 'Aucune tâche enregistrée. Envoyez-en une à une IA pour la voir apparaître ici.',
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'min',
       accept: 'Récupérer ce plan',
       actual: 'Réalisé',
       backCurrent: 'Revenir à la tâche en cours',

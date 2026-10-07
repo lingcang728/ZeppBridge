@@ -1,36 +1,15 @@
-import workoutCatalog from '../assets/workouts/catalog.json';
-import { defineMessages, locale, messagesOf, type Locale } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
+import { workoutNameMessages } from './workoutNames.i18n';
 
 /*
- * 运动名来自随包目录（`src/assets/workouts/catalog.json`），后端也 include! 同
- * 一个文件。目录里每个运动都有 `label_zh` 和 `label_en` 两个名字，界面按当前
- * 语言取。
+ * 运动名来自随包目录（`src/assets/workouts/catalog.json`），后端也 include! 同一个文件。界面用的是
+ * 从它生成的文案模块 `lib/workoutNames`（scripts/assets/build-workout-names.mjs）：zh / en / es 与目录一致，
+ * 七种语言包按 moduleId 覆盖，没覆盖的回落英文名。
  *
  * 后端的 `sport_catalog::options()` 仍然只发 `key` 和中文 `label`——那是给
  * CLI / MCP 用的，不该跟着界面语言变。界面拿到那份列表之后，**按 key 自己
  * 查名字**，不用后端发来的 label。
  */
-const enCatalogLabels = new Map(
-  workoutCatalog.sports.map((sport) => [sport.key, sport.label_en]),
-);
-const catalogLabels: Record<Locale, Map<string, string>> = {
-  zh: new Map(workoutCatalog.sports.map((sport) => [sport.key, sport.label_zh])),
-  en: enCatalogLabels,
-  // 目录里还没有西语名的运动先用英文名。
-  es: new Map(workoutCatalog.sports.map((sport) => [
-    sport.key,
-    (sport as { label_es?: string }).label_es ?? sport.label_en,
-  ])),
-  // 随包目录只有 zh/en/es 三语运动名（catalog.json 是后端共享的生成物）；
-  // 七种语言包语言先给英文名。界面 fallback 树仍走各自语言包覆盖。
-  nl: enCatalogLabels,
-  'pt-BR': enCatalogLabels,
-  'pt-PT': enCatalogLabels,
-  de: enCatalogLabels,
-  ru: enCatalogLabels,
-  'hi-IN': enCatalogLabels,
-  fr: enCatalogLabels,
-};
 
 const messages = defineMessages(
   {
@@ -137,7 +116,8 @@ export const workoutLabel = (value: string): string => {
   if (unknownCode) return t.unknownWithCode(unknownCode[1]);
   const normalized = value.trim().toLowerCase();
   const fallback = t.fallback as Record<string, string | undefined>;
-  return catalogLabels[locale.value].get(normalized) || fallback[normalized] || value || t.workout;
+  const names = messagesOf(workoutNameMessages) as Record<string, string | undefined>;
+  return names[normalized] || fallback[normalized] || value || t.workout;
 };
 
 

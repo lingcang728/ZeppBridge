@@ -2275,6 +2275,7 @@ Markdown में उत्तर दें।`,
       ruleTask: 'टास्क नाम + समय',
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'मिनट',
       pickDays: (label: string) => `${label} के दिन चुनकर AI को दें`,
       sleepIntentHint: 'पिछले 14 दिनों की नींद भेजकर पूछें कि नींद कैसी रही और क्या सुधारें',
       weekIntentHint: 'पिछले 7 दिन भेजकर पूछें कि प्रशिक्षण भार उचित है और रिकवरी कैसी चल रही है',

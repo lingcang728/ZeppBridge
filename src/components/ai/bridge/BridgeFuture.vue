@@ -105,7 +105,7 @@ const onWheel = (event: WheelEvent) => {
           <span v-else-if="day.rest || !day.after.length" class="rest-moon"><Icon name="moon" :size="18"/><small>{{ bedtime(day.rest?.bedtime_minutes) }}</small></span>
           <span class="workout-shape"><PlanShape v-if="day.after[0]" :profile="workoutProfile(day.after[0])" :scale-seconds="scale" :domain="domain"/><PlanShape v-else-if="fixProfile(day.date)" :profile="fixProfile(day.date)!" :scale-seconds="scale" :domain="domain"/><i v-else-if="!heldOn(day.date).length" class="rest-line"></i></span>
           <span class="day-name">{{ dayName(day) }}</span>
-          <span v-if="day.after[0]" class="day-duration">{{ Math.round(workoutProfile(day.after[0]).seconds / 60) }} <small>min</small></span>
+          <span v-if="day.after[0]" class="day-duration">{{ Math.round(workoutProfile(day.after[0]).seconds / 60) }} <small>{{ t.unitMin }}</small></span>
           <span v-if="stamped && day.after.length" class="stamp"><Icon name="watch" :size="11"/></span>
           <span class="day-date">{{ day.date.slice(5).replace('-',' / ') }}</span>
         </component>

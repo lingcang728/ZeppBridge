@@ -22,7 +22,7 @@ const messages = defineMessages(
     historical: '正在查看历史 · 只读', backCurrent: '回到当前任务', undone: '已撤销', mcp: '收到一份来自 MCP 的计划', accept: '接回这份计划',
     previewPaste: '网页预览：在这里粘贴最终回复', inspect: '接回并检查', fullDemo: '完整演示 · 全部为模拟数据',
     demoHint: '90 天数据、饮食与体重、两周计划；不连接真实账号或手表', demoDelivered: '本地模拟已完成，没有向真实手表发送。', demoLedger: '模拟发送账本', nutrition: '饮食记录', bodyNote: '体重与饮食随身体数据一起交付',
-    planned: '排的', actual: '练的', done: '按计划完成', missed: '没有匹配运动', extra: '计划外运动', retry: '重新读取',
+    planned: '排的', actual: '练的', done: '按计划完成', missed: '没有匹配运动', extra: '计划外运动', retry: '重新读取', unitMin: '分钟',
   },
   {
     past: 'Your past', pastNote: 'Lit rows go to the AI', future: 'Your next step', futureNote: 'Bring your agreed plan home', today: 'Today',
@@ -45,7 +45,7 @@ const messages = defineMessages(
     historical: 'Viewing history · read only', backCurrent: 'Back to current task', undone: 'Undone', mcp: 'A plan arrived from MCP', accept: 'Accept this plan',
     previewPaste: 'Web preview: paste the final reply here', inspect: 'Receive and check', fullDemo: 'Full demo · simulated data only',
     demoHint: '90 days, food and weight, a two-week plan; no real account or watch', demoDelivered: 'Local simulation complete. Nothing was sent to a real watch.', demoLedger: 'Simulated delivery ledger', nutrition: 'Food records', bodyNote: 'Weight and food travel with body data',
-    planned: 'Planned', actual: 'Actual', done: 'Matched workout', missed: 'No matching workout', extra: 'Extra workout', retry: 'Read again',
+    planned: 'Planned', actual: 'Actual', done: 'Matched workout', missed: 'No matching workout', extra: 'Extra workout', retry: 'Read again', unitMin: 'min',
   },
   {
     past: 'Tu pasado', pastNote: 'Las filas activas van a la IA', future: 'Tu siguiente paso', futureNote: 'Trae el plan acordado a casa', today: 'Hoy',
@@ -68,7 +68,7 @@ const messages = defineMessages(
     historical: 'Historial · solo lectura', backCurrent: 'Volver a la tarea actual', undone: 'Deshecho', mcp: 'Llegó un plan desde MCP', accept: 'Aceptar este plan',
     previewPaste: 'Vista web: pega aquí la respuesta final', inspect: 'Recibir y comprobar', fullDemo: 'Demo completa · solo datos simulados',
     demoHint: '90 días, alimentación y peso, plan de dos semanas; sin cuenta ni reloj real', demoDelivered: 'Simulación local completada. No se envió nada a un reloj real.', demoLedger: 'Registro de envío simulado', nutrition: 'Registro de alimentos', bodyNote: 'Peso y alimentación se incluyen con los datos corporales',
-    planned: 'Previsto', actual: 'Real', done: 'Actividad coincidente', missed: 'Sin actividad coincidente', extra: 'Actividad adicional', retry: 'Leer de nuevo',
+    planned: 'Previsto', actual: 'Real', done: 'Actividad coincidente', missed: 'Sin actividad coincidente', extra: 'Actividad adicional', retry: 'Leer de nuevo', unitMin: 'min',
   }, 'components/ai/bridge/bridge',
 );
 export const useBridgeText = () => useMessages(messages);

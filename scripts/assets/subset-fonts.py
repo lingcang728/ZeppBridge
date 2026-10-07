@@ -67,6 +67,18 @@ def scan_cjk() -> str:
     return ''.join(sorted(chars))
 
 
+NARROW_NBSP = 0x202F
+THIN_SPACE = 0x2009
+
+
+def add_narrow_nbsp(font: TTFont) -> None:
+    """MiSans 没有 U+202F（窄不换行空格）。数字分组用它（lib/format.ts formatNumber，俄语 / 法语的
+    「1 709」），没有字形会落到别的字体、宽窄不一。借 U+2009 细空格的字形：一样窄，但不会断行。"""
+    for table in font['cmap'].tables:
+        if table.isUnicode() and THIN_SPACE in table.cmap and NARROW_NBSP not in table.cmap:
+            table.cmap[NARROW_NBSP] = table.cmap[THIN_SPACE]
+
+
 def cut(source: pathlib.Path, dest: pathlib.Path, unicodes: list[int]) -> int:
     options = subset.Options()
     options.flavor = 'woff2'
@@ -75,6 +87,7 @@ def cut(source: pathlib.Path, dest: pathlib.Path, unicodes: list[int]) -> int:
     options.notdef_outline = True
     options.hinting = False
     font = TTFont(source)
+    add_narrow_nbsp(font)
     subsetter = subset.Subsetter(options=options)
     subsetter.populate(unicodes=unicodes)
     subsetter.subset(font)

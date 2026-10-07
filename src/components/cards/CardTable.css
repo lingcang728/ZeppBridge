@@ -44,6 +44,9 @@
 :deep(.pcard.drop-target .pcard-face) { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--tint), 0 0 26px 2px color-mix(in srgb, var(--tint) 45%, transparent); }
 .table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
 .table-foot { min-height: 0; }
+/* 右下角的收集箱是 fixed 的：提示条给它让出一块（德 / 俄的箱子标签更长，D9）。够宽时左右对称让，居中不偏。 */
+@media (min-width: 701px) { .table-foot { padding-right: 240px; } }
+@media (min-width: 1200px) { .table-foot { padding-inline: 240px; } }
 /* 窄窗口：收集箱在右下角，底部提示抬到它上方。 */
 @media (max-width: 700px) {
   .card-table { padding-bottom: 88px; }

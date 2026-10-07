@@ -2435,6 +2435,7 @@ export default {
       exchangeTitle: 'Этот обмен', exchangeMissing: 'Обмен не найден; возможно, он был очищен.', sentTo: (provider: string, when: string) => `Отправлено в ${provider} · ${when}`, question: 'Ваш вопрос', noQuestion: 'Без вопроса', dataSent: 'Переданные данные', daysBefore: (days: number) => `${days} дн. назад`, workoutsSent: (count: number) => `Тренировок: ${count}`, planBack: 'Полученный план', revealFile: 'Показать файл в Проводнике',
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'мин',
       selected: (n: number) => `${n} ${plural(n, { one: 'тренировка выбрана', few: 'тренировки выбраны', many: 'тренировок выбрано', other: 'тренировки выбраны' })}`,
       shape: 'Перетащите, чтобы поменять дни местами, или выберите день и используйте ← →; Delete удаляет день',
       sleepIntent: 'Посмотреть недавний сон',

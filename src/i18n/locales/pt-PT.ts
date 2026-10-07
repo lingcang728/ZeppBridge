@@ -2529,6 +2529,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       planBack: 'Plano recebido', revealFile: 'Mostrar o ficheiro no Explorador',
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'min',
       shape: 'Arrasta para trocar os dias ou, depois de selecionar um, usa ← →; Delete remove o dia',
       sleepIntent: 'Ver o sono recente',
       sleepQuestion: 'Como tem sido o meu sono? O que posso melhorar?',

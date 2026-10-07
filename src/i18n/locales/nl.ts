@@ -2724,6 +2724,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       monthAria: (month: string, label: string, days: number) => `${label}, ${days} dagen gekozen in ${month}. Tik om per week uit te vouwen`,
     },
     'components/ai/bridge/bridge': {
+      unitMin: 'min',
       accept: 'Dit plan overnemen',
       actual: 'Werkelijk',
       backCurrent: 'Terug naar de huidige taak',

@@ -4,6 +4,7 @@ import {
   formatDistance,
   formatDuration,
   formatMetric,
+  formatNumber,
   isFiniteNumber,
   localDateString,
 } from '../format';
@@ -117,5 +118,16 @@ describe('formatBytes', () => {
     expect(formatBytes(2048)).toBe('2 KB');
     expect(formatBytes(3 * 1024 * 1024)).toBe('3.0 MB');
     expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
+  });
+});
+
+describe('数字分组用窄不换行空格', () => {
+  afterEach(() => setLocale('zh'));
+  it('俄语、法语的千位分隔都是 U+202F（字体子集里有这个字形），不是和普通空格一样宽的 U+00A0', () => {
+    setLocale('ru');
+    expect(formatNumber(1709)).toBe('1 709');
+    expect(formatMetric(12345)).toBe('12 345');
+    setLocale('fr');
+    expect(formatNumber(1709)).toBe('1 709');
   });
 });
