@@ -1,10 +1,5 @@
 <script setup lang="ts">
-/**
- * 顶部悬浮导航：一枚玻璃胶囊。中间的三项导航就是**应用顶栏用的那个胶囊选择器**（SegmentTrack）——
- * 同一块凹槽托着一块凸起的玻璃，拖一下、点一下，滑块带着弹性跟过去；站点和软件长的是一个样子。
- * 往下滚以后收窄一点；最上面一条细线是阅读进度（只动 scaleX）。
- */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import BrandMark from '../../components/BrandMark.vue';
 import SegmentTrack from '../../components/SegmentTrack.vue';
 import LandingIcon from './LandingIcon.vue';
@@ -12,126 +7,81 @@ import LocalePicker from './LocalePicker.vue';
 import { landingTheme, toggleLandingTheme } from './theme';
 import type { LandingLocale } from '../../composables/useLandingLocale';
 import type { LandingCopy } from './types';
-import { magnetic } from './motion';
-
-export type NavTarget = 'story' | 'ai' | 'privacy';
-
+export type NavTarget = 'story' | 'privacy' | 'connect' | 'faq' | 'download';
 const props = defineProps<{ copy: LandingCopy['nav']; locale: LandingLocale; downloadHref: string; githubHref: string; active: NavTarget }>();
-const emit = defineEmits<{ locale: [value: LandingLocale]; download: []; go: [target: NavTarget] }>();
-
+const emit = defineEmits<{ locale: [value: LandingLocale]; go: [target: NavTarget] }>();
 const items = computed(() => [
-  { value: 'story' as NavTarget, label: props.copy.demo },
-  { value: 'ai' as NavTarget, label: props.copy.ai },
-  { value: 'privacy' as NavTarget, label: props.copy.privacy },
+  { value: 'story' as NavTarget, label: props.copy.demo }, { value: 'connect' as NavTarget, label: props.copy.connect },
+  { value: 'privacy' as NavTarget, label: props.copy.privacy }, { value: 'faq' as NavTarget, label: props.copy.faq },
 ]);
-
+const mobileOpen = ref(false);
+const toggle = ref<HTMLButtonElement | null>(null);
+const menu = ref<HTMLElement | null>(null);
+const header = ref<HTMLElement | null>(null);
 const scrolled = ref(false);
-const progress = ref<HTMLElement | null>(null);
-let frame = 0;
-const onScroll = () => {
-  if (frame) return;
-  frame = requestAnimationFrame(() => {
-    frame = 0;
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    scrolled.value = window.scrollY > 24;
-    if (progress.value) progress.value.style.transform = `scaleX(${max > 0 ? Math.min(1, window.scrollY / max) : 0})`;
-  });
-};
+let scrollFrame = 0;
+const onScroll = () => { if (scrollFrame) return; scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; scrolled.value = window.scrollY > 20; }); };
+const close = async (restoreFocus = true) => { if (!mobileOpen.value) return; mobileOpen.value = false; if (restoreFocus) { await nextTick(); toggle.value?.focus({ preventScroll: true }); } };
+const openMenu = async () => { if (mobileOpen.value) { void close(); return; } mobileOpen.value = true; await nextTick(); menu.value?.querySelector<HTMLElement>('a')?.focus({ preventScroll: true }); };
+const go = (target: NavTarget) => { void close(false); emit('go', target); };
+const onKeydown = (event: KeyboardEvent) => { if (event.key === 'Escape' && mobileOpen.value) { event.preventDefault(); void close(); } };
+const onOutside = (event: Event) => { if (mobileOpen.value && !header.value?.contains(event.target as Node)) void close(false); };
+let desktop: MediaQueryList | null = null;
+const onDesktop = () => { if (desktop?.matches) void close(false); };
 onMounted(() => {
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true }); window.addEventListener('keydown', onKeydown);
+  document.addEventListener('pointerdown', onOutside); document.addEventListener('focusin', onOutside);
+  desktop = window.matchMedia('(min-width: 1101px)'); desktop.addEventListener('change', onDesktop); onScroll();
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onScroll);
-  cancelAnimationFrame(frame);
+  window.removeEventListener('scroll', onScroll); window.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('pointerdown', onOutside); document.removeEventListener('focusin', onOutside);
+  desktop?.removeEventListener('change', onDesktop); cancelAnimationFrame(scrollFrame);
 });
-
-const flipTheme = (event: MouseEvent) => {
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  toggleLandingTheme({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
-};
-const pull = magnetic(6);
+const flipTheme = (event: MouseEvent) => { const rect = (event.currentTarget as HTMLElement).getBoundingClientRect(); toggleLandingTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }); };
 </script>
-
 <template>
-  <header :class="['lp-nav', { 'is-scrolled': scrolled }]">
-    <span ref="progress" class="lp-progress" aria-hidden="true"></span>
-    <div class="lp-nav-pill">
+  <header ref="header" :class="['lp-nav', { 'is-scrolled': scrolled, 'menu-open': mobileOpen }]">
+    <div class="lp-nav-bar">
       <a class="lp-brand" href="#top" :aria-label="copy.home"><BrandMark :size="26" /><strong>ZeppBridge</strong></a>
-      <nav class="lp-links" :aria-label="copy.site">
-        <SegmentTrack :items="items" :model-value="active" :aria-label="copy.site" variant="glass" compact
-          @update:model-value="emit('go', $event as NavTarget)" />
-      </nav>
+      <nav class="lp-links" :aria-label="copy.site"><SegmentTrack :items="items" :model-value="active" :aria-label="copy.site" variant="glass" compact @update:model-value="go($event as NavTarget)" @reselect="go($event as NavTarget)" /></nav>
       <div class="lp-nav-actions">
-        <LocalePicker :model-value="locale" :label="copy.language" @update:model-value="emit('locale', $event)" />
-        <button
-          type="button"
-          class="lp-icon-btn"
-          :aria-label="landingTheme === 'dark' ? copy.toLight : copy.toDark"
-          :title="landingTheme === 'dark' ? copy.toLight : copy.toDark"
-          @click="flipTheme"
-        >
-          <LandingIcon :name="landingTheme === 'dark' ? 'sun' : 'moon'" :size="18" />
-        </button>
-        <a class="lp-icon-btn lp-hide-sm" :href="githubHref" target="_blank" rel="noopener" :aria-label="copy.github" :title="copy.github">
-          <LandingIcon name="github" :size="18" />
-        </a>
-        <a class="lp-nav-cta" :href="downloadHref" rel="noopener" v-on="pull" @click="emit('download')">
-          <LandingIcon name="download" :size="16" /><span>{{ copy.download }}</span>
-        </a>
+        <div class="desktop-locale"><LocalePicker :model-value="locale" :label="copy.language" @update:model-value="emit('locale', $event)" /></div>
+        <button type="button" class="lp-icon-btn" :aria-label="landingTheme === 'dark' ? copy.toLight : copy.toDark" :title="landingTheme === 'dark' ? copy.toLight : copy.toDark" @click="flipTheme"><LandingIcon :name="landingTheme === 'dark' ? 'sun' : 'moon'" :size="18" /></button>
+        <a class="lp-nav-cta" href="#download" @click.prevent="go('download')"><LandingIcon name="download" :size="16" /><span>{{ copy.download }}</span></a>
+        <button ref="toggle" type="button" class="lp-icon-btn menu-toggle" :aria-label="copy.site" :aria-expanded="mobileOpen" aria-controls="mobile-site-nav" @click="openMenu"><LandingIcon v-if="mobileOpen" name="x" :size="19" /><svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 8h14M5 16h14" /></svg></button>
       </div>
     </div>
+    <nav v-if="mobileOpen" id="mobile-site-nav" ref="menu" class="mobile-menu" :aria-label="copy.site">
+      <a v-for="item in items" :key="item.value" :href="`#${item.value}`" :aria-current="active === item.value ? 'location' : undefined" @click.prevent="go(item.value)"><span>{{ item.label }}</span><span aria-hidden="true">↗</span></a>
+      <a href="#download" :aria-current="active === 'download' ? 'location' : undefined" @click.prevent="go('download')"><span>{{ copy.download }}</span><LandingIcon name="download" :size="17" /></a>
+      <div class="mobile-utilities"><LocalePicker :model-value="locale" :label="copy.language" @update:model-value="emit('locale', $event)" /><a :href="githubHref" target="_blank" rel="noopener"><LandingIcon name="github" :size="18" /><span>{{ copy.github }}</span></a></div>
+    </nav>
   </header>
 </template>
-
 <style scoped>
-.lp-nav { position: fixed; top: 0; right: 0; left: 0; z-index: 50; display: flex; justify-content: center; padding: 14px 16px 0; pointer-events: none; }
-.lp-progress { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--lp-green); transform: scaleX(0); transform-origin: 0 50%; will-change: transform; }
-.lp-nav-pill {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  width: min(1328px, 100%);
-  min-height: 58px;
-  padding: 0 10px 0 18px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  pointer-events: auto;
-  transition: width .6s var(--lp-ease), border-color .4s ease, background-color .4s ease, box-shadow .4s ease;
-}
-.is-scrolled .lp-nav-pill {
-  width: min(1040px, 100%);
-  border-color: var(--lp-line);
-  background: color-mix(in srgb, var(--lp-bg) 74%, transparent);
-  box-shadow: 0 20px 50px -30px rgba(20, 30, 14, .45);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-}
-.lp-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--lp-ink); font-size: 16px; text-decoration: none; }
-.lp-links { margin: 0 auto; }
-.lp-nav-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.lp-icon-btn { display: grid; width: 40px; height: 40px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--lp-muted); cursor: pointer; transition: color .2s ease, background-color .2s ease; }
+.lp-nav { position: fixed; top: 14px; right: 24px; left: 24px; z-index: 50; width: min(1340px, calc(100% - 48px)); margin: 0 auto; border: 1px solid var(--lp-line); border-radius: 20px; background: var(--lp-bg); transition: box-shadow .25s ease; }
+.is-scrolled { box-shadow: 0 10px 35px -22px rgba(30, 40, 24, .32); }
+.lp-nav-bar { display: flex; align-items: center; gap: 20px; min-height: 62px; padding: 8px 12px 8px 18px; }
+.lp-brand { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; color: var(--lp-ink); font-size: 16px; text-decoration: none; }
+.lp-brand strong { font-weight: 680; letter-spacing: -.03em; }
+.lp-links { margin: 0 auto; min-width: 0; }
+.lp-links :deep(.segment-track) { --seg-font: 12px; }
+.lp-nav-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.lp-icon-btn { display: grid; width: 40px; height: 40px; place-items: center; padding: 0; flex-shrink: 0; border: 0; border-radius: 50%; background: transparent; color: var(--lp-muted); cursor: pointer; transition: color .2s ease, background-color .2s ease; }
 .lp-icon-btn:hover { background: var(--lp-line); color: var(--lp-ink); }
-.lp-nav-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  margin-left: 4px;
-  padding: 0 18px;
-  border-radius: 999px;
-  background: var(--lp-green);
-  color: var(--lp-green-ink);
-  font-size: 14px;
-  font-weight: 650;
-  text-decoration: none;
-  transition: transform .5s var(--lp-ease), filter .2s ease;
+.lp .lp-nav-cta { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px; border-radius: 999px; background: var(--lp-green); color: var(--lp-green-ink); font-size: 13px; font-weight: 650; text-decoration: none; }
+.lp-nav-cta:hover { filter: brightness(1.07); }
+.menu-toggle, .mobile-menu { display: none; }
+@media (max-width: 1100px) {
+  .lp-links, .desktop-locale { display: none; }
+  .menu-toggle { display: grid; }
+  .mobile-menu { display: grid; padding: 12px 18px 18px; border-top: 1px solid var(--lp-line); max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .mobile-menu > a { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 48px; padding: 8px 4px; border-bottom: 1px solid var(--lp-line); color: var(--lp-muted); font-size: 15px; text-decoration: none; }
+  .mobile-menu > a[aria-current] { color: var(--lp-green); font-weight: 650; }
+  .mobile-utilities { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 18px; }
+  .mobile-utilities > a { display: inline-flex; align-items: center; gap: 6px; color: var(--lp-muted); font-size: 13px; text-decoration: none; }
 }
-.lp-nav-cta:hover { filter: brightness(1.06); }
-@media (max-width: 900px) { .lp-links { display: none; } .lp-nav-actions { margin-left: auto; } }
-@media (max-width: 520px) {
-  .lp-nav { padding: 10px 10px 0; }
-  .lp-nav-pill { gap: 6px; padding: 0 6px 0 12px; }
-  .lp-brand strong, .lp-hide-sm { display: none; }
-}
+@media (max-width: 520px) { .lp-nav { top: 10px; right: 12px; left: 12px; width: calc(100% - 24px); border-radius: 16px; } .lp-nav-bar { min-height: 58px; gap: 8px; padding: 7px 8px 7px 12px; } .lp-brand { font-size: 14px; gap: 7px; } .lp-nav-actions { gap: 0; } .lp .lp-nav-cta { gap: 5px; padding: 0 12px; font-size: 12px; } .mobile-menu { padding: 10px 16px 16px; } .mobile-utilities { gap: 8px; } .mobile-utilities :deep(.lp-locale) { padding-left: 0; } }
+@media (max-width: 360px) { .lp-brand strong { display: none; } }
 </style>

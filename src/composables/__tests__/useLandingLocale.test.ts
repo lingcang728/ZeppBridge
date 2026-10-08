@@ -34,7 +34,7 @@ describe('landing language survives unavailable storage', () => {
     expect(() => language.setLocale('zh')).not.toThrow();
     expect(language.locale.value).toBe('zh');
     expect(document.documentElement.lang).toBe('zh-CN');
-    expect(document.title).toContain('从手腕到你的电脑');
+    expect(document.title).toContain('手表记录，自己的档案');
   });
 
   it('still honors a saved choice', async () => {
@@ -112,7 +112,7 @@ describe('lazy copy packs', () => {
     await language.ensureLandingCopy('fr');
     const copy = language.landingCopyFor('fr');
     expect(copy?.nav.language).toBe('Langue');
-    expect(copy?.hero.titleAccent).toBe('est sur ton ordinateur.');
+    expect(copy?.hero.titleAccent).toBe('Vos propres archives.');
 
     language.setLocale('fr');
     await language.ensureLandingCopy('fr');
@@ -120,6 +120,6 @@ describe('lazy copy packs', () => {
     expect(document.documentElement.lang).toBe('fr');
     // 这三条 fr 字符串是「语言包真的加载了」的证据，跟着 landing/fr.ts 走：
     // 那边改了 nav.language / titleAccent / meta.title 就要同步改这里。
-    expect(document.title).toBe('ZeppBridge · Du poignet à ton ordinateur, de ton ordinateur à l’IA');
+    expect(document.title).toBe('ZeppBridge · Votre montre enregistre. Vos propres archives.');
   });
 });

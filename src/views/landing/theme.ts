@@ -21,7 +21,7 @@ export const landingTheme = ref<LandingTheme>('light');
 export const applyLandingTheme = () => {
   landingTheme.value = read();
   document.documentElement.dataset.theme = landingTheme.value;
-  document.documentElement.style.colorScheme = landingTheme.value;
+  document.documentElement.style.colorScheme = `only ${landingTheme.value}`;
 };
 
 /**
@@ -33,7 +33,7 @@ export const toggleLandingTheme = (origin?: { x: number; y: number }) => {
   const commit = () => {
     landingTheme.value = next;
     document.documentElement.dataset.theme = next;
-    document.documentElement.style.colorScheme = next;
+    document.documentElement.style.colorScheme = `only ${next}`;
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {

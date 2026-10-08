@@ -1,0 +1,190 @@
+{
+  "date": "2026-10-07",
+  "rankedPositions": 150,
+  "distinctProductEntries": 112,
+  "distinctBrands": 110,
+  "batches": [
+    {
+      "batch": 1,
+      "core": [
+        "OpenAI",
+        "Anthropic",
+        "Canva",
+        "Superhuman",
+        "Higgsfield",
+        "Replit",
+        "Suno",
+        "Lovable",
+        "Perplexity",
+        "ElevenLabs"
+      ],
+      "supplement": [
+        "Arena",
+        "Base44"
+      ]
+    },
+    {
+      "batch": 2,
+      "core": [
+        "Midjourney",
+        "OpenArt",
+        "OpenRouter",
+        "Otter",
+        "Figma",
+        "PLAUD",
+        "Notion",
+        "Reface",
+        "Manus",
+        "Speechify"
+      ],
+      "supplement": [
+        "TurboScribe",
+        "OpenEvidence"
+      ]
+    },
+    {
+      "batch": 3,
+      "core": [
+        "Descript",
+        "Zeely",
+        "HeyGen",
+        "Jumpspeak",
+        "Runway",
+        "Kling",
+        "Topaz Labs",
+        "InVideo",
+        "Topview",
+        "Gamma"
+      ],
+      "supplement": [
+        "Z.ai"
+      ]
+    },
+    {
+      "batch": 4,
+      "core": [
+        "Meshy",
+        "QuillBot",
+        "NovelAI",
+        "JustDone",
+        "Fireflies",
+        "Sudowrite",
+        "Jasper",
+        "Photoroom",
+        "Hugging Face",
+        "Genspark"
+      ],
+      "supplement": [
+        "Cursor"
+      ]
+    },
+    {
+      "batch": 5,
+      "core": [
+        "Evoto",
+        "MiniMax",
+        "Beautiful.ai",
+        "fal",
+        "n8n",
+        "Cognition",
+        "FaceApp",
+        "Moises",
+        "Synthesia",
+        "Nous Research"
+      ],
+      "supplement": [
+        "Duck.ai"
+      ]
+    },
+    {
+      "batch": 6,
+      "core": [
+        "ChatGPT",
+        "CapCut",
+        "Gemini",
+        "AI Gallery",
+        "Copilot",
+        "Doubao",
+        "Picsart",
+        "Dola",
+        "Microsoft Edge",
+        "Meituan"
+      ],
+      "supplement": [
+        "ZeroGPT"
+      ]
+    },
+    {
+      "batch": 7,
+      "core": [
+        "Claude",
+        "Yandex",
+        "DeepSeek",
+        "QQ Browser",
+        "Goodnotes",
+        "Edits",
+        "Meta AI",
+        "Grok",
+        "Adobe Lightroom",
+        "Seekee"
+      ],
+      "supplement": [
+        "SeaArt"
+      ]
+    },
+    {
+      "batch": 8,
+      "core": [
+        "VN",
+        "Remini",
+        "Baidu AI Search",
+        "Meitu",
+        "Facemoji",
+        "Wink",
+        "Hypic",
+        "Adobe Express",
+        "Microsoft Bing",
+        "YouCut"
+      ],
+      "supplement": [
+        "Venice"
+      ]
+    },
+    {
+      "batch": 9,
+      "core": [
+        "Polish",
+        "NotebookLM",
+        "Papago",
+        "Gauth",
+        "Hi Translate",
+        "BeautyPlus",
+        "BeautyCam",
+        "Character.ai",
+        "SNOW",
+        "Nova"
+      ],
+      "supplement": [
+        "Google Antigravity"
+      ]
+    },
+    {
+      "batch": 10,
+      "core": [
+        "Qwen",
+        "Faceu",
+        "Photomath",
+        "Emochi",
+        "Google AI Studio",
+        "Freepik",
+        "Quark",
+        "Google Labs",
+        "remove.bg",
+        "Kimi"
+      ],
+      "supplement": [
+        "Adot"
+      ]
+    }
+  ]
+}

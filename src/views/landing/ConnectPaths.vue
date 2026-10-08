@@ -1,57 +1,57 @@
 <script setup lang="ts">
-/* 三种连接方式：三张卡，上面一条线随进场从左画到右，把三个编号串起来。第一张是推荐。 */
-import { ref } from 'vue';
-import { spotlight, useSeen } from './motion';
+import LandingIcon from './LandingIcon.vue';
 import type { LandingCopy } from './types';
 
 defineProps<{ copy: LandingCopy['connect'] }>();
-const row = ref<HTMLElement | null>(null);
-const seen = useSeen(row, 0.3);
+const connectionGuide = 'https://github.com/lingcang728/ZeppBridge/blob/v3/docs/guides/connection.md';
 </script>
 
 <template>
-  <section id="connect" class="lp-section connect">
-    <div data-reveal>
-      <h2 class="lp-h2">{{ copy.heading }}</h2>
-      <p class="lp-lead">{{ copy.lead }}</p>
-    </div>
-    <div ref="row" :class="['paths', { 'is-seen': seen }]">
-      <span class="thread" aria-hidden="true"></span>
-      <article
-        v-for="(path, index) in copy.paths"
-        :key="path.title"
-        :class="['path lp-panel lp-spot', { lead: index === 0 }]"
-        :style="{ '--k': index }"
-        @pointermove="spotlight"
-      >
-        <span class="num">{{ index + 1 }}</span>
-        <span v-if="index === 0" class="badge">{{ copy.recommended }}</span>
-        <h3>{{ path.title }}</h3>
-        <p>{{ path.copy }}</p>
-        <p class="detail">{{ path.detail }}</p>
+  <section id="connect" class="lp-section connect" aria-labelledby="connect-title">
+    <p class="lp-kicker">{{ copy.kicker }}</p>
+    <h2 id="connect-title" class="lp-h2">{{ copy.heading }}</h2>
+    <p class="lp-lead">{{ copy.lead }}</p>
+    <div class="connection-layout">
+      <article class="recommended-path">
+        <div class="path-label"><LandingIcon name="check" :size="18" /><span>{{ copy.recommended }}</span></div>
+        <h3>{{ copy.paths[0].title }}</h3>
+        <p class="path-copy">{{ copy.paths[0].copy }}</p>
+        <p class="path-detail">{{ copy.paths[0].detail }}</p>
+        <a class="guide" :href="connectionGuide" target="_blank" rel="noopener noreferrer">
+          {{ copy.docs }}<LandingIcon name="arrow-right" :size="18" />
+        </a>
       </article>
+      <div class="alternatives">
+        <p class="alternatives-label">{{ copy.advanced }}</p>
+        <article v-for="(path, index) in copy.paths.slice(1)" :key="path.title" class="alternative">
+          <span class="path-number" aria-hidden="true">{{ index + 2 }}</span>
+          <div><h3>{{ path.title }}</h3><p>{{ path.copy }}</p><p class="path-detail">{{ path.detail }}</p></div>
+        </article>
+      </div>
     </div>
-    <p class="note" data-reveal>{{ copy.note }}</p>
+    <div class="connection-notes"><p>{{ copy.note }}</p><p class="edition">{{ copy.edition }}</p></div>
   </section>
 </template>
 
 <style scoped>
-.paths { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 56px; padding-top: 22px; }
-.thread { position: absolute; top: 0; right: 16%; left: 16%; height: 2px; background: var(--lp-line-2); transform: scaleX(0); transform-origin: 0 50%; transition: transform 1.4s var(--lp-ease) .2s; }
-.is-seen .thread { transform: scaleX(1); }
-.path { display: grid; align-content: start; gap: 10px; padding: 34px 26px 28px; opacity: 0; transform: translateY(30px); transition: opacity .8s var(--lp-ease), transform .8s var(--lp-ease); transition-delay: calc(.15s + var(--k) * .15s); }
-.is-seen .path { opacity: 1; transform: none; }
-.path.lead { border-color: color-mix(in srgb, var(--lp-green) 40%, transparent); }
-.num { position: absolute; top: -40px; left: 50%; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--lp-line-2); border-radius: 50%; background: var(--lp-bg); color: var(--lp-muted); font-family: var(--font-mono); font-size: 14px; transform: translateX(-50%); }
-.lead .num { border-color: var(--lp-green); color: var(--lp-green); }
-.badge { justify-self: start; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--lp-green) 16%, transparent); color: var(--lp-green); font-size: 12px; font-weight: 650; }
-.path h3 { margin: 0; font-size: 19px; }
-.path p { margin: 0; color: var(--lp-muted); font-size: 14.5px; line-height: 1.6; }
-.path .detail { color: var(--lp-subtle); font-size: 13.5px; }
-.note { max-width: 46em; margin: 30px 0 0; padding-left: 14px; border-left: 2px solid var(--lp-line-2); color: var(--lp-muted); font-size: 14.5px; line-height: 1.65; }
-@media (max-width: 860px) {
-  .paths { grid-template-columns: 1fr; gap: 44px; padding-top: 30px; }
-  .thread { display: none; }
-}
-@media (prefers-reduced-motion: reduce) { .path { opacity: 1; transform: none; } .thread { transform: none; } }
+.connect .lp-h2 { font-size: clamp(30px, 3.6vw, 48px); line-height: 1.15; }
+.connection-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 52px; margin-top: 38px; }
+.recommended-path { padding: 32px 36px; border: 1px solid var(--lp-line-2); border-radius: 22px; background: var(--lp-panel); }
+.path-label { display: inline-flex; align-items: center; gap: 9px; padding-bottom: 20px; color: var(--lp-green); font-size: 13px; font-weight: 650; }
+.recommended-path h3 { margin: 0; font-size: clamp(22px, 2vw, 28px); line-height: 1.3; letter-spacing: -.02em; }
+.path-copy { margin: 18px 0 12px; font-size: 17px; line-height: 1.65; }
+.path-detail { color: var(--lp-muted); font-size: 14px; line-height: 1.75; }
+.guide { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; margin-top: 16px; border-bottom: 1px solid var(--lp-line-2); font-size: 14px; line-height: 1.5; text-decoration: none; }
+.guide:hover { color: var(--lp-green); }
+.alternatives { padding: 8px 0; }
+.alternatives-label { margin: 0 0 16px; color: var(--lp-muted); font-size: 12px; font-weight: 650; letter-spacing: .07em; }
+.alternative { display: grid; grid-template-columns: 28px 1fr; gap: 16px; padding: 22px 0; border-top: 1px solid var(--lp-line); }
+.path-number { color: var(--lp-subtle); font-family: var(--font-mono); font-size: 13px; line-height: 25px; }
+.alternative h3 { margin: 0; font-size: 18px; line-height: 1.4; }
+.alternative p { margin: 10px 0 0; font-size: 14px; line-height: 1.75; }
+.connection-notes { display: grid; grid-template-columns: 1.1fr 1fr; gap: 52px; margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--lp-line); }
+.connection-notes p { margin: 0; color: var(--lp-muted); font-size: 14px; line-height: 1.75; }
+.connection-notes .edition { font-size: 13px; }
+@media (max-width: 800px) { .connection-layout, .connection-notes { grid-template-columns: 1fr; gap: 24px; }.recommended-path { padding: 26px; }.connection-notes { gap: 16px; } }
+@media (max-width: 420px) { .recommended-path { padding: 22px; }.alternative { gap: 10px; } }
 </style>

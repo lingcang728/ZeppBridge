@@ -83,20 +83,18 @@ export interface LandingPack {
 
 /** zh/en 的 meta 和文案一样内联——首屏就要写对 title，不能等网络。 */
 const DOCUMENT_META: Record<'zh' | 'en', LandingMeta> = {
-  zh: {
-    title: 'ZeppBridge · 从手腕到你的电脑，从电脑到 AI',
-    description: 'ZeppBridge 把 Amazfit / Zepp 的心率、睡眠、运动从 Zepp 云端同步到你自己的电脑，再一键打包交给 AI。免费、开源、本地优先。',
-    ogTitle: 'ZeppBridge · 从手腕，到你的电脑。从电脑，直接到 AI。',
-    ogDescription: '在本机同步、查看 Amazfit 穿戴数据；想问 AI 时挑好范围，一个文件交出去。',
+  "zh": {
+    "title": "ZeppBridge · 手表记录，自己的档案",
+    "description": "把 Amazfit / Zepp 的心率、睡眠和运动保存为本地健康档案。查看合成 v3 示例，下载公开稳定版。免费、开源。",
+    "ogTitle": "ZeppBridge · 手表记录，自己的档案",
+    "ogDescription": "把 Amazfit / Zepp 的心率、睡眠和运动保存为本地健康档案。查看合成 v3 示例，下载公开稳定版。免费、开源。"
   },
-  en: {
-    title: 'ZeppBridge · From your wrist to your desk, from your desk to your AI',
-    description:
-      'ZeppBridge syncs Amazfit / Zepp heart rate, sleep and workouts from the Zepp cloud to your own computer, then packs them for an AI in one click. Free, open source, local first.',
-    ogTitle: 'ZeppBridge · From your wrist to your desk. From your desk to your AI.',
-    ogDescription:
-      'Sync and browse your Amazfit data on your own machine. When you have a question, hand the range you choose to an AI as a single file.',
-  },
+  "en": {
+    "title": "ZeppBridge · Your watch records. Your own archive.",
+    "description": "Keep Amazfit / Zepp heart rate, sleep and workouts in a local health archive. Explore the synthetic v3 sample or download the public stable release. Free and open source.",
+    "ogTitle": "ZeppBridge · Your watch records. Your own archive.",
+    "ogDescription": "Keep Amazfit / Zepp heart rate, sleep and workouts in a local health archive. Explore the synthetic v3 sample or download the public stable release. Free and open source."
+  }
 };
 
 const STORAGE_KEY = 'zeppbridge-landing-locale';

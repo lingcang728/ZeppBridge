@@ -1,169 +1,244 @@
 import type { LandingPack } from '../../composables/useLandingLocale';
 
 const pack: LandingPack = {
-  meta: {
-    title: 'ZeppBridge · Van je pols naar je computer, van je computer naar AI',
-    description: 'ZeppBridge haalt je Amazfit- en Zepp-gegevens uit de Zepp-cloud naar je eigen computer en zet ze klaar in één bestand voor je AI. Gratis en open source.',
-    ogTitle: 'ZeppBridge · Van pols naar bureau. Van bureau naar AI.',
-    ogDescription: 'Synchroniseer en bekijk je hartslag, slaap en trainingen lokaal, en geef ze met één klik aan de AI die je al gebruikt.',
+  "meta": {
+    "title": "ZeppBridge · Je horloge legt vast. Je eigen archief.",
+    "description": "Bewaar Amazfit- en Zepp-gegevens lokaal. Verken het synthetische v3-voorbeeld of download de publieke stabiele versie. Gratis en open source.",
+    "ogTitle": "ZeppBridge · Je horloge legt vast. Je eigen archief.",
+    "ogDescription": "Bewaar Amazfit- en Zepp-gegevens lokaal. Verken het synthetische v3-voorbeeld of download de publieke stabiele versie. Gratis en open source."
   },
-  copy: {
-    nav: {
-      home: 'ZeppBridge home',
-      site: 'Sitenavigatie',
-      demo: 'Demonstratie',
-      ai: 'Naar AI',
-      privacy: 'Privacy',
-      download: 'Downloaden',
-      github: 'GitHub',
-      language: 'Taal',
-      toDark: 'Naar donker',
-      toLight: 'Naar licht',
+  "copy": {
+    "nav": {
+      "home": "ZeppBridge home",
+      "site": "Sitenavigatie",
+      "demo": "Demonstratie",
+      "ai": "Naar AI",
+      "privacy": "Privacy",
+      "download": "Publieke versie",
+      "github": "GitHub",
+      "language": "Taal",
+      "toDark": "Naar donker",
+      "toLight": "Naar licht",
+      "connect": "Verbinden",
+      "faq": "Veelgestelde vragen"
     },
-    downloads: {
-      windows: {
-        label: 'Downloaden voor Windows',
-        hint: 'x64-installatieprogramma',
-        msi: 'MSI voor beheerde installaties',
+    "downloads": {
+      "windows": {
+        "label": "Downloaden voor Windows",
+        "hint": "x64-installatieprogramma",
+        "msi": "MSI voor beheerde installaties"
       },
-      macos: { label: 'Downloaden voor macOS', hint: 'Apple Silicon' },
-      linux: {
-        label: 'Linux',
-        previewBadge: 'Experimenteel',
-        note: 'De CI bouwt deb, rpm, AppImage en Flatpak, maar niemand heeft inloggen en de sleutelbos al volledig getest op een echte Linux-desktop. Loop je ergens tegenaan? Open een issue.',
+      "macos": {
+        "label": "Downloaden voor macOS",
+        "hint": "Apple Silicon"
       },
-      status: {
-        loading: 'Nieuwste installatieprogramma zoeken',
-        ready: 'Klik om direct te downloaden',
-        fallback: 'Opent GitHub Releases, daar kies je het pakket',
+      "linux": {
+        "label": "Linux",
+        "previewBadge": "Experimenteel",
+        "note": "De CI bouwt deb, rpm, AppImage en Flatpak, maar niemand heeft inloggen en de sleutelbos al volledig getest op een echte Linux-desktop. Loop je ergens tegenaan? Open een issue."
       },
+      "status": {
+        "loading": "Nieuwste installatieprogramma zoeken",
+        "ready": "Klik om direct te downloaden",
+        "fallback": "Opent GitHub Releases, daar kies je het pakket"
+      }
     },
-    sample: 'Voorbeeld',
-    hero: {
-      eyebrow: 'Gratis · Open source · Je gegevens blijven op je computer',
-      titleLead: 'Wat je horloge vastlegt,',
-      titleAccent: 'staat op je eigen computer.',
-      lead: 'ZeppBridge haalt de hartslag, slaap en trainingen die je Amazfit vastlegt uit de Zepp-cloud naar je eigen computer en bewaart ze als archief dat je kunt lezen en meenemen. Wil je iets aan een AI vragen, dan kies je een periode en geef je één bestand door.',
-      github: 'Bekijk de broncode op GitHub',
-      meta: 'Gratis · Windows 10 / 11 · macOS (Apple Silicon) · Linux experimenteel',
-      devices: 'Amazfit-apparaten die het al kent',
-      stage: {
-        hint: 'Klik en probeer het uit',
-        note: 'Rechts zie je het echte ZeppBridge, met voorbeeldgegevens.',
-        loading: 'App wordt geopend…',
-        exit: 'Demo verlaten',
-        unavailable: 'Deze browser kan de demo niet openen. Download de app om het te zien.',
+    "sample": "Voorbeeld",
+    "hero": {
+      "eyebrow": "Gratis · Open source · Lokaal gezondheidsarchief",
+      "titleLead": "Je horloge legt vast.",
+      "titleAccent": "Je eigen archief.",
+      "lead": "Bewaar Amazfit-hartslag, slaap en trainingen uit de Zepp-cloud op je computer. Bekijk je geschiedenis, behoud ontbrekende gegevens en exporteer wat je kiest.",
+      "github": "Bekijk de broncode op GitHub",
+      "meta": "Gratis · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
+      "devices": "Amazfit-apparaten; meetwaarden verschillen per model",
+      "stage": {
+        "hint": "Open het voorbeeld",
+        "note": "De echte app met synthetische gegevens, zonder verbinding met je account.",
+        "loading": "App wordt geopend…",
+        "exit": "Demo verlaten",
+        "unavailable": "De demo is niet beschikbaar. Je kunt de uitleg en broncode nog bekijken."
       },
-      starNudge: {
-        title: 'Je download is gestart',
-        copy: 'Heb je iets aan ZeppBridge? Een ster op GitHub helpt andere Amazfit-gebruikers het te vinden.',
-        action: 'Ster geven',
-        dismiss: 'Later',
-      },
+      "demo": "Bekijk het voorbeeld",
+      "edition": "v3 in ontwikkeling · Synthetische voorbeeldgegevens. De download biedt de publieke stabiele versie; interface en functies kunnen verschillen."
     },
-    beats: [
+    "beats": [
       {
-        kicker: '01 · Synchroniseren',
-        title: 'Haal naar je eigen computer wat je pols vastlegt',
-        body: 'Log in met je eigen Zepp-account en hartslag, slaap en trainingen worden dag na dag opgeslagen in een database op dit apparaat. Leesbaar, meeneembaar en ook zonder netwerk beschikbaar.',
+        "kicker": "01 · Synchroniseren",
+        "title": "Een lokale kopie van je registraties",
+        "body": "Verbind je Zepp-account en bewaar bestaande cloudgegevens op je computer. Gesynchroniseerde registraties zijn offline te bekijken."
       },
       {
-        kicker: '02 · Eerlijk',
-        title: 'Niet gemeten betekent niet gemeten',
-        body: 'Kijk naar de grafiek rechts: gistermiddag is een gat, want het horloge zat niet om je pols. ZeppBridge vult geen 0 in en tekent geen verzonnen lijn. Ontbrekende dagen verschijnen als grijze streepjes rond elk gegevensblok.',
+        "kicker": "02 · Ontbrekend",
+        "title": "Geen meting, geen waarde",
+        "body": "Ontbrekende metingen worden nooit aangevuld met nul, een eerdere waarde of een schatting. Nog niet gesynchroniseerd is iets anders dan niet gemeten."
       },
       {
-        kicker: '03 · Naar de AI',
-        title: 'Wil je iets aan een AI vragen? Kies eerst wat hij te zien krijgt',
-        body: 'Wat binnen de cirkel valt wordt doorgegeven, wat erbuiten valt niet, en de streepjes rond elk punt laten zien op welke dagen er gegevens zijn. Druk op de verzendknop en het ingepakte .md-bestand staat klaar om in de chat te slepen.',
+        "kicker": "03 · Overdracht",
+        "title": "Kies de inhoud en de ontvanger",
+        "body": "In het v3-voorbeeld selecteer je gegevens en datums en bekijk je de export. Die wordt lokaal gemaakt; externe AI krijgt hem pas wanneer jij de inhoud verstuurt."
       },
       {
-        kicker: '04 · Plan',
-        title: 'Een trainingsplan van de AI dat pas naar je horloge gaat nadat jij het hebt gecontroleerd',
-        body: 'Plak het hele antwoord van de AI terug: je ziet dag voor dag wat er verandert, met het hartslagbereik van elke stap als grafiek. Schrijfwijzen die nog niet op je horloge zijn gecontroleerd, worden gemarkeerd. Pas na jouw bevestiging gaat het naar Zepp en je kunt het altijd ongedaan maken.',
+        "kicker": "04 · Plannen",
+        "title": "Bekijk het plan vóór de volgende stap",
+        "body": "De v3 in ontwikkeling toont het importeren en beoordelen van trainingsplannen. Verzenden naar je horloge hangt af van apparaat en validatie; dit is geen algemene belofte voor de stabiele versie."
       },
       {
-        kicker: '05 · Jij bepaalt',
-        title: 'De schakelaars die je nodig hebt zijn er, en niets meer',
-        body: 'Instellingen zijn een stapel kaarten: open er een en sleep de kop opzij om naar de volgende te bladeren. Hoe lang gegevens bewaard blijven, hoe vaak er wordt gesynchroniseerd en of de lokale interface aan staat, bepaal jij.',
-      },
+        "kicker": "05 · Instellingen",
+        "title": "Bepaal het ritme van je archief",
+        "body": "Verken synchronisatie, bewaartermijnen en lokale interfaces. Instellingen kunnen per versie verschillen; controleer hun doel vóór inschakeling."
+      }
     ],
-    flap: {
-      tiles: [
-        { value: '1.096', label: 'nachten slaap' },
-        { value: '742', label: 'trainingen met route' },
-        { value: '1,5M', label: 'minuten hartslag' },
-        { value: '9,8M', label: 'stappen' },
-      ],
+    "flap": {
+      "tiles": [
+        {
+          "value": "1.096",
+          "label": "nachten slaap"
+        },
+        {
+          "value": "742",
+          "label": "trainingen met route"
+        },
+        {
+          "value": "1,5M",
+          "label": "minuten hartslag"
+        },
+        {
+          "value": "9,8M",
+          "label": "stappen"
+        }
+      ]
     },
-    handoff: {
-      chat: 'AI-chat',
-      you: 'Jij',
-      file: 'ZeppBridge laatste 14 dagen.md',
-      prompt: 'Heb ik deze week slechter geslapen dan vorige week? Waar kan dat aan liggen?',
-      answer: 'Iets slechter: gemiddeld 38 minuten minder, vooral diepe slaap. Op dinsdag en donderdag trainde je \'s avonds, en die nachten zakte je hartslag trager. Probeer een week lang \'s middags te trainen.',
-      note: 'Geen ingebouwde AI en geen extra account. Wat eruit gaat, hoeveel en wanneer gebeurt pas als jij klikt.',
-      close: 'Sluiten',
+    "handoff": {
+      "chat": "AI-chat",
+      "you": "Jij",
+      "file": "ZeppBridge laatste 14 dagen.md",
+      "prompt": "Orden dit synthetische voorbeeld. Noem bronnen, datums en ontbrekende velden zonder gezondheidsoordelen.",
+      "answer": "Het bestand ordent slaap en trainingen per datum. Ongemeten perioden blijven leeg. Controleer bronnen en dekking vóór vergelijken; de gegevens verklaren geen oorzaak van veranderingen.",
+      "note": "Synthetisch voorbeeldgesprek. Deze pagina verstuurt geen bestand en verbindt niet met AI. Bij echt gebruik bepaal jij of je inhoud deelt.",
+      "close": "Sluiten"
     },
-    privacy: {
-      heading: 'Je gezondheidsgegevens staan op twee plekken',
-      lead: 'In de Zepp-cloud en op je eigen computer. Een derde is er niet.',
-      nodes: { watch: 'Horloge', cloud: 'Zepp-cloud', computer: 'Je computer', server: 'ZeppBridge-server', none: 'bestaat niet' },
-      points: [
-        {
-          title: 'Tokens in de systeemkluis',
-          copy: 'In Windows Referentiebeheer of de macOS-sleutelhanger, nooit in de gegevensmap.',
-        },
-        {
-          title: 'Geen telemetrie',
-          copy: 'Geen gebruiksmeting en geen gezondheidsgegevens verzameld.',
-        },
-        {
-          title: 'Duidelijke herkomst',
-          copy: 'Elke meting weet of die uit de officiële autorisatie of uit de uitgebreide gegevens komt.',
-        },
-      ],
-    },
-    connect: {
-      heading: 'Drie manieren om te verbinden. Kies de makkelijkste.',
-      lead: 'Begin met de officiële autorisatie. Voeg uitgebreide gegevens toe als je meer meetwaarden wilt.',
-      recommended: 'Aanbevolen',
-      paths: [
-        {
-          title: 'Officiële Zepp-autorisatie',
-          copy: 'Log in bij Zepp in je gewone browser en geef toestemming.',
-          detail: 'Google-, Xiaomi- en Apple-accounts werken. Slaap, hartslag, stappen, trainingen, PAI en gewicht worden gesynchroniseerd.',
-        },
-        {
-          title: 'Uitgebreide gegevens',
-          copy: 'Voegt HRV, bloedzuurstof, stress en paraatheid toe, die de officiële API niet biedt.',
-          detail: 'Inloggen met e-mail of telefoonnummer. Het token staat alleen in je systeemkluis.',
-        },
-        {
-          title: 'Handmatig invoeren',
-          copy: 'De terugval als de andere twee niet lukken.',
-          detail: 'Je plakt zelf een token. Bedoeld voor wie de API kent.',
-        },
-      ],
-      note: 'Wat er synchroniseert, hangt af van wat je account in de Zepp-cloud heeft. Welke meetwaarden je ziet, hangt af van je apparaat en hoe je verbindt.',
-    },
-    final: {
-      heading: 'Installeer het en zie wat je horloge nog weet',
-      lead: 'Gratis, open source, zonder account.',
-      facts: {
-        channel: 'Stabiel kanaal, installatieprogramma\'s via GitHub Releases',
-        systems: 'Windows 10 / 11 (x64) en macOS (Apple Silicon). Linux is experimenteel.',
-        ai: 'Geen extra account nodig. Voor AI-vragen gebruik je de AI die je al hebt.',
-        windows: 'Windows: het installatieprogramma is nog niet ondertekend. Zie je "Onbekende uitgever", kies dan "Meer informatie" en daarna "Toch uitvoeren".',
-        macos: 'macOS: een niet-ondertekende build, dus de eerste start wordt geblokkeerd. Hoe je hem toestaat, staat in de readme op GitHub.',
+    "privacy": {
+      "kicker": "Gegevens en privacy",
+      "heading": "Je archief is lokaal. De routes zijn duidelijk.",
+      "lead": "Normale synchronisatie leest Zepp-gegevens naar je computer. Externe AI is een aparte route die je bewust kiest.",
+      "nodes": {
+        "watch": "Horloge en Zepp-app",
+        "cloud": "Zepp-cloud",
+        "computer": "Lokaal gezondheidsarchief",
+        "export": "Jouw gekozen externe AI"
       },
+      "flowNote": "Je horloge uploadt via de Zepp-telefoonapp. De website bewaart het gezondheidsarchief niet.",
+      "exportNote": "Optionele export · Zelf beoordelen en verzenden",
+      "services": {
+        "title": "Webdiensten met beperkte taken",
+        "copy": "Officiële autorisatie en tokenvernieuwing gebruiken webdiensten. Updates lezen versiegegevens. Vrijwillige probleemrapporten sturen na bevestiging beperkte diagnostiek, zonder gezondheidswaarden."
+      },
+      "docs": "Lees de volledige gegevensgrenzen",
+      "points": [
+        {
+          "title": "Inloggegevens in de systeemkluis",
+          "copy": "Standaard wordt de kluis van je besturingssysteem gebruikt. Sommige platforms bieden expliciete bestandsopslag met andere bescherming."
+        },
+        {
+          "title": "Lokaal betekent niet versleuteld",
+          "copy": "De gezondheidsdatabase is standaard niet versleuteld. Gebruik aparte systeemaccounts en bescherm back-ups."
+        },
+        {
+          "title": "Jij begint de export",
+          "copy": "AI-pakketten worden lokaal voorbereid en opgeschoond. Na verzending gelden de regels van de ontvanger. Gewone exports en volledige back-ups bevatten andere informatie."
+        }
+      ]
     },
-    footer: {
-      tagline: 'Een lokale brug voor Amazfit- en Zepp-gegevens.',
-      disclaimer: 'ZeppBridge is een onafhankelijk opensourceproject en niet verbonden aan Zepp Health of Amazfit.',
-      source: 'Broncode',
+    "connect": {
+      "kicker": "Verbind je registraties",
+      "heading": "Begin met officiële autorisatie",
+      "lead": "Eén dagelijkse route. Geavanceerde verbindingen voegen andere velden toe.",
+      "recommended": "Aanbevolen start",
+      "advanced": "Geavanceerde alternatieven",
+      "edition": "Dit zijn de huidige v3-routes. Raadpleeg de release-notities van de publieke stabiele versie voor haar toegang en functies.",
+      "docs": "Verbindingsgids",
+      "paths": [
+        {
+          "title": "Officiële Zepp-autorisatie",
+          "copy": "Open Zepps autorisatiepagina in je browser en meld je aan zoals gewoonlijk.",
+          "detail": "Leest beschikbare slaap, hartslag, stappen, trainingen, PAI en gewicht uit je account."
+        },
+        {
+          "title": "Geavanceerde gegevensverbinding",
+          "copy": "Voeg deze toe voor HRV, bloedzuurstof, stress of gereedheid.",
+          "detail": "Aanmelden via e-mail of telefoon. De velden verschillen; niet elk apparaat meet of levert ze allemaal."
+        },
+        {
+          "title": "Handmatige inloggegevens",
+          "copy": "Voor API-kenners met rechtmatig verkregen eigen inloggegevens.",
+          "detail": "Voer token, gebruikers-ID en regionaal adres in. Importeer nooit onbekende tokens en deel ze niet openbaar."
+        }
+      ],
+      "note": "Apparaat, cloudgegevens en verbinding bepalen beschikbare velden. Een leeg antwoord bewijst geen gebrek aan ondersteuning. Dit zijn alternatieven, geen drie verplichte stappen."
     },
-  },
+    "final": {
+      "kicker": "Download · Publieke stabiele versie",
+      "heading": "Bewaar een kopie op je eigen computer",
+      "lead": "Gratis en open source. Je Zepp-account volstaat; geen apart ZeppBridge-account.",
+      "docs": "Installatie en release-notities",
+      "facts": {
+        "channel": "De download biedt de publieke stabiele versie. De synthetische demo is v3 in ontwikkeling; interface en functies kunnen afwijken.",
+        "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
+        "ai": "Bekijken en exporteren vereisen geen AI. Externe dienst en account kies je zelf.",
+        "windows": "Windows: nog geen vertrouwde codehandtekening. Een waarschuwing van onbekende uitgever of SmartScreen is mogelijk. Controleer de officiële bron.",
+        "macos": "macOS: niet ondertekend of genotariseerd. De eerste start kan worden geblokkeerd; volg de projectinstructies."
+      }
+    },
+    "footer": {
+      "tagline": "Een lokale brug voor Amazfit- en Zepp-gegevens.",
+      "disclaimer": "ZeppBridge is een onafhankelijk opensourceproject en niet verbonden aan Zepp Health of Amazfit.",
+      "source": "Broncode"
+    },
+    "explore": {
+      "kicker": "Verken de app",
+      "title": "Begin bij een registratie",
+      "lead": "Kies een hoofdstuk van de v3 in ontwikkeling. Ontbrekende gegevens blijven ontbreken.",
+      "tabs": [
+        "Synchroniseren",
+        "Hiaten behouden",
+        "AI-overdracht",
+        "Plannen bekijken",
+        "Instellingen"
+      ]
+    },
+    "faq": {
+      "heading": "Voordat je begint",
+      "lead": "Zes veelgestelde vragen. Details en versieverschillen staan in de documentatie.",
+      "docs": "Projectdocumentatie",
+      "items": [
+        {
+          "question": "Welke accounts heb ik nodig?",
+          "answer": "Synchronisatie vereist je Zepp-account en de Zepp-telefoonapp. Geen extra ZeppBridge-account. Het voorbeeld vraagt geen aanmelding."
+        },
+        {
+          "question": "Worden mijn apparaat en metingen ondersteund?",
+          "answer": "Velden hangen af van gemeten en bewaarde gegevens en de verbinding. Niet elk model wordt met alle meetwaarden beloofd."
+        },
+        {
+          "question": "Kan ik het offline gebruiken?",
+          "answer": "Opgeslagen registraties zijn offline te bekijken en te exporteren. Aanmelden, nieuwe synchronisatie en updates vereisen netwerk. Je horloge gebruikt nog de Zepp-app."
+        },
+        {
+          "question": "Betekent een leeg stuk nul?",
+          "answer": "Nee. Niet gemeten, niet gesynchroniseerd en niet gedecodeerd zijn verschillende toestanden. Ontbrekend wordt nooit met nul, oude waarden of schattingen gevuld."
+        },
+        {
+          "question": "Moet ik AI gebruiken?",
+          "answer": "Nee. Exports worden lokaal gemaakt. AI ontvangt inhoud pas wanneer je die plakt of uploadt. Controleer bereik, verwijderde velden en privacy."
+        },
+        {
+          "question": "Is de download gelijk aan het voorbeeld?",
+          "answer": "Het voorbeeld is v3 in ontwikkeling met synthetische gegevens. De download is stabiel. Planbeoordeling en de nieuwe interface kunnen nog niet publiek zijn; zie release-notities."
+        }
+      ]
+    }
+  }
 };
 
 export default pack;

@@ -1,0 +1,131 @@
+# Landing research batch 09
+
+Date: 2026-10-07\
+Capture: desktop Chromium, 1440 × 1000 viewport, headless, fresh unauthenticated browser context. Initial viewport and one mid-page scroll capture were saved for each official web surface. Hover checks were also attempted for the visible top-level navigation on each rendered entry; Character.AI remained blocked and the Hi Translate navigation target did not resolve to a hoverable element in this pass. Current styles, DOM text, computed font samples, visible navigation and active CSS/Web Animations were recorded. Mobile breakpoints, keyboard-only operation, screen-reader output, contrast ratios and full assistive-technology checks were not tested. No Lighthouse or quantitative load/performance measurements were collected; accessibility notes are limited to visible controls and DOM text.
+
+Raw evidence (HTML, JSON, screenshots): C:\Users\15pro\AppData\Local\Temp\landing-research\batch-09\evidence.json, hover-evidence.json and sibling files in that directory. Font sizes below are computed samples, not claims that every paragraph or heading shares the same scale. “Motion count” is the number of active Web Animations at the capture instant; CSS transitions are recorded separately in the evidence JSON. A count of zero does not rule out video or event-triggered motion.
+
+## Coverage
+
+| Product | Official surface reviewed | Status |
+|---|---|---|
+| Photo Editor - Polish | [InShot app portfolio](https://inshot.app/) and [Google Play product listing](https://play.google.com/store/apps/details?id=photo.editor.photoeditor.photoeditorpro) | Rendered portfolio; product listing text |
+| NotebookLM / Gemini Notebook | [notebook.google](https://notebook.google/) and [Google rename/help reference](https://support.google.com/gemini/answer/16972047?hl=en) | Rendered; current identity verified |
+| Papago | [papago.naver.com](https://papago.naver.com/) | Rendered |
+| Gauth | [gauth.com](https://www.gauth.com/) | Rendered; promo modal covered the first view |
+| Hi Translate | [hitranslate.ai](https://www.hitranslate.ai/) and [a16z-linked Google Play listing](https://play.google.com/store/apps/details?hl=en_US&id=com.zaz.translate) | Rendered; linked store entry points back to the same site and support domain |
+| BeautyPlus | [beautyplus.com](https://pre.beautyplus.com/) | Rendered |
+| BeautyCam | [Meitu BeautyCam page](https://app.meitu.com/myxj/applinks/index.html), which redirected to [meiyan.meipai.com](https://meiyan.meipai.com/) | Rendered; Chinese page |
+| Character.AI | [character.ai](https://character.ai/) and [official About page](https://character.ai/about) | Main page blocked with HTTP 403; About page read as text |
+| SNOW | [snow.me](https://snow.me/) and [Google Play listing](https://play.google.com/store/apps/details?id=com.campmobile.snow) | Rendered; text surface also read through Jina |
+| Nova AI Chatbot | [novaapp.ai](https://novaapp.ai/) | Rendered; ScaleUp product identity checked against its app listing |
+| Google Antigravity (supplemental) | [antigravity.google](https://antigravity.google/) and [Google Developers announcement](https://developers.googleblog.com/en/build-with-google-antigravity-our-new-agentic-development-platform/) | Rendered; official Google developer platform |
+
+Product-identity notes: Google’s current public product and help pages use Gemini Notebook, and the help page says NotebookLM is being renamed. This batch treats the requested NotebookLM entry as that current Gemini Notebook site. Polish is the photo editor listed under InShot Inc. in the Google Play product heading; the same listing’s developer footer names Five Stars Apps Inc., so the store metadata has an attribution discrepancy. inshot.app is a publisher portfolio, not a dedicated Polish homepage, so product-specific marketing claims below come from the store listing. BeautyCam is Meitu’s Chinese-language camera product, separate from BeautyPlus. The a16z-linked Google Play listing for Hi Translate - Chat translator points back to hitranslate.ai as its public website and support domain, confirming that the rendered Hi Translate site is the chart product. The listing uses the package com.zaz.translate; store publisher fields name TexAI and INFINIX INTERNATIONAL LIMITED, so this report does not claim a broader corporate relationship. Nova is the ScaleUp Nova AI chatbot at novaapp.ai, not other Nova-branded AI products. SNOW is the camera app by SNOW Corporation. Antigravity is Google’s agentic developer platform, not an unrelated generic chatbot.
+
+Hover observation: the BeautyPlus Image Editor menu opens a categorized panel with New & Trending, More and View all features; Meitu’s APP item opens a short product list; Antigravity’s Products item opens a panel for Antigravity 2.0, CLI, Extensions, IDE and SDK. Papago’s Dictionary link behaves as a direct external link, and the tested Plans, Academy, Company, Web App and InShot Apps targets showed no dropdown in the captured hover state. These are spot checks, not a full keyboard or touch-navigation audit.
+
+### a16z chart-to-store identity check
+
+The linked mobile products below are from the [a16z 7th-edition ranking](https://a16z.com/100-gen-ai-apps-7/), not names inferred from search results. Store identity was compared with the official product surface reviewed above.
+
+| Assigned product | a16z’s direct store destination | Product match evidence |
+|---|---|---|
+| Polish | [Google Play](https://play.google.com/store/apps/details?id=photo.editor.photoeditor.photoeditorpro) | Exact “Photo Editor - Polish” title; the listing links its public website to inshot.app. The store heading says InShot Inc.; the seller footer says Five Stars Apps Inc. |
+| Gemini Notebook | [App Store](https://apps.apple.com/us/app/gemini-notebook/id6737527615) | Exact Gemini Notebook app name; Apple identifies Google as developer. |
+| Papago | [App Store](https://apps.apple.com/us/app/naver-papago-ai-translator/id1147874819) | Exact Naver Papago translator app; Apple identifies NAVER Corp. |
+| Gauth | [App Store](https://apps.apple.com/za/app/gauth-ai-study-companion/id1542571008) | Exact Gauth study companion app; Apple identifies GAUTHTECH PTE. LTD. |
+| Hi Translate | [Google Play](https://play.google.com/store/apps/details?hl=en_US&id=com.zaz.translate) | Exact “Hi Translate - Chat translator” package. Its public Website link and support email both use hitranslate.ai, matching the rendered site. The store’s developer/seller fields name TexAI and INFINIX INTERNATIONAL LIMITED; this report does not infer a corporate relationship beyond the matching product/site link. |
+| BeautyPlus | [App Store](https://apps.apple.com/us/app/beautyplus-selfie-photo-editor/id622434129) | Exact BeautyPlus selfie editor; Apple identifies PIXOCIAL TECHNOLOGY (SINGAPORE) PTE. LTD. and links its Developer Website to beautyplus.com. |
+| BeautyCam | [App Store](https://apps.apple.com/us/app/beautycam-digicam-photo-editor/id592331499) | Exact BeautyCam camera/editor app; Apple identifies Meitu Technology Co., Ltd., matching the Meitu product page. |
+| Character.AI | [App Store](https://apps.apple.com/us/app/character-ai-chat-talk-text/id1671705818) | Exact Character AI app; Apple identifies Character Technologies, Inc., matching character.ai. |
+| SNOW | [App Store](https://apps.apple.com/us/app/snow-ai-profile/id1022267439) | Exact SNOW camera app; Apple identifies SNOW Corporation and links its Developer Website to snow.me. |
+| Nova | [App Store](https://apps.apple.com/us/app/ai-chatbot-nova/id1669007652) | Exact AI Chatbot - Nova app; Apple identifies SCALEUP YAZILIM HIZMETLERI and links its privacy policy to novaapp.ai. |
+
+## Per-product evidence
+
+### Photo Editor - Polish
+
+The browser-rendered InShot portfolio opens with a full-bleed lifestyle image, dark overlay, and the broad promise “Video & Photo Tool Apps—Millions of Users’ Choice.” Its header groups Home, Apps and About Us. The visible hierarchy then shifts to a publisher-level “Find Best Apps…” section, ratings, and app cards; Polish is one product in the publisher catalogue rather than the subject of the hero. The Polish listing describes filters, effects, collages, portrait retouching and object removal, and presents it as quick everyday editing. The listing’s current copy references an “all-in-one photo editor” and “100+ photo filters and effects”; treat that as store copy, not an independently verified performance claim.
+
+The captured portfolio uses Lato-family text at sampled 12.75–13.5 px, but its headings are not exposed as semantic heading elements in the captured DOM. No active Web Animations or CSS transitions were detected at the capture instant. The page is image-led and scrolls through publisher and app material; the browser capture does not establish a dedicated Polish feature-page hierarchy. The official app listing is the reliable product-detail surface. References: [portfolio](https://inshot.app/), [Polish listing](https://play.google.com/store/apps/details?id=photo.editor.photoeditor.photoeditorpro).
+
+### NotebookLM / Gemini Notebook
+
+The live product site now brands itself “Gemini Notebook” and opens on a very spacious white canvas: compact top navigation, a small research-partner eyebrow, an oversized “Understand anything” headline, one grounding sentence, and a dark “Try Gemini Notebook” button. The promise is specific about working from information the user trusts. The first scroll introduces “How it works,” then explains questions and responses grounded in supplied notes, followed by Reports and featured public notebooks. This creates a readable path from promise, to mechanism, to example content.
+
+The header separates Overview, Plans and Get the App. Plans are a distinct commercial destination; the app CTA is the direct entry point; the homepage carries the product explanation and example notebooks. Computed samples use Google Sans and Google Sans Text, primarily regular and medium weights, with sampled sizes from 15–40 px. Six Web Animations and multiple transition-bearing elements were active at capture time; the page includes motion signals, but this review did not assess every trigger or reduced-motion behavior. The main landing screenshot shows strong whitespace and a clear action, while scroll content supplies proof and use cases. Official references: [current site](https://notebook.google/), [Google help naming note](https://support.google.com/gemini/answer/16972047?hl=en), [Google product blog on notebooks in Gemini](https://blog.google/innovation-and-ai/products/gemini-app/notebooks-gemini-notebooklm/).
+
+### Papago
+
+Papago is a working translation interface rather than a conventional promotional homepage. Its first screen immediately offers the core job: choose source and target languages and enter text. The tool row exposes Text, Image, Document, Voice and Website modes; the source/target language pickers and the translation panel occupy the main work area. Top-level utility links include Dictionary, About Papago Plus, Login and more services. The footer groups help/legal material, feedback, blog and business/API enquiries. The page’s job is clear without making the user read a campaign story first.
+
+Computed text uses Pretendard with system and Noto fallbacks; common samples are 16 px and 13–15 px, with 700-weight controls. The page has visible mode names, language selectors and a keyboard-shortcut panel in the DOM. The utility surface remained at the top after the recorded scroll attempt, consistent with a compact application canvas. Two active Web Animations were detected, but no large scroll-story animation was observed. The homepage is itself the feature surface; related capabilities are exposed as modes rather than a long set of separate feature pages. Reference: [Papago](https://papago.naver.com/), [NAVER tools/product directory](https://www.navercorp.com/en/service/tools).
+
+### Gauth
+
+Gauth’s public root loads as an app-like homework workspace, with a left rail for Homework, Academy, Atlas, Insights and App, and Sign in at the top. The first-screen promise is “Your AI Study Helper / Gauth it, Ace it!” with a question/photo upload area and subject shortcuts. A one-time “Introducing Gauth Academy” dialog appeared over the workspace during this capture and its embedded illustration stayed on a spinner. This blocks part of the main task surface and is a meaningful first-run interruption, even though the page behind it remains visible. The underlying upload control also advertises drag/drop and Ctrl+V paste, a useful visible keyboard affordance.
+
+The page then switches into an editorial product explainer: “Turn Any Subject Into a Visual Adventure,” Atlas concepts, step-by-step answers and a 24/7 tutor service. The feature hierarchy therefore connects homepage modules to learning tool areas, while the left rail is the primary navigation for returning to those areas. Computed typography mixes a custom Libre Baskerville display face with system/Google Sans text; samples include 40 px display and 14–16 px controls. Two active Web Animations and many transition styles were present. Gauth’s own product page is useful as evidence of an app-first web surface, but its modal and large feature claims should be judged as observed marketing/product behavior, not as verified efficacy. References: [Gauth](https://www.gauth.com/), [Gauth product/download page](https://www.gauth.com/download), [how it works](https://www.gauth.io/how-it-works).
+
+### Hi Translate
+
+The page opens as a clean two-column hero: bold “AI Translation for Social Chats and Everyday Reading,” a short explanation tied to WhatsApp and Facebook Messenger, product imagery, and two clear actions, Add to Chrome and Download. The top navigation groups Plugin, Live, File and Download, with a language selector and Log in. Scroll content follows the capability sequence: live voice translation, file translation, language coverage, an AI translation feature grid, then product, resource and support/legal groups. Feature detail is organized around tasks rather than generic AI categories.
+
+Computed display text uses Urbanist, with a sampled 48 px bold heading; body samples are 16–24 px in a system stack. Seven Web Animations and many transition-bearing elements were active; the hero’s product illustration and section modules suggest motion, although no full interaction audit was done. The page claims partner relationships with recognizable companies in a logo row; this capture verifies only that the page displays those logos, not the underlying relationships. References: [Hi Translate](https://www.hitranslate.ai/), [a16z-linked Google Play app](https://play.google.com/store/apps/details?hl=en_US&id=com.zaz.translate), [product login/app surface](https://app.hitranslate.ai/en/signin).
+
+### BeautyPlus
+
+The desktop hero uses a soft pink-to-cyan background wash, scattered photo tiles, a very large centered “Free AI Photo Editor for Every Idea” headline, one explanatory paragraph and a prominent black Start Creating button. The first screen immediately continues into “What Do You Want to Create Today?” with task cards. The header groups Home, AI Influencer, Image Editor, AI Image Generator, Video Editor and API, with Upgrade and Log in at the far edge. This makes the breadth navigable by task family, while the homepage provides a quick-start grid rather than forcing a visitor to understand the whole tool catalogue first.
+
+Computed samples use Poppins for interface/body text and Montserrat for the oversized display headline; sampled sizes include 90 px display, 42 px section heading and 14–20 px body/control text. Twenty active Web Animations and many transitions were detected. A cookie notice appears in the lower-right with Close, Accept All and Manage Cookies actions. The homepage links task cards and grouped tools to deeper image/video editing and image-generation pages. This is a strong example of an explicit “pick a job” entry point, though its saturated beauty imagery and AI breadth do not match ZeppBridge’s tone. References: [BeautyPlus](https://pre.beautyplus.com/), [official app download page](https://pre.beautyplus.com/download-beautyplus), [help center](https://support.beautyplus.com/hc/en-us).
+
+### BeautyCam
+
+The official Meitu BeautyCam page is Chinese-first and opens with a full-bleed portrait image. The hero places the app icon and “拍人像更专业” (“shoot portraits more professionally”) over the image, with separate iOS, Android and Windows companion download buttons. The top navigation links the Meitu company, BeautyCam desktop companion, app family, shooting, Wink, Meitu Cloud Repair and more. The following scroll sections enumerate capture modes, then a PC camera companion, fine-grained beauty controls, video/vlog tools and themed collaborations. The homepage carries both brand storytelling and the product family’s feature catalogue.
+
+Computed type uses Source Han Sans SC; observed samples include light 23.9 px and regular/medium 14–17 px. Three Web Animations and several transition-bearing elements were active. The first screen relies heavily on photography and white overlay text; its download choices are easy to locate, though the image is much stronger than the textual explanation. The feature detail relationship is primarily one long, illustrated product page with download exits, rather than a separate English documentation tree. References: [official BeautyCam page](https://app.meitu.com/myxj/applinks/index.html), [resolved page](https://meiyan.meipai.com/).
+
+### Character.AI
+
+The main page returned HTTP 403 from Cloudflare in the isolated browser, so its current hero, typography, first-screen CTA and motion could not be observed. The official About page was readable as text. It frames Character.AI around interactive entertainment, storytelling, learning and community exploration; the official character-creation guide documents a Create action in the web left menu and distinguishes public characters discoverable by others. These support the product identity and broad navigation responsibilities, but they are not substitutes for a rendered homepage audit.
+
+Treat layout, fonts, menu behavior, CTA placement and animation as unknown in this batch. Do not infer them from old screenshots or third-party descriptions. References: [blocked main site](https://character.ai/), [official About](https://character.ai/about), [official Create guide](https://support.character.ai/hc/en-us/articles/50608869548699-2-Creating-a-Character-Quickstart-Guide-%CF%89).
+
+### SNOW
+
+SNOW’s official page is a very sparse, single-screen download surface. The live render uses a bright cyan treatment over a collage/video background, a large white SNOW mark, the Japanese AR-camera promise, App Store and Google Play badges, social links, and small Contact/Company links. Jina’s readable page confirms the two store destinations and SNOW Corp. attribution; the official Google Play listing identifies SNOW Corporation and describes custom beauty effects, AR makeup, stickers, seasonal filters and one-tap editing. The homepage itself does not explain that feature range in much detail.
+
+The page’s CSS motion inspection returned zero active Web Animations; the visible background is media-led, and no conclusion about video playback or reduced-motion handling is drawn from the animation counter. Body text is a Nanum/Nanum Gothic and system fallback stack; the main logo and product image carry the first-screen message. There is no substantial section hierarchy or separate feature-page structure in the rendered home. References: [SNOW](https://snow.me/), [Google Play product listing](https://play.google.com/store/apps/details?id=com.campmobile.snow).
+
+### Nova AI Chatbot
+
+Nova’s official ScaleUp site uses a black full-screen hero with a restrained NOVA wordmark, a single Web App button at the top right, and a centered “Nova: Your AI Assistant” headline. The supporting line describes aggregating multiple AI models, followed by App Store and Google Play actions and a scroll cue. The next section explains availability and uses such as open-ended questions, homework help, proofreading and writing. A long page eventually groups Products, Nova Info, Community and Company links in the footer; the hero itself keeps navigation very light.
+
+Computed typography uses Inter: sampled 64 px headline and 24 px body text, with 38 px section headings. Four active Web Animations and multiple transitions were recorded. The direct first-screen CTA points to the mobile stores; the Web App link offers another route. Product detail is mostly homepage storytelling and store/download destinations rather than a large nav taxonomy. Official sources identify this as the Nova product at novaapp.ai; the phrase “trusted by thousands” is site copy, not independently verified here. References: [Nova](https://novaapp.ai/), [official download page](https://chat.novaapp.ai/download), [ScaleUp Google Play listing](https://play.google.com/store/apps/details?id=com.scaleup.chatai).
+
+### Google Antigravity (supplemental)
+
+Antigravity’s current home is a clean white developer-product page with a small Google Antigravity mark, category navigation and a dark Download CTA. A large “Experience liftoff with the next-gen agent platform” headline leads the hero; the page then introduces the platform and separates Antigravity 2.0, CLI, Extensions, IDE and SDK. The navigation makes Products, Use Cases, Pricing, Enterprise and Resources distinct groups. Product submenu responsibilities are version/surface selection; use cases group Frontend, Fullstack, Science and Marketer; Resources links docs, blog, changelog, support, press and releases.
+
+Computed samples use Google Sans Flex, with sampled regular, variable and bold weights across 13.5–24 px elements; the rendered display heading is substantially larger. Six Web Animations were active, and colored points in the hero provide a star-field visual. Product pages and docs are directly connected to an umbrella homepage, which explains the platform before a visitor selects a surface. Official Google Developers material confirms Antigravity as Google’s agentic development platform. References: [Antigravity](https://antigravity.google/), [official announcement](https://developers.googleblog.com/en/build-with-google-antigravity-our-new-agentic-development-platform/), [official docs](https://www.antigravity.google/docs).
+
+## Cross-site principles and transfer
+
+1. Put the product’s actual job in the first headline. Gemini Notebook grounds the “research partner” promise in trusted information; Papago goes further by opening directly on the translation task. For ZeppBridge, name local Zepp health-history access and explain ownership in the sentence immediately beside the sample or download action.
+2. Pair a promise with a concrete next step. The strongest first screens combine a short claim, a visible product surface or example, and one primary CTA. Keep download choices clear for Windows/Linux while preserving the interactive sample as the immediate proof.
+3. Organize broad capability around visitor questions. BeautyPlus’s task grid and Antigravity’s product/use-case/resource groups show clear ways to route visitors. For ZeppBridge, keep a small nav around Features, Privacy, Guides and Download; map feature sections to real tasks such as archive, charts, export and optional AI handoff.
+4. Use the scroll as a proof sequence. Gemini Notebook moves from promise to grounding mechanism and examples. BeautyCam moves from portrait capture to modes and desktop companion. ZeppBridge can move from the live sample to supported connections, data ownership/data-flow, missing-sample handling, then platform downloads.
+5. Let a real interface carry explanation. Papago’s language controls and Gauth’s upload area make the entry action tangible. The ZeppBridge sample-data iframe already serves this role; label its demo data and add a short “try this” path rather than replacing it with generic mockups.
+6. Use page depth for details, not more labels. Where a category genuinely contains separate tools, the product pages should carry detail; otherwise a clear home scroll can cover the real flow. Avoid turning every chart or setting into a top-level nav destination.
+7. Treat animation as support for comprehension. Gemini Notebook and Antigravity use motion signals around section/product storytelling; keep any ZeppBridge movement attached to sample navigation or explanatory transitions and respect reduced-motion preferences.
+
+Three strongest references for ZeppBridge are:
+
+- [Gemini Notebook](https://notebook.google/): strongest for a precise promise, explicit explanation of what information grounds the tool, and a short hero-to-example scroll.
+- [Papago](https://papago.naver.com/): strongest for a practical interface whose main action is self-evident and whose utility modes are visible without a large marketing preamble.
+- [Google Antigravity](https://antigravity.google/): strongest for keeping product surfaces and use cases legible under a modest navigation system, plus direct routing to docs and downloads.
+
+Patterns to reject: first-screen promo dialogs that block the core task (as observed on Gauth); unverified “trusted by,” user-count, superiority or expert-efficacy statements; logo rows that imply endorsements without substantiation; CTA clutter that makes a simple archive product sound like an AI suite; and relying on full-bleed lifestyle images when a real app sample can explain the product more clearly.
+
+Concrete transfer suggestions: keep the current warm paper/olive and charcoal identity; lead with local ownership and useful health-history access; show the working sample-data app directly below the hero; add one annotated path through a chart and export; state plainly that absent samples stay absent and that AI handoff is deliberate and optional; group the top navigation into a few user tasks; then end the scroll with clear platform downloads and a concise privacy/data-flow explanation. Treat these as transfer ideas from the observed evidence, not endorsements of the reviewed products or proof of their product claims.

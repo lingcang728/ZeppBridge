@@ -3,7 +3,8 @@
  * `useTheme` 负责切换 `data-theme`；`color-scheme` 跟着 data-theme 走，
  * 让滚动条与原生表单控件自动换色。新颜色一律进这个文件。 */
 :root {
-  color-scheme: dark;
+  /* only 禁止浏览器自动改色，原生控件仍跟随当前主题。 */
+  color-scheme: only dark;
   --bg: #0C0E11;
   --sidebar: #08090C;
   --canvas: #0D0F12;
@@ -186,7 +187,7 @@
  * 原则是每个 token 在浅色下保持同一角色（ink=主文字、line=结构线…），
  * 分类色只调明度饱和不换色相，语义不漂移。 */
 html[data-theme="light"] {
-  color-scheme: light;
+  color-scheme: only light;
   --bg: #EAEDE5;
   --sidebar: #FFFFFF;
   --canvas: #F4F6F3;

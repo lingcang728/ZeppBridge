@@ -9,6 +9,16 @@ import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue';
 export const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
+/** Anchors move both focus and the viewport, including when opened through the mobile menu. */
+export const scrollToSection = (id: string) => {
+  const target = document.getElementById(id);
+  if (!target) return;
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: 'start' });
+  window.history.replaceState(null, '', `#${id}`);
+};
+
 /**
  * 滚到哪一段，哪一段的 `[data-reveal]` 依次浮上来（加 `.is-in`，CSS 里按 `--i` 错开）。
  * 同时给带 `[data-live]` 的块在视口内时挂 `.is-live`，离开就摘掉——循环动画离屏不跑。
@@ -16,16 +26,21 @@ export const prefersReducedMotion = (): boolean =>
 export const useScrollMotion = (root: Ref<HTMLElement | null>) => {
   let reveal: IntersectionObserver | null = null;
   let live: IntersectionObserver | null = null;
-  onMounted(() => {
+  let preference: MediaQueryList | null = null;
+  const configure = () => {
+    reveal?.disconnect();
+    live?.disconnect();
     const el = root.value;
     if (!el) return;
     const reveals = el.querySelectorAll<HTMLElement>('[data-reveal]');
     const lives = el.querySelectorAll<HTMLElement>('[data-live]');
     if (prefersReducedMotion() || typeof IntersectionObserver === 'undefined') {
+      el.classList.remove('lp-motion-ready');
       reveals.forEach((node) => node.classList.add('is-in'));
-      lives.forEach((node) => node.classList.add('is-live'));
+      lives.forEach((node) => node.classList.remove('is-live'));
       return;
     }
+    el.classList.add('lp-motion-ready');
     reveal = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -38,10 +53,16 @@ export const useScrollMotion = (root: Ref<HTMLElement | null>) => {
       for (const entry of entries) entry.target.classList.toggle('is-live', entry.isIntersecting);
     }, { threshold: 0 });
     lives.forEach((node) => live?.observe(node));
+  };
+  onMounted(() => {
+    preference = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
+    preference?.addEventListener('change', configure);
+    configure();
   });
   onBeforeUnmount(() => {
     reveal?.disconnect();
     live?.disconnect();
+    preference?.removeEventListener('change', configure);
   });
 };
 

@@ -1,165 +1,244 @@
 import type { LandingPack } from '../../composables/useLandingLocale';
 
 const pack: LandingPack = {
-  meta: {
-    title: 'ZeppBridge · Vom Handgelenk auf deinen Rechner, vom Rechner zur KI',
-    description: 'ZeppBridge holt deine Amazfit- und Zepp-Daten aus der Zepp-Cloud auf deinen eigenen Rechner und gibt sie dir als eine Datei für deine KI mit. Kostenlos und quelloffen.',
-    ogTitle: 'ZeppBridge · Vom Handgelenk auf den Schreibtisch. Vom Schreibtisch zur KI.',
-    ogDescription: 'Herzfrequenz, Schlaf und Training lokal synchronisieren, ansehen und mit einem Klick an die KI deiner Wahl übergeben.',
+  "meta": {
+    "title": "ZeppBridge · Deine Uhr zeichnet auf. Dein eigenes Archiv.",
+    "description": "Speichere Amazfit- und Zepp-Daten in einem lokalen Archiv. Erkunde das synthetische v3-Beispiel oder lade die öffentliche stabile Version. Kostenlos und quelloffen.",
+    "ogTitle": "ZeppBridge · Deine Uhr zeichnet auf. Dein eigenes Archiv.",
+    "ogDescription": "Speichere Amazfit- und Zepp-Daten in einem lokalen Archiv. Erkunde das synthetische v3-Beispiel oder lade die öffentliche stabile Version. Kostenlos und quelloffen."
   },
-  copy: {
-    nav: {
-      home: 'ZeppBridge Startseite',
-      site: 'Website-Navigation',
-      demo: 'Demo',
-      ai: 'An die KI',
-      privacy: 'Datenschutz',
-      download: 'Download',
-      github: 'GitHub',
-      language: 'Sprache',
-      toDark: 'Zum dunklen Design',
-      toLight: 'Zum hellen Design',
+  "copy": {
+    "nav": {
+      "home": "ZeppBridge Startseite",
+      "site": "Website-Navigation",
+      "demo": "Demo",
+      "ai": "An die KI",
+      "privacy": "Datenschutz",
+      "download": "Öffentliche Version",
+      "github": "GitHub",
+      "language": "Sprache",
+      "toDark": "Zum dunklen Design",
+      "toLight": "Zum hellen Design",
+      "connect": "Verbinden",
+      "faq": "Häufige Fragen"
     },
-    downloads: {
-      windows: { label: 'Für Windows laden', hint: 'x64-Installer', msi: 'MSI für verwaltete Installationen' },
-      macos: { label: 'Für macOS laden', hint: 'Apple Silicon' },
-      linux: {
-        label: 'Linux',
-        previewBadge: 'Experimentell',
-        note: 'deb, rpm, AppImage und Flatpak baut die CI, aber Anmeldung und Schlüsselbund hat noch niemand auf einem echten Linux-Desktop komplett getestet. Probleme? Mach ein Issue auf.',
+    "downloads": {
+      "windows": {
+        "label": "Für Windows laden",
+        "hint": "x64-Installer",
+        "msi": "MSI für verwaltete Installationen"
       },
-      status: {
-        loading: 'Neuestes Installationspaket wird gesucht',
-        ready: 'Klick lädt direkt herunter',
-        fallback: 'Öffnet GitHub Releases, dort wählst du das Paket',
+      "macos": {
+        "label": "Für macOS laden",
+        "hint": "Apple Silicon"
       },
+      "linux": {
+        "label": "Linux",
+        "previewBadge": "Experimentell",
+        "note": "deb, rpm, AppImage und Flatpak baut die CI, aber Anmeldung und Schlüsselbund hat noch niemand auf einem echten Linux-Desktop komplett getestet. Probleme? Mach ein Issue auf."
+      },
+      "status": {
+        "loading": "Neuestes Installationspaket wird gesucht",
+        "ready": "Klick lädt direkt herunter",
+        "fallback": "Öffnet GitHub Releases, dort wählst du das Paket"
+      }
     },
-    sample: 'Beispiel',
-    hero: {
-      eyebrow: 'Kostenlos · Open Source · Deine Daten bleiben auf deinem Rechner',
-      titleLead: 'Was deine Uhr aufzeichnet,',
-      titleAccent: 'liegt auf deinem Rechner.',
-      lead: 'ZeppBridge holt Herzfrequenz, Schlaf und Training, die deine Amazfit aufgezeichnet hat, aus der Zepp-Cloud auf deinen eigenen Rechner und legt sie als Archiv ab, das du lesen und mitnehmen kannst. Hast du eine Frage an die KI, wählst du einen Zeitraum und gibst eine einzige Datei weiter.',
-      github: 'Quellcode auf GitHub ansehen',
-      meta: 'Kostenlos · Windows 10 / 11 · macOS (Apple Silicon) · Linux experimentell',
-      devices: 'Diese Amazfit-Geräte kennt es schon',
-      stage: {
-        hint: 'Klick drauf und probier es aus',
-        note: 'Rechts siehst du das echte ZeppBridge, mit Beispieldaten.',
-        loading: 'App wird geöffnet…',
-        exit: 'Demo verlassen',
-        unavailable: 'Dieser Browser kann die Demo nicht öffnen. Lade die App herunter, dann siehst du es selbst.',
+    "sample": "Beispiel",
+    "hero": {
+      "eyebrow": "Kostenlos · Quelloffen · Lokales Gesundheitsarchiv",
+      "titleLead": "Deine Uhr zeichnet auf.",
+      "titleAccent": "Dein eigenes Archiv.",
+      "lead": "Speichere Amazfit-Puls, Schlaf und Training aus der Zepp-Cloud auf deinem Computer. Lies deinen Verlauf, erhalte Lücken und exportiere nach Bedarf.",
+      "github": "Quellcode auf GitHub ansehen",
+      "meta": "Kostenlos · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
+      "devices": "Amazfit-Geräte; Messwerte unterscheiden sich je Modell",
+      "stage": {
+        "hint": "Beispiel öffnen",
+        "note": "Die echte Anwendung mit synthetischen Daten, ohne Verbindung zu deinem Konto.",
+        "loading": "App wird geöffnet…",
+        "exit": "Demo verlassen",
+        "unavailable": "Die Demo ist nicht verfügbar. Erklärungen und Quellcode bleiben zugänglich."
       },
-      starNudge: {
-        title: 'Dein Download läuft',
-        copy: 'Hilft dir ZeppBridge? Ein Stern auf GitHub hilft anderen Amazfit-Nutzern, es zu finden.',
-        action: 'Stern vergeben',
-        dismiss: 'Später',
-      },
+      "demo": "Beispiel ansehen",
+      "edition": "v3 in Entwicklung · Synthetische Beispieldaten. Der Download bietet die öffentliche stabile Version; Oberfläche und Funktionen können abweichen."
     },
-    beats: [
+    "beats": [
       {
-        kicker: '01 · Synchronisieren',
-        title: 'Hol auf deinen Rechner, was dein Handgelenk aufzeichnet',
-        body: 'Melde dich mit deinem eigenen Zepp-Konto an, und Herzfrequenz, Schlaf und Training landen Tag für Tag in einer Datenbank auf diesem Gerät. Lesbar, mitnehmbar und auch ohne Netz da.',
+        "kicker": "01 · Synchronisieren",
+        "title": "Eine lokale Kopie deiner Aufzeichnungen",
+        "body": "Verbinde dein Zepp-Konto und speichere vorhandene Cloud-Daten auf dem Computer. Synchronisierte Einträge bleiben offline lesbar."
       },
       {
-        kicker: '02 · Ehrlich',
-        title: 'Nicht gemessen heißt nicht gemessen',
-        body: 'Sieh dir das Diagramm rechts an: Gestern Nachmittag ist eine Lücke, weil die Uhr nicht am Arm war. ZeppBridge füllt keine 0 ein und zeichnet keine erfundene Linie. Fehlende Tage erscheinen als graue Striche um jeden Datenblock.',
+        "kicker": "02 · Fehlende Daten",
+        "title": "Keine Messung, kein Wert",
+        "body": "Fehlende Daten werden nie mit null, einem früheren Wert oder einer Schätzung ergänzt. Noch nicht synchronisiert ist etwas anderes als nicht gemessen."
       },
       {
-        kicker: '03 · An die KI',
-        title: 'Eine Frage an die KI? Wähl zuerst aus, was sie sehen darf',
-        body: 'Was im Kreis liegt, wird weitergegeben, was draußen liegt, nicht. Die kleinen Striche um jeden Knoten zeigen, an welchen Tagen Daten da sind. Drück auf den Senden-Knopf, dann liegt die gepackte .md-Datei bereit und du ziehst sie in den Chat.',
+        "kicker": "03 · Übergabe",
+        "title": "Wähle Umfang und Empfänger",
+        "body": "Im v3-Beispiel wählst du Daten und Zeitraum und prüfst den Export. Er wird lokal vorbereitet; eine externe KI erhält ihn erst, wenn du den Inhalt absendest."
       },
       {
-        kicker: '04 · Plan',
-        title: 'Ein Trainingsplan der KI, der erst nach deiner Prüfung auf die Uhr geht',
-        body: 'Füge die Antwort der KI komplett wieder ein: Du siehst Tag für Tag, was sich ändert, und den Herzfrequenzbereich jedes Schritts als Diagramm. Schreibweisen, die noch nicht auf deiner Uhr geprüft sind, werden markiert. Erst nach deiner Bestätigung geht es an Zepp, und du kannst es jederzeit zurücknehmen.',
+        "kicker": "04 · Pläne",
+        "title": "Vor dem nächsten Schritt prüfen",
+        "body": "Die v3 in Entwicklung zeigt Import und Prüfung von Trainingsplänen. Die Übertragung zur Uhr hängt von Gerät und Validierung ab; sie ist kein allgemeines Versprechen der stabilen Version."
       },
       {
-        kicker: '05 · Deine Entscheidung',
-        title: 'Die Schalter, die du brauchst, sind da. Mehr nicht.',
-        body: 'Die Einstellungen sind ein Stapel Karten: Öffne eine und zieh ihre Kopfzeile zur Seite, dann blätterst du zur nächsten. Wie lange Daten bleiben, wie oft synchronisiert wird und ob die lokale Schnittstelle an ist, bestimmst du.',
-      },
+        "kicker": "05 · Einstellungen",
+        "title": "Bestimme den Rhythmus deines Archivs",
+        "body": "Erkunde Synchronisierung, Aufbewahrung und lokale Schnittstellen. Einstellungen können je Version abweichen; prüfe ihren Zweck vor dem Aktivieren."
+      }
     ],
-    flap: {
-      tiles: [
-        { value: '1.096', label: 'Nächte Schlaf' },
-        { value: '742', label: 'Trainings mit Strecke' },
-        { value: '1,5M', label: 'Minuten Herzfrequenz' },
-        { value: '9,8M', label: 'Schritte' },
-      ],
+    "flap": {
+      "tiles": [
+        {
+          "value": "1.096",
+          "label": "Nächte Schlaf"
+        },
+        {
+          "value": "742",
+          "label": "Trainings mit Strecke"
+        },
+        {
+          "value": "1,5M",
+          "label": "Minuten Herzfrequenz"
+        },
+        {
+          "value": "9,8M",
+          "label": "Schritte"
+        }
+      ]
     },
-    handoff: {
-      chat: 'KI-Chat',
-      you: 'Du',
-      file: 'ZeppBridge letzte 14 Tage.md',
-      prompt: 'Habe ich diese Woche schlechter geschlafen als letzte? Woran könnte es liegen?',
-      answer: 'Etwas schlechter: im Schnitt 38 Minuten weniger, vor allem Tiefschlaf. Dienstag und Donnerstag hattest du abends Training, und in diesen Nächten kam dein Puls langsamer herunter. Probier eine Woche lang, am Nachmittag zu trainieren.',
-      note: 'Keine eingebaute KI und kein zusätzliches Konto. Was rausgeht, wie viel und wann, passiert erst, wenn du klickst.',
-      close: 'Schließen',
+    "handoff": {
+      "chat": "KI-Chat",
+      "you": "Du",
+      "file": "ZeppBridge letzte 14 Tage.md",
+      "prompt": "Ordne dieses synthetische Beispiel. Liste Quellen, Daten und fehlende Felder ohne Gesundheitsurteile.",
+      "answer": "Die Datei ordnet Schlaf und Training nach Datum. Nicht gemessene Zeiträume bleiben leer. Prüfe Quellen und Abdeckung vor Vergleichen; diese Daten erklären keine Ursache einer Veränderung.",
+      "note": "Synthetischer Beispieldialog. Diese Seite sendet keine Datei und verbindet sich mit keiner KI. Im echten Einsatz entscheidest du über die Weitergabe.",
+      "close": "Schließen"
     },
-    privacy: {
-      heading: 'Deine Gesundheitsdaten gibt es an zwei Orten',
-      lead: 'In der Zepp-Cloud und auf deinem Rechner. Einen dritten gibt es nicht.',
-      nodes: { watch: 'Uhr', cloud: 'Zepp-Cloud', computer: 'Dein Rechner', server: 'ZeppBridge-Server', none: 'gibt es nicht' },
-      points: [
-        {
-          title: 'Token im Systemtresor',
-          copy: 'In der Windows-Anmeldeinformationsverwaltung oder im macOS-Schlüsselbund, nie im Datenordner.',
-        },
-        {
-          title: 'Keine Telemetrie',
-          copy: 'Kein Nutzungstracking, keine Gesundheitsdaten werden gesammelt.',
-        },
-        {
-          title: 'Klare Herkunft',
-          copy: 'Jeder Eintrag weiß, ob er aus der offiziellen Autorisierung oder den erweiterten Daten stammt.',
-        },
-      ],
-    },
-    connect: {
-      heading: 'Drei Wege zum Verbinden. Nimm den bequemsten.',
-      lead: 'Starte mit der offiziellen Autorisierung. Nimm die erweiterten Daten dazu, wenn du mehr Metriken willst.',
-      recommended: 'Empfohlen',
-      paths: [
-        {
-          title: 'Offizielle Zepp-Autorisierung',
-          copy: 'Melde dich in deinem gewohnten Browser bei Zepp an und stimm zu.',
-          detail: 'Google-, Xiaomi- und Apple-Konten funktionieren. Schlaf, Herzfrequenz, Schritte, Trainings, PAI und Gewicht werden synchronisiert.',
-        },
-        {
-          title: 'Erweiterte Daten',
-          copy: 'Ergänzt HRV, Blutsauerstoff, Stress und Bereitschaft, die die offizielle API nicht bietet.',
-          detail: 'Anmeldung mit E-Mail oder Telefonnummer. Der Token liegt nur in deinem Systemtresor.',
-        },
-        {
-          title: 'Manuelle Eingabe',
-          copy: 'Der Rückfall, wenn beides andere nicht geht.',
-          detail: 'Du fügst selbst einen Token ein. Gedacht für Leute, die die API kennen.',
-        },
-      ],
-      note: 'Was synchronisiert wird, hängt davon ab, was dein Konto in der Zepp-Cloud hat. Welche Metriken du siehst, hängt von deinem Gerät und deiner Verbindungsart ab.',
-    },
-    final: {
-      heading: 'Installier es und sieh, woran sich deine Uhr erinnert',
-      lead: 'Kostenlos, Open Source, ohne Registrierung.',
-      facts: {
-        channel: 'Stabiler Kanal, Installer von GitHub Releases',
-        systems: 'Windows 10 / 11 (x64) und macOS (Apple Silicon). Linux ist experimentell.',
-        ai: 'Kein zusätzliches Konto nötig. Für KI-Fragen nimmst du die, die du schon hast.',
-        windows: 'Windows: Der Installer ist noch nicht signiert. Siehst du "Unbekannter Herausgeber", wähl "Weitere Informationen" und dann "Trotzdem ausführen".',
-        macos: 'macOS: ein unsignierter Build, der erste Start wird blockiert. Wie du ihn erlaubst, steht im GitHub-Readme.',
+    "privacy": {
+      "kicker": "Daten und Privatsphäre",
+      "heading": "Dein Archiv bleibt lokal. Seine Wege sind klar.",
+      "lead": "Die normale Synchronisierung liest Zepp-Daten auf deinen Computer. Eine externe KI ist ein eigener Weg, den du bewusst wählst.",
+      "nodes": {
+        "watch": "Uhr und Zepp-App",
+        "cloud": "Zepp-Cloud",
+        "computer": "Lokales Gesundheitsarchiv",
+        "export": "Deine gewählte externe KI"
       },
+      "flowNote": "Die Uhr lädt zuerst über die Zepp-Handy-App hoch. Die Website speichert das Gesundheitsarchiv nicht.",
+      "exportNote": "Optionaler Export · Selbst prüfen und absenden",
+      "services": {
+        "title": "Website-Dienste mit begrenzten Aufgaben",
+        "copy": "Offizielle Autorisierung und Token-Erneuerung nutzen Website-Dienste. Updates lesen Versionsinformationen. Freiwillige Problemberichte senden nach Bestätigung begrenzte Diagnosedaten ohne Gesundheitswerte."
+      },
+      "docs": "Vollständige Datengrenzen lesen",
+      "points": [
+        {
+          "title": "Zugangsdaten im Systemtresor",
+          "copy": "Standard ist der Tresor des Betriebssystems. Einige Plattformen bieten bewusst wählbare Dateispeicherung mit anderem Schutz."
+        },
+        {
+          "title": "Lokal bedeutet nicht verschlüsselt",
+          "copy": "Die Gesundheitsdatenbank ist standardmäßig unverschlüsselt. Nutze getrennte Systemkonten und schütze Sicherungen."
+        },
+        {
+          "title": "Du startest den Export",
+          "copy": "KI-Pakete werden lokal erstellt und bereinigt. Nach dem Absenden gelten die Regeln des Empfängers. Normale Exporte und vollständige Sicherungen unterscheiden sich."
+        }
+      ]
     },
-    footer: {
-      tagline: 'Eine lokale Brücke für Amazfit- und Zepp-Daten.',
-      disclaimer: 'ZeppBridge ist ein unabhängiges Open-Source-Projekt und nicht mit Zepp Health oder Amazfit verbunden.',
-      source: 'Quellcode',
+    "connect": {
+      "kicker": "Deine Aufzeichnungen verbinden",
+      "heading": "Beginne mit der offiziellen Autorisierung",
+      "lead": "Ein üblicher Weg. Erweiterte Verbindungen liefern weitere Felder.",
+      "recommended": "Empfohlener Einstieg",
+      "advanced": "Erweiterte Alternativen",
+      "edition": "Diese Wege gelten für die aktuelle v3. Zugänge und Funktionen der öffentlichen stabilen Version stehen in ihren Versionshinweisen.",
+      "docs": "Verbindungsanleitung",
+      "paths": [
+        {
+          "title": "Offizielle Zepp-Autorisierung",
+          "copy": "Öffne Zepps Autorisierungsseite im eigenen Browser und melde dich wie gewohnt an.",
+          "detail": "Liest verfügbaren Schlaf, Puls, Schritte, Training, PAI und Gewicht aus deinem Konto."
+        },
+        {
+          "title": "Erweiterte Datenverbindung",
+          "copy": "Ergänze sie für HRV, Blutsauerstoff, Stress oder Bereitschaft.",
+          "detail": "Anmeldung mit E-Mail oder Telefon. Die Felder unterscheiden sich; nicht jedes Gerät misst oder liefert sie."
+        },
+        {
+          "title": "Manuelle Zugangsdaten",
+          "copy": "Für API-erfahrene Personen mit rechtmäßig selbst beschafften Zugangsdaten.",
+          "detail": "Token, Benutzer-ID und regionale Adresse eingeben. Nie unbekannte Tokens importieren oder veröffentlichen."
+        }
+      ],
+      "note": "Gerät, Cloud-Aufzeichnungen und Verbindung bestimmen die Felder. Eine leere Antwort beweist keine fehlende Unterstützung. Es sind Alternativen, nicht drei Pflichtschritte."
     },
-  },
+    "final": {
+      "kicker": "Download · Öffentliche stabile Version",
+      "heading": "Eine Kopie auf deinem eigenen Computer",
+      "lead": "Kostenlos und quelloffen. Dein Zepp-Konto genügt; kein zusätzliches ZeppBridge-Konto.",
+      "docs": "Installation und Versionshinweise",
+      "facts": {
+        "channel": "Der Download bietet die öffentliche stabile Version. Das synthetische Beispiel zeigt v3 in Entwicklung; Oberfläche und Funktionen können abweichen.",
+        "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
+        "ai": "Lesen und Exportieren benötigen keine KI. Dienst und Konto für eine externe KI wählst du selbst.",
+        "windows": "Windows: Noch keine vertrauenswürdige Codesignatur. Unbekannter-Herausgeber- oder SmartScreen-Warnungen sind möglich. Prüfe die offizielle Quelle.",
+        "macos": "macOS: Nicht signiert oder notarisiert. Der erste Start kann blockiert werden; folge der Projektanleitung."
+      }
+    },
+    "footer": {
+      "tagline": "Eine lokale Brücke für Amazfit- und Zepp-Daten.",
+      "disclaimer": "ZeppBridge ist ein unabhängiges Open-Source-Projekt und nicht mit Zepp Health oder Amazfit verbunden.",
+      "source": "Quellcode"
+    },
+    "explore": {
+      "kicker": "Anwendung erkunden",
+      "title": "Beginne mit einem Eintrag",
+      "lead": "Wähle ein Kapitel der v3 in Entwicklung. Lücken im Beispiel bleiben fehlende Daten.",
+      "tabs": [
+        "Synchronisieren",
+        "Lücken erhalten",
+        "KI-Übergabe",
+        "Pläne prüfen",
+        "Einstellungen"
+      ]
+    },
+    "faq": {
+      "heading": "Vor dem Einstieg",
+      "lead": "Sechs häufige Fragen. Details und Versionsunterschiede stehen in der Dokumentation.",
+      "docs": "Projektdokumentation",
+      "items": [
+        {
+          "question": "Welche Konten brauche ich?",
+          "answer": "Die Synchronisierung benötigt dein Zepp-Konto und die Zepp-Handy-App. Kein zusätzliches ZeppBridge-Konto. Das Beispiel braucht keine Anmeldung."
+        },
+        {
+          "question": "Werden Gerät und Messwerte unterstützt?",
+          "answer": "Felder hängen von Messungen, Cloud-Aufbewahrung und Verbindung ab. Kein Modell wird mit allen Messwerten zugesichert."
+        },
+        {
+          "question": "Ist Offline-Nutzung möglich?",
+          "answer": "Gespeicherte Einträge lassen sich offline lesen und exportieren. Anmeldung, neue Synchronisierung und Updates benötigen Netzwerk. Die Uhr nutzt weiter die Zepp-App."
+        },
+        {
+          "question": "Bedeutet eine Lücke null?",
+          "answer": "Nein. Nicht gemessen, nicht synchronisiert und nicht decodiert sind verschieden. Fehlendes wird nie mit null, alten Werten oder Schätzungen gefüllt."
+        },
+        {
+          "question": "Muss ich eine KI verwenden?",
+          "answer": "Nein. Exporte entstehen lokal. Eine KI erhält Inhalte erst beim Einfügen oder Hochladen. Prüfe Umfang, Bereinigung und Datenschutz."
+        },
+        {
+          "question": "Entspricht der Download dem Beispiel?",
+          "answer": "Das Beispiel zeigt v3 in Entwicklung mit synthetischen Daten. Der Download ist stabil. Planprüfung und neue Oberfläche können noch unveröffentlicht sein; siehe Versionshinweise."
+        }
+      ]
+    }
+  }
 };
 
 export default pack;

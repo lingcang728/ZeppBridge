@@ -16,16 +16,16 @@
   --lp-line-2: rgba(30, 36, 26, .2);
   --lp-ink: #1b2118;
   --lp-muted: #4a5445;
-  --lp-subtle: #6b7564;
+  --lp-subtle: #626d5d;
   --lp-green: #2f6b4f;
   --lp-green-ink: #ffffff;
-  --lp-mark: #cfe580;
+  --lp-mark: #dbe4bc;
   --lp-glow: rgba(47, 107, 79, .22);
   --lp-shadow: 0 1px 0 rgba(255, 255, 255, .85) inset, 0 50px 90px -50px rgba(30, 40, 24, .5);
   --lp-ease: cubic-bezier(.22, .8, .2, 1);
   position: relative;
   isolation: isolate;
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: clip;
   background: var(--lp-bg);
   color: var(--lp-ink);
@@ -49,12 +49,15 @@
   --lp-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset, 0 50px 100px -40px rgba(0, 0, 0, .85);
 }
 .lp ::selection { background: color-mix(in srgb, var(--lp-green) 32%, transparent); }
-.lp a { color: inherit; }
+.lp :where(a) { color: inherit; }
+.lp button { font-family: inherit; }
+.lp :is(h1,h2,h3,p,a,button) { overflow-wrap: break-word; }
+.lp :is(section,div)[id] { scroll-margin-top: 112px; }
 .lp :focus-visible { outline: 2px solid var(--lp-green); outline-offset: 3px; border-radius: 8px; }
 
 /* ── 版心与段落骨架 ── */
 .lp-wrap { width: min(1280px, calc(100% - 48px)); margin: 0 auto; }
-.lp-section { position: relative; width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 140px 0 0; }
+.lp-section { position: relative; width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 100px 0 0; }
 
 /* 小标：「03 · 交给 AI」——等宽字、大写、字距拉开，前面一条短线。像杂志的栏目标。 */
 .lp-kicker {
@@ -72,10 +75,10 @@
 .lp-h2 {
   max-width: 16em;
   margin: 0;
-  font-size: clamp(32px, 4.6vw, 62px);
-  font-weight: 700;
+  font-size: clamp(30px, 3.8vw, 52px);
+  font-weight: 660;
   letter-spacing: -.03em;
-  line-height: 1.06;
+  line-height: 1.18;
   text-wrap: balance;
 }
 .lp-lead { max-width: 38em; margin: 20px 0 0; color: var(--lp-muted); font-size: clamp(16px, 1.3vw, 18.5px); line-height: 1.7; text-wrap: pretty; }
@@ -136,6 +139,8 @@
   align-items: center;
   gap: 12px;
   min-height: 52px;
+  font-family: inherit;
+  line-height: 1.35;
   padding: 0 24px;
   border: 0;
   border-radius: 999px;
@@ -145,8 +150,8 @@
   cursor: pointer;
   transition: transform .5s var(--lp-ease), box-shadow .3s ease, background .3s ease;
 }
-.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: .72; }
-.lp-btn-primary {
+.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: 1; }
+.lp .lp-btn-primary {
   background: var(--lp-green);
   color: var(--lp-green-ink);
   box-shadow: 0 1px 0 rgba(255, 255, 255, .22) inset, 0 14px 32px -14px var(--lp-glow);
@@ -154,21 +159,25 @@
 .lp-btn-primary:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, 0 20px 44px -12px var(--lp-glow); filter: brightness(1.05); }
 .lp-btn-ghost { border: 1px solid var(--lp-line-2); background: transparent; color: var(--lp-ink); }
 .lp-btn-ghost:hover { background: var(--lp-panel-2); }
-.lp-btn:active { transition-duration: .1s; }
+.lp-btn:active { transform: translateY(1px); transition-duration: .1s; }
 
 /* ── 滚动显现：`data-reveal` 先藏着，进视口加 .is-in，按 --i 错开。 ── */
-.lp [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--lp-ease), transform .9s var(--lp-ease); transition-delay: calc(var(--i, 0) * 90ms); }
+.lp [data-reveal] { opacity: 1; }
+.lp.lp-motion-ready [data-reveal] { transition: opacity .45s var(--lp-ease), transform .45s var(--lp-ease); transition-delay: calc(var(--i, 0) * 60ms); }
+.lp.lp-motion-ready [data-reveal]:not(.is-in) { opacity: 0; transform: translateY(16px); }
 .lp [data-reveal].is-in { opacity: 1; transform: none; }
+.lp [data-reveal]:focus-within { opacity: 1 !important; transform: none !important; }
 
 /* 循环动画离屏不跑：带 data-live 的块，看不见时暂停里面所有动画。 */
 .lp [data-live]:not(.is-live) *, .lp [data-live]:not(.is-live)::before, .lp [data-live]:not(.is-live)::after { animation-play-state: paused !important; }
 
 @media (max-width: 720px) {
   .lp-wrap, .lp-section { width: calc(100% - 32px); }
-  .lp-section { padding-top: 96px; }
+  .lp-section { padding-top: 70px; }
+  .lp :is(section,div)[id] { scroll-margin-top: 92px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .lp [data-reveal], .lp.lp-motion-ready [data-reveal]:not(.is-in) { opacity: 1; transform: none; transition: none; }
   .lp *, .lp *::before, .lp *::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; transition-delay: 0s !important; }
 }
 

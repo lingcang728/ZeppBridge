@@ -1,213 +1,137 @@
 <script setup lang="ts">
-/**
- * 页面里那扇「真的 ZeppBridge」：同一份前端以演示模式（`?demo=1`，数据全是合成的）跑在一个 iframe 里，
- * 按 1280×800 的桌面尺寸渲染，再整体缩放到窗口宽度——看到的就是桌面应用本体，不是仿制品：
- * 导航胶囊、液态玻璃、设置卡叠的飞入飞出、图里的拖动，全是本体的。
- *
- * 外层页面用 postMessage 指挥它换到某一页（走真路由、真转场）、跟着主题和语言变（见 demo/host.ts）。
- *
- * 防滚轮陷阱：默认盖一层透明的罩子，鼠标滚轮照常滚整页；点一下罩子才把窗口交给访客玩，
- * 指针离开窗口一会儿就收回。这样既不会在滚页面时被应用「吃掉」，也不会不小心拖到里面的东西。
- */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import BrandMark from '../../components/BrandMark.vue';
 import { landingTheme } from './theme';
+import { prefersReducedMotion, useInView } from './motion';
 import type { LandingLocale } from '../../composables/useLandingLocale';
 import type { LandingCopy } from './types';
-
 const LOGICAL_W = 1280;
 const LOGICAL_H = 800;
-/** 与 demo/host.ts 约定的消息来源，两边都只认同源消息。 */
 const SITE = 'zeppbridge-site';
 const DEMO = 'zeppbridge-demo';
-
-const props = defineProps<{
-  /** 应用该显示哪一页（应用内路由，如 `/ai`）。 */
-  route: string;
-  /** 到了这一页以后，把应用里的滚动区滚到哪个元素（CSS 选择器）；没有就回到顶。 */
-  scrollTo?: string | null;
-  locale: LandingLocale;
-  copy: LandingCopy['hero']['stage'];
-  sample: string;
-}>();
+const props = defineProps<{ route: string; scrollTo?: string | null; locale: LandingLocale; copy: LandingCopy['hero']['stage']; sample: string; suspended?: boolean }>();
 const emit = defineEmits<{ handoff: []; ready: [] }>();
-
 const box = ref<HTMLElement | null>(null);
 const frame = ref<HTMLIFrameElement | null>(null);
+const shield = ref<HTMLButtonElement | null>(null);
 const width = ref(0);
 const src = ref<string | null>(null);
 const ready = ref(false);
 const failed = ref(false);
 const playing = ref(false);
 const appPath = ref<string | null>(null);
-
-const scale = computed(() => (width.value > 0 ? width.value / LOGICAL_W : 0.5));
+const inView = useInView(box);
+const scale = computed(() => width.value > 0 ? width.value / LOGICAL_W : .5);
 const height = computed(() => Math.round(LOGICAL_H * scale.value));
-
-const post = (payload: Record<string, unknown>) => {
-  frame.value?.contentWindow?.postMessage({ source: SITE, ...payload }, window.location.origin);
+const post = (payload: Record<string, unknown>) => frame.value?.contentWindow?.postMessage({ source: SITE, ...payload }, window.location.origin);
+let routeTimer = 0;
+let loadTimer = 0;
+const syncScroll = () => {
+  const doc = frame.value?.contentDocument;
+  const main = doc?.querySelector<HTMLElement>('.main-content');
+  if (!main) return;
+  const target = props.scrollTo ? doc?.querySelector<HTMLElement>(props.scrollTo) : null;
+  const top = target ? main.scrollTop + target.getBoundingClientRect().top - main.getBoundingClientRect().top - 12 : 0;
+  main.scrollTo({ top: Math.max(0, top), behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
 };
-
-/** 把应用带到想要的那一页；已经在那儿了只做滚动。 */
 const sync = () => {
   if (!ready.value) return;
-  if (appPath.value !== props.route) post({ type: 'go', to: props.route });
-  else post({ type: 'scroll', selector: props.scrollTo ?? null });
+  window.clearTimeout(routeTimer);
+  if (appPath.value !== props.route) post({ type: 'go', to: props.route }); else syncScroll();
 };
-
+const release = async (restoreFocus = true) => { playing.value = false; if (restoreFocus) { await nextTick(); shield.value?.focus({ preventScroll: true }); } };
+const onKeydown = (event: KeyboardEvent) => { if (event.key === 'Escape' && playing.value && !props.suspended) { event.preventDefault(); void release(); } };
+let boundDocument: Document | null = null;
+let pausedAnimations: Animation[] = [];
+const syncMotion = () => {
+  const doc = frame.value?.contentDocument;
+  if (!doc) return;
+  const paused = !inView.value || document.hidden;
+  doc.documentElement.toggleAttribute('data-site-paused', paused);
+  if (paused) { for (const animation of doc.getAnimations()) if (animation.playState === 'running') { animation.pause(); pausedAnimations.push(animation); } }
+  else { for (const animation of pausedAnimations) if (animation.playState === 'paused') animation.play(); pausedAnimations = []; }
+};
+const bindFrame = () => {
+  const doc = frame.value?.contentDocument;
+  if (!doc || doc === boundDocument) return;
+  boundDocument?.defaultView?.removeEventListener('keydown', onKeydown, true); boundDocument = doc;
+  doc.defaultView?.addEventListener('keydown', onKeydown, true);
+  const style = doc.createElement('style');
+  style.dataset.landingMotion = '';
+  style.textContent = ':root[data-site-paused] *, :root[data-site-paused] *::before, :root[data-site-paused] *::after { animation-play-state: paused !important; } @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }';
+  doc.head.append(style); syncMotion();
+};
 const onMessage = (event: MessageEvent) => {
-  if (event.origin !== window.location.origin) return;
-  const data = event.data as { source?: string; type?: string; path?: string };
+  if (event.origin !== window.location.origin || event.source !== frame.value?.contentWindow) return;
+  const data = event.data as { source?: string; type?: string; path?: string } | null;
   if (data?.source !== DEMO) return;
   if (data.type === 'ready') {
-    ready.value = true;
-    appPath.value = data.path ?? null;
-    emit('ready');
-    sync();
+    ready.value = true; failed.value = false; window.clearTimeout(loadTimer);
+    appPath.value = typeof data.path === 'string' ? data.path : null; bindFrame();
+    post({ type: 'theme', value: landingTheme.value }); post({ type: 'locale', value: props.locale });
+    emit('ready'); sync();
   } else if (data.type === 'route') {
-    appPath.value = data.path ?? null;
-    window.setTimeout(() => post({ type: 'scroll', selector: props.scrollTo ?? null }), 420);
-  } else if (data.type === 'handoff' || data.type === 'open-url') {
-    emit('handoff');
-  }
+    appPath.value = typeof data.path === 'string' ? data.path : null; window.clearTimeout(routeTimer);
+    routeTimer = window.setTimeout(() => { if (appPath.value === props.route) syncScroll(); syncMotion(); }, prefersReducedMotion() ? 0 : 420);
+  } else if ((data.type === 'handoff' || data.type === 'open-url') && playing.value && !props.suspended) emit('handoff');
 };
-
-watch(() => [props.route, props.scrollTo], () => { playing.value = false; sync(); });
+watch(() => [props.route, props.scrollTo], () => { void release(false); sync(); });
+watch(() => props.suspended, (value) => { if (value) void release(false); });
 watch(landingTheme, (value) => post({ type: 'theme', value }));
 watch(() => props.locale, (value) => post({ type: 'locale', value }));
-
-/* 量宽度；离视口远的时候先不加载（首屏那一屏一定在视口里，立刻加载）。 */
+watch(inView, (value) => { if (!value) void release(false); syncMotion(); });
 let sizer: ResizeObserver | null = null;
 let near: IntersectionObserver | null = null;
-let timeout = 0;
 const load = () => {
   if (src.value) return;
   src.value = `/?demo=1&theme=${landingTheme.value}&lang=${props.locale}&route=${encodeURIComponent(props.route)}`;
-  // 8 秒还没等到应用说「我好了」，就当它打不开（脚本被拦、旧浏览器……），给一句明白话。
-  timeout = window.setTimeout(() => { if (!ready.value) failed.value = true; }, 8000);
+  loadTimer = window.setTimeout(() => { if (!ready.value) failed.value = true; }, 12000);
 };
+const resize = () => { width.value = box.value?.getBoundingClientRect().width ?? 0; };
+const activate = async () => { if (!ready.value || props.suspended) return; playing.value = true; await nextTick(); frame.value?.focus({ preventScroll: true }); };
 onMounted(() => {
-  window.addEventListener('message', onMessage);
-  if (box.value && typeof ResizeObserver !== 'undefined') {
-    sizer = new ResizeObserver((entries) => { width.value = entries[0]?.contentRect.width ?? 0; });
-    sizer.observe(box.value);
-    width.value = box.value.getBoundingClientRect().width;
-  }
-  if (box.value && typeof IntersectionObserver !== 'undefined') {
-    near = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { load(); near?.disconnect(); } }, { rootMargin: '700px' });
-    near.observe(box.value);
-  } else load();
+  window.addEventListener('message', onMessage); window.addEventListener('keydown', onKeydown, true); document.addEventListener('visibilitychange', syncMotion);
+  resize();
+  if (box.value && typeof ResizeObserver !== 'undefined') { sizer = new ResizeObserver(resize); sizer.observe(box.value); } else window.addEventListener('resize', resize);
+  if (box.value && typeof IntersectionObserver !== 'undefined') { near = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { load(); near?.disconnect(); } }, { rootMargin: '500px' }); near.observe(box.value); } else load();
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('message', onMessage);
-  sizer?.disconnect();
-  near?.disconnect();
-  window.clearTimeout(timeout);
-  window.clearTimeout(leaveTimer);
+  window.removeEventListener('message', onMessage); window.removeEventListener('keydown', onKeydown, true); window.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', syncMotion);
+  boundDocument?.defaultView?.removeEventListener('keydown', onKeydown, true); sizer?.disconnect(); near?.disconnect(); window.clearTimeout(loadTimer); window.clearTimeout(routeTimer);
 });
-
-/* 点一下接管，离开一会儿收回。 */
-let leaveTimer = 0;
-const activate = () => { playing.value = true; };
-const release = () => { playing.value = false; };
-const onLeave = () => {
-  window.clearTimeout(leaveTimer);
-  leaveTimer = window.setTimeout(release, 900);
-};
-const onEnter = () => window.clearTimeout(leaveTimer);
+defineExpose({ release });
 </script>
 
 <template>
-  <figure ref="box" class="win" @pointerleave="onLeave" @pointerenter="onEnter">
+  <figure ref="box" class="win" data-live>
+    <div class="window-label"><span aria-hidden="true">ZeppBridge</span><span v-if="!playing" aria-hidden="true">{{ sample }} · v3</span><button v-if="playing" type="button" class="exit" @click="release()">{{ copy.exit }} <kbd>Esc</kbd></button></div>
     <div class="frame" :style="{ height: `${height}px` }">
-      <iframe
-        v-if="src"
-        ref="frame"
-        class="app"
-        :src="src"
-        title="ZeppBridge"
-        :tabindex="playing ? 0 : -1"
-        :style="{ width: `${LOGICAL_W}px`, height: `${LOGICAL_H}px`, transform: `scale(${scale})`, pointerEvents: playing ? 'auto' : 'none' }"
-        :class="{ shown: ready }"
-      ></iframe>
-
-      <div v-if="!ready" class="skeleton" aria-live="polite">
-        <template v-if="failed">
-          <p class="fail">{{ copy.unavailable }}</p>
-        </template>
-        <template v-else>
-          <span class="mark"><BrandMark :size="40" /></span>
-          <p>{{ copy.loading }}</p>
-        </template>
-      </div>
-
-      <button v-if="ready && !playing" type="button" class="shield" @click="activate">
-        <span class="hint"><i aria-hidden="true"></i>{{ copy.hint }}</span>
-      </button>
-      <button v-if="playing" type="button" class="exit" @click="release">{{ copy.exit }}</button>
-
-      <!-- 盖在应用上的东西（对话演出）放进窗口框里：定位和圆角裁切都以应用窗口为准，不会探出框外。 -->
-      <slot />
+      <iframe v-if="src" ref="frame" class="app" :src="src" :title="`ZeppBridge · ${copy.note}`" :tabindex="playing && !suspended ? 0 : -1" :inert="!playing || suspended" :style="{ width: `${LOGICAL_W}px`, height: `${LOGICAL_H}px`, transform: `scale(${scale})`, pointerEvents: playing && !suspended ? 'auto' : 'none' }" :class="{ shown: ready }" @load="bindFrame"></iframe>
+      <div v-if="!ready" class="skeleton" aria-live="polite"><span class="mark"><BrandMark :size="36" /></span><p>{{ failed ? copy.unavailable : copy.loading }}</p></div>
+      <button v-if="ready && !playing" ref="shield" type="button" class="shield" @click="activate"><span class="hint"><i aria-hidden="true"></i>{{ copy.hint }}</span></button>
     </div>
-    <figcaption><span class="lp-sample">{{ sample }}</span>{{ copy.note }}</figcaption>
+    <figcaption><span class="lp-sample">{{ sample }}</span><span>{{ copy.note }}</span></figcaption>
   </figure>
 </template>
 
 <style scoped>
-.win { position: relative; display: grid; gap: 14px; margin: 0; width: 100%; }
-.frame {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--lp-line-2);
-  border-radius: 22px;
-  background: var(--lp-bg-2);
-  box-shadow: var(--lp-shadow);
-  /* 只有圆角裁切 + 缩放的 iframe：整块是一个合成层，滚动页面时不重排。 */
-  isolation: isolate;
-  contain: layout paint;
-}
-.app {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border: 0;
-  background: transparent;
-  transform-origin: 0 0;
-  opacity: 0;
-  transition: opacity .6s var(--lp-ease);
-}
+.win { position: relative; margin: 0; width: 100%; }
+.window-label { display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 6px 12px 6px 18px; border: 1px solid var(--lp-line-2); border-bottom: 0; border-radius: 16px 16px 0 0; color: var(--lp-subtle); background: var(--lp-panel-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em; }
+.window-label span:first-child { color: var(--lp-muted); }
+.frame { position: relative; overflow: hidden; border: 1px solid var(--lp-line-2); border-radius: 0 0 16px 16px; background: var(--lp-bg-2); box-shadow: var(--lp-shadow); isolation: isolate; contain: layout paint; }
+.app { position: absolute; top: 0; left: 0; border: 0; background: transparent; transform-origin: 0 0; opacity: 0; transition: opacity .35s var(--lp-ease); }
 .app.shown { opacity: 1; }
-
-.skeleton { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--lp-subtle); font-size: 14px; text-align: center; }
-.skeleton p { margin: 0; max-width: 24em; }
-.mark { display: grid; width: 72px; height: 72px; place-items: center; border-radius: 22px; background: var(--lp-panel); box-shadow: 0 0 0 1px var(--lp-line) inset, var(--lp-shadow); animation: breathe 1.6s ease-in-out infinite; }
-.fail { color: var(--lp-muted); line-height: 1.6; }
-@keyframes breathe { 50% { transform: scale(.94); opacity: .7; } }
-
-/* 罩子：透明，盖在应用上。滚轮不被应用吃掉；点一下才开始玩。 */
-.shield { position: absolute; inset: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: center; padding: 0 0 22px; border: 0; background: transparent; cursor: pointer; }
-.hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--lp-bg) 82%, transparent);
-  box-shadow: 0 0 0 1px var(--lp-line-2) inset, 0 12px 30px -12px rgba(0, 0, 0, .35);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  backdrop-filter: blur(12px) saturate(1.3);
-  color: var(--lp-ink);
-  font-size: 14.5px;
-  font-weight: 650;
-  transition: transform .5s var(--lp-ease);
-}
-.shield:hover .hint { transform: translateY(-3px); }
-.hint i { width: 9px; height: 9px; border-radius: 50%; background: var(--lp-green); box-shadow: 0 0 0 0 var(--lp-glow); animation: ping 2s ease-out infinite; }
-@keyframes ping { 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-
-.exit { position: absolute; right: 14px; bottom: 14px; z-index: 4; padding: 8px 14px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--lp-bg) 82%, transparent); box-shadow: 0 0 0 1px var(--lp-line-2) inset; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--lp-muted); font: inherit; font-size: 13px; cursor: pointer; }
-.exit:hover { color: var(--lp-ink); }
-figcaption { display: flex; align-items: center; gap: 10px; color: var(--lp-subtle); font-size: 13.5px; line-height: 1.5; }
-
-@media (prefers-reduced-motion: reduce) { .mark, .hint i { animation: none; } }
+.skeleton { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 16px; padding: 20px; color: var(--lp-subtle); text-align: center; }
+.skeleton p { margin: 0; max-width: 28em; font-size: 13px; line-height: 1.7; }
+.mark { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 18px; background: var(--lp-panel); border: 1px solid var(--lp-line); }
+.shield { position: absolute; inset: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: center; padding: 0 16px 20px; border: 0; background: transparent; cursor: pointer; }
+.hint { display: inline-flex; align-items: center; gap: 9px; padding: 11px 18px; border: 1px solid var(--lp-line-2); border-radius: 999px; background: var(--lp-panel); box-shadow: 0 10px 30px -18px rgba(30, 40, 24, .4); color: var(--lp-ink); font-size: 13px; font-weight: 650; transition: transform .25s var(--lp-ease); }
+.shield:hover .hint { transform: translateY(-2px); }
+.hint i { width: 6px; height: 6px; border-radius: 50%; background: var(--lp-green); }
+.exit { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; max-width: 75%; padding: 5px 12px; border: 1px solid var(--lp-line-2); border-radius: 999px; background: var(--lp-panel); color: var(--lp-ink); font-family: var(--font-sans); font-size: 12px; line-height: 1.4; cursor: pointer; }
+kbd { padding: 1px 4px; border: 1px solid var(--lp-line-2); border-radius: 4px; color: var(--lp-subtle); font-size: 10px; }
+figcaption { display: flex; align-items: start; gap: 10px; margin-top: 14px; color: var(--lp-subtle); font-size: 12px; line-height: 1.6; }
+figcaption .lp-sample { flex-shrink: 0; }
+@media (max-width: 720px) { .window-label { padding: 6px 10px; } .shield { padding-bottom: 12px; } .hint { padding: 8px 13px; font-size: 12px; } .exit { font-size: 11px; padding: 5px 9px; } }
+@media (prefers-reduced-motion: reduce) { .app, .hint { transition: none; } }
 </style>

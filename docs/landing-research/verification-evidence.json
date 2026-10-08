@@ -1,0 +1,2343 @@
+{
+  "date": "2026-10-07",
+  "timezone": "Asia/Taipei",
+  "preview": "http://127.0.0.1:1532/",
+  "matrix": [
+    {
+      "locale": "zh",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 390,
+      "height": 6196,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 224,
+            "y": 20,
+            "width": 105,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 359.1875,
+            "width": 184.015625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5002.671875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-390-light-no-preference-fallback.png"
+    },
+    {
+      "locale": "zh",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1440,
+      "height": 4707,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1257,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 237.5,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 3811.421875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-1440-light-no-preference-fallback.png"
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "en",
+      "title": "ZeppBridge · Your watch records. Your own archive.",
+      "scrollWidth": 390,
+      "height": 7153,
+      "h1": [
+        {
+          "text": "Your watch records.\nYour own archive.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Get the public release",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 387.1875,
+            "width": 234.890625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5867.40625,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\en-390-light-no-preference-fallback.png"
+    },
+    {
+      "locale": "en",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "en",
+      "title": "ZeppBridge · Your watch records. Your own archive.",
+      "scrollWidth": 1440,
+      "height": 5101,
+      "h1": [
+        {
+          "text": "Your watch records.\nYour own archive.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Get the public release",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1175.453125,
+            "y": 26,
+            "width": 201.546875,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 264.890625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4164.671875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\en-1440-light-no-preference-fallback.png"
+    },
+    {
+      "locale": "es",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "es",
+      "title": "ZeppBridge · Tu reloj registra. Tu propio archivo.",
+      "scrollWidth": 390,
+      "height": 7088,
+      "h1": [
+        {
+          "text": "Tu reloj registra.\nTu propio archivo.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Descargar versión pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Descargar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 415.1875,
+            "width": 247.578125,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Descargar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5801.71875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "es",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "es",
+      "title": "ZeppBridge · Tu reloj registra. Tu propio archivo.",
+      "scrollWidth": 1440,
+      "height": 5055,
+      "h1": [
+        {
+          "text": "Tu reloj registra.\nTu propio archivo.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Descargar versión pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1148.890625,
+            "y": 26,
+            "width": 228.109375,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Descargar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 278.921875,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Descargar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4119.03125,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "nl",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "nl",
+      "title": "ZeppBridge · Je horloge legt vast. Je eigen archief.",
+      "scrollWidth": 390,
+      "height": 7103,
+      "h1": [
+        {
+          "text": "Je horloge legt vast.\nJe eigen archief.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Publieke versie",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 190.46875,
+            "y": 20,
+            "width": 138.53125,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Downloaden voor Windows\nx64-installatieprogramma",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 387.1875,
+            "width": 263.78125,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Downloaden voor Windows\nx64-installatieprogramma",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5816.921875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "nl",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "nl",
+      "title": "ZeppBridge · Je horloge legt vast. Je eigen archief.",
+      "scrollWidth": 1440,
+      "height": 4976,
+      "h1": [
+        {
+          "text": "Je horloge legt vast.\nJe eigen archief.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Publieke versie",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1220.6875,
+            "y": 26,
+            "width": 156.3125,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Downloaden voor Windows\nx64-installatieprogramma",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 296.859375,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Downloaden voor Windows\nx64-installatieprogramma",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4039.34375,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "pt-BR",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "pt-BR",
+      "title": "ZeppBridge · O relógio registra. O arquivo é seu.",
+      "scrollWidth": 390,
+      "height": 7012,
+      "h1": [
+        {
+          "text": "O relógio registra.\nO arquivo é seu.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Versão pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 193.734375,
+            "y": 20,
+            "width": 135.265625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Baixar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 387.1875,
+            "width": 219.390625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Baixar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5703.5625,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "pt-BR",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "pt-BR",
+      "title": "ZeppBridge · O relógio registra. O arquivo é seu.",
+      "scrollWidth": 1440,
+      "height": 4976,
+      "h1": [
+        {
+          "text": "O relógio registra.\nO arquivo é seu.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Versão pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1224.21875,
+            "y": 26,
+            "width": 152.78125,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Baixar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 247.71875,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Baixar para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4039.34375,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "pt-PT",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "pt-PT",
+      "title": "ZeppBridge · O relógio regista. O arquivo é seu.",
+      "scrollWidth": 390,
+      "height": 7023,
+      "h1": [
+        {
+          "text": "O relógio regista.\nO arquivo é seu.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Versão pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 193.734375,
+            "y": 20,
+            "width": 135.265625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Transferir para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 387.1875,
+            "width": 244.421875,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Transferir para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5714.1875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "pt-PT",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "pt-PT",
+      "title": "ZeppBridge · O relógio regista. O arquivo é seu.",
+      "scrollWidth": 1440,
+      "height": 5000,
+      "h1": [
+        {
+          "text": "O relógio regista.\nO arquivo é seu.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Versão pública",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1224.21875,
+            "y": 26,
+            "width": 152.78125,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Transferir para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 275.4375,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Transferir para Windows\nInstalador x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4063.84375,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "de",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "de",
+      "title": "ZeppBridge · Deine Uhr zeichnet auf. Dein eigenes Archiv.",
+      "scrollWidth": 390,
+      "height": 7215,
+      "h1": [
+        {
+          "text": "Deine Uhr zeichnet auf.\nDein eigenes Archiv.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 122.390625
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Öffentliche Version",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Für Windows laden\nx64-Installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 427.984375,
+            "width": 205.0625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Für Windows laden\nx64-Installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5904.8125,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "de",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "de",
+      "title": "ZeppBridge · Deine Uhr zeichnet auf. Dein eigenes Archiv.",
+      "scrollWidth": 1440,
+      "height": 5197,
+      "h1": [
+        {
+          "text": "Deine Uhr zeichnet auf.\nDein eigenes Archiv.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 293.9375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Öffentliche Version",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1193.1875,
+            "y": 26,
+            "width": 183.8125,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Für Windows laden\nx64-Installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 231.859375,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Für Windows laden\nx64-Installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4237.765625,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "ru",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "ru",
+      "title": "ZeppBridge · Часы записывают. Архив принадлежит вам.",
+      "scrollWidth": 390,
+      "height": 7370,
+      "h1": [
+        {
+          "text": "Часы записывают.\nАрхив принадлежит вам.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 122.390625
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Публичная версия",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Скачать для Windows\nУстановщик x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 427.984375,
+            "width": 230.28125,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Скачать для Windows\nУстановщик x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 6036.625,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "ru",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "ru",
+      "title": "ZeppBridge · Часы записывают. Архив принадлежит вам.",
+      "scrollWidth": 1440,
+      "height": 5100,
+      "h1": [
+        {
+          "text": "Часы записывают.\nАрхив принадлежит вам.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 220.453125
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Публичная версия",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1194.609375,
+            "y": 26,
+            "width": 182.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Скачать для Windows\nУстановщик x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 259.765625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Скачать для Windows\nУстановщик x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4164.28125,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "hi-IN",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "hi",
+      "title": "ZeppBridge · घड़ी दर्ज करती है। संग्रह आपका है।",
+      "scrollWidth": 390,
+      "height": 6561,
+      "h1": [
+        {
+          "text": "घड़ी दर्ज करती है।\nसंग्रह आपका है।",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "सार्वजनिक संस्करण",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Windows के लिए डाउनलोड करें\nx64 इंस्टॉलर",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 359.1875,
+            "width": 266.703125,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Windows के लिए डाउनलोड करें\nx64 इंस्टॉलर",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5322.171875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "hi-IN",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "hi",
+      "title": "ZeppBridge · घड़ी दर्ज करती है। संग्रह आपका है।",
+      "scrollWidth": 1440,
+      "height": 4814,
+      "h1": [
+        {
+          "text": "घड़ी दर्ज करती है।\nसंग्रह आपका है।",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "सार्वजनिक संस्करण",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1214.109375,
+            "y": 26,
+            "width": 162.890625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Windows के लिए डाउनलोड करें\nx64 इंस्टॉलर",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 237.5,
+            "width": 300.09375,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Windows के लिए डाउनलोड करें\nx64 इंस्टॉलर",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 3878.109375,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "fr",
+      "width": 390,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "fr",
+      "title": "ZeppBridge · Votre montre enregistre. Vos propres archives.",
+      "scrollWidth": 390,
+      "height": 7306,
+      "h1": [
+        {
+          "text": "Votre montre enregistre.\nVos propres archives.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 122.390625
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Version publique",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Télécharger pour Windows\nInstalleur x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 455.984375,
+            "width": 260.984375,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Télécharger pour Windows\nInstalleur x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5973.09375,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "fr",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "fr",
+      "title": "ZeppBridge · Votre montre enregistre. Vos propres archives.",
+      "scrollWidth": 1440,
+      "height": 5248,
+      "h1": [
+        {
+          "text": "Votre montre enregistre.\nVos propres archives.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 293.9375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Version publique",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1210.25,
+            "y": 26,
+            "width": 166.75,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Télécharger pour Windows\nInstalleur x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 293.78125,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Télécharger pour Windows\nInstalleur x64",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4288.84375,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 320,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 320,
+      "height": 6677,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 288,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 154,
+            "y": 20,
+            "width": 105,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 359.1875,
+            "width": 184.015625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5438.734375,
+            "width": 288,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 768,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 768,
+      "height": 5386,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 181.1875,
+            "width": 350.734375,
+            "height": 83.71875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 566,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 406.734375,
+            "y": 245,
+            "width": 184.015625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 24,
+            "y": 4340.78125,
+            "width": 440,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 1024,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1024,
+      "height": 4558,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 191.1875,
+            "width": 466.234375,
+            "height": 104.53125
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 822,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 551.671875,
+            "y": 227,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 585.453125,
+            "y": 3662.03125,
+            "width": 414.546875,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 1280,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1280,
+      "height": 4673,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 191.1875,
+            "width": 588.921875,
+            "height": 130.625
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1123,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 689.71875,
+            "y": 231.46875,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 722.71875,
+            "y": 3777.328125,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 1920,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1920,
+      "height": 4705,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 320,
+            "y": 191.1875,
+            "width": 601.5625,
+            "height": 148.46875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1497,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1021.5625,
+            "y": 237.5,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1042.71875,
+            "y": 3809.421875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": null
+    },
+    {
+      "locale": "zh",
+      "width": 390,
+      "theme": "dark",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 390,
+      "height": 6196,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 224,
+            "y": 20,
+            "width": 105,
+            "height": 40
+          },
+          "contrast": 8.07
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 16,
+            "y": 359.1875,
+            "width": 184.015625,
+            "height": 59.078125
+          },
+          "contrast": 8.07
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 16,
+            "y": 5002.671875,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 8.07
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-390-dark-no-preference-fallback.png"
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "theme": "light",
+      "motion": "reduce",
+      "mode": "fallback",
+      "lang": "en",
+      "title": "ZeppBridge · Your watch records. Your own archive.",
+      "scrollWidth": 390,
+      "height": 7153,
+      "h1": [
+        {
+          "text": "Your watch records.\nYour own archive.",
+          "visible": true,
+          "rect": {
+            "x": 16,
+            "y": 146.59375,
+            "width": 358,
+            "height": 81.59375
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Get the public release",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 185.609375,
+            "y": 20,
+            "width": 143.390625,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 387.1875,
+            "width": 234.890625,
+            "height": 59.078125
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 16,
+            "y": 5867.40625,
+            "width": 358,
+            "height": 70.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\en-390-light-reduce-fallback.png"
+    },
+    {
+      "locale": "zh",
+      "width": 1440,
+      "theme": "dark",
+      "motion": "no-preference",
+      "mode": "fallback",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1440,
+      "height": 4707,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 1257,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 8.07
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 774.890625,
+            "y": 237.5,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 8.07
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(18, 23, 10)",
+          "bg": "rgb(147, 185, 82)",
+          "rect": {
+            "x": 802.71875,
+            "y": 3811.421875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 8.07
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-1440-dark-no-preference-fallback.png"
+    },
+    {
+      "locale": "en",
+      "width": 1440,
+      "theme": "light",
+      "motion": "reduce",
+      "mode": "fallback",
+      "lang": "en",
+      "title": "ZeppBridge · Your watch records. Your own archive.",
+      "scrollWidth": 1440,
+      "height": 5101,
+      "h1": [
+        {
+          "text": "Your watch records.\nYour own archive.",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "Get the public release",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1175.453125,
+            "y": 26,
+            "width": 201.546875,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 270.75,
+            "width": 264.890625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "Download for Windows\nx64 installer",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 4164.671875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\en-1440-light-reduce-fallback.png"
+    },
+    {
+      "locale": "zh",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "ready",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1440,
+      "height": 4716,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1257,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 237.5,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 3811.421875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-1440-light-no-preference-ready.png"
+    },
+    {
+      "locale": "zh",
+      "width": 1440,
+      "theme": "light",
+      "motion": "no-preference",
+      "mode": "untrusted",
+      "lang": "zh-CN",
+      "title": "ZeppBridge · 手表记录，自己的档案",
+      "scrollWidth": 1440,
+      "height": 4707,
+      "h1": [
+        {
+          "text": "手表记录，\n自己的档案。",
+          "visible": true,
+          "rect": {
+            "x": 80,
+            "y": 191.1875,
+            "width": 608.5,
+            "height": 146.96875
+          }
+        }
+      ],
+      "primary": [
+        {
+          "text": "下载公开版",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 1257,
+            "y": 26,
+            "width": 120,
+            "height": 40
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 774.890625,
+            "y": 237.5,
+            "width": 208.5625,
+            "height": 52
+          },
+          "contrast": 6.293
+        },
+        {
+          "text": "下载 Windows 版\nx64 安装包",
+          "fg": "rgb(255, 255, 255)",
+          "bg": "rgb(47, 107, 79)",
+          "rect": {
+            "x": 802.71875,
+            "y": 3811.421875,
+            "width": 507.28125,
+            "height": 74.859375
+          },
+          "contrast": 6.293
+        }
+      ],
+      "animations": [],
+      "hiddenFocusable": [],
+      "pageerrors": [],
+      "screenshot": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-site-after\\zh-1440-light-no-preference-untrusted.png"
+    }
+  ],
+  "interactions": [
+    {
+      "name": "single-real-frame",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "chapter-1",
+      "passed": true,
+      "detail": {
+        "path": "/",
+        "hash": "#demo-sync",
+        "h1": 1
+      }
+    },
+    {
+      "name": "chapter-2",
+      "passed": true,
+      "detail": {
+        "path": "/heart",
+        "hash": "#demo-missing",
+        "h1": 1
+      }
+    },
+    {
+      "name": "chapter-3",
+      "passed": true,
+      "detail": {
+        "path": "/ai",
+        "hash": "#demo-handoff",
+        "h1": 1
+      }
+    },
+    {
+      "name": "chapter-4",
+      "passed": true,
+      "detail": {
+        "path": "/ai/plan",
+        "hash": "#demo-plan",
+        "h1": 1
+      }
+    },
+    {
+      "name": "chapter-5",
+      "passed": true,
+      "detail": {
+        "path": "/settings",
+        "hash": "#demo-settings",
+        "h1": 1
+      }
+    },
+    {
+      "name": "chapter-keyboard-arrow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "escape-parent-exits",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "escape-frame-exits",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "reject-same-origin-wrong-window",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "accept-demo-handoff",
+      "passed": true,
+      "detail": "AI 对话\n示例\n\n你\n\nZeppBridge 最近14天.md\n\n整理这份合成示例中的记录，列出来源、日期和缺失项，不作健康判断。\n\nAI · 示例\n\n示例文件按日期整理了睡眠和运动记录。没有采样的时段保持空白。比较前应先确认两段时间的来源与覆盖是否一致；这些记录不能说明变化的原因。\n\n合成示例对话。这个页面没有提交文件或连接 AI；真实使用时，由你决定是否发送给外部服务。"
+    },
+    {
+      "name": "dialog-focus-inside",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "dialog-escape-returns",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "real-app-send-opens-sample",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "handoff-background-inert",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "handoff-tab-stays-inside",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "real-send-escape-restores",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no-external-ai-requests",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "faq-expands",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "faq-collapses",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile-menu-all-destinations",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile-menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile-anchor-story",
+      "passed": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 92.40625,
+          "width": 358,
+          "height": 814.75
+        },
+        "focused": "story"
+      }
+    },
+    {
+      "name": "mobile-anchor-connect",
+      "passed": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 92.46875,
+          "width": 358,
+          "height": 1223.3125
+        },
+        "focused": "connect"
+      }
+    },
+    {
+      "name": "mobile-anchor-privacy",
+      "passed": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 92.4375,
+          "width": 358,
+          "height": 1253.03125
+        },
+        "focused": "privacy"
+      }
+    },
+    {
+      "name": "mobile-anchor-faq",
+      "passed": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 91.78125,
+          "width": 358,
+          "height": 649
+        },
+        "focused": "faq"
+      }
+    },
+    {
+      "name": "mobile-anchor-download",
+      "passed": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 91.78125,
+          "width": 358,
+          "height": 1227.390625
+        },
+        "focused": "download"
+      }
+    },
+    {
+      "name": "no-star-nudge",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "interaction-page-errors",
+      "passed": true,
+      "detail": []
+    }
+  ],
+  "controls": [
+    {
+      "name": "language-wheel-keyboard",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "lazy-language-switch",
+      "passed": true,
+      "detail": "Tu reloj registra.\nTu propio archivo."
+    },
+    {
+      "name": "theme-button-dark",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "theme-and-language-persist",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile-language-wheel",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "reduced-motion-all-content",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "static-device-sources",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "body-and-muted-contrast-colors",
+      "passed": true,
+      "detail": {
+        "bg": "rgb(243, 240, 231)",
+        "body": "rgb(27, 33, 24)",
+        "muted": "rgb(74, 84, 69)",
+        "subtle": "rgb(98, 109, 93)"
+      }
+    }
+  ],
+  "download_cases": [
+    {
+      "case": "mac",
+      "passed": true,
+      "primary": "https://github.com/lingcang728/ZeppBridge/releases/download/v2.4.4/ZeppBridge.dmg",
+      "previewBadges": 0,
+      "linuxPackages": 0
+    },
+    {
+      "case": "optional-linux",
+      "passed": true,
+      "primary": "https://github.com/lingcang728/ZeppBridge/releases/download/v2.4.4/ZeppBridge.exe",
+      "previewBadges": 0,
+      "linuxPackages": 0
+    },
+    {
+      "case": "linux-preview",
+      "passed": true,
+      "primary": "https://github.com/lingcang728/ZeppBridge/releases/download/v2.4.4/ZeppBridge.exe",
+      "previewBadges": 1,
+      "linuxPackages": 1
+    },
+    {
+      "case": "linux-verified",
+      "passed": true,
+      "primary": "https://github.com/lingcang728/ZeppBridge/releases/download/v2.4.4/ZeppBridge.exe",
+      "previewBadges": 0,
+      "linuxPackages": 1
+    }
+  ],
+  "source_sha256": {
+    "src/views/LandingPage.vue": "6ef419a6620bc0e40540abe9acb1a242175813e4f7265c89091a368b0ee37b78",
+    "src/composables/useLandingLocale.ts": "2f6131a5b450b7b04267a9a7dff9bd207d3d29b642290dd5c64ae16486d6886a",
+    "src/composables/__tests__/useLandingLocale.test.ts": "ca089943f0a4ac5c94ea8ac5dd2ea77ca94e009f145edbcbd611989f1b2cb885",
+    "src/views/landing/__tests__/motion.test.ts": "768dc208148530438bd637b304b0925746dceebb1990586053627969030e5e19",
+    "src/views/landing/ConnectPaths.vue": "7609008655d28dc329c2fcf7384f170d7fed590ebe36f63bc06938a43c65e2dc",
+    "src/views/landing/copy.ts": "b66442798b64d1090a779af41c16806afb68eee11eab4208cfb9ef0f34b885e5",
+    "src/views/landing/de.ts": "1900ef47bb1cb9a4989b574aab20f3b044e52b9b9c4ec011bb5f191f42b311f3",
+    "src/views/landing/es.ts": "d5345c9fa579488eaaf8c4ab2598a8c6e450469152bcea9181a0d364573fcd0e",
+    "src/views/landing/FaqSection.vue": "9d5ba2025589109b4104dbaccbb220d336a19b05b5481433ed99bcd852ab4be5",
+    "src/views/landing/FinalCta.vue": "57a57b7a40fbb2b87ade64f0d3dce007bb102fa86f8b621e26228560519f7b57",
+    "src/views/landing/FlapBoard.vue": "e4829e1717380dee7c74fdce44f84b2d80bde7483c5442a4426f1a5558053f0f",
+    "src/views/landing/fr.ts": "7d1f8be30f8b6b2eb704451383d0e3c4791aee38776d849a357d05e9b4bdcd4b",
+    "src/views/landing/HandoffOverlay.vue": "fefb22e91516ceb5fbc5c34b145b3062da339b14c542344c68177da1baf38bef",
+    "src/views/landing/hi-IN.ts": "ac38c8a973fc3792266ce4d7b1736b6da042cf1eeebe16dec12366af40ee007a",
+    "src/views/landing/landing.css": "78916653bafd523571d8a97367f644d3e1e21ea068e068c0a3961e2b9dd60615",
+    "src/views/landing/LandingIcon.vue": "dce768633fdd5bba1e12676c409d9f174ac828e8c5abfa64347d695a1a44613d",
+    "src/views/landing/LocalePicker.vue": "c8e20f033fbf44e051ec0090bd89397633925db8342a4a847eafbfe0977d46bd",
+    "src/views/landing/motion.ts": "f5e7d8efeb4e7b7cc5812b2bfac31db98d0b5b522562281e6fd53c8386a3218b",
+    "src/views/landing/nl.ts": "f870166a1fc6207d11ec639a316ab12385c5c85472efa4e267347b124a6aa00a",
+    "src/views/landing/PrivacyFlow.vue": "495bb526860a9d1bc4c8e4aa7226883811ecb4f278d5391ce8ff268240e73487",
+    "src/views/landing/pt-BR.ts": "57bd46dbb4f185a1b8c35ad96f9107247dde9b14922d8ecfcfe43b774a553d66",
+    "src/views/landing/pt-PT.ts": "305260ae53cf9a66361086243be9f767f791e17067f16bfbd8e85d3d616f2626",
+    "src/views/landing/release.ts": "c93eb1c54c03065f53281df3b8cfa200499c9ccf7d04b41b4c6b941f6fa3f293",
+    "src/views/landing/ru.ts": "cd63c622612c143c62484019e969627dbf075b9d0233eedacee20917aacdc91c",
+    "src/views/landing/SiteNav.vue": "6a229e5c5ee4a828e2def80549c5df052dc09b694f6498d7951d8483fe663f32",
+    "src/views/landing/StageWindow.vue": "587d6d6886b15f30a3b7a39359cf22d079ec2b9e4b45660c6d085f2f67057bee",
+    "src/views/landing/StorySection.vue": "a204705511a1e3d30c3f5e853ced28e08ed7f8bec76ae8d51247ed73f0d7a57f",
+    "src/views/landing/theme.ts": "baed240040fb43d43d39d13497405b9859a25aa27c8a2fbec8b442528db73734",
+    "src/views/landing/types.ts": "d4cc8b0beb7595103f046ae483f9182008457818c99c26b14893e012261a0da9",
+    "src/views/landing/useDownloads.ts": "0e6d2f0228de415134dae5bb0ade0168262d171fdd4a0a75723feec086e13f59"
+  },
+  "limits": [
+    "API responses are synthetic fixtures, not live release verification",
+    "Chrome viewport checks are not physical-device or all-engine certification",
+    "Source hashes identify the website snapshot independently of concurrent Git commits"
+  ]
+}
