@@ -149,7 +149,6 @@ export default {
         + 'показатели здоровья и сырые ответы. Отправить?',
       reportFailed: 'Не удалось отправить отчёт об ошибке',
 
-      capabilityIntro: 'Данные, которые ZeppBridge может прочитать из вашего аккаунта. Список обновляется при синхронизации автоматически.',
       lampOn: (count: number) => `Получено: ${count}`,
       lampPending: (count: number) => `Есть в облаке, не сохранено локально: ${count}`,
       lampOff: (count: number) => `Не получено: ${count}`,

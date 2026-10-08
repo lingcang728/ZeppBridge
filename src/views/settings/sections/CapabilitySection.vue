@@ -1,25 +1,38 @@
 <script setup lang="ts">
+/* 数据内容：每条数据流一项，勾 = 本机已有，钟 = 云端有、本机还没收，叉 = 还没拿到。
+   全部排在同一块列表里，不再一格一块小板（卡里套卡）；细节放在每项的提示里。
+   接口诊断和运动编号命名在高级卡，这里只在有没认出的编号时提示一行。 */
+import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
+import { useUnknownCodes } from '../../../composables/settings/useUnknownCodes';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
+import { dataCardMessages } from './data.i18n';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
+const m = useMessages(dataCardMessages);
+const router = useRouter();
 const {
   capabilityOverview,
   capabilityError,
-  probeBusy,
   capabilityAvailable,
   capabilityNotIngested,
   capabilityMissing,
   capabilityBoard,
   capabilityCheckedAt,
-  probeDiagnostics,
-  runCapabilityProbe,
 } = useSettingsContext().capability;
+
+const { unknownCodes, loadCorrections } = useUnknownCodes();
+onMounted(() => { void loadCorrections(); });
+const openCodes = () => { void router.push({ path: '/settings/advanced', hash: '#codes' }); };
+
+const ICONS = { on: 'check', pending: 'clock', off: 'x' } as const;
+const iconFor = (state: string) => ICONS[state as keyof typeof ICONS] ?? 'x';
 </script>
 
 <template>
@@ -28,90 +41,49 @@ const {
       <h3 id="capability-title">{{ d.secCapability }}</h3>
       <span v-if="capabilityCheckedAt" class="s-meta">{{ capabilityCheckedAt }}</span>
     </div>
-    <p class="s-note">{{ t.capabilityIntro }}</p>
     <FoldTransition>
     <div v-if="capabilityError" class="alert danger" role="alert">
       <Icon name="warning" :size="14" />{{ capabilityError }}
     </div>
     </FoldTransition>
 
-    <!-- 三列竖排会让最长的那一列决定整块高度，右边两列下面全是空的。
-         改成一格一条数据流的指示灯：亮 = 本机已有，暗 = 还没拿到。
-         横向铺开，多少条流都能把宽度用满，也一眼看得出「亮了几个」。 -->
-    <div v-if="capabilityOverview" class="capability-board">
-      <p class="capability-legend">
-        <span class="legend-item"><i class="lamp on"></i>{{ t.lampOn(capabilityAvailable.length) }}</span>
-        <span v-if="capabilityNotIngested.length" class="legend-item"><i class="lamp pending"></i>{{ t.lampPending(capabilityNotIngested.length) }}</span>
-        <span class="legend-item"><i class="lamp off"></i>{{ t.lampOff(capabilityMissing.length) }}</span>
-      </p>
-
-      <ul class="capability-grid">
-        <li
-          v-for="row in capabilityBoard"
-          :key="row.key"
-          :class="['capability-cell', 's-tile', row.state, { 'is-sunken': row.state === 'off' }]"
-        >
-          <span class="cell-head">
-            <i :class="['lamp', row.lamp]" aria-hidden="true"></i>
-            <strong>{{ row.label }}</strong>
-          </span>
-          <span class="cell-detail">{{ row.detail }}</span>
-          <span v-if="row.note" class="cell-note">{{ row.note }}</span>
-        </li>
-        <li v-if="!capabilityBoard.length" class="capability-cell s-tile is-sunken off">
-          <span class="cell-head"><i class="lamp off" aria-hidden="true"></i><strong>{{ t.capabilityEmptyTitle }}</strong></span>
-          <span class="cell-detail">{{ t.capabilityEmptyBody }}</span>
-        </li>
-      </ul>
+    <div class="s-list">
+      <div v-if="unknownCodes.length" class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ m.codesHint(unknownCodes.length) }}</span></div>
+        <div class="s-row-control">
+          <button class="button secondary" type="button" @click="openCodes">{{ m.codesFix }}</button>
+        </div>
+      </div>
+      <div class="s-row is-block">
+        <p class="cap-legend">
+          <span>{{ t.lampOn(capabilityAvailable.length) }}</span>
+          <span v-if="capabilityNotIngested.length">{{ t.lampPending(capabilityNotIngested.length) }}</span>
+          <span>{{ t.lampOff(capabilityMissing.length) }}</span>
+          <span class="cap-intro">{{ m.intro }}</span>
+        </p>
+        <ul v-if="capabilityOverview && capabilityBoard.length" class="cap-items">
+          <li v-for="row in capabilityBoard" :key="row.key" :class="['cap-item', row.state]" :title="[row.detail, row.note].filter(Boolean).join(' · ')">
+            <Icon :name="iconFor(row.state)" :size="14" class="cap-mark" />
+            <span class="cap-label">{{ row.label }}</span>
+          </li>
+        </ul>
+        <p v-else-if="capabilityOverview" class="s-row-sub">{{ t.capabilityEmptyTitle }} · {{ t.capabilityEmptyBody }}</p>
+      </div>
     </div>
-
-    <details class="probe-diagnostics">
-      <summary>{{ t.probeSummary }}</summary>
-      <p class="probe-selfcheck">{{ t.probeNote }}</p>
-      <button class="button secondary" type="button" :disabled="probeBusy" @click="runCapabilityProbe">
-        <Icon name="sync" :size="14" :class="{ spinning: probeBusy }" />
-        {{ probeBusy ? t.probing : t.probeRun }}
-      </button>
-      <ul>
-        <li v-for="line in probeDiagnostics" :key="line">{{ line }}</li>
-      </ul>
-    </details>
   </section>
 </template>
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
-.capability-board { display: grid; gap: var(--space-3); }
-.capability-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.legend-item { display: inline-flex; min-height: 28px; align-items: center; gap: 7px; padding: 0 12px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
-.lamp { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--subtle); }
-.lamp.on { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.lamp.pending { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 16%, transparent); }
-.lamp.off { background: color-mix(in srgb, var(--ink) 18%, transparent); }
-
-.capability-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.capability-cell {
-  display: grid;
-  align-content: start;
-  gap: 3px;
-  padding: 12px 14px;
-  min-width: 0;
-}
-.cell-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.cell-head strong { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
-.cell-detail { color: var(--muted); font-size: var(--fs-xs); }
-.cell-note { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-@media (max-width: 720px) { .capability-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
-.probe-diagnostics { padding: 0 4px; }
-.probe-diagnostics > summary { color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
-.probe-diagnostics ul { margin: 8px 0 0; padding-left: 18px; }
-.probe-diagnostics li,
-.probe-selfcheck { color: var(--muted); font-size: var(--fs-xs); line-height: 1.7; overflow-wrap: anywhere; }
+.cap-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.cap-intro { color: var(--subtle); font-size: var(--fs-xs); align-self: center; }
+.cap-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 16px; margin: 4px 0 0; padding: 0; list-style: none; }
+.cap-item { display: flex; min-width: 0; align-items: flex-start; gap: 8px; padding: 6px 0; cursor: default; }
+.cap-label { min-width: 0; color: var(--ink); font-size: var(--fs-sm); line-height: 1.35; overflow-wrap: anywhere; }
+.cap-mark { margin-top: 2px; }
+.cap-mark { flex: 0 0 auto; }
+.cap-item.on .cap-mark { color: var(--accent); }
+.cap-item.pending .cap-mark { color: var(--warning); }
+.cap-item.off .cap-mark { color: var(--subtle); }
+.cap-item.off .cap-label { color: var(--subtle); }
 </style>

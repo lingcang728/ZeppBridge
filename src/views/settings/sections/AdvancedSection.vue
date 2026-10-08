@@ -6,6 +6,8 @@ import Icon from '../../../components/Icon.vue';
 import AuthSection from './AuthSection.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
 import MaintenanceSection from './MaintenanceSection.vue';
+import ProbeSection from './ProbeSection.vue';
+import WorkoutCodesSection from './WorkoutCodesSection.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSettingsFormat } from '../../../composables/settings/useSettingsFormat';
 import { useSyncController } from '../../../composables/useSyncController';
@@ -58,12 +60,13 @@ const runCompactPayloads = async () => {
   }
 };
 
-/* 归档卡的「备份与恢复 → 打开」带着 #backup 过来：等卡展开动画走完再滚到那一块。
+/* 别的卡带着锚点过来（归档卡的 #backup、数据卡的 #codes）：等卡展开动画走完再滚到那一块。
    卡体在 KeepAlive 里，第一次挂载和再次切回来都会走 onActivated。 */
 const route = useRoute();
 onActivated(() => {
-  if (route.hash !== '#backup') return;
-  window.setTimeout(() => document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 360);
+  const id = route.hash.slice(1);
+  if (!id) return;
+  window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 360);
 });
 
 const openDataFolder = async () => {
@@ -113,6 +116,10 @@ const openDataFolder = async () => {
     </div>
 
     <AuthSection />
+
+    <ProbeSection />
+
+    <WorkoutCodesSection />
 
     <MaintenanceSection />
 

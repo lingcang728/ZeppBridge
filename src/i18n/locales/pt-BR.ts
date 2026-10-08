@@ -1660,7 +1660,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       reportDoneNote: 'Apenas os parâmetros técnicos anônimos e suas observações foram enviados.',
       reportConfirm: 'Envia apenas: versão do app, tipo de sistema, revisão do analisador, dicas de produto e estrutura de campos de dispositivos não identificados, versão de firmware, códigos de modelo (deviceSource / deviceType, só inteiros, indicam qual modelo, não qual unidade), códigos e contagens de treinos desconhecidos, o código numérico do erro da última requisição recusada pela nuvem (só número, fluxo e hora, sem o texto retornado) e sua descrição (caminhos locais, e-mails e identificadores longos removidos). Nunca envia conta Zepp, token, número de série, ID de dispositivo, MAC, GPS, valores de saúde ou respostas brutas. Confirmar envio?',
       reportFailed: 'Falha ao enviar relatório',
-      capabilityIntro: 'Fluxos de dados disponíveis na sua conta. Esta lista é atualizada automaticamente durante as sincronizações.',
       lampOn: (count: number) => `Sincronizado (${count})`,
       lampPending: (count: number) => `Na nuvem (não salvo localmente): ${count}`,
       lampOff: (count: number) => `Não sincronizado (${count})`,

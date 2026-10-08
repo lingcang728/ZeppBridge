@@ -1251,8 +1251,6 @@ export default {
         `${records} ${unit} in de cloud${latest ? ` · t/m ${latest}` : ''}`,
       capabilityEmptyBody: 'Na één synchronisatie licht dit op.',
       capabilityEmptyTitle: 'Nog niet gesynchroniseerd',
-      capabilityIntro:
-        'Wat ZeppBridge op dit moment uit je account kan lezen. De lijst werkt zichzelf bij tijdens synchroniseren — jij hoeft niets te doen.',
       capabilityLocal: (records: number, unit: string, latest: string) =>
         `${records} ${unit}${latest ? ` · t/m ${latest}` : ''}`,
       capabilityNoRecords: (days: number) => `Niets vastgelegd in de afgelopen ${days} dagen`,

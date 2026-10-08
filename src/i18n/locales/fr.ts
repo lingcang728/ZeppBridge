@@ -120,7 +120,6 @@ export default {
       reportDoneNote: 'Ce qui est parti : exactement les champs listés ci-dessus, plus votre note. Rien d’autre.',
       reportConfirm: 'Seuls partent : la version de l’application, le type de système, la révision de l’analyseur, les indices de niveau produit et la structure des champs des appareils non reconnus, la version du micrologiciel, les numéros de modèle (deviceSource / deviceType — des entiers qui désignent un modèle, pas un exemplaire), les codes de séances inconnus et leur nombre, le code d’erreur numérique de la dernière requête refusée par le cloud (le numéro, le flux et le moment seulement — jamais le texte renvoyé par le cloud), et votre note ci-dessus (chemins locaux, e-mails et longs identifiants retirés automatiquement). Jamais votre compte Zepp, vos jetons, numéros de série, ID d’appareils, adresses MAC, GPS, valeurs de santé ni réponses brutes. Confirmer l’envoi ?',
       reportFailed: 'Le rapport d’erreur n’a pas pu être envoyé',
-      capabilityIntro: 'Voici ce que ZeppBridge sait lire sur votre compte aujourd’hui. La liste se met à jour seule à chaque synchro — rien à faire à la main.',
       lampOn: (count: number) => plural(count, { one: `${count} récupéré`, other: `${count} récupérés` }),
       lampPending: (count: number) => plural(count, { one: `Dans le cloud, pas en local : ${count}`, other: `Dans le cloud, pas en local : ${count}` }),
       lampOff: (count: number) => plural(count, { one: `${count} non récupéré`, other: `${count} non récupérés` }),

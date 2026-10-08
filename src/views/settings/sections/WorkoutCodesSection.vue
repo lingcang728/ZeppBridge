@@ -24,14 +24,14 @@ onMounted(() => { void loadCorrections(); });
 </script>
 
 <template>
-  <section v-if="unknownCodes.length" class="s-section" aria-labelledby="codes-title">
+  <section v-if="unknownCodes.length" id="codes" class="s-section" aria-labelledby="codes-title">
     <div class="s-section-head">
       <h3 id="codes-title">{{ d.secCodes }}</h3>
       <span v-if="unnamedCodeCount" class="s-meta">{{ t.codesUnnamed(unnamedCodeCount) }}</span>
     </div>
     <p class="s-note">{{ t.codesIntro }}</p>
-    <div class="code-list">
-      <div v-for="entry in unknownCodes" :key="entry.zeppType" class="code-row">
+    <div class="s-list">
+      <div v-for="entry in unknownCodes" :key="entry.zeppType" class="s-row is-block code-row">
         <div class="code-head">
           <span class="code-badge" aria-hidden="true">{{ entry.zeppType }}</span>
           <div class="code-meta">
@@ -79,8 +79,7 @@ onMounted(() => { void loadCorrections(); });
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
-.code-list { display: grid; gap: 10px; }
-.code-row { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
+.code-row { gap: 10px; }
 .code-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .code-badge { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .code-meta { display: grid; gap: 2px; }

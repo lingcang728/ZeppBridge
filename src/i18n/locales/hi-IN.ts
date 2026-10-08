@@ -129,7 +129,6 @@ export default {
       reportFailed: 'एरर रिपोर्ट सबमिट नहीं हो सकी',
 
       // ── 能力清单 ──
-      capabilityIntro: 'ZeppBridge आपके खाते से क्या पढ़ सकता है। यह सिंक के दौरान अपने आप अपडेट होता है।',
       lampOn: (count: number) => `${count} सिंक हुए`,
       lampPending: (count: number) => `क्लाउड में है, लोकल में नहीं ${count}`,
       lampOff: (count: number) => `${count} अभी नहीं मिले`,

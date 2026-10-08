@@ -128,8 +128,6 @@ export default {
       reportConfirm:
         'Só envia: versão da app, tipo de sistema, revisão do interpretador, pistas de produto e estrutura dos campos de dispositivos não identificados, firmware, números de modelo (deviceSource / deviceType, inteiros que dizem que modelo, não que unidade), códigos de treino desconhecidos e contagens, código numérico do último pedido recusado pela nuvem (só número, fluxo e hora, sem o texto devolvido) e a tua nota (caminhos locais, e-mails e identificadores longos removidos automaticamente). Nunca conta Zepp, tokens, números de série, ID de dispositivo, MAC, GPS, valores de saúde ou respostas em bruto. Enviar?',
       reportFailed: 'Não foi possível enviar o relatório de erro',
-      capabilityIntro:
-        'Dados que o ZeppBridge consegue ler da tua conta atualmente. Atualização automática ao sincronizar.',
       lampOn: (count: number) => `Obtidos ${count}`,
       lampPending: (count: number) => `Na nuvem, sem cópia local ${count}`,
       lampOff: (count: number) => `Por obter ${count}`,

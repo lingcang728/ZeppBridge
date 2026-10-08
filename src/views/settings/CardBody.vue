@@ -14,7 +14,6 @@ import DisplayPrefsSection from './sections/DisplayPrefsSection.vue';
 import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
-import WorkoutCodesSection from './sections/WorkoutCodesSection.vue';
 
 defineProps<{ id: string }>();
 </script>
@@ -27,10 +26,7 @@ defineProps<{ id: string }>();
     </template>
     <AutoSyncSection v-else-if="id === 'sync'" />
     <ArchiveSection v-else-if="id === 'archive'" />
-    <template v-else-if="id === 'data'">
-      <CapabilitySection />
-      <WorkoutCodesSection />
-    </template>
+    <CapabilitySection v-else-if="id === 'data'" />
     <template v-else-if="id === 'ai'">
       <McpSection />
       <ExportDefaultsSection />

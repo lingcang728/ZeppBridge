@@ -61,6 +61,9 @@ views/settings/sections/archive.sizeEmpty
 views/settings/sections/archive.sizeSince
 views/settings/sections/archive.sizeTitle
 views/settings/sections/archive.year
+views/settings/sections/data.codesFix
+views/settings/sections/data.codesHint
+views/settings/sections/data.intro
 views/settings/sections/maintenance.cleanupForever
 views/settings/sections/maintenance.cleanupSub
 views/settings/sections/maintenance.cleanupTitle

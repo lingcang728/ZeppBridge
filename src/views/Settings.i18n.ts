@@ -81,7 +81,6 @@ export const settingsMessages = defineMessages(
     reportFailed: '错误报告提交失败',
 
     // ── 能力清单 ──
-    capabilityIntro: '以下是 ZeppBridge 目前能从你账号读到的数据。清单在同步时自动更新，无需手动操作。',
     lampOn: (count: number) => `已获取 ${count}`,
     lampPending: (count: number) => `云端有、本机未收录 ${count}`,
     lampOff: (count: number) => `暂未获取 ${count}`,
@@ -439,7 +438,6 @@ export const settingsMessages = defineMessages(
     reportFailed: 'Could not submit error report',
 
     // ── Capability board ──
-    capabilityIntro: 'What ZeppBridge can currently read from your account. The list updates itself during sync — nothing to press.',
     lampOn: (count: number) => `Fetched ${count}`,
     lampPending: (count: number) => `In the cloud, not stored locally ${count}`,
     lampOff: (count: number) => `Not fetched ${count}`,
@@ -797,7 +795,6 @@ If you need anything from me (which client I use, where the file lives), just as
     reportFailed: 'No se pudo enviar el reporte de error',
 
     // ── Capability board ──
-    capabilityIntro: 'Esto es lo que ZeppBridge puede leer hoy de tu cuenta. La lista se actualiza sola al sincronizar, sin tocar nada.',
     lampOn: (count: number) => `Descargados ${count}`,
     lampPending: (count: number) => `En la nube, sin guardar localmente ${count}`,
     lampOff: (count: number) => `Sin descargar ${count}`,

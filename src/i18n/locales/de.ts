@@ -301,8 +301,6 @@ export default {
       reportConfirm:
         'Gesendet werden nur: App-Version, OS-Typ, Parser-Revision, produktbezogene Hinweise und Feldstrukturen nicht erkannter Geräte, Firmware-Version, Modellklassen-Nummern (deviceSource / deviceType – nur Ganzzahlen, sagen „welches Modell", nicht „welches Exemplar"), unbekannte Trainingscodes mit Anzahl, der numerische Fehlercode der zuletzt von der Cloud abgelehnten Anfrage (nur Nummer, Datenstrom, Zeit – ohne Antworttext der Cloud) und deine Notiz oben (lokale Pfade, E-Mails und lange Kennungen werden automatisch entfernt). Nie gesendet: Zepp-Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte oder Rohantworten. Senden?',
       reportFailed: 'Der Bericht konnte nicht gesendet werden',
-      capabilityIntro:
-        'Aktuell aus deinem Konto lesbare Datenströme. Aktualisiert sich bei jeder Synchronisierung automatisch.',
       lampOn: (count: number) => `Abgerufen: ${count}`,
       lampPending: (count: number) => `In der Cloud, lokal nicht gespeichert: ${count}`,
       lampOff: (count: number) => `Nicht abgerufen: ${count}`,
