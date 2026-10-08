@@ -441,6 +441,16 @@ impl Database {
         };
 
         let summary = workout_series_summary(&samples);
+        let recorded_distance_m: Option<f64> = self
+            .conn
+            .query_row(
+                "SELECT distance_meters FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                [workout_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        let climbs = crate::workout_climbs::detect_climbs(&samples, recorded_distance_m);
 
         let splits = self.load_workout_splits(workout_id)?;
         let laps = self.load_workout_laps(workout_id)?;
@@ -453,6 +463,7 @@ impl Database {
             splits,
             laps,
             summary,
+            climbs,
         })
     }
 

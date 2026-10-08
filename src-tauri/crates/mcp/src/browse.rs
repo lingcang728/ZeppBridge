@@ -262,7 +262,9 @@ pub(super) fn run_workout_detail(
     }))
 }
 
-const WORKOUT_SECTIONS: [&str; 6] = ["summary", "samples", "route", "pauses", "splits", "laps"];
+const WORKOUT_SECTIONS: [&str; 7] = [
+    "summary", "samples", "route", "pauses", "splits", "laps", "climbs",
+];
 
 pub(super) fn run_workout_series(
     db: &Database,
@@ -277,7 +279,7 @@ pub(super) fn run_workout_series(
         .unwrap_or("summary");
     if !WORKOUT_SECTIONS.contains(&section) {
         return Err(CallFailure::plain(format!(
-            "未知的 section：{section}。可选 summary、samples、route、pauses、splits、laps。"
+            "未知的 section：{section}。可选 summary、samples、route、pauses、splits、laps、climbs。"
         )));
     }
     if scope.is_task_scoped() {
@@ -312,6 +314,26 @@ pub(super) fn run_workout_series(
         return Ok(json!({
             "workoutId": workout_id, "section": section, "summary": to_json!(series.summary)?,
         }));
+    }
+    if section == "climbs" {
+        return Ok(match series.climbs {
+            Some(climbs) => json!({
+                "workoutId": workout_id,
+                "section": section,
+                "climbs": to_json!(climbs)?,
+                "units": {
+                    "distance": "m", "elevation": "m", "grade": "%", "verticalSpeed": "m/h",
+                    "pace": "min/km", "heartRate": "bpm", "duration": "s",
+                },
+                "notes": "段落由本机按 method 里的参数从逐点海拔识别；segments 为空表示有海拔但没有明显爬升或下降。",
+            }),
+            None => json!({
+                "workoutId": workout_id,
+                "section": section,
+                "climbs": null,
+                "reason": "这次运动没有海拔采样，或缺少足够的速度采样来算距离，无法识别爬升段。",
+            }),
+        });
     }
     let (limit, offset) = page_args(args, 100, 200);
     let items = match section {

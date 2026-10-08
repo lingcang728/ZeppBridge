@@ -25,5 +25,6 @@ pub mod redact;
 pub mod sport_catalog;
 pub mod sync;
 pub mod training_plan;
+pub mod workout_climbs;
 
 pub mod storage;

@@ -118,6 +118,37 @@ export interface WorkoutSeries {
   splits: WorkoutSplitRow[];
   laps: WorkoutLapRow[];
   summary: WorkoutSeriesSummary;
+  /** null / 缺省 = 没有海拔采样或距离不可信，不出爬升卡；segments 为空 = 没有明显爬升。 */
+  climbs?: WorkoutClimbs | null;
+}
+
+/** 识别爬升段用的参数，「怎么算的」只读这里。 */
+export interface ClimbMethod {
+  smoothing_window_s: number;
+  reversal_m: number;
+  min_change_m: number;
+  min_grade_pct: number;
+  moving_speed_m_s: number;
+}
+
+export interface ClimbSegment {
+  kind: 'climb' | 'descent';
+  start_time: string;
+  end_time: string;
+  start_distance_m: number;
+  end_distance_m: number;
+  /** 上坡为正、下坡为负。 */
+  elevation_change_m: number;
+  average_grade_pct: number;
+  moving_seconds: number;
+  vertical_speed_m_per_h: number | null;
+  average_hr: number | null;
+  average_pace_min_per_km: number | null;
+}
+
+export interface WorkoutClimbs {
+  method: ClimbMethod;
+  segments: ClimbSegment[];
 }
 
 /** Laps recorded by the watch, separate from computed kilometre splits. */

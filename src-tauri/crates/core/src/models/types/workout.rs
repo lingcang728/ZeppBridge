@@ -258,6 +258,10 @@ pub struct WorkoutSeries {
     #[serde(default)]
     pub laps: Vec<WorkoutLapRow>,
     pub summary: WorkoutSeriesSummary,
+    /// 主要爬升 / 下降段。`None` = 没有海拔采样或距离不可信（不出卡）；
+    /// 空段列表 = 有海拔但没有明显爬升。
+    #[serde(default)]
+    pub climbs: Option<crate::workout_climbs::WorkoutClimbs>,
 }
 
 #[derive(Debug, Clone)]

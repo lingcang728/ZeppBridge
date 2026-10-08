@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 运动详情：头图 → 洞察 → 轨迹 / 折线图 / 心率区间 → 右侧解析明细、导出、交给 AI、来源。
+/* 运动详情：头图 → 洞察 → 轨迹 / 爬升段 / 折线图 / 心率区间 → 右侧解析明细、导出、交给 AI、来源。
  *
  * 数据和动作在 composables/useWorkoutDetail.ts，显示计算在 useWorkoutPresentation.ts，
  * 轨迹几何和图表配置在 lib/workoutRoute.ts、lib/workoutCharts.ts，各块界面在 components/workout/。 */
@@ -10,6 +10,7 @@ import GlyphTile from '../components/GlyphTile.vue';
 import InsightCard from '../components/InsightCard.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import WorkoutCharts from '../components/workout/WorkoutCharts.vue';
+import WorkoutClimbsCard from '../components/workout/WorkoutClimbsCard.vue';
 import WorkoutHero from '../components/workout/WorkoutHero.vue';
 import WorkoutRouteCard from '../components/workout/WorkoutRouteCard.vue';
 import WorkoutSidePanels from '../components/workout/WorkoutSidePanels.vue';
@@ -123,6 +124,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
       <div ref="lower" class="lower">
         <div class="main-col">
           <WorkoutRouteCard :canvas="routeCanvas" />
+          <WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" />
           <WorkoutCharts :cards="chartCards" :series-error="seriesError" :hr-zones="hrZones" @retry="loadDetail" />
           <WorkoutProvenanceCard v-if="metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" />
         </div>

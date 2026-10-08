@@ -198,7 +198,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
 | `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
-| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈；仅选择 `section: "route"` 才返回精确坐标 |
+| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
 | `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |

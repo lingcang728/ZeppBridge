@@ -287,7 +287,7 @@ outside the grants — `error.permittedRanges` lists the actual
 | `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
 | `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
-| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps; precise coordinates are returned only for `section: "route"` |
+| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
