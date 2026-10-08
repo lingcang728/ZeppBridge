@@ -12,6 +12,72 @@ fn status_names_are_not_success_for_optional_states() {
 }
 
 #[tokio::test]
+async fn workout_sync_records_only_confirmed_complete_empty_days() {
+    use chrono::TimeZone;
+    let connector = ZeppConnector::new(AuthInfo {
+        app_token: "test-token".into(),
+        user_id: "user-1".into(),
+        region_host: "https://api-mifit.zepp.com".into(),
+    })
+    .unwrap();
+    let manager = SyncManager::new(
+        DataFetcher::new(connector),
+        Database::in_memory().unwrap(),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let start = Utc.with_ymd_and_hms(2023, 10, 1, 0, 0, 0).unwrap();
+    let end = Utc.with_ymd_and_hms(2023, 12, 1, 0, 0, 0).unwrap();
+    let make = |next: i64| {
+        let payload = serde_json::json!({"data":{"items":[],"next":next}});
+        FetchedRecord {
+            incomplete: false,
+            incomplete_reason: None,
+            raw: RawRecord {
+                stream: "workouts".into(),
+                source_key: crate::fetcher::sport_history_key("run", &payload),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: start,
+                end_utc: Some(end),
+                payload,
+                capability: CapabilityStatus::Verified,
+            },
+        }
+    };
+    let day = chrono::NaiveDate::from_ymd_opt(2023, 11, 28).unwrap();
+    // A page that still points further back is not the end of the list.
+    manager
+        .persist_records("workouts", vec![make(end.timestamp())])
+        .await
+        .unwrap();
+    assert_eq!(
+        manager
+            .db
+            .lock()
+            .await
+            .training_load_balance(day, day)
+            .unwrap()[0]
+            .acute_7d,
+        None
+    );
+    manager
+        .persist_records("workouts", vec![make(-1)])
+        .await
+        .unwrap();
+    let point = manager
+        .db
+        .lock()
+        .await
+        .training_load_balance(day, day)
+        .unwrap()
+        .remove(0);
+    assert_eq!(point.acute_7d, Some(0.0));
+    assert_eq!(point.chronic_28d, Some(0.0));
+    assert_eq!(point.chronic_days_with_data, 28);
+    assert_eq!(point.acute_chronic_ratio, None);
+}
+
+#[tokio::test]
 async fn incomplete_fetch_persists_data_but_keeps_sync_retryable() {
     let db = Database::in_memory().unwrap();
     let connector = ZeppConnector::new(AuthInfo {

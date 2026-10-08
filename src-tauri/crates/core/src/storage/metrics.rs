@@ -381,6 +381,10 @@ impl Database {
     /// The chronic window reaches 27 days before the range so the first day
     /// asked for is already backed by a full window instead of ramping up from
     /// zero. Shared with the export so the screen and the file agree.
+    /// Zepp's daily training_load is already a rolling seven-day total; only
+    /// individual workout loads may be summed here. Only fully fetched and
+    /// persisted workout lists establish coverage; missing loads invalidate a day.
+    /// Incomplete windows remain null, including windows with no evidence.
     pub fn training_load_balance(
         &self,
         start: NaiveDate,
@@ -389,17 +393,27 @@ impl Database {
         let history_start = (start - Duration::days(27)).format("%Y-%m-%d").to_string();
         let end_text = end.format("%Y-%m-%d").to_string();
         let mut stmt = self.conn.prepare(
-            "SELECT date, MAX(value) FROM daily_metrics
-             WHERE metric = 'training_load' AND date BETWEEN ?1 AND ?2
-             GROUP BY date ORDER BY date",
+            "SELECT date(start_time, 'localtime') AS day, SUM(training_load),
+                    SUM(CASE WHEN training_load IS NULL OR training_load < 0 THEN 1 ELSE 0 END)
+             FROM workouts WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY day ORDER BY day",
         )?;
         let rows = stmt.query_map(params![history_start, end_text], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<f64>>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
         })?;
+        let mut coverage = self.complete_workout_days(&history_start, &end_text)?;
         let mut by_date: BTreeMap<String, f64> = BTreeMap::new();
         for row in rows {
-            let (date, value) = row?;
-            by_date.insert(date, value);
+            let (date, value, missing) = row?;
+            if missing > 0 || !value.is_some_and(|v| v.is_finite()) {
+                coverage.remove(&date);
+            } else if let Some(value) = value {
+                by_date.insert(date, value);
+            }
         }
 
         let mut balance = Vec::new();
@@ -412,6 +426,8 @@ impl Database {
                     let key = (day - Duration::days(back)).format("%Y-%m-%d").to_string();
                     if let Some(value) = by_date.get(&key) {
                         total += *value;
+                    }
+                    if coverage.contains(&key) {
                         present += 1;
                     }
                 }
@@ -420,13 +436,13 @@ impl Database {
             let (acute, acute_days) = window_sum(7);
             let (chronic, chronic_days) = window_sum(28);
             let chronic_weekly = chronic / 4.0;
-            let ratio = (chronic_days >= 21 && chronic_weekly > 0.0)
+            let ratio = (acute_days == 7 && chronic_days == 28 && chronic_weekly > 0.0)
                 .then(|| (acute / chronic_weekly * 100.0).round() / 100.0);
             balance.push(TrainingBalancePoint {
                 date: day.format("%Y-%m-%d").to_string(),
-                acute_7d: round1(acute),
+                acute_7d: (acute_days == 7).then(|| round1(acute)),
                 acute_days_with_data: acute_days,
-                chronic_28d: round1(chronic),
+                chronic_28d: (chronic_days == 28).then(|| round1(chronic)),
                 chronic_days_with_data: chronic_days,
                 acute_chronic_ratio: ratio,
             });
