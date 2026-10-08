@@ -1,6 +1,6 @@
 /**
- * 舞台左边那一把牌（2026-10-08 横向舞台）：一类一张，收集箱挑的日子并进那一类的牌面；再加一张个人档案、
- * 一张「加一类」虚位。合计不超过 9 张（一页 ≤10 张卡）。
+ * 舞台左边那一把牌（2026-10-08 横向舞台）：一类一张，收集箱挑的日子并进那一类的牌面；再加一张个人档案。
+ * 「加一类」不再是一张虚线牌（它横在线网中间，第二轮），是撒牌区底下的一枚胶囊。合计不超过 8 张。
  *
  * 牌面只说三件事：这一类叫什么、交多长一段（最近 N 天 / 挑了 N 天）、里面几天真有数据（`have/total`，
  * 来自 `ai_task_preview` 的 coverage，和寄出前检查同源）。还没算出来时数字写「—」，不写 0。
@@ -20,7 +20,7 @@ export const STAGE_DATA_ORDER: readonly AiTaskCategory[] = ['sleep', 'recovery',
 
 export interface StageCardModel {
   id: string;
-  kind: 'data' | 'profile' | 'add';
+  kind: 'data' | 'profile';
   category: AiTaskCategory | null;
   icon: IconName;
   tint: string;
@@ -72,7 +72,6 @@ export const useStageCards = () => {
       id: 'personal_note', kind: 'profile', category: 'personal_note', icon: 'user', tint: 'var(--muted)', title: b.value.profile,
       line: note ? s.value.profileFilled : s.value.profileEmpty, have: null, total: null, sub: note ? note.slice(0, 28) : null,
     });
-    if (off.value.length) out.push({ id: 'add', kind: 'add', category: null, icon: 'plus', tint: 'var(--subtle)', title: s.value.add, line: '', have: null, total: null, sub: null });
     return out;
   });
 

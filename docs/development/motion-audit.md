@@ -85,3 +85,17 @@
 | `components/workout/TypePicker.vue` 运动类型纠正 | 例外（类型太多），保持 |
 
 抽帧验证：`/ai/check` 的精确路线开关，深浅两套 × 停着 / 按住 / 拖到一半 / 松手四帧（DPR 2），按住时透镜折射底下的轨道、拖动时绿色按位置淡入、松手落回白钮。
+
+## 第四轮：交给 AI 横向舞台（2026-10-08）
+
+| 动效 | 做法 |
+|---|---|
+| 左牌浮动 | 每张牌一条 CSS `@keyframes`（`translate` / `rotate`，7–17 秒各不相同），页面看不见、寄出途中、减少动效时 `animation-play-state: paused` |
+| 拖牌 / 甩牌 | 同收集箱甩牌：rAF 写 `translate`、按速度歪；往上甩飞出屏幕再算数；牌数变化 FLIP 弹簧重排 |
+| 寄出汇聚 | 拷贝牌沿线取 14 个点写成关键帧（不用 `offset-path`）；线 `pathLength=1` + `stroke-dashoffset` 收回锁里，只在这一两秒动描边 |
+| 半路收回 | Esc 走 `onMotionEscape`，`animateFromNow` 从此刻原路飞回 |
+| 回执长出 | 从锁心 `scale(.12)` 弹簧落位；翻成计划牌用 `flipCard`（2D 压扁） |
+| 收集箱倒进左牌 | 临时小牌沿上拱弧线飞进各类的牌，落定顶一下；不拷贝箱子里的真牌 |
+
+验收：4× CPU 降速 + DPR 2 下寄出一次，点锁那一刻有一个约 190ms（≈ 正常速度 50ms）的长任务（保存任务 + 拷贝牌），汇聚开始后无掉帧；
+逐帧用 CDP `Animation.setPlaybackRate(0.2)` 放慢 5 倍截图（DPR 2 截图本身很慢，不放慢的话帧间隔不准）。

@@ -1,9 +1,0 @@
-.compose-line{display:grid;gap:12px}.intent-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.intent,.profile-entry{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;min-height:32px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);font:11px var(--font-sans);cursor:pointer;transition:transform var(--dur-fast) var(--ease-spring),background var(--dur-base) ease}.intent:hover,.profile-entry:hover{background:var(--mat-raised);color:var(--ink)}.intent:active,.profile-entry:active{transform:scale(.97)}.intent svg{color:var(--accent);opacity:.8}.profile-entry{margin-left:auto;border-color:transparent}.profile-entry.filled svg{color:var(--accent)}.compose-box{display:grid;gap:7px;padding:14px 18px 12px;border:1px solid var(--line);border-radius:16px;background:var(--mat-inset);box-shadow:var(--mat-inset-shadow)}.compose-box>span{font-size:10px;color:var(--subtle);letter-spacing:.02em}.compose-box textarea{display:block;width:100%;padding:0;min-height:32px;max-height:100px;border:0;outline:0;background:none;resize:vertical;color:var(--ink);font:13px/1.6 var(--font-sans)}.compose-box:focus-within{border-color:var(--line-strong)}.compose-box textarea::placeholder{color:var(--subtle);opacity:.7}@media(prefers-reduced-motion:reduce){.intent,.profile-entry{transition:none}}
-
-/* 10-07 第二轮：模板胶囊大一号、每个带一枚有底座的图标，正在用的那个亮起来。 */
-.intent{gap:8px;min-height:38px;padding:4px 14px 4px 5px;border:0;background:var(--mat-inset);box-shadow:var(--mat-inset-shadow);color:var(--ink);font-size:13px;font-weight:600}
-.intent:hover{background:color-mix(in srgb,var(--tint) 10%,var(--mat-inset))}
-.intent.on{background:color-mix(in srgb,var(--tint) 20%,var(--mat-inset));box-shadow:var(--mat-inset-shadow),0 0 0 1px color-mix(in srgb,var(--tint) 50%,transparent)}
-.profile-entry{min-height:38px;font-size:13px}
-.compose-box>span{font-size:12px}.compose-box textarea{min-height:96px;font-size:15px}
-.intent svg{opacity:1}

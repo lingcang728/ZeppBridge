@@ -33,3 +33,4 @@ components/ai/stage/stage.sleepShort
 components/ai/stage/stage.weekShort
 components/ai/stage/stage.workoutShort
 components/ai/stage/stage.nextShort
+components/cards/cards.boxPour

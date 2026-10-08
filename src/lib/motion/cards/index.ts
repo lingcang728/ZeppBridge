@@ -18,7 +18,7 @@ export { dealCards, stackCards, returnStack, stackAndReturn, fanBack, type Landi
 export { flipCard } from './flip';
 export { shuffleCards, cutDeck } from './shuffle';
 export { gatherCards, type CardFlight } from './gather';
-export { convergeCards, emergeFrom, type Convergence } from './converge';
+export { convergeCards, emergeFrom, pourFromBox, type Convergence } from './converge';
 export { flyCardHome, flyFromBox, receive, landPulse, bump } from './fly';
 export { recedeLayer, type Receded } from './camera';
 export { catchCard, lidOpen, lidClose } from './box';

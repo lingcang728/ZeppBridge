@@ -311,6 +311,27 @@ const applyPicks = (byCategory: Map<AiTaskCategory, string[]>, today: string, wo
   });
 };
 
+/**
+ * 收集箱倒进舞台左边的牌（2026-10-08 横向舞台）：和 `applyPicks` 不同，只动箱子里有的那几类——
+ * 那一类开起来、改成「只交挑的这几天」（和这一类已经挑过的日子合在一起）；别的类别原样不动。运动牌并进 workout_ids。
+ */
+const mergePicks = (byCategory: Map<AiTaskCategory, string[]>, today: string, workoutIds: string[] = []) => {
+  if (!byCategory.size && !workoutIds.length) return;
+  rememberSelection();
+  patchDraft({
+    ...(workoutIds.length ? { workout_ids: [...new Set([...draft.value.workout_ids, ...workoutIds])] } : {}),
+    categories: draft.value.categories.map((range) => {
+      const fresh = byCategory.get(range.category);
+      if (!fresh?.length || !AI_TASK_CATEGORY_META[range.category].hasWindow) return range;
+      const days = [...new Set([...(range.picked_days ?? []), ...fresh])].sort();
+      const span = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${days[0]}T00:00:00Z`)) / 86_400_000));
+      return { ...range, enabled: true, days_before: span, picked_days: days };
+    }),
+  });
+  // 运动牌只并进 workout_ids：运动那一类本身也得开着，牌才会出现在左边。
+  if (workoutIds.length) patchRange('workout', { enabled: true });
+};
+
 const setWorkoutSelected = (workoutId: string, selected: boolean) => {
   const ids = draft.value.workout_ids;
   if (ids.includes(workoutId) === selected) return;
@@ -389,6 +410,7 @@ export function useAiTaskDraft() {
     },
     setWindowDays,
     applyPicks,
+    mergePicks,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>
       patchRange(category, { include_workout_day: include }),
     legacyNotice,

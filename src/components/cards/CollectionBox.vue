@@ -60,6 +60,8 @@ const layout = computed(() => handLayout(box.groups.value, viewport.value, {
   insets: { top: 72, bottom: 170 + (viewport.value.width <= 700 ? 66 : 0), side: 24 },
 }));
 const empty = computed(() => box.count.value === 0);
+/** 在舞台上箭头是「放进这次任务」，别处是「用这些日子开一个任务」。 */
+const goLabel = computed(() => (router.currentRoute.value.path === '/ai' ? t.value.boxPour : t.value.boxGo));
 /** 成对的指标（乳酸阈值）：小牌也是对角斜切双色。 */
 const duoStyle = (key: string, style: Record<string, string>) => (PAIRED_METRICS[key] ? { ...style, '--tint2': metricColor(PAIRED_METRICS[key]!) } : style);
 const boxLabel = computed(() => (box.dropHover.value ? t.value.boxDropHere : empty.value ? t.value.boxEmptyLabel : t.value.boxTitle));
@@ -218,9 +220,15 @@ const expandMonth = async (id: string) => {
 };
 const monthAria = (month: { month: string; label: string; count: number }) => t.value.monthAria(monthName(month.month), month.label, month.count);
 
-/** 箭头：新开一个任务，只勾收集箱里的「类别 × 天」，去「交给 AI」。 */
+/** 箭头：新开一个任务，只勾收集箱里的「类别 × 天」，去「交给 AI」。
+    已经在「交给 AI」舞台上：收起铺开层，让舞台把箱子倒进左边的牌（合进当前任务，useBoxPour）。 */
 const go = async () => {
   if (empty.value) return;
+  if (router.currentRoute.value.path === '/ai') {
+    await hide();
+    box.pourRequest.value += 1;
+    return;
+  }
   ctl.resetDraft();
   ctl.applyPicks(box.byCategory(), dayKey(), box.workoutIds());
   box.handedToTask.value = true;
@@ -282,9 +290,9 @@ onBeforeUnmount(() => { releaseEscape(); window.removeEventListener('resize', on
         <p v-if="layout.more > 0" class="spread-more">{{ t.more(layout.more) }}</p>
         <div class="foot-row">
           <button type="button" class="foot-button" @click="clearAll"><Icon name="trash" :size="14" />{{ t.boxClear }}</button>
-          <button type="button" class="hand-go" :title="t.boxGo" @click="go">
+          <button type="button" class="hand-go" :title="goLabel" @click="go">
             <span class="go-icon"><span class="go-box"><Icon name="box" :size="20" /></span><span class="go-arrow"><Icon name="arrow-right" :size="20" /></span></span>
-            <span>{{ t.boxGo }}</span>
+            <span>{{ goLabel }}</span>
           </button>
           <button type="button" class="foot-button" @click="hide()">{{ t.boxClose }}</button>
         </div>

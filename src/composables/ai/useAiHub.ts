@@ -28,7 +28,7 @@ import { usePlanText } from '../../components/plan/usePlanText';
 
 const today = ref(dayKey());
 const demo = ref(false);
-/** 刚交出去一份：「你的过去」那张卡的细条折一下（底栏在外壳上，卡在总页上，借这个信号）。 */
+/** 刚交出去一份（计数）：舞台以外想知道「刚寄出」的地方借这个信号。 */
 const handedOff = ref(0);
 /** 连着拨滚轮、拖图时攒下的改动：停手 350ms 后一次交给后端（每一下都去改草稿、重新校验太密了）。 */
 let pendingEdits: Array<(document: PlanDocument) => PlanDocument> = [];
@@ -84,7 +84,7 @@ const bootstrap = async () => {
   }
 };
 
-/** 只有派生状态、不带生命周期：外壳上的底栏也要任务标题和方向，但它不该让 15 秒的轮询一直开着。 */
+/** 只有派生状态、不带生命周期：寄出编排（useStageSend）也要任务标题和方向，但它不该让 15 秒的轮询一直开着。 */
 export const useAiDerived = () => {
   const ctl = useAiTaskDraft();
   const library = useAiTaskLibrary();
@@ -100,12 +100,10 @@ export const useAiDerived = () => {
 };
 
 export const useAiHub = () => {
-  const ctl = useAiTaskDraft();
   const plan = useTrainingPlan();
   const history = useExchanges();
   const t = useBridgeText();
   const { t: pt } = usePlanText();
-  const { draft } = ctl;
   const derived = useAiDerived();
 
   onMounted(() => {
@@ -124,8 +122,6 @@ export const useAiHub = () => {
     if (!mounted) window.clearInterval(timer);
   });
 
-  /** 「你的过去」看多少天：交出去的各类里最长的那一段（运动按次选，不算），7–90 天。 */
-  const pastDays = computed(() => Math.min(90, Math.max(7, ...draft.value.categories.filter((c) => c.category !== 'workout').map((c) => c.days_before + 1))));
 
   /** 「你的下一步」：手上有草稿就看草稿；否则看已生效的计划（连同最近一次往返里的休息建议）。 */
   const future = computed<PlanDraftPreview | null>(() => {
@@ -200,7 +196,7 @@ export const useAiHub = () => {
   });
 
   return {
-    ...derived, today, demo, pastDays,
+    ...derived, today, demo,
     future, rows, stamped, written, editable, notice,
     edit, queueEdit, changeDay, insertAt, removeDay, retype, removeWorkout,
   };

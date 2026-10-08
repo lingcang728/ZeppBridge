@@ -37,7 +37,12 @@
   100% { translate: -4px 3px; rotate: calc(var(--rot) - 1deg); }
 }
 .stage.paused .slot-button, .stage.gathering .slot-button { animation-play-state: paused; }
-.cloud-empty { position: absolute; left: 0; bottom: 12px; z-index: 1; margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.cloud-empty { position: absolute; left: 0; top: 40%; z-index: 1; margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+/* 加一类：撒牌区底下一枚小胶囊，不是牌、不进线网（第一轮那张虚线牌横在线中间，打乱了层级）。 */
+.add-kind { position: absolute; z-index: 1; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px; border: 0; border-radius: 999px;
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font: 600 var(--fs-xs) var(--font-sans); cursor: pointer; transition: color var(--dur-base) ease, translate 220ms cubic-bezier(.3, 1.3, .5, 1); }
+.add-kind:hover { color: var(--ink); translate: 0 -2px; }
+.add-kind:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .lock-host { position: absolute; z-index: 2; translate: -50% 0; }
 .stage :deep(.future) { z-index: 2; }

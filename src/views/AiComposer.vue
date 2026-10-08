@@ -30,6 +30,7 @@ import { useAiHub } from '../composables/ai/useAiHub';
 import { useStageCards, type StageCardModel } from '../composables/ai/useStageCards';
 import { useStageSend } from '../composables/ai/useStageSend';
 import { useCloudDrag } from '../composables/ai/useCloudDrag';
+import { useBoxPour } from '../composables/ai/useBoxPour';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useBridgeStrip } from '../composables/useBridgeStrip';
@@ -85,11 +86,16 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { observer?.disconnect(); window.removeEventListener('resize', measure); });
 const layout = computed(() => stageLayout(size.value.width, size.value.height));
-const cloud = computed(() => cloudLayout(cards.value.length, layout.value.cloud));
+/** 撒牌区底下留一条给「加一类」那枚胶囊（它不是牌，不进线网，2026-10-08 第二轮）。 */
+const ADD_H = 48;
+const zone = computed(() => ({ ...layout.value.cloud, height: layout.value.cloud.height - (off.value.length ? ADD_H : 0) }));
+const cloud = computed(() => cloudLayout(cards.value.length, zone.value));
+/** 「加一类」紧贴在这把牌的下沿下面（牌被列宽卡住时整把牌是上下居中的）。 */
+const addTop = computed(() => zone.value.y + Math.max(0, ...cloud.value.slots.map((slot) => slot.y + cloud.value.height)) + 22);
 const restOf = (id: string) => {
   const i = cards.value.findIndex((c) => c.id === id);
   const slot = cloud.value.slots[i];
-  return slot ? { x: layout.value.cloud.x + slot.x, y: layout.value.cloud.y + slot.y } : null;
+  return slot ? { x: zone.value.x + slot.x, y: zone.value.y + slot.y } : null;
 };
 
 /* ---------- 拖、甩、点 ---------- */
@@ -101,7 +107,7 @@ const profile = ref(false);
 const drag = useCloudDrag({
   slotOf: (id) => slots.get(id) ?? null,
   restOf,
-  bounds: () => ({ ...layout.value.cloud, cardW: cloud.value.width, cardH: cloud.value.height }),
+  bounds: () => ({ ...zone.value, cardW: cloud.value.width, cardH: cloud.value.height }),
   canFlick: (id) => cards.value.find((c) => c.id === id)?.kind === 'data',
   onTap: (id) => open(id),
   onFlick: (id) => {
@@ -113,8 +119,7 @@ const open = (id: string) => {
   if (send.gathering.value) return;
   const card = cards.value.find((c) => c.id === id);
   if (!card) return;
-  if (card.kind === 'add') adding.value = true;
-  else if (card.kind === 'profile') profile.value = true;
+  if (card.kind === 'profile') profile.value = true;
   else backCard.value = card;
 };
 /* 牌的多少变了（甩掉一张、加回一类、换任务）：重新撒一遍，旧牌用 FLIP 弹簧挪到新位置，新牌淡入——不瞬移。 */
@@ -143,8 +148,20 @@ const placed = computed(() => cards.value.map((card) => {
 const tree = computed(() => {
   const l = layout.value;
   if (l.mode !== 'row') return null;
-  const ports = placed.value.filter((p) => p.card.kind !== 'add').map((p) => ({ id: p.card.id, x: p.x + cloud.value.width, y: p.y + cloud.value.height / 2 }));
-  return threadTree(l.lock, l.lock.r, ports, { x: l.card.x, y: l.card.y + l.card.height / 2, h: l.card.height });
+  const w = cloud.value.width;
+  const h = cloud.value.height;
+  const ports = placed.value.map((p) => ({ id: p.card.id, x: p.x + w, y: p.y + h / 2 }));
+  const obstacles = placed.value.map((p) => ({ id: p.card.id, x: p.x, y: p.y, width: w, height: h }));
+  return threadTree(l.lock, l.lock.r, ports, { x: l.card.x, y: l.card.y + l.card.height / 2, h: l.card.height }, obstacles);
+});
+/** 第几张牌先飞：线按同一个顺序收。 */
+const order = computed(() => Object.fromEntries(placed.value.map((p, i) => [p.card.id, i])));
+
+/* ---------- 收集箱并进左边的牌（useBoxPour） ---------- */
+useBoxPour({
+  cardOf: (category) => slots.get(category)?.querySelector<HTMLElement>('.scard') ?? null,
+  fallback: () => stage.value?.querySelector<HTMLElement>('.add-kind') ?? [...slots.values()][0]?.querySelector<HTMLElement>('.scard') ?? null,
+  busy: () => send.gathering.value,
 });
 
 /* ---------- 三级：从牌背面挑具体日子（牌桌从这张牌发牌） ---------- */
@@ -169,14 +186,17 @@ const deal = async () => {
 const future = ref<{ front: HTMLElement | null; turn: (face: 'question' | 'receipt' | 'plan') => Promise<void> } | null>(null);
 const lockEl = () => stage.value?.querySelector<HTMLElement>('.bridge-lock .lock') ?? null;
 const lit = ref(false);
+/** 线收回锁里（牌飞进锁的那一段）。 */
+const reeled = ref(false);
 let flight: Convergence | null = null;
 const choreography = {
   gather: async () => {
     const box = stage.value?.getBoundingClientRect();
-    const flying = placed.value.filter((p) => p.card.kind !== 'add');
+    const flying = placed.value;
     const els = flying.map((p) => slots.get(p.card.id)?.querySelector<HTMLElement>('.scard')).filter((el): el is HTMLElement => !!el);
     const paths = flying.map((p) => (tree.value && box ? sampleStrand(tree.value, p.card.id, 14).map((pt) => ({ x: pt.x + box.left, y: pt.y + box.top })) : []));
     lit.value = true;
+    reeled.value = true;
     flight = convergeCards(els, paths, lockEl());
     await flight.gather();
   },
@@ -186,9 +206,11 @@ const choreography = {
     flight?.finish();
     flight = null;
     lit.value = false;
+    reeled.value = false;
   },
   scatter: async () => {
     lit.value = false;
+    reeled.value = false;
     await flight?.scatter();
     flight = null;
   },
@@ -237,7 +259,7 @@ onDeactivated(() => { paused.value = true; });
 
     <div ref="stage" :class="['stage', layout.mode, { paused, gathering: send.gathering.value }]" :style="{ height: `${layout.height}px` }" :aria-label="s.stage">
       <div class="spine" :style="layout.mode === 'row' ? { left: `${layout.lock.x}px` } : { top: `${layout.lock.y}px` }" aria-hidden="true"></div>
-      <ThreadField :tree="tree" :width="layout.width" :height="layout.height" :lit="lit" :active="drag.live.value?.id ?? null" />
+      <ThreadField :tree="tree" :width="layout.width" :height="layout.height" :lit="lit" :reeled="reeled" :order="order" :active="drag.live.value?.id ?? null" />
 
       <ul class="cloud" :style="{ '--card-w': `${cloud.width}px` }" :aria-label="t.past">
         <li v-for="(p, i) in placed" :key="p.card.id" :ref="(el) => setSlot(p.card.id, el)" class="slot"
@@ -247,7 +269,10 @@ onDeactivated(() => { paused.value = true; });
           </button>
         </li>
       </ul>
-      <p v-if="cards.length <= 2 && !off.length" class="cloud-empty">{{ s.nothing }}</p>
+      <button v-if="off.length" type="button" class="add-kind" :style="{ left: `${zone.x}px`, top: `${addTop}px` }" @click="adding = true">
+        <Icon name="plus" :size="14" />{{ s.add }}
+      </button>
+      <p v-if="cards.length <= 1" class="cloud-empty">{{ s.nothing }}</p>
 
       <div class="lock-host" :style="{ left: `${layout.lock.x}px`, top: `${layout.lock.y - layout.lock.r}px` }">
         <BridgeLock :r="layout.lock.r" :provider="send.provider.value" :busy="send.gathering.value" :disabled="send.disabled.value" :subscribed="send.subscribed.value"
@@ -256,7 +281,7 @@ onDeactivated(() => { paused.value = true; });
       </div>
 
       <FutureCard ref="future" v-model:face="send.face.value" :box="layout.card" :templates="templates" :disabled="send.gathering.value"
-        :ready="send.ready.value" :blocked="send.blocked.value" :provider="send.provider.value.label" :stale="send.stale.value" :recalled="send.recalled.value"
+        :ready="send.ready.value" :blocked="send.blocked.value" :provider="send.provider.value.label" :provider-icon="send.provider.value.localIcon" :stale="send.stale.value" :recalled="send.recalled.value"
         :steps="send.steps.value" :save-error="send.saveError.value" :rows="hub.rows.value" :drafting="!!plan.preview.value" :plan="plan.state.value"
         :mcp="!!plan.preview.value && !plan.accepted.value" @copy="send.copyAgain()" @open="send.openAgain()" @reveal="send.reveal()" @retry="send.retry($event as 'copy' | 'open')"
         @received="received" @accept="plan.accept()" @discard="plan.discard()" @workout="highlightWorkout" />

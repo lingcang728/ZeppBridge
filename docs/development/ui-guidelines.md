@@ -434,35 +434,17 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 2. Hand to AI (`/ai`)
 
-The hub only summarises; every drill-down is a route that grows out of its
-summary card (`usePageMorph`), and drafts survive moving between them
-(module-level singletons).
+**A horizontal stage** (2026-10-08, replacing the single-column hub): the past on the left (the data being handed over), a bridge in the middle (the AI lock), the future on the right (this question and the plan). At most ten cards on the page; every detail is one level down and grows out of what was clicked. The bar strips, the dock and the "Your past" page are gone (`/ai/past*` redirects to the stage).
 
-- **Hub** (`/ai`): task-name capsule (→ `/ai/tasks`), "Your past" summary
-  card (→ `/ai/past`), "Your next step" summary card with this week's
-  training / rest and delivery state (→ `/ai/plan`), the "last sent to the
-  watch" status bar, template capsules plus the single question box, the
-  round-trip list (each row → `/ai/exchanges/:id`) and the dock.
-- **Your past** (`/ai/past`, `/ai/past/:category`): six categories with their
-  daily strips and a range handle; a category page deals its days as a card
-  table and lists them one row per day. Missing days stay "—".
-- **Plan** (`/ai/plan`, `/ai/plan/:date`): week view with free drag (drop on a
-  card swaps, drop in a gap inserts and shifts, past days are locked, keyboard
-  alternatives), day view with the intensity chart editable in place
-  (duration on the right edge, heart-rate band vertically) and wheel rows for
-  fine values. Sport class and variant are glass segments, with one line
-  saying the watch will ask for the sub-type again (official limitation).
-  Focus and description are required before publishing. A sent plan stays
-  editable except for past days; re-sync pushes every affected 7-day window.
-- **Check before sending** (`/ai/check`): what data goes and how complete it
-  is, attachments, detail level, precise route, per-provider subscription,
-  and a read-only preview of the full prompt (tap the user's sentence to fly
-  back to the question box). No "advanced" fold.
-- **Dock**: readiness summary (→ `/ai/check`) and one provider capsule you can
-  swipe between models; tap sends. Subscription is a badge.
-- Plan vs actual matches local date and compatible sport only. Demo libraries
-  label every record as synthetic and simulate delivery without watch
-  requests.
+- **Left: cards** (`components/ai/stage/StageCard.vue`, `composables/ai/useStageCards.ts`): one card per category being sent plus a profile card, eight at most. A card says only its name, how long a span it carries (last N days / N days picked) and how many days have data (`have/total`, same source as the pre-send check, "—" until computed). Cards sit in **staggered columns** (`lib/aiTask/cloud.ts`: columns offset vertically, card height at most 60 % of the pitch) and drift like playing cards (only `translate` / `rotate`; paused when hidden, while sending or under reduced motion). Drag one and it stays where dropped; **flick it up to leave that category out**; a change in the card count re-deals with FLIP springs. Tap = level two: the card back (`StageCardBack.vue`, a 7 / 14 / 30 / 90-day glass segment, leave out) → "Pick specific days" = level three, the card table dealt from that card. "Add a kind" is a capsule under the cards, **not a card and not part of the thread web**.
+- **The collection box pours into the cards** (`composables/ai/useBoxPour.ts`): on the stage, whenever the box is closed, no card table is open and nothing is being sent, the box empties itself: a few chips per category fly into that category's card (`pourFromBox`), the category becomes "N days picked" (`mergePicks`, only the categories in the box change) and the box clears. On the stage the box arrow reads "Add to this task".
+- **Middle: the bridge** (`BridgeLock.vue`, `ThreadField.vue`, `lib/aiTask/threads.ts`): a round lock on a vertical hairline showing the chosen AI, with a thin readiness ring; under it the Liquid Glass provider wheel (tapping the lens also sends) and an export-only button; under that one line (categories, share of days with data, token estimate) → `/ai/check`. **Threads**: one to three trunks leave the lock and fork in the open space between the cards and the lock; each card gets one branch that bends onto the card's own row and then **runs horizontally through the gaps** to the card's right edge, switching to the nearest free lane if a dragged card is in the way. Branches fade towards the left. On the right there is **a single skein** (three nearly coincident strands) to the right card. Threads are static SVG; only the dragged card's branch is recomputed live.
+- **Right: one card's life** (`FutureCard.vue`): the question card (written on directly, templates as a glass segment at its foot: ask freely / sleep / this week / a workout / next week) → the receipt (`ReceiptFace.vue`: the provider's icon, the handed `.md` drawn as a sheet of paper, hold it to drag into the chat, "⋯" reveals it in Explorer; copy the opening line / open the site again; a full-width "Bring back the final plan") → the plan card (`PlanFace.vue`: the week's training shapes and delivery state → `/ai/plan`). The other card peeks out behind the front one; tapping it flips them (2D squash, not 3D).
+- **Pressing the lock does everything** (`composables/ai/useStageSend.ts` + `lib/motion/cards/converge.ts`): the cards shake and fly along their own threads into the lock, **the threads reel in after them** (`pathLength=1` + dash offset), while the backend prepares the file. The receipt grows out of the lock; 0.4 s after it lands the opening line is copied and the site opens; the cards fade back and the threads pay out again. Esc or a second press mid-flight sends the cards back from where they are; the file still lands as a receipt but the site is not opened. The lock is grey while syncing.
+- **Drill-downs**: task name → saved tasks (`/ai/tasks`); "N round trips" → the round-trip list (`/ai/exchanges`, each row → `/ai/exchanges/:id`); the line under the lock → pre-send check (`/ai/check`); the plan card → week / day (`/ai/plan`, `/ai/plan/:date`).
+- **Plan** (`/ai/plan`, `/ai/plan/:date`): week view with free drag (drop on a card swaps, drop in a gap inserts and shifts, past days are locked, keyboard alternatives), day view with the intensity chart editable in place (duration on the right edge, heart-rate band vertically) and wheel rows for fine values. Sport class and variant are glass segments, with one line saying the watch will ask for the sub-type again (official limitation). Focus and description are required before publishing. A sent plan stays editable except for past days; re-sync pushes every affected 7-day window.
+- **Check before sending** (`/ai/check`): what data goes and how complete it is, attachments, detail level, precise route, per-provider subscription, and a read-only preview of the full prompt (tap the user's sentence to edit it in place; it is the same draft as the question card). No "advanced" fold.
+- Plan vs actual matches local date and compatible sport only. Demo libraries label every record as synthetic and simulate delivery without watch requests.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 

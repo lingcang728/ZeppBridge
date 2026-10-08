@@ -28,7 +28,7 @@ import { useStageText } from './stage.i18n';
 
 const props = defineProps<{
   box: Box; face: FutureFace; templates: AiTaskTemplate[]; disabled: boolean;
-  ready: AiTaskPrepareResult | null; blocked: AiTaskIssue[]; provider: string; stale: boolean; recalled: boolean;
+  ready: AiTaskPrepareResult | null; blocked: AiTaskIssue[]; provider: string; providerIcon: string; stale: boolean; recalled: boolean;
   steps: Record<HandoffStepId, HandoffStep>; saveError: string | null;
   rows: DayRow[]; drafting: boolean; plan: TrainingPlanState | null; mcp: boolean;
 }>();
@@ -100,7 +100,7 @@ defineExpose({ front, turn });
             <li v-for="(issue, i) in blocked" :key="i"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
           </ul>
         </template>
-        <ReceiptFace v-else-if="face === 'receipt'" :ready="ready" :provider="provider" :stale="stale" :recalled="recalled" :steps="steps" :save-error="saveError"
+        <ReceiptFace v-else-if="face === 'receipt'" :ready="ready" :provider="provider" :provider-icon="providerIcon" :stale="stale" :recalled="recalled" :steps="steps" :save-error="saveError"
           :question="ctl.draft.value.prompt" @copy="emit('copy')" @open="emit('open')" @reveal="emit('reveal')" @retry="emit('retry', $event)"
           @edit="turn('question')" @received="emit('received')" />
         <PlanFace v-else :rows="rows" :drafting="drafting" :state="plan" :mcp="mcp" @received="emit('received')" @accept="emit('accept')" @discard="emit('discard')" />
