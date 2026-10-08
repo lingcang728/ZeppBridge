@@ -153,6 +153,7 @@ views/settings/deck.secMcp
 views/settings/deck.themeLabel
 views/settings/deck.themeSystem
 components/overview/DataReadyCapsule.streamSeparator
+components/workout/WorkoutClimbsCard.pace
 
 # fr
 views/Settings.unidentifiedInitial
