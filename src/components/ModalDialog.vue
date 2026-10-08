@@ -90,7 +90,8 @@ onUnmounted(() => {
 /* 暗色和模糊都在 ::before 上、淡入淡出也只动它：遮罩自己一旦带 opacity，就成了模糊的取样边界，
    淡入期间页面清楚、结束才「啪」地糊掉（lib/motion/dialogFlight.ts 头注释）。 */
 .dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
-.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* 背后虚化得更深一点（10-08 H8「缺少背景高斯模糊」）：静态模糊，只淡入淡出这一层。 */
+.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
 /* 等画面跟得上的那一小会儿：面板隐身（不用 0，免得这一层不合成）；遮罩已经在淡入了（10-08 H3）。 */
 .dialog-backdrop.is-entering .dialog-glass,
 .dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }

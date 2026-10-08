@@ -11,6 +11,10 @@
  * 拷贝摆成此刻的样子（每张牌的计算 transform 抄成行内样式）、带一个固定的 blur，之后只淡入淡出它的 opacity，
  * 不逐帧改模糊半径。退到后面的只是收拢好的那一叠（字本来就压在 0.35 的暗里），拷贝不再和新一层的字叠影。
  * 返回时先交叉淡回清楚的那一层，再走回前面。
+ *
+ * 10-08 H8（「拖动、点按时会出现明显的重影」）：退后的那一叠以前就停在**原地**缩小压暗——新一层恰好从那里发出来、
+ * 摆在它正前方，拖走一张、翻一张，牌缝里就透出后面那一叠的字。现在它一边缩小一边退到牌桌左上角（来处的那一叠，
+ * 像桌角放着的一副牌），不再垫在新一层后面。
  */
 import { CLOSE_EASE, OPEN_EASE } from '../timing';
 import { fanBack, stackCards, type Landing } from './deal';
@@ -20,8 +24,10 @@ import { reducedMotion, settled } from './spring';
 
 const RECEDE_MS = 340;
 const PULL_MS = 440;
-const RECEDE_SCALE = 0.82;
-const RECEDE_OPACITY = 0.35;
+const RECEDE_SCALE = 0.42;
+const RECEDE_OPACITY = 0.4;
+/** 退到牌桌左上角：这一叠的中心离牌桌左沿、上沿各多远（按缩小后的牌算，再留一点边）。 */
+const CORNER_PAD = 10;
 const BLUR_SWAP_MS = 220;
 const BLUR = 'blur(5px) saturate(.9)';
 
@@ -114,7 +120,13 @@ export const recedeLayer = (layer: HTMLElement, pileCard: HTMLElement, live: () 
     }
     await stackCards(others, rest.center, rest.angle);
     if (!live() || restoring) return;
-    const back = animateFromNow(layer, { transform: `scale(${RECEDE_SCALE})`, opacity: RECEDE_OPACITY }, { duration: RECEDE_MS, easing: OPEN_EASE, fill: 'forwards' });
+    // 以那一叠为缩放中心缩小，再整层平移，让那一叠的中心落到牌桌左上角。
+    const table = (layer.parentElement ?? layer).getBoundingClientRect();
+    const w = rest.width * RECEDE_SCALE;
+    const corner = { x: table.left + CORNER_PAD + w / 2, y: table.top + CORNER_PAD + (w * 1.4) / 2 };
+    const tx = corner.x - rest.center.x;
+    const ty = corner.y - rest.center.y;
+    const back = animateFromNow(layer, { transform: `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${RECEDE_SCALE})`, opacity: RECEDE_OPACITY }, { duration: RECEDE_MS + 80, easing: OPEN_EASE, fill: 'forwards' });
     await settled([back]);
     if (!live() || restoring || back.playState !== 'finished') return;
     // 退好了：换成预先模糊好的静态拷贝（交叉淡化，只动 opacity）。

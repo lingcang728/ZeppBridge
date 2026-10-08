@@ -98,8 +98,15 @@ const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   if (!pending.has(backdrop) || !backdrop.isConnected) { panel.style.transform = ''; return; }
   pending.delete(backdrop);
   const from = currentRect(origin);
-  const fade = { duration: from ? OPEN_MS * 0.45 : 220, easing: 'ease-out', fill };
-  for (const layer of layers(panel)) layer.animate([{ opacity: NEARLY_HIDDEN }, { opacity: 1 }], fade);
+  // 玻璃底先出来（前三成）、字晚一点（三成半以后）才淡入：面板还小的时候不挤着一屏字——10-08 H8 说的
+  // 「长按进去直接闪现、收回有重影」，就是字在小框里和底下那张牌叠着。
+  const duration = from ? OPEN_MS : 220;
+  for (const layer of layers(panel)) {
+    const text = layer.classList.contains('dialog-scroll');
+    layer.animate(text && from
+      ? [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: 0.35 }, { opacity: 1 }]
+      : [{ opacity: NEARLY_HIDDEN }, { opacity: 1, offset: from ? 0.3 : 1 }, { opacity: 1 }], { duration, easing: 'ease-out', fill });
+  }
   const flight = panel.animate([{ transform: start(from) }, { transform: 'none' }], { duration: from ? OPEN_MS : 220, easing: OPEN_EASE, fill });
   panel.style.transform = '';
   const done = () => forgetEscape(backdrop);
@@ -134,7 +141,10 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   const timing = { duration: CLOSE_MS, easing: CLOSE_EASE, fill: 'forwards' as const };
   // 收起本身就是对 Esc 的回应：不让全局打断再把它快进成一下跳。
   exemptFromSettle(panel.animate([{ transform: panelNow }, { transform: end }], timing));
-  parts.forEach((layer, index) => exemptFromSettle(layer.animate([{ opacity: partsNow[index] }, { opacity: 0 }], { ...timing, easing: 'ease-in' })));
+  // 收：字先淡掉（前三成），玻璃底跟着面板缩回去、最后才淡——缩回那张牌时只剩一块玻璃，不和牌上的字叠成重影。
+  parts.forEach((layer, index) => exemptFromSettle(layer.animate(layer.classList.contains('dialog-scroll')
+    ? [{ opacity: partsNow[index] }, { opacity: 0, offset: 0.3 }, { opacity: 0 }]
+    : [{ opacity: partsNow[index] }, { opacity: partsNow[index], offset: 0.6 }, { opacity: 0 }], { ...timing, easing: 'ease-in' })));
   const fade = exemptFromSettle(backdrop.animate([{ opacity: veilNow }, { opacity: 0 }], { ...timing, easing: 'ease-in', pseudoElement: '::before' }));
   const remove = () => backdrop.remove();
   fade.finished.then(remove, remove);
