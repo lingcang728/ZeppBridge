@@ -94,6 +94,7 @@ components/WeeklyReportCard.metric.weekly.hrv
 components/WeeklyReportCard.metric.weekly.stress
 components/overview/HeartRateCard.bpm
 components/shell/AppTopBar.themeSystem
+composables/useFocusAreas.areaTraining
 composables/useSyncController.streamSeparator
 lib/labels.fallback.badminton
 lib/labels.fallback.walking
@@ -128,6 +129,8 @@ views/Settings.stream.pai
 views/Settings.stream.stress
 views/Settings.stream.vo2max
 views/Settings.unidentifiedInitial
+views/settings/sections/advanced.compactMore
+views/settings/sections/archive.details
 views/SleepDetail.deviceFirmware
 views/SleepDetail.deviceName
 views/SleepList.scoreLabel
