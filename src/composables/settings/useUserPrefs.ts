@@ -2,7 +2,6 @@ import { computed, ref } from 'vue';
 import { useSyncController } from '../useSyncController';
 import { backend, toUserMessage } from '../../lib/bridge';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
-import { storageEstimateText } from '../../lib/storageEstimateText';
 import { useMessages } from '../../i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { UserPrefs } from '../../types';
@@ -32,8 +31,6 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
   const dataBusy = ref<string | null>(null);
   /** 完整偏好（含归档开关）。AppStatus 只带保留期与补拉窗口。 */
   const userPrefs = ref<UserPrefs | null>(null);
-
-  const estimateText = computed(() => storageEstimateText(storageEstimate.value));
 
   /* 保留天数是「往回保留最近 N 天」，不是「N 天后清理」，而且清理只在每次成功
      同步之后执行。所以这里显示会被保留的最早日期，不再显示一个算错的未来日期。 */
@@ -143,7 +140,6 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
     prefsBusy,
     dataBusy,
     userPrefs,
-    estimateText,
     retentionCutoffDate,
     savePrefs,
     applyPrefsChange,

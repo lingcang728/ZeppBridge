@@ -168,11 +168,7 @@ export const settingsMessages = defineMessages(
     mcpConfigPathPlaceholder: '<zeppbridge-mcp 的路径>',
 
     // ── 6. 本地数据保留 ──
-    retentionLabel: '保留时长',
     retentionAria: '本地数据保留天数',
-    retentionNote: (days: number) => `保留最近 ${days} 天的本地数据；清理在每次`,
-    retentionNoteStrong: '成功同步之后',
-    retentionNoteTail: '执行，不会在后台自行发生。',
     retentionCutoff: (date: string) => `下次成功同步后，${date} 以前的数据会被清理`,
     cleaningUp: '正在清理…',
     cleanupNow: '立即清理',
@@ -538,11 +534,7 @@ If you need anything from me (which client I use, where the file lives), just as
     mcpConfigPathPlaceholder: '<path to zeppbridge-mcp>',
 
     // ── 6. Retention ──
-    retentionLabel: 'Keep for',
     retentionAria: 'Local data retention in days',
-    retentionNote: (days: number) => `Keeps the last ${days} days locally. Pruning happens `,
-    retentionNoteStrong: 'after a successful sync',
-    retentionNoteTail: ', never on its own in the background.',
     retentionCutoff: (date: string) => `After the next successful sync, data older than ${date} is pruned`,
     cleaningUp: 'Cleaning up…',
     cleanupNow: 'Clean up now',
@@ -908,11 +900,7 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     mcpConfigPathPlaceholder: '<ruta a zeppbridge-mcp>',
 
     // ── 6. Retention ──
-    retentionLabel: 'Conservar durante',
     retentionAria: 'Días de conservación de datos locales',
-    retentionNote: (days: number) => `Conserva localmente los últimos ${days} días. La limpieza ocurre `,
-    retentionNoteStrong: 'después de una sincronización exitosa',
-    retentionNoteTail: ', nunca por su cuenta en segundo plano.',
     retentionCutoff: (date: string) => `Después de la próxima sincronización exitosa se borrarán los datos anteriores al ${date}`,
     cleaningUp: 'Limpiando…',
     cleanupNow: 'Limpiar ahora',

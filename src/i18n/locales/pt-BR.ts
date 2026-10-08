@@ -292,14 +292,6 @@ export default {
     },
 
     'components/HistoryArchivePanel': {
-      title: 'Arquivo de longo prazo e histórico completo',
-      intro: 'O arquivo interrompe o descarte automático; o preenchimento recupera dados anteriores. Use os dois para manter o histórico completo.',
-      archiveTitle: 'Arquivo de longo prazo',
-      archiveBody: 'Ao ativar, sincronizações mantêm todo o histórico, sem limite de retenção. O banco apenas cresce; ao desativar, o sistema informa o que será descartado na próxima vez.',
-      recommended: 'Recomendado',
-      archiveAria: 'Arquivo de longo prazo',
-      archiveRowTitle: 'Interromper o descarte de histórico após cada sincronização',
-      backfillTitle: 'Preencher histórico anterior',
       autoContinueTitle: 'Iniciar próxima rodada automaticamente',
       estimateDetails: 'Detalhamento por fluxo',
       statPersisted: 'Gravados',
@@ -314,8 +306,6 @@ export default {
       estimateRate: (days: number, perDay: string) => `${days} dias com dados locais · taxa de ~${perDay}/dia`,
       unmeasured: (streams: string) =>
         `Amostras locais insuficientes, sem estimativa: ${streams}. Esses fluxos não entram no total acima; melhor admitir que não sabemos do que inventar uma taxa.`,
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Esta busca traria ${requested} dias de histórico, mas o computador guarda só os últimos ${retention}. Os dados seriam apagados após a próxima sincronização bem-sucedida. Ative primeiro o arquivo de longo prazo ou aumente a retenção.`,
       backfilling: 'Preenchendo…',
       continueBackfill: 'Continuar preenchimento',
       startBackfill: 'Iniciar preenchimento',
@@ -346,12 +336,8 @@ export default {
       rangeAll: (years: number) => `Todo o histórico disponível (até ${years} anos)`,
       rangeCustom: 'Data personalizada',
 
-      confirmDisableArchive: 'Sem o arquivo de longo prazo, a próxima sincronização bem-sucedida limpa os dados mais antigos pela retenção, sem volta.\nSe você acabou de repor histórico, faça um snapshot do banco antes.\nDesativar mesmo?',
-      archiveEnabled: 'Arquivo de longo prazo ativado: o histórico não será descartado.',
-      archiveDisabled: 'Arquivo de longo prazo desativado: a próxima sincronização descartará dados fora da retenção.',
       archiveSaveFailed: 'Não foi possível salvar a configuração do arquivo',
       pickStartFirst: 'Selecione a data de início do preenchimento primeiro.',
-      outOfRetention: 'O período excede a retenção local; os dados anteriores serão descartados na próxima sincronização. Ative o arquivo de longo prazo ou aumente a retenção.',
       roundDone: (remaining: number) =>
         `Rodada concluída; restam ${remaining} blocos mensais. Clique em "Continuar preenchimento" para prosseguir.`,
       allChunksDone: 'Todos os blocos mensais foram processados.',
@@ -1739,11 +1725,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       mcpToolLifeEvents: "Eventos de vida que você registrou",
       mcpSetupPrompt: 'Uso um app de desktop para Windows chamado ZeppBridge, que sincroniza os dados do meu relógio Amazfit / Zepp para um banco SQLite local.\r\nEle traz um programa MCP (zeppbridge-mcp) que quero configurar em você, para consultar meus treinos e dados de saúde direto, sem exportar e colar toda vez.\r\n\r\nO que sei:\r\n- O programa MCP vem no pacote zeppbridge-tools da página de Releases do ZeppBridge no GitHub; ao descompactar, o executável zeppbridge-mcp está dentro. Talvez eu ainda não tenha baixado.\r\n- É um MCP server do tipo stdio: só lê o banco local, sem rede, sem porta aberta, sem token nem API key.\r\n- Formato típico de configuração: {"mcpServers": {"zeppbridge": {"command": "<caminho completo do zeppbridge-mcp>", "args": ["--scope", "task"]}}}\r\n- Doze ferramentas somente leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), eventos de vida (list_life_events) e saúde dos dados (get_data_health).\r\n\r\nMe diga:\r\n1. Para você, a ferramenta que estou usando agora, em qual arquivo vai a configuração ou qual comando a adiciona;\r\n2. Como escrever caminhos do Windows (as barras invertidas precisam de escape?);\r\n3. Como verificar se funcionou depois de configurar.\r\nSe precisar de algo meu (qual cliente uso, onde fica o arquivo), pergunte direto.',
       mcpConfigPathPlaceholder: '<caminho do zeppbridge-mcp>',
-      retentionLabel: 'Retenção de dados',
       retentionAria: 'Retenção de dados locais em dias',
-      retentionNote: (days: number) => `Mantém os últimos ${days} dias localmente. A limpeza ocorre `,
-      retentionNoteStrong: 'apenas após uma sincronização bem-sucedida',
-      retentionNoteTail: ', nunca de forma autônoma.',
       retentionCutoff: (date: string) => `Na próxima sincronização bem-sucedida, dados anteriores a ${date} serão excluídos`,
       cleaningUp: 'Limpando…',
       cleanupNow: 'Limpar agora',
@@ -2206,7 +2188,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       secAppearance: 'Aparência',
       secLocalData: 'Armazenamento local',
       secFeedback: 'Relatório de problemas',
-      secRetention: 'Retenção de dados',
 
       cloudSourceSub: 'Origem dos dados sincronizados',
       firstSyncing: (current: number, total: number) => `Conectado · buscando registros recentes ${current}/${total}`,
@@ -2231,7 +2212,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       themeLight: 'Claro',
       scaleSub: 'Tamanho padrão (100%). Atalhos Ctrl + / Ctrl - também ajustam o zoom',
 
-      retentionSub: 'Apenas os dias mais recentes são preservados (ignorado se o arquivo de longo prazo estiver ativado)',
     },
 
     'views/settings/sections/ExportDefaultsSection': {

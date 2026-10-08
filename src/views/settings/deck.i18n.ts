@@ -44,7 +44,6 @@ export const deckMessages = defineMessages(
     secAppearance: '外观',
     secLocalData: '本机数据',
     secFeedback: '反馈问题',
-    secRetention: '本地保留',
 
     cloudSourceSub: '账号的数据来源',
     firstSyncing: (current: number, total: number) => `连接成功 · 正在取最近记录 ${current}/${total}`,
@@ -69,7 +68,6 @@ export const deckMessages = defineMessages(
     themeLight: '浅色',
     scaleSub: '100% 为设计基准，也可以用 Ctrl + / Ctrl -',
 
-    retentionSub: '只保留最近这么多天；长期归档开启时不生效',
   },
   {
     pageIntro: 'Open a card to adjust it; once open, drag its header sideways to flip to the next.',
@@ -110,7 +108,6 @@ export const deckMessages = defineMessages(
     secAppearance: 'Appearance',
     secLocalData: 'Data on this machine',
     secFeedback: 'Report a problem',
-    secRetention: 'Local retention',
 
     cloudSourceSub: 'Where this account’s data comes from',
     firstSyncing: (current: number, total: number) => `Connected · fetching recent records ${current}/${total}`,
@@ -135,7 +132,6 @@ export const deckMessages = defineMessages(
     themeLight: 'Light',
     scaleSub: '100% is the design size; Ctrl + / Ctrl - also work',
 
-    retentionSub: 'Keeps only the most recent days; ignored while long-term archive is on',
   },
   {
     pageIntro: 'Abre una tarjeta para ajustarla; ya abierta, arrastra la cabecera a un lado para pasar a la siguiente.',
@@ -176,7 +172,6 @@ export const deckMessages = defineMessages(
     secAppearance: 'Apariencia',
     secLocalData: 'Tus datos en este equipo',
     secFeedback: 'Informar de un problema',
-    secRetention: 'Conservación local',
 
     cloudSourceSub: 'De dónde vienen los datos de esta cuenta',
     firstSyncing: (current: number, total: number) => `Conectado · trayendo los registros recientes ${current}/${total}`,
@@ -201,7 +196,6 @@ export const deckMessages = defineMessages(
     themeLight: 'Claro',
     scaleSub: '100 % es el tamaño de diseño; también funcionan Ctrl + / Ctrl -',
 
-    retentionSub: 'Solo se conservan los días más recientes; no se aplica con el archivo a largo plazo activado',
   },
   'views/settings/deck',
 );

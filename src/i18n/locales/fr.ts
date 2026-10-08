@@ -199,11 +199,7 @@ Dis-moi :
 
 S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), demande simplement.`,
       mcpConfigPathPlaceholder: '<chemin vers zeppbridge-mcp>',
-      retentionLabel: 'Conserver pendant',
       retentionAria: 'Conservation des données locales en jours',
-      retentionNote: (days: number) => `Conserve les ${days} derniers jours en local. Le nettoyage a lieu `,
-      retentionNoteStrong: 'après chaque synchro réussie',
-      retentionNoteTail: ', jamais tout seul en arrière-plan.',
       retentionCutoff: (date: string) => `Après la prochaine synchro réussie, les données antérieures au ${date} sont élaguées`,
       cleaningUp: 'Nettoyage…',
       cleanupNow: 'Nettoyer maintenant',
@@ -1122,17 +1118,8 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       trendAria: (label: string) => `Courbe de tendance : ${label}`,
     },
     'components/HistoryArchivePanel': {
-      title: 'Archivage long terme et historique complet',
-      intro: 'L’archivage, c’est « ne plus rien supprimer à partir de maintenant » ; le rattrapage, c’est « aller chercher ce qui précède ». Avec les deux, la copie locale est vraiment complète.',
 
-      archiveTitle: 'Archivage long terme',
-      archiveAria: 'Archivage long terme',
-      archiveBody: 'Activé, une synchro réussie ne taille plus l’historique selon la fenêtre de conservation. La base grandit en continu — désactivable à tout moment, et la désactivation annonce ce que la prochaine synchro élaguerait.',
-      recommended: 'Recommandé',
-      archiveEnabled: 'Archivage long terme activé : les synchros réussies ne taillent plus l’historique.',
-      archiveDisabled: 'Archivage long terme désactivé : la prochaine synchro réussie élaguera selon la fenêtre de conservation.',
       archiveSaveFailed: 'Impossible d’enregistrer le réglage d’archivage',
-      confirmDisableArchive: 'Archivage long terme désactivé : la prochaine synchro réussie élaguera les données plus anciennes selon la fenêtre de conservation, sans retour possible.\nSi vous venez de rattraper de l’historique, faites d’abord un instantané de la base.\nDésactiver quand même ?',
 
       startLabel: 'Rattraper depuis',
       startAria: 'Début du rattrapage d’historique',
@@ -1148,9 +1135,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       estimateRate: (days: number, perDay: string) => `${days} jours d’échantillons locaux · environ ${perDay}/jour`,
       unmeasured: (streams: string) =>
         `Pas assez d’échantillons locaux pour estimer : ${streams}. Ces flux ne comptent pas dans le total ci-dessus — on préfère dire qu’on ne sait pas plutôt qu’inventer un rythme et le multiplier par des années.`,
-      outOfRetention: 'Ce rattrapage dépasse la fenêtre de conservation locale : les données récupérées seront élaguées à la prochaine synchro réussie. Activez d’abord l’archivage long terme, ou allongez la conservation.',
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Ce rattrapage irait chercher ${requested} jours d’historique, mais cette machine ne garde que les ${retention} derniers jours : ce qui reviendrait serait supprimé à la prochaine synchro réussie. Activez d’abord l’archivage long terme, ou allongez la conservation.`,
 
       startBackfill: 'Lancer le rattrapage',
       backfilling: 'Rattrapage en cours…',
@@ -1193,8 +1177,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       retryFailedDone: 'Les mois en échec sont remis en file ; le rattrapage peut reprendre.',
       retryFailedFailed: 'Impossible de remettre en file les mois en échec',
 
-      archiveRowTitle: 'Ne plus élaguer l’historique après chaque synchro',
-      backfillTitle: 'Rattraper l’historique antérieur',
       autoContinueTitle: 'Enchaîner automatiquement le round suivant',
       estimateDetails: 'Détail par flux',
       statPersisted: 'Écrit',
@@ -2336,7 +2318,6 @@ Réponds en Markdown.`,
       secAppearance: 'Apparence',
       secLocalData: 'Données locales',
       secFeedback: 'Signaler un problème',
-      secRetention: 'Rétention locale',
 
       cloudSourceSub: 'Source des données du compte',
       firstSyncing: (current: number, total: number) => `Connecté · récupération des enregistrements récents ${current}/${total}`,
@@ -2361,7 +2342,6 @@ Réponds en Markdown.`,
       themeLight: 'Clair',
       scaleSub: 'Taille standard à 100 % (Ctrl + / - utilisables)',
 
-      retentionSub: 'Seuls les jours récents sont conservés (inactif si l’archivage est activé)',
     },
 
     'views/settings/sections/ExportDefaultsSection': {

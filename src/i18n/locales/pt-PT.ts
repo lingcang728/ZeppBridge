@@ -207,12 +207,7 @@ export default {
       mcpSetupPrompt:
         'Uso uma aplicação de desktop para Windows chamada ZeppBridge que sincroniza os dados do meu relógio Amazfit / Zepp para uma base de dados SQLite local.\r\nEla traz um programa MCP (zeppbridge-mcp) e quero configurá-lo contigo, para poderes consultar os meus treinos e dados de saúde diretamente em vez de eu estar sempre a exportar e colar.\r\n\r\nO que sei sobre ele:\r\n- O programa MCP vem no pacote zeppbridge-tools na página de GitHub Releases do ZeppBridge; descompacta-o e o zeppbridge-mcp está lá dentro. Posso ainda não o ter transferido.\r\n- É um servidor MCP stdio. Lê a base de dados local, não usa a rede, não escuta em nenhuma porta e não precisa de token nem de API key.\r\n- A forma típica da configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": ["--scope", "task"]}}}\r\n- Expõe doze ferramentas só de leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), acontecimentos de vida (list_life_events) e estado dos dados (get_data_health).\r\n\r\nDiz-me por favor:\r\n1. Para ti em concreto — a ferramenta com quem estou a falar agora — em que ficheiro vai a configuração, ou que comando a adiciona;\r\n2. Como escrever um caminho do Windows (as barras invertidas precisam de escape?);\r\n3. Como verificar que funciona depois de configurado.\r\n\r\nSe precisares de algo meu (que cliente uso, onde fica o ficheiro), pergunta.',
       mcpConfigPathPlaceholder: '<caminho para o zeppbridge-mcp>',
-      retentionLabel: 'Retenção de dados',
       retentionAria: 'Retenção de dados locais em dias',
-      retentionNote: (days: number) =>
-        `Guarda localmente os últimos ${days} dias. A limpeza decorre `,
-      retentionNoteStrong: 'após uma sincronização bem-sucedida',
-      retentionNoteTail: ', nunca de forma isolada em segundo plano.',
       retentionCutoff: (date: string) =>
         `Na próxima sincronização com sucesso, os dados anteriores a ${date} serão eliminados`,
       cleaningUp: 'A limpar…',
@@ -696,14 +691,6 @@ export default {
       setupSummary: "Método e referências",
     },
     'components/HistoryArchivePanel': {
-      title: 'Arquivo de longo prazo e histórico completo',
-      intro:
-        'O arquivo preserva os dados futuros; a reposição descarrega os anteriores. Em conjunto, garantem um histórico local completo.',
-      archiveTitle: 'Arquivo de longo prazo',
-      archiveBody:
-        'Com o arquivo ativo, as sincronizações mantêm todo o histórico sem aplicar a janela de retenção. Podes desativar a qualquer momento e ver que dados seriam eliminados.',
-      recommended: 'Recomendado',
-      archiveAria: 'Arquivo de longo prazo',
       startLabel: 'Repor desde',
       startAria: 'Início da reposição do histórico',
       customDateLabel: 'Data de início',
@@ -713,8 +700,6 @@ export default {
         `${days} dias de amostras locais · cerca de ${perDay}/dia`,
       unmeasured: (streams: string) =>
         `Amostras locais insuficientes para estimar: ${streams}. Fora do total acima — melhor «desconhecido» que uma taxa inventada multiplicada por anos.`,
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Esta reposição abrange ${requested} dias, mas o limite local é de ${retention}. Os dados seriam eliminados após a próxima sincronização bem-sucedida. Ativa primeiro o arquivo de longo prazo ou aumenta a retenção.`,
       backfilling: 'A repor…',
       continueBackfill: 'Continuar reposição',
       startBackfill: 'Iniciar reposição',
@@ -748,16 +733,8 @@ export default {
       range3y: 'Últimos 3 anos',
       rangeAll: (years: number) => `Todo o histórico disponível (até ${years} anos)`,
       rangeCustom: 'Data personalizada',
-      confirmDisableArchive:
-        'Ao desativar o arquivo, a próxima sincronização bem-sucedida eliminará os dados fora da janela de retenção (ação irreversível).\nRecomenda-se criar um snapshot da base de dados antes de prosseguir.\nDesativar?',
-      archiveEnabled:
-        'Arquivo de longo prazo ativo: as sincronizações mantêm todo o histórico.',
-      archiveDisabled:
-        'Arquivo de longo prazo inativo: a próxima sincronização aplicará a janela de retenção.',
       archiveSaveFailed: 'Não foi possível guardar a definição do arquivo',
       pickStartFirst: 'Define primeiro a data de início da reposição.',
-      outOfRetention:
-        'O período ultrapassa a retenção local; os dados serão eliminados após a próxima sincronização bem-sucedida. Ativa primeiro o arquivo de longo prazo ou aumenta a retenção.',
       roundDone: (remaining: number) =>
         `Ronda concluída; restam ${remaining} blocos mensais. Prime «Continuar reposição» quando quiseres.`,
       allChunksDone: 'Todos os blocos mensais do registo foram processados.',
@@ -786,9 +763,7 @@ export default {
         hrv: 'VFC',
         wellness: 'Stress / SpO₂ e afins',
       },
-      archiveRowTitle: 'Não eliminar o histórico após cada sincronização',
       autoContinueTitle: 'Avançar automaticamente para a ronda seguinte',
-      backfillTitle: 'Repor histórico anterior',
       estimateDetails: 'Detalhe por tipo de dados',
       statEmpty: 'Vazio na nuvem',
       statFailed: 'Falhados',
@@ -2408,7 +2383,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       secAppearance: 'Aspeto visual',
       secLocalData: 'Dados nesta máquina',
       secFeedback: 'Reportar problema',
-      secRetention: 'Retenção local',
       cloudSourceSub: 'Origem dos dados da conta',
       firstSyncing: (current: number, total: number) => `Ligado · a obter os registos recentes ${current}/${total}`,
       firstSyncingPlain: "Ligado · a obter os registos recentes",
@@ -2430,8 +2404,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       themeDark: 'Escuro',
       themeLight: 'Claro',
       scaleSub: '100% é a escala predefinida (ou usa Ctrl + / Ctrl -)',
-      retentionSub:
-        'Período mantido localmente (ignorado quando o arquivo de longo prazo está ativo)',
     },
     'views/settings/sections/ExportDefaultsSection': {
       example: 'ex.:',

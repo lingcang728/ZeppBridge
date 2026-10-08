@@ -42,7 +42,7 @@ const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSy
 const { feedback, auth, official, prefs, capability } = provideSettingsContext();
 const { dataMessage, dataError } = feedback;
 const { loginError, accountRecognized, connectionLabel } = auth;
-const { userPrefs, retentionDays, applyPrefsChange } = prefs;
+const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
 
@@ -180,7 +180,7 @@ onUnmounted(() => {
 
       <template #body="{ card }">
         <KeepAlive :max="8">
-          <CardBody :key="card.id" :id="card.id" :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
+          <CardBody :key="card.id" :id="card.id" />
         </KeepAlive>
       </template>
     </CardDeck>

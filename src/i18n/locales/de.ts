@@ -397,11 +397,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
 
       // ── 6. Aufbewahrung ──
-      retentionLabel: 'Aufbewahrungsdauer',
       retentionAria: 'Aufbewahrungsdauer lokaler Daten in Tagen',
-      retentionNote: (days: number) => `Die letzten ${days} Tage werden lokal behalten. Bereinigt wird `,
-      retentionNoteStrong: 'nach jeder erfolgreichen Synchronisierung',
-      retentionNoteTail: ', nie von selbst im Hintergrund.',
       retentionCutoff: (date: string) =>
         `Nach der nächsten erfolgreichen Synchronisierung werden Daten vor dem ${date} gelöscht`,
       cleaningUp: 'Bereinigung läuft…',
@@ -900,25 +896,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'components/HistoryArchivePanel': {
       allChunksDone: 'Jeder Monatsblock im Abdeckungsprotokoll ist erledigt.',
-      archiveAria: 'Langzeitarchiv',
-      archiveBody:
-        'Aktiviert: Erfolgreiche Synchronisierungen löschen keine Daten mehr nach Aufbewahrungsfrist. Die Datenbank wächst weiter. Beim Ausschalten siehst du vorab, was gelöscht würde.',
-      archiveDisabled:
-        'Langzeitarchiv aus: Die nächste erfolgreiche Synchronisierung räumt nach der Aufbewahrungsfrist auf.',
-      archiveEnabled:
-        'Langzeitarchiv an: Erfolgreiche Synchronisierungen räumen die Historie nicht mehr auf.',
-      archiveRowTitle: 'Historie nach jeder Synchronisierung nicht mehr aufräumen',
       archiveSaveFailed: 'Die Archiv-Einstellung konnte nicht gespeichert werden',
-      archiveTitle: 'Langzeitarchiv',
       autoContinue: 'Bis zum Ende durchlaufen',
       autoContinueHint:
         'Nach jeder Runde startet automatisch die nächste, bis alles nachgeladen ist. Jederzeit stoppbar, Geholtes bleibt.',
       autoContinueTitle: 'Nach jeder Runde automatisch die nächste starten',
       backfillFailed: 'Das Nachladen der Historie ist fehlgeschlagen',
       backfilling: 'Nachladen läuft…',
-      backfillTitle: 'Ältere Historie nachladen',
-      confirmDisableArchive:
-        'Ohne Langzeitarchiv löscht die nächste erfolgreiche Synchronisierung alte Daten nach der Aufbewahrungsfrist – unwiderruflich.\nFalls du gerade Historie nachgeladen hast, lege vorher einen Datenbank-Snapshot an.\nWirklich ausschalten?',
       confirmResetLedger:
         'Löscht nur das Abdeckungsprotokoll – bereits gespeicherte Daten bleiben erhalten, danach lässt sich der Nachlade-Zeitraum neu planen. Fortfahren?',
       continueBackfill: 'Weiter nachladen',
@@ -940,8 +924,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Diese Blöcke sind fehlgeschlagen. Die übrigen Monate sind unberührt und wurden wie üblich nachgeladen.',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedTitle: 'Monate, die nicht geholt werden konnten',
-      intro:
-        'Das Archiv verhindert künftiges Löschen, das Nachladen holt frühere Daten zurück – beides zusammen macht die lokale Kopie komplett.',
       ledgerComplete:
         'Jeder Monatsblock im Protokoll ist erledigt: entweder lokal geschrieben, oder die Cloud hat klar gesagt, dass sie für diesen Zeitraum nichts hat.',
       ledgerFrom: (from: string) => ` · angefragt ab ${from}`,
@@ -956,8 +938,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Das Protokoll ist geleert. Du kannst einen neuen Nachlade-Zeitraum planen.',
       ledgerResetFailed: 'Das Protokoll ließ sich nicht leeren',
       ledgerTitle: 'Abdeckungsprotokoll',
-      outOfRetention:
-        'Dieses Nachladen geht über die lokale Aufbewahrungsfrist hinaus – Geholtes wird bei der nächsten erfolgreichen Synchronisierung aufgeräumt. Erst das Langzeitarchiv einschalten oder die Frist verlängern.',
       pickStartFirst: 'Wähle erst einen Nachlade-Startpunkt.',
       range1y: '1 Jahr',
       range2y: 'Letzte 2 Jahre',
@@ -965,7 +945,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       rangeAll: (years: number) =>
         `Gesamte verfügbare Historie (bis zu ${years} Jahre)`,
       rangeCustom: 'Eigener Start',
-      recommended: 'Empfohlen',
       resetLedger: 'Protokoll leeren',
       retryFailed: 'Fehlgeschlagene Monate erneut versuchen',
       retryFailedDone:
@@ -997,11 +976,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         workouts: 'Trainings',
       },
       streamSeparator: ', ',
-      title: 'Langzeitarchiv und vollständige Historie',
       unmeasured: (streams: string) =>
         `Zu wenig lokale Messwerte für eine Schätzung (${streams}) – wird in der Gesamtsumme weggelassen statt ungenau hochgerechnet.`,
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Dieses Nachladen holt ${requested} Tage Historie, aber dieser Rechner behält nur die letzten ${retention} Tage – Geholtes wird bei der nächsten erfolgreichen Synchronisierung gelöscht. Erst das Langzeitarchiv einschalten oder die Aufbewahrungsfrist verlängern.`,
     },
     'components/InsightCard': {
       baselineRule: (days: number, tolerance: number | undefined, min: number, max: number) =>
@@ -2770,8 +2746,6 @@ Antworte in Markdown.`,
       pageIntroDeck:
         'Seitwärts streichen zum Auswählen, die mittlere Karte öffnen; für alles auf einmal „Alle anzeigen".',
       openCard: 'Öffnen',
-      retentionSub:
-        'Behält nur die jüngsten Tage; wirkungslos bei eingeschaltetem Langzeitarchiv',
       scaleSub: '100 % ist die Designgröße; Strg + / Strg - gehen auch',
       secAccount: 'Konto',
       secAppearance: 'Erscheinungsbild',
@@ -2785,7 +2759,6 @@ Antworte in Markdown.`,
       secLogin: 'Anmeldemethode',
       secLoginSub: 'Nur aufklappen, wenn du dich anders anmelden musst',
       secMcp: 'MCP',
-      secRetention: 'Lokale Aufbewahrung',
       sumAccount: (state: string, devices: number) =>
         `${state} · ${plural(devices, {
           one: `${devices} Gerät`,

@@ -4,10 +4,9 @@
  * 单独成一个组件，是为了让 Settings.vue 用 <KeepAlive> 按卡缓存它：甩到下一张卡时，
  * 开过的那张直接复用，不用把整段表单（补拉账本、设备列表、MCP 配置）重新挂一遍——
  * 以前每甩一下都要等新区块挂载完才浮上来，就是「甩一下卡一下」。 */
-import HistoryArchivePanel from '../../components/HistoryArchivePanel.vue';
-import type { UserPrefs } from '../../types';
 import AccountSection from './sections/AccountSection.vue';
 import AdvancedSection from './sections/AdvancedSection.vue';
+import ArchiveSection from './sections/ArchiveSection.vue';
 import AuthSection from './sections/AuthSection.vue';
 import AutoSyncSection from './sections/AutoSyncSection.vue';
 import CapabilitySection from './sections/CapabilitySection.vue';
@@ -16,11 +15,9 @@ import DisplayPrefsSection from './sections/DisplayPrefsSection.vue';
 import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
-import RetentionSection from './sections/RetentionSection.vue';
 import WorkoutCodesSection from './sections/WorkoutCodesSection.vue';
 
-defineProps<{ id: string; prefs: UserPrefs | null }>();
-const emit = defineEmits<{ 'prefs-changed': [prefs: UserPrefs] }>();
+defineProps<{ id: string }>();
 </script>
 
 <template>
@@ -31,10 +28,7 @@ const emit = defineEmits<{ 'prefs-changed': [prefs: UserPrefs] }>();
       <AuthSection />
     </template>
     <AutoSyncSection v-else-if="id === 'sync'" />
-    <template v-else-if="id === 'archive'">
-      <HistoryArchivePanel :prefs="prefs" @prefs-changed="(next: UserPrefs) => emit('prefs-changed', next)" />
-      <RetentionSection />
-    </template>
+    <ArchiveSection v-else-if="id === 'archive'" />
     <template v-else-if="id === 'data'">
       <CapabilitySection />
       <WorkoutCodesSection />

@@ -321,14 +321,6 @@ export default {
       setupSummary: "Methode en referentiewaarden",
     },
     'components/HistoryArchivePanel': {
-      title: 'Langetermijnarchief en volledige historie',
-      intro:
-        'Het archief bewaart gegevens vanaf vandaag; met ophalen haal je eerdere historie binnen. Samen maken ze je lokale kopie compleet.',
-      archiveTitle: 'Langetermijnarchief',
-      archiveBody:
-        'Aan: een geslaagde synchronisatie snoeit de historie niet meer volgens de bewaarperiode. De database groeit door; altijd weer uit te zetten, en uitzetten toont wat de volgende synchronisatie zou snoeien.',
-      recommended: 'Aanbevolen',
-      archiveAria: 'Langetermijnarchief',
       startLabel: 'Ophalen vanaf',
       startAria: 'Start van het ophalen van historie',
       customDateLabel: 'Startdatum',
@@ -338,8 +330,6 @@ export default {
         `${days} dagen lokale metingen · ca. ${perDay}/dag`,
       unmeasured: (streams: string) =>
         `Te weinig lokale metingen om groei te schatten: ${streams}. Buiten berekening gehouden om giswerk te vermijden.`,
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Dit haalt ${requested} dagen historie op, maar deze computer bewaart alleen de laatste ${retention} dagen. Opgehaalde gegevens worden na de volgende geslaagde synchronisatie gewist. Zet eerst het langetermijnarchief aan of verleng de bewaartermijn.`,
       backfilling: 'Historie ophalen…',
       continueBackfill: 'Doorgaan met ophalen',
       startBackfill: 'Begin met ophalen',
@@ -373,16 +363,8 @@ export default {
       range3y: 'Afgelopen 3 jaar',
       rangeAll: (years: number) => `Alle beschikbare historie (tot ${years} jaar)`,
       rangeCustom: 'Eigen startpunt',
-      confirmDisableArchive:
-        'Met het langetermijnarchief uit snoeit de volgende geslaagde synchronisatie oudere gegevens volgens de bewaarperiode — onomkeerbaar.\nHeb je net historie opgehaald, maak dan eerst een databasemomentopname.\nUitzetten?',
-      archiveEnabled:
-        'Langetermijnarchief aan: geslaagde synchronisaties snoeien de historie niet meer.',
-      archiveDisabled:
-        'Langetermijnarchief uit: de volgende geslaagde synchronisatie snoeit volgens de bewaarperiode.',
       archiveSaveFailed: 'De archiefinstelling kon niet worden opgeslagen',
       pickStartFirst: 'Kies eerst een startpunt voor het ophalen.',
-      outOfRetention:
-        'Dit ophalen reikt voorbij de lokale bewaarperiode; wat terugkomt wordt bij de volgende geslaagde synchronisatie gesnoeid. Zet eerst het langetermijnarchief aan of vergroot de bewaarperiode.',
       roundDone: (remaining: number) =>
         `Deze ronde is klaar; er blijven ${remaining} maandblokken over. Druk op ‘Doorgaan met ophalen’ om verder te gaan — je kunt stoppen wanneer je wilt.`,
       allChunksDone: 'Elk maandblok in het logboek is afgehandeld.',
@@ -404,8 +386,6 @@ export default {
         'Mislukte maanden staan weer in de wachtrij — je kunt verder ophalen.',
       retryFailedFailed:
         'De mislukte maanden konden niet opnieuw in de wachtrij worden gezet',
-      archiveRowTitle: 'Historie na elke synchronisatie niet meer snoeien',
-      backfillTitle: 'Eerdere historie ophalen',
       autoContinueTitle: 'Na een ronde automatisch de volgende starten',
       estimateDetails: 'Uitsplitsing per stroom',
       statPersisted: 'Geschreven',
@@ -1518,11 +1498,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
         `De volgende geslaagde synchronisatie verwijdert lokale gegevens ouder dan ${days} dagen, definitief. Doorgaan?`,
       retentionCutoff: (date: string) =>
         `Na de volgende geslaagde synchronisatie worden gegevens ouder dan ${date} gesnoeid`,
-      retentionLabel: 'Bewaren voor',
-      retentionNote: (days: number) =>
-        `Bewaart de laatste ${days} dagen lokaal. Snoeien gebeurt `,
-      retentionNoteStrong: 'na een geslaagde synchronisatie',
-      retentionNoteTail: ', nooit zelfstandig op de achtergrond.',
       retry: 'Opnieuw proberen',
       scaleLabel: 'Interface-schaling',
       stream: {
@@ -2585,7 +2560,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       secLocalData: 'Je gegevens op deze computer',
       secFormat: 'Taal en notaties',
       secAppearance: 'Uiterlijk',
-      secRetention: 'Lokale bewaring',
       secExport: 'Standaardexport',
       secCodes: 'Niet-herkende trainingscodes',
       secLogin: 'Inlogmethode',
@@ -2604,8 +2578,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       autoSyncToggle: 'Automatisch synchroniseren',
       exportFormatSub:
         'Vooraf geselecteerd bij export vanuit ‘Naar de AI’ of een training',
-      retentionSub:
-        'Alleen de meest recente dagen worden bewaard; genegeerd zolang het langetermijnarchief aan staat',
       scaleSub: '100% is de ontwerpmaat; Ctrl + en Ctrl - werken ook',
       themeLabel: 'Thema',
       themeLight: 'Licht',

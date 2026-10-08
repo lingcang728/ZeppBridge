@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { onActivated, ref } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import BackupPanel from '../../../components/BackupPanel.vue';
 import Icon from '../../../components/Icon.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
+import MaintenanceSection from './MaintenanceSection.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSettingsFormat } from '../../../composables/settings/useSettingsFormat';
 import { useSyncController } from '../../../composables/useSyncController';
@@ -56,6 +57,14 @@ const runCompactPayloads = async () => {
   }
 };
 
+/* 归档卡的「备份与恢复 → 打开」带着 #backup 过来：等卡展开动画走完再滚到那一块。
+   卡体在 KeepAlive 里，第一次挂载和再次切回来都会走 onActivated。 */
+const route = useRoute();
+onActivated(() => {
+  if (route.hash !== '#backup') return;
+  window.setTimeout(() => document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 360);
+});
+
 const openDataFolder = async () => {
   try { await backend.openDataFolder(); }
   catch (error) { feedback.dataError.value = toUserMessage(error, t.value.openFolderFailed); }
@@ -102,7 +111,9 @@ const openDataFolder = async () => {
       </section>
     </div>
 
-    <section class="s-section">
+    <MaintenanceSection />
+
+    <section id="backup" class="s-section">
       <div class="s-section-head"><h3>{{ t.backupLabel }}</h3></div>
       <BackupPanel />
     </section>

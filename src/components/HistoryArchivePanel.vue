@@ -1,157 +1,105 @@
 <script setup lang="ts">
 /**
- * 长期归档与完整历史补拉（设置卡叠「归档与存储」里的主体）。
- *
- * 三块，从上到下：归档开关 → 补拉以前的历史 → 覆盖账本。
- * 状态和动作在 composables/useHistoryBackfill.ts，账本视图在 archive/CoverageLedger.vue。
+ * 补拉的「明细」：起点、自动续传、估算、失败重试，以及覆盖账本（清空账本在高级·维护）。
+ * 开始 / 继续 / 停止留在「归档与存储」卡的那一行上（ArchiveSection.vue），状态由它传进来。
  */
 import GlassSwitch from './GlassSwitch.vue';
 import WheelDatePicker from './WheelDatePicker.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import FoldTransition from './FoldTransition.vue';
 import CoverageLedger from './archive/CoverageLedger.vue';
-import { useHistoryBackfill } from '../composables/useHistoryBackfill';
+import type { useHistoryBackfill } from '../composables/useHistoryBackfill';
 import type { UserPrefs } from '../types';
 
 defineOptions({ name: 'HistoryArchivePanel' });
 
-const props = defineProps<{ prefs: UserPrefs | null }>();
-const emit = defineEmits<{ (event: 'prefs-changed', prefs: UserPrefs): void }>();
+const props = defineProps<{ state: ReturnType<typeof useHistoryBackfill>; prefs: UserPrefs | null }>();
 
 const {
   t, streamLabel, ledger, busy, error, message, estimate, startChoice, customFrom, START_CHOICES,
-  fromDate, requestedDays, wouldBeCleanedUp, remaining, formatBytes, measuredStreams, unmeasuredStreams,
-  estimateText, stopReasonText, chunkErrorText, autoContinue, stopRequested, isSyncing,
-  toggleArchive, stopBackfill, runBackfill, retryFailed, resetLedger,
-} = useHistoryBackfill(() => props.prefs, (prefs) => emit('prefs-changed', prefs));
+  requestedDays, wouldBeCleanedUp, remaining, formatBytes, measuredStreams, unmeasuredStreams,
+  estimateText, stopReasonText, chunkErrorText, autoContinue, isSyncing,
+  retryFailed,
+} = props.state;
 </script>
 
+<!-- 多根组件：这几行直接排进归档卡的列表里，用细线和上一行分开，不再自己包一块板（卡里套卡）。 -->
 <template>
-  <div class="archive-panel">
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ t.archiveTitle }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main">
-            <span class="s-row-title">{{ t.archiveRowTitle }} <em class="rec-badge">{{ t.recommended }}</em></span>
-            <span class="s-row-sub">{{ t.archiveBody }}</span>
-          </div>
-          <div class="s-row-control">
-            <GlassSwitch
-              :aria-label="t.archiveAria"
-              :model-value="Boolean(prefs?.archive_enabled)"
-              :disabled="busy || !prefs"
-              @update:model-value="toggleArchive"
-            />
-          </div>
+      <div class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ t.startLabel }}</span></div>
+        <div class="s-row-control">
+          <SegmentTrack v-model="startChoice" compact :items="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
         </div>
       </div>
-    </section>
-
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ t.backfillTitle }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ t.startLabel }}</span></div>
-          <div class="s-row-control">
-            <SegmentTrack v-model="startChoice" compact :items="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
-          </div>
-        </div>
-        <FoldTransition>
-        <div v-if="startChoice === 'custom'" class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ t.customDateLabel }}</span></div>
-          <div class="s-row-control">
-            <WheelDatePicker v-model="customFrom" :aria-label="t.customDateAria" />
-          </div>
-        </div>
-        </FoldTransition>
-        <div class="s-row">
-          <div class="s-row-main">
-            <span class="s-row-title">{{ t.autoContinueTitle }}</span>
-            <span class="s-row-sub">{{ t.autoContinueHint }}</span>
-          </div>
-          <div class="s-row-control">
-            <GlassSwitch
-              :aria-label="t.autoContinue"
-              :model-value="autoContinue"
-              :disabled="busy"
-              @update:model-value="autoContinue = !autoContinue"
-            />
-          </div>
-        </div>
-        <details v-if="estimate" class="s-row is-block estimate">
-          <summary>
-            <span class="s-row-main">
-              <span class="s-row-title">{{ t.estimateTitle }}</span>
-              <span class="s-row-sub">{{ estimateText }}</span>
-            </span>
-            <span class="estimate-toggle">{{ t.estimateDetails }}</span>
-          </summary>
-          <table v-if="measuredStreams.length" class="estimate-table">
-            <tbody>
-              <tr v-for="item in measuredStreams" :key="item.stream">
-                <th scope="row">{{ streamLabel(item.stream) }}</th>
-                <td>{{ t.estimateRate(item.observed_days, formatBytes(item.bytes_per_day)) }}</td>
-                <td class="num">+{{ formatBytes(item.estimated_add_bytes) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p v-if="unmeasuredStreams.length" class="s-note">
-            {{ t.unmeasured(unmeasuredStreams.map((item) => streamLabel(item.stream)).join(t.streamSeparator)) }}
-          </p>
-        </details>
-        <div class="s-row actions-row">
-          <div class="s-actions">
-            <button
-              class="button primary"
-              type="button"
-              :disabled="busy || isSyncing || !fromDate || wouldBeCleanedUp || Boolean(estimate?.stop_reason)"
-              @click="runBackfill"
-            >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
-            <button
-              v-if="busy"
-              class="button secondary"
-              type="button"
-              :disabled="stopRequested"
-              @click="stopBackfill"
-            >{{ stopRequested ? t.stopping : t.stopBackfill }}</button>
-            <button
-              v-if="ledger?.failed_chunks_detail?.length"
-              class="button secondary"
-              type="button"
-              :disabled="busy || isSyncing"
-              @click="retryFailed"
-            >{{ t.retryFailed }}</button>
-            <button v-if="ledger?.total_chunks" class="button secondary" type="button" :disabled="busy" @click="resetLedger">
-              {{ t.resetLedger }}
-            </button>
-          </div>
+      <FoldTransition>
+      <div v-if="startChoice === 'custom'" class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ t.customDateLabel }}</span></div>
+        <div class="s-row-control">
+          <WheelDatePicker v-model="customFrom" :aria-label="t.customDateAria" />
         </div>
       </div>
-      <FoldTransition><p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ stopReasonText }}</p></FoldTransition>
-      <FoldTransition><p v-if="wouldBeCleanedUp" class="api-error" role="alert">
-        {{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}
-      </p></FoldTransition>
-      <FoldTransition><p v-if="error" class="api-error" role="alert">{{ error }}</p><p v-else-if="message" class="hint-line ok" role="status">{{ message }}</p></FoldTransition>
-    </section>
-
-    <CoverageLedger
-      v-if="ledger && ledger.total_chunks > 0"
-      :ledger="ledger"
-      :remaining="remaining"
-      :stream-label="streamLabel"
-      :chunk-error-text="chunkErrorText"
-      :t="t"
-   />
-  </div>
+      </FoldTransition>
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.autoContinueTitle }}</span>
+          <span class="s-row-sub">{{ t.autoContinueHint }}</span>
+        </div>
+        <div class="s-row-control">
+          <GlassSwitch
+            :aria-label="t.autoContinue"
+            :model-value="autoContinue"
+            :disabled="busy"
+            @update:model-value="autoContinue = !autoContinue"
+          />
+        </div>
+      </div>
+      <details v-if="estimate" class="s-row is-block estimate">
+        <summary>
+          <span class="s-row-main">
+            <span class="s-row-title">{{ t.estimateTitle }}</span>
+            <span class="s-row-sub">{{ estimateText }}</span>
+          </span>
+          <span class="estimate-toggle">{{ t.estimateDetails }}</span>
+        </summary>
+        <table v-if="measuredStreams.length" class="estimate-table">
+          <tbody>
+            <tr v-for="item in measuredStreams" :key="item.stream">
+              <th scope="row">{{ streamLabel(item.stream) }}</th>
+              <td>{{ t.estimateRate(item.observed_days, formatBytes(item.bytes_per_day)) }}</td>
+              <td class="num">+{{ formatBytes(item.estimated_add_bytes) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="unmeasuredStreams.length" class="s-note">
+          {{ t.unmeasured(unmeasuredStreams.map((item) => streamLabel(item.stream)).join(t.streamSeparator)) }}
+        </p>
+      </details>
+      <div v-if="ledger?.failed_chunks_detail?.length" class="s-row actions-row">
+        <div class="s-actions">
+          <button class="button secondary" type="button" :disabled="busy || isSyncing" @click="retryFailed">{{ t.retryFailed }}</button>
+        </div>
+      </div>
+      <div v-if="estimate?.stop_reason || wouldBeCleanedUp || error || message" class="s-row is-block notes-row">
+        <p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ stopReasonText }}</p>
+        <p v-if="wouldBeCleanedUp" class="api-error" role="alert">{{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}</p>
+        <p v-if="error" class="api-error" role="alert">{{ error }}</p>
+        <p v-else-if="message" class="hint-line ok" role="status">{{ message }}</p>
+      </div>
+      <div v-if="ledger && ledger.total_chunks > 0" class="s-row is-block">
+        <CoverageLedger
+          :ledger="ledger"
+          :remaining="remaining"
+          :stream-label="streamLabel"
+          :chunk-error-text="chunkErrorText"
+          :t="t"
+        />
+      </div>
 </template>
 
 <style scoped src="../views/settings/settings-local.css"></style>
 <style scoped>
-.archive-panel { display: grid; gap: 22px; min-width: 0; }
-/* 新建的库默认开着它（用户 2026-09-29 定：推荐长期保留）。 */
-.rec-badge { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: var(--fs-2xs); font-style: normal; font-weight: 650; vertical-align: 1px; }
-.archive-panel > .s-section + .s-section { margin-top: 0; }
+.notes-row { gap: 6px; }
+.notes-row p { margin: 0; }
 .estimate > summary {
   display: flex;
   align-items: center;

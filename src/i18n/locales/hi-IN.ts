@@ -203,11 +203,7 @@ export default {
       mcpConfigPathPlaceholder: '<zeppbridge-mcp का पाथ>',
 
       // ── 6. 本地数据保留 ──
-      retentionLabel: 'कितने दिन रखें',
       retentionAria: 'लोकल डेटा रिटेंशन, दिनों में',
-      retentionNote: (days: number) => `पिछले ${days} दिन का डेटा लोकल रखा जाता है। सफ़ाई `,
-      retentionNoteStrong: 'कामयाब सिंक के बाद',
-      retentionNoteTail: ' होती है, बैकग्राउंड में कभी नहीं।',
       retentionCutoff: (date: string) => `अगले सिंक के बाद ${date} से पुराना डेटा मिटा दिया जाएगा`,
       cleaningUp: 'सफ़ाई हो रही है…',
       cleanupNow: 'अभी सफ़ाई करें',
@@ -637,24 +633,13 @@ export default {
     },
 
     'components/HistoryArchivePanel': {
-      title: 'दीर्घकालिक आर्काइव और इतिहास',
-      archiveRowTitle: 'सिंक के बाद पुराना इतिहास मिटाना बंद करें',
-      backfillTitle: 'पुराना इतिहास बैकफ़िल करें',
       autoContinueTitle: 'एक राउंड के बाद अगला अपने आप शुरू करें',
       estimateDetails: 'डेटा स्ट्रीम विवरण',
       statPersisted: 'लिखे गए',
       statEmpty: 'क्लाउड में खाली',
       statPending: 'बाकी',
       statFailed: 'विफल',
-      intro: 'आर्काइव डेटा मिटने से रोकता है; बैकफ़िल पुराना डेटा लाता है। दोनों हों तभी लोकल कॉपी पूरी होती है।',
-      archiveTitle: 'दीर्घकालिक आर्काइव',
-      archiveAria: 'दीर्घकालिक आर्काइव',
-      archiveBody: 'चालू होने पर सफल सिंक रिटेंशन अवधि के हिसाब से पुराना इतिहास नहीं मिटाता। डेटाबेस बढ़ता रहता है; इसे कभी भी बंद कर सकते हैं, बंद करने पर अगले सिंक की सफ़ाई का असर दिखेगा।',
-      recommended: 'सुझाया गया',
-      archiveEnabled: 'दीर्घकालिक आर्काइव चालू: पुराना डेटा नहीं मिटाया जाएगा।',
-      archiveDisabled: 'दीर्घकालिक आर्काइव बंद: अगला सिंक रिटेंशन सीमा से पुराना डेटा मिटाएगा।',
       archiveSaveFailed: 'आर्काइव सेटिंग सेव नहीं हुई',
-      confirmDisableArchive: 'दीर्घकालिक आर्काइव बंद करने पर अगला सफल सिंक रिटेंशन अवधि से पुराना डेटा मिटा देगा, जो वापस नहीं आएगा।\nअभी इतिहास बैकफ़िल किया है तो पहले डेटाबेस स्नैपशॉट ले लें।\nबंद करें?',
       startLabel: 'बैकफ़िल शुरुआत',
       startAria: 'इतिहास बैकफ़िल की शुरुआत',
       range1y: 'पिछला 1 साल',
@@ -686,9 +671,6 @@ export default {
       estimateRate: (days: number, perDay: string) => `लोकल ${days} दिन के सैम्पल · करीब ${perDay}/दिन`,
       unmeasured: (streams: string) =>
         `लोकल सैम्पल कम हैं, इसलिए अनुमान नहीं: ${streams}। ये ऊपर के कुल में शामिल नहीं हैं; सालों से गुणा करने के लिए दर गढ़ने से बेहतर है कहना कि नहीं मालूम।`,
-      outOfRetention: 'यह बैकफ़िल रेंज लोकल रिटेंशन से बाहर है — लाया गया डेटा अगले सफल सिंक के बाद मिट जाएगा। पहले दीर्घकालिक आर्काइव चालू करें या रिटेंशन अवधि बढ़ाएँ।',
-      wouldBeCleanedUp: (requested: number, retention: number) =>
-        `बैकफ़िल ${requested} दिन का इतिहास लाएगा, पर यहाँ केवल पिछले ${retention} दिन रखे जाते हैं। अगली सफल सिंक के बाद आया डेटा मिट जाएगा। पहले लंबे समय का आर्काइव चालू करें या रिटेंशन बढ़ाएँ।`,
       failedTitle: 'असफल महीने',
       failedIntro: 'ये चंक विफल रहे। अन्य महीने सामान्य रूप से बैकफ़िल हो गए।',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
@@ -2365,7 +2347,6 @@ Markdown में उत्तर दें।`,
       secAppearance: 'थीम और स्केल',
       secLocalData: 'लोकल डेटा',
       secFeedback: 'फीडबैक',
-      secRetention: 'लोकल रिटेंशन',
 
       cloudSourceSub: 'डेटा स्रोत',
       firstSyncing: (current: number, total: number) => `कनेक्ट हो गया · हाल के रिकॉर्ड ला रहे हैं ${current}/${total}`,
@@ -2390,7 +2371,6 @@ Markdown में उत्तर दें।`,
       themeLight: 'लाइट',
       scaleSub: '100% डिफ़ॉल्ट साइज़ है; Ctrl + / Ctrl - से भी बदल सकते हैं',
 
-      retentionSub: 'केवल हालिया दिन रखे जाते हैं; आर्काइव चालू होने पर लागू नहीं होता',
     },
 
     'views/settings/sections/ExportDefaultsSection': {
