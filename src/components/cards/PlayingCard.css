@@ -18,10 +18,23 @@
 .pcard:focus-visible { outline: none; }
 .pcard:focus-visible .pcard-face { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--focus), 0 24px 40px -24px rgba(0, 0, 0, .8); }
 .pcard.disabled .pcard-face { background: var(--mat-raised); opacity: .45; }
-/* 一叠：后面垫两张歪着的牌。一天都没记录的叠：压暗、缩小一点（稀疏指标的 6 个月不再一排大块）。 */
-.pcard.group::before, .pcard.group::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--w) * .1); background: var(--mat-raised); box-shadow: var(--mat-raised-rim), 0 18px 30px -22px rgba(0, 0, 0, .7); }
-.pcard.group::before { transform: translate(6px, 6px) rotate(4deg); opacity: .8; }
-.pcard.group::after { transform: translate(-5px, 9px) rotate(-5deg); opacity: .55; }
+/* 一叠：后面垫歪着的牌。垫牌**不透明**、只是压暗一档（10-08 H11：以前半透明，几叠挤在一起时叠出一块块灰）。
+   日牌是一张薄牌；周叠后面垫两张；月叠垫两张 + 底下再一道厚边（像一整副牌），顶上的颜色也更浓——三种一眼分得出。 */
+.pcard.group::before, .pcard.group::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--w) * .1);
+  background: linear-gradient(var(--deck-shade, rgba(0, 0, 0, .2)), var(--deck-shade, rgba(0, 0, 0, .2))), var(--mat-raised); box-shadow: var(--mat-raised-rim), 0 18px 30px -22px rgba(0, 0, 0, .7); }
+:root[data-theme='light'] .pcard.group { --deck-shade: rgba(38, 52, 41, .07); }
+.pcard.group::before { transform: translate(6px, 6px) rotate(4deg); }
+.pcard.group::after { transform: translate(-5px, 9px) rotate(-5deg); --deck-shade: rgba(0, 0, 0, .34); }
+.pcard.group.month .pcard-face { background: radial-gradient(130% 80% at 50% 0%, color-mix(in srgb, var(--tint) 30%, transparent), transparent 72%), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 26%, transparent), 0 2px 0 -1px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 4px 0 -1px rgba(0, 0, 0, .35), 0 6px 0 -1px color-mix(in srgb, var(--ink) 10%, transparent), 0 8px 0 -1px rgba(0, 0, 0, .35), 0 30px 46px -24px rgba(0, 0, 0, .85); }
+.pcard.group.month::before { transform: translate(9px, 8px) rotate(5deg); }
+.pcard.group.month::after { transform: translate(-8px, 12px) rotate(-6deg); }
+.pcard.group.month .pcard-title { font-size: min(max(13px, calc(var(--w) * .15)), calc(var(--w) * .8 / var(--tfit, 4))); }
+/* 一叠挑了一部分：虚线框；整叠挑满：实线框 + 实底角标（10-08 H5「挑 5 选 5 要虚实区分」）。 */
+.pcard.picked-some .pcard-face { outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
+.pcard.picked-all .pcard-face { outline: 2px solid var(--accent); outline-offset: 3px; }
+.pcard.picked-some .pcard-badge { padding: 2px 8px; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--canvas, #0d0f12) 82%, transparent); color: var(--accent); box-shadow: none; }
 .pcard.group.empty { scale: .86; }
 .pcard.group.empty .pcard-face { background: var(--mat-raised); opacity: .62; }
 .pcard.group.empty::before, .pcard.group.empty::after { opacity: .3; }

@@ -17,6 +17,8 @@ import { useStageText } from './stage.i18n';
 const props = defineProps<{
   r: number; provider: AiProvider; busy: boolean; disabled: boolean; subscribed: boolean;
   readiness: { categories: number; percent: number } | null; mdLine: string | null; issues: number; waiting: string | null; title: string;
+  /** 有一张牌被拖到锁跟前（H21：牌和锁之间要有互动）：锁迎上来一点、外圈亮起。 */
+  near?: boolean;
 }>();
 const emit = defineEmits<{ go: []; pick: [AiProviderId]; exportOnly: [] }>();
 const t = useHandoffText();
@@ -30,7 +32,7 @@ const go = () => { if (!props.disabled) emit('go'); };
 
 <template>
   <div class="bridge-lock" :style="{ '--r': `${r}px` }">
-    <button type="button" :class="['lock', { busy, disabled }]" :disabled="disabled" :title="title" :aria-label="busy ? s.lockBusy : s.lock(provider.label)" @click="go">
+    <button type="button" :class="['lock', { busy, disabled, near }]" :disabled="disabled" :title="title" :aria-label="busy ? s.lockBusy : s.lock(provider.label)" @click="go">
       <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
         <circle class="track" cx="50" cy="50" :r="RING_R" />
         <circle class="meter" cx="50" cy="50" :r="RING_R" :stroke-dasharray="meter" />
@@ -44,7 +46,7 @@ const go = () => { if (!props.disabled) emit('go'); };
       <span :class="['badge', { paid: subscribed }]" aria-hidden="true">{{ subscribed ? t.planPaid : t.planFree }}</span>
       <button type="button" class="export-only" :disabled="disabled || busy" :title="t.exportOnly" :aria-label="t.exportOnly" @click="emit('exportOnly')"><Icon name="export" :size="15" /></button>
     </div>
-    <RouterLink to="/ai/check" class="ready-line" data-morph-card :title="t.checkHint">
+    <RouterLink to="/ai/check" class="ready-line" data-sheet="check" :title="t.checkHint">
       <span v-if="waiting">{{ waiting }}</span>
       <template v-else>
         <span>{{ readiness ? t.readiness(readiness.categories, readiness.percent) : t.readinessLoading }}</span>
@@ -63,6 +65,11 @@ const go = () => { if (!props.disabled) emit('go'); };
 .lock:active:not(:disabled) { scale: .96; }
 .lock:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 .lock.disabled { cursor: default; filter: grayscale(.7); opacity: .65; }
+.lock.near:not(:disabled) { scale: 1.08; }
+.lock.near .ring .track { stroke: color-mix(in srgb, var(--accent) 45%, transparent); }
+.lock.near .disc { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 34px -6px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 7px color-mix(in srgb, var(--canvas) 70%, transparent); }
+.ring .track { transition: stroke 220ms ease; }
+.disc { transition: box-shadow 220ms ease; }
 .ring, .spin { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); rotate: -90deg; }
 .ring circle, .spin circle { fill: none; stroke-width: 2; stroke-linecap: round; }
 .ring .track { stroke: color-mix(in srgb, var(--ink) 9%, transparent); }
@@ -72,7 +79,11 @@ const go = () => { if (!props.disabled) emit('go'); };
 .disc { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 18px 40px -18px rgba(0, 0, 0, .7), 0 0 0 7px color-mix(in srgb, var(--canvas) 70%, transparent); }
 .disc img { width: 42%; height: 42%; border-radius: 22%; object-fit: contain; }
-.lock-wheel { position: relative; display: flex; align-items: center; gap: 4px; padding: 3px 3px 3px 6px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+/* 滚轮底座是一块毛玻璃（10-08 H19）。玻璃画在垫底的 ::before 上、不画在底座自己身上：祖先带 backdrop-filter 的话，
+   滚轮镜片的折射就取样不到背后（lib/glassLens.ts，同 ModalDialog 的 .dialog-glass）。 */
+.lock-wheel { position: relative; isolation: isolate; display: flex; align-items: center; gap: 4px; padding: 3px 3px 3px 6px; border-radius: 999px; }
+.lock-wheel::before { content: ''; position: absolute; inset: 0; z-index: -1; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong);
+  -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
 .wheel { --cap-ink: var(--accent); height: 38px; background: none !important; box-shadow: none !important; }
 .wheel :deep(.wheel-lens) { top: 2px; bottom: 2px; background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
 .wheel :deep(.wheel-refract) { top: 2px; bottom: 2px; }
@@ -85,12 +96,14 @@ const go = () => { if (!props.disabled) emit('go'); };
 .export-only { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--subtle); cursor: pointer; }
 .export-only:hover:not(:disabled) { background: var(--glass-press); color: var(--ink); }
 .export-only:disabled { opacity: .5; cursor: default; }
-.ready-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; justify-items: center; column-gap: 4px; max-width: 260px; padding: 4px 10px; border-radius: 12px;
-  color: var(--muted); font-size: var(--fs-xs); text-align: center; text-decoration: none; transition: background var(--dur-base) ease; }
+/* 就绪度那两行也是一枚小玻璃（H19：以前硬印在版面上，看不出能点）；悬停浮起一点。 */
+.ready-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; justify-items: center; column-gap: 6px; max-width: 260px; padding: 6px 10px 6px 14px; border: 1px solid var(--mat-glass-line);
+  border-radius: 16px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
+  color: var(--muted); font-size: var(--fs-xs); text-align: center; text-decoration: none; transition: translate 200ms cubic-bezier(.3, 1.3, .5, 1), color var(--dur-base) ease; }
 .ready-line > span, .ready-line > small { grid-column: 1; }
 .ready-line small { color: var(--subtle); font-size: var(--fs-2xs); }
 .ready-line .chev { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--subtle); }
-.ready-line:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); color: var(--ink); }
+.ready-line:hover { translate: 0 -2px; color: var(--ink); }
 .ready-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @keyframes spin { to { rotate: 270deg; } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } .lock { transition: none; } }

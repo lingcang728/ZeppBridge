@@ -31,7 +31,7 @@ const rows = computed(() => props.items.map(item => {
 <template>
   <section class="exchange-list" aria-labelledby="bridge-exchanges-title"><header><h2 id="bridge-exchanges-title">{{ t.history }}</h2><p>{{ t.historyHint }}</p></header>
     <div v-if="!rows.length" class="history-empty"><Icon name="arrow-right" :size="14"/><span>{{ t.emptyHistory }}</span></div>
-    <RouterLink v-for="row in rows" :key="row.item.id" :to="`/ai/exchanges/${encodeURIComponent(row.item.id)}`" class="exchange-row" data-morph-card><time>{{ row.date }}</time><span class="provider"><img v-if="row.icon" :src="row.icon" alt=""/>{{ row.item.provider === 'mcp' ? 'MCP' : row.provider }}</span><span class="question">{{ row.item.question || (row.item.provider === 'mcp' ? t.mcp : t.exported) }}</span><span v-if="row.week.length" class="mini-week" aria-hidden="true"><i v-for="(on,i) in row.week" :key="i" :class="{ on }"></i></span><span class="exchange-state">{{ row.state }}</span><Icon name="chevron-right" :size="14"/></RouterLink>
+    <RouterLink v-for="row in rows" :key="row.item.id" :to="`/ai/exchanges/${encodeURIComponent(row.item.id)}`" class="exchange-row"><time>{{ row.date }}</time><span class="provider"><img v-if="row.icon" :src="row.icon" alt=""/>{{ row.item.provider === 'mcp' ? 'MCP' : row.provider }}</span><span class="question">{{ row.item.question || (row.item.provider === 'mcp' ? t.mcp : t.exported) }}</span><span v-if="row.week.length" class="mini-week" aria-hidden="true"><i v-for="(on,i) in row.week" :key="i" :class="{ on }"></i></span><span class="exchange-state">{{ row.state }}</span><Icon name="chevron-right" :size="14"/></RouterLink>
   </section>
 </template>
 <style scoped src="./ExchangeList.css"></style>

@@ -21,7 +21,7 @@ import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
 import { useCardTableDrag } from '../../composables/useCardTableDrag';
 import {
-  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, shuffleCards, stackCards, type Landing, type Receded,
+  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, stackCards, type Landing, type Receded,
 } from '../../lib/motion/cards';
 import { CLOSE_EASE, OPEN_EASE } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
@@ -97,6 +97,12 @@ const groupValue = (group: DeckGroup) => { const average = numberText(groupSumma
 const groupSub = (group: DeckGroup) => { const s = groupSummary(group); return t.value.recordedOf(s.recorded, s.total); };
 const pickedIn = (group: DeckGroup) => pickableDates(group).filter((date) => box.has(props.source.key, date)).length;
 const groupBadge = (group: DeckGroup) => { const n = pickedIn(group); return n ? t.value.pickedOf(n, pickableDates(group).length) : null; };
+/** 挑了一部分 = 虚线；整叠挑满 = 实线实底（10-08 H5）。 */
+const groupPicked = (group: DeckGroup): 'some' | 'all' | null => {
+  const n = pickedIn(group);
+  if (!n) return null;
+  return n >= pickableDates(group).length ? 'all' : 'some';
+};
 const rangeLabel = (value: DeckRange) => (value === 7 ? t.value.range7 : value === 30 ? t.value.range30 : t.value.range180);
 const rangeItems = computed(() => ([7, 30, 180] as DeckRange[]).map((value) => ({ value: String(value), label: rangeLabel(value) })));
 const crumbs = computed(() => stack.value.map((entry) => entry.title).join(' › '));
@@ -258,13 +264,16 @@ const reopen = () => {
 
 /**
  * 换范围（1A·A1）：以前在忙就直接 return，可分段控件的滑块已经移过去了——右上角写着「6 个月」，桌上还是 7 天。
- * 现在走打断接力：范围先改（分段控件永远和 `range` 一致），在飞的牌从此刻的样子理成一叠，再从这一叠发出新的一副；
- * 半路又换，旧的那次自己停下，新的接着从此刻的样子理牌（被打断时跳过洗牌，直接理）。
+ * 现在走打断接力：范围先改（分段控件永远和 `range` 一致），在飞的牌从此刻的样子理成一叠，再从这一叠发出新的一副。
+ *
+ * 10-08 H11（「7 天、1 个月到 6 个月的切换卡顿明显」，4× 降速量到 116 / 182ms 的长任务、一帧卡 225ms）：
+ * - 去掉洗牌那一段：理牌 → 发牌两段，少等 420ms；
+ * - 新的一副**先在底下隐身渲染好**：理牌的动画先起、等一帧交给合成器，再挂新层——渲染那一大块落在
+ *   合成器自己在放的理牌动画期间，不再卡在「叠好了、该发牌了」那一刻；叠好后撤掉旧层，新层的 DOM 原样留着，直接从这一叠发出。
  */
 const switchRange = async (value: string) => {
   const next = Number(value) as DeckRange;
   if ((next === range.value && !focusDate.value) || closing.value) return;
-  const interrupted = busy.value || seq.moving;
   const id = seq.handoff();
   scatter();
   range.value = next;
@@ -273,23 +282,31 @@ const switchRange = async (value: string) => {
   const loading = loadLevel();
   await picking.cancelConfirm();
   if (!seq.live(id)) return;
-  const old = cardsOf(stack.value.length - 1);
-  for (const layer of layers.slice(0, -1)) animateFromNow(layer, { opacity: 0 }, { duration: 260, fill: 'forwards' }, ['opacity']);
-  if (!interrupted) await shuffleCards(old);
-  if (!seq.live(id)) return;
+  // 上一次换范围还没叠好就又换：那一副隐身的新牌直接扔掉，只理看得见的那一层。
+  const shown = stack.value.filter((entry) => !entry.pending);
+  if (shown.length !== stack.value.length) { stack.value = shown; await nextTick(); }
+  const depth = stack.value.length - 1;
+  const old = cardsOf(depth);
+  for (const layer of layers.slice(0, depth)) animateFromNow(layer, { opacity: 0 }, { duration: 260, fill: 'forwards' }, ['opacity']);
   const center = stageCenter();
-  await stackCards(old, center);
+  const stacked = stackCards(old, center);
+  // 等理牌动画真的交给合成器（一帧），再做渲染新一副这件重活。
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   const level = await loading;
   if (!seq.live(id)) return;
   if (!level) { busy.value = false; return; }
+  const entry: Entry = { id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: true };
+  stack.value = [...stack.value, entry];
+  await Promise.all([stacked, nextTick()]);
+  if (!seq.live(id)) return;
   // 这一叠就是落点：新的一副从同一个位置、同样大小发出来。
   const topCard = old[old.length - 1];
   const width = (topCard?.offsetWidth ?? 120);
   const at = center ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   const from: Landing = { rect: new DOMRect(at.x - width / 2, at.y - width * 0.7, width, width * 1.4), kind: 'pile', angle: 0, width };
-  for (const entry of stack.value) entry.receded?.drop();
+  for (const below of stack.value) below.receded?.drop();
   layers.length = 0;
-  stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
+  stack.value = [{ ...entry, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
   busy.value = false;
@@ -338,7 +355,8 @@ let releaseEscape: (() => void) | null = null;
 let resize: ResizeObserver | null = null;
 const measure = () => {
   const el = stage.value;
-  if (el) stageBox.value = { width: el.clientWidth - 16, height: el.clientHeight - 24 };
+  // 宽度留出层的左右内边距（tableLayout.ts 的 LAYER_PAD_X）再多 4px 余量：取整误差不该把最后一张挤到下一排。
+  if (el) stageBox.value = { width: el.clientWidth - 20, height: el.clientHeight - 24 };
   if (drag.piles.value.length) void nextTick(() => drag.layoutPiles(false));
 };
 onMounted(() => {
@@ -401,7 +419,7 @@ defineExpose({ reopen, isClosing: () => closing.value });
             </template>
             <template v-else>
               <span v-for="(group, i) in entry.level.groups" :key="group.id" :class="['pslot', { 'is-holding': picking.holdId.value === group.id }]" :style="slotStyle(entry.level, i)">
-                <PlayingCard kind="group" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
+                <PlayingCard kind="group" :deck="group.kind" :picked="groupPicked(group)" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
                   :dots="group.days.map((d) => (d.has && box.has(source.key, d.date) ? 'picked' : d.has))" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
                   :aria-label="t.groupAria(groupTitle(group), groupSub(group))" :aria-description="pickedIn(group) === pickableDates(group).length && pickedIn(group) ? t.holdToUnpick : t.holdToPick"
                   @pointerdown="picking.holdStart(group, $event); drag.down($event, group.id)" @pointermove="picking.holdMove($event); drag.move($event)"

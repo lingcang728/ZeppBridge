@@ -27,10 +27,17 @@ export const tableLayout = (level: DeckLevel, stage: StageBox) => {
   return { w: Math.max(72, Math.floor(w)), perRow, rows: Math.ceil(n / perRow) };
 };
 
-/** 一层的牌宽和最大宽度。层自己左右各有 8px 内边距（border-box）：算宽度时带上，不然最后一张会被挤到下一排。 */
+/** 层自己左右各 8px 内边距（border-box）。 */
+export const LAYER_PAD_X = 16;
+
+/**
+ * 一层的牌宽和最大宽度：一行牌 + 牌缝 + 层的左右内边距，正好等于量出来的舞台宽。
+ * 10-08 以前多加了 8px（+24），比层能拿到的宽度还宽：1 个月五叠在 1280 宽的窗口里被挤成 4 + 1 两排，
+ * 扇面的角度却还按一排算，整副牌歪得乱七八糟。
+ */
 export const tableLayerStyle = (level: DeckLevel, stage: StageBox) => {
   const { w, perRow } = tableLayout(level, stage);
-  return { '--card-w': `${w}px`, maxWidth: `${perRow * w + (perRow - 1) * GAP + 24}px` };
+  return { '--card-w': `${w}px`, maxWidth: `${perRow * w + (perRow - 1) * GAP + LAYER_PAD_X}px` };
 };
 
 /**

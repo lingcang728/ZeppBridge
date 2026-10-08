@@ -26,8 +26,15 @@ const routes = [
   },
   {
     path: '/ai',
-    name: 'AiComposer',
     component: () => import('../views/AiComposer.vue'),
+    // 已保存的任务 / 寄出前检查 / 往返记录：舞台上浮起的一张玻璃大卡（子路由，舞台留在后面虚化，10-08 H18）。
+    children: [
+      { path: '', name: 'AiComposer', component: { render: () => null } },
+      { path: 'check', name: 'AiCheck', component: () => import('../views/ai/AiCheck.vue') },
+      { path: 'tasks', name: 'AiTasks', component: () => import('../views/ai/AiTasks.vue') },
+      { path: 'exchanges', name: 'AiExchanges', component: () => import('../views/ai/AiExchanges.vue') },
+      { path: 'exchanges/:id', name: 'AiExchange', component: () => import('../views/ai/AiExchange.vue') },
+    ],
   },
   // 交给 AI 的下钻全是路由（2026-10 精修批次 3）：点开从被点的卡 / 行长出来，返回缩回去（usePageMorph）。
   // 「你的过去」二级页已经取消（2026-10-08 横向舞台）：要交的每一类是舞台左边的一张牌，点牌翻到背面。旧链接回到舞台。
@@ -35,10 +42,6 @@ const routes = [
   { path: '/ai/past/:category', redirect: '/ai' },
   { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
-  { path: '/ai/check', name: 'AiCheck', component: () => import('../views/ai/AiCheck.vue') },
-  { path: '/ai/tasks', name: 'AiTasks', component: () => import('../views/ai/AiTasks.vue') },
-  { path: '/ai/exchanges', name: 'AiExchanges', component: () => import('../views/ai/AiExchanges.vue') },
-  { path: '/ai/exchanges/:id', name: 'AiExchange', component: () => import('../views/ai/AiExchange.vue') },
   {
     path: '/body',
     name: 'BodyStatus',

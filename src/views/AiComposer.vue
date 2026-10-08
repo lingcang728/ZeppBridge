@@ -26,10 +26,13 @@ import BridgeLock from '../components/ai/stage/BridgeLock.vue';
 import FutureCard from '../components/ai/stage/FutureCard.vue';
 import StageCardBack from '../components/ai/stage/StageCardBack.vue';
 import AddKindDialog from '../components/ai/stage/AddKindDialog.vue';
+import AiSheet from '../components/ai/AiSheet.vue';
+import { leaveSheet } from '../lib/motion/sheet';
 import { useAiHub } from '../composables/ai/useAiHub';
 import { useStageCards, type StageCardModel } from '../composables/ai/useStageCards';
 import { useStageSend } from '../composables/ai/useStageSend';
 import { useCloudDrag } from '../composables/ai/useCloudDrag';
+import { useCloudPhysics } from '../composables/ai/useCloudPhysics';
 import { useBoxPour } from '../composables/ai/useBoxPour';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
@@ -114,7 +117,16 @@ const drag = useCloudDrag({
     const card = cards.value.find((c) => c.id === id);
     if (card?.category) ctl.setCategoryEnabled(card.category, false);
   },
+  onLand: (id, dx, dy) => physics.nudge(id, dx, dy),
 });
+/* 牌和牌之间的「力」（10-08 H16）：拖着一张靠近别的牌，别的牌被挤开；松手各自弹回，线跟着轻轻晃。 */
+const physics = useCloudPhysics({
+  slots: () => cards.value.map((c) => { const r = restOf(c.id); return { id: c.id, x: r?.x ?? 0, y: r?.y ?? 0 }; }),
+  offsetOf: (id) => drag.offsetOf(id),
+  live: () => drag.live.value,
+  card: () => ({ width: cloud.value.width, height: cloud.value.height }),
+});
+watch(() => drag.live.value, () => physics.kick());
 const open = (id: string) => {
   if (send.gathering.value) return;
   const card = cards.value.find((c) => c.id === id);
@@ -126,6 +138,7 @@ const open = (id: string) => {
 watch(() => cards.value.map((c) => c.id).join('|'), async () => {
   const before = new Map([...slots].map(([id, el]) => [id, el.getBoundingClientRect()]));
   drag.resetOffsets();
+  physics.reset();
   await nextTick();
   if (reducedMotion()) return;
   const { easing, duration } = springCurve(SPRINGS.settle);
@@ -138,21 +151,34 @@ watch(() => cards.value.map((c) => c.id).join('|'), async () => {
     el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration, easing });
   }
 }, { flush: 'pre' });
-/** 牌此刻的位置（含拖动偏移）：线从这里接出去。 */
+/** 牌此刻的位置（含拖动偏移、被挤开的位移）：线从这里接出去。`stay` 是本来停的位置（不含被挤开），线分组只看它。 */
 const placed = computed(() => cards.value.map((card) => {
   const rest = restOf(card.id) ?? { x: 0, y: 0 };
   const live = drag.live.value?.id === card.id ? drag.live.value : null;
-  const o = live ?? drag.offsetOf(card.id);
-  return { card, rest, x: rest.x + o.x, y: rest.y + o.y, rot: cloud.value.slots[cards.value.indexOf(card)]?.rot ?? 0 };
+  const stored = drag.offsetOf(card.id);
+  const o = live ?? stored;
+  const s = physics.shiftOf(card.id);
+  return { card, rest, x: rest.x + o.x + s.x, y: rest.y + o.y + s.y, stayY: rest.y + stored.y, rot: cloud.value.slots[cards.value.indexOf(card)]?.rot ?? 0 };
 }));
 const tree = computed(() => {
   const l = layout.value;
   if (l.mode !== 'row') return null;
   const w = cloud.value.width;
   const h = cloud.value.height;
-  const ports = placed.value.map((p) => ({ id: p.card.id, x: p.x + w, y: p.y + h / 2 }));
-  const obstacles = placed.value.map((p) => ({ id: p.card.id, x: p.x, y: p.y, width: w, height: h }));
-  return threadTree(l.lock, l.lock.r, ports, { x: l.card.x, y: l.card.y + l.card.height / 2, h: l.card.height }, obstacles);
+  // 牌在锁左边：线接右沿；被拖到锁右边：接左沿（线总是从牌朝着锁的那一边出来）。
+  const ports = placed.value.map((p) => {
+    const left = p.x + w / 2 > l.lock.x;
+    return { id: p.card.id, x: left ? p.x : p.x + w, y: p.y + h / 2, side: left ? 'left' as const : 'right' as const, ry: p.stayY + h / 2 };
+  });
+  return threadTree(l.lock, l.lock.r, ports, { x: l.card.x, y: l.card.y + l.card.height / 2, h: l.card.height }, [], zone.value.x + zone.value.width);
+});
+/** 被拖着的牌靠近锁（牌心离锁心不到两个半锁半径）：锁迎上来、外圈亮起（H21）。 */
+const nearLock = computed(() => {
+  const live = drag.live.value;
+  const p = live ? placed.value.find((one) => one.card.id === live.id) : null;
+  if (!p || layout.value.mode !== 'row') return false;
+  const l = layout.value.lock;
+  return Math.hypot(p.x + cloud.value.width / 2 - l.x, p.y + cloud.value.height / 2 - l.y) < l.r * 2.5;
 });
 /** 第几张牌先飞：线按同一个顺序收。 */
 const order = computed(() => Object.fromEntries(placed.value.map((p, i) => [p.card.id, i])));
@@ -237,6 +263,9 @@ const waiting = computed(() => {
   return syncProgress.value && isSyncing.value ? ht.value.readinessWaitingStep(syncProgress.value.current, syncProgress.value.total) : ht.value.readinessWaiting;
 });
 
+/** 子路由开在哪一张玻璃大卡里（往返记录和某一次往返共用一张，里面换内容）。 */
+const sheetOf = (path: string) => /^\/ai\/(check|tasks|exchanges)(\/|$)/.exec(path)?.[1] ?? null;
+
 /* ---------- 浮动：页面看不见（切走、窗口最小化）时停下 ---------- */
 const paused = ref(false);
 const onVisibility = () => { paused.value = document.hidden; };
@@ -250,7 +279,7 @@ onDeactivated(() => { paused.value = true; });
   <section class="page ai-stage-page" aria-labelledby="ai-page-title">
     <header class="stage-head">
       <AiTaskHeader :fallback-title="hub.title.value" />
-      <RouterLink v-if="history.exchanges.value.length" to="/ai/exchanges" class="exchanges-pill" data-morph-card>
+      <RouterLink v-if="history.exchanges.value.length" to="/ai/exchanges" class="exchanges-pill" data-sheet="exchanges">
         {{ s.exchanges(history.exchanges.value.length) }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
       <div v-if="hub.demo.value" class="demo-banner" role="status"><Icon name="database" :size="14" /><div><strong>{{ t.fullDemo }}</strong><span>{{ t.demoHint }}</span></div></div>
@@ -269,14 +298,17 @@ onDeactivated(() => { paused.value = true; });
           </button>
         </li>
       </ul>
-      <button v-if="off.length" type="button" class="add-kind" :style="{ left: `${zone.x}px`, top: `${addTop}px` }" @click="adding = true">
-        <Icon name="plus" :size="14" />{{ s.add }}
-      </button>
-      <p v-if="cards.length <= 1" class="cloud-empty">{{ s.nothing }}</p>
+      <!-- 「加一类」和一类都不剩时的那句提示排在同一行（10-08 H21：以前提示固定在 40% 高处，和牌、胶囊叠在一起）。 -->
+      <div v-if="off.length || cards.length <= 1" class="add-row" :style="{ left: `${zone.x}px`, top: `${addTop}px`, maxWidth: `${zone.width}px` }">
+        <button v-if="off.length" type="button" class="add-kind" @click="adding = true">
+          <Icon name="plus" :size="14" />{{ s.add }}
+        </button>
+        <p v-if="cards.length <= 1" class="cloud-empty">{{ s.nothing }}</p>
+      </div>
 
       <div class="lock-host" :style="{ left: `${layout.lock.x}px`, top: `${layout.lock.y - layout.lock.r}px` }">
         <BridgeLock :r="layout.lock.r" :provider="send.provider.value" :busy="send.gathering.value" :disabled="send.disabled.value" :subscribed="send.subscribed.value"
-          :readiness="send.readiness.value" :md-line="send.mdLine.value" :issues="send.issueCount.value" :waiting="waiting"
+          :readiness="send.readiness.value" :md-line="send.mdLine.value" :issues="send.issueCount.value" :waiting="waiting" :near="nearLock"
           :title="isSyncing ? ht.goSubSyncing : ht.run(send.provider.value.label)" @go="go" @pick="send.pick" @export-only="send.exportOnly()" />
       </div>
 
@@ -298,6 +330,13 @@ onDeactivated(() => { paused.value = true; });
     <ProfileTray v-if="profile" @close="profile = false" />
     <CardTable v-if="deck" :source="deck.source" :range="7" :origin="deck.origin" :anchor="deck.anchor" @close="deck = null" />
     <PlanClearDialog />
+    <RouterView v-slot="{ Component, route: sub }">
+      <Transition :css="false" @leave="leaveSheet">
+        <AiSheet v-if="Component && sheetOf(sub.path)" :key="sheetOf(sub.path)!" :name="sheetOf(sub.path)!">
+          <Transition name="sheet-swap" mode="out-in"><component :is="Component" :key="sub.path" /></Transition>
+        </AiSheet>
+      </Transition>
+    </RouterView>
   </section>
 </template>
 

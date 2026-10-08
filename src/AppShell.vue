@@ -118,6 +118,9 @@ let leavingScroll = 0;
 const removeBeforeEach = router.beforeEach(async (to, from) => {
   // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。
   settleMotion();
+  // 同一页里的子路由（交给 AI 的玻璃大卡 /ai/tasks 等，10-08 H18）：外层页面不换，不做切页动效，大卡自己长出来。
+  if (to.matched.length > 1 && from.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
+  if (from.matched.length > 1 && to.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
   // 从卡片展开：先把新页首屏的数据备好（多半悬停时已经读好，立刻就过；最多等一小会儿），

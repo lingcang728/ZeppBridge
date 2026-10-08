@@ -84,7 +84,7 @@ const cancelRename = () => { editing.value = false; };
         <span class="title-text">{{ shownTitle }}</span>
       </button>
     </div>
-    <RouterLink v-if="taskList.length" to="/ai/tasks" class="saved-link glass-control is-lens-host" data-morph-card :title="t.historyCount(taskList.length)">
+    <RouterLink v-if="taskList.length" to="/ai/tasks" class="saved-link glass-control is-lens-host" data-sheet="tasks" :title="t.historyCount(taskList.length)">
       <span>{{ t.savedCount(taskList.length) }}</span><Icon name="chevron-right" :size="14" />
     </RouterLink>
     </div>

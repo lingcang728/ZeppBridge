@@ -25,6 +25,11 @@ export interface CloudDragOptions {
   canFlick: (id: string) => boolean;
   onTap: (id: string, el: HTMLElement) => void;
   onFlick: (id: string) => void;
+  /**
+   * 松手后牌没停在手指的地方（出了撒牌区被夹回来、Esc 放回原处）：牌此刻比它要停的位置多出 (dx, dy)。
+   * 舞台把这段差交给「力」（useCloudPhysics）弹回去，线跟着一起走；不给就用 WAAPI 补一段弹簧。
+   */
+  onLand?: (id: string, dx: number, dy: number) => void;
 }
 
 export const useCloudDrag = (options: CloudDragOptions) => {
@@ -60,6 +65,17 @@ export const useCloudDrag = (options: CloudDragOptions) => {
     trail = [...trail.filter((p) => now - p.t < 90), { t: now, x: event.clientX, y: event.clientY }];
     pending = { x: start.ox + dx, y: start.oy + dy };
     if (!frame) frame = requestAnimationFrame(write);
+  };
+
+  /** 牌从 `from` 落到 `to`（都是相对牌位的偏移）。 */
+  const land = (id: string, el: HTMLElement, from: { x: number; y: number }, to: { x: number; y: number }) => {
+    el.style.translate = `${to.x}px ${to.y}px`;
+    const dx = from.x - to.x;
+    const dy = from.y - to.y;
+    if (reducedMotion() || (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5)) return;
+    if (options.onLand) { options.onLand(id, dx, dy); return; }
+    const { easing, duration } = springCurve(SPRINGS.settle);
+    el.animate([{ translate: `${from.x}px ${from.y}px` }, { translate: `${to.x}px ${to.y}px` }], { duration, easing });
   };
 
   const settleTilt = (el: HTMLElement) => {
@@ -107,8 +123,7 @@ export const useCloudDrag = (options: CloudDragOptions) => {
       return;
     }
     if (cancelled) {
-      s.el.animate([{ translate: `${pending.x}px ${pending.y}px` }, { translate: `${s.ox}px ${s.oy}px` }], { duration: 320, easing: 'cubic-bezier(.4, .6, .2, 1)' });
-      s.el.style.translate = `${s.ox}px ${s.oy}px`;
+      land(s.id, s.el, pending, { x: s.ox, y: s.oy });
       live.value = null;
       settleTilt(s.el);
       return;
@@ -117,7 +132,8 @@ export const useCloudDrag = (options: CloudDragOptions) => {
     const x = Math.min(b.x + b.width - b.cardW * 0.5, Math.max(b.x - b.cardW * 0.5, (rest?.x ?? 0) + pending.x)) - (rest?.x ?? 0);
     const y = Math.min(b.y + b.height - b.cardH * 0.5, Math.max(b.y - b.cardH * 0.2, top)) - (rest?.y ?? 0);
     offsets.set(s.id, { x, y });
-    s.el.style.translate = `${x}px ${y}px`;
+    // 松手的地方出了撒牌区：从松手处弹回夹住的位置，不一下跳过去（10-08 H14「拖动是突变的」）。
+    land(s.id, s.el, pending, { x, y });
     live.value = null;
     settleTilt(s.el);
   };

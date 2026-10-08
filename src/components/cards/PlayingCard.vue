@@ -40,7 +40,12 @@ const props = withDefaults(defineProps<{
   value2?: string | null;
   unit2?: string | null;
   tint2?: string | null;
-}>(), { value2: null, unit2: null, tint2: null, value: null, unit: null, corner: null, dots: null, state: 'front', badge: null, disabled: false, empty: false, holding: false, focused: false, tint: 'var(--accent)', icon: null });
+  /** 一叠是一周还是一个月（10-08 H11：日牌 / 周叠 / 月叠厚薄、浓淡不同，一眼分得出）。 */
+  deck?: 'week' | 'month' | null;
+  /** 一叠里挑了一部分（虚线）还是全挑了（实线实底，10-08 H5）。 */
+  picked?: 'some' | 'all' | null;
+}>(), {
+  deck: null, picked: null, value2: null, unit2: null, tint2: null, value: null, unit: null, corner: null, dots: null, state: 'front', badge: null, disabled: false, empty: false, holding: false, focused: false, tint: 'var(--accent)', icon: null });
 const t = useCardsText();
 const parts = computed(() => splitFaceValue(props.value, props.unit));
 const parts2 = computed(() => (props.tint2 ? splitFaceValue(props.value2, props.unit2) : []));
@@ -48,7 +53,7 @@ const fit = computed(() => ({ '--fit': String(Math.max(faceFit(parts.value), par
 </script>
 
 <template>
-  <button type="button" :class="['pcard', kind, state, { disabled, holding, focused, empty, duo: !!tint2 }]" :style="{ '--tint': tint, ...fit }" :aria-disabled="disabled || undefined">
+  <button type="button" :class="['pcard', kind, state, deck, picked ? `picked-${picked}` : null, { disabled, holding, focused, empty, duo: !!tint2 }]" :style="{ '--tint': tint, ...fit }" :aria-disabled="disabled || undefined">
     <span v-if="state === 'boxed'" class="pcard-face outline">
       <Icon name="box" :size="20" />
       <small>{{ t.inBox }}</small>

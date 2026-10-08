@@ -1,17 +1,20 @@
 /**
- * 「交给 AI」舞台中间的线（2026-10-08 横向舞台；同日第二轮按用户反馈收拾）：门锁牵着左边每一张牌。
+ * 「交给 AI」舞台中间的线（2026-10-08 横向舞台；第三轮 10-08 晚按录屏反馈重做）：门锁牵着左边每一张牌。
  *
- * - 不做中心化的星形：锁的左沿出 1–3 根主干（按牌的上下位置分组），主干走到牌堆和锁之间那片空地里分叉，
- *   每张牌一根枝，接在牌的右沿。
- * - **枝不斜穿牌堆**：先在牌堆右沿外的空地里弯到牌心那一行，再水平穿过牌缝进去（牌按砖缝错开摆，cloud.ts）；
- *   被拖过的牌挡住了就换到最近的空走廊，到牌跟前再接上。确定性，拖牌时只是重算一遍。
- * - 第一轮那些「杂线」去掉了（用户：左边的线太乱）；右边那一束收成一把丝——三根几乎贴在一起，
- *   到右牌那头才微微散开。
+ * - 不做中心化的星形：锁的左沿出 1–3 根主干（按牌**本来的**上下位置分组），主干走到锁左边一段固定距离处分叉，
+ *   每张牌一根枝。
+ * - 枝是**一整段平滑的斜曲线**，从分叉点直接弯到牌上朝着锁的那一边（牌在锁左边接右沿、被拖到右边接左沿）。
+ *   第二轮的直角走廊（先弯到牌心那一行、再水平穿牌缝、挡住了换走廊）去掉了：用户说「路径是直角拐角、不能斜切」，
+ *   而且拖一张牌时走廊一换、分叉点一挪，所有的线一起乱跳。线画在牌下面，从牌后面穿过去不碍事。
+ * - **分叉点只看锁和牌的本来位置**（`Port.ry`），不看被拖着的那张此刻在哪：拖牌时只有那一根枝跟着动，
+ *   别的线只随被挤开的牌（cloudPhysics.ts）轻轻晃一下，像 Obsidian 的关系图。
+ * - 右边那一束收成一把丝——三根几乎贴在一起，到右牌那头才微微散开。
  * 坐标是舞台内的像素。`sampleStrand` 把一张牌那根线按「牌 → 锁」取点，给汇聚动画当关键帧。
  */
 export interface Pt { x: number; y: number }
 export interface Cubic { a: Pt; b: Pt; c: Pt; d: Pt }
-export interface Port { id: string; x: number; y: number }
+/** 牌上接线的那一点；`side` 是这一点在牌的哪一边（right = 牌在锁左边）；`ry` 是牌本来的高度，分组只看它。 */
+export interface Port { id: string; x: number; y: number; side?: 'left' | 'right'; ry?: number }
 /** 牌的矩形（舞台坐标）：枝要绕开的东西。 */
 export interface Obstacle { id: string; x: number; y: number; width: number; height: number }
 export interface Strand { id: string; trunk: number; branch: Cubic[] }
@@ -41,46 +44,43 @@ export const cubicPoint = ({ a, b, c, d }: Cubic, t: number): Pt => {
   return { x: w0 * a.x + w1 * b.x + w2 * c.x + w3 * d.x, y: w0 * a.y + w1 * b.y + w2 * c.y + w3 * d.y };
 };
 
-const PAD = 8;
-/** 一段直线（写成三次曲线，好和别的段拼在一起）。 */
-const line = (a: Pt, d: Pt): Cubic => ({ a, b: { x: lerp(a.x, d.x, 1 / 3), y: lerp(a.y, d.y, 1 / 3) }, c: { x: lerp(a.x, d.x, 2 / 3), y: lerp(a.y, d.y, 2 / 3) }, d });
-
 /**
- * 从分叉点到牌（第二轮，像电路板 / 神经元的走线，不再斜穿牌堆）：
- * 先在牌堆右沿外面那片空地里弯到一条水平的「走廊」上，再沿走廊水平进牌堆，到牌跟前再接到牌的右沿。
- * 走廊默认就是牌心那一行（牌按砖缝错开摆，见 cloud.ts，这一行在别的牌的缝里）；
- * 被拖过的牌挡住了，就换到最近的一条不压牌的走廊（某张牌的上沿 / 下沿外面）。
+ * 从分叉点到牌：一整段三次曲线。从分叉点**朝牌的方向**水平出发，到牌那头**从牌外侧**水平接进来，
+ * 中间自然斜过去（`stiff` 越大两头越平、中段越斜）。
  */
-const route = (fork: Pt, port: Port, edge: number, obstacles: Obstacle[]): Cubic[] => {
+export const branchCurve = (fork: Pt, port: Port, stiff = 0.5): Cubic => {
   const end = { x: port.x, y: port.y };
-  const entry = Math.max(port.x + 1, edge);
-  const blocked = (y: number) => obstacles.some((o) => o.id !== port.id && o.x < entry && o.x + o.width > port.x + 2 && y > o.y - PAD && y < o.y + o.height + PAD);
-  const lanes = [port.y, ...obstacles.flatMap((o) => [o.y - PAD * 1.5, o.y + o.height + PAD * 1.5])]
-    .sort((a, b) => Math.abs(a - port.y) - Math.abs(b - port.y));
-  const lane = lanes.find((y) => !blocked(y)) ?? port.y;
-  if (entry <= port.x + 1) return [ease(fork, end, 0.5)];
-  if (Math.abs(lane - port.y) < 0.5) return [ease(fork, { x: entry, y: lane }, 0.5), line({ x: entry, y: lane }, end)];
-  const near = { x: Math.min(entry, port.x + 26), y: lane };
-  return [ease(fork, { x: entry, y: lane }, 0.5), line({ x: entry, y: lane }, near), ease(near, end, 0.5)];
+  const span = Math.max(36, Math.abs(end.x - fork.x));
+  const outward = end.x < fork.x ? -1 : 1;
+  const into = port.side === 'left' ? -1 : 1;
+  return { a: fork, b: { x: fork.x + outward * span * stiff, y: fork.y }, c: { x: end.x + into * span * stiff, y: end.y }, d: end };
 };
 
-export const threadTree = (lock: Pt, radius: number, ports: Port[], target: { x: number; y: number; h: number } | null, obstacles: Obstacle[] = []): ThreadTree => {
+/** 分叉点离锁左沿多远：锁和牌堆之间那段空地的三成，至少 40、至多 120。只看版式，拖牌时不变。 */
+const forkGap = (origin: Pt, edge: number) => Math.max(40, Math.min(120, (origin.x - edge) * 0.3));
+
+/**
+ * `edge`：牌堆（撒牌区）的右沿，算分叉点的固定位置用；不给就按各牌本来位置里最靠右的那张估。
+ * 第五个参数以前是要绕开的牌（直角走廊），现在线从牌后面斜着穿过去，不再需要；留着签名只为兼容老调用。
+ */
+export const threadTree = (lock: Pt, radius: number, ports: Port[], target: { x: number; y: number; h: number } | null, _obstacles: Obstacle[] = [], edge?: number): ThreadTree => {
   const origin = { x: lock.x - radius, y: lock.y };
-  const sorted = [...ports].sort((p, q) => p.y - q.y || p.x - q.x);
+  const restY = (p: Port) => p.ry ?? p.y;
+  const sorted = [...ports].sort((p, q) => restY(p) - restY(q) || p.id.localeCompare(q.id));
   const groups = trunkCount(sorted.length);
   const size = Math.ceil(sorted.length / Math.max(1, groups));
-  const reachAll = ports.length ? Math.max(...ports.map((p) => p.x), ...obstacles.map((o) => o.x + o.width)) : origin.x;
+  const right = edge ?? (ports.length ? Math.max(...ports.map((p) => p.x)) : origin.x - 200);
+  const forkX = origin.x - forkGap(origin, Math.min(right, origin.x - 60));
   const trunks: Cubic[] = [];
   const strands: Strand[] = [];
   for (let g = 0; g * size < sorted.length; g += 1) {
     const members = sorted.slice(g * size, (g + 1) * size);
-    const meanY = members.reduce((sum, p) => sum + p.y, 0) / members.length;
-    // 分叉点落在牌堆右沿和锁之间的空地里，不压在牌上。
-    const fork = { x: lerp(Math.min(reachAll + 24, origin.x - 20), origin.x, 0.3), y: lerp(origin.y, meanY, 0.72) };
+    const meanY = members.reduce((sum, p) => sum + restY(p), 0) / members.length;
+    const fork = { x: forkX, y: lerp(origin.y, meanY, 0.62) };
     trunks.push(ease(origin, fork, 0.5));
-    for (const port of members) strands.push({ id: port.id, trunk: trunks.length - 1, branch: route(fork, port, reachAll + 12, obstacles) });
+    for (const port of members) strands.push({ id: port.id, trunk: trunks.length - 1, branch: [branchCurve(fork, port)] });
   }
-  const right = target
+  const bundle = target
     ? [-1, 0, 1].map((k) => {
       const from = { x: lock.x + radius, y: lock.y };
       const to = { x: target.x, y: target.y + k * 3 };
@@ -89,7 +89,7 @@ export const threadTree = (lock: Pt, radius: number, ports: Port[], target: { x:
       return { ...q, b: { ...q.b, y: q.b.y + 6 + k }, c: { ...q.c, y: q.c.y + 6 - k } };
     })
     : [];
-  return { origin, trunks, strands, right };
+  return { origin, trunks, strands, right: bundle };
 };
 
 const r1 = (n: number) => Math.round(n * 10) / 10;

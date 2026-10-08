@@ -40,12 +40,11 @@ useWidthMorph(stateEl, stateText);
 <template>
   <div class="ledger" :title="t.ledgerNote">
     <span :class="['lead', { warn: !delivered && !empty && !sending, sending }]"><span class="ledger-watch" aria-hidden="true"><Icon name="watch" :size="14" /></span>{{ simulated ? bt.demoLedger : t.ledgerTitle }}</span>
-    <template v-if="!empty || sending">
-      <span v-if="when && !sending" class="when">{{ simulated ? when : t.ledgerWhen(when) }}</span>
+    <span v-if="!empty || sending" class="body">
       <span ref="stateEl" class="state">{{ stateText }}</span>
-      <span v-if="!sending" class="days">{{ t.ledgerDays(sentDays) }}</span>
-    </template>
-    <span v-else class="when">{{ t.ledgerNone }}</span>
+      <span v-if="!sending" class="meta"><template v-if="when">{{ simulated ? when : t.ledgerWhen(when) }} · </template>{{ t.ledgerDays(sentDays) }}</span>
+    </span>
+    <span v-else class="body"><span class="meta">{{ t.ledgerNone }}</span></span>
     <span class="acts">
       <button v-if="state?.can_undo" type="button" class="pill-button quiet" :disabled="busy" @click="emit('undo')">{{ t.undoLast }}</button>
       <button v-if="sentDays > 0" type="button" class="pill-button quiet danger" :disabled="busy" @click="emit('clear')">{{ t.clearWindow }}</button>
@@ -54,17 +53,19 @@ useWidthMorph(stateEl, stateText);
 </template>
 
 <style scoped>
-/* 标题右边的一行小字：不再是一整条凹槽。 */
-.ledger { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: var(--fs-2xs); }
-.lead { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: var(--fs-xs); font-weight: 600; }
+/* 一枚两行的小牌（10-08 H13：以前是一长串粗细不一的小字挤在一行，长语言折成两行就乱了）：
+   左边手表图标和标题，中间「状态」一行 + 「什么时候发的 · 接下来几天有安排」一行，右边撤销 / 清空。 */
+.ledger { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; color: var(--muted); font-size: var(--fs-2xs); }
+.body { display: grid; flex: 1 1 150px; gap: 1px; min-width: 0; }
+.meta { overflow: hidden; color: var(--subtle); text-overflow: ellipsis; white-space: nowrap; }
+.lead { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: var(--ink); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
 .ledger-watch { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .lead.warn .ledger-watch { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
 .lead.sending .ledger-watch { animation: ledger-pulse 1.1s ease-in-out infinite; }
 @keyframes ledger-pulse { 50% { scale: 1.18; } }
 @media (prefers-reduced-motion: reduce) { .lead.sending .ledger-watch { animation: none; } }
-.state { display: inline-block; overflow: hidden; color: var(--ink); white-space: nowrap; }
-.days { color: var(--subtle); }
-.acts { display: flex; gap: 2px; }
+.state { display: inline-block; overflow: hidden; color: var(--ink); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+.acts { display: flex; gap: 2px; margin-left: auto; }
 .acts .pill-button { min-height: 30px; padding-inline: 12px; font-size: var(--fs-2xs); }
 .pill-button.danger { color: var(--danger); }
 </style>
