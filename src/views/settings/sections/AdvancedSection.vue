@@ -6,6 +6,7 @@ import Icon from '../../../components/Icon.vue';
 import AuthSection from './AuthSection.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
 import MaintenanceSection from './MaintenanceSection.vue';
+import MorePrefsSection from './MorePrefsSection.vue';
 import ProbeSection from './ProbeSection.vue';
 import WorkoutCodesSection from './WorkoutCodesSection.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
@@ -116,6 +117,8 @@ const openDataFolder = async () => {
     </div>
 
     <AuthSection />
+
+    <MorePrefsSection />
 
     <ProbeSection />
 

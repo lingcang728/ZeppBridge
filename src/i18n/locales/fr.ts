@@ -203,9 +203,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       days: (days: number) => plural(days, { one: `${days} jour`, other: `${days} jours` }),
       defaultFormatLabel: 'Format d’export par défaut',
       defaultFormatAria: 'Format d’export par défaut',
-      formatJsonHint: 'Données structurées',
-      formatCsvHint: 'Données tabulaires',
-      formatGpxHint: 'Traces de séances',
       updateChecking: 'Vérification…',
       updateCheck: 'Rechercher des mises à jour',
       updateVersion: (version: string) => `Version ${version}`,
@@ -2317,10 +2314,7 @@ Réponds en Markdown.`,
       deviceOpen: 'Voir ou changer de modèle',
 
 
-      mcpLead: 'Laissez les outils IA installés sur votre machine — Claude Code, Codex et autres — interroger directement vos données. Lecture seule, sans réseau, aucun port ouvert.',
       mcpPreview: 'Aperçu de la configuration',
-      mcpToolsLabel: 'Outils exposés à l’IA',
-      mcpTools: "Une fois configuré, l’IA peut interroger vos données avec ces outils. Survolez pour le détail.",
       exportFormatSub: 'Format présélectionné lors d’un export',
 
       themeLabel: 'Thème',
@@ -2331,7 +2325,7 @@ Réponds en Markdown.`,
 
     },
 
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       example: 'p. ex.',
       exampleTitle: '14 derniers jours',
       nameSub: 'Chaque export est nommé selon cette règle : la période et les données se lisent dans le nom du fichier.',
@@ -2353,7 +2347,6 @@ Réponds en Markdown.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Autoriser des tâches pour MCP',
-      hint: 'S’applique uniquement à MCP lancé avec --scope task : il ne voit alors que les données couvertes par les tâches activées. Le mode complet en lecture seule par défaut n’est pas limité par ces options.',
       empty: 'Aucune tâche enregistrée. Envoyez-en une à une IA pour la voir apparaître ici.',
     },
     'components/ai/bridge/bridge': {

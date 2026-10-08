@@ -403,9 +403,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       // ── 7. Export / Nachladen ──
       defaultFormatLabel: 'Standard-Exportformat',
       defaultFormatAria: 'Standard-Exportformat',
-      formatJsonHint: 'Strukturierte Daten',
-      formatCsvHint: 'Tabellendaten',
-      formatGpxHint: 'Trainingsstrecken',
 
       // ── 8. Updates ──
       updateChecking: 'Prüfung läuft…',
@@ -2721,11 +2718,7 @@ Antworte in Markdown.`,
       deviceOpen: 'Modell ansehen oder wechseln',
       exportFormatSub:
         'Vorausgewählt beim Export aus „An die KI" oder einem Training',
-      mcpLead:
-        'Lass KI-Werkzeuge auf deinem Rechner – Claude Code, Codex und ähnliche – deine lokalen Daten direkt abfragen. Nur lesend, offline, ohne offenen Port.',
       mcpPreview: 'Anzeigen, was kopiert wird',
-      mcpTools: "Nach der Einrichtung kann die KI mit diesen Werkzeugen deine Daten abfragen. Für Details mit der Maus darüberfahren.",
-      mcpToolsLabel: 'Für die KI nutzbare Werkzeuge',
       pageIntro:
         'Karte zum Anpassen öffnen; Kopfzeile seitwärts ziehen, um zur nächsten zu wechseln.',
       pageIntroDeck:
@@ -2768,7 +2761,7 @@ Antworte in Markdown.`,
       themeLight: 'Hell',
       themeSystem: 'System',
     },
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       example: 'z. B.',
       exampleTitle: 'Letzte 14 Tage',
       nameSub:
@@ -2853,7 +2846,6 @@ Antworte in Markdown.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Aufgaben für MCP freigeben',
-      hint: 'Gilt nur für MCP mit --scope task. Es kann dann nur den Umfang der Aufgaben abfragen, für die der Schalter aktiviert ist. Der standardmäßige Nur-Lese-Zugriff auf die gesamte Datenbank wird dadurch nicht eingeschränkt.',
       empty: 'Noch keine Aufgaben gespeichert. Sobald du einmal etwas an eine KI übergibst, erscheint die Aufgabe hier.',
     },
     'components/ai/bridge/bridge': {

@@ -209,9 +209,6 @@ export default {
       // ── 7. 导出与补拉偏好 ──
       defaultFormatLabel: 'डिफ़ॉल्ट एक्सपोर्ट फ़ॉर्मैट',
       defaultFormatAria: 'डिफ़ॉल्ट एक्सपोर्ट फ़ॉर्मैट',
-      formatJsonHint: 'स्ट्रक्चर्ड डेटा',
-      formatCsvHint: 'टेबल डेटा',
-      formatGpxHint: 'GPS ट्रैक',
 
       // ── 8. 软件更新 ──
       updateChecking: 'जाँच हो रही है…',
@@ -2346,10 +2343,7 @@ Markdown में उत्तर दें।`,
       deviceOpen: 'मॉडल देखें या बदलें',
 
 
-      mcpLead: 'कंप्यूटर पर मौजूद AI टूल्स — Claude Code, Codex वगैरह — सीधे लोकल डेटा पढ़ सकते हैं। रीड-ओनली, सुरक्षित।',
       mcpPreview: 'कॉपी होने वाला कॉन्फ़िग',
-      mcpToolsLabel: 'AI के लिए उपलब्ध टूल्स',
-      mcpTools: "सेटअप के बाद AI इन टूल से आपका डेटा पढ़ सकता है। विवरण के लिए होवर करें।",
       exportFormatSub: 'एक्सपोर्ट के लिए पहले से चुना फ़ॉर्मैट',
 
       themeLabel: 'थीम',
@@ -2360,7 +2354,7 @@ Markdown में उत्तर दें।`,
 
     },
 
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       example: 'जैसे',
       exampleTitle: 'पिछले 14 दिन',
       nameSub: 'हर एक्सपोर्ट इसी नियम से नामित होता है; फ़ाइल नाम से ही अवधि और कंटेंट पता चल जाता है।',
@@ -2491,7 +2485,7 @@ Markdown में उत्तर दें।`,
       monthAria: (month: string, label: string, days: number) => `${label}, ${month} में चुने गए ${days} दिन। हफ़्ते के अनुसार देखने के लिए दबाएँ`,
     },
     'views/settings/sections/McpTaskScopes': {
-      title: 'MCP के लिए टास्क खोलें', hint: 'केवल --scope task के साथ शुरू किए गए MCP पर लागू। उसे सिर्फ़ चालू किए गए टास्क का दायरा दिखता है; डिफ़ॉल्ट पूर्ण रीड-ओनली मोड इन स्विचों से सीमित नहीं होता।', empty: 'अभी कोई सहेजा टास्क नहीं। AI को कुछ भेजें, वह यहाँ दिखेगा।',
+      title: 'MCP के लिए टास्क खोलें',empty: 'अभी कोई सहेजा टास्क नहीं। AI को कुछ भेजें, वह यहाँ दिखेगा।',
     },
     'demo/texts': {
       easyRun: 'आसान दौड़', intervals: 'इंटरवल 5×3 मिनट', lifeEvent: 'हाफ़ मैराथन प्रशिक्षण शुरू किया', longRun: 'लंबी धीमी दौड़', nickname: 'डेमो उपयोगकर्ता', recoveryRide: 'रिकवरी साइक्लिंग', taskFile: 'पिछले 14 दिन', taskTitle: (month: number, day: number) => `पिछले 14 दिन · ${month}/${day}`, tempoRun: 'टेम्पो रन',

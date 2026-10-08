@@ -1729,9 +1729,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       days: (days: number) => `${days} dias`,
       defaultFormatLabel: 'Formato de exportação padrão',
       defaultFormatAria: 'Formato de exportação padrão',
-      formatJsonHint: 'Dados estruturados',
-      formatCsvHint: 'Planilhas e tabelas',
-      formatGpxHint: 'Rotas de GPS',
       updateChecking: 'Verificando…',
       updateCheck: 'Verificar atualizações',
       updateVersion: (version: string) => `Versão ${version}`,
@@ -2187,10 +2184,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       deviceOpen: 'Gerenciar modelo',
 
 
-      mcpLead: 'Permita que assistentes de IA locais (Claude Code, Codex etc.) consultem seus dados locais via MCP. Somente leitura, sem tráfego de rede ou portas abertas.',
       mcpPreview: 'Visualizar dados copiados',
-      mcpToolsLabel: 'Ferramentas MCP disponíveis',
-      mcpTools: "Depois de configurado, a IA pode consultar seus dados com estas ferramentas. Passe o cursor para ver detalhes.",
       exportFormatSub: 'Formato padrão para exportação de treinos e envio para IA',
 
       themeLabel: 'Tema',
@@ -2201,7 +2195,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
 
     },
 
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       nameTitle: 'Padrão de nomenclatura para exportações de IA',
       nameSub: 'Define o formato dos nomes de arquivo exportados para identificação clara do período e conteúdo pelo modelo de IA.',
       ruleRange: 'Intervalo de datas + conteúdo',
@@ -2604,7 +2598,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Abrir tarefas para o MCP',
-      hint: 'Aplica-se somente ao MCP iniciado com --scope task, que poderá consultar apenas o escopo das tarefas ativadas. O modo padrão, somente leitura e com acesso ao banco inteiro, não é limitado por estas opções.',
       empty: 'Ainda não há tarefas salvas. Envie algo para uma IA e a tarefa aparecerá aqui.',
     },
     'lib/workoutNames': {

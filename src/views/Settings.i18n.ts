@@ -174,9 +174,6 @@ export const settingsMessages = defineMessages(
     // ── 7. 导出与补拉偏好 ──
     defaultFormatLabel: '默认导出格式',
     defaultFormatAria: '默认导出格式',
-    formatJsonHint: '结构化数据',
-    formatCsvHint: '表格数据',
-    formatGpxHint: '运动轨迹',
 
     // ── 8. 软件更新 ──
     updateChecking: '检查中…',
@@ -531,9 +528,6 @@ If you need anything from me (which client I use, where the file lives), just as
     // ── 7. Export ──
     defaultFormatLabel: 'Default export format',
     defaultFormatAria: 'Default export format',
-    formatJsonHint: 'Structured data',
-    formatCsvHint: 'Tabular data',
-    formatGpxHint: 'Workout tracks',
 
     // ── 8. Updates ──
     updateChecking: 'Checking…',
@@ -888,9 +882,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     // ── 7. Export ──
     defaultFormatLabel: 'Formato de exportación predeterminado',
     defaultFormatAria: 'Formato de exportación predeterminado',
-    formatJsonHint: 'Datos estructurados',
-    formatCsvHint: 'Datos en tabla',
-    formatGpxHint: 'Recorridos de entrenamientos',
 
     // ── 8. Updates ──
     updateChecking: 'Revisando…',

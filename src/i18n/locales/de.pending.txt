@@ -43,6 +43,10 @@ views/settings/sections/account.stUnverified
 views/settings/sections/account.stWaiting
 views/settings/sections/account.unknownShort
 views/settings/sections/account.verify
+views/settings/sections/advanced.secPrefs
+views/settings/sections/ai.lead
+views/settings/sections/ai.scopesHint
+views/settings/sections/ai.toolsLabel
 views/settings/sections/archive.backupLatest
 views/settings/sections/archive.backupNone
 views/settings/sections/archive.backupTitle

@@ -1316,9 +1316,6 @@ export default {
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       distanceUnitLabel: 'Afstandseenheid',
       fillAllFields: 'Vul alle verplichte velden in',
-      formatCsvHint: 'Tabelgegevens',
-      formatGpxHint: 'Trainingstracks',
-      formatJsonHint: 'Gestructureerde gegevens',
       healthCheckLabel: 'Gegevensgezondheidscontrole',
       healthCheckNote:
         'Tot hoever elke gegevensstroom kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums het dekt en waar het vandaan kwam. Normaal niet nodig — kom hier als een synchronisatieresultaat anders is dan verwacht.',
@@ -2567,13 +2564,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       themeLight: 'Licht',
       themeDark: 'Donker',
       themeSystem: 'Systeem',
-      mcpLead:
-        'Laat AI-tools die op je computer zijn geïnstalleerd — Claude Code, Codex en dergelijke — je lokale gegevens direct bevragen. Alleen-lezen, offline, geen open poort.',
-      mcpToolsLabel: 'Tools die de AI kan gebruiken',
-      mcpTools: "Na het instellen kan de AI met deze tools je gegevens opvragen. Beweeg eroverheen voor details.",
       mcpPreview: 'Bekijk wat er gekopieerd wordt',
     },
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       example: 'bijv.',
       exampleTitle: 'Afgelopen 14 dagen',
       nameSub:
@@ -2770,7 +2763,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Taken beschikbaar maken voor MCP',
-      hint: 'Geldt alleen voor MCP gestart met --scope task. Dat kan alleen de gegevens opvragen die horen bij ingeschakelde taken; de standaardmodus met alleen-lezen toegang tot alle gegevens wordt hierdoor niet beperkt.',
       empty: 'Er zijn nog geen taken opgeslagen. Stuur iets naar een AI en de taak verschijnt hier.',
     },
     'components/cards/cards': {

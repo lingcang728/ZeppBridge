@@ -3,16 +3,18 @@
  *
  * 以前这里有六段说明（跳过提示、和「交给 AI」的比较、为什么不写教程、工具列表、
  * 分发方式…），配置步骤本来就是让用户把提示词丢给 AI 去问的，界面上不用再讲一遍。
- * 将复制的提示词默认收起，想先看看的人点开就行。 */
+ * 将复制的提示词和 AI 能用的工具默认收起，想先看看的人点开就行。 */
 import { computed, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import McpTaskScopes from './McpTaskScopes.vue';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
+import { aiCardMessages } from './ai.i18n';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
+const a = useMessages(aiCardMessages);
 
 /* 和 zeppbridge-mcp 的 tools/list 一一对应（顺序同 docs/reference/cli-and-mcp*.md 的工具表）。 */
 const MCP_TOOLS = computed(() => [
@@ -61,7 +63,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
     <div class="s-list">
       <div class="s-row">
         <div class="s-row-main">
-          <span class="s-row-title">{{ d.mcpLead }}</span>
+          <span class="s-row-title">{{ a.lead }}</span>
         </div>
       </div>
       <div class="s-row">
@@ -78,16 +80,11 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
       <details class="s-row is-block prompt-fold">
         <summary>{{ d.mcpPreview }}</summary>
         <pre class="mcp-config"><code>{{ t.mcpSetupPrompt }}</code></pre>
-      </details>
-      <div class="s-row is-block">
-        <div class="s-row-main">
-          <span class="s-row-title">{{ d.mcpToolsLabel }}</span>
-          <span class="s-row-sub">{{ d.mcpTools }}</span>
-        </div>
+        <p class="s-row-sub tools-label">{{ a.toolsLabel }}</p>
         <div class="mcp-tools">
           <code v-for="tool in MCP_TOOLS" :key="tool.name" class="chip" :title="tool.detail">{{ tool.name }}</code>
         </div>
-      </div>
+      </details>
       <McpTaskScopes />
     </div>
   </section>
@@ -98,6 +95,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
 .prompt-fold > summary { color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
 .mcp-config { max-height: 220px; margin: 10px 0 0; padding: 12px 14px; overflow: auto; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.7; white-space: pre-wrap; }
 .mcp-config code { color: inherit; font-size: inherit; }
-.mcp-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tools-label { margin: 12px 0 0; }
+.mcp-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mcp-tools .chip { color: var(--ink); font-family: var(--font-mono); cursor: help; }
 </style>

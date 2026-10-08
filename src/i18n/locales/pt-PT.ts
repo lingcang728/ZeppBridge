@@ -210,9 +210,6 @@ export default {
       days: (days: number) => `${days} dias`,
       defaultFormatLabel: 'Formato predefinido de exportação',
       defaultFormatAria: 'Formato predefinido de exportação',
-      formatJsonHint: 'Dados estruturados',
-      formatCsvHint: 'Tabelas',
-      formatGpxHint: 'Percursos de treino',
       updateChecking: 'A verificar…',
       updateCheck: 'Procurar atualizações',
       updateVersion: (version: string) => `Versão ${version}`,
@@ -2376,11 +2373,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       firstReady: "Os teus primeiros dados chegaram: vê esta semana na vista geral",
       goOverview: "Ir para a vista geral",
       deviceOpen: 'Ver ou alterar modelo',
-      mcpLead:
-        'Permite que assistentes de IA locais (como Claude Desktop) consultem os teus dados de saúde em modo apenas de leitura, sem tráfego de rede.',
       mcpPreview: 'Pré-visualizar configuração',
-      mcpToolsLabel: 'Ferramentas MCP disponíveis',
-      mcpTools: "Depois de configurado, a IA pode consultar os teus dados com estas ferramentas. Passa o cursor para ver os detalhes.",
       exportFormatSub:
         'Formato pré-selecionado na exportação de treinos ou tarefas',
       themeLabel: 'Tema',
@@ -2389,7 +2382,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       themeLight: 'Claro',
       scaleSub: '100% é a escala predefinida (ou usa Ctrl + / Ctrl -)',
     },
-    'views/settings/sections/ExportDefaultsSection': {
+    'views/settings/sections/fileName': {
       example: 'ex.:',
       exampleTitle: 'Últimos 14 dias',
       nameSub:
@@ -2633,7 +2626,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Disponibilizar tarefas ao MCP',
-      hint: 'Aplica-se apenas ao MCP iniciado com --scope task: este só pode consultar os dados abrangidos pelas tarefas ativadas. O modo predefinido, de leitura de toda a base de dados, não é limitado por estas opções.',
       empty: 'Ainda não há tarefas guardadas. Envia algo à IA e a tarefa aparecerá aqui.',
     },
     'lib/aiTask/planGuide': {
