@@ -347,7 +347,6 @@ export default {
       privacyTelemetryTitle: 'Keine Telemetrie, keine Nutzungsstatistik',
       privacyTelemetryBody:
         'ZeppBridge überträgt keine Nutzungsstatistiken. Nur bei manuellem Klick auf „Fehlerbericht senden" gehen die ausgewählten anonymisierten Diagnosedaten raus.',
-      privacyModalLink: 'Lokale Datenschutz-Prinzipien ansehen',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
       privacyReportBody:
         'Kein GitHub-Konto nötig. Nach deiner Bestätigung gehen nur Produkt-Feldstrukturen, Firmware, Modellnummern (Ganzzahlen – nur welches Modell) und unbekannte Trainings-Codes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge. Nie raus: Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
@@ -445,15 +444,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
 
       // ── Erweitert ──
       scaleLabel: 'Anzeigeskalierung',
-      dataAuthLabel: 'Daten und Anmeldung',
-      dataAuthNote: (days: number) =>
-        `Die Daten liegen im Ordner „data" im Programmverzeichnis; Aufbewahrung derzeit ${days} Tage.`,
       openDataFolder: 'Datenordner öffnen',
       clearAuth: 'Anmeldedaten löschen',
-      logout: 'Abmelden',
       healthCheckLabel: 'Datenzustandsprüfung',
-      healthCheckNote:
-        'Zeigt Abruf, Parsen und Schreiben je Datenstrom samt Abdeckung und Quelle. Nichts für jeden Tag – hier findest du die Ursache, wenn eine Synchronisierung unerwartete Ergebnisse liefert.',
       healthCheckOpen: 'Datenzustandsprüfung öffnen',
       compactLabel: 'Gespeicherte Rohdaten komprimieren',
       compactNoteA:
@@ -2726,14 +2719,11 @@ Antworte in Markdown.`,
       openCard: 'Öffnen',
       scaleSub: '100 % ist die Designgröße; Strg + / Strg - gehen auch',
       secAccount: 'Konto',
-      secAppearance: 'Erscheinungsbild',
       secCapability: 'Abgerufene Daten',
       secCodes: 'Nicht erkannte Trainings-Codes',
       secDevices: 'Geräte',
       secExport: 'Standard-Export',
       secFeedback: 'Ein Problem melden',
-      secFormat: 'Sprache und Formate',
-      secLocalData: 'Deine Daten auf diesem Rechner',
       secLogin: 'Anmeldemethode',
       secLoginSub: 'Nur aufklappen, wenn du dich anders anmelden musst',
       secMcp: 'MCP',

@@ -172,7 +172,6 @@ export default {
       privacyTelemetryTitle: 'Sem telemetria nem rastreio de utilização',
       privacyTelemetryBody:
         'A app não envia telemetria. Apenas ao clicares em «Enviar relatório de erro» é que os dados anónimos descritos são transmitidos.',
-      privacyModalLink: 'Princípios de privacidade e desidentificação locais',
       privacyReportTitle: 'Dispositivo ou treino não reconhecido?',
       privacyReportBody:
         'Sem conta GitHub nem cópia de dados. Ao confirmar, vão apenas a estrutura de campos, o firmware, códigos de modelo (inteiros — que modelo, não que unidade) e códigos de treino desconhecidos com contagens para o repositório privado de relatórios do ZeppBridge. Nunca conta, tokens, série, ID de dispositivo, MAC, GPS, valores de saúde, respostas em bruto ou caminhos locais.',
@@ -250,15 +249,9 @@ export default {
       syncing: 'A sincronizar…',
       syncNow: 'Sincronizar agora',
       scaleLabel: 'Escala da interface',
-      dataAuthLabel: 'Dados e credenciais',
-      dataAuthNote: (days: number) =>
-        `Os dados ficam na pasta local da app; atualmente com ${days} dias guardados.`,
       openDataFolder: 'Abrir pasta de dados',
       clearAuth: 'Limpar credenciais',
-      logout: 'Terminar sessão',
       healthCheckLabel: 'Saúde dos dados',
-      healthCheckNote:
-        'Verifica o estado de obtenção da nuvem, interpretação e escrita local de cada fluxo, datas abrangidas e proveniência. Consulta se os dados sincronizados divergirem do esperado.',
       healthCheckOpen: 'Abrir saúde dos dados',
       compactLabel: 'Compactar pacotes guardados',
       compactNoteA:
@@ -2364,9 +2357,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       secCodes: 'Tipos de treino não reconhecidos',
       secMcp: 'MCP',
       secExport: 'Formato predefinido de exportação',
-      secFormat: 'Idioma e formatos',
-      secAppearance: 'Aspeto visual',
-      secLocalData: 'Dados nesta máquina',
       secFeedback: 'Reportar problema',
       firstSyncing: (current: number, total: number) => `Ligado · a obter os registos recentes ${current}/${total}`,
       firstSyncingPlain: "Ligado · a obter os registos recentes",

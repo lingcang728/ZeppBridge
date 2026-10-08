@@ -1,9 +1,11 @@
 <script setup lang="ts">
+/* 高级与维护：别的卡挪过来的次要项都在这里。退出账号只在账号卡有一个，这里不再重复。 */
 import { onActivated, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import BackupPanel from '../../../components/BackupPanel.vue';
 import Icon from '../../../components/Icon.vue';
 import AuthSection from './AuthSection.vue';
+import FeedbackSection from './FeedbackSection.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
 import MaintenanceSection from './MaintenanceSection.vue';
 import MorePrefsSection from './MorePrefsSection.vue';
@@ -16,16 +18,17 @@ import { backend, toUserMessage } from '../../../lib/bridge';
 import { formatBytes } from '../../../lib/format';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { advancedCardMessages } from './advanced.i18n';
 
 const t = useMessages(settingsMessages);
+const m = useMessages(advancedCardMessages);
 const { appStatus } = useSyncController();
 const { formatDateTime } = useSettingsFormat();
-const { feedback, auth, prefs } = useSettingsContext();
-const { clearAuth } = auth;
-const { retentionDays, historyDays, storageEstimate } = prefs;
+const { feedback, prefs } = useSettingsContext();
+const { historyDays, storageEstimate } = prefs;
+/* 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 */
+const BUILD_STAMP = __BUILD_STAMP__;
 
-/** 压缩说明展开了没有：点一下文字展开 / 收起（不再悬停展开，见样式里的说明）。 */
-const compactNoteOpen = ref(false);
 const compactBusy = ref(false);
 const compactMessage = ref<string | null>(null);
 const compactError = ref<string | null>(null);
@@ -61,8 +64,8 @@ const runCompactPayloads = async () => {
   }
 };
 
-/* 别的卡带着锚点过来（归档卡的 #backup、数据卡的 #codes）：等卡展开动画走完再滚到那一块。
-   卡体在 KeepAlive 里，第一次挂载和再次切回来都会走 onActivated。 */
+/* 别的卡带着锚点过来（归档卡的 #backup、数据卡的 #codes、隐私卡的 #local-api）：
+   等卡展开动画走完再滚到那一块。卡体在 KeepAlive 里，第一次挂载和再次切回来都会走 onActivated。 */
 const route = useRoute();
 onActivated(() => {
   const id = route.hash.slice(1);
@@ -78,47 +81,51 @@ const openDataFolder = async () => {
 
 <template>
   <div class="advanced">
-    <!-- 三件互不相干的小工具横着排：数据文件夹与认证、数据健康检查、压缩历史报文。 -->
-    <div class="s-tiles">
-      <section class="s-tile s-fact">
-        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="folder" :size="15" /></span><strong>{{ t.dataAuthLabel }}</strong></span>
-        <p>{{ t.dataAuthNote(retentionDays) }}</p>
-        <div class="s-fact-actions">
-          <button class="pill-button" type="button" @click="openDataFolder"><Icon name="folder" :size="14" />{{ t.openDataFolder }}</button>
-          <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
+    <section class="s-section">
+      <div class="s-list">
+        <div class="s-row">
+          <div class="s-row-main">
+            <span class="s-row-title">{{ m.folderTitle }}</span>
+            <span class="s-row-sub">{{ m.folderSub }}</span>
+          </div>
+          <div class="s-row-control">
+            <button class="pill-button" type="button" @click="openDataFolder"><Icon name="folder" :size="14" />{{ t.openDataFolder }}</button>
+          </div>
         </div>
-      </section>
-      <section class="s-tile s-fact">
-        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="database" :size="15" /></span><strong>{{ t.healthCheckLabel }}</strong></span>
-        <p>{{ t.healthCheckNote }}</p>
-        <div class="s-fact-actions">
-          <RouterLink class="pill-button" to="/health-check"><Icon name="database" :size="14" />{{ t.healthCheckOpen }}</RouterLink>
+        <div class="s-row">
+          <div class="s-row-main">
+            <span class="s-row-title">{{ t.healthCheckLabel }}</span>
+            <span class="s-row-sub">{{ m.healthSub }}</span>
+          </div>
+          <div class="s-row-control">
+            <RouterLink class="pill-button" to="/health-check"><Icon name="database" :size="14" />{{ t.healthCheckOpen }}</RouterLink>
+          </div>
         </div>
-      </section>
-      <section class="s-tile s-fact">
-        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="box" :size="15" /></span><strong>{{ t.compactLabel }}</strong></span>
-        <p
-          :class="['clamp', { open: compactNoteOpen }]"
-          role="button"
-          tabindex="0"
-          :aria-expanded="compactNoteOpen"
-          @click="compactNoteOpen = !compactNoteOpen"
-          @keydown.enter.prevent="compactNoteOpen = !compactNoteOpen"
-          @keydown.space.prevent="compactNoteOpen = !compactNoteOpen"
-        >{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</p>
-        <div class="s-fact-actions">
-          <button class="pill-button" type="button" :disabled="compactBusy" @click="runCompactPayloads">
-            <Icon name="box" :size="14" />{{ compactBusy ? t.compacting : t.compactRun }}
-          </button>
+        <div class="s-row is-block">
+          <div class="compact-head">
+            <div class="s-row-main">
+              <span class="s-row-title">{{ t.compactLabel }}</span>
+              <span class="s-row-sub">{{ m.compactSub }}</span>
+            </div>
+            <div class="s-row-control">
+              <button class="pill-button" type="button" :disabled="compactBusy" @click="runCompactPayloads">
+                <Icon name="box" :size="14" />{{ compactBusy ? t.compacting : t.compactRun }}
+              </button>
+            </div>
+          </div>
+          <details class="compact-fold">
+            <summary>{{ m.compactMore }}</summary>
+            <p class="s-row-sub">{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</p>
+          </details>
+          <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
+          <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
         </div>
-        <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
-        <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
-      </section>
-    </div>
-
-    <AuthSection />
+      </div>
+    </section>
 
     <MorePrefsSection />
+
+    <AuthSection />
 
     <ProbeSection />
 
@@ -131,15 +138,20 @@ const openDataFolder = async () => {
       <BackupPanel />
     </section>
 
-    <section class="s-section">
+    <section id="local-api" class="s-section">
       <div class="s-section-head"><h3>{{ t.localApiLabel }}</h3></div>
       <p class="s-note">{{ t.localApiNote }}</p>
       <LocalApiPanel />
     </section>
 
+    <FeedbackSection />
+
     <details class="s-list diag-fold">
       <summary class="s-row">
-        <span class="s-row-main"><span class="s-row-title">{{ t.syncDiagnostics }}</span></span>
+        <span class="s-row-main">
+          <span class="s-row-title">{{ t.syncDiagnostics }}</span>
+          <span class="s-row-sub build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</span>
+        </span>
         <Icon name="chevron-down" :size="16" class="fold-caret" />
       </summary>
       <div v-for="stream in appStatus?.streams" :key="stream.stream" class="s-row stream-row">
@@ -156,25 +168,16 @@ const openDataFolder = async () => {
 <style scoped>
 .advanced { display: grid; gap: 22px; min-width: 0; }
 .advanced > .s-section + .s-section { margin-top: 0; }
-/* 压缩说明很长：小板里先露五行，点一下展开、再点收起，高度平滑过渡。
-   以前是悬停 / 聚焦就展开：鼠标一扫过这一格，它一下变高，下面整块内容跟着往下跳、移开又弹回来
-   （用户 2026-10-03 录屏「鼠标滑过画面突然跳一下」）。布局只在人主动点的时候变。 */
-.clamp {
-  max-height: 5lh;
-  overflow: hidden;
-  cursor: pointer;
-  interpolate-size: allow-keywords;
-  transition: max-height var(--dur-slow) var(--ease-out);
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.4lh), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.4lh), transparent);
-}
-.clamp.open { max-height: max-content; -webkit-mask-image: none; mask-image: none; }
-@media (prefers-reduced-motion: reduce) { .clamp { transition: none; } }
-.s-fact-actions .danger-button { min-height: 34px; border-radius: 999px; }
+.compact-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.compact-fold { margin-top: 6px; }
+.compact-fold > summary { color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
+.compact-fold p { margin: 6px 0 0; line-height: 1.6; }
+.compact-fold strong { color: var(--ink); font-weight: 600; }
 .diag-fold > summary { cursor: pointer; list-style: none; }
 .diag-fold > summary::-webkit-details-marker { display: none; }
 .fold-caret { color: var(--subtle); transition: transform var(--dur-base) var(--ease-out); }
 .diag-fold[open] .fold-caret { transform: rotate(180deg); }
+.build-stamp { font-family: var(--font-mono); }
 .stream-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; min-height: 44px; color: var(--muted); font-size: var(--fs-sm); }
 .stream-row strong { font-weight: 600; color: var(--ink); }
 </style>

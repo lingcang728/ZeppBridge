@@ -121,7 +121,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: '默认用 Windows 凭据管理器 / macOS 钥匙串 / Linux 密钥环。macOS 和 Linux 可显式改用仅当前用户可读写的明文凭据文件；Linux 也支持环境变量。auth.json 只含账号与区域等元数据，令牌不写进日志、导出或错误报告。',
     privacyTelemetryTitle: '没有埋点，没有使用统计',
     privacyTelemetryBody: '应用不自动上报任何使用行为。只有你手动点「提交错误报告」时，才发送下面那几类脱敏字段。',
-    privacyModalLink: '查看本地隐私与脱敏原则',
     privacyReportTitle: '设备或运动没有识别？',
     privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
 
@@ -216,13 +215,9 @@ export const settingsMessages = defineMessages(
 
     // ── 高级与维护 ──
     scaleLabel: '界面缩放',
-    dataAuthLabel: '数据与认证',
-    dataAuthNote: (days: number) => `数据存在程序目录的 data 文件夹，当前保留 ${days} 天。`,
     openDataFolder: '打开数据文件夹',
     clearAuth: '清除认证',
-    logout: '退出账号',
     healthCheckLabel: '数据健康检查',
-    healthCheckNote: '每条数据流从云端取回、被解析、写进本机各走到哪一步，覆盖哪些日期、来自哪个来源。平时不用看；同步结果和预期对不上时来这里找原因。',
     healthCheckOpen: '打开数据健康检查',
     compactLabel: '压缩历史报文',
     compactNoteA: '云端原始报文是库里最占地方的东西，它们是 JSON 文本，压缩后通常只剩五分之一。',
@@ -475,7 +470,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: 'The default is Windows Credential Manager / macOS Keychain / Linux keyring. macOS and Linux can explicitly use a plaintext credential file readable and writable only by your user; Linux also supports environment variables. auth.json holds only account and region metadata. Tokens never enter logs, data exports or error reports.',
     privacyTelemetryTitle: 'No telemetry, no usage statistics',
     privacyTelemetryBody: 'The app reports no usage on its own. Only pressing "Submit error report" sends the de-identified fields listed below.',
-    privacyModalLink: 'Local privacy and de-identification principles',
     privacyReportTitle: 'A device or workout not recognized?',
     privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, firmware version, model-level numbers (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
 
@@ -570,13 +564,9 @@ If you need anything from me (which client I use, where the file lives), just as
 
     // ── Advanced ──
     scaleLabel: 'Interface scale',
-    dataAuthLabel: 'Data and credentials',
-    dataAuthNote: (days: number) => `Data lives in the app\'s data folder; currently keeping ${days} days.`,
     openDataFolder: 'Open the data folder',
     clearAuth: 'Clear credentials',
-    logout: 'Log out',
     healthCheckLabel: 'Data health check',
-    healthCheckNote: 'How far each stream got through cloud fetch, parse and local write; which dates it covers; where it came from. Not for daily checks — come here when a sync result looks wrong.',
     healthCheckOpen: 'Open the data health check',
     compactLabel: 'Compact stored payloads',
     compactNoteA: 'Raw cloud payloads take up most of this database. They are JSON text, and usually compress to about a fifth.',
@@ -829,7 +819,6 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyTokenBody: 'Por defecto: Administrador de credenciales de Windows, Llavero de macOS o llavero de Linux. En macOS y Linux puedes elegir un archivo de credenciales en texto plano que solo tu usuario puede leer y escribir; Linux también admite variables de entorno. auth.json solo guarda metadatos de cuenta y región; los tokens no entran en registros, exportaciones ni reportes de error.',
     privacyTelemetryTitle: 'Sin telemetría ni estadísticas de uso',
     privacyTelemetryBody: 'La app no reporta tu uso por su cuenta. Solo cuando tú pulsas «Enviar un reporte de error» salen los campos anonimizados listados abajo.',
-    privacyModalLink: 'Leer los principios de privacidad local',
     privacyReportTitle: '¿Un dispositivo o entrenamiento no reconocido?',
     privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, la versión de firmware, números de modelo (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 
@@ -924,13 +913,9 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
 
     // ── Advanced ──
     scaleLabel: 'Escala de la interfaz',
-    dataAuthLabel: 'Datos y credenciales',
-    dataAuthNote: (days: number) => `Los datos están en la carpeta data de la app; se conservan ${days} días.`,
     openDataFolder: 'Abrir la carpeta de datos',
     clearAuth: 'Borrar credenciales',
-    logout: 'Cerrar sesión',
     healthCheckLabel: 'Revisión del estado de los datos',
-    healthCheckNote: 'En qué paso quedó cada flujo (descarga de la nube, análisis, escritura local), qué fechas cubre y de qué fuente vino. No es para mirarlo a diario; ven cuando una sincronización no cuadre con lo esperado.',
     healthCheckOpen: 'Abrir la revisión del estado de los datos',
     compactLabel: 'Compactar registros guardados',
     compactNoteA: 'Los mensajes crudos de la nube son lo que más ocupa en la base: texto JSON que comprimido suele quedar en una quinta parte.',

@@ -1,17 +1,22 @@
 <script setup lang="ts">
+/* 隐私与安全：一句话 +「了解更多」，再加一行本机 API 的入口（开关本体在高级卡）。
+   以前卡上的三块说明（库未加密、令牌存哪、没有埋点）是诚实的披露，不能删，挪进了弹窗顶上；
+   诊断报告挪到高级卡「反馈问题」。 */
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import Icon from '../../../components/Icon.vue';
 import ModalDialog from '../../../components/ModalDialog.vue';
-import DiagnosticReportForm from '../DiagnosticReportForm.vue';
-import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
+import { useLocalApi } from '../../../composables/settings/useLocalApi';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
-import { deckMessages } from '../deck.i18n';
+import { privacyCardMessages } from './privacy.i18n';
 
 const t = useMessages(settingsMessages);
-const d = useMessages(deckMessages);
-const privacyDiagnostic = createDiagnosticForm();
+const p = useMessages(privacyCardMessages);
 const privacyModalOpen = ref(false);
+const router = useRouter();
+const { localApiStatus, loadLocalApiStatus } = useLocalApi();
+const openLocalApi = () => { void router.push({ path: '/settings/advanced', hash: '#local-api' }); };
 
 /* 这里曾有三个只写 localStorage、没有任何后端行为的开关（本地数据加密 /
    启动解锁保护 / 匿名使用洞察）。一个默认打开、写着「加密保护」却什么都不做的
@@ -24,40 +29,29 @@ const STALE_PRIVACY_PREF_KEYS = [
 ];
 onMounted(() => {
   for (const key of STALE_PRIVACY_PREF_KEYS) window.localStorage.removeItem(key);
+  void loadLocalApiStatus();
 });
 </script>
 
 <template>
-  <section id="privacy-section" class="privacy" aria-labelledby="privacy-title">
-    <div class="s-section">
-      <div class="s-section-head">
-        <h3 id="privacy-title">{{ d.secLocalData }}</h3>
-        <button class="pill-button quiet" type="button" @click="privacyModalOpen = true">
-          <Icon name="shield" :size="14" />{{ t.privacyModalLink }}
-        </button>
-      </div>
-      <div class="s-tiles">
-        <div class="s-tile s-fact">
-          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="lock" :size="15" /></span><strong>{{ t.privacyDbTitle }}</strong></span>
-          <p>{{ t.privacyDbBody }}</p>
-        </div>
-        <div class="s-tile s-fact">
-          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="shield" :size="15" /></span><strong>{{ t.privacyTokenTitle }}</strong></span>
-          <p>{{ t.privacyTokenBody }}</p>
-        </div>
-        <div class="s-tile s-fact">
-          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="user" :size="15" /></span><strong>{{ t.privacyTelemetryTitle }}</strong></span>
-          <p>{{ t.privacyTelemetryBody }}</p>
+  <section id="privacy-section" class="s-section">
+    <div class="s-list">
+      <div class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ p.lead }}</span></div>
+        <div class="s-row-control">
+          <button class="pill-button quiet" type="button" @click="privacyModalOpen = true">
+            <Icon name="shield" :size="14" />{{ p.learnMore }}
+          </button>
         </div>
       </div>
-    </div>
-    <div class="s-section">
-      <div class="s-section-head"><h3>{{ d.secFeedback }}</h3></div>
-      <div class="s-list">
-        <div class="diagnostic-panel">
-          <strong>{{ t.privacyReportTitle }}</strong>
-          <p>{{ t.privacyReportBody }}</p>
-          <DiagnosticReportForm :form="privacyDiagnostic" />
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.localApiLabel }}</span>
+          <!-- 状态没读到（浏览器预览、后端出错）就不写开关状态，不猜。 -->
+          <span v-if="localApiStatus" class="s-row-sub">{{ localApiStatus.enabled ? p.apiOn(localApiStatus.base_url || '127.0.0.1') : p.apiOff }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="pill-button quiet" type="button" @click="openLocalApi">{{ p.apiOpen }}<Icon name="chevron-right" :size="14" /></button>
         </div>
       </div>
     </div>
@@ -72,6 +66,9 @@ onMounted(() => {
         <button type="button" class="close-btn" :aria-label="t.closeDialog" @click="privacyModalOpen = false"><Icon name="x" :size="16" /></button>
       </div>
       <div class="modal-body">
+        <p><strong>{{ t.privacyDbTitle }}</strong>{{ t.privacyDbBody }}</p>
+        <p><strong>{{ t.privacyTokenTitle }}</strong>{{ t.privacyTokenBody }}</p>
+        <p><strong>{{ t.privacyTelemetryTitle }}</strong>{{ t.privacyTelemetryBody }}</p>
         <p><strong>{{ t.privacyPoint1Title }}</strong>{{ t.privacyPoint1 }}</p>
         <p><strong>{{ t.privacyPoint2Title }}</strong>{{ t.privacyPoint2 }}</p>
         <p><strong>{{ t.privacyPoint3Title }}</strong>{{ t.privacyPoint3 }}</p>
@@ -87,7 +84,3 @@ onMounted(() => {
 
 <style scoped src="../settings-local.css"></style>
 <style scoped src="../settings-modal.css"></style>
-<style scoped>
-.privacy { display: grid; gap: 22px; }
-.privacy > .s-section + .s-section { margin-top: 0; }
-</style>

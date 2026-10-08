@@ -1306,9 +1306,6 @@ export default {
       connFailed: 'Inloggen mislukt',
       connVerifying: 'Verifiëren',
       connWaiting: 'Wachten op inloggen',
-      dataAuthLabel: 'Gegevens en inloggegevens',
-      dataAuthNote: (days: number) =>
-        `Gegevens staan in de datamap naast het programma; nu worden ${days} dagen bewaard.`,
       days: (days: number) => `${days} dagen`,
       defaultFormatAria: 'Standaard exportformaat',
       defaultFormatLabel: 'Standaard exportformaat',
@@ -1317,8 +1314,6 @@ export default {
       distanceUnitLabel: 'Afstandseenheid',
       fillAllFields: 'Vul alle verplichte velden in',
       healthCheckLabel: 'Gegevensgezondheidscontrole',
-      healthCheckNote:
-        'Tot hoever elke gegevensstroom kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums het dekt en waar het vandaan kwam. Normaal niet nodig — kom hier als een synchronisatieresultaat anders is dan verwacht.',
       healthCheckOpen: 'De gegevensgezondheidscontrole openen',
       identifyDevices: 'Apparaten opnieuw herkennen',
       identifying: 'Herkennen…',
@@ -1331,7 +1326,6 @@ export default {
       loginCancelFailed: 'Het inloggen kon niet worden geannuleerd',
       loginIncomplete: 'Inloggen is niet afgerond',
       loginWindowFailed: 'Het inlogvenster kon niet worden geopend',
-      logout: 'Uitloggen',
       manualAuthDone: 'Handmatig inloggen gelukt; de inloggegevens zijn opgeslagen.',
       manualAuthFailed: 'Handmatig inloggen mislukt',
       manualFormHint:
@@ -1393,7 +1387,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       privacyDbBody:
         'Gezondheidsgegevens staan als gewone SQLite in de datamap naast het programma; de bescherming komt van je Windows- / macOS-account en schijfversleuteling. ZeppBridge biedt geen versleutelde database en doet ook niet alsof.',
       privacyDbTitle: 'De lokale database is niet versleuteld',
-      privacyModalLink: 'Lees de lokale privacyprincipes',
       privacyModalOk: 'Begrepen',
       privacyModalTitle: 'Lokale privacyprincipes van ZeppBridge',
       privacyPoint1:
@@ -2542,9 +2535,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       secAccount: 'Zepp-account',
       secDevices: 'Apparaten',
       secCapability: 'Binnengehaalde gegevens',
-      secLocalData: 'Je gegevens op deze computer',
-      secFormat: 'Taal en notaties',
-      secAppearance: 'Uiterlijk',
       secExport: 'Standaardexport',
       secCodes: 'Niet-herkende trainingscodes',
       secLogin: 'Inlogmethode',

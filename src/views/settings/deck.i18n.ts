@@ -40,9 +40,6 @@ export const deckMessages = defineMessages(
     secCodes: '未识别的运动编号',
     secMcp: 'MCP',
     secExport: '默认导出',
-    secFormat: '语言与格式',
-    secAppearance: '外观',
-    secLocalData: '本机数据',
     secFeedback: '反馈问题',
 
     firstSyncing: (current: number, total: number) => `连接成功 · 正在取最近记录 ${current}/${total}`,
@@ -97,9 +94,6 @@ export const deckMessages = defineMessages(
     secCodes: 'Unrecognized workout codes',
     secMcp: 'MCP',
     secExport: 'Default export',
-    secFormat: 'Language and formats',
-    secAppearance: 'Appearance',
-    secLocalData: 'Data on this machine',
     secFeedback: 'Report a problem',
 
     firstSyncing: (current: number, total: number) => `Connected · fetching recent records ${current}/${total}`,
@@ -154,9 +148,6 @@ export const deckMessages = defineMessages(
     secCodes: 'Códigos de entrenamiento no reconocidos',
     secMcp: 'MCP',
     secExport: 'Exportación predeterminada',
-    secFormat: 'Idioma y formatos',
-    secAppearance: 'Apariencia',
-    secLocalData: 'Tus datos en este equipo',
     secFeedback: 'Informar de un problema',
 
     firstSyncing: (current: number, total: number) => `Conectado · trayendo los registros recientes ${current}/${total}`,

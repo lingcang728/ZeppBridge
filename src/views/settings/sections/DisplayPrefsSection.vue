@@ -1,20 +1,10 @@
 <script setup lang="ts">
+/* 显示与语言：语言、主题、距离单位，加一行「我关注」。
+   时间格式、日期顺序、界面缩放不常改，挪到高级卡「更多偏好」（DisplayMoreRows.vue）。 */
 import { computed, ref } from 'vue';
 import CapsuleWheel from '../../../components/CapsuleWheel.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
-import { UI_SCALES, useUiScale, type UiScale } from '../../../composables/useUiScale';
 import { useTheme, type ThemeMode } from '../../../composables/useTheme';
-import {
-  DATE_ORDERS,
-  TIME_FORMATS,
-  dateOrder,
-  dateTimeLabels,
-  setDateOrder,
-  setTimeFormat,
-  timeFormat,
-  type DateOrder,
-  type TimeFormat,
-} from '../../../lib/dateTime';
 import {
   DISTANCE_UNITS,
   distanceUnit,
@@ -26,21 +16,16 @@ import { LOCALES, LOCALE_LABELS, useMessages, type Locale } from '../../../i18n'
 import { shownLocale } from '../../../lib/motion/localeTarget';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
+import FocusAreasRow from './FocusAreasRow.vue';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
-const { scale, setScale } = useUiScale();
 const { themeMode, resolvedTheme, pickTheme } = useTheme();
-const scaleItems = computed(() => UI_SCALES.map((option) => ({ value: option, label: `${option}%` })));
 
 const localeOptions = computed(() =>
   LOCALES.map((value) => ({ value, label: LOCALE_LABELS[value] })));
 const distanceUnitOptions = computed(() =>
   DISTANCE_UNITS.map((value) => ({ value, label: distanceUnitOptionLabel(value) })));
-const timeFormatOptions = computed(() =>
-  TIME_FORMATS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
-const dateOrderOptions = computed(() =>
-  DATE_ORDERS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
 /* 主题三格：深色 / 浅色 / 跟随系统，点哪格就是哪条规则（见 useTheme.pickTheme）；
    新主题从被点的那枚图标处扩散开。顶栏只放月亮 / 太阳两枚，回到跟随系统在这里。 */
 const themeOptions = computed(() => [
@@ -57,8 +42,6 @@ const chooseLocale = (value: string | number) => {
   void import('../../../lib/motion/ashSwitch').then(({ switchLocaleWithAsh }) => switchLocaleWithAsh(String(value) as Locale, origin));
 };
 const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
-const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
-const chooseDateOrder = (value: string | number) => setDateOrder(String(value) as DateOrder);
 const chooseTheme = (value: string | number) => {
   const index = themeOptions.value.findIndex((option) => option.value === value);
   const rect = themeTrack.value?.$el.querySelectorAll<HTMLElement>('.segment-item')[index]?.getBoundingClientRect();
@@ -67,74 +50,34 @@ const chooseTheme = (value: string | number) => {
 </script>
 
 <template>
-  <div class="display-prefs">
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ d.secFormat }}</h3></div>
-      <div class="s-list">
-        <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
-             必须能在中文界面上找到它，反过来也一样。 -->
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">语言 · Language</span></div>
-          <div class="s-row-control">
-            <CapsuleWheel loop :span="236" :items="localeOptions" :model-value="shownLocale" aria-label="语言 · Language" @update:model-value="chooseLocale" ref="localeWheel" />
-          </div>
-        </div>
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ t.distanceUnitLabel }}</span></div>
-          <div class="s-row-control">
-            <SegmentTrack compact :items="distanceUnitOptions" :model-value="distanceUnit" :aria-label="t.distanceUnitLabel" @update:model-value="chooseDistanceUnit" />
-          </div>
-        </div>
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ dateTimeLabels.time }}</span></div>
-          <div class="s-row-control">
-            <SegmentTrack compact :items="timeFormatOptions" :model-value="timeFormat" :aria-label="dateTimeLabels.time" @update:model-value="chooseTimeFormat" />
-          </div>
-        </div>
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ dateTimeLabels.date }}</span></div>
-          <div class="s-row-control">
-            <SegmentTrack compact :items="dateOrderOptions" :model-value="dateOrder" :aria-label="dateTimeLabels.date" @update:model-value="chooseDateOrder" />
-          </div>
+  <section class="s-section">
+    <div class="s-list">
+      <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
+           必须能在中文界面上找到它，反过来也一样。 -->
+      <div class="s-row">
+        <div class="s-row-main"><span class="s-row-title">语言 · Language</span></div>
+        <div class="s-row-control">
+          <CapsuleWheel loop :span="236" :items="localeOptions" :model-value="shownLocale" aria-label="语言 · Language" @update:model-value="chooseLocale" ref="localeWheel" />
         </div>
       </div>
-    </section>
-
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ d.secAppearance }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main">
-            <span class="s-row-title">{{ d.themeLabel }}</span>
-            <span class="s-row-sub">{{ resolvedTheme === 'dark' ? d.themeDark : d.themeLight }}<template v-if="themeMode === 'system'"> · {{ d.themeSystem }}</template></span>
-          </div>
-          <div class="s-row-control">
-            <SegmentTrack ref="themeTrack" compact icon-only :items="themeOptions" :model-value="themeMode" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
-          </div>
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ d.themeLabel }}</span>
+          <span class="s-row-sub">{{ resolvedTheme === 'dark' ? d.themeDark : d.themeLight }}<template v-if="themeMode === 'system'"> · {{ d.themeSystem }}</template></span>
         </div>
-        <!-- 缩放是一枚按内容收紧、靠右的分段控件；以前它被拉满整行，右边空出一大截。 -->
-        <div class="s-row">
-          <div class="s-row-main">
-            <span class="s-row-title">{{ t.scaleLabel }}</span>
-            <span class="s-row-sub">{{ d.scaleSub }}</span>
-          </div>
-          <div class="s-row-control">
-            <SegmentTrack
-              compact
-              :items="scaleItems"
-              :model-value="scale"
-              :aria-label="t.scaleLabel"
-              @update:model-value="(value) => setScale(Number(value) as UiScale)"
-            />
-          </div>
+        <div class="s-row-control">
+          <SegmentTrack ref="themeTrack" compact icon-only :items="themeOptions" :model-value="themeMode" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
         </div>
       </div>
-    </section>
-  </div>
+      <div class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ t.distanceUnitLabel }}</span></div>
+        <div class="s-row-control">
+          <SegmentTrack compact :items="distanceUnitOptions" :model-value="distanceUnit" :aria-label="t.distanceUnitLabel" @update:model-value="chooseDistanceUnit" />
+        </div>
+      </div>
+      <FocusAreasRow />
+    </div>
+  </section>
 </template>
 
 <style scoped src="../settings-local.css"></style>
-<style scoped>
-.display-prefs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
-.display-prefs > .s-section + .s-section { margin-top: 0; }
-</style>
