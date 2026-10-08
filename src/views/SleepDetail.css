@@ -41,7 +41,6 @@
   font-variant-numeric: tabular-nums;
 }
 .score-num small { color: var(--muted); font-size: var(--fs-md); font-weight: 600; }
-.score-note { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.45; }
 .kicker {
   display: flex;
   align-items: center;

@@ -25,6 +25,7 @@ import { activityPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { metricColor } from '../lib/metricTone';
+import { metricInfo } from '../lib/metricInfo';
 import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
@@ -40,7 +41,6 @@ const { dataRevision } = useSyncController();
 interface ActivityCard {
   metric: string;
   label: string;
-  hint: string;
   color: string;
   unit: string;
   decimals?: number;
@@ -51,28 +51,24 @@ const CARDS = computed<ActivityCard[]>(() => [
   {
     metric: 'steps',
     label: t.value.stepsLabel,
-    hint: t.value.stepsHint,
     color: metricColor('steps'),
     unit: t.value.stepsUnit,
   },
   {
     metric: 'distance',
     label: t.value.distanceLabel,
-    hint: t.value.distanceHint,
     color: metricColor('distance'),
     unit: t.value.distanceUnit,
   },
   {
     metric: 'active_calories',
     label: t.value.caloriesLabel,
-    hint: t.value.caloriesHint,
     color: metricColor('active_calories'),
     unit: t.value.caloriesUnit,
   },
   {
     metric: 'active_minutes',
     label: t.value.minutesLabel,
-    hint: t.value.minutesHint,
     color: metricColor('active_minutes'),
     unit: t.value.minutesUnit,
   },
@@ -102,7 +98,7 @@ const everMeasured = (metric: string) => (fullSeries.value[metric]?.points.lengt
 const shownCards = computed(() => cards.value.filter((card) => everMeasured(card.metric)));
 const missingCards = computed(() => cards.value
   .filter((card) => !everMeasured(card.metric))
-  .map((card) => ({ key: card.metric, label: card.label, detail: card.hint })));
+  .map((card) => ({ key: card.metric, label: card.label, detail: metricInfo(card.metric)?.what })));
 
 const load = async () => {
   const seq = loadSeq.next();
@@ -167,7 +163,7 @@ watch(dataRevision, () => { void load(); });
           v-for="card in shownCards"
           :key="card.metric"
           :label="card.label"
-          :hint="card.hint"
+          :info="card.metric"
           :series="card.series"
           :color="card.color"
           :unit="card.unit"
@@ -182,7 +178,8 @@ watch(dataRevision, () => { void load(); });
 <style scoped>
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
 
-.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
+/* 页面级的提示条：细线描边、无底无投影——卡片材质只给主信息区的卡。 */
+.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); color: var(--muted); font-size: var(--fs-sm); }
 .inline-alert[role='alert'] { color: var(--danger); }
 .retry { margin-left: auto; }
 </style>

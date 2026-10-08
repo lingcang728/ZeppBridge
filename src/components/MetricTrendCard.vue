@@ -30,6 +30,7 @@ import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
 import AskAiButton from './ask/AskAiButton.vue';
 import BaselineTag from './ask/BaselineTag.vue';
+import MetricInfoButton from './MetricInfoButton.vue';
 import PickDaysButton from './cards/PickDaysButton.vue';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -78,7 +79,13 @@ const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.ch
 
 const props = withDefaults(defineProps<{
   label: string;
-  hint?: string;
+  /**
+   * 指标 id（`lib/metricInfo` 的注册表键）：给了就在标题旁放一枚「?」，
+   * 三段解释（这是什么 / 这张图展示什么 / 怎么算的与来源）在浮层里。
+   * 以前卡头那行一句话说明（hint）就是这三段里的第一段，挪进去了——
+   * 同一句话不在卡上和浮层里各排一遍。
+   */
+  info?: string;
   series?: MetricSeries | null;
   color: string;
   unit?: string;
@@ -212,17 +219,17 @@ const hasEventMarks = computed(() => {
 </script>
 
 <template>
-  <!-- 四块自上而下：卡头（标题 / 最新读数 / 说明）、覆盖说明、曲线、统计。
+  <!-- 四块自上而下：卡头（标题 / 最新读数）、覆盖说明、曲线、统计。
        卡片是父网格的 subgrid，同一行几张卡的这四块各自对齐（见 material.css 的 .trend-grid）。
        以前标题和说明挤在左边、最新读数占着右上角：葡语这种长标题被压成一列一个词竖着排，
-       右边却空着一大块。现在标题独占一行、读数在它下面、说明铺满整宽。 -->
+       右边却空着一大块。现在标题独占一行、读数在它下面；解释挪进了标题旁的「?」浮层。 -->
   <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
       <!-- 第一行：标题 + 右边的「挑日子」「问 AI」。放不下时按钮整组换到下一行靠右，
            不再浮在标题上面——法语、葡语的长标题曾经和「比平时高」叠在一起（2026-10-07）。 -->
       <div class="trend-top">
         <strong class="trend-title">{{ label }}</strong>
-        <span class="trend-actions"><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
+        <span class="trend-actions"><MetricInfoButton v-if="info" :metric="info" :label="label" /><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
       </div>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
            / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
@@ -237,7 +244,6 @@ const hasEventMarks = computed(() => {
         <!-- 「比平时高 / 低」说的是这个读数，跟在它后面（只和自己比，精修批次 6）。 -->
         <BaselineTag class="trend-baseline" :metric="series?.metric" :format="render" :unit="unit" />
       </span>
-      <small v-if="hint" class="trend-hint">{{ hint }}</small>
     </header>
 
     <!-- 悬停读数只在图上浮出的那块里（日期、数值、当天的生活事件）。以前这一行还会叠一份同样的
@@ -306,7 +312,6 @@ const hasEventMarks = computed(() => {
 .trend-latest :deep(small), .trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }
 .trend-latest :deep(small + strong) { margin-left: 8px; }
 .trend-latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
-.trend-hint { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
 .trend-meta {
   display: flex;
   flex-wrap: wrap;

@@ -8,12 +8,19 @@
  */
 import { RouterLink } from 'vue-router';
 import { trendGridStyle } from '../lib/trendGrid';
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { useWeeklyReport } from '../composables/useWeeklyReport';
+import { useTrainingPlan } from '../composables/useTrainingPlan';
+import { useRevisionReload } from '../composables/useRevisionReload';
+import { today as currentToday } from '../lib/currentDay';
+import { dayKey } from '../lib/aiTask/bridgeScale';
+import { upcomingDays, type UpcomingDay } from '../lib/trainingPlan/upcoming';
+import { displayDateTimeFormatter, parseDisplayDate } from '../lib/dateTime';
+import { usePlanText } from './plan/usePlanText';
 
 import type { InsightFact } from '../types';
 import { useMessages } from '../i18n';
@@ -114,6 +121,26 @@ function formatNumber(fact: InsightFact, value: number): string {
   const word = t.value.unitWord(fact.unit);
   return word ? `${Math.round(value)} ${word}` : `${Math.round(value)}`;
 }
+
+/* 「接下来」那三天：只认账本上发到手表的计划（state.sent），草稿不算——没发出去
+   的排课出现在概览上，会让人以为已经排好了。三天里一条训练都没有时整行不画：
+   分不清「排了休息」和「根本没排」，卡片就是原样。 */
+const plan = useTrainingPlan();
+const planText = usePlanText();
+onMounted(() => { void plan.load(); });
+useRevisionReload(() => { void plan.load(); });
+const nextDays = computed(() => upcomingDays(plan.state.value?.sent ?? [], dayKey(currentToday())));
+
+const weekdayOf = (date: string) => displayDateTimeFormatter({ weekday: 'short' }).format(parseDisplayDate(date));
+const dayText = (day: UpcomingDay) => {
+  if (day.rest) return planText.t.value.rest;
+  return day.minutes === null ? day.name : `${day.name} ${day.minutes}′`;
+};
+const dayAria = (day: UpcomingDay) => {
+  if (day.rest) return `${weekdayOf(day.date)} · ${planText.t.value.rest}`;
+  const body = day.minutes === null ? day.name : `${day.name} · ${planText.minutes(day.minutes)}`;
+  return `${weekdayOf(day.date)} · ${body}`;
+};
 </script>
 
 <template>
@@ -158,6 +185,24 @@ function formatNumber(fact: InsightFact, value: number): string {
         </RouterLink>
       </div>
     </template>
+
+    <!-- 接下来：账本上发到手表的计划里，明天起三天各是什么；一条都没有时整行不画。 -->
+    <footer v-if="nextDays" class="upcoming">
+      <span class="upcoming-label">{{ t.nextUp }}</span>
+      <div class="upcoming-days">
+        <RouterLink
+          v-for="day in nextDays"
+          :key="day.date"
+          :to="`/ai/plan/${day.date}`"
+          :class="['upcoming-day', { rest: day.rest, interval: !day.rest && day.interval }]"
+          :aria-label="dayAria(day)"
+        >
+          <small class="upcoming-weekday">{{ weekdayOf(day.date) }}</small>
+          <i class="upcoming-shape" aria-hidden="true"></i>
+          <span class="upcoming-text">{{ dayText(day) }}</span>
+        </RouterLink>
+      </div>
+    </footer>
   </section>
 </template>
 
@@ -225,4 +270,21 @@ function formatNumber(fact: InsightFact, value: number): string {
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .weekly-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
+
+/* 「接下来」：细线隔开的一行，三个可点的日子。形状是训练类别色：实心圆＝有氧 /
+   轻松，三角＝间歇，空圈＝休息（和交给 AI 那张计划牌同一套读法）。 */
+.upcoming { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-top: 12px; border-top: 1px solid var(--mat-line); }
+.upcoming-label { color: var(--subtle); font-size: var(--fs-xs); }
+.upcoming-days { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.upcoming-day { display: inline-flex; min-width: 0; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-xs); text-decoration: none; transition: color var(--dur-fast) ease; }
+.upcoming-day:hover { color: var(--ink); }
+.upcoming-day:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.upcoming-weekday { color: var(--subtle); }
+.upcoming-text { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.upcoming-shape { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--training); }
+.upcoming-day.interval .upcoming-shape {
+  width: 0; height: 0; border-radius: 0; background: none;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--training);
+}
+.upcoming-day.rest .upcoming-shape { background: none; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
 </style>

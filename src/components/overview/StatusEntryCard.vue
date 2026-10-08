@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* 概览的入口卡（身体状态 / 训练状态共用）：图标 + 当日数值 + 7 天 Sparkline。
+/* 概览的入口卡（身体状态 / 训练状态共用）：图标 + 当日数值，训练卡另有 7 天 Sparkline。
+ * 身体卡只列最新值：恢复的 7 天趋势在同名的身体页看，卡上再画一条是重复。
  *
  * 只给数字和形状——解读留给卡片背后的页面和用户自选的 AI。 */
 import { RouterLink } from 'vue-router';
@@ -9,19 +10,20 @@ import Sparkline from '../Sparkline.vue';
 
 defineOptions({ name: 'OverviewStatusEntryCard' });
 
-defineProps<{
+withDefaults(defineProps<{
   to: string;
   icon: DesignIconName;
   title: string;
   /** 只列有值的项；一项都没有时卡片靠 note 交代。 */
   facts: { key: string; label: string; text: string }[];
-  spark: number[];
-  sparkColor: string;
-  sparkLabel: string;
-  /** spark 画不出来时的一句话（数据薄 / 尚未同步）。 */
-  note: string;
+  /** 7 天趋势：只有训练卡还画；身体卡不传就不画。 */
+  spark?: number[];
+  sparkColor?: string;
+  sparkLabel?: string;
+  /** 没有 spark 可画时的一句话（数据薄 / 尚未同步）；有数时也可以什么都不说。 */
+  caption?: string | null;
   tone: 'body' | 'training';
-}>();
+}>(), { spark: () => [], sparkColor: '', sparkLabel: '', caption: null });
 </script>
 
 <template>
@@ -35,12 +37,12 @@ defineProps<{
           {{ fact.label }} <strong>{{ fact.text }}</strong>
         </span>
       </p>
-      <!-- 线下写明画的是哪项、哪段时间：旁边的数字有三项，线只有一条，不写就对不上。 -->
-      <template v-if="spark.length > 1">
+      <!-- 线下写明画的是哪项、哪段时间：旁边的数字有多项，线只有一条，不写就对不上。 -->
+      <template v-if="spark.length > 1 && sparkColor">
         <Sparkline :values="spark" :color="sparkColor" :label="sparkLabel" />
         <p class="entry-spark-label" aria-hidden="true">{{ sparkLabel }}</p>
       </template>
-      <p v-else class="entry-note">{{ note }}</p>
+      <p v-else-if="caption" class="entry-note">{{ caption }}</p>
     </div>
   </RouterLink>
 </template>

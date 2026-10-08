@@ -4,8 +4,8 @@
 .recent-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .hidden-note { display: inline-flex; align-items: center; gap: 7px; justify-self: start; margin: 0; padding: 7px 14px; border-radius: 999px;
   background: var(--cap-track); box-shadow: var(--cap-track-shadow); color: var(--subtle); font-size: var(--fs-xs); }
-.partial-warning { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; background: var(--mat-card);
-  box-shadow: var(--mat-rim), var(--mat-shadow); color: var(--warning); font-size: var(--fs-sm); }
+.partial-warning { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--mat-line); border-radius: 999px;
+  color: var(--warning); font-size: var(--fs-sm); }
 
 /* 竖着的时间线：一根渐隐的细线串起每一天；左边是时刻，线上是节点，右边一枚胶囊。 */
 .timeline { position: relative; display: grid; gap: 22px; padding: 18px 20px 22px; border-radius: var(--radius-lg); background: var(--mat-card);

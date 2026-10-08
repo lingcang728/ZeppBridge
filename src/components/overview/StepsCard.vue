@@ -4,8 +4,7 @@ import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
 import GlyphTile from '../GlyphTile.vue';
-import { resolvedTheme } from '../../composables/useTheme';
-import { chartPalettes } from '../../lib/echartsTheme';
+import { metricColor } from '../../lib/metricTone';
 import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -81,8 +80,9 @@ const stepsPercent = computed(() =>
 
 const num = (value: unknown) => isFiniteNumber(value) ? formatMetric(value) : '—';
 
-/* 圆环色按主题取（SVG stroke 属性不吃 CSS var）。 */
-const ringColor = computed(() => chartPalettes[resolvedTheme.value].series.readiness);
+/* 步数在哪儿都是同一个颜色（lib/metricTone.ts）：圆环、针脚、日常活动页那条线。
+   以前圆环拿的是准备度的颜色，磁贴和详情页又是另一个，三处三个色。 */
+const ringColor = computed(() => metricColor('steps'));
 </script>
 
 <template>

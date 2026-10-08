@@ -38,16 +38,17 @@
   font-size: var(--fs-sm);
 }
 .chart-note { margin: var(--space-2) 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
+/* 页面级的提示条：细线描边、无底无投影。卡片材质只给主信息区。 */
 .inline-alert {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin: 0;
   padding: 9px 13px;
-  border-radius: var(--radius-lg);
-  background: var(--mat-card);
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
   color: var(--danger);
-  font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow);
+  font-size: var(--fs-sm);
 }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {

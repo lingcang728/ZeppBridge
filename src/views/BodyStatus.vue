@@ -25,6 +25,7 @@ import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
+import { metricInfo } from '../lib/metricInfo';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -80,7 +81,7 @@ const vitalsCards = computed(() => withData('vitals'));
    整组都空时仍由组里那一句说明为什么。 */
 const missingIn = (group: CardGroup, shown: number) => (shown === 0 && group !== 'vitals' ? [] : cards.value
   .filter((card) => groupOf(card.metric) === group && (fullSeries.value[card.metric]?.points.length ?? 0) === 0)
-  .map((card) => ({ key: card.metric, label: card.label, detail: card.emptyText ?? card.hint })));
+  .map((card) => ({ key: card.metric, label: card.label, detail: card.emptyText ?? metricInfo(card.metric)?.what })));
 const missingVitals = computed(() => missingIn('vitals', vitalsCards.value.length));
 const missingBody = computed(() => missingIn('body', bodyCards.value.length));
 const missingIntake = computed(() => missingIn('intake', intakeCards.value.length));
@@ -204,7 +205,7 @@ const groups = computed(() => ({
               v-for="card in vitalsCards"
               :key="card.metric"
               :label="card.label"
-              :hint="card.hint"
+              :info="card.metric"
               :series="card.series"
               :color="card.color"
               :unit="card.unit"
@@ -224,7 +225,7 @@ const groups = computed(() => ({
               v-for="card in bodyCards"
               :key="card.metric"
               :label="card.label"
-              :hint="card.hint"
+              :info="card.metric"
               :series="card.series"
               :color="card.color"
               :unit="card.unit"
@@ -269,7 +270,7 @@ const groups = computed(() => ({
                 v-for="card in intakeCards"
                 :key="card.metric"
                 :label="card.label"
-                :hint="card.hint"
+                :info="card.metric"
                 :series="card.series"
                 :color="card.color"
                 :unit="card.unit"

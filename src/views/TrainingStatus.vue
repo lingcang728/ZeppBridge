@@ -6,6 +6,7 @@ import { computed, onMounted, ref } from 'vue';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
 import SwapChart from '../components/SwapChart.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
@@ -35,6 +36,8 @@ import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
 import { coveredWindowValue } from '../lib/missingValues';
+import { metricInfo } from '../lib/metricInfo';
+import { trainingLoadTierText } from '../lib/trainingLoadTier';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import { trainingStatusMessages as messages } from './TrainingStatus.i18n';
 
@@ -64,6 +67,10 @@ const error = ref<string | null>(null);
 
 const vo2max = computed(() => series.value.vo2max ?? null);
 const trainingLoad = computed(() => series.value.training_load ?? null);
+/* 训练负荷档位（D6）：和概览入口卡同一份逻辑（lib/trainingLoadTier.ts）。这一页没有
+   后端给的个人刻度，用参考刻度 600，档位自带「（参考）」标记——不标会让人以为
+   分级是手表给的。 */
+const loadBand = computed(() => trainingLoadTierText(trainingLoad.value?.latest?.value));
 /* PAI 是滚动 7 天的总值（pai_total）：卡片说明一直这么写，概览磁贴也是它。以前这里画的是当天新挣的
    pai_daily（1 左右），和概览的 12 对不上，用户不知道信哪个（2026-10-04）。 */
 const pai = computed(() => series.value.pai_total ?? null);
@@ -95,10 +102,10 @@ const show = computed(() => ({
 const shownCardCount = computed(() => [show.value.vo2, show.value.load, show.value.pai, show.value.threshold].filter(Boolean).length);
 const missing = computed(() => [
   // key 是指标名：从概览点进来定位到这一项（lib/motion/focusTarget.ts）。
-  !show.value.vo2 && { key: 'vo2max', label: 'VO₂max', detail: t.value.vo2Hint },
-  !show.value.load && { key: 'training_load', label: t.value.loadLabel, detail: t.value.loadHint },
-  !show.value.pai && { key: 'pai_total', label: t.value.paiLabel, detail: t.value.paiHint },
-  !show.value.threshold && { key: 'lactate_threshold_hr', label: t.value.thresholdLabel, detail: t.value.thresholdHint },
+  !show.value.vo2 && { key: 'vo2max', label: 'VO₂max', detail: metricInfo('vo2max')?.what ?? '' },
+  !show.value.load && { key: 'training_load', label: t.value.loadLabel, detail: metricInfo('training_load')?.what ?? '' },
+  !show.value.pai && { key: 'pai_total', label: t.value.paiLabel, detail: metricInfo('pai_total')?.what ?? '' },
+  !show.value.threshold && { key: 'lactate_threshold_hr', label: t.value.thresholdLabel, detail: metricInfo('lactate_threshold')?.what ?? '' },
   !show.value.balance && { key: 'training_balance', label: t.value.balanceLabel, detail: t.value.balanceEmpty },
 ].filter((item): item is { key: string; label: string; detail: string } => Boolean(item)));
 
@@ -328,7 +335,7 @@ useRevisionReload(() => { void load(); });
         <MetricTrendCard
           v-if="show.vo2"
           label="VO₂max"
-          :hint="t.vo2Hint"
+          info="vo2max"
           :series="vo2max"
           :color="metricColor('vo2max')"
           unit="ml/kg/min"
@@ -338,16 +345,17 @@ useRevisionReload(() => { void load(); });
         <MetricTrendCard
           v-if="show.load"
           :label="t.loadLabel"
-          :hint="t.loadHint"
+          info="training_load"
           :series="trainingLoad"
           :color="metricColor('training_load')"
           :unit="t.loadUnit"
           :empty-text="t.loadEmpty"
+          :band="loadBand"
         />
         <MetricTrendCard
           v-if="show.pai"
           :label="t.paiLabel"
-          :hint="t.paiHint"
+          info="pai_total"
           :series="pai"
           :color="metricColor('pai_total')"
           unit="PAI"
@@ -359,7 +367,7 @@ useRevisionReload(() => { void load(); });
         <MetricTrendCard
           v-if="show.threshold"
           :label="t.thresholdLabel"
-          :hint="t.thresholdHint"
+          info="lactate_threshold"
           :series="thresholdHr"
           :color="zeppSemanticColors.heart"
           :empty-text="t.thresholdEmpty"
@@ -386,8 +394,7 @@ useRevisionReload(() => { void load(); });
           <section v-if="show.balance" class="chart-card wide" :aria-label="t.balanceLabel">
             <header class="chart-head">
               <span class="chart-title">
-                <strong>{{ t.balanceLabel }}</strong>
-                <small>{{ t.balanceHint }}</small>
+                <strong>{{ t.balanceLabel }}<MetricInfoButton metric="training_balance" :label="t.balanceLabel" /></strong>
               </span>
               <span v-if="latestBalance" class="chart-latest">
                 <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
@@ -400,7 +407,6 @@ useRevisionReload(() => { void load(); });
               :aria-label="t.balanceChartAria"
             />
             <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
-            <p class="chart-note">{{ t.balanceNote }}</p>
           </section>
           <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />
     </template>

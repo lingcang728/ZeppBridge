@@ -125,7 +125,7 @@ const apply = async (next: string[]) => {
   <section class="pins" aria-labelledby="pins-title">
     <header class="pins-head">
       <h2 id="pins-title">{{ t.title }}</h2>
-      <button v-if="pins.length" type="button" class="pins-edit glass-control" :title="t.edit" @click="pickerOpen = true">
+      <button v-if="pins.length" type="button" class="pill-button quiet pins-edit" :title="t.edit" @click="pickerOpen = true">
         <Icon name="sliders" :size="14" /><span>{{ t.edit }}</span>
       </button>
     </header>
@@ -158,14 +158,10 @@ const apply = async (next: string[]) => {
 .pins { display: grid; gap: 10px; }
 .pins-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
 .pins-head h2 { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 650; }
-/* 「调整」：和顶栏同一族的小玻璃胶囊，图标 + 字，悬停才亮起来。 */
-.pins-edit { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px 0 10px; border: 0; border-radius: 999px;
-  color: var(--muted); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
-  transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease; }
-.pins-edit:hover { background-color: var(--glass-press); color: var(--ink); }
-.pins-edit:active { scale: .96; }
+/* 「调整」：和「查看全部」同一族的 quiet 胶囊按钮，只是比标准的小一号。真玻璃
+   （backdrop-filter）只给浮层，标题行是内容层，不该自己磨砂。 */
+.pins-edit { min-height: 30px; padding: 0 12px; font-size: var(--fs-xs); }
 .pins-edit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.pins-edit svg { color: var(--accent); }
 
 .pins-empty {
   display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px;

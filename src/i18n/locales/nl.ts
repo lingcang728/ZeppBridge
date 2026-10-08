@@ -1566,16 +1566,12 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       noneInRange:
         'Geen activiteitsgegevens in deze periode. Synchroniseer eerst of kies een langere periode.',
       stepsLabel: 'Stappen',
-      stepsHint: 'Dagtotaal aan stappen van het horloge',
       stepsUnit: 'stappen',
       distanceLabel: 'Afstand',
-      distanceHint: 'Die dag afgelegde afstand',
       distanceUnit: 'm',
       caloriesLabel: 'Actieve verbranding',
-      caloriesHint: 'Alleen activiteit, basale stofwisseling uitgesloten',
       caloriesUnit: 'kcal',
       minutesLabel: 'Actieve minuten',
-      minutesHint: 'Minuten die het horloge als actief telde',
       minutesUnit: 'min',
     },
     'views/BodyStatus': {
@@ -1591,9 +1587,7 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       noneInRange:
         'Geen lichaamsstatusgegevens in deze periode. Probeer een langere periode of synchroniseer eerst.',
       readinessLabel: 'Gereedheid',
-      readinessHint: 'Het horloge weegt slaap, HRV en rusthartslag samen tot één score',
       stressLabel: 'Stress',
-      stressHint: 'Daggemiddelde; de gearceerde band is het gemeten bereik van die dag',
       curveCardAria: 'Stress over 24 uur',
       curveTitle: 'Afgelopen 24 uur stress',
       curveSub: 'Het horloge meet elke vijf minuten; individuele metingen in tijdvolgorde',
@@ -1608,42 +1602,22 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       statHighest: 'Hoogste',
       stressTooltip: (clock: string, value: number) => `${clock} <b>${value}</b>`,
       spo2Label: 'Bloedzuurstof',
-      spo2Hint:
-        'Individuele SpO2-metingen per dag gemiddeld; de band is het gemeten bereik van die dag',
       spo2Empty: 'Geen individuele SpO2-metingen in deze periode.',
       odiLabel: 'Nachtelijke SpO2-ODI',
-      odiHint: 'Desaturaties per uur; lager is beter',
-      hrvHint: 'Hartslagvariabiliteit, individuele metingen per dag gemiddeld',
-      rmssdHint: 'Nachtelijke hoogfrequente variabiliteit, per dag gemiddeld',
       respiratoryLabel: 'Ademhalingsfrequentie',
-      respiratoryHint:
-        'Ademhalingstempo tijdens de slaap; de band is het gemeten bereik van die dag',
       restingLabel: 'Rusthartslag',
-      restingHint: 'Rusthartslag zoals ZeppBridge die per dag berekent',
       unitScore: 'pt',
       unitPerHour: '/uur',
       unitBreathsPerMinute: 'br/min',
       weightLabel: 'Gewicht',
-      weightHint:
-        'Elke weging, per dag gemiddeld; de band is het gemeten bereik van die dag',
       bmiLabel: 'BMI',
-      bmiHint: 'Body mass index, door de cloud meegestuurd bij het gewicht',
       fatLabel: 'Lichaamsvet',
-      fatHint:
-        'Vereist een weegschaal met lichaamssamenstelling. Horloge- en handmatig ingevoerde gewichten dragen geen vetmeting',
       muscleLabel: 'Spiermassa',
-      muscleHint: 'Vereist een weegschaal met lichaamssamenstelling',
       waterLabel: 'Lichaamsvocht',
-      waterHint: 'Vereist een weegschaal met lichaamssamenstelling',
       boneLabel: 'Botmassa',
-      boneHint: 'Vereist een weegschaal met lichaamssamenstelling',
       visceralLabel: 'Visceraal vet',
-      visceralHint: 'Een graad, geen percentage. Zepp scoort het 1-30',
       bmrLabel: 'Basale stofwisseling',
-      bmrHint: 'Vereist een weegschaal met lichaamssamenstelling',
       heightLabel: 'Lengte',
-      heightHint:
-        'Profielgegevens die bij elke weging worden meegeëchood, geen meting van de dag',
       unitGrade: 'graad',
       unitKcalPerDay: 'kcal/dag',
       scaleEmpty:
@@ -1655,12 +1629,9 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       intakeGroupEmpty:
         'Geen voedingsgegevens in deze periode. Maaltijden die je in de Zepp-app logt, verschijnen hier na een synchronisatie.',
       intakeCaloriesLabel: 'Gegeten calorieën',
-      intakeCaloriesHint:
-        'Totaal gelogd voor de dag. Dagen zonder log krijgen geen balk en worden nooit met 0 gevuld',
       proteinLabel: 'Eiwit',
       fatIntakeLabel: 'Vet',
       carbsLabel: 'Koolhydraten',
-      macroHint: 'Totaal gelogd voor de dag',
       unitKcal: 'kcal',
       unitGram: 'g',
       macroTitle: 'Voedingsbalans',
@@ -1885,12 +1856,7 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
         'Geen hartslagmetingen in de afgelopen 24 uur — geen curve.',
       bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       restingLabel: 'Rusthartslag',
-      restingHint: 'Het horloge meldt er één per dag; constanter is beter',
-      hrvHint: 'Individuele HRV-metingen, per dag gemiddeld',
-      rmssdHint: 'Een andere HRV-maat, niet hetzelfde getal als hierboven',
       dailyMaxTitle: 'Dagelijkse piekhartslag (ruwe metingen op deze machine)',
-      dailyMaxSub:
-        'De Zepp-app filtert zijn dagelijkse piek; hier niet — dat de twee getallen verschillen is normaal.',
       dailyMaxAria: 'Trend van dagelijkse piekhartslag',
       dailyMaxNone:
         'Geen lokale hartslagmetingen in deze periode — geen piek om mee te vergelijken.',
@@ -1916,11 +1882,8 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       partialUnavailable: 'Sommige gegevensstromen zijn nog niet opgehaald',
       bodyPanelAria: 'Lichaamsstatus openen',
       bodyTitle: 'Lichaamsstatus',
-      factRecovery: 'Gereedheid',
       factStress: 'Stress',
       factSpo2: 'Bloedzuurstof',
-      bodySparkLabel: 'Gereedheid over de afgelopen 7 dagen',
-      bodyThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       bodyEmpty:
         'Gereedheid, stress en bloedzuurstof verschijnen hier na een synchronisatie',
       trainingPanelAria: 'Trainingsstatus openen',
@@ -1930,11 +1893,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       trainingThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       trainingEmpty:
         'VO₂max en trainingsbelasting verschijnen hier na een synchronisatie',
-      loadLow: 'laag',
-      loadMedium: 'matig',
-      loadHigh: 'hoog',
-      loadVeryHigh: 'zeer hoog',
-      loadBandReference: (band: string) => `${band} (referentie)`,
     },
     'views/RecentRecords': {
       title: 'Recente activiteiten',
@@ -1981,7 +1939,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
         `In slaap ${fellAsleep} · wakker ${wokeUp} · in bed ${inBed}`,
       scoreKicker: 'Slaapscore',
-      scoreNote: 'Score van het apparaat — alleen ter weergave.',
       stagesAria: 'Slaapstadia',
       stagesTitle: 'Slaapstadia',
       stageHelpButton: 'Wat de stadia betekenen',
@@ -2045,18 +2002,14 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadFailed: 'Trainingsstatus nu niet beschikbaar',
       retry: 'Opnieuw proberen',
       loadingAria: 'Trainingsstatus laden',
-      vo2Hint: 'Maximale zuurstofopname, door het horloge geschat na buitenruns',
       vo2Empty:
         'Geen VO₂max-metingen in deze periode; wordt alleen bijgewerkt na een hardloopsessie buiten.',
       loadLabel: 'Trainingsbelasting',
-      loadHint: 'Dagelijkse trainingsbelastingscore',
       loadEmpty: 'Geen trainingsbelastingsgegevens in deze periode.',
       paiLabel: 'PAI',
-      paiHint: 'Personal Activity Intelligence over een schuivende 7 dagen',
       paiEmpty: 'Geen PAI-gegevens in deze periode.',
       thresholdLabel: 'Lactaatdrempel',
       latestTag: 'Nieuwste',
-      thresholdHint: 'Hartslag en tempo; werkt alleen bij na een zware run',
       thresholdHr: 'Drempelhartslag',
       thresholdPace: 'Drempeltempo',
       thresholdChartAria: 'Lactaatdrempelhartslag en -tempo',
@@ -2068,14 +2021,10 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadUnit: '' as string,
       thresholdHrTooltip: (value: number) => `Drempelhartslag <b>${value}</b> bpm`,
       balanceLabel: 'Balans van trainingsbelasting',
-      balanceHint:
-        '7-daagse belasting tegenover het 28-daagse weekgemiddelde, d.w.z. de acuut-chronisch-ratio',
       balanceChartAria:
         '7-daagse en 28-daagse trainingsbelasting met de acuut-chronisch-ratio',
       balanceEmpty:
         'Nog te weinig gegevens om de belastingbalans te tonen.',
-      balanceNote:
-        'Acuut:chronisch = som van 7 dagen belasting ÷ (som van 28 dagen ÷ 4). Dekt het 28-daagse venster minder dan 21 dagen, dan geen ratio en breekt de curve daar — onberekend, geen nul.',
       acute7d: '7-daagse belasting',
       chronicWeekly: '28-daags weekgem.',
       acuteChronic: 'Acuut:chronisch',

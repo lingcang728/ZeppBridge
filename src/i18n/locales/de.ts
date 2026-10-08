@@ -1697,39 +1697,32 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       nothingToInstall: 'Kein Update zu installieren. Erneut prüfen.',
     },
     'views/ActivityDetail': {
-      caloriesHint: 'Nur Aktivität, Grundumsatz ausgenommen',
       caloriesLabel: 'Aktivitätskalorien',
       caloriesUnit: 'kcal',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      distanceHint: 'An diesem Tag zurückgelegte Distanz',
       distanceLabel: 'Distanz',
       distanceUnit: 'm',
       intro:
         'Tägliche Schritte, Distanz, Aktivitätskalorien und aktive Minuten. Vergleich nur mit deiner eigenen Historie; Tage ohne Daten bleiben leer, nicht mit 0 gefüllt.',
       loadFailed: 'Aktivitätsdaten gerade nicht verfügbar',
       loadingAria: 'Tägliche Aktivität wird geladen',
-      minutesHint: 'Minuten, die die Uhr als aktiv zählte',
       minutesLabel: 'Aktive Minuten',
       minutesUnit: 'Min.',
       noneInRange:
         'Keine Aktivitätsdaten im gewählten Zeitraum – Zeitraum erweitern oder synchronisieren.',
       retry: 'Wiederholen',
-      stepsHint: 'Tägliche Schrittzahl der Uhr',
       stepsLabel: 'Schritte',
       stepsUnit: 'Schritte',
       title: 'Tägliche Aktivität',
     },
     'views/BodyStatus': {
       vitalsGroupTitle: 'Erholung und Vitalwerte',
-      bmiHint: 'Body-Mass-Index, von der Cloud zusammen mit dem Gewicht geliefert',
       bmiLabel: 'BMI',
-      bmrHint: 'Braucht eine Körperanalysewaage',
       bmrLabel: 'Grundumsatz',
       bodyGroupEmpty:
         'Keine Gewichts- oder Körperzusammensetzungsdaten im Zeitraum. Körperzusammensetzung braucht eine Analysewaage – Uhr und von Hand eingetragene Gewichte bringen sie nicht mit.',
       bodyGroupTitle: 'Gewicht und Körperzusammensetzung',
-      boneHint: 'Braucht eine Körperanalysewaage',
       boneLabel: 'Knochenmasse',
       carbsLabel: 'Kohlenhydrate',
       curveCardAria: '24-Stunden-Stress',
@@ -1742,16 +1735,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       curveTitle: 'Stress der letzten 24 Stunden',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      fatHint:
-        'Braucht eine Körperanalysewaage. Uhr und von Hand eingetragene Gewichte bringen keinen Fettwert mit',
       fatIntakeLabel: 'Fett',
       fatLabel: 'Körperfett',
       gramsPerDay: (grams: string) => `${grams} g pro Tag im Schnitt`,
-      heightHint: 'Profilwert, mit jeder Messung zurückgespiegelt – keine Messung des Tages',
       heightLabel: 'Größe',
-      hrvHint: 'Herzfrequenzvariabilität, Einzelmessungen pro Tag gemittelt',
-      intakeCaloriesHint:
-        'Summe des protokollierten Tages. Tage ohne Protokoll bekommen keinen Balken und werden nie mit 0 gefüllt',
       intakeCaloriesLabel: 'Gegessene Kalorien',
       intakeGroupEmpty:
         'Keine Ernährungsprotokolle im Zeitraum. In der Zepp-App erfasste Mahlzeiten erscheinen nach der Synchronisierung hier.',
@@ -1760,37 +1747,27 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Trends für Bereitschaft, Stress, Blutsauerstoff, HRV, Atemfrequenz, Ruheherzfrequenz, Gewicht, Körperzusammensetzung und Ernährung – alles aus bereits synchronisierten Einträgen.',
       loadFailed: 'Körperstatusdaten gerade nicht verfügbar',
       loadingAria: 'Körperstatus wird geladen',
-      macroHint: 'Summe des protokollierten Tages',
       macroNote:
         'Die Anteile werden aus den Tagesgrammzahlen mit 4/9/4 kcal pro Gramm geschätzt (Eiweiß / Fett / Kohlenhydrate) – nicht aus der Cloud, und sie können um ein, zwei Punkte von der Zepp-App abweichen. Fehlt einer der drei, wird nichts gezeichnet.',
       macroSub: 'Anteil der Kalorien, den jeder Makronährstoff in diesem Zeitraum beisteuerte',
       macroTitle: 'Ernährungsbilanz',
-      muscleHint: 'Braucht eine Körperanalysewaage',
       muscleLabel: 'Muskelmasse',
       noneInRange:
         'Keine Daten im gewählten Zeitraum – Zeitraum erweitern oder synchronisieren.',
-      odiHint: 'Desaturierungen pro Stunde; niedriger ist besser',
       odiLabel: 'Nächtlicher SpO₂-ODI',
       proteinLabel: 'Eiweiß',
-      readinessHint: 'Die Uhr verrechnet Schlaf, HRV und Ruheherzfrequenz zu einem Score',
       readinessLabel: 'Bereitschaft',
-      respiratoryHint: 'Atemfrequenz im Schlaf; das Band ist der gemessene Bereich des Tages',
       respiratoryLabel: 'Atemfrequenz',
-      restingHint: 'Ruheherzfrequenz, wie ZeppBridge sie pro Tag berechnet',
       restingLabel: 'Ruheherzfrequenz',
       retry: 'Wiederholen',
-      rmssdHint: 'Nächtliche hochfrequente Variabilität, pro Tag gemittelt',
       scaleEmpty:
         'Keine Wiegemessungen im Zeitraum – erscheinen nach der Synchronisierung.',
       spo2Empty: 'Keine einzelnen SpO₂-Messwerte in diesem Zeitraum.',
-      spo2Hint:
-        'Einzelne SpO₂-Messwerte pro Tag gemittelt; das Band ist der gemessene Bereich des Tages',
       spo2Label: 'Blutsauerstoff',
       statAverage: 'Durchschnitt',
       statHighest: 'Höchster',
       statLatest: 'Neuester',
       statLowest: 'Niedrigster',
-      stressHint: 'Ganztags-Durchschnitt; das schattierte Band ist der gemessene Bereich des Tages',
       stressLabel: 'Stress',
       stressTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b>`,
       title: 'Körperstatus',
@@ -1801,11 +1778,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       unitKcalPerDay: 'kcal/Tag',
       unitPerHour: '/Std.',
       unitScore: 'Pkt.',
-      visceralHint: 'Eine Stufe, kein Prozentsatz. Zepp vergibt 1–30',
       visceralLabel: 'Viszerales Fett',
-      waterHint: 'Braucht eine Körperanalysewaage',
       waterLabel: 'Körperwasser',
-      weightHint: 'Jede Wägung, pro Tag gemittelt; das Band ist der gemessene Bereich des Tages',
       weightLabel: 'Gewicht',
     },
     'views/DeviceDetail': {
@@ -2014,8 +1988,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dailyMaxNote: '' as string,
       dailyMaxSparse: (days: number) =>
         `${days} dieser Tage haben sehr wenige Messwerte (unter 60). Deren „Spitze" ist nur der höchste dieser wenigen Punkte, nicht der echte Tageshöchstwert – im Chart als hohle Punkte markiert.`,
-      dailyMaxSub:
-        'Zepp filtert die Tages-Spitze; hier werden Rohdaten angezeigt. Abweichungen sind normal.',
       dailyMaxTitle: 'Tägliche Herzfrequenz-Spitze (Roh-Messwerte dieses Rechners)',
       dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
         `${date}<br/>Spitze <b>${max}</b> bpm<br/>Durchschnitt ${avg} bpm<br/>${samples} Messwerte`,
@@ -2025,16 +1997,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dayTitle: 'Letzte 24 Stunden',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      hrvHint: 'Einzelne HRV-Messwerte, pro Tag gemittelt',
       intro:
         "Einzelne Herzfrequenzmessungen der letzten 24 Stunden sowie tägliche Höchstwerte, Ruheherzfrequenz und HRV. Für Zeiten ohne Messungen wird keine Linie gezeichnet.",
       loadingAria: 'Herzfrequenz wird geladen',
       noSamples:
         'Keine Herzfrequenz-Messwerte in den letzten 24 Stunden – keine Kurve.',
-      restingHint: 'Die Uhr meldet einen pro Tag; ruhiger ist besser',
       restingLabel: 'Ruheherzfrequenz',
       retry: 'Wiederholen',
-      rmssdHint: 'Ein anderes HRV-Maß, nicht dieselbe Zahl wie oben',
       statAverage: 'Ø',
       statHighest: 'Max.',
       statLatest: 'Neueste',
@@ -2046,23 +2015,15 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       bodyEmpty:
         'Bereitschaft, Stress und Blutsauerstoff erscheinen nach der Synchronisierung',
       bodyPanelAria: 'Körperstatus öffnen',
-      bodySparkLabel: 'Bereitschaft der letzten 7 Tage',
-      bodyThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
       bodyTitle: 'Körperstatus',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       deviceErrorPrefix: 'Geräteerkennung: ',
       factLoad: 'Belastung',
-      factRecovery: 'Bereitschaft',
       factSpo2: 'SpO₂',
       factStress: 'Stress',
       healthUnavailable: 'Gesundheitsdaten gerade nicht verfügbar',
-      loadBandReference: (band: string) => `${band} (Referenz)`,
       loadFailedTitle: 'Die Datenübersicht konnte nicht gelesen werden',
-      loadHigh: 'hoch',
-      loadLow: 'niedrig',
-      loadMedium: 'mittel',
-      loadVeryHigh: 'sehr hoch',
       loadingAria: 'Übersicht wird geladen',
       overviewTitle: 'Übersicht',
       partialUnavailable: 'Manche Datenströme wurden noch nicht abgerufen',
@@ -2132,7 +2093,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       notProvided: 'Nicht angegeben',
       retry: 'Wiederholen',
       scoreKicker: 'Schlafscore',
-      scoreNote: 'Vom Gerät geliefert, nur zur Anzeige.',
       sourceProvider: 'Anbieter',
       providerOfficial: 'Offizielle Zepp-Autorisierung',
       sourceScope: 'Datenbereich',
@@ -2182,10 +2142,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         `7-Tage-Belastung <b>${value}</b> (${days}/7 Tage mit Daten)`,
       balanceChartAria: '7-Tage- und 28-Tage-Trainingsbelastung mit dem Akut-Chronisch-Verhältnis',
       balanceEmpty: 'Noch zu wenig Trainingsbelastungs-Einträge, um diese Linie zu zeichnen.',
-      balanceHint: '7-Tage-Belastung gegen den 28-Tage-Wochenschnitt, d. h. das Akut-Chronisch-Verhältnis',
       balanceLabel: 'Trainingsbelastungs-Balance',
-      balanceNote:
-        'Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Bei weniger als 21 Tagen Daten im 28-Tage-Fenster bleibt der Wert unberechnet – die Linie reißt dort ab: nicht berechnet, nicht null.',
       chronicTooltip: (value: string) => `28-Tage-Wochenschnitt <b>${value}</b>`,
       chronicWeekly: '28-Tage-Wochenschnitt',
       desktopOnly:
@@ -2195,13 +2152,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       latestTag: 'Aktuell',
       loadEmpty: 'Keine Trainingsbelastungs-Einträge in diesem Zeitraum.',
       loadFailed: 'Trainingsstatusdaten gerade nicht verfügbar',
-      loadHint: 'Täglicher Trainingsbelastungs-Score',
       loadLabel: 'Trainingsbelastung',
       loadUnit: '' as string,
       loadingAria: 'Trainingsstatus wird geladen',
       notProvided: 'Nicht angegeben',
       paiEmpty: 'Keine PAI-Einträge in diesem Zeitraum.',
-      paiHint: 'Personal Activity Intelligence über rollende 7 Tage',
       paiLabel: 'PAI',
       ratioMissing: (days: number) =>
         `— (nur ${days} Tage mit Daten im 28-Tage-Fenster)`,
@@ -2209,7 +2164,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       retry: 'Wiederholen',
       thresholdChartAria: 'Laktatschwellen-Herzfrequenz und -Tempo',
       thresholdEmpty: 'Keine Laktatschwellen-Messungen in diesem Zeitraum.',
-      thresholdHint: 'Herzfrequenz und Tempo; aktualisiert sich nur nach einem harten Lauf',
       thresholdHr: 'Schwellen-HF',
       thresholdHrTooltip: (value: string) => `Schwellen-HF <b>${value}</b> bpm`,
       thresholdLabel: 'Laktatschwelle',
@@ -2221,7 +2175,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       title: 'Trainingsstatus',
       vo2Empty:
         'Keine VO₂max-Einträge in diesem Zeitraum; er aktualisiert sich nur nach einem Lauf im Freien.',
-      vo2Hint: 'Maximale Sauerstoffaufnahme, von der Uhr nach Läufen im Freien geschätzt',
     },
     'views/WorkoutDetail': {
       aiPrompt: (label: string) => `Du bist Sportanalyst. Unten der vollständige Eintrag einer Trainingseinheit (${label}) aus meiner lokalen ZeppBridge-Datenbank, anonymisiert.

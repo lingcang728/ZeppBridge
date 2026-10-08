@@ -15,7 +15,6 @@ type BodyStatusText = typeof bodyStatusMessages.zh;
 export interface BodyCard {
   metric: string;
   label: string;
-  hint: string;
   color: string;
   unit: string;
   decimals?: number;
@@ -89,14 +88,12 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'readiness',
     label: t.readinessLabel,
-    hint: t.readinessHint,
     color: metricColor('readiness'),
     unit: t.unitScore,
   },
   {
     metric: 'stress',
     label: t.stressLabel,
-    hint: t.stressHint,
     color: metricColor('stress'),
     unit: t.unitScore,
     showSpread: true,
@@ -104,7 +101,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'spo2',
     label: t.spo2Label,
-    hint: t.spo2Hint,
     color: metricColor('spo2'),
     unit: '%',
     showSpread: true,
@@ -113,7 +109,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'spo2_odi',
     label: t.odiLabel,
-    hint: t.odiHint,
     color: metricColor('spo2_odi'),
     unit: t.unitPerHour,
     decimals: 1,
@@ -121,7 +116,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'hrv',
     label: 'HRV (SDNN)',
-    hint: t.hrvHint,
     color: metricColor('hrv'),
     unit: 'ms',
     showSpread: true,
@@ -129,7 +123,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
-    hint: t.rmssdHint,
     color: metricColor('hrv_rmssd'),
     unit: 'ms',
     showSpread: true,
@@ -137,7 +130,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'respiratory_rate',
     label: t.respiratoryLabel,
-    hint: t.respiratoryHint,
     color: metricColor('respiratory_rate'),
     unit: t.unitBreathsPerMinute,
     decimals: 1,
@@ -146,14 +138,12 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'resting_hr',
     label: t.restingLabel,
-    hint: t.restingHint,
     color: metricColor('resting_hr'),
     unit: 'bpm',
   },
   {
     metric: 'weight',
     label: t.weightLabel,
-    hint: t.weightHint,
     color: metricColor('weight'),
     unit: bodyMassUnitLabel(),
     decimals: 1,
@@ -164,7 +154,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'bmi',
     label: t.bmiLabel,
-    hint: t.bmiHint,
     color: metricColor('bmi'),
     // BMI 是个比值，两种单位制下是同一个数，不换算。
     unit: '',
@@ -174,7 +163,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'body_fat_rate',
     label: t.fatLabel,
-    hint: t.fatHint,
     color: metricColor('body_fat_rate'),
     unit: '%',
     decimals: 1,
@@ -183,7 +171,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'muscle_mass',
     label: t.muscleLabel,
-    hint: t.muscleHint,
     color: metricColor('muscle_mass'),
     unit: bodyMassUnitLabel(),
     decimals: 1,
@@ -192,7 +179,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'body_water_rate',
     label: t.waterLabel,
-    hint: t.waterHint,
     color: metricColor('body_water_rate'),
     unit: '%',
     decimals: 1,
@@ -200,7 +186,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'bone_mass',
     label: t.boneLabel,
-    hint: t.boneHint,
     color: metricColor('bone_mass'),
     unit: bodyMassUnitLabel(),
     decimals: 2,
@@ -209,21 +194,18 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'visceral_fat',
     label: t.visceralLabel,
-    hint: t.visceralHint,
     color: metricColor('visceral_fat'),
     unit: t.unitGrade,
   },
   {
     metric: 'bmr',
     label: t.bmrLabel,
-    hint: t.bmrHint,
     color: metricColor('bmr'),
     unit: t.unitKcalPerDay,
   },
   {
     metric: 'height',
     label: t.heightLabel,
-    hint: t.heightHint,
     color: metricColor('height'),
     unit: bodyHeightUnitLabel(),
     decimals: 1,
@@ -234,7 +216,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'intake_calories',
     label: t.intakeCaloriesLabel,
-    hint: t.intakeCaloriesHint,
     color: metricColor('intake_calories'),
     unit: t.unitKcal,
     chart: 'bar',
@@ -243,7 +224,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'intake_protein_g',
     label: t.proteinLabel,
-    hint: t.macroHint,
     color: metricColor('intake_protein_g'),
     unit: t.unitGram,
     chart: 'bar',
@@ -252,7 +232,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'intake_fat_g',
     label: t.fatIntakeLabel,
-    hint: t.macroHint,
     color: metricColor('intake_fat_g'),
     unit: t.unitGram,
     chart: 'bar',
@@ -261,7 +240,6 @@ export const buildBodyCards = (t: BodyStatusText): BodyCard[] => [
   {
     metric: 'intake_carbs_g',
     label: t.carbsLabel,
-    hint: t.macroHint,
     color: metricColor('intake_carbs_g'),
     unit: t.unitGram,
     chart: 'bar',

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
 import SectionGroup from '../components/SectionGroup.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
@@ -254,7 +255,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
     <template v-else>
       <article class="sleep-hero" :aria-label="t.heroAria">
         <div class="hero-duration">
-          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}</p>
+          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}<MetricInfoButton metric="sleep_duration" :label="t.durationKicker" /></p>
           <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
           <p class="meta">{{ t.heroMeta(formatTime(session.start_time), formatTime(session.end_time), timeInBedLabel) }}</p>
         </div>
@@ -270,9 +271,8 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
           />
           <strong v-else class="score-empty">—</strong>
           <div class="score-copy">
-            <p class="kicker">{{ t.scoreKicker }}</p>
+            <p class="kicker">{{ t.scoreKicker }}<MetricInfoButton metric="sleep_score" :label="t.scoreKicker" /></p>
             <p class="score-num">{{ score !== null ? score : t.notProvided }}<small v-if="score !== null"> / 100</small></p>
-            <p v-if="score !== null" class="score-note">{{ t.scoreNote }}</p>
           </div>
         </div>
       </article>
@@ -300,7 +300,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
       <!-- 近 7 天结构、来源与设备直接摊开。 -->
           <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
             <div class="stage-head">
-              <h2>{{ t.weeklyTitle }}</h2>
+              <h2>{{ t.weeklyTitle }}<MetricInfoButton metric="sleep_weekly" :label="t.weeklyTitle" /></h2>
               <p>{{ t.weeklySub }}</p>
             </div>
             <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />

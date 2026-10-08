@@ -16,6 +16,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
 import SwapChart from '../components/SwapChart.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
@@ -36,6 +37,7 @@ import { metricColor } from '../lib/metricTone';
 import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
+import { metricInfo } from '../lib/metricInfo';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -153,7 +155,6 @@ const trendCards = computed(() => [
   {
     metric: 'resting_hr',
     label: t.value.restingLabel,
-    hint: t.value.restingHint,
     color: metricColor('resting_hr'),
     unit: 'bpm',
     series: series.value.resting_hr ?? null,
@@ -161,7 +162,6 @@ const trendCards = computed(() => [
   {
     metric: 'hrv',
     label: 'HRV (SDNN)',
-    hint: t.value.hrvHint,
     color: metricColor('hrv'),
     unit: 'ms',
     series: series.value.hrv ?? null,
@@ -169,7 +169,6 @@ const trendCards = computed(() => [
   {
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
-    hint: t.value.rmssdHint,
     color: metricColor('hrv_rmssd'),
     unit: 'ms',
     series: series.value.hrv_rmssd ?? null,
@@ -302,7 +301,7 @@ const shownTrendCards = computed(() => (trendsError.value
   : trendCards.value.filter((card) => everMeasured(card.metric))));
 const missingTrends = computed(() => (trendsError.value ? [] : trendCards.value
   .filter((card) => !everMeasured(card.metric))
-  .map((card) => ({ key: card.metric, label: card.label, detail: card.hint }))));
+  .map((card) => ({ key: card.metric, label: card.label, detail: metricInfo(card.metric)?.what }))));
 /* 「最近 24 小时」写出实际覆盖到的时刻（U11）：没戴表的那几个小时不算进去。 */
 const daySpan = computed(() => {
   const first = points.value[0];
@@ -341,7 +340,7 @@ const daySpan = computed(() => {
       <section class="surface-card day-card" :aria-label="t.dayCardAria">
         <header class="day-head">
           <div>
-            <h2>{{ t.dayTitle }}</h2>
+            <h2>{{ t.dayTitle }}<MetricInfoButton metric="heart_rate_24h" :label="t.dayTitle" /></h2>
             <p>{{ daySpan ?? t.daySub }}</p>
           </div>
           <dl class="day-stats">
@@ -377,8 +376,7 @@ const daySpan = computed(() => {
           <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
             <header class="day-head">
               <div>
-                <h2>{{ t.dailyMaxTitle }}</h2>
-                <p>{{ t.dailyMaxSub }}</p>
+                <h2>{{ t.dailyMaxTitle }}<MetricInfoButton metric="daily_max_hr" :label="t.dailyMaxTitle" /></h2>
               </div>
             </header>
             <SwapChart
@@ -407,7 +405,7 @@ const daySpan = computed(() => {
               v-for="card in shownTrendCards"
               :key="card.metric"
               :label="card.label"
-              :hint="card.hint"
+              :info="card.metric"
               :series="card.series"
               :color="card.color"
               :unit="card.unit"

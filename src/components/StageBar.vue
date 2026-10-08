@@ -374,12 +374,13 @@ const tooltip = computed(() => {
   gap: 10px;
   margin-top: 12px;
 }
+/* 睡眠详情那张卡里的四个小格：凹槽材质，不再各自抬一块小卡板——卡中卡。 */
 .stage-list > div {
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  background: var(--mat-inset);
+  box-shadow: var(--mat-inset-shadow);
 }
 .stage-list span:not(.duration-text), .stage-list strong, .stage-list small { display: block; }
 .stage-list :deep(.duration-text small) { display: inline; font-size: .74em; }

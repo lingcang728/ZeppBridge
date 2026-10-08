@@ -21,7 +21,8 @@ const visible = computed(() => appStatus.value?.data_source === 'official');
 </template>
 
 <style scoped>
-.official-note { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
+/* 页面级的提示条：细线描边、无底无投影——卡片材质只给主信息区的卡。 */
+.official-note { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
 .official-note span { flex: 1; min-width: 0; }
 .official-note .pill-button { flex: none; }
 </style>

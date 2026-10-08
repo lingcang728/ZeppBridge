@@ -16,7 +16,6 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `${fellAsleep} 入睡 · ${wokeUp} 醒来 · 在床 ${inBed}`,
     scoreKicker: '睡眠评分',
-    scoreNote: '设备给的评分，仅作展示。',
     stagesAria: '睡眠阶段',
     stagesTitle: '睡眠阶段',
     stageHelpButton: '阶段说明',
@@ -60,7 +59,6 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `Asleep ${fellAsleep} · awake ${wokeUp} · in bed ${inBed}`,
     scoreKicker: 'Sleep score',
-    scoreNote: 'Reported by the device; shown as recorded, nothing more.',
     stagesAria: 'Sleep stages',
     stagesTitle: 'Sleep stages',
     stageHelpButton: 'What the stages mean',
@@ -104,7 +102,6 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `Te dormiste ${fellAsleep} · despertaste ${wokeUp} · en cama ${inBed}`,
     scoreKicker: 'Puntuación de sueño',
-    scoreNote: 'Puntuación del dispositivo; solo se muestra.',
     stagesAria: 'Fases del sueño',
     stagesTitle: 'Fases del sueño',
     stageHelpButton: 'Qué significan las fases',

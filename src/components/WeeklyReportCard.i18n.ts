@@ -15,6 +15,7 @@ export const weeklyReportMessages = defineMessages(
     loadFailed: '无法生成本地周报',
     barThisWeek: '本周',
     barBaseline: '此前 28 天',
+    nextUp: '接下来',
     noBaseline: '此前的数据不够，这次只报现状',
     baselineCountUnknown: '基线天数未知，这次只报现状不做比较。',
     thinBaseline: (days: number, found: number, needed: number) =>
@@ -51,6 +52,7 @@ export const weeklyReportMessages = defineMessages(
     loadFailed: 'Could not build the local weekly report',
     barThisWeek: 'This week',
     barBaseline: 'Prev. 28 days',
+    nextUp: 'Next up',
     noBaseline: 'Not enough prior data — current figure only.',
     baselineCountUnknown: 'Baseline days unknown — current figure only, no comparison.',
     thinBaseline: (days: number, found: number, needed: number) =>
@@ -85,6 +87,7 @@ export const weeklyReportMessages = defineMessages(
     loadFailed: 'No se pudo generar el informe semanal local',
     barThisWeek: 'Esta semana',
     barBaseline: '28 días previos',
+    nextUp: 'A continuación',
     noBaseline: 'No hay suficiente historial previo, así que solo se muestra el valor actual',
     baselineCountUnknown: 'No se conoce el número de días de la línea base, así que solo se muestra el valor actual sin comparación.',
     thinBaseline: (days: number, found: number, needed: number) =>
