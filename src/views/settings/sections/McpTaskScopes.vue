@@ -53,7 +53,7 @@ const toggle = async (task: AiTaskSummary) => {
   <div class="s-row is-block">
     <div class="s-row-main">
       <span class="s-row-title">{{ t.title }}</span>
-      <span class="s-row-sub">{{ a.scopesHint }}</span>
+      <span class="s-row-sub scope-hint">{{ a.scopesHint }}</span>
     </div>
     <p v-if="!taskList.length" class="s-row-sub empty">{{ t.empty }}</p>
     <ul v-else class="scopes">
@@ -74,4 +74,6 @@ const toggle = async (task: AiTaskSummary) => {
 .scopes li + li { border-top: 1px solid var(--mat-line); }
 .name { min-width: 0; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
 .empty { margin-top: 8px; }
+/* 正文字体会把「--」连写成一条长划，命令行参数 --scope 看起来就成了「—scope」。 */
+.scope-hint { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 </style>
