@@ -159,6 +159,7 @@ components/overview/DataReadyCapsule.streamSeparator
 components/workout/WorkoutClimbsCard.pace
 
 # fr
+views/settings/sections/maintenance.secMaintenance
 views/Settings.unidentifiedInitial
 components/InsightCard.metric.run.distance
 components/orbit/OrbitCanvas.stateCandidate
