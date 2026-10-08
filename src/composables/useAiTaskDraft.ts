@@ -379,8 +379,14 @@ export function useAiTaskDraft() {
     deleteTask,
     setTemplate,
     setCategoryEnabled,
-    setCategoryDays: (category: AiTaskCategory, days: number) =>
-      patchRange(category, { days_before: Math.max(0, Math.floor(days)) }),
+    /** 舞台上某一张牌背面改回溯天数：只改这一类，回到连续的一段（挑过的日子作废），进撤销栈。 */
+    setCategoryDays: (category: AiTaskCategory, days: number) => {
+      const next = Math.max(0, Math.floor(days));
+      const range = categoryRangeOf(draft.value.categories, category);
+      if (range.days_before === next && !range.picked_days?.length) return;
+      rememberSelection();
+      patchRange(category, { days_before: next, picked_days: [] });
+    },
     setWindowDays,
     applyPicks,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>

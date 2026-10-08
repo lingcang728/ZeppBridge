@@ -23,9 +23,6 @@ import { FALLBACK_APP_VERSION } from './lib/appVersion';
 import { formatBytes } from './lib/format';
 
 const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
-/* 交给 AI 的底栏挂在外壳上：总页的下钻都是路由，底栏不能跟着总页一起硬切（components/ai/AiDockHost.vue）。
-   第一次进「交给 AI」才加载，之后一直挂着，只在 /ai 显示。 */
-const AiDockHost = defineAsyncComponent(() => import('./components/ai/AiDockHost.vue'));
 /* 收集箱（精修批次 7.3）：全局悬浮在右下角，空的时候不出现；后端就绪后才挂（它要读上次留下的牌）。 */
 const CollectionBox = defineAsyncComponent(() => import('./components/cards/CollectionBox.vue'));
 
@@ -53,8 +50,6 @@ if (desktopRuntime) {
 
 const route = useRoute();
 const router = useRouter();
-const aiVisited = ref(false);
-watch(() => route.path, (path) => { if (navigationBranch(path) === '/ai') aiVisited.value = true; }, { immediate: true });
 const trayHint = ref(false);
 const {
   statusError,
@@ -239,7 +234,6 @@ onUnmounted(() => {
 
 <template>
   <LifeEventEditor />
-  <AiDockHost v-if="aiVisited" />
   <CollectionBox v-if="backendReady" />
   <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 

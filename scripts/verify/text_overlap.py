@@ -18,7 +18,7 @@ import sys
 from playwright.async_api import async_playwright
 
 LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr']
-PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/past', '/ai/check', '/settings']
+PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/exchanges', '/ai/check', '/settings']
 # 点开以后才出现的整屏层（第三轮 A8：牌桌展开后头部、范围胶囊、提示条不能和牌压在一起）。
 OVERLAYS = {'/body': ('.pick-days', '牌桌')}
 

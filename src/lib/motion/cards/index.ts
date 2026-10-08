@@ -6,6 +6,7 @@
  * - 翻面 `flipCard`：2D 压扁换面（不做 3D，字不糊）；
  * - 洗牌 `shuffleCards` / 切牌 `cutDeck`：换一副、重新理过；
  * - 收牌成叠再飞走 `gatherCards`：送达动画（训练计划发到手表）；
+ * - 汇聚 `convergeCards` / `emergeFrom`：交给 AI 舞台上牌沿线飞进门锁、回执牌从锁里长出来；
  * - 飞进 / 飞出收集箱 `flyCardHome` / `flyFromBox`：真牌本身离开牌位（替身摆在完全相同的位置），到了才算数；
  *   来处接住 `receive`、光圈 `landPulse`、顶一下 `bump`；
  * - 小丑盒 `box.ts`：盖子弹开接住飞来的牌（`catchCard`）、铺开 / 收起时弹起 / 合上（`lidOpen` / `lidClose`）；
@@ -17,6 +18,7 @@ export { dealCards, stackCards, returnStack, stackAndReturn, fanBack, type Landi
 export { flipCard } from './flip';
 export { shuffleCards, cutDeck } from './shuffle';
 export { gatherCards, type CardFlight } from './gather';
+export { convergeCards, emergeFrom, type Convergence } from './converge';
 export { flyCardHome, flyFromBox, receive, landPulse, bump } from './fly';
 export { recedeLayer, type Receded } from './camera';
 export { catchCard, lidOpen, lidClose } from './box';

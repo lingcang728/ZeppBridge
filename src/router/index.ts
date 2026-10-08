@@ -30,13 +30,14 @@ const routes = [
     component: () => import('../views/AiComposer.vue'),
   },
   // 交给 AI 的下钻全是路由（2026-10 精修批次 3）：点开从被点的卡 / 行长出来，返回缩回去（usePageMorph）。
-  { path: '/ai/past', name: 'AiPast', component: () => import('../views/ai/AiPast.vue') },
-  // 某一类的逐天页已经取消（10-07 第二轮）：点「你的过去」的格子直接发牌。旧链接回到「你的过去」。
-  { path: '/ai/past/:category', redirect: '/ai/past' },
+  // 「你的过去」二级页已经取消（2026-10-08 横向舞台）：要交的每一类是舞台左边的一张牌，点牌翻到背面。旧链接回到舞台。
+  { path: '/ai/past', redirect: '/ai' },
+  { path: '/ai/past/:category', redirect: '/ai' },
   { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
   { path: '/ai/check', name: 'AiCheck', component: () => import('../views/ai/AiCheck.vue') },
   { path: '/ai/tasks', name: 'AiTasks', component: () => import('../views/ai/AiTasks.vue') },
+  { path: '/ai/exchanges', name: 'AiExchanges', component: () => import('../views/ai/AiExchanges.vue') },
   { path: '/ai/exchanges/:id', name: 'AiExchange', component: () => import('../views/ai/AiExchange.vue') },
   {
     path: '/body',

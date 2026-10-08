@@ -2,7 +2,6 @@
 .collection-box { position: fixed; right: 24px; bottom: 24px; z-index: 2060; display: inline-flex; align-items: center; gap: 15px; height: 54px; padding: 0 16px 0 10px;
   border: 1px solid var(--mat-glass-line); border-radius: 999px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur);
   box-shadow: var(--mat-glass-shadow); color: var(--ink); font: inherit; cursor: pointer; transition: transform 420ms cubic-bezier(.4, .6, .2, 1), box-shadow 220ms ease; }
-.collection-box.lifted { transform: translateY(-88px); }
 .collection-box:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .collection-box.empty { cursor: default; }
 .box-copy { color: var(--muted); font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; transition: color 180ms ease; }

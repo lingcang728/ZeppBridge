@@ -15,7 +15,7 @@
  * 只动 transform / opacity；背景是一层静态模糊，只淡入淡出它自己。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
 import CoachTip from './CoachTip.vue';
 import { useCardsText } from './cards.i18n';
@@ -35,7 +35,6 @@ import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 const t = useCardsText();
 const box = useCardCollection();
 const ctl = useAiTaskDraft();
-const route = useRoute();
 const router = useRouter();
 const open = ref(false);
 /** 想要的状态：展开（或正在展开）。中途再点箱子 / Esc 就是朝反方向从此刻起放。 */
@@ -55,12 +54,10 @@ const CHROME_MS = 160;
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
 const weekday = (date: string) => displayDateTimeFormatter({ weekday: 'short' }).format(parseDisplayDate(date));
 const monthName = (month: string) => displayDateTimeFormatter({ month: 'long' }).format(parseDisplayDate(`${month}-01`));
-/* 「交给 AI」页底下有底栏：箱子往上让一让。 */
-const lifted = computed(() => route.path === '/ai' || route.path.startsWith('/ai/'));
 const groupText = (key: string, n: number) => (key === 'workout' ? t.value.boxWorkouts(labelOfPick(key), n) : t.value.boxGroup(labelOfPick(key), n));
 const layout = computed(() => handLayout(box.groups.value, viewport.value, {
   groupText, tintOf: tintOfGroup, labelOf: labelOfPick, expanded: expanded.value,
-  insets: { top: 72, bottom: (lifted.value ? 250 : 170) + (viewport.value.width <= 700 ? 66 : 0), side: 24 },
+  insets: { top: 72, bottom: 170 + (viewport.value.width <= 700 ? 66 : 0), side: 24 },
 }));
 const empty = computed(() => box.count.value === 0);
 /** 成对的指标（乳酸阈值）：小牌也是对角斜切双色。 */
@@ -247,7 +244,7 @@ onBeforeUnmount(() => { releaseEscape(); window.removeEventListener('resize', on
 
 <template>
   <Teleport to="body">
-    <button v-if="present" id="card-collection-box" ref="boxButton" type="button" :class="['collection-box', { lifted, open, empty, hover: box.dropHover.value }]"
+    <button v-if="present" id="card-collection-box" ref="boxButton" type="button" :class="['collection-box', { open, empty, hover: box.dropHover.value }]"
       :aria-label="t.boxAria(box.count.value)" :aria-expanded="open" @click="empty ? undefined : toggle()">
       <span class="jack" aria-hidden="true">
         <span class="box-lid"></span>

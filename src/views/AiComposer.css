@@ -1,18 +1,53 @@
-/* 单列叙事（1D·D2 方案 B）：从上往下一条线，内容收窄到 860、字大一号；各段之间同一个间距。 */
-.ai-bridge-page { display: flex; flex-direction: column; gap: 18px; max-width: 860px; margin-inline: auto; padding: 12px 32px 170px; }
-.bridge-page-head { display: flex; justify-content: space-between; align-items: center; min-height: 42px; }
+/* 交给 AI 横向舞台（2026-10-08）：一行任务头，下面一整块舞台（左牌、中锁、右牌），舞台下一条细的状态行。 */
+.ai-stage-page { display: flex; flex-direction: column; gap: 10px; max-width: 1360px; margin-inline: auto; padding: 12px 32px 28px; }
+.stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 42px; }
+.exchanges-pill { display: inline-flex; align-items: center; gap: 2px; padding: 6px 10px 6px 14px; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 650; text-decoration: none; transition: color var(--dur-base) ease; }
+.exchanges-pill:hover { color: var(--ink); }
+.exchanges-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
 .demo-banner div { display: flex; flex-direction: column; gap: 2px; }
 .demo-banner strong { color: var(--accent); font-size: 12px; font-weight: 650; }
 .demo-banner span { font-size: 11px; }
-.bridge-message, .mcp-arrival { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); font-size: var(--fs-xs); color: var(--muted); }
-.bridge-message span, .mcp-arrival span { flex: 1; }
-/* 上次发到手表的状态栏紧贴在「你的下一步」下面，属于同一段。 */
-.plan-status-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; margin-top: -8px; }
-.ai-bridge-page > .exchange-list { margin-top: 6px; }
-@media (max-width: 1100px) { .ai-bridge-page { padding: 8px 20px 200px; } }
-@media (max-width: 700px) { .ai-bridge-page { padding-inline: 12px; } .plan-status-row { flex-wrap: wrap; } }
-/* 右上角的撤销：和图里的撤销胶囊同一枚小玻璃胶囊（GraphUndoPill），进出淡入淡出。 */
 .undo-selection { margin-left: auto; }
 .undo-fade-enter-active, .undo-fade-leave-active { transition: opacity 260ms ease, scale 320ms cubic-bezier(.4, .6, .2, 1); }
 .undo-fade-enter-from, .undo-fade-leave-to { opacity: 0; scale: .92; }
+
+.stage { position: relative; isolation: isolate; width: 100%; min-height: 520px; }
+/* 竖线：贯穿舞台、两头淡掉；窄窗口时是一条横线。 */
+.spine { position: absolute; z-index: 0; pointer-events: none; }
+.stage.row .spine { top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 22% 78%, transparent); }
+.stage.column .spine { left: 0; right: 0; height: 1px; background: linear-gradient(to right, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 20% 80%, transparent); }
+.stage :deep(.threads) { z-index: 0; }
+
+.cloud { position: absolute; inset: 0; z-index: 1; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+.slot { position: absolute; pointer-events: auto; touch-action: none; }
+.slot.is-dragging { z-index: 5; }
+.slot-button { display: block; padding: 0; border: 0; border-radius: calc(var(--card-w) * .11); background: none; color: inherit; font: inherit; cursor: grab;
+  rotate: var(--rot); animation: drift calc(7s + var(--i) * 1.3s) ease-in-out calc(var(--i) * -2.1s) infinite alternate; }
+.slot-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.slot.is-dragging .slot-button { cursor: grabbing; animation-play-state: paused; }
+.slot.is-dragging .slot-button :deep(.scard) { box-shadow: var(--mat-raised-rim), 0 34px 50px -24px rgba(0, 0, 0, .85); scale: 1.04; }
+.slot-button :deep(.scard) { transition: translate 260ms cubic-bezier(.3, 1.3, .5, 1), box-shadow var(--dur-base) ease, scale 220ms ease; }
+.slot-button:hover :deep(.scard) { translate: 0 -6px; }
+/* 像扑克牌在桌上无规则地浮：只动 translate / rotate（合成器）；看不见、汇聚、减少动效时停。 */
+@keyframes drift {
+  0% { translate: 0 0; rotate: var(--rot); }
+  50% { translate: 3px -6px; rotate: calc(var(--rot) + 1.2deg); }
+  100% { translate: -4px 3px; rotate: calc(var(--rot) - 1deg); }
+}
+.stage.paused .slot-button, .stage.gathering .slot-button { animation-play-state: paused; }
+.cloud-empty { position: absolute; left: 0; bottom: 12px; z-index: 1; margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+
+.lock-host { position: absolute; z-index: 2; translate: -50% 0; }
+.stage :deep(.future) { z-index: 2; }
+
+.stage-foot { display: grid; gap: 8px; }
+.stage-foot:empty { display: none; }
+.bridge-message { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); font-size: var(--fs-xs); color: var(--muted); }
+.bridge-message span { flex: 1; }
+.plan-status-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; min-height: 32px; }
+
+@media (max-width: 1100px) { .ai-stage-page { padding: 8px 20px 24px; } }
+@media (max-width: 700px) { .ai-stage-page { padding-inline: 12px; } }
+@media (prefers-reduced-motion: reduce) { .slot-button { animation: none; } .slot-button :deep(.scard) { transition: none; } }
