@@ -17,7 +17,6 @@ import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
 import RetentionSection from './sections/RetentionSection.vue';
-import UpdateSection from './sections/UpdateSection.vue';
 import WorkoutCodesSection from './sections/WorkoutCodesSection.vue';
 
 defineProps<{ id: string; prefs: UserPrefs | null }>();
@@ -31,10 +30,7 @@ const emit = defineEmits<{ 'prefs-changed': [prefs: UserPrefs] }>();
       <DevicesSection />
       <AuthSection />
     </template>
-    <template v-else-if="id === 'sync'">
-      <AutoSyncSection />
-      <UpdateSection />
-    </template>
+    <AutoSyncSection v-else-if="id === 'sync'" />
     <template v-else-if="id === 'archive'">
       <HistoryArchivePanel :prefs="prefs" @prefs-changed="(next: UserPrefs) => emit('prefs-changed', next)" />
       <RetentionSection />

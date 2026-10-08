@@ -1548,9 +1548,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
         weight: 'Gewicht',
         workouts: 'Trainingen',
       },
-      syncDescA: (minutes: number) =>
-        `Synchroniseert cloudgegevens elke ${minutes} minuten terwijl de app open is`,
-      syncDescB: 'Aan laten staan houdt de tijdreeksen doorlopend.',
       syncDiagnostics: 'Synchronisatiediagnostiek',
       syncIntervalAria: 'Interval voor automatisch synchroniseren',
       syncNow: 'Nu synchroniseren',
@@ -1571,7 +1568,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       updateBackground: 'Op de achtergrond doorgaan',
       updateCheck: 'Controleren op updates',
       updateChecking: 'Controleren…',
-      updateCurrent: (version: string) => `Nu ${version}`,
       updateDownloadNote:
         'Het installeert vanzelf als het klaar is; je kunt de notities hierboven blijven lezen.',
       updateDownloadNoteTail:
@@ -1600,8 +1596,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       updateStatusInstalling: 'Installeren; de app herstart als het klaar is',
       updateStatusUnmanaged: 'Updates komen van je pakketbeheerder',
       updateStatusUpToDate: 'Je hebt de nieuwste versie',
-      updateUnmanagedHint: (version: string) =>
-        `Op ${version}. Deze build wordt bijgewerkt via Flatpak of de pakketbeheerder van je distributie: voer flatpak update com.zeppbridge.app uit, of werk het pakket bij.`,
       updateVersion: (version: string) => `Versie ${version}`,
       updateVersionLoading: 'laden',
       verifyAndSync: 'Verifiëren en synchroniseren',
@@ -2566,7 +2560,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       cardAccount: 'Account en apparaten',
       cardData: 'Je gegevens',
       cardDisplay: 'Weergave en taal',
-      cardSync: 'Synchronisatie en updates',
       cardArchive: 'Archief en opslag',
       cardAi: 'AI-tools',
       cardPrivacy: 'Privacy en beveiliging',
@@ -2592,8 +2585,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       secLocalData: 'Je gegevens op deze computer',
       secFormat: 'Taal en notaties',
       secAppearance: 'Uiterlijk',
-      secAutoSync: 'Automatisch synchroniseren',
-      secUpdate: 'Software-update',
       secRetention: 'Lokale bewaring',
       secExport: 'Standaardexport',
       secCodes: 'Niet-herkende trainingscodes',
@@ -2611,9 +2602,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       deviceId: (id: string) => `ID ${id}`,
       deviceOpen: 'Model bekijken of wijzigen',
       autoSyncToggle: 'Automatisch synchroniseren',
-      syncIntervalLabel: 'Synchronisatie-interval',
-      syncNowLabel: 'Nu eenmaal synchroniseren',
-      syncNowSub: 'Haalt alleen de laatste paar dagen op',
       exportFormatSub:
         'Vooraf geselecteerd bij export vanuit ‘Naar de AI’ of een training',
       retentionSub:

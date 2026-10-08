@@ -259,7 +259,6 @@ export default {
 
       updateChecking: 'Проверка…',
       updateCheck: 'Проверить обновления',
-      updateCurrent: (version: string) => `Текущая: ${version}`,
       updateVersion: (version: string) => `Версия ${version}`,
       buildStamp: (stamp: string) => `Сборка ${stamp}`,
       updateVersionLoading: 'загрузка',
@@ -273,9 +272,6 @@ export default {
       updateStatusFailed: 'Обновление не удалось',
       updateStatusUpToDate: 'Установлена актуальная версия',
       updateStatusUnmanaged: 'Обновления управляются пакетным менеджером',
-      updateUnmanagedHint: (version: string) =>
-        `Версия ${version}. Эта сборка обновляется через Flatpak или пакетный менеджер: `
-        + `выполните flatpak update com.zeppbridge.app или обновите пакет.`,
       releaseNotesEmpty: 'У этого выпуска нет описания изменений.',
       updateModalTitle: (version: string) => `Что нового в ZeppBridge ${version}`,
       updateModalCurrent: (version: string) => `Текущая версия: ${version}`,
@@ -293,8 +289,6 @@ export default {
       updateRetry: 'Повторить',
       updateInstall: 'Скачать и установить',
 
-      syncDescA: (minutes: number) => `Облачные данные синхронизируются каждые ${minutes} мин при открытом приложении`,
-      syncDescB: 'Рекомендуется не выключать для непрерывности графиков.',
       syncIntervalAria: 'Интервал автоматической синхронизации',
       minutes: (minutes: number) => `${minutes} мин`,
       syncing: 'Синхронизация…',
@@ -2932,7 +2926,6 @@ export default {
       openCard: 'Открыть',
 
       cardAccount: 'Аккаунт и устройства',
-      cardSync: 'Синхронизация и обновления',
       cardArchive: 'Архив и хранение',
       cardData: 'Ваши данные',
       cardAi: 'Инструменты ИИ',
@@ -2960,8 +2953,6 @@ export default {
       secDevices: 'Устройства',
       secLogin: 'Способ входа',
       secLoginSub: 'Разверните при необходимости изменить способ подключения',
-      secAutoSync: 'Автосинхронизация',
-      secUpdate: 'Обновление приложения',
       secCapability: 'Полученные данные',
       secCodes: 'Нераспознанные коды тренировок',
       secMcp: 'MCP-доступ',
@@ -2982,9 +2973,6 @@ export default {
       deviceId: (id: string) => `ID ${id}`,
       deviceOpen: 'Посмотреть или изменить модель',
 
-      syncIntervalLabel: 'Интервал',
-      syncNowLabel: 'Синхронизировать сейчас',
-      syncNowSub: 'Загружает данные за последние дни',
 
       mcpLead:
         'Позволяет инструментам ИИ (Claude Code, Codex и др.) напрямую запрашивать локальные данные. '

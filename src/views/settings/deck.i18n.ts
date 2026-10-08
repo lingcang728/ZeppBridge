@@ -11,7 +11,6 @@ export const deckMessages = defineMessages(
     openCard: '打开',
 
     cardAccount: '账号与设备',
-    cardSync: '同步与更新',
     cardArchive: '归档与存储',
     cardData: '数据内容',
     cardAi: '交给 AI 工具',
@@ -37,8 +36,6 @@ export const deckMessages = defineMessages(
     secDevices: '设备',
     secLogin: '登录方式',
     secLoginSub: '需要换一种方式登录时再展开',
-    secAutoSync: '自动同步',
-    secUpdate: '软件更新',
     secCapability: '已获取的数据',
     secCodes: '未识别的运动编号',
     secMcp: 'MCP',
@@ -59,9 +56,6 @@ export const deckMessages = defineMessages(
     deviceId: (id: string) => `ID ${id}`,
     deviceOpen: '查看或换型号',
 
-    syncIntervalLabel: '同步间隔',
-    syncNowLabel: '立刻同步一次',
-    syncNowSub: '只拉最近几天的新数据',
 
     mcpLead: '让 Claude Code、Codex 这类装在你电脑上的 AI 工具直接查本机数据——只读、不联网、不开端口。',
     mcpPreview: '查看将复制的内容',
@@ -83,7 +77,6 @@ export const deckMessages = defineMessages(
     openCard: 'Open',
 
     cardAccount: 'Account and devices',
-    cardSync: 'Sync and updates',
     cardArchive: 'Archive and storage',
     cardData: 'Your data',
     cardAi: 'AI tools',
@@ -109,8 +102,6 @@ export const deckMessages = defineMessages(
     secDevices: 'Devices',
     secLogin: 'Sign-in method',
     secLoginSub: 'Expand only to switch sign-in method',
-    secAutoSync: 'Auto sync',
-    secUpdate: 'Software update',
     secCapability: 'Data you have',
     secCodes: 'Unrecognized workout codes',
     secMcp: 'MCP',
@@ -131,9 +122,6 @@ export const deckMessages = defineMessages(
     deviceId: (id: string) => `ID ${id}`,
     deviceOpen: 'View or change model',
 
-    syncIntervalLabel: 'Interval',
-    syncNowLabel: 'Sync once now',
-    syncNowSub: 'Fetches only the last few days',
 
     mcpLead: 'Let AI tools on this machine — Claude Code, Codex and the like — query local data directly. Read-only, offline, no open port.',
     mcpPreview: 'Show what will be copied',
@@ -155,7 +143,6 @@ export const deckMessages = defineMessages(
     openCard: 'Abrir',
 
     cardAccount: 'Cuenta y dispositivos',
-    cardSync: 'Sincronización y actualizaciones',
     cardArchive: 'Archivo y almacenamiento',
     cardData: 'Tus datos',
     cardAi: 'Herramientas de IA',
@@ -181,8 +168,6 @@ export const deckMessages = defineMessages(
     secDevices: 'Dispositivos',
     secLogin: 'Método de inicio de sesión',
     secLoginSub: 'Ábrelo solo si necesitas iniciar sesión de otra forma',
-    secAutoSync: 'Sincronización automática',
-    secUpdate: 'Actualización de software',
     secCapability: 'Datos disponibles',
     secCodes: 'Códigos de entrenamiento no reconocidos',
     secMcp: 'MCP',
@@ -203,9 +188,6 @@ export const deckMessages = defineMessages(
     deviceId: (id: string) => `ID ${id}`,
     deviceOpen: 'Ver o cambiar el modelo',
 
-    syncIntervalLabel: 'Intervalo',
-    syncNowLabel: 'Sincronizar ahora',
-    syncNowSub: 'Solo trae los últimos días',
 
     mcpLead: 'Permite que herramientas de IA instaladas en tu equipo —Claude Code, Codex y similares— consulten directamente tus datos locales. Solo lectura, sin conexión, sin puertos abiertos.',
     mcpPreview: 'Ver lo que se va a copiar',

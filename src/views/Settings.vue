@@ -21,6 +21,7 @@ import { distanceUnit, distanceUnitOptionLabel } from '../lib/units';
 import { locale, LOCALE_LABELS, useMessages } from '../i18n';
 import { settingsMessages } from './Settings.i18n';
 import { deckMessages } from './settings/deck.i18n';
+import { syncCardMessages } from './settings/sections/sync.i18n';
 import {
   SETTINGS_CARD_ICONS,
   SETTINGS_CARD_TONES,
@@ -34,6 +35,7 @@ defineOptions({ name: 'Settings' });
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
+const syncCard = useMessages(syncCardMessages);
 const route = useRoute();
 const router = useRouter();
 const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
@@ -52,7 +54,7 @@ watch(activeId, () => { exportFormat.value = readDefaultExportFormat(); });
 
 const titles = computed<Record<SettingsCardId, string>>(() => ({
   account: d.value.cardAccount,
-  sync: d.value.cardSync,
+  sync: syncCard.value.cardTitle,
   archive: d.value.cardArchive,
   data: d.value.cardData,
   ai: d.value.cardAi,

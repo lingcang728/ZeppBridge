@@ -6,12 +6,10 @@ import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } f
 import { formatBytes } from '../../../lib/format';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
-import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
-const d = useMessages(deckMessages);
-const BUILD_STAMP = __BUILD_STAMP__;
 const updateNotesOpen = ref(false);
+const showStatus = computed(() => ['checking', 'downloading', 'installing', 'upToDate', 'unmanaged'].includes(updateState.status));
 
 /** 卡片上只放第一行；完整说明在弹窗里，免得把一整篇 Release notes 压成一段。 */
 const releaseTeaser = computed(() => {
@@ -55,18 +53,14 @@ const installUpdate = async () => {
 </script>
 
 <template>
-  <section class="s-section update-card" aria-labelledby="update-title">
-    <div class="s-section-head"><h3 id="update-title">{{ d.secUpdate }}</h3></div>
-    <div class="s-list">
+      <!-- 这几行直接排在「同步」卡的列表里（多根组件），所以外面不再包 section。
+           beta 期只给版本号；状态那句只在真有事（查到新版本、失败、下载中）时才出现。 -->
       <div :class="['s-row', 'update-state', `is-${updateState.status}`]" role="status" aria-live="polite">
         <div class="s-row-main">
-          <span class="s-row-title">{{ updateStatusLabel }}</span>
+          <span class="s-row-title">{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</span>
           <span v-if="updateState.status === 'failed'" class="s-row-sub">{{ updateState.error }}</span>
-          <span v-else-if="updateState.status === 'unmanaged'" class="s-row-sub">{{ t.updateUnmanagedHint(updateState.currentVersion || t.updateVersionLoading) }}</span>
-          <span v-else-if="updateState.status === 'available'" class="s-row-sub">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatBytes(updateState.sizeBytes) }}</template></span>
-          <span v-else class="s-row-sub">{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</span>
-          <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
-          <span class="s-row-sub build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</span>
+          <span v-else-if="updateState.status === 'available'" class="s-row-sub">{{ updateStatusLabel }}<template v-if="updateState.sizeBytes"> · {{ formatBytes(updateState.sizeBytes) }}</template></span>
+          <span v-else-if="showStatus" class="s-row-sub">{{ updateStatusLabel }}</span>
         </div>
         <!-- 更新由包管理器管的渠道上不摆这个按钮：按下去只能得到一句
              「这里不管更新」，不如一开始就别给。 -->
@@ -95,7 +89,6 @@ const installUpdate = async () => {
           <button class="button primary" type="button" @click="updateNotesOpen = true">{{ t.updateSeeNotes }}</button>
         </div>
       </div>
-    </div>
 
     <!-- 更新说明弹窗。
          发现新版本时自动弹一次：只给一个版本号，用户没法判断这次值不值得更新。
@@ -156,18 +149,16 @@ const installUpdate = async () => {
         >{{ updateState.status === 'failed' ? t.updateRetry : t.updateInstall }}</button>
       </div>
     </ModalDialog>
-  </section>
 </template>
 
 <style scoped src="../settings-local.css"></style>
 <style scoped src="../settings-modal.css"></style>
 <style scoped>
-.build-stamp { font-family: var(--font-mono); }
-.update-state .s-row-title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; }
+.update-state:not(.is-idle, .is-unmanaged) .s-row-title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; }
 .update-state.is-available .s-row-title::before, .update-state.is-upToDate .s-row-title::before { background: var(--accent); }
 .update-state.is-checking .s-row-title::before, .update-state.is-downloading .s-row-title::before, .update-state.is-installing .s-row-title::before { background: var(--warning); }
 .update-state.is-failed .s-row-title::before { background: var(--danger); }
-.update-card progress { width: 100%; height: 6px; accent-color: var(--accent); }
+progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .release-teaser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .update-progress { display: grid; gap: 7px; margin-top: 14px; }
 .progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ink); font-size: var(--fs-md); }

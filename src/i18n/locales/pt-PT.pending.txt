@@ -17,3 +17,11 @@ components/workout/WorkoutClimbsCard.range
 components/workout/WorkoutClimbsCard.speed
 components/workout/WorkoutClimbsCard.title
 components/workout/WorkoutClimbsCard.vertical
+views/settings/sections/sync.autoSub
+views/settings/sections/sync.cardTitle
+views/settings/sections/sync.cloudStale
+views/settings/sections/sync.cloudStaleNoTime
+views/settings/sections/sync.lastSynced
+views/settings/sections/sync.neverSynced
+views/settings/sections/sync.newest
+views/settings/sections/sync.off

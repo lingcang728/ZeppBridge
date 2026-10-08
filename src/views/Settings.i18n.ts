@@ -190,7 +190,6 @@ export const settingsMessages = defineMessages(
     // ── 8. 软件更新 ──
     updateChecking: '检查中…',
     updateCheck: '检查更新',
-    updateCurrent: (version: string) => `当前 ${version}`,
     updateVersion: (version: string) => `版本 ${version}`,
     buildStamp: (stamp: string) => `构建 ${stamp}`,
     updateVersionLoading: '读取中',
@@ -204,8 +203,6 @@ export const settingsMessages = defineMessages(
     updateStatusFailed: '更新失败',
     updateStatusUpToDate: '当前已是最新版本',
     updateStatusUnmanaged: '由包管理器管理更新',
-    updateUnmanagedHint: (version: string) => `当前 ${version}。这个安装包由 Flatpak 或系统包管理器更新：`
-      + `flatpak update com.zeppbridge.app，或用发行版的包管理器升级。`,
     releaseNotesEmpty: '本次 Release 未填写更新说明。',
     updateModalTitle: (version: string) => `ZeppBridge ${version} 更新了什么`,
     updateModalCurrent: (version: string) => `你现在是 ${version}`,
@@ -224,8 +221,6 @@ export const settingsMessages = defineMessages(
     updateInstall: '下载并安装',
 
     // ── 9. 自动同步 ──
-    syncDescA: (minutes: number) => `应用打开期间每 ${minutes} 分钟自动同步云端记录`,
-    syncDescB: '保持开启可获得连续的时序数据。',
     syncIntervalAria: '自动同步间隔',
     minutes: (minutes: number) => `${minutes} 分钟`,
     syncing: '正在同步…',
@@ -565,7 +560,6 @@ If you need anything from me (which client I use, where the file lives), just as
     // ── 8. Updates ──
     updateChecking: 'Checking…',
     updateCheck: 'Check for updates',
-    updateCurrent: (version: string) => `Currently ${version}`,
     updateVersion: (version: string) => `Version ${version}`,
     buildStamp: (stamp: string) => `Build ${stamp}`,
     updateVersionLoading: 'loading',
@@ -579,8 +573,6 @@ If you need anything from me (which client I use, where the file lives), just as
     updateStatusFailed: 'Update failed',
     updateStatusUpToDate: 'Already on the latest version',
     updateStatusUnmanaged: 'Updates come from your package manager',
-    updateUnmanagedHint: (version: string) => `On ${version}. This build updates through Flatpak or your `
-      + `distribution's package manager: run flatpak update com.zeppbridge.app, or upgrade the package.`,
     releaseNotesEmpty: 'This release has no notes.',
     updateModalTitle: (version: string) => `What changed in ZeppBridge ${version}`,
     updateModalCurrent: (version: string) => `You are on ${version}`,
@@ -599,8 +591,6 @@ If you need anything from me (which client I use, where the file lives), just as
     updateInstall: 'Download and install',
 
     // ── 9. Auto sync ──
-    syncDescA: (minutes: number) => `Syncs cloud records every ${minutes} minutes while the app is open`,
-    syncDescB: 'Keeps the time series continuous.',
     syncIntervalAria: 'Automatic sync interval',
     minutes: (minutes: number) => `${minutes} min`,
     syncing: 'Syncing…',
@@ -940,7 +930,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     // ── 8. Updates ──
     updateChecking: 'Revisando…',
     updateCheck: 'Buscar actualizaciones',
-    updateCurrent: (version: string) => `Versión actual ${version}`,
     updateVersion: (version: string) => `Versión ${version}`,
     buildStamp: (stamp: string) => `Compilación ${stamp}`,
     updateVersionLoading: 'cargando',
@@ -954,8 +943,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     updateStatusFailed: 'La actualización falló',
     updateStatusUpToDate: 'Tienes la versión más reciente',
     updateStatusUnmanaged: 'Las actualizaciones las gestiona tu gestor de paquetes',
-    updateUnmanagedHint: (version: string) => `Versión ${version}. Esta compilación se actualiza con Flatpak o con el gestor `
-      + `de paquetes de tu distribución: ejecuta flatpak update com.zeppbridge.app o actualiza el paquete.`,
     releaseNotesEmpty: 'Esta versión no trae notas.',
     updateModalTitle: (version: string) => `Qué cambió en ZeppBridge ${version}`,
     updateModalCurrent: (version: string) => `Tienes la versión ${version}`,
@@ -974,8 +961,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     updateInstall: 'Descargar e instalar',
 
     // ── 9. Auto sync ──
-    syncDescA: (minutes: number) => `Sincroniza los registros de la nube cada ${minutes} minutos mientras la app está abierta`,
-    syncDescB: 'Dejarla activada mantiene continuas las series de tiempo.',
     syncIntervalAria: 'Intervalo de sincronización automática',
     minutes: (minutes: number) => `${minutes} min`,
     syncing: 'Sincronizando…',
