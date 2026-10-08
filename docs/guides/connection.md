@@ -148,9 +148,12 @@ token is never displayed.
 - **Clear credentials** cancels any in-flight web sign-in, deletes this user's
   token from the OS credential store, deletes the auth metadata, and resets the
   in-memory connection state. It does **not** delete your health database.
-- Settings lets you keep 1–365 days locally (365 by default). Cleanup runs after
-  a successful sync using that number; the manual **Clean up old data** uses the
-  same number and cannot be undone.
+- **Settings → Archive and storage → Keep data for** offers 30, 90 or 180 days,
+  one year (the default), or **Forever**. With a day count, cleanup runs after
+  each successful sync; **Forever** turns on long-term archiving and nothing is
+  cleaned up. The manual **Prune by retention** button now lives in
+  **Advanced and maintenance → Maintenance**, uses the same day count, and cannot
+  be undone.
 - To remove everything, clear credentials in Settings first, then look at the
   `data\` folder next to the program. Back it up before deleting the install
   folder.
