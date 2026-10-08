@@ -1,7 +1,6 @@
 <script setup lang="ts">
-/* 设备：一台设备一行——设备图｜名称和昵称｜一行小标签（固件、最近数据、打码 ID）｜
-   状态｜箭头。整行点进设备二级页（看详情、换型号）。
-   以前是一格一格的小卡，每张卡里字段、状态、按钮各占一行，排得很乱。 */
+/* 设备：一台设备一行——设备图｜名称｜识别状态｜箭头。整行点进设备二级页
+   （固件、最近数据、编号和换型号都在那里）。 */
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
@@ -16,9 +15,11 @@ import { errorTextFor } from '../../../i18n/errors';
 import { backendText } from '../../../i18n/backendText';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
+import { accountCardMessages } from './account.i18n';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
+const a = useMessages(accountCardMessages);
 const { accountRecognized } = useSettingsContext().auth;
 const {
   models: deviceModels,
@@ -26,7 +27,6 @@ const {
   loading: devicesLoading,
   error: deviceError,
   load: loadDevices,
-  maskIdentifier,
 } = useDevices();
 
 /* 设备型号指认：本机推不出来，就问用户——有些账号的设备响应里根本没有任何产品名
@@ -112,12 +112,7 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
           </span>
           <div class="s-row-main">
             <span class="s-row-title">{{ model.canonicalName }}</span>
-            <span class="s-row-sub">{{ model.displayName }}</span>
-            <span class="device-chips">
-              <span class="chip">{{ d.deviceFirmware(model.firmware) }}</span>
-              <span class="chip">{{ d.deviceLatest(model.lastData) }}</span>
-              <span class="chip mono">{{ d.deviceId(maskIdentifier(model.profile.device_id || model.profile.serial)) }}</span>
-            </span>
+            <span v-if="deviceKeyFor(model)" class="s-row-sub">{{ a.deviceCheck }}</span>
           </div>
           <div class="s-row-control">
             <span :class="['state-dot', { on: model.state !== 'unknown' }]">{{ deviceStateLabel(model.state) }}</span>
@@ -130,8 +125,12 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
     <div v-if="unknownDeviceDetected && !devicesLoading" class="s-list">
       <div class="diagnostic-panel unknown-device-report" role="status">
         <strong>{{ t.unknownDeviceTitle }}</strong>
-        <p>{{ t.unknownDeviceBodyA }}<strong>{{ t.unknownDeviceNoName }}</strong>{{ t.unknownDeviceBodyB }}</p>
-        <p>{{ t.unknownDeviceReport }}</p>
+        <p>{{ a.unknownShort }}</p>
+        <details class="learn-more">
+          <summary>{{ a.learnMore }}</summary>
+          <p>{{ t.unknownDeviceBodyA }}<strong>{{ t.unknownDeviceNoName }}</strong>{{ t.unknownDeviceBodyB }}</p>
+          <p>{{ t.unknownDeviceReport }}</p>
+        </details>
         <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
         <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
         <DiagnosticReportForm :form="deviceDiagnostic" />
@@ -160,9 +159,8 @@ a.device-row:hover .row-chevron { color: var(--ink); transform: translateX(2px);
 }
 .device-art :deep(.device-visual) { width: 52px; height: 52px; min-width: 0; min-height: 0; flex: 0 0 52px; border: 0; border-radius: 14px; background: transparent; }
 .device-art :deep(.device-visual img) { padding: 5px; }
-.device-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.device-chips .chip { font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--font-mono); letter-spacing: .02em; }
+.learn-more > summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: var(--fs-sm); }
+.learn-more[open] > summary { margin-bottom: 6px; color: var(--muted); }
 .row-chevron { color: var(--subtle); transition: transform var(--dur-fast) ease, color var(--dur-fast) ease; }
 .empty-icon { color: var(--subtle); }
 .skeleton-row { min-height: 72px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 5%, transparent), transparent); background-size: 200% 100%; animation: device-shimmer 1.4s ease-in-out infinite; }

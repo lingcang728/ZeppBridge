@@ -105,7 +105,7 @@ const changeCard = async (id: string, done: () => void) => {
   done();
 };
 
-/* 旧链接（数据健康页的「去重新连接」等）指向 #connection，现在它在「账号与设备」卡里。 */
+/* 旧链接（数据健康页的「去重新连接」等）指向 #connection，重新连接的按钮在「账号与设备」卡上。 */
 const redirectLegacy = () => {
   const target = legacySettingsTarget(route.hash, route.query.focus);
   if (target) void router.replace(`/settings/${target}`);

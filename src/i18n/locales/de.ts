@@ -246,10 +246,7 @@ export default {
       officialDisconnected: 'Zepp-Autorisierung getrennt – lokale Daten bleiben.',
       officialFailed: 'Zepp-Autorisierung nicht abgeschlossen',
       officialNote: 'Offizielle Daten angebunden: Schlaf, Herzfrequenz, Schritte, Trainings, PAI und Gewicht werden synchronisiert; HRV, Blutsauerstoff, Stress u. a. kommen weiterhin von „Erweiterte Daten".',
-      officialAccountLine: (id: string, since: string) => `Zepp-Autorisierung · ${id} · seit ${since}`,
-      officialAccountEmpty: 'Noch kein Zepp-Konto autorisiert',
       officialNotConnected: 'Nicht autorisiert',
-      cloudAdvancedTitle: 'Zepp Cloud · Erweiterte Daten',
       copyAuthLink: 'Autorisierungslink kopieren',
       copyAuthLinkHint: 'Ist dein Browser bei Zepp angemeldet, geht es direkt zu „Zustimmen". Für ein anderes Konto (z. B. Google- oder Xiaomi-Login) den Link in ein privates Fenster einfügen.',
       linkCopied: 'Link kopiert',
@@ -270,7 +267,6 @@ export default {
       cancel: 'Abbrechen',
 
       // ── 2. Konto und Region ──
-      accountLine: (region: string, lastSync: string) => `Region ${region} · letzte Synchronisierung ${lastSync}`,
       verifyAndSync: 'Verifizieren und synchronisieren',
       reauthenticate: 'Erneut anmelden',
 
@@ -460,9 +456,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       openDataFolder: 'Datenordner öffnen',
       clearAuth: 'Anmeldedaten löschen',
       logout: 'Abmelden',
-      logoutHint:
-        'Meldet das Konto ab. Bereits synchronisierte Daten bleiben auf diesem Rechner erhalten – nach erneuter Anmeldung läuft die Synchronisierung weiter.',
-      logoutNoMultiAccount: "Eine lokale Datenbank gehört zu genau einem Konto: Die Anmeldung mit einem anderen Konto wird abgelehnt, es wird nichts vermischt. Zum Wechseln die App schließen und den Ordner data vorher verschieben.",
       healthCheckLabel: 'Datenzustandsprüfung',
       healthCheckNote:
         'Zeigt Abruf, Parsen und Schreiben je Datenstrom samt Abdeckung und Quelle. Nichts für jeden Tag – hier findest du die Ursache, wenn eine Synchronisierung unerwartete Ergebnisse liefert.',
@@ -538,9 +531,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       connVerifying: 'Wird verifiziert',
       connWaiting: 'Warten auf Anmeldung',
       connFailed: 'Anmeldung fehlgeschlagen',
-      unidentified: 'Nicht erkannt',
       unidentifiedInitial: '?',
-      notProvided: 'Nicht angegeben',
       noRecords: 'Noch keine Einträge',
       timeUnknown: 'Zeit unbekannt',
       refreshFailed: (reason: string) => `Erkennung fehlgeschlagen; auf den lokalen Cache zurückgefallen${reason}`,
@@ -2725,14 +2716,10 @@ Antworte in Markdown.`,
       cardData: 'Deine Daten',
       cardDisplay: 'Anzeige und Sprache',
       cardPrivacy: 'Datenschutz und Sicherheit',
-      cloudSourceSub: 'Woher die Daten dieses Kontos kommen',
       firstSyncing: (current: number, total: number) => `Verbunden · aktuelle Aufzeichnungen werden geladen ${current}/${total}`,
       firstSyncingPlain: "Verbunden · aktuelle Aufzeichnungen werden geladen",
       firstReady: "Deine ersten Daten sind da: Sieh dir diese Woche in der Übersicht an",
       goOverview: "Zur Übersicht",
-      deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-      deviceId: (id: string) => `ID ${id}`,
-      deviceLatest: (time: string) => `Neueste Daten ${time}`,
       deviceOpen: 'Modell ansehen oder wechseln',
       exportFormatSub:
         'Vorausgewählt beim Export aus „An die KI" oder einem Training',

@@ -3,6 +3,7 @@ import { onActivated, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import BackupPanel from '../../../components/BackupPanel.vue';
 import Icon from '../../../components/Icon.vue';
+import AuthSection from './AuthSection.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
 import MaintenanceSection from './MaintenanceSection.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
@@ -110,6 +111,8 @@ const openDataFolder = async () => {
         <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
       </section>
     </div>
+
+    <AuthSection />
 
     <MaintenanceSection />
 

@@ -76,10 +76,7 @@ export default {
       officialDisconnected: 'Zepp अनुमति डिस्कनेक्ट हुई। लोकल डेटा सुरक्षित है।',
       officialFailed: 'Zepp अनुमति विफल हुई',
       officialNote: 'आधिकारिक डेटा जुड़ा है: नींद, हार्ट रेट, कदम, वर्कआउट, PAI और वज़न सिंक होते हैं; HRV, ब्लड ऑक्सीजन और स्ट्रेस "उन्नत डेटा" से आते हैं।',
-      officialAccountLine: (id: string, since: string) => `Zepp अनुमति · ${id} · ${since} से`,
-      officialAccountEmpty: 'अभी आधिकारिक अनुमति नहीं दी गई',
       officialNotConnected: 'कनेक्ट नहीं है',
-      cloudAdvancedTitle: 'Zepp Cloud · उन्नत डेटा',
       copyAuthLink: 'अनुमति लिंक कॉपी करें',
       copyAuthLinkHint: 'ब्राउज़र में Zepp पहले से लॉगिन है तो सीधे अनुमति पेज खुलेगा। दूसरा खाता (जैसे Google या Xiaomi लॉगिन) चाहिए तो लिंक प्राइवेट विंडो में पेस्ट करके खोलें।',
       linkCopied: 'लिंक कॉपी हो गया',
@@ -99,7 +96,6 @@ export default {
       cancel: 'रद्द करें',
 
       // ── 2. 账户与区域 ──
-      accountLine: (region: string, lastSync: string) => `क्षेत्र ${region} · पिछला सिंक ${lastSync}`,
       verifyAndSync: 'जाँचें और सिंक करें',
       reauthenticate: 'दोबारा साइन इन करें',
 
@@ -264,8 +260,6 @@ export default {
       openDataFolder: 'डेटा फ़ोल्डर खोलें',
       clearAuth: 'क्रेडेंशियल्स साफ़ करें',
       logout: 'लॉग आउट',
-      logoutHint: 'सिर्फ़ खाते से लॉग आउट करता है। लोकल डेटा सुरक्षित रहता है।',
-      logoutNoMultiAccount: "एक लोकल डेटाबेस में एक ही अकाउंट रहता है: दूसरे अकाउंट से लॉगिन करने पर मना कर दिया जाता है, कुछ भी मिलता नहीं। अकाउंट बदलने के लिए ऐप बंद करें और पहले data फ़ोल्डर कहीं और रख दें।",
       healthCheckLabel: 'डेटा हेल्थ जाँच',
       healthCheckNote: 'हर स्ट्रीम का क्लाउड फ़ेच, पार्स और लोकल राइट चरण, शामिल तारीख़ें और स्रोत। रोज़ देखने की ज़रूरत नहीं; सिंक उम्मीद जैसा न हो तो यहाँ कारण खोजें।',
       healthCheckOpen: 'डेटा हेल्थ खोलें',
@@ -329,9 +323,7 @@ export default {
       connVerifying: 'जाँच हो रही है',
       connWaiting: 'साइन इन का इंतज़ार',
       connFailed: 'साइन इन विफल',
-      unidentified: 'अज्ञात',
       unidentifiedInitial: 'अ',
-      notProvided: 'उपलब्ध नहीं',
       noRecords: 'कोई रिकॉर्ड नहीं',
       timeUnknown: 'समय अज्ञात',
       refreshFailed: (reason: string) => `पहचान विफल; लोकल कैश पर वापस${reason}`,
@@ -2348,14 +2340,10 @@ Markdown में उत्तर दें।`,
       secLocalData: 'लोकल डेटा',
       secFeedback: 'फीडबैक',
 
-      cloudSourceSub: 'डेटा स्रोत',
       firstSyncing: (current: number, total: number) => `कनेक्ट हो गया · हाल के रिकॉर्ड ला रहे हैं ${current}/${total}`,
       firstSyncingPlain: "कनेक्ट हो गया · हाल के रिकॉर्ड ला रहे हैं",
       firstReady: "आपका पहला डेटा आ गया: ओवरव्यू में यह हफ़्ता देखें",
       goOverview: "ओवरव्यू पर जाएँ",
-      deviceFirmware: (firmware: string) => `फ़र्मवेयर ${firmware}`,
-      deviceLatest: (time: string) => `ताज़ा डेटा ${time}`,
-      deviceId: (id: string) => `ID ${id}`,
       deviceOpen: 'मॉडल देखें या बदलें',
 
 

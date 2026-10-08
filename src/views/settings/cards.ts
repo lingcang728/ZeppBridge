@@ -31,6 +31,7 @@ export const SETTINGS_CARD_TONES: Record<SettingsCardId, GlyphTone> = {
 export const isSettingsCardId = (value: unknown): value is SettingsCardId =>
   typeof value === 'string' && (SETTINGS_CARD_IDS as readonly string[]).includes(value);
 
-/** 旧链接（#connection、?focus=connection）指向的是认证区块，现在它在「账号与设备」卡里。 */
+/** 旧链接（#connection、?focus=connection）是来重新连接的：连接 / 重新授权的主按钮在「账号与设备」卡上
+    （全套登录方式在高级卡，那是换登录方式才去的地方）。 */
 export const legacySettingsTarget = (hash: string, focus: unknown): SettingsCardId | null =>
   (hash === '#connection' || focus === 'connection' ? 'account' : null);

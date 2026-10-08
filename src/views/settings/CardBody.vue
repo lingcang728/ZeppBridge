@@ -7,7 +7,6 @@
 import AccountSection from './sections/AccountSection.vue';
 import AdvancedSection from './sections/AdvancedSection.vue';
 import ArchiveSection from './sections/ArchiveSection.vue';
-import AuthSection from './sections/AuthSection.vue';
 import AutoSyncSection from './sections/AutoSyncSection.vue';
 import CapabilitySection from './sections/CapabilitySection.vue';
 import DevicesSection from './sections/DevicesSection.vue';
@@ -25,7 +24,6 @@ defineProps<{ id: string }>();
     <template v-if="id === 'account'">
       <AccountSection />
       <DevicesSection />
-      <AuthSection />
     </template>
     <AutoSyncSection v-else-if="id === 'sync'" />
     <ArchiveSection v-else-if="id === 'archive'" />

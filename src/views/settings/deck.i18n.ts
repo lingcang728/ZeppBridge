@@ -45,14 +45,10 @@ export const deckMessages = defineMessages(
     secLocalData: '本机数据',
     secFeedback: '反馈问题',
 
-    cloudSourceSub: '账号的数据来源',
     firstSyncing: (current: number, total: number) => `连接成功 · 正在取最近记录 ${current}/${total}`,
     firstSyncingPlain: "连接成功 · 正在取最近记录",
     firstReady: "第一批数据到了：去概览看看这一周",
     goOverview: "去概览看看",
-    deviceFirmware: (firmware: string) => `固件 ${firmware}`,
-    deviceLatest: (time: string) => `最近数据 ${time}`,
-    deviceId: (id: string) => `ID ${id}`,
     deviceOpen: '查看或换型号',
 
 
@@ -109,14 +105,10 @@ export const deckMessages = defineMessages(
     secLocalData: 'Data on this machine',
     secFeedback: 'Report a problem',
 
-    cloudSourceSub: 'Where this account’s data comes from',
     firstSyncing: (current: number, total: number) => `Connected · fetching recent records ${current}/${total}`,
     firstSyncingPlain: "Connected · fetching recent records",
     firstReady: "Your first data is in: see this week on the overview",
     goOverview: "Go to overview",
-    deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-    deviceLatest: (time: string) => `Latest data ${time}`,
-    deviceId: (id: string) => `ID ${id}`,
     deviceOpen: 'View or change model',
 
 
@@ -173,14 +165,10 @@ export const deckMessages = defineMessages(
     secLocalData: 'Tus datos en este equipo',
     secFeedback: 'Informar de un problema',
 
-    cloudSourceSub: 'De dónde vienen los datos de esta cuenta',
     firstSyncing: (current: number, total: number) => `Conectado · trayendo los registros recientes ${current}/${total}`,
     firstSyncingPlain: "Conectado · trayendo los registros recientes",
     firstReady: "Ya llegaron tus primeros datos: mira esta semana en el resumen",
     goOverview: "Ir al resumen",
-    deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-    deviceLatest: (time: string) => `Últimos datos ${time}`,
-    deviceId: (id: string) => `ID ${id}`,
     deviceOpen: 'Ver o cambiar el modelo',
 
 

@@ -88,10 +88,7 @@ export default {
       officialDisconnected: 'Авторизация Zepp отключена. Локальные данные сохранены.',
       officialFailed: 'Авторизация Zepp не завершена',
       officialNote: 'Официальные данные подключены: сон, пульс, шаги, тренировки, PAI и вес синхронизируются; ВСР, кислород в крови и стресс поступают из «Расширенных данных».',
-      officialAccountLine: (id: string, since: string) => `Авторизация Zepp · ${id} · с ${since}`,
-      officialAccountEmpty: 'Авторизация через аккаунт Zepp ещё не выполнена',
       officialNotConnected: 'Не авторизовано',
-      cloudAdvancedTitle: 'Zepp Cloud · «Расширенные данные»',
       copyAuthLink: 'Скопировать ссылку авторизации',
       copyAuthLinkHint: 'Если в браузере уже выполнен вход в Zepp, сразу откроется подтверждение. Чтобы сменить аккаунт (например, войти через Google или Xiaomi), откройте ссылку в приватном окне.',
       linkCopied: 'Ссылка скопирована',
@@ -110,7 +107,6 @@ export default {
       manualSave: 'Сохранить учётные данные',
       cancel: 'Отмена',
 
-      accountLine: (region: string, lastSync: string) => `Регион ${region} · последняя синхронизация ${lastSync}`,
       verifyAndSync: 'Проверить и синхронизировать',
       reauthenticate: 'Войти снова',
 
@@ -296,8 +292,6 @@ export default {
       openDataFolder: 'Открыть папку данных',
       clearAuth: 'Удалить учётные данные',
       logout: 'Выйти из аккаунта',
-      logoutHint: 'Выход только из аккаунта; вся локально синхронизированная история остаётся. После нового входа синхронизация продолжится.',
-      logoutNoMultiAccount: "Одна локальная база — один аккаунт: вход под другим аккаунтом отклоняется, ничего не смешивается. Чтобы сменить аккаунт, закройте приложение и сначала перенесите папку data.",
       healthCheckLabel: 'Состояние данных',
       healthCheckNote:
         'Этапы каждого потока: получение из облака, разбор и запись, даты покрытия и источник. Обычно сюда заходить не нужно; проверьте, если результат синхронизации отличается от ожидаемого.',
@@ -371,9 +365,7 @@ export default {
       connVerifying: 'Проверка',
       connWaiting: 'Ожидание входа',
       connFailed: 'Вход не удался',
-      unidentified: 'Не определено',
       unidentifiedInitial: 'Н',
-      notProvided: 'Нет данных',
       noRecords: 'Записей пока нет',
       timeUnknown: 'Время неизвестно',
 
@@ -2933,14 +2925,10 @@ export default {
       secLocalData: 'Данные на компьютере',
       secFeedback: 'Обратная связь',
 
-      cloudSourceSub: 'Источник данных подключённого аккаунта',
       firstSyncing: (current: number, total: number) => `Подключено · загружаем последние записи ${current}/${total}`,
       firstSyncingPlain: "Подключено · загружаем последние записи",
       firstReady: "Первые данные уже здесь: посмотрите эту неделю в обзоре",
       goOverview: "Перейти к обзору",
-      deviceFirmware: (firmware: string) => `Прошивка ${firmware}`,
-      deviceLatest: (time: string) => `Последние данные: ${time}`,
-      deviceId: (id: string) => `ID ${id}`,
       deviceOpen: 'Посмотреть или изменить модель',
 
 

@@ -1184,8 +1184,6 @@ export default {
       nothingToInstall: 'Geen update om te installeren — controleer opnieuw.',
     },
     'views/Settings': {
-      accountLine: (region: string, lastSync: string) =>
-        `Regio ${region} · laatste sync ${lastSync}`,
       apiAuthNoteA: 'Elk verzoek moet ',
       apiAuthNoteB:
         ' meedragen, anders krijgt het een 401. Opnieuw genereren maakt het oude token direct ongeldig.',
@@ -1241,10 +1239,7 @@ export default {
       officialDisconnected: 'Autorisatie ontkoppeld — je lokale gegevens zijn er nog.',
       officialFailed: 'De Zepp-autorisatie is niet voltooid',
       officialNote: 'Officiële gegevens zijn aangesloten: slaap, hartslag, stappen, trainingen, PAI en gewicht worden gesynchroniseerd; HRV, bloedzuurstof, stress en gereedheid komen via ‘Geavanceerde gegevens’.',
-      officialAccountLine: (id: string, since: string) => `Zepp-autorisatie · ${id} · sinds ${since}`,
-      officialAccountEmpty: 'Nog niet geautoriseerd met een Zepp-account',
       officialNotConnected: 'Niet geautoriseerd',
-      cloudAdvancedTitle: 'Zepp Cloud · geavanceerde gegevens',
       copyAuthLink: 'Autorisatielink kopiëren',
       copyAuthLinkHint: 'Is je browser al bij Zepp ingelogd, dan spring je meteen naar ‘Autorisatie toestaan’. Wil je van account wisselen (bijv. via Google of Xiaomi), plak de link dan in een privévenster.',
       linkCopied: 'Link gekopieerd',
@@ -1342,9 +1337,6 @@ export default {
       loginIncomplete: 'Inloggen is niet afgerond',
       loginWindowFailed: 'Het inlogvenster kon niet worden geopend',
       logout: 'Uitloggen',
-      logoutHint:
-        'Logt alleen uit bij het account — alles wat al naar deze machine is gesynchroniseerd blijft, en na opnieuw inloggen gaat synchroniseren verder.',
-      logoutNoMultiAccount: "Eén lokale database hoort bij één account: inloggen met een ander account wordt geweigerd, er raakt niets vermengd. Wil je wisselen, sluit dan de app en verplaats eerst de map data.",
       manualAuthDone: 'Handmatig inloggen gelukt; de inloggegevens zijn opgeslagen.',
       manualAuthFailed: 'Handmatig inloggen mislukt',
       manualFormHint:
@@ -1395,7 +1387,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
         'Nog geen fysiek apparaat herkend; Zepp-cloud synchroniseert nog steeds als cloudbron.',
       noRecords: 'Nog geen gegevens',
       noSyncDiagnostics: 'Nog geen synchronisatiediagnostiek.',
-      notProvided: 'Niet verstrekt',
       nothingToCompact:
         'Niets om te comprimeren — de opgeslagen payloads zijn al gecomprimeerd.',
       openDataFolder: 'De gegevensmap openen',
@@ -1529,7 +1520,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       syncing: 'Synchroniseren…',
       timeUnknown: 'Tijd onbekend',
       title: 'Instellingen',
-      unidentified: 'Niet herkend',
       unidentifiedInitial: 'N',
       unitDays: 'dagen',
       unitRecords: 'vermeldingen',
@@ -2566,14 +2556,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       secLoginSub: 'Alleen openen als je op een andere manier wilt inloggen',
       secMcp: 'MCP-tools',
       secFeedback: 'Een probleem melden',
-      cloudSourceSub: 'Waar de gegevens van dit account vandaan komen',
       firstSyncing: (current: number, total: number) => `Verbonden · recente registraties ophalen ${current}/${total}`,
       firstSyncingPlain: "Verbonden · recente registraties ophalen",
       firstReady: "Je eerste gegevens zijn binnen: bekijk deze week in het overzicht",
       goOverview: "Naar het overzicht",
-      deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-      deviceLatest: (time: string) => `Laatste gegevens ${time}`,
-      deviceId: (id: string) => `ID ${id}`,
       deviceOpen: 'Model bekijken of wijzigen',
       autoSyncToggle: 'Automatisch synchroniseren',
       exportFormatSub:
