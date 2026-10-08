@@ -201,3 +201,13 @@ h1, h2, p { margin-top: 0; }
 @media (max-width: 760px) {
   .page { padding: 18px 16px 38px; }
 }
+
+/* 全局玻璃提示（lib/glassTip.ts，10-08 H1）：替代浏览器原生 title 的白底小方框。停 450ms 才出、离开立刻收；
+   只动 opacity / translate。浮层是真毛玻璃（材质三层的第三层）。 */
+.glass-tip { position: fixed; z-index: 9000; max-width: min(320px, calc(100vw - 16px)); padding: 6px 11px; border: 1px solid var(--mat-glass-line); border-radius: 10px;
+  background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
+  color: var(--ink); font-size: var(--fs-2xs); font-weight: 600; line-height: 1.4; pointer-events: none; white-space: normal;
+  opacity: 0; translate: 0 4px; transition: opacity 140ms ease, translate 180ms cubic-bezier(.2, .8, .2, 1); }
+.glass-tip.below { translate: 0 -4px; }
+.glass-tip.shown { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) { .glass-tip { transition: opacity 120ms ease; translate: none; } }

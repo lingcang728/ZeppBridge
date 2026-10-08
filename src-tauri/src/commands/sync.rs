@@ -43,7 +43,7 @@ pub async fn start_initial_sync(
                 .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
         }
     };
-    run_sync(&app, &state, SyncWindow::History(days)).await
+    run_sync(&app, &state, SyncWindow::History(days), false).await
 }
 
 #[tauri::command]
@@ -60,10 +60,14 @@ pub async fn start_history_sync(
 /// `quick`：静默的定时同步。只重拉最近几天，整窗刷新到期时照旧整窗
 /// （见 `SyncManager::quick_sync_report_with_progress`）。用户点的、启动时的
 /// 同步不带它，永远整窗。
+///
+/// `skip_probe`：不先探云端新不新（1E）。「云端还没有新数据」提示里的「再试」带它——
+/// 用户刚在手机上下拉过，就是要真同步一次，不能再被探针挡回去。
 pub async fn start_incremental_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     quick: Option<bool>,
+    skip_probe: Option<bool>,
 ) -> std::result::Result<UiSyncReport, AppError> {
     if state.auth_state.read().await.as_str() != "verified" && !official_connected(&state.data_dir)
     {
@@ -77,7 +81,7 @@ pub async fn start_incremental_sync(
     } else {
         SyncWindow::Incremental
     };
-    run_sync(&app, &state, window).await
+    run_sync(&app, &state, window, !skip_probe.unwrap_or(false)).await
 }
 
 /// 一次同步往回拉多远。
@@ -290,6 +294,7 @@ async fn run_sync(
     app: &AppHandle,
     state: &AppState,
     window: SyncWindow,
+    probe: bool,
 ) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
     // Re-read after the lock: save/clear may have swapped the manager while
@@ -329,7 +334,10 @@ async fn run_sync(
     // 同步前先探云端新不新（1E）：手机还没把手表的新数据传上去时，不跑整套流（十几到几十秒），
     // 直接告诉用户去手机上下拉一下。只在快 / 增量同步时探；探不出结论照常同步。
     // 「不新」时不写库，也不记这一轮的云端同步时间——什么都没拉。
-    if let Some(since) = probe_window(&window, &before, full_refresh_due) {
+    if let Some(since) = probe
+        .then(|| probe_window(&window, &before, full_refresh_due))
+        .flatten()
+    {
         let probe = match &manager {
             Some(manager) => manager.probe_cloud(since).await,
             None => official_probe(state, since).await,

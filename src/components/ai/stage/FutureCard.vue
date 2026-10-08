@@ -9,7 +9,7 @@
  * 朝外的那一面后面错开垫着「另一张」：问题 / 回执时垫着计划牌，计划朝外时垫着问题牌。
  * 点垫着的那张 = 翻面换过来（2D 压扁换面，flipCard）。
  */
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import SegmentTrack from '../../SegmentTrack.vue';
 import Icon from '../../Icon.vue';
 import ReceiptFace from './ReceiptFace.vue';
@@ -54,6 +54,7 @@ const intents = computed(() => [
   { value: 'next' as Intent, label: s.value.nextShort, title: t.value.nextIntentHint },
 ]);
 const intent = computed<Intent>(() => (Object.entries(TEMPLATE_OF).find(([, v]) => v.id === ctl.draft.value.template_id)?.[0] as Intent | undefined) ?? 'free');
+const questionsOf = (text: typeof t.value) => ({ sleep: text.sleepQuestion, week: text.weekQuestion, workout: text.workoutQuestion, next: text.nextQuestion });
 const pick = async (next: Intent) => {
   if (props.disabled || next === intent.value) return;
   if (next === 'free') {
@@ -62,13 +63,49 @@ const pick = async (next: Intent) => {
     const spec = TEMPLATE_OF[next];
     ctl.setTemplate(props.templates.find((p) => p.id === spec.id) ?? null);
     ctl.setWindowDays(spec.days - 1);
-    ctl.setPrompt({ sleep: t.value.sleepQuestion, week: t.value.weekQuestion, workout: t.value.workoutQuestion, next: t.value.nextQuestion }[next]);
+    ctl.setPrompt(questionsOf(t.value)[next]);
     if (next === 'workout') emit('workout');
   }
   if (props.face !== 'question') await turn('question');
   await nextTick();
   input.value?.focus();
 };
+
+/**
+ * 换语言（10-08 H17）：牌上的问题是点模板时填进去的那一句，换成西语以后还是中文。
+ * 现在问题还是模板原句（用户没改过）时，跟着换成新语言的同一句；改过的不动。
+ */
+watch(t, (now, before) => {
+  if (!before || now === before) return;
+  const prompt = ctl.draft.value.prompt.trim();
+  const was = questionsOf(before);
+  const key = (Object.keys(was) as Array<keyof typeof was>).find((k) => was[k].trim() === prompt);
+  if (key && questionsOf(now)[key] !== ctl.draft.value.prompt) ctl.setPrompt(questionsOf(now)[key]);
+});
+
+/* 快捷问题永远一行（10-08 H15，用户：排两行拖起来极难）：放不下就在牌里横向滑，两头渐隐。 */
+const strip = ref<HTMLElement | null>(null);
+const overflowing = ref(false);
+let stripObserver: ResizeObserver | null = null;
+const measureStrip = () => {
+  const el = strip.value;
+  overflowing.value = !!el && el.scrollWidth > el.clientWidth + 1;
+};
+onMounted(() => {
+  stripObserver = new ResizeObserver(measureStrip);
+  if (strip.value) {
+    stripObserver.observe(strip.value);
+    const inner = strip.value.firstElementChild;
+    if (inner) stripObserver.observe(inner);
+  }
+});
+onBeforeUnmount(() => stripObserver?.disconnect());
+/** 选中的那一项滑进看得见的地方。 */
+watch(intent, async () => {
+  await nextTick();
+  const el = strip.value?.querySelector<HTMLElement>('.segment-item[aria-checked="true"], .segment-item.is-active');
+  el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+});
 
 /* ---------- 翻面 ---------- */
 const back = computed<FutureFace | null>(() => (props.face === 'plan' ? 'question' : props.rows.length || props.mcp ? 'plan' : null));
@@ -93,8 +130,8 @@ defineExpose({ front, turn });
             <span>{{ t.composer }}</span>
             <textarea ref="input" :value="ctl.draft.value.prompt" :placeholder="t.placeholder" :disabled="disabled" @input="ctl.setPrompt(($event.target as HTMLTextAreaElement).value)"></textarea>
           </label>
-          <div class="templates">
-            <SegmentTrack compact :items="intents" :model-value="intent" :disabled="disabled" :aria-label="t.composer" @update:model-value="pick" />
+          <div ref="strip" :class="['templates', { overflowing }]">
+            <SegmentTrack compact no-wrap :items="intents" :model-value="intent" :disabled="disabled" :aria-label="t.composer" @update:model-value="pick" />
           </div>
           <ul v-if="blocked.length" class="issues" role="alert">
             <li v-for="(issue, i) in blocked" :key="i"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
@@ -112,9 +149,12 @@ defineExpose({ front, turn });
 <style scoped>
 .future { position: absolute; }
 .stack { position: relative; height: var(--card-h); }
-/* 模板：问题牌底边一条玻璃分段，长语言在牌里自己折行。 */
-.templates { display: flex; min-width: 0; padding-top: 12px; border-top: 1px solid var(--mat-line); }
-.templates :deep(.segment-track) { max-width: 100%; }
+/* 模板：问题牌底边一条玻璃分段，永远一行；放不下就横向滑（滚动条藏起来，两头渐隐），上下留出透镜浮起的余量。 */
+.templates { display: flex; min-width: 0; margin: 0 -6px; padding: 10px 6px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain;
+  border-top: 1px solid var(--mat-line); }
+.templates::-webkit-scrollbar { display: none; }
+.templates.overflowing { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); }
+.templates :deep(.segment-track) { flex: 0 0 auto; }
 .fcard { position: absolute; inset: 0; border-radius: 24px; background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); border: 1px solid var(--mat-line); color: var(--ink); }
 .front { display: grid; padding: 18px 18px 16px; overflow: hidden; }
 /* 垫着的那张：往右上错开、歪一点，只露出上沿写着名字的那一条。 */

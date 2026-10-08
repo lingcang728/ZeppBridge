@@ -4,10 +4,11 @@
  * 日牌能叠、周 / 月叠只能拖进箱子；长按一叠最上面那张 = 整叠进箱子；叠里的牌进了箱子就从叠里拿掉；
  * 结构要变（推镜头、退层、换范围、收牌）之前 `scatter()` 让叠全部散掉、不放动画。
  */
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useCardDrag } from './useCardDrag';
 import type { useCardPicking } from './useCardPicking';
 import { cardIdOf, pickableDates, type DeckDay, type DeckLevel } from '../lib/cards/deck';
+import { reducedMotion } from '../lib/motion/cards';
 
 export const useCardTableDrag = (options: {
   /** 最上面这一层。 */
@@ -52,18 +53,40 @@ export const useCardTableDrag = (options: {
     const days = (pile?.cards ?? [id]).map(dayOf).filter((day): day is DeckDay => !!day);
     void picking.sendDays(days, el);
   };
+  /** 这张牌在一叠里：那一叠最上面那张的 id。 */
+  const pileTop = (id: string) => { const pile = drag.pileOf(id); return pile ? pile.cards[pile.cards.length - 1]! : null; };
+  /**
+   * 叠在一起的牌只认长按（10-08 H9）：以前点最上面那张会翻面，点到露出来的下面几张的边（pointer-events: none）
+   * 会穿到桌面上、当成「点空白收牌」——用户看到的是「点一下不知道触发了什么就直接退回去了」。
+   * 现在按住叠里任何一张都是长按整叠；点一下只让那一叠晃一下、角标换成「长按整叠」。
+   */
+  const hintId = ref<string | null>(null);
+  let hintTimer = 0;
+  const nudge = (top: string) => {
+    const el = options.cardOf(top);
+    if (el && !reducedMotion()) {
+      el.animate([{ transform: 'none' }, { transform: 'translateX(-5px) rotate(-1.5deg)' }, { transform: 'translateX(4px) rotate(1deg)' }, { transform: 'translateX(-2px)' }, { transform: 'none' }],
+        { duration: 360, easing: 'ease-in-out' });
+    }
+    hintId.value = top;
+    window.clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(() => { hintId.value = null; }, 1800);
+  };
   const onDayDown = (event: PointerEvent, day: DeckDay) => {
     const id = cardIdOf(day);
     drag.down(event, id);
-    if (drag.isPileTop(id)) picking.holdStart({ id }, event, (el) => sendPile(id, el));
+    const top = pileTop(id);
+    if (top) picking.holdStart({ id: top }, event, () => { const el = options.cardOf(top); if (el) sendPile(top, el); });
   };
   const onDayMove = (event: PointerEvent) => { drag.move(event); picking.holdMove(event); };
   const onDayUp = (event: PointerEvent) => { drag.up(event); picking.holdEnd(); };
   const onDayCancel = (event: PointerEvent) => { drag.cancelEvent(event); picking.holdEnd(); };
   const onDayTap = (day: DeckDay, event: MouseEvent) => {
     if (drag.consumeClick() || picking.consumeHold()) return;
+    const top = pileTop(cardIdOf(day));
+    if (top) { nudge(top); return; }
     void picking.onDayClick(day, event);
   };
 
-  return { drag, scatter, onDayDown, onDayMove, onDayUp, onDayCancel, onDayTap };
+  return { drag, scatter, hintId, onDayDown, onDayMove, onDayUp, onDayCancel, onDayTap };
 };

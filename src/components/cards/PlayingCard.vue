@@ -55,9 +55,11 @@ const fit = computed(() => ({ '--fit': String(Math.max(faceFit(parts.value), par
       <b>{{ title }}</b>
     </span>
     <span v-else-if="state === 'confirm'" class="pcard-face back">
-      <span class="back-mark"><Icon name="check" :size="30" /></span>
-      <strong>{{ t.picked }}</strong>
-      <small class="back-title">{{ title }}</small>
+      <span class="back-send">
+        <span class="back-mark"><Icon name="check" :size="30" /></span>
+        <strong>{{ t.picked }}</strong>
+        <small class="back-title">{{ title }}</small>
+      </span>
       <span class="back-cancel">{{ t.putBack }}</span>
     </span>
     <span v-else class="pcard-face">

@@ -8,7 +8,7 @@
  * - 补位：删之前记下每张牌的位置 / 角度 / 宽度，删之后用 FLIP 弹簧挪到新位置，不再瞬移。
  * 只动 translate / rotate / scale / transform / opacity（模糊只在动的那一张上、两档静态值）。
  */
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 import { reducedMotion, settled, SPRINGS, springCurve } from '../lib/motion/cards';
 
 /** 往上甩：松手前 90ms 的竖直速度（px/ms，负 = 往上）。 */
@@ -59,22 +59,26 @@ export const useHandGestures = (options: {
     }
   };
 
-  /** 往上甩出屏幕（带速度就接着这个速度飞，离屏才算完），然后删掉、补位。 */
+  /**
+   * 往上甩出屏幕（带速度就接着这个速度飞，离屏才算完），然后删掉、补位。
+   * 10-08 H7：放慢、更从容——以前 260–520ms、转 14–30°，像被弹飞；现在 560–900ms、先顺着手的速度出去再慢慢滑走
+   * （减速曲线），只转 6–14°，飞到七成才开始淡。
+   */
   const fling = async (els: HTMLElement[], ids: string[], velocity = { x: 0, y: -1.2 }, from = { x: 0, y: 0, tilt: 0 }) => {
     if (!reducedMotion()) {
       const vy = Math.min(-0.9, velocity.y);
       const flights = els.map((el, i) => {
         // 飞到牌的下沿越过屏幕上沿再多一点：真的「出去了」。
         const bottom = el.getBoundingClientRect().bottom;
-        const dist = Math.max(bottom + 40, -vy * 260);
-        const duration = Math.max(260, Math.min(520, dist / Math.max(1.4, -vy)));
-        const tx = from.x + velocity.x * duration * 0.6;
-        const spin = from.tilt + Math.sign(velocity.x || (i % 2 ? -1 : 1)) * (14 + Math.min(16, Math.abs(velocity.x) * 12));
+        const dist = Math.max(bottom + 60, -vy * 300);
+        const duration = Math.max(560, Math.min(900, (dist / Math.max(1.1, -vy)) * 1.7));
+        const tx = from.x + velocity.x * duration * 0.35;
+        const spin = from.tilt + Math.sign(velocity.x || (i % 2 ? -1 : 1)) * (6 + Math.min(8, Math.abs(velocity.x) * 6));
         return el.animate(
           [{ translate: `${from.x}px ${from.y}px`, rotate: `${from.tilt}deg`, opacity: 1 },
-            { opacity: 1, offset: 0.8 },
+            { opacity: 1, offset: 0.7 },
             { translate: `${tx.toFixed(1)}px ${(from.y - dist).toFixed(1)}px`, rotate: `${spin.toFixed(1)}deg`, opacity: 0 }],
-          { duration, delay: i * 24, easing: 'cubic-bezier(.2, .55, .35, 1)', fill: 'both' },
+          { duration, delay: i * 40, easing: 'cubic-bezier(.22, .7, .3, 1)', fill: 'both' },
         );
       });
       await settled(flights);
@@ -89,6 +93,9 @@ export const useHandGestures = (options: {
   } | null = null;
   /** 刚松手的那一下是不是拖（拖完浏览器还会补一个 click，别把它当成「点开」）。 */
   let dragged = false;
+  /** 正在拖的那张属于哪一组；`leaving` = 已经往上拖得够远，松手就拿出去（组标签据此亮起 / 变色，H12）。 */
+  const draggingKey = ref<string | null>(null);
+  const leaving = ref(false);
   const consumeDrag = (): boolean => { const was = dragged; dragged = false; return was; };
 
   const paint = () => {
@@ -103,6 +110,7 @@ export const useHandGestures = (options: {
     drag.tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, vx * 9));
     drag.el.style.translate = `${dx.toFixed(1)}px ${dy.toFixed(1)}px`;
     drag.el.style.rotate = `${drag.tilt.toFixed(2)}deg`;
+    leaving.value = dy < -90;
     const vy = b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;
     const speed = Math.hypot(vx, vy);
     const blur = BLUR_STEPS.find(([min]) => speed >= min)?.[1] ?? '';
@@ -126,6 +134,7 @@ export const useHandGestures = (options: {
       if (Math.hypot(drag.x - drag.x0, drag.y - drag.y0) < 6) return;
       drag.moved = true;
       drag.el.classList.add('dragging');
+      draggingKey.value = drag.el.dataset.key ?? null;
     }
     if (!drag.frame) drag.frame = requestAnimationFrame(paint);
     // 手停住了（不再有 pointermove）：90ms 后把运动模糊清掉。
@@ -141,6 +150,8 @@ export const useHandGestures = (options: {
     clearTimeout(d.idle);
     d.el.classList.remove('dragging');
     d.el.style.removeProperty('--motion-blur');
+    draggingKey.value = null;
+    leaving.value = false;
     if (!d.moved) { d.el.style.translate = ''; d.el.style.rotate = ''; return; }
     dragged = true;
     const dx = event.clientX - d.x0;
@@ -160,5 +171,5 @@ export const useHandGestures = (options: {
     d.el.animate([{ translate: `${dx}px ${dy}px`, rotate: `${d.tilt}deg` }, { translate: '0px 0px', rotate: '0deg' }], { duration, easing });
   };
 
-  return { dragStart, dragMove, dragEnd, fling, removeWithFlip, consumeDrag };
+  return { dragStart, dragMove, dragEnd, fling, removeWithFlip, consumeDrag, draggingKey, leaving };
 };

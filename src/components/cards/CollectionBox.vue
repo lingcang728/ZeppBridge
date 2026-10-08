@@ -5,7 +5,7 @@
  * - 箱子是一只**合盖的小丑盒**（侧面印数量），右下角悬浮。牌飞进来时盖子弹开接住、落进去再合上（fly.ts → box.ts）。
  *   空箱写「收集箱 · 空」，不画虚线框；有牌被拖着悬在箱子上方时亮起「松手放进来」（`dropHover`，拖拽在牌桌那边做）。
  *   牌桌开着时哪怕是空的也跟着牌桌一起从右下角滑进来；牌桌收起且箱子仍空就跟着滑出去。
- * - 铺开：盖子弹起 → 牌像弹簧一样从盒口蹦出来，再落到各自的位置（按项分组、一周一排、上下错开，见 lib/cards/hand.ts）
+ * - 铺开：盖子弹起 → 牌像弹簧一样从盒口蹦出来，再落到各自的位置（按项、按日期排成一条流下去，牌不互相压，见 lib/cards/hand.ts）
  *   → 盖子合上 → 分组标签、底部按钮最后浮上。收起反过来：按钮和标签先淡下去 → 盖子弹开 → 牌依次落回盒子 → 合上。
  *   中途再点箱子 / Esc = 从此刻原路收回或展开（打断接力 `relay`）。
  * - 某一项挑了一整月：折成一张月牌（点阵点亮挑了的日子），点开按周摊开。
@@ -107,15 +107,20 @@ const slideOut = async () => {
 watch(shouldShow, (show) => { void (show ? slideIn() : slideOut()); }, { immediate: true });
 
 /* ---------- 铺开 / 收回 ---------- */
-/** 铺开：新开时从盒口蹦出来（先往上弹一截、再落到位）；半路掉头时从此刻的样子落回位。 */
-const deal = (fresh: boolean) => {
+/**
+ * 铺开：新开时从盒口蹦出来（先往上弹一截、再落到位）；半路掉头时从此刻的样子落回位。
+ * `lead`：等盖子先弹开的那一小段。**动画在牌挂上来的同一帧就开始**（fill: backwards 让牌在等的时候停在盒口、看不见）——
+ * 10-08 录屏里铺开「先卡一下才出来」：以前先 `await wait(90)` 再发牌，这 90ms 里整副牌已经画在最终位置上，
+ * 然后才跳回盒口再飞出来。
+ */
+const deal = (fresh: boolean, lead = 0) => {
   const cards = handCards();
   if (reducedMotion()) return settled(cards.map((card) => card.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, fill: 'backwards' })));
   const { easing, duration } = springCurve(SPRINGS.deal);
   const n = cards.length;
   return settled(seq.track(cards.map((card, i) => {
     const end = { transform: restTransform(card), opacity: 1 };
-    const options: KeyframeAnimationOptions = { duration: duration + 120, delay: Math.min(i, 24) * 22, easing, fill: 'backwards' };
+    const options: KeyframeAnimationOptions = { duration: duration + 120, delay: lead + Math.min(i, 24) * 22, easing, fill: 'backwards' };
     const spin = ((i * 37) % 17) - 8;
     return fresh
       ? card.animate([{ transform: atBox(card, 0.22), opacity: 0 }, { opacity: 1, offset: 0.12 },
@@ -147,11 +152,10 @@ const show = async () => {
   viewport.value = { width: window.innerWidth, height: window.innerHeight };
   open.value = true;
   await nextTick();
+  const dealt = deal(fresh, fresh ? 90 : 0);
   void fadeBackdrop(1, 380);
   lidOpen(boxButton.value, 'wide');
-  if (fresh && !reducedMotion()) await wait(90);
-  if (!seq.live(id)) return;
-  await deal(fresh);
+  await dealt;
   if (!seq.live(id)) return;
   lidClose(boxButton.value);
   chromeIn.value = true;
@@ -282,8 +286,11 @@ onBeforeUnmount(() => { releaseEscape(); window.removeEventListener('resize', on
           </span>
           <button type="button" class="hand-remove" :aria-label="t.removeCard(month.label, monthName(month.month))" @click.stop="removeCard($event, month.id)"><Icon name="x" :size="12" /></button>
         </div>
-        <button v-for="label in layout.labels" :key="label.key" type="button" class="hand-label" :style="{ ...label.style, '--tint': label.tint }"
-          :aria-label="t.removeCard(label.text, '')" @click="removeGroup(label.key)"><i></i>{{ label.text }}<Icon name="x" :size="11" /></button>
+        <div class="hand-labels" :style="{ top: `${layout.labelTop}px` }">
+          <button v-for="label in layout.labels" :key="label.key" type="button"
+            :class="['hand-label', { active: gestures.draggingKey.value === label.key, leaving: gestures.draggingKey.value === label.key && gestures.leaving.value }]"
+            :style="{ '--tint': label.tint }" :aria-label="t.removeCard(label.text, '')" @click="removeGroup(label.key)"><i></i>{{ label.text }}<Icon name="x" :size="11" /></button>
+        </div>
       </div>
       <footer class="spread-foot">
         <CoachTip id="collection-box" :text="t.tipBox" />

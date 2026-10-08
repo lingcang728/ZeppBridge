@@ -7,11 +7,14 @@
 //! 现在正式同步前先发一个最轻的请求：**本地最新那条心率之后，云端还有没有心率**。心率是逐分钟的
 //! 连续流，手机每同步一次它一定往前走；没往前走，别的流也不会新（同一次手机同步一起上传）。
 //!
-//! - 旧通道：`/users/{id}/heartRate?startTime=<本地最新+1 秒>&limit=1`，有一条就是新的。这个接口按时间
-//!   升序翻页（见 `fetcher/pages.rs` 的游标），所以「从本地最新之后取一条」恰好回答这个问题。
+//! - 旧通道：本地最新心率那天到今天的 `band_data` 明细，看里面最新一条心率——和本地心率**同一个来源**。
+//!   10-08 以前读的是 `/users/{id}/heartRate`，可有的账号这个接口永远是空页，空页又被当成「不新」：
+//!   手机明明同步过，电脑上一直说「还没传到云端」。
 //! - 只连官方：官方心率只能按天取，取今天（本地时区）一天，看最大的时间戳。
 //!
-//! 探不出结论（超时、网络错、令牌问题、认不出的报文）一律当「不知道」，照常同步——探针只能省事，不能挡事。
+//! 「不新」必须有正面证据：云端给出了心率、而最新一条不晚于本地。一条心率都没给（空页、认不出的报文）
+//! 和超时、网络错、令牌问题一样，一律当「不知道」，照常同步——探针只能省事，不能挡事。
+//! 界面上的「再试」也不再探：用户刚在手机上下拉过，就是要真同步一次。
 //! 下面三种情况根本不探，直接同步：
 //! - 本地还没有心率（第一次同步）；
 //! - 本地最新心率已经是两天前：心率监测可能关了，这时「心率没往前走」不代表别的流也没新；
@@ -58,13 +61,15 @@ pub fn probe_since(
     Some(newest)
 }
 
-/// 云端最新的那一刻和本地比。云端没给出时刻（空页）就是「不新」。
+/// 云端最新的那一刻和本地比。云端一条心率都没给出时刻（空页）**不是**「不新」，是不知道：
+/// 有的账号某个接口永远是空页，把它当「不新」会让同步永远被挡住。
 pub fn conclude(since: DateTime<Utc>, cloud_newest: Option<DateTime<Utc>>) -> CloudProbe {
     match cloud_newest {
         Some(at) if at > since => CloudProbe::Newer,
-        _ => CloudProbe::Stale {
-            cloud_latest_at: since,
+        Some(at) => CloudProbe::Stale {
+            cloud_latest_at: at,
         },
+        None => CloudProbe::Unknown,
     }
 }
 
@@ -94,9 +99,9 @@ where
 }
 
 impl SyncManager {
-    /// 旧通道：本地最新心率之后云端还有没有心率。不拿写锁、不写库。
+    /// 旧通道：云端手环数据里最新一条心率比本地新不新。不拿写锁、不写库。
     pub async fn probe_cloud(&self, since: DateTime<Utc>) -> CloudProbe {
-        bounded(since, self.fetcher.heart_rate_after(since)).await
+        bounded(since, self.fetcher.newest_band_heart_rate(since)).await
     }
 }
 

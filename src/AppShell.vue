@@ -13,6 +13,7 @@ import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
+import { installGlassTips } from './lib/glassTip';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
@@ -149,6 +150,7 @@ const routeNotice = computed(() => route.query.notice === 'not-found');
 let disposeMotionInterrupt: (() => void) | null = null;
 /* 指针移到页面里的链接上就先把那一页的代码块取回来：点下去时形变不用等 import()。 */
 let disposePrefetch: (() => void) | null = null;
+let disposeTips: (() => void) | null = null;
 
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
@@ -195,6 +197,7 @@ onMounted(() => {
   document.addEventListener('keydown', onDocumentKeydown);
   disposeMotionInterrupt = installMotionInterrupt();
   disposePrefetch = installPrefetch(router);
+  disposeTips = installGlassTips();
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
       const query = { ...route.query };
@@ -224,6 +227,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
   disposeMotionInterrupt?.();
   disposePrefetch?.();
+  disposeTips?.();
   pageMorph.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在

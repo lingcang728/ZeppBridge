@@ -147,17 +147,21 @@ export const useCardPicking = (options: {
       const target = (event.target as Element | null);
       await options.settle();
       if (options.busy.value) return;
-      handleDay(day, el, id, target);
+      handleDay(day, el, id, target, event.detail === 0);
       return;
     }
-    handleDay(day, el, id, event.target as Element | null);
+    handleDay(day, el, id, event.target as Element | null, event.detail === 0);
   };
-  const handleDay = (day: DeckDay, el: HTMLElement, id: string, target: Element | null) => {
+  /**
+   * 背面（10-08 H10）：只有上半块「✓ 交给 AI」是放进箱子，其余地方（下面那枚「放回」、牌边）都是放回。
+   * 以前反过来——只有那枚小小的「放回」字是放回，差一点点就点成了「放进箱子」。键盘（Enter / 空格）照旧是放进去。
+   */
+  const handleDay = (day: DeckDay, el: HTMLElement, id: string, target: Element | null, keyboard = false) => {
     const state = stateOf(id);
     if (state === 'boxed') { void takeBack(day, el); return; }
     if (state === 'confirm') {
-      if (target?.closest('.back-cancel')) void cancelConfirm();
-      else void sendDay(day, el);
+      if (keyboard || target?.closest('.back-send')) void sendDay(day, el);
+      else void cancelConfirm();
       return;
     }
     if (confirmId.value) void cancelConfirm();

@@ -55,7 +55,7 @@
   font-size: var(--fs-2xs); font-style: normal; font-weight: 750; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .6); }
 /* 背面：翻过来等确认——牌抬起来、阴影加深；点大圆勾放进收集箱，点「放回」翻回去。 */
 .pcard.confirm .pcard-face { transform: translateY(-14px) scale(1.06); }
-.pcard-face.back { grid-template-rows: auto auto auto auto; place-items: center; align-content: center; gap: calc(var(--w) * .045); text-align: center;
+.pcard-face.back { grid-template-rows: minmax(0, 1fr) auto; place-items: center; gap: calc(var(--w) * .04); padding-bottom: calc(var(--w) * .08); text-align: center;
   background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)), var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 40px 56px -26px color-mix(in srgb, var(--accent) 45%, rgba(0, 0, 0, .85));
   color: var(--accent); }
@@ -64,8 +64,11 @@
 .pcard.confirm:hover .back-mark { transform: scale(1.06); }
 .pcard-face.back strong { font-size: max(13px, calc(var(--w) * .1)); }
 .back-title { color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-variant-numeric: tabular-nums; }
-.back-cancel { padding: 3px 10px; border-radius: 999px; color: var(--muted); font-size: max(10px, calc(var(--w) * .07)); }
-.back-cancel:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+/* 上半块（大圆勾 + 交给 AI）= 放进箱子；下面「放回」是一枚看得出能点的胶囊，牌边别处也都算放回（H10）。 */
+.back-send { display: grid; place-items: center; align-content: center; gap: calc(var(--w) * .045); width: 100%; height: 100%; }
+.back-cancel { padding: calc(var(--w) * .03) calc(var(--w) * .1); border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink);
+  font-size: max(11px, calc(var(--w) * .078)); font-weight: 650; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); transition: background 140ms ease; }
+.back-cancel:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); }
 /* 已在收集箱里：牌位只剩一圈虚线轮廓；点它把牌从箱子里拿回来。 */
 .pcard-face.outline { grid-template-rows: auto auto auto; place-items: center; align-content: center; gap: calc(var(--w) * .04); text-align: center;
   background: color-mix(in srgb, var(--ink) 3%, transparent); box-shadow: none; outline: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -1.5px;

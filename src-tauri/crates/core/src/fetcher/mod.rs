@@ -205,21 +205,25 @@ impl DataFetcher {
         conclude_slices(records, last_error, "心率窗口没有可识别记录")
     }
 
-    /// 同步前探云端（`sync/probe.rs`）：`since` 之后云端最早的那一条心率是什么时刻；一条都没有是 `None`。
+    /// 同步前探云端（`sync/probe.rs`）：`since` 所在那天到今天，云端手环数据里最新一条心率的时刻；
+    /// 一条心率都没有是 `None`（探针据此当「不知道」，照常同步）。
     ///
-    /// 只要一条（`limit=1`）：接口按时间升序翻页，有没有比本地新的，一条就够回答。不落库、不留报文。
-    pub async fn heart_rate_after(&self, since: DateTime<Utc>) -> Result<Option<DateTime<Utc>>> {
-        let start = since.timestamp() + 1;
-        let end = Utc::now().timestamp();
-        if end <= start {
-            return Ok(None);
-        }
-        let payload = self
-            .connector
-            .fetch_heart_rate_with_options(start, end, 1, 2)
-            .await?;
-        let items = heart_rate_items(&payload);
-        Ok(heart_rate_cursor(&items).and_then(|next| DateTime::from_timestamp(next - 1, 0)))
+    /// 读的是 `band_data` 明细，**和本地心率同一个来源**（`sleep` 流的 `band_data:detail`）。
+    /// 以前读 `/users/{id}/heartRate`：有的账号这个接口永远是空页（`heart_rate` 流是 unavailable），
+    /// 空页又被当成「云端不新」，于是手机明明同步过了，电脑上一直提示「还没传到云端」（10-08 用户实测）。
+    /// 不落库、不留报文。
+    pub async fn newest_band_heart_rate(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>> {
+        let window = FetchWindow::between(since - Duration::minutes(1), Utc::now())?;
+        let record = self.fetch_sleep_record(window).await?;
+        let band = crate::normalizer::Normalizer::normalize_band_data(&record.raw.payload)?;
+        Ok(band
+            .heart_rate_samples
+            .iter()
+            .map(|sample| sample.timestamp)
+            .max())
     }
 
     pub async fn fetch_sport_detail_record(

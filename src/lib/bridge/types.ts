@@ -332,7 +332,8 @@ export interface BridgeBackend {
 
   startHistorySync(days: number): Promise<SyncReport>;
   /** `quick`：静默的定时同步，只拉最近几天（整窗刷新到期时照旧整窗）。 */
-  startIncrementalSync(quick?: boolean): Promise<SyncReport>;
+  /** `skipProbe`：不先探云端新不新（「云端还没有新数据」提示里的「再试」）。 */
+  startIncrementalSync(quick?: boolean, skipProbe?: boolean): Promise<SyncReport>;
   cancelSync(): Promise<void>;
   probeDataCapabilities(): Promise<CapabilityProbe[]>;
   getCapabilityOverview(): Promise<CapabilityOverview>;

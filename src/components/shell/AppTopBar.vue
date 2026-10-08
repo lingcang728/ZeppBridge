@@ -461,7 +461,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
           <p>{{ cloudStaleText }}</p>
           <div class="stale-actions">
             <button type="button" class="pill-button quiet" @click="dismissCloudStale()">{{ syncCopy.cloudStaleDismiss }}</button>
-            <button type="button" class="pill-button" @click="runSync('incremental')">{{ syncCopy.cloudStaleRetry }}</button>
+            <button type="button" class="pill-button" @click="runSync('incremental', undefined, { skipProbe: true })">{{ syncCopy.cloudStaleRetry }}</button>
           </div>
         </div>
       </Transition>

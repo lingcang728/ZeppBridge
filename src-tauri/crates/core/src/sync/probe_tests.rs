@@ -33,14 +33,22 @@ fn only_a_strictly_newer_cloud_sample_counts_as_new() {
         conclude(since, Some(at("2026-10-07T08:13:00Z"))),
         CloudProbe::Newer
     );
-    for cloud in [None, Some(since), Some(at("2026-10-07T07:00:00Z"))] {
+    for cloud in [since, at("2026-10-07T07:00:00Z")] {
         assert_eq!(
-            conclude(since, cloud),
+            conclude(since, Some(cloud)),
             CloudProbe::Stale {
-                cloud_latest_at: since
+                cloud_latest_at: cloud
             }
         );
     }
+}
+
+/// 10-08 用户实测：`/heartRate` 在他的账号上永远是空页，空页被当成「不新」，手机同步过也一直被挡。
+/// 云端一条心率都没给，只能说明这个来源答不了，不能挡住同步。
+#[test]
+fn an_empty_cloud_answer_never_blocks_the_sync() {
+    let since = at("2026-10-07T08:41:00Z");
+    assert_eq!(conclude(since, None), CloudProbe::Unknown);
 }
 
 #[tokio::test]

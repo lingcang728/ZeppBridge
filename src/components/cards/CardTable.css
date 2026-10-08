@@ -40,7 +40,7 @@
 /* 拖着的牌（1B·B3）：抬起一点、投影加深；叠在下面的牌不接点击；悬在能叠的牌上时那张亮一圈。 */
 :deep(.pcard.dragging) { cursor: grabbing; scale: 1.05; will-change: translate; }
 :deep(.pcard.dragging .pcard-face) { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 44px 56px -24px rgba(0, 0, 0, .95); }
-:deep(.pcard.buried) { pointer-events: none; }
+:deep(.pcard.buried) { cursor: default; }
 :deep(.pcard.drop-target .pcard-face) { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--tint), 0 0 26px 2px color-mix(in srgb, var(--tint) 45%, transparent); }
 .table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
 .table-foot { min-height: 0; }

@@ -16,6 +16,11 @@
  * 开之前先等画面跟得上（`whenFramesSteady`）：弹窗多半是懒加载的，挂上那一帧 GPU 正忙，动画
  * 已经在放的话第一段会被吞掉。等的这一小会儿面板和遮罩都是隐身的（`is-entering`）。
  *
+ * 10-08 H3（「添加事件、个人档案这种小点击，全都会卡一下，或者先闪一下东西再出来」）：
+ * - 等画面跟得上的那一小会儿，面板自己的阴影还画在**最终位置**上——淡淡的一个大框先闪出来，然后面板才从按钮里长出来。
+ *   阴影挪到 `.dialog-glass` 上跟着淡入；面板在等的时候就先摆在起点（按钮那里），动画接手时不跳。
+ * - 遮罩（变暗 + 模糊）不再等：点下去那一帧就开始淡入，手上立刻有回应；只有面板等画面跟得上（最多 160ms）。
+ *
  * 开到一半按 Esc：从此刻的样子原路收回，不先跳到「开好」再收（读计算样式接着放）。开的这段时间
  * 向全局打断登记一个 Esc 处理（onMotionEscape）：不然全局 Esc 会把开的动画快进到底并吞掉这次按键，
  * 用户得再按一次才关得掉。
@@ -83,17 +88,20 @@ const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   backdrop.classList.add('is-entering');
   pending.add(backdrop);
   if (onEscape) escapes.set(backdrop, onMotionEscape(() => { forgetEscape(backdrop); onEscape(); return true; }));
-  await whenFramesSteady(220);
-  if (!pending.has(backdrop) || !backdrop.isConnected) return;
-  pending.delete(backdrop);
   const fill = 'backwards' as const;
+  // 遮罩点下去就开始淡入（不等）；面板先摆在起点等着。
   backdrop.animate([{ opacity: NEARLY_HIDDEN }, { opacity: 1 }], { duration: VEIL_IN_MS, easing: 'ease-out', fill, pseudoElement: '::before' });
+  const final = panel.getBoundingClientRect();
+  const start = (rect: DOMRect | null) => (rect ? flightTransform(rect, final) : 'scale(.96)');
+  panel.style.transform = start(currentRect(origin));
+  await whenFramesSteady(160);
+  if (!pending.has(backdrop) || !backdrop.isConnected) { panel.style.transform = ''; return; }
+  pending.delete(backdrop);
   const from = currentRect(origin);
   const fade = { duration: from ? OPEN_MS * 0.45 : 220, easing: 'ease-out', fill };
   for (const layer of layers(panel)) layer.animate([{ opacity: NEARLY_HIDDEN }, { opacity: 1 }], fade);
-  const flight = from
-    ? panel.animate([{ transform: flightTransform(from, panel.getBoundingClientRect()) }, { transform: 'none' }], { duration: OPEN_MS, easing: OPEN_EASE, fill })
-    : panel.animate([{ transform: 'scale(.96)' }, { transform: 'none' }], { duration: 220, easing: OPEN_EASE, fill });
+  const flight = panel.animate([{ transform: start(from) }, { transform: 'none' }], { duration: from ? OPEN_MS : 220, easing: OPEN_EASE, fill });
+  panel.style.transform = '';
   const done = () => forgetEscape(backdrop);
   flight.finished.then(done, done);
   // 动画已经接手了起点的样子，把隐身撤掉。
@@ -113,7 +121,9 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   document.body.appendChild(backdrop);
   const entering = backdrop.classList.contains('is-entering');
   // 开到一半就关：从此刻的样子接着收。先读计算样式，再停掉开的动画。
-  const panelNow = entering ? 'scale(.96)' : getComputedStyle(panel).transform;
+  // 还在等的时候面板摆在起点（内联 transform），一样从此刻的样子收。
+  const panelNow = getComputedStyle(panel).transform;
+  panel.style.transform = '';
   const veilNow = entering ? NEARLY_HIDDEN : Number(getComputedStyle(backdrop, '::before').opacity) || NEARLY_HIDDEN;
   const parts = layers(panel);
   const partsNow = parts.map((layer) => (entering ? NEARLY_HIDDEN : Number(getComputedStyle(layer).opacity)));

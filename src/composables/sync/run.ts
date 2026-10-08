@@ -73,13 +73,15 @@ const settleReady = (report: SyncReport | null, firstRun = false) => {
  * @param opts.silent 后台发起：不弹「已有同步进行中」。
  * @param opts.quick 定时自动同步：只拉最近几天（后端决定，整窗刷新到期时照旧整窗）。
  * @param opts.waited 用户在等这次同步的结果（启动同步、用户自己点的同步）。
+ * @param opts.skipProbe 不先探云端新不新：「云端还没有新数据」提示里的「再试」——用户刚在手机上
+ *   下拉过，就是要真同步一次。
  *   默认跟着 silent 走：不静默的都是用户点的。启动同步虽然静默，但用户就是
  *   在等它——由 useSyncController 显式传 true。
  */
 export const runSync = (
   mode: 'incremental' | 'initial' | 'history' = 'incremental',
   days?: number,
-  opts?: { silent?: boolean; waited?: boolean; quick?: boolean },
+  opts?: { silent?: boolean; waited?: boolean; quick?: boolean; skipProbe?: boolean },
 ): Promise<SyncReport | null> => {
   const waited = opts?.waited ?? !opts?.silent;
   if (runningSync) {
@@ -129,7 +131,7 @@ export const runSync = (
     const streamRevisionAtStart = streamUpdate.value.revision;
     try {
       const report = mode === 'incremental'
-        ? await backend.startIncrementalSync(Boolean(opts?.quick))
+        ? await backend.startIncrementalSync(Boolean(opts?.quick), Boolean(opts?.skipProbe))
         : await backend.startHistorySync(days ?? status?.history_sync_days ?? 30);
       syncReport.value = report;
       syncState.value = report.outcome;

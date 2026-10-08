@@ -91,11 +91,11 @@ onUnmounted(() => {
    淡入期间页面清楚、结束才「啪」地糊掉（lib/motion/dialogFlight.ts 头注释）。 */
 .dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
 .dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-/* 等画面跟得上的那一小会儿：遮罩和面板都隐身（不用 0，免得这一层不合成）。 */
-.dialog-backdrop.is-entering::before,
+/* 等画面跟得上的那一小会儿：面板隐身（不用 0，免得这一层不合成）；遮罩已经在淡入了（10-08 H3）。 */
 .dialog-backdrop.is-entering .dialog-glass,
 .dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
-.dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); box-shadow: var(--mat-glass-shadow); overflow-wrap: anywhere; }
-.dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); pointer-events: none; }
+/* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
+.dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
+.dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 </style>
