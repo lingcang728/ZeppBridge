@@ -84,6 +84,8 @@ views/WorkoutDetail.statMax
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.eyebrowExport
 components/overview/DataReadyCapsule.streamSeparator
+composables/useFocusAreas.areaTraining
+views/settings/sections/archive.details
 
 # de
 components/DeviceVisual.ring
