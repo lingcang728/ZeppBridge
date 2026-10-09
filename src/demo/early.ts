@@ -7,7 +7,7 @@
  *   2. 把 `theme` / `lang` 参数存起来，等主题和语言层起来以后再应用；
  *   3. 如果带了 `route`，在路由器创建之前把地址改成它——应用一开始就落在那一页，不会先闪一下概览。
  */
-interface DemoFlags { demo: boolean; theme: string | null; lang: string | null }
+interface DemoFlags { demo: boolean; theme: string | null; lang: string | null; showcase: boolean }
 
 declare global {
   interface Window { __ZB_DEMO__?: DemoFlags }
@@ -20,7 +20,7 @@ const read = (): DemoFlags | undefined => {
     if (value === null || value === '0' || value === 'false') return undefined;
     const route = params.get('route');
     if (route && route.startsWith('/') && !route.startsWith('//')) window.history.replaceState(null, '', route);
-    return { demo: true, theme: params.get('theme'), lang: params.get('lang') };
+    return { demo: true, theme: params.get('theme'), lang: params.get('lang'), showcase: params.get('showcase') === '1' };
   } catch {
     return undefined;
   }

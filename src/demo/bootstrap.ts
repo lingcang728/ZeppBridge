@@ -7,6 +7,7 @@ import { createApp } from 'vue';
 import { setTheme } from '../composables/useTheme';
 import { LOCALES, setLocale, type Locale } from '../i18n';
 import { hostPost, listenToSite } from './host';
+import { installPresentation } from './presentation';
 
 const asLocale = (value: string | null | undefined): Locale | null =>
   value && (LOCALES as readonly string[]).includes(value) ? (value as Locale) : null;
@@ -30,6 +31,7 @@ const scrollMain = (selector: string | null): void => {
 
 /** 挂载以后：听外层的指令，把自己当前在哪一页告诉外层。 */
 export const startDemoHost = (router: Router): void => {
+  if (window.__ZB_DEMO__?.showcase) installPresentation(router);
   listenToSite((message) => {
     if (message.type === 'go' && message.to && message.to.startsWith('/') && !message.to.startsWith('//')) {
       void router.push(message.to);

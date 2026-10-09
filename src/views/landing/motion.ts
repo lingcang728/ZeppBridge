@@ -48,7 +48,7 @@ export const useScrollMotion = (root: Ref<HTMLElement | null>) => {
         entry.target.classList.add('is-in');
         reveal?.unobserve(entry.target);
       }
-    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
+    }, { rootMargin: '0px 0px 120px 0px', threshold: 0 });
     reveals.forEach((node) => reveal?.observe(node));
     live = new IntersectionObserver((entries) => {
       for (const entry of entries) entry.target.classList.toggle('is-live', entry.isIntersecting);

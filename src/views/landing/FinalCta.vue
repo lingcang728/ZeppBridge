@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import Icon from '../../components/Icon.vue';
-import GlassRim from '../../components/shell/GlassRim.vue';
 import SegmentTrack from '../../components/SegmentTrack.vue';
 import { GITHUB_URL, isMobileVisitor } from './useDownloads';
 import type { LandingCopy } from './types';
@@ -14,21 +13,24 @@ const items = [{ value: 'windows', label: 'Windows' }, { value: 'macos', label: 
 </script>
 <template>
   <section id="download" class="lp-section final" aria-labelledby="download-title">
-    <h2 id="download-title">{{ journey.download[0] }}</h2><p class="lp-lead">{{ journey.download[1] }}</p>
-    <SegmentTrack class="platform-switch" variant="glass" :items="items" :model-value="platform" :aria-label="journey.nav[3]" @update:model-value="platform = String($event)" />
+    <h2 id="download-title" data-reveal>{{ journey.downloadTitle }}</h2>
+    <p class="lp-lead" data-reveal>{{ journey.downloadLead }}</p>
+    <p class="install-line">{{ journey.install }}</p>
+    <div class="platform-switch"><SegmentTrack v-model="platform" variant="glass" :items="items" :aria-label="journey.nav.download" /></div>
     <div class="download-actions">
       <template v-if="available && platform === 'linux' && linux.length"><a v-for="item in linux" :key="item.label" class="lp-btn lp-btn-primary download-button" :href="item.url"><Icon name="export" :size="22" />{{ item.label }}</a></template>
       <a v-else-if="available && platform !== 'linux'" class="lp-btn lp-btn-primary download-button" :href="selected.href"><Icon name="export" :size="22" />{{ selected.label }}</a>
-      <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="export" :size="22" />{{ journey.download[2] }}</button>
-      <a class="star-button glass-control is-lens-host has-rim" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><GlassRim /><Icon name="star" :size="23" /><span>Star on GitHub</span><Icon name="external" :size="17" /></a>
+      <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="export" :size="22" />{{ journey.downloadPending }}</button>
+      <a class="star-button lp-btn" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><Icon name="star" :size="20" /><span>Star on GitHub</span><Icon name="external" :size="16" /></a>
     </div>
   </section>
 </template>
 <style scoped>
-.final { padding-top: 150px; padding-bottom: 150px; text-align: center; }
-h2 { margin: 0 auto; max-width: 16em; font-size: clamp(38px,4.8vw,72px); line-height: 1.14; letter-spacing: -.045em; font-weight: 600; text-wrap: balance; }
-.final .lp-lead { margin: 26px auto 0; }
-.platform-switch { width: max-content; max-width: 100%; margin: 38px auto 28px; }
+.final { padding-top: 120px; padding-bottom: 120px; text-align: center; }
+h2 { margin: 0 auto; max-width: 16em; font-size: clamp(36px, 4.4vw, 64px); line-height: 1.14; letter-spacing: -.04em; font-weight: 600; text-wrap: balance; }
+.final .lp-lead { margin: 18px auto 0; }
+.install-line { margin: 10px auto 0; max-width: 36em; color: var(--subtle); font-size: 15px; line-height: 1.6; }
+.platform-switch { display: flex; justify-content: center; gap: 8px; width: max-content; max-width: 100%; margin: 28px auto 22px; }
 .download-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 18px; }
 .download-button { min-height: 62px; padding: 18px 28px; font-size: 17px; border-radius: 999px; }
 .download-button:hover svg { animation: download-bounce .65s ease; }
