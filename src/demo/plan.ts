@@ -9,7 +9,7 @@ import { demoText } from './texts';
 import type {
   PlanDayPreview, PlanDraftPreview, PlanPublishAction, PlanPublishRecord, PlanPublishResult,
   PlanStepNode, PlanWorkout, TrainingPlanState,
-  PlanDocument,
+  PlanDocument, PlanStepInput, PlanStep,
 } from '../types/trainingPlan';
 
 const hr = (low: number, high: number) => ({ type: 'heart_rate' as const, low, high });
@@ -35,11 +35,22 @@ const longRun = (): PlanStepNode[] => [
 export interface DemoPlan {
   state(): TrainingPlanState;
   preview(): PlanDraftPreview;
-  saveDraft(): string;
+  saveDraft(document?: PlanDocument): string;
   discard(): boolean;
   updateDraft(document: PlanDocument): boolean;
   publish(action: PlanPublishAction, confirmClear: boolean): PlanPublishResult;
+  setAiPublish(allowed: boolean): boolean;
 }
+
+const writtenStep = (node: PlanStepNode | PlanStep): PlanStepInput => 'type' in node && node.type === 'repeat'
+  ? { repeat: node.times, steps: node.steps.map(writtenStep) }
+  : (() => { const s = node as PlanStep; return { kind: s.intensity, duration: s.length.type === 'time' ? `${s.length.seconds}s` : `${s.length.meters}m`, target: s.target.type === 'heart_rate' ? `hr ${s.target.low}-${s.target.high}` : undefined }; })();
+const readStep = (input: PlanStepInput): PlanStepNode => {
+  if ('repeat' in input) return { type: 'repeat', times: input.repeat, steps: input.steps.map(readStep).flatMap(n => n.type === 'step' ? [n] : n.steps) };
+  const amount = Number.parseFloat(input.duration), distance = /(?:km|\d+m)$/.test(input.duration);
+  const match = input.target?.match(/hr\s+(\d+)\s*-\s*(\d+)/);
+  return { type: 'step', intensity: input.kind as PlanStep['intensity'], length: distance ? { type: 'distance', meters: amount * (input.duration.endsWith('km') ? 1000 : 1) } : { type: 'time', seconds: amount * (input.duration.includes('min') ? 60 : 1) }, target: match ? hr(Number(match[1]), Number(match[2])) : { type: 'open' }, note: input.note };
+};
 
 export const createDemoPlan = (now: Date): DemoPlan => {
   const day = (offset: number) => dayKey(at(now, offset));
@@ -69,10 +80,9 @@ export const createDemoPlan = (now: Date): DemoPlan => {
   let draftOpen = true;
   let canUndo = true;
   let edited: PlanDocument | null = null;
-  const applyEdits = (b: ReturnType<typeof build>) => edited ? edited.workouts.flatMap(input => {
-    const original = b.proposed.find(w => w.name === input.name);
-    return original ? [{ ...original, date: input.date }] : [];
-  }) : b.proposed;
+  let aiMayPublish = false;
+  let previous: PlanWorkout[] | null = null;
+  const applyEdits = (b: ReturnType<typeof build>): PlanWorkout[] => edited ? edited.workouts.map(input => ({ ...input, sport: input.sport as PlanWorkout['sport'], variant: input.variant as PlanWorkout['variant'], steps: input.steps.map(readStep) })) : b.proposed;
   const initialSent = (b: ReturnType<typeof build>): PlanWorkout[] => [b.easy1, b.oldIntervals3, b.oldEasy4];
 
   const days = (b: ReturnType<typeof build>): PlanDayPreview[] => [
@@ -92,16 +102,16 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       return {
         window: { start: day(0) },
         sent: sent ?? initialSent(b),
-        planned: [],
+        planned: sent ?? initialSent(b),
         uncertain: false,
         last_publish: record,
         last_batch: record ? [record] : [],
         weeks: [{ start: day(0), planned: (sent ?? initialSent(b)).length, sent: (sent ?? initialSent(b)).length, state: 'in_sync', error_code: null }],
         can_undo: canUndo,
-        ai_may_publish: false,
+        ai_may_publish: aiMayPublish,
         drafts: draftOpen ? [{
           id: 'demo-draft', origin: 'ai_paste', status: 'open', created_at: iso(now), updated_at: iso(now),
-          document: edited ?? { from: day(1), to: day(7), workouts: b.proposed.map((item) => ({ date: item.date, sport: item.sport, name: item.name, steps: [] })) },
+          document: edited ?? { format: 'zeppbridge-plan/3', from: day(1), to: day(7), workouts: b.proposed.map((item) => ({ date: item.date, sport: item.sport, name: item.name, focus: item.name, description: item.name, steps: item.steps.map(writtenStep) })) },
         }] : [],
       };
     },
@@ -110,31 +120,39 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       return {
         check: {
           from: day(1), to: day(7), workouts: applyEdits(b),
-          issues: [{ severity: 'warning', workout: 4, message: '', message_code: 'ui.training_plan.issue.name_truncated', params: { max: 14 } }],
+          issues: applyEdits(b).flatMap((workout, index) => [...workout.name].length > 14 ? [{ severity: 'warning' as const, workout: index, message: '', message_code: 'ui.training_plan.issue.name_truncated', params: { max: 14 } }] : []),
         },
         window: { start: day(0) },
-        days: edited ? days(b).map(d => ({ ...d, after: applyEdits(b).filter(w => w.date === d.date) })) : days(b),
+        days: edited ? [...new Set([...days(b).map(d => d.date), ...edited.workouts.map(w => w.date)])].sort().map(date => {
+          const before = (sent ?? initialSent(b)).filter(w => w.date === date), after = applyEdits(b).filter(w => w.date === date);
+          const change = !before.length ? (after.length ? 'added' : 'rest') : !after.length ? 'removed' : JSON.stringify(before) === JSON.stringify(after) ? 'unchanged' : 'replaced';
+          return { date, before, after, change };
+        }) : days(b),
       };
     },
-    saveDraft: () => { draftOpen = true; return 'demo-draft'; },
+    saveDraft: (document) => { if (document) edited = structuredClone(document); draftOpen = true; return 'demo-draft'; },
+    setAiPublish: (allowed) => { aiMayPublish = allowed; return allowed; },
     discard: () => { draftOpen = false; return true; },
     updateDraft: (document) => { edited = JSON.parse(JSON.stringify(document)); return true; },
-    publish: (action) => {
+    publish: (action, confirmClear) => {
       const b = build();
       if (action.kind === 'undo') {
         canUndo = false;
-        sent = initialSent(b);
+        sent = previous ?? initialSent(b);
         record = record && { ...record, id: 3, batch_id: 3, kind: 'undo' };
         return { outcome: { outcome: 'send', batch_id: 3, sends: [] }, record, records: record ? [record] : [] };
       }
       if (action.kind === 'clear') {
+        if (!confirmClear) return { outcome: { outcome: 'needs_clear_confirmation' }, record: null, records: [] };
+        previous = sent ?? initialSent(b);
         sent = [];
         record = record && { ...record, id: 4, batch_id: 4, kind: 'clear', role: 'clear', workout_count: 0 };
         return { outcome: { outcome: 'send', batch_id: 4, sends: [] }, record, records: record ? [record] : [] };
       }
       draftOpen = false;
       canUndo = true;
-      sent = b.proposed.filter((item) => item.date <= day(6));
+      previous = sent ?? initialSent(b);
+      sent = applyEdits(b);
       record = {
         id: 2, batch_id: 2, kind: 'publish', role: 'window', window_start: day(0), workout_count: sent.length, state: 'sent', http_status: 200, error_code: null,
         undone: false, created_at: iso(new Date()), finished_at: iso(new Date()),

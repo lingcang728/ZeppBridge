@@ -66,7 +66,8 @@ const daysOf = (data: DemoData, category: AiTaskCategory): Set<string> => {
     case 'resting_hr': return new Set((data.metrics.resting_hr ?? []).map((point) => point.date));
     case 'heart_rate': return new Set(data.metrics.steps.map((point) => point.date));
     case 'training': return new Set(data.metrics.training_load.map((point) => point.date));
-    default: return new Set(); // 没有体成分秤：身体状态一天都没有，如实空着
+    case 'body': return new Set(data.metrics.weight.map(point => point.date));
+    default: return new Set();
   }
 };
 
@@ -100,7 +101,7 @@ export const demoPreview = (data: DemoData, task: AiTask): AiTaskPreview => {
       days_in_range: days.length, days_with_data: covered.length, covered_dates: covered,
       sources: covered.length ? ['device'] : [],
       units: Object.fromEntries(metrics.map((metric) => [metric, UNIT_OF[metric] ?? ''])),
-      metric_days: Object.fromEntries(metrics.map((metric, i) => [metric, Math.max(0, covered.length - (i % 4 === 3 ? 2 : 0))])),
+      metric_days: Object.fromEntries(metrics.map(metric => [metric, data.metrics[metric] ? data.metrics[metric].filter(p => days.includes(p.date)).length : covered.length])),
       missing: covered.length === 0,
     });
     for (const row of rows) coverage.push(toRow(row.days, row.covered, row.workoutId));

@@ -3,6 +3,7 @@
  * 只在演示里被动态导入。
  */
 import type { Router } from 'vue-router';
+import { createApp } from 'vue';
 import { setTheme } from '../composables/useTheme';
 import { LOCALES, setLocale, type Locale } from '../i18n';
 import { hostPost, listenToSite } from './host';
@@ -38,8 +39,14 @@ export const startDemoHost = (router: Router): void => {
       setTheme(message.value);
     } else if (message.type === 'locale' && asLocale(message.value)) {
       setLocale(asLocale(message.value) as Locale);
+    } else if (message.type === 'visibility') {
+      document.documentElement.classList.toggle('is-backgrounded', message.value === 'hidden');
     }
   });
   router.afterEach((to) => hostPost('route', { path: to.path }));
   hostPost('ready', { path: router.currentRoute.value.path });
+  void import('./DemoConversation.vue').then(({ default: Conversation }) => {
+    const root = document.createElement('div'); document.body.append(root);
+    createApp(Conversation, { onReview: () => router.push('/ai/plan') }).mount(root);
+  });
 };

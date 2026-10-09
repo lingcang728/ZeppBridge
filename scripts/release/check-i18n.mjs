@@ -30,6 +30,7 @@ const SKIP_FILES = [
   'views/LandingPage.vue',
   'composables/useLandingLocale.ts',
   'views/landing/copy.ts',
+  'views/landing/journeyCopy.ts', // Typed ten-language website copy, selected by LandingLocale.
 ];
 
 /**
@@ -61,6 +62,11 @@ const ALLOWED = [
     file: 'demo/dataset.ts',
     text: "hrv: 'ms', hrv_rmssd",
     why: '演示日指标的单位键值，和真后端一致（「步」「次/分」）。',
+  },
+  {
+    file: 'demo/dataset.ts',
+    text: "lactate_threshold_pace: '秒/公里'",
+    why: '后端配速的稳定单位键，由 lib/aiTask/metrics.ts 的 unitLabel 本地化。',
   },
   {
     file: 'demo/facts.ts',
@@ -292,6 +298,8 @@ const isProseRisk = (line) => {
 
 const ALLOWED_PROSE = [
   { file: 'demo/runtime.ts', text: 'args.note', why: 'User-authored profile text, persisted by the browser demo adapter.' },
+  { file: 'demo/operations.ts', text: 'a.note', why: 'User-authored profile text stays unchanged in this isolated sample session.' },
+  { file: 'demo/plan.ts', text: 'input.note', why: 'AI or user-authored workout notes are part of the plan document, not interface copy.' },
   { file: 'components/plan/PlanDetail.vue', text: 'row.rest.note', why: 'AI / 用户填写的休息日原文，不是后端界面文案。' },
   { file: 'views/AiComposer.vue', text: 'strips.error.value', why: 'useBridgeStrip 已经通过 toUserMessage 按错误码本地化。' },
   { file: 'views/ai/AiExchanges.vue', text: 'history.error.value', why: 'useExchanges 已经通过 toUserMessage 按错误码本地化。' },
@@ -299,7 +307,7 @@ const ALLOWED_PROSE = [
   { file: 'views/landing/HandoffOverlay.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
   { file: 'views/landing/StageWindow.vue', text: 'copy.note', why: '同上，落地页文案。' },
   { file: 'views/landing/AiHandoff.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
-  { file: 'views/landing/ConnectPaths.vue', text: 'copy.note', why: '同上，落地页文案。' },
+  { file: 'views/landing/TrustSummary.vue', text: 'copy.connect.note', why: '网站连接说明，来自独立的十种语言包，不是后端字段。' },
   { file: 'views/landing/FinalCta.vue', text: 'downloads.linux.note', why: '同上，落地页文案。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.message', why: '估算文案的唯一实现：按 message_code 分支，取不到才回落到原文。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.stop_reason', why: '同上，stop_reason 的兜底。' },

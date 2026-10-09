@@ -28,7 +28,22 @@ const read = (): DemoFlags | undefined => {
 
 if (typeof window !== 'undefined' && window.__ZB_DEMO__ === undefined) {
   const flags = read();
-  if (flags) window.__ZB_DEMO__ = flags;
+  if (flags) {
+    window.__ZB_DEMO__ = flags;
+    // App preferences inside a demo must never overwrite the visitor's real preferences.
+    // Every iframe gets its own disposable Storage, so resetting one demo affects nothing else.
+    const values = new Map<string, string>();
+    const memory: Storage = {
+      get length() { return values.size; }, clear: () => values.clear(),
+      getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, String(value)); },
+      removeItem: key => { values.delete(key); }, key: index => [...values.keys()][index] ?? null,
+    };
+    Object.defineProperty(window, 'localStorage', { configurable: true, value: memory });
+    Object.defineProperty(window, 'sessionStorage', { configurable: true, value: memory });
+    values.set('zeppbridge-theme', flags.theme ?? 'light');
+    values.set('zeppbridge-locale', flags.lang ?? 'en');
+    values.set('zb.focusAsked', '1');
+  }
 }
 
 export {};
