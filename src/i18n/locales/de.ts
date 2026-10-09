@@ -372,21 +372,6 @@ export default {
       mcpToolMetricRecords: "Einzelne Messwerte beliebiger Metriken",
       mcpToolSleepSessions: "Liste der Schlafaufzeichnungen",
       mcpToolLifeEvents: "Von dir erfasste Lebensereignisse",
-      mcpSetupPrompt: `Ich benutze eine Windows-Desktop-App namens ZeppBridge, die die Daten meiner Amazfit-/Zepp-Uhr in eine lokale SQLite-Datenbank synchronisiert.
-Sie bringt ein MCP-Programm (zeppbridge-mcp) mit, das ich bei dir einrichten möchte, damit du meine Trainings und Gesundheitsdaten direkt abfragen kannst, statt dass ich jedes Mal exportiere und einfüge.
-
-Was ich darüber weiß:
-- Das MCP-Programm kommt aus dem zeppbridge-tools-Archiv auf ZeppBridges GitHub-Releases-Seite; entpacken und zeppbridge-mcp liegt darin. Ich habe es eventuell noch nicht heruntergeladen.
-- Es ist ein stdio-MCP-Server. Er liest die lokale Datenbank, nutzt kein Netzwerk, hört auf keinem Port und braucht kein Token und keinen API-Key.
-- Die typische Config-Form ist: {"mcpServers": {"zeppbridge": {"command": "<voller Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Er stellt zwölf nur-lesende Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events) und Datenzustand (get_data_health).
-
-Sag mir:
-1. Konkret für dich – das Werkzeug, mit dem ich gerade spreche – in welche Datei die Config gehört oder welcher Befehl sie hinzufügt;
-2. Wie man einen Windows-Pfad schreibt (müssen Backslashes escaped werden);
-3. Wie ich nach der Einrichtung prüfe, dass es funktioniert.
-
-Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), frag einfach.`,
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
 
       // ── 6. Aufbewahrung ──

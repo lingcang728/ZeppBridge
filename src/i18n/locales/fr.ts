@@ -177,21 +177,6 @@ export default {
       mcpToolMetricRecords: "Relevés individuels de n’importe quelle métrique",
       mcpToolSleepSessions: "Liste des nuits de sommeil",
       mcpToolLifeEvents: "Événements de vie que vous avez notés",
-      mcpSetupPrompt: `J'utilise une application de bureau Windows appelée ZeppBridge qui synchronise les données de ma montre Amazfit / Zepp dans une base SQLite locale.
-Elle embarque un programme MCP (zeppbridge-mcp) et je veux le configurer avec toi, pour que tu puisses interroger mes séances et mes données de santé directement au lieu que je les exporte et les colle à chaque fois.
-
-Ce que j'en sais :
-- Le programme MCP vient de l'archive zeppbridge-tools de la page GitHub Releases de ZeppBridge ; on la décompresse et zeppbridge-mcp est dedans. Je ne l'ai peut-être pas encore téléchargée.
-- C'est un serveur MCP stdio. Il lit la base locale, n'utilise pas le réseau, n'écoute sur aucun port, et n'a besoin ni de jeton ni de clé API.
-- La forme de config typique est : {"mcpServers": {"zeppbridge": {"command": "<chemin complet vers zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Il expose douze outils en lecture seule : séances (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métriques (list_available_metrics, get_metric_series, get_metric_records), sommeil (list_sleep_sessions, get_sleep_detail), alimentation (get_food_data), événements de vie (list_life_events) et santé des données (get_data_health).
-
-Dis-moi :
-1. Pour toi précisément — l'outil à qui je parle là — dans quel fichier va la config, ou quelle commande l'ajoute ;
-2. Comment écrire un chemin Windows (les antislashs doivent-ils être échappés) ;
-3. Comment vérifier que ça marche une fois configuré.
-
-S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), demande simplement.`,
       mcpConfigPathPlaceholder: '<chemin vers zeppbridge-mcp>',
       retentionAria: 'Conservation des données locales en jours',
       retentionCutoff: (date: string) => `Après la prochaine synchro réussie, les données antérieures au ${date} sont élaguées`,

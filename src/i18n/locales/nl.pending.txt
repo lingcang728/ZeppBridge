@@ -133,6 +133,7 @@ views/Overview.focusDone
 views/Overview.focusQuestion
 views/Overview.focusSkip
 views/Overview.showAllModules
+views/Settings.mcpSetupPrompt
 views/settings/sections/account.accountFallback
 views/settings/sections/account.advanced
 views/settings/sections/account.cancel
