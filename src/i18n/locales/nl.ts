@@ -1874,7 +1874,6 @@ export default {
       trainingPanelAria: 'Trainingsstatus openen',
       trainingTitle: 'Trainingsstatus',
       factLoad: 'Belasting',
-      trainingSparkLabel: 'Trainingsbelasting over de afgelopen 7 dagen',
       trainingThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       trainingEmpty:
         'VO₂max en trainingsbelasting verschijnen hier na een synchronisatie',
@@ -1926,9 +1925,6 @@ export default {
       scoreKicker: 'Slaapscore',
       stagesAria: 'Slaapstadia',
       stagesTitle: 'Slaapstadia',
-      stageHelpButton: 'Wat de stadia betekenen',
-      stageHelp:
-        'Diep: de herstellende fase. Licht: het overgangsstadium dat het grootste deel van de nacht inneemt. REM: rapid eye movement, verbonden met geheugen en dromen. Wakker: wakker worden of in de nacht wakker liggen. Dit zijn definities, geen gezondheidsdiagnose.',
       weeklyAria: 'Slaap over de afgelopen 7 dagen',
       weeklyTitle: 'Slaapstructuur, afgelopen 7 dagen',
       weeklySub: 'Stadia gestapeld per nacht',

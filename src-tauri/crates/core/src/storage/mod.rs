@@ -167,6 +167,7 @@ pub mod plan_adherence;
 mod queries;
 mod replay;
 pub mod training_context;
+pub(crate) mod training_coverage;
 pub mod training_plan;
 mod util;
 mod workout_row;

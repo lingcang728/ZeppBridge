@@ -13,14 +13,15 @@ import HeartRateCard from '../components/overview/HeartRateCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
-import StatusEntryCard from '../components/overview/StatusEntryCard.vue';
+import StatusEntryCard, { type EntryFact } from '../components/overview/StatusEntryCard.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { useRevisionReload } from '../composables/useRevisionReload';
-import { useFocusAreas, focusAreaLabel } from '../composables/useFocusAreas';
+import { useFocusAreas, focusChoiceItems } from '../composables/useFocusAreas';
 import { today as currentToday } from '../lib/currentDay';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { createLoadSeq } from '../lib/loadSeq';
@@ -30,7 +31,7 @@ import { metricColor } from '../lib/metricTone';
 import { vTilt } from '../lib/tilt';
 import { formatMetric, isFiniteNumber } from '../lib/format';
 import { displayDateTimeFormatter } from '../lib/dateTime';
-import { FOCUS_AREAS, focusSplit, type FocusArea, type FocusModule } from '../lib/focusAreas';
+import { focusSplit, type FocusChoice, type FocusModule } from '../lib/focusAreas';
 import { trainingLoadTierText } from '../lib/trainingLoadTier';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -56,7 +57,8 @@ const messages = defineMessages(
     trainingPanelAria: '打开训练状态',
     trainingTitle: '训练状态',
     factLoad: '负荷',
-    trainingSparkLabel: '近 7 天训练负荷趋势',
+    entryWeek: '近 7 天',
+    focusLabel: '我关注',
     trainingThin: '近 7 天记录不足以画出趋势',
     trainingEmpty: '同步后展示 VO₂max 与训练负荷',
     focusQuestion: '你最关注什么？',
@@ -85,7 +87,8 @@ const messages = defineMessages(
     trainingPanelAria: 'Open training status',
     trainingTitle: 'Training status',
     factLoad: 'Load',
-    trainingSparkLabel: 'Training load over the last 7 days',
+    entryWeek: 'Last 7 days',
+    focusLabel: 'I care about',
     trainingThin: 'Too few records in the last 7 days for a trend',
     trainingEmpty: 'VO₂max and training load appear after a sync',
     focusQuestion: 'What do you care about most?',
@@ -114,7 +117,8 @@ const messages = defineMessages(
     trainingPanelAria: 'Abrir el estado de entrenamiento',
     trainingTitle: 'Estado de entrenamiento',
     factLoad: 'Carga',
-    trainingSparkLabel: 'Carga de entrenamiento en los últimos 7 días',
+    entryWeek: 'Últimos 7 días',
+    focusLabel: 'Me interesa',
     trainingThin: 'No hay suficientes registros en los últimos 7 días para trazar una tendencia',
     trainingEmpty: 'El VO₂máx y la carga de entrenamiento aparecen aquí después de sincronizar',
     focusQuestion: '¿Qué es lo que más te interesa?',
@@ -173,60 +177,55 @@ const loadBand = computed(() => trainingLoadTierText(trainingLoad.value, overvie
  * reading of those numbers belongs on the page behind the card, and the
  * interpreting of them belongs to the AI the user chooses.
  */
-const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load'];
+const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load', 'steps'];
 
 const seriesValues = (metric: string): number[] =>
   (statusSeries.value[metric]?.points ?? []).map((point) => point.value);
 
 /* 拿不到值就返回 null，让这一项整个消失。
-   一排「血氧 —」「VO₂max —」既没告诉用户任何事，又把有数的那几项挤窄了。 */
-const entryFigure = (metric: string, unit: string, digits = 0): string | null => {
+   一排「血氧 —」「VO₂max —」既没告诉用户任何事，又把有数的那几项挤窄了。
+   每一项带上自己近 7 天的形状：卡片下半截不再空着，线和数字也一一对得上。 */
+const entryFact = (metric: string, label: string, unit = '', digits = 0): EntryFact | null => {
   const value = latestValue(statusSeries.value[metric]);
-  return value === null ? null : `${formatMetric(value, digits)}${unit}`;
+  return value === null
+    ? null
+    : { key: metric, label, text: formatMetric(value, digits), unit, spark: seriesValues(metric), color: metricColor(metric) };
 };
-
-type EntryFact = { key: string; label: string; text: string | null };
-const withValues = (facts: EntryFact[]) =>
-  facts.filter((fact): fact is EntryFact & { text: string } => fact.text !== null);
+const present = (facts: (EntryFact | null)[]): EntryFact[] => facts.filter((fact): fact is EntryFact => fact !== null);
+const hasDays = (...metrics: string[]) => metrics.some((metric) => statusSeries.value[metric]?.days_with_data);
 
 const bodyEntry = computed(() => ({
-  // 只列三个最新值：恢复的 7 天趋势在同名的身体页看，卡上再画一条是重复。
-  facts: withValues([
-    { key: 'readiness', label: t.value.factReadiness, text: entryFigure('readiness', '') },
-    { key: 'stress', label: t.value.factStress, text: entryFigure('stress', '') },
-    { key: 'spo2', label: t.value.factSpo2, text: entryFigure('spo2', '%') },
+  facts: present([
+    entryFact('readiness', t.value.factReadiness),
+    entryFact('stress', t.value.factStress),
+    entryFact('spo2', t.value.factSpo2, '%'),
   ]),
-  caption: statusSeries.value.readiness?.days_with_data
-    || statusSeries.value.stress?.days_with_data
-    || statusSeries.value.spo2?.days_with_data
-    ? null
-    : t.value.bodyEmpty,
+  caption: hasDays('readiness', 'stress', 'spo2') ? t.value.entryWeek : t.value.bodyEmpty,
 }));
 
-const trainingEntry = computed(() => ({
-  facts: withValues([
-    { key: 'vo2max', label: 'VO₂max', text: entryFigure('vo2max', '', 1) },
-    {
-      key: 'training_load',
-      label: t.value.factLoad,
-      text: trainingLoad.value === null
-        ? null
-        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
-    },
-  ]),
-  spark: seriesValues('training_load'),
-  sparkColor: metricColor('training_load'),
-  sparkLabel: t.value.trainingSparkLabel,
-  caption: statusSeries.value.training_load?.days_with_data
-    || statusSeries.value.vo2max?.days_with_data
-    ? t.value.trainingThin
-    : t.value.trainingEmpty,
-}));
+const trainingEntry = computed(() => {
+  const vo2 = entryFact('vo2max', 'VO₂max', '', 1);
+  const load: EntryFact | null = trainingLoad.value === null ? null : {
+    key: 'training_load',
+    label: t.value.factLoad,
+    text: formatMetric(trainingLoad.value),
+    tag: loadBand.value || null,
+    spark: seriesValues('training_load'),
+    color: metricColor('training_load'),
+  };
+  const facts = present([vo2, load]);
+  const thin = facts.every((fact) => (fact.spark?.length ?? 0) < 2);
+  return {
+    facts,
+    caption: !hasDays('training_load', 'vo2max') ? t.value.trainingEmpty : thin ? t.value.trainingThin : t.value.entryWeek,
+  };
+});
+const stepsWeek = computed(() => statusSeries.value.steps?.points ?? []);
 
 /* 「我关注」：选中的区块把对应模块排到最上面，其余收在「查看全部」后面；
    一个没选（或三个全选）时页面就是原样。跨区块的模块（最近记录、这一周、
    生活事件、数据来源）不属于任何一个区块，不参与排序。 */
-const { areas: focusAreas, asked: focusAsked, setAreas: setFocusAreas, skipPrompt: skipFocusPrompt } = useFocusAreas();
+const { areas: focusAreas, asked: focusAsked, choice: focusChoice, setChoice: setFocusChoice, skipPrompt: skipFocusPrompt } = useFocusAreas();
 const showAllModules = ref(false);
 const focusSplitView = computed(() => focusSplit(focusAreas.value));
 const focusMode = computed(() => focusSplitView.value !== null);
@@ -242,7 +241,7 @@ const focusCells = computed(() => {
       };
       case 'steps': return {
         id, component: StepsCard,
-        props: { steps: stepsToday.value, goal: overview.value?.steps_goal ?? null, latestAt: overview.value?.latest_heart_rate_at ?? null },
+        props: { steps: stepsToday.value, goal: overview.value?.steps_goal ?? null, latestAt: overview.value?.latest_heart_rate_at ?? null, week: stepsWeek.value },
       };
       case 'sleep': return { id, component: SleepCard, props: { sleep: lastSleep.value } };
       case 'body': return {
@@ -253,8 +252,7 @@ const focusCells = computed(() => {
         id: 'training', component: StatusEntryCard,
         props: {
           to: '/training', tone: 'training', icon: 'training-load', title: t.value.trainingTitle, 'aria-label': t.value.trainingPanelAria,
-          facts: trainingEntry.value.facts, spark: trainingEntry.value.spark, sparkColor: trainingEntry.value.sparkColor,
-          sparkLabel: trainingEntry.value.sparkLabel, caption: trainingEntry.value.caption,
+          facts: trainingEntry.value.facts, caption: trainingEntry.value.caption,
         },
       };
     }
@@ -264,13 +262,7 @@ const focusCells = computed(() => {
 /* 首次提问：还没答过、又已经连上并读出概览时，页面顶上问一次「你最关注什么」。
    回答过或跳过就再也不出现（记在 localStorage，和选择本身同一处）。 */
 const focusPromptOpen = computed(() => !focusAsked.value && overview.value !== null && !showLoadError.value);
-const draftAreas = ref<FocusArea[]>([]);
-const areaChips = computed(() => FOCUS_AREAS.map((area) => ({ area, label: focusAreaLabel(area) })));
-const toggleDraftArea = (area: FocusArea) => {
-  draftAreas.value = draftAreas.value.includes(area)
-    ? draftAreas.value.filter((kept) => kept !== area)
-    : [...draftAreas.value, area];
-};
+const draftChoice = ref<FocusChoice>('all');
 
 // Each query publishes as soon as it resolves. Stream updates never clear visible cards.
 const queryVersions = new Map<string, number>();
@@ -355,6 +347,11 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
         <h1 id="overview-title">{{ t.overviewTitle }}</h1>
         <p class="overview-date">{{ todayLabel }}</p>
       </div>
+      <!-- 「我关注」随时在这里改：以前只在首次提问里问一次，答过以后只能去设置里找。 -->
+      <div v-if="!focusPromptOpen" class="overview-focus">
+        <span class="overview-focus-label">{{ t.focusLabel }}</span>
+        <SegmentTrack :model-value="focusChoice" :items="focusChoiceItems" :aria-label="t.focusLabel" compact no-wrap @update:model-value="setFocusChoice" />
+      </div>
     </header>
 
     <!-- 认不出型号不是「坏了」，是可以自己指认的。不说这一句，用户只会以为
@@ -373,19 +370,9 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
     <!-- 首次提问：只有第一次连上并读出数据后问一遍，答过或跳过就再也不出现。 -->
     <div v-if="focusPromptOpen" class="focus-prompt" role="note">
       <span class="focus-ask">{{ t.focusQuestion }}</span>
-      <div class="focus-chips" role="group" :aria-label="t.focusQuestion">
-        <button
-          v-for="chip in areaChips"
-          :key="chip.area"
-          type="button"
-          class="focus-chip"
-          :class="{ 'is-on': draftAreas.includes(chip.area) }"
-          :aria-pressed="draftAreas.includes(chip.area)"
-          @click="toggleDraftArea(chip.area)"
-        >{{ chip.label }}</button>
-      </div>
+      <SegmentTrack v-model="draftChoice" :items="focusChoiceItems" :aria-label="t.focusQuestion" compact />
       <span class="focus-actions">
-        <button type="button" class="pill-button" @click="setFocusAreas(draftAreas)">{{ t.focusDone }}</button>
+        <button type="button" class="pill-button" @click="setFocusChoice(draftChoice)">{{ t.focusDone }}</button>
         <button type="button" class="pill-button quiet" @click="skipFocusPrompt">{{ t.focusSkip }}</button>
       </span>
     </div>
@@ -420,14 +407,14 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
         <div class="hr-card-slot">
           <HeartRateCard v-tilt :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
         </div>
-        <StepsCard v-tilt :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
+        <StepsCard v-tilt :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" :week="stepsWeek" />
         <SleepCard v-tilt :sleep="lastSleep" />
       </template>
       <template v-else>
         <div
-          v-for="cell in focusCells"
+          v-for="(cell, index) in focusCells"
           :key="cell.id"
-          :class="['focus-cell', { 'is-wide': focusCells?.length === 1 }]"
+          :class="['focus-cell', { 'is-wide': (focusCells?.length ?? 0) % 2 === 1 && index === (focusCells?.length ?? 0) - 1 }]"
         >
           <component :is="cell.component" v-bind="cell.props" v-tilt />
         </div>
@@ -467,18 +454,11 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 .inline-alert.warning { color: var(--warning); }
 
 /* 首次提问「你最关注什么？」：页面级的一行，不是卡中卡——同样的细线描边、
-   无底无投影。芯片是可按的：选中的按填充区分，不靠彩色描边。 */
+   无底无投影。选择用和设置里同一条玻璃滑块。 */
 .focus-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); color: var(--muted); font-size: var(--fs-sm); }
 .focus-ask { color: var(--ink); font-weight: 600; }
-.focus-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.focus-chip {
-  display: inline-flex; min-height: 30px; align-items: center; padding: 0 14px; border: 0; border-radius: 999px;
-  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
-  color: var(--muted); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
-  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
-}
-.focus-chip.is-on { background: color-mix(in srgb, var(--accent) 20%, transparent); box-shadow: none; color: var(--ink); }
-.focus-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.overview-focus { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; }
+.overview-focus-label { color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
 .focus-actions { display: inline-flex; gap: 8px; margin-left: auto; }
 .overview-skeleton { display: grid; gap: 16px; }
 .skeleton-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -507,7 +487,7 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 }
 /* 「我关注」筛过之后每张卡占半行；只剩一张时占满整行，半行空着比硬撑宽更难看。
    入口卡在原布局里本来就是对半的两张，挪进格子只是同一个宽度。 */
-.dashboard-grid.is-focus .focus-cell { grid-column: span 6; }
+.dashboard-grid.is-focus .focus-cell { display: grid; grid-column: span 6; }
 .dashboard-grid.is-focus .focus-cell.is-wide { grid-column: 1 / -1; }
 @container (max-width: 540px) {
   .dashboard-grid.is-focus .focus-cell, .dashboard-grid.is-focus .focus-cell.is-wide { grid-column: 1 / -1; }

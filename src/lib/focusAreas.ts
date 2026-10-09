@@ -56,6 +56,20 @@ export const focusSplit = (areas: readonly string[]): FocusSplit | null => {
   return { matched, folded };
 };
 
+/**
+ * 滑块上的一格：「均衡」= 没有偏好（页面原样），其余三格各对应一个区块。
+ * 滑块一次只停在一格上；旧版多选存下的两个区块读成「均衡」，用户一拖就换成单选。
+ */
+export type FocusChoice = 'all' | FocusArea;
+export const FOCUS_CHOICES: readonly FocusChoice[] = ['all', ...FOCUS_AREAS];
+
+export const focusChoiceOf = (areas: readonly string[]): FocusChoice => {
+  const picked = normalizeAreas(areas);
+  return picked.length === 1 ? picked[0]! : 'all';
+};
+
+export const areasForChoice = (choice: FocusChoice): FocusArea[] => (choice === 'all' ? [] : [choice]);
+
 /** 区块在界面语言里的名字（菜单 / 芯片 / 那行提问共用一份）。 */
 export const FOCUS_AREA_KEYS: Record<FocusArea, string> = {
   sleep: 'areaSleep',

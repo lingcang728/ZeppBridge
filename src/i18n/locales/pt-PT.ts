@@ -1659,7 +1659,6 @@ export default {
       trainingPanelAria: 'Abrir estado de treino',
       trainingTitle: 'Estado de treino',
       factLoad: 'Carga',
-      trainingSparkLabel: 'Carga de treino nos últimos 7 dias',
       trainingThin: 'Dados insuficientes nos últimos 7 dias para traçar tendência',
       trainingEmpty: 'VO₂max e carga de treino surgem após sincronizar',
     },
@@ -1711,9 +1710,6 @@ export default {
       scoreKicker: 'Pontuação de sono',
       stagesAria: 'Fases de sono',
       stagesTitle: 'Fases de sono',
-      stageHelpButton: 'Significado das fases',
-      stageHelp:
-        'Profundo: sono restaurador físico. Leve: fase de transição predominante. REM: movimentos oculares rápidos, associado à consolidação da memória. Acordado: períodos de vigília durante a noite.',
       weeklyAria: 'Sono nos últimos 7 dias',
       weeklyTitle: 'Estrutura do sono (últimos 7 dias)',
       weeklySub: 'Fases por noite',

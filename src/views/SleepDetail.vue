@@ -24,7 +24,6 @@ import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber 
 import { minutesToHours } from '../lib/missingValues';
 import type { DeviceProfile, SleepSession } from '../types';
 import { sleepDetailMessages as messages } from './SleepDetail.i18n';
-import { vEdgeSafe } from '../lib/edgeSafe';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import { sleepPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
@@ -280,13 +279,9 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
       <!-- 睡眠阶段 -->
       <section class="surface-card stage-card" :aria-label="t.stagesAria">
         <div class="stage-head">
-          <h2>{{ t.stagesTitle }}</h2>
+          <h2>{{ t.stagesTitle }}<MetricInfoButton metric="sleep_stages" :label="t.stagesTitle" /></h2>
           <div class="stage-actions">
             <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
-            <span class="stage-help-anchor">
-              <button class="stage-help-button" type="button" aria-describedby="stage-help-note">{{ t.stageHelpButton }}</button>
-              <span id="stage-help-note" v-edge-safe class="stage-help" role="note">{{ t.stageHelp }}</span>
-            </span>
           </div>
         </div>
         <StageBar

@@ -29,6 +29,7 @@ export const deckMessages = defineMessages(
     sumAi: (format: string) => `MCP 只读接入 · 默认导出 ${format}`,
     sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
     sumPrivacy: '数据只存在本机，不上传',
+    sumFeedback: '设备没认出、数据不对？发一份脱敏报告给我们',
     sumAdvanced: '备份与恢复 · 本机 API · 数据健康',
     autoSyncToggle: '自动同步',
 
@@ -83,6 +84,7 @@ export const deckMessages = defineMessages(
     sumAi: (format: string) => `Read-only MCP access · exports default to ${format}`,
     sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
     sumPrivacy: 'Your data stays on this computer',
+    sumFeedback: 'Device not recognized or data looks wrong? Send us a redacted report',
     sumAdvanced: 'Backup and restore · local API · data health',
     autoSyncToggle: 'Auto sync',
 
@@ -137,6 +139,7 @@ export const deckMessages = defineMessages(
     sumAi: (format: string) => `Acceso MCP de solo lectura · exportación predeterminada ${format}`,
     sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
     sumPrivacy: 'Tus datos se quedan en este equipo',
+    sumFeedback: '¿Dispositivo no reconocido o datos raros? Envíanos un informe anonimizado',
     sumAdvanced: 'Copia de seguridad y restauración · API local · estado de los datos',
     autoSyncToggle: 'Sincronización automática',
 

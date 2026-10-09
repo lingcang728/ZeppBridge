@@ -63,6 +63,25 @@ export const resolveDropUp = (
 };
 
 /**
+ * 贴着按钮的浮层（GlassPopover）横向放哪儿：往空的那边展开。
+ *
+ * 右边放得下就让面板左沿对齐按钮、向右长；放不下再让右沿对齐按钮、向左长；两边都放不下就居中
+ * 夹在窗口里。以前一律右对齐按钮，靠左的「?」只能向左展开，被窗口左沿顶住、紧贴着边，右边
+ * 却空着一大片。
+ */
+export const anchoredLeft = (
+  anchor: { left: number; right: number },
+  width: number,
+  viewportWidth: number,
+  margin: number,
+): number => {
+  const max = Math.max(margin, viewportWidth - width - margin);
+  if (anchor.left + width <= viewportWidth - margin) return Math.max(margin, Math.min(anchor.left, max));
+  if (anchor.right - width >= margin) return Math.min(anchor.right - width, max);
+  return Math.max(margin, Math.min((anchor.left + anchor.right) / 2 - width / 2, max));
+};
+
+/**
  * 算出浮层的 `fixed` 定位样式。
  *
  * 用 `fixed` 而不是 `absolute`：只要祖先里有 `overflow`、`transform` 或自己的

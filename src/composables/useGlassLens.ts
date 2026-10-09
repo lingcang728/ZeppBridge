@@ -10,7 +10,7 @@
  * 透镜外的页面看不见、输出还会把原图换掉，浮起来是一块发暗的方块（2026-10-01 实测）。外层的毛玻璃要让
  * 透镜看得见背后，就把玻璃挪到垫底的一层上（material.css 的 .glass-control.is-lens-host）。
  */
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
+import { computed, getCurrentInstance, onActivated, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { createLensFilter, lensEnabled, lensSupported, type LensFilter, type LensKind } from '../lib/glassLens';
 import { afterMotion } from '../lib/motion/budget';
 
@@ -40,16 +40,24 @@ export const useGlassLens = (target: Ref<HTMLElement | null>, kind: LensKind = '
   const fit = (el: HTMLElement) => lens?.resize(el.offsetWidth, el.offsetHeight);
 
   let disposed = false;
+  /** 该挂的时候组件不在文档里（KeepAlive 停用着）：等它重新激活再挂。 */
+  let waiting = false;
   let stopWatch: (() => void) | null = null;
   /* 挂透镜要沿祖先一路读计算样式（isolatedFromPage），在刚插进文档的新页里每读一次都逼浏览器先把整页样式算完。
      设置卡里有十几个胶囊和滚轮：以前它们在切页形变途中一起挂，主线程一卡 40–100ms，形变跟着一顿一跳
      （用户 2026-10-04 录屏：从「数据来源」点进设置、设置里左右翻卡）。透镜只在拖动 / 转动时才浮起来，
      晚一点挂看不出来：等形变放完、浏览器空下来再挂。 */
   const attach = () => {
-    if (disposed) return;
+    if (disposed || lens) return;
     // 透镜元素多半要等 active 以后才挂上：那时还没有它，就从组件根往上查。
     const root = instance?.proxy?.$el as unknown;
     const from = target.value?.parentElement ?? (root instanceof HTMLElement ? root : null);
+    // 设置卡预热时一张卡挂上去、空闲时就被 KeepAlive 换下（挪进文档外的容器）。文档外的元素读不到计算样式，
+    // filter 读出来是空串，下面会被当成「隔开了」永远不挂——除了最后预热的那张，各卡里的胶囊、开关、滚轮一拖都是平的。
+    if (!from?.isConnected) {
+      waiting = true;
+      return;
+    }
     if (isolatedFromPage(from)) return;
     lens = createLensFilter(kind);
     filterRef.value = lens.ref;
@@ -67,6 +75,11 @@ export const useGlassLens = (target: Ref<HTMLElement | null>, kind: LensKind = '
   };
   onMounted(() => {
     if (!when || !lensEnabled.value || !lensSupported()) return;
+    afterMotion(() => whenIdle(attach));
+  });
+  onActivated(() => {
+    if (!waiting) return;
+    waiting = false;
     afterMotion(() => whenIdle(attach));
   });
 

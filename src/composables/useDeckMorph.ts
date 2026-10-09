@@ -26,8 +26,12 @@ export interface DeckMorphRefs {
 }
 
 /* 时长、曲线和卡身的分段淡入淡出在 lib/motion/timing.ts：概览 ↔ 详情页用的是同一份。 */
-/** coverflow 的卡正面和卡头长得不一样：从它打开时大卡在前 30% 里淡入盖上去，收回时在最后 30% 淡出露出它。 */
+/** coverflow 的卡正面和卡头长得不一样：从它打开时大卡在前 30% 里淡入盖上去。 */
 const COVER_FADE = 0.3;
+/* 收回 coverflow：卡头的字和身后正面的字排版不同，同时看得见就是两份标题叠在一起（录屏里关「反馈」「隐私」时的重影）。
+   卡头的字和卡身一起先淡掉，剩一块空板飞过去，落地前就化开——正面通常比短卡高，空板长不到它那么大，
+   放到最后才淡出的话，最后一帧是一块比正面矮的板「啪」地换成正面。 */
+const COVER_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0, offset: 0.85 }, { opacity: 0 }];
 /** 展开全部 / 收起：一张张飞出、收拢。 */
 const FLIGHT_MS = 520;
 const FLIGHT_STAGGER_MS = 8;
@@ -114,6 +118,10 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     ...el.querySelectorAll<HTMLElement>(':scope > .deck-body, .deck-close, .deck-grip'),
     ...(el.parentElement?.querySelectorAll<HTMLElement>(':scope > .deck-dots') ?? []),
   ];
+  /** 卡头里调用方给的内容（图标、标题、摘要）。和 coverflow 正面交接时要单独淡入淡出。 */
+  const headOf = (el: HTMLElement) => [
+    ...el.querySelectorAll<HTMLElement>(':scope > .open-head > :not(.deck-grip):not(.deck-close)'),
+  ];
 
   const running = (current: Morph | null) => Boolean(current && current.main.playState === 'running');
 
@@ -197,7 +205,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const linear: KeyframeAnimationOptions = { duration: OPEN_MS, easing: 'linear', fill: 'both' };
     const anims = [
       main,
-      ...partsOf(el).map((part) => part.animate(BODY_IN, linear)),
+      ...[...partsOf(el), ...(fromCover ? headOf(el) : [])].map((part) => part.animate(BODY_IN, linear)),
     ];
     if (fromCover) anims.push(el.animate([{ opacity: 0 }, { opacity: 1, offset: COVER_FADE }, { opacity: 1 }], linear));
     const hidden = fromCover ? null : hide(source);
@@ -246,14 +254,21 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     return peekBox(settled, unscaledBox(boxOf(next), origin, scale).top);
   };
 
-  /** 原地淡出（找不到源卡、源卡不在画面里时）。 */
+  /**
+   * 原地淡出：停在人刚才看到的位置（`lift`），往后沉一点、化开。找不到源卡、源卡不在画面里时用；
+   * 长卡滚到很下面再关也用它——卡头远在屏幕上方，缩回源卡要一口气走上千像素：带着卡身飞，满屏表单
+   * 边飞边重新栅格化；先把卡身藏掉再飞，就是内容一下没了、剩一块空板滑过去（「高级卡滑到底返回时跳一下」）。
+   * 缩放绕屏幕正中那一点（换成卡自己的坐标），不然高卡绕远在屏幕外的顶边缩，看得见的那一段会往上窜。
+   */
   const fadeOut = (el: HTMLElement, id: string, closed: () => void, lift: number) => {
+    const top = el.getBoundingClientRect().top + lift;
+    const origin = `50% ${r2(window.innerHeight / 2 - top)}px`;
     const main = el.animate(
       [
-        { opacity: 1, transform: `translate(0px, ${lift}px)` },
-        { opacity: 0, transform: `translate(0px, ${lift + 14}px) scale(.98)` },
+        { opacity: 1, transformOrigin: origin, transform: `translate(0px, ${lift}px)` },
+        { opacity: 0, transformOrigin: origin, transform: `translate(0px, ${lift + 12}px) scale(.97)` },
       ],
-      { duration: 220, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'both' },
+      { duration: 260, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'both' },
     );
     begin({ id, kind: 'close', anims: [main], main, closed, cleanup: () => main.cancel() });
   };
@@ -280,7 +295,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const source = sourceOf(id);
     const target = source ? settledSeenBoxOf(source) : null;
     const onScreen = Boolean(target && target.width >= 24 && target.top < window.innerHeight && target.top + target.height > 0);
-    if (!source || !target || !onScreen) { fadeOut(el, id, closed, lift); return; }
+    const far = lift < -window.innerHeight * 0.5;
+    if (!source || !target || !onScreen || far) { fadeOut(el, id, closed, lift); return; }
     const toCover = Boolean(source.closest('.cover-stage'));
     const box: Box = { left: start.left, top: start.top, width: el.offsetWidth, height: el.offsetHeight };
     const lifted: Box = { ...box, top: box.top + lift };
@@ -294,9 +310,9 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const linear: KeyframeAnimationOptions = { duration: CLOSE_MS, easing: 'linear', fill: 'both' };
     const anims = [
       main,
-      ...partsOf(el).map((part) => part.animate(BODY_OUT, linear)),
+      ...[...partsOf(el), ...(toCover ? headOf(el) : [])].map((part) => part.animate(BODY_OUT, linear)),
     ];
-    if (toCover) anims.push(el.animate([{ opacity: 1 }, { opacity: 1, offset: 1 - COVER_FADE }, { opacity: 0 }], linear));
+    if (toCover) anims.push(el.animate(COVER_OUT, linear));
     const hidden = toCover ? null : hide(source);
     begin({
       id,
