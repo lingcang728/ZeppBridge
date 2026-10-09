@@ -2031,7 +2031,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       trainingEmpty:
         'VO₂max und Trainingsbelastung erscheinen nach der Synchronisierung',
       trainingPanelAria: 'Trainingsstatus öffnen',
-      trainingSparkLabel: 'Trainingsbelastung der letzten 7 Tage',
       trainingThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
       trainingTitle: 'Trainingsstatus',
       unrecognizedCta: 'Hier manuell zuordnen',
@@ -2097,9 +2096,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       providerOfficial: 'Offizielle Zepp-Autorisierung',
       sourceScope: 'Datenbereich',
       sourceTitle: 'Quelle',
-      stageHelp:
-        'Tiefschlaf: körperliche Erholung. Leichtschlaf: Übergangsphase. REM: Traumschlaf und geistige Erholung. Wach: nächtliche Wachphasen. Keine medizinische Diagnose.',
-      stageHelpButton: 'Was die Phasen bedeuten',
       stagesAria: 'Schlafphasen',
       stagesTitle: 'Schlafphasen',
       syncTimeMissing: 'Synchronisierungszeit nicht angegeben',

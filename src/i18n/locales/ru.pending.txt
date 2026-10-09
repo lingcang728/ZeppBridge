@@ -10,6 +10,10 @@ components/MetricInfo.sectionChart
 components/MetricInfo.sectionHow
 components/MetricInfo.sectionWhat
 components/WeeklyReportCard.nextUp
+components/overview/SleepCard.windowAsleep
+components/overview/SleepCard.windowWoke
+components/overview/StepsCard.weekAria
+components/overview/StepsCard.weekTitle
 composables/useFocusAreas.areaAll
 composables/useFocusAreas.areaDaily
 composables/useFocusAreas.areaSleep
@@ -77,6 +81,9 @@ lib/metricInfo/sleep.sleep_durationWhat
 lib/metricInfo/sleep.sleep_scoreChart
 lib/metricInfo/sleep.sleep_scoreHow
 lib/metricInfo/sleep.sleep_scoreWhat
+lib/metricInfo/sleep.sleep_stagesChart
+lib/metricInfo/sleep.sleep_stagesHow
+lib/metricInfo/sleep.sleep_stagesWhat
 lib/metricInfo/sleep.sleep_weeklyChart
 lib/metricInfo/sleep.sleep_weeklyHow
 lib/metricInfo/sleep.sleep_weeklyWhat
@@ -125,8 +132,10 @@ lib/trainingLoadTier.medium
 lib/trainingLoadTier.reference
 lib/trainingLoadTier.veryHigh
 views/Overview.collapseModules
+views/Overview.entryWeek
 views/Overview.factReadiness
 views/Overview.focusDone
+views/Overview.focusLabel
 views/Overview.focusQuestion
 views/Overview.focusSkip
 views/Overview.showAllModules

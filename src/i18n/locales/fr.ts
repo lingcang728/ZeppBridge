@@ -1533,7 +1533,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       partialUnavailable: 'Certains flux de données n’ont pas encore été récupérés',
       trainingTitle: 'État d’entraînement',
       trainingPanelAria: 'Ouvrir l’état d’entraînement',
-      trainingSparkLabel: 'Charge d’entraînement sur les 7 derniers jours',
       trainingEmpty: 'VO₂ max et charge d’entraînement apparaissent ici après une synchro',
       trainingThin: 'Pas assez d’enregistrements sur les 7 derniers jours pour tracer une tendance',
       bodyTitle: 'État du corps',
@@ -1702,8 +1701,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
 
       stagesTitle: 'Phases de sommeil',
       stagesAria: 'Phases de sommeil',
-      stageHelpButton: 'Que signifient les phases',
-      stageHelp: 'Profond : phase réparatrice. Léger : phase de transition dominante. Paradoxal (REM) : mouvements oculaires rapides, mémoire et rêves. Éveillé : éveils nocturnes. Ces définitions ne constituent pas un avis médical.',
       footnote: 'Seuls les résumés de phases reçus du cloud sont affichés. Sans donnée REM, « Non fourni » apparaît sans calcul déductif, et aucune frise n’est tracée.',
 
       weeklyTitle: 'Structure du sommeil, 7 derniers jours',

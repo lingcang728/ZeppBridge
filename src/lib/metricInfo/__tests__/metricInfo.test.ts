@@ -16,8 +16,8 @@ const HEART_PAGE_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd', 'heart_rate_24h', 
 const TRAINING_PAGE_METRICS = ['vo2max', 'training_load', 'pai_total', 'lactate_threshold', 'training_balance'];
 /* 日常活动页：CARDS 写死的四个 id。 */
 const ACTIVITY_PAGE_METRICS = ['steps', 'distance', 'active_calories', 'active_minutes'];
-/* 睡眠详情：时长 / 评分两张主卡 + 近 7 天结构卡（模板里写死的 id）。 */
-const SLEEP_PAGE_METRICS = ['sleep_duration', 'sleep_score', 'sleep_weekly'];
+/* 睡眠详情：时长 / 评分两张主卡 + 阶段卡 + 近 7 天结构卡（模板里写死的 id）。 */
+const SLEEP_PAGE_METRICS = ['sleep_duration', 'sleep_score', 'sleep_weekly', 'sleep_stages'];
 
 const PAGE_METRICS = [
   ...BODY_METRICS,

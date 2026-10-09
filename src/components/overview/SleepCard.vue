@@ -26,6 +26,8 @@ const messages = defineMessages(
     seeMore: '看更多',
     durationHours: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     durationMinutes: (minutes: number) => `${minutes} 分`,
+    windowAsleep: '入睡',
+    windowWoke: '醒来',
   },
   {
     sleepPanelAria: 'Open sleep detail',
@@ -37,6 +39,8 @@ const messages = defineMessages(
     seeMore: 'See more',
     durationHours: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     durationMinutes: (minutes: number) => `${minutes} min`,
+    windowAsleep: 'Fell asleep',
+    windowWoke: 'Woke',
   },
   {
     sleepPanelAria: 'Abrir el detalle de sueño',
@@ -48,6 +52,8 @@ const messages = defineMessages(
     seeMore: 'Ver más',
     durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
     durationMinutes: (minutes: number) => `${minutes} min`,
+    windowAsleep: 'Te dormiste',
+    windowWoke: 'Despertaste',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/overview/SleepCard',
@@ -100,6 +106,16 @@ const sleepBarStages = computed(() =>
     return minutes === null ? [] : [{ ...stage, minutes }];
   }),
 );
+/** 入睡 / 醒来的时刻：排在卡片下沿，和旁边那张卡的底边齐平。拿不到时间就不写这一行。 */
+const sleepWindow = computed(() => {
+  const sleep = props.sleep;
+  if (!sleep) return null;
+  const start = new Date(sleep.start_time);
+  const end = new Date(sleep.end_time);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const clock = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' });
+  return { start: clock.format(start), end: clock.format(end) };
+});
 const activeStage = ref<{ label: string; minutes: number } | null>(null);
 const hoverLeft = ref(50);
 const hoverStage = (event: PointerEvent) => {
@@ -125,6 +141,10 @@ const hoverStage = (event: PointerEvent) => {
       <p class="panel-figure"><span class="figure-value"><template v-for="(part, index) in figureParts(hm(sleep.duration_minutes))" :key="index"><i v-if="part.unit">{{ part.text }}</i><template v-else>{{ part.text }}</template></template></span></p>
       <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" v-edge-safe class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
+      <dl v-if="sleepWindow" class="sleep-window">
+        <div><dt>{{ t.windowAsleep }}</dt><dd>{{ sleepWindow.start }}</dd></div>
+        <div><dt>{{ t.windowWoke }}</dt><dd>{{ sleepWindow.end }}</dd></div>
+      </dl>
     </template>
     <div v-else class="panel-empty compact"><GlyphTile name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
   </RouterLink>
@@ -162,6 +182,10 @@ html[data-theme="light"] .sleep-panel.metric-panel {
 .sleep-stages li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; color: var(--subtle); font-size: var(--fs-sm); }
 .sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }
 .sleep-stages strong { color: var(--muted); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sleep-window { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: auto 0 0; padding-top: 16px; }
+.sleep-window div { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.sleep-window dt { color: var(--subtle); font-size: var(--fs-2xs); }
+.sleep-window dd { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; font-variant-numeric: tabular-nums; }
 .sleep-bar-hit { position: relative; padding: 8px 0; margin: -8px 0; }
 .sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--mat-glass-strong); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; box-shadow: var(--mat-glass-shadow); }
 </style>
