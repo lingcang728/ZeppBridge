@@ -456,7 +456,7 @@ const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr'
  * `key(a,b){…}`、`key: '…'+'…'`、`key: […]` 这类形状。不认得的结构
  * （spread、计算键、裸引用）记进 out.errors 让门禁红——文案表不该出现它们。
  */
-const isIdentStart = (c) => /[A-Za-z_$]/.test(c);
+const isIdentStart = (c) => typeof c === 'string' && /[A-Za-z_$]/.test(c);
 
 const skipWsAndComments = (src, i) => {
   for (;;) {

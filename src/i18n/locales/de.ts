@@ -160,6 +160,14 @@ export default {
     'err.training_plan.draft_closed': 'Dieser Planentwurf wurde schon gesendet oder verworfen',
     'err.training_plan.publish_not_found': 'Zu diesem Versand gibt es keinen Eintrag',
     'err.training_plan.rejected': 'Zepp hat diesen Plan nicht angenommen; der Plan auf deiner Uhr ist unverändert',
+    'err.mcp.bundle_failed': 'Claude Desktop-Erweiterung konnte nicht erstellt werden',
+    'err.mcp.sidecar_missing':
+      'Dieser Build enthält kein MCP-Programm – lade zeppbridge-tools von GitHub herunter',
+    'err.training_plan.ai_publish_disabled': 'Die KI darf Trainingspläne nicht direkt veröffentlichen',
+    'err.training_plan.format': 'Der Trainingsplan ist fehlerhaft aufgebaut und wurde nicht gespeichert',
+    'err.training_plan.invalid': 'Dieser Plan hat die Prüfung nicht bestanden und wurde nicht gesendet',
+    'err.training_plan.needs_clear_confirmation':
+      'Dies würde einen Teil des Plans auf deiner Uhr löschen; bestätige dies in ZeppBridge',
   },
 
   // ── 后端 ui.* 散文码的兜底表 ──
@@ -373,6 +381,21 @@ export default {
       mcpToolSleepSessions: "Liste der Schlafaufzeichnungen",
       mcpToolLifeEvents: "Von dir erfasste Lebensereignisse",
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
+      mcpSetupPrompt: `Ich nutze eine Windows-Desktop-App namens ZeppBridge, die Daten meiner Amazfit / Zepp-Uhr in eine lokale SQLite-Datenbank synchronisiert.
+Sie enthält ein MCP-Programm (zeppbridge-mcp), das ich bei dir einrichten möchte, damit du meine Trainings- und Gesundheitsdaten direkt abfragen kannst, statt dass ich sie jedes Mal exportieren und einfügen muss.
+
+Bekannte Informationen:
+- Das MCP-Programm stammt aus dem Archiv zeppbridge-tools auf der GitHub-Releases-Seite von ZeppBridge; nach dem Entpacken befindet sich zeppbridge-mcp darin. Ich habe es eventuell noch nicht heruntergeladen.
+- Es ist ein stdio-basierter MCP-Server. Gesundheitsdaten sind schreibgeschützt (read-only); er lauscht auf keinem Port und benötigt weder Token noch API-Key. Er nutzt das Netzwerk nur zum Veröffentlichen von Trainingsplänen, und auch das erst nach meiner Erlaubnis.
+- Typischer Aufbau der Konfiguration: {"mcpServers": {"zeppbridge": {"command": "<vollständiger Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Es stellt fünfzehn Nur-Lese-Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events), Datenzustand (get_data_health) und Coaching (get_training_context, get_athlete_profile, get_training_plan); dazu zwei Trainingsplan-Werkzeuge: draft_training_plan (speichert nur einen Entwurf) und publish_training_plan (überträgt erst nach Aktivierung in den Einstellungen an die Uhr).
+
+Bitte sag mir:
+1. Wo genau bei dir (dem Werkzeug, mit dem ich gerade spreche) die Konfiguration eingetragen wird bzw. mit welchem Befehl sie hinzugefügt wird;
+2. Wie der Pfad unter Windows formatiert wird (müssen Backslashes maskiert werden?);
+3. Wie ich nach der Einrichtung überprüfe, ob alles funktioniert.
+
+Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei liegt), frag mich einfach.`,
 
       // ── 6. Aufbewahrung ──
       retentionAria: 'Aufbewahrungsdauer lokaler Daten in Tagen',
@@ -860,7 +883,13 @@ export default {
     },
     'components/HistoryArchivePanel': {
       allChunksDone: 'Jeder Monatsblock im Abdeckungsprotokoll ist erledigt.',
+      archiveDisabled:
+        'Auf Aufbewahrung nach Tagen umgestellt: Die nächste erfolgreiche Synchronisierung löscht ältere Daten.',
+      archiveEnabled:
+        'Auf dauerhafte Aufbewahrung umgestellt: Synchronisierungen löschen nichts mehr.',
       archiveSaveFailed: 'Die Archiv-Einstellung konnte nicht gespeichert werden',
+      confirmDisableArchive:
+        'Wenn du auf eine feste Anzahl von Tagen umstellst, löscht die nächste erfolgreiche Synchronisierung ältere Daten – unwiderruflich.\nFalls du gerade Historie nachgeladen hast, erstelle vorher einen Datenbank-Snapshot.\nWirklich ändern?',
       autoContinue: 'Bis zum Ende durchlaufen',
       autoContinueHint:
         'Nach jeder Runde startet automatisch die nächste, bis alles nachgeladen ist. Jederzeit stoppbar, Geholtes bleibt.',
@@ -902,6 +931,8 @@ export default {
         'Das Protokoll ist geleert. Du kannst einen neuen Nachlade-Zeitraum planen.',
       ledgerResetFailed: 'Das Protokoll ließ sich nicht leeren',
       ledgerTitle: 'Abdeckungsprotokoll',
+      outOfRetention:
+        'Dieser Nachlade-Zeitraum liegt außerhalb der lokalen Aufbewahrungsfrist – geholte Daten würden bei der nächsten erfolgreichen Synchronisierung bereinigt. Stelle „Wie lange aufbewahren“ auf „Dauerhaft“ oder wähle mehr Tage.',
       pickStartFirst: 'Wähle erst einen Nachlade-Startpunkt.',
       range1y: '1 Jahr',
       range2y: 'Letzte 2 Jahre',
@@ -942,6 +973,8 @@ export default {
       streamSeparator: ', ',
       unmeasured: (streams: string) =>
         `Zu wenig lokale Messwerte für eine Schätzung (${streams}) – wird in der Gesamtsumme weggelassen statt ungenau hochgerechnet.`,
+      wouldBeCleanedUp: (requested: number, retention: number) =>
+        `Es sollen ${requested} Tage Historie nachgeladen werden, dieser Rechner behält aber nur die letzten ${retention} Tage – geholte Daten würden bei der nächsten erfolgreichen Synchronisierung gelöscht. Stelle „Wie lange aufbewahren“ auf „Dauerhaft“ oder wähle mehr Tage.`,
     },
     'components/InsightCard': {
       baselineRule: (days: number, tolerance: number | undefined, min: number, max: number) =>
@@ -1054,6 +1087,7 @@ export default {
         'weekly.training_load': 'Trainingsbelastung',
         'weekly.workout_count': 'Trainings',
       },
+      nextUp: 'Als Nächstes',
       noBaseline: 'Zu wenig Historie – nur aktueller Wert',
       noRecentData: 'Keine Messwerte für diese Metrik in den letzten 7 Tagen.',
       notProvided: 'Nicht angegeben',
@@ -1125,6 +1159,8 @@ export default {
       sleepSub: 'Schlafstruktur im Überblick',
       sleepTitle: 'Letzte Nacht',
       sleepTitleOn: (day: string) => `Schlaf · ${day}`,
+      windowAsleep: 'Eingeschlafen',
+      windowWoke: 'Aufgewacht',
     },
     'components/overview/PinnedMetrics': {
       title: 'Meine Metriken',
@@ -1196,6 +1232,8 @@ export default {
       factDone: 'Geschafft',
       factLeft: 'Noch offen',
       factReached: 'Erreicht',
+      weekAria: 'Schritte der letzten 7 Tage; die gestrichelte Linie ist das Ziel',
+      weekTitle: 'Letzte 7 Tage',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -2001,18 +2039,24 @@ export default {
         'Bereitschaft, Stress und Blutsauerstoff erscheinen nach der Synchronisierung',
       bodyPanelAria: 'Körperstatus öffnen',
       bodyTitle: 'Körperstatus',
+      collapseModules: 'Einklappen',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       deviceErrorPrefix: 'Geräteerkennung: ',
       factLoad: 'Belastung',
+      factReadiness: 'Bereitschaft',
       factSpo2: 'SpO₂',
       factStress: 'Stress',
+      focusDone: 'Fertig',
+      focusQuestion: 'Was ist dir am wichtigsten?',
+      focusSkip: 'Überspringen',
       healthUnavailable: 'Gesundheitsdaten gerade nicht verfügbar',
       loadFailedTitle: 'Die Datenübersicht konnte nicht gelesen werden',
       loadingAria: 'Übersicht wird geladen',
       overviewTitle: 'Übersicht',
       partialUnavailable: 'Manche Datenströme wurden noch nicht abgerufen',
       retry: 'Wiederholen',
+      showAllModules: 'Alle anzeigen',
       trainingEmpty:
         'VO₂max und Trainingsbelastung erscheinen nach der Synchronisierung',
       trainingPanelAria: 'Trainingsstatus öffnen',
@@ -2020,6 +2064,8 @@ export default {
       trainingTitle: 'Trainingsstatus',
       unrecognizedCta: 'Hier manuell zuordnen',
       unrecognizedSuffix: ' hat noch kein erkanntes Modell',
+      entryWeek: 'Letzte 7 Tage',
+      focusLabel: 'Mein Fokus',
     },
     'views/RecentRecords': {
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
@@ -2698,6 +2744,8 @@ Antworte in Markdown.`,
       sumDisplay: (language: string, unit: string, scale: number) =>
         `${language} · ${unit} · ${scale} %`,
       sumPrivacy: 'Deine Daten bleiben auf diesem Rechner',
+      sumFeedback:
+        'Gerät nicht erkannt oder Daten fehlerhaft? Sende uns einen anonymisierten Bericht',
       sumSyncOff: 'Automatische Synchronisierung ist aus',
       sumSyncOn: (minutes: number) =>
         `Automatische Synchronisierung · alle ${minutes} Min.`,
@@ -2913,6 +2961,8 @@ Antworte in Markdown.`,
       notOpened: 'Unterwegs abgebrochen; die Website wurde diesmal nicht geöffnet',
       exchanges: (count: number) => plural(count, { one: '1 Austausch', other: `${count} Austausche` }),
       planPeek: 'Dein nächster Schritt',
+      resetCards: 'Karten zurücksetzen',
+      ringHint: 'Halte den Ring gedrückt. Ein voller Kreis sendet ab.',
     },
     'components/cards/cards': {
       noWorkouts: 'Keine Trainings in diesem Zeitraum',
@@ -3137,6 +3187,270 @@ Antworte in Markdown.`,
         rideDescription: '60 Minuten in lockerem, gleichmäßigem Tempo.',
         summary: 'Eine ausgewogene Trainingswoche mit einer Intervalleinheit und einer lockeren Radausfahrt.',
       },
+    },
+
+    // ── views/settings/sections ──
+    'views/settings/sections/account': {
+      accountFallback: 'Zepp-Konto',
+      official: (state: string) => `Offiziell ${state}`,
+      advanced: (state: string) => `Erweiterte Daten ${state}`,
+      stOn: 'verbunden',
+      stOff: 'nicht verbunden',
+      stReauth: 'erneut autorisieren',
+      stWaiting: 'wartet auf Browser',
+      stUnverified: 'nicht verifiziert',
+      stSigningIn: 'wird angemeldet',
+      stFailed: 'Anmeldung fehlgeschlagen',
+      connect: 'Verbinden',
+      reauth: 'Neu autorisieren',
+      cancel: 'Abbrechen',
+      verify: 'Verifizieren',
+      connectAdvanced: 'Erweiterte Daten verbinden',
+      logoutTitle: 'Vom Zepp-Konto abmelden',
+      logoutSub: 'Lokale Daten bleiben; Synchronisierung wird nach erneuter Anmeldung fortgesetzt',
+      logoutShort: 'Abmelden',
+      deviceCheck: 'Falsches Modell? Zum Ändern öffnen',
+      unknownShort: 'Ein Gerät wurde nicht erkannt: Zum Zuweisen des Modells öffnen oder Bericht senden, um es hinzuzufügen',
+      learnMore: 'Mehr erfahren',
+    },
+    'views/settings/sections/sync': {
+      cardTitle: 'Synchronisierung',
+      autoSub: 'Ruft in diesem Intervall neue Daten ab, solange die App geöffnet ist',
+      off: 'Aus',
+      lastSynced: (when: string) => `Zuletzt synchronisiert ${when}`,
+      neverSynced: 'Noch nicht synchronisiert',
+      newest: (when: string) => `Neuester Eintrag ${when}`,
+      cloudStale: (when: string) => `In der Cloud nur Daten bis ${when} · zuerst in der Zepp-App am Smartphone nach unten ziehen`,
+      cloudStaleNoTime: 'Noch keine neuen Daten in der Cloud · zuerst in der Zepp-App am Smartphone nach unten ziehen',
+    },
+    'views/settings/sections/archive': {
+      secKeep: 'Aufbewahrung',
+      keepTitle: 'Wie lange aufbewahren',
+      year: '1 Jahr',
+      forever: 'Dauerhaft',
+      keepForeverSub: 'Keine automatische Bereinigung; die Datenbank wächst mit der Zeit',
+      sizeTitle: 'Auf diesem Rechner',
+      sizeSince: (month: string) => `Seit ${month}`,
+      sizeEmpty: 'Noch keine Daten',
+      secHistory: 'Ältere Historie',
+      fillTitle: 'Ältere Historie nachladen',
+      filledTo: (month: string) => `Nachgeladen bis ${month}`,
+      filledToLeft: (month: string, left: number) => `Nachgeladen bis ${month} · noch ${left} ${left === 1 ? 'Block' : 'Blöcke'}`,
+      neverFilled: 'Noch nicht nachgeladen',
+      details: 'Details',
+      backupTitle: 'Backup und Wiederherstellung',
+      backupLatest: (when: string) => `Letzter Snapshot ${when}`,
+      backupNone: 'Noch keine Snapshots',
+      open: 'Öffnen',
+    },
+    'views/settings/sections/maintenance': {
+      secMaintenance: 'Wartung',
+      cleanupTitle: 'Nach Aufbewahrung bereinigen',
+      cleanupSub: (date: string) => `Löscht Daten vor dem ${date}`,
+      cleanupForever: 'Dauerhafte Aufbewahrung aktiv; nichts zu bereinigen',
+      reparseTitle: 'Lokale Daten neu analysieren',
+      reparseSub: 'Offline nach aktuellen Regeln neu berechnen',
+      resetTitle: 'Abdeckungsprotokoll leeren',
+      resetSub: 'Löscht nur Nachlade-Einträge; gespeicherte Daten bleiben erhalten',
+    },
+    'views/settings/sections/data': {
+      intro: 'Wird bei jeder Synchronisierung aktualisiert; ein ausgegrauter Eintrag bedeutet nicht, dass dein Gerät ihn nicht unterstützt',
+      codesHint: (count: number) => `${count} Trainingstyp${count === 1 ? ' wurde' : 'en wurden'} nicht erkannt`,
+      codesFix: 'Benennen',
+    },
+    'views/settings/sections/ai': {
+      lead: 'Lokalen KI-Werkzeugen (Claude Code, Codex usw.) direkten Zugriff auf deine Daten geben',
+      toolsLabel: 'Verfügbare KI-Werkzeuge (für Details mit der Maus darüberfahren)',
+      scopesHint: 'Gilt nur für MCP, das mit --scope task gestartet wurde',
+      bundlePick: 'Ordner für die Erweiterung wählen',
+      bundleSaved: 'Erweiterung gespeichert; per Doppelklick in Claude Desktop installieren',
+      configReady: 'Konfiguration kopiert, Pfad ist bereits eingetragen',
+      connectCopied: 'Befehle kopiert; im Terminal einfügen und ausführen',
+      connectSub:
+        'Die ersten beiden kopieren Befehle für das Terminal; Claude Desktop speichert eine Erweiterung, die du per Doppelklick installierst',
+      connectTitle: 'KI-Werkzeug verbinden',
+      otherClients: 'Andere Clients',
+      publishOff:
+        'Aus: Die KI erstellt nur Entwürfe; du bestätigst sie unter „An die KI“, bevor etwas auf deine Uhr gelangt',
+      publishOn:
+        'Ein: Mit deiner Zustimmung kann die KI Pläne direkt an deine Uhr senden; bestehende Pläne werden nie gelöscht',
+      publishTitle: 'Der KI erlauben, Trainingspläne direkt zu veröffentlichen',
+      sidecarMissing:
+        'Dieser Build enthält kein MCP-Programm; verbinde manuell über den Prompt oder die Konfiguration unten',
+      toolAthleteProfile:
+        'Herzfrequenzzonen, Schwellenwerte, jüngste Lauftempos und dein Hintergrund für die KI',
+      toolDraftPlan:
+        'Entwirft einen Trainingsplan (nur als Entwurf gespeichert, nicht an die Uhr gesendet)',
+      toolPublishPlan: 'Sendet einen Entwurf an die Uhr (erfordert den Schalter oben)',
+      toolTrainingContext:
+        'Jüngstes Training und Erholung in einem Aufruf: Tagestabelle, jedes Training, der aktive Plan',
+      toolTrainingPlan: 'Trainingsplan-Register: aktiver Plan, Übertragungsstatus, Entwürfe',
+    },
+    'views/settings/sections/display': {
+      focusTitle: 'Mein Fokus',
+      focusSlideSub:
+        'Die Übersicht zeigt diesen Bereich zuerst, der Rest wandert unter „Alle anzeigen“; „Ausgewogen“ belässt alles wie gehabt',
+    },
+    'views/settings/sections/privacy': {
+      lead: 'Deine Daten bleiben auf diesem Rechner: kein Hochladen, keine Nutzungsstatistiken',
+      learnMore: 'Mehr erfahren',
+      apiOn: (url: string) => `Aktiviert · ${url}`,
+      apiOff: 'Deaktiviert',
+      apiOpen: 'Einstellungen',
+    },
+    'views/settings/sections/advanced': {
+      secPrefs: 'Weitere Einstellungen',
+      folderTitle: 'Datenordner',
+      folderSub: 'Der data-Ordner neben der App enthält all deine Gesundheitsdaten',
+      healthSub: 'Wenn ein Synchronisierungsergebnis unerwartet aussieht, findest du hier die Ursache',
+      compactSub: 'Wird beim ersten Start einer neuen Version automatisch ausgeführt; hier lässt es sich manuell wiederholen',
+      compactMore: 'Details',
+    },
+
+    // ── composables / components ──
+    'composables/useFocusAreas': {
+      areaAll: 'Ausgewogen',
+      areaSleep: 'Schlaf',
+      areaDaily: 'Tagesform',
+      areaTraining: 'Training',
+    },
+    'lib/trainingLoadTier': {
+      low: 'niedrig',
+      medium: 'moderat',
+      high: 'hoch',
+      veryHigh: 'sehr hoch',
+      reference: (band: string) => `${band} (Referenz)`,
+    },
+    'components/MetricInfo': {
+      about: (label: string) => `Über „${label}“`,
+      sectionWhat: 'Was das ist',
+      sectionChart: 'Was diese Grafik zeigt',
+      sectionHow: 'Berechnung und Datenquelle',
+    },
+
+    // ── lib/metricInfo ──
+    'lib/metricInfo/vitals': {
+      readinessWhat: 'Ein Bereitschaftswert, den die Uhr aus dem Schlaf der letzten Nacht, der HRV und der Ruheherzfrequenz ermittelt.',
+      readinessChart: 'Ein Datenpunkt pro Tag als Trendverlauf; zeigt deine persönlichen Schwankungen, kein Vergleich mit anderen.',
+      readinessHow: 'Der Wert wird auf der Uhr berechnet und über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle bietet keinen Bereitschaftswert.',
+      stressWhat: 'Ganztägiger Stress: Die Uhr misst etwa alle fünf Minuten und fasst die Werte pro Tag zusammen.',
+      stressChart: 'Diese Karte zeigt den Tagesdurchschnitt, der schattierte Bereich den gemessenen Tagesbereich; die einzelnen Messwerte der letzten 24 Stunden findest du in der Kurvenkarte oben.',
+      stressHow: 'Stammt aus „Erweiterte Daten“ – die offizielle Schnittstelle liefert keinen ganztägigen Stress. Zeiten ohne Messung bleiben frei und werden nicht mit 0 aufgefüllt.',
+      spo2What: 'Blutsauerstoffsättigung (SpO₂): Wie viel Sauerstoff das Hämoglobin im Blut transportiert, in %.',
+      spo2Chart: 'Einzelne Messwerte werden zu einem Tagesdurchschnitt zusammengefasst; der schattierte Bereich zeigt den gemessenen Tagesbereich.',
+      spo2How: 'Jeder Messwert ist eine Einzelmessung der Uhr und stammt aus „Erweiterte Daten“ – die offizielle Schnittstelle bietet keine einzelnen SpO₂-Messungen.',
+      spo2_odiWhat: 'Nächtlicher SpO₂-ODI: Durchschnittliche Anzahl der Sauerstoffabfälle pro Stunde; je niedriger, desto besser.',
+      spo2_odiChart: 'Ein Datenpunkt pro Tag aus der jeweiligen Nachtüberwachung; Nächte ohne Überwachung erhalten keinen Punkt und werden nicht mit 0 aufgefüllt.',
+      spo2_odiHow: 'Der eigene Messwert der Uhr aus der nächtlichen SpO₂-Überwachung, synchronisiert über „Erweiterte Daten“ – die offizielle Schnittstelle enthält diesen Wert nicht, und er wird nicht aus einzelnen SpO₂-Messungen abgeleitet.',
+      hrvWhat: 'Herzfrequenzvariabilität (SDNN-Messwert): Wie stark der zeitliche Abstand zwischen den Herzschlägen schwankt, in ms.',
+      hrvChart: 'Einzelne Messungen werden zu einem Tageswert gemittelt; der schattierte Bereich zeigt den gemessenen Tagesbereich.',
+      hrvHow: 'Stammt aus „Erweiterte Daten“. Die offizielle Schnittstelle meldet ebenfalls einen HRV-Wert, dessen Algorithmus und Einheit jedoch nicht offengelegt sind – er ersetzt kein SDNN und wird hier nicht erfasst.',
+      hrv_rmssdWhat: 'Ein weiteres Maß für die Herzfrequenzvariabilität (RMSSD) – nicht derselbe Wert wie SDNN.',
+      hrv_rmssdChart: 'Nächtliche Messungen werden zu einem Punkt pro Tag gemittelt; der schattierte Bereich zeigt den gemessenen Tagesbereich.',
+      hrv_rmssdHow: 'Stammt aus „Erweiterte Daten“; der offizielle HRV-Wert ersetzt auch hier kein RMSSD.',
+      respiratory_rateWhat: 'Atemfrequenz: Atemzüge pro Minute während des Schlafs.',
+      respiratory_rateChart: 'Zu einem Punkt pro Tag gemittelt; der schattierte Bereich zeigt den gemessenen Tagesbereich.',
+      respiratory_rateHow: 'Von der Uhr während des Schlafs gemessen, über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle liefert keine Atemfrequenz.',
+      resting_hrWhat: 'Ruheherzfrequenz: Herzschläge pro Minute im Ruhezustand.',
+      resting_hrChart: 'Ein Wert der Uhr pro Tag als Trendverlauf; getrennt von der momentanen Herzfrequenz der letzten 24 Stunden dargestellt.',
+      resting_hrHow: 'Wird von der Uhr in der täglichen Übersicht gemeldet und über „Erweiterte Daten“ synchronisiert – hier wird nichts neu berechnet.',
+    },
+    'lib/metricInfo/body': {
+      weightWhat: 'Körpergewicht: Ein Messwert pro Wiegung.',
+      weightChart: 'Bei mehreren Wiegungen an einem Tag wird der Tagesdurchschnitt gebildet; der schattierte Bereich zeigt den gemessenen Tagesbereich.',
+      weightHow: 'Wiegedaten stammen aus der Zepp-Cloud – sowohl die offizielle Schnittstelle als auch „Erweiterte Daten“ synchronisieren sie; von der Uhr erfasstes Gewicht ist enthalten, liefert jedoch keine Körperzusammensetzung.',
+      bmiWhat: 'BMI: Verhältnis von Körpergewicht zu Körpergröße (kg/m²).',
+      bmiChart: 'Wird mit jeder Wiegung aktualisiert.',
+      bmiHow: 'Wird von der Cloud zusammen mit dem Gewichtseintrag geliefert (sowohl über die offizielle Schnittstelle als auch über „Erweiterte Daten“) – wird nicht hier aus Größe und Gewicht berechnet.',
+      body_fat_rateWhat: 'Körperfettanteil: Anteil des Fetts am Körpergewicht, in %.',
+      body_fat_rateChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert; bei mehreren Wiegungen am Tag wird der Tagesdurchschnitt genommen.',
+      body_fat_rateHow: 'Erfordert eine Körperanalysewaage – von der Uhr oder manuell eingegebenes Gewicht enthält diesen Wert nicht. Synchronisiert über „Erweiterte Daten“; die offizielle Schnittstelle für die Körperzusammensetzung ist noch nicht freigeschaltet.',
+      muscle_massWhat: 'Muskelmasse, in deinem gewählten Einheitensystem.',
+      muscle_massChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert.',
+      muscle_massHow: 'Erfordert eine Körperanalysewaage, synchronisiert über „Erweiterte Daten“; die offizielle Schnittstelle für die Körperzusammensetzung ist noch nicht freigeschaltet.',
+      body_water_rateWhat: 'Körperwasseranteil: Anteil des Wassers am Körpergewicht, in %.',
+      body_water_rateChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert.',
+      body_water_rateHow: 'Erfordert eine Körperanalysewaage, synchronisiert über „Erweiterte Daten“; die offizielle Schnittstelle für die Körperzusammensetzung ist noch nicht freigeschaltet.',
+      bone_massWhat: 'Knochenmasse, in deinem gewählten Einheitensystem.',
+      bone_massChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert.',
+      bone_massHow: 'Erfordert eine Körperanalysewaage, synchronisiert über „Erweiterte Daten“; die offizielle Schnittstelle für die Körperzusammensetzung ist noch nicht freigeschaltet.',
+      visceral_fatWhat: 'Viszeralfett: Einstufung des Fetts um die inneren Organe, kein Prozentwert.',
+      visceral_fatChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert.',
+      visceral_fatHow: 'Zepp stuft dies auf einer Skala von 1 bis 30 ein. Erfordert eine Körperanalysewaage, synchronisiert über „Erweiterte Daten“.',
+      bmrWhat: 'Grundumsatz: Täglicher Kalorienverbrauch in völliger Ruhe (kcal/Tag).',
+      bmrChart: 'Wird mit jeder Körperanalyse-Wiegung aktualisiert.',
+      bmrHow: 'Erfordert eine Körperanalysewaage, synchronisiert über „Erweiterte Daten“; die offizielle Schnittstelle für die Körperzusammensetzung ist noch nicht freigeschaltet.',
+      heightWhat: 'Körpergröße: Ein Profilwert, keine Tagesmessung.',
+      heightChart: 'Wird mit jeder Wiegung mitübertragen; ändert sich selten.',
+      heightHow: 'Profildaten aus der Cloud, die mit jeder Wiegung übermittelt werden (sowohl über die offizielle Schnittstelle als auch über „Erweiterte Daten“ synchronisiert).',
+      intake_caloriesWhat: 'Kalorienaufnahme: Gesamte für den Tag manuell erfasste Kalorienmenge.',
+      intake_caloriesChart: 'Als Balken pro Tag dargestellt; Tage ohne Einträge erhalten keinen Balken und werden nicht mit 0 aufgefüllt.',
+      intake_caloriesHow: 'Manuell in der Zepp-App erfasst, über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle für Ernährung ist noch nicht freigeschaltet.',
+      intake_protein_gWhat: 'Protein: Gesamte für den Tag manuell erfasste Menge, in Gramm.',
+      intake_protein_gChart: 'Als Balken pro Tag dargestellt; Tage ohne Einträge erhalten keinen Balken und werden nicht mit 0 aufgefüllt.',
+      intake_protein_gHow: 'Manuell in der Zepp-App erfasst, über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle für Ernährung ist noch nicht freigeschaltet.',
+      intake_fat_gWhat: 'Fett: Gesamte für den Tag manuell erfasste Menge, in Gramm.',
+      intake_fat_gChart: 'Als Balken pro Tag dargestellt; Tage ohne Einträge erhalten keinen Balken und werden nicht mit 0 aufgefüllt.',
+      intake_fat_gHow: 'Manuell in der Zepp-App erfasst, über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle für Ernährung ist noch nicht freigeschaltet.',
+      intake_carbs_gWhat: 'Kohlenhydrate: Gesamte für den Tag manuell erfasste Menge, in Gramm.',
+      intake_carbs_gChart: 'Als Balken pro Tag dargestellt; Tage ohne Einträge erhalten keinen Balken und werden nicht mit 0 aufgefüllt.',
+      intake_carbs_gHow: 'Manuell in der Zepp-App erfasst, über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle für Ernährung ist noch nicht freigeschaltet.',
+    },
+    'lib/metricInfo/training': {
+      vo2maxWhat: 'VO₂max: Maximale Sauerstoffmenge, die dein Körper pro Minute und Kilogramm Körpergewicht verwerten kann (ml/kg/min).',
+      vo2maxChart: 'Wird nur nach Läufen im Freien aktualisiert, meist nur wenige Male im Jahr; Einzelwerte sagen wenig aus, der langfristige Trend wird erst im 6-Monats-Bereich sichtbar.',
+      vo2maxHow: 'Wird von der Uhr nach Läufen im Freien geschätzt und über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle liefert keine VO₂max.',
+      training_loadWhat: 'Trainingsbelastung: die von Zepp gemeldete rollierende Belastung über 7 Tage, ohne Einheit.',
+      training_loadChart: 'Ein Punkt pro Tag; die Einstufung neben dem neuesten Wert (niedrig / moderat / hoch / sehr hoch) orientiert sich an einer Referenzskala von 600 – eine grobe Orientierung, keine Einstufung der Uhr.',
+      training_loadHow: 'Wird von der Uhr pro Tag bereitgestellt und über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle bietet keine tägliche Trainingsbelastung. Die Einstufung wird von ZeppBridge anhand der Referenzskala berechnet.',
+      pai_totalWhat: 'PAI-Vitalitätsindex: Ein persönlicher Aktivitätswert über einen rollierenden 7-Tage-Zeitraum.',
+      pai_totalChart: 'Ein Punkt pro Tag für die rollierende 7-Tage-Gesamtzahl; neu am Tag gesammelte Punkte werden hier nicht dargestellt.',
+      pai_totalHow: 'Sowohl die offizielle Schnittstelle als auch „Erweiterte Daten“ liefern PAI; die rollierende Zählung folgt der Definition von Zepp.',
+      lactate_thresholdWhat: 'Laktatschwelle: Der Belastungspunkt, ab dem Ermüdung rapide zunimmt, bestimmt durch Herzfrequenz und Tempo.',
+      lactate_thresholdChart: 'Zwei Kurven: Herzfrequenz und Tempo (die Tempo-Achse ist invertiert, sodass höheres Tempo nach oben zeigt); aktualisiert sich nur nach längeren intensiven Läufen.',
+      lactate_thresholdHow: 'Wird von der Uhr nach intensiven Läufen geschätzt und über „Erweiterte Daten“ synchronisiert – die offizielle Schnittstelle bietet keine Laktatschwelle.',
+      training_balanceWhat: 'Trainingsbelastungs-Balance: Das Verhältnis der Belastung der letzten 7 Tage zum 28-Tage-Wochendurchschnitt (akut-zu-chronisches Verhältnis).',
+      training_balanceChart: 'Drei Kurven: 7-Tage-Belastung, 28-Tage-Wochendurchschnitt und das Verhältnis; wo eine Kurve abbricht, war ihr Fenster unvollständig – nicht berechnet, keine 0.',
+      training_balanceHow: 'Hier aus den einzelnen Trainingsbelastungen berechnet, summiert nach dem lokalen Startdatum (nicht die rollierende 7-Tage-Belastung von Zepp, sonst zählte jedes Training doppelt); akut:chronisch = Summe über 7 Tage ÷ (Summe über 28 Tage ÷ 4). Ein Tag ist nur vollständig, wenn die Trainingsliste über „Erweiterte Daten“ komplett synchronisiert wurde und jedes Training eine gültige Belastung hat; nur bestätigte Tage ohne Training zählen als 0, unvollständige Fenster von 7 oder 28 Tagen bleiben leer. Trainings der offiziellen Schnittstelle haben keine Belastung, daher bleiben Tage, die nur darüber synchronisiert wurden, außen vor.',
+    },
+    'lib/metricInfo/activity': {
+      stepsWhat: 'Schritte: Die von der Uhr ermittelte Gesamtschrittzahl des Tages.',
+      stepsChart: 'Ein Punkt pro Tag; Tage ohne Aufzeichnung unterbrechen die Kurve und werden nicht mit 0 aufgefüllt. Die stündliche Verteilung findest du in der Stundenkarte oben.',
+      stepsHow: 'Sowohl die offizielle Schnittstelle als auch „Erweiterte Daten“ liefern tägliche Schritte; die Stundenkarte nutzt bevorzugt minutengenaue Einträge des früheren Kanals und füllt Lücken mit der offiziellen Stundenzusammenfassung.',
+      distanceWhat: 'Distanz: Die an diesem Tag insgesamt zurückgelegte Strecke.',
+      distanceChart: 'Ein Punkt pro Tag; Tage ohne Aufzeichnung unterbrechen die Kurve und werden nicht mit 0 aufgefüllt.',
+      distanceHow: 'Wird sowohl von der offiziellen Schnittstelle als auch über „Erweiterte Daten“ bereitgestellt und mit der täglichen Aktivitätsübersicht synchronisiert.',
+      active_caloriesWhat: 'Aktivitätskalorien: Durch Aktivitäten verbrannte Kalorien des Tages, ohne Grundumsatz.',
+      active_caloriesChart: 'Ein Punkt pro Tag; Tage ohne Aufzeichnung unterbrechen die Kurve und werden nicht mit 0 aufgefüllt.',
+      active_caloriesHow: 'Wird sowohl von der offiziellen Schnittstelle als auch über „Erweiterte Daten“ bereitgestellt und getrennt vom Tagesgesamtverbrauch erfasst.',
+      active_minutesWhat: 'Aktive Minuten: Minuten, die die Uhr als Aktivität gewertet hat.',
+      active_minutesChart: 'Ein Punkt pro Tag; Tage ohne Aufzeichnung unterbrechen die Kurve und werden nicht mit 0 aufgefüllt.',
+      active_minutesHow: 'Stammt aus „Erweiterte Daten“ – die offizielle tägliche Zusammenfassung enthält derzeit keine aktiven Minuten.',
+    },
+    'lib/metricInfo/sleep': {
+      sleep_durationWhat: 'Schlafdauer: Gesamte Schlafzeit dieser Nacht, ohne Wachphasen im Bett.',
+      sleep_durationChart: 'Die große Zahl ist die Gesamtdauer dieser Nacht; Einschlaf-, Aufwach- und Bettzeit stehen in der Zeile darunter.',
+      sleep_durationHow: 'Stammt aus den Schlafaufzeichnungen der Cloud – wird sowohl von der offiziellen Schnittstelle als auch über „Erweiterte Daten“ bereitgestellt; fehlt die reine Schlafzeit, wird sie aus Beginn, Ende und Phasendauer berechnet.',
+      sleep_scoreWhat: 'Schlafbewertung: Gesamtbewertung der Nacht durch das Gerät, maximal 100 Punkte.',
+      sleep_scoreChart: 'Reine Anzeige wie aufgezeichnet – hier erfolgt weder Interpretation noch Diagnose.',
+      sleep_scoreHow: 'Wird vom Gerät direkt mit den Schlafdaten geliefert (sowohl über die offizielle Schnittstelle als auch über „Erweiterte Daten“) – nicht von ZeppBridge berechnet.',
+      sleep_weeklyWhat: 'Schlafstruktur der letzten 7 Nächte: Dauer der einzelnen Schlafphasen pro Nacht.',
+      sleep_weeklyChart: 'Ein Balken pro Nacht, gestapelt nach Tiefschlaf / Leichtschlaf / REM / Wach; die ausgewählte Nacht ist hervorgehoben; fehlende Phasen werden als „Nicht angegeben“ gekennzeichnet.',
+      sleep_weeklyHow: 'Die Phasendauern werden mit den Schlafdaten synchronisiert – sowohl von der offiziellen Schnittstelle als auch über „Erweiterte Daten“ bereitgestellt.',
+      sleep_stagesChart:
+        'Eine Zeitachse vom Einschlafen bis zum Aufwachen, jeder Abschnitt nach Phase eingefärbt; fahre mit der Maus darüber, um Beginn, Ende und Dauer zu sehen.',
+      sleep_stagesHow:
+        'Die Phaseneinteilung stammt vom Gerät und wird mit dem Schlafeintrag synchronisiert; dies erklärt nur die Phasen und ist keine Gesundheitsdiagnose.',
+      sleep_stagesWhat:
+        'Tiefschlaf: erholsame Phase zur Regeneration. Leichtschlaf: Übergangsphase, die den Großteil der Nacht ausmacht. REM: schnelle Augenbewegungen, verknüpft mit Träumen und Gedächtnis. Wach: nächtliches Aufwachen oder Wachphasen.',
+    },
+    'lib/metricInfo/heart': {
+      heart_rate_24hWhat: 'Herzfrequenzmessung der letzten 24 Stunden, Messwert für Messwert.',
+      heart_rate_24hChart: 'Die große Zahl zeigt die aktuellste Messung; Zeiten ohne getragene Uhr unterbrechen die Kurve und werden nicht mit 0 aufgefüllt.',
+      heart_rate_24hHow: 'Messpunkte stammen aus der offiziellen Schnittstelle oder „Erweiterte Daten“; aktuellster, durchschnittlicher, niedrigster und höchster Wert dieser Karte werden von ZeppBridge lokal aus den Messwerten dieser 24 Stunden berechnet.',
+      daily_max_hrWhat: 'Tägliche maximale Herzfrequenz, auf diesem Rechner aus den gespeicherten Rohdaten ermittelt.',
+      daily_max_hrChart: 'Zwei Kurven: Tageshöchst- und Tagesdurchschnittswert; Tage mit sehr wenigen Messwerten (unter 60) werden als Hohlpunkte dargestellt – ihr Höchstwert ist lediglich das Maximum dieser wenigen Punkte.',
+      daily_max_hrHow: 'ZeppBridge ermittelt die Werte pro Tag lokal aus den Rohdaten ohne die Filter der Zepp-App; Abweichungen zwischen beiden Werten sind daher normal. Messwerte sowohl aus der offiziellen Schnittstelle als auch aus „Erweiterte Daten“ fließen ein.',
     },
   },
 } satisfies LocalePack;
