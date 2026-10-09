@@ -2948,7 +2948,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       vo2maxWhat: 'Consumo máximo de oxigênio (VO₂max): volume de oxigênio que seu corpo consegue utilizar por minuto por quilo de peso corporal (ml/kg/min).',
       vo2maxChart: 'Atualizado apenas após corridas ao ar livre, poucas vezes ao ano; uma medição isolada é menos informativa que a tendência de longo prazo, que exige o intervalo de 6 meses.',
       vo2maxHow: 'Estimado pelo relógio após corridas ao ar livre, sincronizado via "dados avançados" — a API oficial não possui VO₂max.',
-      training_loadWhat: 'Carga de treino: pontuação diária de esforço físico, sem dimensão.',
+      training_loadWhat: 'Carga de treino: a carga móvel de 7 dias informada pelo Zepp, sem unidade.',
       training_loadChart: 'Um ponto por dia; a faixa ao lado da leitura mais recente (baixa / moderada / alta / muito alta) segue uma escala de referência de 600 pontos — apenas uma estimativa geral, não uma classificação dada pelo relógio.',
       training_loadHow: 'Fornecido pelo relógio diariamente, sincronizado via "dados avançados" — a API oficial não possui carga de treino diária. As faixas são calculadas pelo ZeppBridge com base na escala de referência.',
       pai_totalWhat: 'Pontuação de vitalidade PAI: pontuação pessoal de atividade física calculada em uma janela móvel de 7 dias.',
@@ -2958,8 +2958,8 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       lactate_thresholdChart: 'Duas linhas, frequência cardíaca e ritmo (eixo de ritmo invertido para que valores mais rápidos fiquem mais altos); atualizado apenas após corridas prolongadas de alta intensidade.',
       lactate_thresholdHow: 'Estimado pelo relógio após corridas intensas, sincronizado via "dados avançados" — a API oficial não possui limiar de lactato.',
       training_balanceWhat: 'Equilíbrio da carga de treino: comparação entre a carga dos últimos 7 dias e a média semanal dos últimos 28 dias, ou seja, a razão entre carga aguda e crônica.',
-      training_balanceChart: 'Três linhas: carga de 7 dias, média semanal de 28 dias e razão aguda/crônica; quebras na linha indicam dados insuficientes na janela — não calculada, não zero.',
-      training_balanceHow: 'Calculado localmente pelo ZeppBridge: razão aguda:crônica = soma da carga de 7 dias ÷ (soma da carga de 28 dias ÷ 4); sem razão quando a janela de 28 dias tiver menos de 21 dias com dados. A carga diária vem de "dados avançados".',
+      training_balanceChart: 'Três linhas: carga de 7 dias, média semanal de 28 dias e a razão; onde uma linha se interrompe, a janela dela estava incompleta — não calculada, não zero.',
+      training_balanceHow: 'Calculado aqui a partir da carga de cada treino, somada pela data local de início (não a carga móvel de 7 dias do Zepp, que contaria cada treino de novo); aguda:crônica = soma de 7 dias ÷ (soma de 28 dias ÷ 4). Um dia só está completo quando a lista de treinos foi sincronizada por inteiro pelos dados avançados e cada treino tem uma carga válida; só os dias confirmados sem treinos contam como zero, e janelas incompletas de 7 ou 28 dias ficam vazias. Os treinos da API oficial não trazem carga, então os dias sincronizados só por ela ficam de fora.',
     },
 
     'lib/metricInfo/activity': {
