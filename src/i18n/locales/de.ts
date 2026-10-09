@@ -160,6 +160,14 @@ export default {
     'err.training_plan.draft_closed': 'Dieser Planentwurf wurde schon gesendet oder verworfen',
     'err.training_plan.publish_not_found': 'Zu diesem Versand gibt es keinen Eintrag',
     'err.training_plan.rejected': 'Zepp hat diesen Plan nicht angenommen; der Plan auf deiner Uhr ist unverändert',
+    'err.mcp.bundle_failed': 'Claude Desktop-Erweiterung konnte nicht erstellt werden',
+    'err.mcp.sidecar_missing':
+      'Dieser Build enthält kein MCP-Programm – lade zeppbridge-tools von GitHub herunter',
+    'err.training_plan.ai_publish_disabled': 'Die KI darf Trainingspläne nicht direkt veröffentlichen',
+    'err.training_plan.format': 'Der Trainingsplan ist fehlerhaft aufgebaut und wurde nicht gespeichert',
+    'err.training_plan.invalid': 'Dieser Plan hat die Prüfung nicht bestanden und wurde nicht gesendet',
+    'err.training_plan.needs_clear_confirmation':
+      'Dies würde einen Teil des Plans auf deiner Uhr löschen; bestätige dies in ZeppBridge',
   },
 
   // ── 后端 ui.* 散文码的兜底表 ──
@@ -373,6 +381,21 @@ export default {
       mcpToolSleepSessions: "Liste der Schlafaufzeichnungen",
       mcpToolLifeEvents: "Von dir erfasste Lebensereignisse",
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
+      mcpSetupPrompt: `Ich nutze eine Windows-Desktop-App namens ZeppBridge, die Daten meiner Amazfit / Zepp-Uhr in eine lokale SQLite-Datenbank synchronisiert.
+Sie enthält ein MCP-Programm (zeppbridge-mcp), das ich bei dir einrichten möchte, damit du meine Trainings- und Gesundheitsdaten direkt abfragen kannst, statt dass ich sie jedes Mal exportieren und einfügen muss.
+
+Bekannte Informationen:
+- Das MCP-Programm stammt aus dem Archiv zeppbridge-tools auf der GitHub-Releases-Seite von ZeppBridge; nach dem Entpacken befindet sich zeppbridge-mcp darin. Ich habe es eventuell noch nicht heruntergeladen.
+- Es ist ein stdio-basierter MCP-Server. Gesundheitsdaten sind schreibgeschützt (read-only); er lauscht auf keinem Port und benötigt weder Token noch API-Key. Er nutzt das Netzwerk nur zum Veröffentlichen von Trainingsplänen, und auch das erst nach meiner Erlaubnis.
+- Typischer Aufbau der Konfiguration: {"mcpServers": {"zeppbridge": {"command": "<vollständiger Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Es stellt fünfzehn Nur-Lese-Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events), Datenzustand (get_data_health) und Coaching (get_training_context, get_athlete_profile, get_training_plan); dazu zwei Trainingsplan-Werkzeuge: draft_training_plan (speichert nur einen Entwurf) und publish_training_plan (überträgt erst nach Aktivierung in den Einstellungen an die Uhr).
+
+Bitte sag mir:
+1. Wo genau bei dir (dem Werkzeug, mit dem ich gerade spreche) die Konfiguration eingetragen wird bzw. mit welchem Befehl sie hinzugefügt wird;
+2. Wie der Pfad unter Windows formatiert wird (müssen Backslashes maskiert werden?);
+3. Wie ich nach der Einrichtung überprüfe, ob alles funktioniert.
+
+Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei liegt), frag mich einfach.`,
 
       // ── 6. Aufbewahrung ──
       retentionAria: 'Aufbewahrungsdauer lokaler Daten in Tagen',
@@ -1136,6 +1159,8 @@ export default {
       sleepSub: 'Schlafstruktur im Überblick',
       sleepTitle: 'Letzte Nacht',
       sleepTitleOn: (day: string) => `Schlaf · ${day}`,
+      windowAsleep: 'Eingeschlafen',
+      windowWoke: 'Aufgewacht',
     },
     'components/overview/PinnedMetrics': {
       title: 'Meine Metriken',
@@ -1207,6 +1232,8 @@ export default {
       factDone: 'Geschafft',
       factLeft: 'Noch offen',
       factReached: 'Erreicht',
+      weekAria: 'Schritte der letzten 7 Tage; die gestrichelte Linie ist das Ziel',
+      weekTitle: 'Letzte 7 Tage',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -2037,6 +2064,8 @@ export default {
       trainingTitle: 'Trainingsstatus',
       unrecognizedCta: 'Hier manuell zuordnen',
       unrecognizedSuffix: ' hat noch kein erkanntes Modell',
+      entryWeek: 'Letzte 7 Tage',
+      focusLabel: 'Mein Fokus',
     },
     'views/RecentRecords': {
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
@@ -2715,6 +2744,8 @@ Antworte in Markdown.`,
       sumDisplay: (language: string, unit: string, scale: number) =>
         `${language} · ${unit} · ${scale} %`,
       sumPrivacy: 'Deine Daten bleiben auf diesem Rechner',
+      sumFeedback:
+        'Gerät nicht erkannt oder Daten fehlerhaft? Sende uns einen anonymisierten Bericht',
       sumSyncOff: 'Automatische Synchronisierung ist aus',
       sumSyncOn: (minutes: number) =>
         `Automatische Synchronisierung · alle ${minutes} Min.`,
@@ -2930,6 +2961,8 @@ Antworte in Markdown.`,
       notOpened: 'Unterwegs abgebrochen; die Website wurde diesmal nicht geöffnet',
       exchanges: (count: number) => plural(count, { one: '1 Austausch', other: `${count} Austausche` }),
       planPeek: 'Dein nächster Schritt',
+      resetCards: 'Karten zurücksetzen',
+      ringHint: 'Halte den Ring gedrückt. Ein voller Kreis sendet ab.',
     },
     'components/cards/cards': {
       noWorkouts: 'Keine Trainings in diesem Zeitraum',
@@ -3229,9 +3262,34 @@ Antworte in Markdown.`,
       lead: 'Lokalen KI-Werkzeugen (Claude Code, Codex usw.) direkten Zugriff auf deine Daten geben',
       toolsLabel: 'Verfügbare KI-Werkzeuge (für Details mit der Maus darüberfahren)',
       scopesHint: 'Gilt nur für MCP, das mit --scope task gestartet wurde',
+      bundlePick: 'Ordner für die Erweiterung wählen',
+      bundleSaved: 'Erweiterung gespeichert; per Doppelklick in Claude Desktop installieren',
+      configReady: 'Konfiguration kopiert, Pfad ist bereits eingetragen',
+      connectCopied: 'Befehle kopiert; im Terminal einfügen und ausführen',
+      connectSub:
+        'Die ersten beiden kopieren Befehle für das Terminal; Claude Desktop speichert eine Erweiterung, die du per Doppelklick installierst',
+      connectTitle: 'KI-Werkzeug verbinden',
+      otherClients: 'Andere Clients',
+      publishOff:
+        'Aus: Die KI erstellt nur Entwürfe; du bestätigst sie unter „An die KI“, bevor etwas auf deine Uhr gelangt',
+      publishOn:
+        'Ein: Mit deiner Zustimmung kann die KI Pläne direkt an deine Uhr senden; bestehende Pläne werden nie gelöscht',
+      publishTitle: 'Der KI erlauben, Trainingspläne direkt zu veröffentlichen',
+      sidecarMissing:
+        'Dieser Build enthält kein MCP-Programm; verbinde manuell über den Prompt oder die Konfiguration unten',
+      toolAthleteProfile:
+        'Herzfrequenzzonen, Schwellenwerte, jüngste Lauftempos und dein Hintergrund für die KI',
+      toolDraftPlan:
+        'Entwirft einen Trainingsplan (nur als Entwurf gespeichert, nicht an die Uhr gesendet)',
+      toolPublishPlan: 'Sendet einen Entwurf an die Uhr (erfordert den Schalter oben)',
+      toolTrainingContext:
+        'Jüngstes Training und Erholung in einem Aufruf: Tagestabelle, jedes Training, der aktive Plan',
+      toolTrainingPlan: 'Trainingsplan-Register: aktiver Plan, Übertragungsstatus, Entwürfe',
     },
     'views/settings/sections/display': {
       focusTitle: 'Mein Fokus',
+      focusSlideSub:
+        'Die Übersicht zeigt diesen Bereich zuerst, der Rest wandert unter „Alle anzeigen“; „Ausgewogen“ belässt alles wie gehabt',
     },
     'views/settings/sections/privacy': {
       lead: 'Deine Daten bleiben auf diesem Rechner: kein Hochladen, keine Nutzungsstatistiken',
@@ -3251,6 +3309,7 @@ Antworte in Markdown.`,
 
     // ── composables / components ──
     'composables/useFocusAreas': {
+      areaAll: 'Ausgewogen',
       areaSleep: 'Schlaf',
       areaDaily: 'Tagesform',
       areaTraining: 'Training',
@@ -3378,6 +3437,12 @@ Antworte in Markdown.`,
       sleep_weeklyWhat: 'Schlafstruktur der letzten 7 Nächte: Dauer der einzelnen Schlafphasen pro Nacht.',
       sleep_weeklyChart: 'Ein Balken pro Nacht, gestapelt nach Tiefschlaf / Leichtschlaf / REM / Wach; die ausgewählte Nacht ist hervorgehoben; fehlende Phasen werden als „Nicht angegeben“ gekennzeichnet.',
       sleep_weeklyHow: 'Die Phasendauern werden mit den Schlafdaten synchronisiert – sowohl von der offiziellen Schnittstelle als auch über „Erweiterte Daten“ bereitgestellt.',
+      sleep_stagesChart:
+        'Eine Zeitachse vom Einschlafen bis zum Aufwachen, jeder Abschnitt nach Phase eingefärbt; fahre mit der Maus darüber, um Beginn, Ende und Dauer zu sehen.',
+      sleep_stagesHow:
+        'Die Phaseneinteilung stammt vom Gerät und wird mit dem Schlafeintrag synchronisiert; dies erklärt nur die Phasen und ist keine Gesundheitsdiagnose.',
+      sleep_stagesWhat:
+        'Tiefschlaf: erholsame Phase zur Regeneration. Leichtschlaf: Übergangsphase, die den Großteil der Nacht ausmacht. REM: schnelle Augenbewegungen, verknüpft mit Träumen und Gedächtnis. Wach: nächtliches Aufwachen oder Wachphasen.',
     },
     'lib/metricInfo/heart': {
       heart_rate_24hWhat: 'Herzfrequenzmessung der letzten 24 Stunden, Messwert für Messwert.',

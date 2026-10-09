@@ -197,6 +197,21 @@ export default {
       mcpToolSleepSessions: "Lista de sessões de sono",
       mcpToolLifeEvents: "Acontecimentos de vida que registaste",
       mcpConfigPathPlaceholder: '<caminho para o zeppbridge-mcp>',
+      mcpSetupPrompt: `Utilizo uma aplicação para Windows chamada ZeppBridge que sincroniza os dados do meu relógio Amazfit / Zepp com uma base de dados SQLite local.
+Inclui um programa MCP (zeppbridge-mcp) e pretendo configurá-lo contigo, para que possas consultar os meus treinos e dados de saúde diretamente em vez de ter de exportar e colar sempre.
+
+O que sei sobre ele:
+- O programa MCP é obtido a partir do arquivo zeppbridge-tools na página de Releases do ZeppBridge no GitHub; ao descompactar, o zeppbridge-mcp está lá dentro. Posso ainda não o ter descarregado.
+- É um servidor MCP por stdio. Os dados de saúde são apenas de leitura, não escuta em nenhuma porta e não necessita de token nem chave de API; só utiliza a rede para publicar um plano de treino, e apenas após eu o permitir.
+- O formato habitual da configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Disponibiliza quinze ferramentas de leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), acontecimentos de vida (list_life_events), integridade dos dados (get_data_health) e treinador (get_training_context, get_athlete_profile, get_training_plan); além de duas ferramentas de planos: draft_training_plan (guarda apenas um rascunho) e publish_training_plan (envia para o relógio apenas se eu autorizar nas definições).
+
+Indica-me:
+1. No teu caso específico — a ferramenta com quem estou a falar agora —, em que ficheiro deve ficar a configuração ou que comando a adiciona;
+2. Como escrever o caminho no Windows (se é necessário escapar as barras invertidas);
+3. Como confirmar que ficou a funcionar após a configuração.
+
+Se precisares de alguma informação minha (que cliente utilizo, onde está o ficheiro), pergunta-me.`,
       retentionAria: 'Retenção de dados locais em dias',
       retentionCutoff: (date: string) =>
         `Na próxima sincronização com sucesso, os dados anteriores a ${date} serão eliminados`,
@@ -918,6 +933,8 @@ export default {
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
       sleepTitleOn: (day: string) => `Sono · ${day}`,
+      windowAsleep: 'Adormeceste',
+      windowWoke: 'Acordaste',
     },
     'components/overview/PinnedMetrics': {
       title: 'As minhas métricas',
@@ -990,6 +1007,8 @@ export default {
       factDone: 'Feito',
       factLeft: 'Em falta',
       factReached: 'Atingido',
+      weekTitle: 'Últimos 7 dias',
+      weekAria: 'Passos em cada um dos últimos 7 dias; a linha tracejada é a meta',
     },
     'components/shell/AppTopBar': {
       today: 'Hoje',
@@ -1677,6 +1696,8 @@ export default {
       focusSkip: 'Ignorar',
       showAllModules: 'Mostrar tudo',
       collapseModules: 'Recolher',
+      focusLabel: 'O que me interessa',
+      entryWeek: 'Últimos 7 dias',
     },
     'views/RecentRecords': {
       title: 'Registos recentes',
@@ -2327,6 +2348,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       sumDisplay: (language: string, unit: string, scale: number) =>
         `${language} · ${unit} · ${scale}%`,
       sumPrivacy: 'Os teus dados permanecem apenas neste computador',
+      sumFeedback: 'Dispositivo não reconhecido ou dados incorretos? Envia-nos um relatório anonimizado',
       sumAdvanced: "Cópia de segurança e restauro · API local · integridade dos dados",
       autoSyncToggle: 'Sincronização automática',
       secAccount: 'Conta',
@@ -2565,6 +2587,8 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       notOpened: 'Recolheu a meio do caminho; o site não foi aberto',
       exchanges: (count: number) => plural(count, { one: '1 ida e volta', other: `${count} idas e voltas` }),
       planPeek: 'O seu próximo passo',
+      ringHint: 'Mantém o anel premido para carregar. Uma volta completa envia.',
+      resetCards: 'Repor cartões',
     },
     'components/plan/editor': {
       byTime: 'Por tempo', byDistance: 'Por distância', targetHr: 'Frequência cardíaca', targetPace: 'Ritmo',
@@ -2990,9 +3014,26 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       lead: 'Permite que as ferramentas de IA deste computador (Claude Code, Codex, etc.) consultem os teus dados diretamente',
       toolsLabel: 'Ferramentas disponíveis para a IA (passa o cursor para ver os detalhes)',
       scopesHint: 'Aplica-se apenas ao MCP iniciado com --scope task',
+      publishTitle: 'Permitir que a IA publique planos de treino diretamente',
+      publishOff: 'Desativado: a IA só pode criar rascunhos; confirmas na página «Enviar para a IA» antes de qualquer plano chegar ao relógio',
+      publishOn: 'Ativado: com a tua autorização, a IA pode enviar planos diretamente para o relógio; nunca apaga os planos existentes',
+      toolTrainingContext: 'Treino e recuperação recentes numa única consulta: tabela diária, cada treino, o plano ativo',
+      toolAthleteProfile: 'Zonas de frequência cardíaca, limiares, ritmos de corrida recentes e o contexto que escreveste para a IA',
+      toolTrainingPlan: 'Registo de planos de treino: plano ativo, estado de entrega e rascunhos',
+      toolDraftPlan: 'Cria um plano de treino (guardado apenas como rascunho, não é enviado para o relógio)',
+      toolPublishPlan: 'Envia um rascunho para o relógio (requer o interruptor acima)',
+      connectTitle: 'Ligar a uma ferramenta de IA',
+      connectSub: 'Os dois primeiros copiam comandos para colar num terminal; o Claude Desktop guarda uma extensão que instalas com duplo clique',
+      connectCopied: 'Comandos copiados; cola-os num terminal',
+      bundleSaved: 'Extensão guardada; faz duplo clique para a adicionar ao Claude Desktop',
+      bundlePick: 'Escolhe uma pasta para a extensão',
+      sidecarMissing: 'Esta versão não inclui o programa MCP; liga manualmente com as instruções ou configuração abaixo',
+      otherClients: 'Outros clientes',
+      configReady: 'Configuração copiada com o caminho já preenchido',
     },
     'views/settings/sections/display': {
       focusTitle: 'O que me interessa',
+      focusSlideSub: 'A Visão geral apresenta este bloco primeiro e agrupa o restante em «Mostrar tudo»; «Equilibrado» mantém tudo como está',
     },
     'views/settings/sections/privacy': {
       lead: 'Os teus dados ficam apenas neste computador: sem envios nem estatísticas de utilização',
@@ -3010,6 +3051,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       compactMore: 'Detalhes',
     },
     'composables/useFocusAreas': {
+      areaAll: 'Equilibrado',
       areaSleep: 'Sono',
       areaDaily: 'Estado diário',
       areaTraining: 'Treino',
@@ -3135,6 +3177,9 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       sleep_weeklyWhat: 'Estrutura do sono nos últimos 7 dias: a duração de cada fase em cada noite.',
       sleep_weeklyChart: 'Uma barra por noite, empilhada por sono profundo / leve / REM / acordado; a noite atual é destacada; uma fase não fornecida pela nuvem é identificada como «Não fornecido».',
       sleep_weeklyHow: 'A duração das fases é sincronizada com cada registo de sono — tanto a autorização oficial como os dados avançados a fornecem.',
+      sleep_stagesWhat: 'Profundo: o período reparador. Leve: a fase de transição que ocupa a maior parte da noite. REM: movimento rápido dos olhos, associado à memória e aos sonhos. Acordado: despertares ou períodos acordado durante a noite.',
+      sleep_stagesChart: 'Uma linha cronológica desde que adormeceste até que acordaste, com cada segmento colorido segundo a respetiva fase; passa o cursor para ver o início, fim e duração.',
+      sleep_stagesHow: 'A divisão em fases é determinada pelo dispositivo e sincronizada com o registo de sono. Trata-se de definições, não de um diagnóstico de saúde.',
     },
     'lib/metricInfo/heart': {
       heart_rate_24hWhat: 'Frequência cardíaca, leitura a leitura, nas últimas 24 horas.',
@@ -3308,6 +3353,14 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
     'err.training_plan.draft_closed': 'Este rascunho já foi enviado ou descartado',
     'err.training_plan.publish_not_found': 'Não há registo desse envio',
     'err.training_plan.rejected': 'A Zepp não aceitou este plano; o plano do teu relógio não mudou',
+    'err.training_plan.format': 'O plano de treino tem uma estrutura incorreta e não foi guardado',
+    'err.training_plan.invalid': 'Este plano não passou na validação e não foi enviado',
+    'err.training_plan.ai_publish_disabled': 'A IA não tem permissão para publicar planos diretamente',
+    'err.training_plan.needs_clear_confirmation':
+      'Isto iria limpar parte do plano no teu relógio; confirma no ZeppBridge',
+    'err.mcp.bundle_failed': 'Não foi possível criar a extensão do Claude Desktop',
+    'err.mcp.sidecar_missing':
+      'Esta versão não inclui o programa MCP; descarrega o zeppbridge-tools a partir do GitHub',
   },
   backendText: {
     'ui.backup.file_missing': 'Ficheiro de cópia de segurança não encontrado na pasta',

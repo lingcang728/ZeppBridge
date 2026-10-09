@@ -486,6 +486,8 @@ export default {
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
       sleepTitleOn: (day: string) => `Sono · ${day}`,
+      windowAsleep: 'Adormeceu',
+      windowWoke: 'Acordou',
     },
 
     'components/overview/PinnedMetrics': {
@@ -560,6 +562,8 @@ export default {
       factDone: 'Concluído',
       factLeft: 'Faltam',
       factReached: 'Alcançada',
+      weekAria: 'Passos de cada um dos últimos 7 dias; a linha tracejada é a meta',
+      weekTitle: 'Últimos 7 dias',
     },
 
     'components/shell/AppTopBar': {
@@ -1260,6 +1264,8 @@ export default {
       focusSkip: 'Pular',
       showAllModules: 'Ver tudo',
       collapseModules: 'Recolher',
+      entryWeek: 'Últimos 7 dias',
+      focusLabel: 'Meu foco',
     },
 
     'views/RecentRecords': {
@@ -1706,6 +1712,21 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       mcpToolSleepSessions: "Lista de sessões de sono",
       mcpToolLifeEvents: "Eventos de vida que você registrou",
       mcpConfigPathPlaceholder: '<caminho do zeppbridge-mcp>',
+      mcpSetupPrompt: `Uso um aplicativo de desktop para Windows chamado ZeppBridge que sincroniza os dados do meu relógio Amazfit / Zepp em um banco de dados SQLite local.
+Ele inclui um programa MCP (zeppbridge-mcp) e quero configurá-lo com você, para que você possa consultar meus treinos e dados de saúde diretamente em vez de eu ter que exportar e colar toda vez.
+
+O que sei sobre ele:
+- O programa MCP vem no arquivo zeppbridge-tools da página de Releases do ZeppBridge no GitHub; descompacte-o e o zeppbridge-mcp estará dentro. Pode ser que eu ainda não o tenha baixado.
+- É um servidor MCP via stdio. Os dados de saúde são somente leitura, ele não escuta em nenhuma porta e não precisa de token nem de chave de API; só usa a rede para publicar um plano de treino, e apenas depois que eu permitir.
+- O formato típico de configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Ele oferece quinze ferramentas somente leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), eventos de vida (list_life_events), integridade dos dados (get_data_health) e treinador (get_training_context, get_athlete_profile, get_training_plan); além de duas ferramentas de planos: draft_training_plan (salva apenas um rascunho) e publish_training_plan (envia para o relógio apenas depois que eu permitir nas configurações).
+
+Me diga:
+1. Para você especificamente (a ferramenta com a qual estou falando agora), em qual arquivo a configuração deve ir ou qual comando a adiciona;
+2. Como escrever o caminho no Windows (as barras invertidas precisam ser escapadas?);
+3. Como verificar se funcionou depois de configurado.
+
+Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está), é só me perguntar.`,
       retentionAria: 'Retenção de dados locais em dias',
       retentionCutoff: (date: string) => `Na próxima sincronização bem-sucedida, dados anteriores a ${date} serão excluídos`,
       cleaningUp: 'Limpando…',
@@ -2156,6 +2177,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       secMcp: 'MCP',
       secExport: 'Formato de exportação',
       secFeedback: 'Relatório de problemas',
+      sumFeedback: 'Dispositivo não reconhecido ou dados incorretos? Envie-nos um relatório anonimizado',
 
       firstSyncing: (current: number, total: number) => `Conectado · buscando registros recentes ${current}/${total}`,
       firstSyncingPlain: "Conectado · buscando registros recentes",
@@ -2402,6 +2424,8 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       notOpened: 'Você recolheu no meio do caminho; o site não foi aberto',
       exchanges: (count: number) => plural(count, { one: '1 ida e volta', other: `${count} idas e voltas` }),
       planPeek: 'Seu próximo passo',
+      resetCards: 'Restaurar cartões',
+      ringHint: 'Mantenha o anel pressionado para carregar. Ao completar o círculo, ele é enviado.',
     },
     'components/plan/plan': {
       undoLast: 'Desfazer último envio',
@@ -2789,10 +2813,27 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       lead: 'Permite que ferramentas de IA neste computador (Claude Code, Codex etc.) consultem seus dados diretamente',
       toolsLabel: 'Ferramentas disponíveis para a IA (passe o cursor para detalhes)',
       scopesHint: 'Aplica-se apenas ao MCP iniciado com --scope task',
+      publishTitle: 'Permitir que a IA publique planos de treino diretamente',
+      publishOff: 'Desativado: a IA só pode criar rascunhos; você confirma na página “Enviar para IA” antes de enviar ao relógio',
+      publishOn: 'Ativado: com sua permissão, a IA pode enviar planos direto para o relógio; nunca apaga os planos existentes',
+      toolTrainingContext: 'Treino e recuperação recentes de uma vez só: tabela diária, cada treino e o plano ativo',
+      toolAthleteProfile: 'Zonas de frequência cardíaca, limiares, ritmos recentes de corrida e o contexto que você escreveu para a IA',
+      toolTrainingPlan: 'O registro de planos de treino: plano ativo, status de entrega e rascunhos',
+      toolDraftPlan: 'Elabora um plano de treino (salvo apenas como rascunho, não é enviado ao relógio)',
+      toolPublishPlan: 'Envia o rascunho para o relógio (requer a opção acima ativada)',
+      connectTitle: 'Conectar a uma ferramenta de IA',
+      connectSub: 'Os dois primeiros copiam comandos para colar no terminal; o Claude Desktop salva uma extensão que você instala com um duplo clique',
+      connectCopied: 'Comandos copiados; cole em um terminal para executar',
+      bundleSaved: 'Extensão salva; dê um duplo clique para adicioná-la ao Claude Desktop',
+      bundlePick: 'Escolha uma pasta para salvar a extensão',
+      sidecarMissing: 'Esta versão não inclui o programa MCP; conecte manualmente com o prompt ou a configuração abaixo',
+      otherClients: 'Outros clientes',
+      configReady: 'Configuração copiada com o caminho preenchido',
     },
 
     'views/settings/sections/display': {
       focusTitle: 'Meus focos',
+      focusSlideSub: 'A visão geral exibe este bloco primeiro e reúne o restante em “Ver tudo”; “Equilibrado” mantém como está',
     },
 
     'views/settings/sections/privacy': {
@@ -2813,6 +2854,7 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
     },
 
     'composables/useFocusAreas': {
+      areaAll: 'Equilibrado',
       areaSleep: 'Sono',
       areaDaily: 'Estado diário',
       areaTraining: 'Treino',
@@ -2945,6 +2987,9 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       sleep_weeklyWhat: 'Estrutura do sono nos últimos 7 dias: duração de cada fase do sono a cada noite.',
       sleep_weeklyChart: 'Uma barra por noite, empilhada em sono profundo / sono leve / REM / acordado; a noite atual fica destacada; fases não informadas pela nuvem são marcadas como "Não informado".',
       sleep_weeklyHow: 'As durações de cada fase vêm com os registros de sono — tanto a autorização oficial quanto os "dados avançados" fornecem esses dados.',
+      sleep_stagesWhat: 'Sono profundo: a fase reparadora. Sono leve: a fase de transição que ocupa a maior parte da noite. REM: movimento rápido dos olhos, associado à memória e aos sonhos. Acordado: despertares ou momentos acordado durante a noite.',
+      sleep_stagesChart: 'Uma linha do tempo desde quando você adormeceu até acordar, com cada trecho colorido conforme sua fase; passe o cursor para ver o início, fim e duração.',
+      sleep_stagesHow: 'O dispositivo divide a noite em fases, que são sincronizadas com o registro de sono. São apenas definições, não um diagnóstico de saúde.',
     },
 
     'lib/metricInfo/heart': {
@@ -3082,6 +3127,12 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
     'err.training_plan.draft_closed': 'Este rascunho já foi enviado ou descartado',
     'err.training_plan.publish_not_found': 'Não há registro desse envio',
     'err.training_plan.rejected': 'A Zepp não aceitou este plano; o plano do seu relógio não mudou',
+    'err.mcp.bundle_failed': 'Não foi possível criar a extensão do Claude Desktop',
+    'err.mcp.sidecar_missing': 'Esta versão não inclui o programa MCP; baixe o zeppbridge-tools no GitHub',
+    'err.training_plan.ai_publish_disabled': 'A IA não tem permissão para publicar planos de treino diretamente',
+    'err.training_plan.format': 'O plano de treino tem uma estrutura incorreta e não foi salvo',
+    'err.training_plan.invalid': 'Este plano não passou na validação e não foi enviado',
+    'err.training_plan.needs_clear_confirmation': 'Isso apagaria parte do plano no seu relógio; confirme no ZeppBridge',
   },
   backendText: {
     'ui.backup.file_missing': 'Arquivo de backup não encontrado na pasta de backups.',

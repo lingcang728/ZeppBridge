@@ -177,6 +177,21 @@ export default {
       mcpToolMetricRecords: "Relevés individuels de n’importe quelle métrique",
       mcpToolSleepSessions: "Liste des nuits de sommeil",
       mcpToolLifeEvents: "Événements de vie que vous avez notés",
+      mcpSetupPrompt: `J’utilise une application de bureau Windows appelée ZeppBridge qui synchronise les données de ma montre Amazfit / Zepp dans une base de données SQLite locale.
+Elle inclut un programme MCP (zeppbridge-mcp) et je souhaite le configurer avec toi, afin que tu puisses interroger directement mes séances et mes données de santé sans que j’aie besoin d’exporter et coller à chaque fois.
+
+Ce que je sais :
+- Le programme MCP provient de l’archive zeppbridge-tools disponible sur la page GitHub Releases de ZeppBridge ; une fois décompressée, l’exécutable zeppbridge-mcp se trouve à l’intérieur. Je ne l’ai peut-être pas encore téléchargé.
+- Il s’agit d’un serveur MCP sur stdio. Les données de santé sont en lecture seule, il n’écoute sur aucun port et ne nécessite ni jeton ni clé d’API ; il n’utilise le réseau que pour publier un plan d’entraînement, et uniquement si je l’y autorise.
+- La structure type de configuration est : {"mcpServers": {"zeppbridge": {"command": "<chemin complet vers zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Il fournit quinze outils en lecture seule : séances (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métriques (list_available_metrics, get_metric_series, get_metric_records), sommeil (list_sleep_sessions, get_sleep_detail), alimentation (get_food_data), événements de vie (list_life_events), intégrité des données (get_data_health) et entraînement (get_training_context, get_athlete_profile, get_training_plan) ; plus deux outils pour les plans d’entraînement : draft_training_plan (enregistre uniquement un brouillon) et publish_training_plan (envoie à la montre uniquement si je l’autorise dans les paramètres).
+
+Dis-moi :
+1. Pour toi en particulier (l’outil auquel je parle en ce moment), dans quel fichier inscrire cette configuration ou quelle commande permet de l’ajouter ;
+2. Comment écrire le chemin sous Windows (faut-il échapper les barres obliques inverses « \\ ») ;
+3. Comment vérifier que la configuration fonctionne une fois effectuée.
+
+Si tu as besoin d’informations de ma part (quel client j’utilise, où se trouve le fichier), demande-moi directement.`,
       mcpConfigPathPlaceholder: '<chemin vers zeppbridge-mcp>',
       retentionAria: 'Conservation des données locales en jours',
       retentionCutoff: (date: string) => `Après la prochaine synchro réussie, les données antérieures au ${date} sont élaguées`,
@@ -1308,6 +1323,8 @@ export default {
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
       sleepTitleOn: (day: string) => `Sommeil · ${day}`,
+      windowAsleep: 'Endormi',
+      windowWoke: 'Réveillé',
     },
 
     'components/overview/PinnedMetrics': {
@@ -1382,6 +1399,8 @@ export default {
       factDone: 'Fait',
       factLeft: 'Reste',
       factReached: 'Atteint',
+      weekAria: 'Pas de chacun des 7 derniers jours ; la ligne pointillée représente l’objectif',
+      weekTitle: '7 derniers jours',
     },
     'views/ActivityDetail': {
       title: 'Activité quotidienne',
@@ -1543,6 +1562,8 @@ export default {
       focusSkip: 'Ignorer',
       showAllModules: 'Tout afficher',
       collapseModules: 'Replier',
+      entryWeek: '7 derniers jours',
+      focusLabel: 'Ce qui m’intéresse',
     },
 
     'views/HeartRateDetail': {
@@ -2272,6 +2293,7 @@ Réponds en Markdown.`,
       secMcp: 'Outils MCP',
       secExport: 'Export par défaut',
       secFeedback: 'Signaler un problème',
+      sumFeedback: 'Appareil non reconnu ou données incorrectes ? Envoyez-nous un rapport anonymisé',
 
       firstSyncing: (current: number, total: number) => `Connecté · récupération des enregistrements récents ${current}/${total}`,
       firstSyncingPlain: "Connecté · récupération des enregistrements récents",
@@ -2483,6 +2505,8 @@ Réponds en Markdown.`,
       notOpened: 'Action annulée en cours de route ; le site n’a pas été ouvert',
       exchanges: (count: number) => plural(count, { one: '1 échange', other: `${count} échanges` }),
       planPeek: 'Votre prochaine étape',
+      resetCards: 'Replacer les cartes',
+      ringHint: 'Maintenez l’anneau pour charger ; un tour complet envoie.',
     },
     'components/cards/cards': {
       noWorkouts: 'Aucune séance sur cette période',
@@ -2693,6 +2717,7 @@ Réponds en Markdown.`,
     },
 
     'composables/useFocusAreas': {
+      areaAll: 'Équilibré',
       areaSleep: 'Sommeil',
       areaDaily: 'Forme au quotidien',
       areaTraining: 'Entraînement',
@@ -2783,10 +2808,27 @@ Réponds en Markdown.`,
       lead: 'Permettre aux outils d’IA de cet ordinateur (Claude Code, Codex, etc.) d’interroger directement vos données',
       toolsLabel: 'Outils accessibles par l’IA (survoler pour le détail)',
       scopesHint: 'S’applique uniquement au MCP lancé avec --scope task',
+      publishTitle: 'Autoriser l’IA à publier directement les plans d’entraînement',
+      publishOff: 'Désactivé : l’IA peut uniquement créer des brouillons ; vous confirmez sur la page «\u00A0Envoyer à l’IA\u00A0» avant tout envoi vers votre montre',
+      publishOn: 'Activé : avec votre accord, l’IA peut envoyer des plans directement à votre montre ; elle n’efface jamais les plans existants',
+      toolTrainingContext: 'Entraînement et récupération récents en un seul appel : tableau quotidien, chaque séance, plan actif',
+      toolAthleteProfile: 'Zones de fréquence cardiaque, seuils, allures de course récentes et contexte rédigé pour l’IA',
+      toolTrainingPlan: 'Registre des plans d’entraînement : plan actif, état de distribution, brouillons',
+      toolDraftPlan: 'Rédige un plan d’entraînement (enregistré comme brouillon, non envoyé à la montre)',
+      toolPublishPlan: 'Envoie un brouillon à la montre (nécessite d’activer l’option ci-dessus)',
+      connectTitle: 'Connecter un outil d’IA',
+      connectSub: 'Les deux premiers copient des commandes à coller dans un terminal ; Claude Desktop enregistre une extension à installer par double-clic',
+      connectCopied: 'Commandes copiées ; collez-les dans un terminal',
+      bundleSaved: 'Extension enregistrée ; double-cliquez dessus pour l’ajouter à Claude Desktop',
+      bundlePick: 'Choisir un dossier pour l’extension',
+      sidecarMissing: 'Cette version n’inclut pas le programme MCP ; connectez-le manuellement avec l’invite ou la configuration ci-dessous',
+      otherClients: 'Autres clients',
+      configReady: 'Configuration copiée avec le chemin prérempli',
     },
 
     'views/settings/sections/display': {
       focusTitle: 'Ce qui m’intéresse',
+      focusSlideSub: 'L’aperçu place ce bloc en premier et replie le reste sous «\u00A0Tout voir\u00A0» ; «\u00A0Équilibré\u00A0» conserve la disposition initiale',
     },
 
     'views/settings/sections/privacy': {
@@ -2918,6 +2960,9 @@ Réponds en Markdown.`,
       sleep_weeklyWhat: 'Structure du sommeil sur les 7 dernières nuits : durée de chaque phase pour chaque nuit.',
       sleep_weeklyChart: 'Une barre par nuit, empilée en sommeil profond / léger / paradoxal (REM) / éveillé ; la nuit sélectionnée est mise en valeur ; une phase non fournie par le cloud est indiquée « Non fourni ».',
       sleep_weeklyHow: 'La durée des phases accompagne chaque enregistrement de sommeil — l’autorisation officielle et les Données avancées la fournissent toutes deux.',
+      sleep_stagesChart: 'Une frise chronologique de l’endormissement au réveil, chaque segment coloré selon sa phase ; survolez pour voir le début, la fin et la durée.',
+      sleep_stagesHow: 'Le découpage en phases est fourni par l’appareil et synchronisé avec l’enregistrement de sommeil ; il s’agit de définitions, pas d’un diagnostic médical.',
+      sleep_stagesWhat: 'Profond : la phase réparatrice. Léger : la phase de transition qui occupe la majeure partie de la nuit. REM : sommeil paradoxal, lié à la mémoire et aux rêves. Éveillé : réveils ou périodes éveillées pendant la nuit.',
     },
 
     'lib/metricInfo/heart': {
@@ -2953,12 +2998,18 @@ Réponds en Markdown.`,
     'err.ai_template.builtin_readonly': 'Les modèles intégrés sont en lecture seule — enregistrez-en une copie comme modèle personnel',
     'err.ai_template.invalid': 'Contenu de modèle invalide — vérifiez les champs',
     'err.ai_template.not_found': 'Le modèle n’existe pas ou a été supprimé',
+    'err.mcp.sidecar_missing': 'Cette version n’inclut pas le programme MCP ; téléchargez zeppbridge-tools sur GitHub',
+    'err.mcp.bundle_failed': 'Impossible de créer l’extension Claude Desktop',
     'err.mcp.scope_denied': 'Cette requête dépasse les tâches partagées avec MCP',
     'err.mcp.scope_no_grants': 'Aucune tâche n’est encore ouverte à MCP — marquez une tâche « ouverte à MCP » sur sa page et réessayez',
     'err.training_plan.draft_not_found': 'Ce brouillon de plan n’existe plus',
     'err.training_plan.draft_closed': 'Ce brouillon a déjà été envoyé ou abandonné',
     'err.training_plan.publish_not_found': 'Aucune trace de cet envoi',
     'err.training_plan.rejected': 'Zepp n’a pas accepté ce plan ; le plan sur votre montre n’a pas changé',
+    'err.training_plan.format': 'Structure du plan d’entraînement incorrecte ; le plan n’a pas été enregistré',
+    'err.training_plan.invalid': 'Ce plan n’a pas passé la validation ; il n’a pas été envoyé',
+    'err.training_plan.ai_publish_disabled': 'L’IA n’est pas autorisée à publier directement des plans d’entraînement',
+    'err.training_plan.needs_clear_confirmation': 'Cette publication effacerait une partie du plan sur votre montre ; confirmez dans ZeppBridge',
 
     'err.core.network': 'Impossible de joindre la région Zepp — vérifiez le réseau et réessayez',
     'err.core.needs_reauth': 'Session expirée : reconnectez-vous à Zepp',

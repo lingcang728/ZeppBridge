@@ -582,6 +582,8 @@ export default {
       durationHours: (hours: number, minutes: number) => `${hours} uur ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
       sleepTitleOn: (day: string) => `Slaap · ${day}`,
+      windowAsleep: 'In slaap',
+      windowWoke: 'Wakker',
     },
     'components/overview/PinnedMetrics': {
       loadFailed: 'Kon nu niet lezen',
@@ -656,6 +658,8 @@ export default {
       factDone: 'Gedaan',
       factLeft: 'Resterend',
       factReached: 'Gehaald',
+      weekAria: 'Stappen op elk van de afgelopen 7 dagen; de stippellijn is het doel',
+      weekTitle: 'Afgelopen 7 dagen',
     },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
@@ -1353,6 +1357,21 @@ export default {
       mcpPromptCopied:
         'Gekopieerd. Plak het bij je AI — die geeft de configuratiestappen voor jouw machine.',
       mcpPromptCopyFailed: 'Kopiëren mislukt — selecteer de tekst hierboven zelf.',
+      mcpSetupPrompt: `Ik gebruik een Windows-desktopapp genaamd ZeppBridge die gegevens van mijn Amazfit / Zepp-horloge synchroniseert naar een lokale SQLite-database.
+Er hoort een MCP-programma bij (zeppbridge-mcp) en dat wil ik met jou configureren, zodat je mijn trainingen en gezondheidsgegevens direct kunt opvragen in plaats van dat ik ze telkens moet exporteren en plakken.
+
+Wat ik erover weet:
+- Het MCP-programma is te vinden in het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; pak het uit en zeppbridge-mcp zit erin. Misschien heb ik het nog niet gedownload.
+- Het is een stdio MCP-server. Gezondheidsgegevens zijn alleen-lezen, de server luistert niet op een poort en vereist geen token of API-sleutel; er is alleen netwerkverbinding nodig om een trainingsplan te publiceren, en alleen nadat ik dat heb toegestaan.
+- De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Het programma biedt vijftien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen).
+
+Vertel me:
+1. Specifiek voor jou — de tool waarmee ik nu praat — in welk bestand de configuratie moet of met welk commando ik hem toevoeg;
+2. Hoe een Windows-pad geschreven moet worden (moeten backslashes worden ge-escaped);
+3. Hoe ik kan controleren of het werkt zodra het is geconfigureerd.
+
+Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat), vraag het gerust.`,
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
       mcpToolWorkoutDetail: "Alle opgeslagen samenvattingsvelden en hartslagzones van één training",
       mcpToolWorkoutSeries: "Meetpunten, route, splits en ronden van één training",
@@ -1892,6 +1911,8 @@ export default {
       focusSkip: 'Overslaan',
       showAllModules: 'Alles tonen',
       collapseModules: 'Inklappen',
+      entryWeek: 'Afgelopen 7 dagen',
+      focusLabel: 'Mijn focus',
     },
     'views/RecentRecords': {
       title: 'Recente activiteiten',
@@ -2498,6 +2519,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sumAi: (format: string) => `Alleen-lezen MCP-toegang · standaardexport ${format}`,
       sumAdvanced: "Back-up en herstel · lokale API · gegevenskwaliteit",
       sumPrivacy: 'Je gegevens blijven op deze computer',
+      sumFeedback: 'Apparaat niet herkend of gegevens kloppen niet? Stuur ons een geanonimiseerd rapport',
       secAccount: 'Zepp-account',
       secDevices: 'Apparaten',
       secCapability: 'Binnengehaalde gegevens',
@@ -2790,6 +2812,8 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       notOpened: 'Tussentijds ingetrokken; de website is niet geopend',
       exchanges: (count: number) => plural(count, { one: '1 interactie', other: `${count} interacties` }),
       planPeek: 'Je volgende stap',
+      resetCards: 'Kaarten herstellen',
+      ringHint: 'Houd de ring ingedrukt om te laden. Een volle cirkel verstuurt.',
     },
     'components/ai/bridge/bridge': {
       unitMin: 'min',
@@ -3042,9 +3066,26 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       lead: 'Laat AI-tools op deze computer (Claude Code, Codex enz.) je gegevens rechtstreeks raadplegen',
       toolsLabel: 'Tools die de AI kan gebruiken (beweeg de muis erover voor details)',
       scopesHint: 'Geldt alleen voor MCP die is gestart met --scope task',
+      bundlePick: 'Kies een map voor de extensie',
+      bundleSaved: 'Extensie opgeslagen; dubbelklik erop om toe te voegen aan Claude Desktop',
+      configReady: 'Configuratie gekopieerd met het pad al ingevuld',
+      connectCopied: 'Commando’s gekopieerd; plak ze in een terminal om uit te voeren',
+      connectSub: 'De eerste twee kopiëren een paar commando’s om in een terminal te plakken; Claude Desktop slaat een extensie op die je met een dubbelklik installeert',
+      connectTitle: 'Verbinden met een AI-tool',
+      otherClients: 'Andere clients',
+      publishOff: 'Uit: AI kan alleen concepten maken; je bevestigt op de pagina ‘Naar de AI’ voordat iets je horloge bereikt',
+      publishOn: 'Aan: met jouw toestemming kan AI plannen direct naar je horloge sturen; bestaande plannen worden nooit gewist',
+      publishTitle: 'AI direct trainingsplannen laten publiceren',
+      sidecarMissing: 'Deze versie bevat het MCP-programma niet; koppel handmatig met de prompt of configuratie hieronder',
+      toolAthleteProfile: 'Hartslagzones, drempels, recente hardlooptempo’s en de achtergrond die je voor AI hebt geschreven',
+      toolDraftPlan: 'Stelt een trainingsplan op (alleen als concept opgeslagen, niet naar het horloge gestuurd)',
+      toolPublishPlan: 'Stuurt een concept naar het horloge (vereist de schakelaar hierboven)',
+      toolTrainingContext: 'Recente training en herstel in één overzicht: een dagtabel, elke workout en het actieve plan',
+      toolTrainingPlan: 'Het logboek voor trainingsplannen: actief plan, afleverstatus en concepten',
     },
     'views/settings/sections/display': {
       focusTitle: 'Mijn focus',
+      focusSlideSub: 'Het overzicht toont dit blok eerst en vouwt de rest onder ‘Alles tonen’; ‘Gebalanceerd’ laat alles zoals het is',
     },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
@@ -3062,6 +3103,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       compactMore: 'Toelichting',
     },
     'composables/useFocusAreas': {
+      areaAll: 'Gebalanceerd',
       areaDaily: 'Dagelijkse status',
       areaSleep: 'Slaap',
       areaTraining: 'Training',
@@ -3187,6 +3229,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sleep_weeklyWhat: 'Slaapstructuur over de afgelopen 7 nachten: hoe lang elke slaapfase per nacht duurde.',
       sleep_weeklyChart: 'Eén staaf per nacht, gestapeld in diepe slaap / lichte slaap / REM / wakker; de nacht van deze registratie is gemarkeerd; een fase die door de cloud is weggelaten, wordt aangeduid als ‘Niet verstrekt’.',
       sleep_weeklyHow: 'De duur van de fasen wordt meegeleverd bij elke slaapregistratie — zowel de officiële autorisatie als geavanceerde gegevens leveren deze.',
+      sleep_stagesChart: 'Eén tijdlijn van inslapen tot ontwaken, elk segment gekleurd naar slaapfase; beweeg de cursor erover voor begin, einde en duur.',
+      sleep_stagesHow: 'Het apparaat verdeelt de nacht in fasen, gesynchroniseerd met de slaapregistratie. Dit zijn toelichtingen, geen medische diagnose.',
+      sleep_stagesWhat: 'Diep: de herstellende fase. Licht: de overgangsfase die het grootste deel van de nacht beslaat. REM: snelle oogbewegingen, gekoppeld aan geheugen en dromen. Wakker: ontwaken of wakker liggen gedurende de nacht.',
     },
     'lib/metricInfo/heart': {
       heart_rate_24hWhat: 'Hartslagmetingen van de afgelopen 24 uur, meting voor meting.',
@@ -3331,11 +3376,20 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     'err.login.window_busy':
       'Het vorige inlogvenster is nog niet dicht — wacht even en probeer opnieuw',
     'err.login.window_failed': 'Het inlogvenster kon niet worden geopend',
+    'err.mcp.bundle_failed': 'De Claude Desktop-extensie kon niet worden aangemaakt',
+    'err.mcp.sidecar_missing':
+      'Deze versie bevat het MCP-programma niet; download zeppbridge-tools van GitHub',
     'err.mcp.scope_denied': 'Dat verzoek valt buiten de taken die met MCP zijn gedeeld',
     'err.mcp.scope_no_grants':
       'Nog geen taak is voor MCP opengesteld. Markeer op de takenpagina een taak als ‘open voor MCP’ en probeer opnieuw',
+    'err.training_plan.ai_publish_disabled':
+      'AI heeft geen toestemming om trainingsplannen direct te publiceren',
     'err.training_plan.draft_not_found': 'Dit planconcept bestaat niet meer',
     'err.training_plan.draft_closed': 'Dit planconcept is al verstuurd of weggegooid',
+    'err.training_plan.format': 'Het trainingsplan heeft een onjuiste structuur en is niet opgeslagen',
+    'err.training_plan.invalid': 'Dit plan kwam niet door de validatie en is niet verzonden',
+    'err.training_plan.needs_clear_confirmation':
+      'Hiermee wordt een deel van het plan op je horloge gewist; bevestig dit in ZeppBridge',
     'err.training_plan.publish_not_found': 'Er is geen registratie van deze verzending',
     'err.training_plan.rejected': 'Zepp heeft dit plan niet geaccepteerd; het plan op je horloge is niet veranderd',
     'err.prefs.retention_out_of_range': 'De bewaartermijn moet tussen 1 en 365 dagen liggen',
