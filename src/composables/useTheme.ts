@@ -91,7 +91,7 @@ let revealing: ViewTransitionHandle | null = null;
  *   - 上一次还没放完又拨了一下：把上一次直接放到结尾，这一次立刻生效、不再叠一层快照。
  * 不支持或开了减少动效时直接换。
  */
-const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
+export const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
   const doc = document as ViewTransitionDocument;
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   if (revealing) {

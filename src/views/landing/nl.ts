@@ -46,8 +46,8 @@ const pack: LandingPack = {
     "sample": "Voorbeeld",
     "hero": {
       "eyebrow": "Gratis · Open source · Lokaal gezondheidsarchief",
-      "titleLead": "Je horloge legt vast.",
-      "titleAccent": "Je eigen archief.",
+      "titleLead": "Je gezondheidsgegevens.",
+      "titleAccent": "Op je eigen computer.",
       "lead": "Bewaar Amazfit-hartslag, slaap en trainingen uit de Zepp-cloud op je computer. Bekijk je geschiedenis, behoud ontbrekende gegevens en exporteer wat je kiest.",
       "github": "Bekijk de broncode op GitHub",
       "meta": "Gratis · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
@@ -61,53 +61,6 @@ const pack: LandingPack = {
       },
       "demo": "Bekijk het voorbeeld",
       "edition": "v3 in ontwikkeling · Synthetische voorbeeldgegevens. De download biedt de publieke stabiele versie; interface en functies kunnen verschillen."
-    },
-    "beats": [
-      {
-        "kicker": "01 · Synchroniseren",
-        "title": "Een lokale kopie van je registraties",
-        "body": "Verbind je Zepp-account en bewaar bestaande cloudgegevens op je computer. Gesynchroniseerde registraties zijn offline te bekijken."
-      },
-      {
-        "kicker": "02 · Ontbrekend",
-        "title": "Geen meting, geen waarde",
-        "body": "Ontbrekende metingen worden nooit aangevuld met nul, een eerdere waarde of een schatting. Nog niet gesynchroniseerd is iets anders dan niet gemeten."
-      },
-      {
-        "kicker": "03 · Overdracht",
-        "title": "Kies de inhoud en de ontvanger",
-        "body": "In het v3-voorbeeld selecteer je gegevens en datums en bekijk je de export. Die wordt lokaal gemaakt; externe AI krijgt hem pas wanneer jij de inhoud verstuurt."
-      },
-      {
-        "kicker": "04 · Plannen",
-        "title": "Bekijk het plan vóór de volgende stap",
-        "body": "De v3 in ontwikkeling toont het importeren en beoordelen van trainingsplannen. Verzenden naar je horloge hangt af van apparaat en validatie; dit is geen algemene belofte voor de stabiele versie."
-      },
-      {
-        "kicker": "05 · Instellingen",
-        "title": "Bepaal het ritme van je archief",
-        "body": "Verken synchronisatie, bewaartermijnen en lokale interfaces. Instellingen kunnen per versie verschillen; controleer hun doel vóór inschakeling."
-      }
-    ],
-    "flap": {
-      "tiles": [
-        {
-          "value": "1.096",
-          "label": "nachten slaap"
-        },
-        {
-          "value": "742",
-          "label": "trainingen met route"
-        },
-        {
-          "value": "1,5M",
-          "label": "minuten hartslag"
-        },
-        {
-          "value": "9,8M",
-          "label": "stappen"
-        }
-      ]
     },
     "handoff": {
       "chat": "AI-chat",
@@ -192,20 +145,8 @@ const pack: LandingPack = {
     },
     "footer": {
       "tagline": "Een lokale brug voor Amazfit- en Zepp-gegevens.",
-      "disclaimer": "ZeppBridge is een onafhankelijk opensourceproject en niet verbonden aan Zepp Health of Amazfit.",
+      "disclaimer": "ZeppBridge is een onafhankelijk opensourceproject in het Zepp Developer Partner-programma, geen officieel Zepp-product. Zepp en Amazfit zijn merken van hun eigenaren.",
       "source": "Broncode"
-    },
-    "explore": {
-      "kicker": "Verken de app",
-      "title": "Begin bij een registratie",
-      "lead": "Kies een hoofdstuk van de v3 in ontwikkeling. Ontbrekende gegevens blijven ontbreken.",
-      "tabs": [
-        "Synchroniseren",
-        "Hiaten behouden",
-        "AI-overdracht",
-        "Plannen bekijken",
-        "Instellingen"
-      ]
     },
     "faq": {
       "heading": "Voordat je begint",
@@ -237,6 +178,105 @@ const pack: LandingPack = {
           "answer": "Het voorbeeld is v3 in ontwikkeling met synthetische gegevens. De download is stabiel. Planbeoordeling en de nieuwe interface kunnen nog niet publiek zijn; zie release-notities."
         }
       ]
+    },
+    "rebuild": {
+      "featuresHeading": "Je tijd, in de gegevens die je bewaart.",
+      "featuresLead": "Slaap, hartslag, sport en plannen. Bekijk je archief, onderdeel voor onderdeel.",
+      "demoHeading": "Probeer het vóór je het downloadt",
+      "demoLead": "De echte V3-interface met synthetische voorbeelden. Geen login of toegang tot persoonlijke gegevens.",
+      "mobileHint": "Dit is een desktopapp. Bekijk op je telefoon het volledige scherm; gebruik een computer voor bediening.",
+      "fullscreen": "Desktopdemo op volledig scherm bekijken",
+      "retry": "Demo opnieuw laden",
+      "play": "Demo afspelen",
+      "pause": "Demo pauzeren",
+      "mediaNote": "V3 · Synthetisch voorbeeld · Opgenomen in donker thema",
+      "moreConnections": "Meer verbindingsmogelijkheden",
+      "partner": "Zepp Developer Partner-programma",
+      "disclaimer": "ZeppBridge is een onafhankelijk opensourceproject in het Zepp Developer Partner-programma, geen officieel Zepp-product. Zepp en Amazfit zijn merken van hun eigenaren.",
+      "docsHeading": "Begin hier.",
+      "guide": "Installatie en handleiding",
+      "versions": "Versies en wijzigingslog",
+      "community": "Broncode en community",
+      "privacyDoc": "Gegevens en privacy",
+      "star": "Is dit nuttig? Een ster op GitHub helpt anderen het te vinden.",
+      "dismiss": "Sluiten",
+      "nav": [
+        "Functies",
+        "Gegevens & privacy",
+        "Proberen",
+        "Handleiding"
+      ],
+      "title": [
+        "Je gezondheidsgegevens.",
+        "Op je eigen computer."
+      ],
+      "stories": [
+        {
+          "eyebrow": "Lokaal archief",
+          "title": "Een lokale kopie van je registraties",
+          "body": "Verbind je Zepp-account en bewaar bestaande cloudgegevens op je computer. Gesynchroniseerde registraties zijn offline te bekijken.",
+          "bullets": [
+            "Gesynchroniseerde gegevens offline",
+            "Bronnen en dekking bekijken"
+          ]
+        },
+        {
+          "eyebrow": "Slaapgeschiedenis",
+          "title": "Elke nacht een plek in je geschiedenis",
+          "body": "Bekijk slaapduur en fasen per nacht. Niet gemeten nachten blijven ontbreken; gegevens vervangen geen medische diagnose.",
+          "bullets": [
+            "Nachten en slaapfasen",
+            "Ontbrekende nachten blijven leeg"
+          ]
+        },
+        {
+          "eyebrow": "Hartslag & hiaten",
+          "title": "Geen meting, geen waarde",
+          "body": "Ontbrekende metingen worden nooit aangevuld met nul, een eerdere waarde of een schatting. Nog niet gesynchroniseerd is iets anders dan niet gemeten.",
+          "bullets": [
+            "Hiaten blijven in de curve",
+            "Geen ontbrekende waarde als nul"
+          ]
+        },
+        {
+          "eyebrow": "Sport & training",
+          "title": "Bewaar het verloop van je training",
+          "body": "Bekijk activiteiten, details en trends. Meetwaarden hangen af van apparaat en gesynchroniseerde gegevens; controleer de dekking voor vergelijking.",
+          "bullets": [
+            "Details en trainingstrends",
+            "Bestaande gegevens gebruiken"
+          ]
+        },
+        {
+          "eyebrow": "AI-overdracht",
+          "title": "Kies de inhoud en de ontvanger",
+          "body": "In het v3-voorbeeld selecteer je gegevens en datums en bekijk je de export. Die wordt lokaal gemaakt; externe AI krijgt hem pas wanneer jij de inhoud verstuurt.",
+          "bullets": [
+            "Datums en gegevens kiezen",
+            "Zelf controleren voor verzending"
+          ]
+        },
+        {
+          "eyebrow": "Plancontrole",
+          "title": "Bekijk het plan vóór de volgende stap",
+          "body": "De v3 in ontwikkeling toont het importeren en beoordelen van trainingsplannen. Verzenden naar je horloge hangt af van apparaat en validatie; dit is geen algemene belofte voor de stabiele versie.",
+          "bullets": [
+            "Weekoverzicht en dagelijkse controle",
+            "Overdracht na apparaatcontrole"
+          ]
+        },
+        {
+          "eyebrow": "Instellingen",
+          "title": "Bepaal het ritme van je archief",
+          "body": "Verken synchronisatie, bewaartermijnen en lokale interfaces. Instellingen kunnen per versie verschillen; controleer hun doel vóór inschakeling.",
+          "bullets": [
+            "Sync en bewaartermijn instellen",
+            "Lokale interfaces zelf inschakelen"
+          ]
+        }
+      ],
+      "learnFeatures": "Ontdek functies",
+      "languageFallback": "Deze taal kon niet worden geladen. Engels wordt getoond; kies de taal opnieuw."
     }
   }
 };

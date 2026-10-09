@@ -1,193 +1,64 @@
-/*
- * 落地页的共用样式（不 scoped：各段组件共用这些类和 token；类名一律 lp- 开头，不碰应用的样式）。
- *
- * 2026-10 重做的设计语言：**纸**。浅色是暖白的纸，深色是应用自己的冷灰黑；只有一个强调色（橄榄绿）,
- * 不再有紫色和渐变字——强调靠一道荧光笔式的底色（.lp-mark），像杂志里被人划过的那一句。
- * 版式靠留白、细线和很大的字号，不靠卡片堆叠。产品本身（页面里嵌的真应用）才是页面上最有色彩的东西。
- *
- * 色值从应用 tokens.css 派生（品牌色、暗色底），落地页只多定义「纸」。
- */
-.lp {
-  --lp-bg: #f3f0e7;
-  --lp-bg-2: #eae6d9;
-  --lp-panel: #fbfaf5;
-  --lp-panel-2: #f5f2e8;
-  --lp-line: rgba(30, 36, 26, .11);
-  --lp-line-2: rgba(30, 36, 26, .2);
-  --lp-ink: #1b2118;
-  --lp-muted: #4a5445;
-  --lp-subtle: #626d5d;
-  --lp-green: #2f6b4f;
-  --lp-green-ink: #ffffff;
-  --lp-mark: #dbe4bc;
-  --lp-glow: rgba(47, 107, 79, .22);
-  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .85) inset, 0 50px 90px -50px rgba(30, 40, 24, .5);
-  --lp-ease: cubic-bezier(.22, .8, .2, 1);
-  position: relative;
-  isolation: isolate;
-  min-height: 100dvh;
-  overflow-x: clip;
-  background: var(--lp-bg);
-  color: var(--lp-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-}
-:root[data-theme='dark'] .lp {
-  --lp-bg: #0c0e11;
-  --lp-bg-2: #08090c;
-  --lp-panel: #16191e;
-  --lp-panel-2: #1d2128;
-  --lp-line: rgba(226, 234, 242, .09);
-  --lp-line-2: rgba(226, 234, 242, .18);
-  --lp-ink: #f2f4ee;
-  --lp-muted: #b4bbc3;
-  --lp-subtle: #8a929b;
-  --lp-green: #93b952;
-  --lp-green-ink: #12170a;
-  --lp-mark: rgba(125, 163, 62, .42);
-  --lp-glow: rgba(125, 163, 62, .28);
-  --lp-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset, 0 50px 100px -40px rgba(0, 0, 0, .85);
-}
-.lp ::selection { background: color-mix(in srgb, var(--lp-green) 32%, transparent); }
-.lp :where(a) { color: inherit; }
-.lp button { font-family: inherit; }
-.lp :is(h1,h2,h3,p,a,button) { overflow-wrap: break-word; }
-.lp :is(section,div)[id] { scroll-margin-top: 112px; }
-.lp :focus-visible { outline: 2px solid var(--lp-green); outline-offset: 3px; border-radius: 8px; }
-
-/* ── 版心与段落骨架 ── */
-.lp-wrap { width: min(1280px, calc(100% - 48px)); margin: 0 auto; }
-.lp-section { position: relative; width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 100px 0 0; }
-
-/* 小标：「03 · 交给 AI」——等宽字、大写、字距拉开，前面一条短线。像杂志的栏目标。 */
-.lp-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 18px;
-  color: var(--lp-green);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-}
-.lp-kicker::before { content: ''; width: 28px; height: 1px; background: currentColor; opacity: .55; }
-.lp-h2 {
-  max-width: 16em;
-  margin: 0;
-  font-size: clamp(30px, 3.8vw, 52px);
-  font-weight: 660;
-  letter-spacing: -.03em;
-  line-height: 1.18;
-  text-wrap: balance;
-}
-.lp-lead { max-width: 38em; margin: 20px 0 0; color: var(--lp-muted); font-size: clamp(16px, 1.3vw, 18.5px); line-height: 1.7; text-wrap: pretty; }
-.lp-center { text-align: center; }
-.lp-center .lp-h2, .lp-center .lp-lead { margin-left: auto; margin-right: auto; }
-
-/* 荧光笔：被划过的那一句。只是一道平的底色，不是渐变字。换行时每一行都有。 */
-.lp-mark {
-  background: linear-gradient(transparent 58%, var(--lp-mark) 58% 90%, transparent 90%);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  padding: 0 .06em;
-}
-
-/* 演示角标：「示例」。 */
-.lp-sample {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: 1px solid var(--lp-line-2);
-  border-radius: 999px;
-  color: var(--lp-subtle);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-.lp-sample::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--lp-green); }
-
-/* 面板：纸上的一张卡——实色、细边、一层深深的软影。 */
-.lp-panel {
-  position: relative;
-  border: 1px solid var(--lp-line);
-  border-radius: 26px;
-  background: linear-gradient(180deg, var(--lp-panel), var(--lp-panel-2));
-  box-shadow: var(--lp-shadow);
-}
-
-/* 追光：悬停时一圈跟着指针的高光。 */
-.lp-spot { isolation: isolate; }
-.lp-spot::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lp-green) 10%, transparent), transparent 60%);
-  opacity: 0;
-  transition: opacity .35s ease;
-  pointer-events: none;
-}
-.lp-spot:hover::after { opacity: 1; }
-
-/* ── 按钮 ── */
-.lp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 52px;
-  font-family: inherit;
-  line-height: 1.35;
-  padding: 0 24px;
-  border: 0;
-  border-radius: 999px;
-  font-size: 15.5px;
-  font-weight: 650;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform .5s var(--lp-ease), box-shadow .3s ease, background .3s ease;
-}
-.lp-btn small { display: block; color: inherit; font-size: 12px; font-weight: 500; opacity: 1; }
-.lp .lp-btn-primary {
-  background: var(--lp-green);
-  color: var(--lp-green-ink);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .22) inset, 0 14px 32px -14px var(--lp-glow);
-}
-.lp-btn-primary:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, 0 20px 44px -12px var(--lp-glow); filter: brightness(1.05); }
-.lp-btn-ghost { border: 1px solid var(--lp-line-2); background: transparent; color: var(--lp-ink); }
-.lp-btn-ghost:hover { background: var(--lp-panel-2); }
-.lp-btn:active { transform: translateY(1px); transition-duration: .1s; }
-
-/* ── 滚动显现：`data-reveal` 先藏着，进视口加 .is-in，按 --i 错开。 ── */
-.lp [data-reveal] { opacity: 1; }
-.lp.lp-motion-ready [data-reveal] { transition: opacity .45s var(--lp-ease), transform .45s var(--lp-ease); transition-delay: calc(var(--i, 0) * 60ms); }
-.lp.lp-motion-ready [data-reveal]:not(.is-in) { opacity: 0; transform: translateY(16px); }
-.lp [data-reveal].is-in { opacity: 1; transform: none; }
-.lp [data-reveal]:focus-within { opacity: 1 !important; transform: none !important; }
-
-/* 循环动画离屏不跑：带 data-live 的块，看不见时暂停里面所有动画。 */
-.lp [data-live]:not(.is-live) *, .lp [data-live]:not(.is-live)::before, .lp [data-live]:not(.is-live)::after { animation-play-state: paused !important; }
-
-@media (max-width: 720px) {
-  .lp-wrap, .lp-section { width: calc(100% - 32px); }
-  .lp-section { padding-top: 70px; }
-  .lp :is(section,div)[id] { scroll-margin-top: 92px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp [data-reveal], .lp.lp-motion-ready [data-reveal]:not(.is-in) { opacity: 1; transform: none; transition: none; }
-  .lp *, .lp *::before, .lp *::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; transition-delay: 0s !important; }
-}
-
-/* 切主题的一圈扩散（theme.ts）：关掉默认的交叉淡化，只留新主题那层的圆形裁切。 */
-::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
-
-/* 应用骨架把 html / body / #app 锁成一屏高、不滚（滚动在 #main-content 里）。落地页要整页滚：
-   有 .lp 的时候放开（落地页 chunk 只在浏览器打开时加载，不影响桌面应用）。 */
+/* Website layout consumes the same colors, fonts and glass material as the client. */
+@font-face { font-family: 'ZeppBridge Site'; src: url('/landing/fonts/Landing-CJK-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+2E80-2FFF,U+3000-31FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF; }
+@font-face { font-family: 'ZeppBridge Site'; src: url('/landing/fonts/Landing-CJK-700.woff2') format('woff2'); font-weight: 600 800; font-style: normal; font-display: swap; unicode-range: U+2E80-2FFF,U+3000-31FF,U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF; }
 html:has(.lp), html:has(.lp) body, html:has(.lp) #app { height: auto; min-height: 100%; overflow: visible; }
-html:has(.lp) { scroll-behavior: smooth; }
-:root[data-theme='light']:has(.lp) { background: #f3f0e7; }
-:root[data-theme='dark']:has(.lp) { background: #0c0e11; }
-@media (prefers-reduced-motion: reduce) { html:has(.lp) { scroll-behavior: auto; } }
+html:has(.lp) { scroll-behavior: auto; background: var(--bg); }
+.lp {
+ --lp-bg: var(--bg); --lp-bg-2: var(--surface); --lp-panel: var(--surface-raised); --lp-panel-2: var(--surface);
+ --lp-line: var(--line); --lp-line-2: var(--line-strong); --lp-ink: var(--ink); --lp-muted: var(--muted); --lp-subtle: var(--subtle);
+ --lp-green: var(--accent); --lp-green-ink: var(--accent-ink); --lp-ease: cubic-bezier(.16,1,.3,1);
+ --lp-shadow: 0 36px 90px -32px rgba(0,0,0,.32), 0 8px 24px -12px rgba(0,0,0,.15);
+ position: relative; isolation: isolate; min-height: 100dvh; overflow-x: clip; background: var(--bg); color: var(--ink);
+ font-family: 'ZeppBridge Site',var(--font-sans); -webkit-font-smoothing: antialiased;
+}
+:root[data-theme='light'] .lp { --lp-shadow: 0 32px 80px -28px rgba(31,41,52,.16), 0 8px 24px -12px rgba(31,41,52,.12); }
+.lp::before { content: ''; position: absolute; z-index: -1; inset: 0 0 auto; height: 1050px; background: radial-gradient(ellipse at 72% 28%, var(--accent-soft), transparent 52%); pointer-events: none; }
+.lp * { box-sizing: border-box; }
+.lp :where(a) { color: inherit; }
+.lp :is(h1,h2,h3,p,a,button) { overflow-wrap: break-word; }
+.lp button { font-family: inherit; }
+.lp :is(section,article,div)[id] { scroll-margin-top: 115px; }
+.lp :focus-visible { outline: 2px solid var(--focus); outline-offset: 5px; }
+.lp :focus:not(:focus-visible) { outline: none; }
+.lp-wrap,.lp-section { width: min(1320px,calc(100% - 112px)); margin: 0 auto; }
+.lp-section { position: relative; }
+.lp-h2 { margin: 0; font-size: clamp(34px,4vw,58px); line-height: 1.2; letter-spacing: -.04em; font-weight: 600; text-wrap: balance; }
+.lp-lead { font-size: 19px; line-height: 1.75; color: var(--muted); max-width: 38em; margin: 24px 0 0; }
+.lp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; padding: 12px 22px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink); font-size: 16px; font-weight: 550; line-height: 1.5; text-decoration: none; cursor: pointer; transition: transform .3s var(--lp-ease); }
+.lp-btn-primary { color: var(--accent-ink)!important; border-color: transparent; background: var(--accent); }
+.lp-btn-ghost { color: var(--ink); background: transparent; }
+.lp-btn:hover:not(:disabled) { transform: translateY(-3px); }
+.lp-btn:active:not(:disabled) { transform: scale(.97); }
+.lp-icon-btn { display: grid; place-items: center; width: 40px; min-height: 40px; padding: 8px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
+.lp-skip { position: fixed; top: 10px; left: 20px; z-index: 100; padding: 12px 20px; background: var(--surface); color: var(--ink); transform: translateY(-160%); }
+.lp-skip:focus { transform: translateY(0); }
+.locale-load-error { position: absolute; top: 90px; left: 0; right: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.lp-nav { position: fixed; z-index: 40; top: 16px; left: 0; width: 100%; padding: 0 28px; pointer-events: none; }
+.lp-nav-bar { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; min-height: 58px; gap: 18px; max-width: 1500px; margin: auto; }
+.lp-nav-bar > * { pointer-events: auto; }
+.lp-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; justify-self: start; }
+.lp-brand strong { font-size: 18px; font-weight: 600; letter-spacing: -.035em; }
+.lp-links { justify-self: center; }
+.lp-nav-actions { justify-self: end; display: flex; align-items: center; min-width: 0; max-width: 100%; padding: 3px; border-radius: 999px; }
+.lp-nav-actions .locale-wheel { flex-shrink: 1; min-width: 0; }
+.nav-divider { width: 1px; height: 19px; background: var(--line-strong); margin: 0 5px; }
+.lp .theme-toggle { --seg-pad: 1px; }
+.lp .theme-toggle .segment-item { min-height: 36px; }
+.mobile-toggle { display: none; }
+.lp-mobile-links { pointer-events: auto; width: min(400px,100%); margin: 12px 0 0 auto; padding: 12px; display: grid; border-radius: 24px; }
+.lp-mobile-links a { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 14px 18px; text-decoration: none; font-size: 16px; border-radius: 14px; }
+.lp-mobile-links a:hover { background: var(--surface-hover); }
+.lp-motion-ready [data-reveal] { opacity: 0; transform: translateY(48px) scale(.985); transition: opacity .9s var(--lp-ease),transform 1.1s var(--lp-ease); }
+.lp-motion-ready [data-reveal].is-in, .lp-motion-ready [data-reveal]:focus-within { opacity: 1; transform: none; }
+@media(max-width:1250px) { .lp-brand strong { display: none; } .lp-nav-bar { grid-template-columns: auto 1fr auto; } }
+@media(max-width:1080px) { .lp .lp-links { display: none; } .mobile-toggle { display: grid; flex-shrink: 0; } .lp-nav-bar { grid-template-columns: auto minmax(0,1fr); } }
+@media(max-width:720px) {
+ .lp-wrap,.lp-section { width: calc(100% - 40px); } .lp-lead { font-size: 17px; }
+ .lp-nav { top: 10px; padding: 0 14px; } .lp-nav-bar { gap: 10px; min-height: 48px; }
+ .lp-brand img { width: 32px; height: 32px; }
+ .lp-nav .locale-wheel .wheel-item { font-size: 12px; padding-inline: 7px; }
+ .lp .lp-nav .theme-toggle.is-icon-only .segment-item, .lp .lp-nav .theme-toggle.is-icon-only .segment-ink-item { padding-inline: 5px; }
+ .lp-h2 { font-size: clamp(32px,7vw,44px); }
+}
+@media(max-width:380px) { .lp-nav { padding: 0 10px; } .lp-nav-bar { gap: 5px; } .lp-wrap,.lp-section { width: calc(100% - 32px); } }
+@media(prefers-reduced-motion:reduce) { .lp *, .lp *::before, .lp *::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; } .lp-motion-ready [data-reveal] { opacity: 1; transform: none; } }

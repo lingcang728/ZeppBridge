@@ -46,8 +46,8 @@ const pack: LandingPack = {
     "sample": "Exemple",
     "hero": {
       "eyebrow": "Gratuit · Code ouvert · Archives de santé locales",
-      "titleLead": "Votre montre enregistre.",
-      "titleAccent": "Vos propres archives.",
+      "titleLead": "Vos données de santé.",
+      "titleAccent": "Sur votre ordinateur.",
       "lead": "Conservez sur votre ordinateur le rythme cardiaque, le sommeil et les entraînements Amazfit provenant du cloud Zepp. Consultez votre historique, préservez les lacunes et exportez à votre choix.",
       "github": "Lire le code sur GitHub",
       "meta": "Gratuit · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
@@ -61,53 +61,6 @@ const pack: LandingPack = {
       },
       "demo": "Voir l’exemple",
       "edition": "v3 en développement · Données synthétiques. Le téléchargement propose la version publique stable, dont l’interface et les fonctions peuvent différer."
-    },
-    "beats": [
-      {
-        "kicker": "01 · Synchroniser",
-        "title": "Une copie locale de vos enregistrements",
-        "body": "Connectez votre compte Zepp et conservez les données déjà présentes dans le cloud. Les enregistrements synchronisés restent consultables hors ligne."
-      },
-      {
-        "kicker": "02 · Absences",
-        "title": "Sans mesure, pas de valeur",
-        "body": "Les données absentes ne sont jamais remplacées par zéro, une ancienne valeur ou une estimation. Non synchronisé et non mesuré sont des états différents."
-      },
-      {
-        "kicker": "03 · Transfert",
-        "title": "Choisissez le contenu, puis le destinataire",
-        "body": "L’exemple v3 permet de choisir les dates et les données et de vérifier l’export. Il est préparé localement ; l’IA externe ne le reçoit que si vous l’envoyez."
-      },
-      {
-        "kicker": "04 · Plans",
-        "title": "Vérifiez avant de poursuivre",
-        "body": "La v3 en développement montre l’import et la vérification de plans. Leur envoi à la montre dépend du matériel et des validations ; ce n’est pas une promesse générale de la version stable."
-      },
-      {
-        "kicker": "05 · Réglages",
-        "title": "Réglez le rythme de vos archives",
-        "body": "Explorez synchronisation, conservation et interfaces locales. Les réglages varient selon les versions ; vérifiez leur rôle avant de les activer."
-      }
-    ],
-    "flap": {
-      "tiles": [
-        {
-          "value": "1 096",
-          "label": "nuits de sommeil"
-        },
-        {
-          "value": "742",
-          "label": "séances avec tracé"
-        },
-        {
-          "value": "1,5M",
-          "label": "minutes de fréquence cardiaque"
-        },
-        {
-          "value": "9,8M",
-          "label": "pas"
-        }
-      ]
     },
     "handoff": {
       "chat": "Discussion avec l’IA",
@@ -192,20 +145,8 @@ const pack: LandingPack = {
     },
     "footer": {
       "tagline": "Un pont local pour les données Amazfit et Zepp.",
-      "disclaimer": "ZeppBridge est un projet open source indépendant, sans lien avec Zepp Health ni Amazfit.",
+      "disclaimer": "ZeppBridge est un projet open source indépendant participant au programme Zepp Developer Partner, et non un produit officiel de Zepp. Les marques Zepp et Amazfit appartiennent à leurs titulaires.",
       "source": "Code source"
-    },
-    "explore": {
-      "kicker": "Explorer l’application",
-      "title": "Commencez par un enregistrement",
-      "lead": "Choisissez un chapitre de la v3 en développement. Les lacunes de l’exemple restent absentes.",
-      "tabs": [
-        "Synchroniser",
-        "Données absentes",
-        "Transfert à l’IA",
-        "Vérifier un plan",
-        "Réglages"
-      ]
     },
     "faq": {
       "heading": "Avant de commencer",
@@ -237,6 +178,105 @@ const pack: LandingPack = {
           "answer": "L’exemple est la v3 en développement avec des données synthétiques. Le téléchargement est stable. Vérification des plans et nouvelle interface peuvent être inédites ; consultez les notes."
         }
       ]
+    },
+    "rebuild": {
+      "featuresHeading": "Votre temps, dans les traces que vous gardez.",
+      "featuresLead": "Sommeil, fréquence cardiaque, sport et plans. Découvrez votre archive, étape par étape.",
+      "demoHeading": "Essayez avant de télécharger",
+      "demoLead": "La véritable interface V3, avec des exemples synthétiques. Sans connexion ni accès à vos données personnelles.",
+      "mobileHint": "Il s’agit d’une application de bureau. Sur téléphone, regardez en plein écran ; utilisez un ordinateur pour interagir.",
+      "fullscreen": "Voir la démo de bureau en plein écran",
+      "retry": "Réessayer la démo",
+      "play": "Lire la démo",
+      "pause": "Mettre en pause",
+      "mediaNote": "V3 · Exemple synthétique · Enregistré en mode sombre",
+      "moreConnections": "Autres modes de connexion",
+      "partner": "Programme Zepp Developer Partner",
+      "disclaimer": "ZeppBridge est un projet open source indépendant participant au programme Zepp Developer Partner, et non un produit officiel de Zepp. Les marques Zepp et Amazfit appartiennent à leurs titulaires.",
+      "docsHeading": "Pour commencer.",
+      "guide": "Installation et guide",
+      "versions": "Versions et notes de publication",
+      "community": "Code et communauté",
+      "privacyDoc": "Données et confidentialité",
+      "star": "Ce projet vous aide ? Une étoile sur GitHub aide à le faire connaître.",
+      "dismiss": "Fermer",
+      "nav": [
+        "Fonctions",
+        "Données & vie privée",
+        "Essayer",
+        "Guide"
+      ],
+      "title": [
+        "Vos données de santé.",
+        "Sur votre ordinateur."
+      ],
+      "stories": [
+        {
+          "eyebrow": "Archive locale",
+          "title": "Une copie locale de vos enregistrements",
+          "body": "Connectez votre compte Zepp et conservez les données déjà présentes dans le cloud. Les enregistrements synchronisés restent consultables hors ligne.",
+          "bullets": [
+            "Données synchronisées hors ligne",
+            "Sources et couverture consultables"
+          ]
+        },
+        {
+          "eyebrow": "Historique du sommeil",
+          "title": "Une place pour chaque nuit",
+          "body": "Parcourez la durée et les phases de chaque nuit. Les nuits non mesurées restent absentes ; ces données ne remplacent pas un diagnostic médical.",
+          "bullets": [
+            "Nuits et phases de sommeil",
+            "Les nuits absentes restent vides"
+          ]
+        },
+        {
+          "eyebrow": "Pouls & lacunes",
+          "title": "Sans mesure, pas de valeur",
+          "body": "Les données absentes ne sont jamais remplacées par zéro, une ancienne valeur ou une estimation. Non synchronisé et non mesuré sont des états différents.",
+          "bullets": [
+            "Les courbes gardent les lacunes",
+            "Aucune valeur inventée ou mise à zéro"
+          ]
+        },
+        {
+          "eyebrow": "Sport & entraînement",
+          "title": "Gardez le parcours de vos entraînements",
+          "body": "Consultez activités, détails et tendances. Les mesures dépendent de l’appareil et des données synchronisées ; vérifiez la couverture avant de comparer.",
+          "bullets": [
+            "Détails et tendances du sport",
+            "Consulter les données disponibles"
+          ]
+        },
+        {
+          "eyebrow": "Transfert à l’IA",
+          "title": "Choisissez le contenu, puis le destinataire",
+          "body": "L’exemple v3 permet de choisir les dates et les données et de vérifier l’export. Il est préparé localement ; l’IA externe ne le reçoit que si vous l’envoyez.",
+          "bullets": [
+            "Choisir dates et données",
+            "Vérifier avant d’envoyer soi-même"
+          ]
+        },
+        {
+          "eyebrow": "Révision des plans",
+          "title": "Vérifiez avant de poursuivre",
+          "body": "La v3 en développement montre l’import et la vérification de plans. Leur envoi à la montre dépend du matériel et des validations ; ce n’est pas une promesse générale de la version stable.",
+          "bullets": [
+            "Vue hebdomadaire et révision par jour",
+            "Transfert selon appareil et validation"
+          ]
+        },
+        {
+          "eyebrow": "Réglages",
+          "title": "Réglez le rythme de vos archives",
+          "body": "Explorez synchronisation, conservation et interfaces locales. Les réglages varient selon les versions ; vérifiez leur rôle avant de les activer.",
+          "bullets": [
+            "Synchronisation et conservation",
+            "Interfaces locales à votre initiative"
+          ]
+        }
+      ],
+      "learnFeatures": "Découvrir les fonctions",
+      "languageFallback": "Cette langue n’a pas pu être chargée. L’anglais est affiché ; sélectionnez de nouveau la langue."
     }
   }
 };

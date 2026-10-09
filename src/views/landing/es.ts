@@ -46,8 +46,8 @@ const pack: LandingPack = {
     "sample": "Ejemplo",
     "hero": {
       "eyebrow": "Gratis · Código abierto · Archivo local de salud",
-      "titleLead": "Tu reloj registra.",
-      "titleAccent": "Tu propio archivo.",
+      "titleLead": "Tus datos de salud.",
+      "titleAccent": "En tu propio ordenador.",
       "lead": "Guarda en tu computadora la frecuencia cardiaca, el sueño y los entrenamientos de Amazfit desde la nube de Zepp. Revisa tu historial, conserva los huecos y exporta lo que elijas.",
       "github": "Ver el código en GitHub",
       "meta": "Gratis · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
@@ -61,53 +61,6 @@ const pack: LandingPack = {
       },
       "demo": "Ver el ejemplo",
       "edition": "v3 en desarrollo · Datos sintéticos. La descarga ofrece la versión pública estable; su interfaz y funciones pueden ser distintas."
-    },
-    "beats": [
-      {
-        "kicker": "01 · Sincronizar",
-        "title": "Una copia local de tus registros",
-        "body": "Conecta tu cuenta de Zepp y guarda los registros disponibles en la nube. Los datos sincronizados se pueden consultar sin conexión."
-      },
-      {
-        "kicker": "02 · Datos ausentes",
-        "title": "Sin medición, sin valor",
-        "body": "Nunca se rellenan muestras ausentes con cero, un valor anterior o una estimación. No sincronizado y no medido son estados distintos."
-      },
-      {
-        "kicker": "03 · Para la IA",
-        "title": "Elige el alcance y el destinatario",
-        "body": "En el ejemplo v3 eliges datos y fechas y revisas la exportación. Se prepara localmente; una IA externa solo recibe el contenido cuando tú lo envías."
-      },
-      {
-        "kicker": "04 · Planes",
-        "title": "Revisa antes de continuar",
-        "body": "La v3 en desarrollo muestra la importación y revisión de planes. Enviarlos al reloj depende del dispositivo y de su validación; no es una promesa general de la versión estable."
-      },
-      {
-        "kicker": "05 · Ajustes",
-        "title": "Decide el ritmo de tu archivo",
-        "body": "Explora sincronización, conservación e interfaces locales. Los controles pueden variar entre versiones; comprueba su finalidad antes de activarlos."
-      }
-    ],
-    "flap": {
-      "tiles": [
-        {
-          "value": "1096",
-          "label": "noches de sueño"
-        },
-        {
-          "value": "742",
-          "label": "entrenamientos con ruta"
-        },
-        {
-          "value": "1,5M",
-          "label": "minutos de frecuencia cardiaca"
-        },
-        {
-          "value": "9,8M",
-          "label": "pasos"
-        }
-      ]
     },
     "handoff": {
       "chat": "Chat con la IA",
@@ -192,20 +145,8 @@ const pack: LandingPack = {
     },
     "footer": {
       "tagline": "Un puente local para los datos de Amazfit y Zepp.",
-      "disclaimer": "ZeppBridge es un proyecto independiente de código abierto, sin relación con Zepp Health ni con Amazfit.",
+      "disclaimer": "ZeppBridge es un proyecto independiente de código abierto que participa en el programa Zepp Developer Partner, no un producto oficial de Zepp. Las marcas Zepp y Amazfit pertenecen a sus titulares.",
       "source": "Código fuente"
-    },
-    "explore": {
-      "kicker": "Explora la aplicación",
-      "title": "Empieza por un registro",
-      "lead": "Elige un capítulo de la v3 en desarrollo. Los huecos del ejemplo siguen siendo datos ausentes.",
-      "tabs": [
-        "Sincronizar",
-        "Datos ausentes",
-        "Para la IA",
-        "Revisar planes",
-        "Ajustes"
-      ]
     },
     "faq": {
       "heading": "Antes de empezar",
@@ -237,6 +178,105 @@ const pack: LandingPack = {
           "answer": "El ejemplo muestra v3 en desarrollo con datos sintéticos. La descarga es estable. La revisión de planes y la nueva interfaz podrían no estar publicadas; consulta las notas."
         }
       ]
+    },
+    "rebuild": {
+      "featuresHeading": "Tu tiempo, en los registros que conservas.",
+      "featuresLead": "Sueño, frecuencia cardiaca, deporte y planes. Descubre tu archivo paso a paso.",
+      "demoHeading": "Pruébalo antes de descargarlo",
+      "demoLead": "La interfaz V3 real con ejemplos sintéticos. Sin iniciar sesión ni acceder a tus datos personales.",
+      "mobileHint": "Es una aplicación de escritorio. En el móvil puedes verla a pantalla completa; usa un ordenador para interactuar.",
+      "fullscreen": "Ver la demo de escritorio a pantalla completa",
+      "retry": "Volver a cargar la demo",
+      "play": "Reproducir demo",
+      "pause": "Pausar demo",
+      "mediaNote": "V3 · Ejemplo sintético · Grabado en modo oscuro",
+      "moreConnections": "Más formas de conectar",
+      "partner": "Programa Zepp Developer Partner",
+      "disclaimer": "ZeppBridge es un proyecto independiente de código abierto que participa en el programa Zepp Developer Partner, no un producto oficial de Zepp. Las marcas Zepp y Amazfit pertenecen a sus titulares.",
+      "docsHeading": "Empieza aquí.",
+      "guide": "Instalación y guía",
+      "versions": "Versiones y novedades",
+      "community": "Código y comunidad",
+      "privacyDoc": "Datos y privacidad",
+      "star": "¿Te resulta útil? Una estrella en GitHub ayuda a que otros lo descubran.",
+      "dismiss": "Cerrar",
+      "nav": [
+        "Funciones",
+        "Datos y privacidad",
+        "Probar",
+        "Guía"
+      ],
+      "title": [
+        "Tus datos de salud.",
+        "En tu propio ordenador."
+      ],
+      "stories": [
+        {
+          "eyebrow": "Archivo local",
+          "title": "Una copia local de tus registros",
+          "body": "Conecta tu cuenta de Zepp y guarda los registros disponibles en la nube. Los datos sincronizados se pueden consultar sin conexión.",
+          "bullets": [
+            "Datos sincronizados sin conexión",
+            "Consulta fuentes y cobertura"
+          ]
+        },
+        {
+          "eyebrow": "Historial del sueño",
+          "title": "Un lugar para cada noche",
+          "body": "Revisa la duración y las fases de cada noche. Las noches sin medición siguen ausentes; estos datos no sustituyen un diagnóstico médico.",
+          "bullets": [
+            "Historial nocturno y fases",
+            "No se rellenan noches ausentes"
+          ]
+        },
+        {
+          "eyebrow": "Pulso y lagunas",
+          "title": "Sin medición, sin valor",
+          "body": "Nunca se rellenan muestras ausentes con cero, un valor anterior o una estimación. No sincronizado y no medido son estados distintos.",
+          "bullets": [
+            "Se conservan lagunas en las curvas",
+            "No se inventan valores ni ceros"
+          ]
+        },
+        {
+          "eyebrow": "Deporte y entrenamiento",
+          "title": "Conserva el recorrido de tus entrenamientos",
+          "body": "Consulta actividades, detalles y tendencias. Las métricas dependen del dispositivo y los datos sincronizados; comprueba la cobertura antes de comparar.",
+          "bullets": [
+            "Detalles y tendencias deportivas",
+            "Usa los registros disponibles"
+          ]
+        },
+        {
+          "eyebrow": "Entrega a la IA",
+          "title": "Elige el alcance y el destinatario",
+          "body": "En el ejemplo v3 eliges datos y fechas y revisas la exportación. Se prepara localmente; una IA externa solo recibe el contenido cuando tú lo envías.",
+          "bullets": [
+            "Elige fechas y datos",
+            "Revisa antes de enviar tú mismo"
+          ]
+        },
+        {
+          "eyebrow": "Revisión de planes",
+          "title": "Revisa antes de continuar",
+          "body": "La v3 en desarrollo muestra la importación y revisión de planes. Enviarlos al reloj depende del dispositivo y de su validación; no es una promesa general de la versión estable.",
+          "bullets": [
+            "Vista semanal y revisión diaria",
+            "Envío según dispositivo y validación"
+          ]
+        },
+        {
+          "eyebrow": "Ajustes",
+          "title": "Decide el ritmo de tu archivo",
+          "body": "Explora sincronización, conservación e interfaces locales. Los controles pueden variar entre versiones; comprueba su finalidad antes de activarlos.",
+          "bullets": [
+            "Sincronización y conservación",
+            "Tú activas las interfaces locales"
+          ]
+        }
+      ],
+      "learnFeatures": "Ver funciones",
+      "languageFallback": "No se pudo cargar el idioma. Se muestra inglés; selecciona el idioma otra vez."
     }
   }
 };

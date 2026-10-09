@@ -1,7 +1,8 @@
 import { ref } from 'vue';
+import { revealTheme, type ThemeMode, type ThemeOrigin } from '../../composables/useTheme';
 
 /**
- * 落地页的主题：**默认浅色**（暖白的纸），访客自己切过才记住深色。
+ * 网站首次跟随系统，之后记住访客选择。存储与应用的主题分开。
  * 和应用的主题（composables/useTheme.ts，默认跟随系统）分开存，互不影响。
  * main.ts 在落地模式下首帧前就调 `applyLandingTheme()`，不会先闪一帧另一套。
  */
@@ -10,48 +11,36 @@ const STORAGE_KEY = 'zeppbridge-landing-theme';
 
 const read = (): LandingTheme => {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   } catch {
-    return 'light';
+    // System preference still works when storage is unavailable.
   }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
 export const landingTheme = ref<LandingTheme>('light');
+export const landingThemeMode = ref<ThemeMode>('system');
+let query: MediaQueryList | null = null;
+const commit = (theme: LandingTheme) => {
+  landingTheme.value = theme;
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = `only ${theme}`;
+};
 
 export const applyLandingTheme = () => {
   landingTheme.value = read();
-  document.documentElement.dataset.theme = landingTheme.value;
-  document.documentElement.style.colorScheme = `only ${landingTheme.value}`;
+  try { const saved = window.localStorage.getItem(STORAGE_KEY); landingThemeMode.value = saved === 'dark' || saved === 'light' ? saved : 'system'; } catch { landingThemeMode.value = 'system'; }
+  commit(landingTheme.value);
+  if (!query) { query = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null; query?.addEventListener?.('change', e => { if (landingThemeMode.value === 'system') commit(e.matches ? 'dark' : 'light'); }); }
 };
 
 /**
- * 切主题：支持 View Transitions 时，新主题从按钮的位置一圈扩散开（快照之间的过渡，合成器上做）；
- * 不支持或减少动态时直接换。
+ * 立即切换 token，避免对整个页面与 iframe 做快照过渡。
  */
-export const toggleLandingTheme = (origin?: { x: number; y: number }) => {
-  const next: LandingTheme = landingTheme.value === 'dark' ? 'light' : 'dark';
-  const commit = () => {
-    landingTheme.value = next;
-    document.documentElement.dataset.theme = next;
-    document.documentElement.style.colorScheme = `only ${next}`;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // 记不住就只管这一次。
-    }
-  };
-  const doc = document as Document & { startViewTransition?: (fn: () => void) => { ready: Promise<void> } };
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if (!doc.startViewTransition || reduced || !origin) {
-    commit();
-    return;
-  }
-  const radius = Math.hypot(Math.max(origin.x, window.innerWidth - origin.x), Math.max(origin.y, window.innerHeight - origin.y));
-  const transition = doc.startViewTransition(commit);
-  void transition.ready.then(() => {
-    document.documentElement.animate(
-      { clipPath: [`circle(0px at ${origin.x}px ${origin.y}px)`, `circle(${radius}px at ${origin.x}px ${origin.y}px)`] },
-      { duration: 620, easing: 'cubic-bezier(.22, .8, .2, 1)', pseudoElement: '::view-transition-new(root)' },
-    );
-  }, () => undefined);
+export const pickLandingTheme = (mode: ThemeMode, origin?: ThemeOrigin) => {
+  const next = mode === 'system' ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : mode;
+  revealTheme(() => { landingThemeMode.value = mode; commit(next); try { window.localStorage.setItem(STORAGE_KEY, mode); } catch { /* Session choice still works. */ } }, origin);
 };
+export const toggleLandingTheme = (origin?: ThemeOrigin) => pickLandingTheme(landingTheme.value === 'dark' ? 'light' : 'dark', origin);

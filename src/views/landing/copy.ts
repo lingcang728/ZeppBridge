@@ -1,6 +1,6 @@
 import type { LandingCopy } from './types';
 
-/** Immediate zh/en copy. The other eight locales are loaded on demand. */
+/** Immediate zh/en copy. Other locales are loaded on demand. */
 export const COPY: Record<'zh' | 'en', LandingCopy> = {
   "zh": {
     "nav": {
@@ -41,8 +41,8 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
     "sample": "示例",
     "hero": {
       "eyebrow": "免费 · 开源 · 本地健康档案",
-      "titleLead": "手表记录，",
-      "titleAccent": "自己的档案。",
+      "titleLead": "你的健康记录，",
+      "titleAccent": "留在自己的电脑里。",
       "lead": "把 Amazfit 的心率、睡眠和运动，从 Zepp 云端保存到自己的电脑。查看历史，保留缺失，按需导出。",
       "github": "在 GitHub 上看源码",
       "meta": "免费 · Windows 10 / 11 · macOS（Apple Silicon） · Linux",
@@ -56,53 +56,6 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       },
       "demo": "查看示例",
       "edition": "开发中的 v3 · 合成示例数据。下载按钮提供公开稳定版，界面和功能可能不同。"
-    },
-    "beats": [
-      {
-        "kicker": "01 · 同步",
-        "title": "让记录有一份本地副本",
-        "body": "连接自己的 Zepp 账号，把云端已有的心率、睡眠与运动保存到电脑。已同步的记录可以离线查看。"
-      },
-      {
-        "kicker": "02 · 缺失",
-        "title": "没测到，就留空",
-        "body": "没有采样就是缺失，不用 0、上一个值或估算值补齐。未同步与没有测量，也需要分开看。"
-      },
-      {
-        "kicker": "03 · 交接",
-        "title": "先选范围，再决定交给谁",
-        "body": "在 v3 示例中选择数据和日期，查看要导出的内容。整理文件在本机完成；只有你把内容提交给外部 AI，它才会收到。"
-      },
-      {
-        "kicker": "04 · 计划",
-        "title": "先审核，再谈下一步",
-        "body": "开发中的 v3 可展示训练计划的导入与逐项审核。手表下发受设备与验证状态限制，这不是公开稳定版的通用能力承诺。"
-      },
-      {
-        "kicker": "05 · 设置",
-        "title": "档案的节奏，由你决定",
-        "body": "查看同步、保留期限与本地接口设置。不同版本的设置界面会有差异，启用前先确认各项用途。"
-      }
-    ],
-    "flap": {
-      "tiles": [
-        {
-          "value": "1,096",
-          "label": "个夜晚的睡眠"
-        },
-        {
-          "value": "742",
-          "label": "次运动，带轨迹"
-        },
-        {
-          "value": "1.5M",
-          "label": "个逐分钟心率"
-        },
-        {
-          "value": "9.8M",
-          "label": "步"
-        }
-      ]
     },
     "handoff": {
       "chat": "AI 对话",
@@ -187,20 +140,8 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
     },
     "footer": {
       "tagline": "本地优先的 Amazfit / Zepp 数据桥梁。",
-      "disclaimer": "ZeppBridge 是独立的开源项目，与 Zepp Health、Amazfit 没有隶属关系。",
+      "disclaimer": "ZeppBridge 是独立开源项目，参与 Zepp 开发者合作伙伴项目，并非 Zepp 官方产品。Zepp 与 Amazfit 商标归其权利人所有。",
       "source": "源码"
-    },
-    "explore": {
-      "kicker": "探索应用",
-      "title": "从一段记录开始",
-      "lead": "直接选择一个章节，看看开发中的 v3 如何整理记录。示例中的空白仍然是缺失。",
-      "tabs": [
-        "同步记录",
-        "保留缺失",
-        "交接给 AI",
-        "审核计划",
-        "管理设置"
-      ]
     },
     "faq": {
       "heading": "开始前，你可能想知道",
@@ -232,6 +173,105 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
           "answer": "示例使用开发中的 v3 和合成数据；下载提供公开稳定版。演示中的计划审核、新界面等可能尚未公开，以发行说明为准。"
         }
       ]
+    },
+    "rebuild": {
+      "featuresHeading": "从日常记录，看见自己的时间。",
+      "featuresLead": "睡眠、心率、运动与计划。逐段看看，记录在电脑里如何展开。",
+      "demoHeading": "下载之前，先亲自试试",
+      "demoLead": "真实 V3 前端与合成样本。无需登录，不访问你的个人数据。",
+      "mobileHint": "这是桌面应用。手机上可全屏观看，操作建议在电脑完成。",
+      "fullscreen": "全屏观看桌面示例",
+      "retry": "重试加载示例",
+      "play": "播放演示",
+      "pause": "暂停演示",
+      "mediaNote": "V3 · 合成示例 · 深色界面录制",
+      "moreConnections": "更多连接方式",
+      "partner": "Zepp 开发者合作伙伴项目",
+      "disclaimer": "ZeppBridge 是独立开源项目，参与 Zepp 开发者合作伙伴项目，并非 Zepp 官方产品。Zepp 与 Amazfit 商标归其权利人所有。",
+      "docsHeading": "从这里开始使用。",
+      "guide": "使用与安装指南",
+      "versions": "版本与发行记录",
+      "community": "源码与社区",
+      "privacyDoc": "数据与隐私说明",
+      "star": "这个项目对你有用？欢迎在 GitHub 给个 Star。",
+      "dismiss": "关闭",
+      "nav": [
+        "功能",
+        "数据与隐私",
+        "在线体验",
+        "使用指南"
+      ],
+      "title": [
+        "你的健康记录，",
+        "留在自己的电脑里。"
+      ],
+      "stories": [
+        {
+          "eyebrow": "本地档案",
+          "title": "让记录有一份本地副本",
+          "body": "连接自己的 Zepp 账号，把云端已有的心率、睡眠与运动保存到电脑。已同步的记录可以离线查看。",
+          "bullets": [
+            "已同步记录可离线查看",
+            "来源与覆盖可查询"
+          ]
+        },
+        {
+          "eyebrow": "睡眠记录",
+          "title": "让每一夜，都有迹可循",
+          "body": "浏览长期睡眠记录，打开某一夜的时长和分期。没有佩戴的夜晚保留缺失，记录不能替代医学诊断。",
+          "bullets": [
+            "逐夜记录与睡眠分期",
+            "没佩戴的夜晚不填补"
+          ]
+        },
+        {
+          "eyebrow": "心率与缺失",
+          "title": "没测到，就留空",
+          "body": "没有采样就是缺失，不用 0、上一个值或估算值补齐。未同步与没有测量，也需要分开看。",
+          "bullets": [
+            "曲线保留真实缺口",
+            "没有采样不会补成 0"
+          ]
+        },
+        {
+          "eyebrow": "运动与训练",
+          "title": "运动之后，把过程留下",
+          "body": "回看运动列表、详情和训练状态。指标取决于设备与已同步的记录，先确认覆盖再比较。",
+          "bullets": [
+            "运动详情与训练趋势",
+            "按已有记录查看"
+          ]
+        },
+        {
+          "eyebrow": "AI 交接",
+          "title": "先选范围，再决定交给谁",
+          "body": "在 v3 示例中选择数据和日期，查看要导出的内容。整理文件在本机完成；只有你把内容提交给外部 AI，它才会收到。",
+          "bullets": [
+            "先选日期与数据范围",
+            "审核后自行提交"
+          ]
+        },
+        {
+          "eyebrow": "计划审核",
+          "title": "先审核，再谈下一步",
+          "body": "开发中的 v3 可展示训练计划的导入与逐项审核。手表下发受设备与验证状态限制，这不是公开稳定版的通用能力承诺。",
+          "bullets": [
+            "按周浏览与逐日审核",
+            "下发取决于设备与验证"
+          ]
+        },
+        {
+          "eyebrow": "档案设置",
+          "title": "档案的节奏，由你决定",
+          "body": "查看同步、保留期限与本地接口设置。不同版本的设置界面会有差异，启用前先确认各项用途。",
+          "bullets": [
+            "同步与留存设置",
+            "本机接口由你启用"
+          ]
+        }
+      ],
+      "learnFeatures": "了解功能",
+      "languageFallback": "语言未能加载，暂时显示英语。重新选择该语言可重试。"
     }
   },
   "en": {
@@ -273,8 +313,8 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
     "sample": "Sample",
     "hero": {
       "eyebrow": "Free · Open source · A local health archive",
-      "titleLead": "Your watch records.",
-      "titleAccent": "Your own archive.",
+      "titleLead": "Your watch history.",
+      "titleAccent": "Your own computer.",
       "lead": "Keep Amazfit heart rate, sleep and workouts from the Zepp cloud on your own computer. Browse your history, preserve gaps and export what you choose.",
       "github": "Read the source on GitHub",
       "meta": "Free · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
@@ -288,53 +328,6 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       },
       "demo": "View the sample",
       "edition": "v3 in development · Synthetic sample data. Downloads offer the public stable release; its interface and features may differ."
-    },
-    "beats": [
-      {
-        "kicker": "01 · Sync",
-        "title": "Give your records a local copy",
-        "body": "Connect your own Zepp account and keep existing cloud heart rate, sleep and workouts on your computer. Synced records remain readable offline."
-      },
-      {
-        "kicker": "02 · Missing data",
-        "title": "No measurement, no value",
-        "body": "Missing samples stay missing. They are never filled with zero, a previous value or an estimate. Not yet synced is different from not measured."
-      },
-      {
-        "kicker": "03 · Handoff",
-        "title": "Choose the scope, then the recipient",
-        "body": "In the v3 sample, select data and dates and inspect the export. The package is prepared locally; an external AI receives it only when you submit the content."
-      },
-      {
-        "kicker": "04 · Plans",
-        "title": "Review before the next step",
-        "body": "The developing v3 demonstrates importing and reviewing training plans. Watch delivery depends on device support and validation; it is not a blanket promise for the public stable release."
-      },
-      {
-        "kicker": "05 · Settings",
-        "title": "Set the pace of your archive",
-        "body": "Explore sync, retention and local-interface settings. Controls can differ between versions; check their purpose before enabling them."
-      }
-    ],
-    "flap": {
-      "tiles": [
-        {
-          "value": "1,096",
-          "label": "nights of sleep"
-        },
-        {
-          "value": "742",
-          "label": "workouts with routes"
-        },
-        {
-          "value": "1.5M",
-          "label": "minutes of heart rate"
-        },
-        {
-          "value": "9.8M",
-          "label": "steps"
-        }
-      ]
     },
     "handoff": {
       "chat": "AI chat",
@@ -419,20 +412,8 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
     },
     "footer": {
       "tagline": "A local-first bridge for Amazfit and Zepp data.",
-      "disclaimer": "ZeppBridge is an independent open-source project, not affiliated with Zepp Health or Amazfit.",
+      "disclaimer": "ZeppBridge is an independent open-source project participating in the Zepp Developer Partner program, not an official Zepp product. Zepp and Amazfit trademarks belong to their owners.",
       "source": "Source"
-    },
-    "explore": {
-      "kicker": "Explore the application",
-      "title": "Start with a record",
-      "lead": "Choose a chapter to see how the developing v3 organizes records. Gaps in the sample remain missing.",
-      "tabs": [
-        "Sync records",
-        "Keep gaps",
-        "AI handoff",
-        "Review plans",
-        "Manage settings"
-      ]
     },
     "faq": {
       "heading": "A few things before you begin",
@@ -464,6 +445,105 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
           "answer": "The sample is the developing v3 with synthetic data. Downloads offer the public stable release. Plan review, the new interface and other demo features may not yet be public; check release notes."
         }
       ]
+    },
+    "rebuild": {
+      "featuresHeading": "See your time in the records you keep.",
+      "featuresLead": "Sleep, heart rate, workouts and plans. See how each part of your archive comes together.",
+      "demoHeading": "Try it before you download it",
+      "demoLead": "The real V3 frontend with synthetic samples. No sign-in, no access to your personal data.",
+      "mobileHint": "This is a desktop application. On your phone, view it fullscreen; use a computer for interaction.",
+      "fullscreen": "View the desktop demo fullscreen",
+      "retry": "Retry the demo",
+      "play": "Play demo",
+      "pause": "Pause demo",
+      "mediaNote": "V3 · Synthetic sample · Recorded in dark mode",
+      "moreConnections": "More ways to connect",
+      "partner": "Zepp Developer Partner program",
+      "disclaimer": "ZeppBridge is an independent open-source project participating in the Zepp Developer Partner program, not an official Zepp product. Zepp and Amazfit trademarks belong to their owners.",
+      "docsHeading": "A place to start.",
+      "guide": "Setup and user guide",
+      "versions": "Versions and release notes",
+      "community": "Source and community",
+      "privacyDoc": "Data and privacy",
+      "star": "Finding this useful? A Star on GitHub helps others find it.",
+      "dismiss": "Dismiss",
+      "nav": [
+        "Features",
+        "Data & privacy",
+        "Try the app",
+        "Guide"
+      ],
+      "title": [
+        "Your watch history.",
+        "Your own computer."
+      ],
+      "stories": [
+        {
+          "eyebrow": "Local archive",
+          "title": "Give your records a local copy",
+          "body": "Connect your own Zepp account and keep existing cloud heart rate, sleep and workouts on your computer. Synced records remain readable offline.",
+          "bullets": [
+            "Synced records available offline",
+            "Inspect sources and coverage"
+          ]
+        },
+        {
+          "eyebrow": "Sleep history",
+          "title": "Give every night a place in your history",
+          "body": "Browse your sleep history and open a night’s duration and stages. Nights without a watch stay missing; records cannot replace a medical diagnosis.",
+          "bullets": [
+            "Night-by-night history and stages",
+            "Unmeasured nights stay missing"
+          ]
+        },
+        {
+          "eyebrow": "Heart rate & gaps",
+          "title": "No measurement, no value",
+          "body": "Missing samples stay missing. They are never filled with zero, a previous value or an estimate. Not yet synced is different from not measured.",
+          "bullets": [
+            "Gaps remain in the curve",
+            "No readings are filled with zero"
+          ]
+        },
+        {
+          "eyebrow": "Workouts & training",
+          "title": "Keep the story of every workout",
+          "body": "Review workouts, details and training trends. Available metrics depend on your device and synced records; check coverage before comparing.",
+          "bullets": [
+            "Workout details and training trends",
+            "Use the records already available"
+          ]
+        },
+        {
+          "eyebrow": "AI handoff",
+          "title": "Choose the scope, then the recipient",
+          "body": "In the v3 sample, select data and dates and inspect the export. The package is prepared locally; an external AI receives it only when you submit the content.",
+          "bullets": [
+            "Choose dates and data",
+            "Review before sending yourself"
+          ]
+        },
+        {
+          "eyebrow": "Plan review",
+          "title": "Review before the next step",
+          "body": "The developing v3 demonstrates importing and reviewing training plans. Watch delivery depends on device support and validation; it is not a blanket promise for the public stable release.",
+          "bullets": [
+            "Weekly view and daily review",
+            "Delivery depends on device validation"
+          ]
+        },
+        {
+          "eyebrow": "Archive settings",
+          "title": "Set the pace of your archive",
+          "body": "Explore sync, retention and local-interface settings. Controls can differ between versions; check their purpose before enabling them.",
+          "bullets": [
+            "Sync and retention controls",
+            "Enable local interfaces yourself"
+          ]
+        }
+      ],
+      "learnFeatures": "Explore features",
+      "languageFallback": "This language could not load. English is shown; choose the language again to retry."
     }
   }
 };

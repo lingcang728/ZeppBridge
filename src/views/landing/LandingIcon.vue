@@ -2,7 +2,8 @@
 /* 落地页自己的一小套线性图标（24 网格、1.7 描边、圆角端点），不背应用那张大图标表。 */
 export type LandingIconName =
   | 'watch' | 'laptop' | 'sparkle' | 'arrow-right' | 'download' | 'github' | 'lock' | 'folder'
-  | 'terminal' | 'globe' | 'moon' | 'sun' | 'check' | 'key' | 'eye-off' | 'file' | 'cloud' | 'chevron-down' | 'x';
+  | 'terminal' | 'globe' | 'moon' | 'sun' | 'check' | 'key' | 'eye-off' | 'file' | 'cloud' | 'chevron-down' | 'x'
+  | 'heart' | 'activity' | 'calendar' | 'sliders';
 
 withDefaults(defineProps<{ name: LandingIconName; size?: number }>(), { size: 20 });
 </script>
@@ -15,12 +16,16 @@ withDefaults(defineProps<{ name: LandingIconName; size?: number }>(), { size: 20
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    stroke-width="1.7"
+    stroke-width="1.75"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"
   >
-    <template v-if="name === 'watch'">
+    <path v-if="name === 'heart'" d="M20.5 5.7a5 5 0 0 0-7.1 0L12 7.1l-1.4-1.4a5 5 0 0 0-7.1 7.1L12 21l8.5-8.2a5 5 0 0 0 0-7.1Z" />
+    <path v-else-if="name === 'activity'" d="M2 12h5l3-8 4 16 3-8h5" />
+    <template v-else-if="name === 'calendar'"><rect x="4" y="5" width="16" height="16" rx="3" /><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2M8 17h2" /></template>
+    <template v-else-if="name === 'sliders'"><path d="M5 3v5M5 12v9M12 3v10M12 17v4M19 3v2M19 9v12" /><path d="M2 8h6v4H2zM9 13h6v4H9zM16 5h6v4h-6z" /></template>
+    <template v-else-if="name === 'watch'">
       <rect x="6" y="6" width="12" height="12" rx="3.5" />
       <path d="M9 6 9.6 2.8h4.8L15 6M9 18l.6 3.2h4.8L15 18M12 9.5V12l1.6 1" />
     </template>

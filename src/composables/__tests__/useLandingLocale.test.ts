@@ -112,7 +112,8 @@ describe('lazy copy packs', () => {
     await language.ensureLandingCopy('fr');
     const copy = language.landingCopyFor('fr');
     expect(copy?.nav.language).toBe('Langue');
-    expect(copy?.hero.titleAccent).toBe('Vos propres archives.');
+    expect(copy?.rebuild.title[1]).toBe('Sur votre ordinateur.');
+    expect(copy?.rebuild.stories).toHaveLength(7);
 
     language.setLocale('fr');
     await language.ensureLandingCopy('fr');

@@ -7,10 +7,22 @@
  * 写文案的规矩：不用破折号（—、–），不编造关于产品的精确数字（「快 4 倍」这种不写）；
  * 演示里的读数一律是示例，页面上写明「示例」。
  *
- * 固定首屏价值主张，加五个可直接选择的片段（beats）。示例是开发中的 v3，
+ * 固定首屏价值主张，七组线性功能叙事和独立可操作示例。示例是开发中的 v3，
  * 下载是公开稳定版；文案须说明两者边界。
  */
 export interface LandingCopy {
+  rebuild: {
+    nav: [string, string, string, string];
+    learnFeatures: string; languageFallback: string;
+    title: [string, string];
+    featuresHeading: string; featuresLead: string;
+    demoHeading: string; demoLead: string; mobileHint: string; fullscreen: string;
+    retry: string; play: string; pause: string; mediaNote: string;
+    moreConnections: string; partner: string; disclaimer: string;
+    docsHeading: string; guide: string; versions: string; community: string; privacyDoc: string;
+    star: string; dismiss: string;
+    stories: Array<{ eyebrow: string; title: string; body: string; bullets: string[] }>;
+  };
   nav: {
     home: string;
     site: string;
@@ -50,13 +62,6 @@ export interface LandingCopy {
     devices: string;
     /** 页面里那扇真应用的窗口：邀请点一下、说明、加载中、退出、打不开。 */
     stage: { hint: string; note: string; loading: string; exit: string; unavailable: string };
-  };
-  /** 五个片段，顺序固定：同步、如实、交给 AI、排计划、设置。每个对应右边应用换到的一页。 */
-  beats: [Beat, Beat, Beat, Beat, Beat];
-  explore: { kicker: string; title: string; lead: string; tabs: [string, string, string, string, string] };
-  flap: {
-    /** 翻牌上的数字（示例）和下面的说明。数字按原样显示，各语言自己写千分位。 */
-    tiles: Array<{ value: string; label: string }>;
   };
   /** 明确标注合成内容的交接示例，不执行外部提交。 */
   handoff: {
@@ -101,13 +106,6 @@ export interface LandingCopy {
   };
   footer: { tagline: string; disclaimer: string; source: string };
   faq: { heading: string; lead: string; docs: string; items: Array<{ question: string; answer: string }> };
-}
-
-export interface Beat {
-  /** 「01 · 同步」这种栏目小标。 */
-  kicker: string;
-  title: string;
-  body: string;
 }
 
 export interface ConnectPath {

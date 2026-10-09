@@ -10,8 +10,9 @@ const RELEASE_ENDPOINT = '/api/release';
 /** Mac 访客默认看到 macOS 按钮，其余一律 Windows；判断不出来就退回 Windows，另一个平台的入口始终在。 */
 const isMacVisitor = (): boolean => {
   if (typeof navigator === 'undefined') return false;
-  return /Mac|iPad|iPhone|iPod/i.test(`${navigator.platform ?? ''} ${navigator.userAgent ?? ''}`);
+  return !isMobileVisitor() && /Mac/i.test(`${navigator.platform ?? ''} ${navigator.userAgent ?? ''}`);
 };
+export const isMobileVisitor = (): boolean => typeof navigator !== 'undefined' && (/Android|iPad|iPhone|iPod/i.test(navigator.userAgent ?? '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 const isTrustedAssetUrl = (value: string): boolean => value.startsWith(`${GITHUB_URL}/releases/download/`);
 
@@ -24,16 +25,21 @@ export const useDownloads = (t: Ref<LandingCopy>) => {
   const state = ref<'loading' | 'ready' | 'fallback'>('loading');
 
   const load = async () => {
+    state.value = 'loading'; latest.value = null;
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), 8000);
     try {
-      const response = await fetch(RELEASE_ENDPOINT, { headers: { Accept: 'application/json' } });
+      const response = await fetch(RELEASE_ENDPOINT, { headers: { Accept: 'application/json' }, signal: abort.signal });
       if (!response.ok) throw new Error(`release endpoint returned ${response.status}`);
       const payload = await response.json() as LatestRelease;
+      // This website presents v3. Never send visitors to an old v2 installer or a beta as a v3 release.
+      if (!/^3\.\d+\.\d+$/.test(payload.version)) throw new Error('v3 stable release is not available');
       if (!isUsableReleasePayload(payload.downloads, isTrustedAssetUrl)) throw new Error('invalid asset set');
       latest.value = payload;
       state.value = 'ready';
     } catch {
       state.value = 'fallback';
-    }
+    } finally { window.clearTimeout(timer); }
   };
 
   const primaryPlatform = computed<DownloadPlatform>(() => (isMacVisitor() ? 'macos' : 'windows'));
@@ -69,5 +75,7 @@ export const useDownloads = (t: Ref<LandingCopy>) => {
     ? `v${latest.value?.version}  ${t.value.downloads.status.ready}`
     : t.value.downloads.status[state.value]));
 
-  return { load, primary, secondary, msiHref, linux, linuxIsPreview, statusText };
+  const windows = computed(() => ({ ...t.value.downloads.windows, href: assetFor('windows')?.url ?? RELEASE_URL }));
+  const macos = computed(() => ({ ...t.value.downloads.macos, href: assetFor('macos')?.url ?? RELEASE_URL }));
+  return { load, primary, secondary, windows, macos, state, msiHref, linux, linuxIsPreview, statusText };
 };

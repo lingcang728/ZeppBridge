@@ -172,6 +172,7 @@ const detectLocale = (): LandingLocale => {
  * 界面重算。加载失败静默回落 en：切语言这个动作本身不该失败。
  */
 const loadedPacks = ref<Partial<Record<LandingLocale, LandingPack>>>({});
+const localeLoadError = ref<LandingLocale | null>(null);
 const packInflight = new Map<LandingLocale, Promise<void>>();
 
 /** 确保某语言的落地页语言包已加载。zh/en 直接返回。 */
@@ -183,12 +184,13 @@ export const ensureLandingCopy = (value: LandingLocale): Promise<void> => {
   if (inflight) return inflight;
   const task = import(`../views/landing/${value}.ts`)
     .then((module) => {
+      if (localeLoadError.value === value) localeLoadError.value = null;
       loadedPacks.value = { ...loadedPacks.value, [value]: module.default as LandingPack };
       // 包到了之后补写一次页面级 meta——加载期间 title 用的是英文兜底。
       if (locale.value === value) applyDocumentLanguage(value);
     })
     .catch(() => {
-      // 语言包加载失败不该让切换语言失败：所有键回落 en。
+      if (locale.value === value) { localeLoadError.value = value; applyDocumentLanguage('en'); }
     })
     .finally(() => {
       packInflight.delete(value);
@@ -235,6 +237,7 @@ let initialized = false;
 const setLocale = (value: LandingLocale) => {
   if (!isLandingLocale(value)) return;
   locale.value = value;
+  localeLoadError.value = null;
   try {
     if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, value);
   } catch {
@@ -255,6 +258,7 @@ const initializeLocale = () => {
 };
 
 export const useLandingLocale = () => ({
+  localeLoadError: readonly(localeLoadError),
   locale: readonly(locale),
   initializeLocale,
   setLocale,
