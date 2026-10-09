@@ -6,7 +6,10 @@ export type IconName =
   | 'bike'
   | 'chevron-right'
   | 'gauge'
-  | 'heart-refresh'
+  | 'battery-heart'
+  | 'wrench'
+  | 'week-bars'
+  | 'timeline-flag'
   | 'arrow-left'
   | 'arrow-right'
   | 'bars'
@@ -176,9 +179,10 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <path d="M12 3.8c1.8 2.7 5.4 6.1 5.4 9.6a5.4 5.4 0 1 1-10.8 0c0-3.5 3.6-6.9 5.4-9.6Z" fill="currentColor" />
       <path d="M9.3 14.2c1.3 1.1 4.1 1.1 5.4 0" fill="none" stroke="currentColor" :stroke-width="stroke" />
     </g>
+    <!-- 一左一右两只脚印：后面那只淡一档（双色），小尺寸也看得出是「走」。 -->
     <g v-else-if="name === 'steps'" fill="currentColor" stroke="none">
-      <path d="M6.2 4.1c1.8.3 3.4 1.4 4.5 3l2.1 3.1 2.5 1.8c1 .7 2.1 1 3.4 1.1l.9.1c.9.1 1.5.8 1.4 1.7-.1.7-.5 1.3-1.2 1.7l-3.9-.6c-2-.3-3.7-1.3-4.9-2.9l-1.8-2.3-2.3 5.7c-.5 1.3-1.8 2-3.2 1.7l-1-.2c-.7-.2-1.1-.9-.9-1.6l2.6-9.9c.2-.8.9-1.3 1.6-1.2Z" />
-      <path d="M5.2 19.8h10.2c.8 0 1.4-.5 1.7-1.2l.4-1.2-11.4-1.8-.9 2.2c-.3.9-.1 1.6 0 2Z" opacity=".7" />
+      <path d="M7.6 4.6c1.7 0 2.7 1.8 2.7 4.3 0 2.1-.8 3.4-1 4.8-.2 1.3.6 2.3.6 3.6a2.1 2.1 0 0 1-4.2.3c-.2-1.9-1.3-3.5-1.3-6.6 0-3.4 1.5-6.4 3.2-6.4Z" opacity=".38" />
+      <path d="M16.4 2.6c-1.7 0-2.7 1.8-2.7 4.3 0 2.1.8 3.4 1 4.8.2 1.3-.6 2.3-.6 3.6a2.1 2.1 0 0 0 4.2.3c.2-1.9 1.3-3.5 1.3-6.6 0-3.4-1.5-6.4-3.2-6.4Z" />
     </g>
     <g v-else-if="name === 'stress'" fill="currentColor" stroke="none">
       <circle cx="12" cy="7" r="2.2" />
@@ -216,9 +220,33 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <path d="m12 13.5 4-5" :stroke-width="stroke" />
       <circle cx="12" cy="13.8" r="1.4" fill="currentColor" stroke="none" />
     </g>
-    <g v-else-if="name === 'heart-refresh'">
-      <path d="M19.6 9.2C19.6 13.6 12 18 12 18s-7.6-4.4-7.6-8.8A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7.6 2.2Z" fill="currentColor" stroke="none" opacity=".9" />
-      <path d="M20.6 15.2a3.4 3.4 0 1 1-1.2-2.6m1.2-1v2h-2" :stroke-width="stroke" />
+    <!-- 身体状态：电量里一颗心——「恢复了多少」，不是刷新。 -->
+    <g v-else-if="name === 'battery-heart'">
+      <rect x="3.5" y="7" width="15" height="10" rx="2.6" :stroke-width="stroke" />
+      <path d="M21 10.4v3.2" :stroke-width="stroke" />
+      <rect x="5.6" y="9.1" width="10.8" height="5.8" rx="1.3" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M11 14.2s-2.5-1.4-2.5-3.2A1.35 1.35 0 0 1 11 10.3a1.35 1.35 0 0 1 2.5.7c0 1.8-2.5 3.2-2.5 3.2Z" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 高级与维护：扳手（维护）+ 一个小加号（更多选项）；设置本身仍是齿轮。 -->
+    <g v-else-if="name === 'wrench'">
+      <path d="M15.2 4.4a4.4 4.4 0 0 0-5.3 5.6L4.6 15.3a1.9 1.9 0 0 0 2.7 2.7l5.3-5.3a4.4 4.4 0 0 0 5.6-5.3l-2.6 2.6-2.4-.5-.5-2.4 2.5-2.7Z" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M15.2 4.4a4.4 4.4 0 0 0-5.3 5.6L4.6 15.3a1.9 1.9 0 0 0 2.7 2.7l5.3-5.3a4.4 4.4 0 0 0 5.6-5.3l-2.6 2.6-2.4-.5-.5-2.4 2.5-2.7Z" :stroke-width="stroke" />
+      <path d="M17 15.5v5m-2.5-2.5h5" :stroke-width="stroke" />
+    </g>
+    <!-- 这一周：七根柱子，最后一根（今天）实色加粗、顶上一个点。 -->
+    <g v-else-if="name === 'week-bars'">
+      <path d="M4.5 19.6h15" :stroke-width="stroke" />
+      <path d="M5.5 17v-3M8 17v-5M10.5 17v-2.4M13 17v-6M15.5 17v-4" :stroke-width="stroke" opacity=".55" />
+      <path d="M18.5 17V6.5" stroke-width="2.2" />
+      <circle cx="18.5" cy="4.2" r=".9" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 生活事件：时间线上立起一面小旗。 -->
+    <g v-else-if="name === 'timeline-flag'">
+      <path d="M3.5 18h17M12 18V5.5" :stroke-width="stroke" />
+      <circle cx="6" cy="18" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="18" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
     <path v-else-if="name === 'undo'" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" :stroke-width="stroke" />

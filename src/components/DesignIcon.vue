@@ -46,6 +46,7 @@ export type DesignIconName =
   | 'handoff'
   | 'health-watch'
   | 'heart-rate'
+  | 'maintenance'
   | 'manual-entry'
   | 'outdoor-cycling'
   | 'outdoor-run'
@@ -74,7 +75,8 @@ const props = withDefaults(defineProps<{
   alt: '',
 });
 
-const assets: Record<DesignIconName, string> = {
+/** 只有旧的 3D 名字有图；后来新增的名字（如 maintenance）只走 GlyphTile 的 SVG，不会落到这里。 */
+const assets: Partial<Record<DesignIconName, string>> = {
   'ai-ready': aiReady,
   'app-icon': appIcon,
   'auto-sync': autoSync,

@@ -146,7 +146,7 @@ const dayAria = (day: UpcomingDay) => {
 <template>
   <section class="weekly-card" aria-labelledby="weekly-title">
     <header>
-      <h2 id="weekly-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
+      <h2 id="weekly-title"><Icon name="week-bars" :size="15" />{{ t.title }}</h2>
       <span v-if="report" class="weekly-window">
         {{ t.window(report.recent_start, report.recent_end, report.baseline_start, report.baseline_end) }}
       </span>

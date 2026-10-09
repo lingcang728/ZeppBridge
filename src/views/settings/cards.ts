@@ -13,7 +13,7 @@ export const SETTINGS_CARD_ICONS: Record<SettingsCardId, DesignIconName> = {
   ai: 'handoff',
   display: 'overview',
   privacy: 'secure',
-  advanced: 'settings',
+  advanced: 'maintenance',
 };
 
 /** 每张卡一个颜色：叠在一起时像钱包里颜色不同的卡，一眼分得开。 */
