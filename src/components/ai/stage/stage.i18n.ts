@@ -36,6 +36,8 @@ const messages = defineMessages(
     notOpened: '中途收回了，这次没有自动打开网站',
     exchanges: (count: number) => `往返 ${count} 次`,
     planPeek: '你的下一步',
+    ringHint: '按住圆环蓄力，转满一圈就交出去',
+    resetCards: '复原牌位',
   },
   {
     stage: 'Send to AI: the data you hand over on the left, the AI in the middle, this question and the plan on the right',
@@ -71,6 +73,8 @@ const messages = defineMessages(
     notOpened: 'You pulled it back halfway, so the site was not opened',
     exchanges: (count: number) => (count === 1 ? '1 round trip' : `${count} round trips`),
     planPeek: 'Your next step',
+    ringHint: 'Hold the ring to charge it. A full circle sends.',
+    resetCards: 'Reset cards',
   },
   {
     stage: 'Enviar a la IA: a la izquierda los datos que entregas, en el centro la IA, a la derecha la pregunta y el plan',
@@ -106,6 +110,8 @@ const messages = defineMessages(
     notOpened: 'Lo recogiste a mitad de camino; esta vez no se abrió el sitio',
     exchanges: (count: number) => (count === 1 ? '1 ida y vuelta' : `${count} idas y vueltas`),
     planPeek: 'Tu siguiente paso',
+    ringHint: 'Mantén pulsado el anillo para cargarlo. Al completar el círculo se envía.',
+    resetCards: 'Recolocar tarjetas',
   },
   'components/ai/stage/stage',
 );

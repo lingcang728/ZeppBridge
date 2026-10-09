@@ -9,12 +9,12 @@
  * 朝外的那一面后面错开垫着「另一张」：问题 / 回执时垫着计划牌，计划朝外时垫着问题牌。
  * 点垫着的那张 = 翻面换过来（2D 压扁换面，flipCard）。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import SegmentTrack from '../../SegmentTrack.vue';
+import { computed, nextTick, ref, watch } from 'vue';
+import CapsuleWheel from '../../CapsuleWheel.vue';
 import Icon from '../../Icon.vue';
 import ReceiptFace from './ReceiptFace.vue';
 import PlanFace from './PlanFace.vue';
-import { flipCard } from '../../../lib/motion/cards';
+import { flipCard, reducedMotion, SPRINGS, springCurve } from '../../../lib/motion/cards';
 import type { AiTaskIssue, AiTaskPrepareResult, AiTaskTemplate } from '../../../lib/bridge/types';
 import type { DayRow } from '../../../lib/trainingPlan/week';
 import type { TrainingPlanState } from '../../../types/trainingPlan';
@@ -40,6 +40,7 @@ const t = useBridgeText();
 const s = useStageText();
 const front = ref<HTMLElement | null>(null);
 const input = ref<HTMLTextAreaElement | null>(null);
+const behind = ref<HTMLElement | null>(null);
 
 /* ---------- 模板：五档玻璃分段（自由问 + 四个模板），同旧的模板胶囊 ---------- */
 type Intent = 'free' | 'sleep' | 'week' | 'workout' | 'next';
@@ -83,35 +84,44 @@ watch(t, (now, before) => {
   if (key && questionsOf(now)[key] !== ctl.draft.value.prompt) ctl.setPrompt(questionsOf(now)[key]);
 });
 
-/* 快捷问题永远一行（10-08 H15，用户：排两行拖起来极难）：放不下就在牌里横向滑，两头渐隐。 */
-const strip = ref<HTMLElement | null>(null);
-const overflowing = ref(false);
-let stripObserver: ResizeObserver | null = null;
-const measureStrip = () => {
-  const el = strip.value;
-  overflowing.value = !!el && el.scrollWidth > el.clientWidth + 1;
-};
-onMounted(() => {
-  stripObserver = new ResizeObserver(measureStrip);
-  if (strip.value) {
-    stripObserver.observe(strip.value);
-    const inner = strip.value.firstElementChild;
-    if (inner) stripObserver.observe(inner);
-  }
-});
-onBeforeUnmount(() => stripObserver?.disconnect());
-/** 选中的那一项滑进看得见的地方。 */
-watch(intent, async () => {
-  await nextTick();
-  const el = strip.value?.querySelector<HTMLElement>('.segment-item[aria-checked="true"], .segment-item.is-active');
-  el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-});
+/*
+ * 快捷问题是一只 Liquid Glass 横拨滚轮（10-09）：以前是一条横向滑动的玻璃分段，五项放不下，选中项一拖就跑出牌外
+ * （「排下周」「A workout」被截在牌沿上），换成长一点的语言更甚。滚轮的宽度就是牌里的宽度，两头渐隐，永远不出界；
+ * 选中项的全称写在滚轮下面一行（以前只在悬停提示里，提示框还会伸出牌外）。
+ */
+const wheelItems = computed(() => intents.value.map(({ value, label }) => ({ value, label })));
+const wheelSpan = computed(() => Math.max(160, Math.round(props.box.width - 36)));
+const intentHint = computed(() => intents.value.find((one) => one.value === intent.value)?.title ?? null);
 
 /* ---------- 翻面 ---------- */
 const back = computed<FutureFace | null>(() => (props.face === 'plan' ? 'question' : props.rows.length || props.mcp ? 'plan' : null));
 const turn = async (next: FutureFace) => {
   if (!front.value) { emit('update:face', next); return; }
+  if (next !== 'receipt' && props.face !== 'receipt' && behind.value && !reducedMotion()) { await shuffle(next); return; }
   await flipCard(front.value, async () => { emit('update:face', next); await nextTick(); });
+};
+/**
+ * 问题 ⇄ 计划（10-09，用户：两张之间是硬切）：两张牌换位——朝外那张往下沉、淡出，垫着那张同时升到正面；
+ * 换好内容以后正面这张从垫着的位置落定，换下来的那张从正面退回垫着的位置。全程只动 transform / opacity。
+ */
+const BEHIND = { translate: '6px -30px', rotate: '-1.5deg', scale: '.97' };
+const FRONT = { translate: '0px 0px', rotate: '0deg', scale: '1' };
+const shuffle = async (next: FutureFace) => {
+  const card = front.value!;
+  const peek = behind.value!;
+  const sink = card.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(16px) scale(.96)' }],
+    { duration: 170, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+  const rise = peek.animate([{ ...BEHIND, opacity: 0.9 }, { ...FRONT, opacity: 1 }], { duration: 170, easing: 'cubic-bezier(.2, .8, .3, 1)', fill: 'forwards' });
+  await sink.finished.catch(() => undefined);
+  emit('update:face', next);
+  await nextTick();
+  const { easing, duration } = springCurve(SPRINGS.flip);
+  const land = card.animate([{ opacity: 0, transform: 'translate(6px, -30px) rotate(-1.5deg) scale(.97)' }, { opacity: 1, offset: 0.35 }, { opacity: 1, transform: 'none' }],
+    { duration, easing });
+  sink.cancel();
+  rise.cancel();
+  behind.value?.animate([{ ...FRONT, opacity: 0.4 }, { ...BEHIND, opacity: 0.9 }], { duration, easing });
+  await land.finished.catch(() => undefined);
 };
 const backLabel = computed(() => (back.value === 'plan' ? s.value.planPeek : s.value.questionTitle));
 
@@ -121,7 +131,7 @@ defineExpose({ front, turn });
 <template>
   <div class="future" :style="{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, '--card-h': `${box.height}px` }">
     <div class="stack">
-      <button v-if="back" type="button" class="fcard behind" :aria-label="backLabel" @click="turn(back)">
+      <button v-if="back" ref="behind" type="button" class="fcard behind" :aria-label="backLabel" @click="turn(back)">
         <span class="peek"><Icon :name="back === 'plan' ? 'compass' : 'edit'" :size="13" />{{ backLabel }}</span>
       </button>
       <section ref="front" :class="['fcard', 'front', `face-${face}`]">
@@ -130,8 +140,9 @@ defineExpose({ front, turn });
             <span>{{ t.composer }}</span>
             <textarea ref="input" :value="ctl.draft.value.prompt" :placeholder="t.placeholder" :disabled="disabled" @input="ctl.setPrompt(($event.target as HTMLTextAreaElement).value)"></textarea>
           </label>
-          <div ref="strip" :class="['templates', { overflowing }]">
-            <SegmentTrack compact no-wrap :items="intents" :model-value="intent" :disabled="disabled" :aria-label="t.composer" @update:model-value="pick" />
+          <div class="templates">
+            <CapsuleWheel class="intent-wheel" loop :span="wheelSpan" :items="wheelItems" :model-value="intent" :disabled="disabled" :aria-label="t.composer" @update:model-value="pick" />
+            <Transition name="hint-swap" mode="out-in"><small v-if="intentHint" :key="intent" class="intent-hint">{{ intentHint }}</small></Transition>
           </div>
           <ul v-if="blocked.length" class="issues" role="alert">
             <li v-for="(issue, i) in blocked" :key="i"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
@@ -149,12 +160,14 @@ defineExpose({ front, turn });
 <style scoped>
 .future { position: absolute; }
 .stack { position: relative; height: var(--card-h); }
-/* 模板：问题牌底边一条玻璃分段，永远一行；放不下就横向滑（滚动条藏起来，两头渐隐），上下留出透镜浮起的余量。 */
-.templates { display: flex; min-width: 0; margin: 0 -6px; padding: 10px 6px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain;
-  border-top: 1px solid var(--mat-line); }
-.templates::-webkit-scrollbar { display: none; }
-.templates.overflowing { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); }
-.templates :deep(.segment-track) { flex: 0 0 auto; }
+/* 模板：问题牌底边一只玻璃滚轮，宽度就是牌里的宽度；下面一行是选中项的全称。 */
+.templates { display: grid; justify-items: center; gap: 6px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--mat-line); }
+.intent-wheel { max-width: 100%; }
+.intent-wheel :deep(.wheel-item) { font-size: var(--fs-sm); }
+.intent-hint { max-width: 100%; color: var(--subtle); font-size: var(--fs-2xs); line-height: 1.5; text-align: center; }
+.hint-swap-enter-active, .hint-swap-leave-active { transition: opacity 160ms ease, translate 200ms ease; }
+.hint-swap-enter-from { opacity: 0; translate: 0 4px; }
+.hint-swap-leave-to { opacity: 0; translate: 0 -4px; }
 .fcard { position: absolute; inset: 0; border-radius: 24px; background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); border: 1px solid var(--mat-line); color: var(--ink); }
 .front { display: grid; padding: 18px 18px 16px; overflow: hidden; }
 /* 垫着的那张：往右上错开、歪一点，只露出上沿写着名字的那一条。 */

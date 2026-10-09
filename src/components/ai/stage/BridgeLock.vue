@@ -1,23 +1,28 @@
 <script setup lang="ts">
 /**
- * 舞台正中的门锁（2026-10-08）：一枚圆形的锁，里面是这次要交给的 AI；锁外一圈细环是数据就绪度
- * （旧底栏那枚圆环搬过来）。点锁 = 寄出（准备文件 → 复制开场白 → 打开网站，编排见 useStageSend）。
+ * 舞台正中的门锁（2026-10-08）：一枚圆形的锁，里面是这次要交给的 AI。
+ * 锁外一圈是准备环，跟扑克牌长按那圈一样（10-09）：平时是空的，没有亮条、也不标百分比——
+ * 左边的牌已经写了有几天数据。按住锁，弧从正上方蓄到一整圈（约半秒），满了再寄出
+ * （准备文件 → 复制开场白 → 打开网站，编排见 useStageSend）。没按满就松手，弧收回，不寄。
+ * 准备途中再按一下 = 收回。减少动效时按一下就寄。
  *
  * 锁下面是原来那只 Liquid Glass 横拨滚轮（CapsuleWheel），拨它换锁里的 AI；滚轮镜片里单击也照旧寄出。
  * 再下面一行小字是就绪度和 `.md` 的体量，点它进「寄出前检查」（从这行长出来，返回缩回这里）。
- * 准备文件时环在转（只转 <svg> 自己，上合成器）；同步中锁是灰的、不能点。
+ * 准备文件时环在转（只转 <svg> 自己，上合成器）。同步中锁是灰的、不能点。
  */
-import { computed } from 'vue';
+import { computed, onBeforeUnmount } from 'vue';
 import CapsuleWheel from '../../CapsuleWheel.vue';
 import Icon from '../../Icon.vue';
 import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../../lib/aiProviders';
+import { reducedMotion } from '../../../lib/motion/cards';
+import { usePressHold } from '../../../composables/usePressHold';
 import { useHandoffText } from '../HandoffDock.i18n';
 import { useStageText } from './stage.i18n';
 
 const props = defineProps<{
   r: number; provider: AiProvider; busy: boolean; disabled: boolean; subscribed: boolean;
   readiness: { categories: number; percent: number } | null; mdLine: string | null; issues: number; waiting: string | null; title: string;
-  /** 有一张牌被拖到锁跟前（H21：牌和锁之间要有互动）：锁迎上来一点、外圈亮起。 */
+  /** 有一张牌被拖到锁跟前：锁迎上来一点。 */
   near?: boolean;
 }>();
 const emit = defineEmits<{ go: []; pick: [AiProviderId]; exportOnly: [] }>();
@@ -26,22 +31,46 @@ const s = useStageText();
 const items = computed(() => AI_PROVIDERS.map((p) => ({ value: p.id, label: p.label, image: p.localIcon })));
 const RING_R = 47;
 const RING = 2 * Math.PI * RING_R;
-const meter = computed(() => `${((props.readiness?.percent ?? 0) / 100) * RING} ${RING}`);
+/** 跟扑克牌长按同一档（450ms），稍长一点点，让蓄力看得见，又不用按住不放。 */
+const HOLD_MS = 480;
+/** 转满以后停这一下再寄出：满圈要能被看见，而不是刚满就换成转圈。 */
+const BEAT_MS = 80;
+let beat = 0;
+let fired = false;
+const hold = usePressHold(() => {
+  fired = true;
+  beat = window.setTimeout(() => { beat = 0; fired = false; hold.cancel(); emit('go'); }, reducedMotion() ? 0 : BEAT_MS);
+}, reducedMotion() ? 1 : HOLD_MS);
+const meter = computed(() => `${hold.progress.value * RING} ${RING}`);
+const charging = computed(() => hold.holding.value || hold.progress.value > 0);
+/** 按住开始蓄。准备途中再按 = 收回，不蓄第二圈。没转满就松手，弧收回。 */
+const onPointerDown = (event: PointerEvent) => {
+  if (props.busy) { emit('go'); return; }
+  hold.pointerdown(event);
+};
+const onPointerUp = () => { if (!fired) hold.cancel(); };
+const onKeyDown = (event: KeyboardEvent) => {
+  if (props.busy && (event.code === 'Space' || event.code === 'Enter')) { event.preventDefault(); emit('go'); return; }
+  hold.keydown(event);
+};
+const onKeyUp = (event: KeyboardEvent) => { if (!fired) hold.keyup(event); };
 const go = () => { if (!props.disabled) emit('go'); };
+onBeforeUnmount(() => window.clearTimeout(beat));
 </script>
 
 <template>
   <div class="bridge-lock" :style="{ '--r': `${r}px` }">
-    <button type="button" :class="['lock', { busy, disabled, near }]" :disabled="disabled" :title="title" :aria-label="busy ? s.lockBusy : s.lock(provider.label)" @click="go">
+    <button type="button" :class="['lock', { busy, disabled, near, charging }]" :disabled="disabled" :title="`${title}\n${s.ringHint}`" :aria-label="busy ? s.lockBusy : s.lock(provider.label)"
+      @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="onPointerUp" @keydown="onKeyDown" @keyup="onKeyUp" @click.prevent>
       <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
         <circle class="track" cx="50" cy="50" :r="RING_R" />
-        <circle class="meter" cx="50" cy="50" :r="RING_R" :stroke-dasharray="meter" />
+        <circle v-if="hold.progress.value > 0 && !busy" class="meter" cx="50" cy="50" :r="RING_R" :stroke-dasharray="meter" />
       </svg>
       <svg v-if="busy" class="spin" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" :r="RING_R" :stroke-dasharray="`${RING * 0.18} ${RING}`" /></svg>
       <span class="disc"><img :src="provider.localIcon" alt="" /></span>
     </button>
     <div class="lock-wheel">
-      <CapsuleWheel class="wheel" loop activatable plain :span="196" :items="items" :model-value="provider.id" :disabled="disabled"
+      <CapsuleWheel class="wheel" loop activatable :span="196" :items="items" :model-value="provider.id" :disabled="disabled"
         :aria-label="`${t.go(provider.label)} · ${subscribed ? t.planPaid : t.planFree}`" @update:model-value="emit('pick', $event)" @activate="go" />
       <span :class="['badge', { paid: subscribed }]" aria-hidden="true">{{ subscribed ? t.planPaid : t.planFree }}</span>
       <button type="button" class="export-only" :disabled="disabled || busy" :title="t.exportOnly" :aria-label="t.exportOnly" @click="emit('exportOnly')"><Icon name="export" :size="15" /></button>
@@ -62,7 +91,7 @@ const go = () => { if (!props.disabled) emit('go'); };
 .lock { position: relative; display: grid; place-items: center; width: calc(var(--r) * 2); height: calc(var(--r) * 2); padding: 0; border: 0; border-radius: 50%;
   background: none; cursor: pointer; transition: scale 220ms cubic-bezier(.3, 1.3, .5, 1); }
 .lock:hover:not(:disabled) { scale: 1.04; }
-.lock:active:not(:disabled) { scale: .96; }
+.lock:active:not(:disabled), .lock.charging:not(:disabled) { scale: .96; }
 .lock:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 .lock.disabled { cursor: default; filter: grayscale(.7); opacity: .65; }
 .lock.near:not(:disabled) { scale: 1.08; }
@@ -72,8 +101,8 @@ const go = () => { if (!props.disabled) emit('go'); };
 .disc { transition: box-shadow 220ms ease; }
 .ring, .spin { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); rotate: -90deg; }
 .ring circle, .spin circle { fill: none; stroke-width: 2; stroke-linecap: round; }
-.ring .track { stroke: color-mix(in srgb, var(--ink) 9%, transparent); }
-.ring .meter { stroke: var(--accent); transition: stroke-dasharray 600ms cubic-bezier(.4, .6, .2, 1); }
+.ring .track { stroke: color-mix(in srgb, var(--ink) 14%, transparent); }
+.ring .meter { stroke: var(--accent); stroke-width: 3.2; }
 .spin circle { stroke: var(--accent); stroke-width: 3; }
 .spin { animation: spin 1.1s linear infinite; }
 .disc { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: var(--mat-raised);

@@ -5,7 +5,7 @@
  * 舞台的 `placed`（牌的位置、线的端点）读它。减少动效时不跑（牌不挤、线不晃）。页面看不见时也不跑。
  */
 import { onBeforeUnmount, shallowRef } from 'vue';
-import { stepCloud, type CloudBody } from '../../lib/aiTask/cloudPhysics';
+import { stepCloud, type CloudBody, type CloudBounds } from '../../lib/aiTask/cloudPhysics';
 import { reducedMotion } from '../../lib/motion/cards';
 
 export interface CloudPhysicsOptions {
@@ -16,6 +16,8 @@ export interface CloudPhysicsOptions {
   /** 正被拖着的那张和它此刻的偏移。 */
   live: () => { id: string; x: number; y: number } | null;
   card: () => { width: number; height: number };
+  /** 撒牌区：被挤开的牌碰到四边会被软墙推回来，不闯进中间的锁和右边的牌。 */
+  bounds?: () => CloudBounds;
 }
 
 const NONE = Object.freeze({ x: 0, y: 0 });
@@ -49,8 +51,11 @@ export const useCloudPhysics = (options: CloudPhysicsOptions) => {
   const tick = (now: number) => {
     frame = 0;
     sync();
-    const calm = stepCloud([...bodies.values()], options.card(), last ? (now - last) / 1000 : 1 / 60);
+    const calm = stepCloud([...bodies.values()], options.card(), last ? (now - last) / 1000 : 1 / 60, options.bounds?.());
     last = now;
+    for (const b of bodies.values()) {
+      if (b.bounce && Math.hypot(b.d.x, b.d.y) < 1.5 && Math.hypot(b.v.x, b.v.y) < 12) b.bounce = false;
+    }
     shifts.value = new Map([...bodies.values()].map((b) => [b.id, b.pinned ? NONE : { x: b.d.x, y: b.d.y }]));
     if (calm && [...bodies.values()].every((b) => Math.abs(b.d.x) < 0.3 && Math.abs(b.d.y) < 0.3)) {
       shifts.value = new Map();
@@ -76,6 +81,18 @@ export const useCloudPhysics = (options: CloudPhysicsOptions) => {
     shifts.value = new Map();
   };
   const shiftOf = (id: string) => shifts.value.get(id) ?? NONE;
+  /**
+   * 手拿到了正弹在半路的那张：这段位移已经并进拖的起点，这里清掉，免得和 `live` 加两次。
+   * 同一轮调用方就会写上 `live`，所以要同步改 ref，不能等下一帧。
+   */
+  const take = (id: string) => {
+    const body = bodies.get(id);
+    if (body) { body.d = { x: 0, y: 0 }; body.v = { x: 0, y: 0 }; body.bounce = false; }
+    if (!shifts.value.has(id)) return;
+    const next = new Map(shifts.value);
+    next.delete(id);
+    shifts.value = next;
+  };
   /** 一张牌此刻比它要停的位置多出 (dx, dy)（松手被夹回来）：从这里弹回去，线跟着走。同一帧就生效，不闪到终点。 */
   const nudge = (id: string, dx: number, dy: number) => {
     sync();
@@ -83,11 +100,12 @@ export const useCloudPhysics = (options: CloudPhysicsOptions) => {
     if (!body) return;
     body.pinned = false;
     body.at = undefined;
+    body.bounce = true;
     body.d = { x: body.d.x + dx, y: body.d.y + dy };
     shifts.value = new Map([...shifts.value, [id, { ...body.d }]]);
     kick();
   };
 
   onBeforeUnmount(() => cancelAnimationFrame(frame));
-  return { shiftOf, kick, reset, nudge };
+  return { shiftOf, kick, reset, nudge, take };
 };

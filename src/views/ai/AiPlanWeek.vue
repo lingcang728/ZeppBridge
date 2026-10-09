@@ -94,6 +94,7 @@ const changes = computed(() => (plan.editingSent.value
 <style scoped src="./aiPage.css"></style>
 <style scoped>
 .week-panel { gap: 10px; }
+.week-panel :deep(.bridge-future) { height: auto; min-height: 274px; padding-left: 0; }
 .plan-summary { margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
 .whole-issues { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--warning); font-size: var(--fs-xs); }
 .whole-issues li { display: flex; align-items: center; gap: 8px; }

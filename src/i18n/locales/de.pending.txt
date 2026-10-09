@@ -10,6 +10,8 @@ components/MetricInfo.sectionChart
 components/MetricInfo.sectionHow
 components/MetricInfo.sectionWhat
 components/WeeklyReportCard.nextUp
+components/ai/stage/stage.resetCards
+components/ai/stage/stage.ringHint
 components/overview/SleepCard.windowAsleep
 components/overview/SleepCard.windowWoke
 components/overview/StepsCard.weekAria
