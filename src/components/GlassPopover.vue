@@ -16,6 +16,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onMotionEscape } from '../lib/motion/interrupt';
 import { SPRINGS, reducedMotion, springCurve } from '../lib/motion/cards/spring';
 import { animateFromNow } from '../lib/motion/cards/reversible';
+import { anchoredLeft } from '../lib/popoverPosition';
 
 const props = withDefaults(defineProps<{ anchor: HTMLElement | null; labelledby?: string; width?: number }>(), { labelledby: undefined, width: 340 });
 const emit = defineEmits<{ close: [] }>();
@@ -24,11 +25,11 @@ const veil = ref<HTMLElement | null>(null);
 const style = ref<Record<string, string>>({});
 /** 内容布局好、动画起好之前整块不画（不出现「空板」那一帧）。 */
 const ready = ref(false);
-const MARGIN = 12;
+const MARGIN = 20;
 const GAP = 8;
 let closing: Promise<void> | null = null;
 
-/** 面板放在按钮下方、右边对齐按钮；下面放不下就放上面；左右夹在窗口里。缩放原点 = 按钮中心。 */
+/** 面板放在按钮下方，往空的那边展开（anchoredLeft）；下面放不下就放上面；左右夹在窗口里。缩放原点 = 按钮中心。 */
 const place = () => {
   const box = props.anchor?.getBoundingClientRect();
   const vw = window.innerWidth;
@@ -36,7 +37,7 @@ const place = () => {
   const width = Math.min(props.width, vw - MARGIN * 2);
   const height = panel.value?.offsetHeight ?? 220;
   const anchor = box ?? new DOMRect(vw / 2, vh / 2, 0, 0);
-  const left = Math.min(Math.max(MARGIN, anchor.right - width), vw - width - MARGIN);
+  const left = anchoredLeft(anchor, width, vw, MARGIN);
   const below = anchor.bottom + GAP + height <= vh - MARGIN;
   const top = below ? anchor.bottom + GAP : Math.max(MARGIN, anchor.top - GAP - height);
   const ox = anchor.left + anchor.width / 2 - left;

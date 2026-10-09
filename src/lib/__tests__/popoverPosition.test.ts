@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { popoverStyle, resolveDropUp, VIEWPORT_MARGIN } from '../popoverPosition';
+import { anchoredLeft, popoverStyle, resolveDropUp, VIEWPORT_MARGIN } from '../popoverPosition';
+
+describe('anchoredLeft：往空的那边展开', () => {
+  it('靠左的按钮向右展开，不被窗口左沿顶住', () => {
+    expect(anchoredLeft({ left: 40, right: 70 }, 340, 1280, 16)).toBe(40);
+    expect(anchoredLeft({ left: 4, right: 34 }, 340, 1280, 16)).toBe(16);
+  });
+
+  it('右边放不下才向左展开（右沿对齐按钮）', () => {
+    expect(anchoredLeft({ left: 1200, right: 1230 }, 340, 1280, 16)).toBe(1230 - 340);
+  });
+
+  it('两边都放不下就居中并夹在窗口里', () => {
+    const left = anchoredLeft({ left: 180, right: 210 }, 360, 400, 16);
+    expect(left).toBeGreaterThanOrEqual(16);
+    expect(left + 360).toBeLessThanOrEqual(400 - 16);
+  });
+});
 
 /* issue #9 的回归门。
    日期选择器原来固定向下展开，触发按钮在窗口底部时日历整块落到视口之外，
