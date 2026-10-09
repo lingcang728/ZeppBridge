@@ -175,7 +175,7 @@
 
 ### 5. 设置 (`/settings`)
 
-**三种形态的卡组**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。同一批卡在形态之间用 Web Animations 直接动真实元素（FLIP；几何是纯函数 `lib/deck/morph.ts`，编排在 `composables/useDeckMorph.ts`），所以**随时可以打断**：打开到一半关掉就原路倒回（`Animation.reverse()`），展开到一半收起就从半路飞回去。（View Transitions 过渡期间点什么都不算数，快照带模糊逐帧重绘，收起时一顿一顿的。）
+**三种形态的卡组**，不做左侧目录。九张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 反馈问题 · 隐私与安全 · 高级与维护。同一批卡在形态之间用 Web Animations 直接动真实元素（FLIP；几何是纯函数 `lib/deck/morph.ts`，编排在 `composables/useDeckMorph.ts`），所以**随时可以打断**：打开到一半关掉就原路倒回（`Animation.reverse()`），展开到一半收起就从半路飞回去。（View Transitions 过渡期间点什么都不算数，快照带模糊逐帧重绘，收起时一顿一顿的。）
 
 - `/settings` 默认是 **coverflow**（`DeckCoverflow.vue`，摆位来自纯函数 `lib/deck/coverflow.ts`）：正中一张立着，两侧的卡侧转约 46° 紧紧叠在两边，越远越小、越糊、越淡；卡组首尾相接，两边永远有卡；舞台两端渐隐进背景。拖动（`useSpringIndex` 按速度吸附）、滚轮、←/→、点侧卡转到正中；点正中那张或回车打开。没有左右箭头按钮——拖就是翻。侧卡没有硬边：外侧那一半按离正中的远近渐隐进背景（`coverflowPose().dissolve`）。
 - **「展开全部」**把卡从正中往两边依次抽出（每张相隔 16ms、各 420ms）、纵向平铺成两列；底部浮着醒目的**「收起」**胶囊，按相反顺序插回卡组。用哪种形态记在本机。

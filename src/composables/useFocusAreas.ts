@@ -1,5 +1,6 @@
 /**
- * 概览「我关注」的三个区块：睡眠 / 日常状态 / 训练，可多选。
+ * 概览「我关注」的三个区块：睡眠 / 日常状态 / 训练。界面上是一条滑块（均衡 + 三个区块，一次一格）；
+ * 存储仍是区块数组，旧版多选留下的值照样读得出来。
  *
  * 这是看的偏好，不是数据：和界面语言、置顶指标一样存 `localStorage`，不进库、不进导出。
  * 全局单例——概览的首次提问、概览的排序和设置「显示与语言」里那一行读同一份。
@@ -11,7 +12,9 @@
  */
 import { computed, readonly, ref } from 'vue';
 import { defineMessages, useMessages } from '../i18n';
-import { FOCUS_AREA_KEYS, FOCUS_AREAS, normalizeAreas, type FocusArea } from '../lib/focusAreas';
+import {
+  FOCUS_AREA_KEYS, FOCUS_AREAS, FOCUS_CHOICES, areasForChoice, focusChoiceOf, normalizeAreas, type FocusArea, type FocusChoice,
+} from '../lib/focusAreas';
 
 const AREAS_KEY = 'zb.focusAreas';
 const ASKED_KEY = 'zb.focusAsked';
@@ -65,16 +68,19 @@ export const skipFocusPrompt = (): void => {
 
 const areaWords = defineMessages(
   {
+    areaAll: '均衡',
     areaSleep: '睡眠',
     areaDaily: '日常状态',
     areaTraining: '训练',
   },
   {
+    areaAll: 'Balanced',
     areaSleep: 'Sleep',
     areaDaily: 'Daily status',
     areaTraining: 'Training',
   },
   {
+    areaAll: 'Equilibrado',
     areaSleep: 'Sueño',
     areaDaily: 'Estado diario',
     areaTraining: 'Entrenamiento',
@@ -87,12 +93,23 @@ const words = useMessages(areaWords);
 export const focusAreaLabel = (area: FocusArea): string =>
   (words.value as Record<string, string>)[FOCUS_AREA_KEYS[area]] ?? area;
 
+const choice = computed(() => focusChoiceOf(areas.value));
+
 export const useFocusAreas = () => ({
   areas: readonly(areas),
   asked: readonly(asked),
+  /** 滑块停在哪一格（「均衡」或某个区块）。 */
+  choice,
   setAreas: setFocusAreas,
+  setChoice: (next: FocusChoice) => setFocusAreas(areasForChoice(next)),
   skipPrompt: skipFocusPrompt,
 });
 
 /** 选择区块时给芯片 / 菜单排顺序用的那份区块列表。 */
 export const focusAreaList = computed(() => FOCUS_AREAS.map((area) => ({ area, label: focusAreaLabel(area) })));
+
+/** 「我关注」滑块的四格（概览页头、首次提问、设置里那一行共用）。 */
+export const focusChoiceItems = computed(() => FOCUS_CHOICES.map((value) => ({
+  value,
+  label: value === 'all' ? words.value.areaAll : focusAreaLabel(value),
+})));

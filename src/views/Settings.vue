@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 设置页：钱包式卡叠。
  *
- * 总览（/settings）是八张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
+ * 总览（/settings）是九张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
  * 那张升到最上面摊开，展开后可以左右拖、按按钮或方向键翻到相邻的一张，Esc 回到总览。
  * 各区块的界面和逻辑在 views/settings/sections/，共享状态在 composables/settings/context.ts。 */
 import GlassSwitch from '../components/GlassSwitch.vue';
@@ -59,6 +59,7 @@ const titles = computed<Record<SettingsCardId, string>>(() => ({
   data: d.value.cardData,
   ai: d.value.cardAi,
   display: d.value.cardDisplay,
+  feedback: d.value.secFeedback,
   privacy: d.value.cardPrivacy,
   advanced: d.value.cardAdvanced,
 }));
@@ -77,14 +78,18 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
     data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
     ai: d.value.sumAi(exportFormat.value.toUpperCase()),
     display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
+    feedback: d.value.sumFeedback,
     privacy: d.value.sumPrivacy,
     advanced: d.value.sumAdvanced,
   };
 });
 
 const toneColor = (tone: string) => (tone === 'neutral' ? 'var(--glyph-neutral)' : `var(--${tone})`);
+/** 内容只有几行的卡：展开后收窄（CardDeck 的 is-narrow）。 */
+const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'feedback', 'privacy'];
 const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
   id,
+  narrow: NARROW_CARDS.includes(id),
   icon: SETTINGS_CARD_ICONS[id],
   glyphTone: SETTINGS_CARD_TONES[id],
   tone: toneColor(SETTINGS_CARD_TONES[id]),
@@ -179,7 +184,7 @@ onUnmounted(() => {
       </template>
 
       <template #body="{ card }">
-        <KeepAlive :max="8">
+        <KeepAlive :max="9">
           <CardBody :key="card.id" :id="card.id" />
         </KeepAlive>
       </template>

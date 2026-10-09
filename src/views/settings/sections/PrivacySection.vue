@@ -51,7 +51,7 @@ onMounted(() => {
           <span v-if="localApiStatus" class="s-row-sub">{{ localApiStatus.enabled ? p.apiOn(localApiStatus.base_url || '127.0.0.1') : p.apiOff }}</span>
         </div>
         <div class="s-row-control">
-          <button class="pill-button quiet" type="button" @click="openLocalApi">{{ p.apiOpen }}<Icon name="chevron-right" :size="14" /></button>
+          <button class="pill-button" type="button" @click="openLocalApi">{{ p.apiOpen }}<Icon name="chevron-right" :size="14" /></button>
         </div>
       </div>
     </div>

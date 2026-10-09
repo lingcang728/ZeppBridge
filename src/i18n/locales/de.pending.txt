@@ -10,6 +10,7 @@ components/MetricInfo.sectionChart
 components/MetricInfo.sectionHow
 components/MetricInfo.sectionWhat
 components/WeeklyReportCard.nextUp
+composables/useFocusAreas.areaAll
 composables/useFocusAreas.areaDaily
 composables/useFocusAreas.areaSleep
 composables/useFocusAreas.areaTraining
@@ -129,6 +130,7 @@ views/Overview.focusDone
 views/Overview.focusQuestion
 views/Overview.focusSkip
 views/Overview.showAllModules
+views/settings/deck.sumFeedback
 views/settings/sections/account.accountFallback
 views/settings/sections/account.advanced
 views/settings/sections/account.cancel
@@ -180,7 +182,7 @@ views/settings/sections/archive.year
 views/settings/sections/data.codesFix
 views/settings/sections/data.codesHint
 views/settings/sections/data.intro
-views/settings/sections/display.focusSub
+views/settings/sections/display.focusSlideSub
 views/settings/sections/display.focusTitle
 views/settings/sections/maintenance.cleanupForever
 views/settings/sections/maintenance.cleanupSub

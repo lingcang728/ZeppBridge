@@ -18,8 +18,12 @@ export type DiagnosticFormState = {
   error: string | null;
 };
 
+/* 默认停在「其他」：分段选择器一打开就有一枚选中的胶囊（空值时整条轨道没有滑块，
+   要点一下才出现）。「其他」不替用户断言问题类型，用户换成具体一类再提交更好。 */
+export const DEFAULT_REPORT_CATEGORY = 'other';
+
 export const createDiagnosticForm = () => reactive<DiagnosticFormState>({
-  category: '',
+  category: DEFAULT_REPORT_CATEGORY,
   note: '',
   result: null,
   error: null,
@@ -60,7 +64,7 @@ export const createDiagnosticReport = (feedback: SettingsFeedback) => {
       );
       form.result = { reportId: result.reportId, submittedAt: result.submittedAt };
       form.note = '';
-      form.category = '';
+      form.category = DEFAULT_REPORT_CATEGORY;
     } catch (error) {
       form.error = toUserMessage(error, t.value.reportFailed);
     } finally {
