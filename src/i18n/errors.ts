@@ -122,6 +122,8 @@ const messages = defineMessages(
     'err.export.empty_range': '这段时间没有可导出的记录',
     'err.export.convert_failed': '转换导出格式失败',
     'err.export.write_failed': '写入导出文件失败',
+    'err.mcp.sidecar_missing': '这个版本没有附带 MCP 程序，到 GitHub 下载 zeppbridge-tools',
+    'err.mcp.bundle_failed': '生成 Claude Desktop 扩展包失败',
     'err.export.path_required': '先选择保存位置',
     'err.export.path_not_absolute': '保存位置必须是绝对路径',
     'err.export.not_a_directory': 'FIT 导出需要一个目录，这里选中的是文件',
@@ -309,6 +311,8 @@ const messages = defineMessages(
     'err.export.empty_range': 'No records in this range to export',
     'err.export.convert_failed': "Could not convert to the requested format",
     'err.export.write_failed': "Could not write the export file",
+    'err.mcp.sidecar_missing': 'This build does not include the MCP program; download zeppbridge-tools from GitHub',
+    'err.mcp.bundle_failed': 'Could not create the Claude Desktop extension',
     'err.export.path_required': 'Pick a save location first',
     'err.export.path_not_absolute': 'Save location must be an absolute path',
     'err.export.not_a_directory':
@@ -500,6 +504,8 @@ const messages = defineMessages(
     'err.export.empty_range': 'Sin registros para exportar en este rango',
     'err.export.convert_failed': 'Error al convertir al formato solicitado',
     'err.export.write_failed': 'Error al escribir el archivo de exportación',
+    'err.mcp.sidecar_missing': 'Esta versión no incluye el programa MCP; descarga zeppbridge-tools desde GitHub',
+    'err.mcp.bundle_failed': 'No se pudo crear la extensión de Claude Desktop',
     'err.export.path_required': 'Elige una ruta para guardar el archivo',
     'err.export.path_not_absolute': 'La ruta de guardado debe ser absoluta',
     'err.export.not_a_directory':

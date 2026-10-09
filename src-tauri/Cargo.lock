@@ -6774,6 +6774,7 @@ dependencies = [
  "tokio",
  "windows-sys 0.61.2",
  "zeppbridge-core",
+ "zip",
 ]
 
 [[package]]

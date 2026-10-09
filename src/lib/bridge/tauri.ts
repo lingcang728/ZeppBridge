@@ -12,6 +12,7 @@ import type {
   AiTaskSummary,
   AiTaskTemplate,
   BridgeBackend,
+  McpSidecar,
   UnlistenFn,
 } from './types';
 import type {
@@ -158,6 +159,8 @@ export const tauriBackend: BridgeBackend = {
   trainingPlanPreview(id) { return call<PlanDraftPreview>('training_plan_preview', { id }); },
   trainingPlanDiscard(id) { return call<boolean>('training_plan_discard', { id }); },
   trainingPlanSetAiPublish(allowed) { return call<boolean>('training_plan_set_ai_publish', { allowed }); },
+  getMcpSidecar() { return call<McpSidecar>('get_mcp_sidecar'); },
+  saveMcpBundle(directory) { return call<string>('save_mcp_bundle', { directory }); },
   trainingPlanPublish(action, confirmClear, locale) {
     return call<PlanPublishResult>('training_plan_publish', { action, confirmClear, locale: locale ?? null });
   },

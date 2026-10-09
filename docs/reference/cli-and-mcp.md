@@ -194,6 +194,26 @@ Unknown tools and malformed call envelopes remain JSON-RPC errors.
 Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
 tool list happening to contain no write operations.
 
+### Connecting from the desktop app (Windows)
+
+The Windows installer and the portable build put `zeppbridge-mcp.exe` next to
+`ZeppBridge.exe`. **Settings › AI tools › Connect an AI tool** then fills in the
+real path for you:
+
+- **Claude Code** and **Codex** copy three commands: register the MCP server
+  (with `--scope task`), add this repository as a plugin marketplace, and
+  install the `zepp-coach` coaching skill. Paste them into a terminal. The
+  `--` separator is written as `"--"` because PowerShell swallows a bare `--`
+  before it reaches the npm-installed CLIs.
+- **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. The
+  extension starts the `zeppbridge-mcp.exe` installed next to the app, so it
+  updates together with ZeppBridge.
+
+When the app's library is not the `data` folder next to the executable, the
+generated configuration also sets `ZEPPBRIDGE_DATA_DIR`. Builds without the
+sidecar (development builds) disable these buttons; use the configuration
+below instead.
+
 ### Example configuration
 
 Most MCP clients read the same shape of configuration:

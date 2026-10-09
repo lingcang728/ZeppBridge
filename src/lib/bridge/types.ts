@@ -311,6 +311,10 @@ export interface BridgeBackend {
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;
   trainingPlanDiscard(id: string): Promise<boolean>;
   trainingPlanSetAiPublish(allowed: boolean): Promise<boolean>;
+  /** 安装包附带的 zeppbridge-mcp 在哪；没附带时 path 为空。 */
+  getMcpSidecar(): Promise<McpSidecar>;
+  /** 把 Claude Desktop 的 ZeppBridge.mcpb 写进 directory，返回完整路径。 */
+  saveMcpBundle(directory: string): Promise<string>;
   /** `locale`：界面语言，手表描述第一行的子类型按它写。 */
   trainingPlanPublish(action: PlanPublishAction, confirmClear: boolean, locale?: string): Promise<PlanPublishResult>;
   getAppStatus(): Promise<AppStatus>;
@@ -439,4 +443,10 @@ export interface BridgeBackend {
   openDataFolder(): Promise<void>;
 
   listen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn>;
+}
+
+/** `get_mcp_sidecar`：data_dir_env 不为空时配置里要带 ZEPPBRIDGE_DATA_DIR。 */
+export interface McpSidecar {
+  path: string | null;
+  data_dir_env: string | null;
 }
