@@ -19,8 +19,10 @@
   transform-origin: 50% 0;
   transition: opacity .44s ease, transform .5s cubic-bezier(.4, .6, .2, 1);
 }
+/* 退得比概览 ↔ 详情更淡：没多少内容的扁平卡（隐私、反馈）打开后很矮，身后那组卡露出一大截，
+   .32 时卡头和按钮都还认得出来，前后两层卡叠在一起很乱。 */
 .deck-overview.is-receded {
-  opacity: .32;
+  opacity: .12;
   transform: scale(.94);
   pointer-events: none;
 }
@@ -162,6 +164,9 @@
     var(--mat-card-solid);
   box-shadow: var(--mat-shadow-lift);
 }
+/* 只有几行的卡（隐私、显示、反馈）展开后不拉满整页宽：1100px 宽、两行高的一条板又扁又长，
+   和卡包里的卡同宽（760px），看上去就是那张卡本身被抽了出来。 */
+.open-card.is-narrow { width: min(760px, 100%); margin-inline: auto; }
 /* 拖动时只留轻投影：大面积柔影跟着卡逐帧重画，边缘就是一圈发黑的分界线。 */
 /* 甩出去、下一张滑进来的途中也保持独立的合成层：以前松手那一刻 will-change 就撤了，大卡连同整段表单
    在飞的途中被降回普通层、逐帧重画——拖卡切换「很卡」的那一下。 */
