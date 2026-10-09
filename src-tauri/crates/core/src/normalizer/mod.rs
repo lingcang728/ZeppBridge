@@ -66,6 +66,31 @@ impl Normalizer {
             let value =
                 object.and_then(|o| first_number(o, &["value", "heartRate", "heart_rate", "hr"]));
             let (Some(timestamp), Some(value)) = (timestamp, value) else {
+                // 观测到的第二种形状：`generatedTime` + base64 `heartRateData`。
+                match object.and_then(packed_heart_rate_point) {
+                    Some(Ok((timestamp, value))) => {
+                        // 0 bpm 是哨兵「没测到」，不是一次真实心跳——与主路径同一条规则。
+                        if !value.is_finite() || !(1.0..=300.0).contains(&value) {
+                            diagnostics.push(format!("item {index}: heart rate 数值无效"));
+                            continue;
+                        }
+                        let device_id = object.and_then(device_id);
+                        records.push(MetricSample {
+                            metric: "heart_rate".into(),
+                            timestamp,
+                            value,
+                            unit: "bpm".into(),
+                            source_scope: source_scope(object, device_id.as_deref()),
+                            device_id,
+                        });
+                        continue;
+                    }
+                    Some(Err(diagnostic)) => {
+                        diagnostics.push(diagnostic);
+                        continue;
+                    }
+                    None => {}
+                }
                 diagnostics.push(format!("item {index}: 缺少 timestamp/value"));
                 continue;
             };
@@ -1258,6 +1283,47 @@ fn extract_items(raw: &Value) -> Result<Vec<&Value>> {
         "响应缺少 items/data 数组，可用字段: {}",
         object.keys().cloned().collect::<Vec<_>>().join(", ")
     )))
+}
+
+/// `/users/{id}/heartRate` 的第二种已观测 item 形状（2026-10-06，一个真实账号）：
+///
+/// ```json
+/// { "items": [ { "deviceId": "D8…", "deviceSource": 10551552,
+///                "generatedTime": 1791095423, "heartRateData": "Xg==",
+///                "timeZone": "8", "type": 2 } ] }
+/// ```
+///
+/// `heartRateData` 是 base64 字节串。已验证的语义只有一种：**单字节即一次
+/// 读数**（`"Xg=="` = `[0x5E]` = 94 bpm，与手表同时刻的单次测量一致）。
+/// 多字节的语义没有任何对照样本——可能是多条读数，也可能是别的打包方式，
+/// 所以这里只接受一个字节，多字节报诊断跳过：宁可留一个诚实的缺口，
+/// 不能猜一个读数出来。
+///
+/// `generatedTime` 与 weightRecords 一样是 Unix **秒**（同账号实测
+/// 1791095423 = 2026-10-04T06:30:23Z，与手机 App 显示的 14:30 +08 一致）；
+/// `parse_timestamp` 的秒/毫秒分界正好能处理它。
+///
+/// 返回 `None` = 不是这个形状，走原来的 `缺少 timestamp/value` 诊断。
+fn packed_heart_rate_point(
+    object: &Map<String, Value>,
+) -> Option<std::result::Result<(DateTime<Utc>, f64), String>> {
+    let encoded = first_value(object, &["heartRateData"]).and_then(Value::as_str)?;
+    let timestamp = first_number(object, &["generatedTime", "createTime"])
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .and_then(|seconds| parse_timestamp(&Value::from(seconds)))?;
+    let bytes = match STANDARD.decode(encoded.trim()) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return Some(Err(format!("heartRateData 不是合法 base64: {error}")));
+        }
+    };
+    let [reading] = bytes.as_slice() else {
+        return Some(Err(format!(
+            "heartRateData 有 {} 字节，仅单字节读数已验证，未解析",
+            bytes.len()
+        )));
+    };
+    Some(Ok((timestamp, f64::from(*reading))))
 }
 
 fn item_object(value: &Value) -> Option<&Map<String, Value>> {
@@ -3064,6 +3130,67 @@ mod tests {
             error.is_unavailable(),
             "补拉据此区分「云端没有」和「我们没看懂」，改了这里要同步改 backfill_one_chunk"
         );
+    }
+
+    #[test]
+    fn generated_time_heart_rate_data_reads_the_observed_single_byte_shape() {
+        // 2026-10-06 真实账号观测到的第二种形状（设备号已替换）：
+        // `generatedTime` 是 Unix 秒，`heartRateData` 单字节 [0x5E] = 94 bpm。
+        let raw = serde_json::json!({ "items": [ {
+            "deviceId": "D85403FFFEE4D576",
+            "deviceSource": 10551552,
+            "generatedTime": 1791095423_i64,
+            "heartRateData": "Xg==",
+            "timeZone": "8",
+            "type": 2
+        } ] });
+        let samples = Normalizer::normalize_heart_rate(&raw).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].value, 94.0);
+        assert_eq!(samples[0].unit, "bpm");
+        assert_eq!(
+            samples[0].timestamp,
+            DateTime::from_timestamp(1791095423, 0).unwrap(),
+            "generatedTime 是 Unix 秒；当毫秒读会落到 1970 年"
+        );
+        assert_eq!(samples[0].device_id.as_deref(), Some("D85403FFFEE4D576"));
+    }
+
+    #[test]
+    fn multi_byte_heart_rate_data_is_reported_not_guessed() {
+        // 多字节的语义没有对照样本：宁可留缺口，不能猜读数。
+        let raw = serde_json::json!({ "items": [ {
+            "generatedTime": 1791095423_i64,
+            "heartRateData": "XgJA"
+        } ] });
+        let error = Normalizer::normalize_heart_rate(&raw)
+            .expect_err("仅单字节读数已验证，多字节不能解析成数据");
+        assert!(
+            error.to_string().contains("仅单字节读数已验证"),
+            "得到 {error}"
+        );
+    }
+
+    #[test]
+    fn invalid_base64_heart_rate_data_is_reported() {
+        let raw = serde_json::json!({ "items": [ {
+            "generatedTime": 1791095423_i64,
+            "heartRateData": "***"
+        } ] });
+        let error = Normalizer::normalize_heart_rate(&raw)
+            .expect_err("非法 base64 不能当数据");
+        assert!(error.to_string().contains("不是合法 base64"), "得到 {error}");
+    }
+
+    #[test]
+    fn packed_heart_rate_data_still_rejects_the_zero_sentinel() {
+        // 0 bpm 是哨兵「没测到」，主路径和打包形状同一条规则。
+        let raw = serde_json::json!({ "items": [ {
+            "generatedTime": 1791095423_i64,
+            "heartRateData": "AA=="
+        } ] });
+        let error = Normalizer::normalize_heart_rate(&raw).expect_err("0 是哨兵不是读数");
+        assert!(error.to_string().contains("数值无效"), "得到 {error}");
     }
 
     use super::*;
