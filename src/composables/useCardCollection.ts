@@ -17,6 +17,8 @@ const handedToTask = ref(false);
 const tables = ref(0);
 /** 有一张（或一叠）牌正被拖着悬在箱子上方（1B·B2）：箱子亮起「松手放进来」。 */
 const dropHover = ref(false);
+/** 牌已经拖动超过起步距离：贴边的箱子要提前探出，命中区不能还是那一窄条。 */
+const pointerDragging = ref(false);
 /** 在「交给 AI」舞台上按了箱子的箭头：舞台把箱子倒进左边的牌（useBoxPour），不再新开任务。 */
 const pourRequest = ref(0);
 let loaded = false;
@@ -122,6 +124,7 @@ export const useCardCollection = () => {
     /** 有牌桌开着（箱子空的也要露面接牌）。 */
     tableOpen: computed(() => tables.value > 0),
     dropHover,
+    pointerDragging,
     pourRequest,
     /** 牌桌开 / 收：成对调用。 */
     setTableOpen: (open: boolean) => { tables.value = Math.max(0, tables.value + (open ? 1 : -1)); },

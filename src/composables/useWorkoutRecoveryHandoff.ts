@@ -8,10 +8,11 @@
  * 这次运动本身 + 睡眠 / 恢复状态 / 静息心率三类（窗口是运动开始日往前 30 天：AI 用前 7 天的均值和之前的
  * 30 天基线比），有就带、缺的由导出如实写「未提供」；提示词写明「距上一次运动 N 天」，要求先判断身体状态
  * 再评价表现。预算按这家 AI 是免费版还是已订阅（lib/aiTask/budget.ts）。一份 `.md` 落到桌面，开场白进剪贴板，
- * 打开所选 AI 的网站（useAiTaskHandoff.runAll）。
+ * 打开所选 AI 的网站（useAiTaskHandoff.runAll）。运动页「问 AI」不走这一条：
+ * prepareSheet 只准备 `.md` 并复制开场白，网站要人手点开。
  */
 import { backend } from '../lib/bridge';
-import type { AiTask, AiTaskCategory } from '../lib/bridge/types';
+import type { AiTask, AiTaskCategory, AiTaskPrepareResult } from '../lib/bridge/types';
 import type { Workout } from '../types';
 import type { AiProvider } from '../lib/aiProviders';
 import { newTaskDraft } from '../lib/aiTask/draft';
@@ -36,8 +37,8 @@ export const daysSincePrevious = (workout: Pick<Workout, 'workout_id' | 'start_t
   return daysBetween(dayKey(new Date(previous.start_time)), dayKey(new Date(workout.start_time)));
 };
 
-/** 交给 AI 的任务：这次运动 + 三类恢复背景，其余类别不带。 */
-export const recoveryTask = (workout: Pick<Workout, 'workout_id'>, title: string, prompt: string): AiTask => {
+/** 交给 AI 的任务。带恢复时加上三类背景（往前 30 天）；关掉时只交这次运动。 */
+export const recoveryTask = (workout: Pick<Workout, 'workout_id'>, title: string, prompt: string, withRecovery = true): AiTask => {
   const base = newTaskDraft();
   return {
     ...base,
@@ -47,7 +48,7 @@ export const recoveryTask = (workout: Pick<Workout, 'workout_id'>, title: string
     detail_level: 'detailed',
     categories: base.categories.map((range) => {
       if (range.category === 'workout') return { ...range, enabled: true, days_before: 0, include_workout_day: true };
-      if (RECOVERY_CATEGORIES.includes(range.category)) return { ...range, enabled: true, days_before: BASELINE_DAYS - 1, include_workout_day: true };
+      if (withRecovery && RECOVERY_CATEGORIES.includes(range.category)) return { ...range, enabled: true, days_before: BASELINE_DAYS - 1, include_workout_day: true };
       return { ...range, enabled: false };
     }),
   };
@@ -66,8 +67,13 @@ export const useWorkoutRecoveryHandoff = () => {
       // 读不到运动列表就不写「距上次几天」，交付照常。
     }
     const task = recoveryTask(workout, title, prompt(gap));
+    await handoff.runAll(task, provider, null, optionsFor(provider, task));
+    return handoff.prepareResult.value?.status === 'ready';
+  };
+
+  const optionsFor = (provider: AiProvider, task: AiTask) => {
     const parts = handoffParts(task, null, { hasDirection: false, now: new Date(), format: 'md' });
-    await handoff.runAll(task, provider, null, {
+    return {
       briefText: parts.brief,
       dataFileStem: parts.dataStem,
       promptFileStem: parts.promptStem,
@@ -75,8 +81,27 @@ export const useWorkoutRecoveryHandoff = () => {
       provider: provider.id,
       tokenBudget: isSubscribed(provider.id) ? SUBSCRIBED_TOKEN_BUDGET : FREE_TOKEN_BUDGET,
       markdownGuide: markdownGuide(),
-    });
-    return handoff.prepareResult.value?.status === 'ready';
+    };
+  };
+
+  /**
+   * 运动页就地出文件：准备 `.md`，就绪后再复制开场白。不打开网站。
+   * 关了恢复背景时不查上一次运动。
+   */
+  const prepareSheet = async (workout: Workout, provider: AiProvider, title: string, prompt: (gap: number | null) => string, withRecovery = true): Promise<AiTaskPrepareResult | null> => {
+    let gap: number | null = null;
+    if (withRecovery) {
+      try {
+        const page = await backend.getWorkoutPage(400, 0);
+        gap = daysSincePrevious(workout, page.items);
+      } catch {
+        // 读不到运动列表就不写「距上次几天」，交付照常。
+      }
+    }
+    const task = recoveryTask(workout, title, prompt(gap), withRecovery);
+    const result = await handoff.runPrepare(task, null, optionsFor(provider, task));
+    if (result?.status === 'ready') await handoff.runCopy();
+    return result;
   };
 
   /** 哪一步出了错（准备 / 复制 / 打开）：第一条错误文案。 */
@@ -85,5 +110,15 @@ export const useWorkoutRecoveryHandoff = () => {
     return steps.prepare.errorText ?? steps.copy.errorText ?? steps.open.errorText ?? null;
   };
 
-  return { send, failure, steps: handoff.steps, inFlight: handoff.inFlight };
+  return {
+    send,
+    prepareSheet,
+    failure,
+    steps: handoff.steps,
+    inFlight: handoff.inFlight,
+    lastProvider: handoff.lastProvider,
+    copy: handoff.runCopy,
+    open: (provider: AiProvider) => handoff.runOpen(provider),
+    reveal: handoff.revealOutput,
+  };
 };

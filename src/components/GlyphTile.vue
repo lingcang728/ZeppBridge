@@ -22,10 +22,13 @@ const props = withDefaults(defineProps<{
   tone?: GlyphTone;
   /** 强制只画图形、不画底座。 */
   plain?: boolean;
+  /** 同一形状里，平均 / 最高 / 最低只差颜色深浅。 */
+  role?: 'avg' | 'max' | 'min' | 'none';
 }>(), {
   size: 32,
   tone: undefined,
   plain: false,
+  role: 'none',
 });
 
 const spec = computed(() => glyphFor(props.name));
@@ -38,7 +41,7 @@ const glyphSize = computed(() => (bare.value ? props.size : Math.round(props.siz
   <DesignIcon v-if="spec.image" :name="name" :size="size" />
   <span
     v-else
-    :class="['glyph-tile', `tone-${toneName}`, { 'is-bare': bare }]"
+    :class="['glyph-tile', `tone-${toneName}`, { 'is-bare': bare, 'role-max': role === 'max', 'role-min': role === 'min' }]"
     :style="{ width: `${size}px`, height: `${size}px`, '--tile-radius': `${Math.round(size * 0.3)}px` }"
     aria-hidden="true"
   >
@@ -61,6 +64,8 @@ const glyphSize = computed(() => (bare.value ? props.size : Math.round(props.siz
   box-shadow: var(--mat-tile-rim), 0 4px 12px -6px color-mix(in srgb, var(--tile-tone) 45%, transparent);
   color: var(--tile-tone);
 }
+.glyph-tile.role-max { color: color-mix(in srgb, var(--tile-tone) 55%, var(--ink)); }
+.glyph-tile.role-min { color: color-mix(in srgb, var(--tile-tone) 40%, var(--subtle)); }
 .glyph-tile.is-bare {
   border: 0;
   background: none;

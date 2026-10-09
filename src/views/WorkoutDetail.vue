@@ -33,7 +33,8 @@ const workoutId = computed(() => String(route.params.workoutId || ''));
 const {
   workout, series, device, loading, error, actionError, exportedNote, activeFormat, exportBusy, displayType,
   insight, insightLoading, insightError, seriesError,
-  sendWorkoutToAi,
+  sendWorkoutToAi, copyAsk, openAsk, revealAsk,
+  askBusy, askResult, askError, askProvider,
   aiWithRecovery,
   typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
   loadDetail, exportRecord,
@@ -118,7 +119,15 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         :loading="insightLoading"
         :error="insightError"
         v-model:with-recovery="aiWithRecovery"
+        :ask-busy="askBusy"
+        :ask-result="askResult"
+        :ask-error="askError"
+        :ask-provider="askProvider.label"
+        :ask-provider-icon="askProvider.localIcon"
         @handoff="sendWorkoutToAi"
+        @copy="copyAsk"
+        @open="openAsk"
+        @reveal="revealAsk"
       />
 
       <div ref="lower" class="lower">

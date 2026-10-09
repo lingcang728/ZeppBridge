@@ -66,6 +66,35 @@ const goLabel = computed(() => (router.currentRoute.value.path === '/ai' ? t.val
 const duoStyle = (key: string, style: Record<string, string>) => (PAIRED_METRICS[key] ? { ...style, '--tint2': metricColor(PAIRED_METRICS[key]!) } : style);
 const boxLabel = computed(() => (box.dropHover.value ? t.value.boxDropHere : empty.value ? t.value.boxEmptyLabel : t.value.boxTitle));
 
+/* 空闲贴右缘。悬停、键盘焦点、拖牌过来、刚接进一张牌时探出来。手牌铺开时不贴。 */
+const pointerInside = ref(false);
+const focused = ref(false);
+const docked = ref(false);
+const burst = ref(false);
+let idleTimer = 0;
+let burstTimer = 0;
+const pinOpen = computed(() => open.value || pointerInside.value || focused.value || box.dropHover.value || box.pointerDragging.value || burst.value);
+const clearIdle = () => { window.clearTimeout(idleTimer); idleTimer = 0; };
+const armIdle = () => {
+  clearIdle();
+  if (pinOpen.value || !present.value) { docked.value = false; return; }
+  idleTimer = window.setTimeout(() => { docked.value = true; idleTimer = 0; }, reducedMotion() ? 0 : 1600);
+};
+watch(pinOpen, (pinned) => {
+  if (pinned) { clearIdle(); docked.value = false; }
+  else if (present.value) armIdle();
+});
+watch(present, (shown) => {
+  if (!shown) { clearIdle(); docked.value = false; return; }
+  armIdle();
+});
+watch(() => box.count.value, (next, prev) => {
+  if (prev === undefined || next <= prev) return;
+  burst.value = true;
+  window.clearTimeout(burstTimer);
+  burstTimer = window.setTimeout(() => { burst.value = false; burstTimer = 0; }, reducedMotion() ? 0 : 1600);
+});
+
 const handCards = () => [...(hand.value?.querySelectorAll<HTMLElement>('.hand-card') ?? [])];
 const boxCenter = () => {
   const b = boxButton.value?.querySelector('.jack')?.getBoundingClientRect() ?? boxButton.value?.getBoundingClientRect();
@@ -251,13 +280,19 @@ const releaseEscape = onMotionEscape(() => {
 });
 const onResize = () => { viewport.value = { width: window.innerWidth, height: window.innerHeight }; };
 window.addEventListener('resize', onResize);
-onBeforeUnmount(() => { releaseEscape(); window.removeEventListener('resize', onResize); });
+onBeforeUnmount(() => {
+  releaseEscape();
+  window.removeEventListener('resize', onResize);
+  clearIdle();
+  window.clearTimeout(burstTimer);
+});
 </script>
 
 <template>
   <Teleport to="body">
-    <button v-if="present" id="card-collection-box" ref="boxButton" type="button" :class="['collection-box', { open, empty, hover: box.dropHover.value }]"
-      :aria-label="t.boxAria(box.count.value)" :aria-expanded="open" @click="empty ? undefined : toggle()">
+    <button v-if="present" id="card-collection-box" ref="boxButton" type="button" :class="['collection-box', { open, empty, hover: box.dropHover.value, 'is-docked': docked && !open }]"
+      :aria-label="t.boxAria(box.count.value)" :aria-expanded="open" @click="empty ? undefined : toggle()"
+      @pointerenter="pointerInside = true" @pointerleave="pointerInside = false" @focus="focused = true" @blur="focused = false">
       <span class="jack" aria-hidden="true">
         <span class="box-lid"></span>
         <span class="jack-body"><Transition name="count-roll"><em v-if="!empty" :key="box.count.value">{{ box.count.value }}</em></Transition></span>

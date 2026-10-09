@@ -61,8 +61,26 @@ const normaliseIcns = (path) => {
   const normalised = Buffer.concat([header, ...blocks.map((block) => block.body)]);
   if (normalised.length !== data.length) return;
   if (normalised.equals(data)) return;
-  writeFileSync(path, normalised);
+  // tauri icon 刚把 1.3MB 的 icns 写完，火绒/云查会短暂锁文件。
+  // UNKNOWN -4094 重试几次即可；别的错误照旧抛出。
+  writeFileRetry(path, normalised);
   console.log(`Normalised chunk order in ${path}`);
+};
+
+const writeFileRetry = (path, data) => {
+  let last;
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    try {
+      writeFileSync(path, data);
+      return;
+    } catch (error) {
+      last = error;
+      const code = error && error.code;
+      if (code !== 'UNKNOWN' && code !== 'EBUSY' && code !== 'EPERM' && code !== 'EACCES') throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200 * attempt);
+    }
+  }
+  throw last;
 };
 
 normaliseIcns(join(output, 'icon.icns'));

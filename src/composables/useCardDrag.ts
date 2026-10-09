@@ -44,7 +44,17 @@ export const useCardDrag = (options: {
   let drag: { id: string; el: HTMLElement; pointer: number; x0: number; y0: number; x: number; y: number; base: { x: number; y: number }; moved: boolean; frame: number } | null = null;
   let swallowClick = false;
 
-  const boxRect = () => document.getElementById('card-collection-box')?.getBoundingClientRect() ?? null;
+  const boxRect = (): DOMRect | null => {
+    const el = document.getElementById('card-collection-box');
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    // 贴边时可见的只有一窄条；拖起来之后命中区固定在右下角，不等指针先碰到那一窄条。
+    if (box.pointerDragging.value || el.classList.contains('is-docked')) {
+      const height = Math.max(rect.height, 70);
+      return new DOMRect(window.innerWidth - 220, window.innerHeight - height - 16, 220, height);
+    }
+    return rect;
+  };
   const pileOf = (id: string) => piles.value.find((pile) => pile.cards.includes(id)) ?? null;
   /** 一叠最上面那张。 */
   const topOf = (pile: Pile) => pile.cards[pile.cards.length - 1]!;
@@ -152,6 +162,7 @@ export const useCardDrag = (options: {
       if (Math.hypot(drag.x - drag.x0, drag.y - drag.y0) < START_PX) return;
       drag.moved = true;
       draggingId.value = drag.id;
+      box.pointerDragging.value = true;
       drag.el.setPointerCapture(event.pointerId);
       drag.el.classList.add('dragging');
       if (drag.el.parentElement) drag.el.parentElement.style.zIndex = '60';
@@ -171,9 +182,13 @@ export const useCardDrag = (options: {
     box.dropHover.value = false;
     const target = targetId.value;
     targetId.value = null;
-    if (!d.moved) return;
+    if (!d.moved) {
+      box.pointerDragging.value = false;
+      return;
+    }
     swallowClick = true;
     const over = drop ? hit(d.x, d.y) : null;
+    box.pointerDragging.value = false;
     draggingId.value = null;
     if (over?.kind === 'box') {
       unpile([d.id], false);
@@ -215,7 +230,7 @@ export const useCardDrag = (options: {
   /** 刚松手的那一下是拖：吞掉浏览器随后补的 click。 */
   const consumeClick = (): boolean => { const was = swallowClick; swallowClick = false; return was; };
   /** 换层 / 换范围：叠全部散掉（牌都要重新发）。 */
-  const reset = () => { piles.value = []; draggingId.value = null; targetId.value = null; drag = null; box.dropHover.value = false; };
+  const reset = () => { piles.value = []; draggingId.value = null; targetId.value = null; drag = null; box.dropHover.value = false; box.pointerDragging.value = false; };
 
   return { piles, draggingId, targetId, down, move, up, cancelEvent, cancel, consumeClick, reset, unpile, layoutPiles, pileOf, isPileTop, pileCount, buried };
 };

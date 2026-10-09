@@ -1,7 +1,6 @@
 import { computed, onMounted, ref, watch, type Ref } from 'vue';
 import { useLoadingAfterMotion } from './useFirstLoad';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
-import { useAiHandoff } from './useAiHandoff';
 import { useWorkoutRecoveryHandoff } from './useWorkoutRecoveryHandoff';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { useSyncController } from './useSyncController';
@@ -10,7 +9,8 @@ import { createLoadSeq } from '../lib/loadSeq';
 import { workoutPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
-import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
+import { AI_PROVIDER_BY_ID } from '../lib/aiProviders';
+import type { AiTaskPrepareResult } from '../lib/bridge/types';
 import { workoutLabel } from '../lib/labels';
 import { isFiniteNumber } from '../lib/format';
 import { readDefaultExportFormat } from '../lib/exportScope';
@@ -81,64 +81,51 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
     }
   };
 
-  /* 「交给 AI」就在这一页完成，不再把用户丢回「交给 AI」大页面再让他确认一遍
-     范围。范围就是这一条运动，走的是和导出同一套互斥 ExportScope，所以洞察、
-     导出和 AI 数据包读的是同一个库、同一套规则。 */
-  const { handoffState, handoffError, prepareAndCopy } = useAiHandoff();
-  const aiProviderId = ref<AiProviderId>('chatgpt');
-  const aiProvider = computed(() => AI_PROVIDER_BY_ID[aiProviderId.value]);
-  const aiProviderChoices = computed(() =>
-    AI_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label, image: provider.localIcon })));
-  const aiNote = ref<string | null>(null);
-  /** 「带上前 7 天睡眠和恢复」：默认勾上（1D·D10）。去掉勾选时和以前一样只交这一次运动。 */
+  /* 「问 AI」就在这一页弹出可拖的 .md，不离开运动页，也不自动打开网站。
+     带不带前 7 天睡眠和恢复，都走同一套任务准备。 */
+  /** 「带上前 7 天睡眠和恢复」：默认勾上（1D·D10）。去掉勾选时只交这一次运动。 */
   const aiWithRecovery = ref(true);
   const recoveryHandoff = useWorkoutRecoveryHandoff();
-
-  const sendWithRecovery = async (current: Workout) => {
-    const label = workoutDisplayLabel(current);
-    const day = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(new Date(current.start_time));
-    const ready = await recoveryHandoff.send(current, aiProvider.value, t.value.aiRecoveryTitle(label, day), (gap) => t.value.aiRecoveryPrompt(label, gap));
-    const failed = recoveryHandoff.failure();
-    aiNote.value = failed ?? (ready ? t.value.aiRecoveryDone(aiProvider.value.label) : null);
-  };
+  const askBusy = ref(false);
+  const askResult = ref<AiTaskPrepareResult | null>(null);
+  const askError = ref<string | null>(null);
+  const askProvider = computed(() => recoveryHandoff.lastProvider.value ?? AI_PROVIDER_BY_ID.chatgpt);
 
   const sendWorkoutToAi = async () => {
-    aiNote.value = null;
-    if (!workout.value) return;
+    if (askBusy.value || !workout.value) return;
+    askError.value = null;
+    askResult.value = null;
+    const current = workout.value;
     if (!isTauri()) {
-      aiNote.value = t.value.needDesktop;
+      askError.value = t.value.needDesktop;
       return;
     }
-    if (aiWithRecovery.value) {
-      await sendWithRecovery(workout.value);
-      return;
-    }
+    askBusy.value = true;
     try {
-      const label = workoutDisplayLabel(workout.value);
-      const result = await prepareAndCopy(
-        aiProvider.value,
-        {
-          scope: { kind: 'workout', workoutId: workout.value.workout_id },
-          dataTypes: ['workouts', 'heart_rate'],
-          detail: 'full',
-        },
-        t.value.aiPrompt(label),
-        false, // 精确轨迹默认不外发
+      const label = workoutDisplayLabel(current);
+      const day = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(new Date(current.start_time));
+      const withRecovery = aiWithRecovery.value;
+      const result = await recoveryHandoff.prepareSheet(
+        current,
+        askProvider.value,
+        t.value.aiRecoveryTitle(label, day),
+        (gap) => (withRecovery ? t.value.aiRecoveryPrompt(label, gap) : t.value.aiPrompt(label)),
+        withRecovery,
       );
-      const opened = handoffState.value !== 'copied_only';
-      if (result.mode === 'attachment') {
-        aiNote.value = opened
-          ? t.value.attachmentOpened(aiProvider.value.label)
-          : t.value.attachmentNotOpened(aiProvider.value.label);
-      } else {
-        aiNote.value = opened
-          ? t.value.copiedAndOpened(aiProvider.value.label)
-          : t.value.copiedOnly(aiProvider.value.label);
+      askResult.value = result;
+      if (!result || result.status !== 'ready') {
+        askError.value = recoveryHandoff.failure();
+        return;
       }
-    } catch {
-      // 错误从 handoffError 渲染
+      askError.value = recoveryHandoff.steps.value.copy.errorText;
+    } finally {
+      askBusy.value = false;
     }
   };
+
+  const copyAsk = () => { void recoveryHandoff.copy(); };
+  const openAsk = () => { void recoveryHandoff.open(askProvider.value); };
+  const revealAsk = () => { void recoveryHandoff.reveal(); };
 
   const typeOverrideBusy = ref(false);
   /* 纠正选项直接来自随包运动目录（一百多项），不是一份写死的短名单：目录里有
@@ -264,7 +251,7 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   return {
     workout, series, device, loading: useLoadingAfterMotion(loading), error, actionError, exportedNote, activeFormat, exportBusy, displayType,
     insight, insightLoading, insightError, seriesError,
-    handoffState, handoffError, aiProviderId, aiProvider, aiProviderChoices, aiNote, sendWorkoutToAi, aiWithRecovery,
+    askBusy, askResult, askError, askProvider, sendWorkoutToAi, copyAsk, openAsk, revealAsk, aiWithRecovery,
     typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
     loadDetail, exportRecord,
   };

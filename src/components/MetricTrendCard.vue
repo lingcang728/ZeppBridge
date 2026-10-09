@@ -225,8 +225,8 @@ const hasEventMarks = computed(() => {
        右边却空着一大块。现在标题独占一行、读数在它下面；解释挪进了标题旁的「?」浮层。 -->
   <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
-      <!-- 第一行：标题 + 右边的「挑日子」「问 AI」。放不下时按钮整组换到下一行靠右，
-           不再浮在标题上面——法语、葡语的长标题曾经和「比平时高」叠在一起（2026-10-07）。 -->
+      <!-- 第一行锁死：标题在左、省略号截断；右边永远是三枚图标（?、挑日子、问 AI）。
+           长语言的全文留在按钮自己的 title / aria-label 里。 -->
       <div class="trend-top">
         <strong class="trend-title">{{ label }}</strong>
         <span class="trend-actions"><MetricInfoButton v-if="info" :metric="info" :label="label" /><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
@@ -299,15 +299,20 @@ const hasEventMarks = computed(() => {
   border-radius: var(--radius-lg);
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
+  overflow: clip;
 }
 .trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; }
-/* 标题按自己的长度占位：短标题（VO₂max）和按钮同一行，不再因为硬留 9em 把按钮挤到第二行；
-   长标题放不下时按钮整组换行，标题不会被压成一列一个词。 */
-.trend-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; min-width: 0; }
-.trend-top .trend-title { flex: 1 1 auto; max-width: 100%; padding-top: 3px; }
-.trend-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; margin: -2px -4px 0 auto; }
+/* 标题一列、按钮一列。按钮不许换行到标题上或下一张卡里。 */
+.trend-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; }
+.trend-actions { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.trend-actions :deep(.metric-info),
+.trend-actions :deep(.pick-days),
+.trend-actions :deep(.ask-ai) { position: relative; width: 30px; height: 30px; padding: 0; justify-content: center; gap: 0; }
+.trend-actions :deep(.pick-days span),
+.trend-actions :deep(.ask-ai span) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.trend-actions :deep(.pick-days:has(b)) { width: auto; padding: 0 6px 0 7px; gap: 4px; }
 .trend-baseline { align-self: center; margin-left: 4px; }
-.trend-title { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.trend-title { min-width: 0; overflow: hidden; color: var(--ink); font-size: var(--fs-md); font-weight: 700; line-height: 1.3; white-space: nowrap; text-overflow: ellipsis; }
 .trend-latest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
 .trend-latest :deep(strong), .trend-latest strong { font-family: var(--font-mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .trend-latest :deep(small), .trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }

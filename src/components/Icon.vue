@@ -77,6 +77,11 @@ export type IconName =
   | 'warning'
   | 'watch'
   | 'wifi'
+  | 'bolt'
+  | 'stride'
+  | 'contact'
+  | 'oscillation'
+  | 'ratio'
   | 'x';
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?: number }>(), {
@@ -247,6 +252,35 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <circle cx="18" cy="18" r="1.5" fill="currentColor" stroke="none" />
       <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" fill="currentColor" stroke="none" opacity=".28" />
       <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" :stroke-width="stroke" />
+    </g>
+    <!-- 功率：一道闪电，淡填充加实线，和扳手同一套双色。 -->
+    <g v-else-if="name === 'bolt'">
+      <path d="M13.4 2.6 6.2 13h4.4l-1.2 8.4 8.4-11.6h-4.6l.2-7.2Z" fill="currentColor" opacity=".28" stroke="none" />
+      <path d="M13.4 2.6 6.2 13h4.4l-1.2 8.4 8.4-11.6h-4.6l.2-7.2Z" :stroke-width="stroke" stroke-linejoin="round" />
+    </g>
+    <!-- 步幅：后脚淡、前脚实，底下一条尺。 -->
+    <g v-else-if="name === 'stride'">
+      <path d="M6.4 5.2c1.35 0 2.15 1.4 2.15 3.3 0 1.6-.65 2.6-.85 3.7-.15 1 .4 1.7.4 2.65a1.55 1.55 0 0 1-3.1.2c-.15-1.4-1-2.6-1-4.9 0-2.55 1.15-4.95 2.4-4.95Z" fill="currentColor" opacity=".38" stroke="none" />
+      <path d="M16.8 3.4c-1.55 0-2.45 1.6-2.45 3.75 0 1.85.75 3 .95 4.2.2 1.1-.5 2-.5 3.15a1.85 1.85 0 0 0 3.7.25c.2-1.65 1.2-3.05 1.2-5.75 0-2.95-1.4-5.6-2.9-5.6Z" fill="currentColor" stroke="none" />
+      <path d="M5.2 20.6h13.6M5.2 19.1v1.5M18.8 19.1v1.5" :stroke-width="stroke" stroke-linecap="round" />
+    </g>
+    <!-- 触地：地上一条线、淡一块接触面、上面一只实心脚。 -->
+    <g v-else-if="name === 'contact'">
+      <path d="M3.6 19.2h16.8" :stroke-width="stroke" stroke-linecap="round" />
+      <ellipse cx="12.2" cy="17.5" rx="5.4" ry="1.45" fill="currentColor" opacity=".28" stroke="none" />
+      <path d="M14.8 3.6c-1.6 0-2.55 1.65-2.55 3.9 0 1.95.75 3.1.95 4.4.18 1.15-.55 2.1-.55 3.25a1.95 1.95 0 0 0 3.9.28c.2-1.7 1.2-3.15 1.2-5.95 0-3.05-1.4-5.88-2.95-5.88Z" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 垂直振幅：淡的竖轴、实心的双箭头和中点。 -->
+    <g v-else-if="name === 'oscillation'">
+      <path d="M12 5.4v13.2" :stroke-width="stroke" opacity=".4" stroke-linecap="round" />
+      <path d="M12 3.2 9.3 6.1M12 3.2l2.7 2.9M12 20.8 9.3 17.9M12 20.8l2.7-2.9" :stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 垂直比：基线上两根柱，高的淡、矮的实。 -->
+    <g v-else-if="name === 'ratio'">
+      <path d="M3.8 19.4h16.4" :stroke-width="stroke" stroke-linecap="round" />
+      <rect x="6.2" y="5.4" width="4.4" height="14" rx="1.5" fill="currentColor" opacity=".32" stroke="none" />
+      <rect x="13.2" y="10.6" width="4.4" height="8.8" rx="1.5" fill="currentColor" stroke="none" />
     </g>
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
     <path v-else-if="name === 'undo'" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" :stroke-width="stroke" />

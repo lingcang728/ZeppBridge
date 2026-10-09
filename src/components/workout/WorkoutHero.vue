@@ -79,7 +79,7 @@ const missingLine = computed(() => {
 
     <div class="metric-list" :aria-label="t.metricListAria" :style="{ '--tiles': shownMetrics.length }">
       <div v-for="metric in shownMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]">
-        <GlyphTile :name="metric.icon" :tone="metric.tone" :size="36" />
+        <GlyphTile :name="metric.icon" :tone="metric.tone" :role="metric.role" :size="36" />
         <div><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div>
       </div>
     </div>

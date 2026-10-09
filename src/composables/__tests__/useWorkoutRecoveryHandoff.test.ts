@@ -35,4 +35,10 @@ describe('recoveryTask', () => {
     }
     expect(on.find((range) => range.category === 'workout')?.days_before).toBe(0);
   });
+
+  it('with recovery off sends only this workout', () => {
+    const task = recoveryTask({ workout_id: 'w-1' }, 'title', 'prompt', false);
+    const on = task.categories.filter((range) => range.enabled).map((range) => range.category);
+    expect(on).toEqual(['workout']);
+  });
 });

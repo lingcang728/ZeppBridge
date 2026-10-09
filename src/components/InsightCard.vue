@@ -7,11 +7,14 @@
  * 不是前提。
  */
 import GlassSwitch from './GlassSwitch.vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
+import AskAiButton from './ask/AskAiButton.vue';
+import GlassPopover from './GlassPopover.vue';
+import MdSheet from './ai/MdSheet.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
-import { formatDate } from '../lib/format';
+import type { AiTaskPrepareResult } from '../lib/bridge/types';
 import { useMessages } from '../i18n';
 import {
   distanceUnitLabel,
@@ -42,8 +45,20 @@ const props = defineProps<{
   insight: WorkoutInsight | null;
   loading?: boolean;
   error?: string | null;
+  askBusy?: boolean;
+  askResult?: AiTaskPrepareResult | null;
+  askError?: string | null;
+  askProvider?: string;
+  askProviderIcon?: string;
 }>();
-const emit = defineEmits<{ (event: 'handoff'): void }>();
+const emit = defineEmits<{ handoff: []; copy: []; open: []; reveal: [] }>();
+const sheetOpen = ref(false);
+const askBtn = ref<{ button: HTMLElement | null } | null>(null);
+const askAnchor = computed(() => askBtn.value?.button ?? null);
+const openSheet = () => {
+  sheetOpen.value = true;
+  emit('handoff');
+};
 /** 「带上前 7 天睡眠和恢复」（1D·D10），默认勾上；在运动页的 useWorkoutDetail 里决定交什么。 */
 const withRecovery = defineModel<boolean>('withRecovery', { default: true });
 
@@ -75,14 +90,8 @@ const deltaText = (fact: InsightFact): string => {
   return `${arrow}${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
 };
 
-/*
- * 前后半程。
- *
- * 后端在条件不满足时给的是原因码而不是数字 —— 这里照样把原因说出来，而不是
- * 把整块藏起来：「这次为什么没有」和「这次是多少」一样值得看见。
- */
+/* 前后半程。没有数字时整块不出现，不再写一段「为什么没有」。 */
 const drift = computed(() => props.insight?.heart_rate_drift ?? null);
-const driftReason = computed(() => props.insight?.heart_rate_drift_unavailable ?? null);
 
 /** 米/秒 -> 每个显示单位的分秒。0 或非有限值不显示成 0'00"。 */
 const paceFromSpeed = (metresPerSecond: number): string => {
@@ -116,32 +125,9 @@ const driftRows = computed(() => {
   ];
 });
 
-/** 半个百分点以内当作没变化：那个量级是采样噪声，不是身体。 */
-const driftVerdict = computed(() => {
-  const percent = drift.value?.drift_percent;
-  if (percent === undefined) return null;
-  if (Math.abs(percent) < 0.5) return { tone: 'flat', text: t.value.driftFlat };
-  return percent < 0
-    ? { tone: 'bad', text: t.value.driftRising }
-    : { tone: 'good', text: t.value.driftFalling };
-});
-
 const facts = computed(() => props.insight?.facts ?? []);
-const baselineWindow = computed(() => facts.value.find((fact) => fact.baseline_window)?.baseline_window ?? null);
 const comparedFacts = computed(() => facts.value.filter((fact) => fact.comparison));
 const hasAnyComparison = computed(() => comparedFacts.value.length > 0);
-
-const exclusionSummary = computed(() => {
-  const counts = new Map<string, number>();
-  for (const entry of props.insight?.baseline_excluded ?? []) {
-    counts.set(entry.reason, (counts.get(entry.reason) ?? 0) + 1);
-  }
-  const labels = t.value.exclusion as Record<string, string | undefined>;
-  return [...counts.entries()].map(([reason, count]) => ({
-    label: labels[reason] || reason,
-    count,
-  }));
-});
 </script>
 
 <template>
@@ -153,9 +139,13 @@ const exclusionSummary = computed(() => {
           <GlassSwitch :model-value="withRecovery" :aria-label="t.withRecovery" @update:model-value="withRecovery = !withRecovery" />
           <span>{{ t.withRecovery }}</span>
         </label>
-        <button class="button secondary" type="button" @click="emit('handoff')"><Icon name="send" :size="14" />{{ t.handoff }}</button>
+        <AskAiButton ref="askBtn" direct :label="t.title" :busy="askBusy" :expanded="sheetOpen" @activate="openSheet" />
       </span>
     </header>
+    <GlassPopover v-if="sheetOpen" :anchor="askAnchor" :width="372" @close="sheetOpen = false">
+      <MdSheet :busy="!!askBusy" :result="askResult ?? null" :error="askError ?? null" :provider="askProvider ?? ''" :provider-icon="askProviderIcon ?? ''"
+        @copy="emit('copy')" @open="emit('open')" @reveal="emit('reveal')" />
+    </GlassPopover>
 
     <p v-if="loading" class="insight-note">{{ t.reading }}</p>
     <p v-else-if="error" class="insight-error" role="alert">{{ error }}</p>
@@ -188,55 +178,16 @@ const exclusionSummary = computed(() => {
         </div>
       </div>
 
-      <section class="drift" :aria-label="t.driftTitle">
-        <p class="drift-head">
-          <strong>{{ t.driftTitle }}</strong>
-          <span
-            v-if="drift && driftVerdict"
-            :class="['delta', driftVerdict.tone]"
-          >{{ t.driftDelta(drift.drift_percent.toFixed(1)) }}</span>
-        </p>
-        <p class="insight-note">{{ t.driftSub }}</p>
-        <template v-if="drift">
-          <div class="drift-grid">
-            <div v-for="row in driftRows" :key="row.key" class="fact">
-              <span class="fact-label">{{ row.label }}</span>
-              <strong>{{ row.perBeat }}</strong>
-              <span class="fact-delta muted">{{ row.detail }}</span>
-            </div>
+      <section v-if="driftRows.length" class="drift" :aria-label="t.driftTitle">
+        <p class="drift-head"><strong>{{ t.driftTitle }}</strong></p>
+        <div class="drift-grid">
+          <div v-for="row in driftRows" :key="row.key" class="fact">
+            <span class="fact-label">{{ row.label }}</span>
+            <strong>{{ row.perBeat }}</strong>
+            <span class="fact-delta muted">{{ row.detail }}</span>
           </div>
-          <p v-if="driftVerdict" class="insight-note">{{ driftVerdict.text }}</p>
-        </template>
-        <p v-else-if="driftReason" class="insight-note">{{ t.driftUnavailable(driftReason) }}</p>
-        <p class="insight-note subtle">{{ t.driftNote }}</p>
+        </div>
       </section>
-
-      <details v-if="insight.baseline_included.length || insight.baseline_excluded.length">
-        <summary>{{ t.baselineSummary }}</summary>
-        <p class="insight-note">
-          <template v-if="baselineWindow">
-            {{ t.baselineRule(
-              baselineWindow.days,
-              baselineWindow.distance_tolerance_percent,
-              baselineWindow.min_samples,
-              baselineWindow.max_samples,
-            ) }}
-          </template>
-        </p>
-        <ul class="baseline-list">
-          <li v-for="entry in insight.baseline_included" :key="entry.workout_id">
-            <RouterLink :to="`/workouts/${entry.workout_id}`">
-              {{ formatDate(entry.start_time) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
-            </RouterLink>
-          </li>
-        </ul>
-        <p v-if="exclusionSummary.length" class="insight-note">
-          {{ t.excludedPrefix }}
-          <span v-for="item in exclusionSummary" :key="item.label">{{ t.excludedItem(item.label, item.count) }}</span>
-        </p>
-      </details>
-
-      <p class="insight-note">{{ t.footnote }}</p>
     </template>
   </section>
 </template>

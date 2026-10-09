@@ -3,6 +3,8 @@
    第三轮 B6：「交给 AI」挪到头部右上角的「问 AI」胶囊（和睡眠详情同一个组件、同一个位置），这里不再分两档。 */
 import { computed } from 'vue';
 import type { DesignIconName } from '../DesignIcon.vue';
+import type { GlyphTone } from '../../lib/glyphs';
+import type { MetricRole } from '../../lib/workoutGlyphs';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
 import SegmentTrack from '../SegmentTrack.vue';
@@ -12,7 +14,7 @@ import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
 const props = defineProps<{
-  decoded: { label: string; value: string; icon: DesignIconName }[];
+  decoded: { label: string; value: string; icon: DesignIconName; tone: GlyphTone; role: MetricRole }[];
   exportBusy: boolean;
   exportedNote: string | null;
   actionError: string | null;
@@ -35,7 +37,7 @@ const missingLine = computed(() => {
     <section class="surface-card side-card decoded-card" :aria-label="t.decodedAria">
       <div class="section-head"><GlyphTile name="structured-data" tone="pace" :size="40" /><div><p class="section-eyebrow">{{ t.eyebrowDecoded }}</p><h2>{{ t.decodedTitle }}</h2></div></div>
       <div class="decoded-list">
-        <div v-for="metric in present" :key="metric.label"><GlyphTile :name="metric.icon" :size="28" plain /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
+        <div v-for="metric in present" :key="metric.label"><GlyphTile :name="metric.icon" :tone="metric.tone" :role="metric.role" :size="22" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
       </div>
       <p v-if="missingLine" class="decoded-missing">{{ missingLine }}</p>
       <p class="mapping-note"><GlyphTile name="verified" :size="18" />{{ t.decodedNote }}</p>

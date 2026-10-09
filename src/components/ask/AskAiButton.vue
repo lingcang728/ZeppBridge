@@ -26,7 +26,13 @@ const props = defineProps<{
   label: string;
   /** 形变的来源卡（CSS 选择器，在页面里找）；不给就用按钮所在的那张卡（.trend-card / section）。 */
   card?: string;
+  /** 不弹问题、不离开本页：点一下交给外面（运动页洞察卡就地出文件）。 */
+  direct?: boolean;
+  busy?: boolean;
+  /** 外面的浮层开着（direct 时按钮自己没有问题浮层）。 */
+  expanded?: boolean;
 }>();
+const emit = defineEmits<{ activate: [] }>();
 const a = useAskText();
 const router = useRouter();
 const ctl = useAiTaskDraft();
@@ -36,7 +42,16 @@ const button = ref<HTMLElement | null>(null);
 const popover = ref<InstanceType<typeof GlassPopover> | null>(null);
 const direction = computed(() => baselineOf(props.metric)?.direction ?? null);
 const titleId = computed(() => `ask-${props.workout ? `workout-${props.workout.id}` : props.metric ?? 'metric'}`);
-const shown = computed(() => !!props.metric || !!props.workout);
+const shown = computed(() => !!props.direct || !!props.metric || !!props.workout);
+const expandedNow = computed(() => (props.direct ? !!props.expanded : open.value));
+const onPress = () => {
+  if (props.busy) return;
+  if (props.direct) { emit('activate'); return; }
+  show();
+};
+defineExpose({
+  get button(): HTMLElement | null { return button.value; },
+});
 const presets = computed(() => (props.workout ? workoutAskPresets() : props.metric ? askPresets(props.metric) : []));
 const questions = computed(() => presets.value.map((preset) => ({ preset, text: questionText(preset) })));
 function questionText(preset: AskPreset): string {
@@ -80,11 +95,11 @@ const choose = async (preset: AskPreset, text: string) => {
 </script>
 
 <template>
-  <button v-if="shown" ref="button" type="button" :class="['ask-ai', { lit: direction === 'above' || direction === 'below', open }]" :title="a.ask" :aria-label="a.askTitle(label)"
-    aria-haspopup="dialog" :aria-expanded="open" @click="show">
+  <button v-if="shown" ref="button" type="button" :disabled="busy" :class="['ask-ai', { lit: !direct && (direction === 'above' || direction === 'below'), open: expandedNow }]" :title="a.ask" :aria-label="a.askTitle(label)"
+    aria-haspopup="dialog" :aria-expanded="expandedNow" @click="onPress">
     <Icon name="spark" :size="15" /><span>{{ a.ask }}</span>
   </button>
-  <GlassPopover v-if="open" ref="popover" :anchor="button" :labelledby="titleId" @close="open = false">
+  <GlassPopover v-if="open && !direct" ref="popover" :anchor="button" :labelledby="titleId" @close="open = false">
     <h2 :id="titleId" class="ask-title" data-pop-item><Icon name="spark" :size="16" />{{ a.askTitle(label) }}</h2>
     <p class="ask-hint" data-pop-item>{{ workout ? a.workoutHint : a.askHint }}</p>
     <button v-for="item in questions" :key="item.preset.key" type="button" class="question" data-pop-item @click="choose(item.preset, item.text)">
@@ -104,6 +119,7 @@ const choose = async (preset: AskPreset, text: string) => {
 .ask-ai.lit { background: color-mix(in srgb, var(--accent) 20%, var(--mat-inset)); box-shadow: var(--mat-inset-shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--accent); }
 .ask-ai:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ask-ai:disabled { cursor: progress; }
 .ask-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-md); line-height: 1.3; }
 .ask-title :deep(svg) { flex: 0 0 auto; color: var(--accent); }
 .ask-hint { margin: 0 0 4px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.55; }
