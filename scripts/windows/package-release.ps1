@@ -34,13 +34,21 @@ try {
     $loadedLocalSigningKey = $true
   }
 
+  # zeppbridge-mcp 作为 sidecar 随安装包放到 exe 旁边（3B 打包决定）。
+  & (Join-Path $root 'scripts\release\stage-mcp-sidecar.ps1') | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'MCP sidecar 构建失败。' }
+
   $env:TAURI_CLI_CONFIG = 'src-tauri/tauri.conf.json'
-  npm exec -- tauri build --bundles nsis
+  npm exec -- tauri build --bundles nsis --config src-tauri/tauri.sidecar.conf.json
   if ($LASTEXITCODE -ne 0) { throw 'Tauri 打包失败。' }
   $portable = Join-Path $root 'release\ZeppBridge.exe'
   $built = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge.exe'
   New-Item -ItemType Directory -Force -Path (Split-Path $portable) | Out-Null
   Copy-Item -LiteralPath $built -Destination $portable -Force
+  # 便携版也把 MCP 放在 exe 旁边：设置卡按 exe 所在目录找它。
+  $sidecar = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge-mcp.exe'
+  if (-not (Test-Path -LiteralPath $sidecar)) { throw "打包后没找到 sidecar：$sidecar" }
+  Copy-Item -LiteralPath $sidecar -Destination (Join-Path (Split-Path $portable) 'zeppbridge-mcp.exe') -Force
   & (Join-Path $PSScriptRoot 'publish-local.ps1') -SkipStaleInstall
   if ($LASTEXITCODE -ne 0) { throw '本机发布同步失败。' }
 } finally {

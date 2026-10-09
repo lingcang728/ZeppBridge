@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_PINS, normalizePins, pinnableMetric, pinSparkValues, pinValueText } from '../pinnedMetrics';
+import { DEFAULT_PINS, MAX_PINS, normalizePins, pinnableMetric, pinsFromStored, pinSparkValues, pinValueText } from '../pinnedMetrics';
 
 describe('pinnedMetrics', () => {
+  it('从没挑过时给一套默认的四块；自己清空过就保持空', () => {
+    expect(pinsFromStored(null)).toEqual([...DEFAULT_PINS]);
+    expect(DEFAULT_PINS).toHaveLength(MAX_PINS);
+    expect(normalizePins(DEFAULT_PINS)).toEqual([...DEFAULT_PINS]);
+    expect(pinsFromStored('[]')).toEqual([]);
+    expect(pinsFromStored('["steps"]')).toEqual(['steps']);
+  });
+
   it('只留认识的指标、去重、最多四个，顺序照用户点选的来', () => {
     expect(normalizePins(['weight', 'nope', 'resting_hr', 'weight', 'steps', 'stress', 'spo2'])).toEqual(['weight', 'resting_hr', 'steps', 'stress']);
     expect(normalizePins('weight')).toEqual([]);

@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="C extends { id: string; tone?: string; title: string }">
+<script setup lang="ts" generic="C extends { id: string; tone?: string; title: string; narrow?: boolean }">
 /* 设置卡组：三种形态，同一批卡在它们之间形变过去。
  *
  *   coverflow（默认）：正中一张立着，左右叠在两边，左右拖动挑一张。
@@ -190,9 +190,12 @@ const warmNext = () => {
 };
 const activeIndex = computed(() => props.cards.findIndex((card) => card.id === props.activeId));
 
+/** 这次换卡是卡组自己发起的（拖着甩、圆点跳）：它自己放过渡，watch 里不用再补一段。 */
+let ownSwap = false;
 const step = (direction: -1 | 1) => new Promise<void>((resolve) => {
   const next = props.cards[wrapIndex(activeIndex.value + direction, props.cards.length)];
   if (!next) { resolve(); return; }
+  ownSwap = true;
   emit('change', next.id, resolve);
 });
 
@@ -208,6 +211,9 @@ const guardedToggle = (fn: () => void) => {
   const now = performance.now();
   if (now - lastToggleAt < TOGGLE_GUARD_MS) return;
   lastToggleAt = now;
+  // 开 / 关会换路由，路由钩子里的 settleMotion 会把正在放的形变（以及总览退后的 CSS 过渡）压进 90ms：
+  // 关到一半又点开，倒放就被压成「嗖」一下，总览和卡各走各的——快速开合时的那一顿。卡组自己会原路倒回，不用它快进。
+  deferSettle();
   fn();
 };
 const requestOpen = (id: string) => guardedToggle(() => emit('open', id));
@@ -219,6 +225,8 @@ const jumpTo = (id: string) => {
   // 圆点跳转也带方向：往后跳从右边滑进来，往前跳从左边。
   const target = props.cards.findIndex((card) => card.id === id);
   const direction: -1 | 1 = target < activeIndex.value ? -1 : 1;
+  ownSwap = true;
+  deferSettle();
   emit('change', id, () => morph.swap(direction));
 };
 
@@ -258,6 +266,18 @@ watch(() => props.activeId, async (id, previous) => {
     morph.close(previous, () => {
       if (closingId.value === previous) closingId.value = null;
     }, fromTop);
+  } else if (id && previous && id !== previous) {
+    const own = ownSwap;
+    ownSwap = false;
+    if (own) return;
+    // 卡里的链接把人带到另一张卡（隐私卡「去设置」→ 高级卡的本机 API），或从那里按返回回来：
+    // 以前是一帧硬换内容。和圆点跳转一样，新卡从它所在的那一侧滑进来。
+    reset();
+    markWarm(id);
+    const from = props.cards.findIndex((card) => card.id === previous);
+    const to = props.cards.findIndex((card) => card.id === id);
+    await nextTick();
+    morph.swap(to < from ? -1 : 1);
   }
 });
 
@@ -400,7 +420,7 @@ onBeforeUnmount(() => {
       <div class="deck-backdrop" aria-hidden="true"></div>
       <article
         ref="cardEl"
-        class="deck-card open-card"
+        :class="['deck-card', 'open-card', { 'is-narrow': stageCard.narrow }]"
         :style="{ '--card-tone': stageCard.tone }"
         :aria-roledescription="t.goTo(shownIndex + 1, cards.length)"
         @pointermove="onPointerMove"

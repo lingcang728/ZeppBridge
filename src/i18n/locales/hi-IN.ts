@@ -193,7 +193,6 @@ export default {
       mcpToolMetricRecords: "किसी भी मेट्रिक की अलग-अलग रीडिंग",
       mcpToolSleepSessions: "नींद के सत्रों की सूची",
       mcpToolLifeEvents: "आपके दर्ज किए जीवन के इवेंट",
-      mcpSetupPrompt: 'मैं Windows पर ZeppBridge डेस्कटॉप ऐप इस्तेमाल करता हूँ। यह मेरे Amazfit / Zepp वॉच डेटा को लोकल SQLite में सिंक करता है। इसके zeppbridge-mcp प्रोग्राम को आपके साथ जोड़ना चाहता हूँ, ताकि हर बार एक्सपोर्ट और पेस्ट किए बिना आप मेरे वर्कआउट और स्वास्थ्य डेटा पूछ सकें।\n\nजानकारी:\n- ZeppBridge के GitHub Releases पेज से zeppbridge-tools आर्काइव मिलता है; अनज़िप करने पर उसमें zeppbridge-mcp मिलता है। शायद मैंने अभी डाउनलोड नहीं किया है।\n- यह stdio MCP सर्वर है: सिर्फ़ लोकल डेटाबेस पढ़ता है, नेटवर्क नहीं इस्तेमाल करता, कोई पोर्ट नहीं खोलता, टोकन या API key नहीं चाहिए।\n- कॉन्फ़िग का उदाहरण: {"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp का पूरा पाथ>", "args": ["--scope", "task"]}}}\n- बारह रीड-ओनली टूल: वर्कआउट (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), मेट्रिक्स (list_available_metrics, get_metric_series, get_metric_records), नींद (list_sleep_sessions, get_sleep_detail), भोजन (get_food_data), जीवन की घटनाएँ (list_life_events) और डेटा की स्थिति (get_data_health)।\n\nबताएँ:\n1. आपके लिए, यानी जिस टूल से मैं बात कर रहा हूँ, कॉन्फ़िग किस फ़ाइल में लिखूँ या किस कमांड से जोड़ूँ;\n2. Windows पाथ कैसे लिखूँ, बैकस्लैश एस्केप करना है या नहीं;\n3. सेटअप के बाद काम करने की जाँच कैसे करूँ।\n\nमुझसे कोई जानकारी चाहिए, जैसे कौन-सा क्लाइंट है या फ़ाइल कहाँ है, तो पूछें।',
       mcpConfigPathPlaceholder: '<zeppbridge-mcp का पाथ>',
 
       // ── 6. 本地数据保留 ──
@@ -1691,7 +1690,6 @@ export default {
       retry: 'फिर कोशिश करें',
       trainingEmpty: 'सिंक के बाद VO₂max और ट्रेनिंग लोड यहाँ दिखेंगे',
       trainingPanelAria: 'ट्रेनिंग स्टेटस खोलें',
-      trainingSparkLabel: 'पिछले 7 दिन का ट्रेनिंग लोड',
       trainingThin: 'ट्रेंड के लिए 7 दिन का डेटा पर्याप्त नहीं है',
       trainingTitle: 'ट्रेनिंग स्टेटस',
       unrecognizedCta: 'यहाँ क्लिक करके पहचान बताएँ',
@@ -1751,8 +1749,6 @@ export default {
       providerOfficial: 'Zepp आधिकारिक अनुमति',
       sourceScope: 'दायरा',
       sourceTitle: 'स्रोत',
-      stageHelp: 'गहरी: शारीरिक रिकवरी। हल्की: मुख्य नींद अवधि। REM: मानसिक ताजगी और सपने। जागा हुआ: रात में जागने का समय।',
-      stageHelpButton: 'चरणों का अर्थ',
       stagesAria: 'नींद के चरण',
       stagesTitle: 'नींद के चरण',
       syncTimeMissing: 'सिंक समय उपलब्ध नहीं',
@@ -2617,7 +2613,6 @@ Markdown में उत्तर दें।`,
 
     'views/settings/sections/display': {
       focusTitle: 'मेरी प्राथमिकता',
-      focusSub: 'ओवरव्यू में ये हिस्से पहले दिखेंगे और बाकी "सभी देखें" में सिमट जाएँगे; कुछ न चुनने पर पहले जैसा रहेगा',
     },
 
     'views/settings/sections/privacy': {

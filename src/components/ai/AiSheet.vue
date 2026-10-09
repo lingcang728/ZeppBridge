@@ -5,16 +5,15 @@
  * 用户 10-08：「已保存任务的过渡太生硬，直接用一个遮罩打开非常丑。应该做成卡片平滑展开、背景带高斯模糊」。
  * 以前这几页是整页路由，用页面形变（usePageMorph）从胶囊长成整屏——垫底是一块不透明的底色，看上去就是一层黑幕盖过来。
  * 现在它们是 /ai 的子路由：舞台留在原处，身后一层**静态**毛玻璃 + 暗色只淡入淡出它自己；大卡从被点的那枚胶囊
- * 长出来（只动 transform，内容晚一点淡入，不在小卡里挤着字），关的时候缩回那枚胶囊。点卡外、Esc、顶栏返回都是关。
+ * 形变出来（等比缩放 + 裁成胶囊的形状，见 lib/motion/sheet.ts；内容晚一点淡入，不在小卡里挤着字），关的时候原路形变回那枚胶囊。点卡外、Esc、顶栏返回都是关。
  * 在大卡里从列表点进详情（往返记录 → 某一次）：卡不动，里面交叉淡化换内容。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
-import { flightTransform } from '../../lib/motion/dialogFlight';
 import { onMotionEscape } from '../../lib/motion/interrupt';
 import { OPEN_EASE } from '../../lib/motion/timing';
-import { sheetOrigin } from '../../lib/motion/sheet';
+import { openSheet, sheetOrigin } from '../../lib/motion/sheet';
 import { useBridgeText } from './bridge/bridge.i18n';
 
 const props = defineProps<{ name: string }>();
@@ -23,21 +22,16 @@ const t = useBridgeText();
 const panel = ref<HTMLElement | null>(null);
 const veil = ref<HTMLElement | null>(null);
 const body = ref<HTMLElement | null>(null);
-const OPEN_MS = 460;
+const OPEN_MS = 480;
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-const originRect = () => sheetOrigin(props.name);
 const close = () => { void router.push('/ai'); };
 
 let releaseEscape: (() => void) | null = null;
 onMounted(() => {
   releaseEscape = onMotionEscape(() => { close(); return true; });
   if (reduced() || !panel.value) return;
-  const from = originRect();
   veil.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: 'ease-out', fill: 'backwards' });
-  panel.value.animate(
-    [{ transform: from ? flightTransform(from, panel.value.getBoundingClientRect()) : 'scale(.94)', opacity: from ? 1 : 0 }, { transform: 'none', opacity: 1 }],
-    { duration: OPEN_MS, easing: OPEN_EASE, fill: 'backwards' },
-  );
+  openSheet(panel.value, sheetOrigin(props.name), OPEN_MS, OPEN_EASE);
   // 内容等大卡长到一半多才淡入：不在还是小胶囊的时候就挤着一屏字（那就是重影）。
   body.value?.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1 }], { duration: OPEN_MS, easing: 'ease-out', fill: 'backwards' });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOCUS_AREAS, MODULE_AREA, focusSplit, normalizeAreas } from '../focusAreas';
+import { FOCUS_AREAS, FOCUS_CHOICES, MODULE_AREA, areasForChoice, focusChoiceOf, focusSplit, normalizeAreas } from '../focusAreas';
 
 describe('normalizeAreas', () => {
   it('只留认识的区块、去重、保持点选顺序', () => {
@@ -38,6 +38,21 @@ describe('focusSplit', () => {
 
   it('不认识的输入当没选', () => {
     expect(focusSplit(['whatever'])).toBeNull();
+  });
+});
+
+describe('focus slider choice', () => {
+  it('单选一个区块就停在那一格，其余都是「均衡」', () => {
+    expect(focusChoiceOf(['sleep'])).toBe('sleep');
+    expect(focusChoiceOf([])).toBe('all');
+    expect(focusChoiceOf(['sleep', 'training'])).toBe('all');
+    expect(focusChoiceOf(['nonsense'])).toBe('all');
+  });
+
+  it('「均衡」写回空集合，其余写回单个区块', () => {
+    expect(areasForChoice('all')).toEqual([]);
+    expect(areasForChoice('training')).toEqual(['training']);
+    expect(FOCUS_CHOICES[0]).toBe('all');
   });
 });
 

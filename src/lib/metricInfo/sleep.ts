@@ -1,8 +1,8 @@
 import { defineMessages, messagesOf } from '../../i18n';
 
 /*
- * 「?」浮层三段文案·睡眠详情域（D6）：时长、评分、近 7 天结构三张主卡。
- * 阶段说明（深睡 / 浅睡 / REM / 清醒）还是阶段卡上那个「阶段说明」，不挪。
+ * 「?」浮层三段文案·睡眠详情域（D6）：时长、评分、近 7 天结构三张主卡与阶段卡。
+ * 阶段说明（深睡 / 浅睡 / REM / 清醒）也走同一个「?」浮层（sleep_stages），和时长、评分一个结构。
  * 页脚那句「只展示云端给的阶段汇总」是整页的口径，留在页脚，不进浮层重复。
  */
 
@@ -17,6 +17,9 @@ const messages = defineMessages(
     sleep_weeklyWhat: '近 7 天睡眠结构：每晚各睡眠阶段的时长。',
     sleep_weeklyChart: '每晚一根柱，按深睡 / 浅睡 / REM / 清醒堆叠；当前这一晚高亮；未提供的阶段如实标「未提供」。',
     sleep_weeklyHow: '阶段时长随睡眠记录一起同步——官方授权与「高级数据」都会提供。',
+    sleep_stagesWhat: '深睡：恢复体力的深度睡眠。浅睡：占比较高的过渡阶段。REM：快速眼动期，多与记忆和梦境有关。清醒：夜间醒来或清醒片段。',
+    sleep_stagesChart: '一条时间轴从入睡排到醒来，每一段按所处的阶段上色；悬停可看那一段的起止与时长。',
+    sleep_stagesHow: '阶段切分由设备给出，随睡眠记录同步；这里只说明各阶段的含义，不是健康诊断。',
   },
   {
     sleep_durationWhat: 'Time asleep: the night’s total time asleep, excluding stretches awake in bed.',
@@ -28,6 +31,9 @@ const messages = defineMessages(
     sleep_weeklyWhat: 'Sleep structure, last 7 nights: how long each stage took each night.',
     sleep_weeklyChart: 'One bar per night, stacked into deep / light / REM / awake; this record’s night is highlighted; a stage the cloud left out is labelled “Not provided”.',
     sleep_weeklyHow: 'Stage durations come with each sleep record — both the official authorization and advanced data provide them.',
+    sleep_stagesWhat: 'Deep: the restorative stretch. Light: the transitional stage that takes up most of the night. REM: rapid eye movement, tied to memory and dreaming. Awake: waking up or lying awake in the night.',
+    sleep_stagesChart: 'One timeline from falling asleep to waking, each stretch coloured by its stage; hover to see when it started, ended and how long it lasted.',
+    sleep_stagesHow: 'The device splits the night into stages and they sync with the sleep record. These are definitions, not a health diagnosis.',
   },
   {
     sleep_durationWhat: 'Tiempo dormido: el total de esa noche, sin contar los ratos despierto en la cama.',
@@ -39,12 +45,15 @@ const messages = defineMessages(
     sleep_weeklyWhat: 'Estructura del sueño, últimas 7 noches: cuánto duró cada fase cada noche.',
     sleep_weeklyChart: 'Una barra por noche, apilada en profundo / ligero / REM / despierto; la noche de este registro queda resaltada; una fase que la nube no dio se marca «Sin datos».',
     sleep_weeklyHow: 'La duración de las fases llega con cada registro de sueño — la autorización oficial y los datos avanzados la dan.',
+    sleep_stagesWhat: 'Profundo: el tramo reparador. Ligero: la fase de transición que ocupa la mayor parte de la noche. REM: movimiento ocular rápido, asociado a la memoria y los sueños. Despierto: despertares o ratos despierto durante la noche.',
+    sleep_stagesChart: 'Una línea de tiempo desde que te dormiste hasta que despertaste, con cada tramo coloreado según su fase; pasa el cursor para ver su inicio, fin y duración.',
+    sleep_stagesHow: 'El dispositivo divide la noche en fases, que se sincronizan con el registro de sueño. Son definiciones, no un diagnóstico de salud.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'lib/metricInfo/sleep',
 );
 
-export const SLEEP_METRICS = ['sleep_duration', 'sleep_score', 'sleep_weekly'] as const;
+export const SLEEP_METRICS = ['sleep_duration', 'sleep_score', 'sleep_weekly', 'sleep_stages'] as const;
 
 /** 按指标 id 取三段文案；认不出的 id 返回 null。 */
 export const sleepInfo = (metric: string): { what: string; chart: string; how: string } | null => {

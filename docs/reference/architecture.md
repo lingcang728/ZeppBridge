@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of [v3.0.0-beta.49](https://github.com/lingcang728/ZeppBridge/releases).
+This page describes the product boundaries and current implementation of [v3.0.0-beta.52](https://github.com/lingcang728/ZeppBridge/releases).
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 
@@ -446,7 +446,7 @@ read. Only statuses and field names are recorded.
 | Web sign-in for the first connection | Desktop chain implemented; real-account sign-in verified per environment |
 | Local read-only REST (`/health`, `/workouts/{id}/series`) | Implemented; off by default, token required when enabled |
 | CLI (`status` / `sync` / `export` / `contract`) | Implemented, shipped as a versioned archive with each release |
-| MCP (stdio, five read-only tools) | Implemented, shipped as a versioned archive with each release |
+| MCP (stdio, fifteen read-only tools plus two training-plan write tools) | Implemented, shipped as a versioned archive with each release |
 | Full history backfill, long-term archive, coverage ledger | Implemented |
 | Database snapshots and queued restore | Implemented |
 | More data sources | Not started |

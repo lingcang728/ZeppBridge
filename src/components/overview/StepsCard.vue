@@ -6,6 +6,8 @@ import Icon from '../Icon.vue';
 import GlyphTile from '../GlyphTile.vue';
 import { metricColor } from '../../lib/metricTone';
 import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
+import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
+import type { MetricSeriesPoint } from '../../types';
 import { defineMessages, useMessages } from '../../i18n';
 
 defineOptions({ name: 'OverviewStepsCard' });
@@ -25,6 +27,8 @@ const messages = defineMessages(
     factDone: '已完成',
     factLeft: '还差',
     factReached: '已达成',
+    weekTitle: '近 7 天',
+    weekAria: '近 7 天每天的步数，虚线是目标',
   },
   {
     stepsPanelAria: 'Open daily activity detail',
@@ -40,6 +44,8 @@ const messages = defineMessages(
     factDone: 'Done',
     factLeft: 'To go',
     factReached: 'Reached',
+    weekTitle: 'Last 7 days',
+    weekAria: 'Steps on each of the last 7 days; the dashed line is the goal',
   },
   {
     stepsPanelAria: 'Abrir el detalle de actividad diaria',
@@ -55,6 +61,8 @@ const messages = defineMessages(
     factDone: 'Hecho',
     factLeft: 'Faltan',
     factReached: 'Conseguido',
+    weekTitle: 'Últimos 7 días',
+    weekAria: 'Pasos de cada uno de los últimos 7 días; la línea discontinua es la meta',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/overview/StepsCard',
@@ -67,8 +75,29 @@ const props = defineProps<{
   /** 库里最新一条样本（任何一种）的时间：今天还没有步数时，告诉用户云端的数据停在哪儿。
       有步数时不拿它当「更新于」——它其实是心率样本的时间，步数没有自己的时刻。 */
   latestAt?: string | null;
+  /** 近 7 天每天的步数（只含有记录的日子）：卡片下沿一排小柱，不再空着半张卡。 */
+  week?: MetricSeriesPoint[];
 }>();
 const latestWhen = computed(() => formatWhen(props.latestAt));
+
+const weekBars = computed(() => {
+  const points = (props.week ?? []).filter((point) => isFiniteNumber(point.value));
+  if (points.length < 2) return [];
+  const top = Math.max(stepGoal.value, ...points.map((point) => point.value));
+  const formatDay = displayDateTimeFormatter({ weekday: 'narrow' });
+  return points.slice(-7).map((point) => ({
+    key: point.date,
+    height: Math.max(4, Math.round((point.value / top) * 100)),
+    reached: point.value >= stepGoal.value,
+    day: formatDay.format(parseDisplayDate(`${point.date}T12:00:00`)),
+    title: `${point.date} · ${formatMetric(point.value)}`,
+  }));
+});
+const goalLine = computed(() => {
+  const points = (props.week ?? []).filter((point) => isFiniteNumber(point.value));
+  const top = Math.max(stepGoal.value, ...points.map((point) => point.value));
+  return Math.round((stepGoal.value / top) * 100);
+});
 
 const DEFAULT_STEP_GOAL = 10000;
 const stepGoal = computed(() =>
@@ -101,6 +130,15 @@ const ringColor = computed(() => metricColor('steps'));
         <li><span>{{ t.factDone }}</span><strong>{{ stepsPercent }}%</strong></li>
         <li><span>{{ t.factLeft }}</span><strong>{{ steps >= stepGoal ? t.factReached : formatMetric(stepGoal - steps) }}</strong></li>
       </ul>
+      <div v-if="weekBars.length" class="steps-week" role="img" :aria-label="t.weekAria">
+        <span class="steps-week-head">{{ t.weekTitle }}</span>
+        <div class="steps-week-bars" :style="{ '--goal': goalLine, '--tone': ringColor }">
+          <span v-for="bar in weekBars" :key="bar.key" class="steps-week-col" :title="bar.title">
+            <i :class="{ 'is-reached': bar.reached }" :style="{ height: `${bar.height}%` }"></i>
+            <small>{{ bar.day }}</small>
+          </span>
+        </div>
+      </div>
     </template>
     <p v-else class="steps-goal steps-missing">{{ t.stepsNotYet }}<small v-if="latestWhen">{{ t.stepsLatest(latestWhen) }}</small></p>
   </RouterLink>
@@ -112,6 +150,18 @@ const ringColor = computed(() => metricColor('steps'));
 .steps-facts { display: grid; gap: 9px; margin: 16px 0 0; padding: 0; list-style: none; }
 .steps-facts li { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--subtle); font-size: var(--fs-sm); }
 .steps-facts strong { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 近 7 天：排在卡片下沿（margin-top: auto），和旁边那张卡的底边齐平；虚线是目标。 */
+.steps-week { display: grid; gap: 8px; margin-top: auto; padding-top: 16px; }
+.steps-week-head { color: var(--subtle); font-size: var(--fs-2xs); }
+.steps-week-bars { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; height: 72px; }
+.steps-week-bars::before {
+  content: ''; position: absolute; right: 0; bottom: calc(16px + (100% - 16px) * var(--goal) / 100); left: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--ink) 20%, transparent); pointer-events: none;
+}
+.steps-week-col { display: grid; grid-template-rows: minmax(0, 1fr) 16px; justify-items: center; align-items: end; min-width: 0; height: 100%; }
+.steps-week-col i { display: block; width: min(16px, 100%); border-radius: 5px 5px 3px 3px; background: color-mix(in srgb, var(--tone) 36%, transparent); }
+.steps-week-col i.is-reached { background: var(--tone); }
+.steps-week-col small { color: var(--subtle); font-size: var(--fs-2xs); line-height: 16px; }
 .steps-missing { display: grid; gap: 3px; margin-top: 18px; }
 .steps-missing small { color: var(--subtle); font-size: var(--fs-xs); }
 </style>

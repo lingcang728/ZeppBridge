@@ -92,11 +92,23 @@ export const normalizePins = (value: unknown): string[] => {
 
 const STORAGE_KEY = 'zeppbridge-overview-pins';
 
+/** 从没挑过时先摆这四块，概览第一眼就是满的；用户自己清空过（存了空数组）就尊重那个选择。 */
+export const DEFAULT_PINS: readonly string[] = ['resting_hr', 'hrv_rmssd', 'sleep_score', 'steps'];
+
+export const pinsFromStored = (stored: string | null): string[] => {
+  if (stored === null) return [...DEFAULT_PINS];
+  try {
+    return normalizePins(JSON.parse(stored));
+  } catch {
+    return [...DEFAULT_PINS];
+  }
+};
+
 export const readPins = (): string[] => {
   try {
-    return normalizePins(JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]'));
+    return pinsFromStored(window.localStorage.getItem(STORAGE_KEY));
   } catch {
-    return [];
+    return [...DEFAULT_PINS];
   }
 };
 

@@ -1,9 +1,21 @@
-//! 十二个只读工具的声明（名称、说明、参数结构）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
+//! 十五个只读工具和两个训练计划写工具的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
 //! 由 `the_documented_tools_are_exactly_the_registered_ones` 守着。
 
 use super::*;
 
 pub(super) fn tool_definitions() -> Vec<Value> {
+    let mut tools = data_tool_definitions();
+    tools.extend(coach_tool_definitions());
+    // 没写注解的都是只读查询：告诉客户端可以放心自动调用。
+    for tool in &mut tools {
+        if tool.get("annotations").is_none() {
+            tool["annotations"] = json!({ "readOnlyHint": true, "openWorldHint": false });
+        }
+    }
+    tools
+}
+
+fn data_tool_definitions() -> Vec<Value> {
     let missing = contract::MISSING_VALUE_CONVENTION;
     let time = contract::TIME_CONVENTION;
     vec![
@@ -232,6 +244,102 @@ pub(super) fn tool_definitions() -> Vec<Value> {
                 },
                 "additionalProperties": false
             }
+        }),
+    ]
+}
+
+/// 计划书写格式（zeppbridge-plan/3）的说明，起草工具的参数说明里用。
+const PLAN_FORMAT: &str = "plan 是一个 JSON 对象（格式 zeppbridge-plan/3）：\
+    format 写 \"zeppbridge-plan/3\"；summary 一句话；from / to（YYYY-MM-DD）是这份计划管的日子，\
+    这几天里没写训练的就是休息日，发布时会清掉这几天原有的 ZeppBridge 计划；\
+    rest 可选，[{date, bedtime \"22:30\", sleepTarget \"8h30m\", note}]；\
+    workouts：[{date, sport, variant, name, focus, description, steps}]。\
+    sport 只有 running / cycling / pool_swim / open_water_swim 能发到手表（走路、徒步、力量会被拦下）；\
+    variant 跑步写 outdoor / treadmill / track，骑行写 outdoor / indoor；\
+    name 14 个字以内（手表列表会截断）；focus（训练目的，短词）和 description（要点）必填。\
+    steps 每一步 {kind, duration, target, note}：kind 是 warmup / active / interval / recovery / rest / cooldown；\
+    duration 写 \"20min\"、\"90s\"、\"1h\"、\"400m\"、\"5km\"（m 是米不是分钟）；\
+    target 写 \"hr 135-150\"、\"pace 5:30-5:50\"、\"power 200-220\"，不写就是不设目标。\
+    重复组 {repeat: 3, steps: [...]}，不能嵌套。最远排到今天之后 56 天，日期不能早于今天。";
+
+fn coach_tool_definitions() -> Vec<Value> {
+    let missing = contract::MISSING_VALUE_CONVENTION;
+    vec![
+        json!({
+            "name": "get_training_context",
+            "description": format!(
+                "近期训练与恢复一次给齐：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、\
+                 压力、每日训练负荷、步数、睡眠时长与评分、小睡、当天练了几次）、窗口内每次运动的摘要\
+                 （时长、距离、配速 s/km、心率、爬升、负荷、训练效果、RPE、各心率区间秒数）、距上次运动几天、\
+                 今天起已生效的训练计划、窗口内的生活事件。单位在 units 字段。只给原始值，\
+                 漂移、有氧效率、负荷比请自己算。{missing}"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer", "minimum": 1, "maximum": 90, "default": 28,
+                        "description": "往回多少天，含今天。"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }),
+        json!({
+            "name": "get_athlete_profile",
+            "description": format!(
+                "运动员档案：手表自报与近一年实测的最大心率、静息心率（最近一天与 30 天均值）、\
+                 手表设定的心率区间边界、乳酸阈值心率与配速（s/km）、VO₂max（手表估算）、身高体重、\
+                 近 90 天的跑步（距离、移动时间、配速、心率、爬升，最多 40 条），以及用户写给 AI 的背景。\
+                 排训练强度前先读它。{missing}"
+            ),
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        }),
+        json!({
+            "name": "get_training_plan",
+            "description": format!(
+                "训练计划账本：今天起已生效的计划、按 7 天窗口的送达状态、最近一次推送、还没发的草稿，\
+                 以及用户是否允许 AI 直接发布（aiMayPublish）。官方没有读取接口，这是 ZeppBridge \
+                 自己记的账，不是从手表读回来的。{missing}"
+            ),
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        }),
+        json!({
+            "name": "draft_training_plan",
+            "description": format!(
+                "校验并保存一份训练计划草稿（不会发到手表）。没通过校验就不保存，返回 check.issues 让你改；\
+                 通过后返回 draftId 和逐日「发之前 / 发之后」预览。之后由用户在 ZeppBridge 里确认发送；\
+                 只有 aiMayPublish 为真时，才可以在用户同意后调用 publish_training_plan。\
+                 起草前先用 get_training_context 和 get_athlete_profile 看清近期负荷与恢复：\
+                 加量保守，恢复差就降强度，不做医疗判断。{missing}"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "plan": { "type": "object", "description": PLAN_FORMAT }
+                },
+                "required": ["plan"],
+                "additionalProperties": false
+            },
+            "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false }
+        }),
+        json!({
+            "name": "publish_training_plan",
+            "description": format!(
+                "把一份草稿发到用户的 Zepp App 与手表，整体替换它覆盖到的每个 7 天窗口里 ZeppBridge 发过的计划\
+                 （不动用户在 Zepp App 里自建的）。只有用户在 ZeppBridge 设置里打开了「允许 AI 直接发布」才放行，\
+                 否则返回 err.training_plan.ai_publish_disabled；永远不会清空窗口，需要清空时返回\
+                 err.training_plan.needs_clear_confirmation。调用前必须先把预览讲给用户并得到同意。{missing}"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "draftId": { "type": "string", "description": "draft_training_plan 返回的 draftId。" }
+                },
+                "required": ["draftId"],
+                "additionalProperties": false
+            },
+            "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": true, "openWorldHint": true }
         }),
     ]
 }

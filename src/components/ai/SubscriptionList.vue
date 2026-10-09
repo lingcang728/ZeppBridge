@@ -6,20 +6,46 @@
  * 以前每格 minmax(250px) 放不下，分段折成上下两行、右边空一大片，荷兰语更甚。
  * 10-08 H20：表头一行「全部」——一下把七家都设成免费或已订阅（大多数人要么都没订、要么都订了）；各家不一样时滑块不停在任何一档。
  */
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import { AI_PROVIDERS, type AiProviderId } from '../../lib/aiProviders';
 import { isSubscribed, setSubscribed } from '../../lib/aiTask/budget';
+import { reducedMotion } from '../../lib/motion/cards';
 import { useHandoffText } from './HandoffDock.i18n';
 
 const t = useHandoffText();
 const items = computed(() => [{ value: 'free', label: t.value.planFreeShort, title: t.value.planFree }, { value: 'paid', label: t.value.planPaidShort, title: t.value.planPaid }]);
 const set = (id: AiProviderId, value: string) => setSubscribed(id, value === 'paid');
+/** 「全部」拨过去以后、各家还没依次跟上的那一小段：表头先停在新的那一档，不闪成「各家不一样」。 */
+const pendingAll = ref<string | null>(null);
 const all = computed(() => {
+  if (pendingAll.value) return pendingAll.value;
   const paid = AI_PROVIDERS.filter((provider) => isSubscribed(provider.id)).length;
   return paid === AI_PROVIDERS.length ? 'paid' : paid === 0 ? 'free' : 'mixed';
 });
-const setAll = (value: string) => { for (const provider of AI_PROVIDERS) setSubscribed(provider.id, value === 'paid'); };
+/**
+ * 10-09（用户：从免费切到订阅时下面几行一起刷过去，很笨拙）：七家的滑块从上往下依次拨过去，一行接一行，
+ * 像一道波；以前七块玻璃在同一帧一起起飞。
+ */
+const WAVE_MS = 55;
+let timers: number[] = [];
+const setAll = (value: string) => {
+  timers.forEach((id) => window.clearTimeout(id));
+  timers = [];
+  const targets = AI_PROVIDERS.filter((provider) => isSubscribed(provider.id) !== (value === 'paid'));
+  if (reducedMotion() || targets.length <= 1) { for (const provider of targets) set(provider.id, value); return; }
+  pendingAll.value = value;
+  targets.forEach((provider, i) => {
+    timers.push(window.setTimeout(() => {
+      set(provider.id, value);
+      if (i === targets.length - 1) pendingAll.value = null;
+    }, i * WAVE_MS));
+  });
+};
+onBeforeUnmount(() => {
+  timers.forEach((id) => window.clearTimeout(id));
+  if (pendingAll.value) for (const provider of AI_PROVIDERS) set(provider.id, pendingAll.value);
+});
 </script>
 
 <template>

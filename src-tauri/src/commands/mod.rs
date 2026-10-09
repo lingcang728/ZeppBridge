@@ -1,3 +1,4 @@
+mod ai_clients;
 mod ai_tasks;
 mod auth;
 mod backup;
@@ -150,6 +151,7 @@ where
     .map_err(AppError::from)
 }
 
+pub(crate) use ai_clients::{get_mcp_sidecar, save_mcp_bundle};
 pub(crate) use ai_tasks::{
     ai_exchange_list, ai_profile_save, ai_task_attachment_stat, ai_task_day_strip, ai_task_delete,
     ai_task_delete_many, ai_task_get, ai_task_list, ai_task_prepare, ai_task_preview, ai_task_save,

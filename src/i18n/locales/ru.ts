@@ -225,7 +225,6 @@ export default {
       mcpToolMetricRecords: "Отдельные измерения любой метрики",
       mcpToolSleepSessions: "Список ночей сна",
       mcpToolLifeEvents: "Жизненные события, которые вы записали",
-      mcpSetupPrompt: 'Я использую настольное приложение ZeppBridge для Windows. Оно синхронизирует данные часов Amazfit / Zepp в локальную SQLite. Хочу подключить zeppbridge-mcp к тебе, чтобы запрашивать тренировки и данные здоровья без постоянного экспорта и вставки.\n\nЧто известно:\n- На странице GitHub Releases ZeppBridge скачивается архив zeppbridge-tools; после распаковки в нём есть zeppbridge-mcp. Возможно, я его ещё не скачал.\n- Это stdio MCP-сервер: читает локальную базу, не использует сеть, не открывает порты, не требует токена или API key.\n- Пример конфигурации: {"mcpServers": {"zeppbridge": {"command": "<полный путь к zeppbridge-mcp>", "args": ["--scope", "task"]}}}\n- Двенадцать инструментов только для чтения: тренировки (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), метрики (list_available_metrics, get_metric_series, get_metric_records), сон (list_sleep_sessions, get_sleep_detail), питание (get_food_data), жизненные события (list_life_events) и состояние данных (get_data_health).\n\nПодскажи:\n1. Для тебя конкретно: в какой файл записать конфигурацию или какой командой её добавить;\n2. Как указать путь в Windows, нужно ли экранировать обратные слэши;\n3. Как проверить, что настройка работает.\n\nЕсли нужны сведения от меня (какой клиент, где лежит файл), спроси.',
       mcpConfigPathPlaceholder: '<путь к zeppbridge-mcp>',
 
       retentionAria: 'Срок хранения локальных данных в днях',
@@ -1840,7 +1839,6 @@ export default {
       trainingPanelAria: 'Открыть тренировочный статус',
       trainingTitle: 'Тренировочный статус',
       factLoad: 'Нагрузка',
-      trainingSparkLabel: 'Тренировочная нагрузка за 7 дней',
       trainingThin: 'За последние 7 дней недостаточно записей для графика',
       trainingEmpty: 'МПК (VO₂max) и тренировочная нагрузка появятся после синхронизации',
       focusQuestion: 'Что вас интересует больше всего?',
@@ -1898,10 +1896,6 @@ export default {
       scoreKicker: 'Оценка сна',
       stagesAria: 'Фазы сна',
       stagesTitle: 'Фазы сна',
-      stageHelpButton: 'О фазах сна',
-      stageHelp:
-        'Глубокий: физическое восстановление. Лёгкий: основная часть ночи. '
-        + 'REM: быстрый сон, память и сновидения. Бодрствование: пробуждения среди ночи.',
       weeklyAria: 'Сон за 7 дней',
       weeklyTitle: 'Сон за последние 7 дней',
       weeklySub: 'Фазы по ночам',
@@ -3155,7 +3149,6 @@ export default {
 
     'views/settings/sections/display': {
       focusTitle: 'Мои интересы',
-      focusSub: 'В обзоре эти разделы будут первыми, а остальные свернуты в «Показать все»; если ничего не выбрано, порядок останется прежним',
     },
 
     'views/settings/sections/privacy': {

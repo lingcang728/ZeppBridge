@@ -6,7 +6,11 @@
  * 将复制的提示词和 AI 能用的工具默认收起，想先看看的人点开就行。 */
 import { computed, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
+import McpConnectRow from './McpConnectRow.vue';
+import McpPublishRow from './McpPublishRow.vue';
 import McpTaskScopes from './McpTaskScopes.vue';
+import type { McpSidecar } from '../../../lib/bridge/types';
+import { genericMcpConfig } from '../../../lib/mcpClients';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
@@ -30,16 +34,16 @@ const MCP_TOOLS = computed(() => [
   { name: 'get_sleep_detail', detail: t.value.mcpToolSleepDetail },
   { name: 'list_life_events', detail: t.value.mcpToolLifeEvents },
   { name: 'get_data_health', detail: t.value.mcpToolDataHealth },
+  { name: 'get_training_context', detail: a.value.toolTrainingContext },
+  { name: 'get_athlete_profile', detail: a.value.toolAthleteProfile },
+  { name: 'get_training_plan', detail: a.value.toolTrainingPlan },
+  { name: 'draft_training_plan', detail: a.value.toolDraftPlan },
+  { name: 'publish_training_plan', detail: a.value.toolPublishPlan },
 ]);
 
-const mcpConfigExample = computed(() => `{
-  "mcpServers": {
-    "zeppbridge": {
-      "command": "${t.value.mcpConfigPathPlaceholder}",
-      "args": ["--scope", "task"]
-    }
-  }
-}`);
+/* 安装包附带了 zeppbridge-mcp 时，配置里直接填真实路径（由 McpConnectRow 读回）。 */
+const sidecar = ref<McpSidecar | null>(null);
+const mcpConfigExample = computed(() => genericMcpConfig(sidecar.value, t.value.mcpConfigPathPlaceholder));
 
 const mcpMessage = ref<string | null>(null);
 const copy = async (text: string, done: string, failed: string) => {
@@ -51,7 +55,11 @@ const copy = async (text: string, done: string, failed: string) => {
   }
 };
 const copyMcpPrompt = () => copy(t.value.mcpSetupPrompt, t.value.mcpPromptCopied, t.value.mcpPromptCopyFailed);
-const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied, t.value.mcpConfigCopyFailed);
+const copyMcpConfig = () => copy(
+  mcpConfigExample.value,
+  sidecar.value?.path ? a.value.configReady : t.value.mcpConfigCopied,
+  t.value.mcpConfigCopyFailed,
+);
 </script>
 
 <template>
@@ -66,7 +74,9 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
           <span class="s-row-title">{{ a.lead }}</span>
         </div>
       </div>
+      <McpConnectRow @sidecar="sidecar = $event" />
       <div class="s-row">
+        <span class="s-row-sub other-label">{{ a.otherClients }}</span>
         <div class="s-actions">
           <button class="button primary" type="button" @click="copyMcpPrompt">
             <Icon name="copy" :size="14" />{{ t.mcpCopyPrompt }}
@@ -85,6 +95,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
           <code v-for="tool in MCP_TOOLS" :key="tool.name" class="chip" :title="tool.detail">{{ tool.name }}</code>
         </div>
       </details>
+      <McpPublishRow />
       <McpTaskScopes />
     </div>
   </section>
@@ -96,6 +107,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
 .mcp-config { max-height: 220px; margin: 10px 0 0; padding: 12px 14px; overflow: auto; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.7; white-space: pre-wrap; }
 .mcp-config code { color: inherit; font-size: inherit; }
 .tools-label { margin: 12px 0 0; }
+.other-label { flex: none; }
 .mcp-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mcp-tools .chip { color: var(--ink); font-family: var(--font-mono); cursor: help; }
 </style>

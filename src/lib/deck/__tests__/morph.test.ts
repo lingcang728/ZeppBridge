@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardFrame, flightOffset, morphFrames, peekBox, shownRect, staggerOrder, unscaledBox } from '../morph';
+import { BLEED_EDGE, cardFrame, flightOffset, morphFrames, peekBox, shownRect, staggerOrder, unscaledBox } from '../morph';
 
 describe('staggerOrder', () => {
   it('leaves from the centre outwards, wrapping around the deck', () => {
@@ -70,9 +70,32 @@ describe('cardFrame / morphFrames', () => {
       card,
       26,
     );
-    expect(frames).toHaveLength(3);
     expect(frames.every((frame) => String(frame.clipPath).endsWith('round 26px)'))).toBe(true);
     expect(frames[1].offset).toBe(0.5);
+  });
+  const insets = (frame: Keyframe) =>
+    String(frame.clipPath).match(/inset\(([^)]*) round/)![1].split(' ').map((part) => Number.parseFloat(part));
+  it('never lets the clip run past the card on only some sides mid-morph (square corners when interrupted)', () => {
+    const frames = morphFrames(
+      { rect: { left: 150, top: 400, width: 760, height: 78 }, anchor: { x: 150, y: 400 } },
+      { rect: shownRect({ left: 80, top: 140, width: 900, height: 500 }, 1000), anchor: { x: 80, y: 140 } },
+      { left: 80, top: 140, width: 900, height: 500 },
+      26,
+    );
+    const last = frames[frames.length - 1]!;
+    expect(insets(last).every((value) => value < 0)).toBe(true);
+    for (const frame of frames.slice(0, -1)) expect(insets(frame).every((value) => value >= 0)).toBe(true);
+    expect(frames[frames.length - 2]!.offset).toBeCloseTo(1 - BLEED_EDGE);
+  });
+  it('a source taller than the opened card is clipped to the card, not past its bottom edge', () => {
+    const card = { left: 80, top: 140, width: 900, height: 205 };
+    const frames = morphFrames(
+      { rect: { left: 300, top: 160, width: 468, height: 296 }, anchor: { x: 300, y: 160 } },
+      { rect: card, anchor: { x: 80, y: 140 } },
+      card,
+      26,
+    );
+    for (const frame of frames) expect(insets(frame).every((value) => value >= 0)).toBe(true);
   });
 });
 

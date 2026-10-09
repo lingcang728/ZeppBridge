@@ -45,6 +45,15 @@
 .s-row.is-block { display: grid; align-items: stretch; }
 .s-note { margin: 0; padding: 0 4px; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 
+/* 从别的卡跳过来时落到的那一块：一圈品牌色的光亮起再慢慢退掉（只动阴影和底色，不动排版）。 */
+.s-flash { border-radius: var(--radius-md); animation: s-flash 1.8s var(--ease-out) .25s both; }
+@keyframes s-flash {
+  0% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+  18% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 24px -4px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 7%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .s-flash { animation-duration: .01s; } }
+
 /* 一格一格的信息（数据内容、覆盖账本）：凸起的小板，不是描边的平面磁贴。
    亮一点的底、顶边高光、底边暗线、柔和投影；没有数据的那一格反过来凹下去。 */
 .s-tile {

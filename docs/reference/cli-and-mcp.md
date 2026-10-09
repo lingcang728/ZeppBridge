@@ -194,6 +194,26 @@ Unknown tools and malformed call envelopes remain JSON-RPC errors.
 Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
 tool list happening to contain no write operations.
 
+### Connecting from the desktop app (Windows)
+
+The Windows installer and the portable build put `zeppbridge-mcp.exe` next to
+`ZeppBridge.exe`. **Settings › AI tools › Connect an AI tool** then fills in the
+real path for you:
+
+- **Claude Code** and **Codex** copy three commands: register the MCP server
+  (with `--scope task`), add this repository as a plugin marketplace, and
+  install the `zepp-coach` coaching skill. Paste them into a terminal. The
+  `--` separator is written as `"--"` because PowerShell swallows a bare `--`
+  before it reaches the npm-installed CLIs.
+- **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. The
+  extension starts the `zeppbridge-mcp.exe` installed next to the app, so it
+  updates together with ZeppBridge.
+
+When the app's library is not the `data` folder next to the executable, the
+generated configuration also sets `ZEPPBRIDGE_DATA_DIR`. Builds without the
+sidecar (development builds) disable these buttons; use the configuration
+below instead.
+
 ### Example configuration
 
 Most MCP clients read the same shape of configuration:
@@ -296,6 +316,11 @@ outside the grants — `error.permittedRanges` lists the actual
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream |
+| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect), days since the last workout, the active plan and life events |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, and the background the user wrote for AI |
+| `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
+| `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
+| `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
 
 `get_food_data` returns daily totals and available food-log details: names, descriptions,
 meal types, timestamps, reported weight, and nutrients (including fiber). Reported
@@ -350,4 +375,30 @@ and one write lock, so there is only ever one sync and one writer at a time. Whe
 the CLI cannot get either within its wait it exits with code 4 rather than
 racing the GUI.
 
-MCP's read-only queries take no write lock and can run during a sync.
+MCP's read-only queries take no write lock and can run during a sync. Drafting
+or publishing a training plan takes the write lock only for the moment it
+writes (waiting at most 5 seconds), never while it is on the network.
+
+### Training-plan tools (the only two that write)
+
+Health data stays read-only. From 3.0 MCP can draft and publish training plans:
+
+- `draft_training_plan` only saves a draft, using the same validation as the
+  desktop app's "paste the AI's reply" (only running, cycling, pool and open-water
+  swimming reach the watch; purpose and description are required; step syntax is
+  in the tool description). A plan that fails validation leaves no draft. The
+  draft shows up on the desktop "Send to AI" page for the user to confirm.
+- `publish_training_plan` refuses by default with
+  `err.training_plan.ai_publish_disabled`. It works only after the user turns on
+  "Allow AI to publish directly" in the desktop app's AI tools settings. Publishing
+  uses the same three steps as the desktop app: record in the ledger under the
+  write lock, release the lock while on the network, record the result under the
+  lock. A publish that would clear a 7-day window always returns
+  `err.training_plan.needs_clear_confirmation`; only the user can confirm a clear,
+  on the desktop.
+- `sent` only means the official API accepted the request (it answers success
+  to any body); the content was validated before sending. The watch still asks
+  for the sub-type before the workout starts.
+- All five coach tools (including `get_training_context`, `get_athlete_profile`
+  and `get_training_plan`) are refused under the `task` scope: they span
+  categories and dates and cannot be honestly clipped.

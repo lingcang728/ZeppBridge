@@ -12,9 +12,10 @@
 | 本地重解析 | ✓ | ✓ 启动时按修订号自动、设置里手动 | ✓ `reprocess` | — | — | 不适用 |
 | 数据导出（JSON / CSV / GPX / FIT） | ✓ | ✓ | ✓ `export` | — | — | 不适用 |
 | 交给 AI（单个 `.md` 任务包） | ✓ | ✓ | ✗ | 共享任务定义 task 范围 | — | 是它的来源 |
-| 只读查询：运动 / 指标 / 睡眠 / 饮食 / 生活事件 / 数据健康 | ✓ | ✓ 各页面 | `status` 只给概况 | ✓ 12 个工具 | 部分：`/health`、`/workouts/{id}/series` | 只管 MCP |
+| 只读查询：运动 / 指标 / 睡眠 / 饮食 / 生活事件 / 数据健康 | ✓ | ✓ 各页面 | `status` 只给概况 | ✓ 15 个工具 | 部分：`/health`、`/workouts/{id}/series` | 只管 MCP |
 | 备份、校验、排队恢复 | ✓ | ✓ | ✗ | — | — | 不适用 |
 | 生活事件记录 | ✓ | ✓ 读写 | ✗ | ✓ 只读（任务范围拒绝） | — | 拒绝 |
+| 训练计划起草 / 发到手表 | ✓ | ✓ 粘贴 AI 回复、周视图、单天精调 | ✗ | ✓ 起草；发布要用户打开「允许 AI 直接发布」 | — | 拒绝 |
 | 账号归属（一个库一个账号） | ✓ | ✓ | ✓ 同步前核对 | — | — | 不适用 |
 
 图例：✓ 已接通；✗ 没接、要用得去桌面；— 按设计不做。
@@ -30,6 +31,7 @@
 | `get_metric_series`、`get_metric_records`、`list_sleep_sessions`、`get_sleep_detail` | 裁到授权日期窗；排除的指标拒绝、排除的字段不出现；归不进任何类别的指标拒绝 |
 | `get_food_data` | 只给按天摄入合计（归身体类），不给逐条饮食 |
 | `list_available_metrics`、`list_life_events`、`get_data_health` | 整库视角，整体拒绝 |
+| `get_training_context`、`get_athlete_profile`、`get_training_plan`、`draft_training_plan`、`publish_training_plan` | 跨类别跨日期或训练计划账本，整体拒绝 |
 
 没选运动的任务（「最近 N 天」）窗口截止到今天，导出和 MCP 用同一个函数算（`ai_tasks::coverage::task_window`）。
 

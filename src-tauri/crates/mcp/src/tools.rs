@@ -105,10 +105,12 @@ pub(super) fn scope_denial(
     })
 }
 
-/// 工具执行期的失败出口。`denial` 非空表示范围拒绝（稳定码 + 授权窗口）。
+/// 工具执行期的失败出口。`denial` 非空表示范围拒绝（稳定码 + 授权窗口）；
+/// `code` 非空表示别的有稳定码的失败（训练计划工具），码进 `structuredContent.error`。
 pub(super) struct CallFailure {
     pub(super) message: String,
     pub(super) denial: Option<(&'static str, Value)>,
+    pub(super) code: Option<&'static str>,
 }
 
 impl CallFailure {
@@ -116,6 +118,7 @@ impl CallFailure {
         Self {
             message: message.into(),
             denial: None,
+            code: None,
         }
     }
 
@@ -123,8 +126,35 @@ impl CallFailure {
         Self {
             message: message.into(),
             denial: Some((access::SCOPE_DENIED, permitted_ranges)),
+            code: None,
         }
     }
+
+    pub(super) fn coded(code: &'static str, message: String) -> Self {
+        Self {
+            message,
+            denial: None,
+            code: Some(code),
+        }
+    }
+}
+
+/// 有稳定码的普通失败：码和原文都进 `structuredContent.error`，text 里也带码。
+pub(super) fn coded_error(
+    scope: &AccessScope,
+    grants: usize,
+    code: &'static str,
+    reason: String,
+) -> Value {
+    json!({
+        "content": [{"type":"text", "text": format!("{code}：{reason}")}],
+        "isError": true,
+        "scope": scope_json(scope, grants),
+        "structuredContent": {
+            "error": { "code": code, "reason": reason },
+            "scope": scope_json(scope, grants),
+        },
+    })
 }
 
 /// 工具调用 → 授权请求。每个注册工具都必须在这里有一行映射；
@@ -221,12 +251,34 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
                 .ok_or_else(|| "缺少 workoutId".to_string())?;
             request.workout_ids = vec![workout_id.to_string()];
         }
+        // 教练工具：跨类别、跨日期（或者是训练计划账本），task 范围裁不出诚实子集，整体拒绝。
+        "get_training_context"
+        | "get_athlete_profile"
+        | "get_training_plan"
+        | "draft_training_plan"
+        | "publish_training_plan" => {
+            request.tool = COACH_TOOLS
+                .iter()
+                .find(|tool| **tool == name)
+                .copied()
+                .unwrap_or_default();
+            request.whole_library = true;
+        }
         other => {
-            return Err(format!("没有名为 {other} 的工具。本服务只提供只读查询。"));
+            return Err(format!("没有名为 {other} 的工具。"));
         }
     }
     Ok(request)
 }
+
+/// 3B 的五个教练工具。
+pub(super) const COACH_TOOLS: [&str; 5] = [
+    "get_training_context",
+    "get_athlete_profile",
+    "get_training_plan",
+    "draft_training_plan",
+    "publish_training_plan",
+];
 
 /// `get_food_data` 按天合计的四个摄入指标。
 pub(super) const FOOD_METRICS: [&str; 4] = [
@@ -366,11 +418,12 @@ pub(super) fn execute_tool_with_db(
 
     let mut payload = match run_tool(name, &args, &db, database_bytes, scope, &permit) {
         Ok(payload) => payload,
-        Err(failure) => match failure.denial {
-            Some((code, ranges)) => {
+        Err(failure) => match (failure.denial, failure.code) {
+            (Some((code, ranges)), _) => {
                 return scope_denial(scope, grants.len(), code, failure.message, ranges);
             }
-            None => return tool_error(scope, grants.len(), failure.message),
+            (None, Some(code)) => return coded_error(scope, grants.len(), code, failure.message),
+            (None, None) => return tool_error(scope, grants.len(), failure.message),
         },
     };
 
@@ -416,8 +469,11 @@ pub(super) fn run_tool(
         "get_workout_detail" => run_workout_detail(db, args, scope, permit),
         "get_workout_series" => run_workout_series(db, args, scope, permit),
         "list_life_events" => run_life_events(db, args),
-        other => Err(CallFailure::plain(format!(
-            "没有名为 {other} 的工具。本服务只提供只读查询。"
-        ))),
+        "get_training_context" => run_training_context(db, args),
+        "get_athlete_profile" => run_athlete_profile(db),
+        "get_training_plan" => run_training_plan(db),
+        "draft_training_plan" => run_draft_plan(db, args),
+        "publish_training_plan" => run_publish_plan(db, args),
+        other => Err(CallFailure::plain(format!("没有名为 {other} 的工具。"))),
     }
 }

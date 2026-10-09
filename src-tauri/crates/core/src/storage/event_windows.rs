@@ -95,14 +95,6 @@ impl Database {
         Ok(())
     }
 
-    /// 库文件所在目录；内存库（测试）没有。
-    fn data_dir(&self) -> Option<std::path::PathBuf> {
-        self.conn
-            .path()
-            .filter(|path| !path.is_empty())
-            .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
-    }
-
     fn backup_before_consolidation(&self) -> Result<()> {
         // 内存库（测试）没有文件，也就没有什么可备份的。
         let Some(data_dir) = self.data_dir() else {

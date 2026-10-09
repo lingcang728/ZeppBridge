@@ -249,5 +249,6 @@ fn sleep_session_days_ago(id: &str, end_days_ago: i64) -> SleepSession {
 }
 
 mod browse;
+mod coach;
 mod protocol;
 mod scope;

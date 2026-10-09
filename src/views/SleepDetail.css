@@ -89,20 +89,9 @@
 .stage-head h2 { margin: 0; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
 .stage-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .stage-actions { display: flex; align-items: center; gap: 10px; }
-.stage-help-button {
-  border: 1px solid var(--mat-line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.stage-help-anchor { position: relative; display: inline-flex; }
+.stage-head { align-items: center; }
+.stage-head h2 { display: inline-flex; align-items: center; gap: 8px; }
 .stage-card { overflow: visible; }
-.stage-help { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(340px, calc(100vw - 48px)); padding: 12px 14px; border: 1px solid var(--line-control); border-radius: var(--radius-md); background: var(--mat-glass-strong); box-shadow: 0 14px 32px rgba(0,0,0,.28); color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none; transition: opacity 150ms ease, transform 150ms ease, visibility 150ms; }
-.stage-help-anchor:hover .stage-help, .stage-help-anchor:focus-within .stage-help { opacity: 1; visibility: visible; transform: translateY(0); }
-@media (prefers-reduced-motion: reduce) { .stage-help { transition: none; } }
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

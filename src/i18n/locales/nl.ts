@@ -1353,21 +1353,6 @@ export default {
       mcpPromptCopied:
         'Gekopieerd. Plak het bij je AI — die geeft de configuratiestappen voor jouw machine.',
       mcpPromptCopyFailed: 'Kopiëren mislukt — selecteer de tekst hierboven zelf.',
-      mcpSetupPrompt: `Ik gebruik een Windows-desktop-app genaamd ZeppBridge die gegevens van mijn Amazfit- / Zepp-horloge naar een lokale SQLite-database synchroniseert.
-Er wordt een MCP-programma meegeleverd (zeppbridge-mcp) dat ik bij jou wil configureren, zodat je mijn trainingen en gezondheidsgegevens direct kunt bevragen in plaats van dat ik telkens exporteer en plak.
-
-Wat ik ervan weet:
-- Het MCP-programma komt uit het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; na uitpakken zit zeppbridge-mcp erin. Mogelijk heb ik het nog niet gedownload.
-- Het is een stdio-MCP-server: leest alleen de lokale database, gebruikt geen netwerk, luistert op geen poort en heeft geen token of API-key nodig.
-- De gebruikelijke configvorm: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het biedt twaalf alleen-lezen-tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events) en gegevensstatus (get_data_health).
-
-Vertel me:
-1. Voor jou specifiek — de tool waarmee ik nu praat — naar welk bestand de config gaat, of met welk commando ik hem toevoeg;
-2. Hoe ik een Windows-pad schrijf (moeten backslashes worden ge-escaped);
-3. Hoe ik na het configureren controleer dat het werkt.
-
-Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraag het gewoon.`,
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
       mcpToolWorkoutDetail: "Alle opgeslagen samenvattingsvelden en hartslagzones van één training",
       mcpToolWorkoutSeries: "Meetpunten, route, splits en ronden van één training",
@@ -1899,7 +1884,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       trainingPanelAria: 'Trainingsstatus openen',
       trainingTitle: 'Trainingsstatus',
       factLoad: 'Belasting',
-      trainingSparkLabel: 'Trainingsbelasting over de afgelopen 7 dagen',
       trainingThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       trainingEmpty:
         'VO₂max en trainingsbelasting verschijnen hier na een synchronisatie',
@@ -1956,9 +1940,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       scoreKicker: 'Slaapscore',
       stagesAria: 'Slaapstadia',
       stagesTitle: 'Slaapstadia',
-      stageHelpButton: 'Wat de stadia betekenen',
-      stageHelp:
-        'Diep: de herstellende fase. Licht: het overgangsstadium dat het grootste deel van de nacht inneemt. REM: rapid eye movement, verbonden met geheugen en dromen. Wakker: wakker worden of in de nacht wakker liggen. Dit zijn definities, geen gezondheidsdiagnose.',
       weeklyAria: 'Slaap over de afgelopen 7 dagen',
       weeklyTitle: 'Slaapstructuur, afgelopen 7 dagen',
       weeklySub: 'Stadia gestapeld per nacht',
@@ -3064,7 +3045,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'views/settings/sections/display': {
       focusTitle: 'Mijn focus',
-      focusSub: 'Het overzicht toont deze blokken eerst en vouwt de rest onder ‘Alles tonen’; kies niets om alles bij het oude te laten',
     },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',

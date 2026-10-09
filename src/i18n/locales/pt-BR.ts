@@ -1253,7 +1253,6 @@ export default {
       trainingPanelAria: 'Abrir estado de treino',
       trainingTitle: 'Estado de treino',
       factLoad: 'Carga',
-      trainingSparkLabel: 'Carga de treino nos últimos 7 dias',
       trainingThin: 'Registros insuficientes nos últimos 7 dias para traçar a tendência',
       trainingEmpty: 'VO₂max e carga de treino aparecerão aqui após a sincronização',
       focusQuestion: 'No que você quer focar?',
@@ -1306,8 +1305,6 @@ export default {
       scoreKicker: 'Pontuação do sono',
       stagesAria: 'Estágios de sono',
       stagesTitle: 'Estágios de sono',
-      stageHelpButton: 'Significado dos estágios',
-      stageHelp: 'Profundo: estágio restaurador físico. Leve: transição que compõe a maior parte da noite. REM: consolidação de memória e atividade onírica. Acordado: despertares breves durante a noite. Definições informativas, sem caráter diagnóstico.',
       weeklyAria: 'Sono nos últimos 7 dias',
       weeklyTitle: 'Estrutura do sono (últimos 7 dias)',
       weeklySub: 'Estágios empilhados por noite',
@@ -1708,7 +1705,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       mcpToolMetricRecords: "Leituras individuais de qualquer métrica",
       mcpToolSleepSessions: "Lista de sessões de sono",
       mcpToolLifeEvents: "Eventos de vida que você registrou",
-      mcpSetupPrompt: 'Uso um app de desktop para Windows chamado ZeppBridge, que sincroniza os dados do meu relógio Amazfit / Zepp para um banco SQLite local.\r\nEle traz um programa MCP (zeppbridge-mcp) que quero configurar em você, para consultar meus treinos e dados de saúde direto, sem exportar e colar toda vez.\r\n\r\nO que sei:\r\n- O programa MCP vem no pacote zeppbridge-tools da página de Releases do ZeppBridge no GitHub; ao descompactar, o executável zeppbridge-mcp está dentro. Talvez eu ainda não tenha baixado.\r\n- É um MCP server do tipo stdio: só lê o banco local, sem rede, sem porta aberta, sem token nem API key.\r\n- Formato típico de configuração: {"mcpServers": {"zeppbridge": {"command": "<caminho completo do zeppbridge-mcp>", "args": ["--scope", "task"]}}}\r\n- Doze ferramentas somente leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), eventos de vida (list_life_events) e saúde dos dados (get_data_health).\r\n\r\nMe diga:\r\n1. Para você, a ferramenta que estou usando agora, em qual arquivo vai a configuração ou qual comando a adiciona;\r\n2. Como escrever caminhos do Windows (as barras invertidas precisam de escape?);\r\n3. Como verificar se funcionou depois de configurar.\r\nSe precisar de algo meu (qual cliente uso, onde fica o arquivo), pergunte direto.',
       mcpConfigPathPlaceholder: '<caminho do zeppbridge-mcp>',
       retentionAria: 'Retenção de dados locais em dias',
       retentionCutoff: (date: string) => `Na próxima sincronização bem-sucedida, dados anteriores a ${date} serão excluídos`,
@@ -2797,7 +2793,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
 
     'views/settings/sections/display': {
       focusTitle: 'Meus focos',
-      focusSub: 'A Visão geral mostra esses blocos primeiro e agrupa o restante em "Ver tudo"; se não selecionar nenhum, fica como está',
     },
 
     'views/settings/sections/privacy': {

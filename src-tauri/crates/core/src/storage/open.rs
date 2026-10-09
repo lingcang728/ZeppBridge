@@ -260,6 +260,16 @@ impl Database {
         Ok(Self::from_conn(conn))
     }
 
+    /// 这条连接打开的库文件所在的数据目录；内存库是 `None`。
+    ///
+    /// 只读进程里偶尔要做一次短写入（MCP 起草训练计划），要靠它找到同一个目录的写锁。
+    pub fn data_dir(&self) -> Option<PathBuf> {
+        let file = self.conn.path().filter(|path| !path.is_empty())?;
+        std::path::Path::new(file)
+            .parent()
+            .map(std::path::Path::to_path_buf)
+    }
+
     /// 这条连接是不是只读的（`query_only`）。
     pub fn is_query_only(&self) -> bool {
         self.conn

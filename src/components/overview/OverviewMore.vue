@@ -8,15 +8,12 @@
 import WeeklyReportCard from '../WeeklyReportCard.vue';
 import LifeEventsPanel from '../LifeEventsPanel.vue';
 import SourcesStrip from './SourcesStrip.vue';
-import StatusEntryCard from './StatusEntryCard.vue';
+import StatusEntryCard, { type EntryFact } from './StatusEntryCard.vue';
 
 type Entry = {
-  facts: { key: string; label: string; text: string }[];
-  /** 7 天趋势：只有训练卡还画；身体卡只列最新值。 */
-  spark?: number[];
-  sparkColor?: string;
-  sparkLabel?: string;
-  /** 没有事实可列（或线画不出来）时的一句说明；有数时可以是 null。 */
+  /** 每一项带自己的最新值和近 7 天形状。 */
+  facts: EntryFact[];
+  /** 小线画的是哪段时间，或没有数据时的一句说明。 */
   caption: string | null;
 };
 withDefaults(defineProps<{
@@ -38,7 +35,7 @@ withDefaults(defineProps<{
       <StatusEntryCard to="/body" tone="body" icon="recovery" :aria-label="bodyAria" :title="bodyTitle"
         :facts="body.facts" :caption="body.caption" />
       <StatusEntryCard to="/training" tone="training" icon="training-load" :aria-label="trainingAria" :title="trainingTitle"
-        :facts="training.facts" :spark="training.spark" :spark-color="training.sparkColor" :spark-label="training.sparkLabel" :caption="training.caption" />
+        :facts="training.facts" :caption="training.caption" />
     </div>
     <!-- 「添加事件」只留生活事件卡右上角那一枚：以前卡片上面还挂着一排快捷胶囊，两个按钮做同一件事。 -->
     <LifeEventsPanel />

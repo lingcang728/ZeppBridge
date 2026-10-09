@@ -4,15 +4,15 @@ import { defineMessages } from '../../../i18n';
 export const displayCardMessages = defineMessages(
   {
     focusTitle: '我关注',
-    focusSub: '概览先摆这几块，其余收进「查看全部」；都不选就是原样',
+    focusSlideSub: '概览先摆这一块，其余收进「查看全部」；停在「均衡」就是原样',
   },
   {
     focusTitle: 'I care about',
-    focusSub: 'Overview puts these first and folds the rest under “Show all”; pick none to keep it as is',
+    focusSlideSub: 'Overview puts this block first and folds the rest under “Show all”; “Balanced” keeps it as is',
   },
   {
     focusTitle: 'Me interesa',
-    focusSub: 'El resumen muestra primero estos bloques y agrupa el resto en «Mostrar todo»; sin elegir ninguno queda igual',
+    focusSlideSub: 'El resumen muestra primero este bloque y agrupa el resto en «Mostrar todo»; «Equilibrado» lo deja igual',
   },
   'views/settings/sections/display',
 );

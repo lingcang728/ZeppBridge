@@ -11,7 +11,10 @@
  *
  * 位置是一个连续的浮点下标 `pos`，所有项的形变都由它算出来，拖动和吸附动画
  * 只改这一个数；选中值在动画停稳以后才提交——切语言会重绘整页，放在动画
- * 中途提交会让滚轮卡一下。 */
+ * 中途提交会让滚轮卡一下。
+ *
+ * 根上带 data-ash-skip：换语言的「化灰」按文字的外接框把字平着画出来，而这里的字是沿圆柱侧转的，
+ * 平着画出来的灰和蒙在新字上的那层糊底都和真字错开一截——设置页语言轮换语言时的「残影」。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
@@ -394,6 +397,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     :style="vertical ? { height: `${span}px` } : { width: `${liveSpan}px` }"
     role="slider"
     tabindex="0"
+    data-ash-skip
     :aria-label="ariaLabel"
     :aria-valuemin="0"
     :aria-valuemax="items.length - 1"

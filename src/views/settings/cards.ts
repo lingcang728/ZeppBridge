@@ -1,8 +1,9 @@
 import type { DesignIconName } from '../../components/DesignIcon.vue';
 import type { GlyphTone } from '../../lib/glyphs';
 
-/** 设置卡叠里的八张卡，按总览里从上到下的顺序。id 也是路由 /settings/:card 的那一段。 */
-export const SETTINGS_CARD_IDS = ['account', 'sync', 'archive', 'data', 'ai', 'display', 'privacy', 'advanced'] as const;
+/** 设置卡叠里的九张卡，按总览里从上到下的顺序。id 也是路由 /settings/:card 的那一段。
+    「反馈问题」单独成卡（以前藏在高级卡底部）：想让遇到问题的人一眼找得到。 */
+export const SETTINGS_CARD_IDS = ['account', 'sync', 'archive', 'data', 'ai', 'display', 'feedback', 'privacy', 'advanced'] as const;
 export type SettingsCardId = (typeof SETTINGS_CARD_IDS)[number];
 
 export const SETTINGS_CARD_ICONS: Record<SettingsCardId, DesignIconName> = {
@@ -12,8 +13,9 @@ export const SETTINGS_CARD_ICONS: Record<SettingsCardId, DesignIconName> = {
   data: 'structured-data',
   ai: 'handoff',
   display: 'overview',
+  feedback: 'manual-entry',
   privacy: 'secure',
-  advanced: 'settings',
+  advanced: 'maintenance',
 };
 
 /** 每张卡一个颜色：叠在一起时像钱包里颜色不同的卡，一眼分得开。 */
@@ -24,6 +26,7 @@ export const SETTINGS_CARD_TONES: Record<SettingsCardId, GlyphTone> = {
   data: 'activity',
   ai: 'accent',
   display: 'altitude',
+  feedback: 'calories',
   privacy: 'heart',
   advanced: 'neutral',
 };

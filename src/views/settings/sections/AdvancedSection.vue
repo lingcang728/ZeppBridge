@@ -5,7 +5,6 @@ import { RouterLink, useRoute } from 'vue-router';
 import BackupPanel from '../../../components/BackupPanel.vue';
 import Icon from '../../../components/Icon.vue';
 import AuthSection from './AuthSection.vue';
-import FeedbackSection from './FeedbackSection.vue';
 import LocalApiPanel from './LocalApiPanel.vue';
 import MaintenanceSection from './MaintenanceSection.vue';
 import MorePrefsSection from './MorePrefsSection.vue';
@@ -70,7 +69,16 @@ const route = useRoute();
 onActivated(() => {
   const id = route.hash.slice(1);
   if (!id) return;
-  window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 360);
+  window.setTimeout(() => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 落到哪一块就让那一块亮一下：从别的卡「去设置」过来，一眼看得出该改的是哪儿。
+    target.classList.remove('s-flash');
+    void target.offsetWidth;
+    target.classList.add('s-flash');
+    target.addEventListener('animationend', () => target.classList.remove('s-flash'), { once: true });
+  }, 360);
 });
 
 const openDataFolder = async () => {
@@ -143,8 +151,6 @@ const openDataFolder = async () => {
       <p class="s-note">{{ t.localApiNote }}</p>
       <LocalApiPanel />
     </section>
-
-    <FeedbackSection />
 
     <details class="s-list diag-fold">
       <summary class="s-row">

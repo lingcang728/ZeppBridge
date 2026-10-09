@@ -367,6 +367,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # zeppbridge-mcp 作为 sidecar 随安装包放到 exe 旁边（3B 打包决定），设置卡据此
+      # 给出带真实路径的连接命令。externalBin 只在打包时用 --config 叠上，见
+      # scripts/release/stage-mcp-sidecar.ps1。
+      - name: Stage MCP sidecar
+        shell: pwsh
+        run: ./scripts/release/stage-mcp-sidecar.ps1
+
       - name: Build and bundle (NSIS + MSI)
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
         #
@@ -388,7 +395,7 @@ jobs:
           $attempts = 3
           for ($i = 1; $i -le $attempts; $i++) {
             Write-Host "== tauri build attempt $i/$attempts =="
-            npm run tauri build
+            npm run tauri build -- --config src-tauri/tauri.sidecar.conf.json
             if ($LASTEXITCODE -eq 0) { exit 0 }
             if ($i -lt $attempts) {
               Write-Host "attempt $i failed (exit $LASTEXITCODE); retrying in 20s"

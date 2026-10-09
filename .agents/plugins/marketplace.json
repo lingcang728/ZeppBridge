@@ -1,0 +1,20 @@
+{
+  "name": "zeppbridge",
+  "interface": {
+    "displayName": "ZeppBridge"
+  },
+  "plugins": [
+    {
+      "name": "zepp-coach",
+      "source": {
+        "source": "local",
+        "path": "./packaging/ai-plugins/zepp-coach"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

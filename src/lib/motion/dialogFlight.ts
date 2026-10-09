@@ -72,9 +72,41 @@ export const flightTransform = (from: { left: number; top: number; width: number
   return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${scale.toFixed(3)})`;
 };
 
+/** 面板此刻（带着动画的 transform）看起来的那个框 → 让摆在 `panel` 的新面板看起来一模一样的 transform。不夹缩放上下限。 */
+export const matchTransform = (seen: { left: number; top: number; width: number; height: number },
+  panel: { left: number; top: number; width: number; height: number }): string => {
+  const dx = seen.left + seen.width / 2 - (panel.left + panel.width / 2);
+  const dy = seen.top + seen.height / 2 - (panel.top + panel.height / 2);
+  const scale = Math.max(0.05, seen.width / Math.max(1, panel.width));
+  return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+};
+
 /** 面板里要淡入淡出的两层（毛玻璃底和内容）；面板自己不淡。 */
 const layers = (panel: HTMLElement): HTMLElement[] =>
   Array.from(panel.querySelectorAll<HTMLElement>(':scope > .dialog-glass, :scope > .dialog-scroll'));
+
+/* 正在收起的那段画面（ghost）。收到一半又点开（快速开关、连着点两件事）：新弹窗从它此刻的样子接着长，
+   而不是遮罩叠两层（一层在淡出、一层在淡入，中间暗度掉一截再回来）、面板从按钮重新长一遍，
+   还被后挂到 body 上的 ghost 盖在底下。 */
+let ghost: HTMLElement | null = null;
+interface Handoff { veil: number; seen: DOMRect; glass: number; text: number }
+const takeGhost = (): Handoff | null => {
+  const node = ghost;
+  ghost = null;
+  if (!node?.isConnected) return null;
+  const panel = node.querySelector<HTMLElement>(':scope > .dialog-panel');
+  const parts = panel ? layers(panel) : [];
+  const opacityOf = (cls: string) => Number(getComputedStyle(parts.find((p) => p.classList.contains(cls)) ?? node).opacity) || 0;
+  const handoff = panel ? {
+    veil: Number(getComputedStyle(node, '::before').opacity) || 0,
+    seen: panel.getBoundingClientRect(),
+    glass: opacityOf('dialog-glass'),
+    text: opacityOf('dialog-scroll'),
+  } : null;
+  for (const animation of node.getAnimations({ subtree: true })) animation.cancel();
+  node.remove();
+  return handoff;
+};
 
 /** 正在等「画面跟得上」的那一次打开：关得比它早就别再开了。 */
 const pending = new WeakSet<HTMLElement>();
@@ -84,7 +116,24 @@ const forgetEscape = (backdrop: HTMLElement) => { escapes.get(backdrop)?.(); esc
 
 /** `onEscape`：开到一半按 Esc 时调用（弹窗据此关掉自己，关的动画从此刻原路收回）。 */
 const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) => {
-  if (reducedMotion()) return;
+  if (reducedMotion()) { ghost?.remove(); ghost = null; return; }
+  const handoff = takeGhost();
+  if (handoff) {
+    // 接着收起的那一刻往回长：画面刚刚还在动，不用再等它跟上。
+    if (onEscape) escapes.set(backdrop, onMotionEscape(() => { forgetEscape(backdrop); onEscape(); return true; }));
+    const fill = 'backwards' as const;
+    const rest = Math.max(0.25, 1 - Math.min(handoff.veil, handoff.glass));
+    backdrop.animate([{ opacity: Math.max(NEARLY_HIDDEN, handoff.veil) }, { opacity: 1 }], { duration: VEIL_IN_MS * rest, easing: 'ease-out', fill, pseudoElement: '::before' });
+    for (const layer of layers(panel)) {
+      const from = layer.classList.contains('dialog-scroll') ? handoff.text : handoff.glass;
+      layer.animate([{ opacity: Math.max(NEARLY_HIDDEN, from) }, { opacity: 1 }], { duration: OPEN_MS * rest, easing: 'ease-out', fill });
+    }
+    const flight = panel.animate([{ transform: matchTransform(handoff.seen, panel.getBoundingClientRect()) }, { transform: 'none' }],
+      { duration: OPEN_MS * rest, easing: OPEN_EASE, fill });
+    const done = () => forgetEscape(backdrop);
+    flight.finished.then(done, done);
+    return;
+  }
   backdrop.classList.add('is-entering');
   pending.add(backdrop);
   if (onEscape) escapes.set(backdrop, onMotionEscape(() => { forgetEscape(backdrop); onEscape(); return true; }));
@@ -146,7 +195,9 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
     ? [{ opacity: partsNow[index] }, { opacity: 0, offset: 0.3 }, { opacity: 0 }]
     : [{ opacity: partsNow[index] }, { opacity: partsNow[index], offset: 0.6 }, { opacity: 0 }], { ...timing, easing: 'ease-in' })));
   const fade = exemptFromSettle(backdrop.animate([{ opacity: veilNow }, { opacity: 0 }], { ...timing, easing: 'ease-in', pseudoElement: '::before' }));
-  const remove = () => backdrop.remove();
+  ghost?.remove();
+  ghost = backdrop;
+  const remove = () => { backdrop.remove(); if (ghost === backdrop) ghost = null; };
   fade.finished.then(remove, remove);
   fade.addEventListener('cancel', remove);
 };

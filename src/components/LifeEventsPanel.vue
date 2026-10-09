@@ -41,7 +41,7 @@ onActivated(reload);
 <template>
   <section id="life-events" :class="['life-events', { 'is-empty': empty }]" aria-labelledby="life-events-title">
     <header class="le-head">
-      <span v-if="empty" class="le-empty-mark" aria-hidden="true"><Icon name="pin" :size="18" /></span>
+      <span v-if="empty" class="le-empty-mark" aria-hidden="true"><Icon name="timeline-flag" :size="18" /></span>
       <div>
         <h2 id="life-events-title">{{ t.title }}</h2>
         <p>{{ empty ? t.empty : t.intro }}</p>

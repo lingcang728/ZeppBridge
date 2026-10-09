@@ -75,7 +75,7 @@ ZeppBridge 命令行与 MCP 工具 v$version（$platform）
 
 包含
   zeppbridge-cli$exeSuffix   无交互命令行：status / sync / export / contract
-  zeppbridge-mcp$exeSuffix   MCP stdio 服务，只读
+  zeppbridge-mcp$exeSuffix   MCP stdio 服务
 
 前提
   这两个程序读的是 ZeppBridge 桌面应用的本机数据库。请先安装桌面应用、
@@ -109,8 +109,8 @@ zeppbridge-mcp
   stdio 传输，不监听任何端口。配置示例见 mcp-config-example.json，
   把 <解压目录> 换成实际路径即可。
 
-  工具：list_workouts、get_workout_insight、get_metric_series、
-  get_sleep_detail、get_data_health。全部只读。
+  工具清单见 docs/reference/cli-and-mcp.md。读数据的工具全部只读；
+  发布训练计划要先在桌面应用里打开「允许 AI 直接发布」。
 
 隐私
   两个程序都只读写本机数据目录，不上传任何数据，不返回 token、Cookie

@@ -49,7 +49,10 @@ pub(super) fn server_info() -> Value {
 /// 在看全库，还是只看得到任务授权的那一小块。
 pub(super) fn instructions(scope: &AccessScope) -> String {
     let scope_note = match scope {
-        AccessScope::FullReadOnly => "full-readonly：本机全部健康数据的只读视图。",
+        AccessScope::FullReadOnly => {
+            "full-readonly：本机全部健康数据的只读视图。唯一会写库的是训练计划：\r
+             draft_training_plan 只存草稿，publish_training_plan 要用户在设置里打开「允许 AI 直接发布」才放行。"
+        }
         AccessScope::TaskScoped => {
             "task：只看得到桌面端标为「开放给 MCP」的任务所授权的运动与日期窗口内的数据；\
              范围外的调用会以 err.mcp.scope_denied / err.mcp.scope_no_grants 拒绝，\
@@ -57,7 +60,7 @@ pub(super) fn instructions(scope: &AccessScope) -> String {
         }
     };
     format!(
-        "ZeppBridge 只读健康数据。{}\n时间：{}\n缺失值：{}\n来源：{}\n范围：{scope_note}",
+        "ZeppBridge 健康数据（只读）与训练计划。{}\n时间：{}\n缺失值：{}\n来源：{}\n范围：{scope_note}",
         contract::PRIVACY_NOTE,
         contract::TIME_CONVENTION,
         contract::MISSING_VALUE_CONVENTION,

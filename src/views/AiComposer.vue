@@ -6,7 +6,7 @@
  *   中：一条竖线上的门锁（这次交给哪个 AI、就绪度），锁散出去的思维树牵着每一张牌
  *   右：一张牌——问题 → 回执（交出去的 .md）→ 计划（一张牌的一生，见 FutureCard）
  *
- * 点锁：牌抖两下，沿各自那根线飞进锁（同时后端准备文件），回执牌从锁里长出来落到右边，落定后复制开场白、打开网站
+ * 按住锁蓄满一圈：牌抖两下，沿各自那根线飞进锁（同时后端准备文件），回执牌从锁里长出来落到右边，落定后复制开场白、打开网站
  * （useStageSend）。细节都在下一层：点一张牌 = 翻到背面改回溯天数（二级）→「挑具体日子」= 牌桌从这张牌发牌（三级）；
  * 锁下的小字 → 寄出前检查；计划牌 → 周视图；任务名 → 已保存的任务；「往返 N 次」→ 往返记录。全部从被点处长出、缩回。
  * 原来的柱状条带、底栏、「你的过去」二级页都没有了。
@@ -109,8 +109,6 @@ const adding = ref(false);
 const profile = ref(false);
 const drag = useCloudDrag({
   slotOf: (id) => slots.get(id) ?? null,
-  restOf,
-  bounds: () => ({ ...zone.value, cardW: cloud.value.width, cardH: cloud.value.height }),
   canFlick: (id) => cards.value.find((c) => c.id === id)?.kind === 'data',
   onTap: (id) => open(id),
   onFlick: (id) => {
@@ -118,6 +116,8 @@ const drag = useCloudDrag({
     if (card?.category) ctl.setCategoryEnabled(card.category, false);
   },
   onLand: (id, dx, dy) => physics.nudge(id, dx, dy),
+  grabAt: (id) => physics.shiftOf(id),
+  onTake: (id) => physics.take(id),
 });
 /* 牌和牌之间的「力」（10-08 H16）：拖着一张靠近别的牌，别的牌被挤开；松手各自弹回，线跟着轻轻晃。 */
 const physics = useCloudPhysics({
@@ -125,8 +125,23 @@ const physics = useCloudPhysics({
   offsetOf: (id) => drag.offsetOf(id),
   live: () => drag.live.value,
   card: () => ({ width: cloud.value.width, height: cloud.value.height }),
+  bounds: () => zone.value,
 });
 watch(() => drag.live.value, () => physics.kick());
+/**
+ * 拖着一张牌时（10-09，用户：视觉焦点要始终在手里这张牌上）：舞台其余部分压一层高斯模糊，被挤开的牌在模糊底下让位；
+ * 手里这张浮在最上面。松手以后模糊和层级都留到弹回落定（牌从很远弹回来时，视线还在它身上），再一起退。
+ */
+const holdingCard = computed(() => !!drag.live.value);
+const focusing = ref(false);
+const lifted = ref(false);
+let liftTimer = 0;
+watch(holdingCard, (on) => {
+  window.clearTimeout(liftTimer);
+  if (on) { focusing.value = true; lifted.value = true; }
+  else liftTimer = window.setTimeout(() => { focusing.value = false; lifted.value = false; }, 720);
+});
+onBeforeUnmount(() => window.clearTimeout(liftTimer));
 const open = (id: string) => {
   if (send.gathering.value) return;
   const card = cards.value.find((c) => c.id === id);
@@ -134,23 +149,31 @@ const open = (id: string) => {
   if (card.kind === 'profile') profile.value = true;
   else backCard.value = card;
 };
-/* 牌的多少变了（甩掉一张、加回一类、换任务）：重新撒一遍，旧牌用 FLIP 弹簧挪到新位置，新牌淡入——不瞬移。 */
-watch(() => cards.value.map((c) => c.id).join('|'), async () => {
+/**
+ * 重新撒一遍：拖过的位置作废，旧牌用 FLIP 弹簧挪到新位置，新牌淡入——不瞬移。
+ * `stagger`：一张接一张出发（一键复原：一把牌依次落回原位，看得出是「收拾好了」）。
+ */
+const reflow = async (stagger = 0) => {
   const before = new Map([...slots].map(([id, el]) => [id, el.getBoundingClientRect()]));
   drag.resetOffsets();
   physics.reset();
   await nextTick();
   if (reducedMotion()) return;
   const { easing, duration } = springCurve(SPRINGS.settle);
+  let i = 0;
   for (const [id, el] of slots) {
     const was = before.get(id);
     const now = el.getBoundingClientRect();
     if (!was) { el.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'ease-out' }); continue; }
     const dx = was.left - now.left, dy = was.top - now.top;
     if (Math.abs(dx) + Math.abs(dy) < 1) continue;
-    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration, easing });
+    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration, easing, delay: stagger * i, fill: 'backwards' });
+    i += 1;
   }
-}, { flush: 'pre' });
+};
+/* 牌的多少变了（甩掉一张、加回一类、换任务）。 */
+watch(() => cards.value.map((c) => c.id).join('|'), () => reflow(), { flush: 'pre' });
+const resetCards = () => { if (!drag.dragging() && !send.gathering.value) void reflow(45); };
 /** 牌此刻的位置（含拖动偏移、被挤开的位移）：线从这里接出去。`stay` 是本来停的位置（不含被挤开），线分组只看它。 */
 const placed = computed(() => cards.value.map((card) => {
   const rest = restOf(card.id) ?? { x: 0, y: 0 };
@@ -286,12 +309,13 @@ onDeactivated(() => { paused.value = true; });
       <Transition name="undo-fade"><GraphUndoPill v-if="ctl.canUndo.value" class="undo-selection" :can-undo="ctl.canUndo.value" :label="t.undo" @undo="ctl.undo()" /></Transition>
     </header>
 
-    <div ref="stage" :class="['stage', layout.mode, { paused, gathering: send.gathering.value }]" :style="{ height: `${layout.height}px` }" :aria-label="s.stage">
+    <div ref="stage" :class="['stage', layout.mode, { paused, gathering: send.gathering.value, focusing, lifted }]" :style="{ height: `${layout.height}px` }" :aria-label="s.stage">
       <div class="spine" :style="layout.mode === 'row' ? { left: `${layout.lock.x}px` } : { top: `${layout.lock.y}px` }" aria-hidden="true"></div>
       <ThreadField :tree="tree" :width="layout.width" :height="layout.height" :lit="lit" :reeled="reeled" :order="order" :active="drag.live.value?.id ?? null" />
 
       <ul class="cloud" :style="{ '--card-w': `${cloud.width}px` }" :aria-label="t.past">
-        <li v-for="(p, i) in placed" :key="p.card.id" :ref="(el) => setSlot(p.card.id, el)" class="slot"
+        <li class="focus-veil" aria-hidden="true"></li>
+        <li v-for="(p, i) in placed" :key="p.card.id" :ref="(el) => setSlot(p.card.id, el)" :class="['slot', { top: drag.lastId.value === p.card.id }]"
           :style="{ left: `${p.rest.x}px`, top: `${p.rest.y}px`, translate: `${p.x - p.rest.x}px ${p.y - p.rest.y}px`, '--rot': `${p.rot}deg`, '--i': i }">
           <button type="button" class="slot-button" :aria-label="`${p.card.title} · ${p.card.line}`" @pointerdown="drag.onDown($event, p.card.id)" @keydown.enter.prevent="open(p.card.id)" @keydown.space.prevent="open(p.card.id)">
             <StageCard :card="p.card" />
@@ -299,10 +323,15 @@ onDeactivated(() => { paused.value = true; });
         </li>
       </ul>
       <!-- 「加一类」和一类都不剩时的那句提示排在同一行（10-08 H21：以前提示固定在 40% 高处，和牌、胶囊叠在一起）。 -->
-      <div v-if="off.length || cards.length <= 1" class="add-row" :style="{ left: `${zone.x}px`, top: `${addTop}px`, maxWidth: `${zone.width}px` }">
+      <div v-if="off.length || cards.length <= 1 || drag.moved.value" class="add-row" :style="{ left: `${zone.x}px`, top: `${addTop}px`, maxWidth: `${zone.width}px` }">
         <button v-if="off.length" type="button" class="add-kind" @click="adding = true">
           <Icon name="plus" :size="14" />{{ s.add }}
         </button>
+        <Transition name="undo-fade">
+          <button v-if="drag.moved.value" type="button" class="add-kind" :disabled="send.gathering.value" @click="resetCards">
+            <Icon name="refresh" :size="14" />{{ s.resetCards }}
+          </button>
+        </Transition>
         <p v-if="cards.length <= 1" class="cloud-empty">{{ s.nothing }}</p>
       </div>
 

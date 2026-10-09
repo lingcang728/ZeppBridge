@@ -122,6 +122,8 @@ const messages = defineMessages(
     'err.export.empty_range': '这段时间没有可导出的记录',
     'err.export.convert_failed': '转换导出格式失败',
     'err.export.write_failed': '写入导出文件失败',
+    'err.mcp.sidecar_missing': '这个版本没有附带 MCP 程序，到 GitHub 下载 zeppbridge-tools',
+    'err.mcp.bundle_failed': '生成 Claude Desktop 扩展包失败',
     'err.export.path_required': '先选择保存位置',
     'err.export.path_not_absolute': '保存位置必须是绝对路径',
     'err.export.not_a_directory': 'FIT 导出需要一个目录，这里选中的是文件',
@@ -184,6 +186,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': '这份计划草稿已经发过或丢掉了',
     'err.training_plan.publish_not_found': '找不到这次推送的记录',
     'err.training_plan.rejected': 'Zepp 没有接受这份计划，手表上的计划没有变',
+    'err.training_plan.format': '训练计划的结构不对，没有保存',
+    'err.training_plan.invalid': '这份计划没通过校验，没有发送',
+    'err.training_plan.ai_publish_disabled': '没有允许 AI 直接发布训练计划',
+    'err.training_plan.needs_clear_confirmation': '这次发布会清空手表上的一段计划，需要你在 ZeppBridge 里确认',
   },
   {
     /* —— core —— */
@@ -305,6 +311,8 @@ const messages = defineMessages(
     'err.export.empty_range': 'No records in this range to export',
     'err.export.convert_failed': "Could not convert to the requested format",
     'err.export.write_failed': "Could not write the export file",
+    'err.mcp.sidecar_missing': 'This build does not include the MCP program; download zeppbridge-tools from GitHub',
+    'err.mcp.bundle_failed': 'Could not create the Claude Desktop extension',
     'err.export.path_required': 'Pick a save location first',
     'err.export.path_not_absolute': 'Save location must be an absolute path',
     'err.export.not_a_directory':
@@ -370,6 +378,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': 'This plan draft was already sent or discarded',
     'err.training_plan.publish_not_found': 'No record of that push',
     'err.training_plan.rejected': 'Zepp did not accept this plan; the plan on your watch is unchanged',
+    'err.training_plan.format': 'The training plan is malformed and was not saved',
+    'err.training_plan.invalid': 'This plan did not pass validation and was not sent',
+    'err.training_plan.ai_publish_disabled': 'AI is not allowed to publish training plans directly',
+    'err.training_plan.needs_clear_confirmation': 'This would clear part of the plan on your watch; confirm it in ZeppBridge',
   },
   {
     /* —— core —— */
@@ -492,6 +504,8 @@ const messages = defineMessages(
     'err.export.empty_range': 'Sin registros para exportar en este rango',
     'err.export.convert_failed': 'Error al convertir al formato solicitado',
     'err.export.write_failed': 'Error al escribir el archivo de exportación',
+    'err.mcp.sidecar_missing': 'Esta versión no incluye el programa MCP; descarga zeppbridge-tools desde GitHub',
+    'err.mcp.bundle_failed': 'No se pudo crear la extensión de Claude Desktop',
     'err.export.path_required': 'Elige una ruta para guardar el archivo',
     'err.export.path_not_absolute': 'La ruta de guardado debe ser absoluta',
     'err.export.not_a_directory':
@@ -555,6 +569,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': 'Este borrador ya se envió o se descartó',
     'err.training_plan.publish_not_found': 'No hay registro de ese envío',
     'err.training_plan.rejected': 'Zepp no aceptó este plan; el plan de tu reloj no cambió',
+    'err.training_plan.format': 'El plan de entrenamiento tiene una estructura incorrecta y no se guardó',
+    'err.training_plan.invalid': 'Este plan no pasó la validación y no se envió',
+    'err.training_plan.ai_publish_disabled': 'La IA no tiene permiso para publicar planes directamente',
+    'err.training_plan.needs_clear_confirmation': 'Esto borraría parte del plan de tu reloj; confírmalo en ZeppBridge',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flightTransform } from '../motion/dialogFlight';
+import { flightTransform, matchTransform } from '../motion/dialogFlight';
 import { onMotionSkip, remainingMs, settleMotion, worthInterrupting } from '../motion/interrupt';
 
 const fakeAnimation = (localTime: number, endTime: number, playbackRate = 1, playState = 'running') => ({
@@ -48,5 +48,11 @@ describe('dialog flight', () => {
     const button = { left: 100, top: 900, width: 112, height: 36 };
     expect(flightTransform(button, panel)).toBe('translate(-524.0px, 418.0px) scale(0.200)');
     expect(flightTransform({ left: 670, top: 490, width: 20, height: 20 }, panel)).toBe('translate(0.0px, 0.0px) scale(0.120)');
+  });
+
+  it('a reopened dialog picks up exactly where the half-closed one is, without the scale clamp', () => {
+    const panel = { left: 400, top: 200, width: 560, height: 600 };
+    expect(matchTransform({ left: 414, top: 215, width: 532, height: 570 }, panel)).toBe('translate(0.0px, 0.0px) scale(0.950)');
+    expect(matchTransform(panel, panel)).toBe('translate(0.0px, 0.0px) scale(1.000)');
   });
 });

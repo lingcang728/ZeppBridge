@@ -146,6 +146,16 @@ macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
 stdio 传输，**不监听任何端口，不发出任何网络请求**。只读由连接层保证（`PRAGMA query_only`），不是靠工具列表里恰好没有写操作。
 每行请求上限为 1 MiB；非法 UTF-8/JSON 和超长行会收到错误响应，后续行仍可继续处理。工具执行失败通过 `result` 返回 `isError: true` 和说明文字；未知工具及调用结构错误仍使用 JSON-RPC 错误。
 
+### 从桌面应用连接（Windows）
+
+Windows 安装包和便携版会把 `zeppbridge-mcp.exe` 放在 `ZeppBridge.exe` 旁边。
+**设置 › 交给 AI 工具 › 连到 AI 工具**会替你填好真实路径：
+
+- **Claude Code** 和 **Codex**：复制三行命令——注册 MCP（带 `--scope task`）、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
+- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。扩展启动的是装在应用旁边的那份 `zeppbridge-mcp.exe`，随 ZeppBridge 一起升级。
+
+应用用的库不是可执行文件旁边的 `data` 时，生成的配置会带上 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的构建（开发构建）里这几个按钮不可点，照下面的配置手动接。
+
 ### 配置示例
 
 大多数 MCP 客户端读同一种形状的配置：
@@ -207,6 +217,11 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
 | `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
+| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果）、距上次运动几天、已生效的计划、生活事件 |
+| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景 |
+| `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
+| `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
+| `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
 
 查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
 `intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
@@ -224,6 +239,15 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 `get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
 
+#### 训练计划工具（会写库的只有这两个）
+
+健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
+
+- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
+- `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
+- `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
+- 这五个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
+
 ### 契约
 
 握手时服务器就把边界交给调用方，不必等它拿到一条空序列自己猜：
@@ -239,4 +263,4 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 CLI 的 `sync` 和桌面应用的同步共用同一把跨进程同步租约和同一把写锁，任何时刻只有一个同步、一个写者。等不到时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
 
-MCP 的只读查询不拿写锁，可以和同步同时进行。
+MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。
