@@ -166,6 +166,7 @@ mod payload;
 pub mod plan_adherence;
 mod queries;
 mod replay;
+pub mod training_context;
 pub mod training_plan;
 mod util;
 mod workout_row;

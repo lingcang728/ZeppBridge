@@ -6,6 +6,7 @@
  * 将复制的提示词和 AI 能用的工具默认收起，想先看看的人点开就行。 */
 import { computed, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
+import McpPublishRow from './McpPublishRow.vue';
 import McpTaskScopes from './McpTaskScopes.vue';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
@@ -30,6 +31,11 @@ const MCP_TOOLS = computed(() => [
   { name: 'get_sleep_detail', detail: t.value.mcpToolSleepDetail },
   { name: 'list_life_events', detail: t.value.mcpToolLifeEvents },
   { name: 'get_data_health', detail: t.value.mcpToolDataHealth },
+  { name: 'get_training_context', detail: a.value.toolTrainingContext },
+  { name: 'get_athlete_profile', detail: a.value.toolAthleteProfile },
+  { name: 'get_training_plan', detail: a.value.toolTrainingPlan },
+  { name: 'draft_training_plan', detail: a.value.toolDraftPlan },
+  { name: 'publish_training_plan', detail: a.value.toolPublishPlan },
 ]);
 
 const mcpConfigExample = computed(() => `{
@@ -85,6 +91,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
           <code v-for="tool in MCP_TOOLS" :key="tool.name" class="chip" :title="tool.detail">{{ tool.name }}</code>
         </div>
       </details>
+      <McpPublishRow />
       <McpTaskScopes />
     </div>
   </section>

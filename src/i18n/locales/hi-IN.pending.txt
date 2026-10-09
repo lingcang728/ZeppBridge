@@ -13,6 +13,10 @@ components/WeeklyReportCard.nextUp
 composables/useFocusAreas.areaDaily
 composables/useFocusAreas.areaSleep
 composables/useFocusAreas.areaTraining
+i18n/errors.err.training_plan.ai_publish_disabled
+i18n/errors.err.training_plan.format
+i18n/errors.err.training_plan.invalid
+i18n/errors.err.training_plan.needs_clear_confirmation
 lib/metricInfo/activity.active_caloriesChart
 lib/metricInfo/activity.active_caloriesHow
 lib/metricInfo/activity.active_caloriesWhat
@@ -157,7 +161,15 @@ views/settings/sections/advanced.folderTitle
 views/settings/sections/advanced.healthSub
 views/settings/sections/advanced.secPrefs
 views/settings/sections/ai.lead
+views/settings/sections/ai.publishOff
+views/settings/sections/ai.publishOn
+views/settings/sections/ai.publishTitle
 views/settings/sections/ai.scopesHint
+views/settings/sections/ai.toolAthleteProfile
+views/settings/sections/ai.toolDraftPlan
+views/settings/sections/ai.toolPublishPlan
+views/settings/sections/ai.toolTrainingContext
+views/settings/sections/ai.toolTrainingPlan
 views/settings/sections/ai.toolsLabel
 views/settings/sections/archive.backupLatest
 views/settings/sections/archive.backupNone

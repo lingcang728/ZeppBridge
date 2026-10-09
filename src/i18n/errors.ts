@@ -184,6 +184,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': '这份计划草稿已经发过或丢掉了',
     'err.training_plan.publish_not_found': '找不到这次推送的记录',
     'err.training_plan.rejected': 'Zepp 没有接受这份计划，手表上的计划没有变',
+    'err.training_plan.format': '训练计划的结构不对，没有保存',
+    'err.training_plan.invalid': '这份计划没通过校验，没有发送',
+    'err.training_plan.ai_publish_disabled': '没有允许 AI 直接发布训练计划',
+    'err.training_plan.needs_clear_confirmation': '这次发布会清空手表上的一段计划，需要你在 ZeppBridge 里确认',
   },
   {
     /* —— core —— */
@@ -370,6 +374,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': 'This plan draft was already sent or discarded',
     'err.training_plan.publish_not_found': 'No record of that push',
     'err.training_plan.rejected': 'Zepp did not accept this plan; the plan on your watch is unchanged',
+    'err.training_plan.format': 'The training plan is malformed and was not saved',
+    'err.training_plan.invalid': 'This plan did not pass validation and was not sent',
+    'err.training_plan.ai_publish_disabled': 'AI is not allowed to publish training plans directly',
+    'err.training_plan.needs_clear_confirmation': 'This would clear part of the plan on your watch; confirm it in ZeppBridge',
   },
   {
     /* —— core —— */
@@ -555,6 +563,10 @@ const messages = defineMessages(
     'err.training_plan.draft_closed': 'Este borrador ya se envió o se descartó',
     'err.training_plan.publish_not_found': 'No hay registro de ese envío',
     'err.training_plan.rejected': 'Zepp no aceptó este plan; el plan de tu reloj no cambió',
+    'err.training_plan.format': 'El plan de entrenamiento tiene una estructura incorrecta y no se guardó',
+    'err.training_plan.invalid': 'Este plan no pasó la validación y no se envió',
+    'err.training_plan.ai_publish_disabled': 'La IA no tiene permiso para publicar planes directamente',
+    'err.training_plan.needs_clear_confirmation': 'Esto borraría parte del plan de tu reloj; confírmalo en ZeppBridge',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

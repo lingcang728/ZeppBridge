@@ -33,6 +33,7 @@
 
 pub mod parse;
 pub mod publish;
+pub mod standalone;
 pub mod v2;
 pub mod validate;
 pub mod window;

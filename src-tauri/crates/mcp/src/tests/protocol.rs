@@ -84,15 +84,21 @@ fn every_tool_declares_units_and_the_missing_value_rule() {
 }
 
 #[test]
-fn the_tool_surface_is_read_only() {
-    // 只读是这个进程存在的前提。新增任何会写库的工具都应当先推翻这条测试。
-    let names: Vec<String> = tool_definitions()
-        .iter()
-        .map(|tool| tool["name"].as_str().unwrap_or_default().to_string())
-        .collect();
-    for name in &names {
+fn only_the_two_training_plan_tools_write() {
+    // 健康数据只读是这个进程存在的前提。3B 起唯一的例外是训练计划账本的起草 / 发布，
+    // 而且必须在注解里如实声明自己会写；再加任何会写库的工具都应当先推翻这条测试。
+    const WRITERS: [&str; 2] = ["draft_training_plan", "publish_training_plan"];
+    let tools = tool_definitions();
+    for tool in &tools {
+        let name = tool["name"].as_str().unwrap_or_default();
+        let read_only = tool["annotations"]["readOnlyHint"].as_bool();
+        if WRITERS.contains(&name) {
+            assert_eq!(read_only, Some(false), "{name} 会写库，注解必须说出来");
+            continue;
+        }
+        assert_eq!(read_only, Some(true), "{name} 应当声明只读");
         for verb in [
-            "sync", "delete", "write", "set", "update", "import", "restore",
+            "sync", "delete", "write", "set", "update", "import", "restore", "publish", "draft",
         ] {
             assert!(
                 !name.contains(verb),
@@ -100,7 +106,13 @@ fn the_tool_surface_is_read_only() {
             );
         }
     }
-    assert_eq!(names.len(), 12);
+    // 发布会替换手表上的计划：必须标成 destructive，客户端才会先问用户。
+    let publish = tools
+        .iter()
+        .find(|tool| tool["name"] == "publish_training_plan")
+        .unwrap();
+    assert_eq!(publish["annotations"]["destructiveHint"], true);
+    assert_eq!(tools.len(), 17);
 }
 
 #[test]
@@ -160,7 +172,7 @@ fn a_modern_tools_list_carries_the_required_envelope() {
     assert_eq!(result["resultType"], json!("complete"));
     assert!(result["ttlMs"].as_i64().unwrap() > 0);
     assert_eq!(result["cacheScope"], json!("public"));
-    assert_eq!(result["tools"].as_array().unwrap().len(), 12);
+    assert_eq!(result["tools"].as_array().unwrap().len(), 17);
 }
 
 /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
@@ -242,7 +254,7 @@ fn argv_parsing_is_fail_closed() {
 /// 映射，这条测试就红。
 #[test]
 fn every_registered_tool_builds_a_data_request() {
-    let minimal_args: [(&str, Value); 12] = [
+    let minimal_args: [(&str, Value); 17] = [
         ("list_workouts", json!({})),
         ("get_workout_insight", json!({"workoutId": "w"})),
         ("get_metric_series", json!({"metrics": ["spo2_odi"]})),
@@ -258,6 +270,11 @@ fn every_registered_tool_builds_a_data_request() {
         ("get_workout_detail", json!({"workoutId": "w"})),
         ("get_workout_series", json!({"workoutId": "w"})),
         ("list_life_events", json!({})),
+        ("get_training_context", json!({})),
+        ("get_athlete_profile", json!({})),
+        ("get_training_plan", json!({})),
+        ("draft_training_plan", json!({"plan": {"workouts": []}})),
+        ("publish_training_plan", json!({"draftId": "plan-x"})),
     ];
     for tool in tool_definitions() {
         let name = tool["name"].as_str().unwrap();

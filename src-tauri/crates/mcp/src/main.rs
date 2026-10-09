@@ -15,6 +15,7 @@ use zeppbridge_core::paths;
 use zeppbridge_core::storage::Database;
 
 mod browse;
+mod coach;
 mod protocol;
 mod runners;
 mod schema;
@@ -23,6 +24,7 @@ mod tests;
 mod tools;
 
 use browse::*;
+use coach::*;
 use protocol::*;
 use runners::*;
 use schema::*;

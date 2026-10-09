@@ -200,7 +200,7 @@ file:  second_heart_rate/real_data
 | 网页登录首次连接 | 电脑端链路已实现，真实账号登录按环境验证 |
 | 本机只读 REST（`/health`、`/workouts/{id}/series`） | 已实现；默认关闭，启用后需 token |
 | CLI（`status` / `sync` / `export` / `contract`） | 已实现，随 Release 提供版本化压缩包 |
-| MCP（stdio，只读十二个工具） | 已实现，随 Release 提供版本化压缩包 |
+| MCP（stdio，十五个只读工具 + 两个训练计划写工具） | 已实现，随 Release 提供版本化压缩包 |
 | 完整历史补拉、长期归档、覆盖账本 | 已实现 |
 | 数据库快照与排队恢复 | 已实现 |
 | 更多数据源 | 未开始 |
