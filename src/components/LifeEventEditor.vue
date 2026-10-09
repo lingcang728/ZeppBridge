@@ -77,30 +77,34 @@ async function remove() {
           />
         </div>
         <div class="event-dates">
+          <!-- 快捷日期放在标签同一行的右边：以前单独占一行，整张弹窗高出一截，底部的保存被挤出窗口。 -->
           <div class="field">
-            <span class="field-label">{{ t.start }}</span>
-            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
-            <span class="date-quick">
-              <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
-              <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
+            <span class="field-head">
+              <span class="field-label">{{ t.start }}</span>
+              <span class="date-quick">
+                <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
+                <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
+              </span>
             </span>
+            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
           </div>
           <div v-if="!ongoing" class="field">
-            <span class="field-label">{{ t.end }}</span>
-            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
-            <span class="date-quick">
-              <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
-              <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
+            <span class="field-head">
+              <span class="field-label">{{ t.end }}</span>
+              <span class="date-quick">
+                <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
+                <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
+              </span>
             </span>
+            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
           </div>
         </div>
         <div class="check">
           <span>{{ t.ongoing }}</span>
           <GlassSwitch :model-value="ongoing" :aria-label="t.ongoing" @update:model-value="ongoing = !ongoing" />
         </div>
-        <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="4" data-event-notes /></label>
+        <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="2" data-event-notes /></label>
       </fieldset>
-      <p class="event-hint">{{ t.local }}</p>
       <p v-if="error" role="alert">{{ error === 'invalid' ? t.invalid : t.failed }}</p>
       <div v-if="confirmingDelete" class="delete-confirm" role="alert">
         <strong>{{ t.deleteTitle }}</strong><p>{{ t.deleteHint }}</p>
@@ -109,7 +113,7 @@ async function remove() {
       </div>
       <footer v-else>
         <button v-if="draft.id" type="button" class="button button-danger" :disabled="busy" @click="confirmingDelete = true">{{ t.remove }}</button>
-        <span />
+        <p class="event-hint">{{ t.local }}</p>
         <button type="button" class="button button-secondary" :disabled="busy" @click="close">{{ t.cancel }}</button>
         <button type="submit" class="button button-primary" :disabled="busy">{{ t.save }}</button>
       </footer>
@@ -117,8 +121,12 @@ async function remove() {
   </ModalDialog>
 </template>
 <style scoped>
-.event-form { display:grid; gap:16px; }.event-form h2,.event-form p { margin:0; }
-fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:14px; }
+/* 标题钉在顶上、按钮钉在底下，中间那段才滚：窗口矮的时候也是「顾头又顾尾」——以前整张一起滚，
+   往下滑露出保存，标题就被顶出去了。两条钉住的边各带一层和面板同色的底，滚过去的内容不会透出来。 */
+.event-form { display:grid; gap:12px; }.event-form h2,.event-form p { margin:0; }
+.event-form h2 { position:sticky; top:-20px; z-index:2; margin:-20px -20px 0; padding:18px 20px 8px; border-radius:var(--radius-lg) var(--radius-lg) 0 0; background:var(--mat-glass-strong); -webkit-backdrop-filter:var(--mat-glass-blur); backdrop-filter:var(--mat-glass-blur); font-size:var(--fs-xl); }
+fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:12px; }
+.field-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
 label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted); }
 /* 输入框和页面上的胶囊同一种凹槽：没有描边，焦点时一圈品牌色。 */
 input,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px 14px; border:0; border-radius:14px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); color:var(--ink); font:inherit; outline:none; }
@@ -131,6 +139,8 @@ input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
 .quick:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
 .check { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink); font-size:var(--fs-sm); }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }
-footer { display:flex; flex-wrap:wrap; gap:8px; }footer span { flex:1; }.delete-confirm { display:grid; gap:10px; }
+footer { position:sticky; bottom:-20px; z-index:2; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:0 -20px -20px; padding:12px 20px 18px; border-radius:0 0 var(--radius-lg) var(--radius-lg); background:var(--mat-glass-strong); -webkit-backdrop-filter:var(--mat-glass-blur); backdrop-filter:var(--mat-glass-blur); }
+footer .event-hint { flex:1 1 180px; min-width:0; }
+.delete-confirm { display:grid; gap:10px; }
 @media(max-width:480px) { .event-dates { grid-template-columns:1fr; } }
 </style>
