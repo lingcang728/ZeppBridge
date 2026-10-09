@@ -2,6 +2,9 @@
 node_modules/
 dist/
 dist-ssr/
+.site-cache/
+scripts/site/__pycache__/
+public/landing/media/
 *.local
 
 # Logs and tool state

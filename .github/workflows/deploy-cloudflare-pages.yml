@@ -13,7 +13,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     env:
       CLOUDFLARE_D1_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_API_TOKEN }}
     steps:
@@ -24,8 +24,25 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Build landing page
-        run: npm ci && npm run test:functions && npm run build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Prepare website capture tools
+        run: |
+          python -c "import playwright" || python -m pip install playwright==1.58.0
+          python -m playwright install chromium --with-deps
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
+      - name: Restore captured application journeys
+        uses: actions/cache@v4
+        with:
+          path: .site-cache/media
+          key: landing-media-${{ runner.os }}-${{ hashFiles('src/**', 'scripts/site/capture-features.py') }}
+          restore-keys: landing-media-${{ runner.os }}-
+
+      - name: Build landing page and current application demos
+        run: npm ci && npm run test:functions && npm run build:web
 
       - name: Apply feedback database migrations
         if: env.CLOUDFLARE_D1_API_TOKEN != ''
@@ -44,5 +61,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=zeppbridge --branch=main
+          command: pages deploy .site-cache/site-dist --project-name=zeppbridge --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { siteAssets } from './scripts/site/assets.mjs';
 
 /*
  * 构建标识：短 SHA + 构建时间。
@@ -39,8 +40,9 @@ const buildStamp = () => {
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [vue()],
+export default defineConfig(async ({ mode }) => ({
+  plugins: [vue(), siteAssets(mode === 'site')],
+  publicDir: false,
 
   // Tauri serves the bundled frontend from its asset protocol rather than
   // from an HTTP origin. Relative URLs keep imported WebP/PNG assets inside
@@ -53,6 +55,7 @@ export default defineConfig(async () => ({
     __BUILD_STAMP__: JSON.stringify(buildStamp()),
   },
   build: {
+    outDir: mode === 'site' ? '.site-cache/site-dist' : 'dist',
     // 产物的语法基线，显式钉死。
     //
     // Vite 6 的默认值是 `'modules'`，展开就是下面这一行。Vite 7 起默认

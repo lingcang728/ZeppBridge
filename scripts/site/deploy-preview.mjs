@@ -35,7 +35,7 @@ run(npm, ['run', 'build:web'], root);
 
 const out = mkdtempSync(join(tmpdir(), `${PROJECT}-`));
 const site = join(out, 'dist');
-cpSync(join(root, 'dist'), site, { recursive: true });
+cpSync(join(root, '.site-cache/site-dist'), site, { recursive: true });
 
 writeFileSync(join(site, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 writeFileSync(join(site, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\n');
