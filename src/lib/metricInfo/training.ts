@@ -6,7 +6,7 @@ import { defineMessages, messagesOf } from '../../i18n';
  *
  * 来源事实（v3-plan §4、storage/metrics.rs）：VO₂max、日度训练负荷、乳酸阈只有
  * 「高级数据」；PAI 官方授权也会同步（/users/-/openData/PaiSummary）；负荷平衡
- * 的急慢比是 ZeppBridge 本机算的（7 天之和 ÷ 28 天之和 ÷ 4，窗口不足不给）。
+ * 的急慢比是 ZeppBridge 本机按单次运动负荷算的（7 天之和 ÷ 28 天之和 ÷ 4，窗口不完整不给）。
  */
 
 const messages = defineMessages(
@@ -14,7 +14,7 @@ const messages = defineMessages(
     vo2maxWhat: '最大摄氧量（VO₂max）：单位体重每分钟能利用的氧气量（ml/kg/min）。',
     vo2maxChart: '只在户外跑步后更新，一年更新不了几次；单看一两次不如看长期趋势，6 个月范围才看得出形状。',
     vo2maxHow: '手表在户外跑步后估算，经「高级数据」同步——官方接口没有 VO₂max。',
-    training_loadWhat: '训练负荷：每天的运动负荷得分，无量纲。',
+    training_loadWhat: '训练负荷：Zepp 报告的滚动 7 天训练负荷，无量纲。',
     training_loadChart: '每天一个点；最新读数旁边的档位（偏低 / 中等 / 较高 / 很高）按 600 的参考刻度划分，只是粗读，不是手表给的分级。',
     training_loadHow: '手表按天给出，经「高级数据」同步——官方接口没有日度训练负荷。档位由 ZeppBridge 按参考刻度划出。',
     pai_totalWhat: 'PAI 活力指数：滚动 7 天的个人体力活动积分。',
@@ -24,14 +24,14 @@ const messages = defineMessages(
     lactate_thresholdChart: '心率与配速两条线（配速轴倒置，越快越高）；只在一段时间的高强度跑步后更新。',
     lactate_thresholdHow: '手表在高强度跑步后估算，经「高级数据」同步——官方接口没有乳酸阈值。',
     training_balanceWhat: '运动负荷平衡：近 7 天负荷相对近 28 天周均的对比，即急性／慢性负荷比。',
-    training_balanceChart: '三条线：7 天负荷、28 天周均、急慢比；比值断开的地方是窗口数据不足、没算，不是 0。',
-    training_balanceHow: 'ZeppBridge 本机计算：急慢比 = 7 天负荷之和 ÷（28 天负荷之和 ÷ 4）；28 天窗口不足 21 天有数据时不给比值。每日负荷本身来自「高级数据」。',
+    training_balanceChart: '三条线：7 天负荷、28 天周均、急慢比；线断开的地方是窗口不完整、没算，不是 0。',
+    training_balanceHow: 'ZeppBridge 本机计算：按运动开始的本地日期累加单次运动负荷（不用 Zepp 的滚动 7 天负荷，否则会重复计算）；急慢比 = 7 天之和 ÷（28 天之和 ÷ 4）。只有经「高级数据」完整同步了运动列表、且每次运动都有有效负荷的日子才算完整，确认无运动才计 0；7 天或 28 天窗口不完整时留空。官方接口的运动没有负荷，只经官方同步来的日子不参与计算。',
   },
   {
     vo2maxWhat: 'VO₂max: the oxygen your body can use per minute per kilogram of body weight (ml/kg/min).',
     vo2maxChart: 'It only updates after an outdoor run, a handful of times a year; a single reading says less than the long-term shape, which needs the 6-month range.',
     vo2maxHow: 'Estimated by the watch after outdoor runs, synced via advanced data — the official API has no VO₂max.',
-    training_loadWhat: 'Training load: a dimensionless daily score of how much training you did.',
+    training_loadWhat: 'Training load: the rolling 7-day training load reported by Zepp, dimensionless.',
     training_loadChart: 'One point per day; the tier next to the latest reading (low / moderate / high / very high) follows a 600-point reference scale — a rough reading, not a watch-given grade.',
     training_loadHow: 'Given by the watch per day, synced via advanced data — the official API has no daily training load. The tier is drawn here against the reference scale.',
     pai_totalWhat: 'PAI: a Personal Activity Intelligence score over a rolling 7 days.',
@@ -41,14 +41,14 @@ const messages = defineMessages(
     lactate_thresholdChart: 'Two lines, heart rate and pace (the pace axis is inverted so faster points up); it only updates after a sustained hard run.',
     lactate_thresholdHow: 'Estimated by the watch after hard runs, synced via advanced data — the official API has no lactate threshold.',
     training_balanceWhat: 'Training load balance: the last 7 days of load against the 28-day weekly average — the acute-to-chronic ratio.',
-    training_balanceChart: 'Three lines: 7-day load, 28-day weekly average, and the ratio; where the ratio line breaks, the window was too thin to compute one — uncomputed, not zero.',
-    training_balanceHow: 'Computed here: acute:chronic = 7-day load sum ÷ (28-day load sum ÷ 4); with fewer than 21 days of data in the 28-day window, no ratio is given. The daily loads themselves come via advanced data.',
+    training_balanceChart: 'Three lines: 7-day load, 28-day weekly average, and the ratio; where a line breaks, its window was incomplete — uncomputed, not zero.',
+    training_balanceHow: 'Computed here from individual workout loads, summed by local start date (not Zepp\'s rolling 7-day load, which would count each workout again); acute:chronic = 7-day sum ÷ (28-day sum ÷ 4). A day is complete only when its workout list was fully synced via advanced data and every workout has a valid load; only confirmed days without workouts count as zero, and incomplete 7- or 28-day windows stay empty. Official API workouts carry no load, so days synced only through the official API are left out.',
   },
   {
     vo2maxWhat: 'VO₂máx: el oxígeno que tu cuerpo puede usar por minuto y por kilo de peso (ml/kg/min).',
     vo2maxChart: 'Solo se actualiza tras una carrera al aire libre, pocas veces al año; una lectura aislada dice menos que la forma a largo plazo, que necesita el rango de 6 meses.',
     vo2maxHow: 'La estima el reloj después de carreras al aire libre, por los datos avanzados; la API oficial no tiene VO₂máx.',
-    training_loadWhat: 'Carga de entrenamiento: una puntuación diaria sin unidades de cuánto entrenaste.',
+    training_loadWhat: 'Carga de entrenamiento: la carga de los últimos 7 días que informa Zepp, sin unidades.',
     training_loadChart: 'Un punto por día; el nivel junto a la última lectura (baja / moderada / alta / muy alta) sigue una escala de referencia de 600: una lectura aproximada, no una clasificación del reloj.',
     training_loadHow: 'La da el reloj por día, por los datos avanzados; la API oficial no tiene carga diaria. El nivel se traza aquí con la escala de referencia.',
     pai_totalWhat: 'PAI: la puntuación de actividad personal en 7 días móviles.',
@@ -58,8 +58,8 @@ const messages = defineMessages(
     lactate_thresholdChart: 'Dos líneas, frecuencia cardíaca y ritmo (el eje de ritmo está invertido para que más rápido apunte arriba); solo se actualiza tras una carrera intensa sostenida.',
     lactate_thresholdHow: 'Lo estima el reloj tras carreras intensas, por los datos avanzados; la API oficial no tiene umbral de lactato.',
     training_balanceWhat: 'Equilibrio de la carga: la carga de los últimos 7 días frente al promedio semanal de 28 días, es decir, la relación aguda:crónica.',
-    training_balanceChart: 'Tres líneas: carga de 7 días, promedio semanal de 28 y la relación; donde se corta la relación, la ventana era demasiado corta para calcularla: no calculada, no cero.',
-    training_balanceHow: 'Se calcula aquí: aguda:crónica = suma de 7 días ÷ (suma de 28 días ÷ 4); con menos de 21 días de datos en la ventana de 28, no hay relación. La carga diaria en sí llega por los datos avanzados.',
+    training_balanceChart: 'Tres líneas: carga de 7 días, promedio semanal de 28 y la relación; donde se corta una línea, su ventana estaba incompleta: no calculada, no cero.',
+    training_balanceHow: 'Se calcula aquí sumando la carga de cada entrenamiento por fecha local de inicio (no la carga móvil de 7 días de Zepp, que contaría cada entrenamiento otra vez); aguda:crónica = suma de 7 días ÷ (suma de 28 días ÷ 4). Un día solo está completo si su lista de entrenamientos se sincronizó entera por los datos avanzados y cada uno tiene una carga válida; solo los días confirmados sin entrenamientos cuentan como cero, y las ventanas de 7 o 28 días incompletas quedan vacías. Los entrenamientos de la API oficial no traen carga, así que los días que solo llegan por ella no entran en el cálculo.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'lib/metricInfo/training',

@@ -35,7 +35,6 @@ import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
-import { coveredWindowValue } from '../lib/missingValues';
 import { metricInfo } from '../lib/metricInfo';
 import { trainingLoadTierText } from '../lib/trainingLoadTier';
 import { holdInPlace } from '../lib/motion/holdInPlace';
@@ -180,6 +179,10 @@ const thresholdOption = computed(() => {
   };
 });
 
+/** 28 天周均；窗口不完整时后端给 null，这里照旧留空。 */
+const chronicWeeklyOf = (point: TrainingBalancePoint): number | null =>
+  point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10;
+
 const balanceOption = computed(() => {
   if (balance.value.length < 2) return null;
   const dates = balance.value.map((point) => point.date);
@@ -200,12 +203,11 @@ const balanceOption = computed(() => {
         if (!point) return '';
         const ratio = typeof point.acute_chronic_ratio === 'number'
           ? `${point.acute_chronic_ratio.toFixed(2)}`
-          : t.value.ratioMissing(point.chronic_days_with_data);
-        const acute = coveredWindowValue(point.acute_7d, point.acute_days_with_data);
-        const chronic = coveredWindowValue(
-          Math.round((point.chronic_28d / 4) * 10) / 10,
-          point.chronic_days_with_data,
-        );
+          : point.chronic_days_with_data < 28
+            ? t.value.ratioMissing(point.chronic_days_with_data)
+            : t.value.notProvided;
+        const acute = point.acute_7d;
+        const chronic = chronicWeeklyOf(point);
         return [
           point.date,
           t.value.acuteTooltip(
@@ -226,7 +228,7 @@ const balanceOption = computed(() => {
       {
         name: t.value.acute7d,
         type: 'line',
-        data: balance.value.map((point) => coveredWindowValue(point.acute_7d, point.acute_days_with_data)),
+        data: balance.value.map((point) => point.acute_7d),
         connectNulls: false,
         showSymbol: false,
         smooth: 0.2,
@@ -236,10 +238,7 @@ const balanceOption = computed(() => {
       {
         name: t.value.chronicWeekly,
         type: 'line',
-        data: balance.value.map((point) => coveredWindowValue(
-          Math.round((point.chronic_28d / 4) * 10) / 10,
-          point.chronic_days_with_data,
-        )),
+        data: balance.value.map(chronicWeeklyOf),
         connectNulls: false,
         showSymbol: false,
         smooth: 0.2,

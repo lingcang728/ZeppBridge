@@ -422,8 +422,8 @@ impl Database {
                 analysis.insert(
                     "training_load_balance".into(),
                     serde_json::json!({
-                        "source": "daily_metrics.training_load",
-                        "note": "acute = 最近 7 天负荷之和；chronic = 最近 28 天之和；ratio = acute ÷ (chronic ÷ 4)。chronic 窗口覆盖不足 21 天时不给 ratio。",
+                        "source": "workouts.training_load",
+                        "note": "按运动开始时间的本地日期汇总单次负荷；acute = 最近 7 天负荷之和；chronic = 最近 28 天之和；ratio = acute ÷ (chronic ÷ 4)。仅运动列表完整同步且每次负荷有效的完整本地日计入覆盖；确认无运动才为 0。7 天或 28 天窗口不完整时对应负荷为 null；仅两个窗口完整且慢性负荷大于 0 时给出 ratio。",
                         "days": balance,
                     }),
                 );

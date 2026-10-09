@@ -127,6 +127,11 @@ impl SyncManager {
         records: Vec<FetchedRecord>,
         quiet: bool,
     ) -> Result<StreamReport> {
+        let workout_evidence = if stream == "workouts" {
+            crate::storage::training_coverage::workout_day_evidence(&records)
+        } else {
+            Vec::new()
+        };
         let incomplete = records.iter().any(|record| record.incomplete);
         let reasons: std::collections::BTreeSet<_> = records
             .iter()
@@ -145,6 +150,13 @@ impl SyncManager {
         let mut reports = Vec::with_capacity(records.len());
         for record in records {
             reports.push(Self::persist_record(&db, record)?.report);
+        }
+        if !incomplete
+            && !reports
+                .iter()
+                .any(|r| matches!(r.status, StreamStatus::Failed | StreamStatus::Unverified))
+        {
+            db.record_workout_day_evidence(&workout_evidence)?;
         }
         let incomplete = incomplete.then_some(incomplete_message);
         Self::finish_stream(&db, stream, &reports, incomplete)

@@ -99,11 +99,11 @@ export interface MetricSeries {
 
 export interface TrainingBalancePoint {
   date: string;
-  acute_7d: number;
+  acute_7d: number | null;
   acute_days_with_data: number;
-  chronic_28d: number;
+  chronic_28d: number | null;
   chronic_days_with_data: number;
-  /** Absent until the chronic window is mostly covered. */
+  /** Absent unless both windows are complete and chronic load is positive. */
   acute_chronic_ratio?: number | null;
 }
 
