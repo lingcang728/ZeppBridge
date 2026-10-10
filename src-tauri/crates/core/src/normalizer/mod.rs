@@ -3177,9 +3177,11 @@ mod tests {
             "generatedTime": 1791095423_i64,
             "heartRateData": "***"
         } ] });
-        let error = Normalizer::normalize_heart_rate(&raw)
-            .expect_err("非法 base64 不能当数据");
-        assert!(error.to_string().contains("不是合法 base64"), "得到 {error}");
+        let error = Normalizer::normalize_heart_rate(&raw).expect_err("非法 base64 不能当数据");
+        assert!(
+            error.to_string().contains("不是合法 base64"),
+            "得到 {error}"
+        );
     }
 
     #[test]
