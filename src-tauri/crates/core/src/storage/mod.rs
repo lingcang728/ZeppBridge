@@ -54,7 +54,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-10-v32-dst-days";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-10-v33-hr-packed";
 
 /// A metric actually present in the local library. This inventory deliberately
 /// includes names outside the chart contract so new normalized data is findable.

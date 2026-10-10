@@ -468,6 +468,67 @@ fn huge_hrv_sample_offset_is_skipped_not_panicked() {
 }
 
 #[test]
+fn generated_time_heart_rate_data_reads_the_observed_single_byte_shape() {
+    // 2026-10-06 真实账号观测到的第二种形状（设备号已替换）：
+    // `generatedTime` 是 Unix 秒，`heartRateData` 单字节 [0x5E] = 94 bpm。
+    let raw = serde_json::json!({ "items": [ {
+        "deviceId": "D85403FFFEE4D576",
+        "deviceSource": 10551552,
+        "generatedTime": 1791095423_i64,
+        "heartRateData": "Xg==",
+        "timeZone": "8",
+        "type": 2
+    } ] });
+    let samples = Normalizer::normalize_heart_rate(&raw).unwrap();
+    assert_eq!(samples.len(), 1);
+    assert_eq!(samples[0].value, 94.0);
+    assert_eq!(samples[0].unit, "bpm");
+    assert_eq!(
+        samples[0].timestamp,
+        DateTime::from_timestamp(1791095423, 0).unwrap(),
+        "generatedTime 是 Unix 秒；当毫秒读会落到 1970 年"
+    );
+    assert_eq!(samples[0].device_id.as_deref(), Some("D85403FFFEE4D576"));
+}
+
+#[test]
+fn multi_byte_heart_rate_data_is_reported_not_guessed() {
+    let raw = serde_json::json!({ "items": [ {
+        "generatedTime": 1791095423_i64,
+        "heartRateData": "XgJA"
+    } ] });
+    let error = Normalizer::normalize_heart_rate(&raw)
+        .expect_err("仅单字节读数已验证，多字节不能解析成数据");
+    assert!(
+        error.to_string().contains("仅单字节读数已验证"),
+        "得到 {error}"
+    );
+}
+
+#[test]
+fn invalid_base64_heart_rate_data_is_reported() {
+    let raw = serde_json::json!({ "items": [ {
+        "generatedTime": 1791095423_i64,
+        "heartRateData": "***"
+    } ] });
+    let error = Normalizer::normalize_heart_rate(&raw).expect_err("非法 base64 不能当数据");
+    assert!(
+        error.to_string().contains("不是合法 base64"),
+        "得到 {error}"
+    );
+}
+
+#[test]
+fn packed_heart_rate_data_still_rejects_the_zero_sentinel() {
+    let raw = serde_json::json!({ "items": [ {
+        "generatedTime": 1791095423_i64,
+        "heartRateData": "AA=="
+    } ] });
+    let error = Normalizer::normalize_heart_rate(&raw).expect_err("0 是哨兵不是读数");
+    assert!(error.to_string().contains("数值无效"), "得到 {error}");
+}
+
+#[test]
 fn heart_rate_zero_is_a_sentinel_not_a_reading() {
     let batch = Normalizer::normalize_heart_rate_with_diagnostics(&json!({
         "items": [
