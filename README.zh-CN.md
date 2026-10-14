@@ -11,8 +11,6 @@
 
 *点击上图观看中文短片，了解界面、卡片交互与训练计划。本文图片和视频均使用示例数据。*
 
-> 本页介绍 V3。V3 正式安装包尚未发布；[发布页](https://github.com/lingcang728/ZeppBridge/releases)的 2.x 版本不包含下文的全部功能。
-
 ## 从记录到下一步
 
 ZeppBridge 是一款面向 Zepp / Amazfit 用户的桌面应用。手表通过手机 Zepp App 上传记录，ZeppBridge 再将可获取的数据同步到本机。已同步的记录可以离线查看、备份和导出。
