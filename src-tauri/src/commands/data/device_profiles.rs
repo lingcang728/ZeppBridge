@@ -81,14 +81,30 @@ pub(crate) async fn refresh_device_profile(state: &AppState) {
 pub(super) async fn refresh_device_profiles_from_cloud(
     state: &AppState,
 ) -> std::result::Result<(Vec<DeviceProfile>, DateTime<Utc>), AppError> {
-    let auth = state
-        .auth
-        .load_auth()
-        .map_err(AppError::from)?
-        .ok_or_else(|| AppError::new("err.sync.not_connected", "尚未配置 Zepp 认证"))?;
-    let connector = ZeppConnector::new(auth).map_err(AppError::from)?;
-    let payload = connector.fetch_devices().await.map_err(AppError::from)?;
-    let profiles = parse_device_profiles(&payload);
+    let profiles = match state.auth.load_auth().map_err(AppError::from)? {
+        Some(auth) => {
+            let connector = ZeppConnector::new(auth).map_err(AppError::from)?;
+            let payload = connector.fetch_devices().await.map_err(AppError::from)?;
+            parse_device_profiles(&payload)
+        }
+        // 只连了官方授权就没有 apptoken，也就没有设备列表接口可调。以前这里
+        // 直接报「尚未配置」，设备列表永远是空的，设置页一直挂着「未识别设备」，
+        // 哪怕每条运动里都写着这块表是什么。退而用本机官方运动里的
+        // `deviceSource` / `deviceName` 拼出设备条目，走同一套目录匹配。
+        None => {
+            let items = spawn_independent_read(state.data_dir.clone(), |db| {
+                db.official_workout_device_items()
+            })
+            .await?;
+            if items.is_empty() {
+                return Err(AppError::new(
+                    "err.sync.not_connected",
+                    "尚未配置 Zepp 认证",
+                ));
+            }
+            parse_device_profiles(&Value::Array(items))
+        }
+    };
     if profiles.is_empty() {
         return Err(AppError::new("err.core.unavailable", "Zepp 未返回设备"));
     }

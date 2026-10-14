@@ -242,6 +242,36 @@ fn parse_device_profiles_reads_model_names_from_additional_info() {
 }
 
 #[test]
+fn official_workout_device_items_resolve_to_the_catalog_model() {
+    // `Database::official_workout_device_items` 的输出形状：只连官方授权的账号
+    // 拿不到设备列表，设备条目是从运动列表的 source / deviceName 拼出来的。
+    let value = json!([{
+        "deviceSource": 10551555,
+        "deviceName": "Amazfit T-Rex 3 Pro (48mm)"
+    }]);
+    let profiles = parse_device_profiles(&value);
+    assert_eq!(profiles.len(), 1);
+    let profile = &profiles[0];
+    assert_eq!(profile.name.as_deref(), Some("Amazfit T-Rex 3 Pro (48mm)"));
+    assert_eq!(
+        profile.canonical_name.as_deref(),
+        Some("Amazfit T-Rex 3 Pro 48mm/44mm")
+    );
+    assert_eq!(profile.match_status, DeviceMatchStatus::Exact);
+    // 没有 deviceId 时退回 deviceSource 当键，设置页那一行才点得进去、能改型号。
+    assert_eq!(profile.device_id.as_deref(), Some("10551555"));
+
+    // 目录里还没有的表也要出现在列表里（带着 Zepp 给的名字），用户才能点进去指认。
+    let unknown = parse_device_profile(&json!([{
+        "deviceSource": 99999999,
+        "deviceName": "Amazfit Prototype"
+    }]));
+    assert_eq!(unknown.match_status, DeviceMatchStatus::Unknown);
+    assert_eq!(unknown.name.as_deref(), Some("Amazfit Prototype"));
+    assert_eq!(unknown.device_id.as_deref(), Some("99999999"));
+}
+
+#[test]
 fn parse_device_profiles_reads_double_nested_bind_metadata() {
     let nested = serde_json::to_string(&json!({
         "bindDevice": serde_json::to_string(&json!({

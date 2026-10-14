@@ -210,3 +210,57 @@ fn legacy_hourly_steps_ignore_records_of_an_unverified_length() {
     let item = serde_json::json!({ "date_time": "2026-09-28", "data": "AAAA" });
     assert!(crate::storage::hourly_steps::legacy_hourly_steps(&item).is_none());
 }
+
+/// 只连官方授权的账号没有设备列表接口；设备只能从运动列表里的
+/// `source` / `deviceName` 认出来。
+#[test]
+fn official_workouts_yield_one_device_item_per_device_source() {
+    let db = Database::in_memory().unwrap();
+    let name = r#"{"en-WW":"Amazfit T-Rex 3 Pro (48mm)","zh-CN":"Amazfit T-Rex 3 Pro (48mm)"}"#;
+    let payload = serde_json::json!({
+        "items": [
+            { "type": "OUTDOOR_RUN", "source": "run.10551555.huami.com", "deviceName": name },
+            { "type": "WALKING", "source": "run.10551555.huami.com", "deviceName": name },
+            // 手机记的运动：中间那段不是数字，不算一台表。
+            { "type": "WALKING", "source": "run.mifit.huami.com" },
+        ],
+        "timeZone": "Asia/Kolkata"
+    });
+    db.conn
+        .execute(
+            "INSERT INTO raw_records(stream, source_key, source_scope, start_utc, payload, payload_hash, fetched_at, provider)
+             VALUES ('workouts', 'official:sports:1', 'user_fused', '2026-10-01T00:00:00+00:00', ?1, 'h', '2026-10-01T00:00:00+00:00', 'official')",
+            params![payload.to_string()],
+        )
+        .unwrap();
+
+    assert_eq!(
+        db.official_workout_device_items().unwrap(),
+        vec![serde_json::json!({
+            "deviceSource": 10551555,
+            "deviceName": "Amazfit T-Rex 3 Pro (48mm)"
+        })]
+    );
+}
+
+#[test]
+fn official_device_source_and_name_parsing() {
+    assert_eq!(
+        official_source_device_code("run.10551555.huami.com"),
+        Some(10551555)
+    );
+    assert_eq!(official_source_device_code("run.mifit.huami.com"), None);
+    assert_eq!(official_source_device_code("run..huami.com"), None);
+    assert_eq!(official_source_device_code(""), None);
+
+    let localized = serde_json::json!(r#"{"zh-CN":"跃我 T-Rex 3","en-WW":"Amazfit T-Rex 3"}"#);
+    assert_eq!(
+        official_device_name(&localized).as_deref(),
+        Some("Amazfit T-Rex 3")
+    );
+    assert_eq!(
+        official_device_name(&serde_json::json!("Amazfit Balance 2")).as_deref(),
+        Some("Amazfit Balance 2")
+    );
+    assert_eq!(official_device_name(&serde_json::json!("  ")), None);
+}
