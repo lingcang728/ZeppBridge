@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { deviceStateLabel } from '../useDevices';
+import { deviceStateLabel, useDevices } from '../useDevices';
 import { useSyncController } from '../useSyncController';
 import { backend, toUserMessage } from '../../lib/bridge';
 import { locale, useMessages } from '../../i18n';
@@ -20,7 +20,8 @@ const idleStatus = (): LoginStatus => ({ state: 'idle', message: '', page_url: '
  */
 export const createAuthFlow = (feedback: SettingsFeedback) => {
   const t = useMessages(settingsMessages);
-  const { appStatus, refreshStatus, runSync } = useSyncController();
+  const { appStatus, refreshStatus, runSync, isSyncing } = useSyncController();
+  const { load: loadDevices } = useDevices();
   const { dataMessage, dataError } = feedback;
 
   const reconnecting = ref(false);
@@ -38,8 +39,11 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const manualRegionHost = ref(DEFAULT_REGION_HOST);
   const manualAuthBusy = ref(false);
 
-  const connected = computed(() => appStatus.value?.connection_state === 'connected');
-  const configuredOnly = computed(() => appStatus.value?.connection_state === 'configured');
+  // connection_state 是整个应用的状态，官方授权也能让它变成 connected。
+  // 此处只管高级数据：凭据存在且通过验证，才能显示「当前使用」。
+  const connected = computed(() => Boolean(appStatus.value?.configured) && appStatus.value?.auth_state === 'verified');
+  const needsReauth = computed(() => Boolean(appStatus.value?.configured) && appStatus.value?.auth_state === 'needs_reauth');
+  const configuredOnly = computed(() => Boolean(appStatus.value?.configured) && !connected.value && !needsReauth.value);
   const accountRecognized = computed(() => connected.value || configuredOnly.value);
   const loginInProgress = computed(() => ['waiting', 'extracting', 'verifying'].includes(String(loginStatus.value.state)));
 
@@ -65,7 +69,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   /*
    * `replay`：进设置页时补读的当前状态。后端的 login.status 在整个会话里粘在
    * connected 上，而 0 条写入的账号 last_cloud_sync_at 永远是空——以前每进一次
-   * 设置页就会因为这次补读起一趟看得见的同步。首次同步只跟着真正的「刚连上」走：
+   * 设置页就会因为这次补读起一趟看得见的同步。同步只跟着真正的「刚连上」走：
    * 实时事件，而且此前不是 connected（命令返回值和事件可能各送一次同一个结果）。
    */
   const applyLoginStatus = async (status: LoginStatus, opts?: { replay?: boolean }) => {
@@ -75,8 +79,12 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       reconnecting.value = false;
       loginError.value = null;
       await refreshStatus();
-      if (justConnected && !opts?.replay && !appStatus.value?.last_cloud_sync_at) {
-        void runSync('incremental', undefined, { silent: true, waited: true });
+      if (justConnected && !opts?.replay) {
+        // 官方数据可能已经同步过；补连高级数据后仍需立即读取新通道。
+        // 若官方同步还在运行，等它完成再开一轮，且不让旧通道的云端时间探测跳过补拉。
+        if (isSyncing.value) await runSync('incremental', undefined, { silent: true });
+        void runSync('incremental', undefined, { silent: true, waited: true, skipProbe: true });
+        void loadDevices(true);
       }
     }
     if (status.state === 'failed') {
@@ -199,6 +207,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     manualRegionHost,
     manualAuthBusy,
     connected,
+    needsReauth,
     configuredOnly,
     accountRecognized,
     loginInProgress,

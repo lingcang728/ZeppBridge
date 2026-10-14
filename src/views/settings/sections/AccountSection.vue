@@ -32,7 +32,7 @@ const goOverview = () => {
 };
 
 const {
-  connected, configuredOnly, accountRecognized, loginBusy, loginInProgress, loginStatus, loginMessage,
+  connected, configuredOnly, needsReauth, accountRecognized, loginBusy, loginInProgress, loginStatus, loginMessage,
   startLogin, cancelLogin, verifyAndSync, clearAuth,
 } = useSettingsContext().auth;
 const official = useSettingsContext().official;
@@ -50,6 +50,7 @@ const officialState = computed(() => {
 const advancedState = computed(() => {
   if (loginInProgress.value) return a.value.stSigningIn;
   if (connected.value) return a.value.stOn;
+  if (needsReauth.value) return a.value.stReauth;
   if (configuredOnly.value) return a.value.stUnverified;
   return loginStatus.value.state === 'failed' ? a.value.stFailed : a.value.stOff;
 });

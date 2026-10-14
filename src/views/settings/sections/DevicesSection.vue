@@ -8,6 +8,7 @@ import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import DiagnosticReportForm from '../DiagnosticReportForm.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
+import { useSyncController } from '../../../composables/useSyncController';
 import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
 import { deviceStateLabel, useDeviceAssignment, useDevices } from '../../../composables/useDevices';
 import { useMessages } from '../../../i18n';
@@ -20,7 +21,13 @@ import { accountCardMessages } from './account.i18n';
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const a = useMessages(accountCardMessages);
-const { accountRecognized } = useSettingsContext().auth;
+const { auth, official } = useSettingsContext();
+const { accountRecognized, needsReauth } = auth;
+const { appStatus } = useSyncController();
+// #128：没有高级数据凭据时，可从已同步的官方运动里恢复设备信息。
+// 若仍有高级数据凭据，后端优先用它；不能用官方授权掩盖它的失效状态。
+const officialDeviceFallback = computed(() => official.connected.value && appStatus.value?.configured === false);
+const canRefreshDevices = computed(() => accountRecognized.value || officialDeviceFallback.value);
 const {
   models: deviceModels,
   cache: deviceCache,
@@ -39,20 +46,27 @@ const deviceRefreshBusy = ref(false);
 const deviceRefreshMessage = ref<string | null>(null);
 const deviceRefreshError = ref<string | null>(null);
 
-const unknownDeviceDetected = computed(() => accountRecognized.value && (
-  deviceModels.value.length === 0
-  || deviceModels.value.some((model) => model.profile.match_status === 'unknown')
-));
+// 空列表没有任何可指认的设备，不能据此声称「检测到未识别设备」。
+const unknownDeviceDetected = computed(() =>
+  deviceModels.value.some((model) => model.profile.match_status === 'unknown'));
+// 官方回退还没有运动证据时，#128 沿用 not_connected；这不代表官方授权失败。
+const officialDevicesPending = computed(() => officialDeviceFallback.value
+  && deviceCache.value?.refresh_error_code === 'err.sync.not_connected');
 
 const deviceKeyFor = (model: { profile: { device_id?: string | null; serial?: string | null } }): string =>
   (model.profile.device_id || model.profile.serial || '').trim();
 
 const refreshDevices = async () => {
+  if (!canRefreshDevices.value) return;
   deviceRefreshBusy.value = true;
   deviceRefreshMessage.value = null;
   deviceRefreshError.value = null;
   try {
     await loadDevices(true);
+    if (officialDevicesPending.value) {
+      deviceRefreshMessage.value = t.value.refreshNoNewList;
+      return;
+    }
     const refreshError = deviceError.value
       || errorTextFor(deviceCache.value?.refresh_error_code)
       || backendText(deviceCache.value?.refresh_error, '');
@@ -79,14 +93,14 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
   <section class="s-section" aria-labelledby="devices-title">
     <div class="s-section-head">
       <h3 id="devices-title">{{ d.secDevices }}</h3>
-      <button class="button secondary compact-btn" type="button" :disabled="deviceRefreshBusy" @click="refreshDevices">
+      <button v-if="canRefreshDevices" class="button secondary compact-btn" type="button" :disabled="deviceRefreshBusy" @click="refreshDevices">
         <Icon name="sync" :size="14" :class="{ spinning: deviceRefreshBusy }" />
         {{ deviceRefreshBusy ? t.identifying : t.identifyDevices }}
       </button>
     </div>
     <FoldTransition><div v-if="deviceRefreshError" class="alert danger" role="alert"><Icon name="warning" :size="14" />{{ deviceRefreshError }}</div></FoldTransition>
     <FoldTransition><div v-if="deviceRefreshMessage" class="alert success" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div></FoldTransition>
-    <FoldTransition><div v-if="deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div></FoldTransition>
+    <FoldTransition><div v-if="canRefreshDevices && !officialDevicesPending && deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div></FoldTransition>
 
     <div class="s-list">
       <template v-if="showSkeleton">
@@ -95,7 +109,11 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
       </template>
       <div v-else-if="!deviceModels.length" class="s-row">
         <Icon name="watch" :size="18" class="empty-icon" />
-        <div class="s-row-main"><span class="s-row-sub">{{ t.noDevices }}</span></div>
+        <div v-if="!canRefreshDevices" class="s-row-main">
+          <span class="s-row-title">{{ a.advanced(needsReauth ? a.stReauth : a.stOff) }}</span>
+          <span class="s-row-sub">{{ t.authWebSub }}</span>
+        </div>
+        <div v-else class="s-row-main"><span class="s-row-sub">{{ t.noDevices }}</span></div>
       </div>
       <template v-else>
         <component
