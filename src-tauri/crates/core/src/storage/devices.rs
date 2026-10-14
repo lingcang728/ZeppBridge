@@ -268,6 +268,58 @@ impl Database {
         ))
     }
 
+    /// 官方授权账号的设备证据：从本机已存的官方运动列表里汇总出来。
+    ///
+    /// 官方开放平台没有设备列表接口，`/users/{id}/devices` 只认旧版
+    /// apptoken——只走官方授权的账号永远拿不到设备列表，设置页就一直是
+    /// 「未识别设备」，哪怕每条运动里都写着表名。运动列表的每一项自带
+    /// `source`（`run.10551555.huami.com`，中间那段就是 `deviceSource`）和
+    /// `deviceName`（按语言给的产品名 JSON），这里按 `deviceSource` 去重，
+    /// 拼成设备列表条目的形状交给 `parse_device_profiles`，匹配规则不另起一套。
+    ///
+    /// `source` 中间不是纯数字的（手机记录的运动之类）不算一台表。
+    pub fn official_workout_device_items(&self) -> Result<Vec<serde_json::Value>> {
+        let mut statement = self.conn.prepare(
+            "SELECT payload, payload_zip FROM raw_records
+             WHERE stream = 'workouts' AND provider = 'official'
+             ORDER BY start_utc DESC",
+        )?;
+        let mut rows = statement.query([])?;
+        let mut seen = BTreeMap::<i64, Option<String>>::new();
+        while let Some(row) = rows.next()? {
+            let Ok(payload) = decode_raw_payload(row.get(0)?, row.get(1)?) else {
+                continue;
+            };
+            let Ok(payload) = serde_json::from_str::<serde_json::Value>(&payload) else {
+                continue;
+            };
+            let Some(items) = payload.get("items").and_then(|value| value.as_array()) else {
+                continue;
+            };
+            for item in items {
+                let Some(code) = item
+                    .get("source")
+                    .and_then(|value| value.as_str())
+                    .and_then(official_source_device_code)
+                else {
+                    continue;
+                };
+                let name = item.get("deviceName").and_then(official_device_name);
+                let entry = seen.entry(code).or_insert(None);
+                if entry.is_none() {
+                    *entry = name;
+                }
+            }
+        }
+        Ok(seen
+            .into_iter()
+            .map(|(code, name)| match name {
+                Some(name) => serde_json::json!({ "deviceSource": code, "deviceName": name }),
+                None => serde_json::json!({ "deviceSource": code }),
+            })
+            .collect())
+    }
+
     pub(super) fn harvest_device_identities(&self, payload: &serde_json::Value) -> Result<()> {
         for hint in device_identity_hints(payload) {
             self.upsert_device_identity(&hint)?;
@@ -305,4 +357,32 @@ pub fn device_summary_from_index(
         .max()
         .cloned();
     (latest.is_some(), latest)
+}
+
+/// 官方运动 `source` 里的 `deviceSource`：`run.10551555.huami.com` → `10551555`。
+pub(super) fn official_source_device_code(source: &str) -> Option<i64> {
+    let mut segments = source.trim().split('.');
+    segments.next()?;
+    let code = segments.next()?;
+    if code.is_empty() || !code.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    code.parse().ok().filter(|value| *value > 0)
+}
+
+/// 官方运动的 `deviceName` 是一段按语言给的 JSON 字符串
+/// （`{"en-WW":"Amazfit T-Rex 3 Pro (48mm)","zh-CN":…}`）。目录别名是英文的，
+/// 所以先取 `en-WW`；不是 JSON 的就原样当名字。
+pub(super) fn official_device_name(value: &serde_json::Value) -> Option<String> {
+    let raw = value.as_str()?.trim();
+    let name = match serde_json::from_str::<serde_json::Value>(raw) {
+        Ok(serde_json::Value::Object(names)) => ["en-WW", "en-US", "en"]
+            .iter()
+            .find_map(|locale| names.get(*locale).and_then(|name| name.as_str()))
+            .or_else(|| names.values().find_map(|name| name.as_str()))?
+            .trim()
+            .to_string(),
+        _ => raw.to_string(),
+    };
+    (!name.is_empty()).then_some(name)
 }
