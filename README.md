@@ -15,7 +15,7 @@
 </div>
 
 > [!IMPORTANT]
-> ZeppBridge is an independent, unofficial open-source project. It is not affiliated with or endorsed by Zepp Health, Huami or Amazfit. Use it only with accounts and data you are entitled to access.
+> ZeppBridge is an independent open-source project with official Zepp approval. Use it only with accounts and data you are entitled to access.
 
 [![ZeppBridge overview: pinned metrics, heart rate, steps and sleep](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
@@ -126,7 +126,7 @@ If the Windows install folder is not writable, the app uses your user data folde
 - Syncing health records is read-only; training plans you confirm are written to Zepp. MCP's "Let AI publish training plans directly" is a separate switch.
 - Error reports are only sent when you confirm them. There is no automatic telemetry or background crash reporting.
 
-ZeppBridge is an independent, unofficial open-source project, not affiliated with or endorsed by Zepp Health, Huami or Amazfit. See [security and privacy](docs/reference/security-and-privacy.md); report security issues through GitHub's private vulnerability reporting, not a public issue.
+ZeppBridge is an independent open-source project with official Zepp approval. See [security and privacy](docs/reference/security-and-privacy.md); report security issues through GitHub's private vulnerability reporting, not a public issue.
 
 ## Docs and feedback
 
