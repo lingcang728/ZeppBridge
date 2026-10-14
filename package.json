@@ -1,7 +1,7 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "2.4.4",
+  "version": "3.0.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -9,9 +9,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:web": "vite build",
+    "site:deploy": "node scripts/site/finish-dist.mjs && wrangler pages deploy .site-cache/site-dist --project-name=zeppbridge --branch=main",
+    "build:web": "node scripts/site/build.mjs",
+    "site:media": "python scripts/site/capture-features.py --all",
+    "site:verify": "python scripts/site/verify-landing.py",
     "test:feedback": "node --test tests/feedback-function.test.mjs",
-    "test:functions": "node --test tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs",
+    "test:functions": "node --test tests/font-subset.test.mjs tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs tests/zepp-oauth-functions.test.mjs tests/site-middleware.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
@@ -28,7 +31,7 @@
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
     "feedback:triage": "node scripts/feedback/triage.mjs",
-    "verify:login-probe": "python scripts/verify/login-activity-probe.py || py -3 scripts/verify/login-activity-probe.py"
+    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -36,13 +39,15 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
-    "echarts": "^5.5.1",
+    "echarts": "^6.1.0",
+    "leaflet": "^1.9.4",
     "vue": "^3.5.13",
-    "vue-echarts": "^7.0.3",
+    "vue-echarts": "^8.3.1",
     "vue-router": "^5.3.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@types/leaflet": "^1.9.22",
     "@vitejs/plugin-vue": "^6.0.8",
     "typescript": "~6.0.3",
     "vite": "^7.3.6",

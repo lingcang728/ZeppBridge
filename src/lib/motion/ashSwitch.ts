@@ -1,0 +1,168 @@
+import { nextTick } from 'vue';
+import { ensureLocalePack, locale, setLocale, type Locale } from '../../i18n';
+import { dustLayer } from './ashDust';
+import { drawVisibleText, featherOf, grainsOf, TEXT_INK, type AshOrigin } from './ashGlyphs';
+import { breatheCharts, closeSweep, openSweep, settleNewText, startSweep } from './ashReveal';
+import { localeTarget } from './localeTarget';
+import { whenFramesSteady } from './steady';
+import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
+
+/**
+ * 换语言的「响指」（用户 2026-10-04 提的点子：像《复联 4》灭霸打响指，旧语言的字化成灰被吹走，底下露出新语言）。
+ *
+ * 第二版（同日录屏反馈）：从左往右扫一道风，改成**从语言轮处扩散的一圈涟漪**——和换主题的圆同一个起点方位、
+ * 同一条曲线、同样的时长，「换色」「换字」是同一种动作。圆的边扫到哪里，那里的旧字和图表线条碎成灰、顺着涟漪
+ * 往外吹散，圆里面已经是新语言。第一版的问题和这一版的对策：
+ *   - 前沿那条光带忽隐忽现，不如不要 → 删掉；
+ *   - 导航胶囊在两种语言里位置不同（中文居中；英文同步胶囊变宽、导航让到左边），被一刀刀扫开像瞬移
+ *     → 换场期间导航单独成一层（material.css 的 ash-nav），从旧位置滑到新位置；
+ *   - 只有字碎、图表不动，像只换了一半 → 图表画布的线条也取进灰里；
+ *   - 掉帧 → 灰的画布按 CSS 像素画（不乘设备像素比，4K 屏上少画四分之三）、灰粒上限减半、没有整屏着色器；
+ *     换场期间顶栏胶囊不补间宽度（新快照是活的，宽度每变一帧整张快照都要重画）；
+ *   - 快速连拨时上一次被直接跳到结尾（一次硬切）→ 排队：这一圈放完，接着从语言轮再放一圈到最后拨到的那一项。
+ *
+ * 做法（不碰页面代码，所有页面自动生效）：
+ * 1. **取字形**：换之前扫一遍可视区里看得见的文字（TreeWalker + Range 量每行 / 每个字的位置），按它们的字体、
+ *    字号、颜色画到一张看不见的 2D 画布上，读出像素——灰烬就是旧文字真实的笔画，不是方块。图表画布直接 drawImage。
+ * 2. **换场**：View Transitions 给新旧整页各拍一张（新的那张是活的），新快照套一个从语言轮处长大的圆形遮罩。
+ *    10-12 起是柔边（ashGlyphs.ts 的 featherOf）：硬圆边两侧排版高低不同时，错开的卡沿像一根斜条飞过去。
+ * 3. **吹散**：每个像素是一粒灰，交给 WebGL 一次画完。每粒的「起飞时刻」= 圆扫到它的时刻，位置、透明度、大小全在
+ *    顶点着色器里按时间算，CPU 每帧只更新一个时间。灰的画布带 view-transition-name，换场期间是独立的一层；
+ *    连拨时几圈的灰画在同一张画布上，上一圈没飘完的灰不会被下一次换场冻住。
+ *
+ * 系统要求减少动效、内核没有 View Transitions 时直接换；没有 WebGL 时只放涟漪、不放灰。
+ *
+ * 盖满整屏的浮层（新手引导第一屏）里拨语言时传 `scope`（10-13 录屏）：只把浮层里的字化灰、只给浮层里的字
+ * 蒙雾，顶栏导航也不单独成层。以前压在毛玻璃底下、看不见的整页文字也被取了出来——换场时灰从一大片看不见的
+ * 字上飞起来，在涟漪前沿堆成一道亮圈；雾层画在浮层上面，底下的概览一下子清楚地闪出来；导航那一层
+ * 浮在浮层之上，顶栏凭空闪一下。
+ *
+ * 第三版（2026-10-06 精修纲领 2.2）：
+ *   - 慢下来、柔一点：涟漪 1050ms（timing.ts 的 LOCALE_REVEAL_MS，换主题仍是 640），灰飘得更远、更久，三次方收尾；
+ *   - 新字不是「啪」地出现：圆扫过的地方先蒙着一层预先模糊好的新字，按圈分四环依次淡掉，像卡片那样由糊到清
+ *     （ashReveal.ts，模糊只做一次、是静态层，逐帧只动透明度）；
+ *   - 顶栏导航胶囊的字也化灰；胶囊的玻璃底交给换场那一层自己画，宽度从旧到新平滑伸缩，不再两只宽窄不同的
+ *     胶囊叠着闪（material.css 的 ash-nav）；
+ *   - 图表的线和柱子不化灰，圆扫过时轻轻糊一下再变清楚，不重画。
+ */
+
+export type { AshOrigin };
+type ViewTransitionHandle = { ready: Promise<void>; finished: Promise<void>; skipTransition: () => void };
+type ViewTransitionDocument = Document & { startViewTransition?: (update: () => Promise<void> | void) => ViewTransitionHandle };
+
+/* ── 换场 ──────────────────────────────── */
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+/** 涟漪默认从顶栏的语言轮长出来；顶栏没有语言轮（窄窗口收掉了）时从右上角。 */
+const defaultOrigin = (): AshOrigin => {
+  const rect = document.querySelector<HTMLElement>('.locale-wheel')?.getBoundingClientRect();
+  if (rect?.width) return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  return { x: window.innerWidth - 32, y: 32 };
+};
+
+/** 放一圈：从 origin 扩散到 value。返回时这一圈的换场已经结束（灰可能还在飘）。 */
+const ripple = async (value: Locale, origin: AshOrigin, scope?: Element) => {
+  const doc = document as ViewTransitionDocument;
+  // 语言包先到：换上去的第一帧就是新语言，不会先露出英文兜底、过一会儿再变（那又是一跳）。
+  await Promise.race([ensureLocalePack(value), new Promise((resolve) => window.setTimeout(resolve, 600))]);
+  if (value === locale.value) return;
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const reach = Math.ceil(Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y)));
+  const layer = dustLayer(width, height);
+  const grains = grainsOf([[drawVisibleText(width, height, scope), TEXT_INK]], width, height, origin, reach);
+  let settle = null as ReturnType<typeof settleNewText>;
+  const batch = layer && grains ? layer.add(grains, origin) : null;
+
+  const root = document.documentElement;
+  // 柔边圆（material.css 的 ::view-transition-new(root) 遮罩）：圆心、柔边宽写在根上，半径 --ash-r 由下面的动画推。
+  const feather = featherOf(reach);
+  root.style.setProperty('--ash-x', `${Math.round(origin.x)}px`);
+  root.style.setProperty('--ash-y', `${Math.round(origin.y)}px`);
+  root.style.setProperty('--ash-f', `${feather}px`);
+  const unmask = () => { for (const name of ['--ash-x', '--ash-y', '--ash-f']) root.style.removeProperty(name); };
+  root.dataset.ashMorph = '';
+  if (scope) root.dataset.ashScoped = '';
+  openSweep(origin, reach);
+  const transition = doc.startViewTransition!(async () => {
+    setLocale(value);
+    if (batch) layer!.mount();
+    // 顶栏换语言后要重新量档位（AppTopBar 的 refit，一串 nextTick）：等它落定再拍新快照，换场途中顶栏不再变。
+    for (let i = 0; i < 6; i += 1) await nextTick();
+    // 新字的「糊」底：在新快照里，所以只在圆里面看得见。
+    settle = settleNewText(width, height, origin, reach, layer?.canvas ?? null, scope);
+  });
+  try {
+    await transition.ready;
+  } catch {
+    if (batch) layer!.drop(batch);
+    settle?.dispose();
+    closeSweep();
+    delete root.dataset.ashMorph;
+    delete root.dataset.ashScoped;
+    unmask();
+    return;
+  }
+  const grow = root.animate(
+    { '--ash-r': ['2px', `${reach + feather}px`] } as PropertyIndexedKeyframes,
+    { duration: LOCALE_REVEAL_MS, easing: OPEN_EASE, fill: 'both', pseudoElement: '::view-transition-new(root)' },
+  );
+  // 导航胶囊那一层（material.css 的 ash-nav）和圆同一刻开跑。
+  const parts = [grow, ...document.getAnimations().filter((animation) =>
+    ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? '').includes('(ash-nav)'))];
+  // 和主题扩散一样：先停在起点（画面上还是旧语言），等两张整屏快照上了 GPU、帧节奏平稳再长。
+  // 起点留 2px 而不是 0：零半径时新快照整张被跳过、不上 GPU，开跑后第一帧才现传，卡 100ms。
+  for (const animation of parts) animation.pause();
+  await whenFramesSteady();
+  for (const animation of parts) if (animation.playState === 'paused') animation.play();
+  if (batch) layer!.start(batch, grow);
+  startSweep();
+  settle?.start();
+  breatheCharts(width, height, origin, reach, layer?.canvas ?? null, scope);
+  await transition.finished.catch(() => undefined);
+  closeSweep();
+  delete root.dataset.ashMorph;
+  delete root.dataset.ashScoped;
+  unmask();
+};
+
+let busy = false;
+let queued: { value: Locale; origin?: AshOrigin; scope?: Element } | null = null;
+
+/**
+ * 换语言并放「响指」。`origin` 是被拨的那只语言轮（视口坐标），不给就用顶栏的语言轮。
+ * 上一圈还没放完又拨：记下最后拨到的那一项（语言轮先停在那儿），这一圈放完再从语言轮放一圈过去。
+ * 放不了（减少动效、内核不支持）就直接换。`scope`：盖满整屏的浮层，只动它里面的字（见上面）。
+ */
+export const switchLocaleWithAsh = async (value: Locale, origin?: AshOrigin, scope?: Element): Promise<void> => {
+  if (busy) {
+    queued = { value, origin, scope };
+    localeTarget.value = value;
+    return;
+  }
+  if (value === locale.value) {
+    localeTarget.value = null;
+    return;
+  }
+  const doc = document as ViewTransitionDocument;
+  if (!doc.startViewTransition || reducedMotion()) {
+    localeTarget.value = null;
+    setLocale(value);
+    return;
+  }
+  busy = true;
+  localeTarget.value = value;
+  try {
+    await ripple(value, origin ?? defaultOrigin(), scope);
+  } catch {
+    if (locale.value !== value) setLocale(value);
+  } finally {
+    busy = false;
+    const next = queued;
+    queued = null;
+    if (next) void switchLocaleWithAsh(next.value, next.origin, next.scope);
+    else localeTarget.value = null;
+  }
+};

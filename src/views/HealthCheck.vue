@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { displayDateTimeFormatter } from '../lib/dateTime';
+import { useFirstLoad } from '../composables/useFirstLoad';
 
 /**
  * 数据健康中心。
@@ -17,382 +18,23 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import FoldTransition from '../components/FoldTransition.vue';
 import PageHeader from '../components/PageHeader.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { HEALTH_CHECK_DAYS, healthCheckQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
+import { formatBytes, formatNumber } from '../lib/format';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
 import { backendText } from '../i18n/backendText';
+import { healthCheckMessages as messages } from './HealthCheck.i18n';
 
-const messages = defineMessages(
-  {
-    window30: '最近 30 天',
-    window90: '最近 90 天',
-    window365: '最近一年',
-    loadFailed: '读取数据健康状态失败',
-    retry: '重试',
-    noRecords: '尚无记录',
-    timeUnknown: '时间未知',
-    notProvided: '未提供',
-    backToSettings: '返回设置',
-    eyebrow: '数据健康',
-    title: '数据健康检查',
-    intro: '每条数据流从云端取回、被解析、写进本机这三步分别是什么状态，覆盖到哪些日期，来自哪个来源。缺就是缺，不用 0 补。',
-    rangeAria: '覆盖范围',
-    loadingAria: '正在读取数据健康状态',
-    replayInProgress: '正在用新版解析器重放本地报文。这期间云端同步会主动让路并自动重试，不是失败。',
-
-    timingsTitle: '三个不一样的「时间」',
-    timingCloud: '上次从云端取回',
-    timingCloudNote: '尚无结果',
-    timingReplay: '上次本地重放',
-    timingReplayNote: '用当前解析器重新解释本地报文，不触网，也不改写上面那个时间',
-    timingManual: '上次手动重新解析',
-    timingManualNote: '你亲手点过的那一次',
-    timingNewest: '最新一条健康样本',
-    timingNewestNote: '手表上这条记录本身发生的时间',
-
-    dbTitle: '本机数据库',
-    dbSize: '库体积',
-    dbRaw: '原始报文',
-    dbCanonical: '标准化记录',
-    dbPending: '待归一化',
-    dbSchema: 'schema 版本',
-    dbNormalizer: '解析器修订',
-    integrityPassed: '通过',
-    integrityFailed: (detail: string) => `未通过（${detail}）`,
-    integrityDetailBelow: '详情见下',
-    integrityLine: (verdict: string, checkedAt: string) => `完整性检查：${verdict} · ${checkedAt}`,
-    integrityNeverRun: '还没跑过完整性检查。它会扫描整个库，大库需要一点时间，所以只在你主动点击时执行。',
-
-    streamsTitle: '每条数据流走到哪一步',
-    streamsNote: '取回、解析、写入是三件能各自失败的事。把它们折叠成一个红点，你就没法知道该重试、该重新连接，还是这个账号本来就没有这条流。',
-    stageFetch: '取回',
-    stageParse: '解析',
-    stageWrite: '写入',
-    stageLine: (stage: string, state: string) => `${stage}：${state}`,
-    factRaw: '原始报文',
-    factCanonical: '标准化记录',
-    factSources: '来源',
-    factObservedDays: '观察到的日期',
-    days: (count: number) => `${count} 天`,
-    gapExamples: (dates: string) => `缺口示例：${dates}`,
-    gapMore: ' 等',
-    period: '。',
-    latestObserved: (date: string) => `最近一次 ${date}。`,
-    noRecordsYet: '暂无记录',
-    sourceSeparator: '、',
-
-    occasionalTitle: '偶尔才给的指标',
-    occasionalNote: 'VO₂max、乳酸阈值这类指标手表本来就不是天天给。这里只报告观察到的日期和最近一次，不按天算缺口——把正常的稀疏画成红色才是误导。',
-    occasionalLine: (records: string, days: number) => `${records} 条 · 观察到 ${days} 天`,
-    occasionalLatest: (date: string) => `最近一次 ${date}`,
-    occasionalNone: '这段范围内没有观察到',
-
-    actionsTitle: '可以做点什么',
-    actionRunning: '执行中…',
-    actionRun: '执行',
-    confirmDestructive: (label: string, reason: string) => `${label}：${reason}\n确定继续吗？`,
-    actionSynced: '同步已执行，状态已刷新。',
-    actionReplayed: (count: string) => `已用当前解析器重放本地报文（${count} 条派生记录）。云端同步时间没有被改写。`,
-    actionIntegrityOk: '数据库完整性检查通过。',
-    actionIntegrityFailed: (detail: string) => `数据库完整性检查未通过：${detail}`,
-    actionIntegrityFallback: '请备份数据文件夹后重新同步',
-    actionFolderOpened: '已打开数据文件夹。',
-    actionReconnect: '请到设置页重新连接 Zepp 账号。',
-    actionFailed: (label: string) => `${label}失败`,
-
-    /* 覆盖说明由 kind / cadence / observed_days / gap_total 组合出来。
-       后端也发了一句中文 note，那是给 CLI 的：这里不用它，免得英文界面上
-       冒出半句中文。 */
-    coveragePerEvent: '按事件产生：没有记录代表这段时间没有对应活动，不是缺口。',
-    coverageOccasional: '手表偶尔才给一次：空白日期是正常的，不代表数据丢失。',
-    coverageNoData: '这段时间还没有任何本地数据；先做一次同步再看。',
-    coverageNoGaps: '从第一天有数据起，没有观察到缺口。',
-    coverageGaps: (days: number) =>
-      `从第一天有数据起，有 ${days} 天没有观察到数据。手表没戴、没同步或云端未返回都会造成缺口。`,
-
-    action: {
-      reauth: { label: '重新连接 Zepp 账号', reason: '有数据流因为认证失效而拉不到数据。' },
-      reprocess: { label: '用当前解析器重放本地报文', reason: '' },
-      sync_retry: { label: '再同步一次', reason: '上一次有数据流没能从云端取回数据。' },
-      sync_first: { label: '做第一次同步', reason: '本机还没有任何一次成功的云端同步记录。' },
-      integrity_check: { label: '检查数据库完整性', reason: '对整库做一次 SQLite integrity_check，大库上需要一点时间。' },
-      open_data_folder: { label: '打开数据文件夹', reason: '本机数据库、备份和导出都在这里。' },
-    },
-    reprocessReason: (pending: number) =>
-      `有 ${pending} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。`,
-
-    cadence: {
-      continuous: '一天多次',
-      daily: '一天一条',
-      nightly: '一夜一条',
-      per_event: '发生了才有',
-      occasional: '偶尔才给',
-    },
-    stage: { ok: '正常', failed: '失败', never: '尚未发生' },
-    errorKind: {
-      network: '没连上云端',
-      auth: '需要重新连接账号',
-      not_available: '这个账号没有这条流',
-      unrecognized_payload: '拿到了报文但没看懂',
-      cloud_rejected: '云端收到了请求但拒绝了',
-      storage: '写本地库失败',
-      busy: '另一个操作正在写库，这次让开了',
-      cancelled: '被取消',
-      unknown: '未分类的失败',
-    },
-    source: {
-      device: '单设备',
-      user_fused: '用户融合',
-      unknown: '来源未知',
-    },
-  },
-  {
-    window30: 'Last 30 days',
-    window90: 'Last 90 days',
-    window365: 'Last year',
-    loadFailed: 'Could not read the data health status',
-    retry: 'Try again',
-    noRecords: 'No records yet',
-    timeUnknown: 'Time unknown',
-    notProvided: 'Not provided',
-    backToSettings: 'Back to settings',
-    eyebrow: 'Data health',
-    title: 'Data health check',
-    intro: 'For each data stream: how far it got through fetching from the cloud, parsing, and writing locally; which dates it covers; and where it came from. Missing is missing — never padded with a zero.',
-    rangeAria: 'Coverage window',
-    loadingAria: 'Reading the data health status',
-    replayInProgress: 'Replaying local payloads through the new parser. Cloud syncs step aside and retry themselves during this; that is not a failure.',
-
-    timingsTitle: 'Three different "last times"',
-    timingCloud: 'Last fetched from the cloud',
-    timingCloudNote: 'No result yet',
-    timingReplay: 'Last local replay',
-    timingReplayNote: 'Re-reads local payloads with the current parser. No network, and it does not rewrite the time above.',
-    timingManual: 'Last manual reprocess',
-    timingManualNote: 'The one you clicked yourself',
-    timingNewest: 'Newest health sample',
-    timingNewestNote: 'When the record itself happened on the watch',
-
-    dbTitle: 'Local database',
-    dbSize: 'File size',
-    dbRaw: 'Raw payloads',
-    dbCanonical: 'Normalized records',
-    dbPending: 'Pending normalization',
-    dbSchema: 'Schema version',
-    dbNormalizer: 'Parser revision',
-    integrityPassed: 'passed',
-    integrityFailed: (detail: string) => `failed (${detail})`,
-    integrityDetailBelow: 'details below',
-    integrityLine: (verdict: string, checkedAt: string) => `Integrity check: ${verdict} · ${checkedAt}`,
-    integrityNeverRun: 'No integrity check has been run. It scans the whole database, which takes a while on a large one, so it only runs when you ask for it.',
-
-    streamsTitle: 'How far each stream got',
-    streamsNote: 'Fetching, parsing and writing are three things that fail separately. Collapsed into one red dot, you could not tell whether to retry, to reconnect, or whether this account simply has no such stream.',
-    stageFetch: 'Fetch',
-    stageParse: 'Parse',
-    stageWrite: 'Write',
-    stageLine: (stage: string, state: string) => `${stage}: ${state}`,
-    factRaw: 'Raw payloads',
-    factCanonical: 'Normalized records',
-    factSources: 'Sources',
-    factObservedDays: 'Days observed',
-    days: (count: number) => `${count} days`,
-    gapExamples: (dates: string) => `Gaps include: ${dates}`,
-    gapMore: ' and more',
-    period: '.',
-    latestObserved: (date: string) => `Most recent ${date}.`,
-    noRecordsYet: 'No records yet',
-    sourceSeparator: ', ',
-
-    occasionalTitle: 'Metrics that only turn up occasionally',
-    occasionalNote: 'Metrics like VO₂max and lactate threshold are not reported daily by design. This section reports the days observed and the most recent one, and never counts daily gaps — painting normal sparseness red would be the misleading thing to do.',
-    occasionalLine: (records: string, days: number) => `${records} records · observed on ${days} days`,
-    occasionalLatest: (date: string) => `most recent ${date}`,
-    occasionalNone: 'Nothing observed in this range',
-
-    actionsTitle: 'What you can do',
-    actionRunning: 'Running…',
-    actionRun: 'Run',
-    confirmDestructive: (label: string, reason: string) => `${label}: ${reason}\nContinue?`,
-    actionSynced: 'Sync ran and the status was refreshed.',
-    actionReplayed: (count: string) => `Local payloads replayed with the current parser (${count} derived records). The cloud sync time was not rewritten.`,
-    actionIntegrityOk: 'The database passed its integrity check.',
-    actionIntegrityFailed: (detail: string) => `The database failed its integrity check: ${detail}`,
-    actionIntegrityFallback: 'Back up the data folder and sync again',
-    actionFolderOpened: 'Data folder opened.',
-    actionReconnect: 'Go to Settings and connect the Zepp account again.',
-    actionFailed: (label: string) => `${label} failed`,
-
-    coveragePerEvent: 'Produced per event: no record means nothing happened then, not that something is missing.',
-    coverageOccasional: 'The watch only reports this occasionally; blank days are normal and mean nothing was lost.',
-    coverageNoData: 'No local data for this period yet. Run a sync first.',
-    coverageNoGaps: 'No gaps observed since the first day with data.',
-    coverageGaps: (days: number) =>
-      `${days} days with no data observed since the first day with data. Not wearing the watch, not syncing, or the cloud returning nothing all cause gaps.`,
-
-    action: {
-      reauth: { label: 'Connect the Zepp account again', reason: 'Some streams cannot fetch because the credentials expired.' },
-      reprocess: { label: 'Replay local payloads with the current parser', reason: '' },
-      sync_retry: { label: 'Sync again', reason: 'Some streams failed to fetch from the cloud last time.' },
-      sync_first: { label: 'Run the first sync', reason: 'This machine has no successful cloud sync on record yet.' },
-      integrity_check: { label: 'Check database integrity', reason: 'Runs one SQLite integrity_check over the whole database; it takes a while on a large one.' },
-      open_data_folder: { label: 'Open the data folder', reason: 'The local database, backups and exports all live here.' },
-    },
-    reprocessReason: (pending: number) =>
-      `${pending} stored payloads have produced no normalized record yet. A replay touches no network and does not rewrite the cloud sync time.`,
-
-    cadence: {
-      continuous: 'many times a day',
-      daily: 'once a day',
-      nightly: 'once a night',
-      per_event: 'only when it happens',
-      occasional: 'only occasionally',
-    },
-    stage: { ok: 'OK', failed: 'failed', never: 'never happened' },
-    errorKind: {
-      network: 'could not reach the cloud',
-      auth: 'the account needs reconnecting',
-      not_available: 'this account has no such stream',
-      unrecognized_payload: 'a payload arrived but could not be read',
-      cloud_rejected: 'the cloud received the request and refused it',
-      storage: 'writing to the local database failed',
-      busy: 'another operation was writing, so this one stood aside',
-      cancelled: 'cancelled',
-      unknown: 'unclassified failure',
-    },
-    source: {
-      device: 'single device',
-      user_fused: 'user-fused',
-      unknown: 'source unknown',
-    },
-  },
-  {
-    window30: 'Últimos 30 días',
-    window90: 'Últimos 90 días',
-    window365: 'Último año',
-    loadFailed: 'No se pudo leer el estado de los datos',
-    retry: 'Reintentar',
-    noRecords: 'Aún no hay registros',
-    timeUnknown: 'Hora desconocida',
-    notProvided: 'Sin datos',
-    backToSettings: 'Volver a configuración',
-    eyebrow: 'Estado de los datos',
-    title: 'Revisión del estado de los datos',
-    intro: 'Para cada flujo de datos: hasta dónde llegó en la descarga desde la nube, el análisis y la escritura local; qué fechas cubre; y de dónde vino. Lo que falta, falta: nunca se rellena con cero.',
-    rangeAria: 'Periodo de cobertura',
-    loadingAria: 'Leyendo el estado de los datos',
-    replayInProgress: 'Reprocesando los registros locales con el nuevo analizador. Mientras tanto, las sincronizaciones con la nube esperan y se reintentan solas; no es un fallo.',
-
-    timingsTitle: 'Tres «últimas veces» distintas',
-    timingCloud: 'Última descarga desde la nube',
-    timingCloudNote: 'Aún sin resultado',
-    timingReplay: 'Último reprocesamiento local',
-    timingReplayNote: 'Vuelve a leer los registros locales con el analizador actual. Sin red, y no cambia la hora de arriba.',
-    timingManual: 'Último reprocesamiento manual',
-    timingManualNote: 'El que pulsaste tú',
-    timingNewest: 'Muestra de salud más reciente',
-    timingNewestNote: 'Cuándo ocurrió el registro en el reloj',
-
-    dbTitle: 'Base de datos local',
-    dbSize: 'Tamaño del archivo',
-    dbRaw: 'Registros originales',
-    dbCanonical: 'Registros normalizados',
-    dbPending: 'Pendientes de normalizar',
-    dbSchema: 'Versión del esquema',
-    dbNormalizer: 'Revisión del analizador',
-    integrityPassed: 'correcta',
-    integrityFailed: (detail: string) => `falló (${detail})`,
-    integrityDetailBelow: 'detalles abajo',
-    integrityLine: (verdict: string, checkedAt: string) => `Comprobación de integridad: ${verdict} · ${checkedAt}`,
-    integrityNeverRun: 'No se ha hecho ninguna comprobación de integridad. Revisa toda la base de datos, lo que tarda en una grande, así que solo se hace cuando la pides.',
-
-    streamsTitle: 'Hasta dónde llegó cada flujo',
-    streamsNote: 'Descargar, analizar y escribir son tres cosas que fallan por separado. Si se juntaran en un solo punto rojo, no sabrías si reintentar, volver a conectar, o si esta cuenta simplemente no tiene ese flujo.',
-    stageFetch: 'Descarga',
-    stageParse: 'Análisis',
-    stageWrite: 'Escritura',
-    stageLine: (stage: string, state: string) => `${stage}: ${state}`,
-    factRaw: 'Registros originales',
-    factCanonical: 'Registros normalizados',
-    factSources: 'Fuentes',
-    factObservedDays: 'Días observados',
-    days: (count: number) => `${count} días`,
-    gapExamples: (dates: string) => `Los huecos incluyen: ${dates}`,
-    gapMore: ' y más',
-    period: '.',
-    latestObserved: (date: string) => `El más reciente: ${date}.`,
-    noRecordsYet: 'Aún no hay registros',
-    sourceSeparator: ', ',
-
-    occasionalTitle: 'Métricas que solo aparecen de vez en cuando',
-    occasionalNote: 'Métricas como el VO₂máx y el umbral de lactato no se reportan a diario por diseño. Esta sección muestra los días observados y el más reciente, y nunca cuenta huecos diarios: pintar de rojo una escasez normal sería lo engañoso.',
-    occasionalLine: (records: string, days: number) => `${records} registros · observados en ${days} días`,
-    occasionalLatest: (date: string) => `el más reciente: ${date}`,
-    occasionalNone: 'Nada observado en este rango',
-
-    actionsTitle: 'Qué puedes hacer',
-    actionRunning: 'Ejecutando…',
-    actionRun: 'Ejecutar',
-    confirmDestructive: (label: string, reason: string) => `${label}: ${reason}\n¿Continuar?`,
-    actionSynced: 'Se sincronizó y el estado se actualizó.',
-    actionReplayed: (count: string) => `Los registros locales se reprocesaron con el analizador actual (${count} registros derivados). La hora de sincronización con la nube no cambió.`,
-    actionIntegrityOk: 'La base de datos pasó la comprobación de integridad.',
-    actionIntegrityFailed: (detail: string) => `La base de datos no pasó la comprobación de integridad: ${detail}`,
-    actionIntegrityFallback: 'Haz una copia de la carpeta de datos y vuelve a sincronizar',
-    actionFolderOpened: 'Carpeta de datos abierta.',
-    actionReconnect: 'Ve a Configuración y vuelve a conectar la cuenta de Zepp.',
-    actionFailed: (label: string) => `${label} falló`,
-
-    coveragePerEvent: 'Se produce por evento: si no hay registro es que no pasó nada en ese momento, no que falte algo.',
-    coverageOccasional: 'El reloj solo reporta esto de vez en cuando; los días en blanco son normales y no significan que se haya perdido algo.',
-    coverageNoData: 'Todavía no hay datos locales de este periodo. Sincroniza primero.',
-    coverageNoGaps: 'No se observan huecos desde el primer día con datos.',
-    coverageGaps: (days: number) =>
-      `${days} días sin datos desde el primer día con datos. No usar el reloj, no sincronizar o que la nube no devuelva nada causan huecos.`,
-
-    action: {
-      reauth: { label: 'Volver a conectar la cuenta de Zepp', reason: 'Algunos flujos no pueden descargarse porque las credenciales caducaron.' },
-      reprocess: { label: 'Reprocesar los registros locales con el analizador actual', reason: '' },
-      sync_retry: { label: 'Sincronizar de nuevo', reason: 'Algunos flujos no se pudieron descargar de la nube la última vez.' },
-      sync_first: { label: 'Hacer la primera sincronización', reason: 'Este equipo todavía no tiene ninguna sincronización exitosa con la nube.' },
-      integrity_check: { label: 'Comprobar la integridad de la base de datos', reason: 'Ejecuta un integrity_check de SQLite sobre toda la base de datos; tarda en una grande.' },
-      open_data_folder: { label: 'Abrir la carpeta de datos', reason: 'La base de datos local, las copias y las exportaciones están aquí.' },
-    },
-    reprocessReason: (pending: number) =>
-      `${pending} registros guardados todavía no han producido ningún registro normalizado. Reprocesar no usa la red y no cambia la hora de sincronización con la nube.`,
-
-    cadence: {
-      continuous: 'muchas veces al día',
-      daily: 'una vez al día',
-      nightly: 'una vez por noche',
-      per_event: 'solo cuando ocurre',
-      occasional: 'solo de vez en cuando',
-    },
-    stage: { ok: 'correcto', failed: 'falló', never: 'nunca ocurrió' },
-    errorKind: {
-      network: 'no se pudo conectar con la nube',
-      auth: 'hay que volver a conectar la cuenta',
-      not_available: 'esta cuenta no tiene ese flujo',
-      unrecognized_payload: 'llegaron datos pero no se pudieron leer',
-      cloud_rejected: 'la nube recibió la solicitud y la rechazó',
-      storage: 'falló la escritura en la base de datos local',
-      busy: 'otra operación estaba escribiendo, así que esta esperó',
-      cancelled: 'cancelado',
-      unknown: 'fallo sin clasificar',
-    },
-    source: {
-      device: 'un solo dispositivo',
-      user_fused: 'combinado del usuario',
-      unknown: 'fuente desconocida',
-    },
-  },
-  'views/HealthCheck',
-);
 const t = useMessages(messages);
 
 const lookup = (table: unknown, key: string): string | undefined =>
@@ -404,11 +46,18 @@ const loadSeq = createLoadSeq();
 
 const health = ref<DataHealth | null>(null);
 const loading = ref(true);
+// 从卡 / 链接点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(healthCheckQueries()) : null;
+if (preloaded) {
+  health.value = preloaded[0];
+  loading.value = false;
+}
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const busyAction = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
 const actionError = ref<string | null>(null);
-const windowDays = ref(90);
+const windowDays = ref(HEALTH_CHECK_DAYS);
 
 const WINDOWS = computed(() => [
   { days: 30, label: t.value.window30 },
@@ -421,7 +70,7 @@ const load = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const next = await backend.getDataHealth(windowDays.value);
+    const next = await (windowDays.value === HEALTH_CHECK_DAYS ? cached(healthCheckQueries()[0]) : backend.getDataHealth(windowDays.value));
     if (!loadSeq.isCurrent(seq)) return;
     health.value = next;
   } catch (cause) {
@@ -444,13 +93,6 @@ const formatDateTime = (value?: string | null): string => {
   return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
-};
-
-const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return t.value.notProvided;
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
-  if (bytes >= 1_048_576) return `${Math.round(bytes / 1_048_576)} MB`;
-  return `${Math.round(bytes / 1024)} KB`;
 };
 
 const cadenceLabel = (cadence: string): string => lookup(t.value.cadence, cadence) ?? cadence;
@@ -499,6 +141,9 @@ const sourceLabel = (source: string): string => lookup(t.value.source, source) ?
 
 /** 来源未知的数据不静默并进设备数据里；这里如实分开列。 */
 const sourceSummary = (stream: StreamHealth): string => {
+  if (stream.stream === 'heart_rate' && stream.parse.error_kind === 'not_available') {
+    return stream.canonical_records > 0 ? t.value.heartRateAlternate : t.value.heartRateEndpointEmpty;
+  }
   if (!stream.sources.length) return t.value.noRecordsYet;
   return stream.sources
     .map((entry) => `${sourceLabel(entry.source)} ${entry.records}`)
@@ -526,7 +171,7 @@ const runAction = async (action: HealthAction) => {
       }
     } else if (action.id === 'reprocess') {
       const result = await backend.reprocessLocalData();
-      actionMessage.value = t.value.actionReplayed(result.total_records.toLocaleString(intlLocale()));
+      actionMessage.value = t.value.actionReplayed(formatNumber(result.total_records));
       markDataChanged();
     } else if (action.id === 'integrity_check') {
       const result = await backend.runDatabaseIntegrityCheck();
@@ -537,7 +182,7 @@ const runAction = async (action: HealthAction) => {
       await backend.openDataFolder();
       actionMessage.value = t.value.actionFolderOpened;
     } else if (action.id === 'reauth') {
-      await router.push({ path: '/settings', hash: '#connection' });
+      await router.push('/settings/account');
       actionMessage.value = t.value.actionReconnect;
       return;
     }
@@ -553,37 +198,43 @@ const integrity = computed(() => health.value?.database.last_integrity_check ?? 
 const allStreams = computed(() => health.value?.streams ?? []);
 const occasional = computed(() => health.value?.occasional_metrics ?? []);
 
-onMounted(() => void load());
+/* 首屏一张总结卡：几条数据流正常、几条要处理；细节五块在下面逐块摊开。 */
+const streamOk = (stream: StreamHealth) => [stream.fetch, stream.parse, stream.write].every((stage) => stage.state === 'ok');
+const streamFailed = (stream: StreamHealth) => [stream.fetch, stream.parse, stream.write].some((stage) => stage.state === 'failed' && stage.error_kind !== 'not_available');
+const summary = computed(() => {
+  const streams = allStreams.value;
+  const ok = streams.filter(streamOk).length;
+  const failed = streams.filter(streamFailed).length;
+  return { ok, total: streams.length, failed, pending: streams.length - ok - failed };
+});
+
+// 第一帧用的是先前读好的数据：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 </script>
 
 <template>
   <section class="page health-page" aria-labelledby="health-title">
     <PageHeader
-      back="/settings"
-      :back-label="t.backToSettings"
       title-id="health-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="group" :aria-label="t.rangeAria">
-        <button
-          v-for="range in WINDOWS"
-          :key="range.days"
-          type="button"
-          :aria-pressed="windowDays === range.days"
-          :class="['range-pill', { 'is-on': windowDays === range.days }]"
-          @click="setWindow(range.days)"
-        >{{ range.label }}</button>
-      </div>
+      <SegmentTrack
+        :items="WINDOWS.map((range) => ({ value: range.days, label: range.label }))"
+        :model-value="windowDays"
+        :aria-label="t.rangeAria"
+        @update:model-value="(value) => setWindow(Number(value))"
+      />
     </PageHeader>
 
+    <FoldTransition>
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
+    </FoldTransition>
 
-    <div v-if="loading" class="health-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="health-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="180px" />
     </div>
 
@@ -593,58 +244,14 @@ onMounted(() => void load());
         {{ t.replayInProgress }}
       </div>
 
-      <!-- 三条互不冒充的时间线 -->
-      <section class="health-card" aria-labelledby="timings-title">
-        <h2 id="timings-title">{{ t.timingsTitle }}</h2>
-        <div class="timing-grid">
+      <section class="health-card summary-card" aria-labelledby="summary-title">
+        <div class="summary-main">
+          <span :class="['summary-dot', summary.failed ? 'bad' : summary.pending ? 'warn' : 'ok']" aria-hidden="true"></span>
           <div>
-            <span class="timing-label">{{ t.timingCloud }}</span>
-            <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
-            <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingReplay }}</span>
-            <strong>{{ formatDateTime(health.timings.last_local_replay_at) }}</strong>
-            <span class="timing-note">{{ t.timingReplayNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingManual }}</span>
-            <strong>{{ formatDateTime(health.timings.last_manual_reprocess_at) }}</strong>
-            <span class="timing-note">{{ t.timingManualNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingNewest }}</span>
-            <strong>{{ formatDateTime(health.timings.newest_sample_at) }}</strong>
-            <span class="timing-note">{{ t.timingNewestNote }}</span>
+            <h2 id="summary-title">{{ t.summaryStreams(summary.ok, summary.total) }}</h2>
+            <p class="health-note">{{ summary.failed ? t.summaryFailed(summary.failed) : summary.pending ? t.summaryPending(summary.pending) : t.summaryAllGood }}</p>
           </div>
         </div>
-      </section>
-
-      <!-- 数据库 -->
-      <section class="health-card" aria-labelledby="db-title">
-        <h2 id="db-title">{{ t.dbTitle }}</h2>
-        <div class="fact-grid">
-          <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes) }}</strong></div>
-          <div><span>{{ t.dbRaw }}</span><strong>{{ health.database.raw_records.toLocaleString(intlLocale()) }}</strong></div>
-          <div><span>{{ t.dbCanonical }}</span><strong>{{ health.database.canonical_records.toLocaleString(intlLocale()) }}</strong></div>
-          <div>
-            <span>{{ t.dbPending }}</span>
-            <strong :class="{ warn: health.database.pending_normalization > 0 }">
-              {{ health.database.pending_normalization.toLocaleString(intlLocale()) }}
-            </strong>
-          </div>
-          <div><span>{{ t.dbSchema }}</span><strong>{{ health.database.schema_version }}</strong></div>
-          <div><span>{{ t.dbNormalizer }}</span><strong class="mono">{{ health.database.normalizer_revision }}</strong></div>
-        </div>
-        <p class="health-note">
-          <template v-if="integrity">
-            {{ t.integrityLine(
-              integrity.ok ? t.integrityPassed : t.integrityFailed(integrity.detail || t.integrityDetailBelow),
-              formatDateTime(integrity.checked_at),
-            ) }}
-          </template>
-          <template v-else>{{ t.integrityNeverRun }}</template>
-        </p>
       </section>
 
       <!-- 逐流三阶段 -->
@@ -671,8 +278,8 @@ onMounted(() => void load());
               {{ unknownStageDetail(stream) }}
             </p>
             <dl class="stream-facts">
-              <div><dt>{{ t.factRaw }}</dt><dd>{{ stream.raw_records.toLocaleString(intlLocale()) }}</dd></div>
-              <div><dt>{{ t.factCanonical }}</dt><dd>{{ stream.canonical_records.toLocaleString(intlLocale()) }}</dd></div>
+              <div><dt>{{ t.factRaw }}</dt><dd>{{ formatNumber(stream.raw_records) }}</dd></div>
+              <div><dt>{{ t.factCanonical }}</dt><dd>{{ formatNumber(stream.canonical_records) }}</dd></div>
               <div><dt>{{ t.factSources }}</dt><dd>{{ sourceSummary(stream) }}</dd></div>
               <div><dt>{{ t.factObservedDays }}</dt><dd>{{ t.days(stream.coverage.observed_days) }}</dd></div>
             </dl>
@@ -688,7 +295,58 @@ onMounted(() => void load());
           </article>
         </div>
       </section>
-
+      <!-- 三条互不冒充的时间线 -->
+      <section class="health-card" aria-labelledby="timings-title">
+        <h2 id="timings-title">{{ t.timingsTitle }}</h2>
+        <div class="timing-grid">
+          <div>
+            <span class="timing-label">{{ t.timingCloud }}</span>
+            <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
+            <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
+          </div>
+          <div>
+            <span class="timing-label">{{ t.timingReplay }}</span>
+            <strong>{{ formatDateTime(health.timings.last_local_replay_at) }}</strong>
+            <span class="timing-note">{{ t.timingReplayNote }}</span>
+          </div>
+          <div>
+            <span class="timing-label">{{ t.timingManual }}</span>
+            <strong>{{ formatDateTime(health.timings.last_manual_reprocess_at) }}</strong>
+            <span class="timing-note">{{ t.timingManualNote }}</span>
+          </div>
+          <div>
+            <span class="timing-label">{{ t.timingNewest }}</span>
+            <strong>{{ formatDateTime(health.timings.newest_sample_at) }}</strong>
+            <span class="timing-note">{{ t.timingNewestNote }}</span>
+          </div>
+        </div>
+      </section>
+      <!-- 数据库 -->
+      <section class="health-card" aria-labelledby="db-title">
+        <h2 id="db-title">{{ t.dbTitle }}</h2>
+        <div class="fact-grid">
+          <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes, t.notProvided) }}</strong></div>
+          <div><span>{{ t.dbRaw }}</span><strong>{{ formatNumber(health.database.raw_records) }}</strong></div>
+          <div><span>{{ t.dbCanonical }}</span><strong>{{ formatNumber(health.database.canonical_records) }}</strong></div>
+          <div>
+            <span>{{ t.dbPending }}</span>
+            <strong :class="{ warn: health.database.pending_normalization > 0 }">
+              {{ formatNumber(health.database.pending_normalization) }}
+            </strong>
+          </div>
+          <div><span>{{ t.dbSchema }}</span><strong>{{ health.database.schema_version }}</strong></div>
+          <div><span>{{ t.dbNormalizer }}</span><strong class="mono">{{ health.database.normalizer_revision }}</strong></div>
+        </div>
+        <p class="health-note">
+          <template v-if="integrity">
+            {{ t.integrityLine(
+              integrity.ok ? t.integrityPassed : t.integrityFailed(integrity.detail || t.integrityDetailBelow),
+              formatDateTime(integrity.checked_at),
+            ) }}
+          </template>
+          <template v-else>{{ t.integrityNeverRun }}</template>
+        </p>
+      </section>
       <!-- 偶发指标 -->
       <section v-if="occasional.length" class="health-card" aria-labelledby="occasional-title">
         <h2 id="occasional-title">{{ t.occasionalTitle }}</h2>
@@ -696,14 +354,13 @@ onMounted(() => void load());
         <div class="occasional-list">
           <div v-for="metric in occasional" :key="metric.stream" class="occasional-row">
             <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
-            <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
+            <span>{{ t.occasionalLine(formatNumber(metric.canonical_records), metric.coverage.observed_days) }}</span>
             <span class="muted">
               {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
             </span>
           </div>
         </div>
       </section>
-
       <!-- 可执行动作 -->
       <section class="health-card" aria-labelledby="actions-title">
         <h2 id="actions-title">{{ t.actionsTitle }}</h2>
@@ -721,78 +378,14 @@ onMounted(() => void load());
             >{{ busyAction === action.id ? t.actionRunning : t.actionRun }}</button>
           </div>
         </div>
-        <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
-        <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
+        <!-- 「立即执行」的结果从下面平滑展开（审计 B6 / C2，2026-10-07），不再一下把页面推长。 -->
+        <FoldTransition>
+          <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
+          <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
+        </FoldTransition>
       </section>
     </template>
   </section>
 </template>
 
-<style scoped>
-.health-page { display: grid; gap: 16px; }
-.health-grid { display: grid; gap: 14px; }
-
-.health-card {
-  display: grid;
-  gap: 10px;
-  padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-}
-.health-card h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
-.health-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
-.health-note.ok { color: var(--accent); }
-
-.timing-grid, .fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-.timing-grid > div { display: grid; gap: 2px; }
-.timing-label { color: var(--muted); font-size: var(--fs-xs); }
-.timing-grid strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
-.timing-note { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-
-.fact-grid > div { display: grid; gap: 2px; }
-.fact-grid span { color: var(--muted); font-size: var(--fs-xs); }
-.fact-grid strong { color: var(--ink); font-size: var(--fs-xl); font-weight: 600; }
-.fact-grid strong.warn { color: var(--warning, var(--accent)); }
-.fact-grid strong.mono { font-family: var(--font-mono); font-size: var(--fs-xs); word-break: break-all; }
-
-.stream-list, .occasional-list, .action-list { display: grid; gap: 10px; }
-.stream-row {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-raised);
-}
-.stream-row header { display: flex; align-items: baseline; gap: 8px; }
-.stream-row header strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
-.cadence { color: var(--muted); font-size: var(--fs-xs); }
-
-.stages { display: flex; flex-wrap: wrap; gap: 8px; }
-.stage { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-xs); }
-.stage i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.stage.ok { color: var(--accent); }
-.stage.failed { color: var(--danger); }
-
-.stream-message { margin: 0; color: var(--danger); font-size: var(--fs-xs); line-height: 1.5; }
-.stream-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 0; }
-.stream-facts div { display: grid; gap: 1px; }
-.stream-facts dt { color: var(--muted); font-size: var(--fs-xs); }
-.stream-facts dd { margin: 0; color: var(--ink); font-size: var(--fs-sm); }
-.coverage-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
-
-.occasional-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.occasional-row:last-child { border-bottom: 0; }
-.occasional-row strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.occasional-row span { color: var(--subtle); font-size: var(--fs-xs); }
-.occasional-row .muted { color: var(--muted); }
-
-.action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.action-row:last-child { border-bottom: 0; }
-.action-row div { display: grid; gap: 2px; }
-.action-row strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.action-row span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-
-.inline-alert.neutral { color: var(--muted); }
-</style>
+<style scoped src="./HealthCheck.css"></style>

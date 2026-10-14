@@ -1,47 +1,29 @@
-use crate::ipc_error::AppError;
-use tauri::AppHandle;
+//! 应用自己更新自己：能不能更新、是不是便携版、替换前核对数据位置。
+//! 静默下载与替换的流程在 [`silent`]，便携版原地换文件在 [`portable`]。
 
-/// Fail before the updater replaces an app bundle containing a custom library.
-#[tauri::command]
-pub(crate) fn validate_update_data_location(
-    state: tauri::State<'_, crate::app_state::AppState>,
-) -> Result<(), AppError> {
-    zeppbridge_core::paths::validate_update_data_location(
-        &state.data_dir,
-        &std::env::current_exe()?,
-    )
-    .map_err(|error| {
-        // 底层那句带路径的英文原因以前被整个吞掉，只留了固定文案——
-        // 排查「为什么拒装」时一个字都拿不到。
-        crate::diagnostics::log(&format!("更新前数据位置校验未通过: {error}"));
-        AppError::new(
-            "err.update.unsafe_data_location",
-            "无法确认数据目录可安全保留，已停止安装更新",
-        )
-    })
+use crate::ipc_error::AppError;
+
+pub(crate) mod portable;
+pub(crate) mod silent;
+
+pub(crate) use silent::SilentUpdater;
+
+/// 替换前核对：app 包里装着自定义数据目录时，更新会连包带数据一起换掉，宁可不装。
+pub(crate) fn validate_data_location(data_dir: &std::path::Path) -> Result<(), AppError> {
+    zeppbridge_core::paths::validate_update_data_location(data_dir, &std::env::current_exe()?)
+        .map_err(|error| {
+            // 底层那句带路径的英文原因以前被整个吞掉，只留了固定文案——
+            // 排查「为什么拒装」时一个字都拿不到。
+            crate::diagnostics::log(&format!("更新前数据位置校验未通过: {error}"));
+            AppError::new(
+                "err.update.unsafe_data_location",
+                "无法确认数据目录可安全保留，已停止安装更新",
+            )
+        })
 }
 
 #[cfg(any(windows, test))]
 use std::path::{Path, PathBuf};
-
-#[cfg(windows)]
-use std::{process::Command, thread, time::Duration};
-
-/// The portable-update migration path is a Windows-only concept: the portable
-/// build lives in a user-writable folder next to a future install, while
-/// macOS ships a single `.app` bundle with no portable variant.
-#[cfg(windows)]
-fn installed_path() -> Result<PathBuf, AppError> {
-    let local = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
-        AppError::new(
-            "err.update.localappdata_missing",
-            "Windows LOCALAPPDATA 路径不可用",
-        )
-    })?;
-    Ok(PathBuf::from(local)
-        .join("ZeppBridge")
-        .join("ZeppBridge.exe"))
-}
 
 /// 这个构建能不能自己更新自己。
 ///
@@ -57,9 +39,21 @@ fn installed_path() -> Result<PathBuf, AppError> {
 /// macOS 同理收窄到 aarch64：CI 只产 `ZeppBridge_*_aarch64.app.tar.gz`
 /// （`macos-latest` runner 就是 arm64），x86_64 的 mac 调 `check()` 同样会
 /// 撞到「platforms 里找不到 darwin-x86_64」的假失败。
-#[tauri::command]
 pub(crate) fn self_update_supported() -> bool {
-    cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+    // v3 起打开（2026-10-14）：beta 期关着是因为旧流程会把便携版改装成 `%LOCALAPPDATA%` 里的
+    // 安装版、拉起那份入口；现在便携版原地更新（portable.rs），这条路已经拆了。endpoint 仍是本
+    // 仓库的 releases/latest：2.x 的版本号都比 3.0 小，测试版不会被「更新」回 2.x。
+    let platform = cfg!(all(windows, target_arch = "x86_64"))
+        || cfg!(all(target_os = "macos", target_arch = "aarch64"));
+    // 从 cargo 构建缓存跑起来的开发版不碰：便携版的替换会把构建产物换掉。
+    let built_here = std::env::current_exe()
+        .ok()
+        .and_then(|exe| {
+            exe.parent()
+                .map(zeppbridge_core::paths::is_build_artifact_dir)
+        })
+        .unwrap_or(false);
+    platform && !built_here
 }
 
 /// Windows 上这份 exe 算不算便携版。
@@ -112,7 +106,6 @@ fn program_files_roots() -> Vec<PathBuf> {
         .collect()
 }
 
-#[tauri::command]
 pub(crate) fn is_portable_update() -> Result<bool, AppError> {
     #[cfg(windows)]
     {
@@ -133,49 +126,6 @@ pub(crate) fn is_portable_update() -> Result<bool, AppError> {
     #[cfg(not(windows))]
     {
         Ok(false)
-    }
-}
-
-#[tauri::command]
-pub(crate) async fn launch_migrated_install(app: AppHandle) -> Result<(), AppError> {
-    #[cfg(windows)]
-    {
-        let installed = installed_path()?;
-        let found = tokio::task::spawn_blocking(move || {
-            for _ in 0..30 {
-                if installed.is_file() {
-                    return Some(installed);
-                }
-                thread::sleep(Duration::from_millis(500));
-            }
-            None
-        })
-        .await
-        .map_err(|_| AppError::new("err.update.launch_failed", "等待安装版就绪时任务被中断"))?;
-        let Some(installed) = found else {
-            return Err(AppError::new(
-                "err.update.installed_build_missing",
-                "安装完成后未找到新的 ZeppBridge 安装版",
-            ));
-        };
-        Command::new(&installed).spawn().map_err(|error| {
-            AppError::new(
-                "err.update.launch_failed",
-                format!("无法启动更新后的安装版：{error}"),
-            )
-        })?;
-        app.exit(0);
-        Ok(())
-    }
-    // Never reached on non-Windows: the frontend only calls this when
-    // `is_portable_update()` returned true.
-    #[cfg(not(windows))]
-    {
-        let _ = app;
-        Err(AppError::new(
-            "err.update.portable_windows_only",
-            "便携版安装迁移仅支持 Windows",
-        ))
     }
 }
 

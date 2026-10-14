@@ -2,6 +2,9 @@
 node_modules/
 dist/
 dist-ssr/
+.site-cache/
+scripts/site/__pycache__/
+public/landing/media/
 *.local
 
 # Logs and tool state
@@ -56,10 +59,10 @@ target/
 *.nsis.zip
 *.msi.zip
 
-# Local data and database files
-data/
-!functions/api/zepp/data/
-!functions/api/zepp/data/callback.js
+# Local data and database files. Anchored to the root: a bare `data/` also swallowed
+# src-tauri/src/commands/data/ (source code) without anyone noticing.
+/data/
+src-tauri/data/
 *.db
 *.db-*
 *.sqlite
@@ -121,3 +124,12 @@ Thumbs.db
 
 # 本机 mock 验收目录：真实库的副本 + 造出来的体成分/饮食数据，不进仓库
 mock-test/
+
+# Local-only V3 integration references (never publish)
+/接入资料（ignore）/
+
+# Local-only Fusion plan and design references
+/BETA/
+
+# 宣传短片原片太大，不进仓库（README 链到 zeppbridge.com 首屏播放）
+docs/assets/readme/*.mp4

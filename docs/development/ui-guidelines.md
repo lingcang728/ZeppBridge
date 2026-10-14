@@ -1,19 +1,20 @@
 # ZeppBridge UI design and interaction constraints
 
-Updated 2026-09-05 (aligned with the accessibility and readability pass).
+Updated 2026-09-27 (batches four to seven: one capsule control, interruptible deck morphs, 3D overview and timelines).
 ZeppBridge is a bridge to the user's wearable health data, not a bloated
 analytics app.
 
 [简体中文](ui-guidelines.zh-CN.md)
 
-The visual system is **cool grey with olive green**, dark throughout: brand
-colour `--brand: #7DA33E`, interface base `#0C0E11` (sidebar `#08090C`, cards
-`#16191E`). No ubiquitous purple, no high-saturation neon. Category colours
-(heart-rate red, pace blue, sleep violet, activity cyan and so on) mark data
-categories only; they are never decoration.
+The visual system is **cool grey with olive green**. Dark is the reference
+scheme: brand colour `--brand: #7DA33E`, interface base `#0C0E11` (surfaces
+`#16191E`). The light scheme keeps the same roles on a warm-white base
+(`--brand: #2F6B4F`, base `#EAEDE5`). No ubiquitous purple, no high-saturation
+neon. Category colours (heart-rate red, pace blue, sleep violet, activity cyan
+and so on) mark data categories only; they are never decoration.
 
-There is **only a dark interface**. That is a settled trade-off — see
-"Dark only" below.
+There are **two interface schemes — dark and light — plus a follow-the-system
+mode**. See "Dual theme" below.
 
 ## Core principles
 
@@ -34,17 +35,23 @@ There is **only a dark interface**. That is a settled trade-off — see
   - a package over 2 MiB (`AI_HANDOFF_INLINE_LIMIT_BYTES`) is written to
     `zeppbridge-ai-handoff.json` on the desktop, and the clipboard gets only the
     drag-in instructions;
-  - GPS tracks are drawn locally with inline SVG (`routeCanvas` in
-    `WorkoutDetail.vue`) and never request third-party online map tiles.
+  - GPS tracks are drawn locally with inline SVG by default
+    (`lib/workoutRoute.ts` + `WorkoutRouteCard.vue`), with no outside requests.
+    The online map (OpenStreetMap tiles, `WorkoutRouteMap.vue`) is an optional
+    layer: Leaflet and tiles load only after the user switches the route card to
+    "Map" and agrees, and it falls back to the local drawing on failure. The tile
+    source lives only in `lib/mapTiles.ts`; the CSP allows just that one host.
 - **Progressive disclosure**: everyday use shows core metrics and quick export;
-  interface scale, the data folder, clearing credentials and sync diagnostics
-  are folded into "Advanced and maintenance" at the bottom of Settings.
+  interface scale lives in the "Display and language" settings card; the data
+  folder, clearing credentials and sync diagnostics live in "Advanced and
+  maintenance".
 
 ## Design tokens
 
-**The single source of truth is the `:root` block in `src/App.vue`.** Do not
-hardcode synonymous colour values in pages (the gradient backgrounds on hero and
-panel are a deliberate local exception).
+**The single source of truth is `src/styles/tokens.css`**: `:root` holds the
+dark values and `html[data-theme="light"]` overrides the same set. Do not
+hardcode synonymous colour values in pages (the gradient backgrounds on hero
+and panel are a deliberate local exception).
 
 | Purpose | Token |
 | --- | --- |
@@ -53,9 +60,9 @@ panel are a deliberate local exception).
 | Strokes | `--line` / `--line-strong` for quiet structure; `--line-control` for interactive boundaries |
 | Type scale | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | Brand and actions | `--brand` `#7DA33E` = `--accent`, plus `--accent-hover` `#93B952`, `--accent-soft`, `--accent-ink` `#12170A`, `--action-green` |
-| Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#3DD84C`, each with a translucent `*-wash` |
+| Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#A3CC5C` (light `#4E8A2E`, same family as the brand lime), each with a translucent `*-wash` |
 | Sleep stages | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
-| Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` `#7DA33E` |
+| Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` neutral `rgba(226,234,242,.55)` (never brand green) |
 | Route pace spectrum | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | Spacing / radius | `--space-1…8`, `--radius-sm` 10px / `-md` 14px / `-lg` 18px |
 
@@ -71,23 +78,276 @@ source and measurement date. Estimating with formulas such as 220 − age is
 forbidden. The provenance of the algorithms and percentages is in the
 [architecture summary](../reference/architecture.md).
 
-### Dark only (a settled design trade-off)
+### Dual theme: dark, light and system
 
-- ZeppBridge **offers a dark interface only**. There is no light mode and no
-  follow-the-system mode. `:root` maintains this one token set; do not add
-  `@media (prefers-color-scheme)` or `[data-theme="light"]` branches, and do not
-  add a theme switch.
-- You may therefore assume a dark background when writing styles. No light
-  fallback is needed — but still use tokens rather than hardcoded colours, so
-  the palette stays adjustable as a whole.
-- The light-mode leftovers (`useTheme.ts` and the `zeppbridge-light` ECharts
-  theme) were deleted on 2026-08-24. Do not reintroduce them.
+- ZeppBridge v3 ships **dark, light and follow-the-system schemes**. The user's
+  choice is persisted in `localStorage` under `zeppbridge-theme`
+  (`light` / `dark` / `system`); `src/composables/useTheme.ts` resolves the
+  effective scheme and `initializeTheme()` runs in `main.ts` before first
+  render, so no opposite-scheme flash.
+- The resolved scheme lives on `<html data-theme="light|dark">`
+  (`data-theme-preference` keeps the raw choice for debugging) and
+  `color-scheme` follows it, so scrollbars and native controls repaint. The
+  `theme-color` meta is updated with the scheme.
+- **Components consume tokens and never branch on the scheme.** When a
+  hardcoded dark value genuinely cannot become a token (rare), add a narrowly
+  scoped `html[data-theme="light"] …` override in the patch table at the bottom
+  of `tokens.css` — that table is transitional and should shrink to empty.
+- Category colours keep their hue across schemes and only shift lightness /
+  saturation (light-mode heart red `#C93F49`, brand `#2F6B4F`…). A token keeps
+  the same role in both schemes; semantics do not drift.
+### Material: restrained glass (2026-09-26)
+
+- The whole app has **one card material**: a two-stop gradient, a top-edge
+  highlight (`inset 0 1px 0`) and two soft shadows. Tokens are the `--mat-*`
+  set in `tokens.css` (`--mat-card`, `--mat-line`, `--mat-rim`,
+  `--mat-shadow`, raised `--mat-raised*`, inset `--mat-inset*`, floating
+  `--mat-glass*`), defined for both schemes. Primitives live in
+  `src/styles/material.css`: `.surface-card` / `.mat-card`, `.button`
+  variants (sink 1px when pressed), `.mat-inset`, `.mat-field`,
+  `.chip`, `.glass`. Switches are one component, `components/GlassSwitch.vue` (Liquid Glass: a white knob at rest that lifts into a refracting lens on press and can be dragged).
+- **Real frosted glass (`backdrop-filter`) is only for floating layers**: the
+  top bar, the navigation capsule, dropdowns, the date picker and dialogs.
+  Ordinary cards are not blurred.
+- A category colour only leaves a faint corner glow on a card (about 5% via
+  `color-mix`, `--entry-tone` / `--card-tone`); **never hardcode a card
+  background**. A card's glyph and its curve share one category colour
+  (body = heart red, training = lime, sleep = indigo, activity = cyan).
+- Motion uses `--dur-*` / `--ease-*` and honours `prefers-reduced-motion`.
+- The capsule control (`SegmentTrack.vue`) draws its labels twice: plain ink
+  underneath and "selected" ink on top, clipped to the thumb. The thumb
+  position is two registered CSS lengths (`--thumb-l` / `--thumb-w`,
+  `@property` in `material.css`) transitioned on the track, so the thumb, the
+  top ink's clip and a mask that **hides the plain label under the thumb** move
+  in lockstep. (A translucent glass thumb used to show the regular-weight label
+  under the bold one — every Latin label ghosted after switching to German.)
+  Keyboard focus brightens the thumb (no ring), arrow / Home / End keys work,
+  and pressing / dragging lifts the thumb into a glass lens whose size follows
+  the item under it (`lib/segmentGlass.ts`). Dragging past either end
+  stretches the whole capsule like a rubber band (capped, never out of
+  bounds); a hard flick deforms it toward the flick and springs back.
+  At rest the thumb is an exact-size plate — nothing is scaled, so its ends
+  stay perfectly round.
+- **Secondary actions are `.pill-button`** ("Add event", "See all", "Manage",
+  "Show 6 more"): the same raised capsule as a selected segment, icon in the
+  brand colour; `.pill-button.quiet` has no fill. No bare text links, no
+  outlined rectangles.
+- **Grids of facts are raised tiles, not flat outlined boxes**: weekly report
+  items, the capability board, the coverage ledger and the settings "fact"
+  tiles (`settings-base.css` `.s-tile`) are lighter slabs with a rim and a
+  soft shadow; an absent item sinks into the groove instead (`.is-sunken`).
+- The landing page keeps its own locally scoped dark palette
+  (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
+  not a third theme.
+
+### Depth, capsules and motion (v3 redesign, 2026-09-27)
+
+- **Radii are generous**: `--radius-sm/md/lg/xl` = 12 / 20 / 26 / 34 px. Cards
+  read as slabs with thickness: `--mat-rim` is a top highlight *and* a bottom
+  dark line, `--mat-shadow` has a third, far shadow. The canvas carries a fixed,
+  faint ambient light (`--ambient`, painted by `.app-body::before`) so frosted
+  glass has something to refract; floating glass (`--glass-rim`) has a
+  specular top edge and a return light at the bottom.
+- **No hard edges on stages**: carousels and wheels fade into the background
+  with a horizontal `mask-image` instead of ending at a border.
+- **Choices are capsules, not dropdowns — and there is one look.** A groove
+  (`--cap-track`) holding a raised capsule (`--cap-thumb`) with the
+  selected label in `--cap-ink`; floating on glass (nav, top bar) the capsule
+  is a brighter pane of glass (`--cap-glass-thumb`). Two to five options →
+  the draggable `SegmentTrack` (also icon-only, e.g. the moon / sun theme).
+  Longer lists (language, workout type, AI provider) → `CapsuleWheel.vue`:
+  options on a cylinder by their own widths, the selection always centred
+  under the lens, neighbours turning away like a conveyor round a corner;
+  `loop` wraps first and last so the wheel is never half empty; `lens-icon`
+  pins an icon inside the lens (the globe next to the language). Drag with a
+  critically damped snap, wheel, arrows, click a neighbour; the value is
+  committed only when the wheel settles. `SelectMenu` is gone.
+- **Theme is two icon cells, moon and sun**, in the top bar and in Display
+  settings alike. It follows the system by default; picking the cell that
+  matches the system goes back to following it (`useTheme.pickTheme`). The
+  new theme **spreads from the icon that was pressed**: a View Transition
+  with a feathered radial mask on the new snapshot (`html[data-theme-morph]`
+  in `material.css`), never a hard full-screen cut.
+- **Width changes animate.** When a capsule's text changes (sync pill
+  "Today 10:30" → "Data ready · hand to AI", the undo pill), `useWidthMorph`
+  tweens the width instead of jumping.
+- **Page transitions never pass through a blank frame**: old and new page are
+  on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
+  direction — `forward` focuses into a detail page, `back` backs out, `left` /
+  `right` slide between tabs in nav-capsule order — all with blur. The leaving
+  page is pinned at its scroll position so it does not jump to the top.
+- **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`,
+  2026-10-03): the new page itself is cropped out of the card (`translate` + a
+  fixed-radius `clip-path`, 1:1, no scaling) and slides from the card's corner
+  home, so its header lands where the card was; a copy of the card fades out on
+  top, the header fades in at 6–34 %, the rest at 12–50 %, and the page it came
+  from recedes to .94 / .32. The backing surface and the card copy are children
+  of the page, so one clip animation carries all three. Card and page contents
+  take turns with only a short overlap (no double exposure). Going back is the
+  exact reverse and the last frame is the real card. **Prepared before it
+  opens**: page chunks and first-screen data are fetched on hover, press and
+  idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`,
+  stale-while-revalidate across syncs), the new page draws its first frame
+  with real content, and only then does the morph start. Small tiles that link
+  with `?focus=<metric>` (pinned metrics, the week digest) grow straight into
+  that trend card on the detail page, which gets a brief ring
+  (`lib/motion/focusTarget.ts`). Going back from a scrolled page shrinks the
+  part you are looking at, so it keeps the same pace. Timing is shared with the
+  deck (`lib/motion/timing.ts`; slowed on 2026-10-03 to 500 / 440 ms with
+  `cubic-bezier(.4, .6, .2, 1)`); while it runs, `lib/motion/budget.ts` holds
+  back late chart mounts and skeleton-to-content swaps.
+- **Floating top bar** (round 4, after iPadOS / macOS 26): the bar sits about
+  12 px below the window edge with inset sides; content scrolls under it and a
+  fading "scroll edge" mask sits below it. Each control stays its own piece of
+  glass (merging them was rejected); refraction is only a thin outer ring
+  (`lib/glassLens.ts`), the middle is plain blur. A one-off notice that belongs
+  to a control (the "cloud has nothing newer yet" tip under the sync pill)
+  hangs below the action group as its own glass and never covers page
+  controls (`elementFromPoint` check).
+- **`.ready-glow`** (rotating brand-gradient ring + breathing outer light) is
+  reserved for one moment: "your data is ready — go hand it to the AI". Never
+  two glowing things on one screen. Glass controls are stacking contexts, so
+  the ring is masked to the edge and the light is an outer `box-shadow`;
+  neither may tint the inside of the capsule.
+
+### Hard rules: where things come from, how choices look (2026-10-07)
+
+These four rules apply to every page. A page that breaks one is a bug, not a
+style choice; the open list of pages that still do is
+[`motion-audit.md`](motion-audit.md).
+
+1. **Anything a click brings up grows out of what was clicked, and shrinks
+   back into it.** Secondary pages, dialogs, popovers, menus, detail panes: a
+   page goes through a route and `usePageMorph` (mark the source with
+   `data-morph-card`; rows and capsules smaller than 140×56 work too), a
+   dialog goes through `ModalDialog` + `lib/motion/dialogFlight.ts`, a card
+   table through `lib/motion/cards`. Timing is `lib/motion/timing.ts` (open
+   500 ms, close 440 ms, `cubic-bezier(.4, .6, .2, 1)`). Esc halfway reverses
+   from the current computed style — never jump to "fully open" first, never
+   `reverse()` a finished animation. Do not write a second morph engine.
+2. **Every switch fades with a blur; nothing hard-cuts.** Toggling a panel,
+   swapping tab contents, replacing a skeleton: cross-fade plus a short blur
+   on a *static* layer (blur is set once, only opacity / transform animate —
+   per-frame `filter` / `mask` keeps the fans spinning). Width changes go
+   through `useWidthMorph`. Native `<details>` opens instantly, so a fold that
+   users open often needs a transition wrapper.
+3. **Two to five options are a glass `SegmentTrack`; longer lists are a
+   `CapsuleWheel`; numbers are wheel columns (`WheelColumn`,
+   `WheelDatePicker`); an on / off choice is a `GlassSwitch`.** Drag,
+   keyboard and click all work; the lens follows the finger (`useGlassLens`,
+   `lib/segmentGlass.ts`). All three lift into Liquid Glass under the finger;
+   the 2026-10-07 audit (round 3 in `motion-audit.md`) found no other
+   choice control left.
+4. **No dropdowns, no traditional card-style pickers, no bare checkboxes or
+   radio buttons.** The one exception is the workout-type correction on the
+   workout detail page (`TypePicker`): there are too many types for a wheel.
+
+Check before merging: run `python scripts/verify/text_overlap.py` (every interface language × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did). Open and close each new layer at 4× CPU throttle and
+DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
+through the frames — no bright frame, no blank frame, no jump at the start.
+
+### Playing cards and the collection box (2026-10-07, reworked in round 3)
+
+A day of one metric is a card. Cards are how the user picks *which days* go to
+the AI.
+
+- **Motion kit** (`src/lib/motion/cards/`): `dealCards` first **draws a pile
+  out** of where it came from (0.12 s, the whole pile together), then fans it
+  out (middle first); `stackCards` + `returnStack` (= `stackAndReturn`)
+  gather cards the way a real deck is put away; `flipCard` squeezes a card to
+  a line and opens it on the other face (2D `scaleX` — a 3D turn rasterises
+  the text and it blurs halfway); `shuffleCards` / `cutDeck` say "a different
+  deck" / "re-sorted"; `flyCardHome` / `flyFromBox` move the real card in and
+  out of the box; `receive` / `landPulse` / `bump` let the origin catch a
+  returning pile; `recedeLayer` pushes the camera in; `gatherCards` stacks a
+  week and flies it into the watch icon (plan delivery). `pose.ts` turns
+  "where on screen, which angle, how big" into the card's own transform
+  (cards sit in tilted slots — skip that and a pile lands a few degrees off).
+  Springs are sampled into CSS `linear()` once and played by WAAPI on the
+  compositor (`spring.ts`). Only transform and opacity move; with reduced
+  motion everything becomes a short fade.
+- **Putting cards away is three beats**: (1) *stack* — from the current
+  computed pose, cards slide from the edges inward into one pile at the
+  centre, each tilted 1–4° and offset 1.5 px, fully opaque; (2) *return* —
+  the pile travels along an arc back to where it came from: into the button
+  (which fans its icon open to catch it, then bumps and glows once) or onto
+  the pile that was tapped, matching its position, size and angle on the last
+  frame before cross-fading into it; (3) the backdrop blur, header and range
+  fade back over exactly the same time as the return. Never shrink cards one
+  by one into a point, never let them vanish in mid-air.
+- **Drilling in alternates, never overlaps**: the layer's cards gather into
+  the tapped pile, that pile shrinks back and dims to 0.35, and only then is
+  the next layer drawn out of it. No blurred clone of a layer with text in it
+  (it doubled "9/14–9/20" over "9/16"). Switching range: shuffle → stack in
+  the centre → deal the new deck from that same pile.
+- **Picking a card takes two steps**: the first tap lifts the card (160 ms)
+  and turns it to the back ("For AI ✓", neighbours step aside); tapping the
+  check sends **the real card** — a ghost placed on exactly the same pose,
+  the real one hidden in the same task — along an arc into the box. The box
+  counts it only when it lands; a cancelled flight rolls back. The slot keeps
+  a dashed outline "In the box"; tapping it flies a card back and turns it
+  face up. Piles (week / month) on long-press: the pile sinks, its under-cards
+  square up and the metric colour fills the face from the bottom (450 ms, CSS
+  transitions; released early it drains back). When full, the pile **stays in
+  its slot** — only its top card peels off, lifts and arcs into the box; on
+  landing the pile glows once and its badge pops. Taking a full pile back flies
+  one card from the box that merges into the pile.
+- **Interrupting is a relay, not a lock** (round 4): a new click takes effect
+  at once. Animations in flight finish from their current computed pose in
+  about 120 ms and the new one starts from there (`relay()` in
+  `lib/motion/cards/reversible.ts`, built on `animateFromNow`). Never swallow
+  a click with a `busy` flag (the range segment once showed "6 months" over a
+  7-day table); the only clicks ignored are on the very card that is flying.
+  An opposite action reverses from the current computed style — never
+  `reverse()` a finished animation, Chromium flashes a frame. Nothing is
+  unmounted half-way.
+- **Card table** (`components/cards/CardTable.vue`, picking logic in
+  `composables/useCardPicking.ts`): 7 days → seven day cards; 1 month → 4–5
+  piles by calendar week; 6 months → six month piles (empty piles are dimmed,
+  slightly smaller, with a "No record" pill). Card faces: weekday + suit at
+  the top left, only the suit and the day number (upside down, like a real
+  card) at the bottom right; readings are split into big numbers and small
+  units and never wrap (`lib/cards/faceValue.ts`). The range segment always
+  has a selection. The "Your past" workout row deals one card per workout
+  (key `workout:<id>`, handed over as `workout_ids`).
+- **Collection box = a jack-in-the-box** (`components/cards/CollectionBox.vue`,
+  lid motion in `lib/motion/cards/box.ts`): a closed little box bottom right with
+  the count on its side. A card flying in pops the lid open, is caught, and the
+  lid shuts (`catchCard`); opening pops the lid and the cards spring out, then
+  fan; closing runs backwards. Empty, it just says "Collection box · empty" (no
+  dashed slot); while a card is dragged over it, it lights up "Let go to drop
+  it in" and really accepts the drop (rectangle hit test). It slides in with
+  the card table and out with it if still empty — never pops up from nowhere.
+- **Spread-out hand**: grouped by metric, one row per week aligned to weekdays
+  and offset like Spider Solitaire (`lib/cards/hand.ts`), centred between the
+  header and the buttons; group labels sit above the cards in a safe area. A
+  metric with a whole month picked shows as one month card (dot grid lights the
+  picked days); tap it to spread its weeks. Colour is always
+  `metricColor(metric)` (`lib/metricTone.ts`), the same as the chart.
+- **Taking cards out / dragging**: flick a card up off the screen to take it
+  out (velocity threshold in `useHandGestures.ts`; light motion blur and a
+  deeper shadow only while moving). On the card table a card can be dragged
+  (`useCardDrag.ts`, a drag starts after 6 px so it never fights tap or
+  long-press): onto another card to stack them (offset, count badge, can be
+  pulled apart), onto the box to drop it in; long-press a stack (450 ms colour
+  fill) to send the whole stack. Esc
+  undoes the drag.
+- **Layered backdrops**: each level deeper, the previous one is swapped for a
+  *pre-blurred static* layer and cross-faded — never a per-frame blur.
+- The arrow on the open box starts a **new** task with exactly those
+  categories × days (`picked_days`). Picks are stored locally and cleared only
+  once the task is handed to the AI.
+- **One-off tips**: operating hints appear once as a floating bar with
+  "Got it" (`composables/useCoachTips.ts`, localStorage wrapped in try/catch);
+  the keyboard hint lives in `aria-describedby`, not on screen.
+- Wherever a picked task is described, say "N picked days", not "last N days"
+  (`lib/aiTask/pickedDays.ts` is the single count).
 
 ### Interface copy: two languages, never hardcoded
 
 - **Every word on screen needs a Chinese and an English version.** Write it as
   `defineMessages(zh, en)` in the module that uses it; large pages (Settings,
-  Explore) get a matching `*.i18n.ts`. Do not build one global dictionary — a
+  Overview) get a matching `*.i18n.ts`. Do not build one global dictionary — a
   lazily loaded page's chunk should carry only its own copy.
 - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half: a
   missing English key, an extra key or a mismatched parameter fails to compile.
@@ -123,9 +383,20 @@ forbidden. The provenance of the algorithms and percentages is in the
 
 ## Page structure
 
-Three main navigation items: **Overview** (`/`), **Hand to AI** (`/explore`) and
-**Settings** (`/settings`). Keep it at three — a new page gets an entry card,
-not a sidebar slot.
+Three main navigation items in the centred pill of the top bar
+(`src/components/shell/AppTopBar.vue`): **Overview** (`/`), **Hand to AI**
+(`/ai`) and **Settings** (`/settings`). Keep it at three — a new page gets an
+entry card, not a navigation slot. The top bar also carries the sync-status
+pill, the moon / sun theme toggle and the looping language wheel (globe in
+its lens); below 760px the pill hides and a bottom tabbar covers the same three
+items.
+
+**Back goes where you came from.** The top-left back button and a settings
+card's × / Esc use the history entry vue-router keeps in
+`history.state.back` (`lib/navigation.ts#backDestination`,
+`cardCloseDestination`): Overview → "Manage" → the account card → back lands
+on Overview, not on the settings deck. Only a deep link with no origin falls
+back to the tab root.
 
 Secondary pages stay out of the main navigation: `/body` (body status),
 `/training` (training status), `/recent` (recent records), the `/sleep` and
@@ -134,13 +405,30 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 1. Overview (`/`)
 
-- Hero card: brand line, three value cards (secure / private / AI-ready), and on
-  the right a "recognised device → flowing dashed line → cloud AI" diagram. The
-  device comes from real recognition; with no device, that flow is not drawn.
-- A 12-column dashboard grid: 24-hour heart-rate line (span 6), today's step
-  ring (span 3), last night's sleep structure (span 3), a resting-heart-rate
-  mini card plus the body-status and training-status entry cards (span 4 each),
-  and a two-column recent-records list (full width).
+- There is **no hero card** in v3; the old hero and its "hide intro" preference
+  are gone (Overview clears `zeppbridge.overview.hideHero` on mount). The page
+  opens with the weekly report, coverage notice, `SourcesStrip` (device and
+  account status, extracted from the v2 sidebar) and then the card grid.
+- Cards are modular components under `src/components/overview/`:
+  `HeartRateCard` (recent hours), `StepsCard` (today's ring), `SleepCard`
+  (last night's structure), two `StatusEntryCard`s (body / training entries)
+  and `RecentCard`, laid out on the 12-column `dashboard-grid`.
+- **Panels are slabs, not flat boxes** (`overview/panels.css`): 28px radius,
+  rim highlight and shadow, no border; the `v-tilt` directive
+  (`lib/tilt.ts`) leans a card toward the pointer (a degree or three, less
+  on wide cards) with a specular highlight following it. Off for touch and
+  reduced motion.
+- `RecentCard` is a **horizontal timeline**: the last five sleeps and
+  workouts from left (oldest) to right (newest), each a node on one line with
+  its time above and title / duration below. Life events at the bottom are a
+  **vertical timeline** (category colour + icon per node, ongoing events
+  breathe), with an "all / ongoing" capsule and a capsule search field.
+- **Fetch time is not sample time.** When the cloud has nothing for the last
+  hours, the heart-rate card says so and names the newest reading ("the newest
+  reading is from yesterday 22:20 — watch data reaches the cloud through the
+  Zepp app first"), never "shows up after a sync" right after a sync. Steps
+  say "today's steps haven't reached the cloud yet"; the sources strip shows
+  each device's newest data time instead of "has recent data".
 - Each entry card carries today's value and a 7-day `Sparkline`, leading to
   `/body` and `/training`. They replaced the old training-load / VO₂ Max mini
   cards — the same number is not shown twice on one screen.
@@ -151,39 +439,41 @@ pages, reached from Overview's entry cards and its "view all" links.
 - Overview does no interpretation such as recovery scoring or training advice.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
+- The launch sync reports progress in one place only: the top bar's sync capsule ("Syncing 3/8"). Once the sync the user was waiting for lands it turns into a glowing "data ready · send to AI". Only awaited syncs light it (launch, top bar, tray, settings) — never the 15-minute background auto-sync; failure or a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering `/ai` puts it out. A running sync cannot be cancelled from the UI: stopping halfway leaves some streams updated and others not.
 
-### 2. Hand to AI (`/explore`)
+### 2. Hand to AI (`/ai`)
 
-A three-column layout:
+**A horizontal stage** (2026-10-08, replacing the single-column hub): the past on the left (the data being handed over), a bridge in the middle (the AI lock), the future on the right (this question and the plan). At most ten cards on the page; every detail is one level down and grows out of what was clicked. The bar strips, the dock and the "Your past" page are gone (`/ai/past*` redirects to the stage).
 
-- Left: template categories and a searchable prompt-template list.
-- Middle: the current template's prompt editor (editable, copyable), a
-  four-cell data-awareness summary (date range / record count / data-type count
-  / estimated size), quick-range pills and a hand-drawn calendar popover (not a
-  native date input).
-- Right: export format, target AI (seven: ChatGPT, Claude, Gemini, Kimi,
-  Doubao, DeepSeek, Grok, via the `AI_PROVIDERS` allow-list — a non-listed
-  address is simply refused), and the save / copy prompt / send actions.
-- Each of the three formats runs its own real conversion, and the card subtitle
-  must state the difference. "Choose CSV, actually get JSON" is not allowed:
-  JSON = fully structured; CSV = long-format summary (no per-point samples or
-  tracks); GPX = only workouts that have a GPS track. With nothing to export it
-  errors rather than writing an empty file.
-- Fifteen selectable data types (`exportTypeOptions`) are presented in the right
-  column in the four groups of `exportTypeGroups`: activity / sleep / body
-  status / training. A group heading selects or clears the whole group;
-  individual items are checkboxes. A template only **pre-fills** the selection
-  and never locks it — what you ticked is what gets exported, and the count and
-  size in the summary always describe the file you are about to receive.
-- Size and count are an asynchronous preview; while computing they show `…`,
-  never `0`.
+- **Left: cards** (`components/ai/stage/StageCard.vue`, `composables/ai/useStageCards.ts`): one card per category being sent plus a profile card, eight at most. A card says only its name, how long a span it carries (last N days / N days picked) and how many days have data (`have/total`, same source as the pre-send check, "—" until computed). Cards sit in **staggered columns** (`lib/aiTask/cloud.ts`: columns offset vertically, card height at most 60 % of the pitch) and drift like playing cards (only `translate` / `rotate`; paused when hidden, while sending or under reduced motion). Drag one and it stays where dropped; **flick it up to leave that category out**; a change in the card count re-deals with FLIP springs. Tap = level two: the card back (`StageCardBack.vue`, a 7 / 14 / 30 / 90-day glass segment, leave out) → "Pick specific days" = level three, the card table dealt from that card. "Add a kind" is a capsule under the cards, **not a card and not part of the thread web**.
+- **The collection box pours into the cards** (`composables/ai/useBoxPour.ts`): on the stage, whenever the box is closed, no card table is open and nothing is being sent, the box empties itself: a few chips per category fly into that category's card (`pourFromBox`), the category becomes "N days picked" (`mergePicks`, only the categories in the box change) and the box clears. On the stage the box arrow reads "Add to this task".
+- **Middle: the bridge** (`BridgeLock.vue`, `ThreadField.vue`, `lib/aiTask/threads.ts`): a round lock on a vertical hairline showing the chosen AI, with a thin readiness ring; under it the Liquid Glass provider wheel (tapping the lens also sends) and an export-only button; under that one line (categories, share of days with data, token estimate) → `/ai/check`. **Threads**: one to three trunks leave the lock and fork in the open space between the cards and the lock; each card gets one branch that bends onto the card's own row and then **runs horizontally through the gaps** to the card's right edge, switching to the nearest free lane if a dragged card is in the way. Branches fade towards the left. On the right there is **a single skein** (three nearly coincident strands) to the right card. Threads are static SVG; only the dragged card's branch is recomputed live.
+- **Right: one card's life** (`FutureCard.vue`): the question card (written on directly, templates as a glass segment at its foot: ask freely / sleep / this week / a workout / next week) → the receipt (`ReceiptFace.vue`: the provider's icon, the handed `.md` drawn as a sheet of paper, hold it to drag into the chat, "⋯" reveals it in Explorer; copy the opening line / open the site again; a full-width "Bring back the final plan") → the plan face (`PlanFace.vue`, see "Training plan editor" below). A glass segment at the top of the card switches Ask | Plan (the receipt counts as Ask): question ⇄ receipt is a 2D squash flip, Ask ⇄ Plan cross-dissolves while the card height eases; the card is centred vertically in its box so the skein always meets its midline.
+- **Pressing the lock does everything** (`composables/ai/useStageSend.ts` + `lib/motion/cards/converge.ts`): the cards shake and fly along their own threads into the lock, **the threads reel in after them** (`pathLength=1` + dash offset), while the backend prepares the file. The receipt grows out of the lock; 0.4 s after it lands the `.md` itself goes onto the system clipboard **as a file** (`src-tauri/src/clipboard_files.rs`: Windows `CF_HDROP`; macOS `NSURL` and Linux `text/uri-list` through arboard) and the site opens — Ctrl+V (⌘V on a Mac) in the chat box attaches it in any browser (Chrome, Edge, Arc, Firefox and Safari all accept pasted files), no extension; where that is not available the opening line is copied and the file is dragged as before. With "Hand off to AI automatically" on (Settings → AI tools, Windows only, off by default) the app waits for the AI page to reach the foreground, then pastes the file, pastes the opening line and presses Enter, checking the foreground window and tab title before every keystroke and confirming each step through the browser's UI Automation tree (`src-tauri/src/web_composer.rs`: focus the page's input, wait for an attachment chip carrying the file name, see the opening line land, keep pressing Enter while the upload blocks sending until the message is out); Esc, switching away or a 45 s timeout stops it and leaves the file on the clipboard (`composables/ai/useAutoHandoff.ts`, progress shown in the receipt's lead line); the cards fade back and the threads pay out again. Esc or a second press mid-flight sends the cards back from where they are; the file still lands as a receipt but the site is not opened. The lock is grey while syncing.
+- **Drill-downs**: task name → saved tasks (`/ai/tasks`); "N round trips" → the round-trip list (`/ai/exchanges`, each row → `/ai/exchanges/:id`); the line under the lock → pre-send check (`/ai/check`); the plan card → week / day (`/ai/plan`, `/ai/plan/:date`).
+- **Plan** (`/ai/plan`, `/ai/plan/:date`): see the next section. Focus and description are required before publishing. A sent plan stays editable except for past days; re-sync pushes every affected 7-day window.
+- **Check before sending** (`/ai/check`): what data goes and how complete it is, attachments, detail level, precise route, per-provider subscription, and a read-only preview of the full prompt (tap the user's sentence to edit it in place; it is the same draft as the question card). No "advanced" fold.
+- Plan vs actual matches local date and compatible sport only. Demo libraries label every record as synthetic and simulate delivery without watch requests.
+
+### Training plan editor (2026-10-12, batch 3)
+
+**Fewer words**: no header intros, no footer notes, no repeated meta in cells; say each thing once. Icons are full two-tone (the watch in `Icon.vue`); rest days show a round-headed figure lying with hands behind its head (`components/plan/RestFigure.vue`, token colours for both themes).
+
+- **Plan face** (right card, `components/ai/stage/PlanFace.vue`): title "Your next step" with a receive icon on the right; below it "N training · N rest" and the status chip; the next 3 days (today counts) as "date / name / duration / training shape" rows, rest rows show the figure; "See the week ›". The whole schedule is the `data-morph-card` entry to `/ai/plan`. No plan yet: one sentence and a large receive button.
+- **Status chip** (`components/plan/PlanStatusChip.vue`, logic in `lib/trainingPlan/status.ts`): draft not sent / delivered / partly delivered / unconfirmed / not delivered; the watch pulses while sending. It opens a `GlassPopover`: when it was sent, each week's delivery, discard draft, undo last send, clear watch plan. The ledger caveat lives in the hover title only. The stage and the week view no longer carry a full "last sent" row.
+- **Receive the final plan** (`components/ai/bridge/ReceiveCapsule.vue`, variants `icon` / `primary` / `pill`; motion in `lib/motion/paper.ts`): a glass sheet pulls out of the button → once a plan is read it slides over the schedule and the old rows retreat → after saving, the sheet steps aside one row at a time and each row lands only once uncovered (alternating, never two half-transparent layers; down for stacked rows, right for side-by-side cells) → the status chip flashes. On failure the sheet shows why and returns the way it came. Schedule rows carry `data-paper-row`.
+- **Week view** (`views/ai/AiPlanWeek.vue` + `components/ai/bridge/BridgeFuture.vue`): the title row holds the title, the status chip and receive (pill). Each cell is a flex column: big date number + weekday (`displayDateTimeFormatter`), training shape or figure, name (two-line clamp), duration; today has a green border and a "Today" tag. Week segment in glass. The footer only holds press-and-hold send; the delivery flight lands on the chip's watch. The new-week fade only plays on page flips, never on first mount (the card ↔ page morph is carrying the page in).
+- **Day view** (`views/ai/AiPlanDay.vue` + `components/plan/PlanWorkoutEditor.vue`): header with the title and three round buttons: previous day, next day, "⋯" (delete this day). The strip `PlanStrip.vue` is HTML, 60px high, ticks right under it, fixed font size: width by seconds, height on the same scale as the week shapes (`segmentLevel`), a target band for heart-rate steps, hatching for distance steps; clicking a bar selects that step, scrolls to it and expands it; hovering lights the bar and the step card together, with the readout in a glass tip. Step cards: colour bar, "Warm-up · 1 km", the target right after, ›; open in place to wheel fine-tuning and "Delete this step", with eased height (360 / 300ms). A repeat is one dashed group card with the "×N" capsule (swipe or − / +). At the bottom: "+Warm-up / +Step / +Intervals / +Cool-down" (`addStep` in `lib/trainingPlan/edit.ts`). **No drag-to-edit on the chart.**
+- **Consistent glass**: segments on one page share one variant; the lens attaches as soon as the pointer enters (`useGlassLens().prime()`), so a freshly mounted segment is glass on the first drag.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
-- `/recent` is two columns (sleep / workouts) with "N total" in each column
-  header and a type filter tab on the workout column. Incomplete records that
-  were filtered out must be announced explicitly — "N incomplete records
-  hidden" — never silently disappear.
+- `/recent` is **one vertical timeline** grouped by day, sleep (placed on the
+  day you woke up) and workouts together, newest first. A capsule switches
+  all / sleep / workouts; with workouts a wheel filters by type; "all sleep"
+  and "all workouts" lead to the full lists. Incomplete records that were
+  filtered out must be announced explicitly — "N incomplete records hidden" —
+  never silently disappear.
 - Workout detail: a metric matrix, ECharts heart-rate/pace curves, a local SVG
   track (mapped onto the `--route-*` spectrum by pace) and pause intervals. No
   track points means no map; no per-point samples means no curve.
@@ -206,6 +496,12 @@ A three-column layout:
   threshold heart-rate plus pace card (the pace axis is `inverse`, so "faster"
   points up), a load-balance card (7-day load, 28-day weekly average and the
   acute:chronic ratio as three lines), and the `HeartRateZonePicker`.
+- Life events appear **once per page** as a capsule row (add / the events in
+  range / manage); trend cards no longer repeat "+ Add event · Manage" under
+  every chart. Event dots on a chart still open the event.
+- **Switching range morphs the lines** instead of clearing and redrawing:
+  trend charts update in merge mode (`metricSeries.ts#SMOOTH_CHART_UPDATE`,
+  `notMerge: false, replaceMerge: ['series']`) with a 520ms update animation.
 - Every card states its coverage: "12 of 30 days have records". **Days without
   data break the line** (`connectNulls: false`) — no interpolation, no zero
   padding. With only one day of data no chart is drawn; it simply says a trend
@@ -216,47 +512,109 @@ A three-column layout:
 
 ### 5. Settings (`/settings`)
 
-Numbered sections, top to bottom: 1 authentication method (official web sign-in
-/ HAR import / manual entry) → 2 account and region → 3 connected devices and
-data sources → 4 privacy and security (including the privacy-principles modal)
-→ 5 local data retention → 6 export and backfill preferences → 7 local REST API
-status → 8 software updates → 9 automatic sync.
+A **card deck with three forms**, no sidebar. Eight cards
+(`views/settings/cards.ts`): account and devices · sync and updates · archive
+and storage · data content · hand to AI tools · display and language · privacy
+and security · advanced and maintenance. The same cards morph between forms
+with Web Animations on the real elements (FLIP; geometry in the pure
+`lib/deck/morph.ts`, orchestration in `composables/useDeckMorph.ts`) — so
+every morph can be **interrupted**: closing a card half-way plays the opening
+backwards (`Animation.reverse()`), collapsing mid-unbox flies each card back
+from where it is on screen. (View Transitions froze input for the duration and
+re-rendered blurred snapshots, which stuttered on collapse.)
 
-An "Advanced and maintenance" section at the bottom folds in interface scale,
-opening the data folder and clearing credentials, with a nested "sync
-diagnostics" section listing per-stream status and cloud sync times.
+- `/settings`, default — **coverflow** (`DeckCoverflow.vue`, poses from the
+  pure `lib/deck/coverflow.ts`): the centre card stands upright; neighbours
+  turn ~46° and stack tightly on both sides, smaller, blurrier and fainter with
+  distance; the deck wraps around so both sides are always populated, and the
+  stage edges dissolve into the background. Drag (velocity snap via
+  `useSpringIndex`), wheel, ←/→, or click a side card to turn it to the centre;
+  click the centre card or Enter to open. There are no arrow buttons — dragging
+  is flipping. Side cards have no hard edges: their outer half dissolves into
+  the background with distance (`coverflowPose().dissolve`).
+- **"Show all"** unboxes the deck: cards leave one by one (16ms apart from the
+  centre outwards, 420ms each) into a two-column vertical list; a prominent floating
+  **"Collapse"** capsule puts them back in reverse order. The choice is
+  remembered per viewer.
+- `/settings/:card` opens one card: it grows out of its source card (top-left
+  aligned scale plus a bottom clip to the source's proportions) while the
+  overview recedes around its top centre, blurs and fades; closing lands it
+  exactly back on the source. Inside, flip by dragging the header or flinging
+  it (a drag interrupts a running flip), ←/→ and PageUp/PageDown, or the dots;
+  × / Esc go back where the card was opened from; reduced motion switches
+  instantly. No card has a border or a highlight line — edges come from depth.
+- Unrelated small tools or facts sit **side by side** as tiles (`.s-tiles`):
+  the three privacy facts, and data folder / data health / compaction under
+  Advanced.
+- Layers: `lib/deck/physics.ts` + `lib/deck/coverflow.ts` + `lib/deck/morph.ts`
+  (pure, with vitest) → `composables/useCardDeck.ts` / `useSpringIndex.ts` /
+  `useDeckMorph.ts` → `components/deck/`. Card contents live in
+  `views/settings/sections/`; shared state is injected through
+  `composables/settings/context.ts`.
+- Inside a card, rows use `settings-base.css`: label left, control right,
+  hairlines between rows.
+- History backfill has exactly one entry point, in "archive and storage"
+  (long-term archive switch → start date and run → estimated size → coverage
+  ledger).
 
 ## Components and charts
 
 - No UI framework: every component is in-house, under `src/components/` —
-  `BrandMark`, `CategoryMark`, `CircularProgress`, `DesignIcon`,
-  `DeviceMarquee`, `DeviceVisual`, `EmptyState`, `HeartRateZonePicker`, `Icon`,
-  `MetricTrendCard`, `PageHeader`, `RecordRow`, `SkeletonBlock`, `Sparkline`,
-  `StageBar`. Check here for something reusable before adding one.
+  `BrandMark`, `CapsuleWheel`, `CategoryMark`, `CircularProgress`, `CardDeck`
+  (`deck/`), `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`,
+  `GlyphTile`, `HeartRateZonePicker`, `Icon`, `MetricTrendCard`,
+  `cards/` (`CardTable`, `PlayingCard`, `CollectionBox`, `PickDaysButton`),
+  `ModalDialog`, `PageHeader`, `RecordRow`, `SegmentTrack`, `SkeletonBlock`,
+  `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
+  (`overview/`, `workout/`, `archive/`, `ai/`, `deck/`, `shell/`). Check
+  here for something reusable before adding one.
 - Per-day trends always go through `MetricTrendCard` plus `buildSeriesOption`
   from `lib/metricSeries.ts`; do not write a separate option object per page.
   `SERIES_RANGES` is the single source for the three ranges.
-- The two icon sets have distinct jobs: `Icon.vue` is inline linear SVG (UI
-  controls, small sizes), `DesignIcon.vue` renders the PNG design icons in
-  `src/assets/design-icons/` (navigation, large semantic icons). Images must be
+- Icons: `Icon.vue` is inline linear SVG; large semantic icons use
+  `GlyphTile.vue` — a CSS material base plus an `Icon.vue` glyph, coloured by a
+  `tone` category token (name → glyph map in `lib/glyphs.ts`), shared by both
+  schemes. Do not add PNG 3D icons; only brand artwork (app-icon, brand-mark,
+  zepp-cloud) stays as images. Images must be
   imported so Vite emits real files — the desktop CSP allows neither data URLs
   nor external image sources.
-- Charts use `vue-echarts` with the `zeppbridge-dark` theme registered in
-  `main.ts`. Do not redefine the palette per page.
+- Charts use `vue-echarts` through `src/lib/echartsSetup.ts`, which registers
+  both `zeppbridge-dark` and `zeppbridge-light` and exports the reactive
+  `CHART_THEME` / `chartPalette`. Every `VChart` binds `:theme="CHART_THEME"`
+  **and** `:key="CHART_THEME"` so the chart is rebuilt on a scheme switch, and
+  every chart `option` is a `computed` that reads chrome colours (axis labels,
+  grid lines, tooltip, marks, series semantics) from `chartPalette.value` —
+  never a literal hex. The palette's colour values mirror `tokens.css` because
+  CSS variables cannot reach canvas. Do not redefine the palette per page.
+- Chart chrome follows the glass material: tooltips are rounded, blurred glass
+  panes; the axis pointer is a thin dashed line, and bar charts do not draw the
+  grey shadow box (the sleep chart turned it off entirely). Line series carry a
+  soft gradient under the line unless a measured range is shaded.
+- **Overview never loads ECharts.** Its heart-rate curve is
+  `components/overview/HrMiniChart.vue` (SVG, geometry in `lib/miniChart.ts`)
+  and the entry cards use `Sparkline`. The chart engine is 580 KB and belongs to
+  the interactive charts on detail pages; a `VChart` on Overview makes every cold
+  start parse it again.
 
 ## Interaction and accessibility
 
 - A "skip to main content" link sits at the top; navigation and radio groups are
   annotated with `role` / `aria-*` / `aria-pressed`; charts carry `role="img"`
   and a localised `aria-label`.
-- Focus is a uniform `:focus-visible` 2px `--focus` outline. `outline: none` on
-  its own is forbidden.
+- Focus is a uniform `:focus-visible` 2px `--focus` outline in a neutral grey —
+  no green outlines anywhere, and selected chips are shown by fill, not by a
+  brand-coloured stroke. `outline: none` on its own is forbidden (capsules and
+  wheels brighten their thumb instead).
+- Hover tips and help popovers that can sit near an edge carry `v-edge-safe`
+  (`lib/edgeSafe.ts`): when shown they are nudged (and narrowed if needed) to
+  stay inside the window and every ancestor that clips them.
 - Touch targets are at least 44px (the mobile menu button, the bottom
   navigation, `RecordRow`).
-- The main breakpoint is 760px: the sidebar becomes a top bar plus a bottom
-  tabbar. Overview additionally drops columns at 1180 and 820.
+- The main breakpoint is 760px: the top bar's pill navigation hides and a
+  bottom tabbar covers the same three items. Overview additionally drops
+  columns at 1180 and 820.
 - Interface scale is 80 / 90 / 100 / 110 / 125% (`UI_SCALES`), reachable from
-  Settings → "Advanced and maintenance", with Ctrl + / Ctrl - / Ctrl 0, persisted
+  the "Display and language" settings card, with Ctrl + / Ctrl - / Ctrl 0, persisted
   in localStorage.
 - Check that `Date.getTime()` is valid before formatting a time. Error messages
   keep actionable content rather than collapsing into "failed to load".
@@ -264,7 +622,7 @@ diagnostics" section listing per-stream status and cloud sync times.
 ## Maintaining this document
 
 Page structure follows `src/router/index.ts` and the `navigation` array in
-`src/App.vue`; design tokens follow the `:root` block in `App.vue`. Update this
+`src/AppShell.vue`; design tokens follow `src/styles/tokens.css`. Update this
 page when you change navigation, the palette or theme state. **Where it
 conflicts with the source, the source wins** — and fix this page while you are
 there. Engineering gates are in the [development guide](development.md); product
@@ -276,6 +634,6 @@ boundaries are in the
 
 - Template titles/descriptions and select options wrap instead of hiding meaningful text behind ellipses. Prompt editing and dialog prose use `--fs-md`; supporting copy uses the existing smaller tokens.
 - Do not fade explanatory text with container opacity. Missing-data cards keep readable text and use a dashed border for distinction; disabled actions can still be dimmed.
-- `SelectMenu` keeps focus on the trigger and links its teleported list and active option with `aria-controls` / `aria-activedescendant`. Options and triggers are at least 44px tall.
+- Capsule choices are a `role="radiogroup"` (`SegmentTrack`) or a `role="slider"` (`CapsuleWheel`, with `aria-valuetext` naming the current item); arrows and Home/End work.
 - Settings uses `ModalDialog` for privacy and release notes: named dialog, contained Tab/Shift+Tab navigation, Escape dismissal, focus restoration and a scrolling viewport. Keep close buttons labelled in both languages.
 - Search/editor wrappers use `:focus-within` when their inner fields suppress the native outline.

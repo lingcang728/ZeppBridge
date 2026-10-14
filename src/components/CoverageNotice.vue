@@ -17,7 +17,8 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
  * 所在的 Zepp 区域——区域猜错了，同步会一路跑通、一条记录不带回来，界面上和
  * 「这段时间你确实没数据」长得一模一样。所以这里要把两者分开说。
  */
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { backend, isDesktop } from '../lib/bridge';
 import Icon from './Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { emptyLibraryNotice } from '../lib/emptyLibraryNotice';
@@ -33,47 +34,59 @@ const props = withDefaults(defineProps<{
   requestedDays?: number;
 }>(), { requestedDays: 0 });
 
-const { appStatus, isSyncing, runSync } = useSyncController();
+const { appStatus, isSyncing, runSync, canIncrementalSync } = useSyncController();
 
 const messages = defineMessages(
   {
     empty: '本机还没有任何数据。先同步一次，图表才有东西可画。',
     emptyAfterSync:
-      '同步跑通了，但一条记录也没取到。可能是这个账号在 Zepp 里本来就没有这段时间的数据，也可能是手表还没把数据上传到 Zepp App。先在手机上打开 Zepp 确认那边有数据，再回来同步一次。',
+      '同步跑通了，但一条记录也没取到。可能这账号在 Zepp 里本就没有这段数据，也可能手表还没上传到 Zepp App。先在手机 Zepp 里确认有数据，再回来同步。',
     emptyUnconfirmedRegion:
-      '同步跑通了，但一条记录也没取到。登录时没能确认你的账号属于哪个 Zepp 区域，现在用的是猜出来的那个——打向错误区域的同步就是这样：一路成功，什么都没有。请重新连接账号试试。',
+      '同步跑通了，但一条记录也没取到。登录时没能确认账号属于哪个 Zepp 区域，现在用的是猜的那个——打向错误区域的同步就是这样：一路成功，什么都没有。重新连接账号试试。',
     reconnect: '去重新连接',
     short: (covered: number, earliest: string) =>
-      `本机只有 ${covered} 天的数据（最早 ${earliest}）。更早的部分是空白，因为还没从云端取回来——不是那段时间你没有记录。`,
+      `本机只有 ${covered} 天数据（最早 ${earliest}）。更早的空白是因为还没从云端取回——不是那段时间没有记录。`,
     backfill: '补拉更多历史',
     backfilling: '正在补拉…',
     syncNow: '立即同步',
+    emptyNotConnected: '本机还没有任何数据。先连接你的 Zepp 账号，再同步一次，图表才有东西可画。',
+    keepAllHint: '本机默认长期保留全部记录，同步后不会自动清理。',
+    keepAllChange: '改成只留最近一段',
+    connect: '连接 Zepp 账号',
   },
   {
-    empty: 'Nothing on this machine yet. Sync once and the charts will have something to draw.',
+    empty: 'Nothing on this machine yet. Sync once and charts will have something to draw.',
     emptyAfterSync:
-      'The sync completed but brought nothing back. Either this account has no data for this period in Zepp, or the watch has not uploaded to the Zepp app yet. Check the Zepp app on your phone first, then sync again here.',
+      'Sync ran but brought back nothing. Either this account has no Zepp data for this period, or the watch has not uploaded to the Zepp app yet. Check Zepp on your phone, then sync again.',
     emptyUnconfirmedRegion:
-      'The sync completed but brought nothing back. Signing in could not confirm which Zepp region your account belongs to, so ZeppBridge is using its best guess — and a sync aimed at the wrong region behaves exactly like this: it succeeds and returns nothing. Try connecting your account again.',
+      'Sync ran but brought back nothing. Sign-in could not confirm your account’s Zepp region, so ZeppBridge is guessing — a sync aimed at the wrong region succeeds and returns nothing, exactly like this. Reconnect your account.',
     reconnect: 'Reconnect account',
     short: (covered: number, earliest: string) =>
-      `This machine holds ${covered} days (earliest ${earliest}). Everything before that is blank because it has not been fetched from the cloud yet — not because you recorded nothing then.`,
+      `This machine holds ${covered} days (earliest ${earliest}). Earlier dates are blank because they are not fetched yet — not because you recorded nothing then.`,
     backfill: 'Backfill more history',
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
+    emptyNotConnected: 'Nothing on this machine yet. Connect your Zepp account first, then sync once.',
+    keepAllHint: 'Everything is kept long-term by default — syncs never prune it.',
+    keepAllChange: 'Keep only recent days instead',
+    connect: 'Connect Zepp account',
   },
   {
     empty: 'Todavía no hay nada en este equipo. Sincroniza una vez y los gráficos tendrán qué mostrar.',
     emptyAfterSync:
-      'La sincronización terminó, pero no trajo nada. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj todavía no ha subido sus datos a la app Zepp. Revisa primero la app Zepp en tu teléfono y luego vuelve a sincronizar aquí.',
+      'La sincronización funcionó, pero no trajo ni un registro. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj aún no los sube a la app Zepp. Confirma en la app Zepp del teléfono que haya datos y vuelve a sincronizar.',
     emptyUnconfirmedRegion:
-      'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar a qué región de Zepp pertenece tu cuenta, así que ZeppBridge está usando su mejor suposición, y una sincronización dirigida a la región equivocada se comporta exactamente así: funciona y no devuelve nada. Intenta conectar tu cuenta de nuevo.',
+      'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar la región Zepp de tu cuenta, así que ZeppBridge está usando una región adivinada: una sincronización a la región equivocada hace justo esto, funciona y no devuelve nada. Vuelve a conectar tu cuenta.',
     reconnect: 'Volver a conectar la cuenta',
     short: (covered: number, earliest: string) =>
-      `Este equipo tiene ${covered} días de datos (el más antiguo: ${earliest}). Todo lo anterior aparece vacío porque aún no se ha descargado de la nube, no porque no hayas registrado nada entonces.`,
+      `Este equipo solo tiene ${covered} días de datos (desde ${earliest}). Lo anterior está en blanco porque aún no se descarga de la nube, no porque no hubiera registros.`,
     backfill: 'Recuperar más historial',
     backfilling: 'Recuperando…',
     syncNow: 'Sincronizar ahora',
+    emptyNotConnected: 'Todavía no hay nada en este equipo. Conecta primero tu cuenta de Zepp y luego sincroniza una vez.',
+    keepAllHint: 'Por defecto todo se conserva a largo plazo: las sincronizaciones no borran nada.',
+    keepAllChange: 'Conservar solo los días recientes',
+    connect: 'Conectar cuenta de Zepp',
   },
   'components/CoverageNotice',
 );
@@ -120,6 +133,14 @@ const earliestText = computed(() => {
 /* 补拉到用户当前选的那个范围，而不是某个固定值：他刚刚已经说了想看多远。 */
 const backfill = () => { void runSync('history', props.requestedDays); };
 const syncNow = () => { void runSync('incremental'); };
+
+/* 空库（第一次打开）时顺带说一句保留规则：新建的库默认长期保留，想省空间可以去改。
+   「数据属于我」和「会保留多久」要讲在一起（体验评估第 5 条）。只在长期归档确实开着时说。 */
+const keepAll = ref(false);
+onMounted(() => {
+  if (!isDesktop()) return;
+  void backend.getUserPrefs().then((prefs) => { keepAll.value = prefs.archive_enabled; }).catch(() => undefined);
+});
 </script>
 
 <template>
@@ -133,6 +154,12 @@ const syncNow = () => { void runSync('incremental'); };
       {{ isSyncing ? t.backfilling : t.syncNow }}
     </button>
   </p>
+  <!-- 还没连上账号：「立即同步」点了只会变成「同步失败」，所以这里直接给连接入口。 -->
+  <p v-else-if="isEmpty && !canIncrementalSync" class="coverage-notice" role="status">
+    <Icon name="clock" :size="14" />
+    <span>{{ t.emptyNotConnected }}</span>
+    <RouterLink class="button button-secondary" to="/settings/account">{{ t.connect }}</RouterLink>
+  </p>
   <p v-else-if="isEmpty" class="coverage-notice" role="status">
     <Icon name="clock" :size="14" />
     <span>{{ t.empty }}</span>
@@ -140,7 +167,12 @@ const syncNow = () => { void runSync('incremental'); };
       {{ isSyncing ? t.backfilling : t.syncNow }}
     </button>
   </p>
-  <p v-else-if="isShort" class="coverage-notice" role="status">
+  <p v-if="(isEmpty || isEmptyAfterSync) && keepAll" class="coverage-notice subtle">
+    <Icon name="database" :size="14" />
+    <span>{{ t.keepAllHint }}</span>
+    <RouterLink class="text-action" to="/settings/archive">{{ t.keepAllChange }}</RouterLink>
+  </p>
+  <p v-if="!isEmpty && !isEmptyAfterSync && isShort" class="coverage-notice" role="status">
     <Icon name="clock" :size="14" />
     <span>{{ t.short(coverage!.covered_days, earliestText) }}</span>
     <button class="button button-secondary" type="button" :disabled="isSyncing" @click="backfill">
@@ -157,13 +189,16 @@ const syncNow = () => { void runSync('incremental'); };
   flex-wrap: wrap;
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--muted);
   font-size: var(--fs-md);
-  line-height: 1.5;
+  line-height: 1.5; box-shadow: var(--mat-inset-shadow);
 }
 .coverage-notice span { flex: 1 1 240px; min-width: 0; }
 .coverage-notice .button { flex: 0 0 auto; }
+.coverage-notice.subtle { border-color: transparent; background: none; box-shadow: none; padding-block: 0; font-size: var(--fs-sm); }
+.text-action { flex: 0 0 auto; color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
+.text-action:hover { text-decoration: underline; }
 </style>

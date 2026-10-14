@@ -1,5 +1,7 @@
+import { today as currentToday } from './currentDay';
 import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import type { FacePart } from './cards/faceValue';
 import {
   bigDistanceThresholdMeters,
   distanceUnitLabel,
@@ -18,13 +20,18 @@ export type HealthCategory = 'heart' | 'sleep' | 'activity';
 const messages = defineMessages(
   {
     noUpdates: '暂无更新',
-    noRecords: '尚无记录',
+    noRecords: '暂无记录',
     timeUnknown: '时间未知',
     dateUnknown: '日期未知',
     durationUnknown: '时长未知',
     notRecorded: '未记录',
+    today: '今天',
+    yesterday: '昨天',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`),
+    hourUnit: '小时',
+    minuteUnit: '分',
+    minutesUnit: '分钟',
   },
   {
     noUpdates: 'No updates yet',
@@ -33,18 +40,28 @@ const messages = defineMessages(
     dateUnknown: 'Date unknown',
     durationUnknown: 'Duration unknown',
     notRecorded: 'Not recorded',
+    today: 'Today',
+    yesterday: 'Yesterday',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`),
+    hourUnit: 'h',
+    minuteUnit: 'm',
+    minutesUnit: 'min',
   },
   {
     noUpdates: 'Sin actualizaciones',
-    noRecords: 'Aún no hay registros',
+    noRecords: 'Sin registros',
     timeUnknown: 'Hora desconocida',
     dateUnknown: 'Fecha desconocida',
     durationUnknown: 'Duración desconocida',
     notRecorded: 'No registrado',
+    today: 'Hoy',
+    yesterday: 'Ayer',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
+    hourUnit: 'h',
+    minuteUnit: 'min',
+    minutesUnit: 'min',
   },
   'lib/format',
 );
@@ -59,6 +76,23 @@ export const localDateString = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+/**
+ * 一个时刻的短说法：今天只写「今天 15:22」，昨天写「昨天 22:20」，更早的写「09-25 22:20」。
+ * 给「最新一条样本在什么时候」这类提示用——比完整年月日时分好读，又不会把昨天说成今天。
+ */
+export const formatWhen = (value?: string | null, now = currentToday()): string | null => {
+  if (!value) return null;
+  const date = parseDisplayDate(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((dayStart(now) - dayStart(date)) / 86_400_000);
+  if (days === 0) return `${copy().today} ${time}`;
+  if (days === 1) return `${copy().yesterday} ${time}`;
+  const day = displayDateTimeFormatter({ month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return `${day} ${time}`;
 };
 
 export const formatDateTime = (value?: string, empty = copy().noUpdates): string => {
@@ -117,6 +151,21 @@ export const formatDuration = (minutes?: number | null, empty = copy().durationU
   return copy().duration(Math.floor(total / 60), total % 60);
 };
 
+/**
+ * 时长拆成数字段 / 单位段（第三轮精修 B4）：`<DurationText>`、牌面、睡眠详情头部共用——数字大、单位小一号、不折行。
+ * 英文写成 `8h 11m`。没有值返回 null（界面写「—」，不写 0）。
+ */
+export const formatDurationParts = (minutes?: number | null): FacePart[] | null => {
+  if (!isFiniteNumber(minutes) || minutes < 0) return null;
+  const total = Math.round(minutes);
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  const c = copy();
+  return hours > 0
+    ? [{ n: String(hours) }, { u: c.hourUnit }, { n: String(rest) }, { u: c.minuteUnit }]
+    : [{ n: String(rest) }, { u: c.minutesUnit }];
+};
+
 export const formatDistance = (meters?: number, empty = copy().notRecorded): string => {
   if (!isFiniteNumber(meters) || meters <= 0) return empty;
   return meters >= bigDistanceThresholdMeters()
@@ -124,10 +173,31 @@ export const formatDistance = (meters?: number, empty = copy().notRecorded): str
     : `${Math.round(toShortDistance(meters))} ${shortDistanceUnitLabel()}`;
 };
 
+/**
+ * 全应用唯一的数字写法（按界面语言分组）。俄语用 U+00A0、法语用 U+202F 当千位分隔，前者在 MiSans 里
+ * 和普通空格一样宽，「1 709」看着像两个数；后者 MiSans 原本没有字形。统一换成 U+202F（窄不换行空格，
+ * 字体子集借了细空格的字形，见 scripts/assets/subset-fonts.py）。
+ */
+export const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string =>
+  value.toLocaleString(intlLocale(), options).replace(/[  ]/g, ' ');
+
 export const formatMetric = (value: number | undefined, digits = 0): string => {
   if (!isFiniteNumber(value)) return '—';
-  return value.toLocaleString(intlLocale(), {
+  return formatNumber(value, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
+};
+
+/**
+ * 全应用唯一的字节写法：< 1 KiB 写 B，< 1 MiB 写整数 KB，< 1 GiB 写一位小数 MB，
+ * 再往上两位小数 GB。没有值（null / NaN / ≤ 0）给 `empty`——调用方决定那是「—」、
+ * 「未提供」还是「0 KB」。
+ */
+export const formatBytes = (bytes: number | null | undefined, empty = '—'): string => {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return empty;
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 };

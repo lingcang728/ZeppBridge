@@ -3,11 +3,19 @@ import { computed } from 'vue';
 
 export type IconName =
   | 'activity'
+  | 'bike'
+  | 'chevron-right'
+  | 'gauge'
+  | 'battery-heart'
+  | 'wrench'
+  | 'week-bars'
+  | 'timeline-flag'
   | 'arrow-left'
   | 'arrow-right'
   | 'bars'
   | 'bell'
   | 'box'
+  | 'cards'
   | 'braces'
   | 'dots'
   | 'edit'
@@ -37,6 +45,7 @@ export type IconName =
   | 'external'
   | 'file'
   | 'flame'
+  | 'fit'
   | 'folder'
   | 'gear'
   | 'grid'
@@ -59,13 +68,20 @@ export type IconName =
   | 'steps'
   | 'stress'
   | 'sun'
+  | 'swim'
   | 'sync'
   | 'terminal'
   | 'trash'
+  | 'undo'
   | 'vo2'
   | 'warning'
   | 'watch'
   | 'wifi'
+  | 'bolt'
+  | 'stride'
+  | 'contact'
+  | 'oscillation'
+  | 'ratio'
   | 'x';
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?: number }>(), {
@@ -125,6 +141,7 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     <path v-else-if="name === 'external'" d="M14 5h5v5m0-5-8 8M17 13v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" :stroke-width="stroke" />
     <path v-else-if="name === 'file'" d="M6 3.5h8l4 4V20H6V3.5Zm8 0v4h4M9 12h6m-6 3h6" :stroke-width="stroke" />
     <path v-else-if="name === 'flame'" d="M12 3s5 5.2 5 9.2A5 5 0 0 1 7 12c0-2.2 1.5-4.2 3-5.6-.2 1.8.4 3-1 4.2 2.4-.2 4.6-2 3-7.6Z" fill="currentColor" stroke="none" />
+    <path v-else-if="name === 'fit'" d="M4.5 9V6.2c0-.9.8-1.7 1.7-1.7H9m6 0h2.8c.9 0 1.7.8 1.7 1.7V9m0 6v2.8c0 .9-.8 1.7-1.7 1.7H15m-6 0H6.2c-.9 0-1.7-.8-1.7-1.7V15" :stroke-width="stroke" />
     <path v-else-if="name === 'folder'" d="M3.5 7.5h6l1.6 2h9.4v7.8a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2V7.5Zm0 2h17" :stroke-width="stroke" />
     <g v-else-if="name === 'gear'">
       <circle cx="12" cy="12" r="3" :stroke-width="stroke" />
@@ -167,9 +184,10 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <path d="M12 3.8c1.8 2.7 5.4 6.1 5.4 9.6a5.4 5.4 0 1 1-10.8 0c0-3.5 3.6-6.9 5.4-9.6Z" fill="currentColor" />
       <path d="M9.3 14.2c1.3 1.1 4.1 1.1 5.4 0" fill="none" stroke="currentColor" :stroke-width="stroke" />
     </g>
+    <!-- 一左一右两只脚印：后面那只淡一档（双色），小尺寸也看得出是「走」。 -->
     <g v-else-if="name === 'steps'" fill="currentColor" stroke="none">
-      <path d="M6.2 4.1c1.8.3 3.4 1.4 4.5 3l2.1 3.1 2.5 1.8c1 .7 2.1 1 3.4 1.1l.9.1c.9.1 1.5.8 1.4 1.7-.1.7-.5 1.3-1.2 1.7l-3.9-.6c-2-.3-3.7-1.3-4.9-2.9l-1.8-2.3-2.3 5.7c-.5 1.3-1.8 2-3.2 1.7l-1-.2c-.7-.2-1.1-.9-.9-1.6l2.6-9.9c.2-.8.9-1.3 1.6-1.2Z" />
-      <path d="M5.2 19.8h10.2c.8 0 1.4-.5 1.7-1.2l.4-1.2-11.4-1.8-.9 2.2c-.3.9-.1 1.6 0 2Z" opacity=".7" />
+      <path d="M7.6 4.6c1.7 0 2.7 1.8 2.7 4.3 0 2.1-.8 3.4-1 4.8-.2 1.3.6 2.3.6 3.6a2.1 2.1 0 0 1-4.2.3c-.2-1.9-1.3-3.5-1.3-6.6 0-3.4 1.5-6.4 3.2-6.4Z" opacity=".38" />
+      <path d="M16.4 2.6c-1.7 0-2.7 1.8-2.7 4.3 0 2.1.8 3.4 1 4.8.2 1.3-.6 2.3-.6 3.6a2.1 2.1 0 0 0 4.2.3c.2-1.9 1.3-3.5 1.3-6.6 0-3.4-1.5-6.4-3.2-6.4Z" />
     </g>
     <g v-else-if="name === 'stress'" fill="currentColor" stroke="none">
       <circle cx="12" cy="7" r="2.2" />
@@ -187,12 +205,89 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <circle cx="16.7" cy="13.8" r="3.1" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'warning'" d="m12 3 9 16H3L12 3Zm0 6v4m0 3v.1" :stroke-width="stroke" />
-    <g v-else-if="name === 'watch'">
-      <rect x="7.2" y="6.5" width="9.6" height="11" rx="2.4" :stroke-width="stroke" />
-      <path d="M9 6.5V4.2h6V6.5M9 17.5v2.3h6V17.5" :stroke-width="stroke" />
+    <!-- 手表（2026-10-12）：双色填充带高光——表带浅、表身实、表盘压暗，指针和左上角一道高光。 -->
+    <g v-else-if="name === 'watch'" stroke="none">
+      <path d="M8.7 3.4h6.6l.7 3.4H8Zm-.7 13.8h8l-.7 3.4H8.7Z" fill="currentColor" opacity=".42" />
+      <rect x="6.2" y="6" width="11.6" height="12" rx="3.2" fill="currentColor" />
+      <rect x="8" y="7.8" width="8" height="8.4" rx="2" fill="#000" opacity=".3" />
+      <path d="M12 9.6V12l1.7 1.1" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M7.5 9.4a2.6 2.6 0 0 1 2.1-2.2" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.1" stroke-linecap="round" />
     </g>
     <path v-else-if="name === 'wifi'" d="M3.5 8.8a13.4 13.4 0 0 1 17 0M6.5 12a8.6 8.6 0 0 1 11 0M9.4 15.2a4 4 0 0 1 5.2 0M12 18.7v.1" :stroke-width="stroke" />
+    <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" :stroke-width="stroke" />
+    <g v-else-if="name === 'swim'">
+      <circle cx="16.6" cy="6.4" r="1.9" fill="currentColor" stroke="none" />
+      <path d="m5.5 12.6 4.2-3.4 3.4 2.6 3.6-2.4M3 16.4c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0M3 20c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0" :stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <g v-else-if="name === 'bike'">
+      <circle cx="6" cy="16" r="3.6" :stroke-width="stroke" />
+      <circle cx="18" cy="16" r="3.6" :stroke-width="stroke" />
+      <path d="M6 16 9.5 9h6L18 16M9.5 9 12 16h-6m6.5-10h2.5m-5 3-1-3" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'gauge'">
+      <path d="M4.2 17.5a8.5 8.5 0 1 1 15.6 0" :stroke-width="stroke" />
+      <path d="m12 13.5 4-5" :stroke-width="stroke" />
+      <circle cx="12" cy="13.8" r="1.4" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 身体状态：电量里一颗心——「恢复了多少」，不是刷新。 -->
+    <g v-else-if="name === 'battery-heart'">
+      <rect x="3.5" y="7" width="15" height="10" rx="2.6" :stroke-width="stroke" />
+      <path d="M21 10.4v3.2" :stroke-width="stroke" />
+      <rect x="5.6" y="9.1" width="10.8" height="5.8" rx="1.3" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M11 14.2s-2.5-1.4-2.5-3.2A1.35 1.35 0 0 1 11 10.3a1.35 1.35 0 0 1 2.5.7c0 1.8-2.5 3.2-2.5 3.2Z" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 高级与维护：扳手（维护）+ 一个小加号（更多选项）；设置本身仍是齿轮。 -->
+    <g v-else-if="name === 'wrench'">
+      <path d="M15.2 4.4a4.4 4.4 0 0 0-5.3 5.6L4.6 15.3a1.9 1.9 0 0 0 2.7 2.7l5.3-5.3a4.4 4.4 0 0 0 5.6-5.3l-2.6 2.6-2.4-.5-.5-2.4 2.5-2.7Z" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M15.2 4.4a4.4 4.4 0 0 0-5.3 5.6L4.6 15.3a1.9 1.9 0 0 0 2.7 2.7l5.3-5.3a4.4 4.4 0 0 0 5.6-5.3l-2.6 2.6-2.4-.5-.5-2.4 2.5-2.7Z" :stroke-width="stroke" />
+      <path d="M17 15.5v5m-2.5-2.5h5" :stroke-width="stroke" />
+    </g>
+    <!-- 这一周：七根柱子，最后一根（今天）实色加粗、顶上一个点。 -->
+    <g v-else-if="name === 'week-bars'">
+      <path d="M4.5 19.6h15" :stroke-width="stroke" />
+      <path d="M5.5 17v-3M8 17v-5M10.5 17v-2.4M13 17v-6M15.5 17v-4" :stroke-width="stroke" opacity=".55" />
+      <path d="M18.5 17V6.5" stroke-width="2.2" />
+      <circle cx="18.5" cy="4.2" r=".9" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 生活事件：时间线上立起一面小旗。 -->
+    <g v-else-if="name === 'timeline-flag'">
+      <path d="M3.5 18h17M12 18V5.5" :stroke-width="stroke" />
+      <circle cx="6" cy="18" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="18" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" fill="currentColor" stroke="none" opacity=".28" />
+      <path d="M12 6h5.2l-1.6 2.3 1.6 2.3H12" :stroke-width="stroke" />
+    </g>
+    <!-- 功率：一道闪电，淡填充加实线，和扳手同一套双色。 -->
+    <g v-else-if="name === 'bolt'">
+      <path d="M13.4 2.6 6.2 13h4.4l-1.2 8.4 8.4-11.6h-4.6l.2-7.2Z" fill="currentColor" opacity=".28" stroke="none" />
+      <path d="M13.4 2.6 6.2 13h4.4l-1.2 8.4 8.4-11.6h-4.6l.2-7.2Z" :stroke-width="stroke" stroke-linejoin="round" />
+    </g>
+    <!-- 步幅：后脚淡、前脚实，底下一条尺。 -->
+    <g v-else-if="name === 'stride'">
+      <path d="M6.4 5.2c1.35 0 2.15 1.4 2.15 3.3 0 1.6-.65 2.6-.85 3.7-.15 1 .4 1.7.4 2.65a1.55 1.55 0 0 1-3.1.2c-.15-1.4-1-2.6-1-4.9 0-2.55 1.15-4.95 2.4-4.95Z" fill="currentColor" opacity=".38" stroke="none" />
+      <path d="M16.8 3.4c-1.55 0-2.45 1.6-2.45 3.75 0 1.85.75 3 .95 4.2.2 1.1-.5 2-.5 3.15a1.85 1.85 0 0 0 3.7.25c.2-1.65 1.2-3.05 1.2-5.75 0-2.95-1.4-5.6-2.9-5.6Z" fill="currentColor" stroke="none" />
+      <path d="M5.2 20.6h13.6M5.2 19.1v1.5M18.8 19.1v1.5" :stroke-width="stroke" stroke-linecap="round" />
+    </g>
+    <!-- 触地：地上一条线、淡一块接触面、上面一只实心脚。 -->
+    <g v-else-if="name === 'contact'">
+      <path d="M3.6 19.2h16.8" :stroke-width="stroke" stroke-linecap="round" />
+      <ellipse cx="12.2" cy="17.5" rx="5.4" ry="1.45" fill="currentColor" opacity=".28" stroke="none" />
+      <path d="M14.8 3.6c-1.6 0-2.55 1.65-2.55 3.9 0 1.95.75 3.1.95 4.4.18 1.15-.55 2.1-.55 3.25a1.95 1.95 0 0 0 3.9.28c.2-1.7 1.2-3.15 1.2-5.95 0-3.05-1.4-5.88-2.95-5.88Z" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 垂直振幅：淡的竖轴、实心的双箭头和中点。 -->
+    <g v-else-if="name === 'oscillation'">
+      <path d="M12 5.4v13.2" :stroke-width="stroke" opacity=".4" stroke-linecap="round" />
+      <path d="M12 3.2 9.3 6.1M12 3.2l2.7 2.9M12 20.8 9.3 17.9M12 20.8l2.7-2.9" :stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" />
+    </g>
+    <!-- 垂直比：基线上两根柱，高的淡、矮的实。 -->
+    <g v-else-if="name === 'ratio'">
+      <path d="M3.8 19.4h16.4" :stroke-width="stroke" stroke-linecap="round" />
+      <rect x="6.2" y="5.4" width="4.4" height="14" rx="1.5" fill="currentColor" opacity=".32" stroke="none" />
+      <rect x="13.2" y="10.6" width="4.4" height="8.8" rx="1.5" fill="currentColor" stroke="none" />
+    </g>
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
+    <path v-else-if="name === 'undo'" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" :stroke-width="stroke" />
     <path v-else-if="name === 'bell'" d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6Zm-8 9a2.2 2.2 0 0 0 4 0" :stroke-width="stroke" />
     <g v-else-if="name === 'help'">
       <circle cx="12" cy="12" r="8.5" :stroke-width="stroke" />
@@ -242,6 +337,12 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     <g v-else-if="name === 'ring'">
       <circle cx="12" cy="12" r="8" :stroke-width="stroke" />
       <circle cx="12" cy="12" r="4.4" :stroke-width="stroke" />
+    </g>
+    <!-- 一叠牌：前面一张带方块花色，后面一张只露出左边和底边（线不交叉，小尺寸也干净）。 -->
+    <g v-else-if="name === 'cards'" :stroke-width="stroke">
+      <rect x="8.5" y="3.5" width="11.5" height="15" rx="2.2" />
+      <path d="M8.5 7H6.2A2.2 2.2 0 0 0 4 9.2v10.6A2.2 2.2 0 0 0 6.2 22H14a2.2 2.2 0 0 0 2.2-2.2v-1.3" />
+      <path d="m14.25 7.6 2.1 3.4-2.1 3.4-2.1-3.4 2.1-3.4Z" />
     </g>
     <g v-else-if="name === 'box'">
       <path d="M12 3.3 20 7.5v9L12 20.7 4 16.5v-9L12 3.3Zm-8 4.2 8 4.2 8-4.2M12 11.7v9" :stroke-width="stroke" />

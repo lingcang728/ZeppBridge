@@ -1,0 +1,45 @@
+/* 往返记录（10-13 重做）：按天分组，一条一张圆角小卡；大字是名字，小字是时间 · 交给谁 · 到哪一步。 */
+.exchange-list { display: grid; gap: 0; grid-template-columns: minmax(0, 1fr); }
+.exchange-list > header { display: flex; align-items: baseline; gap: 15px; margin-bottom: 12px; }
+.exchange-list h2 { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.exchange-list > header p { margin: 0; color: var(--subtle); font-size: 10px; }
+.ex-groups { display: grid; gap: 18px; }
+.ex-group { display: grid; gap: 8px; }
+.ex-day { margin: 0 0 2px 4px; color: var(--subtle); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .04em; }
+.ex-rows { position: relative; display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ex-row { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 62px; padding: 10px 10px 10px 12px;
+  border: 1px solid var(--mat-line); border-radius: 18px; background: var(--mat-card); box-shadow: var(--mat-rim); transition: background var(--dur-base) ease, border-color var(--dur-base) ease; }
+.ex-row:hover { background: color-mix(in srgb, var(--ink) 4%, var(--mat-card)); }
+.ex-row.confirming { border-color: color-mix(in srgb, var(--danger) 45%, var(--mat-line)); background: color-mix(in srgb, var(--danger) 6%, var(--mat-card)); }
+.ex-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--accent); }
+.ex-icon img { width: 18px; height: 18px; object-fit: contain; }
+.ex-main { display: grid; gap: 5px; min-width: 0; color: var(--ink); text-decoration: none; }
+.ex-main strong { overflow: hidden; font-size: var(--fs-sm); font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.ex-main:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 8px; }
+.ex-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.ex-meta > i { font-style: normal; opacity: .6; }
+.ex-state { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.ex-state.good { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.ex-state.accent { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
+.ex-state.warn { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+.mini-week { display: inline-flex; gap: 3px; margin-left: 2px; }
+.mini-week i { width: 6px; height: 6px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.mini-week i.on { background: var(--muted); box-shadow: none; }
+.ex-rename { width: 100%; font-weight: 650; }
+.ex-acts { display: flex; align-items: center; gap: 2px; }
+.ex-act, .ex-go { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.ex-act { opacity: 0; transition: opacity var(--dur-base) ease, background var(--dur-base) ease; }
+.ex-row:hover .ex-act, .ex-row:focus-within .ex-act { opacity: 1; }
+.ex-act:hover { background: var(--glass-press); color: var(--ink); }
+.ex-act.danger:hover { color: var(--danger); }
+.ex-act:focus-visible, .ex-go:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; opacity: 1; }
+.ex-go { color: var(--subtle); }
+.pill-button.danger { color: var(--danger); }
+.history-empty { display: flex; align-items: center; gap: 10px; padding: 14px 0; color: var(--subtle); font-size: 11px; opacity: .7; }
+/* 删掉一条：淡出、下面的往上补（只动 opacity / translate）。 */
+.ex-enter-active, .ex-leave-active, .ex-move { transition: opacity 260ms ease, translate 360ms cubic-bezier(.4, .6, .2, 1); }
+.ex-enter-from, .ex-leave-to { opacity: 0; translate: 0 6px; }
+.ex-leave-active { position: absolute; width: 100%; }
+@media (hover: none) { .ex-act { opacity: 1; } }
+@media (max-width: 600px) { .ex-row { grid-template-columns: minmax(0, 1fr) auto; } .ex-icon { display: none; } .mini-week { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ex-enter-active, .ex-leave-active, .ex-move { transition: none; } }

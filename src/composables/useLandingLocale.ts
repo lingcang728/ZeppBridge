@@ -2,7 +2,7 @@ import { readonly, ref } from 'vue';
 import type { LandingCopy } from '../views/landing/types';
 
 /**
- * 落地页（zeppbridge.pages.dev）专用的语言层。
+ * 落地页（zeppbridge.com）专用的语言层。
  *
  * 只服务落地页这一个文件，**不是**应用的 i18n 方案：应用界面有自己的一套
  * （`src/i18n/`），这里的判定规则不一样——落地页面向全网访客，猜不准时给
@@ -83,20 +83,18 @@ export interface LandingPack {
 
 /** zh/en 的 meta 和文案一样内联——首屏就要写对 title，不能等网络。 */
 const DOCUMENT_META: Record<'zh' | 'en', LandingMeta> = {
-  zh: {
-    title: 'ZeppBridge · 本地数据桥梁',
-    description: 'ZeppBridge 是本地优先、开源的 Amazfit/Zepp 穿戴数据桥接与可视化工具。',
-    ogTitle: 'ZeppBridge · 把 Zepp 数据完整交还给你',
-    ogDescription: '在 Windows、macOS 与 Linux 本机连接、整理并可视化 Amazfit 穿戴数据，保留来源并按需交给 AI。',
+  "zh": {
+    "title": "ZeppBridge · 手表记录，自己的档案",
+    "description": "把 Amazfit / Zepp 的心率、睡眠和运动保存为本地健康档案。查看合成 v3 示例，下载公开稳定版。免费、开源。",
+    "ogTitle": "ZeppBridge · 手表记录，自己的档案",
+    "ogDescription": "把 Amazfit / Zepp 的心率、睡眠和运动保存为本地健康档案。查看合成 v3 示例，下载公开稳定版。免费、开源。"
   },
-  en: {
-    title: 'ZeppBridge · Local Data Bridge',
-    description:
-      'ZeppBridge is a local-first, open-source bridge and viewer for Amazfit / Zepp wearable data. Runs on your own Windows, Mac or Linux machine.',
-    ogTitle: 'ZeppBridge · Your Zepp data, handed back in full',
-    ogDescription:
-      'Connect, organize and visualize Amazfit wearable data on your own machine. Sources stay intact, and nothing leaves until you send it.',
-  },
+  "en": {
+    "title": "ZeppBridge · Your watch records. Your own archive.",
+    "description": "Keep Amazfit / Zepp heart rate, sleep and workouts in a local health archive. Explore the synthetic v3 sample or download the public stable release. Free and open source.",
+    "ogTitle": "ZeppBridge · Your watch records. Your own archive.",
+    "ogDescription": "Keep Amazfit / Zepp heart rate, sleep and workouts in a local health archive. Explore the synthetic v3 sample or download the public stable release. Free and open source."
+  }
 };
 
 const STORAGE_KEY = 'zeppbridge-landing-locale';
@@ -174,6 +172,7 @@ const detectLocale = (): LandingLocale => {
  * 界面重算。加载失败静默回落 en：切语言这个动作本身不该失败。
  */
 const loadedPacks = ref<Partial<Record<LandingLocale, LandingPack>>>({});
+const localeLoadError = ref<LandingLocale | null>(null);
 const packInflight = new Map<LandingLocale, Promise<void>>();
 
 /** 确保某语言的落地页语言包已加载。zh/en 直接返回。 */
@@ -185,12 +184,13 @@ export const ensureLandingCopy = (value: LandingLocale): Promise<void> => {
   if (inflight) return inflight;
   const task = import(`../views/landing/${value}.ts`)
     .then((module) => {
+      if (localeLoadError.value === value) localeLoadError.value = null;
       loadedPacks.value = { ...loadedPacks.value, [value]: module.default as LandingPack };
       // 包到了之后补写一次页面级 meta——加载期间 title 用的是英文兜底。
       if (locale.value === value) applyDocumentLanguage(value);
     })
     .catch(() => {
-      // 语言包加载失败不该让切换语言失败：所有键回落 en。
+      if (locale.value === value) { localeLoadError.value = value; applyDocumentLanguage('en'); }
     })
     .finally(() => {
       packInflight.delete(value);
@@ -237,6 +237,7 @@ let initialized = false;
 const setLocale = (value: LandingLocale) => {
   if (!isLandingLocale(value)) return;
   locale.value = value;
+  localeLoadError.value = null;
   try {
     if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, value);
   } catch {
@@ -257,6 +258,7 @@ const initializeLocale = () => {
 };
 
 export const useLandingLocale = () => ({
+  localeLoadError: readonly(localeLoadError),
   locale: readonly(locale),
   initializeLocale,
   setLocale,

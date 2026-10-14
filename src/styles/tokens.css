@@ -1,0 +1,321 @@
+/* 设计 token 唯一来源。深色是 `:root` 默认值，`html[data-theme="light"]`
+ * 覆写同一组变量——组件只消费 token，不知道自己在哪一套主题里。
+ * `useTheme` 负责切换 `data-theme`；`color-scheme` 跟着 data-theme 走，
+ * 让滚动条与原生表单控件自动换色。新颜色一律进这个文件。 */
+:root {
+  /* only 禁止浏览器自动改色，原生控件仍跟随当前主题。 */
+  color-scheme: only dark;
+  --bg: #0C0E11;
+  --sidebar: #08090C;
+  --canvas: #0D0F12;
+  --surface: #16191E;
+  --surface-raised: #1D2128;
+  --surface-hover: #262B33;
+  --ink: #F2F4EE;
+  --muted: #B4BBC3;
+  --subtle: #949CA5;
+  /* 旧的 --faint 在任何表面上都过不了 WCAG AA，退回 --subtle。 */
+  --faint: var(--subtle);
+  --line: rgba(226, 234, 242, .12);
+  --line-control: rgba(226, 234, 242, .46);
+  --line-strong: rgba(226, 234, 242, .22);
+  --brand: #7DA33E;
+  --accent: var(--brand);
+  --accent-hover: #93B952;
+  --accent-strong: #7DA33E;
+  --accent-ink: #12170A;
+  --accent-soft: rgba(125, 163, 62, .12);
+  --action-green: #55702A;
+  --action-green-hover: #668539;
+  --icon-mint: #2FA96B;
+  --heart: #F0616A;
+  --heart-wash: rgba(240, 97, 106, .12);
+  --pace: #4AA8E8;
+  --pace-wash: rgba(74, 168, 232, .12);
+  --calories: #F5860B;
+  --calories-wash: rgba(245, 134, 11, .12);
+  --altitude: #F5C33B;
+  --altitude-wash: rgba(245, 195, 59, .12);
+  --cadence: #4AA8E8;
+  /* 训练 / 准备度：和品牌青柠同一家族，不再用荧光绿。 */
+  --training: #A3CC5C;
+  --readiness: #A3CC5C;
+  --sleep-deep: #6477D7;
+  --sleep-light: #7C8FF0;
+  --sleep-rem: #8B5CF6;
+  --sleep-awake: #E8833A;
+  --sleep: var(--sleep-light);
+  --sleep-wash: rgba(124, 143, 240, .12);
+  --activity: #2BB3C0;
+  --activity-wash: rgba(43, 179, 192, .12);
+  --distance: var(--pace);
+  --danger: #F0616A;
+  --warning: #F5C33B;
+  /* 键盘焦点环：中性的浅灰，不用品牌绿（2026-10-01：「只要有绿色描边的地方，都帮我去掉」）。 */
+  --focus: rgba(226, 234, 242, .55);
+  --route-neutral: #9AA1A9;
+  --route-mint: #2FA96B;
+  --route-cyan: #4AA8E8;
+  --route-amber: #F5C33B;
+  --route-coral: #F0616A;
+  /* 概览卡/工作台的共享面板面：两色渐变只在深色里提供层次，
+     浅色里是纯色白卡 + 实体投影（见下方覆写）。 */
+  --panel: var(--mat-card);
+  --panel-line: var(--mat-line);
+  --panel-line-hover: var(--mat-line-hover);
+  --panel-glint: var(--mat-rim), var(--mat-shadow);
+
+  /* ── 材质（「克制玻璃」）──────────────────────────────────────
+     卡片：一种材质——145° 两色渐变 + 顶边 1px 高光 + 两层柔和投影。
+     凸起（按钮 / 控件头）：稍亮的纵向渐变 + 顶边高光。
+     凹槽（输入框 / 轨道 / 进度条）：比卡片更暗 + 内阴影。
+     玻璃：只给浮在上层的东西（顶栏、导航胶囊、下拉、弹窗）。 */
+  --mat-card: linear-gradient(160deg, #1E232B 0%, #171A20 62%, #15181D 100%);
+  --mat-card-solid: #191C22;
+  /* 磨砂卡：半透明，靠身后一层静态模糊出效果（设置大卡）。 */
+  --mat-card-frost: rgba(25, 28, 34, .86);
+  --mat-line: rgba(226, 234, 242, .085);
+  --mat-line-hover: rgba(226, 234, 242, .17);
+  /* 立体感：顶边一道高光 + 底边一道暗线，卡片像有厚度的一块板，而不是贴在底上的色块。 */
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .075), inset 0 -1px 0 rgba(0, 0, 0, .28);
+  --mat-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 24px -12px rgba(0, 0, 0, .55), 0 30px 60px -30px rgba(0, 0, 0, .6);
+  --mat-shadow-lift: 0 2px 4px rgba(0, 0, 0, .3), 0 18px 36px -14px rgba(0, 0, 0, .6), 0 44px 80px -34px rgba(0, 0, 0, .7);
+  /* 叠放时落在前一张卡上的向上阴影。 */
+  --mat-stack-shadow: 0 -10px 24px -14px rgba(0, 0, 0, .55);
+  --mat-raised: linear-gradient(180deg, #272C34 0%, #20252C 100%);
+  --mat-raised-hover: linear-gradient(180deg, #2E343D 0%, #262B33 100%);
+  --mat-raised-rim: inset 0 1px 0 rgba(255, 255, 255, .075), 0 1px 2px rgba(0, 0, 0, .35);
+  --mat-inset: #121419;
+  --mat-inset-shadow: inset 0 1px 2px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(226, 234, 242, .06);
+  --mat-glass: rgba(24, 27, 33, .72);
+  --mat-glass-strong: rgba(24, 27, 33, .88);
+  --mat-glass-line: rgba(255, 255, 255, .1);
+  --mat-glass-blur: blur(22px) saturate(1.5);
+  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 18px 44px -14px rgba(0, 0, 0, .7);
+  /* 浮动控件的玻璃（Liquid Glass「regular」的网页近似）：清透的底，靠顶边高光
+     和一圈细亮边界定形状，而不是靠厚底色和粗边框；阴影小而软。 */
+  --glass: rgba(30, 34, 41, .46);
+  --glass-sheen: rgba(255, 255, 255, .08);
+  --glass-blur: blur(18px) saturate(1.8) brightness(1.05);
+  /* Liquid Glass 的边：顶上一道镜面高光、底下一道回光，外加一圈极细亮边。 */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -1px 0 rgba(255, 255, 255, .05),
+    inset 0 0 0 1px rgba(255, 255, 255, .075), inset 0 0 22px rgba(255, 255, 255, .025);
+  --glass-shadow: 0 6px 18px -8px rgba(0, 0, 0, .55);
+  --glass-press: rgba(255, 255, 255, .08);
+  /* 滚动边缘：内容滚到浮动控件下面时被轻轻模糊、淡出，代替硬分界线。 */
+  --edge-fade: rgba(13, 15, 18, .78);
+  /* 图标底座：同一种材质，颜色由 --tile-tone 决定。 */
+  --mat-tile-top: #2A2F37;
+  --mat-tile-bottom: #16191E;
+  --mat-tile-rim: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 -1px 0 rgba(0, 0, 0, .35);
+  --glyph-neutral: #C9D0D8;
+  /* 胶囊选择器（SegmentTrack / CapsuleWheel 共用一套）：凹槽里托着一块凸起的胶囊，
+     选中字用品牌色。整个应用只有这一种「从几项里挑一个」的样子。 */
+  --cap-track: #101216;
+  --cap-track-shadow: inset 0 1px 3px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(226, 234, 242, .06);
+  --cap-thumb: linear-gradient(180deg, #3B424C 0%, #2B3139 100%);
+  --cap-thumb-rim: inset 0 1px 0 rgba(255, 255, 255, .17), inset 0 -1px 0 rgba(0, 0, 0, .3),
+    0 1px 2px rgba(0, 0, 0, .45), 0 4px 12px -4px rgba(0, 0, 0, .6);
+  /* 浮在玻璃上的胶囊（导航、顶栏）：底本身是玻璃，滑块只是一块更亮的玻璃。 */
+  --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .07));
+  --cap-glass-thumb-rim: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(255, 255, 255, .04),
+    0 2px 8px -3px rgba(0, 0, 0, .45);
+  /* iOS 26 的玻璃（照 App Store 标签栏录屏，2026-10-01）。
+     胶囊的边：一圈极细高光，上下沿最亮、两端渐弱。停稳时的选中项：比玻璃略深的平胶囊。 */
+  --glass-edge: linear-gradient(180deg, rgba(255, 255, 255, .32), rgba(255, 255, 255, .09) 32%, rgba(255, 255, 255, .05) 68%, rgba(255, 255, 255, .18));
+  --glass-outline: 0 0 0 0 transparent;
+  /* 停稳时的选中项：比玻璃略亮的一块平胶囊，只有一道很淡的顶边高光（不再是压暗的「餐盒盖」）。 */
+  --glass-tab-selected: linear-gradient(180deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, .075));
+  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 0 0 .5px rgba(255, 255, 255, .05);
+  /* 拖动时浮起的折射玻璃（lib/glassLens.ts）：里面清透不铺色；边是一圈极淡的亮描边（不用暗描边：「后面还有黑边」）、
+     左上和右下两道斜对角高光，外加很淡的浮起影子。 */
+  /* 透镜边上的散射光（lib/glassLens.ts 的乳白那一层）：深色底上要淡。 */
+  --lens-scatter: rgba(255, 255, 255, .45);
+  --lens-glass-rim: 0 0 0 .5px rgba(255, 255, 255, .1), 0 8px 18px -8px rgba(0, 0, 0, .45);
+  --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 70deg, rgba(255, 255, 255, .05) 100deg,
+    rgba(255, 255, 255, .62) 140deg, rgba(255, 255, 255, .05) 185deg, rgba(255, 255, 255, .05) 265deg, rgba(255, 255, 255, .78) 310deg, rgba(255, 255, 255, .16));
+  --cap-ink: #A2C765;
+
+  /* 动效 */
+  --dur-fast: 140ms;
+  --dur-base: 300ms;
+  --dur-slow: 680ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.2, 1.15, .32, 1);
+  /* 玻璃透镜浮起（带一点回弹）/ 落下（不回弹）。 */
+  --lens-lift: cubic-bezier(.3, 1.45, .45, 1);
+  --lens-drop: cubic-bezier(.25, .8, .3, 1);
+  /* 切页与形变统一用两档时长、两条缓动（D-1）：进场 / 展开用 std + enter，返回 / 收回用 back。
+     回弹只留在导航胶囊的滑块上（SegmentTrack），切页和卡片收回一律不回弹。
+     2026-10-03 整体放慢（用户：「傻快傻快的」，参考 iOS）：320 / 380 → 420 / 460；悬停、按下这类即时反馈仍是 fast。
+     2026-10-12 再放慢三成（「真的调慢一点」，和 lib/motion/timing.ts 的 PACE 同一个数）：420 / 460 → 550 / 600。 */
+  --dur-std: 550ms;
+  --dur-back: 600ms;
+  --ease-enter: cubic-bezier(.35, .65, .2, 1);
+  --ease-leave: cubic-bezier(.4, 0, .2, 1);
+
+  --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  /* 字号阶梯（设计系统 v5）：默认界面缩放为 100%，通过 token 统一抬高 DOM 字号和图表文字。
+     用户仍可在界面缩放中调整整体大小，半像素值也会随所选缩放一起变化。 */
+  --fs-2xs: 13px;
+  --fs-xs: 14.5px;
+  --fs-sm: 15.5px;
+  --fs-md: 16.5px;
+  --fs-lg: 17.5px;
+  --fs-xl: 18.5px;
+  --fs-2xl: 20px;
+  --fs-3xl: 22px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 26px;
+  --radius-xl: 34px;
+  /* 画布环境光（见 shell.css 的 .app-body::before）。 */
+  --ambient:
+    radial-gradient(900px 520px at 12% -8%, rgba(125, 163, 62, .10), transparent 70%),
+    radial-gradient(760px 520px at 96% 8%, rgba(100, 119, 215, .09), transparent 70%),
+    radial-gradient(900px 600px at 60% 110%, rgba(43, 179, 192, .06), transparent 70%);
+}
+
+/* 浅色主题：暖白底 + 深绿品牌色。色板方向见
+ * docs/development/ui-guidelines.md 的「双主题」一节；
+ * 原则是每个 token 在浅色下保持同一角色（ink=主文字、line=结构线…），
+ * 分类色只调明度饱和不换色相，语义不漂移。 */
+html[data-theme="light"] {
+  color-scheme: only light;
+  --bg: #EAEDE5;
+  --sidebar: #FFFFFF;
+  --canvas: #F4F6F3;
+  --surface: #FFFFFF;
+  --surface-raised: #F3F5EF;
+  --surface-hover: #E5E9E0;
+  --ink: #20261F;
+  --muted: #4C5748;
+  --subtle: #63705C;
+  --faint: var(--subtle);
+  --line: rgba(38, 52, 41, .10);
+  --line-control: rgba(38, 52, 41, .36);
+  --line-strong: rgba(38, 52, 41, .22);
+  --brand: #2F6B4F;
+  --accent: var(--brand);
+  --accent-hover: #3A7E5E;
+  --accent-strong: #27573F;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(47, 107, 79, .10);
+  --action-green: #2F6B4F;
+  --action-green-hover: #27573F;
+  --icon-mint: #22875C;
+  --heart: #C93F49;
+  --heart-wash: rgba(201, 63, 73, .10);
+  --pace: #2E7FC2;
+  --pace-wash: rgba(46, 127, 194, .10);
+  --calories: #C96A05;
+  --calories-wash: rgba(201, 106, 5, .10);
+  --altitude: #A87E0B;
+  --altitude-wash: rgba(168, 126, 11, .12);
+  --cadence: #2E7FC2;
+  --training: #4E8A2E;
+  --readiness: #4E8A2E;
+  --sleep-deep: #5565C9;
+  --sleep-light: #6B7FE0;
+  --sleep-rem: #7C4DDB;
+  --sleep-awake: #D9732B;
+  --sleep: var(--sleep-light);
+  --sleep-wash: rgba(107, 127, 224, .10);
+  --activity: #1E96A6;
+  --activity-wash: rgba(30, 150, 166, .10);
+  --distance: var(--pace);
+  --danger: #C43742;
+  --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
+  --focus: rgba(38, 52, 41, .42);
+  --route-neutral: #6E7670;
+  --route-mint: #22875C;
+  --route-cyan: #2E7FC2;
+  --route-amber: #A87E0B;
+  --route-coral: #C43742;
+  --panel: var(--mat-card);
+  --panel-line: var(--mat-line);
+  --panel-line-hover: var(--mat-line-hover);
+  --panel-glint: var(--mat-rim), var(--mat-shadow);
+
+  --ambient:
+    radial-gradient(900px 520px at 12% -8%, rgba(47, 107, 79, .10), transparent 70%),
+    radial-gradient(760px 520px at 96% 8%, rgba(107, 127, 224, .08), transparent 70%),
+    radial-gradient(900px 600px at 60% 110%, rgba(30, 150, 166, .06), transparent 70%);
+  --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FAFBF8 100%);
+  --mat-card-solid: #FFFFFF;
+  --mat-card-frost: rgba(255, 255, 255, .9);
+  --mat-line: rgba(38, 52, 41, .10);
+  --mat-line-hover: rgba(38, 52, 41, .22);
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(38, 52, 41, .06);
+  --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 28px -14px rgba(38, 52, 41, .16), 0 30px 60px -32px rgba(38, 52, 41, .2);
+  --mat-shadow-lift: 0 2px 6px rgba(38, 52, 41, .1), 0 22px 44px -18px rgba(38, 52, 41, .22);
+  --mat-stack-shadow: 0 -6px 16px -12px rgba(38, 52, 41, .18);
+  --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F1F4EE 100%);
+  --mat-raised-hover: linear-gradient(180deg, #FFFFFF 0%, #E9EEE5 100%);
+  --mat-raised-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .12);
+  --mat-inset: #EDF0EA;
+  --mat-inset-shadow: inset 0 1px 2px rgba(38, 52, 41, .12), inset 0 0 0 1px rgba(38, 52, 41, .07);
+  --mat-glass: rgba(250, 251, 248, .74);
+  --mat-glass-strong: rgba(250, 251, 248, .9);
+  --mat-glass-line: rgba(38, 52, 41, .1);
+  --mat-glass-blur: blur(22px) saturate(1.6);
+  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 18px 44px -16px rgba(38, 52, 41, .28);
+  --glass: rgba(255, 255, 255, .56);
+  --glass-sheen: rgba(255, 255, 255, .5);
+  --glass-blur: blur(16px) saturate(1.8);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(38, 52, 41, .08);
+  --glass-shadow: 0 6px 18px -10px rgba(38, 52, 41, .3);
+  --glass-press: rgba(38, 52, 41, .06);
+  --edge-fade: rgba(246, 247, 243, .8);
+  --mat-tile-top: #FFFFFF;
+  --mat-tile-bottom: #EEF1EA;
+  --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(38, 52, 41, .08);
+  --glyph-neutral: #4C5748;
+  --cap-track: #E4E8E0;
+  --cap-track-shadow: inset 0 1px 2px rgba(38, 52, 41, .14), inset 0 0 0 1px rgba(38, 52, 41, .06);
+  --cap-thumb: linear-gradient(180deg, #FFFFFF 0%, #F7F9F5 100%);
+  --cap-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .16), 0 4px 12px -5px rgba(38, 52, 41, .28);
+  --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .72));
+  --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .14), 0 3px 10px -4px rgba(38, 52, 41, .22);
+  --glass-edge: linear-gradient(180deg, #FFFFFF, rgba(255, 255, 255, .6) 32%, rgba(255, 255, 255, .45) 68%, rgba(255, 255, 255, .9));
+  --glass-outline: 0 0 0 .5px rgba(38, 52, 41, .12);
+  --glass-tab-selected: linear-gradient(180deg, rgba(38, 52, 41, .085), rgba(38, 52, 41, .06));
+  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 0 0 .5px rgba(38, 52, 41, .04);
+  --lens-scatter: #FFFFFF;
+  --lens-glass-rim: 0 0 0 .5px rgba(38, 52, 41, .14), 0 8px 18px -8px rgba(38, 52, 41, .28);
+  --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
+    rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));
+  --cap-ink: #2F6B4F;
+}
+
+/* ── 浅色主题的局部补丁 ────────────────────────────────────────────
+   只放「深色硬编码值在白底上读不出」的选择器。能用 token 自动换色的
+   组件不需要出现在这里。这是过渡期的集中式补丁表：改对应组件的类名
+   时请同步这里，逐步把硬编码换成 token 后这一节应当变空。 */
+
+/* StageBar 的「未知」斜纹在深色里是白 alpha，浅色换成墨色 alpha。 */
+html[data-theme="light"] .stage-bar .unknown {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(38, 52, 41, .22),
+    rgba(38, 52, 41, .22) 4px,
+    rgba(38, 52, 41, .07) 4px,
+    rgba(38, 52, 41, .07) 8px
+  );
+}
+
+/* ComparisonBars：轨道与基线。 */
+html[data-theme="light"] .comparison-track { background: rgba(38, 52, 41, .10); }
+html[data-theme="light"] .comparison-bar .baseline { background: rgba(38, 52, 41, .24); }
+
+/* DeviceDetail：状态灯与提示色。 */
+html[data-theme="light"] .hero-state.on i { background: var(--accent); }
+html[data-theme="light"] .hint-line.ok { color: var(--accent); }
+html[data-theme="light"] .api-error { color: var(--danger); }

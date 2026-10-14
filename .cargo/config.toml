@@ -1,0 +1,9 @@
+# 只放 [env]。target 目录不在这里：CARGO_TARGET_DIR 是本机全局环境变量，优先级高于本文件（见 scripts/v3-gates.ps1）。
+# 从仓库根（--manifest-path）或 src-tauri（tauri build）跑 cargo 都会往上找到这一份。
+[env]
+# 关掉 rusqlite 自带 SQLite 的 SQLITE_ENABLE_MEMORY_MANAGEMENT（2026-10-13）。
+# 开着它，同一进程里所有连接共用一个页缓存池；一条连接扫过一大段之后把池占满，其余连接每放回一页就被立刻
+# 释放、命中率归零，同一条 180 天心率扫描从约 75 ms 变成 650–1050 ms。应用正好是多连接（命令侧写连接、
+# SyncManager、只读池），CLI / MCP 也一样。我们不用 sqlite3_release_memory / 软堆上限，关掉没有代价。
+# 守门测试：storage::tests::open::sqlite_page_caches_are_not_shared_between_connections。
+LIBSQLITE3_FLAGS = "-USQLITE_ENABLE_MEMORY_MANAGEMENT"

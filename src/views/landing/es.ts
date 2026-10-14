@@ -1,140 +1,284 @@
 import type { LandingPack } from '../../composables/useLandingLocale';
 
-/**
- * Español (es) landing pack.
- *
- * Same freedom as the English copy: rewritten to sound natural, not translated
- * word for word. Product terms (ZeppBridge, HAR, appToken, MCP, SQLite, EXE/MSI,
- * Apple Silicon, AI-ready) stay untranslated. Decorative overlines stay in
- * English, matching zh/en.
- */
 const pack: LandingPack = {
-  copy: {
-    nav: {
-      home: 'Inicio de ZeppBridge',
-      site: 'Navegación del sitio',
-      features: 'Qué lee',
-      local: 'Salidas locales',
-      connect: 'Conexión',
-      privacy: 'Privacidad',
-      star: 'Estrella en GitHub',
-      language: 'Idioma',
-    },
-    downloads: {
-      windows: { label: 'Descargar para Windows', hint: 'Recomendado · Instalador EXE x64', msi: 'Despliegue gestionado: descargar MSI' },
-      macos: { label: 'Descargar para macOS', hint: 'Apple Silicon · Instalador DMG' },
-      linux: {
-        label: 'Linux',
-        previewBadge: 'Vista previa',
-        note: 'deb / rpm / AppImage / Flatpak se compilan en CI, pero nadie ha completado todavía el inicio de sesión y el llavero (Secret Service / KWallet) en un escritorio Linux real. Pruébalo si quieres — y abre un issue cuando algo falle. Es justo lo que necesita ahora.',
-      },
-      status: {
-        loading: 'Buscando la última versión en GitHub…',
-        ready: 'Descarga directa, sin pasar por GitHub',
-        fallback: 'Los enlaces directos no están disponibles ahora; se abrirá la página de Release',
-      },
-    },
-    hero: {
-      headlineLead: 'Tus datos de Zepp,',
-      headlineAccent: 'devueltos enteros.',
-      lead: 'ZeppBridge conecta, organiza y visualiza los datos de tu wearable Amazfit en tu propio equipo Windows, Mac o Linux. Cada campo conserva su origen: léelo tú mismo o entrégaselo a una IA en tus términos.',
-      starNudge: {
-        title: 'Tu descarga ha comenzado',
-        copy: 'Si ZeppBridge se gana un sitio en tu equipo, una estrella en GitHub ayuda a que más usuarios de Amazfit lo encuentren.',
-        action: 'Dar una estrella en GitHub',
-        dismiss: 'Quizá más tarde',
-      },
-      trust: [
-        { icon: 'secure', label: 'Local primero' },
-        { icon: 'private', label: 'Privado por defecto' },
-        { icon: 'structured-data', label: 'Datos estructurados' },
-      ],
-      stageLabel: 'Dispositivos Amazfit actuales alimentando ZeppBridge y saliendo como datos estructurados',
-      coreCaption: 'Decodificar · Organizar · Visualizar',
-      outputs: [
-        { title: 'Registros estructurados', copy: 'Origen y marcas de tiempo intactos' },
-        { title: 'AI-ready', copy: 'Solo sale cuando tú lo dices' },
-      ],
-      status: { title: 'Canal local listo', copy: 'Nada pasa por un servidor de ZeppBridge' },
-    },
-    principlesLabel: 'Principios del producto',
-    principles: [
-      { icon: 'secure', title: 'Seguro', copy: 'Se queda en tu equipo' },
-      { icon: 'private', title: 'Privado', copy: 'Nada se sube, nada se filtra' },
-      { icon: 'database', title: 'Procedencia', copy: 'Los orígenes nunca se mezclan' },
-      { icon: 'ai-ready', title: 'AI-ready', copy: 'Estructura clara, lista cuando la pides' },
-    ],
-    features: {
-      overline: 'WHAT YOU CAN READ',
-      heading: 'De las cifras de hoy a cada sesión.',
-      lead: 'La interfaz solo muestra los campos que realmente recibió. Lo que falta se marca como ausente: nada de números inventados para rellenar un panel.',
-      items: [
-        { icon: 'heart-rate', title: 'Frecuencia cardiaca continua', copy: 'Marcas de tiempo y origen conservados: ves la curva real.', tone: 'red' },
-        { icon: 'sleep-waves', title: 'Estructura del sueño', copy: 'Fases de sueño profundo, ligero, REM y vigilia, analizadas en local.', tone: 'purple' },
-        { icon: 'outdoor-run', title: 'Detalle de entrenamiento', copy: 'Ruta, ritmo, cadencia, altitud y carga de entrenamiento.', tone: 'green' },
-        { icon: 'vo2-max', title: 'Métricas de recuperación', copy: 'VO₂ Max, HRV y recuperación, mostrados según su origen.', tone: 'blue' },
-      ],
-    },
-    local: {
-      overline: 'NOT ONLY A WINDOW',
-      heading: 'No hace falta abrirlo.',
-      lead: 'La app de escritorio, la línea de comandos, MCP y la API local de solo lectura comparten un mismo núcleo: unidades, zonas horarias, orígenes y valores ausentes cuentan una sola historia. Lo que falta, falta: ninguna salida rellena el hueco con un cero.',
-      items: [
-        {
-          icon: 'structured-data',
-          title: 'Historial completo y snapshots',
-          copy: 'Recupera el historial de la nube mes a mes con un libro de cuentas por bloque. Los snapshots de toda la base van con suma de verificación, y antes de restaurar ves la diferencia en número de filas.',
-          tag: 'Local',
-        },
-        {
-          icon: 'document',
-          title: 'Línea de comandos',
-          copy: 'status / sync / export. Sin preguntas, códigos de salida estables: listo para el Programador de tareas o cron.',
-          tag: 'CLI',
-        },
-        {
-          icon: 'ai-ready',
-          title: 'MCP de solo lectura',
-          copy: 'Deja que una IA consulte tus datos locales directamente. Transporte stdio: no abre puertos ni toca la red.',
-          tag: 'MCP',
-        },
-      ],
-    },
-    connect: {
-      overline: 'THREE PATHS, ONE LOCAL VAULT',
-      heading: 'Elige la vía que te convenga.',
-      lead: 'Desde el inicio de sesión web oficial hasta una entrega manual totalmente auditable. El estado de la conexión y las causas de error siempre quedan claros.',
-      items: [
-        { icon: 'browser-login', title: 'Inicio de sesión web oficial', copy: 'Autoriza dentro del flujo oficial. Las credenciales se quedan en tu equipo.', tag: 'Recomendado' },
-        { icon: 'document', title: 'Importar HAR', copy: 'Para depuración y usuarios avanzados: reutiliza una solicitud autorizada que ya hayas capturado.', tag: 'Avanzado' },
-        { icon: 'manual-entry', title: 'Entrada manual', copy: 'Escribe tú mismo el appToken y el id de usuario, a la vista.', tag: 'Manual' },
-      ],
-    },
-    privacy: {
-      overline: 'PRIVACY BY ARCHITECTURE',
-      heading: 'Tus datos de wearable no deberían ser el activo en la nube de otro.',
-      lead: 'Base de datos local, identificadores enmascarados y orígenes aislados son la configuración por defecto. Cuando quieras involucrar a una IA, tú decides qué sale y dónde aterriza.',
-      points: [
-        { icon: 'database', label: 'Almacenamiento SQLite local' },
-        { icon: 'profile', label: 'IDs de cuenta enmascarados por defecto' },
-        { icon: 'cloud-output', label: 'La exportación solo ocurre si la provocas' },
-      ],
-      vault: 'No hay ningún backend de ZeppBridge retransmitiendo tus datos de salud.',
-    },
-    footer: {
-      tagline: 'Puente de datos Amazfit de código abierto · Windows y Mac (Apple Silicon)',
-      disclaimer: 'Un proyecto independiente y no oficial de código abierto, sin afiliación ni respaldo de Zepp Health, Huami o Amazfit. Úsalo solo con cuentas y datos a los que tengas derecho de acceso.',
-      download: 'Descargar',
-    },
+  "meta": {
+    "title": "ZeppBridge · Tu reloj registra. Tu propio archivo.",
+    "description": "Archiva localmente los datos de Amazfit y Zepp. Explora el ejemplo sintético v3 o descarga la versión pública estable. Gratis y de código abierto.",
+    "ogTitle": "ZeppBridge · Tu reloj registra. Tu propio archivo.",
+    "ogDescription": "Archiva localmente los datos de Amazfit y Zepp. Explora el ejemplo sintético v3 o descarga la versión pública estable. Gratis y de código abierto."
   },
-  meta: {
-    title: 'ZeppBridge · Puente de datos local',
-    description:
-      'ZeppBridge es un puente y visor local y de código abierto para datos de wearables Amazfit / Zepp. Funciona en tu propio equipo Windows, Mac o Linux.',
-    ogTitle: 'ZeppBridge · Tus datos de Zepp, devueltos enteros',
-    ogDescription:
-      'Conecta, organiza y visualiza los datos de tu wearable Amazfit en tu propio equipo. Los orígenes se conservan y nada sale hasta que tú lo envías.',
-  },
+  "copy": {
+    "nav": {
+      "home": "Inicio de ZeppBridge",
+      "site": "Navegación del sitio",
+      "demo": "Demostración",
+      "ai": "Para la IA",
+      "privacy": "Privacidad",
+      "download": "Descargar versión pública",
+      "github": "GitHub",
+      "language": "Idioma",
+      "toDark": "Cambiar a oscuro",
+      "toLight": "Cambiar a claro",
+      "connect": "Conectar",
+      "faq": "Preguntas frecuentes"
+    },
+    "downloads": {
+      "windows": {
+        "label": "Descargar para Windows",
+        "hint": "Instalador x64",
+        "msi": "MSI para instalaciones gestionadas"
+      },
+      "macos": {
+        "label": "Descargar para macOS",
+        "hint": "Apple Silicon"
+      },
+      "linux": {
+        "label": "Linux",
+        "previewBadge": "Experimental",
+        "note": "La CI genera deb, rpm, AppImage y Flatpak, pero nadie ha probado todavía el inicio de sesión y el llavero de principio a fin en un escritorio Linux real. ¿Algún problema? Abre un issue."
+      },
+      "status": {
+        "loading": "Buscando el instalador más reciente",
+        "ready": "Haz clic para descargar directo",
+        "fallback": "Se abre GitHub Releases, ahí eliges el instalador"
+      }
+    },
+    "sample": "Ejemplo",
+    "hero": {
+      "eyebrow": "Gratis · Código abierto · Archivo local de salud",
+      "titleLead": "Tus datos de salud.",
+      "titleAccent": "En tu propio ordenador.",
+      "lead": "Guarda en tu computadora la frecuencia cardiaca, el sueño y los entrenamientos de Amazfit desde la nube de Zepp. Revisa tu historial, conserva los huecos y exporta lo que elijas.",
+      "github": "Ver el código en GitHub",
+      "meta": "Gratis · Windows 10 / 11 · macOS (Apple Silicon) · Linux",
+      "devices": "Dispositivos Amazfit; las métricas varían según el modelo",
+      "stage": {
+        "hint": "Abrir el ejemplo",
+        "note": "La aplicación real con datos sintéticos, sin conectar tu cuenta.",
+        "loading": "Abriendo la app…",
+        "exit": "Salir de la demostración",
+        "unavailable": "La demostración no está disponible. Puedes leer las secciones o consultar el código."
+      },
+      "demo": "Ver el ejemplo",
+      "edition": "v3 en desarrollo · Datos sintéticos. La descarga ofrece la versión pública estable; su interfaz y funciones pueden ser distintas."
+    },
+    "handoff": {
+      "chat": "Chat con la IA",
+      "you": "Tú",
+      "file": "ZeppBridge últimos 14 días.md",
+      "prompt": "Organiza este ejemplo sintético. Enumera fuentes, fechas y campos ausentes sin emitir juicios de salud.",
+      "answer": "El archivo ordena sueño y entrenamientos por fecha. Los periodos sin medición permanecen vacíos. Antes de comparar, verifica fuentes y cobertura; los registros no explican las causas de un cambio.",
+      "note": "Conversación sintética. Esta página no envía archivos ni conecta con una IA. En el uso real, tú decides si entregas contenido a un servicio externo.",
+      "close": "Cerrar"
+    },
+    "privacy": {
+      "kicker": "Datos y privacidad",
+      "heading": "Tu archivo es local. Sus rutas, claras.",
+      "lead": "La sincronización lee registros de Zepp y los guarda en tu computadora. La IA externa es otra ruta que eliges expresamente.",
+      "nodes": {
+        "watch": "Reloj y app Zepp",
+        "cloud": "Nube de Zepp",
+        "computer": "Archivo local de salud",
+        "export": "La IA externa que elijas"
+      },
+      "flowNote": "El reloj sube los datos mediante la app móvil Zepp. El sitio web no almacena tu archivo de salud.",
+      "exportNote": "Exportación opcional · Revisa y envía tú",
+      "services": {
+        "title": "Servicios web con funciones limitadas",
+        "copy": "La autorización oficial y la renovación de tokens usan servicios web. Las actualizaciones consultan las versiones. Los informes de problemas envían diagnósticos limitados tras tu confirmación, sin lecturas de salud."
+      },
+      "docs": "Ver los límites de datos",
+      "points": [
+        {
+          "title": "Credenciales en el sistema",
+          "copy": "Por defecto se usa la bóveda del sistema. Algunas plataformas permiten elegir un archivo con otra protección."
+        },
+        {
+          "title": "Local no significa cifrado",
+          "copy": "La base de salud no está cifrada por defecto. Usa cuentas de sistema separadas y protege las copias."
+        },
+        {
+          "title": "Tú inicias la exportación",
+          "copy": "Los paquetes de IA se preparan y anonimizan localmente. Al enviarlos rigen las reglas del destinatario. Exportaciones y copias completas contienen información distinta."
+        }
+      ]
+    },
+    "connect": {
+      "kicker": "Conecta tus registros",
+      "heading": "Empieza por la autorización oficial",
+      "lead": "Una ruta habitual. Las alternativas avanzadas añaden otros campos.",
+      "recommended": "Inicio recomendado",
+      "advanced": "Alternativas avanzadas",
+      "edition": "Estas son las rutas de la v3 actual. Consulta las notas de la versión pública estable para conocer sus entradas y funciones.",
+      "docs": "Guía de conexión",
+      "paths": [
+        {
+          "title": "Autorización oficial de Zepp",
+          "copy": "Abre la página de autorización de Zepp en tu navegador y usa tu acceso habitual.",
+          "detail": "Lee sueño, frecuencia cardiaca, pasos, entrenamientos, PAI y peso disponibles en tu cuenta."
+        },
+        {
+          "title": "Conexión de datos avanzados",
+          "copy": "Añádela para HRV, oxígeno en sangre, estrés o disposición.",
+          "detail": "Acceso por correo o teléfono. Los campos son distintos y no todos los dispositivos los miden o devuelven."
+        },
+        {
+          "title": "Credenciales manuales",
+          "copy": "Para quien conoce la API y obtuvo credenciales por una vía legítima bajo su control.",
+          "detail": "Introduce token, ID de usuario y dirección regional. Nunca importes tokens de origen desconocido ni los publiques."
+        }
+      ],
+      "note": "Los campos dependen del dispositivo, los registros en la nube y la conexión. Una respuesta vacía no demuestra falta de compatibilidad. Son alternativas, no tres pasos obligatorios."
+    },
+    "final": {
+      "kicker": "Descarga · Versión pública estable",
+      "heading": "Guarda una copia en tu computadora",
+      "lead": "Gratis y de código abierto. Usa tu cuenta de Zepp; no necesitas otra de ZeppBridge.",
+      "docs": "Instalación y notas de versión",
+      "facts": {
+        "channel": "La descarga es la versión pública estable. El ejemplo sintético es v3 en desarrollo; interfaz y funciones pueden variar.",
+        "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
+        "ai": "Consultar y exportar no exige IA. El servicio externo y su cuenta los eliges tú.",
+        "windows": "Windows: los instaladores aún no tienen firma de confianza. Puede aparecer un aviso de editor desconocido o SmartScreen. Verifica la fuente oficial.",
+        "macos": "macOS: versiones sin firma ni notarización. El primer inicio puede bloquearse; sigue las instrucciones del proyecto."
+      }
+    },
+    "footer": {
+      "tagline": "Un puente local para los datos de Amazfit y Zepp.",
+      "disclaimer": "ZeppBridge es un proyecto independiente de código abierto que participa en el programa Zepp Developer Partner, no un producto oficial de Zepp. Las marcas Zepp y Amazfit pertenecen a sus titulares.",
+      "source": "Código fuente"
+    },
+    "faq": {
+      "heading": "Antes de empezar",
+      "lead": "Seis preguntas habituales. Los detalles y diferencias de versión están en la documentación.",
+      "docs": "Documentación del proyecto",
+      "items": [
+        {
+          "question": "¿Qué cuentas necesito?",
+          "answer": "La sincronización requiere tu cuenta de Zepp y la app móvil Zepp. No hay cuenta adicional de ZeppBridge. El ejemplo no requiere acceso."
+        },
+        {
+          "question": "¿Mi dispositivo y métricas son compatibles?",
+          "answer": "Los campos dependen de lo medido, lo conservado en Zepp y la conexión. No se garantiza que cada modelo ofrezca todas las métricas."
+        },
+        {
+          "question": "¿Puedo usarlo sin conexión?",
+          "answer": "Puedes consultar y exportar registros guardados. Iniciar sesión, sincronizar y buscar actualizaciones requiere red. El reloj sigue usando la app Zepp."
+        },
+        {
+          "question": "¿Un hueco significa cero?",
+          "answer": "No. Sin muestra, sin sincronizar y sin decodificar son estados distintos. Nunca se completan con cero, una lectura anterior o una estimación."
+        },
+        {
+          "question": "¿Tengo que usar una IA?",
+          "answer": "No. La exportación se prepara localmente. La IA recibe contenido solo cuando lo pegas o subes. Revisa alcance, anonimización y privacidad."
+        },
+        {
+          "question": "¿La descarga coincide con el ejemplo?",
+          "answer": "El ejemplo muestra v3 en desarrollo con datos sintéticos. La descarga es estable. La revisión de planes y la nueva interfaz podrían no estar publicadas; consulta las notas."
+        }
+      ]
+    },
+    "rebuild": {
+      "featuresHeading": "Tu tiempo, en los registros que conservas.",
+      "featuresLead": "Sueño, frecuencia cardiaca, deporte y planes. Descubre tu archivo paso a paso.",
+      "demoHeading": "Pruébalo antes de descargarlo",
+      "demoLead": "La interfaz V3 real con ejemplos sintéticos. Sin iniciar sesión ni acceder a tus datos personales.",
+      "mobileHint": "Es una aplicación de escritorio. En el móvil puedes verla a pantalla completa; usa un ordenador para interactuar.",
+      "fullscreen": "Ver la demo de escritorio a pantalla completa",
+      "retry": "Volver a cargar la demo",
+      "play": "Reproducir demo",
+      "pause": "Pausar demo",
+      "mediaNote": "V3 · Ejemplo sintético · Grabado en modo oscuro",
+      "moreConnections": "Más formas de conectar",
+      "partner": "Programa Zepp Developer Partner",
+      "disclaimer": "ZeppBridge es un proyecto independiente de código abierto que participa en el programa Zepp Developer Partner, no un producto oficial de Zepp. Las marcas Zepp y Amazfit pertenecen a sus titulares.",
+      "docsHeading": "Empieza aquí.",
+      "guide": "Instalación y guía",
+      "versions": "Versiones y novedades",
+      "community": "Código y comunidad",
+      "privacyDoc": "Datos y privacidad",
+      "star": "¿Te resulta útil? Una estrella en GitHub ayuda a que otros lo descubran.",
+      "dismiss": "Cerrar",
+      "nav": [
+        "Funciones",
+        "Datos y privacidad",
+        "Probar",
+        "Guía"
+      ],
+      "title": [
+        "Tus datos de salud.",
+        "En tu propio ordenador."
+      ],
+      "stories": [
+        {
+          "eyebrow": "Archivo local",
+          "title": "Una copia local de tus registros",
+          "body": "Conecta tu cuenta de Zepp y guarda los registros disponibles en la nube. Los datos sincronizados se pueden consultar sin conexión.",
+          "bullets": [
+            "Datos sincronizados sin conexión",
+            "Consulta fuentes y cobertura"
+          ]
+        },
+        {
+          "eyebrow": "Historial del sueño",
+          "title": "Un lugar para cada noche",
+          "body": "Revisa la duración y las fases de cada noche. Las noches sin medición siguen ausentes; estos datos no sustituyen un diagnóstico médico.",
+          "bullets": [
+            "Historial nocturno y fases",
+            "No se rellenan noches ausentes"
+          ]
+        },
+        {
+          "eyebrow": "Pulso y lagunas",
+          "title": "Sin medición, sin valor",
+          "body": "Nunca se rellenan muestras ausentes con cero, un valor anterior o una estimación. No sincronizado y no medido son estados distintos.",
+          "bullets": [
+            "Se conservan lagunas en las curvas",
+            "No se inventan valores ni ceros"
+          ]
+        },
+        {
+          "eyebrow": "Deporte y entrenamiento",
+          "title": "Conserva el recorrido de tus entrenamientos",
+          "body": "Consulta actividades, detalles y tendencias. Las métricas dependen del dispositivo y los datos sincronizados; comprueba la cobertura antes de comparar.",
+          "bullets": [
+            "Detalles y tendencias deportivas",
+            "Usa los registros disponibles"
+          ]
+        },
+        {
+          "eyebrow": "Entrega a la IA",
+          "title": "Elige el alcance y el destinatario",
+          "body": "En el ejemplo v3 eliges datos y fechas y revisas la exportación. Se prepara localmente; una IA externa solo recibe el contenido cuando tú lo envías.",
+          "bullets": [
+            "Elige fechas y datos",
+            "Revisa antes de enviar tú mismo"
+          ]
+        },
+        {
+          "eyebrow": "Revisión de planes",
+          "title": "Revisa antes de continuar",
+          "body": "La v3 en desarrollo muestra la importación y revisión de planes. Enviarlos al reloj depende del dispositivo y de su validación; no es una promesa general de la versión estable.",
+          "bullets": [
+            "Vista semanal y revisión diaria",
+            "Envío según dispositivo y validación"
+          ]
+        },
+        {
+          "eyebrow": "Ajustes",
+          "title": "Decide el ritmo de tu archivo",
+          "body": "Explora sincronización, conservación e interfaces locales. Los controles pueden variar entre versiones; comprueba su finalidad antes de activarlos.",
+          "bullets": [
+            "Sincronización y conservación",
+            "Tú activas las interfaces locales"
+          ]
+        }
+      ],
+      "learnFeatures": "Ver funciones",
+      "languageFallback": "No se pudo cargar el idioma. Se muestra inglés; selecciona el idioma otra vez."
+    }
+  }
 };
 
 export default pack;

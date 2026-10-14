@@ -1,181 +1,78 @@
 <script setup lang="ts">
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 defineOptions({ name: 'TrainingStatus' });
-import { computed, onMounted, ref, watch } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { computed, onMounted, ref } from 'vue';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
+import SwapChart from '../components/SwapChart.vue';
+import { trendGridStyle } from '../lib/trendGrid';
+import { useQueuedOption } from '../composables/useQueuedOption';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { useRevisionReload } from '../composables/useRevisionReload';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { trainingPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { metricColor } from '../lib/metricTone';
 import {
   formatPaceSeconds,
   indexSeries,
-  seriesRanges,
-  type SeriesRangeDays,
+  sliceByDate,
+  sliceIndexed,
 } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
-import { defineMessages, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
+import { metricInfo } from '../lib/metricInfo';
+import { trainingLoadTierText } from '../lib/trainingLoadTier';
+import { holdInPlace } from '../lib/motion/holdInPlace';
+import { trainingStatusMessages as messages } from './TrainingStatus.i18n';
 
-const messages = defineMessages(
-  {
-    backToOverview: '返回概览',
-    eyebrow: '训练状态',
-    title: '训练状态',
-    intro: 'VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。',
-    rangeAria: '时间范围',
-    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
-    loadFailed: '训练状态数据暂时不可用',
-    retry: '重试',
-    loadingAria: '正在加载训练状态',
-    vo2Hint: '手表在户外跑步后估算的最大摄氧量',
-    vo2Empty: '这段范围没有 VO₂max 记录；它只在户外跑步后更新。',
-    loadLabel: '训练负荷',
-    loadHint: 'Zepp 报告的滚动 7 天训练负荷',
-    loadEmpty: '这段范围没有训练负荷记录。',
-    paiLabel: 'PAI 活力指数',
-    paiHint: '滚动 7 天的个人活力指数',
-    paiEmpty: '这段范围没有 PAI 记录。',
-    thresholdLabel: '乳酸阈值',
-    thresholdHint: '心率与配速，只在高强度跑步后更新',
-    thresholdHr: '阈值心率',
-    thresholdPace: '阈值配速',
-    thresholdChartAria: '乳酸阈值心率与配速曲线',
-    thresholdOnce: (date: string) => `这段范围只有 1 次阈值测量（${date}），画不出趋势。`,
-    thresholdEmpty: '这段范围没有乳酸阈值测量记录。',
-    thresholdPaceTooltip: (value: string, unit: string) => `阈值配速 <b>${value}</b> ${unit}`,
-    /** 训练负荷是个无量纲分数，图表上不需要单位字。 */
-    loadUnit: '',
-    thresholdHrTooltip: (value: number) => `阈值心率 <b>${value}</b> bpm`,
-    balanceLabel: '运动负荷平衡',
-    balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
-    balanceChartAria: '7 天与 28 天训练负荷及急慢比曲线',
-    balanceEmpty: '训练负荷记录还不够画出这条曲线。',
-    balanceNote: '按本地开始日期累加单次运动负荷。只有运动列表完整同步、且所有运动都有有效负荷，才确认当天数据完整；确认无运动才计为 0。7 天或 28 天窗口不完整时对应负荷留空；仅两个窗口完整且慢性负荷大于 0 时计算急慢比。',
-    acute7d: '7 天负荷',
-    chronicWeekly: '28 天周均',
-    acuteChronic: '急慢比',
-    ratioMissing: (days: number) => `—（28 天窗口只有 ${days} 天有数据）`,
-    notProvided: '未提供',
-    acuteTooltip: (value: string, days: number) => `7 天负荷 <b>${value}</b>（${days}/7 天有数据）`,
-    chronicTooltip: (value: string) => `28 天周均 <b>${value}</b>`,
-    ratioTooltip: (value: string) => `急慢比 <b>${value}</b>`,
-  },
-  {
-    backToOverview: 'Back to overview',
-    eyebrow: 'Training status',
-    title: 'Training status',
-    intro: 'VO₂max, lactate threshold, training load and heart rate zones. All read from synced records; no coaching advice.',
-    rangeAria: 'Time range',
-    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
-    loadFailed: 'Training status data is unavailable right now',
-    retry: 'Try again',
-    loadingAria: 'Loading training status',
-    vo2Hint: 'Maximal oxygen uptake, estimated by the watch after outdoor runs',
-    vo2Empty: 'No VO₂max records in this range; it only updates after an outdoor run.',
-    loadLabel: 'Training load',
-    loadHint: 'Rolling 7-day training load reported by Zepp',
-    loadEmpty: 'No training load records in this range.',
-    paiLabel: 'PAI',
-    paiHint: 'Personal Activity Intelligence over a rolling 7 days',
-    paiEmpty: 'No PAI records in this range.',
-    thresholdLabel: 'Lactate threshold',
-    thresholdHint: 'Heart rate and pace; only updates after a hard run',
-    thresholdHr: 'Threshold HR',
-    thresholdPace: 'Threshold pace',
-    thresholdChartAria: 'Lactate threshold heart rate and pace',
-    thresholdOnce: (date: string) => `Only one threshold measurement in this range (${date}), so there is no trend to draw.`,
-    thresholdEmpty: 'No lactate threshold measurements in this range.',
-    thresholdPaceTooltip: (value: string, unit: string) => `Threshold pace <b>${value}</b> ${unit}`,
-    loadUnit: 'load',
-    thresholdHrTooltip: (value: number) => `Threshold HR <b>${value}</b> bpm`,
-    balanceLabel: 'Training load balance',
-    balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
-    balanceChartAria: '7-day and 28-day training load with the acute-to-chronic ratio',
-    balanceEmpty: 'Not enough training load records to draw this line yet.',
-    balanceNote: 'Sum individual workout loads by local start date. A day is complete only when its workout list is fully synced and every workout has a valid load; only confirmed days without workouts count as zero. Incomplete 7-day or 28-day loads remain missing. The ratio requires both complete windows and positive chronic load.',
-    acute7d: '7-day load',
-    chronicWeekly: '28-day weekly avg',
-    acuteChronic: 'Acute:chronic',
-    ratioMissing: (days: number) => `— (only ${days} days of data in the 28-day window)`,
-    notProvided: 'Not provided',
-    acuteTooltip: (value: string, days: number) => `7-day load <b>${value}</b> (${days}/7 days with data)`,
-    chronicTooltip: (value: string) => `28-day weekly avg <b>${value}</b>`,
-    ratioTooltip: (value: string) => `Acute:chronic <b>${value}</b>`,
-  },
-  {
-    backToOverview: 'Volver al resumen',
-    eyebrow: 'Estado de entrenamiento',
-    title: 'Estado de entrenamiento',
-    intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
-    rangeAria: 'Rango de tiempo',
-    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
-    loadFailed: 'Los datos del estado de entrenamiento no están disponibles en este momento',
-    retry: 'Reintentar',
-    loadingAria: 'Cargando el estado de entrenamiento',
-    vo2Hint: 'Consumo máximo de oxígeno, estimado por el reloj después de carreras al aire libre',
-    vo2Empty: 'No hay registros de VO₂máx en este rango; solo se actualiza después de una carrera al aire libre.',
-    loadLabel: 'Carga de entrenamiento',
-    loadHint: 'Carga de entrenamiento de los últimos 7 días informada por Zepp',
-    loadEmpty: 'No hay registros de carga de entrenamiento en este rango.',
-    loadUnit: '',
-    paiLabel: 'PAI',
-    paiHint: 'Inteligencia de Actividad Personal en los últimos 7 días',
-    paiEmpty: 'No hay registros de PAI en este rango.',
-    thresholdLabel: 'Umbral de lactato',
-    thresholdHint: 'Frecuencia cardíaca y ritmo; solo se actualiza después de una carrera intensa',
-    thresholdHr: 'FC de umbral',
-    thresholdPace: 'Ritmo de umbral',
-    thresholdChartAria: 'Frecuencia cardíaca y ritmo del umbral de lactato',
-    thresholdOnce: (date: string) => `Solo hay una medición de umbral en este rango (${date}), así que no hay tendencia que trazar.`,
-    thresholdEmpty: 'No hay mediciones de umbral de lactato en este rango.',
-    thresholdPaceTooltip: (value: string, unit: string) => `Ritmo de umbral <b>${value}</b> ${unit}`,
-    thresholdHrTooltip: (value: number) => `FC de umbral <b>${value}</b> lpm`,
-    balanceLabel: 'Equilibrio de la carga de entrenamiento',
-    balanceHint: 'Carga de 7 días frente al promedio semanal de 28 días, es decir, la relación aguda:crónica',
-    balanceChartAria: 'Carga de entrenamiento de 7 y 28 días con la relación aguda:crónica',
-    balanceEmpty: 'Todavía no hay suficientes registros de carga de entrenamiento para trazar esta línea.',
-    balanceNote: 'Se suman las cargas por fecha local de inicio. Un día solo está completo si se sincronizó toda su lista de actividades y cada actividad tiene una carga válida; solo los días confirmados sin actividad cuentan como cero. Las cargas de 7 o 28 días incompletos quedan sin datos. La relación requiere ambas ventanas completas y una carga crónica positiva.',
-    acute7d: 'Carga de 7 días',
-    chronicWeekly: 'Promedio semanal de 28 días',
-    acuteChronic: 'Aguda:crónica',
-    ratioMissing: (days: number) => `— (solo ${days} días con datos en la ventana de 28 días)`,
-    notProvided: 'Sin datos',
-    acuteTooltip: (value: string, days: number) => `Carga de 7 días <b>${value}</b> (${days}/7 días con datos)`,
-    chronicTooltip: (value: string) => `Promedio semanal de 28 días <b>${value}</b>`,
-    ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
-  },
-  'views/TrainingStatus',
-);
 const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
-const METRICS = [
-  'vo2max',
-  'training_load',
-  'lactate_threshold_hr',
-  'lactate_threshold_pace',
-  'pai_daily',
-];
-
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(180);
-const series = ref<Record<string, MetricSeries>>({});
-const balance = ref<TrainingBalancePoint[]>([]);
+const rangeDays = useTrendRange();
+/* 一次取最长那档，切范围只在本地切（见 lib/metricSeries.ts 的 sliceSeries）。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const fullBalance = ref<TrainingBalancePoint[]>([]);
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+// 负荷平衡至少看一个月：28 天窗口要先有这么长的跑道才算得出比值。
+const balance = computed(() => sliceByDate(fullBalance.value, Math.max(28, rangeDays.value)));
+trackRangeSwap(rangeDays);
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(trainingPageQueries()) : null;
+if (preloaded) {
+  fullSeries.value = indexSeries(preloaded[0]);
+  fullBalance.value = preloaded[1];
+  loading.value = false;
+}
+const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
 
 const vo2max = computed(() => series.value.vo2max ?? null);
 const trainingLoad = computed(() => series.value.training_load ?? null);
-const pai = computed(() => series.value.pai_daily ?? null);
+/* 训练负荷档位（D6）：和概览入口卡同一份逻辑（lib/trainingLoadTier.ts）。这一页没有
+   后端给的个人刻度，用参考刻度 600，档位自带「（参考）」标记——不标会让人以为
+   分级是手表给的。 */
+const loadBand = computed(() => trainingLoadTierText(trainingLoad.value?.latest?.value));
+/* PAI 是滚动 7 天的总值（pai_total）：卡片说明一直这么写，概览磁贴也是它。以前这里画的是当天新挣的
+   pai_daily（1 左右），和概览的 12 对不上，用户不知道信哪个（2026-10-04）。 */
+const pai = computed(() => series.value.pai_total ?? null);
 const thresholdHr = computed(() => series.value.lactate_threshold_hr ?? null);
 const thresholdPace = computed(() => series.value.lactate_threshold_pace ?? null);
 
@@ -191,20 +88,40 @@ const thresholdDates = computed(() => {
 });
 const hasThreshold = computed(() => thresholdDates.value.length > 0);
 
+/* 近 6 个月一条读数都没有的卡收成一行（U09），把有数据的图（尤其心率区间）让进首屏。
+   按整段定而不是按当前范围：切范围时卡片不增减。 */
+const everMeasured = (...metrics: string[]) => metrics.some((metric) => (fullSeries.value[metric]?.points.length ?? 0) > 0);
+const show = computed(() => ({
+  vo2: everMeasured('vo2max'),
+  load: everMeasured('training_load'),
+  pai: everMeasured('pai_total'),
+  threshold: everMeasured('lactate_threshold_hr', 'lactate_threshold_pace'),
+  balance: fullBalance.value.some((point) => point.acute_days_with_data > 0),
+}));
+const shownCardCount = computed(() => [show.value.vo2, show.value.load, show.value.pai, show.value.threshold].filter(Boolean).length);
+const missing = computed(() => [
+  // key 是指标名：从概览点进来定位到这一项（lib/motion/focusTarget.ts）。
+  !show.value.vo2 && { key: 'vo2max', label: 'VO₂max', detail: metricInfo('vo2max')?.what ?? '' },
+  !show.value.load && { key: 'training_load', label: t.value.loadLabel, detail: metricInfo('training_load')?.what ?? '' },
+  !show.value.pai && { key: 'pai_total', label: t.value.paiLabel, detail: metricInfo('pai_total')?.what ?? '' },
+  !show.value.threshold && { key: 'lactate_threshold_hr', label: t.value.thresholdLabel, detail: metricInfo('lactate_threshold')?.what ?? '' },
+  !show.value.balance && { key: 'training_balance', label: t.value.balanceLabel, detail: t.value.balanceEmpty },
+].filter((item): item is { key: string; label: string; detail: string } => Boolean(item)));
+
 const thresholdOption = computed(() => {
   const dates = thresholdDates.value;
   if (dates.length < 2) return null;
   const pick = (source: MetricSeries | null, date: string) =>
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
-    animationDuration: 600,
-    grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
+    // 左右两根轴各占自己一列（containLabel），字号收小、轴上不再写 bpm（图例和悬停里有），曲线不被两边的字挤窄（第三轮 B7）。
+    grid: { left: 4, right: 4, top: 30, bottom: 6, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
-      textStyle: { fontSize: 14.5 },
+      textStyle: { fontSize: 12.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -220,18 +137,20 @@ const thresholdOption = computed(() => {
         return [params[0].axisValue, ...lines].join('<br>');
       },
     },
-    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 14.5, hideOverlap: true } },
+    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 12, hideOverlap: true } },
     yAxis: [
-      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 14.5, formatter: '{value} bpm' } },
+      // 两根轴刻度对齐（alignTicks）：左右两列数字落在同一条网格线上，不再一边 5 格一边 4 格。
+      { type: 'value', scale: true, splitNumber: 3, alignTicks: true, axisLabel: { fontSize: 12, color: zeppSemanticColors.heart } },
       {
         type: 'value',
         scale: true,
         splitNumber: 3,
+        alignTicks: true,
         // Faster is a smaller number of seconds, so the axis is inverted to
         // keep "better" pointing up like every other chart here.
         inverse: true,
         splitLine: { show: false },
-        axisLabel: { fontSize: 14.5, formatter: (value: number) => formatPaceSeconds(value) },
+        axisLabel: { fontSize: 12, color: zeppSemanticColors.pace, formatter: (value: number) => formatPaceSeconds(value) },
       },
     ],
     series: [
@@ -260,11 +179,14 @@ const thresholdOption = computed(() => {
   };
 });
 
+/** 28 天周均；窗口不完整时后端给 null，这里照旧留空。 */
+const chronicWeeklyOf = (point: TrainingBalancePoint): number | null =>
+  point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10;
+
 const balanceOption = computed(() => {
   if (balance.value.length < 2) return null;
   const dates = balance.value.map((point) => point.date);
   return {
-    animationDuration: 600,
     grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.acute7d, t.value.chronicWeekly, t.value.acuteChronic],
@@ -285,7 +207,7 @@ const balanceOption = computed(() => {
             ? t.value.ratioMissing(point.chronic_days_with_data)
             : t.value.notProvided;
         const acute = point.acute_7d;
-        const chronic = (point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10);
+        const chronic = chronicWeeklyOf(point);
         return [
           point.date,
           t.value.acuteTooltip(
@@ -316,7 +238,7 @@ const balanceOption = computed(() => {
       {
         name: t.value.chronicWeekly,
         type: 'line',
-        data: balance.value.map((point) => (point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10)),
+        data: balance.value.map(chronicWeeklyOf),
         connectNulls: false,
         showSymbol: false,
         smooth: 0.2,
@@ -353,22 +275,19 @@ const load = async () => {
   error.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
-    balance.value = [];
+    fullSeries.value = {};
+    fullBalance.value = [];
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
-  const results = await Promise.allSettled([
-    backend.getMetricSeries(METRICS, rangeDays.value),
-    // The balance chart is always a month: 28-day windows need at least that
-    // much runway before a ratio exists at all.
-    backend.getTrainingBalance(Math.max(28, rangeDays.value)),
-  ]);
+  const [metricsQuery, balanceQuery] = trainingPageQueries();
+  const results = await Promise.allSettled([cached(metricsQuery), cached(balanceQuery)]);
   if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
-  series.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
-  balance.value = trend.status === 'fulfilled' ? trend.value : [];
+  // 失败的那一样保留上一次的结果：真数据不能因为一次库忙被显示成「没有记录」。
+  if (metrics.status === 'fulfilled') fullSeries.value = indexSeries(metrics.value);
+  if (trend.status === 'fulfilled') fullBalance.value = trend.value;
   const rejected = results.find((result) => result.status === 'rejected');
   if (rejected && rejected.status === 'rejected') {
     error.value = toUserMessage(rejected.reason, t.value.loadFailed);
@@ -376,32 +295,23 @@ const load = async () => {
   loading.value = false;
 };
 
-onMounted(() => { void load(); });
-watch(rangeDays, () => { void load(); });
-watch(dataRevision, () => { void load(); });
+/* 和趋势卡同一条队：切范围时一帧只换一张图（见 useQueuedOption）。 */
+const shownThreshold = useQueuedOption(thresholdOption);
+const shownBalance = useQueuedOption(balanceOption);
+
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
+useRevisionReload(() => { void load(); });
+
 </script>
 
 <template>
   <section class="page training-page" aria-labelledby="training-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="training-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
-    >
-      <div class="range-switch" role="group" :aria-label="t.rangeAria">
-        <button
-          v-for="range in ranges"
-          :key="range.days"
-          type="button"
-          :aria-pressed="rangeDays === range.days"
-          :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-          @click="rangeDays = range.days"
-        >{{ range.label }}</button>
-      </div>
-    </PageHeader>
+    />
 
     <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
@@ -411,153 +321,95 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </p>
 
-    <div v-if="loading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
-      <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
-    </div>
+    <!-- 骨架换成内容时交叉淡化：骨架原地钉住淡掉，内容同时在底下出现（从卡展开进来时不等数据）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
+        <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
+      </div>
+    </Transition>
 
-    <template v-else>
-      <div class="card-grid">
+    <template v-if="!initialLoading">
+      <TrendRangeBar />
+      <div v-if="shownCardCount" class="trend-grid" :style="trendGridStyle(shownCardCount)">
         <MetricTrendCard
+          v-if="show.vo2"
           label="VO₂max"
-          :hint="t.vo2Hint"
+          info="vo2max"
           :series="vo2max"
-          :color="zeppSemanticColors.vo2"
+          :color="metricColor('vo2max')"
           unit="ml/kg/min"
           :decimals="1"
           :empty-text="t.vo2Empty"
         />
         <MetricTrendCard
+          v-if="show.load"
           :label="t.loadLabel"
-          :hint="t.loadHint"
+          info="training_load"
           :series="trainingLoad"
-          :color="zeppSemanticColors.training"
+          :color="metricColor('training_load')"
           :unit="t.loadUnit"
           :empty-text="t.loadEmpty"
+          :band="loadBand"
         />
         <MetricTrendCard
+          v-if="show.pai"
           :label="t.paiLabel"
-          :hint="t.paiHint"
+          info="pai_total"
           :series="pai"
-          :color="zeppSemanticColors.calories"
+          :color="metricColor('pai_total')"
           unit="PAI"
           :empty-text="t.paiEmpty"
         />
 
-        <section class="chart-card" :aria-label="t.thresholdLabel">
-          <header class="chart-head">
-            <span class="chart-title">
-              <strong>{{ t.thresholdLabel }}</strong>
-              <small>{{ t.thresholdHint }}</small>
-            </span>
-            <span v-if="thresholdHr?.latest || thresholdPace?.latest" class="chart-latest">
-              <b>{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
-              <b>{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>{{ paceUnitLabel() }}</i>
-            </span>
-          </header>
-          <VChart
-            v-if="thresholdOption"
-            class="chart-body"
-            :theme="CHART_THEME"
-            :option="thresholdOption"
-            autoresize
-            role="img"
-            :aria-label="t.thresholdChartAria"
-          />
-          <p v-else-if="hasThreshold" class="chart-empty">
-            {{ t.thresholdOnce(thresholdDates[0]) }}
-          </p>
-          <p v-else class="chart-empty">{{ t.thresholdEmpty }}</p>
-        </section>
+        <!-- 乳酸阈有心率和配速两条线：和另外三张同一种卡（同样的卡头、同样对齐），
+             只是最新读数和曲线换成自己的，平均/最低/最高那一行不给（两条线各一套会挤）。 -->
+        <MetricTrendCard
+          v-if="show.threshold"
+          :label="t.thresholdLabel"
+          info="lactate_threshold"
+          :series="thresholdHr"
+          :color="zeppSemanticColors.heart"
+          :empty-text="t.thresholdEmpty"
+          hide-stats
+        >
+          <template #latest>
+            <strong class="hr">{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</strong><small>bpm</small>
+            <strong class="pace">{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</strong><small>{{ paceUnitLabel() }}</small>
+          </template>
+          <template v-if="shownThreshold || hasThreshold" #chart>
+            <SwapChart
+              v-if="shownThreshold"
+              :option="shownThreshold"
+              :aria-label="t.thresholdChartAria"
+            />
+            <p v-else class="chart-empty">{{ t.thresholdOnce(thresholdDates[0]) }}</p>
+          </template>
+        </MetricTrendCard>
       </div>
 
-      <section class="chart-card wide" :aria-label="t.balanceLabel">
-        <header class="chart-head">
-          <span class="chart-title">
-            <strong>{{ t.balanceLabel }}</strong>
-            <small>{{ t.balanceHint }}</small>
-          </span>
-          <span v-if="latestBalance" class="chart-latest">
-            <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
-          </span>
-        </header>
-        <VChart
-          v-if="balanceOption"
-          class="chart-body tall"
-          :theme="CHART_THEME"
-          :option="balanceOption"
-          autoresize
-          role="img"
-          :aria-label="t.balanceChartAria"
-        />
-        <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
-        <p class="chart-note">{{ t.balanceNote }}</p>
-      </section>
+      <MissingMetricsRow :items="missing" />
 
-      <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />
+      <!-- 负荷平衡与心率区间直接摊开。 -->
+          <section v-if="show.balance" class="chart-card wide" :aria-label="t.balanceLabel">
+            <header class="chart-head">
+              <span class="chart-title">
+                <strong>{{ t.balanceLabel }}<MetricInfoButton metric="training_balance" :label="t.balanceLabel" /></strong>
+              </span>
+              <span v-if="latestBalance" class="chart-latest">
+                <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
+              </span>
+            </header>
+            <SwapChart
+              v-if="shownBalance"
+              class="chart-body tall"
+              :option="shownBalance"
+              :aria-label="t.balanceChartAria"
+            />
+            <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
+          </section>
+          <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />
     </template>
   </section>
 </template>
 
-<style scoped>
-.training-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill {
-  min-height: 30px;
-  padding: 5px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-
-.chart-card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-.chart-card.wide { padding: var(--space-4) var(--space-6); }
-.chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.chart-title { display: grid; gap: 2px; min-width: 0; }
-.chart-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
-.chart-title small { color: var(--subtle); font-size: var(--fs-xs); }
-.chart-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-.chart-latest b { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-3xl); font-variant-numeric: tabular-nums; }
-.chart-latest i { margin-right: 6px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; }
-.chart-body { width: 100%; height: 172px; margin-top: var(--space-2); }
-.chart-body.tall { height: 236px; }
-.chart-empty {
-  display: flex;
-  align-items: center;
-  min-height: 172px;
-  margin: var(--space-2) 0 0;
-  color: var(--subtle);
-  font-size: var(--fs-sm);
-}
-.chart-note { margin: var(--space-2) 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
-.inline-alert {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 9px 13px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--danger);
-  font-size: var(--fs-sm);
-}
-.retry { margin-left: auto; }
-@media (max-width: 720px) {
-  .card-grid { grid-template-columns: minmax(0, 1fr); }
-  .chart-card.wide { padding: var(--space-4); }
-}
-</style>
+<style scoped src="./TrainingStatus.css"></style>

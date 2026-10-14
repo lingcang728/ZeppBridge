@@ -56,6 +56,10 @@ if (latest.version !== version) {
 if (!latest.platforms?.['windows-x86_64']?.signature) {
   fail('Windows latest.json 缺少 windows-x86_64 签名条目');
 }
+// 便携版的更新包（package-portable.ps1 写进来的）。漏了它，便携版查更新时拿不到包。
+if (!latest.platforms?.['windows-x86_64-portable']?.signature) {
+  fail('Windows latest.json 缺少 windows-x86_64-portable 签名条目');
+}
 
 const signature = readFileSync(args.get('mac-signature'), 'utf8').trim();
 if (!signature) fail('macOS updater 签名为空');

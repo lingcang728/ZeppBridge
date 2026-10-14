@@ -1,0 +1,103 @@
+/* 设置卡叠里各区块共用的排版基元。**全局样式，只加载一次**（由 Settings.vue 引入）。
+ *
+ * 以前 18 个区块组件各自 `<style scoped src>` 引一份，每份被编译成带不同作用域哈希
+ * 的一套，Settings 的 CSS 147 KB 里有 137 KB 是它的重复。这里只放类名自带 `s-` /
+ * `state-dot` / `diagnostic-` 前缀、全应用不会撞名的规则；`.alert`、`code`、`h3` 这类
+ * 通用名字仍按组件 scoped，见 settings-local.css 与 settings-modal.css。
+ *
+ * 优先级比以前低一档（没有作用域属性），组件自己的 scoped 覆盖规则因此总是赢。
+ *
+ *   .s-section         一个区块：小标题 + 一组列表
+ *   .s-section-head    小标题行（右侧可放一个次要操作）
+ *   .s-list            一组行，外面一层浅底，行与行之间一条细线
+ *   .s-row             一行：左边标签（主标题 + 一行说明），右边控件
+ *   .s-note            列表下面的一句补充说明 */
+.s-section { display: grid; gap: 10px; min-width: 0; }
+.s-section + .s-section { margin-top: 22px; }
+.s-section-head { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
+.s-section-head h3 { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; letter-spacing: .02em; }
+.s-section-head .s-meta { color: var(--subtle); font-size: var(--fs-xs); white-space: nowrap; }
+
+.s-list {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ink) 2.5%, transparent);
+}
+.s-row {
+  display: flex;
+  min-width: 0;
+  min-height: 56px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 16px;
+}
+.s-row + .s-row, .s-list > * + * { border-top: 1px solid var(--mat-line); }
+/* 标题按 0 起算、至少留 10em：开关这类小控件永远贴在右边；长的分段胶囊（葡语 / 德语下
+   尤其长）放不下时整个折到标题下一行，而不是压着标题、漫出卡片。 */
+.s-row-main { display: grid; flex: 1 1 0; min-width: min(10em, 100%); gap: 2px; }
+.s-row-title { color: var(--ink); font-size: var(--fs-md); font-weight: 500; }
+.s-row-sub { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
+.s-row-control { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; align-items: center; gap: 10px; margin-left: auto; }
+.s-row.is-block { display: grid; align-items: stretch; }
+.s-note { margin: 0; padding: 0 4px; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+
+/* 从别的卡跳过来时落到的那一块：一圈品牌色的光亮起再慢慢退掉（只动阴影和底色，不动排版）。 */
+.s-flash { border-radius: var(--radius-md); animation: s-flash 1.8s var(--ease-out) .25s both; }
+@keyframes s-flash {
+  0% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+  18% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 24px -4px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 7%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .s-flash { animation-duration: .01s; } }
+
+/* 一格一格的信息（数据内容、覆盖账本）：凸起的小板，不是描边的平面磁贴。
+   亮一点的底、顶边高光、底边暗线、柔和投影；没有数据的那一格反过来凹下去。 */
+.s-tile {
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 6.5%, transparent), color-mix(in srgb, var(--ink) 2.5%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 6px 16px -10px rgba(0, 0, 0, .5);
+  transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease;
+}
+.s-tile:hover { translate: 0 -2px; box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 11%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 12px 22px -12px rgba(0, 0, 0, .55); }
+.s-tile.is-sunken { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+.s-tile.is-sunken:hover { translate: none; box-shadow: var(--cap-track-shadow); }
+
+/* 几件并列的小事（隐私的三条事实、高级里的三个工具）横着排成一行小板，
+   不再一条压一条地竖着排——它们之间没有先后。窄了自动折行。 */
+.s-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.s-fact { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 16px; }
+.s-fact-head { display: flex; align-items: center; gap: 10px; }
+.s-fact-head strong { color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
+.s-fact-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--accent); }
+.s-fact p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.s-fact-actions { display: flex; flex-wrap: wrap; align-self: end; gap: 8px; margin-top: 4px; }
+.s-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.state-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--subtle); font-size: var(--fs-sm); white-space: nowrap; }
+.state-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.state-dot.on { color: var(--accent); }
+.state-dot.warn { color: var(--warning); }
+.state-dot.bad { color: var(--danger); }
+
+/* 诊断报告（设备与隐私两处共用） */
+.diagnostic-panel { display: grid; gap: 8px; padding: 14px 16px; }
+.diagnostic-panel > strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
+.diagnostic-panel > p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.diagnostic-panel .button { justify-self: start; }
+.diagnostic-note { display: grid; gap: 6px; margin: 4px 0; font-size: var(--fs-sm); color: var(--muted); }
+.diagnostic-note em { font-style: normal; color: var(--subtle); }
+.diagnostic-note textarea { width: 100%; min-height: 68px; resize: vertical; }
+.diagnostic-note small { color: var(--subtle); font-size: var(--fs-xs); }
+.diagnostic-done { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 10px; background: var(--accent-soft); color: var(--ink); font-size: var(--fs-sm); }
+.diagnostic-done strong { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+.diagnostic-done p { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+
+@media (max-width: 720px) {
+  .s-row { flex-wrap: wrap; }
+  .s-row-control { width: 100%; justify-content: flex-start; }
+}

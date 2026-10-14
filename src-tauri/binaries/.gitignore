@@ -1,0 +1,3 @@
+# stage-mcp-sidecar.ps1 builds zeppbridge-mcp-<target triple>.exe here before packaging.
+*
+!.gitignore

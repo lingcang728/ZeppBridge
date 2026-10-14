@@ -63,9 +63,10 @@ zeppbridge-cli help
 `--json` 的正文独占 stdout，人读的提示走 stderr，所以 `zeppbridge-cli export > a.csv` 拿到的是干净的文件。
 
 人读的那一半是**英文**：命令行随安装包发给全世界的用户，而 issue #40 那位 Linux
-用户撞上的正是一句他读不懂的中文提示。从共用内核冒上来的错误目前仍然是中文——
-那些字符串散在几百处，桌面端靠错误码查本地文案、根本不显示它们；翻一半只会让
-中英文混在同一句话里。`--json` 的字段名和退出码是契约，不受这件事影响。
+用户撞上的正是一句他读不懂的中文提示。从共用内核冒上来的错误也按类别出英文：
+内核的原话散在几百处、是中文（桌面端靠错误码查本地文案、根本不显示它们），
+命令行不逐句翻，而是英文说清是哪类问题，原话是中文时换成错误码（如
+`err.core.config`），不让中英文混在同一句话里。`--json` 的字段名和退出码是契约，不受这件事影响。
 
 拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
 
@@ -146,6 +147,16 @@ macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
 stdio 传输，**不监听任何端口，不发出任何网络请求**。只读由连接层保证（`PRAGMA query_only`），不是靠工具列表里恰好没有写操作。
 每行请求上限为 1 MiB；非法 UTF-8/JSON 和超长行会收到错误响应，后续行仍可继续处理。工具执行失败通过 `result` 返回 `isError: true` 和说明文字；未知工具及调用结构错误仍使用 JSON-RPC 错误。
 
+### 从桌面应用连接
+
+安装包会把 `zeppbridge-mcp` 放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
+**设置 › 交给 AI 工具 › 连到 AI 工具**会替你填好真实路径：
+
+- **Claude Code** 和 **Codex**：复制三行命令——注册 MCP（带 `--scope task`）、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
+- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。扩展启动的是装在应用旁边的那份 `zeppbridge-mcp`，随 ZeppBridge 一起升级。
+
+应用用的库不是可执行文件旁边的 `data` 时，生成的配置会带上 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的构建（开发构建）里这几个按钮不可点，照下面的配置手动接。Linux 的 AppImage 里也带了一份，但它每次启动都挂到新的临时路径，应用不会把这个路径交给 AI 工具：请下载单独的 CLI / MCP 工具包，照下面的配置接。
+
 ### 配置示例
 
 大多数 MCP 客户端读同一种形状的配置：
@@ -165,6 +176,32 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 压缩包里的 `mcp-config-example.json` 是同一段内容。
 
+### 访问范围（`--scope`）
+
+进程只接受一个可选参数：
+
+```json
+{
+  "mcpServers": {
+    "zeppbridge": {
+      "command": "/path/to/zeppbridge-mcp",
+      "args": ["--scope", "task"]
+    }
+  }
+}
+```
+
+- **`full-readonly`**（缺省值）——已有配置的既有行为：本机数据库的只读全量视图。不带 `--scope` 的旧配置行为完全不变。
+- **`task`**——仍然只读，但只看得到桌面端任务页里标为「开放给 MCP」的任务所授权的内容：这些任务按类别展开的日期窗口内的健康数据；任务里选的运动只有在任务启用了「运动」类别时才能读到它本身——没启用时它只用来定日期窗。任务里单独拖出去的指标 / 字段（例如 HRV、平均心率、深睡分钟）在 MCP 里同样读不到。授权在每次调用时重新读取，所以任务页里翻转开关对下一次请求立即生效，不用重启进程。
+
+argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、缺值、重复传参都会让进程以非零退出并只写一行 stderr——拼错的参数绝不会静默放宽成更大范围。
+
+`task` 范围下，授权外的请求会被拒绝而不是悄悄截断：`list_workouts` 只回授权的运动 id（哪怕它们不在最近 N 条里）；`get_workout_insight` 的基线只按授权运动重算；`get_metric_series` 只回授权窗口内的日期；`get_sleep_detail` 的「最近一晚」只在授权睡眠窗里找；`get_data_health` 是整库口径的报表、裁不出诚实子集，整体拒绝；同样是整库视角的 `list_available_metrics`、`list_life_events` 也整体拒绝，`get_food_data` 只回按天的摄入合计（归在身体类），不给逐条饮食记录。`get_metric_records`、`list_sleep_sessions` 只回授权窗口内的行，归不进任何任务类别的指标直接拒绝。`get_workout_detail` 去掉被排除的字段以及能算回它们的字段（排除心率时心率区间一起去掉，排除距离时步幅一起去掉）。`get_workout_series` 在 `task` 范围里从不返回精确 GPS 轨迹；任务排除了任一字段的运动，逐点各段一律拒绝。没选运动的任务（「最近 N 天」）的窗口截止到今天，和导出完全一致。点名一个被任务排除的指标会被拒绝（而不是回空序列）；运动与睡眠记录里被排除的字段直接不出现，排除了任一分期分钟时连阶段时间轴一起不出现。多个任务同时开放时按并集放行：任一任务允许的指标 / 字段就能出去。`task` 范围的响应还会剥掉 `device_id` 这类身份字段。
+
+每个 `tools/call` 结果都带 `"scope": {"mode": ..., "grants": N}`（成功时在 `structuredContent` 里，出错时在顶层）；`initialize` 与 `server/discover` 也会报告 `"scope": {"mode": ...}` 并在说明文字里写当前范围，客户端始终知道自己在看哪一种视图。
+
+范围拒绝是工具结果而非协议错误：`isError: true`，`structuredContent.error.code` 为 `err.mcp.scope_denied`（请求超出授权——`error.permittedRanges` 列出实际授权的 `{category, start, end}` 窗口供重试）或 `err.mcp.scope_no_grants`（当前没有任何任务开放给 MCP）。
+
 ### 工具
 
 | 工具 | 返回 |
@@ -172,7 +209,7 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
 | `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
-| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈；仅选择 `section: "route"` 才返回精确坐标 |
+| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
 | `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
@@ -181,6 +218,11 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
 | `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
+| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果）、距上次运动几天、已生效的计划、生活事件 |
+| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景 |
+| `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
+| `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
+| `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
 
 查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
 `intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
@@ -198,6 +240,15 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 `get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
 
+#### 训练计划工具（会写库的只有这两个）
+
+健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
+
+- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
+- `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
+- `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
+- 这五个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
+
 ### 契约
 
 握手时服务器就把边界交给调用方，不必等它拿到一条空序列自己猜：
@@ -211,6 +262,6 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 ## 与桌面应用并发
 
-CLI 的 `sync` 和桌面应用的同步走同一把跨进程写锁，任何时刻只有一个写者。拿不到锁时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
+CLI 的 `sync` 和桌面应用的同步共用同一把跨进程同步租约和同一把写锁，任何时刻只有一个同步、一个写者。等不到时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
 
-MCP 的只读查询不拿写锁，可以和同步同时进行。
+MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。

@@ -29,9 +29,9 @@ defineProps<{
   align-items: flex-start;
   gap: 16px;
   padding: 22px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .state-panel h2 { margin: 0 0 6px; font-size: var(--fs-3xl); }
 .state-panel p { margin: 0 0 16px; color: var(--muted); }
@@ -48,6 +48,6 @@ defineProps<{
 }
 .error-panel .state-mark {
   color: var(--warning);
-  background: var(--surface-raised);
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 </style>

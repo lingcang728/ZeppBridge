@@ -25,7 +25,7 @@ verification script is `scripts/assets/verify-ai-assets.py`.
 | DeepSeek | `src/assets/ai/deepseek.png` (PNG 180×180) | [DeepSeek official chat app icon](https://fe-static.deepseek.com/chat/icon-180.png) | `547EAD56DCB71424315BA53BF8F4C35E745EFEAECE106B9FB7E4DCDFA19C1A7A` | The official DeepSeek app icon; copyright/trademark belongs to DeepSeek, limited to identifying the DeepSeek service |
 | Grok | `src/assets/ai/grok.png` (PNG 512×512) | [Grok official site app icon](https://grok.com/images/android-chrome-512x512.png) | `3A462C3C2524733C173BB05C431DE737812F8219DB8FA115B0025D12A347E086` | The Grok product site icon (not the xAI corporate mark); copyright/trademark belongs to Grok/xAI, limited to identifying the Grok service |
 
-The accessible initial-letter fallback appears in the Explore picker only when an
+The accessible initial-letter fallback appears in the AI picker only when an
 icon fails to load; the normal path always renders the seven local product icons
 above. Device cards fall back to an original outline drawn in code when the
 product WebP fails to load, rather than letting wrapped `alt` text pose as an

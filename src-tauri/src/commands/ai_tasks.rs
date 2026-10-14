@@ -1,0 +1,319 @@
+//! BETA1 A7-P3 的十个 `ai_task*` / `ai_template*` 命令。
+//!
+//! 分工与协议一致：
+//! - 读命令走 `spawn_independent_read`（只读连接，不占写锁）；
+//! - 写命令走 `with_write(WritePurpose::Metadata)`；
+//! - `ai_task_prepare` 分两段：bundle 构建走 `spawn_independent_read`，
+//!   落盘是纯文件 IO 走 `spawn_blocking`——写出的是 exports 下的新文件
+//!   而不是 zepp.db，不占 `state.db` 也不需要跨进程写锁；
+//! - `ai_task_attachment_stat` 纯 stat 不碰库，走 `spawn_blocking`。
+//!
+//! 错误码全部来自 core 侧（`err.ai_task.*` / `err.ai_template.*`），
+//! 这层只做薄适配——不在命令层猜实体。
+
+use super::{join_blocking, spawn_independent_read, with_write};
+use crate::app_state::AppState;
+use crate::ipc_error::AppError;
+use zeppbridge_core::ai_tasks::export::markdown::{DEFAULT_TOKEN_BUDGET, SUBSCRIBED_TOKEN_BUDGET};
+use zeppbridge_core::ai_tasks::export::{AiTaskMarkdownParts, AiTaskPromptParts};
+use zeppbridge_core::ai_tasks::{
+    stat_attachment_paths, AiTask, AiTaskAttachmentStat, AiTaskPrepareResult, AiTaskPreview,
+    AiTaskSummary, AiTaskTemplate, DeletedAiTask,
+};
+use zeppbridge_core::storage::card_collection::CardPick;
+use zeppbridge_core::storage::write_lock::WritePurpose;
+
+/// `ai_task_attachment_stat` 的单次路径数上限——它只是个 stat 批量接口，
+/// 不是让前端把整盘文件列表塞进来的。
+const MAX_STAT_PATHS: usize = 256;
+
+/// 列出全部任务（按更新时间倒序），只走索引列。
+#[tauri::command]
+pub async fn ai_task_list(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<AiTaskSummary>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), |db| db.list_ai_tasks()).await
+}
+
+/// 取一个任务的完整对象；不存在 → `err.ai_task.not_found`。
+#[tauri::command]
+pub async fn ai_task_get(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<AiTask, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| db.require_ai_task(&id)).await
+}
+
+/// 保存任务（新建或更新）。后端填 id/时间戳；`mcp_shared` 开关走此命令。
+#[tauri::command]
+pub async fn ai_task_save(
+    state: tauri::State<'_, AppState>,
+    task: AiTask,
+) -> std::result::Result<AiTask, AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.save_ai_task(&task)
+    })
+    .await
+}
+
+/// 置顶 / 取消置顶一个已保存的任务。
+#[tauri::command]
+pub async fn ai_task_set_pinned(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    pinned: bool,
+) -> std::result::Result<(), AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.set_ai_task_pinned(&id, pinned),
+    )
+    .await
+}
+
+/// 删除任务行；附件原件不动。
+#[tauri::command]
+pub async fn ai_task_delete(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<(), AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.delete_ai_task(&id)
+    })
+    .await
+}
+
+/// 批量删除任务（1D·D7）：一次写锁、一个事务；返回删掉的那几份，界面撤销时原样存回。
+#[tauri::command]
+pub async fn ai_task_delete_many(
+    state: tauri::State<'_, AppState>,
+    ids: Vec<String>,
+) -> std::result::Result<Vec<DeletedAiTask>, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.delete_ai_tasks(&ids),
+    )
+    .await
+}
+
+/// 模板列表，内置模板在前。
+#[tauri::command]
+pub async fn ai_template_list(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<AiTaskTemplate>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), |db| db.list_ai_task_templates()).await
+}
+
+/// 保存用户模板。内置模板只读：`err.ai_template.builtin_readonly`。
+#[tauri::command]
+pub async fn ai_template_save(
+    state: tauri::State<'_, AppState>,
+    template: AiTaskTemplate,
+) -> std::result::Result<AiTaskTemplate, AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.save_ai_task_template(&template)
+    })
+    .await
+}
+
+/// 删除用户模板。
+#[tauri::command]
+pub async fn ai_template_delete(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<(), AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.delete_ai_task_template(&id)
+    })
+    .await
+}
+
+/// 预览任务的覆盖事实与警告。未保存的草稿（空 id）也收。
+/// `workout_ids` 里有本机不存在的运动 → `err.ai_task.workout_not_found`。
+#[tauri::command]
+pub async fn ai_task_preview(
+    state: tauri::State<'_, AppState>,
+    task: AiTask,
+    token_budget: Option<usize>,
+) -> std::result::Result<AiTaskPreview, AppError> {
+    let budget = token_budget.map(clamp_budget);
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.ai_task_preview_with_budget(&task, budget)
+    })
+    .await
+}
+
+/// 预算只收两档附近的合理值：界面传来的只有「免费版」「我已订阅」两种。
+fn clamp_budget(budget: usize) -> usize {
+    budget.clamp(DEFAULT_TOKEN_BUDGET / 3, SUBSCRIBED_TOKEN_BUDGET * 4)
+}
+
+/// 生成数据 JSON + 提示词 txt（+ 附件原件副本；文件名由前端按命名规则给）到
+/// 桌面 `ZeppBridge AI/<任务名>_<时间>/`，用户直接从桌面拖进 AI 对话框；
+/// 取不到桌面时回落 `data_dir/exports/ai-tasks/`。`missing` 附件 → `blocked`。
+///
+/// 分两段：构建（校验、锚点、coverage、bundle、序列化）在独立只读连接上
+/// 跑，不占 `state.db`；落盘是纯文件 IO。写出的是新文件而不是
+/// zepp.db——跨进程写锁管的是库的写者，这里不需要它。
+/// `ai_task_prepare` 的可选段：前端按界面语言整理好的任务说明、用户手改的
+/// 最终提示词、两个文件的主名。缺省（旧前端 / 不传）时行为与以前一致。
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AiTaskPrepareOptions {
+    brief_text: Option<String>,
+    prompt_override: Option<String>,
+    data_file_stem: Option<String>,
+    prompt_file_stem: Option<String>,
+    /// 给了就交付成单个 `.md`（批次 ⑦）；`markdown_guide` 是前端本地化好的「这份文件怎么读」。
+    token_budget: Option<usize>,
+    markdown_guide: Option<String>,
+    provider: Option<String>,
+}
+
+#[tauri::command]
+pub async fn ai_task_prepare(
+    state: tauri::State<'_, AppState>,
+    task: AiTask,
+    coverage_note: String,
+    direction_text: Option<String>,
+    options: Option<AiTaskPrepareOptions>,
+) -> std::result::Result<AiTaskPrepareResult, AppError> {
+    let output_root = directories::UserDirs::new()
+        .and_then(|dirs| dirs.desktop_dir().map(|path| path.join("ZeppBridge AI")))
+        .unwrap_or_else(|| state.data_dir.join("exports").join("ai-tasks"));
+    let recorded_task = task.clone();
+    let provider = options
+        .as_ref()
+        .and_then(|o| o.provider.clone())
+        .unwrap_or_else(|| "export".into());
+    let plan = spawn_independent_read(state.data_dir.clone(), move |db| {
+        let options = options.unwrap_or_default();
+        let parts = AiTaskPromptParts {
+            brief: options.brief_text.as_deref(),
+            direction: direction_text.as_deref(),
+            override_text: options.prompt_override.as_deref(),
+            data_stem: options.data_file_stem.as_deref(),
+            prompt_stem: options.prompt_file_stem.as_deref(),
+            markdown: options.token_budget.map(|budget| AiTaskMarkdownParts {
+                guide: options.markdown_guide.as_deref(),
+                token_budget: clamp_budget(budget),
+            }),
+        };
+        db.ai_task_prepare_plan(&task, &coverage_note, &parts, &output_root)
+    })
+    .await?;
+    let result = join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)
+        .and_then(|result| result.map_err(AppError::from))?;
+    if let Some(path) = &result.md_path {
+        with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+            db.record_ai_exchange(&recorded_task, &provider, path)
+        })
+        .await?;
+    }
+    Ok(result)
+}
+
+/// 批量 stat 用户挑的附件路径——本机核对用，`path` 在这里合法返回。
+#[tauri::command]
+pub async fn ai_task_attachment_stat(
+    paths: Vec<String>,
+) -> std::result::Result<Vec<AiTaskAttachmentStat>, AppError> {
+    if paths.len() > MAX_STAT_PATHS {
+        return Err(AppError::new(
+            "err.ai_task.invalid",
+            "一次最多检查 256 个附件路径",
+        ));
+    }
+    join_blocking(tokio::task::spawn_blocking(move || stat_attachment_paths(&paths)).await)
+}
+
+#[tauri::command]
+pub async fn ai_task_day_strip(
+    state: tauri::State<'_, AppState>,
+    days_before: i64,
+    end: Option<String>,
+) -> Result<Vec<zeppbridge_core::storage::ai_strip::DayStripRow>, AppError> {
+    let end = match end {
+        Some(date) => chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+            .map_err(|_| AppError::new("err.ai_task.invalid", "日期无效"))?,
+        None => chrono::Local::now().date_naive(),
+    };
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.ai_task_day_strip(days_before, end)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn ai_exchange_list(
+    state: tauri::State<'_, AppState>,
+    limit: usize,
+) -> Result<Vec<zeppbridge_core::storage::ai_exchanges::AiExchange>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| db.ai_exchange_list(limit)).await
+}
+/// 给一条往返记录起名（空白 = 回到当时的问题）。返回这条是否还在。
+#[tauri::command]
+pub async fn ai_exchange_rename(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    title: String,
+) -> Result<bool, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.rename_ai_exchange(&id, &title),
+    )
+    .await
+}
+
+/// 删掉一条往返记录。返回是否真的删到了。
+#[tauri::command]
+pub async fn ai_exchange_delete(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<bool, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.delete_ai_exchange(&id),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn ai_profile_save(
+    state: tauri::State<'_, AppState>,
+    note: String,
+) -> Result<(), AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_ai_profile_note(&note)
+    })
+    .await
+}
+
+/// 收集箱里现在的牌（精修批次 7.3）。
+#[tauri::command]
+pub async fn card_collection_get(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<CardPick>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), |db| db.card_collection()).await
+}
+
+/// 整份替换收集箱；返回去重排好的那一份。
+#[tauri::command]
+pub async fn card_collection_set(
+    state: tauri::State<'_, AppState>,
+    picks: Vec<CardPick>,
+) -> std::result::Result<Vec<CardPick>, AppError> {
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.set_card_collection(&picks),
+    )
+    .await
+}

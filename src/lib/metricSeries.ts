@@ -3,12 +3,15 @@ import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
 import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
+import { resolvedTheme } from '../composables/useTheme';
+import { chartPalettes } from './echartsTheme';
+import { today as currentToday } from './currentDay';
 
 const messages = defineMessages(
   {
     noRecordsToShow: '没有可显示的记录',
     noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
-    coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
+    coverage: (days: number, withData: number) => `${days} 天中 ${withData} 天有记录`,
     dayRange: (low: string, high: string, unit: string) => `当日区间 ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} 次读数`,
   },
@@ -20,10 +23,10 @@ const messages = defineMessages(
     samples: (count: number) => `${count} readings`,
   },
   {
-    noRecordsToShow: 'Sin registros que mostrar',
+    noRecordsToShow: 'Sin registros para mostrar',
     noRecordsInWindow: (days: number) => `Sin registros en los últimos ${days} días`,
-    coverage: (days: number, withData: number) => `${withData} de ${days} días tienen registros`,
-    dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
+    coverage: (days: number, withData: number) => `${withData} de ${days} días con registros`,
+    dayRange: (low: string, high: string, unit: string) => `Rango del día: ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} lecturas`,
   },
   'lib/metricSeries',
@@ -51,6 +54,104 @@ export const indexSeries = (series: MetricSeries[]): Record<string, MetricSeries
   const map: Record<string, MetricSeries> = {};
   for (const item of series) map[item.metric] = item;
   return map;
+};
+
+/** 页面一次取多长：三档里最长的那档。短的两档从它尾部切出来（sliceSeries）。 */
+export const SERIES_FETCH_DAYS = Math.max(...DISPLAY_RANGE_DAYS);
+
+const shiftDate = (date: string, days: number): string => {
+  const [y, m, d] = date.split('-').map(Number);
+  const next = new Date(y!, m! - 1, d! + days);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+};
+
+/** 范围第一天：今天往回数 `days` 天（含今天），本地日。和后端 `end - (days - 1)` 同一个算法。 */
+export const windowStartDate = (days: number, today = currentToday()): string => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const end = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  return shiftDate(end, -(Math.max(1, Math.round(days)) - 1));
+};
+
+/** 和后端 storage/util.rs 的 round1 一致（值都是非负的健康读数，四舍五入方向不影响）。 */
+const round1 = (value: number) => Math.round(value * 10) / 10;
+
+/** BP extrema retain the measured range behind each daily average. */
+export const metricExtrema = (metric: string, points: MetricSeriesPoint[]) => {
+  const measured = metric.startsWith('blood_pressure_');
+  const lows = points.map(p => measured ? (p.min ?? p.value) : p.value).filter(Number.isFinite);
+  const highs = points.map(p => measured ? (p.max ?? p.value) : p.value).filter(Number.isFinite);
+  return { minimum: lows.length ? Math.min(...lows) : null, maximum: highs.length ? Math.max(...highs) : null };
+};
+
+/**
+ * 从一份长窗口序列的尾部切出最近 `days` 天，重算这一段的最新 / 平均 / 最低 / 最高 / 覆盖。
+ *
+ * 后端每个点只取决于那一天本身（按天聚合），和请求的窗口长短无关，所以「取 180 天再切
+ * 出 7 天」和「直接取 7 天」逐字段相同（`get_metric_series` 的算法见 storage/metrics.rs）。
+ * 切范围因此不用再走一趟 IPC + SQLite：点下去同一帧图表就开始换。
+ */
+export const sliceSeries = (series: MetricSeries, days: number, today = currentToday()): MetricSeries => {
+  const start = windowStartDate(days, today);
+  const end = windowStartDate(1, today);
+  const points = series.points.filter((point) => point.date >= start && point.date <= end);
+  const values = points.map((point) => point.value).filter((value) => Number.isFinite(value));
+  return {
+    ...series,
+    points,
+    latest: points[points.length - 1] ?? null,
+    average: values.length ? round1(values.reduce((sum, value) => sum + value, 0) / values.length) : null,
+    ...metricExtrema(series.metric, points),
+    days_with_data: points.length,
+    window_days: Math.max(1, Math.round(days)),
+  };
+};
+
+/**
+ * 这段范围画不出曲线（没有记录、或只有一天）而更长的某一档画得出：最短的那一档；不用换就是 null。
+ *
+ * 用户 2026-10-04：VO₂max 一年只测几次，范围停在 7 天时那张卡只剩一句「这段范围没有记录」——
+ * 不要给人看一段空范围，自动跳到有记录的那一档。
+ */
+export const widerRangeWithData = (series: MetricSeries | null | undefined, days: number, today = currentToday()): SeriesRangeDays | null => {
+  if (!series?.points.length) return null;
+  const end = windowStartDate(1, today);
+  const count = (span: number) => {
+    const start = windowStartDate(span, today);
+    return series.points.filter((point) => point.date >= start && point.date <= end).length;
+  };
+  // 本来就画得出曲线（两天以上）就不换。只有一天的也往长里找一档画得出曲线的——一个孤零零的读数
+  // 加一句「画不出趋势」，和空着差不多；哪档都只有一天，就停在这里。
+  const here = count(days);
+  if (here >= 2) return null;
+  const longer = SERIES_RANGE_DAYS.filter((span) => span > days);
+  const trend = longer.find((span) => count(span) >= 2);
+  if (trend) return trend;
+  return here ? null : longer.find((span) => count(span) >= 1) ?? null;
+};
+
+/**
+ * `sliceSeries` 作用到一整份按名字索引的序列上。
+ *
+ * 某项在这段范围里画不出曲线、更长的一档里画得出的，那一项按那一档切（`window_days` 跟着变长，
+ * 卡片据此写明「这里显示的是 6 个月」，见 MetricTrendCard）；其余各项照常按 `days` 切。
+ */
+export const sliceIndexed = (
+  series: Record<string, MetricSeries>,
+  days: number,
+  today = currentToday(),
+): Record<string, MetricSeries> => {
+  const out: Record<string, MetricSeries> = {};
+  for (const [name, item] of Object.entries(series)) {
+    out[name] = sliceSeries(item, widerRangeWithData(item, days, today) ?? days, today);
+  }
+  return out;
+};
+
+/** 按日期的数组（训练负荷平衡、日最高心率）同样从尾部切。 */
+export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = currentToday()): T[] => {
+  const start = windowStartDate(days, today);
+  return rows.filter((row) => row.date >= start);
 };
 
 export const latestValue = (series?: MetricSeries | null): number | null => {
@@ -155,6 +256,16 @@ const hexToRgba = (hex: string, alpha: number): string => {
  * absent, and the line closes over it as if the days were adjacent. Anything
  * recorded by hand should pass `calendarAxis: true`.
  */
+/**
+ * 趋势图换数据（切范围、同步来了新数据）时的更新方式：整张换，新线从左往右重新画一遍。
+ *
+ * 以前是合并更新，让 ECharts 把旧线形「变」成新线形。可 7 天、1 个月、6 个月的点数
+ * 不一样，ECharts 按下标对点：多出来的点从两头长出来、少掉的点缩回去，变的那半秒里
+ * 线的左右两端各缺一截，看着像画坏了。重画一遍反而干净，而且每张图是排队一帧一张
+ * 换的（useQueuedOption），整页像一道波扫过去。
+ */
+export const SMOOTH_CHART_UPDATE = { notMerge: true };
+
 export const buildSeriesOption = (
   series: MetricSeries,
   options: SeriesChartOptions,
@@ -190,8 +301,14 @@ export const buildSeriesOption = (
   });
 
   return {
-    animationDuration: 600,
-    grid: { left: 42, right: 14, top: 16, bottom: 26 },
+    // 首次出现不扫入（省下整张画布逐帧重画）；切范围时整张重画（见 SMOOTH_CHART_UPDATE）。
+    animationDuration: 0,
+    animationEasing: 'cubicOut' as const,
+    animationDurationUpdate: 360,
+    animationEasingUpdate: 'cubicInOut' as const,
+    // 右边留够半个日期标签的宽度：最后一个日期居中在最右那一点上，留 14px 时「28/09」会被
+    // 画布裁成「28/0」。（不用 alignMaxLabel 贴边：贴边以后会和前一个标签叠在一起。）
+    grid: { left: 42, right: 24, top: 16, bottom: 26 },
     tooltip: {
       trigger: 'axis',
       formatter: (params: Array<{ axisValue: string }>) => {
@@ -199,12 +316,13 @@ export const buildSeriesOption = (
         const point = axisValue ? byDate.get(axisValue) : undefined;
         if (!point) return '';
         const unit = options.unit ? ` ${options.unit}` : '';
+        const palette = chartPalettes[resolvedTheme.value];
         const spread =
           typeof point.min === 'number' && typeof point.max === 'number'
-            ? `<br><span style="color:#B4BBC3">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
+            ? `<br><span style="color:${palette.tooltipSub}">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
             : '';
         const samples = point.samples
-          ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
+          ? `<br><span style="color:${palette.tooltipDim}">${copy().samples(point.samples)}</span>`
           : '';
         return `${shortDate(point.date)}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },
@@ -251,7 +369,7 @@ export const buildSeriesOption = (
             type: 'bar',
             data: values,
             barMaxWidth: 14,
-            itemStyle: { color: options.color, borderRadius: [2, 2, 0, 0] },
+            itemStyle: { color: options.color, borderRadius: [4, 4, 1, 1] },
           }
         : {
             type: 'line',
@@ -261,7 +379,16 @@ export const buildSeriesOption = (
             showSymbol: series.points.length <= 14,
             symbolSize: 5,
             itemStyle: { color: options.color },
-            lineStyle: { width: 2, color: options.color, cap: 'round' },
+            lineStyle: { width: 2.2, color: options.color, cap: 'round' },
+            // 线下一层从上到下淡掉的光：有体积感，又不会被读成「面积」数据。有区间阴影时不叠。
+            ...(hasSpread ? {} : {
+              areaStyle: {
+                color: {
+                  type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                  colorStops: [{ offset: 0, color: hexToRgba(options.color, 0.2) }, { offset: 1, color: hexToRgba(options.color, 0) }],
+                },
+              },
+            }),
           },
     ],
   };

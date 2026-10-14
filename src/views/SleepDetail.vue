@@ -1,155 +1,33 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { useRoute } from 'vue-router';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
+import SectionGroup from '../components/SectionGroup.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
 import { sleepStageLabel, sleepStageLabels } from '../lib/sleepStages';
-import { defineMessages, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
 
-const messages = defineMessages(
-  {
-    backToRecent: '返回最近记录',
-    title: '睡眠记录详情',
-    loadingDetail: '正在读取睡眠详情…',
-    loadFailedTitle: '无法读取这条睡眠',
-    loadFailed: '睡眠详情暂时不可用',
-    retry: '重试',
-    notFoundTitle: '找不到这条睡眠记录',
-    notFoundMessage: '它可能已被清理，或尚未同步到本机。',
-    heroAria: '睡眠时长与评分',
-    durationKicker: '睡眠时长',
-    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
-      `${fellAsleep} 入睡 · ${wokeUp} 醒来 · 在床 ${inBed}`,
-    scoreKicker: '睡眠评分',
-    scoreNote: '设备提供的评分，仅作记录展示。',
-    stagesAria: '睡眠阶段',
-    stagesTitle: '睡眠阶段',
-    stageHelpButton: '阶段说明',
-    stageHelp: '深睡：恢复体力的深度睡眠。浅睡：占比较高的过渡阶段。REM：快速眼动期，多与记忆和梦境有关。清醒：夜间醒来或清醒片段。以上为阶段含义说明，不是健康诊断。',
-    weeklyAria: '近 7 天睡眠趋势',
-    weeklyTitle: '近 7 天睡眠结构',
-    weeklySub: '每日分期堆叠',
-    weeklyChartAria: '近 7 天睡眠结构柱状图',
-    metaAria: '来源与设备',
-    sourceTitle: '来源',
-    sourceProvider: '数据来源',
-    sourceScope: '数据范围',
-    syncedAt: '同步时间',
-    timezone: '时区',
-    deviceTitle: '设备',
-    deviceName: '设备名称',
-    deviceFirmware: '固件版本',
-    deviceId: '设备 ID',
-    footnote: '只展示云端给出的阶段汇总。没有 REM 字段时显示「未提供」，不会用减法编造，也不绘制未提供的时间轴。',
-    notProvided: '未提供',
-    syncTimeMissing: '同步时间未提供',
-    lastCloudSync: (clock: string) => `最近云端同步 ${clock}`,
-    deviceUndetermined: '设备未确定',
-    hoursAxis: '小时',
-    tooltipTotal: (date: string, hours: string) => `<b>${date} 睡眠合计：${hours} 小时</b><br/>`,
-    tooltipRow: (name: string, hours: number) => `${name}: ${hours} 小时<br/>`,
-    tooltipRowMissing: (name: string) => `${name}: 未提供<br/>`,
-  },
-  {
-    backToRecent: 'Back to recent records',
-    title: 'Sleep record',
-    loadingDetail: 'Reading the sleep record…',
-    loadFailedTitle: 'Could not read this sleep record',
-    loadFailed: 'Sleep detail is unavailable right now',
-    retry: 'Try again',
-    notFoundTitle: 'This sleep record is not here',
-    notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
-    heroAria: 'Sleep duration and score',
-    durationKicker: 'Time asleep',
-    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
-      `Asleep ${fellAsleep} · awake ${wokeUp} · in bed ${inBed}`,
-    scoreKicker: 'Sleep score',
-    scoreNote: 'Reported by the device; shown as recorded, nothing more.',
-    stagesAria: 'Sleep stages',
-    stagesTitle: 'Sleep stages',
-    stageHelpButton: 'What the stages mean',
-    stageHelp: 'Deep: the restorative stretch. Light: the transitional stage that takes up most of the night. REM: rapid eye movement, tied to memory and dreaming. Awake: waking up or lying awake in the night. These are definitions, not a health diagnosis.',
-    weeklyAria: 'Sleep over the last 7 days',
-    weeklyTitle: 'Sleep structure, last 7 days',
-    weeklySub: 'Stages stacked per night',
-    weeklyChartAria: 'Stacked bar chart of sleep structure over the last 7 days',
-    metaAria: 'Source and device',
-    sourceTitle: 'Source',
-    sourceProvider: 'Provider',
-    sourceScope: 'Scope',
-    syncedAt: 'Synced',
-    timezone: 'Time zone',
-    deviceTitle: 'Device',
-    deviceName: 'Name',
-    deviceFirmware: 'Firmware',
-    deviceId: 'Device ID',
-    footnote: 'Only the stage summary the cloud actually gave. When there is no REM field it reads "Not provided" — never back-computed by subtraction — and a timeline that was not provided is never drawn.',
-    notProvided: 'Not provided',
-    syncTimeMissing: 'Sync time not provided',
-    lastCloudSync: (clock: string) => `Last cloud sync ${clock}`,
-    deviceUndetermined: 'Device undetermined',
-    hoursAxis: 'hours',
-    tooltipTotal: (date: string, hours: string) => `<b>${date} — ${hours} h asleep in total</b><br/>`,
-    tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
-    tooltipRowMissing: (name: string) => `${name}: Not provided<br/>`,
-  },
-  {
-    backToRecent: 'Volver a registros recientes',
-    title: 'Registro de sueño',
-    loadingDetail: 'Leyendo el registro de sueño…',
-    loadFailedTitle: 'No se pudo leer este registro de sueño',
-    loadFailed: 'El detalle del sueño no está disponible en este momento',
-    retry: 'Reintentar',
-    notFoundTitle: 'Este registro de sueño no está aquí',
-    notFoundMessage: 'Puede que se haya borrado, o que todavía no se haya sincronizado en este equipo.',
-    heroAria: 'Duración y puntuación del sueño',
-    durationKicker: 'Tiempo dormido',
-    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
-      `Te dormiste ${fellAsleep} · despertaste ${wokeUp} · en cama ${inBed}`,
-    scoreKicker: 'Puntuación de sueño',
-    scoreNote: 'Reportada por el dispositivo; se muestra tal como se registró, nada más.',
-    stagesAria: 'Fases del sueño',
-    stagesTitle: 'Fases del sueño',
-    stageHelpButton: 'Qué significan las fases',
-    stageHelp: 'Profundo: el tramo reparador. Ligero: la fase de transición que ocupa la mayor parte de la noche. REM: movimiento ocular rápido, asociado a la memoria y los sueños. Despierto: despertares o ratos despierto durante la noche. Son definiciones, no un diagnóstico de salud.',
-    weeklyAria: 'Sueño de los últimos 7 días',
-    weeklyTitle: 'Estructura del sueño, últimos 7 días',
-    weeklySub: 'Fases apiladas por noche',
-    weeklyChartAria: 'Gráfico de barras apiladas con la estructura del sueño de los últimos 7 días',
-    metaAria: 'Fuente y dispositivo',
-    sourceTitle: 'Fuente',
-    sourceProvider: 'Proveedor',
-    sourceScope: 'Alcance',
-    syncedAt: 'Sincronizado',
-    timezone: 'Zona horaria',
-    deviceTitle: 'Dispositivo',
-    deviceName: 'Nombre',
-    deviceFirmware: 'Firmware',
-    deviceId: 'ID del dispositivo',
-    footnote: 'Solo el resumen de fases que realmente dio la nube. Cuando no hay campo de REM aparece «Sin datos» (nunca se calcula restando), y nunca se dibuja una línea de tiempo que no se recibió.',
-    notProvided: 'Sin datos',
-    syncTimeMissing: 'Hora de sincronización no disponible',
-    lastCloudSync: (clock: string) => `Última sincronización con la nube ${clock}`,
-    deviceUndetermined: 'Dispositivo sin determinar',
-    hoursAxis: 'horas',
-    tooltipTotal: (date: string, hours: string) => `<b>${date}: ${hours} h de sueño en total</b><br/>`,
-    tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
-    tooltipRowMissing: (name: string) => `${name}: Sin datos<br/>`,
-  },
-  'views/SleepDetail',
-);
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
+import AskAiButton from '../components/ask/AskAiButton.vue';
+import PickDaysButton from '../components/cards/PickDaysButton.vue';
+import DurationText from '../components/DurationText.vue';
 import { useSyncController } from '../composables/useSyncController';
+import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { isTauri, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { minutesToHours } from '../lib/missingValues';
-import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, SleepSession } from '../types';
+import { sleepDetailMessages as messages } from './SleepDetail.i18n';
+import { holdInPlace } from '../lib/motion/holdInPlace';
+import { pageQuery, sleepPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -159,8 +37,16 @@ const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
-const stageHelpOpen = ref(false);
 const sleepId = computed(() => String(route.params.sleepId || ''));
+// 从概览的睡眠卡点进来之前，这一条多半已经预先读好了（lib/pageQueries.ts）：第一帧就是它，不放「加载中」。
+const preloaded = isTauri() && sleepId.value ? peekAll(sleepPageQueries(sleepId.value)) : null;
+if (preloaded) {
+  session.value = preloaded[0];
+  weekSessions.value = preloaded[1];
+  loading.value = false;
+}
+// 页面上看到的「加载中」：数据到了也等卡 ↔ 页的形变放完再换成内容（composables/useFirstLoad.ts）。
+const shownLoading = useLoadingAfterMotion(loading);
 
 const stages = computed(() => session.value ? [
   { label: sleepStageLabel('deep'), minutes: session.value.deep_minutes, tone: 'deep' as const },
@@ -204,25 +90,29 @@ const weeklyChartOption = computed(() => {
 
   // 标出当前日高亮
   const currentIndex = sorted.findIndex((s) => s.sleep_id === sleepId.value);
+  const palette = chartPalette.value;
 
   return {
     animation: false,
-    grid: { left: 34, right: 12, top: 24, bottom: 24, containLabel: false },
+    grid: { left: 34, right: 12, top: 46, bottom: 24, containLabel: false },
     legend: {
       data: sleepStageLabels(),
       top: 0,
       right: 0,
-      textStyle: { color: '#B4BBC3', fontSize: 14.5 },
+      textStyle: { color: palette.axis, fontSize: 14.5 },
       itemWidth: 8,
       itemHeight: 8,
       icon: 'circle',
     },
     tooltip: {
-      trigger: 'axis',
-      backgroundColor: '#1E221F',
-      borderColor: 'rgba(228, 235, 208, 0.16)',
+      trigger: 'axis', triggerOn: 'mousemove|click', showDelay: 0, hideDelay: 0, transitionDuration: 0,
+      // 不画指示框：以前这里是一个灰色的阴影框，把整根柱子框起来，看着多余。
+      // 悬停的那一天由 tooltip 说明，柱子本身不动。
+      axisPointer: { type: 'none' },
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
       borderWidth: 1,
-      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
+      textStyle: { color: palette.tooltipText, fontSize: 15.5 },
       formatter: (params: Array<{ seriesName: string; value: number | null; name: string }>) => {
         if (!params || !params.length) return '';
         const name = params[0].name;
@@ -239,10 +129,10 @@ const weeklyChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: dates,
-      axisLine: { lineStyle: { color: 'rgba(228, 235, 208, 0.1)' } },
+      axisLine: { lineStyle: { color: palette.gridSoft } },
       axisTick: { show: false },
       axisLabel: {
-        color: (_val: string, index: number) => index === currentIndex ? '#93B952' : '#B4BBC3',
+        color: (_val: string, index: number) => index === currentIndex ? palette.accent : palette.axis,
         fontSize: 14.5,
         fontWeight: (_val: string, index: number) => index === currentIndex ? 'bold' : 'normal',
       },
@@ -250,11 +140,11 @@ const weeklyChartOption = computed(() => {
     yAxis: {
       type: 'value',
       name: t.value.hoursAxis,
-      nameTextStyle: { color: '#B4BBC3', fontSize: 14.5, align: 'right' },
+      nameTextStyle: { color: palette.axis, fontSize: 14.5, align: 'right' },
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
-      splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
+      axisLabel: { color: palette.axis, fontSize: 14.5 },
+      splitLine: { show: true, lineStyle: { color: palette.gridSoft, type: 'dashed' } },
     },
     series: [
       {
@@ -262,22 +152,22 @@ const weeklyChartOption = computed(() => {
         type: 'bar',
         stack: 'sleep',
         data: deepData,
-        itemStyle: { color: zeppSemanticColors.sleep.deep },
-        barWidth: 20,
+        itemStyle: { color: chartPalette.value.series.sleep.deep },
+        barWidth: 22,
       },
       {
         name: sleepStageLabel('light'),
         type: 'bar',
         stack: 'sleep',
         data: lightData,
-        itemStyle: { color: zeppSemanticColors.sleep.light },
+        itemStyle: { color: chartPalette.value.series.sleep.light },
       },
       {
         name: sleepStageLabel('rem'),
         type: 'bar',
         stack: 'sleep',
         data: remData,
-        itemStyle: { color: zeppSemanticColors.sleep.rem },
+        itemStyle: { color: chartPalette.value.series.sleep.rem },
       },
       {
         name: sleepStageLabel('awake'),
@@ -285,7 +175,7 @@ const weeklyChartOption = computed(() => {
         stack: 'sleep',
         data: awakeData,
         itemStyle: {
-          color: zeppSemanticColors.sleep.awake,
+          color: chartPalette.value.series.sleep.awake,
           borderRadius: [4, 4, 0, 0],
         },
       },
@@ -297,23 +187,23 @@ let detailSeq = 0;
 
 const loadDetail = async () => {
   const seq = ++detailSeq;
-  loading.value = true;
+  // 已经是这一条（预先读好的、或者只是数据版本变了重读）：内容留着，读完原地换，不退回「加载中」。
+  if (session.value?.sleep_id !== sleepId.value) loading.value = true;
   error.value = null;
   if (!isTauri()) {
     loading.value = false;
     return;
   }
   try {
+    const [detailQuery, recentQuery] = sleepPageQueries(sleepId.value);
     const [detail, recent] = await Promise.all([
-      tauriApi.getSleepDetail(sleepId.value),
-      tauriApi.getRecentSleep(7).catch(() => []),
+      cached(detailQuery),
+      cached(recentQuery).catch(() => []),
     ]);
     if (seq !== detailSeq) return;
     const profile = detail
-      ? await tauriApi.getDeviceProfile({
-          deviceId: detail.device_id,
-          sourceScope: detail.source_scope,
-        }).catch(() => ({ name: t.value.deviceUndetermined }))
+      ? await cached(pageQuery.deviceProfile(detail.device_id, detail.source_scope))
+        .catch(() => ({ name: t.value.deviceUndetermined }))
       : {};
     if (seq !== detailSeq) return;
     session.value = detail;
@@ -327,20 +217,34 @@ const loadDetail = async () => {
   }
 };
 
-onMounted(() => void loadDetail());
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadDetail(); }); else void loadDetail(); });
 watch([dataRevision, sleepId], () => void loadDetail());
+
+/* 官方授权那一份（sleep_id 以 official: 开头）标成官方授权，不再笼统写「Zepp 云端」。 */
+const providerLabel = computed(() => (session.value?.sleep_id.startsWith('official:') ? t.value.providerOfficial : dataProviderLabel()));
+const metaSummary = computed(() => [providerLabel.value, device.value.name].filter(Boolean).join(' · '));
 </script>
 
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
     <header class="page-heading">
-      <h1 id="sleep-detail-title">{{ t.title }}</h1>
-      <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
+      <div>
+        <h1 id="sleep-detail-title">{{ t.title }}</h1>
+        <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
+      </div>
+      <!-- 睡眠也能单独问 AI、挑几晚交给 AI（10-07 用户反馈：点进来没有入口）。 -->
+      <span class="heading-actions">
+        <PickDaysButton category="sleep" :label="t.askLabel" tint="var(--sleep)" :format="(minutes: number) => formatDuration(minutes)" />
+        <AskAiButton metric="sleep_score" :label="t.askLabel" card=".sleep-hero" />
+      </span>
     </header>
 
-    <div v-if="loading" class="muted-line" aria-live="polite">{{ t.loadingDetail }}</div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="shownLoading" class="muted-line" aria-live="polite">{{ t.loadingDetail }}</div>
+    </Transition>
+    <template v-if="!shownLoading">
+    <EmptyState v-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
       <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!session" icon="moon" :title="t.notFoundTitle" :message="t.notFoundMessage" />
@@ -348,8 +252,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
     <template v-else>
       <article class="sleep-hero" :aria-label="t.heroAria">
         <div class="hero-duration">
-          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}</p>
-          <p class="value">{{ formatDuration(session.duration_minutes, t.notProvided) }}</p>
+          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}<MetricInfoButton metric="sleep_duration" :label="t.durationKicker" /></p>
+          <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
           <p class="meta">{{ t.heroMeta(formatTime(session.start_time), formatTime(session.end_time), timeInBedLabel) }}</p>
         </div>
         <div class="hero-score">
@@ -364,9 +268,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
           />
           <strong v-else class="score-empty">—</strong>
           <div class="score-copy">
-            <p class="kicker">{{ t.scoreKicker }}</p>
+            <p class="kicker">{{ t.scoreKicker }}<MetricInfoButton metric="sleep_score" :label="t.scoreKicker" /></p>
             <p class="score-num">{{ score !== null ? score : t.notProvided }}<small v-if="score !== null"> / 100</small></p>
-            <p v-if="score !== null" class="score-note">{{ t.scoreNote }}</p>
           </div>
         </div>
       </article>
@@ -374,13 +277,11 @@ watch([dataRevision, sleepId], () => void loadDetail());
       <!-- 睡眠阶段 -->
       <section class="surface-card stage-card" :aria-label="t.stagesAria">
         <div class="stage-head">
-          <h2>{{ t.stagesTitle }}</h2>
+          <h2>{{ t.stagesTitle }}<MetricInfoButton metric="sleep_stages" :label="t.stagesTitle" /></h2>
           <div class="stage-actions">
             <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
-            <button class="stage-help-button" type="button" @click="stageHelpOpen = !stageHelpOpen">{{ t.stageHelpButton }}</button>
           </div>
         </div>
-        <p v-if="stageHelpOpen" class="stage-help">{{ t.stageHelp }}</p>
         <StageBar
           :stages="stages"
           :slices="session.stages"
@@ -389,200 +290,61 @@ watch([dataRevision, sleepId], () => void loadDetail());
         />
       </section>
 
-      <!-- 睡眠时长周堆叠图 -->
-      <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
-        <div class="stage-head">
-          <h2>{{ t.weeklyTitle }}</h2>
-          <p>{{ t.weeklySub }}</p>
-        </div>
-        <VChart class="weekly-sleep-chart" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
-      </section>
+      <!-- 近 7 天结构、来源与设备直接摊开。 -->
+          <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
+            <div class="stage-head">
+              <h2>{{ t.weeklyTitle }}<MetricInfoButton metric="sleep_weekly" :label="t.weeklyTitle" /></h2>
+              <p>{{ t.weeklySub }}</p>
+            </div>
+            <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
+          </section>
+        <SectionGroup :title="t.metaAria" :summary="metaSummary" icon="health-watch" tone="activity">
+          <section class="meta-grid" :aria-label="t.metaAria">
+            <article class="surface-card meta-card">
+              <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
+              <dl>
+                <div>
+                  <dt>{{ t.sourceProvider }}</dt>
+                  <dd>{{ providerLabel }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.sourceScope }}</dt>
+                  <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.syncedAt }}</dt>
+                  <dd>{{ syncTimeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.timezone }}</dt>
+                  <dd>{{ timezoneLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+            <article class="surface-card meta-card">
+              <p class="meta-title"><Icon name="watch" :size="15" />{{ t.deviceTitle }}</p>
+              <dl>
+                <div>
+                  <dt>{{ t.deviceName }}</dt>
+                  <dd>{{ device.name || t.notProvided }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.deviceFirmware }}</dt>
+                  <dd>{{ device.firmware || t.notProvided }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.deviceId }}</dt>
+                  <dd>{{ deviceIdentifier }}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
+        </SectionGroup>
 
-      <!-- 元数据与设备 -->
-      <section class="meta-grid" :aria-label="t.metaAria">
-        <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
-          <dl>
-            <div>
-              <dt>{{ t.sourceProvider }}</dt>
-              <dd>{{ dataProviderLabel() }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.sourceScope }}</dt>
-              <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.syncedAt }}</dt>
-              <dd>{{ syncTimeLabel }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.timezone }}</dt>
-              <dd>{{ timezoneLabel }}</dd>
-            </div>
-          </dl>
-        </article>
-        <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="watch" :size="15" />{{ t.deviceTitle }}</p>
-          <dl>
-            <div>
-              <dt>{{ t.deviceName }}</dt>
-              <dd>{{ device.name || t.notProvided }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.deviceFirmware }}</dt>
-              <dd>{{ device.firmware || t.notProvided }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.deviceId }}</dt>
-              <dd>{{ deviceIdentifier }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
       <p class="note">{{ t.footnote }}</p>
+    </template>
     </template>
   </section>
 </template>
 
-<style scoped>
-.sleep-page { width: 100%; display: grid; gap: 16px; align-content: start; }
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
-.page-heading { margin: 0; }
-.page-heading h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.page-heading p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-.muted-line { color: var(--muted); }
-.sleep-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 24px;
-  min-width: 0;
-  padding: 18px 20px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-.hero-duration, .hero-score { min-width: 0; }
-.hero-score {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.score-copy { display: grid; gap: 2px; min-width: 0; }
-.score-num {
-  margin: 0;
-  color: var(--ink);
-  font-size: 24px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.score-num small { color: var(--muted); font-size: var(--fs-md); font-weight: 600; }
-.score-note { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.45; }
-.kicker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-.mark {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: 999px;
-  color: var(--sleep);
-  background: var(--sleep-wash);
-}
-.value {
-  margin: 10px 0 0;
-  color: var(--ink);
-  font-size: clamp(32px, 4vw, 42px);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-}
-.meta {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-.score-empty {
-  color: var(--ink);
-  font-size: 31px;
-  font-weight: 600;
-}
-.stage-card, .chart-card { margin: 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.weekly-sleep-chart { width: 100%; height: 180px; }
-.stage-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.stage-head h2 { margin: 0; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
-.stage-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.stage-actions { display: flex; align-items: center; gap: 10px; }
-.stage-help-button {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.stage-help { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
-.meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 0;
-}
-.meta-card { padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.meta-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 10px;
-  color: var(--ink);
-  font-size: var(--fs-md);
-  font-weight: 700;
-}
-.meta-title svg { color: var(--sleep); }
-.meta-card dl { display: grid; gap: 8px; margin: 0; }
-.meta-card dt { color: var(--muted); font-size: var(--fs-sm); }
-.meta-card dd {
-  margin: 3px 0 0;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-  font-size: var(--fs-md);
-}
-.note { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-@media (max-width: 760px) {
-  .sleep-hero, .meta-grid { grid-template-columns: 1fr; }
-  .hero-score { justify-content: flex-start; }
-}
-</style>
+<style scoped src="./SleepDetail.css"></style>

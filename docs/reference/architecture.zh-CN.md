@@ -2,7 +2,7 @@
 
 [English](architecture.md)
 
-本文描述 v2.4.4 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
+本文描述 v3.0.0 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
 
 ## 产品边界
 
@@ -30,7 +30,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 前端只调用 `start_web_login` / `cancel_web_login` / `get_login_status`，并监听 `login://status`。载荷为 `{ state, message, page_url, code }`。
 - app token 默认存在平台凭据存储；macOS 和 Linux 可在系统存储不可用时显式选择文件存储，见[凭据边界](security-and-privacy.zh-CN.md#凭据)。`auth.json` 只保留非敏感元数据。
 - 已保存认证在应用重启后直接恢复为「已配置」；启动后会尝试 `verify_auth`。只有明确 401/403 或 `needs_reauth` 才要求重新连接。
-- 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 30 天重叠窗口（契约值 `zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`，经 `AppStatus.incremental_sync_days` 给界面用——别的地方不许再写死这个数字）。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
+- 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 30 天重叠窗口（契约值 `zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`，经 `AppStatus.incremental_sync_days` 给界面用——别的地方不许再写死这个数字）。静默的 15 分钟定时同步只重拉最近 `QUICK_SYNC_DAYS`（3）天；过去 `FULL_WINDOW_REFRESH_HOURS`（24）小时里没有过一次全部成功的整窗同步时，照旧拉整窗；手动、启动、托盘和 CLI 同步永远整窗（界面从 `AppStatus.auto_sync_days` 得知这一次是哪种）。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
 - 同步结果区分 `updated`、`no_new_data`、`partial`、`failed`；云端拉取时间与各数据流最新样本时间分别保存和显示。本地重解析不会改变云端同步时间。
 
 ### SQLite 与数据语义
@@ -69,6 +69,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 ### 跨进程写入协调
 
 - 同步、历史补拉、schema 迁移、恢复、备份、重新解析和清理都要先拿到跨进程写锁，因此桌面应用和 CLI 不可能同时写同一个库。
+- 同步和历史补拉全程持有另一把**同步租约**（跨进程也不会有两个同步同时跑），写锁只在真正落库的那几段拿。联网等待期间改设置、记生活事件照常能写；这类短写入撞上同步的写库窗口时会等几秒，而不是立刻报错。
 - 锁由操作系统持有（Windows 独占共享模式打开文件，类 Unix `flock`），进程崩溃时内核自动释放，不存在「上次崩了、这次打不开库」这种需要人工删锁文件的故障模式。
 - 只读查询不拿写锁：只读连接本来就写不了东西，让它们排队只会让 MCP 查询在一次长同步期间全部卡住。只读连接用 `PRAGMA query_only`，写入在 SQLite 层就被拒绝。
 
@@ -80,19 +81,19 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 
 ### 桌面界面
 
-- 主导航为概览、交给 AI（`/explore`）、数据健康（`/health-check`）、设置。顶栏提供连接状态与全局同步。
+- 主导航为概览、交给 AI（`/ai`）、设置。顶栏提供连接状态与全局同步。
 - 界面是**统一深色**：设计上不提供浅色 / 跟随系统模式，也没有主题切换入口。可调的只有界面缩放（80%–125%，设置「高级与维护」或 Ctrl + / Ctrl - / Ctrl 0）。
-- 界面是**十种语言**：zh/en/es 三份文案跟着代码就地定义，nl/pt-BR/pt-PT/de/ru/hi-IN/fr 七种靠懒加载语言包。首次启动跟随系统语言（只有明确说中文的才给中文），设置页页头可以随时切换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期和数字分组跟着语言走（`i18n/intlLocale()`），不只换文字。
+- 界面是**中英双语**。首次启动跟随系统语言（只有明确说中文的才给中文），设置页页头可以随时切换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期和数字分组跟着语言走（`i18n/intlLocale()`），不只换文字。
   - **没有引 vue-i18n。** 量过：接上它（含运行时构建、一句文案都没翻）首屏 gzip 从 73.0 kB 涨到 91.6 kB，超出体积预算 7.6 kB。自建的那一层不到一屏代码，首屏只多 0.4 kB。
-  - 文案跟着用它的模块走（`defineMessages(zh, en, es?, moduleId?)` 就地定义，大页面放同名 `*.i18n.ts`），不建全局大字典：懒加载页面的 chunk 仍然只带自己那份。七种语言包语言不动调用点——写了 `moduleId` 的 bundle 会被 `src/i18n/locales/<locale>.ts`（每语言一个文件）按模块覆盖，切换该语言时才 `import()` 进来、至多一次，所以不进首屏。
-  - `defineMessages` 用 `NoInfer` 把形状钉在中文那份上，英文漏键、多键、参数对不上都编译不过。西语那份可以只写一部分，没写的键在西语界面下显示英文。
+  - 文案跟着用它的模块走（`defineMessages(zh, en)` 就地定义，大页面放同名 `*.i18n.ts`），不建全局大字典：懒加载页面的 chunk 仍然只带自己那份。
+  - `defineMessages` 用 `NoInfer` 把形状钉在中文那份上，英文漏键、多键、参数对不上都编译不过。
   - **后端不按 locale 出文案。** GUI / CLI / MCP / 导出四个出口对同一个问题必须给同一份回答，所以后端发稳定的码（`recordsUnitCode`、`HealthAction.code`、`SyncProgress.code`、`InsightFact.reason_code`…），中文原文一并保留给 CLI，界面按码自己出人话，认不出码时才回退到原文。导出 JSON 的 `note` / `detail_note` / `reason` 一个都不翻——它们是外部脚本读的契约。
-  - CI 有一道 `npm run i18n:check`：界面里再出现硬编码中文就红。同一道门还审语言包——缺的键必须登记在 `locales/<locale>.pending.txt`，pending 里列了但包里已翻好、或指向已删键的，都算构建失败。逐条豁免写在 `scripts/release/check-i18n.mjs` 的 ALLOWED 里。
+  - CI 有一道 `npm run i18n:check`：界面里再出现硬编码中文就红。逐条豁免写在 `scripts/release/check-i18n.mjs` 的 ALLOWED 里。
 - 概览按「最新心率 → 交给 AI 入口 → 最近睡眠/运动」组织；同步时间与心率样本时间明确分开。不在概览做恢复或训练分析。
 - 睡眠与运动不进主导航。概览「查看全部」进入 `/sleep`、`/workouts`；单条详情为 `/sleep/:sleepId`、`/workouts/:workoutId`。
 - 身体状态 `/body` 与训练状态 `/training` 同样是二级页面，由概览的两张入口卡片进入。两页都是纯展示：数据早已在本地库里，页面只负责按 7 天 / 1 个月 / 6 个月呈现，并如实说明「N 天里有 M 天有记录」，缺的那几天曲线直接断开，不做插值。
 - 睡眠详情显示真实总时长、评分和四阶段比例；运动详情显示距离、热量、平均/最高心率、训练负荷与 VO₂max，只在距离和时长均有效时计算配速。跑步若已解码出轨迹或心率点则画折线，否则仍显示「未提供」。
-- JSON 导出在 `/explore`（交给 AI）：选提示词模板、复制、保存文件、直接交接给白名单内的 AI 站点。设置页按编号分区展开连接、账户、设备、隐私、保留、导出偏好、本机 API、更新与自动同步；界面缩放、数据文件夹、清除认证和同步诊断收进底部「高级与维护」。
+- 交给 AI（`/ai`）按分析任务生成一份脱敏数据包，交给白名单内的 AI 站点；JSON / CSV / GPX 文件走 `zeppbridge-cli export`，FIT 在运动详情页导出。设置页按编号分区展开连接、账户、设备、隐私、保留、导出偏好、本机 API、更新与自动同步；界面缩放、数据文件夹、清除认证和同步诊断收进底部「高级与维护」。
 - 状态色含义为绿色成功、灰色中性、黄色需关注、红色失败。分类色只用于心率、睡眠、运动等数据类别标记。品牌强调色为低饱和橄榄绿 `#7DA33E`，不是系统蓝。完整色板与页面结构见 [UI 约束](../development/ui-guidelines.zh-CN.md)。
 
 ## 已验证与未验证
@@ -191,15 +192,19 @@ file:  second_heart_rate/real_data
 
 ## 后续阶段
 
+逐项能力在 core / 桌面 / CLI / MCP / 本机 REST 里接通到哪一步、任务范围管不管得到、在哪些平台上验过，见[能力成熟度清单](capability-maturity.zh-CN.md)。
+
 | 阶段 | 状态 |
 | --- | --- |
 | 账号同步、SQLite、桌面 Dashboard | 已完成受控安装版烟测 |
 | 网页登录首次连接 | 电脑端链路已实现，真实账号登录按环境验证 |
 | 本机只读 REST（`/health`、`/workouts/{id}/series`） | 已实现；默认关闭，启用后需 token |
 | CLI（`status` / `sync` / `export` / `contract`） | 已实现，随 Release 提供版本化压缩包 |
-| MCP（stdio，只读五个工具） | 已实现，随 Release 提供版本化压缩包 |
+| MCP（stdio，十五个只读工具 + 两个训练计划写工具） | 已实现，随 Release 提供版本化压缩包 |
 | 完整历史补拉、长期归档、覆盖账本 | 已实现 |
 | 数据库快照与排队恢复 | 已实现 |
 | 更多数据源 | 未开始 |
 | macOS（Apple Silicon）桌面端 | 已合入（#1）；CI 有编译/测试门禁，Release 自 v0.9.2 起提供 dmg 与 updater 产物；ad-hoc 签名，无 Apple 公证 |
 | 公开发布工程（签名、更新、SBOM、干净 VM） | 部分完成：updater 产物与 `latest.json` 已用 Tauri 密钥签名并经 GitHub Release 自动更新；安装包仍无 Authenticode 证书，也没有干净 VM 验收 |
+
+时间桥使用 schema 36：新增 `ai_exchanges` 保存数据寄出、计划接回与发送账本的关联。持久个人档案在 `app_meta`；逐日走势与计划对比复用 core 只读查询，休息建议只留本地。

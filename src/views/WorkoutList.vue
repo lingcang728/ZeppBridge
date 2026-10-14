@@ -1,32 +1,31 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
+import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
+import { useRevisionReload } from '../composables/useRevisionReload';
+import { tauriApi } from '../composables/useTauriApi';
+import { usePagedRecords } from '../composables/usePagedRecords';
+import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
-import { createLoadSeq } from '../lib/loadSeq';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToRecent: '返回最近记录',
-    backToOverview: '返回概览',
     title: '运动',
     intro: '本机已同步的运动记录。没有轨迹时不画地图。',
     loadFailedTitle: '无法读取运动记录',
-    loadFailed: '运动列表暂时不可用',
+    loadFailed: '运动列表暂不可用',
     retry: '重试',
     emptyTitle: '没有可展示的运动记录',
-    emptyMessage: '同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。',
-    labelDistance: '距离',
-    labelBurn: '消耗',
-    labelDuration: '时长',
+    emptyMessage: '同步后，含类型、时间和至少一项有效指标的记录才显示在这里。没有 GPS 或逐点样本时不画空图。',
+    avgHr: (bpm: number) => `均心率 ${bpm}`,
     notProvided: '未提供',
     footnote: (count: number) => `${count} 条可展示记录`,
     shown: (loaded: number, total: number) => `已读取 ${loaded} / 共 ${total} 条`,
@@ -34,18 +33,14 @@ const messages = defineMessages(
     loadingMore: '正在加载…',
   },
   {
-    backToRecent: 'Back to recent records',
-    backToOverview: 'Back to overview',
     title: 'Workouts',
     intro: 'Workouts synced to this machine. No track, no map.',
-    loadFailedTitle: 'Could not read the workouts',
-    loadFailed: 'The workout list is unavailable right now',
-    retry: 'Try again',
+    loadFailedTitle: 'Could not load workouts',
+    loadFailed: 'Workout list unavailable right now',
+    retry: 'Retry',
     emptyTitle: 'Nothing to show yet',
-    emptyMessage: 'After a sync, only records carrying a type, a time and at least one real metric appear here. Without GPS or per-point samples, no empty chart is drawn.',
-    labelDistance: 'Distance',
-    labelBurn: 'Burn',
-    labelDuration: 'Duration',
+    emptyMessage: 'After a sync, only records with a type, a time and at least one real metric appear here. No GPS or per-point samples, no empty chart.',
+    avgHr: (bpm: number) => `Avg HR ${bpm}`,
     notProvided: 'Not provided',
     footnote: (count: number) => `${count} records shown`,
     shown: (loaded: number, total: number) => `Loaded ${loaded} of ${total}`,
@@ -53,18 +48,14 @@ const messages = defineMessages(
     loadingMore: 'Loading…',
   },
   {
-    backToRecent: 'Volver a registros recientes',
-    backToOverview: 'Volver al resumen',
     title: 'Entrenamientos',
     intro: 'Entrenamientos sincronizados en este equipo. Sin recorrido, no hay mapa.',
     loadFailedTitle: 'No se pudieron leer los entrenamientos',
-    loadFailed: 'La lista de entrenamientos no está disponible en este momento',
+    loadFailed: 'Lista de entrenamientos no disponible ahora',
     retry: 'Reintentar',
     emptyTitle: 'Todavía no hay nada que mostrar',
-    emptyMessage: 'Después de sincronizar, aquí solo aparecen los registros que tienen tipo, hora y al menos una métrica real. Sin GPS ni muestras punto a punto, no se dibuja un gráfico vacío.',
-    labelDistance: 'Distancia',
-    labelBurn: 'Calorías',
-    labelDuration: 'Duración',
+    emptyMessage: 'Tras sincronizar solo aparecen registros con tipo, hora y al menos una métrica válida. Sin GPS ni muestras por punto, no se dibuja un gráfico vacío.',
+    avgHr: (bpm: number) => `FC media ${bpm}`,
     notProvided: 'Sin datos',
     footnote: (count: number) => `${count} registros mostrados`,
     shown: (loaded: number, total: number) => `Cargados ${loaded} de ${total}`,
@@ -75,111 +66,46 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
-const workouts = ref<Workout[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
-const displayableList = computed(() => displayableWorkouts(workouts.value));
-/*
- * 分页，不是上限。见 SleepList.vue 里的同一段说明（Reddit p6zxyo7）。
+/* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
  * 注意这里有两个数字，不能混：`total` 是库里的**全部**运动记录数，
  * `displayableList.length` 是过滤掉不可展示项之后**这一屏**的条数。所以
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
- * 把两者混成一句会让人以为应用丢了记录。
- */
-const PAGE_SIZE = 200;
-const total = ref(0);
-const loadingMore = ref(false);
-const listEpoch = createLoadSeq();
-const hasMore = computed(() => workouts.value.length < total.value);
+ * 把两者混成一句会让人以为应用丢了记录。 */
+const {
+  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
+} = usePagedRecords<Workout>({
+  loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
+  idOf: (item) => item.workout_id,
+  failedText: () => t.value.loadFailed,
+  firstPage: pageQuery.workoutPage(LIST_PAGE_SIZE),
+});
+const initialLoading = useFirstLoad(loading);
+const displayableList = computed(() => displayableWorkouts(workouts.value));
 
-function workoutTypeBg(type: string): string {
-  const map: Record<string, string> = {
-    run: 'var(--route-mint)',
-    running: 'var(--route-mint)',
-    trail: 'var(--route-mint)',
-    walk: 'var(--route-cyan)',
-    walking: 'var(--route-cyan)',
-    hiking: 'var(--route-cyan)',
-    treadmill: 'var(--route-amber)',
-    indoor_run: 'var(--route-amber)',
-    ride: 'var(--route-cyan)',
-    cycling: 'var(--route-cyan)',
-    swimming: 'var(--route-cyan)',
-  };
-  return map[type?.trim().toLowerCase()] ?? 'var(--route-mint)';
-}
-
-const workoutFact = (workout: Workout): { fact: string; label: string } => {
+/* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
+   只列有值的项，一项都没有才写「未提供」。 */
+const workoutFact = (workout: Workout): string => {
+  const parts: string[] = [];
+  const minutes = workoutDurationMinutes(workout);
+  if (minutes) parts.push(formatDuration(minutes));
+  if (isFiniteNumber(workout.avg_hr)) parts.push(t.value.avgHr(Math.round(workout.avg_hr)));
   const meters = workout.distance_meters;
-  if (isFiniteNumber(meters) && meters > 0) {
-    return {
-      fact: formatDistance(meters, t.value.notProvided),
-      label: t.value.labelDistance,
-    };
-  }
-  if (isFiniteNumber(workout.calories)) return { fact: `${Math.round(workout.calories)} kcal`, label: t.value.labelBurn };
-  return { fact: formatDuration(workoutDurationMinutes(workout), t.value.notProvided), label: t.value.labelDuration };
+  if (isFiniteNumber(meters) && meters > 0) parts.push(formatDistance(meters));
+  else if (isFiniteNumber(workout.calories)) parts.push(`${Math.round(workout.calories)} kcal`);
+  return parts.length ? parts.join(' · ') : t.value.notProvided;
 };
 
-const loadList = async () => {
-  const epoch = listEpoch.next();
-  loading.value = true;
-  error.value = null;
-  if (!isTauri()) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    loading.value = false;
-    workouts.value = [];
-    total.value = 0;
-    return;
-  }
-  try {
-    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, 0);
-    if (!listEpoch.isCurrent(epoch)) return;
-    // 过滤留给 `displayableList`：这里保留原始条数，否则 offset 会和后端
-    // 的行号对不上，越翻越漏。
-    workouts.value = page.items;
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    if (listEpoch.isCurrent(epoch)) loading.value = false;
-  }
-};
-
-const loadMore = async () => {
-  if (loadingMore.value || loading.value || !hasMore.value) return;
-  const epoch = listEpoch.current();
-  loadingMore.value = true;
-  try {
-    const offset = workouts.value.length;
-    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, offset);
-    if (!listEpoch.isCurrent(epoch)) return;
-    const seen = new Set(workouts.value.map((item) => item.workout_id));
-    workouts.value = [...workouts.value, ...page.items.filter((item) => !seen.has(item.workout_id))];
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    // loadingMore is this call's own flag, not something a newer loadList()
-    // call takes over — unlike `loading`, nothing else will ever clear it,
-    // so it must reset here even if the epoch went stale while we awaited.
-    loadingMore.value = false;
-  }
-};
-
-onMounted(() => void loadList());
-watch(dataRevision, () => void loadList());
+// 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
+useRevisionReload(() => void loadList());
 </script>
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
 
-    <div v-if="loading" class="surface-card" aria-live="polite">
+    <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
@@ -188,20 +114,20 @@ watch(dataRevision, () => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="surface-card">
+    <div v-else class="record-list">
       <RecordRow
         v-for="workout in displayableList"
         :key="workout.workout_id"
         :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
-        icon="run"
-        :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
+        :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time)"
+        :time="formatTime(workout.start_time)"
         :title="workoutDisplayLabel(workout)"
-        :fact="workoutFact(workout).fact"
-        :fact-label="workoutFact(workout).label"
+        :fact="workoutFact(workout)"
       />
     </div>
+    <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
@@ -215,6 +141,7 @@ watch(dataRevision, () => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;

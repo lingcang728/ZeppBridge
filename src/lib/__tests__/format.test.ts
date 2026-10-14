@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  formatBytes,
   formatDistance,
   formatDuration,
   formatMetric,
+  formatNumber,
   isFiniteNumber,
   localDateString,
 } from '../format';
@@ -101,5 +103,31 @@ describe('缺失值的说法跟着界面语言走', () => {
     setLocale('en');
     setLocale('zh');
     expect(formatDuration(125)).toBe('2 小时 5 分');
+  });
+});
+
+describe('formatBytes', () => {
+  it('B / whole KB / 1-decimal MB / 2-decimal GB; empty for missing', () => {
+    expect(formatBytes(null)).toBe('—');
+    expect(formatBytes(Number.NaN)).toBe('—');
+    expect(formatBytes(0)).toBe('—');
+    expect(formatBytes(0, '0 KB')).toBe('0 KB');
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(1023)).toBe('1023 B');
+    expect(formatBytes(1024)).toBe('1 KB');
+    expect(formatBytes(2048)).toBe('2 KB');
+    expect(formatBytes(3 * 1024 * 1024)).toBe('3.0 MB');
+    expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
+  });
+});
+
+describe('数字分组用窄不换行空格', () => {
+  afterEach(() => setLocale('zh'));
+  it('俄语、法语的千位分隔都是 U+202F（字体子集里有这个字形），不是和普通空格一样宽的 U+00A0', () => {
+    setLocale('ru');
+    expect(formatNumber(1709)).toBe('1 709');
+    expect(formatMetric(12345)).toBe('12 345');
+    setLocale('fr');
+    expect(formatNumber(1709)).toBe('1 709');
   });
 });

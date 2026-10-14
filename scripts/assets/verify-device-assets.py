@@ -152,7 +152,7 @@ def main() -> None:
         if not entry.get("asset_hash"):
             fail(f"{catalog_id} missing asset_hash")
         webp = ASSET_DIR / f"{key}.webp"
-        thumb = ASSET_DIR / f"{key}-thumb.png"
+        thumb = ASSET_DIR / f"{key}-thumb.webp"
         if not webp.is_file() or not thumb.is_file():
             fail(f"{catalog_id} missing asset pair for {key}")
         digest = f"sha256:{hashlib.sha256(webp.read_bytes()).hexdigest().upper()}"
@@ -182,8 +182,9 @@ def main() -> None:
         fail(f"model code collision={duplicate_codes}")
 
     image_keys = {entry["image_key"] for entry in entries if entry.get("image_key")}
-    webp_keys = {path.stem for path in ASSET_DIR.glob("*.webp")}
-    thumb_keys = {path.name.removesuffix("-thumb.png") for path in ASSET_DIR.glob("*-thumb.png")}
+    # 缩略图也是 .webp，按后缀分开：`*-thumb.webp` 不算产品图。
+    webp_keys = {path.stem for path in ASSET_DIR.glob("*.webp") if not path.stem.endswith("-thumb")}
+    thumb_keys = {path.name.removesuffix("-thumb.webp") for path in ASSET_DIR.glob("*-thumb.webp")}
     if len(image_keys) != EXPECTED_ASSET_COUNT:
         fail(f"catalog image keys={len(image_keys)}, expected {EXPECTED_ASSET_COUNT}")
     if webp_keys != image_keys:

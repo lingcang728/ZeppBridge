@@ -1,188 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
+import SegmentTrack from './SegmentTrack.vue';
+import CapsuleWheel from './CapsuleWheel.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { heartRateZonesQuery } from '../lib/pageQueries';
+import { cached, peek } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
-import { defineMessages, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
+import { heartRateZonePickerMessages as messages } from './HeartRateZonePicker.i18n';
 
-const messages = defineMessages(
-  {
-    title: '心率区间',
-    intro: '三种算法算出来的区间不一样，哪一种对你有意义只有你知道，所以 ZeppBridge 不预设默认，也不会用 220−年龄 之类的公式估算。下面每个基准都标了出处和测量日期。',
-    clearChoice: '清除选择',
-    desktopOnly: '请从 ZeppBridge 桌面应用打开，心率区间需要读取本机记录。',
-    noBases: '本机还没有可用的心率基准。完成一次运动同步后，这里会出现实测最高心率等基准。',
-    modelGroup: '算法',
-    modelAria: '心率区间算法',
-    pickModelFirst: '先选一种算法，下面就会按你选的基准算出区间。',
-    pickBasesNext: '再选齐上面的基准，就能算出区间与各区间时长。',
-    window: (days: number, total: string) => `近 ${days} 天运动逐秒心率 · 共 ${total}`,
-    outside: (below: string, above: string) => `区间外：低于 Z1 ${below} · 高于 Z5 ${above}`,
-    formulaNote: (formula: string, bases: string) =>
-      `${formula}；边界向下取整，与手表一致。基准：${bases}`,
-    missingBases: (list: string) => `本机还没有${list}`,
-    basesSeparator: '、',
-    zonesUnavailable: '心率区间暂时不可用',
-    saveFailed: '保存心率区间设置失败',
-    zeroMinutes: '0 分',
-    durationHours: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
-    durationMinutes: (minutes: number) => `${minutes} 分`,
-    kind: {
-      max_hr: '最大心率基准',
-      resting_hr: '静息心率基准',
-      threshold_hr: '乳酸阈值基准',
-    },
-    /* 算法名、公式、区间名和基准说明都按后端发来的稳定 id 查表。
-       后端也带着一份中文，那是给 CLI / MCP 的：它们的输出不跟界面语言走。 */
-    model: {
-      max_hr: { label: '最大心率区间', formula: '区间下界 = 最大心率 x 百分比' },
-      hr_reserve: { label: '储备心率区间', formula: '区间下界 = 静息心率 + (最大心率 - 静息心率) x 百分比' },
-      lactate_threshold: { label: '乳酸阈值区间', formula: '区间下界 = 乳酸阈值心率 x 百分比' },
-    },
-    percentBands: ['热身', '燃脂', '有氧耐力', '无氧耐力', '极限'],
-    thresholdBands: ['轻松', '耐力', '节奏', '阈值', '无氧'],
-    basis: {
-      observed_max: {
-        label: '实测最高心率',
-        note: '本地记录到的最高心率。没跑到真正的极限时，区间会整体偏窄。',
-      },
-      device_max: {
-        label: '手表自报最大心率',
-        note: '手表在 PAI 报文里自报的最大心率，通常来自 Zepp App 的个人设置。',
-      },
-      device_resting: {
-        label: '手表自报静息心率',
-        note: '手表在 PAI 报文里自报的静息心率。',
-      },
-      lactate_threshold: {
-        label: '乳酸阈值心率',
-        note: '手表在一次高强度跑步后测出的乳酸阈值心率。',
-      },
-      computed_resting: {
-        label: '本地统计静息心率',
-        note: '',
-      },
-    },
-    computedRestingNote: (days: number) => `近 30 天里有数据的 ${days} 天的平均值。`,
-  },
-  {
-    title: 'Heart rate zones',
-    intro: 'The three models draw different zones, and only you know which one means something for you — so ZeppBridge picks no default and never estimates from a formula like 220 minus your age. Every basis below carries its source and the date it was measured.',
-    clearChoice: 'Clear selection',
-    desktopOnly: 'Open this in the ZeppBridge desktop app; heart rate zones read local records.',
-    noBases: 'No heart rate basis on this machine yet. After one workout sync, measured values such as your highest recorded heart rate show up here.',
-    modelGroup: 'Model',
-    modelAria: 'Heart rate zone model',
-    pickModelFirst: 'Pick a model, and the zones get computed from the bases you choose.',
-    pickBasesNext: 'Choose the remaining bases above to get the zones and the time spent in each.',
-    window: (days: number, total: string) => `Second-by-second workout heart rate over ${days} days · ${total} in total`,
-    outside: (below: string, above: string) => `Outside the zones: below Z1 ${below} · above Z5 ${above}`,
-    formulaNote: (formula: string, bases: string) =>
-      `${formula}. Boundaries round down, matching the watch. Bases: ${bases}`,
-    missingBases: (list: string) => `Not on this machine yet: ${list}`,
-    basesSeparator: ', ',
-    zonesUnavailable: 'Heart rate zones are unavailable right now',
-    saveFailed: 'Could not save the heart rate zone settings',
-    zeroMinutes: '0 min',
-    durationHours: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
-    durationMinutes: (minutes: number) => `${minutes} min`,
-    kind: {
-      max_hr: 'Max HR basis',
-      resting_hr: 'Resting HR basis',
-      threshold_hr: 'Threshold HR basis',
-    },
-    model: {
-      max_hr: { label: 'Max heart rate zones', formula: 'Zone floor = max heart rate x percentage' },
-      hr_reserve: { label: 'Heart rate reserve zones', formula: 'Zone floor = resting HR + (max HR - resting HR) x percentage' },
-      lactate_threshold: { label: 'Lactate threshold zones', formula: 'Zone floor = threshold heart rate x percentage' },
-    },
-    percentBands: ['Warm-up', 'Fat burn', 'Aerobic', 'Anaerobic', 'Maximum'],
-    thresholdBands: ['Easy', 'Endurance', 'Tempo', 'Threshold', 'Anaerobic'],
-    basis: {
-      observed_max: {
-        label: 'Highest recorded heart rate',
-        note: 'The highest heart rate recorded locally. If you never went to a real limit, the zones come out narrow.',
-      },
-      device_max: {
-        label: 'Max heart rate reported by the watch',
-        note: 'What the watch reports in its PAI payload, usually taken from your Zepp app profile.',
-      },
-      device_resting: {
-        label: 'Resting heart rate reported by the watch',
-        note: 'What the watch reports in its PAI payload.',
-      },
-      lactate_threshold: {
-        label: 'Lactate threshold heart rate',
-        note: 'Measured by the watch after a hard run.',
-      },
-      computed_resting: {
-        label: 'Resting heart rate computed locally',
-        note: '',
-      },
-    },
-    computedRestingNote: (days: number) => `Average across the ${days} days with data in the last 30.`,
-  },
-  {
-    title: 'Zonas de frecuencia cardíaca',
-    intro: 'Los tres modelos dibujan zonas distintas, y solo tú sabes cuál tiene sentido para ti; por eso ZeppBridge no elige uno por defecto ni estima con una fórmula como 220 menos tu edad. Cada base de abajo indica su origen y la fecha en que se midió.',
-    clearChoice: 'Borrar selección',
-    desktopOnly: 'Abre esto en la app de escritorio de ZeppBridge; las zonas de frecuencia cardíaca leen registros locales.',
-    noBases: 'Todavía no hay ninguna base de frecuencia cardíaca en este equipo. Después de sincronizar un entrenamiento, aquí aparecen valores medidos como tu frecuencia cardíaca más alta registrada.',
-    modelGroup: 'Modelo',
-    modelAria: 'Modelo de zonas de frecuencia cardíaca',
-    pickModelFirst: 'Elige un modelo y las zonas se calculan con las bases que escojas.',
-    pickBasesNext: 'Elige las bases que faltan arriba para obtener las zonas y el tiempo en cada una.',
-    window: (days: number, total: string) => `Frecuencia cardíaca segundo a segundo de los entrenamientos en ${days} días · ${total} en total`,
-    outside: (below: string, above: string) => `Fuera de las zonas: por debajo de Z1 ${below} · por encima de Z5 ${above}`,
-    formulaNote: (formula: string, bases: string) =>
-      `${formula}. Los límites se redondean hacia abajo, igual que en el reloj. Bases: ${bases}`,
-    missingBases: (list: string) => `Todavía no están en este equipo: ${list}`,
-    basesSeparator: ', ',
-    zonesUnavailable: 'Las zonas de frecuencia cardíaca no están disponibles en este momento',
-    saveFailed: 'No se pudo guardar la configuración de zonas de frecuencia cardíaca',
-    zeroMinutes: '0 min',
-    durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
-    durationMinutes: (minutes: number) => `${minutes} min`,
-    kind: {
-      max_hr: 'Base de FC máxima',
-      resting_hr: 'Base de FC en reposo',
-      threshold_hr: 'Base de FC de umbral',
-    },
-    model: {
-      max_hr: { label: 'Zonas por FC máxima', formula: 'Límite inferior de la zona = FC máxima x porcentaje' },
-      hr_reserve: { label: 'Zonas por FC de reserva', formula: 'Límite inferior de la zona = FC en reposo + (FC máxima - FC en reposo) x porcentaje' },
-      lactate_threshold: { label: 'Zonas por umbral de lactato', formula: 'Límite inferior de la zona = FC de umbral x porcentaje' },
-    },
-    percentBands: ['Calentamiento', 'Quema de grasa', 'Aeróbica', 'Anaeróbica', 'Máxima'],
-    thresholdBands: ['Suave', 'Resistencia', 'Tempo', 'Umbral', 'Anaeróbica'],
-    basis: {
-      observed_max: {
-        label: 'Frecuencia cardíaca más alta registrada',
-        note: 'La frecuencia cardíaca más alta registrada localmente. Si nunca llegaste a un límite real, las zonas salen estrechas.',
-      },
-      device_max: {
-        label: 'Frecuencia cardíaca máxima reportada por el reloj',
-        note: 'Lo que el reloj reporta en sus datos de PAI, normalmente tomado de tu perfil en la app Zepp.',
-      },
-      device_resting: {
-        label: 'Frecuencia cardíaca en reposo reportada por el reloj',
-        note: 'Lo que el reloj reporta en sus datos de PAI.',
-      },
-      lactate_threshold: {
-        label: 'Frecuencia cardíaca de umbral de lactato',
-        note: 'Medida por el reloj después de una carrera intensa.',
-      },
-      computed_resting: {
-        label: 'Frecuencia cardíaca en reposo calculada localmente',
-        note: '',
-      },
-    },
-    computedRestingNote: (days: number) => `Promedio de los ${days} días con datos en los últimos 30.`,
-  },
-  'components/HeartRateZonePicker',
-);
 const t = useMessages(messages);
 
 const kindLabel = (kind: string): string =>
@@ -217,12 +48,34 @@ const props = defineProps<{ days: number; revision: number }>();
 
 const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
+// 训练页的预加载连这张卡一起读好了（lib/pageQueries.ts）：第一帧就是它，不放骨架。
+const preloaded = isDesktop() ? peek(heartRateZonesQuery(props.days)) : null;
+if (preloaded) {
+  options.value = preloaded.value;
+  loading.value = false;
+}
+const initialLoading = useFirstLoad(loading);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 
 const preference = computed(() => options.value?.preference ?? {});
 const models = computed(() => options.value?.models ?? []);
+/* 三种算法是一枚可拖动的胶囊（和全应用「从几项里挑一个」同一种控件），不再是三块贴片。
+   没选过时停在第一项上但不算选中：拨一下才保存。 */
+const modelItems = computed(() => models.value.map((model) => ({ value: model.id, label: modelLabel(model.id, model.label) })));
+const focusedModel = ref<string | null>(null);
+const shownModel = computed(() => models.value.find((model) => model.id === (focusedModel.value ?? preference.value.model))
+  ?? models.value[0] ?? null);
+const onModelPick = (value: string | number) => {
+  const id = String(value);
+  focusedModel.value = id;
+  const model = models.value.find((entry) => entry.id === id);
+  if (model?.available) chooseModel(id);
+};
+/** 区间条的颜色：Z1 冷 → Z5 热，一眼分得出强度，不再五条全是同一种红。 */
+const ZONE_TONES = ['var(--pace)', 'var(--activity)', 'var(--training)', 'var(--calories)', 'var(--heart)'];
+const zoneTone = (zone: number) => ZONE_TONES[Math.min(ZONE_TONES.length - 1, Math.max(0, zone - 1))];
 const bases = computed(() => options.value?.bases ?? []);
 const report = computed(() => options.value?.report ?? null);
 
@@ -245,6 +98,11 @@ const basisSlots = computed(() => {
     candidates: bases.value.filter((basis) => basis.kind === kind),
   }));
 });
+/** 依据的选项：读数 + 名字放进玻璃分段 / 滚轮（审计 A3，2026-10-07；以前是一张张卡片式的行）。 */
+const basisItems = (candidates: HeartRateBasis[]) => candidates.map((basis) => ({
+  value: basis.id, label: `${Math.round(basis.value)} ${basis.unit} · ${basisLabel(basis)}`, title: basisSummary(basis) || undefined,
+}));
+const chosenOf = (slot: { chosen: string | null; candidates: HeartRateBasis[] }) => slot.candidates.find((basis) => basis.id === slot.chosen) ?? null;
 
 const unavailableReason = (requires: string[]): string => {
   const missing = requires
@@ -264,7 +122,7 @@ const load = async () => {
     return;
   }
   try {
-    const next = await backend.getHeartRateZones(props.days);
+    const next = await cached(heartRateZonesQuery(props.days));
     if (!loadSeq.isCurrent(seq)) return;
     options.value = next;
   } catch (cause) {
@@ -329,10 +187,7 @@ const clearChoice = () => void save({
   thresholdBasis: null,
 });
 
-const basisSummary = (basis: HeartRateBasis): string => {
-  const measured = basis.measuredAt ? ` · ${basis.measuredAt}` : '';
-  return `${basis.source}${measured}`;
-};
+const basisSummary = (basis: HeartRateBasis): string => basis.measuredAt ?? '';
 
 const duration = (seconds: number): string => {
   if (!Number.isFinite(seconds) || seconds <= 0) return t.value.zeroMinutes;
@@ -353,7 +208,8 @@ const measuredSeconds = computed(() => {
     + current.aboveZone5Seconds;
 });
 
-onMounted(() => { void load(); });
+// 第一帧用的是先前读好的：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(() => props.days, () => { void load(); });
 watch(() => props.revision, () => { void load(); });
 </script>
@@ -363,85 +219,32 @@ watch(() => props.revision, () => { void load(); });
     <header class="zone-head">
       <div>
         <h2 id="zone-title">{{ t.title }}</h2>
-        <p class="zone-intro">{{ t.intro }}</p>
+        <p class="zone-intro">{{ t.lead }}</p>
       </div>
-      <button
-        v-if="preference.model"
-        class="button button-secondary"
-        type="button"
-        :disabled="saving"
-        @click="clearChoice"
-      >{{ t.clearChoice }}</button>
+      <button v-if="preference.model" class="pill-button quiet" type="button" :disabled="saving" @click="clearChoice">
+        <Icon name="undo" :size="13" />{{ t.clearChoice }}
+      </button>
     </header>
 
     <p v-if="error" class="zone-alert" role="alert"><Icon name="warning" :size="14" />{{ error }}</p>
 
-    <SkeletonBlock v-if="loading" height="220px" />
+    <SkeletonBlock v-if="initialLoading" height="220px" />
     <p v-else-if="!isDesktop()" class="zone-empty">{{ t.desktopOnly }}</p>
     <p v-else-if="!bases.length" class="zone-empty">{{ t.noBases }}</p>
 
     <template v-else>
-      <p class="group-label">{{ t.modelGroup }}</p>
-      <div class="model-grid" role="group" :aria-label="t.modelAria">
-        <button
-          v-for="model in models"
-          :key="model.id"
-          type="button"
-          :aria-pressed="preference.model === model.id"
-          :disabled="!model.available || saving"
-          :class="['model-card', { 'is-on': preference.model === model.id }]"
-          @click="chooseModel(model.id)"
-        >
-          <span class="model-name">
-            <Icon v-if="preference.model === model.id" name="circle-check" :size="14" />
-            {{ modelLabel(model.id, model.label) }}
-          </span>
-          <span class="model-formula">{{ modelFormula(model.id, model.formula) }}</span>
-          <span class="model-bands">
-            {{ model.bands.map((band) => `${Math.round(band.lowPercent * 100)}–${Math.round(band.highPercent * 100)}%`).join(' / ') }}
-          </span>
-          <span v-if="!model.available" class="model-missing">{{ unavailableReason(model.requires) }}</span>
-        </button>
-      </div>
-
-      <template v-if="selectedModel">
-        <div v-for="slot in basisSlots" :key="slot.kind" class="basis-block">
-          <p class="group-label">{{ slot.label }}</p>
-          <div class="basis-list" role="group" :aria-label="slot.label">
-            <button
-              v-for="basis in slot.candidates"
-              :key="basis.id"
-              type="button"
-              :aria-pressed="slot.chosen === basis.id"
-              :disabled="saving"
-              :class="['basis-row', { 'is-on': slot.chosen === basis.id }]"
-              @click="chooseBasis(slot.kind, basis.id)"
-            >
-              <span class="basis-value">{{ Math.round(basis.value) }}<i>{{ basis.unit }}</i></span>
-              <span class="basis-copy">
-                <strong>{{ basisLabel(basis) }}</strong>
-                <span class="basis-source">{{ basisSummary(basis) }}</span>
-                <span v-if="basisNote(basis)" class="basis-note">{{ basisNote(basis) }}</span>
-              </span>
-              <Icon v-if="slot.chosen === basis.id" name="circle-check" :size="15" class="basis-check" />
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <p v-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
-      <p v-else-if="!report" class="zone-empty">{{ t.pickBasesNext }}</p>
-
-      <template v-else>
+      <!-- 结果在前（U16）：选过算法和基准的人一进来先看到区间和时长；怎么算的收进下面的「算法与基准」，
+           还没选齐时它默认展开。 -->
+      <template v-if="report">
         <div class="zone-summary">
           <span>{{ modelLabel(report.model, report.modelLabel) }}</span>
           <span class="zone-window">{{ t.window(report.windowDays, duration(measuredSeconds)) }}</span>
         </div>
         <ul class="zone-list">
           <li v-for="zone in report.zones" :key="zone.zone">
-            <span class="zone-name">Z{{ zone.zone }} {{ zoneName(report.model, zone.zone) || zone.label }}</span>
+            <span class="zone-name"><b :style="{ background: zoneTone(zone.zone) }">Z{{ zone.zone }}</b>{{ zoneName(report.model, zone.zone) || zone.label }}</span>
             <span class="zone-range">{{ zone.minBpm }}–{{ zone.maxBpm }}</span>
-            <span class="zone-bar"><i :style="{ width: `${Math.round((zone.seconds / peakSeconds) * 100)}%` }"></i></span>
+            <span class="zone-bar"><i :style="{ width: `${Math.round((zone.seconds / peakSeconds) * 100)}%`, background: zoneTone(zone.zone) }"></i></span>
             <span class="zone-time">{{ duration(zone.seconds) }}</span>
           </li>
         </ul>
@@ -455,94 +258,96 @@ watch(() => props.revision, () => { void load(); });
           ) }}
         </p>
       </template>
+      <p v-else-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
+      <p v-else class="zone-empty">{{ t.pickBasesNext }}</p>
+
+      <details class="zone-setup" :open="!report">
+        <summary>{{ t.setupSummary }}</summary>
+        <p class="zone-intro">{{ t.intro }}</p>
+      <p class="group-label">{{ t.modelGroup }}</p>
+      <SegmentTrack class="model-track" :items="modelItems" :model-value="shownModel?.id ?? ''" :disabled="saving"
+        :aria-label="t.modelAria" @update:model-value="onModelPick" />
+      <p v-if="shownModel" class="model-line">
+        <span class="model-formula">{{ modelFormula(shownModel.id, shownModel.formula) }}</span>
+        <span class="model-bands">{{ shownModel.bands.map((band) => `${Math.round(band.lowPercent * 100)}–${Math.round(band.highPercent * 100)}%`).join(' · ') }}</span>
+        <span v-if="!shownModel.available" class="model-missing">{{ unavailableReason(shownModel.requires) }}</span>
+      </p>
+
+      <template v-if="selectedModel">
+        <div v-for="slot in basisSlots" :key="slot.kind" class="basis-block">
+          <p class="group-label">{{ slot.label }}</p>
+          <SegmentTrack v-if="slot.candidates.length <= 5" class="basis-track" :items="basisItems(slot.candidates)" :model-value="slot.chosen ?? ''" :disabled="saving"
+            :aria-label="slot.label" @update:model-value="chooseBasis(slot.kind, String($event))" />
+          <CapsuleWheel v-else :span="320" :items="basisItems(slot.candidates)" :model-value="slot.chosen ?? slot.candidates[0]!.id" :disabled="saving"
+            :aria-label="slot.label" @update:model-value="chooseBasis(slot.kind, String($event))" />
+          <p v-if="chosenOf(slot)" class="basis-line">
+            <span v-if="basisSummary(chosenOf(slot)!)" class="basis-source">{{ basisSummary(chosenOf(slot)!) }}</span>
+            <span v-if="basisNote(chosenOf(slot)!)" class="basis-note">{{ basisNote(chosenOf(slot)!) }}</span>
+          </p>
+        </div>
+      </template>
+      </details>
     </template>
   </section>
 </template>
 
 <style scoped>
+/* 与其他卡同一种有厚度的板：不描边、大圆角。选项不再是一格格有硬边的贴片，
+   而是胶囊 + 淡底的行；区间表按列等宽对齐，数字列右对齐。 */
 .zone-card {
   display: grid;
   gap: var(--space-3);
   align-content: start;
-  padding: var(--space-4) var(--space-6);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
   min-width: 0;
+  padding: 20px 24px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .zone-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .zone-head h2 { margin: 0 0 4px; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
+.zone-head .pill-button { flex: 0 0 auto; min-height: 32px; padding: 0 14px; font-size: var(--fs-xs); }
 .zone-intro { margin: 0; max-width: 68ch; color: var(--muted); font-size: var(--fs-sm); line-height: 1.7; }
+.zone-setup { display: grid; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--mat-line); }
+.zone-setup > summary { width: fit-content; min-height: 28px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.zone-setup > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.zone-setup[open] { gap: 10px; }
 .zone-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--danger); font-size: var(--fs-sm); }
 .zone-empty { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
-.group-label { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.group-label { margin: 6px 0 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
 
-.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
-.model-card {
-  display: grid;
-  gap: 5px;
-  align-content: start;
-  padding: var(--space-3);
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  color: var(--muted);
-  text-align: left;
-  cursor: pointer;
-}
-.model-card:hover:not(:disabled) { border-color: var(--accent); }
-.model-card:disabled { opacity: .55; cursor: not-allowed; }
-.model-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.model-name { display: flex; align-items: center; gap: 5px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
-.model-card.is-on .model-name { color: var(--accent); }
-.model-formula { font-size: var(--fs-xs); line-height: 1.6; }
-.model-bands { color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-xs); }
-.model-missing { color: var(--warning); font-size: var(--fs-xs); }
+.model-track { justify-self: start; max-width: 100%; }
+.model-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
+.model-bands { color: var(--subtle); font-variant-numeric: tabular-nums; }
+.model-missing { color: var(--warning); }
 
 .basis-block { display: grid; gap: var(--space-2); }
-.basis-list { display: grid; gap: var(--space-2); }
-.basis-row {
-  display: grid;
-  grid-template-columns: 74px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 44px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  text-align: left;
-  cursor: pointer;
-}
-.basis-row:hover:not(:disabled) { border-color: var(--accent); }
-.basis-row.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.basis-value { color: var(--ink); font-family: var(--font-mono); font-size: 21px; font-variant-numeric: tabular-nums; }
-.basis-value i { margin-left: 3px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; }
-.basis-copy { display: grid; gap: 1px; min-width: 0; }
-.basis-copy strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }
-.basis-source { color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.basis-track { max-width: 100%; }
+.basis-line { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 4px 0; }
+.basis-source { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .basis-note { color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
-.basis-check { color: var(--accent); }
 
-.zone-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }
+.zone-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-top: 6px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .zone-window { color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-.zone-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+/* 四列：区间名 | 心率范围 | 条 | 时长。名字和范围列定宽、时长列右对齐定宽，五行上下对齐。 */
+.zone-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .zone-list li {
   display: grid;
-  grid-template-columns: 108px 74px minmax(60px, 1fr) 86px;
+  grid-template-columns: 128px 92px minmax(60px, 1fr) 112px;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   font-size: var(--fs-sm);
 }
-.zone-name { color: var(--ink); }
+.zone-name { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); white-space: nowrap; }
+.zone-name b { display: inline-grid; min-width: 30px; height: 22px; place-items: center; border-radius: 999px; color: #0B0D10; font-size: var(--fs-2xs); font-weight: 800; }
 .zone-range, .zone-time { color: var(--muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.zone-time { text-align: right; }
-.zone-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
-.zone-bar i { display: block; height: 100%; border-radius: 999px; background: var(--heart); }
+.zone-time { text-align: right; white-space: nowrap; }
+.zone-bar { height: 10px; overflow: hidden; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.zone-bar i { display: block; height: 100%; border-radius: 999px; }
 .zone-outside, .zone-formula { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
 @media (max-width: 720px) {
   .zone-card { padding: var(--space-4); }
   .zone-list li { grid-template-columns: minmax(0, 1fr) auto; }
-  .zone-bar { display: none; }
+  .zone-bar, .zone-range { display: none; }
 }
 </style>

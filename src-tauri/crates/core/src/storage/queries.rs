@@ -1,0 +1,482 @@
+//! 睡眠、运动、概览的列表与详情查询（从 storage/mod.rs 按领域拆出，逻辑不变）。
+
+use super::*;
+
+pub(super) fn stored_stage_minutes(minutes: Option<i32>) -> (i32, i64) {
+    (minutes.unwrap_or(0), i64::from(minutes.is_some()))
+}
+
+/// `pub(crate)`：ai_tasks 导出睡眠窗口数据要按同一规则把「没测到」还原成 None。
+pub(crate) fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> {
+    (available != 0).then_some(minutes)
+}
+
+/// 睡眠列表与详情共用的列（顺序要和 [`SleepRow::read`] 对上）。
+const SLEEP_SESSION_COLUMNS: &str = "sleep_id, start_time, end_time, score, duration_minutes,
+    deep_minutes, deep_available, light_minutes, light_available,
+    rem_minutes, rem_available, awake_minutes, awake_available,
+    source_scope, device_id, synced_at, wake_count";
+
+/// 一行睡眠的原始列值。时间和来源仍是库里的字符串：解析放在 [`SleepRow::into_session`]，
+/// 返回本 crate 的 `Result`——坏时间 / 坏来源照旧报 `err.core.parse`，不会因为塞进
+/// `query_map` 的闭包而变成 `err.core.database`。
+struct SleepRow {
+    sleep_id: String,
+    start: String,
+    end: String,
+    score: Option<i32>,
+    duration_minutes: i32,
+    deep: (i32, i64),
+    light: (i32, i64),
+    rem: (i32, i64),
+    awake: (i32, i64),
+    scope: String,
+    device_id: Option<String>,
+    synced_at: Option<String>,
+    wake_count: Option<i32>,
+}
+
+impl SleepRow {
+    fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            sleep_id: row.get(0)?,
+            start: row.get(1)?,
+            end: row.get(2)?,
+            score: row.get(3)?,
+            duration_minutes: row.get(4)?,
+            deep: (row.get(5)?, row.get(6)?),
+            light: (row.get(7)?, row.get(8)?),
+            rem: (row.get(9)?, row.get(10)?),
+            awake: (row.get(11)?, row.get(12)?),
+            scope: row.get(13)?,
+            device_id: row.get(14)?,
+            synced_at: row.get(15)?,
+            wake_count: row.get(16)?,
+        })
+    }
+
+    fn into_session(self, stages: Vec<SleepStageSlice>) -> Result<SleepSession> {
+        Ok(SleepSession {
+            start_time: parse_datetime(&self.start, "sleep.start_time")?,
+            end_time: parse_datetime(&self.end, "sleep.end_time")?,
+            sleep_id: self.sleep_id,
+            score: self.score,
+            duration_minutes: self.duration_minutes,
+            deep_minutes: loaded_stage_minutes(self.deep.0, self.deep.1),
+            light_minutes: loaded_stage_minutes(self.light.0, self.light.1),
+            rem_minutes: loaded_stage_minutes(self.rem.0, self.rem.1),
+            awake_minutes: loaded_stage_minutes(self.awake.0, self.awake.1),
+            source_scope: parse_scope(&self.scope)?,
+            device_id: self.device_id,
+            synced_at: self
+                .synced_at
+                .as_deref()
+                .map(|value| parse_datetime(value, "sleep.synced_at"))
+                .transpose()?,
+            time_in_bed_minutes: None,
+            stages,
+            wake_count: self.wake_count,
+        })
+    }
+}
+
+impl Database {
+    /// `pub(crate)`：ai_tasks 的 detailed 导出要附真实阶段片，同一份查询。
+    pub(crate) fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stage, start_time, end_time, raw_mode FROM sleep_stages
+             WHERE sleep_id = ?1 ORDER BY start_time, id",
+        )?;
+        let rows = stmt.query_map([sleep_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+            ))
+        })?;
+        let mut stages = Vec::new();
+        for row in rows {
+            let (stage, start, end, raw_mode) = row?;
+            stages.push(SleepStageSlice {
+                stage,
+                start_time: parse_datetime(&start, "sleep_stages.start_time")?,
+                end_time: parse_datetime(&end, "sleep_stages.end_time")?,
+                raw_mode,
+            });
+        }
+        Ok(stages)
+    }
+
+    /// 本机一共有多少条睡眠记录。
+    ///
+    /// 分页要它：没有总数，界面只能说「显示了 500 条」，说不出「共 2317 条」，
+    /// 而用户问的恰恰是「剩下的呢」。
+    pub fn count_sleep_sessions(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM sleep_sessions_shown", [], |row| {
+                row.get(0)
+            })
+            .map_err(Into::into)
+    }
+
+    pub fn get_recent_sleep_sessions(&self, limit: usize) -> Result<Vec<SleepSession>> {
+        self.sleep_sessions_page(limit, 0)
+    }
+
+    /// 一页睡眠记录，最新在前。
+    ///
+    /// `offset` 是这里的新东西。以前 SQL 只有 `LIMIT` 没有 `OFFSET`，所以
+    /// 界面上那个 500 是硬上限而不是页大小：一个下载了全部历史的人，第 501
+    /// 条之后的记录在应用里根本没有入口（Reddit p6zxyo7）。
+    pub fn sleep_sessions_page(&self, limit: usize, offset: usize) -> Result<Vec<SleepSession>> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SLEEP_SESSION_COLUMNS}
+             FROM sleep_sessions_shown ORDER BY start_time DESC LIMIT ?1 OFFSET ?2"
+        ))?;
+        let rows = stmt.query_map([limit, offset], SleepRow::read)?;
+        let mut sessions = Vec::new();
+        for row in rows {
+            // 列表不带阶段片：详情页才要。
+            sessions.push(row?.into_session(Vec::new())?);
+        }
+        Ok(sessions)
+    }
+
+    pub fn get_sleep_detail(&self, sleep_id: &str) -> Result<Option<SleepSession>> {
+        let row = self
+            .conn
+            .query_row(
+                &format!(
+                    "SELECT {SLEEP_SESSION_COLUMNS}
+                     FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1"
+                ),
+                [sleep_id],
+                SleepRow::read,
+            )
+            .optional()?;
+        let Some(mut row) = row else {
+            return Ok(None);
+        };
+        let stages = self.load_sleep_stages(&row.sleep_id)?;
+        // 官方睡眠接口不带设备（实测报文只有起止、阶段和评分），落库时 device_id 是空的。
+        // 同一晚旧通道那一份若带着设备，就用它来认设备：两边是同一只表记下的同一段睡眠。
+        if row.device_id.is_none() && row.sleep_id.starts_with("official:") {
+            if let Some((scope, device_id)) = self
+                .conn
+                .query_row(
+                    "SELECT source_scope, device_id FROM sleep_sessions
+                     WHERE COALESCE(provider, '') != 'official'
+                       AND device_id IS NOT NULL AND device_id != ''
+                       AND start_time < ?2 AND end_time > ?1
+                     ORDER BY ABS(julianday(start_time) - julianday(?1)) LIMIT 1",
+                    params![row.start, row.end],
+                    |found| {
+                        Ok((
+                            found.get::<_, String>(0)?,
+                            found.get::<_, Option<String>>(1)?,
+                        ))
+                    },
+                )
+                .optional()?
+            {
+                row.scope = scope;
+                row.device_id = device_id;
+            }
+        }
+        row.into_session(stages).map(Some)
+    }
+
+    /// 本机一共有多少条运动记录。见 `count_sleep_sessions` 的理由。
+    pub fn count_workouts(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM workouts", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
+    pub fn get_recent_workouts(&self, limit: usize) -> Result<Vec<Workout>> {
+        self.workouts_page(limit, 0)
+    }
+
+    /// 一页运动记录，最新在前。见 `sleep_sessions_page`。
+    pub fn workouts_page(&self, limit: usize, offset: usize) -> Result<Vec<Workout>> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
+        let mut stmt = self.conn.prepare(
+            "SELECT workout_id, workout_type, start_time, end_time,
+                    distance_meters, calories, avg_hr, max_hr,
+                    training_load, vo2max, source_scope, device_id,
+                    synced_at, gps_available, sample_count, zepp_type,
+                    workout_type_source, workout_type_override
+             FROM workouts ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
+        )?;
+        let rows = stmt.query_map([limit, offset], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<f64>>(4)?,
+                row.get::<_, Option<i32>>(5)?,
+                row.get::<_, Option<i32>>(6)?,
+                row.get::<_, Option<i32>>(7)?,
+                row.get::<_, Option<f64>>(8)?,
+                row.get::<_, Option<f64>>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, i64>(13)?,
+                row.get::<_, i64>(14)?,
+                row.get::<_, Option<i32>>(15)?,
+                row.get::<_, String>(16)?,
+                row.get::<_, Option<String>>(17)?,
+            ))
+        })?;
+        // 一次读完编号别名，再在内存里套到每条记录上：表很小，比给两个大
+        // SELECT 各加一个 JOIN 更不容易改错。
+        let code_labels = self.workout_code_label_map()?;
+        let mut workouts = Vec::new();
+        for row in rows {
+            let (
+                workout_id,
+                workout_type,
+                start,
+                end,
+                distance_meters,
+                calories,
+                avg_hr,
+                max_hr,
+                training_load,
+                vo2max,
+                scope,
+                device_id,
+                synced_at,
+                gps_available,
+                sample_count,
+                zepp_type,
+                type_source,
+                user_override,
+            ) = row?;
+            let effective_type = user_override
+                .clone()
+                .unwrap_or_else(|| workout_type.clone());
+            let custom_label = zepp_type.and_then(|code| code_labels.get(&code).cloned());
+            workouts.push(Workout {
+                workout_id,
+                workout_type: workout_type.clone(),
+                normalized_type: workout_type,
+                type_source,
+                user_override,
+                effective_type,
+                custom_label,
+                start_time: parse_datetime(&start, "workout.start_time")?,
+                end_time: parse_datetime(&end, "workout.end_time")?,
+                distance_meters,
+                calories,
+                avg_hr,
+                max_hr,
+                training_load,
+                vo2max,
+                // 列表视图不读这些：屏幕上只有类型、距离、时长和心率，
+                // 为此把 SELECT 加宽十三列再加一个 join，代价落在每一次列表
+                // 渲染上。要这些字段请走单条运动的详情查询。
+                min_hr: None,
+                total_steps: None,
+                moving_seconds: None,
+                elevation_gain_m: None,
+                elevation_loss_m: None,
+                max_altitude_m: None,
+                min_altitude_m: None,
+                training_effect: None,
+                anaerobic_training_effect: None,
+                rpe: None,
+                avg_cadence_spm: None,
+                max_cadence_spm: None,
+                avg_stride_cm: None,
+                hr_zones: Vec::new(),
+                source_scope: parse_scope(&scope)?,
+                device_id,
+                synced_at: synced_at
+                    .as_deref()
+                    .map(|value| parse_datetime(value, "workout.synced_at"))
+                    .transpose()?,
+                gps_available: gps_available != 0,
+                sample_count,
+                zepp_source: None,
+                zepp_type,
+            });
+        }
+        Ok(workouts)
+    }
+
+    pub fn get_workout_detail(&self, workout_id: &str) -> Result<Option<Workout>> {
+        let row = self
+            .conn
+            .query_row(
+                &format!(
+                    "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts WHERE workout_id = ?1 LIMIT 1"
+                ),
+                [workout_id],
+                WorkoutDetailRow::read,
+            )
+            .optional()?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let hr_zones = self.workout_hr_zones(&row.workout_id)?;
+        let route_points: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM route_points WHERE workout_id = ?1",
+            [&row.workout_id],
+            |row| row.get(0),
+        )?;
+        let stored_samples: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM workout_samples WHERE workout_id = ?1",
+            [&row.workout_id],
+            |row| row.get(0),
+        )?;
+        let custom_label = match row.zepp_type {
+            Some(code) => self.workout_code_label_map()?.get(&code).cloned(),
+            None => None,
+        };
+        row.into_workout(WorkoutDetailExtras {
+            hr_zones,
+            route_points,
+            stored_samples,
+            custom_label,
+        })
+        .map(Some)
+    }
+
+    pub fn get_health_overview(&self) -> Result<HealthOverview> {
+        // 日度指标是设备本地日：「今天」也按设备时区算（见 contract::health_today）。
+        let today = crate::contract::health_today(self.device_time_zone()?.as_deref(), Utc::now());
+        let latest_heart_rate = self.get_latest_heart_rate_sample()?;
+        let current_hr = latest_heart_rate.as_ref().map(|(value, _)| *value);
+        let latest_heart_rate_at = latest_heart_rate.map(|(_, timestamp)| timestamp);
+        let resting_hr = self.latest_daily_i32("resting_hr")?;
+        let hrv = self.latest_metric_f64("hrv")?;
+        let (last_updated, coverage, source_scope) = self.overview_metadata()?;
+        let last_sleep_score = self
+            .get_recent_sleep_sessions(1)?
+            .into_iter()
+            .next()
+            .and_then(|sleep| sleep.score);
+        Ok(HealthOverview {
+            current_hr,
+            resting_hr,
+            hrv,
+            last_sleep_score,
+            readiness: self.latest_daily_f64("readiness")?,
+            bio_charge: self.latest_daily_f64("bio_charge")?,
+            hybrid_charge: self.latest_daily_f64("hybrid_charge")?,
+            training_load: self.latest_daily_f64("training_load")?,
+            vo2max: self.latest_daily_f64("vo2max")?,
+            steps_today: self.latest_daily_i32_for_date("steps", today)?,
+            active_calories_today: self
+                .latest_daily_i32_for_date("active_calories", today)?
+                .or(self.latest_daily_i32_for_date("calories", today)?),
+            latest_heart_rate_at,
+            last_updated,
+            coverage,
+            source_scope,
+        })
+    }
+
+    pub(super) fn overview_metadata(
+        &self,
+    ) -> Result<(Option<String>, Option<Coverage>, Option<String>)> {
+        let last_updated = self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?;
+        // 覆盖的最早/最晚日本地与 local_coverage 同一条链路：对原始列取
+        // MIN/MAX 再换算，能走索引；旧写法是对四张表逐行调 date() 再聚合。
+        let (start, end) = self.coverage_day_bounds()?;
+        // 数据流 = 样本表里的各指标 + 另外三张表各算一条。以前是把四张表的
+        // 每一行 UNION 起来再 COUNT(DISTINCT)，真实库上约 90 ms；现在指标名走
+        // 跳跃扫描，另外三张表只问「有没有」。
+        let mut streams: BTreeSet<String> = self.sample_metric_names()?.into_iter().collect();
+        for (stream, table) in [
+            ("daily_summary", "daily_metrics"),
+            ("sleep", "sleep_sessions"),
+            ("workouts", "workouts"),
+        ] {
+            let present: bool = self.conn.query_row(
+                &format!("SELECT EXISTS(SELECT 1 FROM {table})"),
+                [],
+                |row| row.get(0),
+            )?;
+            if present {
+                streams.insert(stream.to_string());
+            }
+        }
+        let stream_count = streams.len() as i64;
+        // 来源：只需要知道是 0 种、1 种（哪一种）还是「混合」。先看三张小表，
+        // 已经见到两种就不必再碰样本表；否则只找一行「和已见来源不同」的样本。
+        let mut scopes = BTreeSet::<String>::new();
+        for table in ["daily_metrics", "sleep_sessions", "workouts"] {
+            let mut statement = self.conn.prepare(&format!(
+                "SELECT DISTINCT source_scope FROM {table} WHERE source_scope IS NOT NULL"
+            ))?;
+            for scope in statement.query_map([], |row| row.get::<_, String>(0))? {
+                scopes.insert(scope?);
+            }
+        }
+        if scopes.len() < 2 {
+            let other: Option<String> = match scopes.iter().next() {
+                Some(seen) => self.conn.query_row(
+                    "SELECT source_scope FROM metric_samples
+                     WHERE source_scope IS NOT NULL AND source_scope <> ?1 LIMIT 1",
+                    [seen],
+                    |row| row.get(0),
+                ),
+                None => self.conn.query_row(
+                    "SELECT source_scope FROM metric_samples
+                     WHERE source_scope IS NOT NULL LIMIT 1",
+                    [],
+                    |row| row.get(0),
+                ),
+            }
+            .optional()?;
+            if let Some(other) = other {
+                scopes.insert(other);
+                if scopes.len() < 2 {
+                    // 前三张表都空、样本表只见到一种：再确认样本表里没有第二种。
+                    let seen = scopes.iter().next().cloned().unwrap_or_default();
+                    let second: Option<String> = self
+                        .conn
+                        .query_row(
+                            "SELECT source_scope FROM metric_samples
+                             WHERE source_scope IS NOT NULL AND source_scope <> ?1 LIMIT 1",
+                            [&seen],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+                    scopes.extend(second);
+                }
+            }
+        }
+        let scope_count = scopes.len() as i64;
+        let only_scope = scopes.iter().next().cloned();
+        let coverage = match (start, end) {
+            (Some(start), Some(end)) => {
+                let start_date = NaiveDate::parse_from_str(&start, "%Y-%m-%d")
+                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                let end_date = NaiveDate::parse_from_str(&end, "%Y-%m-%d")
+                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                Some(Coverage {
+                    start,
+                    end,
+                    days: (end_date - start_date).num_days() + 1,
+                    streams: stream_count,
+                })
+            }
+            _ => None,
+        };
+        let source_scope = match scope_count {
+            0 => None,
+            1 => only_scope,
+            _ => Some("mixed".to_string()),
+        };
+        Ok((last_updated, coverage, source_scope))
+    }
+}

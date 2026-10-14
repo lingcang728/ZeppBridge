@@ -1,0 +1,80 @@
+/* 交给 AI 横向舞台（2026-10-08）：一行任务头，下面一整块舞台（左牌、中锁、右牌），舞台下一条细的状态行。 */
+.ai-stage-page { display: flex; flex-direction: column; gap: 10px; max-width: 1360px; margin-inline: auto; padding: 12px 32px 28px; }
+.stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 42px; }
+.exchanges-pill { display: inline-flex; align-items: center; gap: 2px; padding: 6px 10px 6px 14px; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 650; text-decoration: none; transition: color var(--dur-base) ease; }
+.exchanges-pill:hover { color: var(--ink); }
+.exchanges-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
+.demo-banner div { display: flex; flex-direction: column; gap: 2px; }
+.demo-banner strong { color: var(--accent); font-size: 12px; font-weight: 650; }
+.demo-banner span { font-size: 11px; }
+/* 右边一组：恢复初始 + 撤销。 */
+.head-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.restore-all { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px 0 11px; border: 0; border-radius: 999px; color: var(--muted);
+  font: 650 var(--fs-xs) var(--font-sans); cursor: pointer; transition: color var(--dur-base) ease, translate 220ms cubic-bezier(.3, 1.3, .5, 1); }
+.restore-all:hover:not(:disabled) { color: var(--ink); translate: 0 -1px; }
+.restore-all:disabled { opacity: .5; cursor: default; }
+.restore-all:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.undo-fade-enter-active, .undo-fade-leave-active { transition: opacity 260ms ease, scale 320ms cubic-bezier(.4, .6, .2, 1); }
+.undo-fade-enter-from, .undo-fade-leave-to { opacity: 0; scale: .92; }
+
+.stage { position: relative; isolation: isolate; width: 100%; min-height: 520px; }
+/* 竖线：贯穿舞台、两头淡掉；窄窗口时是一条横线。 */
+.spine { position: absolute; z-index: 0; pointer-events: none; }
+.stage.row .spine { top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 22% 78%, transparent); }
+.stage.column .spine { left: 0; right: 0; height: 1px; background: linear-gradient(to right, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 20% 80%, transparent); }
+.stage :deep(.threads) { z-index: 0; }
+
+.cloud { position: absolute; inset: 0; z-index: 1; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+/* 拖牌时（及松手后弹回的那一小段）整层牌组升到锁和右牌上面：手里这张不会被右边那张盖住。 */
+.stage.lifted .cloud { z-index: 6; }
+.slot { position: absolute; z-index: 1; pointer-events: auto; touch-action: none; }
+.slot.top { z-index: 2; }
+.slot.is-dragging, .slot.is-landing { z-index: 5; }
+/* 焦点（10-13 重做）：手里这张之外的牌退成**剪影**——变暗、去色、半透明，形状和位置都还看得见；线、锁、右牌淡一档。
+   不再压一整块高斯模糊：那层模糊有四条边，牌被挤出舞台时一道分界线格外明显，周围也全看不清。只动 opacity / filter 的静态值。 */
+.slot-button { transition: opacity 240ms ease, filter 240ms ease; }
+.stage.focusing .slot:not(.is-dragging):not(.is-landing) .slot-button { opacity: .5; filter: grayscale(.9) brightness(.72); }
+.stage :deep(.threads), .lock-host, .stage :deep(.future), .add-row, .spine { transition: opacity 240ms ease; }
+.stage.focusing :deep(.threads .branch:not(.hot)), .stage.focusing :deep(.threads .trunk), .stage.focusing .add-row, .stage.focusing .spine { opacity: .35; }
+.stage.focusing .lock-host, .stage.focusing :deep(.future) { opacity: .55; }
+.slot.is-dragging .slot-button :deep(.scard) { box-shadow: var(--mat-raised-rim), inset 0 0 0 1.5px color-mix(in srgb, var(--tint) 55%, transparent),
+  0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 0 44px -8px color-mix(in srgb, var(--tint) 60%, transparent), 0 38px 56px -24px rgba(0, 0, 0, .85); scale: 1.06; }
+.slot-button { display: block; padding: 0; border: 0; border-radius: calc(var(--card-w) * .11); background: none; color: inherit; font: inherit; cursor: grab;
+  rotate: var(--rot); animation: drift calc(7s + var(--i) * 1.3s) ease-in-out calc(var(--i) * -2.1s) infinite alternate; }
+.slot-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.slot.is-dragging .slot-button { cursor: grabbing; animation-play-state: paused; }
+.slot-button :deep(.scard) { transition: translate 260ms cubic-bezier(.3, 1.3, .5, 1), box-shadow var(--dur-base) ease, scale 220ms ease; }
+.slot-button:hover :deep(.scard) { translate: 0 -6px; }
+/* 像扑克牌在桌上无规则地浮：只动 translate / rotate（合成器）；看不见、汇聚、减少动效时停。 */
+@keyframes drift {
+  0% { translate: 0 0; rotate: var(--rot); }
+  50% { translate: 3px -6px; rotate: calc(var(--rot) + 1.2deg); }
+  100% { translate: -4px 3px; rotate: calc(var(--rot) - 1deg); }
+}
+.stage.paused .slot-button, .stage.gathering .slot-button { animation-play-state: paused; }
+/* 加一类：撒牌区底下一枚小胶囊，不是牌、不进线网（第一轮那张虚线牌横在线中间，打乱了层级）。
+   一类都不剩时，提示跟在胶囊右边同一行（H21）。 */
+.add-row { position: absolute; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cloud-empty { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.add-kind { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px; border: 0; border-radius: 999px;
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font: 600 var(--fs-xs) var(--font-sans); cursor: pointer; transition: color var(--dur-base) ease, translate 220ms cubic-bezier(.3, 1.3, .5, 1); }
+.add-kind:hover { color: var(--ink); translate: 0 -2px; }
+.add-kind:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.add-kind:disabled { opacity: .5; cursor: default; }
+
+.lock-host { position: absolute; z-index: 2; translate: -50% 0; }
+.stage :deep(.future) { z-index: 2; }
+
+.stage-foot { display: grid; gap: 8px; }
+/* 玻璃大卡里换内容（往返记录 → 某一次）：交叉淡化，卡不动。 */
+.sheet-swap-enter-active, .sheet-swap-leave-active { transition: opacity 160ms ease; }
+.sheet-swap-enter-from, .sheet-swap-leave-to { opacity: 0; }
+.stage-foot:empty { display: none; }
+.bridge-message { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--mat-glass); font-size: var(--fs-xs); color: var(--muted); }
+.bridge-message span { flex: 1; }
+
+@media (max-width: 1100px) { .ai-stage-page { padding: 8px 20px 24px; } }
+@media (max-width: 700px) { .ai-stage-page { padding-inline: 12px; } }
+@media (prefers-reduced-motion: reduce) { .slot-button { animation: none; transition: none; } .slot-button :deep(.scard) { transition: none; } }

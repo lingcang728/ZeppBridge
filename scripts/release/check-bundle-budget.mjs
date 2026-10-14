@@ -14,7 +14,7 @@
  *   node scripts/release/check-bundle-budget.mjs           检查
  *   node scripts/release/check-bundle-budget.mjs --update  把当前值写回基线
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -89,6 +89,70 @@ const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
 console.log('首屏加载体积（gzip）');
 for (const item of [...scripts, ...styles]) {
   console.log(`  ${item.href.padEnd(44)} ${kb(item.gzip).padStart(10)}`);
+}
+
+/* index.html 看不到的部分：默认路由（/ → Overview）是 router 里的 import()，
+   它自己和它同步依赖的 chunk 同样在首屏关键路径上。下面把这一层也计入报告。
+   只报告、不设阈值——真正挡回归的仍是上面 initialJs/initialCss 两条线。 */
+const assetDir = join(distDir, 'assets');
+const assetNames = existsSync(assetDir) ? readdirSync(assetDir) : [];
+
+const readAsset = (name) => {
+  const file = join(assetDir, name);
+  if (!existsSync(file)) return null;
+  return { href: `assets/${name}`, gzip: gzipSync(readFileSync(file)).length };
+};
+
+/* 只认同步依赖：from "…" 与裸 import "…" 的相对路径引用。
+   import("…") 动态引用刻意不算——被懒加载挪出关键路径的正是那一部分。 */
+const staticDepsOf = (name) => {
+  const deps = new Set();
+  for (const match of readFileSync(join(assetDir, name), 'utf8')
+    .matchAll(/(?:from\s*|import\s*)["'](\.[^"']+\.js)["']/g)) {
+    deps.add(match[1].replace(/^\.\//, ''));
+  }
+  return [...deps];
+};
+
+const entryNames = new Set(scripts.map((item) => item.href.replace(/^assets\//, '')));
+const routeChunk = assetNames.find((name) => /^Overview-[^/]*\.js$/.test(name));
+const routeDeps = new Set();
+if (routeChunk) {
+  const queue = [routeChunk];
+  while (queue.length) {
+    const name = queue.shift();
+    // 已在入口/modulepreload 里计过的不重复算。
+    if (routeDeps.has(name) || entryNames.has(name)) continue;
+    routeDeps.add(name);
+    queue.push(...staticDepsOf(name));
+  }
+}
+const routeItems = [...routeDeps].map(readAsset).filter(Boolean);
+const routeJsGzip = sum(routeItems);
+const routeCssItems = assetNames
+  .filter((name) => /^Overview-[^/]*\.css$/.test(name))
+  .map(readAsset)
+  .filter(Boolean);
+const routeCssGzip = sum(routeCssItems);
+
+console.log('\n默认路由（/ → Overview）及其同步依赖（同样在首屏关键路径上）');
+if (!routeChunk) {
+  console.log('  未找到 Overview-*.js——路由 chunk 的命名可能变了，这份统计漏掉了它。');
+} else {
+  for (const item of [...routeItems, ...routeCssItems]) {
+    console.log(`  ${item.href.padEnd(44)} ${kb(item.gzip).padStart(10)}`);
+  }
+  const total = `  ${'首屏关键路径合计'.padEnd(44)} ${kb(actual.initialJsGzip + routeJsGzip).padStart(10)} JS + ${kb(actual.initialCssGzip + routeCssGzip)} CSS`;
+  console.log(total);
+}
+
+/* 图表引擎理应永远落在懒加载侧。哪天它出现在上面任何一份清单里，
+   就是有人把图表静态 import 回了首屏。 */
+const chartsChunk = assetNames.find((name) => /^charts-[^/]*\.js$/.test(name));
+if (chartsChunk) {
+  const chartsItem = readAsset(chartsChunk);
+  const onCriticalPath = entryNames.has(chartsChunk) || routeDeps.has(chartsChunk);
+  console.log(`\n图表引擎 chunk：${chartsItem.href} ${kb(chartsItem.gzip)}（${onCriticalPath ? '在首屏关键路径上——回归！' : '懒加载，不在首屏关键路径'}）`);
 }
 
 let failed = false;

@@ -8,6 +8,12 @@
 			"binding": "FEEDBACK_DB",
 			"database_name": "zeppbridge-feedback",
 			"database_id": "0a25f637-ed8f-41ad-9927-2c80cdad5bf2"
+		},
+		{
+			"binding": "OFFICIAL_DB",
+			"database_name": "zeppbridge-official",
+			"database_id": "d44cc752-232c-4b80-ae32-f0fb680d1afd",
+			"migrations_dir": "migrations-official"
 		}
 	]
 }

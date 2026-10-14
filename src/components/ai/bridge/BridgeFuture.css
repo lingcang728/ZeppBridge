@@ -1,0 +1,60 @@
+.bridge-future { position: relative; display: grid; gap: 12px; min-width: 0; }
+.week-track { justify-self: start; }
+
+/* 一格一列：日期 → 形状 → 名字 → 时长，谁都不压谁。 */
+.future-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; touch-action: pan-y; }
+.future-days.flipped { animation: week-in 550ms cubic-bezier(.4, .6, .2, 1) both; }
+.future-day { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; min-height: 214px; padding: 12px 10px 12px;
+  border: 1px solid transparent; border-radius: 16px; background: color-mix(in srgb, var(--ink) 3%, transparent); color: var(--ink); font: inherit;
+  text-align: left; text-decoration: none; cursor: pointer; transition: background var(--dur-base) ease, border-color var(--dur-base) ease, scale var(--dur-base) var(--ease-spring); }
+.future-day:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.future-day:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.future-day.today { border-color: color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+.day-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; min-width: 0; }
+.day-head b { font-size: 26px; font-weight: 750; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.day-head small { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.today .day-head b, .today .day-head small { color: var(--accent); }
+.today-tag { align-self: center; margin-left: auto; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent); font-size: var(--fs-2xs); font-style: normal; font-weight: 700; }
+
+.day-art { display: grid; flex: 1 1 auto; align-items: end; justify-items: center; min-height: 64px; }
+.day-art :deep(.shape) { width: 100%; height: 38px; }
+.rest .day-art { align-items: center; }
+.held-mark { display: grid; justify-items: center; gap: 4px; color: var(--warning); }
+.held-mark small { color: var(--ink); font-size: var(--fs-2xs); font-weight: 650; }
+
+.day-name { display: -webkit-box; overflow: hidden; min-height: 2.8em; color: var(--ink); font-size: var(--fs-xs); font-weight: 650; line-height: 1.4;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.rest .day-name { color: var(--muted); font-weight: 550; }
+.day-foot { display: flex; align-items: baseline; gap: 4px; min-height: 22px; color: var(--muted); font-size: var(--fs-2xs); white-space: nowrap; }
+.day-foot b { color: var(--ink); font-size: var(--fs-md); font-weight: 700; font-variant-numeric: tabular-nums; }
+.day-foot.sleep { align-items: center; color: var(--sleep); font-variant-numeric: tabular-nums; }
+.day-foot.badge { align-items: center; align-self: flex-start; padding: 2px 8px; border-radius: 999px; font-weight: 650; white-space: normal; }
+.day-foot.warn { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+.day-foot.bad { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.stamp { position: absolute; right: 10px; bottom: 12px; display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); animation: stamp-in 280ms var(--ease-spring) both; animation-delay: calc(var(--i) * 40ms); }
+
+/* 跟手拖拽：被拖的卡浮起来（只加阴影和一点放大，位移由 useDayDrag 写 translate）。 */
+.future-day.lifted { z-index: 3; scale: 1.04; background: var(--mat-raised); box-shadow: var(--mat-raised-rim), 0 14px 30px -14px rgba(0, 0, 0, .55); cursor: grabbing; }
+.future-day.is-target { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+.future-days.is-dragging .future-day:not(.lifted) { cursor: grabbing; }
+
+/* 底栏只留长按发送。 */
+.future-footer { display: flex; justify-content: flex-end; }
+.hold-button { position: relative; display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 16px 0 38px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--mat-raised); box-shadow: var(--mat-raised-rim); color: var(--ink); font: 600 var(--fs-xs) var(--font-sans); cursor: pointer; touch-action: none; user-select: none; }
+.hold-button > svg:first-child { position: absolute; top: 2px; left: 3px; width: 30px; height: 30px; fill: none; stroke: var(--line); stroke-width: 2; }
+.hold-button > svg:nth-child(2) { position: absolute; left: 11px; color: var(--accent); }
+.hold-button circle.progress { stroke: var(--accent); stroke-dasharray: 81.7; stroke-dashoffset: calc(81.7 * (1 - var(--progress))); transform: rotate(-90deg); transform-origin: center; }
+.hold-button:disabled { opacity: .4; cursor: default; }
+
+.future-empty { position: relative; display: grid; place-items: center; height: 214px; }
+.future-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; opacity: .5; pointer-events: none; }
+.future-grid i { border-radius: 16px; background: color-mix(in srgb, var(--ink) 3%, transparent); }
+
+@keyframes week-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+@keyframes stamp-in { from { opacity: 0; transform: scale(1.6) rotate(-15deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .future-days, .stamp { animation: none; } .future-day { transition: none; } }
+@media (max-width: 900px) { .future-days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

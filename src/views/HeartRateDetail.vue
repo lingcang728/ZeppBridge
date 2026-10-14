@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { displayDateTimeFormatter } from '../lib/dateTime';
+import { useFirstLoad } from '../composables/useFirstLoad';
 
 defineOptions({ name: 'HeartRateDetail' });
 /**
@@ -12,156 +13,45 @@ defineOptions({ name: 'HeartRateDetail' });
  * 没有采样的时间段不画线，也不补 0——曲线断开就是断开。
  */
 import { computed, onMounted, ref, watch } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import MetricInfoButton from '../components/MetricInfoButton.vue';
+import SwapChart from '../components/SwapChart.vue';
+import { trendGridStyle } from '../lib/trendGrid';
+import { useQueuedOption } from '../composables/useQueuedOption';
+import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
-import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { axisInk, zeppSemanticColors, zeppThemeDark } from '../lib/echartsTheme';
-import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
-import { isFiniteNumber } from '../lib/format';
+import { isDesktop, toUserMessage } from '../lib/bridge';
+import { heartPageQueries } from '../lib/pageQueries';
+import { cached, peekAll } from '../lib/readCache';
+import { afterMotion } from '../lib/motion/budget';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
+import { metricColor } from '../lib/metricTone';
+import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
+import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
+import { metricInfo } from '../lib/metricInfo';
+import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
-import { defineMessages, useMessages } from '../i18n';
+import { useMessages } from '../i18n';
+import { heartRateDetailMessages as messages } from './HeartRateDetail.i18n';
 
-const messages = defineMessages(
-  {
-    backToOverview: '返回概览',
-    eyebrow: '心率',
-    title: '心率',
-    intro: '上面是最近 24 小时的全天曲线；7 天 / 1 个月 / 6 个月只改下面的按天趋势。没有采样的时间不画线，也不补 0。',
-    rangeAria: '趋势时间范围',
-    trendRangeLabel: '趋势范围',
-    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
-    loadFailed: '心率数据暂时不可用',
-    dayFailed: '最近 24 小时心率暂时读不到。',
-    dailyMaxFailed: '每日最高心率暂时读不到。',
-    trendsFailed: '静息心率与 HRV 趋势暂时读不到。',
-    retry: '重试',
-    loadingAria: '正在加载心率',
-    dayCardAria: '24 小时心率',
-    dayTitle: '最近 24 小时',
-    daySub: '逐条读数，按时间排列',
-    statLatest: '最新',
-    statAverage: '平均',
-    statLowest: '最低',
-    statHighest: '最高',
-    chartAria: '最近 24 小时心率曲线',
-    noSamples: '最近 24 小时没有心率采样，所以这里不画曲线。',
-    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> 次/分`,
-    restingLabel: '静息心率',
-    restingHint: '手表每天给出的静息心率，越稳越好',
-    hrvHint: '逐条 HRV 读数按天平均',
-    rmssdHint: '另一种 HRV 口径，和上面不是同一个数',
-    emptyCard: '这段范围没有记录。',
-    dailyMaxTitle: '每日最高心率（本机原始样本）',
-    dailyMaxSub: 'Zepp App 显示的日最高心率是过滤过的，这里不过滤——两个数字不一样是正常的。',
-    dailyMaxAria: '每日最高心率趋势',
-    dailyMaxNone: '这段范围里本机没有心率样本，所以没有可比的最高值。',
-    dailyMaxSparse: (days: number) =>
-      `其中 ${days} 天的样本很少（少于 60 个）。那几天的「最高」只是这几个点里的最高，不是那一天真正的峰值——图上用空心点标出。`,
-    dailyMaxLegendMax: '最高',
-    dailyMaxLegendAvg: '平均',
-    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
-      `${date}<br/>最高 <b>${max}</b> 次/分<br/>平均 ${avg} 次/分<br/>${samples} 个样本`,
-    dailyMaxNote: '这里只用本机存着的原始逐条读数。Zepp 自己的日最高心率没有被采集进来（库里那个 device_max_hr 是手表的最大心率设定值，用来划分区间，不是当天实测峰值），所以无法在应用内并排对照——要核对请打开 Zepp App 看那一天的数字。',
-  },
-  {
-    backToOverview: 'Back to overview',
-    eyebrow: 'Heart rate',
-    title: 'Heart rate',
-    intro: 'The full-day curve above is always the last 24 hours; 7 days / 1 month / 6 months only change the day-by-day trends below. Stretches without samples are left blank, not filled with a zero.',
-    rangeAria: 'Trend time range',
-    trendRangeLabel: 'Trend range',
-    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
-    loadFailed: 'Heart rate data is unavailable right now',
-    dayFailed: 'Could not read the last 24 hours of heart rate.',
-    dailyMaxFailed: 'Could not read daily peak heart rate.',
-    trendsFailed: 'Could not read resting heart rate and HRV trends.',
-    retry: 'Try again',
-    loadingAria: 'Loading heart rate',
-    dayCardAria: '24-hour heart rate',
-    dayTitle: 'Last 24 hours',
-    daySub: 'Individual readings, in time order',
-    statLatest: 'Latest',
-    statAverage: 'Avg',
-    statLowest: 'Min',
-    statHighest: 'Max',
-    chartAria: 'Heart rate over the last 24 hours',
-    noSamples: 'No heart rate samples in the last 24 hours, so there is no curve to draw.',
-    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
-    restingLabel: 'Resting heart rate',
-    restingHint: 'The watch reports one per day; steadier is better',
-    hrvHint: 'Individual HRV readings, averaged per day',
-    rmssdHint: 'A different HRV measure, not the same number as above',
-    emptyCard: 'Nothing recorded in this range.',
-    dailyMaxTitle: 'Daily peak heart rate (raw samples on this machine)',
-    dailyMaxSub: 'The Zepp app filters its daily peak; this does not. The two numbers differing is expected.',
-    dailyMaxAria: 'Daily peak heart rate trend',
-    dailyMaxNone: 'No heart rate samples on this machine for this range, so there is no peak to compare.',
-    dailyMaxSparse: (days: number) =>
-      `${days} of these days have very few samples (fewer than 60). On those days the peak is the highest of just those points, not that day real peak — they are drawn as hollow markers.`,
-    dailyMaxLegendMax: 'Peak',
-    dailyMaxLegendAvg: 'Average',
-    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
-      `${date}<br/>Peak <b>${max}</b> bpm<br/>Average ${avg} bpm<br/>${samples} samples`,
-    dailyMaxNote: 'This uses only the raw per-reading samples stored on this machine. The Zepp daily peak is never sent to us (the device_max_hr in the library is the configured maximum used for zone limits, not a measured peak), so there is nothing to place beside it here — open the Zepp app to compare that day number.',
-  },
-  {
-    backToOverview: 'Volver al resumen',
-    eyebrow: 'Frecuencia cardíaca',
-    title: 'Frecuencia cardíaca',
-    intro: 'La curva de todo el día de arriba es siempre las últimas 24 horas; 7 días / 1 mes / 6 meses solo cambian las tendencias diarias de abajo. Los tramos sin muestras quedan en blanco, no se rellenan con cero.',
-    rangeAria: 'Rango de tiempo de la tendencia',
-    trendRangeLabel: 'Rango de tendencia',
-    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
-    loadFailed: 'Los datos de frecuencia cardíaca no están disponibles en este momento',
-    dayFailed: 'No se pudo leer la frecuencia cardíaca de las últimas 24 horas.',
-    dailyMaxFailed: 'No se pudo leer la frecuencia cardíaca máxima diaria.',
-    trendsFailed: 'No se pudieron leer las tendencias de frecuencia en reposo y VFC.',
-    retry: 'Reintentar',
-    loadingAria: 'Cargando la frecuencia cardíaca',
-    dayCardAria: 'Frecuencia cardíaca de 24 horas',
-    dayTitle: 'Últimas 24 horas',
-    daySub: 'Lecturas individuales, en orden cronológico',
-    statLatest: 'Última',
-    statAverage: 'Prom.',
-    statLowest: 'Mín.',
-    statHighest: 'Máx.',
-    chartAria: 'Frecuencia cardíaca de las últimas 24 horas',
-    noSamples: 'No hay muestras de frecuencia cardíaca en las últimas 24 horas, así que no hay curva que trazar.',
-    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> lpm`,
-    restingLabel: 'Frecuencia cardíaca en reposo',
-    restingHint: 'El reloj reporta una por día; cuanto más estable, mejor',
-    hrvHint: 'Lecturas individuales de VFC, promediadas por día',
-    rmssdHint: 'Otra medida de VFC, no es el mismo número que la de arriba',
-    emptyCard: 'No hay nada registrado en este rango.',
-    dailyMaxTitle: 'Frecuencia cardíaca máxima diaria (muestras originales en este equipo)',
-    dailyMaxSub: 'La app Zepp filtra su máximo diario; esto no. Que los dos números sean distintos es lo esperado.',
-    dailyMaxAria: 'Tendencia de la frecuencia cardíaca máxima diaria',
-    dailyMaxNone: 'No hay muestras de frecuencia cardíaca en este equipo para este rango, así que no hay máximo que comparar.',
-    dailyMaxSparse: (days: number) =>
-      `${days} de estos días tienen muy pocas muestras (menos de 60). En esos días el máximo es el más alto de solo esos puntos, no el máximo real del día; se dibujan con marcadores huecos.`,
-    dailyMaxLegendMax: 'Máximo',
-    dailyMaxLegendAvg: 'Promedio',
-    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
-      `${date}<br/>Máximo <b>${max}</b> lpm<br/>Promedio ${avg} lpm<br/>${samples} muestras`,
-    dailyMaxNote: 'Esto usa solo las muestras originales de cada lectura guardadas en este equipo. El máximo diario de Zepp nunca nos llega (el device_max_hr de la biblioteca es el máximo configurado para los límites de zonas, no un máximo medido), así que no hay nada que poner al lado aquí: abre la app Zepp para comparar el número de ese día.',
-  },
-  'views/HeartRateDetail',
-);
 const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
-const TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
-
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
-const series = ref<Record<string, MetricSeries>>({});
+const rangeDays = useTrendRange();
+/* 趋势一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+trackRangeSwap(rangeDays);
 const dayPoints = ref<HeartRatePoint[]>([]);
 /*
  * 每日最高心率（Reddit p74fy0b：Zepp App 显示 104，原始数据峰值超过 120）。
@@ -171,13 +61,23 @@ const dayPoints = ref<HeartRatePoint[]>([]);
  * 是这块表的最大心率设定值（划分区间用的），不是当天实测峰值。把它当成对照
  * 的另一半，就是又造一个「界面上有个数但它不是你以为的意思」。
  */
-const dailyExtremes = ref<DailyHeartRateExtreme[]>([]);
+const fullExtremes = ref<DailyHeartRateExtreme[]>([]);
+const dailyExtremes = computed(() => sliceByDate(fullExtremes.value, rangeDays.value));
 /** 少于这个样本数的一天，它的 max 不能当成完整峰值看。 */
 const SPARSE_SAMPLE_THRESHOLD = 60;
 const sparseDays = computed(
   () => dailyExtremes.value.filter((day) => day.samples < SPARSE_SAMPLE_THRESHOLD).length,
 );
 const loading = ref(true);
+// 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
+const preloaded = isDesktop() ? peekAll(heartPageQueries()) : null;
+if (preloaded) {
+  dayPoints.value = preloaded[0];
+  fullSeries.value = indexSeries(preloaded[1]);
+  fullExtremes.value = preloaded[2];
+  loading.value = false;
+}
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const dayError = ref<string | null>(null);
 const trendsError = ref<string | null>(null);
@@ -207,15 +107,16 @@ const clock = (value: number) => displayDateTimeFormatter({
 const dayChartOption = computed(() => {
   const data = insertNullBreaks(points.value, HR_GAP_BREAK_MS);
   return {
-    animationDuration: 700,
+    // 不扫入：这张图每次进页面都是新建的，从左往右画一遍读起来就是「心率又重画了」。
+    animationDuration: 0,
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: zeppThemeDark.tooltip.backgroundColor,
-      borderColor: zeppThemeDark.tooltip.borderColor,
+      backgroundColor: chartPalette.value.tooltipBg,
+      borderColor: chartPalette.value.tooltipBorder,
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: zeppThemeDark.tooltip.textStyle.color, fontSize: 15.5 },
+      textStyle: { color: chartPalette.value.tooltipText, fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
       formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
@@ -227,24 +128,24 @@ const dayChartOption = computed(() => {
       type: 'time',
       min: data[0]?.[0],
       max: data[data.length - 1]?.[0],
-      axisLabel: { formatter: clock, hideOverlap: true, color: axisInk, fontSize: 14.5 },
-      axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
+      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value', scale: true, splitNumber: 4,
-      axisLabel: { color: axisInk, fontSize: 14.5 },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.gridSoft, type: 'dashed' } },
     },
     series: [{
       type: 'line',
       data,
       smooth: 0.18,
       showSymbol: false,
-      lineStyle: { width: 1.6, color: zeppSemanticColors.heart },
-      areaStyle: { color: 'rgba(240,97,106,.12)' },
+      lineStyle: { width: 1.6, color: chartPalette.value.series.heart },
+      areaStyle: { color: `${chartPalette.value.series.heart}1F` },
       connectNulls: false,
     }],
   };
@@ -254,24 +155,21 @@ const trendCards = computed(() => [
   {
     metric: 'resting_hr',
     label: t.value.restingLabel,
-    hint: t.value.restingHint,
-    color: zeppSemanticColors.readiness,
+    color: metricColor('resting_hr'),
     unit: 'bpm',
     series: series.value.resting_hr ?? null,
   },
   {
     metric: 'hrv',
     label: 'HRV (SDNN)',
-    hint: t.value.hrvHint,
-    color: zeppSemanticColors.pace,
+    color: metricColor('hrv'),
     unit: 'ms',
     series: series.value.hrv ?? null,
   },
   {
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
-    hint: t.value.rmssdHint,
-    color: zeppSemanticColors.calories,
+    color: metricColor('hrv_rmssd'),
     unit: 'ms',
     series: series.value.hrv_rmssd ?? null,
   },
@@ -294,17 +192,18 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
   extremesError.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     if (daySeq !== null) dayPoints.value = [];
-    dailyExtremes.value = [];
+    fullExtremes.value = [];
     if (daySeq !== null) loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
+  const [dayQuery, trendsQuery, extremesQuery] = heartPageQueries();
   const [day, trends, extremes] = await Promise.allSettled([
-    trendsOnly ? Promise.resolve(dayPoints.value) : backend.getHeartRateSeries(24),
-    backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
-    backend.getDailyHeartRateExtremes(rangeDays.value),
+    trendsOnly ? Promise.resolve(dayPoints.value) : cached(dayQuery),
+    cached(trendsQuery),
+    cached(extremesQuery),
   ]);
   const dayCommitted = daySeq !== null && dayLoadSeq.isCurrent(daySeq);
   if (dayCommitted) {
@@ -314,8 +213,8 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
   }
   const trendsCommitted = loadSeq.isCurrent(seq);
   if (trendsCommitted) {
-    series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
-    dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
+    fullSeries.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
+    fullExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
     trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
     extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
   }
@@ -330,12 +229,11 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
 const dailyMaxChartOption = computed(() => {
   const rows = dailyExtremes.value;
   return {
-    animationDuration: 700,
     grid: { left: 40, right: 12, top: 28, bottom: 26 },
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
       top: 0,
-      textStyle: { color: axisInk, fontSize: 14.5 },
+      textStyle: { color: chartPalette.value.axis, fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -348,17 +246,17 @@ const dailyMaxChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: rows.map((row) => row.date.slice(5)),
-      axisLabel: { color: axisInk, fontSize: 14.5, hideOverlap: true },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
-      axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      axisLabel: { color: axisInk, fontSize: 14.5 },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.grid, type: 'dashed' } },
     },
     series: [
       {
@@ -367,13 +265,13 @@ const dailyMaxChartOption = computed(() => {
         data: rows.map((row) => row.max),
         showSymbol: true,
         symbolSize: 6,
-        lineStyle: { width: 2.2, color: zeppSemanticColors.heart },
+        lineStyle: { width: 2.2, color: chartPalette.value.series.heart },
         itemStyle: {
           color: (params: { dataIndex: number }) =>
             (rows[params.dataIndex]?.samples ?? 0) < SPARSE_SAMPLE_THRESHOLD
               ? 'transparent'
-              : zeppSemanticColors.heart,
-          borderColor: zeppSemanticColors.heart,
+              : chartPalette.value.series.heart,
+          borderColor: chartPalette.value.series.heart,
           borderWidth: 1.6,
         },
       },
@@ -382,24 +280,46 @@ const dailyMaxChartOption = computed(() => {
         type: 'line',
         data: rows.map((row) => row.average),
         showSymbol: false,
-        lineStyle: { width: 1.4, type: 'dashed', color: 'rgba(226, 234, 242, .45)' },
+        lineStyle: { width: 1.4, type: 'dashed', color: chartPalette.value.mark },
       },
     ],
   };
 });
 
-onMounted(() => { void load(); });
-watch(rangeDays, () => { void load({ trendsOnly: true }); });
+/* 和趋势卡同一条队：切范围时一帧只换一张图（见 useQueuedOption）。 */
+const shownDailyMax = useQueuedOption(dailyMaxChartOption);
+
+// 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });
+
+const trendsSummary = computed(() => trendCards.value.map((card) => card.label).join(' · '));
+/* 近 6 个月一条读数都没有的趋势收成一行（U09）；按整段定，切范围时卡片不增减。 */
+const everMeasured = (metric: string) => (fullSeries.value[metric]?.points.length ?? 0) > 0;
+const shownTrendCards = computed(() => (trendsError.value
+  ? trendCards.value
+  : trendCards.value.filter((card) => everMeasured(card.metric))));
+const missingTrends = computed(() => (trendsError.value ? [] : trendCards.value
+  .filter((card) => !everMeasured(card.metric))
+  .map((card) => ({ key: card.metric, label: card.label, detail: metricInfo(card.metric)?.what }))));
+/* 「最近 24 小时」写出实际覆盖到的时刻（U11）：没戴表的那几个小时不算进去。 */
+const daySpan = computed(() => {
+  const first = points.value[0];
+  const last = points.value[points.value.length - 1];
+  if (!first || !last) return null;
+  const from = new Date(first.ts);
+  const to = new Date(last.ts);
+  const sameDay = from.toDateString() === to.toDateString();
+  const fromText = formatWhen(from.toISOString());
+  const toText = sameDay ? formatTime(to.toISOString()) : formatWhen(to.toISOString());
+  return fromText && toText ? `${fromText} – ${toText}` : null;
+});
 </script>
 
 <template>
   <section class="page metric-page" aria-labelledby="hr-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="hr-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     />
@@ -409,16 +329,19 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
-      <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
-    </div>
+    <!-- 骨架换成内容时交叉淡化：骨架原地钉住淡掉，内容同时在底下出现（从卡展开进来时不等数据）。 -->
+    <Transition name="skeleton-out" @before-leave="holdInPlace">
+      <div v-if="initialLoading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
+        <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
+      </div>
+    </Transition>
 
-    <template v-else>
+    <template v-if="!initialLoading">
       <section class="surface-card day-card" :aria-label="t.dayCardAria">
         <header class="day-head">
           <div>
-            <h2>{{ t.dayTitle }}</h2>
-            <p>{{ t.daySub }}</p>
+            <h2>{{ t.dayTitle }}<MetricInfoButton metric="heart_rate_24h" :label="t.dayTitle" /></h2>
+            <p>{{ daySpan ?? t.daySub }}</p>
           </div>
           <dl class="day-stats">
             <div><dt>{{ t.statLatest }}</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
@@ -430,6 +353,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="points.length"
           class="day-chart"
+          :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="dayChartOption"
           autoresize
@@ -446,101 +370,55 @@ watch(dataRevision, () => { void load(); });
 
       <!-- 24 小时曲线不跟这个开关走。放在大图下面，才不会让人以为
            切 7 天 / 1 个月会改那张全天图。 -->
-      <div class="range-toolbar">
-        <p class="range-label">{{ t.trendRangeLabel }}</p>
-        <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-          <button
-            v-for="range in ranges"
-            :key="range.days"
-            type="button"
-            role="radio"
-            :aria-checked="rangeDays === range.days"
-            :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-            @click="rangeDays = range.days"
-          >{{ range.label }}</button>
-        </div>
-      </div>
+      <TrendRangeBar />
 
-      <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
-        <header class="day-head">
-          <div>
-            <h2>{{ t.dailyMaxTitle }}</h2>
-            <p>{{ t.dailyMaxSub }}</p>
+      <!-- 每日最高心率、静息心率与 HRV 趋势直接摊开：点进这一页就是来看它们的。 -->
+          <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
+            <header class="day-head">
+              <div>
+                <h2>{{ t.dailyMaxTitle }}<MetricInfoButton metric="daily_max_hr" :label="t.dailyMaxTitle" /></h2>
+              </div>
+            </header>
+            <SwapChart
+              v-if="dailyExtremes.length"
+              class="day-chart"
+              :option="shownDailyMax"
+              :aria-label="t.dailyMaxAria"
+            />
+            <p v-else-if="extremesError" class="inline-alert" role="alert">
+              <Icon name="warning" :size="14" />{{ extremesError }}
+            </p>
+            <p v-else class="inline-alert" role="status">
+              <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
+            </p>
+            <p v-if="sparseDays" class="inline-alert" role="status">
+              <Icon name="info" :size="14" />{{ t.dailyMaxSparse(sparseDays) }}
+            </p>
+            <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
+          </section>
+        <SectionGroup :title="t.trendsTitle" :summary="trendsSummary" icon="resting-heart-rate" tone="heart">
+          <p v-if="trendsError" class="inline-alert" role="alert">
+            <Icon name="warning" :size="14" />{{ trendsError }}
+          </p>
+          <div v-if="shownTrendCards.length" class="trend-grid" :style="trendGridStyle(shownTrendCards.length)">
+            <MetricTrendCard
+              v-for="card in shownTrendCards"
+              :key="card.metric"
+              :label="card.label"
+              :info="card.metric"
+              :series="card.series"
+              :color="card.color"
+              :unit="card.unit"
+              :decimals="0"
+              :empty-text="trendsError ?? undefined"
+            />
           </div>
-        </header>
-        <VChart
-          v-if="dailyExtremes.length"
-          class="day-chart"
-          :theme="CHART_THEME"
-          :option="dailyMaxChartOption"
-          autoresize
-          role="img"
-          :aria-label="t.dailyMaxAria"
-        />
-        <p v-else-if="extremesError" class="inline-alert" role="alert">
-          <Icon name="warning" :size="14" />{{ extremesError }}
-        </p>
-        <p v-else class="inline-alert" role="status">
-          <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
-        </p>
-        <p v-if="sparseDays" class="inline-alert" role="status">
-          <Icon name="info" :size="14" />{{ t.dailyMaxSparse(sparseDays) }}
-        </p>
-        <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
-      </section>
+          <MissingMetricsRow :items="missingTrends" />
+        </SectionGroup>
 
-      <p v-if="trendsError" class="inline-alert" role="alert">
-        <Icon name="warning" :size="14" />{{ trendsError }}
-      </p>
-      <div class="card-grid">
-        <MetricTrendCard
-          v-for="card in trendCards"
-          :key="card.metric"
-          :label="card.label"
-          :hint="card.hint"
-          :series="card.series"
-          :color="card.color"
-          :unit="card.unit"
-          :decimals="0"
-          :empty-text="trendsError || t.emptyCard"
-        />
-      </div>
     </template>
   </section>
 </template>
 
-<style scoped>
-.metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.stack { display: grid; gap: var(--space-4); }
-.range-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.day-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
-.day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-.day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
-.day-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.day-stats { display: flex; gap: 18px; margin: 0; }
-.day-stats div { display: grid; gap: 2px; }
-.day-stats dt { color: var(--subtle); font-size: var(--fs-xs); }
-.day-stats dd { margin: 0; color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; font-family: var(--font-mono); }
-.day-chart { width: 100%; height: 240px; }
-/* 说明为什么这个数字和 Zepp App 里的不一样。少了它，用户只会以为其中一边坏了。 */
-.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
-.inline-alert[role='alert'] { color: var(--danger); }
-.retry { margin-left: auto; }
-@media (max-width: 720px) {
-  .card-grid { grid-template-columns: minmax(0, 1fr); }
-  .day-stats { gap: 12px; }
-}
-</style>
+<style scoped src="./dayPanel.css"></style>
+<style scoped src="./HeartRateDetail.css"></style>

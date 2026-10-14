@@ -78,4 +78,26 @@ describe('insertSleepStageGaps', () => {
     );
     expect(gapped.map((slice) => slice.tone)).toEqual(['deep', 'light']);
   });
+
+  it('clips overlaps and coalesces adjacent slices of the same stage', () => {
+    expect(insertSleepStageGaps([
+      { tone: 'light', start: 3_000, end: 7_000 },
+      { tone: 'deep', start: -1_000, end: 3_500 },
+      { tone: 'light', start: 7_000, end: 8_000 },
+      { tone: 'rem', start: 7_500, end: 9_000 },
+    ], 0, 10_000)).toEqual([
+      { tone: 'deep', start: 0, end: 3_500 },
+      { tone: 'light', start: 3_500, end: 8_000 },
+      { tone: 'rem', start: 8_000, end: 9_000 },
+      { tone: 'unknown', start: 9_000, end: 10_000 },
+    ]);
+  });
+
+  it('keeps a genuine short stage rather than deleting it', () => {
+    expect(insertSleepStageGaps([
+      { tone: 'light', start: 0, end: 5_000 },
+      { tone: 'awake', start: 5_000, end: 5_100 },
+      { tone: 'light', start: 5_100, end: 10_000 },
+    ], 0, 10_000)).toHaveLength(3);
+  });
 });

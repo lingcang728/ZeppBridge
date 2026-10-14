@@ -120,3 +120,64 @@ test('linux packages are optional, and marked preview when present', () => {
   // Windows 和 macOS 不是 preview。
   assert.equal(result.downloads.windowsExe.preview, undefined);
 });
+
+// 一个按 URL 存取的最小 caches.default：够验证「上一次成功的结果」和「查询参数不进缓存键」。
+const memoryCache = () => {
+  const store = new Map();
+  return {
+    store,
+    async match(request) { const hit = store.get(request.url); return hit ? hit.clone() : undefined; },
+    async put(request, response) { store.set(request.url, response.clone()); },
+  };
+};
+const run = async (url) => {
+  const pending = [];
+  const response = await onRequestGet({ request: new Request(url), waitUntil(p) { pending.push(p); } });
+  await Promise.all(pending);
+  return response;
+};
+
+test('when GitHub fails, the last good release is served instead of telling visitors nothing is released', async (context) => {
+  const cache = memoryCache();
+  globalThis.caches = { default: cache }; context.after(() => { delete globalThis.caches; });
+  context.mock.method(globalThis, 'fetch', async () => Response.json(releaseFixture()));
+  assert.equal((await run('https://zeppbridge.com/api/release')).status, 200);
+
+  cache.store.delete('https://zeppbridge.com/api/release'); // 5 分钟的正常缓存过期了
+  context.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 403 }));
+  const stale = await run('https://zeppbridge.com/api/release');
+  assert.equal(stale.status, 200);
+  assert.equal(stale.headers.get('x-release-stale'), '1');
+  assert.equal((await stale.json()).version, '1.1.2');
+});
+
+test('a query string cannot bypass the cache and burn the GitHub quota', async (context) => {
+  globalThis.caches = { default: memoryCache() }; context.after(() => { delete globalThis.caches; });
+  const github = context.mock.method(globalThis, 'fetch', async () => Response.json(releaseFixture()));
+  await run('https://zeppbridge.com/api/release?a=1');
+  const first = github.mock.callCount();
+  await run('https://zeppbridge.com/api/release?b=2');
+  assert.equal(github.mock.callCount(), first, 'the second query string is served from cache');
+});
+
+test('installers come from latest.json + SHA256SUMS.txt when the GitHub API refuses Cloudflare', async (context) => {
+  const sums = [
+    'aa'.repeat(32) + '  ZeppBridge_3.0.0_x64-setup.exe',
+    'bb'.repeat(32) + '  ZeppBridge_3.0.0_x64_en-US.msi',
+    'cc'.repeat(32) + '  ZeppBridge_3.0.0_aarch64.dmg',
+    'dd'.repeat(32) + '  ZeppBridge_3.0.0_amd64.deb',
+    'ee'.repeat(32) + '  latest.json',
+  ].join('\n');
+  context.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).endsWith('/releases/latest/download/latest.json')) return Response.json({ version: '3.0.0', pub_date: '2026-10-15T00:00:00Z' });
+    if (String(url).endsWith('/releases/latest/download/SHA256SUMS.txt')) return new Response(sums);
+    return new Response(null, { status: 403 }); // api.github.com
+  });
+  const response = await onRequestGet({ request: new Request('https://zeppbridge.com/api/release'), waitUntil() {} });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.version, '3.0.0');
+  assert.equal(payload.downloads.windowsExe.url, 'https://github.com/lingcang728/ZeppBridge/releases/download/v3.0.0/ZeppBridge_3.0.0_x64-setup.exe');
+  assert.equal(payload.downloads.macosDmg.digest, `sha256:${'cc'.repeat(32)}`);
+  assert.equal(payload.downloads.linuxDeb.preview, true);
+});

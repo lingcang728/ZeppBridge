@@ -48,18 +48,7 @@ npm run version:check   # are the eight version numbers consistent
 npm run budget:check    # first-screen size budget (build first)
 npm run i18n:check      # no hardcoded Chinese; backend codes have English copy
 npm run docs:check      # repo-internal documentation links resolve
-npm run verify:login-probe  # real browser; not part of CI, see below
 ```
-
-`npm run verify:login-probe` pulls the two scripts ZeppBridge injects into the
-sign-in window straight out of `src-tauri/src/commands/login.rs` and runs them in
-a real browser: an untouched page reads as idle, a typed or autofilled field does
-not, and a one-time code typed inside a **cross-origin iframe** still reaches the
-top frame. Those three answers are the entire basis for deciding whether the
-window may be navigated away, and no Rust test can reach them — a wrong answer
-puts the user back where 1.1.4 was, thrown out mid sign-in. It needs a local
-Chromium (it reuses an installed Chrome or Edge), so CI does not run it; run it
-whenever either script changes.
 
 `npm test` concentrates on one rule: **missing must never be displayed as 0**. A
 card reading "0 minutes of sleep" is far more dangerous than "—", because users
@@ -81,8 +70,6 @@ explain why in the commit.
 ```powershell
 npm run tauri dev
 npm run tauri build
-.\scripts\windows\start-dev.bat
-.\scripts\windows\build.bat
 ```
 
 `npm run package:release` runs the full `tauri build` and, on success, calls
@@ -161,7 +148,6 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `save_auth` | Save auth metadata and the token | The token goes to Windows Credential Manager; the host is re-validated by the connector |
 | `verify_auth` | A real heart-rate request over the last two hours | Accepts only structured JSON and explicit success codes; 401/403 requires re-authentication |
 | `clear_auth` | Invalidate the sign-in session and clear credentials | The health database is kept |
-| `import_from_har` | Extract credentials from a HAR the user exported | Must contain an `api-mifit*` request carrying `apptoken`; then takes the same save path as `save_auth` |
 | `manual_auth` | Enter token / user id / region host by hand | A wrapper over `save_auth`, with identical boundaries |
 | `start_history_sync` | Fetch the 1–365 days the user chose | Defaults to 30 days; emits progress events and can be cancelled |
 | `start_incremental_sync` | Incremental with a 30-day overlap (`contract::INCREMENTAL_SYNC_DAYS`) | Only for verified connections; triggered by the top bar, auto-sync or the tray |
@@ -174,17 +160,13 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `get_workout_series` | Read decoded run samples/route/pauses | Empty arrays when there are no points; nothing is invented |
 | `get_heart_rate_series` | Time-series points for the overview charts | Read hourly / daily from the local database; no samples means an empty array |
 | `get_metric_series` | The per-day curves for `/body` and `/training` | Answers only metric names on the `SERIES_METRICS` allow-list, skipping others; returns `days_with_data` and never pads missing days with 0 |
-| `get_training_balance` | 7-day / 28-day load and the acute:chronic ratio | Sums `workouts.training_load` by local start date, shared with the `training_load_balance` export. Coverage requires a fully fetched and persisted workout list and valid loads for every workout. Only confirmed empty days count as zero. Incomplete 7/28-day totals are `null`; the ratio requires both complete windows and positive chronic load. Existing history needs a new sync to establish this evidence |
+| `get_training_balance` | 7-day / 28-day load and the acute:chronic ratio | Sums `workouts.training_load` by local start date, shared with the `training_load_balance` export. Coverage requires a fully fetched and persisted legacy workout list and valid loads for every workout; official API workouts carry no load and never establish coverage. Only confirmed empty days count as zero. Incomplete 7/28-day totals are `null`; the ratio requires both complete windows and positive chronic load. Existing history needs a new sync to establish this evidence |
 | `get_heart_rate_zones` | Every state of the heart-rate zone selector | All bases are measured and carry their source and measurement date; `report` is `null` until an algorithm is chosen |
 | `set_heart_rate_zone_preference` | Record the chosen algorithm and basis | All four slots may be `null` — "not decided yet" has to be storable |
 | `get_device_profile` / `get_device_profiles` | Read recognised device profiles | From `catalog.json` compiled into the binary; an unrecognised device is never guessed |
 | `get_storage_estimate` | Estimate local database size and reclaimable space | Read-only, computed per day |
 | `reprocess_local_data` | Replay local raw with the current parser | No network, and the cloud sync time is unchanged; returns per-stream replay counts |
-| `get_export_json` | Produce the export JSON string | Reads local data only, per `ExportSelection` |
-| `save_json_export` | Save the export to a file | The path is checked by `validate_export_path(.., "json")` |
-| `save_csv_export` | Save a long-format summary CSV | Reuses the same normalised JSON and converts it; `record_count` is the number of data rows; excludes per-point series and tracks |
-| `save_gpx_export` | Save a GPX 1.1 track | Only workouts with a decoded route become tracks; with no points at all it errors rather than writing an empty file; heart rate is written only when timestamps match exactly |
-| `publish_ai_export` | Update the local `exports/zeppbridge-ai-feed.json` | Fixed path, atomic write |
+| `save_fit_export` | Save the selected workouts as FIT files in a folder | One file per workout; always reads the full per-second series; no series at all is an error, not an empty folder. JSON / CSV / GPX file export lives in the CLI (`zeppbridge-cli export`) |
 | `prepare_ai_handoff` | Build the redacted package for an external AI | Reuses the same export builder, then redacts recursively; over 2 MiB it writes a desktop file instead; precise tracks require an explicit opt-in |
 | `get_local_api_status` | Read the local REST API state and fixed address | A port conflict does not stop the desktop app from starting |
 | `cleanup_old_data` | Clean up old data by day count | `1–365` days; spans canonical tables and reclaims unreferenced raw |
@@ -249,9 +231,10 @@ IDs, the generic 500, and the no-CORS boundary.
    time. Expression unique indexes handle `NULL device_id`, and canonical rows
    keep `raw_record_id`. Migrations start only after the cross-process write
    lock is held and a pre-upgrade backup exists.
-7. `SyncManager` uses a run lock against in-process concurrency and additionally
-   takes the cross-process write lock, so the desktop app and the CLI never
-   write the same database at once. A core stream failure sets `success=false`,
+7. `SyncManager` uses a run lock against in-process concurrency and a
+   cross-process sync lease for the whole run, so the desktop app and the CLI
+   never sync at once; it takes the cross-process write lock only around the
+   stretches that write (`write_db`), never across network I/O. A core stream failure sets `success=false`,
    optional streams show `unavailable`/`unverified`, and retention runs after a
    success (skipped while long-term archiving is on).
 8. The fetch, parse and write stages are recorded separately in
@@ -266,8 +249,8 @@ IDs, the generic 500, and the no-CORS boundary.
   turn missing data into `0`.
 - Check `Date.getTime()` before formatting a time. Errors should keep actionable
   information rather than silently swallowing a string.
-- Use the design tokens in `App.vue`'s `:root` (the single source of truth; the
-  interface is dark only, with no light branch), `focus-visible`, semantic
+- Use the design tokens in `src/styles/tokens.css` (the single source of truth,
+  one set of values per theme; components never branch on the theme), `focus-visible`, semantic
   elements, ARIA and a 44px minimum touch target. The mobile breakpoint is
   currently 760px. See the [UI guidelines](ui-guidelines.md).
 - Backend prose is never rendered raw: the interface renders from the stable
@@ -285,7 +268,7 @@ IDs, the generic 500, and the no-CORS boundary.
 5. `cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets`
 6. `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings`
 7. `cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1`
-8. `npm run package:release` (or `cmd.exe /d /c scripts\windows\build.bat`), then
+8. `npm run package:release`, then
    confirm `release\ZeppBridge.exe` and the current version's NSIS/MSI are
    updated and the previous version's installers are gone.
 9. Double-click the desktop or Start menu ZeppBridge shortcut and confirm it

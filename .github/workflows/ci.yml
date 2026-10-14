@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # v3 是 3.0 的私有 beta 分支（代码审查 E01）：推上来只跑三平台的检查 / 测试和 Docker 自检。
+    # 打包、签名、建 Release 的作业都只认 `v*` tag 或手动触发，v3 的 push 碰不到它们。
+    branches: [main, v3]
     tags: ['v*']
   pull_request:
     branches: [main]
@@ -336,10 +338,15 @@ jobs:
   package:
     name: Package Windows installers
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout
@@ -359,6 +366,13 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # zeppbridge-mcp 作为 sidecar 随安装包放到 exe 旁边（3B 打包决定），设置卡据此
+      # 给出带真实路径的连接命令。externalBin 只在打包时用 --config 叠上，见
+      # scripts/release/stage-mcp-sidecar.ps1。
+      - name: Stage MCP sidecar
+        shell: pwsh
+        run: ./scripts/release/stage-mcp-sidecar.ps1
 
       - name: Build and bundle (NSIS + MSI)
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
@@ -381,7 +395,7 @@ jobs:
           $attempts = 3
           for ($i = 1; $i -le $attempts; $i++) {
             Write-Host "== tauri build attempt $i/$attempts =="
-            npm run tauri build
+            npm run tauri build -- --config src-tauri/tauri.sidecar.conf.json
             if ($LASTEXITCODE -eq 0) { exit 0 }
             if ($i -lt $attempts) {
               Write-Host "attempt $i failed (exit $LASTEXITCODE); retrying in 20s"
@@ -419,6 +433,16 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/publish-local.ps1 -SkipShortcuts -SkipStaleInstall
 
+      # 便携版的静默更新包：ZeppBridge.exe + zeppbridge-mcp.exe 的 zip，签名后写进
+      # latest.json 的 windows-x86_64-portable 条目。便携版不走 NSIS，应用自己原地换 exe
+      # （src-tauri/src/updates/portable.rs）；少了这一条，便携版永远拿不到更新。
+      - name: Package portable update
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: pwsh
+        run: ./scripts/release/package-portable.ps1
+
       # CLI 与 MCP 单独分发：需要它们的人不该被迫先装一个 GUI，
       # 装了 GUI 的人也不该被塞进两个用不到的 binary。
       - name: Package CLI and MCP tools
@@ -435,6 +459,7 @@ jobs:
           path: |
             release/ZeppBridge_*-setup.exe
             release/ZeppBridge_*.msi
+            release/ZeppBridge_*_x64-portable.zip
             release/zeppbridge-tools-*.zip
             release/latest.json
           if-no-files-found: error
@@ -443,10 +468,15 @@ jobs:
   package-macos:
     name: Package macOS bundle
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-macos
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout
@@ -466,13 +496,19 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # 和 Windows 一样带上 zeppbridge-mcp：装在 ZeppBridge.app/Contents/MacOS/ 里、
+      # 主程序旁边，设置「交给 AI 工具」卡据此给出带真实路径的连接命令。
+      - name: Stage MCP sidecar
+        shell: pwsh
+        run: ./scripts/release/stage-mcp-sidecar.ps1
+
       - name: Build and bundle (app + dmg)
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
         # The bundle is ad-hoc signed: no Apple Developer ID, no notarization.
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build -- --bundles app,dmg
+        run: npm run tauri build -- --config src-tauri/tauri.sidecar.conf.json --bundles app,dmg
 
       - name: Collect macOS artifacts
         shell: bash
@@ -513,10 +549,15 @@ jobs:
   package-linux:
     name: Package Linux bundles
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-linux
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout
@@ -550,6 +591,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # deb / rpm 把 zeppbridge-mcp 装到 /usr/bin、主程序旁边。AppImage 里也会带一份，
+      # 但它每次启动挂到新的 /tmp/.mount_*，路径记不住：应用在 AppImage 里不给路径
+      # （ai_clients.rs 的 running_from_appimage），界面指向单独的工具包。
+      - name: Stage MCP sidecar
+        shell: pwsh
+        run: ./scripts/release/stage-mcp-sidecar.ps1
+
       # deb/rpm/appimage 三样都出。三种发行版家族，不要求用户去转换包格式。
       #
       # `--config src-tauri/tauri.linux.conf.json` 把 createUpdaterArtifacts
@@ -569,6 +617,7 @@ jobs:
           for attempt in 1 2 3; do
             if npm run tauri build -- \
               --config src-tauri/tauri.linux.conf.json \
+              --config src-tauri/tauri.sidecar.conf.json \
               --bundles deb,rpm,appimage; then
               exit 0
             fi
@@ -880,6 +929,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           : > SHA256SUMS.txt
           for file in release/ZeppBridge_*-setup.exe release/ZeppBridge_*.msi \
+                      release/ZeppBridge_*_x64-portable.zip \
                       release/zeppbridge-tools-*.zip release-macos/zeppbridge-tools-*.zip \
                       release-linux/zeppbridge-tools-*.zip \
                       "release-macos/ZeppBridge_${version}_aarch64.dmg" \
@@ -900,6 +950,7 @@ jobs:
           subject-path: |
             release/ZeppBridge_*-setup.exe
             release/ZeppBridge_*.msi
+            release/ZeppBridge_*_x64-portable.zip
             release/zeppbridge-tools-*.zip
             release-macos/zeppbridge-tools-*.zip
             release-macos/ZeppBridge_*.dmg
@@ -930,6 +981,7 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             release/ZeppBridge_*-setup.exe \
             release/ZeppBridge_*.msi \
+            release/ZeppBridge_*_x64-portable.zip \
             release/zeppbridge-tools-*.zip \
             release-macos/zeppbridge-tools-*.zip \
             release-linux/zeppbridge-tools-*.zip \

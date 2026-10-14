@@ -22,16 +22,16 @@ describe('backend errors in the English interface', () => {
   it('prefers the code over the backend prose', () => {
     const error = backendError('err.sync.not_connected', '尚未连接 Zepp，请先完成连接');
     const shown = toUserMessage(error);
-    expect(shown).toBe('Not connected to Zepp yet. Connect first');
+    expect(shown).toBe('Not connected to Zepp yet — connect first');
     expect(shown).not.toMatch(/[一-鿿]/);
   });
 
   it('localises the failure that used to strand people at sign-in', () => {
     const error = backendError(
       'err.login.credentials_unreadable',
-      '已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。',
+      '已经登录，但没能从登录窗口读到凭据。可以改用手动填写 App Token。',
     );
-    expect(toUserMessage(error)).toContain('HAR import');
+    expect(toUserMessage(error)).toContain('Enter an App Token manually');
   });
 
   it('falls back to the backend text when a code is unknown', () => {
@@ -47,9 +47,9 @@ describe('backend errors in the English interface', () => {
   it('localises DesktopUnavailableError instead of dropping it at the CJK gate', () => {
     expect(toUserMessage(new DesktopUnavailableError())).toBe('Use the desktop app');
     setLocale('es');
-    expect(toUserMessage(new DesktopUnavailableError())).toBe('Usa la app de escritorio');
+    expect(toUserMessage(new DesktopUnavailableError())).toBe('Requiere la app de escritorio');
     setLocale('zh');
-    expect(toUserMessage(new DesktopUnavailableError())).toBe('请使用桌面应用');
+    expect(toUserMessage(new DesktopUnavailableError())).toBe('需要桌面应用');
   });
 
   it('switches with the interface language', () => {
@@ -62,10 +62,10 @@ describe('backend errors in the English interface', () => {
   it('resolves every code through errorTextFor in both languages', () => {
     setLocale('en');
     expect(errorTextFor('err.core.network')).toBe(
-      "Couldn't reach the Zepp region. Check your network and try again",
+      'Could not reach the Zepp region — check your network and retry',
     );
     setLocale('zh');
-    expect(errorTextFor('err.core.network')).toBe('无法连接 Zepp 区域，请检查网络后重试');
+    expect(errorTextFor('err.core.network')).toBe('连不上 Zepp 区域，检查网络后重试');
     expect(errorTextFor(undefined)).toBeUndefined();
     expect(errorTextFor('err.not.a.real.code')).toBeUndefined();
   });

@@ -10,6 +10,9 @@
 # 例：
 # lib/labels.fallbackNameZepp
 
+# Shared punctuation in translated lists and sentences
+components/MissingMetricsRow.separator
+
 # pt-BR
 components/HeartRateZonePicker.basesSeparator
 components/HeartRateZonePicker.zeroMinutes
@@ -17,7 +20,6 @@ components/HistoryArchivePanel.streamSeparator
 components/StageBar.zeroMinutes
 components/WeeklyReportCard.metric.weekly.hrv
 components/overview/HeartRateCard.bpm
-composables/useExport.typePai
 composables/useSyncController.streamSeparator
 lib/labels.fallback.badminton
 lib/sleepStages.rem
@@ -47,6 +49,19 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.chartAltitude
 views/WorkoutDetail.unitKcal
+components/plan/plan.minuteUnit
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_min
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.unit_score
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
+components/overview/DataReadyCapsule.streamSeparator
+views/WorkoutDetail.routeModeLocal
 
 # nl
 components/DevicePicker.filterBand
@@ -56,10 +71,6 @@ components/HeartRateZonePicker.modelGroup
 components/MetricTrendCard.minimum
 components/MetricTrendCard.maximum
 components/WeeklyReportCard.metric.weekly.stress
-composables/useExport.groupContext
-composables/useExport.typeStress
-composables/useExport.groupTraining
-composables/useExport.unitRecords
 lib/labels.fallback.yoga
 lib/labels.providerZeppCloud
 views/BodyStatus.stressLabel
@@ -73,6 +84,10 @@ views/WorkoutDetail.statMin
 views/WorkoutDetail.statMax
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.eyebrowExport
+components/overview/DataReadyCapsule.streamSeparator
+composables/useFocusAreas.areaTraining
+views/settings/sections/archive.details
+components/tour/tour.inviteLater
 
 # de
 components/DeviceVisual.ring
@@ -83,9 +98,7 @@ components/WeeklyReportCard.metric.weekly.hrv
 components/WeeklyReportCard.metric.weekly.stress
 components/overview/HeartRateCard.bpm
 components/shell/AppTopBar.themeSystem
-composables/useExport.groupTraining
-composables/useExport.typePai
-composables/useExport.typeStress
+composables/useFocusAreas.areaTraining
 composables/useSyncController.streamSeparator
 lib/labels.fallback.badminton
 lib/labels.fallback.walking
@@ -99,14 +112,12 @@ lib/units.short
 lib/units.shortImperial
 views/ActivityDetail.caloriesUnit
 views/ActivityDetail.distanceUnit
-views/AiComposer.detailStandard
 views/AiHandoffPreview.promptTitle
 views/BodyStatus.bmiLabel
 views/BodyStatus.stressLabel
 views/BodyStatus.unitGram
 views/BodyStatus.unitKcal
 views/DeviceDetail.factFirmware
-views/Explore.categoryTraining
 views/HealthCheck.period
 views/HealthCheck.sourceSeparator
 views/HealthCheck.stage.ok
@@ -122,6 +133,8 @@ views/Settings.stream.pai
 views/Settings.stream.stress
 views/Settings.stream.vo2max
 views/Settings.unidentifiedInitial
+views/settings/sections/advanced.compactMore
+views/settings/sections/archive.details
 views/SleepDetail.deviceFirmware
 views/SleepDetail.deviceName
 views/SleepList.scoreLabel
@@ -129,16 +142,34 @@ views/TrainingStatus.paiLabel
 views/WorkoutDetail.eyebrowExport
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.unitKcal
+components/ai/HandoffTray.detailStandard
+lib/aiTask/metrics.bmi
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.hybrid_charge
+lib/aiTask/metrics.mental_charge
+lib/aiTask/metrics.physical_charge
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.spo2
+lib/aiTask/metrics.stress
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
+views/settings/deck.themeLabel
+views/settings/deck.themeSystem
+components/overview/DataReadyCapsule.streamSeparator
+components/workout/WorkoutClimbsCard.pace
 
 # fr
+views/settings/sections/maintenance.secMaintenance
 views/Settings.unidentifiedInitial
 components/InsightCard.metric.run.distance
 components/orbit/OrbitCanvas.stateCandidate
 views/ActivityDetail.distanceLabel
 views/WorkoutList.labelDistance
 views/SleepDetail.sourceTitle
-views/AiComposer.optionsTitle
-views/AiComposer.detailStandard
 views/AiHandoffPreview.colSources
 views/HealthCheck.factSources
 views/OrbitLab.categories.personal_note
@@ -148,6 +179,8 @@ views/WorkoutDetail.chartCadence
 views/WorkoutDetail.eyebrowProvenance
 views/WorkoutDetail.provenanceTitle
 views/WorkoutDetail.provenanceAria
+components/overview/DataReadyCapsule.streamSeparator
+views/WorkoutDetail.routeModeLocal
 
 # pt-PT
 components/BackupPanel.kind.manual
@@ -158,8 +191,6 @@ components/StageBar.zeroMinutes
 components/WeeklyReportCard.metric.weekly.hrv
 components/WeeklyReportCard.metric.weekly.stress
 components/overview/HeartRateCard.bpm
-composables/useExport.typePai
-composables/useExport.typeStress
 composables/useSyncController.streamSeparator
 lib/labels.providerZeppCloud
 lib/sleepStages.rem
@@ -177,7 +208,6 @@ views/BodyStatus.unitScore
 views/BodyStatus.unitKcal
 views/BodyStatus.unitGram
 views/DeviceDetail.factFirmware
-views/Explore.promptEditor
 views/HealthCheck.period
 views/HealthCheck.sourceSeparator
 views/HealthCheck.stage.ok
@@ -193,9 +223,23 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.unitKcal
 views/WorkoutDetail.chartAltitude
-
-# 各语言通用（单位缩写本来就不翻）
-views/Overview.bpm
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.hybrid_charge
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.stress
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_min
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
+components/overview/DataReadyCapsule.streamSeparator
+components/overview/PinnedMetrics.unitBpm
+components/overview/PinnedMetrics.unitKcal
+components/overview/PinnedMetrics.unitMin
+components/plan/plan.minuteUnit
+views/WorkoutDetail.routeModeLocal
 
 # ru
 components/HeartRateZonePicker.basesSeparator
@@ -207,3 +251,86 @@ views/HealthCheck.period
 views/HealthCheck.sourceSeparator
 views/Overview.factSpo2
 views/Settings.refreshFailedPeriod
+components/overview/DataReadyCapsule.streamSeparator
+
+# hi-IN
+components/overview/DataReadyCapsule.streamSeparator
+
+# 生活事件分类短名：荷兰语、德语里 Routine / Training 本来就这么写
+lib/lifeEvents.categoryShort.routine
+lib/lifeEvents.categoryShort.training
+
+# 置顶指标的名字和单位：和详情页卡片同一个说法（views/* 里同名的叶子也在本清单里）
+components/overview/PinnedMetrics.names.hrv
+components/overview/PinnedMetrics.names.hrv_rmssd
+components/overview/PinnedMetrics.names.vo2max
+components/overview/PinnedMetrics.names.pai_total
+components/overview/PinnedMetrics.names.stress
+components/overview/PinnedMetrics.names.bmi
+components/overview/PinnedMetrics.unitPai
+components/overview/PinnedMetrics.unitScore
+# Shared unit abbreviations and cognates kept identical across locales
+components/plan/editor.minutes
+components/plan/editor.seconds
+components/plan/editor.km
+components/plan/editor.hundredMeters
+components/plan/editor.sportLabel
+components/plan/editor.nameLabel
+# Shared duration abbreviations used across locales
+lib/format.hourUnit
+lib/format.minutesUnit
+components/ai/bridge/bridge.unitMin
+
+# 单位与运动名称借词/专有名词（7 种语言通用借词与标准单位）
+lib/aiTask/metrics.unit_per_min
+lib/aiTask/metrics.unit_s_per_km
+lib/workoutNames.aerobics
+lib/workoutNames.badminton
+lib/workoutNames.ballet
+lib/workoutNames.baseball
+lib/workoutNames.basketball
+lib/workoutNames.bmx
+lib/workoutNames.bocce
+lib/workoutNames.bouldering
+lib/workoutNames.bowling
+lib/workoutNames.breaking
+lib/workoutNames.bridge
+lib/workoutNames.cricket
+lib/workoutNames.curling
+lib/workoutNames.darts
+lib/workoutNames.floorball
+lib/workoutNames.flowriding
+lib/workoutNames.frisbee
+lib/workoutNames.futsal
+lib/workoutNames.gateball
+lib/workoutNames.hacky_sack
+lib/workoutNames.handball
+lib/workoutNames.hiit
+lib/workoutNames.hip_hop
+lib/workoutNames.jai_alai
+lib/workoutNames.judo
+lib/workoutNames.karate
+lib/workoutNames.kendo
+lib/workoutNames.kickboxing
+lib/workoutNames.muay_thai
+lib/workoutNames.parkour
+lib/workoutNames.pilates
+lib/workoutNames.pole_dance
+lib/workoutNames.rucking
+lib/workoutNames.sepak_takraw
+lib/workoutNames.shuffleboard
+lib/workoutNames.skateboarding
+lib/workoutNames.snorkeling
+lib/workoutNames.softball
+lib/workoutNames.spinning
+lib/workoutNames.squash
+lib/workoutNames.stepper
+lib/workoutNames.taekwondo
+lib/workoutNames.tai_chi
+lib/workoutNames.tennis
+lib/workoutNames.volleyball
+lib/workoutNames.wall_ball
+lib/workoutNames.weiqi
+lib/workoutNames.yoga
+lib/workoutNames.zumba
+components/ai/stage/stage.facePlan

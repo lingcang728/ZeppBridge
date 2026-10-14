@@ -1,0 +1,58 @@
+/* 牌桌（精修批次 7.2，10-07 第二轮）：整屏一层，底下一层静态毛玻璃 + 暗色（只淡入淡出它自己的 opacity，
+   不逐帧改 blur；模糊画在这一层自己身上，祖先不做 opacity 动画——否则 Chromium 会把它当成取样边界，淡入期间看不到模糊）。 */
+.card-table { position: fixed; inset: 0; z-index: 2000; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px;
+  padding: 26px clamp(16px, 4vw, 56px) 22px; color: var(--ink); }
+/* 收牌途中让点击落到底下的页面：再点一下来处 = 原路扇回来（reopen）。 */
+.card-table.closing { pointer-events: none; }
+.table-backdrop { position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 70%), rgba(6, 8, 12, .62);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
+/* 深一层：更重的静态模糊 + 更暗，平时透明；牌飞进箱子时淡进来再淡回去（只动 opacity）。 */
+.table-backdrop.deep { opacity: 0; pointer-events: none; background: rgba(6, 8, 12, .32); -webkit-backdrop-filter: blur(40px) saturate(1.1); backdrop-filter: blur(40px) saturate(1.1); }
+:root[data-theme='light'] .table-backdrop.deep { background: rgba(236, 240, 233, .3); }
+/* 退到后面的那一层换成的静态模糊拷贝（lib/motion/cards/camera.ts）。 */
+.table-layer.blurred-copy { pointer-events: none; }
+:root[data-theme='light'] .table-backdrop:not(.deep) { background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%), rgba(236, 240, 233, .62); }
+.table-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.table-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 13px;
+  background: color-mix(in srgb, var(--tint) 18%, var(--mat-inset)); color: var(--tint); box-shadow: var(--mat-inset-shadow); }
+.table-titles { flex: 1 1 auto; min-width: 0; }
+.table-titles h2 { margin: 0; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.2; letter-spacing: -.01em; }
+.table-titles p { margin: 3px 0 0; color: var(--muted); font-size: var(--fs-sm); }
+.table-titles b { color: var(--accent); font-weight: 650; }
+.table-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--mat-glass-line); border-radius: 999px;
+  background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
+  color: var(--ink); cursor: pointer; transition: transform 160ms ease; }
+.table-icon:hover { transform: scale(1.06); }
+.table-icon:active { transform: scale(.94); }
+.table-icon:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.table-stage { position: relative; min-height: 0; }
+.table-layer { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 18px; margin: auto; padding: 12px 8px; }
+.table-layer[inert] { pointer-events: none; }
+.table-layer.pending { visibility: hidden; }
+/* 牌位：翻面确认的那张左右的牌往两边让一点（独立的 translate，不冲掉扇面的 transform）。 */
+.pslot { position: relative; display: block; flex: 0 0 auto; transition: translate 280ms cubic-bezier(.3, 1.2, .5, 1); }
+.pslot.shift-l { translate: -14px 0; }
+.pslot.shift-r { translate: 14px 0; }
+/* 按住一叠时其余的叠微微变暗。 */
+.table-layer.holding .pslot:not(.is-holding) :deep(.pcard) { opacity: .62; }
+:deep(.pcard.lifting .pcard-face) { transform: translateY(-14px) scale(1.06); }
+/* 拖着的牌（1B·B3）：抬起一点、投影加深；叠在下面的牌不接点击；悬在能叠的牌上时那张亮一圈。 */
+:deep(.pcard.dragging) { cursor: grabbing; scale: 1.05; will-change: translate; }
+:deep(.pcard.dragging .pcard-face) { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 44px 56px -24px rgba(0, 0, 0, .95); }
+:deep(.pcard.buried) { cursor: default; }
+:deep(.pcard.drop-target .pcard-face) { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--tint), 0 0 26px 2px color-mix(in srgb, var(--tint) 45%, transparent); }
+.table-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
+.table-foot { min-height: 0; }
+/* 右下角的收集箱是 fixed 的：提示条给它让出一块（德 / 俄的箱子标签更长，D9）。够宽时左右对称让，居中不偏。 */
+@media (min-width: 701px) { .table-foot { padding-right: 240px; } }
+@media (min-width: 1200px) { .table-foot { padding-inline: 240px; } }
+/* 窄窗口：收集箱在右下角，底部提示抬到它上方。 */
+@media (max-width: 700px) {
+  .card-table { padding-bottom: 88px; }
+}
+@media (max-width: 640px) {
+  .card-table { padding: 18px 16px 88px; }
+  .table-head { flex-wrap: wrap; }
+  .table-layer { gap: 12px; }
+}

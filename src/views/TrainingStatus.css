@@ -1,0 +1,56 @@
+/* TrainingStatus.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
+.training-page.page { display: grid; gap: var(--space-4); align-content: start; }
+
+/* 与 MetricTrendCard 同一种有厚度的板：不描边、同样的圆角、内边距和卡头高度。 */
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px 18px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+.chart-card.wide { padding: 20px 24px 18px; }
+.chart-head { display: flex; min-height: 70px; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.chart-title { display: grid; gap: 2px; min-width: 0; }
+.chart-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
+.chart-title small { color: var(--subtle); font-size: var(--fs-xs); }
+.chart-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.chart-latest b { color: var(--ink); font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
+.chart-latest b.hr { color: var(--heart); }
+/* 乳酸阈卡（MetricTrendCard 的 #latest / #chart 插槽）：心率红、配速蓝，没有曲线时的说明撑满曲线那一格。 */
+.hr { color: var(--heart); }
+.pace { color: var(--pace); }
+.trend-grid .chart-empty { height: 100%; min-height: 0; margin: 0; }
+.chart-latest b.pace { color: var(--pace); }
+.chart-latest i { margin-right: 8px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
+.chart-latest i:last-child { margin-right: 0; }
+.latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
+.chart-body { width: 100%; height: 172px; margin-top: var(--space-2); flex: 1 1 auto; min-height: 172px; }
+.chart-body.tall { height: 236px; }
+.chart-empty {
+  display: flex;
+  align-items: center;
+  min-height: 172px;
+  margin: var(--space-2) 0 0;
+  color: var(--subtle);
+  font-size: var(--fs-sm);
+}
+.chart-note { margin: var(--space-2) 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
+/* 页面级的提示条：细线描边、无底无投影。卡片材质只给主信息区。 */
+.inline-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+.retry { margin-left: auto; }
+@media (max-width: 720px) {
+  .chart-card.wide { padding: var(--space-4); }
+}

@@ -39,10 +39,7 @@ npm run preview    # 预览 dist（不会连接账户数据）
 npm test           # Vitest：src/lib 的纯函数层
 npm run version:check   # 七处版本号是否一致
 npm run budget:check    # 首屏体积预算（需要先 build）
-npm run verify:login-probe  # 真实浏览器；不进 CI，见下
 ```
-
-`npm run verify:login-probe` 直接从 `src-tauri/src/commands/login.rs` 里抠出注入登录窗口的那两段脚本，放进真实浏览器跑：没人碰过的页面读作空闲，输入过或被自动填充过的不是，**跨源 iframe** 里输入的验证码也要能报到顶层。这三个答案就是「能不能把登录窗口导走」的全部依据，而 Rust 测试够不到它们——答错一个，用户就回到 1.1.4 那个下场：登录到一半被扔出去。它需要本机 Chromium（会复用已装的 Chrome 或 Edge），所以 CI 不跑；改动这两段脚本时手动跑一次。
 
 `npm test` 集中在一条规则上：**缺失不能被显示成 0**。「0 分钟睡眠」的卡片比「—」危险得多，用户会拿它当真实读数。刻意不做组件快照——它会在每次调样式时红掉，于是被习惯性 `-u` 掉，最后既挡不住回归也没人再看。
 
@@ -55,8 +52,6 @@ npm run verify:login-probe  # 真实浏览器；不进 CI，见下
 ```powershell
 npm run tauri dev
 npm run tauri build
-.\scripts\windows\start-dev.bat
-.\scripts\windows\build.bat
 ```
 
 `npm run package:release` 会跑完整 `tauri build`，成功后再调用 `scripts\windows\publish-local.ps1`：
@@ -110,7 +105,6 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `save_auth` | 保存认证元数据和 token | token 进入 Windows Credential Manager；host 由连接器再次校验 |
 | `verify_auth` | 最近两小时真实心率请求 | 只接受结构化 JSON 和明确成功代码；401/403 需要重新认证 |
 | `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
-| `import_from_har` | 从用户自己导出的 HAR 里抽取凭据 | 必须含 `api-mifit*` 请求且带 `apptoken`；随后走 `save_auth` 同一条保存路径 |
 | `manual_auth` | 手动输入 token / user id / region host | 只是 `save_auth` 的包装，边界完全相同 |
 | `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
 | `start_incremental_sync` | 7 天 overlap 增量 | 仅已验证连接可用；顶栏/自动同步/托盘触发 |
@@ -123,17 +117,13 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
 | `get_heart_rate_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
 | `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
-| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 按本地开始日期累加 `workouts.training_load`，与导出 `training_load_balance` 共用；覆盖要求运动列表完整同步且每次运动负荷有效，只有确认无运动才为零；7/28 天窗口不完整时相应负荷为 `null`，两个窗口完整且慢性负荷大于零才给比值；旧数据需重新同步建立完整性证据 |
+| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 按本地开始日期累加 `workouts.training_load`，与导出 `training_load_balance` 共用；覆盖要求旧通道运动列表完整同步且每次运动负荷有效，官方接口的运动没有负荷、不建立覆盖；只有确认无运动才为零；7/28 天窗口不完整时相应负荷为 `null`，两个窗口完整且慢性负荷大于零才给比值；旧数据需重新同步建立完整性证据 |
 | `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |
 | `set_heart_rate_zone_preference` | 记录用户选的算法与基准 | 四个槽位都可为 `null`——「还没决定」必须能存回去 |
 | `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |
 | `get_storage_estimate` | 估算本地库体积与可清理量 | 只读，按天计算 |
 | `reprocess_local_data` | 用当前解析器重放本地 raw | 不触网，不改云端同步时间；返回各 stream 重放条数 |
-| `get_export_json` | 生成导出 JSON 字符串 | 只按 `ExportSelection` 取本地数据 |
-| `save_json_export` | 另存导出文件 | 路径经 `validate_export_path(.., "json")` 校验 |
-| `save_csv_export` | 另存长表 CSV（汇总） | 复用同一份标准化 JSON 再转换；`record_count` 是数据行数；不含逐点序列与轨迹 |
-| `save_gpx_export` | 另存 GPX 1.1 轨迹 | 只有解码出 route 的运动才成轨；一个点都没有时报错而不是写空文件；心率仅在时间戳完全一致时写入 |
-| `publish_ai_export` | 更新本机 `exports/zeppbridge-ai-feed.json` | 固定路径，原子写 |
+| `save_fit_export` | 把选中的运动写成 FIT，一次运动一个文件 | 总是读完整逐秒序列；一条序列都没有时报错而不是留空目录。JSON / CSV / GPX 落盘走 CLI（`zeppbridge-cli export`） |
 | `prepare_ai_handoff` | 生成交给外部 AI 的脱敏数据包 | 复用同一 export builder 后再做递归脱敏；> 2 MiB 改写桌面文件；精确轨迹需显式开启 |
 | `get_local_api_status` | 读取本机 REST API 启动状态与固定地址 | 端口冲突不会阻止桌面 App 启动 |
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
@@ -167,7 +157,7 @@ API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
 6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前值见 `storage/mod.rs` 的 `CURRENT_SCHEMA_VERSION`；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
-7. `SyncManager` 用 run lock 防止进程内并发，并额外获取跨进程写锁，因此桌面应用和 CLI 不会同时写同一个库；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
+7. `SyncManager` 用 run lock 防止进程内并发，全程持有跨进程同步租约，因此桌面应用和 CLI 不会同时同步；跨进程写锁只在真正写库的那几段拿（`write_db`），联网期间从不占着；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
 8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
 
 ## 前端开发约定
@@ -175,7 +165,7 @@ API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，
 - 页面通过 `tauriApi` / `backend` 调用 command，不直接访问 Zepp。
 - 空值显示 `—`、`未记录` 或明确的空状态；不要把缺失数据变成 `0`。
 - 时间格式化前检查 `Date.getTime()`；错误应保留可操作信息，不要静默吞掉字符串。
-- 使用 `App.vue` `:root` 里的设计 token（唯一来源，界面统一深色，不做浅色分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
+- 使用 `src/styles/tokens.css` 里的设计 token（唯一来源，深浅两套各一份值，组件不按主题分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
 - `index.html` 的语言为 `zh-CN`，标题为 `ZeppBridge · 健康数据`；当前没有把默认 Vite 图标当成产品 favicon 的验收证据。
 
 ## 推荐验收顺序
@@ -187,7 +177,7 @@ API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，
 5. `cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets`
 6. `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings`
 7. `cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1`
-8. `npm run package:release`（或 `cmd.exe /d /c scripts\windows\build.bat`），确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
+8. `npm run package:release`，确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
 7. 双击桌面或开始菜单的 ZeppBridge 快捷方式，确认打开的是 `release\ZeppBridge.exe`；再确认产品名/标识、首次启动恢复、设置页网页登录 command。
 
 第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。真实 Zepp 网页登录以及多区域、多设备数据仍需按环境分别验证。

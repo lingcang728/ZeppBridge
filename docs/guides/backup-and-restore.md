@@ -82,7 +82,8 @@ Data from before you installed ZeppBridge does not appear on its own.
 "Long-term archive" and "history backfill" cover the two halves of the timeline:
 
 - **Long-term archive** covers the right-hand half — from today on, a successful
-  sync no longer prunes history by the retention window.
+  sync no longer prunes history by the retention window. You turn it on by
+  picking **Forever** under **Archive and storage → Keep data for**.
 - **History backfill** covers the left-hand half — fetching records from before
   you installed ZeppBridge.
 
@@ -117,7 +118,7 @@ no conclusion yet. It does not start over, and it does not create duplicates.
 
 If the backfill range reaches outside your local retention window and long-term
 archiving is off, the app stops the backfill up front and tells you to either
-turn archiving on or lengthen the retention.
+pick **Forever** or lengthen the retention.
 
 Fetching three years of history and having the next successful sync delete it is
 the most trust-destroying thing this app could do — so that combination is

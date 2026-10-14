@@ -1,7 +1,7 @@
 //! Evidence for complete workout days, independent of generic daily metrics.
 //! Versioned app metadata avoids interpreting older, weaker coverage ledgers.
 use super::*;
-use crate::fetcher::FetchedRecord;
+use crate::fetcher::{sport_history_key, FetchedRecord};
 use chrono::TimeZone;
 
 const PREFIX: &str = "workout_day_complete_v1:";
@@ -16,6 +16,13 @@ pub(crate) struct WorkoutDayEvidence {
 
 /// Reject unknown envelopes, skipped records, missing pages and stalled cursors.
 /// This deliberately requires an explicit terminal cursor, not just HTTP success.
+///
+/// Page keys are content hashes (`sport_history_key`), so they no longer carry
+/// the request cursor. The chain is checked from the payloads instead: each
+/// page's `next` must move strictly back from the previous one (the first page
+/// is requested at the window end), and only the last page may be terminal.
+/// Official API pages (`official:sports:*`) never match the key and never
+/// count as evidence.
 pub(crate) fn workout_day_evidence(records: &[FetchedRecord]) -> Vec<WorkoutDayEvidence> {
     let Some(first) = records.first() else {
         return vec![];
@@ -31,7 +38,7 @@ pub(crate) fn workout_day_evidence(records: &[FetchedRecord]) -> Vec<WorkoutDayE
             || record.raw.stream != "workouts"
             || record.raw.start_utc != start
             || record.raw.end_utc != Some(end)
-            || record.raw.source_key != format!("sport_history:run:{}:{cursor}", start.timestamp())
+            || record.raw.source_key != sport_history_key("run", &record.raw.payload)
         {
             return vec![];
         }
@@ -53,7 +60,8 @@ pub(crate) fn workout_day_evidence(records: &[FetchedRecord]) -> Vec<WorkoutDayE
             return vec![];
         };
         if !items.is_empty() {
-            let Ok(parsed) = Normalizer::normalize_workouts_with_sport(&record.raw.payload, None)
+            let Ok(parsed) =
+                Normalizer::normalize_workouts_with_sport(&record.raw.payload, Some("run"))
             else {
                 return vec![];
             };
@@ -117,23 +125,27 @@ impl Database {
     ) -> Result<()> {
         for item in evidence {
             // Also catches failed writes and locally retained workouts omitted by cloud.
+            let key = format!("{PREFIX}{}", item.day);
             if self.workout_ids_on_day(&item.day)? == item.ids {
-                self.set_app_meta(
-                    &format!("{PREFIX}{}", item.day),
-                    &serde_json::to_string(item)
-                        .map_err(|e| ZeppBridgeError::ParseError(e.to_string()))?,
-                )?;
-            } else {
-                self.conn.execute(
-                    "DELETE FROM app_meta WHERE key = ?1",
-                    [format!("{PREFIX}{}", item.day)],
-                )?;
+                let value = serde_json::to_string(item)
+                    .map_err(|e| ZeppBridgeError::ParseError(e.to_string()))?;
+                // 每轮同步都会把同样的证据再记一遍：原样的不算「数据变了」。
+                if self.get_app_meta(&key)?.as_deref() != Some(value.as_str()) {
+                    self.set_app_meta(&key, &value)?;
+                    note_content_change();
+                }
+            } else if self
+                .conn
+                .execute("DELETE FROM app_meta WHERE key = ?1", [key])?
+                > 0
+            {
+                note_content_change();
             }
         }
         Ok(())
     }
 
-    pub(super) fn complete_workout_days(&self, start: &str, end: &str) -> Result<BTreeSet<String>> {
+    pub(crate) fn complete_workout_days(&self, start: &str, end: &str) -> Result<BTreeSet<String>> {
         let mut stmt = self
             .conn
             .prepare("SELECT value FROM app_meta WHERE key BETWEEN ?1 AND ?2")?;
@@ -171,18 +183,19 @@ impl Database {
 mod tests {
     use super::*;
 
-    fn page(cursor: i64, next: serde_json::Value, items: serde_json::Value) -> FetchedRecord {
+    fn page(next: serde_json::Value, items: serde_json::Value) -> FetchedRecord {
         let start = Utc.with_ymd_and_hms(2023, 11, 1, 12, 0, 0).unwrap();
         let end = start + Duration::days(30);
+        let payload = serde_json::json!({"data":{"items":items,"next":next}});
         FetchedRecord {
             raw: RawRecord {
                 stream: "workouts".into(),
-                source_key: format!("sport_history:run:{}:{cursor}", start.timestamp()),
+                source_key: sport_history_key("run", &payload),
                 source_scope: SourceScope::Device,
                 device_id: None,
                 start_utc: start,
                 end_utc: Some(end),
-                payload: serde_json::json!({"data":{"items":items,"next":next}}),
+                payload,
                 capability: CapabilityStatus::Verified,
             },
             incomplete: false,
@@ -197,32 +210,51 @@ mod tests {
             .unwrap()
             .timestamp();
         let empty = serde_json::json!([]);
-        assert!(!workout_day_evidence(&[page(end, (-1).into(), empty.clone())]).is_empty());
+        assert!(!workout_day_evidence(&[page((-1).into(), empty.clone())]).is_empty());
         for next in [
             serde_json::Value::Null,
             end.into(),
             (end + 1).into(),
             (end - 100).into(),
         ] {
-            assert!(workout_day_evidence(&[page(end, next, empty.clone())]).is_empty());
+            assert!(workout_day_evidence(&[page(next, empty.clone())]).is_empty());
         }
         assert!(!workout_day_evidence(&[
-            page(end, (end - 100).into(), empty.clone()),
-            page(end - 100, (-1).into(), empty.clone()),
+            page((end - 100).into(), empty.clone()),
+            page((-1).into(), empty.clone()),
         ])
         .is_empty());
-        assert!(workout_day_evidence(&[page(
-            end,
-            (-1).into(),
-            serde_json::json!([{"invalid":true}])
-        )])
+        // A second page whose cursor does not move back is a stalled feed.
+        assert!(workout_day_evidence(&[
+            page((end - 100).into(), empty.clone()),
+            page((end - 100).into(), empty.clone()),
+            page((-1).into(), empty.clone()),
+        ])
         .is_empty());
-        let mut incomplete = page(end, (-1).into(), empty.clone());
+        assert!(
+            workout_day_evidence(&[page((-1).into(), serde_json::json!([{"invalid":true}]))])
+                .is_empty()
+        );
+        let mut incomplete = page((-1).into(), empty.clone());
         incomplete.incomplete = true;
         assert!(workout_day_evidence(&[incomplete]).is_empty());
-        let mut unknown = page(end, (-1).into(), empty);
+        let mut unknown = page((-1).into(), empty);
         unknown.raw.payload = serde_json::json!({"data":{"next":-1}});
         assert!(workout_day_evidence(&[unknown]).is_empty());
+    }
+
+    #[test]
+    fn workout_evidence_only_trusts_legacy_pages_keyed_by_their_content() {
+        let empty = serde_json::json!([]);
+        // The key must be the content hash of this very payload.
+        let mut stale = page((-1).into(), empty.clone());
+        stale.raw.source_key = page((-2).into(), empty.clone()).raw.source_key;
+        assert!(workout_day_evidence(&[stale]).is_empty());
+        // Official API pages are split per workout and carry no cursor:
+        // they never prove that a day had no other workouts.
+        let mut official = page((-1).into(), empty);
+        official.raw.source_key = "official:sports:1789908976".into();
+        assert!(workout_day_evidence(&[official]).is_empty());
     }
 
     #[test]
@@ -231,7 +263,7 @@ mod tests {
             .with_ymd_and_hms(2023, 12, 1, 12, 0, 0)
             .unwrap()
             .timestamp();
-        let record = page(end, (-1).into(), serde_json::json!([]));
+        let record = page((-1).into(), serde_json::json!([]));
         let start = record.raw.start_utc.timestamp();
         let evidence = workout_day_evidence(&[record]);
         assert!(evidence.iter().all(|d| d.start >= start && d.end <= end));

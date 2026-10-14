@@ -1,4 +1,5 @@
 mod app_state;
+mod clipboard_files;
 mod commands;
 mod diagnostics;
 mod ipc_error;
@@ -7,6 +8,8 @@ mod local_api;
 mod main_window;
 mod tray_i18n;
 mod updates;
+#[cfg(windows)]
+mod web_composer;
 
 // The desktop shell is an adapter over the shared core: models, storage,
 // migrations, normalization, queries, export and write coordination all live in
@@ -19,24 +22,31 @@ pub use zeppbridge_core::{
 
 use app_state::AppState;
 use commands::{
-    cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
-    compact_raw_payloads, create_manual_backup, delete_life_event, estimate_export, get_app_status,
-    get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes, get_data_health,
-    get_device_profile, get_device_profiles, get_export_json, get_health_overview,
-    get_heart_rate_series, get_heart_rate_zones, get_login_status, get_metric_series,
+    ai_exchange_delete, ai_exchange_list, ai_exchange_rename, ai_handoff_autopaste,
+    ai_handoff_cancel, ai_handoff_copy_file, ai_profile_save, ai_task_attachment_stat,
+    ai_task_day_strip, ai_task_delete, ai_task_delete_many, ai_task_get, ai_task_list,
+    ai_task_prepare, ai_task_preview, ai_task_save, ai_task_set_pinned, ai_template_delete,
+    ai_template_list, ai_template_save, cancel_official_login, cancel_pending_restore, cancel_sync,
+    cancel_web_login, card_collection_get, card_collection_set, cleanup_old_data, clear_auth,
+    compact_raw_payloads, create_manual_backup, delete_life_event, disconnect_official,
+    get_app_status, get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes,
+    get_data_health, get_device_profile, get_device_profiles, get_health_overview,
+    get_heart_rate_series, get_heart_rate_zones, get_hourly_steps, get_login_status,
+    get_mcp_sidecar, get_metric_baselines, get_metric_series, get_official_status,
     get_pending_restore, get_recent_sleep, get_recent_workouts, get_restore_preview,
     get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
     get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
     get_workout_detail, get_workout_insight, get_workout_page, get_workout_series,
-    get_workout_type_options, import_from_har, list_backups, list_life_events, manual_auth,
-    open_data_folder, prepare_ai_handoff, probe_data_capabilities, publish_ai_export,
-    reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks,
-    run_database_integrity_check, save_csv_export, save_fit_export, save_gpx_export,
-    save_json_export, save_life_event, set_backup_pinned, set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
-    start_incremental_sync, start_web_login, submit_device_model_assignment,
-    submit_diagnostic_report, verify_auth, verify_backup,
+    get_workout_type_options, list_backups, list_life_events, manual_auth, open_data_folder,
+    prepare_ai_handoff, probe_data_capabilities, reprocess_local_data, reset_coverage_ledger,
+    retry_failed_backfill_chunks, run_database_integrity_check, save_fit_export, save_life_event,
+    save_mcp_bundle, set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference,
+    set_user_prefs, set_workout_code_label, set_workout_type_override, stage_restore,
+    start_history_backfill, start_history_sync, start_incremental_sync, start_official_login,
+    start_web_login, submit_device_model_assignment, submit_diagnostic_report,
+    training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,
+    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state,
+    training_plan_update_draft, verify_auth, verify_backup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -52,8 +62,8 @@ static EXIT_AFTER_WRITERS: AtomicBool = AtomicBool::new(false);
 ///
 /// `AppState::new` 里要给大库做迁移前整库快照，几百 MB 的库要好几秒；
 /// 这些活挪到 `app-init` 工作线程之后，事件循环先把窗口画出来。前端
-/// 每个 `invoke` 都先过 `whenBackendReady` 这道门（轮询本命令 +
-/// 监听 `app://ready`，见 `src/lib/bridge/tauri.ts`），所以除它以外
+/// 每个 `invoke` 都先过 `whenBackendReady` 这道门（先监听 `app://ready`，
+/// 再问一次本命令，见 `src/lib/bridge/tauri.ts`），所以除它以外
 /// 不需要再有命令侧的自检。
 static APP_READY: AtomicBool = AtomicBool::new(false);
 
@@ -248,6 +258,16 @@ pub fn run() {
         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
 
+    // 便携版刚换完 exe、由旧进程拉起来的这一次：先等旧进程退干净，再初始化单实例——
+    // 不然单实例会把这次启动并进还没退出的旧进程，新版本一闪就没了。平常启动只顺手
+    // 清掉上一次更新留下的 `*.old`（updates/portable.rs）。
+    if let Ok(exe) = std::env::current_exe() {
+        if std::env::args().any(|arg| arg == updates::portable::AFTER_UPDATE_ARG) {
+            updates::portable::wait_for_previous(&exe, std::time::Duration::from_secs(20));
+        }
+        updates::portable::sweep(&exe);
+    }
+
     // WebView2 的用户数据目录必须在 `Builder` 之前定下来：环境变量是
     // WebView2 初始化时读的，`setup()` 里再设已经晚了。
     //
@@ -283,6 +303,7 @@ pub fn run() {
     diagnostics::log("Startup: building Tauri runtime");
     let app = tauri::Builder::default()
         .manage(main_window::MainWindowState::default())
+        .manage(updates::SilentUpdater::default())
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -297,6 +318,8 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(main_window::on_window_event)
@@ -409,8 +432,32 @@ pub fn run() {
                         }
                         app_handle.manage(local_api::LocalApi(local_api.clone()));
                         app_handle.manage(state);
-                        // 先立旗再广播：监听器晚于事件注册的页面靠 `app_is_ready`
-                        // 轮询补上，顺序不能反——反过来就有一个「事件已发、旗还没立」
+                        // 重放的旗也要在广播「就绪」之前举起：以前要等后台线程开起来、
+                        // 数完一遍报文才举，启动后的第一次自动同步可能抢在它前面开跑，
+                        // 联网抓到一半撞上重放的写入、白抓一趟。
+                        let replay_db = storage::Database::open_without_migration(
+                            init_data_dir.join("zepp.db"),
+                        )
+                        .ok();
+                        let replay_plan = replay_db
+                            .as_ref()
+                            .and_then(|db| db.pending_replay_plan().ok().flatten());
+                        // 为什么要重放记一笔：整库重放要一分多钟、期间同步让路，用户只会觉得「点同步没反应」。
+                        // 修订号没变还要重放，就是有报文没盖章——记下条数，下次能查到是谁漏了（10-13）。
+                        if let (Some(db), Some(plan)) = (replay_db.as_ref(), replay_plan.as_ref()) {
+                            diagnostics::log(&format!(
+                                "Startup: replay planned (stored={}, target={}, raw_records={}, unstamped={})",
+                                plan.stored_revision.as_deref().unwrap_or("none"),
+                                plan.target_revision,
+                                plan.raw_records,
+                                db.unstamped_raw_count()
+                                    .map(|count| count.to_string())
+                                    .unwrap_or_else(|_| "?".into()),
+                            ));
+                        }
+                        let replay_flag = replay_plan.map(|_| storage::ReplayGuard::enter());
+                        // 先立旗再广播：前端先注册监听、再问一次 `app_is_ready`，
+                        // 顺序不能反——反过来就有一个「事件已发、旗还没立」
                         // 的窗口期，那一页会等到 60 秒超时。
                         APP_READY.store(true, Ordering::SeqCst);
                         let _ = app_handle.emit("app://ready", ());
@@ -424,42 +471,29 @@ pub fn run() {
                         let compaction_handle = app_handle.clone();
                         let compaction_data_dir = init_data_dir.clone();
                         std::thread::spawn(move || {
-                            let Ok(db) = storage::Database::open_without_migration(
-                                init_data_dir.join("zepp.db"),
-                            ) else {
+                            let Some(db) = replay_db else {
                                 return;
                             };
-                            // 旗必须在拿锁之前举起。以前是拿到锁之后才进 ReplayGuard，于是
-                            // 启动后的自动同步会先干等 20 秒写锁，再把「另一个写入操作正在
-                            // 进行」画成红条——而库其实只是在自愈。
-                            let needs_replay = matches!(db.pending_replay_plan(), Ok(Some(_)));
-                            if needs_replay {
-                                let _replay_flag = storage::ReplayGuard::enter();
-                                match storage::write_lock::acquire_with_timeout(
-                                    &compaction_data_dir,
-                                    storage::write_lock::WritePurpose::Reprocess,
-                                    std::time::Duration::from_secs(30),
-                                ) {
-                                    Ok(_reprocess_guard) => {
-                                        match db.reprocess_raw_records_if_needed() {
-                                            Ok(Some(counts)) => {
-                                                let total: i64 = counts.values().sum();
-                                                diagnostics::log(&format!(
-                                    "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
-                                ));
-                                            }
-                                            Ok(None) => {}
-                                            Err(error) => diagnostics::log(&format!(
-                                                "本地报文重放失败: {error}"
-                                            )),
-                                        }
-                                    }
-                                    Err(error) => {
+                            // 写锁按批拿、批间放开（reprocess_raw_records_if_needed_batched）：
+                            // 十几分钟的整库重放期间，改设置、记生活事件这些短写入照常进得来。
+                            if let Some(replay_flag) = replay_flag {
+                                match db
+                                    .reprocess_raw_records_if_needed_batched(&compaction_data_dir)
+                                {
+                                    Ok(Some(counts)) => {
+                                        let total: i64 = counts.values().sum();
                                         diagnostics::log(&format!(
-                                            "跳过本次报文重放，没能拿到写锁: {error}"
-                                        ));
+                                        "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
+                                    ));
+                                    }
+                                    Ok(None) => {}
+                                    Err(error) => {
+                                        diagnostics::log(&format!("本地报文重放失败: {error}"))
                                     }
                                 }
+                                drop(replay_flag);
+                                // 重放期间让路的同步在等它：前端收到就马上重试，不再干等一分钟。
+                                let _ = compaction_handle.emit("replay://finished", ());
                             }
 
                             // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
@@ -600,8 +634,11 @@ pub fn run() {
             delete_life_event,
             verify_auth,
             clear_auth,
-            import_from_har,
             manual_auth,
+            start_official_login,
+            cancel_official_login,
+            get_official_status,
+            disconnect_official,
             start_web_login,
             cancel_web_login,
             get_login_status,
@@ -614,7 +651,9 @@ pub fn run() {
             get_health_overview,
             get_heart_rate_series,
             get_stress_series,
+            get_metric_baselines,
             get_metric_series,
+            get_hourly_steps,
             get_training_balance,
             get_heart_rate_zones,
             set_heart_rate_zone_preference,
@@ -640,24 +679,41 @@ pub fn run() {
             get_workout_insight,
             get_weekly_report,
             reprocess_local_data,
-            get_export_json,
-            estimate_export,
-            save_json_export,
-            save_csv_export,
             save_fit_export,
-            save_gpx_export,
-            publish_ai_export,
             prepare_ai_handoff,
+            ai_task_day_strip,
+            ai_exchange_list,
+            ai_exchange_rename,
+            ai_exchange_delete,
+            ai_profile_save,
+            training_plan_adherence,
+            training_plan_update_draft,
+            ai_task_list,
+            ai_task_get,
+            ai_task_save,
+            ai_task_delete,
+            ai_task_delete_many,
+            ai_task_set_pinned,
+            card_collection_get,
+            card_collection_set,
+            ai_template_list,
+            ai_template_save,
+            ai_template_delete,
+            ai_task_preview,
+            ai_task_prepare,
+            ai_task_attachment_stat,
+            ai_handoff_copy_file,
+            ai_handoff_autopaste,
+            ai_handoff_cancel,
             set_user_prefs,
             get_user_prefs,
             get_storage_estimate,
             cleanup_old_data,
             compact_raw_payloads,
             open_data_folder,
-            updates::self_update_supported,
-            updates::validate_update_data_location,
-            updates::is_portable_update,
-            updates::launch_migrated_install,
+            updates::silent::update_start,
+            updates::silent::update_view,
+            updates::silent::update_apply,
             list_backups,
             create_manual_backup,
             verify_backup,
@@ -670,6 +726,14 @@ pub fn run() {
             get_coverage_ledger,
             reset_coverage_ledger,
             retry_failed_backfill_chunks,
+            training_plan_state,
+            training_plan_save_draft,
+            training_plan_preview,
+            training_plan_discard,
+            training_plan_set_ai_publish,
+            training_plan_publish,
+            get_mcp_sidecar,
+            save_mcp_bundle,
             set_tray_locale,
             local_api::get_local_api_status,
             local_api::set_local_api_enabled,

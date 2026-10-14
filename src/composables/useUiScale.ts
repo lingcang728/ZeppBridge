@@ -1,4 +1,5 @@
 import { computed, readonly, ref } from 'vue';
+import { isDesktop } from '../lib/bridge';
 
 export const UI_SCALES = [80, 90, 100, 110, 125] as const;
 export type UiScale = (typeof UI_SCALES)[number];
@@ -20,11 +21,29 @@ const readScale = (): UiScale => {
   return isUiScale(saved) ? saved : DEFAULT_UI_SCALE;
 };
 
+const applyCssZoom = (factor: number) => {
+  const root = document.documentElement;
+  root.style.zoom = factor === 1 ? '' : String(factor);
+  root.style.setProperty('--ui-scale', String(factor));
+};
+
+/*
+ * 桌面端走 webview 原生缩放（等同浏览器 Ctrl +/-）。根元素 CSS zoom 会让
+ * getBoundingClientRect 返回已缩放的像素，再当 CSS px 写回就被缩两次——
+ * 80% 时主题菜单、导航滑块、日期弹层全部错位。原生缩放下坐标系是一套，
+ * 这一类问题从根上消失。浏览器预览没有 webview API，才退回 CSS zoom。
+ */
 const applyScale = (value: UiScale) => {
   if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  root.style.zoom = String(value / 100);
-  root.style.setProperty('--ui-scale', String(value / 100));
+  const factor = value / 100;
+  if (!isDesktop()) {
+    applyCssZoom(factor);
+    return;
+  }
+  applyCssZoom(1);
+  void import('@tauri-apps/api/webview')
+    .then(({ getCurrentWebview }) => getCurrentWebview().setZoom(factor))
+    .catch(() => applyCssZoom(factor));
 };
 
 const setScale = (value: UiScale) => {

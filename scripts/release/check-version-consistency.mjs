@@ -3,7 +3,7 @@
  * 版本号一致性检查。
  *
  * 版本号散落在九个位置，其中几处只在特定路径上才会被读到——
- * `App.vue` 的 FALLBACK_APP_VERSION 只在浏览器预览里出现，crate 版本只在
+ * `lib/appVersion.ts` 的 FALLBACK_APP_VERSION 只在浏览器预览里出现，crate 版本只在
  * CLI/MCP 的 `--version` 里出现。少改一处不会有任何报错，只会在发版之后
  * 由用户发现：安装的是 1.0.0，命令行说自己是 0.11.0。
  *
@@ -36,12 +36,12 @@ const SITES = [
   { file: 'src-tauri/crates/core/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/cli/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/mcp/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
-  { file: 'src/App.vue', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
+  { file: 'src/lib/appVersion.ts', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
   // 两份架构文档都要盯。只盯一份的话，另一份的版本号会惄惄过期，
   // 而读到它的人没有任何线索知道那个数字是错的。
   {
     file: 'docs/reference/architecture.md',
-    pattern: /(implementation of v)([0-9][0-9.]*)(\.)/,
+    pattern: /((?:implementation of \[v))([0-9][0-9.]*(?:-[0-9A-Za-z.-]+)?)(\])/,
   },
   {
     file: 'docs/reference/architecture.zh-CN.md',
@@ -57,8 +57,8 @@ const SITES = [
 ];
 
 const target = process.argv[2];
-if (target && !/^\d+\.\d+\.\d+$/.test(target)) {
-  console.error(`版本号要写成 x.y.z，收到：${target}`);
+if (target && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(target)) {
+  console.error(`版本号要写成 x.y.z 或 x.y.z-预发布标识，收到：${target}`);
   process.exit(2);
 }
 

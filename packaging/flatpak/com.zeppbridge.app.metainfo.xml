@@ -17,6 +17,14 @@
   <name xml:lang="zh_CN">ZeppBridge</name>
   <summary>Your Zepp data, handed back to you</summary>
   <summary xml:lang="zh_CN">把你的 Zepp 数据交回给你</summary>
+  <summary xml:lang="es">Tus datos de Zepp, de vuelta en tus manos</summary>
+  <summary xml:lang="de">Deine Zepp-Daten, zurück in deiner Hand</summary>
+  <summary xml:lang="fr">Vos données Zepp, entre vos mains</summary>
+  <summary xml:lang="nl">Je Zepp-gegevens, terug in eigen hand</summary>
+  <summary xml:lang="pt_BR">Seus dados da Zepp, de volta para você</summary>
+  <summary xml:lang="pt_PT">Os teus dados da Zepp, de volta para ti</summary>
+  <summary xml:lang="ru">Ваши данные Zepp снова в ваших руках</summary>
+  <summary xml:lang="hi_IN">आपका Zepp डेटा, वापस आपके हाथों में</summary>
 
   <description>
     <p>
@@ -47,6 +55,14 @@
       它把你的健康记录从 Zepp 云同步到本机的一个 SQLite 文件里，让你不必通过
       手机就能查看、归档和导出这些数据。
     </p>
+    <p xml:lang="zh_CN">主要功能：</p>
+    <ul xml:lang="zh_CN">
+      <li>心率、睡眠、运动、恢复、压力与 SpO₂ 的长期趋势。</li>
+      <li>按月补拉安装前的历史记录，支持暂停与继续。</li>
+      <li>带校验和的整库备份，恢复前提供记录数对比。</li>
+      <li>支持导出为 JSON、CSV 与 GPX。</li>
+      <li>附带非交互式 CLI 与只读 MCP 服务，便于脚本和本地模型调用。</li>
+    </ul>
     <p xml:lang="zh_CN">
       它不会美化数据：没戴表的那天，图上就是一个缺口；手表从未测量过的指标
       显示「未提供」，而不是 0。
@@ -79,7 +95,8 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="2.4.4" date="2026-09-26"/>
+    <release version="3.0.0" date="2026-10-14"/>
+    <release version="2.4.2" date="2026-09-21"/>
     <release version="2.4.1" date="2026-09-19"/>
     <release version="2.3.0" date="2026-09-12"/>
     <release version="2.2.4" date="2026-09-11"/>

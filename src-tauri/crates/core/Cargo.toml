@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge-core"
-version = "2.4.4"
+version = "3.0.0"
 description = "ZeppBridge 的共享数据核心：模型、存储、迁移、归一化、查询、导出与写入协调"
 edition = "2021"
 
@@ -17,15 +17,12 @@ tokio = { workspace = true }
 chrono = { workspace = true }
 jiff = "0.2.35"
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 sha2 = { workspace = true }
 getrandom = { workspace = true }
 hex = { workspace = true }
 directories = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
-regex = { workspace = true }
-url = { workspace = true }
 flate2 = { workspace = true }
 rustyfit = { workspace = true }
 embedded-io-adapters = { workspace = true }

@@ -63,6 +63,38 @@ real accounts and regions has not been fully verified against live services.
   never prints a token; `export --out` echoes back only the path you gave it,
   without resolving it to an absolute path.
 
+## Zepp account authorization (official API)
+
+The official Zepp Open Platform requires a server-held app secret, so this is
+the one part of ZeppBridge that goes through a server we run
+(`zeppbridge.com`, the same Cloudflare Pages Functions + D1 project as `zeppbridge.pages.dev`).
+
+- **What the server holds permanently:** the app ID and app secret (Cloudflare
+  Secrets, never in the repository or the desktop binary), and the SHA-256 of
+  each Zepp user ID that completed authorization — no names, no raw IDs.
+- **What it holds briefly:** while an authorization is in flight, the SHA-256
+  of the browser `state` and of a one-time claim secret, and — once Zepp
+  returns — the token set encrypted with AES-GCM under a separate server key.
+  The row is deleted when your ZeppBridge claims it, and anything unclaimed is
+  purged after 10 minutes.
+- **Who can claim the tokens:** only the process that knows the claim secret.
+  The `state` appears in the browser address bar; the claim secret never does,
+  so browser history or a shoulder-surfer cannot collect your tokens. Tokens
+  are handed out exactly once.
+- **Refreshing:** the desktop sends its current tokens to `/api/zepp/oauth/refresh`;
+  the server adds the app secret, forwards the request to Zepp and returns the
+  new set. Nothing is stored.
+- **The browser only ever sees fixed text.** Authorization codes, states,
+  tokens and Zepp's error descriptions are never echoed into a page or a
+  redirect.
+- **On this computer:** the access and refresh tokens are two separate entries
+  in the OS credential store; `official.json` in the data folder holds only the
+  user ID, connection time and expiry. The official client talks to exactly two
+  hosts — `zeppbridge.com` and `api-open.zepp.com` — and follows no
+  redirects.
+- **Disconnect** asks Zepp to revoke the authorization, then deletes the local
+  tokens. It never deletes health data.
+
 ## The three kinds of "export" have different boundaries
 
 Confusing them causes real privacy accidents — sending a whole-database
@@ -113,8 +145,9 @@ share the sign-in URL with anyone you do not trust.
 
 ## Handing data to an external AI
 
-"Send to AI" in Explore first calls the local `prepare_ai_handoff` to build a
-structured export for the current date range and data types, then recursively
+"Send to AI" (a workout's detail page, or an analysis task on `/ai`) first
+builds a structured export locally (`prepare_ai_handoff` / `ai_task_prepare`)
+for the chosen range and data types, then recursively
 removes authentication fields (token, cookie, authorization, credential and
 other authentication keys) along with account, device and serial identifiers and sleep/training
 record IDs. `route`, latitude/longitude and other precise coordinates are
@@ -145,7 +178,7 @@ issues.
 
 The desktop app uses a separate HTTPS client with no Zepp cookie jar, sending a
 strongly typed allow-listed report only to
-`https://zeppbridge.pages.dev/api/feedback`. The permitted fields are: app and
+`https://zeppbridge.com/api/feedback`. The permitted fields are: app and
 parser version, operating system, database schema version, the field names and
 JSON types in the device response, catalogue candidates, firmware version, safe
 product-name and short-model hints, model-class numbers, the count of
@@ -206,6 +239,10 @@ limited to:
 - the Zepp region service you configured, after host validation;
 - the official Zepp / Huami pages the sign-in window visits;
 - the ZeppBridge Cloudflare Pages Function, for voluntary problem reports;
+- `tile.openstreetmap.org`, **only** after you switch a workout's route card to
+  "Map" and agree (off by default; "Just this once" or "Always"). Loading the
+  visible tiles tells OpenStreetMap roughly where that workout was; no tiles are
+  prefetched or stored offline, and the route itself is drawn locally;
 - the app's own local Tauri IPC.
 
 While ZeppBridge is running it can expose a read-only local API.

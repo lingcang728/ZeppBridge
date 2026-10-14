@@ -33,6 +33,9 @@ pub struct AppStatus {
     pub configured: bool,
     pub auth_state: String,
     pub connection_state: String,
+    /// `legacy` / `official` / `both` / `none`：哪几条通道连着。只连官方时界面要说明哪些指标
+    /// 需要「高级数据」连接（官方没有 HRV、血氧、压力、准备度……）。
+    pub data_source: String,
     pub masked_user_id: Option<String>,
     pub region_host: Option<String>,
     pub last_sync: Option<String>,
@@ -48,6 +51,9 @@ pub struct AppStatus {
     /// 界面那句「正在同步最近 N 天」的 N 从这里来，**不许在前端写死**。它从
     /// 7 改成 30 的时候，只有后端跟着改了，界面上整整一个版本都还在说 7。
     pub incremental_sync_days: i64,
+    /// 静默的定时同步这一次会往回拉多少天：整窗刷新到期时就是
+    /// `incremental_sync_days`，否则是 `QUICK_SYNC_DAYS`。同样不许在前端写死。
+    pub auto_sync_days: i64,
     pub storage: Option<crate::models::StorageEstimate>,
     /// 本机实际有数据的那段日子。界面上每一个「最近 N 天」选择器读的都是本机
     /// 库，所以每一个都需要知道这个，才不会把「库里没有」画成「那几个月你没动」。
@@ -67,6 +73,9 @@ pub struct AppStatus {
     /// 于是界面上只剩一行「同步让路」的提示，却没有任何东西解释为什么。
     /// 状态可以随时被读到，事件不行。
     pub compacting: bool,
+    /// 后台是否正在用本地原始报文重放派生数据。和 `compacting` 一样：启动时的事件前端多半听不到，
+    /// 状态随时读得到。重放期间云端同步会让路（`deferred`）。
+    pub replaying: bool,
 }
 
 /// Web-login progress exposed to the frontend and the `login://status` event.
@@ -133,6 +142,19 @@ pub struct UiSyncReport {
     /// `message` 的中文原文——后端不按界面语言出文案。
     #[serde(default)]
     pub message_code: Option<String>,
+    /// 和结论并列的一句提醒（`ui.sync.*`）。现在只有一种：同步成功了，但旧数据清理
+    /// 没成功——以前它只拼进 `message`，而界面只在 deferred 时读 `message`，用户永远
+    /// 看不见。
+    #[serde(default)]
+    pub notice_code: Option<String>,
+    /// 结论是 `cloud_stale`（同步前探云端，1E）时：云端最新一条数据的时刻。界面写「云端最新 08:12」。
+    #[serde(default)]
+    pub cloud_latest_at: Option<String>,
+    /// 这一轮有没有真的改了库里的健康数据（`storage::content_epoch` 动没动）。
+    /// `total_records` 不能拿来判断：原样再拉一遍的报文照样报上次写入的条数。
+    /// 界面据此决定要不要让各页的读缓存作废；没给（取消、让路、云端没新数据）时界面按条数兜底。
+    #[serde(default)]
+    pub content_changed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -167,6 +189,9 @@ pub fn ui_sync_report(
         .collect::<Vec<_>>();
 
     let total_records = streams.iter().map(|stream| stream.records_written).sum();
+    let notice_code = report
+        .cleanup_failed
+        .then(|| "ui.sync.cleanup_failed".to_string());
 
     // The report-level "last cloud sync at" must reflect the newest cloud
     // timestamp the streams actually carried, not the local completion time
@@ -188,6 +213,9 @@ pub fn ui_sync_report(
         streams,
         message: report.message,
         message_code: None,
+        notice_code,
+        cloud_latest_at: None,
+        content_changed: None,
     }
 }
 

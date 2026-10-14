@@ -1,0 +1,5 @@
+/* BodyStatus.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
+.body-page.page { display: grid; gap: var(--space-4); align-content: start; }
+/* 区间边界是手表给的，不是我们算的。不写清楚，它就会被当成又一套自选算法。 */
+.curve-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.macro-chart { height: 200px; }

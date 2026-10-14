@@ -62,9 +62,3 @@ export const rangeOptions = (
 
 /** 图表和导出的显示范围。三段，够窄能放进一行按钮。 */
 export const DISPLAY_RANGE_DAYS: readonly RangeDays[] = [7, 30, 180];
-
-/**
- * 云端补拉的范围。整条梯子都在，**包括 180**——那是后端的默认值，
- * 选项里没有它就等于让默认值无法显示。
- */
-export const BACKFILL_RANGE_DAYS: readonly RangeDays[] = RANGE_LADDER_DAYS;

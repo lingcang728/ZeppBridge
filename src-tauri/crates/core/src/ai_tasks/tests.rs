@@ -1,0 +1,844 @@
+//! A7 协议行为的收口测试：迁移、CRUD、内置模板只读、P4 窗口、去重、
+//! 附件隐私、prepare 落盘与 blocked、MCP 授权窗口。
+
+use super::export::stat_task_attachments;
+use super::model::*;
+use super::store::normalize_task;
+use crate::access::{granted_windows, shared_task_grants, AccessCategory};
+use crate::models::error::ZeppBridgeError;
+use crate::models::{DailyMetric, MetricSample, SleepSession, SourceScope, Workout};
+use crate::storage::{Database, CURRENT_SCHEMA_VERSION};
+use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone, Utc};
+
+// ---------- 小工具 ----------
+
+fn err_code(error: &ZeppBridgeError) -> &str {
+    error.code()
+}
+
+fn utc(y: i32, m: u32, d: u32, h: u32) -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(y, m, d, h, 0, 0).unwrap()
+}
+
+/// 运动的本地开始日——P4 的锚点日。测试与实现走同一条 localtime 换算，
+/// 什么时区跑都成立。
+fn local_day(t: DateTime<Utc>) -> NaiveDate {
+    t.with_timezone(&Local).date_naive()
+}
+
+fn insert_workout(db: &Database, id: &str, start: DateTime<Utc>) {
+    db.insert_workout(&Workout {
+        workout_id: id.to_string(),
+        workout_type: "running".into(),
+        normalized_type: "running".into(),
+        type_source: "string_field".into(),
+        effective_type: "running".into(),
+        start_time: start,
+        end_time: start + Duration::hours(1),
+        distance_meters: Some(10_000.0),
+        calories: Some(600),
+        avg_hr: Some(140),
+        max_hr: Some(170),
+        source_scope: SourceScope::UserFused,
+        ..Default::default()
+    })
+    .unwrap();
+}
+
+fn insert_sleep(db: &Database, id: &str, end: DateTime<Utc>) {
+    db.insert_sleep_session(&SleepSession {
+        sleep_id: id.to_string(),
+        start_time: end - Duration::hours(7),
+        end_time: end,
+        score: Some(82),
+        duration_minutes: 400,
+        deep_minutes: Some(90),
+        light_minutes: Some(220),
+        rem_minutes: Some(70),
+        awake_minutes: Some(20),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        synced_at: None,
+        time_in_bed_minutes: None,
+        stages: Vec::new(),
+        wake_count: Some(2),
+    })
+    .unwrap();
+}
+
+fn insert_daily(db: &Database, metric: &str, date: NaiveDate, value: f64) {
+    db.insert_daily_metric(&DailyMetric {
+        date: date.to_string(),
+        metric: metric.to_string(),
+        value,
+        unit: "x".into(),
+        source_scope: SourceScope::UserFused,
+        device_id: None,
+    })
+    .unwrap();
+}
+
+fn insert_sample(db: &Database, metric: &str, ts: DateTime<Utc>, value: f64) {
+    db.insert_metric_sample(&MetricSample {
+        metric: metric.to_string(),
+        timestamp: ts,
+        value,
+        unit: "x".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+    })
+    .unwrap();
+}
+
+fn range(category: AiTaskCategory, days_before: i64, include_day: bool) -> AiTaskCategoryRange {
+    AiTaskCategoryRange {
+        category,
+        enabled: true,
+        days_before,
+        include_workout_day: include_day,
+        excluded_metrics: Vec::new(),
+        picked_days: Vec::new(),
+    }
+}
+
+fn task() -> AiTask {
+    AiTask {
+        schema_version: AI_TASK_SCHEMA_VERSION,
+        id: String::new(),
+        title: "测试任务".into(),
+        template_id: None,
+        workout_ids: Vec::new(),
+        categories: Vec::new(),
+        detail_level: AiTaskDetailLevel::Standard,
+        prompt: "看看最近状态".into(),
+        personal_note: String::new(),
+        attachments: Vec::new(),
+        include_precise_gps: false,
+        mcp_shared: false,
+        created_at: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn template(id: &str, builtin: bool) -> AiTaskTemplate {
+    AiTaskTemplate {
+        schema_version: AI_TASK_SCHEMA_VERSION,
+        id: id.to_string(),
+        builtin,
+        name: "模板".into(),
+        name_code: None,
+        categories: Vec::new(),
+        detail_level: AiTaskDetailLevel::Standard,
+        prompt_template: String::new(),
+        prompt_code: None,
+        default_summaries: Vec::new(),
+        required_series: Vec::new(),
+        created_at: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn temp_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("zb-ai-task-test-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+// ---------- v32 迁移 ----------
+
+#[test]
+fn v32_migration_creates_tables_and_seeds_three_builtins() {
+    let db = Database::in_memory().unwrap();
+    let version: i64 = db
+        .conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, CURRENT_SCHEMA_VERSION);
+    db.conn
+        .query_row("SELECT COUNT(*) FROM ai_tasks", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .unwrap();
+
+    let templates = db.list_ai_task_templates().unwrap();
+    assert_eq!(templates.len(), 7);
+    let ids: Vec<&str> = templates.iter().map(|t| t.id.as_str()).collect();
+    for id in [
+        "recovery_run",
+        "long_run_compare",
+        "hr_drift",
+        "sleep_review",
+        "recovery_trend",
+        "week_review",
+        "next_week",
+    ] {
+        assert!(ids.contains(&id), "缺内置模板 {id}");
+    }
+    for template in &templates {
+        assert!(template.builtin);
+        assert_eq!(template.schema_version, 1);
+        assert_eq!(
+            template.name_code.as_deref(),
+            Some(format!("ui.ai_template.{}.name", template.id).as_str())
+        );
+        assert_eq!(
+            template.prompt_code.as_deref(),
+            Some(format!("ui.ai_template.{}.prompt", template.id).as_str())
+        );
+        // 内置 payload 的类别列表总是完整九项（1A·A10 起静息心率单列），静息心率跟着「心率」那一项。
+        assert_eq!(template.categories.len(), 9);
+        let of = |c: AiTaskCategory| {
+            template
+                .categories
+                .iter()
+                .find(|r| r.category == c)
+                .unwrap()
+        };
+        assert_eq!(
+            of(AiTaskCategory::RestingHr).enabled,
+            of(AiTaskCategory::HeartRate).enabled
+        );
+        assert_eq!(
+            of(AiTaskCategory::RestingHr).days_before,
+            of(AiTaskCategory::HeartRate).days_before
+        );
+    }
+}
+
+#[test]
+fn v32_upgrade_from_v31_seeds_builtins_and_stays_idempotent() {
+    // 先建一个全量 v32 库，再倒回 v31 并拆掉新表——这才是「真 v31 老库」
+    // 的形状：全部旧表都在，只差 ai_tasks / ai_task_templates。
+    let dir = temp_dir("v31");
+    let path = dir.join("zepp.db");
+    drop(Database::open_migrated(&path).unwrap());
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "DROP TABLE ai_tasks;
+             DROP TABLE ai_task_templates;
+             PRAGMA user_version = 31;",
+        )
+        .unwrap();
+    }
+    let db = Database::open_migrated(&path).unwrap();
+    let version: i64 = db
+        .conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, CURRENT_SCHEMA_VERSION);
+    assert_eq!(db.list_ai_task_templates().unwrap().len(), 7);
+    drop(db);
+
+    // 只读连接接受当前 schema 版本。
+    let ro = Database::open_read_only(path.clone()).unwrap();
+    assert_eq!(ro.list_ai_task_templates().unwrap().len(), 7);
+    drop(ro);
+
+    // 删掉一条内置行再迁移一次——INSERT OR IGNORE 自愈回来。
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute(
+            "DELETE FROM ai_task_templates WHERE id = 'recovery_run'",
+            [],
+        )
+        .unwrap();
+    }
+    let db = Database::open_migrated(&path).unwrap();
+    assert_eq!(db.list_ai_task_templates().unwrap().len(), 7);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ---------- CRUD ----------
+
+#[test]
+fn task_crud_roundtrip() {
+    let db = Database::in_memory().unwrap();
+    let mut t = task();
+    t.schema_version = 99; // 前端乱报也要钉回 1
+    t.workout_ids = vec!["w1".into(), "w1".into(), " w2 ".into(), "w1".into()];
+    t.template_id = Some("  ".into());
+
+    let saved = db.save_ai_task(&t).unwrap();
+    assert!(saved.id.starts_with("task-"));
+    assert_eq!(saved.schema_version, 1);
+    assert!(!saved.created_at.is_empty() && !saved.updated_at.is_empty());
+    assert_eq!(saved.workout_ids, vec!["w1".to_string(), "w2".to_string()]);
+    assert_eq!(saved.template_id, None);
+
+    let fetched = db.require_ai_task(&saved.id).unwrap();
+    assert_eq!(fetched.title, "测试任务");
+
+    let list = db.list_ai_tasks().unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].workout_count, 2);
+    assert!(!list[0].mcp_shared);
+
+    // 更新：created_at 保留，mcp_shared 翻转走同一条 save。
+    let mut again = fetched.clone();
+    again.mcp_shared = true;
+    again.title = "改名".into();
+    let saved2 = db.save_ai_task(&again).unwrap();
+    assert_eq!(saved2.created_at, fetched.created_at);
+    assert!(db.list_ai_tasks().unwrap()[0].mcp_shared);
+
+    db.delete_ai_task(&saved.id).unwrap();
+    let error = db.delete_ai_task(&saved.id).unwrap_err();
+    assert_eq!(err_code(&error), "err.ai_task.not_found");
+    let error = db.require_ai_task(&saved.id).unwrap_err();
+    assert_eq!(err_code(&error), "err.ai_task.not_found");
+}
+
+#[test]
+fn task_validation_rejects_bad_input() {
+    let db = Database::in_memory().unwrap();
+
+    let mut t = task();
+    t.title = " ".into();
+    assert_eq!(
+        err_code(&db.save_ai_task(&t).unwrap_err()),
+        "err.ai_task.invalid"
+    );
+
+    let mut t = task();
+    t.categories = vec![range(AiTaskCategory::Sleep, 400, true)];
+    assert_eq!(
+        err_code(&db.save_ai_task(&t).unwrap_err()),
+        "err.ai_task.invalid"
+    );
+
+    // 同类别重复出现只留第一个。
+    let mut t = task();
+    t.categories = vec![
+        range(AiTaskCategory::Sleep, 7, true),
+        range(AiTaskCategory::Sleep, 99, false),
+        range(AiTaskCategory::Workout, 3, true),
+    ];
+    let normalized = normalize_task(&t).unwrap();
+    assert_eq!(normalized.categories.len(), 2);
+    assert_eq!(normalized.categories[0].days_before, 7);
+    assert!(normalized.categories[0].enabled);
+
+    // 附件缺字段不行。
+    let mut t = task();
+    t.attachments = vec![AiTaskAttachmentRef {
+        id: "a1".into(),
+        path: " ".into(),
+        display_name: "体检报告".into(),
+        kind: AiTaskAttachmentKind::Pdf,
+        byte_len: None,
+        added_at: "2026-09-01T00:00:00Z".into(),
+    }];
+    assert_eq!(
+        err_code(&db.save_ai_task(&t).unwrap_err()),
+        "err.ai_task.invalid"
+    );
+}
+
+#[test]
+fn builtin_templates_are_readonly() {
+    let db = Database::in_memory().unwrap();
+
+    // 改内置 → builtin_readonly
+    let mut copy = db.get_ai_task_template("recovery_run").unwrap().unwrap();
+    copy.name = "改名".into();
+    assert_eq!(
+        err_code(&db.save_ai_task_template(&copy).unwrap_err()),
+        "err.ai_template.builtin_readonly"
+    );
+    assert_eq!(
+        err_code(&db.delete_ai_task_template("recovery_run").unwrap_err()),
+        "err.ai_template.builtin_readonly"
+    );
+    // 新 id 也塞不进 builtin=true
+    assert_eq!(
+        err_code(
+            &db.save_ai_task_template(&template("tmpl-x", true))
+                .unwrap_err()
+        ),
+        "err.ai_template.invalid"
+    );
+
+    // 「另存为用户模板」是唯一合法路径。
+    let mut mine = template("", false);
+    mine.name_code = Some("ui.ai_template.recovery_run.name".into());
+    let saved = db.save_ai_task_template(&mine).unwrap();
+    assert!(saved.id.starts_with("tmpl-"));
+    assert!(!saved.builtin);
+    assert_eq!(saved.name_code, None, "用户模板不许带内置词条句柄");
+
+    // 用户模板可改可删；删不存在的 → not_found。
+    let mut rename = db.get_ai_task_template(&saved.id).unwrap().unwrap();
+    rename.name = "我的模板".into();
+    db.save_ai_task_template(&rename).unwrap();
+    db.delete_ai_task_template(&saved.id).unwrap();
+    assert_eq!(
+        err_code(&db.delete_ai_task_template(&saved.id).unwrap_err()),
+        "err.ai_template.not_found"
+    );
+}
+
+// ---------- P4 覆盖 ----------
+
+#[test]
+fn coverage_windows_follow_p4_edges() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 10);
+    insert_workout(&db, "w1", start);
+    let anchor_day = local_day(start);
+    insert_daily(&db, "resting_hr", anchor_day - Duration::days(1), 52.0);
+    insert_daily(&db, "resting_hr", anchor_day, 51.0);
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+    let preview = db.ai_task_preview(&t).unwrap();
+    let row = preview
+        .coverage
+        .iter()
+        .find(|r| r.category == AiTaskCategory::Recovery)
+        .unwrap();
+    assert_eq!(row.start_date, (anchor_day - Duration::days(3)).to_string());
+    assert_eq!(row.end_date, anchor_day.to_string());
+    assert_eq!(row.days_in_range, 4);
+    assert_eq!(row.days_with_data, 2);
+    // 界面画「哪几天有数据」靠它：个数必须和 days_with_data 对得上，日期都落在窗口里、升序。
+    assert_eq!(row.covered_dates.len() as i64, row.days_with_data);
+    assert!(row.covered_dates.iter().all(
+        |day| day.as_str() >= row.start_date.as_str() && day.as_str() <= row.end_date.as_str()
+    ));
+    assert!(row.covered_dates.windows(2).all(|pair| pair[0] < pair[1]));
+    assert!(!row.missing);
+    assert!(row.sources.contains(&"user_fused".to_string()));
+    assert!(row.units.contains_key("resting_hr"));
+
+    // include_workout_day=false → 右端是前一天。
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, false)];
+    let preview = db.ai_task_preview(&t).unwrap();
+    let row = &preview.coverage[0];
+    assert_eq!(row.end_date, (anchor_day - Duration::days(1)).to_string());
+    assert_eq!(row.days_in_range, 3);
+    assert_eq!(row.days_with_data, 1);
+
+    // days_before=0 且不含当天 → 空窗，不产行。
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 0, false)];
+    let preview = db.ai_task_preview(&t).unwrap();
+    assert!(preview.coverage.is_empty());
+}
+
+#[test]
+fn coverage_dedups_overlapping_windows_and_links_anchors() {
+    let db = Database::in_memory().unwrap();
+    let s1 = utc(2026, 9, 10, 10);
+    let s2 = utc(2026, 9, 12, 10);
+    insert_workout(&db, "w1", s1);
+    insert_workout(&db, "w2", s2);
+    let d1 = local_day(s1);
+    let d2 = local_day(s2);
+    // 重叠日（在两条窗口里都在）上的数据。
+    let overlap_day = d1.max(d2 - Duration::days(3));
+    insert_daily(&db, "resting_hr", overlap_day, 55.0);
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into(), "w2".into()];
+    // 开着「运动」类别：锚点 id 才会出现在日行的 linked_workout_ids 里。
+    t.categories = vec![
+        range(AiTaskCategory::Recovery, 3, true),
+        range(AiTaskCategory::Workout, 0, true),
+    ];
+
+    let preview = db.ai_task_preview(&t).unwrap();
+    let rows: Vec<_> = preview
+        .coverage
+        .iter()
+        .filter(|r| r.category == AiTaskCategory::Recovery)
+        .collect();
+    // 每锚点一行 + 一行合并视图。
+    assert_eq!(rows.len(), 3);
+    let merged = rows.iter().find(|r| r.workout_id.is_none()).unwrap();
+    assert_eq!(merged.start_date, (d1 - Duration::days(3)).to_string());
+    assert_eq!(merged.end_date, d2.to_string());
+    assert!(merged.days_in_range >= 4);
+    assert!(merged.days_with_data >= 1);
+    assert_eq!(
+        merged.covered_dates.len() as i64,
+        merged.days_with_data,
+        "合并行的日期是各窗口的并集，去重后个数一致"
+    );
+
+    // 出仓文档里重叠日的 (category,date) 只出现一次，linked 两个锚点。
+    let dir = temp_dir("dedup");
+    let prepared = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert_eq!(prepared.status, AiTaskPrepareStatus::Ready);
+    let json_text = std::fs::read_to_string(prepared.json_path.unwrap()).unwrap();
+    let doc: serde_json::Value = serde_json::from_str(&json_text).unwrap();
+    let context = doc["context"].as_array().unwrap();
+    let recovery = context
+        .iter()
+        .find(|c| c["category"] == "recovery")
+        .unwrap();
+    let days = recovery["days"].as_array().unwrap();
+    let overlap_entries: Vec<_> = days
+        .iter()
+        .filter(|d| d["date"] == overlap_day.to_string())
+        .collect();
+    assert_eq!(overlap_entries.len(), 1, "(category,date) 必须去重");
+    let linked: Vec<&str> = overlap_entries[0]["linked_workout_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(linked.contains(&"w1") && linked.contains(&"w2"));
+    // 同一天的同一指标只写一次。
+    let resting: Vec<_> = overlap_entries[0]["metrics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["metric"] == "resting_hr")
+        .collect();
+    assert_eq!(resting.len(), 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn sleep_coverage_attributes_by_wake_day() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 10);
+    insert_workout(&db, "w1", start);
+    let anchor_day = local_day(start);
+    // 睡眠按 end_time（醒来日）归属——这个语义不许变。
+    let sleep_end = utc(2026, 9, 10, 22);
+    insert_sleep(&db, "s1", sleep_end);
+    let expected_day = local_day(sleep_end);
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Sleep, 7, true)];
+    let preview = db.ai_task_preview(&t).unwrap();
+    let row = preview
+        .coverage
+        .iter()
+        .find(|r| r.category == AiTaskCategory::Sleep)
+        .unwrap();
+    let window_start = anchor_day - Duration::days(7);
+    let in_window = expected_day >= window_start && expected_day <= anchor_day;
+    assert_eq!(row.days_with_data, i64::from(in_window));
+    assert_eq!(row.missing, !in_window);
+}
+
+#[test]
+fn missing_workout_is_a_coded_error() {
+    let db = Database::in_memory().unwrap();
+    let mut t = task();
+    t.workout_ids = vec!["ghost-1".into(), "ghost-2".into()];
+    let error = db.ai_task_preview(&t).unwrap_err();
+    assert_eq!(err_code(&error), "err.ai_task.workout_not_found");
+    if let ZeppBridgeError::AiTask(inner) = &error {
+        let params = inner.params().unwrap();
+        assert_eq!(params["workout_ids"].as_array().unwrap().len(), 2);
+    } else {
+        panic!("应当返回 AiTask 错误");
+    }
+}
+
+// ---------- 附件 / prepare ----------
+
+#[test]
+fn shared_grants_expand_only_shared_tasks() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![
+        range(AiTaskCategory::Recovery, 3, true),
+        range(AiTaskCategory::PersonalNote, 0, true),
+    ];
+    t.mcp_shared = true;
+    let shared = db.save_ai_task(&t).unwrap();
+
+    // 未共享的任务不进授权面。
+    let mut t2 = task();
+    t2.title = "不共享".into();
+    t2.workout_ids = vec!["w1".into()];
+    db.save_ai_task(&t2).unwrap();
+
+    let grants = shared_task_grants(&db).unwrap();
+    assert_eq!(grants.len(), 1);
+    let grant = &grants[0];
+    assert_eq!(grant.task_id, shared.id);
+    // 没开 workout 类别：w1 只是定窗的锚点，不是可读实体（R01）。
+    assert_eq!(grant.anchor_workout_ids, vec!["w1".to_string()]);
+    assert!(grant.workout_ids.is_empty());
+    let anchor_day = local_day(utc(2026, 9, 10, 10));
+    // Recovery 开窗；PersonalNote 是任务内容不是时间序列，不产生授权窗。
+    assert_eq!(grant.windows.len(), 1);
+    assert_eq!(grant.windows[0].category, AccessCategory::Recovery);
+    assert_eq!(grant.windows[0].start_date, anchor_day - Duration::days(3));
+    assert_eq!(grant.windows[0].end_date, anchor_day);
+
+    // 共享关掉后下一次读取就没有授权——不重读不是选项。
+    let mut off = shared.clone();
+    off.mcp_shared = false;
+    db.save_ai_task(&off).unwrap();
+    assert!(shared_task_grants(&db).unwrap().is_empty());
+}
+
+/// 拆类（1A·A10）之前存下的任务只有 `heart_rate` 一行：读出来补上同设置的 `resting_hr`，
+/// 拖出去的静息心率跟着走；MCP 授权窗口两类都有——旧任务交出去的数据与拆类前一样，不丢静息心率。
+#[test]
+fn legacy_heart_rate_task_reads_back_split_and_still_grants_resting_hr() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.mcp_shared = true;
+    let saved = db.save_ai_task(&t).unwrap();
+    let mut legacy = range(AiTaskCategory::HeartRate, 5, true);
+    legacy.excluded_metrics = vec!["resting_hr".into(), "heart_rate".into()];
+    let mut doc = serde_json::to_value(&saved).unwrap();
+    doc["categories"] = serde_json::to_value(vec![legacy]).unwrap();
+    db.conn
+        .execute(
+            "UPDATE ai_tasks SET payload = ?2 WHERE id = ?1",
+            rusqlite::params![saved.id, doc.to_string()],
+        )
+        .unwrap();
+
+    let read = db.require_ai_task(&saved.id).unwrap();
+    let cats: Vec<_> = read
+        .categories
+        .iter()
+        .map(|r| {
+            (
+                r.category,
+                r.enabled,
+                r.days_before,
+                r.excluded_metrics.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        cats,
+        vec![
+            (
+                AiTaskCategory::RestingHr,
+                true,
+                5,
+                vec!["resting_hr".to_string()]
+            ),
+            (
+                AiTaskCategory::HeartRate,
+                true,
+                5,
+                vec!["heart_rate".to_string()]
+            ),
+        ]
+    );
+
+    let grants = shared_task_grants(&db).unwrap();
+    let mut granted: Vec<_> = grants[0].windows.iter().map(|w| w.category).collect();
+    granted.sort();
+    assert_eq!(
+        granted,
+        vec![AccessCategory::HeartRate, AccessCategory::RestingHr]
+    );
+}
+
+/// 批量删除（1D·D7）：一个事务删完；返回原样和置顶，存回去就是撤销；不在的 id 跳过不报错。
+#[test]
+fn batch_delete_returns_what_undo_needs_and_skips_missing_ids() {
+    let db = Database::in_memory().unwrap();
+    let mut a = task();
+    a.title = "甲".into();
+    let a = db.save_ai_task(&a).unwrap();
+    let mut b = task();
+    b.title = "乙".into();
+    b.prompt = "另一句".into();
+    let b = db.save_ai_task(&b).unwrap();
+    db.set_ai_task_pinned(&b.id, true).unwrap();
+
+    let gone = db
+        .delete_ai_tasks(&[
+            a.id.clone(),
+            "task-missing".into(),
+            b.id.clone(),
+            a.id.clone(),
+        ])
+        .unwrap();
+    assert_eq!(
+        gone.iter()
+            .map(|d| (d.task.title.as_str(), d.pinned))
+            .collect::<Vec<_>>(),
+        vec![("甲", false), ("乙", true)]
+    );
+    assert!(db.list_ai_tasks().unwrap().is_empty());
+
+    for item in &gone {
+        let back = db.save_ai_task(&item.task).unwrap();
+        assert_eq!(back.id, item.task.id);
+        if item.pinned {
+            db.set_ai_task_pinned(&back.id, true).unwrap();
+        }
+    }
+    let list = db.list_ai_tasks().unwrap();
+    assert_eq!(list.len(), 2);
+    assert!(list.iter().any(|t| t.id == b.id && t.pinned));
+}
+
+#[test]
+fn shared_grants_merge_adjacent_windows_across_anchors() {
+    let db = Database::in_memory().unwrap();
+    // 两个锚点相隔 2 天，days_before=3 → 窗口相接，应并成一条。
+    let s1 = utc(2026, 9, 10, 10);
+    let s2 = utc(2026, 9, 12, 10);
+    insert_workout(&db, "w1", s1);
+    insert_workout(&db, "w2", s2);
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into(), "w2".into()];
+    t.categories = vec![range(AiTaskCategory::Sleep, 3, true)];
+    t.mcp_shared = true;
+    db.save_ai_task(&t).unwrap();
+
+    let grants = shared_task_grants(&db).unwrap();
+    assert_eq!(grants.len(), 1);
+    assert_eq!(grants[0].windows.len(), 2, "装载期按锚点逐条开窗，不预合并");
+    // 合并发生在判定侧 granted_windows：两个相接的 Sleep 窗并成一条。
+    let merged = granted_windows(&grants, &[AccessCategory::Sleep], None);
+    assert_eq!(merged.len(), 1, "相接的授权日窗应合并成一条");
+    assert_eq!(merged[0].start_date, local_day(s1) - Duration::days(3));
+    assert_eq!(merged[0].end_date, local_day(s2));
+
+    // 引用了已删除的运动：宽授权不能因此整个挂掉——幽灵 id 留在
+    // 锚点原样清单里，只是不为它开窗（w1 的窗照常展开）。
+    let mut t = task();
+    t.workout_ids = vec!["w1".into(), "ghost".into()];
+    t.categories = vec![range(AiTaskCategory::Sleep, 1, true)];
+    t.mcp_shared = true;
+    db.save_ai_task(&t).unwrap();
+    let grants = shared_task_grants(&db).unwrap();
+    let grant = grants
+        .iter()
+        .find(|g| g.anchor_workout_ids.iter().any(|id| id == "ghost"))
+        .unwrap();
+    assert!(
+        !grant.windows.is_empty(),
+        "查不到的运动只跳过，不拖垮整个授权"
+    );
+}
+
+mod prepare;
+
+#[test]
+fn the_same_question_again_updates_the_saved_task_and_pins_survive() {
+    let db = Database::in_memory().unwrap();
+    let mut first = task();
+    first.categories = vec![range(AiTaskCategory::Sleep, 13, true)];
+    let saved = db.save_ai_task(&first).unwrap();
+    // 同模板、同时间范围、同一句问题（首尾空白不算）：更新原来那一条，不新建。
+    let mut again = task();
+    again.categories = vec![range(AiTaskCategory::Sleep, 13, true)];
+    again.prompt = "  看看最近状态 ".into();
+    again.title = "又问了一次".into();
+    assert_eq!(db.save_ai_task(&again).unwrap().id, saved.id);
+    assert_eq!(db.list_ai_tasks().unwrap().len(), 1);
+    // 换了回溯范围就是另一个任务。
+    let mut other = again.clone();
+    other.categories = vec![range(AiTaskCategory::Sleep, 29, true)];
+    let other = db.save_ai_task(&other).unwrap();
+    assert_ne!(other.id, saved.id);
+    // 置顶的排在最前；置顶不改 updated_at。
+    let before = db.require_ai_task(&saved.id).unwrap().updated_at;
+    db.set_ai_task_pinned(&saved.id, true).unwrap();
+    let list = db.list_ai_tasks().unwrap();
+    assert_eq!(list[0].id, saved.id);
+    assert!(list[0].pinned && !list[1].pinned);
+    assert_eq!(db.require_ai_task(&saved.id).unwrap().updated_at, before);
+    assert_eq!(
+        err_code(&db.set_ai_task_pinned("task-missing", true).unwrap_err()),
+        "err.ai_task.not_found"
+    );
+}
+
+#[test]
+fn picked_days_export_only_those_days_and_the_collection_survives_a_reopen() {
+    let db = Database::in_memory().unwrap();
+    let today = Local::now().date_naive();
+    for offset in 0..5 {
+        insert_daily(
+            &db,
+            "resting_hr",
+            today - Duration::days(offset),
+            50.0 + offset as f64,
+        );
+    }
+    let mut whole = task();
+    whole.categories = vec![range(AiTaskCategory::Recovery, 4, true)];
+    let whole = db.ai_task_preview(&whole).unwrap();
+
+    // 收集箱挑了三天（故意乱序、带重复）：只交这三天，中间没挑的不算进范围、不出仓。
+    let picked = [today, today - Duration::days(4), today - Duration::days(2)];
+    let mut t = task();
+    let mut picked_range = range(AiTaskCategory::Recovery, 4, true);
+    picked_range.picked_days = picked
+        .iter()
+        .chain(picked.iter().take(1))
+        .map(|day| day.to_string())
+        .collect();
+    t.categories = vec![picked_range];
+    let preview = db.ai_task_preview(&t).unwrap();
+    let row = &preview.coverage[0];
+    let mut expected: Vec<String> = picked.iter().map(|day| day.to_string()).collect();
+    expected.sort();
+    expected.dedup();
+    assert_eq!(row.start_date, expected[0]);
+    assert_eq!(row.end_date, expected[2]);
+    assert_eq!(row.days_in_range, 3);
+    assert_eq!(row.days_with_data, 3);
+    assert_eq!(row.covered_dates, expected);
+    assert_eq!(row.picked_dates, expected);
+    assert_eq!(row.metric_days.get("resting_hr"), Some(&3));
+    assert!(
+        preview.estimated_bytes < whole.estimated_bytes,
+        "没挑的日子不能跟着出去"
+    );
+    assert!(whole.coverage[0].picked_dates.is_empty());
+
+    // 存下来的任务：日期排好去重；挑了不同的日子是另一个任务；坏日期直接拒绝。
+    let saved = db.save_ai_task(&t).unwrap();
+    assert_eq!(saved.categories[0].picked_days, expected);
+    let mut other = t.clone();
+    other.categories[0].picked_days = vec![today.to_string()];
+    assert_ne!(db.save_ai_task(&other).unwrap().id, saved.id);
+    let mut bad = t.clone();
+    bad.categories[0].picked_days = vec!["2026-13-40".into()];
+    assert!(db.save_ai_task(&bad).is_err());
+
+    // 收集箱：去重排好，读回来一样；坏日期整份拒绝、原来的不动。
+    use crate::storage::card_collection::CardPick;
+    let pick = |key: &str, date: NaiveDate| CardPick {
+        key: key.into(),
+        category: AiTaskCategory::Recovery,
+        date: date.to_string(),
+    };
+    let stored = db
+        .set_card_collection(&[
+            pick("hrv", today),
+            pick("hrv", today),
+            pick("cat:sleep", today),
+        ])
+        .unwrap();
+    assert_eq!(stored.len(), 2);
+    assert_eq!(db.card_collection().unwrap(), stored);
+    let mut broken = pick("hrv", today);
+    broken.date = "昨天".into();
+    assert!(db.set_card_collection(&[broken]).is_err());
+    assert_eq!(db.card_collection().unwrap(), stored);
+}

@@ -161,6 +161,14 @@ pub enum ZeppBridgeError {
     #[error("配置错误: {0}")]
     ConfigError(String),
 
+    /// 一轮同步用完了时间预算，后面的流这次没来得及做。
+    ///
+    /// 以前借用 `ConfigError`：慢网络下心率、日度、睡眠都写进去了，界面却红字说
+    /// 「配置需要先修复」，而且这一轮的报告整个丢掉、同步时间不记——于是每 15 分钟的
+    /// 「快速」同步都变成 30 天整窗、再超时。它不是配置问题，下一轮接着做就好。
+    #[error("{0}")]
+    TimedOut(String),
+
     /// 另一个进程正在写同一个数据库。
     ///
     /// 和 `ConfigError` 分开，是因为调用方对这两件事的处理完全不同：
@@ -172,12 +180,34 @@ pub enum ZeppBridgeError {
     #[error("IO 错误: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// 这个库已经属于另一个 Zepp 账号（代码审查 R06）。拒绝写入，不自动清库：
+    /// 换账号要用户先把旧的 `data` 文件夹挪走。
+    #[error("数据库属于另一个 Zepp 账号")]
+    AccountMismatch,
+
+    /// AI 分析任务/模板这一层的业务失败（`err.ai_task.*` / `err.ai_template.*`）。
+    /// 码与参数由 [`crate::ai_tasks::AiTaskError`] 自己定——命令层不猜实体。
+    #[error("{0}")]
+    AiTask(#[from] crate::ai_tasks::AiTaskError),
+
+    /// 训练计划这一层的业务失败（`err.training_plan.*`）：草稿不存在、已经发过等。
+    #[error("{message}")]
+    TrainingPlan { code: &'static str, message: String },
+
     #[allow(dead_code)]
     #[error("未知错误: {0}")]
     Unknown(String),
 }
 
 pub type Result<T> = std::result::Result<T, ZeppBridgeError>;
+
+/// `serde_json` 的失败一律落 `ParseError`——载荷序列化/反序列化错误在
+/// 出口语义上和「云端报文解析不了」是同一类。
+impl From<serde_json::Error> for ZeppBridgeError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::ParseError(format!("JSON 处理失败: {error}"))
+    }
+}
 
 impl ZeppBridgeError {
     pub fn needs_reauth(&self) -> bool {
@@ -219,10 +249,14 @@ impl ZeppBridgeError {
             Self::CredentialStore(_) => "err.core.credential_store",
             Self::InvalidHost(_) => "err.core.invalid_host",
             Self::ConfigError(_) => "err.core.config",
+            Self::TimedOut(_) => "err.core.timed_out",
             Self::Busy(_) => "err.core.busy",
             Self::ParseError(_) => "err.core.parse",
             Self::DatabaseError(_) => "err.core.database",
             Self::IoError(_) => "err.core.io",
+            Self::AiTask(inner) => inner.code(),
+            Self::TrainingPlan { code, .. } => code,
+            Self::AccountMismatch => "err.core.account_mismatch",
             Self::Unknown(_) => "err.core.unknown",
         }
     }
@@ -255,6 +289,7 @@ impl ZeppBridgeError {
             | Self::CredentialStore(message)
             | Self::InvalidHost(message)
             | Self::ConfigError(message)
+            | Self::TimedOut(message)
             | Self::Busy(message) => sanitize_user_text(message),
             // 不过 `sanitize_user_text`：那一层有 140 字上限，而这几句的
             // 全部价值就在于把两个环境变量名和该跑哪条命令说完整。它们是
@@ -263,6 +298,11 @@ impl ZeppBridgeError {
             Self::ParseError(_) => "Zepp 返回的数据无法解析".into(),
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),
+            Self::AiTask(inner) => inner.user_message(),
+            Self::TrainingPlan { message, .. } => sanitize_user_text(message),
+            Self::AccountMismatch => "这个数据库里已经是另一个 Zepp 账号的数据，没有写入当前账号。\
+                要换账号，请先关掉 ZeppBridge，把 data 文件夹移走或改名，再重新连接。"
+                .into(),
             Self::Unknown(message) => sanitize_user_text(message),
         }
     }

@@ -5,10 +5,13 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:webview:allow-set-webview-zoom",
     "dialog:allow-open",
-    "dialog:allow-save",
+    "clipboard-manager:allow-read-text",
     "updater:default",
     "process:allow-restart",
+    "opener:allow-reveal-item-in-dir",
+    "drag:allow-start-drag",
     {
       "identifier": "opener:allow-open-url",
       "allow": [
@@ -18,7 +21,9 @@
         { "url": "https://www.kimi.com/" },
         { "url": "https://www.doubao.com/chat/" },
         { "url": "https://chat.deepseek.com/" },
-        { "url": "https://grok.com/" }
+        { "url": "https://grok.com/" },
+        { "url": "https://github.com/lingcang728/ZeppBridge" },
+          { "url": "https://www.openstreetmap.org/copyright" }
       ]
     }
   ]

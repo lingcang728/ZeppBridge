@@ -1,0 +1,5 @@
+/* HeartRateDetail.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
+.metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
+.stack { display: grid; gap: var(--space-4); }
+/* 说明为什么这个数字和 Zepp App 里的不一样。少了它，用户只会以为其中一边坏了。 */
+.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }

@@ -22,6 +22,18 @@ pub const CONTRACT_VERSION: &str = "1";
 /// 不许再在前端写死一个数字。
 pub const INCREMENTAL_SYNC_DAYS: i64 = 30;
 
+/// 静默的定时自动同步只重拉最近这么多天。
+///
+/// 自动同步每 15 分钟一次；每次都把 30 天整窗重拉一遍，是每次八九十个请求、
+/// 一天近万次——对一个非官方接口来说既浪费又招限流，而其中 27 天几乎总是原样
+/// 回来。手表晚几天才同步上云的数据，由下面这条「每天至少一次整窗」兜住。
+///
+/// 手动同步、启动同步、托盘同步和 CLI 仍然是整窗。界面同样从 `AppStatus` 读它。
+pub const QUICK_SYNC_DAYS: i64 = 3;
+
+/// 距上一次**成功的**整窗同步超过这么多小时，定时同步就照旧整窗拉一次。
+pub const FULL_WINDOW_REFRESH_HOURS: i64 = 24;
+
 /// 时间的表达方式。
 pub const TIME_CONVENTION: &str = "所有时间戳都是 RFC 3339，带时区偏移。云端拉取时间（synced_at / fetched_at）与健康样本发生时间（start_time / timestamp）是两件事，任何情况下都不会互相替代。";
 
@@ -47,7 +59,22 @@ pub struct MetricContract {
 ///
 /// 单位一律用机器可读的短串（`bpm`、`ml/kg/min`），中文说明单独放在
 /// `description`，这样 MCP schema 里的单位不会因为语言而变。
-pub const METRICS: [MetricContract; 38] = [
+pub const METRICS: [MetricContract; 41] = [
+    MetricContract {
+        metric: "blood_pressure_systolic",
+        unit: "mmHg",
+        description: "收缩压，候选接口的明确数值字段；实际测量账号尚待核对",
+    },
+    MetricContract {
+        metric: "blood_pressure_diastolic",
+        unit: "mmHg",
+        description: "舒张压，与收缩压成对保存，保留测量时间",
+    },
+    MetricContract {
+        metric: "blood_pressure_pulse",
+        unit: "bpm",
+        description: "血压测量时的脉搏；缺失则不写，不混入全天心率",
+    },
     // 体重与体成分。来自 `/users/{id}/members/-1/weightRecords`，
     // 不是事件面——见 `ZeppConnector::fetch_weight_records`。
     MetricContract {
@@ -245,6 +272,34 @@ pub const METRICS: [MetricContract; 38] = [
 ];
 
 /// 指标名列表，供 MCP schema 的 enum 使用。
+/// 「健康日」的今天：按设备的时区（同步时从设备信息里记下的 IANA 名）算；不知道设备
+/// 时区、或者名字认不出来时，退回这台电脑的本地时区——不退回 UTC。
+///
+/// 日度指标（`daily_metrics.date`）是设备本地日。以前「今日步数」拿电脑本地日去比：
+/// 电脑和手表不在同一个时区时（出差、远程桌面），午夜前后今日步数是空的或是昨天的。
+pub fn health_today(
+    device_time_zone: Option<&str>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> chrono::NaiveDate {
+    if let Some(name) = device_time_zone
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    {
+        if let (Ok(zone), Ok(timestamp)) = (
+            jiff::tz::TimeZone::get(name),
+            jiff::Timestamp::from_second(now.timestamp()),
+        ) {
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(
+                &timestamp.to_zoned(zone).date().to_string(),
+                "%Y-%m-%d",
+            ) {
+                return date;
+            }
+        }
+    }
+    now.with_timezone(&chrono::Local).date_naive()
+}
+
 pub fn metric_names() -> Vec<&'static str> {
     METRICS.iter().map(|item| item.metric).collect()
 }

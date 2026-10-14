@@ -6,6 +6,7 @@ import {
   formatPaceSeconds,
   indexSeries,
   latestValue,
+  sliceSeries,
 } from '../metricSeries';
 import { setDateOrder } from '../dateTime';
 
@@ -24,10 +25,20 @@ const series = (overrides: Partial<MetricSeries> = {}): MetricSeries =>
   }) as MetricSeries;
 
 describe('覆盖度要说出来，而不是被曲线抹平', () => {
+  it('血压切换日期范围后仍用实测最低与最高，而非日均值极值', () => {
+    const bp = series({ metric: 'blood_pressure_systolic', points: [
+      { date: '2026-06-01', value: 111, min: 106, max: 126 },
+      { date: '2026-05-31', value: 110, min: 105, max: 130 },
+    ] });
+    const cut = sliceSeries(bp, 1, new Date(2026, 5, 1, 12));
+    expect(cut.minimum).toBe(106);
+    expect(cut.maximum).toBe(126);
+    expect(cut.average).toBe(111);
+  });
   it('说清窗口里有多少天真的有记录', () => {
     // 180 天里穿过 12 个点的一条线，不是 180 天的趋势。
     // 读者有权在读出斜率之前知道这件事。
-    expect(coverageLabel(series())).toBe('180 天里有 12 天记录');
+    expect(coverageLabel(series())).toBe('180 天中 12 天有记录');
   });
 
   it('一天记录都没有时直说无记录', () => {

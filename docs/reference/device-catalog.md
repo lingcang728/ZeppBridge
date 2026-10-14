@@ -1,5 +1,7 @@
 # Official Amazfit device catalog
 
+[简体中文](device-catalog.zh-CN.md)
+
 `src/assets/devices/catalog.json` is a maintenance-time snapshot; the model
 list was checked on 2026-08-15 and `device_source_codes` was added on
 2026-09-01 and extended on 2026-09-11. It contains 55 total entries, of which 54 are `active`/`supported`,

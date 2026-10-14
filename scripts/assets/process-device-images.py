@@ -50,7 +50,12 @@ def build(source: Path, destination: Path, max_size: int = 900) -> None:
     image.save(destination.with_suffix(".webp"), "WEBP", lossless=True, method=6)
     thumb = image.copy()
     thumb.thumbnail((240, 240), Image.Resampling.LANCZOS)
-    thumb.save(destination.with_name(destination.stem + "-thumb.png"), "PNG", optimize=True)
+    # 缩略图只给落地页的设备跑马灯用（72 px 显示）。有损 WebP q90 + 无损 alpha：比
+    # 优化过的 PNG 小四分之三（52 张 2.2 MB → 0.6 MB），在 72 px 上看不出差别。
+    thumb.save(
+        destination.with_name(destination.stem + "-thumb.webp"),
+        "WEBP", quality=90, alpha_quality=100, method=6, exact=True,
+    )
 
 
 def main() -> None:

@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tauri::{AppHandle, Emitter};
 
 use crate::app_state::AppState;
@@ -6,11 +6,17 @@ use crate::ipc_error::AppError;
 use crate::ipc_types::{ui_sync_report, UiSyncReport};
 use crate::models::{CapabilityProbe, UserPrefs};
 use crate::storage::coverage::CoverageLedger;
-use crate::sync::{StreamStatus, SyncManager, SyncProgress, SyncReport};
+use crate::sync::{
+    probe_since, CloudProbe, OfficialMode, OfficialSync, StreamStatus, SyncManager, SyncProgress,
+    SyncReport,
+};
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use zeppbridge_core::official::OfficialStore;
 use zeppbridge_core::storage::write_lock::{self, WritePurpose};
+use zeppbridge_core::storage::Database;
 
 use super::with_write;
 
@@ -37,7 +43,7 @@ pub async fn start_initial_sync(
                 .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
         }
     };
-    run_sync(&app, &state, Some(days)).await
+    run_sync(&app, &state, SyncWindow::History(days), false).await
 }
 
 #[tauri::command]
@@ -51,17 +57,41 @@ pub async fn start_history_sync(
 
 /// Run the overlap-window incremental sync and return per-stream progress.
 #[tauri::command]
+/// `quick`：静默的定时同步。只重拉最近几天，整窗刷新到期时照旧整窗
+/// （见 `SyncManager::quick_sync_report_with_progress`）。用户点的、启动时的
+/// 同步不带它，永远整窗。
+///
+/// `skip_probe`：不先探云端新不新（1E）。「云端还没有新数据」提示里的「再试」带它——
+/// 用户刚在手机上下拉过，就是要真同步一次，不能再被探针挡回去。
 pub async fn start_incremental_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
+    quick: Option<bool>,
+    skip_probe: Option<bool>,
 ) -> std::result::Result<UiSyncReport, AppError> {
-    if state.auth_state.read().await.as_str() != "verified" {
+    if state.auth_state.read().await.as_str() != "verified" && !official_connected(&state.data_dir)
+    {
         return Err(AppError::new(
             "err.sync.not_verified",
             "请先完成连接验证，再同步最近数据",
         ));
     }
-    run_sync(&app, &state, None).await
+    let window = if quick.unwrap_or(false) {
+        SyncWindow::Quick
+    } else {
+        SyncWindow::Incremental
+    };
+    run_sync(&app, &state, window, !skip_probe.unwrap_or(false)).await
+}
+
+/// 一次同步往回拉多远。
+enum SyncWindow {
+    /// 常规整窗（`INCREMENTAL_SYNC_DAYS`）。
+    Incremental,
+    /// 定时同步：最近几天，整窗刷新到期时整窗。
+    Quick,
+    /// 历史同步：用户设定的天数。
+    History(i64),
 }
 
 /// Probe the optional Zepp event streams and report what answers.
@@ -135,6 +165,7 @@ pub async fn start_history_backfill(
         return Err(deferred_app_error(kind));
     }
     let manager = require_manager(&state).await?;
+    begin_progress_epoch();
     match manager
         .history_backfill(from, to, max_chunks.unwrap_or(24), |progress| {
             emit_sync_progress(&app, progress)
@@ -157,8 +188,8 @@ pub async fn start_history_backfill(
 pub async fn get_coverage_ledger(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
-    let db = state.db.lock().await;
-    db.coverage_ledger().map_err(AppError::from)
+    // 补拉进行时界面会反复拉它：走独立只读连接，不和同步收尾抢命令侧的锁。
+    super::spawn_independent_read(state.data_dir.clone(), |db| db.coverage_ledger()).await
 }
 
 /// 清空账本，重新规划一次补拉。
@@ -198,7 +229,57 @@ pub async fn cancel_sync(state: tauri::State<'_, AppState>) -> std::result::Resu
     if let Some(manager) = state.sync.read().await.clone() {
         manager.request_cancel();
     }
+    if let Ok(current) = OFFICIAL_CANCEL.lock() {
+        if let Some(flag) = current.as_ref() {
+            flag.store(true, Ordering::SeqCst);
+        }
+    }
     Ok(())
+}
+
+/// 正在跑的那次官方同步的取消旗标（同步命令本身串行，同一时间只有一次）。
+static OFFICIAL_CANCEL: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
+
+/// 官方授权在不在（令牌还在、没有被标成要重新授权）。
+pub(crate) fn official_connected(data_dir: &std::path::Path) -> bool {
+    OfficialStore::new(data_dir)
+        .meta()
+        .ok()
+        .flatten()
+        .is_some_and(|meta| !meta.needs_reauth)
+}
+
+/// 跑一轮官方同步。窗口天数和旧通道同一套规则。
+async fn run_official(
+    state: &AppState,
+    window: &SyncWindow,
+    mode: OfficialMode,
+    on_progress: &(dyn Fn(SyncProgress) + Send + Sync),
+) -> zeppbridge_core::models::error::Result<SyncReport> {
+    let db = Database::open_without_migration(state.data_dir.join("zepp.db"))?;
+    let days = match window {
+        SyncWindow::History(days) => *days,
+        SyncWindow::Incremental => zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS,
+        SyncWindow::Quick => {
+            zeppbridge_core::sync::quick_window_days(db.full_window_refresh_due(Utc::now())?)
+        }
+    };
+    // 手表自己报过时区就用它，没有（只连官方）就用这台电脑的时区。
+    let time_zone = db
+        .device_time_zone()
+        .ok()
+        .flatten()
+        .unwrap_or_else(zeppbridge_core::official::fetch::system_time_zone);
+    let cancel = Arc::new(AtomicBool::new(false));
+    if let Ok(mut current) = OFFICIAL_CANCEL.lock() {
+        *current = Some(cancel.clone());
+    }
+    let sync = OfficialSync::new(&state.data_dir, db, cancel, time_zone)?;
+    let result = sync.run(days, mode, on_progress).await;
+    if let Ok(mut current) = OFFICIAL_CANCEL.lock() {
+        *current = None;
+    }
+    result
 }
 
 async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManager>, AppError> {
@@ -210,16 +291,64 @@ async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManage
         .ok_or_else(|| AppError::new("err.sync.not_connected", "尚未连接 Zepp，请先完成连接"))
 }
 
+/// 每一轮同步在诊断日志里留两行：开始（哪种窗口、探不探云端）和结论（让路 / 云端不新 / 写了几条 / 错误码）。
+/// 以前一行都没有：用户说「点同步没反应」时，日志里看不出同步到底开没开始、为什么停下（10-13）。
+/// 只记结论和条数，不记任何健康数据、令牌或请求内容。
 async fn run_sync(
     app: &AppHandle,
     state: &AppState,
-    history_days: Option<i64>,
+    window: SyncWindow,
+    probe: bool,
+) -> std::result::Result<UiSyncReport, AppError> {
+    let label = match &window {
+        SyncWindow::Incremental => "incremental".to_string(),
+        SyncWindow::Quick => "quick".to_string(),
+        SyncWindow::History(days) => format!("history {days}d"),
+    };
+    crate::diagnostics::log(&format!("Sync started: {label}, probe={probe}"));
+    let started = std::time::Instant::now();
+    let result = run_sync_locked(app, state, window, probe).await;
+    let took = started.elapsed().as_secs_f64();
+    match &result {
+        Ok(report) => crate::diagnostics::log(&format!(
+            "Sync finished: {label}, outcome={}{}, records={}, in {took:.1}s",
+            report.outcome,
+            report
+                .message_code
+                .as_deref()
+                .map(|code| format!(" ({code})"))
+                .unwrap_or_default(),
+            report.total_records,
+        )),
+        Err(error) => crate::diagnostics::log(&format!(
+            "Sync failed: {label}, code={}, in {took:.1}s",
+            error.code
+        )),
+    }
+    result
+}
+
+async fn run_sync_locked(
+    app: &AppHandle,
+    state: &AppState,
+    window: SyncWindow,
+    probe: bool,
 ) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
     // Re-read after the lock: save/clear may have swapped the manager while
     // this command waited, and the handle cloned beforehand would keep writing
     // with the old credential.
-    let manager = require_manager(state).await?;
+    //
+    // 旧通道（高级数据）和 Zepp 官方授权可以只连一边：只连官方时整轮都走官方，
+    // 两边都连时旧通道跑完再补官方独有的那几样（core::sync::official）。
+    let manager = state.sync.read().await.clone();
+    let official = official_connected(&state.data_dir);
+    if manager.is_none() && !official {
+        return Err(AppError::new(
+            "err.sync.not_connected",
+            "尚未连接 Zepp，请先完成连接",
+        ));
+    }
     // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
     // raw payload, which writes in bulk for as long as a quarter of an hour on
     // a large library. A sync starting in the middle of that used to lose the
@@ -234,20 +363,56 @@ async fn run_sync(
     if let Some(kind) = local_maintenance_deferred() {
         return Ok(deferred_ui_report(kind));
     }
-    let before = {
+    let (before, full_refresh_due) = {
         let database = state.db.lock().await;
-        database.newest_samples()?
+        // 读不出来就当到期：宁可多跑一次整窗，也不能被探针挡掉。
+        let due = database.full_window_refresh_due(Utc::now()).unwrap_or(true);
+        (database.newest_samples()?, due)
     };
+    // 同步前先探云端新不新（1E）：手机还没把手表的新数据传上去时，不跑整套流（十几到几十秒），
+    // 直接告诉用户去手机上下拉一下。只在快 / 增量同步时探；探不出结论照常同步。
+    // 「不新」时不写库，也不记这一轮的云端同步时间——什么都没拉。
+    if let Some(since) = probe
+        .then(|| probe_window(&window, &before, full_refresh_due))
+        .flatten()
+    {
+        let probe = match &manager {
+            Some(manager) => manager.probe_cloud(since).await,
+            None => official_probe(state, since).await,
+        };
+        if let CloudProbe::Stale { cloud_latest_at } = probe {
+            return Ok(cloud_stale_ui_report(cloud_latest_at));
+        }
+    }
     let started_at = Utc::now().to_rfc3339();
-    let report_result = if let Some(days) = history_days {
-        manager
-            .history_sync_report_with_progress(days, |progress| emit_sync_progress(app, progress))
-            .await
-    } else {
-        manager
-            .incremental_sync_report_with_progress(|progress| emit_sync_progress(app, progress))
-            .await
+    let epoch_at_start = crate::storage::content_epoch();
+    begin_progress_epoch();
+    let on_progress = |progress| emit_sync_progress(app, progress);
+    let report_result = match &manager {
+        Some(manager) => match window {
+            SyncWindow::History(days) => {
+                manager
+                    .history_sync_report_with_progress(days, on_progress)
+                    .await
+            }
+            SyncWindow::Quick => manager.quick_sync_report_with_progress(on_progress).await,
+            SyncWindow::Incremental => {
+                manager
+                    .incremental_sync_report_with_progress(on_progress)
+                    .await
+            }
+        },
+        None => run_official(state, &window, OfficialMode::Only, &on_progress).await,
     };
+    // 两边都连：旧通道这一轮没出大错，再补官方睡眠和每小时步数。补充失败只写日志，
+    // 不改这一轮的结论——旧通道的数据已经在了。
+    if manager.is_some() && official && report_result.is_ok() {
+        if let Err(error) =
+            run_official(state, &window, OfficialMode::Supplement, &on_progress).await
+        {
+            eprintln!("官方补充同步没有完成: {error}");
+        }
+    }
     let finished_at = Utc::now().to_rfc3339();
     let report = match report_result {
         Ok(report) => report,
@@ -258,9 +423,10 @@ async fn run_sync(
             // A user-initiated cancellation is a deliberate terminal outcome,
             // not a failure: report it as `cancelled` so the UI can show a
             // neutral banner instead of a red error.
-            record_cloud_sync_locked(state, &finished_at, "cancelled", 0).await?;
+            record_cloud_sync_locked(state, &finished_at, "cancelled", 0).await;
             return Ok(ui_sync_report(
                 SyncReport {
+                    cleanup_failed: false,
                     success: false,
                     core_ok: false,
                     streams: Vec::new(),
@@ -274,8 +440,9 @@ async fn run_sync(
             ));
         }
         Err(error) => {
-            record_cloud_sync_locked(state, &finished_at, "failed", 0).await?;
-            if error.needs_reauth() {
+            record_cloud_sync_locked(state, &finished_at, "failed", 0).await;
+            // 只连官方时，令牌失效已经记在 official.json 里；旧通道的状态不动。
+            if error.needs_reauth() && manager.is_some() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
             return Err(error.into());
@@ -283,7 +450,12 @@ async fn run_sync(
     };
     let (freshness, after) = {
         let database = state.db.lock().await;
-        let freshness = database.stream_freshness()?;
+        // 数据已经落库了：读新鲜度失败只让「有没有新样本」的判断退回保守的一边，
+        // 不该把这一轮成功的同步变成错误。
+        let freshness = database.stream_freshness().unwrap_or_else(|error| {
+            eprintln!("同步后读取新鲜度失败: {error}");
+            Default::default()
+        });
         let after = freshness
             .iter()
             .map(|(stream, value)| (stream.clone(), value.newest_sample_at.clone()))
@@ -291,9 +463,11 @@ async fn run_sync(
         (freshness, after)
     };
     let outcome = classify_outcome(&report, &before, &after);
-    record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await?;
+    record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await;
 
-    if report.streams.iter().any(|stream| stream.needs_reauth) {
+    if manager.is_none() {
+        // 只连官方：下面两条改的是旧通道的认证状态，与这一轮无关。
+    } else if report.streams.iter().any(|stream| stream.needs_reauth) {
         *state.auth_state.write().await = "needs_reauth".to_string();
     } else if report.core_ok {
         // 主干数据流通了就说明这份凭据是好的。一条支流（sleep / hrv……）失败
@@ -305,13 +479,21 @@ async fn run_sync(
         *state.auth_warning.write().await = None;
     }
 
-    Ok(ui_sync_report(
+    // 窗口每天往前挪一格：同步完顺手把新进窗口的训练计划发出去（没连官方、窗口
+    // 为空或内容没变都不发）。
+    if official {
+        super::training_plan::roll_after_sync(state).await;
+    }
+
+    let mut ui_report = ui_sync_report(
         report,
         started_at,
         finished_at,
         outcome.to_string(),
         &freshness,
-    ))
+    );
+    ui_report.content_changed = Some(crate::storage::content_epoch() != epoch_at_start);
+    Ok(ui_report)
 }
 
 /// 把一次同步归成界面上的一个词。
@@ -362,25 +544,124 @@ fn samples_advanced(
         })
 }
 
-fn emit_sync_progress(app: &AppHandle, progress: SyncProgress) {
-    let _ = app.emit("sync://progress", progress);
+/// 上一个「流完成」事件时的内容版本。初值取不可能的值：没对齐过就一律报「变了」。
+static PROGRESS_EPOCH: AtomicU64 = AtomicU64::new(u64::MAX);
+
+/// 一轮同步 / 补拉开始：之后第一个完成事件只算这一轮里的改动。
+fn begin_progress_epoch() {
+    PROGRESS_EPOCH.store(crate::storage::content_epoch(), Ordering::SeqCst);
 }
 
+/// 发给界面的进度：完成事件多带一个 `changed`——这一段到底有没有改库。
+/// 原样再拉一遍的流照样会发完成事件，界面不该为它把各页的缓存作废、重查一遍（性能审计 06）。
+#[derive(Clone, serde::Serialize)]
+struct UiSyncProgress {
+    #[serde(flatten)]
+    progress: SyncProgress,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    changed: Option<bool>,
+}
+
+fn emit_sync_progress(app: &AppHandle, progress: SyncProgress) {
+    let changed = progress.completed.then(|| {
+        let now = crate::storage::content_epoch();
+        PROGRESS_EPOCH.swap(now, Ordering::SeqCst) != now
+    });
+    let _ = app.emit("sync://progress", UiSyncProgress { progress, changed });
+}
+
+/// 记下这一轮的同步时间和结论。
+///
+/// 两条改动：等写锁放到阻塞线程池里（以前在 async 里用 `std::thread::sleep` 轮询，
+/// 最多把一个 Tokio worker 冻住 10 秒）；记不上只写日志、不报错——走到这里时数据
+/// 已经全部落库，备份 / 压缩 / CLI 重解析正好占着锁，不该把一次成功的同步变成
+/// IPC 错误、连结论都丢掉。
 async fn record_cloud_sync_locked(
     state: &AppState,
     finished_at: &str,
     outcome: &str,
     records_written: i64,
-) -> std::result::Result<(), AppError> {
-    let _write_guard = write_lock::acquire_with_timeout(
-        &state.data_dir,
-        WritePurpose::Metadata,
-        Duration::from_secs(10),
-    )?;
+) {
+    let data_dir = state.data_dir.clone();
+    let guard = tokio::task::spawn_blocking(move || {
+        write_lock::acquire_with_timeout(&data_dir, WritePurpose::Metadata, Duration::from_secs(10))
+    })
+    .await;
+    let _write_guard = match guard {
+        Ok(Ok(guard)) => guard,
+        Ok(Err(error)) => {
+            eprintln!("没能记下这一轮同步的时间（写锁被占）: {error}");
+            return;
+        }
+        Err(error) => {
+            eprintln!("没能记下这一轮同步的时间: {error}");
+            return;
+        }
+    };
     let database = state.db.lock().await;
-    database
-        .record_cloud_sync(finished_at, outcome, records_written)
-        .map_err(AppError::from)
+    if let Err(error) = database.record_cloud_sync(finished_at, outcome, records_written) {
+        eprintln!("没能记下这一轮同步的时间: {error}");
+    }
+}
+
+/// 这一轮要不要先探云端、从哪一刻往后探。明确要补历史（`History`）时不探。
+fn probe_window(
+    window: &SyncWindow,
+    before: &BTreeMap<String, Option<String>>,
+    full_refresh_due: bool,
+) -> Option<DateTime<Utc>> {
+    if matches!(window, SyncWindow::History(_)) {
+        return None;
+    }
+    let newest = before.get("heart_rate").and_then(|value| value.as_deref());
+    probe_since(newest, Utc::now(), full_refresh_due)
+}
+
+/// 只连官方时的探针：和正式同步用同一份令牌存储与时区。
+async fn official_probe(state: &AppState, since: DateTime<Utc>) -> CloudProbe {
+    let Ok(db) = Database::open_without_migration(state.data_dir.join("zepp.db")) else {
+        return CloudProbe::Unknown;
+    };
+    let time_zone = db
+        .device_time_zone()
+        .ok()
+        .flatten()
+        .unwrap_or_else(zeppbridge_core::official::fetch::system_time_zone);
+    match OfficialSync::new(
+        &state.data_dir,
+        db,
+        Arc::new(AtomicBool::new(false)),
+        time_zone,
+    ) {
+        Ok(sync) => sync.probe_cloud(since).await,
+        Err(_) => CloudProbe::Unknown,
+    }
+}
+
+/// 云端还没有新数据：一行都没拉，界面说「手表的新数据还没传到云端」。
+fn cloud_stale_ui_report(cloud_latest_at: DateTime<Utc>) -> UiSyncReport {
+    let now = Utc::now().to_rfc3339();
+    let mut report = ui_sync_report(
+        SyncReport {
+            cleanup_failed: false,
+            success: true,
+            core_ok: true,
+            streams: Vec::new(),
+            records_written: 0,
+            message: Some(
+                "手表的新数据还没传到云端。在手机上打开 Zepp 下拉同步后，再点同步".into(),
+            ),
+        },
+        now.clone(),
+        now,
+        "cloud_stale".to_string(),
+        &BTreeMap::new(),
+    );
+    report.message_code = Some("ui.sync.cloud_stale".to_string());
+    // 这一轮什么都没拉：报告里的「上次云端同步」不能写成现在（ui_sync_report 没有流时会回落到完成时间）。
+    report.last_cloud_sync_at = String::new();
+    report.cloud_latest_at = Some(cloud_latest_at.to_rfc3339());
+    report
 }
 
 fn local_maintenance_deferred() -> Option<(&'static str, &'static str)> {
@@ -415,6 +696,7 @@ fn deferred_ui_report(kind: (&'static str, &'static str)) -> UiSyncReport {
     let now = Utc::now().to_rfc3339();
     let mut deferred = ui_sync_report(
         SyncReport {
+            cleanup_failed: false,
             success: false,
             core_ok: false,
             streams: Vec::new(),
@@ -438,6 +720,7 @@ mod tests {
 
     fn report(statuses: &[StreamStatus], success: bool) -> SyncReport {
         SyncReport {
+            cleanup_failed: false,
             success,
             core_ok: success,
             streams: statuses
@@ -482,6 +765,7 @@ mod tests {
             .iter()
             .any(|(name, status)| is_core_stream(name) && *status == StreamStatus::Failed);
         SyncReport {
+            cleanup_failed: false,
             success: !any_failed,
             core_ok: !core_failed,
             streams: streams
@@ -551,6 +835,35 @@ mod tests {
             ),
             "failed"
         );
+    }
+
+    #[test]
+    fn a_stale_cloud_reports_nothing_written_and_no_sync_time() {
+        let latest = DateTime::parse_from_rfc3339("2026-10-07T08:12:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let report = cloud_stale_ui_report(latest);
+        assert_eq!(report.outcome, "cloud_stale");
+        assert_eq!(report.total_records, 0);
+        assert!(report.streams.is_empty());
+        // 这一轮什么都没拉：不能把「上次云端同步」写成现在。
+        assert!(report.last_cloud_sync_at.is_empty());
+        assert_eq!(report.message_code.as_deref(), Some("ui.sync.cloud_stale"));
+        assert_eq!(
+            report.cloud_latest_at.as_deref(),
+            Some("2026-10-07T08:12:00+00:00")
+        );
+    }
+
+    #[test]
+    fn history_backfills_never_probe_the_cloud_first() {
+        let recent = (Utc::now() - chrono::Duration::minutes(30)).to_rfc3339();
+        let before = BTreeMap::from([("heart_rate".to_string(), Some(recent))]);
+        assert!(probe_window(&SyncWindow::History(180), &before, false).is_none());
+        assert!(probe_window(&SyncWindow::Incremental, &before, false).is_some());
+        assert!(probe_window(&SyncWindow::Quick, &before, false).is_some());
+        // 整窗刷新到期：照常同步。
+        assert!(probe_window(&SyncWindow::Quick, &before, true).is_none());
     }
 
     #[test]

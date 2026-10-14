@@ -1,0 +1,360 @@
+/* 全局材质基元（「克制玻璃」）。
+ *
+ * 规则只有四种材质，颜色全部来自 tokens.css 的 --mat-*，深浅主题自动换：
+ *   卡片  .surface-card / .mat-card     —— 渐变底 + 顶边高光 + 柔和投影
+ *   凸起  .button.secondary（--mat-raised*）—— 可按的东西，按下时下沉 1px
+ *   凹槽  .mat-inset / .mat-field          —— 输入框、轨道、进度条
+ *   玻璃  .glass                          —— 只给浮层：顶栏、胶囊、下拉、弹窗
+ * 组件里不要再写第二套卡片底色；要换色就改 token。 */
+
+/* ── 卡片 ─────────────────────────── */
+.surface-card,
+.mat-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+
+/* ── 趋势卡网格（MetricTrendCard 及同款卡）──
+   列数由 `--cols` 给（lib/trendGrid.ts 按张数挑，让最后一行尽量是满的）；窗口窄到每列
+   不足 280px 时自动少排。卡片用 subgrid 共用这几行：同一行里标题、说明、曲线、统计
+   各自对齐，卡片底边齐平——不再一张长一张短、下面空出一截。 */
+.trend-grid {
+  --cols: 4;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - (var(--cols) - 1) * var(--space-4)) / var(--cols))), 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+}
+@media (max-width: 720px) {
+  .trend-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── 按钮 ─────────────────────────── */
+.button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) ease;
+}
+.button:active:not(:disabled) { transform: translateY(1px); }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.button-primary, .button.primary {
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 92%, #fff) 0%, var(--accent) 100%);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 2px 8px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.button-primary:hover:not(:disabled), .button.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 80%, #fff) 0%, var(--accent-hover) 100%);
+}
+.button-secondary, .button.secondary {
+  border-color: var(--mat-line-hover);
+  color: var(--muted);
+  background: var(--mat-raised);
+  box-shadow: var(--mat-raised-rim);
+}
+.button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  color: var(--ink);
+  background: var(--mat-raised-hover);
+}
+.button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
+
+/* ── 胶囊按钮 ─────────────────────────
+   次要动作和跳转（「添加事件」「查看全部」「管理」）全应用一个样子：和胶囊选择器里
+   选中的那块同一种凸起胶囊，图标用品牌色。quiet 是不需要底的那一档。 */
+.pill-button {
+  display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 15px;
+  border: 0; border-radius: 999px; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim);
+  color: var(--ink); font-size: var(--fs-xs); font-weight: 600; text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: scale var(--dur-fast) var(--ease-out), filter var(--dur-fast) ease;
+}
+.pill-button:hover { filter: brightness(1.1); }
+.pill-button:active { scale: .96; }
+.pill-button > svg:first-child { color: var(--accent); }
+.pill-button.quiet { background: transparent; box-shadow: none; color: var(--muted); }
+.pill-button.quiet:hover { background: var(--glass-press); color: var(--ink); filter: none; }
+/* 液态玻璃那一档（用户 2026-10-04：生活事件卡上的「添加事件」）：不是一块实色凸起，而是一片透着底的玻璃——
+   清透的底、顶边一道镜面高光、底边回光和一圈极细亮边（--glass-rim），背后的卡面被轻轻磨砂。
+   按下时玻璃略压亮一点，和顶栏的玻璃控件同一套 token。 */
+.pill-button.is-glass {
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+.pill-button.is-glass:hover { filter: none; background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), linear-gradient(var(--glass-press), var(--glass-press)), var(--glass); }
+@media (prefers-reduced-transparency: reduce) {
+  .pill-button.is-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ── 凹槽 ─────────────────────────── */
+.mat-inset {
+  border-radius: var(--radius-sm);
+  background: var(--mat-inset);
+  box-shadow: var(--mat-inset-shadow);
+}
+.mat-field {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--mat-inset);
+  box-shadow: var(--mat-inset-shadow);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.mat-field:focus { outline: none; border-color: var(--focus); box-shadow: var(--mat-inset-shadow); }
+
+/* ── 开关：components/GlassSwitch.vue（Liquid Glass，1D·D4）。以前的 .mat-switch 已删。 ── */
+
+/* ── 小标签 ───────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid var(--mat-line);
+  border-radius: 999px;
+  background: var(--mat-inset);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* ── 玻璃（只给浮层）─────────────── */
+.glass {
+  border: 1px solid var(--mat-glass-line);
+  background: var(--mat-glass);
+  -webkit-backdrop-filter: var(--mat-glass-blur);
+  backdrop-filter: var(--mat-glass-blur);
+  box-shadow: var(--mat-glass-shadow);
+}
+
+/* 浮动控件的玻璃：顶栏上的返回键、导航胶囊、同步状态、主题与语言按钮组。
+   只给浮在内容之上的功能层用，不给内容层的卡片；控件里面的元素不再各自
+   套玻璃（不叠玻璃），用填充和颜色区分。按下时从内部亮一下作为反馈。 */
+.glass-control {
+  border: 0;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+/* 里面放着会浮起玻璃透镜的控件（SegmentTrack / CapsuleWheel）时：毛玻璃挪到垫在底下的一层上，控件自己不带
+   backdrop-filter。否则透镜只看得见这组按钮里面的东西、看不见背后的页面，浮起来是一块发暗的方块
+   （lib/glassLens.ts）。 */
+/* 定位用 :where 降到零优先级：本来就是 absolute 的浮层（关系网的节点浮层）保持自己的定位。 */
+:where(.glass-control.is-lens-host) { position: relative; }
+.glass-control.is-lens-host {
+  isolation: isolate;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--glass-shadow);
+}
+.glass-control.is-lens-host:not(.has-rim)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+}
+
+/* ── 胶囊选择器的滑块位置（SegmentTrack）────────
+   注册成可插值的长度：滑块、上层「选中字」的裁切、下层字的挖空都读这两个量，
+   过渡只写在轨道上一处，三者逐帧同步——不会再出现两层字错开的重影。 */
+@property --thumb-l { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --thumb-w { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --thumb-t { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --thumb-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
+
+/* ── 换主题的扩散（useTheme.revealTheme）──────────
+   新主题的整页快照套一个圆形 clip-path，从被点的按钮处长大；旧快照垫在底下不动。
+   快照层不接指针：动画放着的时候，点击照常落到底下的真实页面（能马上再拨一下，
+   不会被动画「硬控」住）。 */
+html[data-theme-morph]::view-transition { pointer-events: none; }
+html[data-theme-morph]::view-transition-old(root),
+html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* 换语言的「响指」（lib/motion/ashSwitch.ts）：同样不接指针、不放默认的交叉淡化；灰的画布是单独一层，
+   只有新的一侧、不要默认的淡入。
+   导航胶囊在两种语言里位置、宽度都不同（中文居中，英文让到左边、更宽）：换场期间单独成一层（ash-nav），
+   **胶囊的玻璃底由这一层自己画**——快照里只留字和选中块，组框从旧位置、旧宽度平滑伸缩到新的，圆角是真圆角、
+   不会被拉伸。以前两张快照各带一只宽窄不同的胶囊叠着淡入淡出，边缘左右闪（2026-10-06 修）。
+   字照常化灰：旧字在前三成淡出（灰已经飞起来了），新字从两成开始淡入。时长和 LOCALE_REVEAL_MS 一致。 */
+html[data-ash-morph]::view-transition { pointer-events: none; }
+html[data-ash-morph]::view-transition-old(root),
+html[data-ash-morph]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* 新语言从一圈柔边里露出来（10-12，替代硬 clip-path 圆）：圆心 / 柔边宽由 ashSwitch.ts 写在根上，半径 --ash-r 被动画推。 */
+@property --ash-r { syntax: '<length>'; inherits: true; initial-value: 0px; }
+html[data-ash-morph]::view-transition-new(root) {
+  -webkit-mask-image: radial-gradient(circle at var(--ash-x, 50%) var(--ash-y, 0px), #000 calc(var(--ash-r) - var(--ash-f, 160px)), transparent var(--ash-r));
+  mask-image: radial-gradient(circle at var(--ash-x, 50%) var(--ash-y, 0px), #000 calc(var(--ash-r) - var(--ash-f, 160px)), transparent var(--ash-r));
+}
+::view-transition-group(ash-dust), ::view-transition-new(ash-dust) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(ash-dust) { display: none; }
+/* 浮层里换语言（data-ash-scoped，见 ashSwitch.ts）：导航压在浮层底下，不单独成层，不然它会浮到浮层上面闪一下。 */
+html[data-ash-morph]:not([data-ash-scoped]) .pill-nav { view-transition-name: ash-nav; }
+html[data-ash-morph]:not([data-ash-scoped]) .pill-nav,
+html[data-ash-morph]:not([data-ash-scoped]) .pill-nav::after { box-shadow: none; background: none; }
+html[data-ash-morph]:not([data-ash-scoped]) .pill-nav .segment-glass { opacity: 0; }
+html[data-ash-morph]::view-transition-group(ash-nav) {
+  animation-duration: 1050ms;
+  animation-timing-function: cubic-bezier(.4, .6, .2, 1);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  box-shadow: inset 0 0 0 1px var(--mat-glass-line), var(--glass-outline), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html[data-ash-morph]::view-transition-old(ash-nav),
+html[data-ash-morph]::view-transition-new(ash-nav) { height: 100%; object-fit: none; mix-blend-mode: normal; }
+html[data-ash-morph]::view-transition-old(ash-nav) { animation: ash-nav-out 1050ms linear both; }
+html[data-ash-morph]::view-transition-new(ash-nav) { animation: ash-nav-in 1050ms linear both; }
+@keyframes ash-nav-out { 0% { opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes ash-nav-in { 0%, 20% { opacity: 0; } 55%, 100% { opacity: 1; } }
+/* 系统设置「提高对比度」：玻璃加一圈实边。 */
+@media (prefers-contrast: more) {
+  .glass-control { box-shadow: inset 0 0 0 1px var(--ink), var(--glass-shadow); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-control, .glass-control.is-lens-host::before { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass-control.is-lens-host { background: none; }
+}
+
+/* ── 发光（「数据已备好」）──────────────────
+   一圈沿边缘流动的品牌渐变细环 + 一圈会呼吸的外光。只给「该去取了」这一种
+   时刻用：同一屏上不该有第二样东西在发光。
+   玻璃控件带 backdrop-filter，本身就是层叠上下文：z-index:-1 的伪元素会画在
+   它的底色之上——所以环用 mask 挖空只留一道边，外光用 box-shadow（外阴影
+   从不画进盒子里面），都不会把胶囊内部染成彩色。
+   环转的是注册属性（每帧重画渐变）：转三圈、呼吸四次就停在静止的彩环上——
+   提示已经送到，「数据已备好」可能挂上几个小时，不能一直占着 GPU。 */
+@property --glow-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.ready-glow { position: relative; }
+.ready-glow::before, .ready-glow::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.ready-glow::before {
+  inset: -1.5px;
+  padding: 1.5px;
+  background: conic-gradient(from var(--glow-angle), var(--accent), var(--activity), var(--pace), var(--training), var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: glow-spin 3.6s linear 3;
+}
+.ready-glow::after {
+  inset: 0;
+  box-shadow: 0 0 18px 1px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 0 44px 6px color-mix(in srgb, var(--activity) 24%, transparent);
+  animation: glow-breathe 2.6s ease-in-out 4;
+}
+@keyframes glow-spin { to { --glow-angle: 360deg; } }
+@keyframes glow-breathe { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .ready-glow::before, .ready-glow::after { animation: none; }
+}
+
+/* 窗口看不见（最小化 / 被挡住）时动画一律暂停；转圈类进度指示不停。开关由 main.ts 维护，
+   只认 document.hidden——可见但失焦时暂停会把入场动画冻在透明的第一帧。 */
+html.is-backgrounded *, html.is-backgrounded ::before, html.is-backgrounded ::after { animation-play-state: paused; }
+html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-state: running; }
+
+/* 列表页（睡眠、运动）的容器：和「最近记录」时间线同一块板，一根渐隐的细线串起每一行的节点
+   （行本身见 components/RecordRow.vue：日期 112px + 间距 10px + 节点 44px 的一半）。 */
+.record-list {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px 22px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+.record-list::before {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: 30px;
+  left: calc(20px + 112px + 10px + 21px);
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent));
+}
+@media (max-width: 640px) {
+  .record-list::before { left: calc(20px + 72px + 10px + 19px); }
+}
+
+/* ── 卡片入场 ──
+   卡片出现时（首次加载骨架换成内容、切页、缓存页回到场上）一律轻轻淡入、上浮 8px，
+   同一排里依次错开一点，像 iOS 的系统卡片那样「浮」出来——以前是空一拍、然后整块啪地
+   出现。只动 opacity 和独立的 translate 属性（不占 transform，卡片自己的倾斜、悬停照旧）。 */
+@keyframes card-enter { from { opacity: 0; translate: 0 8px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .surface-card, .trend-card, .metric-panel, .weekly-card, .hourly-card, .record-list, .life-events, .sources-strip {
+    animation: card-enter 460ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .trend-grid > :nth-child(2), .dashboard-grid > :nth-child(2) { animation-delay: 40ms; }
+  .trend-grid > :nth-child(3), .dashboard-grid > :nth-child(3) { animation-delay: 80ms; }
+  .trend-grid > :nth-child(4), .dashboard-grid > :nth-child(4) { animation-delay: 120ms; }
+  .trend-grid > :nth-child(n+5) { animation-delay: 160ms; }
+  /* 缓存页回到场上（usePageMorph 给它挂 page-revisit）：卡片原样就在，不再浮一遍。 */
+  .page-revisit :is(.surface-card, .trend-card, .metric-panel, .weekly-card, .hourly-card, .record-list, .life-events, .sources-strip) {
+    animation: none;
+  }
+}
+
+/* 折叠（<details>）展开 / 收起不硬切（审计 B5，2026-10-07）：内容区的高度从 0 平滑到自身高度、同时淡入，
+   收起反过来。全应用十来处折叠一起生效，不用逐个改组件。只在支持 ::details-content 的内核上生效
+   （WebView2 / Chromium 131+），不支持时照旧瞬间展开。 */
+details { interpolate-size: allow-keywords; }
+details::details-content {
+  block-size: 0;
+  overflow: clip;
+  opacity: 0;
+  transition: block-size 300ms cubic-bezier(.4, .6, .2, 1), opacity 240ms ease, content-visibility 300ms allow-discrete;
+}
+details[open]::details-content { block-size: auto; opacity: 1; }
+summary { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  details::details-content { transition: none; }
+}
+
+/* 「再显示 N 条」新出现的行淡入、轻轻浮上来（审计 B7，2026-10-07；以前一下全冒出来）。行一挂上就放一次，
+   已经在的行不动；缓存页回到场上不重放（下面的 page-revisit）。只动 opacity / transform。 */
+@keyframes row-in { from { opacity: 0; transform: translateY(8px); } }
+.tl-row, .le-timeline > li { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.page-revisit :is(.tl-row, .le-timeline > li) { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }

@@ -1,0 +1,126 @@
+/* 一张牌（第三轮 A2）。字号跟着牌宽走（--w）；读数整串不折行，放不下按 --fit（估出来的 em 宽）一起缩。 */
+/* 投影按主题走（10-13「深色太重、显脏；浅色也不好看」）：深色压浅一档，浅色换成带一点绿的淡影。 */
+.pcard { --pcard-drop: 0 18px 32px -22px rgba(0, 0, 0, .58); --pcard-drop-hi: 0 28px 44px -24px rgba(0, 0, 0, .7); --pad-drop: 0 10px 18px -14px rgba(0, 0, 0, .45); }
+:root[data-theme='light'] .pcard { --pcard-drop: 0 14px 26px -18px rgba(28, 40, 30, .26); --pcard-drop-hi: 0 22px 36px -20px rgba(28, 40, 30, .32); --pad-drop: 0 8px 14px -12px rgba(28, 40, 30, .22); }
+.pcard { --w: var(--card-w, 150px); position: relative; isolation: isolate; width: var(--w); aspect-ratio: 5 / 7; flex: 0 0 auto; padding: 0; border: 0; background: none;
+  color: var(--ink); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: scale 220ms cubic-bezier(.3, 1.3, .5, 1), opacity var(--dur-base) ease; }
+.pcard.disabled { cursor: default; }
+/* 牌面：有厚度的一块板，顶上一抹这一项的颜色，像印上去的花色底纹。 */
+.pcard-face { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; padding: calc(var(--w) * .07); border-radius: calc(var(--w) * .1);
+  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 70%), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 14%, transparent), var(--pcard-drop);
+  transition: transform 260ms cubic-bezier(.3, 1.3, .5, 1), box-shadow var(--dur-base) ease; }
+/* 双读数（乳酸阈值）：对角斜切双色——左上 tint（阈值心率红）、右下 tint2（阈值配速蓝）；两行读数各用各的颜色。 */
+.pcard.duo .pcard-face:not(.back):not(.outline) { background:
+  linear-gradient(135deg, color-mix(in srgb, var(--tint) 20%, transparent) 0 50%, color-mix(in srgb, var(--tint2) 20%, transparent) 50% 100%), var(--mat-raised); }
+.pcard.duo .pcard-value.second { color: var(--tint2); }
+.pcard.duo.day .pcard-value { font-size: min(calc(var(--w) * .15), calc(var(--w) * .8 / var(--fit, 2))); }
+.pcard:not(.disabled):not(.confirm):not(.boxed):hover .pcard-face { transform: translateY(-8px); box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), var(--pcard-drop-hi); }
+.pcard.focused .pcard-face { box-shadow: var(--mat-raised-rim), inset 0 0 0 2px color-mix(in srgb, var(--tint) 70%, transparent), 0 30px 50px -24px color-mix(in srgb, var(--tint) 40%, rgba(0, 0, 0, .8)); }
+.pcard:focus-visible { outline: none; }
+.pcard:focus-visible .pcard-face { box-shadow: var(--mat-raised-rim), 0 0 0 2px var(--focus), var(--pcard-drop); }
+.pcard.disabled .pcard-face { background: var(--mat-raised); opacity: .45; }
+/* 一叠：后面垫的牌。垫牌**不透明**、只是压暗一档（10-08 H11：以前半透明，几叠挤在一起时叠出一块块灰）。
+   10-13（「封面牌背后乱叠了很多牌，显脏」）：垫牌不再左右各歪 4–5°、探出牌边，而是**理齐了往下错一点、一张比一张小一号**，
+   像一叠码好的牌；指针移上去时才往两边扇开一点（封面抬起，垫牌跟着张开），离开收回。
+   日牌是一张薄牌；周叠后面垫两张；月叠垫两张 + 底下再一道厚边（像一整副牌），顶上的颜色也更浓——三种一眼分得出。 */
+.pcard.group::before, .pcard.group::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--w) * .1);
+  background: linear-gradient(var(--deck-shade, rgba(0, 0, 0, .16)), var(--deck-shade, rgba(0, 0, 0, .16))), var(--mat-raised); box-shadow: var(--mat-raised-rim), var(--pad-drop);
+  transition: transform 340ms cubic-bezier(.3, 1.25, .5, 1); }
+:root[data-theme='light'] .pcard.group { --deck-shade: rgba(38, 52, 41, .05); }
+.pcard.group::before { transform: translateY(calc(var(--w) * .04)) scale(.955); }
+.pcard.group::after { transform: translateY(calc(var(--w) * .08)) scale(.91); --deck-shade: rgba(0, 0, 0, .28); }
+:root[data-theme='light'] .pcard.group::after { --deck-shade: rgba(38, 52, 41, .1); }
+.pcard.group:not(.disabled):not(.empty):hover::before { transform: translate(calc(var(--w) * .05), calc(var(--w) * .02)) rotate(4deg) scale(.97); }
+.pcard.group:not(.disabled):not(.empty):hover::after { transform: translate(calc(var(--w) * -.05), calc(var(--w) * .05)) rotate(-5deg) scale(.95); }
+.pcard.group.month .pcard-face { background: radial-gradient(130% 80% at 50% 0%, color-mix(in srgb, var(--tint) 30%, transparent), transparent 72%), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 26%, transparent), 0 2px 0 -1px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 4px 0 -1px color-mix(in srgb, var(--ink) 6%, rgba(0, 0, 0, .22)), 0 6px 0 -1px color-mix(in srgb, var(--ink) 10%, transparent), var(--pcard-drop-hi); }
+.pcard.group.month::before { transform: translateY(calc(var(--w) * .05)) scale(.96); }
+.pcard.group.month::after { transform: translateY(calc(var(--w) * .1)) scale(.92); }
+.pcard.group.month:not(.disabled):not(.empty):hover::before { transform: translate(calc(var(--w) * .06), calc(var(--w) * .03)) rotate(5deg) scale(.97); }
+.pcard.group.month:not(.disabled):not(.empty):hover::after { transform: translate(calc(var(--w) * -.06), calc(var(--w) * .07)) rotate(-6deg) scale(.95); }
+.pcard.group.month .pcard-title { font-size: min(max(13px, calc(var(--w) * .15)), calc(var(--w) * .8 / var(--tfit, 4))); }
+/* 一叠挑了一部分：虚线框；整叠挑满：实线框 + 实底角标（10-08 H5「挑 5 选 5 要虚实区分」）。 */
+.pcard.picked-some .pcard-face { outline: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
+.pcard.picked-all .pcard-face { outline: 2px solid var(--accent); outline-offset: 3px; }
+.pcard.picked-some .pcard-badge { padding: 2px 8px; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--canvas, #0d0f12) 82%, transparent); color: var(--accent); box-shadow: none; }
+.pcard.group.empty { scale: .86; }
+.pcard.group.empty .pcard-face { background: var(--mat-raised); opacity: .62; }
+.pcard.group.empty::before, .pcard.group.empty::after { opacity: .3; }
+/* 角标：左上「周四 ◆」；右下只有花色点和日期数字，整枚倒过来（数字倒放像真扑克，汉字不倒放）。 */
+.corner { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-weight: 650; line-height: 1; white-space: nowrap; }
+.corner i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; background: var(--tint); transform: rotate(45deg); }
+.corner.br { justify-self: end; transform: rotate(180deg); }
+.corner.br b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pcard-main { display: grid; align-content: center; justify-items: center; gap: calc(var(--w) * .04); min-width: 0; text-align: center; }
+.pcard-icon { color: var(--tint); }
+.pcard-title { max-width: 100%; font-size: min(max(13px, calc(var(--w) * .15)), calc(var(--w) * .8 / var(--tfit, 4))); font-weight: 750; font-variant-numeric: tabular-nums;
+  line-height: 1.1; letter-spacing: -.01em; white-space: nowrap; }
+.pcard.group .pcard-title { font-size: min(max(12px, calc(var(--w) * .12)), calc(var(--w) * .8 / var(--tfit, 4))); }
+/* 读数：数字等宽大字，单位正文字体小一号、灰一级；整串一行。 */
+.pcard-value { display: inline-flex; align-items: baseline; justify-content: center; gap: .14em; max-width: 100%; color: var(--tint); white-space: nowrap; line-height: 1.05;
+  font-size: min(calc(var(--w) * .19), calc(var(--w) * .8 / var(--fit, 2))); }
+.pcard.group .pcard-value { font-size: min(calc(var(--w) * .13), calc(var(--w) * .8 / var(--fit, 2))); }
+.pcard-value b { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pcard-value small { color: var(--muted); font-family: var(--font-sans, inherit); font-size: .52em; font-weight: 600; }
+.pcard-value.none { color: var(--subtle); font-size: calc(var(--w) * .12); font-weight: 500; }
+.pcard-none-pill { padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--muted); font-size: max(10px, calc(var(--w) * .07));
+  font-weight: 650; white-space: nowrap; }
+/* 一叠里哪几天有记录：一排小点（7 个一行）。 */
+.pcard-dots { display: grid; grid-template-columns: repeat(var(--cols, 7), auto); gap: calc(var(--w) * .022); }
+.pcard-dots i { width: max(4px, calc(var(--w) * .034)); height: max(4px, calc(var(--w) * .034)); border-radius: 50%; background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.pcard-dots i.on { background: var(--tint); }
+/* 已挑进收集箱的日子点亮（放大一圈、描一道亮边）；有已挑的时候，没挑的有记录的点退一档，一眼看出挑了哪几天。 */
+.pcard-dots.has-picked i.on { background: color-mix(in srgb, var(--tint) 42%, transparent); }
+.pcard-dots i.picked { background: var(--tint); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ink) 75%, transparent), 0 0 6px color-mix(in srgb, var(--tint) 70%, transparent); scale: 1.3; }
+.pcard-badge { position: absolute; top: -9px; right: -9px; padding: 3px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-ink, #10140a);
+  font-size: var(--fs-2xs); font-style: normal; font-weight: 750; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .6); }
+/* 背面：翻过来等确认——牌抬起来、阴影加深；点大圆勾放进收集箱，点「放回」翻回去。 */
+.pcard.confirm .pcard-face { transform: translateY(-14px) scale(1.06); }
+.pcard-face.back { grid-template-rows: minmax(0, 1fr) auto; place-items: center; gap: calc(var(--w) * .04); padding-bottom: calc(var(--w) * .08); text-align: center;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)), var(--mat-raised);
+  box-shadow: var(--mat-raised-rim), inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 40px 56px -26px color-mix(in srgb, var(--accent) 45%, rgba(0, 0, 0, .85));
+  color: var(--accent); }
+.back-mark { display: grid; place-items: center; width: calc(var(--w) * .42); height: calc(var(--w) * .42); border-radius: 50%; background: var(--accent); color: var(--accent-ink, #10140a);
+  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--accent) 80%, transparent); transition: transform 160ms ease; }
+.pcard.confirm:hover .back-mark { transform: scale(1.06); }
+.pcard-face.back strong { font-size: max(13px, calc(var(--w) * .1)); }
+.back-title { color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-variant-numeric: tabular-nums; }
+/* 上半块（大圆勾 + 交给 AI）= 放进箱子；下面「放回」是一枚看得出能点的胶囊，牌边别处也都算放回（H10）。 */
+.back-send { display: grid; place-items: center; align-content: center; gap: calc(var(--w) * .045); width: 100%; height: 100%; }
+.back-cancel { padding: calc(var(--w) * .03) calc(var(--w) * .1); border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink);
+  font-size: max(11px, calc(var(--w) * .078)); font-weight: 650; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); transition: background 140ms ease; }
+.back-cancel:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); }
+/* 已在收集箱里：牌位只剩一圈虚线轮廓；点它把牌从箱子里拿回来。 */
+.pcard-face.outline { grid-template-rows: auto auto auto; place-items: center; align-content: center; gap: calc(var(--w) * .04); text-align: center;
+  background: color-mix(in srgb, var(--ink) 3%, transparent); box-shadow: none; outline: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -1.5px;
+  color: var(--muted); animation: pcard-outline-in 280ms 140ms cubic-bezier(.2, .8, .2, 1) both; }
+.pcard-face.outline :deep(svg) { color: var(--accent); }
+.pcard-face.outline small { font-size: max(10px, calc(var(--w) * .075)); }
+.pcard-face.outline b { font-size: max(12px, calc(var(--w) * .1)); font-variant-numeric: tabular-nums; }
+.pcard.boxed:hover .pcard-face.outline { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+@keyframes pcard-outline-in { from { opacity: 0; } }
+/* 闪一下：一圈光，只淡入淡出它自己（牌桌落定后、从箱子拿回来时）。 */
+.pcard-glow { position: absolute; inset: -3px; z-index: 2; border-radius: calc(var(--w) * .1 + 3px); opacity: 0; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--tint), 0 0 30px 6px color-mix(in srgb, var(--tint) 45%, transparent); }
+/* 长按（10-13 重做，原来边框描一圈绿线）：按住的 450ms 里整叠慢慢往下压、垫牌理齐贴到封面底下，
+   这一项的颜色从牌底往上灌满，光圈跟着亮起来；没按满松手就按基础过渡弹回、颜色退下去。只动 scale / transform / opacity。 */
+.pcard.holding { scale: .95; transition: scale 450ms cubic-bezier(.3, .6, .35, 1), opacity var(--dur-base) ease; }
+.pcard.group.holding::before, .pcard.group.holding::after { transform: translateY(calc(var(--w) * .015)) scale(.98); transition-duration: 450ms; }
+.pcard-charge { position: absolute; inset: 0; z-index: 1; overflow: hidden; border-radius: calc(var(--w) * .1); opacity: 0; pointer-events: none;
+  transition: opacity 240ms ease-out; }
+.pcard-charge i { position: absolute; inset: 0; transform: scaleY(0); transform-origin: 50% 100%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--tint) 34%, transparent), color-mix(in srgb, var(--tint) 12%, transparent) 70%, color-mix(in srgb, var(--tint) 24%, transparent) 92%, transparent);
+  transition: transform 220ms cubic-bezier(.4, 0, .6, 1); }
+.pcard.holding .pcard-charge { opacity: 1; transition-duration: 120ms; }
+.pcard.holding .pcard-charge i { transform: scaleY(1); transition: transform 450ms cubic-bezier(.45, .05, .55, .95); }
+.pcard-glow { transition: opacity 220ms ease-out; }
+.pcard.holding .pcard-glow { opacity: .55; transition: opacity 450ms ease-in; }
+/* 飞进箱子的那一张（替身）：只带封面，垫牌留在原处——看上去是从这一叠上抽走了一张。 */
+.pcard.peel::before, .pcard.peel::after { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .pcard, .pcard-face, .pcard.group::before, .pcard.group::after, .pcard-charge, .pcard-charge i, .pcard-glow { transition: none !important; }
+  .pcard-face.outline { animation-duration: 1ms; }
+}

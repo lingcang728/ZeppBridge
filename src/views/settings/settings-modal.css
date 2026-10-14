@@ -1,0 +1,12 @@
+/* 设置区块里弹窗的排版（隐私政策、更新说明）。弹窗 Teleport 到 body，
+ * 仍带着区块的作用域，所以按组件 scoped 引入。 */
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--mat-line); }
+.modal-title-row { display: flex; align-items: center; gap: 8px; }
+.modal-title-row h3 { margin: 0; font-size: var(--fs-xl); line-height: 1.4; }
+.shield-ic { color: var(--accent); }
+.close-btn { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.close-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.modal-body { display: grid; gap: 14px; color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
+.modal-body p { margin: 0; }
+.modal-body strong { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
+.modal-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--mat-line); }

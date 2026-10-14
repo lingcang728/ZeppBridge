@@ -1,28 +1,29 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
+import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
-import { createLoadSeq } from '../lib/loadSeq';
+import { useRevisionReload } from '../composables/useRevisionReload';
+import { tauriApi } from '../composables/useTauriApi';
+import { usePagedRecords } from '../composables/usePagedRecords';
+import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToRecent: '返回最近记录',
-    backToOverview: '返回概览',
     title: '睡眠',
     intro: '本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。',
     loadFailedTitle: '无法读取睡眠记录',
-    loadFailed: '睡眠列表暂时不可用',
+    loadFailed: '睡眠列表暂不可用',
     retry: '重试',
     emptyTitle: '还没有睡眠记录',
-    emptyMessage: '同步后会显示在这里。没有真实阶段时不会编造。',
+    emptyMessage: '同步后显示在这里。没有真实阶段就不编造。',
     scoreLabel: '评分',
     footnote: (count: number, from: string) => `${count} 条记录 · ${from} 起`,
     shown: (shown: number, total: number) => `已显示 ${shown} / 共 ${total} 条`,
@@ -30,13 +31,11 @@ const messages = defineMessages(
     loadingMore: '正在加载…',
   },
   {
-    backToRecent: 'Back to recent records',
-    backToOverview: 'Back to overview',
     title: 'Sleep',
     intro: 'Sleep records synced to this machine. Without a full timeline, only the summary is shown.',
-    loadFailedTitle: 'Could not read the sleep records',
-    loadFailed: 'The sleep list is unavailable right now',
-    retry: 'Try again',
+    loadFailedTitle: 'Could not load sleep records',
+    loadFailed: 'Sleep list unavailable right now',
+    retry: 'Retry',
     emptyTitle: 'No sleep records yet',
     emptyMessage: 'They show up here after a sync. Stages are never invented.',
     scoreLabel: 'Score',
@@ -46,15 +45,13 @@ const messages = defineMessages(
     loadingMore: 'Loading…',
   },
   {
-    backToRecent: 'Volver a registros recientes',
-    backToOverview: 'Volver al resumen',
     title: 'Sueño',
     intro: 'Registros de sueño sincronizados en este equipo. Sin una línea de tiempo completa, solo se muestra el resumen.',
     loadFailedTitle: 'No se pudieron leer los registros de sueño',
-    loadFailed: 'La lista de sueño no está disponible en este momento',
+    loadFailed: 'Lista de sueño no disponible ahora',
     retry: 'Reintentar',
     emptyTitle: 'Aún no hay registros de sueño',
-    emptyMessage: 'Aparecen aquí después de sincronizar. Las fases nunca se inventan.',
+    emptyMessage: 'Aparecen aquí tras sincronizar. Sin fases reales no se inventan.',
     scoreLabel: 'Puntuación',
     footnote: (count: number, from: string) => `${count} registros · desde ${from}`,
     shown: (shown: number, total: number) => `Mostrando ${shown} de ${total}`,
@@ -65,84 +62,27 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
-const sessions = ref<SleepSession[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
-/*
- * 分页，不是上限。
- *
- * 以前这里写死 `getRecentSleep(500)`，而后端的 SQL 只有 LIMIT 没有 OFFSET
- * ——第 501 条之后的记录在应用里**根本没有入口**。一个下载了全部历史的人
- * 会以为数据没同步下来（Reddit p6zxyo7）。
- *
- * 每页 200 而不是 500：首屏更快，而「加载更多」按一下就有下一批。
- * 刻意不引虚拟滚动库：这一页是一串 RecordRow，`v-for` 加分页就够了。
- */
-const PAGE_SIZE = 200;
-const total = ref(0);
-const loadingMore = ref(false);
-const listEpoch = createLoadSeq();
-const hasMore = computed(() => sessions.value.length < total.value);
+/* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
+const {
+  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
+} = usePagedRecords<SleepSession>({
+  loadPage: (limit, offset) => tauriApi.getSleepPage(limit, offset),
+  idOf: (item) => item.sleep_id,
+  failedText: () => t.value.loadFailed,
+  firstPage: pageQuery.sleepPage(LIST_PAGE_SIZE),
+});
+const initialLoading = useFirstLoad(loading);
 
-const loadList = async () => {
-  const epoch = listEpoch.next();
-  loading.value = true;
-  error.value = null;
-  if (!isTauri()) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    loading.value = false;
-    sessions.value = [];
-    total.value = 0;
-    return;
-  }
-  try {
-    const page = await tauriApi.getSleepPage(PAGE_SIZE, 0);
-    if (!listEpoch.isCurrent(epoch)) return;
-    sessions.value = page.items;
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    if (listEpoch.isCurrent(epoch)) loading.value = false;
-  }
-};
-
-const loadMore = async () => {
-  if (loadingMore.value || loading.value || !hasMore.value) return;
-  const epoch = listEpoch.current();
-  loadingMore.value = true;
-  try {
-    // offset 用已经拿到的条数。同步在翻页途中插进新记录会让边界上出现一条
-    // 重复——按 sleep_id 去一次重，比在前端自己维护游标简单，也不会因为
-    // 一次同步就把整个列表推翻重来。
-    const offset = sessions.value.length;
-    const page = await tauriApi.getSleepPage(PAGE_SIZE, offset);
-    if (!listEpoch.isCurrent(epoch)) return;
-    const seen = new Set(sessions.value.map((item) => item.sleep_id));
-    sessions.value = [...sessions.value, ...page.items.filter((item) => !seen.has(item.sleep_id))];
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    // loadingMore is this call's own flag, not something a newer loadList()
-    // call takes over — unlike `loading`, nothing else will ever clear it,
-    // so it must reset here even if the epoch went stale while we awaited.
-    loadingMore.value = false;
-  }
-};
-
-onMounted(() => void loadList());
-watch(dataRevision, () => void loadList());
+// 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
+onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
+useRevisionReload(() => void loadList());
 </script>
 
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
-    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
 
-    <div v-if="loading" class="surface-card" aria-live="polite">
+    <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
@@ -151,20 +91,21 @@ watch(dataRevision, () => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="surface-card">
+    <div v-else class="record-list">
       <RecordRow
         v-for="session in sessions"
         :key="session.sleep_id"
         :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
         category="sleep"
-        icon="moon"
+        design-icon="sleep"
         :kicker="formatDate(session.start_time)"
+        :time="formatTime(session.start_time)"
         :title="formatDuration(session.duration_minutes)"
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
         :fact-label="t.scoreLabel"
-        :compact="false"
       />
     </div>
+    <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
@@ -179,6 +120,7 @@ watch(dataRevision, () => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

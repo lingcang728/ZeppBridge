@@ -1,318 +1,134 @@
 <div align="center">
-  <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
+  <img src="src-tauri/icons/icon.png" width="88" height="88" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
-  <p><strong>把你的 Zepp 数据，完整交还给你。</strong></p>
-  <p>在自己的 Windows / macOS / Linux 电脑上查看、备份、导出 Amazfit 手表的健康记录。</p>
-
-  [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
-  [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
-  [![Windows](https://img.shields.io/badge/Windows-可用-0078D4?logo=windows11&logoColor=white)](#下载与安装)
-  [![macOS](https://img.shields.io/badge/macOS_Apple_Silicon-社区验证-999999?logo=apple&logoColor=white)](#下载与安装)
-  [![Linux](https://img.shields.io/badge/Linux-仅有构建-E95420?logo=linux&logoColor=white)](docs/guides/linux.zh-CN.md)
-  [![版本](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=版本)](https://github.com/lingcang728/ZeppBridge/releases)
-
-  <p><a href="README.md">English</a> · <strong>简体中文</strong> · <a href="README.es.md">Español</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.pt-BR.md">Português (Brasil)</a> · <a href="README.pt-PT.md">Português</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md">Русский</a> · <a href="README.hi-IN.md">हिन्दी</a> · <a href="README.fr.md">Français</a></p>
+  <p><strong>留住每一次记录，安排下一次出发。</strong></p>
+  <p>把 Zepp 健康数据存到电脑，查看趋势、交给 AI，再把训练计划带回手表。</p>
+  <p>免费开源 · Windows / macOS / Linux · 本地存储</p>
+  <p><a href="#开始使用">开始使用</a> · <a href="https://zeppbridge.com/">观看一分钟短片</a> · <a href="README.md">English</a></p>
 </div>
 
-> [!IMPORTANT]
-> ZeppBridge 是独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。只用于你本人有权访问的账号和数据。
+[![ZeppBridge V3 概览：个人指标、心率、步数与睡眠](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
-## Zepp App 里不是已经有这些数据了吗？
+*点击上图观看中文短片，了解界面、卡片交互与训练计划。本文图片和视频均使用示例数据。*
 
-有，但只在手机上，只能按官方给的方式看，而且它是**别人服务器上的一份**。ZeppBridge 解决的是这几件事：
+> 本页介绍 V3。V3 正式安装包尚未发布；[发布页](https://github.com/lingcang728/ZeppBridge/releases)的 2.x 版本不包含下文的全部功能。
 
-- **在电脑的大屏幕上看。** 心率、睡眠、跑步、恢复、压力、血氧的长期趋势，7 天 / 1 个月 / 6 个月随便切。
-- **数据在你自己的电脑上。** 所有记录都存进你电脑里的一个文件。断网也能看，换手机、注销账号、App 改版都不影响。
-- **可以一路补到装它以前。** 按月分块把云端历史取回来，随时可以停、可以接着做，并且如实告诉你哪几个月是「云端确实没有」而不是「还没取到」。
-- **有能真正还原的备份。** 整库快照带校验和完整性检查，恢复前先给出记录数差异预览。
-- **想导出就能导出。** JSON、CSV、GPX 三种格式，随便丢进 Excel、Strava 或你自己的脚本。
-- **想让 AI 分析，一键就走。** 挑好时间范围和数据类型，自动打包成 AI 读得懂的格式并去掉敏感信息，复制粘贴给 ChatGPT、DeepSeek、豆包都行。
-- **也能不开窗口用。** 附带一个无交互命令行（可以挂到任务计划或 cron）和一个只读 MCP 服务（让 AI 直接查你的本机数据，不必先把数据交出去）。
-- **界面有十种语言。** 首次启动跟随系统语言，设置页随时可以切；日期和数字格式也跟着走。
+## 从记录到下一步
 
-还有一件事值得单独说：**它不会替你把数据补漂亮。**
+ZeppBridge 是一款面向 Zepp / Amazfit 用户的桌面应用。手表通过手机 Zepp App 上传记录，ZeppBridge 再将可获取的数据同步到本机。已同步的记录可以离线查看、备份和导出。
 
-你那天没戴表，图上就是断的；某项指标手表没测，界面上写「未提供」，不会填成 0；没有 GPS 轨迹就不画地图。健康数据上，一条编出来的漂亮曲线比一个诚实的缺口更糟。
+### 看清自己的状态
 
-同样地，只有当覆盖账本证明每个月份块都有结论时，界面才会说「本机完整副本」；在那之前它说的是「已成功同步范围内的本地副本」。
+把关心的指标固定在概览，查看今天的状态和长期变化。从一张卡片进入一晚睡眠、一次运动，或某段时间的详细趋势。
 
-## 支持哪些设备
+- **睡眠与恢复**：睡眠时长、评分、分期，以及静息心率、HRV、准备度等趋势。
+- **运动与训练**：配速、心率、分段、训练负荷与 GPS 轨迹；有对应数据时，还能查看跑步功率和跑姿。
+- **日常活动**：步数、活动热量、压力、血氧等记录，配合个人周报回看变化。
+- **生活记录**：记下旅行、作息或身体状况，为指标变化补上自己的背景。
 
-**只要你的设备能同步到 Zepp App，就能试。** ZeppBridge 读的是你账号在云端的数据，不直接连手表，所以不挑具体型号。
+![睡眠详情：时长、评分与分期时间轴](docs/assets/readme/sleep-zh.png)
 
-内置的设备库认识 52 款 Amazfit 产品，覆盖 **GTR、GTS、T-Rex、Balance、Active、Bip、Cheetah、Falcon、Helio、Band** 等系列（含手表、臂带、手环、戒指）。认出来的会显示正确的型号和产品图；认不出的照样同步数据，只是显示成通用名字。
+跑后洞察和周报以你自己的历史为参照。没有采样的时段保留空白，缺少的指标不补零，样本不足时明确提示。
 
-具体能拿到哪些指标，取决于你的手表测不测。装好连上后，设置页的「你的设备能提供什么」会按你自己的账号逐条列出来。
+### 带着记录与 AI 讨论
 
-## 下载与安装
+不用手动整理一堆截图。选择日期、运动和数据类别，写下问题，ZeppBridge 会生成一份包含记录、单位和数据覆盖说明的 Markdown 文件。
 
-到 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 页面下载最新版。
+![交给 AI：选择历史记录、AI 工具和本次问题](docs/assets/readme/ai-zh.png)
 
-**Windows**
+- 从趋势中挑选日子放进收集箱，集中讨论一次变化或几场训练。
+- 自定义问题、补充个人背景，发送前检查带了哪些数据、缺了哪些日期。
+- 打开你选择的 AI 网站，粘贴或拖入文件；Windows 还可选择自动粘贴与发送。
+- 保存任务和往返记录，下次接着讨论。
 
-1. 下载 `ZeppBridge_<版本>_x64-setup.exe`（或 `.msi`），双击安装。
-2. 安装包还没买代码签名证书，Windows 可能弹「未知发布者」，点「更多信息」→「仍要运行」。
-3. 以后直接覆盖安装升级，数据不会丢。
+可以搭配 ChatGPT、Claude、DeepSeek 等工具使用。ZeppBridge 负责准备数据，你使用自己的 AI 账号；AI 服务的费用和数据处理规则由对应提供方决定。
 
-**macOS（Apple Silicon）**
+### 把讨论变成训练计划
 
-> **这是未签名版本。** 没有 Apple 开发者证书、也没有公证，所以 macOS 会拦着不让打开，
-> 需要你自己清掉隔离标记。下面是绕过办法，不是修复——见
-> [#2](https://github.com/lingcang728/ZeppBridge/issues/2)。
+把 AI 按约定格式生成的回复粘贴回来，计划就会排成一周的日卡。逐日检查，拖动交换日期，再调整每次训练的热身、主训练、间歇和放松。
 
-1. 下载 `ZeppBridge_<版本>_aarch64.dmg`，打开后把 `ZeppBridge.app` 拖进「应用程序」。
-2. 首次打开会失败。具体提示取决于你的 macOS 版本：
-   - 提示**「无法验证开发者」** → **右键点应用 → 打开 → 再点「打开」**。
-   - 提示**「ZeppBridge 已损坏，无法打开」** → 右键打开*没用*，要在「终端」里跑下面这行，
-     然后正常打开应用：
+![训练计划周视图：休息日、轻松跑、骑行与间歇训练](docs/assets/readme/plan-zh.png)
 
-     ```bash
-     xattr -dr com.apple.quarantine /Applications/ZeppBridge.app
-     ```
+- 编辑训练时长、距离、强度目标和重复组。
+- 把常用训练存成模板，或导入 `.zwo`、训练计划 `.fit` 文件。
+- 恢复状态较差时，可将当天的间歇训练改为轻松训练。
+- 确认后通过 Zepp 发送到兼容手表，并查看发送状态。
 
-   应用并没有损坏。任何没有公证的下载应用，Gatekeeper 都是这么说的。这类命令只对你
-   确实信任的软件执行——这个项目的每一行代码都在 GitHub 上，你也可以自己编译。
-3. macOS 版由 CI 保证能编译、能通过测试，也有贡献者在 Apple Silicon 上实际跑过；
-   但项目维护者本人没有 Mac，没法独立复核同步和钥匙串行为。介意的话建议先在
-   Windows 上用。
+目前可发送跑步、骑行、泳池游泳和公开水域游泳计划。休息与睡眠建议留在本机；手表是否接收和显示计划取决于设备支持及同步状态。
 
-为什么暂时还是这样：公证本身**不需要**有 Mac——CI 已经跑在 macOS runner 上，签名和
-公证都能在那里完成。缺的是 Apple Developer Program 会员（99 美元/年），项目还没买。
-买了之后这一段就会去掉。
+### 让浏览记录更顺手
 
-**Linux（x86_64）**
+V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动的计划和分组设置卡。支持深色、浅色与跟随系统，提供中文、英文、西班牙语等 10 个语言与地区选项，也能调整单位、时区和界面缩放。
 
-> **能构建出来，但还没有人真的用过。** CI 每次推送都会编译、跑测试、打出包来。
-> **没有**发生过的是：在一台真实的 Linux 桌面上完整走一遍登录和同步——包括令牌
-> 有没有正确进到密钥环里。请把它当成一个需要你帮忙测试的构建，而不是一个发布版。
+[观看中文短片：翻牌、拖动、主题切换与页面动效 →](https://zeppbridge.com/)
 
-发布页上有 Flatpak、`.deb`、`.rpm` 和 AppImage 四种包。都没有签名，请用
-`SHA256SUMS.txt` 核对下载。
+## 数据由你保管
 
-```bash
-sudo apt install ./ZeppBridge_<版本>_amd64.deb      # Debian、Ubuntu
-sudo dnf install ./ZeppBridge_<版本>_x86_64.rpm     # Fedora、RHEL
-flatpak install ./ZeppBridge_<版本>_x86_64.flatpak  # 任何发行版
-```
+**同步与归档。** 支持 Zepp 官方授权，并可连接高级数据补充更多指标。历史记录可以分批补拉、暂停和继续；本机覆盖范围与同步失败会分别说明。
 
-[Linux 指南](docs/guides/linux.zh-CN.md)里写了数据放在哪、没有密钥环时令牌存在
-哪，以及怎么从源码构建。
+**备份与恢复。** 创建整库快照，校验完整性，恢复前预览记录差异。长期保存的备份建议另存到其他磁盘。
 
-另外还有一个只含 CLI 和 MCP 服务的[无头容器镜像](docs/guides/docker.zh-CN.md)，
-适合在 NAS 或服务器上让数据库保持同步。它没法登录——那一步仍然需要桌面应用做一次。
+**自由导出。** JSON 用于程序处理，CSV 用于表格分析，GPX 用于运动轨迹，FIT 用于运动记录交换。导出内容以实际取得的数据为准。
 
-**暂不支持**：Intel Mac、手机。
+**接入自己的工具。** MCP 可让兼容 AI 客户端查询本机记录，健康数据只读；训练计划支持起草，直接发布需单独开启授权。另有 CLI 和默认关闭的本机只读 REST API，方便脚本与自动化使用。详见[命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
 
-### 三个平台各验证到什么程度
+## 开始使用
 
-同一个应用、同一套界面、同样的功能，区别只在于「有没有人真的验过」。与其让人猜，
-不如写清楚。
+### 下载安装
 
-| | Windows 10/11 (x64) | macOS Apple Silicon | Linux x86_64 |
-| --- | --- | --- | --- |
-| 界面与功能 | 一致 | 一致 | 一致 |
-| CI 里能编译 | 是 | 是 | 是 |
-| CI 里跑自动化测试 | 是 | 是 | 是 |
-| 安装后能直接打开 | 是（会有「未知发布者」提示） | **否** —— 见上面未签名版本的说明 | 是 |
-| 登录、同步、导出 | 每次发版维护者实测 | 只有贡献者的冒烟测试 | **还没有人验过** |
-| 凭据存储 | Credential Manager，已验证 | 钥匙串，未独立验证 | Secret Service，**还没有人验过** |
-| 自动更新 | 已验证 | 能构建，未独立验证 | 不适用 —— 由包管理器负责 |
+安装包与版本说明统一放在 [Releases](https://github.com/lingcang728/ZeppBridge/releases)。请确认下载的是你要使用的版本。
 
-维护者在 Windows 上开发，本人没有 Mac，也不用 Linux 桌面。上面这些不是说 macOS
-或 Linux 版有问题，而是说明「谁验过什么」。如果你在这两个平台上遇到异常，反馈会
-非常有用。
+| 平台 | 安装方式 | 验证情况 |
+| --- | --- | --- |
+| Windows 10/11 · x64 | 运行 `.exe` 安装包 | 主要开发与日常使用平台 |
+| macOS · Apple Silicon | 打开 `.dmg`，拖入「应用程序」 | V3 尚缺真机完整验证 |
+| Linux · x86_64 | 按发行版选择 `.deb`、`.rpm`、AppImage 或 Flatpak | V3 尚缺真机完整验证；见 [Linux 指南](docs/guides/linux.zh-CN.md) |
 
-**1.0.0 起，本机数据库的结构与升级路径开始被当作要长期维护的东西**：每次升级前自动备份，快照可以校验也可以恢复。数据存在本机、不会上传，但快照和数据库在同一块盘上——**如果你担心硬盘损坏，请自己再复制一份到别处。**
+当前安装包未做系统代码签名。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。
 
-## 第一次连接
+从 2.x 迁移前，请另存一份旧版数据库备份；V3 升级后的数据库不能直接交给 2.x 使用。
 
-1. 打开 ZeppBridge，点左边的「设置」。
-2. 点「连接」，会弹出 **Zepp 官方登录页**，用你平时的账号密码登录。
-3. 显示「已连接」后窗口自动关闭，应用会自己同步一次。等 40 秒左右，概览页就有内容了。
+### 第一次连接
 
-国内账号、国际账号都可以，登录后应用会自己认出你属于哪个区域的服务器。
+1. 首次打开可先体验示例数据，熟悉界面。
+2. 在「设置 → 账号与设备」点击「连接」，在浏览器中完成 Zepp 官方授权。
+3. 回到应用等待同步，在概览查看已取得的记录。
+4. 如需 HRV、压力、血氧等补充数据，再连接「高级数据」。该方式使用 Zepp 邮箱或手机号与密码，不支持第三方登录。
 
-第一次先拉最近 30 天，好让屏幕上尽快有东西，随后在后台继续补到 180 天。进度可见，随时可以停。之后的每次同步都是增量。
+两种连接应使用同一个 Zepp 账号。可用指标取决于设备测量、云端保存内容和授权范围；「暂未获取到」不等于设备不支持。
 
-应用里每一个「最近 N 天」——训练状态、身体状态、导出页——读的都是**本机**库，不是云端。选的范围如果比本机已有的还早，应用会说明，并给出补拉入口。图上的空白段意思是**还没取回来**，不是「你那段时间没有记录」。
+### 数据放在哪里
 
-想要 180 天以前的历史，到设置页的「长期归档与完整历史」：选 1/2/3 年或自定义起点，它按月分块取，随时可以停，下次接着做。开始前会按你本机已有数据的实际速率估算占用——不是一个写死的常数。
+在设置中使用「打开数据文件夹」可找到当前数据目录。
 
-范围超过本机保留期时，应用会先要求你打开「长期归档」，否则刚取回来的历史会在下一次成功同步后被清掉。
-
-登录卡住了？看[连接指南](docs/guides/connection.zh-CN.md)，里面有排错步骤和两种备用连接方式。
-
-## 装好之后能做什么
-
-**看趋势**
-
-| 页面 | 能看到什么 |
+| 平台 | 默认位置 |
 | --- | --- |
-| **概览** | 最近几小时心率、今日步数、昨晚睡眠结构，本周与你自己此前 28 天的对比图，以及身体状态、训练状态入口。每张卡都能点进去 |
-| **心率** | 完整 24 小时曲线，加上静息心率与两种口径 HRV 的按天趋势 |
-| **日常活动** | 步数、距离、活动热量、活动时长的按天趋势 |
-| **身体状态** | 恢复程度、压力、血氧、心率变异性、呼吸率的长期走势 |
-| **训练状态** | 最大摄氧量、训练负荷、乳酸阈值、PAI，以及最近训练量是偏多还是偏少 |
-| **最近记录** | 每一次睡眠和每一次运动，点进去看详情 |
-| **运动详情** | 距离、配速、心率、每公里分段、GPS 轨迹；跑步还有功率和跑姿 |
-| **设备** | 每台设备的型号来自哪里（目录匹配还是你指认的）、固件、最近数据，随时可以重新指认 |
-| **数据健康**（设置 → 高级与维护） | 每条流的抓取 / 解析 / 写入分别是什么状态，缺的那几天到底是没同步还是本来就没有 |
+| Windows | `ZeppBridge.exe` 旁边的 `data` 文件夹 |
+| macOS | `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| Linux | 通常为 `~/.local/share/zeppbridge/data`；Flatpak、AppImage 见 [Linux 指南](docs/guides/linux.zh-CN.md) |
 
-没有数据的指标不会占着位置显示「—」，而是直接不出现；曲线遇到超过 15 分钟没有采样的时段会断开，不会用一条直线把两头连起来。
+Windows 安装目录不可写时会使用用户数据目录；自定义目录以应用显示为准。
 
-**交给 AI**
+## 隐私与连接
 
-内置几套提示词模板（表现总结、训练洞察、恢复评估、睡眠分析等）。选好模板和时间范围，点「交给 ChatGPT」（或你选的其它工具），应用会打包好数据、抹掉设备编号和精确位置、复制到剪贴板，并打开那个网站。粘贴就能开始问。
+- 健康记录保存在本机数据库中，数据库默认不加密。
+- 同步需要连接 Zepp；官方授权的回调与令牌交换经过项目的授权中转服务。
+- 交给 AI 前会移除账号、设备标识等信息，精确 GPS 默认排除。主动提供的记录会由所选 AI 服务处理，MCP 查询结果也一样。
+- 轨迹默认在本地绘制。开启在线地图后，会向地图服务请求对应区域的地图。
+- 健康记录同步只读；你确认发送的训练计划会写入 Zepp。MCP 的「允许 AI 直接发布」是独立开关。
+- 错误报告由你主动确认提交，没有自动遥测或后台崩溃上报。
 
-单次运动详情页里也有一个「交给 AI」，范围就是**这一条运动**：包含它本身和它进行期间的逐点指标，按天记录的睡眠、步数不会跟着发出去。
+ZeppBridge 是独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。
 
-数据包超过 2 MB 时会自动存成桌面上的一个文件，拖进对话框即可。
+## 文档与反馈
 
-**导出文件**
+- [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md)
+- [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) · [Docker](docs/guides/docker.zh-CN.md)
+- [开发文档](docs/development/development.zh-CN.md) · [更新日志](CHANGELOG.md)
+- [反馈问题或建议](https://github.com/lingcang728/ZeppBridge/issues)
 
-- **JSON** — 完整结构化数据，适合喂给程序或 AI
-- **CSV** — 表格汇总，直接用 Excel 打开
-- **GPX** — 标准轨迹格式，可以导入 Strava、佳明等平台
+## 致谢与许可证
 
-导出包里有什么：训练摘要（类型、起止时间、距离、卡路里、平均/最高心率、训练
-负荷）、每日指标（步数、静息心率、HRV、血氧、压力、呼吸率、PAI、VO₂max）、
-睡眠会话与阶段时间轴。详细程度选**完整**（而不是**摘要**）时，还会带上运动
-的逐秒序列和逐条心率读数。
+接口研究参考了 [m4ary/zepp-health-cli](https://github.com/m4ary/zepp-health-cli)、[Thejuampi/icu](https://github.com/Thejuampi/icu)；运动明细解码参考了 [H3llK33p3r/zepp-fit-extractor](https://github.com/H3llK33p3r/zepp-fit-extractor)。
 
-`.fit` 是单独的一种导出格式，一次运动一个文件，写进你选的文件夹。里面是
-ZeppBridge 从 Zepp 运动明细里解出来的逐秒序列：GPS 轨迹、心率、速度、海拔、
-跑步功率、触地时间、垂直振幅，外加每公里分段和暂停事件。没测到的字段就是不
-写，不会为了让文件看起来完整而补零。步频刻意不写：它的单位在本地库里找不到
-任何汇总字段可以对账，写错了会稳定差两倍，而且看不出来。
-
-没有什么：`.tcx`、账号信息、令牌、设备序列号。GPS 轨迹在 GPX 和 FIT 里都有，
-且只覆盖真的带轨迹的运动。
-
-**跑后洞察与周报**
-
-一次运动结束后，应用会拿它和你自己的历史比：同距离区间的近几次跑步、配速、心率、训练负荷各差多少，用了几个样本、可信度如何。**基线是你自己，不是人群标准**；样本不够时它直接说证据不足，不会为了凑一句话而降低门槛。这些是事实和证据，解释交给 AI。
-
-**不会越用越沉**
-
-云端原始报文是本机库里最占地方的东西。ZeppBridge 会把它们压缩保存——新同步的一进库就是压缩的，装上新版本后第一次启动会在后台把存量压掉并回收磁盘空间，顶部显示进度，完成后自动消失。
-
-压缩前会先解压回来逐字比对，对不上的那条跳过不动：原始报文是本地重新解析的唯一依据，宁可不压也不能压坏。实测一个 211 MB 的库压缩后为 55 MB。
-
-**放着不管**
-
-关掉窗口后应用留在托盘里继续自动同步。不想让它跑，右键托盘图标退出即可。
-
-**不开窗口也能用**
-
-Release 里另有一个 `zeppbridge-tools-<版本>-<平台>.zip`，包含两个程序：
-
-- `zeppbridge-cli` — 无交互命令行：`status` / `sync` / `export`。退出码是稳定契约，可以挂到 Windows 任务计划程序或 cron。
-- `zeppbridge-mcp` — 只读 MCP 服务，stdio 传输，不监听端口也不联网。让 Claude 之类的模型直接查你的本机数据，而不必先把数据交出去。
-
-用法与配置示例见 [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。设置页的 MCP 一节还提供一段可以直接复制给 AI 的说明，让它按你的机器给出配置步骤。
-
-**本机只读 REST**
-
-设置页可以开启一个只绑 `127.0.0.1` 的只读接口，供你自己的脚本取标准化数据。默认关闭，开启后需要 token，不返回任何凭据，也不会监听到局域网。
-
-## 更新了什么
-
-每个版本的改动见 [CHANGELOG.md](CHANGELOG.md)。应用内点「设置 → 软件更新 → 检查更新」发现新版本时，也会直接把更新说明摆出来，并在下载时显示进度。
-
-## 常见问题
-
-**需要一直开着电脑吗？**
-不需要。ZeppBridge 每次启动会补上你不在的这段时间。
-
-**关掉手机上的 Zepp App，还能同步吗？**
-不能。数据链路是：手表 → 手机 Zepp App → Zepp 云 → ZeppBridge。手表得先通过手机把数据传上云，ZeppBridge 才拉得到。所以手机 App 还是要偶尔打开。
-
-**会不会因此被封号？**
-ZeppBridge 用你自己的登录凭据，**只发读取请求**——整个项目里没有任何一处会修改云端数据（可以自己搜，连一个写请求都没有）。行为上和官方 App 打开看数据是一样的。但这毕竟是非官方用法，我们没法替 Zepp 做任何保证。
-
-**同步完发现某项没数据？**
-先确认那段时间手表真的测了。有些指标（比如乳酸阈值、最大摄氧量）只在特定运动后才更新，一年也就几次。设置页的「你的设备能提供什么」会告诉你每一项的实际情况——**注意「暂未获取到」不等于「你的手表不支持」**，Zepp 的接口对没有的数据也是返回空，分不出是没测还是不支持。
-
-**我的数据存在哪？**
-- **Windows**：安装目录旁边的 `data` 文件夹（不是 `%APPDATA%`）。设置页的「高级与维护」里有「打开数据文件夹」按钮。
-- **macOS**：`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`
-- **Linux**：`~/.local/share/zeppbridge/data`（Flatpak 是
-  `~/.var/app/com.zeppbridge.app/data/zeppbridge/data`）。AppImage 和解包的
-  tarball 保持可执行文件旁边的 `data/`。见 [Linux 指南](docs/guides/linux.zh-CN.md)。
-
-**启动之后窗口不出来？**
-按顺序看两个地方：
-
-1. **错误弹框。** 从 v2.1.2 起，启动失败会弹一个对话框，把具体目录和系统
-   错误写出来，而不是静静退出。早于这个版本的表现是「托盘里有图标、
-   点「打开窗口」没反应」——那个图标是一个已经退出的进程留下的。
-2. **日志。** 数据目录（见上一条）里的 `logs/zeppbridge.log`；如果上一次是在窗口
-   出来之前就挂了，还会有 `logs/startup-error.log`。报问题时把它们带上；
-   里面只有路径和版本号，没有账号数据。
-
-Windows 上最常见的原因是数据目录写不进去——`.msi` 装到 `Program Files`，
-普通用户对它没有写权限。从 v2.1.2 起遇到这种情况会回退到
-`%APPDATA%\zeppbridge\ZeppBridge\data`（除非那个写不进去的目录里已经有库，
-那时它会如实报错，而不是悠悠开一个空的）。也可以用环境变量
-`ZEPPBRIDGE_DATA_DIR` 直接指定。
-
-**卸载后数据还在吗？**
-在。卸载不会删 `data` 文件夹，也不会删备份、覆盖账本和你的设置；想彻底清理需要手动删除。
-
-**数据库能备份和还原吗？**
-能。设置页可以随时生成整库快照，每份带 SHA-256 和完整性检查。恢复要排队到下次启动执行（那是唯一能原子替换文件的时刻），排队时会先给出记录数差异预览。详见[备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md)。
-
-**有多块手表会不会混在一起？**
-不会。每条记录都记着来自哪台设备，界面上分开显示。
-
-**数据会传到你们的服务器吗？**
-健康数据、运动详情和登录凭据不会传到 ZeppBridge 的服务器。只有当你在设置页主动确认「提交错误报告」时，应用才会把应用/解析器版本、操作系统、未识别产品的安全型号提示与字段结构、固件版本、未知运动编号和数量写入 ZeppBridge 的私有错误报告库；不会发送账号、Token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。没有自动遥测或后台崩溃上报。
-
-## 隐私
-
-- **登录凭据**默认存在系统凭据存储里（Windows Credential Manager / macOS 钥匙串 / Linux Secret Service）。macOS 钥匙串无法解锁时，可显式改用仅当前用户可读写的明文文件，见 [macOS 凭据存储指南](docs/guides/macos-credentials.zh-CN.md)。Linux 也支持文件和环境变量存储，见 [Linux 指南](docs/guides/linux.zh-CN.md)。文件存储的保护弱于系统存储，不会因系统存储故障而自动启用。
-- **健康数据**是你电脑上一个未加密的数据库文件。和别人共用电脑的话，请用各自独立的系统账户。
-- **交给 AI 时会先脱敏**：自动抹掉设备编号、MAC 地址、精确 GPS 等信息，并在文件里列出抹掉了什么。精确轨迹要你主动勾选才会带上。
-- **地图只在本地画**，不会向任何第三方地图服务发请求。
-- **错误报告必须主动确认**，内容采用固定白名单并在本地生成，不需要 GitHub 账号，也不会自动公开成 Issue。
-- 同步时要连 Zepp 的服务器，所以这不是一个纯离线软件。
-
-详见[安全与隐私](docs/reference/security-and-privacy.zh-CN.md)。发现安全问题请走 GitHub 私密漏洞报告，不要开公开 issue。
-
-## 给开发者
-
-Tauri 2 + Vue 3 + Rust。核心逻辑在 `zeppbridge-core` crate 里，桌面应用、命令行、MCP 和本机 REST 都只是它的适配层——SQL、单位换算、缺失值规则不允许复制第二份。
-
-```bash
-npm ci
-npm run tauri dev
-```
-
-- [开发文档](docs/development/development.zh-CN.md) — 构建门禁、command 契约、本机 REST API、验收顺序
-- [架构摘要](docs/reference/architecture.zh-CN.md) — 产品边界、Zepp 接口映射、已验证与未验证清单
-- [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) — 退出码契约、只读工具、调度示例
-- [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md) — 快照、恢复流程、覆盖账本
-- [Linux](docs/guides/linux.zh-CN.md) — Flatpak、deb/rpm/AppImage、数据目录、凭据存储
-- [macOS 凭据存储](docs/guides/macos-credentials.zh-CN.md) — 登录钥匙串不可用时改用文件存储
-- [Docker](docs/guides/docker.zh-CN.md) — 无头 CLI/MCP 镜像、定时同步、可复现构建
-- [UI 约束](docs/development/ui-guidelines.zh-CN.md) — 设计 token、页面结构、组件清单
-
-欢迎 issue 和 PR。改动前请先读架构摘要里的「未验证清单」——这个项目对「什么算已经确认的事实」有明确标准。
-
-## 致谢
-
-Zepp 的接口没有公开文档，一个数据流是否存在，只能靠已经把它跑通的人写下来。接口映射参考了这几个开源项目：
-
-- [m4ary/zepp-health-cli](https://github.com/m4ary/zepp-health-cli) — 事件接口的划分与字段取值
-- [Thejuampi/icu](https://github.com/Thejuampi/icu) — 独立复现同一组接口，可作交叉验证
-- [H3llK33p3r/zepp-fit-extractor](https://github.com/H3llK33p3r/zepp-fit-extractor)（Apache-2.0）— 运动明细的解码算法
-
-它们不包含在发行物内，ZeppBridge 参考的是它们记录下来的接口事实。
-
-## 许可证
-
-[MIT License](LICENSE)。
-
-发行物内含第三方素材，署名见 [NOTICE](NOTICE)：MiSans 字体（小米，需署名，设置页已注明）、Inter 字体（SIL OFL 1.1）、以及上方致谢里的解码算法（Apache-2.0）。
-
-Zepp、Amazfit 及相关商标属于各自权利人。
+项目采用 [MIT License](LICENSE)。第三方代码与素材署名见 [NOTICE](NOTICE)，相关商标属于各自权利人。

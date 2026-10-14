@@ -6,194 +6,25 @@
  * 历史记录，样本不够就说不够。这里不调用任何 AI，也不做健康建议——AI 是加分，
  * 不是前提。
  */
-import { computed } from 'vue';
+import GlassSwitch from './GlassSwitch.vue';
+import { computed, ref } from 'vue';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
+import AskAiButton from './ask/AskAiButton.vue';
+import GlassPopover from './GlassPopover.vue';
+import MdSheet from './ai/MdSheet.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
-import { formatDate } from '../lib/format';
-import { defineMessages, useMessages } from '../i18n';
+import type { AiTaskPrepareResult } from '../lib/bridge/types';
+import { useMessages } from '../i18n';
 import {
   distanceUnitLabel,
   paceSecondsPerBigUnit,
   paceUnitLabel,
   toBigDistance,
 } from '../lib/units';
+import { insightCardMessages as messages } from './InsightCard.i18n';
+import { changeArrow, changeTone } from '../lib/changeTone';
 
-const messages = defineMessages(
-  {
-    title: '跑完怎么样',
-    unsupportedWorkoutType: '暂不支持这类运动的洞察。第一版只做已用真实数据验证过的跑步；其他运动仍可正常查看、纠正和导出。',
-    handoff: '让 AI 展开分析',
-    currentRun: '本次',
-    baselineRun: '历史基线',
-    reading: '正在读取本地记录…',
-    comparedTo: (count: number) => `和你自己距离相近的最近 ${count} 次跑步相比：`,
-    noComparison: '还没有足够的可比历史记录，所以这次只报数值，不做比较。',
-    baselinePrefix: (value: string, delta: string) => `基线 ${value} · ${delta}`,
-    driftTitle: '前后半程',
-    driftSub: '把这次运动按时间切成两半，比同样的速度各花了多少心跳。',
-    driftFirst: '前半程',
-    driftSecond: '后半程',
-    driftPerBeat: (metres: string) => `${metres} 米/拍`,
-    driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
-    driftDelta: (percent: string) => `${percent}%`,
-    driftRising: '后半程维持同样的速度花了更多心跳。',
-    driftFlat: '前后半程基本一致。',
-    driftFalling: '后半程每一拍跑得比前半程更远。',
-    driftNote: '这只是这一次运动自己的前后对比，不和任何人比。红绿灯、爬坡、间歇和 GPS 漂移都会污染它，所以配速不够稳的时候这里不给数字。',
-    driftUnavailable: (code: string) => ({
-      too_short: '这次太短了，算不了前后半程：前十分钟基本都是心率还在爬，拿它和后半程比量到的是热身，不是漂移。',
-      pace_too_variable: '这次的配速起伏太大（间歇、红绿灯或者爬坡都会这样），前后两半根本不可比，所以不给数字。',
-      not_enough_samples: '这次没有足够的逐点心率和速度采样，算不了前后半程。',
-      unsupported_workout_type: '前后半程对比目前只做跑步 —— 走路和骑行的采样也够算，但还没有拿真实数据验过阈值。',
-    } as Record<string, string | undefined>)[code] ?? '这次算不了前后半程。',
-    baselineSummary: '对比基准是怎么来的',
-    // 容差可能没有（后端标成 null）。那时不编一个数字出来，写「—」。
-    baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
-      `规则：只看最近 ${days} 天里距离相差不超过 ±${tolerance ?? '—'}% 的同类跑步，至少 ${min} 次、最多 ${max} 次。`,
-    excludedPrefix: '排除：',
-    excludedItem: (label: string, count: number) => `${label} ${count} 次 `,
-    footnote: '全部结论只和你自己的历史比较，不和任何人群基准比较，也不做医学判断。缺的数据显示「未提供」，不用 0 填补。',
-    notProvided: '未提供',
-    durationHours: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
-    durationMinutes: (minutes: number) => `${minutes} 分`,
-    metric: {
-      'run.distance': '距离',
-      'run.duration': '用时',
-      'run.pace': '平均配速',
-      'run.avg_hr': '平均心率',
-      'run.training_load': '训练负荷',
-    },
-    confidence: {
-      high: '证据充分',
-      medium: '证据一般',
-      low: '证据偏少',
-      insufficient: '证据不足',
-    },
-    exclusion: {
-      distance_out_of_tolerance: '距离差得太多',
-      missing_distance: '没有距离',
-      missing_duration: '没有时长',
-      implausible_pace: '配速数值不可信',
-      beyond_max_samples: '超出取样上限',
-    },
-  },
-  {
-    title: 'How the run went',
-    unsupportedWorkoutType: 'Insights for this workout type are not supported yet. The first version covers running only, because that is what has been checked against real data. Every other workout still displays, corrects and exports normally.',
-    handoff: 'Let AI dig in',
-    currentRun: 'This run',
-    baselineRun: 'Baseline',
-    reading: 'Reading local records…',
-    comparedTo: (count: number) => `Against your own ${count} most recent runs of a similar distance:`,
-    noComparison: 'Not enough comparable history yet, so this run reports its numbers without comparing them.',
-    baselinePrefix: (value: string, delta: string) => `baseline ${value} · ${delta}`,
-    driftTitle: 'First half vs second',
-    driftSub: 'Splits this workout in two by time and compares how many beats the same speed cost.',
-    driftFirst: 'First half',
-    driftSecond: 'Second half',
-    driftPerBeat: (metres: string) => `${metres} m/beat`,
-    driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
-    driftDelta: (percent: string) => `${percent}%`,
-    driftRising: 'Holding the same speed cost more beats in the second half.',
-    driftFlat: 'The two halves are essentially the same.',
-    driftFalling: 'Each beat carried you further in the second half.',
-    driftNote: 'This compares the workout only with itself, never with anyone else. Traffic lights, hills, intervals and GPS drift all contaminate it, so no number is given when the pace was not steady.',
-    driftUnavailable: (code: string) => ({
-      too_short: 'Too short to split. The first ten minutes are mostly the heart rate still climbing, so comparing them to the second half measures the warm-up, not drift.',
-      pace_too_variable: 'The pace varied too much (intervals, traffic lights or hills all look like this), so the two halves are not comparable and no number is given.',
-      not_enough_samples: 'Not enough per-point heart rate and speed samples in this workout to split it.',
-      unsupported_workout_type: 'The first-half/second-half comparison covers running only for now. Walking and cycling carry enough samples too, but the thresholds have not been checked against real data.',
-    } as Record<string, string | undefined>)[code] ?? 'This workout cannot be split.',
-    baselineSummary: 'Where the baseline comes from',
-    baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
-      `The rule: runs of the same type from the last ${days} days whose distance is within ±${tolerance ?? '—'}% of this one, at least ${min} and at most ${max} of them.`,
-    excludedPrefix: 'Excluded: ',
-    excludedItem: (label: string, count: number) => `${label} ×${count} `,
-    footnote: 'Every conclusion here compares you to your own history — never to a population baseline — and none of it is a medical judgement. Missing data reads "Not provided" rather than being filled with a zero.',
-    notProvided: 'Not provided',
-    durationHours: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
-    durationMinutes: (minutes: number) => `${minutes} min`,
-    metric: {
-      'run.distance': 'Distance',
-      'run.duration': 'Time',
-      'run.pace': 'Avg pace',
-      'run.avg_hr': 'Avg HR',
-      'run.training_load': 'Training load',
-    },
-    confidence: {
-      high: 'Well evidenced',
-      medium: 'Some evidence',
-      low: 'Thin evidence',
-      insufficient: 'Not enough evidence',
-    },
-    exclusion: {
-      distance_out_of_tolerance: 'distance too different',
-      missing_distance: 'no distance',
-      missing_duration: 'no duration',
-      implausible_pace: 'implausible pace',
-      beyond_max_samples: 'past the sample cap',
-    },
-  },
-  {
-    title: 'Cómo te fue en la carrera',
-    unsupportedWorkoutType: 'Todavía no hay análisis para este tipo de entrenamiento. La primera versión cubre solo carrera, porque es lo que se ha verificado con datos reales. Los demás entrenamientos se ven, corrigen y exportan con normalidad.',
-    handoff: 'Pedirle a la IA que profundice',
-    currentRun: 'Esta carrera',
-    baselineRun: 'Referencia',
-    reading: 'Leyendo registros locales…',
-    comparedTo: (count: number) => `Frente a tus ${count} carreras más recientes de distancia similar:`,
-    noComparison: 'Todavía no hay suficiente historial comparable, así que esta carrera muestra sus valores sin compararlos.',
-    baselinePrefix: (value: string, delta: string) => `referencia ${value} · ${delta}`,
-    driftTitle: 'Primera mitad vs. segunda',
-    driftSub: 'Divide el entrenamiento en dos mitades por tiempo y compara cuántos latidos costó la misma velocidad.',
-    driftFirst: 'Primera mitad',
-    driftSecond: 'Segunda mitad',
-    driftPerBeat: (metres: string) => `${metres} m/latido`,
-    driftHrSpeed: (hr: number, pace: string) => `${hr} lpm · ${pace}`,
-    driftDelta: (percent: string) => `${percent}%`,
-    driftRising: 'Mantener la misma velocidad costó más latidos en la segunda mitad.',
-    driftFlat: 'Las dos mitades son prácticamente iguales.',
-    driftFalling: 'Cada latido te llevó más lejos en la segunda mitad.',
-    driftNote: 'Esto compara el entrenamiento solo consigo mismo, nunca con otras personas. Semáforos, cuestas, intervalos y desvíos del GPS lo alteran, así que no se muestra ningún número cuando el ritmo no fue estable.',
-    driftUnavailable: (code: string) => ({
-      too_short: 'Demasiado corto para dividirlo. Los primeros diez minutos son sobre todo la frecuencia cardíaca subiendo, así que compararlos con la segunda mitad mide el calentamiento, no la deriva.',
-      pace_too_variable: 'El ritmo varió demasiado (intervalos, semáforos o cuestas se ven así), así que las dos mitades no son comparables y no se muestra ningún número.',
-      not_enough_samples: 'Este entrenamiento no tiene suficientes muestras punto a punto de frecuencia cardíaca y velocidad para dividirlo.',
-      unsupported_workout_type: 'Por ahora la comparación entre mitades cubre solo carrera. Caminata y ciclismo también tienen suficientes muestras, pero sus umbrales aún no se han verificado con datos reales.',
-    } as Record<string, string | undefined>)[code] ?? 'Este entrenamiento no se puede dividir.',
-    baselineSummary: 'De dónde sale la referencia',
-    baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
-      `La regla: carreras del mismo tipo de los últimos ${days} días cuya distancia esté dentro de ±${tolerance ?? '—'}% de esta, entre ${min} y ${max} carreras.`,
-    excludedPrefix: 'Excluidas: ',
-    excludedItem: (label: string, count: number) => `${label} ×${count} `,
-    footnote: 'Todas las conclusiones te comparan con tu propio historial, nunca con un promedio de población, y ninguna es un juicio médico. Los datos que faltan aparecen como «Sin datos» en vez de rellenarse con cero.',
-    notProvided: 'Sin datos',
-    durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
-    durationMinutes: (minutes: number) => `${minutes} min`,
-    metric: {
-      'run.distance': 'Distancia',
-      'run.duration': 'Tiempo',
-      'run.pace': 'Ritmo medio',
-      'run.avg_hr': 'FC media',
-      'run.training_load': 'Carga de entrenamiento',
-    },
-    confidence: {
-      high: 'Evidencia sólida',
-      medium: 'Algo de evidencia',
-      low: 'Poca evidencia',
-      insufficient: 'Evidencia insuficiente',
-    },
-    exclusion: {
-      distance_out_of_tolerance: 'distancia muy distinta',
-      missing_distance: 'sin distancia',
-      missing_duration: 'sin duración',
-      implausible_pace: 'ritmo poco creíble',
-      beyond_max_samples: 'fuera del límite de muestras',
-    },
-  },
-  'components/InsightCard',
-);
 const t = useMessages(messages);
 
 /* 不支持的原因按后端发来的码渲染。后端那份中文是给 CLI / MCP 的，
@@ -214,11 +45,25 @@ const props = defineProps<{
   insight: WorkoutInsight | null;
   loading?: boolean;
   error?: string | null;
+  askBusy?: boolean;
+  askResult?: AiTaskPrepareResult | null;
+  askError?: string | null;
+  askProvider?: string;
+  askProviderIcon?: string;
 }>();
-const emit = defineEmits<{ (event: 'handoff'): void }>();
+const emit = defineEmits<{ handoff: []; copy: []; open: []; reveal: [] }>();
+const sheetOpen = ref(false);
+const askBtn = ref<{ button: HTMLElement | null } | null>(null);
+const askAnchor = computed(() => askBtn.value?.button ?? null);
+const openSheet = () => {
+  sheetOpen.value = true;
+  emit('handoff');
+};
+/** 「带上前 7 天睡眠和恢复」（1D·D10），默认勾上；在运动页的 useWorkoutDetail 里决定交什么。 */
+const withRecovery = defineModel<boolean>('withRecovery', { default: true });
 
-/** 数字变小对这个指标意味着「更好」吗？只影响配色，不影响事实本身。 */
-const LOWER_IS_BETTER = new Set(['run.pace', 'run.avg_hr']);
+/* 好 / 坏 / 只是变化：和周报同一套规则（lib/changeTone.ts）。距离、时长、训练负荷
+   多了不等于更好，只给方向箭头。 */
 
 const formatValue = (fact: InsightFact): string => {
   if (fact.value === null) return t.value.notProvided;
@@ -236,26 +81,17 @@ const formatValue = (fact: InsightFact): string => {
   return `${Math.round(fact.value)} ${fact.unit}`;
 };
 
-const deltaTone = (fact: InsightFact): 'good' | 'bad' | 'flat' => {
-  if (!fact.comparison || fact.comparison.direction === 'same') return 'flat';
-  const lower = fact.comparison.direction === 'lower';
-  return LOWER_IS_BETTER.has(fact.fact_id) === lower ? 'good' : 'bad';
-};
+const deltaTone = changeTone;
 
 const deltaText = (fact: InsightFact): string => {
   if (!fact.comparison) return '';
   const sign = fact.comparison.delta_percent > 0 ? '+' : '';
-  return `${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
+  const arrow = changeTone(fact) === 'neutral' ? `${changeArrow(fact)}\u00a0` : '';
+  return `${arrow}${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
 };
 
-/*
- * 前后半程。
- *
- * 后端在条件不满足时给的是原因码而不是数字 —— 这里照样把原因说出来，而不是
- * 把整块藏起来：「这次为什么没有」和「这次是多少」一样值得看见。
- */
+/* 前后半程。没有数字时整块不出现，不再写一段「为什么没有」。 */
 const drift = computed(() => props.insight?.heart_rate_drift ?? null);
-const driftReason = computed(() => props.insight?.heart_rate_drift_unavailable ?? null);
 
 /** 米/秒 -> 每个显示单位的分秒。0 或非有限值不显示成 0'00"。 */
 const paceFromSpeed = (metresPerSecond: number): string => {
@@ -289,45 +125,27 @@ const driftRows = computed(() => {
   ];
 });
 
-/** 半个百分点以内当作没变化：那个量级是采样噪声，不是身体。 */
-const driftVerdict = computed(() => {
-  const percent = drift.value?.drift_percent;
-  if (percent === undefined) return null;
-  if (Math.abs(percent) < 0.5) return { tone: 'flat', text: t.value.driftFlat };
-  return percent < 0
-    ? { tone: 'bad', text: t.value.driftRising }
-    : { tone: 'good', text: t.value.driftFalling };
-});
-
 const facts = computed(() => props.insight?.facts ?? []);
-const baselineWindow = computed(() => facts.value.find((fact) => fact.baseline_window)?.baseline_window ?? null);
 const comparedFacts = computed(() => facts.value.filter((fact) => fact.comparison));
 const hasAnyComparison = computed(() => comparedFacts.value.length > 0);
-
-const exclusionSummary = computed(() => {
-  const counts = new Map<string, number>();
-  for (const entry of props.insight?.baseline_excluded ?? []) {
-    counts.set(entry.reason, (counts.get(entry.reason) ?? 0) + 1);
-  }
-  const labels = t.value.exclusion as Record<string, string | undefined>;
-  return [...counts.entries()].map(([reason, count]) => ({
-    label: labels[reason] || reason,
-    count,
-  }));
-});
 </script>
 
 <template>
   <section class="insight-card" aria-labelledby="insight-title">
     <header>
       <h2 id="insight-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
-      <button
-        v-if="insight?.supported"
-        class="button secondary"
-        type="button"
-        @click="emit('handoff')"
-      ><Icon name="send" :size="14" />{{ t.handoff }}</button>
+      <span v-if="insight?.supported" class="insight-handoff">
+        <label class="recovery-toggle" :title="t.withRecoveryHint">
+          <GlassSwitch :model-value="withRecovery" :aria-label="t.withRecovery" @update:model-value="withRecovery = !withRecovery" />
+          <span>{{ t.withRecovery }}</span>
+        </label>
+        <AskAiButton ref="askBtn" direct :label="t.title" :busy="askBusy" :expanded="sheetOpen" @activate="openSheet" />
+      </span>
     </header>
+    <GlassPopover v-if="sheetOpen" :anchor="askAnchor" :width="372" @close="sheetOpen = false">
+      <MdSheet :busy="!!askBusy" :result="askResult ?? null" :error="askError ?? null" :provider="askProvider ?? ''" :provider-icon="askProviderIcon ?? ''"
+        @copy="emit('copy')" @open="emit('open')" @reveal="emit('reveal')" />
+    </GlassPopover>
 
     <p v-if="loading" class="insight-note">{{ t.reading }}</p>
     <p v-else-if="error" class="insight-error" role="alert">{{ error }}</p>
@@ -360,55 +178,16 @@ const exclusionSummary = computed(() => {
         </div>
       </div>
 
-      <section class="drift" :aria-label="t.driftTitle">
-        <p class="drift-head">
-          <strong>{{ t.driftTitle }}</strong>
-          <span
-            v-if="drift && driftVerdict"
-            :class="['delta', driftVerdict.tone]"
-          >{{ t.driftDelta(drift.drift_percent.toFixed(1)) }}</span>
-        </p>
-        <p class="insight-note">{{ t.driftSub }}</p>
-        <template v-if="drift">
-          <div class="drift-grid">
-            <div v-for="row in driftRows" :key="row.key" class="fact">
-              <span class="fact-label">{{ row.label }}</span>
-              <strong>{{ row.perBeat }}</strong>
-              <span class="fact-delta muted">{{ row.detail }}</span>
-            </div>
+      <section v-if="driftRows.length" class="drift" :aria-label="t.driftTitle">
+        <p class="drift-head"><strong>{{ t.driftTitle }}</strong></p>
+        <div class="drift-grid">
+          <div v-for="row in driftRows" :key="row.key" class="fact">
+            <span class="fact-label">{{ row.label }}</span>
+            <strong>{{ row.perBeat }}</strong>
+            <span class="fact-delta muted">{{ row.detail }}</span>
           </div>
-          <p v-if="driftVerdict" class="insight-note">{{ driftVerdict.text }}</p>
-        </template>
-        <p v-else-if="driftReason" class="insight-note">{{ t.driftUnavailable(driftReason) }}</p>
-        <p class="insight-note subtle">{{ t.driftNote }}</p>
+        </div>
       </section>
-
-      <details v-if="insight.baseline_included.length || insight.baseline_excluded.length">
-        <summary>{{ t.baselineSummary }}</summary>
-        <p class="insight-note">
-          <template v-if="baselineWindow">
-            {{ t.baselineRule(
-              baselineWindow.days,
-              baselineWindow.distance_tolerance_percent,
-              baselineWindow.min_samples,
-              baselineWindow.max_samples,
-            ) }}
-          </template>
-        </p>
-        <ul class="baseline-list">
-          <li v-for="entry in insight.baseline_included" :key="entry.workout_id">
-            <RouterLink :to="`/workouts/${entry.workout_id}`">
-              {{ formatDate(entry.start_time) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
-            </RouterLink>
-          </li>
-        </ul>
-        <p v-if="exclusionSummary.length" class="insight-note">
-          {{ t.excludedPrefix }}
-          <span v-for="item in exclusionSummary" :key="item.label">{{ t.excludedItem(item.label, item.count) }}</span>
-        </p>
-      </details>
-
-      <p class="insight-note">{{ t.footnote }}</p>
     </template>
   </section>
 </template>
@@ -418,18 +197,19 @@ const exclusionSummary = computed(() => {
   display: grid;
   gap: 10px;
   padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-handoff { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
+.recovery-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
 .insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }
 .delta { margin-right: 10px; font-weight: 600; }
 .delta.good, .fact-delta.good { color: var(--accent); }
 .delta.bad, .fact-delta.bad { color: var(--danger); }
-.delta.flat, .fact-delta.flat { color: var(--muted); }
+.delta.flat, .fact-delta.flat, .fact-delta.neutral { color: var(--muted); }
 
 /* 好/坏不能只靠绿/红：红绿色觉障碍下这两个状态完全一样。
    统一加一个前置符号，颜色只作为强化。 */
@@ -438,7 +218,7 @@ const exclusionSummary = computed(() => {
 .delta.flat::before, .fact-delta.flat::before { content: '=\a0'; font-weight: 700; }
 
 .fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
-.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .fact-label { color: var(--muted); font-size: var(--fs-xs); }
 .fact strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
 .fact-delta { font-size: var(--fs-xs); }

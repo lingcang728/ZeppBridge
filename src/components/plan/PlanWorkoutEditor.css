@@ -1,0 +1,53 @@
+.workout-editor { display: grid; gap: 18px; min-width: 0; }
+.fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 10px 16px; }
+.field { display: grid; gap: 4px; min-width: 0; color: var(--subtle); font-size: var(--fs-2xs); }
+.field.wide { grid-column: 1 / -1; }
+.field input, .field textarea { width: 100%; resize: vertical; }
+.field.name input { font-size: var(--fs-lg); font-weight: 650; }
+.field.bad input, .field.bad textarea { box-shadow: 0 0 0 1.5px var(--danger); }
+.field.bad small { color: var(--danger); }
+.kinds { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.note { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+.note svg { flex: 0 0 auto; color: var(--accent); }
+
+/* 步骤卡：色条、「热身 · 1 公里」、紧跟着目标、›。 */
+.steps, .steps ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.step-card { --c: var(--accent); overflow: hidden; border: 1px solid var(--mat-line); border-radius: 14px; background: var(--mat-inset); transition: border-color var(--dur-base) ease, background var(--dur-base) ease; }
+.step-card.lit, .step-card.open { border-color: color-mix(in srgb, var(--c) 55%, var(--mat-line)); }
+.step-card.open { background: color-mix(in srgb, var(--c) 5%, var(--mat-inset)); }
+.step-head { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 8px 12px 8px 0; border: 0; background: none; color: var(--ink);
+  font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.step-head:disabled { cursor: default; }
+.step-head:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 14px; }
+.step-head > i { flex: 0 0 auto; align-self: stretch; width: 4px; margin: -8px 4px -8px 0; background: var(--c); }
+.what { font-weight: 650; white-space: nowrap; }
+.aim { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.chev { flex: 0 0 auto; margin-left: auto; color: var(--subtle); transition: rotate var(--dur-base) ease; }
+.step-card.open .chev { rotate: 90deg; color: var(--c); }
+.step-head:disabled .chev { display: none; }
+.step-body { display: grid; justify-items: start; gap: 6px; overflow: hidden; padding: 0 12px 12px 18px; }
+.step-body :deep(.step-editor) { padding: 4px 0 6px; }
+.pill-button.danger { display: inline-flex; align-items: center; gap: 6px; color: var(--danger); }
+
+/* 重复组：一张组卡，头上是「×N」胶囊（和胶囊分段同一套凹槽 + 凸起）。 */
+.group-card { display: grid; gap: 8px; padding: 10px; border: 1px dashed color-mix(in srgb, var(--line-strong) 80%, transparent); border-radius: 16px; }
+.group-card .step-card { background: var(--mat-card); }
+.group-head { display: flex; align-items: center; gap: 8px; }
+.rep-capsule { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow);
+  cursor: ew-resize; touch-action: none; user-select: none; }
+.rep-capsule b { min-width: 44px; padding: 3px 10px; border-radius: 999px; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--cap-ink);
+  font-size: var(--fs-sm); font-weight: 750; text-align: center; font-variant-numeric: tabular-nums; }
+.rep-capsule button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 16px; cursor: pointer; }
+.rep-capsule button:hover:not(:disabled) { background: var(--glass-press); }
+.rep-capsule button:disabled { opacity: .35; cursor: default; }
+
+/* 底部四个按钮。 */
+.adds { display: flex; flex-wrap: wrap; gap: 8px; }
+.add { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px 0 11px; border: 1px dashed color-mix(in srgb, var(--c) 50%, var(--line-strong)); border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 6%, transparent); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 650; cursor: pointer;
+  transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-spring); }
+.add svg { color: var(--c); }
+.add:hover { background: color-mix(in srgb, var(--c) 14%, transparent); translate: 0 -1px; }
+.add:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 700px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .step-card, .chev, .add { transition: none; } }

@@ -8,8 +8,10 @@
  *
  * 这里选出来的结果会被如实标注成「你指认的型号」，不会伪装成自动识别。
  */
+import GlassSwitch from './GlassSwitch.vue';
 import { computed, ref, watch } from 'vue';
-import DesignIcon from './DesignIcon.vue';
+import GlyphTile from './GlyphTile.vue';
+import CapsuleWheel from './CapsuleWheel.vue';
 import DeviceVisual from './DeviceVisual.vue';
 import { catalogEntryMatchesId, deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
 import { defineMessages, locale, useMessages } from '../i18n';
@@ -19,7 +21,7 @@ const messages = defineMessages(
     pickerAria: '手动指认设备型号',
     searchAria: '按型号名称搜索',
     searchPlaceholder: '搜型号，例如 Balance 2',
-    empty: '没有匹配的型号。换个关键词，或者把筛选切回「全部」。',
+    empty: '没有匹配型号。换个关键词，或把筛选切回「全部」。',
     prev: '上一个型号',
     next: '下一个型号',
     alreadyAssigned: '已经是这台了',
@@ -27,8 +29,8 @@ const messages = defineMessages(
     clear: '撤销指认',
     later: '稍后再说',
     contributeTitle: '顺便帮下一版自动认出这台设备',
-    contributeBody: '把「你选的型号 + 这台设备的型号编号（deviceSource / deviceType，只有整数）」交给 ZeppBridge。这两样都只说明「哪一款表」，不含账号、序列号、MAC 或任何健康数据。华米没有公开编号对照表，这是内置目录唯一能长大的方式——几个人指认过之后，同款设备对所有人都会自动识别。',
-    note: '选完会显示成「你指认的型号」，不会被当成自动识别结果。图片和型号都来自随包目录，翻页全程不联网。',
+    contributeBody: '把「你选的型号 + 设备型号编号（deviceSource / deviceType，只有整数）」交给 ZeppBridge。两样都只说明「哪一款表」，不含账号、序列号、MAC 或任何健康数据。华米没有公开编号对照表，这是内置目录唯一能长大的方式——几个人指认后，同款设备对所有用户自动识别。',
+    note: '选完会标注为「你指认的型号」，不当作自动识别结果。图片和型号来自随包目录，翻页全程不联网。',
     filterAll: '全部',
     filterWatch: '手表',
     filterBand: '手环',
@@ -45,11 +47,11 @@ const messages = defineMessages(
     next: 'Next model',
     alreadyAssigned: 'Already this one',
     confirm: "That's my device",
-    clear: 'Withdraw the pick',
+    clear: 'Undo pick',
     later: 'Not now',
-    contributeTitle: 'Help the next release recognize this device on its own',
-    contributeBody: 'Sends ZeppBridge the model you picked plus this device\'s model numbers (deviceSource / deviceType, integers only). Both say which watch it is and nothing else: no account, no serial, no MAC, no health data. Huami publishes no lookup table for those numbers, so this is the only way the built-in catalog grows. Once a few people have pointed at a model, it gets recognized automatically for everyone.',
-    note: 'Your pick shows up as "Model you picked" and is never passed off as an automatic match. Images and model names come from the bundled catalog; browsing them touches no network.',
+    contributeTitle: 'Help the next version recognize this device automatically',
+    contributeBody: 'Send ZeppBridge the model you picked plus its model numbers (deviceSource / deviceType, integers only). Both say only which watch it is — no account, serial, MAC, or health data. Huami publishes no number table, so this is the only way the built-in catalog grows: once a few people point at a model, it auto-recognizes for everyone.',
+    note: 'Your pick is labeled "model you picked", never as an automatic match. Images and names come from the bundled catalog; browsing uses no network.',
     filterAll: 'All',
     filterWatch: 'Watches',
     filterBand: 'Bands',
@@ -61,16 +63,16 @@ const messages = defineMessages(
     pickerAria: 'Elige a mano el modelo de tu dispositivo',
     searchAria: 'Buscar por nombre de modelo',
     searchPlaceholder: 'Busca un modelo, p. ej. Balance 2',
-    empty: 'Ningún modelo coincide. Prueba otra palabra, o vuelve a poner el filtro en Todos.',
+    empty: 'Ningún modelo coincide. Prueba otra palabra, o vuelve a poner el filtro en «Todos».',
     prev: 'Modelo anterior',
     next: 'Modelo siguiente',
     alreadyAssigned: 'Ya es este',
     confirm: 'Este es mi dispositivo',
     clear: 'Retirar la elección',
     later: 'Ahora no',
-    contributeTitle: 'Ayuda a que la próxima versión reconozca este dispositivo sola',
-    contributeBody: 'Envía a ZeppBridge el modelo que elegiste más los números de modelo de este dispositivo (deviceSource / deviceType, solo enteros). Ambos dicen qué reloj es y nada más: sin cuenta, sin número de serie, sin MAC, sin datos de salud. Huami no publica una tabla para esos números, así que esta es la única forma de que crezca el catálogo integrado. Cuando varias personas han señalado un modelo, se reconoce automáticamente para todos.',
-    note: 'Tu elección aparece como «Modelo que elegiste» y nunca se presenta como una coincidencia automática. Las imágenes y los nombres de modelo vienen del catálogo incluido; explorarlos no usa la red.',
+    contributeTitle: 'De paso, ayuda a que la próxima versión lo reconozca por sí sola',
+    contributeBody: 'Envía a ZeppBridge el modelo que elegiste más los números de modelo del dispositivo (deviceSource / deviceType, solo enteros). Ambos solo dicen qué reloj es: sin cuenta, sin número de serie, sin MAC, sin datos de salud. Huami no publica una tabla de equivalencias, así que es la única forma de que crezca el catálogo integrado: cuando varias personas señalan un modelo, se reconoce solo para todos.',
+    note: 'Tu elección queda marcada como «Modelo que elegiste», no como coincidencia automática. Las imágenes y los modelos vienen del catálogo incluido; explorarlos no usa la red.',
     filterAll: 'Todos',
     filterWatch: 'Relojes',
     filterBand: 'Pulseras',
@@ -193,14 +195,8 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
     @keydown="onPickerKeydown"
   >
     <div class="picker-filters">
-      <button
-        v-for="filter in KIND_FILTERS"
-        :key="filter.key"
-        type="button"
-        :class="['filter-chip', { on: kind === filter.key }]"
-        :aria-pressed="kind === filter.key"
-        @click="kind = filter.key"
-      >{{ filter.label }}</button>
+      <!-- 六种设备类型：玻璃滚轮（审计 A1，2026-10-07；以前是一排自己画选中态的小胶囊）。 -->
+      <CapsuleWheel v-model="kind" :span="260" :items="KIND_FILTERS.map((filter) => ({ value: filter.key, label: filter.label }))" :aria-label="t.pickerAria" />
       <input
         v-model="query"
         type="search"
@@ -219,20 +215,19 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         :aria-label="t.prev"
         :disabled="entries.length < 2"
         @click="step(-1)"
-      ><DesignIcon name="chevron-right" :size="20" class="flip" /></button>
+      ><GlyphTile name="chevron-right" :size="20" class="flip" /></button>
 
       <div class="picker-frame">
         <DeviceVisual
-          v-if="neighbours.prev"
+          v-if="neighbours.prev?.src"
           class="peek left"
           :src="neighbours.prev.src"
           :alt="neighbours.prev.entry.canonical_name"
           :kind="neighbours.prev.entry.kind"
         />
         <div class="picker-hero">
-          <!-- 目录里偶尔缺一张图。用 DeviceVisual 是为了走它的 SVG 兜底，
-               而不是把一个破图图标和 alt 文字摆在用户面前。 -->
           <DeviceVisual
+            v-if="currentImage"
             :key="current!.catalog_id"
             class="hero-visual"
             :src="currentImage"
@@ -244,7 +239,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
           <p class="hero-count">{{ index + 1 }} / {{ entries.length }}</p>
         </div>
         <DeviceVisual
-          v-if="neighbours.next"
+          v-if="neighbours.next?.src"
           class="peek right"
           :src="neighbours.next.src"
           :alt="neighbours.next.entry.canonical_name"
@@ -258,7 +253,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         :aria-label="t.next"
         :disabled="entries.length < 2"
         @click="step(1)"
-      ><DesignIcon name="chevron-right" :size="20" /></button>
+      ><GlyphTile name="chevron-right" :size="20" /></button>
     </div>
 
     <div class="picker-actions">
@@ -273,33 +268,25 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
       </button>
       <button class="button secondary" type="button" :disabled="busy" @click="emit('cancel')">{{ t.later }}</button>
     </div>
-    <label class="picker-contribute">
-      <input v-model="contribute" type="checkbox" :disabled="busy" />
+    <!-- 贡献给设备目录：玻璃开关（审计 A2；以前是原生复选框）。 -->
+    <div class="picker-contribute">
       <span>
         <strong>{{ t.contributeTitle }}</strong>
         {{ t.contributeBody }}
       </span>
-    </label>
+      <GlassSwitch :model-value="contribute" :aria-label="t.contributeTitle" :disabled="busy" @update:model-value="contribute = !contribute" />
+    </div>
     <p class="picker-note">{{ t.note }}</p>
   </div>
 </template>
 
 <style scoped>
 .device-picker { display: grid; gap: 12px; outline: none; }
-.device-picker:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 12px; }
+.device-picker:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 12px; }
 
 .picker-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.filter-chip {
-  padding: 4px 12px;
-  border: 1px solid var(--line-control);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.filter-chip.on { border-color: var(--accent); color: var(--accent); }
-.picker-search { flex: 1 1 160px; min-width: 140px; }
+.picker-search { flex: 1 1 190px; min-width: 140px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--mat-inset); color: var(--ink); outline: none; box-shadow: var(--mat-inset-shadow); }
+.picker-search:focus-visible { border-color: var(--focus); }
 
 .picker-empty { padding: 24px 12px; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
 
@@ -320,21 +307,21 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 
 .picker-frame {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
   align-items: center;
   justify-items: center;
   gap: 4px;
   padding: 14px 6px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 14px;
-  background: var(--surface-raised);
-  overflow: hidden;
+  background: var(--mat-inset);
+  overflow: hidden; box-shadow: var(--mat-inset-shadow);
 }
 .peek { width: 56px; height: 56px; flex-basis: 56px; border: 0; background: transparent; opacity: .28; }
-.peek.left { justify-self: end; }
-.peek.right { justify-self: start; }
+.peek.left { grid-column: 1; grid-row: 1; justify-self: end; }
+.peek.right { grid-column: 3; grid-row: 1; justify-self: start; }
 
-.picker-hero { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.picker-hero { grid-column: 2; grid-row: 1; display: grid; justify-items: center; gap: 2px; text-align: center; }
 /* 主图给足高度：竖长的表身在正方框里会被上下切掉。 */
 .picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; }
 .hero-name { margin: 6px 0 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
@@ -344,19 +331,18 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .picker-contribute {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--line-control);
   border-radius: 12px;
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   color: var(--subtle);
   font-size: var(--fs-xs);
   line-height: 1.6;
-  cursor: pointer;
+  box-shadow: var(--mat-raised-rim);
 }
-.picker-contribute input { margin-top: 2px; }
 .picker-contribute strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 600; }
 .picker-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 

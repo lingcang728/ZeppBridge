@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of v2.4.4.
+This page describes the product boundaries and current implementation of [v3.0.0](https://github.com/lingcang728/ZeppBridge/releases).
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 
@@ -59,6 +59,11 @@ way to tell which one is right.
   incremental syncs carry a 30-day overlap window
   (`zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`, surfaced to the UI as
   `AppStatus.incremental_sync_days` — do not hard-code it anywhere else).
+  The silent 15-minute automatic sync re-fetches only the last
+  `QUICK_SYNC_DAYS` (3) days, and falls back to the full window whenever no
+  fully successful full-window sync has happened in the past
+  `FULL_WINDOW_REFRESH_HOURS` (24) hours; manual, launch, tray and CLI syncs
+  always use the full window (`AppStatus.auto_sync_days` tells the UI which).
   A single sync controller
   serves the top-bar "Sync now", Settings, launch sync, the 15-minute automatic
   check, the concurrency lock and page refreshes.
@@ -168,6 +173,12 @@ way to tell which one is right.
 - Syncing, history backfill, schema migration, restore, backup, re-parsing and
   cleanup all acquire the cross-process write lock first, so the desktop app and
   the CLI can never write the same database simultaneously.
+- A sync or history backfill holds a separate **sync lease** for its whole run
+  (so two syncs never overlap across processes) but takes the write lock only
+  for the short stretches where it actually writes. While it waits on the
+  network, saving a setting or a life event goes through; those quick writes
+  wait up to a few seconds for a sync's write window instead of failing at
+  once.
 - The lock is held by the operating system (exclusive share-mode file open on
   Windows, `flock` on Unix-likes), so the kernel releases it when a process
   crashes. There is no "it crashed last time and now the database will not open"
@@ -190,34 +201,26 @@ way to tell which one is right.
 
 ### Desktop interface
 
-- The main navigation is Overview, Hand to AI (`/explore`), Data health
-  (`/health-check`) and Settings. The top bar carries connection status and a
+- The main navigation is Overview, Hand to AI (`/ai`) and Settings. The top bar carries connection status and a
   global sync.
 - The interface is **dark only**: by design there is no light or follow-system
   mode and no theme switch. The only adjustable dimension is interface scale
   (80%–125%, in Settings → "Advanced and maintenance", or Ctrl + / Ctrl - /
   Ctrl 0).
-- The interface ships in **ten languages**: zh, en and es are defined inline
-  with the code that uses them; nl, pt-BR, pt-PT, de, ru, hi-IN and fr are
-  lazy-loaded language packs. On first launch it follows the system language
-  (Chinese only when the system explicitly says so); the Settings page header
-  switches it at any time, and the choice is stored in
+- The interface is **bilingual, Chinese and English**. On first launch it
+  follows the system language (Chinese only when the system explicitly says so);
+  the Settings page header switches it at any time, and the choice is stored in
   `localStorage['zeppbridge-locale']`. Dates, weekday names and number grouping
   follow the language too (`i18n/intlLocale()`), not just the words.
   - **vue-i18n is deliberately not used.** It was measured: wiring it up
     (runtime build included, before translating a single string) grew the
     first-screen gzip from 73.0 kB to 91.6 kB, 7.6 kB over the size budget. The
     hand-rolled layer is under a screenful of code and adds 0.4 kB.
-  - Copy lives with the module that uses it (`defineMessages(zh, en, es?, moduleId?)`
-    inline, with a matching `*.i18n.ts` for large pages) rather than in one
-    global dictionary, so a lazily loaded page's chunk still carries only its
-    own copy. The seven pack languages never touch call sites: a bundle that
-    sets `moduleId` gets its copy overlaid by
-    `src/i18n/locales/<locale>.ts`, one file per language, `import()`ed at most
-    once when that language is picked — so they stay out of the first screen.
+  - Copy lives with the module that uses it (`defineMessages(zh, en)` inline,
+    with a matching `*.i18n.ts` for large pages) rather than in one global
+    dictionary, so a lazily loaded page's chunk still carries only its own copy.
   - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half, so a
-    missing English key, an extra key or a mismatched parameter fails to
-    compile. The Spanish half may be partial; keys left out render in English.
+    missing English key, an extra key or a mismatched parameter fails to compile.
   - **The backend does not produce copy per locale.** The four outlets (GUI,
     CLI, MCP, export) must answer the same question the same way, so the backend
     emits stable codes (`recordsUnitCode`, `HealthAction.code`,
@@ -228,11 +231,8 @@ way to tell which one is right.
     are never translated — they are a contract external scripts read.
   - CI runs `npm run i18n:check`: hardcoded Chinese in the interface turns it
     red, as does a backend code with no English copy, or the interface rendering
-    a backend original where a code was available. The same gate audits the
-    language packs — a missing key must be registered in
-    `locales/<locale>.pending.txt`, and a pending entry that is already
-    translated or points at a removed key fails the build. Per-line exemptions
-    live in `ALLOWED` / `ALLOWED_PROSE` in `scripts/release/check-i18n.mjs`.
+    a backend original where a code was available. Per-line exemptions live in
+    `ALLOWED` / `ALLOWED_PROSE` in `scripts/release/check-i18n.mjs`.
 - Overview is organised as "latest heart rate → Hand to AI entry → recent
   sleep/workouts"; sync time and heart-rate sample time are kept visibly
   separate. Recovery and training analysis do not happen on Overview.
@@ -249,8 +249,9 @@ way to tell which one is right.
   and VO₂max, computing pace only when both distance and duration are valid. A
   run draws a polyline if a track or heart-rate points were decoded, and
   otherwise still says "not provided".
-- JSON export lives in `/explore` (Hand to AI): choose a prompt template, copy,
-  save a file, or hand off directly to an allow-listed AI site. Settings expands
+- Hand to AI (`/ai`) builds one redacted package per analysis task and hands
+  it to an allow-listed AI site; JSON / CSV / GPX files come from
+  `zeppbridge-cli export`, FIT from the workout detail page. Settings expands
   by numbered section into connection, account, devices, privacy, retention,
   export preferences, local API, updates and automatic sync; interface scale,
   the data folder, clearing credentials and sync diagnostics are tucked into
@@ -445,9 +446,11 @@ read. Only statuses and field names are recorded.
 | Web sign-in for the first connection | Desktop chain implemented; real-account sign-in verified per environment |
 | Local read-only REST (`/health`, `/workouts/{id}/series`) | Implemented; off by default, token required when enabled |
 | CLI (`status` / `sync` / `export` / `contract`) | Implemented, shipped as a versioned archive with each release |
-| MCP (stdio, five read-only tools) | Implemented, shipped as a versioned archive with each release |
+| MCP (stdio, fifteen read-only tools plus two training-plan write tools) | Implemented, shipped as a versioned archive with each release |
 | Full history backfill, long-term archive, coverage ledger | Implemented |
 | Database snapshots and queued restore | Implemented |
 | More data sources | Not started |
 | macOS (Apple Silicon) desktop | Merged (#1); CI has compile/test gates and releases have shipped a dmg plus updater artifacts since v0.9.2; ad-hoc signed, no Apple notarisation |
 | Public-release engineering (signing, updates, SBOM, clean VM) | Partly done: updater artifacts and `latest.json` are signed with the Tauri key and auto-update through GitHub Releases; the installers still have no Authenticode certificate and there is no clean-VM acceptance |
+
+The time bridge uses schema 36: `ai_exchanges` links prepared context, received drafts and delivery records. The persistent profile lives in `app_meta`; daily strips and adherence reuse core read-only queries. Rest advice stays local.

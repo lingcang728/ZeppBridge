@@ -922,6 +922,300 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(30, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v31：为官方/旧连接器双源交付预留来源、账号、原始对象和投递回执。
+        // 官方数据尚未默认写入这些表；字段先建立契约，fixture 与后续 provider
+        // 共用。全部是 ensure_table_columns + CREATE IF NOT EXISTS 的增量 DDL，
+        // 按本文件的约定不加 if version 守卫，每次启动幂等重跑。
+        // 已知留白（记入 beta1 known-limitations）：uq_metric_sample_key /
+        // uq_daily_metric_key 等唯一索引尚未把 provider 纳入键，官方写入
+        // 真正落地前需要另加一次索引重建迁移；在那之前双源同键写入会互相
+        // 覆盖，所以官方来源现在只能写进本步新建的独立表。
+        self.ensure_table_columns(
+            "raw_records",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+                ("channel", "TEXT NOT NULL DEFAULT 'legacy_pull'"),
+                ("received_at", "TEXT"),
+                ("parsed_at", "TEXT"),
+                ("persisted_at", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "metric_samples",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "daily_metrics",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "sleep_sessions",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+                ("rem_seconds", "INTEGER"),
+                ("nap_total_seconds", "INTEGER"),
+                ("unmeasurable_seconds", "INTEGER"),
+                ("validation", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS raw_objects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                object_key TEXT NOT NULL,
+                content BLOB NOT NULL,
+                sha256 TEXT NOT NULL,
+                byte_len INTEGER NOT NULL,
+                received_at TEXT NOT NULL,
+                parsed_at TEXT,
+                UNIQUE(provider, account_id, object_key, sha256)
+            );
+            CREATE TABLE IF NOT EXISTS delivery_receipts (
+                event_key TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                channel TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                persisted_at TEXT,
+                cursor TEXT,
+                status TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS official_activity_pings (
+                summary_id TEXT PRIMARY KEY,
+                account_id TEXT,
+                received_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                payload_hash TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS backfill_requests (
+                request_key TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                stream TEXT NOT NULL,
+                chunk_start TEXT NOT NULL,
+                chunk_end TEXT NOT NULL,
+                requested_at TEXT,
+                status TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error_code TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_raw_objects_provider_received
+                ON raw_objects(provider, received_at);
+            CREATE INDEX IF NOT EXISTS idx_delivery_receipts_status
+                ON delivery_receipts(status, received_at);
+            PRAGMA user_version = 31;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(31, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v32：AI 分析任务与模板（BETA1 A7-P1）。
+        //
+        // `payload` 存完整的 AiTask / AiTaskTemplate JSON（schema_version=1）；
+        // 其余列是列表排序、授权筛选（mcp_shared）和预览用的索引列，让
+        // `ai_task_list` 与 MCP 授权路径不必逐行解析 JSON。
+        // 内置模板由 `BUILTIN_TEMPLATE_SEEDS` 种入：行内中文只是兜底文案，
+        // 界面按 payload 里的 `name_code` / `prompt_code` 取本地化文本。
+        // 全部是 CREATE IF NOT EXISTS + INSERT OR IGNORE，无 if 守卫，
+        // 每次启动幂等重跑；被删的内置行会自愈回来。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                template_id TEXT,
+                payload TEXT NOT NULL,
+                workout_count INTEGER NOT NULL DEFAULT 0,
+                mcp_shared INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ai_task_templates (
+                id TEXT PRIMARY KEY,
+                builtin INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            PRAGMA user_version = 32;",
+        )?;
+        for seed in crate::ai_tasks::BUILTIN_TEMPLATE_SEEDS.iter() {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO ai_task_templates
+                    (id, builtin, name, payload, created_at, updated_at)
+                 VALUES (?1, 1, ?2, ?3, ?4, ?4)",
+                params![
+                    seed.id,
+                    seed.name,
+                    seed.payload,
+                    crate::ai_tasks::BUILTIN_SEED_TIMESTAMP
+                ],
+            )?;
+        }
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(32, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v33：补上「查询写法能走索引、索引却不存在」的两条边。
+        //
+        // workouts 的本地日范围筛选在配上 `start_time >= ? AND < ?` 宽限界
+        // 之后落在 start_time 上（列表 `ORDER BY start_time` 同样受益）；
+        // 以前没有索引，每一次范围查询和排序都是全表扫。ai_tasks 的
+        // `WHERE mcp_shared = 1` 是 MCP 授权路径每次请求都要跑的过滤。
+        // 两条都是 CREATE IF NOT EXISTS，幂等重跑，不动任何已发布 DDL。
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_workouts_start
+                 ON workouts(start_time);
+             CREATE INDEX IF NOT EXISTS idx_ai_tasks_mcp
+                 ON ai_tasks(mcp_shared);
+             PRAGMA user_version = 33;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(33, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v34：官方睡眠接入（第九轮批次 ③）。
+        //
+        // 同一晚两边都有时两份都存（官方 `sleep_id` 是 `official:<开始秒>`，不撞键），
+        // 界面、导出、周报读这个视图：和某一晚官方会话有重叠的旧通道会话不显示——
+        // 官方有 REM 真值和小睡，以它为准。只是加一个视图，不动任何已发布的表和索引；
+        // 2.x（v30）不读它，照旧读 sleep_sessions。
+        self.conn.execute_batch(
+            "CREATE VIEW IF NOT EXISTS sleep_sessions_shown AS
+                SELECT s.* FROM sleep_sessions s
+                WHERE s.provider = 'official'
+                   OR NOT EXISTS (
+                       SELECT 1 FROM sleep_sessions o
+                       WHERE o.provider = 'official'
+                         AND o.start_time < s.end_time AND o.end_time > s.start_time);
+             CREATE INDEX IF NOT EXISTS idx_sleep_sessions_provider_start
+                 ON sleep_sessions(provider, start_time);
+             PRAGMA user_version = 34;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(34, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v35：训练计划写入（官方 `POST /users/-/workouts`）。
+        //
+        // 官方没有读取接口，「手表上现在有什么」只能靠这里的发布账本：
+        // - `training_plan_drafts`：人、粘贴的 AI 回复、MCP 写进来的计划原文；
+        // - `training_plan_workouts`：发布后生效的逐条训练。行只增不改，`id` 就是
+        //   V2 的 `workoutId`；换计划只是翻 `active`，所以账本里的旧推送永远能还原；
+        // - `training_plan_publishes`：每一次推送的整窗快照、发出去的报文和结果。
+        //   **先写这一行再发请求**，发完再补结果。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS training_plan_drafts (
+                id TEXT PRIMARY KEY,
+                origin TEXT NOT NULL,
+                document TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS training_plan_workouts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                draft_id TEXT NOT NULL,
+                workout_date TEXT NOT NULL,
+                workout TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_training_plan_workouts_active
+                 ON training_plan_workouts(active, workout_date);
+             CREATE TABLE IF NOT EXISTS training_plan_publishes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                draft_id TEXT,
+                window_start TEXT NOT NULL,
+                window_ids TEXT NOT NULL DEFAULT '[]',
+                body TEXT NOT NULL,
+                activated TEXT NOT NULL DEFAULT '[]',
+                deactivated TEXT NOT NULL DEFAULT '[]',
+                state TEXT NOT NULL,
+                http_status INTEGER,
+                error_code TEXT,
+                undone INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                finished_at TEXT
+             );
+             PRAGMA user_version = 35;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(35, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // 全新建的库（进来时 user_version = 0）默认开长期归档：记录属于用户，默认不自动清理
+        // （用户 2026-09-29 定：首次建库推荐长期保留）。已有的库不动——它们没写过这个键时
+        // 一直是「只留最近 N 天」，改默认值等于替用户改了设置；2.x 共用的真实库也就不受影响。
+        if version == 0 {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO app_meta(key, value, updated_at) VALUES(?1, '1', ?2)",
+                params![super::ARCHIVE_ENABLED_KEY, Utc::now().to_rfc3339()],
+            )?;
+        }
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_exchanges (
+                id TEXT PRIMARY KEY, task_id TEXT NOT NULL, provider TEXT NOT NULL,
+                question TEXT NOT NULL, days_before INTEGER NOT NULL, categories TEXT NOT NULL,
+                workout_ids TEXT NOT NULL DEFAULT '[]', personal_note TEXT NOT NULL DEFAULT '',
+                sent_at TEXT NOT NULL, md_path TEXT NOT NULL, plan_draft_id TEXT,
+                received_at TEXT, publish_id INTEGER
+             );
+             CREATE INDEX IF NOT EXISTS idx_ai_exchanges_sent ON ai_exchanges(sent_at);
+             PRAGMA user_version = 36;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(36,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v37：训练计划多窗口推送（2026-10 精修批次 1）。
+        //
+        // 一次发布要把计划覆盖到的每个 7 天窗口都推一遍，每个窗口一行：
+        // - `batch_id`：同一批共用批里第一行的 `id`；更早的行是 NULL（一行就是一批）。
+        // - `role`：`window` 正常整窗 / `clear` 当前窗口发空数组 / `placeholder` 未来窗口
+        //   的占位清空。占位行要单独认出来：它在窗口前一天留了一条占位训练。
+        // 只加列，不改已发布的 DDL；旧行读出来 batch_id 为 NULL、role 为 'window'。
+        self.ensure_table_columns(
+            "training_plan_publishes",
+            &[
+                ("batch_id", "INTEGER"),
+                ("role", "TEXT NOT NULL DEFAULT 'window'"),
+            ],
+        )?;
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_training_plan_publishes_batch
+                 ON training_plan_publishes(batch_id);
+             PRAGMA user_version = 37;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(37,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v38：已保存的任务能置顶（2026-10 精修批次 5.3）。只加一列，旧行默认不置顶；
+        // 「30 天没动过收进更早」按 updated_at 现算，不落库。
+        self.ensure_table_columns("ai_tasks", &[("pinned", "INTEGER NOT NULL DEFAULT 0")])?;
+        self.conn.execute_batch("PRAGMA user_version = 38;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(38,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

@@ -1,10 +1,19 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
+import { dialogFlight, originOf, type FlightOrigin } from '../lib/motion/dialogFlight';
 
-defineProps<{ labelledby: string }>();
+const props = defineProps<{
+  labelledby: string;
+  /** 从哪个元素长出来、缩回哪里（舞台上被点的那张牌）。不给就用打开它时聚焦的元素 / 最近一次按下的位置。
+      牌是按 pointerdown 拖的、点开时焦点不在它身上：不显式给的话，关的时候会缩进刚点的「收起」按钮，看上去是凭空消失（10-13）。 */
+  origin?: HTMLElement | null;
+}>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const panel = ref<HTMLElement | null>(null);
+const backdrop = ref<HTMLElement | null>(null);
 let returnFocus: HTMLElement | null = null;
+let origin: FlightOrigin | null = null;
+let leaving: { backdrop: HTMLElement; panel: HTMLElement } | null = null;
 
 const isTopmost = () => {
   const dialogs = document.querySelectorAll('[data-modal-dialog]');
@@ -43,30 +52,56 @@ const keepFocusInside = (event: FocusEvent) => {
 
 onMounted(() => {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // 从打开它的那个按钮里长出来，关的时候缩回去（lib/motion/dialogFlight.ts）。
+  origin = originOf(props.origin ?? returnFocus);
+  if (backdrop.value && panel.value) void dialogFlight.open(backdrop.value, panel.value, origin, () => emit('close'));
   // Start at the heading/content instead of scrolling a long dialog to its first action.
   panel.value?.focus({ preventScroll: true });
   document.addEventListener('keydown', onKeydown, true);
   document.addEventListener('focusin', keepFocusInside);
 });
 onBeforeUnmount(() => {
+  // 模板 ref 在卸载时会被清成 null，先把节点记下来留给 onUnmounted。
+  leaving = backdrop.value && panel.value ? { backdrop: backdrop.value, panel: panel.value } : null;
   document.removeEventListener('keydown', onKeydown, true);
   document.removeEventListener('focusin', keepFocusInside);
   if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+});
+/* 卸载以后节点已经被 Vue 摘下来了，但它还是完整的（输入框里的字也还在）：
+   挂回去放完收起的动画再真正移除。 */
+onUnmounted(() => {
+  if (leaving) dialogFlight.close(leaving.backdrop, leaving.panel, origin);
+  leaving = null;
 });
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="dialog-backdrop" @click.self="emit('close')">
+    <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
       <section ref="panel" class="dialog-panel" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
-        <slot />
+        <span class="dialog-glass" aria-hidden="true"></span>
+        <div class="dialog-scroll"><slot /></div>
       </section>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .7); }
-.dialog-panel { width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--line-control); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: 0 12px 36px rgba(0, 0, 0, .5); overflow-wrap: anywhere; }
+/* 两层毛玻璃（全屏遮罩的模糊、面板的磨砂）都画在**垫底的一层**上，不画在遮罩 / 面板自己身上：
+   祖先只要带 backdrop-filter，里面胶囊和日期滚轮的液态玻璃透镜就看不见背后、挂不上（lib/glassLens.ts、
+   composables/useGlassLens.ts），弹窗里的选中块只剩一块不透明的深色胶囊（用户 2026-10-04：「添加事件」
+   里的分类和日期滚轮要做成液态玻璃）。和顶栏图标组的 .glass-control.is-lens-host 同一个做法。 */
+/* 暗色和模糊都在 ::before 上、淡入淡出也只动它：遮罩自己一旦带 opacity，就成了模糊的取样边界，
+   淡入期间页面清楚、结束才「啪」地糊掉（lib/motion/dialogFlight.ts 头注释）。 */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
+/* 背后虚化得更深一点（10-08 H8「缺少背景高斯模糊」）：静态模糊，只淡入淡出这一层。 */
+.dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
+/* 等画面跟得上的那一小会儿：面板隐身（不用 0，免得这一层不合成）；遮罩已经在淡入了（10-08 H3）。 */
+.dialog-backdrop.is-entering .dialog-glass,
+.dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
+/* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
+.dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
+.dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
+.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 </style>

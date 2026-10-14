@@ -1,0 +1,196 @@
+<script setup lang="ts">
+/* 概览最上面的「我的指标」：用户固定的 3–4 个指标，每个一块磁贴——最新值、测于哪天、
+ * 迷你曲线和覆盖天数。没有记录就写「—」和「近 N 天无记录」，不补 0。
+ *
+ * 磁贴和点进去的那张趋势卡是**同一个东西**：同名（PinnedMetrics.i18n.ts 的 names）、同色（lib/metricTone.ts）、
+ * 同一段范围（详情页顶上的 7 天 / 1 个月 / 6 个月，useTrendRange），数值和曲线形状也就一样。
+ * 一个都没固定时是一张引导卡，点开挑选面板（PinPicker）。
+ *
+ * 动效：挑完回来，新加的磁贴由下往上漫出类别色再显出内容；留下的原地不动（缓存页回场不重放）。 */
+import { computed, defineAsyncComponent, onMounted, provide, ref } from 'vue';
+import Icon from '../Icon.vue';
+import PinTile from './PinTile.vue';
+import { PIN_TILES, type PinTileData } from './pinTiles';
+import { backend, isDesktop } from '../../lib/bridge';
+import { useRevisionReload } from '../../composables/useRevisionReload';
+import { useTrendRange } from '../../composables/useTrendRange';
+import { distanceUnit } from '../../lib/units';
+import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
+import { metricColor } from '../../lib/metricTone';
+import { coverageLabel, indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../../lib/metricSeries';
+import { today as currentToday } from '../../lib/currentDay';
+import {
+  pinLatestDate, pinMassUnit, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
+} from '../../lib/pinnedMetrics';
+import type { MetricSeries } from '../../types';
+import { useMessages } from '../../i18n';
+import { pinnedMetricsMessages } from './PinnedMetrics.i18n';
+
+defineOptions({ name: 'OverviewPinnedMetrics' });
+
+const t = useMessages(pinnedMetricsMessages);
+/* 挑选面板只在点「调整」时才用：不放进概览首屏那一块（首屏 CSS 预算）。本机读 chunk 是同一帧的事。 */
+const PinPicker = defineAsyncComponent(() => import('./PinPicker.vue'));
+const range = useTrendRange();
+
+const pins = ref<string[]>(readPins());
+/** 一次取最长那档（和详情页一样），按页面范围在本地切：切范围不查库，切法也和详情页同一个。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, range.value));
+const pickerOpen = ref(false);
+/** 刚从挑选面板回来：这一次让磁贴依次浮上来。 */
+const justPinned = ref(false);
+
+const label = (id: string) => (t.value.names as Record<string, string>)[id] ?? id;
+const unitText = (metric: PinnableMetric) => {
+  void distanceUnit.value; // kg / lb 跟着单位制切换重算（和身体页一样显式依赖一次）
+  return ({
+    bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, kcal: t.value.unitKcal, min: t.value.unitMin,
+    pai: t.value.unitPai, ms: 'ms', percent: '%', mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
+  } as Record<string, string>)[metric.unit] ?? '';
+};
+
+const dayText = (date: string | null): string | null => {
+  if (!date) return null;
+  const day = parseDisplayDate(`${date}T12:00:00`);
+  if (Number.isNaN(day.getTime())) return null;
+  const today = currentToday();
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((start(today) - start(day)) / 86_400_000);
+  if (diff === 0) return t.value.today;
+  if (diff === 1) return t.value.yesterday;
+  return t.value.measuredOn(displayDateTimeFormatter({ month: 'short', day: 'numeric' }).format(day));
+};
+
+const tiles = computed<PinTileData[]>(() => pins.value.flatMap((id) => {
+  const metric = pinnableMetric(id);
+  if (!metric) return [];
+  const data = series.value[id];
+  return [{
+    id,
+    metric,
+    label: label(id),
+    value: pinValueText(metric, data),
+    unit: unitText(metric),
+    when: dayText(pinLatestDate(data)),
+    spark: pinSparkValues(data),
+    // 读失败和「真的没有记录」是两回事：前者不能写成「近 30 天无记录」。
+    coverage: !data && loadFailed.value ? t.value.loadFailed : coverageLabel(data),
+    tone: metricColor(id),
+  }];
+}));
+/* 磁贴的内容交给 PinTile 自己渲染，这里的 TransitionGroup 只认「有哪几块、什么顺序」（性能审计 11）。
+   TransitionGroup 每重渲染一次就要把每块磁贴的位置量两遍（为了「挪位」动画），换语言、数据刷新时
+   内容一变它就跟着重渲染，换语言那一下多出约 30ms 整页强制排版。现在只有增删、换顺序才轮到它。 */
+const tileMap = computed(() => new Map(tiles.value.map((tile) => [tile.id, tile])));
+provide(PIN_TILES, tileMap);
+const tileIds = computed<string[]>((previous) => {
+  const next = tiles.value.map((tile) => tile.id);
+  return previous && previous.length === next.length && previous.every((id, i) => id === next[i]) ? previous : next;
+});
+/* 类名和样式也是 TransitionGroup 的 props：每次渲染新建一个数组 / 对象，它就以为 props 变了、跟着重渲染。 */
+const gridClass = computed(() => ['pins-grid', { 'just-pinned': justPinned.value }]);
+const gridStyle = computed(() => ({ '--count': tileIds.value.length }));
+const PIN_DURATION = { enter: 900, leave: 0 };
+
+let loadSeq = 0;
+/** 上一次读取失败了。已经显示着的数据保留，没有数据的磁贴说「读不出来」而不是「无记录」。 */
+const loadFailed = ref(false);
+/** 读失败返回 null：调用方保留上一次的结果，概览其余部分照常。 */
+const fetchSeries = async (ids: string[]): Promise<Record<string, MetricSeries> | null> => {
+  if (!isDesktop() || !ids.length) return {};
+  try {
+    return indexSeries(await backend.getMetricSeries([...ids], SERIES_FETCH_DAYS));
+  } catch {
+    return null;
+  }
+};
+const load = async () => {
+  const seq = ++loadSeq;
+  const next = await fetchSeries(pins.value);
+  if (seq !== loadSeq) return;
+  loadFailed.value = next === null;
+  if (next) fullSeries.value = next;
+};
+onMounted(() => void load());
+useRevisionReload(() => void load());
+
+/* 挑完回来：先把新指标的数据读好，再一次换上。以前先换磁贴、数据晚一拍到，
+   磁贴先是「—」再跳成数字加曲线，加上整排按新 key 重新挂载，就是「退出去闪一下」。
+   留下来的磁贴原地不动（按 id 保留），新来的那几块从灰底里由下往上漫出类别色再显出内容。 */
+const apply = async (next: string[]) => {
+  pickerOpen.value = false;
+  if (next.join() === pins.value.join()) return;
+  const seq = ++loadSeq;
+  const data = await fetchSeries(next);
+  if (seq !== loadSeq) return;
+  justPinned.value = true;
+  loadFailed.value = data === null;
+  if (data) fullSeries.value = data;
+  pins.value = [...next];
+  writePins(next);
+  window.setTimeout(() => { justPinned.value = false; }, 1200);
+};
+</script>
+
+<template>
+  <section class="pins" aria-labelledby="pins-title">
+    <header class="pins-head">
+      <h2 id="pins-title">{{ t.title }}</h2>
+      <button v-if="pins.length" type="button" class="pill-button quiet pins-edit" :title="t.edit" @click="pickerOpen = true">
+        <Icon name="sliders" :size="14" /><span>{{ t.edit }}</span>
+      </button>
+    </header>
+
+    <button v-if="!pins.length" type="button" class="pins-empty" @click="pickerOpen = true">
+      <span class="pins-plus" aria-hidden="true"><Icon name="plus" :size="18" /></span>
+      <span class="pins-empty-copy"><strong>{{ t.emptyCta }}</strong><small>{{ t.emptySub }}</small></span>
+    </button>
+
+    <!-- 灌色动画在 ::after 和子元素上，Vue 只看得见磁贴自己的 240ms 过渡，会在 27% 处撤掉
+         enter-active 把它截断：时长显式给 900。离场是 display:none，不用等。 -->
+    <TransitionGroup v-else tag="div" name="pin" :appear="justPinned" :duration="PIN_DURATION"
+      :class="gridClass" :style="gridStyle">
+      <PinTile v-for="id in tileIds" :key="id" :id="id" />
+    </TransitionGroup>
+
+    <PinPicker v-if="pickerOpen" :pins="pins" :label="label" @close="pickerOpen = false" @done="apply" />
+  </section>
+</template>
+
+<style scoped>
+.pins { display: grid; gap: 10px; }
+.pins-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+.pins-head h2 { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 650; }
+/* 「调整」：和「查看全部」同一族的 quiet 胶囊按钮，只是比标准的小一号。真玻璃
+   （backdrop-filter）只给浮层，标题行是内容层，不该自己磨砂。 */
+.pins-edit { min-height: 30px; padding: 0 12px; font-size: var(--fs-xs); }
+.pins-edit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.pins-empty {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px;
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 16%, transparent); border-radius: var(--radius-lg);
+  background: transparent; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.pins-empty:hover { border-color: color-mix(in srgb, var(--ink) 24%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.pins-empty:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pins-plus { display: grid; flex: 0 0 auto; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.pins-empty-copy { display: grid; gap: 2px; }
+.pins-empty-copy strong { color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
+.pins-empty-copy small { font-size: var(--fs-xs); }
+
+.pins-grid { position: relative; display: grid; grid-template-columns: repeat(var(--count, 4), minmax(0, 1fr)); gap: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .pin-move { transition: transform 420ms cubic-bezier(.2, .8, .2, 1); }
+}
+/* 去掉的磁贴直接让位（它在挑选面板里已经退过场），剩下的滑到新位置。磁贴自己的样式在 PinTile.vue。 */
+.pin-leave-active { display: none; }
+
+@container (max-width: 760px) {
+  .pins-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .pins-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>

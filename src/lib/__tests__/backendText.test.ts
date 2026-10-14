@@ -49,6 +49,6 @@ describe('backend prose never leaks into the English interface', () => {
 
   it('still prefers a real code when there is one', () => {
     const shown = toUserMessage({ code: 'err.sync.not_connected', message: '尚未连接 Zepp' });
-    expect(shown).toBe('Not connected to Zepp yet. Connect first');
+    expect(shown).toBe('Not connected to Zepp yet — connect first');
   });
 });

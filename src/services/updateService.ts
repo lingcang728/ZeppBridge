@@ -1,187 +1,118 @@
+/**
+ * 静默更新的界面一侧（2026-10-14）。流程全在后端（src-tauri/src/updates/silent.rs）：
+ * 打开应用就查，有新版本就在后台下载、验签，下好了等用户点「更新」。这里只做三件事：
+ *
+ * - 打开时叫一次 `update_start`，之后听 `update://state` 把状态抄进 `updateState`；
+ * - 左上角标志（BrandMark 外圈）和设置页那一行都读这一份；
+ * - 用户点「更新」时叫 `update_apply`（后端会先等同步 / 补拉结束）。
+ *
+ * 失败一律安静：标志保持原样，原因只在设置页里说。新手引导的示例沙盒里（演示运行时接管了 bridge）
+ * 什么都不做，不会去碰真的更新。
+ */
 import { reactive } from 'vue';
-import { defineMessages, messagesOf } from '../i18n';
+import { demoIpcActive, invoke, listen } from '../lib/bridge/ipc';
 import { toUserMessage } from '../lib/bridge';
 
-const updateMessages = defineMessages(
-  { nothingToInstall: '没有可安装的更新，请重新检查。' },
-  { nothingToInstall: 'There is no update to install. Check again.' },
-  { nothingToInstall: 'No hay ninguna actualización para instalar. Vuelve a revisar.' },
-  'services/updateService',
-);
+export type UpdatePhase =
+  | 'idle' | 'checking' | 'downloading' | 'ready' | 'applying' | 'up_to_date' | 'failed' | 'unsupported';
 
-export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate' | 'unmanaged';
-
-export interface UpdateViewState {
-  status: UpdateStatus;
-  currentVersion: string;
-  version: string;
-  date: string;
-  notes: string;
-  sizeBytes: number | null;
-  downloadedBytes: number;
-  totalBytes: number | null;
-  error: string;
+/** 和后端 `UpdateView` 同形。 */
+export interface UpdateView {
+  phase: UpdatePhase;
+  version: string | null;
+  notes: string | null;
+  date: string | null;
+  downloaded: number;
+  total: number | null;
+  waiting_for_sync: boolean;
+  portable: boolean;
+  error_code: string | null;
 }
 
-const AUTO_CHECK_KEY = 'zeppbridge-updater-last-auto-check-v1';
-const AUTO_CHECK_INTERVAL = 24 * 60 * 60 * 1_000;
+export interface UpdateUiState extends UpdateView {
+  currentVersion: string;
+  /** 点「更新」失败时的那句话（已按界面语言取好）。 */
+  applyError: string;
+}
 
-export const updateState = reactive<UpdateViewState>({
-  status: 'idle',
-  currentVersion: '',
-  version: '',
-  date: '',
-  notes: '',
-  sizeBytes: null,
-  downloadedBytes: 0,
-  totalBytes: null,
-  error: '',
+const initial = (): UpdateView => ({
+  phase: 'idle', version: null, notes: null, date: null, downloaded: 0, total: null,
+  waiting_for_sync: false, portable: false, error_code: null,
 });
 
-type TauriUpdate = Awaited<ReturnType<typeof import('@tauri-apps/plugin-updater')['check']>>;
-let pendingUpdate: TauriUpdate = null;
+export const updateState = reactive<UpdateUiState>({ ...initial(), currentVersion: '', applyError: '' });
 
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+/** 下载进度 0–1；拿不到总大小时为 null（界面画不出一圈准的就不画假的）。 */
+export const downloadRatio = (view: Pick<UpdateView, 'downloaded' | 'total'>): number | null =>
+  view.total && view.total > 0 ? Math.min(1, Math.max(0, view.downloaded / view.total)) : null;
 
-function errorMessage(error: unknown): string {
-  // Tauri 插件经常抛 `{ code, message }`，`String(error)` 会变成 `[object Object]`。
-  return toUserMessage(error);
-}
+const isDesktopRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && !demoIpcActive();
 
-function positiveNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
-}
+const apply = (view: UpdateView) => { Object.assign(updateState, view); };
 
-function packageSize(raw: Record<string, unknown>): number | null {
-  const direct = positiveNumber(raw.size);
-  if (direct !== null) return direct;
-  const platforms = raw.platforms;
-  if (!platforms || typeof platforms !== 'object') return null;
-  for (const value of Object.values(platforms)) {
-    if (value && typeof value === 'object') {
-      const size = positiveNumber((value as Record<string, unknown>).size);
-      if (size !== null) return size;
-    }
-  }
-  return null;
-}
+let listening: Promise<void> | null = null;
+const listenOnce = () => {
+  listening ??= listen<UpdateView>('update://state', (event) => apply(event.payload)).then(() => undefined, () => undefined);
+  return listening;
+};
 
-async function loadCurrentVersion(): Promise<void> {
-  if (updateState.currentVersion || !isTauriRuntime()) return;
-  const { getVersion } = await import('@tauri-apps/api/app');
-  updateState.currentVersion = await getVersion();
-}
-
-/* Linux 的每条分发渠道（Flatpak、deb/rpm）都由包管理器管更新，latest.json 里
-   也没有 linux 的条目。后端说不支持时就不要去 check()：那一步只会抛一句
-   「响应的 platforms 里找不到 linux-x86_64」，以「更新失败」的样子出现在设置页
-   上——而实际上什么都没坏。 */
-let selfUpdateSupported: boolean | null = null;
-
-async function isSelfUpdateSupported(): Promise<boolean> {
-  if (selfUpdateSupported !== null) return selfUpdateSupported;
+const loadCurrentVersion = async () => {
+  if (updateState.currentVersion) return;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    selfUpdateSupported = await invoke<boolean>('self_update_supported');
+    const { getVersion } = await import('@tauri-apps/api/app');
+    updateState.currentVersion = await getVersion();
   } catch {
-    // 老版本后端没有这个命令。那些构建全都是 Windows/macOS 的，能自己更新。
-    selfUpdateSupported = true;
+    // 读不到版本号也不影响更新本身。
   }
-  return selfUpdateSupported;
-}
+};
 
-let checkInFlight: Promise<void> | null = null;
-
-export async function checkForDesktopUpdate(manual = false): Promise<void> {
-  if (!isTauriRuntime()) return;
-  if (
-    updateState.status === 'downloading'
-    || updateState.status === 'installing'
-  ) return;
-  if (checkInFlight) return checkInFlight;
-  const run = doCheckForDesktopUpdate(manual);
-  checkInFlight = run.finally(() => {
-    if (checkInFlight === run) checkInFlight = null;
-  });
-  return checkInFlight;
-}
-
-async function doCheckForDesktopUpdate(manual: boolean): Promise<void> {
-  updateState.status = 'checking';
-  updateState.error = '';
+/**
+ * 打开应用时（和设置页的「检查更新」）调用。后端在查 / 在下 / 下好了时原样返回，不会重复开；
+ * 上一次是「已是最新」或失败时重新查一次。
+ */
+export async function startDesktopUpdate(retries = 2): Promise<void> {
+  if (!isDesktopRuntime()) return;
+  await listenOnce();
+  void loadCurrentVersion();
   try {
-    await loadCurrentVersion();
-    if (!(await isSelfUpdateSupported())) {
-      updateState.status = 'unmanaged';
-      return;
-    }
-    const lastCheck = Number(localStorage.getItem(AUTO_CHECK_KEY) ?? 0);
-    if (!manual && Date.now() - lastCheck < AUTO_CHECK_INTERVAL) {
-      updateState.status = 'upToDate';
-      return;
-    }
-    const { check } = await import('@tauri-apps/plugin-updater');
-    pendingUpdate = await check({ timeout: 15_000 });
-    if (!pendingUpdate) {
-      localStorage.setItem(AUTO_CHECK_KEY, String(Date.now()));
-      Object.assign(updateState, { status: 'upToDate', version: '', notes: '', sizeBytes: null });
-      return;
-    }
-    localStorage.removeItem(AUTO_CHECK_KEY);
-    const sizeBytes = packageSize(pendingUpdate.rawJson);
-    Object.assign(updateState, {
-      status: 'available',
-      currentVersion: pendingUpdate.currentVersion,
-      version: pendingUpdate.version,
-      date: pendingUpdate.date ?? '',
-      notes: pendingUpdate.body ?? '',
-      sizeBytes,
-      downloadedBytes: 0,
-      totalBytes: sizeBytes,
-    });
-  } catch (error) {
-    pendingUpdate = null;
-    updateState.status = 'failed';
-    updateState.error = toUserMessage(error, errorMessage(error));
+    apply(await invoke<UpdateView>('update_start'));
+  } catch {
+    // IPC 还没就绪（启动早期、刚从新手引导的沙盒回来）：过几秒再试，不让这次打开一直停在「没查过」。
+    if (retries > 0) window.setTimeout(() => { void startDesktopUpdate(retries - 1); }, 3000);
   }
 }
 
-export async function downloadAndInstallDesktopUpdate(): Promise<void> {
-  if (updateState.status === 'downloading' || updateState.status === 'installing') return;
-  if (!pendingUpdate) {
-    updateState.status = 'failed';
-    updateState.error = messagesOf(updateMessages).nothingToInstall;
-    return;
-  }
-  updateState.status = 'downloading';
+let watching = false;
+/**
+ * 顶栏挂上时调用：先补一次当前状态，之后窗口每次回到前台再补一次。事件是主通道，这只是兜底——
+ * 页面重载、事件在监听挂上之前推过，都不会让标志停在旧样子。只问本机，不联网。
+ */
+export function watchDesktopUpdate(): void {
+  void refreshDesktopUpdate();
+  if (watching || typeof window === 'undefined') return;
+  watching = true;
+  window.addEventListener('focus', () => { void refreshDesktopUpdate(); });
+}
+
+/** 页面晚挂上时补一次当前状态（事件可能在它挂上之前就推过了）。 */
+export async function refreshDesktopUpdate(): Promise<void> {
+  if (!isDesktopRuntime()) return;
+  await listenOnce();
+  void loadCurrentVersion();
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const portable = await invoke<boolean>('is_portable_update');
-    updateState.error = '';
-    updateState.downloadedBytes = 0;
-    await invoke('validate_update_data_location');
-    await pendingUpdate.download((event) => {
-      if (event.event === 'Started') {
-        updateState.totalBytes = event.data.contentLength ?? updateState.sizeBytes;
-      } else if (event.event === 'Progress') {
-        updateState.downloadedBytes += event.data.chunkLength;
-      } else {
-        updateState.status = 'installing';
-      }
-    });
-    updateState.status = 'installing';
-    await invoke('validate_update_data_location');
-    await pendingUpdate.install();
-    if (portable) {
-      await invoke('launch_migrated_install');
-    } else {
-      const { relaunch } = await import('@tauri-apps/plugin-process');
-      await relaunch();
-    }
+    apply(await invoke<UpdateView>('update_view'));
+  } catch {
+    // 同上。
+  }
+}
+
+/** 用户点了「更新」。成功时应用会退出 / 重启，这个 Promise 不会再回来。 */
+export async function applyDesktopUpdate(): Promise<void> {
+  if (updateState.phase !== 'ready') return;
+  updateState.applyError = '';
+  try {
+    await invoke('update_apply');
   } catch (error) {
-    updateState.status = 'failed';
-    updateState.error = errorMessage(error);
+    updateState.applyError = toUserMessage(error, '');
   }
 }

@@ -8,7 +8,7 @@ withDefaults(defineProps<{ height?: string }>(), { height: '168px' });
 
 <style scoped>
 .skeleton-block {
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
   background: linear-gradient(100deg, var(--surface) 30%, var(--surface-raised) 45%, var(--surface) 60%);
   background-size: 240% 100%;

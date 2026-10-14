@@ -28,7 +28,7 @@ Git, and shared copies of your data directory.
    Adjust the application path if you installed it elsewhere. Keep the terminal
    open during this first run. This command sets the storage choice for that
    process; it contains no token and needs no administrator privileges.
-4. Connect your Zepp account in Settings. Web sign-in, HAR import, and manual
+4. Connect your Zepp account in Settings. Web sign-in and manual
    entry all use the selected file store. Existing health records are retained.
    If your token exists only in the locked keychain, sign in again: ZeppBridge
    cannot retrieve or migrate that inaccessible token.

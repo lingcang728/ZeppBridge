@@ -1,0 +1,25 @@
+.receive { position: relative; display: inline-grid; justify-items: center; }
+.receive-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--mat-raised); box-shadow: var(--mat-raised-rim); color: var(--ink); font: inherit; cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-spring), background var(--dur-base) ease; }
+.receive-button:hover:not(:disabled) { transform: translateY(-1px); }
+.receive-button:active:not(:disabled) { transform: scale(.96); }
+.receive-button:disabled { opacity: .55; cursor: default; }
+.receive-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* 计划面标题旁：一枚圆形图标按钮。 */
+.is-icon .receive-button { width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.is-icon .receive-button:hover:not(:disabled) { color: var(--accent); }
+/* 空态：一枚大的、品牌色的。 */
+.is-primary .receive-button { min-height: 46px; padding: 0 22px; border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--mat-raised)); color: var(--accent); font-size: var(--fs-sm); font-weight: 700; }
+/* 周视图标题行：一枚小胶囊。 */
+.is-pill .receive-button { min-height: 30px; padding: 0 13px; font-size: var(--fs-2xs); font-weight: 650; }
+
+.web-paste { position: absolute; top: calc(100% + 8px); right: 0; z-index: 3; display: grid; gap: 8px; width: 320px; padding: 14px; border: 1px solid var(--mat-glass-line);
+  border-radius: 16px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); }
+.is-primary .web-paste { right: auto; left: 50%; translate: -50% 0; }
+.web-paste label { display: grid; gap: 8px; color: var(--muted); font-size: var(--fs-2xs); }
+.web-paste textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--mat-inset); color: var(--ink); font: 11px / 1.5 var(--font-mono); resize: vertical; }
+.web-acts { display: flex; justify-content: flex-end; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .receive-button { transition: none; } }

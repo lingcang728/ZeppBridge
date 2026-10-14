@@ -26,10 +26,15 @@ const ERROR_MESSAGES_FILE = join(srcDir, 'i18n', 'errors.ts');
 
 /** 整份文件都是文案，或者自带一套双语机制。 */
 const SKIP_FILES = [
-  'views/Explore.i18n.ts',
   'views/Settings.i18n.ts',
   'views/LandingPage.vue',
   'composables/useLandingLocale.ts',
+  'views/landing/copy.ts',
+  'views/landing/journeyCopy.ts', // Typed ten-language website copy, selected by LandingLocale.
+  'views/landing/reelCopy.ts', // Typed ten-language MotionReel controls.
+  'views/landing/film/copy.ts', // Film captions per LandingLocale; untranslated locales fall back to English.
+  'views/landing/p4Copy.ts', // P4 chapter copy per LandingLocale (zh here, others in p4/<locale>.ts); untranslated locales keep the older layout.
+  'demo/dialogueCopy.ts', // Typed ten-language demo dialogue strings.
 ];
 
 /**
@@ -38,7 +43,57 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
-    file: 'views/Settings.vue',
+    file: 'components/tour/TourWelcome.vue',
+    text: "const GREETINGS = ['你好'",
+    why: '新手引导第一屏的多语问候轮播：每种语言说它自己的那一句，本来就不跟界面语言走。',
+  },
+  {
+    file: 'lib/aiTask/metrics.ts',
+    text: "'分钟': 'unit_min'",
+    why: '后端 storage/metric_spec.rs 的单位键本身是中文（稳定键，CLI / MCP 契约，不随界面语言变）；这一行是「键 → 各语言说法」的查表，不是文案。',
+  },
+  {
+    file: 'demo/ai.ts',
+    text: 'distance_meters:',
+    why: '演示数据复刻后端原样返回的单位键值（「步」「次/分」这类）；界面按单位表（lib/aiTask/metrics.ts 的 unitLabel）本地化，查不到才原样显示，和真后端的行为一致。',
+  },
+  {
+    file: 'demo/ai.ts',
+    text: "resting_hr: 'bpm'",
+    why: '同上，演示的单位键值。',
+  },
+  {
+    file: 'demo/ai.ts',
+    text: 'ui.ai_task.warn.',
+    why: '后端预览警告的「码 + 中文兜底原文」；界面先按码取自己语言的说法，英文界面里 backendText 闸门不会输出这段中文。演示只是照后端的形状给数据。',
+  },
+  {
+    file: 'demo/dataset.ts',
+    text: "hrv: 'ms', hrv_rmssd",
+    why: '演示日指标的单位键值，和真后端一致（「步」「次/分」）。',
+  },
+  {
+    file: 'demo/dataset.ts',
+    text: "lactate_threshold_pace: '秒/公里'",
+    why: '后端配速的稳定单位键，由 lib/aiTask/metrics.ts 的 unitLabel 本地化。',
+  },
+  {
+    file: 'demo/facts.ts',
+    text: "fact('workout_count'",
+    why: '一周对比里「次」是后端给的单位值，界面按指标 id 取自己语言的单位写法。',
+  },
+  {
+    file: 'demo/facts.ts',
+    text: "recordsUnit: '条'",
+    why: '能力看板的 recordsUnit 是后端的中文兜底，界面先按 recordsUnitCode 取自己语言的说法。',
+  },
+  {
+    file: 'views/landing/BentoGrid.vue',
+    text: 'const GREETINGS',
+    why: '落地页「十种界面语言」那一格滚动的是十种语言各自的问候语，每个词本来就该是它自己的文字。',
+  },
+  {
+    file: 'views/settings/sections/DisplayPrefsSection.vue',
     text: '语言 · Language',
     why: '语言开关的标签刻意是双语的：看不懂中文的人必须能在中文界面上找到它。',
   },
@@ -46,6 +101,11 @@ const ALLOWED = [
     file: 'i18n/index.ts',
     text: "zh: '中文'",
     why: '每种语言在选择器里用自己的名字，和界面当前语言无关。',
+  },
+  {
+    file: 'components/shell/AppTopBar.vue',
+    text: "zh: '中'",
+    why: '顶栏放不下时语言胶囊改成短码；和语言名一样用各语言自己的写法，与界面语言无关。',
   },
   {
     file: 'lib/bridge/errors.ts',
@@ -62,6 +122,12 @@ const ALLOWED = [
     text: 'const CJK =',
     why: '这是判断「这段文字是不是中文」的字符区间，不是给用户看的字——'
       + '整个闸门就靠它，挪进 defineMessages 反而没意义。',
+  },
+  {
+    file: 'lib/aiTask/metrics.ts',
+    text: "'步'",
+    why: '后端覆盖单位表把步数的单位写成「步」（ai_tasks/coverage.rs），'
+      + '这里按协议键把它映射成当前语言的单位文案——键本身是数据不是文案。',
   },
 ];
 
@@ -234,12 +300,23 @@ const isProseRisk = (line) => {
   if (!PROSE_FIELDS.test(line)) return false;
   if (line.includes('toUserMessage(')) return false;
   if (CSS_LINE.test(line.trim())) return false;
-  // `error.message` 这种是 JS Error，不是后端载荷。
-  const stripped = line.replace(JS_ERROR, '');
+  // `error.message` 这种是 JS Error，不是后端载荷；console.error 是控制台打印。
+  const stripped = line.replace(JS_ERROR, '').replace(/\bconsole\.error\b/g, '');
   return PROSE_FIELDS.test(stripped);
 };
 
 const ALLOWED_PROSE = [
+  { file: 'demo/runtime.ts', text: 'args.note', why: 'User-authored profile text, persisted by the browser demo adapter.' },
+  { file: 'demo/operations.ts', text: 'a.note', why: 'User-authored profile text stays unchanged in this isolated sample session.' },
+  { file: 'demo/plan.ts', text: 'input.note', why: 'AI or user-authored workout notes are part of the plan document, not interface copy.' },
+  { file: 'components/plan/PlanDetail.vue', text: 'row.rest.note', why: 'AI / 用户填写的休息日原文，不是后端界面文案。' },
+  { file: 'views/AiComposer.vue', text: 'strips.error.value', why: 'useBridgeStrip 已经通过 toUserMessage 按错误码本地化。' },
+  { file: 'views/ai/AiExchanges.vue', text: 'history.error.value', why: 'useExchanges 已经通过 toUserMessage 按错误码本地化。' },
+  { file: 'lib/trainingPlan/importWorkout/common.ts', text: 'out.note', why: '从 .zwo / .fit 读出来的步骤备注原文，写进草稿的书写格式，不渲染、不是后端界面文案。' },
+  { file: 'lib/trainingPlan/edit.ts', text: 'step.note', why: '训练计划里 AI / 用户写的步骤备注原文，原样写回草稿，不渲染、不是后端界面文案。' },
+  { file: 'views/landing/StageWindow.vue', text: 'copy.note', why: '同上，落地页文案。' },
+  { file: 'views/landing/AiHandoff.vue', text: 'copy.note', why: '落地页自己的文案（landing/copy.ts 与语言包），不是后端字段。' },
+  { file: 'views/landing/FinalCta.vue', text: 'downloads.linux.note', why: '同上，落地页文案。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.message', why: '估算文案的唯一实现：按 message_code 分支，取不到才回落到原文。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate.stop_reason', why: '同上，stop_reason 的兜底。' },
   { file: 'lib/storageEstimateText.ts', text: 'estimate?.stop_reason', why: '同上。' },
@@ -247,8 +324,9 @@ const ALLOWED_PROSE = [
   { file: 'lib/bridge/errors.ts', text: 'error.message', why: '取 JS Error 的 message，不是后端字段。' },
   { file: 'components/HistoryArchivePanel.vue', text: 'item.error', why: '先按 error_code 查文案，未知码才回落。' },
   { file: 'components/HistoryArchivePanel.vue', text: 'stop_reason', why: '走 storageStopReasonText，先查码。' },
+  { file: 'composables/useHistoryBackfill.ts', text: 'stop_reason', why: '只判断有没有停止原因；显示走 storageStopReasonText，先查码。' },
   { file: 'components/WeeklyReportCard.vue', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文。' },
-  { file: 'components/BackupPanel.vue', text: 'verification.problem', why: 'verifyProblemText 按 problem_code 分支，未知码才回落。' },
+  { file: 'composables/useBackups.ts', text: 'verification.problem', why: 'verifyProblemText 按 problem_code 分支，未知码才回落。' },
   { file: 'components/BackupPanel.vue', text: "verifications[item.id].problem", why: '只用来判断有没有失败，显示走 verifyProblemText。' },
   {
     file: 'components/HeartRateZonePicker.vue',
@@ -258,14 +336,15 @@ const ALLOWED_PROSE = [
   },
   { file: 'components/DevicePicker.vue', text: 't.note', why: '本组件自己的文案，不是后端字段。' },
   { file: 'components/InsightCard.vue', text: 'entry.reason', why: '只当计数用的 map key，不显示。' },
-  { file: 'composables/useSyncController.ts', text: 'report.message', why: '先按 message_code 取文案。' },
+  { file: 'composables/sync/notice.ts', text: 'report.message', why: '先按 message_code 取文案。' },
   { file: 'views/HealthCheck.vue', text: 'action.reason', why: 'actionCopy 按 action.code 取文案，未知才回落。' },
   { file: 'views/HealthCheck.vue', text: 'stage.message', why: '只在失败类别（error_kind）都认不出来时才兜底显示。' },
-  { file: 'views/Settings.vue', text: 'status.message', why: '先 errorTextFor(status.code)，原文只作兜底。' },
-  { file: 'views/Settings.vue', text: 'item.note', why: 'capability 先按 status 分支，未知状态才回落。' },
-  { file: 'views/Settings.vue', text: 'row.note', why: 'row.note 来自 capabilityNote()，那里已经先按 status 取文案。' },
+  { file: 'composables/settings/useAuthFlow.ts', text: 'status.message', why: '先 errorTextFor(status.code)，原文只作兜底。' },
+  { file: 'composables/settings/useOfficialAuth.ts', text: 'next.message', why: '先 errorTextFor(next.message_code)，原文只作兜底。' },
+  { file: 'composables/settings/useCapabilityBoard.ts', text: 'item.note', why: 'capability 先按 status 分支，未知状态才回落。' },
+  { file: 'views/settings/sections/CapabilitySection.vue', text: 'row.note', why: 'row.note 来自 capabilityNote()，那里已经先按 status 取文案。' },
   { file: 'composables/useSyncController.ts', text: 'text: payload.message', why: '进度由 code + stream 拼；后端原文只在界面不认识这一步时兜底。' },
-  { file: 'composables/useSyncController.ts', text: 'value.text', why: '同上，renderNotice 里的兜底分支。' },
+  { file: 'composables/sync/notice.ts', text: 'value.text', why: '同上，renderNotice 里的兜底分支。' },
   { file: 'views/HealthCheck.vue', text: 'known.reason', why: 'known 是界面自己的文案对象，不是后端字段。' },
   { file: 'views/HealthCheck.vue', text: 'copy.reason', why: 'copy 是 actionCopy 的结果，已经本地化。' },
   { file: 'views/HealthCheck.vue', text: 'actionCopy(action).reason', why: '同上，已经本地化。' },
@@ -274,21 +353,25 @@ const ALLOWED_PROSE = [
   { file: 'composables/useDevices.ts', text: 'meta.refresh_error', why: 'refreshErrorText 先查 refresh_error_code，未知码才回落。' },
   { file: 'composables/useDevices.ts', text: 'profile.display_name', why: '账号里的设备商品名，不是界面文案。' },
   { file: 'composables/useExport.ts', text: 'result.error', why: '导出范围规则的码（scope_conflict 等），不是后端中文。' },
-  { file: 'views/Settings.vue', text: 'deviceCache.value?.refresh_error', why: '先 errorTextFor(refresh_error_code)，原文只作兜底。' },
-  { file: 'views/Settings.vue', text: 'localApiStatus.value.error', why: '先 errorTextFor(error_code)，原文只作兜底。' },
-  { file: 'views/Settings.vue', text: 'localApiStatus.value?.error', why: '同上。' },
-  { file: 'views/Settings.vue', text: 'updateState.error', why: '更新服务自己的本地化错误，不是后端中文字段。' },
+  { file: 'views/settings/sections/DevicesSection.vue', text: 'deviceCache.value?.refresh_error', why: '先 errorTextFor(refresh_error_code)，原文只作兜底。' },
+  { file: 'composables/settings/useLocalApi.ts', text: 'localApiStatus.value.error', why: '先 errorTextFor(error_code)，原文只作兜底。' },
+  { file: 'composables/settings/useLocalApi.ts', text: 'status.error', why: 'statusError() 先 errorTextFor(error_code)，原文只作兜底。' },
+  { file: 'composables/settings/useLocalApi.ts', text: 'localApiStatus.value?.error', why: '同上。' },
+  { file: 'views/settings/sections/UpdateSection.vue', text: 'updateState.error', why: '更新服务自己的本地化错误，不是后端中文字段。' },
   { file: 'services/updateService.ts', text: 'updateState.error', why: '更新服务自己写的本地化错误，经 errorMessage/toUserMessage。' },
-  { file: 'components/BackupPanel.vue', text: 'preview.blocker', why: 'restoreBlockerText 按 compatibility / problem_code 分支，原文只作兜底。' },
+  { file: 'composables/useBackups.ts', text: 'preview.blocker', why: 'restoreBlockerText 按 compatibility / problem_code 分支，原文只作兜底。' },
   { file: 'components/DeviceMarquee.vue', text: 'entry.display_name', why: '设备目录里的商品名，不是界面文案。' },
+  { file: 'views/landing/DeviceRibbon.vue', text: 'd.display_name', why: '落地页设备带用的设备目录商品名，同 DeviceMarquee，不是界面文案。' },
+  { file: 'demo/DemoConversation.vue', text: "'.message-pair:last-child .answer'", why: 'DOM 选择器里的类名 .message-pair，不是后端字段。' },
+  { file: 'demo/DemoConversation.vue', text: 'console.error(error)', why: '只把 JS 异常写进控制台，不显示给用户。' },
   { file: 'views/Overview.vue', text: 'model.profile.display_name', why: '账号里的设备商品名，不是界面文案。' },
   { file: 'lib/deviceCatalog.ts', text: 'item.display_name', why: '目录匹配用的商品名，不显示给用户当界面文案。' },
-  { file: 'views/Settings.vue', text: 'form.error', why: '诊断表单本地状态，catch 里已经 toUserMessage。' },
-  { file: 'views/Settings.vue', text: 'form.note', why: '用户自己填的诊断备注，不是后端字段。' },
-  { file: 'views/Settings.vue', text: 'deviceDiagnostic.note', why: '用户自己填的诊断备注，不是后端字段。' },
-  { file: 'views/Settings.vue', text: 'deviceDiagnostic.error', why: '本地 toUserMessage 结果，不是后端中文字段。' },
-  { file: 'views/Settings.vue', text: 'privacyDiagnostic.note', why: '用户自己填的诊断备注，不是后端字段。' },
-  { file: 'views/Settings.vue', text: 'privacyDiagnostic.error', why: '本地 toUserMessage 结果，不是后端中文字段。' },
+  { file: 'composables/settings/useDiagnosticReport.ts', text: 'form.error', why: '诊断表单本地状态，catch 里已经 toUserMessage。' },
+  { file: 'views/settings/DiagnosticReportForm.vue', text: 'form.error', why: '诊断表单本地状态，catch 里已经 toUserMessage。' },
+  { file: 'composables/settings/useDiagnosticReport.ts', text: 'form.note', why: '用户自己填的诊断备注，不是后端字段。' },
+  { file: 'views/settings/DiagnosticReportForm.vue', text: 'form.note', why: '用户自己填的诊断备注，不是后端字段。' },
+  { file: 'demo/DemoConversation.vue', text: '.message-pair', why: 'CSS 类名选择器，不是后端散文字段。' },
+  { file: 'views/landing/DeviceRibbon.vue', text: 'd.display_name', why: '设备目录里的商品名，不是界面文案。' },
 ];
 
 const proseFindings = [];
@@ -327,7 +410,11 @@ if (proseFindings.length) {
 }
 
 const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
-const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
+/* 前端自己产生的码（不来自 Rust）：bridge 在后端就绪门超时时给的「还在准备」，以及前端备份查找失败。 */
+const FRONTEND_CODES = new Set(['err.app.starting', 'err.backup.not_found']);
+const unusedCodes = [...translated.keys()]
+  .filter((code) => !declaredCodes.has(code) && !FRONTEND_CODES.has(code))
+  .sort();
 
 if (unhandledUiCodes.length) {
   console.error('后端声明了界面没有处理的文案码——界面会回落到后端那句中文：');
@@ -382,7 +469,7 @@ const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr'
  * `key(a,b){…}`、`key: '…'+'…'`、`key: […]` 这类形状。不认得的结构
  * （spread、计算键、裸引用）记进 out.errors 让门禁红——文案表不该出现它们。
  */
-const isIdentStart = (c) => /[A-Za-z_$]/.test(c);
+const isIdentStart = (c) => typeof c === 'string' && /[A-Za-z_$]/.test(c);
 
 const skipWsAndComments = (src, i) => {
   for (;;) {
@@ -837,6 +924,11 @@ const auditLocalePacks = (writePending) => {
         if (!zhLeaf) {
           problems.push(`  locales/${l}.ts → ${full}: zh 文案里没有这个键`);
           continue;
+        }
+        // 键路径按「.」拼起来比，带点的键（'weekly.hrv'）写成嵌套对象也会对上，
+        // 运行时却按原键查不到、静默回落英文——法语周报就这样漏过一次。按层级数再核一遍。
+        if (moduleId !== 'i18n/errors' && zhLeaf.path && leaf.path.length - 2 !== zhLeaf.path.length) {
+          problems.push(`  locales/${l}.ts → ${full}: 键的层级和 zh 不一样（带点的键要写成引号里的一个键，不要拆成嵌套对象）`);
         }
         if (pendingSet.has(full)) {
           problems.push(`  locales/${l}.ts → ${full}: 已翻译却还在 pending.txt 里（删掉那行）`);

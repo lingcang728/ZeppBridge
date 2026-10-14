@@ -87,10 +87,13 @@ zeppbridge-cli help
 With `--json`, stdout contains only the payload; human-readable notices go to
 stderr. So `zeppbridge-cli export > a.csv` gives you a clean file.
 
-The human-readable half is English. Errors raised by the shared core are still
-Chinese: those strings live in hundreds of places the desktop app never shows
-(it looks up localized text by error code instead), and translating half of them
-would put two languages inside one sentence. The `--json` field names and the
+The human-readable half is English, including errors raised by the shared core.
+The core's own wording is Chinese and lives in hundreds of places the desktop app
+never shows (it looks up localized text by error code instead), so the command
+line does not translate it sentence by sentence: it says in English what kind of
+problem it is, and where the original wording is Chinese it prints the error code
+(for example `err.core.config`) instead, so one sentence never mixes two
+languages. The `--json` field names and the
 exit codes are a contract and do not change with any of this.
 
 A misspelled flag is always an error rather than being ignored — silently
@@ -194,6 +197,31 @@ Unknown tools and malformed call envelopes remain JSON-RPC errors.
 Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
 tool list happening to contain no write operations.
 
+### Connecting from the desktop app
+
+The installers put `zeppbridge-mcp` next to the app's own executable: beside
+`ZeppBridge.exe` on Windows (installer and portable build), inside
+`ZeppBridge.app/Contents/MacOS/` on macOS, and in `/usr/bin` for the Linux deb
+and rpm packages. **Settings › AI tools › Connect an AI tool** then fills in the
+real path for you:
+
+- **Claude Code** and **Codex** copy three commands: register the MCP server
+  (with `--scope task`), add this repository as a plugin marketplace, and
+  install the `zepp-coach` coaching skill. Paste them into a terminal. The
+  `--` separator is written as `"--"` because PowerShell swallows a bare `--`
+  before it reaches the npm-installed CLIs.
+- **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. The
+  extension starts the `zeppbridge-mcp` installed next to the app, so it
+  updates together with ZeppBridge.
+
+When the app's library is not the `data` folder next to the executable, the
+generated configuration also sets `ZEPPBRIDGE_DATA_DIR`. Builds without the
+sidecar (development builds) disable these buttons; use the configuration
+below instead. The Linux AppImage carries the sidecar too, but it mounts at a
+new temporary path on every launch, so the app does not hand that path to AI
+tools: download the separate CLI / MCP tools package and use the configuration
+below.
+
 ### Example configuration
 
 Most MCP clients read the same shape of configuration:
@@ -214,6 +242,72 @@ or environment variable is needed** — the program only reads a local file.
 
 `mcp-config-example.json` in the archive contains the same snippet.
 
+### Access scope (`--scope`)
+
+The process accepts exactly one optional flag:
+
+```json
+{
+  "mcpServers": {
+    "zeppbridge": {
+      "command": "/path/to/zeppbridge-mcp",
+      "args": ["--scope", "task"]
+    }
+  }
+}
+```
+
+- **`full-readonly`** (the default when `--scope` is absent) — the behavior
+  existing configurations already have: read-only access to the whole local
+  database. Configurations without the flag keep working unchanged.
+- **`task`** — still read-only, but limited to what the desktop app marks as
+  *shared with MCP* on its task page: health data inside the per-category date
+  windows those tasks open. A task's selected workouts are readable themselves
+  only when the task enables the workout category; otherwise they just anchor
+  the date windows. Metrics and fields dragged out of a task (HRV, average heart
+  rate, deep-sleep minutes, …) stay unreadable over MCP as well. Grants are
+  re-read on every call, so flipping the share switch applies to the very next
+  request — no restart needed.
+
+argv parsing is fail-closed: an unrecognized argument, an unknown `--scope`
+value, a missing value, or a repeated flag exits non-zero with a single stderr
+line. A mistyped flag never widens access silently.
+
+Under `task`, requests outside the grants are refused rather than silently
+truncated: `list_workouts` returns only granted workout IDs (even when they are
+not among the most recent), `get_workout_insight` re-computes its baseline over
+granted workouts alone, `get_metric_series` answers only days inside the
+granted windows, `get_sleep_detail` resolves "latest night" within the granted
+sleep windows, and `get_data_health` — a whole-library report that cannot be
+honestly clipped — is refused outright. The same goes for the other
+whole-library views: `list_available_metrics` and `list_life_events` are
+refused, and `get_food_data` returns only daily intake totals (under the body
+category), never individual food entries. `get_metric_records` and
+`list_sleep_sessions` return only rows inside the granted windows, and a metric
+that maps to no task category is refused. `get_workout_detail` drops the
+excluded fields plus anything that would reveal them (heart-rate zones when
+heart rate is excluded, stride when distance is). `get_workout_series` never
+returns the precise GPS route under `task`, and refuses the per-point sections
+for a workout whose task excludes any field. A task with no selected workouts
+("the last N days") opens its window ending today, exactly like the export.
+Naming a metric a task excludes is
+refused rather than answered with an empty series; excluded workout and sleep
+fields are simply absent, and excluding any sleep-stage minutes drops the stage
+timeline too. With several shared tasks the grants are a union: a metric or
+field any task allows can go out. Responses under `task` also drop identity
+fields such as `device_id`.
+
+Every `tools/call` result carries `"scope": {"mode": ..., "grants": N}` (inside
+`structuredContent` on success and at the top level on errors), and
+`initialize` / `server/discover` report `"scope": {"mode": ...}` plus an
+instructions line, so a client always knows which view it is looking at.
+
+Scope refusals are tool results, not protocol errors: `isError: true` with
+`structuredContent.error.code` set to `err.mcp.scope_denied` (the request is
+outside the grants — `error.permittedRanges` lists the actual
+`{category, start, end}` windows to retry within) or `err.mcp.scope_no_grants`
+(no task is currently shared).
+
 ### Tools
 
 | Tool | Returns |
@@ -221,7 +315,7 @@ or environment variable is needed** — the program only reads a local file.
 | `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
 | `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
-| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps; precise coordinates are returned only for `section: "route"` |
+| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
@@ -230,6 +324,11 @@ or environment variable is needed** — the program only reads a local file.
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream |
+| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect), days since the last workout, the active plan and life events |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, and the background the user wrote for AI |
+| `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
+| `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
+| `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
 
 `get_food_data` returns daily totals and available food-log details: names, descriptions,
 meal types, timestamps, reported weight, and nutrients (including fiber). Reported
@@ -279,8 +378,35 @@ letting it receive an empty series and guess:
 
 ## Running alongside the desktop app
 
-The CLI's `sync` and the desktop app's sync share one cross-process write lock,
-so there is only ever one writer. When the CLI cannot get the lock it exits with
-code 4 rather than racing the GUI.
+The CLI's `sync` and the desktop app's sync share one cross-process sync lease
+and one write lock, so there is only ever one sync and one writer at a time. When
+the CLI cannot get either within its wait it exits with code 4 rather than
+racing the GUI.
 
-MCP's read-only queries take no write lock and can run during a sync.
+MCP's read-only queries take no write lock and can run during a sync. Drafting
+or publishing a training plan takes the write lock only for the moment it
+writes (waiting at most 5 seconds), never while it is on the network.
+
+### Training-plan tools (the only two that write)
+
+Health data stays read-only. From 3.0 MCP can draft and publish training plans:
+
+- `draft_training_plan` only saves a draft, using the same validation as the
+  desktop app's "paste the AI's reply" (only running, cycling, pool and open-water
+  swimming reach the watch; purpose and description are required; step syntax is
+  in the tool description). A plan that fails validation leaves no draft. The
+  draft shows up on the desktop "Send to AI" page for the user to confirm.
+- `publish_training_plan` refuses by default with
+  `err.training_plan.ai_publish_disabled`. It works only after the user turns on
+  "Allow AI to publish directly" in the desktop app's AI tools settings. Publishing
+  uses the same three steps as the desktop app: record in the ledger under the
+  write lock, release the lock while on the network, record the result under the
+  lock. A publish that would clear a 7-day window always returns
+  `err.training_plan.needs_clear_confirmation`; only the user can confirm a clear,
+  on the desktop.
+- `sent` only means the official API accepted the request (it answers success
+  to any body); the content was validated before sending. The watch still asks
+  for the sub-type before the workout starts.
+- All five coach tools (including `get_training_context`, `get_athlete_profile`
+  and `get_training_plan`) are refused under the `task` scope: they span
+  categories and dates and cannot be honestly clipped.

@@ -1,5 +1,7 @@
 # packaging/
 
+[简体中文](README.zh-CN.md)
+
 Everything needed to turn this repository into something installable, for the
 platforms whose packaging does not live in `src-tauri/tauri.conf.json`.
 

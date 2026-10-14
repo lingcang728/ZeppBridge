@@ -42,7 +42,7 @@ describe('storage estimate copy', () => {
   it('renders the sentence from the screenshot in English', () => {
     const text = storageEstimateText({ ...base, message_code: 'ui.estimate.measured' });
     expect(text).toContain('365 days');
-    expect(text).toContain('the rate your own data actually accumulates');
+    expect(text).toContain('the rate your own data accumulates');
     expect(text).not.toMatch(CHINESE);
   });
 
@@ -60,7 +60,7 @@ describe('storage estimate copy', () => {
        也没法反馈给我们。 */
     const text = storageEstimateText({ ...base, message_code: 'ui.estimate.brand_new' });
     expect(text).not.toMatch(CHINESE);
-    expect(text).toBe('The size of this backfill cannot be estimated right now.');
+    expect(text).toBe('Cannot estimate this backfill’s size right now.');
   });
 
   it('keeps the backend original in the Chinese interface', () => {

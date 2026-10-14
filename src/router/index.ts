@@ -1,4 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { isLandingMode } from '../lib/landingMode';
+import { installReturnScroll } from '../lib/returnScroll';
 
 /*
  * 每个页面都是动态 import，包括首屏 Overview。
@@ -23,10 +25,23 @@ const routes = [
     component: () => import('../views/RecentRecords.vue'),
   },
   {
-    path: '/explore',
-    name: 'Explore',
-    component: () => import('../views/Explore.vue'),
+    path: '/ai',
+    component: () => import('../views/AiComposer.vue'),
+    // 已保存的任务 / 寄出前检查 / 往返记录：舞台上浮起的一张玻璃大卡（子路由，舞台留在后面虚化，10-08 H18）。
+    children: [
+      { path: '', name: 'AiComposer', component: { render: () => null } },
+      { path: 'check', name: 'AiCheck', component: () => import('../views/ai/AiCheck.vue') },
+      { path: 'tasks', name: 'AiTasks', component: () => import('../views/ai/AiTasks.vue') },
+      { path: 'exchanges', name: 'AiExchanges', component: () => import('../views/ai/AiExchanges.vue') },
+      { path: 'exchanges/:id', name: 'AiExchange', component: () => import('../views/ai/AiExchange.vue') },
+    ],
   },
+  // 交给 AI 的下钻全是路由（2026-10 精修批次 3）：点开从被点的卡 / 行长出来，返回缩回去（usePageMorph）。
+  // 「你的过去」二级页已经取消（2026-10-08 横向舞台）：要交的每一类是舞台左边的一张牌，点牌翻到背面。旧链接回到舞台。
+  { path: '/ai/past', redirect: '/ai' },
+  { path: '/ai/past/:category', redirect: '/ai' },
+  { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
+  { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
   {
     path: '/body',
     name: 'BodyStatus',
@@ -78,7 +93,8 @@ const routes = [
     component: () => import('../views/HealthCheck.vue'),
   },
   {
-    path: '/settings',
+    // /settings 是卡叠总览，/settings/:card 是展开的某一张（account / sync / archive …）。
+    path: '/settings/:card?',
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
   },
@@ -88,18 +104,24 @@ const routes = [
   },
 ];
 
+/*
+ * 落地页不渲染 <RouterView>，可路由器启动时照样会把当前地址对应的页面 chunk 解析下来：
+ * 浏览器访客因此白下 Overview 那一整串（18 个 chunk，约 140 KB JS + 32 KB CSS）。
+ * 落地模式只挂一条什么都不画的路由，页面 chunk 一个都不碰。
+ */
+const LANDING_ROUTES: RouteRecordRaw[] = [
+  { path: '/:pathMatch(.*)*', component: { render: () => null } },
+];
+
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes: isLandingMode() ? LANDING_ROUTES : routes,
   scrollBehavior() {
     return { top: 0 };
   },
 });
 
-router.afterEach(() => {
-  const main = document.getElementById('main-content');
-  if (main) main.scrollTo({ top: 0 });
-  else window.scrollTo({ top: 0 });
-});
+// 滚动区是 #main-content：前进回到顶部，后退回到离开时的位置（见 lib/returnScroll.ts）。
+installReturnScroll(router);
 
 export default router;

@@ -1,0 +1,69 @@
+/*
+ * 「交给 AI」页各组件共用的基础样式。组件只写自己的布局；卡片、步骤标题、
+ * 输入框、小按钮、chip 在这里定义一次，不再每个文件抄一遍。
+ * 类名统一 `ai-` 前缀，避免和其他页面撞车。
+ */
+.ai-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+.ai-step-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; }
+.ai-step-no {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; flex: 0 0 22px;
+  border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  font-size: var(--fs-xs); font-weight: 700;
+}
+.ai-step-title { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
+.ai-step-hint { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.ai-label { display: block; margin: 14px 0 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
+.ai-label:first-child { margin-top: 0; }
+.ai-hint { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
+.ai-input {
+  width: 100%; padding: 9px 11px;
+  border: 1px solid var(--line-control); border-radius: var(--radius-sm);
+  background: var(--mat-inset); color: var(--ink); font: inherit; font-size: var(--fs-md); resize: vertical; box-shadow: var(--mat-inset-shadow);
+}
+.ai-input:focus { border-color: var(--focus); outline: none; }
+.ai-input::placeholder { color: var(--subtle); }
+/* 玻璃输入面：没有硬描边，标题写在面里，字数淡淡地压在右下角；聚焦时亮一圈品牌色。 */
+.ai-field {
+  position: relative; display: grid; gap: 2px; margin-top: 14px; padding: 10px 14px 8px;
+  border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  transition: box-shadow var(--dur-fast) ease;
+}
+.ai-field:focus-within { box-shadow: var(--mat-inset-shadow), 0 0 0 1.5px var(--focus); }
+.ai-field-label { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .02em; }
+.ai-field-input {
+  width: 100%; min-height: 1.6em; max-height: 240px; padding: 2px 0; border: 0; outline: none; resize: none; overflow-y: auto;
+  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); line-height: 1.55;
+}
+.ai-field-input::placeholder { color: var(--subtle); }
+.ai-field-count { justify-self: end; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; opacity: .7; }
+.ai-tool {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px;
+  border: 1px solid var(--line-control); border-radius: 9px;
+  background: var(--mat-raised); color: var(--muted); font-size: var(--fs-sm); cursor: pointer; box-shadow: var(--mat-raised-rim);
+}
+.ai-tool:hover:not(:disabled) { color: var(--ink); border-color: var(--mat-line-hover); }
+.ai-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ai-tool:disabled { opacity: .45; cursor: not-allowed; }
+.ai-note { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: var(--fs-sm); color: var(--subtle); }
+.ai-note.ok { color: var(--accent); }
+.ai-note.bad { color: var(--danger); }
+.ai-note.warn { color: var(--warning); }
+.ai-note svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* 接回定稿的玻璃纸片（lib/motion/paper.ts，挂在 body 上）：外层裁切，里面的纸平移出去就是「让开」。 */
+.zb-paper { position: fixed; left: 0; top: 0; z-index: 2050; overflow: hidden; border-radius: 16px; transform-origin: 0 0; pointer-events: none; will-change: transform, opacity; }
+.zb-paper-sheet { position: absolute; inset: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong);
+  -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--glass-rim, var(--mat-glass-shadow)); }
+.zb-paper-text { display: grid; align-content: center; gap: 6px; height: 100%; padding: 16px 18px; }
+.zb-paper-text span { overflow: hidden; color: var(--muted); font: 10px / 1.4 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.zb-paper-text small { color: var(--accent); font-size: var(--fs-2xs); font-weight: 650; }
+.zb-paper.is-failed .zb-paper-text small { color: var(--warning); font-size: var(--fs-xs); line-height: 1.5; }
+/* 纸片盖着日程、新行还没轮到时：先藏着（逐行落定的动画用 fill: backwards 接手）。 */
+[data-paper-hold] [data-paper-row] { opacity: 0; }

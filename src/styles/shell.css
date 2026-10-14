@@ -1,0 +1,225 @@
+/* 桌面外壳的样式（非 scoped，经 AppShell.vue 的 <style src> 引入）：顶栏容器、页面宿主、底部导航、
+   切页过渡、同步提示。外壳是懒加载的，这一块也就不在首屏关键路径上——浏览器里只看落地页的访客不下载它
+   （首屏 CSS 预算，2026-10-04）。两种形态都要的基础规则在 base.css。
+   设计 token 在 src/styles/tokens.css——`:root` 是深色默认值，`html[data-theme="light"]` 覆写同一组变量。 */
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: translateY(-150%);
+  transition: transform 150ms ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* ── 应用骨架：顶栏 + 内容 + 移动端底部导航（见 shell/AppTopBar.vue） ── */
+.app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
+
+/* 状态提示是浮在顶栏下方的小胶囊，不再是一条带分界线的横幅。 */
+.sync-feedback { display: flex; width: fit-content; max-width: calc(100% - 32px); min-height: 32px; min-width: 0; align-items: center; gap: 7px; margin: 2px auto 6px; padding: 6px 16px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow); color: var(--muted); font-size: var(--fs-sm); }
+.sync-feedback.tone-updated { color: var(--accent); }
+.sync-feedback.tone-partial { color: var(--warning); }
+.sync-feedback.tone-no_new_data { color: var(--muted); }
+.sync-feedback.tone-cancelled { color: var(--muted); }
+.sync-feedback.tone-deferred { color: var(--muted); }
+.sync-feedback.tone-failed { color: var(--danger); }
+.sync-feedback a { color: inherit; }
+.spinning { animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.preview-banner, .route-notice { display: flex; width: fit-content; max-width: calc(100% - 32px); align-items: center; gap: 8px; margin: 2px auto 6px; padding: 7px 16px; border-radius: 999px; box-shadow: var(--glass-rim); color: var(--muted); font-size: var(--fs-sm); }
+.preview-banner { background: var(--accent-soft); }
+/* 顶栏下面的状态胶囊出现 / 消失 / 互换（AppShell.vue 的 <Transition name="notice">）：淡入淡出，占的那一截高度
+   跟着收放，下面的页面顺着滑上滑下，而不是一帧被推开、一帧弹回来。 */
+.notice-enter-active, .notice-leave-active {
+  overflow: hidden;
+  transition: opacity 200ms ease, max-height 260ms var(--ease-out), min-height 260ms var(--ease-out),
+    margin-top 260ms var(--ease-out), margin-bottom 260ms var(--ease-out),
+    padding-top 260ms var(--ease-out), padding-bottom 260ms var(--ease-out);
+}
+.notice-enter-from, .notice-leave-to {
+  opacity: 0;
+  max-height: 0;
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.notice-enter-to, .notice-leave-from { max-height: 64px; }
+/* 骨架屏换成内容（<Transition name="skeleton-out" @before-leave="holdInPlace">，lib/motion/holdInPlace.ts）：
+   骨架原地钉住、在上面淡掉，内容同时在它底下出现（卡片自己的 card-enter 淡入）——交叉淡化，中间没有空白的一帧。 */
+.skeleton-out-leave-active { z-index: 1; pointer-events: none; transition: opacity 320ms ease; }
+.skeleton-out-leave-to { opacity: 0; }
+/* 列表换筛选（最近记录的 睡眠 / 运动 / 全部）：旧列表原地钉住淡出，新列表同时淡入。 */
+.list-swap-enter-active { transition: opacity 260ms ease; }
+.list-swap-leave-active { z-index: 1; pointer-events: none; transition: opacity 180ms ease; }
+.list-swap-enter-from, .list-swap-leave-to { opacity: 0; }
+.preview-banner svg { color: var(--accent); }
+.route-notice { background: var(--surface); color: var(--warning); }
+.main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: transparent; }
+/* 滚动条那一条始终留着位置。顶栏和页面都在这个滚动区里：内容一变高、滚动条一出现，可用宽度就少一条——
+   居中的页面左移半条、顶栏右簇左移一整条；变矮时再弹回去。设置卡关上、大卡层收起的那一帧滚动条消失，
+   卡刚落定整页又往右跳一下；概览 ↔ 设置切页时导航胶囊也跟着横跳（2026-10-02 录屏「退回去闪一下的跳变」）。 */
+.main-content { scrollbar-gutter: stable; }
+/* 环境光：画布上两三团很淡的色晕，固定不随内容滚动。玻璃和模糊要有东西可折射，
+   纯平的底色上毛玻璃看起来只是「半透明灰」。 */
+.app-body { position: relative; isolation: isolate; }
+/* 桌面应用不该一双击就把按钮、标题刷成一片蓝：界面文字默认不可选。
+   真正要复制的东西（输入框、代码 / 配置片段、标了 .selectable 的块）照常可选。 */
+.app-body { -webkit-user-select: none; user-select: none; }
+.app-body :is(input, textarea, [contenteditable], pre, code, kbd, .selectable) { -webkit-user-select: text; user-select: text; }
+.app-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ambient), var(--canvas);
+}
+.bottom-nav { display: none; }
+.shell-head { position: sticky; top: 0; z-index: 30; }
+/* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
+   被轻轻模糊、向下淡出，代替硬分界线。页面在顶部静止时不出现——那时没有
+   内容在控件底下，它就没有要做的事。顶栏下沉 12px（1C）以后，这一层从窗口上沿一直盖到顶栏下面 28px：
+   顶栏上方那一条缝里滚过去的内容也是糊的，不和控件抢。 */
+.shell-head::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -28px 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--edge-fade) 0%, var(--edge-fade) 40%, transparent 100%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+  opacity: 0;
+  transition: opacity var(--dur-base, 220ms) ease;
+}
+.shell-head.is-scrolled::before { opacity: 1; }
+@media (prefers-reduced-transparency: reduce) {
+  .shell-head::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(to bottom, var(--canvas) 60%, transparent); }
+}
+/* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
+.page-host { position: relative; min-width: 0; }
+/* 切页：新旧两页同时在场。方向由 AppShell.vue 的 pageMotion / usePageMorph 决定：
+   expand / collapse = 从一张卡长成整页、返回时缩回那张卡（几何由 JS 动，这里只管层次和
+   退场时长）；forward / back = 没有来处的进出；left / right = 换入口时跟着导航胶囊横移。
+   只动 transform / opacity——不加 filter：整屏 blur 在 4K 高分屏上每帧都要重画，两页叠着
+   变糊的那几帧整个窗口发暗，就是「一拖顶栏换页整个界面闪一下」。 */
+/* 透明度和位移同长同曲线（D-7）：以前 240 / 380 各走各的，字已经不透明了还在滑。 */
+[class*='page-'][class*='-enter-active'] {
+  transition: opacity var(--dur-std) var(--ease-enter), transform var(--dur-std) var(--ease-enter);
+}
+[class*='page-'][class*='-leave-active'] {
+  position: absolute;
+  inset: 0 0 auto 0; /* 左右都钉住：限宽居中的页（设置）离场时不跳到左边 */
+  width: 100%;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+/* 10-13（「概览滚到底再点顶栏换页就是硬切，在顶上换才有过渡」）：滚下去以后换页，滚动区一下子回到顶上，
+   整屏要重新光栅化，GPU 卡一两百毫秒；过渡是按时间走的，等第一帧画出来旧页早淡没了、新页也滑完了。
+   所以下面这几种不再用 transition，改成 CSS animation：换页那一刻 .page-host 带着 .holding，动画停在第一帧
+   （旧页还在、新页还没出来，看不出在等），AppShell 等帧节奏恢复（lib/motion/steady.ts）再放。
+   旧页只淡出、不位移：两页各往一个方向走，交叠那一下就是一屏重影。 */
+[class*='page-'].page-forward-enter-active, [class*='page-'].page-back-enter-active, [class*='page-'].page-none-enter-active,
+[class*='page-'].page-left-enter-active, [class*='page-'].page-right-enter-active, [class*='page-'].page-dismiss-enter-active,
+[class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active,
+[class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active, [class*='page-'].page-dismiss-leave-active { transition: none; }
+[class*='page-'].page-forward-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both, page-rise var(--dur-std) var(--ease-enter) both; }
+[class*='page-'].page-back-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both, page-drop var(--dur-std) var(--ease-enter) both; }
+[class*='page-'].page-none-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both; }
+[class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active { animation: page-fade-out 150ms ease both; }
+/* 换入口（点 / 拖顶栏胶囊）：新页顺着胶囊的方向从侧面滑进来，先快后慢地停住；旧页往反方向让一小段、
+   很快淡掉（重叠只有一瞬，不成重影）。以前两边只挪 24px、一共 250ms，看上去就是硬切。 */
+[class*='page-'].page-left-enter-active { animation: page-fade-in 340ms ease-out both, page-from-right 560ms cubic-bezier(.4, .6, .2, 1) both; }
+[class*='page-'].page-right-enter-active { animation: page-fade-in 340ms ease-out both, page-from-left 560ms cubic-bezier(.4, .6, .2, 1) both; }
+[class*='page-'].page-left-leave-active { animation: page-fade-out 200ms ease-in both, page-to-left 280ms ease-in both; }
+[class*='page-'].page-right-leave-active { animation: page-fade-out 200ms ease-in both, page-to-right 280ms ease-in both; }
+/* 换页那一刻先停在第一帧，等帧稳了再放（AppShell.vue 的 holdPageMotion）。 */
+.page-host.holding > [class*='-enter-active'], .page-host.holding > [class*='-leave-active'] { animation-play-state: paused; }
+@keyframes page-fade-in { from { opacity: 0; } }
+@keyframes page-fade-out { to { opacity: 0; } }
+@keyframes page-rise { from { transform: translateY(14px); } }
+@keyframes page-drop { from { transform: translateY(-10px); } }
+@keyframes page-from-right { from { transform: translateX(84px); } }
+@keyframes page-from-left { from { transform: translateX(-84px); } }
+@keyframes page-to-left { to { transform: translateX(-32px); } }
+@keyframes page-to-right { to { transform: translateX(32px); } }
+@keyframes page-shrink-out { to { transform: scale(.94); } }
+@keyframes page-settle-in { from { transform: scale(1.03) translateY(10px); } }
+/* 展开 / 返回：新页自己从那张卡里长出来、返回时缩回那张卡（usePageMorph，和设置卡叠同一种做法）。
+   几何全在 JS 里（页面自己的 translate + clip-path，垫底和卡拷贝是它的子元素）；这里只管层次和占位：
+   退后的来处页 1 < 形变中的页面 3。两条离场过渡的 1200ms 都是占位，真正的时长由形变定，
+   放完就提前收场（usePageMorph 的 endLeave）。 */
+/* 进场这条也是占位：层次要保持到形变放完（等第一帧 + 650ms，10-12 全局放慢后），比它短的话页面中途掉到退后的来处页下面。 */
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: opacity 1200ms linear; }
+.page-expand-enter-from { opacity: .999; }
+/* 来处页退到后面一层（缩到 .94、淡到 .32，JS 动画），窗口长满、完全盖住它以后才离场。 */
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 1200ms linear; }
+.page-expand-leave-to { opacity: .999; }
+/* 来处页一开始就在底板下面，跟着窗口缩小从后面回到前面（JS 动画），不再从透明淡入。 */
+[class*='page-'].page-collapse-enter-active { transition: none; }
+.page-collapse-enter-from { opacity: 1; }
+[class*='page-'].page-collapse-leave-active { z-index: 3; transition: opacity 1200ms linear; }
+.page-collapse-leave-to { opacity: .999; }
+/* 收起（详情页 → 别的入口）：详情页往纵深退——缩小淡出，像被收进去；
+   新页从略近处落定，减速停住，不回弹。只动 transform / opacity。 */
+[class*='page-'].page-dismiss-leave-active { animation: page-fade-out 260ms var(--ease-leave) both, page-shrink-out 300ms var(--ease-leave) both; }
+[class*='page-'].page-dismiss-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) 100ms both, page-settle-in var(--dur-std) var(--ease-enter) 100ms both; }
+.page-host > * { transform-origin: 50% 30vh; }
+/* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
+   不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
+.window-replica, .window-replica * { animation: none !important; transition: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+@media (max-width: 760px) {
+  .sync-feedback { padding-inline: 16px; }
+  .preview-banner, .route-notice { padding-inline: 16px; }
+}
+/* 底部导航：手机宽度一律用；更宽时由顶栏量出来放不下（AppTopBar 的 fit-5，给 <html> 挂 .nav-at-bottom）
+   也挪下来——导航先让位，语言入口留在顶栏（2026-10-01）。两处写同一份。 */
+@media (max-width: 760px) {
+  .main-content { padding-bottom: 64px; }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
+  .bottom-track { width: 100%; }
+  .bottom-track .segment-item, .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+}
+:root.nav-at-bottom .main-content { padding-bottom: 64px; }
+:root.nav-at-bottom .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
+:root.nav-at-bottom .bottom-track { width: 100%; }
+:root.nav-at-bottom .bottom-track .segment-item, :root.nav-at-bottom .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+
+/* ── 页面通用 ───────────────────────────── */
+/* 顶栏下沉了 12px（1C）：页面上沿少留 8px，标题到窗口上沿的距离只比以前多 4px。 */
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 12px 28px 24px; overflow-x: clip; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
+.eyebrow { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); letter-spacing: .06em; }
+h1, h2, p { margin-top: 0; }
+.page h1 { margin-bottom: 6px; font-size: 28.5px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.page-intro { margin-bottom: 0; color: var(--muted); font-size: var(--fs-md); }
+/* 按钮与卡片的全局样式在 styles/material.css。 */
+@media (max-width: 760px) {
+  .page { padding: 18px 16px 38px; }
+}
+
+/* 全局玻璃提示（lib/glassTip.ts，10-08 H1）：替代浏览器原生 title 的白底小方框。停 450ms 才出、离开立刻收；
+   只动 opacity / translate。浮层是真毛玻璃（材质三层的第三层）。 */
+.glass-tip { position: fixed; z-index: 9000; max-width: min(320px, calc(100vw - 16px)); padding: 6px 11px; border: 1px solid var(--mat-glass-line); border-radius: 10px;
+  background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
+  color: var(--ink); font-size: var(--fs-2xs); font-weight: 600; line-height: 1.4; pointer-events: none; white-space: normal;
+  opacity: 0; translate: 0 4px; transition: opacity 140ms ease, translate 180ms cubic-bezier(.2, .8, .2, 1); }
+.glass-tip.below { translate: 0 -4px; }
+.glass-tip.shown { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) { .glass-tip { transition: opacity 120ms ease; translate: none; } }

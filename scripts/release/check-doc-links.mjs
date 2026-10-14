@@ -13,8 +13,8 @@ import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-// temp/ 是被 gitignore 的第三方参考仓库；它们的链接不是我们的责任，
-// 在 CI 上也根本不存在。
+// temp/ 是被 gitignore 的第三方参考仓库，output/ 是被 gitignore 的本机施工记录；
+// 它们的链接不是我们的责任，在 CI 上也根本不存在。
 const SKIP_DIRS = new Set([
   'node_modules',
   'dist',
@@ -23,6 +23,7 @@ const SKIP_DIRS = new Set([
   'release',
   '.omo',
   'temp',
+  'output',
 ]);
 
 const markdownFiles = [];
