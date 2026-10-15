@@ -31,8 +31,42 @@ env:
   ZEPPBRIDGE_BUILD_SHA: ${{ github.sha }}
 
 jobs:
+  changes:
+    name: Documentation and CI routing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      full: ${{ steps.select.outputs.full }}
+    steps:
+      - name: Checkout comparison history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Test CI routing
+        run: node --test tests/ci-routing.test.mjs
+
+      - name: Select checks from changed files
+        id: select
+        run: node scripts/ci/select-checks.mjs
+
+      - name: Check documentation links
+        run: node scripts/release/check-doc-links.mjs
+
+      - name: Check version consistency
+        run: node scripts/release/check-version-consistency.mjs
+
+  # Keep these check names for branch protection. Documentation-only changes
+  # skip jobs, not the workflow, so required checks do not stay Pending.
   verify:
     name: Windows verification
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -57,14 +91,6 @@ jobs:
 
       - name: Build frontend
         run: npm run build
-
-      # 版本号散落在七个文件里，少改一处不会报错，只会由用户在发版后发现。
-      - name: Check version consistency
-        run: npm run version:check
-
-      # 坏掉的相对链接不会让任何构建失败，只会让读者点进 404。
-      - name: Check documentation links
-        run: npm run docs:check
 
       # 首屏体积预算。挡的是「一次提交多出几百 kB」这种没人会主动去量的回归。
       - name: Check bundle budget
@@ -101,6 +127,8 @@ jobs:
 
   verify-linux:
     name: Linux verification
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -297,6 +325,8 @@ jobs:
 
   verify-macos:
     name: macOS verification
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     runs-on: macos-latest
     timeout-minutes: 30
 
