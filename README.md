@@ -17,6 +17,9 @@
 > [!IMPORTANT]
 > ZeppBridge is an independent open-source project with official Zepp approval. Use it only with accounts and data you are entitled to access.
 
+> [!IMPORTANT]
+> **macOS: “ZeppBridge is damaged and can’t be opened”?** After installing from this repository's Releases, follow the [macOS first-launch instructions](#macos-first-launch) below.
+
 [![ZeppBridge overview: pinned metrics, heart rate, steps and sleep](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
 *Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app is available in ten languages.*
@@ -95,6 +98,16 @@ Installers and release notes are on [Releases](https://github.com/lingcang728/Ze
 The installers are not code-signed yet. Windows may warn about an unknown publisher, and macOS may block the app from opening. Only allow it to run, following your system's prompt, once you have checked where the download came from and decided to trust the app. To build V3 from source, see [Development](docs/development/development.md).
 
 Before moving from 2.x, keep a separate copy of your old database: once upgraded by V3, it cannot be opened by 2.x again.
+
+### macOS first launch
+
+If macOS says “ZeppBridge is damaged and can’t be opened”, first make sure you downloaded it from [this repository's Releases](https://github.com/lingcang728/ZeppBridge/releases) and dragged it into **Applications**. Then open **Terminal** and run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/ZeppBridge.app
+```
+
+This removes the quarantine attribute for ZeppBridge only. Open the app again after running the command.
 
 ### First connection
 
