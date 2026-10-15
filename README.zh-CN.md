@@ -7,6 +7,9 @@
   <p><a href="#开始使用">开始使用</a> · <a href="https://zeppbridge.com/">观看一分钟短片</a> · <a href="README.md">English</a></p>
 </div>
 
+> [!IMPORTANT]
+> **macOS 首次打开提示「已损坏，无法打开」？** 拖入「应用程序」后，请按[macOS 首次打开](#macos-首次打开)中的步骤处理。
+
 [![ZeppBridge V3 概览：个人指标、心率、步数与睡眠](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
 *点击上图观看中文短片，了解界面、卡片交互与训练计划。本文图片和视频均使用示例数据。*
@@ -85,6 +88,19 @@ V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动�
 当前安装包未做系统代码签名。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。
 
 从 2.x 迁移前，请另存一份旧版数据库备份；V3 升级后的数据库不能直接交给 2.x 使用。
+
+### macOS 首次打开
+
+1. 从[本仓库 Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载 `.dmg`，确认来源并信任此应用后，打开安装包，将 ZeppBridge 拖入「应用程序」。
+2. 如果打开时提示「已损坏，无法打开」，打开「终端」，执行：
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/ZeppBridge.app
+   ```
+
+3. 执行完成后，再次打开 ZeppBridge。
+
+这条命令仅移除 ZeppBridge 应用的隔离标记。若仍无法打开，请[反馈问题](https://github.com/lingcang728/ZeppBridge/issues)，并附上系统版本和完整提示。
 
 ### 第一次连接
 
