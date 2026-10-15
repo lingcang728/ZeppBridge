@@ -89,8 +89,12 @@ impl OfficialClient {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
             .redirect(reqwest::redirect::Policy::none())
-            .user_agent(concat!("ZeppBridge/", env!("CARGO_PKG_VERSION")))
-            .build()?;
+            .user_agent(concat!("ZeppBridge/", env!("CARGO_PKG_VERSION")));
+        // Unit tests talk to loopback relays. A Windows system proxy must not
+        // intercept those requests (it can return 502 before the relay sees them).
+        #[cfg(test)]
+        let http = http.no_proxy();
+        let http = http.build()?;
         Ok(Self {
             http,
             relay_base: relay_base.trim_end_matches('/').to_string(),

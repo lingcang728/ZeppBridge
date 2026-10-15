@@ -4,6 +4,7 @@ import { dialogFlight, originOf, type FlightOrigin } from '../lib/motion/dialogF
 
 const props = defineProps<{
   labelledby: string;
+  maxWidth?: number;
   /** 从哪个元素长出来、缩回哪里（舞台上被点的那张牌）。不给就用打开它时聚焦的元素 / 最近一次按下的位置。
       牌是按 pointerdown 拖的、点开时焦点不在它身上：不显式给的话，关的时候会缩进刚点的「收起」按钮，看上去是凭空消失（10-13）。 */
   origin?: HTMLElement | null;
@@ -78,7 +79,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
-      <section ref="panel" class="dialog-panel" data-modal-dialog role="dialog" aria-modal="true"
+      <section ref="panel" class="dialog-panel" :style="maxWidth ? { maxWidth: `${maxWidth}px` } : undefined" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
         <span class="dialog-glass" aria-hidden="true"></span>
         <div class="dialog-scroll"><slot /></div>

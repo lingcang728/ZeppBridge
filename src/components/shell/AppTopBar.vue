@@ -4,7 +4,6 @@ import { fontsReady } from '../../lib/fontsReady';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { revealWeeklyReport } from '../../lib/revealWeeklyReport';
 import BrandUpdate from './BrandUpdate.vue';
-import GlassPopover from '../GlassPopover.vue';
 import { applyDesktopUpdate, downloadRatio, updateState, watchDesktopUpdate } from '../../services/updateService';
 import { useUpdateText } from './update.i18n';
 import Icon, { type IconName } from '../Icon.vue';
@@ -120,24 +119,18 @@ const props = defineProps<{
 }>();
 const route = useRoute();
 const router = useRouter();
-/* 静默更新（BrandUpdate 画外圈）：下好了以后左上角从「回概览」变成按钮，点开是版本和「更新」。
-   下载中、平时照旧是回概览的链接，悬停的提示换成下载进度。 */
+/* 静默下载完成后，点左上角直接安装并重启。说明只在重启成功后居中显示。 */
 const u = useUpdateText();
 const updateReady = computed(() => updateState.phase === 'ready' || updateState.phase === 'applying');
-const updateOpen = ref(false);
-const brandButton = ref<HTMLElement | null>(null);
 onMounted(watchDesktopUpdate);
 const brandTitle = computed(() => {
+  if (updateState.phase === 'applying') return updateState.waiting_for_sync ? u.value.waitingSync : u.value.applying;
   if (updateReady.value && updateState.version) return u.value.ready(updateState.version);
   if (updateState.phase === 'downloading') {
     const ratio = downloadRatio(updateState);
     return u.value.downloading(ratio === null ? null : Math.round(ratio * 100));
   }
   return props.versionTitle || t.value.brandHome;
-});
-const applyLabel = computed(() => {
-  if (updateState.phase !== 'applying') return u.value.update;
-  return updateState.waiting_for_sync ? u.value.waitingSync : u.value.applying;
 });
 const activeBranch = computed(() => navigationBranch(route.path));
 const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
@@ -437,15 +430,14 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       </button>
       <button
         v-if="updateReady"
-        ref="brandButton"
         type="button"
         :class="['brand', 'brand-button', { 'is-off': backTo }]"
         :title="brandTitle"
         :aria-label="brandTitle"
-        :aria-expanded="updateOpen"
+        :disabled="updateState.phase === 'applying'"
         :aria-hidden="backTo ? 'true' : undefined"
         :inert="backTo ? true : undefined"
-        @click="updateOpen = true"
+        @click="applyDesktopUpdate()"
       >
         <BrandUpdate :size="30" />
       </button>
@@ -461,14 +453,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
              字标先画出来、量完再被收掉，切语言时闪一下。 -->
         <BrandUpdate :size="30" />
       </RouterLink>
-      <GlassPopover v-if="updateOpen" :anchor="brandButton" :width="320" labelledby="update-pop-title" @close="updateOpen = false">
-        <div class="update-pop">
-          <strong id="update-pop-title">{{ u.newVersion(updateState.version ?? '') }}</strong>
-          <pre v-if="updateState.notes" class="update-notes">{{ updateState.notes }}</pre>
-          <p v-if="updateState.applyError" class="update-error" role="alert">{{ updateState.applyError }}</p>
-          <button type="button" class="button primary update-go" data-pop-item :disabled="updateState.phase === 'applying'" @click="applyDesktopUpdate()">{{ applyLabel }}</button>
-        </div>
-      </GlassPopover>
+
     </div>
 
     <SegmentTrack
@@ -562,12 +547,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 .brand :deep(svg) { display: block; }
 .brand-button { padding: 0; border: 0; background: none; cursor: pointer; }
 .brand-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; border-radius: 50%; }
-.update-pop { display: grid; gap: 10px; padding: 6px 8px 8px; }
-.update-pop strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
-/* 更新说明是发版时写的原文，按纯文本原样显示，不当富文本执行。 */
-.update-notes { max-height: 40vh; margin: 0; overflow: auto; color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-sm); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
-.update-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
-.update-go { justify-self: end; }
 /* 左上角那一格：返回键和品牌叠在一起，看得见的那个占位置，另一个绝对定位叠在同一处、淡出。
    新的晚 60ms 开始淡入：旧的先让一让，两个不会同时以半透明叠成一团。只淡透明度：
    缩放留给返回键自己按下去的那一下（:active），不能被交接的延迟拖慢。 */

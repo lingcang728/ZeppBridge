@@ -77,6 +77,12 @@ const FR: TrayLabels = TrayLabels {
     quit: "Quitter",
 };
 
+const IT: TrayLabels = TrayLabels {
+    show: "Apri ZeppBridge",
+    sync: "Sincronizza ora",
+    quit: "Esci",
+};
+
 /// 按语言码取托盘文案。接受 `pt-BR` / `de-AT` / `zh` / `LANG=de_DE.UTF-8`
 /// 这类输入：小写归一、`_`→`-`，先精确匹配再逐段砍地区子标签，最后按
 /// 基础语言落桶；认不出一律英文。
@@ -99,6 +105,7 @@ pub fn tray_labels(locale: &str) -> TrayLabels {
             "ru" => return RU,
             "hi" | "hi-in" => return HI,
             "fr" => return FR,
+            "it" => return IT,
             _ => {}
         }
         match tag.rfind('-') {
@@ -121,6 +128,7 @@ mod tests {
         assert_eq!(tray_labels("hi-IN").quit, "बंद करें");
         assert_eq!(tray_labels("zh").quit, "退出");
         assert_eq!(tray_labels("es").quit, "Salir");
+        assert_eq!(tray_labels("it").quit, "Esci");
     }
 
     #[test]

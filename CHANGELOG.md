@@ -2,17 +2,24 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## Unreleased / 未发布
+## 3.0.1
 
-### Planned for 2.4.3 / 计划纳入 2.4.3
+完整中英文更新说明见 [3.0.1](docs/releases/3.0.1.md)，同一份内容随桌面程序打包并写入更新清单。
+Full bilingual release notes are in [3.0.1](docs/releases/3.0.1.md), bundled with the desktop app and included in the update manifest.
 
-- Fix blood-oxygen ODI requests using calendar dates in the device timezone, avoiding HTTP 400 and false empty responses from timestamp parameters. Keep the failing substream and cause in partial-sync diagnostics.
-- 血氧 ODI 请求改用设备时区下的日期，避免时间戳参数引发 HTTP 400 或错误空结果；部分同步的诊断记录保留具体子指标和失败原因。
+- 新增全局意大利语桌面界面，含托盘、登录窗口、新手引导与全部 114 个文案模块。
+- Added Italian throughout the desktop app, including the tray, sign-in window, onboarding and all 114 text modules.
+- 更新包静默下载，绿圈亮起后一击安装重启；重启后显示居中大卡片，点“知道了”后不再提醒。兼容从 3.0.0 升级的用户，离线也可阅读说明。
+- Updates download silently; click the green ring to install and restart, then read the centered release-notes dialog. Acknowledged notes stay dismissed, including for upgrades from 3.0.0 and offline launches.
+- 官方授权账号可从已同步运动识别手表；空设备列表不再误报未知设备。
+- Officially authorized accounts can identify watches from synced workouts; an empty list no longer reports an unknown device.
+- 官方与高级认证状态分开显示；补连高级数据后立即同步并刷新设备，失效凭据明确提示重新认证。
+- Official and advanced authentication states are independent. Connecting advanced data syncs the new channel and refreshes devices; expired credentials clearly request reauthentication.
+- 下载文档补充 macOS 首次启动步骤；普通文档改动使用轻量 CI，代码及发版保留完整检查。
+- Download instructions include macOS first-launch steps. Ordinary documentation changes use lightweight CI; code changes and releases retain full verification.
 
-- Isolate parallel authentication tests with exclusively created temporary directories, avoiding intermittent missing `auth.json` failures in CI. Production credential storage is unchanged.
-- 认证并行测试使用独占创建的临时目录，避免 CI 偶发找不到 `auth.json`；不修改正式程序的凭据存储逻辑。
-- Build desktop installers only for release tags or manual CI runs. Pushes to main and pull requests retain verification and Docker checks without repeating installer packaging.
-- 桌面安装包仅在发布标签或手动运行 CI 时构建；main 推送和 PR 保留验证及 Docker 检查，避免重复打包。
+网站与演示的意大利语发布另行安排。
+Italian website and demo publication is scheduled separately.
 
 ## 2.4.0
 

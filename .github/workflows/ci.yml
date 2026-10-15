@@ -436,7 +436,7 @@ jobs:
           exit 1
 
       # latest.json 的 notes 就是应用内更新弹窗展示给用户的说明，硬编码会
-      # 让每次发版都显示上一版的内容。发布 tag 时取该 tag 的注释首行。
+      # 让每次发版都显示上一版的内容。保留 tag 注释全文，供重启后的更新说明展示。
       - name: Resolve release notes from tag
         if: github.ref_type == 'tag'
         shell: bash
@@ -451,12 +451,18 @@ jobs:
             echo "::warning::${GITHUB_REF_NAME} 是轻量标签，没有注释消息；沿用默认说明"
             exit 0
           fi
-          notes=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents:subject)')
+          notes=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)')
           if [[ -z "$notes" ]]; then
             echo "::warning::标签注释为空，沿用默认说明"
             exit 0
           fi
-          echo "ZEPPBRIDGE_RELEASE_NOTES=${notes}" >> "$GITHUB_ENV"
+          delimiter="ZB_NOTES_${RANDOM}_${RANDOM}"
+          while grep -Fxq "$delimiter" <<< "$notes"; do delimiter="ZB_NOTES_${RANDOM}_${RANDOM}"; done
+          {
+            echo "ZEPPBRIDGE_RELEASE_NOTES<<${delimiter}"
+            printf '%s\n' "$notes"
+            echo "$delimiter"
+          } >> "$GITHUB_ENV"
           echo "更新说明：${notes}"
 
       - name: Collect installers into release/

@@ -43,6 +43,21 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
+    file: 'services/updateNotice.ts',
+    text: 'const match = /^## 中文',
+    why: 'Language section marker in authored release notes; the displayed text comes from the release document.',
+  },
+  {
+    file: 'services/updateNotice.ts',
+    text: '新增|新功能|Added|New',
+    why: 'Release-note category parser: these patterns recognize source text, not interface copy.',
+  },
+  {
+    file: 'services/updateNotice.ts',
+    text: '修复|Fixed|Fix',
+    why: 'Release-note category parser; displayed labels come from UpdateNotice.i18n.ts.',
+  },
+  {
     file: 'components/tour/TourWelcome.vue',
     text: "const GREETINGS = ['你好'",
     why: '新手引导第一屏的多语问候轮播：每种语言说它自己的那一句，本来就不跟界面语言走。',
@@ -462,7 +477,7 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it'];
 
 /* —— 极简文案表扫描器 ——
  * 不是真 parser：只对付 `key: '…'`、`key: {…}`、`key: (a,b)=>…`、

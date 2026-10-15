@@ -28,11 +28,11 @@ import { computed, ref, type ComputedRef } from 'vue';
  */
 export type Locale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it';
 
 /** 语言选择器按这个顺序排：先内联三语，再七种语言包语言。 */
 export const LOCALES: readonly Locale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it',
 ];
 
 /** 每种语言在界面上的自称——不翻译，「English」在中文界面里也写 English。 */
@@ -47,11 +47,12 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   ru: 'Русский',
   'hi-IN': 'हिन्दी',
   fr: 'Français',
+  it: 'Italiano',
 };
 
 /** 靠语言包覆盖的七种语言；zh/en/es 的文案就地定义，没有语言包。 */
 export const PACK_LOCALES: readonly Locale[] = [
-  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr',
+  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it',
 ];
 
 const isPackLocale = (value: Locale): boolean =>
@@ -71,6 +72,7 @@ export const HTML_LANG: Record<Locale, string> = {
   ru: 'ru',
   'hi-IN': 'hi-IN',
   fr: 'fr',
+  it: 'it',
 };
 
 /**
@@ -89,6 +91,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
   ru: 'ru-RU',
   'hi-IN': 'hi-IN',
   fr: 'fr-FR',
+  it: 'it-IT',
 };
 
 const isLocale = (value: unknown): value is Locale =>
@@ -110,6 +113,7 @@ const BASE_LANGUAGE: Record<string, Locale> = {
   ru: 'ru',
   hi: 'hi-IN',
   fr: 'fr',
+  it: 'it',
 };
 
 const EXACT_LOCALE = new Map<string, Locale>(

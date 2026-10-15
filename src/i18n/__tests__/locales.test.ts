@@ -51,6 +51,8 @@ describe('pickLocale：navigator.languages 逐条匹配', () => {
     expect(pickLocale(['zh-TW'])).toBe('zh');
     expect(pickLocale(['en-GB'])).toBe('en');
     expect(pickLocale(['fr-CA'])).toBe('fr');
+    expect(pickLocale(['it-IT'])).toBe('it');
+    expect(pickLocale(['it_CH'])).toBe('it');
     expect(pickLocale(['es-MX'])).toBe('es');
     expect(pickLocale(['nl-BE'])).toBe('nl');
     expect(pickLocale(['ru-RU'])).toBe('ru');

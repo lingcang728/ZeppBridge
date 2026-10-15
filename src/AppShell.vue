@@ -29,6 +29,7 @@ const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEven
 const CollectionBox = defineAsyncComponent(() => import('./components/cards/CollectionBox.vue'));
 /* 新手引导（聚光框、沙盒第一屏、首次启动的判断）：后端就绪后才挂，见 components/tour/TourLayer.vue。 */
 const TourLayer = defineAsyncComponent(() => import('./components/tour/TourLayer.vue'));
+const UpdateNotice = defineAsyncComponent(() => import('./components/shell/UpdateNotice.vue'));
 
 const t = useMessages(messages);
 
@@ -260,6 +261,7 @@ onUnmounted(() => {
   <LifeEventEditor />
   <CollectionBox v-if="backendReady" />
   <TourLayer v-if="backendReady" />
+  <UpdateNotice v-if="backendReady" />
   <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
   <div class="app-body">

@@ -12,6 +12,7 @@
 import { reactive } from 'vue';
 import { demoIpcActive, invoke, listen } from '../lib/bridge/ipc';
 import { toUserMessage } from '../lib/bridge';
+import { rememberUpdate, restoreUpdateNotice } from './updateNotice';
 
 export type UpdatePhase =
   | 'idle' | 'checking' | 'downloading' | 'ready' | 'applying' | 'up_to_date' | 'failed' | 'unsupported';
@@ -56,14 +57,19 @@ const listenOnce = () => {
   return listening;
 };
 
-const loadCurrentVersion = async () => {
-  if (updateState.currentVersion) return;
-  try {
-    const { getVersion } = await import('@tauri-apps/api/app');
-    updateState.currentVersion = await getVersion();
-  } catch {
-    // 读不到版本号也不影响更新本身。
-  }
+let versionLoading: Promise<void> | null = null;
+const loadCurrentVersion = (): Promise<void> => {
+  if (updateState.currentVersion) return Promise.resolve();
+  versionLoading ??= (async () => {
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app');
+      updateState.currentVersion = await getVersion();
+      restoreUpdateNotice(updateState.currentVersion);
+    } catch {
+      // Reading the version must not prevent an update; allow a later retry.
+    } finally { versionLoading = null; }
+  })();
+  return versionLoading;
 };
 
 /**
@@ -107,12 +113,22 @@ export async function refreshDesktopUpdate(): Promise<void> {
 }
 
 /** 用户点了「更新」。成功时应用会退出 / 重启，这个 Promise 不会再回来。 */
+let applying = false;
 export async function applyDesktopUpdate(): Promise<void> {
-  if (updateState.phase !== 'ready') return;
+  if (updateState.phase !== 'ready' || applying) return;
+  applying = true;
+  // Disable every entry immediately, before IPC or version lookup can yield.
+  updateState.phase = 'applying';
   updateState.applyError = '';
   try {
+    await loadCurrentVersion();
+    if (updateState.version && updateState.currentVersion) {
+      rememberUpdate({ from: updateState.currentVersion, version: updateState.version, notes: updateState.notes ?? '' });
+    }
     await invoke('update_apply');
   } catch (error) {
+    // The backend consumes the staged package; a failure must offer a fresh check/download.
+    updateState.phase = 'failed';
     updateState.applyError = toUserMessage(error, '');
-  }
+  } finally { applying = false; }
 }

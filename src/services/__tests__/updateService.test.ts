@@ -59,6 +59,7 @@ describe('silent update', () => {
     expect(mocks.invoke).toHaveBeenCalledWith('update_apply', undefined);
     expect(service.updateState.applyError).not.toMatch(/[一-鿿]/);
     expect(service.updateState.applyError).not.toBe('');
+    expect(service.updateState.phase).toBe('failed');
   });
 
   it('does nothing inside the onboarding sandbox', async () => {
@@ -70,5 +71,23 @@ describe('silent update', () => {
     await service.startDesktopUpdate();
     expect(mocks.invoke).not.toHaveBeenCalled();
     expect(service.updateState.phase).toBe('idle');
+  });
+
+  it('one click stores the notes before invoking the updater and blocks duplicate clicks', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: {}, navigator: { languages: ['en'] }, localStorage: {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => saved.set(key, value),
+    } });
+    const service = await import('../updateService');
+    Object.assign(service.updateState, view({ phase: 'ready', version: '3.0.1', notes: 'Added: Italian entry' }), { currentVersion: '3.0.0' });
+    mocks.invoke.mockImplementation(async (command: string) => {
+      expect(command).toBe('update_apply');
+      expect(JSON.parse(saved.get('zeppbridge.update.receipt')!)).toEqual({ from: '3.0.0', version: '3.0.1', notes: 'Added: Italian entry' });
+    });
+    await Promise.all([service.applyDesktopUpdate(), service.applyDesktopUpdate()]);
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    const { updateNotice } = await import('../updateNotice');
+    expect(updateNotice.receipt).toBeNull();
   });
 });

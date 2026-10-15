@@ -10,7 +10,7 @@ import type { DemoPlan } from './plan';
 import type { DemoTurn } from './presentation';
 const emit = defineEmits<{ review: [] }>();
 const dialog = ref<HTMLDialogElement | null>(null), feed = ref<HTMLElement | null>(null);
-const copy = computed(() => JOURNEY[locale.value]);
+const copy = computed(() => JOURNEY[locale.value === 'it' ? 'en' : locale.value]);
 const labels = computed(() => dialogueCopy(locale.value));
 /** 宣传片可以换掉整段台词（presentation.script）；对话打开时读一次。 */
 const scripted = ref<DemoTurn[] | null>(null);

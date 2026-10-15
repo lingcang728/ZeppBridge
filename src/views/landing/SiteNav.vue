@@ -89,7 +89,7 @@ const outside = (event: MouseEvent) => {
 onMounted(() => { setLocale(props.locale); document.addEventListener('pointerdown', outside); narrowQuery?.addEventListener('change', onNarrow); });
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', outside); narrowQuery?.removeEventListener('change', onNarrow); });
 watch(() => props.locale, (value) => { if (appLocale.value !== value) setLocale(value); });
-watch(appLocale, (value) => { if (value !== props.locale) emit('locale', value); }, { flush: 'sync' });
+watch(appLocale, (value) => { if (value !== 'it' && value !== props.locale) emit('locale', value); }, { flush: 'sync' });
 watch(() => props.away, (away) => { if (away) { product.value = false; menu.value = false; languages.value = false; } });
 </script>
 

@@ -196,6 +196,7 @@ pub(super) fn login_window_title(locale: &str) -> &'static str {
             "ru" => return "Войти в Zepp",
             "hi" | "hi-in" => return "Zepp में साइन इन करें",
             "fr" => return "Se connecter à Zepp",
+            "it" => return "Accedi a Zepp",
             "en" => return "Sign in to Zepp",
             _ => {}
         }
