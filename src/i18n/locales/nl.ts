@@ -1326,6 +1326,9 @@ export default {
       loginWindowFailed: 'Het inlogvenster kon niet worden geopend',
       manualAuthDone: 'Handmatig inloggen gelukt; de inloggegevens zijn opgeslagen.',
       manualAuthFailed: 'Handmatig inloggen mislukt',
+      manualTokenLabel: "App-token (App Token)",
+      manualUserIdLabel: "Gebruikers-ID (User ID)",
+      manualRegionHostLabel: "Regionale server (Region Host)",
       manualFormHint:
         'Haal ze uit een mitmproxy/Charles-opname of de devtools van je browser. Drie velden:',
       manualSave: 'Inloggegevens opslaan',

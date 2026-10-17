@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MEDIA = ROOT / '.site-cache/media'
 RAW = ROOT / '.site-cache/capture'
 FIXED = datetime.datetime(2026, 10, 8, 4, 8, tzinfo=datetime.timezone.utc)
-LANGUAGES = ['zh', 'en', 'es', 'fr', 'de', 'nl', 'pt-BR', 'pt-PT', 'ru', 'hi-IN']
+LANGUAGES = ['zh', 'en', 'es', 'fr', 'de', 'nl', 'pt-BR', 'pt-PT', 'ru', 'hi-IN', 'it']
 THEMES = ['light', 'dark']
 SCENES = {'overview': '/', 'sleep': '/sleep', 'workouts': '/workouts', 'ai': '/ai', 'plan': '/ai/plan'}
 ENTRIES = {
@@ -38,6 +38,8 @@ def fingerprint(scene, language):
     files = {Path(__file__).resolve(), src / 'App.vue', src / 'main.ts'}
     files.update(p for p in src.joinpath('demo').glob('**/*.*') if '__tests__' not in p.parts)
     files.update(src.joinpath('styles').glob('**/*.css'))
+    pack = src / 'i18n/locales' / f'{language}.ts'
+    if pack.is_file(): files.add(pack)
     files.update(src.joinpath('assets/fonts').glob('*'))
     pending = [src / entry for entry in ENTRIES[scene]] + list(files)
     visited = set()
@@ -186,9 +188,10 @@ def main():
     parser.add_argument('--all',action='store_true'); parser.add_argument('--force',action='store_true')
     parser.add_argument('--scene',choices=SCENES,default='overview'); parser.add_argument('--language',choices=LANGUAGES,default='zh')
     parser.add_argument('--languages',nargs='+',choices=LANGUAGES,help='Record every scene and theme for these languages only')
-    parser.add_argument('--theme',choices=THEMES,default='light'); parser.add_argument('--workers',type=int,default=3)
+    parser.add_argument('--theme',choices=THEMES,default='light'); parser.add_argument('--workers',type=int,default=1)
     parser.add_argument('--url',default='http://127.0.0.1:1532'); parser.add_argument('--ffmpeg',default='ffmpeg')
     args = parser.parse_args()
+    if args.workers != 1: parser.error('Record one clip at a time; --workers must be 1.')
     if urlparse(args.url).hostname not in ['127.0.0.1','localhost']: raise ValueError('Capture requires a local server')
     MEDIA.mkdir(parents=True,exist_ok=True); RAW.mkdir(parents=True,exist_ok=True)
     manifest = MEDIA/'manifest.json'

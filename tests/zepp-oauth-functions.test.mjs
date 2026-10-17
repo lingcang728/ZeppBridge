@@ -6,6 +6,25 @@ import { onRequest as start } from '../functions/api/zepp/oauth/start.js';
 import { onRequest as callback } from '../functions/api/zepp/oauth/callback.js';
 import { onRequest as claim } from '../functions/api/zepp/oauth/claim.js';
 import { onRequest as refresh } from '../functions/api/zepp/oauth/refresh.js';
+import { pageLanguage, resultPage, startPage } from '../server/zepp/pages.js';
+
+test('Italian regional language tags reach translated authorization and result pages', async () => {
+  const request = new Request('https://example.test', { headers: { 'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8' } });
+  assert.equal(pageLanguage(request), 'it');
+  const pages = [
+    [startPage(request, 'https://example.test/authorize'), 'Autorizza ZeppBridge con il tuo account Zepp'],
+    [resultPage('ready', 200, request), 'Autorizzazione completata'],
+    [resultPage('denied', 200, request), 'Autorizzazione annullata'],
+    [resultPage('expired', 200, request), 'Questa autorizzazione è scaduta'],
+    [resultPage('failed', 200, request), 'Autorizzazione non completata'],
+  ];
+  for (const [response, title] of pages) {
+    const html = await response.text();
+    assert.match(html, /<html lang="it">/);
+    assert.doesNotMatch(html, /undefined/);
+    assert.ok(html.includes(title));
+  }
+});
 
 /*
  * 官方授权中转的门禁。它挡的是三件事：

@@ -83,9 +83,9 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 
 - 主导航为概览、交给 AI（`/ai`）、设置。顶栏提供连接状态与全局同步。
 - 界面是**统一深色**：设计上不提供浅色 / 跟随系统模式，也没有主题切换入口。可调的只有界面缩放（80%–125%，设置「高级与维护」或 Ctrl + / Ctrl - / Ctrl 0）。
-- 界面是**中英双语**。首次启动跟随系统语言（只有明确说中文的才给中文），设置页页头可以随时切换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期和数字分组跟着语言走（`i18n/intlLocale()`），不只换文字。
+- 界面提供 **11 个语言与地区选项**：中文、英文、西班牙语、荷兰语、巴西葡萄牙语、欧洲葡萄牙语、德语、俄语、印地语、法语和意大利语。首次启动匹配系统首个受支持的语言，无匹配时使用英文；设置页可以随时切换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期和数字分组跟着语言走（`i18n/intlLocale()`），不只换文字。
   - **没有引 vue-i18n。** 量过：接上它（含运行时构建、一句文案都没翻）首屏 gzip 从 73.0 kB 涨到 91.6 kB，超出体积预算 7.6 kB。自建的那一层不到一屏代码，首屏只多 0.4 kB。
-  - 文案跟着用它的模块走（`defineMessages(zh, en)` 就地定义，大页面放同名 `*.i18n.ts`），不建全局大字典：懒加载页面的 chunk 仍然只带自己那份。
+  - 中英西三语跟着模块走（`defineMessages(zh, en, es, moduleId)` 就地定义，大页面放同名 `*.i18n.ts`）；其余八个选项放在 `src/i18n/locales/<locale>.ts`，按需加载并按 `moduleId` 覆盖，缺失译文回退英文。
   - `defineMessages` 用 `NoInfer` 把形状钉在中文那份上，英文漏键、多键、参数对不上都编译不过。
   - **后端不按 locale 出文案。** GUI / CLI / MCP / 导出四个出口对同一个问题必须给同一份回答，所以后端发稳定的码（`recordsUnitCode`、`HealthAction.code`、`SyncProgress.code`、`InsightFact.reason_code`…），中文原文一并保留给 CLI，界面按码自己出人话，认不出码时才回退到原文。导出 JSON 的 `note` / `detail_note` / `reason` 一个都不翻——它们是外部脚本读的契约。
   - CI 有一道 `npm run i18n:check`：界面里再出现硬编码中文就红。逐条豁免写在 `scripts/release/check-i18n.mjs` 的 ALLOWED 里。

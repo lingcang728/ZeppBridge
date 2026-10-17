@@ -9,20 +9,20 @@ import type { LandingCopy } from '../views/landing/types';
  * 英文比给中文的读者面更宽。刻意不引框架，也不引应用那层：落地页 chunk
  * 不该背着整个 i18n 运行时。
  *
- * 十种语言里只有 zh/en 的文案内联在 `LandingPage.vue`（首屏即时、不出白屏）；
- * 其余八种各是一个懒加载语言包 `src/views/landing/<locale>.ts`，切换时才
- * `import()` 进来——访客不会为这页面下载十份文案。
+ * 十一种语言里只有 zh/en 的文案内联（首屏即时、不出白屏）；
+ * 其余九种各是一个懒加载语言包 `src/views/landing/<locale>.ts`，切换时才
+ * `import()` 进来——访客不会为这页面下载十一份文案。
  *
  * 落地页本身是懒加载的（App.vue），所以这个模块也只会跟着落地页 chunk 走，
  * 不进桌面应用的首屏。
  */
 export type LandingLocale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it';
 
 /** 语言下拉按这个顺序排，与应用内 LOCALES 一致：先内联的 zh/en，再懒加载语言包。 */
 export const LANDING_LOCALES: readonly LandingLocale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it',
 ];
 
 /** 每种语言在菜单里用自己的名字，不翻译。 */
@@ -37,6 +37,7 @@ export const LOCALE_LABELS: Record<LandingLocale, string> = {
   ru: 'Русский',
   'hi-IN': 'हिन्दी',
   fr: 'Français',
+  it: 'Italiano',
 };
 
 /** `<html lang>` 用的标记，和 locale 一一对应。 */
@@ -51,6 +52,7 @@ const HTML_LANG: Record<LandingLocale, string> = {
   ru: 'ru',
   'hi-IN': 'hi',
   fr: 'fr',
+  it: 'it',
 };
 
 /** `og:locale` 要求 language_TERRITORY 形式，纯机械映射，不放语言包里。 */
@@ -65,6 +67,7 @@ const OG_LOCALE: Record<LandingLocale, string> = {
   ru: 'ru_RU',
   'hi-IN': 'hi_IN',
   fr: 'fr_FR',
+  it: 'it_IT',
 };
 
 /** 每种语言的页面级元信息。SEO 是多语言的重点之一，所以不只换正文。 */
@@ -82,7 +85,7 @@ export interface LandingPack {
 }
 
 /** zh/en 的 meta 和文案一样内联——首屏就要写对 title，不能等网络。 */
-const DOCUMENT_META: Record<'zh' | 'en', LandingMeta> = {
+export const DOCUMENT_META: Record<'zh' | 'en', LandingMeta> = {
   "zh": {
     "title": "ZeppBridge · 手表记录，自己的档案",
     "description": "把 Amazfit / Zepp 的心率、睡眠和运动保存为本地健康档案。查看合成 v3 示例，下载公开稳定版。免费、开源。",
@@ -118,6 +121,7 @@ const BASE_LANGUAGE: Record<string, LandingLocale> = {
   ru: 'ru',
   hi: 'hi-IN',
   fr: 'fr',
+  it: 'it',
 };
 
 const EXACT_LOCALE = new Map<string, LandingLocale>(

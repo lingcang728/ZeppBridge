@@ -55,7 +55,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         "unavailable": "演示暂时无法打开。你仍可阅读下方说明，或查看源码。"
       },
       "demo": "查看示例",
-      "edition": "开发中的 v3 · 合成示例数据。下载按钮提供公开稳定版，界面和功能可能不同。"
+      "edition": "ZeppBridge 3 · 使用合成示例数据。下载最新稳定版，开始使用自己的数据。"
     },
     "handoff": {
       "chat": "AI 对话",
@@ -131,7 +131,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       "lead": "免费、开源。同步使用你已有的 Zepp 账号，无需另建 ZeppBridge 账号。",
       "docs": "安装说明与发行记录",
       "facts": {
-        "channel": "这里下载的是公开稳定版。上方为开发中的 v3 合成演示，界面与功能可能不同。",
+        "channel": "下载页面提供 ZeppBridge 3 最新稳定版。演示使用合成数据；各版本更新内容请查看发行说明。",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "查看与导出不需要 AI。选择外部 AI 时，使用你自己的服务与账号。",
         "windows": "Windows 安装包尚无受信任的代码签名，系统可能显示未知发布者或 SmartScreen 提示。安装前核对官方发行来源。",
@@ -170,7 +170,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         },
         {
           "question": "下载后会和示例一样吗？",
-          "answer": "示例使用开发中的 v3 和合成数据；下载提供公开稳定版。演示中的计划审核、新界面等可能尚未公开，以发行说明为准。"
+          "answer": "演示展示的是使用合成数据的 ZeppBridge 3。下载页面提供最新稳定版。发送训练计划前，请查看发行说明中的版本变更，并确认设备兼容性。"
         }
       ]
     },
@@ -254,7 +254,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         {
           "eyebrow": "计划审核",
           "title": "先审核，再谈下一步",
-          "body": "开发中的 v3 可展示训练计划的导入与逐项审核。手表下发受设备与验证状态限制，这不是公开稳定版的通用能力承诺。",
+          "body": "在 ZeppBridge 3 中导入并查看训练计划。计划能否发送到手表，取决于设备支持情况和兼容性检查结果。",
           "bullets": [
             "按周浏览与逐日审核",
             "下发取决于设备与验证"
@@ -327,7 +327,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         "unavailable": "The demo is unavailable in this browser. Read the sections below or explore the source."
       },
       "demo": "View the sample",
-      "edition": "v3 in development · Synthetic sample data. Downloads offer the public stable release; its interface and features may differ."
+      "edition": "ZeppBridge 3 · Synthetic sample data. Download the latest stable release to use your own data."
     },
     "handoff": {
       "chat": "AI chat",
@@ -403,7 +403,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       "lead": "Free and open source. Sync uses your existing Zepp account; there is no separate ZeppBridge account.",
       "docs": "Installation & release notes",
       "facts": {
-        "channel": "Downloads are the public stable release. The synthetic demo above is v3 in development; its interface and features may differ.",
+        "channel": "Downloads offer the latest stable release of ZeppBridge 3. The demo uses synthetic data; see release notes for changes in each version.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Browsing and exporting need no AI. An external AI uses the service and account you choose.",
         "windows": "Windows installers have no trusted code signature yet. Unknown-publisher or SmartScreen warnings may appear. Verify the official release source before installing.",
@@ -442,7 +442,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         },
         {
           "question": "Will the download match the sample?",
-          "answer": "The sample is the developing v3 with synthetic data. Downloads offer the public stable release. Plan review, the new interface and other demo features may not yet be public; check release notes."
+          "answer": "The demo shows ZeppBridge 3 with synthetic data. Downloads offer the latest stable release. Check release notes for version changes and your device's compatibility before sending a plan."
         }
       ]
     },
@@ -526,7 +526,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         {
           "eyebrow": "Plan review",
           "title": "Review before the next step",
-          "body": "The developing v3 demonstrates importing and reviewing training plans. Watch delivery depends on device support and validation; it is not a blanket promise for the public stable release.",
+          "body": "Import and review training plans in ZeppBridge 3. Sending a plan to your watch depends on device support and compatibility checks.",
           "bullets": [
             "Weekly view and daily review",
             "Delivery depends on device validation"

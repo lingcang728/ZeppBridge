@@ -90,6 +90,14 @@ const COPY: Record<LandingLocale, ReelCopy> = {
     pause: 'रोकें',
     play: 'चलाएं',
   },
+  it: {
+    preparing: 'Preparazione della demo',
+    failed: 'Impossibile continuare la demo',
+    retry: 'Riprova',
+    replay: 'Riavvia',
+    pause: 'Pausa',
+    play: 'Riproduci',
+  },
 };
 
 export const reelCopy = (locale: LandingLocale): ReelCopy => COPY[locale] ?? COPY.en;

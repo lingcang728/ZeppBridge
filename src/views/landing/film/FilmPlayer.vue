@@ -4,7 +4,7 @@ import { PlaybackClock } from '../playback';
 import { useShowcase } from '../useShowcase';
 import { Director, playShot, type ShotTiming } from './director';
 import { FILM_SCORE, SHORT_FILM, pickFilm } from './chapters';
-import { filmCaption, filmLocale, filmScript, type CaptionKey } from './copy';
+import { filmCaption, filmLocale, filmPlayerLabels, filmScript, type CaptionKey } from './copy';
 import type { Camera, Pose, WatchState } from './types';
 import type { LandingLocale } from '../../../composables/useLandingLocale';
 import watchImage from '../../../assets/devices/amazfit-balance-2.webp';
@@ -44,6 +44,7 @@ const active = ref({ chapter: FILM[0]!.id, shot: '' });
 const show = useShowcase(root);
 const text = computed(() => (caption.value ? filmCaption(lang.value, caption.value) : null));
 const script = computed(() => filmScript(lang.value));
+const playerControls = computed(() => filmPlayerLabels(props.locale));
 /** 标题逐字（中文）/ 逐词（西文）模糊入焦，像样片里的大字。 */
 const glyphs = computed(() => {
   const title = text.value?.title ?? '';
@@ -278,11 +279,11 @@ onBeforeUnmount(() => { stop(); window.clearInterval(syncTimer); audio = null; r
       <div ref="veilEl" class="film-veil" aria-hidden="true"></div>
     </div>
     <div v-if="!record" class="film-buttons">
-      <button type="button" class="film-toggle" :aria-label="finished || failed ? 'Replay' : show.running.value ? 'Pause' : 'Play'" @click="toggle">{{ finished || failed ? '↺' : show.running.value ? '❚❚' : '▶' }}</button>
-      <button v-if="scored" type="button" class="film-sound" :class="{ on: soundOn }" :aria-pressed="soundOn" :aria-label="soundOn ? 'Mute' : 'Sound on'" @click="toggleSound">
+      <button type="button" class="film-toggle" :aria-label="finished || failed ? playerControls.replay : show.running.value ? playerControls.pause : playerControls.play" @click="toggle">{{ finished || failed ? '↺' : show.running.value ? '❚❚' : '▶' }}</button>
+      <button v-if="scored" type="button" class="film-sound" :class="{ on: soundOn }" :aria-pressed="soundOn" :aria-label="soundOn ? playerControls.mute : playerControls.soundOn" @click="toggleSound">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" /><path v-if="soundOn" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><path v-else d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
       </button>
-      <button type="button" class="film-skip" aria-label="Skip" @click="emit('skip')">↓</button>
+      <button type="button" class="film-skip" :aria-label="playerControls.skip" @click="emit('skip')">↓</button>
     </div>
   </section>
 </template>

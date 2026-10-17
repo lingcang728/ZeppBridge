@@ -85,6 +85,8 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
     cleanup_old_data: () => ({ deleted: 0 }), open_data_folder: () => null,
     save_fit_export: () => ({ path: 'Demo/ZeppBridge', record_count: data.workouts.length, bytes: 284_320, generated_at: now(), file_count: data.workouts.length }),
     prepare_ai_handoff: () => ({ mode: 'attachment', clipboardText: '', filePath: 'Demo/ZeppBridge.md', bytes: 24320, records: data.sleeps.length, redactions: [], metadata: { preciseRouteIncluded: false, authenticationFieldsRemoved: true, identityFieldsRemoved: true } }),
+    // The website demonstrates the native file-copy step without touching the visitor's clipboard.
+    ai_handoff_copy_file: () => null,
     submit_diagnostic_report: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
     submit_device_model_assignment: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
   };

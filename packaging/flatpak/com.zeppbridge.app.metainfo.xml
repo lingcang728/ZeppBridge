@@ -25,51 +25,130 @@
   <summary xml:lang="pt_PT">Os teus dados da Zepp, de volta para ti</summary>
   <summary xml:lang="ru">Ваши данные Zepp снова в ваших руках</summary>
   <summary xml:lang="hi_IN">आपका Zepp डेटा, वापस आपके हाथों में</summary>
+  <summary xml:lang="it">I tuoi dati Zepp, di nuovo nelle tue mani</summary>
 
   <description>
-    <p>
-      ZeppBridge is a local-first desktop companion for Amazfit and Zepp
-      wearables. It syncs your health records out of the Zepp cloud into a
-      single SQLite file on your own machine, and lets you read, archive and
-      export them without going through a phone.
-    </p>
+    <p xml:lang="zh_CN">ZeppBridge 是一款以本地数据为主的 Amazfit 和 Zepp 穿戴设备桌面伴侣。它会将健康记录从 Zepp Cloud 同步到你自己电脑上的 SQLite 数据库，方便你查看、归档和导出。</p>
+    <p xml:lang="zh_CN">功能介绍：</p>
+    <ul xml:lang="zh_CN">
+      <li>长期追踪心率、睡眠、锻炼、恢复、压力和血氧饱和度（SpO₂）趋势。</li>
+      <li>按月补齐安装前的历史数据，并支持暂停和继续。</li>
+      <li>创建整个数据库的快照，并在还原前校验校验和、比较记录数量。</li>
+      <li>按数据类型导出健康数据和锻炼记录，支持 JSON、CSV、GPX 和 FIT 格式。</li>
+      <li>提供非交互式 CLI 和 MCP 服务器，可供脚本和本地 AI 工具使用。MCP 可以读取记录并准备训练计划草稿；发布计划需要用户明确授权。</li>
+    </ul>
+    <p xml:lang="zh_CN">没有测量的数据会保持缺失。没有手表数据的日期会在图表中留空；未测量的指标会显示为未提供，绝不会用零、先前数值或估算值填补。</p>
+    <p xml:lang="zh_CN">ZeppBridge 是独立的开源项目，并非 Zepp 官方产品。Zepp 和 Amazfit 商标归各自所有者所有。</p>
+    <p>ZeppBridge is a local-first desktop companion for Amazfit and Zepp wearables. It syncs your health records from Zepp Cloud into a SQLite database on your own computer, where you can view, archive and export them.</p>
     <p>What it does:</p>
     <ul>
       <li>Long-term trends for heart rate, sleep, workouts, recovery, stress and SpO₂.</li>
-      <li>Backfills history from before you installed it, month by month, pausable and resumable.</li>
-      <li>Whole-database backups with checksums, and a record-count diff before any restore.</li>
-      <li>Exports to JSON, CSV and GPX.</li>
-      <li>Ships a non-interactive CLI and a read-only MCP server for scripts and local models.</li>
+      <li>Backfills history from before you installed it, month by month, with pause and resume.</li>
+      <li>Whole-database snapshots with checksums and a record-count comparison before restoring.</li>
+      <li>Exports health data and workouts to JSON, CSV, GPX and FIT as applicable.</li>
+      <li>Includes a non-interactive CLI and an MCP server for scripts and local AI tools. MCP can read records and prepare training-plan drafts; publishing requires explicit user permission.</li>
     </ul>
-    <p>
-      It does not prettify data. A day you did not wear the watch is a gap in
-      the chart, and a metric your watch never measured reads "not provided"
-      rather than zero.
-    </p>
-    <p>
-      ZeppBridge is an independent, unofficial project. It is not affiliated
-      with or endorsed by Zepp Health, Huami or Amazfit.
-    </p>
-    <p xml:lang="zh_CN">
-      ZeppBridge 是一个本地优先的桌面伴侣程序，面向 Amazfit / Zepp 手表和手环。
-      它把你的健康记录从 Zepp 云同步到本机的一个 SQLite 文件里，让你不必通过
-      手机就能查看、归档和导出这些数据。
-    </p>
-    <p xml:lang="zh_CN">主要功能：</p>
-    <ul xml:lang="zh_CN">
-      <li>心率、睡眠、运动、恢复、压力与 SpO₂ 的长期趋势。</li>
-      <li>按月补拉安装前的历史记录，支持暂停与继续。</li>
-      <li>带校验和的整库备份，恢复前提供记录数对比。</li>
-      <li>支持导出为 JSON、CSV 与 GPX。</li>
-      <li>附带非交互式 CLI 与只读 MCP 服务，便于脚本和本地模型调用。</li>
+    <p>Missing measurements stay missing. A day without watch data is a gap in the chart, and an unmeasured metric is shown as not provided, never filled with zero, a previous value or an estimate.</p>
+    <p>ZeppBridge is an independent open-source project, not an official Zepp product. Zepp and Amazfit trademarks belong to their respective owners.</p>
+    <p xml:lang="es">ZeppBridge es una aplicación de escritorio local para dispositivos Amazfit y Zepp. Sincroniza tus registros de salud desde Zepp Cloud con una base de datos SQLite en tu propio ordenador, donde puedes consultarlos, archivarlos y exportarlos.</p>
+    <p xml:lang="es">Qué puedes hacer:</p>
+    <ul xml:lang="es">
+      <li>Consultar tendencias a largo plazo de frecuencia cardiaca, sueño, entrenamientos, recuperación, estrés y SpO₂.</li>
+      <li>Recuperar el historial anterior a la instalación, mes a mes, con opciones para pausar y reanudar.</li>
+      <li>Crear copias de toda la base de datos con sumas de verificación y comparar el número de registros antes de restaurarlas.</li>
+      <li>Exportar datos de salud y entrenamientos a JSON, CSV, GPX y FIT, según corresponda.</li>
+      <li>Incluye una CLI sin interacción y un servidor MCP para scripts y herramientas locales de IA. MCP puede leer registros y preparar borradores de planes de entrenamiento; publicarlos requiere permiso explícito del usuario.</li>
     </ul>
-    <p xml:lang="zh_CN">
-      它不会美化数据：没戴表的那天，图上就是一个缺口；手表从未测量过的指标
-      显示「未提供」，而不是 0。
-    </p>
-    <p xml:lang="zh_CN">
-      本项目是独立的非官方开源项目，与 Zepp Health、华米、Amazfit 无关。
-    </p>
+    <p xml:lang="es">Las mediciones ausentes siguen ausentes. Un día sin datos del reloj queda como un hueco en el gráfico y las métricas no medidas aparecen como no proporcionadas; nunca se completan con cero, un valor anterior o una estimación.</p>
+    <p xml:lang="es">ZeppBridge es un proyecto independiente de código abierto, no un producto oficial de Zepp. Las marcas Zepp y Amazfit pertenecen a sus respectivos titulares.</p>
+    <p xml:lang="nl">ZeppBridge is een desktopapp voor Amazfit- en Zepp-wearables, met lokale gegevensopslag als uitgangspunt. De app synchroniseert je gezondheidsgegevens uit Zepp Cloud naar een SQLite-database op je eigen computer, waar je ze kunt bekijken, archiveren en exporteren.</p>
+    <p xml:lang="nl">Wat je ermee kunt doen:</p>
+    <ul xml:lang="nl">
+      <li>Langetermijntrends voor hartslag, slaap, trainingen, herstel, stress en SpO₂.</li>
+      <li>Haalt je geschiedenis van vóór de installatie maand voor maand op, met pauzeren en hervatten.</li>
+      <li>Momentopnamen van de volledige database, met controlesommen en een vergelijking van het aantal records vóór herstel.</li>
+      <li>Exporteert gezondheidsgegevens en trainingen naar JSON, CSV, GPX en FIT, waar van toepassing.</li>
+      <li>Met een niet-interactieve CLI en een MCP-server voor scripts en lokale AI-tools. MCP kan records lezen en concepten van trainingsplannen opstellen; publiceren vereist expliciete toestemming van de gebruiker.</li>
+    </ul>
+    <p xml:lang="nl">Ontbrekende metingen blijven ontbreken. Een dag zonder horlogegegevens is een hiaat in de grafiek. Een niet-gemeten waarde wordt als niet aangeleverd weergegeven en nooit ingevuld met nul, een eerdere waarde of een schatting.</p>
+    <p xml:lang="nl">ZeppBridge is een onafhankelijk opensourceproject en geen officieel Zepp-product. De handelsmerken Zepp en Amazfit zijn eigendom van hun respectieve eigenaren.</p>
+    <p xml:lang="pt_BR">O ZeppBridge é um aplicativo de desktop que prioriza o armazenamento local, criado para dispositivos vestíveis Amazfit e Zepp. Ele sincroniza seus registros de saúde da Zepp Cloud para um banco de dados SQLite no seu computador, onde você pode consultar, arquivar e exportar os dados.</p>
+    <p xml:lang="pt_BR">O que ele faz:</p>
+    <ul xml:lang="pt_BR">
+      <li>Acompanha tendências de longo prazo de frequência cardíaca, sono, treinos, recuperação, estresse e SpO₂.</li>
+      <li>Recupera o histórico anterior à instalação, mês a mês, com opções para pausar e retomar.</li>
+      <li>Cria snapshots do banco de dados completo com checksums e comparação da quantidade de registros antes da restauração.</li>
+      <li>Exporta dados de saúde e treinos para JSON, CSV, GPX e FIT, conforme aplicável.</li>
+      <li>Inclui uma CLI não interativa e um servidor MCP para scripts e ferramentas locais de IA. O MCP pode ler registros e preparar rascunhos de planos de treino; a publicação exige sua permissão explícita.</li>
+    </ul>
+    <p xml:lang="pt_BR">Medições ausentes continuam ausentes. Um dia sem dados do relógio aparece como uma lacuna no gráfico, e uma métrica não medida é indicada como não informada, nunca preenchida com zero, um valor anterior ou uma estimativa.</p>
+    <p xml:lang="pt_BR">O ZeppBridge é um projeto independente de código aberto, não um produto oficial da Zepp. As marcas Zepp e Amazfit pertencem aos respectivos proprietários.</p>
+    <p xml:lang="pt_PT">O ZeppBridge é uma aplicação complementar para computador, com prioridade local, destinada a dispositivos Amazfit e Zepp. Sincroniza os seus registos de saúde da Zepp Cloud para uma base de dados SQLite no seu próprio computador, onde os pode consultar, arquivar e exportar.</p>
+    <p xml:lang="pt_PT">O que faz:</p>
+    <ul xml:lang="pt_PT">
+      <li>Tendências a longo prazo da frequência cardíaca, sono, treinos, recuperação, stress e SpO₂.</li>
+      <li>Recupera o histórico anterior à instalação, mês a mês, com opções para pausar e retomar.</li>
+      <li>Cópias de segurança de toda a base de dados, com somas de verificação e comparação do número de registos antes do restauro.</li>
+      <li>Exporta dados de saúde e treinos para JSON, CSV, GPX e FIT, conforme aplicável.</li>
+      <li>Inclui uma CLI não interativa e um servidor MCP para scripts e ferramentas de IA locais. O MCP pode ler registos e preparar rascunhos de planos de treino; a publicação requer autorização explícita do utilizador.</li>
+    </ul>
+    <p xml:lang="pt_PT">As medições em falta continuam em falta. Um dia sem dados do relógio surge como uma lacuna no gráfico, e uma métrica não medida é indicada como não fornecida, nunca preenchida com zero, um valor anterior ou uma estimativa.</p>
+    <p xml:lang="pt_PT">O ZeppBridge é um projeto independente de código aberto, não um produto oficial da Zepp. As marcas Zepp e Amazfit pertencem aos respetivos titulares.</p>
+    <p xml:lang="de">ZeppBridge ist ein Desktop-Begleiter für Amazfit- und Zepp-Wearables, bei dem deine Daten auf deinem Gerät bleiben. Die App synchronisiert Gesundheitsdaten aus der Zepp-Cloud in eine SQLite-Datenbank auf deinem Computer. Dort kannst du sie ansehen, archivieren und exportieren.</p>
+    <p xml:lang="de">Das bietet die App:</p>
+    <ul xml:lang="de">
+      <li>Langzeitverläufe für Herzfrequenz, Schlaf, Training, Erholung, Stress und SpO₂.</li>
+      <li>Ergänzt den Verlauf monatsweise um Daten aus der Zeit vor der Installation; der Vorgang lässt sich pausieren und fortsetzen.</li>
+      <li>Sichert die gesamte Datenbank mit Prüfsummen und vergleicht die Datensatzanzahl vor einer Wiederherstellung.</li>
+      <li>Exportiert Gesundheitsdaten und Trainings je nach Format als JSON, CSV, GPX und FIT.</li>
+      <li>Enthält eine nicht-interaktive CLI und einen MCP-Server für Skripte und lokale KI-Tools. MCP kann Datensätze lesen und Trainingsplan-Entwürfe vorbereiten; zum Veröffentlichen ist die ausdrückliche Zustimmung des Nutzers erforderlich.</li>
+    </ul>
+    <p xml:lang="de">Fehlende Messungen bleiben fehlend. Ein Tag ohne Uhrdaten ist eine Lücke im Diagramm; ein nicht gemessener Wert wird als nicht angegeben angezeigt und niemals durch null, einen vorherigen Wert oder eine Schätzung ersetzt.</p>
+    <p xml:lang="de">ZeppBridge ist ein unabhängiges Open-Source-Projekt und kein offizielles Zepp-Produkt. Die Marken Zepp und Amazfit gehören ihren jeweiligen Inhabern.</p>
+    <p xml:lang="ru">ZeppBridge — локальное настольное приложение для устройств Amazfit и Zepp. Оно синхронизирует записи о здоровье из Zepp Cloud в базу SQLite на вашем компьютере, где их можно просматривать, архивировать и экспортировать.</p>
+    <p xml:lang="ru">Возможности:</p>
+    <ul xml:lang="ru">
+      <li>Долгосрочные тенденции пульса, сна, тренировок, восстановления, стресса и SpO₂.</li>
+      <li>Помесячно загружает историю за период до установки приложения; синхронизацию можно приостанавливать и возобновлять.</li>
+      <li>Создаёт снимки всей базы с контрольными суммами и сравнением числа записей перед восстановлением.</li>
+      <li>Экспортирует данные о здоровье и тренировках в JSON, CSV, GPX и FIT, если формат применим.</li>
+      <li>Включает CLI без интерактивного режима и MCP-сервер для скриптов и локальных ИИ-инструментов. MCP может читать записи и готовить черновики тренировочных планов; публикация требует явного разрешения пользователя.</li>
+    </ul>
+    <p xml:lang="ru">Отсутствующие измерения остаются отсутствующими. День без данных с часов отображается на графике как пробел, а неизмеренный показатель помечается как отсутствующий и никогда не заполняется нулём, прошлым значением или оценкой.</p>
+    <p xml:lang="ru">ZeppBridge — независимый проект с открытым исходным кодом, а не официальный продукт Zepp. Товарные знаки Zepp и Amazfit принадлежат их владельцам.</p>
+    <p xml:lang="hi_IN">ZeppBridge Amazfit और Zepp वियरेबल्स के लिए एक लोकल-फर्स्ट डेस्कटॉप साथी है। यह Zepp Cloud से स्वास्थ्य रिकॉर्ड आपके अपने कंप्यूटर के SQLite डेटाबेस में सिंक करता है, जहाँ आप उन्हें देख, संग्रहित और निर्यात कर सकते हैं।</p>
+    <p xml:lang="hi_IN">यह क्या करता है:</p>
+    <ul xml:lang="hi_IN">
+      <li>हृदय गति, नींद, वर्कआउट, रिकवरी, तनाव और SpO₂ के लंबे समय के रुझान दिखाता है।</li>
+      <li>इंस्टॉल करने से पहले का इतिहास भी महीने-दर-महीने वापस लाता है; प्रक्रिया रोककर फिर शुरू कर सकते हैं।</li>
+      <li>पूरे डेटाबेस के स्नैपशॉट बनाता है; रीस्टोर से पहले चेकसम और रिकॉर्ड संख्या की तुलना करता है।</li>
+      <li>स्वास्थ्य डेटा और वर्कआउट को ज़रूरत के अनुसार JSON, CSV, GPX और FIT में निर्यात करता है।</li>
+      <li>स्क्रिप्ट और स्थानीय AI टूल के लिए बिना इंटरैक्शन वाला CLI और MCP सर्वर शामिल हैं। MCP रिकॉर्ड पढ़ सकता है और प्रशिक्षण योजना के ड्राफ़्ट तैयार कर सकता है; प्रकाशित करने के लिए उपयोगकर्ता की स्पष्ट अनुमति ज़रूरी है।</li>
+    </ul>
+    <p xml:lang="hi_IN">जो माप उपलब्ध नहीं हैं, वे अनुपस्थित ही रहते हैं। घड़ी का डेटा न होने पर उस दिन चार्ट में खाली जगह दिखती है; जिसका माप नहीं हुआ, उसे अनुपलब्ध बताया जाता है—कभी शून्य, पिछला मान या अनुमान नहीं भरा जाता।</p>
+    <p xml:lang="hi_IN">ZeppBridge एक स्वतंत्र ओपन-सोर्स प्रोजेक्ट है, Zepp का आधिकारिक उत्पाद नहीं। Zepp और Amazfit ट्रेडमार्क उनके संबंधित मालिकों के हैं।</p>
+    <p xml:lang="fr">ZeppBridge est une application de bureau pour les objets connectés Amazfit et Zepp, conçue pour privilégier le stockage local. Elle synchronise vos données de santé depuis Zepp Cloud vers une base SQLite sur votre ordinateur, où vous pouvez les consulter, les archiver et les exporter.</p>
+    <p xml:lang="fr">Fonctionnalités :</p>
+    <ul xml:lang="fr">
+      <li>Suivez les tendances à long terme de la fréquence cardiaque, du sommeil, des entraînements, de la récupération, du stress et de la SpO₂.</li>
+      <li>Récupérez l’historique antérieur à l’installation, mois par mois, avec possibilité de mettre en pause et de reprendre.</li>
+      <li>Créez des instantanés de la base complète avec sommes de contrôle et comparaison du nombre d’enregistrements avant restauration.</li>
+      <li>Exportez les données de santé et les entraînements aux formats JSON, CSV, GPX et FIT, selon le cas.</li>
+      <li>Inclut une interface en ligne de commande non interactive et un serveur MCP pour les scripts et les outils d’IA locaux. MCP peut lire les enregistrements et préparer des brouillons de plans d’entraînement ; leur publication nécessite votre autorisation explicite.</li>
+    </ul>
+    <p xml:lang="fr">Une mesure absente reste absente. Un jour sans données de montre apparaît comme une lacune dans le graphique, et une mesure non relevée est indiquée comme non fournie : elle n’est jamais remplacée par zéro, une valeur précédente ou une estimation.</p>
+    <p xml:lang="fr">ZeppBridge est un projet open source indépendant, et non un produit officiel de Zepp. Les marques Zepp et Amazfit appartiennent à leurs propriétaires respectifs.</p>
+    <p xml:lang="it">ZeppBridge è un’applicazione desktop per dispositivi Amazfit e Zepp, progettata per mettere i dati locali al primo posto. Sincronizza i dati sanitari da Zepp Cloud in un database SQLite sul tuo computer, dove puoi consultarli, archiviarli ed esportarli.</p>
+    <p xml:lang="it">Cosa puoi fare:</p>
+    <ul xml:lang="it">
+      <li>Consulta gli andamenti a lungo termine di frequenza cardiaca, sonno, allenamenti, recupero, stress e SpO₂.</li>
+      <li>Recupera la cronologia precedente all’installazione, mese per mese, con possibilità di mettere in pausa e riprendere.</li>
+      <li>Crea istantanee dell’intero database con checksum e confronto del numero di record prima del ripristino.</li>
+      <li>Esporta dati sanitari e allenamenti nei formati JSON, CSV, GPX e FIT, ove applicabile.</li>
+      <li>Include una CLI non interattiva e un server MCP per script e strumenti IA locali. MCP può leggere i record e preparare bozze di piani di allenamento; la pubblicazione richiede il tuo consenso esplicito.</li>
+    </ul>
+    <p xml:lang="it">Le misurazioni mancanti restano tali. Un giorno senza dati dell’orologio appare come un’interruzione nel grafico; una metrica non misurata è indicata come non fornita e non viene mai completata con zero, un valore precedente o una stima.</p>
+    <p xml:lang="it">ZeppBridge è un progetto open source indipendente, non un prodotto ufficiale Zepp. I marchi Zepp e Amazfit appartengono ai rispettivi proprietari.</p>
   </description>
 
   <launchable type="desktop-id">com.zeppbridge.app.desktop</launchable>
