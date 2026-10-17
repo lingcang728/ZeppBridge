@@ -3,28 +3,25 @@ import { computed, onMounted, ref } from 'vue';
 import Icon from '../../components/Icon.vue';
 import SegmentTrack from '../../components/SegmentTrack.vue';
 import { GITHUB_URL, RELEASES_URL, isMobileVisitor } from './useDownloads';
-import { downloadLeadFor } from './release';
 import type { LandingCopy } from './types';
 import type { JourneyCopy } from './journeyCopy';
 const props = defineProps<{ copy: LandingCopy; journey: JourneyCopy; windows: { label: string; hint: string; href: string }; macos: { label: string; hint: string; href: string }; linux: Array<{label: string; url: string}>; available: boolean; unreachable?: boolean }>();
 const platform = ref('windows');
 onMounted(() => { if (!isMobileVisitor()) { if (/Mac/i.test(navigator.platform)) platform.value = 'macos'; else if (/Linux/i.test(navigator.platform)) platform.value = 'linux'; } });
 const selected = computed(() => platform.value === 'macos' ? props.macos : props.windows);
-/* 读不到最新版（GitHub 一时失败）不等于没发布：说明只留「免费开源」，按钮直接去 GitHub Releases。 */
-const lead = computed(() => downloadLeadFor(props.journey.downloadLead, props.available || !!props.unreachable));
 const items = [{ value: 'windows', label: 'Windows' }, { value: 'macos', label: 'macOS' }, { value: 'linux', label: 'Linux' }];
 </script>
 <template>
   <section id="download" class="lp-section final" aria-labelledby="download-title">
     <h2 id="download-title" data-reveal>{{ journey.downloadTitle }}</h2>
-    <p class="lp-lead" data-reveal>{{ lead }}</p>
+    <p class="lp-lead" data-reveal>{{ journey.downloadLead }}</p>
     <p class="install-line">{{ journey.install }}</p>
     <div class="platform-switch"><SegmentTrack v-model="platform" variant="glass" :items="items" :aria-label="journey.nav.download" /></div>
     <div class="download-actions">
-      <template v-if="available && platform === 'linux' && linux.length"><a v-for="item in linux" :key="item.label" class="lp-btn lp-btn-primary download-button" :href="item.url"><Icon name="export" :size="22" />{{ item.label }}</a></template>
-      <a v-else-if="available && platform !== 'linux'" class="lp-btn lp-btn-primary download-button" :href="selected.href"><Icon name="export" :size="22" />{{ selected.label }}</a>
-      <a v-else-if="unreachable" class="lp-btn lp-btn-primary download-button" :href="RELEASES_URL" target="_blank" rel="noopener noreferrer"><Icon name="export" :size="22" />GitHub Releases<Icon name="external" :size="16" /></a>
-      <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="export" :size="22" />{{ journey.downloadPending }}</button>
+      <template v-if="available && platform === 'linux' && linux.length"><a v-for="item in linux" :key="item.label" class="lp-btn lp-btn-primary download-button" :href="item.url"><Icon name="download" :size="22" />{{ item.label }}</a></template>
+      <a v-else-if="available && platform !== 'linux'" class="lp-btn lp-btn-primary download-button" :href="selected.href"><Icon name="download" :size="22" />{{ selected.label }}</a>
+      <a v-else-if="unreachable" class="lp-btn lp-btn-primary download-button" :href="RELEASES_URL" target="_blank" rel="noopener noreferrer"><Icon name="download" :size="22" />GitHub Releases<Icon name="external" :size="16" /></a>
+      <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="download" :size="22" />{{ journey.downloadPending }}</button>
       <a class="star-button lp-btn" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><Icon name="star" :size="20" /><span>{{ journey.starOnGithub }}</span><Icon name="external" :size="16" /></a>
     </div>
   </section>

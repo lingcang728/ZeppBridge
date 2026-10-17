@@ -86,6 +86,9 @@ export default {
       authManualTitle: 'Introdução manual',
       authManualSub: 'Introduz manualmente o appToken, user_id e anfitrião da região',
       authCollapse: 'Recolher',
+      manualTokenLabel: "Token da aplicação (App Token)",
+      manualUserIdLabel: "ID de utilizador (User ID)",
+      manualRegionHostLabel: "Servidor regional (Region Host)",
       manualFormHint:
         'Obtém-nos via mitmproxy/Charles ou ferramentas de programador do teu navegador. Três campos:',
       manualTokenPlaceholder: 'Copiar do cabeçalho HTTP apptoken',

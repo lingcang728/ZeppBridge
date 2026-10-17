@@ -15,7 +15,7 @@ const pack: FilmPack = {
     deck: { title: 'Foca-te num. Ou espalha-os todos.' },
     lines: { title: 'Lança à vontade. Volta sempre ao lugar.' },
     night: { title: 'Um toque. A noite cai em todo o lado.' },
-    ash: { title: 'Num estalar de dedos. Outro idioma.', sub: 'Dez idiomas.' },
+    ash: { title: 'Num estalar de dedos. Outro idioma.', sub: "Onze opções de idioma e região." },
     cloud: { title: 'O que está na nuvem, está na tua secretária.', sub: 'Inicia sessão na Zepp e os teus registos sincronizam com este computador.' },
     autosync: { title: 'Tu dormes. Ele sincroniza.', sub: 'Desligado, 15, 30 ou 60 minutos.' },
     devices: { title: 'Cada relógio que usas, reconhecido.', sub: 'Detetado automaticamente; se falhar, corriges tu.' },
@@ -46,7 +46,7 @@ const pack: FilmPack = {
     },
     free: {
       title: 'Gratuito. Código aberto. Em todo o lado.',
-      sub: 'Windows · macOS · Linux · Dez idiomas',
+      sub: "Windows · macOS · Linux · Onze opções de idioma e região",
     },
     tryIt: { title: 'zeppbridge.com' },
     pile: { title: 'Empilha tudo. Arruma na caixa.' },

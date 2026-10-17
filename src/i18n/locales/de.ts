@@ -283,6 +283,9 @@ export default {
       authManualTitle: 'Manuell eingeben',
       authManualSub: 'appToken, user_id usw. von Hand eintragen',
       authCollapse: 'Einklappen',
+      manualTokenLabel: "App-Token (App Token)",
+      manualUserIdLabel: "Benutzer-ID (User ID)",
+      manualRegionHostLabel: "Regionaler Server (Region Host)",
       manualFormHint:
         'Aus einem Mitschnitt von mitmproxy/Charles oder den Browser-Entwicklerwerkzeugen übernehmen. Drei Felder:',
       manualTokenPlaceholder: 'Aus dem HTTP-Header „apptoken" kopieren',

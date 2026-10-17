@@ -60,7 +60,7 @@ const pack: LandingPack = {
         "unavailable": "La démonstration est indisponible. Les explications et le code source restent accessibles."
       },
       "demo": "Voir l’exemple",
-      "edition": "v3 en développement · Données synthétiques. Le téléchargement propose la version publique stable, dont l’interface et les fonctions peuvent différer."
+      "edition": "ZeppBridge 3 · Données synthétiques. Téléchargez la dernière version stable pour utiliser vos propres données."
     },
     "handoff": {
       "chat": "Discussion avec l’IA",
@@ -136,7 +136,7 @@ const pack: LandingPack = {
       "lead": "Gratuit et à code ouvert. Votre compte Zepp suffit ; aucun compte ZeppBridge supplémentaire.",
       "docs": "Installation et notes de version",
       "facts": {
-        "channel": "Le téléchargement propose la version publique stable. La démonstration synthétique est la v3 en développement ; interface et fonctions peuvent différer.",
+        "channel": "Les téléchargements proposent la dernière version stable de ZeppBridge 3. La démo utilise des données synthétiques ; consultez les notes de version pour connaître les changements de chaque version.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Consulter et exporter ne nécessite pas d’IA. Vous choisissez le service externe et votre compte.",
         "windows": "Windows : les installateurs n’ont pas encore de signature reconnue. Un avertissement éditeur inconnu ou SmartScreen peut apparaître. Vérifiez la source officielle.",
@@ -175,7 +175,7 @@ const pack: LandingPack = {
         },
         {
           "question": "Le téléchargement ressemble-t-il à l’exemple ?",
-          "answer": "L’exemple est la v3 en développement avec des données synthétiques. Le téléchargement est stable. Vérification des plans et nouvelle interface peuvent être inédites ; consultez les notes."
+          "answer": "La démo présente ZeppBridge 3 avec des données synthétiques. Les téléchargements proposent la dernière version stable. Consultez les notes de version et vérifiez la compatibilité de votre appareil avant d’envoyer un plan."
         }
       ]
     },
@@ -259,7 +259,7 @@ const pack: LandingPack = {
         {
           "eyebrow": "Révision des plans",
           "title": "Vérifiez avant de poursuivre",
-          "body": "La v3 en développement montre l’import et la vérification de plans. Leur envoi à la montre dépend du matériel et des validations ; ce n’est pas une promesse générale de la version stable.",
+          "body": "Importez et vérifiez vos plans d’entraînement dans ZeppBridge 3. Leur envoi à votre montre dépend de la prise en charge de l’appareil et des vérifications de compatibilité.",
           "bullets": [
             "Vue hebdomadaire et révision par jour",
             "Transfert selon appareil et validation"

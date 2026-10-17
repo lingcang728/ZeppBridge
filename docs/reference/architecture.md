@@ -207,18 +207,22 @@ way to tell which one is right.
   mode and no theme switch. The only adjustable dimension is interface scale
   (80%–125%, in Settings → "Advanced and maintenance", or Ctrl + / Ctrl - /
   Ctrl 0).
-- The interface is **bilingual, Chinese and English**. On first launch it
-  follows the system language (Chinese only when the system explicitly says so);
-  the Settings page header switches it at any time, and the choice is stored in
+- The interface offers **eleven language and region options**: Chinese, English,
+  Spanish, Dutch, Brazilian Portuguese, European Portuguese, German, Russian,
+  Hindi, French and Italian. On first launch it follows the first supported
+  system language, falling back to English; Settings switches it at any time,
+  and the choice is stored in
   `localStorage['zeppbridge-locale']`. Dates, weekday names and number grouping
   follow the language too (`i18n/intlLocale()`), not just the words.
   - **vue-i18n is deliberately not used.** It was measured: wiring it up
     (runtime build included, before translating a single string) grew the
     first-screen gzip from 73.0 kB to 91.6 kB, 7.6 kB over the size budget. The
     hand-rolled layer is under a screenful of code and adds 0.4 kB.
-  - Copy lives with the module that uses it (`defineMessages(zh, en)` inline,
-    with a matching `*.i18n.ts` for large pages) rather than in one global
-    dictionary, so a lazily loaded page's chunk still carries only its own copy.
+  - Chinese, English and Spanish copy lives with its module
+    (`defineMessages(zh, en, es, moduleId)` inline, with a matching `*.i18n.ts`
+    for large pages). The other eight options use language packs in
+    `src/i18n/locales/<locale>.ts`, loaded on demand and matched by `moduleId`.
+    Missing translations fall back to English.
   - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half, so a
     missing English key, an extra key or a mismatched parameter fails to compile.
   - **The backend does not produce copy per locale.** The four outlets (GUI,

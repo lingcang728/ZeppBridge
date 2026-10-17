@@ -88,15 +88,15 @@ const needsAttention = computed(() =>
       <div v-if="showManualAuth" class="s-row is-block manual-auth-form">
         <p class="s-row-sub">{{ t.manualFormHint }}</p>
         <label class="form-group">
-          <span>App Token *</span>
+          <span>{{ t.manualTokenLabel }} *</span>
           <input id="manual-apptoken" v-model="manualAppToken" class="mat-field mono" type="password" autocomplete="off" :placeholder="t.manualTokenPlaceholder" :disabled="manualAuthBusy" />
         </label>
         <label class="form-group">
-          <span>User ID *</span>
+          <span>{{ t.manualUserIdLabel }} *</span>
           <input id="manual-userid" v-model="manualUserId" class="mat-field mono" type="text" :placeholder="t.manualUserIdPlaceholder" :disabled="manualAuthBusy" />
         </label>
         <label class="form-group">
-          <span>Region Host *</span>
+          <span>{{ t.manualRegionHostLabel }} *</span>
           <input id="manual-host" v-model="manualRegionHost" class="mat-field mono" type="text" placeholder="https://api-mifit-us3.zepp.com" :disabled="manualAuthBusy" />
         </label>
         <div class="s-actions">
@@ -122,6 +122,7 @@ const needsAttention = computed(() =>
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
+.auth-fold { display: block; }
 .auth-fold > summary { cursor: pointer; list-style: none; }
 .auth-fold > summary::-webkit-details-marker { display: none; }
 .fold-caret { color: var(--subtle); transition: transform var(--dur-base) var(--ease-out); }
@@ -138,8 +139,10 @@ const needsAttention = computed(() =>
   color: var(--muted);
 }
 .auth-icon.current { color: var(--accent); }
-.manual-auth-form { gap: 10px; }
-.form-group { display: grid; gap: 4px; }
-.form-group > span { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.manual-auth-form { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.manual-auth-form > .s-row-sub { margin: 0; overflow-wrap: anywhere; }
+.form-group { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 4px; }
+.form-group > span { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
+.form-group > .mat-field { min-width: 0; }
 .mono { font-family: var(--font-mono); }
 </style>

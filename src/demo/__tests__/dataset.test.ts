@@ -7,10 +7,16 @@ import { createDemoPlan } from '../plan';
 import { dayKey, at } from '../rng';
 import { newTaskDraft } from '../../lib/aiTask/draft';
 import { demoDayStrip } from '../bridge';
+import { createDemoOperations } from '../operations';
 
 const NOW = new Date(2026, 9, 2, 12, 0, 0);
 
 describe('演示数据集', () => {
+  it('handles the native AI file-copy step inside the demo sandbox', () => {
+    const { handlers } = createDemoOperations(buildDemoData(NOW), createDemoPlan(NOW));
+    expect(handlers.ai_handoff_copy_file({ mdPath: 'Demo/ZeppBridge.md' })).toBeNull();
+  });
+
   it('日条带和桌面命令一样给到 186 天：牌桌 6 个月不能只剩前 90 天', () => {
     const data = buildDemoData(NOW);
     const rows = demoDayStrip(data, 184, dayKey(NOW));

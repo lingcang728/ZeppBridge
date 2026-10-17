@@ -44,7 +44,6 @@ watch(() => [props.locale, landingTheme.value], () => { mainIndex.value = 0; sle
       <p>{{ journey.lead }}</p>
       <div class="hero-actions">
         <a class="lp-btn lp-btn-primary" href="#download">{{ journey.nav.download }}</a>
-        <p>{{ journey.downloadPending }}</p>
       </div>
     </div>
     <div class="hero-stage lp-wrap">
@@ -63,7 +62,6 @@ h1 { margin: 0; font-size: clamp(40px, 5.2vw, 76px); line-height: 1.12; letter-s
 h1 span { display: block; color: var(--lp-muted); margin-top: .12em; }
 .hero-copy > p { font-size: clamp(16px, 1.5vw, 19px); max-width: 36em; line-height: 1.65; margin: 18px auto 0; color: var(--lp-muted); text-wrap: balance; }
 .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 18px; margin-top: 22px; }
-.hero-actions p { margin: 0; color: var(--subtle); font-size: 14px; }
 .hero-stage { position: relative; margin-top: 48px; max-width: 1140px; padding: 0 90px; perspective: 1400px; }
 .hero-window { overflow: hidden; border-radius: 22px; box-shadow: var(--lp-shadow); border: 1px solid var(--line); transform: rotateX(5deg); animation: window-in 1.1s cubic-bezier(.16,1,.3,1) both; }
 .hero-stage img { display: block; width: 100%; height: auto; }

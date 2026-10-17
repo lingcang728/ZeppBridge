@@ -60,7 +60,7 @@ const pack: LandingPack = {
         "unavailable": "Die Demo ist nicht verfügbar. Erklärungen und Quellcode bleiben zugänglich."
       },
       "demo": "Beispiel ansehen",
-      "edition": "v3 in Entwicklung · Synthetische Beispieldaten. Der Download bietet die öffentliche stabile Version; Oberfläche und Funktionen können abweichen."
+      "edition": "ZeppBridge 3 · Synthetische Beispieldaten. Lade die neueste stabile Version herunter, um deine eigenen Daten zu verwenden."
     },
     "handoff": {
       "chat": "KI-Chat",
@@ -136,7 +136,7 @@ const pack: LandingPack = {
       "lead": "Kostenlos und quelloffen. Dein Zepp-Konto genügt; kein zusätzliches ZeppBridge-Konto.",
       "docs": "Installation und Versionshinweise",
       "facts": {
-        "channel": "Der Download bietet die öffentliche stabile Version. Das synthetische Beispiel zeigt v3 in Entwicklung; Oberfläche und Funktionen können abweichen.",
+        "channel": "Die Downloads bieten die neueste stabile Version von ZeppBridge 3. Die Demo verwendet synthetische Daten. Versionsänderungen findest du in den Versionshinweisen.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Lesen und Exportieren benötigen keine KI. Dienst und Konto für eine externe KI wählst du selbst.",
         "windows": "Windows: Noch keine vertrauenswürdige Codesignatur. Unbekannter-Herausgeber- oder SmartScreen-Warnungen sind möglich. Prüfe die offizielle Quelle.",
@@ -175,7 +175,7 @@ const pack: LandingPack = {
         },
         {
           "question": "Entspricht der Download dem Beispiel?",
-          "answer": "Das Beispiel zeigt v3 in Entwicklung mit synthetischen Daten. Der Download ist stabil. Planprüfung und neue Oberfläche können noch unveröffentlicht sein; siehe Versionshinweise."
+          "answer": "Die Demo zeigt ZeppBridge 3 mit synthetischen Daten. Die Downloads bieten die neueste stabile Version. Prüfe vor dem Übertragen eines Plans die Versionshinweise und die Kompatibilität deines Geräts."
         }
       ]
     },
@@ -259,7 +259,7 @@ const pack: LandingPack = {
         {
           "eyebrow": "Planprüfung",
           "title": "Vor dem nächsten Schritt prüfen",
-          "body": "Die v3 in Entwicklung zeigt Import und Prüfung von Trainingsplänen. Die Übertragung zur Uhr hängt von Gerät und Validierung ab; sie ist kein allgemeines Versprechen der stabilen Version.",
+          "body": "Importiere und prüfe Trainingspläne in ZeppBridge 3. Ob ein Plan an deine Uhr übertragen werden kann, hängt von Geräteunterstützung und Kompatibilitätsprüfungen ab.",
           "bullets": [
             "Wochenansicht und Tagesprüfung",
             "Übertragung abhängig von Geräteprüfung"

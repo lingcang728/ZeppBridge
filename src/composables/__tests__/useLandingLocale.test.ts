@@ -78,6 +78,8 @@ describe('browser-language detection', () => {
     [['hi'], 'hi-IN'],
     [['hi-IN'], 'hi-IN'],
     [['fr-FR'], 'fr'],
+    [['it-IT'], 'it'],
+    [['it_CH'], 'it'],
     [['ja-JP'], 'en'],
     [['ko', 'de'], 'de'],
     [[], 'en'],
@@ -95,6 +97,25 @@ describe('browser-language detection', () => {
 });
 
 describe('lazy copy packs', () => {
+  it('loads Italian copy and metadata and retains the selected language', async () => {
+    const setItem = vi.fn();
+    vi.stubGlobal('window', {
+      navigator: { languages: ['it-CH'] },
+      localStorage: { getItem: () => null, setItem },
+    });
+    const document = stubDocument();
+    const language = (await import('../useLandingLocale')).useLandingLocale();
+    language.initializeLocale();
+    await language.ensureLandingCopy('it');
+    expect(language.locale.value).toBe('it');
+    expect(language.landingCopyFor('it')?.nav.language).toBe('Lingua');
+    expect(document.title).toContain('Il tuo archivio personale');
+    expect(document.documentElement.lang).toBe('it');
+    language.setLocale('en');
+    language.setLocale('it');
+    expect(setItem).toHaveBeenLastCalledWith('zeppbridge-landing-locale', 'it');
+  });
+
   it('keeps zh/en inline and only loads other languages on demand', async () => {
     vi.stubGlobal('window', {
       navigator: { languages: ['en-US'] },

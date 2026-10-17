@@ -60,7 +60,7 @@ const pack: LandingPack = {
         "unavailable": "De demo is niet beschikbaar. Je kunt de uitleg en broncode nog bekijken."
       },
       "demo": "Bekijk het voorbeeld",
-      "edition": "v3 in ontwikkeling · Synthetische voorbeeldgegevens. De download biedt de publieke stabiele versie; interface en functies kunnen verschillen."
+      "edition": "ZeppBridge 3 · Synthetische voorbeeldgegevens. Download de nieuwste stabiele versie om je eigen gegevens te gebruiken."
     },
     "handoff": {
       "chat": "AI-chat",
@@ -136,7 +136,7 @@ const pack: LandingPack = {
       "lead": "Gratis en open source. Je Zepp-account volstaat; geen apart ZeppBridge-account.",
       "docs": "Installatie en release-notities",
       "facts": {
-        "channel": "De download biedt de publieke stabiele versie. De synthetische demo is v3 in ontwikkeling; interface en functies kunnen afwijken.",
+        "channel": "De downloads bieden de nieuwste stabiele versie van ZeppBridge 3. De demo gebruikt synthetische gegevens; zie de release-opmerkingen voor wijzigingen per versie.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Bekijken en exporteren vereisen geen AI. Externe dienst en account kies je zelf.",
         "windows": "Windows: nog geen vertrouwde codehandtekening. Een waarschuwing van onbekende uitgever of SmartScreen is mogelijk. Controleer de officiële bron.",
@@ -175,7 +175,7 @@ const pack: LandingPack = {
         },
         {
           "question": "Is de download gelijk aan het voorbeeld?",
-          "answer": "Het voorbeeld is v3 in ontwikkeling met synthetische gegevens. De download is stabiel. Planbeoordeling en de nieuwe interface kunnen nog niet publiek zijn; zie release-notities."
+          "answer": "De demo toont ZeppBridge 3 met synthetische gegevens. De downloads bieden de nieuwste stabiele versie. Bekijk de release-opmerkingen voor versieverschillen en controleer de compatibiliteit van je apparaat voordat je een plan verstuurt."
         }
       ]
     },
@@ -259,7 +259,7 @@ const pack: LandingPack = {
         {
           "eyebrow": "Plancontrole",
           "title": "Bekijk het plan vóór de volgende stap",
-          "body": "De v3 in ontwikkeling toont het importeren en beoordelen van trainingsplannen. Verzenden naar je horloge hangt af van apparaat en validatie; dit is geen algemene belofte voor de stabiele versie.",
+          "body": "Importeer trainingsplannen en bekijk ze in ZeppBridge 3. Of je een plan naar je horloge kunt sturen, hangt af van apparaatondersteuning en compatibiliteitscontroles.",
           "bullets": [
             "Weekoverzicht en dagelijkse controle",
             "Overdracht na apparaatcontrole"

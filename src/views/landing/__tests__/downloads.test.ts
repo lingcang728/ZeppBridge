@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { createSSRApp, ref } from 'vue';
+import { renderToString } from '@vue/server-renderer';
 import { COPY } from '../copy';
 import { GITHUB_URL, isMobileVisitor, useDownloads } from '../useDownloads';
 import { JOURNEY } from '../journeyCopy';
-import { downloadLeadFor } from '../release';
+import FinalCta from '../FinalCta.vue';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const payload = () => ({ version: '3.0.0', downloads: {
@@ -58,12 +59,19 @@ describe('website download recovery', () => {
   });
 });
 
-describe('download lead once the release is out', () => {
-  it.each(Object.entries(JOURNEY))('%s drops the "not released yet" sentence when installers are available', (_locale, copy) => {
-    const lead = downloadLeadFor(copy.downloadLead, true);
-    expect(lead.length).toBeGreaterThan(0);
-    expect(lead.length).toBeLessThan(copy.downloadLead.length);
-    expect(lead).not.toMatch(/v3/);
-    expect(downloadLeadFor(copy.downloadLead, false)).toBe(copy.downloadLead);
+describe('released download copy', () => {
+  it.each(Object.entries(JOURNEY))('%s preserves the full stable-release explanation in every download state', async (_locale, journey) => {
+    const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    for (const state of [{ available: true }, { available: false }, { available: false, unreachable: true }]) {
+      const html = await renderToString(createSSRApp(FinalCta, {
+        copy: COPY.en, journey, linux: [],
+        windows: { label: 'Windows', hint: '', href: 'https://example.com/app.exe' },
+        macos: { label: 'macOS', hint: '', href: 'https://example.com/app.dmg' },
+        ...state,
+      }));
+      expect(html).toContain(escape(journey.downloadLead));
+      if (!state.available && !state.unreachable) expect(html).toContain(escape(journey.downloadPending));
+      if (state.unreachable) expect(html).toContain('href="https://github.com/lingcang728/ZeppBridge/releases/latest"');
+    }
   });
 });
