@@ -1,6 +1,9 @@
 import type { LandingLocale } from '../composables/useLandingLocale';
 // The conversation is a scripted local example. These strings never come from an AI service.
 const labels: Partial<Record<LandingLocale, string[]>> = {
+  // TODO(pl): English source copy; translation is tracked in the handoff.
+  pl: ['Send', 'Reading the records', 'Your plan is ready', 'Copy plan', 'Bringing the plan back', 'Back', 'Sample conversation', 'Keep the rest days and package this as a Plan I can bring back.', 'The Plan contains the dates, activities and steps. Rest days stay open, and missing measurements have not been filled with invented records.\n\nBack in ZeppBridge, review each warm-up, workout and cooldown. Drag a card to swap dates, then decide whether to send the plan to your watch.'],
+
   zh: ['发送', '正在整理记录', '计划已整理好', '复制计划', '正在接回计划', '返回', '示例对话', '保留休息日，整理成可以接回的 Plan。', '已将训练日期、项目和步骤整理成 Plan。休息日保留为空白，不会用虚构记录补齐缺失的数据。\n\n接回 ZeppBridge 后，你可以逐日查看热身、训练和放松步骤，也可以拖动卡片交换日期。确认以后再决定是否发到手表。'],
   en: ['Send', 'Reading the records', 'Your plan is ready', 'Copy plan', 'Bringing the plan back', 'Back', 'Sample conversation', 'Keep the rest days and package this as a Plan I can bring back.', 'The Plan contains the dates, activities and steps. Rest days stay open, and missing measurements have not been filled with invented records.\n\nBack in ZeppBridge, review each warm-up, workout and cooldown. Drag a card to swap dates, then decide whether to send the plan to your watch.'],
   es: ['Enviar', 'Revisando los registros', 'El plan está listo', 'Copiar plan', 'Recuperando el plan', 'Volver', 'Conversación de ejemplo', 'Conserva los días de descanso y prepara un Plan para recuperar.', 'El Plan incluye fechas, actividades y pasos. Se conservan los descansos y no se inventan datos ausentes.\n\nEn ZeppBridge puedes revisar el calentamiento, el entrenamiento y la vuelta a la calma, cambiar las fechas y decidir si lo envías al reloj.'],

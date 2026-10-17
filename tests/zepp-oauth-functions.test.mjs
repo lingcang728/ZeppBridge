@@ -8,6 +8,24 @@ import { onRequest as claim } from '../functions/api/zepp/oauth/claim.js';
 import { onRequest as refresh } from '../functions/api/zepp/oauth/refresh.js';
 import { pageLanguage, resultPage, startPage } from '../server/zepp/pages.js';
 
+test('Polish regional tags retain the locale across every authorization page', async () => {
+  for (const tag of ['pl', 'pl-PL,pl;q=0.9,en;q=0.8', 'PL_pl', ' pl-PL']) {
+    const request = new Request('https://example.test?state=not-for-rendering', {
+      headers: { 'Accept-Language': tag },
+    });
+    assert.equal(pageLanguage(request), 'pl');
+    const pages = [startPage(request, 'https://example.test/authorize?a=1&b=2')];
+    for (const state of ['ready', 'denied', 'expired', 'failed']) pages.push(resultPage(state, 400, request));
+    for (const response of pages) {
+      const html = await response.text();
+      assert.match(html, /<html lang="pl">/);
+      assert.doesNotMatch(html, /undefined|not-for-rendering/);
+      assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    }
+  }
+  assert.equal(pageLanguage(new Request('https://example.test', { headers: { 'Accept-Language': 'platform' } })), 'en');
+});
+
 test('Italian regional language tags reach translated authorization and result pages', async () => {
   const request = new Request('https://example.test', { headers: { 'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8' } });
   assert.equal(pageLanguage(request), 'it');
