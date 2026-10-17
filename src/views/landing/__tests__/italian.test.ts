@@ -24,7 +24,7 @@ describe('Italian website and embedded demonstrations', () => {
   it('keeps the film, watch and AI conversation in Italian', () => {
     expect(filmLocale('it')).toBe('it');
     expect(filmCaption('it', 'tagline')).toEqual(film.captions.tagline);
-    expect(filmCaption('it', 'ash').sub).toContain('Undici');
+    expect(filmCaption('it', 'ash').sub).toContain('Dodici');
     expect(filmScript('it')).toEqual(film.script);
     expect(filmScript('it').watchName).toBe('Corsa facile');
     expect(dialogueCopy('it').example).toBe('Conversazione di esempio');
