@@ -139,6 +139,9 @@ export const filmScript = (locale: FilmLocale): FilmScript =>
 export interface PlayerLabels { replay: string; pause: string; play: string; mute: string; soundOn: string; skip: string }
 
 export const FILM_PLAYER_LABELS: Record<LandingLocale, PlayerLabels> = {
+  // TODO(pl): English source copy; translation is tracked in the handoff.
+  pl: { replay: 'Replay', pause: 'Pause', play: 'Play', mute: 'Mute', soundOn: 'Sound on', skip: 'Skip' },
+
   zh: { replay: '重播', pause: '暂停', play: '播放', mute: '静音', soundOn: '开启声音', skip: '跳过' },
   en: { replay: 'Replay', pause: 'Pause', play: 'Play', mute: 'Mute', soundOn: 'Sound on', skip: 'Skip' },
   it: { replay: 'Riavvia', pause: 'Pausa', play: 'Riproduci', mute: 'Disattiva audio', soundOn: 'Attiva audio', skip: 'Salta' },

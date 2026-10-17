@@ -477,7 +477,7 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
 
 /* —— 极简文案表扫描器 ——
  * 不是真 parser：只对付 `key: '…'`、`key: {…}`、`key: (a,b)=>…`、
@@ -880,7 +880,7 @@ const auditLocalePacks = (writePending) => {
   const missingPack = EXPECTED_PACK_LOCALES.filter((l) => !localesFound.includes(l));
   const extraPack = localesFound.filter((l) => !EXPECTED_PACK_LOCALES.includes(l));
   for (const l of missingPack) problems.push(`  缺语言包文件 src/i18n/locales/${l}.ts`);
-  for (const l of extraPack) problems.push(`  多余的语言包文件 ${l}.ts（十语言注册表里没有它）`);
+  for (const l of extraPack) problems.push(`  多余的语言包文件 ${l}.ts（语言注册表里没有它）`);
 
   const allowlist = new Set(
     parseKeyList(join(LOCALES_DIR, 'allowlist-en.txt')).map((e) => `${e.moduleId}.${e.key}`),

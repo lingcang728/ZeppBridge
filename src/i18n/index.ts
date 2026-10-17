@@ -10,7 +10,7 @@ import { computed, ref, type ComputedRef } from 'vue';
  * 「没有复数变格」的代价也没有了。
  *
  * **文案放在哪**：就地定义的部分跟着用它的模块走（`defineMessages` 的
- * zh/en/es 三份），懒加载 chunk 自带本语言；新增的七种语言放进
+ * zh/en/es 三份），懒加载 chunk 自带本语言；其他语言放进
  * `src/i18n/locales/<locale>.ts` 的**语言包**——每语言一个文件，切换语言时
  * 按需 `import()` 进来，不进首屏。就地定义与语言包之间靠 **moduleId** 挂钩：
  * bundle 上带着它属于哪个模块，语言包按模块给「部分文案」做覆盖。
@@ -28,11 +28,11 @@ import { computed, ref, type ComputedRef } from 'vue';
  */
 export type Locale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl';
 
-/** 语言选择器按这个顺序排：先内联三语，再七种语言包语言。 */
+/** 语言选择器按这个顺序排：先内联三语，再语言包语言。 */
 export const LOCALES: readonly Locale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl',
 ];
 
 /** 每种语言在界面上的自称——不翻译，「English」在中文界面里也写 English。 */
@@ -48,11 +48,12 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   'hi-IN': 'हिन्दी',
   fr: 'Français',
   it: 'Italiano',
+  pl: 'Polski',
 };
 
-/** 靠语言包覆盖的七种语言；zh/en/es 的文案就地定义，没有语言包。 */
+/** 靠语言包覆盖的语言；zh/en/es 的文案就地定义，没有语言包。 */
 export const PACK_LOCALES: readonly Locale[] = [
-  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it',
+  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl',
 ];
 
 const isPackLocale = (value: Locale): boolean =>
@@ -73,6 +74,7 @@ export const HTML_LANG: Record<Locale, string> = {
   'hi-IN': 'hi-IN',
   fr: 'fr',
   it: 'it',
+  pl: 'pl',
 };
 
 /**
@@ -92,6 +94,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
   'hi-IN': 'hi-IN',
   fr: 'fr-FR',
   it: 'it-IT',
+  pl: 'pl-PL',
 };
 
 const isLocale = (value: unknown): value is Locale =>
@@ -114,6 +117,7 @@ const BASE_LANGUAGE: Record<string, Locale> = {
   hi: 'hi-IN',
   fr: 'fr',
   it: 'it',
+  pl: 'pl',
 };
 
 const EXACT_LOCALE = new Map<string, Locale>(

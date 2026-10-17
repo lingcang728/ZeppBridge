@@ -80,6 +80,9 @@ describe('browser-language detection', () => {
     [['fr-FR'], 'fr'],
     [['it-IT'], 'it'],
     [['it_CH'], 'it'],
+    [['pl-PL'], 'pl'],
+    [['pl_PL'], 'pl'],
+    [['PL'], 'pl'],
     [['ja-JP'], 'en'],
     [['ko', 'de'], 'de'],
     [[], 'en'],
@@ -97,6 +100,36 @@ describe('browser-language detection', () => {
 });
 
 describe('lazy copy packs', () => {
+  it('loads Polish metadata and remembers Polski across page initialization', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      navigator: { languages: ['pl-PL'] },
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+      },
+    });
+    const document = stubDocument();
+    const mod = await import('../useLandingLocale');
+    const language = mod.useLandingLocale();
+    const pack = (await import('../../views/landing/pl')).default;
+    expect(mod.LOCALE_LABELS.pl).toBe('Polski');
+    language.initializeLocale();
+    await language.ensureLandingCopy('pl');
+    expect(language.locale.value).toBe('pl');
+    expect(language.landingCopyFor('pl')).toEqual(pack.copy);
+    expect(language.localeLoadError.value).toBeNull();
+    expect(document.title).toBe(pack.meta.title);
+    expect(document.documentElement.lang).toBe('pl');
+    language.setLocale('en');
+    language.setLocale('pl');
+    expect(store.get('zeppbridge-landing-locale')).toBe('pl');
+    vi.resetModules();
+    const restarted = (await import('../useLandingLocale')).useLandingLocale();
+    restarted.initializeLocale();
+    expect(restarted.locale.value).toBe('pl');
+  });
+
   it('loads Italian copy and metadata and retains the selected language', async () => {
     const setItem = vi.fn();
     vi.stubGlobal('window', {

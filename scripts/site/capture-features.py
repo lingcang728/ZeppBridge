@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MEDIA = ROOT / '.site-cache/media'
 RAW = ROOT / '.site-cache/capture'
 FIXED = datetime.datetime(2026, 10, 8, 4, 8, tzinfo=datetime.timezone.utc)
-LANGUAGES = ['zh', 'en', 'es', 'fr', 'de', 'nl', 'pt-BR', 'pt-PT', 'ru', 'hi-IN', 'it']
+LANGUAGES = ['zh', 'en', 'es', 'fr', 'de', 'nl', 'pt-BR', 'pt-PT', 'ru', 'hi-IN', 'it', 'pl']
 THEMES = ['light', 'dark']
 SCENES = {'overview': '/', 'sleep': '/sleep', 'workouts': '/workouts', 'ai': '/ai', 'plan': '/ai/plan'}
 ENTRIES = {

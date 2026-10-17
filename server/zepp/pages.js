@@ -27,6 +27,7 @@ export const pageLanguage = (request) => {
   if (/^\s*de\b/i.test(header)) return 'de';
   if (/^\s*fr\b/i.test(header)) return 'fr';
   if (/^\s*it\b/i.test(header)) return 'it';
+  if (/^\s*pl(?:[-_,;\s]|$)/i.test(header)) return 'pl';
   if (/^\s*nl\b/i.test(header)) return 'nl';
   if (/^\s*pt-pt\b/i.test(header)) return 'pt-PT';
   if (/^\s*pt\b/i.test(header)) return 'pt-BR';
@@ -36,6 +37,26 @@ export const pageLanguage = (request) => {
 };
 
 const COPY = {
+  // TODO(pl): English source copy; translation is tracked in the handoff.
+  pl: {
+    brand: 'ZeppBridge',
+    steps: ['Sign in on Zepp’s own page', 'Allow ZeppBridge to read data', 'Back to ZeppBridge'],
+    start: {
+      title: 'Authorize ZeppBridge with your Zepp account',
+      lead: 'ZeppBridge keeps your Zepp health data on your own computer. Next you will see Zepp’s official authorization page (user.zepp.com); your account and password go only to Zepp.',
+      notes: [
+        'If this browser is already signed in to Zepp, it goes straight to the consent step.',
+        'To use a different account (for example Google, Xiaomi, Facebook or Apple sign-in), go back to ZeppBridge, click “Copy authorization link” and open it in a private window.',
+      ],
+      action: 'Continue to Zepp',
+      fine: 'You can disconnect at any time in ZeppBridge settings.',
+    },
+    ready: { title: 'Authorized', lead: 'Go back to ZeppBridge — it finishes connecting by itself within a few seconds. You can close this page.' },
+    denied: { title: 'Authorization cancelled', lead: 'You did not grant access, so ZeppBridge received nothing. You can start again from the app.' },
+    expired: { title: 'This authorization expired', lead: 'An authorization link works once and expires after 10 minutes. Go back to ZeppBridge and click “Authorize” again.' },
+    failed: { title: 'Authorization not completed', lead: 'Zepp did not accept this authorization, so nothing was saved. Go back to the app and try again.' },
+  },
+
   zh: {
     brand: 'ZeppBridge',
     steps: ['在 Zepp 官方页面登录', '同意 ZeppBridge 读取数据', '回到 ZeppBridge'],
@@ -285,7 +306,7 @@ const BADGES = {
 };
 
 const HTML_LANG = {
-  zh: 'zh-CN', en: 'en', es: 'es', de: 'de', fr: 'fr', it: 'it', nl: 'nl',
+  zh: 'zh-CN', en: 'en', es: 'es', de: 'de', fr: 'fr', it: 'it', pl: 'pl', nl: 'nl',
   'pt-BR': 'pt-BR', 'pt-PT': 'pt-PT', ru: 'ru', 'hi-IN': 'hi-IN',
 };
 

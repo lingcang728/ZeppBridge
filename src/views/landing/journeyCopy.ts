@@ -145,6 +145,67 @@ function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | '
 }
 
 export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
+  // TODO(pl): English source copy; translation is tracked in the handoff.
+  pl: {
+  title: ['Everything your wrist remembers.', 'Yours to keep.'],
+  lead: 'Sync from Zepp to this machine. Overview, sleep stages, workout comparison and the training plan sit in one place.',
+  nav: { product: 'Product', motion: 'Design', try: 'Try it', download: 'Download', menu: 'Open menu' },
+  groups: { records: 'Records', ai: 'Send to AI', connect: 'Connect' },
+  links: { overview: 'Overview', sleep: 'Sleep and recovery', workouts: 'Workouts', ask: 'Exchange', plan: 'Training plan', arrange: 'Arrange cards', mcp: 'MCP', api: 'Local API', settings: 'Advanced' },
+  themes: ['Dark', 'Light', 'System'],
+  motionTitle: 'Motion',
+  motionLead: 'From the first press to the last spring. Five interactions, played in sequence.',
+  motions: [
+    { id: 'glass', title: 'Bottom glass', text: 'Press, drag and release. The lens follows your pointer, refracting its background.' },
+    { id: 'poker', title: 'Pick days and flip', text: 'Seven days, one month, six months, and back. Tap the empty space to gather the deck.' },
+    { id: 'seasons', title: 'Four pinned cards', text: 'Add four metrics to an empty home, view them, then remove them one by one.' },
+    { id: 'notes', title: 'Notes and spring', text: 'Open a sleep-duration note, then lift a card and watch it settle when released.' },
+    { id: 'box', title: 'Collection box', text: 'The box opens, takes an item, then closes.' },
+  ],
+  recordsTitle: 'Records',
+  records: [
+    { id: 'overview', title: 'Overview', text: 'Resting heart rate, HRV, sleep score and steps on one page.' },
+    { id: 'sleep', title: 'Sleep', text: 'Duration, score and stages for each night. Unmeasured time stays empty.' },
+    { id: 'workouts', title: 'Workouts', text: 'This session against your own similar distances, with heart rate, pace and the route.' },
+  ],
+  aiTitle: 'Send to AI',
+  aiLead: 'Ask with your records, refine the answer, and bring the plan back. A complete sample conversation in about 45 seconds.',
+  you: 'You', reply: 'Reply',
+  turns: [
+    { prompt: 'Plan the coming week with these sleep and workout records. Mark missing measurements as not provided and keep rest days.', answer: 'I will organise the sleep and workouts in this sample separately. Days without measurements stay “not provided”; missing data is never treated as zero.\n\nThe draft combines an easy run, recovery ride, tempo run and intervals with rest days. Each session has individual steps, including its warm-up and cooldown. You can refine the durations before bringing this draft back for review.' },
+    { prompt: 'Make the first easy run 40 minutes, keeping the warm-up and cooldown.', answer: 'The first easy run is now 40 minutes: a 6-minute warm-up, 28 minutes of easy running and a 6-minute cooldown. The plan card will show these as three separate steps.\n\nThe other sessions and rest days stay as planned. Next, I can package the draft as a Plan so you can inspect each day, swap dates and make further changes in ZeppBridge.' },
+  ],
+  beats: [
+    { id: 'plan', title: 'Week plan', text: 'Seven days, each one a workout or a rest day.' },
+    { id: 'arrange', title: 'Arrange and delete', text: 'Drag to swap two days, or delete a card.' },
+    { id: 'prompt', title: 'Custom prompt', text: 'You can edit the question before it is sent.' },
+    { id: 'types', title: 'Dates and sport types', text: 'Check a date range, then the workout types to include.' },
+  ],
+  settingsTitle: 'Connections and advanced settings',
+  settingsLead: 'These sit on one board. None of them has its own page.',
+  settings: [
+    { id: 'mcp', title: 'MCP', text: 'Other tools read the archive through the local read-only MCP.' },
+    { id: 'api', title: 'Local API', text: 'Bound to 127.0.0.1. Read only.' },
+    { id: 'timezone', title: 'Time zone', text: 'The same record shows its date in the zone you pick.' },
+    { id: 'units', title: 'Units', text: 'Distance and pace use the units you pick.' },
+    { id: 'time', title: 'Time', text: 'The clock format is changed here.' },
+    { id: 'year', title: 'Year', text: 'Open the archive by year.' },
+    { id: 'range', title: 'Range', text: 'Pick the start and end dates to view.' },
+    { id: 'events', title: 'Life events', text: 'Write an event on a day and read it next to sleep and workouts.' },
+  ],
+  demoTitle: 'Click through it yourself.',
+  demoLead: 'A year of fictional records. Changes stay in this sample.',
+  demoStart: 'Click to start', demoReset: 'Reset sample',
+  demoTabs: ['Archive', 'Sleep', 'Workouts', 'Send to AI', 'Plan'],
+  back: 'Back to the intro',
+  downloadTitle: 'Install on this computer',
+  downloadLead: "Free and open source. Download the latest stable release of ZeppBridge 3.",
+  downloadPending: "No compatible installer is currently available",
+  install: 'Run the Windows installer. Drag the macOS app into Applications. Pick a package for Linux.',
+  system: 'System',
+  starOnGithub: 'Star on GitHub',
+},
+
   it: pack({
     title: ['Tutto ciò che il polso ricorda.', 'Tuo per sempre.'],
     lead: 'Sincronizza da Zepp a questo computer. Panoramica, fasi del sonno, confronto degli allenamenti e piano di allenamento in un unico posto.',
