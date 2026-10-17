@@ -22,7 +22,7 @@
 
 [![ZeppBridge overview: pinned metrics, heart rate, steps and sleep](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
-*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers eleven language and region options.*
+*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers twelve language and region options.*
 
 ## From a record to your next step
 

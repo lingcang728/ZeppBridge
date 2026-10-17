@@ -10,14 +10,13 @@ export interface ReelCopy {
 }
 
 const COPY: Record<LandingLocale, ReelCopy> = {
-  // TODO(pl): English source copy; translation is tracked in the handoff.
   pl: {
-    preparing: 'Preparing demo',
-    failed: 'The demo could not continue',
-    retry: 'Retry',
-    replay: 'Replay',
-    pause: 'Pause',
-    play: 'Play',
+    preparing: 'Przygotowywanie wersji demonstracyjnej',
+    failed: 'Nie udało się kontynuować wersji demonstracyjnej',
+    retry: 'Ponów próbę',
+    replay: 'Odtwórz ponownie',
+    pause: 'Wstrzymaj',
+    play: 'Odtwórz',
   },
 
   zh: {

@@ -26,6 +26,7 @@
   <summary xml:lang="ru">Ваши данные Zepp снова в ваших руках</summary>
   <summary xml:lang="hi_IN">आपका Zepp डेटा, वापस आपके हाथों में</summary>
   <summary xml:lang="it">I tuoi dati Zepp, di nuovo nelle tue mani</summary>
+  <summary xml:lang="pl">Twoje dane z Zepp z powrotem w Twoich rękach</summary>
 
   <description>
     <p xml:lang="zh_CN">ZeppBridge 是一款以本地数据为主的 Amazfit 和 Zepp 穿戴设备桌面伴侣。它会将健康记录从 Zepp Cloud 同步到你自己电脑上的 SQLite 数据库，方便你查看、归档和导出。</p>
@@ -149,6 +150,17 @@
     </ul>
     <p xml:lang="it">Le misurazioni mancanti restano tali. Un giorno senza dati dell’orologio appare come un’interruzione nel grafico; una metrica non misurata è indicata come non fornita e non viene mai completata con zero, un valore precedente o una stima.</p>
     <p xml:lang="it">ZeppBridge è un progetto open source indipendente, non un prodotto ufficiale Zepp. I marchi Zepp e Amazfit appartengono ai rispettivi proprietari.</p>
+    <p xml:lang="pl">ZeppBridge to aplikacja komputerowa dla urządzeń ubieralnych Amazfit i Zepp, stawiająca na lokalne przechowywanie danych. Synchronizuje dane zdrowotne z Zepp Cloud do bazy SQLite na Twoim komputerze, gdzie możesz je przeglądać, archiwizować i eksportować.</p>
+    <p xml:lang="pl">Możliwości aplikacji:</p>
+    <ul xml:lang="pl">
+      <li>Długoterminowe trendy tętna, snu, treningów, regeneracji, stresu oraz SpO₂.</li>
+      <li>Uzupełnianie historii sprzed instalacji aplikacji miesiąc po miesiącu, z opcją wstrzymania i wznowienia.</li>
+      <li>Tworzenie migawek całej bazy danych z sumami kontrolnymi i porównaniem liczby zapisów przed przywróceniem.</li>
+      <li>Eksport danych zdrowotnych i treningów do formatów JSON, CSV, GPX oraz FIT, zależnie od typu danych.</li>
+      <li>Wbudowany nieinteraktywny wiersz poleceń (CLI) oraz serwer MCP dla skryptów i lokalnych narzędzi AI. Serwer MCP może odczytywać zapisy i przygotowywać wersje robocze planów treningowych; publikacja planu wymaga wyraźnej zgody użytkownika.</li>
+    </ul>
+    <p xml:lang="pl">Brakujące pomiary pozostają puste. Dzień bez danych z zegarka stanowi przerwę na wykresie, a niezmierzone wskaźniki są oznaczane jako niepodane — nigdy nie są zastępowane zerem, poprzednią wartością ani wartością szacunkową.</p>
+    <p xml:lang="pl">ZeppBridge to niezależny projekt otwartoźródłowy, a nie oficjalny produkt Zepp. Znaki towarowe Zepp i Amazfit należą do ich odpowiednich właścicieli.</p>
   </description>
 
   <launchable type="desktop-id">com.zeppbridge.app.desktop</launchable>

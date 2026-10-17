@@ -13,7 +13,7 @@ const leafPaths = (value: unknown, prefix = ''): string[] =>
     ? Object.entries(value).flatMap(([key, child]) => leafPaths(child, `${prefix}.${key}`))
     : [prefix];
 
-describe('Polish website integration (copy awaiting translation)', () => {
+describe('Polish website integration', () => {
   it('provides the complete landing, chapter and journey shapes', () => {
     expect(leafPaths(polish.copy).sort()).toEqual(leafPaths(COPY.en).sort());
     expect(leafPaths(JOURNEY.pl).sort()).toEqual(leafPaths(JOURNEY.en).sort());
@@ -31,5 +31,11 @@ describe('Polish website integration (copy awaiting translation)', () => {
     expect(leafPaths(reelCopy('pl')).sort()).toEqual(leafPaths(reelCopy('en')).sort());
     expect(leafPaths(dialogueCopy('pl')).sort()).toEqual(leafPaths(dialogueCopy('en')).sort());
     expect(dialogueCopy('pl').finalTurn.answer).toBeTruthy();
+    expect(polish.meta.title).toContain('Twoje dane z zegarka');
+    expect(JOURNEY.pl.nav.download).toBe('Pobierz');
+    expect(reelCopy('pl').retry).toBe('Ponów próbę');
+    expect(filmPlayerLabels('pl').play).toBe('Odtwórz');
+    expect(filmScript('pl')).not.toEqual(filmScript('en'));
+    expect(dialogueCopy('pl').finalTurn.answer).not.toBe(dialogueCopy('en').finalTurn.answer);
   });
 });

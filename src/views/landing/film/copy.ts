@@ -20,7 +20,7 @@ const zh = {
   deck: { title: '专注一张，或随心铺开。' },
   lines: { title: '随手一拨，自有分寸。' },
   night: { title: '一键入夜，覆盖全局。' },
-  ash: { title: '弹指之间，换一种语言。', sub: "支持 11 种语言和地区选项。" },
+  ash: { title: '弹指之间，换一种语言。', sub: "支持 12 种语言和地区选项。" },
   cloud: { title: '云上有的，桌上都有。', sub: '登录 Zepp 账号，记录同步到这台电脑。' },
   autosync: { title: '你睡你的，它同步它的。', sub: '关、15、30、60 分钟，自动同步。' },
   devices: { title: '每一块表，都认得。', sub: '自动识别；认错了，亲手指认。' },
@@ -40,7 +40,7 @@ const zh = {
   display: { title: '公里或英里，12 或 24，大小随心。' },
   backup: { title: '快照在手，进退有据。', sub: '数据库快照，一键生成，随时恢复。' },
   api: { title: '本机 API，只对你开门。', sub: '只绑 127.0.0.1，只读，要令牌。' },
-  free: { title: '免费，开源，处处可用。', sub: "Windows · macOS · Linux · 支持 11 种语言和地区选项" },
+  free: { title: '免费，开源，处处可用。', sub: "Windows · macOS · Linux · 支持 12 种语言和地区选项" },
   tryIt: { title: 'zeppbridge.com' },
   pile: { title: '叠成一叠，收进箱里。' },
   planIntro: { title: '训练计划，交给 AI。' },
@@ -65,7 +65,7 @@ const en: Record<CaptionKey, Caption> = {
   deck: { title: 'Focus on one. Or spread them all.' },
   lines: { title: 'Toss it around. It always comes back.' },
   night: { title: 'One tap. Night falls everywhere.' },
-  ash: { title: 'One snap. Another language.', sub: "Eleven language and region options." },
+  ash: { title: 'One snap. Another language.', sub: "Twelve language and region options." },
   cloud: { title: "If it's in the cloud, it's on your desk.", sub: 'Sign in with Zepp and your records sync to this computer.' },
   autosync: { title: 'You sleep. It syncs.', sub: 'Off, 15, 30 or 60 minutes.' },
   devices: { title: 'Every watch you wear, recognised.', sub: 'Detected for you, and yours to correct.' },
@@ -85,7 +85,7 @@ const en: Record<CaptionKey, Caption> = {
   display: { title: 'Kilometres or miles. 12 or 24 hours. Any size you like.' },
   backup: { title: 'Snapshots to step back to.', sub: 'Save the database in one click. Restore whenever you need.' },
   api: { title: 'A local API that answers only you.', sub: 'Bound to 127.0.0.1, read-only, token required.' },
-  free: { title: 'Free. Open source. Everywhere.', sub: "Windows · macOS · Linux · Eleven language and region options" },
+  free: { title: 'Free. Open source. Everywhere.', sub: "Windows · macOS · Linux · Twelve language and region options" },
   tryIt: { title: 'zeppbridge.com' },
   pile: { title: 'Stack them. Toss them in.' },
   planIntro: { title: 'Your training plan, by AI.' },
@@ -139,8 +139,7 @@ export const filmScript = (locale: FilmLocale): FilmScript =>
 export interface PlayerLabels { replay: string; pause: string; play: string; mute: string; soundOn: string; skip: string }
 
 export const FILM_PLAYER_LABELS: Record<LandingLocale, PlayerLabels> = {
-  // TODO(pl): English source copy; translation is tracked in the handoff.
-  pl: { replay: 'Replay', pause: 'Pause', play: 'Play', mute: 'Mute', soundOn: 'Sound on', skip: 'Skip' },
+  pl: { replay: 'Odtwórz ponownie', pause: 'Wstrzymaj', play: 'Odtwórz', mute: 'Wycisz', soundOn: 'Włącz dźwięk', skip: 'Pomiń' },
 
   zh: { replay: '重播', pause: '暂停', play: '播放', mute: '静音', soundOn: '开启声音', skip: '跳过' },
   en: { replay: 'Replay', pause: 'Pause', play: 'Play', mute: 'Mute', soundOn: 'Sound on', skip: 'Skip' },

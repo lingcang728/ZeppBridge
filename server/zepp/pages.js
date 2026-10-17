@@ -37,24 +37,23 @@ export const pageLanguage = (request) => {
 };
 
 const COPY = {
-  // TODO(pl): English source copy; translation is tracked in the handoff.
   pl: {
     brand: 'ZeppBridge',
-    steps: ['Sign in on Zepp’s own page', 'Allow ZeppBridge to read data', 'Back to ZeppBridge'],
+    steps: ['Zaloguj się na oficjalnej stronie Zepp', 'Zezwól ZeppBridge na odczyt danych', 'Wróć do ZeppBridge'],
     start: {
-      title: 'Authorize ZeppBridge with your Zepp account',
-      lead: 'ZeppBridge keeps your Zepp health data on your own computer. Next you will see Zepp’s official authorization page (user.zepp.com); your account and password go only to Zepp.',
+      title: 'Autoryzuj ZeppBridge swoim kontem Zepp',
+      lead: 'ZeppBridge przechowuje Twoje dane zdrowotne z Zepp na Twoim własnym komputerze. W kolejnym kroku otworzy się oficjalna strona autoryzacji Zepp (user.zepp.com); Twój login i hasło trafiają wyłącznie do Zepp.',
       notes: [
-        'If this browser is already signed in to Zepp, it goes straight to the consent step.',
-        'To use a different account (for example Google, Xiaomi, Facebook or Apple sign-in), go back to ZeppBridge, click “Copy authorization link” and open it in a private window.',
+        'Jeśli w tej przeglądarce jesteś już zalogowany do Zepp, od razu przejdziesz do kroku zatwierdzenia zgody.',
+        'Aby użyć innego konta (np. logowania przez Google, Xiaomi, Facebook lub Apple): wróć do ZeppBridge, kliknij „Kopiuj link autoryzacyjny” i otwórz go w oknie incognito.',
       ],
-      action: 'Continue to Zepp',
-      fine: 'You can disconnect at any time in ZeppBridge settings.',
+      action: 'Przejdź do Zepp',
+      fine: 'W każdej chwili możesz rozłączyć konto w ustawieniach ZeppBridge.',
     },
-    ready: { title: 'Authorized', lead: 'Go back to ZeppBridge — it finishes connecting by itself within a few seconds. You can close this page.' },
-    denied: { title: 'Authorization cancelled', lead: 'You did not grant access, so ZeppBridge received nothing. You can start again from the app.' },
-    expired: { title: 'This authorization expired', lead: 'An authorization link works once and expires after 10 minutes. Go back to ZeppBridge and click “Authorize” again.' },
-    failed: { title: 'Authorization not completed', lead: 'Zepp did not accept this authorization, so nothing was saved. Go back to the app and try again.' },
+    ready: { title: 'Autoryzacja zakończona pomyślnie', lead: 'Wróć do ZeppBridge — połączenie zostanie nawiązane automatycznie w ciągu kilku sekund. Możesz już zamknąć tę stronę.' },
+    denied: { title: 'Autoryzacja została anulowana', lead: 'Dostęp nie został przyznany, więc ZeppBridge nie otrzymał żadnych danych. Możesz rozpocząć proces ponownie z poziomu aplikacji.' },
+    expired: { title: 'Autoryzacja wygasła', lead: 'Link autoryzacyjny jest jednorazowy i wygasa po 10 minutach. Wróć do ZeppBridge i kliknij ponownie „Autoryzuj”.' },
+    failed: { title: 'Autoryzacja nie powiodła się', lead: 'Serwis Zepp nie zaakceptował tej autoryzacji, więc nic nie zostało zapisane. Wróć do aplikacji i spróbuj ponownie.' },
   },
 
   zh: {
