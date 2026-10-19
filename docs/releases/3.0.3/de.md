@@ -1,0 +1,6 @@
+- Added: **Datumsformat folgt der Systemregion**. Datumsreihenfolge und 12-/24-Stunden-Format richten sich nach dem regionalen Format des Betriebssystems, selbst bei englischer Oberfläche; anpassbar unter Einstellungen → Anzeige und Sprache.
+- Improved: **Klarere Hinweise zu fehlenden Daten bei offizieller Autorisierung**. Trainingsliste, Geräte und Ernährungskarte weisen nun darauf hin, dass Radfahren und weitere Trainings, die Geräteerkennung sowie Ernährungsprotokolle „Erweiterte Daten“ erfordern.
+- Improved: **Weitere Uhren werden erkannt**. Modellnummern für Bip 6, Balance 3, Active 2 Square, Active 3 Premium, T-Rex Ultra 2, Cheetah Pro, Balance Ultra und Helio Strap Pro hinzugefügt.
+- Improved: **Versionshinweise zerfallen zu Asche**. Beim Klick auf „Verstanden“ zerfällt die Karte ausgehend von der Schaltfläche zu Asche und kehrt zur Startseite zurück.
+- Fixed: **Unvollständige manuelle SpO₂-Messungen**. Tage mit vielen Messwerten stoppen nicht mehr nach der ersten Seite; die verbleibenden Daten werden nun vollständig abgerufen.
+- Fixed: **Schlaf und Herzfrequenz in Sommerzeit-Regionen um eine Stunde verschoben**. Meldet die Uhr ihre Zeitzone ohne Sommerzeit-Stunde, wird diese anhand der Gerätezeitzone korrigiert; beim ersten Start nach dem Update werden lokale Daten im Hintergrund neu aufbereitet.

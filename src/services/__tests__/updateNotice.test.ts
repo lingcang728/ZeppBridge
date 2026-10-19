@@ -62,7 +62,7 @@ describe('release notes after a successful restart', () => {
     restoreUpdateNotice(BUNDLED_VERSION);
     expect(updateNotice.receipt?.from).toBe('');
     // 正文不再塞进回执：显示时按界面语言从打包的文件里取。
-    expect(await loadBundledNotes(BUNDLED_VERSION, 'en')).toContain('Polish');
+    expect(await loadBundledNotes(BUNDLED_VERSION, 'en')).toMatch(/^- (Added|Improved|Fixed): \*\*/m);
     acknowledgeUpdate();
     prepareUpdateNotice();
     restoreUpdateNotice(BUNDLED_VERSION);
