@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { displayDateTimeFormatter, parseDisplayDate, setDateOrder, setTimeFormat } from '../dateTime';
+import { displayDateTimeFormatter, parseDisplayDate, regionDateOrder, setDateOrder, setSystemRegion, setTimeFormat } from '../dateTime';
 import { formatTime } from '../format';
 import { setLocale } from '../../i18n';
 
@@ -47,5 +47,47 @@ describe('local display policy', () => {
   ])('renders absolute timestamps in %s at %s', (timeZone, input, expected) => {
     setTimeFormat('24h');
     expect(displayDateTimeFormatter({ timeZone, hour: '2-digit', minute: '2-digit' }).format(parseDisplayDate(input))).toBe(expected);
+  });
+});
+
+describe('「跟随系统地区」跟的是操作系统的区域格式', () => {
+  afterEach(() => {
+    setSystemRegion(null);
+    setDateOrder('regional');
+    setTimeFormat('regional');
+    setLocale('en');
+  });
+  const day = new Date(2026, 9, 19, 16, 5);
+  const numeric = { year: 'numeric', month: '2-digit', day: '2-digit' } as const;
+  it('英文界面 + 葡萄牙区域：日/月/年、24 小时制', () => {
+    setLocale('en');
+    setSystemRegion('pt_PT.UTF-8');
+    const date = displayDateTimeFormatter(numeric).format(day);
+    expect(date.indexOf('19')).toBeLessThan(date.indexOf('10'));
+    expect(displayDateTimeFormatter({ hour: 'numeric', minute: '2-digit' }).format(day)).toBe('16:05');
+  });
+  it('星期仍跟界面语言', () => {
+    setLocale('zh');
+    setSystemRegion('de-DE');
+    expect(displayDateTimeFormatter({ weekday: 'long' }).format(day)).toMatch(/星期|周一/);
+  });
+  it('区域和界面语言顺序一样时照旧；探不到区域时退回界面语言', () => {
+    setLocale('en');
+    setSystemRegion('en-US');
+    expect(displayDateTimeFormatter(numeric).format(day)).toBe('10/19/2026');
+    setSystemRegion(null);
+    expect(displayDateTimeFormatter(numeric).format(day)).toBe('10/19/2026');
+  });
+  it('手动选的顺序和时制压过系统区域', () => {
+    setSystemRegion('pt-PT');
+    setDateOrder('mdy');
+    setTimeFormat('12h');
+    expect(displayDateTimeFormatter(numeric).format(day)).toBe('10/19/2026');
+    expect(displayDateTimeFormatter({ hour: 'numeric', minute: '2-digit' }).format(day)).toMatch(/4:05/);
+  });
+  it('区域格式能识别出顺序', () => {
+    expect(regionDateOrder('en-US')).toBe('mdy');
+    expect(regionDateOrder('pt-PT')).toBe('dmy');
+    expect(regionDateOrder('zh-CN')).toBe('ymd');
   });
 });

@@ -7,6 +7,8 @@ import { useSyncController } from '../composables/useSyncController';
 import { useMessages } from '../i18n';
 import { officialOnlyNoteMessages as messages } from './OfficialOnlyNote.i18n';
 
+/* topic=workouts：运动列表上那一句，只说运动；默认是概览 / 身体状态页的总说明。 */
+const props = defineProps<{ topic?: 'overview' | 'workouts' }>();
 const t = useMessages(messages);
 const { appStatus } = useSyncController();
 const visible = computed(() => appStatus.value?.data_source === 'official');
@@ -15,7 +17,7 @@ const visible = computed(() => appStatus.value?.data_source === 'official');
 <template>
   <p v-if="visible" class="official-note" role="note">
     <Icon name="info" :size="15" />
-    <span>{{ t.text }}</span>
+    <span>{{ props.topic === 'workouts' ? t.workouts : t.text }}</span>
     <RouterLink class="pill-button" to="/settings/account">{{ t.action }}</RouterLink>
   </p>
 </template>

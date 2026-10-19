@@ -8,6 +8,7 @@ mod login;
 mod official;
 mod status;
 mod sync;
+mod system;
 mod training_plan;
 
 use crate::ipc_error::AppError;
@@ -198,6 +199,7 @@ pub(crate) use sync::{
     retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
     start_incremental_sync,
 };
+pub(crate) use system::system_region_locale;
 
 pub(crate) use training_plan::{
     training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,

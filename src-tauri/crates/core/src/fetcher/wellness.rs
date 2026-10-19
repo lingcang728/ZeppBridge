@@ -221,14 +221,10 @@ impl DataFetcher {
                 let to = slice.end_utc.timestamp_millis();
                 let limit = wellness_request_limit(surface);
                 let outcome = match surface {
-                    ProbeSurface::V2Events => {
-                        self.connector
-                            .fetch_events(event_type, sub_type, from, to, limit, true)
-                            .await
-                    }
-                    ProbeSurface::UserEvents => {
-                        self.connector
-                            .fetch_user_events(event_type, sub_type, from, to, limit, true)
+                    ProbeSurface::V2Events
+                    | ProbeSurface::UserEvents
+                    | ProbeSurface::FileInfoEvents => {
+                        self.fetch_wellness_by_time(surface, event_type, sub_type, from, to, limit)
                             .await
                     }
                     ProbeSurface::UserEventsDay => match slice.local_days(time_zone) {
@@ -251,17 +247,6 @@ impl DataFetcher {
                     ProbeSurface::WeightRecords => Err(ZeppBridgeError::Unavailable(
                         "体重不是事件流，不能从这里取".into(),
                     )),
-                    ProbeSurface::FileInfoEvents => {
-                        self.connector
-                            .fetch_file_info_events(
-                                event_type,
-                                sub_type.unwrap_or("real_data"),
-                                from,
-                                to,
-                                limit,
-                            )
-                            .await
-                    }
                     ProbeSurface::BloodPressureDays => {
                         self.connector
                             .fetch_blood_pressure_days(
@@ -278,8 +263,29 @@ impl DataFetcher {
                     }
                 };
                 match outcome {
+                    Ok(payload)
+                        if surface.pages_by_time() && wellness_page_hits_cap(&payload, limit) =>
+                    {
+                        // 满页 = 被截断了：按这一页覆盖到的时间，把窗口里没覆盖的部分接着要。
+                        let (pages, gaps) =
+                            continue_capped_page_with(&payload, from, to, limit, |lo, hi| {
+                                self.fetch_wellness_by_time(
+                                    surface, event_type, sub_type, lo, hi, limit,
+                                )
+                            })
+                            .await?;
+                        let reason =
+                            (!gaps.is_empty()).then(|| format!("{label}: {}", gaps.join("; ")));
+                        for (page, body) in std::iter::once(payload).chain(pages).enumerate() {
+                            let mut record =
+                                fetched_wellness_record(label, surface, &slice, body, limit, page);
+                            record.incomplete = reason.is_some();
+                            record.incomplete_reason = reason.clone();
+                            records.push(record);
+                        }
+                    }
                     Ok(payload) => records.push(fetched_wellness_record(
-                        label, surface, &slice, payload, limit,
+                        label, surface, &slice, payload, limit, 0,
                     )),
                     Err(error) if is_abort_error(&error) => return Err(error),
                     Err(error) => {
@@ -339,18 +345,28 @@ pub(super) fn wellness_request_limit(surface: ProbeSurface) -> i64 {
 
 /// Keep the items that arrived, but do not treat a truncated page as the
 /// whole window. The server stops at `limit` instead of paging.
+///
+/// `page` 0 is the slice's own request; later pages are the follow-ups for a
+/// capped slice and get a `:p<n>` suffix — a page number, never a millisecond
+/// timestamp, so the same data re-fetched lands on the same key.
 pub(super) fn fetched_wellness_record(
     label: &str,
     surface: ProbeSurface,
     slice: &FetchWindow,
     payload: Value,
     limit: i64,
+    page: usize,
 ) -> FetchedRecord {
     let truncated = wellness_page_hits_cap(&payload, limit);
+    let suffix = if page == 0 {
+        String::new()
+    } else {
+        format!(":p{page}")
+    };
     let mut record = FetchedRecord::from_raw(RawRecord {
         stream: "wellness".into(),
         source_key: format!(
-            "wellness:{label}:{}:{}:{}",
+            "wellness:{label}:{}:{}:{}{suffix}",
             surface.as_str(),
             slice.start_day(),
             slice.end_day()
@@ -397,4 +413,144 @@ pub(super) fn payload_items(payload: &Value) -> Vec<Value> {
         return items.clone();
     }
     Vec::new()
+}
+
+/// Follow-up requests one capped slice may make. Blood oxygen at one reading a
+/// minute is ~1440 items a day, so a 3-day slice needs about five pages; the
+/// bound only stops a misbehaving server from looping.
+pub(super) const WELLNESS_CONTINUATION_PAGES: usize = 24;
+
+impl ProbeSurface {
+    /// Surfaces addressed by an epoch-millisecond window, so a capped page can
+    /// be continued by asking for the part of the window it did not cover.
+    pub(super) fn pages_by_time(self) -> bool {
+        matches!(
+            self,
+            Self::V2Events | Self::UserEvents | Self::FileInfoEvents
+        )
+    }
+}
+
+impl DataFetcher {
+    async fn fetch_wellness_by_time(
+        &self,
+        surface: ProbeSurface,
+        event_type: &str,
+        sub_type: Option<&str>,
+        from: i64,
+        to: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        match surface {
+            ProbeSurface::V2Events => {
+                self.connector
+                    .fetch_events(event_type, sub_type, from, to, limit, true)
+                    .await
+            }
+            ProbeSurface::UserEvents => {
+                self.connector
+                    .fetch_user_events(event_type, sub_type, from, to, limit, true)
+                    .await
+            }
+            ProbeSurface::FileInfoEvents => {
+                self.connector
+                    .fetch_file_info_events(
+                        event_type,
+                        sub_type.unwrap_or("real_data"),
+                        from,
+                        to,
+                        limit,
+                    )
+                    .await
+            }
+            _ => Err(ZeppBridgeError::Unavailable(
+                "这个接口不按时间窗口翻页".into(),
+            )),
+        }
+    }
+}
+
+/// The span of epoch-millisecond timestamps in a page. Second-resolution
+/// values are scaled up so they compare with the request window.
+pub(super) fn page_millis_span(payload: &Value) -> Option<(i64, i64)> {
+    payload_items(payload)
+        .iter()
+        .filter_map(|item| match item.get("timestamp")? {
+            Value::Number(number) => number.as_i64(),
+            Value::String(text) => text.trim().parse().ok(),
+            _ => None,
+        })
+        .map(|value| {
+            if value < 100_000_000_000 {
+                value * 1000
+            } else {
+                value
+            }
+        })
+        .fold(None, |span, value| match span {
+            None => Some((value, value)),
+            Some((low, high)) => Some((low.min(value), high.max(value))),
+        })
+}
+
+/// The parts of `[from, to]` a capped page left out. The server truncates a
+/// window from one end — which end is not documented — so both sides outside
+/// the page's span are asked for; the side it did cover comes back empty.
+fn uncovered(payload: &Value, from: i64, to: i64) -> Option<Vec<(i64, i64)>> {
+    let (low, high) = page_millis_span(payload)?;
+    let mut ranges = Vec::new();
+    if low > from {
+        ranges.push((from, low - 1));
+    }
+    if high < to {
+        ranges.push((high + 1, to));
+    }
+    // A full page that already spans the whole window cannot be narrowed.
+    (!ranges.is_empty()).then_some(ranges)
+}
+
+/// Continue a capped page until the window is covered. Returns the extra
+/// pages and, for any part that still could not be fetched, a reason — those
+/// keep the slice marked incomplete so backfill retries it instead of the
+/// stream looking complete while missing most of the window (2026-10 report:
+/// "individual SpO2 readings after 09-24 are missing").
+pub(super) async fn continue_capped_page_with<F, Fut>(
+    first: &Value,
+    from: i64,
+    to: i64,
+    limit: i64,
+    mut fetch: F,
+) -> Result<(Vec<Value>, Vec<String>)>
+where
+    F: FnMut(i64, i64) -> Fut,
+    Fut: std::future::Future<Output = Result<Value>>,
+{
+    let mut pages = Vec::new();
+    let mut gaps = Vec::new();
+    let Some(mut queue) = uncovered(first, from, to) else {
+        gaps.push(format!("response reached the {limit}-item limit"));
+        return Ok((pages, gaps));
+    };
+    while let Some((low, high)) = queue.pop() {
+        if pages.len() >= WELLNESS_CONTINUATION_PAGES {
+            gaps.push(format!("{low}..{high}: page budget exhausted"));
+            continue;
+        }
+        match fetch(low, high).await {
+            Ok(page) => {
+                if wellness_page_hits_cap(&page, limit) {
+                    match uncovered(&page, low, high) {
+                        Some(rest) => queue.extend(rest),
+                        None => gaps.push(format!(
+                            "{low}..{high}: response reached the {limit}-item limit"
+                        )),
+                    }
+                }
+                pages.push(page);
+            }
+            Err(error) if is_abort_error(&error) => return Err(error),
+            Err(error) => gaps.push(format!("{low}..{high}: {}", error.user_message())),
+        }
+    }
+    Ok((pages, gaps))
 }

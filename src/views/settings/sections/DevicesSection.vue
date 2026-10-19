@@ -113,7 +113,7 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
           <span class="s-row-title">{{ a.advanced(needsReauth ? a.stReauth : a.stOff) }}</span>
           <span class="s-row-sub">{{ t.authWebSub }}</span>
         </div>
-        <div v-else class="s-row-main"><span class="s-row-sub">{{ t.noDevices }}</span></div>
+        <div v-else class="s-row-main"><span class="s-row-sub">{{ appStatus?.data_source === 'official' ? t.noDevicesOfficial : t.noDevices }}</span></div>
       </div>
       <template v-else>
         <component

@@ -327,3 +327,26 @@ AI）经用户逐条确认后的结论。只记结论，不贴原文；具体待
   一条日期在窗口前一天的占位训练」，再立刻重推前一个窗口把占位覆盖掉——这依赖服务端
   不校验越界日期的**未定义行为**，封装在 `training_plan::v2::clear_future_window` 一处。
 - 用户在 Zepp App 里手建的计划从不受我们推送影响。
+
+## 13. 批次 2「数据要对」的结论（2026-10-19，3.0.3）
+
+来源：反馈库里「运动只有跑步 / 步行」「设备认不出」「饮食卡空」「血氧缺」「时间差一小时」几类报告。
+
+- **这几类报告的共同根因是「只连了官方授权」**（反馈里 `device_status: not_configured`）。
+  对照开发库 09-01 至 09-20 的同一时段：官方运动接口只回跑步、步行等少数类型，骑行、
+  力量、球类只有旧连接器有；设备型号也只有旧连接器的 `deviceSource` 能认。所以不是 bug，
+  界面改为明说（运动列表、设备、首页来源条、饮食卡、「为什么有些数据没有？」），
+  **不许拿别的东西填空**。
+- **单次血氧缺一截**：本地复现不出。防御性修正：按时间分页的面（V2Events / UserEvents /
+  FileInfoEvents）一页到上限时，按这一页实际覆盖的时间段把窗口剩下的部分续拉
+  （`fetcher/wellness.rs::continue_capped_page_with`，最多 24 页）；续拉失败只把这一片
+  标成 incomplete，不报假成功。是不是这个原因，要等用户回诊断。
+- **夏令时差一小时（假设，没有夏令时地区的样本）**：band 报文里的 `tz` 在夏令时期间
+  有时等于标准时偏移。`normalizer/band_items.rs::effective_band_offset` 只在
+  「设备时区当天确实处于夏令时」且「`tz` 恰好等于标准偏移」时补上那一小时，其余原样。
+  已 bump `NORMALIZER_REVISION`（v36-band-dst）。拿到真实样本后要回来核对。
+- **日期格式「跟随系统地区」跟的是操作系统的区域格式**，不是界面语言：
+  `system_region_locale` 命令读 Windows `GetUserDefaultLocaleName` / macOS `AppleLocale` /
+  Linux `LC_TIME`，界面语言与区域的日期顺序不一致时用「语言-区域」混合 locale。
+- **设备目录**按「≥2 份独立报告、零异议」新收 8 个编号，裁决记录在
+  `scripts/assets/build-device-catalog.py`；3:1、2:2 的不收（多数票不算数）。

@@ -699,3 +699,33 @@ fn epoch_day_follows_dst_zones_by_name() {
         Some("2026-07-01")
     );
 }
+
+/// 夏令时期间摘要 `tz` 若是标准时偏移，就按设备时区补上那一小时；`tz` 已经带夏令时、
+/// 不过夏令时的时区、或者不知道设备时区，都原样不动（2026-10「4 点显示成 5 点」）。
+#[test]
+fn band_offset_adds_the_missing_daylight_hour_only_when_tz_is_the_standard_offset() {
+    use crate::normalizer::band_items::effective_band_offset;
+    let day = |text: &str| NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap();
+    let lisbon = Some("Europe/Lisbon");
+    assert_eq!(effective_band_offset(0, day("2026-08-01"), lisbon), 3600);
+    assert_eq!(effective_band_offset(3600, day("2026-08-01"), lisbon), 3600);
+    assert_eq!(effective_band_offset(0, day("2026-01-15"), lisbon), 0);
+    assert_eq!(effective_band_offset(0, day("2026-08-01"), None), 0);
+    assert_eq!(
+        effective_band_offset(0, day("2026-08-01"), Some("Not/AZone")),
+        0
+    );
+    assert_eq!(
+        effective_band_offset(28_800, day("2026-08-01"), Some("Asia/Shanghai")),
+        28_800
+    );
+    // 南半球：1 月是夏令时，标准偏移取两者较小的那个。
+    assert_eq!(
+        effective_band_offset(36_000, day("2026-01-15"), Some("Australia/Sydney")),
+        39_600
+    );
+    assert_eq!(
+        effective_band_offset(36_000, day("2026-07-15"), Some("Australia/Sydney")),
+        36_000
+    );
+}

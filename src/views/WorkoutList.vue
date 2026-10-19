@@ -15,6 +15,7 @@ import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber 
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 
 const messages = defineMessages(
   {
@@ -104,6 +105,7 @@ useRevisionReload(() => void loadList());
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
     <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <OfficialOnlyNote topic="workouts" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />

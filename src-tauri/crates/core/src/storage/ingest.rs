@@ -212,7 +212,8 @@ impl Database {
                 }
             }
             "sleep" => {
-                let band = Normalizer::normalize_band_data(payload)?;
+                let zone = self.device_time_zone().ok().flatten();
+                let band = Normalizer::normalize_band_data_in_zone(payload, zone.as_deref())?;
                 if band.sleep_sessions.is_empty()
                     && band.heart_rate_samples.is_empty()
                     && band.daily_metrics.is_empty()

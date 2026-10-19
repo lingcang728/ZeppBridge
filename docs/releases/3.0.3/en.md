@@ -1,0 +1,6 @@
+- Added: **Dates follow your system region**. Date order and 12/24-hour time follow your operating system’s regional format, even with an English interface; change them in Settings → Display and language.
+- Improved: **Clear about what official authorization lacks**. The workout list, devices and food card now say that cycling and other workouts, device identification and food logs need Advanced data.
+- Improved: **More watches recognized**. Added model codes for Bip 6, Balance 3, Active 2 Square, Active 3 Premium, T-Rex Ultra 2, Cheetah Pro, Balance Ultra and Helio Strap Pro.
+- Improved: **Release notes dissolve into ash**. Tap “Got it” and the card crumbles away from the button, back to the home page.
+- Fixed: **Missing spot SpO₂ readings**. Days with many readings no longer stop after the first page; the rest are fetched too.
+- Fixed: **Sleep and heart rate an hour off during daylight saving time**. When the watch reports its time zone without the DST hour, it’s added back from the device’s time zone; the first launch after updating re-processes local data in the background.

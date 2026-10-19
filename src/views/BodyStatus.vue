@@ -29,11 +29,15 @@ import { metricInfo } from '../lib/metricInfo';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
+import { useSyncController } from '../composables/useSyncController';
 import { bodyStatusMessages as messages } from './BodyStatus.i18n';
 import { buildBodyCards, convertSeries, groupOf, METRICS, type CardGroup } from './body/bodyCards';
 import { useBodyCharts } from '../composables/useBodyCharts';
 
 const t = useMessages(messages);
+/* 只连官方授权时没有饮食数据：空的饮食组要说清楚是缺连接，不是没记过。 */
+const { appStatus } = useSyncController();
+const officialOnly = computed(() => appStatus.value?.data_source === 'official');
 
 
 const rangeDays = useTrendRange();
@@ -240,7 +244,7 @@ const groups = computed(() => ({
       </SectionGroup>
       <SectionGroup :title="groups.intake.title" :summary="groups.intake.summary" icon="manual-entry" tone="training">
           <p v-if="!intakeCards.length" class="inline-alert" role="status" :data-focus-keys="groupKeys.intake">
-            <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
+            <Icon name="info" :size="14" />{{ officialOnly ? t.intakeNeedsAdvanced : t.intakeGroupEmpty }}
           </p>
           <template v-else>
             <section v-if="macroChartOption" class="surface-card day-card" :aria-label="t.macroTitle">

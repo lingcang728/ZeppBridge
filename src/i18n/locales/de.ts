@@ -259,10 +259,8 @@ export default {
       title: 'Warum fehlen manche Daten?',
       lead: 'ZeppBridge hat zwei Verbindungen, und sie liefern nicht dieselben Daten.',
       officialName: 'Offizielle Autorisierung',
-      officialHas: 'Herzfrequenz|Schlaf|Schritte|Trainings|PAI|Gewicht',
       officialLacks: 'Kann ältere Historie nicht nachladen',
       advancedName: 'Erweiterte Daten',
-      advancedHas: 'HRV|Blutsauerstoff|Ganztägiger Stress|Bereitschaft|Charge|Trainingsbelastung|Ernährung|Ältere Historie',
       advancedLogin: 'Nur Zepp-E-Mail oder -Telefonnummer + Passwort',
       advancedNoThirdParty: 'Google, Apple, WeChat, Xiaomi und andere Drittanbieter werden nicht unterstützt',
       footer: 'Ist nur die offizielle Autorisierung verbunden, kommt nichts aus der Spalte „Erweiterte Daten“ an. Das ist eine Einschränkung der offiziellen Schnittstelle, kein Fehler von ZeppBridge. Wir haben das bei Zepp (Huami) gemeldet, bisher aber keine Antwort erhalten.',
@@ -281,7 +279,6 @@ export default {
       note: 'Änderung',
     },
     'components/OfficialOnlyNote': {
-      text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingsbelastung bietet die offizielle API nicht an – verbinde dafür „Erweiterte Daten".',
       action: 'Verbinden',
     },
     // ── views/Settings ──

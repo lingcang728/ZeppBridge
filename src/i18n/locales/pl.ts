@@ -831,10 +831,8 @@ export default {
   title: 'Dlaczego brakuje części danych?',
   lead: 'ZeppBridge ma dwa połączenia i nie zwracają one tych samych danych.',
   officialName: 'Oficjalna autoryzacja',
-  officialHas: 'Tętno|Sen|Kroki|Treningi|PAI|Waga',
   officialLacks: 'Nie można pobrać wcześniejszej historii',
   advancedName: 'Dane zaawansowane',
-  advancedHas: 'HRV|Natlenienie krwi|Całodobowy stres|Gotowość|Charge|Obciążenie treningowe|Wpisy żywieniowe|Wcześniejsza historia',
   advancedLogin: 'Tylko e-mail lub numer telefonu Zepp + hasło',
   advancedNoThirdParty: 'Logowanie przez Google, Apple, WeChat, Xiaomi ani inne usługi zewnętrzne nie działa',
   footer: 'Przy samej oficjalnej autoryzacji nic z kolumny „Dane zaawansowane” nie jest pobierane — to ograniczenie oficjalnego kanału, a nie błąd ZeppBridge. Zgłosiliśmy to do Zepp (Huami), ale dotąd nie otrzymaliśmy odpowiedzi.',
@@ -854,7 +852,6 @@ export default {
 },
 // Source: src/components/OfficialOnlyNote.i18n.ts
 "components/OfficialOnlyNote": {
-    text: 'Podłączono tylko oficjalną autoryzację Zepp: synchronizowane są tętno, sen, kroki, treningi, PAI i waga. Oficjalne API nie udostępnia HRV, natlenienia krwi, stresu, gotowości ani obciążenia treningowego — połącz dane zaawansowane, aby je uzyskać.',
     action: 'Połącz',
   },
 // Source: src/components/overview/HeartRateCard.vue

@@ -69,10 +69,8 @@ export default {
       title: 'Waarom ontbreken sommige gegevens?',
       lead: 'ZeppBridge heeft twee verbindingen, en ze leveren niet dezelfde gegevens op.',
       officialName: 'Officiële autorisatie',
-      officialHas: 'Hartslag|Slaap|Stappen|Trainingen|PAI|Gewicht',
       officialLacks: 'Kan geen eerdere historie ophalen',
       advancedName: 'Geavanceerde gegevens',
-      advancedHas: 'HRV|Bloedzuurstof|Heledag-stress|Gereedheid|Charge|Trainingsbelasting|Voedingslog|Eerdere historie',
       advancedLogin: 'Alleen inloggen met Zepp-e-mail of -telefoonnummer + wachtwoord',
       advancedNoThirdParty: 'Inloggen via Google, Apple, WeChat, Xiaomi en andere derden werkt niet',
       footer: 'Met alleen de officiële autorisatie komt er niets binnen uit de kolom Geavanceerde gegevens. Dat is een beperking van wat het officiële kanaal biedt, geen fout in ZeppBridge. We hebben dit bij Zepp (Huami) aangekaart, maar nog geen reactie ontvangen.',
@@ -91,7 +89,6 @@ export default {
       note: 'Wijziging',
     },
     'components/OfficialOnlyNote': {
-      text: 'Alleen officiële Zepp-autorisatie verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht synchroniseren. HRV, bloedzuurstof, stress, gereedheid en trainingsbelasting biedt de officiële koppeling niet aan — daarvoor koppel je ‘Geavanceerde gegevens’.',
       action: 'Verbinden',
     },
     App: {

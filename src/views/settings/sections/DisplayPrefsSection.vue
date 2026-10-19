@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* 显示与语言：语言、主题、距离单位，加一行「我关注」。
-   时间格式、日期顺序、界面缩放不常改，挪到高级卡「更多偏好」（DisplayMoreRows.vue）。 */
+   时间格式、日期顺序在距离单位下面（DateTimeRows.vue）；界面缩放不常改，在高级卡「更多偏好」。 */
 import { computed, ref } from 'vue';
 import CapsuleWheel from '../../../components/CapsuleWheel.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
@@ -16,6 +16,7 @@ import { LOCALES, LOCALE_LABELS, useMessages, type Locale } from '../../../i18n'
 import { shownLocale } from '../../../lib/motion/localeTarget';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
+import DateTimeRows from './DateTimeRows.vue';
 import FocusAreasRow from './FocusAreasRow.vue';
 
 const t = useMessages(settingsMessages);
@@ -75,6 +76,7 @@ const chooseTheme = (value: string | number) => {
           <SegmentTrack compact :items="distanceUnitOptions" :model-value="distanceUnit" :aria-label="t.distanceUnitLabel" @update:model-value="chooseDistanceUnit" />
         </div>
       </div>
+      <DateTimeRows />
       <FocusAreasRow />
     </div>
   </section>

@@ -168,7 +168,8 @@ const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
 const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) => {
   pending.delete(backdrop);
   forgetEscape(backdrop);
-  if (reducedMotion() || backdrop.isConnected) return;
+  // 已经化成灰飞走了（ashDissolve.ts）：不再挂回去缩一遍。
+  if (reducedMotion() || backdrop.isConnected || backdrop.dataset.dissolved !== undefined) return;
   // 挂回去的只是一段收起的画面：不再是对话框，不能被聚焦、点中，也不能被别的逻辑当成「还有弹窗开着」。
   panel.removeAttribute('data-modal-dialog');
   panel.removeAttribute('role');

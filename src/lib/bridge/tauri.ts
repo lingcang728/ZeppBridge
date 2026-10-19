@@ -394,6 +394,9 @@ export const tauriBackend: BridgeBackend = {
   setTrayLocale(locale: string) {
     return call<void>('set_tray_locale', { locale });
   },
+  systemRegionLocale() {
+    return call<string | null>('system_region_locale');
+  },
   listBackups() {
     return call<BackupManifest[]>('list_backups');
   },
