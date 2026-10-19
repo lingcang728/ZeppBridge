@@ -24,6 +24,7 @@ const items = [{ value: 'windows', label: 'Windows' }, { value: 'macos', label: 
       <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="download" :size="22" />{{ journey.downloadPending }}</button>
       <a class="star-button lp-btn" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><Icon name="star" :size="20" /><span>{{ journey.starOnGithub }}</span><Icon name="external" :size="16" /></a>
     </div>
+    <p v-if="platform === 'windows'" class="blocked-line">{{ journey.windowsBlocked }}</p>
   </section>
 </template>
 <style scoped>
@@ -31,6 +32,7 @@ const items = [{ value: 'windows', label: 'Windows' }, { value: 'macos', label: 
 h2 { margin: 0 auto; max-width: 16em; font-size: clamp(36px, 4.4vw, 64px); line-height: 1.14; letter-spacing: -.04em; font-weight: 600; text-wrap: balance; }
 .final .lp-lead { margin: 18px auto 0; }
 .install-line { margin: 10px auto 0; max-width: 36em; color: var(--subtle); font-size: 15px; line-height: 1.6; }
+.blocked-line { margin: 26px auto 0; max-width: 40em; color: var(--subtle); font-size: 14px; line-height: 1.7; text-wrap: pretty; }
 .platform-switch { display: flex; justify-content: center; gap: 8px; width: max-content; max-width: 100%; margin: 28px auto 22px; }
 .download-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 18px; }
 .download-button { min-height: 62px; padding: 18px 28px; font-size: 17px; border-radius: 999px; }

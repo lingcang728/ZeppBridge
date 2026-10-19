@@ -184,6 +184,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },
     cancel_web_login: () => ({ state: 'idle', message: '', page_url: '' }),
     start_official_login: () => handlers.get_official_status({}), cancel_official_login: () => handlers.get_official_status({}),
+    check_official_login_now: () => handlers.get_official_status({}),
     disconnect_official: () => ({ state: 'disconnected', message: null, message_code: null, user_id_masked: null, nickname: null, connected_at: null, authorize_url: null }),
     cancel_sync: () => null,
     get_workout_type_options: () => ['running', 'cycling', 'walking', 'hiking', 'pool_swim', 'strength', 'yoga'].map(key => ({ key, label: key, family: key })),

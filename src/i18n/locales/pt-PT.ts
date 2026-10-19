@@ -54,6 +54,31 @@ export default {
       failed: 'Não foi possível ler os passos por hora.',
       legend: (peak: string) => `Verde mais forte = mais passos; o mais forte ronda os ${peak}`,
     },
+    'components/WhyHalfData': {
+      title: 'Porque faltam alguns dados?',
+      lead: 'O ZeppBridge tem duas ligações e não devolvem os mesmos dados.',
+      officialName: 'Autorização oficial',
+      officialHas: 'Frequência cardíaca|Sono|Passos|Treinos|PAI|Peso',
+      officialLacks: 'Não repõe histórico anterior',
+      advancedName: 'Dados avançados',
+      advancedHas: 'VFC|Oxigénio no sangue|Stress ao longo do dia|Prontidão|Charge|Carga de treino|Registos alimentares|Histórico anterior',
+      advancedLogin: 'Apenas e-mail ou telemóvel Zepp + palavra-passe',
+      advancedNoThirdParty: 'Não funciona com Google, Apple, WeChat, Xiaomi nem outros inícios de sessão de terceiros',
+      footer: 'Apenas com a autorização oficial, nada da coluna Dados avançados é recebido. Trata-se de um limite do canal oficial e não de uma falha do ZeppBridge. Já comunicámos a situação à Zepp (Huami), mas ainda não obtivemos resposta.',
+      close: 'Percebi',
+    },
+    'components/shell/UpdateNotice': {
+      title: (version: string) => `Atualizado para v${version}`,
+      since: (version: string) => `Antes: v${version}`,
+      acknowledge: 'Percebi',
+      star: 'Dar uma estrela no GitHub',
+      next: 'Ver as novidades',
+      empty: 'Esta versão não incluiu notas de versão.',
+      added: 'Novo',
+      improved: 'Melhorado',
+      fixed: 'Corrigido',
+      note: 'Atualização',
+    },
     'components/OfficialOnlyNote': {
       text: 'Apenas a autorização oficial Zepp está ligada: sincroniza sono, frequência cardíaca, passos, treinos, PAI e peso. VFC, oxigénio no sangue, stress, prontidão e carga de treino não constam da API oficial — liga «Dados avançados» para os veres.',
       action: 'Ligar',
@@ -174,9 +199,6 @@ export default {
       privacyTelemetryTitle: 'Sem telemetria nem rastreio de utilização',
       privacyTelemetryBody:
         'A app não envia telemetria. Apenas ao clicares em «Enviar relatório de erro» é que os dados anónimos descritos são transmitidos.',
-      starTitle: 'O ZeppBridge foi-te útil?',
-      starBody: 'Uma estrela no GitHub ajuda mais pessoas a encontrá-lo.',
-      starAction: 'Dar uma estrela',
       privacyReportTitle: 'Dispositivo ou treino não reconhecido?',
       privacyReportBody:
         'Sem conta GitHub nem cópia de dados. Ao confirmar, vão apenas a estrutura de campos, o firmware, códigos de modelo (inteiros — que modelo, não que unidade) e códigos de treino desconhecidos com contagens para o repositório privado de relatórios do ZeppBridge. Nunca conta, tokens, série, ID de dispositivo, MAC, GPS, valores de saúde, respostas em bruto ou caminhos locais.',
@@ -2909,6 +2931,9 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       zumba: 'Zumba',
     },
     'views/settings/sections/account': {
+      whySub: 'Os dados avançados só iniciam sessão com e-mail ou telemóvel da Zepp e palavra-passe',
+      waitingHint: 'Aprova no navegador e isto liga-se sozinho',
+      checkNow: 'Verificar agora',
       accountFallback: 'Conta Zepp',
       official: (state: string) => `Oficial ${state}`,
       advanced: (state: string) => `Dados avançados ${state}`,
@@ -3332,8 +3357,18 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       'Não foi possível comunicar com o serviço de regiões do Zepp. Verifica a tua ligação',
     'err.login.region_retrying':
       'Serviço de regiões do Zepp temporariamente inacessível — nova tentativa em curso.',
-    'err.login.third_party_stalled':
-      'O início de sessão de terceiros parece bloqueado; as passkeys Google ficam muitas vezes na verificação dentro da app. Fecha a janela e usa e-mail + palavra-passe, ou introduz o App Token nas Definições.',
+    'err.login.third_party_blocked':
+      'Os dados avançados só aceitam início de sessão com e-mail ou telemóvel da Zepp e palavra-passe — Google, Apple, WeChat e Xiaomi não funcionam aqui. Se entras na Zepp com um deles, usa a autorização oficial.',
+    'err.login.other_account':
+      'Esta é outra conta Zepp: a conta com que acabaste de entrar não é a que autorizaste oficialmente, por isso nada foi guardado. Se criaste a tua conta Zepp com Google, Apple ou outro serviço, entrar com o mesmo e-mail e uma palavra-passe conta como uma conta nova.',
+    'err.official.other_account':
+      'Esta é outra conta Zepp: a conta que autorizaste não é a ligada aos dados avançados, por isso esta autorização não foi guardada. Se criaste a tua conta Zepp com Google, Apple ou outro serviço, entrar com o mesmo e-mail e uma palavra-passe conta como uma conta nova.',
+    'err.official.relay_unreachable':
+      'O navegador pode já mostrar a autorização como concluída, mas o ZeppBridge não consegue chegar a zeppbridge.com para a recolher. Se o navegador usa proxy e a app não, ativa o proxy do sistema (ou deixa a tua ferramenta de proxy abranger todas as apps) e escolhe “Verificar agora”.',
+    'err.official.still_pending':
+      'Acabámos de verificar: o intermediário ainda não recebeu esta autorização. Confirma que aprovaste no navegador e viste a página de sucesso. Se essa página era de uma tentativa anterior, inicia a autorização de novo.',
+    'err.backfill.start_too_early':
+      'Data de início demasiado antiga — só é possível recuperar os últimos 3650 dias',
     'err.login.bad_url': 'Endereço de autenticação inválido',
     'err.login.window_failed': 'Não foi possível abrir a janela de autenticação',
     'err.login.window_busy':

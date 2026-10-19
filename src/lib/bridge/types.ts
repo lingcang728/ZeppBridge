@@ -334,6 +334,8 @@ export interface BridgeBackend {
   /** Zepp 官方授权：系统浏览器里授权，桌面端自己去中转站领令牌。 */
   startOfficialLogin(): Promise<OfficialStatus>;
   cancelOfficialLogin(): Promise<OfficialStatus>;
+  /** 「我已在网页授权，立即检查」：叫醒等待中的那次轮询，结果经 official://status 送回。 */
+  checkOfficialLoginNow(): Promise<OfficialStatus>;
   getOfficialStatus(): Promise<OfficialStatus>;
   /** 撤销官方授权并删掉本机令牌；不动任何健康数据。 */
   disconnectOfficial(): Promise<OfficialStatus>;

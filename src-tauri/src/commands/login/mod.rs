@@ -12,7 +12,9 @@ use crate::models::{AuthInfo, ZeppBridgeError};
 
 use serde_json::Value;
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use std::sync::Arc;
 
 use std::time::Duration;
 
@@ -21,6 +23,7 @@ use tauri::{
     WebviewWindowBuilder,
 };
 
+mod copy;
 mod extract;
 mod poll;
 mod region_probe;
@@ -29,6 +32,7 @@ mod tests;
 mod url_policy;
 mod window;
 
+use copy::*;
 pub(crate) use extract::*;
 use poll::*;
 pub(crate) use region_probe::*;
@@ -54,15 +58,6 @@ const POLL_INTERVAL: Duration = Duration::from_millis(750);
 const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-
-/// 停在第三方授权页多久之后，主动说一句「这条路可能走不通」。
-///
-/// 这不是超时，也不会打断任何东西——登录本来就慢，输密码、等邮箱里的验证码、
-/// 扫码都要时间。它针对的是另一件事：Google 的 passkey 在嵌入式 WebView 里
-/// 常常停在 "verifying it's you" 不动，而这一点我们改不了。与其让人对着一个
-/// 不会有结果的页面等满十五分钟才看到一句「登录超时」，不如现在就告诉他还有
-/// 邮箱+密码，以及设置页里手动填 App Token 这两条路。
-const THIRD_PARTY_STALL_AFTER: Duration = Duration::from_secs(120);
 
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -104,6 +99,60 @@ const LOGIN_ACTIVITY_SCRIPT: &str = r#"(function(){
         window.__zeppbridgeInteracted = true;
       }
     }, true);
+  } catch (e) {}
+})();"#;
+
+/// 把官方通用登录页上那排第三方登录藏起来（见 `THIRD_PARTY_AUTH_HOSTS`）。
+///
+/// 选择器是 2026-10-19 对着 user.zepp.com 的通用登录页核对的：`.hm-social-login`
+/// 包着整排，每个按钮是 `.social-item`。只改元素自己的 style，不插 `<style>`——
+/// 登录页的 CSP 可能不收内联样式表，而 CSSOM 写 style 不受它管。Zepp 改版让
+/// 选择器失效时，导航拦截兜底。
+const HIDE_THIRD_PARTY_SCRIPT: &str = r#"(function(){
+  try {
+    if (window.__zeppbridgeThirdPartyHidden) { return; }
+    window.__zeppbridgeThirdPartyHidden = true;
+    var SELECTOR = '.hm-social-login, .social-item, [class*="social-login"]';
+    var hide = function(){
+      try {
+        var nodes = document.querySelectorAll(SELECTOR);
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].style.display !== 'none') {
+            nodes[i].style.setProperty('display', 'none', 'important');
+          }
+        }
+      } catch (e) {}
+    };
+    new MutationObserver(hide).observe(document, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', hide);
+  } catch (e) {}
+})();"#;
+
+/// 登录窗口顶部的横幅，只挂在顶层页面上。文字由 `login_banner_text` 按界面语言
+/// 给出，替换 `__ZEPPBRIDGE_BANNER_TEXT__`（已经是 JSON 字符串字面量）。
+/// 用 `textContent` 写字，不拼 HTML。
+const LOGIN_BANNER_SCRIPT: &str = r#"(function(){
+  try {
+    if (window.top !== window) { return; }
+    var TEXT = __ZEPPBRIDGE_BANNER_TEXT__;
+    var ID = 'zeppbridge-login-banner';
+    var place = function(){
+      if (!document.body || document.getElementById(ID)) { return; }
+      var bar = document.createElement('div');
+      bar.id = ID;
+      bar.setAttribute('role', 'note');
+      bar.textContent = TEXT;
+      var css = {
+        'box-sizing': 'border-box', 'position': 'relative', 'z-index': '2147483647',
+        'margin': '0', 'padding': '10px 18px', 'background': '#fff4d6', 'color': '#3d2c00',
+        'border-bottom': '1px solid #e8c766', 'font': '13px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif',
+        'text-align': 'center'
+      };
+      for (var key in css) { bar.style.setProperty(key, css[key], 'important'); }
+      document.body.insertBefore(bar, document.body.firstChild);
+    };
+    new MutationObserver(place).observe(document, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', place);
   } catch (e) {}
 })();"#;
 
@@ -186,7 +235,8 @@ pub async fn start_web_login(
     );
     publish_status(&app, &state, status.clone()).await;
 
-    let window = match build_login_window(&app, &page_url, &locale) {
+    let third_party_blocked = Arc::new(AtomicBool::new(false));
+    let window = match build_login_window(&app, &page_url, &locale, third_party_blocked.clone()) {
         Ok(window) => window,
         // 已经把状态推成「请在弹出窗口完成登录」了，可弹窗并没有开起来。
         // 不改回去的话，界面下次读状态还会拿到这句 waiting，指着一个不存在
@@ -196,7 +246,7 @@ pub async fn start_web_login(
             return Err(error);
         }
     };
-    spawn_login_poll(app, epoch, window);
+    spawn_login_poll(app, epoch, window, third_party_blocked);
     Ok(status)
 }
 

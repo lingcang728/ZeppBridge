@@ -32,6 +32,16 @@ ones that never responded inside the old sign-in window.
 4. The browser shows **Authorized**. Go back to ZeppBridge: it finishes
    connecting by itself within a few seconds. You can close the browser tab.
 
+If the browser says you're authorized but ZeppBridge keeps **waiting for the
+browser**:
+
+- Click **Check now** on that row to check immediately instead of waiting.
+- After a few failed attempts to reach `zeppbridge.com`, Settings says so and
+  suggests what to check; when the main address is unreachable, ZeppBridge
+  automatically tries the backup address `zeppbridge.pages.dev`.
+- If it still fails, a proxy, firewall or company network is probably blocking
+  those two domains. ZeppBridge uses your system proxy settings.
+
 What passes through our server (`zeppbridge.com`, also reachable as `zeppbridge.pages.dev`; Cloudflare) and why:
 Zepp requires a server-held app secret to turn the authorization into tokens,
 so that one step happens there. The tokens are encrypted while they wait,
@@ -66,6 +76,13 @@ inside a window embedded in the app, which third-party providers block — so it
 works with an email or phone number and password, **not** with Google, Xiaomi,
 Facebook or Apple sign-in.
 
+Since 3.0.2 the sign-in window says this at the top and hides the third-party
+buttons; if you still end up on a third-party sign-in page, the window blocks
+it and asks you to use email or phone + password. If you sign in to a different
+Zepp account than the one connected through **Zepp account authorization**,
+ZeppBridge tells you it's another Zepp account and doesn't save it, so the two
+accounts' data never mix.
+
 ### 1. Start the connection
 
 1. Open ZeppBridge and go to **Settings**.
@@ -91,8 +108,7 @@ If the primary page is still untouched after about 90 seconds — nothing typed,
 nothing clicked, and the window still on the page ZeppBridge opened — it switches
 to the fallback page `https://user.huami.com/privacy2/index.html`. That switch is
 for a page that never rendered, so it never happens while you are signing in:
-once you type or click, or the window reaches a Xiaomi, Google, Facebook or
-WeChat page, ZeppBridge leaves it alone for the rest of the session. The whole
+once you type or click, ZeppBridge leaves it alone for the rest of the session. The whole
 session times out after 15 minutes; **Retry** starts it again.
 
 If you are signed in but ZeppBridge says it **could not read the credentials**,

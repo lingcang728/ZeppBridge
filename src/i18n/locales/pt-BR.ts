@@ -55,6 +55,31 @@ export default {
       failed: 'Não foi possível carregar os passos por hora.',
       legend: (peak: string) => `Verde mais forte = mais passos; o mais forte é cerca de ${peak}`,
     },
+    'components/WhyHalfData': {
+      title: 'Por que alguns dados estão faltando?',
+      lead: 'O ZeppBridge tem duas conexões e elas não trazem os mesmos dados.',
+      officialName: 'Autorização oficial',
+      officialHas: 'Frequência cardíaca|Sono|Passos|Treinos|PAI|Peso',
+      officialLacks: 'Não recupera histórico anterior',
+      advancedName: 'Dados avançados',
+      advancedHas: 'HRV|Oxigênio no sangue|Estresse de todo o dia|Prontidão|Charge|Carga de treino|Registro alimentar|Histórico anterior',
+      advancedLogin: 'Apenas e-mail ou telefone da Zepp + senha',
+      advancedNoThirdParty: 'Não funciona com Google, Apple, WeChat, Xiaomi ou outros logins de terceiros',
+      footer: 'Com apenas a autorização oficial, nada da coluna Dados avançados é recebido — isso é um limite do que o canal oficial oferece, não um problema do ZeppBridge. Já entramos em contato com a Zepp (Huami), mas ainda não tivemos resposta.',
+      close: 'Entendi',
+    },
+    'components/shell/UpdateNotice': {
+      title: (version: string) => `Atualizado para v${version}`,
+      since: (version: string) => `Antes: v${version}`,
+      acknowledge: 'Entendi',
+      star: 'Dar uma estrela no GitHub',
+      next: 'Ver as novidades',
+      empty: 'Esta versão não incluiu notas de versão.',
+      added: 'Novo',
+      improved: 'Melhorado',
+      fixed: 'Corrigido',
+      note: 'Atualização',
+    },
     'components/OfficialOnlyNote': {
       text: 'Apenas a autorização oficial do Zepp está ativa: frequência cardíaca, sono, passos, treinos, PAI e peso são sincronizados. HRV, SpO2, estresse, prontidão e carga requerem "Dados avançados".',
       action: 'Conectar',
@@ -1677,9 +1702,6 @@ Regras: compare-me apenas com meu próprio histórico, não com médias populaci
       privacyTokenBody: 'Por padrão: Gerenciador de Credenciais do Windows, Chaves do macOS ou chaveiro do Linux. No macOS e Linux você pode optar por um arquivo de credenciais em texto claro que só seu usuário lê e escreve; Linux também aceita variáveis de ambiente. auth.json só guarda metadados de conta e região. Tokens não entram em logs, exportações ou relatórios de erro.',
       privacyTelemetryTitle: 'Zero telemetria ou rastreamento de uso',
       privacyTelemetryBody: 'O ZeppBridge não coleta nem transmite dados de telemetria. Relatórios de erro são enviados única e exclusivamente quando acionados manualmente por você.',
-      starTitle: 'O ZeppBridge foi útil para você?',
-      starBody: 'Uma estrela no GitHub ajuda mais pessoas a encontrá-lo.',
-      starAction: 'Dar uma estrela',
       privacyReportTitle: 'Dispositivo ou treino não reconhecido?',
       privacyReportBody: 'Sem cadastro no GitHub nem cópia de dados. Ao confirmar, só estrutura de campos em nível de produto, versão de firmware, códigos de modelo (inteiros, indicam só qual modelo) e códigos e contagens de treinos desconhecidos vão para o repositório privado de relatórios do ZeppBridge; nunca conta, token, número de série, ID de dispositivo, MAC, GPS, valores de saúde, respostas brutas ou caminhos locais.',
       mcpBadge: 'Dados de saúde somente leitura · sem portas de rede abertas',
@@ -2701,6 +2723,9 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     },
 
     'views/settings/sections/account': {
+      whySub: 'Os dados avançados só entram com e-mail ou telefone da Zepp e senha',
+      waitingHint: 'Aprove no navegador e isto se conecta sozinho',
+      checkNow: 'Verificar agora',
       accountFallback: 'Conta Zepp',
       official: (state: string) => `Oficial ${state}`,
       advanced: (state: string) => `Dados avançados ${state}`,
@@ -3124,7 +3149,18 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     'err.login.credentials_rejected': 'Credenciais recusadas pelo Zepp. Faça logout na janela e entre novamente',
     'err.login.region_unreachable': 'Não foi possível conectar ao serviço de região do Zepp. Verifique sua conexão e tente novamente',
     'err.login.region_retrying': 'Serviço de região temporariamente inacessível — tentando novamente. A janela de login permanece ativa',
-    'err.login.third_party_stalled': 'Login social bloqueado ou travado (comum com passkeys do Google em navegadores embutidos). Feche a janela e use e-mail/senha ou insira o App Token manualmente.',
+    'err.login.third_party_blocked':
+      'Os dados avançados só aceitam login com e-mail ou telefone da Zepp e senha — Google, Apple, WeChat e Xiaomi não funcionam aqui. Se você entra na Zepp com um deles, use a autorização oficial.',
+    'err.login.other_account':
+      'Esta é outra conta Zepp: a conta com que você acabou de entrar não é a que você autorizou oficialmente, então nada foi salvo. Se você criou sua conta Zepp com Google, Apple ou outro serviço, entrar com o mesmo e-mail e uma senha conta como uma conta nova.',
+    'err.official.other_account':
+      'Esta é outra conta Zepp: a conta que você autorizou não é a conectada aos dados avançados, então esta autorização não foi salva. Se você criou sua conta Zepp com Google, Apple ou outro serviço, entrar com o mesmo e-mail e uma senha conta como uma conta nova.',
+    'err.official.relay_unreachable':
+      'O navegador pode já mostrar a autorização como concluída, mas o ZeppBridge não consegue acessar zeppbridge.com para buscá-la. Se o navegador usa proxy e o app não, ative o proxy do sistema (ou deixe sua ferramenta de proxy cobrir todos os apps) e escolha “Verificar agora”.',
+    'err.official.still_pending':
+      'Acabamos de verificar: o intermediário ainda não recebeu esta autorização. Confirme que você aprovou no navegador e viu a página de sucesso. Se essa página era de uma tentativa anterior, inicie a autorização de novo.',
+    'err.backfill.start_too_early':
+      'Data de início muito antiga — é possível buscar no máximo os últimos 3650 dias',
     'err.login.bad_url': 'URL de login inválida',
     'err.login.window_failed': 'Não foi possível abrir a janela de login',
     'err.login.window_busy': 'A janela anterior ainda está sendo encerrada. Aguarde alguns instantes e tente novamente',

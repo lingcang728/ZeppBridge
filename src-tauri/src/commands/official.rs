@@ -24,11 +24,32 @@ pub const OFFICIAL_EVENT: &str = "official://status";
 /// 领令牌的间隔。用户在浏览器里点完同意到桌面端发现，最多差这么久。
 const CLAIM_INTERVAL: Duration = Duration::from_secs(2);
 
+/// 连续这么多次连不上中转站，就在界面上明说，不再干等（约 2–60 秒，看是立刻
+/// 被拒还是等到超时）。以前网络错误一律静默重试，用户看到的是浏览器里「已授权」、
+/// App 里一直「等待授权」，最多等满 15 分钟也不知道原因。
+const RELAY_UNREACHABLE_AFTER: u32 = 3;
+
+/// 等待中要多说的一句，按码本地化；中文原文只兜底。
+type Notice = (&'static str, &'static str);
+
+const RELAY_UNREACHABLE: Notice = (
+    "err.official.relay_unreachable",
+    "浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理或让代理软件接管全部应用，然后点「立即检查」。",
+);
+
+const STILL_PENDING: Notice = (
+    "err.official.still_pending",
+    "刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意并看到授权成功的页面；如果那是另一个浏览器窗口里的旧授权，请重新点一次授权。",
+);
+
 /// 正在进行的那次授权：取消旗标，和这次授权的起始地址（界面「复制授权链接」用）。
 /// 同一时间只有一次。
 struct Flow {
     cancel: Arc<AtomicBool>,
     start_url: String,
+    notice: Option<Notice>,
+    /// 「我已在网页授权，立即检查」：叫醒轮询，不等下一个间隔。
+    wake: Arc<tokio::sync::Notify>,
 }
 
 static FLOW: Mutex<Option<Flow>> = Mutex::new(None);
@@ -77,20 +98,51 @@ fn mask(user_id: &str) -> String {
     format!("••••{tail}")
 }
 
-/// 正在等待的那次授权的起始地址；没有在等时为 `None`。
-fn waiting_url() -> Option<String> {
-    FLOW.lock()
-        .ok()
-        .and_then(|flow| flow.as_ref().map(|flow| flow.start_url.clone()))
+/// 正在等待的那次授权的起始地址和附带的一句；没有在等时为 `None`。
+fn waiting_flow() -> Option<(String, Option<Notice>)> {
+    FLOW.lock().ok().and_then(|flow| {
+        flow.as_ref()
+            .map(|flow| (flow.start_url.clone(), flow.notice))
+    })
+}
+
+/// 换掉自己那一次授权附带的那句话。变了才返回 true（才值得再发一次状态）。
+fn set_notice(mine: &Arc<AtomicBool>, notice: Option<Notice>) -> bool {
+    let Ok(mut flow) = FLOW.lock() else {
+        return false;
+    };
+    match flow.as_mut() {
+        Some(current) if Arc::ptr_eq(&current.cancel, mine) && current.notice != notice => {
+            current.notice = notice;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// 等待中的下一句话：手动查过、还没结果就说「还没收到」；网络恢复后撤掉「连不上」；
+/// 其余保持原样，免得那句话在两次自动轮询之间一闪而过。
+fn notice_after_pending(current: Option<Notice>, woken: bool) -> Option<Notice> {
+    if woken {
+        Some(STILL_PENDING)
+    } else if current == Some(RELAY_UNREACHABLE) {
+        None
+    } else {
+        current
+    }
+}
+
+fn current_notice() -> Option<Notice> {
+    waiting_flow().and_then(|(_, notice)| notice)
 }
 
 fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
     let meta = OfficialStore::new(data_dir).meta().ok().flatten();
-    if let Some(url) = waiting_url() {
+    if let Some((url, notice)) = waiting_flow() {
         return OfficialStatus {
             state: "waiting".into(),
-            message_code: None,
-            message: None,
+            message_code: notice.map(|(code, _)| code.to_string()),
+            message: notice.map(|(_, message)| message.to_string()),
             user_id_masked: None,
             nickname: None,
             connected_at: None,
@@ -162,7 +214,7 @@ pub async fn start_official_login(
 ) -> Result<OfficialStatus, AppError> {
     let request = AuthorizationRequest::new()
         .map_err(|_| AppError::new("err.official.failed", "无法生成这次授权的随机值"))?;
-    let Some((cancel, generation)) = begin_flow(request.start_url())? else {
+    let Some((cancel, generation, wake)) = begin_flow(request.start_url())? else {
         return Ok(stored_status(&state.data_dir));
     };
     if app
@@ -180,7 +232,7 @@ pub async fn start_official_login(
     publish(&app, &waiting);
     let data_dir = state.data_dir.clone();
     tauri::async_runtime::spawn(async move {
-        let outcome = poll_claim(&data_dir, request, &cancel, generation).await;
+        let outcome = poll_claim(&app, &data_dir, request, &cancel, &wake, generation).await;
         clear_flow_if(&cancel);
         if cancel.load(Ordering::SeqCst) {
             // 用户取消了（也许已经重新开始了一次）：这次的结果不再发布。
@@ -195,12 +247,15 @@ pub async fn start_official_login(
     Ok(waiting)
 }
 
-/// 已有一次在等就返回 `None`（复用它）；否则登记新的一次，返回它的取消旗标
-/// 和代次。
+/// 已有一次在等就返回 `None`（复用它）；否则登记新的一次，返回它的取消旗标、
+/// 代次和叫醒轮询用的铃。
 ///
 /// 锁里只决定「复用还是新建」；状态要等锁放开再算——`stored_status` 会再锁
 /// 一次 FLOW，std 的 Mutex 不可重入，在锁里算就是死锁（代码审查 R04）。
-fn begin_flow(start_url: String) -> Result<Option<(Arc<AtomicBool>, u64)>, AppError> {
+#[allow(clippy::type_complexity)]
+fn begin_flow(
+    start_url: String,
+) -> Result<Option<(Arc<AtomicBool>, u64, Arc<tokio::sync::Notify>)>, AppError> {
     let mut flow = FLOW
         .lock()
         .map_err(|_| AppError::new("err.official.failed", "官方授权状态异常，请重启应用后再试"))?;
@@ -208,12 +263,15 @@ fn begin_flow(start_url: String) -> Result<Option<(Arc<AtomicBool>, u64)>, AppEr
         return Ok(None);
     }
     let cancel = Arc::new(AtomicBool::new(false));
+    let wake = Arc::new(tokio::sync::Notify::new());
     *flow = Some(Flow {
         cancel: cancel.clone(),
         start_url,
+        notice: None,
+        wake: wake.clone(),
     });
     // 新的一次登录作废之前所有在途的回执（R05）。
-    Ok(Some((cancel, invalidate_pending_logins())))
+    Ok(Some((cancel, invalidate_pending_logins(), wake)))
 }
 
 fn clear_flow() {
@@ -237,9 +295,11 @@ fn clear_flow_if(mine: &Arc<AtomicBool>) {
 /// 一直领到有结果、超时或被取消。成功时令牌已存好，返回 `None`；否则返回要
 /// 显示的失败状态（取消也算「没有失败」，回到闲置）。
 async fn poll_claim(
+    app: &AppHandle,
     data_dir: &std::path::Path,
     request: AuthorizationRequest,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
+    wake: &tokio::sync::Notify,
     generation: u64,
 ) -> Option<OfficialStatus> {
     let client = match OfficialClient::new() {
@@ -252,8 +312,12 @@ async fn poll_claim(
         }
     };
     let deadline = Instant::now() + Duration::from_secs(AUTHORIZATION_WINDOW_SECONDS);
+    let mut network_failures = 0u32;
     loop {
-        tokio::time::sleep(CLAIM_INTERVAL).await;
+        let woken = tokio::select! {
+            _ = tokio::time::sleep(CLAIM_INTERVAL) => false,
+            _ = wake.notified() => true,
+        };
         if cancel.load(Ordering::SeqCst) {
             return None;
         }
@@ -268,9 +332,25 @@ async fn poll_claim(
             .claim(&request.state, request.claim_secret(), now)
             .await
         {
-            Ok(ClaimOutcome::Pending) => continue,
-            // 网络抖一下不算失败，下一轮再领。
-            Err(ZeppBridgeError::NetworkError(_)) => continue,
+            Ok(ClaimOutcome::Pending) => {
+                network_failures = 0;
+                // 手动查的那一次无论变没变都回一句，界面上的「正在检查」才停得下来。
+                if set_notice(cancel, notice_after_pending(current_notice(), woken)) || woken {
+                    publish(app, &stored_status(data_dir));
+                }
+                continue;
+            }
+            // 网络抖一下不算失败，下一轮再领；连续几次都不通，或者用户手动查
+            // 也不通，就把原因摆出来，但照样接着领——网络一恢复就能连上。
+            Err(ZeppBridgeError::NetworkError(_)) => {
+                network_failures += 1;
+                if (woken || network_failures >= RELAY_UNREACHABLE_AFTER)
+                    && (set_notice(cancel, Some(RELAY_UNREACHABLE)) || woken)
+                {
+                    publish(app, &stored_status(data_dir));
+                }
+                continue;
+            }
             Ok(ClaimOutcome::Ready(tokens)) => {
                 return save_verified(data_dir, &client, tokens, generation).await
             }
@@ -339,6 +419,17 @@ async fn save_verified(
     if zeppbridge_core::official::current_generation() != generation {
         return None;
     }
+    // 高级数据连的是另一个 Zepp 账号：明说，不静默只出一半数据。
+    let legacy = zeppbridge_core::auth::AuthManager::new(data_dir.to_path_buf()).saved_user_id();
+    if legacy
+        .as_deref()
+        .is_some_and(|legacy| crate::commands::accounts_differ(legacy, &tokens.user_id))
+    {
+        return Some(OfficialStatus::failed(
+            "err.official.other_account",
+            "这是另一个 Zepp 账号：官方授权的和高级数据登录的不是同一个账号，没有保存这次授权。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。",
+        ));
+    }
     // 库属于另一个账号就不存这把令牌（R06）。
     if let Err(error) = crate::commands::claim_library_for_login(data_dir, &tokens.user_id).await {
         return Some(OfficialStatus::failed(&error.code, &error.message));
@@ -367,6 +458,22 @@ fn cancel_flow() {
         }
     }
     invalidate_pending_logins();
+}
+
+/// 「我已在网页授权，立即检查」：叫醒正在等的那次轮询，马上去领一次。
+///
+/// 不在这里直接领：中转站交出令牌即删，两处同时领会让慢的那一处看到「已过期」。
+/// 结果照常经 `official://status` 送回界面。
+#[tauri::command]
+pub async fn check_official_login_now(
+    state: tauri::State<'_, AppState>,
+) -> Result<OfficialStatus, AppError> {
+    if let Ok(flow) = FLOW.lock() {
+        if let Some(current) = flow.as_ref() {
+            current.wake.notify_one();
+        }
+    }
+    Ok(stored_status(&state.data_dir))
 }
 
 #[tauri::command]

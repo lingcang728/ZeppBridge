@@ -202,6 +202,10 @@ export const tauriBackend: BridgeBackend = {
     return call<OfficialStatus>('cancel_official_login');
   },
 
+  checkOfficialLoginNow() {
+    return call<OfficialStatus>('check_official_login_now');
+  },
+
   getOfficialStatus() {
     return call<OfficialStatus>('get_official_status');
   },

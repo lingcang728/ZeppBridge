@@ -120,42 +120,37 @@ fn an_explicit_rejection_stays_fatal() {
     assert_eq!(failure.error.code, "err.login.credentials_rejected");
 }
 
-/// 停在第三方授权页太久，才提示；其余情况一律不出声。
+/// 第三方登录一律拦下：高级数据只认 Zepp 邮箱 / 手机号 + 密码。拦下的同时要
+/// 认得出是第三方，界面才能说清楚为什么点了没反应。
 #[test]
-fn the_third_party_hint_fires_only_while_stuck_on_a_third_party_page() {
-    let long = THIRD_PARTY_STALL_AFTER;
-    let short = Duration::from_secs(5);
-    let google = "https://accounts.google.com/o/oauth2/auth";
-
-    assert!(third_party_stall_is_due(google, long, false, false));
-    // 还没等够。登录本来就慢，输密码等验证码都要时间。
-    assert!(!third_party_stall_is_due(google, short, false, false));
-    // 这一页上已经说过一次了。
-    assert!(!third_party_stall_is_due(google, long, false, true));
-    // 凭据已经读到，卡住的是后面的区域确认，不该建议换登录方式。
-    assert!(!third_party_stall_is_due(google, long, true, false));
-    // 停在我们自己打开的那一页——那是另一条兜底路径（备用登录页）管的事。
-    assert!(!third_party_stall_is_due(
-        PRIMARY_LOGIN_URL,
-        long,
-        false,
-        false
-    ));
-}
-
-/// 放行导航和「是不是第三方授权页」读的是同一份 host 表。
-#[test]
-fn third_party_hosts_are_shared_with_the_navigation_allowlist() {
+fn third_party_sign_in_is_blocked_and_recognised() {
     for host in THIRD_PARTY_AUTH_HOSTS {
         let url = format!("https://{host}/oauth");
-        assert!(is_allowed_login_url(&url), "{url} should be allowed");
+        assert!(!is_allowed_login_url(&url), "{url} must be blocked");
         assert!(
             is_third_party_auth_page(&url),
             "{url} should be third-party"
         );
     }
+    // Zepp 自己的通用登录页、验证码页照常放行。
+    assert!(is_allowed_login_url(
+        "https://user.zepp.com/universalLogin/index.html#/login"
+    ));
+    assert!(is_allowed_login_url("https://watchface.zepp.com/"));
     assert!(!is_third_party_auth_page("https://watchface.zepp.com/"));
     assert!(!is_third_party_auth_page("not a url"));
+}
+
+/// 账号对不上只在两边都有编号、且不同的时候成立；还没配置的一边不算。
+#[test]
+fn only_two_known_different_accounts_count_as_a_mismatch() {
+    assert!(crate::commands::accounts_differ("1234567890", "9876543210"));
+    assert!(!crate::commands::accounts_differ(
+        "1234567890",
+        " 1234567890 "
+    ));
+    assert!(!crate::commands::accounts_differ("", "1234567890"));
+    assert!(!crate::commands::accounts_differ("1234567890", ""));
 }
 
 #[test]
@@ -468,6 +463,7 @@ fn native_login_title_follows_the_interface_locale() {
     assert_eq!(login_window_title("hi-IN"), "Zepp में साइन इन करें");
     assert_eq!(login_window_title("fr"), "Se connecter à Zepp");
     assert_eq!(login_window_title("nl"), "Inloggen bij Zepp");
+    assert_eq!(login_window_title("pl-PL"), "Zaloguj się do Zepp");
     assert_eq!(login_window_title("ja-JP"), "Sign in to Zepp");
 }
 
@@ -556,19 +552,20 @@ fn login_navigation_allow_list() {
     assert!(is_allowed_login_url(
         "https://user.huami.com/privacy2/index.html"
     ));
-    assert!(is_allowed_login_url(
+    // 3.0.2 起高级数据只认邮箱 + 密码：第三方登录页一律挡在窗口外。
+    assert!(!is_allowed_login_url(
         "https://account.xiaomi.com/oauth2/authorize"
     ));
-    assert!(is_allowed_login_url(
+    assert!(!is_allowed_login_url(
         "https://open.weixin.qq.com/connect/qrconnect"
     ));
-    assert!(is_allowed_login_url(
+    assert!(!is_allowed_login_url(
         "https://accounts.google.com/o/oauth2/auth"
     ));
-    assert!(is_allowed_login_url(
+    assert!(!is_allowed_login_url(
         "https://www.facebook.com/dialog/oauth"
     ));
-    assert!(is_allowed_login_url(
+    assert!(!is_allowed_login_url(
         "https://account-us.amazfit.com/v1/accounts/connect/facebook/callback"
     ));
     assert!(!is_allowed_login_url("about:blank"));
