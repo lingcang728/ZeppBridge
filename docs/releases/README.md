@@ -29,6 +29,10 @@
 - 中文行里加粗段别以「」或括号收尾再接冒号（会排成「」：」）；用逗号或句号接后文。
 - 需要先讲一件事再看改动时（如 3.0.2 的「为什么有些数据没有？」），用 `leadsWithWhyHalfData` 这类开关加一页，正文组件用卡片 / 小标签，不要写成大段文字。
 
+## 什么时候发
+
+冻结、排期、批准和自动打 tag 见 [`scheduling.md`](scheduling.md)。
+
 ## GitHub Release / tag 说明
 
 tag 说明用英文（随安装包发出去，见 CLAUDE.md），内容就是 `en.md`，同样一条一行、开头加粗；第一行是应用内更新提示。正文里有 `##` 标题时 `git tag --cleanup=verbatim`。
