@@ -23,6 +23,10 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   const busy = ref(false);
   /** 已经按码本地化好的失败说明（后端原文只兜底）。 */
   const failureText = ref<string | null>(null);
+  /** 等待中附带的一句（连不上中转站、手动查过还没结果），按码取当前语言。 */
+  const waitingText = ref<string | null>(null);
+  /** 「立即检查」刚点过，等结果从 official://status 回来。 */
+  const checking = ref(false);
   let unlisten: (() => void) | undefined;
   /** 挂载代次：detach 一次就作废之前所有还没回来的 attach（R16）。 */
   let attachGen = 0;
@@ -36,6 +40,8 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     status.value = next;
     // 全局状态（顶栏、自动同步、首次同步）由同步控制器统一处理，这里只渲染。
     applyOfficialStatus(next);
+    waitingText.value = next.state === 'waiting' && next.message_code ? errorTextFor(next.message_code) ?? null : null;
+    if (next.state !== 'waiting' || next.message_code) checking.value = false;
     if (next.state === 'failed') {
       // 后端的中文原文只兜底；先按码取当前语言的说法。
       failureText.value = errorTextFor(next.message_code ?? undefined)
@@ -66,6 +72,19 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
       failureText.value = toUserMessage(cause, t.value.officialFailed);
     } finally {
       busy.value = false;
+    }
+  };
+
+  /** 「我已在网页授权，立即检查」：叫醒后台轮询马上领一次，结果照常经事件回来。 */
+  const checkNow = async () => {
+    checking.value = true;
+    try {
+      await backend.checkOfficialLoginNow();
+      // 一次领取最多 20 秒（再加备用地址）；万一事件没回来，别让按钮一直转。
+      window.setTimeout(() => { checking.value = false; }, 45_000);
+    } catch (cause) {
+      checking.value = false;
+      failureText.value = toUserMessage(cause, t.value.officialFailed);
     }
   };
 
@@ -120,8 +139,8 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   };
 
   return {
-    status, busy, failureText, waiting, connected, needsReauth, linkCopied,
-    start, cancel, disconnect, copyLink, attach, detach,
+    status, busy, failureText, waitingText, checking, waiting, connected, needsReauth, linkCopied,
+    start, cancel, checkNow, disconnect, copyLink, attach, detach,
   };
 };
 

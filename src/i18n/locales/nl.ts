@@ -65,6 +65,31 @@ export default {
       failed: 'Stappen per uur nu niet beschikbaar.',
       legend: (peak: string) => `Feller groen betekent meer stappen; het felst is ongeveer ${peak}`,
     },
+    'components/WhyHalfData': {
+      title: 'Waarom ontbreken sommige gegevens?',
+      lead: 'ZeppBridge heeft twee verbindingen, en ze leveren niet dezelfde gegevens op.',
+      officialName: 'Officiële autorisatie',
+      officialHas: 'Hartslag|Slaap|Stappen|Trainingen|PAI|Gewicht',
+      officialLacks: 'Kan geen eerdere historie ophalen',
+      advancedName: 'Geavanceerde gegevens',
+      advancedHas: 'HRV|Bloedzuurstof|Heledag-stress|Gereedheid|Charge|Trainingsbelasting|Voedingslog|Eerdere historie',
+      advancedLogin: 'Alleen inloggen met Zepp-e-mail of -telefoonnummer + wachtwoord',
+      advancedNoThirdParty: 'Inloggen via Google, Apple, WeChat, Xiaomi en andere derden werkt niet',
+      footer: 'Met alleen de officiële autorisatie komt er niets binnen uit de kolom Geavanceerde gegevens. Dat is een beperking van wat het officiële kanaal biedt, geen fout in ZeppBridge. We hebben dit bij Zepp (Huami) aangekaart, maar nog geen reactie ontvangen.',
+      close: 'Begrepen',
+    },
+    'components/shell/UpdateNotice': {
+      title: (version: string) => `Bijgewerkt naar v${version}`,
+      since: (version: string) => `Was v${version}`,
+      acknowledge: 'Begrepen',
+      star: 'Ster geven op GitHub',
+      next: 'Bekijk wat er nieuw is',
+      empty: 'Deze versie heeft geen release-opmerkingen.',
+      added: 'Nieuw',
+      improved: 'Verbeterd',
+      fixed: 'Opgelost',
+      note: 'Wijziging',
+    },
     'components/OfficialOnlyNote': {
       text: 'Alleen officiële Zepp-autorisatie verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht synchroniseren. HRV, bloedzuurstof, stress, gereedheid en trainingsbelasting biedt de officiële koppeling niet aan — daarvoor koppel je ‘Geavanceerde gegevens’.',
       action: 'Verbinden',
@@ -1480,9 +1505,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         `Na de volgende geslaagde synchronisatie worden gegevens ouder dan ${date} gesnoeid`,
       retry: 'Opnieuw proberen',
       scaleLabel: 'Interface-schaling',
-      starAction: 'Een ster geven',
-      starBody: 'Een ster op GitHub helpt meer mensen het te vinden.',
-      starTitle: 'Heeft ZeppBridge je geholpen?',
       stream: {
         blood_pressure: 'Bloeddruk',
         daily_activity: 'Dagelijkse activiteit',
@@ -2946,6 +2968,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       language: (lang: string) => `- Schrijf name, focus, description, summary en note in het ${lang}: ze worden exact zo getoond in ZeppBridge en op het horloge.`,
     },
     'views/settings/sections/account': {
+      whySub: 'Geavanceerde gegevens loggen alleen in met Zepp-e-mail of -telefoonnummer en wachtwoord',
+      waitingHint: 'Sta het toe in je browser, dan verbindt dit vanzelf',
+      checkNow: 'Nu controleren',
       accountFallback: 'Zepp-account',
       official: (state: string) => `Officieel ${state}`,
       advanced: (state: string) => `Geavanceerde gegevens ${state}`,
@@ -3429,8 +3454,18 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       'De Zepp-regiodienst is nu onbereikbaar — controleer je netwerk en probeer opnieuw',
     'err.login.state_unavailable': 'De toestand van de app is niet beschikbaar',
     'err.login.sync_init_failed': 'Ingelogd, maar synchroniseren kon niet worden geïnitialiseerd',
-    'err.login.third_party_stalled':
-      'De login via een derde lijkt vast te lopen. Google-passkeys blijven in een in-app-venster vaak op de verificatiestap hangen. Sluit het inlogvenster en gebruik e-mail + wachtwoord, of voer via Instellingen handmatig een App Token in.',
+    'err.login.third_party_blocked':
+      'Geavanceerde gegevens werken alleen met inloggen via Zepp-e-mailadres of -telefoonnummer en wachtwoord — Google, Apple, WeChat en Xiaomi werken hier niet. Log je bij Zepp in met een daarvan, gebruik dan de officiële autorisatie.',
+    'err.login.other_account':
+      'Dit is een ander Zepp-account: het account waarmee je net inlogde is niet het account dat je officieel hebt geautoriseerd, dus er is niets opgeslagen. Heb je je Zepp-account met Google, Apple of een andere dienst aangemaakt, dan telt inloggen met hetzelfde e-mailadres en een wachtwoord als een nieuw account.',
+    'err.official.other_account':
+      'Dit is een ander Zepp-account: het account dat je autoriseerde is niet het account dat voor geavanceerde gegevens is ingelogd, dus deze autorisatie is niet opgeslagen. Heb je je Zepp-account met Google, Apple of een andere dienst aangemaakt, dan telt inloggen met hetzelfde e-mailadres en een wachtwoord als een nieuw account.',
+    'err.official.relay_unreachable':
+      'Je browser toont de autorisatie misschien al als voltooid, maar ZeppBridge kan zeppbridge.com niet bereiken om die op te halen. Gebruikt je browser een proxy en de app niet, zet dan de systeemproxy aan (of laat je proxytool alle apps afhandelen) en kies ‘Nu controleren’.',
+    'err.official.still_pending':
+      'Net gecontroleerd: de relay heeft deze autorisatie nog niet ontvangen. Controleer of je in de browser hebt toegestaan en de bevestigingspagina zag. Kwam die pagina van een eerdere poging, start de autorisatie dan opnieuw.',
+    'err.backfill.start_too_early':
+      'Startdatum te vroeg — je kunt hooguit de laatste 3650 dagen ophalen',
     'err.official.browser': 'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
     'err.official.denied': 'Je hebt geen toegang gegeven, dus ZeppBridge heeft niets ontvangen.',
     'err.official.rejected': 'Zepp heeft deze autorisatie niet geaccepteerd — probeer opnieuw',

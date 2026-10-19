@@ -1,6 +1,6 @@
-//! 和中转站、官方接口说话的 HTTP 客户端。只连两个固定主机，不跟随跳转。
+//! 和中转站、官方接口说话的 HTTP 客户端。只连固定的几个主机（中转站主域名与备用域名、官方接口），不跟随跳转。
 
-use super::{OfficialTokens, API_BASE, RELAY_BASE};
+use super::{OfficialTokens, API_BASE, RELAY_BASE, RELAY_FALLBACK_BASE};
 use crate::models::{error::Result, ZeppBridgeError};
 use serde::Deserialize;
 use serde_json::json;
@@ -76,12 +76,16 @@ async fn bounded_json(response: reqwest::Response) -> Result<serde_json::Value> 
 pub struct OfficialClient {
     http: reqwest::Client,
     relay_base: String,
+    /// 主中转站连不上（发不出请求）时再试的地址。测试里为空。
+    relay_fallback: Option<String>,
     api_base: String,
 }
 
 impl OfficialClient {
     pub fn new() -> Result<Self> {
-        Self::with_bases(RELAY_BASE, API_BASE)
+        let mut client = Self::with_bases(RELAY_BASE, API_BASE)?;
+        client.relay_fallback = Some(RELAY_FALLBACK_BASE.to_string());
+        Ok(client)
     }
 
     /// 测试用：指到本地假服务。正式代码只走 [`Self::new`] 的两个固定主机。
@@ -98,16 +102,38 @@ impl OfficialClient {
         Ok(Self {
             http,
             relay_base: relay_base.trim_end_matches('/').to_string(),
+            relay_fallback: None,
             api_base: api_base.trim_end_matches('/').to_string(),
         })
     }
 
+    /// 往中转站 POST 一次。请求根本没发出去（DNS、连接、超时）时换备用地址再试；
+    /// 拿到了任何 HTTP 响应就不换——那是中转站的回答，不是网络问题。
+    async fn post_relay(&self, path: &str, body: &serde_json::Value) -> Result<reqwest::Response> {
+        let primary = self
+            .http
+            .post(format!("{}{path}", self.relay_base))
+            .json(body)
+            .send()
+            .await;
+        match (primary, self.relay_fallback.as_deref()) {
+            (Ok(response), _) => Ok(response),
+            (Err(_), Some(fallback)) => Ok(self
+                .http
+                .post(format!("{fallback}{path}"))
+                .json(body)
+                .send()
+                .await?),
+            (Err(error), None) => Err(error.into()),
+        }
+    }
+
     pub async fn claim(&self, state: &str, claim_secret: &str, now: i64) -> Result<ClaimOutcome> {
         let response = self
-            .http
-            .post(format!("{}/api/zepp/oauth/claim", self.relay_base))
-            .json(&json!({ "state": state, "claim_secret": claim_secret }))
-            .send()
+            .post_relay(
+                "/api/zepp/oauth/claim",
+                &json!({ "state": state, "claim_secret": claim_secret }),
+            )
             .await?;
         let status = response.status().as_u16();
         if status == 404 {
@@ -142,10 +168,10 @@ impl OfficialClient {
             return Ok(RefreshOutcome::Revoked);
         };
         let response = self
-            .http
-            .post(format!("{}/api/zepp/oauth/refresh", self.relay_base))
-            .json(&json!({ "access_token": tokens.access_token, "refresh_token": refresh_token }))
-            .send()
+            .post_relay(
+                "/api/zepp/oauth/refresh",
+                &json!({ "access_token": tokens.access_token, "refresh_token": refresh_token }),
+            )
             .await?;
         let status = response.status().as_u16();
         if status == 401 {

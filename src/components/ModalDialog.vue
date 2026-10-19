@@ -103,6 +103,10 @@ onUnmounted(() => {
 .dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
 /* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
 .dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
+/* 面板本身只是焦点的落脚点（打开时 focus 它，读屏会念标题），不是控件。启动时弹出的更新提示前面没有
+   任何鼠标操作，Chromium 把这次程序聚焦当成键盘聚焦，全局 :focus-visible 就给整块弹窗描了一圈浅色框
+   （用户 2026-10-19 截图）。里面按钮的焦点框照常。 */
+.dialog-panel:focus, .dialog-panel:focus-visible { outline: none; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 </style>

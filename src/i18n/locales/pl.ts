@@ -827,6 +827,31 @@ export default {
     summary: (list: string) => `Brak odczytów w ostatnich 6 miesiącach: ${list}`,
     separator: ', ',
   },
+"components/WhyHalfData": {
+  title: 'Dlaczego brakuje części danych?',
+  lead: 'ZeppBridge ma dwa połączenia i nie zwracają one tych samych danych.',
+  officialName: 'Oficjalna autoryzacja',
+  officialHas: 'Tętno|Sen|Kroki|Treningi|PAI|Waga',
+  officialLacks: 'Nie można pobrać wcześniejszej historii',
+  advancedName: 'Dane zaawansowane',
+  advancedHas: 'HRV|Natlenienie krwi|Całodobowy stres|Gotowość|Charge|Obciążenie treningowe|Wpisy żywieniowe|Wcześniejsza historia',
+  advancedLogin: 'Tylko e-mail lub numer telefonu Zepp + hasło',
+  advancedNoThirdParty: 'Logowanie przez Google, Apple, WeChat, Xiaomi ani inne usługi zewnętrzne nie działa',
+  footer: 'Przy samej oficjalnej autoryzacji nic z kolumny „Dane zaawansowane” nie jest pobierane — to ograniczenie oficjalnego kanału, a nie błąd ZeppBridge. Zgłosiliśmy to do Zepp (Huami), ale dotąd nie otrzymaliśmy odpowiedzi.',
+  close: 'Rozumiem',
+},
+"components/shell/UpdateNotice": {
+  title: (version: string) => `Zaktualizowano do v${version}`,
+  since: (version: string) => `Poprzednio v${version}`,
+  acknowledge: 'Rozumiem',
+  star: 'Daj gwiazdkę na GitHubie',
+  next: 'Zobacz, co nowego',
+  empty: 'Ta wersja nie zawiera informacji o wydaniu.',
+  added: 'Nowości',
+  improved: 'Ulepszenia',
+  fixed: 'Poprawki',
+  note: 'Aktualizacja',
+},
 // Source: src/components/OfficialOnlyNote.i18n.ts
 "components/OfficialOnlyNote": {
     text: 'Podłączono tylko oficjalną autoryzację Zepp: synchronizowane są tętno, sen, kroki, treningi, PAI i waga. Oficjalne API nie udostępnia HRV, natlenienia krwi, stresu, gotowości ani obciążenia treningowego — połącz dane zaawansowane, aby je uzyskać.',
@@ -1195,15 +1220,6 @@ export default {
     waitingSync: 'Oczekiwanie na zakończenie synchronizacji…',
     applying: 'Aktualizowanie…',
   },
-// Source: src/components/shell/UpdateNotice.i18n.ts
-"components/shell/UpdateNotice": {
-  title: (version: string) => `Zaktualizowano do v${version}`,
-  since: (version: string) => `Poprzednio v${version}`,
-  acknowledge: 'Rozumiem',
-  fullNotes: 'Zobacz pełną listę zmian',
-  empty: 'Do tej wersji nie dołączono informacji o wydaniu. Szczegóły znajdziesz na stronie wydania.',
-  added: 'Nowości', improved: 'Ulepszenia', fixed: 'Poprawki', note: 'Aktualizacja',
-},
 // Source: src/components/StageBar.vue
 "components/StageBar": {
     notProvided: 'Nie podano',
@@ -1542,8 +1558,18 @@ export default {
       'Nie udało się połączyć z usługą regionu Zepp — sprawdź sieć i spróbuj ponownie',
     'err.login.region_retrying':
       'Nie można połączyć się z usługą regionu Zepp — ponawianie próby. Okno logowania pozostaje otwarte; nie trzeba logować się ponownie',
-    'err.login.third_party_stalled':
-      'Logowanie przez stronę trzecią zawiesiło się — klucze dostępu Google (passkeys) często zatrzymują się na weryfikacji wewnątrz wbudowanego okna. Zamknij okno logowania i użyj adresu e-mail + hasła lub wprowadź token aplikacji ręcznie w Ustawieniach.',
+    'err.login.third_party_blocked':
+      'Dane zaawansowane obsługują tylko logowanie adresem e-mail lub numerem telefonu Zepp i hasłem — Google, Apple, WeChat i Xiaomi tu nie działają. Jeśli logujesz się do Zepp przez jedną z tych usług, użyj oficjalnej autoryzacji.',
+    'err.login.other_account':
+      'To inne konto Zepp: konto, na które właśnie zalogowano, nie jest tym autoryzowanym oficjalnie, więc nic nie zapisano. Jeśli konto Zepp założono przez Google, Apple lub inną usługę, logowanie tym samym adresem e-mail i hasłem to dla Zepp nowe konto.',
+    'err.official.other_account':
+      'To inne konto Zepp: autoryzowane konto nie jest tym zalogowanym do danych zaawansowanych, więc tej autoryzacji nie zapisano. Jeśli konto Zepp założono przez Google, Apple lub inną usługę, logowanie tym samym adresem e-mail i hasłem to dla Zepp nowe konto.',
+    'err.official.relay_unreachable':
+      'Przeglądarka może już pokazywać autoryzację jako zakończoną, ale ZeppBridge nie może połączyć się z zeppbridge.com, aby ją odebrać. Jeśli przeglądarka korzysta z proxy, a aplikacja nie, włącz proxy systemowe (lub pozwól narzędziu proxy obsługiwać wszystkie aplikacje) i wybierz „Sprawdź teraz”.',
+    'err.official.still_pending':
+      'Właśnie sprawdzono: pośrednik nie otrzymał jeszcze tej autoryzacji. Upewnij się, że zatwierdzono ją w przeglądarce i pojawiła się strona potwierdzenia. Jeśli ta strona pochodzi z wcześniejszej próby, rozpocznij autoryzację ponownie.',
+    'err.backfill.start_too_early':
+      'Data początkowa jest zbyt wczesna — można pobrać wstecz najwyżej ostatnie 3650 dni',
     'err.login.bad_url': 'Nieprawidłowy adres logowania',
     'err.login.window_failed': 'Nie udało się otworzyć okna logowania',
     'err.login.window_busy':
@@ -2978,9 +3004,6 @@ Kontynuować?`,
     privacyTokenBody: 'Domyślnie używany jest Menedżer poświadczeń Windows / pęk kluczy macOS / baza kluczy Linux (keyring). Systemy macOS i Linux mogą jawnie korzystać z pliku poświadczeń w postaci zwykłego tekstu, możliwego do odczytu i zapisu tylko przez Twojego użytkownika; Linux obsługuje także zmienne środowiskowe. Plik auth.json przechowuje wyłącznie metadane konta i regionu. Tokeny nigdy nie trafiają do dzienników zdarzeń, eksportów danych ani raportów błędów.',
     privacyTelemetryTitle: 'Brak telemetrii i statystyk użytkowania',
     privacyTelemetryBody: 'Aplikacja sama z siebie nie przesyła żadnych danych o użytkowaniu. Jedynie naciśnięcie przycisku „Wyślij raport o błędzie” wysyła zanonimizowane pola wymienione poniżej.',
-    starTitle: 'Czy ZeppBridge Ci pomógł?',
-    starBody: 'Gwiazdka na GitHubie pomoże innym łatwiej go znaleźć.',
-    starAction: 'Dodaj gwiazdkę na GitHubie',
     privacyReportTitle: 'Urządzenie lub trening nie zostały rozpoznane?',
     privacyReportBody: 'Bez konta GitHub, bez ręcznego kopiowania danych. Po potwierdzeniu tylko struktury pól na poziomie produktu, wersja oprogramowania układowego, numery na poziomie modelu (liczby całkowite — określające jedynie model) oraz kody i liczby nieznanych treningów trafiają do prywatnego magazynu zgłoszeń ZeppBridge. Nigdy: dane konta, tokeny, numery seryjne, ID urządzeń, adresy MAC, współrzędne GPS, wartości zdrowotne, surowe odpowiedzi ani lokalne ścieżki.',
 
@@ -3322,6 +3345,9 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
 
   // Source: src/views/settings/sections/account.i18n.ts
   "views/settings/sections/account": {
+    whySub: 'Dane zaawansowane logują się tylko e-mailem lub telefonem Zepp i hasłem',
+    waitingHint: 'Zatwierdź w przeglądarce, a połączenie nastąpi samo',
+    checkNow: 'Sprawdź teraz',
     accountFallback: 'Konto Zepp',
     official: (state: string) => `Oficjalne: ${state}`,
     advanced: (state: string) => `Zaawansowane dane: ${state}`,

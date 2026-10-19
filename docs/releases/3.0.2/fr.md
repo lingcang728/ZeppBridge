@@ -1,0 +1,6 @@
+- Fixed: **Rattrapage de l’historique (#136)** : « Tout (jusqu’à 10 ans) » n’échoue plus avec « date invalide », et le sélecteur de date de début personnalisée n’est plus vide.
+- Improved: **Connexion aux données avancées par e-mail ou téléphone + mot de passe uniquement**. La fenêtre de connexion l’explique en haut et masque les boutons tiers. Si vous vous connectez à un autre compte que celui autorisé officiellement, ZeppBridge vous le signale directement.
+- Improved: **L’autorisation officielle n’attend plus sans explication**. Si ZeppBridge n’arrive pas à joindre zeppbridge.com, l’application en explique la cause et indique quoi vérifier. Le nouveau bouton « Vérifier maintenant » vérifie tout de suite, et une adresse de secours est essayée automatiquement.
+- Added: **« Pourquoi certaines données manquent-elles ? »** est toujours accessible dans Paramètres → Compte.
+- Added: **Interface en polonais**.
+- Improved: **Les notes de version suivent la langue de l’interface**, dans les 12 langues.

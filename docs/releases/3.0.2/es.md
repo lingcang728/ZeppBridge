@@ -1,0 +1,6 @@
+- Fixed: **Recuperación del historial (#136)**: «Todo (hasta 10 años)» ya no falla con «fecha no válida», y el selector de fecha de inicio personalizada ya no aparece vacío.
+- Improved: **El inicio de sesión de datos avanzados ahora solo admite correo o teléfono + contraseña**. La ventana lo explica arriba y oculta los botones de terceros; si entras con una cuenta distinta de la que autorizaste oficialmente, ZeppBridge te avisa de inmediato.
+- Improved: **La autorización oficial ya no espera en silencio**. Si no se logra conectar con zeppbridge.com, indica el motivo y qué revisar. El nuevo botón «Comprobar ahora» comprueba al momento, y se prueba automáticamente una dirección de respaldo.
+- Added: **«¿Por qué faltan algunos datos?»** está siempre disponible en Configuración → Cuenta.
+- Added: **Interfaz en polaco**.
+- Improved: **Las notas de la versión siguen el idioma de la interfaz**, en los 12 idiomas.

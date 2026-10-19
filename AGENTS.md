@@ -6,7 +6,7 @@
 
 - 3.0.0 已发布（PR #126 把 v3 压缩合进 main，标签 `v3.0.0`）。**从此直接在 `main` 上开发**，本目录检出的就是 `main`。
 - `v3` 分支冻结：不再往上提交，不从它开新分支，也不再合回 main。2.x 不再维护。
-- `main` 有分支保护，改动走 PR。必需检查为 Documentation and CI routing、Windows / macOS verification；当前允许管理员显式绕过检查。
+- 仓库主人直接提交推送 `main`，不开 PR（2026-10-19 定）：动手前 `git pull --rebase origin main`，本地门禁跑完再推；push 会自动跑 CI，打 `v*` 标签前确认 main 最新 CI 是绿的。分支保护（Documentation and CI routing、Windows / macOS verification）只拦外部 PR，管理员不受限。
 - 普通 README、文档 Markdown 和文档图片改动只跑轻量文档检查，三平台构建及 Docker 跳过。参与 Rust 契约测试的 `docs/reference/cli-and-mcp*.md`、代码、配置、脚本及未知文件仍跑完整验证。发布标签与手动 CI 始终跑完整流程。
 - **推 `v*` 标签就会触发 CI 打包并创建 GitHub Release**，已装用户随即收到更新。推送、打标签、发版先问用户。
 

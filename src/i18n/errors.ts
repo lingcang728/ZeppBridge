@@ -85,8 +85,18 @@ const messages = defineMessages(
     'err.login.credentials_rejected': 'Zepp 拒绝了这次登录凭据，退出登录窗口后重新登录',
     'err.login.region_unreachable': '暂时连不上 Zepp 区域服务，检查网络后重试',
     'err.login.region_retrying': '暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着，不用重新登录',
-    'err.login.third_party_stalled':
-      '第三方登录好像卡住了。Google 通行密钥在应用内窗口里经常停在验证那一步。可以关掉登录窗口改用邮箱+密码，或者在设置里手动填 App Token。',
+    'err.login.third_party_blocked':
+      '高级数据只支持 Zepp 邮箱 / 手机号 + 密码登录，Google、Apple、微信、小米等第三方登录在这里用不了。用第三方登录的账号请改走官方授权。',
+    'err.login.other_account':
+      '这是另一个 Zepp 账号：刚才登录的和官方授权的不是同一个账号，没有写入任何数据。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。',
+    'err.official.other_account':
+      '这是另一个 Zepp 账号：官方授权的和高级数据登录的不是同一个账号，没有保存这次授权。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。',
+    'err.official.relay_unreachable':
+      '浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理（或让代理软件接管所有应用），然后点「立即检查」。',
+    'err.official.still_pending':
+      '刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意，并看到了授权成功的页面；如果那是之前另一次的授权页，请重新点一次授权。',
+    'err.backfill.start_too_early':
+      '补拉起点太早：最多只能补拉最近 3650 天',
     'err.login.bad_url': '登录地址无效',
     'err.login.window_failed': '无法打开登录窗口',
     'err.login.window_busy': '上一个登录窗口还没关完，稍等一下再试',
@@ -276,8 +286,18 @@ const messages = defineMessages(
       "Could not reach the Zepp region service — check your network and retry",
     'err.login.region_retrying':
       "Cannot reach the Zepp region service — retrying. The sign-in window stays open; no need to sign in again",
-    'err.login.third_party_stalled':
-      'Third-party sign-in looks stuck — Google passkeys often stall at verification inside an in-app window. Close the sign-in window and use email + password, or enter an App Token manually in Settings.',
+    'err.login.third_party_blocked':
+      'Advanced data only supports signing in with a Zepp email or phone number and password — Google, Apple, WeChat and Xiaomi sign-in don’t work here. If you sign in to Zepp with one of those, use official authorization instead.',
+    'err.login.other_account':
+      'This is a different Zepp account: the account you just signed in with isn’t the one you authorized officially, so nothing was saved. If you created your Zepp account with Google, Apple or another third party, signing in with the same email and a password counts as a new Zepp account.',
+    'err.official.other_account':
+      'This is a different Zepp account: the account you authorized isn’t the one signed in for advanced data, so this authorization wasn’t saved. If you created your Zepp account with Google, Apple or another third party, signing in with the same email and a password counts as a new Zepp account.',
+    'err.official.relay_unreachable':
+      'Your browser may already show the authorization as done, but ZeppBridge can’t reach zeppbridge.com to collect it. If your browser uses a proxy and the app doesn’t, turn on the system proxy (or let your proxy tool cover all apps), then choose “Check now”.',
+    'err.official.still_pending':
+      'Just checked: the relay hasn’t received this authorization yet. Make sure you approved it in the browser and saw the success page. If that page came from an earlier attempt, start the authorization again.',
+    'err.backfill.start_too_early':
+      'Backfill start is too early — at most the last 3650 days can be backfilled',
     'err.login.bad_url': 'Invalid sign-in address',
     'err.login.window_failed': "Could not open sign-in window",
     'err.login.window_busy':
@@ -479,8 +499,18 @@ const messages = defineMessages(
       'Sin conexión con el servicio de regiones de Zepp: revisa tu red y reintenta',
     'err.login.region_retrying':
       'Sin conexión con el servicio de regiones de Zepp; reintentando. La ventana sigue abierta, no es necesario reiniciar sesión',
-    'err.login.third_party_stalled':
-      'Inicio de sesión externo atascado: las llaves de paso de Google suelen bloquearse en ventanas embebidas. Cierra la ventana y usa correo + contraseña, o ingresa un App Token en Configuración.',
+    'err.login.third_party_blocked':
+      'Los datos avanzados solo admiten iniciar sesión con correo o teléfono de Zepp y contraseña; Google, Apple, WeChat y Xiaomi no funcionan aquí. Si entras en Zepp con uno de ellos, usa la autorización oficial.',
+    'err.login.other_account':
+      'Es otra cuenta de Zepp: la cuenta con la que acabas de entrar no es la que autorizaste oficialmente, así que no se guardó nada. Si creaste tu cuenta de Zepp con Google, Apple u otro servicio, entrar con el mismo correo y una contraseña cuenta como una cuenta nueva.',
+    'err.official.other_account':
+      'Es otra cuenta de Zepp: la cuenta que autorizaste no es la que tiene sesión en los datos avanzados, así que no se guardó esta autorización. Si creaste tu cuenta de Zepp con Google, Apple u otro servicio, entrar con el mismo correo y una contraseña cuenta como una cuenta nueva.',
+    'err.official.relay_unreachable':
+      'Puede que el navegador ya muestre la autorización como hecha, pero ZeppBridge no logra conectar con zeppbridge.com para recogerla. Si el navegador usa un proxy y la app no, activa el proxy del sistema (o deja que tu herramienta de proxy cubra todas las apps) y elige «Comprobar ahora».',
+    'err.official.still_pending':
+      'Acabamos de comprobar: el intermediario aún no ha recibido esta autorización. Confirma que la aprobaste en el navegador y viste la página de éxito. Si esa página era de un intento anterior, vuelve a iniciar la autorización.',
+    'err.backfill.start_too_early':
+      'El inicio del historial es demasiado antiguo: como máximo se pueden recuperar los últimos 3650 días',
     'err.login.bad_url': 'Dirección de inicio de sesión no válida',
     'err.login.window_failed': 'No se pudo abrir la ventana de inicio de sesión',
     'err.login.window_busy':

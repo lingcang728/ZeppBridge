@@ -2,7 +2,12 @@
 
 use super::*;
 
-pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
+pub(super) fn spawn_login_poll(
+    app: AppHandle,
+    epoch: u64,
+    window: WebviewWindow,
+    third_party_blocked: Arc<AtomicBool>,
+) {
     tauri::async_runtime::spawn(async move {
         let started = std::time::Instant::now();
         let mut fallback_used = false;
@@ -18,11 +23,6 @@ pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow
         // 凭据已经读到了，卡住的是后面的区域确认。这和「压根没登录」「登录了
         // 但读不到凭据」都不一样，超时那一刻得说对是哪一种。
         let mut credentials_extracted = false;
-        // 当前停在哪一页、从什么时候开始停的。第三方授权页的停滞提示按这个计时，
-        // 而不是按整场登录——不然在授权页之间正常来回跳也会被算成卡住。
-        let mut current_page = String::new();
-        let mut page_since = std::time::Instant::now();
-        let mut third_party_hinted = false;
 
         loop {
             if !epoch_active(&app, epoch) {
@@ -52,24 +52,15 @@ pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow
             }
 
             let page_url = current_page_url(&window);
-            if page_url != current_page {
-                current_page = page_url.clone();
-                page_since = std::time::Instant::now();
-                third_party_hinted = false;
-            }
-            if third_party_stall_is_due(
-                &page_url,
-                page_since.elapsed(),
-                credentials_extracted,
-                third_party_hinted,
-            ) {
-                third_party_hinted = true;
+            // 点了第三方登录、被导航拦截挡下了：页面上什么都不会发生，所以在
+            // 主窗口里说清楚为什么。窗口留着，换成邮箱 + 密码就能接着登。
+            if third_party_blocked.swap(false, Ordering::SeqCst) && !credentials_extracted {
                 emit_progress(
                     &app,
                     epoch,
                     "waiting",
-                    "err.login.third_party_stalled",
-                    "第三方登录好像卡住了。可以关掉这个窗口，改用邮箱+密码登录；也可以在设置里手动填写 App Token。",
+                    "err.login.third_party_blocked",
+                    "高级数据只支持 Zepp 邮箱 / 手机号 + 密码登录，Google、Apple、微信、小米等第三方登录在这里用不了。用第三方登录的账号请走官方授权。",
                     &page_url,
                 )
                 .await;
@@ -86,8 +77,8 @@ pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow
                         None => {}
                     }
                 } else {
-                    // 地址已经不是我们打开的那一页——小米验证码页、Google /
-                    // Facebook 授权页、微信扫码页。用户正在登录流程里。
+                    // 地址已经不是我们打开的那一页——Zepp 的通用登录页、
+                    // 验证码页。用户正在登录流程里。
                     user_active = true;
                 }
             }
@@ -255,6 +246,11 @@ pub(super) async fn persist_extracted_login(
         return Err(LoginFailure::cancelled());
     }
 
+    // 官方授权连的是另一个 Zepp 账号：明说，不要静默只出一半数据。最常见的是
+    // 当初用 Google 注册、这里用同一个邮箱加密码登录——Zepp 当成了新账号。
+    if let Some(error) = other_account_than_official(&state.data_dir, &auth.user_id) {
+        return Err(LoginFailure::fatal(error));
+    }
     // 库属于另一个账号就不存这把令牌（R06）。
     if let Err(error) =
         crate::commands::claim_library_for_login(&state.data_dir, &auth.user_id).await
@@ -275,6 +271,26 @@ pub(super) async fn persist_extracted_login(
         return Err(LoginFailure::cancelled());
     }
     Ok(())
+}
+
+/// 高级数据登录拿到的账号和已保存的官方授权账号不是同一个时，给出要显示的错误。
+///
+/// 两边的 user_id 是同一套编号（2026-10-19 用真实库核对过：同一账号两边完全相等），
+/// 可以直接比。
+pub(super) fn other_account_than_official(
+    data_dir: &std::path::Path,
+    user_id: &str,
+) -> Option<AppError> {
+    let official = zeppbridge_core::official::OfficialStore::new(data_dir)
+        .meta()
+        .ok()
+        .flatten()?;
+    crate::commands::accounts_differ(&official.user_id, user_id).then(|| {
+        AppError::new(
+            "err.login.other_account",
+            "这是另一个 Zepp 账号：刚才登录的和官方授权的不是同一个账号，没有写入任何数据。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。",
+        )
+    })
 }
 
 pub(super) async fn apply_persisted_login(

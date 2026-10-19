@@ -1,0 +1,6 @@
+- Fixed: **Geschiedenis ophalen (#136)**: ‘Alles (tot 10 jaar)’ mislukt niet meer met ‘ongeldige datum’, en de keuzelijst voor een eigen startdatum is niet meer leeg.
+- Improved: **Geavanceerde gegevens loggen alleen in met e-mail of telefoonnummer + wachtwoord**. Het inlogvenster legt dat bovenaan uit en verbergt de knoppen van derden; log je in met een ander account dan je officieel hebt geautoriseerd, dan zegt ZeppBridge dat meteen.
+- Improved: **Officiële autorisatie wacht niet meer stilzwijgend**. Als zeppbridge.com niet bereikbaar is, legt de app uit waarom en wat je kunt controleren. Met de nieuwe knop ‘Nu controleren’ controleer je direct, en er wordt automatisch een reserveadres geprobeerd.
+- Added: **‘Waarom ontbreken sommige gegevens?’** staat altijd klaar in Instellingen → Zepp-account.
+- Added: **Poolse interface**.
+- Improved: **Release-opmerkingen volgen nu je interfacetaal**, in alle 12 talen.

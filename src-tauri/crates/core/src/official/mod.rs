@@ -25,6 +25,9 @@ use sha2::{Digest, Sha256};
 /// 同一套 D1：Zepp 控制台登记的授权回调仍是 pages.dev（server/zepp/official.js 的 REDIRECT_URI），
 /// 授权从这里开始、回调落在 pages.dev，状态在同一个库里，互不影响。旧版本应用继续用 pages.dev 也照常可用。
 pub const RELAY_BASE: &str = "https://zeppbridge.com";
+/// 主域名连不上时再试一次的同一个中转站。有的网络里新域名不通、pages.dev 通
+/// （或者反过来）；两个地址背后是同一套 D1，从哪个领都一样。
+pub const RELAY_FALLBACK_BASE: &str = "https://zeppbridge.pages.dev";
 /// 官方数据接口。
 pub const API_BASE: &str = "https://api-open.zepp.com";
 

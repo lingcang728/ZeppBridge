@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { acknowledgeUpdate, notesForLocale, prepareUpdateNotice, releaseRows, rememberUpdate, restoreUpdateNotice, updateNotice } from '../updateNotice';
+import {
+  BUNDLED_VERSION, acknowledgeUpdate, bundledNoteLocales, emphasis, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale,
+  prepareUpdateNotice, releaseRows, rememberUpdate, restoreUpdateNotice, updateNotice,
+} from '../updateNotice';
+import { LOCALES } from '../../i18n';
+import { FALLBACK_APP_VERSION } from '../../lib/appVersion';
 
 describe('release notes after a successful restart', () => {
   let storage: Map<string, string>;
@@ -48,18 +53,19 @@ describe('release notes after a successful restart', () => {
     expect(() => restoreUpdateNotice('3.0.1')).not.toThrow();
     expect(() => acknowledgeUpdate()).not.toThrow();
   });
-  it('shows bundled notes to a legacy user only after launching the installed new version', () => {
+  it('shows bundled notes to a legacy user only after launching the installed new version', async () => {
     storage.set('zeppbridge.tour.firstLaunch', '1');
     prepareUpdateNotice();
     expect(updateNotice.receipt).toBeNull();
     restoreUpdateNotice('3.0.0');
     expect(updateNotice.receipt).toBeNull();
-    restoreUpdateNotice('3.0.1');
+    restoreUpdateNotice(BUNDLED_VERSION);
     expect(updateNotice.receipt?.from).toBe('');
-    expect(updateNotice.receipt?.notes).toContain('Italian');
+    // 正文不再塞进回执：显示时按界面语言从打包的文件里取。
+    expect(await loadBundledNotes(BUNDLED_VERSION, 'en')).toContain('Polish');
     acknowledgeUpdate();
     prepareUpdateNotice();
-    restoreUpdateNotice('3.0.1');
+    restoreUpdateNotice(BUNDLED_VERSION);
     expect(updateNotice.receipt).toBeNull();
   });
   it('never mistakes first-launch onboarding or a same-version relaunch for an upgrade', () => {
@@ -87,5 +93,62 @@ describe('release notes after a successful restart', () => {
       { text: '错误', kind: 'fixed', heading: false },
       { text: '<script>bad()</script>', kind: 'note', heading: false },
     ]);
+  });
+});
+
+/*
+ * 门禁：当前版本的更新说明必须十二种界面语言齐全。以前只有中英两段，其余十种语言
+ * 一律看英文——发版时漏翻一种，这里就挂。
+ */
+describe('bundled release notes for the current version', () => {
+  it('ships the notes for the version this build is', () => {
+    expect(BUNDLED_VERSION).toBe(FALLBACK_APP_VERSION);
+  });
+  it('has one file per interface language, each with categorized lines', async () => {
+    expect(bundledNoteLocales()).toEqual([...LOCALES].sort());
+    for (const language of LOCALES) {
+      const notes = await loadBundledNotes(BUNDLED_VERSION, language);
+      expect(notes, language).toBeTruthy();
+      const rows = releaseRows(notes!);
+      expect(rows.length, language).toBeGreaterThan(0);
+      // 每一行都带类别词：漏写的话界面上只会显示一个笼统的「更新」。
+      expect(rows.filter((row) => row.kind === 'note'), language).toEqual([]);
+    }
+  });
+  it('zh and en follow docs/releases/README.md: every line opens with one bold lead', async () => {
+    for (const language of ['zh', 'en']) {
+      for (const row of releaseRows((await loadBundledNotes(BUNDLED_VERSION, language))!)) {
+        const segments = emphasis(row.text);
+        expect(segments[0]?.strong, `${language}: ${row.text}`).toBe(true);
+        expect(segments.filter((segment) => segment.strong).length, `${language}: ${row.text}`).toBe(1);
+      }
+    }
+  });
+  it('falls back to English for an unknown language and to nothing for another version', async () => {
+    expect(await loadBundledNotes(BUNDLED_VERSION, 'xx')).toBe(await loadBundledNotes(BUNDLED_VERSION, 'en'));
+    expect(await loadBundledNotes('2.9.9', 'zh')).toBeNull();
+  });
+  it('3.0.2 opens with the missing-data explanation', () => {
+    expect(leadsWithWhyHalfData('3.0.2')).toBe(true);
+    expect(leadsWithWhyHalfData('3.0.1')).toBe(false);
+  });
+});
+
+describe('release note layout', () => {
+  it('groups rows as added, improved, fixed, then anything else, keeping authored order', () => {
+    const rows = releaseRows('- Fixed: a\n- Added: b\n## Section\n- Improved: c\n- Added: d\nplain');
+    expect(groupRows(rows)).toEqual([
+      { kind: 'added', items: ['b', 'd'] },
+      { kind: 'improved', items: ['c'] },
+      { kind: 'fixed', items: ['a'] },
+      { kind: 'note', items: ['plain'] },
+    ]);
+  });
+  it('only understands **bold**, and never turns text into markup', () => {
+    expect(emphasis('**Lead** then <b>x</b>')).toEqual([
+      { text: 'Lead', strong: true },
+      { text: ' then <b>x</b>', strong: false },
+    ]);
+    expect(emphasis('a ** b')).toEqual([{ text: 'a ** b', strong: false }]);
   });
 });

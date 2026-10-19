@@ -73,8 +73,18 @@ export default {
     'err.login.region_unreachable': 'Zepp-Regionsdienst gerade nicht erreichbar – Netzwerk prüfen und erneut versuchen',
     'err.login.region_retrying':
       'Der Zepp-Regionsdienst ist gerade nicht erreichbar – es wird erneut versucht. Das Anmeldefenster bleibt offen, eine neue Anmeldung ist nicht nötig',
-    'err.login.third_party_stalled':
-      'Diese Drittanbieter-Anmeldung scheint zu hängen. Google-Passkeys bleiben im In-App-Fenster oft beim Verifizieren stecken. Anmeldefenster schließen und stattdessen E-Mail + Passwort nutzen, oder in den Einstellungen ein App-Token von Hand eintragen.',
+    'err.login.third_party_blocked':
+      'Erweiterte Daten unterstützen nur die Anmeldung mit Zepp-E-Mail-Adresse oder -Telefonnummer und Passwort – Google, Apple, WeChat und Xiaomi funktionieren hier nicht. Wenn du dich bei Zepp damit anmeldest, nutze stattdessen die offizielle Autorisierung.',
+    'err.login.other_account':
+      'Das ist ein anderes Zepp-Konto: Das Konto, mit dem du dich gerade angemeldet hast, ist nicht das offiziell autorisierte, daher wurde nichts gespeichert. Wenn du dein Zepp-Konto mit Google, Apple oder einem anderen Dienst erstellt hast, gilt die Anmeldung mit derselben E-Mail-Adresse und einem Passwort als neues Konto.',
+    'err.official.other_account':
+      'Das ist ein anderes Zepp-Konto: Das autorisierte Konto ist nicht das für erweiterte Daten angemeldete, daher wurde diese Autorisierung nicht gespeichert. Wenn du dein Zepp-Konto mit Google, Apple oder einem anderen Dienst erstellt hast, gilt die Anmeldung mit derselben E-Mail-Adresse und einem Passwort als neues Konto.',
+    'err.official.relay_unreachable':
+      'Dein Browser zeigt die Autorisierung vielleicht schon als erledigt, aber ZeppBridge erreicht zeppbridge.com nicht, um sie abzuholen. Wenn dein Browser einen Proxy nutzt und die App nicht, schalte den System-Proxy ein (oder lass dein Proxy-Tool alle Apps abdecken) und wähle „Jetzt prüfen“.',
+    'err.official.still_pending':
+      'Gerade geprüft: Der Vermittler hat diese Autorisierung noch nicht erhalten. Prüfe, ob du im Browser zugestimmt und die Erfolgsseite gesehen hast. Stammt die Seite von einem früheren Versuch, starte die Autorisierung neu.',
+    'err.backfill.start_too_early':
+      'Startdatum zu früh – nachladen lassen sich höchstens die letzten 3650 Tage',
     'err.login.bad_url': 'Ungültige Anmeldeadresse',
     'err.login.window_failed': 'Das Anmeldefenster konnte nicht geöffnet werden',
     'err.login.window_busy': 'Das vorige Anmeldefenster schließt noch – kurz warten und erneut versuchen',
@@ -245,6 +255,31 @@ export default {
       failed: 'Stündliche Schritte gerade nicht lesbar.',
       legend: (peak: string) => `Kräftigeres Grün heißt mehr Schritte; am kräftigsten sind etwa ${peak}`,
     },
+    'components/WhyHalfData': {
+      title: 'Warum fehlen manche Daten?',
+      lead: 'ZeppBridge hat zwei Verbindungen, und sie liefern nicht dieselben Daten.',
+      officialName: 'Offizielle Autorisierung',
+      officialHas: 'Herzfrequenz|Schlaf|Schritte|Trainings|PAI|Gewicht',
+      officialLacks: 'Kann ältere Historie nicht nachladen',
+      advancedName: 'Erweiterte Daten',
+      advancedHas: 'HRV|Blutsauerstoff|Ganztägiger Stress|Bereitschaft|Charge|Trainingsbelastung|Ernährung|Ältere Historie',
+      advancedLogin: 'Nur Zepp-E-Mail oder -Telefonnummer + Passwort',
+      advancedNoThirdParty: 'Google, Apple, WeChat, Xiaomi und andere Drittanbieter werden nicht unterstützt',
+      footer: 'Ist nur die offizielle Autorisierung verbunden, kommt nichts aus der Spalte „Erweiterte Daten“ an. Das ist eine Einschränkung der offiziellen Schnittstelle, kein Fehler von ZeppBridge. Wir haben das bei Zepp (Huami) gemeldet, bisher aber keine Antwort erhalten.',
+      close: 'Verstanden',
+    },
+    'components/shell/UpdateNotice': {
+      title: (version: string) => `Aktualisiert auf v${version}`,
+      since: (version: string) => `Vorher v${version}`,
+      acknowledge: 'Verstanden',
+      star: 'Auf GitHub einen Stern geben',
+      next: 'Neuerungen ansehen',
+      empty: 'Diese Version enthält keine Versionshinweise.',
+      added: 'Neu',
+      improved: 'Verbessert',
+      fixed: 'Behoben',
+      note: 'Änderung',
+    },
     'components/OfficialOnlyNote': {
       text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingsbelastung bietet die offizielle API nicht an – verbinde dafür „Erweiterte Daten".',
       action: 'Verbinden',
@@ -375,9 +410,6 @@ export default {
       privacyTelemetryTitle: 'Keine Telemetrie, keine Nutzungsstatistik',
       privacyTelemetryBody:
         'ZeppBridge überträgt keine Nutzungsstatistiken. Nur bei manuellem Klick auf „Fehlerbericht senden" gehen die ausgewählten anonymisierten Diagnosedaten raus.',
-      starTitle: 'Hat dir ZeppBridge geholfen?',
-      starBody: 'Ein Stern auf GitHub hilft anderen, das Projekt zu finden.',
-      starAction: 'Stern auf GitHub',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
       privacyReportBody:
         'Kein GitHub-Konto nötig. Nach deiner Bestätigung gehen nur Produkt-Feldstrukturen, Firmware, Modellnummern (Ganzzahlen – nur welches Modell) und unbekannte Trainings-Codes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge. Nie raus: Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
@@ -3171,6 +3203,9 @@ Antworte in Markdown.`,
 
     // ── views/settings/sections ──
     'views/settings/sections/account': {
+      whySub: 'Erweiterte Daten melden sich nur mit Zepp-E-Mail oder -Telefonnummer und Passwort an',
+      waitingHint: 'Im Browser zustimmen – dann verbindet sich das von selbst',
+      checkNow: 'Jetzt prüfen',
       accountFallback: 'Zepp-Konto',
       official: (state: string) => `Offiziell ${state}`,
       advanced: (state: string) => `Erweiterte Daten ${state}`,

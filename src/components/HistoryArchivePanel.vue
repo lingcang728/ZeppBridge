@@ -16,7 +16,7 @@ defineOptions({ name: 'HistoryArchivePanel' });
 const props = defineProps<{ state: ReturnType<typeof useHistoryBackfill>; prefs: UserPrefs | null }>();
 
 const {
-  t, streamLabel, ledger, busy, error, message, estimate, startChoice, customFrom, START_CHOICES,
+  t, streamLabel, ledger, busy, error, message, estimate, startChoice, customFrom, customMin, customMax, START_CHOICES,
   requestedDays, wouldBeCleanedUp, remaining, formatBytes, measuredStreams, unmeasuredStreams,
   estimateText, stopReasonText, chunkErrorText, autoContinue, isSyncing,
   retryFailed,
@@ -35,7 +35,7 @@ const {
       <div v-if="startChoice === 'custom'" class="s-row">
         <div class="s-row-main"><span class="s-row-title">{{ t.customDateLabel }}</span></div>
         <div class="s-row-control">
-          <WheelDatePicker v-model="customFrom" :aria-label="t.customDateAria" />
+          <WheelDatePicker v-model="customFrom" :min="customMin" :max="customMax" :aria-label="t.customDateAria" />
         </div>
       </div>
       </FoldTransition>

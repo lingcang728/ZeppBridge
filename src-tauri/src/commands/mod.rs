@@ -66,6 +66,15 @@ pub(crate) async fn with_write<T>(
 
 /// 保存新凭据之前核对库归属（代码审查 R06）：库已经属于另一个账号就拒绝，
 /// 什么也不写；空库或同一个账号就认下。旧通道与官方授权共用这一个入口。
+/// 两个 Zepp 账号编号是不是不同的人。任何一边为空都不算对不上——那是还没配置。
+///
+/// 官方授权和高级数据的 user_id 是同一套编号（2026-10-19 用真实库核对过：
+/// 同一账号两边完全相等），可以直接比。
+pub(crate) fn accounts_differ(a: &str, b: &str) -> bool {
+    let (a, b) = (a.trim(), b.trim());
+    !a.is_empty() && !b.is_empty() && a != b
+}
+
 pub(crate) async fn claim_library_for_login(
     data_dir: &Path,
     user_id: &str,
@@ -180,7 +189,8 @@ pub(crate) use data::{
 };
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
 pub(crate) use official::{
-    cancel_official_login, disconnect_official, get_official_status, start_official_login,
+    cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
+    start_official_login,
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{

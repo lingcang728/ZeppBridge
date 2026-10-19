@@ -1,0 +1,6 @@
+- Fixed: **Preenchimento do histórico (#136)**: “Tudo (até 10 anos)” não falha mais com “data inválida”, e o seletor de data de início personalizada não aparece mais vazio.
+- Improved: **Dados avançados agora só com e-mail ou telefone + senha**. A janela de login explica isso no topo e esconde os botões de terceiros; se você entrar com uma conta diferente da autorizada oficialmente, o ZeppBridge avisa na hora.
+- Improved: **Autorização oficial não espera mais em silêncio**. Se o ZeppBridge não conseguir acessar zeppbridge.com, agora ele explica o motivo e o que verificar. O novo botão “Verificar agora” verifica na hora, e um endereço reserva é tentado automaticamente.
+- Added: **“Por que alguns dados estão faltando?”** fica sempre disponível em Configurações → Conta.
+- Added: **Interface em polonês**.
+- Improved: **Notas de versão seguem o idioma da interface**, nos 12 idiomas.

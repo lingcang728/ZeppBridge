@@ -1,0 +1,6 @@
+- Fixed: **Historie nachladen (#136)**: „Alles (bis zu 10 Jahre)“ scheitert nicht mehr mit „ungültiges Datum“, und die Auswahl für ein eigenes Startdatum ist nicht mehr leer.
+- Improved: **Erweiterte Daten melden sich nur noch mit E-Mail oder Telefonnummer + Passwort an**. Das Anmeldefenster erklärt das oben und blendet Drittanbieter-Schaltflächen aus; meldest du dich mit einem anderen Konto an als dem offiziell autorisierten, sagt ZeppBridge dir das direkt.
+- Improved: **Offizielle Autorisierung wartet nicht mehr stumm**. Kann zeppbridge.com nicht erreicht werden, erklärt die App warum und was du prüfen kannst. Die neue Schaltfläche „Jetzt prüfen“ prüft sofort, und eine Ausweichadresse wird automatisch versucht.
+- Added: **„Warum fehlen manche Daten?“** ist jederzeit unter Einstellungen → Konto zu finden.
+- Added: **Polnische Oberfläche**.
+- Improved: **Versionshinweise folgen der Sprache der Oberfläche**, in allen 12 Sprachen.

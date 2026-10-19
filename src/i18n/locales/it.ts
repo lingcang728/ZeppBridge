@@ -373,6 +373,31 @@ export default {
     separator: ', ',
   },
 
+  'components/WhyHalfData': {
+    title: 'Perché mancano alcuni dati?',
+    lead: 'ZeppBridge ha due connessioni e non restituiscono gli stessi dati.',
+    officialName: 'Autorizzazione ufficiale',
+    officialHas: 'Frequenza cardiaca|Sonno|Passi|Allenamenti|PAI|Peso',
+    officialLacks: 'Non recupera la cronologia precedente',
+    advancedName: 'Dati avanzati',
+    advancedHas: 'HRV|SpO₂|Stress tutto il giorno|Prontezza|Charge|Carico di allenamento|Diario alimentare|Cronologia precedente',
+    advancedLogin: 'Solo e-mail o telefono Zepp + password',
+    advancedNoThirdParty: 'Non supporta l’accesso con Google, Apple, WeChat, Xiaomi né altre terze parti',
+    footer: 'Con la sola autorizzazione ufficiale non arriva nulla della colonna «Dati avanzati». È un limite del canale ufficiale, non un problema di ZeppBridge. Abbiamo segnalato la questione a Zepp (Huami), ma finora non abbiamo ricevuto risposta.',
+    close: 'Ho capito',
+  },
+  'components/shell/UpdateNotice': {
+    title: (version: string) => `Aggiornato alla v${version}`,
+    since: (version: string) => `In precedenza v${version}`,
+    acknowledge: 'Ho capito',
+    star: 'Lascia una stella su GitHub',
+    next: 'Scopri le novità',
+    empty: 'Questa versione non include note di rilascio.',
+    added: 'Novità',
+    improved: 'Miglioramenti',
+    fixed: 'Risoluzioni',
+    note: 'Aggiornamento',
+  },
   'components/OfficialOnlyNote': {
     text: 'È collegata solo l’autorizzazione ufficiale Zepp: frequenza cardiaca, sonno, passi, allenamenti, PAI e peso vengono sincronizzati. HRV, SpO₂, stress, prontezza e carico di allenamento non sono forniti dall’API ufficiale — connetti «Dati avanzati» per ottenerli.',
     action: 'Connetti',
@@ -1162,17 +1187,6 @@ export default {
     syncWait: 'Attendi il completamento della sincronizzazione',
   },
 
-  'components/shell/UpdateNotice': {
-    title: (version: string) => `Aggiornato alla v${version}`,
-    since: (version: string) => `In precedenza v${version}`,
-    acknowledge: 'Ho capito',
-    fullNotes: 'Visualizza le note di rilascio complete',
-    empty: 'Nessuna nota di rilascio inclusa con questa versione. Consulta il rilascio completo per i dettagli.',
-    added: 'Novità',
-    improved: 'Miglioramenti',
-    fixed: 'Risoluzioni',
-    note: 'Aggiornamento',
-  },
 
   'components/shell/update': {
     newVersion: (version: string) => `Versione ${version}`,
@@ -2916,9 +2930,6 @@ export default {
     privacyTokenBody: 'Predefinito: Gestione credenziali di Windows / Portachiavi di macOS / portachiavi Linux. macOS e Linux possono utilizzare esplicitamente un file di credenziali in chiaro leggibile e modificabile solo dal tuo utente; Linux supporta anche variabili di ambiente. auth.json contiene solo metadati dell’account e della regione. I token non vengono mai inseriti nei log, nelle esportazioni di dati o nelle segnalazioni di errore.',
     privacyTelemetryTitle: 'Nessuna telemetria, nessuna statistica d’uso',
     privacyTelemetryBody: 'L’applicazione non invia automaticamente alcuna informazione sulle tue abitudini d’uso. Invia i campi anonimizzati indicati sotto solo se premi esplicitamente «Invia segnalazione di errore».',
-    starTitle: 'ZeppBridge ti è stato utile?',
-    starBody: 'Una stella su GitHub aiuta altre persone a scoprirlo.',
-    starAction: 'Lascia una stella',
     privacyReportTitle: 'Dispositivo o allenamento non riconosciuto?',
     privacyReportBody: 'Nessun account GitHub né duplicazione dei dati. Previa conferma, al repository privato delle segnalazioni di ZeppBridge vengono inviati solo: conformazione dei campi a livello di prodotto, versione del firmware, numeri di modello (interi che identificano solo il modello dell’orologio, non il singolo esemplare) e codici degli allenamenti sconosciuti con il relativo conteggio. Mai account, token, numeri di serie, ID dispositivo, indirizzi MAC, GPS, valori sanitari, risposte grezze o percorsi locali.',
     mcpBadge: 'Dati sanitari di sola lettura · nessuna porta in ascolto',
@@ -3461,6 +3472,9 @@ Rispondi in Markdown.`,
   },
 
   'views/settings/sections/account': {
+    whySub: 'I dati avanzati accedono solo con e-mail o telefono Zepp e password',
+    waitingHint: 'Approva nel browser e la connessione avverrà da sola',
+    checkNow: 'Controlla ora',
     accountFallback: 'Account Zepp',
     official: (state: string) => `Ufficiale ${state}`,
     advanced: (state: string) => `Dati avanzati ${state}`,
@@ -3670,8 +3684,18 @@ Rispondi in Markdown.`,
     'Impossibile raggiungere il servizio di regione Zepp: controlla la rete e riprova',
   'err.login.region_retrying':
     'Impossibile raggiungere il servizio di regione Zepp, nuovo tentativo in corso. Lascia aperta la finestra di accesso, non è necessario accedere nuovamente',
-  'err.login.third_party_stalled':
-    'L’accesso di terze parti sembra bloccato: le passkey di Google spesso si arrestano alla verifica all’interno della finestra dell’app. Chiudi la finestra di accesso e usa e-mail + password, oppure inserisci manualmente l’App Token nelle Impostazioni.',
+  'err.login.third_party_blocked':
+    'I dati avanzati supportano solo l’accesso con e-mail o numero di telefono Zepp e password: Google, Apple, WeChat e Xiaomi qui non funzionano. Se accedi a Zepp con uno di questi, usa l’autorizzazione ufficiale.',
+  'err.login.other_account':
+    'Questo è un altro account Zepp: l’account con cui hai appena effettuato l’accesso non è quello autorizzato ufficialmente, quindi non è stato salvato nulla. Se hai creato l’account Zepp con Google, Apple o un altro servizio, accedere con la stessa e-mail e una password conta come un nuovo account.',
+  'err.official.other_account':
+    'Questo è un altro account Zepp: l’account autorizzato non è quello collegato ai dati avanzati, quindi questa autorizzazione non è stata salvata. Se hai creato l’account Zepp con Google, Apple o un altro servizio, accedere con la stessa e-mail e una password conta come un nuovo account.',
+  'err.official.relay_unreachable':
+    'Il browser potrebbe già mostrare l’autorizzazione come completata, ma ZeppBridge non riesce a raggiungere zeppbridge.com per recuperarla. Se il browser usa un proxy e l’app no, attiva il proxy di sistema (o lascia che lo strumento proxy copra tutte le app), poi scegli «Controlla ora».',
+  'err.official.still_pending':
+    'Appena controllato: il relay non ha ancora ricevuto questa autorizzazione. Verifica di averla approvata nel browser e di aver visto la pagina di conferma. Se quella pagina era di un tentativo precedente, riavvia l’autorizzazione.',
+  'err.backfill.start_too_early':
+    'Data iniziale troppo vecchia: si possono recuperare al massimo gli ultimi 3650 giorni',
   'err.login.bad_url': 'Indirizzo di accesso non valido',
   'err.login.window_failed': 'Impossibile aprire la finestra di accesso',
   'err.login.window_busy':

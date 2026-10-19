@@ -151,9 +151,11 @@ pub async fn start_history_backfill(
     // 按自然月对六条流展开成几十万个同步块，卡住整个 app（同时占着写锁）。
     // 和其它所有时间窗口一样，上限是 `MAX_HISTORY_SYNC_DAYS`：再早 Zepp
     // 也不会有记录。
+    // 和「日期格式不对」是两回事，各有各的码：#136 里「全部」按日历年往回退了
+    // 3652 天，撞上这里却显示成「需要 YYYY-MM-DD」，用户完全看不懂。
     if (to - from).num_days() > UserPrefs::MAX_HISTORY_SYNC_DAYS {
         return Err(AppError::new(
-            "err.backfill.bad_start_date",
+            "err.backfill.start_too_early",
             format!(
                 "补拉起点太早：最多只能补拉最近 {} 天",
                 UserPrefs::MAX_HISTORY_SYNC_DAYS

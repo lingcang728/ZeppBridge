@@ -6,11 +6,17 @@ pub(super) fn build_login_window(
     app: &AppHandle,
     page_url: &str,
     locale: &str,
+    third_party_blocked: Arc<AtomicBool>,
 ) -> std::result::Result<WebviewWindow, AppError> {
     let url = page_url
         .parse()
         .map_err(|_| AppError::new("err.login.bad_url", "登录地址无效"))?;
     let app_for_new_window = app.clone();
+    let blocked_on_navigation = third_party_blocked.clone();
+    let banner_script = LOGIN_BANNER_SCRIPT.replace(
+        "__ZEPPBRIDGE_BANNER_TEXT__",
+        &serde_json::to_string(login_banner_text(locale)).unwrap_or_else(|_| "\"\"".into()),
+    );
     // The zepp-login capability is only window-close + event-listen, and it
     // has no `remote` URLs. A page loaded from watchface.zepp.com therefore
     // cannot invoke app commands: Tauri 2 requires an explicit remote
@@ -25,22 +31,32 @@ pub(super) fn build_login_window(
         .incognito(true)
         // 登录表单可能在子框架里，两边都要挂上活动标记。
         .initialization_script_for_all_frames(LOGIN_ACTIVITY_SCRIPT)
+        // 第三方登录按钮先在页面上藏起来；Zepp 改版让选择器失效时，下面的
+        // 导航拦截兜底，并告诉用户为什么点了没反应。
+        .initialization_script_for_all_frames(HIDE_THIRD_PARTY_SCRIPT)
+        .initialization_script(&banner_script)
         .inner_size(920.0, 760.0)
         .min_inner_size(420.0, 520.0)
         .resizable(true)
-        .on_navigation(|url| {
+        .on_navigation(move |url| {
             let allowed = is_allowed_login_url(url.as_str());
             if !allowed {
                 log_blocked_login_url("navigation", url);
+                if is_third_party_auth_page(url.as_str()) {
+                    blocked_on_navigation.store(true, Ordering::SeqCst);
+                }
             }
             allowed
         })
-        // Keep OAuth in this login webview.  A provider that switches to
-        // `target=_blank` must not escape to the system browser because the
-        // resulting Zepp cookies would live in a different browser profile.
+        // A sign-in page that switches to `target=_blank` must not escape to
+        // the system browser because the resulting Zepp cookies would live in
+        // a different browser profile.
         .on_new_window(move |url, _features| {
             if !is_allowed_login_url(url.as_str()) {
                 log_blocked_login_url("new-window", &url);
+                if is_third_party_auth_page(url.as_str()) {
+                    third_party_blocked.store(true, Ordering::SeqCst);
+                }
                 return NewWindowResponse::Deny;
             }
             if let Some(window) = app_for_new_window.get_webview_window(LOGIN_WINDOW_LABEL) {
@@ -170,40 +186,4 @@ pub(super) async fn close_login_window_and_wait(app: &AppHandle) -> bool {
             CloseWait::KeepWaiting => tokio::time::sleep(LOGIN_WINDOW_CLOSE_POLL).await,
         }
     }
-}
-
-/// 登录弹窗标题按界面语言走（BETA1 P7：locale 从 `'zh'|'en'` 放宽到十语言）。
-///
-/// 归一规则和 `tray_i18n::tray_labels` 一致：小写、`_`→`-`、去 `.` 后缀，
-/// 先精确匹配再逐段砍地区子标签，认不出一律英文。这里单列一张表是因为
-/// 文案本身不同（「登录 Zepp」），不复用托盘三条。
-///
-/// de/ru/hi 为直译初稿，W4 母语审校时可整体替换——见 W2-S6 报告 §5 的交接。
-pub(super) fn login_window_title(locale: &str) -> &'static str {
-    let mut tag = locale.trim().to_ascii_lowercase().replace('_', "-");
-    if let Some(dot) = tag.find('.') {
-        tag.truncate(dot);
-    }
-    while !tag.is_empty() {
-        match tag.as_str() {
-            "zh" => return "登录 Zepp",
-            "es" => return "Iniciar sesión en Zepp",
-            "nl" => return "Inloggen bij Zepp",
-            "pt-br" => return "Entrar no Zepp",
-            // 裸 pt 与未列出的葡语地区一律欧洲葡语，同 tray_i18n 的裁决。
-            "pt" | "pt-pt" => return "Iniciar sessão no Zepp",
-            "de" => return "Bei Zepp anmelden",
-            "ru" => return "Войти в Zepp",
-            "hi" | "hi-in" => return "Zepp में साइन इन करें",
-            "fr" => return "Se connecter à Zepp",
-            "it" => return "Accedi a Zepp",
-            "en" => return "Sign in to Zepp",
-            _ => {}
-        }
-        match tag.rfind('-') {
-            Some(cut) => tag.truncate(cut),
-            None => break,
-        }
-    }
-    "Sign in to Zepp"
 }

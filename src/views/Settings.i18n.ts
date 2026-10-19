@@ -123,9 +123,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: '默认用 Windows 凭据管理器 / macOS 钥匙串 / Linux 密钥环。macOS 和 Linux 可显式改用仅当前用户可读写的明文凭据文件；Linux 也支持环境变量。auth.json 只含账号与区域等元数据，令牌不写进日志、导出或错误报告。',
     privacyTelemetryTitle: '没有埋点，没有使用统计',
     privacyTelemetryBody: '应用不自动上报任何使用行为。只有你手动点「提交错误报告」时，才发送下面那几类脱敏字段。',
-    starTitle: 'ZeppBridge 帮到你了？',
-    starBody: '去 GitHub 点个 Star，让更多人找到它。',
-    starAction: '点个 Star',
     privacyReportTitle: '设备或运动没有识别？',
     privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
 
@@ -456,9 +453,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: 'The default is Windows Credential Manager / macOS Keychain / Linux keyring. macOS and Linux can explicitly use a plaintext credential file readable and writable only by your user; Linux also supports environment variables. auth.json holds only account and region metadata. Tokens never enter logs, data exports or error reports.',
     privacyTelemetryTitle: 'No telemetry, no usage statistics',
     privacyTelemetryBody: 'The app reports no usage on its own. Only pressing "Submit error report" sends the de-identified fields listed below.',
-    starTitle: 'Has ZeppBridge helped you?',
-    starBody: 'A star on GitHub helps more people find it.',
-    starAction: 'Star on GitHub',
     privacyReportTitle: 'A device or workout not recognized?',
     privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, firmware version, model-level numbers (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
 
@@ -789,9 +783,6 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyTokenBody: 'Por defecto: Administrador de credenciales de Windows, Llavero de macOS o llavero de Linux. En macOS y Linux puedes elegir un archivo de credenciales en texto plano que solo tu usuario puede leer y escribir; Linux también admite variables de entorno. auth.json solo guarda metadatos de cuenta y región; los tokens no entran en registros, exportaciones ni reportes de error.',
     privacyTelemetryTitle: 'Sin telemetría ni estadísticas de uso',
     privacyTelemetryBody: 'La app no reporta tu uso por su cuenta. Solo cuando tú pulsas «Enviar un reporte de error» salen los campos anonimizados listados abajo.',
-    starTitle: '¿Te ha servido ZeppBridge?',
-    starBody: 'Una estrella en GitHub ayuda a que más gente lo encuentre.',
-    starAction: 'Dar una estrella',
     privacyReportTitle: '¿Un dispositivo o entrenamiento no reconocido?',
     privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, la versión de firmware, números de modelo (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 

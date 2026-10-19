@@ -16,6 +16,8 @@ export interface JourneyCopy {
   demoTabs: [string, string, string, string, string];
   back: string;
   downloadTitle: string; downloadLead: string; downloadPending: string; install: string;
+  /** 未签名安装包被浏览器 / SmartScreen 拦下时怎么保留、怎么运行。只在 Windows 档显示。 */
+  windowsBlocked: string;
   system: string;
   starOnGithub: string;
 }
@@ -76,6 +78,7 @@ const zh: JourneyCopy = {
   downloadLead: "免费开源。下载 ZeppBridge 3 最新稳定版。",
   downloadPending: "目前没有可用的兼容安装包",
   install: 'Windows 运行安装包。macOS 拖进应用程序。Linux 选对应的包。',
+  windowsBlocked: 'Windows 安装包还没有代码签名，浏览器可能把新版本标成「不常下载」或「可疑」：在下载列表的「…」里选「保留」（Edge 还要点「显示更多 → 仍然保留」）。安装时若出现「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。请只从本页或 GitHub Releases 下载。',
   system: '跟随系统',
   starOnGithub: '在 GitHub 上加星',
 };
@@ -136,12 +139,14 @@ const en: JourneyCopy = {
   downloadLead: "Free and open source. Download the latest stable release of ZeppBridge 3.",
   downloadPending: "No compatible installer is currently available",
   install: 'Run the Windows installer. Drag the macOS app into Applications. Pick a package for Linux.',
+  windowsBlocked: 'The Windows installer is not code-signed yet, so your browser may flag a new release as uncommon or suspicious. Open the download list, choose … → Keep (in Edge, then Show more → Keep anyway). If “Windows protected your PC” appears, choose More info → Run anyway. Only download from this page or GitHub Releases.',
   system: 'System',
   starOnGithub: 'Star on GitHub',
 };
 
-function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | 'links' | 'themes' | 'motionTitle' | 'motionLead' | 'motions' | 'recordsTitle' | 'records' | 'aiTitle' | 'aiLead' | 'you' | 'reply' | 'turns' | 'beats' | 'settingsTitle' | 'settingsLead' | 'settings' | 'demoTitle' | 'demoLead' | 'demoStart' | 'demoReset' | 'demoTabs' | 'back' | 'downloadTitle' | 'downloadLead' | 'downloadPending' | 'install' | 'system' | 'starOnGithub'>): JourneyCopy {
-  return partial;
+function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | 'links' | 'themes' | 'motionTitle' | 'motionLead' | 'motions' | 'recordsTitle' | 'records' | 'aiTitle' | 'aiLead' | 'you' | 'reply' | 'turns' | 'beats' | 'settingsTitle' | 'settingsLead' | 'settings' | 'demoTitle' | 'demoLead' | 'demoStart' | 'demoReset' | 'demoTabs' | 'back' | 'downloadTitle' | 'downloadLead' | 'downloadPending' | 'install' | 'system' | 'starOnGithub'> & Partial<Pick<JourneyCopy, 'windowsBlocked'>>): JourneyCopy {
+  // 还没翻的语言先回落英文；待翻清单在桌面《翻译.md》。
+  return { windowsBlocked: en.windowsBlocked, ...partial };
 }
 
 export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
@@ -201,6 +206,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadLead: "Bezpłatne i otwartoźródłowe. Pobierz najnowsze stabilne wydanie ZeppBridge 3.",
     downloadPending: "Obecnie brak kompatybilnego pakietu instalacyjnego",
     install: 'Uruchom instalator w systemie Windows. Przeciągnij aplikację do Programów w macOS. Wybierz odpowiedni pakiet dla Linuksa.',
+    windowsBlocked: 'Instalator dla systemu Windows nie ma jeszcze podpisu cyfrowego, więc przeglądarka może oznaczyć nowe wydanie jako „nieczęsto pobierane” lub „podejrzane”. Na liście pobierania wybierz … → „Zachowaj” (w Edge następnie: „Pokaż więcej → Zachowaj mimo to”). Jeśli podczas instalacji pojawi się komunikat „System Windows ochronił ten komputer”, wybierz „Więcej informacji → Uruchom mimo to”. Pobieraj wyłącznie z tej strony lub z GitHub Releases.',
     system: 'Systemowy',
     starOnGithub: 'Dodaj gwiazdkę na GitHubie',
   }),
@@ -261,6 +267,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadLead: "Gratuito e open source. Scarica la versione stabile più recente di ZeppBridge 3.",
     downloadPending: "Al momento non è disponibile alcun programma di installazione compatibile",
     install: 'Esegui il file di installazione su Windows. Trascina l’app in Applicazioni su macOS. Scegli il pacchetto adatto per Linux.',
+    windowsBlocked: 'Il file di installazione per Windows non dispone ancora di una firma digitale, quindi il browser potrebbe contrassegnare una nuova versione come «non comune» o «sospetta»: nell’elenco dei download, seleziona … → «Conserva» o «Mantieni» (su Edge, poi «Mostra altro → Mantieni comunque»). Se compare «PC protetto da Windows», seleziona «Ulteriori informazioni → Esegui comunque». Scarica solo da questa pagina o da GitHub Releases.',
     system: 'Sistema',
     starOnGithub: 'Lascia una stella su GitHub',
   }) satisfies JourneyCopy,
@@ -316,6 +323,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Instalar en este ordenador', downloadLead: "Gratis y de código abierto. Descarga la última versión estable de ZeppBridge 3.",
     downloadPending: "No hay ningún instalador compatible disponible en este momento",
     install: 'Ejecuta el instalador de Windows. Arrastra la app de macOS a Aplicaciones. Elige un paquete para Linux.',
+    windowsBlocked: 'El instalador de Windows aún no tiene firma de código, por lo que el navegador puede marcar una nueva versión como poco común o sospechosa: en la lista de descargas, elige «…» → «Conservar» (en Edge, pulsa luego «Mostrar más → Conservar de todos modos»). Si al instalar aparece «Windows protegió su PC», pulsa «Más información → Ejecutar de todas formas». Descarga únicamente desde esta página o desde GitHub Releases.',
     system: 'Sistema',
     starOnGithub: 'Dar estrella en GitHub',
   }),
@@ -370,6 +378,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Installer sur cet ordinateur', downloadLead: "Gratuit et open source. Téléchargez la dernière version stable de ZeppBridge 3.",
     downloadPending: "Aucun programme d’installation compatible n’est disponible pour le moment",
     install: 'Lancez l’installateur Windows. Glissez l’app macOS dans Applications. Choisissez un paquet Linux.',
+    windowsBlocked: 'L’installateur Windows n’a pas encore de signature de code, votre navigateur peut donc signaler une nouvelle version comme « rarement téléchargée » ou « suspecte » : dans la liste des téléchargements, choisissez … → « Conserver » (dans Edge, puis « Afficher plus → Conserver quand même »). Si « Windows a protégé votre ordinateur » apparaît, cliquez sur « Informations complémentaires → Exécuter quand même ». Téléchargez uniquement depuis cette page ou depuis GitHub Releases.',
     system: 'Système',
     starOnGithub: 'Star sur GitHub',
   }),
@@ -424,6 +433,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Auf diesem Computer installieren', downloadLead: "Kostenlos und quelloffen. Lade die neueste stabile Version von ZeppBridge 3 herunter.",
     downloadPending: "Derzeit ist kein kompatibles Installationspaket verfügbar",
     install: 'Windows-Setup starten. Die macOS-App in Programme ziehen. Für Linux ein Paket wählen.',
+    windowsBlocked: 'Das Windows-Installationsprogramm ist noch nicht codesigniert, daher stuft dein Browser eine neue Version möglicherweise als „nicht häufig heruntergeladen“ oder „verdächtig“ ein. Öffne die Download-Liste, wähle … → „Beibehalten“ (in Edge danach „Mehr anzeigen → Trotzdem beibehalten“). Falls beim Installieren „Der Computer wurde durch Windows geschützt“ erscheint, wähle „Weitere Informationen → Trotzdem ausführen“. Bitte lade die Datei nur von dieser Seite oder über GitHub Releases herunter.',
     system: 'System',
     starOnGithub: 'Stern auf GitHub',
   }),
@@ -478,6 +488,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Installeren op deze computer', downloadLead: "Gratis en open source. Download de nieuwste stabiele versie van ZeppBridge 3.",
     downloadPending: "Er is momenteel geen compatibel installatieprogramma beschikbaar",
     install: 'Start het Windows-installatieprogramma. Sleep de macOS-app naar Programma’s. Kies een Linux-pakket.',
+    windowsBlocked: 'Het Windows-installatieprogramma heeft nog geen code-ondertekening, waardoor je browser een nieuwe versie kan markeren als ‘niet vaak gedownload’ of ‘verdacht’. Open de downloadlijst, kies … → Behouden (in Edge daarna Meer weergeven → Toch behouden). Als “Windows heeft uw pc beschermd” verschijnt, kies dan Meer informatie → Toch uitvoeren. Download alleen vanaf deze pagina of GitHub Releases.',
     system: 'Systeem',
     starOnGithub: 'Ster op GitHub',
   }),
@@ -532,6 +543,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Instalar neste computador', downloadLead: "Gratuito e de código aberto. Baixe a versão estável mais recente do ZeppBridge 3.",
     downloadPending: "Nenhum instalador compatível está disponível no momento",
     install: 'Execute o instalador do Windows. Arraste o app do macOS para Aplicativos. Escolha um pacote Linux.',
+    windowsBlocked: 'O instalador do Windows ainda não tem assinatura de código, por isso seu navegador pode sinalizar uma nova versão como incomum ou suspeita. Abra a lista de downloads, escolha … → Manter (no Edge, depois Mostrar mais → Manter mesmo assim). Se aparecer “O Windows protegeu o seu computador”, escolha Mais informações → Executar assim mesmo. Baixe apenas desta página ou do GitHub Releases.',
     system: 'Sistema',
     starOnGithub: 'Dar estrela no GitHub',
   }),
@@ -586,6 +598,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Instalar neste computador', downloadLead: "Gratuito e de código aberto. Transfira a versão pública estável mais recente do ZeppBridge 3.",
     downloadPending: "Não há atualmente nenhum instalador compatível disponível",
     install: 'Executa o instalador do Windows. Arrasta a app do macOS para Aplicações. Escolhe um pacote Linux.',
+    windowsBlocked: 'O instalador do Windows ainda não tem assinatura de código, pelo que o teu browser pode identificar uma nova versão como pouco comum ou suspeita. Abre a lista de transferências, escolhe … → Manter (no Edge, clica em Mostrar mais → Manter mesmo assim). Se surgir "O Windows protegeu o seu PC", escolhe Mais informações → Executar mesmo assim. Transfere apenas a partir desta página ou do GitHub Releases.',
     system: 'Sistema',
     starOnGithub: 'Dar estrela no GitHub',
   }),
@@ -640,6 +653,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'Установить на этот компьютер', downloadLead: "Бесплатный проект с открытым исходным кодом. Скачайте последнюю стабильную версию ZeppBridge 3.",
     downloadPending: "Подходящий установщик сейчас недоступен",
     install: 'Запустите установщик Windows. Перетащите приложение macOS в «Программы». Для Linux выберите пакет.',
+    windowsBlocked: 'Установщик Windows пока не имеет цифровой подписи, поэтому браузер может пометить новую версию как «редко скачиваемую» или «подозрительную»: в списке загрузок выберите «…» → «Сохранить» (в Edge затем «Показать больше → Всё равно сохранить»). Если появится «Система Windows защитила ваш компьютер», нажмите «Подробнее → Выполнить в любом случае». Скачивайте только с этой страницы или из GitHub Releases.',
     system: 'Системная',
     starOnGithub: 'Оценить на GitHub',
   }),
@@ -694,6 +708,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     downloadTitle: 'इस कंप्यूटर पर स्थापित करें', downloadLead: "मुफ़्त और ओपन सोर्स। ZeppBridge 3 का नवीनतम स्थिर संस्करण डाउनलोड करें।",
     downloadPending: "अभी कोई अनुकूल इंस्टॉलर उपलब्ध नहीं है",
     install: 'Windows इंस्टॉलर चलाएँ। macOS ऐप को Applications में रखें। Linux के लिए पैकेज चुनें।',
+    windowsBlocked: 'Windows इंस्टॉलर अभी कोड-साइन नहीं है, इसलिए आपका ब्राउज़र नए संस्करण को असामान्य या संदिग्ध के रूप में चिह्नित कर सकता है: डाउनलोड सूची में … → रखें चुनें (Edge में, फिर अधिक दिखाएँ → फिर भी रखें)। यदि “Windows ने आपके PC की सुरक्षा की” दिखाई दे, तो अधिक जानकारी → फिर भी चलाएँ चुनें। कृपया केवल इसी पृष्ठ या GitHub Releases से ही डाउनलोड करें।',
     system: 'सिस्टम',
     starOnGithub: 'GitHub पर स्टार दें',
   }),

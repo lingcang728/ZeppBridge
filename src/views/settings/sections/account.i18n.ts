@@ -25,6 +25,9 @@ export const accountCardMessages = defineMessages(
     deviceCheck: '认错了？点进去换型号',
     unknownShort: '有设备没认出型号：点它进去指认，或发一份报告补进目录',
     learnMore: '了解更多',
+    whySub: '高级数据只能用 Zepp 邮箱 / 手机号 + 密码登录',
+    waitingHint: '在浏览器里点完同意，这里会自动连上',
+    checkNow: '立即检查',
   },
   {
     accountFallback: 'Zepp account',
@@ -48,6 +51,9 @@ export const accountCardMessages = defineMessages(
     deviceCheck: 'Wrong model? Open it to change',
     unknownShort: 'A device wasn’t recognized: open it to pick the model, or send a report to add it',
     learnMore: 'Learn more',
+    whySub: 'Advanced data only signs in with a Zepp email or phone number and password',
+    waitingHint: 'Approve in your browser and this connects on its own',
+    checkNow: 'Check now',
   },
   {
     accountFallback: 'Cuenta de Zepp',
@@ -71,6 +77,9 @@ export const accountCardMessages = defineMessages(
     deviceCheck: '¿Modelo equivocado? Ábrelo para cambiarlo',
     unknownShort: 'Hay un dispositivo sin reconocer: ábrelo para elegir el modelo, o envía un informe para añadirlo',
     learnMore: 'Más información',
+    whySub: 'Los datos avanzados solo entran con correo o teléfono de Zepp y contraseña',
+    waitingHint: 'Aprueba en el navegador y esto se conectará solo',
+    checkNow: 'Comprobar ahora',
   },
   'views/settings/sections/account',
 );
