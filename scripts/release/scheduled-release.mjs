@@ -35,15 +35,20 @@ const finish = (code) => {
   process.exit(code);
 };
 
-/** 这个提交自己那次 push CI 的三平台检查都是绿的（不是跳过，也不是别的提交的）。 */
+/**
+ * 这个提交自己的 CI 三平台检查都是绿的（不是跳过，也不是别的提交的）。
+ * push 和在分支上手动触发的都算：快照里的 ci.yml 还不认 freeze/** 时（3.0.3 就是），
+ * 推 freeze 分支不会自动跑，要 `gh workflow run ci.yml --ref freeze/v<版本>`。
+ */
 function ciProblems(sha) {
-  const runs = ghJson(`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&per_page=20`).workflow_runs ?? [];
+  const runs = (ghJson(`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=30`).workflow_runs ?? [])
+    .filter((r) => r.event === 'push' || r.event === 'workflow_dispatch');
   const green = runs.filter((r) => r.status === 'completed' && r.conclusion === 'success');
   if (!green.length) {
     const latest = runs[0];
     return [latest
       ? `快照的 CI 还没绿：最近一次 ${latest.status}/${latest.conclusion ?? '—'}（${latest.html_url}）`
-      : '快照没有自己的 CI 记录——推一次 freeze/v<版本> 分支让 CI 在这个提交上跑完整检查'];
+      : '快照没有自己的 CI 记录——推 freeze/v<版本> 分支，没自动跑就 gh workflow run ci.yml --ref freeze/v<版本>'];
   }
   for (const r of green) {
     const jobs = ghJson(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`).jobs ?? [];

@@ -22,7 +22,7 @@
    ```
 
    冻结的是 HEAD（`--commit <SHA>` 指定更早的提交）。**默认排在计划里上一版的后一天、北京时间晚上 9 点**（3.0.2 就是这个点发的；不早于明天，留出自测时间）；要别的时间加 `--at 2026-10-22T21:00:00+08:00`。脚本先核对快照（见下），再建本地 `freeze/v3.0.3` 分支，计划里记一条 `approved: false`。
-3. 提交计划文件，`git push origin main freeze/v3.0.3`。等 freeze 分支的 CI 绿。
+3. 提交计划文件，`git push origin main freeze/v3.0.3`。等 freeze 分支的 CI 绿。快照里的 `ci.yml` 还不认 `freeze/**` 时（只有 3.0.3），推送不会自动跑 CI，要手动 `gh workflow run ci.yml --ref freeze/v3.0.3`；手动跑的也算数（它会顺带演练打包，但不在 tag 上，不建 Release）。
 4. 打本地包自测。通过后 `node scripts/release/freeze.mjs approve 3.0.3`，提交并推送。
 5. 到点后的第一次整点检查（每小时第 17 分，GitHub 忙时会晚一些）建 tag、触发 CI；CI 打包、签名、建 Release 约半小时，已装用户随后收到更新。按晚上 9 点排期，Release 一般在 21:50 前后出现。
 
