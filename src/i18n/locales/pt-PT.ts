@@ -58,8 +58,11 @@ export default {
       title: 'Porque faltam alguns dados?',
       lead: 'O ZeppBridge tem duas ligações e não devolvem os mesmos dados.',
       officialName: 'Autorização oficial',
+      officialHas: 'Frequência cardíaca|Sono|Passos|Corridas e caminhadas|PAI|Peso',
       officialLacks: 'Não repõe histórico anterior',
       advancedName: 'Dados avançados',
+      advancedHas:
+        'VFC|Oxigénio no sangue|Stress durante todo o dia|Prontidão|Charge|Carga de treino|Ciclismo e outros treinos|Registos alimentares|Identificação de dispositivos|Histórico anterior',
       advancedLogin: 'Apenas e-mail ou telemóvel Zepp + palavra-passe',
       advancedNoThirdParty: 'Não funciona com Google, Apple, WeChat, Xiaomi nem outros inícios de sessão de terceiros',
       footer: 'Apenas com a autorização oficial, nada da coluna Dados avançados é recebido. Trata-se de um limite do canal oficial e não de uma falha do ZeppBridge. Já comunicámos a situação à Zepp (Huami), mas ainda não obtivemos resposta.',
@@ -78,6 +81,9 @@ export default {
       note: 'Atualização',
     },
     'components/OfficialOnlyNote': {
+      text: 'Apenas a autorização oficial da Zepp está ligada: frequência cardíaca, sono, passos, corridas e caminhadas, PAI e peso são sincronizados. A API oficial não disponibiliza VFC, oxigénio no sangue, stress, prontidão, carga de treino, ciclismo e outros treinos nem identificação de dispositivos — liga os «Dados avançados» para os obteres.',
+      workouts:
+        'Apenas a autorização oficial está ligada. A API oficial fornece corridas, caminhadas e poucos outros treinos; ciclismo, treino de força, desportos de raquete e os restantes necessitam de «Dados avançados».',
       action: 'Ligar',
     },
     'views/Settings': {
@@ -124,6 +130,8 @@ export default {
       deviceErrorPrefix: 'Identificação de dispositivos: ',
       noDevices:
         'Ainda não foi identificado nenhum dispositivo físico; o Zepp Cloud continua a sincronizar via nuvem.',
+      noDevicesOfficial:
+        'Ainda não foi identificado nenhum dispositivo físico. Apenas com a autorização oficial, o relógio só pode ser reconhecido a partir dos treinos sincronizados; liga os «Dados avançados» para uma identificação completa.',
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       unknownDeviceTitle: 'Dispositivo não identificado',
       unknownDeviceBodyA: 'Algumas contas Zepp devolvem registos sem ',
@@ -968,6 +976,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       identifyFailed: (reason: string) =>
         `Identificação de dispositivos indisponível: ${reason}`,
       noDevicesYet: 'Nenhum dispositivo identificado',
+      noDevicesOfficial: 'Liga os «Dados avançados» para identificar dispositivos',
       manage: 'Gerir',
       sourcesAria: 'Fontes de dados e estado da conta',
       latestData: (when: string) => `Dados mais recentes a ${when}`,
@@ -1424,6 +1433,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       intakeGroupTitle: 'Alimentação',
       intakeGroupEmpty:
         'Sem registos alimentares neste intervalo. As refeições registadas na app Zepp surgem aqui após sincronizar.',
+      intakeNeedsAdvanced:
+        'Os registos alimentares provêm da ligação de «Dados avançados»; a autorização oficial por si só não os inclui.',
       intakeCaloriesLabel: 'Calorias consumidas',
       proteinLabel: 'Proteínas',
       fatIntakeLabel: 'Gorduras',

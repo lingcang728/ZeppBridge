@@ -259,8 +259,10 @@ export default {
       title: 'Warum fehlen manche Daten?',
       lead: 'ZeppBridge hat zwei Verbindungen, und sie liefern nicht dieselben Daten.',
       officialName: 'Offizielle Autorisierung',
+      officialHas: 'Herzfrequenz|Schlaf|Schritte|Laufen und Gehen|PAI|Gewicht',
       officialLacks: 'Kann ältere Historie nicht nachladen',
       advancedName: 'Erweiterte Daten',
+      advancedHas: 'HRV|Blutsauerstoff|Ganztägiger Stress|Bereitschaft|Charge|Trainingsbelastung|Radfahren und weitere Trainings|Ernährungsprotokolle|Geräteerkennung|Ältere Historie',
       advancedLogin: 'Nur Zepp-E-Mail oder -Telefonnummer + Passwort',
       advancedNoThirdParty: 'Google, Apple, WeChat, Xiaomi und andere Drittanbieter werden nicht unterstützt',
       footer: 'Ist nur die offizielle Autorisierung verbunden, kommt nichts aus der Spalte „Erweiterte Daten“ an. Das ist eine Einschränkung der offiziellen Schnittstelle, kein Fehler von ZeppBridge. Wir haben das bei Zepp (Huami) gemeldet, bisher aber keine Antwort erhalten.',
@@ -279,6 +281,8 @@ export default {
       note: 'Änderung',
     },
     'components/OfficialOnlyNote': {
+      text: 'Nur offizielle Zepp-Autorisierung verbunden: Herzfrequenz, Schlaf, Schritte, Laufen und Gehen, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft, Trainingsbelastung, Radfahren und weitere Trainings sowie die Geräteerkennung bietet die offizielle Schnittstelle nicht – dafür bitte „Erweiterte Daten“ verbinden.',
+      workouts: 'Nur offizielle Autorisierung verbunden: Die offizielle Schnittstelle liefert nur Laufen, Gehen und einige wenige Trainings; Radfahren, Krafttraining, Ballsportarten und der Rest erfordern „Erweiterte Daten“.',
       action: 'Verbinden',
     },
     // ── views/Settings ──
@@ -334,6 +338,7 @@ export default {
       identifyDevices: 'Geräte erneut erkennen',
       deviceErrorPrefix: 'Geräteerkennung: ',
       noDevices: 'Noch kein physisches Gerät erkannt; Zepp Cloud synchronisiert weiterhin als Cloud-Quelle.',
+      noDevicesOfficial: 'Noch kein physisches Gerät erkannt. Ist nur die offizielle Autorisierung verbunden, lässt sich eine Uhr nur anhand synchronisierter Trainings erkennen; für eine vollständige Erkennung bitte „Erweiterte Daten“ verbinden.',
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       unknownDeviceTitle: 'Ein nicht erkanntes Gerät',
       unknownDeviceBodyA: 'Manche Zepp-Konten liefern Geräteeinträge mit ',
@@ -1218,6 +1223,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       latestData: (when: string) => `Neueste Daten ${when}`,
       manage: 'Verwalten',
       noDevicesYet: 'Noch kein Gerät erkannt',
+      noDevicesOfficial: 'Für die Geräteerkennung bitte „Erweiterte Daten“ verbinden',
       sourcesAria: 'Datenquellen und Kontostatus',
     },
     'components/overview/StepsCard': {
@@ -1775,6 +1781,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       intakeCaloriesLabel: 'Gegessene Kalorien',
       intakeGroupEmpty:
         'Keine Ernährungsprotokolle im Zeitraum. In der Zepp-App erfasste Mahlzeiten erscheinen nach der Synchronisierung hier.',
+      intakeNeedsAdvanced:
+        'Ernährungsprotokolle stammen aus der Verbindung „Erweiterte Daten“; ist nur die offizielle Autorisierung verbunden, gibt es keine Ernährungsdaten.',
       intakeGroupTitle: 'Aufnahme',
       intro:
         'Trends für Bereitschaft, Stress, Blutsauerstoff, HRV, Atemfrequenz, Ruheherzfrequenz, Gewicht, Körperzusammensetzung und Ernährung – alles aus bereits synchronisierten Einträgen.',

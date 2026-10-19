@@ -69,8 +69,11 @@ export default {
       title: 'Waarom ontbreken sommige gegevens?',
       lead: 'ZeppBridge heeft twee verbindingen, en ze leveren niet dezelfde gegevens op.',
       officialName: 'Officiële autorisatie',
+      officialHas: 'Hartslag|Slaap|Stappen|Hardlopen en wandelen|PAI|Gewicht',
       officialLacks: 'Kan geen eerdere historie ophalen',
       advancedName: 'Geavanceerde gegevens',
+      advancedHas:
+        'HRV|Zuurstofsaturatie|Stress gedurende de dag|Gereedheid|Charge|Trainingsbelasting|Fietsen en overige trainingen|Voedingslogboeken|Apparaatidentificatie|Oudere geschiedenis',
       advancedLogin: 'Alleen inloggen met Zepp-e-mail of -telefoonnummer + wachtwoord',
       advancedNoThirdParty: 'Inloggen via Google, Apple, WeChat, Xiaomi en andere derden werkt niet',
       footer: 'Met alleen de officiële autorisatie komt er niets binnen uit de kolom Geavanceerde gegevens. Dat is een beperking van wat het officiële kanaal biedt, geen fout in ZeppBridge. We hebben dit bij Zepp (Huami) aangekaart, maar nog geen reactie ontvangen.',
@@ -89,6 +92,10 @@ export default {
       note: 'Wijziging',
     },
     'components/OfficialOnlyNote': {
+      text:
+        'Alleen de officiële Zepp-autorisatie is verbonden: hartslag, slaap, stappen, hardlopen en wandelen, PAI en gewicht worden gesynchroniseerd. De officiële API biedt geen HRV, bloedzuurstof, stress, gereedheid, trainingsbelasting, fietsen en overige trainingen of apparaatidentificatie — verbind ‘Geavanceerde gegevens’ om deze te zien.',
+      workouts:
+        'Alleen de officiële autorisatie is verbonden. De officiële API levert alleen hardlopen, wandelen en enkele andere trainingen; voor fietsen, krachttraining, racketsporten en de rest zijn ‘Geavanceerde gegevens’ nodig.',
       action: 'Verbinden',
     },
     App: {
@@ -639,6 +646,7 @@ export default {
       identifyFailed: (reason: string) =>
         `Apparaatherkenning is niet beschikbaar: ${reason}`,
       noDevicesYet: 'Nog geen apparaat herkend',
+      noDevicesOfficial: 'Verbind ‘Geavanceerde gegevens’ om apparaten te herkennen',
       manage: 'Beheren',
       sourcesAria: 'Gegevensbronnen en accountstatus',
       latestData: (when: string) => `Nieuwste gegevens ${when}`,
@@ -1397,6 +1405,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       minutes: (minutes: number) => `${minutes} min`,
       noDevices:
         'Nog geen fysiek apparaat herkend; Zepp-cloud synchroniseert nog steeds als cloudbron.',
+      noDevicesOfficial:
+        'Nog geen fysiek apparaat herkend. Met alleen de officiële autorisatie kan een horloge alleen worden herkend uit gesynchroniseerde trainingen; verbind ‘Geavanceerde gegevens’ voor volledige herkenning.',
       noRecords: 'Nog geen gegevens',
       noSyncDiagnostics: 'Nog geen synchronisatiediagnostiek.',
       nothingToCompact:
@@ -1628,6 +1638,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       intakeGroupTitle: 'Inname',
       intakeGroupEmpty:
         'Geen voedingsgegevens in deze periode. Maaltijden die je in de Zepp-app logt, verschijnen hier na een synchronisatie.',
+      intakeNeedsAdvanced:
+        'Voedingsgegevens komen binnen via de verbinding ‘Geavanceerde gegevens’; met alleen de officiële autorisatie zijn deze niet inbegrepen.',
       intakeCaloriesLabel: 'Gegeten calorieën',
       proteinLabel: 'Eiwit',
       fatIntakeLabel: 'Vet',
