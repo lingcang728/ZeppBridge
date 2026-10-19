@@ -1,0 +1,58 @@
+name: Scheduled release
+
+# 按 .github/release-schedule.json 定时发布提前冻结好的版本（说明见 docs/releases/scheduling.md）。
+# 它只做三件事：核对、建附注 tag、触发 CI 在 tag 上打包；打包和建 Release 仍是 ci.yml 那一套。
+#
+# 暂停：release-schedule.json 里 paused: true；最快的办法是 `gh workflow disable scheduled-release.yml`。
+# 紧急修复：Actions 页手动运行并填 version，跳过时间 / 批准 / 暂停，但不跳过检查。
+on:
+  schedule:
+    # 整点后错开一点，GitHub 的定时任务高峰会延迟甚至丢弃。
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '立即发布这一版（只能是计划里的下一版，例如 3.0.3）；留空 = 按计划'
+        required: false
+        default: ''
+      dry_run:
+        description: '只检查不发布'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: scheduled-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release the next frozen version when due
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main with tags
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch freeze branches and tags
+        run: git fetch --force --tags origin '+refs/heads/freeze/*:refs/remotes/origin/freeze/*'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Release when due
+        env:
+          # 有 RELEASE_TOKEN（细粒度个人令牌：contents + actions + workflows 写）就用它，
+          # 否则用默认令牌：默认令牌建的 tag 不触发 push，脚本会再手动触发一次 CI。
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          TAG_TRIGGERS_CI: ${{ secrets.RELEASE_TOKEN != '' }}
+          URGENT_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/release/scheduled-release.mjs
