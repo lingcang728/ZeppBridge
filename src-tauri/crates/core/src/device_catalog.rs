@@ -430,9 +430,7 @@ mod tests {
             .expect("accepted contribution must identify a device");
             assert_eq!(matched.entry.catalog_id, catalog_id);
         }
-        for code in [
-            92, 102, 104, 254, 8_126_720, 9_765_121, 11_469_059, 11_092_224,
-        ] {
+        for code in [92, 102, 104, 254] {
             assert!(
                 match_catalog(&CatalogMatchInput {
                     device_source_codes: vec![code],
@@ -477,21 +475,48 @@ mod tests {
         }
 
         // 分歧仍在、或独立证据仍只有一份的编号不能悄悄溜进去。
-        for code in [
-            10_813_699_i64,
-            9_765_121,
-            11_092_224,
-            11_469_059,
-            11_272_451,
-            8_126_720,
+        assert!(
+            match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![10_813_699],
+                ..CatalogMatchInput::default()
+            })
+            .is_none(),
+            "10813699 还没有裁决通过，不该匹配到任何型号"
+        );
+    }
+
+    /// 2026-10-19 这一轮（反馈库 445 份报告）：9 月时证据不够的几个编号凑够了
+    /// 「≥2 份独立、零异议」，裁决记录在 `scripts/assets/build-device-catalog.py`。
+    /// 11141376（3:1）和 7995649（2:2）有异议，照样不收——多数票不算数。
+    #[test]
+    fn the_codes_adjudicated_on_2026_10_19_resolve_to_their_products() {
+        for (code, catalog_id) in [
+            (8_126_720_i64, "amazfit-cheetah-pro-47mm"),
+            (9_765_121, "amazfit-bip-6"),
+            (10_223_875, "amazfit-active-2-square"),
+            (10_879_232, "amazfit-t-rex-ultra-2"),
+            (10_944_768, "amazfit-active-3-premium"),
+            (11_092_224, "amazfit-balance-ultra"),
+            (11_145_475, "amazfit-balance-3"),
+            (11_272_451, "amazfit-helio-strap-pro"),
+            (11_469_059, "amazfit-helio-strap-pro"),
         ] {
+            let found = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
+            assert_eq!(found.entry.catalog_id, catalog_id);
+            assert_eq!(found.status, CatalogMatchStatus::Exact);
+        }
+        for code in [11_141_376_i64, 7_995_649] {
             assert!(
                 match_catalog(&CatalogMatchInput {
                     device_source_codes: vec![code],
                     ..CatalogMatchInput::default()
                 })
                 .is_none(),
-                "{code} 还没有裁决通过，不该匹配到任何型号"
+                "{code} 有异议，不该匹配到任何型号"
             );
         }
     }

@@ -59,10 +59,8 @@ export default {
       title: 'Por que alguns dados estão faltando?',
       lead: 'O ZeppBridge tem duas conexões e elas não trazem os mesmos dados.',
       officialName: 'Autorização oficial',
-      officialHas: 'Frequência cardíaca|Sono|Passos|Treinos|PAI|Peso',
       officialLacks: 'Não recupera histórico anterior',
       advancedName: 'Dados avançados',
-      advancedHas: 'HRV|Oxigênio no sangue|Estresse de todo o dia|Prontidão|Charge|Carga de treino|Registro alimentar|Histórico anterior',
       advancedLogin: 'Apenas e-mail ou telefone da Zepp + senha',
       advancedNoThirdParty: 'Não funciona com Google, Apple, WeChat, Xiaomi ou outros logins de terceiros',
       footer: 'Com apenas a autorização oficial, nada da coluna Dados avançados é recebido — isso é um limite do que o canal oficial oferece, não um problema do ZeppBridge. Já entramos em contato com a Zepp (Huami), mas ainda não tivemos resposta.',
@@ -81,7 +79,6 @@ export default {
       note: 'Atualização',
     },
     'components/OfficialOnlyNote': {
-      text: 'Apenas a autorização oficial do Zepp está ativa: frequência cardíaca, sono, passos, treinos, PAI e peso são sincronizados. HRV, SpO2, estresse, prontidão e carga requerem "Dados avançados".',
       action: 'Conectar',
     },
 

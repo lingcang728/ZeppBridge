@@ -46,7 +46,8 @@
       "device_source_codes": [
         11141377,
         11141379,
-        11145472
+        11145472,
+        11145475
       ]
     },
     {
@@ -81,7 +82,9 @@
       "asset_hash": "sha256:362940CE15AC7A85922A8FF6BFA816D79DD818C840B6969C71900153D73191A3",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-ultra",
-      "device_source_codes": []
+      "device_source_codes": [
+        11092224
+      ]
     },
     {
       "catalog_id": "amazfit-cheetah-2-pro",
@@ -223,6 +226,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-3-premium",
       "device_source_codes": [
+        10944768,
         10944769,
         10944771
       ]
@@ -260,6 +264,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-ultra-2",
       "device_source_codes": [
+        10879232,
         10879233
       ]
     },
@@ -415,7 +420,8 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-2-square",
       "device_source_codes": [
-        10223873
+        10223873,
+        10223875
       ]
     },
     {
@@ -492,6 +498,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-6",
       "device_source_codes": [
+        9765121,
         10158337
       ]
     },
@@ -825,7 +832,9 @@
       "asset_hash": "sha256:C3E42E7A068596016830C660134EF9AFCA7D16B125D3BC3D1CE62081958E125C",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-pro-47mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8126720
+      ]
     },
     {
       "catalog_id": "amazfit-cheetah-47mm",
@@ -1748,7 +1757,10 @@
       "status": "active",
       "supported": true,
       "checked_at": "2026-08-15",
-      "device_source_codes": []
+      "device_source_codes": [
+        11272451,
+        11469059
+      ]
     },
     {
       "catalog_id": "amazfit-helio-core",

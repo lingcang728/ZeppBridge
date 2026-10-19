@@ -66,8 +66,8 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     "amazfit-active-2-44mm": [8913155, 10092800, 10092801, 10092803, 10092807],
     "amazfit-active-42mm": [8323329],
     "amazfit-balance-2-xt": [10486019],
-    "amazfit-active-2-square": [10223873],
-    "amazfit-bip-6": [10158337],
+    "amazfit-active-2-square": [10223873, 10223875],
+    "amazfit-bip-6": [9765121, 10158337],
     "amazfit-cheetah-2-ultra": [9978112, 9978113],
     # 10289411 同样是人工裁决：17 份里 14 份 Helio Strap，相邻的 10289410
     # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
@@ -82,13 +82,13 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     "amazfit-helio-ring": [8651008],
     # 11145472 是 2026-09-01 那批新增的：3 份报告一致指向 Balance 3，和已经
     # 收了的相邻编号 11141379 同族。
-    "amazfit-balance-3": [11141377, 11141379, 11145472],
+    "amazfit-balance-3": [11141377, 11141379, 11145472, 11145475],
     "amazfit-gtr-4-46mm": [7930112, 7930113],
     # 下面两个上一轮还只有一份报告，这一轮凑够了独立第二份：
     #   10944769 -> Active 3 Premium（3 份，无异议）
     #   10879233 -> T-Rex Ultra 2（2 份，无异议）
-    "amazfit-active-3-premium": [10944769, 10944771],
-    "amazfit-t-rex-ultra-2": [10879233],
+    "amazfit-active-3-premium": [10944768, 10944769, 10944771],
+    "amazfit-t-rex-ultra-2": [10879232, 10879233],
     # 2026-09-02 晚上那批（反馈库 175 行）新凑够第二份的三个。三个都在高位段、
     # 都没有任何异议，报告还跨了多个版本，不是同一次提交的重复：
     #   10813697 -> Active MAX     3 份（v1.1.1 / v2.1.0 / v2.1.0）
@@ -97,6 +97,10 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     #                              相邻编号 10944769 同族
     "amazfit-active-max": [10813697],
     "amazfit-bip-max": [11206915],
+    # 下面三款是 2026-10-19 那一轮第一次收编号的，见下方裁决记录。
+    "amazfit-cheetah-pro-47mm": [8126720],
+    "amazfit-balance-ultra": [11092224],
+    "amazfit-helio-strap-pro": [11272451, 11469059],
 }
 # 2026-09-11: seven additional codes accepted from distinct submission contexts;
 # adjacent-time duplicate reports were counted only once. See the dated feedback
@@ -132,6 +136,28 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
 #     高位编号 11272451、8126720、10223872、10223875、10944768、11141376。
 #     原来在这一行里的 10813697、11206915、10944771 在 2026-09-02 那批里
 #     凑够了，10682625 在 2026-09-03 这一批里凑够了，都已经收进上表。
+#
+# 2026-10-19 裁决记录（反馈库 445 份报告）。「独立」= 设备集合（同一份报告里
+# 全部 deviceSource）不同，或系统不同；同一账号隔几天重复提交只算一份：
+#   * 8126720 -> Cheetah Pro：2 份（v2.2.0 Linux、v3.0.1 Windows），零异议。
+#   * 9765121 -> Bip 6：3 个不同设备集合（macOS 五块表、Linux 单表、Windows
+#     表 + 秤），零异议。上一轮因「同一分钟重复」只算 1 份，现在凑够了。
+#   * 10223875 -> Active 2 Square：3 个独立语境（v1.1.1、v3.0.1 Windows、
+#     v3.0.1 macOS 三设备集合），零异议，与已收的 10223873 同族。
+#   * 10879232 -> T-Rex Ultra 2：2 个独立设备集合（单表；表 + Helio Strap），
+#     零异议，与已收的 10879233 同族。
+#   * 10944768 -> Active 3 Premium：3 个独立设备集合，零异议，与 10944769 同族。
+#   * 11092224 -> Balance Ultra：2 个独立设备集合（+102、+1105），零异议。
+#   * 11145475 -> Balance 3：2 份（Windows 单表、macOS 表 + 秤 + Balance 2），
+#     零异议，与已收的 11145472 同族。
+#   * 11272451、11469059 -> Helio Strap Pro：两个编号总是一起出现（同一账号
+#     两条记录），3 个独立账号指认，零异议；11469059 带 deviceType 15。
+# 明确不收（多数票不算数）：
+#   * 11141376 —— Balance 3 3 份 vs Balance 2 1 份（v3.0.1 Linux，同报告另一块
+#     表是 GTR 2，不是挑错了那一台）。
+#   * 7995649 —— GTS 4 43mm 2 份 vs Balance 2 2 份。
+# 只有一份、继续等：7995648、8192257、8257793、8454401、9699584、10223872、
+#   11010305（两份相隔 18 分钟、只是升级了版本，按同一份算）、11010307、11145473。
 
 
 def card(

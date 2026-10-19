@@ -72,6 +72,15 @@ impl Normalizer {
     }
 
     pub fn normalize_band_data(raw: &Value) -> Result<BandNormalizedData> {
+        Self::normalize_band_data_in_zone(raw, None)
+    }
+
+    /// 同 [`Self::normalize_band_data`]，另带设备的 IANA 时区（`device_identities.timezone`），
+    /// 用来校正夏令时期间摘要 `tz` 少算的那一小时（见 [`effective_band_offset`]）。
+    pub fn normalize_band_data_in_zone(
+        raw: &Value,
+        zone: Option<&str>,
+    ) -> Result<BandNormalizedData> {
         let items = extract_items(raw)?;
         let mut sleep_sessions = Vec::new();
         let mut heart_rate_samples = Vec::new();
@@ -104,7 +113,7 @@ impl Normalizer {
 
             if let Some(summary) = decoded_summary.as_ref().and_then(Value::as_object) {
                 if let Some(sleep) = summary.get("slp").and_then(Value::as_object) {
-                    match sleep_from_band_item(object, summary, sleep, source_scope.clone()) {
+                    match sleep_from_band_item(object, summary, sleep, source_scope.clone(), zone) {
                         Ok(session) => {
                             if session.stages.is_empty()
                                 && sleep
@@ -131,7 +140,7 @@ impl Normalizer {
                 sleep_sessions.push(session);
             }
 
-            match heart_rate_from_band_item(object, decoded_summary.as_ref()) {
+            match heart_rate_from_band_item(object, decoded_summary.as_ref(), zone) {
                 Ok(samples) => heart_rate_samples.extend(samples),
                 Err(message) => diagnostics.push(format!("item {index}: {message}")),
             }

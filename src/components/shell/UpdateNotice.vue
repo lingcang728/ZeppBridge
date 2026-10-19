@@ -32,6 +32,27 @@ watch(() => receipt.value?.version, () => { page.value = 0; });
 const onLeadPage = computed(() => !!receipt.value && leadsWithWhyHalfData(receipt.value.version) && page.value === 0);
 
 const origin = () => document.querySelector<HTMLElement>('.brand');
+
+/* 点「知道了」：卡片从这颗按钮往左上角一路化成灰飞走，背后的模糊退掉回到主页（lib/motion/ashDissolve.ts）。
+   放不了（减少动态效果、没有 WebGL）就照常收起。 */
+const dissolving = ref(false);
+const acknowledge = async (event: MouseEvent) => {
+  if (dissolving.value) return;
+  dissolving.value = true;
+  const button = event.currentTarget as HTMLElement;
+  const panel = button.closest<HTMLElement>('[data-modal-dialog]');
+  const rect = button.getBoundingClientRect();
+  try {
+    if (panel) {
+      const { ashDissolve } = await import('../../lib/motion/ashDissolve');
+      await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'));
+    }
+  } catch {
+    // 动画出错不能卡住「知道了」。
+  }
+  acknowledgeUpdate();
+  dissolving.value = false;
+};
 /** 地址写死、并在 capabilities/default.json 里单独放行，别的链接打不开。 */
 const REPO = 'https://github.com/lingcang728/ZeppBridge';
 const star = () => {
@@ -66,7 +87,7 @@ const star = () => {
           <span class="star-icon" aria-hidden="true"><Icon name="star" :size="16" /></span>{{ t.star }}
         </button>
         <button v-if="onLeadPage" type="button" class="button primary acknowledge" @click="page = 1">{{ t.next }}</button>
-        <button v-else type="button" class="button primary acknowledge" @click="acknowledgeUpdate">{{ t.acknowledge }}</button>
+        <button v-else type="button" class="button primary acknowledge" :disabled="dissolving" @click="acknowledge">{{ t.acknowledge }}</button>
       </footer>
     </div>
   </ModalDialog>

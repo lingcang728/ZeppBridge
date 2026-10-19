@@ -394,6 +394,8 @@ export interface BridgeBackend {
   resetCoverageLedger(): Promise<CoverageLedger>;
   retryFailedBackfillChunks(): Promise<CoverageLedger>;
   setTrayLocale(locale: string): Promise<void>;
+  /** 操作系统的区域格式（如 `pt-PT`），日期顺序与 12/24 小时制跟它走；取不到为 null。 */
+  systemRegionLocale(): Promise<string | null>;
   listBackups(): Promise<BackupManifest[]>;
   createManualBackup(): Promise<BackupManifest>;
   verifyBackup(backupId: string): Promise<BackupVerification>;

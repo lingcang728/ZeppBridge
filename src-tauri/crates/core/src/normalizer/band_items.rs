@@ -7,6 +7,7 @@ pub(super) fn sleep_from_band_item(
     summary: &Map<String, Value>,
     sleep: &Map<String, Value>,
     scope: SourceScope,
+    zone: Option<&str>,
 ) -> std::result::Result<SleepSession, String> {
     let start_time = first_value(sleep, &["st", "startTime", "start_time"])
         .and_then(parse_timestamp)
@@ -44,7 +45,7 @@ pub(super) fn sleep_from_band_item(
             end_time.timestamp()
         )
     });
-    let stages = sleep_stages_from_band(item, summary, sleep);
+    let stages = sleep_stages_from_band(item, summary, sleep, zone);
 
     Ok(SleepSession {
         sleep_id,
@@ -134,6 +135,7 @@ pub(super) fn sleep_stages_from_band(
     item: &Map<String, Value>,
     summary: &Map<String, Value>,
     sleep: &Map<String, Value>,
+    zone: Option<&str>,
 ) -> Vec<SleepStageSlice> {
     let Some(date) = first_string(item, &["date_time", "date", "dayId"])
         .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok())
@@ -144,6 +146,7 @@ pub(super) fn sleep_stages_from_band(
     let Some(timezone_offset) = first_value(summary, &["tz"])
         .and_then(timezone_offset_seconds)
         .map(|value| value.clamp(-18 * 3600, 18 * 3600))
+        .map(|value| effective_band_offset(value, date, zone))
     else {
         return Vec::new();
     };
@@ -317,6 +320,7 @@ pub(super) fn band_stage_minutes(sleep: &Map<String, Value>, expected_mode: i64)
 pub(super) fn heart_rate_from_band_item(
     item: &Map<String, Value>,
     decoded_summary: Option<&Value>,
+    zone: Option<&str>,
 ) -> std::result::Result<Vec<MetricSample>, String> {
     let Some(encoded) = item.get("data_hr").and_then(Value::as_str) else {
         return Ok(Vec::new());
@@ -334,6 +338,7 @@ pub(super) fn heart_rate_from_band_item(
         .and_then(|summary| first_value(summary, &["tz"]))
         .and_then(timezone_offset_seconds)
         .map(|value| value.clamp(-18 * 3600, 18 * 3600))
+        .map(|value| effective_band_offset(value, day, zone))
     else {
         return Ok(Vec::new());
     };
@@ -673,4 +678,39 @@ pub(super) fn collect_daily_metrics(
         }
     }
     count
+}
+
+/// 手环摘要 `tz`（秒）在这一天实际该用的偏移。
+///
+/// 2026-10 两位欧洲用户报「全部提前 1 小时」「4 点的数据显示成 5 点」，Zepp App 里却是对的：
+/// `data_hr` / 睡眠阶段是从当地零点起的分钟序号，App 直接当钟点画；我们用 `tz` 换成 UTC，
+/// 如果夏令时期间 `tz` 给的是**标准时**偏移，换出来就整体晚一小时。中国不过夏令时，
+/// 开发库里看不出来，所以只在三条同时成立时才校正，其余一律原样：
+/// - 知道设备的 IANA 时区；
+/// - 这一天该时区处在夏令时（实际偏移 ≠ 标准偏移，标准偏移取 1 月 / 7 月两者较小的）；
+/// - `tz` 恰好等于标准偏移。
+///
+/// `tz` 本来就带夏令时的报文（等于实际偏移）不受影响；切换日仍按一天一个偏移处理。
+pub(crate) fn effective_band_offset(tz: i64, day: NaiveDate, zone: Option<&str>) -> i64 {
+    let Some(zone) = zone.and_then(|name| jiff::tz::TimeZone::get(name).ok()) else {
+        return tz;
+    };
+    let offset_at = |month: i8, day_of_month: i8| -> Option<i64> {
+        let date = jiff::civil::Date::new(day.year() as i16, month, day_of_month).ok()?;
+        let zoned = date.at(12, 0, 0, 0).to_zoned(zone.clone()).ok()?;
+        Some(i64::from(zoned.offset().seconds()))
+    };
+    let (Some(actual), Some(january), Some(july)) = (
+        offset_at(day.month() as i8, day.day() as i8),
+        offset_at(1, 15),
+        offset_at(7, 15),
+    ) else {
+        return tz;
+    };
+    let standard = january.min(july);
+    if actual != standard && tz == standard {
+        actual
+    } else {
+        tz
+    }
 }

@@ -23,6 +23,7 @@ import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
 import { formatBytes } from './lib/format';
+import { setSystemRegion } from './lib/dateTime';
 
 const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
 /* 收集箱（精修批次 7.3）：全局悬浮在右下角，空的时候不出现；后端就绪后才挂（它要读上次留下的牌）。 */
@@ -200,8 +201,17 @@ const syncTrayLocale = () => {
 
 watch(locale, syncTrayLocale);
 
+/* 「跟随系统地区」要的是操作系统的区域格式，不是界面语言；探一次就够（lib/dateTime.ts）。 */
+const loadSystemRegion = () => {
+  if (!desktopRuntime) return;
+  void backend.systemRegionLocale().then(setSystemRegion).catch(() => {
+    // 老后端或探不到：留在 null，日期照旧按界面语言排。
+  });
+};
+
 onMounted(() => {
   syncTrayLocale();
+  loadSystemRegion();
   initializeScale();
   void whenBackendReady().then(() => {
     backendReady.value = true;

@@ -44,9 +44,9 @@ use commands::{
     set_user_prefs, set_workout_code_label, set_workout_type_override, stage_restore,
     start_history_backfill, start_history_sync, start_incremental_sync, start_official_login,
     start_web_login, submit_device_model_assignment, submit_diagnostic_report,
-    training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,
-    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state,
-    training_plan_update_draft, verify_auth, verify_backup,
+    system_region_locale, training_plan_adherence, training_plan_discard, training_plan_preview,
+    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
+    training_plan_state, training_plan_update_draft, verify_auth, verify_backup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -187,7 +187,7 @@ fn system_ui_locale() -> Option<String> {
 
 /// 用户的界面语言，形如 `zh-CN` / `en-US`。取不到就返回 `None`。
 #[cfg(windows)]
-fn windows_ui_locale() -> Option<String> {
+pub(crate) fn windows_ui_locale() -> Option<String> {
     use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
 
     // `LOCALE_NAME_MAX_LENGTH`（winnls.h，85 个 wchar，含结尾 NUL）。
@@ -629,6 +629,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_is_ready,
+            system_region_locale,
             list_life_events,
             save_life_event,
             delete_life_event,
