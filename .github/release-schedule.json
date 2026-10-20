@@ -12,6 +12,12 @@
       "commit": "1a23f32bdd083e07f1aea1b221e86afab999c864",
       "notBefore": "2026-10-21T21:00:00+08:00",
       "approved": true
+    },
+    {
+      "version": "3.0.5",
+      "commit": "1c48a804d18839cf4ffcf68672649cb37a66cb61",
+      "notBefore": "2026-10-22T21:00:00+08:00",
+      "approved": true
     }
   ]
 }
