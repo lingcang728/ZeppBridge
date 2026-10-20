@@ -27,6 +27,9 @@ const PORTABLE_TARGET: &str = "windows-x86_64-portable";
 /// 只换查询地址、不换公钥：指到哪里，下载下来的包都要过内置公钥的签名核对。
 /// 用来在本机对着一份自己起的 latest.json 走一遍整条链路。
 const ENDPOINT_ENV: &str = "ZEPPBRIDGE_UPDATE_ENDPOINT";
+/// 托盘常驻时隔多久再查一次。一天发一版，只在打开时查一次的话，挂在托盘里的人会一连
+/// 错过好几版（#143：3.0.1 一直没见到 3.0.2）。
+const RECHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -131,6 +134,19 @@ pub(crate) fn update_view(updater: tauri::State<'_, SilentUpdater>) -> UpdateVie
     updater.view()
 }
 
+/// 打开时那一次由界面发起；之后每隔 [`RECHECK_EVERY`] 再查一次。在下 / 下好了 / 在装的时候
+/// `update_start` 原样返回，不会打断它们；这个构建不自己更新就不再查。
+pub(crate) fn spawn_periodic_recheck(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(RECHECK_EVERY).await;
+            if update_start(app.clone()).phase == Phase::Unsupported {
+                break;
+            }
+        }
+    });
+}
+
 /// 开始一次后台检查（打开应用时、设置页手动「检查更新」时）。已经在查 / 在下 / 下好了 /
 /// 在装就原样返回当前状态，不重复开。
 #[tauri::command]
@@ -186,6 +202,12 @@ async fn check_and_download(app: AppHandle) {
     let update = match checked {
         Ok(Some(update)) => update,
         Ok(None) => {
+            // 「已是最新」也记一行：以前只记失败和下载完成，用户翻日志时分不清是查过了没有
+            // 新版本，还是根本没查（#143）。
+            crate::diagnostics::log(&format!(
+                "静默更新：已是最新（{}）",
+                app.package_info().version
+            ));
             publish(&app, |inner| inner.view.phase = Phase::UpToDate);
             return;
         }

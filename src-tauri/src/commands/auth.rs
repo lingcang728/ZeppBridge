@@ -145,7 +145,11 @@ pub async fn clear_auth(
     let _command_guard = state.lock_sync_commands().await;
     state.replace_sync_manager(None).await;
 
-    state.auth.clear_auth()?;
+    if let Some(left_behind) = state.auth.clear_auth()? {
+        crate::diagnostics::log(&format!(
+            "退出登录：本地已清除，但系统凭据存储里的旧条目没能删掉（{left_behind}）"
+        ));
+    }
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "unconfigured".to_string();

@@ -8,8 +8,8 @@
     "https://amazfit-en.cdn.bcebos.com/smart-scale.html"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 56,
-  "canonical_device_count": 54,
+  "active_supported_count": 57,
+  "canonical_device_count": 55,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -2002,6 +2002,34 @@
       "canonical_device_key": "amazfit-pace",
       "checked_at": "2026-09-21",
       "provenance": "Amazfit Pace name verified against official Amazfit support on 2026-09-21; requested in feedback 5bf0a448-dec6-40eb-816b-691097cda1f4. Name matching and manual identification only; source 400 is deliberately unmapped. Product art pending verification.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "amazfit-cheetah-square",
+      "canonical_name": "Amazfit Cheetah Square",
+      "display_name": "Amazfit Cheetah Square",
+      "name_zh": "Amazfit Cheetah Square",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Cheetah Square",
+        "Cheetah Square",
+        "Amazfit Cheetah (Square)"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_cheetah(square)/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_cheetah(square)/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-cheetah-square",
+      "checked_at": "2026-10-20",
+      "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. Manual identification only: the one in-app report had no Advanced data connection and carried no deviceSource, so none is claimed. Product art pending.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",

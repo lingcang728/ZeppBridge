@@ -163,7 +163,9 @@ fn child_process_entry() {
     let dir = PathBuf::from(std::env::var(DIR_ENV).unwrap());
     let store = OfficialStore::with_backend(&dir, Arc::new(DiskBackend::new(&dir)));
     match role.as_str() {
-        "disconnect" => store.disconnect().unwrap(),
+        "disconnect" => {
+            store.disconnect().unwrap();
+        }
         "revoke" => {
             store.mark_needs_reauth_if_current(&used()).unwrap();
         }

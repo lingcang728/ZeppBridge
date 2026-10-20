@@ -172,3 +172,40 @@ fn clear_auth_uses_hint_when_auth_json_is_gone() {
     assert!(!dir.join("auth.user-id").exists());
     let _ = fs::remove_dir_all(dir);
 }
+
+/// #145：macOS 上新构建读不了旧钥匙串条目、授权弹窗又答不上来时，删除会失败。
+/// 退出登录照样完成：`auth.json` 和提示文件都删掉，之后读不到账号；存储的原话交回去记日志。
+#[test]
+fn clear_auth_still_signs_out_when_the_store_refuses_to_delete() {
+    struct RefusesDelete(MemoryCredentials);
+    impl CredentialBackend for RefusesDelete {
+        fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
+            self.0.set(user_id, token)
+        }
+        fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
+            self.0.get(user_id)
+        }
+        fn delete(&self, _user_id: &str) -> std::result::Result<(), String> {
+            Err("keychain prompt was not answered".to_string())
+        }
+    }
+    let dir = temp_dir();
+    let manager = AuthManager::with_credential_backend(
+        dir.clone(),
+        Arc::new(RefusesDelete(MemoryCredentials::default())),
+    );
+    manager
+        .save_auth(&AuthInfo {
+            app_token: "token-a".to_string(),
+            user_id: "user-a".to_string(),
+            region_host: "https://api-mifit.zepp.com".to_string(),
+        })
+        .unwrap();
+
+    let left_behind = manager.clear_auth().unwrap();
+    assert!(left_behind.is_some());
+    assert!(!dir.join("auth.json").exists());
+    assert!(!dir.join("auth.user-id").exists());
+    assert!(manager.load_auth().unwrap().is_none());
+    let _ = fs::remove_dir_all(dir);
+}
