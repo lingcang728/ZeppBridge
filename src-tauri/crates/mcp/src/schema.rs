@@ -223,8 +223,8 @@ fn data_tool_definitions() -> Vec<Value> {
                  还是因为那段时间本来就没数据。\
                  `pending_normalization` 只统计当前解析器尚未处理的报文。\
                  `normalization_by_stream` 按流统计 pending、normalized、\
-                 processed_without_output（解析完成但无输出，不保证已识别）和 quarantined（解析失败已隔离）；\
-                 后两者不应被当作反复重放就能消除的积压。\
+                 processed_without_output（解析完成但无输出，不保证已识别）、empty_response（云端明确回了空集合，那段时间没有数据，不是错误）和 quarantined（看不懂、已隔离）；\
+                 后三者不应被当作反复重放就能消除的积压。\
                  `normalizer_replay_pending` 为真时，历史记录需要重放\
                  （`stored_normalizer_revision` 是哪一版，`normalizer_revision` 是当前版）——\
                  此时运动类型、睡眠阶段这类派生字段可能过时，回答里应当说明这一点。\

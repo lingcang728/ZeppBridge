@@ -287,6 +287,11 @@ fn normalization_health_tracks_attempts_not_canonical_ownership() {
     raw.stream = "heart_rate".into();
     raw.source_key = "empty-heart-rate".into();
     assert!(db.persist_fetched_record(&raw).is_err());
+    // 看不懂的报文才算隔离；云端回空集合是「这段时间没有」，单独报（#143：
+    // 心率接口逐日回空，几千条全记成隔离，用户以为解析坏了）。
+    raw.source_key = "unreadable-heart-rate".into();
+    raw.payload = serde_json::json!({"unexpected": 1});
+    assert!(db.persist_fetched_record(&raw).is_err());
     let health = db.data_health(14, 0).unwrap();
     assert_eq!(health.database.pending_normalization, 0);
     assert!(health
@@ -301,6 +306,11 @@ fn normalization_health_tracks_attempts_not_canonical_ownership() {
         .normalization_by_stream
         .iter()
         .any(|r| r.stream == "heart_rate" && r.state == "quarantined" && r.records == 1));
+    assert!(health
+        .database
+        .normalization_by_stream
+        .iter()
+        .any(|r| r.stream == "heart_rate" && r.state == "empty_response" && r.records == 1));
 
     // An interrupted sync leaves raw pending even at the current revision.
     db.set_app_meta("normalizer_revision", NORMALIZER_REVISION)

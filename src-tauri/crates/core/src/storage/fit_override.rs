@@ -165,27 +165,22 @@ impl Database {
     pub fn workout_fit_override(&self, workout_id: &str) -> Result<Option<WorkoutFitOverride>> {
         self.conn
             .query_row(
-                "SELECT workout_id, file_name, sha256, byte_len, imported_at,
-                        fit_distance_m, fit_moving_seconds,
-                        original_distance_m, original_moving_seconds
-                 FROM workout_fit_overrides WHERE workout_id = ?1",
+                &format!("{OVERRIDE_SELECT} WHERE workout_id = ?1"),
                 [workout_id],
-                |row| {
-                    Ok(WorkoutFitOverride {
-                        workout_id: row.get(0)?,
-                        file_name: row.get(1)?,
-                        sha256: row.get(2)?,
-                        byte_len: row.get(3)?,
-                        imported_at: row.get(4)?,
-                        distance_m: row.get(5)?,
-                        moving_seconds: row.get(6)?,
-                        original_distance_m: row.get(7)?,
-                        original_moving_seconds: row.get(8)?,
-                    })
-                },
+                override_from_row,
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    /// 本机所有修正，按导入时间排。CLI 的 `fit-override --list` 用它（#143：
+    /// 修正只在本机，用户要在几台电脑上各做一遍，先得知道这台做过哪些）。
+    pub fn list_workout_fit_overrides(&self) -> Result<Vec<WorkoutFitOverride>> {
+        let mut stmt = self
+            .conn
+            .prepare(&format!("{OVERRIDE_SELECT} ORDER BY imported_at"))?;
+        let rows = stmt.query_map([], override_from_row)?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     /// 云端明细入库的唯一入口：有修正就写修正文件的序列。
@@ -287,4 +282,23 @@ impl Database {
         let summary_distance = self.workout_distance_meters(workout_id)?;
         Ok(decode_workout_detail(&payload, summary_end, summary_distance).ok())
     }
+}
+
+const OVERRIDE_SELECT: &str = "SELECT workout_id, file_name, sha256, byte_len, imported_at,
+        fit_distance_m, fit_moving_seconds,
+        original_distance_m, original_moving_seconds
+ FROM workout_fit_overrides";
+
+fn override_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkoutFitOverride> {
+    Ok(WorkoutFitOverride {
+        workout_id: row.get(0)?,
+        file_name: row.get(1)?,
+        sha256: row.get(2)?,
+        byte_len: row.get(3)?,
+        imported_at: row.get(4)?,
+        distance_m: row.get(5)?,
+        moving_seconds: row.get(6)?,
+        original_distance_m: row.get(7)?,
+        original_moving_seconds: row.get(8)?,
+    })
 }

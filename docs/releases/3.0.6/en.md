@@ -1,0 +1,6 @@
+- Added: **A FAQ**. Why sign-in goes through zeppbridge.com, why you only see part of your data, whether Helio Strap works, and what to do when Windows says not to run the app; the sign-in row links straight to it.
+- Added: **Connect Claude, Codex and more from the AI page**. A small pill at the top takes you to one-click MCP setup in Settings, so AI tools read your local data directly, no copy-paste.
+- Added: **Replace workouts from the command line (#143)**. zeppbridge-cli has a new fit-override command to replace a workout with a corrected .fit, undo it and list replacements; run it on each computer you use.
+- Added: **The shoes picked for a workout (#143)**. The shoe ID chosen in Zepp is stored locally and passed to AI over MCP; Zepp doesn’t send shoe names. The first launch after updating re-processes local data in the background.
+- Improved: **A one-time tip for automatic handoff on Windows**. The first time you hand off to AI, the receipt card offers to paste and send for you, with the switch right there.
+- Improved: **Data health tells empty responses apart (#143)**. Requests Zepp answered with an empty list no longer count as quarantined; the MCP data health report lists them separately from payloads that really couldn’t be read.

@@ -419,24 +419,31 @@ impl Database {
         Ok(())
     }
 
+    /// `payload` 是这条报文本身（解不开时为 `None`）：云端明确回了空集合时记成
+    /// `empty_response`，数据健康把它和「看不懂」分开报（#143）。判法和同步时
+    /// 认「云端无」的那一条（`sync/persist.rs`）是同一个。
     pub(super) fn insert_raw_quarantine(
         &self,
         raw_record_id: i64,
         stream: &str,
         source_key: &str,
         error: &ZeppBridgeError,
+        payload: Option<&serde_json::Value>,
     ) -> Result<()> {
+        let empty_response = error.is_unavailable()
+            && payload.is_some_and(crate::normalizer::payload_is_explicitly_empty);
         self.conn.execute(
             "INSERT INTO raw_quarantine(
-                 raw_record_id, stream, source_key, error, revision, quarantined_at
+                 raw_record_id, stream, source_key, error, revision, quarantined_at, empty_response
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(raw_record_id) DO UPDATE SET
                 stream = excluded.stream,
                 source_key = excluded.source_key,
                 error = excluded.error,
                 revision = excluded.revision,
-                quarantined_at = excluded.quarantined_at",
+                quarantined_at = excluded.quarantined_at,
+                empty_response = excluded.empty_response",
             params![
                 raw_record_id,
                 stream,
@@ -444,6 +451,7 @@ impl Database {
                 error.to_string(),
                 NORMALIZER_REVISION,
                 Utc::now().to_rfc3339(),
+                empty_response,
             ],
         )?;
         Ok(())
@@ -488,8 +496,13 @@ impl Database {
         match normalized {
             Ok(counts) => Ok((raw_id, counts)),
             Err(error) => {
-                let _ =
-                    self.insert_raw_quarantine(raw_id, &record.stream, &record.source_key, &error);
+                let _ = self.insert_raw_quarantine(
+                    raw_id,
+                    &record.stream,
+                    &record.source_key,
+                    &error,
+                    Some(&record.payload),
+                );
                 Err(error)
             }
         }

@@ -1251,6 +1251,22 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(39,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v40（3.0.6，#143）：
+        // - `raw_quarantine.empty_response`：云端明确回了空集合（这段时间没有）。数据健康
+        //   把它和「看不懂」分开报——以前心率接口逐日回空，几千条全算成「隔离」，像是出了错。
+        //   旧行默认 0，推修订号后的重放按报文重新判。
+        // - `workouts.gear_id`：Zepp 摘要里的 `gearId`（用户给这次运动选的鞋）。只有编号，
+        //   云端不给鞋名，不编。旧行为空，重放补上。
+        self.ensure_table_columns(
+            "raw_quarantine",
+            &[("empty_response", "INTEGER NOT NULL DEFAULT 0")],
+        )?;
+        self.ensure_table_columns("workouts", &[("gear_id", "TEXT")])?;
+        self.conn.execute_batch("PRAGMA user_version = 40;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(40,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

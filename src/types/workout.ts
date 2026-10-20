@@ -53,6 +53,8 @@ export interface Workout {
   avg_cadence_spm?: number | null;
   max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
+  /** Zepp 里给这次运动选的跑鞋编号；Zepp 不给名称（#143）。 */
+  gear_id?: string | null;
   total_steps?: number | null;
   gps_available?: boolean;
   sample_count?: number;

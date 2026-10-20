@@ -56,6 +56,7 @@ zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
 zeppbridge-cli reprocess --json  # 用当前解析器重放本地报文
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # 在这台电脑上顶替一条运动
 zeppbridge-cli contract          # 打印单位、时区、来源与缺失值的定义
 zeppbridge-cli help
 ```
@@ -85,6 +86,18 @@ zeppbridge-cli help
 重放全程持有跨进程写锁，不联网，也不改写「上次云端同步」的时间——它有自己的时间线。放进定时任务是安全的：不加 `--all` 时，修订号一旦对上它什么都不做。
 
 `status` 会报 `normalizerRevision`（库里记着的）、`normalizerRevisionExpected`（这个版本会产出的）和 `normalizerReplayPending`。前两者不相等，就是全部信号。
+
+### 用修正过的 .fit 顶替运动
+
+桌面应用里可以拿修正过的 `.fit` 顶替一条运动（运动详情页的「用修正的 .fit 替换」），`fit-override` 让脚本也能做：
+
+```bash
+zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # 顶替
+zeppbridge-cli fit-override --workout <id> --remove --json             # 撤销，回到 Zepp 的数值
+zeppbridge-cli fit-override --list --json                              # 这台电脑顶替过哪些
+```
+
+顶替只存在这台电脑的库里：Zepp 没有导入运动的接口，云端和手表上的那份不会变。之后的同步、`reprocess` 和解析器重放都不会冲掉它，快照也会带上它。运动编号来自 Zepp，几台电脑上是同一个，所以有几份库就在每台上跑同一条命令。文件起点要和那次运动相差 5 分钟以内（否则 `errorKind: "fit_start_mismatch"`），运动得已经在库里（否则 `workout_not_found`），两者都以 1 退出。撤销一条没被顶替过的运动照样成功，返回 `"removed": false`。
 
 ### 退出码
 
@@ -206,7 +219,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 | 工具 | 返回 |
 |---|---|
-| `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
+| `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm。`gearId` 是这次运动在 Zepp 里选的跑鞋编号，没选为 `null`；Zepp 不给跑鞋名称 |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
 | `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
@@ -217,7 +230,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
-| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
+| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
 | `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果）、距上次运动几天、已生效的计划、生活事件 |
 | `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景 |
 | `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
