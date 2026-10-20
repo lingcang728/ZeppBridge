@@ -41,13 +41,52 @@ pub(super) async fn build_diagnostic_report(
         device_evidence,
         user_assigned_models,
         unknown_workout_codes: db.diagnostic_unknown_workout_codes()?,
-        workout_type_corrections: db.diagnostic_workout_type_corrections()?,
+        workout_type_corrections: report_safe_corrections(
+            db.diagnostic_workout_type_corrections()?,
+        ),
         workout_type_conflicts: db.diagnostic_workout_type_conflicts()?,
         // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
         category: None,
         user_note: user_note.and_then(sanitize_diagnostic_note),
         last_cloud_rejection: db.diagnostic_cloud_rejection()?,
     })
+}
+
+/// 运动 key 的形状，和反馈端点的 `WORKOUT_KEY` 一致：小写字母开头，字母、数字、下划线。
+fn is_report_workout_key(value: &str) -> bool {
+    let mut chars = value.chars();
+    (1..=48).contains(&value.len())
+        && chars.next().is_some_and(|ch| ch.is_ascii_lowercase())
+        && chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
+}
+
+/// 「我们的解释」还可以是 normalizer 原样写的 `unknown:<编号>`。
+fn is_report_interpreted_key(value: &str) -> bool {
+    if let Some(code) = value.strip_prefix("unknown:") {
+        let digits = code.strip_prefix('-').unwrap_or(code);
+        return (1..=5).contains(&digits.len()) && digits.chars().all(|ch| ch.is_ascii_digit());
+    }
+    is_report_workout_key(value)
+}
+
+/// 只发端点认得的纠正条目，最多 64 条（端点的上限）。
+///
+/// issue #143：未知编号被改了类型以后，`unknown:46` 这个带冒号的值让端点把**整份**
+/// 报告 422，连「其他问题」也发不出去。端点已经放行这个形状；这里再兜一层——以后
+/// 万一又冒出一种端点不认的写法，丢掉的也只是那一条线索，不是整份报告。
+pub(super) fn report_safe_corrections(
+    items: Vec<DiagnosticWorkoutCorrection>,
+) -> Vec<DiagnosticWorkoutCorrection> {
+    items
+        .into_iter()
+        .filter(|item| {
+            (-1..=65535).contains(&item.code)
+                && item.records >= 1
+                && is_report_interpreted_key(&item.interpreted)
+                && is_report_workout_key(&item.corrected)
+        })
+        .take(64)
+        .collect()
 }
 
 /// 把用户写的自由文本收拾成可以发出去的样子。

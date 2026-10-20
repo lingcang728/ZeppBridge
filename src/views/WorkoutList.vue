@@ -74,7 +74,7 @@ const t = useMessages(messages);
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
  * 把两者混成一句会让人以为应用丢了记录。 */
 const {
-  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
+  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded, sentinelRef,
 } = usePagedRecords<Workout>({
   loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
   idOf: (item) => item.workout_id,
@@ -130,7 +130,7 @@ useRevisionReload(() => void loadList());
       />
     </div>
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore" class="load-more">
+    <div v-if="hasMore" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>

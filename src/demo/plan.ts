@@ -136,6 +136,8 @@ export const createDemoPlan = (now: Date): DemoPlan => {
     updateDraft: (document) => { edited = JSON.parse(JSON.stringify(document)); return true; },
     publish: (action, confirmClear) => {
       const b = build();
+      // 演示账本永远是「已送达」，没有要补发的周。
+      if (action.kind === 'resend') return { outcome: { outcome: 'not_needed' }, record: null, records: [] };
       if (action.kind === 'undo') {
         canUndo = false;
         sent = previous ?? initialSent(b);

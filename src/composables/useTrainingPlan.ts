@@ -275,6 +275,8 @@ const publish = () => {
   return Promise.resolve();
 };
 const undo = () => run({ kind: 'undo' }, false);
+/** 没确认送达 / 没送到的那几周再发一次（内容不变，整窗替换，不会在手表上多出训练）。 */
+const resend = () => (busy.value ? Promise.resolve() : run({ kind: 'resend' }, false));
 const clear = (confirmed = false) => run({ kind: 'clear' }, confirmed);
 
 const dismissNotice = () => { notice.value = null; };
@@ -289,5 +291,5 @@ export const useTrainingPlan = () => ({
   state, draftId, preview, busy, notice, clearPending, clearScope, blocking, unverified,
   document, accepted, revision, editingSent, readClipboardPlan, receiveFromClipboard, reshape, editActive,
   accept: () => { accepted.value = true; },
-  load, resume, paste, startDraft, discard, publish, undo, clear, dismissNotice, cancelClear, confirmClear,
+  load, resume, paste, startDraft, discard, publish, undo, resend, clear, dismissNotice, cancelClear, confirmClear,
 });

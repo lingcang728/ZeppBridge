@@ -99,6 +99,23 @@ mod tests {
         assert_eq!(resolve(105), None);
     }
 
+    /// 46 / 47 / 141 / 193：越野滑雪、山地骑行、划船、钓鱼。
+    ///
+    /// 证据是 issue #143（3.0.2，Amazfit Balance 2）逐条对着 Zepp App 核对的原话：
+    /// 「46 = cross-country skiing (skate), 47 = mountain bike, 141 = rowing,
+    /// 193 = fishing」。47 在反馈库里已经挂了 12 份报告，只是一直没有语义。
+    /// 141 / 193 和设备协议那张表里的 66（划船）/ 64（钓鱼）不是同一个编号——
+    /// 云端编号优先，见目录 notes。
+    #[test]
+    fn issue_143_codes() {
+        assert_eq!(resolve(46), Some("cross_country_skiing"));
+        assert_eq!(resolve(47), Some("mountain_biking"));
+        assert_eq!(resolve(141), Some("water_rowing"));
+        assert_eq!(resolve(193), Some("fishing"));
+        // 遛狗只开放手动纠正：还不知道哪个编号会产生它，不猜。
+        assert!(is_known_key("dog_walking"));
+    }
+
     /// 211 是公路骑行。
     ///
     /// 反馈库里 10 份报告、199 条记录都挂着这个编号，跨 1.1.1 到 1.1.5 每个版本，

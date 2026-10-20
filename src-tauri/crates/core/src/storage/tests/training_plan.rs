@@ -102,6 +102,19 @@ fn the_ledger_is_written_before_sending_and_doubt_stays_visible() {
     let overview = db.plan_overview(day(TODAY)).unwrap();
     assert!(overview.uncertain);
     assert_eq!(overview.planned.len(), 1);
+
+    // issue #143：没确认送达的那一周可以再发，不会因为「内容没变」被判成 not_needed。
+    let retry = sends(publish(&db, PublishRequest::Roll, false));
+    assert_eq!(retry.len(), 1);
+    assert_eq!(dates(&retry[0].body), ["2026-10-03"]);
+    db.finish_plan_publish(retry[0].publish_id, &SendOutcome::Delivered)
+        .unwrap();
+    assert!(!db.plan_overview(day(TODAY)).unwrap().uncertain);
+    // 送到了就不再重发。
+    assert!(matches!(
+        publish(&db, PublishRequest::Roll, false),
+        Prepared::NotNeeded
+    ));
 }
 
 #[test]
