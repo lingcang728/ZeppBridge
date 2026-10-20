@@ -287,6 +287,32 @@ impl Database {
         Ok(changed)
     }
 
+    /// 把「账本说写进去了、库里却一条报文都没有」的月份改回待补拉，返回改了几块。
+    ///
+    /// 3.0 之前的保留期清理删了派生行和报文，却没把账本改回来：账本仍是
+    /// `persisted`，补拉就永远跳过这些月份。真实库里运动缺了 2024-08 起整整一年、
+    /// 睡眠缺 19 个月，而 Zepp App 里都还在（#143 跑鞋里程对不上时查出来的）。
+    /// 现在的 `cleanup_old_data` 会顺手改账本，这里只修它修好之前留下的。
+    ///
+    /// 只看原始报文：派生行一定指向报文，报文只在没有派生行指向时才会被删，所以
+    /// 窗口里一条这条流的报文都没有，就是这个月确实什么都不剩了。判错的代价只是
+    /// 多拉一遍（补拉是幂等的 upsert），拉回来就有报文了，不会反复触发。
+    pub fn reopen_chunks_without_raw(&self) -> Result<usize> {
+        let changed = self.conn.execute(
+            "UPDATE coverage_ledger
+                SET status = 'pending', records = 0, persisted_at = NULL,
+                    error = NULL, error_code = NULL, attempts = 0, updated_at = ?1
+              WHERE status IN ('persisted', 'partial')
+                AND NOT EXISTS (
+                    SELECT 1 FROM raw_records r
+                     WHERE r.stream = coverage_ledger.stream
+                       AND r.start_utc < coverage_ledger.chunk_end
+                       AND COALESCE(r.end_utc, r.start_utc) > coverage_ledger.chunk_start)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        Ok(changed)
+    }
+
     /// 记录一块的结果。
     ///
     /// 失败会累加 `attempts`，成功（写入或云端确认为空）把它清零——一块曾经

@@ -498,9 +498,14 @@ pub async fn disconnect_official(
             }
         }
     }
-    store
+    let left_behind = store
         .disconnect()
         .map_err(|_| AppError::new("err.official.store", "没能从系统凭据存储里删掉官方令牌"))?;
+    if let Some(left_behind) = left_behind {
+        crate::diagnostics::log(&format!(
+            "断开官方授权：本地已清除，但系统凭据存储里的旧令牌没能删掉（{left_behind}）"
+        ));
+    }
     Ok(stored_status(&data_dir))
 }
 

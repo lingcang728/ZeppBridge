@@ -419,3 +419,33 @@ async fn an_oversized_body_without_a_length_is_cut_off() {
         other => panic!("超限响应必须报错：{other:?}"),
     }
 }
+
+/// #145：钥匙串删不掉时也要断得开。元数据是「已连接」的唯一依据，它照删；
+/// 留下的令牌没人指向，存储的原话交回去记日志。
+#[test]
+fn disconnect_still_disconnects_when_the_store_refuses_to_delete() {
+    struct RefusesDelete(Arc<MemoryBackend>);
+    impl CredentialBackend for RefusesDelete {
+        fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
+            self.0.set(user_id, token)
+        }
+        fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
+            self.0.get(user_id)
+        }
+        fn delete(&self, _user_id: &str) -> std::result::Result<(), String> {
+            Err("keychain prompt was not answered".into())
+        }
+        fn supports_named_entries(&self) -> bool {
+            true
+        }
+    }
+    let dir = temp_dir();
+    let store = OfficialStore::with_backend(&dir, Arc::new(RefusesDelete(MemoryBackend::named())));
+    store.save(&tokens(), 1).unwrap();
+    assert!(store.meta().unwrap().is_some());
+
+    assert!(store.disconnect().unwrap().is_some());
+    assert!(store.meta().unwrap().is_none());
+    assert!(store.load().unwrap().is_none());
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -578,7 +578,10 @@ pub fn run() {
                     "sync" => {
                         let _ = app.emit("tray://sync", ());
                     }
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        diagnostics::log("退出：托盘菜单「退出」");
+                        app.exit(0);
+                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -626,6 +629,7 @@ pub fn run() {
                 }
             }
             app.state::<main_window::MainWindowState>().set_ready();
+            updates::silent::spawn_periodic_recheck(app.handle().clone());
             diagnostics::log("Startup: application setup complete");
             Ok(())
         })
@@ -755,8 +759,15 @@ pub fn run() {
                 diagnostics::log("Startup: event loop ready");
                 main_window::request_show(app, "startup");
             }
-            tauri::RunEvent::ExitRequested { api, .. } => {
+            // 退出的每一条路都留一行日志（#143）：tao 在事件循环结束后才 panic，日志里只看得到
+            // panic，看不到是谁让它退出的。`code` 为空 = 最后一个窗口关了 / 系统要求退出；
+            // 有值 = 代码里调了 `exit`（托盘「退出」、更新换包前会先各记一行）。
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                diagnostics::log(&format!("退出：收到退出请求（code {code:?}）"));
                 handle_exit_requested(app, &api);
+            }
+            tauri::RunEvent::Exit => {
+                diagnostics::log("退出：事件循环结束");
             }
             _ => {}
         }),

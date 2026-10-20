@@ -274,7 +274,12 @@ impl AuthManager {
     /// Removes both metadata and the corresponding credential-store entry.
     /// A corrupt `auth.json` no longer leaves the credential behind: the
     /// best-effort user-id hint file is consulted as a fallback.
-    pub fn clear_auth(&self) -> Result<()> {
+    ///
+    /// 凭据存储拒绝删除时（macOS 上 ad-hoc 签名的新构建读不了旧钥匙串条目、而那个
+    /// 授权弹窗用户答不上来，#145）**照样退出**：本地元数据照删，留下的条目以后不会
+    /// 再被读到，同一账号重新登录时覆盖它。以前这里直接报错，`auth.json` 也留着，
+    /// 用户既退不出去也登不进来。存储的原话返回给调用方记日志。
+    pub fn clear_auth(&self) -> Result<Option<String>> {
         let user_id = self
             .read_stored()
             .ok()
@@ -282,11 +287,10 @@ impl AuthManager {
             .filter(|value| !value.trim().is_empty())
             .or_else(|| self.read_user_id_hint());
 
+        let mut left_behind = None;
         if let Some(user_id) = user_id {
             let user_id = validate_user_id(&user_id)?;
-            self.credentials
-                .delete(&user_id)
-                .map_err(credential_error)?;
+            left_behind = self.credentials.delete(&user_id).err();
         }
         if self.auth_file.exists() {
             fs::remove_file(&self.auth_file)?;
@@ -294,7 +298,7 @@ impl AuthManager {
         if self.user_id_file.exists() {
             let _ = fs::remove_file(&self.user_id_file);
         }
-        Ok(())
+        Ok(left_behind)
     }
 
     fn write_user_id_hint(&self, user_id: &str) -> Result<()> {

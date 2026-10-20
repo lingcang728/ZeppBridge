@@ -2,5 +2,9 @@
 - Added: **Connect Claude, Codex and more from the AI page**. A small pill at the top takes you to one-click MCP setup in Settings, so AI tools read your local data directly, no copy-paste.
 - Added: **Replace workouts from the command line (#143)**. zeppbridge-cli has a new fit-override command to replace a workout with a corrected .fit, undo it and list replacements; run it on each computer you use.
 - Added: **The shoes picked for a workout (#143)**. The shoe ID chosen in Zepp is stored locally and passed to AI over MCP; Zepp doesn’t send shoe names. The first launch after updating re-processes local data in the background.
+- Added: **Cheetah Square in the model list (#137)**. You can pick it by hand in Settings › Account and devices; automatic recognition needs a report that includes its model code.
 - Improved: **A one-time tip for automatic handoff on Windows**. The first time you hand off to AI, the receipt card offers to paste and send for you, with the switch right there.
 - Improved: **Data health tells empty responses apart (#143)**. Requests Zepp answered with an empty list no longer count as quarantined; the MCP data health report lists them separately from payloads that really couldn’t be read.
+- Improved: **Update checks while in the tray (#143)**. ZeppBridge checks again every 6 hours, and the log now records “already up to date” and what made the app quit.
+- Fixed: **History that backfill skipped (#143)**. Early versions deleted old data without updating the backfill record, so those months counted as fetched; after updating they are queued again, and one Start backfilling in Settings › Archive and storage brings them back.
+- Fixed: **Signing out on macOS (#145)**. When the keychain item can’t be deleted, signing out and disconnecting the official authorization still complete instead of failing.

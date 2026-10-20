@@ -1267,6 +1267,21 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(40,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v41（3.0.6）：不改结构，只修一次覆盖账本。3.0 之前的保留期清理删了数据却没改账本，
+        // 那些月份一直标着「已写入」，补拉永远跳过（见 `reopen_chunks_without_raw`）。
+        // 修复守在 `version < 41` 里：一次性的，不该每次启动都扫一遍。版本号不能放进去——
+        // 上面那几行 `user_version = 40` 每次启动都会重写，这里必须每次都写回 41。
+        if version < 41 {
+            let reopened = self.reopen_chunks_without_raw()?;
+            if reopened > 0 {
+                tracing::info!("覆盖账本：{reopened} 个月标着已写入但本地没有数据，已改回待补拉");
+            }
+        }
+        self.conn.execute_batch("PRAGMA user_version = 41;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(41,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

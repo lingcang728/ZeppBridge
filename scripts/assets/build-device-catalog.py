@@ -424,6 +424,27 @@ EXTRAS: list[dict[str, Any]] = [
         "checked_at": "2026-09-03",
         "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
     },
+    # issue #137：Cheetah Square 不在目录里，用户连「这款不对？手动指认」都选不到。
+    # 和上面的 Balance 2 XT 一样先不带图、不带编号：10-19 那份应用内报告没连高级数据，
+    # 里面没有任何 deviceSource，不猜。收到带编号的报告后再补进 DEVICE_SOURCE_CODES。
+    {
+        "catalog_id": "amazfit-cheetah-square",
+        "canonical_name": "Amazfit Cheetah Square",
+        "display_name": "Amazfit Cheetah Square",
+        "name_zh": "Amazfit Cheetah Square",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Amazfit Cheetah Square", "Cheetah Square", "Amazfit Cheetah (Square)"],
+        "region": ["global"],
+        "official_page": "https://support.amazfit.com/en/amazfit_cheetah(square)/user-guide",
+        "official_url": "https://support.amazfit.com/en/amazfit_cheetah(square)/user-guide",
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-cheetah-square",
+        "checked_at": "2026-10-20",
+        "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. Manual identification only: the one in-app report had no Advanced data connection and carried no deviceSource, so none is claimed. Product art pending.",
+    },
 ]
 
 
