@@ -705,3 +705,32 @@ fn a_report_note_is_capped_and_can_be_absent() {
     )
     .is_none());
 }
+
+/// issue #143：未知编号被改了类型，`unknown:46` 要能发出去；端点不认的形状只丢那一条。
+#[test]
+fn corrections_from_unknown_codes_are_sent_and_odd_shapes_are_dropped_alone() {
+    let item = |interpreted: &str, corrected: &str| DiagnosticWorkoutCorrection {
+        code: 46,
+        interpreted: interpreted.into(),
+        corrected: corrected.into(),
+        records: 8,
+    };
+    let kept = report_safe_corrections(vec![
+        item("unknown:46", "cross_country_skiing"),
+        item("open_water_swimming", "trail_running"),
+        item("Open Water", "run"),
+        item("unknown:x", "run"),
+        item("run", "unknown:46"),
+    ]);
+    let pairs: Vec<_> = kept
+        .iter()
+        .map(|c| (c.interpreted.as_str(), c.corrected.as_str()))
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            ("unknown:46", "cross_country_skiing"),
+            ("open_water_swimming", "trail_running")
+        ]
+    );
+}

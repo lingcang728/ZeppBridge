@@ -110,13 +110,15 @@ pub async fn training_plan_set_ai_publish(
     .await
 }
 
-/// 界面能发起的三种推送。滚动推送只在同步之后自动跑，不从界面发。
+/// 界面能发起的推送。滚动推送平时在同步之后自动跑；`Resend` 是用户手动补一次
+/// （issue #143：断网那一周「未确认」，用户要能自己点重发，而不是等下一次同步）。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum PublishAction {
     Draft { id: String },
     Undo,
     Clear,
+    Resend,
 }
 
 /// 推送的结局。`outcome` 与 core 的 `Prepared` 一致，`send` 时多一份账本结果。
@@ -140,6 +142,7 @@ pub async fn training_plan_publish(
         PublishAction::Draft { id } => PublishRequest::Draft { id },
         PublishAction::Undo => PublishRequest::UndoLast,
         PublishAction::Clear => PublishRequest::Clear,
+        PublishAction::Resend => PublishRequest::Roll,
     };
     publish(&state.data_dir, &state.db, request, confirm_clear, locale).await
 }

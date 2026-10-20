@@ -344,10 +344,19 @@ test('workout type corrections are model-class only, and optional', () => {
   ];
   assert.equal(validateFeedbackReport(quiet), true);
 
+  // issue #143：未知编号被改了类型，「我们的解释」是 normalizer 原样写的 `unknown:46`。
+  assert.equal(validateFeedbackReport({
+    ...report(),
+    workoutTypeCorrections: [{ code: 46, interpreted: 'unknown:46', corrected: 'cross_country_skiing', records: 8 }],
+  }), true);
+
   for (const bad of [
     // 自由文本会让这两个字段变成又一个可以塞任意内容的通道。
     [{ code: 7, interpreted: 'Open Water Swimming', corrected: 'trail_running', records: 1 }],
     [{ code: 7, interpreted: 'open_water_swimming', corrected: '../../etc/passwd', records: 1 }],
+    // 冒号只给「没认出来」用，而且后面只能是编号。
+    [{ code: 46, interpreted: 'unknown:anything goes', corrected: 'run', records: 1 }],
+    [{ code: 46, interpreted: 'run', corrected: 'unknown:46', records: 1 }],
     // 实例信息一律不许出现。
     [{ code: 7, interpreted: 'a', corrected: 'b', records: 1, workoutId: 'leak' }],
     [{ code: 7, interpreted: 'a', corrected: 'b' }],

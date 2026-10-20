@@ -171,7 +171,7 @@ export interface PlanWeekStatus {
   error_code: string | null;
 }
 
-export type PlanPublishAction = { kind: 'draft'; id: string } | { kind: 'undo' } | { kind: 'clear' };
+export type PlanPublishAction = { kind: 'draft'; id: string } | { kind: 'undo' } | { kind: 'clear' } | { kind: 'resend' };
 
 export type PlanPrepared =
   | { outcome: 'send'; batch_id: number; sends: { publish_id: number; window_start: string; role: PlanPublishRecord['role'] }[] }

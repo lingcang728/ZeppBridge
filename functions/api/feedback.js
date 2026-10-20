@@ -171,6 +171,15 @@ const validCloudRejection = (entry) => hasOnlyKeys(entry, ['stream', 'code', 'at
 const WORKOUT_KEY = /^[a-z][a-z0-9_]{0,47}$/;
 
 /**
+ * 「我们的解释」还可能是「没认出来」：库里记成 `unknown:<编号>`（normalizer 的
+ * 原样写法）。issue #143：用户把一条未知编号的运动改了类型以后，这个带冒号的值
+ * 撞上 `WORKOUT_KEY`，整份报告 422——之后连「其他问题」也发不出去，而这恰恰是
+ * 最该收到的那一类纠正。冒号后面只许是编号本身，仍然不是自由文本。
+ */
+const UNKNOWN_WORKOUT_KEY = /^unknown:-?\d{1,5}$/;
+const validInterpretedKey = (value) => WORKOUT_KEY.test(value) || UNKNOWN_WORKOUT_KEY.test(value);
+
+/**
  * 「Zepp 编号 → 我们的解释 → 用户的解释」。
  *
  * issue #24 那类问题唯一可能的证据：编号我们认识，只是认错了，所以
@@ -183,7 +192,7 @@ const validWorkoutCorrection = (entry) => hasOnlyKeys(
 )
   && boundedInteger(entry.code, -1, 65535)
   && boundedString(entry.interpreted, 48)
-  && WORKOUT_KEY.test(entry.interpreted)
+  && validInterpretedKey(entry.interpreted)
   && boundedString(entry.corrected, 48)
   && WORKOUT_KEY.test(entry.corrected)
   && boundedInteger(entry.records, 1, 1_000_000_000);
