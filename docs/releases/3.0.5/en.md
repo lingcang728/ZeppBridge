@@ -1,0 +1,7 @@
+- Added: **More workout types recognised (#143)**. Cross-country skiing, mountain biking, rowing and fishing are now detected automatically, and Dog Walking can be picked by hand; exported FIT files use the matching sport. The first launch after updating re-processes local data in the background.
+- Added: **Adjustable visual effects**. Settings › Advanced and maintenance has Auto / Full / Low; Low turns off frosted glass and morphing animations, and Linux uses Low by default.
+- Improved: **Workout and sleep lists load more as you scroll**. You used to have to click Load more at the bottom, and if you missed it, your records seemed to stop at some month.
+- Fixed: **“Report a problem” rejected whole reports (#143)**. A workout whose type you had changed could get the entire report refused; now a correction that doesn’t pass is dropped on its own and the rest is sent.
+- Fixed: **Training plans couldn’t be resent after a dropped connection**. Weeks whose delivery wasn’t confirmed are resent with the next publish, and the plan status has a Resend unconfirmed weeks button.
+- Fixed: **Backfill “failed” months that never cleared**. Months the cloud explicitly has nothing for are marked Empty in cloud, the current month no longer asks for days that haven’t happened yet, and Retry failed items starts backfilling right away.
+- Fixed: **Sign-in not opening the browser in the Linux AppImage**. Before opening the browser or the data folder, the AppImage’s bundled library paths are removed so the system browser starts normally.
