@@ -1000,11 +1000,13 @@ export default {
       chess: 'Schaken',
       core_training: 'Coretraining',
       cricket: 'Cricket',
+      cross_country_skiing: 'Langlaufen',
       cross_training: 'Crosstraining',
       curling: 'Curling',
       dance: 'Dansen',
       darts: 'Darten',
       dodgeball: 'Trefbal',
+      dog_walking: 'Hond uitlaten',
       dragon_boat: 'Drakenboot',
       driving: 'Autorijden',
       e_bike: 'Elektrisch fietsen',
@@ -1050,6 +1052,7 @@ export default {
       martial_arts: 'Vechtsport',
       mass_gymnastics: 'Groepsgymnastiek',
       modern_dance: 'Moderne dans',
+      mountain_biking: 'Mountainbiken',
       muay_thai: 'Muay Thai',
       open_water_swimming: 'Openwaterzwemmen',
       parallel_bars: 'Brug',
@@ -2545,6 +2548,12 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       themeDark: 'Donker',
       themeSystem: 'Systeem',
       mcpPreview: 'Bekijk wat er gekopieerd wordt',
+      effectsLabel: 'Visuele effecten',
+      effectsSub:
+        'Laag schakelt matglas en vormveranderende animaties uit; Automatisch gebruikt Laag op Linux',
+      effectsAuto: 'Automatisch',
+      effectsFull: 'Volledig',
+      effectsLite: 'Laag',
     },
     'views/settings/sections/fileName': {
       example: 'bijv.',
@@ -2712,6 +2721,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       never: 'Nog niets verzonden',
       undo: 'Laatste verzending ongedaan maken',
       clear: 'Plan op horloge wissen',
+      resend: 'Niet-bevestigde weken opnieuw verzenden',
     },
     'components/plan/library': {
       saveTemplate: 'Opslaan als sjabloon',
@@ -3507,6 +3517,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     'err.backfill.start_too_early':
       'Startdatum te vroeg — je kunt hooguit de laatste 3650 dagen ophalen',
     'err.official.browser': 'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
+    'err.open_url.failed':
+      'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
+    'err.open_url.not_allowed': 'Alleen https-links kunnen worden geopend.',
     'err.official.denied': 'Je hebt geen toegang gegeven, dus ZeppBridge heeft niets ontvangen.',
     'err.official.rejected': 'Zepp heeft deze autorisatie niet geaccepteerd — probeer opnieuw',
     'err.official.expired': 'Deze autorisatie is verlopen — klik opnieuw op autoriseren',

@@ -1191,6 +1191,7 @@ export default {
     never: 'Nulla di inviato finora',
     undo: 'Annulla l’ultimo invio',
     clear: 'Cancella il piano dall’orologio',
+    resend: 'Reinvia settimane non confermate',
   },
 
   'components/shell/AppTopBar': {
@@ -2351,11 +2352,13 @@ export default {
     chess: "Scacchi",
     core_training: "Allenamento del core",
     cricket: "Cricket",
+    cross_country_skiing: "Sci di fondo",
     cross_training: "Cross training",
     curling: "Curling",
     dance: "Danza",
     darts: "Freccette",
     dodgeball: 'Palla avvelenata',
+    dog_walking: "Passeggiata con cane",
     dragon_boat: "Dragon boat",
     driving: "Guida",
     e_bike: "Bici elettrica",
@@ -2401,6 +2404,7 @@ export default {
     martial_arts: "Arti marziali",
     mass_gymnastics: "Ginnastica di gruppo",
     modern_dance: "Danza moderna",
+    mountain_biking: "Mountain bike",
     muay_thai: "Muay Thai",
     open_water_swimming: "Nuoto in acque libere",
     parallel_bars: "Parallele",
@@ -3511,6 +3515,11 @@ Rispondi in Markdown.`,
     themeDark: 'Scuro',
     themeLight: 'Chiaro',
     scaleSub: 'Dimensione standard al 100% (Ctrl + / - supportati)',
+    effectsLabel: 'Effetti visivi',
+    effectsSub: 'Basso disattiva il vetro smerigliato e le animazioni di transizione; Automatico usa Basso su Linux',
+    effectsAuto: 'Automatico',
+    effectsFull: 'Completi',
+    effectsLite: 'Basso',
   },
 
   'views/settings/sections/McpTaskScopes': {
@@ -3708,6 +3717,9 @@ Rispondi in Markdown.`,
   'err.login.connected': 'Connesso all’account Zepp',
   'err.official.browser':
     'Impossibile aprire il browser di sistema: controlla il browser predefinito e riprova.',
+  'err.open_url.failed':
+    'Impossibile aprire il browser di sistema: controlla il browser predefinito e riprova.',
+  'err.open_url.not_allowed': 'È possibile aprire solo link https.',
   'err.official.denied':
     'Autorizzazione non concessa: ZeppBridge non ha ricevuto alcun dato.',
   'err.official.rejected': 'Zepp non ha accettato l’autorizzazione: riprova.',
