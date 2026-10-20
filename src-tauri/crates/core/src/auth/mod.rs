@@ -13,7 +13,6 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 mod backends;
@@ -310,10 +309,7 @@ impl AuthManager {
         let temp_path = parent.join(format!(
             ".auth.user-id.tmp-{}-{}",
             std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::unique_suffix()
         ));
         let result = (|| -> io::Result<()> {
             let mut file = OpenOptions::new()
@@ -360,10 +356,7 @@ impl AuthManager {
 
         let json = serde_json::to_vec_pretty(stored)
             .map_err(|e| ZeppBridgeError::ParseError(e.to_string()))?;
-        let suffix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let suffix = crate::unique_suffix();
         let temp_path = parent.join(format!(
             ".{}.tmp-{}-{}",
             self.auth_file

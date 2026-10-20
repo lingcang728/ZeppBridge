@@ -12,10 +12,7 @@ fn stdio_recovers_from_bad_input_and_returns_tool_errors_in_result() {
     let missing_dir = std::env::temp_dir().join(format!(
         "zeppbridge-mcp-stdio-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     let mut child = Command::new(env!("CARGO_BIN_EXE_zeppbridge-mcp"))
         .env("ZEPPBRIDGE_DATA_DIR", &missing_dir)
@@ -170,10 +167,7 @@ fn scoped_library() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-mcp-scope-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     {

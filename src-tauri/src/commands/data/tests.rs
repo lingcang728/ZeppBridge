@@ -3,7 +3,6 @@ use super::*;
 use crate::models::{DeviceMatchStatus, DeviceProfile};
 use serde_json::json;
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn nested_identity_and_helio_name_survive_empty_outer_metadata() {
@@ -472,10 +471,7 @@ fn indexed_identity_keeps_nickname_and_recovers_cached_catalog_fields() {
 
 #[test]
 fn legacy_devices_json_is_read_with_new_defaults() {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+    let suffix = zeppbridge_core::unique_suffix();
     let dir = std::env::temp_dir().join(format!("zeppbridge-device-cache-{suffix}"));
     fs::create_dir_all(&dir).unwrap();
     fs::write(

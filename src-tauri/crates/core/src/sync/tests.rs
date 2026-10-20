@@ -128,10 +128,7 @@ async fn failure_report_preserves_records_written() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-test-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();
@@ -256,10 +253,7 @@ async fn cancel_and_wait_sets_the_flag_and_returns_when_idle() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-cancel-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();
@@ -362,10 +356,7 @@ async fn empty_pending_details_clears_a_stale_failed_status() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-empty-pending-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();

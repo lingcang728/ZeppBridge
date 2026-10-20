@@ -144,10 +144,7 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
     let staging = parent.join(format!(
         ".bundle-migration-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir(&staging)?;
     let staged = (|| -> io::Result<()> {
@@ -195,10 +192,7 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
         let aside = parent.join(format!(
             ".pre-migration-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::unique_suffix()
         ));
         std::fs::rename(destination, &aside)?;
     }
@@ -747,10 +741,7 @@ pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let temp = parent.join(format!(
         ".{file_name}.tmp-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let result = (|| {
         let mut file = std::fs::OpenOptions::new()

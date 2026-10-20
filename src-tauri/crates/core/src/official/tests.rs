@@ -44,10 +44,7 @@ fn temp_dir() -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-official-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -444,7 +441,8 @@ fn disconnect_still_disconnects_when_the_store_refuses_to_delete() {
     store.save(&tokens(), 1).unwrap();
     assert!(store.meta().unwrap().is_some());
 
-    assert!(store.disconnect().unwrap().is_some());
+    // 走 clear 而不是 disconnect：disconnect 会推全局代次，和上面那条唯一推代次的用例并行会互相踩。
+    assert!(store.clear().unwrap().is_some());
     assert!(store.meta().unwrap().is_none());
     assert!(store.load().unwrap().is_none());
     let _ = std::fs::remove_dir_all(dir);

@@ -163,10 +163,7 @@ fn future_schema_is_refused_without_changing_the_database() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-future-schema-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("zepp.db");
@@ -507,10 +504,7 @@ fn v26_library_gains_stage_available_columns_at_v27() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-v26-sleep-available-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

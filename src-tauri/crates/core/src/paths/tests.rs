@@ -35,10 +35,7 @@ fn replacing_the_bundle_preserves_migrated_account_devices_and_library() {
     let root = std::env::temp_dir().join(format!(
         "bundle-update-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let bundle = root.join("ZeppBridge.app");
     let source = bundle.join("Contents/MacOS/data");
@@ -100,10 +97,7 @@ fn bundle_migration_copies_live_wal_and_preserves_existing_library() {
     let root = std::env::temp_dir().join(format!(
         "bundle-copy-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("ZeppBridge.app/Contents/MacOS/data");
     let destination = root.join("support/data");
@@ -163,10 +157,7 @@ fn bundle_migration_tolerates_finder_junk_and_leftover_logs() {
     let root = std::env::temp_dir().join(format!(
         "bundle-junk-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -210,10 +201,7 @@ fn bundle_migration_falls_back_to_file_copy_when_the_source_db_wont_open() {
     let root = std::env::temp_dir().join(format!(
         "bundle-corrupt-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -237,10 +225,7 @@ fn bundle_migration_recreates_symlinks_instead_of_failing() {
     let root = std::env::temp_dir().join(format!(
         "bundle-link-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -271,10 +256,7 @@ fn an_app_suffixed_directory_without_contents_is_not_a_bundle() {
     let root = std::env::temp_dir().join(format!(
         "fake-bundle-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let exe_dir = root.join("tools.app").join("release");
     let data = exe_dir.join("data");
@@ -396,10 +378,7 @@ fn relocates_sqlite_group_without_overwriting() {
     let root = std::env::temp_dir().join(format!(
         "zeppbridge-path-test-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("appdata");
     let dest = root.join("install").join("data");
@@ -445,10 +424,7 @@ fn does_not_attach_foreign_wal_to_existing_destination_db() {
     let root = std::env::temp_dir().join(format!(
         "zeppbridge-path-wal-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("appdata");
     let dest = root.join("install").join("data");
@@ -494,10 +470,7 @@ fn atomic_write_replaces_an_existing_file() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-atomic-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("out.json");
