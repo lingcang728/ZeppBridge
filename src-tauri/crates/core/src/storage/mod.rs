@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 38;
+pub const CURRENT_SCHEMA_VERSION: i64 = 39;
 
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -55,7 +55,7 @@ pub const EXPORT_DATA_TYPES: [&str; 19] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-10-v36-band-dst";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-10-v37-pauses-distance";
 
 /// A metric actually present in the local library. This inventory deliberately
 /// includes names outside the chart contract so new normalized data is findable.
@@ -147,6 +147,7 @@ mod devices;
 mod diagnostics;
 mod estimate;
 mod event_windows;
+pub mod fit_override;
 mod freshness;
 mod guards;
 mod hourly_steps;
@@ -178,6 +179,7 @@ mod writes;
 pub(crate) use ai_export::*;
 pub use capability::*;
 pub use devices::*;
+pub use fit_override::{FitOverrideOutcome, WorkoutFitOverride, FIT_START_TOLERANCE_SECONDS};
 pub use freshness::*;
 pub use guards::*;
 use ingest::SerializedPayload;

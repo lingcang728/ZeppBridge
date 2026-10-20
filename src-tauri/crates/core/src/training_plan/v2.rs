@@ -62,6 +62,12 @@ pub fn variant_label(sport: Sport, variant: Variant, locale: WatchLocale) -> Opt
         (Sport::Cycling, Variant::Indoor, Zh) => "室内骑行",
         (Sport::Cycling, Variant::Indoor, En) => "Indoor cycling",
         (Sport::Cycling, Variant::Indoor, Es) => "Ciclismo en interior",
+        (Sport::Running, Variant::Trail, Zh) => "越野跑",
+        (Sport::Running, Variant::Trail, En) => "Trail run",
+        (Sport::Running, Variant::Trail, Es) => "Trail running",
+        (Sport::Cycling, Variant::Mountain, Zh) => "山地骑行",
+        (Sport::Cycling, Variant::Mountain, En) => "Mountain biking",
+        (Sport::Cycling, Variant::Mountain, Es) => "Ciclismo de montaña",
         _ => return None,
     })
 }

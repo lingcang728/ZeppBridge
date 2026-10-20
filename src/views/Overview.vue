@@ -4,6 +4,8 @@ defineOptions({ name: 'Overview' });
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch, type Component } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
+import BackfillOffer from '../components/BackfillOffer.vue';
+import { addDays, dayKey } from '../lib/aiTask/bridgeScale';
 import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
@@ -382,6 +384,8 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
+    <!-- 补拉入口（3.0.4）：本机不满一年时就地问一句，不只藏在设置页深处。说过「先不用」就不再出现。 -->
+    <BackfillOffer place="overview" :start="addDays(dayKey(), -364)" class="overview-backfill" />
     <OfficialOnlyNote />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
@@ -442,6 +446,7 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 </template>
 
 <style scoped>
+.overview-backfill { margin: 0; }
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
 .overview-header { flex-wrap: wrap; min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }

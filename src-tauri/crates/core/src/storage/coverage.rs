@@ -115,7 +115,7 @@ pub struct StreamCoverage {
     /// 实际写进本机库的最早 / 最晚月份。
     pub persisted_from: Option<String>,
     pub persisted_to: Option<String>,
-    /// 请求过但云端没返回的月份，最多列 12 个。
+    /// 请求过但云端没返回的月份，最多列 120 个（十年）：牌桌按它把一叠标成「云端没有」（3.0.4）。
     pub empty_months: Vec<String>,
     pub records: i64,
 }
@@ -402,7 +402,7 @@ impl Database {
                     ChunkStatus::EmptyFromCloud => {
                         completed += 1;
                         coverage.empty_chunks += 1;
-                        if coverage.empty_months.len() < 12 {
+                        if coverage.empty_months.len() < 120 {
                             coverage.empty_months.push(chunk.chunk_start.clone());
                         }
                     }

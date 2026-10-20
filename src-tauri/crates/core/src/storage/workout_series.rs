@@ -265,8 +265,8 @@ impl Database {
                 "INSERT INTO workout_samples
                     (workout_id, timestamp, heart_rate, pace, speed, cadence, altitude, stride,
                      power_watts, ground_contact_ms, vertical_oscillation_mm, vertical_ratio_pct,
-                     equivalent_pace_s)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                     equivalent_pace_s, distance_m)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             )?;
             for sample in &decoded.samples {
                 insert.execute(params![
@@ -283,6 +283,7 @@ impl Database {
                     sample.vertical_oscillation_mm,
                     sample.vertical_ratio_pct,
                     sample.equivalent_pace_s_per_km,
+                    sample.distance_m,
                 ])?;
             }
         }
@@ -382,7 +383,7 @@ impl Database {
             let mut stmt = self.conn.prepare(
                 "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride,
                         power_watts, ground_contact_ms, vertical_oscillation_mm,
-                        vertical_ratio_pct, equivalent_pace_s
+                        vertical_ratio_pct, equivalent_pace_s, distance_m
                  FROM workout_samples WHERE workout_id = ?1 ORDER BY timestamp",
             )?;
             let rows = stmt.query_map([workout_id], |row| {
@@ -399,6 +400,7 @@ impl Database {
                     vertical_oscillation_mm: row.get(9)?,
                     vertical_ratio_pct: row.get(10)?,
                     equivalent_pace_s_per_km: row.get(11)?,
+                    distance_m: row.get(12)?,
                 })
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?

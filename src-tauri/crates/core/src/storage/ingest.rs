@@ -268,7 +268,8 @@ impl Database {
                 let summary_end = self.workout_end_time(&workout_id)?;
                 let summary_distance = self.workout_distance_meters(&workout_id)?;
                 let decoded = decode_workout_detail(payload, summary_end, summary_distance)?;
-                self.replace_workout_series(&workout_id, &decoded)?;
+                // 用户导入过修正 .fit 的运动，云端明细只留在 raw_records 里（#140）。
+                self.apply_cloud_series(&workout_id, &decoded)?;
                 counts.primary_records =
                     (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
             }

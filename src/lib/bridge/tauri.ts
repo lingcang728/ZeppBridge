@@ -58,6 +58,7 @@ import type {
   TrainingBalancePoint,
   UserPrefs,
   Workout,
+  WorkoutFitOverride,
   WorkoutSeries,
 } from '../../types';
 
@@ -331,6 +332,16 @@ export const tauriBackend: BridgeBackend = {
       workoutId,
       userOverride: userOverride || null,
     });
+  },
+
+  getWorkoutFitOverride(workoutId: string) {
+    return call<WorkoutFitOverride | null>('get_workout_fit_override', { workoutId });
+  },
+  importWorkoutFit(workoutId: string, path: string) {
+    return call<WorkoutFitOverride>('import_workout_fit', { workoutId, path });
+  },
+  removeWorkoutFit(workoutId: string) {
+    return call<boolean>('remove_workout_fit', { workoutId });
   },
 
   getWorkoutTypeOptions() {

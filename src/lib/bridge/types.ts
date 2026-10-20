@@ -41,6 +41,7 @@ import type {
   TrainingBalancePoint,
   UserPrefs,
   Workout,
+  WorkoutFitOverride,
   WorkoutSeries,
 } from '../../types';
 
@@ -374,6 +375,11 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
+  /** #140：本机用修正过的 .fit 顶替这条运动；`path` 是用户在对话框里选的文件。 */
+  getWorkoutFitOverride(workoutId: string): Promise<WorkoutFitOverride | null>;
+  importWorkoutFit(workoutId: string, path: string): Promise<WorkoutFitOverride>;
+  /** 返回 false 表示本来就没有修正。 */
+  removeWorkoutFit(workoutId: string): Promise<boolean>;
   getWorkoutTypeOptions(): Promise<SportOption[]>;
   getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
   setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;

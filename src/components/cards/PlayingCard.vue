@@ -15,6 +15,7 @@ import { computed } from 'vue';
 import Icon, { type IconName } from '../Icon.vue';
 import { useCardsText } from './cards.i18n';
 import { faceFit, splitFaceValue, textFit } from '../../lib/cards/faceValue';
+import type { GroupCoverage, GroupKind } from '../../lib/cards/deck';
 
 const props = withDefaults(defineProps<{
   kind: 'day' | 'group';
@@ -40,12 +41,14 @@ const props = withDefaults(defineProps<{
   value2?: string | null;
   unit2?: string | null;
   tint2?: string | null;
-  /** 一叠是一周还是一个月（10-08 H11：日牌 / 周叠 / 月叠厚薄、浓淡不同，一眼分得出）。 */
-  deck?: 'week' | 'month' | null;
+  /** 一叠是一周、一个月、一季还是一年（10-08 H11：日牌 / 周叠 / 月叠厚薄、浓淡不同，一眼分得出；季、年叠沿用月叠的样子）。 */
+  deck?: GroupKind | null;
+  /** 没有记录的一叠是「还没补拉」（虚线）还是「云端没有」（3.0.4，读覆盖账本）；null 就是普通的「没有记录」。 */
+  coverage?: GroupCoverage;
   /** 一叠里挑了一部分（虚线）还是全挑了（实线实底，10-08 H5）。 */
   picked?: 'some' | 'all' | null;
 }>(), {
-  deck: null, picked: null, value2: null, unit2: null, tint2: null, value: null, unit: null, corner: null, dots: null, state: 'front', badge: null, disabled: false, empty: false, holding: false, focused: false, tint: 'var(--accent)', icon: null });
+  deck: null, coverage: null, picked: null, value2: null, unit2: null, tint2: null, value: null, unit: null, corner: null, dots: null, state: 'front', badge: null, disabled: false, empty: false, holding: false, focused: false, tint: 'var(--accent)', icon: null });
 const t = useCardsText();
 const parts = computed(() => splitFaceValue(props.value, props.unit));
 const parts2 = computed(() => (props.tint2 ? splitFaceValue(props.value2, props.unit2) : []));
@@ -53,7 +56,7 @@ const fit = computed(() => ({ '--fit': String(Math.max(faceFit(parts.value), par
 </script>
 
 <template>
-  <button type="button" :class="['pcard', kind, state, deck, picked ? `picked-${picked}` : null, { disabled, holding, focused, empty, duo: !!tint2 }]" :style="{ '--tint': tint, ...fit }" :aria-disabled="disabled || undefined">
+  <button type="button" :class="['pcard', kind, state, deck, picked ? `picked-${picked}` : null, coverage ? `cov-${coverage}` : null, { disabled, holding, focused, empty, duo: !!tint2 }]" :style="{ '--tint': tint, ...fit }" :aria-disabled="disabled || undefined">
     <span v-if="state === 'boxed'" class="pcard-face outline">
       <Icon name="box" :size="20" />
       <small>{{ t.inBox }}</small>
@@ -72,7 +75,7 @@ const fit = computed(() => ({ '--fit': String(Math.max(faceFit(parts.value), par
       <span class="pcard-main">
         <Icon v-if="icon" class="pcard-icon" :name="icon" :size="22" />
         <strong class="pcard-title">{{ title }}</strong>
-        <span v-if="kind === 'group' && empty" class="pcard-none-pill">{{ t.noRecord }}</span>
+        <span v-if="kind === 'group' && empty" class="pcard-none-pill">{{ coverage === 'not_backfilled' ? t.notBackfilled : coverage === 'cloud_empty' ? t.cloudEmpty : t.noRecord }}</span>
         <template v-else-if="tint2 && kind === 'day'">
           <span :class="['pcard-value', { none: !parts.length }]"><template v-if="parts.length"><template v-for="(part, i) in parts" :key="i"><b v-if="part.n">{{ part.n }}</b><small v-else>{{ part.u }}</small></template></template><template v-else>—</template></span>
           <span :class="['pcard-value', 'second', { none: !parts2.length }]"><template v-if="parts2.length"><template v-for="(part, i) in parts2" :key="i"><b v-if="part.n">{{ part.n }}</b><small v-else>{{ part.u }}</small></template></template><template v-else>—</template></span>

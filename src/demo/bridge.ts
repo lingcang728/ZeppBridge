@@ -12,8 +12,8 @@ export const demoDayStrip = (data: DemoData, count: number, end: string): DayStr
     ['resting_hr','resting_hr','bpm'], ['heart_rate','heart_rate','bpm'], ['workout','moving_seconds','min'],
     ['training','training_load','load'], ['body','weight','kg'],
   ];
-  return specs.map(([category,metric,unit]) => ({ category, metric, cells: Array.from({ length: Math.min(186,Math.max(1,count)) },(_,i) => {
-    const date = addDays(end,1-Math.min(186,Math.max(1,count))+i);
+  return specs.map(([category,metric,unit]) => ({ category, metric, cells: Array.from({ length: Math.min(3700,Math.max(1,count)) },(_,i) => {
+    const date = addDays(end,1-Math.min(3700,Math.max(1,count))+i);
     const workouts = data.workouts.filter(w => dayKey(new Date(w.start_time)) === date);
     const sleeps = data.sleeps.filter(s => dayKey(new Date(s.end_time)) === date);
     const reading = data.metrics[metric]?.find(p => p.date === date);

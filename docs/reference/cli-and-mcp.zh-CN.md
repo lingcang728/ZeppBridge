@@ -208,7 +208,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 |---|---|
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
@@ -244,7 +244,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
 
-- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
+- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表，这是 Zepp 接口的限制：走路、徒步、力量、轮滑、越野滑雪会被拦下，力量训练的动作和组数也发不过去；跑步可写 `trail` 越野跑、骑行可写 `mountain` 山地车；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
 - `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
 - `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
 - 这五个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。

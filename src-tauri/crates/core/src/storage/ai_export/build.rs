@@ -517,6 +517,14 @@ impl Database {
                     "vo2max": vo2max,
                     "source_scope": source_scope,
                     "device_label": devices.label(device_id.as_deref()),
+                    // 用户的 .fit 修正（#140）：有它时距离和序列都是修正版。
+                    "local_fit_correction": self.workout_fit_override(&workout_id)?.map(|info| {
+                        serde_json::json!({
+                            "file_name": info.file_name,
+                            "imported_at": info.imported_at,
+                            "cloud_distance_meters": info.original_distance_m,
+                        })
+                    }),
                     "sample_count": series.samples.len(),
                     "route_point_count": series.route.len(),
                     "pauses": series.pauses,

@@ -254,8 +254,9 @@ const PLAN_FORMAT: &str = "plan 是一个 JSON 对象（格式 zeppbridge-plan/3
     这几天里没写训练的就是休息日，发布时会清掉这几天原有的 ZeppBridge 计划；\
     rest 可选，[{date, bedtime \"22:30\", sleepTarget \"8h30m\", note}]；\
     workouts：[{date, sport, variant, name, focus, description, steps}]。\
-    sport 只有 running / cycling / pool_swim / open_water_swim 能发到手表（走路、徒步、力量会被拦下）；\
-    variant 跑步写 outdoor / treadmill / track，骑行写 outdoor / indoor；\
+    sport 只有 running / cycling / pool_swim / open_water_swim 能发到手表，这是 Zepp 接口的限制\
+    （走路、徒步、力量、轮滑、越野滑雪会被拦下；力量训练的动作和组数也发不过去）；\
+    variant 跑步写 outdoor / treadmill / track / trail（越野跑），骑行写 outdoor / indoor / mountain（山地车）；\
     name 14 个字以内（手表列表会截断）；focus（训练目的，短词）和 description（要点）必填。\
     steps 每一步 {kind, duration, target, note}：kind 是 warmup / active / interval / recovery / rest / cooldown；\
     duration 写 \"20min\"、\"90s\"、\"1h\"、\"400m\"、\"5km\"（m 是米不是分钟）；\

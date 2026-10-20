@@ -3,7 +3,7 @@
  *
  * 数据和动作在 composables/useWorkoutDetail.ts，显示计算在 useWorkoutPresentation.ts，
  * 轨迹几何和图表配置在 lib/workoutRoute.ts、lib/workoutCharts.ts，各块界面在 components/workout/。 */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import EmptyState from '../components/EmptyState.vue';
 import GlyphTile from '../components/GlyphTile.vue';
@@ -19,6 +19,7 @@ import AskAiButton from '../components/ask/AskAiButton.vue';
 import { workoutLabel } from '../lib/labels';
 import { workoutDisplayLabel } from '../lib/workouts';
 import { useWorkoutDetail } from '../composables/useWorkoutDetail';
+import { useWorkoutFitCorrection } from '../composables/useWorkoutFitCorrection';
 import { useWorkoutPresentation } from '../composables/useWorkoutPresentation';
 import { useMessages } from '../i18n';
 import { holdInPlace } from '../lib/motion/holdInPlace';
@@ -39,6 +40,8 @@ const {
   typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
   loadDetail, exportRecord,
 } = useWorkoutDetail(workoutId);
+/* reactive 包一层：来源卡在两列之间换位置时状态（刚才那句提示）不丢，模板里也不用写 .value。 */
+const fit = reactive(useWorkoutFitCorrection(workoutId));
 
 const {
   durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,
@@ -135,7 +138,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           <WorkoutRouteCard :canvas="routeCanvas" />
           <WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" />
           <WorkoutCharts :cards="chartCards" :series-error="seriesError" :hr-zones="hrZones" @retry="loadDetail" />
-          <WorkoutProvenanceCard v-if="metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" />
+          <WorkoutProvenanceCard v-if="metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" :fit="fit" @replace-fit="fit.replace" @restore-fit="fit.restore" />
         </div>
         <WorkoutSidePanels
           v-model:format="activeFormat"
@@ -146,7 +149,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           @export="exportRecord"
         >
           <template #after>
-            <WorkoutProvenanceCard v-if="!metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" />
+            <WorkoutProvenanceCard v-if="!metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" :fit="fit" @replace-fit="fit.replace" @restore-fit="fit.restore" />
           </template>
         </WorkoutSidePanels>
       </div>

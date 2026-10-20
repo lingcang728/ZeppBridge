@@ -293,6 +293,25 @@ const setWindowDays = (days: number) => {
 };
 
 /**
+ * 「应用到所有类别」（3.0.4）：把这一类的范围（回溯天数和挑过的日子）原样抄给其它有时间范围的类别，
+ * 不用逐类打开「挑具体日子」逐月拖。开不开哪一类不动。
+ */
+const applyRangeToAll = (category: AiTaskCategory) => {
+  const source = categoryRangeOf(draft.value.categories, category);
+  const picked = [...(source.picked_days ?? [])];
+  const same = (range: AiTaskCategoryRange) => range.days_before === source.days_before
+    && (range.picked_days ?? []).join() === picked.join();
+  const windows = draft.value.categories.filter((range) => AI_TASK_CATEGORY_META[range.category].hasWindow);
+  if (windows.every(same)) return;
+  rememberSelection();
+  patchDraft({
+    categories: draft.value.categories.map((range) => (
+      AI_TASK_CATEGORY_META[range.category].hasWindow ? { ...range, days_before: source.days_before, picked_days: [...picked] } : range
+    )),
+  });
+};
+
+/**
  * 收集箱交过来的「这一类 × 这几天」（精修批次 7.3）：只开挑了的类别，每类只交挑的那几天。
  * `days_before` 设成从最早那天到今天，MCP 授权和「最近 N 天」的说法仍然说得通。
  */
@@ -443,6 +462,7 @@ export function useAiTaskDraft() {
       patchRange(category, { days_before: next, picked_days: [] });
     },
     setWindowDays,
+    applyRangeToAll,
     applyPicks,
     mergePicks,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>

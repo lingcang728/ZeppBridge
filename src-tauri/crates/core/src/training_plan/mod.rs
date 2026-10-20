@@ -185,8 +185,12 @@ pub enum Sport {
 impl Sport {
     pub fn parse(text: &str) -> Option<Self> {
         Some(match text.trim().to_ascii_lowercase().as_str() {
-            "running" | "run" => Self::Running,
-            "cycling" | "ride" | "bike" => Self::Cycling,
+            // 越野跑、山地车是大类下的子类型（#138）：手表只收大类，子类型写进描述，
+            // 用户在手表上再选一次。写成 sport 时也认，按大类发。
+            "running" | "run" | "trail_running" | "trail_run" => Self::Running,
+            "cycling" | "ride" | "bike" | "mountain_biking" | "mountain_bike" | "mtb" => {
+                Self::Cycling
+            }
             "pool_swim" | "lap_swimming" | "pool_swimming" => Self::PoolSwim,
             "open_water_swim" | "open_water_swimming" => Self::OpenWaterSwim,
             _ => return None,
@@ -196,8 +200,13 @@ impl Sport {
     /// 这个大类允许的子类型。游泳不分。
     pub fn variants(self) -> &'static [Variant] {
         match self {
-            Self::Running => &[Variant::Outdoor, Variant::Treadmill, Variant::Track],
-            Self::Cycling => &[Variant::Outdoor, Variant::Indoor],
+            Self::Running => &[
+                Variant::Outdoor,
+                Variant::Treadmill,
+                Variant::Track,
+                Variant::Trail,
+            ],
+            Self::Cycling => &[Variant::Outdoor, Variant::Indoor, Variant::Mountain],
             Self::PoolSwim | Self::OpenWaterSwim => &[],
         }
     }
@@ -211,6 +220,10 @@ pub enum Variant {
     Indoor,
     Treadmill,
     Track,
+    /// 越野跑（#138）。
+    Trail,
+    /// 山地车（#138）。
+    Mountain,
 }
 
 impl Variant {
@@ -220,6 +233,8 @@ impl Variant {
             "indoor" | "trainer" | "turbo" => Self::Indoor,
             "treadmill" => Self::Treadmill,
             "track" => Self::Track,
+            "trail" | "trail_running" | "trail_run" => Self::Trail,
+            "mountain" | "mountain_biking" | "mountain_bike" | "mtb" => Self::Mountain,
             _ => return None,
         })
     }
@@ -238,6 +253,10 @@ pub enum Activity {
     Yoga,
     Rowing,
     Elliptical,
+    /// 轮滑（#138）：V2 没有对应的大类。
+    InlineSkating,
+    /// 越野滑雪（#138）：同上。
+    CrossCountrySkiing,
 }
 
 impl Activity {
@@ -249,6 +268,10 @@ impl Activity {
             "yoga" | "pilates" | "mobility" | "stretching" => Self::Yoga,
             "rowing" | "row" => Self::Rowing,
             "elliptical" => Self::Elliptical,
+            "inline_skating" | "skating" | "roller_skating" => Self::InlineSkating,
+            "cross_country_skiing" | "xc_skiing" | "nordic_skiing" | "skiing" => {
+                Self::CrossCountrySkiing
+            }
             _ => return None,
         })
     }

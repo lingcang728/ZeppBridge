@@ -159,6 +159,11 @@ const messages = defineMessages(
 
     /* —— 其它 —— */
     'err.workout.not_found': '运动记录不存在',
+    'err.workout_fit.not_fit': '这不是一个能读懂的 .fit 文件',
+    'err.workout_fit.too_large': '文件太大，不像是一次运动的 .fit',
+    'err.workout_fit.read_failed': '读不了这个文件',
+    'err.workout_fit.no_activity': '这个 .fit 里没有运动记录（没有逐点数据，也没有圈）',
+    'err.workout_fit.start_mismatch': '这个 .fit 的开始时间和这条运动差了 5 分钟以上，不像是同一次运动',
     'err.prefs.retention_out_of_range': '保留天数必须在 1 到 365 天之间',
     'err.storage.write_busy': '另一个 ZeppBridge 写入操作正在进行，等它结束',
     'err.storage.write_lock_unavailable': '无法建立写入锁，检查数据文件夹的权限',
@@ -370,6 +375,11 @@ const messages = defineMessages(
 
     /* —— misc —— */
     'err.workout.not_found': 'Workout record does not exist',
+    'err.workout_fit.not_fit': 'This is not a .fit file ZeppBridge can read',
+    'err.workout_fit.too_large': 'This file is too large to be a single workout .fit',
+    'err.workout_fit.read_failed': 'Could not read this file',
+    'err.workout_fit.no_activity': 'This .fit has no activity in it (no records and no laps)',
+    'err.workout_fit.start_mismatch': 'This .fit starts more than 5 minutes away from this workout — it does not look like the same session',
     'err.prefs.retention_out_of_range': 'Retention must be between 1 and 365 days',
     'err.storage.write_busy': 'Another ZeppBridge write is in progress — wait for it to finish',
     'err.storage.write_lock_unavailable':
@@ -583,6 +593,11 @@ const messages = defineMessages(
 
     /* —— misc —— */
     'err.workout.not_found': 'El registro de entrenamiento no existe',
+    'err.workout_fit.not_fit': 'Esto no es un archivo .fit que ZeppBridge pueda leer',
+    'err.workout_fit.too_large': 'El archivo es demasiado grande para un solo entrenamiento .fit',
+    'err.workout_fit.read_failed': 'No se pudo leer este archivo',
+    'err.workout_fit.no_activity': 'Este .fit no contiene ninguna actividad (ni registros ni vueltas)',
+    'err.workout_fit.start_mismatch': 'Este .fit empieza a más de 5 minutos de este entrenamiento; no parece la misma sesión',
     'err.prefs.retention_out_of_range': 'La retención debe estar entre 1 y 365 días',
     'err.storage.write_busy': 'Otra escritura de ZeppBridge en curso; espera a que termine',
     'err.storage.write_lock_unavailable':
