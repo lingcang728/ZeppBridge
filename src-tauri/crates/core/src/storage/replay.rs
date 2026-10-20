@@ -345,16 +345,20 @@ impl Database {
         }
 
         self.set_app_meta(REPLAY_LAST_FAILURES_KEY, &failures.to_string())?;
-        // 有新失败就不推进修订号，下次启动还会再走一遍（已隔离的会被跳过）。
-        // 空库 0 条 0 失败仍盖章，避免第一次同步之后平白重放。
-        if failures == 0 {
-            self.conn.execute(
-                "INSERT INTO app_meta(key, value, updated_at)
-                 VALUES('normalizer_revision', ?1, ?2)
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-                params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
-            )?;
-        }
+        // 走完一整遍就推进修订号，失败的已经按这一版记进隔离表。
+        //
+        // 以前是「有新失败就不推进」，可同一版规则再跑一遍结果不会变：第二遍
+        // 跳过已隔离的、必然 0 失败，于是每推一次修订号都要整库重放两遍
+        // （3.0.3 的日志里 21:46 一遍、22:00 又一遍）。而「失败」大多是云端
+        // 本来就回了空数据（某天心率 items 为空），重放多少遍也是空的。
+        // 中途收手（退出、让出写锁）在上面已经直接返回，不会走到这里。
+        // 空库 0 条也盖章，避免第一次同步之后平白重放。
+        self.conn.execute(
+            "INSERT INTO app_meta(key, value, updated_at)
+             VALUES('normalizer_revision', ?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
+        )?;
         self.set_app_meta(LAST_LOCAL_REPROCESS_AT_KEY, &Utc::now().to_rfc3339())?;
         Ok(counts)
     }
