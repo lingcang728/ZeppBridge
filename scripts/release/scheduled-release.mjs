@@ -1,124 +1,193 @@
-// 定时发布（.github/workflows/scheduled-release.yml 每小时跑一次；说明见 docs/releases/scheduling.md）。
-//
-// 一次最多发一版：挑出计划里下一个没发的版本 → 到点且批准了 → 逐项核对 →
-// 建附注 tag → 触发 CI 在这个 tag 上打包、建 Release。任何一项不过就退出码 1、什么都不发。
-//
-// 环境变量：GH_TOKEN、GITHUB_REPOSITORY；URGENT_VERSION（手动立即发布）；DRY_RUN=true 只检查不发；
-// TAG_TRIGGERS_CI=true 表示用的是个人令牌，建 tag 本身就会触发 CI，不必再手动触发；NOW 覆盖当前时间（演练用）。
+// 提前构建并核验冻结版本，暂存为草稿；到点只公开已核验的 Release。
+// DRY_RUN=true 只读；URGENT_VERSION 跳过时间/批准/暂停，但不跳过版本顺序或产物核验。
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
-import { decide, nextRelease, parseSchedule, tagMessage, verifySnapshot } from './schedule-core.mjs';
-
-const SCHEDULE = '.github/release-schedule.json';
-const REQUIRED_JOBS = ['Windows verification', 'Linux verification', 'macOS verification'];
+import { createHash } from 'node:crypto';
+import { appendFileSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { decide, nextRelease, parseSchedule, releaseAssetNames, tagMessage, verifyPreparedRelease, verifySnapshot } from './schedule-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY || 'lingcang728/ZeppBridge';
-const dryRun = process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1';
+const dryRun = ['true', '1'].includes(process.env.DRY_RUN);
 const urgentVersion = (process.env.URGENT_VERSION || '').replace(/^v/, '').trim() || null;
 const now = process.env.NOW ? new Date(process.env.NOW) : new Date();
-
+const REQUIRED_JOBS = ['Windows verification', 'Linux verification', 'macOS verification'];
+const PACKAGE_JOBS = ['Package Windows installers', 'Package macOS bundle', 'Package Linux bundles', 'Package Flatpak bundle'];
+const summary = [];
+const say = (line) => { console.log(line); summary.push(line); };
 const run = (cmd, args, input) => execFileSync(cmd, args, {
   encoding: 'utf8', input, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
 });
 const git = (args) => run('git', args);
-// 只读查询偶尔会断（EOF / 5xx），重试两次；写操作（建 tag、触发 CI）不重试，免得重复。
-const ghJson = (path) => {
-  for (let attempt = 1; ; attempt += 1) {
-    try { return JSON.parse(run('gh', ['api', path])); } catch (error) { if (attempt >= 3) throw error; }
+// 只重试只读查询；写操作遇到断线留给下一次运行核对状态后恢复。
+const read = (operation) => {
+  for (let attempt = 1; ; attempt++) {
+    try { return operation(); } catch (error) { if (attempt >= 3) throw error; }
   }
 };
+const api = (path) => `repos/${repo}/${path}`;
+const ghJson = (path) => read(() => JSON.parse(run('gh', ['api', api(path)])));
+const pages = (path, key) => read(() => JSON.parse(run('gh', ['api', api(path), '--paginate', '--slurp'])).flatMap((p) => key ? p[key] : p));
+const writeApi = (path, body, method = 'POST') => JSON.parse(run('gh', ['api', api(path), '--method', method, '--input', '-'], JSON.stringify(body)));
+const releases = () => pages('releases?per_page=100');
+const publicTags = (items) => new Set(items.filter((r) => !r.draft && !r.prerelease && r.published_at).map((r) => r.tag_name));
+const remoteTagFor = (entry) => ghJson(`git/matching-refs/tags/v${entry.version}`).find((ref) => ref.ref === `refs/tags/v${entry.version}`);
+const notesFor = (entry) => git(['show', `${entry.commit}:docs/releases/${entry.version}/en.md`]);
+const jobsFor = (id) => pages(`actions/runs/${id}/jobs?per_page=100`, 'jobs');
+const jobsPassed = (jobs, names) => names.every((name) => jobs.some((j) => j.name === name && j.conclusion === 'success'));
+const runsFor = (sha) => pages(`actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=100`, 'workflow_runs')
+  .filter((r) => ['push', 'workflow_dispatch'].includes(r.event));
 
-const summary = [];
-const say = (line) => { console.log(line); summary.push(line); };
-const finish = (code) => {
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
-  process.exit(code);
-};
-
-/**
- * 这个提交自己的 CI 三平台检查都是绿的（不是跳过，也不是别的提交的）。
- * push 和在分支上手动触发的都算：快照里的 ci.yml 还不认 freeze/** 时（3.0.3 就是），
- * 推 freeze 分支不会自动跑，要 `gh workflow run ci.yml --ref freeze/v<版本>`。
- */
-function ciProblems(sha) {
-  const runs = (ghJson(`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=30`).workflow_runs ?? [])
-    .filter((r) => r.event === 'push' || r.event === 'workflow_dispatch');
-  const green = runs.filter((r) => r.status === 'completed' && r.conclusion === 'success');
-  if (!green.length) {
-    const latest = runs[0];
-    return [latest
-      ? `快照的 CI 还没绿：最近一次 ${latest.status}/${latest.conclusion ?? '—'}（${latest.html_url}）`
-      : '快照没有自己的 CI 记录——推 freeze/v<版本> 分支，没自动跑就 gh workflow run ci.yml --ref freeze/v<版本>'];
+function ciProblems(runs) {
+  for (const r of runs.filter((r) => r.status === 'completed' && r.conclusion === 'success')) {
+    if (jobsPassed(jobsFor(r.id), REQUIRED_JOBS)) return [];
   }
-  for (const r of green) {
-    const jobs = ghJson(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`).jobs ?? [];
-    const ok = REQUIRED_JOBS.every((name) => jobs.some((j) => j.name === name && j.conclusion === 'success'));
-    if (ok) return [];
-  }
-  return [`快照的 CI 绿了，但 ${REQUIRED_JOBS.join(' / ')} 不是全都跑过（被跳过的不算）`];
+  return ['冻结快照自己的 Windows / Linux / macOS verification 尚未全部通过（跳过不算）'];
 }
 
-/** 上一版 tag 的 CI 还在跑或者挂了：先不发下一版。 */
-function previousReleaseState(tag) {
-  try {
-    run('gh', ['release', 'view', tag, '--repo', repo, '--json', 'tagName']);
-    return { ok: true };
-  } catch { /* 没有 Release，看 CI */ }
-  const runs = ghJson(`repos/${repo}/actions/workflows/ci.yml/runs?branch=${tag}&per_page=5`).workflow_runs ?? [];
-  const latest = runs[0];
-  if (latest && latest.status !== 'completed') return { ok: false, wait: true, reason: `上一版 ${tag} 还在打包（${latest.html_url}）` };
-  return { ok: false, wait: false, reason: `上一版 ${tag} 有 tag 但没有 Release（${latest ? `CI ${latest.conclusion}：${latest.html_url}` : '没有 CI 记录'}）；修好或删掉 tag 前不发下一版` };
+// 在公开/上传前重新读取远端计划，暂停、撤销批准、换快照和调整时间立即生效。
+function guard(entry, { publishing = false } = {}) {
+  const file = ghJson('contents/.github/release-schedule.json?ref=main');
+  const schedule = parseSchedule(Buffer.from(file.content, 'base64').toString('utf8'));
+  const next = nextRelease(schedule, publicTags(releases()));
+  if (!next || next.entry.version !== entry.version || next.entry.commit !== entry.commit
+      || next.entry.notBefore.getTime() !== entry.notBefore.getTime()) throw new Error('远端发布计划已改变，停止本次操作，等待下一次检查');
+  const verdict = decide({ schedule, entry: next.entry, now: new Date(), urgentVersion });
+  if (publishing ? !verdict.release : (!urgentVersion && (schedule.paused || !next.entry.approved))) throw new Error(verdict.reason);
+  const branch = ghJson(`git/ref/heads/freeze/v${entry.version}`);
+  if (branch.object.sha !== entry.commit) throw new Error('远端 freeze 分支已改变，不发布旧产物');
+  if (publishing) {
+    const main = ghJson('git/ref/heads/main');
+    const latest = runsFor(main.object.sha).find((r) => r.event === 'push' && r.head_branch === 'main');
+    if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') throw new Error('main 最新提交的 CI 尚未成功，暂不公开 Release');
+  }
 }
 
-function publish(entry) {
+function readAsset(release, name) {
+  const asset = release.assets.find((a) => a.name === name);
+  if (!asset) throw new Error(`草稿缺少 ${name}`);
+  const text = read(() => run('gh', ['api', api(`releases/assets/${asset.id}`), '-H', 'Accept: application/octet-stream']));
+  const digest = `sha256:${createHash('sha256').update(text).digest('hex')}`;
+  if (digest !== asset.digest) throw new Error(`${name} 下载内容与服务端摘要不一致`);
+  return text;
+}
+
+function verifyDraft(entry, draft) {
+  const checksums = readAsset(draft, 'SHA256SUMS.txt');
+  const latest = JSON.parse(readAsset(draft, 'latest.json'));
+  const problems = verifyPreparedRelease({ entry, release: draft, notes: notesFor(entry), latest, checksums, repo });
+  if (problems.length) throw new Error(problems.join('\n- '));
+}
+
+function ensureTag(entry) {
   const tag = `v${entry.version}`;
-  const notes = git(['show', `${entry.commit}:docs/releases/${entry.version}/en.md`]);
-  const tagObject = JSON.parse(run('gh', ['api', `repos/${repo}/git/tags`, '--input', '-'], JSON.stringify({
-    tag, message: tagMessage(entry.version, notes), object: entry.commit, type: 'commit',
-  })));
-  run('gh', ['api', `repos/${repo}/git/refs`, '--input', '-'], JSON.stringify({ ref: `refs/tags/${tag}`, sha: tagObject.sha }));
-  say(`已建附注 tag ${tag} → ${entry.commit.slice(0, 8)}`);
-  // 默认令牌建的 tag 不会触发 push 事件（GitHub 防递归），但 workflow_dispatch 例外。
-  if (process.env.TAG_TRIGGERS_CI !== 'true') {
-    run('gh', ['workflow', 'run', 'ci.yml', '--repo', repo, '--ref', tag]);
-    say(`已触发 CI 在 ${tag} 上打包并建 Release`);
+  const message = tagMessage(entry.version, notesFor(entry));
+  const ref = remoteTagFor(entry);
+  if (ref) {
+    if (ref.object.type !== 'tag') throw new Error(`${tag} 已存在但不是附注 tag，不覆盖`);
+    const existing = ghJson(`git/tags/${ref.object.sha}`);
+    if (existing.object.sha !== entry.commit || existing.message?.trim() !== message.trim()) throw new Error(`${tag} 已存在但提交或附注不一致，不覆盖`);
+    return;
   }
+  const object = writeApi('git/tags', { tag, message, object: entry.commit, type: 'commit' });
+  writeApi('git/refs', { ref: `refs/tags/${tag}`, sha: object.sha });
+  say(`已建附注 tag ${tag} → ${entry.commit.slice(0, 8)}`);
+}
+
+function publish(entry, draft) {
+  verifyDraft(entry, ghJson(`releases/${draft.id}`));
+  guard(entry, { publishing: true });
+  ensureTag(entry);
+  const result = writeApi(`releases/${draft.id}`, { draft: false, make_latest: 'true' }, 'PATCH');
+  if (result.draft || !result.published_at) throw new Error('GitHub 未确认 Release 已公开');
+  say(`已公开 v${entry.version}：${result.html_url}（使用提前核验的安装包，未重新编译）`);
+}
+
+// 兼容升级流程时仍在按旧 tag 工作流构建的 3.0.3，不并行创建第二份 Release。
+function waitForLegacyTag(entry) {
+  const runs = pages(`actions/workflows/ci.yml/runs?branch=v${entry.version}&per_page=5`, 'workflow_runs');
+  if (runs.some((r) => r.status !== 'completed')) {
+    say(`v${entry.version} 已有 tag，旧发布构建还在运行；等待它完成。`);
+    return;
+  }
+  throw new Error(`v${entry.version} 已有 tag 但没有公开 Release；请检查原发布构建，不另建或重打 tag`);
+}
+
+function stage(entry, items) {
+  if (dryRun) throw new Error('演练模式不能上传草稿');
+  guard(entry);
+  const build = ghJson(`actions/runs/${process.env.PREPARE_RUN_ID}`);
+  if (build.head_sha !== entry.commit || build.head_branch !== `freeze/v${entry.version}` || build.event !== 'workflow_dispatch'
+      || build.status !== 'completed' || build.conclusion !== 'success'
+      || !jobsPassed(jobsFor(build.id), [...REQUIRED_JOBS, ...PACKAGE_JOBS])) throw new Error('准备产物的构建记录与快照不一致或没有全部通过');
+  const output = '.prepared-release/assets';
+  const files = readdirSync(output).sort();
+  const expected = [...Object.values(releaseAssetNames(entry.version)), 'latest.json', 'SHA256SUMS.txt'].sort();
+  if (JSON.stringify(files) !== JSON.stringify(expected)) throw new Error('待上传的 14 个附件不一致');
+  const tag = `v${entry.version}`;
+  let draft = items.find((r) => r.tag_name === tag);
+  const body = tagMessage(entry.version, notesFor(entry));
+  if (draft && (!draft.draft || draft.target_commitish !== entry.commit || draft.body?.trim() !== body.trim())) throw new Error('已有 Release 与本次草稿不一致，不覆盖');
+  if (!draft) draft = writeApi('releases', { tag_name: tag, target_commitish: entry.commit, name: `ZeppBridge ${entry.version}`, body, draft: true, prerelease: false });
+  run('gh', ['release', 'upload', tag, '--repo', repo, '--clobber', ...files.map((name) => join(output, name))]);
+  draft = ghJson(`releases/${draft.id}`);
+  for (const asset of draft.assets) {
+    const local = createHash('sha256').update(readFileSync(join(output, asset.name))).digest('hex');
+    if (asset.digest !== `sha256:${local}`) throw new Error(`上传后的摘要与本地不一致：${asset.name}`);
+  }
+  verifyDraft(entry, draft);
+  say(`v${entry.version} 草稿已准备：14 个附件、SHA-256 校验和、自动更新签名条目与地址全部核验通过；计划 ${entry.notBefore.toISOString()} 公开。`);
 }
 
 function main() {
-  const schedule = parseSchedule(readFileSync(SCHEDULE, 'utf8'));
-  const tags = new Set(git(['tag', '-l', 'v*']).split('\n').map((t) => t.trim()).filter(Boolean));
-  const next = nextRelease(schedule, tags);
-  if (!next) { say('计划里的版本都发完了。'); return 0; }
+  const schedule = parseSchedule(readFileSync('.github/release-schedule.json', 'utf8'));
+  const items = releases();
+  const next = nextRelease(schedule, publicTags(items));
+  if (!next) { say('计划里的版本都已公开发布。'); return; }
   const { entry, previousTag } = next;
-  say(`下一版：v${entry.version}（${entry.commit.slice(0, 8)}，不早于 ${entry.notBefore.toISOString()}，${entry.approved ? '已批准' : '未批准'}）`);
-
+  if (process.argv[2] === 'stage') {
+    if (entry.version !== process.env.PREPARE_VERSION || entry.commit !== process.env.PREPARE_COMMIT) throw new Error('准备中的版本已经不是下一版');
+    stage(entry, items);
+    return;
+  }
+  say(`下一版：v${entry.version}（${entry.commit.slice(0, 8)}，计划公开 ${entry.notBefore.toISOString()}，${entry.approved ? '已批准' : '未批准'}）`);
   const verdict = decide({ schedule, entry, now, urgentVersion });
-  if (!verdict.release && !dryRun) { say(verdict.reason); return verdict.error ? 1 : 0; }
-  say(verdict.release ? verdict.reason : `（演练）${verdict.reason}，照样跑一遍检查`);
-
-  if (previousTag) {
-    const prev = previousReleaseState(previousTag);
-    if (!prev.ok) { say(prev.reason); return prev.wait ? 0 : 1; }
+  if (verdict.error) throw new Error(verdict.reason);
+  if (!urgentVersion && (schedule.paused || !entry.approved)) { say(verdict.reason); return; }
+  const draft = items.find((r) => r.tag_name === `v${entry.version}` && r.draft);
+  if (!draft && remoteTagFor(entry)) { waitForLegacyTag(entry); return; }
+  const runs = runsFor(entry.commit);
+  const checks = ciProblems(runs);
+  if (checks.length && runs.some((r) => r.status !== 'completed')) { say('冻结快照的 CI 正在运行，完成后自动继续准备。'); return; }
+  const problems = [...verifySnapshot({ git, entry, previousTag, freezeRef: `origin/freeze/v${entry.version}` }), ...checks];
+  if (problems.length) throw new Error(`发布前检查未通过：\n- ${problems.join('\n- ')}`);
+  if (draft) {
+    if (draft.target_commitish !== entry.commit || draft.body?.trim() !== tagMessage(entry.version, notesFor(entry)).trim()) throw new Error('草稿来自另一个快照；请先删除旧草稿再重新准备');
+    let ready = false;
+    try { verifyDraft(entry, draft); ready = true; } catch (error) { say(`草稿尚未核验完整，需要重新准备：${error.message}`); }
+    if (ready) {
+      say(`v${entry.version} 安装包已提前构建并核验。${verdict.reason}`);
+      if (verdict.release && !dryRun) publish(entry, draft);
+      else if (dryRun) say('演练模式，不公开 Release。');
+      return;
+    }
   }
-  const problems = [
-    ...verifySnapshot({ git, entry, previousTag, freezeRef: `origin/freeze/v${entry.version}` }),
-    ...ciProblems(entry.commit),
-  ];
-  if (problems.length) {
-    say(`v${entry.version} 没通过发布前检查，这次不发：`);
-    for (const p of problems) say(`- ${p}`);
-    return 1;
+  const builds = runs.filter((r) => r.event === 'workflow_dispatch' && r.head_branch === `freeze/v${entry.version}`);
+  for (const build of builds.filter((r) => r.status === 'completed' && r.conclusion === 'success')) {
+    if (!jobsPassed(jobsFor(build.id), [...REQUIRED_JOBS, ...PACKAGE_JOBS])) continue;
+    const artifacts = pages(`actions/runs/${build.id}/artifacts?per_page=100`, 'artifacts');
+    if (!['zeppbridge-installers', 'zeppbridge-macos', 'zeppbridge-linux', 'zeppbridge-flatpak']
+      .every((name) => artifacts.some((a) => a.name === name && !a.expired && a.size_in_bytes > 0))) continue;
+    say(`复用冻结快照已通过的完整构建 ${build.id}，准备草稿（不重新编译）。`);
+    if (!dryRun && process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `prepare_run=${build.id}\nversion=${entry.version}\ncommit=${entry.commit}\n`);
+    return;
   }
-  say('发布前检查全部通过：快照在 main 上、freeze 分支一致、继承上一版、版本号与 12 种更新说明齐全、迁移只追加、快照自己的三平台 CI 全绿。');
-  if (dryRun || !verdict.release) { say('演练模式，不建 tag。'); return 0; }
-  publish(entry);
-  return 0;
+  const active = builds.find((r) => r.status !== 'completed');
+  if (active) { say(`v${entry.version} 正在提前构建：${active.html_url}；完成后自动准备草稿。`); return; }
+  if (builds.length && builds[0].conclusion !== 'success') throw new Error(`v${entry.version} 的提前构建未通过，请重跑失败的构建：${builds[0].html_url}`);
+  if (dryRun) { say('演练：需要在 freeze 分支提前构建；本次不触发。'); return; }
+  run('gh', ['workflow', 'run', 'ci.yml', '--repo', repo, '--ref', `freeze/v${entry.version}`]);
+  say(`已开始提前构建 v${entry.version}；构建成功后自动核验并暂存草稿，到点才公开。`);
 }
 
-try {
-  finish(main());
-} catch (error) {
-  say(`定时发布出错，什么都没发：${error.message}`);
-  finish(1);
-}
+try { main(); } catch (error) { say(`发布流程出错：${error.message}`); process.exitCode = 1; }
+finally { if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`); }

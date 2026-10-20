@@ -133,3 +133,4 @@ mock-test/
 
 # 宣传短片原片太大，不进仓库（README 链到 zeppbridge.com 首屏播放）
 docs/assets/readme/*.mp4
+.prepared-release/
