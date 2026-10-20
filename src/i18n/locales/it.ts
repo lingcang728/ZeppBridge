@@ -31,6 +31,16 @@ export default {
     trayHint: 'Chiudendo la finestra, ZeppBridge rimane nella barra di sistema; la sincronizzazione automatica continua.',
   },
 
+  'components/BackfillOffer': {
+    later: 'Non ora',
+    offer: (date: string) =>
+      `Questo computer arriva solo fino al ${date}. Recuperare la cronologia precedente dal cloud?`,
+    running: 'Recupero in corso in secondo piano — continuerà anche uscendo da questa pagina',
+    settings: 'Impostazioni di recupero',
+    stop: 'Interrompi',
+    years: (n: number) => (n === 1 ? '1 anno' : `${n} anni`),
+  },
+
   'components/BackupPanel': {
     title: 'Istantanee e ripristino del database',
     intro1a: 'Un’istantanea è una copia completa dell’intero file ',
@@ -724,7 +734,15 @@ export default {
 
 'components/ai/stage/stage': {
     stage: 'Invia all’IA: a sinistra i dati da trasmettere, al centro l’IA, a destra la domanda e il piano',
-    recent: (days: number) => `Ultimi ${days} giorni`,
+    recent: (days: number) =>
+      days >= 3650 ? 'Tutto (fino a 10 anni)' : days === 365 ? 'Ultimo anno' : `Ultimi ${days} giorni`,
+    year1: '1 anno',
+    all: 'Tutto',
+    applyAll: 'Applica a tutte le categorie',
+    appliedAll: 'Applicato a tutte le categorie',
+    sizeHint: (size: string, tokens: string) => `Intera attività ≈ ${size} · ${tokens} token`,
+    sizeTooLong:
+      'Intervallo troppo lungo per l’IA: per gli allenamenti meno recenti mantieni solo il riepilogo, oppure riduci l’intervallo',
     picked: (days: number) => plural(days, { one: '1 giorno selezionato', other: `${days} giorni selezionati` }),
     haveOf: (have: number, total: number) => `${have} su ${total} giorni con dati`,
     extraWorkouts: (count: number) => plural(count, { one: '+1 allenamento selezionato', other: `+${count} allenamenti selezionati` }),
@@ -813,6 +831,15 @@ export default {
     range7: '7 giorni',
     range30: '1 mese',
     range180: '6 mesi',
+    range365: '1 anno',
+    rangeAll: 'Tutto',
+    quarter: (q: number) => `T${q}`,
+    yearTop: 'Anno',
+    notBackfilled: 'Non recuperato',
+    cloudEmpty: 'Assente nel cloud',
+    span: 'Intervallo',
+    spanAria: 'Selezione continua: tocca la prima carta, poi l’ultima',
+    spanFrom: 'Ora tocca l’ultima carta',
     rangeAria: 'Intervallo del tavolo',
     picked: 'Per l’IA',
     noRecord: 'Nessun dato',
@@ -1128,11 +1155,15 @@ export default {
     activityYoga: 'Yoga e allungamento',
     activityRowing: 'Canottaggio',
     activityElliptical: 'Ellittica',
+    activityInlineSkating: 'Pattinaggio in linea',
+    activityCrossCountrySkiing: 'Sci di fondo',
     variantOutdoorRun: 'Corsa all’aperto',
     variantTreadmill: 'Tapis roulant',
     variantTrack: 'Corsa su pista',
     variantOutdoorRide: 'Ciclismo all’aperto',
     variantIndoorRide: 'Ciclismo indoor',
+    variantTrail: 'Trail running',
+    variantMountain: 'Mountain bike',
     variantPick: (name: string) => `L’orologio ti chiederà di nuovo il tipo: scegli «${name}».`,
     variantPickAny: 'L’orologio ti chiederà di nuovo il tipo esatto: i piani di terze parti indicano solo la categoria dello sport, una limitazione di Zepp.',
     heldBadge: 'Non inviabile all’orologio',
@@ -2265,6 +2296,8 @@ export default {
       yoga: "yoga e allungamento",
       rowing: "vogatore",
       elliptical: "ellittica",
+      inline_skating: "pattinaggio in linea",
+      cross_country_skiing: "sci di fondo",
     },
     "ui.training_plan.issue.sport_not_deliverable": (p: {
       activity?: unknown;
@@ -3387,6 +3420,15 @@ Rispondi in Markdown.`,
     provenanceScope: 'Ambito',
     provenanceRecordId: 'ID registrazione',
     provenanceSynced: 'Ultima sincronizzazione',
+    provenanceFit: 'Correzione locale',
+    fitCloudDistance: 'Distanza originale nel cloud',
+    fitReplace: 'Sostituisci con un .fit corretto',
+    fitReplaceAgain: 'Usa un altro .fit',
+    fitRestore: 'Ripristina la versione del cloud',
+    fitDialogTitle: 'Seleziona il file .fit corretto',
+    fitApplied: 'Sostituito solo su questo computer — il cloud Zepp rimane invariato',
+    fitRestored: 'Versione del cloud ripristinata',
+    fitFailed: 'Impossibile sostituire questo allenamento',
     evidenceSummary: 'Giustificazione del tipo e origini',
     missingMetrics: (list: string) => `Non fornito in questa registrazione: ${list}`,
     routeMissing: 'Nessun percorso: questa registrazione non contiene abbastanza punti GPS per tracciare un itinerario.',
@@ -3797,6 +3839,14 @@ Rispondi in Markdown.`,
   /* —— misc —— */
   'err.workout.not_found':
     'La registrazione dell’allenamento non esiste o è stata eliminata',
+  'err.workout_fit.not_fit': 'Questo non è un file .fit che ZeppBridge può leggere',
+  'err.workout_fit.too_large':
+    'Il file è troppo grande per essere il .fit di un singolo allenamento',
+  'err.workout_fit.read_failed': 'Impossibile leggere questo file',
+  'err.workout_fit.no_activity':
+    'Questo .fit non contiene alcuna attività (nessun record e nessun giro)',
+  'err.workout_fit.start_mismatch':
+    'Questo .fit inizia con oltre 5 minuti di differenza rispetto a questo allenamento: non sembra la stessa sessione',
   'err.prefs.retention_out_of_range':
     'I giorni di conservazione devono essere compresi tra 1 e 365 giorni',
   'err.storage.write_busy':

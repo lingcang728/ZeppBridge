@@ -44,6 +44,8 @@ import { stageLayout } from '../lib/aiTask/stageLayout';
 import { sampleStrand, threadTree } from '../lib/aiTask/threads';
 import { categoryDeckSource } from '../lib/cards/categoryDeck';
 import type { DeckSource } from '../lib/cards/sources';
+import { deckRangeOf, type DeckRange } from '../lib/cards/deck';
+import { categoryRangeOf } from '../lib/aiTask/categories';
 import { bump, convergeCards, emergeFrom, reducedMotion, SPRINGS, springCurve, type Convergence } from '../lib/motion/cards';
 import { onMotionEscape } from '../lib/motion/interrupt';
 import { useBridgeText } from '../components/ai/bridge/bridge.i18n';
@@ -223,7 +225,7 @@ useBoxPour({
 
 /* ---------- 三级：从牌背面挑具体日子（牌桌从这张牌发牌） ---------- */
 const CardTable = defineAsyncComponent(() => import('../components/cards/CardTable.vue'));
-const deck = shallowRef<{ source: DeckSource; origin: DOMRect; anchor: Element | null } | null>(null);
+const deck = shallowRef<{ source: DeckSource; range: DeckRange; origin: DOMRect; anchor: Element | null } | null>(null);
 const deal = async () => {
   const card = backCard.value;
   backCard.value = null;
@@ -234,6 +236,8 @@ const deal = async () => {
   const unit = strips.rows.value.find((r) => r.category === card.category)?.cells.find((cell) => cell.unit)?.unit ?? null;
   deck.value = {
     source: categoryDeckSource(card.category, { unit, pickedWorkouts: () => ctl.draft.value.workout_ids, releaseWorkout: (id) => ctl.setWorkoutSelected(id, false) }),
+    // 牌桌从这一类现在的范围发牌（3.0.4：选了 1 年就是四叠季度，全部就是一年一叠）。
+    range: deckRangeOf(categoryRangeOf(ctl.draft.value.categories, card.category).days_before + 1),
     origin: el?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 4, window.innerHeight / 2, 0, 0),
     anchor: el,
   };
@@ -370,7 +374,7 @@ onDeactivated(() => { paused.value = true; });
     <StageCardBack v-if="backCard" :card="cards.find((c) => c.id === backCard!.id) ?? backCard" :anchor="cardEl(backCard.id)" @close="backCard = null" @deal="deal" />
     <AddKindDialog v-if="adding" :cards="off.map(dataCard)" :empty="empty" @close="adding = false" />
     <ProfileTray v-if="profile" :anchor="cardEl('profile')" @close="profile = false" />
-    <CardTable v-if="deck" :source="deck.source" :range="7" :origin="deck.origin" :anchor="deck.anchor" @close="deck = null" />
+    <CardTable v-if="deck" :source="deck.source" :range="deck.range" :origin="deck.origin" :anchor="deck.anchor" @close="deck = null" />
     <PlanClearDialog />
     <RouterView v-slot="{ Component, route: sub }">
       <Transition :css="false" @leave="leaveSheet">

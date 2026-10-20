@@ -186,6 +186,10 @@ pub struct WorkoutSeriesSample {
     /// Grade-adjusted equivalent pace in seconds per kilometre (`equivPace`),
     /// verified against `bestEquivPace` and `avgEquivPace`.
     pub equivalent_pace_s_per_km: Option<f64>,
+    /// The watch's own cumulative distance in metres (`currentDistance`), only
+    /// on seconds that carried a reading. FIT `record.distance` (#139).
+    #[serde(default)]
+    pub distance_m: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -664,3 +664,112 @@ fn a_coordinate_cursor_overflow_truncates_the_route() {
     assert_eq!(decoded.route_dropped_points, 2);
     assert!((decoded.route[0].latitude - 40.04663552).abs() < 1e-8);
 }
+
+/// #139：一位 Balance 2 用户 127 条带 `pause` 的明细，一条暂停都没入库。
+/// 种类不是 2 / 3 的行以前整行丢掉；现在种类只当标签，区间照收。
+#[test]
+fn pauses_of_any_kind_are_kept() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;600;",
+        "pause": "1700000060,10,-1,-1,1;1700000100,20,-1,-1,4;1700000200,30,-1,-1,2;",
+    });
+    let decoded = decode_workout_detail(&raw, None, None).unwrap();
+    let kinds: Vec<&str> = decoded.pauses.iter().map(|p| p.kind.as_str()).collect();
+    assert_eq!(kinds, vec!["other", "other", "manual"]);
+    let total: i64 = decoded
+        .pauses
+        .iter()
+        .map(|p| (p.end_time - p.start_time).num_seconds())
+        .sum();
+    assert_eq!(total, 60);
+}
+
+/// 起点写成毫秒、或写成相对开始的秒数，都要落到同一个时刻。
+#[test]
+fn pause_start_in_millis_or_relative_seconds_lands_on_the_same_moment() {
+    for pause in ["1700000060000,10000,-1,-1,2;", "60,10,-1,-1,2;"] {
+        let raw = json!({ "trackid": 1_700_000_000i64, "time": "0;600;", "pause": pause });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.pauses.len(), 1, "{pause}");
+        assert_eq!(
+            decoded.pauses[0].start_time.timestamp(),
+            1_700_000_060,
+            "{pause}"
+        );
+        assert_eq!(
+            decoded.pauses[0].end_time.timestamp(),
+            1_700_000_070,
+            "{pause}"
+        );
+    }
+}
+
+/// 读出来不在这次运动里的暂停是列读错了，不收。
+#[test]
+fn a_pause_before_the_workout_is_dropped() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;600;",
+        "pause": "1600000000,10,-1,-1,2;",
+    });
+    assert!(decode_workout_detail(&raw, None, None)
+        .unwrap()
+        .pauses
+        .is_empty());
+}
+
+/// `[5]` 是墙钟累计（含暂停）的 kilo_pace：边界按 `[5]` 放，暂停算进那一公里。
+#[test]
+fn kilo_pace_with_wall_clock_elapsed_places_boundaries_after_pauses() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;400;400;",
+        "currentDistance": "",
+        // 第二公里里停了 60 秒：运动 310 s，墙钟 300 → 670。
+        "pause": "1700000400,60,-1,-1,2;",
+        "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+    1,310,geo,1,-1,670,310237,71,0,107,0,2,0,164;",
+    });
+    let decoded = decode_workout_detail(&raw, None, Some(2000.0)).unwrap();
+    assert_eq!(decoded.splits.len(), 2);
+    assert_eq!(decoded.splits[0].duration_seconds, 300);
+    assert_eq!(decoded.splits[1].end_time.timestamp(), 1_700_000_670);
+}
+
+/// `[5]` 是运动用时累计时，边界要按暂停往后推，不能停表 60 秒后每个边界都早一分钟。
+#[test]
+fn kilo_pace_moving_time_is_shifted_by_earlier_pauses() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;400;400;",
+        "currentDistance": "",
+        "pause": "1700000100,60,-1,-1,2;",
+        "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+    1,310,geo,1,-1,610,310237,71,0,107,0,2,0,164;",
+    });
+    let decoded = decode_workout_detail(&raw, None, Some(2000.0)).unwrap();
+    assert_eq!(decoded.splits.len(), 2);
+    assert_eq!(decoded.splits[0].end_time.timestamp(), 1_700_000_360);
+    assert_eq!(decoded.splits[1].end_time.timestamp(), 1_700_000_670);
+}
+
+/// 手表的累计距离只落在有读数的那一秒，FIT 的 `record.distance` 就写它。
+#[test]
+fn samples_carry_the_watchs_cumulative_distance_only_where_it_was_read() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;10;",
+        "currentDistance": "5,1500;5,3000;",
+    });
+    let decoded = decode_workout_detail(&raw, None, None).unwrap();
+    let with_distance: Vec<(i64, f64)> = decoded
+        .samples
+        .iter()
+        .filter_map(|s| {
+            s.distance_m
+                .map(|d| (s.timestamp.timestamp() - 1_700_000_000, d))
+        })
+        .collect();
+    assert_eq!(with_distance, vec![(5, 15.0), (10, 30.0)]);
+}

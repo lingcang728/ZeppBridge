@@ -29,9 +29,9 @@ export type PlanStepInput =
   | { kind: string; duration: string; target?: string; note?: string };
 
 export type PlanSport = 'running' | 'cycling' | 'pool_swim' | 'open_water_swim';
-export type PlanVariant = 'outdoor' | 'indoor' | 'treadmill' | 'track';
+export type PlanVariant = 'outdoor' | 'indoor' | 'treadmill' | 'track' | 'trail' | 'mountain';
 /** 读得懂、但手表收不下的活动（V2 只认四个大类，其余单条静默丢弃）。 */
-export type PlanActivity = 'walking' | 'hiking' | 'strength' | 'yoga' | 'rowing' | 'elliptical';
+export type PlanActivity = 'walking' | 'hiking' | 'strength' | 'yoga' | 'rowing' | 'elliptical' | 'inline_skating' | 'cross_country_skiing';
 export type PlanIntensity = 'warmup' | 'active' | 'interval' | 'recovery' | 'rest' | 'cooldown';
 
 export type PlanStepLength = { type: 'time'; seconds: number } | { type: 'distance'; meters: number };

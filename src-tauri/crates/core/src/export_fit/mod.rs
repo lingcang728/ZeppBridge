@@ -13,8 +13,14 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 mod fields;
+/// 反方向：读用户修正过的 .fit（#140）。和写出端共用字段约定，所以放在一起。
+pub mod import;
 mod laps;
 mod records;
+
+pub use import::{
+    decode_fit_file, FitImportError, ImportedFit, ImportedFitSummary, MAX_FIT_IMPORT_BYTES,
+};
 
 use fields::*;
 use laps::*;

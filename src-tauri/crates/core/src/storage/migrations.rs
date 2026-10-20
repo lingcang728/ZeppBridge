@@ -1216,6 +1216,41 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(38,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v39（3.0.4）：
+        // - `workout_samples.distance_m`：手表自己的累计距离（#139，FIT 的
+        //   `record.distance`）。只加列，旧行为空，推修订号后的重放补上。
+        // - `workout_fit_overrides`：用户拿修正过的 .fit 顶替一条运动（#140）。
+        //   和运动类型纠正一样是第 3 层「用户的本地纠正」：只在本机，不回传云端，
+        //   重放不动它。**故意不挂外键到 workouts**：摘要报文重放会删了再插
+        //   运动行，挂了 CASCADE 修正会跟着没。`original_*` 是最近一次云端给的
+        //   值，撤销修正时原样放回。
+        self.ensure_table_columns("workout_samples", &[("distance_m", "REAL")])?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_fit_overrides (
+                workout_id TEXT PRIMARY KEY,
+                file_name TEXT,
+                sha256 TEXT NOT NULL,
+                byte_len INTEGER NOT NULL,
+                fit BLOB NOT NULL,
+                imported_at TEXT NOT NULL,
+                fit_start_time TEXT NOT NULL,
+                fit_end_time TEXT NOT NULL,
+                fit_distance_m REAL,
+                fit_moving_seconds INTEGER,
+                fit_avg_hr INTEGER,
+                fit_max_hr INTEGER,
+                original_end_time TEXT,
+                original_distance_m REAL,
+                original_moving_seconds INTEGER,
+                original_avg_hr INTEGER,
+                original_max_hr INTEGER
+             );
+             PRAGMA user_version = 39;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(39,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

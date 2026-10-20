@@ -314,7 +314,7 @@ outside the grants — `error.permittedRanges` lists the actual
 |---|---|
 | `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
-| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
+| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
@@ -393,8 +393,11 @@ Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 
 - `draft_training_plan` only saves a draft, using the same validation as the
   desktop app's "paste the AI's reply" (only running, cycling, pool and open-water
-  swimming reach the watch; purpose and description are required; step syntax is
-  in the tool description). A plan that fails validation leaves no draft. The
+  swimming reach the watch — a Zepp API limit, so walking, hiking, strength,
+  inline skating and cross-country skiing are refused and strength exercises and
+  sets can't be sent; running also takes the `trail` variant and cycling
+  `mountain`; purpose and description are required; step syntax is in the tool
+  description). A plan that fails validation leaves no draft. The
   draft shows up on the desktop "Send to AI" page for the user to confirm.
 - `publish_training_plan` refuses by default with
   `err.training_plan.ai_publish_disabled`. It works only after the user turns on

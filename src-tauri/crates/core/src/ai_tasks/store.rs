@@ -24,10 +24,11 @@ const MAX_ID_CHARS: usize = 200;
 const MAX_ATTACHMENTS: usize = 16;
 const MAX_PATH_CHARS: usize = 1_024;
 const MAX_CATEGORIES: usize = 16;
-const MAX_DAYS_BEFORE: i64 = 365;
+/// 回溯上限：「全部」= 十年（3.0.4，和补拉上限 `MAX_HISTORY_SYNC_DAYS` 一致）。
+const MAX_DAYS_BEFORE: i64 = 3650;
 const MAX_EXCLUDED_METRICS: usize = 64;
-/// 一类最多挑多少天：六个月的牌全挑满也够。
-const MAX_PICKED_DAYS: usize = 400;
+/// 一类最多挑多少天：「全部」那十个自然年的牌全挑满也够（3.0.4）。
+const MAX_PICKED_DAYS: usize = 3700;
 
 fn random_hex(bytes: usize) -> String {
     let mut buffer = vec![0u8; bytes];

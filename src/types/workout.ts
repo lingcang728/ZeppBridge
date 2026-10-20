@@ -268,3 +268,17 @@ export interface HeartRateZoneOptions {
   report?: HeartRateZoneReport | null;
   windowDays: number;
 }
+
+/** 用户拿修正过的 .fit 顶替了这条运动（#140）。只在本机生效，撤销后回到云端原值。 */
+export interface WorkoutFitOverride {
+  workoutId: string;
+  fileName: string | null;
+  sha256: string;
+  byteLen: number;
+  importedAt: string;
+  distanceM: number | null;
+  movingSeconds: number | null;
+  /** 云端给的距离，撤销后回到这个值。 */
+  originalDistanceM: number | null;
+  originalMovingSeconds: number | null;
+}

@@ -56,3 +56,7 @@
   .table-head { flex-wrap: wrap; }
   .table-layer { gap: 12px; }
 }
+/* 连选（3.0.4）：头部的开关亮起来时，起点那张描一圈虚线。 */
+.span-toggle { display: inline-flex; align-items: center; width: auto; gap: 6px; padding: 0 14px; font: 600 var(--fs-xs) var(--font-sans); color: var(--muted); }
+.span-toggle.on { color: var(--tint); border-color: color-mix(in srgb, var(--tint) 60%, transparent); background: color-mix(in srgb, var(--tint) 14%, transparent); }
+:deep(.pcard.span-from) { outline: 2px dashed var(--tint); outline-offset: 4px; }

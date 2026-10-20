@@ -25,8 +25,12 @@ import {
 } from '../../lib/motion/cards';
 import { CLOSE_EASE, OPEN_EASE, paced } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
-import { cardIdOf, expandGroup, focusWindow, groupSummary, pickableDates, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
+import { cardIdOf, DECK_RANGES, expandGroup, focusWindow, groupDots, groupSummary, pickableDates, quarterOf, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
 import { deckToday, type DeckSource } from '../../lib/cards/sources';
+import { groupCoverage, type CoverageContext } from '../../lib/cards/coverage';
+import { backend } from '../../lib/bridge';
+import { useSyncController } from '../../composables/useSyncController';
+import { useCardSpan } from '../../composables/useCardSpan';
 import { tableLayerStyle, tableSlotStyle } from '../../lib/cards/tableLayout';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 
@@ -78,6 +82,26 @@ const { drag, scatter, hintId, onDayDown, onDayMove, onDayUp, onDayCancel, onDay
   level: () => top.value?.level ?? null, cardOf, picking, blocked: () => busy.value || closing.value, has: (date) => box.has(props.source.key, date),
 });
 
+/* ---------- 连选（3.0.4，composables/useCardSpan.ts） ---------- */
+const { on: spanOn, from: spanFrom, tap: spanTap, toggle: toggleSpan, reset: resetSpan } = useCardSpan({
+  level: () => top.value?.level ?? null, picking, blocked: () => busy.value || closing.value,
+});
+const tapDay = (day: DeckDay, event: MouseEvent) => {
+  if (drag.consumeClick() || picking.consumeHold()) return;
+  if (spanTap(event, cardIdOf(day))) return;
+  onDayTap(day, event);
+};
+
+/* ---------- 没有记录的一叠：还没补拉 / 云端没有（3.0.4，lib/cards/coverage.ts） ---------- */
+const { appStatus } = useSyncController();
+const coverageCtx = shallowRef<CoverageContext | null>(null);
+const loadCoverage = async () => {
+  let ledger = null;
+  try { ledger = await backend.getCoverageLedger(); } catch { ledger = null; }
+  coverageCtx.value = { category: props.source.category, earliestLocal: appStatus.value?.coverage?.earliest_day ?? null, ledger };
+};
+const coverageOf = (group: DeckGroup) => groupCoverage(group, coverageCtx.value);
+
 /* ---------- 文案 ---------- */
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
 const weekday = (date: string) => displayDateTimeFormatter({ weekday: 'short' }).format(parseDisplayDate(date));
@@ -93,8 +117,15 @@ const dayAria = (day: DeckDay) => {
   if (state === 'confirm') return t.value.confirmAria(md(day.date));
   return t.value.dayAria(md(day.date), day.text ?? dayAriaValue(day), false);
 };
-const groupTitle = (group: DeckGroup) => (group.kind === 'month' ? monthName(group.start) : t.value.weekRange(md(group.start), md(group.end)));
-const groupTop = (group: DeckGroup) => (group.kind === 'month' ? group.start.slice(0, 4) : yearMonth(group.start));
+const groupTitle = (group: DeckGroup) => {
+  if (group.kind === 'year') return group.start.slice(0, 4);
+  if (group.kind === 'quarter') return t.value.quarter(quarterOf(group.start));
+  return group.kind === 'month' ? monthName(group.start) : t.value.weekRange(md(group.start), md(group.end));
+};
+const groupTop = (group: DeckGroup) => {
+  if (group.kind === 'year') return t.value.yearTop;
+  return group.kind === 'month' || group.kind === 'quarter' ? group.start.slice(0, 4) : yearMonth(group.start);
+};
 const groupValue = (group: DeckGroup) => { const average = numberText(groupSummary(group).average); return average === null ? null : t.value.average(average); };
 const groupSub = (group: DeckGroup) => { const s = groupSummary(group); return t.value.recordedOf(s.recorded, s.total); };
 const pickedIn = (group: DeckGroup) => pickableDates(group).filter((date) => box.has(props.source.key, date)).length;
@@ -105,8 +136,8 @@ const groupPicked = (group: DeckGroup): 'some' | 'all' | null => {
   if (!n) return null;
   return n >= pickableDates(group).length ? 'all' : 'some';
 };
-const rangeLabel = (value: DeckRange) => (value === 7 ? t.value.range7 : value === 30 ? t.value.range30 : t.value.range180);
-const rangeItems = computed(() => ([7, 30, 180] as DeckRange[]).map((value) => ({ value: String(value), label: rangeLabel(value) })));
+const rangeLabel = (value: DeckRange) => ({ 7: t.value.range7, 30: t.value.range30, 180: t.value.range180, 365: t.value.range365, 3650: t.value.rangeAll })[value];
+const rangeItems = computed(() => DECK_RANGES.map((value) => ({ value: String(value), label: rangeLabel(value) })));
 const crumbs = computed(() => stack.value.map((entry) => entry.title).join(' › '));
 const hint = computed(() => (top.value?.level.kind === 'groups' ? t.value.hintGroups : t.value.tipDays));
 const pickedCount = computed(() => box.picks.value.filter((pick) => pick.key === props.source.key).length);
@@ -177,6 +208,7 @@ const push = async (group: DeckGroup, card: HTMLElement) => {
   if (busy.value || closing.value) return;
   const id = seq.handoff();
   scatter();
+  resetSpan();
   busy.value = true;
   await picking.cancelConfirm();
   const depth = stack.value.length - 1;
@@ -201,6 +233,7 @@ const pop = async () => {
   if (depth <= 0) { await close(); return; }
   const id = seq.handoff();
   scatter();
+  resetSpan();
   popping = true;
   busy.value = true;
   await picking.cancelConfirm();
@@ -286,6 +319,7 @@ const switchRange = async (value: string) => {
   if ((next === range.value && !focusDate.value) || closing.value) return;
   const id = seq.handoff();
   scatter();
+  resetSpan();
   range.value = next;
   focusDate.value = null;
   busy.value = true;
@@ -345,6 +379,7 @@ const onBlank = (event: MouseEvent) => {
 };
 const tapGroup = (group: DeckGroup, event: MouseEvent) => {
   if (drag.consumeClick() || picking.consumeHold()) return;
+  if (spanTap(event, group.id)) return;
   void push(group, event.currentTarget as HTMLElement);
 };
 const onCardKey = (event: KeyboardEvent, item: { group?: DeckGroup }) => {
@@ -392,6 +427,7 @@ onMounted(() => {
   backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
   introHead();
   void deal(seq.next());
+  if (!workouts.value) void loadCoverage();
 });
 onBeforeUnmount(() => {
   releaseEscape?.();
@@ -413,9 +449,10 @@ defineExpose({ reopen, isClosing: () => closing.value });
         <span v-else class="table-mark" data-intro aria-hidden="true"><Icon name="cards" :size="18" /></span>
         <div class="table-titles" data-intro>
           <h2 :id="titleId">{{ source.label }}</h2>
-          <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template></p>
+          <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template><template v-if="spanOn"> · <b>{{ spanFrom ? t.spanFrom : t.spanAria }}</b></template></p>
         </div>
         <span v-if="!workouts" data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
+        <button type="button" :class="['table-icon', 'span-toggle', { on: spanOn }]" data-intro :aria-pressed="spanOn" :aria-label="t.spanAria" :title="t.spanAria" @click="toggleSpan"><Icon name="link" :size="16" /><span>{{ t.span }}</span></button>
         <button type="button" class="table-icon" data-intro data-table-close :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
       </header>
       <div ref="stage" class="table-stage" @click.self="onBlank">
@@ -427,18 +464,18 @@ defineExpose({ reopen, isClosing: () => closing.value });
                 <PlayingCard kind="day" :data-card-id="cardIdOf(day)" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
                   :value="source.second ? numberText(day.value) : dayValue(day)" :unit="!day.text && numberText(day.value) ? source.unit : null"
                   :value2="source.second && day.value2 != null ? source.second.format(day.value2) : null" :unit2="source.second?.unit ?? null" :tint2="source.second?.tint ?? null" :icon="day.icon" :state="day.has ? picking.stateOf(cardIdOf(day)) : 'front'"
-                  :class="{ lifting: picking.liftId.value === cardIdOf(day), buried: drag.buried(cardIdOf(day)), 'drop-target': drag.targetId.value === cardIdOf(day) }"
+                  :class="{ lifting: picking.liftId.value === cardIdOf(day), buried: drag.buried(cardIdOf(day)), 'drop-target': drag.targetId.value === cardIdOf(day), 'span-from': spanOn && spanFrom === cardIdOf(day) }"
                   :disabled="!day.has" :focused="day.date === focusDate && (!workouts || i === entry.level.days.findIndex((d) => d.date === focusDate))" :tint="source.tint"
                   :badge="drag.pileCount(cardIdOf(day)) ? (hintId === cardIdOf(day) ? t.holdPile : `×${drag.pileCount(cardIdOf(day))}`) : null" :holding="picking.holdId.value === cardIdOf(day)"
                   :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(cardIdOf(day)) === 'boxed'"
                   @pointerdown="onDayDown($event, day)" @pointermove="onDayMove" @pointerup="onDayUp" @pointercancel="onDayCancel"
-                  @click="onDayTap(day, $event)" @keydown="onCardKey($event, {})" />
+                  @click="tapDay(day, $event)" @keydown="onCardKey($event, {})" />
               </span>
             </template>
             <template v-else>
               <span v-for="(group, i) in entry.level.groups" :key="group.id" :class="['pslot', { 'is-holding': picking.holdId.value === group.id }]" :style="slotStyle(entry.level, i)">
                 <PlayingCard kind="group" :deck="group.kind" :picked="groupPicked(group)" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
-                  :dots="group.days.map((d) => (d.has && box.has(source.key, d.date) ? 'picked' : d.has))" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
+                  :dots="groupDots(group, (date) => box.has(source.key, date))" :empty="!groupSummary(group).recorded" :coverage="coverageOf(group)" :class="{ 'span-from': spanOn && spanFrom === group.id }" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
                   :aria-label="t.groupAria(groupTitle(group), groupSub(group))" :aria-description="pickedIn(group) === pickableDates(group).length && pickedIn(group) ? t.holdToUnpick : t.holdToPick"
                   @pointerdown="picking.holdStart(group, $event); drag.down($event, group.id)" @pointermove="picking.holdMove($event); drag.move($event)"
                   @pointerup="picking.holdEnd(); drag.up($event)" @pointercancel="picking.holdEnd(); drag.cancelEvent($event)"

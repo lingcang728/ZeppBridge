@@ -317,7 +317,17 @@ export default {
   "components/ai/stage/stage": {
     stage: 'Wyślij do AI: dane do przekazania po lewej, AI pośrodku, pytanie i plan po prawej',
     recent: (days: number) =>
-      `Ostatnie ${plural(days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}`,
+      days >= 3650
+        ? 'Wszystko (do 10 lat)'
+        : days === 365
+          ? 'Ostatni rok'
+          : `Ostatnie ${plural(days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}`,
+    year1: '1 rok',
+    all: 'Wszystko',
+    applyAll: 'Zastosuj do wszystkich kategorii',
+    appliedAll: 'Zastosowano do wszystkich kategorii',
+    sizeHint: (size: string, tokens: string) => `Całe zadanie ≈ ${size} · ${tokens} tokenów`,
+    sizeTooLong: 'Zbyt długi zakres dla AI: starsze treningi zachowają tylko podsumowanie lub skróć zakres',
     picked: (days: number) =>
       plural(days, { one: `Wybrano ${days} dzień`, few: `Wybrano ${days} dni`, many: `Wybrano ${days} dni`, other: `Wybrano ${days} dnia` }),
     haveOf: (have: number, total: number) => `${have} z ${total} dni zawiera dane`,
@@ -478,6 +488,22 @@ export default {
     },
   },
 
+  // Source: src/components/BackfillOffer.i18n.ts
+  'components/BackfillOffer': {
+    offer: (date: string) => `Ten komputer ma dane tylko od ${date}. Pobrać wcześniejszą historię z chmury?`,
+    years: (n: number) =>
+      plural(n, {
+        one: `${n} rok`,
+        few: `${n} lata`,
+        many: `${n} lat`,
+        other: `${n} lat`,
+      }),
+    later: 'Nie teraz',
+    running: 'Pobieranie w tle — będzie kontynuowane po opuszczeniu tej strony',
+    stop: 'Zatrzymaj',
+    settings: 'Ustawienia pobierania historii',
+  },
+
   // Source: src/components/cards/cards.i18n.ts
   "components/cards/cards": {
     pick: 'Wybierz dni',
@@ -500,6 +526,15 @@ export default {
     range7: '7 dni',
     range30: '1 miesiąc',
     range180: '6 miesięcy',
+    range365: '1 rok',
+    rangeAll: 'Wszystko',
+    quarter: (q: number) => `Kw${q}`,
+    yearTop: 'Cały rok',
+    notBackfilled: 'Jeszcze niepobrane',
+    cloudEmpty: 'Brak w chmurze',
+    span: 'Zakres',
+    spanAria: 'Wybierz zakres kart: dotknij pierwszej, a następnie ostatniej',
+    spanFrom: 'Teraz dotknij ostatniej karty',
     rangeAria: 'Zakres stołu kart',
     picked: 'Dla AI',
     noRecord: 'Brak zapisów',
@@ -1155,11 +1190,15 @@ export default {
     activityYoga: 'Joga / rozciąganie',
     activityRowing: 'Wioślarz',
     activityElliptical: 'Orbitrek',
+    activityCrossCountrySkiing: 'Biegi narciarskie',
+    activityInlineSkating: 'Jazda na rolkach',
     variantOutdoorRun: 'Bieg w terenie',
     variantTreadmill: 'Bieżnia',
     variantTrack: 'Bieżnia lekkoatletyczna',
     variantOutdoorRide: 'Kolarstwo na zewnątrz',
     variantIndoorRide: 'Kolarstwo stacjonarne',
+    variantMountain: 'Kolarstwo górskie',
+    variantTrail: 'Bieg przełajowy',
     variantPick: (name: string) => `Zegarek ponownie zapyta o typ: wybierz „${name}”.`,
     variantPickAny: 'Zegarek ponownie zapyta o dokładny typ: plany innych firm przekazują tylko grupę dyscypliny, co wynika z ograniczeń Zepp.',
     heldBadge: 'Niewspierane przez zegarek',
@@ -1644,6 +1683,12 @@ export default {
 
     /* —— misc —— */
     'err.workout.not_found': 'Wpis treningu nie istnieje',
+    'err.workout_fit.not_fit': 'To nie jest plik .fit, który ZeppBridge potrafi odczytać',
+    'err.workout_fit.too_large': 'Plik jest zbyt duży jak na pojedynczy trening .fit',
+    'err.workout_fit.read_failed': 'Nie udało się odczytać tego pliku',
+    'err.workout_fit.no_activity': 'Ten plik .fit nie zawiera aktywności (brak punktów danych ani okrążeń)',
+    'err.workout_fit.start_mismatch':
+      'Czas rozpoczęcia tego pliku .fit różni się o ponad 5 minut od tego treningu — nie wygląda to na ten sam trening',
     'err.prefs.retention_out_of_range': 'Okres przechowywania musi wynosić od 1 do 365 dni',
     'err.storage.write_busy': 'Inny proces zapisu w ZeppBridge jest w toku — poczekaj na jego zakończenie',
     'err.storage.write_lock_unavailable':
@@ -2345,7 +2390,7 @@ export default {
     'ui.training_plan.issue.missing_description': () => 'Dodaj kluczowe założenia; zegarek wyświetli je w opisie',
     'ui.training_plan.issue.name_truncated': (p: Params) => `Nazwa przekracza ${str(p.max)} znaków i zostanie obcięta na liście w zegarku (w widoku szczegółów będzie widoczna w całości)`,
     fallback: () => 'W tym planie wystąpił nierozpoznany problem',
-    activity: { walking: 'marsz', hiking: 'wędrówka', strength: 'trening siłowy', yoga: 'joga / rozciąganie', rowing: 'wioślarz', elliptical: 'orbitrek' },
+    activity: { walking: 'marsz', hiking: 'wędrówka', strength: 'trening siłowy', yoga: 'joga / rozciąganie', rowing: 'wioślarz', elliptical: 'orbitrek', cross_country_skiing: 'biegi narciarskie', inline_skating: 'jazda na rolkach' },
   },
 
   // Source: src/lib/units.ts
@@ -3767,6 +3812,15 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     provenanceSynced: 'Ostatnia synchronizacja',
     provenanceRecordId: 'Identyfikator wpisu',
     provenanceDevice: 'Urządzenie',
+    provenanceFit: 'Lokalna korekta',
+    fitCloudDistance: 'Dystans w chmurze',
+    fitReplace: 'Zastąp poprawionym plikiem .fit',
+    fitReplaceAgain: 'Użyj innego pliku .fit',
+    fitRestore: 'Przywróć wersję z chmury',
+    fitDialogTitle: 'Wybierz poprawiony plik .fit',
+    fitApplied: 'Zastąpiono tylko na tym komputerze — dane w chmurze Zepp pozostają bez zmian',
+    fitRestored: 'Przywrócono wersję z chmury',
+    fitFailed: 'Nie udało się zastąpić tego treningu',
     pageFoot: 'Zdekodowano na tym komputerze; ślad rysowany na lokalnym płótnie, nigdy niewysyłany do usług mapowych.',
   },
 

@@ -14,6 +14,15 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/BackfillOffer': {
+      offer: (date: string) =>
+        `Deze computer gaat maar terug tot ${date}. Eerdere historie ophalen uit de cloud?`,
+      years: (n: number) => (n === 1 ? '1 jaar' : `${n} jaar`),
+      later: 'Nu niet',
+      running: 'Historie wordt op de achtergrond opgehaald — dit gaat door als je deze pagina verlaat',
+      stop: 'Stoppen',
+      settings: 'Instellingen voor ophalen',
+    },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Geen metingen in de afgelopen 6 maanden: ${list}`,
       separator: ", ",
@@ -2207,6 +2216,15 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       provenanceSynced: 'Laatst gesynchroniseerd',
       provenanceRecordId: 'Item-id',
       provenanceDevice: 'Apparaat',
+      provenanceFit: 'Lokale correctie',
+      fitCloudDistance: 'Cloudafstand',
+      fitReplace: 'Vervangen door een gecorrigeerd .fit-bestand',
+      fitReplaceAgain: 'Ander .fit-bestand gebruiken',
+      fitRestore: 'Cloudversie herstellen',
+      fitDialogTitle: 'Kies het gecorrigeerde .fit-bestand',
+      fitApplied: 'Alleen op deze computer vervangen — Zepp-cloud blijft ongewijzigd',
+      fitRestored: 'Cloudversie hersteld',
+      fitFailed: 'Kon deze training niet vervangen',
       pageFoot:
         'Gedecodeerd op deze machine. De track is op een lokaal canvas getekend en nooit naar een kaartdienst gestuurd.',
       evidenceSummary: "Onderbouwing en bron van het type",
@@ -2609,8 +2627,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       dismiss: 'Begrepen',
       activityWalking: 'Wandelen', activityHiking: 'Wandelen in de bergen', activityStrength: 'Krachttraining',
       activityYoga: 'Yoga / stretchen', activityRowing: 'Roeien', activityElliptical: 'Crosstrainer',
+      activityInlineSkating: 'Inlineskaten', activityCrossCountrySkiing: 'Langlaufen',
       variantOutdoorRun: 'Hardlopen buiten', variantTreadmill: 'Loopband', variantTrack: 'Baanlopen',
       variantOutdoorRide: 'Fietsen buiten', variantIndoorRide: 'Indoor fietsen',
+      variantTrail: 'Trailrunning', variantMountain: 'Mountainbiken',
       variantPick: (name: string) => `Je horloge vraagt opnieuw om het type: kies '${name}'.`,
       variantPickAny: 'Je horloge vraagt opnieuw om het precieze type. Plannen van derden geven alleen de sportcategorie door; dat is een beperking van Zepp.',
       heldBadge: 'Niet naar horloge te sturen',
@@ -2652,9 +2672,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       activity: {
         walking: 'Wandelen', hiking: 'Wandelen in de bergen', strength: 'Krachttraining',
         yoga: 'Yoga / stretchen', rowing: 'Roeien', elliptical: 'Crosstrainer',
+        inline_skating: 'inlineskaten', cross_country_skiing: 'langlaufen',
       },
       'ui.training_plan.issue.sport_not_deliverable': (p: { activity?: string }) => {
-        const label = p.activity === 'walking' ? 'wandelen' : p.activity === 'hiking' ? 'wandelen in de bergen' : p.activity === 'strength' ? 'krachttraining' : p.activity === 'yoga' ? 'yoga / stretchen' : p.activity === 'rowing' ? 'roeien' : p.activity === 'elliptical' ? 'crosstrainer' : p.activity ?? '';
+        const label = p.activity === 'walking' ? 'wandelen' : p.activity === 'hiking' ? 'wandelen in de bergen' : p.activity === 'strength' ? 'krachttraining' : p.activity === 'yoga' ? 'yoga / stretchen' : p.activity === 'rowing' ? 'roeien' : p.activity === 'elliptical' ? 'crosstrainer' : p.activity === 'inline_skating' ? 'inlineskaten' : p.activity === 'cross_country_skiing' ? 'langlaufen' : p.activity ?? '';
         return `Het horloge accepteert alleen hardlopen, fietsen en zwemmen; '${label}' kan niet worden verstuurd.`;
       },
       'ui.training_plan.issue.bad_variant': (p: { value?: string }) => `'${p.value ?? ''}' is geen geldig subtype voor deze sport.`,
@@ -2761,6 +2782,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       boxEmptyLabel: 'Verzamelbox · leeg',
       boxDropHere: 'Laat los om toe te voegen',
       close: 'Kaarten opruimen', back: 'Eén niveau terug', range7: '7 dagen', range30: '1 maand', range180: '6 maanden', rangeAria: 'Kaartbereik',
+      range365: '1 jaar', rangeAll: 'Alles', quarter: (q: number) => `K${q}`, yearTop: 'Hele jaar',
+      notBackfilled: 'Nog niet opgehaald', cloudEmpty: 'Niets in de cloud',
+      span: 'Reeks', spanAria: 'Reeks kaarten kiezen: tik op de eerste en daarna op de laatste', spanFrom: 'Tik nu op de laatste kaart',
       picked: 'Voor AI', noRecord: 'Geen registratie', recorded: 'Geregistreerd',
       noWorkouts: 'Geen trainingen in deze periode',
       recentWorkouts: 'Afgelopen week',
@@ -2782,7 +2806,14 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'components/ai/stage/stage': {
       stage: 'Naar AI sturen: links de gedeelde gegevens, in het midden AI, rechts de vraag en het plan',
-      recent: (days: number) => `Laatste ${days} dagen`,
+      recent: (days: number) =>
+        days >= 3650 ? 'Alles (max. 10 jaar)' : days === 365 ? 'Afgelopen jaar' : `Laatste ${days} dagen`,
+      year1: '1 jaar',
+      all: 'Alles',
+      applyAll: 'Toepassen op alle categorieën',
+      appliedAll: 'Toegepast op alle categorieën',
+      sizeHint: (size: string, tokens: string) => `Hele taak ≈ ${size} · ${tokens} tokens`,
+      sizeTooLong: 'Te lang voor de AI om te lezen: behoud van eerdere trainingen alleen een samenvatting, of verkort het bereik',
       picked: (days: number) => plural(days, { one: '1 dag gekozen', other: `${days} dagen gekozen` }),
       haveOf: (have: number, total: number) => `${have} van ${total} dagen met gegevens`,
       extraWorkouts: (count: number) => plural(count, { one: '+1 gekozen training', other: `+${count} gekozen trainingen` }),
@@ -3537,6 +3568,13 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     'err.update.swap_failed': 'Kon programmabestanden niet vervangen; alles is teruggezet zoals het was',
     'err.update.install_failed': 'Installeren van nieuwe versie mislukt',
     'err.workout.not_found': 'Die training bestaat niet',
+    'err.workout_fit.no_activity':
+      'Dit .fit-bestand bevat geen activiteit (geen meetpunten en geen ronden)',
+    'err.workout_fit.not_fit': 'Dit is geen .fit-bestand dat ZeppBridge kan lezen',
+    'err.workout_fit.read_failed': 'Kon dit bestand niet lezen',
+    'err.workout_fit.start_mismatch':
+      'De starttijd van dit .fit-bestand verschilt meer dan 5 minuten van deze training — het lijkt niet om dezelfde sessie te gaan',
+    'err.workout_fit.too_large': 'Dit bestand is te groot om een .fit van één training te zijn',
   },
   backendText: {
     'ui.backup.file_missing': 'Het back-upbestand is niet gevonden',

@@ -117,7 +117,8 @@ impl Database {
     }
 
     pub fn metric_series(&self, metrics: &[String], days: i64) -> Result<Vec<MetricSeries>> {
-        let window_days = days.clamp(1, 1825);
+        // 牌桌的「全部」（3.0.4）一次取十个自然年。
+        let window_days = days.clamp(1, 3700);
         let end = Local::now().date_naive();
         let start = end - Duration::days(window_days - 1);
         let start_text = start.format("%Y-%m-%d").to_string();

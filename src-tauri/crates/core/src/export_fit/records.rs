@@ -218,6 +218,8 @@ pub(super) struct Point {
     /// 步幅，单位厘米。`workout_samples.stride` 逐秒都有，而 FIT 文件里这
     /// 一列一直是空的——对拍报告里「步幅只在 Zepp 那份里有」说的就是它。
     pub(super) stride_cm: Option<f64>,
+    /// 手表的累计距离，米（#139）。只在有读数的那一秒有。
+    pub(super) distance_m: Option<f64>,
 }
 
 /// 把 `route` 和 `samples` 两条序列按时间戳合并成一条。
@@ -260,6 +262,7 @@ pub(super) fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
         point.power_watts = entry.get("power_watts").and_then(Value::as_f64);
         point.ground_contact_ms = entry.get("ground_contact_ms").and_then(Value::as_f64);
         point.stride_cm = entry.get("stride_cm").and_then(Value::as_f64);
+        point.distance_m = entry.get("distance_m").and_then(Value::as_f64);
         point.vertical_oscillation_mm =
             entry.get("vertical_oscillation_mm").and_then(Value::as_f64);
         // route 已经给过高度时不覆盖：两者同源，但 route 那份和坐标是配套的。
@@ -276,6 +279,7 @@ pub(super) fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
             || point.power_watts.is_some()
             || point.altitude_m.is_some()
             || point.cadence_spm.is_some()
+            || point.distance_m.is_some()
     });
 
     merged.into_iter().collect()
@@ -295,6 +299,17 @@ pub(super) fn record_message(unix: i64, point: &Point, sport: typedef::Sport) ->
     }
     if let Some(altitude) = point.altitude_m.and_then(encode_altitude) {
         fields.push(u16_field(mesgdef::Record::ALTITUDE, altitude));
+    }
+    // 累计距离：u32、单位厘米（scale 100）。Strava 这类工具按它算移动距离；
+    // 缺了它就只能拿 GPS 自己积分，被干扰的轨迹会多出几公里。
+    if let Some(distance) = point
+        .distance_m
+        .filter(|value| value.is_finite() && *value >= 0.0)
+    {
+        let centimetres = (distance * 100.0).round();
+        if centimetres < f64::from(u32::MAX) {
+            fields.push(u32_field(mesgdef::Record::DISTANCE, centimetres as u32));
+        }
     }
     if let Some(heart_rate) = point.heart_rate.filter(|value| (1..=255).contains(value)) {
         fields.push(u8_field(mesgdef::Record::HEART_RATE, heart_rate as u8));

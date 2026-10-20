@@ -390,6 +390,8 @@ impl Database {
                 ])?;
             }
         }
+        // 用户导入过修正 .fit 的运动：刚写进来的云端值记成原值，再盖回修正值（#140）。
+        self.reapply_fit_override_summary(&workout.workout_id)?;
         Ok(())
     }
 }
