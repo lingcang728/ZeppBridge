@@ -42,6 +42,7 @@ impl Default for Workout {
             avg_cadence_spm: None,
             max_cadence_spm: None,
             avg_stride_cm: None,
+            gear_id: None,
             hr_zones: Vec::new(),
             source_scope: SourceScope::Unknown,
             device_id: None,
@@ -131,6 +132,10 @@ pub struct Workout {
     /// 平均步幅（厘米）。
     #[serde(default)]
     pub avg_stride_cm: Option<f64>,
+    /// 这次运动用的装备（鞋）在 Zepp 里的编号，摘要的 `gearId`（#143）。
+    /// 只有编号：云端不给鞋名，界面和导出都不编一个名字出来。
+    #[serde(default)]
+    pub gear_id: Option<String>,
     /// 云端算好的心率区间分布。
     ///
     /// Zepp 的 `heart_range` 就是这个，格式是 `秒数,区间上限` 的六段。以前整条

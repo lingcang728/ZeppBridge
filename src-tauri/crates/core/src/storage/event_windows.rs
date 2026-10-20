@@ -284,7 +284,13 @@ impl Database {
             Err(error) => {
                 self.conn.execute("ROLLBACK TO consolidate_day", [])?;
                 self.conn.execute("RELEASE consolidate_day", [])?;
-                self.insert_raw_quarantine(id, &record.stream, &record.source_key, &error)?;
+                self.insert_raw_quarantine(
+                    id,
+                    &record.stream,
+                    &record.source_key,
+                    &error,
+                    Some(&record.payload),
+                )?;
             }
         }
         Ok(self

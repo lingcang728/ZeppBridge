@@ -632,6 +632,7 @@ fn insert_run(db: &Database, workout_id: &str, month: u32, day: u32) {
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,
         device_id: Some("device-1".into()),

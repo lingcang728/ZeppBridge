@@ -283,7 +283,7 @@ impl Database {
                     Ok(value) => value,
                     Err(error) => {
                         failures += 1;
-                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                        self.insert_raw_quarantine(*id, stream, source_key, &error, None)?;
                         continue;
                     }
                 };
@@ -296,6 +296,7 @@ impl Database {
                             stream,
                             source_key,
                             &ZeppBridgeError::ParseError(error.to_string()),
+                            None,
                         )?;
                         continue;
                     }
@@ -318,7 +319,13 @@ impl Database {
                         self.conn.execute("ROLLBACK TO reprocess_record", [])?;
                         self.conn.execute("RELEASE reprocess_record", [])?;
                         failures += 1;
-                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                        self.insert_raw_quarantine(
+                            *id,
+                            stream,
+                            source_key,
+                            &error,
+                            Some(&payload),
+                        )?;
                     }
                 }
             }

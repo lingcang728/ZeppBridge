@@ -80,6 +80,7 @@ zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
 zeppbridge-cli reprocess --json  # replay local payloads with the current normalizer
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # replace a workout on this machine
 zeppbridge-cli contract          # prints the unit, timezone, source and missing-value definitions
 zeppbridge-cli help
 ```
@@ -124,6 +125,25 @@ safe on a timer: without `--all` it does nothing once the revision matches.
 `status` reports `normalizerRevision` (what the library holds),
 `normalizerRevisionExpected` (what this build produces) and
 `normalizerReplayPending`. Those first two being different is the whole signal.
+
+### Replacing a workout with a corrected .fit
+
+The desktop app can replace a workout with a corrected `.fit` (the workout page's **Replace with a corrected .fit**). `fit-override` does the same from a script:
+
+```bash
+zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # replace
+zeppbridge-cli fit-override --workout <id> --remove --json             # undo; Zepp's values come back
+zeppbridge-cli fit-override --list --json                              # what this machine has replaced
+```
+
+A replacement lives only in that machine's library: Zepp has no endpoint for
+importing a workout, so the cloud copy and the watch stay as they were. It
+survives later syncs, `reprocess` and parser replays, and snapshots include it.
+Workout IDs come from Zepp and are the same on every machine, so with several
+libraries you run the same command on each. The file must start within 5
+minutes of the workout (`errorKind: "fit_start_mismatch"` otherwise) and the
+workout must already be in the library (`workout_not_found`); both exit with 1.
+Undoing something that was never replaced succeeds with `"removed": false`.
 
 ### Exit codes
 
@@ -312,7 +332,7 @@ outside the grants — `error.permittedRanges` lists the actual
 
 | Tool | Returns |
 |---|---|
-| `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
+| `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm. `gearId` is the ID of the shoes picked for that workout in Zepp, or `null`; Zepp sends no shoe names |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
 | `get_workout_detail` | All stored summary fields and heart-rate zones for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
@@ -323,7 +343,7 @@ outside the grants — `error.permittedRanges` lists the actual
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
 | `list_life_events` | Locally authored life events in a date window |
-| `get_data_health` | Fetch/parse/write state and coverage per stream |
+| `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
 | `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect), days since the last workout, the active plan and life events |
 | `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, and the background the user wrote for AI |
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |

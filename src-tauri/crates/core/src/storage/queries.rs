@@ -209,7 +209,7 @@ impl Database {
                     distance_meters, calories, avg_hr, max_hr,
                     training_load, vo2max, source_scope, device_id,
                     synced_at, gps_available, sample_count, zepp_type,
-                    workout_type_source, workout_type_override
+                    workout_type_source, workout_type_override, gear_id
              FROM workouts ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
         let rows = stmt.query_map([limit, offset], |row| {
@@ -232,6 +232,7 @@ impl Database {
                 row.get::<_, Option<i32>>(15)?,
                 row.get::<_, String>(16)?,
                 row.get::<_, Option<String>>(17)?,
+                row.get::<_, Option<String>>(18)?,
             ))
         })?;
         // 一次读完编号别名，再在内存里套到每条记录上：表很小，比给两个大
@@ -258,6 +259,7 @@ impl Database {
                 zepp_type,
                 type_source,
                 user_override,
+                gear_id,
             ) = row?;
             let effective_type = user_override
                 .clone()
@@ -295,6 +297,8 @@ impl Database {
                 avg_cadence_spm: None,
                 max_cadence_spm: None,
                 avg_stride_cm: None,
+                // 鞋的编号只多一列，列表就带上：按鞋分组（#143）要从列表里拿。
+                gear_id,
                 hr_zones: Vec::new(),
                 source_scope: parse_scope(&scope)?,
                 device_id,

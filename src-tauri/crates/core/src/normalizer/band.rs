@@ -341,6 +341,10 @@ impl Normalizer {
                     .filter(|value| *value > 0.0),
                 avg_stride_cm: first_number(object, &["avg_stride_length", "avgStrideLength"])
                     .filter(|value| *value > 0.0),
+                // 没选鞋时云端给的是空串，当成没有。
+                gear_id: first_string(object, &["gearId", "gear_id"])
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty()),
                 hr_zones: parse_heart_range(first_string(object, &["heart_range"]).as_deref()),
                 source_scope: source_scope(Some(object), source_device.as_deref()),
                 device_id: source_device,

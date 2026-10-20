@@ -38,6 +38,7 @@ use zeppbridge_core::sync::{SyncManager, SyncReport};
 
 mod args;
 mod cmd_export;
+mod cmd_fit;
 mod cmd_probe;
 mod cmd_reprocess;
 mod cmd_status;
@@ -48,6 +49,7 @@ mod tests;
 
 use args::*;
 use cmd_export::*;
+use cmd_fit::*;
 use cmd_probe::*;
 use cmd_reprocess::*;
 use cmd_status::*;
@@ -113,6 +115,7 @@ Commands:
   probe               Check candidate health endpoints without importing data
   reprocess           Replay stored payloads with the current parser (no network)
   export              Export local data as JSON / CSV / GPX / FIT
+  fit-override        Replace a workout with a corrected .fit on this machine, undo, or list
   contract            Print the read contract (units, time zone, source, missing values)
   version             Print the version
   help                Print this help
@@ -145,6 +148,15 @@ export options:
                             weight, food, blood_pressure
   --detail <summary|full>   Default: summary
   --out <path>              Default: write to stdout
+
+fit-override options (exactly one form):
+  --workout <id> --fit <file.fit>   Replace that workout with the corrected file
+  --workout <id> --remove           Undo the replacement; Zepp's values come back
+  --list                            List the replacements on this machine
+  A replacement lives only in this machine's library (Zepp has no way to import a
+  workout). It survives later syncs, reprocess and parser replays. Workout IDs
+  come from Zepp and are the same on every machine, so the same command can be
+  scripted on each one.
 
 Common options:
   --json                    Machine-readable output on stdout, human notes on stderr
@@ -199,6 +211,7 @@ fn run(args: &[String]) -> u8 {
         "probe" => cmd_probe(rest),
         "reprocess" => cmd_reprocess(rest),
         "export" => cmd_export(rest),
+        "fit-override" => cmd_fit_override(rest),
         other => {
             eprintln!("Unknown command: {other}\n");
             eprint!("{HELP}");

@@ -52,6 +52,8 @@ pub(super) fn run_list_workouts(
                 "calories": workout.calories,
                 "avgHr": workout.avg_hr,
                 "maxHr": workout.max_hr,
+                // 鞋的编号（Zepp 的 gearId，#143）。只有编号，没有鞋名。
+                "gearId": workout.gear_id,
                 "sourceScope": workout.source_scope,
                 "gpsAvailable": workout.gps_available,
                 "sampleCount": workout.sample_count,

@@ -200,7 +200,7 @@ fn missing_sleep_stages_are_stored_as_unavailable_and_query_returns_none() {
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
     assert_eq!(version, CURRENT_SCHEMA_VERSION);
-    assert_eq!(CURRENT_SCHEMA_VERSION, 39);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 40);
 
     let start = ts();
     db.insert_sleep_session(&SleepSession {
@@ -735,4 +735,48 @@ fn cleanup_resets_ledger_months_and_drops_raw_whose_window_expired() {
         )
         .unwrap();
     assert_eq!(persisted, 0, "被清掉的月份不能还说已写入");
+}
+/// #143：摘要里的 `gearId`（这次运动选的鞋）入库后，列表和详情都读得到；
+/// 没选鞋时云端给空串，当成没有，不存一个空编号。
+#[test]
+fn workout_gear_id_survives_persist_and_reads_back_in_list_and_detail() {
+    let db = Database::in_memory().unwrap();
+    let payload = serde_json::json!({"data": {"summary": [
+        {"trackid": "with-shoes", "start_time": 1_700_000_000i64, "end_time": 1_700_003_600i64,
+         "type": 1, "gearId": "c89d4256-cd4a-4b51-9c55-3f1d2a6e7b10"},
+        {"trackid": "no-shoes", "start_time": 1_700_100_000i64, "end_time": 1_700_103_600i64,
+         "type": 1, "gearId": ""}
+    ]}});
+    db.persist_fetched_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "gear-fixture".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload,
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+
+    let gear = |id: &str| {
+        db.get_workout_detail(id)
+            .unwrap()
+            .expect("运动应当在库里")
+            .gear_id
+    };
+    assert_eq!(
+        gear("with-shoes").as_deref(),
+        Some("c89d4256-cd4a-4b51-9c55-3f1d2a6e7b10")
+    );
+    assert_eq!(gear("no-shoes"), None, "空串不是一双鞋");
+    let listed = db.workouts_page(10, 0).unwrap();
+    let with_shoes = listed
+        .iter()
+        .find(|w| w.workout_id == "with-shoes")
+        .unwrap();
+    assert_eq!(
+        with_shoes.gear_id.as_deref(),
+        Some("c89d4256-cd4a-4b51-9c55-3f1d2a6e7b10")
+    );
 }
