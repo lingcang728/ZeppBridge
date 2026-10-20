@@ -95,10 +95,14 @@ impl CredentialBackend for PausingBackend {
     }
 }
 
+/// 同一测试进程里的几个用例并行跑；macOS 的时钟只到微秒，光靠 pid + 时间戳
+/// 会让两个用例拿到同一个目录，一边的子进程把另一边的令牌断开（2026-10-20 CI）。
 fn temp_dir() -> PathBuf {
+    static SERIAL: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(
-        "zeppbridge-official-xproc-{}-{}",
+        "zeppbridge-official-xproc-{}-{}-{}",
         std::process::id(),
+        SERIAL.fetch_add(1, Ordering::Relaxed),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
