@@ -83,6 +83,7 @@ function runScheduler(f, { due = false, dryRun = false, paused = false, remotePa
   const packaging = ['Package Windows installers', 'Package macOS bundle', 'Package Linux bundles', 'Package Flatpak bundle'];
   const runs = [{ id: 1, event: 'push', head_branch: 'main', status: 'completed', conclusion: mainGreen ? 'success' : 'failure' }];
   if (build !== 'missing') runs.unshift({ id: 2, event: 'workflow_dispatch', head_branch: `freeze/v${f.entry.version}`, status: build === 'active' ? 'in_progress' : 'completed', conclusion: build === 'failed' ? 'failure' : build === 'active' ? null : 'success', html_url: 'https://example.test/build' });
+  if (legacy) runs.unshift({ id: 4, event: 'workflow_dispatch', head_branch: `v${f.entry.version}`, status: 'in_progress', conclusion: null });
   gh(`actions/workflows/ci.yml/runs?head_sha=${f.entry.commit}&per_page=100`, { workflow_runs: runs }, { paginated: true });
   gh('actions/runs/1/jobs?per_page=100', { jobs: required.map((name) => ({ name, conclusion: 'success' })) }, { paginated: true });
   gh('actions/runs/2/jobs?per_page=100', { jobs: [...required, ...packaging].map((name) => ({ name, conclusion: 'success' })) }, { paginated: true });
@@ -92,7 +93,6 @@ function runScheduler(f, { due = false, dryRun = false, paused = false, remotePa
   gh(`git/ref/heads/freeze/v${f.entry.version}`, { object: { sha: changedFreeze ? 'b'.repeat(40) : f.entry.commit } });
   gh('git/ref/heads/main', { object: { sha: 'c'.repeat(40) } });
   gh(`actions/workflows/ci.yml/runs?head_sha=${'c'.repeat(40)}&per_page=100`, { workflow_runs: [{ id: 3, event: 'push', head_branch: 'main', status: 'completed', conclusion: mainGreen ? 'success' : 'failure' }] }, { paginated: true });
-  if (legacy) gh(`actions/workflows/ci.yml/runs?branch=v${f.entry.version}&per_page=5`, { workflow_runs: [{ status: 'in_progress' }] }, { paginated: true });
   route('git', ['tag', '-l', `v${f.entry.version}`], legacy ? `v${f.entry.version}\n` : '');
   route('git', ['merge-base', '--is-ancestor', f.entry.commit, 'origin/main'], '');
   route('git', ['rev-parse', `origin/freeze/v${f.entry.version}`], f.entry.commit);
