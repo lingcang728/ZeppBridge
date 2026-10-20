@@ -88,6 +88,10 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt,clippy
           rustup default stable
 
+      # 锁文件里的镜像地址 npm 12 会拒绝；CI 自带的 npm 还装得上，所以要在 npm ci 前单独拦。
+      - name: Check lockfile registry
+        run: npm run lockfile:check
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -724,6 +728,15 @@ jobs:
       # 只删这一层，**不碰 glib / gtk / gio** —— 那些跟宿主机的 glibc 版本挂钩，
       # 删了会在更多发行版上炸，而不是更少。
       #
+      # GStreamer 是反过来的那一层：必须**整套自带**（tauri.conf.json 的
+      # bundleMediaFramework）。webkit2gtk 把 libgstreamer 1.24 核心库拉进了包，
+      # 插件却一个没带、AppRun 也没改插件路径，于是 WebKit 去扫宿主机的插件目录。
+      # 2026-10-20 核对 Ubuntu 26.04 的 gstreamer1.0-plugins-base 1.28.2：依赖
+      # glib ≥ 2.81.1，引用了包里 glib 2.80 没有的 g_sort_array —— 进程里只有
+      # 一份 libglib，宿主插件加载即 undefined symbol（外部报告见
+      # guiliznas/ZeppBridge#1 的 docs/web-mode/PLANNING.md §7）。整套自带后，
+      # linuxdeploy-plugin-gstreamer 的钩子把 GST_PLUGIN_SYSTEM_PATH 指回包内。
+      #
       # 每次都先把整份 usr/lib 打印出来：这一步的效果在 Windows 上验不了，那份
       # 清单是唯一能让人事后判断「删对了没有」的东西。
       - name: Let the AppImage use the host graphics stack
@@ -738,6 +751,18 @@ jobs:
           echo "::group::AppDir usr/lib 的完整清单"
           find squashfs-root/usr/lib -maxdepth 2 \( -type f -o -type l \) | sort
           echo "::endgroup::"
+
+          # GStreamer 必须整套在包里，且钩子把插件路径指回包内；少一样，WebKit
+          # 就会去加载宿主机为新版 glib 编的插件（见上面的说明）。
+          echo "::group::AppRun hooks"
+          ls squashfs-root/apprun-hooks
+          grep -h 'GST_PLUGIN' squashfs-root/apprun-hooks/*.sh || true
+          echo "::endgroup::"
+          grep -qF 'GST_PLUGIN_SYSTEM_PATH_1_0="${APPDIR}/usr/lib/gstreamer-1.0"' squashfs-root/apprun-hooks/*.sh \
+            || { echo "::error::AppRun 钩子没有把 GST_PLUGIN_SYSTEM_PATH 指回包内"; exit 1; }
+          plugins=$( (find squashfs-root/usr/lib/gstreamer-1.0 -name 'libgst*.so' 2>/dev/null || true) | wc -l)
+          echo "自带 GStreamer 插件 $plugins 个"
+          [[ $plugins -gt 0 ]] || { echo "::error::包里没有 GStreamer 插件"; exit 1; }
 
           # 与宿主机的合成器 / 驱动强耦合的那一层。模式照 AppImage 上游
           # excludelist 的图形部分抄。2026-09-03 实测只有前四条（libwayland-*）

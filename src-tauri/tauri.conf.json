@@ -51,6 +51,9 @@
       "minimumSystemVersion": "11.0"
     },
     "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
       "deb": {
         "depends": ["libdbus-1-3", "libayatana-appindicator3-1"]
       },

@@ -5,3 +5,4 @@
 - Fixed: **Training plans couldn’t be resent after a dropped connection**. Weeks whose delivery wasn’t confirmed are resent with the next publish, and the plan status has a Resend unconfirmed weeks button.
 - Fixed: **Backfill “failed” months that never cleared**. Months the cloud explicitly has nothing for are marked Empty in cloud, the current month no longer asks for days that haven’t happened yet, and Retry failed items starts backfilling right away.
 - Fixed: **Sign-in not opening the browser in the Linux AppImage**. Before opening the browser or the data folder, the AppImage’s bundled library paths are removed so the system browser starts normally.
+- Fixed: **Linux AppImage crashing on newer distributions**. On systems such as Ubuntu 26.04 it could crash because it mixed in the system’s media components; it now brings its own. Thanks to @guiliznas for tracking this down.

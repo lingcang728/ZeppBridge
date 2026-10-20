@@ -30,6 +30,7 @@
     "version:check": "node scripts/release/check-version-consistency.mjs",
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
+    "lockfile:check": "node scripts/release/check-lockfile-registry.mjs",
     "feedback:triage": "node scripts/feedback/triage.mjs",
     "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py"
   },
