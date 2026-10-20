@@ -10,14 +10,14 @@ export interface UpdateReceipt {
 const KEY = 'zeppbridge.update.receipt';
 const VERSION_KEY = 'zeppbridge.update.lastLaunchedVersion';
 /** 随应用打包了更新说明的版本。发版时和下面 glob 里的目录一起改。 */
-export const BUNDLED_VERSION = '3.0.5';
+export const BUNDLED_VERSION = '3.0.6';
 
 /*
  * 本版更新说明随应用打包，一种界面语言一个文件（docs/releases/<版本>/<locale>.md），
  * 懒加载：只在弹窗出现时取当前语言那一份。以前只拆 `## 中文 / ## English`，
  * 其余十种语言全回落英文。tests 里有门禁：当前版本十二种语言必须齐全。
  */
-const BUNDLED_NOTES = import.meta.glob('../../docs/releases/3.0.5/*.md', {
+const BUNDLED_NOTES = import.meta.glob('../../docs/releases/3.0.6/*.md', {
   query: '?raw', import: 'default',
 }) as Record<string, () => Promise<string>>;
 
