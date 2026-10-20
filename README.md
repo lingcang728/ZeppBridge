@@ -166,6 +166,7 @@ ZeppBridge is an independent open-source project with official Zepp approval. Se
 
 ## Docs and feedback
 
+- [FAQ](docs/guides/faq.md): why sign-in goes through zeppbridge.com, why some data is missing, Helio Strap, download warnings, AI without copy-paste
 - [Backup, restore and full history](docs/guides/backup-and-restore.md)
 - [CLI and MCP](docs/reference/cli-and-mcp.md) · [Docker](docs/guides/docker.md)
 - [Development](docs/development/development.md) · [Changelog](CHANGELOG.md)
