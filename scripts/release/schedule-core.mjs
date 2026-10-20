@@ -39,7 +39,7 @@ export function parseSchedule(text) {
 }
 
 /**
- * 计划里第一个还没有 tag 的版本。严格按顺序：后面的版本已经发了、前面的却没发，
+ * 计划里第一个还没有公开稳定 Release 的版本（草稿与正在打包的 tag 不算已发布）。严格按顺序：
  * 说明有人手动插过队，停下来让人看，不自己判断。
  */
 export function nextRelease(schedule, releasedTags) {
@@ -146,4 +146,64 @@ export function verifySnapshot({ git, entry, previousTag, mainRef = 'origin/main
 /** tag 正文 = Release 说明 = 应用内更新提示：第一行标题，下面是英文更新说明（与 v3.0.2 同格式）。 */
 export function tagMessage(version, englishNotes) {
   return `# ZeppBridge ${version}\n\n${englishNotes.trim()}\n`;
+}
+
+/** 兼容已冻结的 3.0.4 旧附件名；3.0.5 起使用带平台名称的新附件名。 */
+export function releaseAssetNames(version) {
+  const plain = compareVersions(version, '3.0.5') >= 0;
+  return {
+    windows: plain ? `ZeppBridge-${version}-Windows-Setup.exe` : `ZeppBridge_${version}_x64-setup.exe`,
+    msi: plain ? `ZeppBridge-${version}-Windows.msi` : `ZeppBridge_${version}_x64_en-US.msi`,
+    portable: plain ? `ZeppBridge-${version}-Windows-Portable.zip` : `ZeppBridge_${version}_x64-portable.zip`,
+    dmg: plain ? `ZeppBridge-${version}-macOS-AppleSilicon.dmg` : `ZeppBridge_${version}_aarch64.dmg`,
+    mac: plain ? `ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz` : `ZeppBridge_${version}_aarch64.app.tar.gz`,
+    deb: plain ? `ZeppBridge-${version}-Linux-x64.deb` : `ZeppBridge_${version}_amd64.deb`,
+    rpm: plain ? `ZeppBridge-${version}-Linux-x64.rpm` : `ZeppBridge_${version}_x86_64.rpm`,
+    appimage: plain ? `ZeppBridge-${version}-Linux-x64.AppImage` : `ZeppBridge_${version}_x86_64.AppImage`,
+    flatpak: plain ? `ZeppBridge-${version}-Linux-x64.flatpak` : `ZeppBridge_${version}_x86_64.flatpak`,
+    windowsTools: `zeppbridge-tools-${version}-x86_64-pc-windows-msvc.zip`,
+    macTools: `zeppbridge-tools-${version}-aarch64-apple-darwin.zip`,
+    linuxTools: `zeppbridge-tools-${version}-x86_64-unknown-linux-gnu.zip`,
+  };
+}
+
+export function parseChecksums(text) {
+  const sums = new Map();
+  for (const line of text.trim().split(/\r?\n/)) {
+    const match = /^([a-f0-9]{64})\s+\*?([^/\\\s]+)$/.exec(line);
+    if (!match || sums.has(match[2])) throw new Error('SHA256SUMS.txt 格式不正确或附件名重复');
+    sums.set(match[2], `sha256:${match[1]}`);
+  }
+  return sums;
+}
+
+/** 发布前只读取两份小元数据，逐项对比 GitHub 服务端摘要；不重新下载安装包。 */
+export function verifyPreparedRelease({ entry, release, notes, latest, checksums, repo }) {
+  const problems = [];
+  const normalized = (text) => String(text ?? '').replace(/\r\n/g, '\n').trim();
+  const body = tagMessage(entry.version, notes);
+  if (release.tag_name !== `v${entry.version}` || release.target_commitish !== entry.commit) problems.push('草稿的版本或冻结提交不一致');
+  if (!release.draft || release.prerelease) problems.push('待发布版本必须是非预发布的草稿');
+  if (normalized(release.body) !== normalized(body)) problems.push('草稿的更新说明与冻结快照不一致');
+  const names = releaseAssetNames(entry.version);
+  const expected = [...Object.values(names), 'latest.json', 'SHA256SUMS.txt'].sort();
+  const assets = release.assets ?? [];
+  if (JSON.stringify(assets.map((a) => a.name).sort()) !== JSON.stringify(expected)) problems.push('草稿的 14 个附件不齐全或含有额外文件');
+  for (const asset of assets) {
+    if (!(asset.size > 0) || !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? '') || asset.state !== 'uploaded') problems.push(`附件未完整上传：${asset.name}`);
+  }
+  const sums = parseChecksums(checksums);
+  if (sums.size !== expected.length - 1) problems.push('校验和清单的附件数量不正确');
+  for (const asset of assets) {
+    if (asset.name !== 'SHA256SUMS.txt' && sums.get(asset.name) !== asset.digest) problems.push(`附件摘要不一致：${asset.name}`);
+  }
+  if (latest.version !== entry.version || normalized(latest.notes) !== normalized(body)) problems.push('自动更新版本或说明不一致');
+  if (new Date(latest.pub_date).getTime() !== entry.notBefore.getTime()) problems.push('自动更新元数据的发布时间与计划不一致');
+  const platforms = { 'windows-x86_64': names.windows, 'windows-x86_64-portable': names.portable, 'darwin-aarch64': names.mac };
+  if (JSON.stringify(Object.keys(latest.platforms ?? {}).sort()) !== JSON.stringify(Object.keys(platforms).sort())) problems.push('自动更新平台不齐全');
+  for (const [platform, name] of Object.entries(platforms)) {
+    const item = latest.platforms?.[platform];
+    if (!item?.signature?.trim() || item.url !== `https://github.com/${repo}/releases/download/v${entry.version}/${name}`) problems.push(`自动更新签名或下载地址不正确：${platform}`);
+  }
+  return problems;
 }

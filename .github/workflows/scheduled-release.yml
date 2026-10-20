@@ -1,14 +1,28 @@
 name: Scheduled release
 
 # 按 .github/release-schedule.json 定时发布提前冻结好的版本（说明见 docs/releases/scheduling.md）。
-# 它只做三件事：核对、建附注 tag、触发 CI 在 tag 上打包；打包和建 Release 仍是 ci.yml 那一套。
+# 提前在 freeze 分支跑 CI 打包、核验并上传草稿；到点只建附注 tag 并公开已核验的草稿。
 #
 # 暂停：release-schedule.json 里 paused: true；最快的办法是 `gh workflow disable scheduled-release.yml`。
 # 紧急修复：Actions 页手动运行并填 version，跳过时间 / 批准 / 暂停，但不跳过检查。
 on:
   schedule:
+    # 北京时间 21:00 公开；GitHub cron 仍可能迟到，下面的每小时检查负责补偿。
+    - cron: '0 13 * * *'
     # 整点后错开一点，GitHub 的定时任务高峰会延迟甚至丢弃。
     - cron: '17 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-schedule.json'
+      - '.github/workflows/scheduled-release.yml'
+      - 'scripts/release/scheduled-release.mjs'
+      - 'scripts/release/prepare-release.mjs'
+      - 'scripts/release/schedule-core.mjs'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: ['freeze/**']
   workflow_dispatch:
     inputs:
       version:
@@ -23,6 +37,8 @@ on:
 permissions:
   contents: write
   actions: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: scheduled-release
@@ -30,13 +46,20 @@ concurrency:
 
 jobs:
   release:
-    name: Release the next frozen version when due
+    name: Prepare ahead and publish the next frozen version when due
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    env:
+      # 默认令牌建 tag 不触发第二轮打包；已提前完成打包，不再需要 RELEASE_TOKEN。
+      GH_TOKEN: ${{ github.token }}
+      URGENT_VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - name: Checkout main with tags
         uses: actions/checkout@v5
         with:
+          # workflow_run 带写权限，只执行受信任的 main；不检出触发事件提供的分支或提交。
+          ref: main
           fetch-depth: 0
 
       - name: Fetch freeze branches and tags
@@ -47,12 +70,67 @@ jobs:
         with:
           node-version: 22
 
-      - name: Release when due
+      - name: Check preparation and publication state
+        id: plan
+        run: node scripts/release/scheduled-release.mjs
+
+      - name: Download Windows installers from the frozen build
+        if: steps.plan.outputs.prepare_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.plan.outputs.prepare_run }}
+          name: zeppbridge-installers
+          path: .prepared-release/windows
+
+      - name: Download macOS bundle from the frozen build
+        if: steps.plan.outputs.prepare_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.plan.outputs.prepare_run }}
+          name: zeppbridge-macos
+          path: .prepared-release/macos
+
+      - name: Download Linux bundles from the frozen build
+        if: steps.plan.outputs.prepare_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.plan.outputs.prepare_run }}
+          name: zeppbridge-linux
+          path: .prepared-release/linux
+
+      - name: Download Flatpak bundle from the frozen build
+        if: steps.plan.outputs.prepare_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.plan.outputs.prepare_run }}
+          name: zeppbridge-flatpak
+          path: .prepared-release/flatpak
+
+      - name: Assemble and checksum release files
+        if: steps.plan.outputs.prepare_run != ''
         env:
-          # 有 RELEASE_TOKEN（细粒度个人令牌：contents + actions + workflows 写）就用它，
-          # 否则用默认令牌：默认令牌建的 tag 不触发 push，脚本会再手动触发一次 CI。
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-          TAG_TRIGGERS_CI: ${{ secrets.RELEASE_TOKEN != '' }}
-          URGENT_VERSION: ${{ inputs.version }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          PREPARE_VERSION: ${{ steps.plan.outputs.version }}
+          PREPARE_COMMIT: ${{ steps.plan.outputs.commit }}
+        run: node scripts/release/prepare-release.mjs
+
+      - name: Attest prepared release files
+        if: steps.plan.outputs.prepare_run != ''
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: .prepared-release/assets/*
+
+      - name: Upload and verify draft release
+        if: steps.plan.outputs.prepare_run != ''
+        env:
+          PREPARE_VERSION: ${{ steps.plan.outputs.version }}
+          PREPARE_COMMIT: ${{ steps.plan.outputs.commit }}
+          PREPARE_RUN_ID: ${{ steps.plan.outputs.prepare_run }}
+        run: node scripts/release/scheduled-release.mjs stage
+
+      - name: Publish prepared release if already due
+        if: steps.plan.outputs.prepare_run != ''
         run: node scripts/release/scheduled-release.mjs
