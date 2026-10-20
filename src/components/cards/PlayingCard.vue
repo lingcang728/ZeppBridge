@@ -81,7 +81,7 @@ const fit = computed(() => ({ '--fit': String(Math.max(faceFit(parts.value), par
         <span v-else class="pcard-value none">—</span>
         <span v-if="dots && dots.length" :class="['pcard-dots', { 'has-picked': dots.includes('picked') }]" aria-hidden="true" :style="{ '--cols': Math.min(7, dots.length) }"><i v-for="(on, i) in dots" :key="i" :class="{ on: on === true, picked: on === 'picked' }"></i></span>
       </span>
-      <span class="corner br" aria-hidden="true"><i></i><b v-if="corner">{{ corner }}</b></span>
+      <span class="corner br" aria-hidden="true"><b v-if="corner">{{ corner }}</b><i></i></span>
       <em v-if="badge" class="pcard-badge">{{ badge }}</em>
     </span>
     <span class="pcard-glow" aria-hidden="true"></span>

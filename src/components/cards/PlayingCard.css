@@ -49,10 +49,10 @@
 .pcard.group.empty { scale: .86; }
 .pcard.group.empty .pcard-face { background: var(--mat-raised); opacity: .62; }
 .pcard.group.empty::before, .pcard.group.empty::after { opacity: .3; }
-/* 角标：左上「周四 ◆」；右下只有花色点和日期数字，整枚倒过来（数字倒放像真扑克，汉字不倒放）。 */
+/* 角标：左上「周四 ◆」；右下「16 ◆」，只有日期数字和花色点。不倒放：屏幕上的牌不会被转过来看，倒放的数字只会被读错（16 倒过来像 91）。 */
 .corner { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-weight: 650; line-height: 1; white-space: nowrap; }
 .corner i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; background: var(--tint); transform: rotate(45deg); }
-.corner.br { justify-self: end; transform: rotate(180deg); }
+.corner.br { justify-self: end; }
 .corner.br b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .pcard-main { display: grid; align-content: center; justify-items: center; gap: calc(var(--w) * .04); min-width: 0; text-align: center; }
 .pcard-icon { color: var(--tint); }
