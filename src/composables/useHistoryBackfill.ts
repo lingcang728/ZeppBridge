@@ -320,14 +320,18 @@ export const useHistoryBackfill = (
   const retryFailed = async () => {
     busy.value = true;
     error.value = null;
+    let requeued = false;
     try {
       ledger.value = await backend.retryFailedBackfillChunks();
       message.value = t.value.retryFailedDone;
+      requeued = true;
     } catch (cause) {
       error.value = toUserMessage(cause, t.value.retryFailedFailed);
     } finally {
       busy.value = false;
     }
+    // 排好队就接着跑：只排队不跑，用户看到的仍是那排失败，还得再找「继续补拉」。
+    if (requeued) await runBackfill();
   };
 
   const resetLedger = async () => {

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import { whenFramesSteady } from '../lib/motion/steady';
 import { OPEN_EASE, REVEAL_MS } from '../lib/motion/timing';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 /**
  * 界面主题：深色 / 浅色 / 跟随系统。
@@ -93,7 +94,7 @@ let revealing: ViewTransitionHandle | null = null;
  */
 export const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
   const doc = document as ViewTransitionDocument;
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const reduced = lessMotion();
   if (revealing) {
     revealing.skipTransition();
     revealing = null;

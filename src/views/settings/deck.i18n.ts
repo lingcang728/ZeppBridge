@@ -58,6 +58,11 @@ export const deckMessages = defineMessages(
     themeDark: '深色',
     themeLight: '浅色',
     scaleSub: '100% 为设计基准，也可以用 Ctrl + / Ctrl -',
+    effectsLabel: '界面特效',
+    effectsSub: '低特效关掉毛玻璃和形变动画；自动 = Linux 上用低特效',
+    effectsAuto: '自动',
+    effectsFull: '完整',
+    effectsLite: '低特效',
 
   },
   {
@@ -113,6 +118,11 @@ export const deckMessages = defineMessages(
     themeDark: 'Dark',
     themeLight: 'Light',
     scaleSub: '100% is the design size; Ctrl + / Ctrl - also work',
+    effectsLabel: 'Visual effects',
+    effectsSub: 'Low turns off frosted glass and morphing animations; Auto uses Low on Linux',
+    effectsAuto: 'Auto',
+    effectsFull: 'Full',
+    effectsLite: 'Low',
 
   },
   {
@@ -168,6 +178,11 @@ export const deckMessages = defineMessages(
     themeDark: 'Oscuro',
     themeLight: 'Claro',
     scaleSub: '100 % es el tamaño de diseño; también funcionan Ctrl + / Ctrl -',
+    effectsLabel: 'Efectos visuales',
+    effectsSub: 'Reducidos quita el vidrio esmerilado y las animaciones de transformación; Automático los reduce en Linux',
+    effectsAuto: 'Automático',
+    effectsFull: 'Completos',
+    effectsLite: 'Reducidos',
 
   },
   'views/settings/deck',

@@ -84,6 +84,7 @@ V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动�
 | Windows 10/11 · x64 | 运行 `.exe` 安装包 | 主要开发与日常使用平台 |
 | macOS · Apple Silicon | 打开 `.dmg`，拖入「应用程序」 | V3 尚缺真机完整验证 |
 | Linux · x86_64 | 按发行版选择 `.deb`、`.rpm`、AppImage 或 Flatpak | V3 尚缺真机完整验证；见 [Linux 指南](docs/guides/linux.zh-CN.md) |
+| 服务器 / AI 智能体，无桌面 | CLI / MCP 工具包或 Docker | 见[没有桌面](#没有桌面服务器与-ai-智能体) |
 
 当前安装包未做系统代码签名。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。
 
@@ -122,6 +123,28 @@ V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动�
 | Linux | 通常为 `~/.local/share/zeppbridge/data`；Flatpak、AppImage 见 [Linux 指南](docs/guides/linux.zh-CN.md) |
 
 Windows 安装目录不可写时会使用用户数据目录；自定义目录以应用显示为准。
+
+### 没有桌面：服务器与 AI 智能体
+
+日常使用不一定要开桌面应用。NAS、家用服务器或跑 AI 智能体的机器上，用无界面工具：
+
+- **CLI 与 MCP 工具**：每个版本都有 `zeppbridge-tools-<版本>-<平台>.zip`，内含 `zeppbridge-cli`（同步、状态、导出，退出码可供脚本判断）和 `zeppbridge-mcp`（只读、走 stdio、不开端口的 MCP 服务）。见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
+- **Docker**：`packaging/docker` 可构建用于定时同步的无界面镜像。见 [Docker](docs/guides/docker.zh-CN.md)。
+
+登录仍需一次浏览器：在任意一台电脑的桌面应用里连上账号，再按 [Docker 指南](docs/guides/docker.zh-CN.md#怎么把凭据送进去) 把 `auth.json` 和令牌带过去。MCP 只读本地数据库，完全不需要令牌。
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) 在 `~/.hermes/config.yaml` 里加上：
+
+```yaml
+mcp_servers:
+  zeppbridge:
+    command: "/opt/zeppbridge/zeppbridge-mcp"   # 工具解压的位置
+    args: []                                     # 改成 ["--scope", "task"] 只开放应用任务页共享的部分
+    env:
+      ZEPPBRIDGE_DATA_DIR: "/home/you/zeppbridge/data"   # 数据目录的绝对路径
+```
+
+其他 MCP 客户端用各自的格式填同样的 `command` / `args` / `env`；JSON 写法见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
 
 ## 隐私与连接
 

@@ -12,6 +12,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { newWheelAccel, wheelSteps } from '../lib/wheel/momentum';
 import { useGlassLens } from '../composables/useGlassLens';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 const props = defineProps<{
   items: { value: number; label: string }[];
@@ -38,7 +39,7 @@ let lastTs = 0;
 const moving = ref(false);
 const last = () => props.items.length - 1;
 const clamp = (value: number) => Math.min(last(), Math.max(0, value));
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 const commit = () => {
   const item = props.items[Math.round(clamp(target))];

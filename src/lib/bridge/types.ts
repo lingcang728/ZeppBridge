@@ -423,6 +423,8 @@ export interface BridgeBackend {
     prompt: string,
     includePreciseRoute?: boolean,
   ): Promise<AiHandoffResult>;
+  /** 用系统浏览器打开 https 链接；AppImage 里会先剥掉运行时注入的库路径（Rust 侧 external_open.rs）。 */
+  openExternalUrl(url: string): Promise<void>;
 
   /* ---------- Beta1 分析任务命令（A7 P3；Rust 侧 `commands/ai_tasks.rs`） ---------- */
 

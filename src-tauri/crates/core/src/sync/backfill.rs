@@ -143,7 +143,13 @@ impl SyncManager {
             .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
         let end = chrono::NaiveDate::parse_from_str(&chunk.chunk_end, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
-        let window = FetchWindow::between(coverage::to_utc(start), coverage::to_utc(end))?;
+        // 当月那一块的结束日在未来；未来的日子 Zepp 按天的事件接口直接回 HTTP 400，
+        // 整块就被记成「部分写入」、重试也消不掉。只问到此刻为止。
+        let window_end = coverage::to_utc(end).min(Utc::now());
+        if window_end <= coverage::to_utc(start) {
+            return Ok((ChunkStatus::EmptyFromCloud, 0, None));
+        }
+        let window = FetchWindow::between(coverage::to_utc(start), window_end)?;
 
         let records = match chunk.stream.as_str() {
             "heart_rate" => self.fetcher.fetch_heart_rate_records(window).await,

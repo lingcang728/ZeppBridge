@@ -104,7 +104,10 @@ function Get-CargoTargetDir {
 # 版本号可以带预发布后缀（3.0.0-beta.4）。以前只认 x.y.z，于是 v3 的每一个
 # beta 安装包都认不出版本、永远不会被当成旧包清掉，release\ 里越积越多。
 function Get-VersionedArtifactVersion([string]$Name, [string]$ProductName) {
-  if ($Name -match "^$([regex]::Escape($ProductName))_(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)_") {
+  # 旧名 ZeppBridge_<版本>_x64-setup.exe，新名 ZeppBridge-<版本>-Windows-Setup.exe。
+  # 新名里版本后面紧跟 `-Windows`，预发布段要懒匹配，否则会把平台名吞进版本号；
+  # 真正判断「是不是当前版本」的是 Test-KeepReleaseFile 的前缀比对，这里只认出「带版本号」。
+  if ($Name -match "^$([regex]::Escape($ProductName))[_-](\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)??)[_-]") {
     return $Matches[1]
   }
   return $null
@@ -114,7 +117,7 @@ function Test-KeepReleaseFile([string]$Name, [string]$Version, [string]$ProductN
   if ($Name -ieq "$ProductName.exe") { return $true }
   $fileVersion = Get-VersionedArtifactVersion -Name $Name -ProductName $ProductName
   if ($null -eq $fileVersion) { return $true }
-  return $fileVersion -eq $Version
+  return $Name -match "^$([regex]::Escape($ProductName))[_-]$([regex]::Escape($Version))[_-]"
 }
 
 function Remove-OldVersionedArtifacts {
@@ -304,8 +307,11 @@ if (-not (Test-Path -LiteralPath $ReleaseDir -PathType Container)) {
 }
 
 $portableDest = Join-Path $ReleaseDir "$productName.exe"
+# Tauri 产出的文件名（找源文件用）和发到 Release 的文件名（3.0.5 起写人能看懂的平台）。
 $nsisName = "${productName}_${version}_x64-setup.exe"
 $msiName = "${productName}_${version}_x64_en-US.msi"
+$nsisReleaseName = "${productName}-${version}-Windows-Setup.exe"
+$msiReleaseName = "${productName}-${version}-Windows.msi"
 
 if (-not $UserEntryOnly) {
   $targetDir = Get-CargoTargetDir
@@ -356,7 +362,7 @@ if (-not $UserEntryOnly) {
   }
 
   if ($nsisSource) {
-    $nsisDest = Join-Path $ReleaseDir $nsisName
+    $nsisDest = Join-Path $ReleaseDir $nsisReleaseName
     Copy-WithRetry -Source $nsisSource.FullName -Destination $nsisDest
     Write-Host "已复制 NSIS：$nsisDest"
     $signaturePath = "$($nsisSource.FullName).sig"
@@ -377,7 +383,7 @@ if (-not $UserEntryOnly) {
       platforms = [ordered]@{
         'windows-x86_64' = [ordered]@{
           signature = $signature
-          url = "https://github.com/lingcang728/ZeppBridge/releases/download/v$version/$nsisName"
+          url = "https://github.com/lingcang728/ZeppBridge/releases/download/v$version/$nsisReleaseName"
           size = (Get-Item -LiteralPath $nsisDest).Length
         }
       }
@@ -385,7 +391,7 @@ if (-not $UserEntryOnly) {
     Write-Utf8NoBom -Path (Join-Path $ReleaseDir 'latest.json') -Content ($latest | ConvertTo-Json -Depth 6)
   }
   if ($msiSource) {
-    $msiDest = Join-Path $ReleaseDir $msiName
+    $msiDest = Join-Path $ReleaseDir $msiReleaseName
     Copy-WithRetry -Source $msiSource.FullName -Destination $msiDest
     Write-Host "已复制 MSI：$msiDest"
   }

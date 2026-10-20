@@ -8,6 +8,16 @@ const TOKEN: &str = "zbk_0123456789abcdef";
 
 /// 生命周期用例绑定的是临时端口而不是 43921：开发机上常常正好有一份
 /// ZeppBridge 在跑，用真实端口测出来的失败是环境冲突，不是产品行为。
+/// 端口已经放出来了：能重新绑上它，或者连过去被拒绝。
+///
+/// 只看「连不上」会误报：Linux 上对刚释放的临时端口发起连接，偶尔内核把源端口也挑成
+/// 同一个，自己连上自己（TCP simultaneous open），connect 就成功了（CI 上撞到过）。
+/// 只看「能绑上」也不行：Windows / macOS 上还有没关掉的已接受连接时会拒绝重绑。
+/// 两个都不成立，才说明那里真有东西在监听。
+fn port_is_released(address: &str) -> bool {
+    TcpListener::bind(address).is_ok() || ClientStream::connect(address).is_err()
+}
+
 fn ephemeral_address() -> String {
     let probe = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = probe.local_addr().unwrap().port();
@@ -275,15 +285,12 @@ fn enable_disable_cycle_binds_and_releases_the_port_without_restart() {
     let disabled = controller.set_enabled(false);
     assert!(!disabled.enabled && !disabled.running);
     assert!(!read_enabled_flag(&dir));
-    assert!(
-        ClientStream::connect(address.as_str()).is_err(),
-        "关闭后端口必须释放"
-    );
+    assert!(port_is_released(&address), "关闭后端口必须释放");
 
     // 关闭之后可以立即再次启用，端口没有被自己的旧 listener 占住。
     assert!(controller.set_enabled(true).running);
     controller.shutdown();
-    assert!(ClientStream::connect(address.as_str()).is_err());
+    assert!(port_is_released(&address));
 }
 
 /// 一个慢客户端不该把另一个正常客户端堵住。
@@ -355,7 +362,7 @@ fn disabling_does_not_wait_for_a_silent_client() {
         elapsed < Duration::from_millis(800),
         "关闭本机 API 等了 {elapsed:?}——shutdown 仍在 UI 线程 join worker"
     );
-    assert!(ClientStream::connect(address.as_str()).is_err());
+    assert!(port_is_released(&address));
 }
 
 #[test]

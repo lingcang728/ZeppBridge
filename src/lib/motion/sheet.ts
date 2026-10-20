@@ -9,6 +9,7 @@
  * 开好以后 clip-path 要撤掉，不然大卡的投影被裁掉；最后一小段把裁切框放到卡外（同心圆角），投影是一点点亮出来的，不在动画结束时「啪」地出现。
  */
 import { CLOSE_EASE, paced } from './timing';
+import { lessMotion } from './lessMotion';
 
 const CLOSE_MS = paced(380);
 const BLEED = 90;
@@ -69,7 +70,7 @@ export const leaveSheet = (el: Element, done: () => void) => {
   const panel = root.querySelector<HTMLElement>('.sheet-panel');
   const body = root.querySelector<HTMLElement>('.sheet-body');
   const veil = root.querySelector<HTMLElement>('.sheet-veil');
-  if (!panel || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+  if (!panel || lessMotion()) { done(); return; }
   root.style.pointerEvents = 'none';
   const style = getComputedStyle(panel);
   const now = style.transform;

@@ -2,6 +2,7 @@ import { dustLayer } from './ashDust';
 import { drawVisibleText, featherOf, grainsOf, TEXT_INK, type AshOrigin } from './ashGlyphs';
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
+import { lessMotion } from './lessMotion';
 
 /**
  * 一块浮层「化成灰飞走」（想法 1-2，2026-10-19）：更新卡点「知道了」，卡片从按钮那一角往对角一路碎成灰，
@@ -16,7 +17,7 @@ import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
  * 放完之后元素是看不见的；`veil` 的 `data-dissolved` 告诉弹窗收起时别再把它挂回去缩一遍（dialogFlight.close）。
  */
 export const ashDissolve = async (target: HTMLElement, origin: AshOrigin, veil?: HTMLElement | null): Promise<boolean> => {
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  if (lessMotion()) return false;
   if (!target.isConnected) return false;
   const width = window.innerWidth;
   const height = window.innerHeight;

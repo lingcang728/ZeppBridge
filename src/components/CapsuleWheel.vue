@@ -19,6 +19,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
 import { useGlassLens } from '../composables/useGlassLens';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 export type WheelItem<T extends string | number> = { value: T; label: string; icon?: IconName; image?: string };
 
@@ -82,7 +83,7 @@ const animating = ref(false);
 
 /** 相邻两项之间的空隙（沿圆柱表面量），px。 */
 const GAP = 12;
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 const measure = () => {
   sizes.value = itemEls.value.map((el) => (vertical.value ? el.offsetHeight : el.offsetWidth));

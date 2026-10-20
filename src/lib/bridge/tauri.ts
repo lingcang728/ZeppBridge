@@ -455,6 +455,10 @@ export const tauriBackend: BridgeBackend = {
     return call<ExportResult>('save_fit_export', { selection, directory });
   },
 
+  openExternalUrl(url: string) {
+    return call<void>('open_external_url', { url });
+  },
+
   prepareAiHandoff(selection: ExportSelection, prompt: string, includePreciseRoute = false) {
     return call<AiHandoffResult>('prepare_ai_handoff', {
       selection,
