@@ -46,6 +46,7 @@
 | 暂停（记在仓库里） | `node scripts/release/freeze.mjs pause`，提交推送；`resume` 恢复 |
 | 改某一版的时间 | `node scripts/release/freeze.mjs move 3.0.4 --at <时间>`，提交推送 |
 | 撤掉还没发的一版 | `node scripts/release/freeze.mjs remove 3.0.5`，提交推送 |
+| 已冻结（甚至已批准）的一版还要补修复 | 修复提交到 main → `git branch -D freeze/v3.0.5` → `freeze.mjs add 3.0.5 --at <原时间>`（会变回未批准）→ 提交计划，`git push origin main`，再 `git push --force-with-lease=freeze/v3.0.5:<旧快照 SHA> origin freeze/v3.0.5` → 等新快照的 CI 绿、重新自测后 `approve`。更新说明加了行要等 12 种语言补齐再冻结 |
 | 严重 bug 马上发 | Actions → Scheduled release → Run workflow，填 `version`。跳过时间、批准和暂停，**不跳过检查**，也只能是计划里的下一版 |
 | 只看检查结果 | 同上，勾 `dry_run`；本地：`DRY_RUN=1 node scripts/release/scheduled-release.mjs` |
 | 看计划 | `node scripts/release/freeze.mjs list` |
