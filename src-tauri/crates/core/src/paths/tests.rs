@@ -466,6 +466,29 @@ fn does_not_attach_foreign_wal_to_existing_destination_db() {
     let _ = fs::remove_dir_all(root);
 }
 
+/// `ZEPPBRIDGE_DATA_DIR` 或开发版指到别处时，装好的应用那份库原地不动。
+#[test]
+fn the_live_library_is_never_relocated_into_another_data_dir() {
+    let flat = PathBuf::from("/Users/a/Library/Application Support/com.zeppbridge.ZeppBridge");
+    let live = flat.join("data");
+    let custom = PathBuf::from("/tmp/zeppbridge-custom");
+    let candidates = vec![flat.clone(), live.clone()];
+
+    assert_eq!(
+        relocation_sources(&custom, candidates.clone(), Some(&live)),
+        vec![flat.clone()]
+    );
+    // Windows：AppData 那份照旧搬进安装目录旁边。
+    assert_eq!(
+        relocation_sources(&custom, candidates.clone(), None),
+        vec![flat.clone(), live.clone()]
+    );
+    assert_eq!(
+        relocation_sources(&live, candidates, Some(&live)),
+        vec![flat]
+    );
+}
+
 #[test]
 fn atomic_write_replaces_an_existing_file() {
     let dir = std::env::temp_dir().join(format!(

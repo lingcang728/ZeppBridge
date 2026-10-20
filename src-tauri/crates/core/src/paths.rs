@@ -417,10 +417,8 @@ pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
 /// 目的地已有的文件照旧一个不覆盖（`zepp.db` 在就整组不动）。
 pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
     let mut failed = Vec::new();
-    for source in legacy_source_dirs() {
-        if source == data_dir {
-            continue;
-        }
+    let live = live_user_data_dir();
+    for source in relocation_sources(data_dir, legacy_source_dirs(), live.as_deref()) {
         if let Err(error) = relocate_from(&source, data_dir) {
             failed.push(format!("{}（{error}）", source.display()));
         }
@@ -432,6 +430,32 @@ pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
             "旧版 AppData 数据迁移未完全成功（{}）。应用仍可启动，现有文件未被覆盖。",
             failed.join("、")
         ))
+    }
+}
+
+/// 哪些旧目录该搬进 `data_dir`。
+///
+/// `live` 是装好的应用正在用的库（macOS 的 Application Support、Linux 的 XDG
+/// 目录）。它也在 `legacy_source_dirs()` 里，可它不是旧版遗留：`ZEPPBRIDGE_DATA_DIR`
+/// 指到别处、或者从 `target/` 跑一次开发版，都会把整个库连同凭据挪走，装好的
+/// 应用下次打开就是一个空库。Windows 上传 `None`：那里 `%APPDATA%` 的库本来就
+/// 该搬进安装目录旁边。
+fn relocation_sources(
+    data_dir: &Path,
+    candidates: Vec<PathBuf>,
+    live: Option<&Path>,
+) -> Vec<PathBuf> {
+    candidates
+        .into_iter()
+        .filter(|source| source != data_dir && Some(source.as_path()) != live)
+        .collect()
+}
+
+fn live_user_data_dir() -> Option<PathBuf> {
+    if cfg!(windows) {
+        None
+    } else {
+        user_data_dir().ok()
     }
 }
 
