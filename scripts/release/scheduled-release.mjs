@@ -104,7 +104,8 @@ function publish(entry, draft) {
 
 // 兼容升级流程时仍在按旧 tag 工作流构建的 3.0.3，不并行创建第二份 Release。
 function waitForLegacyTag(entry) {
-  const runs = pages(`actions/workflows/ci.yml/runs?branch=v${entry.version}&per_page=5`, 'workflow_runs');
+  // REST 的 branch 筛选未返回标签上的手动运行；按 SHA 查询后再核对标签名。
+  const runs = runsFor(entry.commit).filter((r) => r.head_branch === `v${entry.version}`);
   if (runs.some((r) => r.status !== 'completed')) {
     say(`v${entry.version} 已有 tag，旧发布构建还在运行；等待它完成。`);
     return;
