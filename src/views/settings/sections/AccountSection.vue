@@ -11,13 +11,16 @@ import { whyHalfDataMessages } from '../../../components/WhyHalfData.i18n';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSyncController } from '../../../composables/useSyncController';
 import { revealWeeklyReport } from '../../../lib/revealWeeklyReport';
-import { useMessages } from '../../../i18n';
+import { locale, useMessages } from '../../../i18n';
+import { openFaq } from '../../../lib/faqLink';
+import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { accountCardMessages } from './account.i18n';
 
 const d = useMessages(deckMessages);
 const a = useMessages(accountCardMessages);
 const w = useMessages(whyHalfDataMessages);
+const t = useMessages(settingsMessages);
 /* 「为什么有些数据没有？」常驻在这张卡上：只连官方授权的人看到一半数据时，第一个来找的就是这里。 */
 const whyOpen = ref(false);
 const { appStatus, isSyncing, syncProgress, dataReady, pickUpReady } = useSyncController();
@@ -102,7 +105,7 @@ const action = computed<Action | null>(() => {
       </div>
       <!-- 官方授权在等浏览器那边：说清楚会自动连上，也给一个马上去查的按钮（浏览器显示已授权、这里还在等的时候）。 -->
       <div v-if="official.waiting.value" class="s-row">
-        <div class="s-row-main"><span class="s-row-sub">{{ a.waitingHint }}</span></div>
+        <div class="s-row-main"><span class="s-row-sub">{{ a.waitingHint }}</span><button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button></div>
         <div class="s-row-control">
           <button class="button secondary" type="button" :disabled="official.checking.value" @click="official.checkNow">{{ a.checkNow }}</button>
         </div>

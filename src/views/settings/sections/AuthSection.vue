@@ -4,7 +4,8 @@ import { computed } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
-import { useMessages } from '../../../i18n';
+import { locale, useMessages } from '../../../i18n';
+import { openFaq } from '../../../lib/faqLink';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 
@@ -42,6 +43,7 @@ const needsAttention = computed(() =>
           <span class="s-row-sub">{{ official.waiting.value ? t.officialWaiting : t.officialSub }}</span>
           <span v-if="official.connected.value" class="s-row-sub">{{ t.officialNote }}</span>
           <span v-if="official.waiting.value && official.status.value.authorize_url" class="s-row-sub">{{ t.copyAuthLinkHint }}</span>
+          <button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button>
         </div>
         <div class="s-row-control">
           <template v-if="official.waiting.value">

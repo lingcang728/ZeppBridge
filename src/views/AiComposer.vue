@@ -317,6 +317,10 @@ onDeactivated(() => { paused.value = true; });
       <RouterLink v-if="history.exchanges.value.length" to="/ai/exchanges" class="exchanges-pill" data-sheet="exchanges">
         {{ s.exchanges(history.exchanges.value.length) }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
+      <!-- MCP 一键接入早就在设置 → AI 卡里，但没人知道（3.0.6）：这里放一枚胶囊直达。不写 ChatGPT：它不接本机 stdio MCP。 -->
+      <RouterLink v-if="!hub.demo.value" to="/settings/ai" class="exchanges-pill mcp-pill" :title="s.mcpPillHint">
+        <Icon name="terminal" :size="13" />{{ s.mcpPill }}<Icon name="chevron-right" :size="13" />
+      </RouterLink>
       <div v-if="hub.demo.value" class="demo-banner" role="status"><Icon name="database" :size="14" /><div><strong>{{ t.fullDemo }}</strong><span>{{ t.demoHint }}</span></div></div>
       <div class="head-tools">
         <Transition name="undo-fade">

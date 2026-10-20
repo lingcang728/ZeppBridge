@@ -13,6 +13,7 @@
  */
 import { computed, ref } from 'vue';
 import Icon from '../../Icon.vue';
+import GlassSwitch from '../../GlassSwitch.vue';
 import HandoffSteps from '../HandoffSteps.vue';
 import ReceiveCapsule from '../bridge/ReceiveCapsule.vue';
 import { isDesktop } from '../../../lib/bridge';
@@ -24,6 +25,7 @@ import type { HandoffStep, HandoffStepId } from '../../../composables/useAiTaskH
 import { useHandoffText } from '../HandoffDock.i18n';
 import { useStageText } from './stage.i18n';
 import { useHandoffLead } from './useHandoffLead';
+import { autoPasteOn, autoSupported, setAutoPaste } from '../../../composables/ai/useAutoHandoff';
 
 const props = defineProps<{
   ready: AiTaskPrepareResult | null; provider: string; providerIcon: string; stale: boolean; recalled: boolean;
@@ -39,6 +41,12 @@ const failed = computed(() => Object.values(props.steps).some((step) => step.sta
 /** 只留一句最要紧的提醒：收回了 > 文件旧了 > 拖不出去 > 任务没存上。 */
 const note = computed(() => (props.recalled ? s.value.notOpened : props.stale ? t.value.stale : dragFailed.value ? t.value.dragFailed : props.saveError));
 const lead = useHandoffLead(() => props.provider);
+/* 「全自动」藏在设置里没人知道（3.0.6）：Windows 上第一次看到回执时就地提示一次、带开关。
+   出现过就记下，以后不再出现；这一张回执上一直留着，拨回去也来得及。 */
+const TIP_KEY = 'zeppbridge.ai.autoTipSeen';
+const tipSeen = () => { try { return window.localStorage.getItem(TIP_KEY) === '1'; } catch { return true; } };
+const showAutoTip = ref(autoSupported() && !autoPasteOn.value && !tipSeen());
+if (showAutoTip.value) { try { window.localStorage.setItem(TIP_KEY, '1'); } catch { /* 记不住就只这一次 */ } }
 const onFileDrag = (event: MouseEvent) => {
   const path = props.ready?.md_path;
   if (!desktop || !path || event.button !== 0 || (event.target as HTMLElement).closest('.reveal')) return;
@@ -68,6 +76,11 @@ const onFileDrag = (event: MouseEvent) => {
     </div>
     <p v-else-if="ready" class="hint">{{ t.outputAt(ready.output_dir) }}</p>
     <p class="hint lead" role="status">{{ lead }}</p>
+    <div v-if="showAutoTip" class="auto-tip">
+      <span>{{ s.autoTip }}</span>
+      <GlassSwitch :model-value="autoPasteOn" :aria-label="s.autoTip" @update:model-value="setAutoPaste" />
+      <button type="button" class="tip-close" :title="s.autoTipClose" :aria-label="s.autoTipClose" @click="showAutoTip = false"><Icon name="x" :size="12" /></button>
+    </div>
     <p v-if="note" class="note" role="status">{{ note }}</p>
     <HandoffSteps v-if="failed" class="steps" :steps="steps" :provider-label="provider" @retry="emit('retry', $event)" />
 
@@ -116,6 +129,11 @@ h3 { margin: 0; font-size: var(--fs-md); font-weight: 700; line-height: 1.3; }
 .reveal { position: absolute; z-index: 1; right: 8px; bottom: 12px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--subtle); cursor: pointer; }
 .reveal:hover { background: var(--glass-press); color: var(--ink); }
 .hint { flex: 0 0 auto; margin: -4px 0 0; color: var(--subtle); font-size: var(--fs-2xs); line-height: 1.5; }
+.auto-tip { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin: -6px 0 0; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.auto-tip span { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: var(--fs-2xs); line-height: 1.45; }
+.tip-close { display: grid; flex: 0 0 auto; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--subtle); cursor: pointer; }
+.tip-close:hover { background: var(--glass-press); color: var(--ink); }
+.tip-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .note { margin: -6px 0 0; color: var(--warning); font-size: var(--fs-2xs); line-height: 1.5; }
 .steps { font-size: var(--fs-2xs); }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

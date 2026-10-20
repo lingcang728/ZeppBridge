@@ -5,6 +5,7 @@
   color: var(--muted); font-size: var(--fs-xs); font-weight: 650; text-decoration: none; transition: color var(--dur-base) ease; }
 .exchanges-pill:hover { color: var(--ink); }
 .exchanges-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mcp-pill { gap: 5px; padding-left: 12px; }
 .demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
 .demo-banner div { display: flex; flex-direction: column; gap: 2px; }
 .demo-banner strong { color: var(--accent); font-size: 12px; font-weight: 650; }
