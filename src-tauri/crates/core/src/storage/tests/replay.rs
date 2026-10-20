@@ -493,7 +493,7 @@ fn replaying_workout_summaries_does_not_erase_the_detail_series() {
 
 /// 坏 raw 不能吞掉、也不能把整轮重放打成 Err，更不能因此盖章。
 #[test]
-fn replay_quarantines_bad_raw_without_stamping_or_aborting() {
+fn replay_quarantines_bad_raw_and_still_stamps_after_one_full_pass() {
     let db = Database::in_memory().unwrap();
     db.insert_raw_record(&RawRecord {
         stream: "workouts".into(),
@@ -572,10 +572,16 @@ fn replay_quarantines_bad_raw_without_stamping_or_aborting() {
         .parse()
         .unwrap();
     assert!(failures >= 1, "failures = {failures}");
-    assert_ne!(
+    // 同一版规则再跑一遍结果不会变：走完一整遍就推进修订号，失败的留在隔离表里。
+    // 以前不推进，每推一次修订号都要整库重放两遍（3.0.3 / 3.0.4 的真实库都是这样）。
+    assert_eq!(
         db.stored_normalizer_revision().unwrap().as_deref(),
         Some(NORMALIZER_REVISION),
-        "有新失败就不能推进修订号"
+        "走完一整遍就推进修订号"
+    );
+    assert!(
+        db.pending_replay_plan().unwrap().is_none(),
+        "隔离过的报文不能让下次启动再欠一遍重放"
     );
     let raw_kept: i64 = db
         .conn
