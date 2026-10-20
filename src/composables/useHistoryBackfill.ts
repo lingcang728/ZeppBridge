@@ -267,6 +267,12 @@ export const useHistoryBackfill = (
               message.value = copy().stoppedByUser(remaining.value);
               break;
             }
+            // 重新开跑就换回进度：一轮补拉要几分钟，不换的话「本地维护进行中」会一直
+            // 挂到这一轮跑完，看起来像还在等维护（10-20 用户报过）。
+            message.value = copy().roundProgress(
+              ledger.value?.completed_chunks ?? 0,
+              ledger.value?.total_chunks ?? 0,
+            );
             continue;
           }
           throw cause;
