@@ -48,6 +48,7 @@ npm run version:check   # are the eight version numbers consistent
 npm run budget:check    # first-screen size budget (build first)
 npm run i18n:check      # no hardcoded Chinese; backend codes have English copy
 npm run docs:check      # repo-internal documentation links resolve
+npm run lockfile:check  # package-lock resolved URLs point at registry.npmjs.org (npm 12 refuses mirrors)
 ```
 
 `npm test` concentrates on one rule: **missing must never be displayed as 0**. A
