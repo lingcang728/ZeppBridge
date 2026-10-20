@@ -6,10 +6,7 @@ fn migration_lock_contention_returns_busy_and_preserves_the_database() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-cli-migration-busy-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("zepp.db");

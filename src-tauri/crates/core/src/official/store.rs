@@ -158,10 +158,7 @@ impl OfficialStore {
         let text = serde_json::to_string_pretty(meta)
             .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
         // 临时文件名每次不同：两个写者共用一个固定名字会互相覆盖半截内容。
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or_default();
+        let nonce = crate::unique_suffix();
         let temp = self
             .dir
             .join(format!("{META_FILE}.{}.{nonce}.tmp", std::process::id()));

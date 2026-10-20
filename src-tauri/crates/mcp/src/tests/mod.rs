@@ -15,10 +15,7 @@ impl TestLibrary {
         // `open_migrated` 里报「无法建立写入锁：No such file or directory」。
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let serial = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let nonce = zeppbridge_core::unique_suffix();
         let dir = std::env::temp_dir().join(format!(
             "zeppbridge-mcp-test-{}-{nonce}-{serial}",
             std::process::id()

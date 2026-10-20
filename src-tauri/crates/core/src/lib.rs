@@ -28,3 +28,19 @@ pub mod training_plan;
 pub mod workout_climbs;
 
 pub mod storage;
+
+/// 临时文件、临时目录名的唯一后缀：纳秒时间戳 + 进程内序号。进程号由调用方另外带上。
+///
+/// 只用时间戳不够：macOS 的系统时钟只精确到微秒，两个并行测试在同一微秒里拿到同一个名字，
+/// `create_dir` 报 AlreadyExists（3.0.6 的 `fit_override` 测试在 macOS CI 上就这么挂的，
+/// 7350d07c 修过同一类）。写盘的临时文件同理：同一进程两个线程撞名会互相覆盖半截内容。
+/// 序号让同一进程里永不重复，时间戳让前一次运行留下的同名残留几乎不可能撞上。
+pub fn unique_suffix() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    format!("{nanos}-{}", NEXT.fetch_add(1, Ordering::Relaxed))
+}

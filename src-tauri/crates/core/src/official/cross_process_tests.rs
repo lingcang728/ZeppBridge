@@ -103,10 +103,7 @@ fn temp_dir() -> PathBuf {
         "zeppbridge-official-xproc-{}-{}-{}",
         std::process::id(),
         SERIAL.fetch_add(1, Ordering::Relaxed),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     dir

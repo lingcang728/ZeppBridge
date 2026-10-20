@@ -36,10 +36,7 @@ fn file_credentials_survive_a_normal_macos_launch() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-macos-credentials-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     fs::create_dir_all(&dir).unwrap();
     // Simulate an upgrade with metadata pointing at an inaccessible Keychain.
