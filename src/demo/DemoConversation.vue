@@ -8,6 +8,7 @@ import Icon from '../components/Icon.vue';
 import { useTrainingPlan } from '../composables/useTrainingPlan';
 import type { DemoPlan } from './plan';
 import type { DemoTurn } from './presentation';
+import { lessMotion } from '../lib/motion/lessMotion';
 const emit = defineEmits<{ review: [] }>();
 const dialog = ref<HTMLDialogElement | null>(null), feed = ref<HTMLElement | null>(null);
 const copy = computed(() => JOURNEY[locale.value]);
@@ -35,7 +36,7 @@ const scroll = async (reply = false) => {
   if (!el) return;
   const last = reply ? el.querySelector<HTMLElement>('.message-pair:last-child .answer') : null;
   el.scrollTo({ top: last ? el.scrollTop + last.getBoundingClientRect().top - el.getBoundingClientRect().top - 20 : el.scrollHeight,
-    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    behavior: lessMotion() ? 'instant' : 'smooth' });
 };
 const review = async () => {
   const api = (window as unknown as { __ZB_DEMO_API__: { receivePlan(): void; plan: DemoPlan } }).__ZB_DEMO_API__;

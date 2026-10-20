@@ -53,9 +53,11 @@ const CACHE_SECONDS = 300;
  * 支持」，而事实是构建挂了——那比一个明确的错误更难被发现。
  */
 const requiredAssetPatterns = {
-  windowsExe: /^ZeppBridge_[^/]+_x64-setup\.exe$/,
-  windowsMsi: /^ZeppBridge_[^/]+_x64_en-US\.msi$/,
-  macosDmg: /^ZeppBridge_[^/]+_aarch64\.dmg$/,
+  // 3.0.5 起附件名写人能看懂的平台（ZeppBridge-3.0.5-Windows-Setup.exe）；旧名照认，
+  // 「最后一次好的 Release」可能还是旧版本。
+  windowsExe: /^ZeppBridge(?:_[^/]+_x64-setup|-[^/]+-Windows-Setup)\.exe$/,
+  windowsMsi: /^ZeppBridge(?:_[^/]+_x64_en-US|-[^/]+-Windows)\.msi$/,
+  macosDmg: /^ZeppBridge(?:_[^/]+_aarch64|-[^/]+-macOS-AppleSilicon)\.dmg$/,
 };
 
 /*
@@ -71,10 +73,10 @@ const requiredAssetPatterns = {
  * 页面上、等哪天验证过了再有人记得去删。
  */
 const optionalAssetPatterns = {
-  linuxDeb: /^ZeppBridge_[^/]+_amd64\.deb$/,
-  linuxRpm: /^ZeppBridge_[^/]+_x86_64\.rpm$/,
-  linuxAppImage: /^ZeppBridge_[^/]+_x86_64\.AppImage$/,
-  linuxFlatpak: /^ZeppBridge_[^/]+_x86_64\.flatpak$/,
+  linuxDeb: /^ZeppBridge(?:_[^/]+_amd64|-[^/]+-Linux-x64)\.deb$/,
+  linuxRpm: /^ZeppBridge(?:_[^/]+_x86_64|-[^/]+-Linux-x64)\.rpm$/,
+  linuxAppImage: /^ZeppBridge(?:_[^/]+_x86_64|-[^/]+-Linux-x64)\.AppImage$/,
+  linuxFlatpak: /^ZeppBridge(?:_[^/]+_x86_64|-[^/]+-Linux-x64)\.flatpak$/,
 };
 
 /** 哪些下载项还没有经过真实设备验证。 */

@@ -20,6 +20,7 @@ import CapsuleWheel from '../CapsuleWheel.vue';
 import { locale, LOCALE_LABELS, LOCALES, type Locale } from '../../i18n';
 import { useTourText } from './tour.i18n';
 import { onMotionEscape } from '../../lib/motion/interrupt';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const emit = defineEmits<{ (event: 'start'): void; (event: 'skip'): void }>();
 const t = useTourText();
@@ -49,7 +50,7 @@ const FADE_MS = 420;
 const SOFT = 0.16;
 let timer = 0;
 let running: Animation[] = [];
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 const wait = (ms: number) => new Promise<void>((resolve) => { timer = window.setTimeout(resolve, ms); });
 let cycle = 0;
 

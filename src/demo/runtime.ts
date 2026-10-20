@@ -86,6 +86,12 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     return { items: all.slice(offset, offset + limit), total: all.length };
   };
 
+  const openUrl = (url: unknown) => {
+    hostPost('open-url', { url: String(url ?? '') });
+    if (/chatgpt|claude|kimi|gemini|deepseek|qwen/i.test(String(url))) window.dispatchEvent(new Event('demo-handoff'));
+    return null;
+  };
+
   const handlers: Record<string, Handler> = {
     app_is_ready: () => true,
     'plugin:app|version': () => FALLBACK_APP_VERSION,
@@ -96,7 +102,9 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     },
     'plugin:event|unlisten': () => null,
     'plugin:webview|set_webview_zoom': () => null,
-    'plugin:opener|open_url': (args) => { hostPost('open-url', { url: String(args.url ?? '') }); if (/chatgpt|claude|kimi|gemini|deepseek|qwen/i.test(String(args.url))) window.dispatchEvent(new Event('demo-handoff')); return null; },
+    'plugin:opener|open_url': (args) => openUrl(args.url),
+    // 交给 AI 打开网站走自家命令（AppImage 要先剥库路径），演示里同样只转给宿主页。
+    open_external_url: (args) => openUrl(args.url),
     'plugin:opener|reveal_item_in_dir': () => null,
     'plugin:drag|start_drag': () => null,
     set_tray_locale: () => null,

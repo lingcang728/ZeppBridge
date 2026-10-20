@@ -29,6 +29,7 @@ import { issueDate } from '../../lib/trainingPlan/week';
 import { documentIndexOf, workoutToInput } from '../../lib/trainingPlan/edit';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import type { PlanDocument, PlanSport, PlanWorkout } from '../../types/trainingPlan';
+import { lessMotion } from '../../lib/motion/lessMotion';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiPlanDay' });
@@ -109,7 +110,7 @@ const titleBox = ref<HTMLElement | null>(null);
 watch(date, async (now, before) => {
   dayDir.value = before && now < before ? 'prev' : 'next';
   await nextTick();
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (lessMotion()) return;
   const heading = titleBox.value?.querySelector<HTMLElement>('#ai-day-title');
   const dx = dayDir.value === 'next' ? 18 : -18;
   heading?.animate([{ opacity: 0, transform: `translateX(${dx}px)` }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2, .8, .2, 1)' });

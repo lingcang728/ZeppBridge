@@ -1,4 +1,4 @@
-import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ref } from 'vue';
 import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import type { AiHandoffResult, ExportSelection } from '../types';
@@ -57,7 +57,7 @@ export const openProviderSite = async (provider: AiProvider): Promise<'opened' |
     throw new Error(copy().targetNotAllowed);
   }
   if (!isTauri()) return 'skipped';
-  await openUrl(provider.url);
+  await tauriApi.openExternalUrl(provider.url);
   return 'opened';
 };
 
@@ -123,7 +123,7 @@ export function useAiHandoff() {
 
     if (!loadSeq.isCurrent(seq)) return result;
     try {
-      await openUrl(provider.url);
+      await tauriApi.openExternalUrl(provider.url);
       if (loadSeq.isCurrent(seq)) {
         handoffState.value = result.mode === 'attachment' ? 'attachment' : 'opened';
       }

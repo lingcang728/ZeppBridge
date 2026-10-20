@@ -16,6 +16,7 @@ import { OPEN_EASE, paced } from '../../lib/motion/timing';
 import { openSheet, sheetOrigin } from '../../lib/motion/sheet';
 import { whenFramesSteady } from '../../lib/motion/steady';
 import { useBridgeText } from './bridge/bridge.i18n';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const props = defineProps<{ name: string }>();
 const router = useRouter();
@@ -24,7 +25,7 @@ const panel = ref<HTMLElement | null>(null);
 const veil = ref<HTMLElement | null>(null);
 const body = ref<HTMLElement | null>(null);
 const OPEN_MS = paced(480);
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 const close = () => { void router.push('/ai'); };
 
 let releaseEscape: (() => void) | null = null;

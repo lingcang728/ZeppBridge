@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref } from 'vue';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 /**
  * 一个会「弹到整数格」的连续下标，给 coverflow 这类拖着转、松手吸附的控件用。
@@ -28,7 +29,7 @@ export const useSpringIndex = (options: {
     const n = Math.max(1, options.count());
     return options.wrap ? ((value % n) + n) % n : value;
   };
-  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const reduced = () => lessMotion();
 
   const tick = (ts: number) => {
     const dt = Math.min(34, lastTs ? ts - lastTs : 16.7) / 1000;

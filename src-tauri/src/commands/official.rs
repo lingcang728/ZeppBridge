@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_opener::OpenerExt;
 use zeppbridge_core::models::ZeppBridgeError;
 use zeppbridge_core::official::{
     invalidate_pending_logins, AuthorizationRequest, ClaimOutcome, OfficialClient, OfficialStore,
@@ -217,11 +216,8 @@ pub async fn start_official_login(
     let Some((cancel, generation, wake)) = begin_flow(request.start_url())? else {
         return Ok(stored_status(&state.data_dir));
     };
-    if app
-        .opener()
-        .open_url(request.start_url(), None::<&str>)
-        .is_err()
-    {
+    // AppImage 里要先把运行时注入的库路径剥掉，浏览器才起得来（见 external_open.rs）。
+    if crate::external_open::open_url(&app, &request.start_url()).is_err() {
         clear_flow();
         return Err(AppError::new(
             "err.official.browser",

@@ -10,6 +10,7 @@ import {
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
 import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater } from '../lib/motion/focusTarget';
 import { whenFramesSteady } from '../lib/motion/steady';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 type Rect = WindowRect;
 
@@ -56,7 +57,7 @@ const bigEnough = (el: Element | null): boolean => {
 };
 const radiusOf = (el: Element) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22;
 const r1 = (value: number) => Number(value.toFixed(1));
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 /** 被点的链接所在的那张卡：链接本身够大就是它，否则往外找最近的一块板。 */
 const cardOfLink = (link: HTMLElement): HTMLElement | null => {

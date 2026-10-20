@@ -32,6 +32,7 @@ import { dragThumb, FLICK_VELOCITY, snapStop, type SegmentStop } from '../lib/na
 import { flickDeform, liftRect, rubberStretch, squash, stretchLimit } from '../lib/segmentGlass';
 import { useGlassLens } from '../composables/useGlassLens';
 import { exemptFromSettle } from '../lib/motion/interrupt';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 /** `title`：标签是缩写时的全名（悬停提示和读屏用）。 */
 export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName; title?: string };
@@ -151,7 +152,7 @@ const DROP_MS = 260;
 const LIFT_EASE = 'cubic-bezier(.3, 1.45, .45, 1)';
 const DROP_EASE = 'cubic-bezier(.25, .8, .3, 1)';
 
-const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => lessMotion();
 
 const buttons = () => Array.from(track.value?.querySelectorAll<HTMLElement>('.segment-item') ?? []);
 const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({

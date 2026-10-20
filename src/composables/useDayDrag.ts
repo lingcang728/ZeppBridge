@@ -9,6 +9,7 @@
  * - 键盘替代：格子上的 ← / → 和相邻一天交换（BridgeFuture 里），Delete 删掉这天。
  */
 import { nextTick, onBeforeUnmount, ref, type Ref } from 'vue';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 const SPRING = 'cubic-bezier(.34, 1.36, .64, 1)';
 const SETTLE = 'cubic-bezier(.4, .6, .2, 1)';
@@ -30,7 +31,7 @@ export const useDayDrag = (options: {
   let cells: Cell[] = [];
   let moved = false;
   let swallowClick = false;
-  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const reduced = () => lessMotion();
 
   const cellsNow = (): Cell[] => [...(options.root.value?.querySelectorAll<HTMLElement>('[data-day]') ?? [])]
     .map((el) => ({ el, date: el.dataset.day ?? '', rect: el.getBoundingClientRect() }));

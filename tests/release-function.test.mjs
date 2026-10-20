@@ -40,6 +40,30 @@ test('projects the three user-facing installers from a stable release', () => {
   assert.equal(result.downloads.macosDmg.digest, 'sha256:macos');
 });
 
+test('3.0.5 plain-language asset names are recognised, Linux and the portable zip included', () => {
+  const name = (file) => ({ name: file, browser_download_url: `https://example.test/${file}`, size: 1, digest: null });
+  const result = projectLatestRelease({
+    ...releaseFixture(),
+    tag_name: 'v3.0.5',
+    assets: [
+      'ZeppBridge-3.0.5-Windows-Setup.exe',
+      'ZeppBridge-3.0.5-Windows.msi',
+      'ZeppBridge-3.0.5-Windows-Portable.zip',
+      'ZeppBridge-3.0.5-macOS-AppleSilicon.dmg',
+      'ZeppBridge-3.0.5-macOS-AppleSilicon.app.tar.gz',
+      'ZeppBridge-3.0.5-Linux-x64.deb',
+      'ZeppBridge-3.0.5-Linux-x64.rpm',
+      'ZeppBridge-3.0.5-Linux-x64.AppImage',
+      'ZeppBridge-3.0.5-Linux-x64.flatpak',
+    ].map(name),
+  });
+  assert.equal(result.downloads.windowsExe.name, 'ZeppBridge-3.0.5-Windows-Setup.exe');
+  assert.equal(result.downloads.windowsMsi.name, 'ZeppBridge-3.0.5-Windows.msi');
+  assert.equal(result.downloads.macosDmg.name, 'ZeppBridge-3.0.5-macOS-AppleSilicon.dmg');
+  assert.equal(result.downloads.linuxAppImage.name, 'ZeppBridge-3.0.5-Linux-x64.AppImage');
+  assert.equal(result.downloads.linuxFlatpak.name, 'ZeppBridge-3.0.5-Linux-x64.flatpak');
+});
+
 test('rejects an incomplete release instead of serving the wrong file', () => {
   const fixture = releaseFixture();
   fixture.assets = fixture.assets.filter((asset) => !asset.name.endsWith('.dmg'));

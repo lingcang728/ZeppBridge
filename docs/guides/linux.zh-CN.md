@@ -34,16 +34,16 @@ flatpak run com.zeppbridge.app
 
 脚本只要求宿主机上有 `flatpak`、`flatpak-builder` 和 `elfutils`（提供 `eu-strip`，flatpak-builder 剥调试信息时要用），别的都不需要——Rust 和 Node 来自 Flatpak 的 SDK 扩展，不会往系统里装任何工具链。全程 `--user`，不需要 root。
 
-加 `--bundle` 还会额外产出一个可直接安装的单文件：`release/ZeppBridge_<版本>_x86_64.flatpak`。
+加 `--bundle` 还会额外产出一个可直接安装的单文件：`release/ZeppBridge-<版本>-Linux-x64.flatpak`。
 
 ### deb / rpm / AppImage
 
 从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载：
 
 ```bash
-sudo apt install ./ZeppBridge_<版本>_amd64.deb      # Debian、Ubuntu
-sudo dnf install ./ZeppBridge_<版本>_x86_64.rpm     # Fedora、RHEL
-chmod +x ZeppBridge_<版本>_x86_64.AppImage && ./ZeppBridge_<版本>_x86_64.AppImage
+sudo apt install ./ZeppBridge-<版本>-Linux-x64.deb      # Debian、Ubuntu
+sudo dnf install ./ZeppBridge-<版本>-Linux-x64.rpm     # Fedora、RHEL
+chmod +x ZeppBridge-<版本>-Linux-x64.AppImage && ./ZeppBridge-<版本>-Linux-x64.AppImage
 ```
 
 这些包没有签名。Linux 上没有和 Windows/macOS 对应的代码签名体系，所以请用发布页的 `SHA256SUMS.txt` 核对下载。
@@ -153,7 +153,7 @@ CI 编的不能。（GL / DRM 那一层——`libEGL`、`libGL`、`libgbm`、`li
 ```bash
 # 通过 XWayland 强制走 X11。这不是应用的默认行为：在没装 XWayland 的纯 Wayland
 # 系统上，它是把一种打不开换成另一种，所以这个决定留给你，不由我们替你做。
-GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
 
 # 显式关掉合成（AppImage 版本已经自己这么做了；如果你装的是 deb/rpm/Flatpak
 # 却有同样的症状，在这里设它）。

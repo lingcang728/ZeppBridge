@@ -358,3 +358,14 @@ summary { cursor: pointer; }
 .tl-row, .le-timeline > li { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
 .page-revisit :is(.tl-row, .le-timeline > li) { animation: none; }
 @media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }
+
+
+/* ── 低特效（composables/useEffects.ts，Linux 默认开，issue #133）──────────────────
+   WebKitGTK 为了不白屏关掉了 DMABUF 渲染，剩下的路径扛不住整页背景滤镜：翻页要好几秒。
+   这里一律换成不透明的玻璃底色；动画那一半在 lib/motion/lessMotion.ts。放在文件最后，
+   盖过 tokens.css 里 `html[data-theme="light"]` 同等优先级的玻璃 token。 */
+html[data-effects="lite"] { --glass: var(--mat-glass-strong); --glass-blur: none; --mat-glass-blur: none; }
+html[data-effects="lite"] *, html[data-effects="lite"] *::before, html[data-effects="lite"] *::after {
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+html[data-effects="lite"] :is(.tl-row, .le-timeline > li) { animation: none; }

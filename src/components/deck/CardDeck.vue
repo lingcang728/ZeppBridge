@@ -23,6 +23,7 @@ import { staggerOrder } from '../../lib/deck/morph';
 import { wrapIndex } from '../../lib/deck/physics';
 import { deferSettle, onMotionEscape } from '../../lib/motion/interrupt';
 import { defineMessages, useMessages } from '../../i18n';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const messages = defineMessages(
   {
@@ -86,7 +87,7 @@ defineSlots<{
   quick?(props: { card: C }): unknown;
 }>();
 
-const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => lessMotion();
 
 /* —— 总览形态：coverflow 还是平铺。记在本机，下次进来还是用户上次选的那种。
    默认平铺：coverflow 一次只读得清中间三张（正对面那张完全透明），只想改个保留时间的人

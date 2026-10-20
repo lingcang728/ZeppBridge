@@ -25,6 +25,7 @@ import { addStep, removeStep, setRepeat, setStepLength, setStepTarget, setText, 
 import type { PlanDocument, PlanIssue, PlanSport, PlanStepLength, PlanTarget, PlanVariant, PlanWorkout } from '../../types/trainingPlan';
 import { usePlanText } from './usePlanText';
 import { useEditorText } from './editor.i18n';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const props = defineProps<{
   workout: PlanWorkout;
@@ -131,7 +132,7 @@ const describe = (segment: ProfileSegment) => {
 
 /* 展开 / 收起：高度平滑过渡（只这一块，360ms 开、300ms 收）。 */
 const EASE = 'cubic-bezier(.4, .6, .2, 1)';
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 const grow = (el: Element, done: () => void) => {
   if (reduced()) { done(); return; }
   const h = (el as HTMLElement).scrollHeight;

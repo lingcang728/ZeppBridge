@@ -581,6 +581,28 @@ pub async fn set_workout_type_override(
     workout.ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
 }
 
+/// 用系统浏览器打开一个 https 链接（交给 AI 时打开 AI 网站）。
+///
+/// 不直接在前端调 opener 插件：AppImage 里浏览器会继承运行时注入的库路径而起不来，
+/// 要先剥掉（external_open.rs）。只收 https，前端另有固定的 AI 站点白名单。
+#[tauri::command]
+pub fn open_external_url(app: tauri::AppHandle, url: String) -> std::result::Result<(), AppError> {
+    let parsed = tauri::Url::parse(&url)
+        .map_err(|_| AppError::new("err.open_url.not_allowed", "只能打开 https 链接"))?;
+    if parsed.scheme() != "https" || parsed.host_str().is_none() || !parsed.username().is_empty() {
+        return Err(AppError::new(
+            "err.open_url.not_allowed",
+            "只能打开 https 链接",
+        ));
+    }
+    crate::external_open::open_url(&app, parsed.as_str()).map_err(|_| {
+        AppError::new(
+            "err.open_url.failed",
+            "没能打开系统浏览器，请检查默认浏览器设置后重试",
+        )
+    })
+}
+
 /// Open the application's local data directory in the platform file manager.
 #[tauri::command]
 pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Result<(), AppError> {
@@ -617,16 +639,12 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
     // 的标准入口，deb / rpm / Flatpak / AppImage 四条渠道都有。
     #[cfg(target_os = "linux")]
     {
-        std::process::Command::new("xdg-open")
-            .arg(&state.data_dir)
-            .spawn()
-            .map(|_| ())
-            .map_err(|error| {
-                AppError::new(
-                    "err.data_folder.open_failed",
-                    format!("打开数据文件夹失败: {error}"),
-                )
-            })
+        crate::external_open::open_folder(&state.data_dir).map_err(|error| {
+            AppError::new(
+                "err.data_folder.open_failed",
+                format!("打开数据文件夹失败: {error}"),
+            )
+        })
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]

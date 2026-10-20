@@ -2,6 +2,7 @@ mod app_state;
 mod clipboard_files;
 mod commands;
 mod diagnostics;
+mod external_open;
 mod ipc_error;
 mod ipc_types;
 mod local_api;
@@ -38,16 +39,16 @@ use commands::{
     get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
     get_workout_detail, get_workout_fit_override, get_workout_insight, get_workout_page,
     get_workout_series, get_workout_type_options, import_workout_fit, list_backups,
-    list_life_events, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
-    remove_workout_fit, reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks,
-    run_database_integrity_check, save_fit_export, save_life_event, save_mcp_bundle,
-    set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
-    set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
-    start_history_sync, start_incremental_sync, start_official_login, start_web_login,
-    submit_device_model_assignment, submit_diagnostic_report, system_region_locale,
-    training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,
-    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state,
-    training_plan_update_draft, verify_auth, verify_backup,
+    list_life_events, manual_auth, open_data_folder, open_external_url, prepare_ai_handoff,
+    probe_data_capabilities, remove_workout_fit, reprocess_local_data, reset_coverage_ledger,
+    retry_failed_backfill_chunks, run_database_integrity_check, save_fit_export, save_life_event,
+    save_mcp_bundle, set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference,
+    set_user_prefs, set_workout_code_label, set_workout_type_override, stage_restore,
+    start_history_backfill, start_history_sync, start_incremental_sync, start_official_login,
+    start_web_login, submit_device_model_assignment, submit_diagnostic_report,
+    system_region_locale, training_plan_adherence, training_plan_discard, training_plan_preview,
+    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
+    training_plan_state, training_plan_update_draft, verify_auth, verify_backup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -717,6 +718,7 @@ pub fn run() {
             cleanup_old_data,
             compact_raw_payloads,
             open_data_folder,
+            open_external_url,
             updates::silent::update_start,
             updates::silent::update_view,
             updates::silent::update_apply,

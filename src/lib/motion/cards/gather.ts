@@ -9,6 +9,7 @@
  * 减少动效时什么都不放，直接返回。
  */
 import { CLOSE_EASE, OPEN_EASE, paced } from '../timing';
+import { lessMotion } from '../lessMotion';
 
 const GATHER_MS = paced(460);
 const STAGGER_MS = paced(45);
@@ -22,7 +23,7 @@ export interface CardFlight {
   returnHome: () => Promise<void>;
 }
 
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 const finished = (animations: Animation[]) => Promise.all(animations.map((a) => a.finished.catch(() => undefined))).then(() => undefined);
 
 export const gatherCards = (cards: HTMLElement[]): CardFlight => {

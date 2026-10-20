@@ -94,6 +94,7 @@ Installers and release notes are on [Releases](https://github.com/lingcang728/Ze
 | Windows 10/11 · x64 | Run the `.exe` installer | Main development and daily-use platform |
 | macOS · Apple Silicon | Open the `.dmg` and drag the app into Applications | V3 not yet fully verified on a real machine |
 | Linux · x86_64 | Pick `.deb`, `.rpm`, AppImage or Flatpak for your distribution | V3 not yet fully verified on a real machine; see the [Linux guide](docs/guides/linux.md) |
+| Server or AI agent, no desktop | CLI / MCP tools package or Docker | See [Without a desktop](#without-a-desktop-servers-and-ai-agents) |
 
 The installers are not code-signed yet. Windows may warn about an unknown publisher, and macOS may block the app from opening. Only allow it to run, following your system's prompt, once you have checked where the download came from and decided to trust the app. To build V3 from source, see [Development](docs/development/development.md).
 
@@ -129,6 +130,28 @@ Use the same Zepp account for both connections. Which metrics are available depe
 | Linux | Usually `~/.local/share/zeppbridge/data`; for Flatpak and AppImage see the [Linux guide](docs/guides/linux.md) |
 
 If the Windows install folder is not writable, the app uses your user data folder instead; a custom location is whatever the app shows.
+
+### Without a desktop: servers and AI agents
+
+The desktop app is not needed day to day. On a NAS, a home server or a machine where an AI agent runs, use the headless tools instead:
+
+- **CLI and MCP tools.** Each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
+- **Docker.** `packaging/docker` builds a headless image for scheduled syncs. See [Docker](docs/guides/docker.md).
+
+Signing in still needs a browser once: connect the account in the desktop app on any machine, then bring `auth.json` and the token over as the [Docker guide](docs/guides/docker.md#getting-the-credentials-in) describes. MCP only reads the local database and needs no token at all.
+
+For [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp), add this to `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  zeppbridge:
+    command: "/opt/zeppbridge/zeppbridge-mcp"   # where you unpacked the tools
+    args: []                                     # ["--scope", "task"] limits it to what the app's task page shares
+    env:
+      ZEPPBRIDGE_DATA_DIR: "/home/you/zeppbridge/data"   # absolute path to the library
+```
+
+Other MCP clients take the same `command` / `args` / `env` in their own format; the [CLI and MCP](docs/reference/cli-and-mcp.md#example-configuration) page has the JSON version.
 
 ## Privacy and connections
 

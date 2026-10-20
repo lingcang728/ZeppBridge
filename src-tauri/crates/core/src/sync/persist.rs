@@ -221,7 +221,12 @@ impl SyncManager {
                 db.record_stream_stage(&stream, Stage::Parse, &StageOutcome::Ok)?;
                 db.record_stream_stage(&stream, Stage::Write, &StageOutcome::Ok)?;
             }
-            Err(error) if error.is_unavailable() && capability == CapabilityStatus::Unverified => {
+            // 云端明确回了空集合：哪怕这条流的结构还没逐字段核实，「空」也不是「看不懂」。
+            Err(error)
+                if error.is_unavailable()
+                    && capability == CapabilityStatus::Unverified
+                    && !crate::normalizer::payload_is_explicitly_empty(&record.raw.payload) =>
+            {
                 report.status = StreamStatus::Unverified;
                 report.capability = CapabilityStatus::Unverified;
                 report.message = Some(error.user_message());

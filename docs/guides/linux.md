@@ -45,16 +45,16 @@ Rust and Node come from Flatpak SDK extensions, so no toolchain is installed
 system-wide. Everything is `--user`; it never asks for root.
 
 `--bundle` also writes a single installable file to
-`release/ZeppBridge_<version>_x86_64.flatpak`.
+`release/ZeppBridge-<version>-Linux-x64.flatpak`.
 
 ### deb / rpm / AppImage
 
 Download from [Releases](https://github.com/lingcang728/ZeppBridge/releases):
 
 ```bash
-sudo apt install ./ZeppBridge_<version>_amd64.deb      # Debian, Ubuntu
-sudo dnf install ./ZeppBridge_<version>_x86_64.rpm     # Fedora, RHEL
-chmod +x ZeppBridge_<version>_x86_64.AppImage && ./ZeppBridge_<version>_x86_64.AppImage
+sudo apt install ./ZeppBridge-<version>-Linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./ZeppBridge-<version>-Linux-x64.rpm     # Fedora, RHEL
+chmod +x ZeppBridge-<version>-Linux-x64.AppImage && ./ZeppBridge-<version>-Linux-x64.AppImage
 ```
 
 These builds are not signed. There is no code-signing story on Linux equivalent
@@ -210,7 +210,7 @@ will not start, these are the escape hatches, in the order worth trying:
 # Force X11 through XWayland. Not the app's default: on a pure Wayland system
 # with no XWayland installed this trades one failure for another, so it is
 # yours to decide, not ours.
-GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
 
 # Turn compositing off explicitly (the AppImage build already does this; set it
 # here if you are on a deb/rpm/Flatpak install that shows the same symptom).

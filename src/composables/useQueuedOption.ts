@@ -1,4 +1,5 @@
 import { onBeforeUnmount, shallowRef, watch, type Ref } from 'vue';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 /**
  * 图表换数据时排队：一帧只让一张图 setOption。
@@ -33,7 +34,7 @@ const enqueue = (owner: object, job: () => void) => {
 export const useQueuedOption = <T>(source: Ref<T>): Ref<T> => {
   const owner = {};
   const shown = shallowRef(source.value) as Ref<T>;
-  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const reduced = () => lessMotion();
   watch(source, (value) => {
     // 从「没图」变成「有图」（或反过来）是换组件，不是换数据：直接给，别让卡片空着等。
     if (value === null || shown.value === null || reduced()) {

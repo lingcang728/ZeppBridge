@@ -28,6 +28,7 @@
 import { exemptFromSettle, onMotionEscape } from './interrupt';
 import { whenFramesSteady } from './steady';
 import { paced } from './timing';
+import { lessMotion } from './lessMotion';
 
 export interface FlightOrigin {
   /** 点开它的元素；关的时候它还在就重新量一次（页面可能滚过）。 */
@@ -43,7 +44,7 @@ const CLOSE_EASE = 'cubic-bezier(.4, 0, .7, .2)';
 /** 起点不是 0：透明度为 0 的层 Chromium 可能不合成，第一帧可见时才去光栅化，又是一跳。 */
 const NEARLY_HIDDEN = 0.001;
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 /** 最近一次按下的位置：键盘打开、或者打开它的按钮已经没了时，退而从这里长出来。 */
 let lastPress: { x: number; y: number } | null = null;

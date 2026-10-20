@@ -495,9 +495,9 @@ jobs:
         with:
           name: zeppbridge-installers
           path: |
-            release/ZeppBridge_*-setup.exe
-            release/ZeppBridge_*.msi
-            release/ZeppBridge_*_x64-portable.zip
+            release/ZeppBridge-*-Windows-Setup.exe
+            release/ZeppBridge-*-Windows.msi
+            release/ZeppBridge-*-Windows-Portable.zip
             release/zeppbridge-tools-*.zip
             release/latest.json
           if-no-files-found: error
@@ -557,15 +557,15 @@ jobs:
           mkdir -p release-macos
 
           dmg=$(ls "$bundle"/dmg/*.dmg)
-          cp "$dmg" "release-macos/ZeppBridge_${version}_aarch64.dmg"
+          cp "$dmg" "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.dmg"
 
           # The updater consumes the .app.tar.gz, never the dmg. A missing
           # signature would advertise an unverifiable update, so fail here
           # rather than publish a half-signed latest.json.
           cp "$bundle/macos/ZeppBridge.app.tar.gz" \
-             "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz"
+             "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz"
           cp "$bundle/macos/ZeppBridge.app.tar.gz.sig" \
-             "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz.sig"
+             "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz.sig"
           ls -la release-macos
 
       - name: Package CLI and MCP tools
@@ -697,9 +697,9 @@ jobs:
             echo "  ${matches[0]}  ->  $dest"
           }
 
-          take_one "$bundle/deb/*.deb"           "release-linux/ZeppBridge_${version}_amd64.deb"
-          take_one "$bundle/rpm/*.rpm"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
-          take_one "$bundle/appimage/*.AppImage" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
+          take_one "$bundle/deb/*.deb"           "release-linux/ZeppBridge-${version}-Linux-x64.deb"
+          take_one "$bundle/rpm/*.rpm"           "release-linux/ZeppBridge-${version}-Linux-x64.rpm"
+          take_one "$bundle/appimage/*.AppImage" "release-linux/ZeppBridge-${version}-Linux-x64.AppImage"
 
       # 让 AppImage 用宿主机的 Wayland 库，而不是 CI runner 的那一份。
       #
@@ -731,7 +731,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release-linux
-          image=$(ls ZeppBridge_*_x86_64.AppImage)
+          image=$(ls ZeppBridge-*-Linux-x64.AppImage)
           chmod +x "$image"
           ./"$image" --appimage-extract >/dev/null
 
@@ -818,7 +818,7 @@ jobs:
             flatpak flatpak-builder elfutils
 
       - name: Build and export the bundle
-        # --bundle 会写 release/ZeppBridge_<version>_x86_64.flatpak；
+        # --bundle 会写 release/ZeppBridge-<version>-Linux-x64.flatpak；
         # --no-install 是因为 CI 上没人要运行它，装一遍只是浪费几分钟。
         run: ./packaging/flatpak/build-flatpak.sh --bundle --no-install
 
@@ -826,7 +826,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: zeppbridge-flatpak
-          path: release/ZeppBridge_*.flatpak
+          path: release/ZeppBridge-*.flatpak
           if-no-files-found: error
           retention-days: 14
 
@@ -927,8 +927,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           node scripts/release/merge-latest-json.mjs \
             --windows-latest release/latest.json \
-            --mac-signature "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz.sig" \
-            --mac-asset "ZeppBridge_${version}_aarch64.app.tar.gz" \
+            --mac-signature "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz.sig" \
+            --mac-asset "ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz" \
             --version "$version" \
             --repo "${GITHUB_REPOSITORY}" \
             --out release/latest.json
@@ -966,16 +966,16 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           : > SHA256SUMS.txt
-          for file in release/ZeppBridge_*-setup.exe release/ZeppBridge_*.msi \
-                      release/ZeppBridge_*_x64-portable.zip \
+          for file in release/ZeppBridge-*-Windows-Setup.exe release/ZeppBridge-*-Windows.msi \
+                      release/ZeppBridge-*-Windows-Portable.zip \
                       release/zeppbridge-tools-*.zip release-macos/zeppbridge-tools-*.zip \
                       release-linux/zeppbridge-tools-*.zip \
-                      "release-macos/ZeppBridge_${version}_aarch64.dmg" \
-                      "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
-                      release-linux/ZeppBridge_*.deb \
-                      release-linux/ZeppBridge_*.rpm \
-                      release-linux/ZeppBridge_*.AppImage \
-                      release-linux/ZeppBridge_*.flatpak \
+                      "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.dmg" \
+                      "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz" \
+                      release-linux/ZeppBridge-*.deb \
+                      release-linux/ZeppBridge-*.rpm \
+                      release-linux/ZeppBridge-*.AppImage \
+                      release-linux/ZeppBridge-*.flatpak \
                       release/latest.json; do
             sha256sum "$file" | sed "s#[^ ]*/##" >> SHA256SUMS.txt
           done
@@ -986,18 +986,18 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            release/ZeppBridge_*-setup.exe
-            release/ZeppBridge_*.msi
-            release/ZeppBridge_*_x64-portable.zip
+            release/ZeppBridge-*-Windows-Setup.exe
+            release/ZeppBridge-*-Windows.msi
+            release/ZeppBridge-*-Windows-Portable.zip
             release/zeppbridge-tools-*.zip
             release-macos/zeppbridge-tools-*.zip
-            release-macos/ZeppBridge_*.dmg
-            release-macos/ZeppBridge_*.app.tar.gz
+            release-macos/ZeppBridge-*.dmg
+            release-macos/ZeppBridge-*.app.tar.gz
             release-linux/zeppbridge-tools-*.zip
-            release-linux/ZeppBridge_*.deb
-            release-linux/ZeppBridge_*.rpm
-            release-linux/ZeppBridge_*.AppImage
-            release-linux/ZeppBridge_*.flatpak
+            release-linux/ZeppBridge-*.deb
+            release-linux/ZeppBridge-*.rpm
+            release-linux/ZeppBridge-*.AppImage
+            release-linux/ZeppBridge-*.flatpak
 
       - name: Publish GitHub Release
         # Idempotent: skips if the release already exists.
@@ -1017,18 +1017,18 @@ jobs:
             notes_args=(--generate-notes)
           fi
           gh release create "${GITHUB_REF_NAME}" \
-            release/ZeppBridge_*-setup.exe \
-            release/ZeppBridge_*.msi \
-            release/ZeppBridge_*_x64-portable.zip \
+            release/ZeppBridge-*-Windows-Setup.exe \
+            release/ZeppBridge-*-Windows.msi \
+            release/ZeppBridge-*-Windows-Portable.zip \
             release/zeppbridge-tools-*.zip \
             release-macos/zeppbridge-tools-*.zip \
             release-linux/zeppbridge-tools-*.zip \
-            "release-macos/ZeppBridge_${version}_aarch64.dmg" \
-            "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
-            release-linux/ZeppBridge_*.deb \
-            release-linux/ZeppBridge_*.rpm \
-            release-linux/ZeppBridge_*.AppImage \
-            release-linux/ZeppBridge_*.flatpak \
+            "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.dmg" \
+            "release-macos/ZeppBridge-${version}-macOS-AppleSilicon.app.tar.gz" \
+            release-linux/ZeppBridge-*.deb \
+            release-linux/ZeppBridge-*.rpm \
+            release-linux/ZeppBridge-*.AppImage \
+            release-linux/ZeppBridge-*.flatpak \
             release/latest.json \
             SHA256SUMS.txt \
             --title "ZeppBridge ${version}" \

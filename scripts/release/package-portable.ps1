@@ -40,7 +40,7 @@ New-Item -ItemType Directory -Path $stage | Out-Null
 Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'ZeppBridge.exe')
 Copy-Item -LiteralPath $mcp -Destination (Join-Path $stage 'zeppbridge-mcp.exe')
 
-$zipName = "ZeppBridge_${version}_x64-portable.zip"
+$zipName = "ZeppBridge-${version}-Windows-Portable.zip"
 $zip = Join-Path $release $zipName
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
