@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { echoTitle, leadParagraph, lettersBetween, parseEcho, parseLetter } from '../letters/parse';
-import { STAMP_DESIGNS, stampDesign, stampFace } from '../letters/stamp';
+import { stampFace } from '../letters/stamp';
 import { archiveSpan } from '../letters/personal';
 
 describe('letters', () => {
@@ -41,12 +41,6 @@ describe('letters', () => {
   it('prints the minor version on a stamp, and the full version for patch releases', () => {
     expect(stampFace('3.1.0')).toBe('3.1');
     expect(stampFace('3.0.7')).toBe('3.0.7');
-  });
-  it('gives neighbouring versions different stamps, and a beta the same stamp as its release', () => {
-    expect(stampDesign('3.1.0')).not.toBe(stampDesign('3.1.1'));
-    expect(stampDesign('3.1.0')).not.toBe(stampDesign('3.2.0'));
-    expect(stampDesign('3.1.0-beta.2')).toBe(stampDesign('3.1.0'));
-    expect(STAMP_DESIGNS).toContain(stampDesign('not-a-version'));
   });
 
   it('only states the archive span when there is at least a month of data', () => {

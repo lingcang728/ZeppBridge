@@ -2,23 +2,20 @@
 /**
  * 一枚邮票（批次 6）：厚的米白纸、细密齿孔、票面一幅小画，右上角黑色衬线面值。
  * 票面：作者给这一版画了图（docs/releases/letters/<版本>/stamp.*，规格见 docs/releases/README.md）就用它；
- * 没有就用 ZeppBridge 自己的一套（StampArt.vue，按版本轮换，2026-10-21 用户：别用通用的风景图）。
+ * 没有就贴默认那枚（StampArt.vue：海拔山形，面值照样印这一版的版本号）。
  * 横版，外框 124 × 100，票面 108 × 84，从 (8, 8) 起。
  *
  * 不用 SVG 滤镜和混合模式（2026-10-21：信封翻面时这些要逐帧重画，录屏里整段翻面被跳过）：
  * 纸边的厚度是往右下错开一点的一层暗色齿孔外形，纸纹是一张自带透明度的颗粒图（assets/letters/paper-speck.png）。
  */
 import { computed, useId } from 'vue';
-import { stampDesign, stampFace } from '../../lib/letters/stamp';
+import { stampFace } from '../../lib/letters/stamp';
 import { useStampImage } from '../../services/letters';
 import StampArt from './StampArt.vue';
 import speck from '../../assets/letters/paper-speck.png';
 
 const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number }>(), { width: 92, tilt: 0 });
 const face = computed(() => stampFace(props.version));
-const design = computed(() => stampDesign(props.version));
-/* 深底的票面，面值印成浅色。 */
-const lightInk = computed(() => !image.value && design.value === 'sleep');
 const image = useStampImage(() => props.version);
 const id = `stamp-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
@@ -52,11 +49,11 @@ const holes = computed(() => {
     </g>
     <g :clip-path="`url(#${id}-face)`">
       <image v-if="image" :href="image" x="8" y="8" width="108" height="84" preserveAspectRatio="xMidYMid slice" />
-      <g v-else transform="translate(8 8)"><StampArt :design="design" /></g>
+      <g v-else transform="translate(8 8)"><StampArt /></g>
       <!-- 印在纸上：票面也透一点纸纹，四边压一圈淡淡的油墨边。 -->
       <rect x="8" y="8" width="108" height="84" :fill="`url(#${id}-grain)`" opacity=".55" />
       <rect x="8" y="8" width="108" height="84" class="face-edge" />
-      <text :class="['denomination', { light: lightInk }]" x="111" y="22" text-anchor="end">{{ face }}</text>
+      <text class="denomination" x="111" y="22" text-anchor="end">{{ face }}</text>
     </g>
   </svg>
 </template>
@@ -69,5 +66,4 @@ const holes = computed(() => {
   font: 400 15px/1 Georgia, 'Times New Roman', 'Songti SC', serif; fill: #1b1915; letter-spacing: -.02em;
   paint-order: stroke; stroke: rgb(246 241 229 / .5); stroke-width: 1.6;
 }
-.denomination.light { fill: #f6efdc; stroke: rgb(20 25 40 / .4); }
 </style>
