@@ -8,7 +8,7 @@ import WhyHalfData from '../WhyHalfData.vue';
 import ReleaseNotesList from './ReleaseNotesList.vue';
 import LetterEnvelope from '../letters/LetterEnvelope.vue';
 import { letterVersions } from '../../services/letters';
-import { lettersBetween } from '../../lib/letters/parse';
+import { baseVersion, lettersBetween } from '../../lib/letters/parse';
 import {
   acknowledgeUpdate, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale, releaseRows, updateNotice,
 } from '../../services/updateNotice';
@@ -69,7 +69,7 @@ const star = () => {
 </script>
 
 <template>
-  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="receipt.version" :notes="groups" :origin="origin()" @done="acknowledgeUpdate" />
+  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="baseVersion(receipt.version)" :notes="groups" :origin="origin()" @done="acknowledgeUpdate" />
   <ModalDialog v-else-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
     <div class="release-card">
       <header class="release-header">
