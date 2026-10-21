@@ -4,9 +4,10 @@
  * - 纸：暖灰米白，细密的棉浆纸颗粒（assets/letters/paper-tooth.png，按左上来光算出来的凹凸，soft-light 叠上去），没有花纹。
  * - 封盖：一大片三角压在上面，尖是圆的；边上有一道纸厚的亮边，底下投一层很淡的影子。
  * - 折边：底片和两侧折片几乎同色，只靠一条细亮线（纸边受光）和极淡的影子分开；底片伸进封盖下面，两片是叠着的。
- * - 背面不写地址；火漆压在封盖尖上，邮票贴右上角，邮戳是几道波浪线掠过邮票左下角。
+ * - 两面（2026-10-21 采纳用户转来的建议）：正面写「寄自 / 致」，邮票贴右上角，邮戳（圆戳带收信日期 + 波浪线）掠过邮票左下角；
+ *   背面只有封舌和火漆。邮票不在封舌上，拆信时封舌翻起来、邮票不动也不会被撕坏。
  *
- * state：sealed 封着 → opening 封盖翻开、信纸往上抽出 → leaving 信封往下沉、淡掉（信纸已经变成外面那张信纸）。
+ * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：sealed 封着 → opening 封盖翻开、信纸往上抽出 → leaving 信封往下沉、淡掉（信纸已经变成外面那张信纸）。
  * 立体感（用户 2026-10-21：「注重立体感」）：光从左上来——左折片朝光偏亮、右折片背光偏暗、封盖最亮；
  * 封盖和底片往右下投影；信封四边是折过来的圆边（上左亮、下右暗），中间因为装着信微微鼓起；底下贴桌一圈实影。
  * 翻封盖用 rotateX，前后层次靠离散的 z-index 关键帧换；其余都只动 transform / opacity。
@@ -17,9 +18,13 @@ import Postmark from './Postmark.vue';
 
 withDefaults(defineProps<{
   version: string;
+  face?: 'front' | 'back';
   state?: 'sealed' | 'opening' | 'leaving' | 'still';
   bundled?: number;
-}>(), { state: 'still', bundled: 0 });
+  date?: string | null;
+  to?: string;
+  from?: string;
+}>(), { face: 'back', state: 'still', bundled: 0, date: null, to: '', from: '' });
 const id = `env-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 /* 160 × 100 的坐标。封盖尖在 (80, 60)，圆角。底片不和封盖尖对尖：它往上伸到 (80, 31) 附近、压在封盖下面，
  * 两条边在火漆两侧钻进封盖底下——上下两片叠着、火漆封住叠口，才是旧时封信的样子（2026-10-21 用户指出）。 */
@@ -30,10 +35,11 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
 </script>
 
 <template>
-  <div :class="['envelope', `is-${state}`, { bundled: bundled > 1 }]">
+  <div :class="['envelope', `face-${face}`, `is-${state}`, { bundled: bundled > 1 }]">
     <span v-if="bundled > 2" class="env-ghost two" aria-hidden="true"></span>
     <span v-if="bundled > 1" class="env-ghost one" aria-hidden="true"></span>
     <span class="env-back" aria-hidden="true"></span>
+    <template v-if="face === 'back'">
     <span class="env-paper" aria-hidden="true"></span>
     <svg class="env-pocket" viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
@@ -71,14 +77,22 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
         <path :d="FLAP_EDGE" class="lip-light" />
       </svg>
     </span>
+    </template>
     <span class="env-tooth" aria-hidden="true"></span>
     <span class="env-light" aria-hidden="true"></span>
     <span v-if="bundled > 1" class="env-twine" aria-hidden="true"></span>
-    <div class="env-stamp" aria-hidden="true">
-      <PostageStamp :version="version" :width="88" :tilt="0.6" />
-      <Postmark class="env-postmark" :width="96" />
-    </div>
-    <div class="env-seal"><slot name="seal" /></div>
+    <template v-if="face === 'front'">
+      <div class="env-address" aria-hidden="true">
+        <span class="env-from">{{ from }}</span>
+        <span class="env-to">{{ to }}</span>
+        <span class="env-lines"><i></i><i></i><i></i></span>
+      </div>
+      <div class="env-stamp" aria-hidden="true">
+        <PostageStamp :version="version" :width="88" :tilt="0.6" />
+        <Postmark class="env-postmark" :date="date" :width="88" />
+      </div>
+    </template>
+    <div v-else class="env-seal"><slot name="seal" /></div>
   </div>
 </template>
 
@@ -89,7 +103,7 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
   --env-bottom-out: #d9d2c5; --env-bottom-in: #e6e0d6;
   --env-flap-top: #f0ebe3; --env-flap: #e2dbcf;
   --env-side: #ddd6ca;
-  --env-inside: #cdc4b3; --env-lip: rgb(255 253 248 / .85);
+  --env-inside: #cdc4b3; --env-lip: rgb(255 253 248 / .85); --env-ink: #4a4237;
   position: relative; width: 100%; aspect-ratio: 1.6; perspective: 1200px;
 }
 :root[data-theme='dark'] .envelope {
@@ -127,9 +141,19 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
   background: linear-gradient(to right, transparent calc(50% - 1px), #a8845a calc(50% - 1px), #a8845a calc(50% + 1px), transparent calc(50% + 1px)),
     linear-gradient(to bottom, transparent calc(60% - 1px), #a8845a calc(60% - 1px), #a8845a calc(60% + 1px), transparent calc(60% + 1px));
   opacity: .85; transition: opacity 300ms ease; }
+/* 正面：整张纸（不是里衬色），左上角寄件人、中间偏下收件人，像手写在纸上。 */
+.face-front .env-back { background: linear-gradient(160deg, var(--env-flap-top), var(--env-left-in) 70%, var(--env-right-out)); }
+.env-address { position: absolute; inset: 0; z-index: 6; color: var(--env-ink); pointer-events: none; }
+.env-from { position: absolute; left: 7%; top: 9%; font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+/* 收件人：像参考图那样一个名字、底下三道写地址的线（线只是纸上印的格，不编地址）。 */
+.env-to { position: absolute; left: 9%; top: 40%; font: 400 var(--fs-xl)/1.3 'Segoe Script', 'Snell Roundhand', 'KaiTi', 'STKaiti', 'Kaiti SC', Georgia, serif; }
+.env-lines { position: absolute; left: 9%; top: 58%; display: grid; gap: 15px; width: 46%; }
+.env-lines i { display: block; height: 1px; background: rgb(110 90 60 / .3); box-shadow: 0 1px 0 rgb(255 255 255 / .5); }
+.env-lines i:nth-child(2) { width: 82%; }
+.env-lines i:nth-child(3) { width: 92%; }
 .env-stamp { position: absolute; right: 5%; top: 7%; z-index: 6; }
-/* 邮戳：波浪线从邮票左下角掠过，大半在信封上。 */
-.env-postmark { position: absolute; left: -52px; bottom: -16px; }
+/* 邮戳：圆戳盖在信封上，波浪线从邮票左下角掠过。 */
+.env-postmark { position: absolute; right: 50px; bottom: -18px; }
 /* 火漆正压在封盖尖上（封盖 62% 高，尖在 60% 处）。 */
 .env-seal { position: absolute; left: 50%; top: 58.5%; z-index: 7; transform: translate(-50%, -50%); }
 

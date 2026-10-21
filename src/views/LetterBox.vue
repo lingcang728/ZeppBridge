@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 信匣（批次 6；2026-10-21 照用户喜欢的写信应用重做）：顶上一个信箱，来信是一排真信封横着摆，
- * 拆过的火漆带裂痕、邮戳是第一次收到的日子；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
+ * 摆的是正面（邮票、邮戳是第一次收到的日子）；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
  * 批次 7 的每周数据来信、时间胶囊、那年今天以后也收在这里。
  */
 import '../components/letters/paper.css';
@@ -10,7 +10,6 @@ import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeArt from '../components/letters/EnvelopeArt.vue';
-import WaxSeal from '../components/letters/WaxSeal.vue';
 import MailboxArt from '../components/letters/MailboxArt.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import { useLetterText } from '../components/letters/letters.i18n';
@@ -123,9 +122,7 @@ const reread = async (version: string, event: MouseEvent) => {
         <li v-for="(v, i) in versions" :key="v" class="rail-item" :style="{ '--tilt': `${(i % 3 - 1) * 0.8}deg` }">
           <button type="button" class="rail-envelope" :aria-label="t.rereadAria(v)" @click="reread(v, $event)">
             <span class="rail-scale">
-              <EnvelopeArt :version="v">
-                <template #seal><WaxSeal still :cracked="!!receivedDate(v)" :size="96" /></template>
-              </EnvelopeArt>
+              <EnvelopeArt :version="v" face="front" :date="receivedDate(v)" :to="t.to" :from="t.from" />
             </span>
             <span v-if="repliedTo(v)" class="replied">{{ t.replied }}</span>
           </button>
@@ -198,7 +195,7 @@ const reread = async (version: string, event: MouseEvent) => {
 /* 信封按 480 宽画（邮票、邮戳、火漆的比例和弹窗里一样），摆在这里缩小。 */
 .rail-scale { display: block; width: 480px; transform: scale(.625); transform-origin: 0 0; }
 .replied {
-  position: absolute; left: 10px; top: 10px; z-index: 8; padding: 2px 9px; border: 1.5px solid rgb(150 46 40 / .7); border-radius: 3px;
+  position: absolute; right: 14px; bottom: 14px; z-index: 8; padding: 2px 9px; border: 1.5px solid rgb(150 46 40 / .7); border-radius: 3px;
   color: rgb(150 46 40 / .85); font: 700 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .1em; rotate: -8deg; mix-blend-mode: multiply;
 }
 .rail-title { margin: 8px 0 0; font-size: var(--fs-sm); font-weight: 700; }

@@ -74,9 +74,9 @@ onBeforeUnmount(() => window.clearTimeout(timer));
       <image :href="wax" width="120" height="120" :clip-path="`url(#${id}-${half.key})`" />
     </svg>
     <!-- 拆过的：一道细裂缝，暗线下面衬一道亮边，像蜡真的断开过。 -->
-    <svg v-if="cracked" class="crack" viewBox="0 0 120 120" aria-hidden="true">
-      <path class="crack-light" :d="CRACK" transform="translate(.8 .6)" />
-      <path class="crack-dark" :d="CRACK" />
+    <svg v-if="cracked || holding" :class="['crack', { growing: holding }]" viewBox="0 0 120 120" aria-hidden="true">
+      <path class="crack-light" :d="CRACK" transform="translate(.8 .6)" pathLength="1" />
+      <path class="crack-dark" :d="CRACK" pathLength="1" />
     </svg>
     <svg v-if="!still" class="hold-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="49" pathLength="1" /></svg>
   </component>
@@ -98,6 +98,9 @@ onBeforeUnmount(() => window.clearTimeout(timer));
 .crack path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .crack-dark { stroke: rgb(35 4 6 / .78); stroke-width: 1.3; }
 .crack-light { stroke: rgb(255 190 175 / .35); stroke-width: .9; }
+/* 按住时裂纹从上沿往下沿着印面慢慢长出来，长满就裂开（和 HOLD_MS 一样长）。 */
+.crack.growing path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: crack-grow 700ms cubic-bezier(.5, 0, .9, .6) forwards; }
+@keyframes crack-grow { to { stroke-dashoffset: 0; } }
 .hold-ring { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); rotate: -90deg; pointer-events: none; }
 .hold-ring circle { fill: none; stroke: rgb(255 236 228 / .85); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
 .holding .hold-ring circle { opacity: .9; stroke-dashoffset: 0; transition: stroke-dashoffset 700ms linear, opacity 120ms ease; }

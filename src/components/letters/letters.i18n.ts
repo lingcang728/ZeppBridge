@@ -3,6 +3,10 @@ import type { ArchiveSpan } from '../../lib/letters/personal';
 
 /* 信封、信纸、回信、信匣共用一份。另外 9 种语言在 src/i18n/locales/*.ts 的 'components/letters/letters' 下。 */
 const messages = defineMessages({
+  to: '致：你',
+  from: '寄自 ZeppBridge',
+  flipHint: '点一下，翻到背面拆信',
+  flipAria: '把信封翻到背面',
   sealHint: '按住火漆印，或者把它掰开',
   sealAria: (version: string) => `拆开 ${version} 的信`,
   bundle: (count: number) => `${count} 封信捆在一起`,
@@ -67,6 +71,10 @@ const messages = defineMessages({
   replied: '已回',
   rereadAria: (version: string) => `重读 ${version} 的信`,
 }, {
+  to: 'To: you',
+  from: 'From ZeppBridge',
+  flipHint: 'Tap to turn it over',
+  flipAria: 'Turn the envelope over',
   sealHint: 'Press and hold the wax seal, or snap it open',
   sealAria: (version: string) => `Open the letter for ${version}`,
   bundle: (count: number) => `${count} letters tied together`,
@@ -134,6 +142,10 @@ const messages = defineMessages({
   replied: 'Replied',
   rereadAria: (version: string) => `Read the ${version} letter again`,
 }, {
+  to: 'Para: ti',
+  from: 'De ZeppBridge',
+  flipHint: 'Toca para darle la vuelta',
+  flipAria: 'Dar la vuelta al sobre',
   sealHint: 'Mantén pulsado el sello de lacre o rómpelo',
   sealAria: (version: string) => `Abrir la carta de ${version}`,
   bundle: (count: number) => `${count} cartas atadas`,
