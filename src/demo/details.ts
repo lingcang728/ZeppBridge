@@ -52,7 +52,11 @@ export const demoBaselines = (data: DemoData, names: string[]): MetricBaseline[]
   const values = points.slice(0, -1).map(p => p.value).sort((a, b) => a - b);
   const median = values[Math.floor(values.length / 2)], spread = Math.max(.1, values[values.length - 1] - values[0]);
   const delta = round(latest.value - median, 2), direction = delta > spread * .3 ? 'above' : delta < -spread * .3 ? 'below' : 'usual';
-  return [{ metric, latest_date: latest.date, latest: latest.value, median, spread, days: values.length, delta, direction, message_code: `ui.metric_baseline.${direction}` }];
+  // 常态带（3.1）：之前 90 天第 10 / 第 90 百分位，和 core insight::anomaly 同一个规则。
+  const usual = (data.metrics[metric] ?? []).slice(-91, -1).map(p => p.value).sort((a, b) => a - b);
+  const q = (f: number) => usual[Math.round(f * (usual.length - 1))];
+  return [{ metric, latest_date: latest.date, latest: latest.value, median, spread, days: values.length, delta, direction, message_code: `ui.metric_baseline.${direction}`,
+    usual_low: usual.length >= 14 ? q(.1) : null, usual_high: usual.length >= 14 ? q(.9) : null, usual_days: usual.length }];
 });
 
 export const demoHourlySteps = (data: DemoData, start: string, end: string): HourlySteps[] => data.metrics.steps

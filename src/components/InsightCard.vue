@@ -168,7 +168,7 @@ const hasAnyComparison = computed(() => comparedFacts.value.length > 0);
         <div v-for="fact in facts" :key="fact.fact_id" class="fact">
           <span class="fact-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
-          <ComparisonBars v-if="fact.comparison && fact.value !== null" :current="fact.value" :baseline="fact.comparison.baseline_value"
+          <ComparisonBars v-if="fact.comparison && fact.value !== null" :current="fact.value" :baseline="fact.comparison.baseline_value" :uncertain="fact.confidence === 'low'"
             :current-label="t.currentRun" :baseline-label="t.baselineRun"
             :current-text="formatValue(fact)" :baseline-text="formatValue({ ...fact, value: fact.comparison.baseline_value })" :tone="deltaTone(fact)" />
           <span v-if="fact.comparison" :class="['fact-delta', deltaTone(fact)]">

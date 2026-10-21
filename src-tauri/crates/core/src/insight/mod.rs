@@ -17,8 +17,8 @@ impl Database {
         metrics: &[String],
         today: NaiveDate,
     ) -> Result<Vec<anomaly::MetricBaseline>> {
-        // 最新读数要在 3 天内，基线是它之前 28 天：取 45 天足够。
-        let series = self.metric_series(metrics, 45)?;
+        // 最新读数要在 3 天内，常态带是它之前 90 天：取 95 天足够（28 天的基线在其中）。
+        let series = self.metric_series(metrics, 95)?;
         Ok(series
             .iter()
             .filter_map(|s| {

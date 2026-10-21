@@ -812,4 +812,20 @@ mod baseline_marks {
         let mark = metric_baseline("hrv", &spiky, day(0)).unwrap();
         assert_eq!(mark.direction, BaselineDirection::Usual);
     }
+
+    /// 常态带只看最新读数之前 90 天、不含最新这天：今天的异常值不能把「常态」撑大。
+    #[test]
+    fn the_usual_band_is_your_own_middle_eighty_percent_without_today() {
+        let mut points: Vec<(NaiveDate, f64)> = (1..=100)
+            .map(|i| (day(-i), (i % 10) as f64 + 50.0))
+            .collect();
+        points.push((day(0), 200.0));
+        let mark = metric_baseline("resting_hr", &points, day(0)).unwrap();
+        assert_eq!(mark.usual_days, 90);
+        let (low, high) = (mark.usual_low.unwrap(), mark.usual_high.unwrap());
+        assert!((50.0..=52.0).contains(&low), "low = {low}");
+        assert!((57.0..=59.0).contains(&high), "high = {high}");
+        let sparse = metric_baseline("hrv", &series(28, 50.0), day(0)).unwrap();
+        assert!(sparse.usual_low.is_some(), "28 天也够给常态带");
+    }
 }

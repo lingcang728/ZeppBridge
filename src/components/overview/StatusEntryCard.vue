@@ -1,5 +1,7 @@
 <script setup lang="ts">
-/* 概览的入口卡（身体状态 / 训练状态共用）：每一项一格——名字、最新值、近 7 天的一条小线。
+/* 概览的入口卡（身体状态 / 训练状态共用）：每一项一行——名字、最新值、近 7 天的一条小线。
+ * 3.1 起按 tobi 稿的「指标行 + 迷你曲线」排成紧凑列表（不再一格一块凹槽：卡里套卡），数字下面一行
+ * 是和自己比的结论与近 90 天常态（UsualRange，数据不够就没有）。
  * 以前只有一行数字，卡片下半截整块空着；现在每格自带自己那一项的形状，卡片是满的，
  * 也不会出现「几个数字配一条线、线是哪一项」对不上的问题。
  *
@@ -8,6 +10,7 @@ import { RouterLink } from 'vue-router';
 import type { DesignIconName } from '../DesignIcon.vue';
 import GlyphTile from '../GlyphTile.vue';
 import Sparkline from '../Sparkline.vue';
+import UsualRange from '../ask/UsualRange.vue';
 
 defineOptions({ name: 'OverviewStatusEntryCard' });
 
@@ -23,6 +26,8 @@ export type EntryFact = {
   color?: string;
   /** 数字后面跟的一个短标签（训练负荷的档位）。 */
   tag?: string | null;
+  /** 给常态范围排数字用（和 text 同一种格式）；没有就不画常态那一行。 */
+  format?: (value: number) => string;
 };
 
 withDefaults(defineProps<{
@@ -45,10 +50,13 @@ withDefaults(defineProps<{
       <p class="entry-label">{{ title }}</p>
       <GlyphTile class="entry-go" name="chevron-right" :size="18" />
     </div>
-    <ul v-if="facts.length" class="entry-facts" :style="{ '--cols': Math.min(facts.length, 3) }">
+    <ul v-if="facts.length" class="entry-facts">
       <li v-for="fact in facts" :key="fact.key" class="entry-fact">
-        <span class="fact-label">{{ fact.label }}</span>
-        <span class="fact-value"><strong>{{ fact.text }}</strong><small v-if="fact.unit">{{ fact.unit }}</small><em v-if="fact.tag">{{ fact.tag }}</em></span>
+        <span class="fact-label"><i :style="{ background: fact.color }" aria-hidden="true"></i>{{ fact.label }}</span>
+        <span class="fact-main">
+          <span class="fact-value"><strong>{{ fact.text }}</strong><small v-if="fact.unit">{{ fact.unit }}</small><em v-if="fact.tag">{{ fact.tag }}</em></span>
+          <UsualRange v-if="fact.format" class="fact-usual" :metric="fact.key" :format="fact.format" />
+        </span>
         <Sparkline v-if="(fact.spark?.length ?? 0) > 1 && fact.color" class="fact-spark" :values="fact.spark!" :color="fact.color" :label="`${fact.label} · ${caption ?? ''}`" />
         <span v-else class="fact-spark fact-spark-empty" aria-hidden="true"></span>
       </li>
@@ -73,24 +81,29 @@ withDefaults(defineProps<{
 .entry-go { opacity: .7; transition: translate var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease; }
 .entry-panel:hover .entry-go { opacity: 1; translate: 2px 0; }
 
-.entry-facts { display: grid; flex: 1 1 auto; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.entry-facts { display: grid; flex: 1 1 auto; align-content: start; margin: 0; padding: 0; list-style: none; }
 .entry-fact {
-  display: grid; align-content: space-between; gap: 4px; min-width: 0; padding: 12px 12px 8px;
-  border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  display: grid; grid-template-columns: minmax(5em, 1fr) minmax(0, 1.3fr) minmax(64px, 1fr); align-items: center; gap: 12px;
+  min-width: 0; padding: 10px 0;
 }
-.fact-label { overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.entry-fact + .entry-fact { border-top: 1px solid var(--mat-line); }
+.fact-label { display: flex; align-items: center; gap: 7px; overflow: hidden; color: var(--muted); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
+.fact-label i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.fact-main { display: grid; gap: 1px; min-width: 0; }
+.fact-usual { justify-content: flex-start; }
 .fact-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 3px; min-width: 0; }
 .fact-value strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-2xl); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .fact-value small { color: var(--muted); font-size: var(--fs-xs); }
 .fact-value em { margin-left: 5px; color: var(--muted); font-size: var(--fs-xs); font-style: normal; }
-.fact-spark { height: 40px; margin-top: 2px; }
-.fact-spark :deep(svg) { height: 40px; }
+.fact-spark { height: 34px; }
+.fact-spark :deep(svg) { height: 34px; }
 .fact-spark-empty { display: block; border-radius: 8px;
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 6px, transparent 6px 12px); }
 .entry-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 
 @container (max-width: 420px) {
-  .entry-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .entry-fact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .fact-spark { grid-column: 1 / -1; }
 }
 
 /* 卡片底色统一走材质；类别只在左下角留一点同色微光，和图标、曲线是同一个颜色。 */

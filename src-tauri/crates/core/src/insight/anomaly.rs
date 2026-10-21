@@ -5,7 +5,9 @@
 //! - 少于 14 天有读数就不标（数据不够，说不出「平时」）；
 //! - 平时 = 中位数，波动 = 1.4826 × 中位绝对偏差（对偶尔一两天的极端值不敏感），太小时按中位数的 2% 兜底；
 //! - 最新读数离中位数超过 2 个波动才标「比平时高 / 低」，同时给出差值；
-//! - 最新读数要在最近 3 天内，太旧的不算「现在」。
+//! - 最新读数要在最近 3 天内，太旧的不算「现在」；
+//! - 另给一条**常态带**（3.1，卡片底行「状态词 ←→ 范围」）：最新读数之前 90 天里中间八成的读数
+//!   （第 10 到第 90 百分位）。也只和自己比，不用人群常模；少于 14 天不给。
 //!
 //! 不下诊断、不给训练建议：只给方向、差值和基线本身，界面按 `message_code` 说一句「比平时高 6」。
 
@@ -18,6 +20,10 @@ pub const THRESHOLD: f64 = 2.0;
 pub const FRESH_DAYS: i64 = 3;
 const MAD_SCALE: f64 = 1.4826;
 const MIN_RELATIVE_SPREAD: f64 = 0.02;
+/// 常态带往回看多少天。
+pub const USUAL_RANGE_DAYS: i64 = 90;
+const USUAL_LOW_QUANTILE: f64 = 0.1;
+const USUAL_HIGH_QUANTILE: f64 = 0.9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -43,6 +49,19 @@ pub struct MetricBaseline {
     pub delta: f64,
     /// `ui.metric_baseline.above` / `below` / `usual`。
     pub message_code: &'static str,
+    /// 常态带：之前 90 天第 10 / 第 90 百分位。天数不够为 `None`。
+    pub usual_low: Option<f64>,
+    pub usual_high: Option<f64>,
+    /// 常态带用了几天的读数。
+    pub usual_days: usize,
+}
+
+/// 已排序数组的线性插值分位数。
+fn quantile(sorted: &[f64], q: f64) -> f64 {
+    let at = q * (sorted.len() - 1) as f64;
+    let lo = at.floor() as usize;
+    let hi = at.ceil() as usize;
+    sorted[lo] + (sorted[hi] - sorted[lo]) * (at - lo as f64)
 }
 
 fn median(sorted: &[f64]) -> f64 {
@@ -87,6 +106,21 @@ pub fn metric_baseline(
         .max(center.abs() * MIN_RELATIVE_SPREAD)
         .max(1e-9);
     let delta = latest - center;
+    let usual_from = latest_date - Duration::days(USUAL_RANGE_DAYS);
+    let mut usual: Vec<f64> = points
+        .iter()
+        .filter(|(date, _)| *date >= usual_from && *date < latest_date)
+        .map(|(_, v)| *v)
+        .collect();
+    usual.sort_by(|a, b| a.total_cmp(b));
+    let (usual_low, usual_high) = if usual.len() >= MIN_DAYS {
+        (
+            Some(quantile(&usual, USUAL_LOW_QUANTILE)),
+            Some(quantile(&usual, USUAL_HIGH_QUANTILE)),
+        )
+    } else {
+        (None, None)
+    };
     let direction = if delta / spread >= THRESHOLD {
         BaselineDirection::Above
     } else if delta / spread <= -THRESHOLD {
@@ -108,5 +142,8 @@ pub fn metric_baseline(
             BaselineDirection::Below => "ui.metric_baseline.below",
             BaselineDirection::Usual => "ui.metric_baseline.usual",
         },
+        usual_low,
+        usual_high,
+        usual_days: usual.len(),
     })
 }

@@ -911,6 +911,7 @@ export default {
       summaryAria: 'Доля фаз сна',
       cursorHint: "Наведите указатель на график, чтобы увидеть значение в конкретный момент; нажмите, чтобы зафиксировать его, затем переходите по этапам стрелками",
       cursorAt: (time: string) => `В ${time}`,
+      momentDeep: (time: string) => `Самый длинный глубокий сон · ${time}`,
     },
 
     'components/WeeklyReportCard': {
@@ -2557,6 +2558,10 @@ export default {
       withSleep: 'Посмотри также на мой сон', sleepWithTraining: 'Посмотри на сон вместе с тренировками', trainingNext: 'С таким состоянием на следующей неделе увеличить или снизить нагрузку?',
       bodyFood: (label: string) => `Связано ли изменение ${label} с питанием и тренировками?`, above: (delta: string) => `Выше обычного на ${delta}`, below: (delta: string) => `Ниже обычного на ${delta}`,
       baselineHint: (median: string, days: number) => `Сравнение с вашими данными: медиана за предыдущие ${days} дн. — ${median}. Это не диагноз.`,
+      usualWord: 'Обычно',
+      usualRange: (range: string) => `Обычно ${range}`,
+      usualHint: (range: string, days: number) =>
+        `Только по сравнению с вами: за предыдущие ${days} дн. средние 80% дней укладывались в диапазон ${range}. Не является диагнозом.`,
     },
     'components/cards/cards': {
       noWorkouts: 'За этот период нет тренировок',
@@ -3354,6 +3359,12 @@ export default {
       backupLatest: (when: string) => `Последний снимок: ${when}`,
       backupNone: 'Снимков пока нет',
       open: 'Открыть',
+      fill: 'Заполнить',
+      legendLocal: 'На этом компьютере',
+      legendGold: 'Догружено',
+      legendGap: 'Не хватает',
+      legendEmpty: 'Нет в облаке',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
     },
 
     'views/settings/sections/maintenance': {

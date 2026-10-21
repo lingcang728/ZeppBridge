@@ -187,6 +187,10 @@ export interface MetricBaseline {
   /** 最新读数 − 中位数。 */
   delta: number;
   message_code: 'ui.metric_baseline.above' | 'ui.metric_baseline.below' | 'ui.metric_baseline.usual';
+  /** 常态带（3.1）：最新读数之前 90 天第 10 / 第 90 百分位。天数不够为 null；旧后端没有。 */
+  usual_low?: number | null;
+  usual_high?: number | null;
+  usual_days?: number;
 }
 
 export interface AiTaskSummary {

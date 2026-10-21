@@ -479,6 +479,7 @@ export default {
     zeroMinutes: '0 min',
     cursorHint: 'Passa il cursore sul grafico per visualizzare un momento; fai clic per bloccarlo, quindi usa i tasti freccia per scorrere le fasi',
     cursorAt: (time: string) => `Alle ${time}`,
+    momentDeep: (time: string) => `Sonno profondo più lungo · ${time}`,
   },
 
   'components/TrendRangeBar': {
@@ -869,6 +870,9 @@ export default {
     above: (delta: string) => `${delta} sopra la media`,
     below: (delta: string) => `${delta} sotto la media`,
     baselineHint: (median: string, days: number) => `Confronto con te stesso: mediana dei ${days} giorni precedenti, ${median}. Non è una diagnosi.`,
+    usualWord: 'Abituale',
+    usualRange: (range: string) => `Abituale ${range}`,
+    usualHint: (range: string, days: number) => `Confrontato solo con te: nei precedenti ${days} giorni, l’80% centrale dei giorni è rientrato in ${range}. Non è una diagnosi.`,
   },
 
   'components/cards/cards': {
@@ -3673,6 +3677,12 @@ Rispondi in Markdown.`,
     backupLatest: (when: string) => `Ultimo snapshot ${when}`,
     backupNone: 'Nessuno snapshot al momento',
     open: 'Apri',
+    fill: 'Completa',
+    legendLocal: 'Su questo computer',
+    legendGold: 'Completato',
+    legendGap: 'Mancante',
+    legendEmpty: 'Non presente nel cloud',
+    cellAria: (month: string, state: string) => `${month}: ${state}`,
   },
 
   'views/settings/sections/data': {

@@ -51,6 +51,8 @@
   --distance: var(--pace);
   --danger: #F0616A;
   --warning: #F5C33B;
+  /* 金继月历的金线（3.1）：补拉补上的月份。只用在那一处细线上，不当强调色。 */
+  --kintsugi: #E2B65A;
   /* 键盘焦点环：中性的浅灰，不用品牌绿（2026-10-01：「只要有绿色描边的地方，都帮我去掉」）。 */
   --focus: rgba(226, 234, 242, .55);
   --route-neutral: #9AA1A9;
@@ -233,6 +235,7 @@ html[data-theme="light"] {
   --distance: var(--pace);
   --danger: #C43742;
   --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
+  --kintsugi: #A9781F;
   --focus: rgba(38, 52, 41, .42);
   --route-neutral: #6E7670;
   --route-mint: #22875C;
