@@ -53,6 +53,18 @@ export function insertSleepStageGaps(
 }
 
 /**
+ * 睡眠时间轴上的关键时刻（3.1，取自 tobi 稿的「深睡峰」）：最长一段连续深睡的中点，毫秒时间戳；
+ * 没有深睡为 null。入睡 / 醒来详情页顶上已经写了；「在床」后端可能没给，不拿整段时长冒充。
+ */
+export function longestDeepMidpoint(slices: readonly TimedSleepSlice[]): number | null {
+  let longest: TimedSleepSlice | null = null;
+  for (const slice of slices) {
+    if (slice.tone === 'deep' && (!longest || slice.end - slice.start > longest.end - longest.start)) longest = slice;
+  }
+  return longest ? (longest.start + longest.end) / 2 : null;
+}
+
+/**
  * 阶段顺序固定：由深到浅再到醒，阶梯图的 y 轴就是这个顺序。
  *
  * `unknown` 排在最后，而且**只在真的出现未知片段时**才画进坐标轴——

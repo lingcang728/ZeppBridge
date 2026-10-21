@@ -314,6 +314,14 @@ export const useHistoryBackfill = (
     }
   };
 
+  /** 金继月历的「补上它」：从那个月补到今天。已经补好的月份账本会跳过，不会重拉。 */
+  const fillFrom = async (month: string) => {
+    const from = `${month}-01`;
+    startChoice.value = 'custom';
+    customFrom.value = from < customMin.value ? customMin.value : from;
+    await runBackfill();
+  };
+
   /* 「重试失败项」和「清空账本」是两件事：前者只让失败的月份重新排队，
      已经写入的历史一条都不动。上一版没有前者，用户为了重试一个月份只能清掉
      整个账本，把几年历史重拉一遍。 */
@@ -377,6 +385,7 @@ export const useHistoryBackfill = (
     toggleArchive,
     stopBackfill,
     runBackfill,
+    fillFrom,
     retryFailed,
     resetLedger,
   };

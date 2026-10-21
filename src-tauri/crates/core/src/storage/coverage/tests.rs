@@ -622,3 +622,58 @@ fn months_marked_persisted_without_any_raw_are_reopened_once_on_upgrade() {
         .unwrap();
     assert_eq!(version, crate::storage::CURRENT_SCHEMA_VERSION);
 }
+
+/// 金继月历：金线只给真写进记录的月份；云端说没有的月份不画成裂缝；
+/// 有一条流失败就仍是裂缝，哪怕别的流写进去了也不能算补好。
+#[test]
+fn month_seams_only_gild_months_that_gained_records() {
+    let db = db();
+    db.plan_backfill(date("2025-01-01"), date("2025-04-30"))
+        .unwrap();
+    for stream in BACKFILL_STREAMS {
+        db.record_backfill_chunk(
+            stream,
+            "2025-01-01",
+            ChunkStatus::EmptyFromCloud,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        db.record_backfill_chunk(stream, "2025-02-01", ChunkStatus::Persisted, 0, None, None)
+            .unwrap();
+    }
+    db.record_backfill_chunk(
+        "sleep",
+        "2025-03-01",
+        ChunkStatus::Persisted,
+        20,
+        None,
+        None,
+    )
+    .unwrap();
+    db.record_backfill_chunk(
+        "workouts",
+        "2025-03-01",
+        ChunkStatus::Failed,
+        0,
+        Some("x"),
+        None,
+    )
+    .unwrap();
+    db.record_backfill_chunk("sleep", "2025-04-01", ChunkStatus::Persisted, 9, None, None)
+        .unwrap();
+    let months = db.coverage_ledger().unwrap().months;
+    let state = |m: &str| {
+        months
+            .iter()
+            .find(|seam| seam.month == m)
+            .map(|seam| seam.state.as_str())
+            .unwrap_or("missing")
+            .to_string()
+    };
+    assert_eq!(state("2025-01"), "empty");
+    assert_eq!(state("2025-02"), "empty");
+    assert_eq!(state("2025-03"), "crack");
+    assert_eq!(state("2025-04"), "gold");
+}

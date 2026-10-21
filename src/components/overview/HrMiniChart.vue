@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import type { TimedValue } from '../../lib/chartGaps';
 import type { ChartPalette } from '../../lib/echartsTheme';
 import { nearestByX, niceTicks, smoothPath, splitAtGaps, timeTicks, type PlotPoint } from '../../lib/miniChart';
+import { gateAxisTicks } from '../../lib/axisTicks';
 
 /* 描线动画整个会话只放一次。概览页是 KeepAlive 缓存的：从详情页返回时它被重新插回文档，
    CSS 动画会从头再放——于是每次回到概览，心率线都「重新画一遍」。第一次画完就摘掉这个类，
@@ -61,7 +62,10 @@ const areas = computed(() => segments.value.map((segment, index) => {
   return `${lines.value[index]} L${last.x.toFixed(1)} ${plotBottom} L${first.x.toFixed(1)} ${plotBottom} Z`;
 }));
 const latest = computed(() => plotted.value[plotted.value.length - 1] ?? null);
-const xTicks = computed(() => (width.value ? timeTicks(range.value.start, range.value.end, plotWidth.value) : []));
+/* 过轴标签门禁：钟面时间重复（夏令时结束那一小时）的刻度不画第二个。 */
+const xTicks = computed(() => (width.value
+  ? gateAxisTicks(timeTicks(range.value.start, range.value.end, plotWidth.value).map((at) => ({ at, label: props.clock(at) }))).map((tick) => tick.at)
+  : []));
 
 /** 读数框的左边沿：以光标为中心，靠边时不出图。框宽取一个够用的定值（框本身 min-width 同值）。 */
 const TIP_W = 150;
@@ -69,6 +73,16 @@ const tipX = computed(() => {
   const at = hover.value?.x ?? 0;
   return Math.round(Math.min(Math.max(at - TIP_W / 2, 0), Math.max(width.value - TIP_W, 0)));
 });
+/* 「最新一刻」黑胶囊（3.1，取自 tobi 稿）：最新读数那一刻一根竖线落到横轴，顶上一枚反色胶囊写钟点。
+   不是「现在」——数据要经云端才到，钉的是最新那条样本的时间。胶囊宽度随 12 / 24 小时制变，
+   所以不猜宽度：靠右的时候右边贴着竖线往左长，靠左的时候左边贴着往右长，中间居中。 */
+const capStyle = computed(() => {
+  const at = latest.value?.x ?? 0;
+  const y = Math.max((latest.value?.y ?? 0) - 38, -10);
+  const shift = at > width.value * 0.8 ? 'calc(-100% + 8px)' : at < width.value * 0.2 ? '-8px' : '-50%';
+  return { transform: `translate(${Math.round(at)}px, ${Math.round(y)}px) translateX(${shift})` };
+});
+
 const onMove = (event: PointerEvent) => {
   const rect = host.value?.getBoundingClientRect();
   if (!rect || !rect.width) return;
@@ -140,8 +154,12 @@ onBeforeUnmount(() => {
       <path v-for="(d, i) in lines" :key="`l${i}`" class="line" :d="d" pathLength="1" fill="none" :stroke="color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       <line v-if="average !== null" :x1="PAD.left" :x2="width - PAD.right" :y1="y(average)" :y2="y(average)"
         :stroke="chrome.mark" stroke-width="1.1" stroke-dasharray="5 4" />
+      <line v-if="latest" class="now-line" :x1="latest.x" :x2="latest.x" :y1="latest.y" :y2="plotBottom" :stroke="chrome.axis" stroke-width="1" />
+      <!-- 末端圆点带一圈光晕：静态的两层圆，不用滤镜。 -->
+      <circle v-if="latest" :cx="latest.x" :cy="latest.y" r="10" :fill="color" opacity=".16" />
       <circle v-if="latest" :cx="latest.x" :cy="latest.y" r="3.5" :fill="color" :stroke="chrome.spot" stroke-width="2" />
     </svg>
+    <span v-if="latest && !hover && width" class="hr-now" aria-hidden="true" :style="capStyle">{{ clock(latest.ts) }}</span>
     <template v-if="hover">
       <i class="hr-cursor" aria-hidden="true" :style="{ transform: `translateX(${hover.x}px)`, top: `${PAD.top}px`, height: `${plotBottom - PAD.top}px`, background: chrome.grid }"></i>
       <i class="hr-dot" aria-hidden="true" :style="{ transform: `translate(${hover.x}px, ${hover.y}px)`, background: color, borderColor: chrome.spot }"></i>
@@ -161,6 +179,23 @@ onBeforeUnmount(() => {
 .intro .area { animation: hr-fade 900ms ease both; }
 @keyframes hr-draw { from { stroke-dashoffset: 1; } }
 @keyframes hr-fade { from { opacity: 0; } }
+.hr-now {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding: 3px 10px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+}
+.intro .now-line, .intro .hr-now { animation: hr-fade 900ms ease both; }
 .hr-cursor, .hr-dot { position: absolute; left: 0; pointer-events: none; will-change: transform; }
 .hr-cursor { width: 1px; }
 .hr-dot { top: 0; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border: 2px solid; border-radius: 50%; }

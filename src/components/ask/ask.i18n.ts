@@ -24,6 +24,9 @@ const messages = defineMessages(
     above: (delta: string) => `比平时高 ${delta}`,
     below: (delta: string) => `比平时低 ${delta}`,
     baselineHint: (median: string, days: number) => `和你自己比：前 ${days} 天的中位数是 ${median}。不是诊断。`,
+    usualWord: '平时',
+    usualRange: (range: string) => `常态 ${range}`,
+    usualHint: (range: string, days: number) => `只和你自己比：之前 ${days} 天里，中间八成的日子落在 ${range}。不是诊断。`,
   },
   {
     ask: 'Ask AI',
@@ -44,6 +47,9 @@ const messages = defineMessages(
     above: (delta: string) => `Above usual by ${delta}`,
     below: (delta: string) => `Below usual by ${delta}`,
     baselineHint: (median: string, days: number) => `Compared with you: the median of the previous ${days} days is ${median}. Not a diagnosis.`,
+    usualWord: 'As usual',
+    usualRange: (range: string) => `Usual ${range}`,
+    usualHint: (range: string, days: number) => `Compared only with you: over the previous ${days} days, the middle 80% of days fell within ${range}. Not a diagnosis.`,
   },
   {
     ask: 'Preguntar a la IA',
@@ -64,6 +70,9 @@ const messages = defineMessages(
     above: (delta: string) => `Por encima de lo habitual: ${delta}`,
     below: (delta: string) => `Por debajo de lo habitual: ${delta}`,
     baselineHint: (median: string, days: number) => `Comparado contigo: la mediana de los ${days} días anteriores es ${median}. No es un diagnóstico.`,
+    usualWord: 'Como siempre',
+    usualRange: (range: string) => `Habitual ${range}`,
+    usualHint: (range: string, days: number) => `Comparado solo contigo: en los ${days} días anteriores, el 80 % central de los días quedó entre ${range}. No es un diagnóstico.`,
   },
   'components/ask/ask',
 );

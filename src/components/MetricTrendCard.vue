@@ -30,6 +30,7 @@ import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
 import AskAiButton from './ask/AskAiButton.vue';
 import BaselineTag from './ask/BaselineTag.vue';
+import UsualRange from './ask/UsualRange.vue';
 import MetricInfoButton from './MetricInfoButton.vue';
 import PickDaysButton from './cards/PickDaysButton.vue';
 import type { MetricSeries } from '../types';
@@ -253,6 +254,7 @@ const hasEventMarks = computed(() => {
       <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
+      <UsualRange range-only :metric="series?.metric" :format="render" />
       <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
     </p>
 

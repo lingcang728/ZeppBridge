@@ -191,7 +191,7 @@ const entryFact = (metric: string, label: string, unit = '', digits = 0): EntryF
   const value = latestValue(statusSeries.value[metric]);
   return value === null
     ? null
-    : { key: metric, label, text: formatMetric(value, digits), unit, spark: seriesValues(metric), color: metricColor(metric) };
+    : { key: metric, label, text: formatMetric(value, digits), unit, spark: seriesValues(metric), color: metricColor(metric), format: (v: number) => formatMetric(v, digits) };
 };
 const present = (facts: (EntryFact | null)[]): EntryFact[] => facts.filter((fact): fact is EntryFact => fact !== null);
 const hasDays = (...metrics: string[]) => metrics.some((metric) => statusSeries.value[metric]?.days_with_data);

@@ -620,6 +620,7 @@ export default {
       summaryAria: 'Proporção dos estágios de sono',
       cursorHint: "Passe o cursor sobre o gráfico para ver um instante; clique para fixá-lo e use as setas para avançar etapa por etapa",
       cursorAt: (time: string) => `Às ${time}`,
+      momentDeep: (time: string) => `Sono profundo mais longo · ${time}`,
     },
 
     'components/WeeklyReportCard': {
@@ -2307,6 +2308,10 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       bodyFood: (label: string) => `A mudança em ${label} combina com minha alimentação e meus treinos?`,
       above: (delta: string) => `${delta} acima do normal`, below: (delta: string) => `${delta} abaixo do normal`,
       baselineHint: (median: string, days: number) => `Comparação com você: a mediana dos ${days} dias anteriores é ${median}. Isto não é um diagnóstico.`,
+      usualWord: 'Habitual',
+      usualRange: (range: string) => `Habitual ${range}`,
+      usualHint: (range: string, days: number) =>
+        `Comparado apenas com você: nos ${days} dias anteriores, os 80% centrais dos dias ficaram em ${range}. Não é um diagnóstico.`,
     },
     'components/cards/cards': {
       more: (count: number) => `Mais ${count} cartas`,
@@ -2825,6 +2830,12 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       backupLatest: (when: string) => `Último snapshot em ${when}`,
       backupNone: 'Ainda não há snapshots',
       open: 'Abrir',
+      fill: 'Preencher',
+      legendLocal: 'Neste computador',
+      legendGold: 'Preenchido',
+      legendGap: 'Faltando',
+      legendEmpty: 'Nada na nuvem',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
     },
 
     'views/settings/sections/maintenance': {

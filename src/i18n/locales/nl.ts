@@ -506,6 +506,7 @@ export default {
       summaryAria: 'Aandeel per slaapstadium',
       cursorHint: "Wijs een moment op de grafiek aan; klik om het vast te zetten en gebruik de pijltjestoetsen om per fase te bladeren",
       cursorAt: (time: string) => `Om ${time}`,
+      momentDeep: (time: string) => `Langste diepe slaap · ${time}`,
     },
     'components/WeeklyReportCard': {
       title: 'Deze week',
@@ -2777,6 +2778,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       workoutNext: (label: string) => `Hoe kan ik mijn volgende training (${label}) het beste plannen?`,
       above: (delta: string) => `${delta} hoger dan gebruikelijk`, below: (delta: string) => `${delta} lager dan gebruikelijk`,
       baselineHint: (median: string, days: number) => `Vergeleken met jezelf: de mediaan van de afgelopen ${days} dagen is ${median}. Dit is geen diagnose.`,
+      usualWord: 'Gewoonlijk',
+      usualRange: (range: string) => `Gewoonlijk ${range}`,
+      usualHint: (range: string, days: number) =>
+        `Alleen vergeleken met jezelf: over de afgelopen ${days} dagen viel de middelste 80% van de dagen binnen ${range}. Geen diagnose.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Taken beschikbaar maken voor MCP',
@@ -3079,6 +3084,12 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       backupLatest: (when: string) => `Laatste momentopname ${when}`,
       backupNone: 'Nog geen momentopnamen',
       open: 'Openen',
+      fill: 'Aanvullen',
+      legendLocal: 'Op deze computer',
+      legendGold: 'Aangevuld',
+      legendGap: 'Ontbreekt',
+      legendEmpty: 'Niet in de cloud',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
     },
     'views/settings/sections/maintenance': {
       secMaintenance: 'Onderhoud',

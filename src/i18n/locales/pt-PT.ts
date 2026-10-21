@@ -847,6 +847,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       summaryAria: 'Distribuição de fases de sono',
       cursorHint: "Passa o cursor sobre o gráfico para ver um instante; clica para o fixar e usa as setas para percorrer fase a fase",
       cursorAt: (time: string) => `Às ${time}`,
+      momentDeep: (time: string) => `Sono profundo mais longo · ${time}`,
     },
     'components/WeeklyReportCard': {
       title: 'Esta semana',
@@ -2684,6 +2685,10 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       bodyFood: (label: string) => `A alteração de ${label} está de acordo com a minha alimentação e treino?`,
       above: (delta: string) => `${delta} acima do habitual`, below: (delta: string) => `${delta} abaixo do habitual`,
       baselineHint: (median: string, days: number) => `Comparação contigo: a mediana dos ${days} dias anteriores é ${median}. Não é um diagnóstico.`,
+      usualWord: 'Habitual',
+      usualRange: (range: string) => `Habitual ${range}`,
+      usualHint: (range: string, days: number) =>
+        `Comparado apenas consigo: nos ${days} dias anteriores, os 80% centrais dos dias ficaram em ${range}. Não é um diagnóstico.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Disponibilizar tarefas ao MCP',
@@ -3038,6 +3043,12 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       backupLatest: (when: string) => `Última cópia de segurança ${when}`,
       backupNone: 'Ainda sem cópias de segurança',
       open: 'Abrir',
+      fill: 'Preencher',
+      legendLocal: 'Neste computador',
+      legendGold: 'Preenchido',
+      legendGap: 'Em falta',
+      legendEmpty: 'Nada na nuvem',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
     },
     'views/settings/sections/maintenance': {
       secMaintenance: 'Manutenção',

@@ -360,6 +360,19 @@ summary { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }
 
 
+/* ── 晕涂（sfumato，3.1）────────────────────────────────────────────────
+   不确定的东西不画硬边：分期里「未知」那几段、样本太少的常态参照，边缘往两头晕开。
+   这不是装饰，是对「不确定」的诚实表达。只用静态遮罩，不逐帧、不 backdrop。
+   .sfumato 两头都晕开；.sfumato-end 只晕末端（参照值本身不准，起点 0 是准的）。 */
+.sfumato {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--sfumato-edge, 35%), #000 calc(100% - var(--sfumato-edge, 35%)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--sfumato-edge, 35%), #000 calc(100% - var(--sfumato-edge, 35%)), transparent);
+}
+.sfumato-end {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--sfumato-edge, 40%)), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--sfumato-edge, 40%)), transparent);
+}
+
 /* ── 低特效（composables/useEffects.ts，Linux 默认开，issue #133）──────────────────
    WebKitGTK 为了不白屏关掉了 DMABUF 渲染，剩下的路径扛不住整页背景滤镜：翻页要好几秒。
    这里一律换成不透明的玻璃底色；动画那一半在 lib/motion/lessMotion.ts。放在文件最后，

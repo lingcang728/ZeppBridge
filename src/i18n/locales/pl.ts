@@ -401,6 +401,10 @@ export default {
     below: (delta: string) => `Poniżej normy o ${delta}`,
     baselineHint: (median: string, days: number) =>
       `W porównaniu z Twoją normą: mediana z poprzednich ${plural(days, { one: `${days} dnia`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })} wynosi ${median}. To nie jest diagnoza medyczna.`,
+    usualWord: 'Zwykle',
+    usualRange: (range: string) => `Zwykle ${range}`,
+    usualHint: (range: string, days: number) =>
+      `Tylko w porównaniu z Tobą: w ciągu ostatnich ${days} dni środkowe 80% dni mieściło się w przedziale ${range}. To nie jest diagnoza.`,
   },
 
   // Source: src/components/BackupPanel.i18n.ts
@@ -1333,6 +1337,7 @@ export default {
     summaryAria: 'Udział faz snu',
     cursorHint: 'Wskaż wykres, aby odczytać punkt; kliknij, aby przypiąć, klawisze strzałek przełączają fazy',
     cursorAt: (time: string) => `O ${time}`,
+    momentDeep: (time: string) => `Najdłuższy sen głęboki · ${time}`,
   },
 // Source: src/components/tour/tour.i18n.ts
 "components/tour/tour": {
@@ -3567,6 +3572,12 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     backupLatest: (when: string) => `Ostatnia migawka: ${when}`,
     backupNone: 'Brak migawek',
     open: 'Otwórz',
+    fill: 'Uzupełnij',
+    legendLocal: 'Na tym komputerze',
+    legendGold: 'Uzupełniono',
+    legendGap: 'Brakuje',
+    legendEmpty: 'Brak w chmurze',
+    cellAria: (month: string, state: string) => `${month}: ${state}`,
   },
 
   // Source: src/views/settings/sections/data.i18n.ts

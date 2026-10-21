@@ -174,7 +174,7 @@ const dayAria = (day: UpcomingDay) => {
           <strong>{{ formatValue(fact) }}</strong>
 
           <template v-if="chartFor(fact)">
-            <ComparisonBars :current="fact.value!" :baseline="fact.comparison!.baseline_value"
+            <ComparisonBars :current="fact.value!" :baseline="fact.comparison!.baseline_value" :uncertain="fact.confidence === 'low'"
               :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
               :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" :color="metricColor(fact.metric)" />
             <span :class="['weekly-delta', tone(fact)]">

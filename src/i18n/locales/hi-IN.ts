@@ -780,6 +780,7 @@ export default {
       notProvided: 'उपलब्ध नहीं',
       cursorHint: "चार्ट पर पॉइंटर ले जाकर उस समय का डेटा देखें; पिन करने के लिए क्लिक करें, फिर तीर कुंजियों से एक-एक चरण देखें",
       cursorAt: (time: string) => `${time} पर`,
+      momentDeep: (time: string) => `सबसे लंबी गहरी नींद · ${time}`,
     },
 
     'components/WeeklyReportCard': {
@@ -2571,6 +2572,9 @@ Markdown में उत्तर दें।`,
       firstAbove: (label: string) => `${label} हाल में सामान्य से ज़्यादा है। इसका क्या मतलब हो सकता है?`, firstBelow: (label: string) => `${label} हाल में सामान्य से कम है। इसका क्या मतलब हो सकता है?`, firstUsual: (label: string) => `${label} में हालिया बदलाव सामान्य है?`,
       withTraining: (label: string) => `क्या ${label} मेरे हालिया प्रशिक्षण भार से मेल खाता है?`, withSleep: 'मेरी नींद भी देखें', sleepWithTraining: 'प्रशिक्षण के साथ मेरी नींद भी देखें', trainingNext: 'इस स्थिति में अगले सप्ताह प्रशिक्षण बढ़ाऊँ या घटाऊँ?', bodyFood: (label: string) => `क्या ${label} का बदलाव मेरे भोजन और प्रशिक्षण से मेल खाता है?`,
       above: (delta: string) => `सामान्य से ${delta} अधिक`, below: (delta: string) => `सामान्य से ${delta} कम`, baselineHint: (median: string, days: number) => `आपके अपने आँकड़ों से तुलना: पिछले ${days} दिनों का मध्यिका ${median} है। यह निदान नहीं है।`,
+      usualWord: 'सामान्य',
+      usualRange: (range: string) => `सामान्य ${range}`,
+      usualHint: (range: string, days: number) => `सिर्फ़ आपकी तुलना में: पिछले ${days} दिनों में से बीच के 80% दिन ${range} में रहे। यह कोई निदान नहीं है।`,
     },
     'components/cards/cards': {
       noWorkouts: 'इस अवधि में कोई वर्कआउट नहीं',
@@ -2713,6 +2717,12 @@ Markdown में उत्तर दें।`,
       backupLatest: (when: string) => `पिछला स्नैपशॉट ${when}`,
       backupNone: 'अभी कोई स्नैपशॉट नहीं',
       open: 'खोलें',
+      fill: 'भरें',
+      legendLocal: 'इस कंप्यूटर पर',
+      legendGold: 'प्राप्त कर भरा गया',
+      legendGap: 'अनुपलब्ध',
+      legendEmpty: 'क्लाउड में नहीं',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
     },
 
     'views/settings/sections/maintenance': {
