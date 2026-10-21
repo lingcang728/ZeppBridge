@@ -1,17 +1,21 @@
 <script setup lang="ts">
 /**
- * 信匣（批次 6）：所有作者来信离线可重读，自己的回信和它们的回执，以及每一版一枚的邮票。
+ * 信匣（批次 6；2026-10-21 照用户喜欢的写信应用重做）：顶上一个信箱，来信是一排真信封横着摆，
+ * 拆过的火漆带裂痕、邮戳是第一次收到的日子；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
  * 批次 7 的每周数据来信、时间胶囊、那年今天以后也收在这里。
  */
 import '../components/letters/paper.css';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
+import EnvelopeArt from '../components/letters/EnvelopeArt.vue';
+import WaxSeal from '../components/letters/WaxSeal.vue';
+import MailboxArt from '../components/letters/MailboxArt.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import { useLetterText } from '../components/letters/letters.i18n';
-import { echoTitles, letterVersions, loadLetter } from '../services/letters';
-import { letterBox, loadLetterBox, markReceiptsSeen, syncLetterBox } from '../services/letterBox';
+import { echoTitles, letterVersions, loadLetter, receivedDate } from '../services/letters';
+import { letterBox, loadLetterBox, markReceiptsSeen, repliedTo, syncLetterBox } from '../services/letterBox';
 import { BUNDLED_VERSION, groupRows, loadBundledNotes, releaseRows, type NoteGroup } from '../services/updateNotice';
 import { leadParagraph, parseLetter } from '../lib/letters/parse';
 import { displayDateTimeFormatter } from '../lib/dateTime';
@@ -35,8 +39,7 @@ watch(locale, async (language) => {
   for (const v of versions.value) {
     const letter = await loadLetter(v, language);
     const paragraphs = letter ? parseLetter(letter.text).paragraphs : [];
-    const first = (paragraphs[leadParagraph(paragraphs)] ?? '').replace(/\*\*/g, '');
-    next.set(v, first.length > 90 ? `${first.slice(0, 88)}…` : first);
+    next.set(v, (paragraphs[leadParagraph(paragraphs)] ?? '').replace(/\*\*/g, ''));
   }
   previews.value = next;
   titles.value = await echoTitles(language);
@@ -51,6 +54,27 @@ onMounted(async () => {
 });
 const retry = async () => { syncing.value = true; await syncLetterBox(); syncing.value = false; };
 watch(tab, (value) => { if (value === 'replies') markReceiptsSeen(); });
+
+/* 信箱：旗子竖着 = 有新回执或有待寄出。点一下箱门开合、去取信；有新回执就翻到「我的回信」，没有就说一声。 */
+const flagUp = computed(() => letterBox.unseen || letterBox.view.outbox.length > 0);
+const peek = ref(false);
+const quiet = ref(false);
+let quietTimer = 0;
+onBeforeUnmount(() => window.clearTimeout(quietTimer));
+const mailboxLine = computed(() => (syncing.value ? t.value.mailboxChecking
+  : letterBox.unseen ? t.value.mailboxNew
+    : letterBox.view.outbox.length ? t.value.mailboxOutbox(letterBox.view.outbox.length)
+      : quiet.value ? t.value.mailboxQuiet : t.value.mailboxLetters(versions.value.length)));
+const checkMail = async () => {
+  if (syncing.value) return;
+  peek.value = true;
+  await retry();
+  peek.value = false;
+  if (letterBox.unseen) { tab.value = 'replies'; return; }
+  quiet.value = true;
+  window.clearTimeout(quietTimer);
+  quietTimer = window.setTimeout(() => { quiet.value = false; }, 2600);
+};
 
 const day = (iso: string) => {
   const date = new Date(iso);
@@ -86,16 +110,27 @@ const reread = async (version: string, event: MouseEvent) => {
       <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" />
     </PageHeader>
 
+    <div class="mailbox-row">
+      <button type="button" class="mailbox-button" :aria-label="t.mailboxAria" :disabled="syncing" @click="checkMail">
+        <MailboxArt :flag="flagUp" :peek="peek" :size="112" />
+      </button>
+      <p class="mailbox-line" role="status">{{ mailboxLine }}</p>
+    </div>
+
     <section v-if="tab === 'letters'" class="box-section">
       <p v-if="!versions.length" class="box-empty">{{ t.emptyLetters }}</p>
-      <ul v-else class="letter-list">
-        <li v-for="v in versions" :key="v" class="letter-row">
-          <PostageStamp :version="v" :width="40" />
-          <div class="letter-main">
-            <span class="letter-title">{{ t.letterHead(v) }}</span>
-            <span class="letter-preview">{{ previews.get(v) }}</span>
-          </div>
-          <button type="button" class="button secondary" @click="reread(v, $event)">{{ t.reread }}</button>
+      <ul v-else class="envelope-rail">
+        <li v-for="(v, i) in versions" :key="v" class="rail-item" :style="{ '--tilt': `${(i % 3 - 1) * 0.8}deg` }">
+          <button type="button" class="rail-envelope" :aria-label="t.rereadAria(v)" @click="reread(v, $event)">
+            <span class="rail-scale">
+              <EnvelopeArt :version="v" :date="receivedDate(v)" :to="t.to" :from="t.from">
+                <template #seal><WaxSeal still :cracked="!!receivedDate(v)" :size="96" /></template>
+              </EnvelopeArt>
+            </span>
+            <span v-if="repliedTo(v)" class="replied">{{ t.replied }}</span>
+          </button>
+          <h2 class="rail-title">{{ t.letterHead(v) }}</h2>
+          <p class="rail-preview">{{ previews.get(v) }}</p>
         </li>
       </ul>
     </section>
@@ -104,19 +139,19 @@ const reread = async (version: string, event: MouseEvent) => {
       <template v-if="letterBox.view.outbox.length">
         <h2 class="box-heading">{{ t.outbox }}</h2>
         <ul class="reply-list">
-          <li v-for="pending in letterBox.view.outbox" :key="pending.local_id" class="reply-row is-pending">
-            <span class="reply-version">{{ t.letterHead(pending.letter_version) }}</span>
-            <p class="reply-text">{{ pending.text || t.alsoAttached(pending.also_hit.length) }}</p>
+          <li v-for="pending in letterBox.view.outbox" :key="pending.local_id" class="reply-slip paper is-pending">
+            <span class="slip-head">{{ t.letterHead(pending.letter_version) }}</span>
+            <p class="slip-text paper-lines">{{ pending.text || t.alsoAttached(pending.also_hit.length) }}</p>
           </li>
         </ul>
         <button type="button" class="button secondary" :disabled="syncing" @click="retry">{{ t.outboxRetry }}</button>
       </template>
       <p v-if="!letterBox.view.sent.length && !letterBox.view.outbox.length" class="box-empty">{{ t.emptyReplies }}</p>
       <ul v-else-if="letterBox.view.sent.length" class="reply-list">
-        <li v-for="sent in letterBox.view.sent" :key="sent.reply_id" class="reply-row">
-          <span class="reply-version">{{ t.letterHead(sent.letter_version) }} · {{ t.sentOn(day(sent.sent_at)) }}</span>
-          <p class="reply-text">{{ sent.text || t.alsoAttached(sent.also_hit.length) }}</p>
-          <p v-if="receiptLine(sent.reply_id).length" class="reply-receipt">{{ receiptLine(sent.reply_id).join(' · ') }}</p>
+        <li v-for="sent in letterBox.view.sent" :key="sent.reply_id" class="reply-slip paper">
+          <span class="slip-head">{{ t.letterHead(sent.letter_version) }} · {{ t.sentOn(day(sent.sent_at)) }}</span>
+          <p class="slip-text paper-lines">{{ sent.text || t.alsoAttached(sent.also_hit.length) }}</p>
+          <p v-if="receiptLine(sent.reply_id).length" class="slip-receipt">{{ receiptLine(sent.reply_id).join(' · ') }}</p>
         </li>
       </ul>
     </section>
@@ -125,7 +160,7 @@ const reread = async (version: string, event: MouseEvent) => {
       <p class="stamp-count">{{ t.stampCount(versions.length) }}</p>
       <div v-if="versions.length" class="stamp-album">
         <figure v-for="(v, i) in versions" :key="v" class="album-slot">
-          <PostageStamp :version="v" :width="86" :tilt="(i % 3 - 1) * 2.5" />
+          <PostageStamp :version="v" :width="128" :tilt="(i % 3 - 1) * 2.5" />
           <figcaption>{{ v }}</figcaption>
         </figure>
       </div>
@@ -137,22 +172,58 @@ const reread = async (version: string, event: MouseEvent) => {
 </template>
 
 <style scoped>
-.box-section { display: grid; gap: 14px; margin-top: 18px; }
+.mailbox-row { display: flex; align-items: flex-end; gap: 14px; margin-top: 10px; }
+.mailbox-button { flex: none; padding: 0; border: 0; border-radius: var(--radius-md); background: none; cursor: pointer; }
+.mailbox-button:disabled { cursor: progress; }
+.mailbox-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.mailbox-line { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); }
+
+.box-section { display: grid; gap: 14px; margin-top: 14px; }
 .box-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.box-section > .button { justify-self: start; }
 .box-heading { margin: 0; color: var(--muted); font-size: var(--fs-2xs); font-weight: 400; letter-spacing: .06em; }
-.letter-list, .reply-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.letter-row { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); }
-.letter-main { display: grid; flex: 1; gap: 4px; min-width: 0; }
-.letter-title { font-weight: 700; font-size: var(--fs-sm); }
-.letter-preview { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
-.reply-row { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); }
-.reply-row.is-pending { border-style: dashed; }
-.reply-version { color: var(--muted); font-size: var(--fs-2xs); }
-.reply-text { margin: 0; font-size: var(--fs-xs); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.reply-receipt { margin: 0; color: var(--accent); font-size: var(--fs-2xs); }
+
+/* 来信：一排信封横着摆，按住拖或滚轮横滑，一封停一格。 */
+.envelope-rail {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 300px; gap: 28px; margin: 0 -8px; padding: 18px 8px 22px; list-style: none;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 8px; scrollbar-width: thin; overscroll-behavior-x: contain;
+}
+.rail-item { display: grid; gap: 6px; min-width: 0; scroll-snap-align: start; }
+.rail-envelope {
+  position: relative; display: block; width: 300px; height: 188px; padding: 0; border: 0; background: none; cursor: pointer;
+  transform: rotate(var(--tilt)); transition: transform 320ms cubic-bezier(.3, .7, .3, 1);
+}
+.rail-envelope:hover { transform: rotate(0deg) translateY(-6px); }
+.rail-envelope:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; border-radius: 4px; }
+/* 信封按 480 宽画（邮票、邮戳、火漆的比例和弹窗里一样），摆在这里缩小。 */
+.rail-scale { display: block; width: 480px; transform: scale(.625); transform-origin: 0 0; }
+.replied {
+  position: absolute; left: 10px; top: 10px; z-index: 8; padding: 2px 9px; border: 1.5px solid rgb(150 46 40 / .7); border-radius: 3px;
+  color: rgb(150 46 40 / .85); font: 700 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .1em; rotate: -8deg; mix-blend-mode: multiply;
+}
+.rail-title { margin: 8px 0 0; font-size: var(--fs-sm); font-weight: 700; }
+.rail-preview {
+  display: -webkit-box; margin: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+}
+
+/* 我的回信：一张张小信纸，回执像盖上去的一行字。 */
+.reply-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin: 0; padding: 0; list-style: none; }
+.reply-slip { --paper-size: 15px; --paper-line: 28px; display: grid; align-content: start; padding: 14px 20px 16px; }
+.reply-slip.is-pending { opacity: .78; }
+.slip-head { color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); letter-spacing: .06em; }
+.slip-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.slip-receipt { margin: 8px 0 0; color: var(--paper-rubric); font: 700 var(--fs-2xs)/1.6 var(--font-sans); letter-spacing: .04em; }
+
 .stamp-count { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
-.stamp-album { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 22px 14px; padding: 22px; border-radius: var(--radius-lg); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.stamp-album { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 26px 14px; padding: 26px; border-radius: var(--radius-lg); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .album-slot { display: grid; justify-items: center; gap: 8px; margin: 0; }
 .album-slot figcaption { color: var(--muted); font: 400 var(--fs-2xs)/1 var(--font-mono); }
-@media (max-width: 600px) { .letter-row { flex-wrap: wrap; } }
+
+@media (max-width: 600px) {
+  .envelope-rail { grid-auto-columns: 260px; }
+  .rail-envelope { width: 260px; height: 163px; }
+  .rail-scale { transform: scale(.5417); }
+}
+@media (prefers-reduced-motion: reduce) { .rail-envelope { transition: none; } }
 </style>

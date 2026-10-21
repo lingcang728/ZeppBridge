@@ -1,27 +1,65 @@
 /*
- * 信纸的材质（批次 6）。信纸是「物件」，不走卡片的玻璃材质：浅色主题是米白纸、深色主题是炭灰纸，
- * 字色、朱色（首字母）、横线跟着换。只在信封和信匣里用。
+ * 信纸和信封的「纸」（批次 6）。纸是物件，不走卡片的玻璃材质：
+ * 纸就是纸：深色主题也是米白纸，只是压暗一点免得刺眼（炭灰纸放在深色界面上又成了卡片，2026-10-21 用户嫌像卡片）；纸纹是一张可平铺的纤维图（assets/letters/paper-grain.png，
+ * CSP 不许 data URL，所以是实体文件）。只在信封和信匣里用。
+ *
+ * 横线信纸：字号 --paper-size、行距 --paper-line，每行底下一条线，字压在线上。
  */
-.paper {
-  --paper: #fbf8f1;
-  --paper-edge: #e7dfcf;
-  --paper-ink: #2b2a25;
-  --paper-muted: #77736a;
+.paper, .paper-stock {
+  --paper: #fbf7ee;
+  --paper-tint: #f6efe1;
+  --paper-edge: #e4dccb;
+  --paper-ink: #2f2c26;
+  --paper-muted: #7d7768;
   --paper-rubric: #a3322c;
-  --paper-rule: rgb(120 110 90 / .16);
+  --paper-rule: rgb(150 120 80 / .2);
+  --paper-grain-opacity: .55;
+  --paper-size: 17px;
+  --paper-line: 34px;
   --paper-font: Georgia, 'Iowan Old Style', 'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', serif;
-  background: var(--paper);
+}
+:root[data-theme='dark'] :is(.paper, .paper-stock) {
+  --paper: #e4dccb;
+  --paper-tint: #d9cfbb;
+  --paper-edge: #c9bea7;
+  --paper-ink: #2a2722;
+  --paper-muted: #6c6658;
+  --paper-rubric: #962e28;
+  --paper-rule: rgb(120 95 60 / .24);
+  --paper-grain-opacity: .5;
+}
+@media (max-width: 600px) {
+  .paper, .paper-stock { --paper-size: 16px; --paper-line: 32px; }
+}
+
+.paper {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(170deg, var(--paper) 0%, var(--paper) 55%, var(--paper-tint) 100%);
   color: var(--paper-ink);
-  border: 1px solid var(--paper-edge);
-  border-radius: 6px;
-  box-shadow: 0 1px 0 rgb(255 255 255 / .6) inset, 0 18px 40px -18px rgb(0 0 0 / .45), 0 2px 6px rgb(0 0 0 / .12);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgb(255 255 255 / .5) inset, 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
 }
 :root[data-theme='dark'] .paper {
-  --paper: #1b1e22;
-  --paper-edge: #2c3137;
-  --paper-ink: #dcd8cd;
-  --paper-muted: #9b978d;
-  --paper-rubric: #d0685d;
-  --paper-rule: rgb(220 210 190 / .09);
-  box-shadow: 0 1px 0 rgb(255 255 255 / .04) inset, 0 22px 48px -18px rgb(0 0 0 / .8), 0 2px 6px rgb(0 0 0 / .4);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .3) inset, 0 26px 54px -22px rgb(0 0 0 / .85), 0 2px 6px rgb(0 0 0 / .4);
 }
+/* 纸纹叠在纸面上、字的下面。 */
+.paper::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: url('../../assets/letters/paper-grain.png') 0 0 / 320px 320px repeat;
+  opacity: var(--paper-grain-opacity);
+}
+
+/* 横线：线落在每一行底边往上 6px（正好托住字脚，不是悬在字下面一截）。给这个类的元素 padding-top 必须是 --paper-line 的整数倍，线才对得上字。 */
+.paper-lines {
+  background-image: linear-gradient(to bottom, transparent calc(var(--paper-line) - 7px), var(--paper-rule) calc(var(--paper-line) - 7px) calc(var(--paper-line) - 6px), transparent calc(var(--paper-line) - 6px));
+  background-size: 100% var(--paper-line);
+  background-repeat: repeat-y;
+  font: 400 var(--paper-size) / var(--paper-line) var(--paper-font);
+  color: var(--paper-ink);
+}
+.paper-lines p { margin: 0 0 var(--paper-line); }
+.paper-lines p:last-child { margin-bottom: 0; }
+/* 中文段首空两格、段与段之间不空行（信的习惯）；西文不缩进、空一行。 */
+.paper-lines:lang(zh) p:not(.no-indent) { text-indent: 2em; }
+.paper-lines:lang(zh) p { margin-bottom: 0; }

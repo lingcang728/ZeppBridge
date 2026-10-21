@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 回信那张信纸（批次 6 拍板：只要一个文字框，不要快捷选项，不收附件；上限 1000 字，可以不写）。
- * 横线信纸样式；草稿由外面自动存本机；「允许匿名引用」默认不勾。
+ * 直接写在信纸的横线上（框随字长高，纸滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
  * 寄出（或进了离线待寄箱）的那一刻，写好的那页对折、往右上角飞走，再淡淡地回来，表示已经封好不能改了。
  */
 import { computed, ref, watch } from 'vue';
@@ -11,7 +11,7 @@ import { useLetterText } from './letters.i18n';
 
 export type ReplyState = 'idle' | 'sending' | 'sent' | 'queued' | 'error';
 
-const props = defineProps<{ head: string; draft: ReplyDraft; state: ReplyState; error?: string }>();
+const props = defineProps<{ draft: ReplyDraft; state: ReplyState; error?: string }>();
 const emit = defineEmits<{ (event: 'update:draft', draft: ReplyDraft): void; (event: 'send'): void }>();
 const t = useLetterText();
 
@@ -39,12 +39,11 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 </script>
 
 <template>
-  <article class="reply-sheet paper">
-    <span class="sheet-kicker">{{ head }}</span>
+  <div class="reply-sheet">
     <label class="reply-label" for="letter-reply-text">{{ t.replyTitle }}</label>
     <div ref="written" :class="['written', { sealed: state === 'sent' || state === 'queued' }]">
     <textarea id="letter-reply-text" class="reply-text" :value="draft.text" :placeholder="t.replyPlaceholder"
-      :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="7" @input="input"></textarea>
+      :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="6" @input="input"></textarea>
     <div class="reply-meta">
       <label class="quote">
         <input type="checkbox" :checked="draft.allowQuote" :disabled="state === 'sent' || state === 'queued'" @change="update({ allowQuote: ($event.target as HTMLInputElement).checked })" />
@@ -63,33 +62,31 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
     <p v-if="state === 'sent'" class="reply-status ok" role="status">{{ t.sent }}</p>
     <p v-else-if="state === 'queued'" class="reply-status" role="status">{{ t.queued }}</p>
     <p v-else-if="state === 'error' && error" class="reply-status bad" role="alert">{{ error }}</p>
-  </article>
+  </div>
 </template>
 
 <style scoped>
-.sheet-kicker { display: block; margin-bottom: 12px; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-.reply-label { display: block; margin-bottom: 6px; font: 700 var(--fs-md)/1.4 var(--paper-font); }
-/* 横线信纸：行高 30px，背景每 30px 一条细线，字正好压在线上。 */
+/* 每一行都是 --paper-line 的整数倍，字和控件都落在 paper-lines 的横线上。 */
+.reply-label { display: block; font: 700 var(--paper-size) / var(--paper-line) var(--paper-font); }
 .reply-text {
-  display: block; width: 100%; min-height: 210px; padding: 0 2px; border: 0; outline: none; resize: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 29px, var(--paper-rule) 29px 30px);
-  background-attachment: local; color: var(--paper-ink); font: 400 var(--fs-sm)/30px var(--paper-font); caret-color: var(--paper-rubric);
+  display: block; width: 100%; min-height: calc(var(--paper-line) * 6); padding: 0; border: 0; outline: none; resize: none; overflow: hidden;
+  field-sizing: content; background: transparent; color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); caret-color: var(--paper-rubric);
 }
 .written { transform-origin: 50% 0; }
 .written.sealed { opacity: .6; }
 .reply-text::placeholder { color: var(--paper-muted); opacity: .8; }
-.reply-text:focus-visible { box-shadow: 0 2px 0 -1px var(--focus); }
-.reply-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 10px; }
-.quote { display: flex; gap: 8px; align-items: flex-start; font: 400 var(--fs-xs)/1.5 var(--font-sans); cursor: pointer; }
-.quote input { margin-top: 3px; accent-color: var(--accent); }
+.reply-text:focus-visible { box-shadow: inset 2px 0 0 var(--focus); }
+.reply-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: var(--paper-line); }
+.quote { display: flex; gap: 8px; align-items: center; min-height: var(--paper-line); font: 400 var(--fs-xs) / calc(var(--paper-line) / 2) var(--font-sans); cursor: pointer; }
+.quote input { flex: none; accent-color: var(--accent); }
 .quote small { display: block; color: var(--paper-muted); font-size: var(--fs-2xs); }
-.counter { flex: none; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.6 var(--font-mono); }
+.counter { flex: none; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-mono); }
 .counter.full { color: var(--paper-rubric); }
-.attached { margin: 8px 0 0; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.5 var(--font-sans); }
-.reply-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; }
-.privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.5 var(--font-sans); }
+.attached { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
+.reply-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: calc(var(--paper-line) * 2); }
+.privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / calc(var(--paper-line) / 2) var(--font-sans); }
 .send { flex: none; min-width: 96px; }
-.reply-status { margin: 10px 0 0; font: 400 var(--fs-xs)/1.5 var(--font-sans); color: var(--paper-muted); }
+.reply-status { margin: 0; font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); color: var(--paper-muted); }
 .reply-status.ok { color: var(--accent); }
 .reply-status.bad { color: var(--danger); }
 </style>

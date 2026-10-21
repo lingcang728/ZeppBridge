@@ -22,6 +22,14 @@
 4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题，`asking` 条目旁边会有「我也遇到」。允许匿名引用的回信才可以引用原话。
 5. 回音写了就 12 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 和冻结都会查。
 
+### 这一版的邮票（可选）
+
+每一版信封右上角贴一枚邮票、信匣集邮册里收一枚。票面图由用户每版画一张（如 gpt-image），放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就用默认那张（`src/assets/letters/stamp-default.webp`）。
+
+- **只要画**：横版 5:4，至少 1000 × 800，jpg / webp 压到 300 KB 以内。
+- **不要**字、面值、边框、齿孔、邮戳——齿孔白边、右上角面值（版本号）、邮戳都由界面画（`PostageStamp.vue` / `Postmark.vue`），每版版式一致。
+- 右上角留一块不太花的地方，面值压在那里。
+
 ## 文件
 
 - 一版一个目录：`docs/releases/<版本>/<locale>.md`，12 种界面语言各一份（zh、en、es、nl、pt-BR、pt-PT、de、ru、hi-IN、fr、it、pl）。

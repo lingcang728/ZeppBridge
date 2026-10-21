@@ -802,7 +802,74 @@ export default {
 
 // --- Batch 2 ---
 // Source: src/components/InsightCard.i18n.ts
-"components/InsightCard": {
+  // Source: src/components/letters/letters.i18n.ts
+  'components/letters/letters': {
+    to: 'Do: Ciebie',
+    from: 'Od ZeppBridge',
+    sealHint: 'Przytrzymaj pieczęć lakową lub ją przełam',
+    sealAria: (version: string) => `Otwórz list dla wersji ${version}`,
+    bundle: (count: number) => `${plural(count, { one: `${count} list powiązany`, few: `${count} listy powiązane`, many: `${count} listów powiązanych`, other: `${count} listu powiązanego` })} razem`,
+    sheetLetter: 'List',
+    sheetNotes: 'Co nowego',
+    sheetEcho: 'Ostatnio napisałeś',
+    sheetReply: 'Odpowiedź',
+    prev: 'Poprzednia strona',
+    next: 'Następna strona',
+    page: (index: number, total: number) => `Strona ${index} z ${total}`,
+    acknowledge: 'Rozumiem',
+    letterHead: (version: string) => `ZeppBridge ${version}`,
+    postscript: (span: { years?: number; months?: number }) => {
+      const parts = [
+        span.years ? plural(span.years, { one: `${span.years} rok`, few: `${span.years} lata`, many: `${span.years} lat`, other: `${span.years} roku` }) : '',
+        span.months ? plural(span.months, { one: `${span.months} miesiąc`, few: `${span.months} miesiące`, many: `${span.months} miesięcy`, other: `${span.months} miesiąca` }) : '',
+      ].filter(Boolean);
+      return `P.S. Twoje archiwum obejmuje już ${parts.join(' i ')}.`;
+    },
+    echoNext: 'Naprawimy w następnej wersji',
+    echoLater: 'Odłożone',
+    echoAsking: 'Nadal zbieramy opinie',
+    alsoHit: 'U mnie też',
+    alsoHitOn: 'Zanotowano',
+    alsoHitHint: 'Zostanie wysłane po zamknięciu listu — tylko identyfikator tego punktu',
+    replyTitle: 'Napisz do autora',
+    replyPlaceholder: 'Napisz cokolwiek chcesz — albo nic.',
+    counter: (count: number, max: number) => `${count} / ${max}`,
+    allowQuote: 'Możesz zacytować mnie anonimowo',
+    allowQuoteHint: 'Następny list zacytuje tylko odpowiedzi z tą opcją — bez nazwy ani konta',
+    send: 'Wyślij',
+    sending: 'Wysyłanie…',
+    sent: 'Wysłano. Potwierdzenie odbioru pojawi się w Twojej skrzynce na listy',
+    queued: 'Brak połączenia w tej chwili — oczekuje w skrzynce nadawczej i zostanie wysłane po połączeniu z siecią',
+    alsoAttached: (count: number) => `Załączono: „u mnie też” (${count})`,
+    privacy: 'Wysyłana jest tylko Twoja wiadomość i wersja — bez danych konta, urządzenia czy zdrowotnych',
+    soundOn: 'Wycisz dźwięki',
+    soundOff: 'Włącz dźwięki',
+    boxTitle: 'Skrzynka na listy',
+    boxSub: 'Listy od autora, Twoje odpowiedzi i ich potwierdzenia — czytelne offline',
+    tabLetters: 'Listy',
+    tabReplies: 'Moje odpowiedzi',
+    tabStamps: 'Znaczki',
+    emptyLetters: 'Nie ma jeszcze listów. Następny nadejdzie wraz z kolejną aktualizacją.',
+    emptyReplies: 'Jeszcze nie wysłałeś odpowiedzi.',
+    outbox: 'Skrzynka nadawcza',
+    outboxRetry: 'Wyślij teraz',
+    sentOn: (date: string) => `Wysłano ${date}`,
+    read: 'Przeczytane',
+    unread: 'Jeszcze nieprzeczytane',
+    filedUnder: (title: string) => `Przypisano do „${title}”`,
+    statusNext: 'Naprawimy w następnej wersji',
+    statusLater: 'Odłożone',
+    statusAsking: 'Nadal zbieramy opinie',
+    statusFixed: (version: string | null) => (version ? `Naprawiono w ${version}` : 'Naprawiono'),
+    statusDeclined: 'Obecnie nieplanowane',
+    reread: 'Przeczytaj ponownie',
+    stampCount: (have: number) => plural(have, { one: `${have} znaczek`, few: `${have} znaczki`, many: `${have} znaczków`, other: `${have} znaczka` }),
+    settingsRow: 'Skrzynka na listy',
+    settingsSub: (count: number) => (count ? `${plural(count, { one: `${count} list`, few: `${count} listy`, many: `${count} listów`, other: `${count} listu` })} do ponownego przeczytania, z potwierdzeniami` : 'Tutaj trafiają listy od autora i ich potwierdzenia'),
+    open: 'Otwórz',
+  },
+
+  "components/InsightCard": {
     title: 'Przebieg biegu',
     unsupportedWorkoutType: 'Brak analizy dla tego typu treningu. Pierwsza wersja obejmuje wyłącznie bieganie — to, co zostało zweryfikowane na rzeczywistych danych. Inne treningi nadal wyświetlają się, korygują i eksportują normalnie.',
     handoff: 'Przeanalizuj z AI',
@@ -1749,6 +1816,13 @@ export default {
     'err.training_plan.invalid': 'Ten plan nie przeszedł walidacji i nie został wysłany',
     'err.training_plan.ai_publish_disabled': 'AI nie ma uprawnień do bezpośredniego publikowania planów treningowych',
     'err.training_plan.needs_clear_confirmation': 'Spowodowałoby to wyczyszczenie części planu na zegarku; potwierdź tę operację w ZeppBridge',
+
+    /* —— letters —— */
+    'err.letters.client_init_failed': 'Nie udało się zainicjować połączenia do wysyłania listów. Uruchom ponownie aplikację i spróbuj jeszcze raz.',
+    'err.letters.save_failed': 'Twoja odpowiedź nie mogła zostać zapisana na tym komputerze. Sprawdź wolne miejsce na dysku i spróbuj ponownie.',
+    'err.letters.invalid': 'Ta odpowiedź wskazuje na nieprawidłową wersję i nie została wysłana.',
+    'err.letters.empty': 'Odpowiedź jest pusta — napisz kilka słów przed wysłaniem.',
+    'err.letters.rejected': 'Serwer nie przyjął tej odpowiedzi. Może być wymagana aktualizacja aplikacji.',
   },
 
 // --- Batch 3 ---
@@ -3402,7 +3476,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     themeLight: 'Jasny',
     scaleSub: '100% to domyślny rozmiar; możesz także użyć Ctrl + / Ctrl -',
     effectsLabel: 'Efekty wizualne',
-    effectsSub: 'Niskie wyłączają matowe szkło i animacje przekształceń; Automatycznie używa Niskie w systemie Linux',
+    effectsSub: 'Niskie wyłączają matowe szkło i animacje przekształceń; Automatycznie używa Niskie w systemie Linux, na wolniejszych maszynach lub przy niskim poziomie baterii',
     effectsAuto: 'Automatycznie',
     effectsFull: 'Pełne',
     effectsLite: 'Niskie',

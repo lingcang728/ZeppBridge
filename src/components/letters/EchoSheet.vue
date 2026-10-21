@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 「上期回音」那张信纸：作者把上一版的回信归成几类，写明下版先修 / 推迟 / 继续征集。
+ * 「上期回音」那页：作者把上一版的回信归成几类，写明下版先修 / 推迟 / 继续征集。写在横线信纸上，每条占整行。
  * 「继续征集」的条目可以点「我也遇到」：只记下这一条的编号，合上信时和回信一起寄出（不算回信栏的快捷选项）。
  */
 import { computed } from 'vue';
@@ -8,7 +8,7 @@ import { emphasis } from '../../services/updateNotice';
 import { parseEcho, type EchoKind } from '../../lib/letters/parse';
 import { useLetterText } from './letters.i18n';
 
-const props = defineProps<{ text: string; lang: string; head: string; alsoHit: string[] }>();
+const props = defineProps<{ text: string; lang: string; alsoHit: string[] }>();
 const emit = defineEmits<{ (event: 'toggle', id: string): void }>();
 const t = useLetterText();
 const echo = computed(() => parseEcho(props.text));
@@ -20,9 +20,8 @@ const label = (kind: EchoKind) => (kind === 'next' ? t.value.echoNext : kind ===
 </script>
 
 <template>
-  <article class="echo-sheet paper" :lang="lang">
-    <span class="sheet-kicker">{{ head }}</span>
-    <p v-for="(line, index) in echo.intro" :key="`i${index}`" class="intro">
+  <div class="echo" :lang="lang">
+    <p v-for="(line, index) in echo.intro" :key="`i${index}`">
       <template v-for="(segment, part) in emphasis(line)" :key="part"><strong v-if="segment.strong">{{ segment.text }}</strong><template v-else>{{ segment.text }}</template></template>
     </p>
     <section v-for="group in groups" :key="group.kind" :class="['echo-group', `is-${group.kind}`]">
@@ -37,25 +36,24 @@ const label = (kind: EchoKind) => (kind === 'next' ? t.value.echoNext : kind ===
         </li>
       </ul>
     </section>
-  </article>
+  </div>
 </template>
 
 <style scoped>
-.sheet-kicker { display: block; margin-bottom: 16px; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-.intro { margin: 0 0 1.1em; font: 400 var(--fs-sm)/1.85 var(--paper-font); }
-.echo-group + .echo-group { margin-top: 18px; }
-.echo-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .06em; }
+.echo strong { font-weight: 700; }
+.echo-group { margin-bottom: var(--paper-line); }
+.echo-group h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); letter-spacing: .08em; }
 .echo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .is-later .echo-dot { background: var(--route-amber); }
 .is-asking .echo-dot { background: var(--route-cyan); }
-ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font: 400 var(--fs-xs)/1.75 var(--paper-font); }
-li strong { font-weight: 700; }
+ul { margin: 0; padding: 0; list-style: none; }
+li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+/* 「我也遇到」比一行矮，压在行里不破坏横线。 */
 .me-too {
-  flex: none; min-height: 28px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--paper-ink) 22%, transparent); border-radius: 999px;
+  flex: none; height: calc(var(--paper-line) - 8px); padding: 0 12px; border: 1px solid color-mix(in srgb, var(--paper-ink) 24%, transparent); border-radius: 999px;
   background: transparent; color: var(--paper-ink); font: 400 var(--fs-2xs)/1 var(--font-sans); cursor: pointer; transition: background 160ms ease, border-color 160ms ease;
 }
 .me-too:hover { border-color: color-mix(in srgb, var(--paper-ink) 45%, transparent); }
-.me-too.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.me-too.on { background: color-mix(in srgb, var(--paper-rubric) 14%, transparent); border-color: var(--paper-rubric); color: var(--paper-rubric); }
 .me-too:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 </style>

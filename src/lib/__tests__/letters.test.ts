@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { echoTitle, leadParagraph, lettersBetween, parseEcho, parseLetter } from '../letters/parse';
-import { stampDesign } from '../letters/stamp';
+import { stampFace } from '../letters/stamp';
 import { archiveSpan } from '../letters/personal';
 
 describe('letters', () => {
@@ -38,14 +38,9 @@ describe('letters', () => {
     expect(lettersBetween(all, '3.1.0', '3.1.1')).toEqual([]);
   });
 
-  it('gives every version its own stamp, and the same one every time', () => {
-    const a = stampDesign('3.1.0');
-    expect(stampDesign('3.1.0')).toEqual(a);
-    expect(a.face).toBe('3.1');
-    expect(stampDesign('3.0.7').face).toBe('3.0.7');
-    expect(a.paths.length).toBeGreaterThan(0);
-    const designs = ['3.0.7', '3.0.8', '3.0.9', '3.1.0', '3.1.1', '3.2.0'].map((v) => JSON.stringify(stampDesign(v).paths));
-    expect(new Set(designs).size).toBe(designs.length);
+  it('prints the minor version on a stamp, and the full version for patch releases', () => {
+    expect(stampFace('3.1.0')).toBe('3.1');
+    expect(stampFace('3.0.7')).toBe('3.0.7');
   });
 
   it('only states the archive span when there is at least a month of data', () => {

@@ -1,50 +1,79 @@
 <script setup lang="ts">
 /**
- * 一枚邮票（lib/letters/stamp.ts 出几何，这里只画）。齿孔是一圈半圆缺口的遮罩，纸面固定米白，
- * 图案是单色线画，颜色来自类别色 token。深浅主题下邮票本身都是「纸」，只有外面的投影跟着主题。
+ * 一枚邮票（批次 6；2026-10-21 照用户的参考图重做：厚的米白纸、齿孔有厚度、票面是一幅画，右上角黑色衬线面值）。
+ * 票面图用作者为这一版画的图（docs/releases/letters/<版本>/stamp.*，规格见 docs/releases/README.md）；
+ * 没有就用默认那张（assets/letters/stamp-default.webp）。图里不带字和边——齿孔、白边、面值都在这里画。
+ * 横版，外框 124 × 100，票面 108 × 84，从 (8, 8) 起。
  */
-import { computed } from 'vue';
-import { stampDesign } from '../../lib/letters/stamp';
+import { computed, useId } from 'vue';
+import { stampFace } from '../../lib/letters/stamp';
+import { useStampImage } from '../../services/letters';
+import fallbackArt from '../../assets/letters/stamp-default.webp';
+import grain from '../../assets/letters/paper-grain.png';
 
-const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number }>(), { width: 64, tilt: 0 });
-const design = computed(() => stampDesign(props.version));
-const uid = computed(() => `stamp-${props.version.replace(/\./g, '-')}-${Math.round(props.width)}`);
+const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number }>(), { width: 92, tilt: 0 });
+const face = computed(() => stampFace(props.version));
+const image = useStampImage(() => props.version);
+const id = `stamp-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
-/* 外框 96 × 112，内框 8..88 × 8..104（图案坐标 0..80 × 0..96 平移过去）。齿孔沿四边每 8 个单位一个。 */
+/* 齿孔沿四边每 7.4 个单位一个，四角各留一个。 */
 const holes = computed(() => {
   const list: Array<[number, number]> = [];
-  for (let x = 4; x <= 92; x += 8) list.push([x, 0], [x, 112]);
-  for (let y = 4; y <= 108; y += 8) list.push([0, y], [96, y]);
+  for (let x = 3.2; x <= 124; x += 7.4) list.push([x, 0], [x, 100]);
+  for (let y = 3.3; y <= 100; y += 7.4) list.push([0, y], [124, y]);
   return list;
 });
 </script>
 
 <template>
-  <svg class="stamp" :width="width" :height="width * 112 / 96" viewBox="0 0 96 112" :style="{ '--stamp-tone': `var(${design.tone})`, rotate: `${tilt}deg` }" aria-hidden="true">
+  <svg class="stamp" :width="width" :height="width * 100 / 124" viewBox="0 0 124 100" :style="{ rotate: `${tilt}deg` }" aria-hidden="true">
     <defs>
-      <mask :id="`${uid}-perf`">
-        <rect width="96" height="112" fill="#fff" />
-        <circle v-for="([x, y], i) in holes" :key="i" :cx="x" :cy="y" r="2.6" fill="#000" />
+      <mask :id="`${id}-perf`">
+        <rect width="124" height="100" fill="#fff" />
+        <circle v-for="([x, y], i) in holes" :key="i" :cx="x" :cy="y" r="2.75" fill="#000" />
       </mask>
-      <clipPath :id="`${uid}-inner`"><rect x="8" y="8" width="80" height="96" rx="1.5" /></clipPath>
+      <pattern :id="`${id}-grain`" width="48" height="48" patternUnits="userSpaceOnUse">
+        <image :href="grain" width="48" height="48" />
+      </pattern>
+      <!-- 纸边的厚度：齿孔和外沿左上受光、右下压暗。 -->
+      <filter :id="`${id}-bevel`" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation=".9" result="soft" />
+        <feSpecularLighting in="soft" surfaceScale="2.4" specularConstant=".55" specularExponent="14" lighting-color="#fff" result="shine">
+          <feDistantLight azimuth="225" elevation="42" />
+        </feSpecularLighting>
+        <feComposite in="shine" in2="SourceAlpha" operator="in" result="shineIn" />
+        <feOffset in="soft" dx=".5" dy=".6" result="drop" />
+        <feComposite in="SourceAlpha" in2="drop" operator="out" result="rim" />
+        <feFlood flood-color="rgb(90 70 40)" flood-opacity=".22" />
+        <feComposite in2="rim" operator="in" result="rimShade" />
+        <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="rimShade" /><feMergeNode in="shineIn" /></feMerge>
+      </filter>
+      <clipPath :id="`${id}-face`"><rect x="8" y="8" width="108" height="84" /></clipPath>
     </defs>
-    <rect class="paper" width="96" height="112" :mask="`url(#${uid}-perf)`" />
-    <rect class="frame" x="8" y="8" width="80" height="96" rx="1.5" />
-    <g :clip-path="`url(#${uid}-inner)`" transform="translate(8 8)">
-      <path v-for="(d, i) in design.paths" :key="i" class="motif" :d="d" />
-      <circle v-for="([x, y, r], i) in design.dots" :key="`d${i}`" class="star" :cx="x" :cy="y" :r="r" />
+    <g :filter="`url(#${id}-bevel)`">
+      <g :mask="`url(#${id}-perf)`">
+        <rect class="margin" width="124" height="100" />
+        <rect width="124" height="100" :fill="`url(#${id}-grain)`" class="margin-grain" />
+      </g>
     </g>
-    <text class="brand" x="13" y="19">ZEPPBRIDGE</text>
-    <text class="face" x="84" y="99" text-anchor="end">{{ design.face }}</text>
+    <g :clip-path="`url(#${id}-face)`">
+      <image :href="image ?? fallbackArt" x="8" y="8" width="108" height="84" preserveAspectRatio="xMidYMid slice" />
+      <!-- 印在纸上：票面也透一点纸纹，四边压一圈淡淡的油墨边。 -->
+      <rect x="8" y="8" width="108" height="84" :fill="`url(#${id}-grain)`" class="face-grain" />
+      <rect x="8" y="8" width="108" height="84" class="face-edge" />
+      <text class="denomination" x="111" y="22" text-anchor="end">{{ face }}</text>
+    </g>
   </svg>
 </template>
 
 <style scoped>
-.stamp { display: block; overflow: visible; filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / .22)); }
-.paper { fill: #faf6ec; }
-.frame { fill: color-mix(in srgb, var(--stamp-tone) 9%, #faf6ec); stroke: color-mix(in srgb, var(--stamp-tone) 55%, #6d6456); stroke-width: .8; }
-.motif { fill: none; stroke: var(--stamp-tone); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
-.star { fill: var(--stamp-tone); }
-.brand { font: 700 6px/1 var(--font-sans); letter-spacing: .12em; fill: color-mix(in srgb, var(--stamp-tone) 60%, #3a352c); }
-.face { font: 700 15px/1 Georgia, 'Times New Roman', serif; fill: #3a352c; }
+.stamp { display: block; overflow: visible; filter: drop-shadow(0 .6px .6px rgb(60 45 25 / .35)) drop-shadow(0 3px 5px rgb(40 30 15 / .14)); }
+.margin { fill: #f6f1e5; }
+.margin-grain { opacity: .9; mix-blend-mode: multiply; }
+.face-grain { opacity: .35; mix-blend-mode: multiply; }
+.face-edge { fill: none; stroke: rgb(50 40 25 / .28); stroke-width: .7; }
+.denomination {
+  font: 400 15px/1 Georgia, 'Times New Roman', 'Songti SC', serif; fill: #1b1915; letter-spacing: -.02em;
+  paint-order: stroke; stroke: rgb(246 241 229 / .45); stroke-width: 1.6;
+}
 </style>
