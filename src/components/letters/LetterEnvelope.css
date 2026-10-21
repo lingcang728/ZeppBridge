@@ -31,13 +31,64 @@
   to { transform: perspective(1400px) translateY(150px) translateZ(-320px) rotateX(24deg); opacity: 0; }
 }
 
-.reader { display: grid; justify-items: center; gap: 14px; }
+/* 信纸和底下的按钮之间留开一截（2026-10-21 用户：离得太近）。 */
+.reader { display: grid; justify-items: center; gap: 34px; }
 /* 信封出现后不久就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）；展开时才露出来。 */
 .is-front .reader, .is-sealed .reader, .is-opening .reader { opacity: 0; pointer-events: none; }
 /* 飞近、展开这一段：信纸是对折着的，只露上半页（下半页由 .fold-flap 从后面翻下来）；字和按钮都先不出来，展开完再浮上来。 */
 .pad-shell { position: relative; transform-origin: 50% 0; }
 .is-unfolding .letter-pad { clip-path: inset(0 -40px calc(100% - var(--fold-h, 50%)) -40px); }
 .is-unfolding .leaf-body, .is-unfolding .leaf-foot, .is-unfolding .letter-foot { opacity: 0; }
+.inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
+.inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
+.fold-flap {
+  position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); bottom: 0; z-index: 9; border-radius: 0 0 3px 3px; pointer-events: none;
+  transform-origin: 50% 0; backface-visibility: visible;
+  background: url('../../assets/letters/paper-speck.png') 0 0 / 128px repeat, linear-gradient(170deg, #fbf7ee, #f4eee2);
+  box-shadow: 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
+}
+/* 折痕：翻下来时折线那一道暗一点。 */
+.fold-flap::before { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .16), transparent); }
+.reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
+@keyframes ink-in { from { opacity: 0; } }
+@keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }
+
+.leaf-paper {
+  display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
+  padding: var(--paper-line) clamp(22px, 7%, 56px) 0;
+}
+.leaf-body { flex: 1; min-height: 0; }
+/* 回信那张只有一页、不滚动（2026-10-21 用户：信纸不能上下滚）；写多了只在文字框里往下走，见 ReplySheet。 */
+.leaf-fixed { height: 100%; overflow: hidden; }
+.leaf-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 52px; flex: none;
+  color: var(--paper-muted); font: 400 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .04em;
+}
+.leaf-number { font: 400 var(--fs-sm)/1 var(--paper-font); }
+.leaf-number b { color: var(--paper-rubric); font-weight: 400; }
+
+/*
+ * 更新清单写在信纸上（2026-10-21 用户：一整段加粗挤在一起，可读性低、太乱；要分层次，别一味加粗）。
+ * 分组名用分组的颜色；每条：标题单独一行、分组色、半粗；正文另起一行、淡一点的墨、左边一道分组色的细竖线往里收（像引用）；
+ * 议题编号缀在标题后面、等宽小字；条与条之间空一行。全部压在横线上（行高都是 --paper-line，空行也是整行）。
+ */
+.notes-leaf { --note-added: #3f6e43; --note-improved: #8a5a16; --note-fixed: #a3322c; --note-other: var(--paper-muted); }
+.notes-leaf :deep(.release-group) { --note: var(--note-other); margin: 0 0 var(--paper-line); }
+.notes-leaf :deep(.release-group.is-added) { --note: var(--note-added); }
+.notes-leaf :deep(.release-group.is-improved) { --note: var(--note-improved); }
+.notes-leaf :deep(.release-group.is-fixed) { --note: var(--note-fixed); }
+.notes-leaf :deep(.release-group + .release-group) { margin-top: 0; }
+.notes-leaf :deep(.release-group h3) { margin: 0; color: var(--note); font: 600 var(--fs-2xs) / var(--paper-line) var(--font-sans); letter-spacing: .12em; }
+.notes-leaf :deep(.release-dot) { background: var(--note); }
+.notes-leaf :deep(.release-group ul) { display: block; margin: 0; padding: 0; }
+.notes-leaf :deep(.release-group li) { margin: 0 0 var(--paper-line); color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); }
+.notes-leaf :deep(.release-group li:last-child) { margin-bottom: 0; }
+.notes-leaf :deep(.release-group li::before) { display: none; }
+.notes-leaf :deep(.note-title) { display: block; color: var(--note); font-weight: 600; }
+.notes-leaf :deep(.note-ref) { margin-left: .6em; color: var(--paper-muted); font: 400 var(--fs-2xs) / 1 var(--font-mono); letter-spacing: 0; }
+.notes-leaf :deep(.note-body) { display: block; padding-left: 14px; border-left: 2px solid color-mix(in srgb, var(--note) 35%, transparent); color: #575144; }
+
+.letter-foot { opacity: 0; }
 .inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
 .inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
 .fold-flap {
@@ -73,14 +124,11 @@
 .notes-leaf :deep(.release-group li) { color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); }
 .notes-leaf :deep(.release-group li strong) { color: var(--paper-ink); }
 
-.letter-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(640px, calc(100vw / var(--ui-scale, 1) - 32px)); }
-.pager { display: flex; align-items: center; gap: 10px; }
-.icon-button { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid rgb(255 255 255 / .22); border-radius: 50%; background: rgb(255 255 255 / .12); color: #fff; cursor: pointer; transition: background 160ms ease; }
-.icon-button:hover:not(:disabled) { background: rgb(255 255 255 / .2); }
-.icon-button:disabled { opacity: .35; cursor: default; }
-.icon-button svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.acknowledge { min-width: 104px; min-height: 42px; }
+.letter-foot { display: flex; align-items: center; justify-content: flex-end; min-height: 42px; width: min(640px, calc(100vw / var(--ui-scale, 1) - 32px)); }
+/* 不在最后一页时占着位置但看不见（不跳版）；翻到最后一页浮上来。 */
+.acknowledge { min-width: 104px; min-height: 42px; opacity: 0; translate: 0 6px; visibility: hidden; transition: opacity 260ms ease, translate 260ms ease, visibility 0s 260ms; }
+.acknowledge.shown { opacity: 1; translate: 0 0; visibility: visible; transition: opacity 320ms 200ms ease, translate 320ms 200ms ease, visibility 0s; }
+.acknowledge.shown:disabled { opacity: .6; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {

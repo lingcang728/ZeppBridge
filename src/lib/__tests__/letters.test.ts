@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { echoTitle, leadParagraph, lettersBetween, parseEcho, parseLetter } from '../letters/parse';
 import { stampFace } from '../letters/stamp';
 import { archiveSpan } from '../letters/personal';
+import { noteParts } from '../letters/notes';
 
 describe('letters', () => {
   it('reads paragraphs and a short dash-led signature, like the website archive', () => {
@@ -49,5 +50,11 @@ describe('letters', () => {
     expect(archiveSpan('2019-08-25', today)).toEqual({ years: 7, months: 1 });
     expect(archiveSpan('2026-10-01', today)).toBeNull();
     expect(archiveSpan(null, today)).toBeNull();
+  });
+
+  it('splits a release note into title, body and issue refs for the paper', () => {
+    expect(noteParts('**命令行顶替运动（#143）**。zeppbridge-cli 新增 fit-override。')).toEqual({ title: '命令行顶替运动', body: 'zeppbridge-cli 新增 fit-override。', refs: ['#143'] });
+    expect(noteParts('**Backfill gaps (#143, #150)**: months come back.')).toEqual({ title: 'Backfill gaps', body: 'months come back.', refs: ['#143', '#150'] });
+    expect(noteParts('Plain note without a title')).toEqual({ title: '', body: 'Plain note without a title', refs: [] });
   });
 });

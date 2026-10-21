@@ -2,6 +2,7 @@
 /**
  * 回信那张信纸（批次 6 拍板：只要一个文字框，不要快捷选项，不收附件；上限 1000 字，可以不写）。
  * 直接写在信纸的横线上（框固定 7 行高、纸不滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
+ * 回信用蓝墨水写（和来信的黑墨分开，2026-10-21 用户）；框没有边、没有焦点竖条；勾选框、计数、说明、「寄出」都是整行、压在线上。
  * 寄出（或进了离线待寄箱）的那一刻，写好的那页对折、往右上角飞走，再淡淡地回来，表示已经封好不能改了。
  */
 import { computed, ref, watch } from 'vue';
@@ -53,17 +54,19 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
       :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="7" @input="input" @scroll="snap"></textarea>
     <div class="reply-meta">
       <label class="quote">
-        <input type="checkbox" :checked="draft.allowQuote" :disabled="state === 'sent' || state === 'queued'" @change="update({ allowQuote: ($event.target as HTMLInputElement).checked })" />
-        <span>{{ t.allowQuote }}<small>{{ t.allowQuoteHint }}</small></span>
+        <input class="quote-input" type="checkbox" :checked="draft.allowQuote" :disabled="state === 'sent' || state === 'queued'" @change="update({ allowQuote: ($event.target as HTMLInputElement).checked })" />
+        <span class="quote-box" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.4l2.3 2.3 4.7-5" /></svg></span>
+        <span>{{ t.allowQuote }}</span>
       </label>
       <span :class="['counter', { full: count >= LETTER_REPLY_MAX }]">{{ t.counter(count, LETTER_REPLY_MAX) }}</span>
     </div>
+    <p class="quote-hint">{{ t.allowQuoteHint }}</p>
     </div>
     <p v-if="draft.alsoHit.length" class="attached">{{ t.alsoAttached(draft.alsoHit.length) }}</p>
     <footer class="reply-foot">
       <p class="privacy">{{ t.privacy }}</p>
-      <button type="button" class="button primary send" :disabled="!canSend" @click="emit('send')">
-        {{ state === 'sending' ? t.sending : t.send }}
+      <button type="button" class="send" :disabled="!canSend" @click="emit('send')">
+        {{ state === 'sending' ? t.sending : t.send }}<span aria-hidden="true"> →</span>
       </button>
     </footer>
     <p v-if="state === 'sent'" class="reply-status ok" role="status">{{ t.sent }}</p>
@@ -73,31 +76,45 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 </template>
 
 <style scoped>
-/* 每一行都是 --paper-line 的整数倍，字和控件都落在 paper-lines 的横线上。 */
+/* 每一行都是 --paper-line 的整数倍，字和控件都落在 paper-lines 的横线上。回信的字用蓝墨水。 */
+.reply-sheet { --reply-ink: #24467e; }
 .reply-label { display: block; font: 700 var(--paper-size) / var(--paper-line) var(--paper-font); }
 /* 信纸只有一页、不滚动（2026-10-21 用户）：框固定 7 行高，写多了只在框里往下走，不出滚动条。 */
 .reply-text {
-  display: block; width: 100%; height: calc(var(--paper-line) * 7); padding: 0; border: 0; outline: none; resize: none; overflow-y: auto; scrollbar-width: none;
-  background: transparent; color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); caret-color: var(--paper-rubric);
+  display: block; width: 100%; height: calc(var(--paper-line) * 7); margin: 0; padding: 0; border: 0; border-radius: 0; outline: none; box-shadow: none; resize: none;
+  overflow-y: auto; scrollbar-width: none; background: transparent; color: var(--reply-ink);
+  font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); caret-color: var(--reply-ink);
 }
 .written { transform-origin: 50% 0; }
 .written.sealed { opacity: .6; }
 .reply-text::-webkit-scrollbar { display: none; }
-.reply-text::placeholder { color: var(--paper-muted); opacity: .8; }
-.reply-text:focus-visible { box-shadow: inset 2px 0 0 var(--focus); }
-.reply-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: var(--paper-line); }
-/* 勾选框那行和底下的说明各占整行（说明折行也是一行一行压在线上），框和第一行的字对齐。 */
-.quote { display: flex; gap: 8px; align-items: flex-start; font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); cursor: pointer; }
-.quote input { flex: none; margin: calc(var(--paper-line) / 2 - 5px) 0 0; accent-color: var(--accent); }
-.quote small { display: block; color: var(--paper-muted); font-size: var(--fs-2xs); line-height: var(--paper-line); }
+.reply-text::placeholder { color: var(--paper-muted); opacity: .75; }
+.reply-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: var(--paper-line); margin-top: var(--paper-line); }
+/* 勾选框是画在纸上的小方格（不用系统的黑框），勾上了是一笔蓝墨水的对勾。 */
+.quote { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--paper-ink); font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); cursor: pointer; }
+.quote-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.quote-box { display: grid; place-items: center; flex: none; width: 15px; height: 15px; border: 1.5px solid var(--paper-muted); border-radius: 3px; }
+.quote-box svg { width: 12px; height: 12px; fill: none; stroke: var(--reply-ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity 140ms ease; }
+.quote-input:checked + .quote-box { border-color: var(--reply-ink); }
+.quote-input:checked + .quote-box svg { opacity: 1; }
+.quote-input:focus-visible + .quote-box { outline: 2px solid var(--focus); outline-offset: 2px; }
+.quote-input:disabled + .quote-box { opacity: .5; }
+.quote-hint { margin: 0; padding-left: 24px; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
 .counter { flex: none; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-mono); }
 .counter.full { color: var(--paper-rubric); }
 .attached { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-.reply-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-top: var(--paper-line); }
+.reply-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: var(--paper-line); }
 .privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-/* 按钮占两行高的中间，压过一条线没关系（它是实心的），字不压线。 */
-.send { flex: none; min-width: 96px; margin-top: calc(var(--paper-line) - 21px); }
+/* 「寄出」是一行蓝墨水写的字，不是压线的大按钮。 */
+.send {
+  flex: none; height: var(--paper-line); padding: 0 2px; border: 0; background: none; cursor: pointer;
+  color: var(--reply-ink); font: 600 var(--paper-size) / var(--paper-line) var(--paper-font);
+  transition: translate 160ms ease, opacity 160ms ease;
+}
+.send:hover:not(:disabled) { translate: 3px 0; }
+.send:disabled { color: var(--paper-muted); opacity: .6; cursor: default; }
+.send:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
 .reply-status { margin: 0; font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); color: var(--paper-muted); }
-.reply-status.ok { color: var(--accent); }
+.reply-status.ok { color: var(--reply-ink); }
 .reply-status.bad { color: var(--danger); }
 </style>

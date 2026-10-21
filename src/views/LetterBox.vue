@@ -1,19 +1,18 @@
 <script setup lang="ts">
 /**
- * 信匣（批次 6；2026-10-21 照用户喜欢的写信应用重做）：顶上一个信箱，来信是一排真信封横着摆，
- * 摆的是正面（邮票、邮戳是第一次收到的日子）；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
+ * 信匣（批次 6；2026-10-21 照用户喜欢的写信应用重做）：来信是一排真信封横着摆（正面，只贴邮票；
+ * 顶上原来的信箱和一行小字被用户删了，取信在进页面时自动做）；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
  * 批次 7 的每周数据来信、时间胶囊、那年今天以后也收在这里。
  */
 import '../components/letters/paper.css';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeArt from '../components/letters/EnvelopeArt.vue';
-import MailboxArt from '../components/letters/MailboxArt.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import { useLetterText } from '../components/letters/letters.i18n';
-import { echoTitles, letterVersions, loadLetter, receivedDate } from '../services/letters';
+import { echoTitles, letterVersions, loadLetter } from '../services/letters';
 import { letterBox, loadLetterBox, markReceiptsSeen, repliedTo, syncLetterBox } from '../services/letterBox';
 import { BUNDLED_VERSION, groupRows, loadBundledNotes, releaseRows, type NoteGroup } from '../services/updateNotice';
 import { leadParagraph, parseLetter } from '../lib/letters/parse';
@@ -54,27 +53,6 @@ onMounted(async () => {
 const retry = async () => { syncing.value = true; await syncLetterBox(); syncing.value = false; };
 watch(tab, (value) => { if (value === 'replies') markReceiptsSeen(); });
 
-/* 信箱：旗子竖着 = 有新回执或有待寄出。点一下箱门开合、去取信；有新回执就翻到「我的回信」，没有就说一声。 */
-const flagUp = computed(() => letterBox.unseen || letterBox.view.outbox.length > 0);
-const peek = ref(false);
-const quiet = ref(false);
-let quietTimer = 0;
-onBeforeUnmount(() => window.clearTimeout(quietTimer));
-const mailboxLine = computed(() => (syncing.value ? t.value.mailboxChecking
-  : letterBox.unseen ? t.value.mailboxNew
-    : letterBox.view.outbox.length ? t.value.mailboxOutbox(letterBox.view.outbox.length)
-      : quiet.value ? t.value.mailboxQuiet : t.value.mailboxLetters(versions.value.length)));
-const checkMail = async () => {
-  if (syncing.value) return;
-  peek.value = true;
-  await retry();
-  peek.value = false;
-  if (letterBox.unseen) { tab.value = 'replies'; return; }
-  quiet.value = true;
-  window.clearTimeout(quietTimer);
-  quietTimer = window.setTimeout(() => { quiet.value = false; }, 2600);
-};
-
 const day = (iso: string) => {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? '' : displayDateTimeFormatter({ year: 'numeric', month: 'short', day: 'numeric' }).format(date);
@@ -94,7 +72,7 @@ const receiptLine = (replyId: string): string[] => {
   return parts;
 };
 
-/* 重读一封：信封直接是打开的；本版的信顺带当前打包的更新说明。 */
+/* 重读一封：和第一次收到一样从信封正面开始（翻面、拆火漆、抽信）——2026-10-21 用户：不小心关了信，想再看一遍开信。本版的信顺带当前打包的更新说明。 */
 const reading = ref<{ version: string; notes: NoteGroup[] | null; origin: HTMLElement | null } | null>(null);
 const reread = async (version: string, event: MouseEvent) => {
   const origin = event.currentTarget as HTMLElement;
@@ -109,20 +87,13 @@ const reread = async (version: string, event: MouseEvent) => {
       <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" />
     </PageHeader>
 
-    <div class="mailbox-row">
-      <button type="button" class="mailbox-button" :aria-label="t.mailboxAria" :disabled="syncing" @click="checkMail">
-        <MailboxArt :flag="flagUp" :peek="peek" :size="112" />
-      </button>
-      <p class="mailbox-line" role="status">{{ mailboxLine }}</p>
-    </div>
-
     <section v-if="tab === 'letters'" class="box-section">
       <p v-if="!versions.length" class="box-empty">{{ t.emptyLetters }}</p>
       <ul v-else class="envelope-rail">
         <li v-for="(v, i) in versions" :key="v" class="rail-item" :style="{ '--tilt': `${(i % 3 - 1) * 0.8}deg` }">
           <button type="button" class="rail-envelope" :aria-label="t.rereadAria(v)" @click="reread(v, $event)">
             <span class="rail-scale">
-              <EnvelopeArt :version="v" face="front" :date="receivedDate(v)" :to="t.to" :from="t.from" />
+              <EnvelopeArt :version="v" face="front" :to="t.to" />
             </span>
             <span v-if="repliedTo(v)" class="replied">{{ t.replied }}</span>
           </button>
@@ -164,17 +135,11 @@ const reread = async (version: string, event: MouseEvent) => {
       <p v-else class="box-empty">{{ t.emptyLetters }}</p>
     </section>
 
-    <LetterEnvelope v-if="reading" :versions="[reading.version]" :current="reading.version" :notes="reading.notes" opened :origin="reading.origin" @done="reading = null" />
+    <LetterEnvelope v-if="reading" :versions="[reading.version]" :current="reading.version" :notes="reading.notes" :origin="reading.origin" @done="reading = null" />
   </section>
 </template>
 
 <style scoped>
-.mailbox-row { display: flex; align-items: flex-end; gap: 14px; margin-top: 10px; }
-.mailbox-button { flex: none; padding: 0; border: 0; border-radius: var(--radius-md); background: none; cursor: pointer; }
-.mailbox-button:disabled { cursor: progress; }
-.mailbox-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-.mailbox-line { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); }
-
 .box-section { display: grid; gap: 14px; margin-top: 14px; }
 .box-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .box-section > .button { justify-self: start; }

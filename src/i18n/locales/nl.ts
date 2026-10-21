@@ -3385,7 +3385,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'components/letters/letters': {
       to: 'Aan: gebruiker',
-      from: 'Van ZeppBridge',
       flipHint: 'Tik om de envelop om te draaien',
       flipAria: 'Draai de envelop om',
       sealHint: 'Tik op het lakzegel of veeg eroverheen',
@@ -3395,8 +3394,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sheetNotes: 'Wat is er nieuw',
       sheetEcho: 'Vorige keer zei je',
       sheetReply: 'Beantwoorden',
-      prev: 'Vorige pagina',
-      next: 'Volgende pagina',
       page: (index: number, total: number) => `Pagina ${index} van ${total}`,
       acknowledge: 'Begrepen',
       letterHead: (version: string) => `ZeppBridge ${version}`,
@@ -3424,8 +3421,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       queued: 'Geen verbinding op dit moment — staat in Postvak UIT en wordt verzonden zodra je online bent',
       alsoAttached: (count: number) => `Bijgevoegd: “ik ook” bij ${count}`,
       privacy: 'Alleen je woorden en het versienummer worden verzonden — geen account-, apparaat- of gezondheidsgegevens',
-      soundOn: 'Geluid dempen',
-      soundOff: 'Geluid aanzetten',
       boxTitle: 'Brievenbus',
       boxSub: 'Brieven van de auteur, je reacties en hun ontvangstbevestigingen — offline leesbaar',
       tabLetters: 'Brieven',
@@ -3452,14 +3447,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
           ? `${count} ${count === 1 ? 'brief' : 'brieven'} om te herlezen, met ontvangstbevestigingen`
           : 'Brieven van de auteur en ontvangstbevestigingen vind je hier',
       open: 'Openen',
-      mailboxAria: 'Kijk in de brievenbus',
-      mailboxNew: 'Nieuwe ontvangstbevestigingen',
-      mailboxQuiet: 'Niets nieuws in de brievenbus',
-      mailboxChecking: 'Post ophalen…',
-      mailboxOutbox: (count: number) =>
-        `${count} ${count === 1 ? 'reactie' : 'reacties'} klaar om te versturen`,
-      mailboxLetters: (count: number) =>
-        `${count} ${count === 1 ? 'brief' : 'brieven'} ontvangen`,
       replied: 'Beantwoord',
       rereadAria: (version: string) => `Lees de brief voor ${version} opnieuw`,
     },

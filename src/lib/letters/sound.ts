@@ -1,28 +1,16 @@
 /**
- * 信封的两声（批次 6）：火漆裂开、信纸滑出。默认开、很轻；减少动态效果 / 低特效时不出声；
- * 信封角落有静音开关，选择记在本机。系统静音时浏览器的声音本来就出不来，不用另外判断。
+ * 信封的两声（批次 6）：火漆裂开、信纸滑出。一直开着、很轻（2026-10-21 用户：默认开声音、不能关，静音按钮删了）；
+ * 减少动态效果 / 低特效时不出声。系统静音时浏览器的声音本来就出不来，不用另外判断。
  *
  * 不打包音频文件（CSP 不放 data URL，也省体积）：用 WebAudio 现场合成——一小段滤过的噪声加一个低频的「咔」。
  */
-import { ref } from 'vue';
 import { lessMotion } from '../motion/lessMotion';
 
-const KEY = 'zeppbridge.letters.sound';
 const VOLUME = 0.14;
-
-const read = (): boolean => {
-  try { return window.localStorage.getItem(KEY) !== 'off'; } catch { return true; }
-};
-export const letterSoundOn = ref(typeof window === 'undefined' ? true : read());
-
-export function setLetterSound(on: boolean): void {
-  letterSoundOn.value = on;
-  try { window.localStorage.setItem(KEY, on ? 'on' : 'off'); } catch { /* 记不住就只管这一次 */ }
-}
 
 let context: AudioContext | null = null;
 const audio = (): AudioContext | null => {
-  if (!letterSoundOn.value || lessMotion() || typeof window === 'undefined') return null;
+  if (lessMotion() || typeof window === 'undefined') return null;
   const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return null;
   try {
