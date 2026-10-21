@@ -7,6 +7,8 @@
  * - 背面不写地址；火漆压在封盖尖上，邮票贴右上角，邮戳是几道波浪线掠过邮票左下角。
  *
  * state：sealed 封着 → opening 封盖翻开、信纸往上抽出 → leaving 信封往下沉、淡掉（信纸已经变成外面那张信纸）。
+ * 立体感（用户 2026-10-21：「注重立体感」）：光从左上来——左折片朝光偏亮、右折片背光偏暗、封盖最亮；
+ * 封盖和底片往右下投影；信封四边是折过来的圆边（上左亮、下右暗），中间因为装着信微微鼓起；底下贴桌一圈实影。
  * 翻封盖用 rotateX，前后层次靠离散的 z-index 关键帧换；其余都只动 transform / opacity。
  */
 import { useId } from 'vue';
@@ -35,28 +37,32 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
     <span class="env-paper" aria-hidden="true"></span>
     <svg class="env-pocket" viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <linearGradient :id="`${id}-side`" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="var(--env-side-top)" />
-          <stop offset="1" stop-color="var(--env-side)" />
+        <linearGradient :id="`${id}-left`" x1="0" y1=".2" x2="1" y2=".6">
+          <stop offset="0" stop-color="var(--env-left-out)" />
+          <stop offset="1" stop-color="var(--env-left-in)" />
         </linearGradient>
-        <linearGradient :id="`${id}-bottom`" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="var(--env-bottom-top)" />
-          <stop offset="1" stop-color="var(--env-bottom)" />
+        <linearGradient :id="`${id}-right`" x1="1" y1=".2" x2="0" y2=".6">
+          <stop offset="0" stop-color="var(--env-right-out)" />
+          <stop offset="1" stop-color="var(--env-right-in)" />
         </linearGradient>
-        <filter :id="`${id}-lip`" x="-5%" y="-20%" width="110%" height="140%">
-          <feGaussianBlur stdDeviation=".7" />
+        <linearGradient :id="`${id}-bottom`" x1=".2" y1="1" x2=".6" y2="0">
+          <stop offset="0" stop-color="var(--env-bottom-out)" />
+          <stop offset="1" stop-color="var(--env-bottom-in)" />
+        </linearGradient>
+        <filter :id="`${id}-cast`" x="-5%" y="-10%" width="115%" height="125%">
+          <feDropShadow dx=".6" dy=".9" stdDeviation=".8" flood-color="rgb(70 50 25)" flood-opacity=".26" />
         </filter>
       </defs>
-      <!-- 两侧折片铺满，底片压在上面；底片边缘往上投一丝影子、边上一道亮线。 -->
-      <rect width="160" height="100" :fill="`url(#${id}-side)`" />
-      <path :d="BOTTOM_EDGE" class="lip-shadow" :filter="`url(#${id}-lip)`" />
-      <path :d="BOTTOM" :fill="`url(#${id}-bottom)`" />
+      <!-- 左右折片各一片（朝光 / 背光），底片压在上面、往右下投影，边上一道亮线。 -->
+      <path d="M0 0L82 52L0 100Z" :fill="`url(#${id}-left)`" />
+      <path d="M160 0L78 52L160 100Z" :fill="`url(#${id}-right)`" />
+      <path :d="BOTTOM" :fill="`url(#${id}-bottom)`" :filter="`url(#${id}-cast)`" />
       <path :d="BOTTOM_EDGE" class="lip-light" />
     </svg>
     <span class="env-flap" aria-hidden="true">
       <svg viewBox="0 0 160 62" preserveAspectRatio="none">
         <defs>
-          <linearGradient :id="`${id}-flap`" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient :id="`${id}-flap`" x1=".15" y1="0" x2=".7" y2="1">
             <stop offset="0" stop-color="var(--env-flap-top)" />
             <stop offset="1" stop-color="var(--env-flap)" />
           </linearGradient>
@@ -78,20 +84,25 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
 
 <style scoped>
 .envelope {
-  --env-side-top: #e3ddd2; --env-side: #dcd5c9;
-  --env-bottom-top: #e6e0d6; --env-bottom: #e0d9ce;
-  --env-flap-top: #ebe6dd; --env-flap: #e5dfd5;
-  --env-inside: #cdc4b3; --env-lip: rgb(255 253 248 / .85); --env-lip-shadow: rgb(95 75 45 / .2);
+  --env-left-out: #e9e4da; --env-left-in: #ddd6ca;
+  --env-right-out: #d3cbbe; --env-right-in: #dcd5c9;
+  --env-bottom-out: #d9d2c5; --env-bottom-in: #e6e0d6;
+  --env-flap-top: #f0ebe3; --env-flap: #e2dbcf;
+  --env-side: #ddd6ca;
+  --env-inside: #cdc4b3; --env-lip: rgb(255 253 248 / .85);
   position: relative; width: 100%; aspect-ratio: 1.6; perspective: 1200px;
 }
 :root[data-theme='dark'] .envelope {
-  --env-side-top: #d6cfc2; --env-side: #cec6b8;
-  --env-bottom-top: #d9d2c6; --env-bottom: #d2cabd;
-  --env-flap-top: #ded8cd; --env-flap: #d7d0c4;
+  --env-left-out: #dcd5c9; --env-left-in: #cfc7b9;
+  --env-right-out: #c5bcae; --env-right-in: #cec6b8;
+  --env-bottom-out: #cbc3b5; --env-bottom-in: #d8d1c5;
+  --env-flap-top: #e2dcd2; --env-flap: #d3cbbe;
+  --env-side: #cec6b8;
   --env-inside: #bdb3a1; --env-lip: rgb(250 245 235 / .7);
 }
 .envelope > span, .env-pocket { position: absolute; inset: 0; border-radius: 5px; }
-.env-back { background: var(--env-inside); box-shadow: 0 1px 1.5px rgb(40 30 15 / .16), 0 24px 44px -20px rgb(20 15 5 / .5), 0 6px 14px -6px rgb(20 15 5 / .18); }
+/* 贴着桌面：一圈实的接触影 + 往右下的软影。 */
+.env-back { background: var(--env-inside); box-shadow: 1px 1.5px 1.5px rgb(40 30 15 / .22), 3px 6px 10px -2px rgb(30 20 8 / .2), 10px 30px 46px -18px rgb(20 15 5 / .5); }
 .env-ghost { background: var(--env-side); box-shadow: 0 10px 22px -12px rgb(0 0 0 / .45); }
 .env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
 .env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .85; }
@@ -102,14 +113,16 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
 }
 .env-pocket { z-index: 2; width: 100%; height: 100%; overflow: hidden; }
 .lip-light { fill: none; stroke: var(--env-lip); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
-.lip-shadow { fill: none; stroke: var(--env-lip-shadow); stroke-width: 2.4; transform: translateY(-.5px); vector-effect: non-scaling-stroke; }
 /* 封盖：纸厚的亮边 + 往下投的一层淡影。 */
 .env-flap { z-index: 4; bottom: auto !important; height: 62% !important; transform-origin: 50% 0; border-radius: 5px 5px 0 0 !important;
-  filter: drop-shadow(0 1.2px 1px rgb(80 60 35 / .26)) drop-shadow(0 6px 9px rgb(80 60 35 / .13)); }
+  filter: drop-shadow(.8px 1.6px 1.2px rgb(70 50 25 / .3)) drop-shadow(3px 8px 10px rgb(70 50 25 / .16)); }
 .env-flap svg { display: block; width: 100%; height: 100%; overflow: visible; }
 /* 纸面颗粒和整体受光盖在折片和封盖上（同一张纸）。 */
 .env-tooth { z-index: 5; pointer-events: none; background: url('../../assets/letters/paper-tooth.png') 0 0 / 128px repeat; mix-blend-mode: soft-light; opacity: .6; }
-.env-light { z-index: 5; pointer-events: none; background: radial-gradient(120% 90% at 20% 0%, rgb(255 255 255 / .16), transparent 60%), linear-gradient(170deg, transparent 55%, rgb(60 45 25 / .06)); }
+/* 受光与厚度：中间微鼓（中心偏亮、四周压暗），四边折过来的圆边上左亮、下右暗。 */
+.env-light { z-index: 5; pointer-events: none;
+  background: radial-gradient(70% 80% at 42% 40%, rgb(255 255 255 / .14), transparent 70%), radial-gradient(130% 120% at 30% 20%, transparent 55%, rgb(60 45 25 / .1)), linear-gradient(160deg, rgb(255 255 255 / .1), transparent 40%, rgb(60 45 25 / .07));
+  box-shadow: inset 1.5px 1.5px 0 rgb(255 255 255 / .55), inset 0 0 2px 1px rgb(255 255 255 / .18), inset -1.5px -2px 1.5px rgb(70 50 25 / .2), inset -4px -6px 10px -4px rgb(70 50 25 / .12); }
 .env-twine { z-index: 6; pointer-events: none;
   background: linear-gradient(to right, transparent calc(50% - 1px), #a8845a calc(50% - 1px), #a8845a calc(50% + 1px), transparent calc(50% + 1px)),
     linear-gradient(to bottom, transparent calc(60% - 1px), #a8845a calc(60% - 1px), #a8845a calc(60% + 1px), transparent calc(60% + 1px));

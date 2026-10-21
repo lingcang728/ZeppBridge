@@ -3,7 +3,8 @@
 .letter-stage > * { grid-area: 1 / 1; }
 
 .envelope-wrap { display: grid; justify-items: center; gap: 22px; width: min(500px, calc(100vw / var(--ui-scale, 1) - 48px)); }
-.envelope-wrap :deep(.envelope) { rotate: -1.2deg; }
+/* 像参考照片那样斜放在桌上：往后倒一点、转一点，立体感先从角度来。 */
+.envelope-wrap :deep(.envelope) { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg); }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
 /* 信纸展开时信封往下沉、淡掉。 */
