@@ -1,0 +1,86 @@
+/* 信封（LetterEnvelope.vue）。动的只有 transform / opacity；封盖翻开时的前后层次用离散的 z-index 关键帧换。 */
+.letter-stage { display: grid; place-items: center; gap: 18px; min-height: 340px; }
+
+.envelope-wrap { display: grid; justify-items: center; gap: 22px; }
+.envelope {
+  --env: #efe6d3; --env-deep: #e1d5bd; --env-line: rgb(110 90 60 / .22); --env-ink: #5b5243;
+  position: relative; width: min(460px, calc(100vw / var(--ui-scale, 1) - 56px)); aspect-ratio: 1.62; perspective: 1100px;
+}
+:root[data-theme='dark'] .envelope { --env: #2a2e34; --env-deep: #22262b; --env-line: rgb(230 220 200 / .12); --env-ink: #c9c3b5; }
+.env-back, .env-pocket, .env-flap, .env-ghost { position: absolute; inset: 0; border-radius: 6px; }
+.env-back { background: var(--env-deep); box-shadow: 0 24px 48px -22px rgb(0 0 0 / .6), 0 3px 8px rgb(0 0 0 / .16); }
+/* 跳版更新：后面再露出一两只信封的边。 */
+.env-ghost { background: var(--env-deep); box-shadow: 0 10px 22px -12px rgb(0 0 0 / .5); }
+.env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
+.env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .8; }
+.env-paper { position: absolute; left: 6%; right: 6%; top: 8%; bottom: 10%; z-index: 1; border-radius: 4px; }
+/* 下面和两侧三块折边拼成口袋；静态 clip-path，不做动画。 */
+.env-pocket {
+  z-index: 2; background: var(--env);
+  clip-path: polygon(0 0, 50% 56%, 100% 0, 100% 100%, 0 100%);
+  box-shadow: inset 0 -1px 0 var(--env-line);
+}
+.env-pocket::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top right, transparent calc(50% - .6px), var(--env-line) 50%, transparent calc(50% + .6px)) left bottom / 50% 100% no-repeat, linear-gradient(to top left, transparent calc(50% - .6px), var(--env-line) 50%, transparent calc(50% + .6px)) right bottom / 50% 100% no-repeat; }
+.env-flap {
+  z-index: 4; bottom: auto; height: 60%; transform-origin: 50% 0; backface-visibility: visible;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--env) 92%, white), var(--env));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / .12));
+}
+/* 捆信的细绳：一横一竖，拆开时淡掉。 */
+.env-twine { position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background: linear-gradient(to right, transparent calc(50% - 1px), #b08a5a calc(50% - 1px), #b08a5a calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to bottom, transparent calc(62% - 1px), #b08a5a calc(62% - 1px), #b08a5a calc(62% + 1px), transparent calc(62% + 1px));
+  opacity: .85; transition: opacity 300ms ease; }
+.env-address { position: absolute; left: 8%; bottom: 11%; z-index: 3; display: grid; gap: 4px; color: var(--env-ink); }
+.env-to { font: 400 var(--fs-md)/1.3 'Segoe Script', 'Snell Roundhand', 'KaiTi', 'STKaiti', Georgia, serif; }
+.env-from { font: 400 var(--fs-2xs)/1.3 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
+.env-stamp { position: absolute; right: 6%; bottom: 10%; z-index: 3; }
+.env-seal { position: absolute; left: 50%; top: 60%; z-index: 6; transform: translate(-50%, -50%); }
+.seal-hint { margin: 0; color: rgb(255 255 255 / .8); text-shadow: 0 1px 2px rgb(0 0 0 / .25); font-size: var(--fs-xs); text-align: center; }
+
+/* 拆开：封盖翻上去（翻过一半就落到信纸后面），信纸往上滑出，然后整只信封往下沉、淡掉。 */
+.is-opening .env-flap { animation: flap-open 560ms cubic-bezier(.4, .1, .3, 1) forwards; }
+.is-opening .env-paper { animation: paper-rise 620ms 460ms cubic-bezier(.2, .7, .3, 1) forwards; }
+.is-opening .env-twine { opacity: 0; }
+.is-opening .envelope-wrap { animation: envelope-sink 360ms 900ms cubic-bezier(.4, 0, .7, .2) forwards; }
+.is-opening .seal-hint { opacity: 0; transition: opacity 200ms ease; }
+@keyframes flap-open {
+  0% { transform: rotateX(0deg); z-index: 4; }
+  49% { z-index: 4; }
+  50% { z-index: 0; }
+  100% { transform: rotateX(178deg); z-index: 0; }
+}
+@keyframes paper-rise { to { transform: translateY(-58%); } }
+@keyframes envelope-sink { to { transform: translateY(26%) scale(.94); opacity: 0; } }
+
+.deck-enter { animation: deck-in 520ms cubic-bezier(.2, .75, .25, 1) both; }
+@keyframes deck-in { from { transform: translateY(-9%) scale(.95); opacity: 0; } }
+
+.notes-sheet .sheet-kicker { display: block; margin-bottom: 18px; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
+/* 更新清单放在信纸上：用纸的字色，不用卡片的灰。 */
+.notes-sheet :deep(.release-group li) { color: var(--paper-ink); font-family: var(--paper-font); }
+.notes-sheet :deep(.release-group li strong) { color: var(--paper-ink); }
+.notes-sheet :deep(.release-group h3) { color: var(--paper-muted); }
+
+.letter-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(600px, calc(100vw / var(--ui-scale, 1) - 40px)); }
+.pager { display: flex; align-items: center; gap: 8px; }
+.dots { display: flex; gap: 6px; }
+.dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--ink) 26%, transparent); cursor: pointer; transition: background 200ms ease, transform 200ms ease; }
+.dot.on { background: var(--ink); transform: scale(1.25); }
+.dot:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.icon-button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--mat-line); border-radius: 50%; background: var(--mat-raised); color: var(--ink); cursor: pointer; }
+.icon-button:disabled { opacity: .35; cursor: default; }
+.icon-button svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.acknowledge { min-width: 104px; min-height: 42px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-enter { animation: deck-fade 220ms ease both; }
+  @keyframes deck-fade { from { opacity: 0; } }
+}
+@media (max-width: 600px) {
+  .letter-foot { flex-wrap: wrap; justify-content: center; }
+  .acknowledge { flex: 1 0 100%; }
+}

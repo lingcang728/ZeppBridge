@@ -4,6 +4,7 @@ mod ai_tasks;
 mod auth;
 mod backup;
 mod data;
+mod letters;
 mod login;
 mod official;
 mod status;
@@ -190,6 +191,7 @@ pub(crate) use data::{
     set_workout_code_label, set_workout_type_override, submit_device_model_assignment,
     submit_diagnostic_report,
 };
+pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,

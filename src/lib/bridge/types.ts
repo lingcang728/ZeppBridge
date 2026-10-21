@@ -416,6 +416,12 @@ export interface BridgeBackend {
   compactRawPayloads(): Promise<RawPayloadCompaction>;
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
+  /** 信匣：本机的待寄出、已寄出和上次取回的回执（不联网）。 */
+  lettersState(): Promise<import('../../types/letters').LetterBoxView>;
+  /** 寄一封回信；连不上就放进待寄出，返回 queued。 */
+  lettersSendReply(input: import('../../types/letters').LetterReplyInput): Promise<import('../../types/letters').LetterSendResult>;
+  /** 补寄待寄出、再取一次回执；连不上就原样返回本机的。 */
+  lettersSync(): Promise<import('../../types/letters').LetterBoxView>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   prepareAiHandoff(

@@ -88,6 +88,12 @@ const routes = [
     component: () => import('../views/DeviceDetail.vue'),
   },
   {
+    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。入口在设置「同步」卡的版本那一行下面。
+    path: '/letters',
+    name: 'LetterBox',
+    component: () => import('../views/LetterBox.vue'),
+  },
+  {
     path: '/health-check',
     name: 'HealthCheck',
     component: () => import('../views/HealthCheck.vue'),

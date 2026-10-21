@@ -11,6 +11,40 @@ export const NOTE_LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru
 export const LETTERS_SINCE = '3.0.7';
 export const letterPath = (version, locale) => `docs/releases/letters/${version}/${locale}.md`;
 export const needsLetter = (version) => compareVersions(version, LETTERS_SINCE) >= 0;
+export const echoPath = (version, locale) => `docs/releases/letters/${version}/echo/${locale}.md`;
+
+/*
+ * 「上期回音」可以没有；有了就 12 种语言都要有，列表行格式和 src/lib/letters/parse.ts 的 parseEcho 一致，
+ * 每种语言的 #id 和中文原稿同一组、同一顺序——回执「归入『…』」和「我也遇到」都按 #id 对。
+ */
+const ECHO_ITEM = /^[-*]\s+(next|later|asking)\s+#([a-z0-9][a-z0-9-]{0,47})\s*[:：]\s*(.+)$/;
+const echoIds = (text) => {
+  const ids = [];
+  const bad = [];
+  for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
+    const line = raw.trim();
+    if (!/^[-*]\s/.test(line)) continue;
+    const match = ECHO_ITEM.exec(line);
+    if (match) ids.push(match[2]); else bad.push(line);
+  }
+  return { ids, bad };
+};
+export function echoProblems(version, show) {
+  const original = show(echoPath(version, 'zh'));
+  if (!original?.trim()) return [];
+  const problems = [];
+  const expected = echoIds(original);
+  if (!expected.ids.length) problems.push(`${echoPath(version, 'zh')} 没有一条回音（列表行要写成 \`- next|later|asking #id: …\`）`);
+  if (new Set(expected.ids).size !== expected.ids.length) problems.push(`${echoPath(version, 'zh')} 里有重复的 #id`);
+  for (const locale of NOTE_LOCALES) {
+    const text = show(echoPath(version, locale));
+    if (!text?.trim()) { problems.push(`缺上期回音 ${echoPath(version, locale)}`); continue; }
+    const { ids, bad } = echoIds(text);
+    for (const line of bad) problems.push(`${echoPath(version, locale)} 这一行不是回音格式：${line.slice(0, 60)}`);
+    if (ids.join(' ') !== expected.ids.join(' ')) problems.push(`${echoPath(version, locale)} 的 #id 和中文原稿对不上`);
+  }
+  return problems;
+}
 
 const VERSION = /^\d+\.\d+\.\d+$/;
 const SHA = /^[0-9a-f]{40}$/;
@@ -141,6 +175,7 @@ export function verifySnapshot({ git, entry, previousTag, mainRef = 'origin/main
     for (const locale of NOTE_LOCALES) {
       if (!show(letterPath(v, locale))?.trim()) problems.push(`缺作者来信 ${letterPath(v, locale)}（每一版都要先写信）`);
     }
+    problems.push(...echoProblems(v, show));
   }
 
   if (previousTag) {

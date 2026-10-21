@@ -441,6 +441,15 @@ export const tauriBackend: BridgeBackend = {
   compactRawPayloads() {
     return call<RawPayloadCompaction>('compact_raw_payloads');
   },
+  lettersState() {
+    return call<import('../../types/letters').LetterBoxView>('letters_state');
+  },
+  lettersSendReply(input: import('../../types/letters').LetterReplyInput) {
+    return call<import('../../types/letters').LetterSendResult>('letters_send_reply', { ...input });
+  },
+  lettersSync() {
+    return call<import('../../types/letters').LetterBoxView>('letters_sync');
+  },
   submitDiagnosticReport(note?: string, category?: string) {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
       note: note ?? null,

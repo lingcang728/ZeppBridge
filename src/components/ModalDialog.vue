@@ -8,6 +8,8 @@ const props = defineProps<{
   /** 从哪个元素长出来、缩回哪里（舞台上被点的那张牌）。不给就用打开它时聚焦的元素 / 最近一次按下的位置。
       牌是按 pointerdown 拖的、点开时焦点不在它身上：不显式给的话，关的时候会缩进刚点的「收起」按钮，看上去是凭空消失（10-13）。 */
   origin?: HTMLElement | null;
+  /** 不画玻璃面板、不留内边距：信封这类自己就是「物件」的浮层用（components/letters/LetterEnvelope.vue）。 */
+  bare?: boolean;
 }>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const panel = ref<HTMLElement | null>(null);
@@ -79,7 +81,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
-      <section ref="panel" class="dialog-panel" :style="maxWidth ? { maxWidth: `${maxWidth}px` } : undefined" data-modal-dialog role="dialog" aria-modal="true"
+      <section ref="panel" :class="['dialog-panel', { 'is-bare': bare }]" :style="maxWidth ? { maxWidth: `${maxWidth}px` } : undefined" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
         <span class="dialog-glass" aria-hidden="true"></span>
         <div class="dialog-scroll"><slot /></div>
@@ -109,4 +111,6 @@ onUnmounted(() => {
 .dialog-panel:focus, .dialog-panel:focus-visible { outline: none; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
+.is-bare > .dialog-glass { display: none; }
+.is-bare > .dialog-scroll { padding: 0; overflow: visible; }
 </style>

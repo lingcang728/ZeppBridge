@@ -123,40 +123,8 @@ pub(super) fn sanitize_diagnostic_note(note: &str) -> Option<String> {
     (!collapsed.is_empty()).then_some(collapsed)
 }
 
-/// 一个词看起来像不像凭据、序列号或设备 ID。
-///
-/// 判断只看形状，不看它自称是什么：长串的十六进制、长串数字、带 @ 的地址、
-/// MAC 形状，都直接换掉。宁可多抹一个型号编号，也不要漏出一个 token。
-pub(super) fn looks_like_secret(token: &str) -> bool {
-    let value = token.trim_matches(|character: char| {
-        !character.is_alphanumeric() && character != '@' && character != ':' && character != '-'
-    });
-    if value.chars().count() < 8 {
-        return false;
-    }
-    if value.contains('@') && value.contains('.') {
-        return true;
-    }
-    // aa:bb:cc:dd:ee:ff 形状的 MAC 地址
-    let colon_groups: Vec<&str> = value.split(':').collect();
-    if colon_groups.len() >= 6
-        && colon_groups
-            .iter()
-            .all(|group| group.len() == 2 && group.chars().all(|c| c.is_ascii_hexdigit()))
-    {
-        return true;
-    }
-    let alnum = value.chars().filter(|c| c.is_ascii_alphanumeric()).count();
-    let digits = value.chars().filter(|c| c.is_ascii_digit()).count();
-    if alnum >= 16
-        && value
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return true;
-    }
-    digits >= 10
-}
+/// 一个词看起来像不像凭据、序列号或设备 ID（规则在 core，回信脱敏也用同一份）。
+pub(super) use zeppbridge_core::redact::looks_like_secret;
 
 /// 逐台设备把「用户指认的型号」和「这台设备的型号类编号」配成对。
 ///

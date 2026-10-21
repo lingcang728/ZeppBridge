@@ -5,8 +5,12 @@ import ModalDialog from '../ModalDialog.vue';
 import BrandMark from '../BrandMark.vue';
 import Icon from '../Icon.vue';
 import WhyHalfData from '../WhyHalfData.vue';
+import ReleaseNotesList from './ReleaseNotesList.vue';
+import LetterEnvelope from '../letters/LetterEnvelope.vue';
+import { letterVersions } from '../../services/letters';
+import { lettersBetween } from '../../lib/letters/parse';
 import {
-  acknowledgeUpdate, emphasis, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale, releaseRows, updateNotice,
+  acknowledgeUpdate, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale, releaseRows, updateNotice,
 } from '../../services/updateNotice';
 import { locale } from '../../i18n';
 import { useUpdateNoticeText } from './UpdateNotice.i18n';
@@ -25,6 +29,9 @@ watch([() => receipt.value?.version, locale], async ([version, language]) => {
 const rows = computed(() => releaseRows(bundled.value ?? notesForLocale(receipt.value?.notes ?? '', locale.value)));
 /* 按新增 / 改进 / 修复分组列出，不再每行前面挂一个小标签（用户 2026-10-19：「很难读」）。 */
 const groups = computed(() => groupRows(rows.value));
+
+/* 3.0.7 起每一版都有作者来信：有信就用信封（更新说明是其中一张信纸），跳过几版才更新的人几封捆成一叠。没有信的老版本仍用这张卡。 */
+const letters = computed(() => (receipt.value ? lettersBetween(letterVersions(), receipt.value.from, receipt.value.version) : []));
 
 /* 3.0.2 先放一页「为什么有些数据没有」，再看改了什么。 */
 const page = ref(0);
@@ -62,7 +69,8 @@ const star = () => {
 </script>
 
 <template>
-  <ModalDialog v-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
+  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="receipt.version" :notes="groups" :origin="origin()" @done="acknowledgeUpdate" />
+  <ModalDialog v-else-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
     <div class="release-card">
       <header class="release-header">
         <span class="release-mark"><BrandMark :size="32" /></span>
@@ -72,15 +80,8 @@ const star = () => {
         <WhyHalfData title-id="update-notice-why" />
       </div>
       <div v-else class="release-body">
-        <section v-for="group in groups" :key="group.kind" :class="['release-group', `is-${group.kind}`]">
-          <h3><span class="release-dot" aria-hidden="true"></span>{{ t[group.kind] }}</h3>
-          <ul>
-            <li v-for="(item, index) in group.items" :key="index">
-              <template v-for="(segment, part) in emphasis(item)" :key="part"><strong v-if="segment.strong">{{ segment.text }}</strong><template v-else>{{ segment.text }}</template></template>
-            </li>
-          </ul>
-        </section>
-        <p v-if="!groups.length" class="release-empty">{{ t.empty }}</p>
+        <ReleaseNotesList :groups="groups" />
+
       </div>
       <footer class="release-actions">
         <button type="button" class="button secondary star-button" @click="star">
@@ -100,17 +101,6 @@ const star = () => {
 h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; letter-spacing: -.015em; }
 .release-header p { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
 .release-body { margin: 24px 0; max-height: 52vh; overflow-y: auto; overscroll-behavior: contain; }
-.release-group + .release-group { margin-top: 18px; }
-.release-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--muted); font-size: var(--fs-2xs); font-weight: 400; letter-spacing: .04em; }
-.release-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
-.is-added .release-dot { background: var(--accent); }
-.is-improved .release-dot { background: var(--route-amber); }
-.is-fixed .release-dot { background: var(--danger); }
-.release-group ul { display: grid; gap: 8px; margin: 0; padding: 0 0 0 15px; list-style: none; }
-.release-group li { position: relative; font-size: var(--fs-xs); line-height: 1.7; color: var(--muted); }
-.release-group li::before { content: ''; position: absolute; left: -12px; top: .78em; width: 4px; height: 4px; border-radius: 50%; background: var(--subtle); }
-.release-group li strong { font-weight: 700; color: var(--ink); }
-.release-empty { color: var(--muted); line-height: 1.7; }
 .release-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
 .release-actions .button { min-height: 42px; padding-inline: 18px; font-size: var(--fs-xs); }
 .acknowledge { min-width: 104px; }

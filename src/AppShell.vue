@@ -19,6 +19,7 @@ import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { startDesktopUpdate } from './services/updateService';
+import { scheduleLetterBoxSync } from './services/letterBox';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
@@ -222,6 +223,8 @@ onMounted(() => {
     }
     // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts）。走裸 `invoke`，得等后端就绪再发。
     void startDesktopUpdate();
+    // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）。
+    scheduleLetterBoxSync();
   });
   void initialize();
   document.addEventListener('keydown', onDocumentKeydown);
