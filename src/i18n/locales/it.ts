@@ -360,8 +360,6 @@ export default {
   },
 
   'components/letters/letters': {
-    to: 'A: te',
-    from: 'Da ZeppBridge',
     sealHint: 'Tieni premuto il sigillo di ceralacca o aprilo',
     sealAria: (version: string) => `Apri la lettera per ${version}`,
     bundle: (count: number) => `${count} lettere legate insieme`,

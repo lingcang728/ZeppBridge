@@ -43,7 +43,7 @@ type Phase = 'sealed' | 'opening' | 'unfolding' | 'reading';
 const phase = ref<Phase>(props.opened ? 'reading' : 'sealed');
 const index = ref(0);
 const newest = computed(() => props.versions[props.versions.length - 1] ?? props.current);
-/* 邮戳：第一次收到这封信的那天。重读时不再盖新的戳。 */
+/* 信头日期：第一次收到这封信的那天。重读时不再记新的。 */
 const postmark = ref<string | null>(null);
 onMounted(() => { postmark.value = props.opened ? receivedDate(newest.value) : receivedOn(newest.value); });
 
@@ -128,7 +128,7 @@ const acknowledge = async (event?: MouseEvent) => {
     <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened }]">
       <div v-if="phase !== 'reading'" class="envelope-wrap">
         <EnvelopeArt :version="newest" :state="phase === 'sealed' ? 'sealed' : phase === 'opening' ? 'opening' : 'leaving'"
-          :bundled="versions.length" :date="postmark" :to="t.to" :from="t.from">
+          :bundled="versions.length">
           <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
         </EnvelopeArt>
         <p class="seal-hint">{{ versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ t.sealHint }}</p>

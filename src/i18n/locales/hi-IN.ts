@@ -3040,8 +3040,6 @@ Markdown में उत्तर दें।`,
     },
 
     'components/letters/letters': {
-      to: 'सेवा में: आप',
-      from: 'प्रेषक: ZeppBridge',
       sealHint: 'लाख की मुहर दबाकर रखें या तोड़कर खोलें',
       sealAria: (version: string) => `${version} के लिए पत्र खोलें`,
       bundle: (count: number) => `${count} पत्र एक साथ बंधे हुए`,

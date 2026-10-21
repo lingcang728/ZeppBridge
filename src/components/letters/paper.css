@@ -1,6 +1,6 @@
 /*
  * 信纸和信封的「纸」（批次 6）。纸是物件，不走卡片的玻璃材质：
- * 纸就是纸：深色主题也是米白纸，只是压暗一点免得刺眼（炭灰纸放在深色界面上又成了卡片，2026-10-21 用户嫌像卡片）；纸纹是一张可平铺的纤维图（assets/letters/paper-grain.png，
+ * 纸就是纸：深色主题也是米白纸，只是压暗一点免得刺眼（炭灰纸放在深色界面上又成了卡片，2026-10-21 用户嫌像卡片）；纸纹是一张可平铺的棉浆纸颗粒（assets/letters/paper-tooth.png，以 50% 灰为中性、soft-light 叠上去；
  * CSP 不许 data URL，所以是实体文件）。只在信封和信匣里用。
  *
  * 横线信纸：字号 --paper-size、行距 --paper-line，每行底下一条线，字压在线上。
@@ -13,7 +13,7 @@
   --paper-muted: #7d7768;
   --paper-rubric: #a3322c;
   --paper-rule: rgb(150 120 80 / .2);
-  --paper-grain-opacity: .55;
+  --paper-grain-opacity: .75;
   --paper-size: 17px;
   --paper-line: 34px;
   --paper-font: Georgia, 'Iowan Old Style', 'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', serif;
@@ -26,7 +26,7 @@
   --paper-muted: #6c6658;
   --paper-rubric: #962e28;
   --paper-rule: rgb(120 95 60 / .24);
-  --paper-grain-opacity: .5;
+  --paper-grain-opacity: .7;
 }
 @media (max-width: 600px) {
   .paper, .paper-stock { --paper-size: 16px; --paper-line: 32px; }
@@ -46,8 +46,8 @@
 /* 纸纹叠在纸面上、字的下面。 */
 .paper::before {
   content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-  background: url('../../assets/letters/paper-grain.png') 0 0 / 320px 320px repeat;
-  opacity: var(--paper-grain-opacity);
+  background: url('../../assets/letters/paper-tooth.png') 0 0 / 128px 128px repeat;
+  opacity: var(--paper-grain-opacity); mix-blend-mode: soft-light;
 }
 
 /* 横线：线落在每一行底边往上 6px（正好托住字脚，不是悬在字下面一截）。给这个类的元素 padding-top 必须是 --paper-line 的整数倍，线才对得上字。 */
