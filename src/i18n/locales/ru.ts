@@ -911,7 +911,6 @@ export default {
       summaryAria: 'Доля фаз сна',
       cursorHint: "Наведите указатель на график, чтобы увидеть значение в конкретный момент; нажмите, чтобы зафиксировать его, затем переходите по этапам стрелками",
       cursorAt: (time: string) => `В ${time}`,
-      momentDeep: (time: string) => `Самый длинный глубокий сон · ${time}`,
     },
 
     'components/WeeklyReportCard': {

@@ -1154,7 +1154,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       zeroMinutes: '0 Min.',
       cursorHint: "Zeige auf die Grafik für einen Zeitpunkt; klicke zum Fixieren und nutze die Pfeiltasten, um Abschnitt für Abschnitt weiterzugehen",
       cursorAt: (time: string) => `Um ${time}`,
-      momentDeep: (time: string) => `Längste Tiefschlafphase · ${time}`,
     },
     'components/WeeklyReportCard': {
       barBaseline: '28 Tage davor',

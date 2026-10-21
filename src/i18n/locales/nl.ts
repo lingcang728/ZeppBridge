@@ -506,7 +506,6 @@ export default {
       summaryAria: 'Aandeel per slaapstadium',
       cursorHint: "Wijs een moment op de grafiek aan; klik om het vast te zetten en gebruik de pijltjestoetsen om per fase te bladeren",
       cursorAt: (time: string) => `Om ${time}`,
-      momentDeep: (time: string) => `Langste diepe slaap · ${time}`,
     },
     'components/WeeklyReportCard': {
       title: 'Deze week',

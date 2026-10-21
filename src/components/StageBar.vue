@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import DurationText from './DurationText.vue';
-import { insertSleepStageGaps, longestDeepMidpoint, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
+import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import { vEdgeSafe } from '../lib/edgeSafe';
@@ -16,7 +16,6 @@ const messages = defineMessages(
     summaryAria: '睡眠阶段汇总比例',
     cursorHint: '指针移到图上看某一刻；点一下固定，方向键逐段看',
     cursorAt: (time: string) => `${time} 时`,
-    momentDeep: (time: string) => `深睡最长段 · ${time}`,
   },
   {
     notProvided: 'Not provided',
@@ -25,7 +24,6 @@ const messages = defineMessages(
     summaryAria: 'Sleep stage share',
     cursorHint: 'Point at the chart to read a moment; click to pin, arrow keys step through stages',
     cursorAt: (time: string) => `At ${time}`,
-    momentDeep: (time: string) => `Longest deep sleep · ${time}`,
   },
   {
     notProvided: 'No proporcionado',
@@ -34,7 +32,6 @@ const messages = defineMessages(
     summaryAria: 'Proporción de fases del sueño',
     cursorHint: 'Pasa el puntero para leer un momento; haz clic para fijarlo y usa las flechas para recorrer las fases',
     cursorAt: (time: string) => `A las ${time}`,
-    momentDeep: (time: string) => `Sueño profundo más largo · ${time}`,
   },
   'components/StageBar',
 );
@@ -128,17 +125,6 @@ const timeline = computed<BarSegment[]>(() => {
 
 const isHypnogram = computed(() => timeline.value.length > 0 && range.value !== null);
 
-/* 深睡最长段（3.1，取自 tobi 稿的「深睡峰」）：图上一根竖线，顶上一枚反色胶囊写钟点。指针在图上时让给游标。
-   靠两边时胶囊往里收（按百分比收：胶囊宽度大约是轴宽的一成）。 */
-const deepPeak = computed(() => {
-  const current = range.value;
-  if (!current) return null;
-  const at = longestDeepMidpoint(timeline.value as TimedSleepSlice[]);
-  if (at === null) return null;
-  const left = ((at - current.from) / current.span) * 100;
-  const time = formatTime(new Date(at).toISOString());
-  return { left, time, anchor: left < 8 ? 'start' : left > 92 ? 'end' : 'middle', label: t.value.momentDeep(time) };
-});
 /**
  * 这一夜有没有认不出来的阶段。
  *
@@ -271,10 +257,6 @@ const tooltip = computed(() => {
     <template v-if="isHypnogram">
       <div class="sleep-timeline">
         <div class="timeline-legend"><span v-for="(label, index) in stageLabels" :key="label"><i :class="STAGE_TONES[index]"></i>{{ label }}</span></div>
-        <!-- 胶囊放在轨道外面一行（轨道裁切圆角，放里面会被切掉）；指针在图上时藏起来但不收行高，免得图上下跳。 -->
-        <div v-if="deepPeak" class="timeline-peak-row">
-          <span :class="['timeline-peak-cap', deepPeak.anchor, { 'is-hidden': cursor !== null }]" :style="{ left: `${deepPeak.left}%` }" :title="deepPeak.label">{{ deepPeak.time }}</span>
-        </div>
         <div
           class="timeline-tracks"
           :class="{ 'is-pinned': pinned }"
@@ -295,7 +277,6 @@ const tooltip = computed(() => {
           <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered, sfumato: slice.tone === 'unknown' }]"
             :style="timelineStyle(slice)" aria-hidden="true" />
           <span v-if="cursor !== null" class="timeline-cursor" :style="{ left: `${cursor * 100}%` }" aria-hidden="true" />
-          <span v-else-if="deepPeak" class="timeline-peak" :style="{ left: `${deepPeak.left}%` }" aria-hidden="true" />
         </div>
       </div>
       <div class="stage-axis ticked">
@@ -346,17 +327,6 @@ const tooltip = computed(() => {
 .timeline-tracks.is-pinned .timeline-cursor { opacity: .9; }
 .stage-axis.ticked { position: relative; }
 .stage-axis .tick { position: absolute; top: 0; transform: translateX(-50%); color: var(--subtle); font-size: var(--fs-xs); }
-/* 深睡最长段：竖线贯穿各泳道，胶囊在轨道正上方一行，底边贴着轨道顶。 */
-.timeline-peak { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -.5px; background: var(--ink); opacity: .7; pointer-events: none; z-index: 2; }
-.timeline-peak-row { position: relative; height: 22px; margin-bottom: -10px; }
-.timeline-peak-cap.is-hidden { visibility: hidden; }
-.timeline-peak-cap {
-  position: absolute; bottom: 0; z-index: 3; padding: 2px 9px; border-radius: 999px;
-  background: var(--ink); color: var(--bg); font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
-  transform: translateX(-50%); pointer-events: auto;
-}
-.timeline-peak-cap.start { transform: translateX(-6px); }
-.timeline-peak-cap.end { transform: translateX(calc(-100% + 6px)); }
 .timeline-readout { min-height: 1.6em; margin: 6px 0 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .stage-bar {
   position: relative;

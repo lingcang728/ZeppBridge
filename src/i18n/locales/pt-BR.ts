@@ -620,7 +620,6 @@ export default {
       summaryAria: 'Proporção dos estágios de sono',
       cursorHint: "Passe o cursor sobre o gráfico para ver um instante; clique para fixá-lo e use as setas para avançar etapa por etapa",
       cursorAt: (time: string) => `Às ${time}`,
-      momentDeep: (time: string) => `Sono profundo mais longo · ${time}`,
     },
 
     'components/WeeklyReportCard': {

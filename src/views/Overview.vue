@@ -214,6 +214,7 @@ const trainingEntry = computed(() => {
     tag: loadBand.value || null,
     spark: seriesValues('training_load'),
     color: metricColor('training_load'),
+    format: (v: number) => formatMetric(v),
   };
   const facts = present([vo2, load]);
   const thin = facts.every((fact) => (fact.spark?.length ?? 0) < 2);

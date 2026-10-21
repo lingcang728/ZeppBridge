@@ -780,7 +780,6 @@ export default {
       notProvided: 'उपलब्ध नहीं',
       cursorHint: "चार्ट पर पॉइंटर ले जाकर उस समय का डेटा देखें; पिन करने के लिए क्लिक करें, फिर तीर कुंजियों से एक-एक चरण देखें",
       cursorAt: (time: string) => `${time} पर`,
-      momentDeep: (time: string) => `सबसे लंबी गहरी नींद · ${time}`,
     },
 
     'components/WeeklyReportCard': {
