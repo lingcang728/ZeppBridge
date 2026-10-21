@@ -181,6 +181,30 @@ export const drawVisibleText = (width: number, height: number, scope: Element = 
 };
 
 
+/**
+ * 整块面（信纸）也化灰：按各自的纸色填一块圆角矩形。只取字时，深色主题里纸上的墨字碎成的灰是暗的、看不见，
+ * 纸本身又只被遮罩吃掉——看着像被一个黑圈抹掉，不像烧成灰（2026-10-21 用户：「知道了」后灰烬动效没了）。
+ * 颜色取元素的 `--paper`，没有就取背景色。
+ */
+export const drawSurfaces = (width: number, height: number, surfaces: Element[]): CanvasRenderingContext2D | null => {
+  if (!surfaces.length) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  for (const el of surfaces) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    ctx.fillStyle = cs.getPropertyValue('--paper').trim() || cs.backgroundColor;
+    ctx.beginPath();
+    ctx.roundRect(r.left, r.top, r.width, r.height, Number.parseFloat(cs.borderTopLeftRadius) || 0);
+    ctx.fill();
+  }
+  return ctx;
+};
+
 export type Grains = { data: Float32Array; count: number; size: number };
 
 /** 文字和图表的像素 → 灰粒：位置、颜色、两枚随机数、起飞时刻和寿命（每粒 10 个 float）。 */
