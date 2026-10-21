@@ -453,9 +453,9 @@ if (-not $SkipStaleInstall) {
   Write-Host 'v3 跳过 2.x LocalAppData / Uninstall 清理，以免动到正式版残留项。'
 }
 
+# 按前缀比对认当前版本（同 Test-KeepReleaseFile）：版本号的懒匹配会把 3.0.9-beta.1 读成 3.0.9，直接比会把本版 beta 当成旧包。
 $leftover = @(Get-ChildItem -LiteralPath $ReleaseDir -File | Where-Object {
-    $fileVersion = Get-VersionedArtifactVersion -Name $_.Name -ProductName $productName
-    return ($null -ne $fileVersion -and $fileVersion -ne $version)
+    -not (Test-KeepReleaseFile -Name $_.Name -Version $version -ProductName $productName)
   })
 if ($leftover.Count -gt 0) {
   $names = ($leftover | ForEach-Object { $_.Name }) -join ', '
