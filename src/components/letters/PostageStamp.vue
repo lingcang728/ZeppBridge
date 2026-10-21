@@ -9,18 +9,18 @@ import { computed, useId } from 'vue';
 import { stampFace } from '../../lib/letters/stamp';
 import { useStampImage } from '../../services/letters';
 import fallbackArt from '../../assets/letters/stamp-default.webp';
-import grain from '../../assets/letters/paper-grain.png';
+import tooth from '../../assets/letters/paper-tooth.png';
 
 const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number }>(), { width: 92, tilt: 0 });
 const face = computed(() => stampFace(props.version));
 const image = useStampImage(() => props.version);
 const id = `stamp-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
-/* 齿孔沿四边每 7.4 个单位一个，四角各留一个。 */
+/* 齿孔又细又密（参考图那样）：沿四边每 5.2 个单位一个。 */
 const holes = computed(() => {
   const list: Array<[number, number]> = [];
-  for (let x = 3.2; x <= 124; x += 7.4) list.push([x, 0], [x, 100]);
-  for (let y = 3.3; y <= 100; y += 7.4) list.push([0, y], [124, y]);
+  for (let x = 2.4; x <= 124; x += 5.2) list.push([x, 0], [x, 100]);
+  for (let y = 2.4; y <= 100; y += 5.2) list.push([0, y], [124, y]);
   return list;
 });
 </script>
@@ -30,10 +30,10 @@ const holes = computed(() => {
     <defs>
       <mask :id="`${id}-perf`">
         <rect width="124" height="100" fill="#fff" />
-        <circle v-for="([x, y], i) in holes" :key="i" :cx="x" :cy="y" r="2.75" fill="#000" />
+        <circle v-for="([x, y], i) in holes" :key="i" :cx="x" :cy="y" r="1.85" fill="#000" />
       </mask>
-      <pattern :id="`${id}-grain`" width="48" height="48" patternUnits="userSpaceOnUse">
-        <image :href="grain" width="48" height="48" />
+      <pattern :id="`${id}-grain`" width="60" height="60" patternUnits="userSpaceOnUse">
+        <image :href="tooth" width="60" height="60" />
       </pattern>
       <!-- 纸边的厚度：齿孔和外沿左上受光、右下压暗。 -->
       <filter :id="`${id}-bevel`" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
@@ -69,8 +69,8 @@ const holes = computed(() => {
 <style scoped>
 .stamp { display: block; overflow: visible; filter: drop-shadow(0 .6px .6px rgb(60 45 25 / .35)) drop-shadow(0 3px 5px rgb(40 30 15 / .14)); }
 .margin { fill: #f6f1e5; }
-.margin-grain { opacity: .9; mix-blend-mode: multiply; }
-.face-grain { opacity: .35; mix-blend-mode: multiply; }
+.margin-grain { opacity: .9; mix-blend-mode: soft-light; }
+.face-grain { opacity: .5; mix-blend-mode: soft-light; }
 .face-edge { fill: none; stroke: rgb(50 40 25 / .28); stroke-width: .7; }
 .denomination {
   font: 400 15px/1 Georgia, 'Times New Roman', 'Songti SC', serif; fill: #1b1915; letter-spacing: -.02em;

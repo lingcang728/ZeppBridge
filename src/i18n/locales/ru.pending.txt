@@ -17,7 +17,6 @@ components/letters/letters.echoNext
 components/letters/letters.emptyLetters
 components/letters/letters.emptyReplies
 components/letters/letters.filedUnder
-components/letters/letters.from
 components/letters/letters.letterHead
 components/letters/letters.mailboxAria
 components/letters/letters.mailboxChecking
@@ -63,7 +62,6 @@ components/letters/letters.statusNext
 components/letters/letters.tabLetters
 components/letters/letters.tabReplies
 components/letters/letters.tabStamps
-components/letters/letters.to
 components/letters/letters.unread
 i18n/errors.err.letters.client_init_failed
 i18n/errors.err.letters.empty

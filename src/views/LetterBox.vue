@@ -123,7 +123,7 @@ const reread = async (version: string, event: MouseEvent) => {
         <li v-for="(v, i) in versions" :key="v" class="rail-item" :style="{ '--tilt': `${(i % 3 - 1) * 0.8}deg` }">
           <button type="button" class="rail-envelope" :aria-label="t.rereadAria(v)" @click="reread(v, $event)">
             <span class="rail-scale">
-              <EnvelopeArt :version="v" :date="receivedDate(v)" :to="t.to" :from="t.from">
+              <EnvelopeArt :version="v">
                 <template #seal><WaxSeal still :cracked="!!receivedDate(v)" :size="96" /></template>
               </EnvelopeArt>
             </span>

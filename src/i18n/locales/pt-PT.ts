@@ -3345,8 +3345,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       resetDone: 'Concluído; serão mostradas da próxima vez que aceder aqui',
     },
     'components/letters/letters': {
-      to: 'Para: si',
-      from: 'De ZeppBridge',
       sealHint: 'Mantenha premido o selo de cera ou abra-o',
       sealAria: (version: string) => `Abrir a carta de ${version}`,
       bundle: (count: number) => `${count} cartas atadas`,

@@ -3137,8 +3137,6 @@ Réponds en Markdown.`,
       resetDone: 'Terminé ; ils s’afficheront à nouveau la prochaine fois',
     },
     'components/letters/letters': {
-      to: 'Pour : vous',
-      from: 'De ZeppBridge',
       sealHint: 'Maintenez le sceau de cire enfoncé ou brisez-le',
       sealAria: (version: string) => `Ouvrir la lettre pour ${version}`,
       bundle: (count: number) => `${count} lettres attachées ensemble`,
