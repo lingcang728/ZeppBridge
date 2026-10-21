@@ -360,6 +360,10 @@ export default {
   },
 
   'components/letters/letters': {
+    to: 'A: te',
+    from: 'Da ZeppBridge',
+    flipHint: 'Tocca per girare la busta',
+    flipAria: 'Gira la busta',
     sealHint: 'Tieni premuto il sigillo di ceralacca o aprilo',
     sealAria: (version: string) => `Apri la lettera per ${version}`,
     bundle: (count: number) => `${count} lettere legate insieme`,

@@ -10,6 +10,8 @@
  * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：sealed 封着 → opening 封盖翻开、信纸往上抽出 → leaving 信封往下沉、淡掉（信纸已经变成外面那张信纸）。
  * 立体感（用户 2026-10-21：「注重立体感」）：光从左上来——左折片朝光偏亮、右折片背光偏暗、封盖最亮；
  * 封盖和底片往右下投影；信封四边是折过来的圆边（上左亮、下右暗），中间因为装着信微微鼓起；底下贴桌一圈实影。
+ * 背面（2026-10-21 用户嫌不够好看）：两侧折片的尖是圆的；底片上压一行无墨凸印 ZEPPBRIDGE；
+ * 封盖里面衬一张深色花纹衬纸（旧式信封那样），封盖翻过一半才看得见。
  * 翻封盖用 rotateX，前后层次靠离散的 z-index 关键帧换；其余都只动 transform / opacity。
  */
 import { useId } from 'vue';
@@ -32,6 +34,12 @@ const FLAP = 'M0 0H160C152 6 104 41 87.5 55Q80 61 72.5 55C56 41 8 6 0 0Z';
 const FLAP_EDGE = 'M160 0C152 6 104 41 87.5 55Q80 61 72.5 55C56 41 8 6 0 0';
 const BOTTOM = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100Z';
 const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100';
+/* 两侧折片：尖在中线附近、是圆的。 */
+const LEFT = 'M0 0C20 12 60 37 75 47Q83 52 75 57C60 66 20 88 0 100Z';
+const RIGHT = 'M160 0C140 12 100 37 85 47Q77 52 85 57C100 66 140 88 160 100Z';
+const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47Q77 52 85 57';
+/* 衬纸比封盖小一圈，四周留出纸边。 */
+const LINER = 'M7 3H153C144 9 102 39 87 50.5Q80 55.5 73 50.5C58 39 16 9 7 3Z';
 </script>
 
 <template>
@@ -60,10 +68,17 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
         </filter>
       </defs>
       <!-- 左右折片各一片（朝光 / 背光），底片压在上面、往右下投影，边上一道亮线。 -->
-      <path d="M0 0L82 52L0 100Z" :fill="`url(#${id}-left)`" />
-      <path d="M160 0L78 52L160 100Z" :fill="`url(#${id}-right)`" />
+      <path :d="LEFT" :fill="`url(#${id}-left)`" />
+      <path :d="RIGHT" :fill="`url(#${id}-right)`" />
+      <path :d="SIDE_EDGES" class="side-edge" />
       <path :d="BOTTOM" :fill="`url(#${id}-bottom)`" :filter="`url(#${id}-cast)`" />
       <path :d="BOTTOM_EDGE" class="lip-light" />
+      <!-- 无墨凸印：同一行字错开半个单位，一道亮、一道暗。 -->
+      <g class="emboss" text-anchor="middle">
+        <text x="79.7" y="87.7" class="emboss-light">ZEPPBRIDGE</text>
+        <text x="80.3" y="88.3" class="emboss-shade">ZEPPBRIDGE</text>
+        <text x="80" y="88">ZEPPBRIDGE</text>
+      </g>
     </svg>
     <span class="env-flap" aria-hidden="true">
       <svg viewBox="0 0 160 62" preserveAspectRatio="none">
@@ -75,6 +90,19 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
         </defs>
         <path :d="FLAP" :fill="`url(#${id}-flap)`" />
         <path :d="FLAP_EDGE" class="lip-light" />
+      </svg>
+      <!-- 封盖里面：翻过一半换成这一面（上下已经翻过来了，花纹对称看不出）。 -->
+      <svg class="flap-liner" viewBox="0 0 160 62" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <pattern :id="`${id}-liner`" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="var(--env-liner)" />
+            <path d="M0 4L4 0L8 4L4 8Z" fill="none" stroke="var(--env-liner-ink)" stroke-width=".22" />
+            <path d="M4 2.6L4.5 4L4 5.4L3.5 4Z M2.6 4L4 3.5L5.4 4L4 4.5Z" fill="var(--env-liner-ink)" />
+            <circle v-for="([cx, cy], k) in [[0, 0], [8, 0], [0, 8], [8, 8]]" :key="k" :cx="cx" :cy="cy" r=".5" fill="var(--env-liner-ink)" />
+          </pattern>
+        </defs>
+        <path :d="FLAP" fill="var(--env-inside)" />
+        <path :d="LINER" :fill="`url(#${id}-liner)`" />
       </svg>
     </span>
     </template>
@@ -104,6 +132,7 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
   --env-flap-top: #f0ebe3; --env-flap: #e2dbcf;
   --env-side: #ddd6ca;
   --env-inside: #cdc4b3; --env-lip: rgb(255 253 248 / .85); --env-ink: #4a4237;
+  --env-liner: #2f3b52; --env-liner-ink: rgb(214 186 122 / .62);
   position: relative; width: 100%; aspect-ratio: 1.6; perspective: 1200px;
 }
 :root[data-theme='dark'] .envelope {
@@ -120,17 +149,25 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
 .env-ghost { background: var(--env-side); box-shadow: 0 10px 22px -12px rgb(0 0 0 / .45); }
 .env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
 .env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .85; }
-/* 露出来的信纸：和外面那张信纸同一个纸色、同样的横线。 */
+/* 装在里面的信：折着的一张纸，外面是空白的背面，中间一道折痕（抽出来以后接手的那张信纸也是空白的，字等展开才浮上来）。 */
 .env-paper {
   inset: 6% 6% 10% !important; z-index: 1; border-radius: 2px !important; box-shadow: 0 -1px 3px rgb(0 0 0 / .08);
-  background: repeating-linear-gradient(to bottom, transparent 0 15px, rgb(150 120 80 / .16) 15px 16px) 0 18px / 100% no-repeat, #f6f2e9;
+  background: linear-gradient(to bottom, transparent calc(50% - 1px), rgb(150 120 80 / .14) calc(50% - 1px) 50%, rgb(255 255 255 / .6) 50% calc(50% + 1px), transparent calc(50% + 1px)), linear-gradient(170deg, #fbf7ee, #f4eee2);
 }
 .env-pocket { z-index: 2; width: 100%; height: 100%; overflow: hidden; }
 .lip-light { fill: none; stroke: var(--env-lip); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+.side-edge { fill: none; stroke: rgb(90 70 40 / .16); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.emboss text { font: 400 4.2px/1 Georgia, 'Times New Roman', serif; letter-spacing: .9px; fill: var(--env-bottom-in); }
+.emboss .emboss-light { fill: rgb(255 253 246 / .75); }
+.emboss .emboss-shade { fill: rgb(90 70 40 / .3); }
 /* 封盖：纸厚的亮边 + 往下投的一层淡影。 */
 .env-flap { z-index: 4; bottom: auto !important; height: 62% !important; transform-origin: 50% 0; border-radius: 5px 5px 0 0 !important;
   filter: drop-shadow(.8px 1.6px 1.2px rgb(70 50 25 / .3)) drop-shadow(3px 8px 10px rgb(70 50 25 / .16)); }
 .env-flap svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.env-flap .flap-liner { position: absolute; inset: 0; opacity: 0; }
+.is-opening .flap-liner { animation: liner-show 560ms linear forwards; }
+.is-leaving .flap-liner { opacity: 1; }
+@keyframes liner-show { 0%, 36% { opacity: 0; } 37%, 100% { opacity: 1; } }
 /* 纸面颗粒和整体受光盖在折片和封盖上（同一张纸）。 */
 .env-tooth { z-index: 5; pointer-events: none; background: url('../../assets/letters/paper-tooth.png') 0 0 / 128px repeat; mix-blend-mode: soft-light; opacity: .6; }
 /* 受光与厚度：中间微鼓（中心偏亮、四周压暗），四边折过来的圆边上左亮、下右暗。 */
@@ -158,16 +195,15 @@ const BOTTOM_EDGE = 'M0 100C14 86 44 58 62 40Q80 22 98 40C116 58 146 86 160 100'
 .env-seal { position: absolute; left: 50%; top: 58.5%; z-index: 7; transform: translate(-50%, -50%); }
 
 /* 拆开：封盖翻上去（翻过一半就落到信纸后面），信纸往上抽出来。 */
-.is-opening .env-flap { animation: flap-open 560ms cubic-bezier(.4, .1, .3, 1) forwards; }
-.is-opening .env-paper, .is-leaving .env-paper { animation: paper-rise 620ms 420ms cubic-bezier(.2, .7, .3, 1) both; }
+/* 翻转和换层分成两个动画：只有 transform 的那个能交给合成线程，主线程忙的时候封盖也不停（z-index 放在同一组关键帧里会把整段拖回主线程）。 */
+.is-opening .env-flap { animation: flap-open 560ms cubic-bezier(.4, .1, .3, 1) forwards, flap-depth 560ms linear forwards; }
+/* 信纸整张抽出来（底边过了信封口），外面那张信纸再从这里接手，不会有一截穿过信封。 */
+.is-opening .env-paper { animation: paper-rise 760ms 440ms cubic-bezier(.35, 0, .25, 1) both; }
 .is-opening .env-twine, .is-leaving .env-twine { opacity: 0; }
 .is-leaving .env-flap { transform: rotateX(178deg); z-index: 0; }
-.is-leaving .env-paper { animation: none; transform: translateY(-58%); opacity: 0; }
-@keyframes flap-open {
-  0% { transform: rotateX(0deg); z-index: 4; }
-  49% { z-index: 4; }
-  50% { z-index: 0; }
-  100% { transform: rotateX(178deg); z-index: 0; }
-}
-@keyframes paper-rise { to { transform: translateY(-58%); } }
+.is-leaving .env-paper { transform: translateY(-112%); opacity: 0; }
+@keyframes flap-open { from { transform: rotateX(0deg); } to { transform: rotateX(178deg); } }
+/* 翻到竖直（这条缓动约在 37% 的时间）就落到信纸后面。 */
+@keyframes flap-depth { 0%, 36% { z-index: 4; } 37%, 100% { z-index: 0; } }
+@keyframes paper-rise { to { transform: translateY(-112%); } }
 </style>

@@ -77,15 +77,17 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 .reply-text::placeholder { color: var(--paper-muted); opacity: .8; }
 .reply-text:focus-visible { box-shadow: inset 2px 0 0 var(--focus); }
 .reply-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: var(--paper-line); }
-.quote { display: flex; gap: 8px; align-items: center; min-height: var(--paper-line); font: 400 var(--fs-xs) / calc(var(--paper-line) / 2) var(--font-sans); cursor: pointer; }
-.quote input { flex: none; accent-color: var(--accent); }
-.quote small { display: block; color: var(--paper-muted); font-size: var(--fs-2xs); }
+/* 勾选框那行和底下的说明各占整行（说明折行也是一行一行压在线上），框和第一行的字对齐。 */
+.quote { display: flex; gap: 8px; align-items: flex-start; font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); cursor: pointer; }
+.quote input { flex: none; margin: calc(var(--paper-line) / 2 - 5px) 0 0; accent-color: var(--accent); }
+.quote small { display: block; color: var(--paper-muted); font-size: var(--fs-2xs); line-height: var(--paper-line); }
 .counter { flex: none; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-mono); }
 .counter.full { color: var(--paper-rubric); }
 .attached { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-.reply-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: calc(var(--paper-line) * 2); }
-.privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / calc(var(--paper-line) / 2) var(--font-sans); }
-.send { flex: none; min-width: 96px; }
+.reply-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-top: var(--paper-line); }
+.privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
+/* 按钮占两行高的中间，压过一条线没关系（它是实心的），字不压线。 */
+.send { flex: none; min-width: 96px; margin-top: calc(var(--paper-line) - 21px); }
 .reply-status { margin: 0; font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); color: var(--paper-muted); }
 .reply-status.ok { color: var(--accent); }
 .reply-status.bad { color: var(--danger); }
