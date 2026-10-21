@@ -7,7 +7,7 @@
 // 本地打包（package:release）只提醒——自测包可以先打，信和翻译齐了再冻结。
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { NOTE_LOCALES, letterPath, needsLetter } from './schedule-core.mjs';
+import { NOTE_LOCALES, echoProblems, letterPath, needsLetter } from './schedule-core.mjs';
 
 export function missingLetters(version, exists = (path) => existsSync(path) && readFileSync(path, 'utf8').trim() !== '') {
   if (!needsLetter(version)) return [];
@@ -17,6 +17,9 @@ export function missingLetters(version, exists = (path) => existsSync(path) && r
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const version = process.argv[2] ?? JSON.parse(readFileSync('package.json', 'utf8')).version;
   const missing = missingLetters(version);
+  const echo = needsLetter(version) ? echoProblems(version, (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null)) : [];
+  for (const problem of echo) console.error(problem);
+  if (echo.length) process.exitCode = 1;
   if (!needsLetter(version)) {
     console.log(`${version} 早于作者来信流程，不需要信。`);
   } else if (missing.length === 0) {

@@ -11,10 +11,15 @@ import { toUserMessage } from '../../../lib/bridge';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { useUpdateText } from '../../../components/shell/update.i18n';
+import { useLetterText } from '../../../components/letters/letters.i18n';
+import { letterVersions } from '../../../services/letters';
+import { letterBox, loadLetterBox } from '../../../services/letterBox';
 
 const t = useMessages(settingsMessages);
 const u = useUpdateText();
-onMounted(() => { void refreshDesktopUpdate(); });
+const l = useLetterText();
+const letterCount = letterVersions().length;
+onMounted(() => { void refreshDesktopUpdate(); void loadLetterBox(); });
 
 const ready = computed(() => updateState.phase === 'ready' || updateState.phase === 'applying');
 const busy = computed(() => updateState.phase === 'checking' || updateState.phase === 'downloading');
@@ -55,6 +60,16 @@ const status = computed(() => {
       </button>
     </div>
   </div>
+  <!-- 信匣：作者来信都在这里重读，回信的回执有新动静时亮一个点。 -->
+  <div class="s-row letter-row">
+    <div class="s-row-main">
+      <span class="s-row-title">{{ l.settingsRow }}<i v-if="letterBox.unseen" class="unseen" aria-hidden="true"></i></span>
+      <span class="s-row-sub">{{ l.settingsSub(letterCount) }}</span>
+    </div>
+    <div class="s-row-control">
+      <RouterLink class="button secondary" to="/letters">{{ l.open }}</RouterLink>
+    </div>
+  </div>
 </template>
 
 <style scoped src="../settings-local.css"></style>
@@ -64,4 +79,5 @@ const status = computed(() => {
 .update-state.is-checking .s-row-title::before, .update-state.is-downloading .s-row-title::before, .update-state.is-applying .s-row-title::before { background: var(--warning); }
 .update-state.is-failed .s-row-title::before { background: var(--danger); }
 .s-row-sub.bad { color: var(--danger); }
+.unseen { display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 </style>

@@ -1,0 +1,27 @@
+/*
+ * 信纸的材质（批次 6）。信纸是「物件」，不走卡片的玻璃材质：浅色主题是米白纸、深色主题是炭灰纸，
+ * 字色、朱色（首字母）、横线跟着换。只在信封和信匣里用。
+ */
+.paper {
+  --paper: #fbf8f1;
+  --paper-edge: #e7dfcf;
+  --paper-ink: #2b2a25;
+  --paper-muted: #77736a;
+  --paper-rubric: #a3322c;
+  --paper-rule: rgb(120 110 90 / .16);
+  --paper-font: Georgia, 'Iowan Old Style', 'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', serif;
+  background: var(--paper);
+  color: var(--paper-ink);
+  border: 1px solid var(--paper-edge);
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgb(255 255 255 / .6) inset, 0 18px 40px -18px rgb(0 0 0 / .45), 0 2px 6px rgb(0 0 0 / .12);
+}
+:root[data-theme='dark'] .paper {
+  --paper: #1b1e22;
+  --paper-edge: #2c3137;
+  --paper-ink: #dcd8cd;
+  --paper-muted: #9b978d;
+  --paper-rubric: #d0685d;
+  --paper-rule: rgb(220 210 190 / .09);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .04) inset, 0 22px 48px -18px rgb(0 0 0 / .8), 0 2px 6px rgb(0 0 0 / .4);
+}
