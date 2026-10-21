@@ -67,7 +67,7 @@ const holes = computed(() => {
 </template>
 
 <style scoped>
-.stamp { display: block; overflow: visible; filter: drop-shadow(0 .6px .6px rgb(60 45 25 / .35)) drop-shadow(0 3px 5px rgb(40 30 15 / .14)); }
+.stamp { display: block; overflow: visible; filter: drop-shadow(.6px 1px .7px rgb(60 45 25 / .38)) drop-shadow(2px 4px 5px rgb(40 30 15 / .16)); }
 .margin { fill: #f6f1e5; }
 .margin-grain { opacity: .9; mix-blend-mode: soft-light; }
 .face-grain { opacity: .5; mix-blend-mode: soft-light; }

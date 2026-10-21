@@ -86,7 +86,7 @@ onBeforeUnmount(() => window.clearTimeout(timer));
 .wax-seal {
   position: relative; display: block; padding: 0; border: 0; border-radius: 50%; background: none; cursor: grab; touch-action: none;
   /* 蜡是厚的：贴纸面一圈实的影子，再往下一层软的。 */
-  filter: drop-shadow(0 1.5px 1px rgb(50 10 10 / .38)) drop-shadow(0 5px 8px rgb(40 15 10 / .22));
+  filter: drop-shadow(1.2px 2px 1.2px rgb(50 10 10 / .42)) drop-shadow(4px 8px 9px rgb(40 15 10 / .26));
 }
 .wax-seal.still { cursor: default; }
 .wax-seal:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
