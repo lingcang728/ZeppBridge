@@ -1,4 +1,5 @@
 import { LOCALE_REVEAL_MS } from './timing';
+import { grainBudget } from './performance';
 
 /** 换语言「响指」的取样：把可视区的旧文字变成一粒粒灰（lib/motion/ashSwitch.ts）。
  *
@@ -9,8 +10,7 @@ import { LOCALE_REVEAL_MS } from './timing';
 /** 灰粒寿命：圆扫过以后再各自飘一阵（放慢后飘得更久、更远，收尾减速）。 */
 export const LIFE_MIN = 900;
 export const LIFE_SPAN = 700;
-/** 灰粒上限：超过就按网格隔点取样。 */
-export const MAX_GRAINS = 36000;
+/* 灰粒上限按性能档位和电源给（lib/motion/performance.ts 的 grainBudget），超过就按网格隔点取样。 */
 /** 像素多实才算墨。 */
 export const TEXT_INK = 48;
 
@@ -195,7 +195,7 @@ export const grainsOf = (
   let inked = 0;
   for (const { data, ink } of sources) for (let i = 3; i < data.length; i += 4) if (data[i]! > ink) inked += 1;
   if (!inked) return null;
-  const step = Math.max(1, Math.ceil(Math.sqrt(inked / MAX_GRAINS)));
+  const step = Math.max(1, Math.ceil(Math.sqrt(inked / grainBudget())));
   // 隔点取样落在网格上，实际取到的粒数会比 inked / step² 略多：每张来源按一行的量留余地。
   const capacity = Math.ceil(inked / (step * step) + sources.length * (width / step + 2));
   const out = new Float32Array(capacity * 10);

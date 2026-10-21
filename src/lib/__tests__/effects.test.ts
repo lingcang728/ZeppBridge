@@ -13,9 +13,11 @@ describe('effects mode', () => {
     expect(isLinuxWebView(android)).toBe(false);
   });
 
-  it('auto means low effects on Linux only; an explicit choice wins everywhere', () => {
+  it('auto means low effects on Linux or a constrained machine; an explicit choice wins everywhere', () => {
     expect(resolveLite('auto', true)).toBe(true);
     expect(resolveLite('auto', false)).toBe(false);
+    expect(resolveLite('auto', false, true)).toBe(true);
+    expect(resolveLite('full', false, true)).toBe(false);
     expect(resolveLite('full', true)).toBe(false);
     expect(resolveLite('lite', false)).toBe(true);
   });

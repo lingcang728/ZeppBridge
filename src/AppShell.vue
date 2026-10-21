@@ -20,6 +20,7 @@ import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { startDesktopUpdate } from './services/updateService';
 import { scheduleLetterBoxSync } from './services/letterBox';
+import { startMotionSensing } from './lib/motion/performance';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
@@ -225,6 +226,7 @@ onMounted(() => {
     void startDesktopUpdate();
     // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）。
     scheduleLetterBoxSync();
+    startMotionSensing();
   });
   void initialize();
   document.addEventListener('keydown', onDocumentKeydown);

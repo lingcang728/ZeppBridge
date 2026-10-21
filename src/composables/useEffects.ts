@@ -1,7 +1,11 @@
-import { computed, readonly, ref } from 'vue';
+import { computed, readonly, ref, watch } from 'vue';
+import { autoLite } from '../lib/motion/performance';
 
 /**
  * 界面特效档位：完整 / 低特效 / 自动（issue #133）。
+ *
+ * 「自动」在三种情况下走低特效：Linux、首启量出来性能偏弱（或重特效连着卡被降了档）、电量低于 15% 且没在充电
+ * （lib/motion/performance.ts）。选了「完整」就不自动降。
  *
  * Linux 的 WebKitGTK 为了不白屏关掉了 DMABUF 渲染（AppImage 连加速合成也关了，见 src-tauri/src/lib.rs），
  * 剩下的渲染路径扛不住整页毛玻璃和形变动画：翻页要好几秒，悬停都卡。所以 Linux 上「自动」= 低特效。
@@ -34,11 +38,11 @@ const readMode = (): EffectsMode => {
 export const isLinuxWebView = (userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent): boolean =>
   /Linux/.test(userAgent) && !/Android/.test(userAgent);
 
-export const resolveLite = (value: EffectsMode, linux: boolean): boolean =>
-  value === 'lite' || (value === 'auto' && linux);
+export const resolveLite = (value: EffectsMode, linux: boolean, constrained = false): boolean =>
+  value === 'lite' || (value === 'auto' && (linux || constrained));
 
 const mode = ref<EffectsMode>(readMode());
-const lite = computed(() => resolveLite(mode.value, isLinuxWebView()));
+const lite = computed(() => resolveLite(mode.value, isLinuxWebView(), autoLite.value));
 
 const apply = () => {
   if (typeof document === 'undefined') return;
@@ -56,7 +60,10 @@ const setEffects = (value: EffectsMode) => {
   apply();
 };
 
-/** main.ts 在首次渲染前调用。 */
-export const initializeEffects = () => apply();
+/** main.ts 在首次渲染前调用。之后档位、电源变了（自动档）跟着换。 */
+export const initializeEffects = () => {
+  apply();
+  watch(lite, apply);
+};
 
 export const useEffects = () => ({ mode: readonly(mode), lite, setEffects });
