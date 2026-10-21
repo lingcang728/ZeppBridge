@@ -3,6 +3,7 @@ import { drawVisibleText, featherOf, grainsOf, TEXT_INK, type AshOrigin } from '
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
 import { lessMotion } from './lessMotion';
+import { beginFrameLog, claimHeavy, endFrameLog } from './performance';
 
 /**
  * 一块浮层「化成灰飞走」（想法 1-2，2026-10-19）：更新卡点「知道了」，卡片从按钮那一角往对角一路碎成灰，
@@ -13,12 +14,22 @@ import { lessMotion } from './lessMotion';
  * 卡片本身被一圈柔边遮罩从起点吃掉（--ash-r 由 WAAPI 推，material.css 里注册过），
  * 遮罩只挂在卡片的玻璃层和内容层上，不挂在卡片外壳上——外壳一带遮罩就成了玻璃的取样边界，毛玻璃会在第一帧糊掉。
  *
- * 返回 false 表示没放（减少动效、没有 WebGL、元素不在了），调用方照常关闭。
+ * 返回 false 表示没放（减少动效、没有 WebGL、元素不在了、别的重特效正在放），调用方照常关闭。
  * 放完之后元素是看不见的；`veil` 的 `data-dissolved` 告诉弹窗收起时别再把它挂回去缩一遍（dialogFlight.close）。
  */
 export const ashDissolve = async (target: HTMLElement, origin: AshOrigin, veil?: HTMLElement | null): Promise<boolean> => {
   if (lessMotion()) return false;
   if (!target.isConnected) return false;
+  const release = claimHeavy('ash-dissolve');
+  if (!release) return false;
+  try {
+    return await dissolve(target, origin, veil);
+  } finally {
+    release(endFrameLog());
+  }
+};
+
+const dissolve = async (target: HTMLElement, origin: AshOrigin, veil?: HTMLElement | null): Promise<boolean> => {
   const width = window.innerWidth;
   const height = window.innerHeight;
   const rect = target.getBoundingClientRect();
@@ -28,6 +39,7 @@ export const ashDissolve = async (target: HTMLElement, origin: AshOrigin, veil?:
   ));
   const layer = dustLayer(width, height);
   if (!layer) return false;
+  beginFrameLog();
   const grains = grainsOf([[drawVisibleText(width, height, target), TEXT_INK]], width, height, origin, reach);
   const batch = grains ? layer.add(grains, origin) : null;
 
