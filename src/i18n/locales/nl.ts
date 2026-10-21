@@ -3384,7 +3384,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       resetDone: 'Klaar; ze verschijnen weer wanneer je er de volgende keer komt',
     },
     'components/letters/letters': {
-      to: 'Aan: jou',
+      to: 'Aan: gebruiker',
       from: 'Van ZeppBridge',
       flipHint: 'Tik om de envelop om te draaien',
       flipAria: 'Draai de envelop om',

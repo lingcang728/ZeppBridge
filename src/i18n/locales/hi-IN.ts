@@ -3040,7 +3040,7 @@ Markdown में उत्तर दें।`,
     },
 
     'components/letters/letters': {
-      to: 'सेवा में: आप',
+      to: 'सेवा में: उपयोगकर्ता',
       from: 'प्रेषक: ZeppBridge',
       flipHint: 'लिफाफा पलटने के लिए टैप करें',
       flipAria: 'लिफाफा पलटें',

@@ -804,7 +804,7 @@ export default {
 // Source: src/components/InsightCard.i18n.ts
   // Source: src/components/letters/letters.i18n.ts
   'components/letters/letters': {
-    to: 'Do: Ciebie',
+    to: 'Do: Użytkownika',
     from: 'Od ZeppBridge',
     flipHint: 'Dotknij, aby odwrócić kopertę',
     flipAria: 'Odwróć kopertę',

@@ -240,7 +240,7 @@ export default {
       aria: "Zeitraum des Tagesverlaufs",
     },
     'components/letters/letters': {
-      to: 'An: dich',
+      to: 'An: Benutzer',
       from: 'Von ZeppBridge',
       flipHint: 'Tippen, um den Umschlag umzudrehen',
       flipAria: 'Briefumschlag umdrehen',

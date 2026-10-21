@@ -32,7 +32,7 @@ export default {
       aria: "Период тренда по дням",
     },
     'components/letters/letters': {
-      to: 'Кому: вам',
+      to: 'Кому: пользователю',
       from: 'От ZeppBridge',
       flipHint: 'Нажмите, чтобы перевернуть конверт',
       flipAria: 'Перевернуть конверт',

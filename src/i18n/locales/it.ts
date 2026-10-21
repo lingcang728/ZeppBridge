@@ -360,7 +360,7 @@ export default {
   },
 
   'components/letters/letters': {
-    to: 'A: te',
+    to: 'A: utente',
     from: 'Da ZeppBridge',
     flipHint: 'Tocca per girare la busta',
     flipAria: 'Gira la busta',
