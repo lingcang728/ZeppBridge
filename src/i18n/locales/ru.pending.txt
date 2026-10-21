@@ -19,6 +19,12 @@ components/letters/letters.emptyReplies
 components/letters/letters.filedUnder
 components/letters/letters.from
 components/letters/letters.letterHead
+components/letters/letters.mailboxAria
+components/letters/letters.mailboxChecking
+components/letters/letters.mailboxLetters
+components/letters/letters.mailboxNew
+components/letters/letters.mailboxOutbox
+components/letters/letters.mailboxQuiet
 components/letters/letters.next
 components/letters/letters.open
 components/letters/letters.outbox
@@ -29,9 +35,11 @@ components/letters/letters.prev
 components/letters/letters.privacy
 components/letters/letters.queued
 components/letters/letters.read
+components/letters/letters.replied
 components/letters/letters.replyPlaceholder
 components/letters/letters.replyTitle
 components/letters/letters.reread
+components/letters/letters.rereadAria
 components/letters/letters.sealAria
 components/letters/letters.sealHint
 components/letters/letters.send

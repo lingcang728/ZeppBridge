@@ -4,6 +4,7 @@
  *
  * 原稿：docs/releases/letters/<版本>/<locale>.md；回音：docs/releases/letters/<版本>/echo/<locale>.md（可以没有）。
  */
+import { ref, watch, type Ref } from 'vue';
 import { compareVersions, echoTitle, parseEcho } from '../lib/letters/parse';
 
 type Loader = () => Promise<string>;
@@ -68,3 +69,61 @@ export async function echoTitles(language: string): Promise<Map<string, string>>
   }
   return titles;
 }
+/* ── 邮票图 ──────────────────────────────── */
+
+/* 作者为这一版画的票面图（可以没有，没有就用生成的线画）。打包成实体文件，CSP 不许 data URL。 */
+const STAMPS = import.meta.glob('../../docs/releases/letters/*/stamp.{png,jpg,jpeg,webp}', { query: '?url', import: 'default' }) as Record<string, () => Promise<string>>;
+const STAMP_PATH = /\/letters\/(\d+\.\d+\.\d+)\/stamp\.[a-z]+$/;
+let stampIndex: Map<string, () => Promise<string>> | null = null;
+const stamps = () => {
+  if (stampIndex) return stampIndex;
+  stampIndex = new Map();
+  for (const [path, loader] of Object.entries(STAMPS)) {
+    const match = STAMP_PATH.exec(path);
+    if (match) stampIndex.set(match[1]!, loader);
+  }
+  return stampIndex;
+};
+/** 测试 / 预览注入用。 */
+export function __setStampSources(sources: Record<string, string>): void {
+  stampIndex = new Map(Object.entries(sources).map(([version, url]) => [version, async () => url]));
+}
+const stampCache = new Map<string, Promise<string | null>>();
+export const stampUrl = (version: string): Promise<string | null> => {
+  if (!stampCache.has(version)) {
+    const loader = stamps().get(version);
+    stampCache.set(version, loader ? loader().catch(() => null) : Promise.resolve(null));
+  }
+  return stampCache.get(version)!;
+};
+/** 组件里用：版本变了重新取；取到之前是 null（先画生成的线画也行，但通常一瞬间就到）。 */
+export function useStampImage(version: () => string): Ref<string | null> {
+  const url = ref<string | null>(null);
+  watch(version, (v) => {
+    url.value = null;
+    void stampUrl(v).then((found) => { if (version() === v) url.value = found; });
+  }, { immediate: true });
+  return url;
+}
+
+/* ── 邮戳日期 ──────────────────────────────── */
+
+/* 邮戳上的日子：这台电脑第一次收到这封信的那天（本机记，不上报）。 */
+const RECEIVED_KEY = 'zeppbridge.letters.received';
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+};
+const readReceived = (): Record<string, string> => {
+  try { return JSON.parse(window.localStorage.getItem(RECEIVED_KEY) ?? '{}') as Record<string, string>; } catch { return {}; }
+};
+/** 取这封信的邮戳日期；第一次问就记下今天。 */
+export function receivedOn(version: string): string {
+  const all = readReceived();
+  if (all[version]) return all[version]!;
+  all[version] = today();
+  try { window.localStorage.setItem(RECEIVED_KEY, JSON.stringify(all)); } catch { /* 存不下就每次都是今天 */ }
+  return all[version]!;
+}
+/** 只看不记（信匣里还没拆的信不该盖上今天的戳）。 */
+export const receivedDate = (version: string): string | null => readReceived()[version] ?? null;

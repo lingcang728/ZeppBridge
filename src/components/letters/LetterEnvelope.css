@@ -1,75 +1,48 @@
-/* 信封（LetterEnvelope.vue）。动的只有 transform / opacity；封盖翻开时的前后层次用离散的 z-index 关键帧换。 */
-.letter-stage { display: grid; place-items: center; gap: 18px; min-height: 340px; }
+/* 信封与信纸（LetterEnvelope.vue）。信封和信纸叠在同一格里：展开的那一下两边同时在场。动的只有 transform / opacity。 */
+.letter-stage { display: grid; place-items: center; min-height: 340px; }
+.letter-stage > * { grid-area: 1 / 1; }
 
-.envelope-wrap { display: grid; justify-items: center; gap: 22px; }
-.envelope {
-  --env: #efe6d3; --env-deep: #e1d5bd; --env-line: rgb(110 90 60 / .22); --env-ink: #5b5243;
-  position: relative; width: min(460px, calc(100vw / var(--ui-scale, 1) - 56px)); aspect-ratio: 1.62; perspective: 1100px;
+.envelope-wrap { display: grid; justify-items: center; gap: 22px; width: min(500px, calc(100vw / var(--ui-scale, 1) - 48px)); }
+.envelope-wrap :deep(.envelope) { rotate: -1.2deg; }
+.seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
+.is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
+/* 信纸展开时信封往下沉、淡掉。 */
+.is-unfolding .envelope-wrap { animation: envelope-sink 420ms cubic-bezier(.4, 0, .7, .2) forwards; pointer-events: none; }
+@keyframes envelope-sink { to { transform: translateY(22%) scale(.94); opacity: 0; } }
+
+.reader { display: grid; justify-items: center; gap: 14px; }
+/* 展开途中字还不出来，纸长到原位附近再浮上来（否则看得见字被拉扁）；底下的按钮最后出现。 */
+.is-unfolding .leaf-body, .is-unfolding .leaf-foot { animation: ink-in 360ms 300ms ease both; }
+.is-unfolding .letter-foot { animation: ink-in 320ms 420ms ease both; }
+.reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
+@keyframes ink-in { from { opacity: 0; } }
+@keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }
+
+.leaf-paper {
+  display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
+  padding: var(--paper-line) clamp(22px, 7%, 56px) 0;
 }
-:root[data-theme='dark'] .envelope { --env: #2a2e34; --env-deep: #22262b; --env-line: rgb(230 220 200 / .12); --env-ink: #c9c3b5; }
-.env-back, .env-pocket, .env-flap, .env-ghost { position: absolute; inset: 0; border-radius: 6px; }
-.env-back { background: var(--env-deep); box-shadow: 0 24px 48px -22px rgb(0 0 0 / .6), 0 3px 8px rgb(0 0 0 / .16); }
-/* 跳版更新：后面再露出一两只信封的边。 */
-.env-ghost { background: var(--env-deep); box-shadow: 0 10px 22px -12px rgb(0 0 0 / .5); }
-.env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
-.env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .8; }
-.env-paper { position: absolute; left: 6%; right: 6%; top: 8%; bottom: 10%; z-index: 1; border-radius: 4px; }
-/* 下面和两侧三块折边拼成口袋；静态 clip-path，不做动画。 */
-.env-pocket {
-  z-index: 2; background: var(--env);
-  clip-path: polygon(0 0, 50% 56%, 100% 0, 100% 100%, 0 100%);
-  box-shadow: inset 0 -1px 0 var(--env-line);
+.leaf-body { flex: 1; min-height: 0; }
+/* 不分页的几张（更新说明、上期回音、回信）：纸里面滚动，横线跟着字一起走。 */
+.leaf-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; background-attachment: local; scrollbar-width: thin; }
+.leaf-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 52px; flex: none;
+  color: var(--paper-muted); font: 400 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .04em;
 }
-.env-pocket::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top right, transparent calc(50% - .6px), var(--env-line) 50%, transparent calc(50% + .6px)) left bottom / 50% 100% no-repeat, linear-gradient(to top left, transparent calc(50% - .6px), var(--env-line) 50%, transparent calc(50% + .6px)) right bottom / 50% 100% no-repeat; }
-.env-flap {
-  z-index: 4; bottom: auto; height: 60%; transform-origin: 50% 0; backface-visibility: visible;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--env) 92%, white), var(--env));
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  filter: drop-shadow(0 2px 2px rgb(0 0 0 / .12));
-}
-/* 捆信的细绳：一横一竖，拆开时淡掉。 */
-.env-twine { position: absolute; inset: 0; z-index: 5; pointer-events: none;
-  background: linear-gradient(to right, transparent calc(50% - 1px), #b08a5a calc(50% - 1px), #b08a5a calc(50% + 1px), transparent calc(50% + 1px)),
-    linear-gradient(to bottom, transparent calc(62% - 1px), #b08a5a calc(62% - 1px), #b08a5a calc(62% + 1px), transparent calc(62% + 1px));
-  opacity: .85; transition: opacity 300ms ease; }
-.env-address { position: absolute; left: 8%; bottom: 11%; z-index: 3; display: grid; gap: 4px; color: var(--env-ink); }
-.env-to { font: 400 var(--fs-md)/1.3 'Segoe Script', 'Snell Roundhand', 'KaiTi', 'STKaiti', Georgia, serif; }
-.env-from { font: 400 var(--fs-2xs)/1.3 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
-.env-stamp { position: absolute; right: 6%; bottom: 10%; z-index: 3; }
-.env-seal { position: absolute; left: 50%; top: 60%; z-index: 6; transform: translate(-50%, -50%); }
-.seal-hint { margin: 0; color: rgb(255 255 255 / .8); text-shadow: 0 1px 2px rgb(0 0 0 / .25); font-size: var(--fs-xs); text-align: center; }
+.leaf-number { font: 400 var(--fs-sm)/1 var(--paper-font); }
+.leaf-number b { color: var(--paper-rubric); font-weight: 400; }
 
-/* 拆开：封盖翻上去（翻过一半就落到信纸后面），信纸往上滑出，然后整只信封往下沉、淡掉。 */
-.is-opening .env-flap { animation: flap-open 560ms cubic-bezier(.4, .1, .3, 1) forwards; }
-.is-opening .env-paper { animation: paper-rise 620ms 460ms cubic-bezier(.2, .7, .3, 1) forwards; }
-.is-opening .env-twine { opacity: 0; }
-.is-opening .envelope-wrap { animation: envelope-sink 360ms 900ms cubic-bezier(.4, 0, .7, .2) forwards; }
-.is-opening .seal-hint { opacity: 0; transition: opacity 200ms ease; }
-@keyframes flap-open {
-  0% { transform: rotateX(0deg); z-index: 4; }
-  49% { z-index: 4; }
-  50% { z-index: 0; }
-  100% { transform: rotateX(178deg); z-index: 0; }
-}
-@keyframes paper-rise { to { transform: translateY(-58%); } }
-@keyframes envelope-sink { to { transform: translateY(26%) scale(.94); opacity: 0; } }
+/* 更新清单写在信纸上：用纸的字色和行距，不用卡片的灰。 */
+.notes-leaf :deep(.release-group) { margin: 0 0 var(--paper-line); }
+.notes-leaf :deep(.release-group h3) { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
+.notes-leaf :deep(.release-group ul) { margin: 0; gap: 0; }
+.notes-leaf :deep(.release-group li) { color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); }
+.notes-leaf :deep(.release-group li strong) { color: var(--paper-ink); }
 
-.deck-enter { animation: deck-in 520ms cubic-bezier(.2, .75, .25, 1) both; }
-@keyframes deck-in { from { transform: translateY(-9%) scale(.95); opacity: 0; } }
-
-.notes-sheet .sheet-kicker { display: block; margin-bottom: 18px; color: var(--paper-muted); font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-/* 更新清单放在信纸上：用纸的字色，不用卡片的灰。 */
-.notes-sheet :deep(.release-group li) { color: var(--paper-ink); font-family: var(--paper-font); }
-.notes-sheet :deep(.release-group li strong) { color: var(--paper-ink); }
-.notes-sheet :deep(.release-group h3) { color: var(--paper-muted); }
-
-.letter-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(600px, calc(100vw / var(--ui-scale, 1) - 40px)); }
-.pager { display: flex; align-items: center; gap: 8px; }
-.dots { display: flex; gap: 6px; }
-.dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--ink) 26%, transparent); cursor: pointer; transition: background 200ms ease, transform 200ms ease; }
-.dot.on { background: var(--ink); transform: scale(1.25); }
-.dot:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.icon-button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--mat-line); border-radius: 50%; background: var(--mat-raised); color: var(--ink); cursor: pointer; }
+.letter-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(640px, calc(100vw / var(--ui-scale, 1) - 32px)); }
+.pager { display: flex; align-items: center; gap: 10px; }
+.icon-button { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid rgb(255 255 255 / .22); border-radius: 50%; background: rgb(255 255 255 / .12); color: #fff; cursor: pointer; transition: background 160ms ease; }
+.icon-button:hover:not(:disabled) { background: rgb(255 255 255 / .2); }
 .icon-button:disabled { opacity: .35; cursor: default; }
 .icon-button svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -77,10 +50,10 @@
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .deck-enter { animation: deck-fade 220ms ease both; }
-  @keyframes deck-fade { from { opacity: 0; } }
+  .reread .reader { animation: reader-fade 220ms ease both; }
+  @keyframes reader-fade { from { opacity: 0; } }
 }
 @media (max-width: 600px) {
-  .letter-foot { flex-wrap: wrap; justify-content: center; }
+  .letter-foot { flex-wrap: wrap; }
   .acknowledge { flex: 1 0 100%; }
 }
