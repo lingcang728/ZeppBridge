@@ -54,10 +54,14 @@ export function echoTitle(item: EchoItem): string {
   return item.text.split(/[:：。.]/)[0]!.replace(/\*\*/g, '').trim();
 }
 
-/** 版本号比较（只认 x.y.z）。 */
+/** 预发布后缀（3.0.9-beta.2 的 -beta.2）去掉后的正式版本号。 */
+export const baseVersion = (v: string): string => v.replace(/-.*$/, '');
+const RELEASE = /^\d+\.\d+\.\d+$/;
+
+/** 版本号比较（只比 x.y.z，预发布后缀不参与）。 */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
+  const pa = baseVersion(a).split('.').map(Number);
+  const pb = baseVersion(b).split('.').map(Number);
   for (let i = 0; i < 3; i += 1) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
   return 0;
 }
@@ -65,11 +69,15 @@ export function compareVersions(a: string, b: string): number {
 /**
  * 这次升级该收到哪几封信：上次的版本（不含）到这次的版本（含）之间写过信的版本，从旧到新。
  * 跳过好几个版本才更新的人，几封信捆成一叠一起到。from 为空（老安装、版本不明）时只给这一版的信。
+ * 本地测试包用预发布号模拟升级（2026-10-21 用户：停在 3.0.9，用 3.0.9-beta.1、-beta.2…）：每装一个 beta 都再收一次
+ * 它所属正式版的信。正式发版只用 x.y.z，不受影响。
  */
 export function lettersBetween(available: string[], from: string, to: string): string[] {
-  const valid = /^\d+\.\d+\.\d+$/;
-  return available.filter((v) => valid.test(v)
-    && compareVersions(v, to) <= 0
-    && (valid.test(from) ? compareVersions(v, from) > 0 : v === to))
+  const target = baseVersion(to);
+  const prerelease = to !== target && RELEASE.test(target);
+  const since = baseVersion(from);
+  return available.filter((v) => RELEASE.test(v)
+    && compareVersions(v, target) <= 0
+    && ((prerelease && v === target) || (RELEASE.test(since) ? compareVersions(v, since) > 0 : v === target)))
     .sort(compareVersions);
 }

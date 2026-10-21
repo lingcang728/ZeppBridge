@@ -39,6 +39,13 @@ describe('letters', () => {
     expect(lettersBetween(all, '3.1.0', '3.1.1')).toEqual([]);
   });
 
+  it('a local beta build re-delivers the letter of the release it belongs to', () => {
+    const all = ['3.0.7', '3.0.9'];
+    expect(lettersBetween(all, '3.0.9', '3.0.9-beta.1')).toEqual(['3.0.9']);
+    expect(lettersBetween(all, '3.0.9-beta.1', '3.0.9-beta.2')).toEqual(['3.0.9']);
+    expect(lettersBetween(all, '3.0.6', '3.0.9-beta.1')).toEqual(['3.0.7', '3.0.9']);
+  });
+
   it('prints the minor version on a stamp, and the full version for patch releases', () => {
     expect(stampFace('3.1.0')).toBe('3.1');
     expect(stampFace('3.0.7')).toBe('3.0.7');
