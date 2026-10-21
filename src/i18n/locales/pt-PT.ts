@@ -3345,7 +3345,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       resetDone: 'Concluído; serão mostradas da próxima vez que aceder aqui',
     },
     'components/letters/letters': {
-      to: 'Para: si',
+      to: 'Para: utilizador',
       from: 'De ZeppBridge',
       flipHint: 'Toque para virar o envelope',
       flipAria: 'Virar o envelope',

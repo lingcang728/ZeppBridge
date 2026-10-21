@@ -3137,7 +3137,7 @@ Réponds en Markdown.`,
       resetDone: 'Terminé ; ils s’afficheront à nouveau la prochaine fois',
     },
     'components/letters/letters': {
-      to: 'Pour : vous',
+      to: 'Pour : utilisateur',
       from: 'De ZeppBridge',
       flipHint: 'Touchez pour retourner l’enveloppe',
       flipAria: 'Retourner l’enveloppe',
