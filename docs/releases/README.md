@@ -24,7 +24,7 @@
 
 ### 这一版的邮票（可选）
 
-每一版信封右上角贴一枚邮票、信匣集邮册里收一枚。票面图由用户每版画一张（如 gpt-image），放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就从 ZeppBridge 自己的一套票面里按版本轮换一枚（桥、手表、睡眠、路线、海拔、云到本机，`src/components/letters/StampArt.vue`；哪版用哪枚见 `src/lib/letters/stamp.ts`）。
+每一版信封右上角贴一枚邮票、信匣集邮册里收一枚。票面图由用户每版画一张（如 gpt-image），放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就贴默认那枚（海拔山形，`src/components/letters/StampArt.vue`），面值照样印这一版的版本号。
 
 - **只要画**：横版 5:4，至少 1000 × 800，jpg / webp 压到 300 KB 以内。
 - **不要**字、面值、边框、齿孔、邮戳——齿孔白边、右上角面值（版本号）、邮戳都由界面画（`PostageStamp.vue` / `Postmark.vue`），每版版式一致。
