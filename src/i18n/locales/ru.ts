@@ -32,6 +32,10 @@ export default {
       aria: "Период тренда по дням",
     },
     'components/letters/letters': {
+      to: 'Кому: вам',
+      from: 'От ZeppBridge',
+      flipHint: 'Нажмите, чтобы перевернуть конверт',
+      flipAria: 'Перевернуть конверт',
       sealHint: 'Удерживайте сургучную печать или сломайте её',
       sealAria: (version: string) => `Вскрыть письмо к версии ${version}`,
       bundle: (count: number) => plural(count, { one: `${count} письмо в пачке`, few: `${count} письма в пачке`, many: `${count} писем в пачке`, other: `${count} письма в пачке` }),

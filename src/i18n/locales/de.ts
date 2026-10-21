@@ -240,6 +240,10 @@ export default {
       aria: "Zeitraum des Tagesverlaufs",
     },
     'components/letters/letters': {
+      to: 'An: dich',
+      from: 'Von ZeppBridge',
+      flipHint: 'Tippen, um den Umschlag umzudrehen',
+      flipAria: 'Briefumschlag umdrehen',
       sealHint: 'Halte das Wachssiegel gedrückt oder brich es auf',
       sealAria: (version: string) => `Brief für ${version} öffnen`,
       bundle: (count: number) => `${count} Briefe zusammengebunden`,

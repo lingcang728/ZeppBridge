@@ -41,16 +41,18 @@ const label = (kind: EchoKind) => (kind === 'next' ? t.value.echoNext : kind ===
 
 <style scoped>
 .echo strong { font-weight: 700; }
-.echo-group { margin-bottom: var(--paper-line); }
+/* 组与组、导语与第一组之间都空一行。 */
+.echo-group { margin-top: var(--paper-line); }
+.echo-group:first-child { margin-top: 0; }
 .echo-group h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); letter-spacing: .08em; }
 .echo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .is-later .echo-dot { background: var(--route-amber); }
 .is-asking .echo-dot { background: var(--route-cyan); }
 ul { margin: 0; padding: 0; list-style: none; }
-li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-/* 「我也遇到」比一行矮，压在行里不破坏横线。 */
+li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+/* 「我也遇到」比一行矮，底边正好落在这一行的横线上（像字一样站在线上），不把行撑高。 */
 .me-too {
-  flex: none; height: calc(var(--paper-line) - 8px); padding: 0 12px; border: 1px solid color-mix(in srgb, var(--paper-ink) 24%, transparent); border-radius: 999px;
+  flex: none; height: 22px; margin-top: calc(var(--paper-line) - 7px - 22px); padding: 0 12px; border: 1px solid color-mix(in srgb, var(--paper-ink) 24%, transparent); border-radius: 999px;
   background: transparent; color: var(--paper-ink); font: 400 var(--fs-2xs)/1 var(--font-sans); cursor: pointer; transition: background 160ms ease, border-color 160ms ease;
 }
 .me-too:hover { border-color: color-mix(in srgb, var(--paper-ink) 45%, transparent); }

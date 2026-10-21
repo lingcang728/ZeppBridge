@@ -6,32 +6,37 @@
 /*
  * 两面信封：正面（邮票）和背面（火漆）叠在一格里，背面先转 180°；整体像参考照片那样斜放在桌上（往后倒一点、转一点）。
  * 翻面绕竖轴转半圈，中途往上抬一点再落下。只动 transform。
+ * 斜放的那组数（perspective 1600 / rotateX 16 / rotateZ -3.5）在 LetterEnvelope.vue 的 TILT 里还有一份（信纸从这个角度摆正），改要一起改。
+ * 关键帧里直接写数、不用 var()，两面先各自提升成合成层（will-change）：翻面整段交给合成线程，
+ * 第一下不用现光栅化背面（2026-10-21 用户：一开始翻转有点卡）。
  */
-.flipper {
-  --tilt: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg);
-  display: grid; width: 100%; transform-style: preserve-3d; transform: var(--tilt);
-}
-.flipper.flipped { transform: var(--tilt) rotateY(180deg); animation: flip-over 900ms cubic-bezier(.45, .05, .25, 1); }
+.flipper { display: grid; width: 100%; transform-style: preserve-3d; transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg); will-change: transform; }
+.flipper.flipped { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(180deg); animation: flip-over 900ms cubic-bezier(.45, .05, .25, 1); }
 @keyframes flip-over {
-  0% { transform: var(--tilt) rotateY(0deg); }
-  50% { transform: var(--tilt) translateZ(70px) rotateY(90deg); }
-  100% { transform: var(--tilt) rotateY(180deg); }
+  0% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(0deg); }
+  50% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(70px) rotateY(90deg); }
+  100% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(180deg); }
 }
-.face { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.face-front { cursor: pointer; border-radius: 6px; }
-.face-front:disabled { cursor: default; }
-.face-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
-.face-back { transform: rotateY(180deg); }
+.side { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
+.side-front { cursor: pointer; border-radius: 6px; }
+.side-front:disabled { cursor: default; }
+.side-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
+/* 别叫 .face-*：EnvelopeArt 的根节点自己带 face-front / face-back，scoped 样式会命中子组件根，背面就被多转半圈、左右反了（2026-10-21 踩过）。 */
+.side-back { transform: rotateY(180deg); }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
-/* 信纸展开时信封往下沉、淡掉。 */
-.is-unfolding .envelope-wrap { animation: envelope-sink 420ms cubic-bezier(.4, 0, .7, .2) forwards; pointer-events: none; }
-@keyframes envelope-sink { to { transform: translateY(22%) scale(.94); opacity: 0; } }
+/* 信纸往上抽的时候信封同时往下退一点（一手抽、一手拿着信封），信纸才能整张出来、不穿过信封；展开时信封再往下沉、淡掉。 */
+.is-opening .envelope-wrap { animation: envelope-lower 760ms 440ms cubic-bezier(.35, 0, .25, 1) forwards; }
+.is-unfolding .envelope-wrap { animation: envelope-sink 460ms cubic-bezier(.4, 0, .7, .2) forwards; pointer-events: none; }
+@keyframes envelope-lower { to { transform: translateY(72px); } }
+@keyframes envelope-sink { from { transform: translateY(72px); } to { transform: translateY(calc(72px + 16%)) scale(.94); opacity: 0; } }
 
 .reader { display: grid; justify-items: center; gap: 14px; }
+/* 翻到背面后就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）；展开时才露出来。 */
+.is-sealed .reader, .is-opening .reader { opacity: 0; pointer-events: none; }
 /* 展开途中字还不出来，纸长到原位附近再浮上来（否则看得见字被拉扁）；底下的按钮最后出现。 */
-.is-unfolding .leaf-body, .is-unfolding .leaf-foot { animation: ink-in 360ms 300ms ease both; }
-.is-unfolding .letter-foot { animation: ink-in 320ms 420ms ease both; }
+.is-unfolding .leaf-body, .is-unfolding .leaf-foot { animation: ink-in 360ms 620ms ease both; }
+.is-unfolding .letter-foot { animation: ink-in 320ms 700ms ease both; }
 .reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
 @keyframes ink-in { from { opacity: 0; } }
 @keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }

@@ -3384,6 +3384,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       resetDone: 'Klaar; ze verschijnen weer wanneer je er de volgende keer komt',
     },
     'components/letters/letters': {
+      to: 'Aan: jou',
+      from: 'Van ZeppBridge',
+      flipHint: 'Tik om de envelop om te draaien',
+      flipAria: 'Draai de envelop om',
       sealHint: 'Houd het lakzegel ingedrukt of breek het open',
       sealAria: (version: string) => `Open de brief voor ${version}`,
       bundle: (count: number) => `${count} brieven samengebonden`,

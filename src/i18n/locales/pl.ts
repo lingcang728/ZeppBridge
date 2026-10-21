@@ -804,6 +804,10 @@ export default {
 // Source: src/components/InsightCard.i18n.ts
   // Source: src/components/letters/letters.i18n.ts
   'components/letters/letters': {
+    to: 'Do: Ciebie',
+    from: 'Od ZeppBridge',
+    flipHint: 'Dotknij, aby odwrócić kopertę',
+    flipAria: 'Odwróć kopertę',
     sealHint: 'Przytrzymaj pieczęć lakową lub ją przełam',
     sealAria: (version: string) => `Otwórz list dla wersji ${version}`,
     bundle: (count: number) => `${plural(count, { one: `${count} list powiązany`, few: `${count} listy powiązane`, many: `${count} listów powiązanych`, other: `${count} listu powiązanego` })} razem`,
