@@ -19,7 +19,9 @@
 .side-back { transform: rotateY(180deg) translateZ(calc(var(--thick) / 2)); }
 /*
  * 四条纸边：各自竖起来（转 90°）立在信封的四条边上，宽度就是厚度。正对着看时是一条看不见的线，转到侧面才露出来；
- * 中间一道浅、两头暗（两层纸夹着里面的信），比正面略暗一点。两头让开一点圆角。
+ * 中间一道浅、两头暗（两层纸夹着里面的信），比正面略暗一点。
+ * 四条都通到角上：曾为了圆角两头各让开 5px，转到侧面时四个角各漏出一个黑洞（2026-10-21 用户截图）；
+ * 通到角上只在圆角外多出不到 2px 的纸边，正对着看时纸边是一条线，看不出来。
  */
 .edge {
   --edge-out: #c9bfae; --edge-lit: #e3dccf; --edge-mid: #d6cdbd;
@@ -27,10 +29,10 @@
   background: linear-gradient(var(--edge-dir, to right), var(--edge-out), var(--edge-lit) 22%, var(--edge-mid) 50%, var(--edge-lit) 78%, var(--edge-out));
 }
 :root[data-theme='dark'] .edge { --edge-out: #b9ae9b; --edge-lit: #d3cbbe; --edge-mid: #c6bcab; }
-.edge-l, .edge-r { top: 5px; bottom: 5px; width: var(--thick); }
+.edge-l, .edge-r { top: 0; bottom: 0; width: var(--thick); }
 .edge-l { left: calc(var(--thick) / -2); transform: rotateY(-90deg); }
 .edge-r { right: calc(var(--thick) / -2); transform: rotateY(90deg); }
-.edge-t, .edge-b { --edge-dir: to bottom; left: 5px; right: 5px; height: var(--thick); }
+.edge-t, .edge-b { --edge-dir: to bottom; left: 0; right: 0; height: var(--thick); }
 .edge-t { top: calc(var(--thick) / -2); transform: rotateX(90deg); }
 .edge-b { bottom: calc(var(--thick) / -2); transform: rotateX(-90deg); }
 /* 拆开以后封盖翻到上面、信从上沿抽出来：上沿那条边让开。 */

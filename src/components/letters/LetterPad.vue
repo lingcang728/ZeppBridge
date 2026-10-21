@@ -6,6 +6,7 @@
  * 往后翻：最上面那张整张往左抽出来（抽到和整沓完全错开），再从后面滑回去、落到整沓底下——
  * 换层次的那一刻它和别的纸没有重叠，所以看不出「一跳」（2026-10-21 录屏：只抽出一半就换层，被压住的半张闪一下，用户说一顿一卡）。
  * 下一张本来就在下面，跟着慢慢浮上来摆正。往前翻反过来：最底下那张从后面往左抽出来，再盖到最上面。
+ * 出去回来是一条不停的圈（lib/letters/turn.ts）：以前两段关键帧在最远处停一拍，往前翻「顿一下」、往后翻那张「突然冒出来」（同日第二段录屏）。
  * 翻页：拖着最上面那张往左抽（松手过 70px 或甩得够快就翻，不够就弹回；往右拖翻回上一张）、鼠标滚轮、方向键。
  *
  * 只动 transform / opacity（层次靠 WAAPI 的 z-index 离散关键帧在抽到最远处换）。减少动态效果时交叉淡入。
@@ -15,6 +16,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { playPaperSlide } from '../../lib/letters/sound';
+import { poseTransform, turnKeyframes, type Pose } from '../../lib/letters/turn';
 
 const props = defineProps<{ count: number; index: number }>();
 const emit = defineEmits<{ (event: 'update:index', index: number): void }>();
@@ -27,9 +29,7 @@ let start: { x: number; y: number; id: number; t: number } | null = null;
 let horizontal = false;
 
 /* 每一层的摆法：0 最上面，1、2 往下错开；更深的都摆成 2。 */
-const POSE = ['translate(0px, 0px) rotate(0deg)', 'translate(4px, 5px) rotate(.8deg)', 'translate(-5px, 9px) rotate(-1deg)'];
-/* 抽出来最远的位置：整张抽到整沓左边、往上一点、转一点角（和整沓不再重叠，换层次看不出来）。 */
-const OUT = 'translate(-112%, -3%) rotate(-7deg)';
+const POSE: Pose[] = [{ x: 0, y: 0, r: 0 }, { x: 4, y: 5, r: 0.8 }, { x: -5, y: 9, r: -1 }];
 const TURN_MS = 980;
 
 const depth = (i: number) => (i - props.index + props.count) % props.count;
@@ -39,7 +39,7 @@ const pose = (i: number) => POSE[Math.min(depth(i), 2)]!;
 const moving = ref(new Set<number>());
 
 /* 动的那张：往后翻是原来最上面那张（落到最底下），往前翻是最底下那张（盖到最上面）。起止各按它前后的层摆。 */
-const turn = async (mover: number, forward: boolean, startPose: string) => {
+const turn = async (mover: number, forward: boolean, startPose: Pose) => {
   const leaf = leaves.value[mover];
   moving.value = new Set(moving.value).add(mover);
   const endPose = pose(mover);
@@ -47,19 +47,15 @@ const turn = async (mover: number, forward: boolean, startPose: string) => {
     const top = String(props.count + 2);
     const bottom = '0';
     const [from, to] = forward ? [top, bottom] : [bottom, top];
-    await leaf.animate([
-      { transform: startPose, zIndex: from, easing: 'cubic-bezier(.3, .55, .35, 1)' },
-      { transform: OUT, zIndex: from, offset: .5 },
-      { transform: OUT, zIndex: to, offset: .501, easing: 'cubic-bezier(.45, 0, .2, 1)' },
-      { transform: endPose, zIndex: to },
-    ], { duration: TURN_MS }).finished.catch(() => undefined);
+    await leaf.animate(turnKeyframes(startPose, endPose, leaf.offsetWidth, leaf.offsetHeight, from, to), { duration: TURN_MS })
+      .finished.catch(() => undefined);
   }
   const next = new Set(moving.value);
   next.delete(mover);
   moving.value = next;
 };
 
-const go = (next: number, startTransform?: string) => {
+const go = (next: number, startTransform?: Pose) => {
   if (next < 0 || next >= props.count || next === props.index) return;
   const forward = next > props.index;
   const mover = forward ? props.index : next;
@@ -118,7 +114,7 @@ const move = (event: PointerEvent) => {
 const up = (event: PointerEvent) => {
   if (horizontal && start) {
     const speed = (event.clientX - start.x) / Math.max(1, performance.now() - start.t);
-    const held = dragTransform.value;
+    const held = dragPose.value;
     if ((drag.value < -70 || speed < -0.6) && props.index < props.count - 1) go(props.index + 1, held);
     else if ((drag.value > 20 || speed > 0.6) && props.index > 0) go(props.index - 1);
     event.preventDefault();
@@ -130,15 +126,15 @@ const up = (event: PointerEvent) => {
 };
 
 const fade = computed(() => lessMotion());
-const dragTransform = computed(() => {
+const dragPose = computed<Pose>(() => {
   const width = root.value?.clientWidth || 640;
-  return `translate(${drag.value}px, ${Math.min(0, drag.value) * 0.02}px) rotate(${(drag.value / width) * 10}deg)`;
+  return { x: drag.value, y: Math.min(0, drag.value) * 0.02, r: (drag.value / width) * 10 };
 });
 const leafStyle = (i: number) => {
   if (fade.value) return undefined;
   const d = depth(i);
   const style: Record<string, string> = { zIndex: String(props.count - d) };
-  style.transform = d === 0 && drag.value ? dragTransform.value : pose(i);
+  style.transform = poseTransform(d === 0 && drag.value ? dragPose.value : pose(i));
   if ((d === 0 && drag.value) || moving.value.has(i)) style.transition = 'none';
   return style;
 };
