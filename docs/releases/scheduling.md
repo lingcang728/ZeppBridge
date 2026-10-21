@@ -14,6 +14,7 @@
 
 ## 一版从冻结到发布
 
+0. **先写信。** 3.0.7 起每一版都要有作者来信（`docs/releases/letters/<版本>/`，12 种语言；见 [README](README.md#第一步先写信)）。冻结前先问用户「这版的信写了吗」，`node scripts/release/check-letter.mjs <版本>` 不过就不往下走。
 1. 在 main 上做完这一版，**单独一个提交**统一版本号（`check-version-consistency.mjs <版本>`）、切 `BUNDLED_VERSION`、12 种更新说明齐全，本地门禁全绿。
 2. 冻结并登记：
 
@@ -35,7 +36,7 @@
 
 - 快照在 `origin/main` 上，且 `origin/freeze/v<版本>` 正好指向它（防止快照被悄悄换掉）。
 - 快照包含上一版 tag 的提交：后一版继承前一版的全部修复。
-- 快照里 `package.json` / `tauri.conf.json` 的版本、`BUNDLED_VERSION` 和 glob 都是这一版；`docs/releases/<版本>/` 下 12 种语言齐全。
+- 快照里 `package.json` / `tauri.conf.json` 的版本、`BUNDLED_VERSION` 和 glob 都是这一版；`docs/releases/<版本>/` 下 12 种语言齐全；3.0.7 起 `docs/releases/letters/<版本>/` 下的作者来信也要 12 种齐全。
 - **跨版本升级**：`migrations.rs` 相对上一版 tag 只追加不删改，`CURRENT_SCHEMA_VERSION` 不倒退。用户从 3.0.1 直接跳到 3.0.5 时，迁移是按顺序一步步补上的，所以只要每版都只追加就安全；迁移本身的正确性由 CI 里的 storage 测试守着。
 - 快照**自己那次** push CI 的 Windows / Linux / macOS verification 全是 success（跳过的不算）。
 - 上一版已经有公开的稳定 Release。兼容旧流程：上一版已有 tag 且还在打包时等待；构建失败时停止，不重复建 Release 或重打 tag。
@@ -67,5 +68,5 @@
 - **提前准备能消除到点才开始编译的约半小时等待，不能消除 GitHub cron 本身的延迟。** `notBefore` 仍是「不早于」；若要求严格准点，需要独立调度器与告警，不能只依靠 GitHub 定时触发。
 - 操作面板中的草稿已准备状态才代表安装包已就绪；只有公开稳定 Release 才会影响已装用户。
 - 仓库 60 天没有提交，GitHub 会自动停用定时工作流。
-- tag 正文 = Release 说明 = 应用内更新提示：`# ZeppBridge <版本>` 加空行，再接 `docs/releases/<版本>/en.md`（与 v3.0.2 同格式）。
+- tag 正文 = Release 说明 = 应用内更新提示：`# ZeppBridge <版本>` 加空行，再接 `docs/releases/<版本>/en.md`（与 v3.0.2 同格式）；3.0.7 起后面再接 `## A letter from the author` 和英文信全文。
 - 用户天天看到更新提示会疲劳；不急的改进可以攒两天一版，计划里的时间随时能改。

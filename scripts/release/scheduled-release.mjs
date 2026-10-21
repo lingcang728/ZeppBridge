@@ -4,7 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { decide, nextRelease, parseSchedule, releaseAssetNames, tagMessage, verifyPreparedRelease, verifySnapshot } from './schedule-core.mjs';
+import {
+  decide, letterPath, needsLetter, nextRelease, parseSchedule, releaseAssetNames, tagMessage, verifyPreparedRelease, verifySnapshot,
+} from './schedule-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY || 'lingcang728/ZeppBridge';
 const dryRun = ['true', '1'].includes(process.env.DRY_RUN);
@@ -32,6 +34,12 @@ const releases = () => pages('releases?per_page=100');
 const publicTags = (items) => new Set(items.filter((r) => !r.draft && !r.prerelease && r.published_at).map((r) => r.tag_name));
 const remoteTagFor = (entry) => ghJson(`git/matching-refs/tags/v${entry.version}`).find((ref) => ref.ref === `refs/tags/v${entry.version}`);
 const notesFor = (entry) => git(['show', `${entry.commit}:docs/releases/${entry.version}/en.md`]);
+// 3.0.7 起每版都有信（verifySnapshot 把关）；更早的版本没有，读不到就是 null。
+const letterFor = (entry) => {
+  if (!needsLetter(entry.version)) return null;
+  try { return git(['show', `${entry.commit}:${letterPath(entry.version, 'en')}`]); } catch { return null; }
+};
+const bodyFor = (entry) => tagMessage(entry.version, notesFor(entry), letterFor(entry));
 const jobsFor = (id) => pages(`actions/runs/${id}/jobs?per_page=100`, 'jobs');
 const jobsPassed = (jobs, names) => names.every((name) => jobs.some((j) => j.name === name && j.conclusion === 'success'));
 const runsFor = (sha) => pages(`actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=100`, 'workflow_runs')
@@ -74,13 +82,13 @@ function readAsset(release, name) {
 function verifyDraft(entry, draft) {
   const checksums = readAsset(draft, 'SHA256SUMS.txt');
   const latest = JSON.parse(readAsset(draft, 'latest.json'));
-  const problems = verifyPreparedRelease({ entry, release: draft, notes: notesFor(entry), latest, checksums, repo });
+  const problems = verifyPreparedRelease({ entry, release: draft, notes: notesFor(entry), letter: letterFor(entry), latest, checksums, repo });
   if (problems.length) throw new Error(problems.join('\n- '));
 }
 
 function ensureTag(entry) {
   const tag = `v${entry.version}`;
-  const message = tagMessage(entry.version, notesFor(entry));
+  const message = bodyFor(entry);
   const ref = remoteTagFor(entry);
   if (ref) {
     if (ref.object.type !== 'tag') throw new Error(`${tag} 已存在但不是附注 tag，不覆盖`);
@@ -126,7 +134,7 @@ function stage(entry, items) {
   if (JSON.stringify(files) !== JSON.stringify(expected)) throw new Error('待上传的 14 个附件不一致');
   const tag = `v${entry.version}`;
   let draft = items.find((r) => r.tag_name === tag);
-  const body = tagMessage(entry.version, notesFor(entry));
+  const body = bodyFor(entry);
   if (draft && (!draft.draft || draft.target_commitish !== entry.commit || draft.body?.trim() !== body.trim())) throw new Error('已有 Release 与本次草稿不一致，不覆盖');
   if (!draft) draft = writeApi('releases', { tag_name: tag, target_commitish: entry.commit, name: `ZeppBridge ${entry.version}`, body, draft: true, prerelease: false });
   run('gh', ['release', 'upload', tag, '--repo', repo, '--clobber', ...files.map((name) => join(output, name))]);
@@ -162,7 +170,7 @@ function main() {
   const problems = [...verifySnapshot({ git, entry, previousTag, freezeRef: `origin/freeze/v${entry.version}` }), ...checks];
   if (problems.length) throw new Error(`发布前检查未通过：\n- ${problems.join('\n- ')}`);
   if (draft) {
-    if (draft.target_commitish !== entry.commit || draft.body?.trim() !== tagMessage(entry.version, notesFor(entry)).trim()) throw new Error('草稿来自另一个快照；请先删除旧草稿再重新准备');
+    if (draft.target_commitish !== entry.commit || draft.body?.trim() !== bodyFor(entry).trim()) throw new Error('草稿来自另一个快照；请先删除旧草稿再重新准备');
     let ready = false;
     try { verifyDraft(entry, draft); ready = true; } catch (error) { say(`草稿尚未核验完整，需要重新准备：${error.message}`); }
     if (ready) {

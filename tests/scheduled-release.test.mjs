@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import {
-  NOTE_LOCALES, decide, defaultReleaseTime, nextRelease, parseSchedule, removedLines, tagMessage, verifySnapshot,
+  LETTER_HEADING, NOTE_LOCALES, decide, defaultReleaseTime, letterPath, nextRelease, parseSchedule, removedLines, tagMessage, verifySnapshot,
 } from '../scripts/release/schedule-core.mjs';
 
 const sha = (c) => c.repeat(40);
@@ -62,7 +62,15 @@ test('a frozen version defaults to 9 pm Beijing time, the day after the last sch
 
 test('the tag body keeps the release-notes format the in-app prompt reads', () => {
   assert.equal(tagMessage('3.0.3', '- Added: **X**.\n'), '# ZeppBridge 3.0.3\n\n- Added: **X**.\n');
+  // 有信的版本：信接在更新清单后面，单独一节，标题固定（应用内回落显示时在这里截断）。
+  assert.equal(tagMessage('3.1.0', '- Added: **X**.\n', 'Dear reader,\n\nThanks.\n'),
+    `# ZeppBridge 3.1.0\n\n- Added: **X**.\n\n${LETTER_HEADING}\n\nDear reader,\n\nThanks.\n`);
+  assert.equal(tagMessage('3.1.0', '- Added: **X**.\n', '  '), '# ZeppBridge 3.1.0\n\n- Added: **X**.\n');
   assert.deepEqual(removedLines('--- a/m.rs\n+++ b/m.rs\n@@ -1 +1,2 @@\n+new\n'), []);
+  // 有信的版本：信接在更新清单后面，单独一节，标题固定（应用内回落显示时在这里截断）。
+  assert.equal(tagMessage('3.1.0', '- Added: **X**.\n', 'Dear reader,\n\nThanks.\n'),
+    `# ZeppBridge 3.1.0\n\n- Added: **X**.\n\n${LETTER_HEADING}\n\nDear reader,\n\nThanks.\n`);
+  assert.equal(tagMessage('3.1.0', '- Added: **X**.\n', '  '), '# ZeppBridge 3.1.0\n\n- Added: **X**.\n');
   assert.deepEqual(removedLines('--- a/m.rs\n+++ b/m.rs\n@@ -3 +3 @@\n-old\n+new\n'), ['-old']);
 });
 
@@ -73,11 +81,12 @@ test('a snapshot must carry its version, all notes, the previous release and app
     mkdirSync(dirname(join(cwd, path)), { recursive: true });
     writeFileSync(join(cwd, path), text);
   };
-  const release = (version, { notes = NOTE_LOCALES, schema = 38, migrations = 'step1\n' } = {}) => {
+  const release = (version, { notes = NOTE_LOCALES, letters = [], schema = 38, migrations = 'step1\n' } = {}) => {
     write('package.json', JSON.stringify({ version }));
     write('src-tauri/tauri.conf.json', JSON.stringify({ version }));
     write('src/services/updateNotice.ts', `export const BUNDLED_VERSION = '${version}';\nglob('../../docs/releases/${version}/*.md')\n`);
     for (const l of notes) write(`docs/releases/${version}/${l}.md`, `- Added: **${l}**.\n`);
+    for (const l of letters) write(letterPath(version, l), `Dear reader (${l}).\n`);
     write('src-tauri/crates/core/src/storage/mod.rs', `pub const CURRENT_SCHEMA_VERSION: i64 = ${schema};\n`);
     write('src-tauri/crates/core/src/storage/migrations.rs', migrations);
     git(['add', '-A']);
@@ -105,6 +114,13 @@ test('a snapshot must carry its version, all notes, the previous release and app
     const problems = verifySnapshot({ git, entry: { version: '3.0.5', commit: rewritten }, previousTag: 'v3.0.2', mainRef: 'main' });
     assert.ok(problems.some((p) => p.includes('migrations.rs')));
     assert.ok(problems.some((p) => p.includes('CURRENT_SCHEMA_VERSION')));
+
+    // 3.0.7 起每版都要有信：缺一种语言也不让冻结；3.0.6 及以前不要求。
+    const noLetter = release('3.0.7', { letters: NOTE_LOCALES.filter((l) => l !== 'ru'), schema: 39, migrations: 'step1\nstep2\n' });
+    const letterProblems = verifySnapshot({ git, entry: { version: '3.0.7', commit: noLetter }, previousTag: 'v3.0.2', mainRef: 'main' });
+    assert.deepEqual(letterProblems, [`缺作者来信 ${letterPath('3.0.7', 'ru')}（每一版都要先写信）`]);
+    const withLetter = release('3.0.8', { letters: NOTE_LOCALES, schema: 39, migrations: 'step1\nstep2\n' });
+    assert.deepEqual(verifySnapshot({ git, entry: { version: '3.0.8', commit: withLetter }, previousTag: 'v3.0.2', mainRef: 'main' }), []);
 
     // 快照不在 main 上（比如只在某个分支），或者没继承上一版：都不发。
     git(['checkout', '-q', '--orphan', 'stray']);

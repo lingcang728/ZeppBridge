@@ -4,6 +4,14 @@
 /** 每一版的更新说明必须齐全的 12 种界面语言（与 docs/releases/README.md 一致）。 */
 export const NOTE_LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
 
+/**
+ * 作者来信（2026-10-20 用户定）：从这一版起每一版都要有信，补丁版也算。
+ * 原稿 docs/releases/letters/<版本>/<locale>.md，12 种语言齐了才能冻结、才能发。3.0.6 之前的版本没有信。
+ */
+export const LETTERS_SINCE = '3.0.7';
+export const letterPath = (version, locale) => `docs/releases/letters/${version}/${locale}.md`;
+export const needsLetter = (version) => compareVersions(version, LETTERS_SINCE) >= 0;
+
 const VERSION = /^\d+\.\d+\.\d+$/;
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -129,6 +137,11 @@ export function verifySnapshot({ git, entry, previousTag, mainRef = 'origin/main
     const text = show(`docs/releases/${v}/${locale}.md`);
     if (!text?.trim()) problems.push(`缺 docs/releases/${v}/${locale}.md`);
   }
+  if (needsLetter(v)) {
+    for (const locale of NOTE_LOCALES) {
+      if (!show(letterPath(v, locale))?.trim()) problems.push(`缺作者来信 ${letterPath(v, locale)}（每一版都要先写信）`);
+    }
+  }
 
   if (previousTag) {
     const migrations = 'src-tauri/crates/core/src/storage/migrations.rs';
@@ -143,9 +156,16 @@ export function verifySnapshot({ git, entry, previousTag, mainRef = 'origin/main
   return problems;
 }
 
-/** tag 正文 = Release 说明 = 应用内更新提示：第一行标题，下面是英文更新说明（与 v3.0.2 同格式）。 */
-export function tagMessage(version, englishNotes) {
-  return `# ZeppBridge ${version}\n\n${englishNotes.trim()}\n`;
+/** Release 正文里信件那一节的标题；应用内回落显示更新清单时在这里截断（updateNotice.ts 的 notesForLocale）。 */
+export const LETTER_HEADING = '## A letter from the author';
+
+/**
+ * tag 正文 = Release 说明 = 应用内更新提示：第一行标题，下面是英文更新说明（与 v3.0.2 同格式）；
+ * 有信时在后面接一节英文信——信封界面以后就算不在了，信也照常寄到 Release 上。
+ */
+export function tagMessage(version, englishNotes, englishLetter = null) {
+  const letter = englishLetter?.trim() ? `\n${LETTER_HEADING}\n\n${englishLetter.trim()}\n` : '';
+  return `# ZeppBridge ${version}\n\n${englishNotes.trim()}\n${letter}`;
 }
 
 /** 兼容已冻结的 3.0.4 旧附件名；3.0.5 起使用带平台名称的新附件名。 */
@@ -178,10 +198,10 @@ export function parseChecksums(text) {
 }
 
 /** 发布前只读取两份小元数据，逐项对比 GitHub 服务端摘要；不重新下载安装包。 */
-export function verifyPreparedRelease({ entry, release, notes, latest, checksums, repo }) {
+export function verifyPreparedRelease({ entry, release, notes, letter = null, latest, checksums, repo }) {
   const problems = [];
   const normalized = (text) => String(text ?? '').replace(/\r\n/g, '\n').trim();
-  const body = tagMessage(entry.version, notes);
+  const body = tagMessage(entry.version, notes, letter);
   if (release.tag_name !== `v${entry.version}` || release.target_commitish !== entry.commit) problems.push('草稿的版本或冻结提交不一致');
   if (!release.draft || release.prerelease) problems.push('待发布版本必须是非预发布的草稿');
   if (normalized(release.body) !== normalized(body)) problems.push('草稿的更新说明与冻结快照不一致');

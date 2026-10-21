@@ -2,6 +2,16 @@
 
 应用内「已更新到 vX」弹窗（`src/components/shell/UpdateNotice.vue`）显示的就是这里的文件。**每一版都按这份规范写**（2026-10-19 用户定）；改渲染样式也只改那一个组件，所有版本一起生效。
 
+## 第一步：先写信
+
+**每一版都要有作者来信**（2026-10-20 用户定，补丁版也算，不降级成明信片）。信写什么都行，不限于更新——更新说明是单独一张信纸。写信是发版流程，不是界面功能：就算以后信封界面被砍了，信也照常寄出（GitHub Release 正文 + 官网 `zeppbridge.com/letters` 归档）。
+
+- 原稿：`docs/releases/letters/<版本>/zh.md`，**用户本人用中文写**。开发会话不替用户写信，只能提醒。
+- `en.md` 由开发会话译出、**用户亲自审**；其余 10 种语言登记到桌面《翻译.md》交给翻译 agent。
+- 格式：普通段落，段与段之间空一行；只认 `**加粗**`，不要标题、列表、链接、HTML。最后一段单独一行写落款（以 `——` 或 `—` 开头），界面会把它排成签名。
+- 门禁：`node scripts/release/check-letter.mjs [<版本>]`。从 3.0.7 起，`freeze.mjs add` 和定时发布在缺任何一种语言的信时拒绝；`npm run package:release` 只提醒（自测包可以先打，但「翻译完再打包」的规矩不变）。
+- Release 正文：英文更新说明之后接一节 `## A letter from the author` + `en.md` 全文（`schedule-core.mjs` 的 `tagMessage`）。
+
 ## 文件
 
 - 一版一个目录：`docs/releases/<版本>/<locale>.md`，12 种界面语言各一份（zh、en、es、nl、pt-BR、pt-PT、de、ru、hi-IN、fr、it、pl）。
