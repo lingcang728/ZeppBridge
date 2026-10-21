@@ -14,7 +14,6 @@
 import './paper.css';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
-import Icon from '../Icon.vue';
 import ReleaseNotesList from '../shell/ReleaseNotesList.vue';
 import WaxSeal from './WaxSeal.vue';
 import EnvelopeArt from './EnvelopeArt.vue';
@@ -27,7 +26,7 @@ import { useLetterText } from './letters.i18n';
 import { useLetterEnvelope, type Sheet } from '../../composables/useLetterEnvelope';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { whenFramesSteady } from '../../lib/motion/steady';
-import { letterSoundOn, playPaperSlide, setLetterSound } from '../../lib/letters/sound';
+import { playPaperSlide } from '../../lib/letters/sound';
 import { receivedDate, receivedOn } from '../../services/letters';
 import type { NoteGroup } from '../../services/updateNotice';
 
@@ -200,6 +199,8 @@ const unfold = async () => {
   await Promise.all([fly.finished, swing?.finished].map((p) => p?.catch(() => undefined)));
   phase.value = 'reading';
   inked.value = true;
+  await nextTick();
+  pad.value?.nudge();
 };
 /* scoped 样式会给关键帧名加哈希后缀（paper-rise-d5acf8d9），按前缀认；按全名比对曾经永远对不上，每次都是 1.8 秒兜底在推，抽出来干等 0.85 秒。 */
 const onAnimationEnd = (event: AnimationEvent) => { if (event.animationName.startsWith('paper-rise')) void unfold(); };
@@ -254,11 +255,11 @@ const acknowledge = async (event?: MouseEvent) => {
         <div ref="flipper" class="flipper" :style="flipperStyle"
           @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
           <button type="button" class="side side-front" :aria-label="t.flipAria" :disabled="phase !== 'front'" @click="flip">
-            <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :date="postmark" :to="t.to" :from="t.from" />
+            <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :to="t.to" />
           </button>
           <div class="side side-back" :inert="phase === 'front' || undefined">
             <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : phase === 'unfolding' ? 'leaving' : 'sealed'"
-              :bundled="versions.length" :from="t.from">
+              :bundled="versions.length">
               <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
             </EnvelopeArt>
           </div>
@@ -268,19 +269,18 @@ const acknowledge = async (event?: MouseEvent) => {
 
       <!-- 信封出现后不久就挂上、排好版（藏着、不可操作），展开那一下不用现排。 -->
       <div v-if="loaded && (staged || phase === 'reading')" ref="reader" class="reader" :inert="phase !== 'reading' || undefined"
+        @wheel="phase === 'reading' && pad?.wheel($event)"
         :style="foldH ? { '--fold-h': `${foldH}px` } : undefined">
         <div class="pad-shell">
         <LetterPad ref="pad" v-model:index="index" :count="pages.length">
-          <template #page="{ i, active, live }">
-            <!-- 压在下面看不见正文的纸只画空白纸；分页的几种（来信、更新说明、上期回音）第一页一直排着，好量出有几页。 -->
-            <article v-if="pages[i] && !live && !(pages[i]!.sheet.kind !== 'reply' && pages[i]!.sub === 0)" class="leaf-paper paper"></article>
-            <article v-else-if="pages[i]" class="leaf-paper paper" :lang="pages[i]!.sheet.kind === 'letter' ? (pages[i]!.sheet as { lang: string }).lang : undefined">
+          <template #page="{ i, active }">
+            <article v-if="pages[i]" class="leaf-paper paper" :lang="pages[i]!.sheet.kind === 'letter' ? (pages[i]!.sheet as { lang: string }).lang : undefined">
               <div class="leaf-body">
                 <LetterFlow v-if="pages[i]!.sheet.kind === 'letter'" :text="(pages[i]!.sheet as { text: string }).text"
                   :lang="(pages[i]!.sheet as { lang: string }).lang" :head="postmark ?? ''" :postscript="postscriptFor(pages[i]!.sheet)"
                   :page="pages[i]!.sub" :active="active" @pages="setCount(pages[i]!.sheetIndex, $event)" />
                 <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'notes'" class="notes-leaf" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
-                  <ReleaseNotesList :groups="notes ?? []" />
+                  <ReleaseNotesList :groups="notes ?? []" paper />
                 </PagedLeaf>
                 <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'echo'" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
                   <EchoSheet :text="(pages[i]!.sheet as { text: string }).text" :lang="(pages[i]!.sheet as { lang: string }).lang"
@@ -300,16 +300,10 @@ const acknowledge = async (event?: MouseEvent) => {
         <!-- 展开时的下半页：从折痕处绕到后面去，再翻下来。空白的纸，翻完就撤掉，换成信纸本身的下半页。 -->
         <span v-if="phase === 'unfolding'" class="fold-flap" aria-hidden="true"></span>
         </div>
+        <!-- 底下只有「知道了」，而且只在最后一页出现（2026-10-21 用户：静音、左右箭头都不要，翻页靠拖、滚轮、方向键）。 -->
         <footer class="letter-foot">
-          <button type="button" class="icon-button" :aria-pressed="letterSoundOn" :title="letterSoundOn ? t.soundOn : t.soundOff"
-            :aria-label="letterSoundOn ? t.soundOn : t.soundOff" @click="setLetterSound(!letterSoundOn)">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path v-if="letterSoundOn" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /><path v-else d="M17 9l5 6M22 9l-5 6" /></svg>
-          </button>
-          <div class="pager">
-            <button type="button" class="icon-button" :disabled="index === 0" :aria-label="t.prev" @click="go(index - 1)"><Icon name="arrow-left" :size="16" /></button>
-            <button type="button" class="icon-button" :disabled="index === pages.length - 1" :aria-label="t.next" @click="go(index + 1)"><Icon name="arrow-right" :size="16" /></button>
-          </div>
-          <button type="button" class="button primary acknowledge" :disabled="closing" @click="acknowledge">{{ t.acknowledge }}</button>
+          <button type="button" :class="['button', 'primary', 'acknowledge', { shown: index === pages.length - 1 }]"
+            :disabled="closing || index !== pages.length - 1" :tabindex="index === pages.length - 1 ? undefined : -1" @click="acknowledge">{{ t.acknowledge }}</button>
         </footer>
       </div>
     </div>

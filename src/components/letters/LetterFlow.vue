@@ -28,6 +28,10 @@ const opening = computed(() => {
 });
 const body = computed(() => letter.value.paragraphs.slice(leadIndex.value + 1));
 
+/* 落款只在第一次翻到这一页时描一遍；之后再翻回来就是写好的（2026-10-21 录屏：每翻到一次重描一次，看着一顿）。 */
+const signed = ref(props.active);
+watch(() => props.active, (on) => { if (on) signed.value = true; });
+
 const win = ref<HTMLElement | null>(null);
 const flow = ref<HTMLElement | null>(null);
 const box = ref({ width: 0, height: 0, gap: 48 });
@@ -89,7 +93,7 @@ const flowStyle = computed(() => box.value.width ? {
         <template v-for="(segment, part) in emphasis(paragraph)" :key="part"><strong v-if="segment.strong">{{ segment.text }}</strong><template v-else>{{ segment.text }}</template></template>
       </p>
       <p v-if="postscript" class="postscript no-indent">{{ postscript }}</p>
-      <svg v-if="letter.signature" :class="['signature', { drawn: active }]" viewBox="0 0 320 68" role="img" :aria-label="letter.signature">
+      <svg v-if="letter.signature" :class="['signature', { drawn: signed }]" viewBox="0 0 320 68" role="img" :aria-label="letter.signature">
         <text x="316" y="50" text-anchor="end">{{ letter.signature }}</text>
       </svg>
     </div>

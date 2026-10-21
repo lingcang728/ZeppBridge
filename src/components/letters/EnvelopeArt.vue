@@ -4,8 +4,8 @@
  * - 纸：暖灰米白，细密的棉浆纸颗粒（assets/letters/paper-speck.png，自带透明度的亮点 / 暗点，直接叠，不用混合模式）。
  * - 封盖：一大片三角压在上面，尖是圆的；边上一道纸厚的亮边，底下一层淡影。
  * - 折边：底片和两侧折片几乎同色，只靠细亮线和极淡的影子分开；底片伸进封盖下面，两片叠着、火漆封住叠口。
- * - 两面：正面「寄自 ZeppBridge / 致：用户」、右上角邮票、邮戳（圆戳带收信日期 + 波浪线）掠过邮票左下角；
- *   背面只有封舌、火漆，底片上压一行无墨凸印「寄自 ZeppBridge」。邮票不在封舌上，拆信不会撕坏它。
+ * - 两面：正面左上角 ZEPPBRIDGE、手写「致：用户」、右上角一枚邮票（2026-10-21 用户：邮戳和波浪线都不要，只留邮票；
+ *   寄件人不写「寄自」，全大写品牌名）；背面只有封舌、火漆，底片上压一行无墨凸印 ZEPPBRIDGE。邮票不在封舌上，拆信不会撕坏它。
  *
  * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：
  * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）、信纸往上抽出 → leaving 信纸已经交给外面那张信纸。
@@ -16,17 +16,16 @@
  */
 import { useId } from 'vue';
 import PostageStamp from './PostageStamp.vue';
-import Postmark from './Postmark.vue';
 
 withDefaults(defineProps<{
   version: string;
   face?: 'front' | 'back';
   state?: 'sealed' | 'opening' | 'leaving' | 'still';
   bundled?: number;
-  date?: string | null;
   to?: string;
-  from?: string;
-}>(), { face: 'back', state: 'still', bundled: 0, date: null, to: '', from: '' });
+}>(), { face: 'back', state: 'still', bundled: 0, to: '' });
+/* 品牌名不翻译。 */
+const SENDER = 'ZEPPBRIDGE';
 const id = `env-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 /* 160 × 100 的坐标。封盖尖在 (80, 60)，圆角。底片往上伸到 (80, 31) 附近、压在封盖下面——上下两片叠着、火漆封住叠口。 */
 const FLAP = 'M0 0H160C152 6 104 41 87.5 55Q80 61 72.5 55C56 41 8 6 0 0Z';
@@ -90,18 +89,17 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
     <span v-if="bundled > 1" class="env-twine" aria-hidden="true"></span>
     <template v-if="face === 'front'">
       <div class="env-address" aria-hidden="true">
-        <span class="env-from">{{ from }}</span>
+        <span class="env-from">{{ SENDER }}</span>
         <span class="env-to">{{ to }}</span>
         <span class="env-lines"><i></i><i></i><i></i></span>
       </div>
       <div class="env-stamp" aria-hidden="true">
         <PostageStamp :version="version" :width="88" :tilt="0.6" />
-        <Postmark class="env-postmark" :date="date" :width="88" />
       </div>
     </template>
     <template v-else>
       <!-- 无墨凸印的寄信人：同一行字错开一点，一道亮、一道暗。 -->
-      <span v-if="from" class="env-emboss" aria-hidden="true">{{ from }}</span>
+      <span class="env-emboss" aria-hidden="true">{{ SENDER }}</span>
       <div class="env-seal"><slot name="seal" /></div>
     </template>
   </div>
@@ -158,7 +156,7 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 /* 正面：整张纸（不是里衬色），左上角寄件人、中间偏下收件人，像手写在纸上。 */
 .face-front .env-back { background: linear-gradient(160deg, var(--env-flap-top), var(--env-left-in) 70%, var(--env-right-out)); }
 .env-address { position: absolute; inset: 0; z-index: 6; color: var(--env-ink); pointer-events: none; }
-.env-from { position: absolute; left: 7%; top: 9%; font: 400 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .08em; opacity: .7; }
+.env-from { position: absolute; left: 7%; top: 9%; font: 600 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .18em; opacity: .7; }
 /* 收件人：一个名字、底下三道写地址的线（线只是纸上印的格，不编地址）。 */
 .env-to { position: absolute; left: 9%; top: 40%; font: 400 var(--fs-xl)/1.3 'Segoe Script', 'Snell Roundhand', 'KaiTi', 'STKaiti', 'Kaiti SC', Georgia, serif; }
 .env-lines { position: absolute; left: 9%; top: 58%; display: grid; gap: 15px; width: 46%; }
@@ -166,11 +164,9 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 .env-lines i:nth-child(2) { width: 82%; }
 .env-lines i:nth-child(3) { width: 92%; }
 .env-stamp { position: absolute; right: 5%; top: 7%; z-index: 6; }
-/* 邮戳：圆戳盖在信封上，波浪线从邮票左下角掠过。 */
-.env-postmark { position: absolute; right: 50px; bottom: -18px; }
 .env-emboss {
   inset: auto 0 9% !important; z-index: 6; text-align: center; pointer-events: none;
-  color: var(--env-bottom-in); font: 400 var(--fs-2xs)/1 Georgia, 'Songti SC', serif; letter-spacing: .14em;
+  color: var(--env-bottom-in); font: 600 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .24em;
   text-shadow: -.6px -.6px 0 rgb(255 253 246 / .8), .6px .6px 0 rgb(90 70 40 / .32);
 }
 /* 火漆正压在封盖尖上（封盖 62% 高，尖在 60% 处）。 */
