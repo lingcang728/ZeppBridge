@@ -170,7 +170,8 @@ const leafStyle = (i: number) => {
 }
 .letter-pad.dragging { cursor: grabbing; }
 /* 每张一层合成层：画一次，之后翻页只动层，不重画字。下一张浮上来摆正比抽走那张稍慢一点、晚一点起步。 */
-.leaf { position: absolute; inset: 0; transform-origin: 50% 60%; will-change: transform; transition: transform 620ms 120ms cubic-bezier(.3, .7, .25, 1); }
+/* 透明度那条给拆信用：展开时底下几张先藏着，展开完淡出来。 */
+.leaf { position: absolute; inset: 0; transform-origin: 50% 60%; will-change: transform; transition: transform 620ms 120ms cubic-bezier(.3, .7, .25, 1), opacity 420ms ease; }
 .leaf > :deep(*) { height: 100%; }
 /* 下面的纸：一层淡淡的影子，翻上来时退掉。 */
 .leaf:not(.current)::after {

@@ -1,4 +1,4 @@
-/* 信封与信纸（LetterEnvelope.vue）。信封和信纸叠在同一格里：展开的那一下两边同时在场。动的只有 transform / opacity。 */
+/* 信封与信纸（LetterEnvelope.vue）。信封和信纸叠在同一格里：拆信的那一下两边同时在场。动的只有 transform / opacity。 */
 .letter-stage { display: grid; place-items: center; min-height: 340px; }
 .letter-stage > * { grid-area: 1 / 1; }
 
@@ -10,45 +10,45 @@
  */
 .flipper { display: grid; width: 100%; transform-style: preserve-3d; will-change: transform; cursor: grab; touch-action: none; }
 .flipper:active { cursor: grabbing; }
-.is-opening .flipper, .is-unfolding .flipper { cursor: default; }
+.is-opening .flipper { cursor: default; }
 .side { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; cursor: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
 .side-front { border-radius: 6px; }
 .side-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 /* 别叫 .face-*：EnvelopeArt 的根节点自己带 face-front / face-back，scoped 样式会命中子组件根，背面就被多转半圈、左右反了（2026-10-21 踩过）。 */
 .side-back { transform: rotateY(180deg); }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
-.is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
-/*
- * 信纸往上抽的时候信封同时往下退一点（一手抽、一手拿着信封），信纸才能整张出来、不穿过信封；
- * 信纸飞近的同时，信封往后、往下倒着退远淡掉（透视里变小、往后仰）——两样东西一近一远，才有纵深。
- */
-.is-opening .envelope-wrap { animation: envelope-lower 620ms 320ms cubic-bezier(.35, 0, .25, 1) forwards; }
-.is-unfolding .envelope-wrap { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); pointer-events: none; }
-.is-unfolding.receding .envelope-wrap { animation: envelope-recede 640ms cubic-bezier(.4, 0, .6, 1) forwards; }
-@keyframes envelope-lower { to { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); } }
-@keyframes envelope-recede {
-  from { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); opacity: 1; }
-  to { transform: perspective(1400px) translateY(150px) translateZ(-320px) rotateX(24deg); opacity: 0; }
-}
+.is-opening .seal-hint { opacity: 0; }
+/* 拆信时信封怎么沉、怎么退远，由 lib/letters/unfold.ts 的时间线用 WAAPI 放（和信纸共用一个时钟）。 */
+.is-opening .envelope-wrap { pointer-events: none; will-change: transform, opacity; }
 
 /* 信纸和底下的按钮之间留开一截（2026-10-21 用户：离得太近）。 */
 .reader { display: grid; justify-items: center; gap: 34px; }
-/* 信封出现后不久就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）；展开时才露出来。 */
-.is-front .reader, .is-sealed .reader, .is-opening .reader { opacity: 0; pointer-events: none; }
-/* 飞近、展开这一段：信纸是对折着的，只露上半页（下半页由 .fold-flap 从后面翻下来）；字和按钮都先不出来，展开完再浮上来。 */
+/*
+ * 信封出现后不久就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）。
+ * 拆信时露出来，但信纸自己由动画先藏着，等信封里那张抽出信封口才接手。
+ */
+.is-front .reader, .is-sealed .reader { opacity: 0; pointer-events: none; }
+/* 拆信这一段：信纸对折着，只露上半页（下半页由 .fold-flap 从后面翻下来）；底下几张纸、字和按钮都先不出来，展开完再浮上来。 */
 .pad-shell { position: relative; transform-origin: 50% 0; }
-.is-unfolding .letter-pad { clip-path: inset(0 -40px calc(100% - var(--fold-h, 50%)) -40px); }
-.is-unfolding .leaf-body, .is-unfolding .leaf-foot, .is-unfolding .letter-foot { opacity: 0; }
+.is-opening .pad-shell { will-change: transform, opacity; }
+.folded .letter-pad { clip-path: inset(0 -60px calc(100% - var(--fold-h, 50%)) -60px); }
+.folded :deep(.leaf:not(.current)) { opacity: 0; }
+.is-opening .leaf-body, .is-opening .leaf-foot, .is-opening .letter-foot { opacity: 0; }
 .inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
 .inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
+/*
+ * 下半页：和信纸同一种纸（.paper 的底色按整页高度对齐到下半截、纸纹接着上半截的位置铺），先折在后面——背面朝人就看不见
+ * （2026-10-21 录屏：以前背面也画，折在后面时整块盖在上半页上闪一下）——转过竖直才露出来、往下翻到位。
+ */
 .fold-flap {
-  position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); bottom: 0; z-index: 9; border-radius: 0 0 3px 3px; pointer-events: none;
-  transform-origin: 50% 0; backface-visibility: visible;
-  background: url('../../assets/letters/paper-speck.png') 0 0 / 128px repeat, linear-gradient(170deg, #fbf7ee, #f4eee2);
+  position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); height: calc(var(--pad-h, 100%) - var(--fold-h, 50%)); z-index: 9; pointer-events: none;
+  border-radius: 0 0 3px 3px; transform-origin: 50% 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background-size: 100% var(--pad-h, 100%); background-position: 0 100%;
   box-shadow: 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
 }
+.fold-flap::before { background-position: 0 calc(-1 * var(--fold-h, 0px)); }
 /* 折痕：翻下来时折线那一道暗一点。 */
-.fold-flap::before { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .16), transparent); }
+.fold-flap::after { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .14), transparent); }
 .reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
 @keyframes ink-in { from { opacity: 0; } }
 @keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }
@@ -87,42 +87,6 @@
 .notes-leaf :deep(.note-title) { display: block; color: var(--note); font-weight: 600; }
 .notes-leaf :deep(.note-ref) { margin-left: .6em; color: var(--paper-muted); font: 400 var(--fs-2xs) / 1 var(--font-mono); letter-spacing: 0; }
 .notes-leaf :deep(.note-body) { display: block; padding-left: 14px; border-left: 2px solid color-mix(in srgb, var(--note) 35%, transparent); color: #575144; }
-
-.letter-foot { opacity: 0; }
-.inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
-.inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
-.fold-flap {
-  position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); bottom: 0; z-index: 9; border-radius: 0 0 3px 3px; pointer-events: none;
-  transform-origin: 50% 0; backface-visibility: visible;
-  background: url('../../assets/letters/paper-speck.png') 0 0 / 128px repeat, linear-gradient(170deg, #fbf7ee, #f4eee2);
-  box-shadow: 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
-}
-/* 折痕：翻下来时折线那一道暗一点。 */
-.fold-flap::before { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .16), transparent); }
-.reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
-@keyframes ink-in { from { opacity: 0; } }
-@keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }
-
-.leaf-paper {
-  display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
-  padding: var(--paper-line) clamp(22px, 7%, 56px) 0;
-}
-.leaf-body { flex: 1; min-height: 0; }
-/* 回信那张只有一页、不滚动（2026-10-21 用户：信纸不能上下滚）；写多了只在文字框里往下走，见 ReplySheet。 */
-.leaf-fixed { height: 100%; overflow: hidden; }
-.leaf-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 52px; flex: none;
-  color: var(--paper-muted); font: 400 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .04em;
-}
-.leaf-number { font: 400 var(--fs-sm)/1 var(--paper-font); }
-.leaf-number b { color: var(--paper-rubric); font-weight: 400; }
-
-/* 更新清单写在信纸上：用纸的字色和行距，不用卡片的灰。 */
-.notes-leaf :deep(.release-group) { margin: 0 0 var(--paper-line); }
-.notes-leaf :deep(.release-group h3) { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-.notes-leaf :deep(.release-group ul) { margin: 0; gap: 0; }
-.notes-leaf :deep(.release-group li) { color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); }
-.notes-leaf :deep(.release-group li strong) { color: var(--paper-ink); }
 
 .letter-foot { display: flex; align-items: center; justify-content: flex-end; min-height: 42px; width: min(640px, calc(100vw / var(--ui-scale, 1) - 32px)); }
 /* 不在最后一页时占着位置但看不见（不跳版）；翻到最后一页浮上来。 */

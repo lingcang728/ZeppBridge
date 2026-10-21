@@ -8,7 +8,7 @@
  *   寄件人不写「寄自」，全大写品牌名）；背面只有封舌、火漆，底片上压一行无墨凸印 ZEPPBRIDGE。邮票不在封舌上，拆信不会撕坏它。
  *
  * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：
- * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）、信纸往上抽出 → leaving 信纸已经交给外面那张信纸。
+ * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）。信纸往上抽由外面按 lib/letters/unfold.ts 的时间线放（WAAPI）。
  *
  * 性能（2026-10-21 录屏：点了翻面，整段翻面动画被跳过）：两面都在 3D 翻转的合成层里，所以这里不用 SVG 滤镜、
  * 不用 mix-blend-mode——影子是错开一点的同形暗色路径，纸纹是自带透明度的图。动的只有 transform / opacity；
@@ -20,7 +20,7 @@ import PostageStamp from './PostageStamp.vue';
 withDefaults(defineProps<{
   version: string;
   face?: 'front' | 'back';
-  state?: 'sealed' | 'opening' | 'leaving' | 'still';
+  state?: 'sealed' | 'opening' | 'still';
   bundled?: number;
   to?: string;
 }>(), { face: 'back', state: 'still', bundled: 0, to: '' });
@@ -44,7 +44,7 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
     <span v-if="bundled > 1" class="env-ghost one" aria-hidden="true"></span>
     <span class="env-back" aria-hidden="true"></span>
     <template v-if="face === 'back'">
-    <span class="env-paper" aria-hidden="true"></span>
+    <span class="env-paper paper" aria-hidden="true"></span>
     <svg class="env-pocket" viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient :id="`${id}-left`" x1="0" y1=".2" x2="1" y2=".6">
@@ -131,11 +131,15 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 .env-ghost { background: var(--env-side); box-shadow: 0 10px 22px -12px rgb(0 0 0 / .45); }
 .env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
 .env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .85; }
-/* 装在里面的信：对折的一张纸，露在外面的是空白的一面（字在里面），抽出来以后由外面那张信纸接手再展开。 */
+/*
+ * 装在里面的信：对折的一张纸，露在外面的是空白的一面（字在里面）。抽出信封口的那一刻由外面那沓信纸原地接手，
+ * 所以要和它缩小后的样子一模一样：同一种纸（.paper 的底色和纸纹，纸纹按缩小后的大小铺）、同样的细影、同样的圆角。
+ */
 .env-paper {
-  inset: 6% 6% 10% !important; z-index: 1; border-radius: 2px !important; box-shadow: 0 -1px 3px rgb(0 0 0 / .08);
-  background: linear-gradient(170deg, #fbf7ee, #f4eee2);
+  inset: 6% 6% 10% !important; z-index: 1; border-radius: 2px !important; background: var(--paper) !important;
+  box-shadow: 0 1.4px 3.5px rgb(0 0 0 / .14) !important; will-change: transform, opacity;
 }
+.env-paper::before { background-size: 88px 88px !important; }
 .env-pocket { z-index: 2; width: 100%; height: 100%; overflow: hidden; }
 .lip-light { fill: none; stroke: var(--env-lip); stroke-width: 1.1; vector-effect: non-scaling-stroke; }
 .side-edge { fill: none; stroke: rgb(90 70 40 / .16); stroke-width: .8; vector-effect: non-scaling-stroke; }
@@ -172,20 +176,12 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 /* 火漆正压在封盖尖上（封盖 62% 高，尖在 60% 处）。 */
 .env-seal { position: absolute; left: 50%; top: 58.5%; z-index: 7; transform: translate(-50%, -50%); --seal-hinge: calc(var(--seal-size, 96px) / 2 - 36.5625cqw); }
 
-/*
- * 拆开：封盖往上翻（自己带透视，转轴在信封上沿），翻到竖直就落到信纸后面；火漆上半块粘在封盖上，跟着一起翻、翻过竖直就看不见了。
- * 信纸往上整张抽出来。
- */
+/* 拆开：封盖往上翻（自己带透视，转轴在信封上沿），翻到竖直就落到信纸后面；火漆上半块粘在封盖上，跟着一起翻、翻过竖直就看不见了。 */
 .is-opening .env-flap { animation: flap-open 520ms cubic-bezier(.4, .1, .3, 1) forwards, flap-depth 520ms linear forwards; }
 .is-opening .env-seal :deep(.wax.top) { transform-origin: 50% var(--seal-hinge); animation: flap-open 520ms cubic-bezier(.4, .1, .3, 1) forwards, seal-hide 520ms linear forwards; }
-.is-opening .env-paper { animation: paper-rise 620ms 320ms cubic-bezier(.35, 0, .25, 1) both; }
-.is-opening .env-twine, .is-leaving .env-twine { opacity: 0; }
-.is-leaving .env-flap { transform: perspective(1200px) rotateX(178deg); z-index: 0; }
-.is-leaving .env-seal :deep(.wax.top) { opacity: 0; }
-.is-leaving .env-paper { transform: translateY(-112%); opacity: 0; }
+.is-opening .env-twine { opacity: 0; }
 @keyframes flap-open { from { transform: perspective(1200px) rotateX(0deg); } to { transform: perspective(1200px) rotateX(178deg); } }
 /* 这条缓动约在 37% 的时间翻到竖直。 */
 @keyframes flap-depth { 0%, 36% { z-index: 4; } 37%, 100% { z-index: 0; } }
 @keyframes seal-hide { 0%, 36% { opacity: 1; } 37%, 100% { opacity: 0; } }
-@keyframes paper-rise { to { transform: translateY(-112%); } }
 </style>

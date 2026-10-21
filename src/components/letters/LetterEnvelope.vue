@@ -3,9 +3,10 @@
  * 作者来信的信封（批次 6，想法 3；2026-10-21 按用户给的参考重做：要像信纸，不像卡片）。更新后弹出、或在信匣里重读：
  *
  *   正面（邮票、邮戳、致：用户）→ 点一下翻到背面，或者拖着信封像 3D 模型那样转（2026-10-21 用户：别斜放、要能拖着转）
- *   → 点一下 / 划一下火漆 → 火漆沿封盖边裂开，上半块跟着封盖翻上去 → 对折的信纸整张从信封口抽出来
- *   → 这张对折的信朝人飞近（带透视纵深），信封往后、往下退远淡掉 → 下半页从后面绕着折痕翻下来，展开成整页
- *   （2026-10-21 用户：原来「先开、再出、再慢慢拉伸」像纯平面；现在不拉伸，只有位移、纵深和折页。）
+ *   → 点一下 / 划一下火漆 → 火漆不规则地裂开（崩掉几粒碎屑），上半块跟着封盖翻上去
+ *   → 一气呵成（2026-10-21 用户第三轮：原来抽出、闪到顶上、再折角闪一下，一顿一顿）：对折的信往上抽、信封往下沉，
+ *     抽出信封口的那一刻外面那沓信纸原地接手、不停顿，顺着弧线放大落到位，下半页从后面翻下来；信封往后退远淡掉。
+ *     路径和时间线见 lib/letters/unfold.ts。
  *   → 一页一页地读：① 来信（长信自动分页；跳版更新时几封按旧到新）② 更新说明 ③ 上期回音（有才放）④ 回信
  *
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
@@ -27,6 +28,7 @@ import { useLetterEnvelope, type Sheet } from '../../composables/useLetterEnvelo
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { whenFramesSteady } from '../../lib/motion/steady';
 import { playPaperSlide } from '../../lib/letters/sound';
+import { planUnfold } from '../../lib/letters/unfold';
 import { receivedDate, receivedOn } from '../../services/letters';
 import type { NoteGroup } from '../../services/updateNotice';
 
@@ -43,7 +45,7 @@ const t = useLetterText();
 const { sheets, loaded, span, draft, replyState, replyError, toggleAlsoHit, send, flushVotesOnClose } =
   useLetterEnvelope(toRef(props, 'versions'), toRef(props, 'current'), toRef(props, 'notes'));
 
-type Phase = 'front' | 'sealed' | 'opening' | 'unfolding' | 'reading';
+type Phase = 'front' | 'sealed' | 'opening' | 'reading';
 const phase = ref<Phase>(props.opened ? 'reading' : 'front');
 const index = ref(0);
 /*
@@ -54,8 +56,6 @@ const index = ref(0);
 const staged = ref(props.opened);
 /* 展开完成后字和按钮浮上来（只在第一次展开时，重读不放）。 */
 const inked = ref(false);
-/* 信纸真正开飞的那一刻才让信封往后退（展开第一帧要光栅化整页，CSS 动画先放会被吞掉一截）。 */
-const receding = ref(false);
 const newest = computed(() => props.versions[props.versions.length - 1] ?? props.current);
 /* 信头日期：第一次收到这封信的那天。重读时不再记新的。 */
 const postmark = ref<string | null>(null);
@@ -152,66 +152,48 @@ const flip = () => {
 };
 
 /*
- * 拆信之后：信纸往上抽（EnvelopeArt 的 paper-rise）→ 抽完（等它的 animationend，不按时间猜，免得还没抽出来就接手、穿过信封）
- * → 外面那沓信纸接手：起点和抽出来的那张对折的信重合（只露上半页，下半页折在后面），
- *   一边飞近一边摆到位（往人这边抬起再落下：纵深）；信封同时往后、往下退远淡掉；
- * → 快到位时，下半页绕折痕从后面翻下来（转过 90° 时正对着人，透视下最显纵深）；翻完字浮上来。
- * 整段只有 transform / opacity；先停在起点等帧节奏稳了再放（lib/motion/steady.ts）。
+ * 拆信：火漆裂开后，先把整段动画按起点摆好、暂停着（画面上还是封着的信封，看不出在等），
+ * 等帧节奏稳了（lib/motion/steady.ts）再让封盖、信纸、信封、下半页同一帧一起放——它们共用一个时钟，接手那一刻分毫不差。
+ * 只动 transform / opacity。
  */
 const foldH = ref(0);
-const unfold = async () => {
-  if (phase.value !== 'opening') return;
+const padH = ref(0);
+let unfolding = false;
+const open = async () => {
+  if (phase.value !== 'sealed' || unfolding) return;
+  if (lessMotion()) { phase.value = 'reading'; return; }
+  unfolding = true;
   staged.value = true;
   await nextTick();
+  const envelope = stage.value?.querySelector<HTMLElement>('.side-back .envelope');
+  const wrap = stage.value?.querySelector<HTMLElement>('.envelope-wrap');
   const sheet = stage.value?.querySelector<HTMLElement>('.env-paper');
-  const paper = sheet?.getBoundingClientRect();
   const shell = reader.value?.querySelector<HTMLElement>('.pad-shell');
-  const to = shell?.getBoundingClientRect();
-  if (!shell || !sheet || !paper || !to?.width) { phase.value = 'reading'; inked.value = true; return; }
-  const W = shell.offsetWidth;
-  const H = shell.offsetHeight;
-  /* 对折后露在外面的那一截：按信封里那张纸的比例，至少半页（不然折在后面的下半页会从顶上冒出来）。 */
-  foldH.value = Math.round(Math.min(H, Math.max(H / 2, W / (sheet.offsetWidth / sheet.offsetHeight))));
-  phase.value = 'unfolding';
+  if (!envelope || !wrap || !sheet || !shell || !shell.offsetWidth) { phase.value = 'reading'; inked.value = true; return; }
+  const box = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; };
+  const plan = planUnfold({ envelope: box(envelope), paper: box(sheet), shell: box(shell) });
+  foldH.value = plan.foldH < shell.offsetHeight ? plan.foldH : 0;
+  padH.value = shell.offsetHeight;
   await nextTick();
-  const dx = paper.left + paper.width / 2 - (to.left + to.width / 2);
-  const dy = paper.top - to.top;
-  const sx = paper.width / W;
-  const sy = paper.height / foldH.value;
-  const at = (x: number, y: number, z: number, a: number, kx: number, ky: number) =>
-    `translate(${x}px, ${y}px) perspective(1400px) translateZ(${z}px) rotateX(${a}deg) scale(${kx}, ${ky})`;
-  const fly = shell.animate([
-    { transform: at(dx, dy, 0, 0, sx, sy), easing: 'cubic-bezier(.3, .5, .3, 1)' },
-    { transform: at(dx * 0.22, dy * 0.22 - 24, 150, -9, (sx + 1) / 2, (sy + 1) / 2), offset: 0.55, easing: 'cubic-bezier(.3, .2, .25, 1)' },
-    { transform: at(0, 0, 0, 0, 1, 1) },
-  ], { duration: 680 });
+  const timing = { duration: plan.duration, fill: 'forwards' as const };
+  const moves = [
+    wrap.animate(plan.envelope, timing),
+    sheet.animate(plan.paper, timing),
+    shell.animate(plan.shell, { duration: plan.duration }),
+  ];
   const flap = reader.value?.querySelector<HTMLElement>('.fold-flap');
-  const swing = flap?.animate([
-    { transform: 'perspective(1400px) rotateX(180deg)' },
-    { transform: 'perspective(1400px) rotateX(0deg)' },
-  ], { duration: 520, delay: 420, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'backwards' });
-  fly.pause();
-  swing?.pause();
-  await whenFramesSteady(220);
-  receding.value = true;
-  fly.play();
-  swing?.play();
-  await Promise.all([fly.finished, swing?.finished].map((p) => p?.catch(() => undefined)));
+  if (flap) moves.push(flap.animate(plan.flap.keyframes, { duration: plan.flap.duration, delay: plan.flap.delay, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'backwards' }));
+  moves.forEach((move) => move.pause());
+  await whenFramesSteady(200);
+  phase.value = 'opening';
+  moves.forEach((move) => move.play());
+  later(220, playPaperSlide);
+  await Promise.all(moves.map((move) => move.finished.catch(() => undefined)));
   phase.value = 'reading';
+  foldH.value = 0;
   inked.value = true;
   await nextTick();
   pad.value?.nudge();
-};
-/* scoped 样式会给关键帧名加哈希后缀（paper-rise-d5acf8d9），按前缀认；按全名比对曾经永远对不上，每次都是 1.8 秒兜底在推，抽出来干等 0.85 秒。 */
-const onAnimationEnd = (event: AnimationEvent) => { if (event.animationName.startsWith('paper-rise')) void unfold(); };
-const open = () => {
-  if (phase.value !== 'sealed') return;
-  if (lessMotion()) { phase.value = 'reading'; return; }
-  phase.value = 'opening';
-  later(360, playPaperSlide);
-  later(560, () => { staged.value = true; });
-  /* 兜底：animationend 没来（比如被系统暂停了动画）也要接着展开。 */
-  later(1800, () => { void unfold(); });
 };
 
 const label = (sheet: Sheet) => (sheet.kind === 'letter' ? t.value.letterHead(sheet.version)
@@ -250,7 +232,7 @@ const acknowledge = async (event?: MouseEvent) => {
 <template>
   <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="acknowledge()">
     <h2 id="letter-envelope-title" class="sr-only">{{ t.letterHead(newest) }}</h2>
-    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, receding }]" @animationend="onAnimationEnd">
+    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0 }]">
       <div v-if="phase !== 'reading'" class="envelope-wrap">
         <div ref="flipper" class="flipper" :style="flipperStyle"
           @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
@@ -258,7 +240,7 @@ const acknowledge = async (event?: MouseEvent) => {
             <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :to="t.to" />
           </button>
           <div class="side side-back" :inert="phase === 'front' || undefined">
-            <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : phase === 'unfolding' ? 'leaving' : 'sealed'"
+            <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : 'sealed'"
               :bundled="versions.length">
               <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
             </EnvelopeArt>
@@ -270,7 +252,7 @@ const acknowledge = async (event?: MouseEvent) => {
       <!-- 信封出现后不久就挂上、排好版（藏着、不可操作），展开那一下不用现排。 -->
       <div v-if="loaded && (staged || phase === 'reading')" ref="reader" class="reader" :inert="phase !== 'reading' || undefined"
         @wheel="phase === 'reading' && pad?.wheel($event)"
-        :style="foldH ? { '--fold-h': `${foldH}px` } : undefined">
+        :style="foldH ? { '--fold-h': `${foldH}px`, '--pad-h': `${padH}px` } : undefined">
         <div class="pad-shell">
         <LetterPad ref="pad" v-model:index="index" :count="pages.length">
           <template #page="{ i, active }">
@@ -297,8 +279,8 @@ const acknowledge = async (event?: MouseEvent) => {
             </article>
           </template>
         </LetterPad>
-        <!-- 展开时的下半页：从折痕处绕到后面去，再翻下来。空白的纸，翻完就撤掉，换成信纸本身的下半页。 -->
-        <span v-if="phase === 'unfolding'" class="fold-flap" aria-hidden="true"></span>
+        <!-- 展开时的下半页：先折在后面（背面朝人、看不见），再绕折痕翻下来。和信纸同一种纸，翻完就撤掉，换成信纸本身的下半页。 -->
+        <span v-if="foldH" class="fold-flap paper" aria-hidden="true"></span>
         </div>
         <!-- 底下只有「知道了」，而且只在最后一页出现（2026-10-21 用户：静音、左右箭头都不要，翻页靠拖、滚轮、方向键）。 -->
         <footer class="letter-foot">
