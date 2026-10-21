@@ -59,7 +59,9 @@ export function prepareUpdateNotice(): void {
 }
 
 /** Authored bilingual release notes use the reader's language; other languages fall back to English. */
-export function notesForLocale(notes: string, language: string): string {
+export function notesForLocale(raw: string, language: string): string {
+  // 3.0.7 起 Release 正文在更新清单后面接一节英文信（schedule-core.mjs 的 LETTER_HEADING），信另走信封，不混进清单。
+  const notes = raw.split(/^## A letter from the author\s*$/m)[0]!;
   const match = /^## 中文\r?\n([\s\S]*?)^## English\r?\n([\s\S]*)/m.exec(notes);
   return match ? (language === 'zh' ? match[1]! : match[2]!).trim() : notes;
 }

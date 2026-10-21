@@ -85,6 +85,8 @@ describe('release notes after a successful restart', () => {
     expect(notesForLocale(notes, 'zh')).toBe('修复：中文说明');
     expect(notesForLocale(notes, 'it')).toBe('Fixed: English notes');
     expect(notesForLocale('Plain notes', 'en')).toBe('Plain notes');
+    expect(notesForLocale('# ZeppBridge 3.1.0\n\n- Added: **X**.\n\n## A letter from the author\n\nDear reader,\n', 'de').trim())
+      .toBe('# ZeppBridge 3.1.0\n\n- Added: **X**.');
   });
   it('classifies source notes but preserves untrusted content as plain text', () => {
     expect(releaseRows('# Features\n- Added: setting\n修复：错误\n<script>bad()</script>')).toEqual([

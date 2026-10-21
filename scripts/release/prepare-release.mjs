@@ -4,9 +4,9 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseSchedule, releaseAssetNames, tagMessage } from './schedule-core.mjs';
+import { letterPath, needsLetter, parseSchedule, releaseAssetNames, tagMessage } from './schedule-core.mjs';
 
-export function prepareAssets({ root, output, entry, notes, repo }) {
+export function prepareAssets({ root, output, entry, notes, letter = null, repo }) {
   const names = releaseAssetNames(entry.version);
   mkdirSync(output, { recursive: true });
   const sources = {
@@ -27,7 +27,7 @@ export function prepareAssets({ root, output, entry, notes, repo }) {
   const signature = readFileSync(join(root, 'macos', `${names.mac}.sig`), 'utf8').trim();
   if (!signature) throw new Error('缺少 macOS 自动更新签名');
   const download = (name) => `https://github.com/${repo}/releases/download/v${entry.version}/${name}`;
-  latest.notes = tagMessage(entry.version, notes).trim();
+  latest.notes = tagMessage(entry.version, notes, letter).trim();
   latest.pub_date = entry.notBefore.toISOString();
   latest.platforms['windows-x86_64'].url = download(names.windows);
   latest.platforms['windows-x86_64-portable'].url = download(names.portable);
@@ -44,6 +44,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const entry = schedule.releases.find((r) => r.version === process.env.PREPARE_VERSION && r.commit === process.env.PREPARE_COMMIT);
   if (!entry) throw new Error('待组装的版本与冻结计划不一致');
   const notes = execFileSync('git', ['show', `${entry.commit}:docs/releases/${entry.version}/en.md`], { encoding: 'utf8' });
-  const files = prepareAssets({ root: '.prepared-release', output: '.prepared-release/assets', entry, notes, repo: process.env.GITHUB_REPOSITORY });
+  const letter = needsLetter(entry.version)
+    ? execFileSync('git', ['show', `${entry.commit}:${letterPath(entry.version, 'en')}`], { encoding: 'utf8' })
+    : null;
+  const files = prepareAssets({ root: '.prepared-release', output: '.prepared-release/assets', entry, notes, letter, repo: process.env.GITHUB_REPOSITORY });
   console.log(`已组装并生成 SHA-256 清单：${files.length} 个发布附件，快照 ${entry.commit}`);
 }

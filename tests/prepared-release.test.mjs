@@ -11,7 +11,7 @@ import { NOTE_LOCALES, parseChecksums, releaseAssetNames, tagMessage, verifyPrep
 
 const repo = 'lingcang728/ZeppBridge';
 const digest = (text) => `sha256:${createHash('sha256').update(text).digest('hex')}`;
-const fixture = (version = '3.0.4') => {
+const fixture = (version = '3.0.4', letter = null) => {
   const root = mkdtempSync(join(tmpdir(), 'zeppbridge-prepared-'));
   const entry = { version, commit: 'a'.repeat(40), approved: true, notBefore: new Date('2099-10-21T13:00:00Z') };
   const notes = '- Added: **Prepared release**.\n';
@@ -22,15 +22,15 @@ const fixture = (version = '3.0.4') => {
   writeFileSync(join(root, 'macos', `${names.mac}.sig`), 'mac-signature');
   writeFileSync(join(root, 'windows', 'latest.json'), JSON.stringify({ version, notes: 'branch build fallback', platforms: { 'windows-x86_64': { signature: 'windows-signature' }, 'windows-x86_64-portable': { signature: 'portable-signature' } } }));
   const output = join(root, 'assets');
-  const files = prepareAssets({ root, output, entry, notes, repo });
+  const files = prepareAssets({ root, output, entry, notes, letter, repo });
   const assets = files.map((name, index) => {
     const bytes = readFileSync(join(output, name));
     return { id: 100 + index, name, state: 'uploaded', size: bytes.length, digest: digest(bytes) };
   });
-  const release = { id: 42, tag_name: `v${version}`, target_commitish: entry.commit, body: tagMessage(version, notes), draft: true, prerelease: false, assets };
+  const release = { id: 42, tag_name: `v${version}`, target_commitish: entry.commit, body: tagMessage(version, notes, letter), draft: true, prerelease: false, assets };
   const latest = JSON.parse(readFileSync(join(output, 'latest.json'), 'utf8'));
   const checksums = readFileSync(join(output, 'SHA256SUMS.txt'), 'utf8');
-  return { root, output, entry, notes, release, latest, checksums, repo };
+  return { root, output, entry, notes, letter, release, latest, checksums, repo };
 };
 
 for (const version of ['3.0.4', '3.0.6']) test(`prepares complete signed updater metadata and checksums for frozen ${version} names`, () => {
@@ -41,6 +41,15 @@ for (const version of ['3.0.4', '3.0.6']) test(`prepares complete signed updater
     assert.equal(parseChecksums(f.checksums).size, 13);
     assert.equal(f.latest.pub_date, f.entry.notBefore.toISOString());
     assert.equal(f.latest.notes, tagMessage(version, f.notes).trim());
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('the author letter rides along in the Release body and updater notes, and must match', () => {
+  const f = fixture('3.1.0', 'Dear reader,\n\nThis one took a while.\n');
+  try {
+    assert.deepEqual(verifyPreparedRelease(f), []);
+    assert.match(f.latest.notes, /## A letter from the author\n\nDear reader,/);
+    assert.ok(verifyPreparedRelease({ ...f, letter: null }).some((p) => p.includes('更新说明')));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
