@@ -33,6 +33,13 @@ const fixture = (version = '3.0.4', letter = null) => {
   return { root, output, entry, notes, letter, release, latest, checksums, repo };
 };
 
+test('tool archives use readable platform names from 3.0.5, and the target triple before that', () => {
+  assert.equal(releaseAssetNames('3.0.4').windowsTools, 'zeppbridge-tools-3.0.4-x86_64-pc-windows-msvc.zip');
+  assert.equal(releaseAssetNames('3.0.5').windowsTools, 'zeppbridge-tools-3.0.5-Windows-x64.zip');
+  assert.equal(releaseAssetNames('3.0.5').macTools, 'zeppbridge-tools-3.0.5-macOS-AppleSilicon.zip');
+  assert.equal(releaseAssetNames('3.0.5').linuxTools, 'zeppbridge-tools-3.0.5-Linux-x64.zip');
+});
+
 for (const version of ['3.0.4', '3.0.6']) test(`prepares complete signed updater metadata and checksums for frozen ${version} names`, () => {
   const f = fixture(version);
   try {

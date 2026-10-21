@@ -203,7 +203,7 @@ export function tagMessage(version, englishNotes, englishLetter = null) {
   return `# ZeppBridge ${version}\n\n${englishNotes.trim()}\n${letter}`;
 }
 
-/** 兼容已冻结的 3.0.4 旧附件名；3.0.5 起使用带平台名称的新附件名。 */
+/** 兼容已冻结的 3.0.4 旧附件名。3.0.5 起安装包和工具包都用能看懂的平台名，和 package-tools.ps1 的产出一致。 */
 export function releaseAssetNames(version) {
   const plain = compareVersions(version, '3.0.5') >= 0;
   return {
@@ -216,9 +216,9 @@ export function releaseAssetNames(version) {
     rpm: plain ? `ZeppBridge-${version}-Linux-x64.rpm` : `ZeppBridge_${version}_x86_64.rpm`,
     appimage: plain ? `ZeppBridge-${version}-Linux-x64.AppImage` : `ZeppBridge_${version}_x86_64.AppImage`,
     flatpak: plain ? `ZeppBridge-${version}-Linux-x64.flatpak` : `ZeppBridge_${version}_x86_64.flatpak`,
-    windowsTools: `zeppbridge-tools-${version}-x86_64-pc-windows-msvc.zip`,
-    macTools: `zeppbridge-tools-${version}-aarch64-apple-darwin.zip`,
-    linuxTools: `zeppbridge-tools-${version}-x86_64-unknown-linux-gnu.zip`,
+    windowsTools: plain ? `zeppbridge-tools-${version}-Windows-x64.zip` : `zeppbridge-tools-${version}-x86_64-pc-windows-msvc.zip`,
+    macTools: plain ? `zeppbridge-tools-${version}-macOS-AppleSilicon.zip` : `zeppbridge-tools-${version}-aarch64-apple-darwin.zip`,
+    linuxTools: plain ? `zeppbridge-tools-${version}-Linux-x64.zip` : `zeppbridge-tools-${version}-x86_64-unknown-linux-gnu.zip`,
   };
 }
 
