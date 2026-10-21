@@ -2,7 +2,8 @@
 /**
  * 作者来信的信封（批次 6，想法 3；2026-10-21 按用户给的参考重做：要像信纸，不像卡片）。更新后弹出、或在信匣里重读：
  *
- *   封着 → 按住 / 掰开火漆 → 封盖翻开、信纸从信封口抽出来 → 这张纸展开成一整张信纸（从它在信封里的位置长大），信封沉下去
+ *   正面（邮票、邮戳、致：你）→ 点一下翻到背面（2026-10-21 用户定：邮票和火漆分两面，拆信不会撕坏邮票）
+ *   → 按住 / 掰开火漆 → 封盖翻开、信纸从信封口抽出来 → 这张纸展开成一整张信纸（从它在信封里的位置长大），信封沉下去
  *   → 一页一页地读：① 来信（长信自动分页；跳版更新时几封按旧到新）② 更新说明 ③ 上期回音（有才放）④ 回信
  *
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
@@ -39,8 +40,8 @@ const t = useLetterText();
 const { sheets, loaded, span, draft, replyState, replyError, toggleAlsoHit, send, flushVotesOnClose } =
   useLetterEnvelope(toRef(props, 'versions'), toRef(props, 'current'), toRef(props, 'notes'));
 
-type Phase = 'sealed' | 'opening' | 'unfolding' | 'reading';
-const phase = ref<Phase>(props.opened ? 'reading' : 'sealed');
+type Phase = 'front' | 'sealed' | 'opening' | 'unfolding' | 'reading';
+const phase = ref<Phase>(props.opened ? 'reading' : 'front');
 const index = ref(0);
 const newest = computed(() => props.versions[props.versions.length - 1] ?? props.current);
 /* 信头日期：第一次收到这封信的那天。重读时不再记新的。 */
@@ -80,6 +81,13 @@ const unfold = async () => {
     ], { duration: 640, easing: 'cubic-bezier(.3, .7, .2, 1)' });
   }
   later(660, () => { phase.value = 'reading'; });
+};
+/* 翻到背面：信封绕竖轴翻过来（中途微微抬起），翻完把焦点交给火漆。 */
+const flip = () => {
+  if (phase.value !== 'front') return;
+  phase.value = 'sealed';
+  if (!lessMotion()) playPaperSlide();
+  later(lessMotion() ? 0 : 900, () => stage.value?.querySelector<HTMLElement>('.env-seal button')?.focus());
 };
 const open = () => {
   if (phase.value !== 'sealed') return;
@@ -127,11 +135,18 @@ const acknowledge = async (event?: MouseEvent) => {
     <h2 id="letter-envelope-title" class="sr-only">{{ t.letterHead(newest) }}</h2>
     <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened }]">
       <div v-if="phase !== 'reading'" class="envelope-wrap">
-        <EnvelopeArt :version="newest" :state="phase === 'sealed' ? 'sealed' : phase === 'opening' ? 'opening' : 'leaving'"
-          :bundled="versions.length">
-          <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
-        </EnvelopeArt>
-        <p class="seal-hint">{{ versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ t.sealHint }}</p>
+        <div :class="['flipper', { flipped: phase !== 'front' }]">
+          <button type="button" class="face face-front" :aria-label="t.flipAria" :disabled="phase !== 'front'" @click="flip">
+            <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :date="postmark" :to="t.to" :from="t.from" />
+          </button>
+          <div class="face face-back" :inert="phase === 'front' || undefined">
+            <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : phase === 'unfolding' ? 'leaving' : 'sealed'"
+              :bundled="versions.length">
+              <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
+            </EnvelopeArt>
+          </div>
+        </div>
+        <p class="seal-hint">{{ versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ phase === 'front' ? t.flipHint : t.sealHint }}</p>
       </div>
 
       <div v-if="(phase === 'unfolding' || phase === 'reading') && loaded" ref="reader" class="reader">

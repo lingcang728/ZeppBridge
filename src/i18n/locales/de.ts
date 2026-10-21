@@ -298,6 +298,14 @@ export default {
       settingsRow: 'Briefkasten',
       settingsSub: (count: number) => (count ? `${count} ${count === 1 ? 'Brief' : 'Briefe'} zum Nachlesen, mit Empfangsbestätigungen` : 'Hier findest du die Briefe des Autors und Empfangsbestätigungen'),
       open: 'Öffnen',
+      mailboxAria: 'Briefkasten prüfen',
+      mailboxNew: 'Neue Empfangsbestätigungen',
+      mailboxQuiet: 'Nichts Neues im Briefkasten',
+      mailboxChecking: 'Post wird abgerufen…',
+      mailboxOutbox: (count: number) => `${count} ${count === 1 ? 'Antwort wartet' : 'Antworten warten'} auf den Versand`,
+      mailboxLetters: (count: number) => `${count} ${count === 1 ? 'Brief empfangen' : 'Briefe empfangen'}`,
+      replied: 'Beantwortet',
+      rereadAria: (version: string) => `Brief für ${version} erneut lesen`,
     },
     'lib/aiTask/markdownGuide': {
       guide: [

@@ -421,6 +421,14 @@ export default {
     settingsRow: 'Cassetta postale',
     settingsSub: (count: number) => (count ? `${count} ${count === 1 ? 'lettera' : 'lettere'} da rileggere, con ricevute` : 'Le lettere dell’autore e le ricevute sono custodite qui'),
     open: 'Apri',
+    mailboxAria: 'Controlla la cassetta postale',
+    mailboxNew: 'Nuove ricevute',
+    mailboxQuiet: 'Niente di nuovo nella cassetta postale',
+    mailboxChecking: 'Controllo della posta…',
+    mailboxOutbox: (count: number) => `${count} ${count === 1 ? 'risposta in attesa' : 'risposte in attesa'} di invio`,
+    mailboxLetters: (count: number) => `${count} ${count === 1 ? 'lettera ricevuta' : 'lettere ricevute'}`,
+    replied: 'Risposto',
+    rereadAria: (version: string) => `Rileggi la lettera per ${version}`,
   },
 
   'components/MetricInfo': {

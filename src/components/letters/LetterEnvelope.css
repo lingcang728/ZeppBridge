@@ -3,8 +3,25 @@
 .letter-stage > * { grid-area: 1 / 1; }
 
 .envelope-wrap { display: grid; justify-items: center; gap: 22px; width: min(500px, calc(100vw / var(--ui-scale, 1) - 48px)); }
-/* 像参考照片那样斜放在桌上：往后倒一点、转一点，立体感先从角度来。 */
-.envelope-wrap :deep(.envelope) { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg); }
+/*
+ * 两面信封：正面（邮票）和背面（火漆）叠在一格里，背面先转 180°；整体像参考照片那样斜放在桌上（往后倒一点、转一点）。
+ * 翻面绕竖轴转半圈，中途往上抬一点再落下。只动 transform。
+ */
+.flipper {
+  --tilt: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg);
+  display: grid; width: 100%; transform-style: preserve-3d; transform: var(--tilt);
+}
+.flipper.flipped { transform: var(--tilt) rotateY(180deg); animation: flip-over 900ms cubic-bezier(.45, .05, .25, 1); }
+@keyframes flip-over {
+  0% { transform: var(--tilt) rotateY(0deg); }
+  50% { transform: var(--tilt) translateZ(70px) rotateY(90deg); }
+  100% { transform: var(--tilt) rotateY(180deg); }
+}
+.face { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.face-front { cursor: pointer; border-radius: 6px; }
+.face-front:disabled { cursor: default; }
+.face-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
+.face-back { transform: rotateY(180deg); }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
 /* 信纸展开时信封往下沉、淡掉。 */
@@ -51,6 +68,7 @@
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
+  .flipper.flipped { animation: none; }
   .reread .reader { animation: reader-fade 220ms ease both; }
   @keyframes reader-fade { from { opacity: 0; } }
 }
@@ -58,3 +76,4 @@
   .letter-foot { flex-wrap: wrap; }
   .acknowledge { flex: 1 0 100%; }
 }
+:root[data-effects='lite'] .flipper.flipped { animation: none; }

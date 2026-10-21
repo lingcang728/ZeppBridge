@@ -865,6 +865,14 @@ export default {
     settingsRow: 'Skrzynka na listy',
     settingsSub: (count: number) => (count ? `${plural(count, { one: `${count} list`, few: `${count} listy`, many: `${count} listów`, other: `${count} listu` })} do ponownego przeczytania, z potwierdzeniami` : 'Tutaj trafiają listy od autora i ich potwierdzenia'),
     open: 'Otwórz',
+    mailboxAria: 'Sprawdź skrzynkę na listy',
+    mailboxNew: 'Nowe potwierdzenia',
+    mailboxQuiet: 'Nic nowego w skrzynce na listy',
+    mailboxChecking: 'Sprawdzanie poczty…',
+    mailboxOutbox: (count: number) => `${plural(count, { one: `${count} odpowiedź oczekuje`, few: `${count} odpowiedzi oczekują`, many: `${count} odpowiedzi oczekuje`, other: `${count} odpowiedzi oczekuje` })} na wysłanie`,
+    mailboxLetters: (count: number) => `${plural(count, { one: `Otrzymano ${count} list`, few: `Otrzymano ${count} listy`, many: `Otrzymano ${count} listów`, other: `Otrzymano ${count} listu` })}`,
+    replied: 'Wysłano odp.',
+    rereadAria: (version: string) => `Przeczytaj ponownie list dla wersji ${version}`,
   },
 
   "components/InsightCard": {

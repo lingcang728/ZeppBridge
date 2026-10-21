@@ -3448,6 +3448,16 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
           ? `${count} ${count === 1 ? 'brief' : 'brieven'} om te herlezen, met ontvangstbevestigingen`
           : 'Brieven van de auteur en ontvangstbevestigingen vind je hier',
       open: 'Openen',
+      mailboxAria: 'Kijk in de brievenbus',
+      mailboxNew: 'Nieuwe ontvangstbevestigingen',
+      mailboxQuiet: 'Niets nieuws in de brievenbus',
+      mailboxChecking: 'Post ophalen…',
+      mailboxOutbox: (count: number) =>
+        `${count} ${count === 1 ? 'reactie' : 'reacties'} klaar om te versturen`,
+      mailboxLetters: (count: number) =>
+        `${count} ${count === 1 ? 'brief' : 'brieven'} ontvangen`,
+      replied: 'Beantwoord',
+      rereadAria: (version: string) => `Lees de brief voor ${version} opnieuw`,
     },
   },
   errors: {
