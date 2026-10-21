@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 回信那张信纸（批次 6 拍板：只要一个文字框，不要快捷选项，不收附件；上限 1000 字，可以不写）。
- * 直接写在信纸的横线上（框随字长高，纸滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
+ * 直接写在信纸的横线上（框固定 7 行高、纸不滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
  * 寄出（或进了离线待寄箱）的那一刻，写好的那页对折、往右上角飞走，再淡淡地回来，表示已经封好不能改了。
  */
 import { computed, ref, watch } from 'vue';
@@ -35,6 +35,13 @@ watch(() => props.state, (next, previous) => {
     fly.cancel();
   }, () => {});
 });
+/* 框里往下走时只停在整行上，字不会落到两条横线中间（滚轮一下滚的不是整行）。 */
+const snap = (event: Event) => {
+  const el = event.target as HTMLTextAreaElement;
+  const line = parseFloat(getComputedStyle(el).lineHeight) || 34;
+  const top = Math.round(el.scrollTop / line) * line;
+  if (Math.abs(top - el.scrollTop) > 0.5) el.scrollTop = top;
+};
 const input = (event: Event) => update({ text: Array.from((event.target as HTMLTextAreaElement).value).slice(0, LETTER_REPLY_MAX).join('') });
 </script>
 
@@ -43,7 +50,7 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
     <label class="reply-label" for="letter-reply-text">{{ t.replyTitle }}</label>
     <div ref="written" :class="['written', { sealed: state === 'sent' || state === 'queued' }]">
     <textarea id="letter-reply-text" class="reply-text" :value="draft.text" :placeholder="t.replyPlaceholder"
-      :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="6" @input="input"></textarea>
+      :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="7" @input="input" @scroll="snap"></textarea>
     <div class="reply-meta">
       <label class="quote">
         <input type="checkbox" :checked="draft.allowQuote" :disabled="state === 'sent' || state === 'queued'" @change="update({ allowQuote: ($event.target as HTMLInputElement).checked })" />
@@ -68,12 +75,14 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 <style scoped>
 /* 每一行都是 --paper-line 的整数倍，字和控件都落在 paper-lines 的横线上。 */
 .reply-label { display: block; font: 700 var(--paper-size) / var(--paper-line) var(--paper-font); }
+/* 信纸只有一页、不滚动（2026-10-21 用户）：框固定 7 行高，写多了只在框里往下走，不出滚动条。 */
 .reply-text {
-  display: block; width: 100%; min-height: calc(var(--paper-line) * 6); padding: 0; border: 0; outline: none; resize: none; overflow: hidden;
-  field-sizing: content; background: transparent; color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); caret-color: var(--paper-rubric);
+  display: block; width: 100%; height: calc(var(--paper-line) * 7); padding: 0; border: 0; outline: none; resize: none; overflow-y: auto; scrollbar-width: none;
+  background: transparent; color: var(--paper-ink); font: 400 var(--paper-size) / var(--paper-line) var(--paper-font); caret-color: var(--paper-rubric);
 }
 .written { transform-origin: 50% 0; }
 .written.sealed { opacity: .6; }
+.reply-text::-webkit-scrollbar { display: none; }
 .reply-text::placeholder { color: var(--paper-muted); opacity: .8; }
 .reply-text:focus-visible { box-shadow: inset 2px 0 0 var(--focus); }
 .reply-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: var(--paper-line); }

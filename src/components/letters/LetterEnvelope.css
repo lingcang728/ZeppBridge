@@ -4,39 +4,50 @@
 
 .envelope-wrap { display: grid; justify-items: center; gap: 22px; width: min(500px, calc(100vw / var(--ui-scale, 1) - 48px)); }
 /*
- * 两面信封：正面（邮票）和背面（火漆）叠在一格里，背面先转 180°；整体像参考照片那样斜放在桌上（往后倒一点、转一点）。
- * 翻面绕竖轴转半圈，中途往上抬一点再落下。只动 transform。
- * 斜放的那组数（perspective 1600 / rotateX 16 / rotateZ -3.5）在 LetterEnvelope.vue 的 TILT 里还有一份（信纸从这个角度摆正），改要一起改。
- * 关键帧里直接写数、不用 var()，两面先各自提升成合成层（will-change）：翻面整段交给合成线程，
- * 第一下不用现光栅化背面（2026-10-21 用户：一开始翻转有点卡）。
+ * 两面信封：正面（邮票）和背面（火漆）叠在一格里，背面先转 180°。摆正放着（2026-10-21 用户：别斜放），
+ * 角度由 LetterEnvelope.vue 写在行内样式里：拖着转、点了翻面都是 perspective + rotateX / rotateY，松手的回落用 WAAPI。
+ * 两面先各自提升成合成层（will-change）：翻面整段在合成线程上放，第一下不用现光栅化背面。
  */
-.flipper { display: grid; width: 100%; transform-style: preserve-3d; transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg); will-change: transform; }
-.flipper.flipped { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(180deg); animation: flip-over 900ms cubic-bezier(.45, .05, .25, 1); }
-@keyframes flip-over {
-  0% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(0deg); }
-  50% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(70px) rotateY(90deg); }
-  100% { transform: perspective(1600px) rotateX(16deg) rotateZ(-3.5deg) translateZ(0px) rotateY(180deg); }
-}
-.side { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
-.side-front { cursor: pointer; border-radius: 6px; }
-.side-front:disabled { cursor: default; }
+.flipper { display: grid; width: 100%; transform-style: preserve-3d; will-change: transform; cursor: grab; touch-action: none; }
+.flipper:active { cursor: grabbing; }
+.is-opening .flipper, .is-unfolding .flipper { cursor: default; }
+.side { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; cursor: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
+.side-front { border-radius: 6px; }
 .side-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 /* 别叫 .face-*：EnvelopeArt 的根节点自己带 face-front / face-back，scoped 样式会命中子组件根，背面就被多转半圈、左右反了（2026-10-21 踩过）。 */
 .side-back { transform: rotateY(180deg); }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint, .is-unfolding .seal-hint { opacity: 0; }
-/* 信纸往上抽的时候信封同时往下退一点（一手抽、一手拿着信封），信纸才能整张出来、不穿过信封；展开时信封再往下沉、淡掉。 */
-.is-opening .envelope-wrap { animation: envelope-lower 760ms 440ms cubic-bezier(.35, 0, .25, 1) forwards; }
-.is-unfolding .envelope-wrap { animation: envelope-sink 460ms cubic-bezier(.4, 0, .7, .2) forwards; pointer-events: none; }
-@keyframes envelope-lower { to { transform: translateY(72px); } }
-@keyframes envelope-sink { from { transform: translateY(72px); } to { transform: translateY(calc(72px + 16%)) scale(.94); opacity: 0; } }
+/*
+ * 信纸往上抽的时候信封同时往下退一点（一手抽、一手拿着信封），信纸才能整张出来、不穿过信封；
+ * 信纸飞近的同时，信封往后、往下倒着退远淡掉（透视里变小、往后仰）——两样东西一近一远，才有纵深。
+ */
+.is-opening .envelope-wrap { animation: envelope-lower 620ms 320ms cubic-bezier(.35, 0, .25, 1) forwards; }
+.is-unfolding .envelope-wrap { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); pointer-events: none; }
+.is-unfolding.receding .envelope-wrap { animation: envelope-recede 640ms cubic-bezier(.4, 0, .6, 1) forwards; }
+@keyframes envelope-lower { to { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); } }
+@keyframes envelope-recede {
+  from { transform: perspective(1400px) translateY(64px) translateZ(0px) rotateX(0deg); opacity: 1; }
+  to { transform: perspective(1400px) translateY(150px) translateZ(-320px) rotateX(24deg); opacity: 0; }
+}
 
 .reader { display: grid; justify-items: center; gap: 14px; }
-/* 翻到背面后就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）；展开时才露出来。 */
-.is-sealed .reader, .is-opening .reader { opacity: 0; pointer-events: none; }
-/* 展开途中字还不出来，纸长到原位附近再浮上来（否则看得见字被拉扁）；底下的按钮最后出现。 */
-.is-unfolding .leaf-body, .is-unfolding .leaf-foot { animation: ink-in 360ms 620ms ease both; }
-.is-unfolding .letter-foot { animation: ink-in 320ms 700ms ease both; }
+/* 信封出现后不久就先挂好、排好版、画好，用透明度藏着（不用 visibility，免得露出来那一帧再现画整页）；展开时才露出来。 */
+.is-front .reader, .is-sealed .reader, .is-opening .reader { opacity: 0; pointer-events: none; }
+/* 飞近、展开这一段：信纸是对折着的，只露上半页（下半页由 .fold-flap 从后面翻下来）；字和按钮都先不出来，展开完再浮上来。 */
+.pad-shell { position: relative; transform-origin: 50% 0; }
+.is-unfolding .letter-pad { clip-path: inset(0 -40px calc(100% - var(--fold-h, 50%)) -40px); }
+.is-unfolding .leaf-body, .is-unfolding .leaf-foot, .is-unfolding .letter-foot { opacity: 0; }
+.inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
+.inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
+.fold-flap {
+  position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); bottom: 0; z-index: 9; border-radius: 0 0 3px 3px; pointer-events: none;
+  transform-origin: 50% 0; backface-visibility: visible;
+  background: url('../../assets/letters/paper-speck.png') 0 0 / 128px repeat, linear-gradient(170deg, #fbf7ee, #f4eee2);
+  box-shadow: 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
+}
+/* 折痕：翻下来时折线那一道暗一点。 */
+.fold-flap::before { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .16), transparent); }
 .reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
 @keyframes ink-in { from { opacity: 0; } }
 @keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }
@@ -46,8 +57,8 @@
   padding: var(--paper-line) clamp(22px, 7%, 56px) 0;
 }
 .leaf-body { flex: 1; min-height: 0; }
-/* 不分页的几张（更新说明、上期回音、回信）：纸里面滚动，横线跟着字一起走。 */
-.leaf-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; background-attachment: local; scrollbar-width: thin; }
+/* 回信那张只有一页、不滚动（2026-10-21 用户：信纸不能上下滚）；写多了只在文字框里往下走，见 ReplySheet。 */
+.leaf-fixed { height: 100%; overflow: hidden; }
 .leaf-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 52px; flex: none;
   color: var(--paper-muted); font: 400 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .04em;
@@ -73,7 +84,6 @@
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .flipper.flipped { animation: none; }
   .reread .reader { animation: reader-fade 220ms ease both; }
   @keyframes reader-fade { from { opacity: 0; } }
 }
@@ -81,4 +91,3 @@
   .letter-foot { flex-wrap: wrap; }
   .acknowledge { flex: 1 0 100%; }
 }
-:root[data-effects='lite'] .flipper.flipped { animation: none; }

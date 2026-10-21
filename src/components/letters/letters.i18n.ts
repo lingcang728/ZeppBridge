@@ -3,7 +3,7 @@ import type { ArchiveSpan } from '../../lib/letters/personal';
 
 /* 信封、信纸、回信、信匣共用一份。另外 9 种语言在 src/i18n/locales/*.ts 的 'components/letters/letters' 下。 */
 const messages = defineMessages({
-  to: '致：你',
+  to: '致：用户',
   from: '寄自 ZeppBridge',
   flipHint: '点一下，翻到背面拆信',
   flipAria: '把信封翻到背面',
@@ -71,7 +71,7 @@ const messages = defineMessages({
   replied: '已回',
   rereadAria: (version: string) => `重读 ${version} 的信`,
 }, {
-  to: 'To: you',
+  to: 'To: User',
   from: 'From ZeppBridge',
   flipHint: 'Tap to turn it over',
   flipAria: 'Turn the envelope over',
@@ -142,7 +142,7 @@ const messages = defineMessages({
   replied: 'Replied',
   rereadAria: (version: string) => `Read the ${version} letter again`,
 }, {
-  to: 'Para: ti',
+  to: 'Para: usuario',
   from: 'De ZeppBridge',
   flipHint: 'Toca para darle la vuelta',
   flipAria: 'Dar la vuelta al sobre',

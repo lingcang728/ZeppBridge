@@ -3149,7 +3149,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       from: 'De ZeppBridge',
       flipHint: 'Toque para virar o envelope',
       flipAria: 'Virar o envelope',
-      sealHint: 'Mantenha pressionado o selo de cera ou abra-o',
+      sealHint: 'Toque no selo de cera ou deslize o dedo sobre ele',
       sealAria: (version: string) => `Abrir a carta de ${version}`,
       bundle: (count: number) => `${count} cartas amarradas juntas`,
       sheetLetter: 'Carta',

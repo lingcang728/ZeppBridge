@@ -3349,7 +3349,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       from: 'De ZeppBridge',
       flipHint: 'Toque para virar o envelope',
       flipAria: 'Virar o envelope',
-      sealHint: 'Mantenha premido o selo de cera ou abra-o',
+      sealHint: 'Toque no selo de cera ou deslize com o dedo',
       sealAria: (version: string) => `Abrir a carta de ${version}`,
       bundle: (count: number) => `${count} cartas atadas`,
       sheetLetter: 'Carta',

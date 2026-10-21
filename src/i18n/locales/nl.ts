@@ -3388,7 +3388,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       from: 'Van ZeppBridge',
       flipHint: 'Tik om de envelop om te draaien',
       flipAria: 'Draai de envelop om',
-      sealHint: 'Houd het lakzegel ingedrukt of breek het open',
+      sealHint: 'Tik op het lakzegel of veeg eroverheen',
       sealAria: (version: string) => `Open de brief voor ${version}`,
       bundle: (count: number) => `${count} brieven samengebonden`,
       sheetLetter: 'Brief',
