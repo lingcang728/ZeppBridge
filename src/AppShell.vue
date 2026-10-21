@@ -18,7 +18,7 @@ import { whenFramesSteady } from './lib/motion/steady';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
-import { startDesktopUpdate } from './services/updateService';
+import { bootDesktopUpdate } from './services/updateService';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
@@ -220,8 +220,8 @@ onMounted(() => {
       void refreshStatus();
       markDataChanged();
     }
-    // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts）。走裸 `invoke`，得等后端就绪再发。
-    void startDesktopUpdate();
+    // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts；设置里关了自动更新就不查）。走裸 `invoke`，得等后端就绪再发。
+    void bootDesktopUpdate();
     // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）；动效档位首启量帧、看电源。
     // 两样都不在首屏关键路径上，就绪后再按需加载（首屏体积预算）。
     void import('./services/letterBox').then((letterBox) => letterBox.scheduleLetterBoxSync());

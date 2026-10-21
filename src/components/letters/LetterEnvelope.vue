@@ -7,9 +7,14 @@
  *   → 一气呵成（2026-10-21 用户第三轮：原来抽出、闪到顶上、再折角闪一下，一顿一顿）：对折的信往上抽、信封往下沉，
  *     抽出信封口的那一刻外面那沓信纸原地接手、不停顿，顺着弧线放大落到位，下半页从后面翻下来；信封往后退远淡掉。
  *     路径和时间线见 lib/letters/unfold.ts。
+ *     抽信时信纸和信封就分开纵深（一个往前抬、一个往后退），信纸上一直印着第一页的字——不再先出来一张白纸、展开完才浮出字
+ *     （2026-10-21 用户第四轮：太扁、像连在一起、空白页太繁琐）。
  *   → 一页一页地读：① 来信（长信自动分页；跳版更新时几封按旧到新）② 更新说明 ③ 上期回音（有才放）④ 回信
  *
+ * 信封有厚度：正反两面各往外让半个厚度，四条侧边是纸边（2026-10-21 用户：转到侧面薄得像一张二维的纸）。
+ *
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
+ * 半路关掉（Esc、点背后，还没读到最后一页也一样）：从哪里来回哪里去——信纸（或还没拆的信封）缩小飞回打开它的地方。
  * 减少动态效果 / 低特效：不放封盖和展开，火漆一点就开，翻页交叉淡入，「知道了」直接收起。重读（opened）时直接是信纸。
  */
 import './paper.css';
@@ -26,6 +31,8 @@ import ReplySheet from './ReplySheet.vue';
 import { useLetterText } from './letters.i18n';
 import { useLetterEnvelope, type Sheet } from '../../composables/useLetterEnvelope';
 import { lessMotion } from '../../lib/motion/lessMotion';
+import { exemptFromSettle } from '../../lib/motion/interrupt';
+import { paced } from '../../lib/motion/timing';
 import { whenFramesSteady } from '../../lib/motion/steady';
 import { playPaperSlide } from '../../lib/letters/sound';
 import { planUnfold } from '../../lib/letters/unfold';
@@ -42,7 +49,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ (event: 'done'): void }>();
 const t = useLetterText();
 
-const { sheets, loaded, span, draft, replyState, replyError, toggleAlsoHit, send, flushVotesOnClose } =
+const { sheets, loaded, span, draft, replyState, replyError, send } =
   useLetterEnvelope(toRef(props, 'versions'), toRef(props, 'current'), toRef(props, 'notes'));
 
 type Phase = 'front' | 'sealed' | 'opening' | 'reading';
@@ -171,17 +178,20 @@ const open = async () => {
   const shell = reader.value?.querySelector<HTMLElement>('.pad-shell');
   if (!envelope || !wrap || !sheet || !shell || !shell.offsetWidth) { phase.value = 'reading'; inked.value = true; return; }
   const box = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; };
-  const plan = planUnfold({ envelope: box(envelope), paper: box(sheet), shell: box(shell) });
+  const plan = planUnfold({ envelope: box(envelope), wrap: box(wrap), paper: box(sheet), shell: box(shell) });
   foldH.value = plan.foldH < shell.offsetHeight ? plan.foldH : 0;
   padH.value = shell.offsetHeight;
   await nextTick();
+  const flap = reader.value?.querySelector<HTMLElement>('.fold-flap');
+  printFirstPage(shell, sheet, flap);
   const timing = { duration: plan.duration, fill: 'forwards' as const };
   const moves = [
     wrap.animate(plan.envelope, timing),
     sheet.animate(plan.paper, timing),
     shell.animate(plan.shell, { duration: plan.duration }),
   ];
-  const flap = reader.value?.querySelector<HTMLElement>('.fold-flap');
+  const shadow = reader.value?.querySelector<HTMLElement>('.lift-shadow');
+  if (shadow) moves.push(shadow.animate(plan.shadow, timing));
   if (flap) moves.push(flap.animate(plan.flap.keyframes, { duration: plan.flap.duration, delay: plan.flap.delay, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'backwards' }));
   moves.forEach((move) => move.pause());
   await whenFramesSteady(200);
@@ -192,8 +202,31 @@ const open = async () => {
   phase.value = 'reading';
   foldH.value = 0;
   inked.value = true;
-  await nextTick();
-  pad.value?.nudge();
+};
+
+/*
+ * 信封里那张、翻下来的下半页都印上第一页（拷一份排好的页面进去，按各自的大小缩放、错位）：抽出来时就看得见字，
+ * 接手、翻下来时和真的那页一模一样，不会先空白再浮出字。拷贝只是一幅画：不可交互、读屏不念。
+ */
+const printFirstPage = (shell: HTMLElement, sheet: HTMLElement, flap: HTMLElement | null | undefined) => {
+  const page = shell.querySelector<HTMLElement>('.leaf.current > *');
+  if (!page) return;
+  const W = shell.offsetWidth;
+  const H = shell.offsetHeight;
+  const print = (host: HTMLElement, scale: number, top: number) => {
+    const holder = document.createElement('span');
+    holder.className = 'page-print';
+    holder.setAttribute('aria-hidden', 'true');
+    holder.inert = true;
+    const copy = page.cloneNode(true) as HTMLElement;
+    copy.removeAttribute('id');
+    copy.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    Object.assign(copy.style, { position: 'absolute', left: '0', top: `${top}px`, width: `${W}px`, height: `${H}px`, margin: '0', transformOrigin: '0 0', transform: `scale(${scale})` });
+    holder.append(copy);
+    host.append(holder);
+  };
+  print(sheet, sheet.offsetWidth / W, 0);
+  if (flap) print(flap, 1, -foldH.value);
 };
 
 const label = (sheet: Sheet) => (sheet.kind === 'letter' ? t.value.letterHead(sheet.version)
@@ -211,20 +244,54 @@ const onKey = (event: KeyboardEvent) => {
 onMounted(() => document.addEventListener('keydown', onKey));
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 
+/*
+ * 半路关掉（Esc、点背后）：从哪里来回哪里去（2026-10-21 用户：读到第二、三页直接退出时没有回去的动效）。
+ * 整格（信纸那一沓，或还没拆的信封）绕看得见的那样东西的中心缩小、飞回打开它的地方（左上角的标志 / 信匣里那只信封），
+ * 路上微微转一点，快到时才淡掉；背后的暗色和模糊同时退。放完给遮罩打上 dissolved，弹窗卸载时就不再缩一遍。
+ */
+const FLY_HOME_MS = paced(460);
+const flyHome = async () => {
+  const el = stage.value;
+  const panel = el?.closest<HTMLElement>('[data-modal-dialog]');
+  const veil = panel?.closest<HTMLElement>('.dialog-backdrop');
+  const home = props.origin?.isConnected ? props.origin.getBoundingClientRect() : null;
+  const subject = el?.querySelector<HTMLElement>(phase.value === 'reading' || phase.value === 'opening' ? '.pad-shell' : '.flipper');
+  if (!el || !veil || !home || !home.width || !subject || lessMotion()) return;
+  const seen = subject.getBoundingClientRect();
+  const frame = el.getBoundingClientRect();
+  const cx = seen.left + seen.width / 2;
+  const cy = seen.top + Math.min(seen.height, foldH.value || seen.height) / 2;
+  const scale = Math.max(0.05, Math.min(home.width / seen.width, home.height / Math.max(1, seen.height)));
+  const dx = home.left + home.width / 2 - cx;
+  const dy = home.top + home.height / 2 - cy;
+  el.style.transformOrigin = `${cx - frame.left}px ${cy - frame.top}px`;
+  const timing = { duration: FLY_HOME_MS, easing: 'cubic-bezier(.4, .6, .2, 1)', fill: 'forwards' as const };
+  const away = exemptFromSettle(el.animate([
+    { transform: 'none', opacity: 1 },
+    { transform: `translate(${dx * 0.55}px, ${dy * 0.42}px) scale(${0.35 + scale * 0.65}) rotate(-3deg)`, opacity: 1, offset: 0.55 },
+    { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(-5deg)`, opacity: 0 },
+  ], timing));
+  const now = Number(getComputedStyle(veil, '::before').opacity) || 1;
+  exemptFromSettle(veil.animate([{ opacity: now }, { opacity: 0 }], { ...timing, easing: 'ease-in', pseudoElement: '::before' }));
+  await away.finished.catch(() => undefined);
+  veil.dataset.dissolved = '';
+};
+
 const closing = ref(false);
 const acknowledge = async (event?: MouseEvent) => {
   if (closing.value) return;
   closing.value = true;
-  await flushVotesOnClose();
   const button = event?.currentTarget as HTMLElement | undefined;
   const panel = button?.closest<HTMLElement>('[data-modal-dialog]');
-  if (button && panel) {
-    try {
+  try {
+    if (button && panel) {
       const rect = button.getBoundingClientRect();
       const { ashDissolve } = await import('../../lib/motion/ashDissolve');
       await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'));
-    } catch { /* 动画出错不能卡住「知道了」 */ }
-  }
+    } else {
+      await flyHome();
+    }
+  } catch { /* 动画出错不能卡住关信 */ }
   emit('done');
 };
 </script>
@@ -236,6 +303,9 @@ const acknowledge = async (event?: MouseEvent) => {
       <div v-if="phase !== 'reading'" class="envelope-wrap">
         <div ref="flipper" class="flipper" :style="flipperStyle"
           @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
+          <!-- 信封的四条纸边（有厚度，转到侧面不再是一条线）。 -->
+          <i class="edge edge-l" aria-hidden="true"></i><i class="edge edge-r" aria-hidden="true"></i>
+          <i class="edge edge-t" aria-hidden="true"></i><i class="edge edge-b" aria-hidden="true"></i>
           <button type="button" class="side side-front" :aria-label="t.flipAria" :disabled="phase !== 'front'" @click="flip">
             <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :to="t.to" />
           </button>
@@ -254,6 +324,8 @@ const acknowledge = async (event?: MouseEvent) => {
         @wheel="phase === 'reading' && pad?.wheel($event)"
         :style="foldH ? { '--fold-h': `${foldH}px`, '--pad-h': `${padH}px` } : undefined">
         <div class="pad-shell">
+        <!-- 飞起来时底下那团影子（只在展开这一段）。 -->
+        <span v-if="foldH" class="lift-shadow" aria-hidden="true"></span>
         <LetterPad ref="pad" v-model:index="index" :count="pages.length">
           <template #page="{ i, active }">
             <article v-if="pages[i]" class="leaf-paper paper" :lang="pages[i]!.sheet.kind === 'letter' ? (pages[i]!.sheet as { lang: string }).lang : undefined">
@@ -265,8 +337,7 @@ const acknowledge = async (event?: MouseEvent) => {
                   <ReleaseNotesList :groups="notes ?? []" paper />
                 </PagedLeaf>
                 <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'echo'" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
-                  <EchoSheet :text="(pages[i]!.sheet as { text: string }).text" :lang="(pages[i]!.sheet as { lang: string }).lang"
-                    :also-hit="draft.alsoHit" @toggle="toggleAlsoHit" />
+                  <EchoSheet :text="(pages[i]!.sheet as { text: string }).text" :lang="(pages[i]!.sheet as { lang: string }).lang" />
                 </PagedLeaf>
                 <div v-else class="leaf-fixed paper-lines">
                   <ReplySheet v-model:draft="draft" :state="replyState" :error="replyError" @send="send()" />
@@ -280,7 +351,7 @@ const acknowledge = async (event?: MouseEvent) => {
           </template>
         </LetterPad>
         <!-- 展开时的下半页：先折在后面（背面朝人、看不见），再绕折痕翻下来。和信纸同一种纸，翻完就撤掉，换成信纸本身的下半页。 -->
-        <span v-if="foldH" class="fold-flap paper" aria-hidden="true"></span>
+        <span v-if="foldH" class="fold-flap" aria-hidden="true"></span>
         </div>
         <!-- 底下只有「知道了」，而且只在最后一页出现（2026-10-21 用户：静音、左右箭头都不要，翻页靠拖、滚轮、方向键）。 -->
         <footer class="letter-foot">

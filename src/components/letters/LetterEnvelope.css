@@ -8,14 +8,33 @@
  * 角度由 LetterEnvelope.vue 写在行内样式里：拖着转、点了翻面都是 perspective + rotateX / rotateY，松手的回落用 WAAPI。
  * 两面先各自提升成合成层（will-change）：翻面整段在合成线程上放，第一下不用现光栅化背面。
  */
-.flipper { display: grid; width: 100%; transform-style: preserve-3d; will-change: transform; cursor: grab; touch-action: none; }
+.flipper { --thick: 10px; position: relative; display: grid; width: 100%; transform-style: preserve-3d; will-change: transform; cursor: grab; touch-action: none; }
 .flipper:active { cursor: grabbing; }
 .is-opening .flipper { cursor: default; }
 .side { grid-area: 1 / 1; display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; cursor: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
-.side-front { border-radius: 6px; }
+/* 厚度：两面各往外让半个厚度（正面朝人、背面朝后），中间夹着四条纸边。 */
+.side-front { border-radius: 6px; transform: translateZ(calc(var(--thick) / 2)); }
 .side-front:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 /* 别叫 .face-*：EnvelopeArt 的根节点自己带 face-front / face-back，scoped 样式会命中子组件根，背面就被多转半圈、左右反了（2026-10-21 踩过）。 */
-.side-back { transform: rotateY(180deg); }
+.side-back { transform: rotateY(180deg) translateZ(calc(var(--thick) / 2)); }
+/*
+ * 四条纸边：各自竖起来（转 90°）立在信封的四条边上，宽度就是厚度。正对着看时是一条看不见的线，转到侧面才露出来；
+ * 中间一道浅、两头暗（两层纸夹着里面的信），比正面略暗一点。两头让开一点圆角。
+ */
+.edge {
+  --edge-out: #c9bfae; --edge-lit: #e3dccf; --edge-mid: #d6cdbd;
+  position: absolute; pointer-events: none;
+  background: linear-gradient(var(--edge-dir, to right), var(--edge-out), var(--edge-lit) 22%, var(--edge-mid) 50%, var(--edge-lit) 78%, var(--edge-out));
+}
+:root[data-theme='dark'] .edge { --edge-out: #b9ae9b; --edge-lit: #d3cbbe; --edge-mid: #c6bcab; }
+.edge-l, .edge-r { top: 5px; bottom: 5px; width: var(--thick); }
+.edge-l { left: calc(var(--thick) / -2); transform: rotateY(-90deg); }
+.edge-r { right: calc(var(--thick) / -2); transform: rotateY(90deg); }
+.edge-t, .edge-b { --edge-dir: to bottom; left: 5px; right: 5px; height: var(--thick); }
+.edge-t { top: calc(var(--thick) / -2); transform: rotateX(90deg); }
+.edge-b { bottom: calc(var(--thick) / -2); transform: rotateX(-90deg); }
+/* 拆开以后封盖翻到上面、信从上沿抽出来：上沿那条边让开。 */
+.is-opening .edge-t { opacity: 0; }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint { opacity: 0; }
 /* 拆信时信封怎么沉、怎么退远，由 lib/letters/unfold.ts 的时间线用 WAAPI 放（和信纸共用一个时钟）。 */
@@ -28,27 +47,34 @@
  * 拆信时露出来，但信纸自己由动画先藏着，等信封里那张抽出信封口才接手。
  */
 .is-front .reader, .is-sealed .reader { opacity: 0; pointer-events: none; }
-/* 拆信这一段：信纸对折着，只露上半页（下半页由 .fold-flap 从后面翻下来）；底下几张纸、字和按钮都先不出来，展开完再浮上来。 */
+/*
+ * 拆信这一段：信纸对折着，只露上半页（下半页由 .fold-flap 从后面翻下来）；底下几张纸和按钮先不出来，展开完再浮上来。
+ * 字一直在（2026-10-21 用户：先出一张白纸、展开完才浮出字，太繁琐）——信封里那张印着同一页，接手时就是同一幅画。
+ */
 .pad-shell { position: relative; transform-origin: 50% 0; }
 .is-opening .pad-shell { will-change: transform, opacity; }
 .folded .letter-pad { clip-path: inset(0 -60px calc(100% - var(--fold-h, 50%)) -60px); }
 .folded :deep(.leaf:not(.current)) { opacity: 0; }
-.is-opening .leaf-body, .is-opening .leaf-foot, .is-opening .letter-foot { opacity: 0; }
-.inked .leaf-body, .inked .leaf-foot { animation: ink-in 360ms ease both; }
+.is-opening .letter-foot { opacity: 0; }
 .inked .letter-foot { animation: ink-in 320ms 120ms ease both; }
+/* 飞起来时底下那团影子：只有对折露出来那截大小，透明度和下错由 unfold.ts 的时间线放。 */
+.lift-shadow {
+  position: absolute; left: 3%; right: 3%; top: 0; height: var(--fold-h, 50%); z-index: -1; pointer-events: none; opacity: 0;
+  border-radius: 4px; box-shadow: 0 46px 70px -22px rgb(0 0 0 / .78), 0 12px 24px -10px rgb(0 0 0 / .4); will-change: transform, opacity;
+}
+/* 信封里那张、下半页上印的那一页（LetterEnvelope.vue 的 printFirstPage）。 */
+:deep(.page-print) { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
 /*
  * 下半页：和信纸同一种纸（.paper 的底色按整页高度对齐到下半截、纸纹接着上半截的位置铺），先折在后面——背面朝人就看不见
  * （2026-10-21 录屏：以前背面也画，折在后面时整块盖在上半页上闪一下）——转过竖直才露出来、往下翻到位。
  */
 .fold-flap {
   position: absolute; left: 0; right: 0; top: var(--fold-h, 50%); height: calc(var(--pad-h, 100%) - var(--fold-h, 50%)); z-index: 9; pointer-events: none;
-  border-radius: 0 0 3px 3px; transform-origin: 50% 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  background-size: 100% var(--pad-h, 100%); background-position: 0 100%;
+  overflow: hidden; border-radius: 0 0 3px 3px; transform-origin: 50% 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   box-shadow: 0 24px 50px -24px rgb(0 0 0 / .55), 0 2px 5px rgb(0 0 0 / .14);
 }
-.fold-flap::before { background-position: 0 calc(-1 * var(--fold-h, 0px)); }
 /* 折痕：翻下来时折线那一道暗一点。 */
-.fold-flap::after { content: ''; position: absolute; inset: 0 0 auto; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .14), transparent); }
+.fold-flap::after { content: ''; position: absolute; inset: 0 0 auto; z-index: 1; height: 18px; background: linear-gradient(to bottom, rgb(90 70 40 / .14), transparent); }
 .reread .reader { animation: reader-in 480ms cubic-bezier(.2, .75, .25, 1) both; }
 @keyframes ink-in { from { opacity: 0; } }
 @keyframes reader-in { from { transform: translateY(14px) scale(.98); opacity: 0; } }

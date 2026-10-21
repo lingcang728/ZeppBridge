@@ -729,6 +729,7 @@ pub fn run() {
             open_external_url,
             updates::silent::update_start,
             updates::silent::update_view,
+            updates::silent::update_set_auto,
             updates::silent::update_apply,
             list_backups,
             create_manual_backup,

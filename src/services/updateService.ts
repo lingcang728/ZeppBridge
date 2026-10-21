@@ -9,7 +9,7 @@
  * 失败一律安静：标志保持原样，原因只在设置页里说。新手引导的示例沙盒里（演示运行时接管了 bridge）
  * 什么都不做，不会去碰真的更新。
  */
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { demoIpcActive, invoke, listen } from '../lib/bridge/ipc';
 import { toUserMessage } from '../lib/bridge';
 import { rememberUpdate, restoreUpdateNotice } from './updateNotice';
@@ -86,6 +86,37 @@ export async function startDesktopUpdate(retries = 2): Promise<void> {
     // IPC 还没就绪（启动早期、刚从新手引导的沙盒回来）：过几秒再试，不让这次打开一直停在「没查过」。
     if (retries > 0) window.setTimeout(() => { void startDesktopUpdate(retries - 1); }, 3000);
   }
+}
+
+/*
+ * 自动更新开关（设置「同步」卡版本那一行，2026-10-21 用户）。默认开；关掉以后打开应用不再自己查、托盘常驻时的
+ * 定时复查也停（后端 `update_set_auto`），只有手动「检查更新」才查。存在本机，和自动同步一样。
+ */
+const AUTO_KEY = 'zeppbridge.update.auto';
+const readAuto = () => {
+  try { return window.localStorage.getItem(AUTO_KEY) !== 'false'; } catch { return true; }
+};
+export const autoUpdate = ref(typeof window === 'undefined' ? true : readAuto());
+
+/** 打开应用、后端就绪后调用一次：开着就查（有新版本在后台下载），关着只把选择告诉后端。 */
+export async function bootDesktopUpdate(retries = 2): Promise<void> {
+  if (autoUpdate.value) return startDesktopUpdate(retries);
+  if (!isDesktopRuntime()) return;
+  await listenOnce();
+  void loadCurrentVersion();
+  try {
+    await invoke('update_set_auto', { enabled: false });
+  } catch {
+    if (retries > 0) window.setTimeout(() => { void bootDesktopUpdate(retries - 1); }, 3000);
+  }
+}
+
+export async function setAutoUpdate(enabled: boolean): Promise<void> {
+  autoUpdate.value = enabled;
+  try { window.localStorage.setItem(AUTO_KEY, String(enabled)); } catch { /* 隐私模式存不下：这次运行照样生效。 */ }
+  if (!isDesktopRuntime()) return;
+  try { await invoke('update_set_auto', { enabled }); } catch { /* 下次打开时再告诉后端。 */ }
+  if (enabled) void startDesktopUpdate();
 }
 
 let watching = false;

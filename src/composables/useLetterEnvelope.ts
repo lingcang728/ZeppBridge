@@ -1,6 +1,6 @@
 /**
  * 一只信封里装什么（批次 6）：几封作者来信（跳版更新时捆成一叠）、这一版的更新说明、上期回音、回信。
- * 负责按界面语言取文本、回信草稿的自动保存、寄出，以及合上信时把「我也遇到」寄出去。
+ * 负责按界面语言取文本、回信草稿的自动保存和寄出。
  */
 import { computed, ref, watch, type Ref } from 'vue';
 import { locale } from '../i18n';
@@ -55,29 +55,24 @@ export function useLetterEnvelope(versions: Ref<string[]>, current: Ref<string>,
   const replyState = ref<ReplyState>(repliedTo(current.value) ? 'sent' : 'idle');
   const replyError = ref('');
 
-  const toggleAlsoHit = (id: string) => {
-    const set = new Set(draft.value.alsoHit);
-    if (set.has(id)) set.delete(id); else set.add(id);
-    draft.value = { ...draft.value, alsoHit: [...set] };
-  };
-
-  const send = async (onlyVotes = false): Promise<boolean> => {
+  const send = async (): Promise<boolean> => {
     if (replyState.value === 'sending') return false;
-    const text = onlyVotes ? '' : draft.value.text;
-    if (!text.trim() && !draft.value.alsoHit.length) return false;
+    const { text } = draft.value;
+    if (!text.trim()) return false;
     replyState.value = 'sending';
     replyError.value = '';
     try {
       const result = await sendLetterReply({
-        localId: onlyVotes ? `${draft.value.localId}-votes` : draft.value.localId,
+        localId: draft.value.localId,
         letterVersion: current.value,
         locale: locale.value,
         text,
         allowQuote: draft.value.allowQuote,
-        alsoHit: draft.value.alsoHit,
+        // 「我也遇到」不再有（2026-10-21）；旧草稿里存过的也不再寄。
+        alsoHit: [],
       });
       replyState.value = result.status;
-      if (!onlyVotes) clearDraft(current.value);
+      clearDraft(current.value);
       return true;
     } catch (error) {
       replyState.value = 'error';
@@ -86,13 +81,5 @@ export function useLetterEnvelope(versions: Ref<string[]>, current: Ref<string>,
     }
   };
 
-  /** 合上信时：点过「我也遇到」但没寄回信的，只把这几条编号寄出去；写了一半的字不替用户寄。 */
-  const flushVotesOnClose = async () => {
-    if (replyState.value === 'idle' && draft.value.alsoHit.length) {
-      await send(true);
-      draft.value = { ...draft.value, alsoHit: [] };
-    }
-  };
-
-  return { sheets, loaded, span, draft, replyState, replyError, toggleAlsoHit, send, flushVotesOnClose };
+  return { sheets, loaded, span, draft, replyState, replyError, send };
 }

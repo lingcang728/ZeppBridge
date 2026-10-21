@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import ModalDialog from '../ModalDialog.vue';
 import BrandMark from '../BrandMark.vue';
-import Icon from '../Icon.vue';
 import WhyHalfData from '../WhyHalfData.vue';
 import ReleaseNotesList from './ReleaseNotesList.vue';
 import LetterEnvelope from '../letters/LetterEnvelope.vue';
@@ -60,12 +58,6 @@ const acknowledge = async (event: MouseEvent) => {
   acknowledgeUpdate();
   dissolving.value = false;
 };
-/** 地址写死、并在 capabilities/default.json 里单独放行，别的链接打不开。 */
-const REPO = 'https://github.com/lingcang728/ZeppBridge';
-const star = () => {
-  if ('__TAURI_INTERNALS__' in window) void openUrl(REPO).catch(() => undefined);
-  else window.open(REPO, '_blank', 'noopener,noreferrer');
-};
 </script>
 
 <template>
@@ -84,9 +76,6 @@ const star = () => {
 
       </div>
       <footer class="release-actions">
-        <button type="button" class="button secondary star-button" @click="star">
-          <span class="star-icon" aria-hidden="true"><Icon name="star" :size="16" /></span>{{ t.star }}
-        </button>
         <button v-if="onLeadPage" type="button" class="button primary acknowledge" @click="page = 1">{{ t.next }}</button>
         <button v-else type="button" class="button primary acknowledge" :disabled="dissolving" @click="acknowledge">{{ t.acknowledge }}</button>
       </footer>
@@ -104,28 +93,6 @@ h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; le
 .release-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
 .release-actions .button { min-height: 42px; padding-inline: 18px; font-size: var(--fs-xs); }
 .acknowledge { min-width: 104px; }
-
-/* 星星：弹窗出现后转一圈、跳一下；悬停时再来一次。只动 transform，减少动态效果时静止。 */
-.star-button { display: inline-flex; align-items: center; gap: 8px; }
-.star-icon { display: inline-flex; color: var(--route-amber); transform-origin: 50% 55%; animation: star-spin-hop 900ms cubic-bezier(.3, .7, .3, 1) 650ms both; }
-.star-button:hover .star-icon, .star-button:focus-visible .star-icon { animation: star-spin-hop-again 900ms cubic-bezier(.3, .7, .3, 1) both; }
-@keyframes star-spin-hop {
-  0% { transform: translateY(0) rotate(0deg) scale(1); }
-  45% { transform: translateY(-6px) rotate(216deg) scale(1.18); }
-  70% { transform: translateY(0) rotate(360deg) scale(1); }
-  84% { transform: translateY(-2px) rotate(360deg) scale(1); }
-  100% { transform: translateY(0) rotate(360deg) scale(1); }
-}
-@keyframes star-spin-hop-again {
-  0% { transform: translateY(0) rotate(0deg) scale(1); }
-  45% { transform: translateY(-6px) rotate(216deg) scale(1.18); }
-  70% { transform: translateY(0) rotate(360deg) scale(1); }
-  84% { transform: translateY(-2px) rotate(360deg) scale(1); }
-  100% { transform: translateY(0) rotate(360deg) scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .star-icon, .star-button:hover .star-icon, .star-button:focus-visible .star-icon { animation: none; }
-}
 
 @media (max-width: 600px) { .release-card { padding: 4px; } h2 { font-size: var(--fs-xl); } .release-header { gap: 12px; } .release-body { margin: 20px 0; } .release-actions .button { flex: 1; } }
 </style>

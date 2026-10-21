@@ -91,17 +91,8 @@ const wheel = (event: WheelEvent) => {
   go(next);
 };
 
-/* 第一次读到时最上面那张往左轻轻抽一下再放回去：告诉人这沓纸是可以拖着翻的（不写说明小字）。 */
-const nudge = () => {
-  const leaf = leaves.value[props.index];
-  if (!leaf || props.count < 2 || lessMotion() || dragging.value || moving.value.size) return;
-  leaf.animate([
-    { transform: POSE[0] },
-    { transform: 'translate(-34px, -2px) rotate(-1.4deg)', offset: .45, easing: 'cubic-bezier(.4, 0, .2, 1)' },
-    { transform: POSE[0] },
-  ], { duration: 900, delay: 500, easing: 'cubic-bezier(.3, .6, .3, 1)' });
-};
-defineExpose({ go, wheel, nudge });
+/* 以前第一次读到时最上面那张会往左探一下提示能拖；用户看来像手势识别出错的晃动（2026-10-21），去掉了。 */
+defineExpose({ go, wheel });
 onBeforeUnmount(() => window.clearTimeout(wheelReset));
 
 const down = (event: PointerEvent) => {
