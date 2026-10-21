@@ -2,16 +2,17 @@
 /**
  * 作者来信的信封（批次 6，想法 3；2026-10-21 按用户给的参考重做：要像信纸，不像卡片）。更新后弹出、或在信匣里重读：
  *
- *   正面（邮票、邮戳、致：你）→ 点一下翻到背面（2026-10-21 用户定：邮票和火漆分两面，拆信不会撕坏邮票）
- *   → 点一下 / 划一下火漆 → 封盖翻开、信纸整张从信封口抽出来（信封同时往下退）
- *   → 这张纸带着信封那样的斜放透视摆正、往下展开成一整张信纸，信封沉下去（2026-10-21 用户：抽出来穿模、透视不好）
+ *   正面（邮票、邮戳、致：用户）→ 点一下翻到背面，或者拖着信封像 3D 模型那样转（2026-10-21 用户：别斜放、要能拖着转）
+ *   → 点一下 / 划一下火漆 → 火漆沿封盖边裂开，上半块跟着封盖翻上去 → 对折的信纸整张从信封口抽出来
+ *   → 这张对折的信朝人飞近（带透视纵深），信封往后、往下退远淡掉 → 下半页从后面绕着折痕翻下来，展开成整页
+ *   （2026-10-21 用户：原来「先开、再出、再慢慢拉伸」像纯平面；现在不拉伸，只有位移、纵深和折页。）
  *   → 一页一页地读：① 来信（长信自动分页；跳版更新时几封按旧到新）② 更新说明 ③ 上期回音（有才放）④ 回信
  *
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
  * 减少动态效果 / 低特效：不放封盖和展开，火漆一点就开，翻页交叉淡入，「知道了」直接收起。重读（opened）时直接是信纸。
  */
 import './paper.css';
-import { computed, onBeforeUnmount, onMounted, ref, toRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
 import Icon from '../Icon.vue';
 import ReleaseNotesList from '../shell/ReleaseNotesList.vue';
@@ -19,6 +20,7 @@ import WaxSeal from './WaxSeal.vue';
 import EnvelopeArt from './EnvelopeArt.vue';
 import LetterPad from './LetterPad.vue';
 import LetterFlow from './LetterFlow.vue';
+import PagedLeaf from './PagedLeaf.vue';
 import EchoSheet from './EchoSheet.vue';
 import ReplySheet from './ReplySheet.vue';
 import { useLetterText } from './letters.i18n';
@@ -46,10 +48,15 @@ type Phase = 'front' | 'sealed' | 'opening' | 'unfolding' | 'reading';
 const phase = ref<Phase>(props.opened ? 'reading' : 'front');
 const index = ref(0);
 /*
- * 外面那沓信纸什么时候挂上去排版（透明度 0 藏着）：翻到背面、人还在看火漆的时候。第一次排要加载字体、找系统回退字体，
- * 降速 4× 量到主线程卡 0.35 秒，放在这时没人察觉；火漆拆得比这还快，就等封盖翻完——那时只剩合成线程上的位移动画。
+ * 外面那沓信纸什么时候挂上去排版（透明度 0 藏着、不可操作）：信封出现后不久、人还在看信封的时候。
+ * 第一次排要加载字体、找系统回退字体，降速 4× 量到主线程卡 0.35 秒——放在这时没东西在动；
+ * 人拆得比这还快，拆信那一下也会挂上（那时只剩合成线程上的动画）。
  */
 const staged = ref(props.opened);
+/* 展开完成后字和按钮浮上来（只在第一次展开时，重读不放）。 */
+const inked = ref(false);
+/* 信纸真正开飞的那一刻才让信封往后退（展开第一帧要光栅化整页，CSS 动画先放会被吞掉一截）。 */
+const receding = ref(false);
 const newest = computed(() => props.versions[props.versions.length - 1] ?? props.current);
 /* 信头日期：第一次收到这封信的那天。重读时不再记新的。 */
 const postmark = ref<string | null>(null);
@@ -62,7 +69,7 @@ const setCount = (sheetIndex: number, count: number) => {
 };
 type Page = { sheet: Sheet; sheetIndex: number; sub: number };
 const pages = computed<Page[]>(() => sheets.value.flatMap((sheet, sheetIndex) => {
-  const n = sheet.kind === 'letter' ? counts.value[sheetIndex] ?? 1 : 1;
+  const n = sheet.kind === 'reply' ? 1 : counts.value[sheetIndex] ?? 1;
   return Array.from({ length: n }, (_, sub) => ({ sheet, sheetIndex, sub }));
 }));
 
@@ -72,55 +79,138 @@ onBeforeUnmount(() => timers.forEach((id) => window.clearTimeout(id)));
 
 const stage = ref<HTMLElement | null>(null);
 const reader = ref<HTMLElement | null>(null);
+onMounted(() => { if (!props.opened) later(lessMotion() ? 0 : 900, () => { staged.value = true; }); });
+
+/* ── 信封：摆正放着，可以拖着转（像 3D 模型），松手落回最近的一面；点正面翻到背面 ── */
+const flipper = ref<HTMLElement | null>(null);
+const turn = ref({ x: 0, y: 0 });
+const orbit = (x: number, y: number, z = 0) => `perspective(1400px) translateZ(${z}px) rotateX(${x}deg) rotateY(${y}deg)`;
+const flipperStyle = computed(() => ({ transform: orbit(turn.value.x, turn.value.y) }));
+const faceOf = (y: number): Phase => (((Math.round(y / 180) % 2) + 2) % 2 === 0 ? 'front' : 'sealed');
+let motion: Animation | null = null;
+/* 从现在的角度转到 (x, y)：先把终点写进样式，再用 WAAPI 从起点放过去（整段在合成线程上）。 */
+const settle = (x: number, y: number, keyframes?: Keyframe[], duration = 480) => {
+  const el = flipper.value;
+  const from = orbit(turn.value.x, turn.value.y);
+  motion?.cancel();
+  turn.value = { x, y };
+  phase.value = faceOf(y);
+  if (!el || lessMotion()) return;
+  motion = el.animate(keyframes ?? [{ transform: from }, { transform: orbit(x, y) }], { duration, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+};
+type Drag = { x: number; y: number; id: number; base: { x: number; y: number }; moved: boolean; t: number; vx: number; lastX: number };
+let drag: Drag | null = null;
+let suppressClick = false;
+const canTurn = () => phase.value === 'front' || phase.value === 'sealed';
+const dragDown = (event: PointerEvent) => {
+  if (!canTurn() || event.button !== 0) return;
+  drag = { x: event.clientX, y: event.clientY, id: event.pointerId, base: { ...turn.value }, moved: false, t: performance.now(), vx: 0, lastX: event.clientX };
+};
+const dragMove = (event: PointerEvent) => {
+  if (!drag || event.pointerId !== drag.id) return;
+  const dx = event.clientX - drag.x;
+  const dy = event.clientY - drag.y;
+  if (!drag.moved) {
+    if (Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    motion?.cancel();
+    flipper.value?.setPointerCapture(event.pointerId);
+  }
+  const now = performance.now();
+  drag.vx = (event.clientX - drag.lastX) / Math.max(1, now - drag.t);
+  drag.t = now;
+  drag.lastX = event.clientX;
+  turn.value = { x: Math.max(-28, Math.min(28, drag.base.x - dy * 0.3)), y: drag.base.y + dx * 0.45 };
+};
+const dragUp = (event: PointerEvent) => {
+  if (!drag || event.pointerId !== drag.id) return;
+  const { moved, vx } = drag;
+  drag = null;
+  if (!moved) return;
+  /* 拖过以后松手不算「点了一下」。 */
+  suppressClick = true;
+  window.setTimeout(() => { suppressClick = false; }, 0);
+  const was = phase.value;
+  /* 甩得快就多转一点再落：按松手前的速度往前推 140ms。 */
+  settle(0, Math.round((turn.value.y + vx * 140 * 0.45) / 180) * 180);
+  if (was === 'front' && phase.value === 'sealed') afterFlip();
+};
+const afterFlip = () => {
+  if (!lessMotion()) later(40, playPaperSlide);
+  later(lessMotion() ? 0 : 640, () => stage.value?.querySelector<HTMLElement>('.env-seal button')?.focus());
+};
+/* 点正面：翻半圈，中途往人这边抬一点。曲线一开始就走得快，点下去立刻有反应（2026-10-21 用户：翻面反应慢）。 */
+const flip = () => {
+  if (suppressClick || phase.value !== 'front') return;
+  const from = turn.value;
+  const y = from.y + 180;
+  settle(0, y, [
+    { transform: orbit(from.x, from.y, 0) },
+    { transform: orbit(0, from.y + 90, 70), offset: 0.45 },
+    { transform: orbit(0, y, 0) },
+  ], 620);
+  afterFlip();
+};
+
 /*
- * 信纸从抽出来的那张纸长成一整张。外面那沓信纸在拆信时就已经挂好、排好版（藏着），这里只放动画：
- * 起点和信封里那张纸重合——同样的斜放透视（和 .flipper 的 --tilt 是同一组数，改一处要改两处）、同样大；
- * 先摆正、移到位、宽度长满（高度还是信封里那张的比例），再往下展开到整页，像把折着的信打开。
- * 动画先停在起点等帧节奏稳了再放（lib/motion/steady.ts）：第一次上屏要光栅化整页信纸。
+ * 拆信之后：信纸往上抽（EnvelopeArt 的 paper-rise）→ 抽完（等它的 animationend，不按时间猜，免得还没抽出来就接手、穿过信封）
+ * → 外面那沓信纸接手：起点和抽出来的那张对折的信重合（只露上半页，下半页折在后面），
+ *   一边飞近一边摆到位（往人这边抬起再落下：纵深）；信封同时往后、往下退远淡掉；
+ * → 快到位时，下半页绕折痕从后面翻下来（转过 90° 时正对着人，透视下最显纵深）；翻完字浮上来。
+ * 整段只有 transform / opacity；先停在起点等帧节奏稳了再放（lib/motion/steady.ts）。
  */
-const TILT = 'perspective(1600px) rotateX(16deg) rotateZ(-3.5deg)';
-const FLAT = 'perspective(1600px) rotateX(0deg) rotateZ(0deg)';
+const foldH = ref(0);
 const unfold = async () => {
+  if (phase.value !== 'opening') return;
+  staged.value = true;
+  await nextTick();
   const sheet = stage.value?.querySelector<HTMLElement>('.env-paper');
   const paper = sheet?.getBoundingClientRect();
-  const pad = reader.value?.querySelector<HTMLElement>('.letter-pad');
-  const to = pad?.getBoundingClientRect();
+  const shell = reader.value?.querySelector<HTMLElement>('.pad-shell');
+  const to = shell?.getBoundingClientRect();
+  if (!shell || !sheet || !paper || !to?.width) { phase.value = 'reading'; inked.value = true; return; }
+  const W = shell.offsetWidth;
+  const H = shell.offsetHeight;
+  /* 对折后露在外面的那一截：按信封里那张纸的比例，至少半页（不然折在后面的下半页会从顶上冒出来）。 */
+  foldH.value = Math.round(Math.min(H, Math.max(H / 2, W / (sheet.offsetWidth / sheet.offsetHeight))));
   phase.value = 'unfolding';
-  if (!pad || !sheet || !paper || !to?.width) { later(0, () => { phase.value = 'reading'; }); return; }
+  await nextTick();
   const dx = paper.left + paper.width / 2 - (to.left + to.width / 2);
-  const dy = paper.top + paper.height / 2 - (to.top + to.height / 2);
-  const sx = sheet.offsetWidth / pad.offsetWidth;
-  const sy = sheet.offsetHeight / pad.offsetHeight;
-  /* 宽度长满时，高度按信封里那张的比例；顶边对齐终点的顶边。 */
-  const midY = Math.min(1, sy / sx);
-  const lift = -(1 - midY) * pad.offsetHeight / 2;
-  const motion = pad.animate([
-    { transform: `translate(${dx}px, ${dy}px) ${TILT} scale(${sx}, ${sy})`, easing: 'cubic-bezier(.3, .55, .3, 1)' },
-    { transform: `translate(0px, ${lift}px) ${FLAT} scale(1, ${midY})`, offset: .5, easing: 'cubic-bezier(.4, 0, .2, 1)' },
-    { transform: `translate(0px, 0px) ${FLAT} scale(1, 1)` },
-  ], { duration: 820 });
-  motion.pause();
+  const dy = paper.top - to.top;
+  const sx = paper.width / W;
+  const sy = paper.height / foldH.value;
+  const at = (x: number, y: number, z: number, a: number, kx: number, ky: number) =>
+    `translate(${x}px, ${y}px) perspective(1400px) translateZ(${z}px) rotateX(${a}deg) scale(${kx}, ${ky})`;
+  const fly = shell.animate([
+    { transform: at(dx, dy, 0, 0, sx, sy), easing: 'cubic-bezier(.3, .5, .3, 1)' },
+    { transform: at(dx * 0.22, dy * 0.22 - 24, 150, -9, (sx + 1) / 2, (sy + 1) / 2), offset: 0.55, easing: 'cubic-bezier(.3, .2, .25, 1)' },
+    { transform: at(0, 0, 0, 0, 1, 1) },
+  ], { duration: 680 });
+  const flap = reader.value?.querySelector<HTMLElement>('.fold-flap');
+  const swing = flap?.animate([
+    { transform: 'perspective(1400px) rotateX(180deg)' },
+    { transform: 'perspective(1400px) rotateX(0deg)' },
+  ], { duration: 520, delay: 420, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'backwards' });
+  fly.pause();
+  swing?.pause();
   await whenFramesSteady(220);
-  motion.play();
-  await motion.finished.catch(() => undefined);
+  receding.value = true;
+  fly.play();
+  swing?.play();
+  await Promise.all([fly.finished, swing?.finished].map((p) => p?.catch(() => undefined)));
   phase.value = 'reading';
+  inked.value = true;
 };
-/* 翻到背面：信封绕竖轴翻过来（中途微微抬起），翻完把焦点交给火漆。 */
-const flip = () => {
-  if (phase.value !== 'front') return;
-  phase.value = 'sealed';
-  /* 第一次出声要建 AudioContext，主线程会顿一下：等翻面动画交给合成线程以后再响。 */
-  if (!lessMotion()) later(60, playPaperSlide);
-  later(lessMotion() ? 0 : 900, () => stage.value?.querySelector<HTMLElement>('.env-seal button')?.focus());
-  later(lessMotion() ? 0 : 1000, () => { staged.value = true; });
-};
+/* scoped 样式会给关键帧名加哈希后缀（paper-rise-d5acf8d9），按前缀认；按全名比对曾经永远对不上，每次都是 1.8 秒兜底在推，抽出来干等 0.85 秒。 */
+const onAnimationEnd = (event: AnimationEvent) => { if (event.animationName.startsWith('paper-rise')) void unfold(); };
 const open = () => {
   if (phase.value !== 'sealed') return;
   if (lessMotion()) { phase.value = 'reading'; return; }
   phase.value = 'opening';
-  later(480, playPaperSlide);
-  later(620, () => { staged.value = true; });
-  later(1240, () => { void unfold(); });
+  later(360, playPaperSlide);
+  later(560, () => { staged.value = true; });
+  /* 兜底：animationend 没来（比如被系统暂停了动画）也要接着展开。 */
+  later(1800, () => { void unfold(); });
 };
 
 const label = (sheet: Sheet) => (sheet.kind === 'letter' ? t.value.letterHead(sheet.version)
@@ -159,15 +249,16 @@ const acknowledge = async (event?: MouseEvent) => {
 <template>
   <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="acknowledge()">
     <h2 id="letter-envelope-title" class="sr-only">{{ t.letterHead(newest) }}</h2>
-    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened }]">
+    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, receding }]" @animationend="onAnimationEnd">
       <div v-if="phase !== 'reading'" class="envelope-wrap">
-        <div :class="['flipper', { flipped: phase !== 'front' }]">
+        <div ref="flipper" class="flipper" :style="flipperStyle"
+          @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
           <button type="button" class="side side-front" :aria-label="t.flipAria" :disabled="phase !== 'front'" @click="flip">
             <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :date="postmark" :to="t.to" :from="t.from" />
           </button>
           <div class="side side-back" :inert="phase === 'front' || undefined">
             <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : phase === 'unfolding' ? 'leaving' : 'sealed'"
-              :bundled="versions.length">
+              :bundled="versions.length" :from="t.from">
               <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
             </EnvelopeArt>
           </div>
@@ -175,25 +266,27 @@ const acknowledge = async (event?: MouseEvent) => {
         <p class="seal-hint">{{ versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ phase === 'front' ? t.flipHint : t.sealHint }}</p>
       </div>
 
-      <!-- 翻到背面后就挂上、排好版（藏着、不可操作），展开那一下不用现排。 -->
-      <div v-if="loaded && (staged || phase === 'reading')" ref="reader" class="reader" :inert="phase === 'sealed' || phase === 'opening' || undefined">
+      <!-- 信封出现后不久就挂上、排好版（藏着、不可操作），展开那一下不用现排。 -->
+      <div v-if="loaded && (staged || phase === 'reading')" ref="reader" class="reader" :inert="phase !== 'reading' || undefined"
+        :style="foldH ? { '--fold-h': `${foldH}px` } : undefined">
+        <div class="pad-shell">
         <LetterPad ref="pad" v-model:index="index" :count="pages.length">
           <template #page="{ i, active, live }">
-            <!-- 压在下面看不见正文的纸只画空白纸；每封信的第一页一直排着，好量出这封信有几页。 -->
-            <article v-if="pages[i] && !live && !(pages[i]!.sheet.kind === 'letter' && pages[i]!.sub === 0)" class="leaf-paper paper"></article>
+            <!-- 压在下面看不见正文的纸只画空白纸；分页的几种（来信、更新说明、上期回音）第一页一直排着，好量出有几页。 -->
+            <article v-if="pages[i] && !live && !(pages[i]!.sheet.kind !== 'reply' && pages[i]!.sub === 0)" class="leaf-paper paper"></article>
             <article v-else-if="pages[i]" class="leaf-paper paper" :lang="pages[i]!.sheet.kind === 'letter' ? (pages[i]!.sheet as { lang: string }).lang : undefined">
               <div class="leaf-body">
                 <LetterFlow v-if="pages[i]!.sheet.kind === 'letter'" :text="(pages[i]!.sheet as { text: string }).text"
                   :lang="(pages[i]!.sheet as { lang: string }).lang" :head="postmark ?? ''" :postscript="postscriptFor(pages[i]!.sheet)"
                   :page="pages[i]!.sub" :active="active" @pages="setCount(pages[i]!.sheetIndex, $event)" />
-                <div v-else-if="pages[i]!.sheet.kind === 'notes'" class="leaf-scroll paper-lines notes-leaf">
+                <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'notes'" class="notes-leaf" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
                   <ReleaseNotesList :groups="notes ?? []" />
-                </div>
-                <div v-else-if="pages[i]!.sheet.kind === 'echo'" class="leaf-scroll paper-lines">
+                </PagedLeaf>
+                <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'echo'" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
                   <EchoSheet :text="(pages[i]!.sheet as { text: string }).text" :lang="(pages[i]!.sheet as { lang: string }).lang"
                     :also-hit="draft.alsoHit" @toggle="toggleAlsoHit" />
-                </div>
-                <div v-else class="leaf-scroll paper-lines">
+                </PagedLeaf>
+                <div v-else class="leaf-fixed paper-lines">
                   <ReplySheet v-model:draft="draft" :state="replyState" :error="replyError" @send="send()" />
                 </div>
               </div>
@@ -204,6 +297,9 @@ const acknowledge = async (event?: MouseEvent) => {
             </article>
           </template>
         </LetterPad>
+        <!-- 展开时的下半页：从折痕处绕到后面去，再翻下来。空白的纸，翻完就撤掉，换成信纸本身的下半页。 -->
+        <span v-if="phase === 'unfolding'" class="fold-flap" aria-hidden="true"></span>
+        </div>
         <footer class="letter-foot">
           <button type="button" class="icon-button" :aria-pressed="letterSoundOn" :title="letterSoundOn ? t.soundOn : t.soundOff"
             :aria-label="letterSoundOn ? t.soundOn : t.soundOff" @click="setLetterSound(!letterSoundOn)">

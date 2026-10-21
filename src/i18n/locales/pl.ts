@@ -808,7 +808,7 @@ export default {
     from: 'Od ZeppBridge',
     flipHint: 'Dotknij, aby odwrócić kopertę',
     flipAria: 'Odwróć kopertę',
-    sealHint: 'Przytrzymaj pieczęć lakową lub ją przełam',
+    sealHint: 'Dotknij pieczęci lakowej lub przesuń po niej palcem',
     sealAria: (version: string) => `Otwórz list dla wersji ${version}`,
     bundle: (count: number) => `${plural(count, { one: `${count} list powiązany`, few: `${count} listy powiązane`, many: `${count} listów powiązanych`, other: `${count} listu powiązanego` })} razem`,
     sheetLetter: 'List',

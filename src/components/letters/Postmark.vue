@@ -20,7 +20,8 @@ const waves = (shift: number) => [0, 1, 2, 3, 4, 5].map((i) => {
   <svg class="postmark" :width="width * (date ? 164 : 100) / 100" :height="width * 60 / 100" :viewBox="`0 0 ${date ? 164 : 100} 60`"
     :style="{ rotate: `${tilt}deg` }" aria-hidden="true">
     <defs>
-      <path :id="`${id}-top`" d="M7 30A24 24 0 0 1 55 30" />
+      <!-- 字写在两圈之间：基线半径 21.6，字高约 4，正好落在 19.5～27 的环带里（2026-10-21 用户：字和日期都出界了）。 -->
+      <path :id="`${id}-top`" d="M9.4 30A21.6 21.6 0 0 1 52.6 30" />
       <!-- 断墨：一层细碎的遮罩，让线和字有几处没盖实。 -->
       <mask :id="`${id}-ink`">
         <rect width="164" height="60" fill="#fff" />
@@ -32,8 +33,8 @@ const waves = (shift: number) => [0, 1, 2, 3, 4, 5].map((i) => {
         <circle cx="31" cy="30" r="27" class="ring" />
         <circle cx="31" cy="30" r="19.5" class="ring thin" />
         <text class="arc"><textPath :href="`#${id}-top`" startOffset="50%" text-anchor="middle">ZEPPBRIDGE</textPath></text>
-        <text class="date" x="31" y="33.5" text-anchor="middle">{{ date }}</text>
-        <circle cx="31" cy="45" r="1.3" class="dot" />
+        <text class="date" x="31" y="32" text-anchor="middle">{{ date }}</text>
+        <circle cx="31" cy="39.5" r="1.1" class="dot" />
       </template>
       <path v-for="(d, i) in waves(date ? 64 : 0)" :key="i" class="wave" :d="d" />
     </g>
@@ -41,11 +42,12 @@ const waves = (shift: number) => [0, 1, 2, 3, 4, 5].map((i) => {
 </template>
 
 <style scoped>
-.postmark { --ink: rgb(30 28 28 / .72); display: block; overflow: visible; pointer-events: none; mix-blend-mode: multiply; }
+.postmark { --ink: rgb(30 28 28 / .72); display: block; overflow: visible; pointer-events: none; }
 .wave { fill: none; stroke: var(--ink); stroke-width: 1.15; stroke-linecap: round; }
 .ring { fill: none; stroke: var(--ink); stroke-width: 1.3; }
 .ring.thin { stroke-width: .7; }
-.arc { font: 700 5.6px/1 var(--font-sans); letter-spacing: .2em; fill: var(--ink); }
-.date { font: 700 7.4px/1 Georgia, 'Times New Roman', serif; letter-spacing: .03em; fill: var(--ink); }
+.arc { font: 700 4.6px/1 var(--font-sans); letter-spacing: .12em; fill: var(--ink); }
+/* 日期要放进内圈（直径 39）：十个字符 5.6px 宽约 30。 */
+.date { font: 700 5.6px/1 Georgia, 'Times New Roman', serif; letter-spacing: 0; fill: var(--ink); }
 .dot { fill: var(--ink); }
 </style>

@@ -39,20 +39,28 @@ const measure = async () => {
   const line = parseFloat(getComputedStyle(inner).lineHeight) || 34;
   const width = Math.floor(el.clientWidth);
   const height = Math.max(line, Math.floor(el.clientHeight / line) * line);
-  if (width === box.value.width && height === box.value.height) return;
-  box.value = { ...box.value, width, height };
+  if (width !== box.value.width || height !== box.value.height) {
+    box.value = { ...box.value, width, height };
+    await nextTick();
+  }
+  /* 尺寸没变也重报：字体后到会重排，页数跟着变（2026-10-21 长信量成 1 页，后半封信翻不到）。 */
   if (props.page !== 0) return;
-  await nextTick();
   const step = width + box.value.gap;
   emit('pages', Math.max(1, Math.round((inner.scrollWidth + box.value.gap) / step)));
 };
 let observer: ResizeObserver | null = null;
+/* 信纸用的字体（衬线、手写落款）是用到才下载的，下完一批就重量一次；只听事件，不读 document.fonts.ready（那个 getter 会逼整页样式重算）。 */
+const remeasure = () => { void measure(); };
 onMounted(() => {
-  observer = new ResizeObserver(() => { void measure(); });
+  observer = new ResizeObserver(remeasure);
   if (win.value) observer.observe(win.value);
+  document.fonts?.addEventListener('loadingdone', remeasure);
   void measure();
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  document.fonts?.removeEventListener('loadingdone', remeasure);
+});
 /* 换语言、换信：正文变了重量一次（尺寸没变也要量）。 */
 watch(() => [props.text, props.postscript], async () => {
   box.value = { ...box.value, width: 0, height: 0 };

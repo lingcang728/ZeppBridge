@@ -364,7 +364,7 @@ export default {
     from: 'Da ZeppBridge',
     flipHint: 'Tocca per girare la busta',
     flipAria: 'Gira la busta',
-    sealHint: 'Tieni premuto il sigillo di ceralacca o aprilo',
+    sealHint: 'Tocca il sigillo di ceralacca o scorri con il dito',
     sealAria: (version: string) => `Apri la lettera per ${version}`,
     bundle: (count: number) => `${count} lettere legate insieme`,
     sheetLetter: 'Lettera',

@@ -36,7 +36,7 @@ export default {
       from: 'От ZeppBridge',
       flipHint: 'Нажмите, чтобы перевернуть конверт',
       flipAria: 'Перевернуть конверт',
-      sealHint: 'Удерживайте сургучную печать или сломайте её',
+      sealHint: 'Нажмите на сургучную печать или проведите по ней',
       sealAria: (version: string) => `Вскрыть письмо к версии ${version}`,
       bundle: (count: number) => plural(count, { one: `${count} письмо в пачке`, few: `${count} письма в пачке`, many: `${count} писем в пачке`, other: `${count} письма в пачке` }),
       sheetLetter: 'Письмо',

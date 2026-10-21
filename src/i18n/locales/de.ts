@@ -244,7 +244,7 @@ export default {
       from: 'Von ZeppBridge',
       flipHint: 'Tippen, um den Umschlag umzudrehen',
       flipAria: 'Briefumschlag umdrehen',
-      sealHint: 'Halte das Wachssiegel gedrückt oder brich es auf',
+      sealHint: 'Tippe auf das Wachssiegel oder streiche kurz darüber',
       sealAria: (version: string) => `Brief für ${version} öffnen`,
       bundle: (count: number) => `${count} Briefe zusammengebunden`,
       sheetLetter: 'Brief',
