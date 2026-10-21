@@ -14,6 +14,7 @@ use super::portable;
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -90,6 +91,8 @@ struct Inner {
 #[derive(Default)]
 pub(crate) struct SilentUpdater {
     inner: Mutex<Inner>,
+    /// 用户在设置里关了自动更新：定时复查跳过，只有手动「检查更新」才查。
+    manual_only: AtomicBool,
 }
 
 impl SilentUpdater {
@@ -129,6 +132,13 @@ fn is_portable() -> bool {
     super::is_portable_update().unwrap_or(false)
 }
 
+/// 设置里的「自动更新」开关（界面存在本机，每次打开告诉后端一次）。关掉只停定时复查，
+/// 已经在下 / 下好的那一版不撤；打开应用时那一次检查由界面按开关决定发不发。
+#[tauri::command]
+pub(crate) fn update_set_auto(updater: tauri::State<'_, SilentUpdater>, enabled: bool) {
+    updater.manual_only.store(!enabled, Ordering::Relaxed);
+}
+
 #[tauri::command]
 pub(crate) fn update_view(updater: tauri::State<'_, SilentUpdater>) -> UpdateView {
     updater.view()
@@ -140,6 +150,13 @@ pub(crate) fn spawn_periodic_recheck(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(RECHECK_EVERY).await;
+            if app
+                .state::<SilentUpdater>()
+                .manual_only
+                .load(Ordering::Relaxed)
+            {
+                continue;
+            }
             if update_start(app.clone()).phase == Phase::Unsupported {
                 break;
             }

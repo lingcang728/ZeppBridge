@@ -19,7 +19,7 @@
 1. `node scripts/letters/replies.mjs export`：把没处理完的回信导到 `桌面\回信\<日期>.md`（**仓库外，回信原文绝不进仓库**），按关键词粗分类，附「我也遇到」计票。
 2. 读完给它们定性：`node scripts/letters/replies.mjs mark <id...> --category <#id> --status next|later|asking|fixed|declined [--fixed-in x.y.z]`。用户的信匣回执显示的就是这几项（已读 · 归入「补拉卡住」· 3.1.1 修）。`fixed` / `declined` 算处理完。
 3. `node scripts/letters/replies.mjs prune`：处理完满 180 天的从线上删除（先 export 留底）。每个命令都可以加 `--dry-run` 只看 SQL。
-4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题，`asking` 条目旁边会有「我也遇到」。允许匿名引用的回信才可以引用原话。
+4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题。信纸上只画 `next` / `later` 两组，`asking`（继续征集）条目不显示、也没有「我也遇到」了（2026-10-21 用户：没意义），别再写。允许匿名引用的回信才可以引用原话。
 5. 回音写了就 12 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 和冻结都会查。
 
 ### 这一版的邮票（可选）

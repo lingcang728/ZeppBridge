@@ -2,6 +2,7 @@
 /**
  * 回信那张信纸（批次 6 拍板：只要一个文字框，不要快捷选项，不收附件；上限 1000 字，可以不写）。
  * 直接写在信纸的横线上（框固定 7 行高、纸不滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
+ * 底下只留这一个勾选（2026-10-21 用户：小字太多）——计数、引用说明、隐私说明都不写；字数到上限时框自己停住。
  * 回信用蓝墨水写（和来信的黑墨分开，2026-10-21 用户）；框没有边、没有焦点竖条；勾选框、计数、说明、「寄出」都是整行、压在线上。
  * 寄出（或进了离线待寄箱）的那一刻，写好的那页对折、往右上角飞走，再淡淡地回来，表示已经封好不能改了。
  */
@@ -16,9 +17,8 @@ const props = defineProps<{ draft: ReplyDraft; state: ReplyState; error?: string
 const emit = defineEmits<{ (event: 'update:draft', draft: ReplyDraft): void; (event: 'send'): void }>();
 const t = useLetterText();
 
-const count = computed(() => Array.from(props.draft.text).length);
 const canSend = computed(() => props.state !== 'sending' && props.state !== 'sent' && props.state !== 'queued'
-  && (props.draft.text.trim().length > 0 || props.draft.alsoHit.length > 0));
+  && props.draft.text.trim().length > 0);
 const update = (patch: Partial<ReplyDraft>) => emit('update:draft', { ...props.draft, ...patch });
 /* 只在「寄出中 → 寄出 / 待寄」那一下飞，重读一封已经回过的信不飞。只动 transform / opacity。 */
 const written = ref<HTMLElement | null>(null);
@@ -52,23 +52,17 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
     <div ref="written" :class="['written', { sealed: state === 'sent' || state === 'queued' }]">
     <textarea id="letter-reply-text" class="reply-text" :value="draft.text" :placeholder="t.replyPlaceholder"
       :maxlength="LETTER_REPLY_MAX" :readonly="state === 'sending' || state === 'sent' || state === 'queued'" rows="7" @input="input" @scroll="snap"></textarea>
-    <div class="reply-meta">
+    <footer class="reply-foot">
       <label class="quote">
         <input class="quote-input" type="checkbox" :checked="draft.allowQuote" :disabled="state === 'sent' || state === 'queued'" @change="update({ allowQuote: ($event.target as HTMLInputElement).checked })" />
         <span class="quote-box" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.4l2.3 2.3 4.7-5" /></svg></span>
         <span>{{ t.allowQuote }}</span>
       </label>
-      <span :class="['counter', { full: count >= LETTER_REPLY_MAX }]">{{ t.counter(count, LETTER_REPLY_MAX) }}</span>
-    </div>
-    <p class="quote-hint">{{ t.allowQuoteHint }}</p>
-    </div>
-    <p v-if="draft.alsoHit.length" class="attached">{{ t.alsoAttached(draft.alsoHit.length) }}</p>
-    <footer class="reply-foot">
-      <p class="privacy">{{ t.privacy }}</p>
       <button type="button" class="send" :disabled="!canSend" @click="emit('send')">
         {{ state === 'sending' ? t.sending : t.send }}<span aria-hidden="true"> →</span>
       </button>
     </footer>
+    </div>
     <p v-if="state === 'sent'" class="reply-status ok" role="status">{{ t.sent }}</p>
     <p v-else-if="state === 'queued'" class="reply-status" role="status">{{ t.queued }}</p>
     <p v-else-if="state === 'error' && error" class="reply-status bad" role="alert">{{ error }}</p>
@@ -89,7 +83,6 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 .written.sealed { opacity: .6; }
 .reply-text::-webkit-scrollbar { display: none; }
 .reply-text::placeholder { color: var(--paper-muted); opacity: .75; }
-.reply-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: var(--paper-line); margin-top: var(--paper-line); }
 /* 勾选框是画在纸上的小方格（不用系统的黑框），勾上了是一笔蓝墨水的对勾。 */
 .quote { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--paper-ink); font: 400 var(--fs-xs) / var(--paper-line) var(--font-sans); cursor: pointer; }
 .quote-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -99,12 +92,7 @@ const input = (event: Event) => update({ text: Array.from((event.target as HTMLT
 .quote-input:checked + .quote-box svg { opacity: 1; }
 .quote-input:focus-visible + .quote-box { outline: 2px solid var(--focus); outline-offset: 2px; }
 .quote-input:disabled + .quote-box { opacity: .5; }
-.quote-hint { margin: 0; padding-left: 24px; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-.counter { flex: none; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-mono); }
-.counter.full { color: var(--paper-rubric); }
-.attached { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
-.reply-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: var(--paper-line); }
-.privacy { margin: 0; color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); }
+.reply-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: var(--paper-line); margin-top: var(--paper-line); }
 /* 「寄出」是一行蓝墨水写的字，不是压线的大按钮。 */
 .send {
   flex: none; height: var(--paper-line); padding: 0 2px; border: 0; background: none; cursor: pointer;

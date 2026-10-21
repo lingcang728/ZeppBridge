@@ -181,6 +181,7 @@ export const settingsMessages = defineMessages(
     // ── 8. 软件更新 ──
     updateChecking: '检查中…',
     updateCheck: '检查更新',
+    updateAuto: '自动更新',
     updateVersion: (version: string) => `版本 ${version}`,
     buildStamp: (stamp: string) => `构建 ${stamp}`,
     updateVersionLoading: '读取中',
@@ -513,6 +514,7 @@ If you need anything from me (which client I use, where the file lives), just as
     // ── 8. Updates ──
     updateChecking: 'Checking…',
     updateCheck: 'Check for updates',
+    updateAuto: 'Auto-update',
     updateVersion: (version: string) => `Version ${version}`,
     buildStamp: (stamp: string) => `Build ${stamp}`,
     updateVersionLoading: 'loading',
@@ -845,6 +847,7 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     // ── 8. Updates ──
     updateChecking: 'Revisando…',
     updateCheck: 'Buscar actualizaciones',
+    updateAuto: 'Actualización automática',
     updateVersion: (version: string) => `Versión ${version}`,
     buildStamp: (stamp: string) => `Compilación ${stamp}`,
     updateVersionLoading: 'cargando',

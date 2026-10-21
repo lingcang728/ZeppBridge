@@ -132,12 +132,12 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 .env-ghost.one { transform: translate(10px, -9px) rotate(2.4deg); }
 .env-ghost.two { transform: translate(-12px, -14px) rotate(-3deg); opacity: .85; }
 /*
- * 装在里面的信：对折的一张纸，露在外面的是空白的一面（字在里面）。抽出信封口的那一刻由外面那沓信纸原地接手，
- * 所以要和它缩小后的样子一模一样：同一种纸（.paper 的底色和纸纹，纸纹按缩小后的大小铺）、同样的细影、同样的圆角。
+ * 装在里面的信：对折的一张纸，下半页折在后面、朝外的是第一页的上半截（拆信时 LetterEnvelope 把排好的那一页缩小印上来）。
+ * 抽出信封口的那一刻由外面那沓信纸原地接手，所以要和它缩小后的样子一模一样：同一种纸、同样的细影、同样的圆角。
  */
 .env-paper {
   inset: 6% 6% 10% !important; z-index: 1; border-radius: 2px !important; background: var(--paper) !important;
-  box-shadow: 0 1.4px 3.5px rgb(0 0 0 / .14) !important; will-change: transform, opacity;
+  box-shadow: 0 1.4px 3.5px rgb(0 0 0 / .14), 0 10px 18px -10px rgb(0 0 0 / .35) !important; will-change: transform, opacity;
 }
 .env-paper::before { background-size: 88px 88px !important; }
 .env-pocket { z-index: 2; width: 100%; height: 100%; overflow: hidden; }
