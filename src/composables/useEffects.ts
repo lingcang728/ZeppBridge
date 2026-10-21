@@ -1,5 +1,5 @@
 import { computed, readonly, ref, watch } from 'vue';
-import { autoLite } from '../lib/motion/performance';
+import { autoLite } from '../lib/motion/tier';
 
 /**
  * 界面特效档位：完整 / 低特效 / 自动（issue #133）。
