@@ -287,7 +287,9 @@ const acknowledge = async (event?: MouseEvent) => {
     if (button && panel) {
       const rect = button.getBoundingClientRect();
       const { ashDissolve } = await import('../../lib/motion/ashDissolve');
-      await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'));
+      // 最上面那张纸整张碎成纸灰（底下几张只露一点边，跟着遮罩退掉就行）。
+      const sheet = panel.querySelector('.leaf.current .paper');
+      await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'), sheet ? [sheet] : []);
     } else {
       await flyHome();
     }
