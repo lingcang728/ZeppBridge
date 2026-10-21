@@ -1337,7 +1337,6 @@ export default {
     summaryAria: 'Udział faz snu',
     cursorHint: 'Wskaż wykres, aby odczytać punkt; kliknij, aby przypiąć, klawisze strzałek przełączają fazy',
     cursorAt: (time: string) => `O ${time}`,
-    momentDeep: (time: string) => `Najdłuższy sen głęboki · ${time}`,
   },
 // Source: src/components/tour/tour.i18n.ts
 "components/tour/tour": {

@@ -139,27 +139,9 @@ export const useBodyCharts = (series: Readonly<Ref<Record<string, MetricSeries>>
       }
       data.push([point.ts, point.value]);
     });
-    /* 最新一刻（3.1，和首页心率卡同一个样子）：竖线 + 顶上反色胶囊写钟点，末端圆点带一圈光晕。
-       钉的是最新那条样本，不是「现在」。胶囊在右边缘居中，右边多留出它的半宽。 */
-    const last = curve.value[curve.value.length - 1];
-    const palette = chartPalette.value;
-    const marks = last ? {
-      markLine: {
-        silent: true, animation: false, symbol: 'none',
-        lineStyle: { color: palette.axis, type: 'solid', width: 1 },
-        label: { show: true, position: 'end', formatter: clock(last.ts), backgroundColor: palette.tooltipText, color: palette.tooltipBg,
-          borderRadius: 999, padding: [3, 9], fontSize: 13, fontWeight: 600 },
-        data: [{ xAxis: last.ts }],
-      },
-      markPoint: {
-        silent: true, animation: false, symbol: 'circle', symbolSize: 8, label: { show: false },
-        itemStyle: { color: zeppSemanticColors.calories, borderColor: palette.spot, borderWidth: 2, shadowBlur: 12, shadowColor: zeppSemanticColors.calories },
-        data: [{ coord: [last.ts, last.value] }],
-      },
-    } : {};
     return {
       animationDuration: 0,
-      grid: { left: 40, right: last ? 40 : 18, top: last ? 30 : 16, bottom: 28 },
+      grid: { left: 40, right: 18, top: 16, bottom: 28 },
       tooltip: {
         trigger: 'axis',
         backgroundColor: chartPalette.value.tooltipBg,
@@ -203,7 +185,6 @@ export const useBodyCharts = (series: Readonly<Ref<Record<string, MetricSeries>>
         lineStyle: { width: 1.6, color: zeppSemanticColors.calories },
         areaStyle: { color: `${chartPalette.value.series.calories}1F` },
         connectNulls: false,
-        ...marks,
       }],
     };
   });

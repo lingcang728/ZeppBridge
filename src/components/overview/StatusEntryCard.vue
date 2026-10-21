@@ -5,6 +5,9 @@
  * 以前只有一行数字，卡片下半截整块空着；现在每格自带自己那一项的形状，卡片是满的，
  * 也不会出现「几个数字配一条线、线是哪一项」对不上的问题。
  *
+ * 只有一项时（比如训练状态只有负荷）行列表会剩下大半张空卡：换成「大数字 + 占满下半截的曲线」，
+ * 两三项时各行均分卡片高度。版式只看项数，不看是哪张卡。
+ *
  * 只给数字和形状——解读留给卡片背后的页面和用户自选的 AI。没有采样的那一项不画线（不编数据）。 */
 import { RouterLink } from 'vue-router';
 import type { DesignIconName } from '../DesignIcon.vue';
@@ -50,7 +53,13 @@ withDefaults(defineProps<{
       <p class="entry-label">{{ title }}</p>
       <GlyphTile class="entry-go" name="chevron-right" :size="18" />
     </div>
-    <ul v-if="facts.length" class="entry-facts">
+    <div v-if="facts.length === 1" class="entry-solo">
+      <span class="fact-label"><i :style="{ background: facts[0].color }" aria-hidden="true"></i>{{ facts[0].label }}</span>
+      <span class="fact-value"><strong>{{ facts[0].text }}</strong><small v-if="facts[0].unit">{{ facts[0].unit }}</small><em v-if="facts[0].tag">{{ facts[0].tag }}</em></span>
+      <UsualRange v-if="facts[0].format" class="fact-usual" :metric="facts[0].key" :format="facts[0].format" />
+      <Sparkline v-if="(facts[0].spark?.length ?? 0) > 1 && facts[0].color" class="solo-spark" fill :values="facts[0].spark!" :color="facts[0].color" :label="`${facts[0].label} · ${caption ?? ''}`" />
+    </div>
+    <ul v-else-if="facts.length" class="entry-facts">
       <li v-for="fact in facts" :key="fact.key" class="entry-fact">
         <span class="fact-label"><i :style="{ background: fact.color }" aria-hidden="true"></i>{{ fact.label }}</span>
         <span class="fact-main">
@@ -81,7 +90,7 @@ withDefaults(defineProps<{
 .entry-go { opacity: .7; transition: translate var(--dur-base) var(--ease-out), opacity var(--dur-fast) ease; }
 .entry-panel:hover .entry-go { opacity: 1; translate: 2px 0; }
 
-.entry-facts { display: grid; flex: 1 1 auto; align-content: start; margin: 0; padding: 0; list-style: none; }
+.entry-facts { display: grid; flex: 1 1 auto; grid-auto-rows: 1fr; margin: 0; padding: 0; list-style: none; }
 .entry-fact {
   display: grid; grid-template-columns: minmax(5em, 1fr) minmax(0, 1.3fr) minmax(64px, 1fr); align-items: center; gap: 12px;
   min-width: 0; padding: 10px 0;
@@ -99,6 +108,12 @@ withDefaults(defineProps<{
 .fact-spark :deep(svg) { height: 34px; }
 .fact-spark-empty { display: block; border-radius: 8px;
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 6px, transparent 6px 12px); }
+.entry-solo { display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-height: 0; }
+.entry-solo .fact-value { gap: 0 6px; margin-top: 6px; }
+.entry-solo .fact-value strong { font-size: 34px; line-height: 1; } /* 和心率卡的大数字同一号（panels.css .figure-value） */
+.entry-solo .fact-value small { font-size: var(--fs-md); }
+.entry-solo .fact-value em { font-size: var(--fs-sm); }
+.solo-spark { min-height: 96px; margin-top: 10px; }
 .entry-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 
 @container (max-width: 420px) {

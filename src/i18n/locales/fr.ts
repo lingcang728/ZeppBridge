@@ -571,7 +571,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       zeroMinutes: '0 min',
       cursorHint: "Survolez le graphique pour voir un instant ; cliquez pour le fixer, puis utilisez les flèches pour parcourir les phases",
       cursorAt: (time: string) => `À ${time}`,
-      momentDeep: (time: string) => `Plus longue phase de sommeil profond · ${time}`,
     },
     'lib/bridge/errors': {
       desktopOnly: 'L’application de bureau est requise',

@@ -5,13 +5,17 @@ const props = defineProps<{
   values: number[];
   color: string;
   label: string;
+  /** 撑满父容器的高度（概览入口卡只有一项时，曲线占掉卡片下半截）。默认高 52。 */
+  fill?: boolean;
 }>();
 
-const HEIGHT = 52;
+const BASE_HEIGHT = 52;
 const PAD_Y = 8;
 const PAD_X = 6;
 const host = ref<HTMLElement | null>(null);
 const width = ref(280);
+/* 高度跟着容器量，viewBox 也跟着变：preserveAspectRatio="none" 硬拉会把线拉粗、末端圆点拉成椭圆。 */
+const height = ref(BASE_HEIGHT);
 const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
 const fillId = `spark-fill-${uid}`;
 const glowId = `spark-glow-${uid}`;
@@ -28,7 +32,7 @@ const points = computed(() => {
   const step = inner / (values.length - 1);
   return values.map((value, index) => ({
     x: PAD_X + index * step,
-    y: HEIGHT - PAD_Y - ((value - low) / span) * (HEIGHT - PAD_Y * 2),
+    y: height.value - PAD_Y - ((value - low) / span) * (height.value - PAD_Y * 2),
   }));
 });
 
@@ -55,7 +59,7 @@ const areaPath = computed(() => {
   if (pts.length < 2 || !linePath.value) return '';
   const last = pts[pts.length - 1];
   const first = pts[0];
-  const base = HEIGHT - 2;
+  const base = height.value - 2;
   return `${linePath.value} L${last.x.toFixed(1)} ${base} L${first.x.toFixed(1)} ${base} Z`;
 });
 
@@ -66,6 +70,8 @@ onMounted(() => {
   const apply = () => {
     const next = Math.round(host.value?.clientWidth ?? 280);
     if (next > 0) width.value = next;
+    const tall = Math.round(host.value?.clientHeight ?? BASE_HEIGHT);
+    if (props.fill && tall > 0) height.value = tall;
   };
   apply();
   observer = new ResizeObserver(apply);
@@ -75,9 +81,9 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <div v-if="lastPoint" ref="host" class="sparkline">
+  <div v-if="lastPoint" ref="host" :class="['sparkline', { 'is-fill': fill }]">
     <svg
-      :viewBox="`0 0 ${width} ${HEIGHT}`"
+      :viewBox="`0 0 ${width} ${height}`"
       preserveAspectRatio="none"
       role="img"
       :aria-label="label"
@@ -113,5 +119,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
 <style scoped>
 .sparkline { width: 100%; height: 52px; min-width: 0; }
+/* 放在纵向 flex 里吃掉剩下的高度。 */
+.sparkline.is-fill { flex: 1 1 0; height: auto; min-height: 52px; }
 .sparkline svg { display: block; width: 100%; height: 100%; overflow: visible; }
 </style>

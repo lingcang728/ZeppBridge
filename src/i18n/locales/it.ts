@@ -479,7 +479,6 @@ export default {
     zeroMinutes: '0 min',
     cursorHint: 'Passa il cursore sul grafico per visualizzare un momento; fai clic per bloccarlo, quindi usa i tasti freccia per scorrere le fasi',
     cursorAt: (time: string) => `Alle ${time}`,
-    momentDeep: (time: string) => `Sonno profondo più lungo · ${time}`,
   },
 
   'components/TrendRangeBar': {

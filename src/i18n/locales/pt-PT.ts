@@ -847,7 +847,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       summaryAria: 'Distribuição de fases de sono',
       cursorHint: "Passa o cursor sobre o gráfico para ver um instante; clica para o fixar e usa as setas para percorrer fase a fase",
       cursorAt: (time: string) => `Às ${time}`,
-      momentDeep: (time: string) => `Sono profundo mais longo · ${time}`,
     },
     'components/WeeklyReportCard': {
       title: 'Esta semana',
