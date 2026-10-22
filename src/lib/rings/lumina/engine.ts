@@ -5,16 +5,19 @@
  *
  * 幕次对应：
  * - `idle`：穿过星海飞入（Lumina 开场）；
- * - `year`：粒子聚成年份数字（第一次 = Lumina 的「3」：淡入、无冲击波；之后换年 = 「2 / 1」：先收缩再弹开 + 冲击波 + 抖动）；
+ * - `year`：粒子聚成年份数字（第一次 = Lumina 的「3」：一镜到底淡入，聚拢那一刻落一拳；之后换年 = 「2 / 1」：先收缩再弹开 + 冲击波 + 抖动）；
  * - `shape`：年轮切片（= Lumina 的蛋糕 / 灯笼，焦点星 = 蜡烛火焰那一池，逐帧闪烁）；
- * - `finale`：爆开、星海冲回、标题字成形、一道扫光（= Lumina 终幕）。
+ * - `finale`：爆开、星海冲回，年轮留在中间，标题化成一条绕着它公转的光带，一道扫光（= Lumina 终幕）。
+ *
+ * 打击感（用户 2026-10-22：「拳击式切换是最得意的设计，合理地扩大到全局」）：每一幕落定都有一拳——
+ * 冲击波 + 镜头一抖 + 整组粒子先缩后弹（`land`）。力度分档：终幕最重，换年其次，进年轮再次，回年轮最轻。
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { BloomEffect, EffectComposer, EffectPass, RenderPass } from 'postprocessing';
 import {
-  GALAXY_COUNT, TEXT_COUNT, fillAmbient, fillDigit, fillIdle, fillRings, fillStarfield, fillText,
-  generateBackgroundStars, newPC, type FocalInfo, type PC,
+  GALAXY_COUNT, NO_FOCAL, TEXT_COUNT, fillAmbient, fillDigit, fillFinale, fillIdle, fillRings, fillStarfield,
+  generateBackgroundStars, newPC, placeBand, type BandInfo, type FocalInfo, type PC,
 } from './shapes';
 import type { RingYear } from '../../../types/rings';
 
@@ -47,6 +50,20 @@ const IDLE_SPIN = 0.0026;
 
 const PUNCH_BEAT = 0.4;
 const PUNCH_CONTRACT = 0.55;
+
+/** 落定的那一拳（不是换年那种整段拳击，而是到位时补的一下）：先缩一点，再 easeOutBack 弹回，过冲一点点。 */
+type Land = { wave: number; shake: number; squash: number };
+const LAND: Record<'three' | 'shapeIn' | 'shapeBack', Land> = {
+  three: { wave: WAVE_AMP_DIGIT, shake: 0.7, squash: 0.16 },
+  shapeIn: { wave: WAVE_AMP, shake: 0.55, squash: 0.12 },
+  shapeBack: { wave: WAVE_AMP * 0.6, shake: 0.35, squash: 0.08 },
+};
+/** 形变走到多少时算「到位」，在那一刻落拳（easeOut 的形变早就看着聚好了，等到 1 会显得慢半拍）。 */
+const LAND_AT: Partial<Record<Phase, number>> = { three: 0.62, shape: 0.82 };
+const POP_DUR = 0.42;
+const POP_CONTRACT = 0.3;
+/** 光带公转的角速度（弧度 / 秒）：慢慢转，看得出它在三维里绕着年轮走。 */
+const BAND_SPEED = 0.16;
 
 const DURATIONS: Record<Phase, number> = { idle: 1.0, three: 1.5, two: 0.72, shape: 1.1, finale: 1.0 };
 
@@ -113,7 +130,17 @@ export class RingsLuminaEngine {
   private shake = { t: 0, dur: 0.6, amp: 0 };
 
   private cache = new Map<string, PC>();
-  private focal: FocalInfo = { count: 0, base: new Float32Array(0) };
+  private focals = new Map<number | null, FocalInfo>();
+  private finaleBands = new Map<string, { focal: FocalInfo; band: BandInfo }>();
+  private focal: FocalInfo = NO_FOCAL;
+  private band: BandInfo | null = null;
+  /** 还没落的那一拳（形变走到 LAND_AT 时落）。 */
+  private pendingLand: Land | null = null;
+  /** 整组字的「先缩后弹」：t 从 0 走到 POP_DUR。 */
+  private pop = { t: POP_DUR, squash: 0 };
+  /** 指针悬停的那颗星（下标是这一年 stars 里的位置）。 */
+  private hover: number | null = null;
+  private projected = new THREE.Vector3();
   private years: RingYear[] = [];
   private selected: number | null = null;
   private finaleText = '';
@@ -203,18 +230,28 @@ export class RingsLuminaEngine {
     if (phase === 'shape') {
       return this.once(`t_rings_${this.selected}`, () => {
         const p = newPC(TEXT_COUNT);
-        this.focal = fillRings(p, TEXT_COUNT, this.years, this.selected);
-        this.cache.set(`focal_${this.selected}`, { pos: new Float32Array(0), col: this.focal.base });
+        this.focals.set(this.selected, fillRings(p, TEXT_COUNT, this.years, this.selected));
         return p;
       });
     }
-    if (phase === 'finale') return this.once(`t_fin_${this.finaleText}`, () => { const p = newPC(TEXT_COUNT); fillText(this.finaleText, p, TEXT_COUNT); return p; });
+    if (phase === 'finale') {
+      return this.once(`t_fin_${this.selected}_${this.finaleText}`, () => {
+        const p = newPC(TEXT_COUNT);
+        const { focal, band } = fillFinale(this.finaleText, p, TEXT_COUNT, this.years, this.selected);
+        this.finaleBands.set(`${this.selected}_${this.finaleText}`, { focal, band });
+        return p;
+      });
+    }
     return this.once('t_idle', () => { const p = newPC(TEXT_COUNT); fillIdle(p, TEXT_COUNT); return p; });
   }
 
   /** 换数据（年份列表、选中的那年、终幕的字）。缓存的年轮造型作废。 */
   setData(years: RingYear[], selected: number | null, finaleText: string) {
-    if (years !== this.years) for (const key of [...this.cache.keys()]) if (key.startsWith('t_rings_') || key.startsWith('focal_')) this.cache.delete(key);
+    if (years !== this.years) {
+      for (const key of [...this.cache.keys()]) if (key.startsWith('t_rings_') || key.startsWith('t_fin_')) this.cache.delete(key);
+      this.focals.clear();
+      this.finaleBands.clear();
+    }
     this.years = years;
     this.selected = selected;
     this.finaleText = finaleText;
@@ -222,15 +259,27 @@ export class RingsLuminaEngine {
 
   get introActive() { return this.intro.active; }
 
+  /** 飞入途中点了一下：不等了，下一帧就当飞到了（onIntroDone 进第一幕，镜头从近处拉回数字的距离）。 */
+  skipIntro() {
+    if (this.intro.active) this.intro.t = 1;
+  }
+
   /** 进入一幕。`year` 第一次是 Lumina 的「3」，之后都是拳击式的「2」。 */
   setPhase(next: RingPhase) {
+    const from = this.phase;
     const phase: Phase = next === 'year' ? (this.phase === 'idle' ? 'three' : 'two') : next;
     this.phase = phase;
     const g = this.galaxyTarget(phase), t = this.textTarget(phase);
-    if (phase === 'shape') {
-      const base = this.cache.get(`focal_${this.selected}`)?.col;
-      this.focal = base ? { count: base.length / 3, base } : { count: 0, base: new Float32Array(0) };
-    }
+    this.band = null;
+    if (phase === 'shape') this.focal = this.focals.get(this.selected) ?? NO_FOCAL;
+    else if (phase === 'finale') {
+      const fin = this.finaleBands.get(`${this.selected}_${this.finaleText}`);
+      this.focal = fin?.focal ?? NO_FOCAL;
+      this.band = fin?.band ?? null;
+    } else this.focal = NO_FOCAL;
+    this.hover = null;
+    // 落定的那一拳：数字聚拢、年轮成形时补上（换年的「2」自带整段拳击，终幕自带爆闪和 MEGA 冲击波）。
+    this.pendingLand = phase === 'three' ? LAND.three : phase === 'shape' ? (from === 'finale' ? LAND.shapeBack : LAND.shapeIn) : null;
     this.gTargetPos = g.pos; this.gTargetCol = g.col;
     this.tTargetPos = t.pos; this.tTargetCol = t.col;
     this.gStartPos.set(this.gPos.array as Float32Array);
@@ -240,16 +289,9 @@ export class RingsLuminaEngine {
     this.morphT = 0;
     this.morphDur = DURATIONS[phase];
 
-    // Shockwave ('three' skipped to keep the nebula→digit transition clean).
-    if (phase !== 'three') {
-      let slot = this.waves.find(w => !w.active);
-      if (!slot) { slot = this.waves[0]; for (const w of this.waves) if (w.t > slot.t) slot = w; }
-      slot.t = 0; slot.active = true;
-      const cfg = phase === 'finale' ? MEGA
-        : phase === 'two' ? { speed: WAVE_SPEED, amp: WAVE_AMP_DIGIT, width: WAVE_WIDTH, life: WAVE_LIFE }
-          : { speed: WAVE_SPEED, amp: WAVE_AMP, width: WAVE_WIDTH, life: WAVE_LIFE };
-      slot.speed = cfg.speed; slot.amp = cfg.amp; slot.width = cfg.width; slot.life = cfg.life;
-    }
+    // Shockwave at the start of the switch for the punch ('two') and the finale; 'three' and 'shape' get theirs when they land.
+    if (phase === 'two') this.wave({ speed: WAVE_SPEED, amp: WAVE_AMP_DIGIT, width: WAVE_WIDTH, life: WAVE_LIFE });
+    else if (phase === 'finale') this.wave(MEGA);
     if (phase === 'shape') this.charge = 0;
     if (phase === 'finale') {
       this.finaleT = 0;
@@ -269,8 +311,28 @@ export class RingsLuminaEngine {
     this.directCamera(phase);
   }
 
+  private wave(cfg: { speed: number; amp: number; width: number; life: number }) {
+    let slot = this.waves.find(w => !w.active);
+    if (!slot) { slot = this.waves[0]; for (const w of this.waves) if (w.t > slot.t) slot = w; }
+    slot.t = 0; slot.active = true;
+    slot.speed = cfg.speed; slot.amp = cfg.amp; slot.width = cfg.width; slot.life = cfg.life;
+  }
+
+  /** 落定的一拳：冲击波 + 镜头一抖 + 整组字先缩后弹。 */
+  private land(cfg: Land) {
+    this.wave({ speed: WAVE_SPEED, amp: cfg.wave, width: WAVE_WIDTH, life: WAVE_LIFE });
+    if (!this.options.reducedMotion) {
+      this.shake = { t: DIGIT_SHAKE.dur, dur: DIGIT_SHAKE.dur, amp: cfg.shake };
+      this.pop = { t: 0, squash: cfg.squash };
+    }
+  }
+
   /** 重播：回到飞入。 */
   replay() {
+    this.focal = NO_FOCAL;
+    this.band = null;
+    this.hover = null;
+    this.pendingLand = null;
     this.phase = 'idle';
     this.setPhaseRaw('idle');
     this.intro = { active: !this.options.reducedMotion, t: 0 };
@@ -356,6 +418,10 @@ export class RingsLuminaEngine {
 
     let morphActive = false;
     if (this.morphT < 1) { this.morphT = Math.min(1, this.morphT + d / this.morphDur); morphActive = true; }
+    const landAt = LAND_AT[phase];
+    if (this.pendingLand && landAt !== undefined && this.morphT >= landAt) { this.land(this.pendingLand); this.pendingLand = null; }
+    // 终幕的光带：每帧把目标转一点，弹簧跟着走，就是在公转；朝镜头那半圈亮、背后那半圈暗。
+    if (phase === 'finale' && this.band) placeBand(this.band, this.tTargetPos, this.tTargetCol, this.finaleT * BAND_SPEED);
     const isDigit = phase === 'three' || phase === 'two';
     const e = (phase === 'finale' || phase === 'three') ? easeOutCubic(this.morphT) : easeInOutCubic(this.morphT);
 
@@ -481,15 +547,18 @@ export class RingsLuminaEngine {
       // Focal light (Lumina 的蜡烛火焰 → 这一年的每次运动)：充能、闪烁、轻轻摇曳；其余的切片随之微微发亮。
       if (phase === 'shape' && isText) {
         const focal = this.focal;
+        const hoverFrom = this.hover === null ? -1 : this.hover * focal.per;
+        const hoverTo = this.hover === null ? -1 : this.hover === focal.stars - 1 ? focal.count : hoverFrom + focal.per;
         const sway = (Math.sin(time * 2.6) * 0.35 + Math.sin(time * 5.3) * 0.12) * 0.25;
         for (let i = 0; i < focal.count; i++) {
           // 每颗星自己的节拍（Lumina 一支蜡烛用同一个 7 Hz；这里几百颗，同拍会像频闪）。
           const pulse = 0.55 + 0.45 * Math.sin(time * 7 + (i % 97) * 0.61);
-          const k = 0.6 + 3.2 * this.charge * pulse;
+          const lit = hoverFrom <= i && i < hoverTo ? 2.6 : 1;
+          const k = (0.6 + 3.2 * this.charge * pulse) * lit;
           pos[i * 3] += sway;
-          col[i * 3] = Math.min(2.8, focal.base[i * 3] * k);
-          col[i * 3 + 1] = Math.min(2.4, focal.base[i * 3 + 1] * k);
-          col[i * 3 + 2] = Math.min(1.6, focal.base[i * 3 + 2] * k);
+          col[i * 3] = Math.min(2.8 * lit, focal.base[i * 3] * k);
+          col[i * 3 + 1] = Math.min(2.4 * lit, focal.base[i * 3 + 1] * k);
+          col[i * 3 + 2] = Math.min(1.6 * lit, focal.base[i * 3 + 2] * k);
         }
         const glow = 1 + 0.10 * (0.5 + 0.5 * Math.sin(time * 2.6));
         for (let i = focal.count; i < count; i++) {
@@ -512,6 +581,16 @@ export class RingsLuminaEngine {
     } else {
       t.quaternion.slerp(isDigit ? this.camera.quaternion : IDENTITY_Q, 0.15);
     }
+
+    // 落定的那一拳：整组字先缩一下，再弹回来过冲一点点。
+    if (this.pop.t < POP_DUR) {
+      this.pop.t = Math.min(POP_DUR, this.pop.t + d);
+      const k = this.pop.t / POP_DUR;
+      const scale = k < POP_CONTRACT
+        ? 1 - this.pop.squash * Math.sin((k / POP_CONTRACT) * Math.PI / 2)
+        : 1 - this.pop.squash + this.pop.squash * easeOutBack((k - POP_CONTRACT) / (1 - POP_CONTRACT));
+      t.scale.setScalar(scale);
+    } else if (t.scale.x !== 1) t.scale.setScalar(1);
 
     const g = this.galaxyGroup;
     g.rotation.x += (0 - g.rotation.x) * (phase === 'finale' ? 0.04 : 0.05);
@@ -541,6 +620,39 @@ export class RingsLuminaEngine {
     this.running = false;
     cancelAnimationFrame(this.frame);
   }
+
+  /** 指针下最近的那颗星（屏幕上 14px 以内），只在年轮这一幕、形变走完以后才认。返回这一年 stars 里的下标。 */
+  pickStar(clientX: number, clientY: number): number | null {
+    const focal = this.focal;
+    if (this.phase !== 'shape' || this.morphT < 0.9 || !focal.stars) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    this.textGroup.updateMatrixWorld();
+    const v = this.projected;
+    let best: number | null = null, bestD = 14 * 14;
+    for (let j = 0; j < focal.stars; j++) {
+      v.set(focal.centers[j * 3], focal.centers[j * 3 + 1], focal.centers[j * 3 + 2]).applyMatrix4(this.textGroup.matrixWorld).project(this.camera);
+      if (v.z > 1) continue;
+      const x = rect.left + (v.x + 1) / 2 * rect.width, y = rect.top + (1 - v.y) / 2 * rect.height;
+      const dd = (x - clientX) ** 2 + (y - clientY) ** 2;
+      if (dd < bestD) { bestD = dd; best = j; }
+    }
+    return best;
+  }
+
+  /** 这颗星此刻在屏幕上的位置（卡片从这里长出来）。 */
+  starPoint(index: number): { x: number; y: number } | null {
+    const focal = this.focal;
+    if (index < 0 || index >= focal.stars) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.textGroup.updateMatrixWorld();
+    const v = this.projected.set(focal.centers[index * 3], focal.centers[index * 3 + 1], focal.centers[index * 3 + 2])
+      .applyMatrix4(this.textGroup.matrixWorld).project(this.camera);
+    return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height };
+  }
+
+  /** 悬停的那颗星亮起来（null = 都不亮）。 */
+  setHover(index: number | null) { this.hover = index; }
 
   private resize() {
     const width = Math.max(1, this.host.clientWidth);

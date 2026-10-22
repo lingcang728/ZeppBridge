@@ -17,7 +17,7 @@ export interface FactWords {
   running: string; runValue: (runs: number, km: string) => string;
   longestRun: string; longestWorkout: string;
   busiestMonth: string; busiestValue: (month: string, n: number) => string;
-  steps: string; sleep: string; sleepValue: (h: number, m: number) => string;
+  steps: string; stepsValue: (n: string) => string; sleep: string; sleepValue: (h: number, m: number) => string;
   records: string; races: string;
 }
 
@@ -25,6 +25,10 @@ export interface Fact {
   key: 'workouts' | 'activeDays' | 'hours' | 'running' | 'longestRun' | 'longestWorkout' | 'busiestMonth' | 'steps' | 'sleep' | 'records' | 'races';
   label: string;
   value: string;
+  /** 值下面的一行小字（那次运动是哪天）：以前挤在值后面，「户外骑行 · 5:51 · 12月7日」窄的时候会断在奇怪的地方。 */
+  detail?: string;
+  /** 页面上入场时数字从 0 滚上来（只给纯数量的那几行；时间、日期不滚）。 */
+  count?: boolean;
   /** 可以点过去的那次运动。 */
   workoutId?: string;
 }
@@ -43,26 +47,27 @@ export const yearFacts = (
   const number = new Intl.NumberFormat(intlLocale());
   const blank = year.data_days === 0;
   const facts: Fact[] = [
-    { key: 'workouts', label: words.workouts, value: blank ? NONE : words.times(year.workouts) },
-    { key: 'activeDays', label: words.activeDays, value: blank ? NONE : words.days(year.active_days) },
-    { key: 'hours', label: words.hours, value: year.duration_s > 0 ? words.hoursValue(number.format(Math.round(year.duration_s / 360) / 10)) : NONE },
-    { key: 'running', label: words.running, value: blank ? NONE : words.runValue(year.runs, number.format(Number(kmText(year.run_distance_m / 1000)))) },
+    { key: 'workouts', label: words.workouts, value: blank ? NONE : words.times(year.workouts), count: true },
+    { key: 'activeDays', label: words.activeDays, value: blank ? NONE : words.days(year.active_days), count: true },
+    { key: 'hours', label: words.hours, value: year.duration_s > 0 ? words.hoursValue(number.format(Math.round(year.duration_s / 360) / 10)) : NONE, count: true },
+    { key: 'running', label: words.running, value: blank ? NONE : words.runValue(year.runs, number.format(Number(kmText(year.run_distance_m / 1000)))), count: true },
   ];
   const run = year.longest_run;
   facts.push({
     key: 'longestRun', label: words.longestRun, workoutId: run?.workout_id,
-    value: run?.distance_m ? `${kmText(run.distance_m / 1000)} km · ${shortDay(run.date)}` : NONE,
+    value: run?.distance_m ? `${kmText(run.distance_m / 1000)} km` : NONE, detail: run?.distance_m ? shortDay(run.date) : undefined, count: true,
   });
   const long = year.longest_workout;
   facts.push({
     key: 'longestWorkout', label: words.longestWorkout, workoutId: long?.workout_id,
-    value: long?.duration_s ? `${kindName(long.kind)} · ${Math.floor(long.duration_s / 3600)}:${String(Math.floor((long.duration_s % 3600) / 60)).padStart(2, '0')} · ${shortDay(long.date)}` : NONE,
+    value: long?.duration_s ? `${kindName(long.kind)}\u00a0·\u00a0${Math.floor(long.duration_s / 3600)}:${String(Math.floor((long.duration_s % 3600) / 60)).padStart(2, '0')}` : NONE,
+    detail: long?.duration_s ? shortDay(long.date) : undefined,
   });
   facts.push({
     key: 'busiestMonth', label: words.busiestMonth,
     value: year.busiest_month ? words.busiestValue(monthName(year.busiest_month, year.year), year.busiest_month_workouts) : NONE,
   });
-  facts.push({ key: 'steps', label: words.steps, value: year.steps_total !== null ? number.format(year.steps_total) : NONE });
+  facts.push({ key: 'steps', label: words.steps, value: year.steps_total !== null ? words.stepsValue(number.format(year.steps_total)) : NONE, count: true });
   const sleep = year.sleep_avg_minutes;
   facts.push({ key: 'sleep', label: words.sleep, value: sleep !== null ? words.sleepValue(Math.floor(Math.round(sleep) / 60), Math.round(sleep) % 60) : NONE });
   if (year.personal_records.length) facts.push({ key: 'records', label: words.records, value: year.personal_records.map(recordName).join(' · ') });
