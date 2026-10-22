@@ -130,3 +130,39 @@ fn a_fit_from_another_workout_is_refused() {
     assert_eq!(distance(&db), Some(2600.0));
     assert!(db.workout_fit_override("1700000000").unwrap().is_none());
 }
+
+/// #143：撤销修正时取回的云端序列以高级通道为准，哪怕官方那份拉得更晚。
+#[test]
+fn undo_restores_the_legacy_series_even_when_the_official_detail_is_newer() {
+    let db = Database::in_memory().unwrap();
+    insert_cloud_workout(&db);
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: "official:sport_detail:1700000000".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "trackId": "1700000000", "startTime": 1_700_000_000i64,
+            "samplingTime": "0;300;300;", "heartRate": "0,120;300,2;300,-2;"
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.conn
+        .execute(
+            "UPDATE raw_records SET fetched_at = '2099-01-01T00:00:00+00:00' WHERE source_key LIKE 'official:%'",
+            [],
+        )
+        .unwrap();
+    db.reprocess_raw_records().unwrap();
+
+    let bytes = corrected_fit();
+    let imported = decode_fit_file(&bytes).unwrap();
+    db.import_workout_fit("1700000000", Some("river.fit"), &bytes, &imported)
+        .unwrap();
+    assert!(db.remove_workout_fit("1700000000").unwrap());
+    let series = db.get_workout_series("1700000000").unwrap();
+    assert_eq!(series.samples.first().and_then(|s| s.heart_rate), Some(150));
+}

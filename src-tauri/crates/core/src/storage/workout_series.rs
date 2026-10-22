@@ -192,6 +192,26 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// 这条运动有没有一份读得懂的高级通道明细（`workout_detail:<id>:<source>`，报文在、而且没被隔离）。
+    ///
+    /// 同时连了官方授权和高级通道时，同一次运动两边各有一份明细；两份都会整份替换逐秒序列，
+    /// 重放又按拉取先后走，于是后拉到的官方版把高级版冲掉——逐点距离、功率、触地时间一起没了（#143）。
+    /// 高级版字段更全，以它为准：有它时官方明细不再写序列，只在没有它时兜底。
+    pub fn has_legacy_workout_detail(&self, workout_id: &str) -> Result<bool> {
+        let prefix = format!("workout_detail:{workout_id}:");
+        let found: bool = self.conn.query_row(
+            "SELECT EXISTS (
+                 SELECT 1 FROM raw_records r
+                 WHERE r.stream = 'workout_detail'
+                   AND substr(r.source_key, 1, length(?1)) = ?1
+                   AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)
+             )",
+            [prefix],
+            |row| row.get(0),
+        )?;
+        Ok(found)
+    }
+
     /// 记下一次跑步明细拉取的结果。成功就清掉失败计数；失败则累加，过了
     /// [`WORKOUT_DETAIL_ATTEMPT_DECAY`] 的旧计数先衰减再记成第一次。
     pub fn record_workout_detail_fetch_result(

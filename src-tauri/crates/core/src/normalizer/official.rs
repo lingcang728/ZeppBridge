@@ -314,7 +314,8 @@ impl Normalizer {
 
     /// 官方运动明细 → 旧通道明细的字段名，交给 `decode_workout_detail`。
     ///
-    /// `distanceInCentimeter` 不映射：旧通道对应的串单位没有核实过，对不上就是编数据。
+    /// `distanceInCentimeter` 接成 `currentDistance`（形状同为「秒差, 累计厘米」），但单位没拿真实报文
+    /// 核过：入库时逐点距离要和汇总距离对得上才留，见 `storage::official::drop_unreconciled_distance`（#143）。
     pub fn official_detail_as_legacy(raw: &Value) -> Value {
         let mut data = Map::new();
         for (from, to) in [
@@ -328,6 +329,7 @@ impl Normalizer {
             ("gait", "gait"),
             ("pause", "pause"),
             ("kilometerPace", "kilo_pace"),
+            ("distanceInCentimeter", "currentDistance"),
         ] {
             if let Some(value) = raw
                 .get(from)

@@ -116,17 +116,24 @@ impl Database {
                         "明细对应的运动汇总还不存在".into(),
                     ));
                 }
-                let summary_end = self.workout_end_time(&workout_id)?;
-                let summary_distance = self.workout_distance_meters(&workout_id)?;
-                let decoded = decode_workout_detail(
-                    &Normalizer::official_detail_as_legacy(payload),
-                    summary_end,
-                    summary_distance,
-                )?;
-                // 用户导入过修正 .fit 的运动，云端明细只留在 raw_records 里（#140）。
-                self.apply_cloud_series(&workout_id, &decoded)?;
-                counts.primary_records =
-                    (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
+                // 高级通道已经有这条运动的明细：以它为准，官方这份不再整份替换逐秒序列（#143）。
+                // 报文照样算处理过（下面记 raw_normalization），不会被反复重放。
+                if self.has_legacy_workout_detail(&workout_id)? {
+                    counts.primary_records = 0;
+                } else {
+                    let summary_end = self.workout_end_time(&workout_id)?;
+                    let summary_distance = self.workout_distance_meters(&workout_id)?;
+                    let mut decoded = decode_workout_detail(
+                        &Normalizer::official_detail_as_legacy(payload),
+                        summary_end,
+                        summary_distance,
+                    )?;
+                    drop_unreconciled_distance(&mut decoded, summary_distance);
+                    // 用户导入过修正 .fit 的运动，云端明细只留在 raw_records 里（#140）。
+                    self.apply_cloud_series(&workout_id, &decoded)?;
+                    counts.primary_records =
+                        (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
+                }
             }
         }
         self.mark_official_rows(raw_record_id)?;
@@ -225,5 +232,32 @@ impl Database {
             |row| row.get(0),
         )?;
         Ok(attempts >= MAX_WORKOUT_DETAIL_ATTEMPTS)
+    }
+}
+
+/// 官方明细的逐点距离（`distanceInCentimeter`，接成 `currentDistance` 解码）要和汇总距离对得上才留。
+///
+/// 这串的单位只在合成样例里见过（形状是「秒差, 累计厘米」，和高级通道的 `currentDistance` 一样），
+/// 没拿真实报文核过。对账：逐秒距离的末值和汇总距离相差超过 3%、或者没有汇总距离可对，
+/// 就把逐秒距离整列清掉——宁缺不编，和 laps / kilo_pace 的对账同一态度（#143）。
+pub(super) fn drop_unreconciled_distance(
+    decoded: &mut DecodedWorkout,
+    summary_distance_m: Option<f64>,
+) {
+    let last = decoded
+        .samples
+        .iter()
+        .filter_map(|sample| sample.distance_m)
+        .fold(None, |best: Option<f64>, value| {
+            Some(best.map_or(value, |b| b.max(value)))
+        });
+    let Some(last) = last else { return };
+    let agrees = summary_distance_m
+        .filter(|total| total.is_finite() && *total > 0.0)
+        .is_some_and(|total| ((last - total) / total).abs() <= 0.03);
+    if !agrees {
+        for sample in &mut decoded.samples {
+            sample.distance_m = None;
+        }
     }
 }
