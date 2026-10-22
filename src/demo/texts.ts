@@ -10,6 +10,8 @@ const messages = defineMessages(
   {
     nickname: '示例用户',
     lifeEvent: '开始备赛半程马拉松',
+    noteMine: '周三晚上固定游泳，不排跑步',
+    noteProposed: '左膝跑 15 km 以上会痛，长距离要分段',
     taskTitle: (month: number, day: number) => `最近 14 天 · ${month}月${day}日`,
     taskFile: '最近 14 天',
     easyRun: '轻松跑',
@@ -21,6 +23,8 @@ const messages = defineMessages(
   {
     nickname: 'Demo user',
     lifeEvent: 'Started half-marathon training',
+    noteMine: 'Swims on Wednesday evenings; no runs that day',
+    noteProposed: 'Left knee hurts past 15 km; split long runs',
     taskTitle: (month: number, day: number) => `Last 14 days · ${month}/${day}`,
     taskFile: 'last 14 days',
     easyRun: 'Easy run',
@@ -32,6 +36,8 @@ const messages = defineMessages(
   {
     nickname: 'Usuario de ejemplo',
     lifeEvent: 'Empecé a preparar una media maratón',
+    noteMine: 'Nada los miércoles por la tarde; ese día no corre',
+    noteProposed: 'Le duele la rodilla izquierda a partir de 15 km; dividir las tiradas largas',
     taskTitle: (month: number, day: number) => `Últimos 14 días · ${day}/${month}`,
     taskFile: 'últimos 14 días',
     easyRun: 'Carrera suave',

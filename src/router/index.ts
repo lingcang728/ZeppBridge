@@ -41,6 +41,10 @@ const routes = [
   { path: '/ai/past', redirect: '/ai' },
   { path: '/ai/past/:category', redirect: '/ai' },
   { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
+  // 计划留档（批次 7）：推到手表的每一份计划。要排在 :date 前面，不然 history 会被当成日期。
+  { path: '/ai/plan/history', name: 'AiPlanHistory', component: () => import('../views/ai/AiPlanHistory.vue') },
+  // 教练档案（批次 7，AI 记忆收件箱）：AI 经 MCP 提议、你确认的长期事实。
+  { path: '/ai/memory', name: 'AiCoachNotes', component: () => import('../views/ai/AiCoachNotes.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
   {
     path: '/body',

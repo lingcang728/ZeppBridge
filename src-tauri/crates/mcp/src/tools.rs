@@ -256,7 +256,8 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
         | "get_athlete_profile"
         | "get_training_plan"
         | "draft_training_plan"
-        | "publish_training_plan" => {
+        | "publish_training_plan"
+        | "propose_coach_note" => {
             request.tool = COACH_TOOLS
                 .iter()
                 .find(|tool| **tool == name)
@@ -271,13 +272,14 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
     Ok(request)
 }
 
-/// 3B 的五个教练工具。
-pub(super) const COACH_TOOLS: [&str; 5] = [
+/// 3B 的五个教练工具，加上批次 7 的「提议记住」。
+pub(super) const COACH_TOOLS: [&str; 6] = [
     "get_training_context",
     "get_athlete_profile",
     "get_training_plan",
     "draft_training_plan",
     "publish_training_plan",
+    "propose_coach_note",
 ];
 
 /// `get_food_data` 按天合计的四个摄入指标。
@@ -474,6 +476,7 @@ pub(super) fn run_tool(
         "get_training_plan" => run_training_plan(db),
         "draft_training_plan" => run_draft_plan(db, args),
         "publish_training_plan" => run_publish_plan(db, args),
+        "propose_coach_note" => run_propose_note(db, args),
         other => Err(CallFailure::plain(format!("没有名为 {other} 的工具。"))),
     }
 }

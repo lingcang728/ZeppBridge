@@ -206,9 +206,21 @@ pub(crate) use sync::{
 pub(crate) use system::system_region_locale;
 
 pub(crate) use training_plan::{
-    training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,
-    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state,
-    training_plan_update_draft,
+    training_plan_adherence, training_plan_discard, training_plan_history, training_plan_preview,
+    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
+    training_plan_state, training_plan_update_draft,
+};
+
+mod coach_notes;
+pub(crate) use coach_notes::{
+    coach_note_add, coach_note_decide, coach_note_delete, coach_note_edit, coach_notes_export,
+    coach_notes_list,
+};
+
+mod feedback;
+pub(crate) use feedback::{
+    workout_feedback_adjusted, workout_feedback_dismiss, workout_feedback_get,
+    workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
 };
 
 mod life_events;

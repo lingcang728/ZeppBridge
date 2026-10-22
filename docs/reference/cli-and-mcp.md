@@ -345,10 +345,11 @@ outside the grants — `error.permittedRanges` lists the actual
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
 | `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect), days since the last workout, the active plan and life events |
-| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, and the background the user wrote for AI |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, and the coach notes the user has confirmed (`coachNotes`) |
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
 | `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
+| `propose_coach_note` | **Writes (a proposal)**: puts one sentence about the user (an injury, a routine, a preference) into the desktop inbox; it reaches `get_athlete_profile` only after the user taps "Remember" |
 
 `get_food_data` returns daily totals and available food-log details: names, descriptions,
 meal types, timestamps, reported weight, and nutrients (including fiber). Reported
@@ -404,10 +405,11 @@ the CLI cannot get either within its wait it exits with code 4 rather than
 racing the GUI.
 
 MCP's read-only queries take no write lock and can run during a sync. Drafting
-or publishing a training plan takes the write lock only for the moment it
-writes (waiting at most 5 seconds), never while it is on the network.
+or publishing a training plan, or proposing a coach note, takes the write lock
+only for the moment it writes (waiting at most 5 seconds), never while it is on
+the network.
 
-### Training-plan tools (the only two that write)
+### Tools that write: the training plan and the coach-notes inbox
 
 Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 
@@ -430,6 +432,13 @@ Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 - `sent` only means the official API accepted the request (it answers success
   to any body); the content was validated before sending. The watch still asks
   for the sub-type before the workout starts.
-- All five coach tools (including `get_training_context`, `get_athlete_profile`
+- `propose_coach_note` only proposes. The note goes into a separate inbox table
+  (never a health table) and the user confirms or rejects each one in the
+  desktop app; only confirmed notes appear in `get_athlete_profile` as
+  `coachNotes`, labelled with who wrote them (the user, or the MCP client by the
+  name it reported). A sentence the user rejected cannot be proposed again, and
+  at most 20 proposals can wait at once. The user can edit, delete and export
+  every note as Markdown.
+- All six coach tools (including `get_training_context`, `get_athlete_profile`
   and `get_training_plan`) are refused under the `task` scope: they span
   categories and dates and cannot be honestly clipped.

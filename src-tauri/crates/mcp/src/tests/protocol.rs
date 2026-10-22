@@ -84,10 +84,14 @@ fn every_tool_declares_units_and_the_missing_value_rule() {
 }
 
 #[test]
-fn only_the_two_training_plan_tools_write() {
-    // 健康数据只读是这个进程存在的前提。3B 起唯一的例外是训练计划账本的起草 / 发布，
-    // 而且必须在注解里如实声明自己会写；再加任何会写库的工具都应当先推翻这条测试。
-    const WRITERS: [&str; 2] = ["draft_training_plan", "publish_training_plan"];
+fn only_the_training_plan_and_coach_note_tools_write() {
+    // 健康数据只读是这个进程存在的前提。3B 起的例外是训练计划账本的起草 / 发布，批次 7 加了
+    // 教练档案的「提议」，而且必须在注解里如实声明自己会写；再加任何会写库的工具都应当先推翻这条测试。
+    const WRITERS: [&str; 3] = [
+        "draft_training_plan",
+        "publish_training_plan",
+        "propose_coach_note",
+    ];
     let tools = tool_definitions();
     for tool in &tools {
         let name = tool["name"].as_str().unwrap_or_default();
@@ -112,7 +116,13 @@ fn only_the_two_training_plan_tools_write() {
         .find(|tool| tool["name"] == "publish_training_plan")
         .unwrap();
     assert_eq!(publish["annotations"]["destructiveHint"], true);
-    assert_eq!(tools.len(), 17);
+    // 提议只进收件箱，不覆盖任何东西。
+    let propose = tools
+        .iter()
+        .find(|tool| tool["name"] == "propose_coach_note")
+        .unwrap();
+    assert_eq!(propose["annotations"]["destructiveHint"], false);
+    assert_eq!(tools.len(), 18);
 }
 
 #[test]
@@ -172,7 +182,7 @@ fn a_modern_tools_list_carries_the_required_envelope() {
     assert_eq!(result["resultType"], json!("complete"));
     assert!(result["ttlMs"].as_i64().unwrap() > 0);
     assert_eq!(result["cacheScope"], json!("public"));
-    assert_eq!(result["tools"].as_array().unwrap().len(), 17);
+    assert_eq!(result["tools"].as_array().unwrap().len(), 18);
 }
 
 /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
@@ -254,7 +264,7 @@ fn argv_parsing_is_fail_closed() {
 /// 映射，这条测试就红。
 #[test]
 fn every_registered_tool_builds_a_data_request() {
-    let minimal_args: [(&str, Value); 17] = [
+    let minimal_args: [(&str, Value); 18] = [
         ("list_workouts", json!({})),
         ("get_workout_insight", json!({"workoutId": "w"})),
         ("get_metric_series", json!({"metrics": ["spo2_odi"]})),
@@ -275,6 +285,7 @@ fn every_registered_tool_builds_a_data_request() {
         ("get_training_plan", json!({})),
         ("draft_training_plan", json!({"plan": {"workouts": []}})),
         ("publish_training_plan", json!({"draftId": "plan-x"})),
+        ("propose_coach_note", json!({"note": "n"})),
     ];
     for tool in tool_definitions() {
         let name = tool["name"].as_str().unwrap();

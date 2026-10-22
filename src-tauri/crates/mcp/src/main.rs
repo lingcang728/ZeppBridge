@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use std::io::{self, BufRead, Write};
+use std::sync::Mutex;
 
 use chrono::{Duration, Local, NaiveDate};
 
@@ -56,6 +57,8 @@ const SUPPORTED_PROTOCOL_VERSIONS: [&str; 5] = [
 const META_PROTOCOL_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
 
 const META_SERVER_INFO: &str = "io.modelcontextprotocol/serverInfo";
+
+const META_CLIENT_INFO: &str = "io.modelcontextprotocol/clientInfo";
 
 /// 列表结果的缓存提示。工具定义只跟着构建走，进程活着的时候不会变，
 /// 但也别让客户端缓存到下一次升级之后——一小时是个既省往返又不至于

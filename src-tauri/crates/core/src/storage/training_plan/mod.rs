@@ -15,8 +15,10 @@
 //!   `startDate` 无关）。未来窗口要变空，走「占位 + 重推前一个窗口」。自动的滚动
 //!   推送永远不清空任何窗口。
 
+mod history;
 mod publish;
 
+pub use history::{HistoryWorkout, PlanHistoryEntry};
 pub use publish::PLACEHOLDER_ID_BASE;
 
 use super::Database;

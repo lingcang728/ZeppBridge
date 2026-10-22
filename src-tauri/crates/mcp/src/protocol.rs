@@ -50,8 +50,9 @@ pub(super) fn server_info() -> Value {
 pub(super) fn instructions(scope: &AccessScope) -> String {
     let scope_note = match scope {
         AccessScope::FullReadOnly => {
-            "full-readonly：本机全部健康数据的只读视图。唯一会写库的是训练计划：\r
-             draft_training_plan 只存草稿，publish_training_plan 要用户在设置里打开「允许 AI 直接发布」才放行。"
+            "full-readonly：本机全部健康数据的只读视图。会写库的只有训练计划和教练档案收件箱：\
+             draft_training_plan 只存草稿，publish_training_plan 要用户在设置里打开「允许 AI 直接发布」才放行；\
+             propose_coach_note 只把一句话放进收件箱，用户点了「记住」才生效。"
         }
         AccessScope::TaskScoped => {
             "task：只看得到桌面端标为「开放给 MCP」的任务所授权的运动与日期窗口内的数据；\
@@ -74,6 +75,29 @@ pub(super) fn requested_protocol_version(params: &Value) -> Option<&str> {
         .get("_meta")
         .and_then(|meta| meta.get(META_PROTOCOL_VERSION))
         .and_then(Value::as_str)
+}
+
+/// 客户端自报的名字（legacy 在 `initialize` 的 `clientInfo`，modern 在每个请求的 `_meta`）。
+/// 只用来在「AI 想记住」的收件箱里标是谁提的，不做任何判断。
+static CLIENT_NAME: Mutex<Option<String>> = Mutex::new(None);
+
+fn remember_client(params: &Value) {
+    let name = params
+        .get("clientInfo")
+        .or_else(|| {
+            params
+                .get("_meta")
+                .and_then(|meta| meta.get(META_CLIENT_INFO))
+        })
+        .and_then(|info| info.get("name"))
+        .and_then(Value::as_str);
+    if let (Some(name), Ok(mut slot)) = (name, CLIENT_NAME.lock()) {
+        *slot = Some(name.to_string());
+    }
+}
+
+pub(super) fn client_name() -> Option<String> {
+    CLIENT_NAME.lock().ok().and_then(|slot| slot.clone())
 }
 
 /// 这一版我们认不认。
@@ -121,6 +145,7 @@ pub(super) fn handle_scoped(
     params: &Value,
     scope: &AccessScope,
 ) -> Result<Value, RpcError> {
+    remember_client(params);
     // `server/discover` 本身就是 modern 的入口，也是 stdio 上的时代探针：
     // 客户端拿它试一下，认得就是 modern 服务器，报未知方法就退回 initialize。
     if method == "server/discover" {

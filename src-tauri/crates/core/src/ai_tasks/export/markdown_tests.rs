@@ -277,3 +277,22 @@ fn final_format_follows_food_and_comparison_without_filling_unknowns() {
     assert_eq!(comparison.2[1][5], "");
     assert_eq!(comparison.2[1][6], "");
 }
+
+#[test]
+fn confirmed_coach_notes_lead_the_data_and_say_who_wrote_them() {
+    let mut document = sample_document(10);
+    document["coach_notes"] = json!([
+        { "text": "Left knee hurts past 15 km", "source": "mcp", "source_name": "Claude", "since": "2026-10-20" },
+        { "text": "Swims on Wednesday evenings", "source": "user", "source_name": null, "since": "2026-10-21" }
+    ]);
+    let text = render_task_markdown(&document, "", 1_000_000).text;
+    let notes = text.find("## Coach notes").unwrap();
+    assert!(notes < text.find("## Summary").unwrap());
+    assert!(text.contains(
+        "- Left knee hurts past 15 km (proposed by an AI, confirmed by the user, 2026-10-20)"
+    ));
+    assert!(text.contains("- Swims on Wednesday evenings (written by the user, 2026-10-21)"));
+    assert!(!render_task_markdown(&sample_document(10), "", 1_000_000)
+        .text
+        .contains("Coach notes"));
+}
