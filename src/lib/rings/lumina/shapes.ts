@@ -32,12 +32,13 @@ export const newPC = (count: number): PC => ({
 });
 
 // ===== textGen.ts =====
-export const generateTextParticles = (text: string, count: number, width = 640, height = 240) => {
+/** 把一行字画到画布上，按 2px 步长取亮的像素（画布像素坐标，x、y 交替）。字号从 200 往下缩到能放进 86% 宽、78% 高。 */
+const rasterText = (text: string, width: number, height: number): number[] => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return new Float32Array(count * 3);
+  if (!ctx) return [];
 
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
@@ -61,25 +62,38 @@ export const generateTextParticles = (text: string, count: number, width = 640, 
   ctx.fillText(text, width / 2, height / 2);
 
   const data = ctx.getImageData(0, 0, width, height).data;
-  const validPoints: number[] = [];
-  const scale = 36 / width; // map canvas pixels to ~36 world units wide
+  const points: number[] = [];
   for (let y = 0; y < height; y += 2) {
     for (let x = 0; x < width; x += 2) {
-      if (data[(y * width + x) * 4] > 128) validPoints.push((x - width / 2) * scale, -(y - height / 2) * scale);
+      if (data[(y * width + x) * 4] > 128) points.push(x, y);
     }
   }
+  return points;
+};
+
+/** 打乱的取样顺序（Fisher-Yates）：粒子比像素少时，每个字都均匀取到，不会只取到前半句。 */
+const shuffled = (n: number) => {
+  const order = new Int32Array(n);
+  for (let i = 0; i < n; i++) order[i] = i;
+  for (let i = n - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  return order;
+};
+
+export const generateTextParticles = (text: string, count: number, width = 640, height = 240) => {
+  const raster = rasterText(text, width, height);
+  const scale = 36 / width; // map canvas pixels to ~36 world units wide
+  const validPoints: number[] = [];
+  for (let k = 0; k < raster.length; k += 2) validPoints.push((raster[k] - width / 2) * scale, -(raster[k + 1] - height / 2) * scale);
 
   const positions = new Float32Array(count * 3);
   const pointCount = validPoints.length / 2;
   if (pointCount === 0) return positions;
 
   // Fisher-Yates shuffle so all glyph regions are sampled uniformly before wrapping around.
-  const order = new Int32Array(pointCount);
-  for (let i = 0; i < pointCount; i++) order[i] = i;
-  for (let i = pointCount - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    const t = order[i]; order[i] = order[j]; order[j] = t;
-  }
+  const order = shuffled(pointCount);
   for (let i = 0; i < count; i++) {
     const p = order[i % pointCount];
     positions[i * 3] = validPoints[p * 2] + (Math.random() - 0.5) * 0.08;
@@ -152,19 +166,66 @@ export function fillStarfield({ pos, col }: PC, count: number) {
   }
 }
 
-// Finale text: extruded along Z for genuine 3D volume, biased toward the front and back faces.
-export function fillText(text: string, { pos, col }: PC, count: number) {
-  const tp = generateTextParticles(text, count, 768, 260);
-  const THICK = 1.4;
-  const base = PALETTE.finaleText;
-  for (let i = 0; i < count; i++) {
-    pos[i * 3] = tp[i * 3];
-    pos[i * 3 + 1] = tp[i * 3 + 1];
-    const face = (i & 1) === 0 ? 1 : -1;
-    pos[i * 3 + 2] = face * THICK * (0.7 + Math.random() * 0.3);
-    const m = 1.0 + Math.random() * 0.14;
-    setCol(col, i, base[0] * m, base[1] * m, base[2] * m);
+// Finale: the year's rings stay in the middle; the title becomes a band of light orbiting them like Saturn's ring
+// (user, 2026-10-22: the old front/back-extruded text split into two slabs as soon as you orbited it).
+const BAND_RADIUS = 19;
+const BAND_TILT = 0.26; // the near side dips below the rings, the far side rises behind them
+const BAND_RING_SHARE = 0.42; // the rest of the text pool goes to the band (Chinese strokes need the density)
+
+/** 光带上每颗粒子的基准：角度、高度、半径、颜色。引擎每帧按公转角把它们摆到目标位置上。 */
+export interface BandInfo { start: number; theta: Float32Array; h: Float32Array; r: Float32Array; base: Float32Array }
+
+/** 光带转到 `phi` 时的目标：圆柱面（竖轴）→ 绕 X 轴倾斜；朝着镜头那半圈亮、背后那半圈暗，读得出前后。 */
+export function placeBand(band: BandInfo, pos: Float32Array, col: Float32Array, phi: number) {
+  const cos = Math.cos(BAND_TILT), sin = Math.sin(BAND_TILT);
+  const n = band.theta.length;
+  for (let k = 0; k < n; k++) {
+    const i = band.start + k;
+    const a = band.theta[k] + phi;
+    const sa = Math.sin(a), ca = Math.cos(a);
+    const x = band.r[k] * sa, y = band.h[k], z = band.r[k] * ca;
+    pos[i * 3] = x;
+    pos[i * 3 + 1] = y * cos - z * sin;
+    pos[i * 3 + 2] = y * sin + z * cos;
+    const lit = 0.28 + 0.72 * (0.5 + 0.5 * ca);
+    col[i * 3] = band.base[k * 3] * lit;
+    col[i * 3 + 1] = band.base[k * 3 + 1] * lit;
+    col[i * 3 + 2] = band.base[k * 3 + 2] * lit;
   }
+}
+
+export function fillFinale(text: string, pc: PC, count: number, years: RingYear[], selected: number | null): { focal: FocalInfo; band: BandInfo } {
+  const ringN = Math.round(count * BAND_RING_SHARE);
+  const focal = fillRings({ pos: pc.pos.subarray(0, ringN * 3), col: pc.col.subarray(0, ringN * 3) }, ringN, years, selected);
+  // 字绕一整圈：同一句写两遍，中间用「·」隔开，转到哪儿前面都有一句正着的。
+  const loop = `${text}  ·  ${text}  ·  `;
+  const W = 2600, H = 170;
+  const raster = rasterText(loop, W, H);
+  const n = count - ringN;
+  const band: BandInfo = { start: ringN, theta: new Float32Array(n), h: new Float32Array(n), r: new Float32Array(n), base: new Float32Array(n * 3) };
+  const points = raster.length / 2;
+  const height = (2 * Math.PI * BAND_RADIUS) * (H / W);
+  const FRONT_SHIFT = Math.PI * 2 * 0.22;
+  const order = shuffled(Math.max(1, points));
+  const base = PALETTE.finaleText;
+  for (let k = 0; k < n; k++) {
+    if (points) {
+      const p = order[k % points];
+      // 画布从左往右 = 正面看从左往右（角度增大时 x = r·sinθ 往右走），不会是镜像字。
+      // 画布正中是两句之间的「·」：整体转一点，让第一句的正中先落在正前方。
+      band.theta[k] = (raster[p * 2] / W - 0.5) * Math.PI * 2 + FRONT_SHIFT;
+      band.h[k] = -(raster[p * 2 + 1] / H - 0.5) * height + (Math.random() - 0.5) * 0.06;
+    } else {
+      band.theta[k] = Math.random() * Math.PI * 2;
+      band.h[k] = 0;
+    }
+    // 一层薄壳：径向均匀铺开，从哪个角度看都是一整条，不会裂成前后两片。
+    band.r[k] = BAND_RADIUS + (Math.random() - 0.5) * 0.7;
+    const m = 1.0 + Math.random() * 0.14;
+    setCol(band.base, k, base[0] * m, base[1] * m, base[2] * m);
+  }
+  placeBand(band, pc.pos, pc.col, 0);
+  return { focal, band };
 }
 
 // Static deep-space background: generated once, never updated per-frame.
@@ -193,8 +254,11 @@ const THICK = 1.1; // 切片半厚
 const TILT = -0.5; // 往后仰一点，看得见切面和树皮
 const FOCAL_MAX = 1400;
 
-/** 焦点星那一池的粒子：每颗星的下标范围和基准颜色（引擎逐帧按它闪烁）。 */
-export interface FocalInfo { count: number; base: Float32Array }
+/** 焦点星那一池的粒子：基准颜色（引擎逐帧按它闪烁），以及「哪几颗粒子是哪颗星」——
+    第 j 颗星是 [j·per, (j+1)·per)，最后一颗把余下的都包了；`centers` 是每颗星那一小团的中心（已经后仰过），
+    点星星时拿它投影到屏幕上找最近的（不用对几千颗粒子做射线）。 */
+export interface FocalInfo { count: number; base: Float32Array; per: number; stars: number; centers: Float32Array }
+export const NO_FOCAL: FocalInfo = { count: 0, base: new Float32Array(0), per: 1, stars: 0, centers: new Float32Array(0) };
 
 const pickWeighted = (pool: { w: number; rgb: RGB }[]) => {
   let r = Math.random();
@@ -234,13 +298,14 @@ export function fillRings({ pos, col }: PC, count: number, years: RingYear[], se
   const stars = sel?.stars ?? [];
   const focal = stars.length && selRing ? Math.min(FOCAL_MAX, Math.max(260, stars.length * 8)) : 0;
   const base = new Float32Array(focal * 3);
+  const per = stars.length ? Math.max(1, Math.floor(focal / stars.length)) : 1;
+  const drawn = focal ? Math.min(stars.length, Math.ceil(focal / per)) : 0;
 
   // 焦点星：选中那一年的每次运动，角度 = 日期，半径按时长排名铺在那一圈里，浮在切面前方。
   if (focal && sel && selRing) {
     const durations = stars.map(s => s.duration_s).filter((d): d is number => !!d).sort((a, b) => a - b);
     const rank = (d: number | null) => (d && durations.length > 1 ? durations.indexOf(d) / (durations.length - 1) : 0.5);
     const maxRun = Math.max(0, ...stars.filter(s => s.is_run).map(s => s.distance_m ?? 0));
-    const per = Math.max(1, Math.floor(focal / stars.length));
     const days = daysInYear(sel.year);
     for (let i = 0; i < focal; i++) {
       const star = stars[Math.min(stars.length - 1, Math.floor(i / per))];
@@ -324,5 +389,14 @@ export function fillRings({ pos, col }: PC, count: number, years: RingYear[], se
     pos[k * 3 + 1] = y * cos - z * sin;
     pos[k * 3 + 2] = y * sin + z * cos;
   }
-  return { count: focal, base };
+  // 每颗星那一小团的中心（点星星用）。
+  const centers = new Float32Array(drawn * 3);
+  const sizes = new Float32Array(drawn);
+  for (let i = 0; i < focal; i++) {
+    const j = Math.min(drawn - 1, Math.floor(i / per));
+    centers[j * 3] += pos[i * 3]; centers[j * 3 + 1] += pos[i * 3 + 1]; centers[j * 3 + 2] += pos[i * 3 + 2];
+    sizes[j] += 1;
+  }
+  for (let j = 0; j < drawn; j++) for (let a = 0; a < 3; a++) centers[j * 3 + a] /= sizes[j] || 1;
+  return { count: focal, base, per, stars: drawn, centers };
 }
