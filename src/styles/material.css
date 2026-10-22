@@ -355,10 +355,23 @@ summary { cursor: pointer; }
 /* 「再显示 N 条」新出现的行淡入、轻轻浮上来（审计 B7，2026-10-07；以前一下全冒出来）。行一挂上就放一次，
    已经在的行不动；缓存页回到场上不重放（下面的 page-revisit）。只动 opacity / transform。 */
 @keyframes row-in { from { opacity: 0; transform: translateY(8px); } }
-.tl-row, .le-timeline > li { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
-.page-revisit :is(.tl-row, .le-timeline > li) { animation: none; }
-@media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }
+.tl-row { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.page-revisit .tl-row { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tl-row { animation: none; } }
 
+
+/* ── 履历里的列表行（跑鞋、比赛、伤病、纪元与事件）────────────────────────────
+   悬停是一块内缩的圆角高亮，不再贴着分隔线被直直切开（用户 2026-10-22：「边缘像被裁切了一样」）。
+   分隔线画在行与行之间的缝里、左右各缩一截；悬停行上下两条线淡掉，不穿过高亮块。 */
+.row-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.row-list > li { position: relative; }
+.row-list > li + li::before { content: ''; position: absolute; top: -2.5px; right: 12px; left: 12px; height: 1px; pointer-events: none;
+  background: var(--mat-line); transition: opacity var(--dur-fast) ease; }
+.row-list > li:is(:hover, :focus-within)::before, .row-list > li:is(:hover, :focus-within) + li::before { opacity: 0; }
+.row-hit { width: 100%; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur-fast) ease; }
+.row-hit:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.row-hit:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
 
 /* ── 晕涂（sfumato，3.1）────────────────────────────────────────────────
    不确定的东西不画硬边：分期里「未知」那几段、样本太少的常态参照，边缘往两头晕开。
@@ -381,4 +394,4 @@ html[data-effects="lite"] { --glass: var(--mat-glass-strong); --glass-blur: none
 html[data-effects="lite"] *, html[data-effects="lite"] *::before, html[data-effects="lite"] *::after {
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
-html[data-effects="lite"] :is(.tl-row, .le-timeline > li) { animation: none; }
+html[data-effects="lite"] .tl-row { animation: none; }

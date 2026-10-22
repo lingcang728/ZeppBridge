@@ -2,6 +2,7 @@
 import GlassSwitch from './GlassSwitch.vue';
 import { computed, ref, watch } from 'vue';
 import WheelDatePicker from './WheelDatePicker.vue';
+import DateRangeField from './DateRangeField.vue';
 import ModalDialog from './ModalDialog.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
@@ -10,7 +11,7 @@ import { eventCategories, lifeEventMessages, validLifeEvent } from '../lib/lifeE
 import { localDateString } from '../lib/format';
 import { useMessages } from '../i18n';
 const t = useMessages(lifeEventMessages);
-const { draft, reload } = useLifeEvents();
+const { draft, origin, reload } = useLifeEvents();
 const busy = ref(false);
 const error = ref('');
 const confirmingDelete = ref(false);
@@ -35,7 +36,8 @@ const ongoing = computed({ get: () => draft.value?.endDate === null, set: value 
 const dayOffset = (days: number) => { const date = new Date(); date.setDate(date.getDate() - days); return localDateString(date); };
 const today = () => dayOffset(0);
 function setStart(value: string) { if (draft.value && value) draft.value.startDate = value; }
-function setEnd(value: string) { if (draft.value && value) draft.value.endDate = value; }
+// 持续中结束那一栏是收起的：那时候的滚轮不该把「持续」悄悄关掉。
+function setEnd(value: string) { if (draft.value && value && draft.value.endDate !== null) draft.value.endDate = value; }
 function close() { if (!busy.value) draft.value = null; }
 function setCategory(value: string | number) {
   if (!draft.value) return;
@@ -61,7 +63,7 @@ async function remove() {
 }
 </script>
 <template>
-  <ModalDialog v-if="draft" labelledby="life-event-editor-title" @close="close">
+  <ModalDialog v-if="draft" labelledby="life-event-editor-title" :origin="origin" @close="close">
     <form class="event-form" @submit.prevent="save">
       <h2 id="life-event-editor-title">{{ draft.id ? t.edit : t.add }}</h2>
       <fieldset :disabled="busy">
@@ -76,33 +78,38 @@ async function remove() {
             @update:model-value="setCategory"
           />
         </div>
-        <div class="event-dates">
-          <!-- 快捷日期放在标签同一行的右边：以前单独占一行，整张弹窗高出一截，底部的保存被挤出窗口。 -->
-          <div class="field">
-            <span class="field-head">
-              <span class="field-label">{{ t.start }}</span>
-              <span class="date-quick">
-                <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
-                <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
-              </span>
-            </span>
-            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
-          </div>
-          <div v-if="!ongoing" class="field">
-            <span class="field-head">
-              <span class="field-label">{{ t.end }}</span>
-              <span class="date-quick">
-                <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
-                <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
-              </span>
-            </span>
-            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
-          </div>
-        </div>
+        <!-- 先决定还在不在持续，再看日期：持续中只有开始日期、居中；关掉持续，开始日期推到左边、结束日期从右边出来。 -->
         <div class="check">
           <span>{{ t.ongoing }}</span>
           <GlassSwitch :model-value="ongoing" :aria-label="t.ongoing" @update:model-value="ongoing = !ongoing" />
         </div>
+        <DateRangeField :show-end="!ongoing">
+          <!-- 快捷日期放在标签同一行的右边：以前单独占一行，整张弹窗高出一截，底部的保存被挤出窗口。 -->
+          <template #start>
+            <div class="field">
+              <span class="field-head">
+                <span class="field-label">{{ t.start }}</span>
+                <span class="date-quick">
+                  <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
+                  <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
+                </span>
+              </span>
+              <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
+            </div>
+          </template>
+          <template #end>
+            <div class="field">
+              <span class="field-head">
+                <span class="field-label">{{ t.end }}</span>
+                <span class="date-quick">
+                  <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
+                  <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
+                </span>
+              </span>
+              <WheelDatePicker :model-value="draft.endDate ?? draft.startDate" :min="draft.startDate" :aria-label="t.end" data-event-end @update:model-value="setEnd" />
+            </div>
+          </template>
+        </DateRangeField>
         <div class="check epoch-check">
           <span><span>{{ t.epoch }}</span><small>{{ t.epochHint }}</small></span>
           <GlassSwitch :model-value="draft.epoch" :aria-label="t.epoch" data-event-epoch @update:model-value="draft.epoch = !draft.epoch" />
@@ -135,7 +142,7 @@ label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted
 /* 输入框和页面上的胶囊同一种凹槽：没有描边，焦点时一圈品牌色。 */
 input,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px 14px; border:0; border-radius:14px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); color:var(--ink); font:inherit; outline:none; }
 input:focus,textarea:focus { box-shadow: var(--cap-track-shadow), 0 0 0 2px var(--focus); }
-textarea { resize:vertical; }.event-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+textarea { resize:vertical; }
 input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
 .date-quick { display:flex; flex-wrap:wrap; gap:6px; }
 .quick { min-height:28px; padding:0 10px; border:0; border-radius:999px; background:color-mix(in srgb, var(--ink) 7%, transparent); color:var(--muted); font:inherit; font-size:var(--fs-xs); cursor:pointer; }
@@ -148,5 +155,4 @@ input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
 footer { position:sticky; bottom:-20px; z-index:2; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:0 -20px -20px; padding:12px 20px 18px; border-radius:0 0 var(--radius-lg) var(--radius-lg); background:var(--mat-glass-strong); -webkit-backdrop-filter:var(--mat-glass-blur); backdrop-filter:var(--mat-glass-blur); }
 footer .event-hint { flex:1 1 180px; min-width:0; }
 .delete-confirm { display:grid; gap:10px; }
-@media(max-width:480px) { .event-dates { grid-template-columns:1fr; } }
 </style>

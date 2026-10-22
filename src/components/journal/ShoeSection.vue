@@ -28,9 +28,9 @@ const asInput = (shoe: ShoeSummary): ShoeInput => {
 <template>
   <JournalCard :title="t.shoes" tone="shoe" :hint="t.shoesHint" :action="t.addShoe" @action="o => emit('edit', fresh(), o)">
     <p v-if="shoes && !list.length" class="empty">{{ t.noShoe }}</p>
-    <ul v-else class="shoe-list">
+    <ul v-else class="row-list">
       <li v-for="shoe in list" :key="shoe.id">
-        <button type="button" class="shoe" :class="`wear-${shoe.wear}`" @click="emit('edit', asInput(shoe), $event.currentTarget as HTMLElement)">
+        <button type="button" class="shoe row-hit" :class="`wear-${shoe.wear}`" @click="emit('edit', asInput(shoe), $event.currentTarget as HTMLElement)">
           <span class="s-name">{{ shoe.name }}<em v-if="shoe.is_default">{{ t.isDefaultBadge }}</em></span>
           <span class="s-km">{{ t.shoeKm(kmText(shoe.km), kmText(shoe.retire_km)) }}</span>
           <span class="s-bar" aria-hidden="true"><i :style="{ width: `${share(shoe) * 100}%` }"></i></span>
@@ -55,11 +55,7 @@ const asInput = (shoe: ShoeSummary): ShoeInput => {
 
 <style scoped>
 .empty { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
-.shoe-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.shoe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; width: 100%; padding: 10px 6px; border: 0; border-top: 1px solid var(--mat-line); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.shoe-list li:first-child .shoe { border-top: 0; }
-.shoe:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
-.shoe:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.shoe { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
 .s-name { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
 .s-name em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--pace) 16%, transparent); color: var(--muted); font-size: var(--fs-2xs); font-style: normal; font-weight: 500; }
 .s-km { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }

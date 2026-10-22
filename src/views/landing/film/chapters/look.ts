@@ -18,7 +18,8 @@ export const prologue: Chapter = {
 
 /** 按位置点（不按文字：访客用别的语言时 iframe 里也是那种语言）。 */
 export const tapNth = async (d: Director, selector: string, index: number, after = 450) => d.tap(await d.find(selector, { index }), { after, travel: 260 });
-export const ADD_EVENT = '#life-events .le-head .pill-button';
+/** 生活事件的「记一件事」：在履历页「纪元与事件」卡右上角（第二枚；第一枚是「新纪元」）。 */
+export const ADD_EVENT = '#life-events .jc-actions .pill-button:last-child';
 /** 换到一页：关掉展示墙和浮层、到路由、滚到顶。 */
 export const page = (d: Director, path: string) => d.cut(async () => { await d.clear(); await d.go(path, 200); });
 /** 黑场里直接进最近一晚的睡眠页（第一次跟着概览睡眠卡的链接走并记下地址，之后一步跳到；不演形变）。 */

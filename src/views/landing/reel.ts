@@ -247,7 +247,7 @@ export async function runReel(view: Window, id: string, clock: PlaybackClock, st
     for (const char of text) { field.value += char; field.dispatchEvent(new EventType('input', { bubbles: true })); await clock.wait(35); }
     stage.beat('custom-question'); await wait(2500);
   } else if (id === 'events') {
-    await go('/'); await tap('#life-events .le-head .pill-button', 1000);
+    await go('/journal'); await tap('#life-events .jc-actions .pill-button:last-child', 1000);
     const dialog = await find('[data-modal-dialog]'); stage.beat('context');
     const items = dialog.querySelectorAll('.segment-item');
     for (const index of [0, 1]) if (items[index]) await tap(items[index]!, 1500);
