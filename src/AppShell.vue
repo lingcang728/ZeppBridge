@@ -15,6 +15,7 @@ import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
 import { installGlassTips } from './lib/glassTip';
 import { whenFramesSteady } from './lib/motion/steady';
+import { punch } from './lib/motion/punch';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
@@ -147,6 +148,13 @@ const removeAfterEach = router.afterEach(() => {
 });
 const onPageBeforeLeave = (el: Element) => {
   (el as HTMLElement).style.top = `${-leavingScroll}px`;
+};
+/* 横着切页（底栏拖过去、点过去）、前进后退落定时补一拳：年轮舞台拳击式切换的手感（lib/motion/punch.ts）。
+   卡 ⇄ 页的形变自己在落地时打（usePageMorph），这里不重复。 */
+const onPageAfterEnter = (el: Element) => {
+  const kind = motion.value;
+  if (kind === 'left' || kind === 'right') punch(el, { strength: 0.5 });
+  else if (kind === 'forward' || kind === 'back') punch(el, { strength: 0.3 });
 };
 const onMainScroll = (event: Event) => {
   const under = (event.target as HTMLElement).scrollTop > 2;
@@ -341,7 +349,7 @@ onUnmounted(() => {
            详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
       <div :class="['page-host', { holding: pageHold }]">
       <RouterView v-slot="{ Component }">
-        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
+        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @after-enter="onPageAfterEnter" @leave="pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
           <KeepAlive :include="CACHED_PAGES" :max="4">
             <component :is="Component" />
           </KeepAlive>
