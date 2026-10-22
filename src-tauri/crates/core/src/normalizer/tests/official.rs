@@ -149,10 +149,15 @@ fn official_detail_decodes_with_the_legacy_decoder() {
     });
     let legacy = Normalizer::official_detail_as_legacy(&raw);
     assert!(legacy["data"].get("distance").is_none());
-    assert!(legacy["data"].get("currentDistance").is_none());
+    // `distanceInCentimeter` 接成 `currentDistance`（#143）；单位由入库时和汇总距离对账把关。
+    assert_eq!(legacy["data"]["currentDistance"], "0,0;1,399;1,835;");
     let decoded = crate::decoder::decode_workout_detail(&legacy, None, None).unwrap();
     assert_eq!(decoded.route.len(), 3);
     assert!(!decoded.samples.is_empty());
+    assert!(decoded
+        .samples
+        .iter()
+        .any(|sample| sample.distance_m == Some(8.35)));
 }
 
 #[test]
