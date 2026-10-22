@@ -229,5 +229,8 @@ pub(crate) use logbook::{
     races_list, shoe_delete, shoe_save, shoes_overview, workout_feel_get, workout_feel_save,
 };
 
+mod rings;
+pub(crate) use rings::{annual_rings, rings_save_image};
+
 mod life_events;
 pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};

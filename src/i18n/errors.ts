@@ -228,6 +228,7 @@ const messages = defineMessages(
     'err.coach_notes.export': '导出教练档案失败',
     'err.logbook.invalid': '填的内容不对，检查一下再存',
     'err.logbook.gear_taken': '这个 Zepp 鞋编号已经认到另一双鞋上了',
+    'err.rings.save': '年轮图片没存下来，看看图片文件夹能不能写',
   },
   {
     /* —— core —— */
@@ -458,6 +459,7 @@ const messages = defineMessages(
     'err.coach_notes.export': 'Could not export the coach notes',
     'err.logbook.invalid': 'Something in this entry is not valid — check it and save again',
     'err.logbook.gear_taken': 'This Zepp shoe ID already belongs to another pair',
+    'err.rings.save': 'Couldn’t save the rings image — check that your Pictures folder is writable',
   },
   {
     /* —— core —— */
@@ -689,6 +691,7 @@ const messages = defineMessages(
     'err.coach_notes.export': 'No se pudo exportar el expediente del entrenador',
     'err.logbook.invalid': 'Algo de esta entrada no es válido; revísalo y vuelve a guardar',
     'err.logbook.gear_taken': 'Este ID de zapatilla de Zepp ya pertenece a otro par',
+    'err.rings.save': 'No se pudo guardar la imagen de los anillos; comprueba que la carpeta Imágenes admite escritura',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

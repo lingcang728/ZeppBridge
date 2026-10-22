@@ -185,6 +185,8 @@ export const tauriBackend: BridgeBackend = {
   raceSave(input) { return call<number>('race_save', { input }); },
   raceDelete(id) { return call<void>('race_delete', { id }); },
   personalRecords() { return call('personal_records'); },
+  annualRings() { return call('annual_rings'); },
+  ringsSaveImage(fileStem, png) { return call('rings_save_image', { fileStem, png }); },
   trainingPlanState() { return call<TrainingPlanState>('training_plan_state'); },
   trainingPlanSaveDraft(document, pasted) { return call<string>('training_plan_save_draft', { document, pasted }); },
   trainingPlanPreview(id) { return call<PlanDraftPreview>('training_plan_preview', { id }); },

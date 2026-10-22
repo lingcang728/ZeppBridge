@@ -9,6 +9,7 @@
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
 import { onActivated, onMounted, shallowRef } from 'vue';
+import { RouterLink } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import EpochSection from '../components/journal/EpochSection.vue';
 import InjuryEditor from '../components/journal/InjuryEditor.vue';
@@ -19,11 +20,13 @@ import RecordWall from '../components/journal/RecordWall.vue';
 import ShoeEditor from '../components/journal/ShoeEditor.vue';
 import ShoeSection from '../components/journal/ShoeSection.vue';
 import { useJournalText } from '../components/journal/journal.i18n';
+import { useRingsText } from '../components/rings/rings.i18n';
 import { useLogbook } from '../composables/useLogbook';
 import type { InjuryInput, RaceInput, ShoeInput } from '../types/logbook';
 
 defineOptions({ name: 'Journal' });
 const t = useJournalText();
+const rings = useRingsText();
 const logbook = useLogbook();
 onMounted(() => { void logbook.load(); });
 onActivated(() => { void logbook.load(); });
@@ -35,7 +38,9 @@ const close = () => { editing.value = null; logbook.error.value = null; };
 
 <template>
   <section class="page journal-page" aria-labelledby="journal-title">
-    <PageHeader title-id="journal-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="journal-title" :title="t.title" :intro="t.intro">
+      <RouterLink class="pill-button quiet" :to="{ name: 'Rings' }">{{ rings.entry }} →</RouterLink>
+    </PageHeader>
     <div class="journal-grid">
       <RaceSection class="span-races" @edit="race => (editing = { kind: 'race', value: race })" />
       <RecordWall class="span-records" />

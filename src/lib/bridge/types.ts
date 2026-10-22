@@ -351,6 +351,10 @@ export interface BridgeBackend {
   raceDelete(id: number): Promise<void>;
   /** PB 墙：5K / 10K / 半马 / 全马，本机现算。 */
   personalRecords(): Promise<import('../../types/logbook').PersonalRecords>;
+  /** 年轮年度回顾：从有数据的第一年到今年，每年一圈。 */
+  annualRings(): Promise<import('../../types/rings').AnnualRings>;
+  /** 把画好的年轮 PNG 存到「图片\ZeppBridge」，返回完整路径。 */
+  ringsSaveImage(fileStem: string, png: number[]): Promise<string>;
   trainingPlanState(): Promise<TrainingPlanState>;
   trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;

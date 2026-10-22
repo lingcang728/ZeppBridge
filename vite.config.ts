@@ -85,6 +85,8 @@ export default defineConfig(async ({ mode }) => ({
           if (id.includes('echarts') || id.includes('zrender')) return 'charts';
           // Leaflet 只给运动详情的在线地图用，而且要用户手动打开；默认的 vendor 块是首屏就加载的。
           if (id.includes('/leaflet/')) return 'map';
+          // three + postprocessing 只给年轮页的粒子舞台用。
+          if (id.includes('/three/') || id.includes('/postprocessing/')) return 'particles';
           if (id.includes('/vue/') || id.includes('vue-router') || id.includes('@vue/')) {
             return 'vue';
           }
