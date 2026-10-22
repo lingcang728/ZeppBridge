@@ -59,9 +59,9 @@ const accept = (race: Race) => {
     </button>
     <p v-else class="empty">{{ t.noRace }}</p>
 
-    <ul v-if="upcoming.length > 1" class="race-list" :aria-label="t.upcoming">
+    <ul v-if="upcoming.length > 1" class="row-list" :aria-label="t.upcoming">
       <li v-for="race in upcoming.slice(1)" :key="race.id">
-        <button type="button" @click="emit('edit', asInput(race), $event.currentTarget as HTMLElement)">
+        <button type="button" class="race-row row-hit" @click="emit('edit', asInput(race), $event.currentTarget as HTMLElement)">
           <span class="rl-date">{{ journalDay(race.race_date) }}</span>
           <span class="rl-name">{{ race.name }}</span>
           <span class="rl-meta">{{ distanceName(race) }} · {{ t.daysLeft(daysBetween(today, race.race_date)) }}</span>
@@ -107,8 +107,8 @@ button { font: inherit; color: inherit; }
 .cd-days { grid-column: 2; grid-row: 1 / span 3; display: grid; justify-items: end; align-content: center; }
 .cd-days b { color: var(--training); font-family: var(--font-mono); font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
 .cd-days small { color: var(--muted); font-size: var(--fs-xs); }
-.race-list, .pending, .medals { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.race-list button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 12px; width: 100%; padding: 8px 4px; border: 0; border-top: 1px solid var(--mat-line); background: transparent; text-align: left; cursor: pointer; }
+.pending, .medals { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.race-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 12px; padding-block: 8px; }
 .rl-date { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .rl-name { color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .rl-name small { margin-left: 6px; color: var(--subtle); font-size: var(--fs-xs); }

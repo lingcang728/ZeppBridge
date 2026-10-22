@@ -31,7 +31,8 @@ const logbook = useLogbook();
 onMounted(() => { void logbook.load(); });
 onActivated(() => { void logbook.load(); });
 
-type Editing = { kind: 'race'; value: RaceInput } | { kind: 'shoe'; value: ShoeInput } | { kind: 'injury'; value: InjuryInput } | null;
+/* origin：被点的按钮 / 那一行。弹窗从它长出来、关的时候缩回去（从哪里来，回哪里去）。 */
+type Editing = ({ kind: 'race'; value: RaceInput } | { kind: 'shoe'; value: ShoeInput } | { kind: 'injury'; value: InjuryInput }) & { origin?: HTMLElement } | null;
 const editing = shallowRef<Editing>(null);
 const close = () => { editing.value = null; logbook.error.value = null; };
 </script>
@@ -39,18 +40,19 @@ const close = () => { editing.value = null; logbook.error.value = null; };
 <template>
   <section class="page journal-page" aria-labelledby="journal-title">
     <PageHeader title-id="journal-title" :title="t.title" :intro="t.intro">
-      <RouterLink class="pill-button quiet" :to="{ name: 'Rings' }">{{ rings.entry }} →</RouterLink>
+      <!-- data-morph-card：胶囊比一般的卡小，不标的话换页会从整页展开；标上就从这颗胶囊长出年轮页、返回时缩回来。 -->
+      <RouterLink class="pill-button quiet" :to="{ name: 'Rings' }" data-morph-card>{{ rings.entry }} →</RouterLink>
     </PageHeader>
     <div class="journal-grid">
-      <RaceSection class="span-races" @edit="race => (editing = { kind: 'race', value: race })" />
+      <RaceSection class="span-races" @edit="(race, origin) => (editing = { kind: 'race', value: race, origin })" />
       <RecordWall class="span-records" />
-      <ShoeSection class="span-shoes" @edit="shoe => (editing = { kind: 'shoe', value: shoe })" />
+      <ShoeSection class="span-shoes" @edit="(shoe, origin) => (editing = { kind: 'shoe', value: shoe, origin })" />
       <EpochSection class="span-epochs" />
-      <InjurySection class="span-injuries" @edit="injury => (editing = { kind: 'injury', value: injury })" />
+      <InjurySection class="span-injuries" @edit="(injury, origin) => (editing = { kind: 'injury', value: injury, origin })" />
     </div>
-    <RaceEditor v-if="editing?.kind === 'race'" :race="editing.value" @close="close" />
-    <ShoeEditor v-if="editing?.kind === 'shoe'" :shoe="editing.value" @close="close" />
-    <InjuryEditor v-if="editing?.kind === 'injury'" :injury="editing.value" @close="close" />
+    <RaceEditor v-if="editing?.kind === 'race'" :race="editing.value" :origin="editing.origin" @close="close" />
+    <ShoeEditor v-if="editing?.kind === 'shoe'" :shoe="editing.value" :origin="editing.origin" @close="close" />
+    <InjuryEditor v-if="editing?.kind === 'injury'" :injury="editing.value" :origin="editing.origin" @close="close" />
   </section>
 </template>
 
