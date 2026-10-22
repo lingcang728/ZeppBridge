@@ -134,6 +134,7 @@ fn render_with(
     }
     out.push_str("# Data\n\n");
     coach_notes_section(&mut out, document);
+    super::journal::journal_section(&mut out, document);
 
     let series_present = document
         .get("workouts")

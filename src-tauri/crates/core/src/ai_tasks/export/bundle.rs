@@ -278,6 +278,11 @@ impl Database {
         if !coach_notes.is_empty() {
             document.insert("coach_notes".into(), Value::Array(coach_notes));
         }
+        // 履历（批次 7）：用户自己写的 PB / 伤病 / 比赛 / 跑鞋 / 纪元，和教练档案一样不受类别开关管。
+        let journal = self.journal_for_ai()?;
+        if !journal.is_empty() {
+            document.insert("journal".into(), serde_json::to_value(&journal)?);
+        }
         if self.is_demo_library()? {
             document.insert("simulated_data".into(), json!(true));
         }
@@ -406,6 +411,15 @@ impl Database {
         }
         if !workout.hr_zones.is_empty() {
             object.insert("hr_zones".into(), serde_json::to_value(&workout.hr_zones)?);
+        }
+        // 用户自己打的 RPE / 酸痛（批次 7）；和手表的 `rpe` 分开。
+        if let Some((rpe, soreness)) = self.workout_feel_map()?.remove(&workout.workout_id) {
+            if let Some(rpe) = rpe {
+                object.insert("user_rpe".into(), json!(rpe));
+            }
+            if !soreness.is_empty() {
+                object.insert("soreness".into(), json!(soreness));
+            }
         }
         object.insert("sample_count".into(), json!(workout.sample_count));
         object.insert("gps_available".into(), json!(workout.gps_available));

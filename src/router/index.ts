@@ -46,6 +46,8 @@ const routes = [
   // 教练档案（批次 7，AI 记忆收件箱）：AI 经 MCP 提议、你确认的长期事实。
   { path: '/ai/memory', name: 'AiCoachNotes', component: () => import('../views/ai/AiCoachNotes.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
+  // 履历（批次 7 主观层）：比赛与奖牌墙、PB 墙、跑鞋、伤病、纪元。
+  { path: '/journal', name: 'Journal', component: () => import('../views/Journal.vue') },
   {
     path: '/body',
     name: 'BodyStatus',

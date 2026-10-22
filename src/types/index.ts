@@ -9,4 +9,5 @@ export * from './diagnostics';
 export * from './devices';
 export * from './export';
 export * from './lifeEvents';
+export * from './logbook';
 export * from './trainingPlan';

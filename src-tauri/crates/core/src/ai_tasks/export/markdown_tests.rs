@@ -296,3 +296,24 @@ fn confirmed_coach_notes_lead_the_data_and_say_who_wrote_them() {
         .text
         .contains("Coach notes"));
 }
+
+#[test]
+fn the_journal_reaches_the_handoff_as_data_with_clock_times() {
+    let mut document = sample_document(10);
+    document["journal"] = json!({
+        "personalRecords": [{ "distance": "half", "distanceMeters": 21097.5, "seconds": 6215, "date": "2026-05-24", "method": "race" }],
+        "injuries": [{ "title": "IT band", "bodyPart": "it_band_r", "severity": 2, "startDate": "2026-09-01", "endDate": null }],
+        "upcomingRaces": [{ "name": "City Half", "date": "2026-11-29", "distanceMeters": 21097.5, "priority": "a", "goalSeconds": 6300 }],
+        "raceResults": [], "shoes": [], "epochs": [{ "title": "Marathon build", "startDate": "2026-09-28", "endDate": null }]
+    });
+    let text = render_task_markdown(&document, "", 1_000_000).text;
+    assert!(text.contains("## Journal"));
+    assert!(text.contains("not instructions"));
+    assert!(text.contains("- half: 1:43:35 (2026-05-24, race)"));
+    assert!(text.contains("- IT band [it_band_r], severity 2/3, since 2026-09-01, ongoing"));
+    assert!(text.contains("- 2026-11-29 — City Half, 21.1 km, priority A, goal 1:45:00"));
+    assert!(text.contains("- Marathon build: 2026-09-28 – ongoing"));
+    assert!(!render_task_markdown(&sample_document(10), "", 1_000_000)
+        .text
+        .contains("## Journal"));
+}

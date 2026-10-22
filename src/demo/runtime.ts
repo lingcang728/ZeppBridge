@@ -25,6 +25,7 @@ import type { AiTask } from '../lib/bridge/types';
 import type { PlanPublishAction } from '../types/trainingPlan';
 import { demoBaselines, demoHeartExtremes, demoHourlySteps, demoInsight, demoTrainingBalance, demoWorkoutSeries, demoZones } from './details';
 import { createDemoOperations } from './operations';
+import { createDemoLogbook } from './logbook';
 import type { HeartRateZonePreference } from '../types';
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -132,7 +133,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     get_pending_restore: () => null,
 
     list_life_events: () => [{
-      id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', createdAt: '', updatedAt: '',
+      id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: '', updatedAt: '',
     }],
     get_health_overview: () => demoOverview(data),
     get_heart_rate_series: (args) => hoursOf(Number(args.hours ?? 24)),
@@ -213,7 +214,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     training_plan_set_ai_publish: a => plan.setAiPublish(!!a.allowed),
     training_plan_publish: (args) => plan.publish(args.action as PlanPublishAction, Boolean(args.confirmClear)),
   };
-  Object.assign(handlers, operations.handlers, {
+  Object.assign(handlers, operations.handlers, createDemoLogbook(data), {
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },

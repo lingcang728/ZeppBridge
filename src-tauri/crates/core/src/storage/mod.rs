@@ -134,6 +134,7 @@ pub mod corrections;
 pub mod coverage;
 
 pub mod life_events;
+pub mod logbook;
 
 mod migrations;
 

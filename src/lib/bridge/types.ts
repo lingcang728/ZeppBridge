@@ -334,6 +334,23 @@ export interface BridgeBackend {
   coachNoteDelete(id: number): Promise<void>;
   /** 把界面排好的 Markdown 存到桌面「ZeppBridge AI」文件夹，返回文件路径。 */
   coachNotesExport(fileStem: string, markdown: string): Promise<string>;
+  /** 履历：登记的鞋（累计里程、退役提醒）+ Zepp 里记过还没登记的鞋编号。 */
+  shoesOverview(): Promise<import('../../types/logbook').ShoeOverview>;
+  /** 存一双鞋；Zepp 鞋编号已认到别的鞋时报 `err.logbook.gear_taken`。 */
+  shoeSave(input: import('../../types/logbook').ShoeInput): Promise<number>;
+  shoeDelete(id: number): Promise<void>;
+  /** 运动详情「你的感受」：自己的 RPE、酸痛部位、这次算哪双鞋。 */
+  workoutFeelGet(workoutId: string): Promise<import('../../types/logbook').WorkoutFeel | null>;
+  workoutFeelSave(input: import('../../types/logbook').WorkoutFeelInput): Promise<void>;
+  injuriesList(): Promise<import('../../types/logbook').Injury[]>;
+  injurySave(input: import('../../types/logbook').InjuryInput): Promise<number>;
+  injuryDelete(id: number): Promise<void>;
+  /** 比赛，按日期排；过了比赛日没成绩的带一个候选运动。 */
+  racesList(): Promise<import('../../types/logbook').Race[]>;
+  raceSave(input: import('../../types/logbook').RaceInput): Promise<number>;
+  raceDelete(id: number): Promise<void>;
+  /** PB 墙：5K / 10K / 半马 / 全马，本机现算。 */
+  personalRecords(): Promise<import('../../types/logbook').PersonalRecords>;
   trainingPlanState(): Promise<TrainingPlanState>;
   trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;

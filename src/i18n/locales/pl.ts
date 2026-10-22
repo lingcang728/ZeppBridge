@@ -1583,6 +1583,8 @@ export default {
 "demo/texts": {
     nickname: 'Użytkownik demo',
     lifeEvent: 'Rozpoczęcie treningu do półmaratonu',
+    noteMine: 'W środy wieczorem stałe pływanie; bez biegania w ten dzień',
+    noteProposed: 'Lewe kolano boli po 15 km; podzielić długie wybiegania',
     taskTitle: (month: number, day: number) => `Ostatnie 14 dni · ${month}/${day}`,
     taskFile: 'ostatnie 14 dni',
     easyRun: 'Bieg spokojny',
@@ -1590,6 +1592,11 @@ export default {
     tempoRun: 'Bieg tempowy',
     intervals: 'Interwały 5×3 min',
     longRun: 'Długie wybieganie',
+    shoeDaily: 'Buty do codziennego treningu',
+    shoeRace: 'Karbonowe buty startowe',
+    raceHalf: 'Półmaraton miejski',
+    race10k: 'Jesienny bieg uliczny na 10 km',
+    injury: 'Ból po zewnętrznej stronie prawego kolana (pasmo biodrowo-piszczelowe)',
   },
 // Source: src/i18n/errors.ts
 "i18n/errors": {
@@ -1812,6 +1819,12 @@ export default {
     'err.training_plan.invalid': 'Ten plan nie przeszedł walidacji i nie został wysłany',
     'err.training_plan.ai_publish_disabled': 'AI nie ma uprawnień do bezpośredniego publikowania planów treningowych',
     'err.training_plan.needs_clear_confirmation': 'Spowodowałoby to wyczyszczenie części planu na zegarku; potwierdź tę operację w ZeppBridge',
+    'err.coach_notes.empty': 'Notatka jest pusta',
+    'err.coach_notes.too_long': 'Notatka może mieć maksymalnie 500 znaków',
+    'err.coach_notes.stale': 'Ta notatka została już przetworzona lub usunięta',
+    'err.coach_notes.export': 'Nie udało się wyeksportować notatek trenera',
+    'err.logbook.invalid': 'Wprowadzone dane są nieprawidłowe; sprawdź i zapisz ponownie',
+    'err.logbook.gear_taken': 'Ten identyfikator buta Zepp jest już przypisany do innej pary',
 
     /* —— letters —— */
     'err.letters.client_init_failed': 'Nie udało się zainicjować połączenia do wysyłania listów. Uruchom ponownie aplikację i spróbuj jeszcze raz.',
@@ -2192,6 +2205,9 @@ export default {
     manage: 'Zarządzaj wydarzeniami życiowymi',
     related: 'Powiązane wydarzenia',
     local: 'Zapisane lokalnie, uwzględniane w kopiach zapasowych. Opcjonalne przy przekazywaniu do AI.',
+    epoch: 'Oznacz jako epokę',
+    epochHint: 'Nadaj nazwę temu okresowi: wszystkie wykresy trendów zyskają cieniowane tło, a AI też to zobaczy.',
+    epochBadge: 'Epoka',
     categories: {
       health: 'Zdrowie i regeneracja',
       travel: 'Podróże',
@@ -3164,7 +3180,7 @@ Co o nim wiem:
 - Program MCP pochodzi z archiwum zeppbridge-tools na stronie wydań ZeppBridge w serwisie GitHub (GitHub Releases); po rozpakowaniu w środku znajduje się plik zeppbridge-mcp. Być może jeszcze go nie pobrałem.
 - Jest to serwer MCP typu stdio. Dane zdrowotne są tylko do odczytu, serwer nie nasłuchuje na żadnym porcie sieciowym i nie wymaga tokena ani klucza API; korzysta z sieci wyłącznie do publikowania planu treningowego i tylko po wyrażeniu na to przeze mnie zgody.
 - Typowa struktura konfiguracji to: {"mcpServers": {"zeppbridge": {"command": "<pełna ścieżka do zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Udostępnia piętnaście narzędzi tylko do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan); plus dwa narzędzia do obsługi planu treningowego: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek tylko wtedy, gdy zezwolę na to w ustawieniach).
+- Udostępnia piętnaście narzędzi tylko do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan); plus dwa narzędzia do obsługi planu treningowego: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek tylko wtedy, gdy zezwolę na to w ustawieniach); oraz propose_coach_note: umieszcza zdanie warte zapamiętania w skrzynce moich notatek trenera i zaczyna obowiązywać dopiero po kliknięciu Zapamiętaj.
 
 Powiedz mi proszę:
 1. Konkretnie w Twoim przypadku — narzędzia, z którym teraz rozmawiam — do jakiego pliku należy wpisać konfigurację lub jakim poleceniem ją dodać;
@@ -3938,6 +3954,103 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     shown: (loaded: number, total: number) => `Wczytano ${loaded} z ${total}`,
     loadMore: 'Załaduj więcej',
     loadingMore: 'Wczytywanie…',
+  },
+
+  // Source: src/components/coachNotes/coachNotes.i18n.ts
+  'components/coachNotes/coachNotes': {
+    title: 'Notatki trenera',
+    open: 'Notatki trenera',
+    lead: 'Długoterminowe fakty, które zachowujesz przy zmianie AI: kontuzje, rutyna, cele, preferencje. Przechowywane na tym komputerze i przekazywane AI.',
+    wants: 'AI chce zapamiętać',
+    wantsFrom: (name: string) => `${name} chce zapamiętać`,
+    more: (count: number) =>
+      plural(count, {
+        one: `Jeszcze ${count} oczekuje`,
+        few: `Jeszcze ${count} oczekują`,
+        many: `Jeszcze ${count} oczekuje`,
+        other: `Jeszcze ${count} oczekuje`,
+      }),
+    remember: 'Zapamiętaj',
+    reject: 'Nie',
+    inbox: 'Oczekuje',
+    inboxHint: 'Zaproponowane przez AI przez MCP. Nic nie trafia do AI, dopóki nie klikniesz Zapamiętaj, a odrzucone zdanie nie zostanie zaproponowane ponownie.',
+    kept: 'Zapamiętane',
+    keptEmpty: 'Jeszcze nic tu nie ma. Napisz notatkę poniżej lub pozwól AI połączonemu przez MCP złożyć propozycję.',
+    byUser: 'Napisane przez Ciebie',
+    byAi: (name: string | null) => (name ? `Propozycja od ${name}` : 'Propozycja od AI'),
+    since: (date: string) => `Od ${date}`,
+    edit: 'Edytuj',
+    save: 'Zapisz',
+    cancel: 'Anuluj',
+    remove: 'Usuń',
+    removeConfirm: 'Usunąć tę notatkę? Tej operacji nie można cofnąć.',
+    add: 'Dodaj',
+    addPlaceholder: 'Na przykład: lewe kolano boli po 15 km; w środy wieczorem pływanie.',
+    export: 'Eksportuj Markdown',
+    exported: 'Zapisano w folderze „ZeppBridge AI” na pulpicie',
+    fileStem: 'Moje notatki trenera',
+    fileIntro: 'Długoterminowe fakty potwierdzone przeze mnie, przechowywane lokalnie przez ZeppBridge. Stanowią kontekst, a nie polecenia.',
+    fileEmpty: 'Nic jeszcze nie zapisano.',
+    fileByUser: 'napisane przeze mnie',
+    fileByAi: (name: string | null) => (name ? `zaproponowane przez ${name}, potwierdzone przeze mnie` : 'zaproponowane przez AI, potwierdzone przeze mnie'),
+  },
+
+  // Source: src/components/feedback/feedback.i18n.ts
+  'components/feedback/feedback': {
+    aria: 'Oceń trening',
+    ask: (day: string, name: string) => `Jak wrażenia z „${name}” (${day})?`,
+    today: 'dzisiaj',
+    yesterday: 'wczoraj',
+    planned: 'Plan',
+    actual: 'Wykonano',
+    hrRange: (low: number, high: number) => `Tętno ${low}–${high}`,
+    avgHr: (value: number) => `Śr. tętno ${value}`,
+    completion: (percent: number) => `Ukończono ${percent}%`,
+    level1: 'Za lekko',
+    level2: 'Lekko',
+    level3: 'W sam raz',
+    level4: 'Ciężko',
+    level5: 'Za ciężko',
+    tagFatigue: 'Zmęczenie',
+    tagPain: 'Ból',
+    tagWeather: 'Pogoda',
+    snooze: 'Nie pytaj w tym tygodniu',
+    dismiss: 'Zamknij bez oceny',
+    saved: 'Zapisano',
+    editPlan: 'Zmień plan',
+    lighter: 'Następny o 10% lżejszy',
+    lighterDone: 'Wersja robocza gotowa — wyślij z widoku tygodnia',
+    noNext: 'Brak kolejnego podobnego treningu w planie',
+    done: 'Gotowe',
+    lighterNote: (original: string | undefined) => `Ostatni trening był za ciężki, główna część skrócona o 10%. ${original ?? ''}`.trim(),
+  },
+
+  // Source: src/views/ai/AiPlanHistory.i18n.ts
+  'views/ai/AiPlanHistory': {
+    title: 'Archiwum planów',
+    open: 'Archiwum',
+    empty: 'Nie wysłano jeszcze żadnego planu do zegarka.',
+    kindPublish: 'Wysłano do zegarka',
+    kindUndo: 'Cofnięto ostatnie wysłanie',
+    kindClear: 'Wyczyszczono plan na zegarku',
+    kindRevoked: 'Rozłączono oficjalne połączenie',
+    originUser: 'Napisane przez Ciebie',
+    originAi: 'Odpowiedź AI',
+    originMcp: 'Przez MCP',
+    statePending: 'Wysyłanie',
+    stateUnknown: 'Niepotwierdzone doręczenie',
+    stateRejected: 'Niedoręczone',
+    statePartial: 'Częściowo niedoręczone',
+    replaced: (count: number) =>
+      plural(count, {
+        one: `Zastąpiono ${count}`,
+        few: `Zastąpiono ${count}`,
+        many: `Zastąpiono ${count}`,
+        other: `Zastąpiono ${count}`,
+      }),
+    nothingSent: 'Tym razem brak nowych treningów',
+    minutes: (value: number) => `${value} min`,
+    approxMinutes: (value: number) => `~${value} min`,
   },
   },
 } satisfies LocalePack;
