@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, shallowRef } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
 import { localDateString } from '../lib/format';
 import type { LifeEvent, LifeEventInput } from '../types';
@@ -7,6 +7,8 @@ const events = ref<LifeEvent[]>([]);
 const loading = ref(false);
 const failed = ref(false);
 const draft = ref<LifeEventInput | null>(null);
+/** 编辑器从哪个元素长出来、关的时候缩回哪里（ModalDialog 的 origin）：卡头的按钮、被点的那一行。 */
+const origin = shallowRef<HTMLElement | null>(null);
 /* 胶囊与图上事件区带互相高亮（U24）。分两个方向存：图表只跟着胶囊变，胶囊只跟着图表变——
    否则悬停图表 → 改图表 → 图表重绘触发移出 → 又改回来，来回抖。 */
 const chipFocus = ref<number | null>(null);
@@ -25,7 +27,8 @@ async function reload() {
     .finally(() => { loading.value = false; pending = null; });
   return pending;
 }
-function open(event?: LifeEvent, date = localDateString(new Date())) {
+function open(event?: LifeEvent, date = localDateString(new Date()), from: HTMLElement | null = null) {
+  origin.value = from;
   draft.value = event ? { id: event.id, title: event.title, category: event.category,
     startDate: event.startDate, endDate: event.endDate, notes: event.notes, epoch: event.epoch ?? false }
     : { id: null, title: '', category: 'other', startDate: date, endDate: date, notes: '', epoch: false };
@@ -34,4 +37,4 @@ function open(event?: LifeEvent, date = localDateString(new Date())) {
 function ensureLoaded() {
   if (!loadedOnce) void reload();
 }
-export const useLifeEvents = () => ({ ensureLoaded, events, loading, loaded, failed, draft, reload, open, chipFocus, chartFocus });
+export const useLifeEvents = () => ({ ensureLoaded, events, loading, loaded, failed, draft, origin, reload, open, chipFocus, chartFocus });

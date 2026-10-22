@@ -30,9 +30,9 @@ const span = (injury: Injury) => (injury.end_date ? `${journalDay(injury.start_d
     <div class="injury-body">
       <BodyMap class="map" :model-value="hurting" :marked="healed" readonly :show-list="false" />
       <p v-if="injuries && !list.length" class="empty">{{ t.noInjury }}</p>
-      <ul v-else class="injury-list">
+      <ul v-else class="row-list">
         <li v-for="injury in list" :key="injury.id">
-          <button type="button" :class="{ ongoing: !injury.end_date }" @click="emit('edit', asInput(injury), $event.currentTarget as HTMLElement)">
+          <button type="button" :class="['injury row-hit', { ongoing: !injury.end_date }]" @click="emit('edit', asInput(injury), $event.currentTarget as HTMLElement)">
             <span class="i-title">{{ injury.title }}<em v-if="!injury.end_date">{{ t.stillHurting }}</em></span>
             <span class="i-meta">
               <template v-if="injury.body_part">{{ partName(injury.body_part) }} · </template>
@@ -46,14 +46,11 @@ const span = (injury: Injury) => (injury.end_date ? `${journalDay(injury.start_d
 </template>
 
 <style scoped>
-.injury-body { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.injury-body { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .empty { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
-.injury-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.injury-list button { display: grid; gap: 3px; width: 100%; padding: 10px 6px; border: 0; border-top: 1px solid var(--mat-line); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.injury-list li:first-child button { border-top: 0; }
-.injury-list button:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.injury { display: grid; gap: 3px; }
 .i-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .i-title em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--heart) 16%, transparent); color: var(--heart); font-size: var(--fs-2xs); font-style: normal; font-weight: 600; }
 .i-meta { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-@container journal (max-width: 560px) { .injury-body { grid-template-columns: minmax(0, 1fr); } .map { max-width: 280px; justify-self: center; width: 100%; } }
+@container journal (max-width: 560px) { .injury-body { grid-template-columns: minmax(0, 1fr); } .map { max-width: 400px; justify-self: center; width: 100%; } }
 </style>

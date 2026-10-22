@@ -66,10 +66,11 @@ const messages = defineMessages(
     severities: { '1': '轻', '2': '中', '3': '重（影响训练）' },
     startDate: '开始', endDate: '好了', since: (date: string) => `${date} 起`,
 
-    epochs: '纪元',
-    epochsHint: '给一段日子起个名（备战首马、伤后恢复），所有趋势图都垫一层底色，AI 也会知道。',
+    epochs: '纪元与事件',
+    epochsHint: '生活里的事都记在这里：一次感冒、一段旅程、一次训练变化。给一段日子起个名（备战首马、伤后恢复）就成了纪元，所有趋势图都垫一层底色，AI 也会知道。',
     addEpoch: '新纪元',
-    noEpoch: '还没有纪元。',
+    addEvent: '记一件事',
+    noEpoch: '还没有记过事，也还没有纪元。',
     dayCount: (days: number) => `${days} 天`,
 
     entry: '履历',
@@ -141,10 +142,11 @@ const messages = defineMessages(
     severities: { '1': 'Mild', '2': 'Moderate', '3': 'Severe (affects training)' },
     startDate: 'Started', endDate: 'Healed', since: (date: string) => `since ${date}`,
 
-    epochs: 'Eras',
-    epochsHint: 'Name a stretch of time (first marathon build, coming back from injury): every trend chart gets a shaded backdrop and AI sees it too.',
+    epochs: 'Eras & life events',
+    epochsHint: 'Everything that happens in life goes here: a cold, a trip, a change in training. Name a stretch of time (first marathon build, coming back from injury) and it becomes an era: every trend chart gets a shaded backdrop and AI sees it too.',
     addEpoch: 'New era',
-    noEpoch: 'No eras yet.',
+    addEvent: 'Log an event',
+    noEpoch: 'No events or eras yet.',
     dayCount: (days: number) => (days === 1 ? '1 day' : `${days} days`),
 
     entry: 'Journal',
@@ -216,10 +218,11 @@ const messages = defineMessages(
     severities: { '1': 'Leve', '2': 'Moderada', '3': 'Grave (afecta al entrenamiento)' },
     startDate: 'Empezó', endDate: 'Curada', since: (date: string) => `desde ${date}`,
 
-    epochs: 'Etapas',
-    epochsHint: 'Ponle nombre a una temporada (preparando el primer maratón, volviendo de una lesión): todas las gráficas de tendencia la sombrean y la IA también la ve.',
+    epochs: 'Etapas y eventos',
+    epochsHint: 'Todo lo que pasa en tu vida va aquí: un resfriado, un viaje, un cambio de entrenamiento. Ponle nombre a una temporada (preparando el primer maratón, volviendo de una lesión) y se vuelve una etapa: todas las gráficas de tendencia la sombrean y la IA también la ve.',
     addEpoch: 'Nueva etapa',
-    noEpoch: 'Aún no hay etapas.',
+    addEvent: 'Anotar un evento',
+    noEpoch: 'Aún no hay eventos ni etapas.',
     dayCount: (days: number) => (days === 1 ? '1 día' : `${days} días`),
 
     entry: 'Diario',

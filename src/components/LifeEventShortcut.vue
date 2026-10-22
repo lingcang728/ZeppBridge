@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 页面顶上的一排生活事件胶囊：「+ 添加事件」和这段时间里的事件（带分类色点，点开编辑）；
- * 超过三件时多一枚「相关事件 · N」跳到概览的生活事件时间线。以前是一行散落的纯文字
+ * 超过三件时多一枚「相关事件 · N」跳到履历页的「纪元与事件」。以前是一行散落的纯文字
  * 链接，右边还挂着一个「管理生活事件」小标题，每张趋势卡里又各有一份——和页面上的胶囊、
  * 玻璃不是一种东西；现在每页只有这一排。
  */
@@ -20,17 +20,28 @@ const router = useRouter();
 const today = () => localDateString(new Date());
 const rangeStart = () => { const date = new Date(); date.setDate(date.getDate() - Math.max(0, (props.days ?? 1) - 1)); return props.start || localDateString(date); };
 const related = computed(() => events.value.filter(e => overlapsEvent(e, rangeStart(), props.end || today())));
-async function manage() { await router.push('/'); requestAnimationFrame(() => document.getElementById('life-events')?.scrollIntoView({ behavior: 'smooth' })); }
+/* 生活事件的家在履历页的「纪元与事件」卡里（以前在概览底部，用户 2026-10-22 定：生活事件就是履历）。 */
+async function manage() {
+  await router.push({ name: 'Journal' });
+  // 履历页是异步挂上来的（还要等换页动画），卡出现了再滚过去；等不到就算了。
+  const until = performance.now() + 1500;
+  const seek = () => {
+    const card = document.getElementById('life-events');
+    if (card) card.scrollIntoView({ behavior: 'smooth' });
+    else if (performance.now() < until) requestAnimationFrame(seek);
+  };
+  requestAnimationFrame(seek);
+}
 onMounted(reload);
 </script>
 
 <template>
   <div class="event-shortcut">
-    <button type="button" class="pill-button" @click="open(undefined, end || today())"><Icon name="plus" :size="14" />{{ t.add }}</button>
+    <button type="button" class="pill-button" @click="open(undefined, end || today(), $event.currentTarget as HTMLElement)"><Icon name="plus" :size="14" />{{ t.add }}</button>
     <!-- 胶囊带日期（U24），悬停 / 聚焦时图上同一事件的区带加深；悬停图上的区带时这枚胶囊亮起。 -->
     <button v-for="event in related.slice(0, 3)" :key="event.id" type="button" class="event-chip"
       :class="{ 'is-linked': chartFocus === event.id }" :title="event.title"
-      :style="{ '--event-tone': eventTone(event.category) }" @click="open(event)"
+      :style="{ '--event-tone': eventTone(event.category) }" @click="open(event, undefined, $event.currentTarget as HTMLElement)"
       @mouseenter="chipFocus = event.id" @mouseleave="chipFocus = null" @focus="chipFocus = event.id" @blur="chipFocus = null">
       <i aria-hidden="true"></i><span>{{ event.title }}</span><small>{{ eventSpanLabel(event) }}</small>
     </button>
