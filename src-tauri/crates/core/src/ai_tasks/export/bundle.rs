@@ -262,6 +262,22 @@ impl Database {
                 );
             }
         }
+        // 教练档案（批次 7）：用户确认过的长期事实，不是健康数据，不受类别开关管。
+        let coach_notes: Vec<Value> = self
+            .accepted_coach_notes()?
+            .into_iter()
+            .map(|note| {
+                json!({
+                    "text": note.text,
+                    "source": note.source,
+                    "source_name": note.source_name,
+                    "since": note.decided_at.unwrap_or(note.created_at).chars().take(10).collect::<String>(),
+                })
+            })
+            .collect();
+        if !coach_notes.is_empty() {
+            document.insert("coach_notes".into(), Value::Array(coach_notes));
+        }
         if self.is_demo_library()? {
             document.insert("simulated_data".into(), json!(true));
         }

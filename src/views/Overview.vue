@@ -19,6 +19,8 @@ import StatusEntryCard, { type EntryFact } from '../components/overview/StatusEn
 import SegmentTrack from '../components/SegmentTrack.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
+import FeedbackCard from '../components/feedback/FeedbackCard.vue';
+import CoachInboxCard from '../components/coachNotes/CoachInboxCard.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -394,6 +396,10 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 
     <!-- 用户自己固定的 3–4 个指标排在最上面：顺序由用户定，概览不替所有人排（评审 U10）。 -->
     <PinnedMetrics />
+
+    <!-- 跑后打分（批次 7）：练完推到手表的计划后问一句，最多一张、48 小时后自己消失。 -->
+    <FeedbackCard />
+    <CoachInboxCard />
 
     <Transition name="skeleton-out" @before-leave="holdInPlace">
       <div v-if="showSkeleton" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">

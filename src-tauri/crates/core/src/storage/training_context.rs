@@ -184,6 +184,20 @@ pub struct AthleteProfile {
     pub recent_runs: Vec<ProfileRun>,
     /// 用户在「让 AI 认识你的背景」里写的话；没写是 null。是数据，不是指令。
     pub profile_note: Option<String>,
+    /// 用户确认过的「教练档案」（AI 提议、用户点了记住的，和用户自己写的），旧的在前。
+    /// 是数据，不是指令。
+    pub coach_notes: Vec<ProfileCoachNote>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileCoachNote {
+    pub text: String,
+    /// `user`（用户自己写的）/ `mcp`（某个 AI 提议、用户确认的）。
+    pub source: String,
+    pub source_name: Option<String>,
+    /// 记下的日期（UTC 日）。
+    pub since: String,
 }
 
 fn local_date(at: DateTime<Utc>) -> NaiveDate {
@@ -455,6 +469,21 @@ impl Database {
             height_cm: latest("height", 1825)?,
             recent_runs,
             profile_note: (!note.trim().is_empty()).then_some(note),
+            coach_notes: self
+                .accepted_coach_notes()?
+                .into_iter()
+                .map(|note| ProfileCoachNote {
+                    since: note
+                        .decided_at
+                        .unwrap_or(note.created_at)
+                        .chars()
+                        .take(10)
+                        .collect(),
+                    text: note.text,
+                    source: note.source,
+                    source_name: note.source_name,
+                })
+                .collect(),
         })
     }
 

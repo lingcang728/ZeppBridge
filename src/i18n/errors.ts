@@ -222,6 +222,10 @@ const messages = defineMessages(
     'err.training_plan.invalid': '这份计划没通过校验，没有发送',
     'err.training_plan.ai_publish_disabled': '没有允许 AI 直接发布训练计划',
     'err.training_plan.needs_clear_confirmation': '这次发布会清空手表上的一段计划，需要你在 ZeppBridge 里确认',
+    'err.coach_notes.empty': '内容是空的',
+    'err.coach_notes.too_long': '一条最多 500 字',
+    'err.coach_notes.stale': '这一条已经处理过或删掉了',
+    'err.coach_notes.export': '导出教练档案失败',
   },
   {
     /* —— core —— */
@@ -446,6 +450,10 @@ const messages = defineMessages(
     'err.training_plan.invalid': 'This plan did not pass validation and was not sent',
     'err.training_plan.ai_publish_disabled': 'AI is not allowed to publish training plans directly',
     'err.training_plan.needs_clear_confirmation': 'This would clear part of the plan on your watch; confirm it in ZeppBridge',
+    'err.coach_notes.empty': 'The note is empty',
+    'err.coach_notes.too_long': 'A note can be at most 500 characters',
+    'err.coach_notes.stale': 'This note was already handled or deleted',
+    'err.coach_notes.export': 'Could not export the coach notes',
   },
   {
     /* —— core —— */
@@ -671,6 +679,10 @@ const messages = defineMessages(
     'err.training_plan.invalid': 'Este plan no pasó la validación y no se envió',
     'err.training_plan.ai_publish_disabled': 'La IA no tiene permiso para publicar planes directamente',
     'err.training_plan.needs_clear_confirmation': 'Esto borraría parte del plan de tu reloj; confírmalo en ZeppBridge',
+    'err.coach_notes.empty': 'La nota está vacía',
+    'err.coach_notes.too_long': 'Una nota puede tener como máximo 500 caracteres',
+    'err.coach_notes.stale': 'Esta nota ya se gestionó o se eliminó',
+    'err.coach_notes.export': 'No se pudo exportar el expediente del entrenador',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

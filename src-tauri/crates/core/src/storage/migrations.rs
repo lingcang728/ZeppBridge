@@ -1282,6 +1282,49 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(41,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v42（批次 7：让理解留在本地）。
+        //
+        // `workout_feedback`：跑后打分，用户对一次运动「感觉怎么样」。
+        // 和运动类型纠正一样是用户自己的东西：**不挂外键到 workouts**（重放会删了再插运动行），
+        // 保留期清理和重放都不碰它。`plan_workout_id` 指向只增不改的计划行，所以计划以后
+        // 改了，这条打分仍然对得上当时推到手表的那一份。`state`：`rated` 打了分 / `dismissed`
+        // 没打就关掉了（同一条不再问）。评分 1–5 = 太轻松 → 太难。`adjustment`：因为这次打分
+        // 对计划做了什么（目前只有 `lighter_10`：下次同类减 10%，起草后由用户确认再发）。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_feedback (
+                workout_id TEXT PRIMARY KEY,
+                plan_workout_id INTEGER,
+                state TEXT NOT NULL CHECK(state IN ('rated', 'dismissed')),
+                rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+                tags TEXT NOT NULL DEFAULT '[]',
+                note TEXT,
+                adjustment TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK(state = 'dismissed' OR rating IS NOT NULL)
+             );
+             CREATE INDEX IF NOT EXISTS idx_workout_feedback_plan
+                 ON workout_feedback(plan_workout_id);
+             -- AI 记忆收件箱：AI 只能提议（proposed），用户确认才算数（accepted）。
+             -- 拒绝的留着（rejected）：同一句话不会被反复提议。来源 user / mcp，
+             -- source_name 是 MCP 客户端自报的名字（Claude Desktop、Cursor……），只用来显示。
+             CREATE TABLE IF NOT EXISTS coach_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('proposed', 'accepted', 'rejected')),
+                source TEXT NOT NULL CHECK(source IN ('user', 'mcp')),
+                source_name TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                decided_at TEXT
+             );
+             CREATE INDEX IF NOT EXISTS idx_coach_notes_state ON coach_notes(state, id);
+             PRAGMA user_version = 42;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(42,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

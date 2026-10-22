@@ -32,6 +32,7 @@ import { usePlanText } from '../../components/plan/usePlanText';
 import { foreignToUi, langOf } from '../../lib/trainingPlan/foreignText';
 import { issueDate } from '../../lib/trainingPlan/week';
 import { planIssueText } from '../../lib/trainingPlan/issues';
+import { usePlanHistoryText } from './AiPlanHistory.i18n';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiPlanWeek' });
@@ -44,6 +45,7 @@ const t = useBridgeText();
 const h = useHubText();
 const { t: pt } = usePlanText();
 const l = useLibraryText();
+const ht = usePlanHistoryText();
 /** 没有计划时用一条训练起一份新草稿：管今天起的 7 天，训练放在今天。 */
 const library = usePlanAdd((workout) => plan.startDraft({
   format: 'zeppbridge-plan/3', from: hub.today.value, to: addDays(hub.today.value, 6),
@@ -101,6 +103,7 @@ const changes = computed(() => (plan.editingSent.value
         <PlanStatusChip ref="chip" :state="plan.state.value" :drafting="!!plan.preview.value && plan.accepted.value" :busy="plan.busy.value" :sending="sending" :simulated="hub.demo.value"
           :discardable="!!plan.preview.value && plan.accepted.value" @undo="plan.undo()" @clear="plan.clear()" @discard="plan.discard()" />
         <ReceiveCapsule v-if="hub.future.value" variant="pill" :target="landing" @received="received" />
+        <RouterLink class="pill-button quiet" to="/ai/plan/history"><Icon name="clock" :size="14" />{{ ht.open }}</RouterLink>
       </div>
     </PageHeader>
     <div v-if="plan.preview.value && !plan.accepted.value" class="ai-message"><Icon name="spark" :size="16" /><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>

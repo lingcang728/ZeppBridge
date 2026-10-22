@@ -154,9 +154,48 @@ fn task_scope_refuses_every_coach_tool() {
         ("get_training_plan", json!({})),
         ("draft_training_plan", json!({ "plan": easy_run_plan() })),
         ("publish_training_plan", json!({ "draftId": "plan-x" })),
+        ("propose_coach_note", json!({ "note": "左膝会痛" })),
     ] {
         let result = library.call(&AccessScope::TaskScoped, name, args);
         assert_eq!(result["isError"], true, "{name} 在 task 范围里应当被拒");
     }
     assert_eq!(open_drafts(&library), 0, "task 范围里的起草不能写库");
+    let db = Database::open_read_only(library.0.join("zepp.db")).unwrap();
+    assert!(db.proposed_coach_notes().unwrap().is_empty());
+}
+
+#[test]
+fn a_proposed_note_waits_in_the_inbox_until_the_user_accepts_it() {
+    let library = TestLibrary::empty();
+    let first = library.call(
+        &AccessScope::FullReadOnly,
+        "propose_coach_note",
+        json!({ "note": "左膝跑 15 km 以上会痛" }),
+    );
+    assert_eq!(ok(&first)["outcome"]["outcome"], "proposed");
+    let again = library.call(
+        &AccessScope::FullReadOnly,
+        "propose_coach_note",
+        json!({ "note": "左膝跑 15 km 以上会痛" }),
+    );
+    assert_eq!(ok(&again)["outcome"]["outcome"], "already_proposed");
+
+    // 没点「记住」之前，档案里没有它。
+    let profile = library.call(&AccessScope::FullReadOnly, "get_athlete_profile", json!({}));
+    assert_eq!(ok(&profile)["coachNotes"], json!([]));
+
+    let id = {
+        let db = Database::open_read_only(library.0.join("zepp.db")).unwrap();
+        db.proposed_coach_notes().unwrap()[0].id
+    };
+    Database::open_migrated(&library.0.join("zepp.db"))
+        .unwrap()
+        .decide_coach_note(id, true)
+        .unwrap();
+    let profile = library.call(&AccessScope::FullReadOnly, "get_athlete_profile", json!({}));
+    assert_eq!(
+        ok(&profile)["coachNotes"][0]["text"],
+        "左膝跑 15 km 以上会痛"
+    );
+    assert_eq!(ok(&profile)["coachNotes"][0]["source"], "mcp");
 }

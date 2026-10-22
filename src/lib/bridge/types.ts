@@ -315,6 +315,25 @@ export interface BridgeBackend {
   aiProfileSave(note: string): Promise<void>;
   trainingPlanAdherence(from: string, to: string): Promise<import('../../types/timeBridge').AdherenceDay[]>;
   trainingPlanUpdateDraft(id: string, document: PlanDocument): Promise<boolean>;
+  /** 推过的每一份计划（留档），新的在前。 */
+  trainingPlanHistory(limit?: number): Promise<import('../../types/feedback').PlanHistoryEntry[]>;
+  /** 跑后打分：现在该问哪一条（最多一条，48 小时内、对得上计划、没打过）。 */
+  workoutFeedbackPrompt(): Promise<import('../../types/feedback').FeedbackPrompt | null>;
+  workoutFeedbackGet(workoutId: string): Promise<import('../../types/feedback').WorkoutFeedback | null>;
+  workoutFeedbackSave(input: import('../../types/feedback').FeedbackInput): Promise<void>;
+  workoutFeedbackDismiss(workoutId: string): Promise<void>;
+  /** 「这周别问」：返回到哪天为止（下周一）。 */
+  workoutFeedbackSnooze(): Promise<string>;
+  workoutFeedbackAdjusted(workoutId: string, adjustment: import('../../types/feedback').FeedbackAdjustment): Promise<void>;
+  /** 教练档案（AI 记忆收件箱）：记住的 + 等确认的。 */
+  coachNotesList(): Promise<import('../../types/coachNotes').CoachNotes>;
+  coachNoteAdd(text: string): Promise<number>;
+  /** 记住 / 不要一条 AI 的提议。已经处理过的报 `err.coach_notes.stale`。 */
+  coachNoteDecide(id: number, accept: boolean): Promise<void>;
+  coachNoteEdit(id: number, text: string): Promise<void>;
+  coachNoteDelete(id: number): Promise<void>;
+  /** 把界面排好的 Markdown 存到桌面「ZeppBridge AI」文件夹，返回文件路径。 */
+  coachNotesExport(fileStem: string, markdown: string): Promise<string>;
   trainingPlanState(): Promise<TrainingPlanState>;
   trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;

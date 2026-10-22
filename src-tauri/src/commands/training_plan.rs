@@ -282,6 +282,18 @@ pub(crate) async fn forget_after_revoke(state: &AppState) {
     }
 }
 
+/// 推过的每一份计划（留档），新的在前。
+#[tauri::command]
+pub async fn training_plan_history(
+    state: tauri::State<'_, AppState>,
+    limit: Option<usize>,
+) -> Result<Vec<zeppbridge_core::storage::training_plan::PlanHistoryEntry>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.plan_history(limit.unwrap_or(60))
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn training_plan_adherence(
     state: tauri::State<'_, AppState>,

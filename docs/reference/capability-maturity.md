@@ -21,6 +21,8 @@
 | Backup, verify, queued restore | ✓ | ✓ | ✗ | — | — | n/a |
 | Life-event logging | ✓ | ✓ read/write | ✗ | ✓ read-only (refused in task scope) | — | refused |
 | Training plan drafting / sending to the watch | ✓ | ✓ paste the AI reply, week view, per-day tuning | ✗ | ✓ drafting; publishing needs the user to turn on "Let AI publish directly" | — | refused |
+| Post-workout rating | ✓ | ✓ overview card, plan archive | ✗ | ✓ read in `get_training_plan` (`recentFeedback`) | — | refused |
+| Coach notes (AI memory inbox) | ✓ | ✓ confirm / edit / delete / export Markdown; included in the AI handoff `.md` | ✗ | ✓ `propose_coach_note` (a proposal only; the user confirms) | — | refused |
 | Account ownership (one account per library) | ✓ | ✓ | ✓ checked before sync | — | — | n/a |
 
 Legend: ✓ wired; ✗ not wired, use the desktop app; — not done by design.

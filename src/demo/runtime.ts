@@ -56,6 +56,12 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   let nextId = 1;
   let status = demoStatus(data);
   let demoPicks: unknown[] = [];
+  const feedbackDone = new Set<string>();
+  /* 教练档案：演示里收件箱有一条 AI 的提议、档案里有一条自己写的。 */
+  const coachNotes: import('../types/coachNotes').CoachNote[] = [
+    { id: 1, text: demoText().noteMine, state: 'accepted', source: 'user', source_name: null, created_at: '2026-10-12T12:00:00Z', updated_at: '2026-10-12T12:00:00Z', decided_at: '2026-10-12T12:00:00Z' },
+    { id: 2, text: demoText().noteProposed, state: 'proposed', source: 'mcp', source_name: 'Claude', created_at: '2026-10-21T09:00:00Z', updated_at: '2026-10-21T09:00:00Z', decided_at: null },
+  ];
 
   const emit = (event: string, payload: unknown) => {
     for (const id of listeners.get(event) ?? []) callbacks.get(id)?.({ event, id: 0, payload });
@@ -164,6 +170,27 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     ai_exchange_list: () => [],
     training_plan_adherence: a => data.workouts.filter(w => w.start_time.slice(0, 10) >= String(a.from) && w.start_time.slice(0, 10) <= String(a.to)).map(w => ({ date: dayKey(new Date(w.start_time)), planned: { name: w.effective_type, sport: w.effective_type, seconds: w.moving_seconds, hr_low: 130, hr_high: 150 }, actual: [{ workout_id: w.workout_id, seconds: w.moving_seconds, avg_hr: w.avg_hr, sport: w.effective_type, compatible: true }], verdict: 'done' })),
     training_plan_update_draft: (args) => plan.updateDraft(args.document as import('../types/trainingPlan').PlanDocument),
+    /* 跑后打分：演示里拿最近一次跑步当「练完了计划」，打分 / 关掉 / 这周别问后不再问。 */
+    workout_feedback_prompt: () => {
+      const run = data.workouts.find(w => w.effective_type.includes('running'));
+      if (!run || feedbackDone.has(run.workout_id)) return null;
+      const seconds = run.moving_seconds ?? 1800;
+      return { date: dayKey(new Date(run.start_time)), planned: { plan_workout_id: 1, name: 'Tempo 6×800m', sport: 'running', seconds: Math.round(seconds / 0.92 / 60) * 60, meters: null, hr_low: 145, hr_high: 160 },
+        actual: { workout_id: run.workout_id, sport: run.effective_type, start_time: run.start_time, end_time: run.end_time, seconds, meters: run.distance_meters ?? null, avg_hr: run.avg_hr ?? null },
+        completion: 0.92, completion_basis: 'duration', expires_at: new Date(Date.parse(run.end_time) + 48 * 3600e3).toISOString() };
+    },
+    workout_feedback_get: () => null,
+    workout_feedback_save: a => { feedbackDone.add(String((a.input as { workout_id: string }).workout_id)); },
+    workout_feedback_dismiss: a => { feedbackDone.add(String(a.workoutId)); },
+    workout_feedback_snooze: () => { data.workouts.forEach(w => feedbackDone.add(w.workout_id)); return dayKey(new Date(data.now.getTime() + 7 * 864e5)); },
+    workout_feedback_adjusted: () => null,
+    training_plan_history: () => [],
+    coach_notes_list: () => ({ accepted: coachNotes.filter(n => n.state === 'accepted'), proposed: coachNotes.filter(n => n.state === 'proposed').reverse() }),
+    coach_note_add: a => { const id = coachNotes.length + 1; const now = new Date().toISOString(); coachNotes.push({ id, text: String(a.text).trim(), state: 'accepted', source: 'user', source_name: null, created_at: now, updated_at: now, decided_at: now }); return id; },
+    coach_note_decide: a => { const note = coachNotes.find(n => n.id === Number(a.id)); if (note) { note.state = a.accept ? 'accepted' : 'rejected'; note.decided_at = new Date().toISOString(); } },
+    coach_note_edit: a => { const note = coachNotes.find(n => n.id === Number(a.id)); if (note) note.text = String(a.text).trim(); },
+    coach_note_delete: a => { const at = coachNotes.findIndex(n => n.id === Number(a.id)); if (at >= 0) coachNotes.splice(at, 1); },
+    coach_notes_export: a => `C:/Users/demo/Desktop/ZeppBridge AI/${String(a.fileStem)}.md`,
     'plugin:clipboard-manager|read_text': () => clipboard,
     'plugin:clipboard-manager|write_text': a => { clipboard = String(a.text ?? ''); },
     ai_template_list: () => demoTemplates(),

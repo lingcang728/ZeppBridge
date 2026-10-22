@@ -291,7 +291,8 @@ fn coach_tool_definitions() -> Vec<Value> {
             "description": format!(
                 "运动员档案：手表自报与近一年实测的最大心率、静息心率（最近一天与 30 天均值）、\
                  手表设定的心率区间边界、乳酸阈值心率与配速（s/km）、VO₂max（手表估算）、身高体重、\
-                 近 90 天的跑步（距离、移动时间、配速、心率、爬升，最多 40 条），以及用户写给 AI 的背景。\
+                 近 90 天的跑步（距离、移动时间、配速、心率、爬升，最多 40 条）、用户写给 AI 的背景，\
+                 以及用户确认过的教练档案（coachNotes：AI 提议后用户点了记住的、和用户自己写的）。\
                  排训练强度前先读它。{missing}"
             ),
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -341,6 +342,25 @@ fn coach_tool_definitions() -> Vec<Value> {
                 "additionalProperties": false
             },
             "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": true, "openWorldHint": true }
+        }),
+        json!({
+            "name": "propose_coach_note",
+            "description": format!(
+                "提议让 ZeppBridge 记住一句关于用户的长期事实或偏好（伤病史、作息、目标、喜欢 / 不喜欢的训练……），\
+                 换任何 AI 都带得走。只是提议：放进用户的收件箱，用户在 ZeppBridge 里点了「记住」才会出现在\
+                 get_athlete_profile 的 coachNotes 里；用户拒绝过的同一句话不能再提。一条一句、写成第三人称的事实\
+                 （例：「左膝跑 15 km 以上会痛」），最多 500 字；不要记一次性的数据（今天的心率、某次运动），\
+                 那些本来就在健康数据里。不写任何健康数据表。{missing}"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "note": { "type": "string", "description": "要记住的一句话。" }
+                },
+                "required": ["note"],
+                "additionalProperties": false
+            },
+            "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
         }),
     ]
 }

@@ -376,4 +376,23 @@ impl Workout {
     pub fn total_seconds(&self) -> Option<u64> {
         self.steps.iter().map(StepNode::seconds).sum()
     }
+
+    /// 全部按距离计的总米数；有任何一步按时间计就是 `None`（同样不估算）。
+    pub fn total_meters(&self) -> Option<u64> {
+        let meters = |step: &Step| match step.length {
+            StepLength::Distance { meters } => Some(u64::from(meters)),
+            StepLength::Time { .. } => None,
+        };
+        self.steps
+            .iter()
+            .map(|node| match node {
+                StepNode::Step(step) => meters(step),
+                StepNode::Repeat { times, steps } => steps
+                    .iter()
+                    .map(meters)
+                    .sum::<Option<u64>>()
+                    .map(|total| total * u64::from(*times)),
+            })
+            .sum()
+    }
 }
