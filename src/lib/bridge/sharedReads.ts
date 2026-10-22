@@ -22,7 +22,7 @@ const SHARED = new Set([
 ]);
 
 /** 这些前缀 / 命令只读，完成时不算「状态变了」。其余命令完成都当作可能写过。 */
-const READ_ONLY = /^(get_|list_|plugin:event\||plugin:app\||app_is_ready$|ai_task_list$|ai_exchange_list$|training_plan_state$|shoes_overview$|workout_feel_get$|injuries_list$|races_list$|personal_records$)/;
+const READ_ONLY = /^(get_|list_|plugin:event\||plugin:app\||app_is_ready$|ai_task_list$|ai_exchange_list$|training_plan_state$|shoes_overview$|workout_feel_get$|injuries_list$|races_list$|personal_records$|annual_rings$)/;
 
 export const REUSE_MS = 1000;
 

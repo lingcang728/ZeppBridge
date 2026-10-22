@@ -2,6 +2,7 @@
 import type { DemoData } from './dataset';
 import type { DemoHandler } from './operations';
 import { at, dayKey, iso } from './rng';
+import { demoAnnualRings } from './rings';
 import { demoText } from './texts';
 import type {
   Injury, InjuryInput, PersonalRecords, Race, RaceInput, ShoeInput, ShoeSummary, WorkoutFeel, WorkoutFeelInput,
@@ -87,5 +88,11 @@ export const createDemoLogbook = (data: DemoData): Record<string, DemoHandler> =
     race_save: a => { const [next, id] = upsert(races, a.input as RaceInput); races = next; return id; },
     race_delete: a => { races = races.filter(r => r.id !== Number(a.id)); },
     personal_records: () => records(),
+    annual_rings: () => demoAnnualRings(
+      data,
+      races.filter(r => r.result_seconds !== null).map(r => ({ name: r.name, date: r.race_date, seconds: r.result_seconds! })),
+      records().records.flatMap(row => (row.best ? [[row.key, row.best.date] as [typeof row.key, string]] : [])),
+    ),
+    rings_save_image: a => `C:/Users/demo/Pictures/ZeppBridge/${String(a.fileStem)}.png`,
   };
 };

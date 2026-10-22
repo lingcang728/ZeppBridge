@@ -48,6 +48,8 @@ const routes = [
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
   // 履历（批次 7 主观层）：比赛与奖牌墙、PB 墙、跑鞋、伤病、纪元。
   { path: '/journal', name: 'Journal', component: () => import('../views/Journal.vue') },
+  // 年轮年度回顾（批次 7）：一年一圈年轮、一次运动一颗星。
+  { path: '/rings', name: 'Rings', component: () => import('../views/Rings.vue') },
   {
     path: '/body',
     name: 'BodyStatus',

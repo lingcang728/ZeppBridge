@@ -9,6 +9,7 @@ import WeeklyReportCard from '../WeeklyReportCard.vue';
 import LifeEventsPanel from '../LifeEventsPanel.vue';
 import SourcesStrip from './SourcesStrip.vue';
 import JournalEntryCard from './JournalEntryCard.vue';
+import RingsSeasonCard from './RingsSeasonCard.vue';
 import StatusEntryCard, { type EntryFact } from './StatusEntryCard.vue';
 
 type Entry = {
@@ -38,6 +39,7 @@ withDefaults(defineProps<{
       <StatusEntryCard to="/training" tone="training" icon="training-load" :aria-label="trainingAria" :title="trainingTitle"
         :facts="training.facts" :caption="training.caption" />
     </div>
+    <RingsSeasonCard />
     <JournalEntryCard />
     <!-- 「添加事件」只留生活事件卡右上角那一枚：以前卡片上面还挂着一排快捷胶囊，两个按钮做同一件事。 -->
     <LifeEventsPanel />
