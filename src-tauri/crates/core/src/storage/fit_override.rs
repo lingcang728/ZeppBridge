@@ -248,7 +248,8 @@ impl Database {
             .map(|imported| imported.decoded))
     }
 
-    /// 本机最新的一份云端明细，按入库时的同一套参数解码。
+    /// 本机的云端明细，按入库时的同一套参数解码。两条通道都有时取高级通道那份（字段更全，
+    /// 和入库时的优先级一致，见 `has_legacy_workout_detail`），同一通道里取最新的。
     fn decode_cloud_detail(&self, workout_id: &str) -> Result<Option<DecodedWorkout>> {
         let legacy_prefix = format!("workout_detail:{workout_id}:");
         let official_key = format!(
@@ -258,10 +259,12 @@ impl Database {
         let row: Option<(i64, String)> = self
             .conn
             .query_row(
-                "SELECT id, source_key FROM raw_records
-                  WHERE stream = 'workout_detail'
-                    AND (substr(source_key, 1, length(?1)) = ?1 OR source_key = ?2)
-                  ORDER BY fetched_at DESC, id DESC LIMIT 1",
+                "SELECT r.id, r.source_key FROM raw_records r
+                  WHERE r.stream = 'workout_detail'
+                    AND (substr(r.source_key, 1, length(?1)) = ?1 OR r.source_key = ?2)
+                    AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)
+                  ORDER BY (substr(r.source_key, 1, length(?1)) = ?1) DESC, r.fetched_at DESC, r.id DESC
+                  LIMIT 1",
                 params![legacy_prefix, official_key],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -273,14 +276,19 @@ impl Database {
             return Ok(None);
         };
         let payload: serde_json::Value = serde_json::from_str(&decode_raw_payload(stored, zip)?)?;
-        let payload = if workout_id_from_detail_key(&source_key).is_some() {
+        let legacy = workout_id_from_detail_key(&source_key).is_some();
+        let payload = if legacy {
             payload
         } else {
             Normalizer::official_detail_as_legacy(&payload)
         };
         let summary_end = self.workout_end_time(workout_id)?;
         let summary_distance = self.workout_distance_meters(workout_id)?;
-        Ok(decode_workout_detail(&payload, summary_end, summary_distance).ok())
+        let mut decoded = decode_workout_detail(&payload, summary_end, summary_distance).ok();
+        if let (false, Some(decoded)) = (legacy, decoded.as_mut()) {
+            super::official::drop_unreconciled_distance(decoded, summary_distance);
+        }
+        Ok(decoded)
     }
 }
 
