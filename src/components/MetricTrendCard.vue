@@ -181,6 +181,14 @@ const option = computed(() => {
     if (covered.length === 1) {
       lines.push({ xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
         lineStyle: { color, width: lit ? 3 : 2, type: 'solid', opacity: lit ? 0.85 : 0.5 } });
+    } else if (event.epoch) {
+      /* 纪元（批次 7）：一整段更淡的底色，名字小字写在区带里面的左上角（在画布内，不会被裁）。 */
+      areas.push([
+        { xAxis: covered[0], name: event.title, eventId: event.id, emphasis,
+          label: { show: true, position: 'insideTopLeft', formatter: event.title, color: palette.axis, fontSize: 10, padding: [4, 6, 0, 6], overflow: 'truncate' },
+          itemStyle: { color, opacity: lit ? 0.22 : 0.07 } },
+        { xAxis: covered[covered.length - 1] },
+      ]);
     } else {
       areas.push([
         { xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,

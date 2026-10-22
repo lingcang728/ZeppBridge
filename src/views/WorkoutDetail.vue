@@ -14,6 +14,7 @@ import WorkoutClimbsCard from '../components/workout/WorkoutClimbsCard.vue';
 import WorkoutHero from '../components/workout/WorkoutHero.vue';
 import WorkoutRouteCard from '../components/workout/WorkoutRouteCard.vue';
 import WorkoutSidePanels from '../components/workout/WorkoutSidePanels.vue';
+import WorkoutFeelCard from '../components/workout/WorkoutFeelCard.vue';
 import WorkoutProvenanceCard from '../components/workout/WorkoutProvenanceCard.vue';
 import AskAiButton from '../components/ask/AskAiButton.vue';
 import { workoutLabel } from '../lib/labels';
@@ -149,6 +150,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           @export="exportRecord"
         >
           <template #after>
+            <WorkoutFeelCard :workout-id="workoutId" />
             <WorkoutProvenanceCard v-if="!metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" :fit="fit" @replace-fit="fit.replace" @restore-fit="fit.restore" />
           </template>
         </WorkoutSidePanels>

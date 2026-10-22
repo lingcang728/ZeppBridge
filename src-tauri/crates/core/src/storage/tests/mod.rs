@@ -70,6 +70,7 @@ mod devices;
 mod event_windows;
 mod export;
 mod fit_override;
+mod logbook;
 mod metrics;
 mod official;
 mod queries;

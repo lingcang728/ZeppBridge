@@ -30,6 +30,7 @@ use std::path::{Path, PathBuf};
 mod bundle;
 mod gather;
 mod helpers;
+mod journal;
 pub mod markdown;
 
 pub(crate) use helpers::*;

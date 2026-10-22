@@ -1319,8 +1319,69 @@ impl Database {
                 decided_at TEXT
              );
              CREATE INDEX IF NOT EXISTS idx_coach_notes_state ON coach_notes(state, id);
+             -- 主观层（批次 7）：跑鞋、每次运动的感受、伤病、比赛。全是用户自己写的，
+             -- 和打分一样不挂外键到 workouts，重放、保留期清理都不碰。
+             -- 跑鞋：`sport` 是鞋的用途（running / trail / walking / hiking）；`zepp_gear_id`
+             -- 把 Zepp 摘要里的 gearId 认到这双鞋（云端只给编号不给名字）；`start_km` 是登记前
+             -- 已经跑过的里程；`retire_km` 是提醒退役的里程（默认 700，常见 600–800）。
+             CREATE TABLE IF NOT EXISTS shoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                zepp_gear_id TEXT,
+                start_km REAL NOT NULL DEFAULT 0,
+                retire_km REAL NOT NULL DEFAULT 700,
+                started_on TEXT NOT NULL,
+                retired_on TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             -- 一次运动的感受：自己的 RPE（1–10，手表记的在 workouts.rpe，不覆盖它）、
+             -- 酸痛部位（人形图上的部位编号，JSON 数组）、穿哪双鞋。`shoe_mode`：
+             -- auto 按 Zepp 编号 / 默认鞋认，none 明说没穿登记过的鞋，chosen 指定 `shoe_id`。
+             CREATE TABLE IF NOT EXISTS workout_annotations (
+                workout_id TEXT PRIMARY KEY,
+                rpe INTEGER CHECK(rpe BETWEEN 1 AND 10),
+                soreness TEXT NOT NULL DEFAULT '[]',
+                shoe_mode TEXT NOT NULL DEFAULT 'auto' CHECK(shoe_mode IN ('auto', 'none', 'chosen')),
+                shoe_id INTEGER,
+                updated_at TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS injuries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body_part TEXT,
+                severity INTEGER CHECK(severity BETWEEN 1 AND 3),
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK(end_date IS NULL OR end_date >= start_date)
+             );
+             -- 比赛：报了名的、跑完的。`result_seconds` 是用户填的成绩（官方成绩优先于手表），
+             -- `workout_id` 是认到的那次运动。
+             CREATE TABLE IF NOT EXISTS races (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                race_date TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                distance_m REAL,
+                goal_seconds INTEGER,
+                priority TEXT NOT NULL DEFAULT 'a' CHECK(priority IN ('a', 'b', 'c')),
+                result_seconds INTEGER,
+                workout_id TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_races_date ON races(race_date);
              PRAGMA user_version = 42;",
         )?;
+        // 纪元：给一段日子起名（「备战首马」「伤后恢复」），图表铺一层底色。就是生活事件多一个标记。
+        self.ensure_table_columns("life_events", &[("epoch", "INTEGER NOT NULL DEFAULT 0")])?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(42,?1)",
             [Utc::now().to_rfc3339()],

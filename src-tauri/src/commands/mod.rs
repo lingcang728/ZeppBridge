@@ -223,5 +223,11 @@ pub(crate) use feedback::{
     workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
 };
 
+mod logbook;
+pub(crate) use logbook::{
+    injuries_list, injury_delete, injury_save, personal_records, race_delete, race_save,
+    races_list, shoe_delete, shoe_save, shoes_overview, workout_feel_get, workout_feel_save,
+};
+
 mod life_events;
 pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};

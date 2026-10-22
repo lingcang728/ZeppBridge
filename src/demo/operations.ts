@@ -22,7 +22,7 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
   const tasks = new Map<string, AiTask>([[initial.id, initial]]), pinned = new Set<string>([initial.id]);
   const templates = new Map<string, AiTaskTemplate>();
   const events: LifeEvent[] = [
-    { id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', createdAt: now(), updatedAt: now() },
+    { id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: now(), updatedAt: now() },
   ];
   const exchanges: AiExchange[] = [{ id: 'demo-exchange-1', task_id: initial.id, provider: 'ChatGPT', question: initial.title, days_before: 14,
     categories: initial.categories, workout_ids: [], personal_note: '', sent_at: now(), md_path: 'ZeppBridge.md',

@@ -27,8 +27,8 @@ async function reload() {
 }
 function open(event?: LifeEvent, date = localDateString(new Date())) {
   draft.value = event ? { id: event.id, title: event.title, category: event.category,
-    startDate: event.startDate, endDate: event.endDate, notes: event.notes }
-    : { id: null, title: '', category: 'other', startDate: date, endDate: date, notes: '' };
+    startDate: event.startDate, endDate: event.endDate, notes: event.notes, epoch: event.epoch ?? false }
+    : { id: null, title: '', category: 'other', startDate: date, endDate: date, notes: '', epoch: false };
 }
 /** 趋势图要画事件区带，但不是每页都有事件胶囊（它负责 reload）：没读过就读一次。 */
 function ensureLoaded() {

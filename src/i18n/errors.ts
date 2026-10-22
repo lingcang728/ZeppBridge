@@ -226,6 +226,8 @@ const messages = defineMessages(
     'err.coach_notes.too_long': '一条最多 500 字',
     'err.coach_notes.stale': '这一条已经处理过或删掉了',
     'err.coach_notes.export': '导出教练档案失败',
+    'err.logbook.invalid': '填的内容不对，检查一下再存',
+    'err.logbook.gear_taken': '这个 Zepp 鞋编号已经认到另一双鞋上了',
   },
   {
     /* —— core —— */
@@ -454,6 +456,8 @@ const messages = defineMessages(
     'err.coach_notes.too_long': 'A note can be at most 500 characters',
     'err.coach_notes.stale': 'This note was already handled or deleted',
     'err.coach_notes.export': 'Could not export the coach notes',
+    'err.logbook.invalid': 'Something in this entry is not valid — check it and save again',
+    'err.logbook.gear_taken': 'This Zepp shoe ID already belongs to another pair',
   },
   {
     /* —— core —— */
@@ -683,6 +687,8 @@ const messages = defineMessages(
     'err.coach_notes.too_long': 'Una nota puede tener como máximo 500 caracteres',
     'err.coach_notes.stale': 'Esta nota ya se gestionó o se eliminó',
     'err.coach_notes.export': 'No se pudo exportar el expediente del entrenador',
+    'err.logbook.invalid': 'Algo de esta entrada no es válido; revísalo y vuelve a guardar',
+    'err.logbook.gear_taken': 'Este ID de zapatilla de Zepp ya pertenece a otro par',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

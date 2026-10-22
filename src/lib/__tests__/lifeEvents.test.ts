@@ -4,7 +4,7 @@ import { setLocale } from '../../i18n';
 import type { LifeEventInput } from '../../types';
 
 const event: LifeEventInput = { id: null, title: 'Resfriado', category: 'health',
-  startDate: '2026-09-01', endDate: '2026-09-05', notes: '' };
+  startDate: '2026-09-01', endDate: '2026-09-05', notes: '', epoch: false };
 
 describe('life events calendar context', () => {
   it('includes either boundary and open ranges without timezone conversion', () => {

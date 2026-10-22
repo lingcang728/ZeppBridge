@@ -73,7 +73,7 @@ onActivated(reload);
               {{ date(event.startDate) }}<template v-if="event.endDate !== event.startDate"> — {{ event.endDate ? date(event.endDate) : t.active }}</template>
             </span>
           </span>
-          <span class="le-kind">{{ t.categories[event.category] }}</span>
+          <span class="le-kind">{{ t.categories[event.category] }}<template v-if="event.epoch"> · {{ t.epochBadge }}</template></span>
           <span v-if="event.notes" class="le-notes">{{ event.notes }}</span>
         </button>
       </li>

@@ -327,6 +327,7 @@ const ALLOWED_PROSE = [
   { file: 'components/plan/PlanDetail.vue', text: 'row.rest.note', why: 'AI / 用户填写的休息日原文，不是后端界面文案。' },
   { file: 'views/AiComposer.vue', text: 'strips.error.value', why: 'useBridgeStrip 已经通过 toUserMessage 按错误码本地化。' },
   { file: 'views/ai/AiExchanges.vue', text: 'history.error.value', why: 'useExchanges 已经通过 toUserMessage 按错误码本地化。' },
+  { file: 'views/Journal.vue', text: 'logbook.error.value', why: '关闭弹窗时清空错误状态；useLogbook 内部已通过 toUserMessage 本地化。' },
   { file: 'lib/trainingPlan/importWorkout/common.ts', text: 'out.note', why: '从 .zwo / .fit 读出来的步骤备注原文，写进草稿的书写格式，不渲染、不是后端界面文案。' },
   { file: 'lib/trainingPlan/edit.ts', text: 'step.note', why: '训练计划里 AI / 用户写的步骤备注原文，原样写回草稿，不渲染、不是后端界面文案。' },
   { file: 'views/landing/StageWindow.vue', text: 'copy.note', why: '同上，落地页文案。' },

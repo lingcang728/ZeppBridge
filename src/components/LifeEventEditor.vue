@@ -103,6 +103,10 @@ async function remove() {
           <span>{{ t.ongoing }}</span>
           <GlassSwitch :model-value="ongoing" :aria-label="t.ongoing" @update:model-value="ongoing = !ongoing" />
         </div>
+        <div class="check epoch-check">
+          <span><span>{{ t.epoch }}</span><small>{{ t.epochHint }}</small></span>
+          <GlassSwitch :model-value="draft.epoch" :aria-label="t.epoch" data-event-epoch @update:model-value="draft.epoch = !draft.epoch" />
+        </div>
         <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="2" data-event-notes /></label>
       </fieldset>
       <p v-if="error" role="alert">{{ error === 'invalid' ? t.invalid : t.failed }}</p>
@@ -138,6 +142,8 @@ input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
 .quick:hover { background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--ink); }
 .quick:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
 .check { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink); font-size:var(--fs-sm); }
+.epoch-check > span { display:grid; gap:2px; }
+.epoch-check small { color:var(--subtle); font-size:var(--fs-xs); line-height:1.5; }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }
 footer { position:sticky; bottom:-20px; z-index:2; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:0 -20px -20px; padding:12px 20px 18px; border-radius:0 0 var(--radius-lg) var(--radius-lg); background:var(--mat-glass-strong); -webkit-backdrop-filter:var(--mat-glass-blur); backdrop-filter:var(--mat-glass-blur); }
 footer .event-hint { flex:1 1 180px; min-width:0; }

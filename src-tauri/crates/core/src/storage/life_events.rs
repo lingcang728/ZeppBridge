@@ -15,6 +15,9 @@ pub struct LifeEventInput {
     /// None means still ongoing; a single day has end_date == start_date.
     pub end_date: Option<String>,
     pub notes: String,
+    /// 纪元（批次 7）：给一段日子起的名字，图表在这段日子下面铺一层底色。旧调用方不带这个字段时当作普通事件。
+    #[serde(default)]
+    pub epoch: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,7 +51,7 @@ impl Database {
             return Err(invalid());
         }
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, category, start_date, end_date, notes, created_at, updated_at
+            "SELECT id, title, category, start_date, end_date, notes, created_at, updated_at, epoch
              FROM life_events WHERE (?1 IS NULL OR end_date IS NULL OR end_date >= ?1)
              AND (?2 IS NULL OR start_date <= ?2) ORDER BY start_date DESC, id DESC",
         )?;
@@ -61,6 +64,7 @@ impl Database {
                     start_date: row.get(3)?,
                     end_date: row.get(4)?,
                     notes: row.get(5)?,
+                    epoch: row.get::<_, i64>(8)? != 0,
                 },
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
@@ -89,7 +93,7 @@ impl Database {
         if let Some(id) = input.id {
             let changed = self.conn.execute(
                 "UPDATE life_events SET title=?1, category=?2, start_date=?3, end_date=?4,
-                 notes=?5, updated_at=?6 WHERE id=?7",
+                 notes=?5, updated_at=?6, epoch=?8 WHERE id=?7",
                 params![
                     title,
                     input.category,
@@ -97,7 +101,8 @@ impl Database {
                     input.end_date,
                     input.notes,
                     now,
-                    id
+                    id,
+                    input.epoch
                 ],
             )?;
             if changed == 0 {
@@ -106,9 +111,9 @@ impl Database {
             Ok(id)
         } else {
             self.conn.execute(
-                "INSERT INTO life_events(title, category, start_date, end_date, notes, created_at, updated_at)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?6)",
-                params![title, input.category, input.start_date, input.end_date, input.notes, now])?;
+                "INSERT INTO life_events(title, category, start_date, end_date, notes, created_at, updated_at, epoch)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7)",
+                params![title, input.category, input.start_date, input.end_date, input.notes, now, input.epoch])?;
             Ok(self.conn.last_insert_rowid())
         }
     }
@@ -132,6 +137,7 @@ mod tests {
             start_date: "2026-09-01".into(),
             end_date: Some("2026-09-05".into()),
             notes: "User context".into(),
+            epoch: false,
         }
     }
     #[test]
