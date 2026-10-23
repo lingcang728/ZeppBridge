@@ -57,7 +57,7 @@ const accept = (race: Race) => {
       </span>
       <span class="cd-meta">{{ journalDay(next.race_date) }} · {{ distanceName(next) }}<template v-if="next.goal_seconds"> · {{ t.goal(clockText(next.goal_seconds)) }}</template></span>
     </button>
-    <p v-else class="empty">{{ t.noRace }}</p>
+    <p v-else class="empty">{{ t.noRecord }}</p>
 
     <ul v-if="upcoming.length > 1" class="row-list" :aria-label="t.upcoming">
       <li v-for="race in upcoming.slice(1)" :key="race.id">
@@ -91,7 +91,7 @@ const accept = (race: Race) => {
         </button>
       </li>
     </ul>
-    <p v-else-if="!pending.length" class="empty">{{ t.medalsEmpty }}</p>
+    <p v-else-if="!pending.length" class="empty">{{ t.noRecord }}</p>
   </JournalCard>
 </template>
 

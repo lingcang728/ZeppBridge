@@ -72,3 +72,21 @@ export const splitPart = (part: string): [string, 'l' | 'r' | null] => {
   const match = /^(.*)_(l|r)$/.exec(part);
   return match ? [match[1], match[2] as 'l' | 'r'] : [part, null];
 };
+
+/**
+ * 点哪儿都算数：取离指针最近的部位。在某个椭圆里面按「离中心多近」比（小部位叠在大部位上也点得中），
+ * 在外面按到椭圆边的近似距离比；超过 `reach` 个单位（手、头顶、身体外的空白）就不算。
+ */
+export function nearestBodyRegion(view: BodyView, x: number, y: number, reach = 10): BodyRegion | null {
+  let best: BodyRegion | null = null;
+  let bestScore = Infinity;
+  for (const region of BODY_REGIONS) {
+    if (region.view !== view) continue;
+    const dx = x - region.cx;
+    const dy = y - region.cy;
+    const k = Math.hypot(dx / region.rx, dy / region.ry);
+    const score = k <= 1 ? k - 1 : Math.hypot(dx, dy) * (1 - 1 / k);
+    if (score < bestScore) { bestScore = score; best = region; }
+  }
+  return best && bestScore <= reach ? best : null;
+}

@@ -2,14 +2,16 @@
 /**
  * 人形图（批次 7 主观层）：正面 + 背面两个线描人形，点选酸痛 / 伤病的部位。
  *
- * 画法学达芬奇手稿：墨线勾轮廓、右侧一排斜向排线当阴影、头上一道十字构图线、旁边一根八头身比例尺，
+ * 画法学达芬奇手稿：墨线勾轮廓、右侧一排斜向排线当阴影、头上一道十字构图线，
  * 纸色底。不用照片、不用填色人体模型。颜色全走主题 token（墨色是 ink 和一点赭石调出来的），深浅两套都成立。
  *
- * 区域是椭圆热区：平时看不见，悬停描一圈虚线，选中是一块带排线的血色。键盘可以 Tab 到每个部位、空格切换。
+ * 区域是椭圆：平时看不见，选中是一块带排线的血色。点哪儿都算数（用户 2026-10-23：「点击区只占了中间这么小一点」）：
+ * 指针在人形上移动时取离它最近的部位（REACH 以内），描一圈虚线、上方浮出部位名，点下去就是它。
+ * 键盘可以 Tab 到每个部位、空格切换。
  * `single` 时只能选一个（伤病记录），再点一次取消；`readonly` 时只显示。
  */
-import { computed } from 'vue';
-import { BODY_REGIONS, type BodyView } from '../../lib/logbook/body';
+import { computed, shallowRef } from 'vue';
+import { BODY_REGIONS, nearestBodyRegion, type BodyRegion, type BodyView } from '../../lib/logbook/body';
 import { useBodyPartName, useBodyText } from './body.i18n';
 
 const props = withDefaults(defineProps<{
@@ -79,22 +81,48 @@ const lerp = (y: number, y0: number, x0: number, y1: number, x1: number) => x0 +
 const HATCH = hatch(72, 128, y => (y < 104 ? lerp(y, 66, 81, 104, 76) : lerp(y, 104, 76, 134, 81)))
   + hatch(142, 192, y => lerp(y, 134, 82, 198, 79))
   + hatch(226, 256, y => lerp(y, 220, 80, 264, 75), 6);
-/* 八头身比例尺：头顶 6 到脚底 288，八等分。 */
-const RULER = Array.from({ length: 9 }, (_, i) => 6 + (282 / 8) * i);
+/* 画布只框住人形（两臂外沿 x≈17–103、头顶 6 到脚底 288），同样的宽度里人画得更大。
+   八头身比例尺去掉了（用户 2026-10-23：缩小以后那根尺只显得乱）。 */
+const VB = { x: 14, y: 2, w: 92, h: 290 };
+
+/* shallowRef：存的是 BODY_REGIONS 里的原对象，模板里用 === 认是哪一个。 */
+const hot = shallowRef<BodyRegion | null>(null);
+function regionAt(event: MouseEvent, view: BodyView) {
+  const ctm = (event.currentTarget as SVGSVGElement).getScreenCTM();
+  if (!ctm) return null;
+  const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(ctm.inverse());
+  return nearestBodyRegion(view, point.x, point.y);
+}
+function onMove(event: MouseEvent, view: BodyView) {
+  if (!props.readonly) hot.value = regionAt(event, view);
+}
+function onPick(event: MouseEvent, view: BodyView) {
+  if (props.readonly) return;
+  const region = regionAt(event, view);
+  hot.value = region;
+  if (region) toggle(region.part);
+}
+/* 部位名浮在椭圆上方，左右夹在画布里。 */
+const label = computed(() => {
+  const region = hot.value;
+  if (!region) return null;
+  return { view: region.view, text: partName.value(region.part), x: Math.min(VB.x + VB.w - 20, Math.max(VB.x + 20, region.cx)), y: region.cy - region.ry - 3 };
+});
 </script>
 
 <template>
   <div class="body-map" :class="{ readonly }">
     <div class="figures">
       <figure v-for="view in views" :key="view" :class="['figure', `is-${view}`]">
-        <svg viewBox="0 0 120 300" role="group" :aria-label="`${t.figure} · ${view === 'front' ? t.front : t.back}`">
+        <svg :viewBox="`${VB.x} ${VB.y} ${VB.w} ${VB.h}`" role="group" :aria-label="`${t.figure} · ${view === 'front' ? t.front : t.back}`"
+          :class="{ pointing: hot?.view === view }" @mousemove="onMove($event, view)" @mouseleave="hot = null" @click="onPick($event, view)">
           <defs>
             <pattern :id="`${uid}-sel`" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
               <rect width="3" height="3" class="sel-wash" />
               <path d="M0 0V3" class="sel-line" />
             </pattern>
           </defs>
-          <path class="ruler" :d="`M4 6V288${RULER.map(y => `M2 ${y}H6`).join('')}`" />
+          <rect v-if="!readonly" class="hit" :x="VB.x" :y="VB.y" :width="VB.w" :height="VB.h" />
           <g class="ink">
             <ellipse cx="60" cy="19" rx="10.5" ry="13" />
             <path v-if="view === 'front'" class="construct" d="M60 3V35M48 19H72" />
@@ -115,16 +143,16 @@ const RULER = Array.from({ length: 9 }, (_, i) => 6 + (282 / 8) * i);
             v-for="region in BODY_REGIONS.filter(r => r.view === view)"
             :key="`${view}-${region.part}`"
             class="region"
-            :class="{ on: selected.has(region.part), marked: marked.has(region.part) }"
+            :class="{ on: selected.has(region.part), marked: marked.has(region.part), hot: hot === region }"
             :cx="region.cx" :cy="region.cy" :rx="region.rx" :ry="region.ry"
             :style="selected.has(region.part) ? { fill: `url(#${uid}-sel)` } : undefined"
             :role="readonly ? undefined : 'checkbox'"
             :aria-checked="readonly ? undefined : selected.has(region.part)"
             :aria-label="partName(region.part)"
             :tabindex="readonly ? undefined : 0"
-            @click="toggle(region.part)"
             @keydown="onKey($event, region.part)"
           ><title>{{ partName(region.part) }}</title></ellipse>
+          <text v-if="label?.view === view" class="hot-label" :x="label.x" :y="label.y" aria-hidden="true">{{ label.text }}</text>
         </svg>
         <figcaption>{{ view === 'front' ? t.front : t.back }}</figcaption>
       </figure>
@@ -148,12 +176,13 @@ const RULER = Array.from({ length: 9 }, (_, i) => 6 + (282 / 8) * i);
   --bm-paper: color-mix(in srgb, var(--mat-inset) 90%, #c9a46b);
   display: grid; gap: 10px; min-width: 0;
 }
-/* 两个人形各占一块纸，背面那块暗一点（转过身去、背着光），标签做成小签条：不用细看线条也知道哪面是哪面。 */
+/* 两个人形共用一块纸（用户 2026-10-23：两块纸底显得碎），正反面靠下面的小签条和五官 / 后脑这些朝向线索分。
+   人形宽度由 --bm-figure-max 定（默认 160px），弹窗里放大；--bm-figure-max-h 给矮窗口兜底。 */
 .figures { display: flex; justify-content: center; gap: 10px; padding: 10px; border-radius: 18px; background: var(--bm-paper); box-shadow: var(--cap-track-shadow); }
-.figure { display: grid; justify-items: center; gap: 6px; margin: 0; padding: 10px 6px 8px; flex: 1 1 0; max-width: 200px; border-radius: 14px; }
-.figure.is-front { background: color-mix(in srgb, #fff 4%, transparent); }
-.figure.is-back { background: color-mix(in srgb, #000 14%, transparent); }
-.figure svg { display: block; width: 100%; height: auto; overflow: visible; }
+.figure { display: grid; justify-items: center; gap: 6px; margin: 0; padding: 6px 4px 4px; flex: 1 1 0; max-width: var(--bm-figure-max, 160px); min-width: 0; }
+.figure svg { display: block; width: 100%; height: auto; max-height: var(--bm-figure-max-h, none); overflow: visible; }
+.body-map:not(.readonly) svg.pointing { cursor: pointer; }
+.hit { fill: transparent; }
 .figure figcaption { padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--bm-ink) 12%, transparent); color: var(--muted); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .08em; }
 .ink { fill: none; stroke: var(--bm-ink); stroke-width: .9; stroke-linecap: round; stroke-linejoin: round; }
 .ink .detail { stroke-width: .55; opacity: .75; }
@@ -162,11 +191,13 @@ const RULER = Array.from({ length: 9 }, (_, i) => 6 + (282 / 8) * i);
 .ink .hair { stroke-width: .45; opacity: .7; }
 .ink .spine { stroke-width: 1.1; opacity: .7; stroke-dasharray: 2.2 1.6; }
 .ink .construct { stroke-width: .35; opacity: .45; stroke-dasharray: 1.5 2; }
-.ruler { fill: none; stroke: var(--bm-ink); stroke-width: .4; opacity: .4; }
-.region { fill: transparent; stroke: transparent; stroke-width: .8; cursor: pointer; outline: none; transition: fill .18s ease, stroke .18s ease; }
+.region { fill: transparent; stroke: transparent; stroke-width: .8; outline: none; transition: fill .18s ease, stroke .18s ease; }
+/* 能点的时候椭圆本身不接指针：点和悬停都交给整张 svg 算「最近的部位」；只读时留着，好让 <title> 浮出部位名。 */
+.body-map:not(.readonly) .region { pointer-events: none; }
 .readonly .region { cursor: default; }
 .region.marked { fill: color-mix(in srgb, var(--warning) 34%, transparent); stroke: color-mix(in srgb, var(--warning) 60%, transparent); stroke-dasharray: 1.2 1.6; }
-.body-map:not(.readonly) .region:hover, .region:focus-visible { stroke: var(--bm-ink); stroke-dasharray: 1.6 1.4; }
+.region.hot, .region:focus-visible { fill: color-mix(in srgb, var(--heart) 10%, transparent); stroke: var(--bm-ink); stroke-dasharray: 1.6 1.4; }
+.hot-label { fill: var(--ink); font-size: 6.5px; font-weight: 600; text-anchor: middle; paint-order: stroke; stroke: var(--bm-paper); stroke-width: 2.4px; stroke-linejoin: round; pointer-events: none; }
 .region:focus-visible { stroke: var(--focus); stroke-width: 1.2; }
 .body-map .region.on { stroke: var(--heart); stroke-width: 1; stroke-dasharray: none; }
 .sel-wash { fill: color-mix(in srgb, var(--heart) 30%, transparent); }

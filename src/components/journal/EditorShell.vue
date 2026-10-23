@@ -7,7 +7,8 @@ import { useJournalText } from './journal.i18n';
 
 /* origin：从哪个元素长出来、关的时候缩回哪里（卡头的按钮、被点的那一行）。三个编辑器都没声明它，
    写在编辑器上的 origin 会作为透传属性落到这里。 */
-const props = defineProps<{ title: string; busy: boolean; error: string | null; canDelete: boolean; origin?: HTMLElement | null }>();
+/* maxWidth：伤病编辑要把人形图放大，弹窗比另外两个宽（InjuryEditor.vue）。 */
+const props = defineProps<{ title: string; busy: boolean; error: string | null; canDelete: boolean; origin?: HTMLElement | null; maxWidth?: number }>();
 const emit = defineEmits<{ (event: 'save'): void; (event: 'close'): void; (event: 'remove'): void }>();
 const t = useJournalText();
 const id = `journal-editor-${Math.random().toString(36).slice(2, 8)}`;
@@ -17,7 +18,7 @@ const close = () => { if (!props.busy) emit('close'); };
 </script>
 
 <template>
-  <ModalDialog :labelledby="id" :origin="origin" @close="close">
+  <ModalDialog :labelledby="id" :origin="origin" :max-width="maxWidth" @close="close">
     <form class="journal-form" @submit.prevent="emit('save')">
       <h2 :id="id">{{ title }}</h2>
       <fieldset :disabled="busy"><slot /></fieldset>

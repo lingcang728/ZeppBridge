@@ -4,7 +4,6 @@ import { defineMessages, useMessages } from '../../i18n';
 const messages = defineMessages(
   {
     title: '履历',
-    intro: '你自己写下的那一半：比赛、成绩、跑鞋、伤病和纪元。只在这台电脑上，交给 AI 时一起带上。',
     save: '保存', cancel: '取消', remove: '删除', edit: '编辑', add: '添加', notes: '备注（可选）',
     removeConfirm: '删掉这一条？',
     timeHint: '时:分:秒，如 1:45:00',
@@ -19,11 +18,9 @@ const messages = defineMessages(
     goal: (time: string) => `目标 ${time}`,
     races: '比赛',
     upcoming: '报了名的',
-    noRace: '还没有登记比赛。登记一场，倒计时会出现在这里，AI 排计划也以它为终点。',
     addRace: '登记比赛',
     editRace: '编辑比赛',
     medals: '奖牌墙',
-    medalsEmpty: '跑完的比赛填上成绩，就挂在这里。',
     awaiting: '等成绩',
     fillResult: '填成绩',
     candidate: (time: string, km: string) => `那天有一次 ${km} · ${time} 的运动，是这一场吗？`,
@@ -35,13 +32,11 @@ const messages = defineMessages(
     distances: { '5k': '5 公里', '10k': '10 公里', half: '半程马拉松', marathon: '全程马拉松' },
 
     records: 'PB 墙',
-    recordsHint: (runs: number) => `从 ${runs} 次够长的跑步里找最快的一段。窗口两头落在真实采样上，只会算慢，不会算快。`,
     methods: { samples: '逐秒轨迹', splits: '整公里分段', whole: '整次运动', race: '比赛成绩' },
     noRecord: '还没有',
     then: '其后',
 
     shoes: '跑鞋',
-    shoesHint: '里程按这个顺序认：你在运动里指定的鞋 → Zepp 记的鞋 → 这类运动的默认鞋。认不出的不算。',
     addShoe: '登记一双', editShoe: '编辑跑鞋',
     noShoe: '还没有登记跑鞋。',
     wear: { fresh: '状态良好', near: '快到退役里程', due: '该退役了', retired: '已退役' },
@@ -58,7 +53,6 @@ const messages = defineMessages(
     startedOn: '开始穿', retired: '已经退役', retiredOn: '退役日期', zeppGear: 'Zepp 鞋编号',
 
     injuries: '伤病',
-    injuriesHint: '哪儿、从哪天到哪天、多重。AI 排计划时会看到还没好的和 90 天内好的。',
     addInjury: '记一条伤病', editInjury: '编辑伤病',
     noInjury: '没有记录。愿一直如此。',
     stillHurting: '还没好',
@@ -67,7 +61,6 @@ const messages = defineMessages(
     startDate: '开始', endDate: '好了', since: (date: string) => `${date} 起`,
 
     epochs: '纪元与事件',
-    epochsHint: '生活里的事都记在这里：一次感冒、一段旅程、一次训练变化。给一段日子起个名（备战首马、伤后恢复）就成了纪元，所有趋势图都垫一层底色，AI 也会知道。',
     addEpoch: '新纪元',
     addEvent: '记一件事',
     noEpoch: '还没有记过事，也还没有纪元。',
@@ -80,7 +73,6 @@ const messages = defineMessages(
   },
   {
     title: 'Journal',
-    intro: 'The half you write yourself: races, results, shoes, injuries and eras. Stays on this computer and travels with your AI handoffs.',
     save: 'Save', cancel: 'Cancel', remove: 'Delete', edit: 'Edit', add: 'Add', notes: 'Notes (optional)',
     removeConfirm: 'Delete this entry?',
     timeHint: 'h:mm:ss, e.g. 1:45:00',
@@ -95,11 +87,9 @@ const messages = defineMessages(
     goal: (time: string) => `Goal ${time}`,
     races: 'Races',
     upcoming: 'Coming up',
-    noRace: 'No races yet. Add one and the countdown shows up here; AI plans will build toward it.',
     addRace: 'Add race',
     editRace: 'Edit race',
     medals: 'Medal wall',
-    medalsEmpty: 'Finished races land here once you add the result.',
     awaiting: 'Result pending',
     fillResult: 'Add result',
     candidate: (time: string, km: string) => `You recorded ${km} in ${time} that day. Was that the race?`,
@@ -111,13 +101,11 @@ const messages = defineMessages(
     distances: { '5k': '5K', '10k': '10K', half: 'Half marathon', marathon: 'Marathon' },
 
     records: 'Personal bests',
-    recordsHint: (runs: number) => `The fastest stretch across ${runs} long-enough runs. Windows end on real samples, so a time can only come out slower, never faster.`,
     methods: { samples: 'Per-second track', splits: 'Whole-km splits', whole: 'Whole workout', race: 'Race result' },
     noRecord: 'Not yet',
     then: 'Then',
 
     shoes: 'Shoes',
-    shoesHint: 'Mileage is credited in this order: the pair you picked on the workout → the shoe Zepp recorded → the default for that sport. Anything unmatched is left out.',
     addShoe: 'Add a pair', editShoe: 'Edit shoe',
     noShoe: 'No shoes yet.',
     wear: { fresh: 'Good to go', near: 'Nearing retirement', due: 'Time to retire', retired: 'Retired' },
@@ -134,7 +122,6 @@ const messages = defineMessages(
     startedOn: 'First worn', retired: 'Retired', retiredOn: 'Retired on', zeppGear: 'Zepp shoe ID',
 
     injuries: 'Injuries',
-    injuriesHint: 'Where, from when to when, how bad. AI planning sees the ongoing ones and those healed in the last 90 days.',
     addInjury: 'Log an injury', editInjury: 'Edit injury',
     noInjury: 'Nothing logged. Long may it last.',
     stillHurting: 'Ongoing',
@@ -143,7 +130,6 @@ const messages = defineMessages(
     startDate: 'Started', endDate: 'Healed', since: (date: string) => `since ${date}`,
 
     epochs: 'Eras & life events',
-    epochsHint: 'Everything that happens in life goes here: a cold, a trip, a change in training. Name a stretch of time (first marathon build, coming back from injury) and it becomes an era: every trend chart gets a shaded backdrop and AI sees it too.',
     addEpoch: 'New era',
     addEvent: 'Log an event',
     noEpoch: 'No events or eras yet.',
@@ -156,7 +142,6 @@ const messages = defineMessages(
   },
   {
     title: 'Diario',
-    intro: 'La mitad que escribes tú: carreras, marcas, zapatillas, lesiones y etapas. Se queda en este ordenador y viaja con lo que pasas a la IA.',
     save: 'Guardar', cancel: 'Cancelar', remove: 'Eliminar', edit: 'Editar', add: 'Añadir', notes: 'Notas (opcional)',
     removeConfirm: '¿Eliminar esta entrada?',
     timeHint: 'h:mm:ss, p. ej. 1:45:00',
@@ -171,11 +156,9 @@ const messages = defineMessages(
     goal: (time: string) => `Objetivo ${time}`,
     races: 'Carreras',
     upcoming: 'Inscritas',
-    noRace: 'Aún no hay carreras. Añade una y aquí verás la cuenta atrás; los planes de la IA apuntarán a ella.',
     addRace: 'Añadir carrera',
     editRace: 'Editar carrera',
     medals: 'Medallero',
-    medalsEmpty: 'Las carreras terminadas aparecen aquí cuando añades el resultado.',
     awaiting: 'Falta el resultado',
     fillResult: 'Añadir resultado',
     candidate: (time: string, km: string) => `Ese día registraste ${km} en ${time}. ¿Fue la carrera?`,
@@ -187,13 +170,11 @@ const messages = defineMessages(
     distances: { '5k': '5K', '10k': '10K', half: 'Media maratón', marathon: 'Maratón' },
 
     records: 'Mejores marcas',
-    recordsHint: (runs: number) => `El tramo más rápido de ${runs} carreras suficientemente largas. Las ventanas terminan en muestras reales: el tiempo solo puede salir más lento, nunca más rápido.`,
     methods: { samples: 'Registro por segundo', splits: 'Parciales de km enteros', whole: 'Entreno completo', race: 'Resultado de carrera' },
     noRecord: 'Aún no',
     then: 'Después',
 
     shoes: 'Zapatillas',
-    shoesHint: 'El kilometraje se asigna en este orden: el par que elegiste en el entreno → el que registró Zepp → el predeterminado de ese deporte. Lo que no encaja no cuenta.',
     addShoe: 'Añadir un par', editShoe: 'Editar zapatilla',
     noShoe: 'Aún no hay zapatillas.',
     wear: { fresh: 'En buen estado', near: 'Cerca de retirarlas', due: 'Toca retirarlas', retired: 'Retiradas' },
@@ -210,7 +191,6 @@ const messages = defineMessages(
     startedOn: 'Primer uso', retired: 'Retirada', retiredOn: 'Fecha de retirada', zeppGear: 'ID de zapatilla de Zepp',
 
     injuries: 'Lesiones',
-    injuriesHint: 'Dónde, desde cuándo hasta cuándo y cuánto. Al planificar, la IA ve las que siguen abiertas y las curadas en los últimos 90 días.',
     addInjury: 'Anotar una lesión', editInjury: 'Editar lesión',
     noInjury: 'Nada anotado. Que siga así.',
     stillHurting: 'Sigue abierta',
@@ -219,7 +199,6 @@ const messages = defineMessages(
     startDate: 'Empezó', endDate: 'Curada', since: (date: string) => `desde ${date}`,
 
     epochs: 'Etapas y eventos',
-    epochsHint: 'Todo lo que pasa en tu vida va aquí: un resfriado, un viaje, un cambio de entrenamiento. Ponle nombre a una temporada (preparando el primer maratón, volviendo de una lesión) y se vuelve una etapa: todas las gráficas de tendencia la sombrean y la IA también la ve.',
     addEpoch: 'Nueva etapa',
     addEvent: 'Anotar un evento',
     noEpoch: 'Aún no hay eventos ni etapas.',

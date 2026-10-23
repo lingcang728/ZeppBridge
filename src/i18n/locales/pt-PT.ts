@@ -3530,7 +3530,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
     },
     'components/workout/feel': {
       title: 'Como se sentiu',
-      eyebrow: 'Apenas você sabe',
       rpe: 'Esforço percebido (RPE)',
       rpeEasy: 'Fácil',
       rpeHard: 'Difícil',
@@ -3552,7 +3551,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
         unknown: 'não identificado',
       },
       autoNow: (name: string, how: string) => `A contar para “${name}” (${how})`,
-      autoUnknown: 'Não está a contar para nenhum par. Defina um par predefinido ou escolha um aqui.',
       noShoes: 'Nenhumas sapatilhas registadas ainda.',
       register: 'Registar no diário',
       retired: 'Abatidas',
@@ -3560,7 +3558,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
     },
     'components/journal/journal': {
       title: 'Diário',
-      intro: 'A parte que escreve pessoalmente: provas, resultados, sapatilhas, lesões e épocas. Fica apenas neste computador e acompanha os envios para a IA.',
       save: 'Guardar',
       cancel: 'Cancelar',
       remove: 'Eliminar',
@@ -3580,11 +3577,9 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       goal: (time: string) => `Objetivo ${time}`,
       races: 'Provas',
       upcoming: 'Inscrito',
-      noRace: 'Nenhuma prova registada ainda. Adicione uma e a contagem decrescente surgirá aqui; os planos da IA focar-se-ão nela.',
       addRace: 'Registar prova',
       editRace: 'Editar prova',
       medals: 'Mural de medalhas',
-      medalsEmpty: 'As provas concluídas surgem aqui assim que registar o resultado.',
       awaiting: 'A aguardar resultado',
       fillResult: 'Introduzir resultado',
       candidate: (time: string, km: string) => `Registou um treino de ${km} em ${time} nesse dia. Foi esta prova?`,
@@ -3618,7 +3613,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       },
 
       records: 'Recordes pessoais',
-      recordsHint: (runs: number) => `O segmento mais rápido em ${runs} corridas suficientemente longas. As janelas fecham sobre medições reais, pelo que um tempo apenas pode sair mais lento, nunca artificialmente mais rápido.`,
       methods: {
         samples: 'Trajeto segundo a segundo',
         splits: 'Parciais de km completos',
@@ -3629,7 +3623,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       then: 'Depois',
 
       shoes: 'Sapatilhas',
-      shoesHint: 'A quilometragem é atribuída por esta ordem: o par escolhido no treino → as sapatilhas registadas pelo Zepp → o par predefinido para a modalidade. Treinos não identificados não contam.',
       addShoe: 'Registar um par',
       editShoe: 'Editar sapatilhas',
       noShoe: 'Nenhumas sapatilhas registadas ainda.',
@@ -3664,7 +3657,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       zeppGear: 'ID da sapatilha no Zepp',
 
       injuries: 'Lesões',
-      injuriesHint: 'Onde, de quando a quando e com que gravidade. Ao planear, a IA consulta as lesões ativas e as recuperadas nos últimos 90 dias.',
       addInjury: 'Registar lesão',
       editInjury: 'Editar lesão',
       noInjury: 'Nenhuma lesão registada. Que assim se mantenha.',
@@ -3682,7 +3674,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       since: (date: string) => `desde ${date}`,
 
       epochs: 'Épocas e eventos da vida',
-      epochsHint: 'Tudo o que acontece na vida fica aqui: uma constipação, uma viagem, uma mudança no treino. Dê um nome a um período (preparação para a primeira maratona, recuperação de uma lesão) e ele passa a ser uma época: todos os gráficos de tendência ganham um sombreado, e a IA também fica a saber.',
       addEvent: 'Registar um evento',
       addEpoch: 'Nova época',
       noEpoch: 'Ainda não há eventos nem épocas.',

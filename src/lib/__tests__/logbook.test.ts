@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_PARTS, BODY_REGIONS, splitPart } from '../logbook/body';
+import { BODY_PARTS, BODY_REGIONS, nearestBodyRegion, splitPart } from '../logbook/body';
 import { clockText, daysBetween, paceOf, parseClock, raceDistanceKey } from '../logbook/clock';
 
 describe('body map', () => {
@@ -15,6 +15,12 @@ describe('body map', () => {
     expect(calf.cx).toBeLessThan(60);
     expect(splitPart('it_band_r')).toEqual(['it_band', 'r']);
     expect(splitPart('neck')).toEqual(['neck', null]);
+  });
+
+  it('snaps nearby clicks to the closest region and ignores clicks far off the body', () => {
+    expect(nearestBodyRegion('front', 72, 204)?.part).toBe('knee_l');
+    expect(nearestBodyRegion('back', 71, 258)?.part).toBe('achilles_r');
+    expect(nearestBodyRegion('front', 14, 10)).toBeNull();
   });
 });
 

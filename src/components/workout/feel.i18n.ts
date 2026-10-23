@@ -4,7 +4,6 @@ import { defineMessages, useMessages } from '../../i18n';
 const messages = defineMessages(
   {
     title: '你的感受',
-    eyebrow: '只有你知道',
     rpe: '用力程度（RPE）',
     rpeEasy: '轻松', rpeHard: '吃力', rpeMax: '极限',
     watchRpe: (value: number) => `手表记的 ${value}`,
@@ -18,7 +17,6 @@ const messages = defineMessages(
     none: '没穿登记的',
     how: { chosen: '你指定的', zepp: 'Zepp 记的', default: '默认鞋', none: '你说没穿登记的', unknown: '认不出' },
     autoNow: (name: string, how: string) => `现在算在「${name}」上（${how}）`,
-    autoUnknown: '现在没算到任何一双。设一双默认鞋，或在这里选。',
     noShoes: '还没登记跑鞋。',
     register: '去履历登记',
     retired: '已退役',
@@ -26,7 +24,6 @@ const messages = defineMessages(
   },
   {
     title: 'How it felt',
-    eyebrow: 'Only you know',
     rpe: 'Effort (RPE)',
     rpeEasy: 'Easy', rpeHard: 'Hard', rpeMax: 'All-out',
     watchRpe: (value: number) => `Watch said ${value}`,
@@ -40,7 +37,6 @@ const messages = defineMessages(
     none: 'Not a logged pair',
     how: { chosen: 'your pick', zepp: 'recorded by Zepp', default: 'default pair', none: 'you said not a logged pair', unknown: 'unmatched' },
     autoNow: (name: string, how: string) => `Counting toward “${name}” (${how})`,
-    autoUnknown: 'Not counted toward any pair. Set a default pair, or pick one here.',
     noShoes: 'No shoes logged yet.',
     register: 'Add them in Journal',
     retired: 'Retired',
@@ -48,7 +44,6 @@ const messages = defineMessages(
   },
   {
     title: 'Cómo te sentiste',
-    eyebrow: 'Solo tú lo sabes',
     rpe: 'Esfuerzo (RPE)',
     rpeEasy: 'Fácil', rpeHard: 'Duro', rpeMax: 'Al límite',
     watchRpe: (value: number) => `El reloj marcó ${value}`,
@@ -62,7 +57,6 @@ const messages = defineMessages(
     none: 'Ninguno registrado',
     how: { chosen: 'elegidas por ti', zepp: 'registradas por Zepp', default: 'par predeterminado', none: 'dijiste que ninguno registrado', unknown: 'sin identificar' },
     autoNow: (name: string, how: string) => `Suma a «${name}» (${how})`,
-    autoUnknown: 'No suma a ningún par. Define un par predeterminado o elige uno aquí.',
     noShoes: 'Aún no hay zapatillas.',
     register: 'Añadirlas en el Diario',
     retired: 'Retiradas',

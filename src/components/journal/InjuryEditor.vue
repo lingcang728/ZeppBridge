@@ -1,5 +1,7 @@
 <script setup lang="ts">
-/* 伤病编辑：怎么了、哪儿（人形图点一处）、多重、哪天开始、好了没有。 */
+/* 伤病编辑：怎么了、哪儿（人形图点一处）、多重、哪天开始、好了没有。
+   弹窗加宽，人形图单独占左栏、放大了好点（用户 2026-10-23：「屏幕这么大，点击区只占中间这么小一点」），
+   其余字段在右栏；窄窗口退回上下一栏。 */
 import { computed, ref, watch } from 'vue';
 import BodyMap from './BodyMap.vue';
 import EditorShell from './EditorShell.vue';
@@ -49,25 +51,37 @@ async function remove() {
 </script>
 
 <template>
-  <EditorShell :title="draft.id ? t.editInjury : t.addInjury" :busy="busy" :error="local ?? error" :can-delete="Boolean(draft.id)"
+  <EditorShell :title="draft.id ? t.editInjury : t.addInjury" :busy="busy" :error="local ?? error" :can-delete="Boolean(draft.id)" :max-width="820"
     @save="save" @close="emit('close')" @remove="remove">
-    <label>{{ t.injuryTitle }}<input v-model="draft.title" maxlength="120" required data-injury-title></label>
-    <div class="field"><span>{{ t.bodyPart }}</span><BodyMap v-model="parts" single /></div>
-    <div class="field"><span>{{ t.severity }}</span>
-      <SegmentTrack compact :model-value="draft.severity ?? 0" :items="severities" :aria-label="t.severity"
-        @update:model-value="v => (draft.severity = Number(v) as 1 | 2 | 3)" />
+    <div class="injury-layout">
+      <div class="field map-col"><span>{{ t.bodyPart }}</span><BodyMap v-model="parts" single /></div>
+      <div class="form-col">
+        <label>{{ t.injuryTitle }}<input v-model="draft.title" maxlength="120" required data-injury-title></label>
+        <div class="field"><span>{{ t.severity }}</span>
+          <SegmentTrack compact :model-value="draft.severity ?? 0" :items="severities" :aria-label="t.severity"
+            @update:model-value="v => (draft.severity = Number(v) as 1 | 2 | 3)" />
+        </div>
+        <!-- 还没好：只有开始日期、居中；好了：开始日期推到左边，「好了」那天从右边出来（DateRangeField）。 -->
+        <div class="check"><span>{{ t.stillHurting }}</span>
+          <GlassSwitch :model-value="ongoing" :aria-label="t.stillHurting" @update:model-value="ongoing = !ongoing" />
+        </div>
+        <DateRangeField :show-end="!ongoing">
+          <template #start><div class="field"><span>{{ t.startDate }}</span><WheelDatePicker v-model="draft.start_date" :aria-label="t.startDate" /></div></template>
+          <template #end><div class="field"><span>{{ t.endDate }}</span>
+            <WheelDatePicker :model-value="draft.end_date ?? draft.start_date" :min="draft.start_date" :aria-label="t.endDate"
+              @update:model-value="v => { if (draft.end_date !== null) draft.end_date = v; }" />
+          </div></template>
+        </DateRangeField>
+        <label>{{ t.notes }}<textarea v-model="draft.notes" rows="2" maxlength="2000"></textarea></label>
+      </div>
     </div>
-    <!-- 还没好：只有开始日期、居中；好了：开始日期推到左边，「好了」那天从右边出来（DateRangeField）。 -->
-    <div class="check"><span>{{ t.stillHurting }}</span>
-      <GlassSwitch :model-value="ongoing" :aria-label="t.stillHurting" @update:model-value="ongoing = !ongoing" />
-    </div>
-    <DateRangeField :show-end="!ongoing">
-      <template #start><div class="field"><span>{{ t.startDate }}</span><WheelDatePicker v-model="draft.start_date" :aria-label="t.startDate" /></div></template>
-      <template #end><div class="field"><span>{{ t.endDate }}</span>
-        <WheelDatePicker :model-value="draft.end_date ?? draft.start_date" :min="draft.start_date" :aria-label="t.endDate"
-          @update:model-value="v => { if (draft.end_date !== null) draft.end_date = v; }" />
-      </div></template>
-    </DateRangeField>
-    <label>{{ t.notes }}<textarea v-model="draft.notes" rows="2" maxlength="2000"></textarea></label>
   </EditorShell>
 </template>
+
+<style scoped>
+.injury-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.form-col { display: grid; gap: 12px; min-width: 0; }
+/* 人形图放大到这一栏的宽度，矮窗口按高度收，免得脚要滚下去才点得到。 */
+.map-col { --bm-figure-max: 220px; --bm-figure-max-h: min(62vh, 560px); }
+@media (max-width: 720px) { .injury-layout { grid-template-columns: minmax(0, 1fr); } }
+</style>

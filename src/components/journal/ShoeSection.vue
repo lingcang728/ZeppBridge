@@ -26,7 +26,7 @@ const asInput = (shoe: ShoeSummary): ShoeInput => {
 </script>
 
 <template>
-  <JournalCard :title="t.shoes" tone="shoe" :hint="t.shoesHint" :action="t.addShoe" @action="o => emit('edit', fresh(), o)">
+  <JournalCard :title="t.shoes" tone="shoe" :action="t.addShoe" @action="o => emit('edit', fresh(), o)">
     <p v-if="shoes && !list.length" class="empty">{{ t.noShoe }}</p>
     <ul v-else class="row-list">
       <li v-for="shoe in list" :key="shoe.id">
