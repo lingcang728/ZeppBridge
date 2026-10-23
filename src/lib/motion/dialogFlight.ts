@@ -28,7 +28,6 @@
 import { exemptFromSettle, onMotionEscape } from './interrupt';
 import { whenFramesSteady } from './steady';
 import { paced } from './timing';
-import { punch } from './punch';
 import { lessMotion } from './lessMotion';
 
 export interface FlightOrigin {
@@ -162,8 +161,7 @@ const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   const flight = panel.animate([{ transform: start(from) }, { transform: 'none' }], { duration: from ? OPEN_MS : 220, easing: OPEN_EASE, fill });
   panel.style.transform = '';
   const done = () => forgetEscape(backdrop);
-  // 从按钮里长到位的那一刻落一拳（年轮舞台拳击式切换的 DOM 版，lib/motion/punch.ts）：轻轻一沉一弹、边缘一圈冲击波。
-  flight.finished.then(() => { done(); if (from && backdrop.isConnected) punch(panel, { strength: 0.6, wave: true }); }, done);
+  flight.finished.then(done, done);
   // 动画已经接手了起点的样子，把隐身撤掉。
   backdrop.classList.remove('is-entering');
 };

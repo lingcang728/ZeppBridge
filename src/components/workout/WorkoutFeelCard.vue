@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 运动详情右栏「你的感受」（批次 7 主观层）：自己打的 RPE（1–10，手表记的另外写着）、酸痛部位（人形图）、
+ * 运动详情右栏「你的感受」（批次 7 主观层）：自己打的 RPE（1–10，手表记的那格染成绿色）、酸痛部位（人形图）、
  * 这次穿的鞋（自动 / 选一双 / 没穿登记的）。每改一处就存，不用找保存按钮。
  *
  * 鞋只在穿鞋的运动上问（跑步、越野、走路、徒步）；「自动」时写明现在算在哪双上、为什么。
@@ -60,14 +60,25 @@ const assignedName = computed(() => {
   const id = feel.value?.assigned?.shoe_id;
   return id ? feel.value?.choices.find(c => c.id === id)?.name ?? null : null;
 });
-const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round(18 + value * 8)}%, var(--pace))`;
+/* 刻度从绿走到红，和下面那条轨道同一条渐变（srgb 插值，color-mix 和 linear-gradient 一致）。 */
+const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round(((value - 1) / 9) * 100)}%, var(--training))`;
+/* 手表记的那一格（用户 2026-10-23：「手表记的 1，这个 1 的圈圈应该被绿色填充」）：
+   自己还没打分时，手表那格用品牌绿填满、比它小的淡淡铺一层；自己打了分且和手表不同，手表那格退成一圈绿描边。 */
+const watchClass = (value: number) => {
+  const watch = feel.value?.watch_rpe ?? null;
+  if (watch === null) return null;
+  if (feel.value?.rpe === null) return value === watch ? 'watch' : value < watch ? 'watch-below' : null;
+  return value === watch && value !== feel.value?.rpe ? 'watch-ring' : null;
+};
+/* 轨道上的三处刻度，标签对在 1、5、10 正下方。 */
+const RPE_MARKS = [1, 5, 10] as const;
 </script>
 
 <template>
   <section v-if="feel" class="surface-card feel-card" :aria-label="t.title">
     <div class="feel-head">
       <GlyphTile name="recovery" tone="heart" :size="40" />
-      <div><p class="eyebrow">{{ t.eyebrow }}</p><h2>{{ t.title }}</h2></div>
+      <h2>{{ t.title }}</h2>
       <small v-if="savedAt" :key="savedAt" class="saved" role="status">{{ t.saved }}</small>
     </div>
 
@@ -76,8 +87,9 @@ const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round
         <button v-if="feel.rpe !== null" type="button" class="link" @click="save({ rpe: null })">{{ t.clear }}</button></div>
       <div class="rpe" role="radiogroup" :aria-label="t.rpe">
         <button v-for="value in 10" :key="value" type="button" role="radio" :aria-checked="feel.rpe === value"
-          :class="{ on: feel.rpe === value, below: feel.rpe !== null && value < feel.rpe }" :style="{ '--rpe': rpeTone(value) }" @click="setRpe(value)">{{ value }}</button>
+          :class="[{ on: feel.rpe === value, below: feel.rpe !== null && value < feel.rpe }, watchClass(value)]" :style="{ '--rpe': rpeTone(value) }" @click="setRpe(value)">{{ value }}</button>
       </div>
+      <div class="rpe-track" aria-hidden="true"><i v-for="mark in RPE_MARKS" :key="mark" :style="{ left: `${((mark - 1) / 9) * 100}%`, '--rpe': rpeTone(mark) }"></i></div>
       <div class="rpe-ends" aria-hidden="true"><span>{{ t.rpeEasy }}</span><span>{{ t.rpeHard }}</span><span>{{ t.rpeMax }}</span></div>
     </div>
 
@@ -100,7 +112,7 @@ const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round
           <button v-for="shoe in feel.choices" :key="shoe.id" type="button" :class="{ on: feel.shoe_id === shoe.id, retired: shoe.retired }"
             @click="save({ shoe_mode: 'chosen', shoe_id: shoe.id })">{{ shoe.name }}<small v-if="shoe.retired"> · {{ t.retired }}</small></button>
         </div>
-        <p v-else-if="feel.shoe_mode === 'auto'" class="note">{{ assignedName ? t.autoNow(assignedName, t.how[feel.assigned?.how ?? 'unknown']) : t.autoUnknown }}</p>
+        <p v-else-if="feel.shoe_mode === 'auto' && assignedName" class="note">{{ t.autoNow(assignedName, t.how[feel.assigned?.how ?? 'unknown']) }}</p>
       </template>
       <p v-else class="note">{{ t.noShoes }} <RouterLink to="/journal">{{ t.register }} →</RouterLink></p>
     </div>
@@ -111,8 +123,7 @@ const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round
 <style scoped>
 .feel-card { display: grid; gap: 14px; padding: 16px 18px 18px; border-radius: var(--radius-lg); }
 .feel-head { display: flex; align-items: center; gap: 10px; }
-.feel-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
-.eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }
+.feel-head h2 { margin: 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
 .saved { margin-left: auto; color: var(--accent); font-size: var(--fs-xs); animation: saved-fade 1.6s ease forwards; }
 @keyframes saved-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
 .block { display: grid; gap: 8px; }
@@ -126,8 +137,17 @@ const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round
 .rpe button:hover { color: var(--ink); }
 .rpe button.below { background: color-mix(in srgb, var(--rpe) 28%, var(--cap-track)); color: var(--ink); }
 .rpe button.on { background: var(--rpe); color: var(--bg); font-weight: 700; }
+.rpe button.watch { background: var(--brand); color: var(--bg); font-weight: 700; }
+.rpe button.watch-below { background: color-mix(in srgb, var(--brand) 26%, var(--cap-track)); color: var(--ink); }
+.rpe button.watch-ring { box-shadow: var(--cap-track-shadow), inset 0 0 0 2px var(--brand); color: var(--ink); }
 .rpe button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.rpe-ends { display: flex; justify-content: space-between; color: var(--subtle); font-size: var(--fs-2xs); }
+/* 轨道从第 1 格圆心画到第 10 格圆心：两头各缩进半格（10 列、9 道 4px 间距）。 */
+.rpe-track { position: relative; height: 3px; margin: 0 calc((100% - 36px) / 20); border-radius: 999px; background: linear-gradient(90deg, var(--training), var(--heart)); }
+.rpe-track i { position: absolute; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: var(--rpe); transform: translate(-50%, -50%); }
+.rpe-ends { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: -2px; color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
+.rpe-ends span:nth-child(1) { grid-column: 1; justify-self: start; }
+.rpe-ends span:nth-child(2) { grid-column: 5; justify-self: center; }
+.rpe-ends span:nth-child(3) { grid-column: 10; justify-self: end; }
 .modes, .choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .modes button, .choices button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
 .modes button.on, .choices button.on { background: color-mix(in srgb, var(--pace) 22%, transparent); color: var(--ink); }

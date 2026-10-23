@@ -18,7 +18,7 @@ const how = (effort: Effort) => (effort.method === 'race' && effort.race_name ? 
 </script>
 
 <template>
-  <JournalCard :title="t.records" tone="record" :hint="records ? t.recordsHint(records.runs_scanned) : undefined">
+  <JournalCard :title="t.records" tone="record">
     <ul class="pb-grid">
       <li v-for="row in rows" :key="row.key" class="pb" :class="{ none: !row.best }">
         <span class="pb-dist">{{ t.distances[row.key] }}</span>

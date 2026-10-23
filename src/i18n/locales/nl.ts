@@ -3574,7 +3574,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'components/workout/feel': {
       title: 'Hoe het voelde',
-      eyebrow: 'Alleen jij weet dit',
       rpe: 'Inspanning (RPE)',
       rpeEasy: 'Makkelijk',
       rpeHard: 'Zwaar',
@@ -3596,7 +3595,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
         unknown: 'onbekend',
       },
       autoNow: (name: string, how: string) => `Telt mee voor “${name}” (${how})`,
-      autoUnknown: 'Telt momenteel niet mee voor een paar. Stel een standaardpaar in of kies hier.',
       noShoes: 'Nog geen schoenen geregistreerd.',
       register: 'Registreren in logboek',
       retired: 'Met pensioen',
@@ -3604,8 +3602,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'components/journal/journal': {
       title: 'Logboek',
-      intro:
-        'Het deel dat je zelf schrijft: wedstrijden, uitslagen, schoenen, blessures en periodes. Blijft op deze computer en reist mee met je AI-overdrachten.',
       save: 'Opslaan',
       cancel: 'Annuleren',
       remove: 'Verwijderen',
@@ -3626,12 +3622,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       goal: (time: string) => `Doel ${time}`,
       races: 'Wedstrijden',
       upcoming: 'Aangemeld',
-      noRace:
-        'Nog geen wedstrijden ingevoerd. Voeg er een toe en het aftellen verschijnt hier; AI-schema’s bouwen ernaartoe.',
       addRace: 'Wedstrijd toevoegen',
       editRace: 'Wedstrijd bewerken',
       medals: 'Medaillewand',
-      medalsEmpty: 'Voltooide wedstrijden verschijnen hier zodra je de uitslag invult.',
       awaiting: 'Uitslag in afwachting',
       fillResult: 'Uitslag invullen',
       candidate: (time: string, km: string) =>
@@ -3666,8 +3659,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       },
 
       records: 'Persoonlijke records',
-      recordsHint: (runs: number) =>
-        `Het snelste segment uit ${runs} voldoende lange duurlopen. Vensters eindigen op echte meetpunten, dus een tijd valt alleen langzamer uit, nooit sneller.`,
       methods: {
         samples: 'Per-seconde GPS',
         splits: 'Kilometersplits',
@@ -3678,8 +3669,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       then: 'Daarna',
 
       shoes: 'Hardloopschoenen',
-      shoesHint:
-        'Kilometers worden in deze volgorde toegerekend: het paar dat je bij de training koos → de schoen die Zepp vastlegde → het standaardpaar voor die sport. Niet-herkende kilometers tellen niet mee.',
       addShoe: 'Paar toevoegen',
       editShoe: 'Schoen bewerken',
       noShoe: 'Nog geen schoenen geregistreerd.',
@@ -3716,8 +3705,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       zeppGear: 'Zepp-schoen-ID',
 
       injuries: 'Blessures',
-      injuriesHint:
-        'Waar, van wanneer tot wanneer, hoe ernstig. AI ziet bij het plannen de actieve blessures en die in de afgelopen 90 dagen zijn hersteld.',
       addInjury: 'Blessure noteren',
       editInjury: 'Blessure bewerken',
       noInjury: 'Niets genoteerd. Houden zo.',
@@ -3735,8 +3722,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       since: (date: string) => `sinds ${date}`,
 
       epochs: 'Periodes en gebeurtenissen',
-      epochsHint:
-        'Alles wat in het leven gebeurt, noteer je hier: een verkoudheid, een reis, een verandering in je training. Geef een tijdvak een naam (opbouw eerste marathon, herstel van een blessure) en het wordt een periode: elke trendgrafiek krijgt een gekleurde achtergrond en de AI ziet het ook.',
       addEvent: 'Gebeurtenis noteren',
       addEpoch: 'Nieuwe periode',
       noEpoch: 'Nog geen gebeurtenissen of periodes.',

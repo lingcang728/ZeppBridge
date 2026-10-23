@@ -4096,7 +4096,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
   // Source: src/components/workout/feel.i18n.ts
   'components/workout/feel': {
     title: 'Twoje odczucia',
-    eyebrow: 'Tylko Ty to wiesz',
     rpe: 'Odczuwalny wysiłek (RPE)',
     rpeEasy: 'Lekko',
     rpeHard: 'Ciężko',
@@ -4118,7 +4117,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
       unknown: 'nierozpoznane',
     },
     autoNow: (name: string, how: string) => `Naliczane dla „${name}” (${how})`,
-    autoUnknown: 'Obecnie nie jest przypisane do żadnej pary. Ustaw parę domyślną lub wybierz tutaj.',
     noShoes: 'Nie zarejestrowano jeszcze butów.',
     register: 'Zarejestruj w dzienniku',
     retired: 'Wycofane',
@@ -4128,7 +4126,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
   // Source: src/components/journal/journal.i18n.ts
   'components/journal/journal': {
     title: 'Dziennik',
-    intro: 'Część, którą prowadzisz osobiście: zawody, wyniki, buty, kontuzje i okresy. Zostaje wyłącznie na tym komputerze i towarzyszy przekazywaniu danych do AI.',
     save: 'Zapisz',
     cancel: 'Anuluj',
     remove: 'Usuń',
@@ -4154,11 +4151,9 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     goal: (time: string) => `Cel ${time}`,
     races: 'Zawody',
     upcoming: 'Zgłoszone',
-    noRace: 'Brak zarejestrowanych zawodów. Dodaj bieg, a odliczanie pojawi się tutaj; plany AI uwzględnią go jako cel.',
     addRace: 'Dodaj zawody',
     editRace: 'Edytuj zawody',
     medals: 'Ściana medali',
-    medalsEmpty: 'Ukończone zawody pojawią się tutaj, gdy tylko wpiszesz wynik.',
     awaiting: 'Oczekiwanie na wynik',
     fillResult: 'Wpisz wynik',
     candidate: (time: string, km: string) => `Tego dnia zarejestrowano trening ${km} w czasie ${time}. Czy to te zawody?`,
@@ -4192,8 +4187,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     },
 
     records: 'Rekordy życiowe',
-    recordsHint: (runs: number) =>
-      `Najszybszy odcinek spośród ${runs} odpowiednio długich biegów. Okna kończą się na rzeczywistych próbkach trasy, więc wynik może być tylko bardziej rygorystyczny, nigdy sztucznie zawyżony.`,
     methods: {
       samples: 'Ślad co sekundę',
       splits: 'Międzyczasy co kilometr',
@@ -4204,7 +4197,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     then: 'Następnie',
 
     shoes: 'Buty do biegania',
-    shoesHint: 'Przebieg jest przypisywany w następującej kolejności: para wybrana na treningu → buty zarejestrowane przez Zepp → domyślna para dla tej dyscypliny. Nierozpoznane kilometry nie są wliczane.',
     addShoe: 'Dodaj parę',
     editShoe: 'Edytuj buty',
     noShoe: 'Nie zarejestrowano jeszcze butów.',
@@ -4245,7 +4237,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     zeppGear: 'ID butów w Zepp',
 
     injuries: 'Kontuzje',
-    injuriesHint: 'Gdzie, w jakim okresie i jak poważna. Przy planowaniu AI uwzględnia trwające urazy oraz te wyleczone w ciągu ostatnich 90 dni.',
     addInjury: 'Zapisz kontuzję',
     editInjury: 'Edytuj kontuzję',
     noInjury: 'Brak zarejestrowanych kontuzji. Oby tak dalej.',
@@ -4263,7 +4254,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     since: (date: string) => `od ${date}`,
 
     epochs: 'Okresy i wydarzenia',
-    epochsHint: 'Wszystko, co dzieje się w życiu, zapisujesz tutaj: przeziębienie, podróż, zmianę w treningu. Nazwij przedział czasu (przygotowania do pierwszego maratonu, powrót po kontuzji), a stanie się okresem: każdy wykres trendów dostanie delikatne tło, a AI też je zobaczy.',
     addEvent: 'Dodaj wydarzenie',
     addEpoch: 'Nowy okres',
     noEpoch: 'Nie zapisano jeszcze wydarzeń ani okresów.',

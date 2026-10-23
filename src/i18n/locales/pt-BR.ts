@@ -3330,7 +3330,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     },
     'components/workout/feel': {
       title: 'Como você se sentiu',
-      eyebrow: 'Só você sabe',
       rpe: 'Esforço percebido (RPE)',
       rpeEasy: 'Fácil',
       rpeHard: 'Difícil',
@@ -3352,7 +3351,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
         unknown: 'não identificado',
       },
       autoNow: (name: string, how: string) => `Contando para “${name}” (${how})`,
-      autoUnknown: 'Não está contando para nenhum par. Defina um par padrão ou escolha um aqui.',
       noShoes: 'Nenhum tênis cadastrado ainda.',
       register: 'Cadastrar no diário',
       retired: 'Aposentado',
@@ -3360,7 +3358,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     },
     'components/journal/journal': {
       title: 'Diário',
-      intro: 'A parte que você mesmo escreve: provas, resultados, tênis, lesões e fases. Fica só neste computador e viaja junto com os envios para a IA.',
       save: 'Salvar',
       cancel: 'Cancelar',
       remove: 'Excluir',
@@ -3380,11 +3377,9 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       goal: (time: string) => `Meta ${time}`,
       races: 'Provas',
       upcoming: 'Inscrito',
-      noRace: 'Nenhuma prova cadastrada ainda. Adicione uma e a contagem regressiva aparecerá aqui; os planos da IA focarão nela.',
       addRace: 'Cadastrar prova',
       editRace: 'Editar prova',
       medals: 'Mural de medalhas',
-      medalsEmpty: 'As provas concluídas aparecem aqui assim que você registrar o resultado.',
       awaiting: 'Aguardando resultado',
       fillResult: 'Informar resultado',
       candidate: (time: string, km: string) => `Você registrou um treino de ${km} em ${time} nesse dia. Foi essa prova?`,
@@ -3414,7 +3409,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       },
 
       records: 'Recordes pessoais',
-      recordsHint: (runs: number) => `O trecho mais rápido entre ${runs} treinos suficientemente longos. As janelas terminam em pontos reais de amostragem, então o tempo só pode sair mais lento, nunca artificialmente mais rápido.`,
       methods: {
         samples: 'Trajeto segundo a segundo',
         splits: 'Parciais por km',
@@ -3425,7 +3419,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       then: 'Depois',
 
       shoes: 'Tênis',
-      shoesHint: 'A quilometragem é atribuída nesta ordem: o par que você escolheu no treino → o tênis registrado pelo Zepp → o tênis padrão para a modalidade. Treinos não identificados não somam.',
       addShoe: 'Cadastrar um par',
       editShoe: 'Editar tênis',
       noShoe: 'Nenhum tênis cadastrado ainda.',
@@ -3460,7 +3453,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       zeppGear: 'ID do tênis no Zepp',
 
       injuries: 'Lesões',
-      injuriesHint: 'Onde, de quando a quando e qual a gravidade. Ao planejar, a IA visualiza as lesões ativas e as curadas nos últimos 90 dias.',
       addInjury: 'Registrar lesão',
       editInjury: 'Editar lesão',
       noInjury: 'Nenhuma lesão registrada. Que continue assim.',
@@ -3478,7 +3470,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       since: (date: string) => `desde ${date}`,
 
       epochs: 'Fases e eventos da vida',
-      epochsHint: 'Tudo o que acontece na vida fica aqui: um resfriado, uma viagem, uma mudança no treino. Dê um nome a um período (preparação para a primeira maratona, retorno após lesão) e ele vira uma fase: todos os gráficos de tendência ganham um fundo destacado e a IA também fica sabendo.',
       addEpoch: 'Nova fase',
       addEvent: 'Registrar um evento',
       noEpoch: 'Nenhum evento ou fase ainda.',

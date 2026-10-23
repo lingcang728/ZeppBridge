@@ -39,7 +39,7 @@ const close = () => { editing.value = null; logbook.error.value = null; };
 
 <template>
   <section class="page journal-page" aria-labelledby="journal-title">
-    <PageHeader title-id="journal-title" :title="t.title" :intro="t.intro">
+    <PageHeader title-id="journal-title" :title="t.title">
       <!-- data-morph-card：胶囊比一般的卡小，不标的话换页会从整页展开；标上就从这颗胶囊长出年轮页、返回时缩回来。 -->
       <RouterLink class="pill-button quiet" :to="{ name: 'Rings' }" data-morph-card>{{ rings.entry }} →</RouterLink>
     </PageHeader>

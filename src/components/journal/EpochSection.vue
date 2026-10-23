@@ -37,7 +37,7 @@ function addEpoch(origin: HTMLElement) {
 </script>
 
 <template>
-  <JournalCard id="life-events" :title="t.epochs" tone="epoch" :hint="t.epochsHint">
+  <JournalCard id="life-events" :title="t.epochs" tone="epoch">
     <template #actions>
       <button type="button" class="pill-button quiet" @click="addEpoch(target($event))">{{ t.addEpoch }}</button>
       <button type="button" class="pill-button quiet" @click="lifeEvents.open(undefined, todayKey(), target($event))">{{ t.addEvent }}</button>

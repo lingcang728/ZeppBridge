@@ -4,7 +4,6 @@ import { unscaledBox } from '../lib/deck/morph';
 import { holdMotion } from '../lib/motion/budget';
 import { deferSettle, exemptFromSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import { CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, RECEDE_OPACITY, RECEDE_SCALE } from '../lib/motion/timing';
-import { punch } from '../lib/motion/punch';
 import {
   backdropFor, fly, HEAD_IN, HEAD_OUT, hide, PAGE_BODY_IN, PAGE_BODY_OUT, REPLICA_IN, REPLICA_OUT,
 } from '../lib/motion/pageFlight';
@@ -375,8 +374,6 @@ export const usePageMorph = (options: { back: () => void }) => {
       hidden?.cancel();
       flight.dispose();
       release();
-      // 一镜到底的形变落地：补一拳（和年轮舞台的拳击式切换同一种手感，lib/motion/punch.ts）。
-      punch(el, { strength: 0.45 });
       // 定位的那张卡：等页面排版落定（形变放完图表才挂、有的卡读完数据才长高），还差多少就平滑滚过去，再圈一下。
       // 形变开始前那次滚动是按当时的页面高度算的，常常滚不够——不能只圈不滚。
       if (focus) revealFocusLater(el, focus);
