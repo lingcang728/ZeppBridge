@@ -8,12 +8,16 @@ import WheelDatePicker from './WheelDatePicker.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import FoldTransition from './FoldTransition.vue';
 import CoverageLedger from './archive/CoverageLedger.vue';
+import WorkoutDetailBackfill from './WorkoutDetailBackfill.vue';
+import { workoutToolsMessages } from './WorkoutTools.i18n';
+import { useMessages } from '../i18n';
 import type { useHistoryBackfill } from '../composables/useHistoryBackfill';
 import type { UserPrefs } from '../types';
 
 defineOptions({ name: 'HistoryArchivePanel' });
 
 const props = defineProps<{ state: ReturnType<typeof useHistoryBackfill>; prefs: UserPrefs | null }>();
+const tools = useMessages(workoutToolsMessages);
 
 const {
   t, streamLabel, ledger, busy, error, message, estimate, startChoice, customFrom, customMin, customMax, START_CHOICES,
@@ -75,10 +79,12 @@ const {
         </p>
       </details>
       <div v-if="ledger?.failed_chunks_detail?.length" class="s-row actions-row">
+        <p class="s-note">{{ tools.retryHint }}</p>
         <div class="s-actions">
           <button class="button secondary" type="button" :disabled="busy || isSyncing" @click="retryFailed">{{ t.retryFailed }}</button>
         </div>
       </div>
+      <WorkoutDetailBackfill />
       <div v-if="estimate?.stop_reason || wouldBeCleanedUp || error || message" class="s-row is-block notes-row">
         <p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ stopReasonText }}</p>
         <p v-if="wouldBeCleanedUp" class="api-error" role="alert">{{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}</p>

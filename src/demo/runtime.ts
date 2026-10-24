@@ -25,6 +25,7 @@ import type { AiTask } from '../lib/bridge/types';
 import type { PlanPublishAction } from '../types/trainingPlan';
 import { demoBaselines, demoHeartExtremes, demoHourlySteps, demoInsight, demoTrainingBalance, demoWorkoutSeries, demoZones } from './details';
 import { createDemoOperations } from './operations';
+import { createDemoWorkoutEdits } from './workoutEdits';
 import { createDemoLogbook } from './logbook';
 import type { HeartRateZonePreference } from '../types';
 
@@ -214,7 +215,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     training_plan_set_ai_publish: a => plan.setAiPublish(!!a.allowed),
     training_plan_publish: (args) => plan.publish(args.action as PlanPublishAction, Boolean(args.confirmClear)),
   };
-  Object.assign(handlers, operations.handlers, createDemoLogbook(data), {
+  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoWorkoutEdits(data), {
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },

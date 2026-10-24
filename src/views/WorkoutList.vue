@@ -1,8 +1,9 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
-import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import WorkoutTools from '../components/WorkoutTools.vue';
+import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
 import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
@@ -66,6 +67,20 @@ const messages = defineMessages(
   'views/WorkoutList',
 );
 const t = useMessages(messages);
+const tools = useMessages(workoutToolsMessages);
+const selecting = ref(false);
+const hiddenView = ref(false);
+const selected = ref(new Set<string>());
+const selectedIds = computed(() => [...selected.value]);
+const toggleSelected = (id: string) => { if (selected.value.has(id)) selected.value.delete(id); else selected.value.add(id); };
+const switchVisibility = () => {
+  hiddenView.value = !hiddenView.value;
+  selected.value.clear();
+  // Never leave visible records actionable in the hidden view (or vice versa),
+  // including when the replacement query fails.
+  workouts.value = []; total.value = 0;
+  void loadList();
+};
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
@@ -76,13 +91,14 @@ const t = useMessages(messages);
 const {
   items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded, sentinelRef,
 } = usePagedRecords<Workout>({
-  loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
+  loadPage: (limit, offset) => hiddenView.value ? tauriApi.getHiddenWorkoutPage(limit, offset) : tauriApi.getWorkoutPage(limit, offset),
   idOf: (item) => item.workout_id,
   failedText: () => t.value.loadFailed,
-  firstPage: pageQuery.workoutPage(LIST_PAGE_SIZE),
 });
 const initialLoading = useFirstLoad(loading);
-const displayableList = computed(() => displayableWorkouts(workouts.value));
+// Recovery must include hidden records with incomplete summaries too. Otherwise
+// CLI-hidden or partially synced records can disappear from the restore surface.
+const displayableList = computed(() => hiddenView.value ? workouts.value : displayableWorkouts(workouts.value));
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
@@ -106,6 +122,16 @@ useRevisionReload(() => void loadList());
   <section class="page list-page" aria-labelledby="workout-list-title">
     <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
     <OfficialOnlyNote topic="workouts" />
+    <div class="selection-actions">
+      <button class="button secondary" type="button" :aria-pressed="selecting" @click="selecting = !selecting; selected.clear()">{{ selecting ? tools.done : tools.select }}</button>
+      <button class="button secondary" type="button" :aria-pressed="hiddenView" @click="switchVisibility">{{ hiddenView ? tools.visible : tools.hidden }}</button>
+      <template v-if="selecting">
+        <button class="button secondary" type="button" @click="displayableList.forEach(w => selected.add(w.workout_id))">{{ tools.selectLoaded }}</button>
+        <button class="button secondary" type="button" @click="selected.clear()">{{ tools.clearSelection }}</button>
+      </template>
+    </div>
+    <p class="footnote">{{ tools.localHint }}</p>
+    <WorkoutTools :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -116,11 +142,12 @@ useRevisionReload(() => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="record-list">
+    <div v-else :class="['record-list', { selecting }]">
+      <div v-for="workout in displayableList" :key="workout.workout_id" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
+      <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time)} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />
       <RecordRow
-        v-for="workout in displayableList"
-        :key="workout.workout_id"
-        :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
+        class="workout-record"
+        :to="hiddenView ? undefined : { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
         :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time)"
@@ -128,6 +155,7 @@ useRevisionReload(() => void loadList());
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout)"
       />
+      </div>
     </div>
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" :ref="sentinelRef" class="load-more">
@@ -143,11 +171,23 @@ useRevisionReload(() => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+.selectable-record { display: flex; align-items: center; gap: 12px; }
+.selectable-record > :last-child { flex: 1; min-width: 0; }
+.selectable-record input { width: 22px; height: 22px; accent-color: var(--accent); flex-shrink: 0; }
+.selectable-record.selected { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-md); }
+.selectable-record input:focus-visible, .selection-actions .button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.record-list.selecting::before { display: none; }
+.selection-actions .button { max-width: 100%; overflow-wrap: anywhere; }
 .stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);
   font-size: var(--fs-sm);
+}
+@media (max-width: 420px) {
+  .record-list::before { display: none; }
+  .record-list { padding-inline: 10px; }
 }
 </style>

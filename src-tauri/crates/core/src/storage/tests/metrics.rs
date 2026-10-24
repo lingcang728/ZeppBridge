@@ -344,6 +344,33 @@ fn insert_acwr_workout(db: &Database, day: &str, load: Option<f64>) {
 }
 
 #[test]
+fn hidden_loads_are_excluded_without_discarding_original_day_evidence() {
+    let db = Database::in_memory().unwrap();
+    let day = NaiveDate::from_ymd_opt(2023, 11, 28).unwrap();
+    insert_acwr_workout(&db, "2023-11-28", Some(700.0));
+    // Hiding must never manufacture missing cloud coverage.
+    let edit = db
+        .edit_workouts(&["2023-11-28-Some(700.0)".into()], None, Some(true))
+        .unwrap();
+    let point = db.training_load_balance(day, day).unwrap().remove(0);
+    assert_eq!(point.acute_7d, None);
+    assert_eq!(point.chronic_28d, None);
+    // Evidence contains every original cloud record, including hidden ones.
+    confirm_acwr_days(&db, "2023-11-01", "2023-11-29");
+    let point = db.training_load_balance(day, day).unwrap().remove(0);
+    assert_eq!(point.acute_7d, Some(0.0));
+    assert_eq!(point.chronic_28d, Some(0.0));
+    assert_eq!(point.acute_days_with_data, 7);
+    assert_eq!(point.chronic_days_with_data, 28);
+    assert_eq!(point.acute_chronic_ratio, None);
+    db.undo_workout_edit(&edit.id).unwrap();
+    assert_eq!(
+        db.training_load_balance(day, day).unwrap()[0].acute_7d,
+        Some(700.0)
+    );
+}
+
+#[test]
 fn acwr_unknown_loads_and_missing_days_keep_windows_null() {
     let db = Database::in_memory().unwrap();
     let day = NaiveDate::from_ymd_opt(2023, 11, 28).unwrap();

@@ -2,6 +2,7 @@ mod app_state;
 mod clipboard_files;
 mod commands;
 mod diagnostics;
+mod exit_gate;
 mod external_open;
 mod ipc_error;
 mod ipc_types;
@@ -32,30 +33,31 @@ use commands::{
     card_collection_set, check_official_login_now, cleanup_old_data, clear_auth, coach_note_add,
     coach_note_decide, coach_note_delete, coach_note_edit, coach_notes_export, coach_notes_list,
     compact_raw_payloads, create_manual_backup, delete_life_event, disconnect_official,
-    get_app_status, get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes,
-    get_data_health, get_device_profile, get_device_profiles, get_health_overview,
-    get_heart_rate_series, get_heart_rate_zones, get_hourly_steps, get_login_status,
-    get_mcp_sidecar, get_metric_baselines, get_metric_series, get_official_status,
-    get_pending_restore, get_recent_sleep, get_recent_workouts, get_restore_preview,
-    get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
+    edit_workouts, get_app_status, get_capability_overview, get_coverage_ledger,
+    get_daily_heart_rate_extremes, get_data_health, get_device_profile, get_device_profiles,
+    get_health_overview, get_heart_rate_series, get_heart_rate_zones, get_hidden_workout_page,
+    get_hourly_steps, get_login_status, get_mcp_sidecar, get_metric_baselines, get_metric_series,
+    get_official_status, get_pending_restore, get_recent_sleep, get_recent_workouts,
+    get_restore_preview, get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
     get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
-    get_workout_detail, get_workout_fit_override, get_workout_insight, get_workout_page,
-    get_workout_series, get_workout_type_options, import_workout_fit, injuries_list, injury_delete,
-    injury_save, letters_send_reply, letters_state, letters_sync, list_backups, list_life_events,
-    manual_auth, open_data_folder, open_external_url, personal_records, prepare_ai_handoff,
-    probe_data_capabilities, race_delete, race_save, races_list, remove_workout_fit,
-    reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks, rings_save_image,
-    run_database_integrity_check, save_fit_export, save_life_event, save_mcp_bundle,
-    set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
-    set_workout_code_label, set_workout_type_override, shoe_delete, shoe_save, shoes_overview,
-    stage_restore, start_history_backfill, start_history_sync, start_incremental_sync,
-    start_official_login, start_web_login, submit_device_model_assignment,
+    get_workout_detail, get_workout_detail_coverage, get_workout_fit_override, get_workout_insight,
+    get_workout_page, get_workout_series, get_workout_type_options, import_workout_fit,
+    injuries_list, injury_delete, injury_save, letters_send_reply, letters_state, letters_sync,
+    list_backups, list_life_events, manual_auth, open_data_folder, open_external_url,
+    personal_records, prepare_ai_handoff, probe_data_capabilities, race_delete, race_save,
+    races_list, remove_workout_fit, reprocess_local_data, reset_coverage_ledger,
+    retry_failed_backfill_chunks, rings_save_image, run_database_integrity_check, save_fit_export,
+    save_life_event, save_mcp_bundle, set_backup_pinned, set_device_model_override,
+    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
+    set_workout_type_override, shoe_delete, shoe_save, shoes_overview, stage_restore,
+    start_history_backfill, start_history_sync, start_incremental_sync, start_official_login,
+    start_web_login, start_workout_detail_backfill, submit_device_model_assignment,
     submit_diagnostic_report, system_region_locale, training_plan_adherence, training_plan_discard,
     training_plan_history, training_plan_preview, training_plan_publish, training_plan_save_draft,
-    training_plan_set_ai_publish, training_plan_state, training_plan_update_draft, verify_auth,
-    verify_backup, workout_feedback_adjusted, workout_feedback_dismiss, workout_feedback_get,
-    workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze, workout_feel_get,
-    workout_feel_save,
+    training_plan_set_ai_publish, training_plan_state, training_plan_update_draft,
+    undo_workout_edit, verify_auth, verify_backup, workout_feedback_adjusted,
+    workout_feedback_dismiss, workout_feedback_get, workout_feedback_prompt, workout_feedback_save,
+    workout_feedback_snooze, workout_feel_get, workout_feel_save,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -65,7 +67,12 @@ use tauri::{AppHandle, Emitter, Manager};
 use zeppbridge_core::models::RawPayloadCompaction;
 use zeppbridge_core::storage::write_lock::{self, WritePurpose};
 
-static EXIT_AFTER_WRITERS: AtomicBool = AtomicBool::new(false);
+static EXIT_GATE: exit_gate::ExitGate = exit_gate::ExitGate::new();
+// Retain the write barrier until process termination, including the gap between
+// the waiter's success and the event loop processing its final exit request.
+static EXIT_WRITE_GUARD: std::sync::Mutex<Option<write_lock::ExclusiveWriteGuard>> =
+    std::sync::Mutex::new(None);
+struct ExitDataDir(std::path::PathBuf);
 
 /// 后端（AppState）是否已经就绪。
 ///
@@ -119,38 +126,68 @@ fn main_window_size(work_width: u32, work_height: u32, scale: f64) -> Option<(f6
 // 托盘文案表在 `tray_i18n.rs`（S6 的十语言表）：本文件只留调用点。
 // `tray_i18n::tray_labels` 自己归一语言码，`pt-BR`/`de-AT`/env 形参都收。
 
-fn handle_exit_requested(app: &AppHandle, api: &tauri::ExitRequestApi) {
-    if EXIT_AFTER_WRITERS.load(Ordering::SeqCst) {
-        return;
+fn handle_exit_requested(app: &AppHandle, code: Option<i32>, api: &tauri::ExitRequestApi) {
+    match EXIT_GATE.request() {
+        exit_gate::ExitAction::Allow => return,
+        exit_gate::ExitAction::KeepWaiting => {
+            api.prevent_exit();
+            return;
+        }
+        exit_gate::ExitAction::CheckWriters => {}
     }
-    let Some(state) = app.try_state::<AppState>() else {
+    let Some(data_dir) = app.try_state::<ExitDataDir>().map(|dir| dir.0.clone()) else {
+        EXIT_GATE.writers_finished();
         return;
     };
-    let data_dir = state.data_dir.clone();
     match write_lock::try_acquire(&data_dir, WritePurpose::Metadata) {
-        Ok(_guard) => {}
+        Ok(guard) => {
+            *EXIT_WRITE_GUARD.lock().unwrap_or_else(|p| p.into_inner()) = Some(guard);
+            EXIT_GATE.writers_finished();
+        }
         Err(write_lock::WriteLockError::Busy { .. }) => {
-            EXIT_AFTER_WRITERS.store(true, Ordering::SeqCst);
             api.prevent_exit();
             // 重放/压缩在批边界上看到这面旗就收手，写锁尽快交还——退出
             // 等待线程不用干等整个维护窗口（大库上能到分钟级）。
             storage::request_background_write_abort();
-            if let Ok(sync) = state.sync.try_read() {
-                if let Some(manager) = sync.as_ref() {
-                    manager.request_cancel();
+            if let Some(state) = app.try_state::<AppState>() {
+                if let Ok(sync) = state.sync.try_read() {
+                    if let Some(manager) = sync.as_ref() {
+                        manager.request_cancel();
+                    }
                 }
             }
             let app = app.clone();
-            std::thread::spawn(move || {
-                let _guard = write_lock::acquire_with_timeout(
-                    &data_dir,
-                    WritePurpose::Metadata,
-                    Duration::from_secs(300),
-                );
-                app.exit(0);
-            });
+            let spawned = std::thread::Builder::new()
+                .name("exit-writer-wait".into())
+                .spawn(move || {
+                    match write_lock::acquire_with_timeout(
+                        &data_dir,
+                        WritePurpose::Metadata,
+                        Duration::from_secs(300),
+                    ) {
+                        Ok(guard) => {
+                            *EXIT_WRITE_GUARD.lock().unwrap_or_else(|p| p.into_inner()) =
+                                Some(guard);
+                            EXIT_GATE.writers_finished();
+                            diagnostics::log("退出：写入已结束，继续退出");
+                            app.exit(code.unwrap_or(0));
+                        }
+                        Err(error) => {
+                            diagnostics::log(&format!(
+                                "退出已取消，等待写入结束失败，可重试：{error}"
+                            ));
+                            EXIT_GATE.retry_later();
+                        }
+                    }
+                });
+            if let Err(error) = spawned {
+                diagnostics::log(&format!("退出已取消，无法启动等待线程：{error}"));
+                EXIT_GATE.retry_later();
+            }
         }
         Err(error) => {
+            api.prevent_exit();
+            EXIT_GATE.retry_later();
             diagnostics::log(&format!("退出时无法检查写锁: {error}"));
         }
     }
@@ -354,6 +391,9 @@ pub fn run() {
                     return Err(diagnostics::fatal_startup("无法使用数据文件夹", error).into());
                 }
             };
+            // Available before the slow initializer publishes AppState, so a
+            // quit during migration/restoration still waits for its writer.
+            app.manage(ExitDataDir(data_dir.clone()));
             // 本机还有没有第二个库。有的话，用户看到的会是「我的数据不见了」，
             // 而真相是这次解析到了另一个目录（NSIS 装在 %LOCALAPPDATA%、MSI 装在
             // Program Files，两者的落点不同）。只记录，不搬动——见
@@ -392,6 +432,9 @@ pub fn run() {
                 std::thread::Builder::new()
                     .name("app-init".into())
                     .spawn(move || {
+                        if EXIT_GATE.is_exiting() {
+                            return;
+                        }
                         let stage_started = std::time::Instant::now();
                         // 排队中的恢复要在 AppState 建立之前执行：那之后桌面命令、
                         // 同步线程和本机 API 就各自持有连接，再换文件必然打架。
@@ -426,6 +469,9 @@ pub fn run() {
                             "Startup: database and application state ready in {:.1}s",
                             stage_started.elapsed().as_secs_f64()
                         ));
+                        if EXIT_GATE.is_exiting() {
+                            return;
+                        }
                         if let Some(notice) = restore_notice {
                             state.push_startup_warning(notice);
                         }
@@ -480,6 +526,9 @@ pub fn run() {
                         let compaction_handle = app_handle.clone();
                         let compaction_data_dir = init_data_dir.clone();
                         std::thread::spawn(move || {
+                            if EXIT_GATE.is_exiting() {
+                                return;
+                            }
                             let Some(db) = replay_db else {
                                 return;
                             };
@@ -503,6 +552,10 @@ pub fn run() {
                                 drop(replay_flag);
                                 // 重放期间让路的同步在等它：前端收到就马上重试，不再干等一分钟。
                                 let _ = compaction_handle.emit("replay://finished", ());
+                            }
+
+                            if EXIT_GATE.is_exiting() {
+                                return;
                             }
 
                             // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
@@ -690,6 +743,9 @@ pub fn run() {
             import_workout_fit,
             remove_workout_fit,
             set_workout_type_override,
+            edit_workouts,
+            undo_workout_edit,
+            get_hidden_workout_page,
             get_workout_type_options,
             get_unknown_workout_codes,
             set_workout_code_label,
@@ -773,6 +829,8 @@ pub fn run() {
             get_pending_restore,
             cancel_pending_restore,
             start_history_backfill,
+            get_workout_detail_coverage,
+            start_workout_detail_backfill,
             get_coverage_ledger,
             reset_coverage_ledger,
             retry_failed_backfill_chunks,
@@ -802,9 +860,12 @@ pub fn run() {
             // 有值 = 代码里调了 `exit`（托盘「退出」、更新换包前会先各记一行）。
             tauri::RunEvent::ExitRequested { code, api, .. } => {
                 diagnostics::log(&format!("退出：收到退出请求（code {code:?}）"));
-                handle_exit_requested(app, &api);
+                handle_exit_requested(app, code, &api);
             }
             tauri::RunEvent::Exit => {
+                if let Some(api) = app.try_state::<local_api::LocalApi>() {
+                    api.0.shutdown();
+                }
                 diagnostics::log("退出：事件循环结束");
             }
             _ => {}

@@ -4,7 +4,9 @@
  * 数据和动作在 composables/useWorkoutDetail.ts，显示计算在 useWorkoutPresentation.ts，
  * 轨迹几何和图表配置在 lib/workoutRoute.ts、lib/workoutCharts.ts，各块界面在 components/workout/。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import WorkoutTools from '../components/WorkoutTools.vue';
+import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
 import EmptyState from '../components/EmptyState.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import InsightCard from '../components/InsightCard.vue';
@@ -27,6 +29,8 @@ import { holdInPlace } from '../lib/motion/holdInPlace';
 import { workoutDetailMessages as messages } from './WorkoutDetail.i18n';
 
 defineOptions({ name: 'WorkoutDetail' });
+const router = useRouter();
+const tools = useMessages(workoutToolsMessages);
 
 const t = useMessages(messages);
 const route = useRoute();
@@ -114,6 +118,9 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           <AskAiButton :workout="{ id: workout.workout_id, label: sportName }" :label="sportName" card=".workout-hero" />
         </template>
       </WorkoutHero>
+      <WorkoutTools :ids="[workout.workout_id]" @changed="hidden => hidden ? router.push('/workouts') : loadDetail()" />
+      <p v-if="series?.samples.some(sample => sample.altitude_m != null) || series?.summary.elevation_gain_m != null || workout.elevation_gain_m != null" class="footnote">{{ tools.altitudeHint }}</p>
+      <p v-if="workout.effective_type === 'strength'" class="footnote">{{ tools.strengthHint }}</p>
 
       <!-- 不支持这类运动的洞察时整块不渲染：一张只会说「暂不支持」的卡片
            除了占地方和让人困惑之外没有别的作用。 -->

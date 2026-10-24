@@ -41,9 +41,11 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
 
   // connection_state 是整个应用的状态，官方授权也能让它变成 connected。
   // 此处只管高级数据：凭据存在且通过验证，才能显示「当前使用」。
-  const connected = computed(() => Boolean(appStatus.value?.configured) && appStatus.value?.auth_state === 'verified');
-  const needsReauth = computed(() => Boolean(appStatus.value?.configured) && appStatus.value?.auth_state === 'needs_reauth');
-  const configuredOnly = computed(() => Boolean(appStatus.value?.configured) && !connected.value && !needsReauth.value);
+  const credentialAvailable = computed(() => appStatus.value?.credential_available ?? Boolean(appStatus.value?.configured));
+  const configurationPresent = computed(() => appStatus.value?.auth_configuration_present ?? Boolean(appStatus.value?.configured));
+  const connected = computed(() => credentialAvailable.value && appStatus.value?.auth_state === 'verified');
+  const needsReauth = computed(() => configurationPresent.value && (!credentialAvailable.value || appStatus.value?.auth_state === 'needs_reauth'));
+  const configuredOnly = computed(() => credentialAvailable.value && !connected.value && !needsReauth.value);
   const accountRecognized = computed(() => connected.value || configuredOnly.value);
   const loginInProgress = computed(() => ['waiting', 'extracting', 'verifying'].includes(String(loginStatus.value.state)));
 

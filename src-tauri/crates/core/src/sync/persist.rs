@@ -14,13 +14,21 @@ impl SyncManager {
     ) -> Result<Vec<StreamReport>> {
         let pending = {
             let db = self.db.lock().await;
-            db.pending_running_details()?
+            db.pending_history_details(40, false)?
         };
         let queue_len = pending.len();
         let mut reports = Vec::new();
         let mut last_error = None;
         let mut attempted = 0usize;
         for item in pending {
+            if !self
+                .db
+                .lock()
+                .await
+                .workout_detail_request_ready(&item.workout_id)?
+            {
+                continue;
+            }
             if self.cancel.load(Ordering::SeqCst) {
                 return Err(ZeppBridgeError::Cancelled);
             }
@@ -35,12 +43,24 @@ impl SyncManager {
             {
                 Ok(record) => {
                     let db = self.write_db().await?;
+                    let empty = crate::normalizer::payload_is_explicitly_empty(&record.raw.payload);
                     let report = Self::persist_record(&db, record)?.report;
                     // 拿到了但解不开（隔离）不算成功：以前在落库之前就记成功，这条明细
                     // 从此不再算待拉取，下一轮同步把这一流报成绿色「没有待拉取」，这次
                     // 跑步的轨迹和采样永远没有。现在按解析结果记，失败计数照常退避。
                     let parsed = matches!(report.status, StreamStatus::Success);
                     db.record_workout_detail_fetch_result(&item.workout_id, &item.source, parsed)?;
+                    db.record_detail_request(
+                        &item.workout_id,
+                        if empty {
+                            "empty_from_cloud"
+                        } else if parsed {
+                            "persisted"
+                        } else {
+                            "parse_failed"
+                        },
+                        None,
+                    )?;
                     reports.push(report);
                 }
                 Err(error) if error.is_cancelled() => return Err(error),
@@ -48,6 +68,11 @@ impl SyncManager {
                 Err(error) => {
                     tracing::warn!("拉取运动明细 {} 失败: {}", item.workout_id, error);
                     if let Ok(db) = self.write_db().await {
+                        db.record_detail_request(
+                            &item.workout_id,
+                            super::details::detail_failure_status(&error),
+                            Some(error.code()),
+                        )?;
                         let _ = db.record_workout_detail_fetch_result(
                             &item.workout_id,
                             &item.source,
@@ -74,7 +99,7 @@ impl SyncManager {
         let previous = self.previous_records_written("workout_detail").await?;
         let still_pending = {
             let db = self.db.lock().await;
-            !db.pending_running_details()?.is_empty()
+            !db.pending_history_details(40, false)?.is_empty()
         };
         let message = if still_pending {
             "待拉取的跑步明细将在下次同步继续"

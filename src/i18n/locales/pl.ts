@@ -17,6 +17,60 @@ const activity = (value: unknown): string => str(value);
 
 export default {
   modules: {
+    'components/WorkoutTools': {
+      select: 'Wybierz treningi',
+      done: 'Zakończ wybór',
+      selectLoaded: 'Zaznacz wczytane treningi',
+      clearSelection: 'Wyczyść wybór',
+      selected: (n: number) =>
+        plural(n, {
+          one: `Wybrano ${n} trening`,
+          few: `Wybrano ${n} treningi`,
+          many: `Wybrano ${n} treningów`,
+          other: `Wybrano ${n} treningu`,
+        }),
+      visible: 'Treningi',
+      hidden: 'Ukryte treningi',
+      type: 'Wybierz typ treningu',
+      apply: 'Zastosuj typ',
+      clearType: 'Przywróć automatyczne rozpoznawanie',
+      preview: (n: number, type: string) =>
+        plural(n, {
+          one: `Zmień ${n} trening na „${type}”`,
+          few: `Zmień ${n} treningi na „${type}”`,
+          many: `Zmień ${n} treningów na „${type}”`,
+          other: `Zmień ${n} treningu na „${type}”`,
+        }),
+      hide: 'Ukryj na tym komputerze',
+      restore: 'Pokaż ponownie',
+      undo: 'Cofnij ostatnią zmianę',
+      localHint: 'Treningi ukryte na tym komputerze nie są uwzględniane w statystykach, AI ani eksporcie. Oryginalne dane pozostają zachowane i można je przywrócić w sekcji „Ukryte treningi”.',
+      saved: (n: number) =>
+        plural(n, {
+          one: `Zaktualizowano ${n} trening`,
+          few: `Zaktualizowano ${n} treningi`,
+          many: `Zaktualizowano ${n} treningów`,
+          other: `Zaktualizowano ${n} treningu`,
+        }),
+      failed: 'Nie udało się zapisać zmian. Spróbuj ponownie',
+      detailsTitle: 'Uzupełnij szczegóły treningów',
+      detailChannel: 'Źródło szczegółów',
+      advancedChannel: 'Dane zaawansowane',
+      officialChannel: 'Oficjalne połączenie Zepp',
+      detailsHint: 'Pobierz osobno szczegóły wcześniej zsynchronizowanych treningów. Możesz zatrzymać zadanie i wznowić je później; chmura może nie zawierać wszystkich szczegółów.',
+      start: 'Rozpocznij lub wznów',
+      pause: 'Zatrzymaj to zadanie',
+      retry: 'Ponów nieudane próby',
+      detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) =>
+        `Jeszcze niewysłane: ${pending} · Zapisane: ${persisted} · Bez szczegółów w chmurze: ${empty} · Błędy żądań: ${failed} · Błędy analizy: ${parse} · Bieżący kanał niedostępny: ${unavailable}`,
+      stopped: 'Zadanie zostało zatrzymane. Postęp zapisano',
+      detailFailed: 'Nie udało się uzupełnić szczegółów treningów. Sprawdź połączenie i spróbuj ponownie',
+      retryHint: 'Możesz tu także ponowić nieudane bloki z wcześniejszych wersji, bez czyszczenia rejestru ani usuwania bazy danych.',
+      credentialHint: 'Zaawansowane połączenie danych jest zapisane na tym komputerze, ale dane logowania są chwilowo niedostępne. Zaloguj się ponownie lub wyloguj i połącz jeszcze raz; oficjalna autoryzacja pozostaje zachowana osobno.',
+      altitudeHint: 'Wysokość nad poziomem morza pochodzi z zapisów zegarka lub plików FIT zaimportowanych na tym komputerze. Skalibrowana wysokość z Zepp App nie została jeszcze pobrana, dlatego wartości mogą się różnić.',
+      planHint: 'Plany są wysyłane zgodnie z wybraną główną kategorią sportu. Etykiety takie jak Trail są przesyłane jako opis; nie potwierdzono jeszcze, czy zegarek może przełączyć się na odpowiedni tryb sportowy. Plany treningu siłowego nie mogą być jeszcze wysyłane.',
+      strengthHint: 'W ukończonych treningach siłowych wyświetlane są tylko dane rzeczywiście zwrócone przez chmurę. Liczba powtórzeń w seriach, obciążenie i automatyczny pomiar ciśnienia krwi wymagają weryfikacji na podstawie próbek z konta. Jeśli model jest nieznany, możesz wskazać urządzenie ręcznie.',
+    },
 // --- Batch 1 ---
 // Source: src/App.i18n.ts
   "App": {

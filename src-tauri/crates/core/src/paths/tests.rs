@@ -18,6 +18,56 @@ use super::*;
 use std::fs;
 
 #[test]
+fn explicit_library_never_discovers_or_moves_a_default_library() {
+    let root = std::env::temp_dir().join(format!(
+        "explicit-library-isolation-{}-{}",
+        std::process::id(),
+        crate::unique_suffix()
+    ));
+    let source = root.join("default");
+    let destination = root.join("isolated");
+    fs::create_dir_all(&source).unwrap();
+    fs::create_dir_all(&destination).unwrap();
+    fs::write(source.join("zepp.db"), b"default library sentinel").unwrap();
+    fs::write(source.join("auth.json"), b"default credential sentinel").unwrap();
+    let candidates = default_library_sources(Some(destination.clone().into_os_string()), || {
+        panic!("must not discover default locations for an explicit library")
+    });
+    for candidate in candidates {
+        relocate_from(&candidate, &destination).unwrap();
+    }
+    assert_eq!(
+        fs::read(source.join("zepp.db")).unwrap(),
+        b"default library sentinel"
+    );
+    assert_eq!(
+        fs::read(source.join("auth.json")).unwrap(),
+        b"default credential sentinel"
+    );
+    assert_eq!(fs::read_dir(&destination).unwrap().count(), 0);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn absent_or_empty_override_keeps_default_discovery_and_invalid_override_fails_closed() {
+    let source = PathBuf::from("default-library-candidate");
+    assert_eq!(
+        default_library_sources(None, || vec![source.clone()]),
+        vec![source.clone()]
+    );
+    assert_eq!(
+        default_library_sources(Some("".into()), || vec![source.clone()]),
+        vec![source]
+    );
+    assert!(
+        default_library_sources(Some("relative/library".into()), || {
+            panic!("invalid overrides must not fall back to a real library")
+        })
+        .is_empty()
+    );
+}
+
+#[test]
 fn app_bundle_takes_priority_even_under_a_build_cache() {
     let path = Path::new("/tmp/target/release/bundle/ZeppBridge.app/Contents/MacOS");
     assert!(is_build_artifact_dir(path));

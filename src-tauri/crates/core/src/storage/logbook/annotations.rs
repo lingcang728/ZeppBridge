@@ -65,7 +65,7 @@ impl Database {
         let watch_rpe: Option<Option<i32>> = self
             .conn
             .query_row(
-                "SELECT rpe FROM workouts WHERE workout_id = ?1",
+                "SELECT rpe FROM workouts_visible WHERE workout_id = ?1",
                 [workout_id],
                 |row| row.get(0),
             )
@@ -125,7 +125,7 @@ impl Database {
         let exists: bool = self
             .conn
             .query_row(
-                "SELECT 1 FROM workouts WHERE workout_id = ?1",
+                "SELECT 1 FROM workouts_visible WHERE workout_id = ?1",
                 [&input.workout_id],
                 |_| Ok(true),
             )

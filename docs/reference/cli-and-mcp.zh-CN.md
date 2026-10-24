@@ -71,6 +71,28 @@ zeppbridge-cli help
 
 拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
 
+### 历史摘要、独立明细与本机纠正
+
+`sync --mode history --days N` 支持 1–3650 天。365 天以内使用普通历史窗口，366–3650 天使用持久化的按月覆盖账本；范围超过本机保留期时，先在设置中启用长期归档。`--max-chunks 24` 限制单次最多处理的月份块（允许 1–720），重新执行相同命令会续传；`--retry-failed` 重置已耗尽重试的失败块。Ctrl+C 保留已完成进度并返回退出码 `8`。JSON 中包含 `mode`、`cancelled`、`backfill` 与 `replay`；`backfill.complete` 表示覆盖任务完成，也包括云端明确无数据的月份，不保证每个月都有记录。
+
+运动明细使用独立持久队列，不再将摘要覆盖或零样本数当成明细是否完整的判断：
+
+```bash
+zeppbridge-cli workout-details --status --json
+zeppbridge-cli workout-details --channel advanced --max-items 20 --json
+zeppbridge-cli workout-details --channel official --max-items 20 --retry-failed --json
+zeppbridge-cli set-type --workout ID1 --workout ID2 --type run --json
+zeppbridge-cli set-type --workout ID1 --clear --json
+zeppbridge-cli hide --workout ID1 --json
+zeppbridge-cli hide --list --json
+zeppbridge-cli restore --workout ID1 --json
+zeppbridge-cli set-type --undo EDIT_ID --json
+```
+
+拉取明细必须指定 `advanced` 或 `official` 通道，并具有该通道的可用凭据。单次 1–40 条，默认 20 条。`--status` 只读查询、不联网，可用 `--channel` 筛选。再次执行会接着处理未完成项；已写入和云端明确无明细的记录不重复请求。失败项退避后重试，`--retry-failed` 只重置所选通道。Ctrl+C 安全暂停。JSON 包含 `coverage`、`channel`、`complete`、`cancelled`；所选通道仍有待请求或失败项（含退避中的记录）时返回 `8`，覆盖查询本身成功则返回 `0`。
+
+同次传入的全部 `--workout` ID 在一个事务中修改，并返回编辑 ID。`--undo EDIT_ID` 撤销整批修改；存在冲突的后续修改时拒绝撤销。`--clear` 恢复自动类型识别。类型值使用运动目录的标准 key，例如跑步为 `run`。隐藏保留原始记录，并从正常读取、统计及导出中排除；恢复后重新参与统计。隐藏和纠正仅作用于本机库。
+
 ### 解析器升级
 
 派生记录——一次运动的类型、一晚的睡眠阶段、全天压力曲线——是报文第一次入库时由解析器产出的。规则改版之后，已经在库里的记录仍然是旧结果。只有把存下来的原始报文重放一遍，历史才会跟上；不重放，一个新增运动编号的版本只修好以后同步来的记录，此前那 199 条 `unknown:211` 一条都不会变——而来报这个问题的人恰恰是为历史记录来的。

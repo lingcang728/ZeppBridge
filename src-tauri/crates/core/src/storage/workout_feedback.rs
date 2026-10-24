@@ -146,7 +146,7 @@ impl Database {
             "SELECT w.workout_id, date(w.start_time,'localtime'), w.start_time, w.end_time,
                     COALESCE(w.workout_type_override, w.workout_type), w.moving_seconds,
                     w.distance_meters, w.avg_hr
-               FROM workouts w
+               FROM workouts_visible w
               WHERE w.end_time >= ?1 AND w.start_time <= ?2
                 AND NOT EXISTS (SELECT 1 FROM workout_feedback f WHERE f.workout_id = w.workout_id)
               ORDER BY w.end_time DESC LIMIT 20",
@@ -220,7 +220,7 @@ impl Database {
             .conn
             .query_row(
                 "SELECT date(start_time,'localtime'), COALESCE(workout_type_override, workout_type)
-                   FROM workouts WHERE workout_id = ?1",
+                   FROM workouts_visible WHERE workout_id = ?1",
                 [workout_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -343,9 +343,11 @@ impl Database {
                     f.adjustment, f.created_at, f.updated_at, w.start_time,
                     COALESCE(w.workout_type_override, w.workout_type), p.workout, p.workout_date
                FROM workout_feedback f
-               LEFT JOIN workouts w ON w.workout_id = f.workout_id
+               LEFT JOIN workouts_visible w ON w.workout_id = f.workout_id
                LEFT JOIN training_plan_workouts p ON p.id = f.plan_workout_id
               WHERE (?1 IS NULL OR f.workout_id = ?1) AND (?2 = 0 OR f.state = 'rated')
+                AND NOT EXISTS (SELECT 1 FROM workout_local_state s
+                                WHERE s.workout_id = f.workout_id AND s.hidden = 1)
               ORDER BY COALESCE(w.start_time, f.created_at) DESC LIMIT ?3",
         )?;
         let rows = statement.query_map(

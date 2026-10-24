@@ -136,7 +136,6 @@ fn current_notice() -> Option<Notice> {
 }
 
 fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
-    let meta = OfficialStore::new(data_dir).meta().ok().flatten();
     if let Some((url, notice)) = waiting_flow() {
         return OfficialStatus {
             state: "waiting".into(),
@@ -148,10 +147,18 @@ fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
             authorize_url: Some(url),
         };
     }
+    stored_account_status(&OfficialStore::new(data_dir))
+}
+
+fn stored_account_status(store: &OfficialStore) -> OfficialStatus {
+    let meta = store.meta().ok().flatten();
     match meta {
         Some(meta) => OfficialStatus {
             // 过期了还没续上（get_official_status 会先试着续一次）就不能说「已授权」。
-            state: if meta.needs_reauth || meta.is_expired(chrono::Utc::now().timestamp()) {
+            state: if meta.needs_reauth
+                || meta.is_expired(chrono::Utc::now().timestamp())
+                || store.load().ok().flatten().is_none()
+            {
                 "needs_reauth"
             } else {
                 "connected"
@@ -512,6 +519,47 @@ pub async fn disconnect_official(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn official_metadata_without_readable_credentials_offers_reauthorization() {
+        struct Credentials(std::result::Result<Option<String>, String>);
+        impl zeppbridge_core::auth::CredentialBackend for Credentials {
+            fn set(&self, _: &str, _: &str) -> std::result::Result<(), String> {
+                Ok(())
+            }
+            fn get(&self, _: &str) -> std::result::Result<Option<String>, String> {
+                self.0.clone()
+            }
+            fn delete(&self, _: &str) -> std::result::Result<(), String> {
+                Ok(())
+            }
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-official-status-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(
+            dir.join("official.json"),
+            r#"{"user_id":"user-a","connected_at":1,"expires_at":null,"needs_reauth":false}"#,
+        )
+        .unwrap();
+        for (credentials, expected) in [
+            (Err("access denied".into()), "needs_reauth"),
+            (Ok(None), "needs_reauth"),
+            (Ok(Some("token".into())), "connected"),
+        ] {
+            let store = OfficialStore::with_backend(&dir, Arc::new(Credentials(credentials)));
+            let status = stored_account_status(&store);
+            assert_eq!(status.state, expected);
+            assert!(
+                status.user_id_masked.is_some(),
+                "retain identity for the disconnect control"
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     /// R04：已有一次在等时再点「授权」，要在有限时间内拿到同一个等待状态，
     /// 之后取消和查询照常——以前这条路径在锁里重入同一把锁，永远不返回。

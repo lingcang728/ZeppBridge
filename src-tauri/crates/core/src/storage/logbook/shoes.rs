@@ -193,7 +193,7 @@ impl Database {
             "SELECT w.workout_id, COALESCE(w.workout_type_override, w.workout_type),
                     date(w.start_time, 'localtime'), w.distance_meters, w.gear_id,
                     a.shoe_mode, a.shoe_id
-               FROM workouts w LEFT JOIN workout_annotations a ON a.workout_id = w.workout_id
+               FROM workouts_visible w LEFT JOIN workout_annotations a ON a.workout_id = w.workout_id
               WHERE (?1 IS NULL OR w.workout_id = ?1)
               ORDER BY w.start_time",
         )?;

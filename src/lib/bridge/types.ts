@@ -419,6 +419,11 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
+  editWorkouts(workoutIds: string[], changeType: boolean, workoutType: string | null, hidden: boolean | null): Promise<{ id: string; changed: number }>;
+  undoWorkoutEdit(id: string): Promise<number>;
+  getHiddenWorkoutPage(limit: number, offset: number): Promise<Page<Workout>>;
+  getWorkoutDetailCoverage(channel?: WorkoutDetailChannel): Promise<WorkoutDetailCoverage>;
+  startWorkoutDetailBackfill(maxRecords: number, retryFailed: boolean, channel?: WorkoutDetailChannel): Promise<WorkoutDetailCoverage>;
   /** #140：本机用修正过的 .fit 顶替这条运动；`path` 是用户在对话框里选的文件。 */
   getWorkoutFitOverride(workoutId: string): Promise<WorkoutFitOverride | null>;
   importWorkoutFit(workoutId: string, path: string): Promise<WorkoutFitOverride>;
@@ -526,3 +531,10 @@ export interface McpSidecar {
   stale_clients?: McpClientId[];
 }
 export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex';
+
+export type WorkoutDetailChannel = 'advanced' | 'official';
+
+export interface WorkoutDetailCoverage {
+  pending: number; persisted: number; empty_from_cloud: number; request_failed: number;
+  parse_failed: number; unavailable: number; ready: number;
+}

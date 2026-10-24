@@ -82,6 +82,34 @@ fn pause_count(db: &Database) -> i64 {
 }
 
 #[test]
+fn a_hidden_workout_keeps_fit_corrections_during_cloud_replay_and_restore() {
+    let db = Database::in_memory().unwrap();
+    insert_cloud_workout(&db);
+    let bytes = corrected_fit();
+    let imported = decode_fit_file(&bytes).unwrap();
+    let edit = db
+        .edit_workouts(&["1700000000".into()], Some(Some("hiking")), Some(true))
+        .unwrap();
+    assert!(matches!(
+        db.import_workout_fit("1700000000", None, &bytes, &imported)
+            .unwrap(),
+        FitOverrideOutcome::Applied(_)
+    ));
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(db.count_workouts().unwrap(), 0);
+    assert_eq!(distance(&db), Some(2200.0));
+    db.undo_workout_edit(&edit.id).unwrap();
+    assert!(db
+        .get_workout_series("1700000000")
+        .unwrap()
+        .samples
+        .iter()
+        .any(|s| s.distance_m == Some(2200.0)));
+    assert!(db.remove_workout_fit("1700000000").unwrap());
+    assert_eq!(distance(&db), Some(2600.0));
+}
+
+#[test]
 fn a_fit_correction_survives_replay_and_undo_restores_the_cloud() {
     let db = Database::in_memory().unwrap();
     insert_cloud_workout(&db);

@@ -55,7 +55,7 @@ impl Database {
                     }
                 }
                 AiTaskCategory::Workout => {
-                    let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'), workout_id, moving_seconds FROM workouts WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
+                    let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'), workout_id, moving_seconds FROM workouts_visible WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
                     let mut complete = BTreeMap::<String, bool>::new();
                     for row in stmt.query_map(params![first, last], |r| {
                         Ok((

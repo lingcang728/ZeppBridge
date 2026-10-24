@@ -12,14 +12,14 @@ import { deckMessages } from '../deck.i18n';
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const {
-  reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly,
+  reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly, needsReauth,
   showManualAuth, manualAppToken, manualUserId, manualRegionHost, manualAuthBusy,
   startLogin, cancelLogin, submitManualAuth,
 } = useSettingsContext().auth;
 const official = useSettingsContext().official;
 
 const needsAttention = computed(() =>
-  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value
+  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value || needsReauth.value
   || official.waiting.value || Boolean(official.failureText.value) || official.needsReauth.value
   || !(connected.value || configuredOnly.value || official.connected.value));
 </script>
@@ -59,6 +59,7 @@ const needsAttention = computed(() =>
           <button v-else class="button primary" type="button" :disabled="official.busy.value" @click="official.start">
             {{ official.busy.value ? t.authOpening : official.needsReauth.value ? t.officialReauth : t.officialConnect }}
           </button>
+          <button v-if="!official.connected.value && !official.waiting.value && official.status.value.user_id_masked" class="button secondary" type="button" :disabled="official.busy.value" @click="official.disconnect">{{ t.officialDisconnect }}</button>
         </div>
       </div>
       <div class="s-row">

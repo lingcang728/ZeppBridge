@@ -1,8 +1,9 @@
 {
-  "version": 8,
-  "checked_at": "2026-10-20",
+  "version": 9,
+  "checked_at": "2026-10-23",
   "notes": "Zepp cloud-history observations take precedence where its numeric types differ from the Zepp OS device protocol. Extended identifiers are cross-checked against Gadgetbridge's Zepp OS catalog and user-supplied Zepp App screenshots. A null code means the sport is offered as a manual correction but no Zepp numeric type is known to produce it -- never guess one in to make the entry look complete.",
   "sports": [
+    { "code": 224, "key": "hiking", "label_zh": "徒步", "label_en": "Hiking", "label_es": "Senderismo", "source": "user_reported", "evidence": "https://github.com/lingcang728/ZeppBridge/issues/125" },
     { "code": 1, "key": "run", "label_zh": "户外跑步", "label_en": "Outdoor Running", "label_es": "Carrera al aire libre", "source": "cloud_verified" },
     { "code": 2, "key": "treadmill", "label_zh": "跑步机", "label_en": "Treadmill", "label_es": "Caminadora", "source": "zepp_os_compatible" },
     { "code": 3, "key": "walking", "label_zh": "健走", "label_en": "Walking", "label_es": "Caminata", "source": "zepp_os_compatible" },
@@ -16,7 +17,7 @@
     { "code": 12, "key": "elliptical", "label_zh": "椭圆机", "label_en": "Elliptical", "label_es": "Elíptica", "source": "user_reported" },
     { "code": 13, "key": "walking", "label_zh": "健走", "label_en": "Walking", "label_es": "Caminata", "source": "cloud_inferred" },
     { "code": 14, "key": "pool_swimming", "label_zh": "泳池游泳", "label_en": "Pool Swimming", "label_es": "Natación en piscina", "source": "cloud_reference" },
-    { "code": 15, "key": "hiking", "label_zh": "徒步", "label_en": "Hiking", "label_es": "Senderismo", "source": "zepp_os_compatible" },
+    { "code": null, "key": "hiking", "label_zh": "徒步", "label_en": "Hiking", "label_es": "Senderismo", "source": "zepp_os_compatible" },
     { "code": 16, "key": "free_training", "label_zh": "自由训练", "label_en": "Free Training", "label_es": "Entrenamiento libre", "source": "cloud_inferred" },
     { "code": 17, "key": "tennis", "label_zh": "网球", "label_en": "Tennis", "label_es": "Tenis", "source": "zepp_os_compatible" },
     { "code": 21, "key": "jump_rope", "label_zh": "跳绳", "label_en": "Jump Rope", "label_es": "Saltar la cuerda", "source": "zepp_os_compatible" },

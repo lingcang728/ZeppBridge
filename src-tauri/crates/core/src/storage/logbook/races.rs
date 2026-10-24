@@ -112,7 +112,7 @@ impl Database {
             "SELECT workout_id, COALESCE(workout_type_override, workout_type), start_time,
                     CAST(ROUND((julianday(end_time) - julianday(start_time)) * 86400) AS INTEGER),
                     distance_meters
-               FROM workouts WHERE date(start_time, 'localtime') = ?1",
+               FROM workouts_visible WHERE date(start_time, 'localtime') = ?1",
         )?;
         let rows = statement.query_map([&race.race_date], |row| {
             Ok((

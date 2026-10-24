@@ -1,5 +1,144 @@
 use super::*;
 
+#[test]
+fn changing_a_device_assignment_replays_context_types_and_preserves_workout_corrections() {
+    let db = Database::in_memory().unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:run:assignment-change".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({"items": [{
+            "workoutId": "assigned", "startTime": 1700000000, "endTime": 1700003600,
+            "type": 15, "deviceId": "AABBCCDDEEFF"
+        }]}),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.reprocess_raw_records().unwrap();
+    assert!(db.pending_replay_plan().unwrap().is_none());
+    db.set_workout_type_override("assigned", Some("strength"))
+        .unwrap();
+    for (assignment, expected) in [
+        (Some("amazfit-balance-2"), "open_water_swimming"),
+        (Some("amazfit-t-rex-3"), "unknown:15"),
+        (Some("amazfit-balance-2"), "open_water_swimming"),
+        (None, "unknown:15"),
+    ] {
+        db.set_device_model_override("AABBCCDDEEFF", assignment)
+            .unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_some());
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        let row = db.get_workout_detail("assigned").unwrap().unwrap();
+        assert_eq!(row.normalized_type, expected);
+        assert_eq!(row.effective_type, "strength");
+        assert_eq!(row.zepp_type, Some(15));
+        assert!(db.pending_replay_plan().unwrap().is_none());
+    }
+}
+
+#[test]
+fn context_type_replay_corrects_old_hiking_without_losing_local_edits() {
+    let db = Database::in_memory().unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(), source_key: "sport_history:run:context-types".into(),
+        source_scope: SourceScope::Device, device_id: None, start_utc: ts(), end_utc: None,
+        payload: serde_json::json!({"items": [
+            {"workoutId": "balance", "startTime": 1700000000, "endTime": 1700003600, "type": 15, "deviceId": "AABBCCDDEEFF"},
+            {"workoutId": "corrected", "startTime": 1700004000, "endTime": 1700007600, "type": 15, "deviceId": "AABBCCDDEEFF"},
+            {"workoutId": "unattributed", "startTime": 1700008000, "endTime": 1700011600, "type": 15},
+            {"workoutId": "other", "startTime": 1700012000, "endTime": 1700015600, "type": 15, "deviceId": "112233445566"},
+            {"workoutId": "hike", "startTime": 1700016000, "endTime": 1700019600, "type": 224}
+        ]}), capability: CapabilityStatus::Verified,
+    }).unwrap();
+    db.reprocess_raw_records().unwrap();
+    // Emulate rows produced by the old unconditional 15 -> hiking rule.
+    db.conn.execute("UPDATE workouts SET workout_type = 'hiking', workout_type_source = 'numeric_mapped' WHERE zepp_type = 15", []).unwrap();
+    db.set_workout_type_override("corrected", Some("strength"))
+        .unwrap();
+    db.upsert_device_identity(&DeviceIdentityHint {
+        aliases: vec!["AABBCCDDEEFF".into(), "23229501001311".into()],
+        device_id: Some("AABBCCDDEEFF".into()),
+        serial: Some("23229501001311".into()),
+        name: Some("Amazfit T-Rex 3".into()),
+        ..Default::default()
+    })
+    .unwrap();
+    // The explicit user assignment via an alias supersedes an old profile name.
+    db.set_device_model_override("23229501001311", Some("amazfit-balance-2"))
+        .unwrap();
+    db.set_app_meta(
+        "normalizer_revision",
+        "zepp-normalizer-before-context-types",
+    )
+    .unwrap();
+    db.reprocess_raw_records_if_needed().unwrap().unwrap();
+    for (id, expected) in [
+        ("balance", "open_water_swimming"),
+        ("corrected", "open_water_swimming"),
+        ("unattributed", "unknown:15"),
+        ("other", "unknown:15"),
+        ("hike", "hiking"),
+    ] {
+        let row = db.get_workout_detail(id).unwrap().unwrap();
+        assert_eq!(row.normalized_type, expected, "{id}");
+        assert_eq!(
+            row.effective_type,
+            if id == "corrected" {
+                "strength"
+            } else {
+                expected
+            },
+            "{id}"
+        );
+    }
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(db.get_recent_workouts(10).unwrap().len(), 5);
+    assert_eq!(
+        db.get_workout_detail("corrected")
+            .unwrap()
+            .unwrap()
+            .effective_type,
+        "strength"
+    );
+}
+
+#[test]
+fn context_type_replay_uses_a_stored_device_name_and_rejects_conflicting_payload() {
+    let db = Database::in_memory().unwrap();
+    db.upsert_device_identity(&DeviceIdentityHint {
+        device_id: Some("AABBCCDDEEFF".into()),
+        name: Some("Amazfit Balance 2".into()),
+        ..Default::default()
+    })
+    .unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(), source_key: "sport_history:run:profile-context".into(),
+        source_scope: SourceScope::Device, device_id: None, start_utc: ts(), end_utc: None,
+        payload: serde_json::json!({"items": [
+            {"workoutId": "profile", "startTime": 1700000000, "endTime": 1700003600, "type": 15, "deviceId": "AABBCCDDEEFF"},
+            {"workoutId": "conflict", "startTime": 1700004000, "endTime": 1700007600, "type": 15, "deviceId": "AABBCCDDEEFF", "deviceName": "Amazfit T-Rex 3"}
+        ]}), capability: CapabilityStatus::Verified,
+    }).unwrap();
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(
+        db.get_workout_detail("profile")
+            .unwrap()
+            .unwrap()
+            .normalized_type,
+        "open_water_swimming"
+    );
+    assert_eq!(
+        db.get_workout_detail("conflict")
+            .unwrap()
+            .unwrap()
+            .normalized_type,
+        "unknown:15"
+    );
+}
+
 /// 一条运动加上它的明细报文，明细里带手表记的圈。
 ///
 /// 这个夹具模拟明细规则尚未落库的旧库：明细里的 `lap` 已经被清掉，后面的

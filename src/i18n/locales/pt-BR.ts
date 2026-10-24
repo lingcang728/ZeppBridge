@@ -15,6 +15,25 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/WorkoutTools': {
+      detailChannel: 'Fonte dos detalhes', advancedChannel: 'Dados avançados', officialChannel: 'Zepp oficial',
+      select: 'Selecionar registros', done: 'Concluir seleção', selectLoaded: 'Selecionar registros carregados', clearSelection: 'Limpar seleção',
+      selected: (n: number) => plural(n, { one: `${n} registro selecionado`, other: `${n} registros selecionados` }), visible: 'Registros de treino', hidden: 'Registros ocultos',
+      type: 'Selecionar tipo de treino', apply: 'Aplicar tipo', clearType: 'Restaurar detecção automática',
+      preview: (n: number, type: string) => plural(n, { one: `Alterar ${n} registro para “${type}”`, other: `Alterar ${n} registros para “${type}”` }),
+      hide: 'Ocultar neste computador', restore: 'Voltar a exibir', undo: 'Desfazer última alteração',
+      localHint: 'Registros ocultos neste computador não entram nas estatísticas, na IA nem nas exportações. Os dados originais são mantidos e podem ser restaurados em “Registros ocultos”.',
+      saved: (n: number) => plural(n, { one: `${n} registro atualizado`, other: `${n} registros atualizados` }), failed: 'Falha ao atualizar. Tente novamente.',
+      detailsTitle: 'Completar detalhes dos treinos', detailsHint: 'Complete separadamente os detalhes dos treinos anteriores já sincronizados. Você pode parar e continuar mais tarde; a nuvem pode não disponibilizar todos os detalhes.',
+      start: 'Iniciar ou continuar', pause: 'Interromper tarefa', retry: 'Tentar novamente os itens com falha',
+      detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) => `Não solicitados ${pending} · Salvos ${persisted} · Sem detalhes na nuvem ${empty} · Falhas na solicitação ${failed} · Falhas na interpretação ${parse} · Canal atual indisponível ${unavailable}`,
+      stopped: 'Tarefa interrompida. Progresso salvo.', detailFailed: 'Falha ao completar os detalhes. Verifique a conexão e tente novamente.',
+      retryHint: 'Você também pode tentar novamente aqui os blocos com falha de versões anteriores, sem limpar o registro de cobertura nem excluir o banco de dados.',
+      credentialHint: 'A conexão de dados avançados está salva neste computador, mas as credenciais estão temporariamente indisponíveis. Você pode fazer login novamente ou sair da conta e reconectar; a autorização oficial é mantida separadamente.',
+      altitudeHint: 'A altitude vem dos registros do relógio ou de arquivos FIT importados neste computador. A altitude calibrada do Zepp App ainda não foi obtida, por isso os valores podem ser diferentes.',
+      planHint: 'Os planos são enviados de acordo com a categoria de esporte selecionada. Rótulos como Trail são enviados como descrição; ainda não foi confirmado se o relógio consegue alternar para o modo de treino correspondente. Planos de treino de força ainda não podem ser enviados.',
+      strengthHint: 'Treinos de força concluídos exibem apenas os dados retornados pela nuvem. Repetições e carga por série, além da pressão arterial automática, precisam de validação com amostras de contas; se o modelo for desconhecido, você pode identificar o dispositivo manualmente.',
+    },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Sem leituras nos últimos 6 meses: ${list}`,
       separator: ", ",

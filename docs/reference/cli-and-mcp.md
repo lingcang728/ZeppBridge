@@ -100,6 +100,46 @@ exit codes are a contract and do not change with any of this.
 A misspelled flag is always an error rather than being ignored — silently
 accepting `--form json` would let a script believe the format took effect.
 
+### Historical summaries and workout details
+
+`sync --mode history --days N` accepts 1–3650 days. Up to 365 days uses
+the normal history window; 366–3650 days uses the persistent monthly coverage
+ledger. Enable long-term archive in Settings when the range exceeds local
+retention. `--max-chunks 24` bounds each monthly run (1–720); rerun the same
+command to resume, or add `--retry-failed` to reset exhausted failures. Ctrl+C
+keeps completed chunks and returns exit code `8`. JSON includes `mode`,
+`cancelled`, `backfill` and `replay`; `backfill.complete` describes coverage,
+including confirmed cloud-empty months, rather than promising cloud data exists.
+
+Workout details have a separate persistent queue:
+
+```bash
+zeppbridge-cli workout-details --status --json
+zeppbridge-cli workout-details --channel advanced --max-items 20 --json
+zeppbridge-cli workout-details --channel official --max-items 20 --retry-failed --json
+zeppbridge-cli set-type --workout ID1 --workout ID2 --type run --json
+zeppbridge-cli set-type --workout ID1 --clear --json
+zeppbridge-cli hide --workout ID1 --json
+zeppbridge-cli hide --list --json
+zeppbridge-cli restore --workout ID1 --json
+zeppbridge-cli set-type --undo EDIT_ID --json
+```
+
+Fetching requires an explicit channel and its connected credentials; each run
+requests at most 1–40 details (default 20). `--status` reads without network or
+writes and optionally filters by `--channel`. Rerunning resumes unfinished
+requests. Successful and cloud-empty records are skipped; failed requests use
+backoff, and `--retry-failed` resets failures only for the selected channel.
+Ctrl+C pauses safely. JSON contains `coverage`, `channel`, `complete` and
+`cancelled`. Fetching exits `8` while the selected channel still has pending or
+failed requests, including during backoff; a coverage query exits `0` when the
+query itself succeeds. Summary coverage and detail coverage are independent.
+
+Local edits are atomic across all `--workout` IDs and return an edit ID.
+`--undo EDIT_ID` reverses the entire edit unless a later edit conflicts.
+`--clear` removes the local type correction. Hiding preserves the original
+record and excludes it from normal reads and exports until restored.
+
 ### Normalizer upgrades
 
 Derived records — a workout's sport type, a night's sleep stages, the all-day

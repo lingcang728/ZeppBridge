@@ -13,6 +13,8 @@
  *     换成能发的大类。只有 `editable` 时才给出路（历史和 MCP 未接受的草稿只读）。
  */
 import { computed } from 'vue';
+import { useMessages } from '../../i18n';
+import { workoutToolsMessages } from '../WorkoutTools.i18n';
 import SegmentTrack, { type SegmentItem } from '../SegmentTrack.vue';
 import { SPORT_VARIANTS } from '../../lib/trainingPlan/reshape';
 import PlanStrip from './PlanStrip.vue';
@@ -34,6 +36,7 @@ const props = withDefaults(defineProps<{ row: DayRow | null; issues: PlanIssue[]
 const emit = defineEmits<{ retype: [index: number, sport: PlanSport]; remove: [index: number] }>();
 const { t, sport, activity, variant, intensity, minutes, length, target } = usePlanText();
 const bridgeText = useBridgeText();
+const tools = useMessages(workoutToolsMessages);
 const restTime = computed(() => { const n = props.row?.rest?.bedtime_minutes; return n == null ? null : `${String(Math.floor(n / 60)).padStart(2,'0')}:${String(n % 60).padStart(2,'0')}`; });
 
 const dateLine = computed(() => {
@@ -53,8 +56,7 @@ const facts = computed(() => {
 const pickNote = computed(() => {
   const current = workout.value;
   if (!current || !SPORT_VARIANTS[current.sport].length) return '';
-  const name = variant(current.sport, current.variant);
-  return name ? t.value.variantPick(name) : t.value.variantPickAny;
+  return tools.value.planHint;
 });
 /* 只管手表收不下的（走路这类）；能发的大类只是缺东西的，在单天页的编辑器里补。 */
 const held = computed<PlanHeldWorkout[]>(() => props.row?.held.filter((item) => item.activity) ?? []);
@@ -243,4 +245,9 @@ h3 { margin: 0; font-size: var(--fs-2xl); line-height: 1.25; }
 .held-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .held-acts .danger { color: var(--danger); }
 @media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 540px) {
+  .step { grid-template-columns: 14px minmax(0, 1fr); gap: 6px; }
+  .target { grid-column: 2; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  .local-rest p:first-child { flex-wrap: wrap; gap: 6px; }
+}
 </style>

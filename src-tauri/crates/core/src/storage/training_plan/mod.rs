@@ -271,7 +271,7 @@ impl Database {
     pub fn training_plan_max_hr(&self) -> Result<Option<u16>> {
         let value: Option<f64> = self.conn.query_row(
             "SELECT MAX(v) FROM (
-                SELECT MAX(max_hr) AS v FROM workouts WHERE max_hr > 0
+                SELECT MAX(max_hr) AS v FROM workouts_visible WHERE max_hr > 0
                 UNION ALL
                 SELECT MAX(value) FROM daily_metrics
                  WHERE metric = 'device_max_hr' AND value > 0)",

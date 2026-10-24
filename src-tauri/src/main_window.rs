@@ -57,6 +57,9 @@ fn checked<T>(operation: &str, result: tauri::Result<T>) -> Option<T> {
 }
 
 pub(crate) fn request_show(app: &AppHandle, source: &'static str) {
+    if crate::EXIT_GATE.is_exiting() {
+        return;
+    }
     diagnostics::log(&format!("Main window open requested: {source}"));
     let state = app.state::<MainWindowState>();
     // A second launch can arrive while the configured window is still being
@@ -198,6 +201,9 @@ fn recover_geometry(window: &WebviewWindow) {
 }
 
 fn show(app: &AppHandle) {
+    if crate::EXIT_GATE.is_exiting() {
+        return;
+    }
     let window = match app.get_webview_window("main") {
         Some(window) => window,
         None => {

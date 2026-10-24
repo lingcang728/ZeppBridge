@@ -115,7 +115,7 @@ impl Database {
         let mut statement = self.conn.prepare(&format!(
             "SELECT workout_id, date(start_time, 'localtime'), distance_meters,
                     CAST(ROUND((julianday(end_time) - julianday(start_time)) * 86400) AS INTEGER)
-               FROM workouts
+               FROM workouts_visible
               WHERE COALESCE(workout_type_override, workout_type) IN ({})
                 AND distance_meters >= ?1",
             RUN_TYPES

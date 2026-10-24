@@ -93,7 +93,10 @@ impl Database {
             }
             OfficialKind::Sports => {
                 let legacy = Normalizer::official_sports_as_legacy(payload);
-                let rows = Normalizer::normalize_workouts_with_sport(&legacy, None)?;
+                let rows =
+                    Normalizer::normalize_workouts_with_device_context(&legacy, None, |id| {
+                        self.workout_device_catalog_id(id)
+                    })?;
                 let keep: Vec<String> = rows.iter().map(|row| row.workout_id.clone()).collect();
                 // 和旧通道一样只删「不再产出」的：先删再插会级联带走逐秒序列和轨迹。
                 self.clear_workouts_for_raw_except(raw_record_id, &keep)?;

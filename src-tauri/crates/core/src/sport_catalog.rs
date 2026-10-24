@@ -50,6 +50,60 @@ pub fn resolve(type_id: i64) -> Option<&'static str> {
     entries().get(&type_id).map(String::as_str)
 }
 
+/// Cloud history and Zepp OS protocol numbers are separate namespaces (#155).
+/// The conflicting cloud code 15 is only established for Balance 2.
+pub fn resolve_cloud(
+    type_id: i64,
+    device_source: Option<i64>,
+    name: Option<&str>,
+) -> Option<&'static str> {
+    resolve_cloud_with_device(type_id, device_source, name, None)
+}
+
+/// `catalog_id` must belong to the physical device identified by this row,
+/// never merely the account's current or only watch. Conflicting recognised
+/// identities are insufficient evidence for the device-specific code 15.
+pub fn resolve_cloud_with_device(
+    type_id: i64,
+    device_source: Option<i64>,
+    name: Option<&str>,
+    catalog_id: Option<&str>,
+) -> Option<&'static str> {
+    if type_id != 15 {
+        return resolve(type_id);
+    }
+    let source = crate::device_catalog::match_catalog(&crate::device_catalog::CatalogMatchInput {
+        device_source_codes: device_source.into_iter().collect(),
+        ..Default::default()
+    });
+    let named = crate::device_catalog::match_catalog(&crate::device_catalog::CatalogMatchInput {
+        device_names: name.into_iter().collect(),
+        ..Default::default()
+    });
+    let local = catalog_id.and_then(|id| {
+        crate::device_catalog::catalog_entries()
+            .iter()
+            .find(|entry| entry.catalog_id == id)
+    });
+    let mut identities = source
+        .iter()
+        .map(|matched| matched.entry)
+        .chain(named.iter().map(|matched| matched.entry))
+        .chain(local);
+    let first = identities.next()?;
+    let key = |entry: &crate::device_catalog::CatalogEntry| {
+        entry
+            .canonical_device_key
+            .clone()
+            .unwrap_or_else(|| entry.catalog_id.clone())
+    };
+    let expected = key(first);
+    if expected != "amazfit-balance-2" || identities.any(|entry| key(entry) != expected) {
+        return None;
+    }
+    Some("open_water_swimming")
+}
+
 fn known_keys() -> &'static HashSet<String> {
     static KEYS: OnceLock<HashSet<String>> = OnceLock::new();
     KEYS.get_or_init(|| options().iter().map(|entry| entry.key.clone()).collect())
@@ -87,6 +141,37 @@ pub fn options() -> &'static [SportOption] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn code_15_requires_unambiguous_balance_2_cloud_context() {
+        assert_eq!(resolve(15), None);
+        assert_eq!(resolve_cloud(15, None, None), None);
+        assert_eq!(
+            resolve_cloud(15, Some(9568512), None),
+            Some("open_water_swimming")
+        );
+        assert_eq!(
+            resolve_cloud(15, None, Some("Amazfit Balance 2")),
+            Some("open_water_swimming")
+        );
+        assert_eq!(
+            resolve_cloud(15, Some(9568512), Some("Amazfit T-Rex 3")),
+            None
+        );
+        assert_eq!(
+            resolve_cloud_with_device(15, Some(9568512), None, Some("amazfit-t-rex-3")),
+            None
+        );
+        assert_eq!(
+            resolve_cloud_with_device(15, None, None, Some("amazfit-balance-2")),
+            Some("open_water_swimming")
+        );
+        assert_eq!(
+            resolve_cloud_with_device(15, None, None, Some("not-a-device")),
+            None
+        );
+        assert_eq!(resolve_cloud(224, None, None), Some("hiking"));
+    }
 
     #[test]
     fn catalog_keeps_cloud_overrides_and_covers_extended_types() {

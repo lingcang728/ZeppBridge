@@ -16,11 +16,13 @@ import { openFaq } from '../../../lib/faqLink';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { accountCardMessages } from './account.i18n';
+import { workoutToolsMessages } from '../../../components/WorkoutTools.i18n';
 
 const d = useMessages(deckMessages);
 const a = useMessages(accountCardMessages);
 const w = useMessages(whyHalfDataMessages);
 const t = useMessages(settingsMessages);
+const tools = useMessages(workoutToolsMessages);
 /* 「为什么有些数据没有？」常驻在这张卡上：只连官方授权的人看到一半数据时，第一个来找的就是这里。 */
 const whyOpen = ref(false);
 const { appStatus, isSyncing, syncProgress, dataReady, pickUpReady } = useSyncController();
@@ -124,7 +126,7 @@ const action = computed<Action | null>(() => {
         两个人在 Reddit 上问同一句话：「我怎么退出？找不到 logout 按钮。」
         （p71rsj2、p7497lq）后端 `clear_auth` 本来就只清凭据、保留本机历史。
       -->
-      <div v-if="appStatus?.configured" class="s-row">
+      <div v-if="appStatus?.auth_configuration_present || appStatus?.configured" class="s-row">
         <div class="s-row-main">
           <span class="s-row-title">{{ a.logoutTitle }}</span>
           <span class="s-row-sub">{{ a.logoutSub }}</span>
@@ -133,6 +135,7 @@ const action = computed<Action | null>(() => {
           <button class="button danger-button" type="button" @click="clearAuth">{{ a.logoutShort }}</button>
         </div>
       </div>
+      <p v-if="appStatus?.auth_configuration_present && !appStatus?.credential_available" class="s-note" role="status">{{ tools.credentialHint }}</p>
     </div>
     <FoldTransition><p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p></FoldTransition>
     <FoldTransition><p v-if="official.waiting.value && official.waitingText.value" class="hint-line" role="status"><Icon name="info" :size="13" />{{ official.waitingText.value }}</p></FoldTransition>

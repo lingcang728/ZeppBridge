@@ -168,7 +168,7 @@ impl Database {
                     start_time, end_time, distance_meters, moving_seconds,
                     calories, avg_hr, max_hr, min_hr, training_load, vo2max,
                     source_scope, date(start_time,'localtime')
-             FROM workouts
+             FROM workouts_visible
              WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2
              ORDER BY start_time",
         )?;

@@ -4,6 +4,7 @@ mod ai_tasks;
 mod auth;
 mod backup;
 mod data;
+pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
 mod letters;
 mod login;
 mod official;
@@ -199,9 +200,9 @@ pub(crate) use official::{
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
-    cancel_sync, get_coverage_ledger, probe_data_capabilities, reset_coverage_ledger,
-    retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
-    start_incremental_sync,
+    cancel_sync, get_coverage_ledger, get_workout_detail_coverage, probe_data_capabilities,
+    reset_coverage_ledger, retry_failed_backfill_chunks, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_workout_detail_backfill,
 };
 pub(crate) use system::system_region_locale;
 

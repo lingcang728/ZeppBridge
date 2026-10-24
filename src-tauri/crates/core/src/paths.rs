@@ -384,12 +384,15 @@ pub fn webview_user_data_dir(data_dir: &Path) -> PathBuf {
 /// 返回空表示没有第二份，也就是绝大多数人的情况。
 pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
-    let mut candidates = legacy_source_dirs();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            candidates.push(parent.join("data"));
+    let candidates = default_library_sources(std::env::var_os(DATA_DIR_ENV), || {
+        let mut candidates = legacy_source_dirs();
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(parent) = exe.parent() {
+                candidates.push(parent.join("data"));
+            }
         }
-    }
+        candidates
+    });
     for candidate in candidates {
         if candidate == data_dir || !candidate.join(SQLITE_GROUP[0]).is_file() {
             continue;
@@ -410,9 +413,13 @@ pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
 /// 2026-10-14 去掉了那道跳过：还停在 AppData 时代的老用户升级到 3.x 也能搬过来。
 /// 目的地已有的文件照旧一个不覆盖（`zepp.db` 在就整组不动）。
 pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
+    let candidates = default_library_sources(std::env::var_os(DATA_DIR_ENV), legacy_source_dirs);
+    if candidates.is_empty() {
+        return None;
+    }
     let mut failed = Vec::new();
     let live = live_user_data_dir();
-    for source in relocation_sources(data_dir, legacy_source_dirs(), live.as_deref()) {
+    for source in relocation_sources(data_dir, candidates, live.as_deref()) {
         if let Err(error) = relocate_from(&source, data_dir) {
             failed.push(format!("{}（{error}）", source.display()));
         }
@@ -424,6 +431,21 @@ pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
             "旧版 AppData 数据迁移未完全成功（{}）。应用仍可启动，现有文件未被覆盖。",
             failed.join("、")
         ))
+    }
+}
+
+/// An explicit library is an isolation boundary, including on Windows where
+/// Known Folder APIs ignore APPDATA/USERPROFILE environment overrides. Do not
+/// even discover default locations when a custom library was requested. Invalid
+/// overrides also fail closed; resolve_data_dir reports their configuration error.
+fn default_library_sources(
+    raw: Option<std::ffi::OsString>,
+    discover: impl FnOnce() -> Vec<PathBuf>,
+) -> Vec<PathBuf> {
+    if matches!(data_dir_from_env_value(raw), Ok(None)) {
+        discover()
+    } else {
+        Vec::new()
     }
 }
 
