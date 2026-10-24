@@ -145,7 +145,7 @@ impl Database {
             }
         }
         let mut actual = BTreeMap::<String, Vec<ActualDay>>::new();
-        let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'),workout_id,moving_seconds,avg_hr,COALESCE(workout_type_override,workout_type) FROM workouts WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
+        let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'),workout_id,moving_seconds,avg_hr,COALESCE(workout_type_override,workout_type) FROM workouts_visible WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
         for row in stmt.query_map(params![from.to_string(), to.to_string()], |r| {
             Ok((
                 r.get::<_, String>(0)?,

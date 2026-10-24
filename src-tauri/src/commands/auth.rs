@@ -151,6 +151,10 @@ pub async fn clear_auth(
         ));
     }
     {
+        let mut warning = state.auth_warning.write().await;
+        *warning = None;
+    }
+    {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "unconfigured".to_string();
     }

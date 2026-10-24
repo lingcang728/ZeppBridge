@@ -37,12 +37,14 @@ use zeppbridge_core::storage::{Database, ReplayPlan, EXPORT_DATA_TYPES, NORMALIZ
 use zeppbridge_core::sync::{SyncManager, SyncReport};
 
 mod args;
+mod cmd_details;
 mod cmd_export;
 mod cmd_fit;
 mod cmd_probe;
 mod cmd_reprocess;
 mod cmd_status;
 mod cmd_sync;
+mod cmd_workout_edit;
 mod exit;
 #[cfg(test)]
 mod tests;
@@ -112,10 +114,15 @@ Usage:
 Commands:
   status              Print local database and account status (no network)
   sync                Sync from the Zepp cloud into the local SQLite database
+  workout-details     Show coverage or fetch a bounded batch of historical workout details
   probe               Check candidate health endpoints without importing data
   reprocess           Replay stored payloads with the current parser (no network)
   export              Export local data as JSON / CSV / GPX / FIT
   fit-override        Replace a workout with a corrected .fit on this machine, undo, or list
+  set-type            Correct local workout types: --workout ID (repeatable) --type TYPE | --clear
+  hide                Hide local workouts: --workout ID (repeatable); --list lists hidden workouts
+  restore             Restore hidden workouts: --workout ID (repeatable)
+                       Each edit returns an ID; --undo EDIT_ID reverses the whole edit
   contract            Print the read contract (units, time zone, source, missing values)
   version             Print the version
   help                Print this help
@@ -123,12 +130,23 @@ Commands:
 sync options:
   --mode <incremental|initial|history>   Default: incremental
   --days <N>                             history mode only; 1-3650
+  --max-chunks <N>                       >365 days: monthly chunks per run; 1-720 (default 24)
+  --retry-failed                         >365 days: retry exhausted failed chunks
+                                         Rerun to resume; Ctrl+C stops safely. Archive/retention must cover the range.
   --no-reprocess                         Skip the parser replay before syncing
   --json                                 Emit a machine-readable sync report
 
 reprocess options:
   --all                     Replay every payload, not only what a parser upgrade owes
   --json                    Emit a machine-readable replay report
+
+workout-details options:
+  --status                  Read coverage only (no network); optional --channel filter
+  --channel <advanced|official>  Required for fetching; uses that channel's credentials
+  --max-items <N>            Fetch at most 1-40 workouts (default 20)
+  --retry-failed            Reset failed requests for the selected channel before fetching
+  --json                    Emit coverage, completion and cancellation state
+  Rerun to resume. Ctrl+C pauses safely; persisted and cloud-empty details are skipped.
 
 probe options:
   --streams <a,b,c>          Default: blood_pressure; also heart_rate,daily_summary
@@ -208,10 +226,12 @@ fn run(args: &[String]) -> u8 {
         }
         "status" => cmd_status(rest),
         "sync" => cmd_sync(rest),
+        "workout-details" => cmd_details::cmd_details(rest),
         "probe" => cmd_probe(rest),
         "reprocess" => cmd_reprocess(rest),
         "export" => cmd_export(rest),
         "fit-override" => cmd_fit_override(rest),
+        "set-type" | "hide" | "restore" => cmd_workout_edit::cmd_workout_edit(command, rest),
         other => {
             eprintln!("Unknown command: {other}\n");
             eprint!("{HELP}");

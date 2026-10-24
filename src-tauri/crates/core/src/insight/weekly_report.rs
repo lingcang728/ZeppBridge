@@ -199,7 +199,7 @@ impl Database {
             "workout_count" => {
                 let raw = self.collect_raw_samples(
                     "SELECT date(start_time, 'localtime'), 1.0, source_scope
-                     FROM workouts
+                     FROM workouts_visible
                      WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,

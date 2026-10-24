@@ -23,6 +23,27 @@ impl SerializedPayload {
 }
 
 impl Database {
+    /// Stored identity aliases link a historical workout to its own device.
+    /// A user-assigned device model wins over an old identity display name.
+    pub(super) fn workout_device_catalog_id(&self, device_id: &str) -> Result<Option<String>> {
+        let profile = self.lookup_device_profile(device_id)?;
+        let mut keys = vec![device_id];
+        if let Some(profile) = profile.as_ref() {
+            keys.extend(profile.device_id.as_deref());
+            keys.extend(profile.serial.as_deref());
+        }
+        if let Some(assigned) = self.device_model_override(&keys)? {
+            return Ok(Some(assigned.catalog_id));
+        }
+        Ok(profile.and_then(|profile| {
+            crate::device_catalog::match_catalog(&crate::device_catalog::CatalogMatchInput {
+                device_names: profile.name.as_deref().into_iter().collect(),
+                ..Default::default()
+            })
+            .map(|matched| matched.entry.catalog_id.clone())
+        }))
+    }
+
     pub(super) fn ensure_table_columns(&self, table: &str, columns: &[(&str, &str)]) -> Result<()> {
         let mut stmt = self.conn.prepare(&format!("PRAGMA table_info({table})"))?;
         let existing = stmt
@@ -244,7 +265,10 @@ impl Database {
                 let sport = source_key
                     .strip_prefix("sport_history:")
                     .and_then(|value| value.split(':').next());
-                let rows = Normalizer::normalize_workouts_with_sport(payload, sport)?;
+                let rows =
+                    Normalizer::normalize_workouts_with_device_context(payload, sport, |id| {
+                        self.workout_device_catalog_id(id)
+                    })?;
                 counts.primary_records = rows.len() as i64;
                 // 先算出新行，再只删「这条报文以前产出、现在不再产出」的那些。
                 // 别的流是「先清空，再插」；workouts 不能那么做，见

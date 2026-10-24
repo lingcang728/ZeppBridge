@@ -1,0 +1,33 @@
+{
+  "exe": "C:\\Users\\15pro\\Desktop\\MyProject\\ZeppBridge\\release\\ZeppBridge.exe",
+  "executed_copy": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\bin\\ZeppBridge.exe",
+  "sha256": "b08a5b73adc7dba1440b4b3928f5d88ee53d497710189252d7e4429a3d94c5ac",
+  "version": "3.0.9-beta.11",
+  "data_dir": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\library",
+  "desktop": "ZeppBridgeRepairQA_45488",
+  "cdp_port": 6324,
+  "checks": [
+    {
+      "name": "packaged native startup and webview load on private desktop"
+    },
+    {
+      "name": "native WM_CLOSE hides to tray and retains process"
+    }
+  ],
+  "skipped": [
+    "Native IPC readiness and synthetic workout hide/undo: CDP not attached.",
+    "Repeated restart/write-lock wait, writer-release restart and restart persistence: not executed.",
+    "Tray menu quit and updater install/restart: not executed."
+  ],
+  "limitations": [
+    "No reporter hardware reproduction; no claim that #143 is fully resolved.",
+    "Native HWND close exercised; restart IPC unavailable without CDP. No new product test API.",
+    "No Shell tray menu selection: private desktop has no Explorer notification area."
+  ],
+  "webview_processes": "{\"ProcessId\":4160,\"Name\":\"msedgewebview2.exe\",\"CommandLine\":\"\\\"C:\\\\Program Files (x86)\\\\Microsoft\\\\EdgeWebView\\\\Application\\\\155.0.4283.62\\\\msedgewebview2.exe\\\" --embedded-browser-webview=1 --webview-exe-name=ZeppBridge.exe --webview-exe-version=3.0.9-beta.11 --user-data-dir=\\\"C:\\\\Users\\\\15pro\\\\AppData\\\\Local\\\\Temp\\\\zeppbridge-beta11-native-dfjnetun\\\\library\\\\webview\\\\EBWebView\\\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=6324 --lang=zh-CN --mojo-named-platform-channel-pipe=47788.47888.10519785365175073181 /pfhostedapp:16822ec24d5098d38d7d684eb39e32bad1bde998\"}",
+  "ok": false,
+  "error": "AssertionError: Condition timed out: <urlopen error timed out>",
+  "log": "[2026-10-24 11:10:21.755] 启动 ZeppBridge 3.0.9-beta.11 / windows / exe=C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\bin\\ZeppBridge.exe / data_dir=C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\library\n[2026-10-24 11:10:21.757] Startup: building Tauri runtime\n[2026-10-24 11:10:22.170] Startup: entered application setup\n[2026-10-24 11:10:22.171] Startup: looking up main window\n[2026-10-24 11:10:22.172] Startup: main window found; querying monitor\n[2026-10-24 11:10:22.172] Main window fitting: work=3840x2160 at 0,0 scale=2.5; logical=1331x800\n[2026-10-24 11:10:22.177] Startup: tray ready\n[2026-10-24 11:10:22.178] Startup: application setup complete\n[2026-10-24 11:10:22.178] Startup: event loop ready\n[2026-10-24 11:10:22.179] Main window open requested: startup\n[2026-10-24 11:10:22.190] Main window open completed: visible=Ok(true), minimized=Ok(false), position=Ok(PhysicalPosition { x: 241, y: 36 }), size=Ok(PhysicalSize { width: 3358, height: 2088 })\n[2026-10-24 11:10:22.196] Startup: database and application state ready in 0.0s\n[2026-10-24 11:10:22.196] Main webview page load: Started\n[2026-10-24 11:10:22.197] Startup: replay planned (stored=none, target=zepp-normalizer-2026-10-v41-context-types, raw_records=0, unstamped=0)\n[2026-10-24 11:10:22.198] normalizer 升级，已重放本地原始报文（0 条派生记录）\n[2026-10-24 11:10:22.326] Main webview page load: Finished\n[2026-10-24 11:10:22.391] 静默更新：err.update.check_failed（The configured updater endpoint must use a secure protocol like `https`.）\n[2026-10-24 11:10:22.429] Main webview page load: Started\n[2026-10-24 11:10:22.441] Main webview page load: Finished\n[2026-10-24 11:10:23.344] Main window hidden to tray\n",
+  "cleanup_verified": "No QA ZeppBridge or WebView2 process matched either temporary profile after Job cleanup.",
+  "separate_cli_report": "native-cli-status.json"
+}

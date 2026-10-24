@@ -47,6 +47,19 @@ fn rate(id: &str, rating: u8, tags: &[&str]) -> FeedbackInput {
 }
 
 #[test]
+fn hiding_a_rated_workout_excludes_its_feedback_until_restored() {
+    let db = Database::in_memory().unwrap();
+    run_at(&db, "run", "running", 7);
+    db.save_workout_feedback(&rate("run", 5, &[])).unwrap();
+    let edit = db.edit_workouts(&["run".into()], None, Some(true)).unwrap();
+    assert!(db.workout_feedback("run").unwrap().is_none());
+    assert!(db.workout_feedback_history(10).unwrap().is_empty());
+    db.undo_workout_edit(&edit.id).unwrap();
+    assert_eq!(db.workout_feedback_history(10).unwrap().len(), 1);
+    assert_eq!(db.workout_feedback("run").unwrap().unwrap().rating, Some(5));
+}
+
+#[test]
 fn asks_once_for_the_matching_run_within_48_hours_and_keeps_the_answer() {
     let db = Database::in_memory().unwrap();
     delivered_plan(&db);

@@ -22,7 +22,12 @@ export interface CapabilityStatus {
 }
 
 export interface AppStatus {
+  /** Advanced-data credentials are locally readable; remote verification is `auth_state`. */
   configured: boolean;
+  /** Saved metadata survives missing/denied credentials, keeping recovery controls visible. */
+  auth_configuration_present?: boolean;
+  /** Local credential availability; falls back to `configured` for older backends. */
+  credential_available?: boolean;
   auth_state: string;
   connection_state: 'unconfigured' | 'configured' | 'connected' | 'needs_reauth' | string;
   /** 哪几条通道连着：只连官方时界面要说明哪些指标需要「高级数据」。旧后端没有这个字段。 */

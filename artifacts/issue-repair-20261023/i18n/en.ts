@@ -1,0 +1,18 @@
+export const messages = {
+  select: 'Select workouts', done: 'Done selecting', selectLoaded: 'Select loaded workouts', clearSelection: 'Clear selection',
+  selected: (n: number) => `${n} selected`, visible: 'Workouts', hidden: 'Hidden workouts',
+  type: 'Select workout type', apply: 'Apply type', clearType: 'Restore automatic detection',
+  preview: (n: number, type: string) => `Change ${n} workouts to “${type}”`,
+  hide: 'Hide on this device', restore: 'Show again', undo: 'Undo last change',
+  localHint: 'Workouts hidden on this device are excluded from statistics, AI, and exports. Original data is kept and can be restored from Hidden workouts.',
+  saved: (n: number) => `${n} workouts updated`, failed: 'Update failed. Please try again.',
+  detailsTitle: 'Fetch missing workout details', detailsHint: 'Fetch details for previously synced workouts separately. You can stop and resume later; some details may not be available in the cloud.',
+  start: 'Start or resume', pause: 'Stop this task', retry: 'Retry failed items',
+  detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) => `Not requested ${pending} · Saved ${persisted} · No cloud details ${empty} · Request failed ${failed} · Parse failed ${parse} · Current channel unavailable ${unavailable}`,
+  stopped: 'Task stopped. Progress saved.', detailFailed: 'Failed to fetch workout details. Check your connection and try again.',
+  retryHint: 'You can also retry failed blocks left by older versions here, without clearing the ledger or deleting the database.',
+  credentialHint: 'An advanced data connection is saved on this device, but its credentials are temporarily unavailable. Sign in again, or sign out and reconnect. Official authorization is kept separately.',
+  altitudeHint: 'Altitude comes from watch recordings or locally imported FIT files. Calibrated altitude from the Zepp App has not been fetched, so the values may differ.',
+  planHint: 'Plans are sent as running or cycling workouts. Labels such as Trail are sent as descriptions; switching to the corresponding workout mode on the watch has not been confirmed. Strength training plans cannot be sent yet.',
+  strengthHint: 'Completed strength workouts only show data actually returned by the cloud. Per-set reps, weights, and automatic blood pressure require validation with account samples. If the model is unknown, you can identify the device manually.',
+};

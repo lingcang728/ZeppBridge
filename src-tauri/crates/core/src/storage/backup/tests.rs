@@ -28,6 +28,52 @@ fn seed(data_dir: &Path, samples: i64) -> Database {
 }
 
 #[test]
+fn backup_restore_keeps_hidden_state_type_corrections_and_undo_history() {
+    let dir = temp_dir("local-workout-edits");
+    let db = seed(&dir, 1);
+    db.insert_workout(&crate::models::Workout {
+        workout_id: "hidden-run".into(),
+        workout_type: "running".into(),
+        normalized_type: "running".into(),
+        type_source: "numeric_mapped".into(),
+        start_time: Utc.with_ymd_and_hms(2026, 8, 1, 0, 0, 0).unwrap(),
+        end_time: Utc.with_ymd_and_hms(2026, 8, 1, 1, 0, 0).unwrap(),
+        source_scope: SourceScope::Device,
+        ..Default::default()
+    })
+    .unwrap();
+    let edit = db
+        .edit_workouts(&["hidden-run".into()], Some(Some("hiking")), Some(true))
+        .unwrap();
+    drop(db);
+    let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+    let db = Database::new(database_path(&dir)).unwrap();
+    db.undo_workout_edit(&edit.id).unwrap();
+    drop(db);
+    stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+    let outcome = apply_pending_restore(&dir).unwrap();
+    assert!(outcome.succeeded, "{outcome:?}");
+    let db = Database::new(database_path(&dir)).unwrap();
+    assert_eq!(db.count_workouts().unwrap(), 0);
+    assert_eq!(
+        db.hidden_workouts_page(10, 0).unwrap()[0]
+            .user_override
+            .as_deref(),
+        Some("hiking")
+    );
+    db.undo_workout_edit(&edit.id).unwrap();
+    assert_eq!(db.count_workouts().unwrap(), 1);
+    assert!(db
+        .get_workout_detail("hidden-run")
+        .unwrap()
+        .unwrap()
+        .user_override
+        .is_none());
+    drop(db);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn regression_markdown_manifest_ids_cannot_redirect_pruning_or_pinning() {
     let dir = temp_dir("manifest-id-boundary");
     drop(seed(&dir, 1));

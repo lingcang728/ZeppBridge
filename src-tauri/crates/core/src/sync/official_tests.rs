@@ -23,6 +23,139 @@ impl CredentialBackend for NoCredentials {
     }
 }
 
+fn detail_sync(db: Database, base: &str, cancel: Arc<AtomicBool>) -> OfficialSync {
+    OfficialSync::with_parts(
+        None,
+        db,
+        cancel,
+        OfficialClient::with_bases(base, base).unwrap(),
+        OfficialStore::with_backend(&std::env::temp_dir(), Arc::new(NoCredentials)),
+        "Asia/Shanghai".into(),
+    )
+}
+
+fn detail_tokens() -> OfficialTokens {
+    OfficialTokens {
+        access_token: "access-fixture".into(),
+        refresh_token: None,
+        expires_at: None,
+        user_id: "1".into(),
+    }
+}
+
+#[tokio::test]
+async fn detail_empty_response_is_terminal_across_normal_and_history_sync() {
+    let db = Database::in_memory().unwrap();
+    official_workout(&db, "1789908976");
+    let (base, hits) = serve(|_| Reply::json(200, r#"{"items":[]}"#)).await;
+    let sync = detail_sync(db, &base, Arc::new(AtomicBool::new(false)));
+    let mut tokens = detail_tokens();
+    sync.sync_details(&mut tokens, true, 1).await.unwrap();
+    let coverage = sync
+        .db
+        .lock()
+        .await
+        .workout_detail_coverage_for_channel(Some(true))
+        .unwrap();
+    assert_eq!(coverage.empty_from_cloud, 1);
+    assert_eq!(coverage.ready, 0);
+    assert!(sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn detail_parse_failure_is_recorded_and_retried_only_within_budget() {
+    let db = Database::in_memory().unwrap();
+    official_workout(&db, "1789908976");
+    let (base, hits) = serve(|_| Reply::json(200, r#"{"unexpected":"shape"}"#)).await;
+    let sync = detail_sync(db, &base, Arc::new(AtomicBool::new(false)));
+    let mut tokens = detail_tokens();
+    for _ in 0..3 {
+        sync.sync_details(&mut tokens, true, 1).await.unwrap();
+    }
+    let coverage = sync.db.lock().await.workout_detail_coverage().unwrap();
+    assert_eq!(coverage.parse_failed, 1);
+    assert_eq!(coverage.ready, 0);
+    assert!(sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(hits.load(Ordering::SeqCst), 3);
+    sync.db
+        .lock()
+        .await
+        .retry_failed_history_details_for_channel(true)
+        .unwrap();
+    sync.sync_details(&mut tokens, true, 1).await.unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), 4);
+}
+
+#[tokio::test]
+async fn detail_cancellation_preserves_the_unrequested_queue() {
+    let db = Database::in_memory().unwrap();
+    official_workout(&db, "1789908976");
+    let (base, hits) = serve(|_| Reply::json(200, r#"{"items":[]}"#)).await;
+    let sync = detail_sync(db, &base, Arc::new(AtomicBool::new(true)));
+    assert!(sync
+        .sync_details(&mut detail_tokens(), true, 20)
+        .await
+        .unwrap_err()
+        .is_cancelled());
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        sync.db
+            .lock()
+            .await
+            .workout_detail_coverage()
+            .unwrap()
+            .ready,
+        1
+    );
+}
+
+#[tokio::test]
+async fn detail_without_hr_or_gps_is_persisted_and_never_requested_again() {
+    let db = Database::in_memory().unwrap();
+    let id = (Utc::now() - Duration::days(1)).timestamp().to_string();
+    official_workout(&db, &id);
+    let payload =
+        serde_json::json!({"trackId": id, "samplingTime": "0;1;", "pause": ""}).to_string();
+    let (base, hits) = serve(move |_| Reply::json(200, payload.clone())).await;
+    let sync = detail_sync(db, &base, Arc::new(AtomicBool::new(false)));
+    let mut tokens = detail_tokens();
+    sync.sync_details(&mut tokens, true, 1).await.unwrap();
+    {
+        let db = sync.db.lock().await;
+        assert_eq!(db.workout_detail_coverage().unwrap().persisted, 1);
+        let series = db.get_workout_series(&id).unwrap();
+        assert!(series
+            .samples
+            .iter()
+            .all(|sample| sample.heart_rate.is_none()));
+        // The queue must remain terminal even when no sensor samples are retained.
+        db.conn
+            .execute("DELETE FROM workout_samples WHERE workout_id = ?1", [&id])
+            .unwrap();
+        db.conn
+            .execute(
+                "UPDATE workouts SET sample_count = 0 WHERE workout_id = ?1",
+                [&id],
+            )
+            .unwrap();
+    }
+    assert!(sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+}
+
 fn official_workout(db: &Database, id: &str) {
     let start = Utc::now() - Duration::days(1);
     db.insert_workout(&Workout {
@@ -68,7 +201,7 @@ async fn a_failing_detail_endpoint_is_reported_not_logged_away() {
         user_id: "1".into(),
     };
     let report = sync
-        .sync_details(&mut tokens)
+        .sync_details(&mut tokens, false, 20)
         .await
         .unwrap()
         .expect("有明细没拉到就必须有一份报告");
@@ -99,17 +232,28 @@ async fn a_detail_that_keeps_failing_is_set_aside_instead_of_failing_every_sync(
         user_id: "1".into(),
     };
     for _ in 0..2 {
-        let report = sync.sync_details(&mut tokens).await.unwrap().unwrap();
+        let report = sync
+            .sync_details(&mut tokens, false, 20)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(report.status, StreamStatus::Failed);
     }
-    let third = sync.sync_details(&mut tokens).await.unwrap().unwrap();
+    let third = sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .unwrap();
     assert_ne!(
         third.status,
         StreamStatus::Failed,
         "第 3 次放下，不再标失败"
     );
     assert!(
-        sync.sync_details(&mut tokens).await.unwrap().is_none(),
+        sync.sync_details(&mut tokens, false, 20)
+            .await
+            .unwrap()
+            .is_none(),
         "放下后不在待补列表"
     );
 
@@ -124,9 +268,17 @@ async fn a_detail_that_keeps_failing_is_set_aside_instead_of_failing_every_sync(
         OfficialStore::with_backend(&std::env::temp_dir(), Arc::new(NoCredentials)),
         "Asia/Shanghai".into(),
     );
-    let report = sync.sync_details(&mut tokens).await.unwrap().unwrap();
+    let report = sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .unwrap();
     assert_ne!(report.status, StreamStatus::Failed, "官方说没有：当场放下");
-    assert!(sync.sync_details(&mut tokens).await.unwrap().is_none());
+    assert!(sync
+        .sync_details(&mut tokens, false, 20)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 /// 训练负荷平衡（#120）只认旧通道翻到底的运动列表作「这天运动齐了」的凭据。

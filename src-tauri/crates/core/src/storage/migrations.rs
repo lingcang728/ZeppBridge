@@ -1386,6 +1386,36 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(42,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_local_state (
+                workout_id TEXT PRIMARY KEY,
+                type_override TEXT,
+                hidden INTEGER NOT NULL DEFAULT 0 CHECK(hidden IN (0, 1))
+             );
+             INSERT OR IGNORE INTO workout_local_state(workout_id, type_override)
+                SELECT workout_id, workout_type_override FROM workouts WHERE workout_type_override IS NOT NULL;
+             CREATE TABLE IF NOT EXISTS workout_edit_history (
+                id TEXT PRIMARY KEY, before_json TEXT NOT NULL, after_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE VIEW IF NOT EXISTS workouts_visible AS SELECT * FROM workouts w
+                WHERE NOT EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = w.workout_id AND s.hidden = 1);
+             CREATE VIEW IF NOT EXISTS workouts_hidden AS SELECT * FROM workouts w
+                WHERE EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = w.workout_id AND s.hidden = 1);
+             CREATE TRIGGER IF NOT EXISTS restore_local_workout_type AFTER INSERT ON workouts
+                WHEN EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = NEW.workout_id)
+                BEGIN UPDATE workouts SET workout_type_override = (SELECT type_override FROM workout_local_state WHERE workout_id = NEW.workout_id)
+                      WHERE workout_id = NEW.workout_id; END;
+             CREATE TABLE IF NOT EXISTS workout_detail_requests (
+                workout_id TEXT PRIMARY KEY, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+                requested_at TEXT, retry_after TEXT, error_code TEXT
+             );
+             PRAGMA user_version = 43;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(43, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

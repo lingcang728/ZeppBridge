@@ -46,6 +46,20 @@ impl Flags {
         self.values.iter().any(|(name, _)| name == key)
     }
 
+    /// Reject missing values and accidental values on switches before opening a library.
+    pub(super) fn validate_values(&self, valued: &[&str]) -> Result<(), String> {
+        for (name, value) in &self.values {
+            if valued.contains(&name.as_str()) {
+                if value.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                    return Err(format!("--{name} requires a non-empty value"));
+                }
+            } else if value.is_some() {
+                return Err(format!("--{name} does not take a value"));
+            }
+        }
+        Ok(())
+    }
+
     /// 未知开关一律报错。静默忽略拼错的开关，会让 `--form json` 悄悄跑出
     /// 一个默认格式的结果，而调度脚本毫无察觉。
     pub(super) fn reject_unknown(&self, known: &[&str]) -> Result<(), String> {

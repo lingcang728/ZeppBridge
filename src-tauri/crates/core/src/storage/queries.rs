@@ -192,7 +192,9 @@ impl Database {
     /// 本机一共有多少条运动记录。见 `count_sleep_sessions` 的理由。
     pub fn count_workouts(&self) -> Result<i64> {
         self.conn
-            .query_row("SELECT COUNT(*) FROM workouts", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM workouts_visible", [], |row| {
+                row.get(0)
+            })
             .map_err(Into::into)
     }
 
@@ -202,16 +204,30 @@ impl Database {
 
     /// 一页运动记录，最新在前。见 `sleep_sessions_page`。
     pub fn workouts_page(&self, limit: usize, offset: usize) -> Result<Vec<Workout>> {
+        self.workouts_page_in(limit, offset, false)
+    }
+
+    pub(super) fn workouts_page_in(
+        &self,
+        limit: usize,
+        offset: usize,
+        hidden: bool,
+    ) -> Result<Vec<Workout>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
         let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
-        let mut stmt = self.conn.prepare(
+        let table = if hidden {
+            "workouts_hidden"
+        } else {
+            "workouts_visible"
+        };
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT workout_id, workout_type, start_time, end_time,
                     distance_meters, calories, avg_hr, max_hr,
                     training_load, vo2max, source_scope, device_id,
                     synced_at, gps_available, sample_count, zepp_type,
                     workout_type_source, workout_type_override, gear_id
-             FROM workouts ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
-        )?;
+             FROM {table} ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
+        ))?;
         let rows = stmt.query_map([limit, offset], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -320,7 +336,7 @@ impl Database {
             .conn
             .query_row(
                 &format!(
-                    "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts WHERE workout_id = ?1 LIMIT 1"
+                    "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts_visible WHERE workout_id = ?1 LIMIT 1"
                 ),
                 [workout_id],
                 WorkoutDetailRow::read,
@@ -394,7 +410,7 @@ impl Database {
         let last_updated = self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?;
         // 覆盖的最早/最晚日本地与 local_coverage 同一条链路：对原始列取
         // MIN/MAX 再换算，能走索引；旧写法是对四张表逐行调 date() 再聚合。
-        let (start, end) = self.coverage_day_bounds()?;
+        let (start, end) = self.coverage_day_bounds_in(true)?;
         // 数据流 = 样本表里的各指标 + 另外三张表各算一条。以前是把四张表的
         // 每一行 UNION 起来再 COUNT(DISTINCT)，真实库上约 90 ms；现在指标名走
         // 跳跃扫描，另外三张表只问「有没有」。
@@ -402,7 +418,7 @@ impl Database {
         for (stream, table) in [
             ("daily_summary", "daily_metrics"),
             ("sleep", "sleep_sessions"),
-            ("workouts", "workouts"),
+            ("workouts", "workouts_visible"),
         ] {
             let present: bool = self.conn.query_row(
                 &format!("SELECT EXISTS(SELECT 1 FROM {table})"),
@@ -417,7 +433,7 @@ impl Database {
         // 来源：只需要知道是 0 种、1 种（哪一种）还是「混合」。先看三张小表，
         // 已经见到两种就不必再碰样本表；否则只找一行「和已见来源不同」的样本。
         let mut scopes = BTreeSet::<String>::new();
-        for table in ["daily_metrics", "sleep_sessions", "workouts"] {
+        for table in ["daily_metrics", "sleep_sessions", "workouts_visible"] {
             let mut statement = self.conn.prepare(&format!(
                 "SELECT DISTINCT source_scope FROM {table} WHERE source_scope IS NOT NULL"
             ))?;

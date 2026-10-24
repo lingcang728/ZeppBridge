@@ -30,7 +30,12 @@ pub struct CapabilityStatusView {
 /// Overall application status exposed to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AppStatus {
+    /// Advanced-data credential is locally readable and passes format checks.
     pub configured: bool,
+    /// Saved advanced-data metadata exists, even when its credential is inaccessible.
+    pub auth_configuration_present: bool,
+    /// Same local availability as `configured`; separate from remote verification.
+    pub credential_available: bool,
     pub auth_state: String,
     pub connection_state: String,
     /// `legacy` / `official` / `both` / `none`：哪几条通道连着。只连官方时界面要说明哪些指标

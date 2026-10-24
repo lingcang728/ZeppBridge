@@ -1,0 +1,18 @@
+export const messages = {
+  select: 'Seleccionar registros', done: 'Terminar selección', selectLoaded: 'Seleccionar registros cargados', clearSelection: 'Borrar selección',
+  selected: (n: number) => `${n} seleccionados`, visible: 'Registros de actividad', hidden: 'Registros ocultos',
+  type: 'Elegir tipo de actividad', apply: 'Aplicar tipo', clearType: 'Restaurar detección automática',
+  preview: (n: number, type: string) => `Cambiar ${n} registros a «${type}»`,
+  hide: 'Ocultar en este equipo', restore: 'Volver a mostrar', undo: 'Deshacer último cambio',
+  localHint: 'Los registros ocultos en este equipo se excluyen de las estadísticas, la IA y las exportaciones. Los datos originales se conservan y puedes restaurarlos desde los registros ocultos.',
+  saved: (n: number) => `${n} registros actualizados`, failed: 'No se pudo guardar el cambio. Intenta de nuevo.',
+  detailsTitle: 'Completar detalles de actividad', detailsHint: 'Completa por separado los detalles de actividades anteriores ya sincronizadas. Puedes detener la tarea y continuar después; es posible que la nube no tenga todos los detalles.',
+  start: 'Iniciar o continuar', pause: 'Detener esta tarea', retry: 'Reintentar elementos fallidos',
+  detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) => `Sin solicitar ${pending} · Guardados ${persisted} · Sin detalles en la nube ${empty} · Solicitudes fallidas ${failed} · Errores de interpretación ${parse} · Canal actual no disponible ${unavailable}`,
+  stopped: 'La tarea se detuvo y se guardó el progreso', detailFailed: 'No se pudieron completar los detalles. Revisa la conexión e intenta de nuevo.',
+  retryHint: 'También puedes reintentar aquí los bloques fallidos de versiones anteriores, sin vaciar el registro de seguimiento ni eliminar la base de datos.',
+  credentialHint: 'La conexión de datos avanzada está guardada en este equipo, pero sus credenciales no están disponibles por ahora. Puedes volver a iniciar sesión o cerrar sesión y conectar después; la autorización oficial se conserva por separado.',
+  altitudeHint: 'La altitud proviene del reloj o de un archivo FIT importado en este equipo. Aún no se obtiene la altitud calibrada de Zepp App, por lo que los valores pueden diferir.',
+  planHint: 'Los planes se envían como carrera o ciclismo. Las etiquetas como Trail se incluyen en la descripción; aún no se ha confirmado que el reloj pueda cambiar al modo de actividad correspondiente. Por ahora no se pueden enviar planes de fuerza.',
+  strengthHint: 'Para los entrenamientos de fuerza completados solo se muestran los datos que devuelve la nube. Las repeticiones por serie, los pesos y la presión arterial automática requieren validación con muestras de cuentas; si se desconoce el modelo, puedes identificar el dispositivo manualmente.',
+};

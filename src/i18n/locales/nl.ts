@@ -14,6 +14,51 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/WorkoutTools': {
+      select: 'Trainingen selecteren',
+      done: 'Selectie afronden',
+      selectLoaded: 'Geladen trainingen selecteren',
+      clearSelection: 'Selectie wissen',
+      selected: (n: number) => `${n} geselecteerd`,
+      visible: 'Trainingen',
+      hidden: 'Verborgen trainingen',
+      type: 'Sporttype kiezen',
+      apply: 'Type toepassen',
+      clearType: 'Automatische herkenning herstellen',
+      preview: (n: number, type: string) =>
+        n === 1 ? `1 training wijzigen in ‘${type}’` : `${n} trainingen wijzigen in ‘${type}’`,
+      hide: 'Op deze computer verbergen',
+      restore: 'Weer tonen',
+      undo: 'Laatste wijziging ongedaan maken',
+      localHint:
+        'Trainingen die op deze computer verborgen zijn, tellen niet mee in statistieken, AI en exports. De oorspronkelijke gegevens blijven bewaard; je kunt ze herstellen via ‘Verborgen trainingen’.',
+      saved: (n: number) => (n === 1 ? '1 training bijgewerkt' : `${n} trainingen bijgewerkt`),
+      failed: 'Wijzigen mislukt. Probeer het opnieuw.',
+      detailsTitle: 'Trainingsdetails aanvullen',
+      detailChannel: 'Bron van details',
+      advancedChannel: 'Geavanceerde gegevens',
+      officialChannel: 'Officiële Zepp-verbinding',
+      detailsHint:
+        'Haal voor eerder gesynchroniseerde trainingen afzonderlijk ontbrekende details op. Je kunt op elk moment stoppen en later doorgaan; de cloud biedt mogelijk niet alle details.',
+      start: 'Starten of hervatten',
+      pause: 'Deze taak stoppen',
+      retry: 'Mislukte items opnieuw proberen',
+      detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) =>
+        `Nog niet opgevraagd ${pending} · Opgeslagen ${persisted} · Geen details in de cloud ${empty} · Mislukte aanvragen ${failed} · Fouten bij het ontleden ${parse} · Huidig kanaal niet beschikbaar ${unavailable}`,
+      stopped: 'Deze taak is gestopt. De voortgang is opgeslagen.',
+      detailFailed: 'Trainingsdetails aanvullen mislukt. Controleer de verbinding en probeer het opnieuw.',
+      retryHint:
+        'Ook mislukte blokken uit oudere versies kun je hier opnieuw proberen, zonder het logboek te wissen of de database te verwijderen.',
+      credentialHint:
+        'Op deze computer is een geavanceerde gegevensverbinding opgeslagen, maar de inloggegevens zijn tijdelijk niet beschikbaar. Log opnieuw in of log uit en maak opnieuw verbinding. De officiële autorisatie blijft apart bewaard.',
+      altitudeHint:
+        'De hoogte is afkomstig van de horlogeregistratie of een lokaal geïmporteerd FIT-bestand. De gekalibreerde hoogte van de Zepp App is nog niet opgehaald; beide waarden kunnen verschillen.',
+      planHint:
+        'Plannen worden verzonden volgens de gekozen sportcategorie. Labels zoals ‘Trail’ worden als toelichting meegestuurd; het is nog niet bevestigd of het horloge naar de bijbehorende sportmodus kan overschakelen. Krachttrainingsplannen kunnen nog niet worden verzonden.',
+      strengthHint:
+        'Bij voltooide krachttrainingen worden alleen gegevens getoond die de cloud daadwerkelijk terugstuurt. Herhalingen en gewichten per set en automatische bloeddrukmetingen moeten nog worden geverifieerd met voorbeeldgegevens uit accounts. Als het model onbekend is, kun je zelf aangeven welk apparaat het is.',
+    },
+
     'components/BackfillOffer': {
       offer: (date: string) =>
         `Deze computer gaat maar terug tot ${date}. Eerdere historie ophalen uit de cloud?`,

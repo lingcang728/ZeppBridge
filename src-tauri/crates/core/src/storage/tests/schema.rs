@@ -400,7 +400,14 @@ fn schema_v10_workout_rows_migrate_without_losing_type_facts() {
     let db = Database::in_memory().unwrap();
     db.conn
         .execute_batch(
-            "ALTER TABLE workouts DROP COLUMN workout_type_conflict;
+            // v10 did not have the v43 local-state trigger/views. Remove those
+            // before removing columns they depend on, just as in an actual old DB.
+            "DROP TRIGGER restore_local_workout_type;
+                 DROP VIEW workouts_visible;
+                 DROP VIEW workouts_hidden;
+                 DROP TABLE workout_local_state;
+                 DROP TABLE workout_edit_history;
+                 ALTER TABLE workouts DROP COLUMN workout_type_conflict;
                  ALTER TABLE workouts DROP COLUMN workout_type_override;
                  ALTER TABLE workouts DROP COLUMN workout_type_source;
                  DELETE FROM schema_migrations WHERE version = 11;

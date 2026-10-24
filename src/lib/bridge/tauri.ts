@@ -14,6 +14,8 @@ import type {
   BridgeBackend,
   McpSidecar,
   UnlistenFn,
+  WorkoutDetailCoverage,
+  WorkoutDetailChannel,
 } from './types';
 import type {
   HourlySteps,
@@ -360,6 +362,14 @@ export const tauriBackend: BridgeBackend = {
       userOverride: userOverride || null,
     });
   },
+
+  editWorkouts(workoutIds: string[], changeType: boolean, workoutType: string | null, hidden: boolean | null) {
+    return call<{ id: string; changed: number }>('edit_workouts', { workoutIds, changeType, workoutType, hidden });
+  },
+  undoWorkoutEdit(id: string) { return call<number>('undo_workout_edit', { id }); },
+  getHiddenWorkoutPage(limit: number, offset: number) { return call<Page<Workout>>('get_hidden_workout_page', { limit, offset }); },
+  getWorkoutDetailCoverage(channel?: WorkoutDetailChannel) { return call<WorkoutDetailCoverage>('get_workout_detail_coverage', { channel: channel ?? null }); },
+  startWorkoutDetailBackfill(maxRecords: number, retryFailed: boolean, channel?: WorkoutDetailChannel) { return call<WorkoutDetailCoverage>('start_workout_detail_backfill', { maxRecords, retryFailed, channel: channel ?? null }); },
 
   getWorkoutFitOverride(workoutId: string) {
     return call<WorkoutFitOverride | null>('get_workout_fit_override', { workoutId });

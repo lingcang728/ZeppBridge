@@ -1,0 +1,18 @@
+{
+  "exe": "C:\\Users\\15pro\\Desktop\\MyProject\\ZeppBridge\\release\\ZeppBridge.exe",
+  "executed_copy": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-saxov245\\bin\\ZeppBridge.exe",
+  "sha256": "b08a5b73adc7dba1440b4b3928f5d88ee53d497710189252d7e4429a3d94c5ac",
+  "version": "3.0.9-beta.11",
+  "data_dir": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-saxov245\\library",
+  "desktop": "ZeppBridgeRepairQA_38128",
+  "checks": [],
+  "skipped": [],
+  "limitations": [
+    "No reporter hardware reproduction; no claim that #143 is fully resolved.",
+    "Native HWND close and existing restart IPC exercised; no new product test API.",
+    "No Shell tray menu selection: private desktop has no Explorer notification area."
+  ],
+  "ok": false,
+  "error": "AssertionError: Condition timed out: <urlopen error timed out>",
+  "log": "[2026-10-24 11:07:57.394] 启动 ZeppBridge 3.0.9-beta.11 / windows / exe=C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-saxov245\\bin\\ZeppBridge.exe / data_dir=C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-saxov245\\library\n[2026-10-24 11:07:57.396] Startup: building Tauri runtime\n[2026-10-24 11:07:57.891] Startup: entered application setup\n[2026-10-24 11:07:57.893] Startup: looking up main window\n[2026-10-24 11:07:57.894] Startup: main window found; querying monitor\n[2026-10-24 11:07:57.894] Main window fitting: work=3840x2160 at 0,0 scale=2.5; logical=1331x800\n[2026-10-24 11:07:57.901] Startup: tray ready\n[2026-10-24 11:07:57.902] Startup: application setup complete\n[2026-10-24 11:07:57.903] Startup: event loop ready\n[2026-10-24 11:07:57.903] Main window open requested: startup\n[2026-10-24 11:07:57.916] Main window open completed: visible=Ok(true), minimized=Ok(false), position=Ok(PhysicalPosition { x: 241, y: 36 }), size=Ok(PhysicalSize { width: 3358, height: 2088 })\n[2026-10-24 11:07:57.924] Main webview page load: Started\n[2026-10-24 11:07:57.924] Startup: database and application state ready in 0.0s\n[2026-10-24 11:07:57.926] Startup: replay planned (stored=none, target=zepp-normalizer-2026-10-v41-context-types, raw_records=0, unstamped=0)\n[2026-10-24 11:07:57.927] normalizer 升级，已重放本地原始报文（0 条派生记录）\n[2026-10-24 11:07:58.086] Main webview page load: Finished\n[2026-10-24 11:07:58.166] 静默更新：err.update.check_failed（The configured updater endpoint must use a secure protocol like `https`.）\n[2026-10-24 11:07:58.216] Main webview page load: Started\n[2026-10-24 11:07:58.229] Main webview page load: Finished\n"
+}

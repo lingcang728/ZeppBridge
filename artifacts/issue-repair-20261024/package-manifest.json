@@ -1,0 +1,30 @@
+[
+  {
+    "name": "ZeppBridge.exe",
+    "bytes": 40263168,
+    "version": "3.0.9-beta.11",
+    "sha256": "b08a5b73adc7dba1440b4b3928f5d88ee53d497710189252d7e4429a3d94c5ac",
+    "version_source": "PE ProductVersion"
+  },
+  {
+    "name": "ZeppBridge-3.0.9-beta.11-Windows-Setup.exe",
+    "bytes": 17977441,
+    "version": "3.0.9-beta.11",
+    "sha256": "b2f5b69a3a4b90361256da0e66f06c464377fa8b614d47a45bf57e4cd5f88cc9",
+    "version_source": "PE ProductVersion"
+  },
+  {
+    "name": "zeppbridge-cli.exe",
+    "bytes": 9668096,
+    "version": "3.0.9-beta.11",
+    "sha256": "cca1c214d60431a2c41978efe6ec6f94812226ee57de56e2bde977ee2d23a2ee",
+    "version_source": "CLI --version"
+  },
+  {
+    "name": "zeppbridge-mcp.exe",
+    "bytes": 7614976,
+    "version": "3.0.9-beta.11",
+    "sha256": "790bb1b3d799e078253c0a12d78ed823df65758133c14b6a87b5050900b72828",
+    "version_source": "MCP initialize.serverInfo"
+  }
+]

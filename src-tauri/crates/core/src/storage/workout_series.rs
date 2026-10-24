@@ -96,7 +96,9 @@ impl Database {
     pub fn workout_hr_zones(&self, workout_id: &str) -> Result<Vec<HeartRateZoneBucket>> {
         let mut stmt = self.conn.prepare(
             "SELECT zone_index, upper_bound_bpm, seconds FROM workout_hr_zones
-              WHERE workout_id = ?1 ORDER BY zone_index",
+              WHERE workout_id = ?1
+                AND EXISTS (SELECT 1 FROM workouts_visible w WHERE w.workout_id = ?1)
+              ORDER BY zone_index",
         )?;
         let rows = stmt.query_map([workout_id], |row| {
             Ok(HeartRateZoneBucket {
@@ -159,7 +161,7 @@ impl Database {
         let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
         let mut stmt = self.conn.prepare(
             "SELECT w.workout_id, w.zepp_source
-             FROM workouts w
+             FROM workouts_visible w
              LEFT JOIN workout_detail_fetch_attempts a
                ON a.workout_id = w.workout_id AND a.source = w.zepp_source
              WHERE w.zepp_source IS NOT NULL
@@ -399,6 +401,16 @@ impl Database {
     }
 
     pub fn get_workout_series(&self, workout_id: &str) -> Result<WorkoutSeries> {
+        // All public readers (desktop, MCP, REST and exports) share this gate.
+        // Internal detail persistence deliberately continues to use the base table.
+        let hidden: bool = self.conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM workout_local_state WHERE workout_id = ?1 AND hidden = 1)",
+            [workout_id],
+            |row| row.get(0),
+        )?;
+        if hidden {
+            return Err(ZeppBridgeError::DataUnavailable("运动记录不存在".into()));
+        }
         let mut samples = {
             let mut stmt = self.conn.prepare(
                 "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride,
@@ -466,7 +478,7 @@ impl Database {
         let recorded_distance_m: Option<f64> = self
             .conn
             .query_row(
-                "SELECT distance_meters FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                "SELECT distance_meters FROM workouts_visible WHERE workout_id = ?1 LIMIT 1",
                 [workout_id],
                 |row| row.get(0),
             )

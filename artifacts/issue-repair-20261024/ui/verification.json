@@ -1,0 +1,1312 @@
+{
+  "mode": "headless disposable demo",
+  "checks": [
+    {
+      "name": "cross-page selection, keyboard type search, preview and apply",
+      "passed": true,
+      "selected_ids": [
+        "1792797600",
+        "1768692600"
+      ]
+    },
+    {
+      "name": "undo batch type correction",
+      "passed": true
+    },
+    {
+      "name": "hide, hidden view, restore",
+      "passed": true,
+      "workout_id": "1792797600"
+    },
+    {
+      "name": "detail hide navigates to list with working undo",
+      "passed": true
+    },
+    {
+      "name": "official and advanced bounded detail start with ready=0",
+      "passed": true
+    },
+    {
+      "name": "12 locale sequential layout checks, 320px and 200% equivalent zoom",
+      "passed": true,
+      "layouts": 26
+    },
+    {
+      "name": "E3 with-altitude",
+      "passed": true,
+      "source": "synthetic demo IPC response override; no real account"
+    },
+    {
+      "name": "E3 without-altitude",
+      "passed": true,
+      "source": "synthetic demo IPC response override; no real account"
+    },
+    {
+      "name": "E3 null-series",
+      "passed": true,
+      "source": "synthetic demo IPC response override; no real account"
+    },
+    {
+      "name": "E4 light new controls contrast >=4.5 and keyboard Tab/Space checkbox",
+      "passed": true,
+      "scope": "new multi-select/detail controls only; not whole-app accessibility audit",
+      "tab_hops_to_first_checkbox": 4
+    },
+    {
+      "name": "E4 dark new controls contrast >=4.5 and keyboard Tab/Space checkbox",
+      "passed": true,
+      "scope": "new multi-select/detail controls only; not whole-app accessibility audit",
+      "tab_hops_to_first_checkbox": 4
+    }
+  ],
+  "layouts": [
+    {
+      "locale": "zh",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "en",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "es",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "nl",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pt-BR",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pt-PT",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "de",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "ru",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "hi-IN",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "fr",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "it",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pl",
+      "mode": "540px list selected",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "en",
+      "mode": "320px list selected",
+      "width": 320,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "en",
+      "mode": "1080px CSS zoom 200% (540px content equivalent)",
+      "width": 1080,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "zh",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "en",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "es",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "nl",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pt-BR",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pt-PT",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "de",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "ru",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "hi-IN",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "fr",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "it",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    },
+    {
+      "locale": "pl",
+      "mode": "540px archive details",
+      "width": 540,
+      "documentOverflow": false,
+      "mainOverflow": false,
+      "badControls": []
+    }
+  ],
+  "page_errors": [],
+  "ipc_calls": [
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 200
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1769297880"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1769297880"
+      }
+    },
+    {
+      "command": "get_device_profile",
+      "args": {
+        "deviceId": "DEMO0000BAND01",
+        "sourceScope": "device"
+      }
+    },
+    {
+      "command": "edit_workouts",
+      "args": {
+        "workoutIds": [
+          "1792797600",
+          "1768692600"
+        ],
+        "changeType": true,
+        "workoutType": "hiking",
+        "hidden": null
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "undo_workout_edit",
+      "args": {
+        "id": "demo-edit-1"
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "edit_workouts",
+      "args": {
+        "workoutIds": [
+          "1792797600"
+        ],
+        "changeType": false,
+        "workoutType": "hiking",
+        "hidden": true
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 271,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_hidden_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "edit_workouts",
+      "args": {
+        "workoutIds": [
+          "1792797600"
+        ],
+        "changeType": false,
+        "workoutType": "hiking",
+        "hidden": false
+      }
+    },
+    {
+      "command": "get_hidden_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_hidden_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_insight",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_fit_override",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_type_options",
+      "args": {}
+    },
+    {
+      "command": "get_device_profile",
+      "args": {
+        "deviceId": "DEMO0000BAND01",
+        "sourceScope": "device"
+      }
+    },
+    {
+      "command": "workout_feel_get",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_type_options",
+      "args": {}
+    },
+    {
+      "command": "edit_workouts",
+      "args": {
+        "workoutIds": [
+          "1792797600"
+        ],
+        "changeType": false,
+        "workoutType": null,
+        "hidden": true
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792624260"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792624260"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792579380"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792579380"
+      }
+    },
+    {
+      "command": "get_device_profile",
+      "args": {
+        "deviceId": "DEMO0000BAND01",
+        "sourceScope": "device"
+      }
+    },
+    {
+      "command": "undo_workout_edit",
+      "args": {
+        "id": "demo-edit-5"
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_coverage_ledger",
+      "args": {}
+    },
+    {
+      "command": "get_storage_estimate",
+      "args": {
+        "days": 365
+      }
+    },
+    {
+      "command": "list_backups",
+      "args": {}
+    },
+    {
+      "command": "get_capability_overview",
+      "args": {}
+    },
+    {
+      "command": "get_device_profiles",
+      "args": {
+        "refresh": false
+      }
+    },
+    {
+      "command": "get_app_status",
+      "args": {}
+    },
+    {
+      "command": "get_user_prefs",
+      "args": {}
+    },
+    {
+      "command": "plugin:event|listen",
+      "args": {
+        "event": "login://status",
+        "target": {
+          "kind": "Any"
+        },
+        "handler": 19
+      }
+    },
+    {
+      "command": "plugin:event|listen",
+      "args": {
+        "event": "official://status",
+        "target": {
+          "kind": "Any"
+        },
+        "handler": 20
+      }
+    },
+    {
+      "command": "get_login_status",
+      "args": {}
+    },
+    {
+      "command": "get_official_status",
+      "args": {}
+    },
+    {
+      "command": "get_workout_detail_coverage",
+      "args": {
+        "channel": "advanced"
+      }
+    },
+    {
+      "command": "get_workout_detail_coverage",
+      "args": {
+        "channel": "official"
+      }
+    },
+    {
+      "command": "start_workout_detail_backfill",
+      "args": {
+        "maxRecords": 20,
+        "retryFailed": false,
+        "channel": "official"
+      }
+    },
+    {
+      "command": "get_workout_detail_coverage",
+      "args": {
+        "channel": "advanced"
+      }
+    },
+    {
+      "command": "start_workout_detail_backfill",
+      "args": {
+        "maxRecords": 20,
+        "retryFailed": false,
+        "channel": "advanced"
+      }
+    },
+    {
+      "command": "plugin:event|unlisten",
+      "args": {
+        "event": "login://status",
+        "eventId": 21
+      }
+    },
+    {
+      "command": "plugin:event|unlisten",
+      "args": {
+        "event": "official://status",
+        "eventId": 22
+      }
+    },
+    {
+      "command": "get_workout_page",
+      "args": {
+        "limit": 200,
+        "offset": 0
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792106640"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792106640"
+      }
+    },
+    {
+      "command": "get_device_profile",
+      "args": {
+        "deviceId": "DEMO0000BAND01",
+        "sourceScope": "device"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "zh"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "zh"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "es"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "es"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "nl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "nl"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792797600"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792711920"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792711920"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792624260"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792624260"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792579380"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792579380"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792364460"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792364460"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792280640"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792280640"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1792021500"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1792021500"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1791973260"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1791973260"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1791759660"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1791759660"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-BR"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-BR"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1791674580"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1791674580"
+      }
+    },
+    {
+      "command": "get_workout_detail",
+      "args": {
+        "workoutId": "1791588000"
+      }
+    },
+    {
+      "command": "get_workout_series",
+      "args": {
+        "workoutId": "1791588000"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-PT"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-PT"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "de"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "de"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "ru"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "ru"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "hi-IN"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "hi-IN"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "fr"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "fr"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "it"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "it"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "get_coverage_ledger",
+      "args": {}
+    },
+    {
+      "command": "get_storage_estimate",
+      "args": {
+        "days": 365
+      }
+    },
+    {
+      "command": "list_backups",
+      "args": {}
+    },
+    {
+      "command": "get_capability_overview",
+      "args": {}
+    },
+    {
+      "command": "get_device_profiles",
+      "args": {
+        "refresh": false
+      }
+    },
+    {
+      "command": "get_app_status",
+      "args": {}
+    },
+    {
+      "command": "get_user_prefs",
+      "args": {}
+    },
+    {
+      "command": "plugin:event|listen",
+      "args": {
+        "event": "login://status",
+        "target": {
+          "kind": "Any"
+        },
+        "handler": 23
+      }
+    },
+    {
+      "command": "plugin:event|listen",
+      "args": {
+        "event": "official://status",
+        "target": {
+          "kind": "Any"
+        },
+        "handler": 24
+      }
+    },
+    {
+      "command": "get_login_status",
+      "args": {}
+    },
+    {
+      "command": "get_official_status",
+      "args": {}
+    },
+    {
+      "command": "get_workout_detail_coverage",
+      "args": {
+        "channel": "advanced"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "zh"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "zh"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "en"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "es"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "es"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "nl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "nl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-BR"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-BR"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-PT"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pt-PT"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "de"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "de"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "ru"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "ru"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "hi-IN"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "hi-IN"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "fr"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "fr"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "it"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "it"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pl"
+      }
+    },
+    {
+      "command": "set_tray_locale",
+      "args": {
+        "locale": "pl"
+      }
+    }
+  ],
+  "passed": true,
+  "contrast": [
+    {
+      "theme": "light",
+      "surface": "new multi-select controls",
+      "method": "computed text foreground against rendered background pixels with text hidden",
+      "measurements": [
+        {
+          "text": "Done selecting",
+          "ratio": 14.31
+        },
+        {
+          "text": "Hidden workouts",
+          "ratio": 7.19
+        },
+        {
+          "text": "Select loaded workouts",
+          "ratio": 7.19
+        },
+        {
+          "text": "Clear selection",
+          "ratio": 7.19
+        },
+        {
+          "text": "1 selected",
+          "ratio": 14.1
+        },
+        {
+          "text": "Apply type",
+          "ratio": 7.11
+        },
+        {
+          "text": "Restore automatic detection",
+          "ratio": 7.18
+        },
+        {
+          "text": "Hide on this device",
+          "ratio": 7.18
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "surface": "new detail backfill controls",
+      "method": "computed text foreground against rendered background pixels with text hidden",
+      "measurements": [
+        {
+          "text": "Fetch missing workout details",
+          "ratio": 13.93
+        },
+        {
+          "text": "Fetch details separately for previously synced workouts. You can stop and resume later; some details may not be available in the cloud.",
+          "ratio": 4.73
+        },
+        {
+          "text": "Detail source",
+          "ratio": 6.85
+        },
+        {
+          "text": "Advanced data\nZepp official",
+          "ratio": 15.46
+        },
+        {
+          "text": "Not requested 0 · Saved 271 · No cloud details 0 · Request failures 0 · Parsing failures 0 · Current channel unavailable 0",
+          "ratio": 6.85
+        },
+        {
+          "text": "Start or resume",
+          "ratio": 7.24
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "surface": "new multi-select controls",
+      "method": "computed text foreground against rendered background pixels with text hidden",
+      "measurements": [
+        {
+          "text": "Done selecting",
+          "ratio": 12.01
+        },
+        {
+          "text": "Hidden workouts",
+          "ratio": 7.55
+        },
+        {
+          "text": "Select loaded workouts",
+          "ratio": 7.55
+        },
+        {
+          "text": "Clear selection",
+          "ratio": 7.55
+        },
+        {
+          "text": "1 selected",
+          "ratio": 17.32
+        },
+        {
+          "text": "Apply type",
+          "ratio": 8.9
+        },
+        {
+          "text": "Restore automatic detection",
+          "ratio": 7.64
+        },
+        {
+          "text": "Hide on this device",
+          "ratio": 7.64
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "surface": "new detail backfill controls",
+      "method": "computed text foreground against rendered background pixels with text hidden",
+      "measurements": [
+        {
+          "text": "Fetch missing workout details",
+          "ratio": 13.51
+        },
+        {
+          "text": "Fetch details separately for previously synced workouts. You can stop and resume later; some details may not be available in the cloud.",
+          "ratio": 5.39
+        },
+        {
+          "text": "Detail source",
+          "ratio": 7.72
+        },
+        {
+          "text": "Advanced data\nZepp official",
+          "ratio": 15.4
+        },
+        {
+          "text": "Not requested 0 · Saved 271 · No cloud details 0 · Request failures 0 · Parsing failures 0 · Current channel unavailable 0",
+          "ratio": 7.72
+        },
+        {
+          "text": "Start or resume",
+          "ratio": 7.55
+        }
+      ]
+    }
+  ]
+}

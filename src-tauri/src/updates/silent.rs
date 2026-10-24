@@ -150,6 +150,9 @@ pub(crate) fn spawn_periodic_recheck(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(RECHECK_EVERY).await;
+            if crate::EXIT_GATE.is_exiting() {
+                break;
+            }
             if app
                 .state::<SilentUpdater>()
                 .manual_only
@@ -168,6 +171,9 @@ pub(crate) fn spawn_periodic_recheck(app: AppHandle) {
 /// 在装就原样返回当前状态，不重复开。
 #[tauri::command]
 pub(crate) fn update_start(app: AppHandle) -> UpdateView {
+    if crate::EXIT_GATE.is_exiting() {
+        return app.state::<SilentUpdater>().view();
+    }
     let supported = super::self_update_supported();
     let mut start = false;
     let view = publish(&app, |inner| {
@@ -384,7 +390,11 @@ pub(crate) async fn update_apply(
             AppError::new("err.update.install_failed", format!("安装失败：{error}"))
         })?;
         // Windows 上 install 自己会退出进程；走到这里的是 macOS，换好了 .app 要重启。
-        app.restart();
+        // restart() never returns on a worker thread, retaining _guards forever.
+        // ExitRequested then waits on this command's own write lock. The request
+        // variant returns so those guards are released before the exit waiter.
+        app.request_restart();
+        Ok(())
     }
     .await;
     if let Err(error) = &result {

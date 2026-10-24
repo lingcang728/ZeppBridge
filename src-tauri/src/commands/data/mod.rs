@@ -581,6 +581,50 @@ pub async fn set_workout_type_override(
     workout.ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
 }
 
+#[tauri::command]
+pub async fn edit_workouts(
+    state: tauri::State<'_, AppState>,
+    workout_ids: Vec<String>,
+    change_type: bool,
+    workout_type: Option<String>,
+    hidden: Option<bool>,
+) -> std::result::Result<zeppbridge_core::storage::workout_edits::WorkoutEdit, AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.edit_workouts(
+            &workout_ids,
+            change_type.then_some(workout_type.as_deref()),
+            hidden,
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn undo_workout_edit(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<usize, AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.undo_workout_edit(&id)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_hidden_workout_page(
+    state: tauri::State<'_, AppState>,
+    limit: usize,
+    offset: usize,
+) -> std::result::Result<WorkoutPage, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        Ok(WorkoutPage {
+            items: db.hidden_workouts_page(limit.clamp(1, MAX_PAGE_SIZE), offset)?,
+            total: db.count_hidden_workouts()?,
+        })
+    })
+    .await
+}
+
 /// 用系统浏览器打开一个 https 链接（交给 AI 时打开 AI 网站）。
 ///
 /// 不直接在前端调 opener 插件：AppImage 里浏览器会继承运行时注入的库路径而起不来，

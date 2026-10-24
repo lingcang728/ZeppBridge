@@ -417,7 +417,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT date(start_time, 'localtime') AS day, SUM(training_load),
                     SUM(CASE WHEN training_load IS NULL OR training_load < 0 THEN 1 ELSE 0 END)
-             FROM workouts WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+             FROM workouts_visible WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
              GROUP BY day ORDER BY day",
         )?;
         let rows = stmt.query_map(params![history_start, end_text], |row| {

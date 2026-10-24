@@ -239,6 +239,25 @@ export default {
   },
 
   modules: {
+    'components/WorkoutTools': {
+      select: 'Trainings auswählen', done: 'Auswahl beenden', selectLoaded: 'Geladene Trainings auswählen', clearSelection: 'Auswahl aufheben',
+      selected: (n: number) => `${n} ausgewählt`, visible: 'Trainings', hidden: 'Ausgeblendete Trainings',
+      type: 'Sportart auswählen', apply: 'Sportart übernehmen', clearType: 'Automatische Erkennung wiederherstellen',
+      preview: (n: number, type: string) => plural(n, { one: `1 Training auf „${type}“ ändern`, other: `${n} Trainings auf „${type}“ ändern` }),
+      hide: 'Auf diesem Gerät ausblenden', restore: 'Wieder anzeigen', undo: 'Letzte Änderung rückgängig machen',
+      localHint: 'Lokal ausgeblendete Trainings werden bei Statistiken, KI und Exporten nicht berücksichtigt. Die Originaldaten bleiben erhalten und lassen sich unter „Ausgeblendete Trainings“ wieder einblenden.',
+      saved: (n: number) => plural(n, { one: '1 Training aktualisiert', other: `${n} Trainings aktualisiert` }), failed: 'Änderung fehlgeschlagen. Bitte erneut versuchen.',
+      detailsTitle: 'Trainingsdetails ergänzen', detailsHint: 'Details bereits synchronisierter Trainings separat nachladen. Du kannst den Vorgang stoppen und später fortsetzen; die Cloud stellt möglicherweise nicht alle Details bereit.',
+      detailChannel: 'Quelle der Details', advancedChannel: 'Erweiterte Daten', officialChannel: 'Zepp offiziell',
+      start: 'Starten oder fortsetzen', pause: 'Vorgang stoppen', retry: 'Fehlgeschlagene Anfragen wiederholen',
+      detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) => `Noch nicht angefragt ${pending} · Gespeichert ${persisted} · Keine Cloud-Details ${empty} · Anfrage fehlgeschlagen ${failed} · Fehler beim Einlesen ${parse} · Aktueller Kanal nicht verfügbar ${unavailable}`,
+      stopped: 'Vorgang gestoppt. Fortschritt gespeichert.', detailFailed: 'Details konnten nicht ergänzt werden. Verbindung prüfen und erneut versuchen.',
+      retryHint: 'Auch fehlgeschlagene Datenblöcke aus älteren Versionen lassen sich hier wiederholen, ohne das Protokoll zu leeren oder die Datenbank zu löschen.',
+      credentialHint: 'Eine Verbindung für „Erweiterte Daten“ ist auf diesem Gerät gespeichert, die Zugangsdaten sind derzeit jedoch nicht verfügbar. Melde dich erneut an oder melde dich ab und verbinde dich neu; die offizielle Autorisierung bleibt separat erhalten.',
+      altitudeHint: 'Die Höhe stammt aus den Uhraufzeichnungen oder lokal importierten FIT-Dateien. Die kalibrierte Höhe der Zepp-App wurde noch nicht abgerufen; die Werte können abweichen.',
+      planHint: 'Pläne werden für die ausgewählte Sportkategorie gesendet. Bezeichnungen wie Trail werden als Beschreibung übertragen; ob die Uhr in den entsprechenden Sportmodus wechseln kann, ist noch nicht bestätigt. Krafttrainingspläne lassen sich derzeit nicht senden.',
+      strengthHint: 'Bei abgeschlossenen Krafttrainings werden nur Daten angezeigt, die tatsächlich von der Cloud geliefert werden. Wiederholungen und Gewicht je Satz sowie automatische Blutdruckmessungen müssen noch anhand von Beispieldaten aus Konten überprüft werden. Ist das Modell unbekannt, kannst du das Gerät manuell zuordnen.',
+    },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Keine Messwerte in den letzten 6 Monaten: ${list}`,
       separator: ", ",

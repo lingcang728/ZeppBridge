@@ -53,6 +53,38 @@ fn feel(id: &str, mode: &str, shoe_id: Option<i64>) -> AnnotationInput {
 }
 
 #[test]
+fn hidden_runs_leave_shoe_mileage_personal_records_and_annual_rings_until_restored() {
+    let db = Database::in_memory().unwrap();
+    // Stored workout keys come from the sport catalog (`run`); `running`
+    // is the shoe family and is not a canonical workout type.
+    workout(&db, "run", "run", (2026, 10, 3), 5.0, Some("gear-a"));
+    db.save_shoe(&shoe("Daily", "running", true, Some("gear-a")))
+        .unwrap();
+    assert_eq!(db.personal_records().unwrap().runs_scanned, 1);
+    assert_eq!(db.shoe_overview().unwrap().0[0].workouts, 1);
+    let edit = db.edit_workouts(&["run".into()], None, Some(true)).unwrap();
+    assert_eq!(db.personal_records().unwrap().runs_scanned, 0);
+    assert_eq!(db.shoe_overview().unwrap().0[0].workouts, 0);
+    assert_eq!(db.shoe_overview().unwrap().0[0].km, 0.0);
+    assert!(db
+        .annual_rings()
+        .unwrap()
+        .years
+        .iter()
+        .all(|year| year.workouts == 0));
+    db.undo_workout_edit(&edit.id).unwrap();
+    assert_eq!(db.personal_records().unwrap().runs_scanned, 1);
+    assert_eq!(db.shoe_overview().unwrap().0[0].workouts, 1);
+    assert_eq!(db.shoe_overview().unwrap().0[0].km, 5.0);
+    assert!(db
+        .annual_rings()
+        .unwrap()
+        .years
+        .iter()
+        .any(|year| year.workouts == 1));
+}
+
+#[test]
 fn shoes_are_credited_by_choice_then_zepp_then_default_and_never_by_guess() {
     let db = Database::in_memory().unwrap();
     workout(&db, "zepp", "run", (2026, 3, 1), 10.0, Some("g-1"));

@@ -62,6 +62,9 @@ fn default_version() -> u32 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AuthStatus {
     pub configured: bool,
+    /// Metadata survives a denied/missing platform credential, so recovery remains reachable.
+    pub configuration_present: bool,
+    pub credential_error: Option<String>,
     pub user_id: Option<String>,
     pub region_host: Option<String>,
     pub token_masked: Option<String>,
@@ -115,7 +118,9 @@ impl AuthManager {
         let token = validate_token(&auth.app_token)?;
         let region_host = normalize_region_host(&auth.region_host)?;
         let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
-        let previous = self.credentials.get(&user_id).map_err(credential_error)?;
+        // Reading an old Keychain entry may be denied while replacing it is
+        // allowed. A fresh login must still get the chance to write its token.
+        let previous = self.credentials.get(&user_id);
 
         self.credentials
             .set(&user_id, &token)
@@ -134,11 +139,16 @@ impl AuthManager {
             // Do not delete the previous account's credential: the new id
             // never became current.
             match previous {
-                Some(old) => {
+                Ok(Some(old)) => {
                     let _ = self.credentials.set(&user_id, &old);
                 }
-                None => {
+                Ok(None) => {
                     let _ = self.credentials.delete(&user_id);
+                }
+                Err(_) => {
+                    // The previous value is unknown; do not delete an entry
+                    // that may have existed before this recovery attempt.
+                    tracing::warn!("认证元数据保存失败，旧凭据不可读，无法回滚凭据替换");
                 }
             }
             return Err(error);
@@ -238,6 +248,8 @@ impl AuthManager {
         if !self.auth_file.exists() {
             return Ok(AuthStatus {
                 configured: false,
+                configuration_present: false,
+                credential_error: None,
                 user_id: None,
                 region_host: None,
                 token_masked: None,
@@ -246,17 +258,51 @@ impl AuthManager {
             });
         }
 
-        let (stored, legacy_token) = self.read_stored()?;
-        let user_id = validate_user_id(&stored.user_id)?;
-        let region_host = normalize_region_host(&stored.region_host)?;
+        // Invalid metadata must not break the settings snapshot and hide the
+        // very controls needed to replace or clear it.
+        let recoverable = |error: ZeppBridgeError| AuthStatus {
+            configured: false,
+            configuration_present: true,
+            credential_error: Some(error.user_message()),
+            user_id: self
+                .read_user_id_hint()
+                .and_then(|id| validate_user_id(&id).ok()),
+            region_host: None,
+            token_masked: None,
+            version: None,
+            updated_at: None,
+        };
+        let (stored, legacy_token) = match self.read_stored() {
+            Ok(stored) => stored,
+            Err(error) => return Ok(recoverable(error)),
+        };
+        let user_id = match validate_user_id(&stored.user_id) {
+            Ok(id) => id,
+            Err(error) => return Ok(recoverable(error)),
+        };
+        let region_host = match normalize_region_host(&stored.region_host) {
+            Ok(host) => host,
+            Err(error) => return Ok(recoverable(error)),
+        };
         let token = self
             .credentials
             .get(&user_id)
-            .map_err(credential_error)?
-            .or(legacy_token);
+            .map_err(credential_error)
+            .and_then(|token| {
+                token
+                    .or(legacy_token)
+                    .ok_or(ZeppBridgeError::Headless(HeadlessProblem::TokenNotInStore))
+            })
+            .and_then(|token| validate_token(&token));
+        let (token, error) = match token {
+            Ok(token) => (Some(token), None),
+            Err(error) => (None, Some(error.user_message())),
+        };
 
         Ok(AuthStatus {
             configured: token.is_some(),
+            configuration_present: true,
+            credential_error: error,
             user_id: Some(user_id),
             region_host: Some(region_host),
             token_masked: token.as_deref().map(mask_token),
@@ -283,12 +329,14 @@ impl AuthManager {
             .read_stored()
             .ok()
             .map(|(stored, _)| stored.user_id)
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| self.read_user_id_hint());
+            .and_then(|id| validate_user_id(&id).ok())
+            .or_else(|| {
+                self.read_user_id_hint()
+                    .and_then(|id| validate_user_id(&id).ok())
+            });
 
         let mut left_behind = None;
         if let Some(user_id) = user_id {
-            let user_id = validate_user_id(&user_id)?;
             left_behind = self.credentials.delete(&user_id).err();
         }
         if self.auth_file.exists() {

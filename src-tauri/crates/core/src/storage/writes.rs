@@ -313,7 +313,11 @@ impl Database {
                 zepp_source = COALESCE(excluded.zepp_source, workouts.zepp_source),
                 zepp_type = excluded.zepp_type,
                 workout_type_source = excluded.workout_type_source,
-                workout_type_override = COALESCE(workouts.workout_type_override, excluded.workout_type_override),
+                workout_type_override = CASE
+                    WHEN EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = excluded.workout_id)
+                    THEN (SELECT s.type_override FROM workout_local_state s WHERE s.workout_id = excluded.workout_id)
+                    ELSE COALESCE(workouts.workout_type_override, excluded.workout_type_override)
+                END,
                 workout_type_conflict = excluded.workout_type_conflict,
                 -- 一律 COALESCE：补拉回来的摘要可能缺字段，缺的那次不该把上一次
                 -- 已经拿到的值抹成 NULL。

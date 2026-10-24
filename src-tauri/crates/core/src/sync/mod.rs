@@ -31,6 +31,7 @@ use tokio::sync::Mutex;
 
 mod backfill;
 mod chunked;
+mod details;
 mod official;
 mod persist;
 mod probe;
