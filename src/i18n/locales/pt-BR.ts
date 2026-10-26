@@ -3375,6 +3375,15 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       retired: 'Aposentado',
       saved: 'Salvo',
     },
+    'components/journal/repair': {
+      timelineEmpty: 'Escolha um dia na linha do tempo para registrar um evento',
+      moreRecords: (n: number) => `Mais ${n}`,
+      noRaces: 'Nenhuma prova ainda',
+      noInjuries: 'Nenhuma lesão registrada',
+      untilNow: 'Até hoje',
+      more: 'Mais',
+      distance: 'Distância total',
+    },
     'components/journal/journal': {
       title: 'Diário',
       save: 'Salvar',

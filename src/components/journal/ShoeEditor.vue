@@ -5,12 +5,10 @@ import { computed, ref, watch } from 'vue';
 import EditorShell from './EditorShell.vue';
 import GlassSwitch from '../GlassSwitch.vue';
 import SegmentTrack from '../SegmentTrack.vue';
-import WheelDatePicker from '../WheelDatePicker.vue';
-import DateRangeField from '../DateRangeField.vue';
+import DateRows from '../DateRows.vue';
 import { useJournalText } from './journal.i18n';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
-import { localDateString } from '../../lib/format';
 import type { ShoeInput, ShoeSport } from '../../types/logbook';
 
 const props = defineProps<{ shoe: ShoeInput }>();
@@ -33,10 +31,12 @@ const sports = computed(() => (['running', 'trail', 'walking', 'hiking'] as Shoe
 const retired = computed({
   get: () => draft.value.retired_on !== null,
   set: (value: boolean) => {
-    draft.value.retired_on = value ? localDateString(new Date()) : null;
+    draft.value.retired_on = value ? draft.value.started_on : null;
     if (value) draft.value.is_default = false;
   },
 });
+
+watch(() => draft.value.started_on, start => { if (draft.value.retired_on && draft.value.retired_on < start) draft.value.retired_on = start; });
 
 async function save() {
   local.value = null;
@@ -66,17 +66,10 @@ async function remove() {
       <label>{{ t.startKm }}<input v-model="startKm" class="num" inputmode="decimal"></label>
       <label>{{ t.retireKm }}<input v-model="retireKm" class="num" inputmode="numeric"><span class="hint">{{ t.retireHint }}</span></label>
     </div>
-    <!-- 还在穿：只有开始穿的日子、居中；退役了：它推到左边，退役日期从右边出来（DateRangeField）。 -->
     <div class="check"><span>{{ t.retired }}</span>
       <GlassSwitch :model-value="retired" :aria-label="t.retired" @update:model-value="retired = !retired" />
     </div>
-    <DateRangeField :show-end="draft.retired_on !== null">
-      <template #start><div class="field"><span>{{ t.startedOn }}</span><WheelDatePicker v-model="draft.started_on" :aria-label="t.startedOn" /></div></template>
-      <template #end><div class="field"><span>{{ t.retiredOn }}</span>
-        <WheelDatePicker :model-value="draft.retired_on ?? draft.started_on" :min="draft.started_on" :aria-label="t.retiredOn"
-          @update:model-value="v => { if (draft.retired_on !== null) draft.retired_on = v; }" />
-      </div></template>
-    </DateRangeField>
+        <DateRows v-model:start="draft.started_on" v-model:end="draft.retired_on" :start-label="t.startedOn" :end-label="t.retiredOn" />
     <p v-if="draft.zepp_gear_id" class="hint">{{ t.zeppGear }} · {{ draft.zepp_gear_id }}</p>
     <label>{{ t.notes }}<textarea v-model="draft.notes" rows="2" maxlength="1000"></textarea></label>
   </EditorShell>

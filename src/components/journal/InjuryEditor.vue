@@ -7,12 +7,10 @@ import BodyMap from './BodyMap.vue';
 import EditorShell from './EditorShell.vue';
 import GlassSwitch from '../GlassSwitch.vue';
 import SegmentTrack from '../SegmentTrack.vue';
-import WheelDatePicker from '../WheelDatePicker.vue';
-import DateRangeField from '../DateRangeField.vue';
+import DateRows from '../DateRows.vue';
 import { useJournalText } from './journal.i18n';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
-import { localDateString } from '../../lib/format';
 import type { InjuryInput } from '../../types/logbook';
 
 const props = defineProps<{ injury: InjuryInput }>();
@@ -31,7 +29,7 @@ const parts = computed({
 const severities = computed(() => [1, 2, 3].map(value => ({ value, label: (t.value.severities as Record<number, string>)[value] })));
 const ongoing = computed({
   get: () => draft.value.end_date === null,
-  set: (value: boolean) => { draft.value.end_date = value ? null : localDateString(new Date()); },
+  set: (value: boolean) => { draft.value.end_date = value ? null : draft.value.start_date; },
 });
 // 开始日期滚过了好了的日子：好了的日子跟着走。
 watch(() => draft.value.start_date, (start) => {
@@ -61,17 +59,10 @@ async function remove() {
           <SegmentTrack compact :model-value="draft.severity ?? 0" :items="severities" :aria-label="t.severity"
             @update:model-value="v => (draft.severity = Number(v) as 1 | 2 | 3)" />
         </div>
-        <!-- 还没好：只有开始日期、居中；好了：开始日期推到左边，「好了」那天从右边出来（DateRangeField）。 -->
         <div class="check"><span>{{ t.stillHurting }}</span>
           <GlassSwitch :model-value="ongoing" :aria-label="t.stillHurting" @update:model-value="ongoing = !ongoing" />
         </div>
-        <DateRangeField :show-end="!ongoing">
-          <template #start><div class="field"><span>{{ t.startDate }}</span><WheelDatePicker v-model="draft.start_date" :aria-label="t.startDate" /></div></template>
-          <template #end><div class="field"><span>{{ t.endDate }}</span>
-            <WheelDatePicker :model-value="draft.end_date ?? draft.start_date" :min="draft.start_date" :aria-label="t.endDate"
-              @update:model-value="v => { if (draft.end_date !== null) draft.end_date = v; }" />
-          </div></template>
-        </DateRangeField>
+        <DateRows v-model:start="draft.start_date" v-model:end="draft.end_date" :start-label="t.startDate" :end-label="t.endDate" />
         <label>{{ t.notes }}<textarea v-model="draft.notes" rows="2" maxlength="2000"></textarea></label>
       </div>
     </div>

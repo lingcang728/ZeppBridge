@@ -15,18 +15,17 @@ const rectOf = (el: Element): Rect => {
 };
 
 /**
- * 卡和页的内容先后交替，只在交接处叠一小段（线性时间轴）。卡和详情页的排版本来就不一样（字、图都不在同一个地方），
- * 两边同时半透明叠着就是一屏重影——2026-10-03 第二轮用户说的「表面是延伸，字完全不同」。所以：
- * 打开时卡的拷贝先在前 24% 淡掉，页头 16%–42% 接上，页面其余部分 20%–56% 再出来；收回时页面内容前 28% 先走、
- * 页头 24%–48% 淡掉、卡的拷贝 40%–68% 回来。收回的形状走得靠前（40% 的时间已经缩到卡上八成），卡要跟着它一起回来——
- * 以前按 70%–95% 才回来，窗口早早落在卡上，中间一百多毫秒只剩一个页头标题，像一张空卡。落地那一帧就是卡本身。
+ * 卡和页的文字按线性时间轴先后交替，不能同时半透明叠着：PB 返回时，旧页头会压在成绩上形成两层字。
+ * 打开：拷贝在 24% 淡完，页头从 24% 接上，正文从 28% 接上。
+ * 收回：正文在 28% 淡完，页头在 36% 淡完，拷贝从 36% 接上、64% 完全显示。
+ * 拷贝随收拢及时回来，不拖到窗口已经落地以后；全程保留同一块不透明底板。
  */
 export const REPLICA_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.24 }, { opacity: 0 }];
-export const HEAD_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.16 }, { opacity: 1, offset: 0.42 }, { opacity: 1 }];
-export const PAGE_BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.2 }, { opacity: 1, offset: 0.56 }, { opacity: 1 }];
+export const HEAD_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.24 }, { opacity: 1, offset: 0.48 }, { opacity: 1 }];
+export const PAGE_BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.28 }, { opacity: 1, offset: 0.56 }, { opacity: 1 }];
 export const PAGE_BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.28 }, { opacity: 0 }];
-export const HEAD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.24 }, { opacity: 0, offset: 0.48 }, { opacity: 0 }];
-export const REPLICA_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1, offset: 0.68 }, { opacity: 1 }];
+export const HEAD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.16 }, { opacity: 0, offset: 0.36 }, { opacity: 0 }];
+export const REPLICA_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.36 }, { opacity: 1, offset: 0.64 }, { opacity: 1 }];
 
 /** 页面的「卡头」（页头）和其余部分。没有页头的页（运动详情）拿第一块当卡头，免得中间有一段什么都没有。 */
 export const partsOf = (page: HTMLElement) => {

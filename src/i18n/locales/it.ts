@@ -13,6 +13,15 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/journal/repair': {
+      timelineEmpty: 'Seleziona un giorno sulla cronologia per registrare un evento',
+      moreRecords: (n: number) => `Altri ${n}`,
+      noRaces: 'Ancora nessuna gara',
+      noInjuries: 'Nessun infortunio registrato',
+      untilNow: 'Oggi',
+      more: 'Altro',
+      distance: 'Distanza totale',
+    },
     'components/WorkoutTools': {
       select: 'Seleziona allenamenti',
       done: 'Termina selezione',

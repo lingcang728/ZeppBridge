@@ -161,6 +161,9 @@ const CACHED_PAGES = [
   'RecentRecords',
   'SleepList',
   'WorkoutList',
+  // Preserve the selected star as the return target. RingsStage stops rendering
+  // on deactivation and disposes its WebGL context when evicted from this cache.
+  'Rings',
 ];
 
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
@@ -341,7 +344,7 @@ onUnmounted(() => {
            详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
       <div :class="['page-host', { holding: pageHold }]">
       <RouterView v-slot="{ Component }">
-        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
+        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" :on-enter="motion === 'expand' || motion === 'collapse' ? pageMorph.onMorphEnter : pageMorph.onEnter" :on-leave="motion === 'expand' || motion === 'collapse' ? pageMorph.onMorphLeave : pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
           <KeepAlive :include="CACHED_PAGES" :max="4">
             <component :is="Component" />
           </KeepAlive>

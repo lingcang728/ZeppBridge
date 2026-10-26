@@ -9,7 +9,7 @@
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
 import { onActivated, onMounted, shallowRef } from 'vue';
-import { RouterLink } from 'vue-router';
+import RingsPreview from '../components/journal/RingsPreview.vue';
 import PageHeader from '../components/PageHeader.vue';
 import EpochSection from '../components/journal/EpochSection.vue';
 import InjuryEditor from '../components/journal/InjuryEditor.vue';
@@ -20,13 +20,11 @@ import RecordWall from '../components/journal/RecordWall.vue';
 import ShoeEditor from '../components/journal/ShoeEditor.vue';
 import ShoeSection from '../components/journal/ShoeSection.vue';
 import { useJournalText } from '../components/journal/journal.i18n';
-import { useRingsText } from '../components/rings/rings.i18n';
 import { useLogbook } from '../composables/useLogbook';
 import type { InjuryInput, RaceInput, ShoeInput } from '../types/logbook';
 
 defineOptions({ name: 'Journal' });
 const t = useJournalText();
-const rings = useRingsText();
 const logbook = useLogbook();
 onMounted(() => { void logbook.load(); });
 onActivated(() => { void logbook.load(); });
@@ -39,16 +37,14 @@ const close = () => { editing.value = null; logbook.error.value = null; };
 
 <template>
   <section class="page journal-page" aria-labelledby="journal-title">
-    <PageHeader title-id="journal-title" :title="t.title">
-      <!-- data-morph-card：胶囊比一般的卡小，不标的话换页会从整页展开；标上就从这颗胶囊长出年轮页、返回时缩回来。 -->
-      <RouterLink class="pill-button quiet" :to="{ name: 'Rings' }" data-morph-card>{{ rings.entry }} →</RouterLink>
-    </PageHeader>
+    <PageHeader title-id="journal-title" :title="t.title" />
     <div class="journal-grid">
-      <RaceSection class="span-races" @edit="(race, origin) => (editing = { kind: 'race', value: race, origin })" />
-      <RecordWall class="span-records" />
-      <ShoeSection class="span-shoes" @edit="(shoe, origin) => (editing = { kind: 'shoe', value: shoe, origin })" />
-      <EpochSection class="span-epochs" />
-      <InjurySection class="span-injuries" @edit="(injury, origin) => (editing = { kind: 'injury', value: injury, origin })" />
+      <RingsPreview class="span-full" />
+      <RecordWall class="span-full" />
+      <EpochSection class="span-full" />
+      <RaceSection class="span-half" @edit="(race, origin) => (editing = { kind: 'race', value: race, origin })" />
+      <InjurySection class="span-half" @edit="(injury, origin) => (editing = { kind: 'injury', value: injury, origin })" />
+      <ShoeSection class="span-full" @edit="(shoe, origin) => (editing = { kind: 'shoe', value: shoe, origin })" />
     </div>
     <RaceEditor v-if="editing?.kind === 'race'" :race="editing.value" :origin="editing.origin" @close="close" />
     <ShoeEditor v-if="editing?.kind === 'shoe'" :shoe="editing.value" :origin="editing.origin" @close="close" />
@@ -58,12 +54,9 @@ const close = () => { editing.value = null; logbook.error.value = null; };
 
 <style scoped>
 .journal-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.journal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; container: journal / inline-size; }
-.span-races { grid-column: span 7; }
-.span-records { grid-column: span 5; }
-.span-shoes { grid-column: span 7; }
-.span-epochs { grid-column: span 5; }
-.span-injuries { grid-column: 1 / -1; }
+.journal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; container: journal / inline-size; align-items: start; }
+.span-full { grid-column: 1 / -1; }
+.span-half { grid-column: span 6; }
 @media (max-width: 1100px) {
   .journal-grid > * { grid-column: 1 / -1; }
 }

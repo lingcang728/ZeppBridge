@@ -12,6 +12,15 @@ type IssueParams = { activity?: string; value?: string; max?: number; low?: numb
 
 export default {
   modules: {
+    'components/journal/repair': {
+      timelineEmpty: 'Выберите день на временной шкале, чтобы добавить событие',
+      moreRecords: (n: number) => plural(n, { one: `Ещё ${n} запись`, few: `Ещё ${n} записи`, many: `Ещё ${n} записей`, other: `Ещё ${n} записи` }),
+      noRaces: 'Пока нет соревнований',
+      noInjuries: 'Пока нет записей о травмах',
+      untilNow: 'По настоящее время',
+      more: 'Ещё',
+      distance: 'Общая дистанция',
+    },
     'demo/texts': {
       easyRun: 'Лёгкий бег',
       intervals: 'Интервалы 5×3 мин',

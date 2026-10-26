@@ -11,6 +11,12 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/journal/repair': {
+      timelineEmpty: 'कोई घटना दर्ज करने के लिए टाइमलाइन पर एक दिन चुनें',
+      moreRecords: (n: number) => `${n} और`,
+      noRaces: 'अभी कोई रेस नहीं', noInjuries: 'चोट का कोई रिकॉर्ड नहीं',
+      untilNow: 'अब तक', more: 'और देखें', distance: 'कुल दूरी',
+    },
     'components/WorkoutTools': {
       select: 'रिकॉर्ड चुनें', done: 'चयन पूरा करें', selectLoaded: 'लोड किए गए रिकॉर्ड चुनें', clearSelection: 'चयन हटाएँ',
       selected: (n: number) => plural(n, { one: `${n} रिकॉर्ड चुना गया`, other: `${n} रिकॉर्ड चुने गए` }), visible: 'वर्कआउट रिकॉर्ड', hidden: 'छिपे हुए रिकॉर्ड',

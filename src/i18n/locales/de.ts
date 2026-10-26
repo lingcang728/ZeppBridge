@@ -239,6 +239,15 @@ export default {
   },
 
   modules: {
+    'components/journal/repair': {
+      timelineEmpty: 'Wähle einen Tag auf der Zeitleiste, um ein Ereignis einzutragen',
+      moreRecords: (n: number) => `${n} weitere`,
+      noRaces: 'Noch keine Wettkämpfe',
+      noInjuries: 'Keine Verletzungen eingetragen',
+      untilNow: 'Heute',
+      more: 'Mehr',
+      distance: 'Gesamtdistanz',
+    },
     'components/WorkoutTools': {
       select: 'Trainings auswählen', done: 'Auswahl beenden', selectLoaded: 'Geladene Trainings auswählen', clearSelection: 'Auswahl aufheben',
       selected: (n: number) => `${n} ausgewählt`, visible: 'Trainings', hidden: 'Ausgeblendete Trainings',

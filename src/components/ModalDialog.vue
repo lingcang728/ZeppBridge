@@ -25,7 +25,7 @@ const isTopmost = () => {
 const focusableElements = () => Array.from(panel.value?.querySelectorAll<HTMLElement>(
   'button, a[href], input, select, textarea, [tabindex]',
 ) ?? []).filter((element) => element.tabIndex >= 0
-  && !element.matches(':disabled') && element.getClientRects().length > 0);
+  && !element.matches(':disabled') && !element.closest('[inert]') && element.getClientRects().length > 0);
 
 const onKeydown = (event: KeyboardEvent) => {
   if (!isTopmost()) return;
@@ -110,7 +110,11 @@ onUnmounted(() => {
    （用户 2026-10-19 截图）。里面按钮的焦点框照常。 */
 .dialog-panel:focus, .dialog-panel:focus-visible { outline: none; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
-.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
+.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 .is-bare > .dialog-glass { display: none; }
 .is-bare > .dialog-scroll { padding: 0; overflow: visible; }
+.dialog-panel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--surface); z-index: 0; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
+.dialog-panel.is-flying::after { opacity: 1; transition: none; }
+.is-flying > .dialog-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.is-bare::after { display: none; }
 </style>

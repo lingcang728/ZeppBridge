@@ -7,11 +7,12 @@
  * 存到图片文件夹，原始数据不离开这台电脑。12 月 15 日起默认看今年，之前默认看去年。
  */
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import RingsStage from '../components/rings/RingsStage.vue';
-import CountUp from '../components/rings/CountUp.vue';
+import { useRepairText } from '../components/journal/repair.i18n';
+import { defaultRingYear } from '../lib/rings/selection';
 import { useRingsText } from '../components/rings/rings.i18n';
 import { useJournalText } from '../components/journal/journal.i18n';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -24,6 +25,7 @@ import type { AnnualRings } from '../types/rings';
 defineOptions({ name: 'Rings' });
 const t = useRingsText();
 const j = useJournalText();
+const repair = useRepairText();
 const route = useRoute();
 const router = useRouter();
 
@@ -40,19 +42,11 @@ const load = async () => {
 onMounted(load);
 onActivated(load);
 
-/** 12 月 15 日起默认今年，之前默认去年（有的话）。 */
-const defaultYear = (data: AnnualRings): number | null => {
-  const years = data.years.map(y => y.year);
-  if (!years.length) return null;
-  const [y, m, d] = data.today.split('-').map(Number);
-  const late = m === 12 && d >= 15;
-  return late || !years.includes(y - 1) ? years[years.length - 1] : y - 1;
-};
 const selected = computed<number | null>(() => {
   const data = rings.value;
   if (!data) return null;
   const asked = Number(route.query.year);
-  return data.years.some(y => y.year === asked) ? asked : defaultYear(data);
+  return data.years.some(y => y.year === asked) ? asked : defaultRingYear(data);
 });
 const pick = (year: number) => { void router.replace({ query: { ...route.query, year: String(year) } }); };
 const year = computed(() => rings.value?.years.find(y => y.year === selected.value) ?? null);
@@ -61,20 +55,26 @@ const yearItems = computed(() => [...(rings.value?.years ?? [])].reverse().map(y
 const facts = computed(() => (year.value
   ? yearFacts(year.value, t.value, key => j.value.distances[key], workoutLabel)
   : []));
-const openWorkout = (id?: string) => { if (id) void router.push({ name: 'WorkoutDetail', params: { workoutId: id } }); };
+const primaryKeys = ['workouts', 'hours', 'running', 'activeDays', 'longestRun'];
+const displayedYear = shallowRef<typeof year.value>(null);
+const displayedFacts = computed(() => displayedYear.value ? yearFacts(displayedYear.value, t.value, key => j.value.distances[key], workoutLabel) : []);
+const primaryFacts = computed(() => primaryKeys.flatMap(key => displayedFacts.value.filter(f => f.key === key)));
+const secondaryFacts = computed(() => displayedFacts.value.filter(f => !primaryKeys.includes(f.key)));
 
 const stage = ref<InstanceType<typeof RingsStage> | null>(null);
 
 /* 下方的数据：等舞台从飞入落到第一幕、或者用户先滚到这里，才出场。 */
 const factsBox = ref<HTMLElement | null>(null);
 const factsShown = ref(false);
-watch(() => stage.value?.stage, value => { if (value && value !== 'idle') factsShown.value = true; });
+watch(selected, () => { factsShown.value = false; });
+function landed(phase: string) { if (phase === 'year') { displayedYear.value = year.value; factsShown.value = true; } }
 let factsObserver: IntersectionObserver | null = null;
-watch(factsBox, box => {
+watch([factsBox, selected], ([box]) => {
   factsObserver?.disconnect();
   if (!box || factsShown.value) return;
   factsObserver = new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.isIntersecting)) { factsShown.value = true; factsObserver?.disconnect(); }
+    // A narrow layout may be scrolled to the facts before the canvas is visible.
+    if (entries.some(entry => entry.isIntersecting) && window.innerWidth < 1280) { displayedYear.value = year.value; factsShown.value = true; factsObserver?.disconnect(); }
   }, { threshold: 0.25 });
   factsObserver.observe(box);
 });
@@ -130,18 +130,26 @@ const reveal = async () => {
     <p v-if="rings && !rings.years.length" class="rings-empty">{{ t.empty }}</p>
     <template v-if="year && rings">
       <SegmentTrack v-if="yearItems.length > 1" class="rings-years" compact :items="yearItems" :model-value="year.year" :aria-label="t.years" @update:model-value="pick" />
-      <RingsStage ref="stage" class="rings-stage-box" :years="rings.years" :selected="year.year" :finale-text="t.shareTitle(year.year)" @open-workout="openWorkout" />
-      <!-- 不再「闪现」：舞台第一次落到年份数字上（或者先滚到这里）才出场，各行错峰升起、数字从 0 滚上来；
-           换年份时整块按年份重挂，再落一次（和舞台的拳击同拍）。 -->
-      <section ref="factsBox" :class="['rings-facts', 'metric-panel', { shown: factsShown }]" :aria-label="t.yearAria(year.year)">
-        <p :key="`c${year.year}`" class="coverage">{{ t.coverage(year.data_days, year.in_progress) }}</p>
-        <dl :key="year.year">
-          <div v-for="(fact, i) in facts" :key="fact.key" :class="['fact', { link: fact.workoutId }]" :style="{ '--i': i }" @click="openWorkout(fact.workoutId)">
-            <dt>{{ fact.label }}</dt>
-            <dd><CountUp v-if="fact.count" :text="fact.value" :run="factsShown" :delay="160 + i * 45" /><template v-else>{{ fact.value }}</template><small v-if="fact.detail">{{ fact.detail }}</small></dd>
+      <div class="rings-experience">
+        <RingsStage ref="stage" class="rings-stage-box" :years="rings.years" :selected="year.year" :finale-text="t.shareTitle(year.year)" @land="landed" />
+        <section ref="factsBox" :class="['rings-facts', { shown: factsShown }]" :aria-label="t.yearAria(year.year)">
+          <div v-if="displayedYear" class="facts-content" :inert="!factsShown || undefined" :aria-hidden="!factsShown">
+            <p class="coverage">{{ t.coverage(displayedYear.data_days, displayedYear.in_progress) }}</p>
+            <div class="primary-facts">
+              <component :is="fact.workoutId ? RouterLink : 'div'" v-for="fact in primaryFacts" :key="fact.key" class="fact" data-morph-card
+                :to="fact.workoutId ? { name: 'WorkoutDetail', params: { workoutId: fact.workoutId } } : undefined">
+                <span class="fact-label">{{ fact.label }}</span><strong>{{ fact.value }}</strong><small v-if="fact.detail">{{ fact.detail }}</small>
+              </component>
+            </div>
+            <details class="more-facts"><summary>{{ repair.more }}</summary>
+              <component :is="fact.workoutId ? RouterLink : 'div'" v-for="fact in secondaryFacts" :key="fact.key" class="fact secondary" data-morph-card
+                :to="fact.workoutId ? { name: 'WorkoutDetail', params: { workoutId: fact.workoutId } } : undefined">
+                <span class="fact-label">{{ fact.label }}</span><strong>{{ fact.value }}</strong><small v-if="fact.detail">{{ fact.detail }}</small>
+              </component>
+            </details>
           </div>
-        </dl>
-      </section>
+        </section>
+      </div>
     </template>
   </section>
 </template>
@@ -153,24 +161,28 @@ const reveal = async () => {
 .rings-error { margin: 0; color: var(--heart); font-size: var(--fs-sm); }
 .rings-empty { margin: 0; color: var(--muted); }
 .rings-years { justify-self: start; max-width: 100%; }
-.rings-stage-box { height: clamp(460px, 72vh, 860px); box-shadow: var(--mat-rim), var(--mat-shadow); }
-.rings-facts { display: grid; gap: 10px; padding: 20px 24px; border-radius: var(--radius-lg); transition: opacity .5s ease, translate .6s cubic-bezier(.2, .9, .25, 1); }
-/* 还没出场：占着位置（下面不跳），看不见。 */
-.rings-facts:not(.shown) { visibility: hidden; opacity: 0; translate: 0 16px; }
-.coverage { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-/* 出场 / 换年份：每行错峰升起，落定时轻轻过冲一下（和舞台的拳击是一套手感）。 */
-.shown .coverage { animation: fact-in 520ms cubic-bezier(.2, .9, .25, 1) both; }
-.shown .fact { animation: fact-in 560ms cubic-bezier(.2, .9, .25, 1) both; animation-delay: calc(120ms + var(--i) * 45ms); }
-@keyframes fact-in {
-  0% { opacity: 0; transform: translateY(12px) scale(.96); }
-  55% { opacity: 1; transform: translateY(-2px) scale(1.02); }
-  100% { opacity: 1; transform: none; }
+.rings-experience { display: grid; grid-template-columns: minmax(0, 2.125fr) minmax(300px, 1fr); background: #050510; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--mat-rim), var(--mat-shadow); }
+.rings-stage-box { min-height: 640px; height: min(76vh, 860px); }
+.rings-facts { position: relative; padding: 32px; min-width: 0; color: #f5efdf; }
+.rings-facts::before { content: ''; position: absolute; left: 0; top: 5%; bottom: 5%; width: 1px; background: linear-gradient(transparent, #d8bc7950, transparent); }
+.facts-content { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease, transform 120ms ease; }
+.shown .facts-content { opacity: 1; transform: none; transition-duration: 240ms; }
+.coverage { margin: 0 0 16px; font-size: 16px; color: #c5bdaf; line-height: 1.6; }
+.primary-facts { display: grid; }
+.fact { display: grid; gap: 4px; padding: 12px 0; color: inherit; text-decoration: none; border-top: 1px solid #ffffff12; }
+.fact-label { color: #bcb4aa; font-size: 14px; }
+.fact strong { font-size: 28px; line-height: 1.3; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fact small { color: #c5bdaf; font-size: 14px; }
+a.fact:hover strong { color: var(--kintsugi); }
+.more-facts { margin-top: 12px; }
+.more-facts summary { color: #dec78e; font-size: 16px; cursor: pointer; }
+.secondary strong { font-size: 20px; }
+@media (max-width: 1279px) {
+  .rings-experience { grid-template-columns: minmax(0, 1fr); }
+  .rings-stage-box { height: clamp(460px, 68vh, 760px); min-height: 460px; }
+  .rings-facts::before { top: 0; bottom: auto; left: 5%; right: 5%; height: 1px; width: auto; background: linear-gradient(90deg, transparent, #d8bc7950, transparent); }
+  .primary-facts { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }
 }
-.rings-facts dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 28px; margin: 0; }
-.fact { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
-.fact dt { flex: none; color: var(--muted); font-size: var(--fs-sm); }
-.fact dd { margin: 0; min-width: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
-.fact dd small { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-.fact.link { cursor: pointer; }
-.fact.link:hover dd { color: var(--kintsugi); }
+@media (max-width: 600px) { .rings-facts { padding: 24px; } .primary-facts { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .facts-content { transition: none; transform: none; } }
 </style>
