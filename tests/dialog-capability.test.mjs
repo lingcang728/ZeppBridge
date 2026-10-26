@@ -46,8 +46,8 @@ const dialogMethodsUsed = () => {
   for (const file of sourceFiles(sourceRoot)) {
     for (const match of readFileSync(file, 'utf8').matchAll(IMPORT_PATTERN)) {
       for (const binding of match[1].split(',')) {
-        // `open as showOpenDialog` -> `open`：别名不改 ACL 里的名字。
-        const method = binding.split(/\bas\b/)[0].trim();
+        // `open as showOpenDialog` / `{ open: pick }` -> `open`：别名不改 ACL 里的名字。
+        const method = binding.split(/\bas\b|:/)[0].trim();
         if (!method) continue;
         const where = used.get(method) ?? [];
         where.push(path.relative(repoRoot, file).split(path.sep).join('/'));
@@ -66,8 +66,8 @@ const grantedPermissions = () =>
 test('the scan finds the dialog call sites at all', () => {
   // 正则一旦被改坏，下面两条会因为「一个调用点都没找到」而空过。
   const used = dialogMethodsUsed();
-  // save() 随旧 Explore 页的 JSON/CSV/GPX 另存一起删了，dialog:allow-save 也随之收回。
-  assert.deepEqual([...used.keys()].sort(), ['open']);
+  // save() 随旧 Explore 页删过一次，又随「带走我的一切」回来了：dialog:allow-save 跟着它走。
+  assert.deepEqual([...used.keys()].sort(), ['open', 'save']);
   assert.ok(used.get('open').includes('src/composables/useWorkoutDetail.ts'), 'FIT 导出的目录选择');
 });
 
