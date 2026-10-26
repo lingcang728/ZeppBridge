@@ -213,6 +213,15 @@ export interface AiTaskSummary {
   mcp_shared: boolean;
   /** 置顶的排在最前，也不会因为久没动收进「更早」。 */
   pinned?: boolean;
+  /** 启用的数据类别（Prompt 库按它筛）。 */
+  categories?: string[];
+}
+
+/** 一个任务以前用过的提示词（`ai_prompt_versions`）。 */
+export interface AiPromptVersion {
+  id: number;
+  prompt: string;
+  replaced_at: string;
 }
 
 /** `ai_task_preview` 的运动摘要行；字段与 Rust `AiTaskWorkoutBrief` 一一对应。 */
@@ -517,6 +526,12 @@ export interface BridgeBackend {
   setMetricExcluded(metric: string, excluded: boolean): Promise<string[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
   aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
+  /** Prompt 库：一个任务以前用过的提示词，新的在前。 */
+  aiPromptVersions(id: string): Promise<AiPromptVersion[]>;
+  /** 把任务导出成 `.zbprompt`（桌面「ZeppBridge AI」），返回路径。 */
+  aiPromptExport(id: string): Promise<string>;
+  /** 导入一份 `.zbprompt`，存成已保存的任务。 */
+  aiPromptImport(path: string): Promise<AiTask>;
   cardCollectionGet(): Promise<CardPick[]>;
   cardCollectionSet(picks: CardPick[]): Promise<CardPick[]>;
   aiTemplateList(): Promise<AiTaskTemplate[]>;

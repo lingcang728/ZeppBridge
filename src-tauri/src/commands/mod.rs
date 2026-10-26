@@ -168,11 +168,11 @@ where
 pub(crate) use ai_clients::{get_mcp_sidecar, save_mcp_bundle};
 pub(crate) use ai_handoff::{ai_handoff_autopaste, ai_handoff_cancel, ai_handoff_copy_file};
 pub(crate) use ai_tasks::{
-    ai_exchange_delete, ai_exchange_list, ai_exchange_rename, ai_profile_save,
-    ai_task_attachment_stat, ai_task_day_strip, ai_task_delete, ai_task_delete_many, ai_task_get,
-    ai_task_list, ai_task_prepare, ai_task_preview, ai_task_save, ai_task_set_pinned,
-    ai_template_delete, ai_template_list, ai_template_save, card_collection_get,
-    card_collection_set,
+    ai_exchange_delete, ai_exchange_list, ai_exchange_rename, ai_profile_save, ai_prompt_export,
+    ai_prompt_import, ai_prompt_versions, ai_task_attachment_stat, ai_task_day_strip,
+    ai_task_delete, ai_task_delete_many, ai_task_get, ai_task_list, ai_task_prepare,
+    ai_task_preview, ai_task_save, ai_task_set_pinned, ai_template_delete, ai_template_list,
+    ai_template_save, card_collection_get, card_collection_set,
 };
 pub(crate) use auth::{clear_auth, manual_auth, start_fresh_library, verify_auth};
 pub(crate) use backup::{

@@ -555,6 +555,15 @@ export const tauriBackend: BridgeBackend = {
   aiTaskSetPinned(id: string, pinned: boolean) {
     return call<void>('ai_task_set_pinned', { id, pinned });
   },
+  aiPromptVersions(id: string) {
+    return call<import('./types').AiPromptVersion[]>('ai_prompt_versions', { id });
+  },
+  aiPromptExport(id: string) {
+    return call<string>('ai_prompt_export', { id });
+  },
+  aiPromptImport(path: string) {
+    return call<import('./types').AiTask>('ai_prompt_import', { path });
+  },
   cardCollectionGet() {
     return call<CardPick[]>('card_collection_get');
   },

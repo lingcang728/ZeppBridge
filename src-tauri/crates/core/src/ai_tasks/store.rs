@@ -189,10 +189,14 @@ fn normalize_categories(
 }
 
 impl Database {
-    /// P3 `ai_task_list`：只走索引列，不解析 payload。
+    /// P3 `ai_task_list`：走索引列；启用的类别由 SQLite 的 JSON 函数从 payload 里取，
+    /// 不在 Rust 里整份反序列化。
     pub fn list_ai_tasks(&self) -> Result<Vec<AiTaskSummary>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, template_id, workout_count, mcp_shared, updated_at, pinned
+            "SELECT id, title, template_id, workout_count, mcp_shared, updated_at, pinned,
+                    (SELECT group_concat(json_extract(value, '$.category'))
+                     FROM json_each(ai_tasks.payload, '$.categories')
+                     WHERE json_extract(value, '$.enabled'))
              FROM ai_tasks ORDER BY pinned DESC, updated_at DESC, id",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -204,6 +208,10 @@ impl Database {
                 mcp_shared: row.get::<_, i64>(4)? != 0,
                 updated_at: row.get(5)?,
                 pinned: row.get::<_, i64>(6)? != 0,
+                categories: row
+                    .get::<_, Option<String>>(7)?
+                    .map(|list| list.split(',').map(str::to_string).collect())
+                    .unwrap_or_default(),
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
@@ -256,8 +264,11 @@ impl Database {
             task.id = self.new_ai_task_id()?;
             task.created_at = now.clone();
         } else {
-            task.created_at = self
-                .get_ai_task(&task.id)?
+            let existing = self.get_ai_task(&task.id)?;
+            if let Some(existing) = &existing {
+                self.remember_prompt_version(&task.id, &existing.prompt, &task.prompt)?;
+            }
+            task.created_at = existing
                 .map(|existing| existing.created_at)
                 .filter(|created| !created.is_empty())
                 .unwrap_or_else(|| now.clone());
