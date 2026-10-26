@@ -3325,6 +3325,15 @@ Réponds en Markdown.`,
       approxMinutes: (value: number) => `~${value} min`,
     },
 
+    'components/journal/repair': {
+      timelineEmpty: 'Choisissez un jour sur la chronologie pour noter un événement',
+      moreRecords: (n: number) => `${n} de plus`,
+      noRaces: 'Aucune course pour le moment',
+      noInjuries: 'Aucune blessure enregistrée',
+      untilNow: 'À ce jour',
+      more: 'Plus',
+      distance: 'Distance totale',
+    },
     'components/journal/body': {
       front: 'Face',
       back: 'Dos',

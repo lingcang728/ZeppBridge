@@ -3,7 +3,7 @@
 import { computed, ref, watch } from 'vue';
 import EditorShell from './EditorShell.vue';
 import SegmentTrack from '../SegmentTrack.vue';
-import WheelDatePicker from '../WheelDatePicker.vue';
+import DateRows from '../DateRows.vue';
 import { useJournalText } from './journal.i18n';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
@@ -54,7 +54,7 @@ async function remove() {
   <EditorShell :title="draft.id ? t.editRace : t.addRace" :busy="busy" :error="local ?? error" :can-delete="Boolean(draft.id)"
     @save="save" @close="emit('close')" @remove="remove">
     <label>{{ t.raceName }}<input v-model="draft.name" maxlength="120" required data-race-name></label>
-    <div class="field"><span>{{ t.raceDate }}</span><WheelDatePicker v-model="draft.race_date" :aria-label="t.raceDate" /></div>
+    <DateRows v-model:start="draft.race_date" :start-label="t.raceDate" />
     <div class="field"><span>{{ t.raceSport }}</span>
       <SegmentTrack compact :model-value="draft.sport" :items="sports" :aria-label="t.raceSport" @update:model-value="v => (draft.sport = v as RaceSport)" />
     </div>

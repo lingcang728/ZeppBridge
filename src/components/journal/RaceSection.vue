@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useRepairText } from './repair.i18n';
+const repair = useRepairText();
 /**
  * 比赛：最上面是下一场的倒计时（大数字），下面是之后报了名的，再下面是奖牌墙。
  *
@@ -11,7 +13,7 @@ import { useJournalText } from './journal.i18n';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
 import { clockText, daysBetween, paceOf, raceDistanceKey } from '../../lib/logbook/clock';
-import { journalDay, kmText, todayKey } from '../../lib/logbook/display';
+import { journalDay, journalShortDay, kmText, todayKey } from '../../lib/logbook/display';
 import type { Race, RaceInput } from '../../types/logbook';
 
 const emit = defineEmits<{ (event: 'edit', race: RaceInput, origin?: HTMLElement): void }>();
@@ -57,7 +59,7 @@ const accept = (race: Race) => {
       </span>
       <span class="cd-meta">{{ journalDay(next.race_date) }} · {{ distanceName(next) }}<template v-if="next.goal_seconds"> · {{ t.goal(clockText(next.goal_seconds)) }}</template></span>
     </button>
-    <p v-else class="empty">{{ t.noRecord }}</p>
+    <p v-else-if="!past.length" class="empty">{{ repair.noRaces }}</p>
 
     <ul v-if="upcoming.length > 1" class="row-list" :aria-label="t.upcoming">
       <li v-for="race in upcoming.slice(1)" :key="race.id">
@@ -69,7 +71,7 @@ const accept = (race: Race) => {
       </li>
     </ul>
 
-    <div class="medal-head"><h3>{{ t.medals }}</h3></div>
+    <div v-if="past.length" class="medal-head"><h3>{{ t.medals }}</h3></div>
     <ul v-if="pending.length" class="pending">
       <li v-for="race in pending" :key="race.id">
         <span class="rl-name">{{ race.name }} <small>{{ journalDay(race.race_date) }} · {{ t.awaiting }}</small></span>
@@ -86,12 +88,12 @@ const accept = (race: Race) => {
           <span class="ribbon" aria-hidden="true"></span>
           <span class="coin"><small>{{ distanceName(race) }}</small><b>{{ clockText(race.result_seconds!) }}</b></span>
           <span class="m-name">{{ race.name }}</span>
-          <span class="m-meta">{{ journalDay(race.race_date) }}<template v-if="paceLine(race)"> · {{ paceLine(race) }}</template></span>
+          <span class="m-meta"><span>{{ journalShortDay(race.race_date) }}</span><span v-if="paceLine(race)">{{ paceLine(race) }}</span></span>
           <span v-if="race.goal_seconds && race.result_seconds! <= race.goal_seconds" class="m-goal">{{ t.beatGoal }}</span>
         </button>
       </li>
     </ul>
-    <p v-else-if="!pending.length" class="empty">{{ t.noRecord }}</p>
+
   </JournalCard>
 </template>
 
@@ -133,6 +135,7 @@ button { font: inherit; color: inherit; }
 .coin b { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
 .medal.gold .coin small, .medal.gold .coin b { color: color-mix(in srgb, black 78%, var(--warning)); }
 .m-name { margin-top: 6px; color: var(--ink); font-size: var(--fs-sm); line-height: 1.35; overflow-wrap: anywhere; }
-.m-meta { color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.m-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 6px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.m-meta span { white-space: nowrap; }
 .m-goal { color: var(--warning); font-size: var(--fs-2xs); font-weight: 650; }
 </style>

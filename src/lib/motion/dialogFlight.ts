@@ -29,6 +29,8 @@ import { exemptFromSettle, onMotionEscape } from './interrupt';
 import { whenFramesSteady } from './steady';
 import { paced } from './timing';
 import { lessMotion } from './lessMotion';
+import { cardReplica, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
+import { OPEN_EASE as WINDOW_EASE } from './timing';
 
 export interface FlightOrigin {
   /** 点开它的元素；关的时候它还在就重新量一次（页面可能滚过）。 */
@@ -117,7 +119,7 @@ const escapes = new WeakMap<HTMLElement, () => void>();
 const forgetEscape = (backdrop: HTMLElement) => { escapes.get(backdrop)?.(); escapes.delete(backdrop); };
 
 /** `onEscape`：开到一半按 Esc 时调用（弹窗据此关掉自己，关的动画从此刻原路收回）。 */
-const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) => {
+const scaleOpen = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) => {
   if (reducedMotion()) { ghost?.remove(); ghost = null; return; }
   const handoff = takeGhost();
   if (handoff) {
@@ -166,7 +168,7 @@ const open = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   backdrop.classList.remove('is-entering');
 };
 
-const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) => {
+const scaleClose = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) => {
   pending.delete(backdrop);
   forgetEscape(backdrop);
   // 已经化成灰飞走了（ashDissolve.ts）：不再挂回去缩一遍。
@@ -205,4 +207,117 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   fade.addEventListener('cancel', remove);
 };
 
-export const dialogFlight = { open, close };
+// Bare envelopes retain their existing flight; ordinary panels use the shared window geometry.
+export const dialogFlight = {
+  open: (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) =>
+    panel.classList.contains('is-bare') ? scaleOpen(backdrop, panel, origin, onEscape) : windowOpen(backdrop, panel, origin, onEscape),
+  close: (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) =>
+    panel.classList.contains('is-bare') ? scaleClose(backdrop, panel, origin) : windowClose(backdrop, panel, origin),
+};
+
+
+/** Shared by dialogs and the stage-local star card. Content stays at 1:1 throughout. */
+export function dialogWindowFrames(from: WindowRect, to: WindowRect, panel: WindowRect, radius: number): Keyframe[] {
+  return windowPoses({ rect: from, anchor: { x: from.left, y: from.top } }, { rect: to, anchor: { x: to.left, y: to.top } }).map((pose, i) => {
+    const dx = pose.anchor.x - panel.left, dy = pose.anchor.y - panel.top;
+    return { offset: WINDOW_OFFSETS[i], transform: `translate(${dx}px, ${dy}px)`,
+      // DOMRect dimensions are prototype getters, so spreading the object loses them.
+      clipPath: windowInset(pose.rect, { left: panel.left + dx, top: panel.top + dy, width: panel.width, height: panel.height }, radius, true) };
+  });
+}
+let windowGhost: HTMLElement | null = null;
+let firstWindow = true;
+const windowDuration = 480;
+function snapshot(panel: HTMLElement) {
+  const style = getComputedStyle(panel);
+  return { transform: style.transform, clipPath: style.clipPath };
+}
+export function visibleWindow(panel: HTMLElement): WindowRect {
+  const box = panel.getBoundingClientRect();
+  const clip = getComputedStyle(panel).clipPath.match(/^inset\((.*?) round/);
+  const edges = clip?.[1].split(/\s+/).map(Number.parseFloat);
+  if (!edges?.length || edges.some(value => !Number.isFinite(value))) return box;
+  const top = edges[0], right = edges[1] ?? top, bottom = edges[2] ?? top, left = edges[3] ?? right;
+  return { left: box.left + left, top: box.top + top, width: box.width - left - right, height: box.height - top - bottom };
+}
+function attachReplica(panel: HTMLElement, origin: FlightOrigin | null, closing: boolean) {
+  const source = origin?.el;
+  if (!source?.isConnected) return null;
+  const replica = cardReplica(source).el;
+  replica.dataset.dialogReplica = '';
+  Object.assign(replica.style, { position: 'absolute', left: '0', top: '0', zIndex: '4', pointerEvents: 'none' });
+  panel.appendChild(replica);
+  replica.animate(closing ? [{ opacity: 0 }, { opacity: 0, offset: .7 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0, offset: .3 }, { opacity: 0 }], { duration: windowDuration, fill: 'both', easing: 'linear' });
+  return replica;
+}
+function radiusFor(origin: FlightOrigin | null, panel: HTMLElement) {
+  const from = currentRect(origin);
+  return Math.min(parseFloat(getComputedStyle(origin?.el ?? panel).borderRadius) || 16, (from?.height ?? 32) / 2, (from?.width ?? 32) / 2, 24);
+}
+function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) {
+  if (reducedMotion()) { windowGhost?.remove(); windowGhost = null; return; }
+  let handed: WindowRect | null = null, veil = NEARLY_HIDDEN;
+  if (windowGhost) {
+    const old = windowGhost.querySelector<HTMLElement>('.dialog-panel');
+    if (old) handed = visibleWindow(old);
+    veil = Number(getComputedStyle(windowGhost, '::before').opacity) || veil;
+    for (const animation of windowGhost.getAnimations({ subtree: true })) animation.cancel();
+    windowGhost.remove(); windowGhost = null;
+  }
+  if (onEscape) escapes.set(backdrop, onMotionEscape(() => { onEscape(); return true; }));
+  const final = panel.getBoundingClientRect();
+  const from = handed ?? currentRect(origin) ?? { ...final.toJSON(), left: final.left + final.width / 2 - 20, top: final.top + final.height / 2 - 20, width: 40, height: 40 };
+  const frames = dialogWindowFrames(from, final, final, radiusFor(origin, panel));
+  panel.classList.add('is-flying');
+  const replica = attachReplica(panel, origin, false);
+  backdrop.animate([{ opacity: veil }, { opacity: 1 }], { duration: 240, fill: 'backwards', easing: 'ease-out', pseudoElement: '::before' });
+  const flight = panel.animate(frames, { duration: windowDuration, easing: WINDOW_EASE, fill: 'both' });
+  // 这次会话第一次开弹窗：组件刚懒加载完、GPU 正忙着光栅化，先停在按钮那一帧等画面跟得上（最多 160ms）再放，
+  // 不然第一段被吞掉、看上去是一跳。遮罩不等，点下去那一帧就开始变暗。之后的弹窗都不等。
+  if (firstWindow) {
+    firstWindow = false;
+    const held = panel.getAnimations({ subtree: true });
+    held.forEach(animation => animation.pause());
+    void whenFramesSteady(160).then(() => held.forEach(animation => { if (animation.playState === 'paused') animation.play(); }));
+  }
+  const finish = () => {
+    forgetEscape(backdrop);
+    replica?.remove();
+    panel.classList.remove('is-flying');
+    if (backdrop.isConnected && !backdrop.inert) flight.cancel();
+  };
+  flight.finished.then(finish, () => { forgetEscape(backdrop); });
+}
+function windowClose(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) {
+  forgetEscape(backdrop);
+  if (reducedMotion() || backdrop.isConnected || backdrop.dataset.dissolved !== undefined) return;
+  panel.removeAttribute('data-modal-dialog'); panel.removeAttribute('role');
+  backdrop.inert = true; backdrop.setAttribute('aria-hidden', 'true'); backdrop.style.pointerEvents = 'none';
+  document.body.appendChild(backdrop);
+  const now = snapshot(panel);
+  // Every keyframe must start from the visible window, not the full layout box.
+  // Replacing only frame zero makes an interrupted opening grow again on close.
+  const seen = visibleWindow(panel);
+  const veil = Number(getComputedStyle(backdrop, '::before').opacity) || 1;
+  for (const animation of backdrop.getAnimations({ subtree: true })) animation.cancel();
+  panel.querySelectorAll('[data-dialog-replica]').forEach(el => el.remove());
+  panel.style.transform = ''; panel.style.clipPath = '';
+  const final = panel.getBoundingClientRect();
+  const to = currentRect(origin) ?? { left: final.left + final.width / 2, top: final.top + final.height / 2, width: 1, height: 1 };
+  const frames = dialogWindowFrames(seen, to, final, radiusFor(origin, panel));
+  // `none` cannot interpolate with inset(): it would jump halfway through close.
+  frames[0] = { ...frames[0], transform: now.transform, ...(now.clipPath === 'none' ? {} : { clipPath: now.clipPath }) };
+  panel.classList.add('is-flying');
+  attachReplica(panel, origin, true);
+  const timing = { duration: windowDuration, easing: WINDOW_EASE, fill: 'forwards' as const };
+  const flight = exemptFromSettle(panel.animate(frames, timing));
+  const content = panel.querySelector<HTMLElement>('.dialog-scroll');
+  if (content) exemptFromSettle(content.animate([{ opacity: 1 }, { opacity: 1, offset: .7 }, { opacity: 0 }], { ...timing, easing: 'linear' }));
+  exemptFromSettle(backdrop.animate([{ opacity: veil }, { opacity: 0 }], { ...timing, pseudoElement: '::before' }));
+  windowGhost?.remove(); windowGhost = backdrop;
+  const done = () => {
+    backdrop.remove(); if (windowGhost === backdrop) windowGhost = null;
+    if (origin?.el?.isConnected) origin.el.animate([{ transform: 'scale(.96)' }, { transform: 'none' }], { duration: 180, easing: 'ease-out' });
+  };
+  flight.finished.then(done, () => { backdrop.remove(); });
+}

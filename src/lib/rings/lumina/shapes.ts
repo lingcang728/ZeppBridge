@@ -149,6 +149,29 @@ export function fillDigit(text: string, { pos, col }: PC, count: number) {
   }
 }
 
+/** Same 640×240 canvas, font and baseline as the crisp SVG text in RingsStage. */
+export function fillScreenDigit(text: string, { pos, col }: PC, count: number, font: string, worldWidth: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640; canvas.height = 240;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.font = `750 160px ${font}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = 'white';
+  ctx.fillText(text, 320, 172);
+  const pixels = ctx.getImageData(0, 0, 640, 240).data;
+  const points: number[] = [];
+  for (let y = 0; y < 240; y += 2) for (let x = 0; x < 640; x += 2) {
+    if (pixels[(y * 640 + x) * 4 + 3] > 128) points.push(x, y);
+  }
+  const order = shuffled(points.length / 2), scale = worldWidth / 640;
+  for (let i = 0; i < count; i++) {
+    const p = order[i % order.length];
+    pos[i * 3] = (points[p * 2] - 320) * scale;
+    pos[i * 3 + 1] = (120 - points[p * 2 + 1]) * scale;
+    pos[i * 3 + 2] = 0;
+    setCol(col, i, ...PALETTE.digit);
+  }
+}
+
 // Finale starfield: a dense spherical shell (r 16–34) enclosing the text.
 export function fillStarfield({ pos, col }: PC, count: number) {
   for (let i = 0; i < count; i++) {
@@ -194,31 +217,17 @@ export function placeBand(band: BandInfo, pos: Float32Array, col: Float32Array, 
   }
 }
 
-export function fillFinale(text: string, pc: PC, count: number, years: RingYear[], selected: number | null): { focal: FocalInfo; band: BandInfo } {
+export function fillFinale(_text: string, pc: PC, count: number, years: RingYear[], selected: number | null): { focal: FocalInfo; band: BandInfo } {
   const ringN = Math.round(count * BAND_RING_SHARE);
   const focal = fillRings({ pos: pc.pos.subarray(0, ringN * 3), col: pc.col.subarray(0, ringN * 3) }, ringN, years, selected);
-  // 字绕一整圈：同一句写两遍，中间用「·」隔开，转到哪儿前面都有一句正着的。
-  const loop = `${text}  ·  ${text}  ·  `;
-  const W = 2600, H = 170;
-  const raster = rasterText(loop, W, H);
+  // Crisp glyphs are separate billboards. The particles are only a thin dust
+  // ribbon, not a second rasterized sentence competing with the readable text.
   const n = count - ringN;
   const band: BandInfo = { start: ringN, theta: new Float32Array(n), h: new Float32Array(n), r: new Float32Array(n), base: new Float32Array(n * 3) };
-  const points = raster.length / 2;
-  const height = (2 * Math.PI * BAND_RADIUS) * (H / W);
-  const FRONT_SHIFT = Math.PI * 2 * 0.22;
-  const order = shuffled(Math.max(1, points));
   const base = PALETTE.finaleText;
   for (let k = 0; k < n; k++) {
-    if (points) {
-      const p = order[k % points];
-      // 画布从左往右 = 正面看从左往右（角度增大时 x = r·sinθ 往右走），不会是镜像字。
-      // 画布正中是两句之间的「·」：整体转一点，让第一句的正中先落在正前方。
-      band.theta[k] = (raster[p * 2] / W - 0.5) * Math.PI * 2 + FRONT_SHIFT;
-      band.h[k] = -(raster[p * 2 + 1] / H - 0.5) * height + (Math.random() - 0.5) * 0.06;
-    } else {
-      band.theta[k] = Math.random() * Math.PI * 2;
-      band.h[k] = 0;
-    }
+    band.theta[k] = Math.random() * Math.PI * 2;
+    band.h[k] = (Math.random() - .5) * .65;
     // 一层薄壳：径向均匀铺开，从哪个角度看都是一整条，不会裂成前后两片。
     band.r[k] = BAND_RADIUS + (Math.random() - 0.5) * 0.7;
     const m = 1.0 + Math.random() * 0.14;
@@ -229,10 +238,10 @@ export function fillFinale(text: string, pc: PC, count: number, years: RingYear[
 }
 
 // Static deep-space background: generated once, never updated per-frame.
-export function generateBackgroundStars(): PC {
-  const pc = newPC(BG_COUNT);
+export function generateBackgroundStars(count = BG_COUNT): PC {
+  const pc = newPC(count);
   const { pos, col } = pc;
-  for (let i = 0; i < BG_COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     const r = 45 + Math.random() * 45;
     const t = Math.random() * Math.PI * 2;
     const p = Math.acos(2 * Math.random() - 1);

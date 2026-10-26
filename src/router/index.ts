@@ -130,7 +130,8 @@ const LANDING_ROUTES: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes: isLandingMode() ? LANDING_ROUTES : routes,
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    if (to.name === 'Rings' && from.name === 'Rings' && to.path === from.path) return false;
     return { top: 0 };
   },
 });

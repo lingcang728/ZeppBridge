@@ -4,6 +4,7 @@
    新建 / 编辑都用同一个生活事件编辑器，从被点的按钮 / 那一行长出来、关的时候缩回去。 */
 import { computed, onMounted, ref } from 'vue';
 import Icon from '../Icon.vue';
+import EpochTimeline from './EpochTimeline.vue';
 import JournalCard from './JournalCard.vue';
 import { useJournalText } from './journal.i18n';
 import { useLifeEvents } from '../../composables/useLifeEvents';
@@ -42,6 +43,8 @@ function addEpoch(origin: HTMLElement) {
       <button type="button" class="pill-button quiet" @click="addEpoch(target($event))">{{ t.addEpoch }}</button>
       <button type="button" class="pill-button quiet" @click="lifeEvents.open(undefined, todayKey(), target($event))">{{ t.addEvent }}</button>
     </template>
+    <EpochTimeline class="wide-timeline" />
+    <div class="narrow-list">
     <p v-if="lifeEvents.loaded.value && !lifeEvents.events.value.length" class="empty">{{ t.noEpoch }}</p>
     <ul v-if="epochs.length" class="row-list">
       <li v-for="event in epochs" :key="event.id">
@@ -70,6 +73,7 @@ function addEpoch(origin: HTMLElement) {
         <button v-if="visible > STEP" type="button" class="pill-button quiet" @click="visible = STEP">{{ le.showLess }}</button>
       </div>
     </template>
+    </div>
   </JournalCard>
 </template>
 
@@ -91,4 +95,6 @@ function addEpoch(origin: HTMLElement) {
 .e-notes { grid-column: 2; display: -webkit-box; overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .more { display: flex; justify-content: center; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .ev-node.ongoing::after { animation: none; } }
+.narrow-list { display: none; }
+@media (max-width: 720px) { .wide-timeline { display: none; } .narrow-list { display: grid; gap: 12px; } }
 </style>

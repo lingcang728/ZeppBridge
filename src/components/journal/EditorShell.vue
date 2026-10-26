@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 履历里三种编辑弹窗（比赛、跑鞋、伤病）共用的壳：标题钉顶、按钮钉底、中间滚；删除先确认一次。
    版式照生活事件编辑器（LifeEventEditor.vue）。 */
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
 import { useJournalText } from './journal.i18n';
 
@@ -13,16 +13,31 @@ const emit = defineEmits<{ (event: 'save'): void; (event: 'close'): void; (event
 const t = useJournalText();
 const id = `journal-editor-${Math.random().toString(36).slice(2, 8)}`;
 const confirming = ref(false);
+const form = ref<HTMLFormElement>();
+const invalid = ref<HTMLInputElement | null>(null);
+const invalidHost = ref<HTMLElement | null>(null);
+function clearInvalid() { invalid.value?.removeAttribute('aria-invalid'); invalid.value?.removeAttribute('aria-describedby'); invalid.value = null; invalidHost.value = null; }
+async function submit() {
+  clearInvalid();
+  const field = [...(form.value?.querySelectorAll<HTMLInputElement>('input, textarea') ?? [])].find(input => (input.required && !input.value.trim()) || !input.validity.valid);
+  if (field) {
+    invalid.value = field; invalidHost.value = field.closest('label') ?? field.parentElement;
+    field.setAttribute('aria-invalid', 'true'); field.setAttribute('aria-describedby', `${id}-invalid`);
+    await nextTick(); field.scrollIntoView({ block: 'center', behavior: 'instant' }); field.focus({ preventScroll: true });
+    return;
+  }
+  emit('save');
+}
 watch(() => props.title, () => { confirming.value = false; });
 const close = () => { if (!props.busy) emit('close'); };
 </script>
 
 <template>
   <ModalDialog :labelledby="id" :origin="origin" :max-width="maxWidth" @close="close">
-    <form class="journal-form" @submit.prevent="emit('save')">
+    <form ref="form" class="journal-form" novalidate @submit.prevent="submit" @input="clearInvalid">
       <h2 :id="id">{{ title }}</h2>
       <fieldset :disabled="busy"><slot /></fieldset>
-      <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+      <Teleport v-if="invalidHost" :to="invalidHost"><p :id="`${id}-invalid`" class="form-error" role="alert">{{ t.required }}</p></Teleport>
       <div v-if="confirming" class="delete-confirm" role="alert">
         <strong>{{ t.removeConfirm }}</strong>
         <div class="row">
@@ -31,6 +46,7 @@ const close = () => { if (!props.busy) emit('close'); };
         </div>
       </div>
       <footer v-else>
+        <p v-if="error" class="form-error save-error" role="alert">{{ error }}</p>
         <button v-if="canDelete" type="button" class="button button-danger" :disabled="busy" @click="confirming = true">{{ t.remove }}</button>
         <span class="spacer"></span>
         <button type="button" class="button button-secondary" :disabled="busy" @click="close">{{ t.cancel }}</button>
@@ -63,4 +79,6 @@ fieldset :deep(.check) { display: flex; align-items: center; justify-content: sp
 fieldset :deep(.hint) { color: var(--subtle); font-size: var(--fs-xs); }
 fieldset :deep(.num) { font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) { fieldset :deep(.pair) { grid-template-columns: 1fr; } }
+.save-error { flex: 1 0 100%; }
+fieldset :deep([aria-invalid="true"]) { box-shadow: 0 0 0 2px var(--heart); }
 </style>

@@ -45,7 +45,15 @@ export const hurryAnimation = (animation: Animation, ms: number): void => {
   const left = remainingMs(animation);
   if (left <= ms) return;
   const next = animation.playbackRate * (left / Math.max(ms, 1));
-  if (typeof animation.updatePlaybackRate === 'function') animation.updatePlaybackRate(next);
+  if (typeof CSSTransition !== 'undefined' && animation instanceof CSSTransition) {
+    // A CSS transition can be replaced by the same navigation that hurries it.
+    // Edge 156 crashes when the asynchronous rate update is still pending
+    // (reproduced with DevTools slow playback, including header pseudo-elements).
+    // Apply the rate synchronously and restore the position to avoid a jump.
+    const position = animation.currentTime;
+    animation.playbackRate = next;
+    if (position !== null) animation.currentTime = position;
+  } else if (typeof animation.updatePlaybackRate === 'function') animation.updatePlaybackRate(next);
   else animation.playbackRate = next;
 };
 

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useRepairText } from './repair.i18n';
+const repair = useRepairText();
 /* 伤病：左边人形图（还没好的血色、好了的淡淡一圈黄），右边一条条记录，还没好的在前。
    一条都没有时不画人形，卡片收成一行（用户 2026-10-23：空着一张大人形太空）。 */
 import { computed } from 'vue';
@@ -28,7 +30,7 @@ const span = (injury: Injury) => (injury.end_date ? `${journalDay(injury.start_d
 
 <template>
   <JournalCard :title="t.injuries" tone="injury" :action="t.addInjury" @action="o => emit('edit', fresh(), o)">
-    <p v-if="injuries && !list.length" class="empty">{{ t.noInjury }}</p>
+    <p v-if="injuries && !list.length" class="empty">{{ repair.noInjuries }}</p>
     <div v-else-if="list.length" class="injury-body">
       <BodyMap class="map" :model-value="hurting" :marked="healed" readonly :show-list="false" />
       <ul class="row-list">

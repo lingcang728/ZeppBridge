@@ -88,11 +88,14 @@ const linksTo = (href: string, scope: string) => {
 };
 const STAYING = '.page-host > :not([class*="-leave"])';
 
-/** 告诉 Vue 离场可以结束了：expand / collapse 的离场过渡在 CSS 里是一条很长的占位，
-    真正的时长由这里的动画决定，放完就提前收场。 */
-const endLeave = (el: HTMLElement) => {
-  el.dispatchEvent(new TransitionEvent('transitionend', { propertyName: 'opacity' }));
+/** 形变真正落地时通知 Vue；暂停、倒放与慢放期间不提前移除页面。 */
+const transitionDone = new WeakMap<Element, () => void>();
+const endTransition = (el: Element) => {
+  const done = transitionDone.get(el);
+  transitionDone.delete(el);
+  done?.();
 };
+const endLeave = endTransition;
 
 /** `source`：不是从链接、而是从一张卡直接开的（armPageMorph）：返回时按这个标记找回那张卡。 */
 type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; source?: string };
@@ -276,6 +279,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       if (leaving) endLeave(leaving);
       // 没有形变可借（减少动效、不是从卡点进来）：页面出来以后再滚到要定位的那张卡。
       if (focus && el instanceof HTMLElement) revealFocusLater(el, focus);
+      endTransition(el);
       return;
     }
     takeHold()();
@@ -370,6 +374,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       }
       // 窗口长满：来处页先离场（KeepAlive 收进缓存），再撤掉形变——这一帧页面就是它的静止样子。
       if (leaving) endLeave(leaving);
+      endTransition(el);
       back?.cancel();
       hidden?.cancel();
       flight.dispose();
@@ -386,6 +391,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       hidden?.cancel();
       back?.cancel();
       release();
+      endTransition(el);
     });
   };
 
@@ -438,6 +444,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     if (!el.isConnected || !viewport || !host) {
       backdrop.remove();
       endLeave(el);
+      if (job.staying) endTransition(job.staying);
       job.release();
       return;
     }
@@ -507,6 +514,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       hidden?.cancel();
       forward?.animation.cancel();
       if (staying) staying.style.transformOrigin = '';
+      if (staying) endTransition(staying);
       job.release();
       const leave = () => {
         endLeave(el);
@@ -582,5 +590,20 @@ export const usePageMorph = (options: { back: () => void }) => {
     clean(el);
     if (el instanceof HTMLElement) el.style.top = '';
   };
-  return { decide, onEnter, onLeave, onAfterLeave, dispose };
+  // Vue's CSS timeout uses wall time, while WAAPI can be paused, reversed or
+  // slowed in DevTools. Let the actual flight own completion on both pages.
+  // Ordinary navigation keeps Vue's automatic CSS completion (one-arg hooks).
+  const onMorphEnter = (el: Element, done: () => void) => {
+    transitionDone.set(el, done);
+    const waitingForFlight = !!expandFrom || !!pendingCollapse;
+    onEnter(el);
+    if (!waitingForFlight) endTransition(el);
+  };
+  const onMorphLeave = (el: Element, done: () => void) => {
+    transitionDone.set(el, done);
+    const waitingForFlight = !!collapseTo || !!expandFrom || aborted.has(el);
+    onLeave(el);
+    if (!waitingForFlight) endTransition(el);
+  };
+  return { decide, onEnter, onLeave, onMorphEnter, onMorphLeave, onAfterLeave, dispose };
 };

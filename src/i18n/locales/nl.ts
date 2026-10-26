@@ -14,6 +14,15 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/journal/repair': {
+      timelineEmpty: 'Kies een dag op de tijdlijn om een gebeurtenis vast te leggen',
+      moreRecords: (n: number) => `${n} meer`,
+      noRaces: 'Nog geen wedstrijden',
+      noInjuries: 'Geen blessures vastgelegd',
+      untilNow: 'Heden',
+      more: 'Meer',
+      distance: 'Totale afstand',
+    },
     'components/WorkoutTools': {
       select: 'Trainingen selecteren',
       done: 'Selectie afronden',

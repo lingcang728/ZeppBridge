@@ -4324,6 +4324,16 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     shoeAlert: (name: string) => `${name}: pora na wycofanie`,
     shoeNear: (name: string) => `${name}: blisko wycofania`,
   },
+  // Source: src/components/journal/repair.i18n.ts
+  'components/journal/repair': {
+    timelineEmpty: 'Wybierz dzień na osi czasu, aby zapisać wydarzenie',
+    moreRecords: (n: number) => `Jeszcze ${n}`,
+    noRaces: 'Nie ma jeszcze zawodów',
+    noInjuries: 'Brak zapisanych kontuzji',
+    untilNow: 'Do teraz',
+    more: 'Więcej',
+    distance: 'Łączny dystans',
+  },
   // Source: src/components/rings/rings.i18n.ts
   'components/rings/rings': {
     title: 'Słoje roczne',
