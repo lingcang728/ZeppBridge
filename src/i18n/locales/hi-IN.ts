@@ -16,6 +16,7 @@ export default {
       moreRecords: (n: number) => `${n} और`,
       noRaces: 'अभी कोई रेस नहीं', noInjuries: 'चोट का कोई रिकॉर्ड नहीं',
       untilNow: 'अब तक', more: 'और देखें', distance: 'कुल दूरी',
+      recorded: 'दर्ज',
     },
     'components/WorkoutTools': {
       select: 'रिकॉर्ड चुनें', done: 'चयन पूरा करें', selectLoaded: 'लोड किए गए रिकॉर्ड चुनें', clearSelection: 'चयन हटाएँ',
@@ -450,6 +451,13 @@ export default {
         data: { label: 'डेटा मेल नहीं खाता', hint: 'डेटा खाली है या Zepp से अलग है' },
         other: { label: 'अन्य समस्या', hint: 'नीचे लिखकर बताएँ' },
       },
+      logoutConfirm:
+        'क्या इस खाते से लॉग आउट करना चाहते हैं?\n\nकेवल लॉगिन क्रेडेंशियल्स हटाए जाएंगे; सिंक किया गया इतिहास इसी कंप्यूटर पर रहेगा।\n\nइस लाइब्रेरी में केवल एक Zepp खाता रखा जाता है: बाद में किसी अन्य खाते से लॉगिन करने पर अस्वीकार कर दिया जाएगा। खाता बदलने के लिए, साइन-इन त्रुटि संदेश में "अन्य खाते के साथ नए सिरे से शुरू करें" चुनें।',
+      freshStart: 'अन्य खाते के साथ नए सिरे से शुरू करें',
+      freshStartConfirm:
+        'सभी मौजूदा डेटा को अलग रखकर एक खाली लाइब्रेरी के साथ दोबारा कनेक्ट करें?\n\nकुछ भी हटाया नहीं जाएगा: पुराना डेटा ऐप के बगल में "data-before-<तारीख>" फ़ोल्डर में सुरक्षित रहेगा — वापस आने के लिए बस उसका नाम बदलकर "data" कर दें। दोनों कनेक्शन लॉग आउट हो जाएंगे और ऐप पुनः प्रारंभ हो जाएगा।',
+      newAccountWarning:
+        'इसके लिए कोई नया Zepp खाता न बनाएं, और न ही अपनी घड़ी को किसी दूसरे खाते से जोड़ें: दोबारा जोड़ने से घड़ी की सेटिंग्स मिट जाती हैं।',
     },
 
     'App': {
@@ -1985,6 +1993,8 @@ Markdown में उत्तर दें।`,
       provenanceScope: 'दायरा',
       provenanceSynced: 'सिंक समय',
       provenanceTitle: 'स्रोत विवरण',
+      provenanceImported: 'फ़ाइल से आयात किया गया',
+      provenanceImportedAt: 'आयात समय',
       provenanceFit: 'स्थानीय सुधार',
       fitCloudDistance: 'क्लाउड की मूल दूरी',
       fitReplace: 'संशोधित .fit से बदलें',
@@ -2601,6 +2611,8 @@ Markdown में उत्तर दें।`,
       usualWord: 'सामान्य',
       usualRange: (range: string) => `सामान्य ${range}`,
       usualHint: (range: string, days: number) => `सिर्फ़ आपकी तुलना में: पिछले ${days} दिनों में से बीच के 80% दिन ${range} में रहे। यह कोई निदान नहीं है।`,
+      longTermHint: (range: string, since: string, days: number, recent: string) =>
+        `आपका दीर्घकालिक सामान्य स्तर: ${since} से रीडिंग वाले ${days} दिनों में से, बीच के 80% दिन ${range} के दायरे में रहे${recent ? `; पिछले 90 दिनों में: ${recent}` : ''}। सिर्फ़ आपकी अपनी तुलना में, यह कोई निदान नहीं है।`,
     },
     'components/cards/cards': {
       noWorkouts: 'इस अवधि में कोई वर्कआउट नहीं',
@@ -2633,6 +2645,7 @@ Markdown में उत्तर दें।`,
       raceHalf: 'सिटी हाफ मैराथन',
       race10k: 'शरद ऋतु 10K सड़क दौड़',
       injury: 'दाहिने घुटने के बाहरी हिस्से में दर्द (आईटी बैंड)',
+      capsuleNote: 'एक साल पहले का मैं: तब मैंने हफ़्ते में तीन बार दौड़ना शुरू ही किया था और घुटने में थोड़ा दर्द रहता था। उम्मीद है कि आप अभी भी दौड़ रहे हैं, और स्ट्रेचिंग करना नहीं भूलते।',
     },
     'lib/aiTask/planGuide': {
       example: { summary: 'एक तीव्र सत्र; बाकी एरोबिक अभ्यास और रिकवरी', restNote: 'तीव्र सत्र से एक रात पहले जल्दी सोएँ', intervalName: '3×1 किमी इंटरवल', intervalFocus: 'गति-सहनशक्ति बढ़ाएँ', intervalDescription: 'हर दोहराव समान गति से दौड़ें; आख़िरी में तेज़ स्प्रिंट न करें\nरिकवरी में धीरे दौड़ें या चलें', rideName: 'लंबी एरोबिक साइक्लिंग', rideFocus: 'सहनशक्ति बढ़ाएँ', rideDescription: 'कैडेंस 85–95 रखें; चढ़ाई पर हृदय गति के पीछे न भागें' },
@@ -2756,6 +2769,15 @@ Markdown में उत्तर दें।`,
       legendGap: 'अनुपलब्ध',
       legendEmpty: 'क्लाउड में नहीं',
       cellAria: (month: string, state: string) => `${month}: ${state}`,
+      takeTitle: 'सब कुछ अपने साथ ले जाएँ',
+      takeSub: 'रेटिंग, नोट्स, जूते, रेस, प्लान, AI टास्क, पत्र — आपने यहाँ जो कुछ भी लिखा, सब एक JSON फ़ाइल में',
+      takeButton: 'निर्यात',
+      takeDone: (n: number) =>
+        plural(n, {
+          one: `${n} रिकॉर्ड निर्यात हुआ`,
+          other: `${n} रिकॉर्ड निर्यात हुए`,
+        }),
+      takeFailed: 'निर्यात विफल रहा, कृपया पुनः प्रयास करें',
     },
 
     'views/settings/sections/maintenance': {
@@ -2848,6 +2870,16 @@ Markdown में उत्तर दें।`,
       sectionWhat: 'यह क्या है',
       sectionChart: 'यह चार्ट क्या दिखाता है',
       sectionHow: 'इसकी गणना और स्रोत',
+      sectionTrust: 'यह कैसे मापा जाता है',
+      trustChipTitle: 'एल्गोरिदम अनुमान',
+      excludedChipTitle: 'आपने इसे विश्लेषण से बाहर रखा है',
+      useInAnalysis: 'विश्लेषण में शामिल करें',
+      useInAnalysisHint:
+        'बंद होने पर भी यह दिखता रहेगा और कोई डेटा हटाया नहीं जाएगा; बस यह सामान्य तुलनाओं से बाहर रहेगा और AI या MCP को नहीं भेजा जाएगा।',
+      trustMeasured: 'घड़ी या डिवाइस के सेंसर द्वारा सीधे ली गई रीडिंग।',
+      trustComputed: 'मापी गई रीडिंग या आपके अपने लॉग से एक प्रकाशित, निश्चित सूत्र द्वारा परिवर्तित।',
+      trustEstimated:
+        'Zepp द्वारा अपने एल्गोरिदम से कई रीडिंग के आधार पर निकाला गया एक अनुमान। Zepp ने अपनी विधि या त्रुटि सीमा प्रकाशित नहीं की है, और प्रयोगशाला मापों से इसमें अंतर हो सकता है।',
     },
 
     'lib/metricInfo/vitals': {
@@ -3197,6 +3229,7 @@ Markdown में उत्तर दें।`,
       noNext: 'आगे इस प्रकार का कोई सत्र निर्धारित नहीं है',
       done: 'ठीक है',
       lighterNote: (original: string | undefined) => `पिछला सत्र बहुत कठिन था, मुख्य भाग 10% कम किया गया। ${original ?? ''}`.trim(),
+      toastBody: 'सहेजने के लिए एक स्तर पर टैप करें — ऐप खोलने की ज़रूरत नहीं',
     },
 
     'views/ai/AiPlanHistory': {
@@ -3455,6 +3488,107 @@ Markdown में उत्तर दें।`,
       close: 'बंद करें',
       stepsValue: (n: string) => `${n} कदम`,
     },
+
+    'components/ai/hub/promptLibrary': {
+      all: 'सभी',
+      filterLabel: 'डेटा श्रेणी के अनुसार फ़िल्टर करें',
+      noMatch: 'इस प्रकार के डेटा का उपयोग करने वाला कोई कार्य नहीं है।',
+      history: 'पहले के प्रॉम्प्ट',
+      historyEmpty: 'इस कार्य का प्रॉम्प्ट अभी तक नहीं बदला गया है।',
+      historyLoadFailed: 'पुराने प्रॉम्प्ट लोड नहीं किए जा सके',
+      replacedAt: (when: string) => `${when} तक उपयोग किया गया`,
+      useVersion: 'यह संस्करण उपयोग करें',
+      exportPrompt: '.zbprompt निर्यात करें',
+      exported: (path: string) => `${path} पर निर्यात किया गया`,
+      importPrompt: '.zbprompt आयात करें',
+      imported: (title: string) => `“${title}” आयात किया गया। वर्कआउट चुनें और यह तैयार है।`,
+      fileFilter: 'ZeppBridge प्रॉम्प्ट',
+    },
+
+    'components/letters/dataLetters': {
+      tab: 'आपके पत्र',
+      empty: 'अभी कोई पत्र नहीं है। प्रत्येक पूरे सप्ताह के बाद एक डेटा पत्र आता है, और आप अपने भविष्य के लिए एक कैप्सूल सील कर सकते हैं।',
+      loadFailed: 'आपके पत्र पढ़े नहीं जा सके',
+      onThisDay: 'आज के दिन',
+      yearsAgo: (years: number) => (years === 1 ? 'आज से एक साल पहले' : `आज से ${years} साल पहले`),
+      stepsLabel: 'कदम',
+      steps: (count: string) => `${count} कदम`,
+      workout: (type: string, km: string | null, minutes: number | null) =>
+        [type, km ? `${km} किमी` : '', minutes ? `${minutes} मिनट` : ''].filter(Boolean).join(' · '),
+      capsules: 'टाइम कैप्सूल',
+      capsulePlaceholder: 'अपने भविष्य के लिए लिखें। सील होने के बाद, तय दिन आने से पहले इसे कोई नहीं पढ़ सकता — आप भी नहीं।',
+      openAfter: 'खोलें',
+      spanHalfYear: 'छह महीने में',
+      spanOneYear: 'एक साल में',
+      spanThreeYears: 'तीन साल में',
+      seal: 'सील करें',
+      sealing: 'सील किया जा रहा है…',
+      sealFailed: 'सील नहीं किया जा सका। बाद में पुनः प्रयास करें।',
+      sealedUntil: (date: string) => `सील बंद · ${date} को खुलेगा`,
+      sealedOn: (date: string) => `${date} को लिखा गया`,
+      due: 'समय आ गया है',
+      open: 'खोलें',
+      openFailed: 'खोला नहीं जा सका। बाद में पुनः प्रयास करें।',
+      openedOn: (date: string) => `${date} को खोला गया`,
+      then: 'लिखते समय',
+      now: 'खोलते समय',
+      windowNote: 'प्रत्येक मान पिछले 28 दिनों का औसत है',
+      weekly: 'साप्ताहिक पत्र',
+      weekRange: (from: string, to: string) => `${from} – ${to}`,
+      vsBefore: (value: string, percent: string) => `पिछले 4 सप्ताह ${value} · ${percent}`,
+    },
+
+    'components/workout/workoutImport': {
+      open: 'वर्कआउट आयात करें',
+      close: 'आयात बंद करें',
+      title: 'अन्य स्थान से आयात करें',
+      hint: 'यह केवल इस कंप्यूटर पर रहता है, Zepp को कभी नहीं भेजा जाता। यहाँ पहले से मौजूद वर्कआउट के शुरू होने के दो मिनट के भीतर शुरू होने वाला वर्कआउट छोड़ दिया जाता है।',
+      sources: {
+        gpx: 'GPX / TCX',
+        fit: 'FIT',
+        strava: 'Strava संग्रह',
+        apple_health: 'Apple Health',
+      },
+      short: {
+        gpx: 'GPX',
+        fit: 'FIT',
+        strava: 'Strava',
+        apple_health: 'Apple Health',
+      },
+      filter: {
+        gpx: 'GPX / TCX फ़ाइलें',
+        fit: 'FIT फ़ाइलें',
+        strava: 'Strava निर्यात संग्रह',
+        apple_health: 'Apple Health निर्यात संग्रह',
+      },
+      reading: 'पढ़ा जा रहा है…',
+      added: (n: number) =>
+        plural(n, {
+          one: `${n} आयात हुआ`,
+          other: `${n} आयात हुए`,
+        }),
+      nothingNew: 'कोई नया वर्कआउट नहीं',
+      duplicates: (n: number) =>
+        plural(n, {
+          one: `${n} पहले से मौजूद है, छोड़ दिया गया`,
+          other: `${n} पहले से मौजूद हैं, छोड़ दिए गए`,
+        }),
+      unreadable: (n: number) =>
+        plural(n, {
+          one: `${n} पढ़ा नहीं जा सका`,
+          other: `${n} पढ़े नहीं जा सके`,
+        }),
+      batches: 'आयात इतिहास',
+      count: (n: number) => `${n}`,
+      undo: 'यह आयात पूर्ववत करें',
+      undone: 'पूर्ववत किया गया',
+      removed: (n: number) =>
+        plural(n, {
+          one: `इस आयात से ${n} वर्कआउट हटाया गया`,
+          other: `इस आयात से ${n} वर्कआउट हटाए गए`,
+        }),
+      failed: 'आयात विफल रहा। कृपया पुनः प्रयास करें।',
+    },
   },
   errors: {
     /* —— core —— */
@@ -3667,6 +3801,24 @@ Markdown में उत्तर दें।`,
     'err.logbook.invalid': 'दर्ज की गई सामग्री अमान्य है; जांचें और पुनः सहेजें',
     'err.logbook.gear_taken': 'यह Zepp जूता ID पहले से ही किसी अन्य जोड़ी द्वारा उपयोग में है',
     'err.rings.save': 'वलय की छवि सहेजी नहीं जा सकी — जांचें कि चित्र फ़ोल्डर लिखने योग्य है या नहीं',
+    'err.auth.fresh_start_failed':
+      'नया डेटा फ़ोल्डर तैयार नहीं किया जा सका; आपका मौजूदा डेटा अपरिवर्तित है',
+    'err.letters.capsule_date': 'खोलने की वह तारीख मान्य नहीं है। कृपया दोबारा चुनें।',
+    'err.feedback.toast_failed': 'सिस्टम नोटिफ़िकेशन नहीं दिखाया जा सका।',
+    'err.export.my_records': 'फ़ाइल नहीं लिखी जा सकी। किसी अन्य स्थान पर पुनः प्रयास करें।',
+    'err.import.source': 'अज्ञात आयात स्रोत।',
+    'err.import.too_large':
+      'वह फ़ाइल बहुत बड़ी है (64 MB से अधिक)। Strava और Apple Health के लिए पूरा निर्यात संग्रह चुनें।',
+    'err.import.not_recognized':
+      'यह फ़ाइल आपके चुने हुए स्रोत का निर्यात नहीं है। किसी अन्य स्रोत से प्रयास करें।',
+    'err.import.read':
+      'यह फ़ाइल पढ़ी नहीं जा सकी। सुनिश्चित करें कि किसी अन्य प्रोग्राम में यह खुली न हो।',
+    'err.ai_task.bad_prompt_file':
+      'यह एक उपयोग योग्य .zbprompt फ़ाइल नहीं है (ग़लत प्रारूप, नए संस्करण से, या कोई प्रॉम्प्ट नहीं)।',
+    'err.ai_task.prompt_export':
+      '.zbprompt निर्यात नहीं किया जा सका। जांचें कि डेस्कटॉप लिखने योग्य है या नहीं।',
+    'err.ai_task.prompt_import':
+      'यह फ़ाइल पढ़ी नहीं जा सकी (बहुत बड़ी है या खोली नहीं जा सकती)।',
   },
   backendText: {
     'ui.backup.file_missing': 'बैकअप फ़ाइल नहीं मिली',

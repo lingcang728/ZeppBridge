@@ -22,6 +22,7 @@ export default {
       untilNow: 'Heden',
       more: 'Meer',
       distance: 'Totale afstand',
+      recorded: 'Vastgelegd',
     },
     'components/WorkoutTools': {
       select: 'Trainingen selecteren',
@@ -113,6 +114,8 @@ export default {
       raceHalf: 'Halve marathon van de stad',
       race10k: '10 km-wegwedstrijd in de herfst',
       injury: 'Pijn buitenkant rechterknie (IT-band)',
+      capsuleNote:
+        'Van een jaar geleden: ik was net begonnen met drie keer per week hardlopen en mijn knie deed nog een beetje pijn. Ik hoop dat je nog steeds hardloopt, en niet vergeet te rekken.',
     },
     'components/activity/HourlyStepsCard': {
       title: 'Stappen per uur',
@@ -1637,6 +1640,13 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       updateVersionLoading: 'laden',
       verifyAndSync: 'Verifiëren en synchroniseren',
       verifyFailed: 'Verificatie is niet afgerond',
+      logoutConfirm:
+        'Wil je uitloggen bij dit account?\n\nAlleen inloggegevens worden gewist; gesynchroniseerde historie blijft op deze computer bewaard.\n\nDeze database bevat één Zepp-account: inloggen met een ander account wordt hierna geweigerd. Om te wisselen, kies je “Met een ander account opnieuw beginnen” in de inlogfoutmelding.',
+      freshStart: 'Met een ander account opnieuw beginnen',
+      freshStartConfirm:
+        'Alle huidige gegevens opzij zetten en opnieuw verbinden met een lege database?\n\nEr wordt niets verwijderd: de oude gegevens blijven in een map “data-before-<datum>” naast de app staan — hernoem deze weer naar “data” om terug te keren. Beide verbindingen worden uitgelogd en de app herstart.',
+      newAccountWarning:
+        'Maak hiervoor geen nieuw Zepp-account aan en koppel je horloge niet aan een ander account: opnieuw koppelen wist de instellingen op het horloge.',
     },
     'views/ActivityDetail': {
       title: 'Dagelijkse activiteit',
@@ -2282,6 +2292,8 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       provenanceProvider: 'Aanbieder',
       provenanceScope: 'Bereik',
       provenanceSynced: 'Laatst gesynchroniseerd',
+      provenanceImported: 'Geïmporteerd uit een bestand',
+      provenanceImportedAt: 'Geïmporteerd',
       provenanceRecordId: 'Item-id',
       provenanceDevice: 'Apparaat',
       provenanceFit: 'Lokale correctie',
@@ -2844,6 +2856,8 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       usualRange: (range: string) => `Gewoonlijk ${range}`,
       usualHint: (range: string, days: number) =>
         `Alleen vergeleken met jezelf: over de afgelopen ${days} dagen viel de middelste 80% van de dagen binnen ${range}. Geen diagnose.`,
+      longTermHint: (range: string, since: string, days: number, recent: string) =>
+        `Je langetermijnnorm: over de ${days} dagen met metingen sinds ${since} viel de middelste 80% binnen ${range}${recent ? `; de afgelopen 90 dagen waren ${recent}` : ''}. Alleen vergeleken met jezelf, geen diagnose.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Taken beschikbaar maken voor MCP',
@@ -3152,6 +3166,12 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       legendGap: 'Ontbreekt',
       legendEmpty: 'Niet in de cloud',
       cellAria: (month: string, state: string) => `${month}: ${state}`,
+      takeTitle: 'Neem alles mee',
+      takeSub:
+        'Beoordelingen, notities, schoenen, wedstrijden, plannen, AI-taken, brieven — alles wat je hier hebt geschreven, in één JSON-bestand',
+      takeButton: 'Exporteren',
+      takeDone: (n: number) => (n === 1 ? '1 record geëxporteerd' : `${n} records geëxporteerd`),
+      takeFailed: 'Exporteren mislukt. Probeer het opnieuw.',
     },
     'views/settings/sections/maintenance': {
       secMaintenance: 'Onderhoud',
@@ -3232,6 +3252,17 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sectionWhat: 'Wat dit is',
       sectionChart: 'Wat deze grafiek toont',
       sectionHow: 'Berekening en bron',
+      sectionTrust: 'Hoe het wordt gemeten',
+      trustChipTitle: 'Algoritmeschatting',
+      excludedChipTitle: 'Je hebt dit uitgesloten van de analyse',
+      useInAnalysis: 'Meenemen in analyse',
+      useInAnalysisHint:
+        'Indien uitgeschakeld blijft dit gewoon zichtbaar en worden er geen gegevens verwijderd; het wordt alleen buiten vergelijkingen met je norm gelaten en niet naar AI of MCP verzonden.',
+      trustMeasured: 'Rechtstreeks gemeten door de sensor op het horloge of apparaat.',
+      trustComputed:
+        'Omgerekend uit metingen of je eigen registraties met een openbare, vaste formule.',
+      trustEstimated:
+        'Een schatting die Zepp met een eigen algoritme afleidt uit meerdere metingen. Zepp heeft de methode en de foutmarge niet openbaar gemaakt, en laboratoriummetingen kunnen hiervan afwijken.',
     },
     'lib/metricInfo/vitals': {
       readinessWhat: 'Een gereedheidsscore die het horloge berekent op basis van de slaap, HRV en rusthartslag van de afgelopen nacht.',
@@ -3575,6 +3606,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       noNext: 'Er staat geen volgende vergelijkbare sessie gepland',
       done: 'Prima',
       lighterNote: (original: string | undefined) => `Vorige keer was te zwaar, kernblok is 10% korter. ${original ?? ''}`.trim(),
+      toastBody: 'Tik op een niveau om het op te slaan — je hoeft de app niet te openen',
     },
     'views/ai/AiPlanHistory': {
       title: 'Planarchief',
@@ -3838,6 +3870,95 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       ready: (year: number) => `Je jaarring voor ${year} is aangegroeid`,
       readyHint: 'Een ring per jaar, één ster per training.',
     },
+    'components/ai/hub/promptLibrary': {
+      all: 'Alles',
+      filterLabel: 'Filteren op gegevenscategorie',
+      noMatch: 'Geen enkele taak gebruikt dit type gegevens.',
+      history: 'Eerdere formuleringen',
+      historyEmpty: 'De prompt van deze taak is nog niet gewijzigd.',
+      historyLoadFailed: 'Kon eerdere formuleringen niet laden',
+      replacedAt: (when: string) => `gebruikt tot ${when}`,
+      useVersion: 'Deze versie gebruiken',
+      exportPrompt: 'Exporteer .zbprompt',
+      exported: (path: string) => `Geëxporteerd naar ${path}`,
+      importPrompt: 'Importeer .zbprompt',
+      imported: (title: string) => `“${title}” geïmporteerd. Kies trainingen en je kunt aan de slag.`,
+      fileFilter: 'ZeppBridge-prompt',
+    },
+    'components/letters/dataLetters': {
+      tab: 'Je brieven',
+      empty:
+        'Nog geen brieven. Na elke volledige week ontvang je hier een gegevensbrief; je kunt ook een tijdcapsule verzegelen voor je toekomstige zelf.',
+      loadFailed: 'Kon je brieven niet laden',
+      onThisDay: 'Op deze dag',
+      yearsAgo: (years: number) =>
+        years === 1 ? 'Vandaag een jaar geleden' : `Vandaag ${years} jaar geleden`,
+      stepsLabel: 'Stappen',
+      steps: (count: string) => `${count} stappen`,
+      workout: (type: string, km: string | null, minutes: number | null) =>
+        [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
+      capsules: 'Tijdcapsules',
+      capsulePlaceholder:
+        'Schrijf aan je toekomstige zelf. Eenmaal verzegeld kan niemand het vóór de datum lezen — zelfs jij nu niet.',
+      openAfter: 'Openen',
+      spanHalfYear: 'over zes maanden',
+      spanOneYear: 'over een jaar',
+      spanThreeYears: 'over drie jaar',
+      seal: 'Verzegelen',
+      sealing: 'Verzegelen…',
+      sealFailed: 'Kon niet worden verzegeld. Probeer het later opnieuw.',
+      sealedUntil: (date: string) => `Verzegeld · opent op ${date}`,
+      sealedOn: (date: string) => `Geschreven op ${date}`,
+      due: 'Het is zover',
+      open: 'Openen',
+      openFailed: 'Kon niet worden geopend. Probeer het later opnieuw.',
+      openedOn: (date: string) => `Geopend op ${date}`,
+      then: 'Bij het schrijven',
+      now: 'Bij het openen',
+      windowNote: 'Telkens het gemiddelde van de voorgaande 28 dagen',
+      weekly: 'Wekelijkse brieven',
+      weekRange: (from: string, to: string) => `${from} – ${to}`,
+      vsBefore: (value: string, percent: string) => `vorige 4 weken ${value} · ${percent}`,
+    },
+    'components/workout/workoutImport': {
+      open: 'Trainingen importeren',
+      close: 'Import sluiten',
+      title: 'Van elders importeren',
+      hint: 'Blijft op deze computer, wordt nooit naar Zepp verzonden. Een training die binnen twee minuten van een reeds aanwezige training begint, wordt overgeslagen.',
+      sources: {
+        gpx: 'GPX / TCX',
+        fit: 'FIT',
+        strava: 'Strava-archief',
+        apple_health: 'Apple Health',
+      },
+      short: {
+        gpx: 'GPX',
+        fit: 'FIT',
+        strava: 'Strava',
+        apple_health: 'Apple Health',
+      },
+      filter: {
+        gpx: 'GPX / TCX-bestanden',
+        fit: 'FIT-bestanden',
+        strava: 'Strava-export',
+        apple_health: 'Apple Health-export',
+      },
+      reading: 'Lezen…',
+      added: (n: number) => (n === 1 ? '1 geïmporteerd' : `${n} geïmporteerd`),
+      nothingNew: 'Geen nieuwe trainingen',
+      duplicates: (n: number) =>
+        n === 1 ? '1 stond al hier, overgeslagen' : `${n} stonden al hier, overgeslagen`,
+      unreadable: (n: number) => (n === 1 ? '1 onleesbaar' : `${n} onleesbaar`),
+      batches: 'Importen',
+      count: (n: number) => `${n}`,
+      undo: 'Deze import ongedaan maken',
+      undone: 'Ongedaan gemaakt',
+      removed: (n: number) =>
+        n === 1
+          ? '1 training uit deze import verwijderd'
+          : `${n} trainingen uit deze import verwijderd`,
+      failed: 'Importeren mislukt. Probeer het opnieuw.',
+    },
   },
   errors: {
     'err.app.starting': 'Lokale gegevens worden nog klaargemaakt; dit wordt zo vanzelf vernieuwd',
@@ -4065,6 +4186,25 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     'err.workout_fit.start_mismatch':
       'De starttijd van dit .fit-bestand verschilt meer dan 5 minuten van deze training — het lijkt niet om dezelfde sessie te gaan',
     'err.workout_fit.too_large': 'Dit bestand is te groot om een .fit van één training te zijn',
+    'err.auth.fresh_start_failed':
+      'Kon geen nieuwe gegevensmap voorbereiden; je huidige gegevens zijn ongewijzigd gebleven',
+    'err.letters.capsule_date': 'Die openingsdatum is niet geldig. Kies opnieuw.',
+    'err.feedback.toast_failed': 'De systeemmelding kon niet worden getoond.',
+    'err.export.my_records':
+      'Kon dat bestand niet schrijven. Probeer een andere locatie.',
+    'err.import.source': 'Onbekende importbron.',
+    'err.import.too_large':
+      'Dat bestand is te groot (meer dan 64 MB). Kies voor Strava en Apple Health het volledige exportarchief.',
+    'err.import.not_recognized':
+      'Dat bestand is geen export van de gekozen bron. Probeer een andere bron.',
+    'err.import.read':
+      'Kon dat bestand niet lezen. Zorg dat geen ander programma het geopend heeft.',
+    'err.ai_task.bad_prompt_file':
+      'Dit is geen bruikbaar .zbprompt-bestand (verkeerd formaat, van een nieuwere versie of geen prompt aanwezig).',
+    'err.ai_task.prompt_export':
+      'Kon het .zbprompt-bestand niet exporteren. Controleer of het bureaublad beschrijfbaar is.',
+    'err.ai_task.prompt_import':
+      'Kon dat bestand niet lezen (te groot of kan niet worden geopend).',
   },
   backendText: {
     'ui.backup.file_missing': 'Het back-upbestand is niet gevonden',

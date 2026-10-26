@@ -367,6 +367,23 @@ export default {
     revealFile: 'Pokaż plik w Eksploratorze',
   },
 
+  // Source: src/components/ai/hub/promptLibrary.i18n.ts
+  'components/ai/hub/promptLibrary': {
+    all: 'Wszystkie',
+    filterLabel: 'Filtruj według kategorii danych',
+    noMatch: 'Żadne zadanie nie korzysta z tego typu danych.',
+    history: 'Wcześniejsze wersje pytania',
+    historyEmpty: 'Treść promptu dla tego zadania nie była jeszcze zmieniana.',
+    historyLoadFailed: 'Nie udało się wczytać wcześniejszych wersji pytania',
+    replacedAt: (when: string) => `używane do ${when}`,
+    useVersion: 'Użyj tej wersji',
+    exportPrompt: 'Eksportuj .zbprompt',
+    exported: (path: string) => `Wyeksportowano do ${path}`,
+    importPrompt: 'Importuj .zbprompt',
+    imported: (title: string) => `Zaimportowano „${title}”. Wybierz treningi i gotowe.`,
+    fileFilter: 'Prompt ZeppBridge',
+  },
+
   // Source: src/components/ai/stage/stage.i18n.ts
   "components/ai/stage/stage": {
     stage: 'Wyślij do AI: dane do przekazania po lewej, AI pośrodku, pytanie i plan po prawej',
@@ -459,6 +476,13 @@ export default {
     usualRange: (range: string) => `Zwykle ${range}`,
     usualHint: (range: string, days: number) =>
       `Tylko w porównaniu z Tobą: w ciągu ostatnich ${days} dni środkowe 80% dni mieściło się w przedziale ${range}. To nie jest diagnoza.`,
+    longTermHint: (range: string, since: string, days: number, recent: string) =>
+      `Twoja długoterminowa norma: spośród ${plural(days, {
+        one: `${days} dnia`,
+        few: `${days} dni`,
+        many: `${days} dni`,
+        other: `${days} dni`,
+      })} z odczytami od ${since} roku środkowe 80% mieściło się w granicach ${range}${recent ? `; ostatnie 90 dni: ${recent}` : ''}. Porównanie wyłącznie z Tobą, to nie jest diagnoza.`,
   },
 
   // Source: src/components/BackupPanel.i18n.ts
@@ -919,6 +943,48 @@ export default {
     rereadAria: (version: string) => `Przeczytaj ponownie list dla wersji ${version}`,
   },
 
+  // Source: src/components/letters/dataLetters.i18n.ts
+  'components/letters/dataLetters': {
+    tab: 'Twoje listy',
+    empty: 'Nie ma jeszcze listów. Po każdym pełnym tygodniu trafi tu list z podsumowaniem danych; możesz też zamknąć kapsułę czasu dla siebie w przyszłości.',
+    loadFailed: 'Nie udało się wczytać Twoich listów',
+    onThisDay: 'Tamtego roku dzisiaj',
+    yearsAgo: (years: number) =>
+      years === 1
+        ? 'Rok temu tego dnia'
+        : `${years} ${plural(years, {
+            one: 'rok',
+            few: 'lata',
+            many: 'lat',
+            other: 'lat',
+          })} temu tego dnia`,
+    stepsLabel: 'Kroki',
+    steps: (count: string) => `${count} kroków`,
+    workout: (type: string, km: string | null, minutes: number | null) =>
+      [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
+    capsules: 'Kapsuły czasu',
+    capsulePlaceholder: 'Napisz do siebie w przyszłości. Po zapieczętowaniu nikt nie przeczyta jej przed nadejściem wyznaczonego dnia — nawet Ty.',
+    openAfter: 'Otwarcie',
+    spanHalfYear: 'za pół roku',
+    spanOneYear: 'za rok',
+    spanThreeYears: 'za trzy lata',
+    seal: 'Zapieczętuj',
+    sealing: 'Pieczętowanie…',
+    sealFailed: 'Nie udało się zapieczętować. Spróbuj ponownie później.',
+    sealedUntil: (date: string) => `Zapieczętowana · otwarcie: ${date}`,
+    sealedOn: (date: string) => `Zapisano ${date}`,
+    due: 'Pora na otwarcie',
+    open: 'Otwórz',
+    openFailed: 'Nie udało się otworzyć. Spróbuj ponownie później.',
+    openedOn: (date: string) => `Otwarto ${date}`,
+    then: 'W chwili zapisu',
+    now: 'W chwili otwarcia',
+    windowNote: 'Każda wartość to średnia z poprzednich 28 dni',
+    weekly: 'Listy cotygodniowe',
+    weekRange: (from: string, to: string) => `${from} – ${to}`,
+    vsBefore: (value: string, percent: string) => `poprzednie 4 tyg.: ${value} · ${percent}`,
+  },
+
   "components/InsightCard": {
     title: 'Przebieg biegu',
     unsupportedWorkoutType: 'Brak analizy dla tego typu treningu. Pierwsza wersja obejmuje wyłącznie bieganie — to, co zostało zweryfikowane na rzeczywistych danych. Inne treningi nadal wyświetlają się, korygują i eksportują normalnie.',
@@ -965,6 +1031,14 @@ export default {
     sectionWhat: 'Czym jest ten wskaźnik',
     sectionChart: 'Co przedstawia ten wykres',
     sectionHow: 'Jak jest obliczany i skąd pochodzi',
+    sectionTrust: 'Jak jest mierzony',
+    trustChipTitle: 'Szacunek algorytmu',
+    excludedChipTitle: 'Wykluczono z analizy',
+    useInAnalysis: 'Uwzględniaj w analizie',
+    useInAnalysisHint: 'Po wyłączeniu ten wskaźnik nadal się wyświetla i żadne dane nie są usuwane; nie jest jedynie porównywany z Twoją normą ani przekazywany do AI i MCP.',
+    trustMeasured: 'Odczyt zmierzony bezpośrednio przez czujnik zegarka lub urządzenia.',
+    trustComputed: 'Przeliczono z odczytów lub własnych wpisów według jawnego, stałego wzoru.',
+    trustEstimated: 'Wartość szacunkowa wyliczana przez Zepp z wielu odczytów za pomocą własnego algorytmu. Zepp nie publikuje metody ani marginesu błędu, a wynik może różnić się od pomiarów laboratoryjnych.',
   },
 // Source: src/components/MetricTrendCard.vue
 "components/MetricTrendCard": {
@@ -1651,6 +1725,8 @@ export default {
     raceHalf: 'Półmaraton miejski',
     race10k: 'Jesienny bieg uliczny na 10 km',
     injury: 'Ból po zewnętrznej stronie prawego kolana (pasmo biodrowo-piszczelowe)',
+    capsuleNote:
+      'Ja sprzed roku: wtedy dopiero zaczynałem biegać trzy razy w tygodniu i kolano jeszcze trochę bolało. Mam nadzieję, że wciąż biegasz i nie zapominasz o rozciąganiu.',
   },
 // Source: src/i18n/errors.ts
 "i18n/errors": {
@@ -1887,6 +1963,17 @@ export default {
     'err.letters.invalid': 'Ta odpowiedź wskazuje na nieprawidłową wersję i nie została wysłana.',
     'err.letters.empty': 'Odpowiedź jest pusta — napisz kilka słów przed wysłaniem.',
     'err.letters.rejected': 'Serwer nie przyjął tej odpowiedzi. Może być wymagana aktualizacja aplikacji.',
+    'err.auth.fresh_start_failed': 'Nie udało się przygotować nowego folderu danych — bieżące dane pozostały bez zmian',
+    'err.letters.capsule_date': 'Nieprawidłowa data otwarcia — wybierz ją ponownie',
+    'err.feedback.toast_failed': 'Nie udało się wyświetlić powiadomienia systemowego',
+    'err.export.my_records': 'Nie udało się zapisać tego pliku — spróbuj w innej lokalizacji',
+    'err.import.source': 'Nieznane źródło importu',
+    'err.import.too_large': 'Plik jest zbyt duży (ponad 64 MB). W przypadku Strava i Apple Health wybierz całe archiwum eksportu',
+    'err.import.not_recognized': 'Ten plik nie jest eksportem z wybranego źródła — wybierz inne źródło i spróbuj ponownie',
+    'err.import.read': 'Nie udało się odczytać tego pliku — upewnij się, że żaden inny program go nie używa',
+    'err.ai_task.bad_prompt_file': 'To nie jest poprawny plik .zbprompt (nieprawidłowy format, pochodzi z nowszej wersji lub brak promptu)',
+    'err.ai_task.prompt_export': 'Nie udało się wyeksportować .zbprompt — sprawdź, czy pulpit jest dostępny do zapisu',
+    'err.ai_task.prompt_import': 'Nie udało się odczytać tego pliku (jest zbyt duży lub nie można go otworzyć)',
   },
 
 // --- Batch 3 ---
@@ -3479,6 +3566,13 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
       data: { label: 'Wartości liczbowe się nie zgadzają', hint: 'dane są zawsze puste lub różnią się od aplikacji Zepp' },
       other: { label: 'Inny problem', hint: 'opisz go poniżej' },
     },
+    logoutConfirm:
+      'Czy na pewno chcesz wylogować się z tego konta?\n\nUsunięte zostaną tylko poświadczenia logowania; zsynchronizowana historia na tym komputerze zostanie zachowana.\n\nTa baza danych obsługuje tylko jedno konto Zepp: późniejsze logowanie z innego konta zostanie odrzucone. Aby zmienić konto, wybierz „Zacznij od nowa z innym kontem” w komunikacie błędu logowania.',
+    freshStart: 'Zacznij od nowa z innym kontem',
+    freshStartConfirm:
+      'Odłożyć bieżące dane na bok i połączyć się ponownie z pustą bazą danych?\n\nNic nie zostanie usunięte: dotychczasowe dane pozostaną w folderze „data-before-<data>” obok aplikacji — aby do nich wrócić, wystarczy zmienić jego nazwę z powrotem na „data”. Nastąpi wylogowanie z obu kanałów, a aplikacja uruchomi się ponownie.',
+    newAccountWarning:
+      'Nie twórz w tym celu nowego konta Zepp ani nie paruj zegarka z innym kontem: ponowne sparowanie usuwa ustawienia z zegarka.',
   },
 
 // --- Batch 5 ---
@@ -3647,6 +3741,17 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     legendGap: 'Brakuje',
     legendEmpty: 'Brak w chmurze',
     cellAria: (month: string, state: string) => `${month}: ${state}`,
+    takeTitle: 'Zabierz wszystko ze sobą',
+    takeSub: 'Oceny, notatki, buty, zawody, plany, zadania AI, listy — wszystko, co tutaj zapisano, w jednym pliku JSON',
+    takeButton: 'Eksportuj',
+    takeDone: (n: number) =>
+      `Wyeksportowano ${n} ${plural(n, {
+        one: 'rekord',
+        few: 'rekordy',
+        many: 'rekordów',
+        other: 'rekordu',
+      })}`,
+    takeFailed: 'Eksport nie powiódł się. Spróbuj ponownie.',
   },
 
   // Source: src/views/settings/sections/data.i18n.ts
@@ -3975,6 +4080,8 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     provenanceSynced: 'Ostatnia synchronizacja',
     provenanceRecordId: 'Identyfikator wpisu',
     provenanceDevice: 'Urządzenie',
+    provenanceImported: 'Zaimportowano z pliku',
+    provenanceImportedAt: 'Zaimportowano',
     provenanceFit: 'Lokalna korekta',
     fitCloudDistance: 'Dystans w chmurze',
     fitReplace: 'Zastąp poprawionym plikiem .fit',
@@ -4077,6 +4184,7 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     noNext: 'Brak kolejnego podobnego treningu w planie',
     done: 'Gotowe',
     lighterNote: (original: string | undefined) => `Ostatni trening był za ciężki, główna część skrócona o 10%. ${original ?? ''}`.trim(),
+    toastBody: 'Wybierz poziom, aby zapisać — bez otwierania aplikacji',
   },
 
   // Source: src/views/ai/AiPlanHistory.i18n.ts
@@ -4174,6 +4282,67 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     register: 'Zarejestruj w dzienniku',
     retired: 'Wycofane',
     saved: 'Zapisano',
+  },
+
+  // Source: src/components/workout/workoutImport.i18n.ts
+  'components/workout/workoutImport': {
+    open: 'Importuj treningi',
+    close: 'Zwiń import',
+    title: 'Import z innych źródeł',
+    hint: 'Tylko na tym komputerze, nigdy nie wysyłane do Zepp. Trening rozpoczynający się w odstępie do dwóch minut od już zapisanego zostanie pominięty.',
+    sources: {
+      gpx: 'GPX / TCX',
+      fit: 'FIT',
+      strava: 'Paczka Strava',
+      apple_health: 'Apple Health',
+    },
+    short: {
+      gpx: 'GPX',
+      fit: 'FIT',
+      strava: 'Strava',
+      apple_health: 'Apple Health',
+    },
+    filter: {
+      gpx: 'Pliki GPX / TCX',
+      fit: 'Pliki FIT',
+      strava: 'Eksport ze Strava',
+      apple_health: 'Eksport z Apple Health',
+    },
+    reading: 'Odczytywanie…',
+    added: (n: number) =>
+      `Zaimportowano ${n} ${plural(n, {
+        one: 'trening',
+        few: 'treningi',
+        many: 'treningów',
+        other: 'treningu',
+      })}`,
+    nothingNew: 'Brak nowych treningów',
+    duplicates: (n: number) =>
+      `${n} ${plural(n, {
+        one: 'trening był',
+        few: 'treningi były',
+        many: 'treningów było',
+        other: 'treningu było',
+      })} już na tym komputerze — pominięto`,
+    unreadable: (n: number) =>
+      `${n} ${plural(n, {
+        one: 'nieczytelny trening',
+        few: 'nieczytelne treningi',
+        many: 'nieczytelnych treningów',
+        other: 'nieczytelnego treningu',
+      })}`,
+    batches: 'Historia importu',
+    count: (n: number) => `${n}`,
+    undo: 'Cofnij ten import',
+    undone: 'Cofnięto',
+    removed: (n: number) =>
+      `Usunięto ${n} ${plural(n, {
+        one: 'trening',
+        few: 'treningi',
+        many: 'treningów',
+        other: 'treningu',
+      })} z tego importu`,
+    failed: 'Import nie powiódł się. Spróbuj ponownie.',
   },
 
   // Source: src/components/journal/journal.i18n.ts
@@ -4332,6 +4501,7 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     untilNow: 'Do teraz',
     more: 'Więcej',
     distance: 'Łączny dystans',
+    recorded: 'Zapisane',
   },
   // Source: src/components/rings/rings.i18n.ts
   'components/rings/rings': {
