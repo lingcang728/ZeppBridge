@@ -67,7 +67,7 @@ const zh: P4Copy = {
     summaryLead: '十四项常用设置，一张卡叠收好。',
     items: [
       { id: 'sync', title: '自动同步', text: '关、15、30、60 分钟，一档就好。', icon: 'auto-sync' },
-      { id: 'retention', title: '保留多久', text: '云端能取到的历史拉回本地，留多久你定。', icon: 'database' },
+      { id: 'retention', title: '十年，都在本机', text: '最多十年的历史拉回本地，一直保留。不随云端的窗口滚走。', icon: 'database' },
       { id: 'data', title: '数据内容', text: '哪些拉得到、哪些拉不到，一目了然。', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Claude Code、Codex 等本机工具直接来问；发布计划需另行授权。', icon: 'structured-data' },
       { id: 'formats', title: '四种格式', text: 'JSON · CSV · GPX，运动页再加 FIT。', icon: 'document' },
@@ -79,7 +79,7 @@ const zh: P4Copy = {
       { id: 'api', title: '本机 API', text: '只绑 127.0.0.1，只读访问，需要令牌。', icon: 'structured-data' },
       { id: 'privacy', title: '隐私与安全', text: '凭据交给系统保护，令牌不写进日志。', icon: 'browser-login' },
       { id: 'filename', title: '文件命名', text: '交给 AI 的文件叫什么，你来定。', icon: 'document' },
-      { id: 'folder', title: '数据文件夹', text: '查看本机存储位置，按需备份与迁移。', icon: 'database' },
+      { id: 'folder', title: '随时带走', text: '数据就在本机文件夹里；你写下的打分、计划、AI 任务，一键导出成 JSON。', icon: 'database' },
     ],
   },
   nav: [
