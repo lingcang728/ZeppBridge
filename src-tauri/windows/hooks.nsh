@@ -18,6 +18,13 @@
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
+  ; The workout-feedback toast registers a display name for its AppUserModelID and the
+  ; zeppbridge: link its buttons use (src-tauri/src/feedback_toast.rs). Both point at this
+  ; install, so they go with it whether or not the data box is ticked.
+  ${If} $UpdateMode <> 1
+    DeleteRegKey HKCU "Software\Classes\zeppbridge"
+    DeleteRegKey HKCU "Software\Classes\AppUserModelId\com.zeppbridge.app"
+  ${EndIf}
   ${If} $DeleteAppDataCheckboxState = 1
   ${AndIf} $UpdateMode <> 1
     RmDir /r "$INSTDIR\data"

@@ -8,5 +8,12 @@ fn main() {
         zeppbridge_lib::purge_credentials_for_uninstall();
         return;
     }
+    // 跑后打分通知上的按钮：只写下打分就退出，不起界面（feedback_toast.rs）。
+    if let Some(link) = std::env::args()
+        .find(|arg| arg.starts_with(zeppbridge_lib::feedback_toast::FEEDBACK_LINK_PREFIX))
+    {
+        zeppbridge_lib::feedback_toast::handle_feedback_link(&link);
+        return;
+    }
     zeppbridge_lib::run()
 }

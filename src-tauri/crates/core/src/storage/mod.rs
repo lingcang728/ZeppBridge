@@ -151,6 +151,7 @@ mod devices;
 mod diagnostics;
 mod estimate;
 mod event_windows;
+pub mod feedback_toast;
 pub mod fit_override;
 mod freshness;
 mod guards;

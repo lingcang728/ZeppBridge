@@ -125,3 +125,46 @@ fn dismissing_or_snoozing_stops_the_question() {
     assert!(until > today);
     assert!(db.workout_feedback_prompt(now).unwrap().is_none());
 }
+
+#[test]
+fn toast_link_rates_once_with_its_own_token_and_never_reissues() {
+    use crate::storage::feedback_toast::{parse_feedback_link, ToastRating};
+    let db = Database::in_memory().unwrap();
+    delivered_plan(&db);
+    let end = run_at(&db, "run", "running", 7);
+    let now = end + Duration::hours(1);
+    let due = db.feedback_toast_due(now).unwrap().expect("a matching run");
+    assert_eq!(due.prompt.actual.workout_id, "run");
+    // 一条运动只发一次通知。
+    assert!(db.feedback_toast_due(now).unwrap().is_none());
+
+    let forged = "0".repeat(32);
+    assert_eq!(
+        db.rate_from_toast(&forged, 4, now).unwrap(),
+        ToastRating::Refused
+    );
+    assert_eq!(
+        db.rate_from_toast(&due.token, 4, end + Duration::hours(49))
+            .unwrap(),
+        ToastRating::Refused
+    );
+    assert!(db.workout_feedback("run").unwrap().is_none());
+
+    let link = format!("zeppbridge://feedback/?t={}&r=4", due.token);
+    let (token, rating) = parse_feedback_link(&link).unwrap();
+    assert_eq!(
+        db.rate_from_toast(&token, rating, now).unwrap(),
+        ToastRating::Saved
+    );
+    assert_eq!(db.workout_feedback("run").unwrap().unwrap().rating, Some(4));
+    // 用过就作废。
+    assert_eq!(
+        db.rate_from_toast(&token, 1, now).unwrap(),
+        ToastRating::Refused
+    );
+    assert_eq!(db.workout_feedback("run").unwrap().unwrap().rating, Some(4));
+
+    assert!(parse_feedback_link("zeppbridge://feedback?t=abc&r=4").is_none());
+    assert!(parse_feedback_link(&format!("zeppbridge://feedback?t={token}&r=9")).is_none());
+    assert!(parse_feedback_link("zeppbridge://open").is_none());
+}

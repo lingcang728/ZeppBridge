@@ -230,6 +230,7 @@ mod feedback;
 pub(crate) use feedback::{
     workout_feedback_adjusted, workout_feedback_dismiss, workout_feedback_get,
     workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
+    workout_feedback_toast_due, workout_feedback_toast_show,
 };
 
 mod logbook;

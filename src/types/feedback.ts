@@ -72,3 +72,17 @@ export interface PlanHistoryEntry {
   workouts: PlanHistoryWorkout[];
   replaced: number;
 }
+
+/** 该发系统通知的那一条（后端 core::storage::feedback_toast）。 */
+export interface FeedbackToastDue {
+  token: string;
+  prompt: FeedbackPrompt;
+}
+
+/** 发通知的文案，界面按界面语言组好。`labels` 五档，从太轻松到太难。 */
+export interface FeedbackToastText {
+  token: string;
+  title: string;
+  body: string;
+  labels: string[];
+}

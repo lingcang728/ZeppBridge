@@ -78,6 +78,8 @@ flate2 = "1.1"
 # （tauri-plugin-clipboard-manager 带进来的），这里只是变成直接依赖。
 [target.'cfg(not(windows))'.dependencies]
 arboard = { version = "3.6", default-features = false, features = ["wayland-data-control"] }
+# 跑后打分的系统通知（src/feedback_toast.rs）：Mac / Linux 上是普通通知。Windows 走 WinRT 原生通知。
+notify-rust = "4.18"
 
 [target.'cfg(windows)'.dependencies]
 # 全自动交给 AI 的「眼睛」：读浏览器给读屏软件的界面树（UI Automation，src/web_composer.rs）。
@@ -88,6 +90,10 @@ windows = { version = "0.61", features = [
     "Win32_System_Ole",
     "Win32_System_Variant",
     "Win32_UI_Accessibility",
+    # 跑后打分的原生通知（src/feedback_toast.rs）。
+    "Data_Xml_Dom",
+    "Foundation",
+    "UI_Notifications",
 ] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
@@ -99,4 +105,6 @@ windows-sys = { version = "0.61", features = [
     # 启动失败时那个原生对话框（MessageBoxW）。没有它，Windows 上起不来就是
     # 完全无声的——见 src/diagnostics.rs 顶部。
     "Win32_UI_WindowsAndMessaging",
+    # 跑后打分通知：登记通知名字图标和 zeppbridge: 链接（src/feedback_toast.rs）。
+    "Win32_System_Registry",
 ] }
