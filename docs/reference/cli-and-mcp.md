@@ -378,6 +378,7 @@ outside the grants — `error.permittedRanges` lists the actual
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
+| `get_baselines` | Your own norm per metric, never a population norm: `recent` compares the latest reading (within 3 days) with the previous 28-day median and gives the 90-day middle-80% band; `long_term` is the middle 80% of all local history (up to ten years) with its median, start date and a per-year breakdown (`null` under a year of history). The official API only covers recent windows |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
 | `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
@@ -390,6 +391,12 @@ outside the grants — `error.permittedRanges` lists the actual
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
 | `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
 | `propose_coach_note` | **Writes (a proposal)**: puts one sentence about the user (an injury, a routine, a preference) into the desktop inbox; it reaches `get_athlete_profile` only after the user taps "Remember" |
+
+Metrics the user switched off with **Use in analysis** (the "?" panel on a metric
+card) are removed from every tool result, in any spelling (`vo2max`, `vo2Max`, …),
+and the result then carries `excludedByUser` with the list and a note that this is
+the user's choice, not missing data. Nothing is deleted; the user's own exports
+(CLI, FIT) are not affected.
 
 `get_food_data` returns daily totals and available food-log details: names, descriptions,
 meal types, timestamps, reported weight, and nutrients (including fiber). Reported

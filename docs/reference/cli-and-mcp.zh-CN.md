@@ -247,6 +247,7 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
+| `get_baselines` | 每项指标「你的常态」，只和自己比、不用人群常模：`recent` 是最新读数（3 天内）与之前 28 天中位数的比较和 90 天中间八成的常态带；`long_term` 是本机全部历史（最多十年）中间八成、中位数、起始日期和逐年拆分（历史不满一年为 `null`）。官方接口只给近期窗口 |
 | `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
 | `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
@@ -259,6 +260,8 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
 | `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
 | `propose_coach_note` | **写（提议）**：把一句关于用户的话（伤病、作息、偏好）放进桌面端收件箱；用户点了「记住」才会出现在 `get_athlete_profile` 里 |
+
+用户在指标卡「?」浮层里关掉「参与分析」的指标，会从每个工具的返回里去掉（不分 `vo2max` / `vo2Max` 这类写法），返回里同时带 `excludedByUser`：名单和一句说明——这是用户的选择，不是缺数据。数据一行不删，用户自己的导出（CLI、FIT）不受影响。
 
 查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
 `intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。

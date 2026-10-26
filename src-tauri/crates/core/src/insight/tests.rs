@@ -827,5 +827,40 @@ mod baseline_marks {
         assert!((57.0..=59.0).contains(&high), "high = {high}");
         let sparse = metric_baseline("hrv", &series(28, 50.0), day(0)).unwrap();
         assert!(sparse.usual_low.is_some(), "28 天也够给常态带");
+        assert!(sparse.long_term.is_none(), "不满一年的历史不叫长期常态");
+    }
+
+    /// 长期常态看全部历史、不含最新这天，逐年给中位数；读数够了跨度不满一年也不给。
+    #[test]
+    fn the_long_term_norm_spans_every_year_and_never_counts_today() {
+        use super::super::anomaly::long_term_norm;
+        // 三年：第一年 60 上下，后两年 50 上下（隔天一条），今天一个离谱的 200。
+        let mut points: Vec<(NaiveDate, f64)> = (1..=1095)
+            .step_by(2)
+            .map(|i| (day(-i), if i > 730 { 60.0 } else { 50.0 } + (i % 3) as f64))
+            .collect();
+        points.push((day(0), 200.0));
+        let mark = metric_baseline("resting_hr", &points, day(0)).unwrap();
+        let norm = mark.long_term.expect("three years is enough");
+        assert_eq!(norm.days, 548);
+        assert!(
+            norm.high < 70.0,
+            "today's 200 must not stretch the norm: {}",
+            norm.high
+        );
+        assert_eq!(norm.years.first().map(|y| y.year), Some(2023));
+        assert_eq!(norm.years.last().map(|y| y.year), Some(2026));
+        let early = norm.years.iter().find(|y| y.year == 2024).unwrap();
+        assert!(
+            early.median > 55.0,
+            "2024 starts in the 60s: {}",
+            early.median
+        );
+
+        let dense_but_short: Vec<(NaiveDate, f64)> = (1..=300).map(|i| (day(-i), 50.0)).collect();
+        assert!(
+            long_term_norm(&dense_but_short, day(0)).is_none(),
+            "300 天也不满一年"
+        );
     }
 }

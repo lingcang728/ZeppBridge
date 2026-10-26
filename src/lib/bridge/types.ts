@@ -191,6 +191,17 @@ export interface MetricBaseline {
   usual_low?: number | null;
   usual_high?: number | null;
   usual_days?: number;
+  /** 长期常态：最新读数之前全部历史（最多十年）中间八成与逐年拆分；不满一年为 null。旧后端没有。 */
+  long_term?: LongTermNorm | null;
+}
+
+export interface LongTermNorm {
+  since: string;
+  days: number;
+  median: number;
+  low: number;
+  high: number;
+  years: { year: number; days: number; median: number; low: number; high: number }[];
 }
 
 export interface AiTaskSummary {
@@ -495,6 +506,9 @@ export interface BridgeBackend {
   aiTaskDeleteMany(ids: string[]): Promise<Array<{ task: AiTask; pinned: boolean }>>;
   /** 这几项指标「比平时高 / 低」的结论（数据不够的不返回）。 */
   getMetricBaselines(metrics: string[]): Promise<MetricBaseline[]>;
+  /** 用户排除的指标（不参与比较、不交给 AI / MCP；数据不删）。 */
+  metricExclusions(): Promise<string[]>;
+  setMetricExcluded(metric: string, excluded: boolean): Promise<string[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
   aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
   cardCollectionGet(): Promise<CardPick[]>;

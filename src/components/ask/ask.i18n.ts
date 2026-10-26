@@ -27,6 +27,8 @@ const messages = defineMessages(
     usualWord: '平时',
     usualRange: (range: string) => `常态 ${range}`,
     usualHint: (range: string, days: number) => `只和你自己比：之前 ${days} 天里，中间八成的日子落在 ${range}。不是诊断。`,
+    longTermHint: (range: string, since: string, days: number, recent: string) =>
+      `你的长期常态：自 ${since} 年起有读数的 ${days} 天里，中间八成落在 ${range}${recent ? `；近 90 天是 ${recent}` : ''}。只和你自己比，不是诊断。`,
   },
   {
     ask: 'Ask AI',
@@ -50,6 +52,8 @@ const messages = defineMessages(
     usualWord: 'As usual',
     usualRange: (range: string) => `Usual ${range}`,
     usualHint: (range: string, days: number) => `Compared only with you: over the previous ${days} days, the middle 80% of days fell within ${range}. Not a diagnosis.`,
+    longTermHint: (range: string, since: string, days: number, recent: string) =>
+      `Your long-term norm: across ${days} days with readings since ${since}, the middle 80% fell within ${range}${recent ? `; the last 90 days were ${recent}` : ''}. Compared only with you, not a diagnosis.`,
   },
   {
     ask: 'Preguntar a la IA',
@@ -73,6 +77,8 @@ const messages = defineMessages(
     usualWord: 'Como siempre',
     usualRange: (range: string) => `Habitual ${range}`,
     usualHint: (range: string, days: number) => `Comparado solo contigo: en los ${days} días anteriores, el 80 % central de los días quedó entre ${range}. No es un diagnóstico.`,
+    longTermHint: (range: string, since: string, days: number, recent: string) =>
+      `Tu norma a largo plazo: en ${days} días con lecturas desde ${since}, el 80 % central quedó entre ${range}${recent ? `; los últimos 90 días, ${recent}` : ''}. Comparado solo contigo, no es un diagnóstico.`,
   },
   'components/ask/ask',
 );

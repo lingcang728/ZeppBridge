@@ -8,6 +8,9 @@
 //! - 最新读数要在最近 3 天内，太旧的不算「现在」；
 //! - 另给一条**常态带**（3.1，卡片底行「状态词 ←→ 范围」）：最新读数之前 90 天里中间八成的读数
 //!   （第 10 到第 90 百分位）。也只和自己比，不用人群常模；少于 14 天不给。
+//! - **长期常态**（3.1 之后，「用十年历史算你的常态」）：最新读数之前**全部**历史（最多十年）
+//!   中间八成，外加逐年的中位数和带。历史跨度不满一年或读数少于 120 天不给——
+//!   不到一年的「常态」只是季节，不是你。官方接口只给近期窗口，这一条只有本机给得出。
 //!
 //! 不下诊断、不给训练建议：只给方向、差值和基线本身，界面按 `message_code` 说一句「比平时高 6」。
 
@@ -24,6 +27,37 @@ const MIN_RELATIVE_SPREAD: f64 = 0.02;
 pub const USUAL_RANGE_DAYS: i64 = 90;
 const USUAL_LOW_QUANTILE: f64 = 0.1;
 const USUAL_HIGH_QUANTILE: f64 = 0.9;
+/// 长期常态至少要跨这么多天（第一条到最新一条）。
+pub const LONG_TERM_MIN_SPAN_DAYS: i64 = 365;
+/// 长期常态至少要有这么多天的读数。
+pub const LONG_TERM_MIN_DAYS: usize = 120;
+/// 长期常态最多回看这么多天（十年）。
+pub const LONG_TERM_MAX_DAYS: i64 = 3660;
+
+/// 某一个自然年里的常态。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct YearNorm {
+    pub year: i32,
+    pub days: usize,
+    pub median: f64,
+    pub low: f64,
+    pub high: f64,
+}
+
+/// 你的长期常态：全部历史中间八成。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct LongTermNorm {
+    /// 最早一条读数。
+    pub since: NaiveDate,
+    /// 用了几天的读数。
+    pub days: usize,
+    pub median: f64,
+    /// 第 10 / 第 90 百分位。
+    pub low: f64,
+    pub high: f64,
+    /// 逐年（读数够 14 天的年份），从早到晚。
+    pub years: Vec<YearNorm>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,6 +88,62 @@ pub struct MetricBaseline {
     pub usual_high: Option<f64>,
     /// 常态带用了几天的读数。
     pub usual_days: usize,
+    /// 长期常态（最新读数之前的全部历史）。历史不够一年为 `None`。
+    pub long_term: Option<LongTermNorm>,
+}
+
+fn band(values: &mut [f64]) -> (f64, f64, f64) {
+    values.sort_by(|a, b| a.total_cmp(b));
+    (
+        quantile(values, USUAL_LOW_QUANTILE),
+        median(values),
+        quantile(values, USUAL_HIGH_QUANTILE),
+    )
+}
+
+/// 一项指标在 `before` 之前全部读数的长期常态（任意顺序，同一天只取一个）。
+pub fn long_term_norm(points: &[(NaiveDate, f64)], before: NaiveDate) -> Option<LongTermNorm> {
+    use chrono::Datelike;
+    let mut history: Vec<(NaiveDate, f64)> = points
+        .iter()
+        .copied()
+        .filter(|(date, v)| v.is_finite() && *date < before)
+        .collect();
+    history.sort_by_key(|(date, _)| *date);
+    let (since, _) = *history.first()?;
+    let (last, _) = *history.last()?;
+    if history.len() < LONG_TERM_MIN_DAYS || (last - since).num_days() < LONG_TERM_MIN_SPAN_DAYS {
+        return None;
+    }
+    let mut years = Vec::new();
+    for year in since.year()..=last.year() {
+        let mut values: Vec<f64> = history
+            .iter()
+            .filter(|(date, _)| date.year() == year)
+            .map(|(_, v)| *v)
+            .collect();
+        if values.len() < MIN_DAYS {
+            continue;
+        }
+        let (low, median, high) = band(&mut values);
+        years.push(YearNorm {
+            year,
+            days: values.len(),
+            median,
+            low,
+            high,
+        });
+    }
+    let mut values: Vec<f64> = history.iter().map(|(_, v)| *v).collect();
+    let (low, median, high) = band(&mut values);
+    Some(LongTermNorm {
+        since,
+        days: values.len(),
+        median,
+        low,
+        high,
+        years,
+    })
 }
 
 /// 已排序数组的线性插值分位数。
@@ -145,5 +235,6 @@ pub fn metric_baseline(
         usual_low,
         usual_high,
         usual_days: usual.len(),
+        long_term: long_term_norm(&points, latest_date),
     })
 }

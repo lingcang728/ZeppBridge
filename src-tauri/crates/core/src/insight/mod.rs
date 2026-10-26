@@ -17,25 +17,64 @@ impl Database {
         metrics: &[String],
         today: NaiveDate,
     ) -> Result<Vec<anomaly::MetricBaseline>> {
-        // 最新读数要在 3 天内，常态带是它之前 90 天：取 95 天足够（28 天的基线在其中）。
-        let series = self.metric_series(metrics, 95)?;
+        // 长期常态要全部历史（最多十年）；28 天基线和 90 天常态带都在其中。
+        let series = self.metric_series(metrics, anomaly::LONG_TERM_MAX_DAYS)?;
         Ok(series
             .iter()
-            .filter_map(|s| {
-                let points: Vec<(NaiveDate, f64)> = s
-                    .points
-                    .iter()
-                    .filter_map(|p| {
-                        Some((
-                            NaiveDate::parse_from_str(&p.date, "%Y-%m-%d").ok()?,
-                            p.value,
-                        ))
-                    })
-                    .collect();
-                anomaly::metric_baseline(&s.metric, &points, today)
+            .filter_map(|s| anomaly::metric_baseline(&s.metric, &dated_points(s), today))
+            .collect())
+    }
+
+    /// 交给 AI 的常态（MCP `get_baselines`）：近期和自己比的结论 + 全部历史的长期常态。
+    /// 最新读数太旧时近期结论为空，长期常态照给（它本来就不看「现在」）。
+    pub fn metric_norms(&self, metrics: &[String], today: NaiveDate) -> Result<Vec<MetricNorms>> {
+        let series = self.metric_series(metrics, anomaly::LONG_TERM_MAX_DAYS)?;
+        Ok(series
+            .iter()
+            .filter(|s| !s.points.is_empty())
+            .map(|s| {
+                let points = dated_points(s);
+                let mut recent = anomaly::metric_baseline(&s.metric, &points, today);
+                let long_term = match recent.as_mut() {
+                    Some(recent) => recent.long_term.take(),
+                    None => anomaly::long_term_norm(&points, today + Duration::days(1)),
+                };
+                MetricNorms {
+                    metric: s.metric.clone(),
+                    unit: s.unit.clone(),
+                    reading_days: points.len(),
+                    recent,
+                    long_term,
+                }
             })
             .collect())
     }
+}
+
+/// 一项指标的常态，给 AI 读。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MetricNorms {
+    pub metric: String,
+    pub unit: String,
+    /// 本机一共有几天的读数（最多十年）。
+    pub reading_days: usize,
+    /// 近 28 天的比较与 90 天常态带；最新读数不在 3 天内为 `None`。
+    pub recent: Option<anomaly::MetricBaseline>,
+    /// 全部历史的长期常态与逐年中位数；不满一年为 `None`。
+    pub long_term: Option<anomaly::LongTermNorm>,
+}
+
+fn dated_points(series: &crate::models::MetricSeries) -> Vec<(NaiveDate, f64)> {
+    series
+        .points
+        .iter()
+        .filter_map(|p| {
+            Some((
+                NaiveDate::parse_from_str(&p.date, "%Y-%m-%d").ok()?,
+                p.value,
+            ))
+        })
+        .collect()
 }
 
 /// 单次跑步洞察的基线规则。全部是常量而不是散落在 SQL 里的字面量，
