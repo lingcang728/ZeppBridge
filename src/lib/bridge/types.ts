@@ -484,6 +484,12 @@ export interface BridgeBackend {
   lettersSendReply(input: import('../../types/letters').LetterReplyInput): Promise<import('../../types/letters').LetterSendResult>;
   /** 补寄待寄出、再取一次回执；连不上就原样返回本机的。 */
   lettersSync(): Promise<import('../../types/letters').LetterBoxView>;
+  /** 信匣的数据来信：顺手寄出上一周的来信，再读出全部来信和那年今天。 */
+  dataLettersState(): Promise<import('../../types/letters').DataLettersView>;
+  /** 封一个时间胶囊，`openOn` 是本地日 YYYY-MM-DD。 */
+  dataLettersSealCapsule(note: string, openOn: string): Promise<number>;
+  /** 开封一个到期的胶囊。 */
+  dataLettersOpenCapsule(id: number): Promise<import('../../types/letters').DataLetter>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   prepareAiHandoff(

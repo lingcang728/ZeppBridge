@@ -24,6 +24,7 @@ const messages = defineMessages(
     raceHalf: '城市半程马拉松',
     race10k: '秋季 10K 公路赛',
     injury: '右膝外侧疼（髂胫束）',
+    capsuleNote: '一年前的我：那时刚开始每周跑三次，膝盖还有点疼。希望你还在跑，也别忘了拉伸。',
   },
   {
     nickname: 'Demo user',
@@ -42,6 +43,7 @@ const messages = defineMessages(
     raceHalf: 'City Half Marathon',
     race10k: 'Autumn 10K road race',
     injury: 'Outer right knee pain (IT band)',
+    capsuleNote: 'From a year ago: I had just started running three times a week and my knee still hurt a little. I hope you are still running, and still stretching.',
   },
   {
     nickname: 'Usuario de ejemplo',
@@ -60,6 +62,7 @@ const messages = defineMessages(
     raceHalf: 'Media maratón de la ciudad',
     race10k: '10K de otoño en ruta',
     injury: 'Dolor en la cara externa de la rodilla derecha (cintilla iliotibial)',
+    capsuleNote: 'Desde hace un año: acababa de empezar a correr tres veces por semana y aún me dolía un poco la rodilla. Ojalá sigas corriendo y estirando.',
   },
   'demo/texts',
 );

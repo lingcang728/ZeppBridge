@@ -1416,6 +1416,29 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(43, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v44（批次 7：信匣里的数据来信）。每周数据来信和时间胶囊都是写下那一刻的快照：
+        // 以后重解析、补拉改了派生数据，旧信也不跟着变——信就是当时寄出的样子。
+        // `period_key` 只给每周来信用（`weekly:<那周最后一天>`），同一周只寄一封。
+        // 胶囊的 `note` 是用户写给将来的话，`open_on`（本地日）之前界面拿不到原文。
+        // 和打分、跑鞋一样是用户自己的东西，重放、保留期清理都不碰。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS data_letters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL CHECK(kind IN ('weekly', 'capsule')),
+                period_key TEXT UNIQUE,
+                written_at TEXT NOT NULL,
+                open_on TEXT,
+                opened_at TEXT,
+                note TEXT NOT NULL DEFAULT '',
+                body TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_data_letters_kind ON data_letters(kind, id);
+             PRAGMA user_version = 44;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(44, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
