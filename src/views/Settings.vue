@@ -11,6 +11,7 @@ import CardDeck from '../components/deck/CardDeck.vue';
 import CardBody from './settings/CardBody.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
+import AccountConflict from './settings/AccountConflict.vue';
 import { provideSettingsContext } from '../composables/settings/context';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -45,7 +46,12 @@ const router = useRouter();
 const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
 const { feedback, auth, official, prefs, capability } = provideSettingsContext();
 const { dataMessage, dataError } = feedback;
-const { loginError, accountConflict, freshStartBusy, accountRecognized, connectionLabel } = auth;
+const { loginError, accountConflict, loginConflict, freshStartBusy, accountRecognized, connectionLabel } = auth;
+/* 只用高级数据：断开官方授权后，「不是同一个账号」那句也就过时了。 */
+const disconnectOfficialForAdvanced = async () => {
+  await official.disconnect();
+  if (!official.status.value.user_id_masked) loginError.value = null;
+};
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
@@ -159,13 +165,26 @@ onUnmounted(() => {
     </div>
     <div v-if="official.accountConflict.value && !loginError" class="alert warning" role="status">
       <Icon name="info" :size="15" />
-      <span class="alert-body">{{ t.newAccountWarning }}</span>
+      <span class="alert-body">
+        <template v-if="official.failureConflict.value">
+          {{ official.failureText.value }}
+          <AccountConflict :pair="official.failureConflict.value" rejected="official" />
+        </template>
+        <span :class="{ 'alert-note': official.failureConflict.value }">{{ t.newAccountWarning }}</span>
+      </span>
       <button type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>
     </div>
     <div v-if="loginError" class="alert danger" role="alert">
       <Icon name="warning" :size="15" />
       <span class="alert-body">
         {{ loginError }}
+        <AccountConflict
+          v-if="loginConflict"
+          :pair="loginConflict"
+          rejected="advanced"
+          :busy="official.busy.value"
+          @disconnect-official="disconnectOfficialForAdvanced"
+        />
         <span v-if="accountConflict" class="alert-note">{{ t.newAccountWarning }}</span>
       </span>
       <button v-if="accountConflict" type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>

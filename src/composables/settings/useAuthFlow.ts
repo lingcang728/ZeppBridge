@@ -6,7 +6,7 @@ import { locale, useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
 import { settingsMessages } from '../../views/Settings.i18n';
-import type { LoginStatus } from '../../types';
+import type { AccountPair, LoginStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
 
 const DEFAULT_REGION_HOST = 'https://api-mifit-us3.zepp.com';
@@ -31,7 +31,14 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   /* 登录失败的码。高级数据和官方授权不是同一个账号、或库已经认了别的账号时，
      提示里要多给一条出路：换个账号从头开始（旧数据挪到一边，不删）。 */
   const loginErrorCode = ref<string | undefined>();
-  watch(loginError, (value) => { if (!value) loginErrorCode.value = undefined; });
+  /** 和官方授权不是同一个账号时，两边各是谁（设置页并排列出）。 */
+  const loginConflict = ref<AccountPair | null>(null);
+  watch(loginError, (value) => {
+    if (!value) {
+      loginErrorCode.value = undefined;
+      loginConflict.value = null;
+    }
+  });
   const accountConflict = computed(() => (
     loginErrorCode.value === 'err.login.other_account' || loginErrorCode.value === 'err.core.account_mismatch'
   ));
@@ -102,6 +109,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       loginError.value = errorTextFor(status.code)
         ?? backendText(status.message, t.value.loginIncomplete);
       loginErrorCode.value = status.code ?? undefined;
+      loginConflict.value = status.conflict ?? null;
     }
   };
 
@@ -225,6 +233,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     loginStatus,
     loginError,
     accountConflict,
+    loginConflict,
     freshStartBusy,
     startFresh,
     loginBusy,
