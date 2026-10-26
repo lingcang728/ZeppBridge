@@ -317,3 +317,75 @@ pub async fn card_collection_set(
     )
     .await
 }
+
+/// 一个任务以前用过的提示词（Prompt 库的版本历史），新的在前。
+#[tauri::command]
+pub async fn ai_prompt_versions(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<Vec<zeppbridge_core::ai_tasks::library::AiPromptVersion>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| db.ai_prompt_versions(&id)).await
+}
+
+/// 把一个任务导出成 `.zbprompt`，存到桌面的「ZeppBridge AI」文件夹（和教练档案同一处），返回路径。
+#[tauri::command]
+pub async fn ai_prompt_export(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> std::result::Result<String, AppError> {
+    let failed = || AppError::new("err.ai_task.prompt_export", "导出 .zbprompt 失败");
+    let text = spawn_independent_read(state.data_dir.clone(), {
+        let id = id.clone();
+        move |db| db.export_zbprompt(&id)
+    })
+    .await?;
+    let title = serde_json::from_str::<zeppbridge_core::ai_tasks::library::ZbPrompt>(&text)
+        .map(|prompt| prompt.title)
+        .unwrap_or_default();
+    let stem: String = title
+        .chars()
+        .filter(|c| !c.is_control() && !r#"\/:*?"<>|"#.contains(*c))
+        .take(60)
+        .collect();
+    let stem = stem.trim().trim_matches('.');
+    let stem = if stem.is_empty() { "prompt" } else { stem };
+    let root = directories::UserDirs::new()
+        .and_then(|dirs| dirs.desktop_dir().map(|path| path.join("ZeppBridge AI")))
+        .unwrap_or_else(|| state.data_dir.join("exports").join("ai-tasks"));
+    let path = root.join(format!("{stem}.zbprompt"));
+    join_blocking(
+        tokio::task::spawn_blocking(move || {
+            std::fs::create_dir_all(&root).map_err(|_| failed())?;
+            std::fs::write(&path, text).map_err(|_| failed())?;
+            Ok(path.to_string_lossy().into_owned())
+        })
+        .await,
+    )?
+}
+
+/// 导入一份 `.zbprompt`，存成「已保存的任务」里的一条（没有关联运动）。
+#[tauri::command]
+pub async fn ai_prompt_import(
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> std::result::Result<AiTask, AppError> {
+    use zeppbridge_core::ai_tasks::library::ZBPROMPT_MAX_BYTES;
+    let unreadable = || AppError::new("err.ai_task.prompt_import", "读不了这份 .zbprompt");
+    let text = join_blocking(
+        tokio::task::spawn_blocking(move || {
+            let size = std::fs::metadata(&path).map_err(|_| unreadable())?.len();
+            if size > ZBPROMPT_MAX_BYTES {
+                return Err(unreadable());
+            }
+            std::fs::read_to_string(&path).map_err(|_| unreadable())
+        })
+        .await,
+    )??;
+    with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.import_zbprompt(&text),
+    )
+    .await
+}

@@ -13,6 +13,7 @@
 
 pub mod coverage;
 pub mod export;
+pub mod library;
 pub mod model;
 pub mod store;
 

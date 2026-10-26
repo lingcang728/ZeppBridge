@@ -9,6 +9,8 @@
  * - 置顶的排在最前；没置顶、30 天没动过的收进「更早」折叠组，不删除。
  * - 只有交给过 AI 的任务才会被保存（交给 AI 那一下才存），同模板、同范围、同一句问题会更新原来那一条
  *   （后端 save_ai_task 去重）。
+ * - Prompt 库（批次 7）：按数据类别筛；每张卡能翻出以前的问法（改掉的提示词都留着）；
+ *   导出 / 导入 `.zbprompt`——只带问法和类别，不带运动、日子、备注、附件。导入的也落在这一页。
  */
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -22,12 +24,17 @@ import { useHubText } from '../../components/ai/hub/hub.i18n';
 import { backend, toUserMessage } from '../../lib/bridge';
 import type { AiTask, AiTaskSummary } from '../../lib/bridge/types';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
+import { AI_TASK_CATEGORY_META, AI_TASK_CATEGORY_ORDER } from '../../lib/aiTask/categories';
+import { aiTaskTextFor } from '../../lib/aiTask/copy';
+import { revealInFolder } from '../../composables/useAiHandoff';
+import PromptHistory from '../../components/ai/hub/PromptHistory.vue';
+import { usePromptLibraryText } from '../../components/ai/hub/promptLibrary.i18n';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiTasks' });
 useAiHub();
 const router = useRouter();
-const { draft, loadTask, resetDraft, deleteTask, setTitle } = useAiTaskDraft();
+const { draft, loadTask, resetDraft, deleteTask, setTitle, setPrompt } = useAiTaskDraft();
 const { taskList, libraryError, loadTaskList } = useAiTaskLibrary();
 const h = useHubText();
 const STALE_MS = 30 * 86_400_000;
@@ -37,9 +44,44 @@ const when = (iso: string) => {
   return displayDateTimeFormatter({ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
 };
 const stale = (task: AiTaskSummary) => !task.pinned && Date.now() - new Date(task.updated_at).getTime() > STALE_MS;
-const recent = computed(() => taskList.value.filter((task) => !stale(task)));
-const earlier = computed(() => taskList.value.filter(stale));
+/* 按数据类别筛：只列出至少一个任务用到的数据类别，只有一种时不出这一排。 */
+const lib = usePromptLibraryText();
+const category = ref<string | null>(null);
+const present = computed(() => AI_TASK_CATEGORY_ORDER.filter((c) => AI_TASK_CATEGORY_META[c].hasWindow
+  && taskList.value.some((task) => task.categories?.includes(c))));
+const shown = computed(() => (category.value ? taskList.value.filter((task) => task.categories?.includes(category.value!)) : taskList.value));
+const recent = computed(() => shown.value.filter((task) => !stale(task)));
+const earlier = computed(() => shown.value.filter(stale));
 const error = ref<string | null>(null);
+const notice = ref<string | null>(null);
+
+/* —— 以前的问法：翻出来、挑一版填回总页的输入框 —— */
+const historyOf = ref<string | null>(null);
+const useVersion = async (task: AiTaskSummary, prompt: string) => {
+  if (task.id !== draft.value.id) await loadTask(task.id).catch(() => undefined);
+  setPrompt(prompt);
+  await router.push('/ai');
+};
+
+/* —— .zbprompt：导出到桌面「ZeppBridge AI」并在文件夹里点出来；导入选一个文件 —— */
+const exportPrompt = async (task: AiTaskSummary) => {
+  try {
+    const path = await backend.aiPromptExport(task.id);
+    notice.value = lib.value.exported(path);
+    await revealInFolder(path).catch(() => undefined);
+  } catch (e) { error.value = toUserMessage(e, ''); }
+};
+const importPrompt = async () => {
+  try {
+    const { open: pick } = await import('@tauri-apps/plugin-dialog');
+    const path = await pick({ multiple: false, directory: false, filters: [{ name: lib.value.fileFilter, extensions: ['zbprompt', 'json'] }] });
+    if (typeof path !== 'string') return;
+    const task = await backend.aiPromptImport(path);
+    category.value = null;
+    await loadTaskList();
+    notice.value = lib.value.imported(task.title);
+  } catch (e) { error.value = toUserMessage(e, ''); }
+};
 
 const sel = useTaskSelection();
 const onCardClick = (id: string) => {
@@ -129,17 +171,27 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 <template>
   <section class="page ai-sub-page story" aria-labelledby="ai-tasks-title">
     <PageHeader title-id="ai-tasks-title" :title="h.tasksTitle" :intro="h.tasksIntro">
+      <button type="button" class="pill-button quiet" @click="importPrompt"><Icon name="download" :size="13" />{{ lib.importPrompt }}</button>
       <button type="button" class="pill-button" @click="fresh"><Icon name="plus" :size="13" />{{ h.newTask }}</button>
     </PageHeader>
+    <div v-if="taskList.length > 1 && present.length > 1" class="category-filter" role="group" :aria-label="lib.filterLabel">
+      <button type="button" :class="['chip', { on: !category }]" :aria-pressed="!category" @click="category = null">{{ lib.all }}</button>
+      <button v-for="c in present" :key="c" type="button" :class="['chip', { on: category === c }]" :aria-pressed="category === c"
+        :style="{ '--tint': AI_TASK_CATEGORY_META[c].tint }" @click="category = category === c ? null : c">
+        <Icon :name="AI_TASK_CATEGORY_META[c].icon" :size="12" />{{ aiTaskTextFor(AI_TASK_CATEGORY_META[c].labelCode) }}
+      </button>
+    </div>
+    <p v-if="notice" class="ai-message notice" role="status"><Icon name="check" :size="14" /><span>{{ notice }}</span></p>
     <p v-if="taskList.length > 1 && !sel.selecting.value" class="select-hint">{{ h.selectHint }}</p>
     <p v-if="libraryError || error" class="ai-message" role="alert"><Icon name="warning" :size="14" /><span>{{ libraryError || error }}</span></p>
     <div v-if="!taskList.length" class="ai-panel ai-empty">{{ h.tasksEmpty }}</div>
+    <div v-else-if="!shown.length" class="ai-panel ai-empty">{{ lib.noMatch }}</div>
     <template v-for="(group, gi) in [recent, earlier]" :key="gi">
       <component :is="gi === 0 ? 'div' : 'details'" v-if="group.length" :class="['task-group', { earlier: gi === 1 }]">
         <summary v-if="gi === 1"><Icon name="chevron-right" :size="14" />{{ h.earlier(group.length) }}<small>{{ h.earlierHint }}</small></summary>
         <TransitionGroup tag="ul" name="task" class="task-grid">
           <li v-for="task in group" :key="task.id" :data-task-id="task.id"
-            :class="['task-card', { current: task.id === draft.id, pinned: task.pinned, selecting: sel.selecting.value, selected: sel.selected.value.has(task.id) }]"
+            :class="['task-card', { current: task.id === draft.id, pinned: task.pinned, selecting: sel.selecting.value, selected: sel.selected.value.has(task.id), expanded: historyOf === task.id }]"
             @pointerdown="sel.down($event, task.id)">
             <input v-if="renaming === task.id" class="ai-input rename" type="text" :value="task.title" maxlength="120" :aria-label="h.rename"
               @blur="commitRename(task, $event)" @keydown.enter.prevent="commitRename(task, $event)" @keydown.esc.prevent="renaming = null" />
@@ -154,8 +206,12 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
             <span v-if="!sel.selecting.value" class="acts">
               <button type="button" :class="['act', { on: task.pinned }]" :title="task.pinned ? h.unpin : h.pin" :aria-label="task.pinned ? h.unpin : h.pin" :aria-pressed="!!task.pinned" @click="togglePin(task)"><Icon name="pin" :size="14" /></button>
               <button type="button" class="act" :title="h.rename" :aria-label="h.rename" @click="renaming = task.id"><Icon name="edit" :size="14" /></button>
+              <button type="button" :class="['act', { on: historyOf === task.id }]" :title="lib.history" :aria-label="lib.history" :aria-expanded="historyOf === task.id"
+                @click="historyOf = historyOf === task.id ? null : task.id"><Icon name="clock" :size="14" /></button>
+              <button type="button" class="act" :title="lib.exportPrompt" :aria-label="lib.exportPrompt" @click="exportPrompt(task)"><Icon name="export" :size="14" /></button>
               <button type="button" class="act danger" :title="h.remove" :aria-label="h.remove" @click="remove(task)"><Icon name="trash" :size="14" /></button>
             </span>
+            <PromptHistory v-if="historyOf === task.id && !sel.selecting.value" :task-id="task.id" @use="useVersion(task, $event)" />
           </li>
         </TransitionGroup>
       </component>
@@ -181,6 +237,13 @@ onBeforeUnmount(() => window.clearTimeout(undoTimer));
 <style scoped src="./aiPage.css"></style>
 <style scoped>
 .task-group + .task-group { margin-top: 18px; }
+.task-card.expanded.pinned::before { top: 26px; }
+.category-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.category-filter .chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border: 1px solid var(--mat-line); border-radius: 999px;
+  background: var(--mat-card); color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.category-filter .chip :deep(svg) { color: var(--tint, currentColor); }
+.category-filter .chip.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--mat-line)); color: var(--ink); font-weight: 600; }
+.notice { color: var(--muted); }
 /* 单列列表：一个任务一张圆角小卡，卡与卡之间留缝（10-13：以前是贴满整宽的直角行，上下两条线、左右顶到边，看着生硬、像出界）。
    正在用的那个标题是品牌绿，置顶的左边一道绿色短条（收在卡里面）。 */
 .task-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }

@@ -1439,6 +1439,22 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(44, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v45（批次 7：Prompt 库）。任务提示词每次被改掉前的那一句。不挂外键到 ai_tasks：
+        // 撤销删除是把任务原样存回去，历史要跟着回来。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_prompt_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                replaced_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_ai_prompt_versions_task ON ai_prompt_versions(task_id, id);
+             PRAGMA user_version = 45;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(45, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
