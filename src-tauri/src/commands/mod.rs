@@ -9,6 +9,7 @@ mod data_letters;
 mod imports;
 mod letters;
 mod login;
+mod my_records;
 mod official;
 mod status;
 mod sync;
@@ -202,6 +203,7 @@ pub(crate) use imports::{
 };
 pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
+pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
     start_official_login,

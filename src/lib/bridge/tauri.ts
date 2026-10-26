@@ -502,6 +502,9 @@ export const tauriBackend: BridgeBackend = {
   dataLettersOpenCapsule(id: number) {
     return call<import('../../types/letters').DataLetter>('data_letters_open_capsule', { id });
   },
+  exportMyRecords(path: string) {
+    return call<number>('export_my_records', { path });
+  },
   importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]) {
     return call<import('../../types/imports').ImportReport>('import_workouts', { source, paths });
   },
