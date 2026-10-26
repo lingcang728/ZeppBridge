@@ -164,6 +164,8 @@ export const tauriBackend: BridgeBackend = {
   trainingPlanUpdateDraft(id, document) { return call('training_plan_update_draft', { id, document }); },
   trainingPlanHistory(limit) { return call('training_plan_history', { limit: limit ?? null }); },
   workoutFeedbackPrompt() { return call('workout_feedback_prompt'); },
+  workoutFeedbackToastDue() { return call('workout_feedback_toast_due'); },
+  workoutFeedbackToastShow(text: import('../../types/feedback').FeedbackToastText) { return call<void>('workout_feedback_toast_show', { text }); },
   workoutFeedbackGet(workoutId) { return call('workout_feedback_get', { workoutId }); },
   workoutFeedbackSave(input) { return call<void>('workout_feedback_save', { input }); },
   workoutFeedbackDismiss(workoutId) { return call<void>('workout_feedback_dismiss', { workoutId }); },

@@ -339,6 +339,10 @@ export interface BridgeBackend {
   trainingPlanHistory(limit?: number): Promise<import('../../types/feedback').PlanHistoryEntry[]>;
   /** 跑后打分：现在该问哪一条（最多一条，48 小时内、对得上计划、没打过）。 */
   workoutFeedbackPrompt(): Promise<import('../../types/feedback').FeedbackPrompt | null>;
+  /** 有一条该发系统通知的打分：令牌 + 卡片内容（每条运动只给一次）。 */
+  workoutFeedbackToastDue(): Promise<import('../../types/feedback').FeedbackToastDue | null>;
+  /** 发系统通知：Windows 带五档按钮，其他平台是普通通知。文案由界面组好。 */
+  workoutFeedbackToastShow(text: import('../../types/feedback').FeedbackToastText): Promise<void>;
   workoutFeedbackGet(workoutId: string): Promise<import('../../types/feedback').WorkoutFeedback | null>;
   workoutFeedbackSave(input: import('../../types/feedback').FeedbackInput): Promise<void>;
   workoutFeedbackDismiss(workoutId: string): Promise<void>;

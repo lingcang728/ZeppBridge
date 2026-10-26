@@ -16,6 +16,7 @@ import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
 import { installGlassTips } from './lib/glassTip';
 import { whenFramesSteady } from './lib/motion/steady';
 import { useSyncController } from './composables/useSyncController';
+import { useFeedbackToast } from './composables/useFeedbackToast';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { bootDesktopUpdate } from './services/updateService';
@@ -63,6 +64,8 @@ const {
   dataReady, pickUpReady,
   initialize, dispose: disposeSyncController, refreshStatus, markDataChanged,
 } = useSyncController();
+// 跑后打分：窗口不在眼前时，同步落地后发一条系统通知（Windows 上带五档按钮）。
+useFeedbackToast();
 
 /* 「数据已备好」一进交给 AI 就算取走了：不管是点胶囊进来的、点导航进来的，
    还是同步落地时人本来就在这一页。 */

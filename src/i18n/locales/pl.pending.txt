@@ -22,6 +22,7 @@ components/ai/hub/promptLibrary.noMatch
 components/ai/hub/promptLibrary.replacedAt
 components/ai/hub/promptLibrary.useVersion
 components/ask/ask.longTermHint
+components/feedback/feedback.toastBody
 components/journal/repair.recorded
 components/letters/dataLetters.capsulePlaceholder
 components/letters/dataLetters.capsules
@@ -84,6 +85,7 @@ i18n/errors.err.ai_task.bad_prompt_file
 i18n/errors.err.ai_task.prompt_export
 i18n/errors.err.ai_task.prompt_import
 i18n/errors.err.auth.fresh_start_failed
+i18n/errors.err.feedback.toast_failed
 i18n/errors.err.import.not_recognized
 i18n/errors.err.import.read
 i18n/errors.err.import.source

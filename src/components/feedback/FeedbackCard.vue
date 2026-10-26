@@ -14,13 +14,11 @@ import Icon from '../Icon.vue';
 import SegmentTrack, { type SegmentItem } from '../SegmentTrack.vue';
 import { useWorkoutFeedback } from '../../composables/useWorkoutFeedback';
 import { useRevisionReload } from '../../composables/useRevisionReload';
-import { addDays, dayKey } from '../../lib/aiTask/bridgeScale';
-import { today as currentToday } from '../../lib/currentDay';
-import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { formatDistance, formatDuration } from '../../lib/format';
 import { metricColor } from '../../lib/metricTone';
 import type { FeedbackRating, FeedbackTag } from '../../types/feedback';
 import { useFeedbackText } from './feedback.i18n';
+import { feedbackAsk } from './feedbackAsk';
 
 const t = useFeedbackText();
 const router = useRouter();
@@ -31,14 +29,7 @@ const notice = ref<string | null>(null);
 onMounted(() => { void feedback.load(); });
 useRevisionReload(() => { void feedback.load(); });
 
-const dayWord = computed(() => {
-  const date = prompt.value?.date;
-  if (!date) return '';
-  const today = dayKey(currentToday());
-  if (date === today) return t.value.today;
-  if (date === addDays(today, -1)) return t.value.yesterday;
-  return displayDateTimeFormatter({ weekday: 'long' }).format(parseDisplayDate(date));
-});
+const ask = computed(() => (prompt.value ? feedbackAsk(prompt.value, t.value) : ''));
 
 const amount = (seconds: number | null, meters: number | null, basis: 'duration' | 'distance' | null): string => {
   if (basis === 'distance' && meters !== null) return formatDistance(meters);
@@ -88,7 +79,7 @@ const lighten = async () => {
 <template>
   <section v-if="prompt && sides" class="feedback-card" role="group" :aria-label="t.aria" :style="{ '--fb-tone': metricColor('training_load') }">
     <header class="fb-head">
-      <strong class="fb-ask">{{ t.ask(dayWord, prompt.planned.name) }}</strong>
+      <strong class="fb-ask">{{ ask }}</strong>
       <span v-if="rating === null" class="fb-tools">
         <button type="button" class="pill-button quiet" @click="feedback.snooze()">{{ t.snooze }}</button>
         <button type="button" class="fb-close" :aria-label="t.dismiss" :title="t.dismiss" @click="feedback.dismiss()"><Icon name="x" :size="15" /></button>
@@ -113,7 +104,7 @@ const lighten = async () => {
       </div>
     </div>
 
-    <SegmentTrack :items="levels" :model-value="rating ?? 0" :aria-label="t.ask(dayWord, prompt.planned.name)" :disabled="busy" fill compact @update:model-value="rate" />
+    <SegmentTrack :items="levels" :model-value="rating ?? 0" :aria-label="ask" :disabled="busy" fill compact @update:model-value="rate" />
 
     <div v-if="rating !== null" class="fb-after">
       <span class="fb-saved"><Icon name="check" :size="14" />{{ t.saved }}</span>

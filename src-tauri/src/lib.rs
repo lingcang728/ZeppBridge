@@ -11,6 +11,7 @@ mod main_window;
 mod tray_i18n;
 mod uninstall;
 pub use uninstall::{purge_credentials_for_uninstall, PURGE_CREDENTIALS_ARG};
+pub mod feedback_toast;
 mod updates;
 #[cfg(windows)]
 mod web_composer;
@@ -62,7 +63,8 @@ use commands::{
     training_plan_state, training_plan_update_draft, undo_import_batch, undo_workout_edit,
     verify_auth, verify_backup, workout_feedback_adjusted, workout_feedback_dismiss,
     workout_feedback_get, workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
-    workout_feel_get, workout_feel_save, workout_import_sources,
+    workout_feedback_toast_due, workout_feedback_toast_show, workout_feel_get, workout_feel_save,
+    workout_import_sources,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -804,6 +806,8 @@ pub fn run() {
             workout_feedback_save,
             workout_feedback_dismiss,
             workout_feedback_snooze,
+            workout_feedback_toast_due,
+            workout_feedback_toast_show,
             workout_feedback_adjusted,
             coach_notes_list,
             coach_note_add,
