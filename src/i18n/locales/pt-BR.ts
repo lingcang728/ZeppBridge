@@ -2844,6 +2844,18 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       zumba: 'Zumba',
     },
 
+    'views/settings/accountConflict': {
+      official: 'Autorização oficial',
+      advanced: 'Dados avançados',
+      noNickname: 'Sem apelido',
+      advancedOnlyTitle: 'Usar apenas dados avançados também funciona',
+      advancedKept:
+        'Os dados avançados já estão conectados e trazem a maior parte dos seus dados, então você pode dispensar a autorização oficial. Se quiser usar as duas, inicie a autorização oficial novamente, copie o link em uma janela anônima, entre com a mesma conta que você usa nos dados avançados e permita o acesso.',
+      advancedAfterDisconnect:
+        'Desconecte a autorização oficial e entre nos dados avançados com a conta vinculada ao seu relógio (e-mail ou telefone e senha). Se essa conta foi criada com Google ou Apple, os dados avançados não conseguem entrar; mantenha apenas a autorização oficial.',
+      disconnectOfficial: 'Desconectar autorização oficial',
+    },
+
     'views/settings/sections/account': {
       whySub: 'Os dados avançados só entram com e-mail ou telefone da Zepp e senha',
       waitingHint: 'Aprove no navegador e isto se conecta sozinho',

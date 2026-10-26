@@ -3651,6 +3651,16 @@ Rispondi in Markdown.`,
     retry: 'Riprova',
   },
 
+  'views/settings/accountConflict': {
+    official: 'Autorizzazione ufficiale',
+    advanced: 'Dati avanzati',
+    noNickname: 'Nessun nickname',
+    advancedOnlyTitle: 'Bastano anche solo i dati avanzati',
+    advancedKept: 'I dati avanzati sono già connessi e forniscono la maggior parte dei tuoi dati, quindi puoi fare a meno dell’autorizzazione ufficiale. Per usarle entrambe, avvia di nuovo l’autorizzazione ufficiale, copia il link in una finestra in incognito, accedi con lo stesso account usato per i dati avanzati e poi consenti l’accesso.',
+    advancedAfterDisconnect: 'Disconnetti prima l’autorizzazione ufficiale, poi accedi ai dati avanzati con l’account a cui è associato il tuo orologio (e-mail o telefono e password). Se l’account è stato creato con Google o Apple, non è possibile accedere ai dati avanzati: mantieni solo l’autorizzazione ufficiale.',
+    disconnectOfficial: 'Disconnetti autorizzazione ufficiale',
+  },
+
   'views/settings/deck': {
     pageIntro: 'Apri una scheda per regolarla; una volta aperta, trascina l’intestazione lateralmente per passare alla successiva.',
     pageIntroDeck: 'Scorri lateralmente per scegliere una scheda e tocca quella al centro per aprirla — oppure «Mostra tutto» per vederle tutte insieme.',

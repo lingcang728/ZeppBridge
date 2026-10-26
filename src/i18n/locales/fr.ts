@@ -3699,6 +3699,17 @@ Réponds en Markdown.`,
         }),
       failed: 'Échec de l’importation. Veuillez réessayer.',
     },
+    'views/settings/accountConflict': {
+      official: 'Autorisation officielle',
+      advanced: 'Données avancées',
+      noNickname: 'Sans pseudo',
+      advancedOnlyTitle: 'Les données avancées seules suffisent aussi',
+      advancedKept:
+        'Les données avancées sont déjà connectées et fournissent la plupart de vos données, vous pouvez donc vous passer de l’autorisation officielle. Si vous souhaitez utiliser les deux, relancez l’autorisation officielle, copiez le lien dans une fenêtre de navigation privée, connectez-vous avec le même compte que pour les données avancées, puis autorisez l’accès.',
+      advancedAfterDisconnect:
+        'Déconnectez d’abord l’autorisation officielle, puis connectez-vous aux données avancées avec le compte associé à votre montre (e-mail ou téléphone et mot de passe). Si ce compte a été créé via Google ou Apple, les données avancées ne peuvent pas s’y connecter ; conservez alors uniquement l’autorisation officielle.',
+      disconnectOfficial: 'Déconnecter l’autorisation officielle',
+    },
   },
   errors: {
     'err.app.starting': 'Les données locales sont en préparation ; l’affichage s’actualisera de lui-même dans un instant',

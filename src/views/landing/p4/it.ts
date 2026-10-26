@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Quattordici impostazioni quotidiane, raccolte in un unico mazzo di schede.',
     items: [
       { id: 'sync', title: 'Sincronizzazione automatica', text: 'Disattivata, 15, 30 o 60 minuti. Scegline una.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Dieci anni, tutti qui', text: 'Scarica fino a dieci anni di cronologia su questo computer e conservala. Non svanisce quando la finestra del cloud si sposta.', icon: 'database' },
+      { id: 'retention', title: 'Dieci anni, conservati qui', text: 'Porta fino a dieci anni di cronologia su questo computer e conservala. Non svanisce insieme alla finestra del cloud.', icon: 'database' },
       { id: 'data', title: 'Copertura dei dati', text: 'Cosa può essere sincronizzato e cosa no, a colpo d’occhio.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Strumenti locali come Claude Code e Codex possono interrogare direttamente. L’invio dei piani richiede un’autorizzazione separata.', icon: 'structured-data' },
       { id: 'formats', title: 'Quattro formati', text: 'JSON · CSV · GPX, oltre a FIT nella pagina degli allenamenti.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'API locale', text: 'Vincolata a 127.0.0.1. Sola lettura, token richiesto.', icon: 'structured-data' },
       { id: 'privacy', title: 'Privacy e sicurezza', text: 'Le credenziali sono protette dal sistema operativo. I token non finiscono mai nei log.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomi dei file', text: 'Decidi tu come nominare i file preparati per l’IA.', icon: 'document' },
-      { id: 'folder', title: 'Portalo con te', text: 'I tuoi dati risiedono in una cartella su questo computer e tutto ciò che hai scritto qui — valutazioni, piani, attività IA — si esporta in un unico file JSON.', icon: 'database' },
+      { id: 'folder', title: 'Porta via tutto', text: 'I tuoi dati restano in una cartella su questo computer, e tutto ciò che hai scritto qui — valutazioni, piani, attività AI — viene esportato in un unico file JSON.', icon: 'database' },
     ],
   },
   nav: [
