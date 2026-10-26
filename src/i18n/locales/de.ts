@@ -220,6 +220,25 @@ export default {
     'err.letters.empty': 'Deine Antwort ist leer – schreibe zuerst ein paar Worte.',
     'err.letters.rejected':
       'Der Server hat diese Antwort nicht angenommen. Möglicherweise musst du die App aktualisieren.',
+    'err.auth.fresh_start_failed':
+      'Neuer Datenordner konnte nicht vorbereitet werden; deine aktuellen Daten bleiben unverändert',
+    'err.letters.capsule_date': 'Dieses Öffnungsdatum ist ungültig. Bitte wähle es erneut.',
+    'err.feedback.toast_failed': 'Die Systembenachrichtigung konnte nicht angezeigt werden.',
+    'err.export.my_records':
+      'Diese Datei konnte nicht geschrieben werden. Versuche es an einem anderen Speicherort.',
+    'err.import.source': 'Unbekannte Importquelle.',
+    'err.import.too_large':
+      'Die Datei ist zu groß (über 64 MB). Wähle für Strava und Apple Health das gesamte Export-Archiv.',
+    'err.import.not_recognized':
+      'Diese Datei ist kein Export der gewählten Quelle. Versuche es mit einer anderen Quelle.',
+    'err.import.read':
+      'Diese Datei konnte nicht gelesen werden. Stelle sicher, dass sie nicht von einem anderen Programm verwendet wird.',
+    'err.ai_task.bad_prompt_file':
+      'Das ist keine verwendbare .zbprompt-Datei (falsches Format, aus einer neueren Version oder ohne Prompt).',
+    'err.ai_task.prompt_export':
+      '.zbprompt konnte nicht exportiert werden. Prüfe, ob auf den Schreibtisch geschrieben werden kann.',
+    'err.ai_task.prompt_import':
+      'Diese Datei konnte nicht gelesen werden (zu groß oder lässt sich nicht öffnen).',
   },
 
   // ── 后端 ui.* 散文码的兜底表 ──
@@ -247,6 +266,7 @@ export default {
       untilNow: 'Heute',
       more: 'Mehr',
       distance: 'Gesamtdistanz',
+      recorded: 'Aufgezeichnet',
     },
     'components/WorkoutTools': {
       select: 'Trainings auswählen', done: 'Auswahl beenden', selectLoaded: 'Geladene Trainings auswählen', clearSelection: 'Auswahl aufheben',
@@ -770,6 +790,13 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
           hint: 'unten beschreiben',
         },
       },
+      logoutConfirm:
+        'Möchtest du dich von diesem Konto abmelden?\n\nNur die Anmeldedaten werden gelöscht; der synchronisierte Verlauf bleibt auf diesem Rechner erhalten.\n\nDiese Datenbank nimmt nur ein Zepp-Konto auf: Eine spätere Anmeldung mit einem anderen Konto wird abgelehnt. Um das Konto zu wechseln, wähle im Anmeldefehler „Mit anderem Konto neu anfangen".',
+      freshStart: 'Mit anderem Konto neu anfangen',
+      freshStartConfirm:
+        'Alle aktuellen Daten beiseitelegen und mit einer leeren Datenbank neu verbinden?\n\nEs wird nichts gelöscht: Die bisherigen Daten bleiben im Ordner „data-before-<Datum>" neben der App erhalten – benenne ihn einfach wieder in „data" um, falls du zurückkehren möchtest. Beide Verbindungen werden abgemeldet und die App startet neu.',
+      newAccountWarning:
+        'Erstelle hierfür kein neues Zepp-Konto und verbinde deine Uhr nicht mit einem anderen Konto: Ein erneutes Koppeln löscht die Einstellungen auf der Uhr.',
     },
 
     'App': {
@@ -2470,6 +2497,8 @@ Antworte in Markdown.`,
       provenanceScope: 'Datenbereich',
       provenanceSynced: 'Zuletzt synchronisiert',
       provenanceTitle: 'Herkunft',
+      provenanceImported: 'Aus Datei importiert',
+      provenanceImportedAt: 'Importiert',
       retry: 'Wiederholen',
       routeAria: 'Voller GPS-Track',
       routeLegendNoPace: 'Weniger als 3 gültige Tempo-Punkte · nicht nach Geschwindigkeit gefärbt',
@@ -3149,6 +3178,8 @@ Antworte in Markdown.`,
       usualHint: (range: string, days: number) => `Nur im Vergleich zu dir: In den letzten ${days} Tagen lagen die mittleren 80 % der Tage zwischen ${range}. Keine Diagnose.`,
 
       baselineHint: (median: string, days: number) => 'Verglichen mit dir selbst: Der Median der letzten ' + days + ' Tage beträgt ' + median + '. Keine Diagnose.',
+      longTermHint: (range: string, since: string, days: number, recent: string) =>
+        `Dein langfristiger Normalbereich: Über ${days} Tage mit Messwerten seit ${since} lagen die mittleren 80 % im Bereich ${range}${recent ? `; in den letzten 90 Tagen ${recent}` : ''}. Nur im Vergleich zu dir selbst, keine Diagnose.`,
     },
     'components/plan/editor': {
       byTime: 'Nach Zeit', byDistance: 'Nach Distanz', targetHr: 'Herzfrequenz', targetPace: 'Tempo', targetPower: 'Leistung', targetOpen: 'Kein Ziel',
@@ -3536,6 +3567,7 @@ Antworte in Markdown.`,
       noNext: 'Keine vergleichbare Einheit mehr im Plan',
       done: 'Fertig',
       lighterNote: (original: string | undefined) => `Letztes Mal zu hart empfunden, Hauptteil um 10 % gekürzt. ${original ?? ''}`.trim(),
+      toastBody: 'Tippe eine Stufe an, um sie zu speichern – ohne die App zu öffnen',
     },
     'views/ai/AiPlanHistory': {
       title: 'Planarchiv',
@@ -3574,6 +3606,8 @@ Antworte in Markdown.`,
       raceHalf: 'Stadt-Halbmarathon',
       race10k: '10-km-Herbst-Straßenlauf',
       injury: 'Schmerzen an der Außenseite des rechten Knies (IT-Band)',
+      capsuleNote:
+        'Von mir vor einem Jahr: Damals hatte ich gerade angefangen, dreimal die Woche zu laufen, und mein Knie tat noch etwas weh. Ich hoffe, du läufst immer noch – und vergisst das Dehnen nicht.',
     },
     'lib/trainingPlan/issues': {
       fallback: () => 'Ein Problem in diesem Plan konnte nicht erkannt werden',
@@ -3702,6 +3736,13 @@ Antworte in Markdown.`,
       legendGap: 'Fehlt',
       legendEmpty: 'Nicht in der Cloud',
       cellAria: (month: string, state: string) => `${month}: ${state}`,
+      takeTitle: 'Alles mitnehmen',
+      takeSub:
+        'Bewertungen, Notizen, Schuhe, Wettkämpfe, Pläne, KI-Aufgaben, Briefe – alles, was du hier festgehalten hast, in einer einzigen JSON-Datei',
+      takeButton: 'Exportieren',
+      takeDone: (n: number) =>
+        plural(n, { one: '1 Eintrag exportiert', other: `${n} Einträge exportiert` }),
+      takeFailed: 'Export fehlgeschlagen. Bitte erneut versuchen.',
     },
     'views/settings/sections/maintenance': {
       secMaintenance: 'Wartung',
@@ -3944,6 +3985,17 @@ Antworte in Markdown.`,
       sectionWhat: 'Was das ist',
       sectionChart: 'Was diese Grafik zeigt',
       sectionHow: 'Berechnung und Datenquelle',
+      sectionTrust: 'Wie es gemessen wird',
+      trustChipTitle: 'Algorithmische Schätzung',
+      excludedChipTitle: 'Von der Analyse ausgeschlossen',
+      useInAnalysis: 'In Analyse einbeziehen',
+      useInAnalysisHint:
+        'Wenn deaktiviert, wird dieser Wert weiterhin angezeigt und keine Daten werden gelöscht; er wird lediglich von Normalbereich-Vergleichen ausgeschlossen und nicht an KI oder MCP übergeben.',
+      trustMeasured: 'Direkt vom Sensor der Uhr oder des Geräts erfasster Messwert.',
+      trustComputed:
+        'Aus Messwerten oder eigenen Protokollen anhand einer öffentlich bekannten, festen Formel berechnet.',
+      trustEstimated:
+        'Ein von Zepp per Algorithmus aus mehreren Messwerten geschätzter Wert. Zepp hat Methode und Fehlertoleranz nicht veröffentlicht; Abweichungen zu Labormessungen sind möglich.',
     },
 
     // ── lib/metricInfo ──
@@ -4077,6 +4129,91 @@ Antworte in Markdown.`,
       chart:
         'Gemessener Tagesdurchschnitt. Tage ohne Messungen bleiben leer. Datenabfragen behalten Tagesbereiche; Exporte behalten Messzeitpunkt und Messwert.',
       how: 'Experimentelle Blutdruck-Synchronisierung: erfasst explizite Wertepaare. Kandidaten-Endpunkte müssen noch mit einem messenden Konto verifiziert werden. Messmethode und Kalibrierungsdaten bleiben in der Rohantwort erhalten.',
+    },
+    'components/ai/hub/promptLibrary': {
+      all: 'Alle',
+      filterLabel: 'Nach Datenkategorie filtern',
+      noMatch: 'Keine Aufgabe verwendet diese Art von Daten.',
+      history: 'Frühere Formulierungen',
+      historyEmpty: 'Der Prompt für diese Aufgabe wurde noch nicht geändert.',
+      historyLoadFailed: 'Frühere Formulierungen konnten nicht geladen werden',
+      replacedAt: (when: string) => `Verwendet bis ${when}`,
+      useVersion: 'Diese Version verwenden',
+      exportPrompt: '.zbprompt exportieren',
+      exported: (path: string) => `Exportiert nach ${path}`,
+      importPrompt: '.zbprompt importieren',
+      imported: (title: string) => `„${title}“ importiert. Wähle Trainings aus und es ist startklar.`,
+      fileFilter: 'ZeppBridge-Prompt',
+    },
+    'components/letters/dataLetters': {
+      tab: 'Deine Briefe',
+      empty:
+        'Noch keine Briefe vorhanden. Nach jeder vollen Woche trifft hier ein Datenbrief ein; du kannst auch eine Zeitkapsel für dein zukünftiges Ich versiegeln.',
+      loadFailed: 'Deine Briefe konnten nicht geladen werden',
+      onThisDay: 'An diesem Tag',
+      yearsAgo: (years: number) =>
+        years === 1 ? 'Heute vor einem Jahr' : `Heute vor ${years} Jahren`,
+      stepsLabel: 'Schritte',
+      steps: (count: string) => `${count} Schritte`,
+      workout: (type: string, km: string | null, minutes: number | null) =>
+        [type, km ? `${km} km` : '', minutes ? `${minutes} Min.` : ''].filter(Boolean).join(' · '),
+      capsules: 'Zeitkapseln',
+      capsulePlaceholder:
+        'Schreibe an dein zukünftiges Ich. Einmal versiegelt, kann niemand sie vor dem Stichtag lesen – nicht einmal du selbst.',
+      openAfter: 'Öffnen',
+      spanHalfYear: 'in einem halben Jahr',
+      spanOneYear: 'in einem Jahr',
+      spanThreeYears: 'in drei Jahren',
+      seal: 'Versiegeln',
+      sealing: 'Wird versiegelt…',
+      sealFailed: 'Konnte nicht versiegelt werden. Bitte später erneut versuchen.',
+      sealedUntil: (date: string) => `Versiegelt · Öffnung am ${date}`,
+      sealedOn: (date: string) => `Verfasst am ${date}`,
+      due: 'Der Tag ist da',
+      open: 'Öffnen',
+      openFailed: 'Konnte nicht geöffnet werden. Bitte später erneut versuchen.',
+      openedOn: (date: string) => `Geöffnet am ${date}`,
+      then: 'Beim Verfassen',
+      now: 'Beim Öffnen',
+      windowNote: 'Jeweils der Durchschnitt der vorangegangenen 28 Tage',
+      weekly: 'Wöchentliche Briefe',
+      weekRange: (from: string, to: string) => `${from} – ${to}`,
+      vsBefore: (value: string, percent: string) => `vorherige 4 Wochen ${value} · ${percent}`,
+    },
+    'components/workout/workoutImport': {
+      open: 'Trainings importieren',
+      close: 'Import schließen',
+      title: 'Von extern importieren',
+      hint: 'Bleibt auf diesem Rechner, wird nie an Zepp gesendet. Trainings, deren Startzeit weniger als zwei Minuten von einem bereits vorhandenen abweicht, werden übersprungen.',
+      sources: { gpx: 'GPX / TCX', fit: 'FIT', strava: 'Strava-Archiv', apple_health: 'Apple Health' },
+      short: { gpx: 'GPX', fit: 'FIT', strava: 'Strava', apple_health: 'Apple Health' },
+      filter: {
+        gpx: 'GPX- / TCX-Dateien',
+        fit: 'FIT-Dateien',
+        strava: 'Strava-Exportarchiv',
+        apple_health: 'Apple Health-Export',
+      },
+      reading: 'Wird gelesen…',
+      added: (n: number) =>
+        plural(n, { one: '1 Training importiert', other: `${n} Trainings importiert` }),
+      nothingNew: 'Keine neuen Trainings',
+      duplicates: (n: number) =>
+        plural(n, {
+          one: '1 bereits vorhanden, übersprungen',
+          other: `${n} bereits vorhanden, übersprungen`,
+        }),
+      unreadable: (n: number) =>
+        plural(n, { one: '1 nicht lesbar', other: `${n} nicht lesbar` }),
+      batches: 'Importverlauf',
+      count: (n: number) => `${n}`,
+      undo: 'Diesen Import rückgängig machen',
+      undone: 'Rückgängig gemacht',
+      removed: (n: number) =>
+        plural(n, {
+          one: '1 Training aus diesem Import entfernt',
+          other: `${n} Trainings aus diesem Import entfernt`,
+        }),
+      failed: 'Import fehlgeschlagen. Bitte erneut versuchen.',
     },
   },
 } satisfies LocalePack;

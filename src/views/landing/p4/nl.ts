@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Veertien dagelijkse opties, handig verzameld in één stapel kaarten.',
     items: [
       { id: 'sync', title: 'Automatische synchronisatie', text: 'Uit, 15, 30 of 60 minuten. Eén instelling volstaat.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Bewaartermijn', text: 'Cloudhistorie wordt lokaal opgeslagen. Jij bepaalt hoe lang het bewaard blijft.', icon: 'database' },
+      { id: 'retention', title: 'Tien jaar, hier bewaard', text: 'Haal tot tien jaar geschiedenis naar deze computer en bewaar het. Het verdwijnt niet wanneer het bewaarvenster van de cloud verschuift.', icon: 'database' },
       { id: 'data', title: 'Gegevensbereik', text: 'Wat wel en niet gesynchroniseerd kan worden, glashelder op een rij.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Lokale tools zoals Claude Code en Codex vragen direct data op. Plannen publiceren vereist toestemming.', icon: 'structured-data' },
       { id: 'formats', title: 'Vier formaten', text: 'JSON · CSV · GPX, plus FIT op de trainingspagina.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'Lokale API', text: 'Alleen gebonden aan 127.0.0.1. Alleen-lezen, beveiligd met token.', icon: 'structured-data' },
       { id: 'privacy', title: 'Privacy en beveiliging', text: 'Inloggegevens beschermd door het besturingssysteem. Tokens komen nooit in logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Bestandsnamen', text: 'Bepaal zelf hoe geëxporteerde AI-bestanden heten.', icon: 'document' },
-      { id: 'folder', title: 'Gegevensmap', text: 'Bekijk de lokale opslaglocatie voor eenvoudige back-up en migratie.', icon: 'database' },
+      { id: 'folder', title: 'Neem het mee', text: 'Je gegevens staan in een map op deze computer, en alles wat je hier hebt geschreven — beoordelingen, plannen, AI-taken — exporteer je naar één JSON-bestand.', icon: 'database' },
     ],
   },
   nav: [

@@ -21,6 +21,7 @@ export default {
       untilNow: 'Oggi',
       more: 'Altro',
       distance: 'Distanza totale',
+      recorded: 'Registrato',
     },
     'components/WorkoutTools': {
       select: 'Seleziona allenamenti',
@@ -461,11 +462,54 @@ export default {
     rereadAria: (version: string) => `Rileggi la lettera per ${version}`,
   },
 
+  'components/letters/dataLetters': {
+    tab: 'Le tue lettere',
+    empty: 'Ancora nessuna lettera. Al termine di ogni settimana intera riceverai una lettera con i tuoi dati; puoi anche sigillare una capsula per il tuo io futuro.',
+    loadFailed: 'Impossibile leggere le tue lettere',
+    onThisDay: 'Accadde oggi',
+    yearsAgo: (years: number) => (years === 1 ? 'Un anno fa oggi' : `${years} anni fa oggi`),
+    stepsLabel: 'Passi',
+    steps: (count: string) => `${count} passi`,
+    workout: (type: string, km: string | null, minutes: number | null) =>
+      [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
+    capsules: 'Capsule del tempo',
+    capsulePlaceholder: 'Scrivi al tuo io futuro. Una volta sigillata, nessuno potrà leggerla prima della data stabilita — nemmeno tu.',
+    openAfter: 'Apri',
+    spanHalfYear: 'tra sei mesi',
+    spanOneYear: 'tra un anno',
+    spanThreeYears: 'tra tre anni',
+    seal: 'Sigilla',
+    sealing: 'Sigillatura in corso…',
+    sealFailed: 'Impossibile sigillare, riprova più tardi.',
+    sealedUntil: (date: string) => `Sigillata · si apre il ${date}`,
+    sealedOn: (date: string) => `Scritta il ${date}`,
+    due: 'È arrivato il momento',
+    open: 'Apri',
+    openFailed: 'Impossibile aprire, riprova più tardi.',
+    openedOn: (date: string) => `Aperta il ${date}`,
+    then: 'Quando è stata scritta',
+    now: 'All’apertura',
+    windowNote: 'Ciascuno è la media dei 28 giorni precedenti',
+    weekly: 'Lettere settimanali',
+    weekRange: (from: string, to: string) => `${from} – ${to}`,
+    vsBefore: (value: string, percent: string) => `4 settimane precedenti ${value} · ${percent}`,
+  },
+
   'components/MetricInfo': {
     about: (label: string) => `Informazioni su «${label}»`,
     sectionWhat: 'Che cos’è',
     sectionChart: 'Cosa mostra questo grafico',
     sectionHow: 'Calcolo e provenienza',
+    sectionTrust: 'Come viene misurato',
+    trustChipTitle: 'Stima dell’algoritmo',
+    excludedChipTitle: 'Hai escluso questo elemento dall’analisi',
+    useInAnalysis: 'Usa nell’analisi',
+    useInAnalysisHint:
+      'Se disattivato, questo dato viene comunque mostrato e non viene eliminato nulla; viene solo escluso dai confronti con la tua norma e non viene inviato all’IA né a MCP.',
+    trustMeasured: 'Misurato direttamente dal sensore sull’orologio o sul dispositivo.',
+    trustComputed: 'Calcolato a partire dalle letture o dalle tue registrazioni con una formula fissa e pubblica.',
+    trustEstimated:
+      'Una stima che Zepp ricava da diverse letture con un proprio algoritmo. Zepp non ha pubblicato il metodo né il margine di errore, e le misurazioni di laboratorio potrebbero differire.',
   },
 
   'components/MetricTrendCard': {
@@ -834,7 +878,23 @@ export default {
     revealFile: 'Mostra il file in Esplora file',
   },
 
-'components/ai/stage/stage': {
+  'components/ai/hub/promptLibrary': {
+    all: 'Tutti',
+    filterLabel: 'Filtra per categoria di dati',
+    noMatch: 'Nessuna attività utilizza questo tipo di dati.',
+    history: 'Versioni precedenti',
+    historyEmpty: 'Il prompt di questa attività non è stato ancora modificato.',
+    historyLoadFailed: 'Impossibile caricare le versioni precedenti',
+    replacedAt: (when: string) => `in uso fino al ${when}`,
+    useVersion: 'Usa questa',
+    exportPrompt: 'Esporta .zbprompt',
+    exported: (path: string) => `Esportato in ${path}`,
+    importPrompt: 'Importa .zbprompt',
+    imported: (title: string) => `Importato «${title}». Scegli gli allenamenti ed è pronto.`,
+    fileFilter: 'Prompt ZeppBridge',
+  },
+
+  'components/ai/stage/stage': {
     stage: 'Invia all’IA: a sinistra i dati da trasmettere, al centro l’IA, a destra la domanda e il piano',
     recent: (days: number) =>
       days >= 3650 ? 'Tutto (fino a 10 anni)' : days === 365 ? 'Ultimo anno' : `Ultimi ${days} giorni`,
@@ -916,6 +976,8 @@ export default {
     usualWord: 'Abituale',
     usualRange: (range: string) => `Abituale ${range}`,
     usualHint: (range: string, days: number) => `Confrontato solo con te: nei precedenti ${days} giorni, l’80% centrale dei giorni è rientrato in ${range}. Non è una diagnosi.`,
+    longTermHint: (range: string, since: string, days: number, recent: string) =>
+      `La tua norma a lungo termine: su ${days} giorni con misurazioni dal ${since}, l’80% centrale è rientrato in ${range}${recent ? `; negli ultimi 90 giorni ${recent}` : ''}. Confrontato solo con te stesso, non è una diagnosi.`,
   },
 
   'components/cards/cards': {
@@ -1613,6 +1675,8 @@ export default {
     taskFile: 'ultimi 14 giorni',
     taskTitle: (month: number, day: number) => `Ultimi 14 giorni · ${day}/${month}`,
     tempoRun: 'Corsa a ritmo',
+    capsuleNote:
+      'Da un anno fa: avevo appena iniziato a correre tre volte a settimana e il ginocchio mi faceva ancora un po’ male. Spero che tu stia ancora correndo, e senza dimenticare lo stretching.',
   },
 
   // ========================================================
@@ -3299,6 +3363,13 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
       },
     },
     refreshFailedPeriod: '.',
+    logoutConfirm:
+      'Vuoi disconnetterti da questo account?\n\nVengono cancellate solo le credenziali di accesso; la cronologia sincronizzata su questo computer viene conservata interamente.\n\nQuesto database può contenere un solo account Zepp: un successivo accesso con un altro account verrà rifiutato. Per cambiare account, seleziona «Ricomincia da capo con un altro account» nell’avviso di errore di accesso.',
+    freshStart: 'Ricomincia da capo con un altro account',
+    freshStartConfirm:
+      'Vuoi spostare tutti i dati attuali e riconnetterti con un database vuoto?\n\nNon viene eliminato nulla: i vecchi dati rimarranno in una cartella «data-before-<data>» accanto all’applicazione — basta rinominarla in «data» per ripristinarli. Verrà effettuata la disconnessione da entrambi i canali e l’applicazione si riavvierà.',
+    newAccountWarning:
+      'Non creare un nuovo account Zepp per questo motivo e non associare l’orologio a un altro account: la nuova associazione cancella le impostazioni sull’orologio.',
   },
 
   'views/SleepDetail': {
@@ -3556,6 +3627,8 @@ Rispondi in Markdown.`,
     evidenceSummary: 'Giustificazione del tipo e origini',
     missingMetrics: (list: string) => `Non fornito in questa registrazione: ${list}`,
     routeMissing: 'Nessun percorso: questa registrazione non contiene abbastanza punti GPS per tracciare un itinerario.',
+    provenanceImported: 'Importato da un file',
+    provenanceImportedAt: 'Importato',
   },
 
   'views/WorkoutList': {
@@ -3735,6 +3808,12 @@ Rispondi in Markdown.`,
     legendGap: 'Mancante',
     legendEmpty: 'Non presente nel cloud',
     cellAria: (month: string, state: string) => `${month}: ${state}`,
+    takeTitle: 'Porta via tutto',
+    takeSub:
+      'Valutazioni, note, scarpe, gare, piani, attività IA, lettere: tutto ciò che hai scritto qui, in un unico file JSON',
+    takeButton: 'Esporta',
+    takeDone: (n: number) => (n === 1 ? '1 registrazione esportata' : `${n} registrazioni esportate`),
+    takeFailed: 'Esportazione non riuscita, riprova',
   },
 
   'views/settings/sections/data': {
@@ -3847,6 +3926,7 @@ Rispondi in Markdown.`,
     noNext: 'Nessuna sessione simile pianificata successivamente',
     done: 'Va bene',
     lighterNote: (original: string | undefined) => `L’ultima volta è stata troppo dura, blocco principale accorciato del 10%. ${original ?? ''}`.trim(),
+    toastBody: 'Tocca un livello per annotarlo, senza aprire l’app',
   },
 
   'views/ai/AiPlanHistory': {
@@ -3928,6 +4008,42 @@ Rispondi in Markdown.`,
     register: 'Registra nel diario',
     retired: 'Dismesse',
     saved: 'Salvato',
+  },
+
+  'components/workout/workoutImport': {
+    open: 'Importa allenamenti',
+    close: 'Chiudi importazione',
+    title: 'Importa da altre origini',
+    hint: 'Resta su questo computer, non viene mai inviato a Zepp. Un allenamento che inizia entro due minuti da uno già presente viene ignorato.',
+    sources: {
+      gpx: 'GPX / TCX',
+      fit: 'FIT',
+      strava: 'Archivio Strava',
+      apple_health: 'Apple Health',
+    },
+    short: {
+      gpx: 'GPX',
+      fit: 'FIT',
+      strava: 'Strava',
+      apple_health: 'Apple Health',
+    },
+    filter: {
+      gpx: 'File GPX / TCX',
+      fit: 'File FIT',
+      strava: 'Archivio di esportazione Strava',
+      apple_health: 'Archivio di esportazione Apple Health',
+    },
+    reading: 'Lettura in corso…',
+    added: (n: number) => `${n} importati`,
+    nothingNew: 'Nessun nuovo allenamento',
+    duplicates: (n: number) => `${n} già presenti, ignorati`,
+    unreadable: (n: number) => `${n} illeggibili`,
+    batches: 'Importazioni',
+    count: (n: number) => `${n}`,
+    undo: 'Annulla questa importazione',
+    undone: 'Annullata',
+    removed: (n: number) => `Rimossi ${n} allenamenti da questa importazione`,
+    failed: 'Importazione non riuscita. Riprova.',
   },
 
   'components/journal/journal': {
@@ -4417,6 +4533,25 @@ Rispondi in Markdown.`,
   'err.logbook.invalid': 'I dati inseriti non sono validi: controlla e salva di nuovo',
   'err.logbook.gear_taken': 'Questo ID scarpa Zepp è già associato a un altro paio',
   'err.rings.save': 'Impossibile salvare l’immagine degli anelli — controlla che la cartella Immagini sia scrivibile',
+  'err.auth.fresh_start_failed':
+    'Impossibile preparare una nuova cartella dei dati; i dati attuali non sono stati modificati',
+  'err.letters.capsule_date': 'La data di apertura non è valida. Selezionala di nuovo.',
+  'err.feedback.toast_failed': 'Impossibile mostrare la notifica di sistema.',
+  'err.export.my_records':
+    'Impossibile scrivere questo file. Prova in un’altra posizione.',
+  'err.import.source': 'Origine di importazione sconosciuta.',
+  'err.import.too_large':
+    'Il file è troppo grande (superiore a 64 MB). Per Strava e Apple Health, seleziona l’intero archivio di esportazione.',
+  'err.import.not_recognized':
+    'Questo file non è un’esportazione dell’origine selezionata. Prova con un’altra origine.',
+  'err.import.read':
+    'Impossibile leggere questo file. Assicurati che non sia aperto in un altro programma.',
+  'err.ai_task.bad_prompt_file':
+    'Questo non è un file .zbprompt utilizzabile (formato errato, proveniente da una versione più recente o senza prompt).',
+  'err.ai_task.prompt_export':
+    'Impossibile esportare il file .zbprompt. Controlla che la Scrivania sia scrivibile.',
+  'err.ai_task.prompt_import':
+    'Impossibile leggere questo file (troppo grande o impossibile da aprire).',
   },
 
   backendText: {

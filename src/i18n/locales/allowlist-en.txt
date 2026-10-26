@@ -345,3 +345,10 @@ lib/workoutNames.weiqi
 lib/workoutNames.yoga
 lib/workoutNames.zumba
 components/ai/stage/stage.facePlan
+components/workout/workoutImport.sources.gpx
+components/workout/workoutImport.sources.fit
+components/workout/workoutImport.short.gpx
+components/workout/workoutImport.short.fit
+components/workout/workoutImport.short.strava
+components/workout/workoutImport.sources.apple_health
+components/workout/workoutImport.short.apple_health

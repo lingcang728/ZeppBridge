@@ -44,7 +44,7 @@ const pack: P4Copy = {
     summaryLead: 'Czternaście codziennych opcji zebranych w jednym stosie kart.',
     items: [
       { id: 'sync', title: 'Automatyczna synchronizacja', text: 'Wyłączona, co 15, 30 lub 60 minut. Wybierz odpowiednią.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Czas przechowywania', text: 'Historia dostępna w chmurze trafia na ten komputer. Ty decydujesz, jak długo ma tu pozostać.', icon: 'database' },
+      { id: 'retention', title: 'Dziesięć lat, na tym komputerze', text: 'Pobierz do dziesięciu lat historii na ten komputer i zachowaj je. Twoje dane nie znikną wraz z oknem retencji w chmurze.', icon: 'database' },
       { id: 'data', title: 'Pokrycie danych', text: 'Co można zsynchronizować, a czego nie — wszystko widać jak na dłoni.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Narzędzia lokalne, takie jak Claude Code czy Codex, mogą odpytywać bazę bezpośrednio. Wysyłanie planów wymaga osobnej zgody.', icon: 'structured-data' },
       { id: 'formats', title: 'Cztery formaty', text: 'JSON · CSV · GPX, a na stronie treningu także FIT.', icon: 'document' },
@@ -56,7 +56,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'Lokalne API', text: 'Powiązane z 127.0.0.1. Wyłącznie do odczytu, wymaga tokena.', icon: 'structured-data' },
       { id: 'privacy', title: 'Prywatność i bezpieczeństwo', text: 'Poświadczenia chroni system operacyjny. Tokeny nigdy nie trafiają do dzienników zdarzeń.', icon: 'browser-login' },
       { id: 'filename', title: 'Nazwy plików', text: 'Sam decydujesz, jak mają się nazywać pliki przygotowywane dla AI.', icon: 'document' },
-      { id: 'folder', title: 'Folder danych', text: 'Sprawdź, gdzie dane są przechowywane na tym komputerze, twórz ich kopie lub przenieś w inne miejsce.', icon: 'database' },
+      { id: 'folder', title: 'Zabierz wszystko ze sobą', text: 'Twoje dane znajdują się w folderze na tym komputerze, a wszystko, co tutaj zapisano — oceny, plany czy zadania AI — wyeksportujesz do jednego pliku JSON.', icon: 'database' },
     ],
   },
   nav: [
