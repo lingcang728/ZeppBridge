@@ -74,6 +74,7 @@ mod imports;
 mod logbook;
 mod metric_prefs;
 mod metrics;
+mod my_records;
 mod official;
 mod queries;
 mod replay;

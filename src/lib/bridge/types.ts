@@ -503,6 +503,8 @@ export interface BridgeBackend {
   dataLettersSealCapsule(note: string, openOn: string): Promise<number>;
   /** 开封一个到期的胶囊。 */
   dataLettersOpenCapsule(id: number): Promise<import('../../types/letters').DataLetter>;
+  /** 带走我的一切：自己写下、整理的记录导出成一份 JSON，返回条数。 */
+  exportMyRecords(path: string): Promise<number>;
   /** 导入一种来源的一个或多个文件，合成一批。 */
   importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]): Promise<import('../../types/imports').ImportReport>;
   /** 全部导入批次，新的在前。 */

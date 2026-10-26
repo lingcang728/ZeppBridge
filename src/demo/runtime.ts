@@ -227,6 +227,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), {
     // 演示里不发系统通知。
     workout_feedback_toast_due: () => null, workout_feedback_toast_show: () => null,
+    export_my_records: () => 128,
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },

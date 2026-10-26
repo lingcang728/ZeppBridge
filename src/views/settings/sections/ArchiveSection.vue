@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import HistoryArchivePanel from '../../../components/HistoryArchivePanel.vue';
 import KintsugiCalendar from '../../../components/archive/KintsugiCalendar.vue';
+import TakeAllRow from './TakeAllRow.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useHistoryBackfill } from '../../../composables/useHistoryBackfill';
@@ -175,6 +176,7 @@ const openBackup = () => { void router.push({ path: '/settings/advanced', hash: 
           <button class="button secondary" type="button" @click="openBackup">{{ a.open }}</button>
         </div>
       </div>
+      <TakeAllRow />
     </div>
   </section>
 </template>
