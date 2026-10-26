@@ -181,6 +181,8 @@ impl Database {
              LEFT JOIN workout_detail_fetch_attempts a ON a.workout_id = w.workout_id
                 AND a.source = CASE WHEN w.provider = 'official' THEN 'official' ELSE w.zepp_source END
              WHERE (?1 IS NULL OR w.workout_id = ?1)
+               -- 导入的运动没有云端明细可拉。
+               AND NOT EXISTS(SELECT 1 FROM workout_imports i WHERE i.workout_id = w.workout_id)
              ORDER BY COALESCE(d.attempts, a.attempts, 0), w.start_time DESC",
         )?;
         let rows = statement.query_map([id], |r| {

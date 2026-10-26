@@ -6,6 +6,7 @@ mod backup;
 mod data;
 pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
 mod data_letters;
+mod imports;
 mod letters;
 mod login;
 mod official;
@@ -195,6 +196,9 @@ pub(crate) use data::{
 };
 pub(crate) use data_letters::{
     data_letters_open_capsule, data_letters_seal_capsule, data_letters_state,
+};
+pub(crate) use imports::{
+    import_batches, import_workouts, undo_import_batch, workout_import_sources,
 };
 pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};

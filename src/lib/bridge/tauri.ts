@@ -500,6 +500,18 @@ export const tauriBackend: BridgeBackend = {
   dataLettersOpenCapsule(id: number) {
     return call<import('../../types/letters').DataLetter>('data_letters_open_capsule', { id });
   },
+  importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]) {
+    return call<import('../../types/imports').ImportReport>('import_workouts', { source, paths });
+  },
+  importBatches() {
+    return call<import('../../types/imports').ImportBatch[]>('import_batches');
+  },
+  undoImportBatch(batchId: number) {
+    return call<number>('undo_import_batch', { batchId });
+  },
+  workoutImportSources() {
+    return call<Record<string, import('../../types/imports').ImportSourceKey>>('workout_import_sources');
+  },
   submitDiagnosticReport(note?: string, category?: string) {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
       note: note ?? null,

@@ -333,31 +333,31 @@ impl Database {
             )?;
             self.conn.execute(
                 "DELETE FROM workout_hr_zones
-                 WHERE workout_id IN (SELECT workout_id FROM workouts WHERE start_time < ?1)",
+                 WHERE workout_id IN (SELECT workout_id FROM workouts WHERE start_time < ?1) AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM workouts WHERE start_time < ?1",
+                "DELETE FROM workouts WHERE start_time < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM workout_samples WHERE timestamp < ?1",
+                "DELETE FROM workout_samples WHERE timestamp < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM route_points WHERE timestamp < ?1",
+                "DELETE FROM route_points WHERE timestamp < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM workout_pauses WHERE start_time < ?1",
+                "DELETE FROM workout_pauses WHERE start_time < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM workout_laps WHERE start_time < ?1",
+                "DELETE FROM workout_laps WHERE start_time < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
-                "DELETE FROM workout_splits WHERE start_time < ?1",
+                "DELETE FROM workout_splits WHERE start_time < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;
             // Raw responses are retained from their fetch time, not their query

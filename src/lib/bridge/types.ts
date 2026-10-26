@@ -499,6 +499,14 @@ export interface BridgeBackend {
   dataLettersSealCapsule(note: string, openOn: string): Promise<number>;
   /** 开封一个到期的胶囊。 */
   dataLettersOpenCapsule(id: number): Promise<import('../../types/letters').DataLetter>;
+  /** 导入一种来源的一个或多个文件，合成一批。 */
+  importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]): Promise<import('../../types/imports').ImportReport>;
+  /** 全部导入批次，新的在前。 */
+  importBatches(): Promise<import('../../types/imports').ImportBatch[]>;
+  /** 整批撤销，返回删掉的运动条数。 */
+  undoImportBatch(batchId: number): Promise<number>;
+  /** 导入的运动各自的来源（workout_id → 来源）。 */
+  workoutImportSources(): Promise<Record<string, import('../../types/imports').ImportSourceKey>>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   prepareAiHandoff(
