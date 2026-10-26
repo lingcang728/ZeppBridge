@@ -4215,5 +4215,16 @@ Antworte in Markdown.`,
         }),
       failed: 'Import fehlgeschlagen. Bitte erneut versuchen.',
     },
+    'views/settings/accountConflict': {
+      official: 'Offizielle Autorisierung',
+      advanced: 'Erweiterte Daten',
+      noNickname: 'Kein Spitzname',
+      advancedOnlyTitle: 'Erweiterte Daten allein reichen auch',
+      advancedKept:
+        'Erweiterte Daten sind bereits verbunden und liefern den Großteil deiner Daten, du kannst die offizielle Autorisierung also überspringen. Wenn du beide nutzen möchtest: Starte die offizielle Autorisierung erneut, kopiere den Link in ein privates Fenster, melde dich mit demselben Konto wie bei den erweiterten Daten an und stimme zu.',
+      advancedAfterDisconnect:
+        'Trenne zuerst die offizielle Autorisierung und melde dich dann bei den erweiterten Daten mit dem Konto an, mit dem deine Uhr gekoppelt ist (E-Mail oder Telefonnummer und Passwort). Wurde dieses Konto über Google oder Apple erstellt, ist eine Anmeldung für erweiterte Daten nicht möglich – behalte in diesem Fall nur die offizielle Autorisierung.',
+      disconnectOfficial: 'Offizielle Autorisierung trennen',
+    },
   },
 } satisfies LocalePack;

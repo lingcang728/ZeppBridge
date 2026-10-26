@@ -3104,6 +3104,17 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       },
       language: (lang: string) => `- Schrijf name, focus, description, summary en note in het ${lang}: ze worden exact zo getoond in ZeppBridge en op het horloge.`,
     },
+    'views/settings/accountConflict': {
+      official: 'Officiële autorisatie',
+      advanced: 'Geavanceerde gegevens',
+      noNickname: 'Geen bijnaam',
+      advancedOnlyTitle: 'Alleen geavanceerde gegevens volstaat ook',
+      advancedKept:
+        'Geavanceerde gegevens zijn al verbonden en leveren het merendeel van je gegevens, dus je kunt de officiële autorisatie overslaan. Wil je beide gebruiken, start de officiële autorisatie dan opnieuw, kopieer de link naar een privévenster, log in met hetzelfde account als voor geavanceerde gegevens en geef toestemming.',
+      advancedAfterDisconnect:
+        'Ontkoppel eerst de officiële autorisatie en log vervolgens in bij geavanceerde gegevens met het account waaraan je horloge is gekoppeld (e-mailadres of telefoonnummer met wachtwoord). Is dat account aangemaakt via Google of Apple, dan werken geavanceerde gegevens niet; behoud dan alleen de officiële autorisatie.',
+      disconnectOfficial: 'Officiële autorisatie ontkoppelen',
+    },
     'views/settings/sections/account': {
       whySub: 'Geavanceerde gegevens loggen alleen in met Zepp-e-mail of -telefoonnummer en wachtwoord',
       waitingHint: 'Sta het toe in je browser, dan verbindt dit vanzelf',

@@ -3575,6 +3575,19 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
       'Nie twórz w tym celu nowego konta Zepp ani nie paruj zegarka z innym kontem: ponowne sparowanie usuwa ustawienia z zegarka.',
   },
 
+  // Source: src/views/settings/accountConflict.i18n.ts
+  "views/settings/accountConflict": {
+    official: 'Oficjalna autoryzacja',
+    advanced: 'Dane zaawansowane',
+    noNickname: 'Brak pseudonimu',
+    advancedOnlyTitle: 'Same dane zaawansowane też wystarczą',
+    advancedKept:
+      'Dane zaawansowane są już połączone i dostarczają większość danych, więc możesz pominąć oficjalną autoryzację. Aby korzystać z obu, rozpocznij ponownie oficjalną autoryzację, skopiuj link do okna prywatnego, zaloguj się na to samo konto, co w danych zaawansowanych, a następnie zezwól na dostęp.',
+    advancedAfterDisconnect:
+      'Odłącz oficjalną autoryzację, a następnie zaloguj się do danych zaawansowanych kontem sparowanym z zegarkiem (e-mail lub telefon i hasło). Jeśli konto zostało utworzone przez Google lub Apple, dane zaawansowane nie będą działać, więc pozostaw tylko oficjalną autoryzację.',
+    disconnectOfficial: 'Odłącz oficjalną autoryzację',
+  },
+
 // --- Batch 5 ---
 // Source: src/views/settings/deck.i18n.ts
   "views/settings/deck": {

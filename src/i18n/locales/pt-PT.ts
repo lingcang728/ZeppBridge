@@ -3053,6 +3053,17 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       yoga: 'Yoga',
       zumba: 'Zumba',
     },
+    'views/settings/accountConflict': {
+      official: 'Autorização oficial',
+      advanced: 'Dados avançados',
+      noNickname: 'Sem alcunha',
+      advancedOnlyTitle: 'Também podes usar apenas os dados avançados',
+      advancedKept:
+        'Os dados avançados já estão ligados e trazem a maior parte dos teus dados, pelo que podes dispensar a autorização oficial. Se quiseres ambas, clica novamente na autorização oficial, copia a ligação para uma janela privada, inicia sessão com a mesma conta que usas nos dados avançados e depois autoriza.',
+      advancedAfterDisconnect:
+        'Desliga primeiro a autorização oficial e depois inicia sessão nos dados avançados com a conta associada ao teu relógio (e-mail ou telemóvel e palavra-passe). Se essa conta tiver sido criada com o Google ou a Apple, os dados avançados não permitem iniciar sessão; mantém apenas a autorização oficial.',
+      disconnectOfficial: 'Desligar autorização oficial',
+    },
     'views/settings/sections/account': {
       whySub: 'Os dados avançados só iniciam sessão com e-mail ou telemóvel da Zepp e palavra-passe',
       waitingHint: 'Aprova no navegador e isto liga-se sozinho',
