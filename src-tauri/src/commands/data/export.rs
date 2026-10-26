@@ -94,8 +94,14 @@ pub async fn prepare_ai_handoff(
         ));
     }
 
+    // 用户排除的指标不交给 AI（metric_prefs）；自己的导出（FIT / CLI）不受影响。
     let (export, record_count) = spawn_independent_read(state.data_dir.clone(), move |db| {
-        db.build_ai_export_value(&selection)
+        let (mut export, count) = db.build_ai_export_value(&selection)?;
+        zeppbridge_core::storage::metric_prefs::apply_exclusions(
+            &mut export,
+            &db.excluded_metrics()?,
+        );
+        Ok((export, count))
     })
     .await?;
     if record_count == 0 {

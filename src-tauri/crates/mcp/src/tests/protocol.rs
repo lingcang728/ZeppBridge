@@ -122,7 +122,7 @@ fn only_the_training_plan_and_coach_note_tools_write() {
         .find(|tool| tool["name"] == "propose_coach_note")
         .unwrap();
     assert_eq!(propose["annotations"]["destructiveHint"], false);
-    assert_eq!(tools.len(), 18);
+    assert_eq!(tools.len(), 19);
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn a_modern_tools_list_carries_the_required_envelope() {
     assert_eq!(result["resultType"], json!("complete"));
     assert!(result["ttlMs"].as_i64().unwrap() > 0);
     assert_eq!(result["cacheScope"], json!("public"));
-    assert_eq!(result["tools"].as_array().unwrap().len(), 18);
+    assert_eq!(result["tools"].as_array().unwrap().len(), 19);
 }
 
 /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
@@ -264,7 +264,7 @@ fn argv_parsing_is_fail_closed() {
 /// 映射，这条测试就红。
 #[test]
 fn every_registered_tool_builds_a_data_request() {
-    let minimal_args: [(&str, Value); 18] = [
+    let minimal_args: [(&str, Value); 19] = [
         ("list_workouts", json!({})),
         ("get_workout_insight", json!({"workoutId": "w"})),
         ("get_metric_series", json!({"metrics": ["spo2_odi"]})),
@@ -272,6 +272,7 @@ fn every_registered_tool_builds_a_data_request() {
         ("get_data_health", json!({})),
         ("get_food_data", json!({})),
         ("list_available_metrics", json!({})),
+        ("get_baselines", json!({"metrics": ["resting_hr"]})),
         (
             "get_metric_records",
             json!({"metric": "steps", "source": "daily_metrics"}),

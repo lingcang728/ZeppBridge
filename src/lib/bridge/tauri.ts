@@ -537,6 +537,12 @@ export const tauriBackend: BridgeBackend = {
   getMetricBaselines(metrics: string[]) {
     return call<MetricBaseline[]>('get_metric_baselines', { metrics });
   },
+  metricExclusions() {
+    return call<string[]>('metric_exclusions');
+  },
+  setMetricExcluded(metric: string, excluded: boolean) {
+    return call<string[]>('set_metric_excluded', { metric, excluded });
+  },
   aiTaskSetPinned(id: string, pinned: boolean) {
     return call<void>('ai_task_set_pinned', { id, pinned });
   },

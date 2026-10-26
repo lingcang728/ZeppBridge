@@ -71,6 +71,7 @@ mod event_windows;
 mod export;
 mod fit_override;
 mod logbook;
+mod metric_prefs;
 mod metrics;
 mod official;
 mod queries;

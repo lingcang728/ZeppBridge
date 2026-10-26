@@ -161,6 +161,20 @@ pub(super) fn run_metric_series(
     }))
 }
 
+pub(super) fn run_baselines(db: &Database, args: &Value) -> Result<Value, CallFailure> {
+    let metrics = metric_args(args).map_err(CallFailure::plain)?;
+    let norms = db
+        .metric_norms(&metrics, Local::now().date_naive())
+        .map_err(|error| CallFailure::plain(error.user_message()))?;
+    Ok(json!({
+        "baselines": serde_json::to_value(&norms)
+            .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))?,
+        "requestedMetrics": metrics,
+        "missingValues": contract::MISSING_VALUE_CONVENTION,
+        "time": contract::TIME_CONVENTION,
+    }))
+}
+
 pub(super) fn run_sleep_detail(
     db: &Database,
     args: &Value,

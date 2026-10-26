@@ -57,6 +57,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   const listeners = new Map<string, number[]>();
   let nextId = 1;
   let status = demoStatus(data);
+  let excludedMetrics: string[] = [];
   let demoPicks: unknown[] = [];
   const feedbackDone = new Set<string>();
   /* 教练档案：演示里收件箱有一条 AI 的提议、档案里有一条自己写的。 */
@@ -143,7 +144,13 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
       return data.stress.filter((point) => new Date(point.timestamp).getTime() >= from);
     },
     get_metric_series: (args) => metricSeries(data, Number(args.days ?? 7), (args.metrics as string[] | null) ?? null),
-    get_metric_baselines: a => demoBaselines(data, a.metrics as string[]),
+    get_metric_baselines: a => demoBaselines(data, (a.metrics as string[]).filter(m => !excludedMetrics.includes(m))),
+    metric_exclusions: () => [...excludedMetrics],
+    set_metric_excluded: a => {
+      excludedMetrics = excludedMetrics.filter(m => m !== a.metric);
+      if (a.excluded) excludedMetrics = [...excludedMetrics, String(a.metric)].sort();
+      return [...excludedMetrics];
+    },
     get_daily_heart_rate_extremes: a => demoHeartExtremes(data, Number(a.days ?? 30)),
     get_hourly_steps: a => demoHourlySteps(data, String(a.start), String(a.end)),
     get_training_balance: a => demoTrainingBalance(data, Number(a.days ?? 90)),

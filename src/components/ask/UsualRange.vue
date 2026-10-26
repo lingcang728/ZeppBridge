@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * 卡片底行「状态词 ←→ 常态范围」（3.1，取自 tobi 稿，去掉人群常模）：左边是和自己比的结论
- * （平时 / 比平时高 6 / 比平时低 3，规则同 BaselineTag），右边是你自己近 90 天中间八成的读数。
+ * （平时 / 比平时高 6 / 比平时低 3，规则同 BaselineTag），右边是你自己的常态：有满一年的历史时
+ * 用全部历史（最多十年）中间八成——「你的常态」不该被一个季节带偏；不满一年才退回近 90 天。
  * 范围只来自本机的历史，数据不够（少于 14 天）整行不画，不拿人群常模顶上。
  */
 import { computed } from 'vue';
@@ -17,12 +18,18 @@ const props = defineProps<{
 const a = useAskText();
 const { baselineOf } = useMetricBaselines();
 const baseline = computed(() => baselineOf(props.metric));
-const range = computed(() => {
+const span = (low: number, high: number) => {
+  const a = props.format(low);
+  const b = props.format(high);
+  return a === b ? a : `${a}–${b}`;
+};
+const recentRange = computed(() => {
   const b = baseline.value;
-  if (!b || b.usual_low == null || b.usual_high == null) return null;
-  const low = props.format(b.usual_low);
-  const high = props.format(b.usual_high);
-  return low === high ? low : `${low}–${high}`;
+  return b && b.usual_low != null && b.usual_high != null ? span(b.usual_low, b.usual_high) : null;
+});
+const range = computed(() => {
+  const long = baseline.value?.long_term;
+  return long ? span(long.low, long.high) : recentRange.value;
 });
 const word = computed(() => {
   const b = baseline.value;
@@ -33,7 +40,11 @@ const word = computed(() => {
   if (b.message_code === 'ui.metric_baseline.below') return a.value.below(delta);
   return a.value.usualWord;
 });
-const hint = computed(() => (range.value ? a.value.usualHint(range.value, baseline.value?.usual_days ?? 90) : ''));
+const hint = computed(() => {
+  const long = baseline.value?.long_term;
+  if (long && range.value) return a.value.longTermHint(range.value, long.since.slice(0, 4), long.days, recentRange.value ?? '');
+  return range.value ? a.value.usualHint(range.value, baseline.value?.usual_days ?? 90) : '';
+});
 </script>
 
 <template>

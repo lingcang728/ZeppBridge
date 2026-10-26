@@ -186,9 +186,9 @@ pub(crate) use data::{
     get_storage_estimate, get_stress_series, get_training_balance, get_unknown_workout_codes,
     get_user_prefs, get_weekly_report, get_workout_detail, get_workout_fit_override,
     get_workout_insight, get_workout_page, get_workout_series, get_workout_type_options,
-    import_workout_fit, open_data_folder, open_external_url, prepare_ai_handoff,
+    import_workout_fit, metric_exclusions, open_data_folder, open_external_url, prepare_ai_handoff,
     remove_workout_fit, reprocess_local_data, run_database_integrity_check, save_fit_export,
-    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    set_device_model_override, set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs,
     set_workout_code_label, set_workout_type_override, submit_device_model_assignment,
     submit_diagnostic_report,
 };

@@ -159,6 +159,7 @@ mod hr_zones;
 mod ingest;
 mod maintenance;
 mod meta;
+pub mod metric_prefs;
 mod metric_spec;
 mod metrics;
 mod official;

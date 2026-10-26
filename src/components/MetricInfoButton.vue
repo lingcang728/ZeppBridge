@@ -12,6 +12,9 @@ import Icon from './Icon.vue';
 import GlassPopover from './GlassPopover.vue';
 import { metricInfo } from '../lib/metricInfo';
 import { metricTrust } from '../lib/metricInfo/trust';
+import GlassSwitch from './GlassSwitch.vue';
+import { isDesktop } from '../lib/bridge';
+import { useMetricExclusions } from '../composables/useMetricExclusions';
 import { useMetricInfoText } from './MetricInfo.i18n';
 
 const props = defineProps<{
@@ -24,6 +27,9 @@ const props = defineProps<{
 const t = useMetricInfoText();
 const info = computed(() => metricInfo(props.metric));
 const trust = computed(() => metricTrust(props.metric));
+const { isExcluded, setExcluded } = useMetricExclusions();
+const excluded = computed(() => isExcluded(props.metric));
+const toggleUse = (use: boolean) => { void setExcluded(props.metric, !use).catch(() => undefined); };
 const trustText = computed(() => {
   if (trust.value === 'measured') return t.value.trustMeasured;
   if (trust.value === 'computed') return t.value.trustComputed;
@@ -35,8 +41,9 @@ const titleId = computed(() => `metric-info-${props.metric}`);
 </script>
 
 <template>
-  <!-- 算法估算的指标在标题旁明说一声；测量 / 换算的不贴，免得满屏标签。 -->
-  <span v-if="info && trust === 'estimated'" class="trust-chip" role="img" :title="t.trustChipTitle" :aria-label="t.trustChipTitle">≈</span>
+  <!-- 用户排除的标「⊘」；算法估算的标「≈」（只说来历，不打准不准的分）；测量 / 换算的不贴，免得满屏标签。 -->
+  <span v-if="info && excluded" class="trust-chip excluded" role="img" :title="t.excludedChipTitle" :aria-label="t.excludedChipTitle">⊘</span>
+  <span v-else-if="info && trust === 'estimated'" class="trust-chip" role="img" :title="t.trustChipTitle" :aria-label="t.trustChipTitle">≈</span>
   <button
     v-if="info"
     ref="button"
@@ -71,7 +78,14 @@ const titleId = computed(() => `metric-info-${props.metric}`);
     </section>
     <section v-if="trust" class="info-section" data-pop-item>
       <h3>{{ t.sectionTrust }}</h3>
-      <p :class="['trust-line', trust]">{{ trustText }}</p>
+      <p>{{ trustText }}</p>
+    </section>
+    <section v-if="isDesktop()" class="info-section use-row" data-pop-item>
+      <div class="use-copy">
+        <h3>{{ t.useInAnalysis }}</h3>
+        <p>{{ t.useInAnalysisHint }}</p>
+      </div>
+      <GlassSwitch :model-value="!excluded" :aria-label="t.useInAnalysis" @update:model-value="toggleUse" />
     </section>
   </GlassPopover>
 </template>
@@ -115,7 +129,9 @@ const titleId = computed(() => `metric-info-${props.metric}`);
   vertical-align: middle;
   cursor: help;
 }
-.trust-line.estimated { color: var(--warning); }
+.trust-chip.excluded { background: var(--mat-inset); color: var(--subtle); }
+.use-row { display: flex; align-items: center; gap: 12px; }
+.use-copy { flex: 1; min-width: 0; }
 
 .info-title { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.3; }
 .info-section h3 {

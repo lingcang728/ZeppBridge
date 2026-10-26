@@ -105,6 +105,25 @@ fn data_tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "get_baselines",
+            "description": format!(
+                "你的常态，只和用户自己比（不用人群常模）。每项指标给：recent——最新读数（要在 3 天内）                 与之前 28 天中位数的比较（direction above/below/usual、delta、spread）和之前 90 天中间八成的                 常态带（usual_low/usual_high）；long_term——本机全部历史（最多十年）中间八成（low/high）、                 中位数、起始日期和逐年的中位数与带（years）。历史不满一年时 long_term 为 null，最新读数太旧时                 recent 为 null。官方接口只给近期窗口，长期常态只有这里有。这是整库视角，任务范围里不提供。{missing}"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "metrics": {
+                        "type": "array",
+                        "items": { "type": "string", "enum": contract::metric_names() },
+                        "minItems": 1,
+                        "description": "指标名。没有读数的指标不出现在结果里。"
+                    }
+                },
+                "required": ["metrics"],
+                "additionalProperties": false
+            }
+        }),
+        json!({
             "name": "list_available_metrics",
             "description": format!(
                 "列出本机已归一化入库的所有指标，包括图表契约之外的新指标；返回来源表、单位、记录数和日期范围。\

@@ -256,9 +256,39 @@ pub async fn get_metric_baselines(
     metrics: Vec<String>,
 ) -> std::result::Result<Vec<zeppbridge_core::insight::anomaly::MetricBaseline>, AppError> {
     let today = chrono::Local::now().date_naive();
+    // 用户排除的指标不参与「比平时」的比较（metric_prefs）。
     spawn_independent_read(state.data_dir.clone(), move |db| {
+        let excluded = db.excluded_metrics()?;
+        let metrics: Vec<String> = metrics
+            .into_iter()
+            .filter(|metric| !excluded.contains(metric))
+            .collect();
         db.metric_baselines(&metrics, today)
     })
+    .await
+}
+
+/// 用户排除的指标（不参与比较、不交给 AI / MCP；数据不删）。
+#[tauri::command]
+pub async fn metric_exclusions(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<String>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| db.excluded_metrics()).await
+}
+
+/// 排除 / 恢复一项指标，返回新的名单。
+#[tauri::command]
+pub async fn set_metric_excluded(
+    state: tauri::State<'_, AppState>,
+    metric: String,
+    excluded: bool,
+) -> std::result::Result<Vec<String>, AppError> {
+    crate::commands::with_write(
+        &state.data_dir,
+        &state.db,
+        zeppbridge_core::storage::write_lock::WritePurpose::Metadata,
+        move |db| db.set_metric_excluded(&metric, excluded),
+    )
     .await
 }
 
