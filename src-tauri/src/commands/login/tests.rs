@@ -615,3 +615,24 @@ fn login_window_has_no_opener_permission() {
             && permission.as_str() != Some("opener:default")
             && permission["identifier"] != "opener:allow-open-url"));
 }
+
+/// 账号对不上时并排给界面的两个账号只露后四位：完整编号不进事件载荷。
+#[test]
+fn an_account_conflict_shows_only_the_last_four_digits() {
+    use crate::ipc_types::{mask_user_id, AccountBrief, AccountPair};
+    assert_eq!(mask_user_id(" 1234567890 "), "••••7890");
+    let mut status = LoginStatus::new("failed", "err.login.other_account", "", "");
+    status.conflict = Some(AccountPair {
+        official: AccountBrief {
+            user_id_masked: mask_user_id("1234567890"),
+            nickname: Some("Runner".into()),
+        },
+        advanced: AccountBrief {
+            user_id_masked: mask_user_id("9876543210"),
+            nickname: None,
+        },
+    });
+    let json = serde_json::to_string(&status).unwrap();
+    assert!(!json.contains("1234567890") && !json.contains("9876543210"));
+    assert!(json.contains("••••7890") && json.contains("••••3210"));
+}

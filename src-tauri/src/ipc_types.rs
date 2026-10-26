@@ -83,6 +83,37 @@ pub struct AppStatus {
     pub replaying: bool,
 }
 
+/// 一条连接连到的 Zepp 账号：只露编号后四位，昵称只有官方授权那边有。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccountBrief {
+    pub user_id_masked: String,
+    pub nickname: Option<String>,
+}
+
+/// 官方授权和高级数据「不是同一个账号」被拒时，两边各是哪个账号。
+///
+/// 只给报错用：光说「不是同一个账号」，用户看不出是哪边错了——官方授权那一步
+/// 直接用浏览器里已经登录的 Zepp 账号，页面上也不写是谁（tupac7，2026-10-26）。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccountPair {
+    pub official: AccountBrief,
+    pub advanced: AccountBrief,
+}
+
+/// 编号只露后四位，两边并排时足够认出是不是同一个。
+pub fn mask_user_id(user_id: &str) -> String {
+    let tail: String = user_id
+        .trim()
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("••••{tail}")
+}
+
 /// Web-login progress exposed to the frontend and the `login://status` event.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LoginStatus {
@@ -93,6 +124,9 @@ pub struct LoginStatus {
     /// 中文原文。登录是英文用户最容易卡住的一步，这里尤其不能只有中文。
     #[serde(default)]
     pub code: String,
+    /// 和官方授权不是同一个账号时，两边各是谁。
+    #[serde(default)]
+    pub conflict: Option<AccountPair>,
 }
 
 impl LoginStatus {
@@ -102,6 +136,7 @@ impl LoginStatus {
             message: String::new(),
             page_url: String::new(),
             code: String::new(),
+            conflict: None,
         }
     }
 
@@ -116,6 +151,7 @@ impl LoginStatus {
             message: message.into(),
             page_url: page_url.into(),
             code: code.to_string(),
+            conflict: None,
         }
     }
 }

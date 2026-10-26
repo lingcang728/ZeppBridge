@@ -167,14 +167,7 @@ pub(super) fn spawn_login_poll(
                         continue;
                     }
                     Err(failure) => {
-                        finish_failed(
-                            &app,
-                            epoch,
-                            &failure.error.code,
-                            &failure.error.message,
-                            page_url,
-                        )
-                        .await;
+                        finish_login_failure(&app, epoch, failure, page_url).await;
                         close_login_window_for_epoch(&app, epoch);
                         return;
                     }
@@ -194,6 +187,8 @@ pub(super) fn spawn_login_poll(
 pub(super) struct LoginFailure {
     pub(super) error: AppError,
     pub(super) retryable: bool,
+    /// 和官方授权不是同一个账号时，两边各是谁（界面并排列出）。
+    pub(super) conflict: Option<Box<crate::ipc_types::AccountPair>>,
 }
 
 impl LoginFailure {
@@ -201,6 +196,7 @@ impl LoginFailure {
         Self {
             error,
             retryable: false,
+            conflict: None,
         }
     }
 
@@ -208,6 +204,7 @@ impl LoginFailure {
         Self {
             error,
             retryable: true,
+            conflict: None,
         }
     }
 
@@ -248,8 +245,8 @@ pub(super) async fn persist_extracted_login(
 
     // 官方授权连的是另一个 Zepp 账号：明说，不要静默只出一半数据。最常见的是
     // 当初用 Google 注册、这里用同一个邮箱加密码登录——Zepp 当成了新账号。
-    if let Some(error) = other_account_than_official(&state.data_dir, &auth.user_id) {
-        return Err(LoginFailure::fatal(error));
+    if let Some(failure) = other_account_than_official(&state.data_dir, &auth.user_id) {
+        return Err(failure);
     }
     // 库属于另一个账号就不存这把令牌（R06）。
     if let Err(error) =
@@ -280,16 +277,28 @@ pub(super) async fn persist_extracted_login(
 pub(super) fn other_account_than_official(
     data_dir: &std::path::Path,
     user_id: &str,
-) -> Option<AppError> {
+) -> Option<LoginFailure> {
+    use crate::ipc_types::{mask_user_id, AccountBrief, AccountPair};
     let official = zeppbridge_core::official::OfficialStore::new(data_dir)
         .meta()
         .ok()
         .flatten()?;
     crate::commands::accounts_differ(&official.user_id, user_id).then(|| {
-        AppError::new(
+        let mut failure = LoginFailure::fatal(AppError::new(
             "err.login.other_account",
             "这是另一个 Zepp 账号：刚才登录的和官方授权的不是同一个账号，没有写入任何数据。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。",
-        )
+        ));
+        failure.conflict = Some(Box::new(AccountPair {
+            official: AccountBrief {
+                user_id_masked: mask_user_id(&official.user_id),
+                nickname: official.nickname.clone(),
+            },
+            advanced: AccountBrief {
+                user_id_masked: mask_user_id(user_id),
+                nickname: None,
+            },
+        }));
+        failure
     })
 }
 
@@ -412,6 +421,29 @@ pub(super) async fn finish_failed(
     page_url: String,
 ) {
     emit_progress(app, epoch, "failed", code, message, &page_url).await;
+}
+
+/// 登录失败收尾：和 `finish_failed` 一样，只是把账号对照一起带给界面。
+async fn finish_login_failure(
+    app: &AppHandle,
+    epoch: u64,
+    failure: LoginFailure,
+    page_url: String,
+) {
+    if !epoch_active(app, epoch) {
+        return;
+    }
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let mut status = LoginStatus::new(
+        "failed",
+        &failure.error.code,
+        failure.error.message,
+        safe_login_page_url(&page_url),
+    );
+    status.conflict = failure.conflict.map(|pair| *pair);
+    publish_status(app, &state, status).await;
 }
 
 pub(super) async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {

@@ -6,6 +6,7 @@
 
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
+use crate::ipc_types::{mask_user_id, AccountBrief, AccountPair};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -69,6 +70,8 @@ pub struct OfficialStatus {
     /// 等待授权时的起始地址。里面只有 state 和领取密钥的哈希，可以放心复制到
     /// 无痕窗口里打开（换账号用）。
     pub authorize_url: Option<String>,
+    /// 授权到的账号和高级数据不是同一个时，两边各是谁。
+    pub conflict: Option<AccountPair>,
 }
 
 impl OfficialStatus {
@@ -81,20 +84,9 @@ impl OfficialStatus {
             nickname: None,
             connected_at: None,
             authorize_url: None,
+            conflict: None,
         }
     }
-}
-
-fn mask(user_id: &str) -> String {
-    let tail: String = user_id
-        .chars()
-        .rev()
-        .take(4)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
-    format!("••••{tail}")
 }
 
 /// 正在等待的那次授权的起始地址和附带的一句；没有在等时为 `None`。
@@ -145,6 +137,7 @@ fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
             nickname: None,
             connected_at: None,
             authorize_url: Some(url),
+            conflict: None,
         };
     }
     stored_account_status(&OfficialStore::new(data_dir))
@@ -166,10 +159,11 @@ fn stored_account_status(store: &OfficialStore) -> OfficialStatus {
             .into(),
             message_code: None,
             message: None,
-            user_id_masked: Some(mask(&meta.user_id)),
+            user_id_masked: Some(mask_user_id(&meta.user_id)),
             nickname: meta.nickname.clone(),
             connected_at: Some(meta.connected_at),
             authorize_url: None,
+            conflict: None,
         },
         None => OfficialStatus {
             state: "idle".into(),
@@ -179,6 +173,7 @@ fn stored_account_status(store: &OfficialStore) -> OfficialStatus {
             nickname: None,
             connected_at: None,
             authorize_url: None,
+            conflict: None,
         },
     }
 }
@@ -424,14 +419,25 @@ async fn save_verified(
     }
     // 高级数据连的是另一个 Zepp 账号：明说，不静默只出一半数据。
     let legacy = zeppbridge_core::auth::AuthManager::new(data_dir.to_path_buf()).saved_user_id();
-    if legacy
+    if let Some(legacy) = legacy
         .as_deref()
-        .is_some_and(|legacy| crate::commands::accounts_differ(legacy, &tokens.user_id))
+        .filter(|legacy| crate::commands::accounts_differ(legacy, &tokens.user_id))
     {
-        return Some(OfficialStatus::failed(
+        let mut status = OfficialStatus::failed(
             "err.official.other_account",
             "这是另一个 Zepp 账号：官方授权的和高级数据登录的不是同一个账号，没有保存这次授权。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。",
-        ));
+        );
+        status.conflict = Some(AccountPair {
+            official: AccountBrief {
+                user_id_masked: mask_user_id(&tokens.user_id),
+                nickname: nickname.clone(),
+            },
+            advanced: AccountBrief {
+                user_id_masked: mask_user_id(legacy),
+                nickname: None,
+            },
+        });
+        return Some(status);
     }
     // 库属于另一个账号就不存这把令牌（R06）。
     if let Err(error) = crate::commands::claim_library_for_login(data_dir, &tokens.user_id).await {

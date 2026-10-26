@@ -4,7 +4,7 @@ import { useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
 import { settingsMessages } from '../../views/Settings.i18n';
-import type { OfficialStatus } from '../../types';
+import type { AccountPair, OfficialStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
 import { applyOfficialStatus } from '../sync/run';
 
@@ -25,7 +25,14 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   const failureText = ref<string | null>(null);
   /** 失败的码；授权到了和高级数据 / 库主人不同的账号时，设置页顶上给出「从头开始」。 */
   const failureCode = ref<string | null>(null);
-  watch(failureText, (value) => { if (!value) failureCode.value = null; });
+  /** 授权到的账号和高级数据不是同一个时，两边各是谁。 */
+  const failureConflict = ref<AccountPair | null>(null);
+  watch(failureText, (value) => {
+    if (!value) {
+      failureCode.value = null;
+      failureConflict.value = null;
+    }
+  });
   const accountConflict = computed(() => (
     failureCode.value === 'err.official.other_account' || failureCode.value === 'err.core.account_mismatch'
   ));
@@ -53,6 +60,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
       failureText.value = errorTextFor(next.message_code ?? undefined)
         ?? backendText(next.message ?? '', t.value.officialFailed);
       failureCode.value = next.message_code ?? null;
+      failureConflict.value = next.conflict ?? null;
     } else if (next.state !== 'idle') {
       failureText.value = null;
     }
@@ -146,7 +154,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   };
 
   return {
-    status, busy, failureText, accountConflict, waitingText, checking, waiting, connected, needsReauth, linkCopied,
+    status, busy, failureText, accountConflict, failureConflict, waitingText, checking, waiting, connected, needsReauth, linkCopied,
     start, cancel, checkNow, disconnect, copyLink, attach, detach,
   };
 };
