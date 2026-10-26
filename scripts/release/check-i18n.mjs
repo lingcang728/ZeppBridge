@@ -346,7 +346,8 @@ const ALLOWED_PROSE = [
   { file: 'components/BackfillOffer.vue', text: 'offer.error', why: '补拉循环里已经过 toUserMessage（先查码）的错误句。' },
   { file: 'components/workout/WorkoutProvenanceCard.vue', text: 'fit.note', why: '#140 前端自己的提示（workoutDetailMessages），不是后端散文。' },
   { file: 'components/workout/WorkoutProvenanceCard.vue', text: 'fit.error', why: '#140 已经过 toUserMessage（先查 err.workout_fit.* 码）的错误句。' },
-  { file: 'components/WeeklyReportCard.vue', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文。' },
+  { file: 'components/weeklyFactText.ts', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文（周报卡和每周来信共用）。' },
+  { file: 'components/letters/DataLetters.vue', text: 'letter.note', why: '时间胶囊里用户自己写给将来的话，原样显示。' },
   { file: 'composables/useBackups.ts', text: 'verification.problem', why: 'verifyProblemText 按 problem_code 分支，未知码才回落。' },
   { file: 'components/BackupPanel.vue', text: "verifications[item.id].problem", why: '只用来判断有没有失败，显示走 verifyProblemText。' },
   {

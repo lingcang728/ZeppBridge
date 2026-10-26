@@ -5,6 +5,7 @@ mod auth;
 mod backup;
 mod data;
 pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
+mod data_letters;
 mod letters;
 mod login;
 mod official;
@@ -191,6 +192,9 @@ pub(crate) use data::{
     set_device_model_override, set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs,
     set_workout_code_label, set_workout_type_override, submit_device_model_assignment,
     submit_diagnostic_report,
+};
+pub(crate) use data_letters::{
+    data_letters_open_capsule, data_letters_seal_capsule, data_letters_state,
 };
 pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};

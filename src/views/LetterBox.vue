@@ -2,7 +2,7 @@
 /**
  * 信匣（批次 6；2026-10-21 照用户喜欢的写信应用重做）：来信是一排真信封横着摆（正面，只贴邮票；
  * 顶上原来的信箱和一行小字被用户删了，取信在进页面时自动做）；自己的回信是一张张小信纸，回执盖在下面；集邮册每版一枚。
- * 批次 7 的每周数据来信、时间胶囊、那年今天以后也收在这里。
+ * 批次 7 的每周数据来信、时间胶囊、那年今天收在「你的信」（DataLetters.vue）。
  */
 import '../components/letters/paper.css';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -11,6 +11,8 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeArt from '../components/letters/EnvelopeArt.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
+import DataLetters from '../components/letters/DataLetters.vue';
+import { useDataLetterText } from '../components/letters/dataLetters.i18n';
 import { useLetterText } from '../components/letters/letters.i18n';
 import { echoTitles, letterVersions, loadLetter } from '../services/letters';
 import { letterBox, loadLetterBox, markReceiptsSeen, repliedTo, syncLetterBox } from '../services/letterBox';
@@ -20,11 +22,13 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { locale } from '../i18n';
 import type { LetterReceipt } from '../types/letters';
 
-type Tab = 'letters' | 'replies' | 'stamps';
+type Tab = 'letters' | 'mine' | 'replies' | 'stamps';
 const t = useLetterText();
+const dataText = useDataLetterText();
 const tab = ref<Tab>('letters');
 const tabs = computed(() => [
   { value: 'letters' as const, label: t.value.tabLetters },
+  { value: 'mine' as const, label: dataText.value.tab },
   { value: 'replies' as const, label: t.value.tabReplies },
   { value: 'stamps' as const, label: t.value.tabStamps },
 ]);
@@ -101,6 +105,10 @@ const reread = async (version: string, event: MouseEvent) => {
           <p class="rail-preview">{{ previews.get(v) }}</p>
         </li>
       </ul>
+    </section>
+
+    <section v-else-if="tab === 'mine'" class="box-section">
+      <DataLetters />
     </section>
 
     <section v-else-if="tab === 'replies'" class="box-section" :aria-busy="syncing">

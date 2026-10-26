@@ -56,3 +56,51 @@ export interface LetterReplyInput {
   allowQuote: boolean;
   alsoHit: string[];
 }
+
+/* 信匣里的数据来信（批次 7）：每周数据来信、时间胶囊、那年今天。 */
+export interface SnapshotValue {
+  metric: string;
+  unit: string;
+  value: number | null;
+  days: number;
+}
+
+export interface LetterSnapshot {
+  start: string;
+  end: string;
+  values: SnapshotValue[];
+}
+
+export interface DataLetter {
+  id: number;
+  kind: 'weekly' | 'capsule';
+  written_at: string;
+  open_on: string | null;
+  opened_at: string | null;
+  /** 胶囊没到日子：话和快照都拿不到。 */
+  sealed: boolean;
+  note: string | null;
+  weekly: import('./insight').WeeklyReport | null;
+  written_snapshot: LetterSnapshot | null;
+  opened_snapshot: LetterSnapshot | null;
+}
+
+export interface OnThisDayWorkout {
+  workout_id: string;
+  workout_type: string;
+  start_time: string;
+  distance_meters: number | null;
+  duration_seconds: number | null;
+}
+
+export interface OnThisDayYear {
+  date: string;
+  years_ago: number;
+  values: SnapshotValue[];
+  workouts: OnThisDayWorkout[];
+}
+
+export interface DataLettersView {
+  letters: DataLetter[];
+  on_this_day: OnThisDayYear[];
+}

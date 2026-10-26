@@ -491,6 +491,15 @@ export const tauriBackend: BridgeBackend = {
   lettersSync() {
     return call<import('../../types/letters').LetterBoxView>('letters_sync');
   },
+  dataLettersState() {
+    return call<import('../../types/letters').DataLettersView>('data_letters_state');
+  },
+  dataLettersSealCapsule(note: string, openOn: string) {
+    return call<number>('data_letters_seal_capsule', { note, openOn });
+  },
+  dataLettersOpenCapsule(id: number) {
+    return call<import('../../types/letters').DataLetter>('data_letters_open_capsule', { id });
+  },
   submitDiagnosticReport(note?: string, category?: string) {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
       note: note ?? null,
