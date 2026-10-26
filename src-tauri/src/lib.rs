@@ -9,6 +9,8 @@ mod ipc_types;
 mod local_api;
 mod main_window;
 mod tray_i18n;
+mod uninstall;
+pub use uninstall::{purge_credentials_for_uninstall, PURGE_CREDENTIALS_ARG};
 mod updates;
 #[cfg(windows)]
 mod web_composer;
@@ -50,14 +52,15 @@ use commands::{
     save_life_event, save_mcp_bundle, set_backup_pinned, set_device_model_override,
     set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
     set_workout_type_override, shoe_delete, shoe_save, shoes_overview, stage_restore,
-    start_history_backfill, start_history_sync, start_incremental_sync, start_official_login,
-    start_web_login, start_workout_detail_backfill, submit_device_model_assignment,
-    submit_diagnostic_report, system_region_locale, training_plan_adherence, training_plan_discard,
-    training_plan_history, training_plan_preview, training_plan_publish, training_plan_save_draft,
-    training_plan_set_ai_publish, training_plan_state, training_plan_update_draft,
-    undo_workout_edit, verify_auth, verify_backup, workout_feedback_adjusted,
-    workout_feedback_dismiss, workout_feedback_get, workout_feedback_prompt, workout_feedback_save,
-    workout_feedback_snooze, workout_feel_get, workout_feel_save,
+    start_fresh_library, start_history_backfill, start_history_sync, start_incremental_sync,
+    start_official_login, start_web_login, start_workout_detail_backfill,
+    submit_device_model_assignment, submit_diagnostic_report, system_region_locale,
+    training_plan_adherence, training_plan_discard, training_plan_history, training_plan_preview,
+    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
+    training_plan_state, training_plan_update_draft, undo_workout_edit, verify_auth, verify_backup,
+    workout_feedback_adjusted, workout_feedback_dismiss, workout_feedback_get,
+    workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze, workout_feel_get,
+    workout_feel_save,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -312,6 +315,24 @@ pub fn run() {
             updates::portable::wait_for_previous(&exe, std::time::Duration::from_secs(20));
         }
         updates::portable::sweep(&exe);
+    }
+
+    // 「换个账号从头开始」排队的改名必须抢在日志、WebView、数据库打开数据目录之前
+    // （commands/auth.rs::start_fresh_library）。
+    if let Ok(data_dir) = paths::resolve_data_dir() {
+        let moved = paths::apply_pending_fresh_start(&data_dir);
+        if !matches!(moved, Ok(None)) {
+            diagnostics::init(Some(&data_dir));
+            match moved {
+                Ok(Some(aside)) => {
+                    diagnostics::log(&format!("从头开始：旧数据已挪到 {}", aside.display()))
+                }
+                Err(error) => diagnostics::log(&format!(
+                    "从头开始：数据文件夹没能挪开（{error}），下次启动再试"
+                )),
+                Ok(None) => {}
+            }
+        }
     }
 
     // WebView2 的用户数据目录必须在 `Builder` 之前定下来：环境变量是
@@ -701,6 +722,7 @@ pub fn run() {
             delete_life_event,
             verify_auth,
             clear_auth,
+            start_fresh_library,
             manual_auth,
             start_official_login,
             cancel_official_login,

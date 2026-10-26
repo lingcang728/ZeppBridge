@@ -408,8 +408,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       manualAuthDone: 'Autenticação manual concluída; credenciais guardadas.',
       manualAuthFailed: 'Autenticação manual falhou',
       verifyFailed: 'A verificação não foi concluída',
-      clearAuthConfirm:
-        'Terminar sessão desta conta?\n\nApenas as credenciais são limpas; todos os dados sincronizados neste computador mantêm-se.\n\nNota: múltiplas contas ainda não são suportadas; iniciar sessão com outra conta gravará na mesma base de dados local.',
       authCleared:
         'Sessão terminada. Os teus dados sincronizados permanecem aqui.',
       clearAuthFailed: 'Não foi possível limpar as credenciais',

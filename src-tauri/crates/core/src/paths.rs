@@ -1,6 +1,9 @@
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+mod fresh_start;
+pub use fresh_start::{apply_pending_fresh_start, request_fresh_start};
+
 const SQLITE_GROUP: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
 const LEGACY_FILES: [&str; 8] = [
     "auth.json",

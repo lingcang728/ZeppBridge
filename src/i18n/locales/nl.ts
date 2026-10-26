@@ -1373,8 +1373,6 @@ export default {
       cleanupFailed: 'Opschonen van oude gegevens is mislukt',
       cleanupNow: 'Nu opschonen',
       clearAuth: 'Inloggegevens wissen',
-      clearAuthConfirm:
-        'Uitloggen bij dit account?\n\nAlleen de inloggegevens worden gewist; alles wat al naar deze machine is gesynchroniseerd blijft.\n\nLet op: meerdere accounts worden nog niet ondersteund — inloggen met een ander account schrijft beide accounts in dezelfde lokale database.',
       clearAuthFailed: 'De inloggegevens konden niet worden gewist',
       closeDialog: 'Dialoog sluiten',
       codeCleared: (code: number) => `De eigen naam voor code ${code} is gewist.`,

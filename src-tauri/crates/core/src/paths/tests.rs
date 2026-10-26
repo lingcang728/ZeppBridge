@@ -540,3 +540,54 @@ fn atomic_write_replaces_an_existing_file() {
     assert!(leftovers.is_empty(), "temp file was left behind");
     let _ = fs::remove_dir_all(dir);
 }
+
+fn fresh_root(label: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!("zb-fresh-{label}-{}", crate::unique_suffix()));
+    std::fs::create_dir_all(&root).unwrap();
+    root
+}
+
+#[test]
+fn fresh_start_moves_the_whole_library_aside_and_keeps_every_file() {
+    use std::time::Duration;
+    let root = fresh_root("move");
+    let data = root.join("data");
+    std::fs::create_dir_all(data.join("webview")).unwrap();
+    std::fs::write(data.join("zepp.db"), b"library").unwrap();
+    std::fs::write(data.join("official.json"), b"{}").unwrap();
+
+    assert_eq!(
+        fresh_start::apply_with_wait(&data, Duration::ZERO).unwrap(),
+        None,
+        "no marker, no move"
+    );
+    request_fresh_start(&data).unwrap();
+    let aside = fresh_start::apply_with_wait(&data, Duration::ZERO)
+        .unwrap()
+        .expect("moved");
+
+    assert!(data.is_dir());
+    assert_eq!(
+        std::fs::read_dir(&data).unwrap().count(),
+        0,
+        "fresh library is empty"
+    );
+    assert_eq!(std::fs::read(aside.join("zepp.db")).unwrap(), b"library");
+    assert!(aside.join("official.json").is_file() && aside.join("webview").is_dir());
+    assert!(
+        !aside.join(fresh_start::MARKER).exists(),
+        "renaming it back must not move it again"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn fresh_start_never_reuses_an_existing_folder() {
+    let root = fresh_root("reuse");
+    std::fs::create_dir_all(root.join("data-before-x")).unwrap();
+    assert_eq!(
+        fresh_start::aside_path(&root.join("data"), "x").unwrap(),
+        root.join("data-before-x-2")
+    );
+    let _ = std::fs::remove_dir_all(root);
+}

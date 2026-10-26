@@ -11,6 +11,7 @@ import { computed, ref } from 'vue';
 import Icon from './Icon.vue';
 import GlassPopover from './GlassPopover.vue';
 import { metricInfo } from '../lib/metricInfo';
+import { metricTrust } from '../lib/metricInfo/trust';
 import { useMetricInfoText } from './MetricInfo.i18n';
 
 const props = defineProps<{
@@ -22,12 +23,20 @@ const props = defineProps<{
 
 const t = useMetricInfoText();
 const info = computed(() => metricInfo(props.metric));
+const trust = computed(() => metricTrust(props.metric));
+const trustText = computed(() => {
+  if (trust.value === 'measured') return t.value.trustMeasured;
+  if (trust.value === 'computed') return t.value.trustComputed;
+  return t.value.trustEstimated;
+});
 const open = ref(false);
 const button = ref<HTMLElement | null>(null);
 const titleId = computed(() => `metric-info-${props.metric}`);
 </script>
 
 <template>
+  <!-- 算法估算的指标在标题旁明说一声；测量 / 换算的不贴，免得满屏标签。 -->
+  <span v-if="info && trust === 'estimated'" class="trust-chip" role="img" :title="t.trustChipTitle" :aria-label="t.trustChipTitle">≈</span>
   <button
     v-if="info"
     ref="button"
@@ -60,6 +69,10 @@ const titleId = computed(() => `metric-info-${props.metric}`);
       <h3>{{ t.sectionHow }}</h3>
       <p>{{ info.how }}</p>
     </section>
+    <section v-if="trust" class="info-section" data-pop-item>
+      <h3>{{ t.sectionTrust }}</h3>
+      <p :class="['trust-line', trust]">{{ trustText }}</p>
+    </section>
   </GlassPopover>
 </template>
 
@@ -85,6 +98,24 @@ const titleId = computed(() => `metric-info-${props.metric}`);
 .metric-info:active { transform: scale(.92); }
 .metric-info[aria-expanded='true'] { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--mat-inset)); }
 .metric-info:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.trust-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 16%, var(--mat-inset));
+  color: var(--warning);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+}
+.trust-line.estimated { color: var(--warning); }
 
 .info-title { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.3; }
 .info-section h3 {

@@ -211,6 +211,10 @@ export const tauriBackend: BridgeBackend = {
     return call<AppStatus>('clear_auth');
   },
 
+  startFreshLibrary() {
+    return call<void>('start_fresh_library');
+  },
+
 
   manualAuth(appToken: string, userId: string, regionHost: string) {
     return call<AppStatus>('manual_auth', { appToken, userId, regionHost });

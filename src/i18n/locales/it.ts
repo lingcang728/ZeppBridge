@@ -3224,7 +3224,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     manualAuthDone: 'Autenticazione manuale riuscita; credenziali salvate.',
     manualAuthFailed: 'Autenticazione manuale non riuscita',
     verifyFailed: 'Verifica non completata',
-    clearAuthConfirm: 'Disconnettere questo account?\n\nVerranno rimosse solo le credenziali di accesso; tutti i dati già sincronizzati su questo computer saranno conservati.\n\nNota: il supporto multi-account non è ancora disponibile — l’accesso con un altro account scriverà i dati nello stesso database locale.',
     authCleared: 'Account disconnesso; la cronologia sincronizzata rimane su questo computer.',
     clearAuthFailed: 'Impossibile rimuovere le credenziali',
     reprocessed: (count: number) => `Dati locali rianalizzati in ${plural(count, { one: `${count} registrazione normalizzata`, other: `${count} registrazioni normalizzate` })}. L’orario di sincronizzazione cloud è invariato.`,

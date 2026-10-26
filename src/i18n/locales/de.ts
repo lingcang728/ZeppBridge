@@ -685,8 +685,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       manualAuthDone: 'Manuelle Anmeldung erfolgreich; die Anmeldedaten sind gespeichert.',
       manualAuthFailed: 'Manuelle Anmeldung fehlgeschlagen',
       verifyFailed: 'Verifizierung fehlgeschlagen',
-      clearAuthConfirm:
-        'Von diesem Konto abmelden?\n\nNur die Anmeldedaten werden gelöscht; bereits Synchronisiertes bleibt auf diesem Rechner erhalten.\n\nHinweis: Kontenwechsel wird noch nicht unterstützt – eine Anmeldung mit anderem Konto schreibt in dieselbe lokale Datenbank.',
       authCleared: 'Abgemeldet. Bereits synchronisierte Daten bleiben erhalten.',
       clearAuthFailed: 'Die Anmeldedaten konnten nicht gelöscht werden',
       reprocessed: (count: number) =>

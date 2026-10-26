@@ -59,7 +59,7 @@ const errorText = (error: unknown): string => {
 
 /* 后端返回的是 `{ code, message, params? }`。code 才是契约，message 是中文
    原文——只在这里还没有对应文案时兜底。 */
-const errorCode = (error: unknown): string | undefined => {
+export const errorCode = (error: unknown): string | undefined => {
   if (typeof error === 'object' && error !== null) {
     const candidate = error as UnknownRecord;
     if (typeof candidate.code === 'string' && candidate.code) return candidate.code;

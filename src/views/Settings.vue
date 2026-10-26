@@ -45,7 +45,7 @@ const router = useRouter();
 const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
 const { feedback, auth, official, prefs, capability } = provideSettingsContext();
 const { dataMessage, dataError } = feedback;
-const { loginError, accountRecognized, connectionLabel } = auth;
+const { loginError, accountConflict, freshStartBusy, accountRecognized, connectionLabel } = auth;
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
@@ -157,7 +157,19 @@ onUnmounted(() => {
       <Icon name="warning" :size="15" />{{ statusError }}
       <button type="button" @click="() => refreshStatus()">{{ t.retry }}</button>
     </div>
-    <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
+    <div v-if="official.accountConflict.value && !loginError" class="alert warning" role="status">
+      <Icon name="info" :size="15" />
+      <span class="alert-body">{{ t.newAccountWarning }}</span>
+      <button type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>
+    </div>
+    <div v-if="loginError" class="alert danger" role="alert">
+      <Icon name="warning" :size="15" />
+      <span class="alert-body">
+        {{ loginError }}
+        <span v-if="accountConflict" class="alert-note">{{ t.newAccountWarning }}</span>
+      </span>
+      <button v-if="accountConflict" type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>
+    </div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
@@ -215,6 +227,11 @@ h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 .alert.success { color: var(--accent); }
 .alert.danger { color: var(--danger); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: var(--fs-sm); }
+.alert.warning { color: var(--warning); }
+.alert-body { display: grid; gap: 4px; min-width: 0; }
+.alert-note { color: var(--muted); }
+.alert-body ~ button { flex: none; text-decoration: underline; text-underline-offset: 3px; }
+.alert button:disabled { cursor: progress; opacity: .6; }
 
 .card-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 2px; }
 .card-title { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 650; line-height: 1.3; }

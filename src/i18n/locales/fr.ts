@@ -361,7 +361,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       manualAuthDone: 'Authentification manuelle réussie ; les identifiants sont enregistrés.',
       manualAuthFailed: 'L’authentification manuelle a échoué',
       verifyFailed: 'La vérification ne s’est pas achevée',
-      clearAuthConfirm: 'Se déconnecter de ce compte ?\n\nSeuls les identifiants sont effacés ; tout ce qui est déjà synchronisé sur cette machine est conservé.\n\nRemarque : pas encore de bascule entre comptes — se connecter avec un autre compte écrirait les deux dans la même base locale.',
       authCleared: 'Compte déconnecté ; l’historique déjà synchronisé reste sur cette machine.',
       clearAuthFailed: 'Impossible d’effacer les identifiants',
       reprocessed: (count: number) => `Données locales re-analysées en ${plural(count, { one: `${count} enregistrement normalisé`, other: `${count} enregistrements normalisés` })}. L’heure de synchro cloud est inchangée.`,

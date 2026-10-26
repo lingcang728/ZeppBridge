@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { backend, toUserMessage } from '../../lib/bridge';
 import { useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
@@ -23,6 +23,12 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   const busy = ref(false);
   /** 已经按码本地化好的失败说明（后端原文只兜底）。 */
   const failureText = ref<string | null>(null);
+  /** 失败的码；授权到了和高级数据 / 库主人不同的账号时，设置页顶上给出「从头开始」。 */
+  const failureCode = ref<string | null>(null);
+  watch(failureText, (value) => { if (!value) failureCode.value = null; });
+  const accountConflict = computed(() => (
+    failureCode.value === 'err.official.other_account' || failureCode.value === 'err.core.account_mismatch'
+  ));
   /** 等待中附带的一句（连不上中转站、手动查过还没结果），按码取当前语言。 */
   const waitingText = ref<string | null>(null);
   /** 「立即检查」刚点过，等结果从 official://status 回来。 */
@@ -46,6 +52,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
       // 后端的中文原文只兜底；先按码取当前语言的说法。
       failureText.value = errorTextFor(next.message_code ?? undefined)
         ?? backendText(next.message ?? '', t.value.officialFailed);
+      failureCode.value = next.message_code ?? null;
     } else if (next.state !== 'idle') {
       failureText.value = null;
     }
@@ -139,7 +146,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   };
 
   return {
-    status, busy, failureText, waitingText, checking, waiting, connected, needsReauth, linkCopied,
+    status, busy, failureText, accountConflict, waitingText, checking, waiting, connected, needsReauth, linkCopied,
     start, cancel, checkNow, disconnect, copyLink, attach, detach,
   };
 };
