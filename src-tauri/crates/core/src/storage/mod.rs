@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 45;
+pub const CURRENT_SCHEMA_VERSION: i64 = 46;
 
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -156,6 +156,7 @@ mod freshness;
 mod guards;
 mod hourly_steps;
 mod hr_zones;
+pub mod imports;
 mod ingest;
 mod maintenance;
 mod meta;

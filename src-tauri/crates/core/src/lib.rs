@@ -15,6 +15,7 @@ pub mod event_days;
 pub mod export_fit;
 pub mod export_formats;
 pub mod fetcher;
+pub mod import;
 pub mod insight;
 pub mod letters;
 pub mod local_api;

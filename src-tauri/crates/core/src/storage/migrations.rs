@@ -1455,6 +1455,34 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(45, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v46（批次 7：多源导入）。GPX / FIT / Strava 整包 / Apple 健康导入的运动照常写进
+        // workouts（raw_record_id 为空，重放不碰），这里记它们来自哪一批、哪种来源，
+        // 整批撤销按 batch_id 删。撤销过的批次留一行（undone_at），运动已删。
+        // 导入的运动是用户自己带进来的，保留期清理不删。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS import_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL CHECK(source IN ('gpx', 'fit', 'strava', 'apple_health')),
+                file_name TEXT,
+                imported_at TEXT NOT NULL,
+                added INTEGER NOT NULL,
+                duplicates INTEGER NOT NULL,
+                unreadable INTEGER NOT NULL,
+                undone_at TEXT
+             );
+             CREATE TABLE IF NOT EXISTS workout_imports (
+                workout_id TEXT PRIMARY KEY,
+                batch_id INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                name TEXT
+             );
+             CREATE INDEX IF NOT EXISTS idx_workout_imports_batch ON workout_imports(batch_id);
+             PRAGMA user_version = 46;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(46, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

@@ -33,6 +33,8 @@ pub const MAX_FIT_IMPORT_BYTES: usize = 32 * 1024 * 1024;
 pub struct ImportedFit {
     pub decoded: DecodedWorkout,
     pub summary: ImportedFitSummary,
+    /// FIT `sport` 枚举的原值；文件没写就是 `None`。导入运动（`crate::import`）按它认运动类型。
+    pub sport: Option<u8>,
 }
 
 /// 修正文件自己的汇总。缺哪项就是 `None`，存储层不会拿它覆盖云端的值。
@@ -199,6 +201,7 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
             laps,
         },
         summary,
+        sport: (sport.0 != u8::MAX).then_some(sport.0),
     })
 }
 

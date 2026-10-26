@@ -17,6 +17,9 @@ import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, worko
 import type { Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
+import WorkoutImport from '../components/workout/WorkoutImport.vue';
+import { workoutImportMessages } from '../components/workout/workoutImport.i18n';
+import type { ImportSourceKey } from '../types/imports';
 
 const messages = defineMessages(
   {
@@ -68,6 +71,11 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 const tools = useMessages(workoutToolsMessages);
+const importText = useMessages(workoutImportMessages);
+const importing = ref(false);
+/* 导入的运动在摘要行最前面标来源（GPX / Strava / Apple 健康……）；日期那一栏太窄，放不下。 */
+const importSources = ref<Record<string, ImportSourceKey>>({});
+const loadImportSources = () => tauriApi.workoutImportSources().then((map) => { importSources.value = map; }).catch(() => undefined);
 const selecting = ref(false);
 const hiddenView = ref(false);
 const selected = ref(new Set<string>());
@@ -104,18 +112,20 @@ const displayableList = computed(() => hiddenView.value ? workouts.value : displ
    只列有值的项，一项都没有才写「未提供」。 */
 const workoutFact = (workout: Workout): string => {
   const parts: string[] = [];
+  const source = importSources.value[workout.workout_id];
+  if (source) parts.push(importText.value.short[source]);
   const minutes = workoutDurationMinutes(workout);
   if (minutes) parts.push(formatDuration(minutes));
   if (isFiniteNumber(workout.avg_hr)) parts.push(t.value.avgHr(Math.round(workout.avg_hr)));
   const meters = workout.distance_meters;
   if (isFiniteNumber(meters) && meters > 0) parts.push(formatDistance(meters));
   else if (isFiniteNumber(workout.calories)) parts.push(`${Math.round(workout.calories)} kcal`);
-  return parts.length ? parts.join(' · ') : t.value.notProvided;
+  return parts.length > (source ? 1 : 0) ? parts.join(' · ') : [...parts, t.value.notProvided].join(' · ');
 };
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
-onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-useRevisionReload(() => void loadList());
+onMounted(() => { void loadImportSources(); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
+useRevisionReload(() => { void loadList(); void loadImportSources(); });
 </script>
 
 <template>
@@ -125,11 +135,13 @@ useRevisionReload(() => void loadList());
     <div class="selection-actions">
       <button class="button secondary" type="button" :aria-pressed="selecting" @click="selecting = !selecting; selected.clear()">{{ selecting ? tools.done : tools.select }}</button>
       <button class="button secondary" type="button" :aria-pressed="hiddenView" @click="switchVisibility">{{ hiddenView ? tools.visible : tools.hidden }}</button>
+      <button class="button secondary" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">{{ importing ? importText.close : importText.open }}</button>
       <template v-if="selecting">
         <button class="button secondary" type="button" @click="displayableList.forEach(w => selected.add(w.workout_id))">{{ tools.selectLoaded }}</button>
         <button class="button secondary" type="button" @click="selected.clear()">{{ tools.clearSelection }}</button>
       </template>
     </div>
+    <WorkoutImport v-if="importing" id="workout-import" />
     <p class="footnote">{{ tools.localHint }}</p>
     <WorkoutTools :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
 

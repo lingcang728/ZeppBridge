@@ -21,15 +21,17 @@ defineProps<{
 const emit = defineEmits<{ replaceFit: []; restoreFit: [] }>();
 const t = useMessages(workoutDetailMessages);
 const desktop = isTauri();
+// 从 GPX / Strava / Apple 健康导入的运动（core::storage::imports）：没经过 Zepp 云端。
+const imported = (workout: WorkoutMetrics) => workout.type_source === 'imported';
 </script>
 
 <template>
   <section class="surface-card meta-card" :aria-label="t.provenanceAria">
     <div class="section-head"><GlyphTile name="database" tone="altitude" :size="40" /><div><p class="section-eyebrow">{{ t.eyebrowProvenance }}</p><h2>{{ t.provenanceTitle }}</h2></div></div>
     <dl>
-      <div><dt>{{ t.provenanceProvider }}</dt><dd>{{ dataProviderLabel() }}</dd></div>
+      <div><dt>{{ t.provenanceProvider }}</dt><dd>{{ imported(workout) ? t.provenanceImported : dataProviderLabel() }}</dd></div>
       <div><dt>{{ t.provenanceScope }}</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div>
-      <div><dt>{{ t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div>
+      <div><dt>{{ imported(workout) ? t.provenanceImportedAt : t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div>
       <div><dt>{{ t.provenanceRecordId }}</dt><dd>{{ workout.workout_id }}</dd></div>
       <div><dt>{{ t.provenanceDevice }}</dt><dd>{{ deviceName }}</dd></div>
       <template v-if="fit.override">

@@ -24,6 +24,7 @@ directories = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
 flate2 = { workspace = true }
+zip = { version = "4.6", default-features = false, features = ["deflate-flate2"] }
 rustyfit = { workspace = true }
 embedded-io-adapters = { workspace = true }
 
