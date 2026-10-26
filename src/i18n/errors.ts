@@ -59,6 +59,7 @@ const messages = defineMessages(
 
     /* —— 连接与认证 —— */
     'err.auth.sync_init_failed': '无法初始化同步，检查认证区域后重试',
+    'err.auth.fresh_start_failed': '没能准备新的数据文件夹，现有数据没有变动',
     'err.auth.verify_network': '认证验证失败：连不上 Zepp 服务，检查网络后重试',
     'err.auth.verify_needs_reauth': '认证验证失败：认证已失效，重新保存认证信息',
     'err.auth.verify_failed': '认证验证失败',
@@ -274,6 +275,7 @@ const messages = defineMessages(
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': "Could not init sync — check the account region and retry",
+    'err.auth.fresh_start_failed': 'Could not prepare a new data folder; your current data is unchanged',
     'err.auth.verify_network':
       "Verification failed: could not reach Zepp — check your network and retry",
     'err.auth.verify_needs_reauth':
@@ -506,6 +508,7 @@ const messages = defineMessages(
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': 'No se pudo inicializar la sincronización: revisa tu región y reintenta',
+    'err.auth.fresh_start_failed': 'No se pudo preparar una carpeta de datos nueva; tus datos actuales no cambiaron',
     'err.auth.verify_network':
       'Fallo de verificación: sin conexión con Zepp. Revisa tu red y reintenta',
     'err.auth.verify_needs_reauth':

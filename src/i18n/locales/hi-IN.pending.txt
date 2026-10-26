@@ -1,3 +1,13 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
+components/MetricInfo.sectionTrust
+components/MetricInfo.trustChipTitle
+components/MetricInfo.trustComputed
+components/MetricInfo.trustEstimated
+components/MetricInfo.trustMeasured
 components/journal/repair.recorded
+i18n/errors.err.auth.fresh_start_failed
+views/Settings.freshStart
+views/Settings.freshStartConfirm
+views/Settings.logoutConfirm
+views/Settings.newAccountWarning

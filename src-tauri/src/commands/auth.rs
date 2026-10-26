@@ -170,6 +170,45 @@ pub async fn clear_auth(
     build_app_status(&state).await
 }
 
+/// 换个账号从头开始：删掉两条通道的令牌，排队把整个数据文件夹挪到一边，然后重启。
+///
+/// 改名必须在重启后、任何文件被打开之前做（`paths::fresh_start`）；旧数据一字不删，
+/// 挪到 `data-before-<时间>`。不撤销官方那边的授权：用户可能还要用同一个账号重新授权。
+#[tauri::command]
+pub async fn start_fresh_library(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
+    state
+        .login
+        .epoch
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    zeppbridge_core::official::invalidate_pending_logins();
+    let _command_guard = state.lock_sync_commands().await;
+    state.replace_sync_manager(None).await;
+
+    if let Ok(Some(left_behind)) = state.auth.clear_auth() {
+        crate::diagnostics::log(&format!(
+            "从头开始：旧通道令牌没能从凭据存储删掉（{left_behind}）"
+        ));
+    }
+    let official = zeppbridge_core::official::OfficialStore::new(&state.data_dir);
+    if let Ok(Some(left_behind)) = official.disconnect() {
+        crate::diagnostics::log(&format!(
+            "从头开始：官方令牌没能从凭据存储删掉（{left_behind}）"
+        ));
+    }
+    crate::paths::request_fresh_start(&state.data_dir).map_err(|error| {
+        AppError::new(
+            "err.auth.fresh_start_failed",
+            format!("没能准备新的数据文件夹：{error}"),
+        )
+    })?;
+    crate::diagnostics::log("从头开始：已排队挪开数据文件夹，正在重启");
+    app.request_restart();
+    Ok(())
+}
+
 /// Verify a credential with the same bounded recent heart-rate query used by
 /// `verify_auth`.  The request is made without holding application locks.
 pub(crate) async fn verify_recent_heart_rate(

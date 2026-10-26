@@ -170,15 +170,24 @@ token is never displayed.
   cleaned up. The manual **Prune by retention** button now lives in
   **Advanced and maintenance → Maintenance**, uses the same day count, and cannot
   be undone.
-- To remove everything, clear credentials in Settings first, then look at the
-  `data\` folder next to the program. Back it up before deleting the install
-  folder.
+- To remove everything, uninstall with **Delete the application data** ticked.
+  This now really removes the `data\` folder next to the program, the
+  tokens in Windows Credential Manager, and the copy an old 2.x install may have
+  left in `%APPDATA%\zeppbridge\ZeppBridge`. Earlier versions left
+  all of it behind, so a reinstall came back with the old account and devices.
+  Back up `data\` first if you may want it again.
 - **One `data\` folder holds one Zepp account.** The database remembers which
   account first wrote to it; signing in or authorizing with a different account
   afterwards is refused without writing anything, and existing data is never
-  wiped automatically. To switch accounts, quit ZeppBridge, move or rename the
-  `data\` folder (your old data stays in it), then start the program and
-  connect again. The legacy connector and the official authorization must use
-  the same account.
+  wiped automatically. To switch accounts, choose **Start over with another
+  account** in the sign-in error: both connections are signed out, the whole
+  `data\` folder is renamed to `data-before-<date>` (nothing is deleted;
+  rename it back to return), and the app restarts with an empty library. The
+  legacy connector and the official authorization must use the same account.
+- **Don't create a new Zepp account or move your watch to another account to
+  get this working.** Pairing a watch with a different account resets the
+  settings on the watch. If your Zepp account was created with Google, Apple
+  or another service, signing in with the same email and a password is a
+  different account to Zepp; use the official authorization instead.
 
 Further boundaries are in [security and privacy](../reference/security-and-privacy.md).

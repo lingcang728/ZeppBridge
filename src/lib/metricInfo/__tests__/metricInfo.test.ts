@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { setLocale, type Locale } from '../../../i18n';
 import { METRIC_INFO_IDS, metricInfo } from '../index';
+import { metricTrust } from '../trust';
 import { METRICS as BODY_METRICS } from '../../../views/body/bodyCards';
 
 /*
@@ -62,6 +63,12 @@ describe('metric info registry', () => {
         expect(info?.how.length, `${locale}: ${id}.how`).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('every registered id says how far it can be trusted; the watch VO₂max is an estimate', () => {
+    for (const id of METRIC_INFO_IDS) expect(metricTrust(id), id).not.toBeNull();
+    expect(metricTrust('vo2max')).toBe('estimated');
+    expect(metricTrust('steps')).toBe('measured');
   });
 
   it('an unknown id renders no button at all', () => {

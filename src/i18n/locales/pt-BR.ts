@@ -1886,7 +1886,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       manualAuthDone: 'Credenciais manuais salvas com sucesso.',
       manualAuthFailed: 'Falha na autenticação manual',
       verifyFailed: 'Falha na verificação',
-      clearAuthConfirm: 'Deseja desconectar esta conta?\n\nApenas as credenciais serão removidas; os dados locais serão preservados.\n\nAtenção: alternar contas não é suportado — uma nova conta gravará no mesmo banco de dados local.',
       authCleared: 'Sessão encerrada. Dados locais preservados.',
       clearAuthFailed: 'Falha ao remover credenciais',
       reprocessed: (count: number) => `Dados locais reprocessados (${count} registros gerados). Horários da nuvem mantidos.`,

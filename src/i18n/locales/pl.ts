@@ -3368,7 +3368,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     manualAuthDone: 'Uwierzytelnianie ręczne powiodło się; dane logowania zapisane.',
     manualAuthFailed: 'Uwierzytelnianie ręczne nie powiodło się',
     verifyFailed: 'Weryfikacja nie została ukończona',
-    clearAuthConfirm: 'Wylogować się z tego konta?\n\nUsunięte zostaną wyłącznie dane logowania; zsynchronizowana historia pozostanie na tym komputerze.\n\nUwaga: brak jeszcze obsługi wielu kont — zalogowanie się na inne konto zapisze dane do tej samej biblioteki lokalnej.',
     authCleared: 'Wylogowano; zsynchronizowana historia pozostała na tym komputerze.',
     clearAuthFailed: 'Nie udało się wyczyścić danych logowania',
     reprocessed: (count: number) =>

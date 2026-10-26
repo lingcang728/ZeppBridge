@@ -369,6 +369,8 @@ export interface BridgeBackend {
   getAppStatus(): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;
+  /** 两条通道都退出、排队把数据文件夹挪到一边，然后重启应用；旧数据不删。 */
+  startFreshLibrary(): Promise<void>;
   manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
   /** 登录窗标题跟随界面语言，后端认十种界面语言标记（认不出回落英文）。 */

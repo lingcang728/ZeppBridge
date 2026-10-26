@@ -1,7 +1,7 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { deviceStateLabel, useDevices } from '../useDevices';
 import { useSyncController } from '../useSyncController';
-import { backend, toUserMessage } from '../../lib/bridge';
+import { backend, errorCode, toUserMessage } from '../../lib/bridge';
 import { locale, useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
@@ -28,6 +28,14 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const loginStatus = ref<LoginStatus>(idleStatus());
   const loginError = ref<string | null>(null);
   const loginBusy = ref(false);
+  /* 登录失败的码。高级数据和官方授权不是同一个账号、或库已经认了别的账号时，
+     提示里要多给一条出路：换个账号从头开始（旧数据挪到一边，不删）。 */
+  const loginErrorCode = ref<string | undefined>();
+  watch(loginError, (value) => { if (!value) loginErrorCode.value = undefined; });
+  const accountConflict = computed(() => (
+    loginErrorCode.value === 'err.login.other_account' || loginErrorCode.value === 'err.core.account_mismatch'
+  ));
+  const freshStartBusy = ref(false);
   let unlistenLogin: (() => void) | undefined;
   /** 挂载代次：detach 一次就作废之前所有还没回来的 attach（R16）。 */
   let attachGen = 0;
@@ -93,6 +101,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       // status.message 是后端的中文原文，只能兜底；先按码取当前语言的说法。
       loginError.value = errorTextFor(status.code)
         ?? backendText(status.message, t.value.loginIncomplete);
+      loginErrorCode.value = status.code ?? undefined;
     }
   };
 
@@ -148,6 +157,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       dataMessage.value = t.value.manualAuthDone;
     } catch (error) {
       loginError.value = toUserMessage(error, t.value.manualAuthFailed);
+      loginErrorCode.value = errorCode(error);
     } finally {
       manualAuthBusy.value = false;
     }
@@ -163,8 +173,20 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     }
   };
 
+  /** 应用会重启，成功时这里等不到返回。 */
+  const startFresh = async () => {
+    if (!window.confirm(t.value.freshStartConfirm)) return;
+    freshStartBusy.value = true;
+    try {
+      await backend.startFreshLibrary();
+    } catch (error) {
+      dataError.value = toUserMessage(error, t.value.clearAuthFailed);
+      freshStartBusy.value = false;
+    }
+  };
+
   const clearAuth = async () => {
-    if (!window.confirm(t.value.clearAuthConfirm)) return;
+    if (!window.confirm(t.value.logoutConfirm)) return;
     dataError.value = null;
     try {
       await backend.clearAuth();
@@ -202,6 +224,9 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     reconnecting,
     loginStatus,
     loginError,
+    accountConflict,
+    freshStartBusy,
+    startFresh,
     loginBusy,
     showManualAuth,
     manualAppToken,
