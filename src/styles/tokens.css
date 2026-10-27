@@ -191,9 +191,9 @@
     radial-gradient(900px 520px at 12% -8%, rgba(125, 163, 62, .10), transparent 70%),
     radial-gradient(760px 520px at 96% 8%, rgba(100, 119, 215, .09), transparent 70%),
     radial-gradient(900px 600px at 60% 110%, rgba(43, 179, 192, .06), transparent 70%);
-  /* 年轮木片（lib/rings/wood.ts）：木头本身不分主题，只有下面的投影和外面的月份刻度跟着主题。 */
-  --wood-shadow: rgba(0, 0, 0, .55);
-  --wood-guide: rgba(214, 190, 160, .32);
+  /* 年轮木片（lib/rings/wood.ts）：木头本身不分主题，只有下面的投影和外面的月份刻度跟着主题。 */
+  --wood-shadow: rgba(0, 0, 0, .55);
+  --wood-guide: rgba(214, 190, 160, .32);
 }
 
 /* 浅色主题：暖白底 + 深绿品牌色。色板方向见
