@@ -3226,10 +3226,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       toolTrainingContext: 'Recente training en herstel in één overzicht: een dagtabel, elke workout en het actieve plan',
       toolTrainingPlan: 'Het logboek voor trainingsplannen: actief plan, afleverstatus en concepten',
     },
-    'views/settings/sections/display': {
-      focusTitle: 'Mijn focus',
-      focusSlideSub: 'Het overzicht toont dit blok eerst en vouwt de rest onder ‘Alles tonen’; ‘Gebalanceerd’ laat alles zoals het is',
-    },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
       learnMore: 'Meer informatie',

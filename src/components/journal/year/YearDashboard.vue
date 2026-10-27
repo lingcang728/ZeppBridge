@@ -6,6 +6,7 @@
 import { computed, onActivated, onMounted, ref, shallowRef } from 'vue';
 import Icon from '../../Icon.vue';
 import AskAiButton from '../../ask/AskAiButton.vue';
+import GlassRim from '../../shell/GlassRim.vue';
 import { useAnnualRings } from '../../../composables/useAnnualRings';
 import { defaultRingYear } from '../../../lib/rings/selection';
 import RingsCard from './RingsCard.vue';
@@ -53,7 +54,8 @@ const detail = shallowRef<{ kind: HighlightKind; origin: HTMLElement } | null>(n
       <header>
         <h2>{{ y.activity }}</h2>
         <AskAiButton direct :label="String(year.year)" @activate="view.askAi(calendarCard)" />
-        <div class="stepper glass-control">
+        <div class="stepper glass-control is-lens-host has-rim">
+          <GlassRim />
           <button type="button" :disabled="order.indexOf(year.year) <= 0" :aria-label="y.prevYear" @click="step(-1)"><Icon name="chevron-right" :size="16" class="flip" /></button>
           <span class="stepper-year" aria-live="polite"><Transition :name="`year-${direction}`"><span :key="year.year">{{ year.year }}</span></Transition></span>
           <button type="button" :disabled="order.indexOf(year.year) >= order.length - 1" :aria-label="y.nextYear" @click="step(1)"><Icon name="chevron-right" :size="16" /></button>
@@ -80,7 +82,8 @@ const detail = shallowRef<{ kind: HighlightKind; origin: HTMLElement } | null>(n
 .calendar-card header { display: flex; align-items: center; gap: 10px; }
 .calendar-card h2 { margin: 0 auto 0 0; font-size: var(--fs-lg); font-weight: 600; }
 .calendar-card :deep(svg) { max-width: none !important; }
-/* 翻年用浮在卡上的液态玻璃胶囊（用户 2026-10-27：「右上角的切换居然不是 Liquid Glass」），和顶栏的按钮组同一种材质。 */
+/* 翻年用浮在卡上的液态玻璃胶囊（用户 2026-10-27：「右上角的切换居然不是 Liquid Glass」）：和顶栏的按钮组同一种做法，
+   玻璃画在垫底的 GlassRim 上、外圈一窄条折射；只带 .glass-control 是一层毛玻璃，在不透明的卡上看着就是个描边胶囊。 */
 .stepper { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; }
 .stepper-year { display: grid; place-items: center; min-width: 3.4em; height: 28px; overflow: hidden; font-variant-numeric: tabular-nums; font-weight: 600; }
 .stepper-year > span { grid-area: 1 / 1; }

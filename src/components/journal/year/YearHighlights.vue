@@ -26,7 +26,7 @@ const tallest = (months: Month[]) => Math.max(1, ...months.map(m => m.distance))
 <template>
   <div class="highlights">
     <button type="button" class="highlight" :disabled="!activeMonths.length" @click="open('months', $event)">
-      <span class="head"><Icon name="bars" :size="18" />{{ y.activeMonths }}<Icon v-if="activeMonths.length" name="chevron-right" :size="16" class="go" /></span>
+      <span class="head"><Icon name="bars" :size="18" />{{ y.activeMonths }}</span>
       <ol v-if="activeMonths.length" class="ranks">
         <li v-for="(m, i) in activeMonths.slice(0, 3)" :key="m.month" :style="{ '--share': m.count / activeMonths[0].count }">
           <span class="rank">{{ i + 1 }}</span><span class="month">{{ m.label }}</span><span class="bar" /><b>{{ m.text }}</b>
@@ -35,12 +35,12 @@ const tallest = (months: Month[]) => Math.max(1, ...months.map(m => m.distance))
       <strong v-else class="none">—</strong>
     </button>
     <button type="button" class="highlight" :disabled="!streak" @click="open('streak', $event)">
-      <span class="head"><Icon name="flame" :size="18" />{{ y.streak }}<Icon v-if="streak" name="chevron-right" :size="16" class="go" /></span>
+      <span class="head"><Icon name="flame" :size="18" />{{ y.streak }}</span>
       <template v-if="streak"><strong class="big">{{ streak.text }}</strong><small>{{ streak.range }}</small></template>
       <strong v-else class="none">—</strong>
     </button>
     <button type="button" class="highlight" :disabled="!bestMonth" @click="open('distance', $event)">
-      <span class="head"><Icon name="map" :size="18" />{{ y.bestMonth }}<Icon v-if="bestMonth" name="chevron-right" :size="16" class="go" /></span>
+      <span class="head"><Icon name="map" :size="18" />{{ y.bestMonth }}</span>
       <template v-if="bestMonth">
         <strong class="big">{{ bestMonth.km }}</strong><small>{{ bestMonth.label }}</small>
         <span class="columns" aria-hidden="true"><i v-for="m in months" :key="m.month" :class="{ top: m.month === bestMonth.month }" :style="{ '--share': m.distance / tallest(months) }" /></span>
@@ -48,7 +48,7 @@ const tallest = (months: Month[]) => Math.max(1, ...months.map(m => m.distance))
       <strong v-else class="none">—</strong>
     </button>
     <component :is="longestRun ? RouterLink : 'div'" class="highlight" :to="longestRun ? `/workouts/${longestRun.id}` : undefined" :data-morph-card="longestRun ? '' : undefined">
-      <span class="head"><Icon name="run" :size="18" />{{ t.longestRun }}<Icon v-if="longestRun" name="chevron-right" :size="16" class="go" /></span>
+      <span class="head"><Icon name="run" :size="18" />{{ t.longestRun }}</span>
       <template v-if="longestRun"><strong class="big">{{ longestRun.value }}</strong><small>{{ longestRun.date }}</small></template>
       <strong v-else class="none">—</strong>
     </component>
@@ -65,7 +65,6 @@ button.highlight:not(:disabled):hover, a.highlight:hover { background: color-mix
 .highlight:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .head { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .head :deep(svg) { color: var(--kintsugi); flex: none; }
-.head .go { margin-left: auto; color: var(--muted); }
 .big { font-size: clamp(26px, 2.4vw, 32px); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .none { color: var(--muted); font-size: 28px; font-weight: 400; }
 small { color: var(--muted); font-size: var(--fs-sm); }

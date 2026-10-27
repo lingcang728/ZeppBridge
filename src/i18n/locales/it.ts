@@ -3832,10 +3832,6 @@ Rispondi in Markdown.`,
     codesFix: 'Assegna un nome',
   },
 
-  'views/settings/sections/display': {
-    focusTitle: 'Cosa mi interessa',
-    focusSlideSub: 'La panoramica posiziona questo blocco per primo e raggruppa il resto sotto «Mostra tutto»; «Bilanciato» mantiene la disposizione iniziale',
-  },
 
   'views/settings/sections/fileName': {
     example: 'ad es.',

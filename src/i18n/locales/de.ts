@@ -3819,11 +3819,6 @@ Antworte in Markdown.`,
       autoOn:
         'Ein: Sobald die KI-Website öffnet, werden Datei und Einleitungstext für dich eingefügt und gesendet; mit Esc jederzeit stoppen',
     },
-    'views/settings/sections/display': {
-      focusTitle: 'Mein Fokus',
-      focusSlideSub:
-        'Die Übersicht zeigt diesen Bereich zuerst, der Rest wandert unter „Alle anzeigen“; „Ausgewogen“ belässt alles wie gehabt',
-    },
     'views/settings/sections/privacy': {
       lead: 'Deine Daten bleiben auf diesem Rechner: kein Hochladen, keine Nutzungsstatistiken',
       learnMore: 'Mehr erfahren',

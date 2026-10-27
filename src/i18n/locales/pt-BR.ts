@@ -2970,10 +2970,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       autoOn: 'Ativado: ao abrir o site da IA, o arquivo e a mensagem inicial são colados e enviados para você; pressione Esc a qualquer momento para parar',
     },
 
-    'views/settings/sections/display': {
-      focusTitle: 'Meus focos',
-      focusSlideSub: 'A visão geral exibe este bloco primeiro e reúne o restante em “Ver tudo”; “Equilibrado” mantém como está',
-    },
 
     'views/settings/sections/privacy': {
       lead: 'Seus dados ficam apenas neste computador: sem uploads, sem estatísticas de uso',
