@@ -50,7 +50,7 @@ const messages = defineMessages(
   },
   {
     title: 'Rings',
-    intro: 'One ring per year, the earliest at the centre. A ring swells with each week\'s training, every tick is one workout, and the line breaks where data is missing.',
+    intro: 'One ring a year, the earliest at the centre. A ring swells with each week\'s training, every tick is one workout, and the line breaks where data is missing.',
     entry: 'Rings',
     empty: 'No data yet. Sync, and the first ring will grow here.',
     years: 'Years',
@@ -128,13 +128,13 @@ const messages = defineMessages(
     busiestValue: (month: string, n: number) => `${month} · ${n}`,
     steps: 'Pasos en todo el año',
     stepsValue: (n: string) => `${n} pasos`,
-    sleep: 'Sueño medio por noche',
+    sleep: 'Sueño promedio por noche',
     sleepValue: (h: number, m: number) => `${h} h ${m} min`,
     records: 'Marcas personales batidas',
     races: 'Carreras terminadas',
     coverage: (days: number, ongoing: boolean) => {
       const span = `${days} ${days === 1 ? 'día' : 'días'}`;
-      return ongoing ? `En lo que va de año, tu reloj te ha acompañado ${span}` : `Este año, tu reloj te acompañó ${span}`;
+      return ongoing ? `En lo que va del año, tu reloj te ha acompañado ${span}` : `Este año, tu reloj te acompañó ${span}`;
     },
     share: 'Guardar como imagen',
     drawing: 'Dibujando…',
