@@ -56,7 +56,7 @@ pub fn footwear_family(effective_type: &str) -> Option<&'static str> {
 }
 
 /// 身体部位（人形图上能点的区域）。左右分开，伤病和酸痛共用这一份。
-pub const BODY_PARTS: [&str; 29] = [
+pub const BODY_PARTS: [&str; 40] = [
     "neck",
     "shoulder_l",
     "shoulder_r",
@@ -86,6 +86,17 @@ pub const BODY_PARTS: [&str; 29] = [
     "foot_r",
     "it_band_l",
     "it_band_r",
+    "head",
+    "upper_arm_l",
+    "upper_arm_r",
+    "elbow_l",
+    "elbow_r",
+    "forearm_l",
+    "forearm_r",
+    "wrist_l",
+    "wrist_r",
+    "hand_l",
+    "hand_r",
 ];
 
 pub(crate) fn valid_body_part(part: &str) -> bool {

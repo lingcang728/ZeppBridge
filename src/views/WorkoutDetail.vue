@@ -52,6 +52,8 @@ const {
   durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,
   heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge,
 } = useWorkoutPresentation(workout, series, device, displayType);
+/* 海拔的出处说明挂在「累计爬升」那格的悬停提示上，不在页面里再占一行小字。 */
+const hasAltitude = computed(() => Boolean(series.value?.samples.some(sample => sample.altitude_m != null) || series.value?.summary.elevation_gain_m != null || workout.value?.elevation_gain_m != null));
 const sportName = computed(() => (workout.value ? workoutDisplayLabel(workout.value) || workoutLabel(displayType.value) : ''));
 
 /* 两列底部尽量齐平：「来源信息」放进（不算它自己时）更矮的那一列。没有轨迹的运动
@@ -112,14 +114,14 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         :metrics="heroMetrics"
         :override-choices="typeOverrideChoices"
         :override-busy="typeOverrideBusy"
+        :altitude-note="hasAltitude ? tools.altitudeHint : undefined"
         @override="changeWorkoutOverride"
       >
         <template #actions>
+          <WorkoutTools single :ids="[workout.workout_id]" @changed="hidden => hidden ? router.push('/workouts') : loadDetail()" />
           <AskAiButton :workout="{ id: workout.workout_id, label: sportName }" :label="sportName" card=".workout-hero" />
         </template>
       </WorkoutHero>
-      <WorkoutTools :ids="[workout.workout_id]" @changed="hidden => hidden ? router.push('/workouts') : loadDetail()" />
-      <p v-if="series?.samples.some(sample => sample.altitude_m != null) || series?.summary.elevation_gain_m != null || workout.elevation_gain_m != null" class="footnote">{{ tools.altitudeHint }}</p>
       <p v-if="workout.effective_type === 'strength'" class="footnote">{{ tools.strengthHint }}</p>
 
       <!-- 不支持这类运动的洞察时整块不渲染：一张只会说「暂不支持」的卡片

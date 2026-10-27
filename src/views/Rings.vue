@@ -7,7 +7,7 @@
  * 存到图片文件夹，原始数据不离开这台电脑。12 月 15 日起默认看今年，之前默认看去年。
  */
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import RingsStage from '../components/rings/RingsStage.vue';
@@ -20,6 +20,10 @@ import { drawShare, SNAPSHOT_SIZE } from '../lib/rings/draw';
 import { NONE, yearFacts } from '../lib/rings/facts';
 import { workoutLabel } from '../lib/labels';
 import { fontsReady } from '../lib/fontsReady';
+import { diveOut } from '../lib/rings/cosmosDive';
+import AskAiButton from '../components/ask/AskAiButton.vue';
+import { useYearView } from '../components/journal/year/useYearView';
+import { STAGE_NEBULA_RATIO } from '../lib/rings/nebula';
 import type { AnnualRings } from '../types/rings';
 
 defineOptions({ name: 'Rings' });
@@ -50,7 +54,8 @@ const selected = computed<number | null>(() => {
 });
 const pick = (year: number) => { void router.replace({ query: { ...route.query, year: String(year) } }); };
 const year = computed(() => rings.value?.years.find(y => y.year === selected.value) ?? null);
-const yearItems = computed(() => [...(rings.value?.years ?? [])].reverse().map(y => ({ value: y.year, label: String(y.year), title: t.value.yearAria(y.year) })));
+// 按钮上就是年份本身，不再挂一个「2026 年」的悬停提示（和按钮字重复）。
+const yearItems = computed(() => [...(rings.value?.years ?? [])].reverse().map(y => ({ value: y.year, label: String(y.year) })));
 
 const facts = computed(() => (year.value
   ? yearFacts(year.value, t.value, key => j.value.distances[key], workoutLabel)
@@ -62,12 +67,23 @@ const primaryFacts = computed(() => primaryKeys.flatMap(key => displayedFacts.va
 const secondaryFacts = computed(() => displayedFacts.value.filter(f => !primaryKeys.includes(f.key)));
 
 const stage = ref<InstanceType<typeof RingsStage> | null>(null);
+/* 交给 AI：和履历页年轮区块同一份「我看到的这一年」，再加上右栏这些（步数、睡眠、PB、比赛……）。 */
+const yearView = useYearView(rings, selected);
+const experience = ref<HTMLElement | null>(null);
+const askAi = () => yearView.askAi(experience.value, facts.value.map(f => `${f.label}: ${f.value}${f.detail ? ` · ${f.detail}` : ''}`));
+/* 回履历：星云从舞台缩回卡上那一格（进来时的反放）。 */
+onBeforeRouteLeave((to) => {
+  const box = (stage.value?.$el as HTMLElement | undefined)?.getBoundingClientRect();
+  if (to.name === 'Journal' && box?.width) diveOut({ cx: box.left + box.width / 2, cy: box.top + box.height / 2, radius: box.height * STAGE_NEBULA_RATIO });
+});
 
 /* 下方的数据：等舞台从飞入落到第一幕、或者用户先滚到这里，才出场。 */
 const factsBox = ref<HTMLElement | null>(null);
 const factsShown = ref(false);
-watch(selected, () => { factsShown.value = false; });
-function landed(phase: string) { if (phase === 'year') { displayedYear.value = year.value; factsShown.value = true; } }
+/* 换年份时右栏不清空（以前先整栏消失、等一秒多新数字才出来）：旧数字压暗留着，新的年份落定时再换上、亮回来。 */
+const swapping = ref(false);
+watch(selected, () => { if (factsShown.value) swapping.value = true; });
+function landed(phase: string) { if (phase === 'year') { displayedYear.value = year.value; factsShown.value = true; swapping.value = false; } }
 let factsObserver: IntersectionObserver | null = null;
 watch([factsBox, selected], ([box]) => {
   factsObserver?.disconnect();
@@ -121,6 +137,7 @@ const reveal = async () => {
   <section class="page rings-page" aria-labelledby="rings-title">
     <PageHeader title-id="rings-title" :title="t.title" :intro="t.intro">
       <div v-if="year" class="rings-actions">
+        <AskAiButton direct :label="String(year.year)" @activate="askAi" />
         <span v-if="savedPath" class="saved">{{ t.saved }}</span>
         <button v-if="savedPath" type="button" class="pill-button quiet" @click="reveal">{{ t.openFolder }}</button>
         <button v-else type="button" class="pill-button" :disabled="saving" @click="share">{{ saving ? t.drawing : t.share }}</button>
@@ -130,9 +147,9 @@ const reveal = async () => {
     <p v-if="rings && !rings.years.length" class="rings-empty">{{ t.empty }}</p>
     <template v-if="year && rings">
       <SegmentTrack v-if="yearItems.length > 1" class="rings-years" compact :items="yearItems" :model-value="year.year" :aria-label="t.years" @update:model-value="pick" />
-      <div class="rings-experience">
+      <div ref="experience" class="rings-experience">
         <RingsStage ref="stage" class="rings-stage-box" :years="rings.years" :selected="year.year" :finale-text="t.shareTitle(year.year)" @land="landed" />
-        <section ref="factsBox" :class="['rings-facts', { shown: factsShown }]" :aria-label="t.yearAria(year.year)">
+        <section ref="factsBox" :class="['rings-facts', { shown: factsShown, swapping }]" :aria-label="t.yearAria(year.year)">
           <div v-if="displayedYear" class="facts-content" :inert="!factsShown || undefined" :aria-hidden="!factsShown">
             <p class="coverage">{{ t.coverage(displayedYear.data_days, displayedYear.in_progress) }}</p>
             <div class="primary-facts">
@@ -160,13 +177,16 @@ const reveal = async () => {
 .saved { color: var(--kintsugi); font-size: var(--fs-sm); }
 .rings-error { margin: 0; color: var(--heart); font-size: var(--fs-sm); }
 .rings-empty { margin: 0; color: var(--muted); }
+/* 年份就是普通的数字，选中也不加粗（用户 2026-10-27：2024、2025、2026 字太重）。 */
 .rings-years { justify-self: start; max-width: 100%; }
+.rings-years :deep(.segment-ink) { font-weight: 500; }
 .rings-experience { display: grid; grid-template-columns: minmax(0, 2.125fr) minmax(300px, 1fr); background: #050510; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--mat-rim), var(--mat-shadow); }
 .rings-stage-box { min-height: 640px; height: min(76vh, 860px); }
 .rings-facts { position: relative; padding: 32px; min-width: 0; color: #f5efdf; }
 .rings-facts::before { content: ''; position: absolute; left: 0; top: 5%; bottom: 5%; width: 1px; background: linear-gradient(transparent, #d8bc7950, transparent); }
 .facts-content { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease, transform 120ms ease; }
-.shown .facts-content { opacity: 1; transform: none; transition-duration: 240ms; }
+.shown .facts-content { opacity: 1; transform: none; transition-duration: 420ms; }
+.shown.swapping .facts-content { opacity: .3; transition-duration: 240ms; }
 .coverage { margin: 0 0 16px; font-size: 16px; color: #c5bdaf; line-height: 1.6; }
 .primary-facts { display: grid; }
 .fact { display: grid; gap: 4px; padding: 12px 0; color: inherit; text-decoration: none; border-top: 1px solid #ffffff12; }

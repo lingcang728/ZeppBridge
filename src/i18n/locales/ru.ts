@@ -2434,8 +2434,8 @@ export default {
       none: 'Ничего не выбрано',
       figure: 'Фигура тела: выберите зоны',
       sided: (base: string, side: 'l' | 'r', key: string) => {
-        const neuter = ['shoulder', 'knee', 'achilles'].includes(key);
-        const masculine = ['hip', 'quad', 'it_band'].includes(key);
+        const neuter = ['shoulder', 'knee', 'achilles', 'forearm', 'wrist'].includes(key);
+        const masculine = ['hip', 'quad', 'it_band', 'elbow'].includes(key);
         const prefix = side === 'l'
           ? (neuter ? 'Левое' : masculine ? 'Левый' : 'Левая')
           : (neuter ? 'Правое' : masculine ? 'Правый' : 'Правая');
@@ -2459,6 +2459,12 @@ export default {
         ankle: 'лодыжка',
         foot: 'стопа',
         it_band: 'подвздошно-большеберцовый тракт',
+        head: 'голова',
+        upper_arm: 'верхняя часть руки',
+        elbow: 'локоть',
+        forearm: 'предплечье',
+        wrist: 'запястье',
+        hand: 'кисть',
       },
     },
     'components/journal/journal': {
@@ -2606,6 +2612,29 @@ export default {
       entryNoRace: 'Забеги, обувь и травмы; личные рекорды определяются автоматически',
       shoeAlert: (name: string) => `${name}: пора списать`,
       shoeNear: (name: string) => `${name}: близко к списанию`,
+    },
+    'components/journal/year/year': {
+      prevYear: 'Предыдущий год',
+      nextYear: 'Следующий год',
+      other: 'Другое',
+      vsLastYear: (pct: string) => `по сравнению с прошлым годом ${pct}`,
+      vsSameSpan: (pct: string) => `по сравнению с тем же периодом прошлого года ${pct}`,
+      coverage: (pct: string) => `${pct} покрыто`,
+      activity: 'Год день за днём',
+      activeMonths: 'Самые активные месяцы',
+      streak: 'Самая длинная серия',
+      streakDays: (n: number) =>
+        n === 1
+          ? '1 день'
+          : plural(n, {
+              one: `${n} день подряд`,
+              few: `${n} дня подряд`,
+              many: `${n} дней подряд`,
+              other: `${n} дня подряд`,
+            }),
+      bestMonth: 'Месяц с наибольшей дистанцией',
+      askQuestion: (year: number) => `Подведите итоги моего ${year} года: как прошёл этот год, в чём я прибавил и на чём стоит сосредоточиться в следующем году?`,
+      askSeen: (year: number) => `Что я вижу за ${year} год на странице журнала ZeppBridge:`,
     },
     'views/WorkoutList': {
       title: 'Тренировки',
@@ -3906,18 +3935,9 @@ export default {
       intro: 'Один круг в год, одна звезда за тренировку. Пробелы остаются пустыми.',
       entry: 'Годичные кольца',
       empty: 'Данных пока нет. После синхронизации здесь вырастет первое кольцо.',
-      growing: 'Ещё растёт',
-      blankYear: 'За этот год нет данных — оставлено пустым.',
       years: 'Годы',
       yearAria: (year: number) => `${year} год`,
-      hintIdle: 'Сквозь звёздное море…',
-      hintYear: 'Этот год',
-      hintShape: 'Одно кольцо в год, одна звезда за тренировку',
-      hintFinale: 'Перетащите мышь, чтобы облететь свой год',
       replay: 'Повторить',
-      tapSkip: 'Нажмите, чтобы пропустить',
-      tapHint: 'Нажмите на пустое место: следующая сцена',
-      starHint: 'Нажмите на звезду, чтобы открыть эту тренировку',
       starOpen: 'Открыть тренировку',
       starRank: (n: number) => (n === 1 ? 'Самая длинная за год' : `№${n} по длине за год`),
       close: 'Закрыть',

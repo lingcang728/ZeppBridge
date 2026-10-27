@@ -104,6 +104,7 @@ export const generateTextParticles = (text: string, count: number, width = 640, 
 };
 
 // Idle starfield: a wide, slightly flattened sphere (r 6–56) that surrounds the camera during the intro fly-in.
+// 金黄的星云（用户 2026-10-27），和履历卡上那一小团同一套三档颜色（lib/rings/nebula.ts），飞进来时交接得上。
 export function fillIdle({ pos, col }: PC, count: number) {
   for (let i = 0; i < count; i++) {
     const r = 6 + Math.random() * 50;
@@ -114,9 +115,9 @@ export function fillIdle({ pos, col }: PC, count: number) {
     pos[i * 3 + 2] = r * Math.cos(p) * 0.7;
     const b = 0.45 + Math.random() * 0.5;
     const roll = Math.random();
-    if (roll > 0.9) setCol(col, i, b * 1.0, b * 0.85, b * 0.55);
-    else if (roll > 0.55) setCol(col, i, b * 0.6, b * 0.75, b * 1.0);
-    else setCol(col, i, b * 0.85, b * 0.92, b * 1.0);
+    if (roll > 0.72) setCol(col, i, b * 1.0, b * 0.64, b * 0.27);
+    else if (roll > 0.3) setCol(col, i, b * 1.0, b * 0.8, b * 0.44);
+    else setCol(col, i, b * 1.0, b * 0.92, b * 0.7);
   }
 }
 
@@ -150,6 +151,16 @@ export function fillDigit(text: string, { pos, col }: PC, count: number) {
 }
 
 /** Same 640×240 canvas, font and baseline as the crisp SVG text in RingsStage. */
+/** 正态分布的随机数（Box–Muller）。 */
+const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+
+/**
+ * 年份数字：不是一块实心的金字，是一团拼出字形的星云（用户 2026-10-27：「太实心了，不像星云、不像宇宙」）。
+ * - 五成五的粒子落在笔画上，其中多数挤在笔画边缘：字是亮的轮廓、里面透着暗，不是糊满的一块；
+ * - 三成是贴着笔画散开的薄雾，前后也有厚度；
+ * - 一成五撒成字后面一大团很淡的星云，偶尔有一颗亮星。
+ * 颜色在暖金、琥珀、淡金之间变，明暗也不一，和开场的星海是一家。
+ */
 export function fillScreenDigit(text: string, { pos, col }: PC, count: number, font: string, worldWidth: number) {
   const canvas = document.createElement('canvas');
   canvas.width = 640; canvas.height = 240;
@@ -158,17 +169,39 @@ export function fillScreenDigit(text: string, { pos, col }: PC, count: number, f
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = 'white';
   ctx.fillText(text, 320, 172);
   const pixels = ctx.getImageData(0, 0, 640, 240).data;
-  const points: number[] = [];
+  const lit = (x: number, y: number) => x >= 0 && y >= 0 && x < 640 && y < 240 && pixels[(y * 640 + x) * 4 + 3] > 128;
+  const edge: number[] = [], inner: number[] = [];
   for (let y = 0; y < 240; y += 2) for (let x = 0; x < 640; x += 2) {
-    if (pixels[(y * 640 + x) * 4 + 3] > 128) points.push(x, y);
+    if (!lit(x, y)) continue;
+    (lit(x - 4, y) && lit(x + 4, y) && lit(x, y - 4) && lit(x, y + 4) ? inner : edge).push(x, y);
   }
-  const order = shuffled(points.length / 2), scale = worldWidth / 640;
+  const all = [...edge, ...inner];
+  if (!all.length) return;
+  const scale = worldWidth / 640;
+  const pick = (list: number[]) => { const p = (Math.random() * (list.length / 2)) | 0; return [(list[p * 2] - 320) * scale, (120 - list[p * 2 + 1]) * scale]; };
+  const tint = (i: number, light: number) => {
+    const roll = Math.random();
+    if (roll > 0.72) setCol(col, i, light * 1.0, light * 0.64, light * 0.27);
+    else if (roll > 0.3) setCol(col, i, light * 1.0, light * 0.82, light * 0.42);
+    else setCol(col, i, light * 1.0, light * 0.93, light * 0.72);
+  };
+  const stroke = Math.floor(count * 0.55), haze = Math.floor(count * 0.3);
   for (let i = 0; i < count; i++) {
-    const p = order[i % order.length];
-    pos[i * 3] = (points[p * 2] - 320) * scale;
-    pos[i * 3 + 1] = (120 - points[p * 2 + 1]) * scale;
-    pos[i * 3 + 2] = 0;
-    setCol(col, i, ...PALETTE.digit);
+    let x: number, y: number, z: number, light: number;
+    if (i < stroke) {
+      [x, y] = pick(Math.random() < 0.7 && edge.length ? edge : all);
+      x += gauss() * 0.12; y += gauss() * 0.12; z = gauss() * 0.35;
+      light = 0.75 + Math.random() * 0.5;
+    } else if (i < stroke + haze) {
+      [x, y] = pick(all);
+      x += gauss() * 0.9; y += gauss() * 0.9; z = gauss() * 1.4;
+      light = 0.22 + Math.random() * 0.3;
+    } else {
+      x = gauss() * worldWidth * 0.36; y = gauss() * worldWidth * 0.16; z = gauss() * 4;
+      light = Math.random() > 0.94 ? 0.9 + Math.random() * 0.4 : 0.18 + Math.random() * 0.24;
+    }
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    tint(i, light);
   }
 }
 

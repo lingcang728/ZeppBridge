@@ -25,6 +25,8 @@ const props = defineProps<{
   metrics: HeroMetric[];
   overrideChoices: { value: string; label: string }[];
   overrideBusy: boolean;
+  /** 海拔从哪来：挂在海拔那格的悬停提示上。 */
+  altitudeNote?: string;
 }>();
 const emit = defineEmits<{ override: [value: string | number] }>();
 const t = useMessages(workoutDetailMessages);
@@ -78,7 +80,7 @@ const missingLine = computed(() => {
     </div>
 
     <div class="metric-list" :aria-label="t.metricListAria" :style="{ '--tiles': shownMetrics.length }">
-      <div v-for="metric in shownMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]">
+      <div v-for="metric in shownMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]" :title="metric.tone === 'altitude' ? altitudeNote : undefined">
         <GlyphTile :name="metric.icon" :tone="metric.tone" :role="metric.role" :size="36" />
         <div><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div>
       </div>

@@ -143,7 +143,6 @@ useRevisionReload(() => { void loadList(); void loadImportSources(); });
     </div>
     <WorkoutImport v-if="importing" id="workout-import" />
     <p class="footnote">{{ tools.localHint }}</p>
-    <WorkoutTools :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -169,6 +168,7 @@ useRevisionReload(() => { void loadList(); void loadImportSources(); });
       />
       </div>
     </div>
+    <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
@@ -186,8 +186,20 @@ useRevisionReload(() => { void loadList(); void loadImportSources(); });
 .selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
 .selectable-record { display: flex; align-items: center; gap: 12px; }
 .selectable-record > :last-child { flex: 1; min-width: 0; }
-.selectable-record input { width: 22px; height: 22px; accent-color: var(--accent); flex-shrink: 0; }
-.selectable-record.selected { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-md); }
+/* 多选：圆形勾选框进场时弹出来，勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下（用户 2026-10-27：多选要更生动）。 */
+.selectable-record { border-radius: var(--radius-md); transition: background 200ms ease; }
+.selectable-record input { appearance: none; display: grid; place-content: center; width: 24px; height: 24px; margin: 0 0 0 4px; flex-shrink: 0;
+  border: 2px solid var(--line-control); border-radius: 50%; background: transparent; cursor: pointer;
+  animation: check-in 320ms cubic-bezier(.2, 1.5, .4, 1) both; transition: background 160ms ease, border-color 160ms ease; }
+.selectable-record input::before { content: ''; width: 6px; height: 11px; margin-top: -3px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) scale(0); transition: transform 240ms cubic-bezier(.2, 1.6, .4, 1); }
+.selectable-record input:checked { border-color: var(--accent); background: var(--accent); }
+.selectable-record input:checked::before { transform: rotate(45deg) scale(1); }
+.selectable-record.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); animation: row-pop 300ms cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes check-in { from { transform: scale(0); opacity: 0; } }
+@keyframes row-pop { 40% { transform: scale(1.012); } }
+.list-tools { margin-top: 12px; }
+@media (prefers-reduced-motion: reduce) { .selectable-record input, .selectable-record.selected { animation: none; } .selectable-record input::before { transition: none; } }
 .selectable-record input:focus-visible, .selection-actions .button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .record-list.selecting::before { display: none; }
 .selection-actions .button { max-width: 100%; overflow-wrap: anywhere; }

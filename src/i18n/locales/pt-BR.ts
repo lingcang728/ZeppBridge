@@ -3425,7 +3425,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       none: 'Nada selecionado',
       figure: 'Figura corporal: selecione as áreas',
       sided: (base: string, side: 'l' | 'r', key: string) => {
-        const feminine = ['shin', 'calf', 'it_band'].includes(key);
+        const feminine = ['shin', 'calf', 'it_band', 'head', 'hand'].includes(key);
         return `${base} ${side === 'l' ? (feminine ? 'esquerda' : 'esquerdo') : (feminine ? 'direita' : 'direito')}`;
       },
       parts: {
@@ -3446,6 +3446,12 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
         ankle: 'Tornozelo',
         foot: 'Pé',
         it_band: 'Banda iliotibial',
+        head: 'Cabeça',
+        upper_arm: 'Braço',
+        elbow: 'Cotovelo',
+        forearm: 'Antebraço',
+        wrist: 'Pulso',
+        hand: 'Mão',
       },
     },
     'components/workout/feel': {
@@ -3611,22 +3617,29 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       shoeNear: (name: string) => `${name}: próximo da aposentadoria`,
     },
 
+    'components/journal/year/year': {
+      prevYear: 'Ano anterior',
+      nextYear: 'Ano seguinte',
+      other: 'Outros',
+      vsLastYear: (pct: string) => `vs. ano passado ${pct}`,
+      vsSameSpan: (pct: string) => `vs. mesmo período do ano passado ${pct}`,
+      coverage: (pct: string) => `${pct} coberto`,
+      activity: 'O ano, dia a dia',
+      activeMonths: 'Meses mais ativos',
+      streak: 'Maior sequência',
+      streakDays: (n: number) => (n === 1 ? '1 dia' : `${n} dias seguidos`),
+      bestMonth: 'Mês com maior distância',
+      askQuestion: (year: number) => `Revise meu ${year}: como foi o ano, onde evoluí e no que devo focar no próximo ano?`,
+      askSeen: (year: number) => `O que vejo de ${year} na página do diário do ZeppBridge:`,
+    },
+
     'components/rings/rings': {
       title: 'Anéis',
       intro: 'Um anel por ano, uma estrela por treino. As lacunas ficam em branco.',
       entry: 'Anéis',
       empty: 'Ainda não há dados. Sincronize e o primeiro anel crescerá aqui.',
-      growing: 'Ainda crescendo',
-      blankYear: 'Sem dados neste ano — em branco.',
       years: 'Anos',
       yearAria: (year: number) => `${year}`,
-      hintIdle: 'Cruzando as estrelas…',
-      hintYear: 'Este ano',
-      hintShape: 'Um anel por ano, uma estrela por treino',
-      hintFinale: 'Arraste para orbitar seu ano',
-      tapSkip: 'Toque para pular',
-      tapHint: 'Toque em um espaço vazio para ir à próxima cena',
-      starHint: 'Toque em uma estrela para ver aquele treino',
       starOpen: 'Abrir este treino',
       starRank: (n: number) => (n === 1 ? 'O mais longo do ano' : `O ${n}º mais longo do ano`),
       close: 'Fechar',

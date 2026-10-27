@@ -9,7 +9,7 @@
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
 import { onActivated, onMounted, shallowRef } from 'vue';
-import RingsPreview from '../components/journal/RingsPreview.vue';
+import YearDashboard from '../components/journal/year/YearDashboard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import EpochSection from '../components/journal/EpochSection.vue';
 import InjuryEditor from '../components/journal/InjuryEditor.vue';
@@ -39,7 +39,7 @@ const close = () => { editing.value = null; logbook.error.value = null; };
   <section class="page journal-page" aria-labelledby="journal-title">
     <PageHeader title-id="journal-title" :title="t.title" />
     <div class="journal-grid">
-      <RingsPreview class="span-full" />
+      <YearDashboard class="span-full" />
       <RecordWall class="span-full" />
       <EpochSection class="span-full" />
       <RaceSection class="span-half" @edit="(race, origin) => (editing = { kind: 'race', value: race, origin })" />
