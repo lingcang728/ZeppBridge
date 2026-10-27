@@ -12,6 +12,7 @@ const messages = defineMessages(
       neck: '颈', shoulder: '肩', upper_back: '上背', lower_back: '下背', chest: '胸', abdomen: '腹',
       hip: '髋前', glute: '臀', quad: '大腿前侧', hamstring: '大腿后侧', knee: '膝', shin: '小腿前侧',
       calf: '小腿肚', achilles: '跟腱', ankle: '踝', foot: '足', it_band: '髂胫束',
+      head: '头', upper_arm: '上臂', elbow: '肘', forearm: '前臂', wrist: '手腕', hand: '手',
     },
   },
   {
@@ -22,20 +23,22 @@ const messages = defineMessages(
       neck: 'Neck', shoulder: 'shoulder', upper_back: 'Upper back', lower_back: 'Lower back', chest: 'Chest', abdomen: 'Abdomen',
       hip: 'hip flexor', glute: 'glute', quad: 'quad', hamstring: 'hamstring', knee: 'knee', shin: 'shin',
       calf: 'calf', achilles: 'Achilles', ankle: 'ankle', foot: 'foot', it_band: 'IT band',
+      head: 'Head', upper_arm: 'upper arm', elbow: 'elbow', forearm: 'forearm', wrist: 'wrist', hand: 'hand',
     },
   },
   {
     front: 'Delante', back: 'Detrás', clear: 'Borrar', none: 'Nada marcado',
     figure: 'Figura del cuerpo: marca las zonas',
-    // rodilla / espinilla / cintilla son femeninos.
+    // rodilla / espinilla / cintilla / muñeca / mano son femeninos.
     sided: (base: string, side: 'l' | 'r', key: string) => {
-      const feminine = ['knee', 'shin', 'it_band'].includes(key);
+      const feminine = ['knee', 'shin', 'it_band', 'wrist', 'hand'].includes(key);
       return `${base} ${side === 'l' ? (feminine ? 'izquierda' : 'izquierdo') : (feminine ? 'derecha' : 'derecho')}`;
     },
     parts: {
       neck: 'Cuello', shoulder: 'Hombro', upper_back: 'Espalda alta', lower_back: 'Zona lumbar', chest: 'Pecho', abdomen: 'Abdomen',
       hip: 'Flexor de cadera', glute: 'Glúteo', quad: 'Cuádriceps', hamstring: 'Isquiotibial', knee: 'Rodilla', shin: 'Espinilla',
       calf: 'Gemelo', achilles: 'Tendón de Aquiles', ankle: 'Tobillo', foot: 'Pie', it_band: 'Cintilla iliotibial',
+      head: 'Cabeza', upper_arm: 'Brazo', elbow: 'Codo', forearm: 'Antebrazo', wrist: 'Muñeca', hand: 'Mano',
     },
   },
   'components/journal/body',

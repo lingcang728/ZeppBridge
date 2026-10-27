@@ -90,6 +90,7 @@ composables/useFocusAreas.areaTraining
 views/settings/sections/archive.details
 components/tour/tour.inviteLater
 components/journal/body.parts.hamstring
+components/journal/body.parts.hand
 components/journal/journal.raceSport
 
 # de

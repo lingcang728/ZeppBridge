@@ -12,6 +12,8 @@ export const BODY_PARTS = [
   'hip_l', 'hip_r', 'glute_l', 'glute_r', 'quad_l', 'quad_r', 'hamstring_l', 'hamstring_r',
   'knee_l', 'knee_r', 'shin_l', 'shin_r', 'calf_l', 'calf_r', 'achilles_l', 'achilles_r',
   'ankle_l', 'ankle_r', 'foot_l', 'foot_r', 'it_band_l', 'it_band_r',
+  'head', 'upper_arm_l', 'upper_arm_r', 'elbow_l', 'elbow_r', 'forearm_l', 'forearm_r',
+  'wrist_l', 'wrist_r', 'hand_l', 'hand_r',
 ] as const;
 export type BodyPart = (typeof BODY_PARTS)[number];
 export type BodyView = 'front' | 'back';
@@ -27,6 +29,8 @@ export interface BodyRegion {
 
 /** 中线上的部位：一面一个，不分左右。 */
 const MIDLINE: [string, BodyView, number, number, number][] = [
+  ['head', 'front', 19, 10.5, 13],
+  ['head', 'back', 19, 10.5, 13],
   ['neck', 'front', 38, 6, 5],
   ['chest', 'front', 70, 19, 11],
   ['abdomen', 'front', 102, 14, 17],
@@ -34,8 +38,17 @@ const MIDLINE: [string, BodyView, number, number, number][] = [
   ['upper_back', 'back', 74, 19, 14],
   ['lower_back', 'back', 108, 13, 11],
 ];
+/** 手臂沿 BodyMap 的 ARM 轮廓往下排：上臂、肘、前臂、腕、手，两面一样。 */
+const ARM: [string, number, number, number, number][] = [
+  ['upper_arm', 90, 80, 5.5, 13],
+  ['elbow', 93, 100, 5, 5],
+  ['forearm', 95, 117, 4.5, 12],
+  ['wrist', 97, 137, 4, 3.5],
+  ['hand', 97, 148, 4.5, 7],
+];
 /** 分左右的部位：只写看的人右半边那一份（cx > 60）。 */
 const SIDED: [string, BodyView, number, number, number, number][] = [
+  ...(['front', 'back'] as const).flatMap(view => ARM.map(([part, cx, cy, rx, ry]) => [part, view, cx, cy, rx, ry] as [string, BodyView, number, number, number, number])),
   ['shoulder', 'front', 84, 53, 8, 7],
   ['hip', 'front', 71, 133, 8, 6],
   ['quad', 'front', 69, 166, 7.5, 21],

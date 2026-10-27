@@ -163,7 +163,8 @@ const indexOf = (section: string, value: string) =>
 </template>
 
 <style scoped>
-.type-picker { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; max-width: 240px; }
+/* 选中的类型是一个值、不是主要动作：不用胶囊按钮默认的 600 粗体（用户 2026-10-27：运动页小字太重）。 */
+.type-picker { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; max-width: 240px; font-weight: 500; }
 .type-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .tp-head h2 { margin: 0; font-size: var(--fs-lg); }

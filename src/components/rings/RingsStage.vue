@@ -5,6 +5,7 @@ import { RingsLuminaEngine, type RingPhase } from '../../lib/rings/lumina/engine
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { onMotionEscape } from '../../lib/motion/interrupt';
 import { fontsReady } from '../../lib/fontsReady';
+import { diveActive, stageReady } from '../../lib/rings/cosmosDive';
 import { useRingsText } from './rings.i18n';
 import type { RingYear } from '../../types/rings';
 
@@ -20,12 +21,9 @@ const flash = ref(0);
 let phaseTimer = 0;
 function phase(next: RingPhase) {
   clearTimeout(phaseTimer);
-  const wasYear = landed.value && stage.value === 'year';
   stage.value = next; landed.value = false;
   engine.value?.prepare();
-  // Crisp text leaves before its particle silhouette disperses.
-  if (wasYear && next !== 'year' && !lessMotion()) phaseTimer = window.setTimeout(() => engine.value?.setPhase(next), 80);
-  else engine.value?.setPhase(next);
+  engine.value?.setPhase(next);
   if (next === 'finale') flash.value++;
 }
 function advance() {
@@ -108,7 +106,7 @@ onMounted(async () => {
       onLand: p => { landed.value = true; emit('land', p); },
     });
     e.setData(props.years, props.selected, props.finaleText); engine.value = e;
-    if (lessMotion()) phase('year'); sync();
+    if (lessMotion()) phase('year'); sync(); handOff();
   };
   initFrame = requestAnimationFrame(() => { initFrame = requestAnimationFrame(initialize); });
   observer = new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); sync(); });
@@ -116,15 +114,22 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', sync); window.addEventListener('keydown', onKey);
   forgetEscape = onMotionEscape(() => { if (!active || !starOpen.value) return false; closeStar(); return true; });
 });
-onActivated(() => { active = true; sync(); });
+/* 从履历卡飞进来的：飞行层在等舞台画好第一帧才淡掉。缓存着回来的舞台从头放开场，镜头照样往星云里飞。 */
+function handOff() {
+  if (!diveActive()) return;
+  requestAnimationFrame(() => requestAnimationFrame(stageReady));
+}
+onActivated(() => {
+  active = true;
+  if (diveActive() && engine.value) { replay(); handOff(); }
+  sync();
+});
 onDeactivated(() => { active = false; sync(); });
 onBeforeUnmount(() => {
   disposed = true; clearTimeout(phaseTimer); cancelAnimationFrame(initFrame); observer?.disconnect(); forgetEscape?.();
   document.removeEventListener('visibilitychange', sync); window.removeEventListener('keydown', onKey);
   engine.value?.dispose(); engine.value = null;
 });
-const hint = computed(() => stage.value === 'idle' ? t.value.hintIdle : stage.value === 'year' ? t.value.hintYear : stage.value === 'finale' ? t.value.hintFinale : year.value?.data_days === 0 ? t.value.blankYear : `${t.value.hintShape}${year.value?.in_progress ? ` · ${t.value.growing}` : ''}`);
-const subHint = computed(() => stage.value === 'idle' ? t.value.tapSkip : stage.value === 'shape' && stars.value.length ? `${t.value.starHint} · ${t.value.tapHint}` : t.value.tapHint);
 defineExpose({
   capture: (width: number, height: number) => engine.value?.capture(width, height) ?? null,
   settle: async () => {
@@ -137,12 +142,10 @@ defineExpose({
 
 <template>
   <div ref="root" class="rings-stage" :data-phase="stage" :data-landed="landed">
-    <div ref="host" :class="['stage-canvas', { 'on-star': hover !== null }]" tabindex="0" :aria-label="t.title"
+    <div ref="host" :class="['stage-canvas', { 'on-star': hover !== null }]" tabindex="0" :aria-label="t.yearAria(selected)"
       @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointermove="onPointerMove" @pointerleave="onPointerLeave" />
     <div class="stage-ui">
       <Transition name="flash"><div v-if="stage === 'finale'" :key="flash" class="finale-flash" /></Transition>
-      <div class="hint-row"><Transition name="hint"><div :key="stage" class="hint">{{ hint }}<small>{{ subHint }}</small></div></Transition></div>
-      <Transition name="year"><svg v-if="stage === 'year' && landed" class="year-text" viewBox="0 0 640 240" :aria-label="String(selected)"><defs><linearGradient id="rings-year-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c8" /><stop offset=".55" stop-color="#f0cd7c" /><stop offset="1" stop-color="#c99a45" /></linearGradient></defs><text x="320" y="172" text-anchor="middle" fill="url(#rings-year-gold)">{{ selected }}</text></svg></Transition>
       <div class="stage-actions"><button type="button" class="stage-button" :disabled="star !== null" @click="replay">{{ t.replay }}</button></div>
     </div>
     <Transition name="dim"><div v-if="starOpen" class="star-dim" @click="closeStar" /></Transition>
@@ -158,19 +161,10 @@ defineExpose({
 .finale-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, #ffe9b7, transparent 65%); }
 .flash-enter-active { animation: finale-flash .4s ease-out; }
 @keyframes finale-flash { from { opacity: .35; } to { opacity: 0; } }
-.hint-row { position: absolute; top: 24px; left: 12px; right: 12px; display: grid; justify-items: center; }
-.hint { grid-area: 1/1; max-width: 100%; box-sizing: border-box; padding: 12px 24px; border: 1px solid #ffffff26; border-radius: 30px; background: #151520; color: #f6efdf; font-size: 20px; text-align: center; }
-.hint small { display: block; margin-top: 4px; color: #b4afbb; font-size: 16px; }
-.hint-enter-active, .hint-leave-active { transition: opacity 200ms ease; }
-.hint-enter-from, .hint-leave-to { opacity: 0; }
-.year-text { position: absolute; left: 50%; top: 50%; width: min(88%, 640px); height: auto; transform: translate(-50%, -50%); font: 750 160px var(--font-mono); font-variant-numeric: tabular-nums; pointer-events: none; }
-.year-enter-active { transition: opacity 160ms ease; } .year-leave-active { transition: opacity 80ms ease; }
-.year-enter-from, .year-leave-to { opacity: 0; }
 .stage-actions { position: absolute; right: 24px; bottom: 24px; pointer-events: auto; }
 .stage-button { padding: 8px 18px; border: 1px solid #ffffff30; border-radius: 999px; background: #1d1b25; color: #e0d7c6; font: inherit; font-size: 16px; cursor: pointer; }
 .stage-button:disabled { opacity: .4; cursor: default; }
 .star-dim { position: absolute; inset: 0; z-index: 3; background: #00000073; }
 .dim-enter-active, .dim-leave-active { transition: opacity 240ms ease; } .dim-enter-from, .dim-leave-to { opacity: 0; }
-@media (max-width: 720px) { .hint { font-size: 18px; padding: 10px 16px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>

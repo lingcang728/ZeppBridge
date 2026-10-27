@@ -2,12 +2,14 @@
 /* 纪元与事件的横向时间轴（宽屏；窄屏退回 EpochSection 里的竖向列表）。
    轴线上方是事件的圆点（相近的日子自动分泳道），下方是纪元的色带，最底下一行月份。
    默认看截至今天的最近 12 个月，右边留半个月：「今天」那条线不贴边，还在持续的纪元 / 事件在它右边渐隐，表示「至今」。
-   按住拖动或横向滚轮往前翻，最早到第一条记录所在的月份。点空白的日子：以那天为开始新建事件，编辑器从点击处长出来。 */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+   按住拖动或横向滚轮往前翻，最早到第一条记录所在的月份。点空白的日子：以那天为开始新建事件，编辑器从点击处长出来。
+   指针在空白处移动时，一条竖线吸附在指着的那一天、顶上写着日期；点下去以后那一天一直标着，直到编辑器关上
+   （用户 2026-10-27：「翻到具体时间时，根本看不出自己点到了哪一天」）。 */
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import { useLifeEvents } from '../../composables/useLifeEvents';
 import { eventIcon, eventTone } from '../../lib/lifeEvents';
-import { journalShortDay, todayKey } from '../../lib/logbook/display';
+import { journalDay, journalShortDay, todayKey } from '../../lib/logbook/display';
 import { daysBetween } from '../../lib/logbook/clock';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { newWheelAccel, wheelSteps } from '../../lib/wheel/momentum';
@@ -23,6 +25,16 @@ const anchor = ref<HTMLElement>();
 const width = ref(900);
 const offset = ref(0);
 const hovered = ref<{ event: LifeEvent; x: number; y: number; below: boolean } | null>(null);
+/** 指着的那天（cursor）和点下去的那天（picked）：轴上的中心位置 + 日期。 */
+const cursor = ref<{ x: number; date: string } | null>(null);
+const picked = ref<{ x: number; date: string } | null>(null);
+const mark = computed(() => picked.value ?? cursor.value);
+/* 日期签不被视口两头切掉：中心夹在看得见的那段里。 */
+const markLabelX = computed(() => {
+  const left = maxOffset.value - offset.value;
+  return mark.value ? Math.max(left + 56, Math.min(left + width.value - 56, mark.value.x)) : 0;
+});
+watch(() => life.draft.value, draft => { if (!draft) picked.value = null; });
 const today = todayKey();
 
 /* 竖向尺寸（px）：事件泳道往上叠，纪元泳道往下叠。 */
@@ -119,8 +131,9 @@ function down(e: PointerEvent) {
   drag = { x: e.clientX, offset: offset.value, last: e.clientX, time: e.timeStamp, velocity: 0 };
 }
 function move(e: PointerEvent) {
+  if (!drag || !moved) cursor.value = (e.target as Element).closest('button') ? null : dayAt(e.clientX);
   if (!drag) return;
-  if (!moved && Math.abs(e.clientX - drag.x) > 5) { moved = true; viewport.value?.setPointerCapture(e.pointerId); hovered.value = null; }
+  if (!moved && Math.abs(e.clientX - drag.x) > 5) { moved = true; viewport.value?.setPointerCapture(e.pointerId); hovered.value = null; cursor.value = null; }
   if (!moved) return;
   drag.velocity = (e.clientX - drag.last) / Math.max(1, e.timeStamp - drag.time);
   offset.value = clamp(drag.offset + e.clientX - drag.x);
@@ -146,17 +159,24 @@ function wheel(e: WheelEvent) {
   e.preventDefault(); stop();
   offset.value = clamp(offset.value - wheelSteps(accel, e.deltaX || e.deltaY, e.deltaMode, e.timeStamp) * monthWidth.value / 3);
 }
-function add(e: PointerEvent) {
+/** 视口里的横坐标 → 那一天（不晚于今天）和它在轴上的中心。 */
+function dayAt(clientX: number) {
   const rect = viewport.value!.getBoundingClientRect();
-  const px = e.clientX - rect.left;
-  const pos = (px + maxOffset.value - offset.value) / monthWidth.value;
+  const pos = (clientX - rect.left + maxOffset.value - offset.value) / monthWidth.value;
   const month = Math.min(last, first.value + Math.floor(pos));
   const day = Math.min(daysIn(month), Math.floor((pos - (month - first.value)) * daysIn(month)) + 1);
-  const date = `${Math.floor(month / 12)}-${String(month % 12 + 1).padStart(2, '0')}-${String(Math.max(1, day)).padStart(2, '0')}`;
-  // 锚点先摆到点击处（同步布局），编辑器量它的矩形、从那里长出来。
-  anchor.value!.style.left = `${px - 12}px`;
+  const raw = `${Math.floor(month / 12)}-${String(month % 12 + 1).padStart(2, '0')}-${String(Math.max(1, day)).padStart(2, '0')}`;
+  const date = raw > today ? today : raw;
+  return { date, x: x(date) + monthWidth.value / daysIn(monthIndex(date)) / 2 };
+}
+function add(e: PointerEvent) {
+  const rect = viewport.value!.getBoundingClientRect();
+  const at = dayAt(e.clientX);
+  picked.value = at; cursor.value = null;
+  // 锚点先摆到那一天的竖线上（同步布局），编辑器量它的矩形、从那里长出来，关上时也缩回这里。
+  anchor.value!.style.left = `${at.x + offset.value - maxOffset.value - 12}px`;
   anchor.value!.style.top = `${e.clientY - rect.top - 16}px`;
-  life.open(undefined, date > today ? today : date, anchor.value);
+  life.open(undefined, at.date, anchor.value);
 }
 function key(e: KeyboardEvent) {
   if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
@@ -180,7 +200,7 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
 
 <template>
   <div ref="viewport" class="timeline" tabindex="0" :aria-label="j.epochs" @keydown="key" @pointerdown="down" @pointermove="move" @pointerup="up"
-    @pointercancel="drag = null" @click.capture="swallowClick" @wheel="wheel">
+    @pointercancel="drag = null" @pointerleave="cursor = null" @click.capture="swallowClick" @wheel="wheel">
     <span ref="anchor" class="day-anchor" aria-hidden="true" />
     <div class="timeline-track" :style="{ width: `${totalWidth}px`, height: `${height}px`, transform: `translateX(${offset - maxOffset}px)`, '--axis': `${axisY}px` }">
       <template v-for="month in months" :key="month.i">
@@ -189,6 +209,10 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
       </template>
       <i class="axis" aria-hidden="true" />
       <i class="today" :style="{ left: `${todayX}px` }" aria-hidden="true" />
+      <template v-if="mark">
+        <i :class="['day-mark', { picked: !!picked }]" :style="{ left: `${mark.x}px` }" aria-hidden="true" />
+        <span :class="['day-label', { picked: !!picked }]" :style="{ left: `${markLabelX}px` }" aria-hidden="true">{{ journalDay(mark.date) }}</span>
+      </template>
       <button v-for="item in epochs" :key="item.event.id" type="button" data-timeline-event :data-order="order(item.event)" class="epoch-band"
         :style="{ left: `${item.left}px`, top: `${bandTop(item.lane)}px`, width: `${item.width}px`, '--event-tone': eventTone(item.event.category), '--solid': `${item.solid * 100}%` }"
         :aria-label="label(item.event)" @pointerenter="showTip(item.event, $event.currentTarget)" @pointerleave="hovered = null" @focus="showTip(item.event, $event.currentTarget)" @blur="hovered = null"
@@ -219,6 +243,11 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
 .month { position: absolute; padding-left: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .axis { position: absolute; left: 0; right: 0; top: var(--axis); height: 1px; background: var(--mat-line); }
 .today { position: absolute; top: 0; bottom: 22px; width: 1px; background: var(--kintsugi); opacity: .7; }
+.day-mark { position: absolute; top: 22px; bottom: 22px; width: 1px; margin-left: -.5px; background: color-mix(in srgb, var(--ink) 40%, transparent); pointer-events: none; }
+.day-mark.picked { width: 2px; margin-left: -1px; background: var(--accent); }
+.day-label { position: absolute; top: 0; padding: 1px 8px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: inset 0 0 0 1px var(--mat-line);
+  color: var(--ink); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; transform: translateX(-50%); pointer-events: none; }
+.day-label.picked { background: var(--accent); box-shadow: none; color: var(--accent-ink); }
 button { font: inherit; color: var(--ink); cursor: pointer; }
 button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .epoch-band { position: absolute; height: 26px; padding: 0; border: 0; border-radius: 7px; background: none; text-align: left; overflow: visible; }

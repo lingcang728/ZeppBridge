@@ -227,7 +227,8 @@ export function dialogWindowFrames(from: WindowRect, to: WindowRect, panel: Wind
 }
 let windowGhost: HTMLElement | null = null;
 let firstWindow = true;
-const windowDuration = 480;
+/* 480ms 太赶（用户 2026-10-27：「整体动画太快了」）；照卡片展开的节奏放到 ~620ms。 */
+const windowDuration = paced(480);
 function snapshot(panel: HTMLElement) {
   const style = getComputedStyle(panel);
   return { transform: style.transform, clipPath: style.clipPath };
@@ -272,6 +273,10 @@ function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   const replica = attachReplica(panel, origin, false);
   backdrop.animate([{ opacity: veil }, { opacity: 1 }], { duration: 240, fill: 'backwards', easing: 'ease-out', pseudoElement: '::before' });
   const flight = panel.animate(frames, { duration: windowDuration, easing: WINDOW_EASE, fill: 'both' });
+  // 窗口还在长的时候里面的字是按最终版式排的、被裁切框切掉一半（用户 2026-10-27：「字体显示有残缺」）：
+  // 框长到一半以前内容不出现，之后再淡入；起点那张卡的拷贝前三成淡出，中间只有一块玻璃在长。
+  const content = panel.querySelector<HTMLElement>('.dialog-scroll');
+  content?.animate([{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: .45 }, { opacity: 1 }], { duration: windowDuration, easing: 'ease-out', fill: 'both' });
   // 这次会话第一次开弹窗：组件刚懒加载完、GPU 正忙着光栅化，先停在按钮那一帧等画面跟得上（最多 160ms）再放，
   // 不然第一段被吞掉、看上去是一跳。遮罩不等，点下去那一帧就开始变暗。之后的弹窗都不等。
   if (firstWindow) {
@@ -283,6 +288,7 @@ function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   const finish = () => {
     forgetEscape(backdrop);
     replica?.remove();
+    content?.getAnimations().forEach(animation => animation.cancel());
     panel.classList.remove('is-flying');
     if (backdrop.isConnected && !backdrop.inert) flight.cancel();
   };
@@ -299,6 +305,8 @@ function windowClose(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOr
   // Replacing only frame zero makes an interrupted opening grow again on close.
   const seen = visibleWindow(panel);
   const veil = Number(getComputedStyle(backdrop, '::before').opacity) || 1;
+  const content = panel.querySelector<HTMLElement>('.dialog-scroll');
+  const contentNow = content ? Number(getComputedStyle(content).opacity) : 1;
   for (const animation of backdrop.getAnimations({ subtree: true })) animation.cancel();
   panel.querySelectorAll('[data-dialog-replica]').forEach(el => el.remove());
   panel.style.transform = ''; panel.style.clipPath = '';
@@ -311,8 +319,8 @@ function windowClose(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOr
   attachReplica(panel, origin, true);
   const timing = { duration: windowDuration, easing: WINDOW_EASE, fill: 'forwards' as const };
   const flight = exemptFromSettle(panel.animate(frames, timing));
-  const content = panel.querySelector<HTMLElement>('.dialog-scroll');
-  if (content) exemptFromSettle(content.animate([{ opacity: 1 }, { opacity: 1, offset: .7 }, { opacity: 0 }], { ...timing, easing: 'linear' }));
+  // 收：字先淡掉（前三成），剩一块玻璃缩回去、末尾换成那张卡的拷贝——不在缩小的框里切字。
+  if (content) exemptFromSettle(content.animate([{ opacity: contentNow }, { opacity: 0, offset: .3 }, { opacity: 0 }], { ...timing, easing: 'linear' }));
   exemptFromSettle(backdrop.animate([{ opacity: veil }, { opacity: 0 }], { ...timing, pseudoElement: '::before' }));
   windowGhost?.remove(); windowGhost = backdrop;
   const done = () => {

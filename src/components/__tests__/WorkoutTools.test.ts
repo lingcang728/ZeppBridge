@@ -50,10 +50,10 @@ const renderer = createRenderer<Node, Node>({
 const all = (root: Node): Node[] => [root, ...root.children.flatMap(all)];
 const textOf = (root: Node): string => root.text + root.children.map(textOf).join('');
 const flush = async () => { await Promise.resolve(); await nextTick(); await Promise.resolve(); await nextTick(); };
-const mount = (ids: string[], hidden = false) => {
+const mount = (ids: string[], hidden = false, single = false) => {
   const root = node('root');
   const changed = vi.fn();
-  const app = renderer.createApp(WorkoutTools, { ids, hidden, onChanged: changed });
+  const app = renderer.createApp(WorkoutTools, { ids, hidden, single, onChanged: changed });
   app.provide(ssrContextKey, {});
   app.mount(root);
   const click = async (label: string) => {
@@ -72,10 +72,10 @@ beforeEach(async () => {
 });
 
 describe('workout edit controls', () => {
-  it('previews and sends every selected ID, including selections from earlier pages', async () => {
+  it('sends every selected ID, including selections from earlier pages', async () => {
     const mounted = mount(['page-1', 'page-2']);
+    expect(textOf(mounted.root)).toContain('2 selected');
     await mounted.click('pick-run');
-    expect(textOf(mounted.root)).toContain('2 workouts');
     await mounted.click('Apply type');
     expect(api.editWorkouts).toHaveBeenCalledWith(['page-1', 'page-2'], true, 'run', null);
     expect(mounted.changed).toHaveBeenCalledWith(null);
@@ -92,6 +92,17 @@ describe('workout edit controls', () => {
     expect(api.undoWorkoutEdit).toHaveBeenCalledWith('edit-1');
     expect(lastWorkoutEditId.value).toBeNull();
     list.app.unmount();
+  });
+
+  it('on a detail page offers only hiding, without the multi-select framing', async () => {
+    const mounted = mount(['detail-id'], false, true);
+    const buttons = all(mounted.root).filter((el) => el.type === 'button').map(textOf);
+    expect(buttons).toEqual(['Hide on this device']);
+    expect(textOf(mounted.root)).not.toContain('selected');
+    await mounted.click('Hide on this device');
+    expect(api.editWorkouts).toHaveBeenCalledWith(['detail-id'], false, null, true);
+    expect(api.getWorkoutTypeOptions).not.toHaveBeenCalled();
+    mounted.app.unmount();
   });
 
   it('restores hidden records and clears type overrides with distinct backend arguments', async () => {

@@ -4236,8 +4236,8 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     none: 'Nic nie wybrano',
     figure: 'Sylwetka ciała: wybierz obszary',
     sided: (base: string, side: 'l' | 'r', key: string) => {
-      const neuter = ['knee', 'achilles', 'it_band'].includes(key);
-      const feminine = ['shin', 'calf', 'ankle', 'foot'].includes(key);
+      const neuter = ['knee', 'achilles', 'it_band', 'upper_arm', 'forearm'].includes(key);
+      const feminine = ['shin', 'calf', 'ankle', 'foot', 'hand', 'head'].includes(key);
       const prefix = side === 'l'
         ? (neuter ? 'Lewe' : feminine ? 'Lewa' : 'Lewy')
         : (neuter ? 'Prawe' : feminine ? 'Prawa' : 'Prawy');
@@ -4264,6 +4264,12 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
       ankle: 'Kostka',
       foot: 'Stopa',
       it_band: 'Pasmo biodrowo-piszczelowe',
+      head: 'Głowa',
+      upper_arm: 'Ramię',
+      elbow: 'Łokieć',
+      forearm: 'Przedramię',
+      wrist: 'Nadgarstek',
+      hand: 'Dłoń',
     },
   },
 
@@ -4516,23 +4522,37 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     distance: 'Łączny dystans',
     recorded: 'Zapisane',
   },
+  // Source: src/components/journal/year/year.i18n.ts
+  'components/journal/year/year': {
+    prevYear: 'Poprzedni rok',
+    nextYear: 'Następny rok',
+    other: 'Inne',
+    vsLastYear: (pct: string) => `vs ubiegły rok ${pct}`,
+    vsSameSpan: (pct: string) => `vs ten sam okres ubiegłego roku ${pct}`,
+    coverage: (pct: string) => `${pct} pokrycia`,
+    activity: 'Rok dzień po dniu',
+    activeMonths: 'Najaktywniejsze miesiące',
+    streak: 'Najdłuższa seria',
+    streakDays: (n: number) =>
+      plural(n, {
+        one: '1 dzień',
+        few: `${n} dni z rzędu`,
+        many: `${n} dni z rzędu`,
+        other: `${n} dnia z rzędu`,
+      }),
+    bestMonth: 'Miesiąc z największym dystansem',
+    askQuestion: (year: number) =>
+      `Podsumuj mój rok ${year}: jak minął ten rok, w czym zrobiłem postępy i na czym powinienem się skupić w przyszłym roku?`,
+    askSeen: (year: number) => `To, co widzę w dzienniku ZeppBridge za rok ${year}:`,
+  },
   // Source: src/components/rings/rings.i18n.ts
   'components/rings/rings': {
     title: 'Słoje roczne',
     intro: 'Jeden słój na rok, jedna gwiazdka na trening. Luki pozostają puste.',
     entry: 'Słoje roczne',
     empty: 'Brak danych. Po synchronizacji wyrośnie tu pierwszy słój.',
-    growing: 'Wciąż rośnie',
-    blankYear: 'Brak danych w tym roku — pozostawiono puste.',
     years: 'Lata',
     yearAria: (year: number) => `Rok ${year}`,
-    hintIdle: 'Przemierzając morze gwiazd…',
-    hintYear: 'Ten rok',
-    hintShape: 'Jeden słój na rok, jedna gwiazdka na trening',
-    hintFinale: 'Przeciągnij, aby okrążyć swój rok',
-    tapSkip: 'Dotknij, aby pominąć',
-    tapHint: 'Dotknij pustej przestrzeni, aby przejść dalej',
-    starHint: 'Dotknij gwiazdki, aby zobaczyć ten trening',
     starOpen: 'Otwórz ten trening',
     starRank: (n: number) => (n === 1 ? 'Najdłuższy w tym roku' : `#${n} najdłuższy w tym roku`),
     close: 'Zamknij',

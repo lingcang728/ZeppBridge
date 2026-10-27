@@ -56,8 +56,10 @@ a.pb-main:hover .pb-time { color: var(--accent); }
 .pb-then li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .pb-then small { color: var(--subtle); }
 .pb-main { display: grid; gap: 8px; padding: 20px 16px; color: inherit; text-decoration: none; min-width: 0; }
-a.pb-main:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.pb-toggle { justify-self: end; margin: 0 12px 12px; }
+/* 悬停亮的是整格：只亮链接那块的话，下面「另外 N 次」那一截不亮，中间横出一条直角分界（用户 2026-10-27）。 */
+.pb { transition: background 160ms ease; }
+.pb:has(> a.pb-main:hover) { background: color-mix(in srgb, var(--ink) 4%, var(--mat-inset)); }
+.pb-toggle { justify-self: end; margin: 0 12px 12px; font-weight: 500; }
 .pb.none { outline: 1px dashed var(--mat-line); box-shadow: none; }
 .pb-how { justify-self: start; padding: 2px 8px; border-radius: 99px; background: var(--mat-card); color: var(--subtle); font-size: var(--fs-2xs); overflow-wrap: anywhere; }
 @media (max-width: 1100px) { .pb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
