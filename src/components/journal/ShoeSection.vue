@@ -76,5 +76,7 @@ const asInput = (shoe: ShoeSummary): ShoeInput => {
 .gear li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .g-id { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .g-meta { flex: 1; min-width: 0; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+/* 鞋与鞋之间不画分隔线（用户 2026-10-27：「太突兀了」），靠行距分开；悬停仍是那块圆角高亮。 */
+.row-list > li + li::before { content: none; }
 @media (min-width: 1101px) { .row-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; } }
 </style>

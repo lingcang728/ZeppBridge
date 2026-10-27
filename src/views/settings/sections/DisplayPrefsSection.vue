@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 显示与语言：语言、主题、距离单位，加一行「我关注」。
+/* 显示与语言：语言、主题、距离单位。「我关注」只在概览页头改（用户 2026-10-27 从这里去掉了）。
    时间格式、日期顺序在距离单位下面（DateTimeRows.vue）；界面缩放不常改，在高级卡「更多偏好」。 */
 import { computed, ref } from 'vue';
 import CapsuleWheel from '../../../components/CapsuleWheel.vue';
@@ -17,7 +17,6 @@ import { shownLocale } from '../../../lib/motion/localeTarget';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import DateTimeRows from './DateTimeRows.vue';
-import FocusAreasRow from './FocusAreasRow.vue';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
@@ -77,7 +76,6 @@ const chooseTheme = (value: string | number) => {
         </div>
       </div>
       <DateTimeRows />
-      <FocusAreasRow />
     </div>
   </section>
 </template>

@@ -3780,12 +3780,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     codesFix: 'Nadaj im nazwy',
   },
 
-  // Source: src/views/settings/sections/display.i18n.ts
-  "views/settings/sections/display": {
-    focusTitle: 'Mój priorytet',
-    focusSlideSub: 'Przegląd umieszcza tę sekcję na początku, a pozostałe zwija pod „Pokaż wszystko”; opcja „Zrównoważony” zachowuje układ domyślny',
-  },
-
   // Source: src/views/settings/sections/fileName.i18n.ts
   "views/settings/sections/fileName": {
     nameTitle: 'Nazwy plików przekazywanych do AI',

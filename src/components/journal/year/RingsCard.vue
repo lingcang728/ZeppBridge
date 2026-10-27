@@ -37,7 +37,6 @@ const shapes = computed(() => layout.value.bands.map(band => ({
         <span class="dot" /><span class="name">{{ item.label }}</span><b>{{ item.text }}</b>
       </li>
     </ul>
-    <span class="arrow" aria-hidden="true">→</span>
   </RouterLink>
 </template>
 
@@ -60,7 +59,5 @@ h2 { grid-column: 1 / -1; margin: 0; font-size: var(--fs-lg); font-weight: 600; 
 .dot { width: 8px; height: 8px; border-radius: 50%; background: v-bind('WOOD.cambium'); }
 .name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .legend b { font-weight: 500; font-variant-numeric: tabular-nums; }
-.arrow { position: absolute; top: 18px; right: 22px; font-size: 20px; color: var(--muted); transition: color var(--dur-base) ease, transform var(--dur-base) ease; }
-a.rings-card:hover .arrow { color: var(--ink); transform: translateX(3px); }
 @media (max-width: 600px) { .rings-card { gap: 4px 16px; padding: 16px; } .tree { width: 112px; } }
 </style>

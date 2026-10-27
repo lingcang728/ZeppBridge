@@ -2949,10 +2949,6 @@ Réponds en Markdown.`,
       autoOn: 'Activé : à l’ouverture du site de l’IA, le fichier et le message d’introduction sont collés et envoyés à votre place ; appuyez sur Esc pour arrêter à tout moment',
     },
 
-    'views/settings/sections/display': {
-      focusTitle: 'Ce qui m’intéresse',
-      focusSlideSub: 'L’aperçu place ce bloc en premier et replie le reste sous «\u00A0Tout voir\u00A0» ; «\u00A0Équilibré\u00A0» conserve la disposition initiale',
-    },
 
     'views/settings/sections/privacy': {
       lead: 'Vos données restent sur cet ordinateur : aucun téléversement, aucune statistique d’utilisation',

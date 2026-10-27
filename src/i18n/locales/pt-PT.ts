@@ -3173,10 +3173,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       autoOff: 'Desativado: o ficheiro vai para a área de transferência; prime Ctrl+V na conversa da IA e depois Enter',
       autoOn: 'Ativado: ao abrir o site da IA, o ficheiro e a mensagem inicial são colados e enviados por ti; prime Esc para parar a qualquer momento',
     },
-    'views/settings/sections/display': {
-      focusTitle: 'O que me interessa',
-      focusSlideSub: 'A Visão geral apresenta este bloco primeiro e agrupa o restante em «Mostrar tudo»; «Equilibrado» mantém tudo como está',
-    },
     'views/settings/sections/privacy': {
       lead: 'Os teus dados ficam apenas neste computador: sem envios nem estatísticas de utilização',
       learnMore: 'Saber mais',
