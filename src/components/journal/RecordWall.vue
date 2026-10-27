@@ -23,8 +23,9 @@ const how = (effort: Effort) => (effort.method === 'race' && effort.race_name ? 
 <template>
   <JournalCard :title="t.records" tone="record">
     <ul class="pb-grid">
-      <li v-for="row in rows" :key="row.key" class="pb" :class="{ none: !row.best }">
-        <component :is="row.best?.workout_id ? RouterLink : 'div'" :to="row.best?.workout_id ? `/workouts/${row.best.workout_id}` : undefined" class="pb-main" :data-morph-card="row.best?.workout_id ? '' : undefined">
+      <!-- 形变认的是整格（带「另外 N 次」那一截）：只标链接的话，回来时窗口落在格子上半截，像是错位了（用户 2026-10-27）。 -->
+      <li v-for="row in rows" :key="row.key" class="pb" :class="{ none: !row.best }" :data-morph-card="row.best?.workout_id ? '' : undefined">
+        <component :is="row.best?.workout_id ? RouterLink : 'div'" :to="row.best?.workout_id ? `/workouts/${row.best.workout_id}` : undefined" class="pb-main">
           <span class="pb-dist">{{ t.distances[row.key] }}</span>
           <template v-if="row.best">
             <span class="pb-time">{{ clockText(row.best.seconds) }}</span>

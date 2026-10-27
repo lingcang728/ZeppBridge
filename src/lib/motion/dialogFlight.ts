@@ -227,6 +227,25 @@ export function dialogWindowFrames(from: WindowRect, to: WindowRect, panel: Wind
 }
 let windowGhost: HTMLElement | null = null;
 let firstWindow = true;
+/* 弹窗开着、收回还没落地时，来处（被点的那一行、那张卡）藏起来（用户 2026-10-27 跑鞋：「点开后后面的字消失；点回去时，
+   除非那块界面完全落地，否则字绝不应该先于动画出现」）。以前来处一直留在原地，收回时窗口里的拷贝和背后的真行叠成两份字。
+   用属性不用行内样式 / 类名：来处多半有 Vue 绑着的 class，补丁时会被冲掉（样式见 ModalDialog.vue 的全局一条）。 */
+const sources = new WeakMap<HTMLElement, HTMLElement>();
+function hideSource(backdrop: HTMLElement, origin: FlightOrigin | null) {
+  const el = origin?.el;
+  if (!el?.isConnected) return;
+  el.setAttribute('data-dialog-source', '');
+  sources.set(backdrop, el);
+}
+function showSource(backdrop: HTMLElement) {
+  const el = sources.get(backdrop);
+  sources.delete(backdrop);
+  el?.removeAttribute('data-dialog-source');
+}
+/* 背后的模糊：开的时候跟着窗口慢慢糊上，收的时候窗口缩回去的前四成几乎不退、落地时才散掉——
+   以前收起用窗口那条先快后慢的曲线，前一百多毫秒就退了一半，看上去是「啪」一下变清楚（10-27 跑鞋录屏）。 */
+const VEIL_OPEN: Keyframe[] = [{ opacity: NEARLY_HIDDEN }, { opacity: 1 }];
+const veilClose = (from: number): Keyframe[] => [{ opacity: from }, { opacity: from * 0.88, offset: 0.4 }, { opacity: 0 }];
 /* 480ms 太赶（用户 2026-10-27：「整体动画太快了」）；照卡片展开的节奏放到 ~620ms。 */
 const windowDuration = paced(480);
 function snapshot(panel: HTMLElement) {
@@ -245,10 +264,13 @@ function attachReplica(panel: HTMLElement, origin: FlightOrigin | null, closing:
   const source = origin?.el;
   if (!source?.isConnected) return null;
   const replica = cardReplica(source).el;
+  // 来处藏着时带着 data-dialog-source，拷贝会照抄这个标记跟着一起隐身：收的时候飞回来的是一块白板（10-27）。
+  replica.querySelectorAll('[data-dialog-source]').forEach(node => node.removeAttribute('data-dialog-source'));
   replica.dataset.dialogReplica = '';
   Object.assign(replica.style, { position: 'absolute', left: '0', top: '0', zIndex: '4', pointerEvents: 'none' });
   panel.appendChild(replica);
-  replica.animate(closing ? [{ opacity: 0 }, { opacity: 0, offset: .7 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0, offset: .3 }, { opacity: 0 }], { duration: windowDuration, fill: 'both', easing: 'linear' });
+  // 收：拷贝在窗口快落地的那一段（四成到八成）亮回来——以前七成才开始亮，窗口已经停在卡上了还是一块空板（10-27 录屏「图片跳变」）。
+  replica.animate(closing ? [{ opacity: 0 }, { opacity: 0, offset: .4 }, { opacity: 1, offset: .8 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0, offset: .3 }, { opacity: 0 }], { duration: windowDuration, fill: 'both', easing: 'linear' });
   return replica;
 }
 function radiusFor(origin: FlightOrigin | null, panel: HTMLElement) {
@@ -263,6 +285,7 @@ function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
     if (old) handed = visibleWindow(old);
     veil = Number(getComputedStyle(windowGhost, '::before').opacity) || veil;
     for (const animation of windowGhost.getAnimations({ subtree: true })) animation.cancel();
+    showSource(windowGhost);
     windowGhost.remove(); windowGhost = null;
   }
   if (onEscape) escapes.set(backdrop, onMotionEscape(() => { onEscape(); return true; }));
@@ -271,7 +294,10 @@ function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   const frames = dialogWindowFrames(from, final, final, radiusFor(origin, panel));
   panel.classList.add('is-flying');
   const replica = attachReplica(panel, origin, false);
-  backdrop.animate([{ opacity: veil }, { opacity: 1 }], { duration: 240, fill: 'backwards', easing: 'ease-out', pseudoElement: '::before' });
+  // 拷贝已经盖在来处上了，真的那一份这一帧就藏起来。
+  hideSource(backdrop, origin);
+  const veilFrames = veil > NEARLY_HIDDEN ? [{ opacity: veil }, { opacity: 1 }] : VEIL_OPEN;
+  backdrop.animate(veilFrames, { duration: windowDuration * 0.7, fill: 'backwards', easing: 'ease-out', pseudoElement: '::before' });
   const flight = panel.animate(frames, { duration: windowDuration, easing: WINDOW_EASE, fill: 'both' });
   // 窗口还在长的时候里面的字是按最终版式排的、被裁切框切掉一半（用户 2026-10-27：「字体显示有残缺」）：
   // 框长到一半以前内容不出现，之后再淡入；起点那张卡的拷贝前三成淡出，中间只有一块玻璃在长。
@@ -296,7 +322,7 @@ function windowOpen(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
 }
 function windowClose(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null) {
   forgetEscape(backdrop);
-  if (reducedMotion() || backdrop.isConnected || backdrop.dataset.dissolved !== undefined) return;
+  if (reducedMotion() || backdrop.isConnected || backdrop.dataset.dissolved !== undefined) { showSource(backdrop); return; }
   panel.removeAttribute('data-modal-dialog'); panel.removeAttribute('role');
   backdrop.inert = true; backdrop.setAttribute('aria-hidden', 'true'); backdrop.style.pointerEvents = 'none';
   document.body.appendChild(backdrop);
@@ -321,11 +347,13 @@ function windowClose(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOr
   const flight = exemptFromSettle(panel.animate(frames, timing));
   // 收：字先淡掉（前三成），剩一块玻璃缩回去、末尾换成那张卡的拷贝——不在缩小的框里切字。
   if (content) exemptFromSettle(content.animate([{ opacity: contentNow }, { opacity: 0, offset: .3 }, { opacity: 0 }], { ...timing, easing: 'linear' }));
-  exemptFromSettle(backdrop.animate([{ opacity: veil }, { opacity: 0 }], { ...timing, pseudoElement: '::before' }));
+  exemptFromSettle(backdrop.animate(veilClose(veil), { ...timing, easing: 'linear', pseudoElement: '::before' }));
+  if (windowGhost && windowGhost !== backdrop) showSource(windowGhost);
   windowGhost?.remove(); windowGhost = backdrop;
+  // 落地那一帧：真的来处露出来、拷贝和窗口一起撤掉（拷贝和真卡逐像素一致，lib/motion/replica.ts），不再额外弹一下。
   const done = () => {
+    showSource(backdrop);
     backdrop.remove(); if (windowGhost === backdrop) windowGhost = null;
-    if (origin?.el?.isConnected) origin.el.animate([{ transform: 'scale(.96)' }, { transform: 'none' }], { duration: 180, easing: 'ease-out' });
   };
-  flight.finished.then(done, () => { backdrop.remove(); });
+  flight.finished.then(done, () => { showSource(backdrop); backdrop.remove(); });
 }

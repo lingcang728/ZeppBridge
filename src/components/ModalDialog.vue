@@ -118,3 +118,8 @@ onUnmounted(() => {
 .is-flying > .dialog-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
 .is-bare::after { display: none; }
 </style>
+
+<style>
+/* 弹窗从它长出来、还没缩回落地的那段时间，来处藏着（lib/motion/dialogFlight.ts 的 hideSource）。 */
+[data-dialog-source] { opacity: 0 !important; transition: none !important; }
+</style>
