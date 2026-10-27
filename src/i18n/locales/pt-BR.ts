@@ -3625,6 +3625,8 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       vsSameSpan: (pct: string) => `vs. mesmo período do ano passado ${pct}`,
       coverage: (pct: string) => `${pct} coberto`,
       activity: 'O ano, dia a dia',
+      less: 'Menos',
+      more: 'Mais',
       activeMonths: 'Meses mais ativos',
       streak: 'Maior sequência',
       streakDays: (n: number) => (n === 1 ? '1 dia' : `${n} dias seguidos`),

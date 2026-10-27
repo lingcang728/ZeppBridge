@@ -3784,6 +3784,8 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       vsSameSpan: (pct: string) => `vs. o mesmo período do ano passado ${pct}`,
       coverage: (pct: string) => `${pct} coberto`,
       activity: 'O ano, dia a dia',
+      less: 'Menos',
+      more: 'Mais',
       activeMonths: 'Meses mais ativos',
       streak: 'Sequência mais longa',
       streakDays: (n: number) => (n === 1 ? '1 dia' : `${n} dias seguidos`),
