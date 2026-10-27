@@ -84,7 +84,10 @@
   background: var(--ambient), var(--canvas);
 }
 .bottom-nav { display: none; }
-.shell-head { position: sticky; top: 0; z-index: 30; }
+/* flow-root：顶栏的 margin-top: 12px 不许穿出 .shell-head。穿出去的话静止时整块在 12px、一滚就吸到 0，
+   滚到页底再切页那一帧滚动归零，顶栏「咚」地往下掉 12px（用户 2026-10-27「划到最下面跳到交给 AI 顶部会跳变」）。
+   现在不论滚没滚，顶栏都离窗口上沿 12px（1C 的本意）。 */
+.shell-head { position: sticky; top: 0; z-index: 30; display: flow-root; }
 /* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
    被轻轻模糊、向下淡出，代替硬分界线。页面在顶部静止时不出现——那时没有
    内容在控件底下，它就没有要做的事。顶栏下沉 12px（1C）以后，这一层从窗口上沿一直盖到顶栏下面 28px：

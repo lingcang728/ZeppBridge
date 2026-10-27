@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+/* 点开一次运动（年轮上的一条刻线）：卡片从刻线外端长出来（缩放的原点就是那一点），关上时缩回去再消失。
+   内容精简：运动、日期、距离、时长、「这一年第 N 长」；← → 去前一次 / 后一次（卡片跟着滑到那条刻线旁边），
+   「看这次运动」从这张卡长成详情页（data-morph-card）。材质是应用自己的浮层玻璃。 */
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
-import { dialogWindowFrames, visibleWindow } from '../../lib/motion/dialogFlight';
+import Icon from '../Icon.vue';
 import { OPEN_EASE } from '../../lib/motion/timing';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { journalDay, kmText } from '../../lib/logbook/display';
@@ -13,119 +16,122 @@ import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 import type { RingStar } from '../../types/rings';
 
 const props = defineProps<{
-  star: RingStar; open: boolean; rank: number | null;
+  star: RingStar; rank: number | null; closing: boolean; hasPrev: boolean; hasNext: boolean;
   point: () => { x: number; y: number } | null;
   stage: HTMLElement | null;
 }>();
-const emit = defineEmits<{ close: []; closed: [] }>();
+const emit = defineEmits<{ close: []; closed: []; step: [delta: 1 | -1] }>();
 const t = useRingsText();
 const workoutText = useMessages(workoutDetailMessages);
-const card = ref<HTMLElement>();
-const detailed = ref(false);
-const left = ref(0), top = ref(0), width = ref(340);
-let frame = 0, flight: Animation | null = null, fade: Animation | null = null, revision = 0;
-let tipHeight = 76;
-let side: 'left' | 'right' | null = null;
+const card = ref<HTMLElement | null>(null);
+const WIDTH = 300;
+const left = ref(0), top = ref(0);
+let placed = false, frame = 0, flight: Animation | null = null;
+
+/** 卡片该在哪：星的右边（贴边就左边），竖着居中对着星；换星时滑过去，不跳。 */
+function aim() {
+  const host = props.stage, p = props.point();
+  if (!host || !p) return null;
+  const box = host.getBoundingClientRect();
+  const height = card.value?.offsetHeight ?? 200;
+  const x = p.x - box.left, y = p.y - box.top;
+  const right = x + 28 + WIDTH < box.width - 12;
+  return {
+    star: { x, y },
+    left: Math.max(12, Math.min(box.width - WIDTH - 12, right ? x + 28 : x - 28 - WIDTH)),
+    top: Math.max(12, Math.min(box.height - height - 12, y - height / 2)),
+  };
+}
 function track() {
-  const host = props.stage, point = props.point();
-  if (host && point) {
-    const box = host.getBoundingClientRect();
-    tipHeight = card.value?.querySelector('header')?.offsetHeight ?? 76;
-    width.value = Math.min(340, Math.max(160, box.width - 24));
-    const x = point.x - box.left, y = point.y - box.top;
-    const fullHeight = card.value?.offsetHeight ?? tipHeight;
-    const progress = Number(flight?.effect?.getComputedTiming().progress ?? 1);
-    const height = flight ? tipHeight + (fullHeight - tipHeight) * (props.open ? progress : 1 - progress) : fullHeight;
-    if (!props.open && !detailed.value) side = null;
-    side ??= x + 16 + width.value > box.width - 12 ? 'left' : 'right';
-    left.value = Math.max(12, Math.min(box.width - width.value - 12, side === 'left' ? x - width.value - 16 : x + 16));
-    top.value = Math.max(12, Math.min(box.height - height - 12, y - tipHeight / 2));
-  }
   frame = requestAnimationFrame(track);
+  const next = aim();
+  if (!next) return;
+  const k = placed && !lessMotion() ? 0.22 : 1;
+  left.value += (next.left - left.value) * k;
+  top.value += (next.top - top.value) * k;
+  placed = true;
 }
-async function change(open: boolean) {
-  const mine = ++revision;
-  const el = card.value;
-  if (!el) return;
-  const style = getComputedStyle(el);
-  const pose = { transform: style.transform, clipPath: style.clipPath };
-  const seen = visibleWindow(el);
-  fade?.cancel(); fade = null;
-  flight?.cancel();
-  const from = el.getBoundingClientRect();
-  if (open) detailed.value = true;
+/** 缩放的原点放在星上：长出来、缩回去都对着那颗星。 */
+function fromStar() {
+  const next = aim();
+  if (!next) return { transform: 'scale(.04)', origin: '0 0' };
+  return { transform: 'scale(.04)', origin: `${next.star.x - left.value}px ${next.star.y - top.value}px` };
+}
+async function grow() {
   await nextTick();
-  if (mine !== revision) return;
-  const final = el.getBoundingClientRect();
-  const small = { left: final.left, top: final.top, width: final.width, height: tipHeight };
-  const frames = dialogWindowFrames(pose.clipPath !== 'none' ? seen : open ? { ...small, top: from.top, left: from.left } : final, open ? final : small, final, 12);
-  if (pose.clipPath !== 'none') frames[0] = { ...frames[0], ...pose };
-  if (!lessMotion()) {
-    flight = el.animate(frames, { duration: 480, easing: OPEN_EASE, fill: 'both' });
-    try { await flight.finished; } catch { return; }
-    if (mine !== revision) return;
-    flight.cancel(); flight = null;
-  }
-  if (open) el.focus({ preventScroll: true });
-  else {
-    detailed.value = false;
-    await nextTick();
-    if (!lessMotion()) {
-      fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: 'forwards' });
-      try { await fade.finished; } catch { return; }
-      if (mine !== revision) return;
-    }
-    emit('closed');
-  }
+  const el = card.value;
+  if (!el || lessMotion()) return;
+  const { transform, origin } = fromStar();
+  el.style.transformOrigin = origin;
+  flight = el.animate([{ transform, opacity: 0 }, { opacity: 1, offset: 0.35 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: OPEN_EASE, fill: 'backwards' });
+  el.focus({ preventScroll: true });
 }
+async function shrink() {
+  const el = card.value;
+  if (!el || lessMotion()) { emit('closed'); return; }
+  flight?.cancel();
+  const { transform, origin } = fromStar();
+  el.style.transformOrigin = origin;
+  flight = el.animate([{ transform: 'none', opacity: 1 }, { opacity: 1, offset: 0.6 }, { transform, opacity: 0 }], { duration: 320, easing: 'cubic-bezier(.4, 0, .7, .2)', fill: 'forwards' });
+  try { await flight.finished; } catch { return; }
+  emit('closed');
+}
+watch(() => props.closing, (now) => { if (now) void shrink(); });
+onMounted(() => { track(); void grow(); });
+onBeforeUnmount(() => { cancelAnimationFrame(frame); flight?.cancel(); });
+
 function key(event: KeyboardEvent) {
-  if (!props.open) return;
-  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); emit('close'); }
-  if (event.key === 'Tab') {
-    const items = [...card.value!.querySelectorAll<HTMLElement>('button, a[href]')];
-    const index = items.indexOf(document.activeElement as HTMLElement);
-    const next = index < 0 ? (event.shiftKey ? items.length - 1 : 0) : (index + (event.shiftKey ? -1 : 1) + items.length) % items.length;
-    event.preventDefault(); items[next]?.focus();
-  }
+  if (event.key !== 'Tab') return;
+  const items = [...card.value!.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')];
+  const index = items.indexOf(document.activeElement as HTMLElement);
+  const next = index < 0 ? (event.shiftKey ? items.length - 1 : 0) : (index + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+  event.preventDefault(); items[next]?.focus();
 }
-watch(() => props.open, change);
-onMounted(() => { track(); if (props.open) void change(true); });
-onActivated(() => { if (!frame) track(); });
-onDeactivated(() => { cancelAnimationFrame(frame); frame = 0; });
-onBeforeUnmount(() => { revision++; cancelAnimationFrame(frame); flight?.cancel(); fade?.cancel(); });
 </script>
 
 <template>
-  <div class="star-position" :style="{ transform: `translate3d(${left}px, ${top}px, 0)`, width: `${width}px` }">
-  <section ref="card" :class="['star-card', { detailed }]"
-    :role="open ? 'dialog' : 'tooltip'" aria-labelledby="ring-star-title" tabindex="-1" data-morph-card @keydown="key" @pointerdown.stop @pointerup.stop @pointermove.stop>
+  <section ref="card" class="star-card" role="dialog" aria-labelledby="ring-star-title" tabindex="-1" data-morph-card
+    :style="{ left: `${left}px`, top: `${top}px`, width: `${WIDTH}px`, }"
+    @keydown="key" @pointerdown.stop @pointerup.stop @pointermove.stop>
     <header>
+      <span class="dot" aria-hidden="true" />
       <h2 id="ring-star-title">{{ workoutLabel(star.kind) }}</h2>
-      <p>{{ journalDay(star.date) }}<template v-if="star.distance_m"> · {{ kmText(star.distance_m / 1000) }} km</template></p>
+      <button type="button" class="icon-button" :aria-label="t.close" @click="emit('close')"><Icon name="x" :size="14" /></button>
     </header>
-    <div v-if="detailed" class="star-details" :inert="!open || undefined">
-      <dl><div v-if="star.duration_s"><dt>{{ workoutText.metricDuration }}</dt><dd>{{ clockText(star.duration_s) }}</dd></div></dl>
-      <p v-if="rank" class="star-rank">{{ t.starRank(rank) }}</p>
-      <footer>
-        <button type="button" class="stage-button" @click="emit('close')">{{ t.close }}</button>
-        <RouterLink class="stage-button primary" :to="{ name: 'WorkoutDetail', params: { workoutId: star.workout_id } }">{{ t.starOpen }}</RouterLink>
-      </footer>
-    </div>
+    <p class="date">{{ journalDay(star.date) }}</p>
+    <dl>
+      <div><dt>{{ workoutText.metricDistance }}</dt><dd>{{ star.distance_m ? `${kmText(star.distance_m / 1000)} km` : '—' }}</dd></div>
+      <div><dt>{{ workoutText.metricDuration }}</dt><dd>{{ star.duration_s ? clockText(star.duration_s) : '—' }}</dd></div>
+    </dl>
+    <p v-if="rank" class="rank">{{ t.starRank(rank) }}</p>
+    <footer>
+      <div class="steps">
+        <button type="button" class="icon-button" :disabled="!hasPrev" :aria-label="t.starPrev" @click="emit('step', -1)"><Icon name="chevron-right" :size="16" class="flip" /></button>
+        <button type="button" class="icon-button" :disabled="!hasNext" :aria-label="t.starNext" @click="emit('step', 1)"><Icon name="chevron-right" :size="16" /></button>
+      </div>
+      <RouterLink class="open" :to="{ name: 'WorkoutDetail', params: { workoutId: star.workout_id } }">{{ t.starOpen }}</RouterLink>
+    </footer>
   </section>
-  </div>
 </template>
 
 <style scoped>
-.star-position { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; }
-.star-card { position: relative; width: 100%; box-sizing: border-box; border: 1px solid #6c5835; border-radius: 12px; background: #14131e; color: #fff4dc; pointer-events: none; overflow: hidden; outline: none; }
-.star-card.detailed { pointer-events: auto; box-shadow: 0 16px 60px #0008; }
-header { box-sizing: border-box; min-height: 76px; padding: 14px 16px; }
-h2 { margin: 0; font-size: 18px; font-weight: 650; }
-header p { margin: 4px 0 0; color: #c7bdab; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
-.star-details { display: grid; gap: 16px; padding: 0 16px 16px; }
-dl, dd, p { margin: 0; } dt { color: #c7bdab; font-size: 16px; } dd { font: 28px var(--font-mono); }
-.star-rank { color: #e8cb8d; font-size: 16px; }
-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
-.stage-button { border: 1px solid #6c5835; border-radius: 99px; padding: 8px 12px; background: #24202c; color: inherit; font: inherit; font-size: 16px; cursor: pointer; text-decoration: none; }
-.primary { background: #493d26; }
+.star-card { position: absolute; z-index: 4; display: grid; gap: 10px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; outline: none; color: var(--ink);
+  background: var(--mat-glass-strong); border: 1px solid var(--mat-glass-line); box-shadow: var(--mat-glass-shadow);
+  -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); }
+header { display: flex; align-items: center; gap: 8px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 650; }
+.date { margin: -4px 0 0; color: var(--muted); font-size: 14px; }
+dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+dt { color: var(--muted); font-size: 12px; } dd { margin: 2px 0 0; font: 22px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.rank { margin: 0; color: var(--accent); font-size: 14px; }
+footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.steps { display: flex; gap: 4px; }
+.icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: var(--glass-press); color: inherit; cursor: pointer; transition: background 160ms ease, scale 120ms ease; }
+.icon-button:hover:not(:disabled) { background: var(--mat-line-hover); }
+.icon-button:active:not(:disabled) { scale: .9; }
+.icon-button:disabled { opacity: .35; cursor: default; }
+.flip { transform: rotate(180deg); }
+.open { padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 600; text-decoration: none; transition: background 160ms ease; }
+.open:hover { background: var(--accent-hover); }
 </style>

@@ -1,5 +1,5 @@
 /**
- * 年轮分享图：粒子舞台截下的一帧（1080×1080）+ 下面几行字，在本机的 canvas 上拼成 1080×1440 的 PNG。
+ * 年轮分享图：年轮（treeSnapshot.ts，1080×1080）+ 下面几行字，在本机的 canvas 上拼成 1080×1440 的 PNG。
  * 原始数据不离开这台电脑——截的只是像素；字是界面已经排好的（标题、事实），这里不排版数字。
  */
 export const SHARE_WIDTH = 1080;
@@ -8,7 +8,7 @@ export const SNAPSHOT_SIZE = 1080;
 
 const INK = 'rgba(255, 255, 255, .95)';
 const MUTED = 'rgba(255, 255, 255, .55)';
-const GOLD = 'rgba(255, 226, 150, .95)';
+const ACCENT = 'rgba(227, 164, 82, .95)';
 const FONT = "'MiSans', 'Microsoft YaHei', 'Segoe UI', sans-serif";
 
 export interface ShareInput {
@@ -33,19 +33,19 @@ export const drawShare = (canvas: HTMLCanvasElement, input: ShareInput): void =>
   canvas.height = SHARE_HEIGHT;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  ctx.fillStyle = '#050510';
+  ctx.fillStyle = '#15181d';
   ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
   if (input.snapshot) ctx.drawImage(input.snapshot, 0, 0, SNAPSHOT_SIZE, SNAPSHOT_SIZE);
 
   // 上沿压一层暗，标题读得清；下沿和文字区接上。
   const top = ctx.createLinearGradient(0, 0, 0, 260);
-  top.addColorStop(0, 'rgba(5, 5, 16, .85)');
-  top.addColorStop(1, 'rgba(5, 5, 16, 0)');
+  top.addColorStop(0, 'rgba(21, 24, 29, .85)');
+  top.addColorStop(1, 'rgba(21, 24, 29, 0)');
   ctx.fillStyle = top;
   ctx.fillRect(0, 0, SHARE_WIDTH, 260);
   const bottom = ctx.createLinearGradient(0, SNAPSHOT_SIZE - 200, 0, SNAPSHOT_SIZE);
-  bottom.addColorStop(0, 'rgba(5, 5, 16, 0)');
-  bottom.addColorStop(1, 'rgba(5, 5, 16, 1)');
+  bottom.addColorStop(0, 'rgba(21, 24, 29, 0)');
+  bottom.addColorStop(1, 'rgba(21, 24, 29, 1)');
   ctx.fillStyle = bottom;
   ctx.fillRect(0, SNAPSHOT_SIZE - 200, SHARE_WIDTH, 200);
 
@@ -69,7 +69,7 @@ export const drawShare = (canvas: HTMLCanvasElement, input: ShareInput): void =>
     ctx.fillStyle = MUTED;
     ctx.font = `24px ${FONT}`;
     ctx.fillText(fit(ctx, fact.label, colWidth), x, y);
-    ctx.fillStyle = i === 0 ? GOLD : INK;
+    ctx.fillStyle = i === 0 ? ACCENT : INK;
     ctx.font = `600 32px ${FONT}`;
     ctx.fillText(fit(ctx, fact.value, colWidth), x, y + 44);
   });

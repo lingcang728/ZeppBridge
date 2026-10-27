@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { angleOfDay, dayOfYear, treeRings, weekShape, WEEKS } from '../rings/geometry';
-import { fillRings } from '../rings/lumina/shapes';
+import { edgeSegments, hitRing, radiusAt, ringTicks, SAMPLES, treeLayout, weekAtFraction } from '../rings/tree';
 import type { RingStar, RingYear } from '../../types/rings';
 
 const year = (y: number, weeks: (number | null)[], dataDays = 100, stars: RingStar[] = []): RingYear => ({
@@ -37,44 +37,54 @@ describe('rings geometry', () => {
   });
 });
 
-describe('rings particles', () => {
-  const count = 6000;
-  const pc = () => ({ pos: new Float32Array(count * 3), col: new Float32Array(count * 3) });
-  /** 撤掉造型的后仰，量出每颗粒子在切面上的半径和第几天。 */
-  const flat = (pos: Float32Array, i: number, days: number) => {
-    const tilt = -0.5;
-    const x = pos[i * 3];
-    const y = pos[i * 3 + 1] * Math.cos(tilt) + pos[i * 3 + 2] * Math.sin(tilt);
-    const angle = Math.atan2(-y, x);
-    const day = (((angle + Math.PI / 2) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * days;
-    return { r: Math.hypot(x, y), day };
-  };
+describe('tree rings', () => {
+  const run = (id: string, date: string, duration_s: number | null = 1800): RingStar => ({ workout_id: id, date, kind: 'running', is_run: true, distance_m: 5000, duration_s });
+  const busy = Array<number | null>(WEEKS).fill(120);
 
-  it('leaves the weeks without data empty on the ring', () => {
-    const weeks = Array<number | null>(WEEKS).fill(120);
-    for (let w = 26; w <= 30; w += 1) weeks[w] = null;
-    const target = pc();
-    const focal = fillRings(target, count, [year(2023, weeks)], 2023);
-    expect(focal.count).toBe(0);
-    const bark = Math.round(count * 0.08);
-    for (let i = 0; i < count - bark; i += 1) {
-      const { r, day } = flat(target.pos, i, 365);
-      if (r <= 1.05) continue; // 髓心
-      expect(day < 26 * 7 || day >= 31 * 7).toBe(true);
-    }
-    expect(target.pos.every(Number.isFinite)).toBe(true);
+  it('grows ring on ring: each inner edge is the previous outer edge, and it fits the radius', () => {
+    const quiet = Array<number | null>(WEEKS).fill(20);
+    quiet[30] = 400;
+    const layout = treeLayout([year(2022, busy), year(2023, quiet), year(2024, busy)], 300);
+    expect(layout.bands.map(b => b.year)).toEqual([2022, 2023, 2024]);
+    expect(layout.bands[1].inner).toBe(layout.bands[0].outer);
+    expect(Math.max(...layout.bands[2].outer)).toBeCloseTo(300);
+    for (const band of layout.bands) expect(band.outer.every((r, s) => r > band.inner[s])).toBe(true);
+    // 那一周练得多，那里就鼓出来。
+    const width = (f: number) => radiusAt(layout.bands[1].outer, f) - radiusAt(layout.bands[1].inner, f);
+    expect(width(weekAtFraction(2023, 30.5 * 7 / 365).start + 0.004)).toBeGreaterThan(width(0.1));
   });
 
-  it('gives each workout of the selected year its own glowing stars and none for other years', () => {
-    const stars: RingStar[] = [
-      { workout_id: 'a', date: '2024-03-04', kind: 'run', is_run: true, distance_m: 10000, duration_s: 3300 },
-      { workout_id: 'b', date: '2024-07-06', kind: 'yoga', is_run: false, distance_m: null, duration_s: null },
-    ];
-    const years = [year(2023, Array(WEEKS).fill(60)), year(2024, Array(WEEKS).fill(60), 200, stars)];
-    const target = pc();
-    const focal = fillRings(target, count, years, 2024);
-    expect(focal.count).toBeGreaterThan(0);
-    expect(focal.base).toHaveLength(focal.count * 3);
-    expect(fillRings(pc(), count, years, 2023).count).toBe(0);
+  it('breaks the line where a week has no data instead of drawing it as zero', () => {
+    const weeks = [...busy];
+    for (let w = 26; w <= 30; w += 1) weeks[w] = null;
+    const [band] = treeLayout([year(2023, weeks)], 300).bands;
+    expect(band.present.filter(p => !p).length).toBeGreaterThan(0);
+    expect(band.present[0]).toBe(true);
+    expect(band.present[Math.round(28.5 * 7 / 365 * SAMPLES)]).toBe(false);
+    const gaps = edgeSegments(band).filter(seg => !seg.present);
+    expect(gaps).toHaveLength(1);
+  });
+
+  it('draws one tick per workout inside its ring, longer for longer workouts, and never invents a duration', () => {
+    const stars = [run('a', '2024-03-02', 600), run('b', '2024-03-02', 3 * 3600), run('c', '2024-09-10', null)];
+    const layout = treeLayout([year(2024, busy, 300, stars)], 300);
+    const ticks = ringTicks(layout.bands[0], stars);
+    expect(ticks).toHaveLength(3);
+    const length = (i: number) => Math.hypot(ticks[i].x2 - ticks[i].x1, ticks[i].y2 - ticks[i].y1);
+    expect(length(0)).toBeLessThan(length(1));
+    expect(length(2)).toBeGreaterThan(0);
+    // 同一天两次不叠成一条。
+    expect(ticks[0].f).not.toBe(ticks[1].f);
+    for (const tick of ticks) expect(hitRing(layout, (tick.x1 + tick.x2) / 2, (tick.y1 + tick.y2) / 2)?.band.year).toBe(2024);
+  });
+
+  it('finds the ring and the week under the pointer', () => {
+    const layout = treeLayout([year(2023, busy), year(2024, busy)], 300);
+    expect(hitRing(layout, 0, 0)).toBeNull();
+    expect(hitRing(layout, 0, -0.97 * radiusAt(layout.bands[1].outer, 0))?.band.year).toBe(2024);
+    expect(hitRing(layout, 0, -1.01 * radiusAt(layout.bands[1].outer, 0))).toBeNull();
+    const week = weekAtFraction(2024, 0.5);
+    expect(week.from <= '2024-07-02' && week.to >= '2024-07-02').toBe(true);
+    expect(weekAtFraction(2024, 0.999).to).toBe('2024-12-31');
   });
 });

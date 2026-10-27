@@ -490,6 +490,23 @@ export const usePageMorph = (options: { back: () => void }) => {
         flight.retarget({ rect: settled, anchor: { x: settled.left, y: settled.top - job.lift } });
       });
     }
+    /* 收回途中来处页还在排版（上面的区块晚一帧才读到数、图片撑开）：卡被往下推了，终点跟着改。
+       以前只在出发时量一次，窗口落在卡原来的位置，落地那一帧整块跳下去（用户 2026-10-27「PB 的位置根本不在原来的地方」）。 */
+    if (present) {
+      let aim = target;
+      const follow = () => {
+        if (landed || !el.isConnected || !present.isConnected) return;
+        const transform = staying ? getComputedStyle(staying).transform : 'none';
+        const scale = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).a : 1;
+        const now = forward ? unscaledBox(rectOf(present), forward.origin, scale) : rectOf(present);
+        if (Math.abs(now.left - aim.left) > 1.5 || Math.abs(now.top - aim.top) > 1.5) {
+          aim = now;
+          flight.retarget({ rect: now, anchor: { x: now.left, y: now.top - job.lift } });
+        }
+        requestAnimationFrame(follow);
+      };
+      requestAnimationFrame(follow);
+    }
     const all = () => [...flight.anims, ...(forward ? [forward.animation] : [])];
     // 来处页刚从缓存插回文档，第一次上屏要整页重新光栅化：先停在起点（画面上就是详情页本身），等帧节奏平稳再缩。
     // 以前一插回去就开跑，GPU 卡住的第一帧吞掉了七成路程——「返回时一下跳回去」。

@@ -164,8 +164,7 @@ const CACHED_PAGES = [
   'RecentRecords',
   'SleepList',
   'WorkoutList',
-  // Preserve the selected star as the return target. RingsStage stops rendering
-  // on deactivation and disposes its WebGL context when evicted from this cache.
+  // Keep the selected year and open workout card when returning from a workout.
   'Rings',
 ];
 
