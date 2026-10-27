@@ -3843,6 +3843,8 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       vsSameSpan: (pct: string) => `t.o.v. dezelfde periode vorig jaar ${pct}`,
       coverage: (pct: string) => `${pct} gedekt`,
       activity: 'Het jaar van dag tot dag',
+      less: 'Minder',
+      more: 'Meer',
       activeMonths: 'Actiefste maanden',
       streak: 'Langste reeks',
       streakDays: (n: number) => (n === 1 ? '1 dag' : `${n} dagen op rij`),

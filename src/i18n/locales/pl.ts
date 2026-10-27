@@ -4531,6 +4531,8 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
     vsSameSpan: (pct: string) => `vs ten sam okres ubiegłego roku ${pct}`,
     coverage: (pct: string) => `${pct} pokrycia`,
     activity: 'Rok dzień po dniu',
+    less: 'Mniej',
+    more: 'Więcej',
     activeMonths: 'Najaktywniejsze miesiące',
     streak: 'Najdłuższa seria',
     streakDays: (n: number) =>

@@ -2621,6 +2621,8 @@ export default {
       vsSameSpan: (pct: string) => `по сравнению с тем же периодом прошлого года ${pct}`,
       coverage: (pct: string) => `${pct} покрыто`,
       activity: 'Год день за днём',
+      less: 'Меньше',
+      more: 'Больше',
       activeMonths: 'Самые активные месяцы',
       streak: 'Самая длинная серия',
       streakDays: (n: number) =>
