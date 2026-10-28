@@ -13,25 +13,6 @@ export const workoutDetailMessages = defineMessages(
     seriesFailed: '无法读取这次运动的逐点序列',
     seriesFailedTitle: '逐点序列读取失败',
     exportNeedsSeries: '逐点序列读取失败，无法导出这条记录。',
-    aiPrompt: (label: string) => `你是专业运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
-只基于记录里的事实分析这次训练：强度、配速与心率的关系、有没有明显掉速或异常段落，并给下一次的具体建议。
-
-约束：
-- 数据里没有人群基准，不要拿我和「一般健康人群」或任何平均水平比；
-- 缺失的项直接说缺失，不要用 0 或估算值填补；
-- 不做医学诊断、疾病风险判断或治疗建议。
-
-以 Markdown 格式输出。`,
-    needDesktop: 'AI 交接需要桌面应用；网页预览不会打开外部网站。',
-    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · 带恢复背景`,
-    aiRecoveryPrompt: (label: string, gap: number | null) => `这是我的一次${label}${gap === null ? '（这之前没有记录到运动）' : `，距上一次运动 ${gap} 天`}。文件里还有这次运动之前 30 天的睡眠、静息心率、HRV、压力和准备度（有就带，缺的写「未提供」）。
-
-请按这个顺序说：
-1. 先判断这次运动前的身体状态：前 7 天的均值和之前 30 天的基线比，恢复得好还是差；
-2. 再结合这个状态评价这次的强度和表现，分清是状态问题还是练得不好；
-3. 最后说${gap === null ? '下一次' : `隔了 ${gap} 天，下一次`}该回到什么强度。
-
-约束：只和我自己的历史比，不和人群平均比；缺的数据直接说缺，不估算；不做医学诊断。`,
     noCorrection: '不纠正',
     deviceNameMissing: '设备名称未提供',
     notFetchedYet: '尚未获取',
@@ -179,25 +160,6 @@ export const workoutDetailMessages = defineMessages(
     seriesFailed: "Could not load this workout's per-point series",
     seriesFailedTitle: 'Per-point series failed to load',
     exportNeedsSeries: 'Per-point series failed to load — this record cannot be exported.',
-    aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
-Analyze this session using only facts in the record: intensity, pace–heart-rate relation, any clear slowdown or anomalous stretch, and what to do differently next time.
-
-Constraints:
-- There is no population baseline in this data. Do not compare me to "healthy adults" or to any average.
-- Where something is missing, say it is missing. Never fill the gap with a zero or an estimate.
-- No medical diagnosis, no disease-risk judgement, no treatment advice.
-
-Answer in Markdown.`,
-    needDesktop: 'AI handoff needs the desktop app — the browser preview will not open external sites.',
-    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · with recovery`,
-    aiRecoveryPrompt: (label: string, gap: number | null) => `This is one ${label} of mine${gap === null ? ' (no earlier workout is recorded)' : `, ${gap} days after my previous workout`}. The file also has my sleep, resting HR, HRV, stress and readiness for the 30 days before it (included where recorded; missing ones say “not provided”).
-
-Please answer in this order:
-1. First judge my condition before this workout: compare the last 7 days with the 30-day baseline before them — am I well recovered or not?
-2. Then assess this session's intensity and performance in light of that, and tell a recovery issue apart from a bad session.
-3. Finally, ${gap === null ? 'what intensity to aim for next time' : `after a ${gap}-day gap, what intensity to return to next time`}.
-
-Rules: compare me only with my own history, not with population averages; say plainly when data is missing instead of estimating; no medical diagnosis.`,
     noCorrection: 'No correction',
     deviceNameMissing: 'Device name not provided',
     notFetchedYet: 'Not fetched yet',
@@ -345,25 +307,6 @@ Rules: compare me only with my own history, not with population averages; say pl
     seriesFailed: 'No se pudo leer la serie punto a punto de este entrenamiento',
     seriesFailedTitle: 'No se pudo cargar la serie punto a punto',
     exportNeedsSeries: 'La serie punto a punto no se pudo cargar, así que este registro no se puede exportar.',
-    aiPrompt: (label: string) => `Eres un analista deportivo. A continuación está el registro completo de uno de mis entrenamientos de ${label}, tomado de la base de datos local de ZeppBridge y anonimizado.
-Analiza esta sesión usando solo los hechos de este registro: la intensidad, cómo se relaciona el ritmo con la frecuencia cardíaca, si hay una desaceleración clara o un tramo anómalo, y qué hacer concretamente distinto la próxima vez.
-
-Restricciones:
-- En estos datos no hay una referencia de población. No me compares con «adultos sanos» ni con ningún promedio.
-- Donde falte algo, di que falta. Nunca rellenes el hueco con un 0 ni una estimación.
-- Nada de diagnósticos médicos, juicios de riesgo de enfermedad ni consejos de tratamiento.
-
-Responde en español, en Markdown.`,
-    needDesktop: 'Pasar a la IA requiere la app de escritorio; la vista previa web no abre sitios externos.',
-    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · con recuperación`,
-    aiRecoveryPrompt: (label: string, gap: number | null) => `Esta es una sesión de ${label}${gap === null ? ' (no hay entrenamientos registrados antes)' : `, ${gap} días después de mi entrenamiento anterior`}. El archivo también incluye mi sueño, FC en reposo, HRV, estrés y preparación de los 30 días previos (lo que esté registrado; lo que falte aparece como «no proporcionado»).
-
-Responde en este orden:
-1. Primero evalúa mi estado antes de esta sesión: compara los últimos 7 días con la referencia de los 30 días anteriores: ¿estoy bien recuperado o no?
-2. Luego valora la intensidad y el rendimiento de esta sesión según ese estado, y distingue un problema de recuperación de una mala sesión.
-3. Por último, ${gap === null ? 'a qué intensidad apuntar la próxima vez' : `tras ${gap} días sin entrenar, a qué intensidad volver la próxima vez`}.
-
-Reglas: compárame solo con mi propio historial, no con promedios de la población; si faltan datos, dilo en lugar de estimar; sin diagnósticos médicos.`,
     noCorrection: 'Sin corrección',
     deviceNameMissing: 'Nombre del dispositivo no disponible',
     notFetchedYet: 'Aún sin datos',

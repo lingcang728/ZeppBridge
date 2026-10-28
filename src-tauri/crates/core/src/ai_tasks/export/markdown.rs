@@ -19,6 +19,8 @@ use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
+mod extras;
+
 /// 曲线取平均的档位（秒）。1 秒原始采样不进 `.md`：一条长跑就能吃掉整份预算。
 pub const CURVE_AVERAGE_STEPS: [u32; 3] = [10, 30, 60];
 /// 没订阅时的默认预算（token）：Gemini 等免费版约读得完 3.2 万。
@@ -547,7 +549,7 @@ fn workouts_section(
         let id = cell_opt(workout.get("workout_id"));
         let zones = workout.get("hr_zones").and_then(Value::as_array);
         let series = workout.get("series");
-        if zones.is_none() && series.is_none() {
+        if zones.is_none() && series.is_none() && !extras::present(workout) {
             continue;
         }
         let _ = writeln!(out, "### Workout {id}\n");
@@ -560,6 +562,7 @@ fn workouts_section(
                 &[("upper_bound_bpm", "bpm"), ("seconds", "s")],
             );
         }
+        extras::render(out, workout);
         let Some(series) = series else {
             continue;
         };

@@ -39,9 +39,6 @@ const workoutId = computed(() => String(route.params.workoutId || ''));
 const {
   workout, series, device, loading, error, actionError, exportedNote, activeFormat, exportBusy, displayType,
   insight, insightLoading, insightError, seriesError,
-  sendWorkoutToAi, copyAsk, openAsk, revealAsk,
-  askBusy, askResult, askError, askProvider,
-  aiWithRecovery,
   typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
   loadDetail, exportRecord,
 } = useWorkoutDetail(workoutId);
@@ -54,6 +51,12 @@ const {
 } = useWorkoutPresentation(workout, series, device, displayType);
 /* 海拔的出处说明挂在「累计爬升」那格的悬停提示上，不在页面里再占一行小字。 */
 const hasAltitude = computed(() => Boolean(series.value?.samples.some(sample => sample.altitude_m != null) || series.value?.summary.elevation_gain_m != null || workout.value?.elevation_gain_m != null));
+/* 平路时爬升卡那一句用的实数：最低 / 最高取逐点海拔（和海拔图的统计同一份），累计爬升取记录汇总。 */
+const relief = computed(() => {
+  const heights = (series.value?.samples ?? []).map(sample => sample.altitude_m).filter((v): v is number => v != null && v >= -500 && v <= 10_000);
+  const gain = workout.value?.elevation_gain_m ?? series.value?.summary.elevation_gain_m ?? null;
+  return { min: heights.length ? Math.min(...heights) : null, max: heights.length ? Math.max(...heights) : null, gain };
+});
 const sportName = computed(() => (workout.value ? workoutDisplayLabel(workout.value) || workoutLabel(displayType.value) : ''));
 
 /* 两列底部尽量齐平：「来源信息」放进（不算它自己时）更矮的那一列。没有轨迹的运动
@@ -131,22 +134,12 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         :insight="insight"
         :loading="insightLoading"
         :error="insightError"
-        v-model:with-recovery="aiWithRecovery"
-        :ask-busy="askBusy"
-        :ask-result="askResult"
-        :ask-error="askError"
-        :ask-provider="askProvider.label"
-        :ask-provider-icon="askProvider.localIcon"
-        @handoff="sendWorkoutToAi"
-        @copy="copyAsk"
-        @open="openAsk"
-        @reveal="revealAsk"
       />
 
       <div ref="lower" class="lower">
         <div class="main-col">
           <WorkoutRouteCard :canvas="routeCanvas" />
-          <WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" />
+          <WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" :relief="relief" />
           <WorkoutCharts :cards="chartCards" :series-error="seriesError" :hr-zones="hrZones" @retry="loadDetail" />
           <WorkoutProvenanceCard v-if="metaInMain" :workout="workout" :device-name="deviceName" :sync-badge="syncBadge" :fit="fit" @replace-fit="fit.replace" @restore-fit="fit.restore" />
         </div>

@@ -373,9 +373,6 @@ export default {
   'components/InsightCard': {
     title: 'Analisi di questa corsa',
     reading: 'Lettura dei record locali in corso…',
-    handoff: 'Fai analizzare all’IA',
-    withRecovery: 'Includi i 7 giorni precedenti: sonno e recupero',
-    withRecoveryHint: 'Dopo qualche giorno senza allenamenti, includere i dati precedenti su sonno, FC a riposo e HRV consente all’IA di distinguere tra un recupero insufficiente e una sessione sottotono.',
     baselineRun: 'Riferimento',
     currentRun: 'Questa corsa',
     comparedTo: (count: number) => `Confrontata con le tue ultime ${count} corse di distanza simile:`,
@@ -3595,21 +3592,8 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     savedFit: 'File FIT salvato',
     copied: (format: string) => `Dati ${format} copiati.`,
 
-    needDesktop: 'Il passaggio all’IA richiede l’applicazione desktop: questa anteprima del browser non apre siti esterni.',
     preparing: 'Preparazione in corso…',
     insightFailed: 'Impossibile generare informazioni per questo allenamento',
-    aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · con recupero`,
-    aiRecoveryPrompt: (label: string, gap: number | null) => `Ecco uno dei miei allenamenti di ${label}${gap === null ? ' (nessun allenamento precedente registrato)' : `, ${gap} giorni dopo il mio allenamento precedente`}. Il file contiene anche i dati su sonno, FC a riposo, HRV, stress e prontezza per i 30 giorni precedenti (inclusi se registrati; i dati mancanti indicano «non fornito»).\n\nRispondi in questo ordine:\n1. Valuta prima il mio stato di forma prima di questo allenamento: confronta la media degli ultimi 7 giorni con la baseline dei 30 giorni precedenti — il recupero è stato buono o scarso?\n2. Analizza poi l'intensità e le prestazioni di questo allenamento alla luce di tale stato, distinguendo un problema di recupero da una cattiva sessione.\n3. Infine, ${gap === null ? 'quale intensità puntare per la prossima volta' : `dopo un intervallo di ${gap} giorni, a quale intensità riprendere la prossima volta`}.\n\nRegole: confrontami solo con la mia cronologia personale, non con medie della popolazione; indica chiaramente i dati mancanti invece di stimarli; nessuna diagnosi medica.`,
-    aiPrompt: (label: string) => `Sei un analista sportivo. Ecco la registrazione completa della mia sessione di ${label}, estratta dal database locale di ZeppBridge e anonimizzata.
-Analizza questa sessione basandoti esclusivamente sui fatti contenuti nella registrazione: intensità, rapporto passo / frequenza cardiaca, eventuali cali di ritmo o segmenti anomali, e cosa cambiare concretamente la prossima volta.
-
-Vincoli:
-- Questi dati non hanno riferimenti di popolazione: non confrontarmi con «adulti sani» né con alcuna media.
-- Se un dato manca, dichiara che manca. Non colmare mai i vuoti con 0 o stime.
-- Nessuna diagnosi medica, nessuna valutazione del rischio di malattie, nessun consiglio terapeutico.
-
-Rispondi in Markdown.`,
-
     eyebrowProvenance: 'Provenienza',
     provenanceTitle: 'Provenienza',
     provenanceAria: 'Provenienza',
