@@ -3982,7 +3982,60 @@ export default {
       saved: 'Сохранено',
       openFolder: 'Показать в папке',
       shareTitle: (year: number) => `Мой ${year} год в кольцах`,
-      shareFooter: 'Только реальные данные · создано на этом компьютере · ZeppBridge',
+      shareStory: {
+        heroWorkouts: 'тренировок',
+        heroDays: 'активных дней',
+        heroHours: 'часов',
+        perWeek: (n: string) => `В среднем ${n} тренировок в неделю`,
+        ran: (km: string) => `Пробег ${km} км`,
+        marathons: (n: string) => `≈ ${n} марафонов`,
+        runs: (n: number) =>
+          plural(n, {
+            one: `${n} пробежка`,
+            few: `${n} пробежки`,
+            many: `${n} пробежек`,
+            other: `${n} пробежки`,
+          }),
+        farthest: (km: string) => `Самая длинная пробежка: ${km} км`,
+        longest: (time: string) => `Самая долгая тренировка: ${time}`,
+        busiest: (month: string) => `${month} — самый активный`,
+        busiestNote: (n: number) =>
+          plural(n, {
+            one: `${n} тренировка в этом месяце`,
+            few: `${n} тренировки в этом месяце`,
+            many: `${n} тренировок в этом месяце`,
+            other: `${n} тренировки в этом месяце`,
+          }),
+        records: (n: number) =>
+          plural(n, {
+            one: `${n} новый личный рекорд`,
+            few: `${n} новых личных рекорда`,
+            many: `${n} новых личных рекордов`,
+            other: `${n} новых личных рекорда`,
+          }),
+        races: (n: number) =>
+          plural(n, {
+            one: `${n} завершённое соревнование`,
+            few: `${n} завершённых соревнования`,
+            many: `${n} завершённых соревнований`,
+            other: `${n} завершённых соревнования`,
+          }),
+        steps: (n: string) =>
+          plural(Number(n.replace(/\D/g, '')), {
+            one: `Пройден ${n} шаг`,
+            few: `Пройдено ${n} шага`,
+            many: `Пройдено ${n} шагов`,
+            other: `Пройдено ${n} шагов`,
+          }),
+        sleep: (h: number, m: number) => `${h} ч ${m} мин сна за ночь`,
+        sleepNote: (nights: number) =>
+          plural(nights, {
+            one: `за ${nights} ночь`,
+            few: `за ${nights} ночи`,
+            many: `за ${nights} ночей`,
+            other: `за ${nights} ночи`,
+          }),
+      },
       fileStem: (year: number) => `ZeppBridge Годичные кольца ${year}`,
       ready: (year: number) => `Ваше кольцо за ${year} год выросло`,
       readyHint: 'Один круг в год, одна засечка за тренировку.',
