@@ -6,11 +6,14 @@
  *
  * - measured：传感器直接读数（心率、步数、血氧、体重、血压）。
  * - computed：由读数或你自己的记录按公开的固定算式换算（BMI、负荷平衡、ODI、饮食合计）。
- * - estimated：Zepp 的算法推断，方法和误差范围都没公布（VO₂max、准备度、体脂……）。
+ * - inferred：常识推算——大家都知道是手表推出来的，做法也人人熟悉（从体动和心率判断睡眠、从步数推距离、
+ *   从心率算热量和 PAI）。界面不另外标，免得满屏记号（用户 2026-10-28：「睡眠时长没必要特意标算法」）。
+ * - modeled：黑盒估算——Zepp 用自己的模型估出来，方法和误差范围都没公布，和实验室测量可能差得远
+ *   （VO₂max、准备度、体脂……）。只有这一档在「?」按钮角上挂一粒琥珀点。
  *
  * 认不出的 id 返回 null：不贴标签，比贴错强。
  */
-export type MetricTrust = 'measured' | 'computed' | 'estimated';
+export type MetricTrust = 'measured' | 'computed' | 'inferred' | 'modeled';
 
 const TRUST: Record<string, MetricTrust> = {
   steps: 'measured',
@@ -36,24 +39,25 @@ const TRUST: Record<string, MetricTrust> = {
   intake_fat_g: 'computed',
   intake_carbs_g: 'computed',
 
-  vo2max: 'estimated',
-  lactate_threshold: 'estimated',
-  training_load: 'estimated',
-  pai_total: 'estimated',
-  readiness: 'estimated',
-  stress: 'estimated',
-  respiratory_rate: 'estimated',
-  distance: 'estimated',
-  active_calories: 'estimated',
-  active_minutes: 'estimated',
-  body_fat_rate: 'estimated',
-  muscle_mass: 'estimated',
-  body_water_rate: 'estimated',
-  bone_mass: 'estimated',
-  visceral_fat: 'estimated',
-  sleep_duration: 'estimated',
-  sleep_score: 'estimated',
-  sleep_stages: 'estimated',
+  pai_total: 'inferred',
+  stress: 'inferred',
+  respiratory_rate: 'inferred',
+  distance: 'inferred',
+  active_calories: 'inferred',
+  active_minutes: 'inferred',
+  sleep_duration: 'inferred',
+  sleep_score: 'inferred',
+  sleep_stages: 'inferred',
+
+  vo2max: 'modeled',
+  lactate_threshold: 'modeled',
+  training_load: 'modeled',
+  readiness: 'modeled',
+  body_fat_rate: 'modeled',
+  muscle_mass: 'modeled',
+  body_water_rate: 'modeled',
+  bone_mass: 'modeled',
+  visceral_fat: 'modeled',
 };
 
 export const metricTrust = (metric: string): MetricTrust | null => TRUST[metric] ?? null;

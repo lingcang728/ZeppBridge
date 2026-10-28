@@ -72,6 +72,25 @@ export const useCardTableDrag = (options: {
     window.clearTimeout(hintTimer);
     hintTimer = window.setTimeout(() => { hintId.value = null; }, 1800);
   };
+  /**
+   * 逐帧 / 按下就变的样子（悬在哪张上、按住哪一叠、抬起哪张）直接切到那一张牌的 classList（10-28 牌桌卡顿）：
+   * 以前写在模板里，状态一变整桌重渲染，拖一张牌每划过一张就整桌重打一遍补丁。`dragging` 一直是这么做的。
+   */
+  const mark = (id: () => string | null, apply: (el: HTMLElement, on: boolean) => void) => watch(id, (now, before) => {
+    const old = before ? options.cardOf(before) : null;
+    if (old) apply(old, false);
+    const el = now ? options.cardOf(now) : null;
+    if (el) apply(el, true);
+  }, { flush: 'post' });
+  mark(() => drag.targetId.value, (el, on) => el.classList.toggle('drop-target', on));
+  mark(() => picking.liftId.value, (el, on) => el.classList.toggle('lifting', on));
+  mark(() => picking.holdId.value, (el, on) => {
+    el.classList.toggle('holding', on);
+    // 按住时其余的牌微微变暗（CardTable.css）；周 / 月叠的牌位标出按住的那一叠。
+    el.closest('.table-layer')?.classList.toggle('has-hold', on);
+    if (options.level()?.kind === 'groups') el.parentElement?.classList.toggle('is-holding', on);
+  });
+
   const onDayDown = (event: PointerEvent, day: DeckDay) => {
     const id = cardIdOf(day);
     drag.down(event, id);

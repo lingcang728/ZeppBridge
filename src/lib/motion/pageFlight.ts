@@ -18,8 +18,11 @@ const rectOf = (el: Element): Rect => {
 /**
  * 卡 ↔ 页的分段淡入淡出和背后的模糊，照履历页弹窗（lib/motion/dialogFlight.ts 的 windowOpen / windowClose）抄过来
  * （用户 2026-10-28：「直接照抄履历页卡片的动画，那些动画太好了」）：
- * 打开：卡拷贝前三成淡完，窗口长到四成半以前里面只有一块底板在长，之后页面内容才淡入——不在小框里挤一屏字。
- * 收回：内容前三成淡完，剩底板缩回去；卡拷贝在快落地那一段（四成到八成）亮回来，落地那一帧就是真卡。
+ * 打开：卡拷贝前三成淡完，窗口长到近四成以前里面只有一块卡色的底板在长，之后页面内容才淡入——不在小框里挤一屏字。
+ * 收回：内容先留着跟窗口一起缩，一成半到四成之间淡掉（窗口那时已经缩得不大了，不会剩一整屏空底板）；卡拷贝在四成到七成亮回来，
+ * 落地那一帧就是真卡。
+ * 底板从卡色过渡到页面底色（plateIn / plateOut，见 window.ts 的 pageBackdrop）：中间那一段空板看上去是卡在长，
+ * 不是一块黑板（2026-10-28 录屏）。
  * 文字按线性时间轴先后交替，卡和页的字永远不同时半透明叠着。
  * 被打断时从此刻的透明度接着走（`from`），不先跳回起点。
  */
@@ -28,9 +31,14 @@ export const PAGE_WINDOW_EASE = OPEN_EASE;
 /** 起点不是 0：透明度为 0 的层 Chromium 可能不合成，第一帧可见时才去光栅化，又是一跳。 */
 const NEARLY_HIDDEN = 0.001;
 export const replicaOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: 0, offset: 0.3 }, { opacity: 0 }];
-export const replicaIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.4 }, { opacity: 1, offset: 0.8 }, { opacity: 1 }];
-export const contentIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.45 }, { opacity: 1 }];
-export const contentOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: 0, offset: 0.3 }, { opacity: 0 }];
+export const replicaIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.4 }, { opacity: 1, offset: 0.7 }, { opacity: 1 }];
+/** 开到一半就返回、窗口里两样都还淡着：卡拷贝立刻亮回来，窗口里一直是那张卡，不留一段空板。 */
+export const replicaBack = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: 1, offset: 0.25 }, { opacity: 1 }];
+export const contentIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.38 }, { opacity: 1 }];
+export const contentOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.15 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }];
+/** 底板上层（页面底色）：开的时候跟着窗口长成整页盖上来，收的时候先退成卡色再缩回卡上。 */
+export const plateIn = (from = 0): Keyframe[] => [{ opacity: Math.max(NEARLY_HIDDEN, from) }, { opacity: Math.max(NEARLY_HIDDEN, from), offset: 0.2 }, { opacity: 1, offset: 0.8 }, { opacity: 1 }];
+export const plateOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.1 }, { opacity: NEARLY_HIDDEN, offset: 0.6 }, { opacity: NEARLY_HIDDEN }];
 /** 背后的模糊：开的时候跟着窗口慢慢糊上（前七成）；收的时候前四成几乎不退、落地时才散掉。 */
 export const veilIn = (from = 0): { frames: Keyframe[]; options: KeyframeAnimationOptions } => ({
   frames: [{ opacity: Math.max(NEARLY_HIDDEN, from) }, { opacity: 1 }],
@@ -92,9 +100,10 @@ export interface FlightSnapshot {
   window: Rect;
   /** 页面左上角此刻在屏幕上的位置。 */
   anchor: { x: number; y: number };
-  /** 页面内容（以页头为准）和卡拷贝此刻的透明度。 */
+  /** 页面内容（以页头为准）、卡拷贝、底板上层此刻的透明度。 */
   content: number;
   replica: number;
+  plate: number;
 }
 
 export interface Flight {
@@ -134,6 +143,8 @@ export const fly = (o: {
   replicaFade: Keyframe[];
   head: Keyframe[];
   body: Keyframe[];
+  /** 底板上层（页面底色）的透明度。 */
+  plate: Keyframe[];
 }): Flight => {
   const { page } = o;
   const start = rectOf(page);
@@ -157,6 +168,8 @@ export const fly = (o: {
     page.appendChild(el);
     track(el.animate(o.replicaFade, linear));
   }
+  const plate = o.backdrop.firstElementChild;
+  if (plate instanceof HTMLElement) track(plate.animate(o.plate, linear));
   if (head) track(head.animate(o.head, linear));
   const parts = new Map<HTMLElement, Animation>();
   const leavingParts = new WeakSet<HTMLElement>();
@@ -216,11 +229,13 @@ export const fly = (o: {
       const box = page.getBoundingClientRect();
       const content = opacityOf(head);
       const replica = opacityOf(o.replica?.el);
+      const plateNow = opacityOf(plate);
       return {
         window: visibleWindow(page),
         anchor: { x: box.left, y: box.top },
         content: Number.isFinite(content) ? content : 1,
         replica: Number.isFinite(replica) ? replica : 0,
+        plate: Number.isFinite(plateNow) ? plateNow : 1,
       };
     },
     retarget: (next) => {

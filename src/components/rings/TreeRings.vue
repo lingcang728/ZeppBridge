@@ -4,7 +4,8 @@
    选中那圈提亮、外沿描深，圈里一次运动一道深色细纹（长短看时长）。页面上只有这块木头（用户要「只留大大的年轮」），让人自己探索：
    - 鼠标在木头上：一根径向的指针跟着走，指着一年里的哪一天（外面那个月份亮起来）；所在那圈微微亮起，浮出那一周（日期、几次、多久）；
    - 点一圈选那年（那圈闪一下），键盘 ← → 也能换（左上角的年份胶囊用户 2026-10-27 说不需要，去掉了）；
-   - 悬停 / 点细纹是那次运动，点开卡片从细纹里长出来（StarCard），卡片开着时 ← → 顺着时间走；
+   - 悬停 / 点细纹是那次运动，点开卡片从细纹里长出来（StarCard）；开着时一根琥珀指针从髓心指着它，在卡上滚轮 / 横扫 / 左右拖
+     或按 ← → 顺着时间走，指针沿年轮转过去、卡沿着圆周跟过去（用户 2026-10-28：不要箭头）；
    - 滚轮放大（以鼠标为中心），放大后拖动平移，双击或右下角「还原」回来；键盘 + − 0 一样。
    进来时一圈圈从髓心往外长出来、最后树皮合上，之后一道很淡的光泽隔一阵扫过木面（只动 transform）。 */
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
@@ -12,6 +13,7 @@ import StarCard from './StarCard.vue';
 import { bandPath, edgeSegments, hitRing, loopPath, monthStarts, neighborStar, pointAt, radiusAt, ringTicks, treeLayout, wedgePath, weekAtFraction } from '../../lib/rings/tree';
 import { bandWood, barkOf, grainPaths, raysOf, slicePath, WOOD } from '../../lib/rings/wood';
 import { lessMotion } from '../../lib/motion/lessMotion';
+import { shortestArc } from '../../lib/rings/starCard';
 import { onMotionEscape } from '../../lib/motion/interrupt';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { kmText } from '../../lib/logbook/display';
@@ -151,25 +153,48 @@ const tooltip = computed(() => {
 const open = ref<number | null>(null);
 const closing = ref(false);
 const openStar = computed(() => (open.value === null ? null : stars.value[open.value] ?? null));
-const rank = computed(() => {
-  const seconds = openStar.value?.duration_s;
-  return seconds ? 1 + stars.value.filter(s => (s.duration_s ?? 0) > seconds).length : null;
+/** 前后各一次：卡片预读它们的详情，拨过去就是满的。 */
+const neighborIds = computed(() => {
+  if (open.value === null) return [];
+  return [-1, 1].map(d => stars.value[open.value! + d]?.workout_id).filter((v): v is string => !!v);
 });
-function show(index: number) { open.value = index; closing.value = false; hover.value = null; hoverTick.value = null; needle.value = null; }
+function show(index: number) { open.value = index; closing.value = false; hover.value = null; hoverTick.value = null; needle.value = null; aimNeedle(); }
 function close() {
   if (open.value === null || closing.value) return;
   closing.value = true;
   host.value?.focus({ preventScroll: true });
 }
-function closed() { open.value = null; closing.value = false; }
+function closed() { open.value = null; closing.value = false; aim.value = null; cancelAnimationFrame(aimFrame); }
 function stepStar(delta: 1 | -1) {
   if (open.value === null) return;
   const next = neighborStar(stars.value, open.value, delta);
   if (next !== null) show(next);
 }
+/* 琥珀指针：转向点开的那道细纹的外端，换一次就沿最短的那段弧转过去；卡片追的就是指针的外端，所以卡沿着圆周走。 */
+const aim = ref<{ f: number; r: number } | null>(null);
+let aimFrame = 0;
+function aimNeedle() {
+  cancelAnimationFrame(aimFrame);
+  const stepFrame = () => {
+    const tick = open.value === null ? null : ticks.value[open.value];
+    if (!tick) { aim.value = null; return; }
+    const r = Math.hypot(tick.x2, tick.y2);
+    const now = aim.value;
+    if (!now || lessMotion()) { aim.value = { f: tick.f, r }; return; }
+    const df = shortestArc(now.f, tick.f), dr = r - now.r;
+    if (Math.abs(df) < 0.0002 && Math.abs(dr) < 0.2) { aim.value = { f: tick.f, r }; return; }
+    aim.value = { f: (((now.f + df * 0.2) % 1) + 1) % 1, r: now.r + dr * 0.2 };
+    aimFrame = requestAnimationFrame(stepFrame);
+  };
+  stepFrame();
+}
+const aimLine = computed(() => {
+  if (!aim.value || open.value === null) return null;
+  return { a: pointAt(layout.value.pith * 1.6, aim.value.f), b: pointAt(aim.value.r, aim.value.f) };
+});
 const point = () => {
-  const tick = open.value === null ? null : ticks.value[open.value];
-  return tick ? toClient(tick.x2, tick.y2) : null;
+  const p = aimLine.value?.b;
+  return p ? toClient(p.x, p.y) : null;
 };
 const stepYear = (delta: number) => {
   const next = order.value[order.value.indexOf(props.selected) + delta];
@@ -269,7 +294,8 @@ async function grow() {
 }
 /* 卡片开着时点年轮和卡片以外的地方：收起卡片（年轮上的点击由 onClick 自己处理）。 */
 const onOutside = (event: PointerEvent) => {
-  if (open.value === null || !(event.target instanceof Element)) return;
+  // 页面被缓存着（在运动详情里）时不管：点详情页的返回键不该把回来要落的那张卡关掉。
+  if (!active || open.value === null || !(event.target instanceof Element)) return;
   if (event.target.closest('.star-card') || svg.value?.contains(event.target)) return;
   close();
 };
@@ -280,12 +306,18 @@ onMounted(() => {
   forgetEscape = onMotionEscape(() => { if (!active || open.value === null) return false; close(); return true; });
   void grow();
 });
-onActivated(() => { active = true; void grow(); });
-onDeactivated(() => { active = false; open.value = null; closing.value = false; onLeave(); resetZoom(); });
-onBeforeUnmount(() => { window.clearTimeout(grown); window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onOutside); forgetEscape?.(); });
+/* 从「看这次运动」回来：卡还开着、木头不重新长一遍、放大的样子也留着——详情页正好缩回这张卡（用户 2026-10-28 定）。 */
+onActivated(() => { active = true; if (open.value === null) void grow(); });
+onDeactivated(() => {
+  active = false;
+  onLeave();
+  if (closing.value) closed();
+  if (open.value === null) resetZoom();
+});
+onBeforeUnmount(() => { window.clearTimeout(grown); cancelAnimationFrame(aimFrame); window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onOutside); forgetEscape?.(); });
 
 /* 换年时卡片和悬停都清掉，那圈闪一下。 */
-watch(() => props.selected, () => { open.value = null; closing.value = false; onLeave(); flash.value += 1; });
+watch(() => props.selected, () => { open.value = null; closing.value = false; aim.value = null; onLeave(); flash.value += 1; });
 </script>
 
 <template>
@@ -339,6 +371,10 @@ watch(() => props.selected, () => { open.value = null; closing.value = false; on
             <text v-for="shape in shapes.filter(s => s.width >= 15 || s.band.year === selected)" :key="shape.band.year"
               :class="{ selected: shape.band.year === selected, hovered: hover?.year === shape.band.year }" x="0" :y="shape.labelY">{{ shape.band.year }}</text>
           </g>
+          <g v-if="aimLine" :class="['aim', { closing }]" aria-hidden="true">
+            <line :x1="aimLine.a.x" :y1="aimLine.a.y" :x2="aimLine.b.x" :y2="aimLine.b.y" />
+            <circle :cx="aimLine.b.x" :cy="aimLine.b.y" r="4.5" />
+          </g>
           <g v-if="needleLine" class="needle" aria-hidden="true">
             <line :x1="needleLine.a.x" :y1="needleLine.a.y" :x2="needleLine.b.x" :y2="needleLine.b.y" />
             <circle :cx="needleLine.b.x" :cy="needleLine.b.y" r="3.5" />
@@ -354,8 +390,8 @@ watch(() => props.selected, () => { open.value = null; closing.value = false; on
       </div>
     </Transition>
     <div v-if="tooltip && open === null && !panning" class="ring-tip" role="tooltip" :style="{ transform: `translate(${pointer.x}px, ${pointer.y}px)` }">{{ tooltip }}</div>
-    <StarCard v-if="openStar && open !== null" :star="openStar" :rank="rank" :point="point" :stage="host" :closing="closing"
-      :has-prev="open > 0" :has-next="open < stars.length - 1" @close="close" @closed="closed" @step="stepStar" />
+    <StarCard v-if="openStar && open !== null" :star="openStar" :year="year" :neighbors="neighborIds" :point="point" :stage="host" :closing="closing"
+      @close="close" @closed="closed" @step="stepStar" />
   </div>
 </template>
 
@@ -414,6 +450,11 @@ svg.on-ring, svg.on-tick { cursor: pointer; }
 .labels text.hovered { fill: v-bind('WOOD.mark'); }
 .labels text.selected { fill: v-bind('WOOD.mark'); font-size: 14px; font-weight: 700; }
 .needle { pointer-events: none; }
+/* 点开那次运动的指针：琥珀色、比悬停的那根实，关卡时跟着淡掉。 */
+.aim { pointer-events: none; transition: opacity 260ms ease; }
+.aim.closing { opacity: 0; }
+.aim line { stroke: var(--wood-card-amber); stroke-width: 1.6; stroke-linecap: round; }
+.aim circle { fill: var(--wood-card-amber); stroke: v-bind('WOOD.labelHalo'); stroke-width: 2; }
 .needle line { stroke: rgba(255, 248, 230, .7); stroke-width: 1; stroke-dasharray: 3 3; }
 .needle circle { fill: var(--ink); stroke: var(--bg, transparent); stroke-width: 1.5; }
 /* 光泽：一道很淡的斜光隔一阵扫过木面，像打过蜡的木头反光。圆形裁切、只动 transform。 */

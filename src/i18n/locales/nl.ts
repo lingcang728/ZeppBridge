@@ -3261,7 +3261,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sectionChart: 'Wat deze grafiek toont',
       sectionHow: 'Berekening en bron',
       sectionTrust: 'Hoe het wordt gemeten',
-      trustChipTitle: 'Algoritmeschatting',
+      trustChipTitle: 'Black-box-schatting',
       excludedChipTitle: 'Je hebt dit uitgesloten van de analyse',
       useInAnalysis: 'Meenemen in analyse',
       useInAnalysisHint:
@@ -3269,6 +3269,8 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       trustMeasured: 'Rechtstreeks gemeten door de sensor op het horloge of apparaat.',
       trustComputed:
         'Omgerekend uit metingen of je eigen registraties met een openbare, vaste formule.',
+      trustInferred:
+        'Door het horloge afgeleid uit sensormetingen op een bekende manier (zoals slaap uit beweging en hartslag, afstand uit stappen). De details zijn niet gepubliceerd, maar voor trends is het ruim voldoende.',
       trustEstimated:
         'Een schatting die Zepp met een eigen algoritme afleidt uit meerdere metingen. Zepp heeft de methode en de foutmarge niet openbaar gemaakt, en laboratoriummetingen kunnen hiervan afwijken.',
     },
@@ -3858,10 +3860,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       years: 'Jaren',
       yearAria: (year: number) => `${year}`,
       starOpen: 'Bekijk deze workout',
-      starPrev: 'Vorige workout',
-      starNext: 'Volgende workout',
+      avgSpeed: 'Gemiddelde snelheid',
+      starHint: 'Scroll of sleep zijwaarts voor de vorige of volgende training',
       switchTo: (year: number) => `Bekijk ${year}`,
-      starRank: (n: number) => (n === 1 ? 'Langste van het jaar' : `#${n} langste van het jaar`),
       close: 'Sluiten',
       weekNoData: 'Geen gegevens deze week',
       weekRest: 'Geen workouts deze week',

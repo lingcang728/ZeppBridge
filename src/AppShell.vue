@@ -349,7 +349,8 @@ onUnmounted(() => {
       <div :class="['page-host', { holding: pageHold }]">
       <RouterView v-slot="{ Component }">
         <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" :on-enter="motion === 'expand' || motion === 'collapse' ? pageMorph.onMorphEnter : pageMorph.onEnter" :on-leave="motion === 'expand' || motion === 'collapse' ? pageMorph.onMorphLeave : pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
-          <KeepAlive :include="CACHED_PAGES" :max="4">
+          <!-- 上限和名单一样长：以前名单 5 页、上限 4，年轮页会被挤出缓存，从运动详情返回时卡片已经关了。 -->
+          <KeepAlive :include="CACHED_PAGES" :max="CACHED_PAGES.length">
             <component :is="Component" />
           </KeepAlive>
         </Transition>

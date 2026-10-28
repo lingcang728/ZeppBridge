@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * 页面顶上的一排生活事件胶囊：「+ 添加事件」和这段时间里的事件（带分类色点，点开编辑）；
+ * 页面顶上的一排生活事件胶囊：这段时间里的事件（带分类色点，点开编辑）；这段时间没有事件就整行不出。
+ * 以前打头还有一枚「+ 添加事件」，用户 2026-10-28 定为遗留：记事件的地方是履历页的「纪元与事件」。
  * 超过三件时多一枚「相关事件 · N」跳到履历页的「纪元与事件」。以前是一行散落的纯文字
  * 链接，右边还挂着一个「管理生活事件」小标题，每张趋势卡里又各有一份——和页面上的胶囊、
  * 玻璃不是一种东西；现在每页只有这一排。
  */
 import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import Icon from './Icon.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { eventSpanLabel, eventTone, lifeEventMessages, overlapsEvent } from '../lib/lifeEvents';
 import { localDateString } from '../lib/format';
@@ -36,8 +36,7 @@ onMounted(reload);
 </script>
 
 <template>
-  <div class="event-shortcut">
-    <button type="button" class="pill-button" @click="open(undefined, end || today(), $event.currentTarget as HTMLElement)"><Icon name="plus" :size="14" />{{ t.add }}</button>
+  <div v-if="related.length" class="event-shortcut">
     <!-- 胶囊带日期（U24），悬停 / 聚焦时图上同一事件的区带加深；悬停图上的区带时这枚胶囊亮起。 -->
     <button v-for="event in related.slice(0, 3)" :key="event.id" type="button" class="event-chip"
       :class="{ 'is-linked': chartFocus === event.id }" :title="event.title"
