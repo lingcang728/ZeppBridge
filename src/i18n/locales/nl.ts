@@ -3849,7 +3849,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       yearAria: (year: number) => `${year}`,
       starOpen: 'Bekijk deze workout',
       avgSpeed: 'Gemiddelde snelheid',
-      starHint: 'Scroll of sleep zijwaarts voor de vorige of volgende training',
       switchTo: (year: number) => `Bekijk ${year}`,
       close: 'Sluiten',
       weekNoData: 'Geen gegevens deze week',

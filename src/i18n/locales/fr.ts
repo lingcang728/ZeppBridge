@@ -3581,7 +3581,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       yearAria: (year: number) => `${year}`,
       starOpen: 'Voir cette séance',
       avgSpeed: 'Vitesse moyenne',
-      starHint: 'Faites défiler ou glissez latéralement pour voir la séance précédente ou suivante',
+      starHint: 'Faites défiler à la molette ou balayez sur le pavé tactile pour voir la séance précédente ou suivante',
       switchTo: (year: number) => `Afficher ${year}`,
       close: 'Fermer',
       weekNoData: 'Aucune donnée cette semaine',

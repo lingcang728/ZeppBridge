@@ -21,9 +21,9 @@ import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
 import { useCardTableDrag } from '../../composables/useCardTableDrag';
 import {
-  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackCards, type Landing, type Receded,
+  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackAndReturnMs, stackCards, type Landing, type Receded,
 } from '../../lib/motion/cards';
-import { CLOSE_EASE, OPEN_EASE, paced } from '../../lib/motion/timing';
+import { OPEN_EASE, paced } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
 import { cardIdOf, DECK_RANGES, expandGroup, focusWindow, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
 import { deckToday, type DeckSource } from '../../lib/cards/sources';
@@ -40,7 +40,6 @@ const props = withDefaults(defineProps<{ source: DeckSource; range: DeckRange; o
 const emit = defineEmits<{ close: [] }>();
 const t = useCardsText();
 const box = useCardCollection();
-const RETURN_MS = paced(440);
 /** 换范围时桌角那一叠淡掉的时长：和理牌（~320ms）差不多同时落定。 */
 const PARK_FADE_MS = paced(300);
 
@@ -267,8 +266,10 @@ const pop = async () => {
  * 背景、标题、底下的提示、底下还没退成桌角一叠的层：从此刻的样子淡到 `to`，和放回同起同止。
  * 桌角那一叠不归这里管（`receded.fadeOut / fadeIn`）：以前这里把它淡回 1，收到一半又打开时父牌整张亮在牌缝后面。
  */
+/** 收起时背景淡出两头缓：前快的曲线一上来就把模糊抽掉大半，牌还叠在正中、页面已经露出来了（10-28 录屏）。 */
+const CHROME_OUT_EASE = 'cubic-bezier(.45, 0, .4, 1)';
 const fadeChrome = (to: number, duration: number) => {
-  const easing = to ? OPEN_EASE : CLOSE_EASE;
+  const easing = to ? OPEN_EASE : CHROME_OUT_EASE;
   const under = layers.slice(0, -1).filter((_, i) => !stack.value[i]?.receded);
   const els = [backdrop.value, head.value, foot.value, ...under].filter((el): el is HTMLElement => !!el);
   return els.map((el) => animateFromNow(el, { opacity: to }, { duration, easing, fill: 'forwards' }, ['opacity']));
@@ -288,14 +289,16 @@ const close = async () => {
   picking.holdEnd();
   const cards = cardsOf(stack.value.length - 1).filter((card) => card.style.visibility !== 'hidden');
   const receiver = receive(props.anchor);
-  await stackCards(cards, stageCenter());
-  if (!seq.live(id)) { receiver.cancel(); return; }
-  // 放回：整叠缩回来处，背景模糊、标题、箱子（空的话）同一段时间里淡回去，牌落地那一刻页面正好清楚。
-  setBoxOpen(false);
-  const fadeMs = reducedMotion() ? 160 : RETURN_MS;
+  // 背景模糊、标题、桌角那一叠从理牌这一刻就开始淡，跨过理牌 + 放回整段，牌落地那一刻页面正好清楚
+  // （10-28 录屏：以前理牌时背景纹丝不动、放回才开始淡，又是前快的曲线，牌还叠在正中背景就没了，看着像牌凭空悬着再消失）。
+  const fadeMs = reducedMotion() ? 160 : stackAndReturnMs(cards.length);
   const fades = fadeChrome(0, fadeMs);
   // 桌角那一叠（上一层退下去的）也一起淡掉：以前它的模糊拷贝不在 layers 里，整桌淡完它还亮着，像一块残影。
   const parked = stack.value.map((entry) => entry.receded?.fadeOut(fadeMs));
+  await stackCards(cards, stageCenter());
+  if (!seq.live(id)) { receiver.cancel(); return; }
+  // 放回：整叠缩回来处，箱子（空的话）同时滑走。
+  setBoxOpen(false);
   await Promise.all([returnStack(cards, anchorLanding()), ...fades.map((a) => a.finished.catch(() => undefined)), ...parked]);
   if (!seq.live(id)) { receiver.cancel(); return; }
   receiver.land(props.source.tint);

@@ -4542,7 +4542,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     yearAria: (year: number) => `Rok ${year}`,
     starOpen: 'Zobacz ten trening',
     avgSpeed: 'Średnia prędkość',
-    starHint: 'Przewiń lub przeciągnij w bok, aby zobaczyć poprzedni lub kolejny trening',
     switchTo: (year: number) => `Zobacz ${year}`,
     close: 'Zamknij',
     weekNoData: 'Brak danych w tym tygodniu',

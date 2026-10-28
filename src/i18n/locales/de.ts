@@ -3946,7 +3946,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       yearAria: (year: number) => `${year}`,
       starOpen: 'Training ansehen',
       avgSpeed: 'Durchschnittstempo',
-      starHint: 'Scrollen oder seitlich ziehen für das vorherige oder nächste Training',
+      starHint: 'Scrollen oder auf dem Trackpad wischen für das vorherige oder nächste Training',
       switchTo: (year: number) => `${year} anzeigen`,
       close: 'Schließen',
       weekNoData: 'Keine Daten in dieser Woche',

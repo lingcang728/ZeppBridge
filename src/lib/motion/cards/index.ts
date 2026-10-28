@@ -15,7 +15,7 @@
  * - 打断 `reversible.ts`：从此刻的计算样式原路放回、编排发号；`relay()` 打断接力（新点击立刻生效，旧动画收尾）。
  * 全部只动 transform / opacity，弹簧缓动见 `spring.ts`；减少动效时退化成淡入淡出或不放。
  */
-export { dealCards, stackCards, returnStack, stackAndReturn, fanBack, type Landing } from './deal';
+export { dealCards, stackCards, returnStack, stackAndReturn, stackAndReturnMs, fanBack, type Landing } from './deal';
 export { flipCard } from './flip';
 export { shuffleCards, cutDeck } from './shuffle';
 export { gatherCards, type CardFlight } from './gather';

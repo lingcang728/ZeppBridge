@@ -3631,7 +3631,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       yearAria: (year: number) => `${year}`,
       starOpen: 'Ver este treino',
       avgSpeed: 'Velocidade média',
-      starHint: 'Role ou arraste para os lados para ver o treino anterior ou seguinte',
       switchTo: (year: number) => `Ver ${year}`,
       close: 'Fechar',
       weekNoData: 'Sem dados nesta semana',
