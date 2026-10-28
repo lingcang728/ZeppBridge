@@ -63,6 +63,10 @@
   --cal-tip: #0F1216;
   /* 键盘焦点环：中性的浅灰，不用品牌绿（2026-10-01：「只要有绿色描边的地方，都帮我去掉」）。 */
   --focus: rgba(226, 234, 242, .55);
+  /* PB 墙牌叠右上角的奖牌（1 金 2 银 3 铜）。 */
+  --medal-gold: #E9BC4C;
+  --medal-silver: #C3CAD3;
+  --medal-bronze: #D08A57;
   --route-neutral: #9AA1A9;
   --route-mint: #2FA96B;
   --route-cyan: #4AA8E8;
@@ -266,6 +270,9 @@ html[data-theme="light"] {
   --cal-4: #CF630A;
   --cal-tip: #FFFFFF;
   --focus: rgba(38, 52, 41, .42);
+  --medal-gold: #D6A21E;
+  --medal-silver: #A9B1BB;
+  --medal-bronze: #B8703F;
   --route-neutral: #6E7670;
   --route-mint: #22875C;
   --route-cyan: #2E7FC2;
