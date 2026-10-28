@@ -17,7 +17,6 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Escolhe um dia na cronologia para registar um acontecimento',
       timelineToday: 'Hoje',
-      moreRecords: (n: number) => `Mais ${n}`,
       noRaces: 'Ainda não há provas',
       noInjuries: 'Ainda não há lesões registadas',
       untilNow: 'Até ao presente',

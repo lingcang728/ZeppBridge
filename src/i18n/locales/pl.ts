@@ -4488,7 +4488,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   'components/journal/repair': {
     timelineEmpty: 'Wybierz dzień na osi czasu, aby zapisać wydarzenie',
     timelineToday: 'Dzisiaj',
-    moreRecords: (n: number) => `Jeszcze ${n}`,
     noRaces: 'Nie ma jeszcze zawodów',
     noInjuries: 'Brak zapisanych kontuzji',
     untilNow: 'Do teraz',

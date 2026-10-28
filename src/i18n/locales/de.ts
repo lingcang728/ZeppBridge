@@ -261,7 +261,6 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Wähle einen Tag auf der Zeitleiste, um ein Ereignis einzutragen',
       timelineToday: 'Heute',
-      moreRecords: (n: number) => `${n} weitere`,
       noRaces: 'Noch keine Wettkämpfe',
       noInjuries: 'Keine Verletzungen eingetragen',
       untilNow: 'Heute',

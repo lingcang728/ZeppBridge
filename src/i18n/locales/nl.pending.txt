@@ -3,6 +3,7 @@
 components/ask/ask.sleepHint
 components/ask/ask.sleepNight
 components/ask/ask.sleepRecovery
+components/journal/repair.pbCard
 components/workout/WorkoutClimbsCard.flatRelief
 composables/ai/useStageCards.thisWorkout
 views/Overview.entrySparse

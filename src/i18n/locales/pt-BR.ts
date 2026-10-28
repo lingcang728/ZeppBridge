@@ -3460,7 +3460,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     'components/journal/repair': {
       timelineEmpty: 'Escolha um dia na linha do tempo para registrar um evento',
       timelineToday: 'Hoje',
-      moreRecords: (n: number) => `Mais ${n}`,
       noRaces: 'Nenhuma prova ainda',
       noInjuries: 'Nenhuma lesão registrada',
       untilNow: 'Até hoje',
