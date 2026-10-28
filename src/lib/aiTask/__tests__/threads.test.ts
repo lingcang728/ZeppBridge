@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { cubicPoint, pathD, sampleStrand, threadTree, trunkCount } from '../threads';
+import { cubicPoint, pathD, sampleStrand, slotRoute, strandRoute, threadTree, traceEven, trunkCount } from '../threads';
 import { stepCloud, type CloudBody } from '../cloudPhysics';
 
 const ports = [
@@ -95,4 +95,34 @@ it('stays finite with two cards exactly on top of each other and a huge frame ga
   stepCloud([a, b], card, 2);
   for (const v of [a.d.x, a.d.y, b.d.x, b.d.y]) expect(Number.isFinite(v)).toBe(true);
   expect(a.d.x).not.toBe(b.d.x);
+});
+
+it('routes a card along its strand into the lock centre, evenly by arc length (the reel-in dash stays on the card)', () => {
+  const tree = threadTree(lock, 56, ports, { x: 820, y: 260, h: 380 });
+  const route = strandRoute(tree, 'sleep', lock);
+  const { points, marks } = traceEven(route, 25);
+  expect(points).toHaveLength(25);
+  expect(points[0]).toEqual({ x: 180, y: 90 });
+  expect(points[24]!.x).toBeCloseTo(lock.x, 1);
+  expect(points[24]!.y).toBeCloseTo(lock.y, 1);
+  // 分叉、锁左沿、锁心依次走完。
+  expect(marks).toHaveLength(3);
+  expect(marks[0]!).toBeGreaterThan(0);
+  expect(marks[0]!).toBeLessThan(marks[1]!);
+  expect(marks[2]!).toBeCloseTo(1, 6);
+  const gaps = points.slice(1).map((p, i) => Math.hypot(p.x - points[i]!.x, p.y - points[i]!.y));
+  expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(Math.max(...gaps) * 0.12);
+  expect(strandRoute(tree, 'nope', lock)).toEqual([]);
+});
+
+it('routes an attachment from the lock along the right bundle into its tray slot', () => {
+  const tree = threadTree(lock, 56, ports, { x: 820, y: 260, h: 380 });
+  const slot = { x: 900, y: 520 };
+  const { points } = traceEven(slotRoute(tree, lock, 56, slot), 20);
+  expect(points[0]).toEqual(lock);
+  expect(points[19]!.x).toBeCloseTo(slot.x, 1);
+  expect(points[19]!.y).toBeCloseTo(slot.y, 1);
+  // 经过右牌左沿（那束线的终点）。
+  expect(points.some((p) => Math.abs(p.x - 820) < 12 && Math.abs(p.y - 260) < 20)).toBe(true);
+  expect(traceEven([], 10)).toEqual({ points: [], marks: [] });
 });

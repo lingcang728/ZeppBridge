@@ -10,6 +10,7 @@
  *   [              接回定稿              ]
  *
  * 它本身就是交出去的文件卡：拖不了就在资源管理器里选中它。某一步失败就地写原因和重试。
+ * 标了 `data-enter` 的几块（head / file / rest / act）是交出动画里依次淡入的单位：托盘里的附件并成 file 那一块（useAttachFlight）。
  */
 import { computed, ref } from 'vue';
 import Icon from '../../Icon.vue';
@@ -57,7 +58,7 @@ const onFileDrag = (event: MouseEvent) => {
 
 <template>
   <div class="receipt">
-    <header>
+    <header data-enter="head">
       <span class="logo"><img :src="providerIcon" alt="" /></span>
       <div class="head-copy">
         <h3>{{ s.receiptTitle(provider) }}</h3>
@@ -67,28 +68,28 @@ const onFileDrag = (event: MouseEvent) => {
     </header>
 
     <!-- 交出去的那份文件画成一页纸，占满牌的中间：按住它拖进对话框。 -->
-    <div v-if="ready?.md_path" :class="['sheet', { draggable: desktop }]" role="button" tabindex="0" :aria-label="t.fileAria(fileName)" :title="s.receiptLead"
+    <div v-if="ready?.md_path" :class="['sheet', { draggable: desktop }]" data-enter="file" role="button" tabindex="0" :aria-label="t.fileAria(fileName)" :title="s.receiptLead"
       @mousedown="onFileDrag" @keydown.enter.prevent="emit('reveal')">
       <button type="button" class="reveal" :title="t.revealFile" :aria-label="t.revealFile" @click.stop="emit('reveal')"><Icon name="dots" :size="16" /></button>
       <span class="sheet-lines" aria-hidden="true"><i v-for="n in 5" :key="n"></i></span>
       <span class="sheet-tag" aria-hidden="true">.md</span>
       <span class="sheet-copy"><strong>{{ fileName }}</strong><small>{{ t.fileMeta(formatBytes(ready.byte_len), formatTokens(ready.markdown?.approx_tokens ?? 0)) }}</small></span>
     </div>
-    <p v-else-if="ready" class="hint">{{ t.outputAt(ready.output_dir) }}</p>
-    <p class="hint lead" role="status">{{ lead }}</p>
-    <div v-if="showAutoTip" class="auto-tip">
+    <p v-else-if="ready" class="hint" data-enter="file">{{ t.outputAt(ready.output_dir) }}</p>
+    <p class="hint lead" role="status" data-enter="rest">{{ lead }}</p>
+    <div v-if="showAutoTip" class="auto-tip" data-enter="rest">
       <span>{{ s.autoTip }}</span>
       <GlassSwitch :model-value="autoPasteOn" :aria-label="s.autoTip" @update:model-value="setAutoPaste" />
       <button type="button" class="tip-close" :title="s.autoTipClose" :aria-label="s.autoTipClose" @click="showAutoTip = false"><Icon name="x" :size="12" /></button>
     </div>
-    <p v-if="note" class="note" role="status">{{ note }}</p>
-    <HandoffSteps v-if="failed" class="steps" :steps="steps" :provider-label="provider" @retry="emit('retry', $event)" />
+    <p v-if="note" class="note" role="status" data-enter="rest">{{ note }}</p>
+    <HandoffSteps v-if="failed" class="steps" data-enter="rest" :steps="steps" :provider-label="provider" @retry="emit('retry', $event)" />
 
-    <div class="actions">
+    <div class="actions" data-enter="act">
       <button type="button" class="pill-button quiet" @click="emit('copy')">{{ s.copyAgain }}</button>
       <button type="button" class="pill-button quiet" @click="emit('open')">{{ s.openAgain(provider) }}</button>
     </div>
-    <ReceiveCapsule class="receive-row" variant="primary" @received="emit('received')" />
+    <ReceiveCapsule class="receive-row" data-enter="act" variant="primary" @received="emit('received')" />
   </div>
 </template>
 
