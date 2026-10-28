@@ -12,6 +12,11 @@ import type { RingYear } from '../../../types/rings';
 const props = defineProps<{ years: RingYear[]; year: RingYear | null; legend: { key: string; label: string; count: number; text: string }[] }>();
 const t = useRingsText();
 
+/* 图例永远占 4 行（kindLegend 最多前 3 + 其他）：不足的补看不见的占位行。以前 2024 年 3 行、2025 年 4 行，
+   换年时卡片高度变了，同一排的热力图和下面整页跟着跳（用户 2026-10-28 录屏）。 */
+const LEGEND_ROWS = 4;
+const pad = computed(() => Math.max(0, LEGEND_ROWS - props.legend.length));
+
 const R = 100;
 const layout = computed(() => treeLayout(props.years, R));
 const bark = computed(() => barkOf(layout.value, 7));
@@ -40,6 +45,7 @@ const shapes = computed(() => layout.value.bands.map(band => ({
           <li v-for="item in legend" :key="item.key">
             <span class="dot" /><span class="name">{{ item.label }}</span><b>{{ item.text }}</b>
           </li>
+          <li v-for="n in pad" :key="`pad-${n}`" class="pad" aria-hidden="true"><span class="dot" /><span class="name">&nbsp;</span><b>&nbsp;</b></li>
         </ul>
       </Transition>
     </div>
@@ -68,7 +74,8 @@ h2 { grid-column: 1 / -1; margin: 0; font-size: var(--fs-lg); font-weight: 600; 
 .legend-swap-enter-from, .legend-swap-leave-to { opacity: 0; }
 .legend { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .legend li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--mat-line); }
-.legend li:last-child { border-bottom: 0; }
+.legend li:last-child, .legend li:has(+ .pad) { border-bottom: 0; }
+.legend .pad { visibility: hidden; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: v-bind('WOOD.cambium'); }
 .name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .legend b { font-weight: 500; font-variant-numeric: tabular-nums; }
