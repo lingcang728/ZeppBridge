@@ -3,11 +3,11 @@
  * 舞台右边那一张牌（2026-10-08，用户拍板「一张牌的一生」）：
  *
  *   问题牌（你在牌上写这次想问什么，牌底一条玻璃分段选模板）
- *     → 按门锁：左边的牌飞进锁，**回执牌**从锁里长出来落在这里（ReceiptFace：交出去的 .md 文件卡）
+ *     → 按门锁：左边的牌飞进锁，附件小卡落进这张牌底下的托盘、并成一枚 .md，这一面换成**回执**（ReceiptFace；10-28 useAttachFlight）
  *     → 接回 AI 的定稿：回执牌翻面成**计划牌**（PlanFace，点开进 /ai/plan）。
  *
  * 2026-10-12 第 3 批：去掉后面错开垫着的那张牌，牌顶一条玻璃分段「提问｜计划」切换。回执是提问那一档的另一面，
- * 问题 ⇄ 回执仍然翻面（flipCard）；提问 ⇄ 计划是交叉溶解：旧内容先淡出，换内容，牌高平滑变到新高度，新内容稍晚淡入。
+ * 回执 → 问题（「改问题」）交给 `detach`：附件拆开、牌沿线飞回（严格倒放）；其余换面是交叉溶解：旧内容先淡出，换内容，牌高平滑变到新高度，新内容稍晚淡入。
  * 牌在 `box` 里竖直居中，思维树的线（AiComposer 的 threadTree）一直接在牌的中线上。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -16,7 +16,7 @@ import SegmentTrack from '../../SegmentTrack.vue';
 import Icon from '../../Icon.vue';
 import ReceiptFace from './ReceiptFace.vue';
 import PlanFace from './PlanFace.vue';
-import { flipCard, reducedMotion } from '../../../lib/motion/cards';
+import { reducedMotion } from '../../../lib/motion/cards';
 import { paced } from '../../../lib/motion/timing';
 import type { AiTaskIssue, AiTaskPrepareResult, AiTaskTemplate } from '../../../lib/bridge/types';
 import type { DayRow } from '../../../lib/trainingPlan/week';
@@ -34,6 +34,8 @@ const props = defineProps<{
   ready: AiTaskPrepareResult | null; blocked: AiTaskIssue[]; provider: string; providerIcon: string; stale: boolean; recalled: boolean;
   steps: Record<HandoffStepId, HandoffStep>; saveError: string | null;
   rows: DayRow[]; drafting: boolean; plan: TrainingPlanState | null; mcp: boolean; busy: boolean; simulated: boolean;
+  /** 回执 → 问题：附件原路拆开、牌飞回（换面由它自己做）。 */
+  detach?: () => Promise<void>;
 }>();
 const emit = defineEmits<{
   'update:face': [FutureFace]; copy: []; open: []; reveal: []; retry: [HandoffStepId]; received: []; accept: []; discard: []; workout: []; undo: []; clear: [];
@@ -123,9 +125,9 @@ let turning: Promise<void> | null = null;
 const turn = async (next: FutureFace) => {
   if (turning) await turning;
   if (next === props.face) return;
-  if (!front.value || !body.value || reducedMotion()) { emit('update:face', next); return; }
-  const flip = (next === 'receipt' && props.face === 'question') || (next === 'question' && props.face === 'receipt');
-  turning = flip ? flipCard(front.value, async () => { emit('update:face', next); await nextTick(); }) : crossfade(next);
+  const detaching = next === 'question' && props.face === 'receipt' && props.detach;
+  if (!detaching && (!front.value || !body.value || reducedMotion())) { emit('update:face', next); return; }
+  turning = detaching ? props.detach!() : crossfade(next);
   await turning;
   turning = null;
 };
@@ -159,7 +161,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { observer?.disconnect(); grow?.cancel(); });
 
-defineExpose({ front, turn });
+defineExpose({ front, body, turn });
 </script>
 
 <template>
@@ -176,8 +178,9 @@ defineExpose({ front, turn });
             <CapsuleWheel class="intent-wheel" loop :span="wheelSpan" :items="wheelItems" :model-value="intent" :disabled="disabled" :aria-label="t.composer" @update:model-value="pick" />
             <Transition name="hint-swap" mode="out-in"><small v-if="intentHint" :key="intent" class="intent-hint">{{ intentHint }}</small></Transition>
           </div>
-          <ul v-if="blocked.length" class="issues" role="alert">
+          <ul v-if="blocked.length || (steps.prepare.state === 'failed' && steps.prepare.errorText)" class="issues" role="alert">
             <li v-for="(issue, i) in blocked" :key="i"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
+            <li v-if="steps.prepare.state === 'failed' && steps.prepare.errorText"><Icon name="warning" :size="13" />{{ steps.prepare.errorText }}</li>
           </ul>
         </template>
         <ReceiptFace v-else-if="face === 'receipt'" :ready="ready" :provider="provider" :provider-icon="providerIcon" :stale="stale" :recalled="recalled" :steps="steps" :save-error="saveError"
