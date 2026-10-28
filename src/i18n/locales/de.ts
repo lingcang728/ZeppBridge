@@ -1177,10 +1177,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       durationMinutes: (minutes: number) => `${minutes} Min.`,
       footnote:
         'Vergleich nur mit deiner eigenen Historie, nie mit Bevölkerungsnormen, keine medizinische Beurteilung. Fehlende Daten stehen als „Nicht angegeben", nie mit 0 gefüllt.',
-      handoff: 'An die KI',
-      withRecovery: 'Vorherige 7 Tage Schlaf und Erholung einbeziehen',
-      withRecoveryHint:
-        'Nach einigen Ruhetagen ermöglicht das Mitsenden von Schlaf, Ruhepuls und HRV vor diesem Training der KI zu erkennen, ob es an der Erholung oder an einer schlechten Einheit lag.',
       metric: {
         'run.avg_hr': 'Ø HF',
         'run.distance': 'Distanz',
@@ -2378,15 +2374,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
         'Keine VO₂max-Einträge in diesem Zeitraum; er aktualisiert sich nur nach einem Lauf im Freien.',
     },
     'views/WorkoutDetail': {
-      aiPrompt: (label: string) => `Du bist Sportanalyst. Unten der vollständige Eintrag einer Trainingseinheit (${label}) aus meiner lokalen ZeppBridge-Datenbank, anonymisiert.
-Analysiere diese Einheit nur anhand der Fakten im Eintrag: Intensität, das Verhältnis von Tempo und Herzfrequenz, ob es einen deutlichen Einbruch oder auffällige Abschnitte gab, und konkrete Empfehlungen fürs nächste Mal.
-
-Regeln:
-- Diese Daten haben keinen Bevölkerungsmaßstab – vergleiche mich nicht mit „gesunden Erwachsenen" oder irgendeinem Durchschnitt.
-- Was fehlt, sag einfach, dass es fehlt – nicht mit 0 oder Schätzungen auffüllen.
-- Keine medizinische Diagnose, keine Krankheitsrisiko-Einschätzung, keine Behandlungsempfehlung.
-
-Antworte in Markdown.`,
       chartAltitude: 'Höhe',
       chartAria: (title: string) => `${title} im Verlauf`,
       chartCadence: 'Schrittfrequenz',
@@ -2396,9 +2383,6 @@ Antworte in Markdown.`,
         'Für diese Einheit wurden keine Herzfrequenz-, Tempo-, Höhen- oder Schrittfrequenz-Serien synchronisiert.',
       chartsEmptyTitle: 'Keine Messpunkt-Kurven',
       copied: (format: string) => `${format}-Daten kopiert.`,
-      aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · mit Erholungshintergrund`,
-      aiRecoveryPrompt: (label: string, gap: number | null) =>
-        `Dies ist ein(e) ${label} von mir${gap === null ? ' (zuvor ist kein Training aufgezeichnet)' : `, ${gap} Tage nach meinem vorherigen Training`}. Die Datei enthält auch meinen Schlaf, Ruhepuls, HRV, Stress und Readiness der letzten 30 Tage davor (wo aufgezeichnet; fehlende Werte sind mit „nicht angegeben“ markiert).\n\nBitte antworte in dieser Reihenfolge:\n1. Beurteile zuerst meinen körperlichen Zustand vor diesem Training: Vergleiche den Durchschnitt der letzten 7 Tage mit der 30-Tage-Baseline davor – bin ich gut erholt oder nicht?\n2. Bewerte dann Intensität und Leistung dieser Einheit vor diesem Hintergrund und unterscheide zwischen einem Erholungsproblem und einer schlechten Einheit.\n3. Sage abschließend, ${gap === null ? 'welche Intensität beim nächsten Mal' : `nach ${gap} Tagen Pause, zu welcher Intensität beim nächsten Mal`} zurückgekehrt werden sollte.\n\nRegeln: Vergleiche mich nur mit meiner eigenen Historie, nicht mit Bevölkerungsdurchschnitten; benenne fehlende Daten klar, statt zu schätzen; keine medizinischen Diagnosen.`,
       correctionAria: 'Meine Korrektur dieser Trainingsart',
       customName: (code: string, name: string) => `Dein Name für Code ${code}: ${name}`,
       decodedAria: 'Dekodierte Werte',
@@ -2468,8 +2452,6 @@ Antworte in Markdown.`,
       metricTrainingEffect: 'Aerober Trainingseffekt',
       metricTrainingLoad: 'Trainingsbelastung',
       myCorrection: 'Meine Korrektur',
-      needDesktop:
-        'KI-Übergabe erfordert die Desktop-App (Browser-Vorschau öffnet keine externen Links).',
       noCorrection: 'Keine Korrektur',
       notFetchedYet: 'Noch nicht abgerufen',
       notFoundMessage:

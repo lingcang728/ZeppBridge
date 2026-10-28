@@ -13,6 +13,7 @@ import { useMessages } from '../i18n';
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
 import AskAiButton from '../components/ask/AskAiButton.vue';
+import { dayKey } from '../lib/aiTask/bridgeScale';
 import PickDaysButton from '../components/cards/PickDaysButton.vue';
 import DurationText from '../components/DurationText.vue';
 import { useSyncController } from '../composables/useSyncController';
@@ -33,6 +34,8 @@ const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
 const { maskIdentifier } = useDevices();
 const session = ref<SleepSession | null>(null);
+/* 问 AI 的窗口以这一晚醒来那天为终点（交给 AI 的睡眠也按醒来日归属）。 */
+const night = computed(() => (session.value ? { date: dayKey(new Date(session.value.end_time)) } : null));
 const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
@@ -236,7 +239,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
       <!-- 睡眠也能单独问 AI、挑几晚交给 AI（10-07 用户反馈：点进来没有入口）。 -->
       <span class="heading-actions">
         <PickDaysButton category="sleep" :label="t.askLabel" tint="var(--sleep)" :format="(minutes: number) => formatDuration(minutes)" />
-        <AskAiButton metric="sleep_score" :label="t.askLabel" card=".sleep-hero" />
+        <AskAiButton metric="sleep_score" :night="night" :label="t.askLabel" card=".sleep-hero" />
       </span>
     </header>
 

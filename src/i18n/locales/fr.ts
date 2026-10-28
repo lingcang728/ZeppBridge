@@ -1258,9 +1258,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'components/InsightCard': {
       title: 'Comment s’est passée cette course',
       reading: 'Lecture des enregistrements locaux…',
-      handoff: 'Laisser l’IA creuser',
-      withRecovery: 'Inclure les 7 jours précédents : sommeil et récupération',
-      withRecoveryHint: 'Après quelques jours sans entraînement, transmettre le sommeil, la FC au repos et la VFC préalables permet à l’IA de distinguer un problème de récupération d’une mauvaise séance.',
       baselineRun: 'Référence',
       currentRun: 'Cette course',
       comparedTo: (count: number) => `Comparée à vos ${count} dernières courses de distance comparable :`,
@@ -2050,21 +2047,8 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       savedFit: 'Fichier FIT enregistré',
       copied: (format: string) => `Données ${format} copiées.`,
 
-      needDesktop: 'La remise à l’IA exige l’application de bureau : cet aperçu navigateur n’ouvre pas de sites externes.',
       preparing: 'Préparation…',
       insightFailed: 'Impossible de construire un insight pour cette séance',
-      aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · avec récupération`,
-      aiRecoveryPrompt: (label: string, gap: number | null) => `Voici l'une de mes séances de ${label}${gap === null ? ' (aucun entraînement antérieur n\'est enregistré)' : `, ${gap} jours après mon précédent entraînement`}. Le fichier contient également mon sommeil, ma FC au repos, ma VFC, mon stress et ma préparation pour les 30 jours précédents (inclus si enregistrés ; les données manquantes indiquent « non fourni »).\n\nMerci de répondre dans cet ordre :\n1. Évalue d'abord mon état de forme avant cette séance : compare la moyenne des 7 derniers jours à la base de référence des 30 jours précédents — suis-je bien récupéré ou non ?\n2. Analyse ensuite l'intensité et les performances de cette séance à la lumière de cet état, en distinguant un problème de récupération d'une mauvaise séance.\n3. Enfin, ${gap === null ? 'quelle intensité viser la prochaine fois' : `après un intervalle de ${gap} jours, à quelle intensité reprendre la prochaine fois`}.\n\nRègles : compare-moi uniquement à mon propre historique, pas aux moyennes de la population ; indique clairement les données manquantes au lieu d'estimer ; aucun diagnostic médical.`,
-      aiPrompt: (label: string) => `Tu es analyste sportif. Voici l’enregistrement complet de ma ${label}, tiré de la base locale ZeppBridge et anonymisé.
-Analyse cette séance uniquement d’après les faits de l’enregistrement : l’intensité, le rapport allure / fréquence cardiaque, un éventuel ralentissement ou segment anormal, et quoi changer concrètement la prochaine fois.
-
-Contraintes :
-- Ces données n’ont aucune référence de population : ne me compare ni à des « adultes en bonne santé » ni à aucune moyenne.
-- Si une donnée manque, dis qu’elle manque. Ne comble jamais avec un 0 ou une estimation.
-- Aucun diagnostic médical, aucun jugement de risque de maladie, aucun conseil de traitement.
-
-Réponds en Markdown.`,
-
       eyebrowProvenance: 'Provenance',
       provenanceTitle: 'Provenance',
       provenanceAria: 'Provenance',

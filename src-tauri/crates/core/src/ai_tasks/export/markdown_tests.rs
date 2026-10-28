@@ -317,3 +317,47 @@ fn the_journal_reaches_the_handoff_as_data_with_clock_times() {
         .text
         .contains("## Journal"));
 }
+
+/// 10-28：锚点运动的「和最近同类跑步比」「前后半程」「爬升段」各成一张表；平路没有够格的段时写明门槛，不留空表。
+#[test]
+fn comparison_halves_and_climbs_become_tables() {
+    let mut document = sample_document(10);
+    let anchor = document["workouts"][0].as_object_mut().unwrap();
+    anchor.insert(
+        "comparison".into(),
+        json!({
+            "baseline_runs": 4,
+            "baseline_window": { "kind": "comparable_runs", "days": 90, "min_samples": 3, "max_samples": 10, "distance_tolerance_percent": 10.0 },
+            "facts": [{ "fact_id": "run.pace", "metric": "pace", "value": 5.4, "unit": "min/km",
+                        "baseline_value": 5.7, "delta": -0.3, "delta_percent": -5.26, "direction": "lower",
+                        "evidence_count": 4, "confidence": "medium" }],
+            "heart_rate_drift": { "first_half_avg_hr": 141.0, "second_half_avg_hr": 149.5, "drift_percent": -4.1 }
+        }),
+    );
+    anchor.insert(
+        "climbs".into(),
+        json!({ "method": { "min_change_m": 30.0, "min_grade_pct": 3.0 }, "segments": [
+            { "kind": "climb", "start_distance_m": 1200.0, "end_distance_m": 2100.0, "elevation_change_m": 42.0,
+              "average_grade_pct": 4.7, "moving_seconds": 320, "average_hr": 156.0 }] }),
+    );
+    let render = render_task_markdown(&document, "", usize::MAX);
+    let all = tables(&render.text);
+    assert!(render
+        .text
+        .contains("Baseline: 4 comparable runs from the previous 90 days."));
+    let compared = table(&all, "Compared with recent similar runs");
+    assert_eq!(cell_of(compared, "run.pace", "baseline_value"), "5.7");
+    assert_eq!(cell_of(compared, "run.pace", "direction"), "lower");
+    let halves = table(&all, "First half vs second half");
+    assert_eq!(cell_of(halves, "second_half_avg_hr", "value"), "149.5");
+    let climbs = table(&all, "Climbs and descents");
+    assert_eq!(cell_of(climbs, "climb", "elevation_change_m (m)"), "42.0");
+    assert_eq!(cell_of(climbs, "climb", "average_hr (bpm)"), "156.0");
+
+    document["workouts"][0]["climbs"]["segments"] = json!([]);
+    let flat = render_task_markdown(&document, "", usize::MAX).text;
+    assert!(
+        flat.contains("No climb or descent reached the thresholds (at least 30.0 m of elevation change at 3.0 % average grade)"),
+        "{flat}"
+    );
+}

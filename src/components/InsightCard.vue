@@ -6,15 +6,10 @@
  * 历史记录，样本不够就说不够。这里不调用任何 AI，也不做健康建议——AI 是加分，
  * 不是前提。
  */
-import GlassSwitch from './GlassSwitch.vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
-import AskAiButton from './ask/AskAiButton.vue';
-import GlassPopover from './GlassPopover.vue';
-import MdSheet from './ai/MdSheet.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
-import type { AiTaskPrepareResult } from '../lib/bridge/types';
 import { useMessages } from '../i18n';
 import {
   distanceUnitLabel,
@@ -45,22 +40,9 @@ const props = defineProps<{
   insight: WorkoutInsight | null;
   loading?: boolean;
   error?: string | null;
-  askBusy?: boolean;
-  askResult?: AiTaskPrepareResult | null;
-  askError?: string | null;
-  askProvider?: string;
-  askProviderIcon?: string;
 }>();
-const emit = defineEmits<{ handoff: []; copy: []; open: []; reveal: [] }>();
-const sheetOpen = ref(false);
-const askBtn = ref<{ button: HTMLElement | null } | null>(null);
-const askAnchor = computed(() => askBtn.value?.button ?? null);
-const openSheet = () => {
-  sheetOpen.value = true;
-  emit('handoff');
-};
-/** 「带上前 7 天睡眠和恢复」（1D·D10），默认勾上；在运动页的 useWorkoutDetail 里决定交什么。 */
-const withRecovery = defineModel<boolean>('withRecovery', { default: true });
+/* 这里以前还有一枚「问 AI」和「带上前 7 天睡眠和恢复」开关，就地出 .md；和页头那枚各管一半，
+   用户分不清（2026-10-28）。现在只留页头那一枚，三个问题都带上这次运动和前后几天的数据。 */
 
 /* 好 / 坏 / 只是变化：和周报同一套规则（lib/changeTone.ts）。距离、时长、训练负荷
    多了不等于更好，只给方向箭头。 */
@@ -134,18 +116,7 @@ const hasAnyComparison = computed(() => comparedFacts.value.length > 0);
   <section class="insight-card" aria-labelledby="insight-title">
     <header>
       <h2 id="insight-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
-      <span v-if="insight?.supported" class="insight-handoff">
-        <label class="recovery-toggle" :title="t.withRecoveryHint">
-          <GlassSwitch :model-value="withRecovery" :aria-label="t.withRecovery" @update:model-value="withRecovery = !withRecovery" />
-          <span>{{ t.withRecovery }}</span>
-        </label>
-        <AskAiButton ref="askBtn" direct :label="t.title" :busy="askBusy" :expanded="sheetOpen" @activate="openSheet" />
-      </span>
     </header>
-    <GlassPopover v-if="sheetOpen" :anchor="askAnchor" :width="372" @close="sheetOpen = false">
-      <MdSheet :busy="!!askBusy" :result="askResult ?? null" :error="askError ?? null" :provider="askProvider ?? ''" :provider-icon="askProviderIcon ?? ''"
-        @copy="emit('copy')" @open="emit('open')" @reveal="emit('reveal')" />
-    </GlassPopover>
 
     <p v-if="loading" class="insight-note">{{ t.reading }}</p>
     <p v-else-if="error" class="insight-error" role="alert">{{ error }}</p>
@@ -201,8 +172,6 @@ const hasAnyComparison = computed(() => comparedFacts.value.length > 0);
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.insight-handoff { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
-.recovery-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
 .insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }

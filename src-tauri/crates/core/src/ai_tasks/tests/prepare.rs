@@ -676,3 +676,84 @@ fn anchor_workouts_follow_the_workout_category_switch_and_its_exclusions() {
         assert!(sample.get("heart_rate").is_none());
     }
 }
+
+/// 10-28：开了「运动」类别时，锚点运动带上运动页洞察卡和爬升卡算出的那两块（`comparison`、`climbs`）；
+/// 排除心率时前后半程、心率那一项和每段平均心率一起去掉。
+#[test]
+fn anchor_workouts_carry_the_comparison_and_climbs_and_hide_heart_rate_on_request() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 6);
+    let seconds = 2400;
+    db.insert_workout(&Workout {
+        workout_id: "w1".into(),
+        workout_type: "run".into(),
+        normalized_type: "run".into(),
+        type_source: "string_field".into(),
+        effective_type: "run".into(),
+        start_time: start,
+        end_time: start + Duration::seconds(seconds),
+        distance_meters: Some(7_200.0),
+        avg_hr: Some(150),
+        max_hr: Some(165),
+        source_scope: SourceScope::Device,
+        ..Default::default()
+    })
+    .unwrap();
+    // 3 m/s 匀速、心率一路上抬；前 1000 秒爬 200 m（3 km，约 6.7%），再 1000 秒下来，之后平路。
+    for second in 0..=seconds {
+        let up = if second <= 1000 {
+            second
+        } else {
+            (2000 - second).max(0)
+        };
+        let altitude = 50.0 + up as f64 * 0.2;
+        db.conn
+            .execute(
+                "INSERT INTO workout_samples (workout_id, timestamp, heart_rate, speed, altitude)
+                 VALUES ('w1', ?1, ?2, 3.0, ?3)",
+                rusqlite::params![
+                    (start + Duration::seconds(second)).to_rfc3339(),
+                    (140.0 + 20.0 * second as f64 / seconds as f64).round() as i64,
+                    altitude
+                ],
+            )
+            .unwrap();
+    }
+    let export = |t: &AiTask| {
+        let dir = temp_dir("extras");
+        let result = db.ai_task_prepare(t, "", &dir).unwrap();
+        let text = std::fs::read_to_string(result.json_path.unwrap()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()
+    };
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Workout, 0, true)];
+
+    let doc = export(&t);
+    let anchor = &doc["workouts"][0];
+    assert!(
+        !anchor["comparison"]["facts"].as_array().unwrap().is_empty(),
+        "{anchor}"
+    );
+    assert!(
+        anchor["comparison"]["heart_rate_drift"].is_object(),
+        "{anchor}"
+    );
+    let segments = anchor["climbs"]["segments"].as_array().unwrap();
+    assert!(
+        segments.iter().any(|segment| segment["kind"] == "climb"),
+        "{segments:?}"
+    );
+
+    t.categories[0].excluded_metrics = vec!["avg_hr".into()];
+    let doc = export(&t);
+    let anchor = &doc["workouts"][0];
+    assert!(anchor["comparison"].get("heart_rate_drift").is_none());
+    for fact in anchor["comparison"]["facts"].as_array().unwrap() {
+        assert!(!fact["metric"].as_str().unwrap().contains("hr"), "{fact}");
+    }
+    for segment in anchor["climbs"]["segments"].as_array().unwrap() {
+        assert!(segment.get("average_hr").is_none(), "{segment}");
+    }
+}

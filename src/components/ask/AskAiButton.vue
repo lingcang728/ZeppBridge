@@ -12,8 +12,10 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
 import GlassPopover from '../GlassPopover.vue';
-import { askPresets, workoutAskPresets, type AskPreset } from '../../lib/metricAsk';
+import { askPresets, daysEndingOn, sleepAskPresets, workoutAskPresets, type AskPreset } from '../../lib/metricAsk';
 import { AI_TASK_CATEGORY_META } from '../../lib/aiTask/categories';
+import { dayKey } from '../../lib/aiTask/bridgeScale';
+import type { AiTaskCategory } from '../../lib/bridge/types';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useMetricBaselines } from '../../composables/useMetricBaselines';
 import { armPageMorph } from '../../composables/usePageMorph';
@@ -23,6 +25,8 @@ const props = defineProps<{
   metric?: string | null;
   /** 单次运动（运动详情头部，第三轮 B6）：问题按运动配，交出去时带上这次运动。和 `metric` 二选一。 */
   workout?: { id: string; label: string } | null;
+  /** 某一晚睡眠（睡眠详情头部）：问题按睡眠配，窗口以那一晚醒来那天为终点。`date` 是醒来那天（本地 YYYY-MM-DD）。 */
+  night?: { date: string } | null;
   label: string;
   /** 形变的来源卡（CSS 选择器，在页面里找）；不给就用按钮所在的那张卡（.trend-card / section）。 */
   card?: string;
@@ -41,8 +45,8 @@ const open = ref(false);
 const button = ref<HTMLElement | null>(null);
 const popover = ref<InstanceType<typeof GlassPopover> | null>(null);
 const direction = computed(() => baselineOf(props.metric)?.direction ?? null);
-const titleId = computed(() => `ask-${props.workout ? `workout-${props.workout.id}` : props.metric ?? 'metric'}`);
-const shown = computed(() => !!props.direct || !!props.metric || !!props.workout);
+const titleId = computed(() => `ask-${props.workout ? `workout-${props.workout.id}` : props.night ? `night-${props.night.date}` : props.metric ?? 'metric'}`);
+const shown = computed(() => !!props.direct || !!props.metric || !!props.workout || !!props.night);
 const expandedNow = computed(() => (props.direct ? !!props.expanded : open.value));
 const onPress = () => {
   if (props.busy) return;
@@ -52,7 +56,7 @@ const onPress = () => {
 defineExpose({
   get button(): HTMLElement | null { return button.value; },
 });
-const presets = computed(() => (props.workout ? workoutAskPresets() : props.metric ? askPresets(props.metric) : []));
+const presets = computed(() => (props.workout ? workoutAskPresets() : props.night ? sleepAskPresets() : props.metric ? askPresets(props.metric) : []));
 const questions = computed(() => presets.value.map((preset) => ({ preset, text: questionText(preset) })));
 function questionText(preset: AskPreset): string {
   const t = a.value;
@@ -66,6 +70,8 @@ function questionText(preset: AskPreset): string {
     case 'workoutReview': return t.workoutReview(props.label);
     case 'workoutRecovery': return t.workoutRecovery(props.label);
     case 'workoutNext': return t.workoutNext(props.label);
+    case 'sleepNight': return t.sleepNight;
+    case 'sleepRecovery': return t.sleepRecovery;
     default: return t.firstUsual(props.label);
   }
 }
@@ -78,15 +84,25 @@ const sourceCard = (): HTMLElement | null => {
   if (props.card) return document.getElementById('main-content')?.querySelector<HTMLElement>(props.card) ?? null;
   return button.value?.closest<HTMLElement>('.workout-hero, .trend-card, .surface-card, section') ?? null;
 };
-/** 新开一个任务：只开这几类、看这么多天、问题填好；浮层缩回按钮，同时卡长成「交给 AI」。 */
+/**
+ * 新开一个任务：只开这几类、每类看各自的天数、明细程度按问题定、问题填好；浮层缩回按钮，同时卡长成「交给 AI」。
+ * 看的是以前某一晚时，窗口改成「以那一晚为终点的这几天」（挑日子），不是「最近 N 天」。
+ */
 const choose = async (preset: AskPreset, text: string) => {
+  const daysOf = (category: AiTaskCategory) => preset.daysBy?.[category] ?? preset.days;
   ctl.resetDraft();
   for (const range of ctl.draft.value.categories) {
     if (!AI_TASK_CATEGORY_META[range.category].hasWindow) continue;
     ctl.setCategoryEnabled(range.category, preset.categories.includes(range.category));
   }
   ctl.setWindowDays(preset.days - 1);
+  for (const category of preset.categories) if (daysOf(category) !== preset.days) ctl.setCategoryDays(category, daysOf(category) - 1);
+  if (preset.detail) ctl.setDetailLevel(preset.detail);
   if (props.workout) ctl.setWorkoutSelected(props.workout.id, true);
+  const today = dayKey();
+  if (props.night && props.night.date < today) {
+    ctl.applyPicks(new Map(preset.categories.map((category) => [category, daysEndingOn(props.night!.date, daysOf(category))])), today);
+  }
   ctl.setPrompt(text);
   void popover.value?.close();
   armPageMorph(sourceCard(), '/ai');
@@ -101,7 +117,7 @@ const choose = async (preset: AskPreset, text: string) => {
   </button>
   <GlassPopover v-if="open && !direct" ref="popover" :anchor="button" :labelledby="titleId" @close="open = false">
     <h2 :id="titleId" class="ask-title" data-pop-item><Icon name="spark" :size="16" />{{ a.askTitle(label) }}</h2>
-    <p class="ask-hint" data-pop-item>{{ workout ? a.workoutHint : a.askHint }}</p>
+    <p class="ask-hint" data-pop-item>{{ workout ? a.workoutHint : night ? a.sleepHint : a.askHint }}</p>
     <button v-for="item in questions" :key="item.preset.key" type="button" class="question" data-pop-item @click="choose(item.preset, item.text)">
       <span>{{ item.text }}</span><Icon name="arrow-right" :size="15" />
     </button>

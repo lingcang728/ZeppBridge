@@ -988,9 +988,6 @@ export default {
   "components/InsightCard": {
     title: 'Przebieg biegu',
     unsupportedWorkoutType: 'Brak analizy dla tego typu treningu. Pierwsza wersja obejmuje wyłącznie bieganie — to, co zostało zweryfikowane na rzeczywistych danych. Inne treningi nadal wyświetlają się, korygują i eksportują normalnie.',
-    handoff: 'Przeanalizuj z AI',
-    withRecovery: 'Uwzględnij 7 poprzednich dni: sen i regenerację',
-    withRecoveryHint: 'Po kilku dniach przerwy przesłanie danych o śnie, tętnie spoczynkowym i HRV z dni poprzedzających trening pozwala AI odróżnić problem z regeneracją od gorszego dnia treningowego.',
     currentRun: 'Ten bieg',
     baselineRun: 'Punkt odniesienia',
     reading: 'Odczytywanie lokalnych wpisów…',
@@ -3940,25 +3937,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     seriesFailed: 'Nie udało się wczytać serii punktowej dla tego treningu',
     seriesFailedTitle: 'Błąd wczytywania serii punktowej',
     exportNeedsSeries: 'Nie udało się wczytać serii punktowej — tego wpisu nie można wyeksportować.',
-    aiPrompt: (label: string) => `Jesteś analitykiem sportowym. Poniżej znajduje się kompletny, zanonimizowany zapis mojego treningu (${label}) pobrany z lokalnej bazy ZeppBridge.
-Przeanalizuj tę sesję wyłącznie na podstawie faktów zawartych w zapisie: intensywność, relacja tempa do tętna, wyraźne spadki tempa lub nietypowe odcinki oraz wskazówki na kolejny trening.
-
-Ograniczenia:
-- W tych danych nie ma żadnego odniesienia populacyjnego. Nie porównuj mnie ze „zdrowymi dorosłymi” ani z jakąkolwiek średnią.
-- Jeśli jakichś danych brakuje, wprost zaznacz ten brak. Nigdy nie uzupełniaj luk zerami ani szacunkami.
-- Żadnych diagnoz medycznych, oceny ryzyka chorób ani zaleceń terapeutycznych.
-
-Odpowiedz w formacie Markdown.`,
-    needDesktop: 'Przekazywanie do AI wymaga aplikacji desktopowej — podgląd w przeglądarce nie otwiera zewnętrznych stron.',
-    aiRecoveryTitle: (label: string, day: string) => `${day} · ${label} · z regeneracją`,
-    aiRecoveryPrompt: (label: string, gap: number | null) => `Oto zapis mojego treningu: ${label}${gap === null ? ' (brak wcześniejszych zarejestrowanych treningów)' : `, ${gap} dni po poprzednim treningu`}. Plik zawiera także dane o moim śnie, tętnie spoczynkowym, HRV, stresie i gotowości z ostatnich 30 dni przed nim (tam, gdzie zostały zarejestrowane; w przypadku braków widnieje informacja „nie podano”).
-
-Odpowiedz w następującej kolejności:
-1. Najpierw oceń mój stan przed tym treningiem: porównaj ostatnie 7 dni z 30-dniową linią bazową — czy moja regeneracja była dobra, czy nie?
-2. Następnie oceń intensywność i wykonanie tej sesji w tym kontekście, odróżniając problem ze zmęczeniem/regeneracją od słabszej formy w danej sesji.
-3. Na koniec wskaż, ${gap === null ? 'do jakiej intensywności dążyć w kolejnym treningu' : `po ${gap}-dniowej przerwie, do jakiej intensywności wrócić w kolejnym treningu`}.
-
-Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnimi populacyjnymi; wprost informuj o brakach danych zamiast zgadywać; bez diagnoz medycznych.`,
     noCorrection: 'Bez korekty',
     deviceNameMissing: 'Nie podano nazwy urządzenia',
     notFetchedYet: 'Jeszcze nie pobrano',

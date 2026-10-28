@@ -844,10 +844,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       title: 'Análise da corrida',
       unsupportedWorkoutType:
         'Esta versão só analisa corrida validada com dados reais. Os restantes treinos continuam disponíveis para consultar, corrigir e exportar.',
-      handoff: 'Enviar à IA',
-      withRecovery: 'Incluir os 7 dias anteriores: sono e recuperação',
-      withRecoveryHint:
-        'Após alguns dias sem treinar, enviar o sono, a FC em repouso e a VFC anteriores permite à IA distinguir um problema de recuperação de um treino mau.',
       currentRun: 'Esta corrida',
       baselineRun: 'Referência',
       reading: 'A ler os registos locais…',
@@ -1914,26 +1910,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       seriesFailedTitle: 'Falha na leitura das séries ponto a ponto',
       exportNeedsSeries:
         'Leitura das séries ponto a ponto incompleta; não é possível exportar este registo.',
-      aiPrompt: (label: string) => `És um especialista em análise desportiva. Segue o registo de um ${label} meu, descarregado da base de dados local do ZeppBridge e anonimizado.
-Analisa a sessão com base estrita nos dados do registo: intensidade, relação entre ritmo e frequência cardíaca, quebras de rendimento ou segmentos anómalos, e recomendações práticas para a próxima sessão.
-
-Condições:
-- Não utilizar referências populacionais nem médias genéricas.
-- Assinalar claramente eventuais dados em falta, sem os preencher com 0 ou estimativas.
-- Não produzir diagnósticos médicos, avaliações de risco de doença nem recomendações clínicas.
-
-Responde em formato Markdown.`,
-      needDesktop:
-        'O envio para a IA requer a aplicação ZeppBridge no computador.',
-      aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · com recuperação`,
-      aiRecoveryPrompt: (label: string, gap: number | null) => `Este é um treino de ${label} meu${gap === null ? ' (não há treinos registados antes)' : `, ${gap} dias após o meu treino anterior`}. O ficheiro também inclui o meu sono, FC em repouso, VFC, stress e prontidão dos 30 dias anteriores (onde houver registo; dados em falta indicam “não fornecido”).
-
-Por favor, responde por esta ordem:
-1. Primeiro avalia a minha condição física antes deste treino: compara a média dos últimos 7 dias com a referência dos 30 dias anteriores – estou bem recuperado ou não?
-2. Depois avalia a intensidade e o rendimento deste treino tendo em conta esse estado, distinguindo um problema de recuperação de um treino mau.
-3. Por fim, ${gap === null ? 'qual a intensidade a visar no próximo treino' : `após um intervalo de ${gap} dias, a que intensidade regressar no próximo treino`}.
-
-Regras: compara-me apenas com o meu próprio histórico, não com médias da população; refere com clareza quando faltarem dados em vez de estimar; sem diagnósticos médicos.`,
       noCorrection: 'Sem correção',
       deviceNameMissing: 'Nome do dispositivo não indicado',
       notFetchedYet: 'Ainda não sincronizado',

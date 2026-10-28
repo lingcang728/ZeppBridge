@@ -517,10 +517,6 @@ export default {
       title: 'Hoe de run ging',
       unsupportedWorkoutType:
         'Inzichten zijn nu alleen beschikbaar voor hardlopen (geverifieerd met echte data). Andere trainingstypen kun je gewoon bekijken, corrigeren en exporteren.',
-      handoff: 'Onderzoek met AI',
-      withRecovery: 'Neem de voorafgaande 7 dagen slaap en herstel mee',
-      withRecoveryHint:
-        'Na een paar dagen rust helpt het meesturen van slaap, rusthartslag en HRV de AI te bepalen of het aan herstel of aan een mindere training lag.',
       currentRun: 'Deze run',
       baselineRun: 'Basislijn',
       reading: 'Lokale gegevens worden gelezen…',
@@ -2154,26 +2150,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       seriesFailedTitle: 'De reeksen per punt konden niet worden geladen',
       exportNeedsSeries:
         'Reeksen per punt ontbreken, waardoor deze training niet kan worden geëxporteerd.',
-      aiPrompt: (label: string) => `Je bent een sportanalist. Hieronder staat het complete overzicht van één ${label} van mij, uit de lokale ZeppBridge-database en geanonimiseerd.
-Analyseer deze sessie alleen aan de hand van de feiten in dit overzicht: de intensiteit, hoe tempo zich verhoudt tot hartslag, of er een duidelijke vertraging of een afwijkend stuk is, en wat er volgende keer concreet anders moet.
-
-Randvoorwaarden:
-- Deze gegevens bevatten geen populatiebasislijn. Vergelijk me niet met ‘gezonde volwassenen’ of met een gemiddelde.
-- Waar iets ontbreekt, zeg dat het ontbreekt. Vul het gat nooit met een 0 of een schatting.
-- Geen medische diagnose, geen oordeel over ziekterisico, geen behandeladvies.
-
-Antwoord in Markdown.`,
-      needDesktop:
-        'De AI-overdracht vereist de desktop-app; deze webpreview opent geen externe sites.',
-      aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · met herstelcontext`,
-      aiRecoveryPrompt: (label: string, gap: number | null) => `Dit is een ${label} van mij${gap === null ? ' (er is geen eerdere training geregistreerd)' : `, ${gap} dagen na mijn vorige training`}. Het bestand bevat ook mijn slaap, rusthartslag, HRV, stress en paraatheid van de 30 dagen ervoor (indien gemeten; ontbrekende gegevens vermelden “niet verstrekt”).
-
-Beantwoord dit graag in deze volgorde:
-1. Beoordeel eerst mijn fysieke gesteldheid vóór deze training: vergelijk het gemiddelde van de afgelopen 7 dagen met de 30-daagse basislijn ervoor – ben ik goed hersteld of niet?
-2. Beoordeel vervolgens de intensiteit en prestaties van deze sessie in dat licht, en onderscheid een herstelprobleem van een slechte trainingssessie.
-3. Geef ten slotte aan ${gap === null ? 'op welke intensiteit ik me de volgende keer moet richten' : `na een onderbreking van ${gap} dagen, naar welke intensiteit ik de volgende keer moet terugkeren`}.
-
-Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddelden; vermeld duidelijk wanneer gegevens ontbreken in plaats van te schatten; geen medische diagnoses.`,
       noCorrection: 'Geen correctie',
       deviceNameMissing: 'Apparaatnaam niet verstrekt',
       notFetchedYet: 'Nog niet opgehaald',
