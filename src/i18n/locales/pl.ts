@@ -4588,6 +4588,68 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     saved: 'Zapisano',
     openFolder: 'Pokaż w folderze',
     shareTitle: (year: number) => `Mój rok ${year} w słojach`,
+    shareStory: {
+      heroWorkouts: 'treningi',
+      heroDays: 'aktywne dni',
+      heroHours: 'godziny',
+      perWeek: (n: string) => `Średnio ${n} treningów w tygodniu`,
+      ran: (km: string) => `Przebiegnięto ${km} km`,
+      marathons: (n: string) => {
+        const val = parseFloat(n.replace(',', '.'));
+        if (!Number.isInteger(val)) {
+          return `≈ ${n} maratonu`;
+        }
+        return `≈ ${plural(val, {
+          one: `${n} maraton`,
+          few: `${n} maratony`,
+          many: `${n} maratonów`,
+          other: `${n} maratonu`,
+        })}`;
+      },
+      runs: (n: number) =>
+        plural(n, {
+          one: `${n} bieg`,
+          few: `${n} biegi`,
+          many: `${n} biegów`,
+          other: `${n} biegu`,
+        }),
+      farthest: (km: string) => `Najdalszy bieg: ${km} km`,
+      longest: (time: string) => `Najdłuższy trening: ${time}`,
+      busiest: (month: string) => {
+        const m = month ? month.charAt(0).toUpperCase() + month.slice(1) : month;
+        return `${m} był najaktywniejszy`;
+      },
+      busiestNote: (n: number) =>
+        plural(n, {
+          one: `${n} trening w tym miesiącu`,
+          few: `${n} treningi w tym miesiącu`,
+          many: `${n} treningów w tym miesiącu`,
+          other: `${n} treningu w tym miesiącu`,
+        }),
+      records: (n: number) =>
+        plural(n, {
+          one: `${n} nowy rekord życiowy`,
+          few: `${n} nowe rekordy życiowe`,
+          many: `${n} nowych rekordów życiowych`,
+          other: `${n} nowego rekordu życiowego`,
+        }),
+      races: (n: number) =>
+        plural(n, {
+          one: `${n} ukończone zawody`,
+          few: `${n} ukończone zawody`,
+          many: `${n} ukończonych zawodów`,
+          other: `${n} ukończonych zawodów`,
+        }),
+      steps: (n: string) => `Zrobiono ${n} kroków`,
+      sleep: (h: number, m: number) => `Średnio ${h} godz. ${m} min snu na noc`,
+      sleepNote: (nights: number) =>
+        plural(nights, {
+          one: `${nights} zarejestrowana noc`,
+          few: `${nights} zarejestrowane noce`,
+          many: `${nights} zarejestrowanych nocy`,
+          other: `${nights} zarejestrowanej nocy`,
+        }),
+    },
     fileStem: (year: number) => `ZeppBridge Sloje ${year}`,
     ready: (year: number) => `Twój słój za rok ${year} już urósł`,
     readyHint: 'Jeden słój na rok, jedna kreska na trening.',
