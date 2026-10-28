@@ -54,7 +54,12 @@
   50% { translate: 3px -6px; rotate: calc(var(--rot) + 1.2deg); }
   100% { translate: -4px 3px; rotate: calc(var(--rot) - 1deg); }
 }
-.stage.paused .slot-button, .stage.gathering .slot-button { animation-play-state: paused; }
+.stage.paused .slot-button, .stage.gathering .slot-button, .stage.attaching .slot-button { animation-play-state: paused; }
+/* 交出去了（10-28 加附件）：牌位隐身但不卸载（撤销倒放要量它的位置），不过渡——回场不重放；交出 / 拆开途中牌位也不过渡，
+   牌本身由 useAttachFlight 飞。左边空着，「加一类」一起退掉。 */
+.slot.away .slot-button { opacity: 0; transition: none; }
+.stage.attaching .slot-button { transition: none; }
+.add-row.away { opacity: 0; pointer-events: none; }
 /* 加一类：撒牌区底下一枚小胶囊，不是牌、不进线网（第一轮那张虚线牌横在线中间，打乱了层级）。
    一类都不剩时，提示跟在胶囊右边同一行（H21）。 */
 .add-row { position: absolute; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -66,6 +71,8 @@
 .add-kind:disabled { opacity: .5; cursor: default; }
 
 .lock-host { position: absolute; z-index: 2; translate: -50% 0; }
+/* 附件从锁盘后面出来：交出 / 拆开途中锁盖在托盘上面。 */
+.stage.attaching .lock-host { z-index: 3; }
 .stage :deep(.future) { z-index: 2; }
 
 .stage-foot { display: grid; gap: 8px; }

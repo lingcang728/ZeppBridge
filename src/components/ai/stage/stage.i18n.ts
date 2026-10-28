@@ -58,6 +58,7 @@ const messages = defineMessages(
     facePlan: '计划',
     tally: (train: number, rest: number) => `${train} 练 ${rest} 休`,
     viewWeek: '查看整周',
+    attachments: '附件',
   },
   {
     stage: 'Send to AI: the data you hand over on the left, the AI in the middle, this question and the plan on the right',
@@ -115,6 +116,7 @@ const messages = defineMessages(
     facePlan: 'Plan',
     tally: (train: number, rest: number) => `${train} training · ${rest} rest`,
     viewWeek: 'See the week',
+    attachments: 'Attachments',
   },
   {
     stage: 'Enviar a la IA: a la izquierda los datos que entregas, en el centro la IA, a la derecha la pregunta y el plan',
@@ -172,6 +174,7 @@ const messages = defineMessages(
     facePlan: 'Plan',
     tally: (train: number, rest: number) => `${train} entreno · ${rest} descanso`,
     viewWeek: 'Ver la semana',
+    attachments: 'Adjuntos',
   },
   'components/ai/stage/stage',
 );

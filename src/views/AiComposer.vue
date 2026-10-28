@@ -6,8 +6,8 @@
  *   中：一条竖线上的门锁（这次交给哪个 AI、就绪度），锁散出去的思维树牵着每一张牌
  *   右：一张牌——问题 → 回执（交出去的 .md）→ 计划（一张牌的一生，见 FutureCard）
  *
- * 按住锁蓄满一圈：牌抖两下，沿各自那根线飞进锁（同时后端准备文件），回执牌从锁里长出来落到右边，落定后复制开场白、打开网站
- * （useStageSend）。细节都在下一层：点一张牌 = 翻到背面改回溯天数（二级）→「挑具体日子」= 牌桌从这张牌发牌（三级）；
+ * 按住锁蓄满一圈：像在和 AI 的对话框里加附件——牌沿各自那根线滑进锁、附件小卡落进右牌的托盘（同时后端准备文件），
+ * 再并成一枚 .md、换成回执，之后复制开场白、打开网站（useStageSend + useAttachFlight）。牌不回来，「改问题」才原路倒放回去。细节都在下一层：点一张牌 = 翻到背面改回溯天数（二级）→「挑具体日子」= 牌桌从这张牌发牌（三级）；
  * 锁下的小字 → 寄出前检查；计划牌 → 周视图；任务名 → 已保存的任务；「往返 N 次」→ 往返记录。全部从被点处长出、缩回。
  * 原来的柱状条带、底栏、「你的过去」二级页都没有了。
  */
@@ -25,11 +25,13 @@ import BridgeLock from '../components/ai/stage/BridgeLock.vue';
 import FutureCard from '../components/ai/stage/FutureCard.vue';
 import StageCardBack from '../components/ai/stage/StageCardBack.vue';
 import AddKindDialog from '../components/ai/stage/AddKindDialog.vue';
+import AttachTray from '../components/ai/stage/AttachTray.vue';
 import AiSheet from '../components/ai/AiSheet.vue';
 import { leaveSheet } from '../lib/motion/sheet';
 import { useAiHub } from '../composables/ai/useAiHub';
 import { useStageCards, type StageCardModel } from '../composables/ai/useStageCards';
 import { useStageSend } from '../composables/ai/useStageSend';
+import { useAttachFlight } from '../composables/ai/useAttachFlight';
 import { useCloudDrag } from '../composables/ai/useCloudDrag';
 import { useCloudPhysics } from '../composables/ai/useCloudPhysics';
 import { useBoxPour } from '../composables/ai/useBoxPour';
@@ -41,12 +43,12 @@ import { useSyncController } from '../composables/useSyncController';
 import { useTrainingPlan } from '../composables/useTrainingPlan';
 import { cloudLayout } from '../lib/aiTask/cloud';
 import { stageLayout } from '../lib/aiTask/stageLayout';
-import { sampleStrand, threadTree } from '../lib/aiTask/threads';
+import { threadTree } from '../lib/aiTask/threads';
 import { categoryDeckSource } from '../lib/cards/categoryDeck';
 import type { DeckSource } from '../lib/cards/sources';
 import { deckRangeOf, type DeckRange } from '../lib/cards/deck';
 import { categoryRangeOf } from '../lib/aiTask/categories';
-import { bump, convergeCards, emergeFrom, reducedMotion, SPRINGS, springCurve, type Convergence } from '../lib/motion/cards';
+import { bump, reducedMotion, SPRINGS, springCurve } from '../lib/motion/cards';
 import { onMotionEscape } from '../lib/motion/interrupt';
 import { useBridgeText } from '../components/ai/bridge/bridge.i18n';
 import { useHandoffText } from '../components/ai/HandoffDock.i18n';
@@ -147,7 +149,7 @@ onBeforeUnmount(() => window.clearTimeout(liftTimer));
 /** 舞台上那张牌本身（背面 / 档案从它长出来、缩回它）。 */
 const cardEl = (id: string): HTMLElement | null => slots.get(id)?.querySelector<HTMLElement>('.scard') ?? null;
 const open = (id: string) => {
-  if (send.gathering.value) return;
+  if (send.gathering.value || flight.busy.value) return;
   const card = cards.value.find((c) => c.id === id);
   if (!card) return;
   if (card.kind === 'profile') profile.value = true;
@@ -243,44 +245,24 @@ const deal = async () => {
   };
 };
 
-/* ---------- 寄出：牌沿线飞进锁 → 回执牌从锁里长出来 ---------- */
-const future = ref<{ front: HTMLElement | null; turn: (face: 'question' | 'receipt' | 'plan') => Promise<void> } | null>(null);
-const lockEl = () => stage.value?.querySelector<HTMLElement>('.bridge-lock .lock') ?? null;
-const lit = ref(false);
-/** 线收回锁里（牌飞进锁的那一段）。 */
-const reeled = ref(false);
-let flight: Convergence | null = null;
-const choreography = {
-  gather: async () => {
-    const box = stage.value?.getBoundingClientRect();
-    const flying = placed.value;
-    const els = flying.map((p) => slots.get(p.card.id)?.querySelector<HTMLElement>('.scard')).filter((el): el is HTMLElement => !!el);
-    const paths = flying.map((p) => (tree.value && box ? sampleStrand(tree.value, p.card.id, 14).map((pt) => ({ x: pt.x + box.left, y: pt.y + box.top })) : []));
-    lit.value = true;
-    reeled.value = true;
-    flight = convergeCards(els, paths, lockEl());
-    await flight.gather();
-  },
-  emerge: async () => {
-    await nextTick();
-    await emergeFrom(future.value?.front ?? null, lockEl());
-    flight?.finish();
-    flight = null;
-    lit.value = false;
-    reeled.value = false;
-  },
-  scatter: async () => {
-    lit.value = false;
-    reeled.value = false;
-    await flight?.scatter();
-    flight = null;
-  },
-};
+/* ---------- 交出：牌沿线进锁、附件落进右牌的托盘、并成 .md（useAttachFlight） ---------- */
+const future = ref<{ front: HTMLElement | null; body: HTMLElement | null; turn: (face: 'question' | 'receipt' | 'plan') => Promise<void> } | null>(null);
+const flight = useAttachFlight({
+  stage, face: send.face, future: () => future.value, tree: () => tree.value, lock: () => layout.value.lock,
+  cards: () => placed.value.map((p) => ({ card: p.card, side: p.x + cloud.value.width / 2 > layout.value.lock.x ? 'left' as const : 'right' as const })),
+  slotOf: (id) => slots.get(id) ?? null,
+});
+/** 托盘贴着右牌底边（右牌在问题 / 回执面占满整个盒子）。 */
+const trayBox = computed(() => {
+  const c = layout.value.card;
+  return { left: `${c.x + 18}px`, width: `${c.width - 36}px`, bottom: `${layout.value.height - c.y - c.height + 14}px` };
+});
 const go = () => {
   if (send.gathering.value) { send.recall(); return; }
-  void send.send(choreography, () => { void history.load(); hub.handedOff.value += 1; });
+  if (flight.busy.value) return;
+  void send.send(flight, () => { void history.load(); hub.handedOff.value += 1; });
 };
-/* 汇聚途中 Esc = 原路收回（接管全局的「Esc 快进动效」，lib/motion/interrupt.ts）。 */
+/* 交出途中 Esc = 原路收回（接管全局的「Esc 快进动效」，lib/motion/interrupt.ts）。 */
 const releaseEscape = onMotionEscape(() => {
   if (!send.gathering.value) return false;
   send.recall();
@@ -332,12 +314,12 @@ onDeactivated(() => { paused.value = true; });
       </div>
     </header>
 
-    <div ref="stage" :class="['stage', layout.mode, { paused, gathering: send.gathering.value, focusing, lifted }]" :style="{ height: `${layout.height}px` }" :aria-label="s.stage">
+    <div ref="stage" :class="['stage', layout.mode, { paused, gathering: send.gathering.value, attaching: flight.busy.value, focusing, lifted }]" :style="{ height: `${layout.height}px` }" :aria-label="s.stage">
       <div class="spine" :style="layout.mode === 'row' ? { left: `${layout.lock.x}px` } : { top: `${layout.lock.y}px` }" aria-hidden="true"></div>
-      <ThreadField :tree="tree" :width="layout.width" :height="layout.height" :lit="lit" :reeled="reeled" :order="order" :active="drag.live.value?.id ?? null" />
+      <ThreadField :tree="tree" :width="layout.width" :height="layout.height" :lit="flight.lit.value" :reeled="flight.away.value" :order="order" :active="drag.live.value?.id ?? null" />
 
       <ul class="cloud" :style="{ '--card-w': `${cloud.width}px` }" :aria-label="t.past">
-        <li v-for="(p, i) in placed" :key="p.card.id" :ref="(el) => setSlot(p.card.id, el)" :class="['slot', { top: drag.lastId.value === p.card.id }]"
+        <li v-for="(p, i) in placed" :key="p.card.id" :ref="(el) => setSlot(p.card.id, el)" :class="['slot', { top: drag.lastId.value === p.card.id, away: flight.away.value }]" :inert="flight.away.value"
           :style="{ left: `${p.rest.x}px`, top: `${p.rest.y}px`, translate: `${p.x - p.rest.x}px ${p.y - p.rest.y}px`, '--rot': `${p.rot}deg`, '--i': i }">
           <button type="button" class="slot-button" :aria-label="`${p.card.title} · ${p.card.line}`" @pointerdown="drag.onDown($event, p.card.id)" @keydown.enter.prevent="open(p.card.id)" @keydown.space.prevent="open(p.card.id)">
             <StageCard :card="p.card" />
@@ -345,7 +327,7 @@ onDeactivated(() => { paused.value = true; });
         </li>
       </ul>
       <!-- 「加一类」和一类都不剩时的那句提示排在同一行（10-08 H21：以前提示固定在 40% 高处，和牌、胶囊叠在一起）。 -->
-      <div v-if="off.length || cards.length <= 1 || drag.moved.value" class="add-row" :style="{ left: `${zone.x}px`, top: `${addTop}px`, maxWidth: `${zone.width}px` }">
+      <div v-if="off.length || cards.length <= 1 || drag.moved.value" :class="['add-row', { away: flight.away.value }]" :style="{ left: `${zone.x}px`, top: `${addTop}px`, maxWidth: `${zone.width}px` }">
         <button v-if="off.length" type="button" class="add-kind" @click="adding = true">
           <Icon name="plus" :size="14" />{{ s.add }}
         </button>
@@ -363,11 +345,12 @@ onDeactivated(() => { paused.value = true; });
           :title="isSyncing ? ht.goSubSyncing : ht.run(send.provider.value.label)" @go="go" @pick="send.pick" @export-only="send.exportOnly()" />
       </div>
 
-      <FutureCard ref="future" v-model:face="send.face.value" :box="layout.card" :templates="templates" :disabled="send.gathering.value"
+      <FutureCard ref="future" v-model:face="send.face.value" :box="layout.card" :templates="templates" :disabled="send.gathering.value || flight.busy.value" :detach="flight.detach"
         :ready="send.ready.value" :blocked="send.blocked.value" :provider="send.provider.value.label" :provider-icon="send.provider.value.localIcon" :stale="send.stale.value" :recalled="send.recalled.value"
         :steps="send.steps.value" :save-error="send.saveError.value" :rows="hub.rows.value" :drafting="!!plan.preview.value" :plan="plan.state.value"
         :mcp="!!plan.preview.value && !plan.accepted.value" :busy="plan.busy.value" :simulated="hub.demo.value" @copy="send.copyAgain()" @open="send.openAgain()" @reveal="send.reveal()" @retry="send.retry($event as 'copy' | 'open')"
         @received="received" @accept="plan.accept()" @discard="plan.discard()" @undo="plan.undo()" @clear="plan.clear()" @workout="highlightWorkout" />
+      <AttachTray v-if="flight.tray.value" :items="flight.items.value" :count="flight.landed.value" :label="s.attachments" :style="trayBox" />
     </div>
 
     <div class="stage-foot">
