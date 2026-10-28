@@ -15,6 +15,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Выберите день на временной шкале, чтобы добавить событие',
       timelineToday: 'Сегодня',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} по скорости из ${total}: ${time}`,
       noRaces: 'Пока нет соревнований',
       noInjuries: 'Пока нет записей о травмах',
       untilNow: 'По настоящее время',
@@ -2019,6 +2020,7 @@ export default {
       showAllModules: 'Показать все',
       collapseModules: 'Свернуть',
       entryWeek: 'Последние 7 дней',
+      entrySparse: 'Последние 90 дней',
       focusLabel: 'Мои интересы',
     },
 
@@ -2306,6 +2308,10 @@ export default {
       title: 'Основные подъемы и спуски',
       aria: 'Основные участки подъема и спуска',
       flat: 'Без заметных подъемов: перепад высоты и уклон не достигли порогов ниже.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `Без заметных подъемов: высота оставалась в пределах ${min}–${max} ${unit} (перепад не более ${range} ${unit})` +
+        (gain ? `; общий подъем ${gain} ${unit} набран за счет множества мелких неровностей` : '') +
+        ', и ни один отрезок не достиг порогов ниже.',
       climb: 'Подъем',
       descent: 'Спуск',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2916,6 +2922,9 @@ export default {
       workoutReview: (label: string) => `Как прошла тренировка «${label}»?`,
       workoutRecovery: (label: string) => `Достаточно ли я восстановился после тренировки «${label}»?`,
       workoutNext: (label: string) => `Как спланировать следующую тренировку «${label}»?`,
+      sleepHint: 'Выберите вопрос для начала: откроется новая задача с данными этой ночи и двух недель сна и восстановления перед ней, а вопрос уже будет заполнен. Перед отправкой его можно изменить.',
+      sleepNight: 'Как я спал этой ночью?',
+      sleepRecovery: 'Удалось ли восстановиться за эту ночь сна?',
       ask: 'Спросить ИИ', askTitle: (label: string) => `Спросить ИИ · ${label}`,
       askHint: 'Выберите вопрос для начала: откроется новая задача только с недавними данными этого показателя и готовым вопросом. Перед отправкой его можно изменить.',
       firstAbove: (label: string) => `В последнее время ${label} выше обычного. Что это может значить?`,
@@ -3049,6 +3058,7 @@ export default {
       facePlan: 'План',
       tally: (train: number, rest: number) => `${train} трен. · ${rest} отдых`,
       viewWeek: 'Вся неделя',
+      attachments: 'Вложения',
     },
     'components/ai/bridge/bridge': {
       unitMin: 'мин',
@@ -3217,6 +3227,10 @@ export default {
 
     'composables/useAiTaskPreview': {
       previewFailed: 'Не удалось построить предпросмотр',
+    },
+
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Эта тренировка',
     },
 
     'lib/aiTask/brief': {

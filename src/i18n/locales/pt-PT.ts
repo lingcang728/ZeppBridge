@@ -17,6 +17,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Escolhe um dia na cronologia para registar um acontecimento',
       timelineToday: 'Hoje',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} mais rápido de ${total}: ${time}`,
       noRaces: 'Ainda não há provas',
       noInjuries: 'Ainda não há lesões registadas',
       untilNow: 'Até ao presente',
@@ -1762,6 +1763,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       collapseModules: 'Recolher',
       focusLabel: 'O que me interessa',
       entryWeek: 'Últimos 7 dias',
+      entrySparse: 'Últimos 90 dias',
     },
     'views/RecentRecords': {
       title: 'Registos recentes',
@@ -2059,6 +2061,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       title: 'Principais subidas e descidas',
       aria: 'Troços principais de subida e descida',
       flat: 'Sem subidas assinaláveis: nenhum troço atingiu os limiares de desnível e inclinação abaixo.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) => `Sem subidas assinaláveis: a altitude oscilou entre ${min} e ${max} ${unit} (máximo ${range} ${unit})` + (gain ? `; os ${gain} ${unit} de subida acumulada são a soma de muitas pequenas elevações` : '') + ' e nenhum troço atingiu os limiares abaixo.',
       climb: 'Subida',
       descent: 'Descida',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2231,6 +2234,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     },
     'composables/useAiTaskPreview': {
       previewFailed: 'Não foi possível gerar a pré-visualização',
+    },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Este treino',
     },
     'lib/aiTask/brief': {
       defaultPlan:
@@ -2631,6 +2637,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       facePlan: 'Plano',
       tally: (train: number, rest: number) => `${train} treino · ${rest} descanso`,
       viewWeek: 'Ver a semana',
+      attachments: 'Anexos',
     },
     'components/plan/easySwap': {
       readiness: (today: number, usual: number) => `Prontidão ${today}, normalmente ${usual}`,
@@ -2704,6 +2711,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       workoutReview: (label: string) => `Como correu este treino de ${label}?`,
       workoutRecovery: (label: string) => `Recuperei o suficiente depois deste treino de ${label}?`,
       workoutNext: (label: string) => `Como devo planear o próximo treino de ${label}?`,
+      sleepHint: 'Escolhe uma pergunta para começar: abre uma nova tarefa com esta noite e as duas semanas anteriores de sono e recuperação, com a pergunta já preenchida. Ainda podes alterá-la antes de enviar.',
+      sleepNight: 'Como dormi esta noite?',
+      sleepRecovery: 'Esta noite de sono recuperou o meu corpo?',
       ask: 'Perguntar à IA', askTitle: (label: string) => `Perguntar à IA · ${label}`,
       askHint: 'Escolhe uma pergunta para começar: abre uma nova tarefa com os dados recentes desta métrica e a pergunta já preenchida. Ainda podes alterá-la antes de enviar.',
       firstAbove: (label: string) => `${label} tem estado acima do habitual. O que poderá significar?`,

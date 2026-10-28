@@ -14,6 +14,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'कोई घटना दर्ज करने के लिए टाइमलाइन पर एक दिन चुनें',
       timelineToday: 'आज',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, ${total} में से #${rank} सबसे तेज़: ${time}`,
       noRaces: 'अभी कोई रेस नहीं', noInjuries: 'चोट का कोई रिकॉर्ड नहीं',
       untilNow: 'अब तक', more: 'और देखें', distance: 'कुल दूरी',
       recorded: 'दर्ज',
@@ -1764,6 +1765,7 @@ export default {
       unrecognizedCta: 'यहाँ क्लिक करके पहचान बताएँ',
       unrecognizedSuffix: ' का मॉडल पहचाना नहीं गया',
       entryWeek: 'पिछले 7 दिन',
+      entrySparse: 'पिछले 90 दिन',
       focusLabel: 'मेरी प्राथमिकता',
     },
 
@@ -2037,6 +2039,10 @@ export default {
       title: "मुख्य चढ़ाई और उतराई",
       aria: "मुख्य चढ़ाई और उतराई खंड",
       flat: "कोई उल्लेखनीय चढ़ाई नहीं: कोई भी खंड नीचे दी गई ऊंचाई और ढलान सीमा तक नहीं पहुंचा।",
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `कोई उल्लेखनीय चढ़ाई नहीं: ऊंचाई ${min} और ${max} ${unit} के बीच रही (अधिकतम ${range} ${unit})` +
+        (gain ? `; कुल चढ़ाई ${gain} ${unit} कई छोटे-छोटे उतार-चढ़ावों का योग है` : '') +
+        ', और कोई भी हिस्सा नीचे दी गई सीमाओं तक नहीं पहुँचा।',
       climb: "चढ़ाई",
       descent: "उतराई",
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2581,12 +2587,19 @@ export default {
       facePlan: 'प्लान',
       tally: (train: number, rest: number) => `${train} ट्रेनिंग · ${rest} आराम`,
       viewWeek: 'पूरा सप्ताह देखें',
+      attachments: 'अटैचमेंट',
+    },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'यह वर्कआउट',
     },
     'components/ask/ask': {
       workoutHint: 'शुरुआत के लिए सवाल चुनें: नया टास्क खुलेगा, जिसमें इस वर्कआउट और उसके आसपास के दिनों का डेटा और भरा हुआ सवाल होगा। भेजने से पहले इसे बदल सकते हैं।',
       workoutReview: (label: string) => `इस बार ${label} कैसा रहा?`,
       workoutRecovery: (label: string) => `क्या इस ${label} के बाद मेरी पर्याप्त रिकवरी हुई?`,
       workoutNext: (label: string) => `अगली बार ${label} की योजना कैसे बनाऊँ?`,
+      sleepHint: 'शुरुआत के लिए एक सवाल चुनें: एक नया टास्क खुलेगा, जिसमें इस रात और उससे पहले के दो हफ़्तों की नींद व रिकवरी का डेटा और भरा हुआ सवाल होगा। भेजने से पहले इसे बदल सकते हैं।',
+      sleepNight: 'मैं इस रात कैसा सोया?',
+      sleepRecovery: 'क्या इस रात की नींद से मेरा शरीर रिकवर हो गया?',
       ask: 'AI से पूछें', askTitle: (label: string) => `AI से पूछें · ${label}`, askHint: 'शुरुआत के लिए सवाल चुनें: नया टास्क खुलेगा, जिसमें केवल इस मेट्रिक का हालिया डेटा और भरा हुआ सवाल होगा। भेजने से पहले इसे बदल सकते हैं।',
       firstAbove: (label: string) => `${label} हाल में सामान्य से ज़्यादा है। इसका क्या मतलब हो सकता है?`, firstBelow: (label: string) => `${label} हाल में सामान्य से कम है। इसका क्या मतलब हो सकता है?`, firstUsual: (label: string) => `${label} में हालिया बदलाव सामान्य है?`,
       withTraining: (label: string) => `क्या ${label} मेरे हालिया प्रशिक्षण भार से मेल खाता है?`, withSleep: 'मेरी नींद भी देखें', sleepWithTraining: 'प्रशिक्षण के साथ मेरी नींद भी देखें', trainingNext: 'इस स्थिति में अगले सप्ताह प्रशिक्षण बढ़ाऊँ या घटाऊँ?', bodyFood: (label: string) => `क्या ${label} का बदलाव मेरे भोजन और प्रशिक्षण से मेल खाता है?`,

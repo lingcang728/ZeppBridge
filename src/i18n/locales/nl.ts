@@ -17,6 +17,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Kies een dag op de tijdlijn om een gebeurtenis vast te leggen',
       timelineToday: 'Vandaag',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} snelste van ${total}: ${time}`,
       noRaces: 'Nog geen wedstrijden',
       noInjuries: 'Geen blessures vastgelegd',
       untilNow: 'Heden',
@@ -1995,6 +1996,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       showAllModules: 'Alles tonen',
       collapseModules: 'Inklappen',
       entryWeek: 'Afgelopen 7 dagen',
+      entrySparse: 'Afgelopen 90 dagen',
       focusLabel: 'Mijn focus',
     },
     'views/RecentRecords': {
@@ -2301,6 +2303,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       title: 'Belangrijkste beklimmingen en afdalingen',
       aria: 'Belangrijkste klim- en afdalingssegmenten',
       flat: 'Geen noemenswaardige beklimmingen: niets voldeed aan de onderstaande hoogte- en stijgingsdrempels.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `Geen noemenswaardige beklimmingen: hoogte bleef tussen ${min} en ${max} ${unit} (maximaal ${range} ${unit})` +
+        (gain ? `; de ${gain} ${unit} totale stijging is opgebouwd uit veel kleine heuveltjes` : '') +
+        ', en geen enkel stuk voldeed aan de onderstaande drempels.',
       climb: 'Klim',
       descent: 'Afdaling',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2826,6 +2832,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       workoutReview: (label: string) => `Hoe ging deze training (${label})?`,
       workoutRecovery: (label: string) => `Ben ik voldoende hersteld na deze training (${label})?`,
       workoutNext: (label: string) => `Hoe kan ik mijn volgende training (${label}) het beste plannen?`,
+      sleepHint: 'Kies een vraag als begin: er wordt een nieuwe taak gestart met deze nacht en de twee weken slaap en herstel ervoor. De vraag is al ingevuld en je kunt die nog aanpassen voordat je verstuurt.',
+      sleepNight: 'Hoe heb ik deze nacht geslapen?',
+      sleepRecovery: 'Ben ik door deze nacht slaap goed hersteld?',
       above: (delta: string) => `${delta} hoger dan gebruikelijk`, below: (delta: string) => `${delta} lager dan gebruikelijk`,
       baselineHint: (median: string, days: number) => `Vergeleken met jezelf: de mediaan van de afgelopen ${days} dagen is ${median}. Dit is geen diagnose.`,
       usualWord: 'Gewoonlijk',
@@ -2930,6 +2939,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       facePlan: 'Plan',
       tally: (train: number, rest: number) => `${train} training · ${rest} rust`,
       viewWeek: 'Hele week bekijken',
+      attachments: 'Bijlagen',
+    },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Deze training',
     },
     'components/ai/bridge/bridge': {
       unitMin: 'min',

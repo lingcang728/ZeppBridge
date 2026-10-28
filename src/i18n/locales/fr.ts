@@ -1551,6 +1551,10 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       title: 'Principales montées et descentes',
       aria: 'Segments principaux de montée et de descente',
       flat: 'Aucune montée notable : aucun dénivelé ni pente n\'a atteint les seuils ci-dessous.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `Aucune montée notable : l’altitude est restée entre ${min} et ${max} ${unit} (${range} ${unit} au maximum)` +
+        (gain ? ` ; les ${gain} ${unit} de dénivelé positif cumulé proviennent de nombreuses petites montées` : '') +
+        ', et aucun tronçon n’a atteint les seuils ci-dessous.',
       climb: 'Montée',
       descent: 'Descente',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -1609,6 +1613,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       showAllModules: 'Tout afficher',
       collapseModules: 'Replier',
       entryWeek: '7 derniers jours',
+      entrySparse: '90 derniers jours',
       focusLabel: 'Ce qui m’intéresse',
     },
 
@@ -2219,6 +2224,9 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'composables/useAiTaskPreview': {
       previewFailed: 'Impossible de générer l’aperçu',
     },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Cette séance',
+    },
 
     'lib/aiTask/brief': {
       defaultPlan: 'Pas de question précise de ma part : donne une analyse complète dans cet ordre :',
@@ -2514,6 +2522,9 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       workoutReview: (label: string) => `Comment s’est passée cette séance de ${label} ?`,
       workoutRecovery: (label: string) => `Ai-je assez récupéré après cette séance de ${label} ?`,
       workoutNext: (label: string) => `Comment organiser ma prochaine séance de ${label} ?`,
+      sleepHint: 'Choisissez une question pour démarrer : une nouvelle tâche sera créée avec cette nuit et les deux semaines de sommeil et de récupération précédentes, avec la question préremplie. Vous pourrez la modifier avant l’envoi.',
+      sleepNight: 'Comment ai-je dormi cette nuit ?',
+      sleepRecovery: 'Cette nuit de sommeil m’a-t-elle permis de bien récupérer ?',
       ask: 'Demander à l’IA', askTitle: (label: string) => `Demander à l’IA · ${label}`,
       askHint: 'Choisissez une question pour démarrer : une nouvelle tâche sera créée avec les données récentes de cette mesure et la question préremplie. Vous pourrez la modifier avant l’envoi.',
       firstAbove: (label: string) => `${label} est plus élevé que d’habitude ces derniers temps. Qu’est-ce que cela peut signifier ?`,
@@ -2610,6 +2621,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       facePlan: 'Plan',
       tally: (train: number, rest: number) => `${train} entraînement · ${rest} repos`,
       viewWeek: 'Voir la semaine',
+      attachments: 'Pièces jointes',
     },
     'components/cards/cards': {
       noWorkouts: 'Aucune séance sur cette période',
@@ -3340,6 +3352,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'components/journal/repair': {
       timelineEmpty: 'Choisissez un jour sur la chronologie pour noter un événement',
       timelineToday: 'Aujourd’hui',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, n°${rank} plus rapide sur ${total} : ${time}`,
       noRaces: 'Aucune course pour le moment',
       noInjuries: 'Aucune blessure enregistrée',
       untilNow: 'À ce jour',
