@@ -36,10 +36,17 @@ const { data: rings, error, load } = useAnnualRings();
 onMounted(load);
 onActivated(load);
 
+/* 选中哪年记在页面自己身上，只在停在年轮页时跟着地址走：页面缓存着去了运动详情，全局路由的 query 里就没有 year 了，
+   以前选中跟着退回默认那年——外圈 / 内圈点开一次运动，背后的木头跳回中间那圈、开着的卡被清掉，返回时形变找不到卡只剩一个黑框，
+   整块木头再重长一遍（用户 2026-10-28 录屏）。 */
+const askedYear = ref<number>(Number.NaN);
+watch(() => [route.name, route.query.year] as const, ([name, value]) => {
+  if (name === 'Rings') askedYear.value = Number(value);
+}, { immediate: true });
 const selected = computed<number | null>(() => {
   const data = rings.value;
   if (!data) return null;
-  const asked = Number(route.query.year);
+  const asked = askedYear.value;
   return data.years.some(y => y.year === asked) ? asked : defaultRingYear(data);
 });
 const pick = (year: number) => { void router.replace({ query: { ...route.query, year: String(year) } }); };

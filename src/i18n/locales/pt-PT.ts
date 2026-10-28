@@ -3786,7 +3786,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       yearAria: (year: number) => `${year}`,
       starOpen: 'Ver este treino',
       avgSpeed: 'Velocidade média',
-      starHint: 'Desloca ou arrasta lateralmente para ver o treino anterior ou seguinte',
       switchTo: (year: number) => `Ver ${year}`,
       close: 'Fechar',
       weekNoData: 'Sem dados esta semana',

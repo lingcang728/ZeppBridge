@@ -4210,7 +4210,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     yearAria: (year: number) => `${year}`,
     starOpen: 'Vedi questo allenamento',
     avgSpeed: 'Velocità media',
-    starHint: 'Scorri o trascina lateralmente per vedere l’allenamento precedente o successivo',
     switchTo: (year: number) => `Mostra ${year}`,
     close: 'Chiudi',
     weekNoData: 'Nessun dato questa settimana',

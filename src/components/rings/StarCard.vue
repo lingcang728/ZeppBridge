@@ -3,7 +3,8 @@
    - 内容（用户 2026-10-28「数据太少」）：运动、星期日期和开始时刻；距离 / 时长 / 配速或速度 / 平均心率（缺哪格就不出那格）；
      心率区间五色条；有 GPS 就画一笔路线剪影；只有真是今年之最才挂一枚徽章（以前的「这一年第 N 长」去掉了）。
      先用年轮里现成的距离、时长出卡，详情到了再补（composables/useStarDetail.ts），数字是会滚的（RollingNumber）。
-   - 换前一次 / 后一次不用箭头：在卡上滚轮、横扫或左右拖，键盘 ← →（TreeRings 管）；琥珀指针沿年轮转过去，卡沿着圆周跟过去。
+   - 换前一次 / 后一次不用箭头：在卡上滚鼠标滚轮或触控板两指扫（一次一步、步与步之间留够动画时间），键盘 ← →（TreeRings 管）；
+     琥珀指针沿年轮转过去，卡沿着圆周跟过去。左右拖着换 10-28 去掉了。
    - 位置写在 `translate` 里（逐帧追着指针外端），长出 / 缩回只动 `scale` 和透明度，两样互不打架；缩回时缩放原点每帧对准刻线
      此刻在屏幕上的位置——放大、平移同时发生也落回那条刻线上。
    - 「看这次运动」从这张卡长成详情页（data-morph-card），返回时卡还开着，详情页正好缩回这张卡。
@@ -36,7 +37,6 @@ const emit = defineEmits<{ close: []; closed: []; step: [delta: 1 | -1] }>();
 const t = useRingsText();
 const workoutText = useMessages(workoutDetailMessages);
 const card = ref<HTMLElement | null>(null);
-const face = ref<HTMLElement | null>(null);
 const WIDTH = 312;
 
 /* ---------- 内容 ---------- */
@@ -153,54 +153,31 @@ onBeforeUnmount(() => { cancelAnimationFrame(frame); flight?.cancel(); });
 onDeactivated(() => { cancelAnimationFrame(frame); });
 onActivated(() => { cancelAnimationFrame(frame); placed = false; track(); });
 
-/* ---------- 换一次：滚轮 / 横扫 / 左右拖 ---------- */
+/* ---------- 换一次：鼠标滚轮 / 触控板两指扫 ---------- */
+/* 左右拖着换 10-28 去掉了（用户：识别不符合交互逻辑）。滚轮滚得再快也一次只走一步、每步之间留够指针转过去、卡沿圆周跟上、
+   标题滑进来的时间（STEP_GAP_MS），不连着跳好几次把动画吃掉；这段时间里攒的滚动直接丢掉，不排队补走。 */
 
 /** 滚轮一格在高分屏上只报 40–50px（DPR 2 时减半）：一格就该走一步，触控板要稍微扫一下。 */
 const WHEEL_STEP = 40;
-const DRAG_STEP = 36;
-const COOLDOWN_MS = 220;
-let wheelSum = 0, coolUntil = 0;
+const STEP_GAP_MS = 480;
+/** 停下来这么久再滚，攒的零头作废：慢慢蹭的触控板不会隔半天突然换一次。 */
+const WHEEL_IDLE_MS = 200;
+let wheelSum = 0, coolUntil = 0, lastWheel = 0;
 function step(delta: 1 | -1) {
-  coolUntil = performance.now() + COOLDOWN_MS;
+  coolUntil = performance.now() + (lessMotion() ? 160 : STEP_GAP_MS);
   wheelSum = 0;
   emit('step', delta);
 }
 function onWheel(event: WheelEvent) {
   const raw = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
   const delta = event.deltaMode === 1 ? raw * 16 : raw;
-  // 触控板的惯性尾巴：刚换过就吃掉，不连着换好几次。
-  if (performance.now() < coolUntil) { wheelSum = 0; return; }
+  const now = performance.now();
+  if (now - lastWheel > WHEEL_IDLE_MS) wheelSum = 0;
+  lastWheel = now;
+  // 刚换过（含触控板的惯性尾巴）：吃掉，不排队。
+  if (now < coolUntil) { wheelSum = 0; return; }
   wheelSum += delta;
   if (Math.abs(wheelSum) >= WHEEL_STEP) step(wheelSum > 0 ? 1 : -1);
-}
-let drag: { x: number; id: number; moved: boolean } | null = null;
-const rubber = (dx: number) => dx / (1 + Math.abs(dx) / 120);
-function onDown(event: PointerEvent) {
-  if (event.button !== 0 || (event.target as Element).closest('a, button')) return;
-  drag = { x: event.clientX, id: event.pointerId, moved: false };
-}
-function onDrag(event: PointerEvent) {
-  if (!drag || event.pointerId !== drag.id || !face.value) return;
-  const dx = event.clientX - drag.x;
-  if (!drag.moved && Math.abs(dx) < 4) return;
-  if (!drag.moved) { drag.moved = true; card.value?.setPointerCapture(event.pointerId); }
-  if (Math.abs(dx) >= DRAG_STEP) {
-    // 往左拖是往后翻（像翻一叠卡）；换完从这里重新算，拖着不放可以连着翻。
-    step(dx < 0 ? 1 : -1);
-    drag.x = event.clientX;
-    face.value.style.translate = '';
-    return;
-  }
-  face.value.style.translate = `${rubber(dx).toFixed(1)}px 0`;
-}
-function onUp(event: PointerEvent) {
-  if (!drag || event.pointerId !== drag.id) return;
-  drag = null;
-  const el = face.value;
-  if (!el || !el.style.translate) return;
-  const from = el.style.translate;
-  el.style.translate = '';
-  if (!lessMotion()) el.animate([{ translate: from }, { translate: '0 0' }], { duration: 260, easing: 'cubic-bezier(.2, .9, .3, 1.2)' });
 }
 
 /* 换了一次：类型和日期顺着方向滑进来（数字自己会滚）。 */
@@ -225,8 +202,8 @@ function key(event: KeyboardEvent) {
 <template>
   <section ref="card" class="star-card" role="dialog" aria-labelledby="ring-star-title" aria-describedby="ring-star-hint" tabindex="-1" data-morph-card
     :style="{ width: `${WIDTH}px` }"
-    @keydown="key" @wheel.stop.prevent="onWheel" @pointerdown.stop="onDown" @pointermove.stop="onDrag" @pointerup.stop="onUp" @pointercancel.stop="onUp" @dblclick.stop>
-    <div ref="face" class="face">
+    @keydown="key" @wheel.stop.prevent="onWheel" @pointerdown.stop @pointermove.stop @pointerup.stop @dblclick.stop>
+    <div class="face">
       <header>
         <span class="dot" aria-hidden="true" />
         <div ref="head" class="head">
@@ -261,10 +238,9 @@ function key(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-.star-card { position: absolute; left: 0; top: 0; z-index: 4; box-sizing: border-box; padding: 14px 16px; border-radius: 18px; outline: none; touch-action: none; cursor: grab;
+.star-card { position: absolute; left: 0; top: 0; z-index: 4; box-sizing: border-box; padding: 14px 16px; border-radius: 18px; outline: none;
   color: var(--wood-card-ink); background: var(--wood-card); border: 1px solid var(--wood-card-line); box-shadow: 0 18px 40px -12px var(--wood-shadow), inset 0 1px 0 rgba(255, 240, 214, .08);
   -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); }
-.star-card:active { cursor: grabbing; }
 .face { display: grid; gap: 12px; }
 header { display: flex; align-items: flex-start; gap: 10px; }
 .dot { flex: none; width: 9px; height: 9px; margin-top: 7px; border-radius: 50%; background: var(--wood-card-amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wood-card-amber) 22%, transparent); }
