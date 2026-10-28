@@ -449,6 +449,7 @@ export default {
     facePlan: 'Plan',
     tally: (train: number, rest: number) => `Trening: ${train} · Odpoczynek: ${rest}`,
     viewWeek: 'Zobacz tydzień',
+    attachments: 'Załączniki',
   },
 
   // Source: src/components/ask/ask.i18n.ts
@@ -468,6 +469,9 @@ export default {
     workoutReview: (label: string) => `Jak poszedł ten trening (${label})?`,
     workoutRecovery: (label: string) => `Czy wystarczająco się zregenerowałem po tym treningu (${label})?`,
     workoutNext: (label: string) => `Jak zaplanować kolejny trening (${label})?`,
+    sleepHint: 'Wybierz pytanie na początek: otworzy ono nowe zadanie z tą nocą oraz dwoma tygodniami snu i regeneracji przed nią, z wpisanym pytaniem. Przed wysłaniem możesz je zmodyfikować.',
+    sleepNight: 'Jak spałem tej nocy?',
+    sleepRecovery: 'Czy po tej nocy snu mój organizm się zregenerował?',
     above: (delta: string) => `Powyżej normy o ${delta}`,
     below: (delta: string) => `Poniżej normy o ${delta}`,
     baselineHint: (median: string, days: number) =>
@@ -1593,6 +1597,10 @@ export default {
     title: 'Główne wzniesienia i spadki',
     aria: 'Główne odcinki wzniesień i spadków',
     flat: 'Brak znaczących wzniesień: żaden odcinek nie osiągnął poniższych progów przewyższenia i nachylenia.',
+    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+      `Brak znaczących wzniesień: wysokość wynosiła od ${min} do ${max} ${unit} (maksymalnie ${range} ${unit})` +
+      (gain ? `; łączne przewyższenie ${gain} ${unit} to suma wielu drobnych wzniesień` : '') +
+      ', a żaden odcinek nie osiągnął poniższych progów.',
     climb: 'Wzniesienie',
     descent: 'Spadek',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -1608,6 +1616,10 @@ export default {
       `Uwzględniane są tylko odcinki o różnicy wysokości co najmniej ${change} m i średnim nachyleniu co najmniej ${grade}%. Dystans wynika z całkowania prędkości punktowej, skalibrowanej do zarejestrowanego dystansu całkowitego; ` +
       `prędkość pionowa i tempo uwzględniają czas w ruchu (czas przy prędkości poniżej ${moving} m/s jest pomijany).`,
   },
+// Source: src/composables/ai/useStageCards.ts
+"composables/ai/useStageCards": {
+  thisWorkout: 'Ten trening',
+},
 // Source: src/composables/useAiHandoff.ts
 "composables/useAiHandoff": {
     clipboardUnsupported: 'Zapis do schowka nie jest tutaj obsługiwany',
@@ -3105,6 +3117,7 @@ Kontynuować?`,
     trainingTitle: 'Stan treningowy',
     factLoad: 'Obciążenie',
     entryWeek: 'Ostatnie 7 dni',
+    entrySparse: 'Ostatnie 90 dni',
     focusLabel: 'Moje priorytety',
     trainingThin: 'Zbyt mało wpisów z ostatnich 7 dni, aby wyznaczyć trend',
     trainingEmpty: 'VO₂max i obciążenie treningowe pojawią się po synchronizacji',
@@ -4488,6 +4501,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   'components/journal/repair': {
     timelineEmpty: 'Wybierz dzień na osi czasu, aby zapisać wydarzenie',
     timelineToday: 'Dzisiaj',
+    pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank}. najszybszy z ${total}: ${time}`,
     noRaces: 'Nie ma jeszcze zawodów',
     noInjuries: 'Brak zapisanych kontuzji',
     untilNow: 'Do teraz',

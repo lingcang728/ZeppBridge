@@ -1317,6 +1317,7 @@ export default {
       showAllModules: 'Ver tudo',
       collapseModules: 'Recolher',
       entryWeek: 'Últimos 7 dias',
+      entrySparse: 'Últimos 90 dias',
       focusLabel: 'Meu foco',
     },
 
@@ -1601,6 +1602,10 @@ export default {
       title: 'Principais subidas e descidas',
       aria: 'Trechos principais de subida e descida',
       flat: 'Sem subidas expressivas: nenhum trecho atingiu os limites de desnível e inclinação abaixo.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `Sem subidas expressivas: a altitude ficou entre ${min} e ${max} ${unit} (${range} ${unit} no máximo)` +
+        (gain ? `; os ${gain} ${unit} de ganho de elevação acumulado são a soma de muitas pequenas variações` : '') +
+        ' e nenhum trecho atingiu os limites abaixo.',
       climb: 'Subida',
       descent: 'Descida',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2107,6 +2112,10 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       previewFailed: 'Falha ao gerar prévia',
     },
 
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Este treino',
+    },
+
     'lib/aiTask/brief': {
       heading: '[Tarefa]',
       intro: (range: string) =>
@@ -2344,6 +2353,9 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       workoutReview: (label: string) => `Como foi este treino de ${label}?`,
       workoutRecovery: (label: string) => `Me recuperei o suficiente depois deste treino de ${label}?`,
       workoutNext: (label: string) => `Como devo planejar meu próximo treino de ${label}?`,
+      sleepHint: 'Escolha uma pergunta para começar: uma nova tarefa será criada com esta noite e as duas semanas anteriores de sono e recuperação, com a pergunta já preenchida. Você ainda poderá editá-la antes de enviar.',
+      sleepNight: 'Como dormi esta noite?',
+      sleepRecovery: 'Esta noite de sono me ajudou a recuperar?',
       ask: 'Perguntar à IA', askTitle: (label: string) => `Perguntar à IA · ${label}`,
       askHint: 'Escolha uma pergunta para começar: uma nova tarefa será criada apenas com os dados recentes desta métrica e a pergunta preenchida. Você ainda poderá editá-la antes de enviar.',
       firstAbove: (label: string) => `${label} tem ficado acima do normal. O que isso pode significar?`,
@@ -2517,6 +2529,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       facePlan: 'Plano',
       tally: (train: number, rest: number) => `${train} treino · ${rest} descanso`,
       viewWeek: 'Ver a semana',
+      attachments: 'Anexos',
     },
     'components/plan/plan': {
       unverifiedNote: '“Não verificado” não significa que esteja errado: o formato está correto, mas ainda não foi conferido no seu relógio como a Zepp o exibirá.',
@@ -3460,6 +3473,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     'components/journal/repair': {
       timelineEmpty: 'Escolha um dia na linha do tempo para registrar um evento',
       timelineToday: 'Hoje',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} mais rápido de ${total}: ${time}`,
       noRaces: 'Nenhuma prova ainda',
       noInjuries: 'Nenhuma lesão registrada',
       untilNow: 'Até hoje',

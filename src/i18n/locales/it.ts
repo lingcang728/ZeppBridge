@@ -16,6 +16,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Seleziona un giorno sulla cronologia per registrare un evento',
       timelineToday: 'Oggi',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} più veloce su ${total}: ${time}`,
       noRaces: 'Ancora nessuna gara',
       noInjuries: 'Nessun infortunio registrato',
       untilNow: 'Oggi',
@@ -951,6 +952,7 @@ export default {
     facePlan: 'Piano',
     tally: (train: number, rest: number) => `${train} allenamento · ${rest} riposo`,
     viewWeek: 'Vedi la settimana',
+    attachments: 'Allegati',
   },
 
   'components/ask/ask': {
@@ -958,6 +960,9 @@ export default {
     workoutReview: (label: string) => `Come è andata questa sessione di ${label}?`,
     workoutRecovery: (label: string) => `Ho recuperato a sufficienza dopo questa sessione di ${label}?`,
     workoutNext: (label: string) => `Come organizzare il mio prossimo allenamento di ${label}?`,
+    sleepHint: 'Scegli una domanda per iniziare: verrà creata una nuova attività con questa notte e le due settimane di sonno e recupero precedenti, con la domanda precompilata. Potrai modificarla prima dell’invio.',
+    sleepNight: 'Come ho dormito questa notte?',
+    sleepRecovery: 'Questa notte di sonno mi ha permesso di recuperare?',
     ask: 'Chiedi all’IA',
     askTitle: (label: string) => `Chiedi all’IA · ${label}`,
     askHint: 'Scegli una domanda per iniziare: verrà creata una nuova attività con i dati recenti di questa metrica e la domanda precompilata. Potrai modificarla prima dell’invio.',
@@ -1514,6 +1519,7 @@ export default {
     title: 'Principali salite e discese',
     aria: 'Segmenti principali di salita e discesa',
     flat: 'Nessuna salita degna di nota: nessun dislivello o pendenza ha raggiunto le soglie sotto indicate.',
+    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) => `Nessuna salita degna di nota: l’altitudine è rimasta tra ${min} e ${max} ${unit} (massimo ${range} ${unit})` + (gain ? `; i ${gain} ${unit} di dislivello positivo totale sono la somma di tanti piccoli saliscendi` : '') + ' e nessun tratto ha raggiunto le soglie indicate sotto.',
     climb: 'Salita',
     descent: 'Discesa',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -1528,6 +1534,10 @@ export default {
       `L’altitudine viene attenuata tramite una media mobile di ${window} secondi; un segmento termina non appena scende (o sale) di oltre ${reversal} m rispetto al punto più alto (o più basso). ` +
       `Vengono mostrati solo i segmenti con almeno ${change} m di dislivello e una pendenza media di almeno il ${grade}%. La distanza deriva dall’integrazione della velocità punto per punto, calibrata sulla distanza totale registrata; ` +
       `la velocità verticale e il passo utilizzano il tempo in movimento (il tempo trascorso a velocità inferiore a ${moving} m/s è escluso).`,
+  },
+
+  'composables/ai/useStageCards': {
+    thisWorkout: 'Questo allenamento',
   },
 
   'composables/useAiHandoff': {
@@ -3020,6 +3030,7 @@ export default {
     showAllModules: "Mostra tutto",
     collapseModules: "Comprimi",
     entryWeek: "Ultimi 7 giorni",
+    entrySparse: "Ultimi 90 giorni",
     focusLabel: "I miei interessi",
   },
 

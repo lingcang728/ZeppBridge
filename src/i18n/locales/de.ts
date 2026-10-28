@@ -261,6 +261,7 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Wähle einen Tag auf der Zeitleiste, um ein Ereignis einzutragen',
       timelineToday: 'Heute',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} schnellste von ${total}: ${time}`,
       noRaces: 'Noch keine Wettkämpfe',
       noInjuries: 'Keine Verletzungen eingetragen',
       untilNow: 'Heute',
@@ -2234,6 +2235,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       unrecognizedCta: 'Hier manuell zuordnen',
       unrecognizedSuffix: ' hat noch kein erkanntes Modell',
       entryWeek: 'Letzte 7 Tage',
+      entrySparse: 'Letzte 90 Tage',
       focusLabel: 'Mein Fokus',
     },
     'views/RecentRecords': {
@@ -2535,6 +2537,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       title: 'Wichtigste Anstiege und Abfahrten',
       aria: 'Hauptabschnitte für Anstiege und Abstiege',
       flat: 'Keine nennenswerten Anstiege: Weder Höhenunterschied noch Steigung haben die Schwellenwerte erreicht.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) => `Keine nennenswerten Anstiege: Die Höhe lag zwischen ${min} und ${max} ${unit} (maximal ${range} ${unit})` + (gain ? `; die ${gain} ${unit} Gesamtanstieg summieren sich aus vielen kleinen Anstiegen` : '') + ' und kein Abschnitt hat die Schwellenwerte unten erreicht.',
       climb: 'Anstieg',
       descent: 'Abstieg',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2920,6 +2923,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
     'composables/useAiTaskPreview': {
       previewFailed: 'Die Vorschau konnte nicht erstellt werden',
     },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Dieses Training',
+    },
     'lib/aiTask/brief': {
       defaultPlan:
         'Keine konkrete Frage von mir – gib eine vollständige Analyse in dieser Reihenfolge:',
@@ -3166,6 +3172,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       workoutReview: (label: string) => `Wie lief dieses Training (${label})?`,
       workoutRecovery: (label: string) => `Habe ich mich nach diesem Training (${label}) ausreichend erholt?`,
       workoutNext: (label: string) => `Wie sollte ich mein nächstes Training (${label}) planen?`,
+      sleepHint: 'Wähle eine Frage als Einstieg: Es wird eine neue Aufgabe mit dieser Nacht und den Schlaf- und Erholungsdaten der zwei Wochen davor geöffnet. Die Frage ist schon ausgefüllt; vor dem Senden kannst du sie noch bearbeiten.',
+      sleepNight: 'Wie habe ich in dieser Nacht geschlafen?',
+      sleepRecovery: 'Habe ich mich nach dieser Nacht wieder erholt?',
       ask: 'KI fragen', askTitle: (label: string) => 'KI fragen · ' + label,
       askHint: 'Wähle eine Frage als Einstieg: Es wird eine neue Aufgabe mit nur den aktuellen Daten dieser Messgröße und der vorausgefüllten Frage geöffnet. Vor dem Senden kannst du sie noch bearbeiten.',
       firstAbove: (label: string) => label + ' liegt in letzter Zeit über dem üblichen Wert. Was könnte das bedeuten?',
@@ -3385,6 +3394,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       facePlan: 'Plan',
       tally: (train: number, rest: number) => `${train} Training · ${rest} Pause`,
       viewWeek: 'Ganze Woche ansehen',
+      attachments: 'Anhänge',
     },
     'components/cards/cards': {
       noWorkouts: 'Keine Trainings in diesem Zeitraum',
