@@ -2614,8 +2614,6 @@ export default {
       shoeNear: (name: string) => `${name}: близко к списанию`,
     },
     'components/journal/year/year': {
-      prevYear: 'Предыдущий год',
-      nextYear: 'Следующий год',
       other: 'Другое',
       vsLastYear: (pct: string) => `по сравнению с прошлым годом ${pct}`,
       vsSameSpan: (pct: string) => `по сравнению с тем же периодом прошлого года ${pct}`,

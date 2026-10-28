@@ -3832,8 +3832,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       shoeNear: (name: string) => `${name}: nadert pensioen`,
     },
     'components/journal/year/year': {
-      prevYear: 'Vorig jaar',
-      nextYear: 'Volgend jaar',
       other: 'Overig',
       vsLastYear: (pct: string) => `t.o.v. vorig jaar ${pct}`,
       vsSameSpan: (pct: string) => `t.o.v. dezelfde periode vorig jaar ${pct}`,

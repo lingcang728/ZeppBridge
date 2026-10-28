@@ -4518,8 +4518,6 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
   },
   // Source: src/components/journal/year/year.i18n.ts
   'components/journal/year/year': {
-    prevYear: 'Poprzedni rok',
-    nextYear: 'Następny rok',
     other: 'Inne',
     vsLastYear: (pct: string) => `vs ubiegły rok ${pct}`,
     vsSameSpan: (pct: string) => `vs ten sam okres ubiegłego roku ${pct}`,

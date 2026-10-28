@@ -46,6 +46,16 @@ export function steadyRadius(from: WindowRect, fromRadius: number, to: WindowRec
   return from.width * from.height <= to.width * to.height ? fromRadius : toRadius;
 }
 
+/** 带着裁切动画的元素此刻在屏幕上看得见的那个框（clip-path 的 inset 从它的布局框里扣掉）。 */
+export function visibleWindow(el: HTMLElement): WindowRect {
+  const box = el.getBoundingClientRect();
+  const clip = getComputedStyle(el).clipPath.match(/^inset\((.*?) round/);
+  const edges = clip?.[1].split(/\s+/).map(Number.parseFloat);
+  if (!edges?.length || edges.some(value => !Number.isFinite(value))) return box;
+  const top = edges[0], right = edges[1] ?? top, bottom = edges[2] ?? top, left = edges[3] ?? right;
+  return { left: box.left + left, top: box.top + top, width: box.width - left - right, height: box.height - top - bottom };
+}
+
 /** 圆角为 0 的那一端：矩形往外多放一个圆角半径，圆弧落到板外，四个角就是方的。 */
 export function bleedRect(rect: WindowRect, radius: number): WindowRect {
   return { left: rect.left - radius, top: rect.top - radius, width: rect.width + radius * 2, height: rect.height + radius * 2 };

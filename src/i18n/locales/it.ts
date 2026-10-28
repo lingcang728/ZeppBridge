@@ -4188,8 +4188,6 @@ Rispondi in Markdown.`,
   },
 
   'components/journal/year/year': {
-    prevYear: 'Anno precedente',
-    nextYear: 'Anno successivo',
     other: 'Altro',
     vsLastYear: (pct: string) => `rispetto all’anno scorso ${pct}`,
     vsSameSpan: (pct: string) => `rispetto allo stesso periodo dell’anno scorso ${pct}`,

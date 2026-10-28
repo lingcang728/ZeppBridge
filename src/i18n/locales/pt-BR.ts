@@ -3614,8 +3614,6 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
     },
 
     'components/journal/year/year': {
-      prevYear: 'Ano anterior',
-      nextYear: 'Ano seguinte',
       other: 'Outros',
       vsLastYear: (pct: string) => `vs. ano passado ${pct}`,
       vsSameSpan: (pct: string) => `vs. mesmo período do ano passado ${pct}`,

@@ -3445,8 +3445,6 @@ Markdown में उत्तर दें।`,
     },
 
     'components/journal/year/year': {
-      prevYear: 'पिछला वर्ष',
-      nextYear: 'अगला वर्ष',
       other: 'अन्य',
       vsLastYear: (pct: string) => `पिछले वर्ष की तुलना में ${pct}`,
       vsSameSpan: (pct: string) => `पिछले वर्ष की इसी अवधि की तुलना में ${pct}`,

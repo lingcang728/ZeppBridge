@@ -3557,8 +3557,6 @@ Réponds en Markdown.`,
     },
 
     'components/journal/year/year': {
-      prevYear: 'Année précédente',
-      nextYear: 'Année suivante',
       other: 'Autre',
       vsLastYear: (pct: string) => `vs l’an dernier ${pct}`,
       vsSameSpan: (pct: string) => `vs même période l’an dernier ${pct}`,

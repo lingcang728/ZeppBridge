@@ -1,13 +1,17 @@
 <script setup lang="ts">
 /* 纪元与事件的横向时间轴（宽屏；窄屏退回 EpochSection 里的竖向列表）。
    轴线上方是事件的圆点（相近的日子自动分泳道），下方是纪元的色带，最底下一行月份。
-   默认看截至今天的最近 12 个月，右边留半个月：「今天」那条线不贴边，还在持续的纪元 / 事件在它右边渐隐，表示「至今」。
-   按住拖动或横向滚轮往前翻，最早到第一条记录所在的月份。点空白的日子：以那天为开始新建事件，编辑器从点击处长出来。
+   默认看截至今天的最近 12 个月，右边留半个月：「今天」不贴边，还在持续的纪元 / 事件在它右边渐隐，表示「至今」。
+   「今天」不再是一整条黄竖线（用户 2026-10-28 嫌丑）：轴上一个带呼吸光晕的小圆点，月份那一行一枚「今天」小胶囊，
+   今天往右的轴线变成渐隐的虚线——还没发生。
+   按住拖动或横向滚轮往前翻，最早到第一条记录或第一年运动数据所在的月份（以前只认事件，没记事件时整条轴正好
+   一屏宽、根本拖不动）。点空白的日子：以那天为开始新建事件，编辑器从点击处长出来。
    指针在空白处移动时，一条竖线吸附在指着的那一天、顶上写着日期；点下去以后那一天一直标着，直到编辑器关上
    （用户 2026-10-27：「翻到具体时间时，根本看不出自己点到了哪一天」）。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import { useLifeEvents } from '../../composables/useLifeEvents';
+import { useAnnualRings } from '../../composables/useAnnualRings';
 import { eventIcon, eventTone } from '../../lib/lifeEvents';
 import { journalDay, journalShortDay, todayKey } from '../../lib/logbook/display';
 import { daysBetween } from '../../lib/logbook/clock';
@@ -20,6 +24,8 @@ import type { LifeEvent } from '../../types';
 const t = useRepairText();
 const j = useJournalText();
 const life = useLifeEvents();
+/* 运动数据从哪一年开始（履历页年轮区块读的同一份，已经在内存里）：轴最早能拖到那年一月。 */
+const rings = useAnnualRings();
 const viewport = ref<HTMLElement>();
 const anchor = ref<HTMLElement>();
 const width = ref(900);
@@ -43,7 +49,8 @@ const DOT = 28, EVENT_LANE = 36, BAND_LANE = 34, GAP = 8;
 const monthIndex = (date: string) => Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7)) - 1;
 const daysIn = (month: number) => new Date(Math.floor(month / 12), month % 12 + 1, 0).getDate();
 const last = monthIndex(today);
-const first = computed(() => Math.min(last - 11, ...life.events.value.map(e => monthIndex(e.startDate))));
+const dataStart = computed(() => { const year = rings.data.value?.years[0]?.year; return year ? year * 12 : last; });
+const first = computed(() => Math.min(last - 11, dataStart.value, ...life.events.value.map(e => monthIndex(e.startDate))));
 const monthWidth = computed(() => width.value / 12.5);
 const totalWidth = computed(() => (last - first.value + 1.5) * monthWidth.value);
 const maxOffset = computed(() => Math.max(0, totalWidth.value - width.value));
@@ -58,14 +65,28 @@ const months = computed(() => Array.from({ length: last - first.value + 1 }, (_,
   const month = first.value + i;
   return { i, label: displayDateTimeFormatter({ year: '2-digit', month: 'short' }).format(new Date(Math.floor(month / 12), month % 12, 1)) };
 }));
+/* 「今天」胶囊和它压着的那个月份名：撞上了就把月份名让开（胶囊更要紧）。 */
+const todayPillHalf = computed(() => (labelWidth(t.value.timelineToday) + 18) / 2);
+const hiddenMonth = computed(() => months.value.find(m => {
+  const left = m.i * monthWidth.value + 6, right = left + labelWidth(m.label) * (12 / 13);
+  return right > todayX.value - todayPillHalf.value - 4 && left < todayX.value + todayPillHalf.value + 4;
+})?.i ?? -1);
 
 /* 纪元名写在色带里；色带比名字短时名字照样写全、往右伸出去，排泳道时按两者里更长的算，不会压到下一条。 */
+/* 字体只读一次、量过的字记住：以前每量一个名字都 getComputedStyle(body) 一次，每次都逼整页重算样式，
+   刚打开履历页时光这一项就占了一百多毫秒（CPU 降速 4× 量的），形变因此晚开跑。 */
 let measureCtx: CanvasRenderingContext2D | null = null;
+const measured = new Map<string, number>();
 const labelWidth = (text: string) => {
-  measureCtx ??= document.createElement('canvas').getContext('2d');
-  if (!measureCtx) return text.length * 13;
-  measureCtx.font = `600 13px ${getComputedStyle(document.body).fontFamily}`;
-  return measureCtx.measureText(text).width;
+  const known = measured.get(text);
+  if (known !== undefined) return known;
+  if (!measureCtx) {
+    measureCtx = document.createElement('canvas').getContext('2d');
+    if (measureCtx) measureCtx.font = `600 13px ${getComputedStyle(document.body).fontFamily}`;
+  }
+  const width = measureCtx ? measureCtx.measureText(text).width : text.length * 13;
+  measured.set(text, width);
+  return width;
 };
 function pack<T>(items: T[], span: (item: T) => [number, number]) {
   const ends: number[] = [];
@@ -192,6 +213,7 @@ function key(e: KeyboardEvent) {
 }
 const order = (event: LifeEvent) => ordered.value.findIndex(item => item.event.id === event.id);
 onMounted(() => {
+  void rings.load();
   observer = new ResizeObserver(entries => { width.value = entries[0].contentRect.width; offset.value = clamp(offset.value); });
   observer.observe(viewport.value!);
 });
@@ -205,10 +227,12 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
     <div class="timeline-track" :style="{ width: `${totalWidth}px`, height: `${height}px`, transform: `translateX(${offset - maxOffset}px)`, '--axis': `${axisY}px` }">
       <template v-for="month in months" :key="month.i">
         <i class="month-rule" :style="{ left: `${month.i * monthWidth}px` }" aria-hidden="true" />
-        <span class="month" :style="{ left: `${month.i * monthWidth}px`, top: `${monthY}px` }">{{ month.label }}</span>
+        <span class="month" :class="{ yielded: month.i === hiddenMonth }" :style="{ left: `${month.i * monthWidth}px`, top: `${monthY}px` }">{{ month.label }}</span>
       </template>
-      <i class="axis" aria-hidden="true" />
-      <i class="today" :style="{ left: `${todayX}px` }" aria-hidden="true" />
+      <i class="axis" :style="{ width: `${todayX}px` }" aria-hidden="true" />
+      <i class="axis-future" :style="{ left: `${todayX}px` }" aria-hidden="true" />
+      <span class="today-dot" :style="{ left: `${todayX}px` }" aria-hidden="true" />
+      <span class="today-pill" :style="{ left: `${todayX}px`, top: `${monthY - 2}px` }">{{ t.timelineToday }}</span>
       <template v-if="mark">
         <i :class="['day-mark', { picked: !!picked }]" :style="{ left: `${mark.x}px` }" aria-hidden="true" />
         <span :class="['day-label', { picked: !!picked }]" :style="{ left: `${markLabelX}px` }" aria-hidden="true">{{ journalDay(mark.date) }}</span>
@@ -241,8 +265,20 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
 .timeline-track { position: relative; will-change: transform; }
 .month-rule { position: absolute; top: 0; bottom: 22px; width: 1px; background: color-mix(in srgb, var(--mat-line) 55%, transparent); }
 .month { position: absolute; padding-left: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.axis { position: absolute; left: 0; right: 0; top: var(--axis); height: 1px; background: var(--mat-line); }
-.today { position: absolute; top: 0; bottom: 22px; width: 1px; background: var(--kintsugi); opacity: .7; }
+.month.yielded { opacity: 0; }
+.axis { position: absolute; left: 0; top: var(--axis); height: 1px; background: var(--mat-line); }
+/* 今天往右：还没发生，轴线是渐隐的虚线。 */
+.axis-future { position: absolute; right: 0; top: var(--axis); height: 1px; opacity: .9;
+  background: repeating-linear-gradient(90deg, var(--mat-line) 0 4px, transparent 4px 9px);
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent); mask-image: linear-gradient(90deg, #000, transparent); }
+/* 今天：轴上一个小圆点，外面一圈很淡的光晕慢慢呼吸（只动 transform / opacity）。 */
+.today-dot { position: absolute; top: var(--axis); width: 9px; height: 9px; margin: -4px 0 0 -4.5px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface); pointer-events: none; }
+.today-dot::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; background: var(--accent); opacity: .18; animation: today-breathe 2.8s ease-in-out infinite; }
+@keyframes today-breathe { 0%, 100% { transform: scale(.6); opacity: .28; } 50% { transform: scale(1.25); opacity: .06; } }
+.today-pill { position: absolute; padding: 1px 9px; border-radius: 999px; transform: translateX(-50%); background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent); font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .today-dot::after { animation: none; } }
 .day-mark { position: absolute; top: 22px; bottom: 22px; width: 1px; margin-left: -.5px; background: color-mix(in srgb, var(--ink) 40%, transparent); pointer-events: none; }
 .day-mark.picked { width: 2px; margin-left: -1px; background: var(--accent); }
 .day-label { position: absolute; top: 0; padding: 1px 8px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: inset 0 0 0 1px var(--mat-line);
