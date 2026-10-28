@@ -15,6 +15,7 @@ export default {
   modules: {
     'components/journal/repair': {
       timelineEmpty: 'Seleziona un giorno sulla cronologia per registrare un evento',
+      timelineToday: 'Oggi',
       moreRecords: (n: number) => `Altri ${n}`,
       noRaces: 'Ancora nessuna gara',
       noInjuries: 'Nessun infortunio registrato',

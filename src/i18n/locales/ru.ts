@@ -14,6 +14,7 @@ export default {
   modules: {
     'components/journal/repair': {
       timelineEmpty: 'Выберите день на временной шкале, чтобы добавить событие',
+      timelineToday: 'Сегодня',
       moreRecords: (n: number) => plural(n, { one: `Ещё ${n} запись`, few: `Ещё ${n} записи`, many: `Ещё ${n} записей`, other: `Ещё ${n} записи` }),
       noRaces: 'Пока нет соревнований',
       noInjuries: 'Пока нет записей о травмах',
