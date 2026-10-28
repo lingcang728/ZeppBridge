@@ -9,6 +9,8 @@
  * 同时竖向和转角一直在变——出去往上、回来偏下，所以掉头时整张纸仍在动。整体用一条先快后缓的时间曲线：
  * 抽的那一下利落（往后翻时还接着手指拖出来的速度），落回整沓时慢慢停稳。
  * 层次只在最远处换：那时它和整沓不重叠，换了也看不出来。
+ *
+ * `side` 是往哪边抽：默认 −1 往左（信纸一直是这样）；+1 往右，整条路径左右镜像（PB 墙的牌叠往右甩时用）。
  */
 
 export interface Pose { x: number; y: number; r: number }
@@ -42,31 +44,32 @@ export const TURN_AT = (() => {
   return (lo + hi) / 2;
 })();
 
-/** 路程 s（0..1）处的位置：起止之间线性过渡，叠上出去回来的一圈。 */
-export function turnPose(s: number, from: Pose, to: Pose, width: number, height: number): Pose {
+/** 路程 s（0..1）处的位置：起止之间线性过渡，叠上出去回来的一圈。往右（side = +1）时横向和转角镜像。 */
+export function turnPose(s: number, from: Pose, to: Pose, width: number, height: number, side: -1 | 1 = -1): Pose {
   const out = Math.sin(Math.PI * s);
   const loop = Math.sin(2 * Math.PI * s);
   const base = (a: number, b: number) => a + (b - a) * s;
+  const m = -side;
   return {
-    x: base(from.x, to.x) + (OUT_X * width - (from.x + to.x) / 2) * out,
+    x: base(from.x, to.x) + (m * OUT_X * width - (from.x + to.x) / 2) * out,
     y: base(from.y, to.y) + (OUT_Y * height - (from.y + to.y) / 2) * out - LOOP_Y * height * loop,
-    r: base(from.r, to.r) + (OUT_R - (from.r + to.r) / 2) * out - LOOP_R * loop,
+    r: base(from.r, to.r) + (m * OUT_R - (from.r + to.r) / 2) * out - m * LOOP_R * loop,
   };
 }
 
 /**
  * 整段关键帧：按时间均匀取样（线性插值），z-index 在最远处那一刻从 fromZ 换成 toZ（同一时刻两帧，不经过中间值）。
  */
-export function turnKeyframes(from: Pose, to: Pose, width: number, height: number, fromZ: string, toZ: string): Keyframe[] {
+export function turnKeyframes(from: Pose, to: Pose, width: number, height: number, fromZ: string, toZ: string, side: -1 | 1 = -1): Keyframe[] {
   const frames: Keyframe[] = [];
   for (let i = 0; i <= SAMPLES; i += 1) {
     const t = i / SAMPLES;
     if (frames.length && t > TURN_AT && (frames[frames.length - 1]!.offset as number) < TURN_AT) {
-      const peak = poseTransform(turnPose(0.5, from, to, width, height));
+      const peak = poseTransform(turnPose(0.5, from, to, width, height, side));
       frames.push({ offset: TURN_AT, transform: peak, zIndex: fromZ });
       frames.push({ offset: TURN_AT + 1e-4, transform: peak, zIndex: toZ });
     }
-    frames.push({ offset: t, transform: poseTransform(turnPose(progress(t), from, to, width, height)), zIndex: t < TURN_AT ? fromZ : toZ });
+    frames.push({ offset: t, transform: poseTransform(turnPose(progress(t), from, to, width, height, side)), zIndex: t < TURN_AT ? fromZ : toZ });
   }
   return frames;
 }

@@ -14,7 +14,6 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'कोई घटना दर्ज करने के लिए टाइमलाइन पर एक दिन चुनें',
       timelineToday: 'आज',
-      moreRecords: (n: number) => `${n} और`,
       noRaces: 'अभी कोई रेस नहीं', noInjuries: 'चोट का कोई रिकॉर्ड नहीं',
       untilNow: 'अब तक', more: 'और देखें', distance: 'कुल दूरी',
       recorded: 'दर्ज',

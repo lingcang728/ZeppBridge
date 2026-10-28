@@ -3356,7 +3356,6 @@ Réponds en Markdown.`,
     'components/journal/repair': {
       timelineEmpty: 'Choisissez un jour sur la chronologie pour noter un événement',
       timelineToday: 'Aujourd’hui',
-      moreRecords: (n: number) => `${n} de plus`,
       noRaces: 'Aucune course pour le moment',
       noInjuries: 'Aucune blessure enregistrée',
       untilNow: 'À ce jour',
