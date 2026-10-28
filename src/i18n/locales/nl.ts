@@ -17,7 +17,6 @@ export default {
     'components/journal/repair': {
       timelineEmpty: 'Kies een dag op de tijdlijn om een gebeurtenis vast te leggen',
       timelineToday: 'Vandaag',
-      moreRecords: (n: number) => `${n} meer`,
       noRaces: 'Nog geen wedstrijden',
       noInjuries: 'Geen blessures vastgelegd',
       untilNow: 'Heden',
