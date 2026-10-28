@@ -9,6 +9,7 @@
    - 滚轮放大（以鼠标为中心），放大后拖动平移，双击或右下角「还原」回来；键盘 + − 0 一样。
    进来时一圈圈从髓心往外长出来、最后树皮合上，之后一道很淡的光泽隔一阵扫过木面（只动 transform）。 */
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import StarCard from './StarCard.vue';
 import { bandPath, edgeSegments, hitRing, loopPath, monthStarts, neighborStar, pointAt, radiusAt, ringTicks, treeLayout, wedgePath, weekAtFraction } from '../../lib/rings/tree';
 import { bandWood, barkOf, grainPaths, raysOf, slicePath, WOOD } from '../../lib/rings/wood';
@@ -306,8 +307,15 @@ onMounted(() => {
   forgetEscape = onMotionEscape(() => { if (!active || open.value === null) return false; close(); return true; });
   void grow();
 });
-/* 从「看这次运动」回来：卡还开着、木头不重新长一遍、放大的样子也留着——详情页正好缩回这张卡（用户 2026-10-28 定）。 */
-onActivated(() => { active = true; if (open.value === null) void grow(); });
+/* 从「看这次运动」回来：卡还开着、木头不重新长一遍、放大的样子也留着——详情页正好缩回这张卡（用户 2026-10-28 定）。
+   退回来的（「交给 AI」、详情页按返回）一律不重长：页面缩回来时背后那块木头又从髓心长一遍，看着像整页重画了（同日录屏）。
+   只有新进来（history 里没有「前面那一页」）才长。 */
+const router = useRouter();
+onActivated(() => {
+  active = true;
+  const returning = !!(router.options.history.state as { forward?: unknown } | null)?.forward;
+  if (open.value === null && !returning) void grow();
+});
 onDeactivated(() => {
   active = false;
   onLeave();

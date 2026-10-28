@@ -1,2 +1,18 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
+components/rings/rings.shareStory.busiest
+components/rings/rings.shareStory.busiestNote
+components/rings/rings.shareStory.farthest
+components/rings/rings.shareStory.heroDays
+components/rings/rings.shareStory.heroHours
+components/rings/rings.shareStory.heroWorkouts
+components/rings/rings.shareStory.longest
+components/rings/rings.shareStory.marathons
+components/rings/rings.shareStory.perWeek
+components/rings/rings.shareStory.races
+components/rings/rings.shareStory.ran
+components/rings/rings.shareStory.records
+components/rings/rings.shareStory.runs
+components/rings/rings.shareStory.sleep
+components/rings/rings.shareStory.sleepNote
+components/rings/rings.shareStory.steps

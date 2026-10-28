@@ -3613,7 +3613,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       saved: 'Enregistré',
       openFolder: 'Afficher dans le dossier',
       shareTitle: (year: number) => `Mon année ${year} en anneaux`,
-      shareFooter: 'Données réelles uniquement · généré sur cet ordinateur · ZeppBridge',
       fileStem: (year: number) => `ZeppBridge Anneaux ${year}`,
       ready: (year: number) => `Votre anneau pour ${year} est prêt`,
       readyHint: 'Un anneau par an, un trait par entraînement.',

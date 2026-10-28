@@ -3980,7 +3980,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       saved: 'Gespeichert',
       openFolder: 'Im Ordner anzeigen',
       shareTitle: (year: number) => `Mein ${year} in Jahresringen`,
-      shareFooter: 'Nur echte Daten · auf diesem Rechner erstellt · ZeppBridge',
       fileStem: (year: number) => `ZeppBridge Jahresringe ${year}`,
       ready: (year: number) => `Dein Jahresring für ${year} ist gewachsen`,
       readyHint: 'Ein Ring pro Jahr, ein Strich pro Training.',
