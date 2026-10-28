@@ -26,6 +26,8 @@ export type EntryFact = {
   unit?: string;
   /** 近 7 天的值；少于两个点不画。 */
   spark?: number[];
+  /** 小线画的不是近 7 天时（稀疏项放宽到近 90 天），行尾写一句是哪段时间。 */
+  span?: string | null;
   color?: string;
   /** 数字后面跟的一个短标签（训练负荷的档位）。 */
   tag?: string | null;
@@ -57,7 +59,8 @@ withDefaults(defineProps<{
       <span class="fact-label"><i :style="{ background: facts[0].color }" aria-hidden="true"></i>{{ facts[0].label }}</span>
       <span class="fact-value"><strong>{{ facts[0].text }}</strong><small v-if="facts[0].unit">{{ facts[0].unit }}</small><em v-if="facts[0].tag">{{ facts[0].tag }}</em></span>
       <UsualRange v-if="facts[0].format" class="fact-usual" :metric="facts[0].key" :format="facts[0].format" />
-      <Sparkline v-if="(facts[0].spark?.length ?? 0) > 1 && facts[0].color" class="solo-spark" fill :values="facts[0].spark!" :color="facts[0].color" :label="`${facts[0].label} · ${caption ?? ''}`" />
+      <Sparkline v-if="(facts[0].spark?.length ?? 0) > 1 && facts[0].color" class="solo-spark" fill :values="facts[0].spark!" :color="facts[0].color" :label="`${facts[0].label} · ${facts[0].span ?? caption ?? ''}`" />
+      <em v-if="facts[0].span" class="fact-span solo-span">{{ facts[0].span }}</em>
     </div>
     <ul v-else-if="facts.length" class="entry-facts">
       <li v-for="fact in facts" :key="fact.key" class="entry-fact">
@@ -66,7 +69,10 @@ withDefaults(defineProps<{
           <span class="fact-value"><strong>{{ fact.text }}</strong><small v-if="fact.unit">{{ fact.unit }}</small><em v-if="fact.tag">{{ fact.tag }}</em></span>
           <UsualRange v-if="fact.format" class="fact-usual" :metric="fact.key" :format="fact.format" />
         </span>
-        <Sparkline v-if="(fact.spark?.length ?? 0) > 1 && fact.color" class="fact-spark" :values="fact.spark!" :color="fact.color" :label="`${fact.label} · ${caption ?? ''}`" />
+        <span v-if="(fact.spark?.length ?? 0) > 1 && fact.color" class="spark-cell">
+          <Sparkline class="fact-spark" :values="fact.spark!" :color="fact.color" :label="`${fact.label} · ${fact.span ?? caption ?? ''}`" />
+          <em v-if="fact.span" class="fact-span">{{ fact.span }}</em>
+        </span>
         <span v-else class="fact-spark fact-spark-empty" aria-hidden="true"></span>
       </li>
     </ul>
@@ -106,6 +112,9 @@ withDefaults(defineProps<{
 .fact-value em { margin-left: 5px; color: var(--muted); font-size: var(--fs-xs); font-style: normal; }
 .fact-spark { height: 34px; }
 .fact-spark :deep(svg) { height: 34px; }
+.spark-cell { position: relative; display: block; min-width: 0; }
+.fact-span { position: absolute; right: 0; bottom: -15px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; white-space: nowrap; }
+.solo-span { position: static; align-self: flex-end; }
 .fact-spark-empty { display: block; border-radius: 8px;
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 6px, transparent 6px 12px); }
 .entry-solo { display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-height: 0; }
@@ -118,7 +127,7 @@ withDefaults(defineProps<{
 
 @container (max-width: 420px) {
   .entry-fact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .fact-spark { grid-column: 1 / -1; }
+  .spark-cell, .fact-spark-empty { grid-column: 1 / -1; }
 }
 
 /* 卡片底色统一走材质；类别只在左下角留一点同色微光，和图标、曲线是同一个颜色。 */
