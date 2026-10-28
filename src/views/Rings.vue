@@ -18,7 +18,9 @@ import { useJournalText } from '../components/journal/journal.i18n';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { drawShare, SNAPSHOT_SIZE } from '../lib/rings/draw';
 import { snapshotTree } from '../lib/rings/treeSnapshot';
-import { NONE, yearFacts } from '../lib/rings/facts';
+import { yearFacts } from '../lib/rings/facts';
+import { shareStory } from '../lib/rings/share';
+import type { RingYear } from '../types/rings';
 import { workoutLabel } from '../lib/labels';
 import { fontsReady } from '../lib/fontsReady';
 import AskAiButton from '../components/ask/AskAiButton.vue';
@@ -58,10 +60,24 @@ const facts = computed(() => (year.value
 
 /* 交给 AI：和履历页年轮区块同一份「我看到的这一年」，再加上这一年的各项数字（步数、睡眠、PB、比赛……）。 */
 const yearView = useYearView(rings, selected);
-const experience = ref<HTMLElement | null>(null);
-const askAi = () => yearView.askAi(experience.value, facts.value.map(f => `${f.label}: ${f.value}${f.detail ? ` · ${f.detail}` : ''}`));
+/* 「交给 AI」从这枚按钮里长出来、返回缩回它：以前拿整块年轮当来处，整屏长到整屏看上去就是硬切（用户 2026-10-28）。 */
+const askButton = ref<InstanceType<typeof AskAiButton> | null>(null);
+const askAi = () => yearView.askAi(askButton.value?.button ?? null, facts.value.map(f => `${f.label}: ${f.value}${f.detail ? ` · ${f.detail}` : ''}`), { anySize: true });
 
 /* 存成图片：本机画年轮 → 拼字 → PNG 字节 → 后端写到「图片\ZeppBridge」。 */
+/** 分享图上的树只长到这一年：那年就是最外面一圈、撑满画面（以前晒 2021 年，它是正中间一小点，外面还套着之后的几年）。
+    只剩一圈时不切（最早那年多半只有半年数据，单独一圈是个扇形，刻线全戳在外面）。 */
+const treeUpTo = (years: RingYear[], year: number) => {
+  const upTo = years.filter(v => v.year <= year);
+  return upTo.length >= 2 ? upTo : years;
+};
+/** 分享图底部的应用图标（public/ 下那张 512px 的）；读不到就只写字。 */
+const loadIcon = () => new Promise<HTMLImageElement | null>((resolve) => {
+  const img = new Image();
+  img.onload = () => resolve(img);
+  img.onerror = () => resolve(null);
+  img.src = '/zeppbridge-icon.png';
+});
 const saving = ref(false);
 const savedPath = ref<string | null>(null);
 const saveError = ref<string | null>(null);
@@ -73,13 +89,16 @@ const share = async () => {
   try {
     await fontsReady();
     const y = year.value;
+    const story = shareStory(y, t.value.shareStory, key => j.value.distances[key], workoutLabel);
     const canvas = document.createElement('canvas');
     drawShare(canvas, {
-      snapshot: snapshotTree(rings.value.years, y.year, SNAPSHOT_SIZE),
+      snapshot: snapshotTree(treeUpTo(rings.value.years, y.year), y.year, SNAPSHOT_SIZE),
       title: t.value.shareTitle(y.year),
-      subtitle: [t.value.coverage(y.data_days, y.in_progress), y.workouts ? `${t.value.workouts} ${t.value.times(y.workouts)}` : ''].filter(Boolean).join(' · '),
-      facts: facts.value.filter(f => f.key !== 'workouts' && f.value !== NONE).map(f => ({ label: f.label, value: f.detail ? `${f.value} · ${f.detail}` : f.value })),
-      footer: t.value.shareFooter,
+      highlight: String(y.year),
+      subtitle: [t.value.coverage(y.data_days, y.in_progress), story.perWeek].filter(Boolean).join(' · '),
+      story,
+      icon: await loadIcon(),
+      brand: 'ZeppBridge',
     });
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('canvas');
@@ -102,7 +121,7 @@ const reveal = async () => {
   <section class="page rings-page" aria-labelledby="rings-title">
     <PageHeader title-id="rings-title" :title="t.title" :intro="t.intro">
       <div v-if="year" class="rings-actions">
-        <AskAiButton direct :label="String(year.year)" @activate="askAi" />
+        <AskAiButton ref="askButton" direct :label="String(year.year)" @activate="askAi" />
         <span v-if="savedPath" class="saved">{{ t.saved }}</span>
         <button v-if="savedPath" type="button" class="pill-button quiet" @click="reveal">{{ t.openFolder }}</button>
         <button v-else type="button" class="pill-button" :disabled="saving" @click="share">{{ saving ? t.drawing : t.share }}</button>
@@ -110,7 +129,7 @@ const reveal = async () => {
     </PageHeader>
     <p v-if="error || saveError" class="rings-error" role="alert">{{ error || saveError }}</p>
     <p v-if="rings && !rings.years.length" class="rings-empty">{{ t.empty }}</p>
-    <div v-if="year && rings" ref="experience" class="rings-experience">
+    <div v-if="year && rings" class="rings-experience">
       <TreeRings :years="rings.years" :selected="year.year" @pick="pick" />
     </div>
   </section>

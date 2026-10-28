@@ -73,8 +73,8 @@ export function useYearView(data: Ref<AnnualRings | null>, selected: Ref<number 
   const router = useRouter();
   const draft = useAiTaskDraft();
   /** 新开一个任务：只交运动这一类、这一年的每一天（今年到今天为止），问题和「我看到的」填好；`card` 长成「交给 AI」整页。
-      `extra`：调用的页面上另外看得到的几行（年轮页右栏的步数、睡眠、PB……）。 */
-  async function askAi(card: HTMLElement | null, extra: string[] = []) {
+      `extra`：调用的页面上另外看得到的几行（年轮页右栏的步数、睡眠、PB……）；`anySize`：来处是那枚「问 AI」按钮本身（年轮页）。 */
+  async function askAi(card: HTMLElement | null, extra: string[] = [], options: { anySize?: boolean } = {}) {
     const v = year.value;
     if (!v) return;
     const days: string[] = [];
@@ -87,7 +87,7 @@ export function useYearView(data: Ref<AnnualRings | null>, selected: Ref<number 
     draft.resetDraft();
     draft.applyPicks(new Map([['workout', days]]), today.value);
     draft.setPrompt([y.value.askQuestion(v.year), '', y.value.askSeen(v.year), ...[...seenLines.value, ...extra].map(line => `- ${line}`)].join('\n'));
-    armPageMorph(card, '/ai');
+    armPageMorph(card, '/ai', options);
     await router.push('/ai');
   }
 

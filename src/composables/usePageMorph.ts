@@ -108,13 +108,15 @@ type Trail = { back: string; href: string; index: number; rect: Rect; radius: nu
  * 返回时缩回这张卡（2026-10-07 第二轮）。先 arm，再 router.push；下一次切页的 decide() 用掉它。
  * 卡上会留一个 data-morph-source 标记，返回时靠它找回卡（来处页是 KeepAlive 缓存的，卡还是那一张）。
  */
-let armed: { card: HTMLElement; href: string; id: string; at: number } | null = null;
+let armed: { card: HTMLElement; href: string; id: string; at: number; anySize: boolean } | null = null;
 let armSeq = 0;
-export const armPageMorph = (card: HTMLElement | null, href: string): void => {
+/** `anySize`：来处是被点的那枚按钮本身（年轮页右上角的「问 AI」——页面上只有一整块年轮，拿它当来处等于从整屏长到整屏，
+    看上去是硬切，用户 2026-10-28）：不受「够大才形变」的门槛限制，页面从这枚胶囊里长出来、返回时缩回它。 */
+export const armPageMorph = (card: HTMLElement | null, href: string, options: { anySize?: boolean } = {}): void => {
   if (!card) { armed = null; return; }
   const id = card.dataset.morphSource || `m${(armSeq += 1)}`;
   card.dataset.morphSource = id;
-  armed = { card, href, id, at: performance.now() };
+  armed = { card, href, id, at: performance.now(), anySize: !!options.anySize };
 };
 /** 被 arm 的卡：只在 arm 之后一小会儿内有效（选完问题就切页；别让一个过期的 arm 劫持之后不相干的切页）。 */
 const takeArmed = (to: RouteLocationNormalized) => {
@@ -368,8 +370,11 @@ export const usePageMorph = (options: { back: () => void }) => {
     from: RouteLocationNormalized, to: RouteLocationNormalized, base: PageMotion, link: HTMLElement | null, direct: ReturnType<typeof takeArmed>,
   ): PageMotion => {
     if (reducedMotion()) return base;
-    if (direct && bigEnough(direct.card)) {
-      expandFrom = { card: direct.card, rect: rectOf(direct.card), radius: radiusOf(direct.card), replica: cardReplica(direct.card) };
+    if (direct && (direct.anySize || bigEnough(direct.card))) {
+      const rect = rectOf(direct.card);
+      // 胶囊按钮的圆角写的是 999px：夹到半高，窗口一开始就是这枚胶囊（圆角也决定背景外扩多少，不能真拿 999 去算）。
+      const radius = Math.min(radiusOf(direct.card), rect.width / 2, rect.height / 2);
+      expandFrom = { card: direct.card, rect, radius, replica: cardReplica(direct.card) };
       expandPath = to.fullPath;
       trails.set(to.fullPath, { back: from.fullPath, href: direct.href, index: 0, rect: expandFrom.rect, radius: expandFrom.radius, source: direct.id });
       return 'expand';

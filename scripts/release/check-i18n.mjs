@@ -327,6 +327,7 @@ const ALLOWED_PROSE = [
   { file: 'components/plan/PlanDetail.vue', text: 'row.rest.note', why: 'AI / 用户填写的休息日原文，不是后端界面文案。' },
   { file: 'components/journal/year/useYearView.ts', text: 'tile.note', why: '年轮四张卡片的副标题（与去年对比/覆盖率），由 useYearText 组装，不是后端散文字段。' },
   { file: 'components/journal/year/YearSummary.vue', text: 'tile.note', why: '同上，年轮小结卡副标题展示。' },
+  { file: 'lib/rings/draw.ts', text: 'card.note', why: '年轮分享卡片的副标题，由 share.ts 组装，不是后端散文字段。' },
   { file: 'views/AiComposer.vue', text: 'strips.error.value', why: 'useBridgeStrip 已经通过 toUserMessage 按错误码本地化。' },
   { file: 'views/ai/AiExchanges.vue', text: 'history.error.value', why: 'useExchanges 已经通过 toUserMessage 按错误码本地化。' },
   { file: 'views/Journal.vue', text: 'logbook.error.value', why: '关闭弹窗时清空错误状态；useLogbook 内部已通过 toUserMessage 本地化。' },
