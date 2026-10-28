@@ -7,7 +7,10 @@
  * 后台再读一次，内容没变不换引用。
  */
 import { ref, shallowRef } from 'vue';
-import { backend, toUserMessage } from '../lib/bridge';
+import { toUserMessage } from '../lib/bridge';
+import { journalQuery } from '../lib/journalQueries';
+import { afterMotion } from '../lib/motion/budget';
+import { cached, peek } from '../lib/readCache';
 import type { AnnualRings } from '../types/rings';
 
 const data = shallowRef<AnnualRings | null>(null);
@@ -16,9 +19,19 @@ const error = ref<string | null>(null);
 const loaded = ref(false);
 let inflight: Promise<void> | null = null;
 
+/* 应用空闲时预读过（lib/journalQueries.ts）就直接拿来画；已经有得画了，重读等形变放完再发。
+   读回来的那一下要比对、重画整棵年轮，也等形变放完——不压在形变上。 */
 const load = () => inflight ??= (async () => {
   try {
-    const next = await backend.annualRings();
+    if (!data.value) {
+      const hit = peek(journalQuery.rings());
+      if (hit) { data.value = hit.value; loaded.value = true; }
+    }
+    const motion = () => new Promise<void>((resolve) => { afterMotion(resolve); });
+    if (data.value) await motion();
+    const next = await cached(journalQuery.rings());
+    // 冷库时（刚同步完）第一次读要好一会儿，回来时形变多半还在放：等它放完再换上。
+    await motion();
     if (JSON.stringify(next) !== JSON.stringify(data.value)) data.value = next;
     error.value = null;
   } catch (e) {
@@ -29,4 +42,10 @@ const load = () => inflight ??= (async () => {
   }
 })();
 
-export const useAnnualRings = () => ({ data, error, loaded, load });
+export const useAnnualRings = () => {
+  if (!data.value) {
+    const hit = peek(journalQuery.rings());
+    if (hit) { data.value = hit.value; loaded.value = true; }
+  }
+  return { data, error, loaded, load };
+};

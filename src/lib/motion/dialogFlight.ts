@@ -29,7 +29,9 @@ import { exemptFromSettle, onMotionEscape } from './interrupt';
 import { whenFramesSteady } from './steady';
 import { paced } from './timing';
 import { lessMotion } from './lessMotion';
-import { cardReplica, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
+import { cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
+
+export { visibleWindow };
 import { OPEN_EASE as WINDOW_EASE } from './timing';
 
 export interface FlightOrigin {
@@ -251,14 +253,6 @@ const windowDuration = paced(480);
 function snapshot(panel: HTMLElement) {
   const style = getComputedStyle(panel);
   return { transform: style.transform, clipPath: style.clipPath };
-}
-export function visibleWindow(panel: HTMLElement): WindowRect {
-  const box = panel.getBoundingClientRect();
-  const clip = getComputedStyle(panel).clipPath.match(/^inset\((.*?) round/);
-  const edges = clip?.[1].split(/\s+/).map(Number.parseFloat);
-  if (!edges?.length || edges.some(value => !Number.isFinite(value))) return box;
-  const top = edges[0], right = edges[1] ?? top, bottom = edges[2] ?? top, left = edges[3] ?? right;
-  return { left: box.left + left, top: box.top + top, width: box.width - left - right, height: box.height - top - bottom };
 }
 function attachReplica(panel: HTMLElement, origin: FlightOrigin | null, closing: boolean) {
   const source = origin?.el;

@@ -1,11 +1,10 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { unscaledBox } from '../lib/deck/morph';
 import { holdMotion } from '../lib/motion/budget';
-import { deferSettle, exemptFromSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
-import { CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, RECEDE_OPACITY, RECEDE_SCALE } from '../lib/motion/timing';
+import { hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import {
-  backdropFor, fly, HEAD_IN, HEAD_OUT, hide, PAGE_BODY_IN, PAGE_BODY_OUT, REPLICA_IN, REPLICA_OUT,
+  backdropFor, contentIn, contentOut, fly, hide, PAGE_WINDOW_EASE, PAGE_WINDOW_MS, pageVeil, removeVeil, replicaIn, replicaOut,
+  veilIn, veilOut, type Flight, type FlightSnapshot,
 } from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
 import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater } from '../lib/motion/focusTarget';
@@ -15,24 +14,29 @@ import { lessMotion } from '../lib/motion/lessMotion';
 type Rect = WindowRect;
 
 /**
- * 从一张卡点进详情页：新页从那张卡里「长」出来；返回时缩回同一张卡。和设置卡叠（useDeckMorph）是同一种做法
- * （2026-10-03 第二版，改之前录屏逐帧看：点开那一下一帧就变成整屏黑板、停 0.3 秒、再淡入新页）：
+ * 从一张卡点进详情页：新页从那张卡里「长」出来；返回时缩回同一张卡。
  *
- * - **动的是新页自己**：页面做 `translate` + 定圆角的 `clip-path: inset()`，1:1 不缩放，从卡的矩形裁到整个可视区，
- *   左上角从卡的左上角滑回原位——页头天然落在卡所在处，像设置大卡的卡头。页面底下的垫底（页面本身是透明的）
- *   和上面那份卡的拷贝都是页面自己的子元素，吃同一道裁切：只有一道合成器动画，逐帧严丝合缝。
- *   （第一版垫底是另一块 fixed 的板，它的裁切动画上不了合成器，新页挂载时就停在卡上不动。）
- * - **全程有东西可看，但不叠影**：卡拷贝 0–24% 淡出，页头 16–42% 淡入，页面其余部分 20–56% 淡入（pageFlight.ts 的分段）。
- *   不再「板长满了等数据」：数据晚到由页面自己的骨架交叉淡接住（shell.css 的 skeleton-out）。
- * - **先备好再展开**（2026-10-03 第二轮，像手机打开 App 那样）：页面代码块和首屏数据在悬停、按下、应用空闲时
- *   就读好了（lib/motion/prefetch.ts、lib/pageQueries.ts），切页前最多再等一小会儿；新页挂载时直接用读好的数据，
- *   连图表一起画好第一帧，形变才开始放——窗口里从头到尾是真内容，没有骨架、没有「长满了再加载」。
- * - **来处页退后一层**：缩到 .94、淡到 .32（设置卡叠的 `.is-receded`），不是蒙一层再撤掉。
- * - **形变期间主线程空着**：形变开跑时 holdMotion()，还没来得及挂的图表、晚到的骨架换内容都等它放完（lib/motion/budget.ts）。
- * - 收回完全对称：详情页裁回卡的矩形、页面内容先淡掉、页头和卡拷贝交叉，落地那一帧拷贝就是真卡。
+ * 2026-10-28 第三版（用户：「直接照抄履历页卡片的动画」，即弹窗的 lib/motion/dialogFlight.ts）：
+ * - **动的是新页自己**：页面做 `translate` + 定圆角的 `clip-path: inset()`，1:1 不缩放，从卡的矩形裁到整个可视区。
+ *   页面底下的垫底和上面那份卡的拷贝都是页面自己的子元素，吃同一道裁切（pageFlight.ts 的 fly）。
+ * - **来处页不再退后缩小，而是蒙上一层模糊**（.page-veil，和弹窗遮罩同一组值）：开的时候跟着窗口慢慢糊上，
+ *   收的时候前四成几乎不退、落地才散——「在回退的位置之间先用界面模糊做填充」。
+ * - **分段和弹窗一样**：卡拷贝前三成淡完、窗口长到四成半以前只有底板、之后内容淡入；收回时内容先淡掉、
+ *   拷贝在四成到八成亮回来，落地那一帧拷贝就是真卡。
+ * - **先备好再展开**：页面代码块和首屏数据提前读好（lib/motion/prefetch.ts），新页第一帧画好、帧节奏平稳了才放。
  *
- * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
- * expand / collapse；`onEnter` / `onLeave` / `onAfterLeave` 挂在切页的 <Transition> 上。
+ * **快点不叠页**（2026-10-28 录屏：形变没放完又点，概览底下压着半张睡眠详情、左上角留着返回键）：
+ * 以前每段形变各自在落地时去「全局表」里找 Vue 的 done，被打断后旧的那段落地时拿到的是新那段的 done，
+ * 提前移走了新页、或者漏掉了旧页，旧页就永远留在文档里。现在：
+ * - Vue 的 done 在钩子被调的那一刻就攥在这段形变手里，旧的 done 晚到也只是空操作（Vue 自己防重入）。
+ * - 正在放的形变被下一次切页打断时**原样停住**（stale），不快进：接手的那一段如果正好是倒回去（开到一半按返回、
+ *   收到一半又点同一张卡），就从停住的那个框、那层模糊的浓度、那几层字的透明度接着走，和弹窗收到一半再点开一样；
+ *   不是倒回去的，被丢下的离场页就地淡掉再移走。
+ * - 兜底：形变落地后扫一遍，凡是攥着 done 却已经不在任何一段形变里的页，一律收场。
+ *
+ * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成 expand / collapse；
+ * `onMorphEnter` / `onMorphLeave` / `onEnter` / `onLeave` / `onAfterLeave` 挂在切页的 <Transition> 上，
+ * `settle()` 在 afterEach 之后（页面已经换上）调一次。
  */
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。窗口不等它：先按记住的位置缩，
     这段时间里找到了就把终点换成真卡；超过这个时长还没有就落在记住的位置上。 */
@@ -41,6 +45,8 @@ const CARD_WAIT_MS = 300;
 const ESC_FINISH_MS = 200;
 /** 找不到卡、没有拷贝可以落地时，页面在终点上淡掉的时长。 */
 const LAND_FADE_MS = 140;
+/** 被下一次切页丢下的离场页就地淡掉的时长。 */
+const RETIRE_MS = 160;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
 const MIN_WIDTH = 140;
 const MIN_HEIGHT = 56;
@@ -56,8 +62,8 @@ const bigEnough = (el: Element | null): boolean => {
   return box.width >= MIN_WIDTH && box.height >= MIN_HEIGHT;
 };
 const radiusOf = (el: Element) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22;
-const r1 = (value: number) => Number(value.toFixed(1));
 const reducedMotion = () => lessMotion();
+const noop = () => undefined;
 
 /** 被点的链接所在的那张卡：链接本身够大就是它，否则往外找最近的一块板。 */
 const cardOfLink = (link: HTMLElement): HTMLElement | null => {
@@ -88,15 +94,6 @@ const linksTo = (href: string, scope: string) => {
 };
 const STAYING = '.page-host > :not([class*="-leave"])';
 
-/** 形变真正落地时通知 Vue；暂停、倒放与慢放期间不提前移除页面。 */
-const transitionDone = new WeakMap<Element, () => void>();
-const endTransition = (el: Element) => {
-  const done = transitionDone.get(el);
-  transitionDone.delete(el);
-  done?.();
-};
-const endLeave = endTransition;
-
 /** `source`：不是从链接、而是从一张卡直接开的（armPageMorph）：返回时按这个标记找回那张卡。 */
 type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; source?: string };
 
@@ -120,36 +117,70 @@ const takeArmed = (to: RouteLocationNormalized) => {
   return hit;
 };
 type Origin = { card: HTMLElement; rect: Rect; radius: number; replica: { el: HTMLElement; rect: Rect } };
+
+/**
+ * 一段正在放的形变。`page` 是在动的那一页（展开时进场的新页、收回时离场的详情页），`under` 是蒙着模糊的那一页
+ * （展开时离场的来处页、收回时回到场上的来处页）。两页的痕迹分开撤：被打断后它们可能各有各的去处。
+ */
+interface Live {
+  kind: 'expand' | 'collapse';
+  page: HTMLElement;
+  /** 在动的那一页的路由：收到一半又点开同一页时据此认出「倒回去」。 */
+  path: string;
+  under: HTMLElement | null;
+  flight: Flight;
+  veil: HTMLElement | null;
+  veilAnim: Animation | null;
+  hidden: Animation | null;
+  release: () => void;
+  /** 两页各自那一次 Vue 过渡的 done：钩子被调时就攥住，晚到的旧 done 只是空操作。 */
+  pageDone: () => void;
+  underDone: () => void;
+  /** 停掉这一段的后台事务（Esc 登记、跟踪终点的循环）。 */
+  stop: () => void;
+  landed: boolean;
+  pageGone: boolean;
+  underGone: boolean;
+}
+/** 被打断、原样停住的那一段，和它停住时的样子。 */
+interface Stale extends Live {
+  snap: FlightSnapshot;
+  veilNow: number;
+  /** 下一次切页里被 Vue 重新用到的那几页（进场或离场）：它们的痕迹由接手的人撤。 */
+  claimed: Set<Element>;
+}
+
 /** 收回：详情页已经在离场，等来处页回到场上、滚动位置恢复以后的那一帧才开始缩。 */
 type Collapse = {
   el: HTMLElement; trail: Trail; backdrop: HTMLElement; staying: HTMLElement | null; release: () => void;
   /** 离开时详情页滚下去了多少：返回时缩回卡的是此刻看得见的那一段，不是页面顶上。 */
   lift: number;
+  done: () => void; stayingDone: () => void; frame: number;
 };
 
 export const usePageMorph = (options: { back: () => void }) => {
   let pressed: HTMLElement | null = null;
-  /** 撤回后回到的来处页：它进场时不再淡入（它刚才一直在窗口四周露着）。 */
-  let resumeStill = false;
   /** 进过场的页面（KeepAlive 缓存的会原样回来）。 */
   const entered = new WeakSet<Element>();
-  /** 正在倒放的动画（Esc 撤回）：页面回到场上时的 clean() 不能把它们一刀切掉。 */
-  const kept = new WeakSet<Animation>();
-  /** 展开到一半被 Esc 撤回的新页：撤回放完才让它离场（之前它还在窗口里跟着缩回去）。 */
-  const aborted = new WeakMap<Element, { done: boolean; leaving: boolean; settle: () => void }>();
   let expandFrom: Origin | null = null;
-  /** 展开时正在退场的来处页（onLeave 先于 onEnter 被调）：等窗口长满再让它走。 */
-  let expandLeaving: HTMLElement | null = null;
+  /** 这次展开要去的路由。 */
+  let expandPath = '';
+  /** 展开时正在退场的来处页（onLeave 先于 onEnter 被调）和它的 done：等窗口长满再让它走。 */
+  let expandLeaving: { el: HTMLElement; done: () => void } | null = null;
   let collapseTo: Trail | null = null;
   /** 返回时详情页此刻的滚动距离（decide 时量，切页后滚动区会被拉回顶上）。 */
   let collapseLift = 0;
   /** 这次切页要定位到的那张卡（链接上的 ?focus=，lib/motion/focusTarget.ts）。 */
   let focusKey: string | null = null;
   let pendingCollapse: Collapse | null = null;
+  let live: Live | null = null;
+  let stale: Stale | null = null;
+  /** 攥着 done、还没收场的页（兜底扫描用）。 */
+  const pending = new Map<Element, () => void>();
   /** decide() 决定要形变时登记的「主线程留给动画」：由接下来的 onEnter / onLeave 接手释放。 */
   let hold: (() => void) | null = null;
   const takeHold = () => {
-    const release = hold ?? (() => undefined);
+    const release = hold ?? noop;
     hold = null;
     return release;
   };
@@ -167,26 +198,143 @@ export const usePageMorph = (options: { back: () => void }) => {
     document.removeEventListener('keydown', rememberKey, true);
   };
 
-  const morphing = (motion: PageMotion): PageMotion => {
-    hold?.();
-    hold = holdMotion();
-    return motion;
+  /** 给一页的 done 包一层：只生效一次，并从兜底名单里划掉。 */
+  const track = (el: Element, done: () => void) => {
+    let called = false;
+    const once = () => {
+      if (called) return;
+      called = true;
+      if (pending.get(el) === once) pending.delete(el);
+      done();
+    };
+    pending.set(el, once);
+    return once;
   };
+
+  /* ---------- 一段形变的痕迹 ---------- */
+
+  /** 在动的那一页：裁切、垫底、卡拷贝全撤掉，页面回到它自己的样子。 */
+  const disposePage = (job: Live) => {
+    if (job.pageGone) return;
+    job.pageGone = true;
+    job.flight.dispose();
+    if (job.underGone) job.release();
+  };
+  /** 蒙着模糊的那一页：模糊撤掉、藏着的那张卡露出来。 */
+  const disposeUnder = (job: Live) => {
+    if (job.underGone) return;
+    job.underGone = true;
+    removeVeil(job.under, job.veil);
+    job.hidden?.cancel();
+    if (job.pageGone) job.release();
+  };
+  const owns = (job: Live | null, el: Element) => !!job && (job.page === el || job.under === el);
+
+  /** 正在放的那一段原样停住，交给下一次切页处理。更早一次被打断、还没处理完的那段直接收场。 */
+  const freeze = () => {
+    if (stale) finishStale(stale);
+    const job = live;
+    live = null;
+    if (!job || job.landed) return;
+    job.stop();
+    const anims = [...job.flight.anims, ...(job.veilAnim ? [job.veilAnim] : [])];
+    for (const animation of anims) animation.pause();
+    const veilNow = job.veil ? Number.parseFloat(getComputedStyle(job.veil).opacity) : 0;
+    stale = { ...job, snap: job.flight.snapshot(), veilNow: Number.isFinite(veilNow) ? veilNow : 0, claimed: new Set() };
+  };
+  /** 被打断的那段彻底收场：痕迹全撤，两个 done 都调（已经被 Vue 处理过的只是空操作）。 */
+  const finishStale = (job: Stale) => {
+    if (stale === job) stale = null;
+    disposePage(job);
+    disposeUnder(job);
+    job.pageDone();
+    job.underDone();
+  };
+  /** 被打断的那段两页都处理完了：不再记着它。 */
+  const dropIfDone = () => { if (stale && stale.pageGone && stale.underGone) stale = null; };
+  /** 被丢下的离场页：从此刻的样子就地淡掉，再移走。 */
+  const retire = (el: HTMLElement, done: () => void, after: () => void) => {
+    const now = Number.parseFloat(getComputedStyle(el).opacity);
+    const fade = el.animate([{ opacity: Number.isFinite(now) ? now : 1 }, { opacity: 0 }], { duration: RETIRE_MS, easing: 'ease-out', fill: 'forwards' });
+    const end = () => { after(); done(); fade.cancel(); dropIfDone(); };
+    fade.finished.then(end, end);
+  };
+  /**
+   * 新的一段形变要开跑了：被打断的那段里，这次也用到的页（`mine`）由新的这段接管，痕迹现在撤
+   * （同一个任务里新形变接着摆好，不会露出中间那一帧）。
+   */
+  const adopt = (mine: Array<Element | null>) => {
+    const job = stale;
+    if (!job) return null;
+    if (mine.includes(job.page)) { job.claimed.add(job.page); disposePage(job); }
+    if (job.under && mine.includes(job.under)) { job.claimed.add(job.under); disposeUnder(job); }
+    return job;
+  };
+
+  /**
+   * 页面换上以后（AppShell 的 afterEach + nextTick）：被打断的那段里没被这次切页用到的页各自收场。
+   * 原本在离场的就地淡掉移走；原本在进场的停在原样（痕迹撤掉、过渡算完）。
+   */
+  const settle = () => {
+    const job = stale;
+    if (!job) return;
+    const leavingPage = job.kind === 'collapse';
+    if (!job.claimed.has(job.page)) {
+      if (leavingPage) retire(job.page, job.pageDone, () => disposePage(job));
+      else { disposePage(job); job.pageDone(); }
+    }
+    if (job.under && !job.claimed.has(job.under)) {
+      if (!leavingPage) retire(job.under, job.underDone, () => disposeUnder(job));
+      else { disposeUnder(job); job.underDone(); }
+    }
+    dropIfDone();
+    sweepSoon();
+  };
+
+  /** 兜底：攥着 done、却已经不在任何一段形变里的页，统统收场——无论哪里漏了，旧页都不会一直压在新页上。 */
+  let sweepTimer = 0;
+  const sweep = () => {
+    for (const [el, done] of [...pending]) {
+      if (owns(live, el) || owns(stale, el) || pendingCollapse?.el === el || pendingCollapse?.staying === el) continue;
+      if (expandLeaving?.el === el) continue;
+      done();
+    }
+  };
+  const sweepSoon = () => {
+    window.clearTimeout(sweepTimer);
+    sweepTimer = window.setTimeout(sweep, PAGE_WINDOW_MS * 2 + 400);
+  };
+
+  /* ---------- 决定这次切页怎么动 ---------- */
 
   const decide = (from: RouteLocationNormalized, to: RouteLocationNormalized, base: PageMotion): PageMotion => {
     const link = pressed;
     pressed = null;
+    // 收回还在等下一帧开跑就又切页：它什么都还没动，详情页直接收场。
+    if (pendingCollapse) {
+      const job = pendingCollapse;
+      pendingCollapse = null;
+      cancelAnimationFrame(job.frame);
+      job.backdrop.remove();
+      job.done();
+      job.stayingDone();
+      job.release();
+    }
+    freeze();
     expandFrom = null;
-    expandLeaving = null;
+    expandPath = '';
+    if (expandLeaving) { const { done } = expandLeaving; expandLeaving = null; done(); }
     collapseTo = null;
     collapseLift = 0;
     focusKey = focusKeyOf(to);
     hold?.();
     hold = null;
+    sweepSoon();
     const direct = takeArmed(to);
     if (reducedMotion()) return base;
     if (direct && bigEnough(direct.card)) {
       expandFrom = { card: direct.card, rect: rectOf(direct.card), radius: radiusOf(direct.card), replica: cardReplica(direct.card) };
+      expandPath = to.fullPath;
       trails.set(to.fullPath, { back: from.fullPath, href: direct.href, index: 0, rect: expandFrom.rect, radius: expandFrom.radius, source: direct.id });
       return 'expand';
     }
@@ -197,6 +345,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       if (card) {
         // 按下那一刻就把卡拷一份：第一帧窗口里就是它。
         expandFrom = { card, rect: rectOf(card), radius: radiusOf(card), replica: cardReplica(card) };
+        expandPath = to.fullPath;
         trails.set(to.fullPath, {
           back: from.fullPath,
           href,
@@ -214,7 +363,8 @@ export const usePageMorph = (options: { back: () => void }) => {
     if (trail && trail.back === to.fullPath) {
       collapseTo = trail;
       collapseLift = main()?.scrollTop ?? 0;
-      return morphing('collapse');
+      hold = holdMotion();
+      return 'collapse';
     }
     // 设置里翻到另一张卡用的是 replace：来路跟着带过去，关掉时仍缩回当初那条。
     if (trail && from.path.startsWith('/settings/') && to.path.startsWith('/settings/')) trails.set(to.fullPath, trail);
@@ -232,59 +382,25 @@ export const usePageMorph = (options: { back: () => void }) => {
     return { left: box.left, top: box.top, width: root.clientWidth, height: root.clientHeight };
   };
 
-  /** 来处页退后一层 / 从后面回来：绕可视区顶边中点缩放（设置卡叠的 .is-receded 同一组值）。
-      返回动画和缩放原点的屏幕坐标（退后时量卡的位置要把缩放算回去）。 */
-  const recede = (page: HTMLElement, viewport: Rect, direction: 'out' | 'in', duration: number, easing: string) => {
-    for (const animation of page.getAnimations()) {
-      if (!kept.has(animation) && !(animation instanceof CSSTransition) && !(animation instanceof CSSAnimation)) animation.cancel();
-    }
-    const box = page.getBoundingClientRect();
-    const origin = { x: viewport.left + viewport.width / 2, y: viewport.top };
-    page.style.transformOrigin = `${r1(origin.x - box.left)}px ${r1(origin.y - box.top)}px`;
-    const back: Keyframe = { transform: `scale(${RECEDE_SCALE})`, opacity: RECEDE_OPACITY };
-    const front: Keyframe = { transform: 'none', opacity: 1 };
-    const animation = page.animate(direction === 'out' ? [front, back] : [back, front], { duration, easing, fill: 'both' });
-    return { animation, origin };
-  };
+  /* ---------- 展开 ---------- */
 
-  /** 新页从卡里长出来：页面自己从卡的矩形裁到整个可视区，左上角从卡的左上角滑回原位；
-      来处页同时退后。窗口长满那一刻来处页离场，形变的痕迹全部撤掉——页面此刻就是它的静止样子。 */
-  const onEnter = (el: Element) => {
-    clean(el);
-    const focus = focusKey;
-    focusKey = null;
-    // 缓存页回场：卡片入场动画（material.css 的 card-enter）不再从头放一遍——
-    // 否则每回一次概览，所有卡片连同心率图都像重新加载了一次。
-    if (entered.has(el)) el.classList.add('page-revisit');
-    entered.add(el);
-    if (resumeStill && el instanceof HTMLElement) {
-      resumeStill = false;
-      el.style.transition = 'none';
-      el.style.opacity = '1';
-      window.setTimeout(() => { el.style.transition = ''; el.style.opacity = ''; }, 120);
-    }
-    // 收回：来处页回到场上了，记下它，下一帧和详情页一起动。
-    if (pendingCollapse && el instanceof HTMLElement) {
-      pendingCollapse.staying = el;
-      return;
-    }
-    const origin = expandFrom;
-    expandFrom = null;
+  /** 新页从卡里长出来：页面自己从卡的矩形裁到整个可视区；来处页同时慢慢蒙上模糊。窗口长满那一刻来处页离场，
+      形变的痕迹全部撤掉——页面此刻就是它的静止样子。 */
+  const startExpand = (el: HTMLElement, done: () => void, origin: Origin, viewport: Rect, host: HTMLElement, focus: string | null) => {
     const leaving = expandLeaving;
     expandLeaving = null;
-    const viewport = viewportOf();
-    const host = main()?.parentElement;
-    if (!origin || !viewport || !host || !(el instanceof HTMLElement)) {
-      if (origin) takeHold()();
-      if (leaving) endLeave(leaving);
-      // 没有形变可借（减少动效、不是从卡点进来）：页面出来以后再滚到要定位的那张卡。
-      if (focus && el instanceof HTMLElement) revealFocusLater(el, focus);
-      endTransition(el);
-      return;
-    }
     takeHold()();
-    // 卡片入场动画不放：页面的出现就是这段形变（页头、其余部分各自淡入）。
+    // 卡片入场动画不放：页面的出现就是这段形变（内容在后半程淡入）。
     el.classList.add('page-revisit');
+    // 收到一半又点开同一页：从停住的那个框接着长，不从卡上重来。
+    const previous = adopt([el, leaving?.el ?? null]);
+    const reversing = previous && previous.kind === 'collapse' && previous.path === expandPath ? previous : null;
+    // 被丢下的旧详情页（同一页的另一个实例）：新页接着它停住的样子长，它这一帧就收场。
+    if (reversing && reversing.page !== el && !reversing.claimed.has(reversing.page)) {
+      reversing.claimed.add(reversing.page);
+      disposePage(reversing);
+      reversing.pageDone();
+    }
     // 要定位到某张卡（置顶指标 → 训练负荷那张趋势卡）：先把页面滚到它（来处页挪回同样的距离，原地不动），
     // 窗口直接从小卡长成那张卡——第一帧那张卡就叠在小卡的位置上，卡拷贝也跟着它走。
     const scroller = main();
@@ -293,107 +409,76 @@ export const usePageMorph = (options: { back: () => void }) => {
       const before = scroller.scrollTop;
       scroller.scrollTop = before + focusScrollDelta(target, scroller, el);
       const moved = scroller.scrollTop - before;
-      if (leaving && moved) leaving.style.top = `${(Number.parseFloat(leaving.style.top) || 0) + moved}px`;
+      if (leaving && moved) leaving.el.style.top = `${(Number.parseFloat(leaving.el.style.top) || 0) + moved}px`;
     }
     const box = rectOf(el);
     const spot = target ? rectOf(target) : null;
     const focusAt = spot ? { x: spot.left - box.left, y: spot.top - box.top } : { x: 0, y: 0 };
     const focusPart = target ? [...el.children].find((child) => child.contains(target)) : undefined;
+    const start = reversing?.snap.window ?? origin.rect;
     const flight = fly({
       page: el,
       backdrop: backdropFor(el, viewport, host, origin.radius),
       radius: origin.radius,
-      from: { rect: origin.rect, anchor: { x: origin.rect.left - focusAt.x, y: origin.rect.top - focusAt.y } },
+      from: { rect: start, anchor: { x: start.left - focusAt.x, y: start.top - focusAt.y } },
       to: { rect: bleedRect(viewport, origin.radius), anchor: { x: box.left, y: box.top } },
-      duration: OPEN_MS,
-      easing: OPEN_EASE,
+      duration: PAGE_WINDOW_MS,
+      easing: PAGE_WINDOW_EASE,
       replica: origin.replica,
       replicaAt: focusAt,
-      replicaFade: REPLICA_OUT,
-      head: HEAD_IN,
-      body: PAGE_BODY_IN,
+      replicaFade: replicaOut(reversing ? reversing.snap.replica : 1),
+      head: contentIn(reversing ? reversing.snap.content : 0),
+      body: contentIn(reversing ? reversing.snap.content : 0),
       early: focusPart ? (part) => part === focusPart : undefined,
     });
-    const back = leaving ? recede(leaving, viewport, 'out', OPEN_MS, OPEN_EASE).animation : null;
+    const veil = leaving ? pageVeil(leaving.el, viewport) : null;
+    const veilFrom = veilIn(previous ? previous.veilNow : 0);
+    const veilAnim = veil ? veil.animate(veilFrom.frames, veilFrom.options) : null;
     // 页面外面的来源（底栏里的就绪度胶囊）浮在形变上面，窗口从它底下长出来：它不用藏，藏了只会空一下（10-07 录屏）。
     const hidden = origin.card.isConnected && main()?.contains(origin.card) ? hide(origin.card) : null;
-    const all = () => [...flight.anims, ...(back ? [back] : [])];
-
-    let landed = false;
+    let release: () => void = noop;
+    const job: Live = {
+      kind: 'expand', page: el, path: expandPath, under: leaving?.el ?? null, flight, veil, veilAnim, hidden,
+      release: () => release(), pageDone: done, underDone: leaving?.done ?? noop, stop: noop,
+      landed: false, pageGone: false, underGone: false,
+    };
+    live = job;
+    dropIfDone();
+    const all = () => [...flight.anims, ...(veilAnim ? [veilAnim] : [])];
     // 先停在起点（窗口里就是那张卡），等新页的第一帧画完再放：新页挂载、排版、图表、首次光栅化都在这一两帧里，
-    // 以前形变和它们挤在同一帧开跑，放出来的前一截全被吞掉（「一下就长满」）。手机上打开新页也是先等新页第一帧。
-    // 形变真正开跑时才让重活让路（lib/motion/budget.ts）。
-    let release: () => void = () => undefined;
+    // 以前形变和它们挤在同一帧开跑，放出来的前一截全被吞掉。形变真正开跑时才让重活让路（lib/motion/budget.ts）。
     for (const animation of all()) animation.pause();
-    // 等帧节奏平稳（至少两帧）：新页首次光栅化让 GPU 卡住的那一两百毫秒落在起点上，不吞掉形变的开头。
     void whenFramesSteady().then(() => {
-      if (landed || aborted.has(el)) return;
+      if (live !== job || job.landed) return;
       release = holdMotion();
       for (const animation of all()) animation.play();
     });
-    // 放到一半按 Esc：不进去了——所有动画原路倒回，路由退回来处。
+    // 放到一半按 Esc：不进去了——路由退回来处，收回从此刻的样子接着缩（decide 把这一段停住交给收回）。
     const forgetEscape = onMotionEscape(() => {
-      if (landed || aborted.has(el)) return false;
-      aborted.set(el, { done: false, leaving: false, settle: () => undefined });
-      forgetEscape();
-      for (const animation of all()) {
-        exemptFromSettle(animation);
-        kept.add(animation);
-        animation.updatePlaybackRate(-1.25);
-        if (animation.playState !== 'running') animation.play();
-      }
-      // 来处页一直在窗口四周露着，回到场上时不要再从透明淡入一遍。
-      resumeStill = true;
-      window.setTimeout(() => { resumeStill = false; }, 1000);
-      deferSettle();
+      if (live !== job || job.landed) return false;
       options.back();
       return true;
     });
-
+    job.stop = forgetEscape;
     const finish = () => {
-      landed = true;
+      if (live !== job || job.landed) return;
+      job.landed = true;
+      live = null;
       forgetEscape();
-      const state = aborted.get(el);
-      if (state) {
-        // 撤回放完：来处页已经回到原样，新页这才离场（它一直在窗口里跟着缩回卡上）。路由还没退回来的话
-        // 形变停在起点（窗口里就是那张卡）等着，onLeave 再收场。
-        state.done = true;
-        state.settle = () => {
-          endLeave(el);
-          flight.dispose();
-          hidden?.cancel();
-          if (back) {
-            kept.delete(back);
-            back.cancel();
-          }
-          if (leaving) leaving.style.transformOrigin = '';
-          release();
-        };
-        if (state.leaving) state.settle();
-        return;
-      }
       // 窗口长满：来处页先离场（KeepAlive 收进缓存），再撤掉形变——这一帧页面就是它的静止样子。
-      if (leaving) endLeave(leaving);
-      endTransition(el);
-      back?.cancel();
-      hidden?.cancel();
-      flight.dispose();
+      disposeUnder(job);
+      job.underDone();
+      job.pageDone();
+      disposePage(job);
       release();
-      // 定位的那张卡：等页面排版落定（形变放完图表才挂、有的卡读完数据才长高），还差多少就平滑滚过去，再圈一下。
-      // 形变开始前那次滚动是按当时的页面高度算的，常常滚不够——不能只圈不滚。
+      sweepSoon();
+      // 定位的那张卡：等页面排版落定再平滑滚过去，再圈一下（形变开始前那次滚动常常滚不够）。
       if (focus) revealFocusLater(el, focus);
     };
-    flight.main.finished.then(finish, () => {
-      // 被别的切页整个取消了（页面又离场了）：形变的痕迹一并撤掉。
-      landed = true;
-      forgetEscape();
-      flight.dispose();
-      hidden?.cancel();
-      back?.cancel();
-      release();
-      endTransition(el);
-    });
+    flight.main.finished.then(finish, noop);
   };
+
+  /* ---------- 收回 ---------- */
 
   /** 来处页此刻已经在场的话，当初那张卡。页面里没有就看页面外面标了 data-morph-card 的（底栏）。 */
   const currentCard = (trail: Trail): HTMLElement | null => {
@@ -434,8 +519,8 @@ export const usePageMorph = (options: { back: () => void }) => {
     }
   };
 
-  /** 返回：展开的逆过程。详情页从整个可视区裁回那张卡，内容先淡掉、页头和卡拷贝交叉，
-      来处页同时从后面回来；落地那一帧拷贝和真卡严丝合缝，真卡接上。 */
+  /** 返回：展开的逆过程。详情页从整个可视区（开到一半被返回时，从它此刻的那个框）裁回那张卡，内容先淡掉，
+      卡拷贝快落地时亮回来；来处页上的模糊前四成几乎不退、落地才散。 */
   const startCollapse = (job: Collapse) => {
     if (pendingCollapse === job) pendingCollapse = null;
     const { el, trail, backdrop } = job;
@@ -443,14 +528,15 @@ export const usePageMorph = (options: { back: () => void }) => {
     const host = main()?.parentElement;
     if (!el.isConnected || !viewport || !host) {
       backdrop.remove();
-      endLeave(el);
-      if (job.staying) endTransition(job.staying);
+      job.done();
+      job.stayingDone();
       job.release();
       return;
     }
     settleStaying();
     const staying = job.staying ?? main()?.querySelector<HTMLElement>(STAYING) ?? null;
-    // 先量卡、拷卡，再让来处页退后：量到的是它回到原大以后的位置和样子。
+    const previous = adopt([el, staying]);
+    const reversing = previous && previous.kind === 'expand' && previous.page === el ? previous : null;
     const present = currentCard(trail);
     const target = present ? rectOf(present) : trail.rect;
     const box = rectOf(el);
@@ -458,47 +544,50 @@ export const usePageMorph = (options: { back: () => void }) => {
       page: el,
       backdrop,
       radius: trail.radius,
-      from: { rect: bleedRect(viewport, trail.radius), anchor: { x: box.left, y: box.top } },
+      from: reversing ? { rect: reversing.snap.window, anchor: reversing.snap.anchor } : { rect: bleedRect(viewport, trail.radius), anchor: { x: box.left, y: box.top } },
       // 滚下去再返回：缩回卡的是此刻看得见的那一段（锚点抬高滚过的距离），走的路和没滚时一样长。
-      // 以前锚点是页面顶上，滚了两千像素就要在 440ms 里多走两千像素——用户看到的「滑到底再返回突然变快」。
       to: { rect: target, anchor: { x: target.left, y: target.top - job.lift } },
-      duration: CLOSE_MS,
-      easing: CLOSE_EASE,
+      duration: PAGE_WINDOW_MS,
+      easing: PAGE_WINDOW_EASE,
       replica: present ? cardReplica(present) : null,
       replicaAt: { x: 0, y: job.lift },
-      replicaFade: REPLICA_IN,
-      head: HEAD_OUT,
-      body: PAGE_BODY_OUT,
-      // 滚下去时页头早就不在画面里：此刻看得见的那几块按页头的节奏走（晚一点淡），窗口里一直有东西。
+      replicaFade: replicaIn(reversing ? reversing.snap.replica : 0),
+      head: contentOut(reversing ? reversing.snap.content : 1),
+      body: contentOut(reversing ? reversing.snap.content : 1),
+      // 滚下去时页头早就不在画面里：此刻看得见的那几块按页头的节奏走，窗口里一直有东西。
       early: job.lift > 40 ? (part) => {
         const shown = part.getBoundingClientRect();
         return shown.bottom > viewport.top && shown.top < viewport.top + viewport.height;
       } : undefined,
     });
-    const forward = staying ? recede(staying, viewport, 'in', CLOSE_MS, CLOSE_EASE) : null;
-    let hidden = present && main()?.contains(present) ? hide(present) : null;
-    let landed = false;
+    const veil = staying ? pageVeil(staying, viewport) : null;
+    const veilFrom = veilOut(previous ? previous.veilNow : 1);
+    const veilAnim = veil ? veil.animate(veilFrom.frames, veilFrom.options) : null;
+    const hidden = present && main()?.contains(present) ? hide(present) : null;
+    const me: Live = {
+      kind: 'collapse', page: el, path: '', under: staying, flight, veil, veilAnim, hidden,
+      release: job.release, pageDone: job.done, underDone: job.stayingDone, stop: noop,
+      landed: false, pageGone: false, underGone: false,
+    };
+    live = me;
+    dropIfDone();
     if (!present) {
-      // 来处页还在重读库：卡出现了就把终点换成它（它此刻跟着来处页缩着，按缩放原点算回原大）。
+      // 来处页还在重读库：卡出现了就把终点换成它。
       void findCard(trail).then((found) => {
-        if (!found || landed || !el.isConnected) return;
+        if (!found || me.landed || live !== me || !el.isConnected) return;
         settleStaying();
-        const transform = staying ? getComputedStyle(staying).transform : 'none';
-        const scale = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).a : 1;
-        const settled = forward ? unscaledBox(rectOf(found), forward.origin, scale) : rectOf(found);
-        hidden = hide(found);
+        const settled = rectOf(found);
+        me.hidden = hide(found);
         flight.retarget({ rect: settled, anchor: { x: settled.left, y: settled.top - job.lift } });
       });
     }
-    /* 收回途中来处页还在排版（上面的区块晚一帧才读到数、图片撑开）：卡被往下推了，终点跟着改。
-       以前只在出发时量一次，窗口落在卡原来的位置，落地那一帧整块跳下去（用户 2026-10-27「PB 的位置根本不在原来的地方」）。 */
+    /* 收回途中来处页还在排版（上面的区块晚一帧才读到数、图片撑开）：卡被往下推了，终点跟着改
+       （用户 2026-10-27「PB 的位置根本不在原来的地方」）。 */
     if (present) {
       let aim = target;
       const follow = () => {
-        if (landed || !el.isConnected || !present.isConnected) return;
-        const transform = staying ? getComputedStyle(staying).transform : 'none';
-        const scale = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).a : 1;
-        const now = forward ? unscaledBox(rectOf(present), forward.origin, scale) : rectOf(present);
+        if (me.landed || live !== me || !el.isConnected || !present.isConnected) return;
+        const now = rectOf(present);
         if (Math.abs(now.left - aim.left) > 1.5 || Math.abs(now.top - aim.top) > 1.5) {
           aim = now;
           flight.retarget({ rect: now, anchor: { x: now.left, y: now.top - job.lift } });
@@ -507,12 +596,11 @@ export const usePageMorph = (options: { back: () => void }) => {
       };
       requestAnimationFrame(follow);
     }
-    const all = () => [...flight.anims, ...(forward ? [forward.animation] : [])];
+    const all = () => [...flight.anims, ...(veilAnim ? [veilAnim] : [])];
     // 来处页刚从缓存插回文档，第一次上屏要整页重新光栅化：先停在起点（画面上就是详情页本身），等帧节奏平稳再缩。
-    // 以前一插回去就开跑，GPU 卡住的第一帧吞掉了七成路程——「返回时一下跳回去」。
     let started = false;
     const go = () => {
-      if (started || landed) return;
+      if (started || me.landed || live !== me) return;
       started = true;
       for (const animation of all()) animation.play();
     };
@@ -520,22 +608,23 @@ export const usePageMorph = (options: { back: () => void }) => {
     void whenFramesSteady().then(go);
     // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——照样落到卡上，只是快一点。
     const forgetEscape = onMotionEscape(() => {
+      if (me.landed || live !== me) return false;
       go();
       for (const animation of all()) hurryAnimation(animation, ESC_FINISH_MS);
       return true;
     });
+    me.stop = forgetEscape;
     const land = () => {
-      if (landed) return;
-      landed = true;
+      if (me.landed || live !== me) return;
+      me.landed = true;
+      live = null;
       forgetEscape();
-      hidden?.cancel();
-      forward?.animation.cancel();
-      if (staying) staying.style.transformOrigin = '';
-      if (staying) endTransition(staying);
-      job.release();
+      disposeUnder(me);
+      me.underDone();
       const leave = () => {
-        endLeave(el);
-        flight.dispose();
+        me.pageDone();
+        disposePage(me);
+        sweepSoon();
       };
       // 同一帧里：真卡露出来、详情页离场、拷贝撤掉（拷贝和真卡逐像素一致，lib/motion/replica.ts）。
       if (present) {
@@ -546,81 +635,117 @@ export const usePageMorph = (options: { back: () => void }) => {
       el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LAND_FADE_MS, easing: 'ease-out', fill: 'forwards' })
         .finished.then(leave, leave);
     };
-    flight.main.finished.then(land, land);
+    flight.main.finished.then(land, noop);
   };
 
-  const onLeave = (el: Element) => {
+  /* ---------- Vue 过渡钩子 ---------- */
+
+  /** 离场页（KeepAlive 缓存着的）会原样再回来：留在它身上的 fill 动画、内联样式和没人认领的形变层必须清掉。
+      以前返回时的淡出是 fill: forwards，缓存页再点开时一揭开就又变回透明——「查看全部」黑屏就是这么来的。 */
+  const clean = (el: Element) => {
+    if (!(el instanceof HTMLElement)) return;
+    const busy = owns(live, el) || owns(stale, el);
+    // 第一次挂上的页身上不会有形变留下的东西：不去 getAnimations()——它会逼新页当场整页算样式，
+    // 刚挂上的大页（履历）光这一下就上百毫秒，形变因此晚开跑。
+    if (!busy && entered.has(el)) {
+      for (const animation of el.getAnimations()) {
+        // 样式表里的切页动画（shell.css 的 page-fade-in 等，随 Vue 的过渡类出现、消失）不归这里管：
+        // beta.58 切页改成 CSS animation 后，onEnter 一上来就把新页的淡入取消了，新页硬切出现（10-13 录屏）。
+        if (animation instanceof CSSAnimation || animation instanceof CSSTransition) continue;
+        animation.cancel();
+      }
+      // 上一段形变漏下的垫底、模糊、卡拷贝（data-morph-layer）：这一页现在不在任何形变里，一律撤掉。
+      el.querySelectorAll(':scope > [data-morph-layer]').forEach((layer) => layer.remove());
+      el.style.isolation = '';
+      el.style.position = '';
+      el.style.clipPath = '';
+    }
+    el.style.transformOrigin = '';
+    el.style.opacity = '';
+    el.style.transition = '';
+    el.style.zIndex = '';
+  };
+
+  const claim = (el: Element) => { if (stale && owns(stale, el)) stale.claimed.add(el); };
+
+  const onEnter = (el: Element, done: () => void = noop) => {
+    claim(el);
+    // 被打断的那一页又回到场上、但这次不是形变接手（换入口等）：它的痕迹现在就撤。
+    const job = stale;
+    if (job && el instanceof HTMLElement && !expandFrom && !pendingCollapse) {
+      if (job.page === el) disposePage(job);
+      if (job.under === el) disposeUnder(job);
+    }
+    clean(el);
+    const focus = focusKey;
+    focusKey = null;
+    // 缓存页回场：卡片入场动画（material.css 的 card-enter）不再从头放一遍。
+    if (entered.has(el)) el.classList.add('page-revisit');
+    entered.add(el);
+    // 收回：来处页回到场上了，记下它，下一帧和详情页一起动。
+    if (pendingCollapse && el instanceof HTMLElement) {
+      pendingCollapse.staying = el;
+      pendingCollapse.stayingDone = track(el, done);
+      return;
+    }
+    const origin = expandFrom;
+    expandFrom = null;
+    const viewport = viewportOf();
+    const host = main()?.parentElement;
+    if (!origin || !viewport || !host || !(el instanceof HTMLElement)) {
+      if (origin) takeHold()();
+      if (expandLeaving) { const leaving = expandLeaving; expandLeaving = null; leaving.done(); }
+      // 没有形变可借（减少动效、不是从卡点进来）：页面出来以后再滚到要定位的那张卡。
+      if (focus && el instanceof HTMLElement) revealFocusLater(el, focus);
+      done();
+      return;
+    }
+    startExpand(el, track(el, done), origin, viewport, host, focus);
+  };
+
+  const onLeave = (el: Element, done: () => void = noop) => {
+    claim(el);
     const trail = collapseTo;
     collapseTo = null;
-    // Esc 撤回的那一页：撤回还在倒放就等它放完再离场（finish 里收场），已经放完的现在收场。
-    const state = aborted.get(el);
-    if (state) {
-      takeHold()();
-      state.leaving = true;
-      if (state.done) state.settle();
-      return;
-    }
-    if (!(el instanceof HTMLElement)) return;
-    // 展开：来处页留着退后，等窗口长满再离场（onEnter 里接手）。
+    if (!(el instanceof HTMLElement)) { done(); return; }
+    // 展开：来处页留着蒙上模糊，等窗口长满再离场（onEnter 里接手）。
     if (expandFrom) {
-      expandLeaving = el;
+      expandLeaving = { el, done: track(el, done) };
       return;
     }
-    if (!trail) return;
+    if (!trail) { done(); return; }
     const viewport = viewportOf();
     const host = main()?.parentElement;
     if (!viewport || !host) {
       takeHold()();
-      endLeave(el);
+      done();
       return;
     }
     // 垫底这一帧就铺满可视区：页面本身是透明的，来处页回到场上时不能从它底下透出来。
+    // （开到一半被返回时，页面还停在被打断的那个框里，垫底跟着同一道裁切，看不出多了一层。）
     const job: Collapse = {
       el, trail, backdrop: backdropFor(el, viewport, host, trail.radius), staying: null, release: takeHold(), lift: collapseLift,
+      done: track(el, done), stayingDone: noop, frame: 0,
     };
     pendingCollapse = job;
     // 来处页这时还没插回文档，滚动区也要下一帧才恢复到离开时的位置（lib/returnScroll.ts 的 rAF 先登记、先跑）：
     // 那张卡要等到那时才量得准。这一帧详情页带着垫底原样盖着，看不出等了一帧。
-    requestAnimationFrame(() => startCollapse(job));
+    job.frame = requestAnimationFrame(() => startCollapse(job));
   };
 
-  /** 离场页（KeepAlive 缓存着的）会原样再回来：留在它身上的 fill 动画和内联样式必须清掉。
-      以前返回时的淡出是 fill: forwards，缓存页再点开时一揭开就又变回透明——
-      「查看全部」黑屏就是这么来的。正在倒放的撤回（kept）留着，它放完自己收拾。 */
-  const clean = (el: Element) => {
-    if (!(el instanceof HTMLElement)) return;
-    let keeping = false;
-    for (const animation of el.getAnimations()) {
-      // 样式表里的切页动画（shell.css 的 page-fade-in 等，随 Vue 的过渡类出现、消失）不归这里管：
-      // beta.58 切页改成 CSS animation 后，onEnter 一上来就把新页的淡入取消了，新页硬切出现（10-13 录屏）。
-      if (animation instanceof CSSAnimation || animation instanceof CSSTransition) continue;
-      if (kept.has(animation) && animation.playState === 'running') keeping = true;
-      else animation.cancel();
-    }
-    if (!keeping) el.style.transformOrigin = '';
-    el.style.opacity = '';
-    el.style.transition = '';
-    el.style.zIndex = '';
-    el.style.clipPath = '';
-  };
   const onAfterLeave = (el: Element) => {
+    // 被打断的那一页由普通切页（CSS 淡出）带走了：淡完再撤它的痕迹。
+    const job = stale;
+    if (job && job.page === el) disposePage(job);
+    if (job && job.under === el) disposeUnder(job);
+    dropIfDone();
     clean(el);
     if (el instanceof HTMLElement) el.style.top = '';
   };
-  // Vue's CSS timeout uses wall time, while WAAPI can be paused, reversed or
-  // slowed in DevTools. Let the actual flight own completion on both pages.
-  // Ordinary navigation keeps Vue's automatic CSS completion (one-arg hooks).
-  const onMorphEnter = (el: Element, done: () => void) => {
-    transitionDone.set(el, done);
-    const waitingForFlight = !!expandFrom || !!pendingCollapse;
-    onEnter(el);
-    if (!waitingForFlight) endTransition(el);
-  };
-  const onMorphLeave = (el: Element, done: () => void) => {
-    transitionDone.set(el, done);
-    const waitingForFlight = !!collapseTo || !!expandFrom || aborted.has(el);
-    onLeave(el);
-    if (!waitingForFlight) endTransition(el);
-  };
-  return { decide, onEnter, onLeave, onMorphEnter, onMorphLeave, onAfterLeave, dispose };
+  // Vue's CSS timeout uses wall time, while WAAPI can be paused or slowed in DevTools.
+  // Let the actual flight own completion on both pages; ordinary navigation keeps
+  // Vue's automatic CSS completion (one-arg hooks).
+  const onMorphEnter = (el: Element, done: () => void) => onEnter(el, done);
+  const onMorphLeave = (el: Element, done: () => void) => onLeave(el, done);
+  return { decide, onEnter: (el: Element) => onEnter(el), onLeave: (el: Element) => onLeave(el), onMorphEnter, onMorphLeave, onAfterLeave, settle, dispose };
 };

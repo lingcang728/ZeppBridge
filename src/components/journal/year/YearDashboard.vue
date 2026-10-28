@@ -4,9 +4,9 @@
    中间原来还有一张「这一年」（粒子年份、三个数、面积图），用户嫌丑，去掉了。
    能看到的都能交给 AI（useYearView 的 askAi，「交给 AI」整页从日历那张卡长出来）。 */
 import { computed, onActivated, onMounted, ref, shallowRef } from 'vue';
-import Icon from '../../Icon.vue';
 import AskAiButton from '../../ask/AskAiButton.vue';
-import GlassRim from '../../shell/GlassRim.vue';
+import SegmentTrack from '../../SegmentTrack.vue';
+import CapsuleWheel from '../../CapsuleWheel.vue';
 import { useAnnualRings } from '../../../composables/useAnnualRings';
 import { defaultRingYear } from '../../../lib/rings/selection';
 import RingsCard from './RingsCard.vue';
@@ -31,15 +31,10 @@ const selected = computed(() => {
   if (!d?.years.length) return null;
   return picked.value !== null && d.years.some(v => v.year === picked.value) ? picked.value : defaultRingYear(d);
 });
-const order = computed(() => data.value?.years.map(v => v.year) ?? []);
-/* 翻年：年份数字顺着翻的方向滑进来（往后翻从右边进、往前翻从左边进）。 */
-const direction = ref<'prev' | 'next'>('next');
-const step = (delta: number) => {
-  const next = order.value[order.value.indexOf(selected.value ?? NaN) + delta];
-  if (next === undefined) return;
-  direction.value = delta < 0 ? 'prev' : 'next';
-  picked.value = next;
-};
+/* 翻年：和顶栏导航、换语言同一种液态玻璃（用户 2026-10-28：「拖动液态玻璃就能切换」）。五年以内是一条
+   SegmentTrack，按住镜片左右拖、点哪年都行；更多年放不下，用语言那种胶囊滚轮（CapsuleWheel）。 */
+const yearItems = computed(() => (data.value?.years ?? []).map(v => ({ value: v.year, label: String(v.year) })));
+const pick = (value: number) => { picked.value = value; };
 const view = useYearView(data, selected);
 const { year, legend, months, activeMonths, allStreaks, bestMonth, longestRun } = view;
 const calendarCard = ref<HTMLElement | null>(null);
@@ -54,12 +49,11 @@ const detail = shallowRef<{ kind: HighlightKind; origin: HTMLElement } | null>(n
       <header>
         <h2>{{ y.activity }}</h2>
         <AskAiButton direct :label="String(year.year)" @activate="view.askAi(calendarCard)" />
-        <div class="stepper glass-control is-lens-host has-rim">
-          <GlassRim />
-          <button type="button" :disabled="order.indexOf(year.year) <= 0" :aria-label="y.prevYear" @click="step(-1)"><Icon name="chevron-right" :size="16" class="flip" /></button>
-          <span class="stepper-year" aria-live="polite"><Transition :name="`year-${direction}`"><span :key="year.year">{{ year.year }}</span></Transition></span>
-          <button type="button" :disabled="order.indexOf(year.year) >= order.length - 1" :aria-label="y.nextYear" @click="step(1)"><Icon name="chevron-right" :size="16" /></button>
-        </div>
+        <template v-if="yearItems.length > 1">
+          <SegmentTrack v-if="yearItems.length <= 5" class="year-track" variant="glass" compact no-wrap :items="yearItems" :model-value="year.year"
+            :aria-label="y.activity" @update:model-value="pick" />
+          <CapsuleWheel v-else class="year-track" :items="yearItems" :model-value="year.year" :span="132" :aria-label="y.activity" @update:model-value="pick" />
+        </template>
       </header>
       <YearCalendar :year="year" :today="data.today" />
     </section>
@@ -82,24 +76,11 @@ const detail = shallowRef<{ kind: HighlightKind; origin: HTMLElement } | null>(n
 .calendar-card header { display: flex; align-items: center; gap: 10px; }
 .calendar-card h2 { margin: 0 auto 0 0; font-size: var(--fs-lg); font-weight: 600; }
 .calendar-card :deep(svg) { max-width: none !important; }
-/* 翻年用浮在卡上的液态玻璃胶囊（用户 2026-10-27：「右上角的切换居然不是 Liquid Glass」）：和顶栏的按钮组同一种做法，
-   玻璃画在垫底的 GlassRim 上、外圈一窄条折射；只带 .glass-control 是一层毛玻璃，在不透明的卡上看着就是个描边胶囊。 */
-.stepper { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; }
-.stepper-year { display: grid; place-items: center; min-width: 3.4em; height: 28px; overflow: hidden; font-variant-numeric: tabular-nums; font-weight: 600; }
-.stepper-year > span { grid-area: 1 / 1; }
-.stepper button { display: grid; place-items: center; width: 32px; height: 30px; border: 0; border-radius: 999px; background: none; color: var(--ink); cursor: pointer;
-  transition: background var(--dur-base) ease, scale var(--dur-fast) var(--ease-out); }
-.stepper button:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-.stepper button:active:not(:disabled) { scale: .9; background: color-mix(in srgb, var(--ink) 16%, transparent); }
-.stepper button:disabled { color: var(--subtle); cursor: default; }
-.year-next-enter-active, .year-next-leave-active, .year-prev-enter-active, .year-prev-leave-active { transition: transform 260ms var(--ease-out), opacity 200ms ease; }
-.year-next-enter-from, .year-prev-leave-to { transform: translateX(70%); opacity: 0; }
-.year-next-leave-to, .year-prev-enter-from { transform: translateX(-70%); opacity: 0; }
-.flip { transform: rotate(180deg); }
+/* 年份胶囊浮在卡上：和顶栏导航同一种液态玻璃（SegmentTrack 的 glass），字用等宽数字，翻年时镜片滑过去。 */
+.year-track { flex: none; font-variant-numeric: tabular-nums; }
 .highlights-slot { grid-column: 1 / -1; }
 .highlight-placeholders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .highlight-placeholders i { min-height: 168px; border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 @container journal (max-width: 1100px) { .nebula-slot, .calendar-card { grid-column: 1 / -1; } }
 @container journal (max-width: 1000px) { .highlight-placeholders { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (prefers-reduced-motion: reduce) { .year-next-enter-active, .year-next-leave-active, .year-prev-enter-active, .year-prev-leave-active { transition: none; } }
 </style>

@@ -3773,8 +3773,6 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
     },
 
     'components/journal/year/year': {
-      prevYear: 'Ano anterior',
-      nextYear: 'Ano seguinte',
       other: 'Outros',
       vsLastYear: (pct: string) => `vs. o ano passado ${pct}`,
       vsSameSpan: (pct: string) => `vs. o mesmo período do ano passado ${pct}`,

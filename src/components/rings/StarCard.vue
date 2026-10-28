@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* 点开一次运动（年轮上的一条刻线）：卡片从刻线外端长出来（缩放的原点就是那一点），关上时缩回去再消失。
    内容精简：运动、日期、距离、时长、「这一年第 N 长」；← → 去前一次 / 后一次（卡片跟着滑到那条刻线旁边），
-   「看这次运动」从这张卡长成详情页（data-morph-card）。材质是应用自己的浮层玻璃。 */
+   「看这次运动」从这张卡长成详情页（data-morph-card）。材质是木头色的浮层玻璃（tokens.css 的 --wood-card-*），
+   强调色是边材的琥珀色，不用应用的绿——绿色压在木头上很跳（用户 2026-10-28）。 */
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
@@ -115,23 +116,23 @@ function key(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-.star-card { position: absolute; z-index: 4; display: grid; gap: 10px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; outline: none; color: var(--ink);
-  background: var(--mat-glass-strong); border: 1px solid var(--mat-glass-line); box-shadow: var(--mat-glass-shadow);
+.star-card { position: absolute; z-index: 4; display: grid; gap: 10px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; outline: none;
+  color: var(--wood-card-ink); background: var(--wood-card); border: 1px solid var(--wood-card-line); box-shadow: 0 18px 40px -12px var(--wood-shadow), inset 0 1px 0 rgba(255, 240, 214, .08);
   -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); }
 header { display: flex; align-items: center; gap: 8px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--wood-card-amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wood-card-amber) 22%, transparent); }
 h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 650; }
-.date { margin: -4px 0 0; color: var(--muted); font-size: 14px; }
+.date { margin: -4px 0 0; color: var(--wood-card-muted); font-size: 14px; }
 dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
-dt { color: var(--muted); font-size: 12px; } dd { margin: 2px 0 0; font: 22px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
-.rank { margin: 0; color: var(--accent); font-size: 14px; }
+dt { color: var(--wood-card-muted); font-size: 12px; } dd { margin: 2px 0 0; font: 22px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.rank { margin: 0; color: var(--wood-card-amber); font-size: 14px; }
 footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .steps { display: flex; gap: 4px; }
-.icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: var(--glass-press); color: inherit; cursor: pointer; transition: background 160ms ease, scale 120ms ease; }
-.icon-button:hover:not(:disabled) { background: var(--mat-line-hover); }
+.icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: var(--wood-card-press); color: inherit; cursor: pointer; transition: background 160ms ease, scale 120ms ease; }
+.icon-button:hover:not(:disabled) { background: var(--wood-card-press-hover); }
 .icon-button:active:not(:disabled) { scale: .9; }
 .icon-button:disabled { opacity: .35; cursor: default; }
 .flip { transform: rotate(180deg); }
-.open { padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 600; text-decoration: none; transition: background 160ms ease; }
-.open:hover { background: var(--accent-hover); }
+.open { padding: 7px 14px; border-radius: 999px; background: var(--wood-card-amber); color: var(--wood-card-amber-ink); font-size: 14px; font-weight: 600; text-decoration: none; transition: background 160ms ease; }
+.open:hover { background: var(--wood-card-amber-hover); }
 </style>

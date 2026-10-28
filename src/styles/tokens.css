@@ -194,6 +194,17 @@
   /* 年轮木片（lib/rings/wood.ts）：木头本身不分主题，只有下面的投影和外面的月份刻度跟着主题。 */
   --wood-shadow: rgba(0, 0, 0, .55);
   --wood-guide: rgba(214, 190, 160, .32);
+  /* 点开年轮上一次运动的那张卡（components/rings/StarCard.vue）：和木头同一个色系——深色是一块烤过的胡桃木色玻璃，
+     强调色是边材那种琥珀 / 蜂蜜色；不用应用的绿（用户 2026-10-28：「绿色的，跟年轮界面的颜色不搭」）。 */
+  --wood-card: linear-gradient(160deg, rgba(74, 47, 28, .86), rgba(38, 24, 14, .9));
+  --wood-card-line: rgba(234, 207, 158, .16);
+  --wood-card-ink: #F6EBDA;
+  --wood-card-muted: rgba(234, 207, 158, .66);
+  --wood-card-amber: #E2B26B;
+  --wood-card-amber-hover: #EEC283;
+  --wood-card-amber-ink: #2E1A0A;
+  --wood-card-press: rgba(234, 207, 158, .12);
+  --wood-card-press-hover: rgba(234, 207, 158, .2);
 }
 
 /* 浅色主题：暖白底 + 深绿品牌色。色板方向见
@@ -316,6 +327,15 @@ html[data-theme="light"] {
   --cap-ink: #2F6B4F;
   --wood-shadow: rgba(84, 52, 22, .28);
   --wood-guide: rgba(128, 82, 42, .38);
+  --wood-card: linear-gradient(160deg, rgba(255, 247, 234, .9), rgba(246, 230, 204, .92));
+  --wood-card-line: rgba(128, 82, 42, .18);
+  --wood-card-ink: #3A230F;
+  --wood-card-muted: rgba(98, 60, 28, .7);
+  --wood-card-amber: #A8642C;
+  --wood-card-amber-hover: #95561F;
+  --wood-card-amber-ink: #FFF6E8;
+  --wood-card-press: rgba(128, 82, 42, .1);
+  --wood-card-press-hover: rgba(128, 82, 42, .17);
 }
 
 /* ── 浅色主题的局部补丁 ────────────────────────────────────────────

@@ -142,6 +142,8 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
 const pageHold = ref(false);
 let holdSeq = 0;
 const removeAfterEach = router.afterEach(() => {
+  // 新页已经换上：被打断的那段形变里没被这次切页用到的页各自收场（usePageMorph.settle）。
+  void nextTick().then(() => pageMorph.settle());
   if (!pageHold.value) return;
   const mine = ++holdSeq;
   void nextTick()

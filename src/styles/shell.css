@@ -163,9 +163,9 @@
    不用 CSS 透明度占位：它的墙钟超时与暂停/倒放/DevTools 慢速播放不同步，
    会提前移除离场页，并在下次返回时遗留仍被快进的 CSSTransition。 */
 [class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: none; }
-/* 来处页退到后面一层（缩到 .94、淡到 .32，JS 动画），窗口长满、完全盖住它以后才离场。 */
+/* 来处页蒙上一层模糊（.page-veil，JS 只动它的透明度），窗口长满、完全盖住它以后才离场。 */
 [class*='page-'].page-expand-leave-active { z-index: 1; transition: none; }
-/* 来处页一开始就在底板下面，跟着窗口缩小从后面回到前面（JS 动画），不再从透明淡入。 */
+/* 来处页一开始就在底板下面、蒙着模糊，跟着窗口缩小慢慢露出来，不再从透明淡入。 */
 [class*='page-'].page-collapse-enter-active { transition: none; }
 .page-collapse-enter-from { opacity: 1; }
 [class*='page-'].page-collapse-leave-active { z-index: 3; transition: none; }
@@ -174,6 +174,10 @@
 [class*='page-'].page-dismiss-leave-active { animation: page-fade-out 260ms var(--ease-leave) both, page-shrink-out 300ms var(--ease-leave) both; }
 [class*='page-'].page-dismiss-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) 100ms both, page-settle-in var(--dur-std) var(--ease-enter) 100ms both; }
 .page-host > * { transform-origin: 50% 30vh; }
+/* 卡 ↔ 页形变时蒙在来处页上的模糊（lib/motion/pageFlight.ts 的 pageVeil）：和弹窗遮罩（ModalDialog.vue 的
+   .dialog-backdrop::before）同一组值，静态模糊，只淡入淡出这一层——用户 2026-10-28「照抄履历页卡片的动画」。 */
+.page-veil { position: absolute; z-index: 2147483000; pointer-events: none; opacity: .001; background: rgba(0, 0, 0, .5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
    不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
 .window-replica, .window-replica * { animation: none !important; transition: none !important; }

@@ -3,8 +3,6 @@ import { defineMessages, useMessages } from '../../../i18n';
 /** 履历页的年轮区块（星云卡、这一年、全年日历、四张小结卡和它们的二级弹窗）。 */
 const messages = defineMessages(
   {
-    prevYear: '上一年',
-    nextYear: '下一年',
     other: '其他',
     vsLastYear: (pct: string) => `比去年 ${pct}`,
     vsSameSpan: (pct: string) => `比去年同期 ${pct}`,
@@ -20,8 +18,6 @@ const messages = defineMessages(
     askSeen: (year: number) => `我在 ZeppBridge 履历页上看到的 ${year} 年：`,
   },
   {
-    prevYear: 'Previous year',
-    nextYear: 'Next year',
     other: 'Other',
     vsLastYear: (pct: string) => `vs last year ${pct}`,
     vsSameSpan: (pct: string) => `vs same period last year ${pct}`,
@@ -37,8 +33,6 @@ const messages = defineMessages(
     askSeen: (year: number) => `What I see for ${year} on my ZeppBridge journal page:`,
   },
   {
-    prevYear: 'Año anterior',
-    nextYear: 'Año siguiente',
     other: 'Otros',
     vsLastYear: (pct: string) => `vs. el año pasado ${pct}`,
     vsSameSpan: (pct: string) => `vs. el mismo periodo del año pasado ${pct}`,

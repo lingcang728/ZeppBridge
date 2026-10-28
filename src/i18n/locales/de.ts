@@ -2758,8 +2758,6 @@ Antworte in Markdown.`,
       shoeNear: (name: string) => `${name}: Ausmusterung rückt näher`,
     },
     'components/journal/year/year': {
-      prevYear: 'Vorheriges Jahr',
-      nextYear: 'Nächstes Jahr',
       other: 'Sonstiges',
       vsLastYear: (pct: string) => `vs. Vorjahr ${pct}`,
       vsSameSpan: (pct: string) => `vs. Vorjahreszeitraum ${pct}`,
