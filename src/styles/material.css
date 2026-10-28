@@ -76,7 +76,7 @@
 .button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 
 /* ── 胶囊按钮 ─────────────────────────
-   次要动作和跳转（「添加事件」「查看全部」「管理」）全应用一个样子：和胶囊选择器里
+   次要动作和跳转（「查看全部」「管理」）全应用一个样子：和胶囊选择器里
    选中的那块同一种凸起胶囊，图标用品牌色。quiet 是不需要底的那一档。 */
 .pill-button {
   display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 15px;

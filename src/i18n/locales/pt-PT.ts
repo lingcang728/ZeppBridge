@@ -3208,7 +3208,7 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       sectionChart: 'O que mostra este gráfico',
       sectionHow: 'Como é calculado e qual a origem',
       sectionTrust: 'Como é medido',
-      trustChipTitle: 'Estimativa do algoritmo',
+      trustChipTitle: 'Estimativa de caixa negra',
       excludedChipTitle: 'Excluíste este elemento da análise',
       useInAnalysis: 'Incluir na análise',
       useInAnalysisHint:
@@ -3216,6 +3216,8 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       trustMeasured: 'Leitura obtida diretamente pelo sensor do relógio ou do dispositivo.',
       trustComputed:
         'Convertido a partir de leituras ou dos teus próprios registos através de uma fórmula pública e fixa.',
+      trustInferred:
+        'Deduzido pelo relógio a partir dos sensores de uma forma conhecida (o sono a partir do movimento e do ritmo cardíaco, a distância a partir dos passos). Os detalhes não foram publicados, mas é suficiente para acompanhar tendências.',
       trustEstimated:
         'Uma estimativa obtida pela Zepp a partir de várias leituras com o seu próprio algoritmo. A Zepp não publicou o método nem a margem de erro, e as medições de laboratório podem diferir.',
     },
@@ -3798,10 +3800,9 @@ Regras: compara-me apenas com o meu próprio histórico, não com médias da pop
       years: 'Anos',
       yearAria: (year: number) => `${year}`,
       starOpen: 'Ver este treino',
-      starPrev: 'Treino anterior',
-      starNext: 'Treino seguinte',
+      avgSpeed: 'Velocidade média',
+      starHint: 'Desloca ou arrasta lateralmente para ver o treino anterior ou seguinte',
       switchTo: (year: number) => `Ver ${year}`,
-      starRank: (n: number) => (n === 1 ? 'O mais longo do ano' : `O ${n}.º mais longo do ano`),
       close: 'Fechar',
       weekNoData: 'Sem dados esta semana',
       weekRest: 'Sem treinos esta semana',

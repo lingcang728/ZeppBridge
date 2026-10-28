@@ -34,8 +34,9 @@
 .pslot { position: relative; display: block; flex: 0 0 auto; transition: translate 280ms cubic-bezier(.3, 1.2, .5, 1); }
 .pslot.shift-l { translate: -14px 0; }
 .pslot.shift-r { translate: 14px 0; }
-/* 按住一叠时其余的叠微微变暗。 */
-.table-layer.holding .pslot:not(.is-holding) :deep(.pcard) { opacity: .62; }
+/* 按住一叠时其余的叠微微变暗。层上的类名故意不叫 holding（10-28）：Blink 按类名建失效集，
+   层上切 holding 会连带 `.pcard.holding .pcard-charge i` 之类的规则，把每张牌里每个元素都重算一遍样式（4× 降速约 24ms）。 */
+.table-layer.has-hold .pslot:not(.is-holding) :deep(.pcard) { opacity: .62; }
 :deep(.pcard.lifting .pcard-face) { transform: translateY(-14px) scale(1.06); }
 /* 拖着的牌（1B·B3）：抬起一点、投影加深；叠在下面的牌不接点击；悬在能叠的牌上时那张亮一圈。 */
 :deep(.pcard.dragging) { cursor: grabbing; scale: 1.05; will-change: translate; }

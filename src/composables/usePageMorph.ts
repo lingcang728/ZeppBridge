@@ -3,13 +3,15 @@ import type { PageMotion } from '../lib/navigation';
 import { holdMotion } from '../lib/motion/budget';
 import { hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import {
-  backdropFor, contentIn, contentOut, fly, hide, PAGE_WINDOW_EASE, PAGE_WINDOW_MS, pageVeil, removeVeil, replicaIn, replicaOut,
-  veilIn, veilOut, type Flight, type FlightSnapshot,
+  backdropFor, contentIn, contentOut, fly, hide, PAGE_WINDOW_EASE, PAGE_WINDOW_MS, pageVeil, plateIn, plateOut, removeVeil, replicaBack,
+  replicaIn, replicaOut, veilIn, veilOut, type Flight, type FlightSnapshot,
 } from '../lib/motion/pageFlight';
 import { bleedRect, cardReplica, type WindowRect } from '../lib/motion/window';
 import { findFocusTarget, focusKeyOf, focusScrollDelta, revealFocusLater } from '../lib/motion/focusTarget';
 import { whenFramesSteady } from '../lib/motion/steady';
 import { lessMotion } from '../lib/motion/lessMotion';
+import { guardScroll, type ScrollGuard } from '../lib/motion/scrollGuard';
+import { whenScrollRestored } from '../lib/returnScroll';
 
 type Rect = WindowRect;
 
@@ -47,6 +49,10 @@ const ESC_FINISH_MS = 200;
 const LAND_FADE_MS = 140;
 /** 被下一次切页丢下的离场页就地淡掉的时长。 */
 const RETIRE_MS = 160;
+/** 形变途中有人想滚：剩下的部分在这么长里放完，落地后再把攒下的滚动补上（lib/motion/scrollGuard.ts）。 */
+const HURRY_MS = 180;
+/** 倒回去（开到一半返回、收到一半又点开）时两页都没离开过文档，帧本来就在走：最多等这么久就放。 */
+const REVERSE_STEADY_MS = 80;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
 const MIN_WIDTH = 140;
 const MIN_HEIGHT = 56;
@@ -138,6 +144,8 @@ interface Live {
   underDone: () => void;
   /** 停掉这一段的后台事务（Esc 登记、跟踪终点的循环）。 */
   stop: () => void;
+  /** 有人想滚：还在等开跑的立刻放，剩下的加速放完。 */
+  hurry: () => void;
   landed: boolean;
   pageGone: boolean;
   underGone: boolean;
@@ -186,6 +194,17 @@ export const usePageMorph = (options: { back: () => void }) => {
   };
   /** 每个详情页是从哪张卡展开来的：键是详情页的 fullPath。 */
   const trails = new Map<string, Trail>();
+  /** 形变期间锁着主滚动区（decide 决定要形变时挂上，落地时放开并补上攒下的滚动）。 */
+  let guard: ScrollGuard | null = null;
+  const lockScroll = () => {
+    const root = main();
+    if (!guard && root) guard = guardScroll(root, () => live?.hurry());
+  };
+  const unlockScroll = (apply: boolean) => {
+    const held = guard;
+    guard = null;
+    held?.release(apply);
+  };
 
   const remember = (event: Event) => { pressed = linkOf(event.target); };
   const rememberKey = (event: KeyboardEvent) => {
@@ -293,11 +312,19 @@ export const usePageMorph = (options: { back: () => void }) => {
 
   /** 兜底：攥着 done、却已经不在任何一段形变里的页，统统收场——无论哪里漏了，旧页都不会一直压在新页上。 */
   let sweepTimer = 0;
+  const busy = (el: Element) =>
+    owns(live, el) || owns(stale, el) || pendingCollapse?.el === el || pendingCollapse?.staying === el || expandLeaving?.el === el;
   const sweep = () => {
     for (const [el, done] of [...pending]) {
-      if (owns(live, el) || owns(stale, el) || pendingCollapse?.el === el || pendingCollapse?.staying === el) continue;
-      if (expandLeaving?.el === el) continue;
-      done();
+      if (!busy(el)) done();
+    }
+    // 不在任何一段形变里的页上还挂着垫底、卡拷贝、模糊：撤掉（模糊连带还原来处页的临时样式）。
+    for (const layer of main()?.querySelectorAll<HTMLElement>('.page-host > * > [data-morph-layer]') ?? []) {
+      const page = layer.parentElement;
+      if (!page || busy(page)) continue;
+      if (import.meta.env.DEV) console.warn('[page-morph] stray morph layer swept', layer.className || layer.tagName);
+      if (layer.classList.contains('page-veil')) removeVeil(page, layer);
+      else layer.remove();
     }
   };
   const sweepSoon = () => {
@@ -331,6 +358,15 @@ export const usePageMorph = (options: { back: () => void }) => {
     hold = null;
     sweepSoon();
     const direct = takeArmed(to);
+    const motion = choose(from, to, base, link, direct);
+    if (motion === 'expand' || motion === 'collapse') lockScroll();
+    else unlockScroll(false);
+    return motion;
+  };
+
+  const choose = (
+    from: RouteLocationNormalized, to: RouteLocationNormalized, base: PageMotion, link: HTMLElement | null, direct: ReturnType<typeof takeArmed>,
+  ): PageMotion => {
     if (reducedMotion()) return base;
     if (direct && bigEnough(direct.card)) {
       expandFrom = { card: direct.card, rect: rectOf(direct.card), radius: radiusOf(direct.card), replica: cardReplica(direct.card) };
@@ -366,11 +402,13 @@ export const usePageMorph = (options: { back: () => void }) => {
       hold = holdMotion();
       return 'collapse';
     }
-    // 设置里翻到另一张卡用的是 replace：来路跟着带过去，关掉时仍缩回当初那条。
-    if (trail && from.path.startsWith('/settings/') && to.path.startsWith('/settings/')) trails.set(to.fullPath, trail);
-    // 单天页翻到前一天 / 后一天（也是 replace）：返回时缩回周视图里**这一天**那一格。
+    // 单天页翻到前一天 / 后一天（replace）：返回时缩回周视图里**这一天**那一格。
     if (trail && from.path.startsWith('/ai/plan/') && to.path.startsWith('/ai/plan/')) {
       trails.set(to.fullPath, { ...trail, href: to.fullPath, index: 0 });
+    } else if (trail && (from.path === to.path || (from.path.startsWith('/settings/') && to.path.startsWith('/settings/')))) {
+      // 同一页只换了参数（年轮换年份的 ?year=）、设置里翻到另一张卡（replace）：来路跟着带过去，关掉时仍缩回当初那张卡
+      // （10-28 录屏：年轮换过年份再返回履历，找不到来路就硬切）。
+      trails.set(to.fullPath, trail);
     }
     return base;
   };
@@ -429,6 +467,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       replicaFade: replicaOut(reversing ? reversing.snap.replica : 1),
       head: contentIn(reversing ? reversing.snap.content : 0),
       body: contentIn(reversing ? reversing.snap.content : 0),
+      plate: plateIn(reversing ? reversing.snap.plate : 0),
       early: focusPart ? (part) => part === focusPart : undefined,
     });
     const veil = leaving ? pageVeil(leaving.el, viewport) : null;
@@ -439,7 +478,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     let release: () => void = noop;
     const job: Live = {
       kind: 'expand', page: el, path: expandPath, under: leaving?.el ?? null, flight, veil, veilAnim, hidden,
-      release: () => release(), pageDone: done, underDone: leaving?.done ?? noop, stop: noop,
+      release: () => release(), pageDone: done, underDone: leaving?.done ?? noop, stop: noop, hurry: noop,
       landed: false, pageGone: false, underGone: false,
     };
     live = job;
@@ -447,12 +486,20 @@ export const usePageMorph = (options: { back: () => void }) => {
     const all = () => [...flight.anims, ...(veilAnim ? [veilAnim] : [])];
     // 先停在起点（窗口里就是那张卡），等新页的第一帧画完再放：新页挂载、排版、图表、首次光栅化都在这一两帧里，
     // 以前形变和它们挤在同一帧开跑，放出来的前一截全被吞掉。形变真正开跑时才让重活让路（lib/motion/budget.ts）。
-    for (const animation of all()) animation.pause();
-    void whenFramesSteady().then(() => {
-      if (live !== job || job.landed) return;
+    let started = false;
+    const go = () => {
+      if (started || live !== job || job.landed) return;
+      started = true;
       release = holdMotion();
       for (const animation of all()) animation.play();
-    });
+    };
+    for (const animation of all()) animation.pause();
+    void whenFramesSteady(previous ? REVERSE_STEADY_MS : undefined).then(go);
+    job.hurry = () => {
+      if (live !== job || job.landed) return;
+      go();
+      for (const animation of all()) hurryAnimation(animation, HURRY_MS);
+    };
     // 放到一半按 Esc：不进去了——路由退回来处，收回从此刻的样子接着缩（decide 把这一段停住交给收回）。
     const forgetEscape = onMotionEscape(() => {
       if (live !== job || job.landed) return false;
@@ -472,6 +519,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       disposePage(job);
       release();
       sweepSoon();
+      unlockScroll(true);
       // 定位的那张卡：等页面排版落定再平滑滚过去，再圈一下（形变开始前那次滚动常常滚不够）。
       if (focus) revealFocusLater(el, focus);
     };
@@ -531,6 +579,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       job.done();
       job.stayingDone();
       job.release();
+      unlockScroll(false);
       return;
     }
     settleStaying();
@@ -551,9 +600,12 @@ export const usePageMorph = (options: { back: () => void }) => {
       easing: PAGE_WINDOW_EASE,
       replica: present ? cardReplica(present) : null,
       replicaAt: { x: 0, y: job.lift },
-      replicaFade: replicaIn(reversing ? reversing.snap.replica : 0),
+      replicaFade: reversing && reversing.snap.content < 0.5 && reversing.snap.replica < 0.5
+        ? replicaBack(reversing.snap.replica)
+        : replicaIn(reversing ? reversing.snap.replica : 0),
       head: contentOut(reversing ? reversing.snap.content : 1),
       body: contentOut(reversing ? reversing.snap.content : 1),
+      plate: plateOut(reversing ? reversing.snap.plate : 1),
       // 滚下去时页头早就不在画面里：此刻看得见的那几块按页头的节奏走，窗口里一直有东西。
       early: job.lift > 40 ? (part) => {
         const shown = part.getBoundingClientRect();
@@ -566,7 +618,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     const hidden = present && main()?.contains(present) ? hide(present) : null;
     const me: Live = {
       kind: 'collapse', page: el, path: '', under: staying, flight, veil, veilAnim, hidden,
-      release: job.release, pageDone: job.done, underDone: job.stayingDone, stop: noop,
+      release: job.release, pageDone: job.done, underDone: job.stayingDone, stop: noop, hurry: noop,
       landed: false, pageGone: false, underGone: false,
     };
     live = me;
@@ -605,12 +657,16 @@ export const usePageMorph = (options: { back: () => void }) => {
       for (const animation of all()) animation.play();
     };
     for (const animation of all()) animation.pause();
-    void whenFramesSteady().then(go);
+    void whenFramesSteady(reversing ? REVERSE_STEADY_MS : undefined).then(go);
+    const hurry = (ms: number) => {
+      go();
+      for (const animation of all()) hurryAnimation(animation, ms);
+    };
+    me.hurry = () => { if (!me.landed && live === me) hurry(HURRY_MS); };
     // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——照样落到卡上，只是快一点。
     const forgetEscape = onMotionEscape(() => {
       if (me.landed || live !== me) return false;
-      go();
-      for (const animation of all()) hurryAnimation(animation, ESC_FINISH_MS);
+      hurry(ESC_FINISH_MS);
       return true;
     });
     me.stop = forgetEscape;
@@ -621,6 +677,8 @@ export const usePageMorph = (options: { back: () => void }) => {
       forgetEscape();
       disposeUnder(me);
       me.underDone();
+      // 攒下的滚动等返回位置恢复完再补，不然下一帧就被恢复盖掉。
+      if (guard) { const held = guard; void whenScrollRestored().then(() => { if (guard === held) unlockScroll(true); }); }
       const leave = () => {
         me.pageDone();
         disposePage(me);
@@ -677,6 +735,9 @@ export const usePageMorph = (options: { back: () => void }) => {
       if (job.under === el) disposeUnder(job);
     }
     clean(el);
+    // 离场时垫的 top（AppShell 的 onPageBeforeLeave，按当时的滚动距离往上提）只给离场页用。离场被打断、又回到场上的页
+    // 没走 afterLeave，top 还挂着：在流里的页整页被提上去一个滚动距离，画面上只剩底色（10-28 录屏「点开马上返回黑屏」）。
+    if (el instanceof HTMLElement) el.style.top = '';
     const focus = focusKey;
     focusKey = null;
     // 缓存页回场：卡片入场动画（material.css 的 card-enter）不再从头放一遍。
@@ -694,6 +755,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     const host = main()?.parentElement;
     if (!origin || !viewport || !host || !(el instanceof HTMLElement)) {
       if (origin) takeHold()();
+      unlockScroll(false);
       if (expandLeaving) { const leaving = expandLeaving; expandLeaving = null; leaving.done(); }
       // 没有形变可借（减少动效、不是从卡点进来）：页面出来以后再滚到要定位的那张卡。
       if (focus && el instanceof HTMLElement) revealFocusLater(el, focus);
