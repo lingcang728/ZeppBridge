@@ -22,10 +22,26 @@ export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: Se
     }),
 );
 
+/**
+ * 纵轴至少撑开 `minSpan`（围绕数据中点）：海拔图按数据自动缩放时，7–12 米的平路会被画成满屏起伏，
+ * 和爬升卡「没有明显爬升」对不上（2026-10-28 录屏）。数据本身跨度够了就不管，交给 ECharts。
+ */
+export const spannedAxis = (points: ChartPoint[], minSpan: number): { min?: number; max?: number } => {
+  if (minSpan <= 0 || !points.length) return {};
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const p of points) { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); }
+  if (hi - lo >= minSpan) return {};
+  const mid = (lo + hi) / 2;
+  const min = Math.floor(mid - minSpan / 2);
+  return { min, max: min + Math.ceil(minSpan) };
+};
+
 /** 一张带均值虚线的面积折线图；少于两个点时返回 null（不画图，不编数据）。 */
-export const lineOption = (points: ChartPoint[], color: string, unit: string, palette: ChartPalette) => {
+export const lineOption = (points: ChartPoint[], color: string, unit: string, palette: ChartPalette, minSpan = 0) => {
   if (points.length < 2) return null;
   const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
+  const yRange = spannedAxis(points, minSpan);
   // 时间轴的刻度间隔钉在「整分钟、大约四格」：短短几分钟的记录里 ECharts 会按秒
   // 切刻度，「19:44 19:46 19:48」挤成一串，hideOverlap 管不到时间轴的两级标签。
   const span = points[points.length - 1]!.t - points[0]!.t;
@@ -46,6 +62,7 @@ export const lineOption = (points: ChartPoint[], color: string, unit: string, pa
     yAxis: {
       type: 'value',
       scale: true,
+      ...yRange,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: palette.axis, fontSize: 14.5 },
