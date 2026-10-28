@@ -17,6 +17,9 @@ import { journalDay, journalShortDay, todayKey } from '../../lib/logbook/display
 import { daysBetween } from '../../lib/logbook/clock';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { newWheelAccel, wheelSteps } from '../../lib/wheel/momentum';
+import {
+  addSample, estimateVelocity, GLIDE_STOP, glideStep, resist, SPRING_MS, springSettled, springStep, unresist, type Sample,
+} from '../../lib/journal/timelineDrag';
 import { useRepairText } from './repair.i18n';
 import { useJournalText } from './journal.i18n';
 import type { LifeEvent } from '../../types';
@@ -132,7 +135,8 @@ const span = (e: LifeEvent) => e.endDate === e.startDate ? journalShortDay(e.sta
 const label = (e: LifeEvent) => `${e.title}，${span(e)}`;
 const tipParts = (e: LifeEvent) => [e.title, span(e), j.value.dayCount(daysBetween(e.startDate, e.endDate ?? today) + 1)];
 function showTip(event: LifeEvent, target: EventTarget | null) {
-  if (drag || !(target instanceof HTMLElement) || !viewport.value) return;
+  // 拖动和松手后的滑行途中，轴在静止的指针下面挪过去，浏览器会补发 pointerenter：别一路闪小签。
+  if (drag || anim || !(target instanceof HTMLElement) || !viewport.value) return;
   const box = target.getBoundingClientRect(), view = viewport.value.getBoundingClientRect();
   const left = Math.max(box.left, view.left);
   // 最上面一条泳道的上方放不下小签：改放到它下面。
@@ -141,38 +145,77 @@ function showTip(event: LifeEvent, target: EventTarget | null) {
 }
 
 let observer: ResizeObserver | undefined;
-let raf = 0;
-let drag: { x: number; offset: number; last: number; time: number; velocity: number } | null = null;
+/* 拖动、滑行、弹回途中不写 offset：那样每动一下整条轴（月份 × 2、色带、事件点）都要重渲染一遍，
+   4× 降速下拖一下几十个 longtask（用户 2026-10-28：拖起来「吃力」）。途中只记 pos、每帧最多一次直接写
+   .timeline-track 的 transform；停下来才把 pos 交回 offset。依赖 offset 的日期签这时本来就藏着。 */
+const track = ref<HTMLElement>();
+/** 拖动 / 滑行 / 弹回途中轴的实时位置（拖过界时在 [0, maxOffset] 外面）；其余时候等于 offset。 */
+let pos = 0;
+let anim = 0, paintFrame = 0;
+/** from：按下时手的位置折回「没有橡皮筋」的坐标，拖到哪都从它加位移再过 resist。 */
+let drag: { x: number; from: number; at: number; samples: Sample[] } | null = null;
 let moved = false;
 const accel = newWheelAccel();
-function stop() { cancelAnimationFrame(raf); hovered.value = null; }
+const paint = () => { if (track.value) track.value.style.transform = `translateX(${pos - maxOffset.value}px)`; };
+/** 停下途中的滑行 / 弹回，停在哪就把哪交回 offset。 */
+function halt() { if (!anim) return; cancelAnimationFrame(anim); anim = 0; offset.value = pos; }
+function stop() { halt(); hovered.value = null; }
 function down(e: PointerEvent) {
   if (e.button !== 0) return;
-  stop(); moved = false;
-  drag = { x: e.clientX, offset: offset.value, last: e.clientX, time: e.timeStamp, velocity: 0 };
+  stop(); moved = false; pos = offset.value;
+  drag = { x: e.clientX, from: unresist(pos, 0, maxOffset.value, width.value), at: pos, samples: [] };
+  addSample(drag.samples, e.timeStamp, pos);
 }
 function move(e: PointerEvent) {
-  if (!drag || !moved) cursor.value = (e.target as Element).closest('button') ? null : dayAt(e.clientX);
-  if (!drag) return;
-  if (!moved && Math.abs(e.clientX - drag.x) > 5) { moved = true; viewport.value?.setPointerCapture(e.pointerId); hovered.value = null; cursor.value = null; }
-  if (!moved) return;
-  drag.velocity = (e.clientX - drag.last) / Math.max(1, e.timeStamp - drag.time);
-  offset.value = clamp(drag.offset + e.clientX - drag.x);
-  drag.last = e.clientX; drag.time = e.timeStamp;
+  if (!drag) { cursor.value = (e.target as Element).closest('button') ? null : dayAt(e.clientX); return; }
+  if (!moved) {
+    // 没过 5px 还不算拖：不量布局、不动轴。
+    if (Math.abs(e.clientX - drag.x) <= 5) return;
+    moved = true; viewport.value?.setPointerCapture(e.pointerId); viewport.value?.classList.add('dragging'); hovered.value = null; cursor.value = null;
+  }
+  drag.at = resist(drag.from + e.clientX - drag.x, 0, maxOffset.value, width.value);
+  addSample(drag.samples, e.timeStamp, drag.at);
+  if (!paintFrame) paintFrame = requestAnimationFrame(() => { paintFrame = 0; if (drag) { pos = drag.at; paint(); } });
 }
 function up(e: PointerEvent) {
   if (!drag) return;
-  const velocity = drag.velocity; drag = null;
-  if (!moved) { if (!(e.target as Element).closest('button')) add(e); return; }
-  // 松手后照着手速滑一段、先快后慢停下（时间常数 150ms），不回弹。
-  let v = velocity, then = performance.now();
+  const { from, x: startX, samples } = drag; drag = null;
+  cancelAnimationFrame(paintFrame); paintFrame = 0; viewport.value?.classList.remove('dragging');
+  if (!moved) {
+    if (!(e.target as Element).closest('button')) add(e);
+    // 按住的是半路截停的弹回：照样弹回去。
+    if (pos !== clamp(pos)) release(0);
+    return;
+  }
+  pos = resist(from + e.clientX - startX, 0, maxOffset.value, width.value); paint();
+  release(estimateVelocity(samples, e.timeStamp));
+}
+function cancel() {
+  if (!drag) return;
+  drag = null; cancelAnimationFrame(paintFrame); paintFrame = 0; viewport.value?.classList.remove('dragging');
+  if (moved) release(0);
+}
+/* 松手后照着手速滑一段、先快后慢停下（时间常数 325ms）；过了界（拖过头松手、或滑着冲出去）用临界阻尼弹簧弹回到头，
+   不来回晃。v 是 px/ms，往右为正（往更早的日子翻）。 */
+function release(v: number) {
+  let state = { x: pos, v }, then = performance.now();
+  let edge: number | null = state.x === clamp(state.x) ? null : clamp(state.x), since = then;
   const tick = (now: number) => {
     const dt = Math.min(32, now - then); then = now;
-    v *= Math.exp(-dt / 150); offset.value = clamp(offset.value + v * dt);
-    if (Math.abs(v) > .015) raf = requestAnimationFrame(tick);
+    if (edge === null) {
+      state = glideStep(state, dt);
+      if (state.x !== clamp(state.x)) { edge = clamp(state.x); since = now; }
+      else if (Math.abs(state.v) < GLIDE_STOP) return settle(state.x);
+    } else {
+      state = springStep(state, edge, dt);
+      if (springSettled(state, edge) || now - since > SPRING_MS * 2) return settle(edge);
+    }
+    pos = state.x; paint();
+    anim = requestAnimationFrame(tick);
   };
-  raf = requestAnimationFrame(tick);
+  anim = requestAnimationFrame(tick);
 }
+function settle(at: number) { anim = 0; pos = at; paint(); offset.value = at; }
 /* 拖过以后松手会补一个 click：别让它打开松手处那个点的编辑器。 */
 function swallowClick(e: MouseEvent) { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }
 function wheel(e: WheelEvent) {
@@ -208,6 +251,7 @@ function key(e: KeyboardEvent) {
   const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
   const next = index < 0 ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1) : Math.max(0, Math.min(buttons.length - 1, index + (e.key === 'ArrowRight' ? 1 : -1)));
   const item = ordered.value[next];
+  halt();
   if (item) offset.value = clamp(maxOffset.value - item.x + width.value / 2);
   buttons[next]?.focus({ preventScroll: true });
 }
@@ -217,14 +261,14 @@ onMounted(() => {
   observer = new ResizeObserver(entries => { width.value = entries[0].contentRect.width; offset.value = clamp(offset.value); });
   observer.observe(viewport.value!);
 });
-onBeforeUnmount(() => { observer?.disconnect(); stop(); });
+onBeforeUnmount(() => { observer?.disconnect(); stop(); cancelAnimationFrame(paintFrame); });
 </script>
 
 <template>
   <div ref="viewport" class="timeline" tabindex="0" :aria-label="j.epochs" @keydown="key" @pointerdown="down" @pointermove="move" @pointerup="up"
-    @pointercancel="drag = null" @pointerleave="cursor = null" @click.capture="swallowClick" @wheel="wheel">
+    @pointercancel="cancel" @pointerleave="cursor = null" @click.capture="swallowClick" @wheel="wheel">
     <span ref="anchor" class="day-anchor" aria-hidden="true" />
-    <div class="timeline-track" :style="{ width: `${totalWidth}px`, height: `${height}px`, transform: `translateX(${offset - maxOffset}px)`, '--axis': `${axisY}px` }">
+    <div ref="track" class="timeline-track" :style="{ width: `${totalWidth}px`, height: `${height}px`, transform: `translateX(${offset - maxOffset}px)`, '--axis': `${axisY}px` }">
       <template v-for="month in months" :key="month.i">
         <i class="month-rule" :style="{ left: `${month.i * monthWidth}px` }" aria-hidden="true" />
         <span class="month" :class="{ yielded: month.i === hiddenMonth }" :style="{ left: `${month.i * monthWidth}px`, top: `${monthY}px` }">{{ month.label }}</span>
@@ -253,6 +297,7 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
         </button>
       </template>
     </div>
+    <i class="drag-shield" aria-hidden="true" />
     <p v-if="!life.events.value.length" class="timeline-empty" :style="{ top: `${axisY - 34}px` }">{{ t.timelineEmpty }}</p>
     <div v-if="hovered" :class="['timeline-tip', { below: hovered.below }]" role="tooltip" :style="{ left: `${hovered.x}px`, top: `${hovered.y}px` }"><span v-for="(part, i) in tipParts(hovered.event)" :key="i">{{ part }}</span></div>
   </div>
@@ -261,7 +306,10 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); });
 <style scoped>
 .timeline { position: relative; overflow: hidden; touch-action: pan-y; user-select: none; border-radius: 12px; cursor: grab; outline: none; }
 .timeline:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
-.timeline:active { cursor: grabbing; }
+/* 拖动时的「抓紧」手势画在一层盖板上，不写成 .timeline:active { cursor }：cursor 会继承，按下、松开各逼整条轴的子树
+   重算一遍样式（4× 降速下一次一百毫秒上下，拖动一开头就顿一下）。盖板过了拖动门槛才出现，不挡点事件点。 */
+.drag-shield { display: none; position: absolute; inset: 0; z-index: 1; cursor: grabbing; }
+.timeline.dragging .drag-shield { display: block; }
 .timeline-track { position: relative; will-change: transform; }
 .month-rule { position: absolute; top: 0; bottom: 22px; width: 1px; background: color-mix(in srgb, var(--mat-line) 55%, transparent); }
 .month { position: absolute; padding-left: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
