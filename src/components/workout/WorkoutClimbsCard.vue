@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* 运动详情的爬升卡：段落由后端（core/workout_climbs）从逐点海拔识别，这里只排版。
-   climbs 为 null 时不渲染（没有海拔采样或距离不可信）；有海拔但没有够格的段写一行「没有明显爬升」，不编段。 */
+   climbs 为 null 时不渲染（没有海拔采样或距离不可信）；有海拔但没有够格的段写一行「没有明显爬升」，不编段。
+   平路那一句带上实数（全程海拔几到几、最大落差、累计爬升是小起伏加起来的）：海拔图纵轴会放大几米的起伏，
+   光说「没有」用户会以为判错了（2026-10-28 录屏：7–12 米的一次跑步）。缺哪个数就不写那半句。 */
 import { computed } from 'vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
@@ -10,7 +12,12 @@ import { distanceUnitLabel, elevationUnitLabel, paceMinutesPerBigUnit, paceUnitL
 import { useMessages } from '../../i18n';
 import { workoutClimbsMessages } from './WorkoutClimbsCard.i18n';
 
-const props = defineProps<{ climbs: WorkoutClimbs; cycling: boolean }>();
+const props = defineProps<{
+  climbs: WorkoutClimbs;
+  cycling: boolean;
+  /** 这次运动的最低 / 最高海拔与累计爬升（米）；平路时写进那一句。 */
+  relief?: { min: number | null; max: number | null; gain: number | null } | null;
+}>();
 const t = useMessages(workoutClimbsMessages);
 
 const num = (value: number, digits = 0) => formatNumber(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -43,6 +50,16 @@ const rows = computed(() => props.climbs.segments.map((segment) => {
   };
 }));
 
+const flat = computed(() => {
+  const r = props.relief;
+  if (!r || r.min === null || r.max === null || r.max < r.min) return t.value.flat;
+  const unit = elevationUnitLabel();
+  const range = r.max - r.min;
+  // 累计爬升比全程落差大得多时才值得一提：那就是一路小起伏攒出来的。
+  const gain = r.gain !== null && r.gain > range * 1.5 ? num(toElevation(r.gain)) : null;
+  return t.value.flatRelief(num(toElevation(r.min)), num(toElevation(r.max)), num(toElevation(range)), gain, unit);
+});
+
 const how = computed(() => {
   const m = props.climbs.method;
   return t.value.how(m.smoothing_window_s, m.reversal_m, m.min_change_m, m.min_grade_pct, m.moving_speed_m_s);
@@ -55,7 +72,7 @@ const how = computed(() => {
       <GlyphTile name="health-watch" tone="altitude" :size="42" />
       <div><p class="section-eyebrow">{{ t.eyebrow }}</p><h2>{{ t.title }}</h2></div>
     </div>
-    <p v-if="!rows.length" class="flat" role="status">{{ t.flat }}</p>
+    <p v-if="!rows.length" class="flat" role="status">{{ flat }}</p>
     <ol v-else class="climb-list">
       <li v-for="row in rows" :key="row.key" :class="{ up: row.up }">
         <div class="lead">

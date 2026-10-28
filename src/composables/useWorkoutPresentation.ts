@@ -157,6 +157,8 @@ export const useWorkoutPresentation = (
 
   /* 图上画的两条要跟着单位换算，采样本身不动：配速的三个统计值走 paceClock，
      它自己会换算——两边都换就成了一次英里、再一次英里。 */
+  /** 海拔图纵轴至少撑开 40 米：平路就画成平的。 */
+  const ALTITUDE_MIN_SPAN_M = 40;
   const chartCards = computed(() => {
     const samples = series.value?.samples;
     const palette = chartPalette.value;
@@ -168,7 +170,7 @@ export const useWorkoutPresentation = (
     return [
       { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, palette.series.heart, 'bpm', palette), stats: statSummary(heart), icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
       { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, palette.series.pace, paceAxisLabel(), palette), stats: statSummary(pace, 'pace'), icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
-      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, palette.series.altitude, elevationUnitLabel(), palette), stats: statSummary(altitude), icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
+      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, palette.series.altitude, elevationUnitLabel(), palette, toElevation(ALTITUDE_MIN_SPAN_M)), stats: statSummary(altitude), icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
       { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: lineOption(cadence, palette.series.cadence, 'spm', palette), stats: statSummary(cadence), icon: 'steps' as DesignIconName, tone: 'activity' as GlyphTone },
     ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null);
   });
