@@ -4508,6 +4508,7 @@ Zasady: porównuj mnie wyłącznie z moją własną historią, a nie ze średnim
   // Source: src/components/journal/repair.i18n.ts
   'components/journal/repair': {
     timelineEmpty: 'Wybierz dzień na osi czasu, aby zapisać wydarzenie',
+    timelineToday: 'Dzisiaj',
     moreRecords: (n: number) => `Jeszcze ${n}`,
     noRaces: 'Nie ma jeszcze zawodów',
     noInjuries: 'Brak zapisanych kontuzji',
