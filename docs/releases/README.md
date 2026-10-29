@@ -4,13 +4,13 @@
 
 ## 第一步：先写信
 
-**每一版都要有作者来信**（2026-10-20 用户定，补丁版也算，不降级成明信片）。信写什么都行，不限于更新——更新说明是单独一张信纸。写信是发版流程，不是界面功能：就算以后信封界面被砍了，信也照常寄出（GitHub Release 正文 + 官网 `zeppbridge.com/letters` 归档）。
+**每一版都要有作者来信**（2026-10-20 用户定，补丁版也算，不降级成明信片）。信写什么都行，不限于更新——更新说明是单独一张信纸。写信是发版流程，不是界面功能：就算以后信封界面被砍了，信也照常寄出（应用里的信封 + 官网 `zeppbridge.com/letters` 归档）。**信不进 GitHub Release 页**（2026-10-29 用户：信直接寄给用户，发布页只写这一版的改动）。
 
 - 原稿：`docs/releases/letters/<版本>/zh.md`，**用户本人用中文写**。开发会话不替用户写信，只能提醒。
 - `en.md` 由开发会话译出、**用户亲自审**；其余 10 种语言登记到桌面《翻译.md》交给翻译 agent。
 - 格式：普通段落，段与段之间空一行；只认 `**加粗**`，不要标题、列表、链接、HTML。最后一段单独一行写落款（以 `——` 或 `—` 开头），界面会把它排成签名。
-- 门禁：`node scripts/release/check-letter.mjs [<版本>]`。从 3.0.7 起，`freeze.mjs add` 和定时发布在缺任何一种语言的信时拒绝；`npm run package:release` 只提醒（自测包可以先打，但「翻译完再打包」的规矩不变）。
-- Release 正文：英文更新说明之后接一节 `## A letter from the author` + `en.md` 全文（`schedule-core.mjs` 的 `tagMessage`）。
+- 门禁：`node scripts/release/check-letter.mjs [<版本>]`。从 3.0.7 起，缺任何一种语言的信都不打 tag；`npm run package:release` 只提醒（自测包可以先打，但「翻译完再打包」的规矩不变）。
+- Release 正文只有标题 + 英文更新说明（`release-core.mjs` 的 `tagMessage`），不接信。
 
 ### 读回信、写「上期回音」
 
@@ -20,7 +20,7 @@
 2. 读完给它们定性：`node scripts/letters/replies.mjs mark <id...> --category <#id> --status next|later|asking|fixed|declined [--fixed-in x.y.z]`。用户的信匣回执显示的就是这几项（已读 · 归入「补拉卡住」· 3.1.1 修）。`fixed` / `declined` 算处理完。
 3. `node scripts/letters/replies.mjs prune`：处理完满 180 天的从线上删除（先 export 留底）。每个命令都可以加 `--dry-run` 只看 SQL。
 4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题。信纸上只画 `next` / `later` 两组，`asking`（继续征集）条目不显示、也没有「我也遇到」了（2026-10-21 用户：没意义），别再写。允许匿名引用的回信才可以引用原话。
-5. 回音写了就 12 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 和冻结都会查。
+5. 回音写了就 12 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 会查。
 
 ### 这一版的邮票（可选）
 
@@ -57,10 +57,20 @@
 - 中文行里加粗段别以「」或括号收尾再接冒号（会排成「」：」）；用逗号或句号接后文。
 - 需要先讲一件事再看改动时（如 3.0.2 的「为什么有些数据没有？」），用 `leadsWithWhyHalfData` 这类开关加一页，正文组件用卡片 / 小标签，不要写成大段文字。
 
-## 什么时候发
+## 怎么发
 
-冻结、排期、批准和自动打 tag 见 [`scheduling.md`](scheduling.md)。
+正常流程，没有冻结、排期或批准（2026-10-29 用户定，定时发布那套已删）：
+
+1. 版本号统一（`node scripts/release/check-version-consistency.mjs <版本>`）、切 `updateNotice.ts` 的 `BUNDLED_VERSION` 和 glob，12 种更新说明和 12 种信齐全（`check-letter.mjs` 过），本地门禁全绿。
+2. `npm run package:release` 打本地包，用户自测。
+3. 用户说发了：提交、`git push origin main`，等 main 的 CI 绿。
+4. 打附注标签并推送，CI 打包四个平台、建 GitHub Release、签 `latest.json`，已装用户随即收到更新：
+
+   ```bash
+   node scripts/release/tag-message.mjs 3.1.1 | git tag -a v3.1.1 --cleanup=verbatim -F -
+   git push origin v3.1.1
+   ```
 
 ## GitHub Release / tag 说明
 
-tag 说明用英文（随安装包发出去，见 CLAUDE.md），内容就是 `en.md`，同样一条一行、开头加粗；第一行是应用内更新提示。正文里有 `##` 标题时 `git tag --cleanup=verbatim`。
+tag 说明用英文（随安装包发出去，见 CLAUDE.md），内容就是标题 + `en.md`（`tag-message.mjs` 生成），同样一条一行、开头加粗；第一行是应用内更新提示；**不接作者来信**。正文里有 `##` 标题，所以 `git tag --cleanup=verbatim`。

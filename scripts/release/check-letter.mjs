@@ -3,11 +3,11 @@
 //   node scripts/release/check-letter.mjs            # 查 package.json 里的版本
 //   node scripts/release/check-letter.mjs 3.1.0      # 查指定版本
 //
-// 缺语言时退出码 1，并列出缺哪几份。冻结（freeze.mjs add）和定时发布会直接拒绝；
-// 本地打包（package:release）只提醒——自测包可以先打，信和翻译齐了再冻结。
+// 缺语言时退出码 1，并列出缺哪几份。打 `v*` 标签前必须过；
+// 本地打包（package:release）只提醒——自测包可以先打，信和翻译齐了再打标签。
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { NOTE_LOCALES, echoProblems, letterPath, needsLetter } from './schedule-core.mjs';
+import { NOTE_LOCALES, echoProblems, letterPath, needsLetter } from './release-core.mjs';
 
 export function missingLetters(version, exists = (path) => existsSync(path) && readFileSync(path, 'utf8').trim() !== '') {
   if (!needsLetter(version)) return [];

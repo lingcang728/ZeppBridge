@@ -10,9 +10,9 @@ if ([string]$tauriConf.productName -ne 'ZeppBridge') {
 
 Push-Location $root
 try {
-  # 每一版都要有作者来信（docs/releases/README.md「发版第一步」）。自测包可以先打，只提醒；冻结时缺信会被拒绝。
+  # 每一版都要有作者来信（docs/releases/README.md「发版第一步」）。自测包可以先打，只提醒；打 tag 前必须补齐。
   node scripts/release/check-letter.mjs
-  if ($LASTEXITCODE -ne 0) { Write-Warning '这版的信还没齐：冻结前要补上（node scripts/release/check-letter.mjs）。' }
+  if ($LASTEXITCODE -ne 0) { Write-Warning '这版的信还没齐：打 tag 前要补上（node scripts/release/check-letter.mjs）。' }
   npm run build
   if ($LASTEXITCODE -ne 0) { throw '前端构建失败。' }
   npm run icons:verify

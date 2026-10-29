@@ -11,7 +11,7 @@ SignPath Foundation 的条件（[terms](https://signpath.org/terms)）对照本�
 | OSI 许可证、无商业双授权、无闭源代码 | MIT ✅。MiSans 字体随包分发，它不是 OSI 许可——字体是资源不是代码，申请时如实说明 |
 | 已发布、仍在维护 | ✅ |
 | 从源码可验证地构建 | ✅ GitHub 托管 runner 构建（`ci.yml` 的 `package` 作业） |
-| 每次签名前人工批准 | 定时发布的 `approve` 之外，SignPath 后台还要再点一次 |
+| 每次签名前人工批准 | 打 tag 之后，SignPath 后台还要再点一次 |
 | 首页公布签名策略 | 要加：README 或网站放 *Free code signing provided by SignPath.io, certificate by SignPath Foundation*，列出 Authors / Reviewers / Approvers 三个角色（目前都是 lingcang728） |
 | 隐私声明：未经同意不传数据 | 已有 [security-and-privacy](../reference/security-and-privacy.md) 和 README「隐私与连接」 |
 | 所有成员在 GitHub 和 SignPath 都开 MFA | 用户确认 |
