@@ -891,6 +891,7 @@ export default {
   // Source: src/components/letters/letters.i18n.ts
   'components/letters/letters': {
     to: 'Do: Użytkownika',
+    toDeveloper: 'Do: Twórcy ZeppBridge',
     flipHint: 'Dotknij, aby odwrócić kopertę',
     flipAria: 'Odwróć kopertę',
     sealHint: 'Dotknij pieczęci lakowej lub przesuń po niej palcem',
@@ -898,6 +899,7 @@ export default {
     bundle: (count: number) => `${plural(count, { one: `${count} list powiązany`, few: `${count} listy powiązane`, many: `${count} listów powiązanych`, other: `${count} listu powiązanego` })} razem`,
     sheetLetter: 'List',
     sheetNotes: 'Co nowego',
+    notesHeading: (version: string) => `Wszystkie zmiany w ${version}`,
     sheetEcho: 'Ostatnio napisałeś',
     sheetReply: 'Odpowiedź',
     page: (index: number, total: number) => `Strona ${index} z ${total}`,
@@ -930,8 +932,6 @@ export default {
     outbox: 'Skrzynka nadawcza',
     outboxRetry: 'Wyślij teraz',
     sentOn: (date: string) => `Wysłano ${date}`,
-    read: 'Przeczytane',
-    unread: 'Jeszcze nieprzeczytane',
     filedUnder: (title: string) => `Przypisano do „${title}”`,
     statusNext: 'Naprawimy w następnej wersji',
     statusLater: 'Odłożone',
@@ -967,6 +967,8 @@ export default {
     workout: (type: string, km: string | null, minutes: number | null) =>
       [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
     capsules: 'Kapsuły czasu',
+    toFuture: 'Do: Mnie w przyszłości',
+    writeFuture: 'Napisz do siebie w przyszłości',
     capsulePlaceholder: 'Napisz do siebie w przyszłości. Po zapieczętowaniu nikt nie przeczyta jej przed nadejściem wyznaczonego dnia — nawet Ty.',
     openAfter: 'Otwarcie',
     spanHalfYear: 'za pół roku',

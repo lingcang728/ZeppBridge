@@ -1,0 +1,19 @@
+/*
+ * 信匣里一排排摆着的信（来信、每周来信、时间胶囊、那年今天的明信片）：横着摆，按住拖或滚轮横滑，一封停一格。
+ * 每封底下只写一行（2026-10-29 用户：信封下面的简介画蛇添足，只留版本号）。
+ */
+.letter-rail {
+  display: grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 28px; margin: 0 -8px; padding: 18px 8px 22px; list-style: none;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 8px; scrollbar-width: thin; overscroll-behavior-x: contain;
+}
+.letter-rail-item { display: grid; justify-items: start; gap: 6px; min-width: 0; scroll-snap-align: start; }
+.letter-rail-caption { margin: 8px 0 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
+.letter-rail-caption.is-muted { color: var(--muted); font-weight: 400; }
+/* 新封好的胶囊落进这一排：从上面轻轻落下、摆正。 */
+.rail-drop-enter-active { transition: opacity 420ms ease, transform 520ms cubic-bezier(.2, .8, .2, 1); }
+.rail-drop-enter-from { opacity: 0; transform: translateY(-18px) scale(.94); }
+.rail-drop-move { transition: transform 420ms cubic-bezier(.3, .7, .3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .rail-drop-enter-active, .rail-drop-move { transition: opacity 200ms ease; }
+  .rail-drop-enter-from { transform: none; }
+}

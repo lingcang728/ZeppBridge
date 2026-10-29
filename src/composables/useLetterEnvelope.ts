@@ -17,9 +17,24 @@ export type Sheet =
   | { kind: 'letter'; version: string; text: string; lang: string }
   | { kind: 'notes'; version: string }
   | { kind: 'echo'; version: string; text: string; lang: string }
-  | { kind: 'reply'; version: string };
+  | { kind: 'reply'; version: string }
+  /* 「你的信」里的信（每周来信、时间胶囊）：内容由外面按 id 画；fixed 的那张只有一页、不分页（写胶囊那张）。 */
+  | { kind: 'custom'; id: string; label: string; fixed?: boolean };
 
-export function useLetterEnvelope(versions: Ref<string[]>, current: Ref<string>, notes: Ref<NoteGroup[] | null>) {
+/** 不是作者来信、用同一只信封装的信。compose：空信封，打开就自己抽出一张空信纸来写（不翻面、没有火漆）。 */
+export interface CustomLetter {
+  title: string;
+  to: string;
+  stamp: string;
+  sheets: Array<{ id: string; label: string; fixed?: boolean }>;
+  compose?: boolean;
+  acknowledge?: string;
+  /** 自己寄出的回信：蓝墨水收件人、不印寄件人、盖寄出那天的邮戳（YYYY-MM-DD）。 */
+  mine?: boolean;
+  postmark?: string;
+}
+
+export function useLetterEnvelope(versions: Readonly<Ref<string[]>>, current: Readonly<Ref<string>>, notes: Readonly<Ref<NoteGroup[] | null>>) {
   const letters = ref<Array<{ version: string; text: string; lang: string }>>([]);
   const echo = ref<{ text: string; lang: string } | null>(null);
   const loaded = ref(false);

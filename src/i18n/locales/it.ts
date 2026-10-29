@@ -404,6 +404,7 @@ export default {
 
   'components/letters/letters': {
     to: 'A: utente',
+    toDeveloper: 'A: lo sviluppatore di ZeppBridge',
     flipHint: 'Tocca per girare la busta',
     flipAria: 'Gira la busta',
     sealHint: 'Tocca il sigillo di ceralacca o scorri con il dito',
@@ -411,6 +412,7 @@ export default {
     bundle: (count: number) => `${count} lettere legate insieme`,
     sheetLetter: 'Lettera',
     sheetNotes: 'Novità',
+    notesHeading: (version: string) => `Tutte le modifiche della ${version}`,
     sheetEcho: 'L’ultima volta hai detto',
     sheetReply: 'Rispondi',
     page: (index: number, total: number) => `Pagina ${index} di ${total}`,
@@ -443,8 +445,6 @@ export default {
     outbox: 'Posta in uscita',
     outboxRetry: 'Invia ora',
     sentOn: (date: string) => `Inviata il ${date}`,
-    read: 'Letta',
-    unread: 'Non ancora letta',
     filedUnder: (title: string) => `Archiviata sotto “${title}”`,
     statusNext: 'Risolviamo nel prossimo',
     statusLater: 'Posticipato',
@@ -471,6 +471,8 @@ export default {
     workout: (type: string, km: string | null, minutes: number | null) =>
       [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
     capsules: 'Capsule del tempo',
+    toFuture: 'A: il mio io futuro',
+    writeFuture: 'Scrivi al tuo io futuro',
     capsulePlaceholder: 'Scrivi al tuo io futuro. Una volta sigillata, nessuno potrà leggerla prima della data stabilita — nemmeno tu.',
     openAfter: 'Apri',
     spanHalfYear: 'tra sei mesi',

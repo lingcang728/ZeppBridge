@@ -87,6 +87,7 @@ export default {
     },
     'components/letters/letters': {
       to: 'Кому: пользователю',
+      toDeveloper: 'Кому: разработчику ZeppBridge',
       flipHint: 'Нажмите, чтобы перевернуть конверт',
       flipAria: 'Перевернуть конверт',
       sealHint: 'Нажмите на сургучную печать или проведите по ней',
@@ -94,6 +95,7 @@ export default {
       bundle: (count: number) => plural(count, { one: `${count} письмо в пачке`, few: `${count} письма в пачке`, many: `${count} писем в пачке`, other: `${count} письма в пачке` }),
       sheetLetter: 'Письмо',
       sheetNotes: 'Что нового',
+      notesHeading: (version: string) => `Все изменения в ${version}`,
       sheetEcho: 'В прошлый раз вы писали',
       sheetReply: 'Ответ',
       page: (index: number, total: number) => `Страница ${index} из ${total}`,
@@ -126,8 +128,6 @@ export default {
       outbox: 'Исходящие',
       outboxRetry: 'Отправить сейчас',
       sentOn: (date: string) => `Отправлено ${date}`,
-      read: 'Прочитано',
-      unread: 'Не прочитано',
       filedUnder: (title: string) => `В теме «${title}»`,
       statusNext: 'В следующем обновлении',
       statusLater: 'Отложено',
@@ -153,6 +153,8 @@ export default {
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} км` : '', minutes ? `${minutes} мин` : ''].filter(Boolean).join(' · '),
       capsules: 'Капсулы времени',
+      toFuture: 'Кому: мне в будущем',
+      writeFuture: 'Напишите себе в будущее',
       capsulePlaceholder: 'Напишите себе в будущее. После запечатывания никто не сможет прочитать письмо до наступления срока — даже вы.',
       openAfter: 'Вскрыть',
       spanHalfYear: 'через полгода',

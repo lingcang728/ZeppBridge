@@ -12,6 +12,8 @@ const messages = defineMessages({
   workout: (type: string, km: string | null, minutes: number | null) =>
     [type, km ? `${km} 公里` : '', minutes ? `${minutes} 分钟` : ''].filter(Boolean).join(' · '),
   capsules: '时间胶囊',
+  toFuture: '致：将来的自己',
+  writeFuture: '写给将来的自己',
   capsulePlaceholder: '写给将来的自己。封上之后，到日子之前谁也看不到，包括现在的你。',
   openAfter: '开封',
   spanHalfYear: '半年后',
@@ -43,6 +45,8 @@ const messages = defineMessages({
   workout: (type: string, km: string | null, minutes: number | null) =>
     [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
   capsules: 'Time capsules',
+  toFuture: 'To: Future me',
+  writeFuture: 'Write to future you',
   capsulePlaceholder: 'Write to your future self. Once sealed, nobody can read it before the day comes — not even you.',
   openAfter: 'Open',
   spanHalfYear: 'in six months',
@@ -74,6 +78,8 @@ const messages = defineMessages({
   workout: (type: string, km: string | null, minutes: number | null) =>
     [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
   capsules: 'Cápsulas del tiempo',
+  toFuture: 'Para: mi yo futuro',
+  writeFuture: 'Escribe a tu yo futuro',
   capsulePlaceholder: 'Escribe a tu yo futuro. Una vez sellada, nadie puede leerla antes de la fecha, ni siquiera tú.',
   openAfter: 'Abrir',
   spanHalfYear: 'dentro de seis meses',

@@ -4,10 +4,14 @@
  * 直接写在信纸的横线上（框固定 7 行高、纸不滚动，字永远压在线上）；草稿由外面自动存本机；「允许匿名引用」默认不勾。
  * 底下只留这一个勾选（2026-10-21 用户：小字太多）——计数、引用说明、隐私说明都不写；字数到上限时框自己停住。
  * 回信用蓝墨水写（和来信的黑墨分开，2026-10-21 用户）；框没有边、没有焦点竖条；勾选框、计数、说明、「寄出」都是整行、压在线上。
- * 寄出（或进了离线待寄箱）的那一刻，写好的那页对折、往右上角飞走，再淡淡地回来，表示已经封好不能改了。
+ * 寄出（或进了离线待寄箱）的那一刻（2026-10-29 用户：以前只是卡一下、变灰）：写好的那页往里折、压扁成一条，
+ * 折痕中间撑开成一只纸飞机，先往下一沉、再顺着弧线飞出窗口右上角（lib/letters/paperPlane.ts）；
+ * 飞机飞远了，那页再淡淡地回来（变浅），表示已经寄走、不能改了。
  */
 import { computed, ref, watch } from 'vue';
 import { lessMotion } from '../../lib/motion/lessMotion';
+import { flyPaperPlane } from '../../lib/letters/paperPlane';
+import { playPaperSlide } from '../../lib/letters/sound';
 import { LETTER_REPLY_MAX, type ReplyDraft } from '../../services/letterBox';
 import { useLetterText } from './letters.i18n';
 
@@ -22,19 +26,26 @@ const canSend = computed(() => props.state !== 'sending' && props.state !== 'sen
 const update = (patch: Partial<ReplyDraft>) => emit('update:draft', { ...props.draft, ...patch });
 /* 只在「寄出中 → 寄出 / 待寄」那一下飞，重读一封已经回过的信不飞。只动 transform / opacity。 */
 const written = ref<HTMLElement | null>(null);
-watch(() => props.state, (next, previous) => {
+watch(() => props.state, async (next, previous) => {
   const page = written.value;
   if (!page || previous !== 'sending' || (next !== 'sent' && next !== 'queued') || lessMotion()) return;
-  const fly = page.animate([
+  const rect = page.getBoundingClientRect();
+  /* ① 往里折、压扁成一条（停在压扁的样子，飞机接手）。 */
+  const fold = page.animate([
     { transform: 'perspective(900px) rotateX(0deg) scale(1)', opacity: 1 },
-    { transform: 'perspective(900px) rotateX(72deg) scale(.9, .5)', opacity: 1, offset: 0.38 },
-    { transform: 'perspective(900px) translate(46%, -150%) rotateX(72deg) rotate(-10deg) scale(.18, .1)', opacity: 0 },
-  ], { duration: 820, easing: 'cubic-bezier(.45, .05, .55, .95)', fill: 'forwards' });
-  /* 停在飞走的终点，回来的淡入接上以后再撤掉它：中间不露一帧原样。 */
-  void fly.finished.then(() => {
-    page.animate([{ opacity: 0 }, { opacity: 0.6 }], { duration: 420, easing: 'ease-out' });
-    fly.cancel();
-  }, () => {});
+    { transform: 'perspective(900px) rotateX(64deg) scale(.82, .45)', opacity: 1, offset: 0.6 },
+    { transform: 'perspective(900px) rotateX(86deg) scale(.6, .06)', opacity: 0 },
+  ], { duration: 340, easing: 'cubic-bezier(.5, 0, .6, 1)', fill: 'forwards' });
+  await fold.finished.catch(() => undefined);
+  playPaperSlide();
+  /* ②③ 折成纸飞机飞走；飞到一半，那页淡淡地回来。 */
+  const flight = flyPaperPlane(rect);
+  window.setTimeout(() => {
+    if (!page.isConnected) return;
+    page.animate([{ opacity: 0 }, { opacity: 0.6 }], { duration: 520, easing: 'ease-out' });
+    fold.cancel();
+  }, 900);
+  await flight;
 });
 /* 框里往下走时只停在整行上，字不会落到两条横线中间（滚轮一下滚的不是整行）。 */
 const snap = (event: Event) => {

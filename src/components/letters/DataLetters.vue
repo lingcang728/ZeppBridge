@@ -1,27 +1,34 @@
 <script setup lang="ts">
 /**
- * 信匣「你的信」（批次 7）：那年今天、时间胶囊、每周数据来信。
+ * 信匣「你的信」（批次 7；2026-10-29 照用户定的形式重做：以前一张张纸片硬贴在页面上，不像信）：
  *
- * 全是本机的事实，不生成评语、不和别人比。每周来信和胶囊是写下那一刻的快照（后端存在
- * data_letters 里），离线也能重读；胶囊没到日子，后端连原文都不给界面。
- * 每周来信的事实怎么写成字和概览的本地周报共用一份（weeklyFactText.ts）。
+ *   那年今天——一排明信片（Postcard），点一下原地翻到背面看那天的数；
+ *   每周来信——一排信封（正面、贴邮票，面值是那周周一），点开和作者来信同一套：翻面、拆火漆、抽信纸；
+ *   时间胶囊——第一只是没封口的空信封「写给将来的自己」，点开自己抽出一张空信纸来写、盖开封日期的邮戳、封上；
+ *   后面是封着火漆的胶囊（背面朝上），到日子了点开拆，没到日子点了只晃一下；拆过的火漆是裂的，可以再读。
+ *
+ * 全是本机的事实，不生成评语、不和别人比。每周来信和胶囊是写下那一刻的快照（后端存在 data_letters 里），
+ * 离线也能重读；胶囊没到日子，后端连原文都不给界面。
  */
 import './paper.css';
-import { computed, onMounted, ref } from 'vue';
+import './letterRail.css';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import WaxSeal from './WaxSeal.vue';
-import { useDataLetterText } from './dataLetters.i18n';
-import { useWeeklyFactText } from '../weeklyFactText';
+import EnvelopeTile from './EnvelopeTile.vue';
+import Postcard from './Postcard.vue';
+import LetterEnvelope from './LetterEnvelope.vue';
+import DataLetterSheet from './DataLetterSheet.vue';
+import CapsuleCompose from './CapsuleCompose.vue';
+import { useDataLetterFormat } from './useDataLetterFormat';
+import { useLetterText } from './letters.i18n';
 import { backend } from '../../lib/bridge';
-import { workoutLabel } from '../../lib/labels';
-import { formatNumber } from '../../lib/format';
-import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
-import { dayKey } from '../../lib/aiTask/bridgeScale';
-import { changeArrow, reportTone as tone } from '../../lib/changeTone';
-import type { DataLetter, DataLettersView, SnapshotValue } from '../../types/letters';
-import type { InsightFact } from '../../types';
+import { lessMotion } from '../../lib/motion/lessMotion';
+import type { CustomLetter } from '../../composables/useLetterEnvelope';
+import type { DataLetter, DataLettersView, OnThisDayYear } from '../../types/letters';
 
-const t = useDataLetterText();
-const facts = useWeeklyFactText();
+const f = useDataLetterFormat();
+const t = f.t;
+const lt = useLetterText();
 
 const view = ref<DataLettersView | null>(null);
 const failed = ref(false);
@@ -35,203 +42,149 @@ const load = async () => {
 };
 onMounted(load);
 
-const capsules = computed(() => (view.value?.letters ?? []).filter((letter) => letter.kind === 'capsule'));
+/* 新写的排在最前（紧挨着空信封），封好时看得见它落进这一排。 */
+const capsules = computed(() => (view.value?.letters ?? []).filter((letter) => letter.kind === 'capsule')
+  .sort((a, b) => b.written_at.localeCompare(a.written_at)));
 const weeklies = computed(() => (view.value?.letters ?? []).filter((letter) => letter.kind === 'weekly' && letter.weekly));
-const isEmpty = computed(() => view.value !== null && !view.value.letters.length && !view.value.on_this_day.length);
+const tilt = (i: number) => (i % 3 - 1) * 0.8;
+const postcardStats = (year: OnThisDayYear) => year.values.filter((value) => value.value !== null)
+  .map((value) => ({ metric: value.metric, label: f.valueLabel(value), value: f.valueText(value) }));
+const postcardWorkouts = (year: OnThisDayYear) => year.workouts.map((workout) => f.workoutText(workout));
+const year = (day: string | null) => (day ?? '').slice(0, 4);
+const capsuleCaption = (letter: DataLetter) => (!letter.sealed && letter.opened_at ? t.value.openedOn(f.longDate(letter.opened_at))
+  : f.isDue(letter) ? t.value.due : t.value.sealedUntil(f.longDate(letter.open_on ?? '')));
 
-const longDate = (value: string) => {
-  const date = parseDisplayDate(value.slice(0, 10));
-  return Number.isNaN(date.getTime()) ? value : displayDateTimeFormatter({ year: 'numeric', month: 'short', day: 'numeric' }).format(date);
-};
-const shortDate = (value: string) => displayDateTimeFormatter({ month: 'short', day: 'numeric' }).format(parseDisplayDate(value));
-const today = () => dayKey(new Date());
-const isDue = (letter: DataLetter) => Boolean(letter.open_on && letter.open_on <= today());
-
-/* 快照里的一项借周报的写法（同一指标同一口径）；步数周报里没有，单独写。 */
-const asFact = (value: SnapshotValue) => ({ metric: value.metric, unit: value.unit } as InsightFact);
-const valueLabel = (value: SnapshotValue) =>
-  (value.metric === 'steps' ? t.value.stepsLabel : facts.metricLabel(`weekly.${value.metric}`, value.metric));
-const valueText = (value: SnapshotValue | undefined) => {
-  if (!value || value.value === null) return '—';
-  if (value.metric === 'steps') return t.value.steps(formatNumber(Math.round(value.value)));
-  return facts.formatNumber(asFact(value), value.value);
-};
-const pairs = (letter: DataLetter) => (letter.written_snapshot?.values ?? []).map((then) => ({
-  then,
-  now: letter.opened_snapshot?.values.find((value) => value.metric === then.metric),
-})).filter((pair) => pair.then.value !== null || (pair.now?.value ?? null) !== null);
-
-const workoutText = (workout: { workout_type: string; distance_meters: number | null; duration_seconds: number | null }) => {
-  const km = workout.distance_meters && workout.distance_meters > 0
-    ? formatNumber(workout.distance_meters / 1000, { maximumFractionDigits: 1 }) : null;
-  const minutes = workout.duration_seconds ? Math.round(workout.duration_seconds / 60) : null;
-  return t.value.workout(workoutLabel(workout.workout_type), km, minutes);
-};
-
-const weeklyFacts = (letter: DataLetter) => (letter.weekly?.facts ?? []).filter((fact) => fact.value !== null);
-const deltaText = (fact: InsightFact) => {
-  if (!fact.comparison) return facts.reasonText(fact);
-  const percent = `${fact.comparison.delta_percent > 0 ? '+' : ''}${fact.comparison.delta_percent.toFixed(1)}%`;
-  const arrow = tone(fact) === 'up' || tone(fact) === 'down' ? `${changeArrow(fact)} ` : '';
-  return t.value.vsBefore(facts.formatNumber(fact, fact.comparison.baseline_value), arrow + percent);
-};
-
-/* 写胶囊：只给三个跨度可选，不弹日历——这是写信，不是排日程。 */
-const SPANS = [{ months: 6, key: 'spanHalfYear' }, { months: 12, key: 'spanOneYear' }, { months: 36, key: 'spanThreeYears' }] as const;
-const note = ref('');
-const months = ref<number>(12);
-const sealing = ref(false);
+/* ── 打开一封：同一只信封弹窗，纸上画什么按 letter 定 ── */
+type Reading = { custom: CustomLetter; letter: DataLetter | null; origin: HTMLElement };
+const reading = ref<Reading | null>(null);
 const actionError = ref('');
-const openOn = () => {
-  const date = new Date();
-  date.setMonth(date.getMonth() + months.value);
-  return dayKey(date);
+
+const openWeekly = (letter: DataLetter, event: MouseEvent) => {
+  const range = t.value.weekRange(f.shortDate(letter.weekly!.recent_start), f.shortDate(letter.weekly!.recent_end));
+  reading.value = {
+    custom: { title: range, to: lt.value.to, stamp: f.stampDay(letter.weekly!.recent_start), sheets: [{ id: String(letter.id), label: t.value.weekly }] },
+    letter,
+    origin: event.currentTarget as HTMLElement,
+  };
 };
-const seal = async () => {
-  if (!note.value.trim() || sealing.value) return;
+
+/* 没到日子：信封在原地晃一下（封着呢）。 */
+const shake = (el: HTMLElement) => {
+  if (lessMotion()) return;
+  el.animate([{ rotate: '0deg' }, { rotate: '-3deg' }, { rotate: '2.5deg' }, { rotate: '-1.5deg' }, { rotate: '0deg' }],
+    { duration: 460, easing: 'ease-in-out', composite: 'add' });
+};
+const openingId = ref<number | null>(null);
+const openCapsule = async (letter: DataLetter, event: MouseEvent) => {
+  const origin = event.currentTarget as HTMLElement;
+  if (letter.sealed && !f.isDue(letter)) { shake(origin); return; }
+  let shown = letter;
+  actionError.value = '';
+  if (letter.sealed) {
+    /* 到日子了：先让后端开封（封着的胶囊后端连原文都不给），再从信封正面开始拆。 */
+    if (openingId.value !== null) return;
+    openingId.value = letter.id;
+    try {
+      await backend.dataLettersOpenCapsule(letter.id);
+      await load();
+      shown = capsules.value.find((item) => item.id === letter.id) ?? letter;
+    } catch {
+      actionError.value = t.value.openFailed;
+      return;
+    } finally {
+      openingId.value = null;
+    }
+  }
+  await nextTick();
+  reading.value = {
+    custom: { title: t.value.capsules, to: t.value.toFuture, stamp: year(shown.open_on), sheets: [{ id: String(shown.id), label: t.value.capsules }] },
+    letter: shown,
+    origin: document.querySelector<HTMLElement>(`[data-capsule="${shown.id}"]`) ?? origin,
+  };
+};
+
+/* 写胶囊：空信封打开，抽出一张空信纸。封好后先把新胶囊放进这一排，再让写好的那页折起来飞回空信封。 */
+const compose = (event: MouseEvent) => {
+  reading.value = {
+    custom: { title: t.value.writeFuture, to: t.value.toFuture, stamp: '', sheets: [{ id: 'compose', label: t.value.capsules, fixed: true }], compose: true },
+    letter: null,
+    origin: event.currentTarget as HTMLElement,
+  };
+};
+const sealing = ref(false);
+const sealError = ref('');
+const composer = ref<InstanceType<typeof CapsuleCompose> | null>(null);
+const seal = async (note: string, openOn: string, close: () => Promise<void>) => {
+  if (sealing.value) return;
   sealing.value = true;
-  actionError.value = '';
+  sealError.value = '';
   try {
-    await backend.dataLettersSealCapsule(note.value.trim(), openOn());
-    note.value = '';
-    await load();
+    await backend.dataLettersSealCapsule(note, openOn);
   } catch {
-    actionError.value = t.value.sealFailed;
-  } finally {
+    sealError.value = t.value.sealFailed;
     sealing.value = false;
+    return;
   }
+  await composer.value?.fold();
+  await load();
+  sealing.value = false;
+  await close();
 };
-const opening = ref<number | null>(null);
-const openCapsule = async (letter: DataLetter) => {
-  opening.value = letter.id;
-  actionError.value = '';
-  try {
-    await backend.dataLettersOpenCapsule(letter.id);
-    await load();
-  } catch {
-    actionError.value = t.value.openFailed;
-  } finally {
-    opening.value = null;
-  }
-};
+const closeReading = () => { reading.value = null; sealError.value = ''; };
 </script>
 
 <template>
   <div class="data-letters">
     <p v-if="failed" class="box-empty" role="alert">{{ t.loadFailed }}</p>
-    <p v-else-if="isEmpty" class="box-empty">{{ t.empty }}</p>
 
     <template v-if="view?.on_this_day.length">
       <h2 class="box-heading">{{ t.onThisDay }}</h2>
-      <ul class="slip-grid">
-        <li v-for="year in view.on_this_day" :key="year.date" class="slip paper">
-          <span class="slip-head">{{ t.yearsAgo(year.years_ago) }} · {{ longDate(year.date) }}</span>
-          <p v-for="value in year.values" :key="value.metric" class="slip-line">
-            <span>{{ valueLabel(value) }}</span><strong>{{ valueText(value) }}</strong>
-          </p>
-          <p v-for="workout in year.workouts" :key="workout.workout_id" class="slip-line">
-            <span>{{ workoutText(workout) }}</span>
-          </p>
+      <ul class="letter-rail">
+        <li v-for="(day, i) in view.on_this_day" :key="day.date" class="letter-rail-item">
+          <Postcard :date="day.date" :label="`${t.yearsAgo(day.years_ago)} · ${f.longDate(day.date)}`" :stats="postcardStats(day)" :workouts="postcardWorkouts(day)" :tilt="tilt(i + 1)" />
+          <p class="letter-rail-caption">{{ t.yearsAgo(day.years_ago) }}</p>
+        </li>
+      </ul>
+    </template>
+
+    <template v-if="weeklies.length">
+      <h2 class="box-heading">{{ t.weekly }}</h2>
+      <ul class="letter-rail">
+        <li v-for="(letter, i) in weeklies" :key="letter.id" class="letter-rail-item">
+          <EnvelopeTile :label="t.weekRange(f.shortDate(letter.weekly!.recent_start), f.shortDate(letter.weekly!.recent_end))"
+            :to="lt.to" :stamp-label="f.stampDay(letter.weekly!.recent_start)" :tilt="tilt(i)" @open="openWeekly(letter, $event)" />
+          <p class="letter-rail-caption">{{ t.weekRange(f.shortDate(letter.weekly!.recent_start), f.shortDate(letter.weekly!.recent_end)) }}</p>
         </li>
       </ul>
     </template>
 
     <h2 class="box-heading">{{ t.capsules }}</h2>
-    <form class="slip paper capsule-pad" @submit.prevent="seal">
-      <textarea v-model="note" class="capsule-text paper-lines" maxlength="1000" rows="4" :placeholder="t.capsulePlaceholder" :aria-label="t.capsules"></textarea>
-      <div class="capsule-row">
-        <label class="capsule-span">
-          <span>{{ t.openAfter }}</span>
-          <select v-model.number="months">
-            <option v-for="span in SPANS" :key="span.months" :value="span.months">{{ t[span.key] }}</option>
-          </select>
-        </label>
-        <button type="submit" class="button" :disabled="!note.trim() || sealing">{{ sealing ? t.sealing : t.seal }}</button>
-      </div>
-    </form>
+    <TransitionGroup tag="ul" name="rail-drop" class="letter-rail">
+      <li key="compose" class="letter-rail-item">
+        <EnvelopeTile :label="t.writeFuture" face="back" :tilt="-0.8" @open="compose" />
+        <p class="letter-rail-caption">{{ t.writeFuture }}</p>
+      </li>
+      <li v-for="(letter, i) in capsules" :key="letter.id" class="letter-rail-item">
+        <EnvelopeTile :data-capsule="letter.id" :label="capsuleCaption(letter)" face="back" :tilt="tilt(i + 2)" @open="openCapsule(letter, $event)">
+          <template #seal><WaxSeal :size="96" still :cracked="!letter.sealed" /></template>
+        </EnvelopeTile>
+        <p :class="['letter-rail-caption', { 'is-muted': letter.sealed && !f.isDue(letter) }]">{{ capsuleCaption(letter) }}</p>
+      </li>
+    </TransitionGroup>
     <p v-if="actionError" class="box-empty" role="alert">{{ actionError }}</p>
 
-    <ul v-if="capsules.length" class="slip-grid">
-      <li v-for="letter in capsules" :key="letter.id" :class="['slip', 'paper', { 'is-sealed': letter.sealed }]">
-        <span class="slip-head">{{ t.sealedOn(longDate(letter.written_at)) }}</span>
-        <template v-if="letter.sealed">
-          <div class="sealed-face">
-            <WaxSeal :size="56" still />
-            <span v-if="isDue(letter)" class="sealed-note">{{ t.due }}</span>
-            <span v-else class="sealed-note">{{ t.sealedUntil(longDate(letter.open_on ?? '')) }}</span>
-          </div>
-          <button v-if="isDue(letter)" type="button" class="button" :disabled="opening === letter.id" @click="openCapsule(letter)">{{ t.open }}</button>
-        </template>
-        <template v-else>
-          <p class="slip-text paper-lines">{{ letter.note }}</p>
-          <table v-if="pairs(letter).length" class="compare">
-            <caption>{{ t.windowNote }}</caption>
-            <thead><tr><th></th><th>{{ t.then }}</th><th>{{ t.now }}</th></tr></thead>
-            <tbody>
-              <tr v-for="pair in pairs(letter)" :key="pair.then.metric">
-                <th scope="row">{{ valueLabel(pair.then) }}</th>
-                <td>{{ valueText(pair.then) }}</td>
-                <td>{{ valueText(pair.now) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <span v-if="letter.opened_at" class="slip-receipt">{{ t.openedOn(longDate(letter.opened_at)) }}</span>
-        </template>
-      </li>
-    </ul>
-
-    <template v-if="weeklies.length">
-      <h2 class="box-heading">{{ t.weekly }}</h2>
-      <ul class="slip-grid">
-        <li v-for="letter in weeklies" :key="letter.id" class="slip paper">
-          <span class="slip-head">{{ t.weekRange(shortDate(letter.weekly!.recent_start), shortDate(letter.weekly!.recent_end)) }}</span>
-          <p v-for="fact in weeklyFacts(letter)" :key="fact.fact_id" class="slip-line">
-            <span>{{ facts.metricLabel(fact.fact_id, fact.metric) }}</span>
-            <strong>{{ facts.formatValue(fact) }}</strong>
-            <em :class="['slip-delta', fact.comparison ? tone(fact) : 'muted']">{{ deltaText(fact) }}</em>
-          </p>
-        </li>
-      </ul>
-    </template>
+    <LetterEnvelope v-if="reading" :versions="[]" current="" :custom="reading.custom" :origin="reading.origin" @done="closeReading">
+      <template #sheet="{ close }">
+        <CapsuleCompose v-if="reading.custom.compose" ref="composer" :busy="sealing" :error="sealError"
+          @seal="(note, openOn) => seal(note, openOn, close)" />
+        <DataLetterSheet v-else-if="reading.letter" :letter="reading.letter" />
+      </template>
+    </LetterEnvelope>
   </div>
 </template>
 
 <style scoped>
-.data-letters { display: grid; gap: 14px; }
+.data-letters { display: grid; gap: 4px; }
 .box-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.box-heading { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-2xs); font-weight: 400; letter-spacing: .06em; }
-.slip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-items: start; gap: 18px; margin: 0; padding: 0; list-style: none; }
-.slip { --paper-size: 15px; --paper-line: 28px; display: grid; align-content: start; gap: 2px; padding: 14px 20px 16px; }
-.slip-head { color: var(--paper-muted); font: 400 var(--fs-2xs) / var(--paper-line) var(--font-sans); letter-spacing: .06em; }
-.slip-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; line-height: var(--paper-line); }
-.slip-line > span { color: var(--paper-muted); }
-.slip-line > strong { font-weight: 700; }
-.slip-delta { flex-basis: 100%; margin-top: -6px; color: var(--paper-muted); font-size: var(--fs-2xs); font-style: normal; line-height: 1.6; }
-/* 信纸是纸色，不跟主题变；好坏用墨色区分，中性指标只给箭头。 */
-.slip-delta.good { color: #2f6b45; }
-.slip-delta.bad { color: var(--paper-rubric); }
-.slip-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.slip-receipt { margin-top: 8px; color: var(--paper-rubric); font: 700 var(--fs-2xs)/1.6 var(--font-sans); letter-spacing: .04em; }
-.slip > .button { justify-self: start; margin-top: 8px; }
-
-.capsule-pad { gap: 10px; }
-.capsule-text {
-  width: 100%; min-height: calc(var(--paper-line) * 4); padding: 0; border: 0; resize: vertical;
-  background-color: transparent; color: var(--paper-ink); font: inherit; line-height: var(--paper-line);
-}
-.capsule-text:focus-visible { outline: none; }
-.capsule-text::placeholder { color: var(--paper-muted); }
-.capsule-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.capsule-span { display: inline-flex; align-items: center; gap: 8px; color: var(--paper-muted); font-size: var(--fs-xs); }
-.capsule-span select { padding: 4px 8px; border: 1px solid rgb(0 0 0 / .18); border-radius: 6px; background: transparent; color: var(--paper-ink); font: inherit; }
-
-.sealed-face { display: flex; align-items: center; gap: 14px; min-height: 72px; }
-.sealed-note { color: var(--paper-muted); font-size: var(--fs-xs); }
-
-.compare { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: var(--fs-xs); }
-.compare caption { caption-side: bottom; padding-top: 6px; color: var(--paper-muted); font-size: var(--fs-2xs); text-align: left; }
-.compare th, .compare td { padding: 3px 6px 3px 0; text-align: left; font-weight: 400; }
-.compare thead th { color: var(--paper-muted); font-size: var(--fs-2xs); }
-.compare tbody th { color: var(--paper-muted); }
-.compare td { font-weight: 700; font-variant-numeric: tabular-nums; }
+.box-heading { margin: 10px 0 0; color: var(--muted); font-size: var(--fs-2xs); font-weight: 400; letter-spacing: .06em; }
 </style>

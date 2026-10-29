@@ -7,35 +7,20 @@
  */
 import { reactive } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
-import type { LetterBoxView, LetterReceipt, LetterReplyInput, LetterSendResult } from '../types/letters';
+import type { LetterBoxView, LetterReplyInput, LetterSendResult } from '../types/letters';
 
 export const LETTER_REPLY_MAX = 1000;
 const DRAFT_KEY = (version: string) => `zeppbridge.letters.draft.${version}`;
-const SEEN_KEY = 'zeppbridge.letters.receiptsSeen';
-
-export const letterBox = reactive<{ view: LetterBoxView; loaded: boolean; unseen: boolean }>({
+/* 已读 / 未读不给用户看（2026-10-29 用户：把已读未读相关的都关掉）：回执只说处理结果，入口也不再亮未读的点。 */
+export const letterBox = reactive<{ view: LetterBoxView; loaded: boolean }>({
   view: { outbox: [], sent: [], receipts: [], receipts_checked_at: null },
   loaded: false,
-  unseen: false,
 });
-
-const fingerprint = (receipts: LetterReceipt[]) => receipts
-  .map((r) => [r.replyId, r.readAt ?? '', r.category ?? '', r.status ?? '', r.fixedIn ?? ''].join('|')).sort().join(';');
 
 const apply = (view: LetterBoxView) => {
   letterBox.view = view;
   letterBox.loaded = true;
-  try {
-    const seen = window.localStorage.getItem(SEEN_KEY) ?? '';
-    letterBox.unseen = view.receipts.length > 0 && fingerprint(view.receipts) !== seen;
-  } catch { letterBox.unseen = false; }
 };
-
-/** 回执看过了：入口的点灭掉。 */
-export function markReceiptsSeen(): void {
-  letterBox.unseen = false;
-  try { window.localStorage.setItem(SEEN_KEY, fingerprint(letterBox.view.receipts)); } catch { /* 下次还会亮，不要紧 */ }
-}
 
 export async function loadLetterBox(): Promise<void> {
   if (!isDesktop()) return;
