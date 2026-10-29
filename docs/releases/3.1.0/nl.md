@@ -1,0 +1,23 @@
+- Added: **Brieven van de auteur**. Elke update bevat nu een brief. Op de laatste pagina kun je direct terugschrijven en je reactie bereikt de auteur anoniem; concepten worden automatisch opgeslagen en wachten op je computer als je offline bent.
+- Added: **Brievenbus**. Wekelijks een brief over je gegevens, brieven aan jezelf over een halfjaar, een jaar of drie jaar die pas op de dag zelf opengaan, en wat je gegevens lieten zien op deze dag in eerdere jaren.
+- Added: **Het Logboek**. Een activiteitenkalender voor het hele jaar, aftellen naar wedstrijden en een medaillemuur, een PR-muur van 5 km tot de marathon, kilometrage van schoenen met herinneringen voor vervanging, blessures en tijdperken, allemaal op één plek.
+- Added: **Jaarringen**. Elk jaar groeit er een nieuwe ring die uitdijt in weken waarin je meer hebt getraind; open een markering om die training te bekijken. Deel het met één klik als afbeelding, waarbij je ruwe gegevens je computer nooit verlaten.
+- Added: **„Je gevoel” bij trainingen**. Leg je eigen RPE-score vast, geef aan waar je spierpijn hebt en welke schoenen je droeg.
+- Added: **Geplande training beoordelen**. Na het voltooien van een schema dat naar je horloge is gestuurd vraagt het overzicht hoe het ging; was het te zwaar, dan verlaag je de volgende sessie met één klik met 10%. Op Windows kun je direct vanuit de systeemmelding reageren.
+- Added: **Postvak In voor AI-herinneringen**. Claude en andere tools kunnen voorstellen wat ze willen onthouden en jij beslist item voor item; alleen wat je bewaart wordt met AI gedeeld.
+- Added: **Promptbibliotheek**. Filter opgeslagen AI-taken op gegevenscategorie, haal eerdere formuleringen van prompts terug en exporteer taken als .zbprompt-bestanden om te delen.
+- Added: **Importeren uit andere bronnen**. Importeer trainingen uit GPX/TCX, FIT, een complete Strava-export of een Apple Gezondheid-export; elke import vormt een batch die je in één keer ongedaan kunt maken.
+- Added: **Alles meenemen**. Exporteer via Instellingen › Archief en opslag alles wat je in ZeppBridge hebt geschreven en geordend met één klik als een enkel JSON-bestand.
+- Added: **Typen in bulk wijzigen en trainingen verbergen (#154, #151)**. Selecteer meerdere trainingen in de lijst; verborgen trainingen tellen niet mee in statistieken, AI en exports, behouden hun oorspronkelijke gegevens en kunnen op elk moment worden hersteld.
+- Added: **Details van eerdere trainingen afzonderlijk ophalen (#153)**. Starten, pauzeren en hervatten via Instellingen › Archief en opslag, waarbij „geen details in de cloud” gescheiden blijft van „mislukte aanvragen”.
+- Improved: **Je eigen normale bereik**. Tot tien jaar aan geschiedenis bepaalt je gebruikelijke bereik, en na een jaar toont de kaart je langetermijnnormaal.
+- Improved: **Herkomst van elke meetwaarde**. Elke meetwaarde vermeldt of het een sensormeting, een openbare formule of een schatting van het Zepp-algoritme is; je kunt een meetwaarde ook buiten de analyse laten zonder de gegevens te wissen.
+- Improved: **Dekkingskalender**. Instellingen toont een rij per jaar en een vakje per maand; maanden waarvan het ophalen daadwerkelijk gegevens heeft opgeleverd kleuren goud, en een ontbrekende maand vul je met één klik aan.
+- Improved: **Duidelijkheid bij niet-overeenkomende accounts**. Als de officiële autorisatie en geavanceerde gegevens verschillende Zepp-accounts gebruiken, worden beide naast elkaar getoond met een passende oplossing; je kunt ook met één klik opnieuw beginnen met een ander account, waarbij oude gegevens opzij worden gezet en niet worden verwijderd.
+- Improved: **Automatische updates uitschakelbaar**. Er is een schakelaar toegevoegd naast „Controleren op updates”, en animaties schakelen automatisch een tandje terug op tragere computers of bij een bijna lege batterij.
+- Fixed: **Sporttype 15 van de Balance 2 wordt niet langer altijd als wandelen beschouwd (#155)**.
+- Fixed: **Bij trainingsdetails op beide verbindingen krijgen geavanceerde gegevens voorrang (#143)**. Afstand per punt wordt niet langer overschreven door officiële details die later worden opgehaald.
+- Fixed: **Uitloggen en opnieuw verbinden werken ook wanneer de macOS-sleutelhanger niet kan worden gelezen (#145)**.
+- Fixed: **Gegevens ophalen via de opdrachtregel voor meer dan 365 dagen (#152)**. Er wordt nu automatisch overgeschakeld naar ophalen per maand.
+- Fixed: **Hoogtemeterskaart en hoogtegrafiek komen nu overeen**. Bij vlakke routes worden het werkelijke hoogtebereik en het grootste hoogteverschil vermeld.
+- Fixed: **Verwijderen met „App-gegevens verwijderen” aangevinkt wist nu daadwerkelijk alles grondig**.
