@@ -175,15 +175,17 @@ forbidden. The provenance of the algorithms and percentages is in the
   on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
   direction — `forward` focuses into a detail page, `back` backs out. The leaving
   page is pinned at its scroll position so it does not jump to the top.
-- **Switching tabs is a ripple from the clicked tab** (2026-10-29,
-  `composables/useTabRipple.ts`, geometry in `lib/motion/tabRipple.ts`): this covers
-  Overview / Hand to AI / Settings and clicking a top tab from any sub-page. A wave
-  front spreads from the tab; each visible block of the old page sinks outward and
-  fades as the front reaches it, and the new page's block in that spot rises in a
-  beat later (the old one is already transparent: no double exposure). Blocks
-  loaded after the switch join the wave. Full-screen layers (the sheet's blur) fade
-  evenly across the whole ripple instead of vanishing first, and the top bar's
-  edge blur holds until the blocks under it are gone. Completion follows the
+- **Switching tabs is a plain fade, one page out then the next in** (2026-10-29,
+  `composables/useTabFade.ts`, layer picking in `lib/motion/tabFade.ts`): this covers
+  Overview / Hand to AI / Settings and clicking a top tab from any sub-page. The old
+  page fades out, then the new page fades in; nothing moves or scales. Two richer
+  versions were rejected the same day: a ripple that split pages into blocks (its
+  per-block `translate` overrode the blocks' own CSS `translate`, so the AI stage
+  jumped sideways, and fill animations stuck on cached pages blanked them), and a
+  glowing ring overlay (judged ugly in both themes). Pages fade layer by layer (the
+  page root's direct children), never the root itself, so glass inside keeps sampling;
+  a full-screen fixed layer (the sheet) is faded one level deeper so its blur does not
+  drop out. Every fill animation is cancelled when done. Completion follows the
   animations themselves (explicit `done`), never Vue's wall-clock timeout — that
   timeout used to remove the old page while the frame-steady hold had paused it,
   leaving a blank screen when switching from a scrolled page.

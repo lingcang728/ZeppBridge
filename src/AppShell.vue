@@ -11,7 +11,7 @@ import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORD
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
-import { useTabRipple } from './composables/useTabRipple';
+import { useTabFade } from './composables/useTabFade';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
 import { installGlassTips } from './lib/glassTip';
@@ -120,20 +120,11 @@ const backLabel = computed(() => {
  * 旧页离场时会被绝对定位，而路由钩子紧接着把滚动区拉回顶部——不处理的话，
  * 旧页会在淡出的那一瞬跳回它自己的顶部。离场前把它按当时的滚动距离往上垫，
  * 画面就停在用户最后看到的那一帧上。 */
-const motion = ref<PageMotion | 'ripple'>('none');
+const motion = ref<PageMotion | 'fade'>('none');
 const pageMorph = usePageMorph({ back: () => router.back() });
-/* 换入口（概览 / 交给 AI / 设置互切，或从二级页直接点顶栏）：从被点的那枚标签扩散的涟漪（composables/useTabRipple.ts，10-29）。
-   窄窗口顶栏的导航收起了，就从底部导航的那一格扩散；都找不到就从内容区顶边正中。 */
-const rippleOrigin = () => {
-  const index = (TAB_ORDER as readonly string[]).indexOf(navigationBranch(route.path));
-  for (const selector of ['.pill-nav .segment-item', '.bottom-track .segment-item']) {
-    const box = document.querySelectorAll<HTMLElement>(selector)[index]?.getBoundingClientRect();
-    if (box && box.width > 0) return { x: box.left + box.width / 2, y: selector.startsWith('.pill') ? box.bottom : box.top };
-  }
-  const view = document.getElementById('main-content')?.getBoundingClientRect();
-  return view ? { x: view.left + view.width / 2, y: view.top } : null;
-};
-const ripple = useTabRipple({ viewport: () => document.getElementById('main-content'), origin: rippleOrigin });
+/* 换入口（概览 / 交给 AI / 设置互切，或从二级页直接点顶栏）：旧页淡出、淡完新页淡入，不位移（composables/useTabFade.ts）。
+   10-29 先后试过从标签扩散的涟漪和光环水波，用户都否了（乱飞、错位；水波丑）。 */
+const tabFade = useTabFade({ viewport: () => document.getElementById('main-content') });
 const isSwitch = (value: PageMotion) => value === 'left' || value === 'right' || value === 'dismiss';
 const morphing = computed(() => motion.value === 'expand' || motion.value === 'collapse');
 /* 其余走 CSS animation 的切页：等它们自己的动画真放完再告诉 Vue（显式 done）。Vue 自己按墙钟算
@@ -145,12 +136,12 @@ const whenCssDone = (el: Element, done: () => void) => requestAnimationFrame(() 
 });
 const enterHook = computed(() => {
   if (morphing.value) return pageMorph.onMorphEnter;
-  if (motion.value === 'ripple') return (el: Element, done: () => void) => { pageMorph.onEnter(el); ripple.onEnter(el, done); };
+  if (motion.value === 'fade') return (el: Element, done: () => void) => { pageMorph.onEnter(el); tabFade.onEnter(el, done); };
   return (el: Element, done: () => void) => { pageMorph.onEnter(el); whenCssDone(el, done); };
 });
 const leaveHook = computed(() => {
   if (morphing.value) return pageMorph.onMorphLeave;
-  if (motion.value === 'ripple') return (el: Element, done: () => void) => { pageMorph.onLeave(el); ripple.onLeave(el, done); };
+  if (motion.value === 'fade') return (el: Element, done: () => void) => { pageMorph.onLeave(el); tabFade.onLeave(el, done); };
   return (el: Element, done: () => void) => { pageMorph.onLeave(el); whenCssDone(el, done); };
 });
 let leavingScroll = 0;
@@ -162,11 +153,11 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
   if (to.matched.length > 1 && from.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   if (from.matched.length > 1 && to.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   const decided = pageMorph.decide(from, to, pageMotion(from.path, to.path));
-  motion.value = isSwitch(decided) ? 'ripple' : decided;
-  if (motion.value === 'ripple') ripple.arm();
+  motion.value = isSwitch(decided) ? 'fade' : decided;
+  if (motion.value === 'fade') tabFade.arm();
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
-  // 走 CSS 动画的几种切页：先停在第一帧，等新页上屏、帧稳了再放（见下面 afterEach 和 shell.css）。涟漪自己等。
-  pageHold.value = motion.value !== 'expand' && motion.value !== 'collapse' && motion.value !== 'ripple';
+  // 走 CSS 动画的几种切页：先停在第一帧，等新页上屏、帧稳了再放（见下面 afterEach 和 shell.css）。换入口的淡入淡出自己等。
+  pageHold.value = motion.value !== 'expand' && motion.value !== 'collapse' && motion.value !== 'fade';
   // 从卡片展开：先把新页首屏的数据备好（多半悬停时已经读好，立刻就过；最多等一小会儿），
   // 新页第一帧就是真内容，而不是长成整页以后再停在骨架上。
   if (motion.value === 'expand') await preloadBeforeOpen(to.fullPath);
@@ -189,11 +180,11 @@ const onPageBeforeLeave = (el: Element) => {
 };
 const onMainScroll = (event: Event) => {
   const under = (event.target as HTMLElement).scrollTop > 2;
-  // 涟漪切页开跑以前滚动区归零了，旧页还垫在原来的位置从顶栏下面经过：顶栏的模糊先别退（useTabRipple 放开它）。
-  if (!under && ripple.holdEdge.value) return;
+  // 换入口开跑以前滚动区归零了，旧页还垫在原来的位置从顶栏下面经过：顶栏的模糊先别退（useTabFade 放开它）。
+  if (!under && tabFade.holdEdge.value) return;
   if (under !== contentUnderBar.value) contentUnderBar.value = under;
 };
-watch(ripple.holdEdge, (held) => {
+watch(tabFade.holdEdge, (held) => {
   if (!held) contentUnderBar.value = (document.getElementById('main-content')?.scrollTop ?? 0) > 2;
 });
 
@@ -310,7 +301,7 @@ onUnmounted(() => {
   disposePrefetch?.();
   disposeTips?.();
   pageMorph.dispose();
-  ripple.dispose();
+  tabFade.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在
   // `initialize()` 上。这个组件卸载时不放，下一次挂载就会多出一份。

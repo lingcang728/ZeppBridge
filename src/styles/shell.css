@@ -139,9 +139,9 @@
 [class*='page-'].page-back-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both, page-drop var(--dur-std) var(--ease-enter) both; }
 [class*='page-'].page-none-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both; }
 [class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active { animation: page-fade-out 150ms ease both; }
-/* 换入口（点 / 拖顶栏胶囊，或从二级页直接点顶栏）：顶栏涟漪，两页的块各自由 WAAPI 动（composables/useTabRipple.ts），
-   页面本身不淡、不位移——整页 opacity 会让页里的毛玻璃失去取样（记忆「动效与玻璃的 Chromium 坑」）。 */
-[class*='page-'].page-ripple-enter-active, [class*='page-'].page-ripple-leave-active { transition: none; }
+/* 换入口（点 / 拖顶栏胶囊，或从二级页直接点顶栏）：旧页淡出、淡完新页淡入（composables/useTabFade.ts），两页逐层由 WAAPI 淡，
+   页面根本身不淡、不位移——整页 opacity 会让页里的毛玻璃失去取样（记忆「动效与玻璃的 Chromium 坑」）。 */
+[class*='page-'].page-fade-enter-active, [class*='page-'].page-fade-leave-active { transition: none; }
 /* 换页那一刻先停在第一帧，等帧稳了再放（AppShell.vue 的 holdPageMotion）。 */
 .page-host.holding > [class*='-enter-active'], .page-host.holding > [class*='-leave-active'] { animation-play-state: paused; }
 @keyframes page-fade-in { from { opacity: 0; } }
