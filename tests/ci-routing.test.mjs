@@ -24,7 +24,6 @@ test('only ordinary prose and documentation images qualify for the fast path', (
 test('tags, manual runs, unknown events and incomplete ranges always run full CI', () => {
   for (const input of [
     { eventName: 'push', ref: 'refs/tags/v3.0.1', event: {} },
-    { eventName: 'push', ref: 'refs/heads/freeze/v3.0.3', event: { before: 'a'.repeat(40), after: 'b'.repeat(40) } },
     { eventName: 'workflow_dispatch', ref: 'refs/heads/main', event: {} },
     { eventName: 'schedule', event: {} },
     { eventName: 'push', event: { before: '0'.repeat(40), after: 'a'.repeat(40) } },

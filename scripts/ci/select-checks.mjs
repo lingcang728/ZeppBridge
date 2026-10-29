@@ -19,11 +19,6 @@ export function selectChecks({ eventName, ref, event, cwd = process.cwd() }) {
   if (ref?.startsWith('refs/tags/') || eventName === 'workflow_dispatch') {
     return { full: true, reason: 'Release tag or manual run' };
   }
-  // A freeze branch is a release snapshot: the scheduled release only tags a
-  // commit whose own CI ran the complete pipeline (scripts/release/scheduled-release.mjs).
-  if (ref?.startsWith('refs/heads/freeze/')) {
-    return { full: true, reason: 'Release freeze branch' };
-  }
 
   let base;
   let head;

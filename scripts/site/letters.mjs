@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** 和 scripts/release/schedule-core.mjs 的 NOTE_LOCALES 一致；第二列是 <html lang>，第三列是语言自称。 */
+/** 和 scripts/release/release-core.mjs 的 NOTE_LOCALES 一致；第二列是 <html lang>，第三列是语言自称。 */
 export const LETTER_LANGUAGES = [
   ['en', 'en', 'English'], ['zh', 'zh-CN', '中文'], ['es', 'es', 'Español'], ['nl', 'nl', 'Nederlands'],
   ['pt-BR', 'pt-BR', 'Português (Brasil)'], ['pt-PT', 'pt-PT', 'Português (Portugal)'], ['de', 'de', 'Deutsch'],
