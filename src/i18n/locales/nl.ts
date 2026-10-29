@@ -3488,6 +3488,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'components/letters/letters': {
       to: 'Aan: gebruiker',
+      toDeveloper: 'Aan: de ZeppBridge-ontwikkelaar',
       flipHint: 'Tik om de envelop om te draaien',
       flipAria: 'Draai de envelop om',
       sealHint: 'Tik op het lakzegel of veeg eroverheen',
@@ -3495,6 +3496,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       bundle: (count: number) => `${count} brieven samengebonden`,
       sheetLetter: 'Brief',
       sheetNotes: 'Wat is er nieuw',
+      notesHeading: (version: string) => `Alle wijzigingen in ${version}`,
       sheetEcho: 'Vorige keer zei je',
       sheetReply: 'Beantwoorden',
       page: (index: number, total: number) => `Pagina ${index} van ${total}`,
@@ -3527,8 +3529,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       outbox: 'Postvak UIT',
       outboxRetry: 'Nu verzenden',
       sentOn: (date: string) => `Verzonden op ${date}`,
-      read: 'Gelezen',
-      unread: 'Nog niet gelezen',
       filedUnder: (title: string) => `Ondergebracht bij “${title}”`,
       statusNext: 'Eerstvolgende',
       statusLater: 'Uitgesteld',
@@ -3933,6 +3933,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
       capsules: 'Tijdcapsules',
+      toFuture: 'Aan: mijn toekomstige zelf',
+      writeFuture: 'Schrijf aan je toekomstige zelf',
       capsulePlaceholder:
         'Schrijf aan je toekomstige zelf. Eenmaal verzegeld kan niemand het vóór de datum lezen — zelfs jij nu niet.',
       openAfter: 'Openen',

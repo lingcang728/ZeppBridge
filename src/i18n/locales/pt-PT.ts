@@ -3435,6 +3435,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     },
     'components/letters/letters': {
       to: 'Para: utilizador',
+      toDeveloper: 'Para: o programador do ZeppBridge',
       flipHint: 'Toque para virar o envelope',
       flipAria: 'Virar o envelope',
       sealHint: 'Toque no selo de cera ou deslize com o dedo',
@@ -3442,6 +3443,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       bundle: (count: number) => `${count} cartas atadas`,
       sheetLetter: 'Carta',
       sheetNotes: 'Novidades',
+      notesHeading: (version: string) => `Todas as alterações da ${version}`,
       sheetEcho: 'Da última vez disse',
       sheetReply: 'Responder',
       page: (index: number, total: number) => `Página ${index} de ${total}`,
@@ -3471,8 +3473,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       outbox: 'Caixa de saída',
       outboxRetry: 'Enviar agora',
       sentOn: (date: string) => `Enviada a ${date}`,
-      read: 'Lida',
-      unread: 'Ainda por ler',
       filedUnder: (title: string) => `Arquivada em “${title}”`,
       statusNext: 'A corrigir a seguir',
       statusLater: 'Adiado',
@@ -3869,6 +3869,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
       capsules: 'Cápsulas do tempo',
+      toFuture: 'Para: o meu eu futuro',
+      writeFuture: 'Escreve para o teu eu futuro',
       capsulePlaceholder:
         'Escreve para o teu eu futuro. Depois de selada, ninguém a pode ler antes do dia chegar — nem mesmo tu.',
       openAfter: 'Abrir',

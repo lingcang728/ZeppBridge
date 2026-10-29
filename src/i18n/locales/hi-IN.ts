@@ -3111,6 +3111,7 @@ export default {
 
     'components/letters/letters': {
       to: 'सेवा में: उपयोगकर्ता',
+      toDeveloper: 'सेवा में: ZeppBridge डेवलपर',
       flipHint: 'लिफाफा पलटने के लिए टैप करें',
       flipAria: 'लिफाफा पलटें',
       sealHint: 'लाख की मुहर पर टैप करें या स्वाइप करें',
@@ -3118,6 +3119,7 @@ export default {
       bundle: (count: number) => `${count} पत्र एक साथ बंधे हुए`,
       sheetLetter: 'पत्र',
       sheetNotes: 'नया क्या है',
+      notesHeading: (version: string) => `${version} के सभी बदलाव`,
       sheetEcho: 'पिछली बार आपने कहा था',
       sheetReply: 'उत्तर',
       page: (index: number, total: number) => `पृष्ठ ${index} / ${total}`,
@@ -3147,8 +3149,6 @@ export default {
       outbox: 'आउटबॉक्स',
       outboxRetry: 'अभी भेजें',
       sentOn: (date: string) => `${date} को भेजा गया`,
-      read: 'पढ़ा हुआ',
-      unread: 'अभी नहीं पढ़ा',
       filedUnder: (title: string) => `“${title}” के तहत दर्ज`,
       statusNext: 'अगले संस्करण में सुधार',
       statusLater: 'स्थगित',
@@ -3548,6 +3548,8 @@ export default {
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} किमी` : '', minutes ? `${minutes} मिनट` : ''].filter(Boolean).join(' · '),
       capsules: 'टाइम कैप्सूल',
+      toFuture: 'सेवा में: मेरा भविष्य',
+      writeFuture: 'अपने भविष्य के लिए लिखें',
       capsulePlaceholder: 'अपने भविष्य के लिए लिखें। सील होने के बाद, तय दिन आने से पहले इसे कोई नहीं पढ़ सकता — आप भी नहीं।',
       openAfter: 'खोलें',
       spanHalfYear: 'छह महीने में',

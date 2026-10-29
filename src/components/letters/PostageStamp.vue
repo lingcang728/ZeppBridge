@@ -14,8 +14,9 @@ import { useStampImage } from '../../services/letters';
 import StampArt from './StampArt.vue';
 import speck from '../../assets/letters/paper-speck.png';
 
-const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number }>(), { width: 92, tilt: 0 });
-const face = computed(() => stampFace(props.version));
+/* label：不是作者来信的邮票（每周来信、时间胶囊）自己印面值，比如周一的日子、开封那年。 */
+const props = withDefaults(defineProps<{ version: string; width?: number; tilt?: number; label?: string }>(), { width: 92, tilt: 0, label: '' });
+const face = computed(() => props.label || stampFace(props.version));
 const image = useStampImage(() => props.version);
 const id = `stamp-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 

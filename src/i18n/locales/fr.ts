@@ -3216,6 +3216,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     },
     'components/letters/letters': {
       to: 'Pour : utilisateur',
+      toDeveloper: 'Pour : le développeur de ZeppBridge',
       flipHint: 'Touchez pour retourner l’enveloppe',
       flipAria: 'Retourner l’enveloppe',
       sealHint: 'Touchez le sceau de cire ou glissez le doigt dessus',
@@ -3223,6 +3224,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       bundle: (count: number) => `${count} lettres attachées ensemble`,
       sheetLetter: 'Lettre',
       sheetNotes: 'Nouveautés',
+      notesHeading: (version: string) => `Tous les changements de la ${version}`,
       sheetEcho: 'La dernière fois, vous avez dit',
       sheetReply: 'Répondre',
       page: (index: number, total: number) => `Page ${index} sur ${total}`,
@@ -3252,8 +3254,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       outbox: 'Boîte d’envoi',
       outboxRetry: 'Envoyer maintenant',
       sentOn: (date: string) => `Envoyée le ${date}`,
-      read: 'Lue',
-      unread: 'Pas encore lue',
       filedUnder: (title: string) => `Classée sous « ${title} »`,
       statusNext: 'Corrigé au prochain tour',
       statusLater: 'Reporté',
@@ -3665,6 +3665,8 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
       capsules: 'Capsules temporelles',
+      toFuture: 'Pour : mon futur moi',
+      writeFuture: 'Écrivez à votre futur vous',
       capsulePlaceholder:
         'Écrivez à votre futur vous. Une fois scellée, personne ne pourra la lire avant la date prévue — pas même vous aujourd’hui.',
       openAfter: 'Ouvrir',

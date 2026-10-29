@@ -7,6 +7,9 @@
  * - 两面：正面左上角 ZEPPBRIDGE、手写「致：用户」、右上角一枚邮票（2026-10-21 用户：邮戳和波浪线都不要，只留邮票；
  *   寄件人不写「寄自」，全大写品牌名）；背面只有封舌、火漆，底片上压一行无墨凸印 ZEPPBRIDGE。邮票不在封舌上，拆信不会撕坏它。
  *
+ * 自己寄出的回信（mine，2026-10-29 用户：「我的回信」要像一只只寄出的信封）：收件人用回信那支蓝墨水写、不印寄件人，
+ * 邮票左下压一枚寄出那天的圆邮戳（postmark，两行：月.日 / 年；双圈、印泥色，不用混合模式）。
+ *
  * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：
  * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）。信纸往上抽由外面按 lib/letters/unfold.ts 的时间线放（WAAPI）。
  *
@@ -23,7 +26,17 @@ withDefaults(defineProps<{
   state?: 'sealed' | 'opening' | 'still';
   bundled?: number;
   to?: string;
-}>(), { face: 'back', state: 'still', bundled: 0, to: '' });
+  /** 邮票面值另印（每周来信、时间胶囊）；不给就印版本号。 */
+  stampLabel?: string;
+  /** 自己寄出去的（我的回信）。 */
+  mine?: boolean;
+  /** 邮戳上的日期 YYYY-MM-DD；不给就不盖。 */
+  postmark?: string;
+}>(), { face: 'back', state: 'still', bundled: 0, to: '', stampLabel: '', mine: false, postmark: '' });
+const mark = (day: string) => {
+  const [year = '', month = '', date = ''] = day.split('-');
+  return { day: `${Number(month)}.${Number(date)}`, year };
+};
 /* 品牌名不翻译。 */
 const SENDER = 'ZEPPBRIDGE';
 const id = `env-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -39,7 +52,7 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 </script>
 
 <template>
-  <div :class="['envelope', `face-${face}`, `is-${state}`, { bundled: bundled > 1 }]">
+  <div :class="['envelope', `face-${face}`, `is-${state}`, { bundled: bundled > 1, mine }]">
     <span v-if="bundled > 2" class="env-ghost two" aria-hidden="true"></span>
     <span v-if="bundled > 1" class="env-ghost one" aria-hidden="true"></span>
     <span class="env-back" aria-hidden="true"></span>
@@ -89,12 +102,16 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
     <span v-if="bundled > 1" class="env-twine" aria-hidden="true"></span>
     <template v-if="face === 'front'">
       <div class="env-address" aria-hidden="true">
-        <span class="env-from">{{ SENDER }}</span>
+        <span v-if="!mine" class="env-from">{{ SENDER }}</span>
         <span class="env-to">{{ to }}</span>
         <span class="env-lines"><i></i><i></i><i></i></span>
       </div>
       <div class="env-stamp" aria-hidden="true">
-        <PostageStamp :version="version" :width="88" :tilt="0.6" />
+        <PostageStamp :version="version" :label="stampLabel" :width="88" :tilt="0.6" />
+      </div>
+      <div v-if="postmark" class="env-postmark" aria-hidden="true">
+        <span class="mark-day">{{ mark(postmark).day }}</span><span class="mark-year">{{ mark(postmark).year }}</span>
+        <svg class="mark-waves" viewBox="0 0 120 30" preserveAspectRatio="none"><path d="M0 5q10-5 20 0t20 0 20 0 20 0 20 0 20 0M0 15q10-5 20 0t20 0 20 0 20 0 20 0 20 0M0 25q10-5 20 0t20 0 20 0 20 0 20 0 20 0" /></svg>
       </div>
     </template>
     <template v-else>
@@ -168,6 +185,19 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 .env-lines i:nth-child(2) { width: 82%; }
 .env-lines i:nth-child(3) { width: 92%; }
 .env-stamp { position: absolute; right: 5%; top: 7%; z-index: 6; }
+/* 自己写的：蓝墨水。 */
+.mine .env-to { top: 30%; color: #24467e; }
+.mine .env-lines { top: 48%; }
+/* 寄出邮戳：压住邮票左下角，往左拖三道波浪线。 */
+.env-postmark {
+  position: absolute; right: 19%; top: 27%; z-index: 7; display: grid; place-content: center; justify-items: center; gap: 1px;
+  width: 74px; height: 74px; border: 2px solid rgb(45 42 60 / .55); border-radius: 50%; color: rgb(45 42 60 / .7); rotate: -14deg; pointer-events: none;
+  box-shadow: inset 0 0 0 5px transparent, inset 0 0 0 6.5px rgb(45 42 60 / .35);
+}
+.mark-day { font: 700 17px/1 var(--font-mono); letter-spacing: .02em; }
+.mark-year { font: 600 11px/1 var(--font-mono); letter-spacing: .08em; }
+.mark-waves { position: absolute; right: 90%; top: 26%; width: 64px; height: 34px; overflow: visible; }
+.mark-waves path { fill: none; stroke: rgb(45 42 60 / .4); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
 .env-emboss {
   inset: auto 0 9% !important; z-index: 6; text-align: center; pointer-events: none;
   color: var(--env-bottom-in); font: 600 var(--fs-2xs)/1 var(--font-sans); letter-spacing: .24em;

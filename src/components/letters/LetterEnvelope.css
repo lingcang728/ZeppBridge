@@ -101,6 +101,8 @@
  * 议题编号缀在标题后面、等宽小字；条与条之间空一行。全部压在横线上（行高都是 --paper-line，空行也是整行）。
  */
 .notes-leaf { --note-added: #3f6e43; --note-improved: #8a5a16; --note-fixed: #a3322c; --note-other: var(--paper-muted); }
+/* 信之后单开的这一页先说一句「以下是 x.y.z 的详细改动」，占一整行横线，字和信正文同一种。 */
+.notes-heading { margin: 0 0 var(--paper-line); color: var(--paper-ink); font: 700 var(--paper-size) / var(--paper-line) var(--paper-font); }
 .notes-leaf :deep(.release-group) { --note: var(--note-other); margin: 0 0 var(--paper-line); }
 .notes-leaf :deep(.release-group.is-added) { --note: var(--note-added); }
 .notes-leaf :deep(.release-group.is-improved) { --note: var(--note-improved); }

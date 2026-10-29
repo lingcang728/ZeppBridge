@@ -3,6 +3,7 @@ import { echoTitle, leadParagraph, lettersBetween, parseEcho, parseLetter } from
 import { stampFace } from '../letters/stamp';
 import { archiveSpan } from '../letters/personal';
 import { noteParts } from '../letters/notes';
+import { flightFrames, flightPath } from '../letters/paperPlane';
 
 describe('letters', () => {
   it('reads paragraphs and a short dash-led signature, like the website archive', () => {
@@ -46,9 +47,10 @@ describe('letters', () => {
     expect(lettersBetween(all, '3.0.6', '3.0.9-beta.1')).toEqual(['3.0.7', '3.0.9']);
   });
 
-  it('prints the minor version on a stamp, and the full version for patch releases', () => {
-    expect(stampFace('3.1.0')).toBe('3.1');
+  it('prints the full version on a stamp, without a prerelease suffix', () => {
+    expect(stampFace('3.1.0')).toBe('3.1.0');
     expect(stampFace('3.0.7')).toBe('3.0.7');
+    expect(stampFace('3.1.0-beta.1')).toBe('3.1.0');
   });
 
   it('only states the archive span when there is at least a month of data', () => {
@@ -63,5 +65,18 @@ describe('letters', () => {
     expect(noteParts('**命令行顶替运动（#143）**。zeppbridge-cli 新增 fit-override。')).toEqual({ title: '命令行顶替运动', body: 'zeppbridge-cli 新增 fit-override。', refs: ['#143'] });
     expect(noteParts('**Backfill gaps (#143, #150)**: months come back.')).toEqual({ title: 'Backfill gaps', body: 'months come back.', refs: ['#143', '#150'] });
     expect(noteParts('Plain note without a title')).toEqual({ title: '', body: 'Plain note without a title', refs: [] });
+  });
+
+  it('flies the paper plane down a little first, then out past the top-right corner, nose along the path', () => {
+    const frames = flightFrames(flightPath({ x: 400, y: 500 }, { width: 1200, height: 800 }));
+    const first = frames[0]!;
+    const last = frames[frames.length - 1]!;
+    expect(first).toMatchObject({ x: 400, y: 500, t: 0 });
+    expect(frames[3]!.y).toBeGreaterThan(500);
+    expect(last.x).toBeGreaterThan(1200);
+    expect(last.y).toBeLessThan(0);
+    expect(last.scale).toBeLessThan(first.scale);
+    /* 起飞时机头朝右下（沉），飞出时朝右上（抬头）。 */
+    expect(first.angle).toBeGreaterThan(frames[frames.length - 2]!.angle);
   });
 });

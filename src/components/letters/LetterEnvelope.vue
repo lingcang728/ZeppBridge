@@ -29,7 +29,7 @@ import PagedLeaf from './PagedLeaf.vue';
 import EchoSheet from './EchoSheet.vue';
 import ReplySheet from './ReplySheet.vue';
 import { useLetterText } from './letters.i18n';
-import { useLetterEnvelope, type Sheet } from '../../composables/useLetterEnvelope';
+import { useLetterEnvelope, type CustomLetter, type Sheet } from '../../composables/useLetterEnvelope';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { exemptFromSettle } from '../../lib/motion/interrupt';
 import { paced } from '../../lib/motion/timing';
@@ -45,15 +45,23 @@ const props = withDefaults(defineProps<{
   notes?: NoteGroup[] | null;
   opened?: boolean;
   origin?: HTMLElement | null;
-}>(), { notes: null, opened: false, origin: null });
+  /** 「你的信」里的信：同一只信封、同一套拆信，纸上画什么由 #sheet 插槽给。 */
+  custom?: CustomLetter | null;
+}>(), { notes: null, opened: false, origin: null, custom: null });
 const emit = defineEmits<{ (event: 'done'): void }>();
 const t = useLetterText();
 
-const { sheets, loaded, span, draft, replyState, replyError, send } =
-  useLetterEnvelope(toRef(props, 'versions'), toRef(props, 'current'), toRef(props, 'notes'));
+const authored = computed(() => (props.custom ? [] : props.versions));
+const letter = useLetterEnvelope(authored, toRef(props, 'current'), toRef(props, 'notes'));
+const { span, draft, replyState, replyError, send } = letter;
+const sheets = computed<Sheet[]>(() => (props.custom
+  ? props.custom.sheets.map((sheet) => ({ kind: 'custom' as const, ...sheet })) : letter.sheets.value));
+const loaded = computed(() => Boolean(props.custom) || letter.loaded.value);
+const composing = computed(() => Boolean(props.custom?.compose));
 
 type Phase = 'front' | 'sealed' | 'opening' | 'reading';
-const phase = ref<Phase>(props.opened ? 'reading' : 'front');
+/* 写胶囊：一上来就是信封背面（没封口），自己打开、抽出空信纸。 */
+const phase = ref<Phase>(props.opened ? 'reading' : props.custom?.compose ? 'sealed' : 'front');
 const index = ref(0);
 /*
  * 外面那沓信纸什么时候挂上去排版（透明度 0 藏着、不可操作）：信封出现后不久、人还在看信封的时候。
@@ -64,9 +72,12 @@ const staged = ref(props.opened);
 /* 展开完成后字和按钮浮上来（只在第一次展开时，重读不放）。 */
 const inked = ref(false);
 const newest = computed(() => props.versions[props.versions.length - 1] ?? props.current);
-/* 信头日期：第一次收到这封信的那天。重读时不再记新的。 */
+/* 信头日期：第一次收到这封信的那天。重读时不再记新的。「你的信」不记。 */
 const postmark = ref<string | null>(null);
-onMounted(() => { postmark.value = props.opened ? receivedDate(newest.value) : receivedOn(newest.value); });
+onMounted(() => {
+  if (props.custom) return;
+  postmark.value = props.opened ? receivedDate(newest.value) : receivedOn(newest.value);
+});
 
 /* 长信分页：每封信的第 0 页量出总页数报上来。 */
 const counts = ref<Record<number, number>>({});
@@ -75,7 +86,7 @@ const setCount = (sheetIndex: number, count: number) => {
 };
 type Page = { sheet: Sheet; sheetIndex: number; sub: number };
 const pages = computed<Page[]>(() => sheets.value.flatMap((sheet, sheetIndex) => {
-  const n = sheet.kind === 'reply' ? 1 : counts.value[sheetIndex] ?? 1;
+  const n = sheet.kind === 'reply' || (sheet.kind === 'custom' && sheet.fixed) ? 1 : counts.value[sheetIndex] ?? 1;
   return Array.from({ length: n }, (_, sub) => ({ sheet, sheetIndex, sub }));
 }));
 
@@ -86,10 +97,12 @@ onBeforeUnmount(() => timers.forEach((id) => window.clearTimeout(id)));
 const stage = ref<HTMLElement | null>(null);
 const reader = ref<HTMLElement | null>(null);
 onMounted(() => { if (!props.opened) later(lessMotion() ? 0 : 900, () => { staged.value = true; }); });
+/* 写胶囊：信封飞到位、稍停一下就自己打开。 */
+onMounted(() => { if (composing.value) later(lessMotion() ? 0 : 520, () => { void open(); }); });
 
 /* ── 信封：摆正放着，可以拖着转（像 3D 模型），松手落回最近的一面；点正面翻到背面 ── */
 const flipper = ref<HTMLElement | null>(null);
-const turn = ref({ x: 0, y: 0 });
+const turn = ref({ x: 0, y: props.custom?.compose ? 180 : 0 });
 const orbit = (x: number, y: number, z = 0) => `perspective(1400px) translateZ(${z}px) rotateX(${x}deg) rotateY(${y}deg)`;
 const flipperStyle = computed(() => ({ transform: orbit(turn.value.x, turn.value.y) }));
 const faceOf = (y: number): Phase => (((Math.round(y / 180) % 2) + 2) % 2 === 0 ? 'front' : 'sealed');
@@ -107,7 +120,7 @@ const settle = (x: number, y: number, keyframes?: Keyframe[], duration = 480) =>
 type Drag = { x: number; y: number; id: number; base: { x: number; y: number }; moved: boolean; t: number; vx: number; lastX: number };
 let drag: Drag | null = null;
 let suppressClick = false;
-const canTurn = () => phase.value === 'front' || phase.value === 'sealed';
+const canTurn = () => !composing.value && (phase.value === 'front' || phase.value === 'sealed');
 const dragDown = (event: PointerEvent) => {
   if (!canTurn() || event.button !== 0) return;
   drag = { x: event.clientX, y: event.clientY, id: event.pointerId, base: { ...turn.value }, moved: false, t: performance.now(), vx: 0, lastX: event.clientX };
@@ -229,7 +242,7 @@ const printFirstPage = (shell: HTMLElement, sheet: HTMLElement, flap: HTMLElemen
   if (flap) print(flap, 1, -foldH.value);
 };
 
-const label = (sheet: Sheet) => (sheet.kind === 'letter' ? t.value.letterHead(sheet.version)
+const label = (sheet: Sheet) => (sheet.kind === 'custom' ? sheet.label : sheet.kind === 'letter' ? t.value.letterHead(sheet.version)
   : sheet.kind === 'notes' ? t.value.sheetNotes : sheet.kind === 'echo' ? t.value.sheetEcho : t.value.sheetReply);
 /* 「附：」只放在最新那封信的末尾。 */
 const postscriptFor = (sheet: Sheet) => (sheet.kind === 'letter' && sheet.version === newest.value && span.value ? t.value.postscript(span.value) : null);
@@ -300,7 +313,7 @@ const acknowledge = async (event?: MouseEvent) => {
 
 <template>
   <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="acknowledge()">
-    <h2 id="letter-envelope-title" class="sr-only">{{ t.letterHead(newest) }}</h2>
+    <h2 id="letter-envelope-title" class="sr-only">{{ custom ? custom.title : t.letterHead(newest) }}</h2>
     <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0 }]">
       <div v-if="phase !== 'reading'" class="envelope-wrap">
         <div ref="flipper" class="flipper" :style="flipperStyle"
@@ -309,16 +322,17 @@ const acknowledge = async (event?: MouseEvent) => {
           <i class="edge edge-l" aria-hidden="true"></i><i class="edge edge-r" aria-hidden="true"></i>
           <i class="edge edge-t" aria-hidden="true"></i><i class="edge edge-b" aria-hidden="true"></i>
           <button type="button" class="side side-front" :aria-label="t.flipAria" :disabled="phase !== 'front'" @click="flip">
-            <EnvelopeArt :version="newest" face="front" :bundled="versions.length" :to="t.to" />
+            <EnvelopeArt :version="newest" face="front" :bundled="custom ? 0 : versions.length" :to="custom ? custom.to : t.to" :stamp-label="custom?.stamp"
+              :mine="custom?.mine" :postmark="custom?.postmark" />
           </button>
           <div class="side side-back" :inert="phase === 'front' || undefined">
             <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : 'sealed'"
-              :bundled="versions.length">
-              <template #seal><WaxSeal :label="t.sealAria(newest)" :size="96" @break="open" /></template>
+              :bundled="custom ? 0 : versions.length">
+              <template v-if="!composing" #seal><WaxSeal :label="custom ? custom.title : t.sealAria(newest)" :size="96" @break="open" /></template>
             </EnvelopeArt>
           </div>
         </div>
-        <p class="seal-hint">{{ versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ phase === 'front' ? t.flipHint : t.sealHint }}</p>
+        <p v-if="!composing" class="seal-hint">{{ !custom && versions.length > 1 ? `${t.bundle(versions.length)} · ` : '' }}{{ phase === 'front' ? t.flipHint : t.sealHint }}</p>
       </div>
 
       <!-- 信封出现后不久就挂上、排好版（藏着、不可操作），展开那一下不用现排。 -->
@@ -336,11 +350,20 @@ const acknowledge = async (event?: MouseEvent) => {
                   :lang="(pages[i]!.sheet as { lang: string }).lang" :head="postmark ?? ''" :postscript="postscriptFor(pages[i]!.sheet)"
                   :page="pages[i]!.sub" :active="active" @pages="setCount(pages[i]!.sheetIndex, $event)" />
                 <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'notes'" class="notes-leaf" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
+                  <p class="notes-heading no-indent">{{ t.notesHeading(pages[i]!.sheet.version) }}</p>
                   <ReleaseNotesList :groups="notes ?? []" paper />
                 </PagedLeaf>
                 <PagedLeaf v-else-if="pages[i]!.sheet.kind === 'echo'" :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
                   <EchoSheet :text="(pages[i]!.sheet as { text: string }).text" :lang="(pages[i]!.sheet as { lang: string }).lang" />
                 </PagedLeaf>
+                <template v-else-if="pages[i]!.sheet.kind === 'custom'">
+                  <div v-if="pages[i]!.sheet.fixed" class="leaf-fixed paper-lines">
+                    <slot name="sheet" :sheet="pages[i]!.sheet" :page="pages[i]!.sub" :close="acknowledge" />
+                  </div>
+                  <PagedLeaf v-else :page="pages[i]!.sub" @pages="setCount(pages[i]!.sheetIndex, $event)">
+                    <slot name="sheet" :sheet="pages[i]!.sheet" :page="pages[i]!.sub" :close="acknowledge" />
+                  </PagedLeaf>
+                </template>
                 <div v-else class="leaf-fixed paper-lines">
                   <ReplySheet v-model:draft="draft" :state="replyState" :error="replyError" @send="send()" />
                 </div>
@@ -357,8 +380,8 @@ const acknowledge = async (event?: MouseEvent) => {
         </div>
         <!-- 底下只有「知道了」，而且只在最后一页出现（2026-10-21 用户：静音、左右箭头都不要，翻页靠拖、滚轮、方向键）。 -->
         <footer class="letter-foot">
-          <button type="button" :class="['button', 'primary', 'acknowledge', { shown: index === pages.length - 1 }]"
-            :disabled="closing || index !== pages.length - 1" :tabindex="index === pages.length - 1 ? undefined : -1" @click="acknowledge">{{ t.acknowledge }}</button>
+          <button v-if="!composing" type="button" :class="['button', 'primary', 'acknowledge', { shown: index === pages.length - 1 }]"
+            :disabled="closing || index !== pages.length - 1" :tabindex="index === pages.length - 1 ? undefined : -1" @click="acknowledge">{{ custom?.acknowledge ?? t.acknowledge }}</button>
         </footer>
       </div>
     </div>

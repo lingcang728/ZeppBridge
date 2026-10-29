@@ -298,6 +298,7 @@ export default {
     },
     'components/letters/letters': {
       to: 'An: Benutzer',
+      toDeveloper: 'An: ZeppBridge-Entwickler',
       flipHint: 'Tippen, um den Umschlag umzudrehen',
       flipAria: 'Briefumschlag umdrehen',
       sealHint: 'Tippe auf das Wachssiegel oder streiche kurz darüber',
@@ -305,6 +306,7 @@ export default {
       bundle: (count: number) => `${count} Briefe zusammengebunden`,
       sheetLetter: 'Brief',
       sheetNotes: 'Neuigkeiten',
+      notesHeading: (version: string) => `Alle Änderungen in ${version}`,
       sheetEcho: 'Letztes Mal sagtest du',
       sheetReply: 'Antworten',
       page: (index: number, total: number) => `Seite ${index} von ${total}`,
@@ -334,8 +336,6 @@ export default {
       outbox: 'Postausgang',
       outboxRetry: 'Jetzt senden',
       sentOn: (date: string) => `Gesendet am ${date}`,
-      read: 'Gelesen',
-      unread: 'Noch ungelesen',
       filedUnder: (title: string) => `Eingeordnet unter „${title}"`,
       statusNext: 'Kommt als Nächstes',
       statusLater: 'Verschoben',
@@ -4182,6 +4182,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       workout: (type: string, km: string | null, minutes: number | null) =>
         [type, km ? `${km} km` : '', minutes ? `${minutes} Min.` : ''].filter(Boolean).join(' · '),
       capsules: 'Zeitkapseln',
+      toFuture: 'An: Mein zukünftiges Ich',
+      writeFuture: 'Schreibe an dein zukünftiges Ich',
       capsulePlaceholder:
         'Schreibe an dein zukünftiges Ich. Einmal versiegelt, kann niemand sie vor dem Stichtag lesen – nicht einmal du selbst.',
       openAfter: 'Öffnen',
