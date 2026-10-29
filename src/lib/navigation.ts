@@ -38,7 +38,7 @@ export const cardCloseDestination = (back: string | null): BackDestination => {
   return { path: back, viaHistory: true };
 };
 
-/** 三个主入口在导航胶囊里的顺序；横向切页的方向按它算。 */
+/** 三个主入口在导航胶囊里的顺序；换入口的涟漪从这一格扩散（AppShell 的 rippleOrigin）。 */
 export const TAB_ORDER = ['/', '/ai', '/settings'] as const;
 
 /** expand / collapse：从某张卡展开成详情页、返回时缩回那张卡（composables/usePageMorph.ts）。 */
@@ -50,10 +50,11 @@ const isTabRoot = (path: string) => (TAB_ORDER as readonly string[]).includes(pa
  * 切页时画面往哪儿走。
  *
  * 同一个入口里往深处走（概览 → 睡眠详情）是「聚焦进去」，回来是「退出来」；
- * 换入口是横向滑，方向跟导航胶囊里的左右顺序一致——手指往哪边拨，画面就从哪边来。
+ * 换入口返回 left / right（按导航胶囊里的左右顺序）；AppShell 把它和下面的 dismiss 都换成从被点标签
+ * 扩散的涟漪（composables/useTabRipple.ts，10-29），方向仍然留着给测试和以后用。
  *
- * 从某个详情页直接跳到别的入口（睡眠详情 → 设置）是「收起」：那张卡回不去了（来处页
- * 不在这条路上），详情页往纵深里退、新页从近处落定，而不是把一张详情页横着拖走。
+ * 从某个详情页直接跳到别的入口（睡眠详情 → 设置）是 dismiss：那张卡回不去了（来处页
+ * 不在这条路上），所以也不形变回卡，同样走涟漪。
  */
 export const pageMotion = (from: string, to: string): PageMotion => {
   if (from === to) return 'none';

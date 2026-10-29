@@ -134,31 +134,20 @@
    （旧页还在、新页还没出来，看不出在等），AppShell 等帧节奏恢复（lib/motion/steady.ts）再放。
    旧页只淡出、不位移：两页各往一个方向走，交叠那一下就是一屏重影。 */
 [class*='page-'].page-forward-enter-active, [class*='page-'].page-back-enter-active, [class*='page-'].page-none-enter-active,
-[class*='page-'].page-left-enter-active, [class*='page-'].page-right-enter-active, [class*='page-'].page-dismiss-enter-active,
-[class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active,
-[class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active, [class*='page-'].page-dismiss-leave-active { transition: none; }
+[class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active { transition: none; }
 [class*='page-'].page-forward-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both, page-rise var(--dur-std) var(--ease-enter) both; }
 [class*='page-'].page-back-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both, page-drop var(--dur-std) var(--ease-enter) both; }
 [class*='page-'].page-none-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) both; }
 [class*='page-'].page-forward-leave-active, [class*='page-'].page-back-leave-active, [class*='page-'].page-none-leave-active { animation: page-fade-out 150ms ease both; }
-/* 换入口（点 / 拖顶栏胶囊）：新页顺着胶囊的方向从侧面滑进来，先快后慢地停住；旧页往反方向让一小段、
-   很快淡掉（重叠只有一瞬，不成重影）。以前两边只挪 24px、一共 250ms，看上去就是硬切。 */
-[class*='page-'].page-left-enter-active { animation: page-fade-in 340ms ease-out both, page-from-right 560ms cubic-bezier(.4, .6, .2, 1) both; }
-[class*='page-'].page-right-enter-active { animation: page-fade-in 340ms ease-out both, page-from-left 560ms cubic-bezier(.4, .6, .2, 1) both; }
-[class*='page-'].page-left-leave-active { animation: page-fade-out 200ms ease-in both, page-to-left 280ms ease-in both; }
-[class*='page-'].page-right-leave-active { animation: page-fade-out 200ms ease-in both, page-to-right 280ms ease-in both; }
+/* 换入口（点 / 拖顶栏胶囊，或从二级页直接点顶栏）：顶栏涟漪，两页的块各自由 WAAPI 动（composables/useTabRipple.ts），
+   页面本身不淡、不位移——整页 opacity 会让页里的毛玻璃失去取样（记忆「动效与玻璃的 Chromium 坑」）。 */
+[class*='page-'].page-ripple-enter-active, [class*='page-'].page-ripple-leave-active { transition: none; }
 /* 换页那一刻先停在第一帧，等帧稳了再放（AppShell.vue 的 holdPageMotion）。 */
 .page-host.holding > [class*='-enter-active'], .page-host.holding > [class*='-leave-active'] { animation-play-state: paused; }
 @keyframes page-fade-in { from { opacity: 0; } }
 @keyframes page-fade-out { to { opacity: 0; } }
 @keyframes page-rise { from { transform: translateY(14px); } }
 @keyframes page-drop { from { transform: translateY(-10px); } }
-@keyframes page-from-right { from { transform: translateX(84px); } }
-@keyframes page-from-left { from { transform: translateX(-84px); } }
-@keyframes page-to-left { to { transform: translateX(-32px); } }
-@keyframes page-to-right { to { transform: translateX(32px); } }
-@keyframes page-shrink-out { to { transform: scale(.94); } }
-@keyframes page-settle-in { from { transform: scale(1.03) translateY(10px); } }
 /* 卡 ↔ 页由 usePageMorph 的真实 WAAPI flight 调用 Vue done，层次一直保留到落地。
    不用 CSS 透明度占位：它的墙钟超时与暂停/倒放/DevTools 慢速播放不同步，
    会提前移除离场页，并在下次返回时遗留仍被快进的 CSSTransition。 */
@@ -169,10 +158,6 @@
 [class*='page-'].page-collapse-enter-active { transition: none; }
 .page-collapse-enter-from { opacity: 1; }
 [class*='page-'].page-collapse-leave-active { z-index: 3; transition: none; }
-/* 收起（详情页 → 别的入口）：详情页往纵深退——缩小淡出，像被收进去；
-   新页从略近处落定，减速停住，不回弹。只动 transform / opacity。 */
-[class*='page-'].page-dismiss-leave-active { animation: page-fade-out 260ms var(--ease-leave) both, page-shrink-out 300ms var(--ease-leave) both; }
-[class*='page-'].page-dismiss-enter-active { animation: page-fade-in var(--dur-std) var(--ease-enter) 100ms both, page-settle-in var(--dur-std) var(--ease-enter) 100ms both; }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 卡 ↔ 页形变时蒙在来处页上的模糊（lib/motion/pageFlight.ts 的 pageVeil）：和弹窗遮罩（ModalDialog.vue 的
    .dialog-backdrop::before）同一组值，静态模糊，只淡入淡出这一层——用户 2026-10-28「照抄履历页卡片的动画」。 */
