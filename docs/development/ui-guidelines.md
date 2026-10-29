@@ -173,9 +173,24 @@ forbidden. The provenance of the algorithms and percentages is in the
   tweens the width instead of jumping.
 - **Page transitions never pass through a blank frame**: old and new page are
   on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
-  direction — `forward` focuses into a detail page, `back` backs out, `left` /
-  `right` slide between tabs in nav-capsule order — all with blur. The leaving
+  direction — `forward` focuses into a detail page, `back` backs out. The leaving
   page is pinned at its scroll position so it does not jump to the top.
+- **Switching tabs is a ripple from the clicked tab** (2026-10-29,
+  `composables/useTabRipple.ts`, geometry in `lib/motion/tabRipple.ts`): this covers
+  Overview / Hand to AI / Settings and clicking a top tab from any sub-page. A wave
+  front spreads from the tab; each visible block of the old page sinks outward and
+  fades as the front reaches it, and the new page's block in that spot rises in a
+  beat later (the old one is already transparent: no double exposure). Blocks
+  loaded after the switch join the wave. Full-screen layers (the sheet's blur) fade
+  evenly across the whole ripple instead of vanishing first, and the top bar's
+  edge blur holds until the blocks under it are gone. Completion follows the
+  animations themselves (explicit `done`), never Vue's wall-clock timeout — that
+  timeout used to remove the old page while the frame-steady hold had paused it,
+  leaving a blank screen when switching from a scrolled page.
+- **Sheets on Hand to AI** (saved tasks, pre-send check, round trips) use the same
+  window morph as dialogs (`lib/motion/sheet.ts` → `dialogWindowFrames`): the first
+  frame is the pill itself (a copy fades out while the real one hides), content
+  stays 1:1, and closing lands back on the pill.
 - **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`,
   2026-10-03): the new page itself is cropped out of the card (`translate` + a
   fixed-radius `clip-path`, 1:1, no scaling) and slides from the card's corner
