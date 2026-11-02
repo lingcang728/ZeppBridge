@@ -156,6 +156,34 @@ fn shoes_are_credited_by_choice_then_zepp_then_default_and_never_by_guess() {
         .is_err());
 }
 
+/// #157：有默认跑鞋时，带着没登记的 Zepp 鞋编号的跑步不能被默认鞋吞掉，
+/// 要出现在「还没添加」里。
+#[test]
+fn an_unregistered_zepp_gear_is_not_swallowed_by_the_default_shoe() {
+    let db = Database::in_memory().unwrap();
+    workout(&db, "plain", "run", (2026, 3, 1), 8.0, None);
+    workout(&db, "other-shoe", "run", (2026, 3, 2), 10.0, Some("g-9"));
+    let daily = db.save_shoe(&shoe("Daily", "running", true, None)).unwrap();
+
+    let (shoes, gear) = db.shoe_overview().unwrap();
+    let daily = shoes
+        .iter()
+        .find(|s| s.shoe.input.id == Some(daily))
+        .unwrap();
+    assert_eq!(daily.km, 8.0, "默认鞋只收没带鞋编号的那次");
+    assert_eq!(gear.len(), 1);
+    assert_eq!(gear[0].zepp_gear_id, "g-9");
+    assert_eq!(gear[0].workouts, 1);
+    assert_eq!(
+        db.workout_feel("other-shoe")
+            .unwrap()
+            .unwrap()
+            .assigned
+            .map(|a| a.how),
+        Some("unknown")
+    );
+}
+
 #[test]
 fn wear_warns_near_and_at_the_retire_distance() {
     let db = Database::in_memory().unwrap();

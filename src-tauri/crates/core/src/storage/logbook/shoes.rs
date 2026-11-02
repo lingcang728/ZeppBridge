@@ -153,6 +153,14 @@ pub(crate) fn assign(workout: &FootwearWorkout, shoes: &[Shoe]) -> ShoeAssignmen
             };
         }
     }
+    // #157：运动带着 Zepp 鞋编号、我们却没登记这双鞋——那双鞋是确定的，只是
+    // 还没添加，不能算到默认鞋头上，不然它永远进不了「还没添加」。
+    if workout.gear_id.is_some() {
+        return ShoeAssignment {
+            shoe_id: None,
+            how: "unknown",
+        };
+    }
     let default_for = |sport: &str| {
         shoes.iter().find(|s| {
             s.input.is_default && s.input.sport == sport && in_service(&s.input, &workout.date)
