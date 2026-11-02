@@ -100,6 +100,39 @@ pub(super) fn retry_after_ms(headers: &header::HeaderMap) -> Option<u64> {
     Some(millis.min(MAX_BACKOFF_MS))
 }
 
+/// 单次请求的时限，以及超时以后还要不要重试。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RequestTiming {
+    pub(super) timeout: Duration,
+    pub(super) retry_on_timeout: bool,
+}
+
+pub(super) const DEFAULT_TIMING: RequestTiming = RequestTiming {
+    timeout: Duration::from_secs(30),
+    retry_on_timeout: true,
+};
+
+/// #157：体重接口就是慢，`limit=15` 都要二十多秒才回，30 秒的时限下它一次都
+/// 没拉完过。给它两分钟；超时不重试——一个两分钟还回不来的请求，马上再发
+/// 两遍只是让这一轮同步多等四分钟。
+pub(super) const WEIGHT_TIMING: RequestTiming = RequestTiming {
+    timeout: Duration::from_secs(120),
+    retry_on_timeout: false,
+};
+
+impl RequestTiming {
+    /// 外层兜底的时限。必须比 reqwest 的单次时限长：外层先到就把一个本来
+    /// 还能回来的请求掐断了（以前外层写死 35 秒，单次时限改长了也没用）。
+    pub(super) fn guard(self) -> Duration {
+        self.timeout + Duration::from_secs(5)
+    }
+
+    /// 第 `attempt` 次（已经加过 1）失败以后还能不能再来一次。
+    pub(super) fn may_retry(self, attempt: usize, timed_out: bool) -> bool {
+        attempt < MAX_ATTEMPTS && (self.retry_on_timeout || !timed_out)
+    }
+}
+
 /// 指数退避 + 抖动。
 ///
 /// 服务器没给 `Retry-After` 时用它。抖动是为了不让同一时刻发起的几条流

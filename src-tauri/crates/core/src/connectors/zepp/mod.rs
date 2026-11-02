@@ -188,6 +188,15 @@ impl ZeppConnector {
     /// 记的时候，跳转会悄悄吃掉重试次数——那正是「有时候同步失败，再点一次
     /// 又好了」这类报告的来源之一。
     async fn get_json(&self, path: &str, params: Vec<(&str, String)>) -> Result<Value> {
+        self.get_json_timed(path, params, DEFAULT_TIMING).await
+    }
+
+    async fn get_json_timed(
+        &self,
+        path: &str,
+        params: Vec<(&str, String)>,
+        timing: RequestTiming,
+    ) -> Result<Value> {
         let mut url = self.path_url(path)?;
         let headers = self.build_headers()?;
         let mut last_retry_status = None;
@@ -204,15 +213,16 @@ impl ZeppConnector {
             let mut query = params.clone();
             query.push(("r", Self::request_id()));
             // 取消和请求一起 select。以前取消只在两条流之间被检查，一个已经
-            // 发出去的请求要等满自己的 35 秒超时——网络差的时候，用户按了
-            // 取消还要看着应用转几十秒。`select!` 落到取消那一支时，请求
-            // future 被 drop，连接随之关闭。
+            // 发出去的请求要等满自己的超时——网络差的时候，用户按了取消还要
+            // 看着应用转几十秒。`select!` 落到取消那一支时，请求 future 被
+            // drop，连接随之关闭。
             let send = tokio::time::timeout(
-                Duration::from_secs(35),
+                timing.guard(),
                 self.client
                     .get(url.clone())
                     .headers(headers.clone())
                     .query(&query)
+                    .timeout(timing.timeout)
                     .send(),
             );
             let outcome = tokio::select! {
@@ -226,7 +236,7 @@ impl ZeppConnector {
                 Ok(Ok(response)) => response,
                 Ok(Err(error)) => {
                     attempt += 1;
-                    if attempt < MAX_ATTEMPTS {
+                    if timing.may_retry(attempt, error.is_timeout()) {
                         self.backoff(backoff_ms).await?;
                         continue;
                     }
@@ -234,7 +244,7 @@ impl ZeppConnector {
                 }
                 Err(_elapsed) => {
                     attempt += 1;
-                    if attempt < MAX_ATTEMPTS {
+                    if timing.may_retry(attempt, true) {
                         self.backoff(backoff_ms).await?;
                         continue;
                     }
@@ -426,7 +436,7 @@ impl ZeppConnector {
             "/users/{}/members/{member_id}/weightRecords",
             self.auth.user_id
         );
-        self.get_json(
+        self.get_json_timed(
             &path,
             vec![
                 ("fromTime", from_seconds.to_string()),
@@ -436,6 +446,7 @@ impl ZeppConnector {
                 // readings most likely to be new to us.
                 ("isForward", "0".to_owned()),
             ],
+            WEIGHT_TIMING,
         )
         .await
     }
@@ -683,6 +694,20 @@ mod tests;
 #[cfg(test)]
 mod retry_policy_tests {
     use super::*;
+
+    /// #157：体重接口一次给两分钟、超时不重试；外层兜底永远比单次时限长；
+    /// 别的接口照旧超时重试。
+    #[test]
+    fn the_weight_endpoint_waits_longer_and_does_not_retry_a_timeout() {
+        assert_eq!(WEIGHT_TIMING.timeout, Duration::from_secs(120));
+        for timing in [DEFAULT_TIMING, WEIGHT_TIMING] {
+            assert!(timing.guard() > timing.timeout);
+        }
+        assert!(!WEIGHT_TIMING.may_retry(1, true));
+        assert!(WEIGHT_TIMING.may_retry(1, false), "连不上照样重试");
+        assert!(DEFAULT_TIMING.may_retry(1, true));
+        assert!(!DEFAULT_TIMING.may_retry(MAX_ATTEMPTS, false));
+    }
 
     #[test]
     fn retry_after_seconds_are_honoured_and_capped() {
