@@ -655,6 +655,17 @@ fn an_unmapped_sport_falls_back_to_generic_rather_than_a_near_miss() {
     // trail running 有真正的对应项，不该落到 GENERIC —— 这正是 issue #24
     // 里被错认成公开水域游泳的那一个。
     assert_eq!(map_sport("trail_running").1 .0, typedef::SubSport::TRAIL.0);
+    // 3.1.1 新进目录的几项都有自己的 FIT 对应项。
+    assert_eq!(map_sport("padel").1 .0, typedef::SubSport::PADEL.0);
+    assert_eq!(
+        map_sport("alpine_skiing").0 .0,
+        typedef::Sport::ALPINE_SKIING.0
+    );
+    assert_eq!(
+        map_sport("stair_climbing").0 .0,
+        typedef::Sport::FLOOR_CLIMBING.0
+    );
+    assert_eq!(map_sport("mtb").1 .0, typedef::SubSport::MOUNTAIN.0);
 }
 
 #[test]
