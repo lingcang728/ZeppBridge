@@ -128,7 +128,7 @@ Windows 安装目录不可写时会使用用户数据目录；自定义目录以
 
 日常使用不一定要开桌面应用。NAS、家用服务器或跑 AI 智能体的机器上，用无界面工具：
 
-- **CLI 与 MCP 工具**：每个版本都有 `zeppbridge-tools-<版本>-<平台>.zip`，内含 `zeppbridge-cli`（同步、状态、导出，退出码可供脚本判断）和 `zeppbridge-mcp`（只读、走 stdio、不开端口的 MCP 服务）。见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
+- **CLI 与 MCP 工具**：桌面应用会把两个程序装在自己旁边（3.1.1 起）；没装应用的机器用每个版本附带的 `zeppbridge-tools-<版本>-<平台>.zip`，内含 `zeppbridge-cli`（同步、状态、导出，退出码可供脚本判断）和 `zeppbridge-mcp`（只读、走 stdio、不开端口的 MCP 服务）。见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
 - **Docker**：`packaging/docker` 可构建用于定时同步的无界面镜像。见 [Docker](docs/guides/docker.zh-CN.md)。
 
 登录仍需一次浏览器：在任意一台电脑的桌面应用里连上账号，再按 [Docker 指南](docs/guides/docker.zh-CN.md#怎么把凭据送进去) 把 `auth.json` 和令牌带过去。MCP 只读本地数据库，完全不需要令牌。

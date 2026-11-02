@@ -1771,21 +1771,6 @@ export default {
       mcpToolSleepSessions: "Lista de sessões de sono",
       mcpToolLifeEvents: "Eventos de vida que você registrou",
       mcpConfigPathPlaceholder: '<caminho do zeppbridge-mcp>',
-      mcpSetupPrompt: `Uso um aplicativo de desktop para Windows chamado ZeppBridge que sincroniza os dados do meu relógio Amazfit / Zepp em um banco de dados SQLite local.
-Ele inclui um programa MCP (zeppbridge-mcp) e quero configurá-lo com você, para que você possa consultar meus treinos e dados de saúde diretamente em vez de eu ter que exportar e colar toda vez.
-
-O que sei sobre ele:
-- O programa MCP vem no arquivo zeppbridge-tools da página de Releases do ZeppBridge no GitHub; descompacte-o e o zeppbridge-mcp estará dentro. Pode ser que eu ainda não o tenha baixado.
-- É um servidor MCP via stdio. Os dados de saúde são somente leitura, ele não escuta em nenhuma porta e não precisa de token nem de chave de API; só usa a rede para publicar um plano de treino, e apenas depois que eu permitir.
-- O formato típico de configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Ele oferece quinze ferramentas somente leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), eventos de vida (list_life_events), integridade dos dados (get_data_health) e treinador (get_training_context, get_athlete_profile, get_training_plan); além de duas ferramentas de planos: draft_training_plan (salva apenas um rascunho) e publish_training_plan (envia para o relógio apenas depois que eu permitir nas configurações); e propose_coach_note: coloca uma frase que vale lembrar na caixa de entrada das minhas notas do treinador e só tem efeito após eu tocar em Lembrar.
-
-Me diga:
-1. Para você especificamente (a ferramenta com a qual estou falando agora), em qual arquivo a configuração deve ir ou qual comando a adiciona;
-2. Como escrever o caminho no Windows (as barras invertidas precisam ser escapadas?);
-3. Como verificar se funcionou depois de configurado.
-
-Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está), é só me perguntar.`,
       retentionAria: 'Retenção de dados locais em dias',
       retentionCutoff: (date: string) => `Na próxima sincronização bem-sucedida, dados anteriores a ${date} serão excluídos`,
       cleaningUp: 'Limpando…',

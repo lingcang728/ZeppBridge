@@ -3179,21 +3179,6 @@ export default {
     mcpToolMetricRecords: 'Letture dettagliate di qualsiasi metrica',
     mcpToolSleepSessions: 'Elenco delle sessioni di sonno',
     mcpToolLifeEvents: 'Eventi di vita che hai registrato',
-    mcpSetupPrompt: `Uso un'applicazione desktop per Windows chiamata ZeppBridge che sincronizza i dati del mio orologio Amazfit / Zepp in un database SQLite locale.
-Include un programma MCP (zeppbridge-mcp) e vorrei configurarlo con te, in modo che tu possa interrogare direttamente i miei allenamenti e i dati sanitari senza doverli esportare e incollare ogni volta.
-
-Informazioni note:
-- Il programma MCP proviene dall'archivio zeppbridge-tools scaricabile dalla pagina Releases su GitHub di ZeppBridge; una volta decompresso, l'eseguibile zeppbridge-mcp si trova all'interno. Potrei non averlo ancora scaricato.
-- È un server MCP basato su stdio. I dati sanitari sono di sola lettura, non è in ascolto su alcuna porta e non richiede token né chiavi API; accede alla rete solo per pubblicare un piano di allenamento, e solo se lo autorizzo esplicitamente.
-- La configurazione tipica ha questa forma: {"mcpServers": {"zeppbridge": {"command": "<percorso completo di zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Fornisce quindici strumenti di sola lettura: allenamenti (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metriche (list_available_metrics, get_metric_series, get_metric_records), sonno (list_sleep_sessions, get_sleep_detail), alimentazione (get_food_data), eventi di vita (list_life_events), integrità dei dati (get_data_health) e preparazione atletica (get_training_context, get_athlete_profile, get_training_plan); oltre a due strumenti per i piani di allenamento: draft_training_plan (salva solo una bozza) e publish_training_plan (invia all'orologio solo se autorizzato nelle impostazioni); e propose_coach_note: inserisce una frase degna di essere ricordata nella casella di posta delle mie note dell’allenatore e ha effetto solo dopo che tocco Ricorda.
-
-Dimmi:
-1. Nello specifico per te (lo strumento con cui sto parlando adesso), in quale file inserire questa configurazione o quale comando usare per aggiungerla;
-2. Come scrivere il percorso su Windows (se le barre rovesciate "\\" devono essere precedute da escape);
-3. Come verificare che funzioni una volta configurato.
-
-Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova il file), chiedimelo pure.`,
     mcpConfigPathPlaceholder: '<percorso di zeppbridge-mcp>',
     retentionAria: 'Conservazione dei dati locali in giorni',
     retentionCutoff: (date: string) => `Dopo la prossima sincronizzazione riuscita, i dati antecedenti al ${date} verranno eliminati`,

@@ -579,6 +579,8 @@ export interface McpSidecar {
   appimage?: boolean;
   /** 本机 AI 客户端里登记了另一份 zeppbridge-mcp 的（多半是 2.x 的旧版，读不了升级后的库）。 */
   stale_clients?: McpClientId[];
+  /** 附带的 zeppbridge-cli 的绝对路径（3.1.1 起）；旧安装包、开发构建、AppImage 里为空。 */
+  cli_path?: string | null;
 }
 export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex';
 

@@ -11,7 +11,7 @@ user agrees.
 
 | Piece | Where |
 |---|---|
-| `zeppbridge-mcp` | Next to `ZeppBridge.exe` in the Windows installer and the portable build (sidecar, `src-tauri/tauri.sidecar.conf.json` + `scripts/release/stage-mcp-sidecar.ps1`), and in the separate `zeppbridge-tools` archive for headless use |
+| `zeppbridge-mcp` (and, since 3.1.1, `zeppbridge-cli`) | Next to `ZeppBridge.exe` in the Windows installer and the portable build (sidecar, `src-tauri/tauri.sidecar.conf.json` + `scripts/release/stage-mcp-sidecar.ps1`), and in the separate `zeppbridge-tools` archive for headless use |
 | Claude Code plugin | `.claude-plugin/marketplace.json` at the repository root → this directory (`.claude-plugin/plugin.json`) |
 | Codex plugin | `.agents/plugins/marketplace.json` at the repository root → this directory (`.codex-plugin/plugin.json`) |
 | Claude Desktop | `ZeppBridge.mcpb`, written by the app (`save_mcp_bundle`) because its manifest must point at the installed sidecar |
@@ -24,7 +24,7 @@ the command the app copies, because its path differs on every machine.
 | Client | What the button does |
 |---|---|
 | Claude Code | Copies `claude mcp add --scope user zeppbridge "--" "<path>" --scope task`, `claude plugin marketplace add lingcang728/ZeppBridge#v3`, `claude plugin install zepp-coach@zeppbridge` |
-| Codex | Copies `codex mcp add zeppbridge "--" "<path>" --scope task`, `codex plugin marketplace add lingcang728/ZeppBridge --ref v3`, `codex plugin add zepp-coach@zeppbridge` |
+| Codex | Copies `codex mcp add zeppbridge "--" "<path>" --scope task`, `codex plugin marketplace add lingcang728/ZeppBridge --ref main`, `codex plugin add zepp-coach@zeppbridge` |
 | Claude Desktop | Asks for a folder, saves `ZeppBridge.mcpb` there and shows it in Explorer |
 
 The commands come from `src/lib/mcpClients.ts`. Two details matter on Windows:

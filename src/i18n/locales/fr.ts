@@ -190,6 +190,8 @@ export default {
       reportDoneTitle: 'Bien reçu, merci',
       reportDoneLine: (id: string, at: string) => `Rapport ${id}, envoyé le ${at}.`,
       reportDoneNote: 'Ce qui est parti : exactement les champs listés ci-dessus, plus votre note. Rien d’autre.',
+      reportConfirm:
+        'Sont uniquement envoyés : la version de l’application, le type de système, la révision de l’analyseur, la structure des champs, les indications produit et les numéros de modèle des appareils non identifiés (deviceSource — des entiers décrivant quel modèle de montre, pas quel exemplaire), les codes d’entraînement inconnus et leur décompte, le code d’erreur numérique de la dernière requête rejetée par le cloud (uniquement le numéro, le flux et l’heure — jamais le texte renvoyé), ainsi que votre note (chemins locaux, e-mails et longs identifiants retirés). Jamais votre compte Zepp, jetons, numéros de série, identifiants d’appareil, adresses MAC, GPS, valeurs de santé ni réponses brutes. Confirmer l’envoi ?',
       reportFailed: 'Le rapport d’erreur n’a pas pu être envoyé',
       lampOn: (count: number) => plural(count, { one: `${count} récupéré`, other: `${count} récupérés` }),
       lampPending: (count: number) => plural(count, { one: `Dans le cloud, pas en local : ${count}`, other: `Dans le cloud, pas en local : ${count}` }),
@@ -229,6 +231,8 @@ export default {
       privacyTelemetryTitle: 'Pas de télémétrie, pas de statistiques d’usage',
       privacyTelemetryBody: 'L’application ne rapporte aucun comportement d’usage d’elle-même. Elle n’envoie les champs anonymisés ci-dessous que si vous appuyez vous-même sur « Envoyer un rapport d’erreur ».',
       privacyReportTitle: 'Un appareil ou une séance non reconnu ?',
+      privacyReportBody:
+        'Aucun compte GitHub requis, aucune donnée à copier. Après confirmation, seuls la structure des champs au niveau produit, les numéros de modèle des appareils non identifiés (des entiers — uniquement quel modèle de montre) et les codes d’entraînement inconnus avec leur décompte sont envoyés au dépôt privé de rapports d’erreur de ZeppBridge. Jamais de compte, jetons, numéros de série, identifiants d’appareil, MAC, GPS, valeurs de santé, réponses brutes ni chemins locaux.',
       mcpBadge: 'Données de santé en lecture seule · n’écoute sur aucun port',
       mcpCopyPrompt: 'Copier pour demander à votre IA',
       mcpCopyConfig: 'Copier seulement l’extrait de config',
@@ -248,21 +252,6 @@ export default {
       mcpToolMetricRecords: "Relevés individuels de n’importe quelle métrique",
       mcpToolSleepSessions: "Liste des nuits de sommeil",
       mcpToolLifeEvents: "Événements de vie que vous avez notés",
-      mcpSetupPrompt: `J’utilise une application de bureau Windows appelée ZeppBridge qui synchronise les données de ma montre Amazfit / Zepp dans une base de données SQLite locale.
-Elle inclut un programme MCP (zeppbridge-mcp) et je souhaite le configurer avec toi, afin que tu puisses interroger directement mes séances et mes données de santé sans que j’aie besoin d’exporter et coller à chaque fois.
-
-Ce que je sais :
-- Le programme MCP provient de l’archive zeppbridge-tools disponible sur la page GitHub Releases de ZeppBridge ; une fois décompressée, l’exécutable zeppbridge-mcp se trouve à l’intérieur. Je ne l’ai peut-être pas encore téléchargé.
-- Il s’agit d’un serveur MCP sur stdio. Les données de santé sont en lecture seule, il n’écoute sur aucun port et ne nécessite ni jeton ni clé d’API ; il n’utilise le réseau que pour publier un plan d’entraînement, et uniquement si je l’y autorise.
-- La structure type de configuration est : {"mcpServers": {"zeppbridge": {"command": "<chemin complet vers zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Il fournit quinze outils en lecture seule : séances (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métriques (list_available_metrics, get_metric_series, get_metric_records), sommeil (list_sleep_sessions, get_sleep_detail), alimentation (get_food_data), événements de vie (list_life_events), intégrité des données (get_data_health) et entraînement (get_training_context, get_athlete_profile, get_training_plan) ; plus deux outils pour les plans d’entraînement : draft_training_plan (enregistre uniquement un brouillon) et publish_training_plan (envoie à la montre uniquement si je l’autorise dans les paramètres) ; et propose_coach_note : place une phrase digne d’être mémorisée dans la boîte de réception de mes notes de coach, et ne prend effet qu’après avoir cliqué sur Mémoriser.
-
-Dis-moi :
-1. Pour toi en particulier (l’outil auquel je parle en ce moment), dans quel fichier inscrire cette configuration ou quelle commande permet de l’ajouter ;
-2. Comment écrire le chemin sous Windows (faut-il échapper les barres obliques inverses « \\ ») ;
-3. Comment vérifier que la configuration fonctionne une fois effectuée.
-
-Si tu as besoin d’informations de ma part (quel client j’utilise, où se trouve le fichier), demande-moi directement.`,
       mcpConfigPathPlaceholder: '<chemin vers zeppbridge-mcp>',
       retentionAria: 'Conservation des données locales en jours',
       retentionCutoff: (date: string) => `Après la prochaine synchro réussie, les données antérieures au ${date} sont élaguées`,
@@ -580,12 +569,15 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       confirm: 'C’est bien mon appareil',
       clear: 'Retirer le choix',
       later: 'Pas maintenant',
+      pickPrompt: 'Faites défiler ou recherchez votre modèle',
+      note: 'Votre choix est étiqueté « Modèle choisi par vous », jamais comme une correspondance automatique. Il reste sur cet ordinateur ; les images et les modèles proviennent du catalogue intégré, et le défilement n’utilise aucun réseau.',
       filterAll: 'Tous',
       filterWatch: 'Montres',
       filterBand: 'Bracelets',
       filterStrap: 'Bracelets sans écran',
       filterRing: 'Bagues',
       filterEarbuds: 'Écouteurs',
+      filterScale: 'Balances',
     },
 
     'components/DeviceVisual': {

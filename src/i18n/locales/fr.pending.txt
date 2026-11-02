@@ -9,5 +9,9 @@ components/letters/letters.authorSheet
 components/letters/letters.authorSign
 components/letters/letters.authorStamp
 composables/useDevices.genericScale
+views/Settings.mcpSetupPrompt
 views/Settings.privacyReportBody
 views/Settings.reportConfirm
+views/settings/sections/ai.cliCopied
+views/settings/sections/ai.cliCopy
+views/settings/sections/ai.cliTitle
