@@ -165,7 +165,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': '编码脱敏 AI 导出失败',
 
     /* —— 问题反馈 —— */
-    'err.diagnostic.nothing_to_submit': '这台设备没有可补充目录的型号编号，暂时不用提交',
     'err.diagnostic.empty_report':
       '先选要反馈的问题类型，或写一句说明——否则这份报告里没有任何可处理的内容',
     'err.diagnostic.client_init_failed': '无法初始化错误报告连接',
@@ -405,8 +404,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': "Could not encode the de-identified AI export",
 
     /* —— feedback —— */
-    'err.diagnostic.nothing_to_submit':
-      "This device has no model number that would help the catalog — nothing to submit",
     'err.diagnostic.empty_report':
       "Pick a problem type or write a note first — otherwise the report has nothing actionable",
     'err.diagnostic.client_init_failed': "Could not initialize the report connection",
@@ -648,8 +645,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': 'Error al codificar la exportación anonimizada para la IA',
 
     /* —— feedback —— */
-    'err.diagnostic.nothing_to_submit':
-      'Este dispositivo no aporta números de modelo útiles para el catálogo; nada que enviar ahora',
     'err.diagnostic.empty_report':
       'Elige primero el tipo de problema o escribe una nota; si no, el reporte no trae nada procesable',
     'err.diagnostic.client_init_failed': 'No se pudo iniciar la conexión del reporte de error',

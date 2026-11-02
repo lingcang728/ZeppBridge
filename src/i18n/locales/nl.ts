@@ -327,10 +327,6 @@ export default {
       confirm: 'Dit is mijn apparaat',
       clear: 'Keuze intrekken',
       later: 'Niet nu',
-      contributeTitle: 'Help de volgende release dit apparaat zelf te herkennen',
-      contributeBody:
-        'Stuurt naar ZeppBridge het door jou gekozen model plus de modelnummers van dit apparaat (deviceSource / deviceType, alleen gehele getallen). Beide zeggen alleen welk model het is — geen account, serienummer, MAC of gezondheidsgegevens. Huami publiceert geen nummertabel; dit is de enige manier waarop de ingebouwde catalogus groeit. Wijzen een paar mensen hetzelfde model aan, dan wordt het voor iedereen automatisch herkend.',
-      note: 'Jouw keuze verschijnt als ‘Door jou gekozen model’ en wordt nooit als automatische match voorgedaan. Afbeeldingen en modelnamen komen uit de meegeleverde catalogus; erin bladeren raakt geen netwerk.',
       filterAll: 'Alles',
       filterWatch: 'Horloges',
       filterBand: 'Bands',
@@ -811,11 +807,6 @@ export default {
       assignmentCleared: 'Modelaanwijzing ingetrokken; terug naar automatische herkenning.',
       assignmentSaved:
         'Je keuze is opgeslagen. Hij verschijnt als ‘Door jou gekozen model’ — nooit als automatische match voorgedaan.',
-      assignmentContributed: (reportId: string) =>
-        `Modelaanwijzing opgeslagen; de modelnummers gingen naar ZeppBridge (${reportId}). De volgende catalogus herkent dit model vanzelf.`,
-      assignmentContributionFailed: (reason: string) =>
-        `Modelaanwijzing opgeslagen (alleen lokaal). De catalogusbijdrage is niet verstuurd: ${reason}`,
-      networkUnavailable: 'Netwerk niet beschikbaar',
       assignmentFailed: 'De modelkeuze kon niet worden opgeslagen',
     },
     'composables/useSyncController': {
@@ -1513,8 +1504,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       privacyPoint5:
         'de hele codebase is open, zonder verborgen naar-huis-bel-logica.',
       privacyPoint5Title: '5. Overal open source: ',
-      privacyReportBody:
-        'Geen GitHub-account of gekopieerde gegevens nodig. Na bevestiging gaan alleen de veldstructuur op productniveau, firmwareversie, modelnummers (gehele getallen — alleen welk model), onbekende trainingscodes en hun aantallen naar de private foutrapportopslag van ZeppBridge; nooit account, tokens, serienummers, apparaat-id\'s, MAC, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
       privacyReportTitle: 'Een apparaat of training niet herkend?',
       privacyTelemetryBody:
         'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf ‘Een foutrapport versturen’ indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
@@ -1559,8 +1548,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         },
       },
       reportCategoryAria: 'Type probleem om te melden',
-      reportConfirm:
-        'Dit verstuurt alleen de app-versie, het type OS, de parserrevisie, hints op productniveau en de veldstructuur van niet-herkende apparaten, firmwareversie, modelnummers (deviceSource / deviceType — alleen gehele getallen, die beschrijven welk model, niet welk exemplaar), onbekende trainingscodes en hun aantallen, de numerieke foutcode van het laatste door de cloud geweigerde verzoek (alleen nummer, welke stroom en wanneer — zonder de tekst die de cloud teruggaf), plus de notitie die je schreef (lokale paden, e-mailadressen en lange identificaties worden automatisch weggestript). Nooit verstuurd: je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
       reportDoneLine: (id: string, at: string) => `Rapport ${id}, verstuurd op ${at}.`,
       reportDoneNote:
         'Verstuurd zijn precies de veldtypen hierboven plus je notitie — verder niets.',
@@ -4073,8 +4060,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     'err.diagnostic.empty_report':
       'Kies eerst een probleemtype of schrijf een toelichting — anders bevat dit rapport niets om mee te werken',
     'err.diagnostic.http_error': 'De rapportdienst gaf een fout terug',
-    'err.diagnostic.nothing_to_submit':
-      'Dit apparaat heeft geen modelnummer dat de catalogus aanvult — nu niets in te sturen',
     'err.diagnostic.rate_limited':
       'Te veel rapporten in korte tijd — probeer het later opnieuw. Al verstuurde blijven bewaard; opnieuw insturen hoeft niet.',
     'err.diagnostic.send_failed':

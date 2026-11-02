@@ -180,25 +180,27 @@ The desktop app uses a separate HTTPS client with no Zepp cookie jar, sending a
 strongly typed allow-listed report only to
 `https://zeppbridge.com/api/feedback`. The permitted fields are: app and
 parser version, operating system, database schema version, the field names and
-JSON types in the device response, catalogue candidates, firmware version, safe
-product-name and short-model hints, model-class numbers, the count of
+JSON types in the device response, safe product-name and short-model hints
+and model numbers for the devices the catalogue cannot identify, the count of
 unrecognised devices, unrecognised workout codes with record counts, the
 count of type conflicts, and the numeric error code from the most recent request
 the Zepp cloud rejected (the number, which data stream and when — never any text
 the cloud returned). The report schema has no fields for accounts, tokens, cookies, serial numbers,
 device IDs, MAC addresses, GPS, health values, raw responses or local paths.
 
-Model-class numbers (`modelIdentifierHints`) are strings of the exact form
-`name:integer`, and only two names are accepted: `deviceSource` and
-`deviceType`. The value must be a JSON integer in the device response, within
-0–99,999,999; anything else is dropped before the report is built. Some Zepp
-accounts return no
-product-name field whatsoever, and those two numbers are the only model clue
-available. They describe *which model of watch*, not *which watch*, and the
-shape is pinned to `name:integer` on both the client and the Pages Function, so
-a serial number, a MAC address or any string cannot get in. Without them, such
-devices can never be added to the built-in catalogue and stay "unrecognised"
-for every user forever.
+Model numbers (`modelIdentifierHints`) are strings of the exact form
+`deviceSource:integer`. The value must be a JSON integer in the device response,
+within 0–99,999,999, and **only devices the catalogue (based on Zepp's official
+table) cannot identify are included**. Identified devices, scales and the
+`deviceType` family code are never sent (from 3.1.1; earlier versions also sent
+the model and firmware of identified devices, which the server now drops instead
+of storing). They describe *which model of watch*, not *which watch*, and the
+shape is pinned on both the client and the Pages Function, so a serial number, a
+MAC address or any string cannot get in.
+
+A model picked by hand in the device picker **stays on this computer**. 3.1.0 and
+earlier offered an opt-in to share the pick so the next catalogue could recognise
+the device; that upload was removed in 3.1.1.
 
 The Pages Function re-runs strict schema, field-count and 32 KiB size checks
 before writing to a private D1 database. There is no public read route, and the

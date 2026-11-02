@@ -27,18 +27,20 @@ pub struct CatalogEntry {
     /// Zepp 设备列表里的 `deviceSource` 数字。
     ///
     /// 有些账号的设备响应里连一个产品名字段都没有，只剩这些数字（issue #4）。
-    /// 华米没有公开对照表，所以这一列全部来自用户在应用里主动指认的型号，
-    /// 由反馈库汇总而来。收录规则写在 `docs/` 的设备目录说明里，要点是：
+    /// 3.1.1 起以 Zepp 官方开发者文档的 deviceSource 对照表为准，另加官方表之前
+    /// 由用户指认汇总、已冻结的一小批（来源和规则见 `scripts/assets/build-device-catalog.py`）：
     ///
-    /// * 只收 `deviceSource`，**绝不收 `deviceType`** —— 后者是族码，光是 0
-    ///   一个值就横跨二十款表，写成一对一必然误判；
-    /// * 只收高位段（≥ 1_000_000）。低位段（15/101/102/104 这些）在反馈里就是
-    ///   自相矛盾的，同一个数字被指认成四款不同的表；
-    /// * 每个数字至少要有两份互相独立的报告。
+    /// * 只收 `deviceSource`，**绝不收 `deviceType`** —— 后者是族码（0 = 表 / 手环、
+    ///   1 = 体脂秤），光是 0 一个值就横跨二十款表；
+    /// * 低位段（< 1_000_000）只收官方表列出的（老表本来就是低位，如 418 = T-Rex 2）；
+    ///   官方表没有的 15 / 101 / 102 / 104 一律不收。
     ///
-    /// 同一款表有多个相邻数字是正常的：低位是配色/尺寸变体。
+    /// 同一款表有多个相邻数字是正常的：低位是配色 / 尺寸 / 国行变体。
     #[serde(default)]
     pub device_source_codes: Vec<i64>,
+    /// `device_source_codes` 里来自官方对照表的那些。
+    #[serde(default)]
+    pub device_source_official: Vec<i64>,
     pub aliases: Vec<String>,
     pub region: Vec<String>,
     pub status: String,
@@ -249,7 +251,7 @@ mod tests {
             assert_eq!(matched.entry.catalog_id, id);
             assert!(matched.entry.device_source_codes.is_empty());
         }
-        for code in [62, 102, 400, 8257793] {
+        for code in [62, 102, 400, 9699584] {
             assert!(match_catalog(&CatalogMatchInput {
                 device_source_codes: vec![code],
                 ..Default::default()
@@ -330,18 +332,25 @@ mod tests {
         }
     }
 
-    /// 目录里绝不能出现族码。
+    /// 目录里绝不能出现族码，低位编号只收官方表列出的。
     ///
-    /// `deviceType` 的取值（0、1、7）和低位段的 `deviceSource`（15、101、102、
-    /// 104）在反馈库里都是自相矛盾的：同一个数字被不同用户指认成好几款表。
-    /// 一旦有人图省事把它们写进目录，所有装着这类表的账号都会被认成同一款。
+    /// `deviceType` 的取值（0、1、7）和官方表之外的低位 `deviceSource`（15、101、
+    /// 102、104）在反馈库里都是自相矛盾的：同一个数字被不同用户指认成好几款表
+    /// （101–104 其实是体脂秤）。一旦写进目录，装着这类设备的账号都会被认成同一款。
     #[test]
-    fn the_catalog_never_carries_a_family_code() {
+    fn low_codes_come_only_from_the_official_table() {
         for entry in catalog_entries() {
             for code in &entry.device_source_codes {
                 assert!(
-                    *code >= 1_000_000,
-                    "{} 收了低位编号 {code}——那一段在反馈里就是自相矛盾的",
+                    *code >= 1_000_000 || entry.device_source_official.contains(code),
+                    "{} 收了官方表之外的低位编号 {code}",
+                    entry.catalog_id
+                );
+            }
+            for code in &entry.device_source_official {
+                assert!(
+                    entry.device_source_codes.contains(code),
+                    "{} 的官方编号 {code} 没进匹配表",
                     entry.catalog_id
                 );
             }
@@ -358,145 +367,46 @@ mod tests {
         }
     }
 
-    /// 2026-09-02 那批新收的编号，按既有规则（两份互相独立、无异议的报告）
-    /// 裁决通过：10551555 -> T-Rex 3 Pro，8651008 -> Helio Ring（Helio Ring
-    /// 的第一个编号）。
-    ///
-    /// 同一批里刻意没收的三个，理由记在
-    /// `scripts/assets/build-device-catalog.py` 的注释里；其中 8913155 和
-    /// 7930112 的异议后来在 2026-09-13 那轮被证明是「同一设备集合几分钟后
-    /// 改正」的误指认，已经收录（见
-    /// `the_codes_adjudicated_on_2026_09_13_resolve_to_their_products`），
-    /// 只剩 10813699 因真实分歧继续不收。
+    /// 官方对照表（docs.zepp.com Device List，2026-11-02 核对）一并裁决了以前
+    /// 众包里吵不出结果的编号，也补上了反馈里一直认不出的那几块表。
     #[test]
-    fn the_codes_adjudicated_on_2026_09_02_resolve_to_their_products() {
+    fn the_official_table_settles_codes_crowd_reports_could_not() {
         for (code, catalog_id) in [
-            (10_551_555_i64, "amazfit-t-rex-3-pro-48-44mm"),
-            (8_651_008, "amazfit-helio-ring"),
+            // 以前「有分歧不收」的四个。
+            (10_813_699_i64, "amazfit-active-max"),
+            (11_141_376, "amazfit-balance-3"),
+            (7_995_649, "amazfit-gts-4-43mm"),
+            (8_454_401, "amazfit-bip-5-46mm"),
+            // 3.1.0 韩国用户的 Cheetah 2 Pro、只有名字没有编号的 Cheetah Square。
+            (11_010_307, "amazfit-cheetah-2-pro"),
+            (8_257_793, "amazfit-cheetah-square"),
+            // 官方表里的低位老表。
+            (418, "amazfit-t-rex-2-47mm"),
+            (254, "amazfit-band-7"),
+            (92, "amazfit-gts-2-mini"),
+            (68, "amazfit-pop"),
+            (244, "amazfit-gtr-2-new-46mm"),
+            // 众包冻结前最后收的一个。
+            (11_092_225, "amazfit-balance-ultra"),
         ] {
             let found = match_catalog(&CatalogMatchInput {
                 device_source_codes: vec![code],
                 ..CatalogMatchInput::default()
             })
             .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
-            assert_eq!(found.entry.catalog_id, catalog_id);
-        }
-
-        // 没裁决通过的那一个不能悄悄溜进去。
-        let code = 10_813_699_i64;
-        assert!(
-            match_catalog(&CatalogMatchInput {
-                device_source_codes: vec![code],
-                ..CatalogMatchInput::default()
-            })
-            .is_none(),
-            "{code} 还没有裁决通过，不该匹配到任何型号"
-        );
-    }
-
-    /// 2026-09-03 这一批（反馈库 183 行）唯一裁决通过的：10682625 -> T-Rex 3
-    /// Pro。2 份互相独立的报告（v1.1.1 / v1.1.5），零异议，高位段，且和已经
-    /// 收了的 10551552 / 10551555 同族。
-    ///
-    /// 同一批里两个有争议的编号又各多了一份，但仍然不收：10813699 从 3:3
-    /// 变成 Active 2 44mm 4 份 vs Active MAX 3 份，8913155 从 2:1 变成 3:1。
-    /// 平票被打破不等于分歧消失——多数票在这张表上从来不算数，因为收错一个
-    /// 编号会让所有同款用户的设备名静默地错掉。
-    #[test]
-    fn the_code_adjudicated_on_2026_09_03_resolves_to_its_product() {
-        let found = match_catalog(&CatalogMatchInput {
-            device_source_codes: vec![10_682_625],
-            ..CatalogMatchInput::default()
-        })
-        .expect("10682625 应当能匹配到 T-Rex 3 Pro");
-        assert_eq!(found.entry.catalog_id, "amazfit-t-rex-3-pro-48-44mm");
-    }
-
-    #[test]
-    fn september_11_device_contributions_match_without_guessing_conflicts() {
-        for (code, catalog_id) in [
-            (10_551_553, "amazfit-t-rex-3-pro-48-44mm"),
-            (10_682_624, "amazfit-t-rex-3-pro-48-44mm"),
-            (11_141_377, "amazfit-balance-3"),
-            (10_092_803, "amazfit-active-2-44mm"),
-            (8_323_329, "amazfit-active-42mm"),
-            (10_486_019, "amazfit-balance-2-xt"),
-            (9_978_112, "amazfit-cheetah-2-ultra"),
-        ] {
-            let matched = match_catalog(&CatalogMatchInput {
-                device_source_codes: vec![code],
-                ..Default::default()
-            })
-            .expect("accepted contribution must identify a device");
-            assert_eq!(matched.entry.catalog_id, catalog_id);
-        }
-        for code in [92, 102, 104, 254] {
-            assert!(
-                match_catalog(&CatalogMatchInput {
-                    device_source_codes: vec![code],
-                    ..Default::default()
-                })
-                .is_none(),
-                "unsupported or duplicate-only evidence for {code}"
-            );
-        }
-    }
-
-    /// 2026-09-13 这一批（反馈库 279 份报告）裁决通过的三个：
-    ///   * 10682627 -> T-Rex 3 Pro：2 份互相独立、跨版本跨日期的报告
-    ///     （v2.2.2 / v2.2.4 macOS），零异议，与已收录的 10682624 / 10682625
-    ///     同族。
-    ///   * 7930112 -> GTR 4 46mm：6 份报告跨至少 4 个独立提交语境。此前的
-    ///     T-Rex 3 异议在 83 秒后被同一设备集合（7930112 + 8716544）的下一
-    ///     份报告改正——「一个账号两块表、第一次挑错了」，相邻的 7930113
-    ///     早已收为 GTR 4 46mm。
-    ///   * 8913155 -> Active 2 44mm：5 份报告跨 5 个独立语境。唯一的 Helio
-    ///     Strap 异议在 3 分钟后被同一设备集合（10289411 + 8913155）改正；
-    ///     该账号的 10289411 已按名字自动匹配为 Helio Strap，把 8913155 也
-    ///     指认成 Helio Strap 等于说它有两条 Helio Strap——就是挑错了那一台。
-    ///
-    /// 仍然不收：10813699 是 Active 2 44mm 7 份 vs Active MAX 3 份的真实
-    /// 分歧；9765121 / 11092224 / 11469059 的 2 份都是同一分钟内同一设备
-    /// 集合的重复提交，只算一份独立证据；11272451 和 8126720 各自只有一份。
-    #[test]
-    fn the_codes_adjudicated_on_2026_09_13_resolve_to_their_products() {
-        for (code, catalog_id) in [
-            (10_682_627_i64, "amazfit-t-rex-3-pro-48-44mm"),
-            (7_930_112, "amazfit-gtr-4-46mm"),
-            (8_913_155, "amazfit-active-2-44mm"),
-        ] {
-            let found = match_catalog(&CatalogMatchInput {
-                device_source_codes: vec![code],
-                ..CatalogMatchInput::default()
-            })
-            .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
-            assert_eq!(found.entry.catalog_id, catalog_id);
+            assert_eq!(found.entry.catalog_id, catalog_id, "deviceSource {code}");
             assert_eq!(found.status, CatalogMatchStatus::Exact);
         }
-
-        // 分歧仍在、或独立证据仍只有一份的编号不能悄悄溜进去。
-        assert!(
-            match_catalog(&CatalogMatchInput {
-                device_source_codes: vec![10_813_699],
-                ..CatalogMatchInput::default()
-            })
-            .is_none(),
-            "10813699 还没有裁决通过，不该匹配到任何型号"
-        );
     }
 
-    /// 2026-10-19 这一轮（反馈库 445 份报告）：9 月时证据不够的几个编号凑够了
-    /// 「≥2 份独立、零异议」，裁决记录在 `scripts/assets/build-device-catalog.py`。
-    /// 11141376（3:1）和 7995649（2:2）有异议，照样不收——多数票不算数。
+    /// 官方表之前众包收下的编号（官方表没列的）照样认得出：3.1.1 冻结，不删。
     #[test]
-    fn the_codes_adjudicated_on_2026_10_19_resolve_to_their_products() {
+    fn frozen_crowd_codes_still_resolve() {
         for (code, catalog_id) in [
-            (8_126_720_i64, "amazfit-cheetah-pro-47mm"),
-            (9_765_121, "amazfit-bip-6"),
-            (10_223_875, "amazfit-active-2-square"),
-            (10_879_232, "amazfit-t-rex-ultra-2"),
-            (10_944_768, "amazfit-active-3-premium"),
-            (11_092_224, "amazfit-balance-ultra"),
+            (10_486_017_i64, "amazfit-balance-2"),
+            (9_978_112, "amazfit-cheetah-2-ultra"),
+            (10_289_411, "amazfit-helio-strap"),
+            (8_651_008, "amazfit-helio-ring"),
             (11_145_475, "amazfit-balance-3"),
             (11_272_451, "amazfit-helio-strap-pro"),
             (11_469_059, "amazfit-helio-strap-pro"),
@@ -507,17 +417,33 @@ mod tests {
             })
             .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
             assert_eq!(found.entry.catalog_id, catalog_id);
-            assert_eq!(found.status, CatalogMatchStatus::Exact);
+            assert!(!found.entry.device_source_official.contains(&code));
         }
-        for code in [11_141_376_i64, 7_995_649] {
-            assert!(
-                match_catalog(&CatalogMatchInput {
-                    device_source_codes: vec![code],
-                    ..CatalogMatchInput::default()
-                })
-                .is_none(),
-                "{code} 有异议，不该匹配到任何型号"
-            );
+    }
+
+    /// 反馈里报过、目录里原来没有卡的型号：能按名字认、能手动指认，但不认领编号。
+    #[test]
+    fn reported_models_without_codes_are_selectable_by_name() {
+        for (name, catalog_id) in [
+            ("Amazfit NEO", "amazfit-neo"),
+            ("Bip S", "amazfit-bip-s"),
+            ("Mi Band 4 NFC", "mi-smart-band-4-nfc"),
+            ("Balance 3 Ti", "amazfit-balance-3"),
+            ("Zepp E Square", "zepp-e-square"),
+        ] {
+            let found = match_catalog(&CatalogMatchInput {
+                product_names: vec![name],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap_or_else(|| panic!("{name} 应当能匹配到 {catalog_id}"));
+            assert_eq!(found.entry.catalog_id, catalog_id);
+        }
+        for catalog_id in ["amazfit-neo", "amazfit-bip-s", "mi-smart-band-4-nfc"] {
+            let entry = catalog_entries()
+                .iter()
+                .find(|entry| entry.catalog_id == catalog_id)
+                .unwrap();
+            assert!(entry.device_source_codes.is_empty(), "{catalog_id}");
         }
     }
 

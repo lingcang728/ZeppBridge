@@ -87,8 +87,10 @@ fn diagnostic_device_report_contains_shapes_but_never_payload_values() {
     }
     assert!(encoded.contains("additionalInfo"));
     assert!(encoded.contains("productName"));
-    assert!(encoded.contains("Amazfit Balance 2"));
-    assert!(encoded.contains("6.2.208.7"));
+    // 认出来的设备不再上报型号和固件号（3.1.1）：只留结构。
+    assert!(report.candidates.is_empty());
+    assert!(!encoded.contains("Amazfit Balance 2"));
+    assert!(!encoded.contains("6.2.208.7"));
     assert_eq!(report.id_alias_objects, 1);
     assert_eq!(report.serial_alias_objects, 1);
 }
@@ -100,20 +102,20 @@ fn diagnostic_device_report_contains_shapes_but_never_payload_values() {
 /// 靠猜一个型号来「修好」），以及诊断报告必须带上型号类数字，否则内置
 /// 目录永远补不全，这台表对每个用户都会一直是未识别。
 ///
-/// `10813699` 是 2026-09-13 仍因真实分歧没收进目录的编号；`7930112`
-/// 已经裁决为 GTR 4，不能再当「未知编号」用。
+/// `12340001` 是官方对照表和目录里都没有的编号（`10813699` 已由官方表裁决为
+/// Active Max，不能再当「未知编号」用）。
 #[test]
 fn a_device_response_with_no_product_name_stays_unknown_and_reports_model_numbers() {
     let payload = json!({
         "items": [{
             "deviceId": "0123456789abcdef",
-            "deviceSource": 10813699,
+            "deviceSource": 12340001,
             "deviceType": 5,
             "macAddress": "AA:BB:CC:DD:EE:FF",
             "sn": "SERIAL-PRIVATE-998877",
             "firmwareVersion": "6.2.208.7",
             "additionalInfo": serde_json::to_string(&json!({
-                "productId": "10813699",
+                "productId": "12340001",
                 "productVersion": "6.2.208.7",
                 "hardwareVersion": "1.0",
                 "btmac": "AA:BB:CC:DD:EE:FF",
@@ -137,13 +139,15 @@ fn a_device_response_with_no_product_name_stays_unknown_and_reports_model_number
     assert!(
         report
             .model_identifier_hints
-            .contains(&"deviceSource:10813699".to_string()),
+            .contains(&"deviceSource:12340001".to_string()),
         "缺了型号编号，内置目录就永远补不上: {:?}",
         report.model_identifier_hints
     );
-    assert!(report
-        .model_identifier_hints
-        .contains(&"deviceType:5".to_string()));
+    // deviceType 是族码，3.1.1 起不再上报。
+    assert_eq!(
+        report.model_identifier_hints,
+        vec!["deviceSource:12340001".to_string()]
+    );
 
     // 型号线索只能是「哪一款」，不能夹带「哪一台」。
     let encoded = serde_json::to_string(&report.model_identifier_hints).unwrap();
@@ -177,6 +181,36 @@ fn a_contributed_device_source_number_is_recognised_without_any_product_name() {
     let profile = parse_device_profile(&payload);
     assert_eq!(profile.catalog_id.as_deref(), Some("amazfit-t-rex-3"));
     assert_eq!(profile.match_status, DeviceMatchStatus::Exact);
+}
+
+/// 认不出型号的体脂秤（`deviceType` = 1）显示成「秤」这一类，不算未识别设备，
+/// 也不进反馈报告；反馈库里的 101–104 全是这一类。
+#[test]
+fn an_unmatched_scale_is_labelled_by_family_and_left_out_of_the_report() {
+    let payload = json!({
+        "items": [
+            { "deviceId": "SCALE-PRIVATE-1", "deviceSource": 102, "deviceType": 1 },
+            { "deviceId": "WATCH-PRIVATE-1", "deviceSource": 12340001, "deviceType": 0 },
+            { "deviceId": "WATCH-PRIVATE-2", "deviceSource": 11010307, "deviceType": 0 }
+        ]
+    });
+    let profiles = parse_device_profiles(&payload);
+    assert_eq!(profiles[0].kind.as_deref(), Some("scale"));
+    assert_eq!(profiles[0].match_status, DeviceMatchStatus::Unknown);
+    assert!(profiles[0].canonical_name.is_none(), "秤只标类，不猜型号");
+    assert_eq!(profiles[1].kind, None, "族码 0 不给认不出的表编一个类");
+    assert_eq!(
+        profiles[2].catalog_id.as_deref(),
+        Some("amazfit-cheetah-2-pro")
+    );
+
+    let report = build_device_diagnostic(&payload);
+    assert_eq!(report.unknown_device_count, 1, "只有那块认不出的表");
+    assert_eq!(
+        report.model_identifier_hints,
+        vec!["deviceSource:12340001".to_string()]
+    );
+    assert!(report.candidates.is_empty());
 }
 
 /// `deviceType` 绝不能用来查目录。

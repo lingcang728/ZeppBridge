@@ -142,13 +142,13 @@ const openPicker = () => {
   pickerOpen.value = true;
 };
 
-const confirmPick = async (catalogId: string, contribute: boolean) => {
-  await assignModel(deviceKey.value, catalogId, contribute);
+const confirmPick = async (catalogId: string) => {
+  await assignModel(deviceKey.value, catalogId);
   if (!assignError.value) pickerOpen.value = false;
 };
 
 const clearPick = async () => {
-  await assignModel(deviceKey.value, '', false);
+  await assignModel(deviceKey.value, '');
   if (!assignError.value) pickerOpen.value = false;
 };
 

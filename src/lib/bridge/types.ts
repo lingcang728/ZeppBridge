@@ -490,7 +490,6 @@ export interface BridgeBackend {
   /** 把存量原始报文压缩掉，返回压缩前后的字节数。耗时随库大小增长。 */
   compactRawPayloads(): Promise<RawPayloadCompaction>;
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
-  submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
   /** 信匣：本机的待寄出、已寄出和上次取回的回执（不联网）。 */
   lettersState(): Promise<import('../../types/letters').LetterBoxView>;
   /** 寄一封回信；连不上就放进待寄出，返回 queued。 */

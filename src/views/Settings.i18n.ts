@@ -80,7 +80,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: '已收到，谢谢',
     reportDoneLine: (id: string, at: string) => `报告编号 ${id}，提交时间 ${at}。`,
     reportDoneNote: '发出去的就是上面那几类字段和你写的说明，没有别的。',
-    reportConfirm: '只发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述「哪一款表」而非「哪一台表」）、未知运动编号和数量、云端最近一次拒绝请求的数字错误码（只有编号、哪条流和时间，不含云端返回的文字），以及你写的说明（自动去掉本机路径、邮箱和长串标识）。不发 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
+    reportConfirm: '只发送应用版本、系统类型、解析器版本、字段结构、认不出的设备的产品级提示和型号编号（deviceSource，只有整数，描述「哪一款表」而非「哪一台表」）、未知运动编号和数量、云端最近一次拒绝请求的数字错误码（只有编号、哪条流和时间，不含云端返回的文字），以及你写的说明（自动去掉本机路径、邮箱和长串标识）。不发 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
     reportFailed: '错误报告提交失败',
 
     // ── 能力清单 ──
@@ -126,7 +126,7 @@ export const settingsMessages = defineMessages(
     privacyTelemetryTitle: '没有埋点，没有使用统计',
     privacyTelemetryBody: '应用不自动上报任何使用行为。只有你手动点「提交错误报告」时，才发送下面那几类脱敏字段。',
     privacyReportTitle: '设备或运动没有识别？',
-    privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
+    privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、认不出的设备的型号编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
 
     // ── 5. MCP ──
     mcpBadge: '健康数据只读 · 不监听端口',
@@ -416,7 +416,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: 'Received, thank you',
     reportDoneLine: (id: string, at: string) => `Report ${id}, submitted ${at}.`,
     reportDoneNote: 'What went out is exactly the field types listed above plus the note you wrote. Nothing else.',
-    reportConfirm: 'This sends the app version, OS type, parser revision, product-level hints and field shapes for unidentified devices, firmware version, model-level numbers (deviceSource / deviceType — integers describing which model, not which unit), unknown workout codes and counts, the numeric error code from the most recent request the cloud rejected (just the number, stream and time — never the returned text), and the note above (local paths, emails and long identifiers stripped). Never your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
+    reportConfirm: 'This sends the app version, OS type, parser revision, field shapes, product-level hints and model numbers for devices that could not be identified (deviceSource — integers describing which model, not which unit), unknown workout codes and counts, the numeric error code from the most recent request the cloud rejected (just the number, stream and time — never the returned text), and the note above (local paths, emails and long identifiers stripped). Never your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
     reportFailed: 'Could not submit error report',
 
     // ── Capability board ──
@@ -462,7 +462,7 @@ export const settingsMessages = defineMessages(
     privacyTelemetryTitle: 'No telemetry, no usage statistics',
     privacyTelemetryBody: 'The app reports no usage on its own. Only pressing "Submit error report" sends the de-identified fields listed below.',
     privacyReportTitle: 'A device or workout not recognized?',
-    privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, firmware version, model-level numbers (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
+    privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, model numbers of devices that could not be identified (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
 
     // ── 5. MCP ──
     mcpBadge: 'Health data read-only · listens on no port',
@@ -752,7 +752,7 @@ If you need anything from me (which client I use, where the file lives), just as
     reportDoneTitle: 'Recibido, gracias',
     reportDoneLine: (id: string, at: string) => `Reporte ${id}, enviado el ${at}.`,
     reportDoneNote: 'Se envió exactamente lo listado arriba más tu nota. Nada más.',
-    reportConfirm: 'Se envía solo: versión de la app, tipo de sistema, revisión del analizador, pistas de producto y forma de los campos de dispositivos sin identificar, versión de firmware, números de modelo (deviceSource / deviceType: enteros que dicen qué modelo de reloj, no qué unidad), códigos de entrenamiento desconocidos con su conteo, el código numérico del último rechazo de la nube (solo el número, qué flujo y cuándo; jamás el texto devuelto) y tu nota (sin rutas, correos ni identificadores largos). Jamás tu cuenta de Zepp, tokens, números de serie, IDs de dispositivo, MAC, GPS, valores de salud ni respuestas originales. ¿Enviar?',
+    reportConfirm: 'Se envía solo: versión de la app, tipo de sistema, revisión del analizador, forma de los campos, pistas de producto y números de modelo de los dispositivos sin identificar (deviceSource: enteros que dicen qué modelo de reloj, no qué unidad), códigos de entrenamiento desconocidos con su conteo, el código numérico del último rechazo de la nube (solo el número, qué flujo y cuándo; jamás el texto devuelto) y tu nota (sin rutas, correos ni identificadores largos). Jamás tu cuenta de Zepp, tokens, números de serie, IDs de dispositivo, MAC, GPS, valores de salud ni respuestas originales. ¿Enviar?',
     reportFailed: 'No se pudo enviar el reporte de error',
 
     // ── Capability board ──
@@ -798,7 +798,7 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyTelemetryTitle: 'Sin telemetría ni estadísticas de uso',
     privacyTelemetryBody: 'La app no reporta tu uso por su cuenta. Solo cuando tú pulsas «Enviar un reporte de error» salen los campos anonimizados listados abajo.',
     privacyReportTitle: '¿Un dispositivo o entrenamiento no reconocido?',
-    privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, la versión de firmware, números de modelo (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
+    privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, los números de modelo de los dispositivos sin identificar (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 
     // ── 5. MCP ──
     mcpBadge: 'Datos de salud de solo lectura · no abre ningún puerto',

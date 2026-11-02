@@ -48,7 +48,7 @@ const deviceRefreshError = ref<string | null>(null);
 
 // 空列表没有任何可指认的设备，不能据此声称「检测到未识别设备」。
 const unknownDeviceDetected = computed(() =>
-  deviceModels.value.some((model) => model.profile.match_status === 'unknown'));
+  deviceModels.value.some((model) => model.profile.match_status === 'unknown' && model.kind !== 'scale'));
 // 官方回退还没有运动证据时，#128 沿用 not_connected；这不代表官方授权失败。
 const officialDevicesPending = computed(() => officialDeviceFallback.value
   && deviceCache.value?.refresh_error_code === 'err.sync.not_connected');
