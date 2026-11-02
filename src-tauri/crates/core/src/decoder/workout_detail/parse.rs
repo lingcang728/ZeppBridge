@@ -87,6 +87,31 @@ pub(super) fn parse_delta_pairs(
     value: Option<&Value>,
     empty_delta_is_one: bool,
 ) -> Vec<(i64, i32)> {
+    parse_delta_pairs_by(value, empty_delta_is_one, |raw| raw.parse::<i32>().ok())
+}
+
+/// 同 `parse_delta_pairs`，但值可以带小数，读成最近的整数。
+///
+/// #159：有的手表把 `currentDistance` 写成 `100000.00000`。按整数解析整行都
+/// 丢，累计距离一个读数都没有，公里分段就没了。只给距离用：心率、海拔带
+/// 小数是另一回事，不能悄悄取整。
+pub(super) fn parse_rounded_delta_pairs(
+    value: Option<&Value>,
+    empty_delta_is_one: bool,
+) -> Vec<(i64, i32)> {
+    parse_delta_pairs_by(value, empty_delta_is_one, |raw| {
+        let parsed = raw.trim().parse::<f64>().ok()?;
+        let rounded = parsed.round();
+        (parsed.is_finite() && rounded >= i32::MIN as f64 && rounded <= i32::MAX as f64)
+            .then_some(rounded as i32)
+    })
+}
+
+fn parse_delta_pairs_by(
+    value: Option<&Value>,
+    empty_delta_is_one: bool,
+    parse_value: impl Fn(&str) -> Option<i32>,
+) -> Vec<(i64, i32)> {
     let Some(text) = value.and_then(Value::as_str) else {
         return Vec::new();
     };
@@ -109,7 +134,7 @@ pub(super) fn parse_delta_pairs(
                 Err(_) => continue,
             }
         };
-        let Some(sample) = raw_value.parse::<i32>().ok() else {
+        let Some(sample) = parse_value(raw_value) else {
             continue;
         };
         pairs.push((delta, sample));
