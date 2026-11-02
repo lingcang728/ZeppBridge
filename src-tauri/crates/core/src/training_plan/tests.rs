@@ -470,3 +470,42 @@ fn clearing_a_future_window_parks_one_placeholder_the_day_before() {
     assert_eq!(workouts[0]["workoutDate"], "2026-10-08");
     assert_eq!(workouts[0]["workoutId"], 1_000_000_042);
 }
+
+/// 泳池一步最少一个池长（25 米，2026-11-02 手表实测收下 25 米和 75 米）；别的运动仍是 50 米。
+/// 游泳的配速没法按每公里读，先整条拦下，不偷偷当成跑步配速发出去。
+#[test]
+fn pool_steps_go_down_to_one_length_and_swims_refuse_pace() {
+    let swim = |sport: &str, duration: &str, target: Option<&str>| {
+        let mut step = json!({ "kind": "interval", "duration": duration });
+        if let Some(target) = target {
+            step["target"] = json!(target);
+        }
+        let plan = document(json!({
+            "format": "zeppbridge-plan/3",
+            "workouts": [{
+                "date": "2026-10-03", "sport": sport, "name": "测试",
+                "focus": "实测", "description": "实测", "steps": [step]
+            }]
+        }));
+        let check = check_plan(&plan, context());
+        check
+            .issues
+            .iter()
+            .map(|issue| issue.message_code)
+            .collect::<Vec<_>>()
+    };
+    assert!(swim("pool_swim", "25m", None).is_empty());
+    assert!(swim("pool_swim", "75m", Some("hr 120-150")).is_empty());
+    assert_eq!(
+        swim("pool_swim", "20m", None),
+        ["ui.training_plan.issue.pool_distance_out_of_range"]
+    );
+    assert_eq!(
+        swim("running", "25m", None),
+        ["ui.training_plan.issue.distance_out_of_range"]
+    );
+    assert_eq!(
+        swim("open_water_swim", "400m", Some("pace 2:00-2:15")),
+        ["ui.training_plan.issue.swim_pace_unsupported"]
+    );
+}

@@ -280,6 +280,7 @@ const PLAN_FORMAT: &str = "plan 是一个 JSON 对象（格式 zeppbridge-plan/3
     steps 每一步 {kind, duration, target, note}：kind 是 warmup / active / interval / recovery / rest / cooldown；\
     duration 写 \"20min\"、\"90s\"、\"1h\"、\"400m\"、\"5km\"（m 是米不是分钟）；\
     target 写 \"hr 135-150\"、\"pace 5:30-5:50\"、\"power 200-220\"，不写就是不设目标。\
+    游泳：泳池每一步至少 25 米，不写配速目标（用心率或不设）。\
     重复组 {repeat: 3, steps: [...]}，不能嵌套。最远排到今天之后 56 天，日期不能早于今天。";
 
 fn coach_tool_definitions() -> Vec<Value> {

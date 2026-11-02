@@ -73,6 +73,9 @@ number you quote must come from a tool result.
      within about 14 characters (the watch truncates it).
    - Durations: `"20min"`, `"90s"`, `"400m"`, `"5km"` (`m` is metres, never
      minutes). Targets: `"hr 135-150"`, `"pace 5:30-5:50"`, `"power 200-220"`.
+   - Swims: distances in metres, each pool step at least 25 m (ideally whole
+     pool lengths; the pool length is set on the watch). No pace target for
+     swims — use a heart-rate range or none.
      Base heart-rate targets on their zones from `get_athlete_profile`.
    - If the draft comes back with `check.issues`, fix every `error` and
      `unverified` issue and draft again.
