@@ -255,32 +255,15 @@ pub fn text_sport(value: &str) -> &'static str {
         .filter(|c| c.is_ascii_alphanumeric())
         .flat_map(|c| c.to_lowercase())
         .collect();
+    // 数字和「游泳」「其它」是导入文件自己的习惯，不进共用别名表。
     match key.as_str() {
-        "run" | "running" | "9" => "run",
-        "trailrun" | "trailrunning" => "trail_running",
-        "virtualrun" | "treadmill" => "treadmill",
-        "ride" | "biking" | "cycling" | "bike" | "gravelride" | "1" => "ride",
-        "virtualride" | "indoorcycling" => "indoor_cycling",
-        "mountainbikeride" | "mountainbiking" => "mountain_biking",
-        "ebikeride" | "ebike" => "e_bike",
-        "walk" | "walking" | "10" => "walking",
-        "hike" | "hiking" | "4" => "hiking",
+        "9" => "run",
+        "1" => "ride",
+        "10" => "walking",
+        "4" => "hiking",
         "swim" | "swimming" => "pool_swimming",
-        "weighttraining" | "strengthtraining" | "strength" => "strength",
         "workout" | "other" => "free_training",
-        "yoga" => "yoga",
-        "pilates" => "pilates",
-        "rowing" => "rowing",
-        "elliptical" => "elliptical",
-        "nordicski" | "crosscountryskiing" => "cross_country_skiing",
-        "hiit" | "highintensityintervaltraining" => "hiit",
-        "kayaking" => "kayaking",
-        "rockclimbing" | "rockclimb" => "rock_climbing",
-        "soccer" | "football" => "soccer",
-        "tennis" => "tennis",
-        "badminton" => "badminton",
-        "basketball" => "basketball",
-        _ => "activity",
+        _ => crate::sport_catalog::text_alias(value).unwrap_or("activity"),
     }
 }
 
