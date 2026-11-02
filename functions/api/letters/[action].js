@@ -3,10 +3,12 @@
  * 但单独一张表（migrations/0008_letter_replies.sql）——回信是人写给人的话，不是诊断证据。
  *
  *   POST /api/letters/reply     寄一封回信（可以只按「我也遇到」，不写字）
- *   POST /api/letters/receipts  按本机随机 install id 取回自己回信的状态（已读 / 归类 / 哪版修）
+ *   POST /api/letters/receipts  按本机随机 install id 取回自己回信的状态（已读 / 归类 / 哪版修），
+ *                               以及作者对这封信的一对一回复（migrations/0009_letter_author_reply.sql）
  *
- * install id 是应用第一次寄信时本机生成的随机 UUID，**不绑账号**。库里只存它的加盐哈希，
- * 回执也只返回状态，不返回回信原文——拿到别人的 install id 也读不到他写了什么。
+ * install id 是应用第一次寄信时本机生成的随机 UUID，**不绑账号**。库里只存它的加盐哈希。
+ * 回执不返回用户写的原文；作者的回复会返回——拿到别人的 install id 读不到他写了什么，
+ * 但能读到作者回他的话，所以作者回复里不写对方的个人信息。
  */
 const MAX_BODY_BYTES = 16 * 1024;
 /** 和客户端 LETTER_REPLY_MAX_CHARS 一致。 */
@@ -132,7 +134,7 @@ async function receipts(context, body) {
   const hash = await installHash(body.installId);
   try {
     const { results } = await context.env.FEEDBACK_DB.prepare(`
-      SELECT id, letter_version, received_at, read_at, category, status, fixed_in
+      SELECT id, letter_version, received_at, read_at, category, status, fixed_in, author_reply, author_reply_at
       FROM letter_replies WHERE install_hash = ? ORDER BY received_at DESC LIMIT ?
     `).bind(hash, RECEIPTS_LIMIT).all();
     return response({
@@ -144,6 +146,8 @@ async function receipts(context, body) {
         category: row.category || null,
         status: row.status || null,
         fixedIn: row.fixed_in || null,
+        authorReply: row.author_reply || null,
+        authorReplyAt: row.author_reply ? row.author_reply_at || null : null,
       })),
     });
   } catch {

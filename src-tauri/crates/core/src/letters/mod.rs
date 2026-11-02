@@ -48,6 +48,12 @@ pub struct SentReply {
     pub text: String,
     pub also_hit: Vec<String>,
     pub sent_at: String,
+    /// 作者对这封信的一对一回复。从回执并进来存在本机：服务端处理完 180 天会删回执，
+    /// 回复不能跟着没了。
+    #[serde(default)]
+    pub author_reply: Option<String>,
+    #[serde(default)]
+    pub author_reply_at: Option<String>,
 }
 
 /// 云端回执，字段和服务端一一对应。`category` 是上期回音里的 `#id`，界面按它查标题。
@@ -61,6 +67,11 @@ pub struct LetterReceipt {
     pub category: Option<String>,
     pub status: Option<String>,
     pub fixed_in: Option<String>,
+    /// 作者的一对一回复（3.1.1 起，migrations/0009）。旧服务端不给这两个字段。
+    #[serde(default)]
+    pub author_reply: Option<String>,
+    #[serde(default)]
+    pub author_reply_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -151,10 +162,34 @@ impl LetterBoxState {
                     text: pending.text.clone(),
                     also_hit: pending.also_hit.clone(),
                     sent_at,
+                    author_reply: None,
+                    author_reply_at: None,
                 },
             );
             self.sent.truncate(LETTER_SENT_MAX);
         }
+    }
+
+    /// 换上刚取回的回执，并把作者回复并进对应的已寄出回信。
+    /// 回执里有这封信：以它为准（回复了就记下，撤回了就清掉）；
+    /// 回执里已经没有这封信（服务端 prune 掉了）：本机记下的回复照旧留着。
+    pub fn apply_receipts(&mut self, receipts: Vec<LetterReceipt>, checked_at: String) {
+        for sent in &mut self.sent {
+            if let Some(receipt) = receipts
+                .iter()
+                .find(|receipt| receipt.reply_id == sent.reply_id)
+            {
+                let reply = receipt
+                    .author_reply
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|text| !text.is_empty());
+                sent.author_reply = reply.map(str::to_string);
+                sent.author_reply_at = reply.and(receipt.author_reply_at.clone());
+            }
+        }
+        self.receipts = receipts;
+        self.receipts_checked_at = Some(checked_at);
     }
 }
 

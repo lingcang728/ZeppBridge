@@ -19,7 +19,7 @@ import { useUpdateText } from '../../../components/shell/update.i18n';
 import { useUpdateNoticeText } from '../../../components/shell/UpdateNotice.i18n';
 import { useLetterText } from '../../../components/letters/letters.i18n';
 import { letterVersions } from '../../../services/letters';
-import { loadLetterBox } from '../../../services/letterBox';
+import { hasNewAuthorReply, loadLetterBox } from '../../../services/letterBox';
 
 const t = useMessages(settingsMessages);
 const u = useUpdateText();
@@ -78,11 +78,12 @@ const openRepo = () => {
       </button>
     </div>
   </div>
-  <!-- 信匣：作者来信都在这里重读，回信的回执有新动静时亮一个点。 -->
+  <!-- 信匣：作者来信都在这里重读；作者一对一回了信、还没拆开看时，小字换成「作者回了你的信」。 -->
   <div class="s-row letter-row">
     <div class="s-row-main">
       <span class="s-row-title">{{ l.settingsRow }}</span>
-      <span class="s-row-sub">{{ l.settingsSub(letterCount) }}</span>
+      <span v-if="hasNewAuthorReply()" class="s-row-sub author-new">{{ l.authorNew }}</span>
+      <span v-else class="s-row-sub">{{ l.settingsSub(letterCount) }}</span>
     </div>
     <div class="s-row-control">
       <RouterLink class="button secondary" to="/letters">{{ l.open }}</RouterLink>
@@ -102,6 +103,7 @@ const openRepo = () => {
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
+.author-new { color: var(--accent); font-weight: 600; }
 .update-state:not(.is-idle, .is-unsupported) .s-row-title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; }
 .update-state.is-ready .s-row-title::before, .update-state.is-up_to_date .s-row-title::before { background: var(--accent); }
 .update-state.is-checking .s-row-title::before, .update-state.is-downloading .s-row-title::before, .update-state.is-applying .s-row-title::before { background: var(--warning); }

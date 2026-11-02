@@ -22,6 +22,16 @@
 4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题。信纸上只画 `next` / `later` 两组，`asking`（继续征集）条目不显示、也没有「我也遇到」了（2026-10-21 用户：没意义），别再写。允许匿名引用的回信才可以引用原话。
 5. 回音写了就 12 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 会查。
 
+### 一对一回复某一封回信
+
+不用等发版，随时可以回。用户的应用取回执时把作者回复一并取回，盖在「我的回信」那只信封上（D1 列 `author_reply` / `author_reply_at`，`migrations/0009_letter_author_reply.sql`）。作者对 agent 说「回那封信 + 内容」，agent 照下面做：
+
+1. `node scripts/letters/replies.mjs show <id>`：看那封信的语言（`locale`）和原文。
+2. 把作者的话译成那封信的语言；中文、英文的信直接用作者原话。
+3. 把译文**回译成中文**，连同译文一起给作者对；作者点头之前不发。
+4. 译文写进仓库外的文件（如 `桌面\回信\reply-<id>.md`），`node scripts/letters/replies.mjs reply <id> --file <文件> --dry-run` 先看 SQL，再去掉 `--dry-run` 发出。最长 2000 字；空文件 = 撤回。
+5. 回复里**不写对方的个人信息**（名字、邮箱、地点）：拿到那台电脑 install id 的人也能读到作者回复。ZeppDock 的回信面板也能回，规则相同。
+
 ### 这一版的邮票（可选）
 
 每一版信封右上角贴一枚邮票、信匣集邮册里收一枚。票面图由用户每版画一张（如 gpt-image），放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就贴默认那枚（海拔山形，`src/components/letters/StampArt.vue`），面值照样印这一版的版本号。

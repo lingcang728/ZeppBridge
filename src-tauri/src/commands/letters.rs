@@ -229,8 +229,7 @@ pub async fn letters_sync(
         if let Ok(response) = client.post(RECEIPTS_ENDPOINT).json(&request).send().await {
             if response.status().is_success() {
                 if let Ok(body) = response.json::<ReceiptsResponse>().await {
-                    letters.receipts = body.receipts;
-                    letters.receipts_checked_at = Some(chrono::Utc::now().to_rfc3339());
+                    letters.apply_receipts(body.receipts, chrono::Utc::now().to_rfc3339());
                 }
             }
         }

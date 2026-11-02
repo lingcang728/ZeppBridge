@@ -19,6 +19,9 @@ export interface SentLetterReply {
   text: string;
   also_hit: string[];
   sent_at: string;
+  /** 作者的一对一回复（3.1.1 起）：从回执并进本机留着，服务端删了回执也还在。 */
+  author_reply?: string | null;
+  author_reply_at?: string | null;
 }
 
 /** 回执状态：下版先修 / 推迟 / 继续征集 / 已修 / 不打算做。作者在发版前标（scripts/letters/replies.mjs）。 */
@@ -33,6 +36,8 @@ export interface LetterReceipt {
   category: string | null;
   status: LetterReceiptStatus | string | null;
   fixedIn: string | null;
+  authorReply?: string | null;
+  authorReplyAt?: string | null;
 }
 
 export interface LetterBoxView {

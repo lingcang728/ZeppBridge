@@ -7,7 +7,7 @@
  */
 import { reactive } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
-import type { LetterBoxView, LetterReplyInput, LetterSendResult } from '../types/letters';
+import type { LetterBoxView, LetterReplyInput, LetterSendResult, SentLetterReply } from '../types/letters';
 
 export const LETTER_REPLY_MAX = 1000;
 const DRAFT_KEY = (version: string) => `zeppbridge.letters.draft.${version}`;
@@ -75,6 +75,31 @@ export function saveDraft(version: string, draft: ReplyDraft): void {
 
 export function clearDraft(version: string): void {
   try { window.localStorage.removeItem(DRAFT_KEY(version)); } catch { /* 无妨 */ }
+}
+
+/*
+ * 作者的一对一回复：新来的（没拆开看过的）在设置的信匣那一行和「我的回信」分栏上提一句，拆开那封就算看过。
+ * 看过的按「回信 id @ 回复时间」记在本机，作者改了回复会再提一次。
+ */
+const AUTHOR_SEEN_KEY = 'zeppbridge.letters.authorRepliesSeen';
+const authorKey = (sent: SentLetterReply) => `${sent.reply_id}@${sent.author_reply_at ?? ''}`;
+const readSeen = (): string[] => {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(AUTHOR_SEEN_KEY) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((key): key is string => typeof key === 'string') : [];
+  } catch { return []; }
+};
+const authorSeen = reactive<{ keys: string[] | null }>({ keys: null });
+const seenKeys = () => (authorSeen.keys ??= typeof window === 'undefined' ? [] : readSeen());
+
+export const isNewAuthorReply = (sent: SentLetterReply): boolean => Boolean(sent.author_reply) && !seenKeys().includes(authorKey(sent));
+export const hasNewAuthorReply = (): boolean => letterBox.view.sent.some(isNewAuthorReply);
+
+export function markAuthorReplySeen(sent: SentLetterReply): void {
+  if (!isNewAuthorReply(sent)) return;
+  const keys = [...seenKeys().filter((key) => !key.startsWith(`${sent.reply_id}@`)), authorKey(sent)].slice(-200);
+  authorSeen.keys = keys;
+  try { window.localStorage.setItem(AUTHOR_SEEN_KEY, JSON.stringify(keys)); } catch { /* 存不了就只在这次打开里 */ }
 }
 
 /** 这一版有没有寄过（含待寄出）：寄过就不再把空白回信栏当成「没写完」。 */

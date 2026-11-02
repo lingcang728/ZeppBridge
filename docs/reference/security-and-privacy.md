@@ -206,6 +206,15 @@ response returns only a random report number. D1 is used solely to locate
 catalogue and parser compatibility problems — never for profiling, usage
 statistics or health analysis.
 
+## Letters to the author
+
+Replies written in the letter box go to zeppbridge.com and are stored in the author's D1 table `letter_replies`, separate from problem reports.
+
+- The first time you send one, the app generates a random install id (UUID v4). It is **not tied to your account**, and the server keeps only a salted hash of it.
+- Before sending, local paths are removed and words that look like credentials, serial numbers or email addresses are blanked. The limit is 1,000 characters. Only replies marked "may quote anonymously" can be quoted in the next letter.
+- Receipts are fetched by install id: the handling status and, from 3.1.1, the author's one-to-one reply. Receipts never return your own text. The author's reply is returned, so anyone holding this computer's `data/letters/state.json` (which contains the install id) can read what the author wrote back. The author does not put your personal details in a reply.
+- Your sent text and the author's reply stay on this computer. The server deletes a reply 180 days after it is handled.
+
 ## "Clear credentials" versus "clean up data"
 
 ### Clear credentials
