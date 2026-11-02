@@ -1442,21 +1442,6 @@ export default {
       mcpPromptCopied:
         'Gekopieerd. Plak het bij je AI — die geeft de configuratiestappen voor jouw machine.',
       mcpPromptCopyFailed: 'Kopiëren mislukt — selecteer de tekst hierboven zelf.',
-      mcpSetupPrompt: `Ik gebruik een Windows-desktopapp genaamd ZeppBridge die gegevens van mijn Amazfit / Zepp-horloge synchroniseert naar een lokale SQLite-database.
-Er hoort een MCP-programma bij (zeppbridge-mcp) en dat wil ik met jou configureren, zodat je mijn trainingen en gezondheidsgegevens direct kunt opvragen in plaats van dat ik ze telkens moet exporteren en plakken.
-
-Wat ik erover weet:
-- Het MCP-programma is te vinden in het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; pak het uit en zeppbridge-mcp zit erin. Misschien heb ik het nog niet gedownload.
-- Het is een stdio MCP-server. Gezondheidsgegevens zijn alleen-lezen, de server luistert niet op een poort en vereist geen token of API-sleutel; er is alleen netwerkverbinding nodig om een trainingsplan te publiceren, en alleen nadat ik dat heb toegestaan.
-- De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het programma biedt vijftien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen); en propose_coach_note: plaatst een zin die het waard is om te onthouden in de inbox van mijn coachnotities en wordt pas actief nadat ik op Onthouden tik.
-
-Vertel me:
-1. Specifiek voor jou — de tool waarmee ik nu praat — in welk bestand de configuratie moet of met welk commando ik hem toevoeg;
-2. Hoe een Windows-pad geschreven moet worden (moeten backslashes worden ge-escaped);
-3. Hoe ik kan controleren of het werkt zodra het is geconfigureerd.
-
-Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat), vraag het gerust.`,
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
       mcpToolWorkoutDetail: "Alle opgeslagen samenvattingsvelden en hartslagzones van één training",
       mcpToolWorkoutSeries: "Meetpunten, route, splits en ronden van één training",

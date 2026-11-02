@@ -2,13 +2,15 @@
 
 [English](cli-and-mcp.md)
 
-`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口，随每个 Release 以独立压缩包分发：需要它们的人不该被迫先装一个 GUI，装了 GUI 的人也不该被塞进两个用不到的程序。
+`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口。3.1.1 起它们随桌面应用一起安装、一起升级（就在主程序旁边，设置 › 交给 AI 工具里能复制路径）；每个 Release 也照旧附一个独立压缩包，给没有桌面的机器：需要它们的人不该被迫先装一个 GUI。
 
 两者都只是 [`zeppbridge-core`](architecture.zh-CN.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
 
 ## 安装
 
-从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
+**装了桌面应用**：不用另装。Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`；设置 › 交给 AI 工具会显示两个程序的完整路径。它们就在应用旁边，读的自然是同一个库。
+
+**没有桌面的机器**：从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
 
 把两个程序放到 ZeppBridge 可执行文件旁边，它们就会读同一个库。数据目录由 `paths.rs` 决定：
 
@@ -184,7 +186,7 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 ### 从桌面应用连接
 
-安装包会把 `zeppbridge-mcp` 放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
+安装包会把 `zeppbridge-mcp`（3.1.1 起还有 `zeppbridge-cli`）放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
 **设置 › 交给 AI 工具 › 连到 AI 工具**会替你填好真实路径：
 
 - **Claude Code** 和 **Codex**：复制三行命令——注册 MCP（带 `--scope task`）、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。

@@ -1,10 +1,10 @@
 # Command line and MCP
 
 `zeppbridge-cli` and `zeppbridge-mcp` are two companion tools alongside the
-desktop app,
-shipped as a separate archive with every release: people who need them should
-not be forced to install a GUI first, and people who installed the GUI should
-not be handed two programs they will never run.
+desktop app. Since 3.1.1 they are installed and updated together with it (right
+next to the main program; Settings › AI tools shows their paths).
+Every release still carries a separate archive for machines without a desktop:
+people who need them should not be forced to install a GUI first.
 
 [简体中文](cli-and-mcp.zh-CN.md)
 
@@ -13,7 +13,14 @@ same `data/zepp.db` the desktop app uses.
 
 ## Installing
 
-Download `zeppbridge-tools-<version>-<platform>.zip` for your platform from
+**With the desktop app installed** there is nothing more to install. On Windows
+(installer and portable build) they sit next to `ZeppBridge.exe`, on macOS inside
+`ZeppBridge.app/Contents/MacOS/`, and the Linux deb / rpm put them in `/usr/bin`.
+Settings › AI tools shows the full path of both. Living next to the
+app, they read the same library.
+
+**On a machine without a desktop**, download
+`zeppbridge-tools-<version>-<platform>.zip` for your platform from
 [Releases](https://github.com/lingcang728/ZeppBridge/releases), unpack it, and
 check it against `SHA256SUMS.txt`.
 

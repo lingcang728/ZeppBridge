@@ -716,12 +716,15 @@ export default {
     confirm: "To moje urządzenie",
     clear: 'Cofnij wybór',
     later: 'Nie teraz',
+    pickPrompt: 'Przeglądaj w bok lub wyszukaj swój model',
+    note: 'Twój wybór zostanie oznaczony jako „Model wybrany przez Ciebie” — nigdy jako automatyczne dopasowanie. Informacja ta pozostaje tylko na tym komputerze; zdjęcia i nazwy modeli pochodzą z dołączonego katalogu, a przeglądanie nie korzysta z sieci.',
     filterAll: 'Wszystkie',
     filterWatch: 'Zegarki',
     filterBand: 'Opaski',
     filterStrap: 'Paski',
     filterRing: 'Pierścienie',
     filterEarbuds: 'Słuchawki',
+    filterScale: 'Wagi',
   },
 
   // Source: src/components/DeviceVisual.vue
@@ -942,6 +945,11 @@ export default {
     open: 'Otwórz',
     replied: 'Wysłano odp.',
     rereadAria: (version: string) => `Przeczytaj ponownie list dla wersji ${version}`,
+    authorStamp: 'Odpowiedź autora',
+    authorSheet: 'Odpowiedź autora',
+    authorSign: '— twórca ZeppBridge',
+    authorRepliedOn: (date: string) => `Odpowiedź z ${date}`,
+    authorNew: 'Autor odpowiedział na Twój list',
   },
 
   // Source: src/components/letters/dataLetters.i18n.ts
@@ -1648,6 +1656,7 @@ export default {
     notFetchedYet: 'Jeszcze nie pobrano',
     timeUnknown: 'Czas nieznany',
     unidentifiedDevice: 'Niezidentyfikowane urządzenie',
+    genericScale: 'Waga analityczna',
     notProvided: 'Nie podano',
     identifyUnavailable: 'Identyfikacja urządzenia jest teraz niedostępna',
     cacheUnavailable: 'Pamięć podręczna urządzeń jest teraz niedostępna',
@@ -3226,6 +3235,7 @@ Kontynuować?`,
     reportDoneTitle: 'Otrzymano, dziękujemy',
     reportDoneLine: (id: string, at: string) => `Raport ${id}, wysłano ${at}.`,
     reportDoneNote: 'Wysłano dokładnie te typy pól, które wymieniono powyżej, oraz Twoją notatkę. Nic więcej.',
+    reportConfirm: 'Zostaną wysłane wyłącznie: wersja aplikacji, typ systemu, wersja parsera, struktury pól, wskazówki na poziomie produktu i numery modeli niezidentyfikowanych urządzeń (deviceSource — liczby całkowite opisujące „który to model”, a nie „który egzemplarz”), kody i liczba nieznanych treningów, numeryczny kod błędu ostatniego żądania odrzuconego przez chmurę (tylko numer, strumień i czas — bez zwracanego tekstu) oraz powyższa notatka (lokalne ścieżki, adresy e-mail i długie identyfikatory są usuwane). Nigdy Twoje konto Zepp, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne ani surowe odpowiedzi. Czy chcesz wysłać?',
     reportFailed: 'Nie udało się wysłać raportu o błędzie',
 
     // ── Capability board ──
@@ -3295,6 +3305,7 @@ Kontynuować?`,
     privacyTelemetryTitle: 'Brak telemetrii i statystyk użytkowania',
     privacyTelemetryBody: 'Aplikacja sama z siebie nie przesyła żadnych danych o użytkowaniu. Jedynie naciśnięcie przycisku „Wyślij raport o błędzie” wysyła zanonimizowane pola wymienione poniżej.',
     privacyReportTitle: 'Urządzenie lub trening nie zostały rozpoznane?',
+    privacyReportBody: 'Bez konta GitHub i bez kopiowania danych. Po potwierdzeniu do prywatnego magazynu raportów ZeppBridge trafiają wyłącznie struktury pól na poziomie produktu, numery modeli niezidentyfikowanych urządzeń (liczby całkowite — wskazujące jedynie model) oraz kody i liczba nieznanych treningów. Nigdy dane konta, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne, surowe odpowiedzi ani lokalne ścieżki.',
 
     // ── 5. MCP ──
     mcpBadge: 'Dane zdrowotne tylko do odczytu · nie nasłuchuje na żadnym porcie',
@@ -3316,21 +3327,6 @@ Kontynuować?`,
     mcpToolMetricRecords: 'Pojedyncze odczyty dla dowolnego wskaźnika',
     mcpToolSleepSessions: 'Lista sesji snu',
     mcpToolLifeEvents: 'Zarejestrowane przez Ciebie wydarzenia życiowe',
-    mcpSetupPrompt: `Używam aplikacji desktopowej dla systemu Windows o nazwie ZeppBridge, która synchronizuje dane z mojego zegarka Amazfit / Zepp do lokalnej bazy danych SQLite.
-Zawiera ona program MCP (zeppbridge-mcp) i chcę go z Tobą skonfigurować, abyś mógł bezpośrednio odpytywać moje treningi i dane zdrowotne, zamiast ręcznego eksportowania i wklejania za każdym razem.
-
-Co o nim wiem:
-- Program MCP pochodzi z archiwum zeppbridge-tools na stronie wydań ZeppBridge w serwisie GitHub (GitHub Releases); po rozpakowaniu w środku znajduje się plik zeppbridge-mcp. Być może jeszcze go nie pobrałem.
-- Jest to serwer MCP typu stdio. Dane zdrowotne są tylko do odczytu, serwer nie nasłuchuje na żadnym porcie sieciowym i nie wymaga tokena ani klucza API; korzysta z sieci wyłącznie do publikowania planu treningowego i tylko po wyrażeniu na to przeze mnie zgody.
-- Typowa struktura konfiguracji to: {"mcpServers": {"zeppbridge": {"command": "<pełna ścieżka do zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Udostępnia piętnaście narzędzi tylko do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan); plus dwa narzędzia do obsługi planu treningowego: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek tylko wtedy, gdy zezwolę na to w ustawieniach); oraz propose_coach_note: umieszcza zdanie warte zapamiętania w skrzynce moich notatek trenera i zaczyna obowiązywać dopiero po kliknięciu Zapamiętaj.
-
-Powiedz mi proszę:
-1. Konkretnie w Twoim przypadku — narzędzia, z którym teraz rozmawiam — do jakiego pliku należy wpisać konfigurację lub jakim poleceniem ją dodać;
-2. Jak poprawnie zapisać ścieżkę w systemie Windows (czy ukośniki odwrotne wymagają ucieczki);
-3. Jak sprawdzić, czy działa po skonfigurowaniu.
-
-Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego klienta korzystam, gdzie znajduje się plik), po prostu zapytaj.`,
     mcpConfigPathPlaceholder: '<ścieżka do zeppbridge-mcp>',
 
     // ── 6. Retention ──

@@ -152,10 +152,10 @@ export const settingsMessages = defineMessages(
 它附带一个 MCP 程序（zeppbridge-mcp），我想配到你这里，让你直接查我的运动和健康数据，不用每次导出再粘贴。
 
 已知信息：
-- MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
+- zeppbridge-mcp 随 ZeppBridge 一起安装，就在主程序旁边；完整路径在 ZeppBridge 的「设置 › 交给 AI 工具」里能看到。没装桌面应用的机器才需要从 GitHub Release 页下载 zeppbridge-tools 压缩包。
 - 它是 stdio 类型的 MCP server，健康数据只读，不监听端口、不需要 token 或 API key；只有在我允许后发布训练计划时才会联网。
 - 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
-- 它有十五个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
+- 它有十六个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
 
 告诉我：
 1. 针对你（我现在用的这个工具）具体该把配置写到哪个文件、用什么命令添加；
@@ -488,10 +488,10 @@ export const settingsMessages = defineMessages(
 It ships an MCP program (zeppbridge-mcp) and I want to configure it with you, so you can query my workouts and health data directly instead of me exporting and pasting every time.
 
 What I know about it:
-- The MCP program comes from the zeppbridge-tools archive on ZeppBridge's GitHub Releases page; unzip it and zeppbridge-mcp is inside. I may not have downloaded it yet.
+- zeppbridge-mcp is installed together with ZeppBridge, right next to the main program; ZeppBridge shows its full path under Settings › AI tools. Only a machine without the desktop app needs the zeppbridge-tools archive from ZeppBridge's GitHub Releases page.
 - It is a stdio MCP server. Health data is read-only, it listens on no port and needs no token or API key; it only uses the network to publish a training plan, and only after I allow that.
 - The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- It exposes fifteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
+- It exposes sixteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
 
 Please tell me:
 1. For you specifically — the tool I am talking to right now — which file the config goes in, or which command adds it;
@@ -824,10 +824,10 @@ If you need anything from me (which client I use, where the file lives), just as
 Incluye un programa MCP (zeppbridge-mcp) y quiero configurarlo contigo, para que puedas consultar mis entrenamientos y datos de salud directamente en vez de que yo exporte y pegue cada vez.
 
 Lo que sé:
-- El programa MCP viene en el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub; al descomprimirlo, zeppbridge-mcp está adentro. Puede que todavía no lo haya descargado.
+- zeppbridge-mcp se instala junto con ZeppBridge, al lado del programa principal; ZeppBridge muestra su ruta completa en Ajustes › Herramientas de IA. Solo un equipo sin la app de escritorio necesita el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub.
 - Es un servidor MCP por stdio. Los datos de salud son de solo lectura, no abre ningún puerto y no necesita token ni clave de API; solo usa la red para publicar un plan de entrenamiento, y solo si yo lo permito.
 - La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Ofrece quince herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes); y propose_coach_note, que deja una frase para recordar en la bandeja de mi expediente de entrenador y solo cuenta cuando pulso Recordar.
+- Ofrece dieciséis herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes); y propose_coach_note, que deja una frase para recordar en la bandeja de mi expediente de entrenador y solo cuenta cuando pulso Recordar.
 
 Dime:
 1. Para ti específicamente (la herramienta con la que estoy hablando ahora), en qué archivo va la configuración o qué comando la agrega;

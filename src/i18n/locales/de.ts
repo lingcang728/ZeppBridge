@@ -561,21 +561,6 @@ export default {
       mcpToolSleepSessions: "Liste der Schlafaufzeichnungen",
       mcpToolLifeEvents: "Von dir erfasste Lebensereignisse",
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
-      mcpSetupPrompt: `Ich nutze eine Windows-Desktop-App namens ZeppBridge, die Daten meiner Amazfit / Zepp-Uhr in eine lokale SQLite-Datenbank synchronisiert.
-Sie enthält ein MCP-Programm (zeppbridge-mcp), das ich bei dir einrichten möchte, damit du meine Trainings- und Gesundheitsdaten direkt abfragen kannst, statt dass ich sie jedes Mal exportieren und einfügen muss.
-
-Bekannte Informationen:
-- Das MCP-Programm stammt aus dem Archiv zeppbridge-tools auf der GitHub-Releases-Seite von ZeppBridge; nach dem Entpacken befindet sich zeppbridge-mcp darin. Ich habe es eventuell noch nicht heruntergeladen.
-- Es ist ein stdio-basierter MCP-Server. Gesundheitsdaten sind schreibgeschützt (read-only); er lauscht auf keinem Port und benötigt weder Token noch API-Key. Er nutzt das Netzwerk nur zum Veröffentlichen von Trainingsplänen, und auch das erst nach meiner Erlaubnis.
-- Typischer Aufbau der Konfiguration: {"mcpServers": {"zeppbridge": {"command": "<vollständiger Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Es stellt fünfzehn Nur-Lese-Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events), Datenzustand (get_data_health) und Coaching (get_training_context, get_athlete_profile, get_training_plan); dazu zwei Trainingsplan-Werkzeuge: draft_training_plan (speichert nur einen Entwurf) und publish_training_plan (überträgt erst nach Aktivierung in den Einstellungen an die Uhr); und propose_coach_note: legt einen Satz, den sich die KI dauerhaft merken soll, in das Postfach meiner „Trainer-Notizen“; wird erst wirksam, wenn ich auf „Merken“ tippe.
-
-Bitte sag mir:
-1. Wo genau bei dir (dem Werkzeug, mit dem ich gerade spreche) die Konfiguration eingetragen wird bzw. mit welchem Befehl sie hinzugefügt wird;
-2. Wie der Pfad unter Windows formatiert wird (müssen Backslashes maskiert werden?);
-3. Wie ich nach der Einrichtung überprüfe, ob alles funktioniert.
-
-Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei liegt), frag mich einfach.`,
 
       // ── 6. Aufbewahrung ──
       retentionAria: 'Aufbewahrungsdauer lokaler Daten in Tagen',

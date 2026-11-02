@@ -135,7 +135,7 @@ If the Windows install folder is not writable, the app uses your user data folde
 
 The desktop app is not needed day to day. On a NAS, a home server or a machine where an AI agent runs, use the headless tools instead:
 
-- **CLI and MCP tools.** Each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
+- **CLI and MCP tools.** The desktop app installs both next to itself (since 3.1.1); for a machine without it, each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
 - **Docker.** `packaging/docker` builds a headless image for scheduled syncs. See [Docker](docs/guides/docker.md).
 
 Signing in still needs a browser once: connect the account in the desktop app on any machine, then bring `auth.json` and the token over as the [Docker guide](docs/guides/docker.md#getting-the-credentials-in) describes. MCP only reads the local database and needs no token at all.

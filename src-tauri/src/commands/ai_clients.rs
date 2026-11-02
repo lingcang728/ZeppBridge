@@ -16,6 +16,8 @@ use zeppbridge_core::paths::write_file_atomically;
 /// 安装包里附带的 MCP 程序名（不含扩展名）。和 `tauri.sidecar.conf.json` 的
 /// `externalBin` 同名；Tauri 打包时会去掉目标三元组后缀。
 const SIDECAR_STEM: &str = "zeppbridge-mcp";
+/// 同样随安装包附带的命令行工具（3.1.1 起）。设置里只给出它的路径，不登记到任何地方。
+const CLI_STEM: &str = "zeppbridge-cli";
 /// 写出的 `.mcpb` 文件名。
 const BUNDLE_FILE: &str = "ZeppBridge.mcpb";
 
@@ -34,6 +36,8 @@ pub struct McpSidecar {
     /// `/tmp/.mount_*` 下，登记进 AI 客户端的路径下次就不存在了。这时 `path` 为空，
     /// 界面说清原因、指向单独的工具包。
     pub appimage: bool,
+    /// 附带的 `zeppbridge-cli` 的绝对路径；和 MCP 分开找，旧安装包、开发构建、AppImage 里为空。
+    pub cli_path: Option<String>,
 }
 
 fn not_bundled(appimage: bool) -> McpSidecar {
@@ -42,13 +46,19 @@ fn not_bundled(appimage: bool) -> McpSidecar {
         data_dir_env: None,
         stale_clients: Vec::new(),
         appimage,
+        cli_path: None,
     }
 }
 
 pub(crate) fn locate_sidecar(exe_dir: &Path, data_dir: &Path) -> McpSidecar {
+    let cli = exe_dir.join(format!("{CLI_STEM}{}", std::env::consts::EXE_SUFFIX));
+    let cli_path = cli.is_file().then(|| cli.to_string_lossy().into_owned());
     let candidate = exe_dir.join(format!("{SIDECAR_STEM}{}", std::env::consts::EXE_SUFFIX));
     if !candidate.is_file() {
-        return not_bundled(false);
+        return McpSidecar {
+            cli_path,
+            ..not_bundled(false)
+        };
     }
     let data_dir_env =
         (exe_dir.join("data") != data_dir).then(|| data_dir.to_string_lossy().into_owned());
@@ -57,6 +67,7 @@ pub(crate) fn locate_sidecar(exe_dir: &Path, data_dir: &Path) -> McpSidecar {
         data_dir_env,
         stale_clients: Vec::new(),
         appimage: false,
+        cli_path,
     }
 }
 
