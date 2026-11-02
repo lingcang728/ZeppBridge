@@ -235,7 +235,10 @@ fn a_mountain_bike_ride_exports_as_cycling_mountain() {
     });
     let (encoded, _) = db.build_ai_export(&selection).unwrap();
     let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
-    assert_eq!(export["data"]["workouts"][0]["effective_type"], "mountain_biking");
+    assert_eq!(
+        export["data"]["workouts"][0]["effective_type"],
+        "mountain_biking"
+    );
     let bytes = to_fit(&export).unwrap().0.remove(0).1;
     let mut cursor = std::io::Cursor::new(bytes);
     let fit = rustyfit::Decoder::new()
@@ -256,10 +259,16 @@ fn a_mountain_bike_ride_exports_as_cycling_mountain() {
     };
     assert_eq!(
         field(mesgdef::Session::SPORT),
-        Some(format!("{:?}", rustyfit::proto::Value::Uint8(typedef::Sport::CYCLING.0)))
+        Some(format!(
+            "{:?}",
+            rustyfit::proto::Value::Uint8(typedef::Sport::CYCLING.0)
+        ))
     );
     assert_eq!(
         field(mesgdef::Session::SUB_SPORT),
-        Some(format!("{:?}", rustyfit::proto::Value::Uint8(typedef::SubSport::MOUNTAIN.0)))
+        Some(format!(
+            "{:?}",
+            rustyfit::proto::Value::Uint8(typedef::SubSport::MOUNTAIN.0)
+        ))
     );
 }
