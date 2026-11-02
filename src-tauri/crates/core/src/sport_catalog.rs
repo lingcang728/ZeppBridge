@@ -218,16 +218,44 @@ mod tests {
     /// 都归到 `mountain_biking`，别名表里的每个 key 都必须是目录里有的。
     #[test]
     fn text_aliases_reach_catalog_keys() {
-        for name in ["mountain_bike", "MTB", "MOUNTAIN_BIKING", "Mountain Bike Ride"] {
+        for name in [
+            "mountain_bike",
+            "MTB",
+            "MOUNTAIN_BIKING",
+            "Mountain Bike Ride",
+        ] {
             assert_eq!(text_alias(name), Some("mountain_biking"), "{name}");
         }
         assert_eq!(text_alias("Running"), Some("run"));
-        assert_eq!(text_alias("swimming"), None, "分不清泳池还是公开水域，不替它猜");
+        assert_eq!(
+            text_alias("swimming"),
+            None,
+            "分不清泳池还是公开水域，不替它猜"
+        );
         assert_eq!(text_alias("tug_of_war"), None);
         for name in [
-            "run", "trailrun", "treadmill", "ride", "indoorcycling", "mtb", "ebike", "walk",
-            "hike", "strength", "yoga", "pilates", "rowing", "elliptical", "nordicski", "hiit",
-            "kayaking", "rockclimbing", "soccer", "tennis", "badminton", "basketball",
+            "run",
+            "trailrun",
+            "treadmill",
+            "ride",
+            "indoorcycling",
+            "mtb",
+            "ebike",
+            "walk",
+            "hike",
+            "strength",
+            "yoga",
+            "pilates",
+            "rowing",
+            "elliptical",
+            "nordicski",
+            "hiit",
+            "kayaking",
+            "rockclimbing",
+            "soccer",
+            "tennis",
+            "badminton",
+            "basketball",
         ] {
             let key = text_alias(name).unwrap();
             assert!(is_known_key(key), "{name} → {key} 不在目录里");
