@@ -9,14 +9,19 @@
  *       给回信定性。用户的信匣回执显示的就是这些：已读、归入「…」、下版先修 / 已在 x.y.z 修好。
  *   node scripts/letters/replies.mjs prune
  *       删掉处理完满 180 天的回信（先 export 留底）。
+ *   node scripts/letters/replies.mjs show <id>
+ *       把一封回信打到终端（语言、版本、原文、已有的作者回复），写一对一回复前先看它是什么语言。
+ *   node scripts/letters/replies.mjs reply <id> --file <回复.md>
+ *       作者的一对一回复（用户的应用取回执时一并取回）。文件放仓库外；空文件 = 撤回。
+ *       流程见 docs/releases/README.md「读回信」：译成来信的语言、回译给作者过目，点头后才发。
  *
  * 加 --dry-run 只打印 SQL 不执行。需要本机 wrangler 已登录。
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { markSql, pruneSql, renderReplies, selectOpenSql, tallyAlsoHit } from './replies-core.mjs';
+import { markSql, pruneSql, renderReplies, replySql, selectOneSql, selectOpenSql, tallyAlsoHit } from './replies-core.mjs';
 
 const DATABASE = 'zeppbridge-feedback';
 const args = process.argv.slice(2);
@@ -69,7 +74,21 @@ if (command === 'export') {
 } else if (command === 'prune') {
   d1(pruneSql());
   if (!dryRun) console.log('已删除处理完满 180 天的回信。');
+} else if (command === 'show') {
+  const [row] = d1(selectOneSql(positional()[0] ?? ''));
+  if (dryRun) process.exit(0);
+  if (!row) { console.error('没有这封回信（可能已经被 prune）。'); process.exit(1); }
+  console.log(`${row.id}\n${row.received_at} · 语言 ${row.locale} · 信 ${row.letter_version} · 应用 ${row.app_version} · ${row.status || '未定'}${row.category ? ` · #${row.category}` : ''}`);
+  console.log(`\n${row.body || '（没写字，只点了「我也遇到」）'}`);
+  if (row.author_reply) console.log(`\n—— 已回复（${row.author_reply_at}）——\n${row.author_reply}`);
+} else if (command === 'reply') {
+  const [id] = positional();
+  const file = option('--file');
+  if (!id || !file) { console.error('用法：replies.mjs reply <id> --file <回复.md> [--dry-run]'); process.exit(2); }
+  const text = readFileSync(file, 'utf8');
+  d1(replySql(id, text));
+  if (!dryRun) console.log(text.trim() ? '已回复。' : '已撤回回复。');
 } else {
-  console.error('用法：node scripts/letters/replies.mjs export|mark|prune（见文件头）');
+  console.error('用法：node scripts/letters/replies.mjs export|mark|prune|show|reply（见文件头）');
   process.exit(2);
 }

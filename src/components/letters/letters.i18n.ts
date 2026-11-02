@@ -52,6 +52,11 @@ const messages = defineMessages({
   open: '打开',
   replied: '已回',
   rereadAria: (version: string) => `重读 ${version} 的信`,
+  authorStamp: '作者回信',
+  authorSheet: '作者的回信',
+  authorSign: '—— ZeppBridge 开发者',
+  authorRepliedOn: (date: string) => `${date} 回`,
+  authorNew: '作者回了你的信',
 }, {
   to: 'To: User',
   toDeveloper: 'To: the ZeppBridge developer',
@@ -105,6 +110,11 @@ const messages = defineMessages({
   open: 'Open',
   replied: 'Replied',
   rereadAria: (version: string) => `Read the ${version} letter again`,
+  authorStamp: 'Author replied',
+  authorSheet: 'Reply from the author',
+  authorSign: '— the ZeppBridge developer',
+  authorRepliedOn: (date: string) => `Replied ${date}`,
+  authorNew: 'The author replied to your letter',
 }, {
   to: 'Para: usuario',
   toDeveloper: 'Para: el desarrollador de ZeppBridge',
@@ -158,6 +168,11 @@ const messages = defineMessages({
   open: 'Abrir',
   replied: 'Respondida',
   rereadAria: (version: string) => `Releer la carta de ${version}`,
+  authorStamp: 'El autor respondió',
+  authorSheet: 'Respuesta del autor',
+  authorSign: '— el desarrollador de ZeppBridge',
+  authorRepliedOn: (date: string) => `Respondida el ${date}`,
+  authorNew: 'El autor respondió a tu carta',
 }, 'components/letters/letters');
 
 export const useLetterText = () => useMessages(messages);
