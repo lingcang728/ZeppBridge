@@ -10,6 +10,10 @@
  * 格子不是链接（`linkDays = false`）。走路这类发不到手表的训练照原样占住那一天。
  * 拖一格跟手走（useDayDrag）：放在另一格上交换，放在缝隙里插入并顺移；键盘 ← → 交换、Delete 删掉这天。
  * 翻周用玻璃分段（也可以在格子上横向滑动）。每一格带 `data-paper-row`：接回定稿时纸片逐格让开、逐格落定。
+ *
+ * 2026-11-02：形状、名字、时长在格子里居中；形状宽度按时长占四成到满宽（同一份计划一把尺，最长那条满宽，
+ * 长短还能横着比；以前满宽 = 至少 1 小时，6 分钟的泳池课只剩左边一根细条）。一天排了几条就画几条（最多三条），
+ * 名字后面写 +N，时长是合计。
  */
 import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -53,7 +57,9 @@ const page = ref(0);
 const board = ref<HTMLElement | null>(null);
 const profiles = computed(() => (props.preview?.days ?? []).flatMap(d => d.after.map(workoutProfile)));
 const domain = computed(() => sharedHrDomain(profiles.value));
-const scale = computed(() => Math.max(3600, ...profiles.value.map(p => p.seconds)));
+/** 形状占格子多宽：最少四成（再短也看得清），这一份计划里最长的那条是满宽。 */
+const shapeWidth = (seconds: number) => `${Math.round(40 + 60 * Math.min(1, seconds / scale.value))}%`;
+const scale = computed(() => Math.max(1, ...profiles.value.map(p => p.seconds)));
 const pages = computed(() => Math.max(1, Math.ceil((props.preview?.days.length ?? 7) / 7)));
 const days = computed(() => (props.preview?.days.slice(Math.min(page.value, pages.value - 1) * 7, (Math.min(page.value, pages.value - 1) + 1) * 7) ?? []).map((day) => {
   const date = parseDisplayDate(day.date);
@@ -64,7 +70,9 @@ const days = computed(() => (props.preview?.days.slice(Math.min(page.value, page
     number: date.getDate(),
     weekday: displayDateTimeFormatter({ weekday: 'short' }).format(date),
     isToday: day.date === props.today,
-    profile: day.after[0] ? workoutProfile(day.after[0]) : fix.length ? fixProfile(day.date) : null,
+    profiles: day.after.length ? day.after.slice(0, 3).map(workoutProfile) : (fixProfile(day.date) ? [fixProfile(day.date)!] : []),
+    more: Math.max(0, day.after.length - 1),
+    minutes: Math.round(day.after.reduce((sum, workout) => sum + workoutProfile(workout).seconds, 0) / 60),
     held: !day.after.length && held.length ? held[0]! : null,
     fix: !day.after.length && fix.length > 0,
     rest: !day.after.length && !held.length && !fix.length,
@@ -123,12 +131,14 @@ const onWheel = (event: WheelEvent) => {
           @keydown="key($event, cell.day.date)" @dragstart.prevent>
           <span class="day-head"><b>{{ cell.number }}</b><small>{{ cell.weekday }}</small><em v-if="cell.isToday" class="today-tag">{{ t.today }}</em></span>
           <span class="day-art">
-            <PlanShape v-if="cell.profile" :profile="cell.profile" :scale-seconds="scale" :domain="domain" />
+            <template v-if="cell.profiles.length">
+              <PlanShape v-for="(shape, n) in cell.profiles" :key="n" :class="{ multi: cell.profiles.length > 1 }" :profile="shape" :scale-seconds="shape.seconds" :domain="domain" :style="{ width: shapeWidth(shape.seconds) }" />
+            </template>
             <span v-else-if="cell.held" class="held-mark"><Icon name="steps" :size="22" /><small>{{ activity(cell.held.activity!) }}</small></span>
             <RestFigure v-else-if="cell.rest" :size="108" />
           </span>
-          <span class="day-name">{{ dayName(cell.day) }}</span>
-          <span v-if="cell.profile && cell.day.after[0]" class="day-foot"><b>{{ Math.round(cell.profile.seconds / 60) }}</b> {{ t.unitMin }}</span>
+          <span class="day-name">{{ dayName(cell.day) }}<em v-if="cell.more" class="more">+{{ cell.more }}</em></span>
+          <span v-if="cell.day.after.length" class="day-foot"><b>{{ cell.minutes }}</b> {{ t.unitMin }}</span>
           <span v-else-if="cell.held" class="day-foot badge warn">{{ pt.heldBadge }}</span>
           <span v-else-if="cell.fix" class="day-foot badge bad"><Icon name="warning" :size="12" />{{ pt.issueError }}</span>
           <span v-else-if="cell.day.rest?.bedtime_minutes != null" class="day-foot sleep"><Icon name="moon" :size="12" />{{ bedtime(cell.day.rest.bedtime_minutes) }}</span>

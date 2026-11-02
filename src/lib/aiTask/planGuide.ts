@@ -93,6 +93,7 @@ const messages = defineMessages(
       '```',
     ].join('\n'),
     language: (lang: string) => `- name、focus、description、summary、note 这些文字一律用${lang}写：它们会原样显示在 ZeppBridge 和手表上。`,
+    swim: '- 游泳的距离按米写，泳池每一步至少 25 米（最好是池长的整数倍，池长在手表上设）；游泳不写配速目标，用心率区间或不设目标。',
   },
   {
     example: {
@@ -121,6 +122,7 @@ const messages = defineMessages(
       example,
       '```',
     ].join('\n'),
+    swim: '- Swim distances are in metres; each pool step is at least 25 m (ideally a whole number of pool lengths, which are set on the watch). Swims take no pace target: use a heart-rate range or none.',
     language: (lang: string) => `- Write name, focus, description, summary and note in ${lang}: they are shown as-is in ZeppBridge and on the watch.`,
   },
   {
@@ -150,6 +152,7 @@ const messages = defineMessages(
       example,
       '```',
     ].join('\n'),
+    swim: '- En natación la distancia va en metros; cada paso en piscina es de al menos 25 m (mejor un número entero de largos, que se configuran en el reloj). La natación no lleva objetivo de ritmo: usa un rango de frecuencia cardiaca o ninguno.',
     language: (lang: string) => `- Escribe name, focus, description, summary y note en ${lang}: se muestran tal cual en ZeppBridge y en el reloj.`,
   },
   'lib/aiTask/planGuide',
@@ -159,5 +162,5 @@ export const planGuide = (now: Date = new Date()): string => {
   const text = messagesOf(messages);
   // 计划里的文字跟着界面语言写（10-13：中文对话里排的计划，换成葡语界面后满屏中文）。语言名用它的自称，
   // 语言包还没翻这一句时回落英文那句，也照样写对语言。
-  return `${text.guide(exampleFor(now, text.example))}\n${text.language(LOCALE_LABELS[locale.value])}`;
+  return `${text.guide(exampleFor(now, text.example))}\n${text.swim}\n${text.language(LOCALE_LABELS[locale.value])}`;
 };

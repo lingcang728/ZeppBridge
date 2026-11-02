@@ -6,7 +6,7 @@
  * 悬停冒出一块整高的灰框。现在用 HTML / CSS 画，高约 60px，刻度紧贴在下面，字号固定：
  *   - 宽度按秒（flex-grow = 秒数）；高度和周视图的训练形状同一把尺（summary.segmentLevel）：有心率目标按目标中点，
  *     否则按强度类别；有心率目标的再叠一层目标带（同一个心率坐标，柱顶落在带子中间）；
- *   - 按距离写的步骤宽度只是示意，加斜纹；
+ *   - 按距离写的步骤宽度只是示意（末尾总时长写「约」）；2026-11-02 起不再加斜纹，泳池课整条都是斜纹太花；
  *   - 点柱子 = 选中那一步（`select`，键是步骤路径 `i` / `i.j`，重复组每一轮是同一个键）；
  *     悬停只把柱子提亮，读数放在自绘的玻璃提示里；`active` 是外面悬停 / 展开着的那一步，所有轮次一起亮。
  * 没有 `interactive` 时（只读）不响应点击。
@@ -103,7 +103,6 @@ const leave = () => {
 button.bar { cursor: pointer; }
 button.bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .fill { position: absolute; right: 0; bottom: 0; left: 0; height: var(--level); border-radius: inherit; background: var(--c); opacity: .82; }
-.approx .fill { background: repeating-linear-gradient(135deg, var(--c) 0 5px, color-mix(in srgb, var(--c) 55%, transparent) 5px 9px); }
 /* 提亮：叠一层白，只动它的透明度。 */
 .fill::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: #fff; opacity: 0; transition: opacity 160ms ease; }
 .bar.hover .fill::after { opacity: .18; }

@@ -10,7 +10,7 @@
  */
 import { backendText } from '../../i18n/backendText';
 import { errorTextFor } from '../../i18n/errors';
-import { defineMessages, messagesOf } from '../../i18n';
+import { defineMessages, locale, messagesOf } from '../../i18n';
 import { displayDateTimeFormatter, parseDisplayDate } from '../dateTime';
 import type { PlanIssue } from '../../types/trainingPlan';
 
@@ -49,6 +49,8 @@ const messages = defineMessages(
     'ui.training_plan.issue.bad_duration': (p: Params) => `看不懂这个时长「${str(p.value)}」，请写成 20min、90s、1h、400m 或 5km`,
     'ui.training_plan.issue.duration_out_of_range': () => '每一步的时长要在 10 秒到 6 小时之间',
     'ui.training_plan.issue.distance_out_of_range': () => '每一步的距离要在 50 米到 100 公里之间',
+    'ui.training_plan.issue.pool_distance_out_of_range': () => '泳池每一步的距离要在 25 米到 100 公里之间',
+    'ui.training_plan.issue.swim_pace_unsupported': () => '游泳先不设配速目标：用心率区间，或者不设目标',
     'ui.training_plan.issue.distance_unverified': () => '按距离计的步骤还没在你的手表上核实过，先改成时间更稳',
     'ui.training_plan.issue.bad_target': (p: Params) => `看不懂这个目标「${str(p.value)}」，请写成 hr 135-150、pace 5:30-5:50 或 power 200-220`,
     'ui.training_plan.issue.open_target_unverified': () => '不设目标的步骤还没在你的手表上核实过，先给一个心率区间',
@@ -64,6 +66,7 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => '要写训练要点，手表上会显示在描述里',
     'ui.training_plan.issue.name_truncated': (p: Params) => `名字超过 ${str(p.max)} 个字，手表列表里会被截断（点开详情仍是全名）`,
     fallback: () => '这条计划有一处无法识别的问题',
+    pastDays: (p: Params) => `${str(p.days)} 已经过去，这几天的训练不会发到手表`,
     activity: { walking: '步行', hiking: '徒步', strength: '力量训练', yoga: '瑜伽 / 拉伸', rowing: '划船', elliptical: '椭圆机', inline_skating: '轮滑', cross_country_skiing: '越野滑雪' },
   },
   {
@@ -86,6 +89,8 @@ const messages = defineMessages(
     'ui.training_plan.issue.bad_duration': (p: Params) => `Cannot read the duration “${str(p.value)}”; write it as 20min, 90s, 1h, 400m or 5km`,
     'ui.training_plan.issue.duration_out_of_range': () => 'Each step must last between 10 seconds and 6 hours',
     'ui.training_plan.issue.distance_out_of_range': () => 'Each step must cover between 50 m and 100 km',
+    'ui.training_plan.issue.pool_distance_out_of_range': () => 'Each pool step must cover between 25 m and 100 km',
+    'ui.training_plan.issue.swim_pace_unsupported': () => 'Swims cannot have a pace target yet: use a heart-rate range or no target',
     'ui.training_plan.issue.distance_unverified': () => 'Steps measured by distance have not been verified on your watch yet; writing them as time is safer',
     'ui.training_plan.issue.bad_target': (p: Params) => `Cannot read the target “${str(p.value)}”; write it as hr 135-150, pace 5:30-5:50 or power 200-220`,
     'ui.training_plan.issue.open_target_unverified': () => 'Steps with no target have not been verified on your watch yet; give a heart-rate range instead',
@@ -101,6 +106,7 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => 'Add the key points; the watch shows them in the description',
     'ui.training_plan.issue.name_truncated': (p: Params) => `The name is longer than ${str(p.max)} characters and will be cut off in the watch list (the detail view still shows it in full)`,
     fallback: () => 'Something in this plan could not be recognised',
+    pastDays: (p: Params) => `${str(p.days)} have already passed; workouts on those days will not be sent to the watch`,
     activity: { walking: 'walking', hiking: 'hiking', strength: 'strength training', yoga: 'yoga / stretching', rowing: 'rowing', elliptical: 'elliptical', inline_skating: 'inline skating', cross_country_skiing: 'cross-country skiing' },
   },
   {
@@ -123,6 +129,8 @@ const messages = defineMessages(
     'ui.training_plan.issue.bad_duration': (p: Params) => `No se entiende la duración «${str(p.value)}»; escríbela como 20min, 90s, 1h, 400m o 5km`,
     'ui.training_plan.issue.duration_out_of_range': () => 'Cada paso debe durar entre 10 segundos y 6 horas',
     'ui.training_plan.issue.distance_out_of_range': () => 'Cada paso debe cubrir entre 50 m y 100 km',
+    'ui.training_plan.issue.pool_distance_out_of_range': () => 'Cada paso en piscina debe cubrir entre 25 m y 100 km',
+    'ui.training_plan.issue.swim_pace_unsupported': () => 'La natación aún no admite objetivo de ritmo: usa un rango de frecuencia cardiaca o ninguno',
     'ui.training_plan.issue.distance_unverified': () => 'Los pasos por distancia aún no se han verificado en tu reloj; es más seguro escribirlos como tiempo',
     'ui.training_plan.issue.bad_target': (p: Params) => `No se entiende el objetivo «${str(p.value)}»; escríbelo como hr 135-150, pace 5:30-5:50 o power 200-220`,
     'ui.training_plan.issue.open_target_unverified': () => 'Los pasos sin objetivo aún no se han verificado en tu reloj; indica un rango de frecuencia cardíaca',
@@ -138,12 +146,30 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => 'Añade los puntos clave; el reloj los muestra en la descripción',
     'ui.training_plan.issue.name_truncated': (p: Params) => `El nombre supera ${str(p.max)} caracteres y se cortará en la lista del reloj (el detalle lo muestra completo)`,
     fallback: () => 'No se pudo reconocer algo de este plan',
+    pastDays: (p: Params) => `${str(p.days)} ya pasaron; los entrenamientos de esos días no se enviarán al reloj`,
     activity: { walking: 'caminata', hiking: 'senderismo', strength: 'fuerza', yoga: 'yoga / estiramientos', rowing: 'remo', elliptical: 'elíptica', inline_skating: 'patinaje en línea', cross_country_skiing: 'esquí de fondo' },
   },
   'lib/trainingPlan/issues',
 );
 
 const copy = () => messagesOf(messages) as unknown as Record<string, Text>;
+
+/**
+ * 一组问题合成给人读的几行（周视图底下那一块）：好几天「已经过去」并成一行列出日期，
+ * 文案一模一样的只留一条；顺序按第一次出现。
+ */
+export const planIssueLines = (issues: PlanIssue[]): string[] => {
+  const past = issues.filter((issue) => issue.message_code === 'ui.training_plan.issue.past_date');
+  const days = past.map((issue) => day(issue.params?.date)).join(locale.value.startsWith('zh') ? '、' : ', ');
+  const lines: string[] = [];
+  for (const issue of issues) {
+    const merged = past.length > 1 && past.includes(issue);
+    if (merged && issue !== past[0]) continue;
+    const line = merged ? copy().pastDays({ days }) : planIssueText(issue);
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return lines;
+};
 
 /** 一条校验问题的界面文案：先按码取，取不到才回落到后端原文（过 backendText 闸门）。 */
 export const planIssueText = (issue: PlanIssue): string => {

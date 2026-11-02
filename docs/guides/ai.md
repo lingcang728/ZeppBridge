@@ -48,7 +48,7 @@ Worth knowing:
 
 - **The watch takes four sports**: running (outdoor, treadmill, track), cycling (outdoor, indoor), pool swimming and open-water swimming. The watch asks for the sub-type again when you start the workout. Walking, hiking, strength, yoga and the like cannot be sent to the watch; the AI tells you so while you plan.
 - Plans start today or later and reach at most 56 days ahead. Days inside the plan's date range without a workout count as rest days, and any earlier plan on those days is cleared.
-- Running paces are per kilometre; each step is a time (20 min) or a distance (400 m), at least 50 m per step.
+- Running paces are per kilometre; each step is a time (20 min) or a distance (400 m), at least 50 m per step. Pool swims are the exception: at least 25 m per step (the pool length is set on the watch: 25 m, 50 m, yards or custom), and swims take no pace target.
 - Sleep and rest advice stays on this computer and is not sent to the watch.
 - If you change a few days after sending, the week view offers to re-sync to the watch. Every plan you have sent is in the week view's **Archive**.
 
