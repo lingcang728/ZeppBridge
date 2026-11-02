@@ -37,8 +37,27 @@ export const spannedAxis = (points: ChartPoint[], minSpan: number): { min?: numb
   return { min, max: min + Math.ceil(minSpan) };
 };
 
+/** 秒 → `m:ss`。配速图的纵轴和提示用它：画的已经是「每公里 / 每英里秒数」，这里不再换算单位。 */
+export const clockSeconds = (seconds: number): string => {
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+};
+
+export interface LineOptionOpts {
+  color: string;
+  unit: string;
+  palette: ChartPalette;
+  /** 纵轴至少撑开多少，见 `spannedAxis`。 */
+  minSpan?: number;
+  /** 纵轴倒过来：配速越快数越小，倒过来「好」才朝上，和别的图一致。 */
+  inverse?: boolean;
+  /** 纵轴刻度和提示里的数怎么写；不给就是保留一位小数的数字。 */
+  format?: (value: number) => string;
+}
+
 /** 一张带均值虚线的面积折线图；少于两个点时返回 null（不画图，不编数据）。 */
-export const lineOption = (points: ChartPoint[], color: string, unit: string, palette: ChartPalette, minSpan = 0) => {
+export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
+  const { color, unit, palette, minSpan = 0, inverse = false, format } = opts;
   if (points.length < 2) return null;
   const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
   const yRange = spannedAxis(points, minSpan);
@@ -63,9 +82,10 @@ export const lineOption = (points: ChartPoint[], color: string, unit: string, pa
       type: 'value',
       scale: true,
       ...yRange,
+      inverse,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: palette.axis, fontSize: 14.5 },
+      axisLabel: { color: palette.axis, fontSize: 14.5, ...(format ? { formatter: format } : {}) },
       splitLine: { show: true, lineStyle: { color: palette.gridSoft, type: 'dashed' } },
     },
     tooltip: {
@@ -78,7 +98,8 @@ export const lineOption = (points: ChartPoint[], color: string, unit: string, pa
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
         const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
-        return `${time}　<b>${Math.round(point.value[1] * 10) / 10}</b> ${unit}`;
+        const value = format ? format(point.value[1]) : String(Math.round(point.value[1] * 10) / 10);
+        return `${time}　<b>${value}</b> ${unit}`;
       },
     },
     series: [{
