@@ -514,7 +514,7 @@ impl Database {
         }
         let mut stmt = self.conn.prepare(
             "SELECT DISTINCT substr(date, 1, 7) FROM daily_metrics
-             UNION SELECT substr(date(start_time, 'localtime'), 1, 7) FROM sleep_sessions
+             UNION SELECT substr(date(end_time, 'localtime'), 1, 7) FROM sleep_sessions
              UNION SELECT substr(date(start_time, 'localtime'), 1, 7) FROM workouts",
         )?;
         let rows = stmt.query_map([], |row| row.get::<_, Option<String>>(0))?;
