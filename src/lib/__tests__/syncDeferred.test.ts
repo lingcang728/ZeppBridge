@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { failedStreamKeys, isCancelledSyncError, isDeferredSyncError } from '../syncDeferred';
+import { failedStreamKeys, isCancelledSyncError, isDeferredSyncError, isLocalMaintenanceError } from '../syncDeferred';
 
 describe('failedStreamKeys', () => {
   it('只把真正 Failed 的流算进失败名单，unavailable / unverified 保持中性', () => {
@@ -27,5 +27,14 @@ describe('isCancelledSyncError', () => {
   it('只认后端的取消码', () => {
     expect(isCancelledSyncError({ code: 'err.core.cancelled' })).toBe(true);
     expect(isCancelledSyncError({ code: 'err.sync.deferred_busy' })).toBe(false);
+  });
+});
+
+describe('isLocalMaintenanceError', () => {
+  it('recognises the read-side maintenance codes and nothing else', () => {
+    expect(isLocalMaintenanceError({ code: 'err.local.maintenance_replay' })).toBe(true);
+    expect(isLocalMaintenanceError({ code: 'err.local.maintenance_compaction' })).toBe(true);
+    expect(isLocalMaintenanceError({ code: 'err.core.database' })).toBe(false);
+    expect(isLocalMaintenanceError('err.local.maintenance_replay')).toBe(false);
   });
 });
