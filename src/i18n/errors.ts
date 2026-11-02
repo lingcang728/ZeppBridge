@@ -131,6 +131,8 @@ const messages = defineMessages(
     'err.sync.deferred_compaction': '正在压缩历史报文省磁盘空间，本次云端同步稍后自动重试',
     'err.sync.deferred_replay': '正在用本地原始报文重建派生数据，本次云端同步稍后自动重试',
     'err.sync.deferred_busy': '另一个写入操作正在进行，本次云端同步稍后自动重试',
+    'err.local.maintenance_compaction': '正在压缩历史报文，完成后自动重试',
+    'err.local.maintenance_replay': '正在用本地原始报文重建数据，完成后自动重试',
     'err.backfill.bad_start_date': '补拉起点日期无效，需要 YYYY-MM-DD',
     'err.backfill.no_canonical_records': '云端返回了报文，但没解析出可用记录',
     'err.backfill.partial_window': '这一块只写入部分数据，还需要重试',
@@ -365,6 +367,8 @@ const messages = defineMessages(
       'Rebuilding derived data from local payloads — this sync retries automatically',
     'err.sync.deferred_busy':
       'Another write is in progress — this sync retries automatically',
+    'err.local.maintenance_compaction': 'Compacting stored payloads — retries automatically when done',
+    'err.local.maintenance_replay': 'Rebuilding data from local payloads — retries automatically when done',
     'err.backfill.bad_start_date': 'Invalid backfill start date — needs YYYY-MM-DD',
     'err.backfill.no_canonical_records':
       'The cloud returned a payload, but no usable records were parsed',
@@ -606,6 +610,8 @@ const messages = defineMessages(
       'Reconstruyendo datos derivados desde registros locales; esta sincronización se reintentará automáticamente',
     'err.sync.deferred_busy':
       'Otra escritura en curso; esta sincronización se reintentará automáticamente',
+    'err.local.maintenance_compaction': 'Compactando registros; se reintentará al terminar',
+    'err.local.maintenance_replay': 'Reconstruyendo datos desde registros locales; se reintentará al terminar',
     'err.backfill.bad_start_date': 'Fecha de inicio de historial no válida: usa AAAA-MM-DD',
     'err.backfill.no_canonical_records':
       'La nube devolvió datos, pero no se hallaron registros utilizables',

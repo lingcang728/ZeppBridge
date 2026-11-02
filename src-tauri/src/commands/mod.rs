@@ -164,7 +164,39 @@ where
         })
         .await,
     )?
-    .map_err(AppError::from)
+    .map_err(read_failure)
+}
+
+/// 独立读失败了：正在重放 / 压缩时报「本机正在整理，稍后自动重试」的码，
+/// 别让界面说「本地数据库暂时不可用」（10-27 反馈：交给 AI 一直这么说）。
+/// 读连接本来就有 30 秒 busy_timeout，所以不再自己重试一遍。
+fn read_failure(error: zeppbridge_core::models::error::ZeppBridgeError) -> AppError {
+    use zeppbridge_core::models::error::ZeppBridgeError;
+    if let ZeppBridgeError::DatabaseError(inner) = &error {
+        // 只记 SQLite 的错误码，不带路径和数据。
+        eprintln!("只读查询失败: {:?}", inner.sqlite_error_code());
+        if let Some(deferred) = local_maintenance_error() {
+            return deferred;
+        }
+    }
+    AppError::from(error)
+}
+
+/// 本机维护（重放 / 压缩）正在进行时，读命令该报的那个码。
+pub(crate) fn local_maintenance_error() -> Option<AppError> {
+    if zeppbridge_core::storage::compaction_in_progress() {
+        Some(AppError::new(
+            "err.local.maintenance_compaction",
+            "正在压缩历史报文，完成后自动重试",
+        ))
+    } else if zeppbridge_core::storage::replay_in_progress() {
+        Some(AppError::new(
+            "err.local.maintenance_replay",
+            "正在用本地原始报文重建数据，完成后自动重试",
+        ))
+    } else {
+        None
+    }
 }
 
 pub(crate) use ai_clients::{get_mcp_sidecar, save_mcp_bundle};
