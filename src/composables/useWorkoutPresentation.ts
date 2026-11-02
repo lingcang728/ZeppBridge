@@ -10,7 +10,7 @@ import { elevationUnitLabel, paceAxisLabel, paceMinutesPerBigUnit, paceUnitLabel
 import { deviceImageFor } from '../lib/deviceCatalog';
 import { workoutTiming } from '../lib/workoutTiming';
 import { buildRouteCanvas } from '../lib/workoutRoute';
-import { lineOption, sampleSeries, type ChartPoint } from '../lib/workoutCharts';
+import { clockSeconds, lineOption, sampleSeries, type ChartPoint } from '../lib/workoutCharts';
 import { useMessages } from '../i18n';
 import { workoutDetailMessages } from '../views/WorkoutDetail.i18n';
 import type { DeviceProfile, WorkoutSeries } from '../types';
@@ -166,12 +166,13 @@ export const useWorkoutPresentation = (
     const pace = sampleSeries(samples, 'pace');
     const altitude = sampleSeries(samples, 'altitude_m').map((point) => ({ t: point.t, v: toElevation(point.v) }));
     const cadence = sampleSeries(samples, 'cadence');
-    const paceChart = pace.map((point) => ({ t: point.t, v: paceMinutesPerBigUnit(point.v) }));
+    // 配速图画「每公里 / 每英里秒数」，纵轴倒过来（快的在上），刻度和提示写成 分:秒。
+    const paceChart = pace.map((point) => ({ t: point.t, v: paceMinutesPerBigUnit(point.v) * 60 }));
     return [
-      { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, palette.series.heart, 'bpm', palette), stats: statSummary(heart), icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
-      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, palette.series.pace, paceAxisLabel(), palette), stats: statSummary(pace, 'pace'), icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
-      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, palette.series.altitude, elevationUnitLabel(), palette, toElevation(ALTITUDE_MIN_SPAN_M)), stats: statSummary(altitude), icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
-      { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: lineOption(cadence, palette.series.cadence, 'spm', palette), stats: statSummary(cadence), icon: 'steps' as DesignIconName, tone: 'activity' as GlyphTone },
+      { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, { color: palette.series.heart, unit: 'bpm', palette }), stats: statSummary(heart), icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
+      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, { color: palette.series.pace, unit: paceAxisLabel(), palette, inverse: true, format: clockSeconds }), stats: statSummary(pace, 'pace'), icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
+      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, { color: palette.series.altitude, unit: elevationUnitLabel(), palette, minSpan: toElevation(ALTITUDE_MIN_SPAN_M) }), stats: statSummary(altitude), icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
+      { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: lineOption(cadence, { color: palette.series.cadence, unit: 'spm', palette }), stats: statSummary(cadence), icon: 'steps' as DesignIconName, tone: 'activity' as GlyphTone },
     ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null);
   });
 
