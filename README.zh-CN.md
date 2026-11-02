@@ -160,6 +160,7 @@ ZeppBridge 是已获得 Zepp 官方认证的独立开源项目。
 ## 文档与反馈
 
 - [常见问题](docs/guides/faq.zh-CN.md)：为什么登录经过 zeppbridge.com、为什么有些数据没有、Helio 表带、下载被拦、AI 不用复制粘贴
+- [交给 AI 指南](docs/guides/ai.zh-CN.md)：复制粘贴、MCP、训练计划发到手表、教练档案
 - [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md)
 - [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) · [Docker](docs/guides/docker.zh-CN.md)
 - [开发文档](docs/development/development.zh-CN.md) · [更新日志](CHANGELOG.md)
