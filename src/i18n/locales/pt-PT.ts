@@ -211,8 +211,6 @@ export default {
       reportDoneLine: (id: string, at: string) => `Relatório ${id}, enviado às ${at}.`,
       reportDoneNote:
         'Apenas os campos indicados acima e a tua nota foram enviados. Nada mais.',
-      reportConfirm:
-        'Só envia: versão da app, tipo de sistema, revisão do interpretador, pistas de produto e estrutura dos campos de dispositivos não identificados, firmware, números de modelo (deviceSource / deviceType, inteiros que dizem que modelo, não que unidade), códigos de treino desconhecidos e contagens, código numérico do último pedido recusado pela nuvem (só número, fluxo e hora, sem o texto devolvido) e a tua nota (caminhos locais, e-mails e identificadores longos removidos automaticamente). Nunca conta Zepp, tokens, números de série, ID de dispositivo, MAC, GPS, valores de saúde ou respostas em bruto. Enviar?',
       reportFailed: 'Não foi possível enviar o relatório de erro',
       lampOn: (count: number) => `Obtidos ${count}`,
       lampPending: (count: number) => `Na nuvem, sem cópia local ${count}`,
@@ -260,8 +258,6 @@ export default {
       privacyTelemetryBody:
         'A app não envia telemetria. Apenas ao clicares em «Enviar relatório de erro» é que os dados anónimos descritos são transmitidos.',
       privacyReportTitle: 'Dispositivo ou treino não reconhecido?',
-      privacyReportBody:
-        'Sem conta GitHub nem cópia de dados. Ao confirmar, vão apenas a estrutura de campos, o firmware, códigos de modelo (inteiros — que modelo, não que unidade) e códigos de treino desconhecidos com contagens para o repositório privado de relatórios do ZeppBridge. Nunca conta, tokens, série, ID de dispositivo, MAC, GPS, valores de saúde, respostas em bruto ou caminhos locais.',
       mcpBadge: 'Dados de saúde só de leitura · não escuta em portas de rede',
       mcpCopyPrompt: 'Copiar instrução para a IA',
       mcpCopyConfig: 'Copiar apenas excerto de configuração',
@@ -653,10 +649,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       confirm: 'Confirmar dispositivo',
       clear: 'Remover seleção',
       later: 'Agora não',
-      contributeTitle: 'Ajuda a reconhecer este dispositivo nas próximas versões',
-      contributeBody:
-        'Envia ao ZeppBridge o modelo escolhido e os números de modelo (deviceSource / deviceType, apenas inteiros). Só identificam que modelo de relógio é: sem conta, número de série, MAC ou dados de saúde. A Huami não publica uma tabela de correspondência; esta é a única forma de fazer crescer o catálogo integrado. Após algumas pessoas indicarem o modelo, passa a ser reconhecido automaticamente para todos.',
-      note: 'A escolha é assinalada como «Modelo selecionado» e nunca como correspondência automática. Imagens e nomes vêm do catálogo integrado, sem consumo de rede.',
       filterAll: 'Todos',
       filterWatch: 'Relógios',
       filterBand: 'Pulseiras',
@@ -1130,11 +1122,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       assignmentCleared: 'Seleção removida. Identificação automática restaurada.',
       assignmentSaved:
         'Modelo guardado como «Modelo selecionado» (nunca apresentado como correspondência automática).',
-      assignmentContributed: (reportId: string) =>
-        `Modelo guardado e códigos enviados ao ZeppBridge (relatório ${reportId}). Será reconhecido automaticamente na próxima versão do catálogo.`,
-      assignmentContributionFailed: (reason: string) =>
-        `Modelo guardado localmente. O envio da contribuição para o catálogo falhou: ${reason}`,
-      networkUnavailable: 'Rede indisponível',
       assignmentFailed: 'Não foi possível guardar o modelo escolhido',
     },
     'composables/useSyncController': {
@@ -4047,8 +4034,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     'err.handoff.mkdir_failed': 'Não foi possível criar a pasta de destino',
     'err.handoff.write_failed': 'Não foi possível gravar os ficheiros para a IA',
     'err.handoff.encode_failed': 'Não foi possível codificar os dados para a IA',
-    'err.diagnostic.nothing_to_submit':
-      'Este dispositivo não contém códigos de modelo adicionais para contribuir para o catálogo',
     'err.diagnostic.empty_report':
       'Descreve o problema ou escolhe uma categoria antes de enviar o relatório',
     'err.diagnostic.client_init_failed': 'Não foi possível estabelecer ligação para envio do relatório',

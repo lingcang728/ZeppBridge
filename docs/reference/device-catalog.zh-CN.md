@@ -3,16 +3,18 @@
 [English](device-catalog.md)
 
 `src/assets/devices/catalog.json` 是维护时生成的快照：型号清单 2026-08-15 核对过，
-`device_source_codes` 2026-09-01 加入、2026-09-11 扩充。共 55 条，其中 54 条是
-`active`/`supported`，覆盖 52 个标准型号键。48 张卡的基线来自提供的 Amazfit 日本官网
+`device_source_codes` 2026-09-01 加入，2026-11-02 改为以 Zepp 官方对照表为准。共 64 条，其中 63 条是
+`active`/`supported`，覆盖 61 个标准型号键。48 张卡的基线来自提供的 Amazfit 日本官网
 截图集（`design_picture/Product`，12 行 × 4 张）；GTR 4 黑色配色那张重复卡共用标准
 GTR 4 素材，不算第二个型号。另有三款仍在售的官方型号（Helio Strap Pro、Helio Core、
 Helio Ring），所以标准型号数超过 48。Helio Armband 只为留存来源而列出，标为
 `status=accessory`、`supported=false`，不算可连接设备。
 
-Balance 2 XT、Amazfit 智能体脂秤和小米体脂秤 2 也可以选，但没有产品图，用现有的占位图。
-认可的来源编号维护在目录的 `device_source_codes` 和
-`scripts/assets/build-device-catalog.py` 的 `DEVICE_SOURCE_CODES` 里。
+Balance 2 XT、小米体脂秤 2，以及 3.1.1 补进来的老型号（Amazfit Pop、Zepp E 圆 / 方、
+Amazfit Neo、Bip S、小米手环 4 NFC 等）也可以选，但没有产品图，用现有的占位图。
+来源编号维护在目录的 `device_source_codes`（其中来自官方表的另列在 `device_source_official`）和
+`scripts/assets/build-device-catalog.py` 的 `OFFICIAL_DEVICE_SOURCE_CODES` /
+`CROWD_DEVICE_SOURCE_CODES` 里。
 
 逐张卡的对应关系记在
 [`device-catalog-audit.json`](./device-catalog-audit.json) 和
@@ -30,24 +32,29 @@ Balance 2 XT、Amazfit 智能体脂秤和小米体脂秤 2 也可以选，但没
 
 ### `device_source_codes` 从哪来
 
-华米没有公开这些整数的对照表，所以每一条都来自用户在应用里手动指认型号、并选择分享出来。
-指认汇总在反馈库里，工具见[反馈分拣](./feedback-triage.zh-CN.md)。
+**以 Zepp 官方开发者文档的对照表为准**：
+[docs.zepp.com › Reference › Device List](https://docs.zepp.com/docs/reference/related-resources/device-list/)
+（中英两版一致，`*` 标国行，2026-11-02 逐条核对）。官方表一并裁决了以前众包里吵不出结果的
+编号（`10813699` = Active Max、`11141376` = Balance 3、`7995649` = GTS 4、`8454401` = Bip 5）。
 
-收录规则由
+3.1.1 之前，编号来自用户在应用里手动指认、并选择分享出来的型号。这条上报已经删掉；
+当时收下、官方表里没有的那一小批（Helio Strap / Strap Pro / Ring、Balance 2 XT、
+Balance 2 的 `10486017` 等）**冻结保留**，不再增加。现在反馈报告只带「目录认不出的
+`deviceSource` 编号」，用来发现官方表更新了什么，工具见[反馈分拣](./feedback-triage.zh-CN.md)。
+
+规则由
 [`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
-的 `DEVICE_SOURCE_CODES` 执行，`device_catalog` 单元测试守着：
+执行，`device_catalog` 单元测试守着：
 
-* **只认 `deviceSource`，绝不用 `deviceType`。** `deviceType` 是系列代码：反馈数据里光
-  `deviceType:0` 就横跨二十个不同型号。
-* **只收高段（≥ 1,000,000）。** 低段在同一批数据里自相矛盾：`deviceSource:102` 被四个人
-  指认成四个不同型号。
-* **每个编号至少两份独立报告。**
-* **冲突由人裁决，绝不按多数票。** 收了两个（`9568513` → Balance 2，`10289411` → Helio
-  Strap）：它们相邻的编号对同一产品意见一致，而每份异议报告还同时指认了第二块表，也就是
-  报告人在选择器里点错了设备。拒了一个（`10813699`，Active MAX 2 对 Active 2 44mm 2）
-  ——平票不算证据。
+* **只认 `deviceSource`，绝不用 `deviceType` 认型号。** `deviceType` 是族码（0 = 表 / 手环、
+  1 = 体脂秤、7 = 耳机）：反馈数据里光 `deviceType:0` 就横跨二十个不同型号。它只用来分大类：
+  认不出型号、`deviceType` 为 1 的设备显示成「体脂秤」，不算未识别设备。
+* **低段（< 1,000,000）只收官方表列出的。** 老表本来就是低位（`418` = T-Rex 2、`254` =
+  Band 7）。官方表没有的 `15` / `101`–`104` 一律不收——反馈库里 `101`–`104` 全都带着
+  `deviceType:1`，是体脂秤那一行被用户指认成了自己的表。
+* **一个编号只能指向一款。** 官方表和冻结的众包撞号时脚本直接报错。
 
-相邻几个编号对应同一产品是正常的：低位编码的是配色 / 尺寸变体。
+相邻几个编号对应同一产品是正常的：低位编码的是配色 / 尺寸 / 国行变体。
 
 账号里的原始昵称留在 `name`/`display_name`；目录补上 `canonical_name`、`display_name`、
 `name_zh` 和 `catalog_id`。`user_fused` 和来源不明的记录永远不认领实体设备。

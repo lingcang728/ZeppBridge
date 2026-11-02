@@ -28,7 +28,7 @@ token、cookie、序列号、MAC、GPS 或健康数值——但它仍然不该�
 | `notes` | 报告人写了一句话的每一份报告——通常信号最强 |
 | `codes` | 未知运动编码：报告数、记录数、出现过的版本 |
 | `rejections` | 云端业务错误码——HTTP 200 但内容说「没成功」的响应 |
-| `devices` | 用户指认的型号，按 `deviceSource`/`deviceType` 分组，并给出能否收录的判断 |
+| `devices` | 反馈里的 `deviceSource` 编号对着当前目录：哪些仍认不出、哪些已经认得出 |
 | `list <status>` | 某个状态下的报告 id |
 | `mark <status> <id...>` | 把报告挪到某个状态 |
 
@@ -90,14 +90,13 @@ are showing empty"）既得不到重新连接的提示，也拿不到任何数�
 
 ### 设备型号编号
 
-`devices` 按 `modelIdentifierHints` 把用户的型号指认分组，并对每个提示给出能否收录的判断。
-收录规则在
-[`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
-的 `DEVICE_SOURCE_CODES` 里，说明见[设备目录参考](./device-catalog.zh-CN.md)。
+`devices` 把有未识别设备的报告里的 `deviceSource` 编号拿出来，对着当前的
+`src/assets/devices/catalog.json` 分两张表：仍认不出的（带报告数和出现过的版本），和现在已经
+认得出的（标明来自官方表还是冻结的众包）。
 
-`eligible: review` 不是批准，意思是自动过滤排除不了这个提示，得由人来定。冲突绝不只靠多数票
-解决——要看持异议的报告人是否在同一份报告里还指认了第二块表，那通常说明有人在选择器里点错了
-设备。
+3.1.1 起目录以 Zepp 官方对照表为准，众包指认冻结、不再上报（规则见
+[设备目录参考](./device-catalog.zh-CN.md)）。仍认不出的编号先去核官方表有没有更新，**不按报告数
+收**。低位的 `101`–`104` 是体脂秤（反馈里全带 `deviceType:1`），新版本已经不会再报。
 
 ## 凭据
 

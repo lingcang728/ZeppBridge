@@ -716,9 +716,6 @@ export default {
     confirm: "To moje urządzenie",
     clear: 'Cofnij wybór',
     later: 'Nie teraz',
-    contributeTitle: 'Pomóż kolejnej wersji automatycznie rozpoznać to urządzenie',
-    contributeBody: 'Prześlij do ZeppBridge wybrany model wraz z jego identyfikatorami liczbowymi (deviceSource / deviceType, wyłącznie liczby całkowite). Określają one jedynie, jaki to model zegarka — żadnych danych konta, numerów seryjnych, adresów MAC ani danych zdrowotnych. Huami nie publikuje tabeli numerów, dlatego jest to jedyny sposób na rozbudowę wbudowanego katalogu: gdy kilka osób wskaże dany model, będzie on automatycznie rozpoznawany u wszystkich.',
-    note: 'Twój wybór jest oznaczony jako „model wybrany ręcznie”, nigdy jako automatyczne dopasowanie. Zdjęcia i nazwy pochodzą z dołączonego katalogu; przeglądanie nie korzysta z sieci.',
     filterAll: 'Wszystkie',
     filterWatch: 'Zegarki',
     filterBand: 'Opaski',
@@ -1657,11 +1654,6 @@ export default {
     noLocalIdentifier: 'Brak lokalnego identyfikatora na tym urządzeniu — nie można zapisać wyboru.',
     assignmentCleared: 'Wybór cofnięty. Przywrócono automatyczne dopasowanie.',
     assignmentSaved: 'Wybór zapisany. Oznaczony jako „Model wybrany przez Ciebie” — nigdy nie podawany jako dopasowanie automatyczne.',
-    assignmentContributed: (reportId: string) =>
-      `Wybór zapisany, a numery modeli przesłano do ZeppBridge (zgłoszenie ${reportId}). Kolejne wydanie katalogu automatycznie rozpozna ten model.`,
-    assignmentContributionFailed: (reason: string) =>
-      `Wybór zapisano lokalnie. Wysłanie danych do katalogu nie powiodło się: ${reason}`,
-    networkUnavailable: 'Sieć niedostępna',
     assignmentFailed: 'Nie udało się zapisać wybranego modelu',
   },
 // Source: src/composables/useFocusAreas.ts
@@ -1889,8 +1881,6 @@ export default {
     'err.handoff.encode_failed': 'Nie udało się zakodować zanonimizowanego eksportu dla AI',
 
     /* —— feedback —— */
-    'err.diagnostic.nothing_to_submit':
-      'To urządzenie nie ma numeru modelu, który pomógłby w katalogu — brak danych do przesłania',
     'err.diagnostic.empty_report':
       'Najpierw wybierz typ problemu lub napisz notatkę — w przeciwnym razie zgłoszenie nie zawiera użytecznych informacji',
     'err.diagnostic.client_init_failed': 'Nie udało się zainicjować połączenia zgłoszenia',
@@ -3236,7 +3226,6 @@ Kontynuować?`,
     reportDoneTitle: 'Otrzymano, dziękujemy',
     reportDoneLine: (id: string, at: string) => `Raport ${id}, wysłano ${at}.`,
     reportDoneNote: 'Wysłano dokładnie te typy pól, które wymieniono powyżej, oraz Twoją notatkę. Nic więcej.',
-    reportConfirm: 'Ta operacja wysyła wersję aplikacji, typ systemu operacyjnego, wersję parsera, wskazówki na poziomie produktu i strukturę pól dla niezidentyfikowanych urządzeń, wersję oprogramowania układowego, numery na poziomie modelu (deviceSource / deviceType — liczby całkowite określające dany model, a nie konkretny egzemplarz), kody i liczbę nieznanych treningów, kod liczbowy błędu z ostatniego żądania odrzuconego przez chmurę (tylko numer, strumień i czas — bez zwracanego tekstu) oraz powyższą notatkę (z usuniętymi lokalnymi ścieżkami, adresami e-mail i długimi identyfikatorami). Nigdy nie wysyła Twojego konta Zepp, tokenów, numerów seryjnych, identyfikatorów urządzeń, adresów MAC, danych GPS, wartości zdrowotnych ani surowych odpowiedzi. Wysłać?',
     reportFailed: 'Nie udało się wysłać raportu o błędzie',
 
     // ── Capability board ──
@@ -3306,7 +3295,6 @@ Kontynuować?`,
     privacyTelemetryTitle: 'Brak telemetrii i statystyk użytkowania',
     privacyTelemetryBody: 'Aplikacja sama z siebie nie przesyła żadnych danych o użytkowaniu. Jedynie naciśnięcie przycisku „Wyślij raport o błędzie” wysyła zanonimizowane pola wymienione poniżej.',
     privacyReportTitle: 'Urządzenie lub trening nie zostały rozpoznane?',
-    privacyReportBody: 'Bez konta GitHub, bez ręcznego kopiowania danych. Po potwierdzeniu tylko struktury pól na poziomie produktu, wersja oprogramowania układowego, numery na poziomie modelu (liczby całkowite — określające jedynie model) oraz kody i liczby nieznanych treningów trafiają do prywatnego magazynu zgłoszeń ZeppBridge. Nigdy: dane konta, tokeny, numery seryjne, ID urządzeń, adresy MAC, współrzędne GPS, wartości zdrowotne, surowe odpowiedzi ani lokalne ścieżki.',
 
     // ── 5. MCP ──
     mcpBadge: 'Dane zdrowotne tylko do odczytu · nie nasłuchuje na żadnym porcie',

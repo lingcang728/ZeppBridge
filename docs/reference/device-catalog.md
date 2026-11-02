@@ -4,8 +4,8 @@
 
 `src/assets/devices/catalog.json` is a maintenance-time snapshot; the model
 list was checked on 2026-08-15 and `device_source_codes` was added on
-2026-09-01 and extended on 2026-09-11. It contains 55 total entries, of which 54 are `active`/`supported`,
-covering 52 canonical model keys. The 48-card baseline is the supplied official
+2026-09-01 and switched to Zepp's official table on 2026-11-02. It contains 64 total entries, of which 63 are `active`/`supported`,
+covering 61 canonical model keys. The 48-card baseline is the supplied official
 Amazfit Japan store capture set (`design_picture/Product`, 12 rows × 4 cards);
 the duplicate GTR 4 black colour card shares the canonical GTR 4 material and
 is not counted as a second model. Three active official extras (Helio Strap Pro,
@@ -13,10 +13,13 @@ Helio Core, and Helio Ring) bring the canonical count above 48. Helio Armband
 remains listed for provenance as `status=accessory` and `supported=false`, so it
 is not counted as a connectable device.
 
-Balance 2 XT, Amazfit Smart Scale and Mi Body Composition Scale 2 are also
-selectable. Their product art is unavailable, so they use the existing placeholder.
-The accepted source numbers are maintained in `device_source_codes` in the
-catalog and `DEVICE_SOURCE_CODES` in `scripts/assets/build-device-catalog.py`.
+Balance 2 XT, Mi Body Composition Scale 2 and the older models added in 3.1.1
+(Amazfit Pop, Zepp E Circle / Square, Amazfit Neo, Bip S, Mi Smart Band 4 NFC and
+others) are also selectable. Their product art is unavailable, so they use the
+existing placeholder. Source numbers are maintained in `device_source_codes` in
+the catalog (the ones from the official table are also listed in
+`device_source_official`) and in `OFFICIAL_DEVICE_SOURCE_CODES` /
+`CROWD_DEVICE_SOURCE_CODES` in `scripts/assets/build-device-catalog.py`.
 
 The card-by-card mapping is kept in
 [`device-catalog-audit.json`](./device-catalog-audit.json) and
@@ -40,30 +43,40 @@ catalog ID, canonical model key, and material source.
 
 ### How `device_source_codes` is populated
 
-Huami publishes no lookup table for these integers, so every entry comes from
-users assigning a model by hand in the app and opting in to share it. The
-assignments are aggregated in the feedback database; see
+**Zepp's official developer table is the source of truth**:
+[docs.zepp.com › Reference › Device List](https://docs.zepp.com/docs/reference/related-resources/device-list/)
+(the Chinese and English versions agree; `*` marks China-market models; checked
+entry by entry on 2026-11-02). It also settles the numbers that crowd reports
+never agreed on (`10813699` = Active Max, `11141376` = Balance 3, `7995649` =
+GTS 4, `8454401` = Bip 5).
+
+Before 3.1.1, numbers came from users assigning a model by hand in the app and
+opting in to share it. That upload has been removed. The few numbers accepted
+that way that the official table does not list (Helio Strap / Strap Pro / Ring,
+Balance 2 XT, Balance 2's `10486017` and others) are **frozen**: kept, never
+extended. Feedback reports now carry only the `deviceSource` numbers the catalog
+cannot resolve, as a way to notice when the official table has moved on; see
 [feedback triage](./feedback-triage.md) for the tooling.
 
-Admission rules, enforced by `DEVICE_SOURCE_CODES` in
+Rules, enforced by
 [`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
 and asserted by the `device_catalog` unit tests:
 
-* **`deviceSource` only — never `deviceType`.** `deviceType` is a family code:
-  in the feedback data, `deviceType:0` alone spans twenty different models.
-* **High band only (>= 1,000,000).** The low band is self-contradictory in the
-  same data: `deviceSource:102` was assigned to four different models by four
-  different people.
-* **At least two independent reports per number.**
-* **Conflicts are adjudicated by hand, never by majority vote.** Two were
-  accepted (`9568513` -> Balance 2, `10289411` -> Helio Strap): their
-  neighbouring numbers are unanimous for the same product, and every
-  dissenting report also assigned a second watch, i.e. the reporter picked the
-  wrong device in the picker. One was rejected (`10813699`, Active MAX 2 vs
-  Active 2 44mm 2) — a tie is not evidence.
+* **Models are identified by `deviceSource` only — never `deviceType`.**
+  `deviceType` is a family code (0 = watch/band, 1 = body composition scale,
+  7 = earbuds): in the feedback data, `deviceType:0` alone spans twenty
+  different models. It is used only for the family: a device whose model is
+  unknown and whose `deviceType` is 1 is shown as a "Body composition scale"
+  rather than an unidentified device.
+* **Low numbers (< 1,000,000) only when the official table lists them.** Older
+  watches really are low (`418` = T-Rex 2, `254` = Band 7). `15` and `101`–`104`
+  are not in the table and stay unresolved — every `101`–`104` in the feedback
+  data carries `deviceType:1`: users picked their scale's row as their watch.
+* **One number, one model.** The script fails if the official table and the
+  frozen crowd list ever claim the same number.
 
 Several adjacent numbers mapping to one product is normal: the low bits encode
-the colour/size variant.
+the colour/size/China-market variant.
 
 The original account nickname remains in `name`/`display_name`; the catalog
 adds `canonical_name`, `display_name`, `name_zh`, and `catalog_id`. `user_fused`

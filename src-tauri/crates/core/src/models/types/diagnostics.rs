@@ -39,30 +39,15 @@ pub struct DiagnosticDeviceEvidence {
     pub firmware_field_objects: usize,
     pub candidates: Vec<DiagnosticDeviceCandidate>,
     pub unmatched_product_hints: Vec<String>,
-    /// 型号类数字标识，形如 `deviceSource:7930112` / `deviceType:5`。
+    /// 目录（含 Zepp 官方对照表）认不出的设备的型号编号，形如 `deviceSource:7930112`。
     ///
-    /// 有些账号的设备响应里根本没有产品名字段，这两个数字是仅有的型号线索。
-    /// 它们描述的是「哪一款表」，不是「哪一台表」：没有序列号、MAC、
-    /// 绑定时间或任何随设备实例变化的值，所以可以安全地用来补内置目录。
-    /// 只收整数，其他一律丢弃。
+    /// 有些账号的设备响应里根本没有产品名字段，这个数字是仅有的型号线索。
+    /// 它描述的是「哪一款表」，不是「哪一台表」：没有序列号、MAC、
+    /// 绑定时间或任何随设备实例变化的值。3.1.1 起不再收 `deviceType`（族码），
+    /// 已认出的设备和体脂秤的编号也不收。
     #[serde(default)]
     pub model_identifier_hints: Vec<String>,
     pub shapes: Vec<DiagnosticObjectShape>,
-}
-
-/// 用户手动指认的型号，配上这台设备的型号类编号。
-///
-/// 这一对是内置目录唯一可能的成长来源：华米没有公开「编号 → 型号」的对照，
-/// 而有些账号的设备响应里除了这些数字什么都没有。一个用户指认一次，下一版
-/// 目录就能让所有同款设备自动识别。
-///
-/// 两半都是型号级事实：`catalog_id` 是随包目录里的产品，`hints` 只含
-/// `deviceSource:整数` 这种取值。没有序列号、MAC、账号或任何设备实例信息。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DiagnosticAssignedModel {
-    pub catalog_id: String,
-    pub model_identifier_hints: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -124,10 +109,6 @@ pub struct DiagnosticReport {
     pub normalizer_revision: String,
     pub operating_system: String,
     pub device_evidence: DiagnosticDeviceEvidence,
-    /// 用户手动指认的型号与该设备的型号类编号。只有用户在选择器里勾选了
-    /// 「帮忙补充目录」时才会有内容；没勾选就是空的，报告里也就没有这一段。
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub user_assigned_models: Vec<DiagnosticAssignedModel>,
     pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
     /// 用户做过的运动类型纠正，按「编号 → 我们的解释 → 用户的解释」聚合。
     ///

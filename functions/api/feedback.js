@@ -86,10 +86,9 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   && device.shapes.length <= 40
   && device.shapes.every(validShape);
 
-// 「用户指认的型号 ↔ 这台设备的型号类编号」。这一对是内置目录唯一可能的成长
-// 来源：华米没有公开编号对照表，而有些账号的设备响应里除了这些数字什么都没有。
-// 两半都被钉死成型号级取值 —— catalogId 必须长得像目录 id，hints 只能是
-// `名字:整数`，所以序列号、MAC、账号都进不来。
+// 「用户指认的型号 ↔ 这台设备的型号类编号」：3.1.0 及更早的客户端会发。3.1.1 起设备目录以
+// Zepp 官方 deviceSource 对照表为准，众包指认冻结——旧客户端发来的照样校验、不报错，
+// 但不再入库（见 `retiredFieldsDropped`）。
 const validAssignedModel = (entry) => hasOnlyKeys(entry, ['catalogId', 'modelIdentifierHints'])
   && boundedString(entry.catalogId, 80)
   && /^[a-z0-9][a-z0-9-]*$/.test(entry.catalogId)
@@ -219,7 +218,7 @@ export const validateFeedbackReport = (report) => {
   if (!boundedString(report.normalizerRevision, 100)) return false;
   if (!['windows', 'macos', 'linux'].includes(report.operatingSystem)) return false;
   if (!validDeviceEvidence(report.deviceEvidence)) return false;
-  // 字段可缺省：只有用户在设备选择器里勾选了「帮忙补充目录」才会带上它。
+  // 字段可缺省：只有 3.1.0 及更早的客户端、且用户勾选了「帮忙补充目录」才会带上它。
   if (report.userAssignedModels !== undefined
     && (!Array.isArray(report.userAssignedModels)
       || report.userAssignedModels.length > 8
@@ -256,6 +255,21 @@ export const validateFeedbackReport = (report) => {
     || report.lastCloudRejection !== undefined
     || report.category !== undefined;
 };
+
+/**
+ * 入库前去掉 3.1.1 起不再收的东西：用户指认（存空数组）、已认出设备的固件号、
+ * `deviceType:N` 族码。旧客户端照发，这里照收，只是不留。
+ */
+export const retiredFieldsDropped = (report) => ({
+  ...report,
+  userAssignedModels: [],
+  deviceEvidence: {
+    ...report.deviceEvidence,
+    candidates: report.deviceEvidence.candidates.map(({ firmware: _firmware, ...rest }) => rest),
+    modelIdentifierHints: (report.deviceEvidence.modelIdentifierHints ?? [])
+      .filter((hint) => hint.startsWith('deviceSource:')),
+  },
+});
 
 /** 十六进制的 SHA-256。 */
 const sha256Hex = async (text) => {
@@ -409,6 +423,7 @@ export async function onRequestPost(context) {
     return response({ ok: false, error: 'rate_limited' }, 429);
   }
 
+  const stored = retiredFieldsDropped(report);
   const reportId = crypto.randomUUID();
   const submittedAt = now.toISOString();
   try {
@@ -430,10 +445,10 @@ export async function onRequestPost(context) {
       report.normalizerRevision,
       report.deviceEvidence.status,
       report.deviceEvidence.unknownDeviceCount,
-      JSON.stringify(report.deviceEvidence),
+      JSON.stringify(stored.deviceEvidence),
       JSON.stringify(report.unknownWorkoutCodes),
       report.workoutTypeConflicts,
-      JSON.stringify(report.userAssignedModels ?? []),
+      JSON.stringify(stored.userAssignedModels),
       report.userNote ?? '',
       report.category ?? '',
       JSON.stringify(report.workoutTypeCorrections ?? []),

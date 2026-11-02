@@ -17,12 +17,12 @@ use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme,
     DeviceCacheMetadata, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
-    DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
-    DiagnosticObjectShape, DiagnosticReport, DiagnosticWorkoutCorrection, ExportDetail,
-    ExportResult, ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
-    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
-    SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout,
-    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
+    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
+    DiagnosticWorkoutCorrection, ExportDetail, ExportResult, ExportSelection,
+    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
+    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, StorageEstimate,
+    StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 
 use crate::storage::corrections::WorkoutCodeLabel;

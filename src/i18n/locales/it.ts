@@ -205,9 +205,6 @@ export default {
     confirm: 'È il mio dispositivo',
     clear: 'Rimuovi selezione',
     later: 'Non ora',
-    contributeTitle: 'Aiuta la prossima versione a riconoscere questo dispositivo automaticamente',
-    contributeBody: 'Invia a ZeppBridge il modello scelto e i codici modello del dispositivo (deviceSource / deviceType, solo numeri interi). Entrambi indicano unicamente di quale orologio si tratta: nessun account, nessun numero di serie, nessun indirizzo MAC, nessun dato sanitario. Huami non pubblica alcuna tabella di corrispondenza per questi codici; questo è l’unico modo per arricchire il catalogo integrato — non appena alcuni utenti associano un modello, questo verrà riconosciuto automaticamente per tutti.',
-    note: 'Una volta scelto, verrà mostrato come «Modello scelto da te», mai come identificazione automatica. Le immagini e i modelli provengono dal catalogo integrato; la navigazione non effettua richieste di rete.',
     filterAll: 'Tutti',
     filterWatch: 'Orologi',
     filterBand: 'Smartband',
@@ -1598,17 +1595,12 @@ export default {
     timeUnknown: 'Ora sconosciuta',
     cacheUnavailable: 'Cache dei dispositivi al momento non disponibile',
     identifyUnavailable: 'Identificazione del dispositivo al momento non disponibile',
-    networkUnavailable: 'Rete non disponibile',
     noLocalIdentifier:
       'Questo dispositivo non ha un identificatore locale utilizzabile: impossibile salvare la selezione.',
     assignmentSaved:
       'Selezione salvata. Verrà mostrata come "Modello indicato da te", mai come corrispondenza automatica.',
     assignmentCleared: 'Selezione del modello rimossa; ripristinata la corrispondenza automatica.',
     assignmentFailed: 'Impossibile salvare il modello selezionato',
-    assignmentContributed: (reportId: string) =>
-      `Selezione salvata e codici modello inviati a ZeppBridge (segnalazione ${reportId}). La prossima versione del catalogo riconoscerà questo modello automaticamente.`,
-    assignmentContributionFailed: (reason: string) =>
-      `Selezione salvata solo su questo dispositivo. Invio al catalogo non riuscito: ${reason}`,
   },
 
   // ========================================================
@@ -3129,7 +3121,6 @@ export default {
     reportDoneTitle: 'Segnalazione ricevuta, grazie',
     reportDoneLine: (id: string, at: string) => `Segnalazione ${id}, inviata il ${at}.`,
     reportDoneNote: 'Dati inviati: esattamente i campi elencati sopra, più la tua nota. Niente altro.',
-    reportConfirm: 'Verranno inviati solo: versione dell’applicazione, tipo di sistema, versione del parser, suggerimenti a livello di prodotto e struttura dei campi per dispositivi non riconosciuti, versione del firmware, numeri di modello (deviceSource / deviceType — numeri interi che identificano il modello, non il singolo dispositivo), codici e numero di allenamenti sconosciuti, codice di errore numerico dell’ultima richiesta rifiutata dal cloud (solo numero, flusso e timestamp — mai il testo restituito dal cloud) e la tua nota sopra riportata (percorsi locali, email e ID lunghi rimossi automaticamente). Mai l’account Zepp, token, numeri di serie, ID dispositivo, indirizzi MAC, coordinate GPS, dati sanitari o risposte grezze. Confermare l’invio?',
     reportFailed: 'Impossibile inviare la segnalazione di errore',
     lampOn: (count: number) => plural(count, { one: `${count} recuperato`, other: `${count} recuperati` }),
     lampPending: (count: number) => plural(count, { one: `Presente nel cloud, non in locale: ${count}`, other: `Presente nel cloud, non in locale: ${count}` }),
@@ -3169,7 +3160,6 @@ export default {
     privacyTelemetryTitle: 'Nessuna telemetria, nessuna statistica d’uso',
     privacyTelemetryBody: 'L’applicazione non invia automaticamente alcuna informazione sulle tue abitudini d’uso. Invia i campi anonimizzati indicati sotto solo se premi esplicitamente «Invia segnalazione di errore».',
     privacyReportTitle: 'Dispositivo o allenamento non riconosciuto?',
-    privacyReportBody: 'Nessun account GitHub né duplicazione dei dati. Previa conferma, al repository privato delle segnalazioni di ZeppBridge vengono inviati solo: conformazione dei campi a livello di prodotto, versione del firmware, numeri di modello (interi che identificano solo il modello dell’orologio, non il singolo esemplare) e codici degli allenamenti sconosciuti con il relativo conteggio. Mai account, token, numeri di serie, ID dispositivo, indirizzi MAC, GPS, valori sanitari, risposte grezze o percorsi locali.',
     mcpBadge: 'Dati sanitari di sola lettura · nessuna porta in ascolto',
     mcpCopyPrompt: 'Copia per chiedere alla tua IA',
     mcpCopyConfig: 'Copia solo il frammento di configurazione',
@@ -4447,8 +4437,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     'Codifica dell’esportazione anonimizzata per l’IA non riuscita',
 
   /* —— feedback —— */
-  'err.diagnostic.nothing_to_submit':
-    'Questo dispositivo non possiede un codice modello utile per il catalogo: nessun dato da inviare',
   'err.diagnostic.empty_report':
     'Seleziona prima una tipologia di problema o scrivi una descrizione, altrimenti la segnalazione non conterrà informazioni utili',
   'err.diagnostic.client_init_failed':

@@ -82,11 +82,16 @@ const formatDeviceDate = (value?: string | null): string => {
   }).format(date).replace(/\//g, '-');
 };
 
+/** 认不出型号、但云端说它是体脂秤的设备（后端按 deviceType 族码标的 kind）。 */
+const isGenericScale = (profile: DeviceProfile): boolean => profile.kind === 'scale' && !profile.canonical_name;
+
 const stateFor = (profile: DeviceProfile): DeviceState => {
   if (profile.has_local_data) return 'recent_data';
   if (cache.value?.status === 'stale' || cache.value?.status === 'refresh_failed') return 'cached';
   if (profile.match_status === 'user_assigned') return 'user_assigned';
   if (profile.canonical_name || profile.match_status === 'exact' || profile.match_status === 'alias') return 'account';
+  // 秤不催用户去指认：它只是没有型号，不是「认错了」。
+  if (isGenericScale(profile)) return 'account';
   return 'unknown';
 };
 
@@ -247,7 +252,8 @@ const reloadAfterLocalWrite = async (opts?: { quiet?: boolean }): Promise<void> 
 
 const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) => ({
   profile,
-  canonicalName: profile.canonical_name?.trim() || profile.name?.trim() || copy().unidentifiedDevice,
+  canonicalName: profile.canonical_name?.trim() || profile.name?.trim()
+    || (isGenericScale(profile) ? copy().genericScale : copy().unidentifiedDevice),
   displayName: profile.display_name?.trim() || copy().notProvided,
   image: deviceImageFor(profile.kind, profile.image_key),
   kind: profile.kind || 'unknown',
@@ -275,7 +281,7 @@ const assignBusy = ref(false);
 const assignError = ref<string | null>(null);
 const assignMessage = ref<string | null>(null);
 
-const assignModel = async (deviceKey: string, catalogId: string, contribute = false): Promise<void> => {
+const assignModel = async (deviceKey: string, catalogId: string): Promise<void> => {
   if (!deviceKey) {
     assignError.value = copy().noLocalIdentifier;
     return;
@@ -293,14 +299,6 @@ const assignModel = async (deviceKey: string, catalogId: string, contribute = fa
       return;
     }
     assignMessage.value = copy().assignmentSaved;
-    if (!contribute) return;
-    // 补目录的提交失败不该让指认看起来没保存成功：本机的那一半已经写好了。
-    try {
-      const result = await backend.submitDeviceModelAssignment();
-      assignMessage.value = copy().assignmentContributed(result.reportId);
-    } catch (cause) {
-      assignMessage.value = copy().assignmentContributionFailed(toUserMessage(cause, copy().networkUnavailable));
-    }
   } catch (cause) {
     assignError.value = toUserMessage(cause, copy().assignmentFailed);
   } finally {

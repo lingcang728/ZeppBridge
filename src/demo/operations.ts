@@ -92,7 +92,6 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
     // The website demonstrates the native file-copy step without touching the visitor's clipboard.
     ai_handoff_copy_file: () => null,
     submit_diagnostic_report: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
-    submit_device_model_assignment: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
   };
   return { handlers, exchanges };
 };

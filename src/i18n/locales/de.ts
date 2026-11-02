@@ -129,7 +129,6 @@ export default {
     'err.handoff.mkdir_failed': 'Der Übergabeordner konnte nicht erstellt werden',
     'err.handoff.write_failed': 'Die anonymisierten KI-Daten konnten nicht geschrieben werden',
     'err.handoff.encode_failed': 'Der anonymisierte KI-Export konnte nicht kodiert werden',
-    'err.diagnostic.nothing_to_submit': 'Dieses Gerät hat keine Modellnummer, die den Katalog ergänzt – nichts zu senden',
     'err.diagnostic.empty_report':
       'Erst eine Problemart wählen oder einen Satz schreiben – sonst enthält der Bericht nichts Verwertbares',
     'err.diagnostic.client_init_failed': 'Es konnte keine Verbindung für den Bericht geöffnet werden',
@@ -490,8 +489,6 @@ export default {
       reportDoneLine: (id: string, at: string) => `Bericht ${id}, gesendet ${at}.`,
       reportDoneNote:
         'Raus ging genau das oben Gelistete plus deine Notiz – nichts weiter.',
-      reportConfirm:
-        'Gesendet werden nur: App-Version, OS-Typ, Parser-Revision, produktbezogene Hinweise und Feldstrukturen nicht erkannter Geräte, Firmware-Version, Modellklassen-Nummern (deviceSource / deviceType – nur Ganzzahlen, sagen „welches Modell", nicht „welches Exemplar"), unbekannte Trainingscodes mit Anzahl, der numerische Fehlercode der zuletzt von der Cloud abgelehnten Anfrage (nur Nummer, Datenstrom, Zeit – ohne Antworttext der Cloud) und deine Notiz oben (lokale Pfade, E-Mails und lange Kennungen werden automatisch entfernt). Nie gesendet: Zepp-Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte oder Rohantworten. Senden?',
       reportFailed: 'Der Bericht konnte nicht gesendet werden',
       lampOn: (count: number) => `Abgerufen: ${count}`,
       lampPending: (count: number) => `In der Cloud, lokal nicht gespeichert: ${count}`,
@@ -541,8 +538,6 @@ export default {
       privacyTelemetryBody:
         'ZeppBridge überträgt keine Nutzungsstatistiken. Nur bei manuellem Klick auf „Fehlerbericht senden" gehen die ausgewählten anonymisierten Diagnosedaten raus.',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
-      privacyReportBody:
-        'Kein GitHub-Konto nötig. Nach deiner Bestätigung gehen nur Produkt-Feldstrukturen, Firmware, Modellnummern (Ganzzahlen – nur welches Modell) und unbekannte Trainings-Codes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge. Nie raus: Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
 
       // ── 5. MCP ──
       mcpBadge: 'Gesundheitsdaten nur lesend · kein offener Port',
@@ -957,9 +952,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       alreadyAssigned: 'Bereits ausgewählt',
       clear: 'Auswahl zurücknehmen',
       confirm: 'Das ist mein Gerät',
-      contributeBody:
-        'Sendet das gewählte Modell und die internen Modellnummern (deviceSource / deviceType, reine Ganzzahlen) an ZeppBridge. Keine Kontodaten, keine Seriennummern, keine MAC, keine Gesundheitsdaten. Huami veröffentlicht keine Zuordnungstabelle – der Katalog wächst nur durch Rückmeldungen. Nach wenigen Hinweisen wird das Modell für alle automatisch erkannt.',
-      contributeTitle: 'Hilf mit, dieses Gerät künftig automatisch zu erkennen',
       empty:
         'Kein passendes Modell. Anderes Stichwort, oder Filter zurück auf „Alle".',
       filterAll: 'Alle',
@@ -970,8 +962,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       filterWatch: 'Uhren',
       later: 'Nicht jetzt',
       next: 'Nächstes Modell',
-      note:
-        'Deine Wahl wird als „Von dir gewähltes Modell" markiert, nicht als automatische Erkennung. Bilder und Modelle kommen aus dem mitgelieferten Katalog – Blättern läuft ohne Netz.',
       pickerAria: 'Gerätemodell von Hand auswählen',
       prev: 'Voriges Modell',
       searchAria: 'Nach Modellname suchen',
@@ -1441,16 +1431,11 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
     },
     'composables/useDevices': {
       assignmentCleared: 'Auswahl zurückgesetzt – wieder automatische Zuordnung.',
-      assignmentContributed: (reportId: string) =>
-        `Modellauswahl gespeichert und übermittelt (Bericht ${reportId}). Nächste Version erkennt das Modell automatisch.`,
-      assignmentContributionFailed: (reason: string) =>
-        `Modellauswahl lokal gespeichert. Katalogbeitrag fehlgeschlagen: ${reason}`,
       assignmentFailed: 'Die Modellauswahl konnte nicht gespeichert werden',
       assignmentSaved:
         'Auswahl gespeichert – angezeigt als „Von dir gewähltes Modell", nie als automatische Zuordnung.',
       cacheUnavailable: 'Geräte-Cache gerade nicht verfügbar',
       identifyUnavailable: 'Geräteerkennung gerade nicht verfügbar',
-      networkUnavailable: 'Netzwerk nicht verfügbar',
       noLocalIdentifier:
         'Keine lokale Kennung für dieses Gerät – Auswahl kann nicht gespeichert werden.',
       notFetchedYet: 'Noch nicht abgerufen',

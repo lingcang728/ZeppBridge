@@ -523,9 +523,6 @@ export const tauriBackend: BridgeBackend = {
       category: category ?? null,
     });
   },
-  submitDeviceModelAssignment(note?: string) {
-    return call<FeedbackSubmissionResult>('submit_device_model_assignment', { note: note ?? null });
-  },
 
   saveFitExport(selection: ExportSelection, directory: string) {
     return call<ExportResult>('save_fit_export', { selection, directory });

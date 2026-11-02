@@ -8,7 +8,6 @@
  *
  * 这里选出来的结果会被如实标注成「你指认的型号」，不会伪装成自动识别。
  */
-import GlassSwitch from './GlassSwitch.vue';
 import { computed, ref, watch } from 'vue';
 import GlyphTile from './GlyphTile.vue';
 import CapsuleWheel from './CapsuleWheel.vue';
@@ -28,15 +27,15 @@ const messages = defineMessages(
     confirm: '这就是我的设备',
     clear: '撤销指认',
     later: '稍后再说',
-    contributeTitle: '顺便帮下一版自动认出这台设备',
-    contributeBody: '把「你选的型号 + 设备型号编号（deviceSource / deviceType，只有整数）」交给 ZeppBridge。两样都只说明「哪一款表」，不含账号、序列号、MAC 或任何健康数据。华米没有公开编号对照表，这是内置目录唯一能长大的方式——几个人指认后，同款设备对所有用户自动识别。',
-    note: '选完会标注为「你指认的型号」，不当作自动识别结果。图片和型号来自随包目录，翻页全程不联网。',
+    pickPrompt: '左右翻，或搜一下型号',
+    note: '选完会标注为「你指认的型号」，不当作自动识别结果。指认只存在这台电脑上；图片和型号来自随包目录，翻页全程不联网。',
     filterAll: '全部',
     filterWatch: '手表',
     filterBand: '手环',
     filterStrap: '表带',
     filterRing: '戒指',
     filterEarbuds: '耳机',
+    filterScale: '体脂秤',
   },
   {
     pickerAria: 'Pick your device model by hand',
@@ -49,15 +48,15 @@ const messages = defineMessages(
     confirm: "That's my device",
     clear: 'Undo pick',
     later: 'Not now',
-    contributeTitle: 'Help the next version recognize this device automatically',
-    contributeBody: 'Send ZeppBridge the model you picked plus its model numbers (deviceSource / deviceType, integers only). Both say only which watch it is — no account, serial, MAC, or health data. Huami publishes no number table, so this is the only way the built-in catalog grows: once a few people point at a model, it auto-recognizes for everyone.',
-    note: 'Your pick is labeled "model you picked", never as an automatic match. Images and names come from the bundled catalog; browsing uses no network.',
+    pickPrompt: 'Flip through, or search for your model',
+    note: 'Your pick is labeled "model you picked", never as an automatic match. It stays on this computer; images and names come from the bundled catalog, and browsing uses no network.',
     filterAll: 'All',
     filterWatch: 'Watches',
     filterBand: 'Bands',
     filterStrap: 'Straps',
     filterRing: 'Rings',
     filterEarbuds: 'Earbuds',
+    filterScale: 'Scales',
   },
   {
     pickerAria: 'Elige a mano el modelo de tu dispositivo',
@@ -70,15 +69,15 @@ const messages = defineMessages(
     confirm: 'Este es mi dispositivo',
     clear: 'Retirar la elección',
     later: 'Ahora no',
-    contributeTitle: 'De paso, ayuda a que la próxima versión lo reconozca por sí sola',
-    contributeBody: 'Envía a ZeppBridge el modelo que elegiste más los números de modelo del dispositivo (deviceSource / deviceType, solo enteros). Ambos solo dicen qué reloj es: sin cuenta, sin número de serie, sin MAC, sin datos de salud. Huami no publica una tabla de equivalencias, así que es la única forma de que crezca el catálogo integrado: cuando varias personas señalan un modelo, se reconoce solo para todos.',
-    note: 'Tu elección queda marcada como «Modelo que elegiste», no como coincidencia automática. Las imágenes y los modelos vienen del catálogo incluido; explorarlos no usa la red.',
+    pickPrompt: 'Pasa los modelos o busca el tuyo',
+    note: 'Tu elección queda marcada como «Modelo que elegiste», no como coincidencia automática. Se guarda solo en este equipo; las imágenes y los modelos vienen del catálogo incluido y explorarlos no usa la red.',
     filterAll: 'Todos',
     filterWatch: 'Relojes',
     filterBand: 'Pulseras',
     filterStrap: 'Correas',
     filterRing: 'Anillos',
     filterEarbuds: 'Audífonos',
+    filterScale: 'Básculas',
   },
   'components/DevicePicker',
 );
@@ -90,14 +89,10 @@ const props = defineProps<{
   busy?: boolean;
 }>();
 const emit = defineEmits<{
-  (event: 'confirm', catalogId: string, contribute: boolean): void;
+  (event: 'confirm', catalogId: string): void;
   (event: 'clear'): void;
   (event: 'cancel'): void;
 }>();
-
-/* 默认勾选，但绝不静默发送：设置页写着「应用不会自动上报任何使用行为」，
-   所以这里必须是一个用户看得见、能取消的选项，而不是点确定就顺手发出去。 */
-const contribute = ref(true);
 
 const KIND_FILTERS = computed(() => [
   { key: 'all', label: t.value.filterAll },
@@ -106,11 +101,14 @@ const KIND_FILTERS = computed(() => [
   { key: 'strap', label: t.value.filterStrap },
   { key: 'ring', label: t.value.filterRing },
   { key: 'earbuds', label: t.value.filterEarbuds },
+  { key: 'scale', label: t.value.filterScale },
 ]);
 
 const kind = ref<string>('all');
 const query = ref('');
-const index = ref(0);
+/* -1 = 还没选。以前一打开就停在排序后的第一款（Active 2 44mm），有人没翻就点了确认，
+   反馈库里那款表因此多了一串张冠李戴的指认（3.1.1 起不上报了，但本机的名字照样会错）。 */
+const index = ref(-1);
 
 const entries = computed<DeviceCatalogEntry[]>(() => {
   const keyword = query.value.trim().toLocaleLowerCase();
@@ -125,7 +123,7 @@ const entries = computed<DeviceCatalogEntry[]>(() => {
     .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name));
 });
 
-const current = computed<DeviceCatalogEntry | null>(() => entries.value[index.value] ?? null);
+const current = computed<DeviceCatalogEntry | null>(() => (index.value >= 0 ? entries.value[index.value] ?? null : null));
 const currentImage = computed(() => (current.value
   ? deviceImageFor(current.value.kind, current.value.image_key)
   : ''));
@@ -134,7 +132,8 @@ const currentImage = computed(() => (current.value
 const neighbours = computed(() => {
   const list = entries.value;
   if (list.length < 2) return { prev: null, next: null };
-  const prev = list[(index.value - 1 + list.length) % list.length];
+  const at = Math.max(index.value, 0);
+  const prev = list[(at - 1 + list.length) % list.length];
   const next = list[(index.value + 1) % list.length];
   return {
     prev: prev ? { entry: prev, src: deviceImageFor(prev.kind, prev.image_key) } : null,
@@ -145,11 +144,15 @@ const neighbours = computed(() => {
 const step = (delta: number) => {
   const total = entries.value.length;
   if (!total) return;
+  if (index.value < 0) {
+    index.value = delta > 0 ? 0 : total - 1;
+    return;
+  }
   index.value = (index.value + delta + total) % total;
 };
 
-/* 筛选变了就回到第一张，否则会停在一个已经被过滤掉的位置上。 */
-watch([kind, query], () => { index.value = 0; });
+/* 筛选变了就回到「还没选」，否则会停在一个已经被过滤掉的位置上；搜了关键词就直接停在第一个结果。 */
+watch([kind, query], () => { index.value = query.value.trim() ? 0 : -1; });
 
 /* 打开时先停在已经指认过的那台上，而不是从头翻。 */
 watch(() => props.modelValue, (value) => {
@@ -213,7 +216,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         class="picker-arrow"
         type="button"
         :aria-label="t.prev"
-        :disabled="entries.length < 2"
+        :disabled="entries.length < 2 && current !== null"
         @click="step(-1)"
       ><GlyphTile name="chevron-right" :size="20" class="flip" /></button>
 
@@ -234,9 +237,10 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
             :alt="current!.canonical_name"
             :kind="current!.kind"
           />
-          <p class="hero-name">{{ heroName }}</p>
+          <p v-if="current" class="hero-name">{{ heroName }}</p>
+          <p v-else class="hero-name hero-prompt">{{ t.pickPrompt }}</p>
           <p v-if="heroSub" class="hero-sub">{{ heroSub }}</p>
-          <p class="hero-count">{{ index + 1 }} / {{ entries.length }}</p>
+          <p class="hero-count">{{ current ? index + 1 : '—' }} / {{ entries.length }}</p>
         </div>
         <DeviceVisual
           v-if="neighbours.next?.src"
@@ -251,7 +255,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         class="picker-arrow"
         type="button"
         :aria-label="t.next"
-        :disabled="entries.length < 2"
+        :disabled="entries.length < 2 && current !== null"
         @click="step(1)"
       ><GlyphTile name="chevron-right" :size="20" /></button>
     </div>
@@ -261,20 +265,12 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         class="button primary"
         type="button"
         :disabled="busy || !current || isCurrentAssigned"
-        @click="current && emit('confirm', current.catalog_id, contribute)"
+        @click="current && emit('confirm', current.catalog_id)"
       >{{ isCurrentAssigned ? t.alreadyAssigned : t.confirm }}</button>
       <button v-if="modelValue" class="button secondary" type="button" :disabled="busy" @click="emit('clear')">
         {{ t.clear }}
       </button>
       <button class="button secondary" type="button" :disabled="busy" @click="emit('cancel')">{{ t.later }}</button>
-    </div>
-    <!-- 贡献给设备目录：玻璃开关（审计 A2；以前是原生复选框）。 -->
-    <div class="picker-contribute">
-      <span>
-        <strong>{{ t.contributeTitle }}</strong>
-        {{ t.contributeBody }}
-      </span>
-      <GlassSwitch :model-value="contribute" :aria-label="t.contributeTitle" :disabled="busy" @update:model-value="contribute = !contribute" />
     </div>
     <p class="picker-note">{{ t.note }}</p>
   </div>
@@ -329,21 +325,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .hero-count { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-xs); font-family: var(--font-mono); }
 
 .picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.picker-contribute {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid var(--line-control);
-  border-radius: 12px;
-  background: var(--mat-raised);
-  color: var(--subtle);
-  font-size: var(--fs-xs);
-  line-height: 1.6;
-  box-shadow: var(--mat-raised-rim);
-}
-.picker-contribute strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 600; }
+.hero-prompt { color: var(--subtle); font-weight: 500; }
 .picker-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 
 @media (prefers-reduced-motion: no-preference) {
