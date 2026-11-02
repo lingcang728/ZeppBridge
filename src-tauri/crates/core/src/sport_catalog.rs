@@ -286,8 +286,26 @@ mod tests {
         assert_eq!(resolve(47), Some("mountain_biking"));
         assert_eq!(resolve(141), Some("water_rowing"));
         assert_eq!(resolve(193), Some("fishing"));
-        // 遛狗只开放手动纠正：还不知道哪个编号会产生它，不猜。
-        assert!(is_known_key("dog_walking"));
+    }
+
+    /// 3.1.1：215 遛狗、216 板式网球、108 爬楼（用户对着 Zepp App 核对）。爬楼和
+    /// 54 的爬楼机是两回事，分成两个 key；高山滑雪（#157）还不知道编号，只供手改。
+    #[test]
+    fn codes_added_in_3_1_1() {
+        assert_eq!(resolve(215), Some("dog_walking"));
+        assert_eq!(resolve(216), Some("padel"));
+        assert_eq!(resolve(108), Some("stair_climbing"));
+        assert_eq!(resolve(54), Some("stair_climber"));
+        assert!(is_known_key("alpine_skiing"));
+    }
+
+    /// #155：按官方对照表的 deviceSource（9568515 是官方表列出的 Balance 2）认出的表上，15 是公开水域游泳。
+    #[test]
+    fn issue_155_balance_2_by_official_device_source_swims_in_open_water() {
+        assert_eq!(
+            resolve_cloud_with_device(15, Some(9568515), None, None),
+            Some("open_water_swimming")
+        );
     }
 
     /// 211 是公路骑行。
