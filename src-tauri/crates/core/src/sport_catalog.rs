@@ -104,6 +104,47 @@ pub fn resolve_cloud_with_device(
     Some("open_water_swimming")
 }
 
+/// 文字的运动类型名 → 运动目录 key：导入文件（GPX `<type>`、Strava、TCX）、
+/// 旧通道报文里的文字类型、官方接口认不出的类型名共用这一张表（#157：山地车
+/// 写成 `mountain_bike` / `MTB` 时以前留成原样，导出 FIT 就成了通用运动）。
+///
+/// 只收没有歧义的名字；认不出返回 `None`，由调用方决定怎么兜。「游泳」这种
+/// 分不清泳池还是公开水域的不在这里——导入那边自己按它的习惯兜。
+pub fn text_alias(value: &str) -> Option<&'static str> {
+    let key: String = value
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect();
+    Some(match key.as_str() {
+        "run" | "running" => "run",
+        "trailrun" | "trailrunning" => "trail_running",
+        "virtualrun" | "treadmill" => "treadmill",
+        "ride" | "biking" | "cycling" | "bike" | "gravelride" => "ride",
+        "virtualride" | "indoorcycling" => "indoor_cycling",
+        "mountainbikeride" | "mountainbiking" | "mountainbike" | "mountaincycling" | "mtb" => {
+            "mountain_biking"
+        }
+        "ebikeride" | "ebike" => "e_bike",
+        "walk" | "walking" => "walking",
+        "hike" | "hiking" => "hiking",
+        "weighttraining" | "strengthtraining" | "strength" => "strength",
+        "yoga" => "yoga",
+        "pilates" => "pilates",
+        "rowing" => "rowing",
+        "elliptical" => "elliptical",
+        "nordicski" | "crosscountryskiing" => "cross_country_skiing",
+        "hiit" | "highintensityintervaltraining" => "hiit",
+        "kayaking" => "kayaking",
+        "rockclimbing" | "rockclimb" => "rock_climbing",
+        "soccer" | "football" => "soccer",
+        "tennis" => "tennis",
+        "badminton" => "badminton",
+        "basketball" => "basketball",
+        _ => return None,
+    })
+}
+
 fn known_keys() -> &'static HashSet<String> {
     static KEYS: OnceLock<HashSet<String>> = OnceLock::new();
     KEYS.get_or_init(|| options().iter().map(|entry| entry.key.clone()).collect())
@@ -171,6 +212,26 @@ mod tests {
             None
         );
         assert_eq!(resolve_cloud(224, None, None), Some("hiking"));
+    }
+
+    /// #157：文字写的山地车（`mountain_bike`、`MTB`、官方的 `MOUNTAIN_BIKING`）
+    /// 都归到 `mountain_biking`，别名表里的每个 key 都必须是目录里有的。
+    #[test]
+    fn text_aliases_reach_catalog_keys() {
+        for name in ["mountain_bike", "MTB", "MOUNTAIN_BIKING", "Mountain Bike Ride"] {
+            assert_eq!(text_alias(name), Some("mountain_biking"), "{name}");
+        }
+        assert_eq!(text_alias("Running"), Some("run"));
+        assert_eq!(text_alias("swimming"), None, "分不清泳池还是公开水域，不替它猜");
+        assert_eq!(text_alias("tug_of_war"), None);
+        for name in [
+            "run", "trailrun", "treadmill", "ride", "indoorcycling", "mtb", "ebike", "walk",
+            "hike", "strength", "yoga", "pilates", "rowing", "elliptical", "nordicski", "hiit",
+            "kayaking", "rockclimbing", "soccer", "tennis", "badminton", "basketball",
+        ] {
+            let key = text_alias(name).unwrap();
+            assert!(is_known_key(key), "{name} → {key} 不在目录里");
+        }
     }
 
     #[test]

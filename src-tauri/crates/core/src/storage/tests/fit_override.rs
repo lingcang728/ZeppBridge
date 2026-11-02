@@ -194,3 +194,72 @@ fn undo_restores_the_legacy_series_even_when_the_official_detail_is_newer() {
     let series = db.get_workout_series("1700000000").unwrap();
     assert_eq!(series.samples.first().and_then(|s| s.heart_rate), Some(150));
 }
+
+/// #157：编号 47 的山地骑行一路走到 FIT，`sub_sport` 必须是 MOUNTAIN，
+/// 不能在中途变回普通骑行的 GENERIC。
+#[test]
+fn a_mountain_bike_ride_exports_as_cycling_mountain() {
+    use rustyfit::profile::{mesgdef, typedef};
+    let db = Database::in_memory().unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:ride:mtb-fixture".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_000_600i64, "type": 47, "dis": "5000" }]
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: "workout_detail:1700000000:ride.huami.com".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "data": { "trackid": 1_700_000_000i64, "time": "0;300;300;", "heart_rate": "0,130;300,2;300,-2;" }
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.reprocess_raw_records().unwrap();
+
+    let mut selection = export_selection(&["workouts"], ExportDetail::Full);
+    selection.scope = Some(ExportScope::Workout {
+        workout_id: "1700000000".into(),
+    });
+    let (encoded, _) = db.build_ai_export(&selection).unwrap();
+    let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(export["data"]["workouts"][0]["effective_type"], "mountain_biking");
+    let bytes = to_fit(&export).unwrap().0.remove(0).1;
+    let mut cursor = std::io::Cursor::new(bytes);
+    let fit = rustyfit::Decoder::new()
+        .decode(&mut embedded_io_adapters::std::FromStd::new(&mut cursor))
+        .unwrap()
+        .unwrap();
+    let session = fit
+        .messages
+        .iter()
+        .find(|m| m.num == typedef::MesgNum::SESSION)
+        .unwrap();
+    let field = |num: u8| {
+        session
+            .fields
+            .iter()
+            .find(|f| f.num == num)
+            .map(|f| format!("{:?}", f.value))
+    };
+    assert_eq!(
+        field(mesgdef::Session::SPORT),
+        Some(format!("{:?}", rustyfit::proto::Value::Uint8(typedef::Sport::CYCLING.0)))
+    );
+    assert_eq!(
+        field(mesgdef::Session::SUB_SPORT),
+        Some(format!("{:?}", rustyfit::proto::Value::Uint8(typedef::SubSport::MOUNTAIN.0)))
+    );
+}

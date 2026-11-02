@@ -617,6 +617,9 @@ fn packed_heart_rate_point(
 /// 8/10/14/23/92 来自社区参考实现；13/22/192 按本地记录动态特征
 /// （步频/步幅/配速/心率）推断，新设备编码出现时可再校正。
 pub(super) fn normalize_type_text(value: &str) -> String {
+    if let Some(key) = crate::sport_catalog::text_alias(value) {
+        return key.to_owned();
+    }
     let normalized = value.trim().to_lowercase().replace([' ', '-'], "_");
     if normalized.is_empty() {
         "unknown".to_owned()

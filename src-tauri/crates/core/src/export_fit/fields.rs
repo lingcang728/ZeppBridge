@@ -109,7 +109,8 @@ pub(super) fn map_sport(key: &str) -> (typedef::Sport, typedef::SubSport) {
         "hiking" => (Sport::HIKING, SubSport::GENERIC),
         "ride" => (Sport::CYCLING, SubSport::GENERIC),
         "road_cycling" => (Sport::CYCLING, SubSport::ROAD),
-        "mountain_biking" => (Sport::CYCLING, SubSport::MOUNTAIN),
+        // 别名兜一层：老库里没经过别名表的文字类型（#157）。
+        "mountain_biking" | "mountain_bike" | "mtb" => (Sport::CYCLING, SubSport::MOUNTAIN),
         "indoor_cycling" => (Sport::CYCLING, SubSport::INDOOR_CYCLING),
         "spinning" => (Sport::CYCLING, SubSport::SPIN),
         "bmx" => (Sport::CYCLING, SubSport::BMX),
