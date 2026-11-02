@@ -389,3 +389,28 @@ fn an_official_only_detail_drops_distance_that_disagrees_with_the_summary() {
     db.reprocess_raw_records().unwrap();
     assert_eq!(series_shape(&db), (Some(120), None));
 }
+
+/// 在 App 里改过入睡 / 醒来的那晚换了 id，旧的那条要被顶掉，一晚只留一条；
+/// 同一台表不重叠的另一晚、另一台表重叠的那晚都不动。
+#[test]
+fn an_edited_band_night_replaces_the_one_it_overlaps() {
+    let db = Database::in_memory().unwrap();
+    let start = SHANGHAI_MIDNIGHT + 1443 * 60;
+    db.insert_sleep_session(&legacy_night(start, start + 450 * 60))
+        .unwrap();
+    db.insert_sleep_session(&legacy_night(start - 86_400, start - 86_400 + 400 * 60))
+        .unwrap();
+    let mut other_watch = legacy_night(start + 60, start + 400 * 60);
+    other_watch.device_id = Some("other".into());
+    other_watch.sleep_id = format!("band:other:{}:{}", start + 60, start + 400 * 60);
+    db.insert_sleep_session(&other_watch).unwrap();
+
+    // 用户把入睡改晚了半小时。
+    let edited = legacy_night(start + 1800, start + 450 * 60);
+    db.insert_sleep_session(&edited).unwrap();
+    let ids = shown_ids(&db);
+    assert_eq!(ids.len(), 3, "{ids:?}");
+    assert!(ids.contains(&edited.sleep_id));
+    assert!(!ids.contains(&format!("band:dev:{start}:{}", start + 450 * 60)));
+    assert!(ids.contains(&other_watch.sleep_id));
+}
