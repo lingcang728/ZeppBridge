@@ -197,7 +197,9 @@ pub const METRICS: [MetricContract; 41] = [
     MetricContract {
         metric: "resting_hr",
         unit: "bpm",
-        description: "静息心率",
+        // #158：AI 把它当成了「睡眠心率」。它是手环睡眠汇总里的 rhr 字段，
+        // 和睡眠区间的平均心率不是一回事，两者数值相等也不说明是同一个量。
+        description: "静息心率：取自手环睡眠汇总的 rhr 字段，不是睡眠期间的平均心率",
     },
     MetricContract {
         metric: "spo2_odi",
