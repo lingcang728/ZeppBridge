@@ -19,6 +19,8 @@ const COPY: Record<LandingLocale, ReelCopy> = {
     play: 'Odtwórz',
   },
 
+  // 繁体还没翻（翻译.md 第三十四批）：先用简体。
+  'zh-TW': { preparing: '正在准备演示', failed: '演示暂时未能继续', retry: '重试', replay: '重播', pause: '暂停', play: '播放' },
   zh: {
     preparing: '正在准备演示',
     failed: '演示暂时未能继续',

@@ -282,6 +282,8 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     starOnGithub: 'Lascia una stella su GitHub',
   }) satisfies JourneyCopy,
   zh, en,
+  // 繁体还没翻（翻译.md 第三十四批）：先用简体。
+  'zh-TW': zh,
   es: pack({
     title: ['Todo lo que recuerda tu muñeca.', 'Tuyo para siempre.'],
     lead: 'Sincroniza desde Zepp a este equipo. Resumen, fases del sueño, comparación de entrenos y plan quedan juntos.',

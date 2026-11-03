@@ -13,7 +13,7 @@ import GlyphTile from './GlyphTile.vue';
 import CapsuleWheel from './CapsuleWheel.vue';
 import DeviceVisual from './DeviceVisual.vue';
 import { catalogEntryMatchesId, deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
-import { defineMessages, locale, useMessages } from '../i18n';
+import { defineMessages, isChineseLocale, locale, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -182,7 +182,7 @@ const onPickerKeydown = (event: KeyboardEvent) => {
 /* 目录里的中文名只在中文界面下用。英文界面下 name_zh 和 canonical_name
    会是同一个词或一个读不懂的中文名，两行都摆出来只是噪音。 */
 const heroName = computed(() => (current.value
-  ? (locale.value === 'zh' ? current.value.name_zh || current.value.canonical_name : current.value.canonical_name)
+  ? (isChineseLocale(locale.value) ? current.value.name_zh || current.value.canonical_name : current.value.canonical_name)
   : ''));
 const heroSub = computed(() => (current.value && current.value.canonical_name !== heroName.value
   ? current.value.canonical_name

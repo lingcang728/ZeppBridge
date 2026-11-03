@@ -18,16 +18,16 @@ import type { LandingCopy } from '../views/landing/types';
  */
 export type LandingLocale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'zh-TW';
 
 /** 语言下拉按这个顺序排，与应用内 LOCALES 一致：先内联的 zh/en，再懒加载语言包。 */
 export const LANDING_LOCALES: readonly LandingLocale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
 ];
 
 /** 每种语言在菜单里用自己的名字，不翻译。 */
 export const LOCALE_LABELS: Record<LandingLocale, string> = {
-  zh: '中文',
+  zh: '简',
   en: 'English',
   es: 'Español',
   nl: 'Nederlands',
@@ -39,6 +39,7 @@ export const LOCALE_LABELS: Record<LandingLocale, string> = {
   fr: 'Français',
   it: 'Italiano',
   pl: 'Polski',
+  'zh-TW': '繁',
 };
 
 /** `<html lang>` 用的标记，和 locale 一一对应。 */
@@ -55,6 +56,7 @@ const HTML_LANG: Record<LandingLocale, string> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  'zh-TW': 'zh-Hant',
 };
 
 /** `og:locale` 要求 language_TERRITORY 形式，纯机械映射，不放语言包里。 */
@@ -71,6 +73,7 @@ const OG_LOCALE: Record<LandingLocale, string> = {
   fr: 'fr_FR',
   it: 'it_IT',
   pl: 'pl_PL',
+  'zh-TW': 'zh_TW',
 };
 
 /** 每种语言的页面级元信息。SEO 是多语言的重点之一，所以不只换正文。 */
@@ -110,9 +113,10 @@ const isLandingLocale = (value: unknown): value is LandingLocale =>
 
 /**
  * 把一个语言标记匹配到落地页语言：先精确匹配（`pt-BR`→`pt-BR`、
- * `hi-IN`→`hi-IN`），再逐段砍地区子标签（`de-AT`→`de`、`zh-TW`→`zh`），
+ * `hi-IN`→`hi-IN`），再逐段砍地区子标签（`de-AT`→`de`、`zh-SG`→`zh`），
  * 最后裸语言查基础映射。**裸 `pt` 给欧洲葡萄牙语**（`pt-PT`）——巴西葡语
- * 只认显式的 `pt-BR` 及其地区变体。
+ * 只认显式的 `pt-BR` 及其地区变体。繁体和应用同一条规则：`zh-TW`、`zh-HK`、
+ * `zh-MO`、`zh-Hant(-*)` 给繁体中文。
  */
 const BASE_LANGUAGE: Record<string, LandingLocale> = {
   zh: 'zh',
@@ -128,9 +132,12 @@ const BASE_LANGUAGE: Record<string, LandingLocale> = {
   pl: 'pl',
 };
 
-const EXACT_LOCALE = new Map<string, LandingLocale>(
-  LANDING_LOCALES.map((value) => [value.toLowerCase(), value]),
-);
+const EXACT_LOCALE = new Map<string, LandingLocale>([
+  ...LANDING_LOCALES.map((value): [string, LandingLocale] => [value.toLowerCase(), value]),
+  ['zh-hk', 'zh-TW'],
+  ['zh-mo', 'zh-TW'],
+  ['zh-hant', 'zh-TW'],
+]);
 
 const matchLanguageTag = (raw: string | undefined): LandingLocale | null => {
   let tag = (raw ?? '').trim().toLowerCase().replace(/_/g, '-');

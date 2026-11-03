@@ -1,12 +1,12 @@
-// 发版共用的纯逻辑：12 种语言清单、作者来信与上期回音的门禁、tag 正文。不碰网络。
+// 发版共用的纯逻辑：13 种语言清单、作者来信与上期回音的门禁、tag 正文。不碰网络。
 // 发版就是正常流程（2026-10-29 用户定，取消了冻结 / 定时 / 批准）：本地打包自测 → 提交推送 main → 打 `v*` 附注标签，CI 打包并建 Release。
 
-/** 每一版的更新说明必须齐全的 12 种界面语言（与 docs/releases/README.md 一致）。 */
-export const NOTE_LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
+/** 每一版的更新说明必须齐全的 13 种界面语言（与 docs/releases/README.md 一致；3.1.1 起加繁体 zh-TW）。 */
+export const NOTE_LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW'];
 
 /**
  * 作者来信（2026-10-20 用户定）：从这一版起每一版都要有信，补丁版也算。
- * 原稿 docs/releases/letters/<版本>/<locale>.md，12 种语言齐了才发。3.0.6 之前的版本没有信。
+ * 原稿 docs/releases/letters/<版本>/<locale>.md，13 种语言齐了才发（3.1.1 之前是 12 种）。3.0.6 之前的版本没有信。
  */
 export const LETTERS_SINCE = '3.0.7';
 export const letterPath = (version, locale) => `docs/releases/letters/${version}/${locale}.md`;
@@ -14,7 +14,7 @@ export const needsLetter = (version) => compareVersions(version, LETTERS_SINCE) 
 export const echoPath = (version, locale) => `docs/releases/letters/${version}/echo/${locale}.md`;
 
 /*
- * 「上期回音」可以没有；有了就 12 种语言都要有，列表行格式和 src/lib/letters/parse.ts 的 parseEcho 一致，
+ * 「上期回音」可以没有；有了就 13 种语言都要有，列表行格式和 src/lib/letters/parse.ts 的 parseEcho 一致，
  * 每种语言的 #id 和中文原稿同一组、同一顺序——回执「归入『…』」和「我也遇到」都按 #id 对。
  */
 const ECHO_ITEM = /^[-*]\s+(next|later|asking)\s+#([a-z0-9][a-z0-9-]{0,47})\s*[:：]\s*(.+)$/;

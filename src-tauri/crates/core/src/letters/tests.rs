@@ -95,6 +95,7 @@ fn also_hit_ids_and_locales_are_shaped_like_the_server_expects() {
         vec!["backfill-stuck", "linux-lag"]
     );
     assert_eq!(normalize_locale("pt-BR"), Some("pt-BR"));
+    assert_eq!(normalize_locale("zh-TW"), Some("zh-TW"));
     assert_eq!(normalize_locale("xx"), None);
     assert!(is_letter_version("3.1.0"));
     assert!(!is_letter_version("3.1"));

@@ -64,7 +64,10 @@ describe('landing language survives unavailable storage', () => {
 
 describe('browser-language detection', () => {
   it.each([
-    [['zh-TW'], 'zh'],
+    [['zh-TW'], 'zh-TW'],
+    [['zh-HK'], 'zh-TW'],
+    [['zh-Hant-MO'], 'zh-TW'],
+    [['zh-SG'], 'zh'],
     [['zh-Hans-CN'], 'zh'],
     [['es-MX'], 'es'],
     [['nl'], 'nl'],
