@@ -30,16 +30,18 @@ Arch 配方面向 `x86_64`，使用系统 GTK / WebKit，通过 Tauri `--no-bund
 
 本地开发先在仓库根目录执行 `nvm use`，再运行 `./packaging/arch/build-local.sh`。
 源码快照、依赖和 Rust target 位于 `$XDG_CACHE_HOME/zeppbridge/arch/`（默认
-`~/.cache/zeppbridge/arch/`），不会复制用户数据库。默认不安装系统依赖或成品；
-`--syncdeps` 会转交给 `makepkg`。原始配方中的 `makepkg -si` 则构建远端已提交的
-`main` 并安装，不包含本地未提交修改。
+`~/.cache/zeppbridge/arch/`），不会复制用户数据库。默认只构建、不安装任何东西；
+额外参数原样转发给 `makepkg`，`--syncdeps` 安装缺少的构建依赖，`--install` 在构建
+成功后安装成品。原始配方中的 `makepkg -si` 则构建远端已提交的 `main` 并安装，
+不包含本地未提交修改。
 
 ## 验证到哪一步
 
-本机 Arch `x86_64` 已完成原生包构建、桌面入口校验及 CLI 版本检查；尚未进行洁净
-chroot 构建、系统安装或 GUI 完整功能验证。AUR 尚未发布，CI 尚未覆盖 Arch。
+本机 Arch `x86_64` 已完成原生包构建、桌面入口校验及 CLI 版本检查，并用 `pacman -U`
+完成了系统安装——报告白屏的用户确认安装后白屏消失。那次构建的快照早于上游 3.1.0
+合并。洁净 chroot 构建仍未进行。AUR 尚未发布，CI 尚未覆盖 Arch。
 
 `.github/workflows/ci.yml` 每次推送都会构建 Flatpak 包、校验桌面入口和 AppStream 文件，并构建
-无界面镜像且**做冒烟测试**。任何 CI 都覆盖不了真实的 Linux 桌面：那里的登录、同步和密钥环行为
-仍没有人实测过。见
+无界面镜像且**做冒烟测试**。任何 CI 都覆盖不了真实的 Linux 桌面——这一部分现在已经有人实测过：
+渲染修复、界面、登录、同步与数据显示都已在报告问题的机器上确认。见
 [docs/guides/linux.zh-CN.md](../docs/guides/linux.zh-CN.md#什么被验证过什么没有)。

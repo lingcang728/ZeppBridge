@@ -13,9 +13,9 @@ ZeppBridge 在 Linux 上提供 Flatpak、`.deb`、`.rpm` 和 AppImage 包，另�
 | 在 Linux 上能编译、clippy 干净、Rust 测试通过 | 每次推送都由 CI 覆盖 |
 | Flatpak 包能构建出来，元数据能通过校验 | 每次推送都由 CI 覆盖 |
 | 无头镜像能构建、能运行、数据目录落在挂载的卷上 | 每次推送都由 CI 覆盖 |
-| 真实 Linux 桌面上的登录、同步、密钥环行为 | **还没有任何人验证过** |
+| 真实桌面使用（Arch x86_64、AMD、Wayland、WebKitGTK 2.54.1）：渲染修复、界面、登录、同步与数据显示 | 已在报告白屏的那台机器上确认——白屏和动画中止不再出现 |
 
-最后一行才是要紧的那行。没有人在 Linux 桌面上完整走过一遍「登录并同步」。Linux 特有的那部分代码——Secret Service 凭据后端和 XDG 数据目录——只被单元测试和一个容器跑过，没有被一个戴着手表的人跑过。如果你试了，一条写清发生了什么的 issue 是最有用的东西。
+这一行是在真实桌面上填上的。报告白屏的用户安装了本地构建的包，确认界面、登录、同步和数据显示都正常，白屏和动画中止不再出现。如果你在自己的机器上遇到问题，一条写清发生了什么的 issue 是最有用的东西。
 
 这和 README 里对 macOS 的态度是同一个：没人查过却说「已支持」，是数据丢失的开始。
 
@@ -56,25 +56,26 @@ AppImage 需要 FUSE。只带 FUSE 3 的系统上，要么装 `libfuse2`，要�
 `x86_64`。它使用系统 GTK / WebKit，生成原生 `.pkg.tar.zst`，将桌面应用、CLI 和 MCP
 三个程序安装到 `/usr/bin`，不经过 AppImage 工具。配方尚未提交到 AUR，不能直接用
 `yay -S zeppbridge-git` 安装。本机 Arch `x86_64` 已完成原生包构建、桌面入口校验及
-CLI 版本检查；尚未进行洁净 chroot 构建、系统安装或 GUI 完整功能验证，CI 尚未覆盖 Arch。
+CLI 版本检查，并用 `pacman -U` 完成了系统安装——报告白屏的用户确认安装后白屏消失。
+那次构建的快照早于上游 3.1.0 合并，配方还没有从当前 `main` 重新构建过；洁净 chroot
+构建仍未进行，CI 尚未覆盖 Arch。
 
 要打包当前工作区（包括未提交修复），在仓库根目录运行：
 
 ```bash
+```bash
 nvm use
 ./packaging/arch/build-local.sh
-# 若需要由 makepkg 安装缺少的系统构建依赖，明确加上此选项：
-./packaging/arch/build-local.sh --syncdeps
+# 额外参数会原样转发给 makepkg：
+#   --syncdeps  让 makepkg 安装缺少的系统构建依赖
+#   --install   构建成功后用 pacman 安装成品
+./packaging/arch/build-local.sh --install
 ```
 
 脚本把受版本控制及未被忽略的源码快照到 `$XDG_CACHE_HOME/zeppbridge/arch/`
 （未设时为 `~/.cache/zeppbridge/arch/`）的独立 Git 仓库，隔离源码、依赖和 Rust target，
-不复制用户数据库。默认不安装系统依赖或成品；完成后在 `release-arch/` 中取得包。
-确认要安装时自行执行：
-
-```bash
-sudo pacman -U release-arch/zeppbridge-git-*.pkg.tar.zst
-```
+不复制用户数据库。默认只构建、不安装任何东西。`release-arch/` 里可能留着多次构建的包，
+手动安装时写准确文件名，不要用通配符。
 
 若要使用原始配方构建并安装远端已提交的 `main`，则运行：
 
@@ -118,7 +119,7 @@ App Token 写入数据目录的 `credentials.json`，Unix 文件权限为 `0600`
 以同一用户身份运行的程序仍能读取它。JSON 存储在当前进程立即生效，重启后也会
 复用已有文件，但显式环境配置优先；若启动配置与文件存储冲突，界面不会允许切换到
 文件存储，需要修复系统凭据存储或调整启动配置。手动输入的凭证保存成功后仍需完成
-原有验证，保存成功不代表验证通过。完整 GUI 真实登录流程尚未验证。
+原有验证，保存成功不代表验证通过。凭证恢复路径的完整真实登录流程（官方与高级数据）尚未在真实桌面端到端验证。
 
 无头服务器或容器也可通过启动环境选择存储方式：
 
@@ -193,6 +194,7 @@ Wayland / X11 和合成器影响。关闭 DMABUF 是切换缓冲区传递与呈�
 本机 Arch Linux + AMD + Wayland + WebKitGTK 2.54.1 的复现中，关闭 DMABUF 后执行
 快照动效触发了 `graphicsLayerFactory` 中止，默认路径则正常。这只验证了这一组环境，
 不能据此保证所有发行版和驱动的行为。
+报告这些故障的用户安装了包含这套策略的本地构建包，确认白屏和动画中止不再出现。
 
 可以分别测试关闭 DMABUF 或恢复默认路径：
 
@@ -223,8 +225,6 @@ DMABUF 后恢复正常，AppImage 仍失败；报告者在本机编译的 AppIma
 GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
 # 显式关掉合成（AppImage 版本已经自己这么做了；如果你装的是 deb/rpm/Flatpak
 # 却有同样的症状，在这里设它）。
-WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
-```
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
 ```
 
@@ -309,8 +309,10 @@ Linux 这边刻意不产出 updater 产物——应用内更新在 Linux 上本�
 ### Arch 上 AppImage 打包失败
 
 本次 Arch 环境中，上面的构建已成功编译原生程序并生成 deb / rpm，失败发生在最后的
-AppImage 打包阶段。可以直接运行 `src-tauri/target/release/zeppbridge` 体验本机原生程序；
-只需要 deb / rpm 产物时，将构建参数改为 `--bundles deb,rpm` 可跳过 AppImage。
+AppImage 打包阶段。2026 年 11 月对合并了上游 3.1.0 的源码重新验证：编译与 deb / rpm
+打包成功，AppImage 仍在 linuxdeploy 处失败。可以直接运行
+`src-tauri/target/release/zeppbridge` 体验本机原生程序；只需要 deb / rpm 产物时，
+将构建参数改为 `--bundles deb,rpm` 可跳过 AppImage。
 这些包分别面向 Debian / RPM 系发行版，并不是让 Arch 通过 `pacman` 安装。
 
 保留已编译的二进制，只重试 AppImage 打包并查看详细日志：
