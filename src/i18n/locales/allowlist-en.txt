@@ -66,6 +66,7 @@ components/journal/journal.shoeSports.hiking
 
 # nl
 components/DevicePicker.filterBand
+components/tour/tour.chapter.workouts
 components/DeviceVisual.ring
 components/DeviceVisual.band
 components/HeartRateZonePicker.modelGroup
@@ -94,6 +95,7 @@ components/journal/body.parts.hand
 components/journal/journal.raceSport
 
 # de
+components/tour/tour.chapter.workouts
 components/DeviceVisual.ring
 components/InsightCard.baselineRun
 components/HeartRateZonePicker.basesSeparator
@@ -325,6 +327,7 @@ lib/workoutNames.karate
 lib/workoutNames.kendo
 lib/workoutNames.kickboxing
 lib/workoutNames.muay_thai
+lib/workoutNames.padel
 lib/workoutNames.parkour
 lib/workoutNames.pilates
 lib/workoutNames.pole_dance
@@ -353,3 +356,5 @@ components/workout/workoutImport.short.fit
 components/workout/workoutImport.short.strava
 components/workout/workoutImport.sources.apple_health
 components/workout/workoutImport.short.apple_health
+views/ai/AiPlanHistory.originMcp
+

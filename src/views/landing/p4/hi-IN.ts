@@ -21,7 +21,7 @@ const pack: P4Copy = {
       title: 'क्लाउड का डेटा, आपकी मेज़ पर वापस।',
       lead: 'अपना Zepp खाता कनेक्ट करें और अपने रिकॉर्ड इस कंप्यूटर पर सिंक करें। फ़्रीक्वेंसी सेट करें और बाकी काम ऑटो-सिंक पर छोड़ दें।',
       points: [
-        { id: 'account', title: 'आधिकारिक साइन-इन', text: 'सिस्टम ब्राउज़र में Zepp में लॉग इन करें, थर्ड-पार्टी अकाउंट भी काम करते हैं। मंज़ूरी की स्थिति कभी भी देखें।', scene: 'account' },
+        { id: 'account', title: 'आधिकारिक साइन-इन', text: 'सिस्टम ब्राउज़र में Zepp में साइन इन करें—Google, Apple, Xiaomi या Facebook से साइन इन करने वाले अकाउंट भी काम करते हैं। ऑथराइज़ेशन की स्थिति कभी भी देखें।', scene: 'account' },
         { id: 'sync', title: 'ऑटोमैटिक सिंक', text: 'बंद, 15, 30 या 60 मिनट। आप सोएं, डेटा अपने आप सिंक होगा।', scene: 'sync' },
         { id: 'devices', title: 'आपकी घड़ी को पहचानता है', text: 'मॉडल की पहचान अपने आप होती है। यदि कोई गड़बड़ हो, तो खुद सही मॉडल चुनें।', scene: 'devices' },
         { id: 'local', title: 'इसी कंप्यूटर पर सुरक्षित', text: 'Zepp से सिंक किया गया स्वास्थ्य डेटा इसी कंप्यूटर पर रहता है, हमारे सर्वर पर कभी नहीं जाता। AI को क्या भेजना है, यह आप तय करते हैं।', scene: 'local' },
@@ -34,17 +34,17 @@ const pack: P4Copy = {
       lead: 'एक ही पेज पर हर ट्रेंड, ताकि शरीर की स्थिति तुरंत समझ आ सके। पूरा इतिहास देखने के लिए किसी भी मेट्रिक को खोलें।',
       points: [
         { id: 'overview', title: 'आपकी पसंद का क्रम', text: 'नींद या वर्कआउट पहले: होम पेज आपकी प्राथमिकताओं के अनुसार व्यवस्थित होता है। स्क्रॉल करें और विवरण देखें।', scene: 'overview' },
-        { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
+        { id: 'normal', title: 'आपका सामान्य दायरा', text: 'हर मेट्रिक के नीचे दी गई रेखा आपका अपना सामान्य दायरा है, किसी और का नहीं। यह कहाँ से आया है, यह देखने के लिए “?” पर टैप करें।', scene: 'normal' },
         { id: 'workouts', title: 'हर दौड़ की एक गूंज', text: 'समान दूरी की अपनी पिछली दौड़ों से तुलना करें: हृदय गति, गति और मैप रूट।', scene: 'workouts' },
         { id: 'gaps', title: 'कुछ भी मनगढ़ंत नहीं', text: 'जो रिकॉर्ड नहीं हुआ, वह खाली रहता है। कोई फर्जी शून्य, पुराना मान या अनुमान नहीं।', scene: 'gaps' },
       ],
     },
-    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
-      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
-      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
-      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
-      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
-      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
+    { id: 'journal', name: 'अभिलेख', title: 'हर सत्र मायने रखता है।', lead: 'वार्षिक वलय, आपका जर्नल, हर वर्कआउट का अहसास और लेखक के पत्र—सब इसी कंप्यूटर पर सुरक्षित हैं।', points: [
+      { id: 'rings', title: 'वार्षिक वलय', text: 'साल में एक वलय। जिस हफ़्ते आपने ज़्यादा वर्कआउट किया, वह वलय चौड़ा होता जाता है।', scene: 'rings' },
+      { id: 'journal', title: 'जर्नल', text: 'व्यक्तिगत सर्वश्रेष्ठ रिकॉर्ड, दौड़ की उलटी गिनती और पदकों की दीवार। जूते अपनी तय दूरी पूरी होने पर आपको याद दिलाते हैं।', scene: 'journal' },
+      { id: 'feel', title: 'वर्कआउट के बाद', text: 'सत्र को रेटिंग दें, दर्द वाले हिस्सों को चिह्नित करें और नोट करें कि आपने कौन से जूते पहने थे।', scene: 'feel' },
+      { id: 'import', title: 'इंपोर्ट और व्यवस्थित करें', text: 'GPX, FIT और Strava एक्सपोर्ट इंपोर्ट करें। उनका प्रकार बदलने या एक साथ छिपाने के लिए कई को चुनें।', scene: 'import' },
+      { id: 'letters', title: 'पत्र पेटी', text: 'हर वर्शन के साथ लेखक का एक पत्र। जवाब दें, लेखक उसे पढ़ेगा और उत्तर भी देगा। साथ ही हर हफ़्ते आपके डेटा पर एक पत्र।', scene: 'letters' },
     ] },
     {
       id: 'ai',
@@ -65,7 +65,7 @@ const pack: P4Copy = {
       lead: 'AI को अपनी स्थिति बताएं और वह हफ़्ते की योजना बनाएगा। वापस पेस्ट करें, मनचाहा बदलाव करें और सीधे घड़ी पर भेजें।',
       points: [
         { id: 'receive', title: 'एक क्लिक में पेस्ट', text: 'बातचीत से ड्राफ्ट तक: वापस कॉपी करें और हफ़्ते का प्लान तैयार है।', scene: 'receive' },
-        { id: 'edit', title: 'आपकी अपनी योजना', text: 'दो दिनों को आपस में बदलने के लिए ड्रैग करें, हर दिन को खोलकर अवधि और तीव्रता एडजस्ट करें।', scene: 'plan-edit' },
+        { id: 'edit', title: 'आपकी अपनी योजना', text: 'दो दिनों को आपस में बदलने के लिए ड्रैग करें, हर दिन को खोलकर अवधि और तीव्रता एडजस्ट करें। घड़ी पर भेजने के लिए देर तक दबाए रखें।', scene: 'plan-edit' },
         { id: 'templates', title: 'टेम्पलेट और इम्पोर्ट', text: 'दोबारा अभ्यास के लिए टेम्पलेट के रूप में सहेजें। .zwo और वर्कआउट .fit फ़ाइलों को भी इम्पोर्ट करें।', scene: 'templates' },
         { id: 'easy', title: 'आज थकान है', text: 'अगर इंटरवल प्लान है लेकिन रिकवरी कम है, तो एक टैप में आसान दौड़ में बदलें। भेजने से पहले आप पुष्टि करते हैं।', scene: 'easy' },
       ],
@@ -79,7 +79,7 @@ const pack: P4Copy = {
     title: 'सेटिंग',
     lead: 'बड़े कार्ड एक-एक करके पलटें; छोटे कार्ड वॉलेट की तरह जमा होते हैं। अकाउंट, सिंक, डिस्प्ले और डेटा मैनेजमेंट सब एक टैप में।',
     summaryTitle: 'हर बारीकी सेटिंग में मौजूद है।',
-    summaryLead: 'चौदह रोज़मर्रा की सेटिंग, एक ही स्टैक में सहेज कर रखी गईं।',
+    summaryLead: 'पंद्रह सामान्य सेटिंग्स, एक साफ़-सुथरे स्टैक में।',
     items: [
       { id: 'sync', title: 'ऑटोमैटिक सिंक', text: 'बंद, 15, 30 या 60 मिनट। बस एक सेटिंग चुनें।', icon: 'auto-sync' },
       { id: 'retention', title: 'दस साल, यहीं सहेजे', text: 'दस साल तक का इतिहास इस कंप्यूटर पर लाएं और संभाल कर रखें। यह क्लाउड की समय सीमा के साथ मिटता नहीं।', icon: 'database' },
@@ -95,11 +95,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'गोपनीयता और सुरक्षा', text: 'सिस्टम द्वारा क्रेडेंशियल्स सुरक्षित। टोकन कभी भी लॉग में नहीं जाते।', icon: 'browser-login' },
       { id: 'filename', title: 'फ़ाइल नाम', text: 'AI के लिए तैयार की जाने वाली फ़ाइलों का नाम आप तय करें।', icon: 'document' },
       { id: 'folder', title: 'कभी भी साथ ले जाएं', text: 'आपका डेटा इसी कंप्यूटर के फ़ोल्डर में रहता है, और यहाँ आपके दर्ज किए रेटिंग, प्लान, AI कार्य एक ही JSON फ़ाइल में एक्सपोर्ट हो जाते हैं।', icon: 'database' },
-      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
+      { id: 'language', title: 'तेरह भाषाएँ', text: 'सरलीकृत और पारंपरिक चीनी, अंग्रेज़ी, स्पैनिश और अन्य। कभी भी बदलें।', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'ZeppBridge को जानें', links: [{ id: 'motion', label: 'डिज़ाइन' }, { id: 'connection', label: 'कनेक्शन' }, { id: 'records', label: 'समझें' }, { id: 'journal', label: 'Archive' }] },
+    { label: 'ZeppBridge को जानें', links: [{ id: 'motion', label: 'डिज़ाइन' }, { id: 'connection', label: 'कनेक्शन' }, { id: 'records', label: 'समझें' }, { id: 'journal', label: 'अभिलेख' }] },
     { label: 'रिकॉर्ड से एक्शन तक', links: [{ id: 'ai', label: 'AI को दें' }, { id: 'ai-plan', label: 'ट्रेनिंग प्लान' }, { id: 'record-sleep', label: 'नींद और कसरत' }] },
     { label: 'आपकी पसंद', links: [{ id: 'connect', label: 'सेटिंग' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'लोकल API' }] },
   ],

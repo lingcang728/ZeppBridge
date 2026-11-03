@@ -9,23 +9,23 @@ const pack: P4Copy = {
       { id: 'theme', title: 'Dzień i noc', text: 'Motyw ciemny i jasny. Jedno stuknięcie i zapada noc.', scene: 'theme' },
     ] },
     { id: 'connection', name: 'Połączenie', title: 'Twoje dane wracają z chmury na biurko.', lead: 'Połącz konto Zepp, a Twoje zapisy zsynchronizują się z tym komputerem. Wybierz częstotliwość i pozwól działać automatycznej synchronizacji.', points: [
-      { id: 'account', title: 'Oficjalne logowanie', text: 'Zaloguj się do Zepp w przeglądarce systemowej. Konta innych dostawców również działają. Sprawdzaj stan autoryzacji w dowolnym momencie.', scene: 'account' },
+      { id: 'account', title: 'Oficjalne logowanie', text: 'Zaloguj się do Zepp w przeglądarce systemowej – konta korzystające z logowania przez Google, Apple, Xiaomi lub Facebook również działają. Status autoryzacji sprawdzisz w każdej chwili.', scene: 'account' },
       { id: 'sync', title: 'Automatyczna synchronizacja', text: 'Wyłączona, co 15, 30 lub 60 minut. Ty śpisz, aplikacja synchronizuje.', scene: 'sync' },
       { id: 'devices', title: 'Rozpoznaje Twój zegarek', text: 'Modele są rozpoznawane automatycznie. Jeśli któryś się nie zgadza, wskaż właściwy.', scene: 'devices' },
       { id: 'local', title: 'Zostaje na tym komputerze', text: 'Dane zdrowotne pobrane z Zepp są zapisywane na tym komputerze i nigdy nie przechodzą przez nasze serwery. To Ty decydujesz, co trafi do AI.', scene: 'local' },
     ] },
     { id: 'records', name: 'Zrozumienie', title: 'Dziesiątki wskaźników na jednym ekranie.', lead: 'Wszystkie trendy na jednej stronie, dzięki czemu od razu widzisz, w jakiej formie jest Twoje ciało. Otwórz wskaźnik, aby przejrzeć pełną historię.', points: [
       { id: 'overview', title: 'W Twojej kolejności', text: 'Najpierw sen czy trening: strona główna dopasowuje się do tego, co dla Ciebie najważniejsze. Przewiń i otwórz szczegóły.', scene: 'overview' },
-      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
+      { id: 'normal', title: 'Twoja norma', text: 'Linia pod każdym wskaźnikiem to Twój własny zwykły zakres, bez porównywania z innymi. Dotknij „?”, aby zobaczyć, skąd pochodzi.', scene: 'normal' },
       { id: 'workouts', title: 'Każdy bieg ma swoje echo', text: 'Porównaj bieżący trening ze swoimi wcześniejszymi biegami na podobnym dystansie, sprawdzając tętno, tempo i trasę.', scene: 'workouts' },
       { id: 'gaps', title: 'Zero zmyślonych danych', text: 'Jeśli coś nie zostało zmierzone, pozostaje puste. Bez dopisywania zer, wcześniejszych odczytów ani szacunków.', scene: 'gaps' },
     ] },
-    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
-      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
-      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
-      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
-      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
-      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
+    { id: 'journal', name: 'Archiwum', title: 'Każdy trening ma znaczenie.', lead: 'Słoje roczne, Twój dziennik, samopoczucie po każdym treningu oraz listy od autora – wszystko przechowywane na tym komputerze.', points: [
+      { id: 'rings', title: 'Słoje drzewa', text: 'Jeden słój na rok. Tygodnie, w których trenowałeś więcej, są szersze.', scene: 'rings' },
+      { id: 'journal', title: 'Dziennik', text: 'Rekordy życiowe, odliczanie do zawodów i ściana medali. Buty przypominają, kiedy osiągną swój limit kilometrów.', scene: 'journal' },
+      { id: 'feel', title: 'Po treningu', text: 'Oceń sesję, wskaż, gdzie boli, i zapisz, w jakich butach biegałeś.', scene: 'feel' },
+      { id: 'import', title: 'Import i porządki', text: 'Importuj pliki GPX, FIT i eksporty ze Stravy. Zaznacz kilka, aby masowo zmienić ich typ lub ukryć.', scene: 'import' },
+      { id: 'letters', title: 'Skrzynka na listy', text: 'List od autora przy każdej wersji. Jeśli odpiszesz, autor przeczyta i odpowie. Do tego co tydzień list o Twoich danych.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Przekaż do AI', title: 'Wykorzystaj subskrypcję, którą już opłacasz.', lead: 'Wybierz dni, a Twoje dane połączą się w jeden plik. Przekaż go sztucznej inteligencji, z której korzystasz na co dzień, poprowadź rozmowę i przenieś wersję roboczą z powrotem.', points: [
       { id: 'providers', title: 'Siedem modeli do wyboru', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao i Grok. Wykorzystaj własne konto i dostępny limit.', scene: 'ai' },
@@ -35,7 +35,7 @@ const pack: P4Copy = {
     ] },
     { id: 'ai-plan', name: 'Plan treningowy', title: 'Dopracuj na komputerze. Trenuj z zegarkiem na ręku.', lead: 'Opisz sztucznej inteligencji swoje samopoczucie, a ułoży plan na cały tydzień. Wklej go z powrotem, dopasuj szczegóły i wyślij na zegarek.', points: [
       { id: 'receive', title: 'Wklej z powrotem', text: 'Z rozmowy prosto do wersji roboczej: skopiuj odpowiedź, a otrzymasz gotowy tygodniowy plan.', scene: 'receive' },
-      { id: 'edit', title: 'Twój własny plan', text: 'Przeciągnij, aby zamienić dwa dni miejscami, otwórz dowolny dzień i zmień czas trwania oraz intensywność każdego etapu. Najedź kursorem, by poznać szczegóły.', scene: 'plan-edit' },
+      { id: 'edit', title: 'Twój własny plan', text: 'Przeciągnij, aby zamienić dwa dni miejscami, otwórz dowolny dzień i zmień czas trwania oraz intensywność każdego etapu. Przytrzymaj dłużej, aby wysłać na zegarek.', scene: 'plan-edit' },
       { id: 'templates', title: 'Szablony i import', text: 'Zapisz plan jako szablon na przyszłość. Możesz także importować pliki treningowe .zwo oraz .fit.', scene: 'templates' },
       { id: 'easy', title: 'Gorszy dzień', text: 'Gdy zaplanowano interwały, a gotowość do wysiłku jest niższa niż zwykle, zmień trening na regeneracyjny jednym stuknięciem. Przed wysłaniem zatwierdzasz każdą zmianę.', scene: 'easy' },
     ] },
@@ -48,7 +48,7 @@ const pack: P4Copy = {
     title: 'Ustawienia',
     lead: 'Przeglądaj duże karty pojedynczo; małe układają się w podręczny wizytownik. Konto, synchronizacja, wyświetlanie i dane dostępne za jednym dotknięciem.',
     summaryTitle: 'Wszystkie szczegóły znajdziesz w Ustawieniach.',
-    summaryLead: 'Czternaście codziennych opcji zebranych w jednym stosie kart.',
+    summaryLead: 'Piętnaście codziennych ustawień uporządkowanych w jednym stosie kart.',
     items: [
       { id: 'sync', title: 'Automatyczna synchronizacja', text: 'Wyłączona, co 15, 30 lub 60 minut. Wybierz odpowiednią.', icon: 'auto-sync' },
       { id: 'retention', title: 'Dziesięć lat, tutaj na miejscu', text: 'Pobierz do dziesięciu lat historii na ten komputer i zachowaj ją na stałe. Nie przepadnie wraz z oknem czasowym w chmurze.', icon: 'database' },
@@ -64,11 +64,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Prywatność i bezpieczeństwo', text: 'Poświadczenia chroni system operacyjny. Tokeny nigdy nie trafiają do dzienników zdarzeń.', icon: 'browser-login' },
       { id: 'filename', title: 'Nazwy plików', text: 'Sam decydujesz, jak mają się nazywać pliki przygotowywane dla AI.', icon: 'document' },
       { id: 'folder', title: 'Zabierz w każdej chwili', text: 'Twoje dane znajdują się w folderze na tym komputerze, a wszystko, co tutaj zapisano — oceny, plany, zadania AI — wyeksportujesz do jednego pliku JSON.', icon: 'database' },
-      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
+      { id: 'language', title: 'Trzynaście języków', text: 'Chiński uproszczony i tradycyjny, angielski, hiszpański i więcej. Przełączaj w dowolnej chwili.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Poznaj ZeppBridge', links: [{ id: 'motion', label: 'Wygląd' }, { id: 'connection', label: 'Połączenie' }, { id: 'records', label: 'Zrozumienie' }, { id: 'journal', label: 'Archive' }] },
+    { label: 'Poznaj ZeppBridge', links: [{ id: 'motion', label: 'Wygląd' }, { id: 'connection', label: 'Połączenie' }, { id: 'records', label: 'Zrozumienie' }, { id: 'journal', label: 'Archiwum' }] },
     { label: 'Od danych do działania', links: [{ id: 'ai', label: 'Przekaż do AI' }, { id: 'ai-plan', label: 'Plan treningowy' }, { id: 'record-sleep', label: 'Sen i treningi' }] },
     { label: 'Po Twojemu', links: [{ id: 'connect', label: 'Ustawienia' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Lokalne API' }] },
   ],

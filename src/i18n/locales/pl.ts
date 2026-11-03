@@ -439,6 +439,8 @@ export default {
       plural(count, { one: `${count} wymiana danych`, few: `${count} wymiany danych`, many: `${count} wymian danych`, other: `${count} wymiany danych` }),
     mcpPill: 'Połącz Claude, Codex i więcej',
     mcpPillHint: 'Pozwól narzędziom AI czytać lokalne dane bezpośrednio przez MCP, bez kopiowania i wklejania',
+    guidePill: 'Jak to działa',
+    guidePillHint: 'Otwórz przewodnik po przekazywaniu danych do AI w przeglądarce',
     autoTip: 'Automatycznie: następnym razem wklej i wyślij za mnie',
     autoTipClose: 'Nie pokazuj więcej',
     ringHint: 'Przytrzymaj pierścień, aby go naładować. Pełen okrąg powoduje wysłanie.',
@@ -1402,7 +1404,7 @@ export default {
     variantOutdoorRide: 'Kolarstwo na zewnątrz',
     variantIndoorRide: 'Kolarstwo stacjonarne',
     variantMountain: 'Kolarstwo górskie',
-    variantTrail: 'Bieg przełajowy',
+    variantTrail: 'Bieg · przełaj',
     variantPick: (name: string) => `Zegarek ponownie zapyta o typ: wybierz „${name}”.`,
     variantPickAny: 'Zegarek ponownie zapyta o dokładny typ: plany innych firm przekazują tylko grupę dyscypliny, co wynika z ograniczeń Zepp.',
     heldBadge: 'Niewspierane przez zegarek',
@@ -1477,67 +1479,105 @@ export default {
   },
 // Source: src/components/tour/tour.i18n.ts
 "components/tour/tour": {
+    cardTitle: 'Przewodnik',
     chapter: {
-      whatsnew: 'Nowości w V3', basics: 'Język i motyw', connect: 'Łączenie', overview: 'Podsumowanie', detail: 'Strony szczegółów',
-      pick: 'Wybór dni', handoff: 'Przekaż do AI', plan: 'Plany treningowe', settings: 'Ustawienia',
-      cards: 'Stół z kartami', box: 'Pudełko kolekcji', check: 'Przed wysłaniem', planFirst: 'Plany treningowe',
+      ai: 'Wyślij do AI',
+      devices: 'Urządzenia i stan danych',
+      home: 'Przegląd',
+      intro: 'Wprowadzenie',
+      journal: 'Dziennik i słoje roczne',
+      letters: 'Skrzynka na listy',
+      metric: 'Wskaźniki i wybór dni',
+      plan: 'Plany treningowe',
+      settings: 'Ustawienia',
+      sleep: 'Sen',
+      workouts: 'Treningi',
     },
-    steps: {
-      whatsnew: {
-        s1: 'Podsumowanie pokazuje tylko kilka wybranych przez Ciebie wskaźników i sygnalizuje, gdy któryś odbiega od Twojej normy.',
-        s2: 'Przekaż dane z kilku dni do AI, a potem pobierz gotowy plan.',
-        s3: 'Pobrany plan możesz wysłać bezpośrednio na zegarek.',
-        s4: 'Narzędzia takie jak Claude Code i Codex mogą odczytywać Twoje dane bezpośrednio przez MCP.',
-        s5: 'Nowe oficjalne połączenie może działać równolegle z dotychczasowym.',
-      },
-      basics: { s1: 'Ciemny, jasny lub zgodnie z systemem.', s2: 'Zmień język w dowolnym momencie.' },
-      connect: {
-        s1: 'Połącz się z kontem Zepp: najpierw oficjalna autoryzacja, a starszy kanał uzupełnia brakujące dane (HRV, SpO₂, stres…).',
-        s2: 'Przeciągnij w dół w aplikacji Zepp na telefonie przed synchronizacją: dane z zegarka muszą trafić do chmury, zanim komputer będzie mógł je pobrać.',
-      },
-      overview: {
-        s1: 'Umieść tutaj 3–4 najczęściej sprawdzane wskaźniki; przycisk „Edytuj” pozwala je zmienić.',
-        s2: 'Wartości są porównywane z Twoją niedawną normą, a nie z innymi osobami.',
-        s3: 'Uporządkuj podsumowanie według własnych priorytetów.',
-      },
-      detail: { s1: 'Wybierz zakres czasu raz, a każda strona go zapamięta.' },
-      pick: {
-        s1: 'Wybierz stąd kilka dni, aby przekazać je do AI.',
-        s2: 'Na stole z kartami dotknij karty, aby ją odwrócić i zaznaczyć, lub przeciągnij ją prosto do pudełka; dotknij stosu, aby go rozwinąć, lub dotknij pustego miejsca, aby odłożyć karty.',
-      },
-      handoff: {
-        s1: 'Wybrane dane znajdują się po lewej stronie: dotknij karty, aby zmienić liczbę objętych nią dni, lub odrzuć ją, aby ją pominąć.', s2: 'Wpisz swoje pytanie po prawej stronie; zostanie ono spakowane do jednego pliku .md dla AI.',
-        s3: 'Przytrzymaj kłódkę na środku, aby przekazać dane: plik trafi do schowka, więc naciśnięcie Ctrl+V w oknie czatu AI dołączy go.',
-        s3Auto: 'Chcesz, aby wklejanie i wysyłanie działo się automatycznie? Włącz opcję „Przekazuj do AI automatycznie” na karcie narzędzi AI w Ustawieniach.',
-      },
-      plan: {
-        s1: 'Wklej ostateczną odpowiedź AI z powrotem, a przekształci się ona w tygodniowy plan.',
-        s2: 'Dotknij wybranego dnia, aby dostosować go indywidualnie.',
-        s3: 'Przytrzymaj, aby wysłać plan na zegarek. Podczas uruchamiania treningu na zegarku wskażesz jeszcze raz dokładny typ sportu.',
-      },
-      settings: { s1: 'Tutaj znajdują się kopia zapasowa i przywracanie.', s2: 'MCP umożliwia narzędziom AI (np. Claude Code, Codex) bezpośredni odczyt danych na tym komputerze (tylko do odczytu, nic nie trafia do sieci); tutaj znajdziesz też wiersz poleceń i wtyczki.', s3: 'Wróć do tej karty, aby ponownie otworzyć przewodnik.' },
-      cards: { s1: 'Dotknij karty, aby ją odwrócić i zaznaczyć, lub przeciągnij ją prosto do pudełka; dotknij stosu, aby go rozwinąć, lub dotknij pustego miejsca, aby odłożyć karty.' },
-      box: { s1: 'Przesuń kartę w górę lub dotknij ×, aby ją wyjąć; dotknij strzałki, aby rozpocząć zadanie z tymi dniami.' },
-      check: { s1: 'Sprawdź tutaj przed wysłaniem: wyświetlona jest pełna lista danych do wysłania, odznacz te, które wolisz zachować dla siebie.' },
-      planFirst: { s1: 'Dotknij dnia, aby zmienić go samodzielnie; przytrzymaj „Wyślij na zegarek”, aby wysłać. Na zegarku wybierzesz typ sportu jeszcze raz przy starcie.' },
-    },
-    next: 'Dalej', prev: 'Wstecz', done: 'Gotowe', skip: 'Pomiń przewodnik', gotIt: 'Rozumiem', tryIt: 'Wypróbuj w ramce',
+    done: 'Gotowe',
+    gotIt: 'Rozumiem',
+    inviteLater: 'Później',
+    look: 'Pokaż',
+    next: 'Dalej',
+    prev: 'Wstecz',
     progress: (index: number, total: number) => `${index} / ${total}`,
+    resetAll: 'Pokaż wszystkie wskazówki ponownie',
+    resetAllDone: 'Gotowe; każda sekcja wyjaśni się ponownie przy następnym otwarciu',
     sample: 'Dane przykładowe',
     sampleHint: 'Przewodnik korzysta z danych przykładowych; Twoja biblioteka pozostaje nienaruszona',
-    welcomePick: 'Wybierz język', welcomeStart: 'Rozpocznij wprowadzenie', welcomeSkip: 'Pomiń i zacznij',
-    inviteLater: 'Później',
-    toolsText: 'Twoje narzędzia AI nadal korzystają ze starej wersji ZeppBridge; połącz je ponownie', toolsGo: 'Połącz ponownie',
-    cardTitle: 'Przewodnik',
-    cardSummary: (seen: number, total: number) =>
-      `Przejrzano ${seen} z ${total} ${plural(total, {
-        one: 'rozdziału',
-        few: 'rozdziałów',
-        many: 'rozdziałów',
-        other: 'rozdziałów',
-      })}`,
-    fullTour: 'Od początku', start: 'Rozpocznij', look: 'Pokaż', seenMark: 'Obejrzane',
-    resetTips: 'Pokaż wskazówki początkowe ponownie', resetDone: 'Gotowe; pojawią się przy następnej wizycie',
+    seenCount: (seen: number, total: number) => `${seen} z ${total} przejrzanych`,
+    seenMark: 'Obejrzane',
+    skip: 'Pomiń przewodnik',
+    start: 'Rozpocznij',
+    steps: {
+      ai: {
+        s1: 'Wybrane dane są po lewej: dotknij karty, aby zmienić liczbę dni, lub odrzuć ją, aby pominąć.',
+        s2: 'Napisz pytanie po prawej; zostanie spakowane w jeden plik .md dla AI.',
+        s3: 'Przytrzymaj kłódkę pośrodku, aby przekazać: plik trafia do schowka, wklej go przez Ctrl+V na czacie z AI.',
+        s3Auto: 'Chcesz zautomatyzować wklejanie i wysyłanie? Włącz „Automatyczne przekazywanie do AI” na karcie narzędzi AI w Ustawieniach.',
+        s4: 'Narzędzia takie jak Claude Code i Codex mogą odczytywać dane bezpośrednio przez MCP, bez kopiowania i wklejania.',
+      },
+      devices: {
+        s1: 'Jeden wiersz na urządzenie; otwórz, aby poprawić model lub je ukryć. Dane zostają zachowane.',
+        s2: 'Zobacz, jak daleko zsynchronizowano każdy strumień i czego brakuje; w karcie Zaawansowane w Ustawieniach.',
+      },
+      home: {
+        s1: 'Zreorganizuj przegląd według własnych priorytetów. Dotknij, aby wypróbować.',
+        s2: 'Każdy panel otwiera się na dłuższy okres i więcej szczegółów.',
+        s3: 'Po ukończeniu zaplanowanego treningu wysłanego do zegarka opisz tutaj, jak poszło.',
+        s4: 'Rzeczy, które AI chce zapamiętać, czekają tutaj na Twoją zgodę.',
+        s5: 'Dziennik i słoje roczne otwierają się stąd.',
+      },
+      intro: {
+        s1: 'Ciemny, jasny lub zgodny z systemem. Dotknij, aby wypróbować.',
+        s2: 'Zmieniaj język w dowolnym momencie; zakręć kółkiem.',
+        s3: 'Połącz konto Zepp na dwa sposoby: najpierw oficjalna autoryzacja, a dane zaawansowane dla braków (HRV, SpO₂, stres).',
+        s4: 'Twoje ulubione wskaźniki są przypięte tutaj; wiersz poniżej to Twój zwykły zakres, bez porównań z innymi.',
+        s5: 'Trzy karty na górze; sen, treningi i dziennik otwierają się z kart w Przeglądzie.',
+        s6: 'Stan synchronizacji jest tutaj; kliknij, aby zsynchronizować. Zielony pierścień na ikonie w lewym górnym rogu oznacza aktualizację.',
+        s7: 'Każda sekcja wyjaśnia się przy pierwszym otwarciu; wróć do tej karty, aby zobaczyć ją ponownie.',
+      },
+      journal: {
+        s1: 'Cały rok aktywności na jednej stronie; otwórz słoje roczne, aby obserwować ich wzrost.',
+        s2: 'Rekordy życiowe od 5 km do maratonu.',
+        s3: 'Odliczanie do zawodów i Twoja ściana medali.',
+        s4: 'Przebieg butów biegowych z przypomnieniem o emeryturze.',
+        s5: 'Jeden słój na rok, szerszy w tygodniach z większą liczbą treningów; dotknij cienkiej linii, aby zobaczyć trening.',
+      },
+      letters: {
+        s1: 'Listy od autora przy każdej aktualizacji są tutaj; otwórz, aby przeczytać.',
+        s2: '„Twoje listy” zawierają cotygodniowe podsumowania danych i listy do przyszłego siebie; odpowiedzi i znaczki w dwóch ostatnich.',
+      },
+      metric: {
+        s1: 'Wybierz zakres czasu raz, a każda strona go zapamięta.',
+        s2: 'Dotknij „?”, aby sprawdzić, czym jest ten wskaźnik i skąd pochodzi, lub wykluczyć go z analizy.',
+        s3: 'Wybierz stąd kilka dni, aby przekazać je do AI.',
+        s4: 'Dotknij karty, aby ją odwrócić i zaznaczyć, lub przeciągnij prosto do pudełka; dotknij pustego miejsca, aby odłożyć.',
+      },
+      plan: {
+        s1: 'Wklej tutaj ostateczną odpowiedź AI, a stanie się planem na tydzień.',
+        s2: 'Dotknij dnia, aby dostosować go osobno.',
+        s3: 'Przytrzymaj, aby wysłać do zegarka; rozpoczynając trening na zegarku, wybierzesz jeszcze typ sportu.',
+        s4: 'Wysłane plany są zachowywane tutaj.',
+      },
+      settings: {
+        s1: 'Ustawienia to talia kart; dotknij jednej, aby ją otworzyć.',
+        s2: 'Kopia zapasowa, przywracanie i uzupełnianie historii znajdują się tutaj.',
+        s3: 'MCP pozwala narzędziom takim jak Claude Code i Codex czytać dane lokalne (tylko do odczytu, offline); narzędzie wiersza poleceń też tu jest.',
+      },
+      sleep: {
+        s1: 'Jeden wiersz na noc; otwórz go, aby zobaczyć fazy, tętno i przebudzenia.',
+      },
+      workouts: {
+        s1: 'Jeden wiersz na trening; otwórz go, aby zobaczyć tempo, tętno, trasę i zapisać swoje odczucia.',
+        s2: 'Zaznacz kilka, aby zmienić ich typ lub je ukryć; import GPX, FIT i Strava zaczyna się tutaj.',
+      },
+    },
+    toolsGo: 'Połącz ponownie',
+    toolsText: 'Twoje narzędzia AI nadal korzystają ze starej wersji ZeppBridge; połącz je ponownie',
+    tryIt: 'Wypróbuj w ramce',
+    welcomePick: 'Wybierz język',
+    welcomeSkip: 'Pomiń i zacznij',
+    welcomeStart: 'Rozpocznij wprowadzenie',
   },
 // Source: src/components/TrendRangeBar.vue
 "components/TrendRangeBar": {
@@ -1664,6 +1704,7 @@ export default {
     assignmentCleared: 'Wybór cofnięty. Przywrócono automatyczne dopasowanie.',
     assignmentSaved: 'Wybór zapisany. Oznaczony jako „Model wybrany przez Ciebie” — nigdy nie podawany jako dopasowanie automatyczne.',
     assignmentFailed: 'Nie udało się zapisać wybranego modelu',
+    hideFailed: 'Nie udało się ukryć ani przywrócić tego urządzenia',
   },
 // Source: src/composables/useFocusAreas.ts
 "composables/useFocusAreas": {
@@ -1798,7 +1839,10 @@ export default {
     'err.login.extracting': 'Odczytano poświadczenia. Potwierdzanie Twojego regionu',
     'err.login.verifying': 'Weryfikowanie konta',
     'err.login.connected': 'Połączono z kontem Zepp',
-    'err.official.browser': 'Nie udało się otworzyć przeglądarki systemowej — sprawdź domyślną przeglądarkę i spróbuj ponownie.',
+    'err.official.browser':
+      'Nie udało się otworzyć przeglądarki systemowej. Kliknij „Kopiuj link autoryzacji”, wklej go w pasek adresu przeglądarki i tam zatwierdź uprawnienia — aplikacja połączy się automatycznie.',
+    'err.official.browser_not_opened':
+      'Strona autoryzacji prawdopodobnie nie otworzyła się w przeglądarce. Jeśli nie pojawiło się żadne okno, kliknij „Kopiuj link autoryzacji” i wklej go w pasek adresu — aplikacja połączy się automatycznie.',
     'err.open_url.failed': 'Nie udało się otworzyć przeglądarki systemowej — sprawdź domyślną przeglądarkę i spróbuj ponownie.',
     'err.open_url.not_allowed': 'Można otwierać tylko łącza https.',
     'err.official.denied': 'Dostęp nie został przyznany — ZeppBridge nie otrzymał uprawnień.',
@@ -1851,6 +1895,10 @@ export default {
       'Przebudowywanie danych pochodnych z lokalnych pakietów — synchronizacja zostanie ponowiona automatycznie',
     'err.sync.deferred_busy':
       'Inny proces zapisu jest w toku — synchronizacja zostanie ponowiona automatycznie',
+    'err.local.maintenance_compaction':
+      'Trwa kompresowanie zapisanych pakietów — po zakończeniu nastąpi automatyczne ponowienie',
+    'err.local.maintenance_replay':
+      'Trwa odbudowywanie danych z lokalnych pakietów — po zakończeniu nastąpi automatyczne ponowienie',
     'err.backfill.bad_start_date': 'Nieprawidłowa data rozpoczęcia pobierania wstecznego — wymagany format RRRR-MM-DD',
     'err.backfill.no_canonical_records':
       'Chmura zwróciła dane, ale nie udało się przetworzyć żadnych poprawnych wpisów',
@@ -2204,7 +2252,7 @@ export default {
       'Najpierw przedyskutuj ze mną plan, w razie potrzeby w kilku rundach wiadomości. Końcowy kod JSON planu wygeneruj dopiero wtedy, gdy wyraźnie powiem „sfinalizuj” lub „wyślij plan”:',
       'Dodaj blok kodu ```json do odpowiedzi w poniższym formacie. ZeppBridge go odczyta, ja go przejrzę, a następnie zostanie przesłany do zegarka.',
       '- date ma format RRRR-MM-DD, dzisiaj lub później, maksymalnie do 56 dni w przód. from / to to zakres obejmowany przez plan: dni w tym zakresie bez zaplanowanego treningu są traktowane jako dni odpoczynku, a dotychczasowe plany na te dni zostaną wyczyszczone. Jeśli pominięto, zakres obejmuje dni od najwcześniejszego do najpóźniejszego treningu.',
-      '- Zegarek akceptuje wyłącznie te 4 dyscypliny: running (podtyp variant: outdoor / treadmill / track), cycling (variant: outdoor / indoor), pool_swim oraz open_water_swim (pływanie nie ma wariantu variant). Zegarek wymaga ponownego wybrania podtypu, więc poprawnie ustaw variant.',
+      '- Zegarek akceptuje tylko te 4 dyscypliny: running (variant: outdoor / treadmill / track / trail; na zegarku nie ma opcji biegu przełajowego, dlatego trail przypomni o rozpoczęciu go jako biegu), cycling (variant: outdoor / indoor), pool_swim oraz open_water_swim (brak variant dla pływania). Zegarek poprosi mnie o ponowny wybór podtypu, więc podaj poprawny variant.',
       '- Marsz, wędrówki, trening siłowy, joga i podobne aktywności nie mogą zostać przesłane do zegarka (Zepp po cichu je ignoruje). Poinformuj mnie w dyskusji, że taka sesja „nie może trafić do zegarka” i pozwól mi zdecydować, czy zamienić ją na jedną z powyższych dyscyplin, czy pominąć. Nigdy nie ukrywaj jej w notatce dotyczącej odpoczynku.',
       '- Każdy trening wymaga podania celu focus (krótka fraza określająca przeznaczenie, np. „Budowanie wytrzymałości” lub „Próg mleczanowy”) oraz opisu description (kluczowe założenia w jednym lub dwóch zdaniach; \\n oznacza nową linię). Oba pola pojawiają się na zegarku, a pierwsza linia to „cel · podtyp”.',
       '- Nazwa name powinna mieć maksymalnie około 14 znaków; dłuższe nazwy zostaną obcięte na liście w zegarku.',
@@ -2216,6 +2264,7 @@ export default {
       example,
       '```',
     ].join('\n'),
+    swim: '- Dystanse pływackie podawaj w metrach; każdy krok na basenie to co najmniej 25 m (najlepiej wielokrotność długości basenu ustawionej w zegarku). Pływanie nie obsługuje celu tempa: użyj strefy tętna lub nie ustawiaj celu.',
     language: (lang: string) => `- Pola name, focus, description, summary i note napisz w języku: ${lang}: są one wyświetlane w ZeppBridge i na zegarku dokładnie w takiej postaci.`,
   },
 
@@ -2621,6 +2670,8 @@ export default {
     'ui.training_plan.issue.bad_duration': (p: Params) => `Nie można odczytać czasu trwania „${str(p.value)}”; zapisz jako 20min, 90s, 1h, 400m lub 5km`,
     'ui.training_plan.issue.duration_out_of_range': () => 'Każdy krok musi trwać od 10 sekund do 6 godzin',
     'ui.training_plan.issue.distance_out_of_range': () => 'Każdy krok musi obejmować dystans od 50 m do 100 km',
+    'ui.training_plan.issue.pool_distance_out_of_range': () => 'Każdy krok na basenie musi wynosić od 25 m do 100 km',
+    'ui.training_plan.issue.swim_pace_unsupported': () => 'Pływanie nie obsługuje jeszcze celu tempa: użyj strefy tętna lub nie ustawiaj celu',
     'ui.training_plan.issue.distance_unverified': () => 'Kroki mierzone dystansem nie zostały jeszcze zweryfikowane na Twoim zegarku; bezpieczniej jest zapisać je jako czas',
     'ui.training_plan.issue.bad_target': (p: Params) => `Nie można odczytać celu „${str(p.value)}”; zapisz jako hr 135-150, pace 5:30-5:50 lub power 200-220`,
     'ui.training_plan.issue.open_target_unverified': () => 'Kroki bez określonego celu nie zostały jeszcze zweryfikowane na Twoim zegarku; podaj zamiast tego strefę tętna',
@@ -2636,6 +2687,7 @@ export default {
     'ui.training_plan.issue.missing_description': () => 'Dodaj kluczowe założenia; zegarek wyświetli je w opisie',
     'ui.training_plan.issue.name_truncated': (p: Params) => `Nazwa przekracza ${str(p.max)} znaków i zostanie obcięta na liście w zegarku (w widoku szczegółów będzie widoczna w całości)`,
     fallback: () => 'W tym planie wystąpił nierozpoznany problem',
+    pastDays: (p: { days?: unknown }) => `${String(p.days ?? '')} już minęły; treningi z tych dni nie zostaną wysłane do zegarka`,
     activity: { walking: 'marsz', hiking: 'wędrówka', strength: 'trening siłowy', yoga: 'joga / rozciąganie', rowing: 'wioślarz', elliptical: 'orbitrek', cross_country_skiing: 'biegi narciarskie', inline_skating: 'jazda na rolkach' },
   },
 
@@ -2653,6 +2705,7 @@ export default {
     aerobic_combo: 'Zestaw ćwiczeń aerobowych',
     aerobics: 'Aerobik',
     air_walker: 'Chodzik powietrzny',
+    alpine_skiing: 'Narciarstwo alpejskie',
     archery: 'Łucznictwo',
     artistic_swimming: 'Pływanie artystyczne',
     badminton: 'Badminton',
@@ -2732,6 +2785,7 @@ export default {
     mountain_biking: 'Kolarstwo górskie',
     muay_thai: 'Muay Thai',
     open_water_swimming: 'Pływanie na otwartym akwenie',
+    padel: 'Padel',
     parallel_bars: 'Poręcze gimnastyczne',
     parkour: 'Parkour',
     pilates: 'Pilates',
@@ -2758,6 +2812,7 @@ export default {
     square_dance: 'Square dance',
     squash: 'Squash',
     stair_climber: 'Schody treningowe',
+    stair_climbing: 'Wchodzenie po schodach',
     stepper: 'Stepper',
     street_dance: 'Street dance',
     strength: 'Trening siłowy',
@@ -2894,6 +2949,12 @@ export default {
     originNoMatchCloud: 'Brak dopasowania (chmura nie przekazała rozpoznawalnej nazwy produktu)',
     originCatalog: 'Dopasowano we wbudowanym katalogu',
     originNoMatch: 'Brak dopasowania',
+    hideAria: 'Ukryj na liście urządzeń',
+    hideTitle: 'Nie chcesz widzieć go na liście?',
+    hideSub: 'Tylko ukrywa na liście urządzeń — jego dane pozostają, a wykresy i eksporty bez zmian.',
+    hideAction: 'Ukryj na liście urządzeń',
+    hiddenNote: 'Ukryte na liście urządzeń; dane pozostają bez zmian.',
+    unhideAction: 'Przywróć na listę urządzeń',
   },
 
   // Source: src/views/HealthCheck.i18n.ts
@@ -3327,6 +3388,21 @@ Kontynuować?`,
     mcpToolMetricRecords: 'Pojedyncze odczyty dla dowolnego wskaźnika',
     mcpToolSleepSessions: 'Lista sesji snu',
     mcpToolLifeEvents: 'Zarejestrowane przez Ciebie wydarzenia życiowe',
+    mcpSetupPrompt: `Używam aplikacji desktopowej dla systemu Windows o nazwie ZeppBridge, która synchronizuje dane z mojego zegarka Amazfit / Zepp do lokalnej bazy danych SQLite.
+Zawiera ona program MCP (zeppbridge-mcp) i chcę go z Tobą skonfigurować, abyś mógł bezpośrednio odpytywać moje treningi i dane zdrowotne, zamiast ręcznego eksportowania i wklejania za każdym razem.
+
+Co o nim wiem:
+- Program zeppbridge-mcp jest instalowany razem z aplikacją ZeppBridge, bezpośrednio obok głównego programu; ZeppBridge wyświetla jego pełną ścieżkę w „Ustawienia › Narzędzia AI”. Tylko komputer bez zainstalowanej aplikacji desktopowej potrzebuje archiwum zeppbridge-tools ze strony wydań ZeppBridge w serwisie GitHub.
+- Jest to serwer MCP typu stdio. Dane zdrowotne są tylko do odczytu, serwer nie nasłuchuje na żadnym porcie sieciowym i nie wymaga tokena ani klucza API; korzysta z sieci wyłącznie do publikowania planu treningowego i tylko po wyrażeniu na to przeze mnie zgody.
+- Typowa struktura konfiguracji to: {"mcpServers": {"zeppbridge": {"command": "<pełna ścieżka do zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Udostępnia szesnaście narzędzi tylko do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan); plus dwa narzędzia do obsługi planu treningowego: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek tylko wtedy, gdy zezwolę na to w ustawieniach); oraz propose_coach_note: umieszcza zdanie warte zapamiętania w skrzynce moich notatek trenera i zaczyna obowiązywać dopiero po kliknięciu „Zapamiętaj”.
+
+Powiedz mi proszę:
+1. Konkretnie w Twoim przypadku — narzędzia, z którym teraz rozmawiam — do jakiego pliku należy wpisać konfigurację lub jakim poleceniem ją dodać;
+2. Jak poprawnie zapisać ścieżkę w systemie Windows (czy ukośniki odwrotne wymagają znaków ucieczki, np. \\\\);
+3. Jak sprawdzić, czy działa po skonfigurowaniu.
+
+Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego klienta korzystam, gdzie znajduje się plik), po prostu zapytaj.`,
     mcpConfigPathPlaceholder: '<ścieżka do zeppbridge-mcp>',
 
     // ── 6. Retention ──
@@ -3679,6 +3755,18 @@ Kontynuować?`,
     deviceCheck: 'Niepoprawny model? Otwórz, aby zmienić',
     unknownShort: 'Nie rozpoznano urządzenia: otwórz, aby wybrać model, lub wyślij raport, aby go dodać',
     learnMore: 'Dowiedz się więcej',
+    hideDevice: 'Ukryj',
+    hideConfirm: 'Tylko ukrywa na tej liście — jego dane pozostają, a wykresy i eksporty bez zmian.',
+    hideConfirmYes: 'Ukryj je',
+    hideCancel: 'Anuluj',
+    hiddenCount: (n: number) =>
+      plural(n, {
+        one: `${n} ukryte urządzenie`,
+        few: `${n} ukryte urządzenia`,
+        many: `${n} ukrytych urządzeń`,
+        other: `${n} ukrytego urządzenia`,
+      }),
+    restoreDevice: 'Przywróć',
   },
 
   // Source: src/views/settings/sections/advanced.i18n.ts
@@ -3713,6 +3801,9 @@ Kontynuować?`,
     sidecarAppImage: 'AppImage uruchamia się z nowej lokalizacji tymczasowej przy każdym starcie, przez co narzędzia AI nie mogą zachować ścieżki: pobierz osobny pakiet narzędzi CLI / MCP i połącz za pomocą poniższej konfiguracji',
     staleClients: (names: string) => `${names} nadal wskazują na inną instancję zeppbridge-mcp (prawdopodobnie starszą wersję, która nie odczytuje tej bazy): użyj odpowiedniego przycisku, aby połączyć ponownie`,
     otherClients: 'Inne programy',
+    cliTitle: 'Narzędzie wiersza poleceń',
+    cliCopy: 'Kopiuj ścieżkę',
+    cliCopied: 'Ścieżka skopiowana',
     configReady: 'Konfiguracja skopiowana z uzupełnioną ścieżką',
     autoTitle: 'Automatyczne przekazywanie do AI',
     autoOff: 'Wyłączone: plik trafia do schowka; naciśnij Ctrl+V w polu czatu AI, a następnie Enter',

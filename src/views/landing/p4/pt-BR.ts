@@ -21,7 +21,7 @@ const pack: P4Copy = {
       title: 'Seus dados da nuvem, de volta na sua mesa.',
       lead: 'Conecte sua conta Zepp e sincronize seus registros com este computador. Escolha o intervalo e deixe a sincronização automática cuidar do resto.',
       points: [
-        { id: 'account', title: 'Login oficial', text: 'Entre no Zepp pelo navegador padrão, inclusive com contas de terceiros. Status de autorização disponível a qualquer momento.', scene: 'account' },
+        { id: 'account', title: 'Login oficial', text: 'Faça login no Zepp no navegador do sistema; contas que usam Google, Apple, Xiaomi ou Facebook também funcionam. Verifique o status de autorização quando quiser.', scene: 'account' },
         { id: 'sync', title: 'Sincronização automática', text: 'Desativado, 15, 30 ou 60 minutos. Você descansa; seus dados sincronizam.', scene: 'sync' },
         { id: 'devices', title: 'Reconhece seu relógio', text: 'Identificação automática do modelo. E se errar, você mesmo seleciona o correto.', scene: 'devices' },
         { id: 'local', title: 'Fica neste computador', text: 'Registros sincronizados do Zepp ficam salvos neste computador e nunca passam pelos nossos servidores. Você escolhe o que enviar à IA.', scene: 'local' },
@@ -34,18 +34,24 @@ const pack: P4Copy = {
       lead: 'Todas as tendências em uma só tela para entender seu corpo na hora. Abra qualquer métrica para ver o histórico completo.',
       points: [
         { id: 'overview', title: 'Na sua ordem', text: 'Sono ou treinos primeiro: a tela inicial segue suas prioridades. Navegue e abra os detalhes.', scene: 'overview' },
-        { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
+        { id: 'normal', title: 'Seu padrão habitual', text: 'A linha sob cada métrica é a sua própria faixa habitual, sem comparar com mais ninguém. Toque em “?” para ver de onde ela vem.', scene: 'normal' },
         { id: 'workouts', title: 'Cada corrida ecoa', text: 'Compare com treinos anteriores de distância parecida: frequência cardíaca, ritmo e trajeto no mapa.', scene: 'workouts' },
         { id: 'gaps', title: 'Nada inventado', text: 'Se não foi medido, fica em branco. Sem zeros falsos, valores repetidos ou estimativas aproximadas.', scene: 'gaps' },
       ],
     },
-    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
-      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
-      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
-      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
-      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
-      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
-    ] },
+    {
+      id: 'journal',
+      name: 'Arquivo',
+      title: 'Cada treino conta.',
+      lead: 'Anéis de crescimento, seu diário, como se sentiu após cada treino e cartas do autor, tudo guardado neste computador.',
+      points: [
+        { id: 'rings', title: 'Anéis de crescimento', text: 'Um anel por ano. As semanas em que você treinou mais ficam mais largas.', scene: 'rings' },
+        { id: 'journal', title: 'Diário', text: 'Recordes pessoais, contagem regressiva para provas e um mural de medalhas. Os tênis avisam quando atingem a quilometragem.', scene: 'journal' },
+        { id: 'feel', title: 'Depois do treino', text: 'Avalie a sessão, aponte onde está doendo e anote qual tênis usou.', scene: 'feel' },
+        { id: 'import', title: 'Importar e organizar', text: 'Importe arquivos GPX, FIT e dados do Strava. Selecione vários para alterar o tipo ou ocultá-los de uma vez.', scene: 'import' },
+        { id: 'letters', title: 'Caixa de cartas', text: 'Uma carta do autor a cada versão. Responda e o autor lê e responde também. Além de uma carta sobre seus dados toda semana.', scene: 'letters' },
+      ],
+    },
     {
       id: 'ai',
       name: 'Enviar à IA',
@@ -65,7 +71,7 @@ const pack: P4Copy = {
       lead: 'Conte como está se sentindo para a IA planejar sua semana. Cole de volta, ajuste até ficar perfeito e envie direto para o pulso.',
       points: [
         { id: 'receive', title: 'Cole com um clique', text: 'Da conversa ao esboço: copie de volta e seu plano semanal está pronto.', scene: 'receive' },
-        { id: 'edit', title: 'Seu plano', text: 'Arraste para inverter dois dias, abra cada sessão e ajuste duração e intensidade passo a passo.', scene: 'plan-edit' },
+        { id: 'edit', title: 'Seu plano', text: 'Arraste para inverter dois dias, abra cada sessão e ajuste duração e intensidade passo a passo. Mantenha pressionado para enviar ao relógio.', scene: 'plan-edit' },
         { id: 'templates', title: 'Modelos e importação', text: 'Salve como modelo para repetir o treino. Compatível com arquivos .zwo e treinos em .fit.', scene: 'templates' },
         { id: 'easy', title: 'Cansaço hoje', text: 'Se havia tiros planejados mas a recuperação está baixa, mude para uma rodagem leve com um toque. Você confirma antes do envio.', scene: 'easy' },
       ],
@@ -79,7 +85,7 @@ const pack: P4Copy = {
     title: 'Ajustes',
     lead: 'Folheie os cartões grandes um a um; os pequenos se organizam como uma carteira. Conta, sincronização, exibição e dados na ponta dos dedos.',
     summaryTitle: 'Os detalhes vivem nos Ajustes.',
-    summaryLead: 'Catorze configurações diárias, organizadas em uma única pilha.',
+    summaryLead: 'Quinze configurações comuns reunidas em uma única pilha de cartões.',
     items: [
       { id: 'sync', title: 'Sincronização automática', text: 'Desativado, 15, 30 ou 60 minutos. Basta escolher.', icon: 'auto-sync' },
       { id: 'retention', title: 'Dez anos, aqui', text: 'Traga até dez anos de histórico para este computador e guarde tudo. Nada desaparece com a janela da nuvem.', icon: 'database' },
@@ -95,7 +101,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacidade e segurança', text: 'Credenciais protegidas pelo sistema operacional. Tokens nunca vão para os logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomes de arquivo', text: 'Defina como nomear os arquivos gerados para a IA.', icon: 'document' },
       { id: 'folder', title: 'Leve com você', text: 'Seus dados ficam em uma pasta neste computador, e tudo o que você escreveu aqui — avaliações, planos, tarefas de IA — é exportado em um único JSON.', icon: 'database' },
-      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
+      { id: 'language', title: 'Treze idiomas', text: 'Chinês simplificado e tradicional, inglês, espanhol e muito mais. Alterne quando quiser.', icon: 'profile' },
     ],
   },
   nav: [
@@ -105,7 +111,7 @@ const pack: P4Copy = {
         { id: 'motion', label: 'Design' },
         { id: 'connection', label: 'Conexão' },
         { id: 'records', label: 'Clareza' },
-        { id: 'journal', label: 'Archive' },
+        { id: 'journal', label: 'Arquivo' },
       ],
     },
     {
