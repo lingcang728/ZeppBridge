@@ -15,13 +15,13 @@ Read this before deciding whether to rely on it.
 | Compiles, clippy-clean, Rust tests pass on Linux | Covered by CI on every push |
 | Flatpak bundle builds and its metadata validates | Covered by CI on every push |
 | The headless image builds, runs, and resolves its data directory | Covered by CI on every push |
-| Sign-in, sync, keyring behaviour on a real Linux desktop | **Not verified by anyone yet** |
+| Real-desktop usage (Arch x86_64, AMD, Wayland, WebKitGTK 2.54.1): rendering fixes, UI, sign-in, sync and data display | Confirmed on the machine that reported the white screens — they and the animation aborts are gone |
 
-The last row is the one that matters. Nobody has run a full sign-in-and-sync
-cycle on a Linux desktop. The Linux-specific code — the Secret Service
-credential backend and the XDG data directory — is exercised by unit tests and
-by a container, not by a person with a watch. If you try it, an issue saying
-what happened is the most useful thing you can send.
+That row was filled in on a real desktop. The person who reported the white
+screens installed a locally built package and confirmed the interface, sign-in,
+sync and data display all work, with the blank windows and animation aborts
+gone. If you hit a problem on your machine, an issue saying what happened is the
+most useful thing you can send.
 
 This is the same posture the README takes for macOS, and for the same reason:
 saying "supported" when nobody has checked is how people lose data.
@@ -77,17 +77,20 @@ repository root with the Arch build dependencies installed:
 ```bash
 nvm use
 ./packaging/arch/build-local.sh
-# Optional: let makepkg install missing dependencies.
-# ./packaging/arch/build-local.sh --syncdeps
-
-# Review the generated package, then install it explicitly:
-sudo pacman -U release-arch/zeppbridge-git-*.pkg.tar.zst
+# Extra arguments are forwarded to makepkg unchanged:
+#   --syncdeps  let makepkg install missing build dependencies
+#   --install   install the finished package with pacman after a successful build
+./packaging/arch/build-local.sh --install
 ```
 
-The helper does not install the package. It snapshots tracked and nonignored
-source files into a local-only Git repository under
+The helper builds by default and installs nothing, but forwards extra arguments
+to `makepkg` unchanged: `--syncdeps` installs missing build dependencies,
+`--install` installs the finished package after a successful build. It snapshots
+tracked and nonignored source files into a local-only Git repository under
 `${XDG_CACHE_HOME:-$HOME/.cache}/zeppbridge/arch`, isolates makepkg and Cargo
 build output, and writes packages to the ignored `release-arch/` directory.
+That directory can hold several packages from earlier builds, so install an
+exact file name rather than a wildcard.
 
 To build the committed upstream `main` branch instead:
 
@@ -100,8 +103,11 @@ Unlike the local helper, this fetches remote source and does not include your
 uncommitted changes; `-i` installs the resulting package. Only x86_64 is targeted.
 
 The native package build completed on Arch x86_64, including desktop-entry
-validation and a CLI version check. A clean-chroot build, system installation
-and full desktop functionality have not been verified; there is no Arch CI job.
+validation and a CLI version check, and the package was installed on the test
+machine (`pacman -U`) — the person who reported the white screens confirmed they
+were gone with this build. That snapshot predates the upstream 3.1.0 merge, so
+A clean-chroot build remains unverified;
+there is no Arch CI job.
 
 ## Where things go
 
@@ -265,6 +271,8 @@ DMABUF off reproduced a `graphicsLayerFactory()` abort during View Transitions;
 the default DMABUF path completed the same interactions. This supports the
 animation guard and keeping rendering overrides available, but does not prove
 compatibility across all drivers and distributions.
+The person who reported these failures installed a locally built package with
+this policy and confirmed the blank windows and animation aborts were gone.
 
 Close the app before comparing these settings:
 
@@ -298,10 +306,6 @@ If those settings do not help, try X11 through XWayland if it is installed:
 # with no XWayland installed this trades one failure for another, so it is
 # yours to decide, not ours.
 GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
-# Another explicit fallback, also available for deb/rpm/Flatpak launches.
-WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
-```
-
 # Another explicit fallback, also available for deb/rpm/Flatpak launches.
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
 ```
@@ -410,8 +414,10 @@ Three of those are easy to miss, and none is on Tauri's own prerequisites list:
 ### AppImage packaging on rolling distributions
 
 On the tested Arch Linux environment, the command above compiled the executable
-and produced the deb and rpm, then failed while packaging the AppImage. To
-retry only packaging the existing executable with detailed output:
+and produced the deb and rpm, then failed while packaging the AppImage. This was
+re-confirmed in November 2026 against the source merged with upstream 3.1.0:
+compiling and the deb/rpm bundles succeeded, the AppImage still stopped at
+linuxdeploy. To retry only packaging the existing executable with detailed output:
 
 ```bash
 npm run tauri -- bundle --config src-tauri/tauri.linux.conf.json --bundles appimage --verbose
