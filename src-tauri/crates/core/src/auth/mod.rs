@@ -132,7 +132,7 @@ impl AuthManager {
         let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
         // Reading an old Keychain entry may be denied while replacing it is
         // allowed. A fresh login must still get the chance to write its token.
-        let previous = self.credentials.get(&user_id);
+        let previous = credentials.get(&user_id);
 
         credentials
             .set(&user_id, &token)
@@ -152,10 +152,10 @@ impl AuthManager {
             // never became current.
             match previous {
                 Ok(Some(old)) => {
-                    let _ = self.credentials.set(&user_id, &old);
+                    let _ = credentials.set(&user_id, &old);
                 }
                 Ok(None) => {
-                    let _ = self.credentials.delete(&user_id);
+                    let _ = credentials.delete(&user_id);
                 }
                 Err(_) => {
                     // The previous value is unknown; do not delete an entry
@@ -298,8 +298,7 @@ impl AuthManager {
             Ok(host) => host,
             Err(error) => return Ok(recoverable(error)),
         };
-        let token = self
-            .credentials
+        let token = credentials
             .get(&user_id)
             .map_err(credential_error)
             .and_then(|token| {
@@ -349,9 +348,10 @@ impl AuthManager {
                     .and_then(|id| validate_user_id(&id).ok())
             });
 
+        let credentials = self.credential_backend();
         let mut left_behind = None;
         if let Some(user_id) = user_id {
-            left_behind = self.credentials.delete(&user_id).err();
+            left_behind = credentials.delete(&user_id).err();
         }
         if self.auth_file.exists() {
             fs::remove_file(&self.auth_file)?;
