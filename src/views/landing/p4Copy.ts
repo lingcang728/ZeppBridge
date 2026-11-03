@@ -32,16 +32,23 @@ const zh: P4Copy = {
       { id: 'theme', title: '日月', text: '深浅两套主题，一键入夜。', scene: 'theme' },
     ] },
     { id: 'connection', name: '连接', title: '云上的记录，回到桌上。', lead: '连接 Zepp 账号，记录同步到这台电脑。设好频率，之后交给自动同步。', points: [
-      { id: 'account', title: '官方授权', text: '在系统浏览器里登录 Zepp，第三方账号也能用。授权状态随时可查。', scene: 'account' },
+      { id: 'account', title: '官方授权', text: '在系统浏览器里登录 Zepp，用 Google、Apple、小米、Facebook 登录的账号也能用。授权状态随时可查。', scene: 'account' },
       { id: 'sync', title: '自动同步', text: '关、15、30、60 分钟。你睡你的，它同步它的。', scene: 'sync' },
       { id: 'devices', title: '认得你的表', text: '自动识别型号；认错了，亲手指认。', scene: 'devices' },
       { id: 'local', title: '留在本机', text: '从 Zepp 同步的健康记录保存在本机，不经过我们的服务器。交给 AI 的内容由你选择。', scene: 'local' },
     ] },
     { id: 'records', name: '看懂', title: '数十项指标，尽收眼底。', lead: '在一页里看清所有趋势，身体状态一目了然。点开指标，继续看完整记录。', points: [
       { id: 'overview', title: '随你排', text: '睡眠还是训练，首页按你的关注重排。上下浏览，再点进详情。', scene: 'overview' },
-      { id: 'hourly', title: '一日之步', text: '每小时的步数、距离、热量，按时细数。', scene: 'hourly' },
+      { id: 'normal', title: '你的常态', text: '每项指标下面那行是你自己的常态范围，不和别人比。点「?」看它从哪来。', scene: 'normal' },
       { id: 'workouts', title: '跑过的路，都有回声', text: '和自己以往相近距离的运动相比，再看心率、配速和轨迹。', scene: 'workouts' },
       { id: 'gaps', title: '绝不编造', text: '没测到就留白。不拿 0、上一次的值或估算值填空。', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: '留档', title: '练过的，都算数。', lead: '年轮、履历、每次练完的感受，还有作者寄来的信，都存在这台电脑上。', points: [
+      { id: 'rings', title: '年轮', text: '一年长一圈，练得多的那周更宽。', scene: 'rings' },
+      { id: 'journal', title: '履历', text: '个人最好成绩、比赛倒计时、奖牌墙；跑鞋到了里程，提醒你换。', scene: 'journal' },
+      { id: 'feel', title: '练完说两句', text: '给这次打个分，标出哪里酸痛，记下穿的哪双鞋。', scene: 'feel' },
+      { id: 'import', title: '导入与整理', text: 'GPX、FIT 和 Strava 导出都能导进来；多选后批量改类型或隐藏。', scene: 'import' },
+      { id: 'letters', title: '信匣', text: '作者每版寄来一封信，你回信，作者会读也会回。每周还有一封你的数据来信。', scene: 'letters' },
     ] },
     { id: 'ai', name: '交给 AI', title: '复用已有订阅，不多花一分钱。', lead: '选好日子，记录变成一个文件。交给常用的 AI，继续对话，再把初稿带回来。', points: [
       { id: 'providers', title: '七家任选', text: 'ChatGPT、Claude、Gemini、Kimi、DeepSeek、豆包、Grok。沿用你已有的账号和额度。', scene: 'ai' },
@@ -51,7 +58,7 @@ const zh: P4Copy = {
     ] },
     { id: 'ai-plan', name: '训练计划', title: '电脑上定稿，手表上开练。', lead: '把身体状况告诉 AI，它排好一周；粘回来，改到满意，再发到手表。', points: [
       { id: 'receive', title: '一键粘回', text: '从对话到初稿，复制回来就是一周计划。', scene: 'receive' },
-      { id: 'edit', title: '计划由你', text: '拖动交换两天，点进每一天，再逐步改时长和强度。悬停就能看细节。', scene: 'plan-edit' },
+      { id: 'edit', title: '计划由你', text: '拖动交换两天，点进每一天逐步改时长和强度。长按，就发到手表。', scene: 'plan-edit' },
       { id: 'templates', title: '模板与导入', text: '存成模板，下次接着练。也能导入 .zwo 和训练 .fit 文件。', scene: 'templates' },
       { id: 'easy', title: '今天累了', text: '今天排了间歇、准备度又低于平常时，一键换成轻松练。修改后由你确认发送。', scene: 'easy' },
     ] },
@@ -64,7 +71,7 @@ const zh: P4Copy = {
     title: '设置页',
     lead: '大卡片逐张翻看，小卡片收成卡包。账号、同步、显示与数据管理，点开就能调整。',
     summaryTitle: '细节，都在设置里。',
-    summaryLead: '十四项常用设置，一张卡叠收好。',
+    summaryLead: '十五项常用设置，一张卡叠收好。',
     items: [
       { id: 'sync', title: '自动同步', text: '关、15、30、60 分钟，一档就好。', icon: 'auto-sync' },
       { id: 'retention', title: '十年，都在本机', text: '最多十年的历史拉回本地，一直保留。不随云端的窗口滚走。', icon: 'database' },
@@ -80,10 +87,11 @@ const zh: P4Copy = {
       { id: 'privacy', title: '隐私与安全', text: '凭据交给系统保护，令牌不写进日志。', icon: 'browser-login' },
       { id: 'filename', title: '文件命名', text: '交给 AI 的文件叫什么，你来定。', icon: 'document' },
       { id: 'folder', title: '随时带走', text: '数据就在本机文件夹里；你写下的打分、计划、AI 任务，一键导出成 JSON。', icon: 'database' },
+      { id: 'language', title: '十三种语言', text: '简体、繁体、English、Español 等，随时切换。', icon: 'profile' },
     ],
   },
   nav: [
-    { label: '认识 ZeppBridge', links: [{ id: 'motion', label: '外观' }, { id: 'connection', label: '连接' }, { id: 'records', label: '看懂' }] },
+    { label: '认识 ZeppBridge', links: [{ id: 'motion', label: '外观' }, { id: 'connection', label: '连接' }, { id: 'records', label: '看懂' }, { id: 'journal', label: '留档' }] },
     { label: '从记录到行动', links: [{ id: 'ai', label: '交给 AI' }, { id: 'ai-plan', label: '训练计划' }, { id: 'record-sleep', label: '睡眠与运动' }] },
     { label: '按你的习惯', links: [{ id: 'connect', label: '设置页' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: '本机 API' }] },
   ],

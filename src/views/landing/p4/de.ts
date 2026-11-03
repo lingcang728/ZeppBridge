@@ -17,9 +17,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Überblick', title: 'Dutzende Messwerte auf einen Blick.', lead: 'Alle Trends auf einer Seite, damit du deine Verfassung sofort verstehst. Öffne jeden Wert für den vollständigen Verlauf.', points: [
       { id: 'overview', title: 'Nach deinen Wünschen', text: 'Schlaf oder Training zuerst: Die Startseite richtet sich nach deinen Prioritäten. Scrollen, dann Details öffnen.', scene: 'overview' },
-      { id: 'hourly', title: 'Stunde für Stunde', text: 'Schritte, Distanz und Kalorien für jede Stunde des Tages.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Jeder Lauf hallt nach', text: 'Vergleiche deine Einheiten mit ähnlichen Distanzen aus der Vergangenheit: Puls, Tempo und GPS-Strecke.', scene: 'workouts' },
       { id: 'gaps', title: 'Nichts erfunden', text: 'Was nicht gemessen wurde, bleibt leer. Keine erfundenen Nullen, vorherigen Werte oder Schätzungen.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'An KI geben', title: 'Nutze Abos, die du schon hast. Ohne Extrakosten.', lead: 'Wähle den Zeitraum: Deine Einträge werden zu einer Datei. Gib sie deiner gewohnten KI, sprich weiter und bring den Planentwurf zurück.', points: [
       { id: 'providers', title: 'Sieben Modelle zur Wahl', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao und Grok. Mit deinem bestehenden Konto und Kontingent.', scene: 'ai' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Datenschutz und Sicherheit', text: 'Zugangsdaten schützt das Betriebssystem. Tokens tauchen nie in Logs auf.', icon: 'browser-login' },
       { id: 'filename', title: 'Dateinamen', text: 'Bestimme selbst, wie die Exportdateien für die KI heißen.', icon: 'document' },
       { id: 'folder', title: 'Jederzeit mitnehmen', text: 'Deine Daten liegen in einem Ordner auf diesem Rechner, und alles, was du hier geschrieben hast – Bewertungen, Pläne, KI-Aufgaben –, lässt sich in eine einzige JSON-Datei exportieren.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'ZeppBridge entdecken', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Verbindung' }, { id: 'records', label: 'Überblick' }] },
+    { label: 'ZeppBridge entdecken', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Verbindung' }, { id: 'records', label: 'Überblick' }, { id: 'journal', label: 'Archive' }] },
     { label: 'Von Daten zur Tat', links: [{ id: 'ai', label: 'An KI geben' }, { id: 'ai-plan', label: 'Trainingsplan' }, { id: 'record-sleep', label: 'Schlaf und Training' }] },
     { label: 'Nach deinen Regeln', links: [{ id: 'connect', label: 'Einstellungen' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Lokale API' }] },
   ],

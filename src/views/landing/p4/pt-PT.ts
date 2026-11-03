@@ -17,9 +17,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Compreender', title: 'Dezenas de métricas num relance.', lead: 'Todas as tendências numa só página para avaliares a tua condição física. Abre qualquer métrica para veres o histórico completo.', points: [
       { id: 'overview', title: 'À tua maneira', text: 'Sono ou treinos primeiro: a página inicial adapta-se às tuas prioridades. Percorre e abre os detalhes.', scene: 'overview' },
-      { id: 'hourly', title: 'Hora a hora', text: 'Passos, distância e calorias acompanhados hora a hora ao longo do dia.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Cada corrida deixa o seu eco', text: 'Compara cada treino com sessões anteriores de distância semelhante: frequência cardíaca, ritmo e percurso no mapa.', scene: 'workouts' },
       { id: 'gaps', title: 'Nada inventado', text: 'Se não foi medido, fica em branco. Sem zeros artificiais, valores repetidos ou estimativas infundadas.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Enviar à IA', title: 'Aproveita as tuas subscrições atuais. Sem custos adicionais.', lead: 'Seleciona os dias: os teus registos transformam-se num único ficheiro. Partilha-o com a tua IA habitual, continua a conversa e traz o primeiro rascunho de volta.', points: [
       { id: 'providers', title: 'Sete modelos à escolha', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao e Grok. Utiliza as tuas contas e limites habituais.', scene: 'ai' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacidade e segurança', text: 'Credenciais protegidas pelo sistema. Os tokens nunca são gravados nos registos de eventos.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomes de ficheiros', text: 'Tu decides o nome dos ficheiros preparados para a IA.', icon: 'document' },
       { id: 'folder', title: 'Leva tudo contigo', text: 'Os teus dados vivem numa pasta deste computador, e tudo o que escreveste aqui — avaliações, planos, tarefas de IA — é exportado para um único ficheiro JSON.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Conhecer o ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Ligação' }, { id: 'records', label: 'Compreender' }] },
+    { label: 'Conhecer o ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Ligação' }, { id: 'records', label: 'Compreender' }, { id: 'journal', label: 'Archive' }] },
     { label: 'Dos registos à ação', links: [{ id: 'ai', label: 'Enviar à IA' }, { id: 'ai-plan', label: 'Plano de treino' }, { id: 'record-sleep', label: 'Sono e treinos' }] },
     { label: 'À tua maneira', links: [{ id: 'connect', label: 'Definições' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'API local' }] },
   ],

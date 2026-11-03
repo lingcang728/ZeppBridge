@@ -16,9 +16,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Zrozumienie', title: 'Dziesiątki wskaźników na jednym ekranie.', lead: 'Wszystkie trendy na jednej stronie, dzięki czemu od razu widzisz, w jakiej formie jest Twoje ciało. Otwórz wskaźnik, aby przejrzeć pełną historię.', points: [
       { id: 'overview', title: 'W Twojej kolejności', text: 'Najpierw sen czy trening: strona główna dopasowuje się do tego, co dla Ciebie najważniejsze. Przewiń i otwórz szczegóły.', scene: 'overview' },
-      { id: 'hourly', title: 'Godzina po godzinie', text: 'Kroki, dystans i kalorie podsumowane dla każdej godziny dnia.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Każdy bieg ma swoje echo', text: 'Porównaj bieżący trening ze swoimi wcześniejszymi biegami na podobnym dystansie, sprawdzając tętno, tempo i trasę.', scene: 'workouts' },
       { id: 'gaps', title: 'Zero zmyślonych danych', text: 'Jeśli coś nie zostało zmierzone, pozostaje puste. Bez dopisywania zer, wcześniejszych odczytów ani szacunków.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Przekaż do AI', title: 'Wykorzystaj subskrypcję, którą już opłacasz.', lead: 'Wybierz dni, a Twoje dane połączą się w jeden plik. Przekaż go sztucznej inteligencji, z której korzystasz na co dzień, poprowadź rozmowę i przenieś wersję roboczą z powrotem.', points: [
       { id: 'providers', title: 'Siedem modeli do wyboru', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao i Grok. Wykorzystaj własne konto i dostępny limit.', scene: 'ai' },
@@ -57,10 +64,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Prywatność i bezpieczeństwo', text: 'Poświadczenia chroni system operacyjny. Tokeny nigdy nie trafiają do dzienników zdarzeń.', icon: 'browser-login' },
       { id: 'filename', title: 'Nazwy plików', text: 'Sam decydujesz, jak mają się nazywać pliki przygotowywane dla AI.', icon: 'document' },
       { id: 'folder', title: 'Zabierz w każdej chwili', text: 'Twoje dane znajdują się w folderze na tym komputerze, a wszystko, co tutaj zapisano — oceny, plany, zadania AI — wyeksportujesz do jednego pliku JSON.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Poznaj ZeppBridge', links: [{ id: 'motion', label: 'Wygląd' }, { id: 'connection', label: 'Połączenie' }, { id: 'records', label: 'Zrozumienie' }] },
+    { label: 'Poznaj ZeppBridge', links: [{ id: 'motion', label: 'Wygląd' }, { id: 'connection', label: 'Połączenie' }, { id: 'records', label: 'Zrozumienie' }, { id: 'journal', label: 'Archive' }] },
     { label: 'Od danych do działania', links: [{ id: 'ai', label: 'Przekaż do AI' }, { id: 'ai-plan', label: 'Plan treningowy' }, { id: 'record-sleep', label: 'Sen i treningi' }] },
     { label: 'Po Twojemu', links: [{ id: 'connect', label: 'Ustawienia' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Lokalne API' }] },
   ],

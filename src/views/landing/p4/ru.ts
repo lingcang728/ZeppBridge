@@ -17,9 +17,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Метрики', title: 'Десятки показателей как на ладони.', lead: 'Все тренды на одном экране, чтобы моментально понимать состояние организма. Откройте любой показатель для полной истории.', points: [
       { id: 'overview', title: 'В вашем порядке', text: 'Сон или тренировки в начале: главный экран подстраивается под ваши приоритеты. Просматривайте и переходите к деталям.', scene: 'overview' },
-      { id: 'hourly', title: 'Час за часом', text: 'Шаги, расстояние и калории за каждый час на протяжении суток.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'У каждой пробежки есть эхо', text: 'Сравнивайте каждую тренировку с похожими по дистанции: пульс, темп и GPS-трек.', scene: 'workouts' },
       { id: 'gaps', title: 'Ничего не выдумано', text: 'Нет измерений — поле остаётся пустым. Никаких ложных нулей, повторов или примерных догадок.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Отдать ИИ', title: 'Используйте имеющиеся подписки. Без лишних трат.', lead: 'Выберите период: записи соберутся в один файл. Передайте привычному ИИ, продолжайте диалог и верните черновик плана.', points: [
       { id: 'providers', title: 'Семь моделей на выбор', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao и Grok. Ваши привычные аккаунты и лимиты.', scene: 'ai' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Конфиденциальность и защита', text: 'Учётные данные защищены системой. Токены никогда не попадают в логи.', icon: 'browser-login' },
       { id: 'filename', title: 'Имена файлов', text: 'Определяйте формат названий файлов, выгружаемых для ИИ.', icon: 'document' },
       { id: 'folder', title: 'Заберите с собой', text: 'Ваши данные хранятся в папке на этом компьютере, а всё, что вы добавили здесь — оценки, планы, задачи ИИ — экспортируется в один файл JSON.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Знакомство с ZeppBridge', links: [{ id: 'motion', label: 'Дизайн' }, { id: 'connection', label: 'Подключение' }, { id: 'records', label: 'Метрики' }] },
+    { label: 'Знакомство с ZeppBridge', links: [{ id: 'motion', label: 'Дизайн' }, { id: 'connection', label: 'Подключение' }, { id: 'records', label: 'Метрики' }, { id: 'journal', label: 'Archive' }] },
     { label: 'От записей к действиям', links: [{ id: 'ai', label: 'Отдать ИИ' }, { id: 'ai-plan', label: 'План тренировок' }, { id: 'record-sleep', label: 'Сон и тренировки' }] },
     { label: 'По вашим правилам', links: [{ id: 'connect', label: 'Настройки' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Локальный API' }] },
   ],

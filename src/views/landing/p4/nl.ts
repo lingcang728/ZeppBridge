@@ -17,9 +17,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Inzicht', title: 'Tientallen meetwaarden in één oogopslag.', lead: 'Alle trends op één pagina zodat je direct ziet hoe je lichaam ervoor staat. Open een meetwaarde voor de volledige geschiedenis.', points: [
       { id: 'overview', title: 'Jouw volgorde', text: 'Slaap of training eerst: de startpagina volgt wat jij belangrijk vindt. Scroll en open de details.', scene: 'overview' },
-      { id: 'hourly', title: 'Uur na uur', text: 'Stappen, afstand en calorieën voor elk uur van de dag in kaart gebracht.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Elke loop heeft een echo', text: 'Vergelijk elke training met eerdere runs van vergelijkbare afstand: hartslag, tempo en route.', scene: 'workouts' },
       { id: 'gaps', title: 'Niets verzonnen', text: 'Geen meting betekent een leeg vak. Geen neppe nullen, herhaalde waarden of vage schattingen.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Naar AI', title: 'Gebruik je vertrouwde abonnementen. Zonder meerkosten.', lead: 'Kies de gewenste dagen: je gegevens worden één bestand. Geef het aan je favoriete AI, praat verder en haal het trainingsplan terug.', points: [
       { id: 'providers', title: 'Zeven modellen', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao en Grok. Gebruik je bestaande accounts en bundels.', scene: 'ai' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacy en beveiliging', text: 'Inloggegevens beschermd door het besturingssysteem. Tokens komen nooit in logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Bestandsnamen', text: 'Bepaal zelf hoe geëxporteerde AI-bestanden heten.', icon: 'document' },
       { id: 'folder', title: 'Altijd mee te nemen', text: 'Je gegevens staan in een map op deze computer, en alles wat je hier hebt geschreven — beoordelingen, plannen, AI-taken — exporteer je naar één JSON-bestand.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Maak kennis met ZeppBridge', links: [{ id: 'motion', label: 'Ontwerp' }, { id: 'connection', label: 'Verbinding' }, { id: 'records', label: 'Inzicht' }] },
+    { label: 'Maak kennis met ZeppBridge', links: [{ id: 'motion', label: 'Ontwerp' }, { id: 'connection', label: 'Verbinding' }, { id: 'records', label: 'Inzicht' }, { id: 'journal', label: 'Archive' }] },
     { label: 'Van data naar actie', links: [{ id: 'ai', label: 'Naar AI' }, { id: 'ai-plan', label: 'Trainingsplan' }, { id: 'record-sleep', label: 'Slaap en training' }] },
     { label: 'Op jouw manier', links: [{ id: 'connect', label: 'Instellingen' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Lokale API' }] },
   ],

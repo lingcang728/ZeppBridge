@@ -17,9 +17,16 @@ const pack: P4Copy = {
     ] },
     { id: 'records', name: 'Comprensione', title: 'Decine di metriche a colpo d’occhio.', lead: 'Tutti i trend in un’unica schermata per vedere come sta il tuo corpo. Apri una metrica per consultare lo storico completo.', points: [
       { id: 'overview', title: 'Il tuo ordine', text: 'Sonno o allenamento per primi: la home page segue ciò che conta per te. Scorri e apri i dettagli.', scene: 'overview' },
-      { id: 'hourly', title: 'Ora per ora', text: 'Passi, distanza e calorie per ogni ora della giornata.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Ogni corsa ha una sua eco', text: 'Confronta ogni sessione con i tuoi allenamenti su distanze simili, esaminando battito cardiaco, passo e tracciato.', scene: 'workouts' },
       { id: 'gaps', title: 'Nessun dato inventato', text: 'Se non è stato misurato, rimane vuoto. Niente zeri fittizi, valori precedenti o stime ipotetiche.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Invia all’IA', title: 'Usa l’abbonamento che hai già.', lead: 'Scegli i giorni e i tuoi dati diventano un unico file. Consegnalo all’IA che usi già, continua la conversazione e importa la bozza.', points: [
       { id: 'providers', title: 'Sette tra cui scegliere', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao e Grok. Con il tuo account e la tua quota consueti.', scene: 'ai' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacy e sicurezza', text: 'Le credenziali sono protette dal sistema operativo. I token non finiscono mai nei log.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomi dei file', text: 'Decidi tu come nominare i file preparati per l’IA.', icon: 'document' },
       { id: 'folder', title: 'Porta via tutto', text: 'I tuoi dati restano in una cartella su questo computer, e tutto ciò che hai scritto qui — valutazioni, piani, attività AI — viene esportato in un unico file JSON.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Scopri ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Connessione' }, { id: 'records', label: 'Comprensione' }] },
+    { label: 'Scopri ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Connessione' }, { id: 'records', label: 'Comprensione' }, { id: 'journal', label: 'Archive' }] },
     { label: 'Dai dati all’azione', links: [{ id: 'ai', label: 'Invia all’IA' }, { id: 'ai-plan', label: 'Piano di allenamento' }, { id: 'record-sleep', label: 'Sonno e allenamenti' }] },
     { label: 'A modo tuo', links: [{ id: 'connect', label: 'Impostazioni' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'API locale' }] },
   ],
