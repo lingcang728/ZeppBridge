@@ -3,7 +3,7 @@
  */
 import { at, dayKey, iso, round } from './rng';
 import { DAYS, DEMO_DEVICE_ID, type DemoData } from './dataset';
-import type { StorageEstimate } from '../types';
+import type { DeviceProfile, StorageEstimate } from '../types';
 
 const average = (values: number[]): number => (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
 
@@ -35,7 +35,8 @@ export const demoDevices = (data: DemoData) => ({
     image_key: 'amazfit-balance-2', kind: 'watch', match_status: 'exact', has_local_data: true,
     last_data_at: iso(new Date(data.now.getTime() - 8 * 60_000)), firmware: '3.8.2.1', serial: 'DEMO-0000', device_id: DEMO_DEVICE_ID,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }],
+  }] as DeviceProfile[],
+  hidden_profiles: [] as DeviceProfile[],
   cache: { status: 'fresh', cached_at: iso(data.now), age_seconds: 120, refreshed: false },
 });
 

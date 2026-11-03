@@ -399,6 +399,9 @@ export const tauriBackend: BridgeBackend = {
   setDeviceModelOverride(deviceKey: string, catalogId: string | null) {
     return call<void>('set_device_model_override', { deviceKey, catalogId });
   },
+  setDeviceHidden(deviceKey: string, hidden: boolean) {
+    return call<void>('set_device_hidden', { deviceKey, hidden });
+  },
   getLocalApiStatus() {
     return call<LocalApiStatus>('get_local_api_status');
   },

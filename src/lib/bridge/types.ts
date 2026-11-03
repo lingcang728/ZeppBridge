@@ -459,6 +459,8 @@ export interface BridgeBackend {
   getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
   setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;
   setDeviceModelOverride(deviceKey: string, catalogId: string | null): Promise<void>;
+  /** 隐藏 / 恢复一台设备。只藏列表，数据照旧。 */
+  setDeviceHidden(deviceKey: string, hidden: boolean): Promise<void>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
   setLocalApiEnabled(enabled: boolean): Promise<LocalApiStatus>;
   revealLocalApiToken(): Promise<string>;
