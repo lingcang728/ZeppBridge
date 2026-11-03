@@ -262,6 +262,9 @@ pub(super) async fn persist_extracted_login(
         return Err(LoginFailure::fatal(error));
     }
     if let Err(error) = state.auth.save_auth(&auth) {
+        if recovery::is_store_error(&error) {
+            recovery::remember(&state, auth, epoch, Some(confidence));
+        }
         // 保存失败通常是系统凭据管理器的事（被策略禁用、令牌超长），原样带上
         // 底层原因；界面按 code 取本地化文案，这句中文留给 CLI、日志和报告。
         return Err(LoginFailure::fatal(AppError::from(error)));
@@ -369,12 +372,14 @@ pub(super) async fn emit_progress(
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
-    publish_status(
-        app,
-        &state,
-        LoginStatus::new(state_name, code, message, safe_login_page_url(page_url)),
-    )
-    .await;
+    let status = if state_name == "failed" {
+        recovery::status(&state).unwrap_or_else(|| {
+            LoginStatus::new(state_name, code, message, safe_login_page_url(page_url))
+        })
+    } else {
+        LoginStatus::new(state_name, code, message, safe_login_page_url(page_url))
+    };
+    publish_status(app, &state, status).await;
 }
 
 pub(super) fn safe_login_page_url(raw: &str) -> String {

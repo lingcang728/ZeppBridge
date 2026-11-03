@@ -330,10 +330,12 @@ export interface BridgeBackend {
   startWebLogin(locale: string): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
+  recoverAdvancedCredentials(storage: 'system' | 'file'): Promise<LoginStatus>;
 
   /** Zepp 官方授权：系统浏览器里授权，桌面端自己去中转站领令牌。 */
   startOfficialLogin(): Promise<OfficialStatus>;
   cancelOfficialLogin(): Promise<OfficialStatus>;
+  recoverOfficialCredentials(storage: 'system' | 'file'): Promise<OfficialStatus>;
   getOfficialStatus(): Promise<OfficialStatus>;
   /** 撤销官方授权并删掉本机令牌；不动任何健康数据。 */
   disconnectOfficial(): Promise<OfficialStatus>;

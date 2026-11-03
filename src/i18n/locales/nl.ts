@@ -3300,6 +3300,35 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       resetTips: 'Eerste-keer-tips opnieuw weergeven',
       resetDone: 'Klaar; ze verschijnen weer wanneer je er de volgende keer komt',
     },
+    'components/CredentialRecovery': {
+      advancedDescription:
+        'Je aanmeldgegevens voor Geavanceerde gegevens konden niet worden opgeslagen. Ze blijven maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden of het token opnieuw in te voeren. Ze worden verwijderd als je annuleert, een andere aanmelding start, handmatig opnieuw aanmeldgegevens indient of de app afsluit.',
+      advancedFileWarning:
+        'Hiermee wordt het App Token voor Geavanceerde gegevens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
+      advancedDiscard: 'Deze aanmeldgegevens verwijderen',
+      advancedExpired: 'Deze aanmeldgegevens zijn niet meer beschikbaar. Maak opnieuw verbinding met Geavanceerde gegevens.',
+      title: 'Kies hoe je je aanmelding wilt opslaan',
+      description:
+        'De autorisatie is geslaagd, maar het token kon niet worden opgeslagen. Het blijft maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden. Als je de app afsluit of een nieuwe autorisatie start, wordt het token verwijderd.',
+      systemOption: 'De systeemopslag voor aanmeldgegevens herstellen (aanbevolen)',
+      fileOption: 'Opslaan in een lokaal JSON-bestand',
+      repairLinux:
+        'Open de wachtwoord- of portemonneebeheerder van je systeem. Maak een standaardsleutelbos of -portemonnee aan als die nog niet bestaat en ontgrendel deze. Zorg op desktops zoals Niri dat een Secret Service-provider zoals KWallet of GNOME Keyring actief is. Probeer het daarna hieronder opnieuw.',
+      repairMac:
+        'Open Sleutelhangertoegang, ontgrendel je inlogsleutelhanger en geef ZeppBridge toestemming om aanmeldgegevens op te slaan. Probeer het daarna hieronder opnieuw.',
+      repairWindows:
+        'Controleer of Windows Referentiebeheer beschikbaar is en je account er gebruik van kan maken. Probeer het daarna hieronder opnieuw.',
+      retrySystem: 'Ik heb het hersteld — opnieuw proberen op te slaan',
+      fileWarning:
+        'Hiermee worden toegangs- en vernieuwingstokens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
+      consent: 'Ik begrijp dit en ga ermee akkoord de tokens als platte tekst op dit apparaat op te slaan.',
+      saveFile: 'Akkoord en opslaan als JSON',
+      discard: 'Deze autorisatie verwijderen',
+      expired: 'Deze autorisatie is niet meer beschikbaar. Meld je opnieuw aan.',
+      savedFile: 'Aanmelding opgeslagen in het lokale bestand credentials.json.',
+      fileUnavailable:
+        'Bestandsopslag is niet beschikbaar op dit platform of wordt door je opstartconfiguratie overschreven. Herstel de systeemopslag voor aanmeldgegevens om door te gaan.',
+    },
   },
   errors: {
     'err.app.starting': 'Lokale gegevens worden nog klaargemaakt; dit wordt zo vanzelf vernieuwd',

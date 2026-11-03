@@ -6,6 +6,7 @@ import { breatheCharts, closeSweep, openSweep, settleNewText, startSweep } from 
 import { localeTarget } from './localeTarget';
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
+import { canUseViewTransitions } from './viewTransitions';
 
 /**
  * 换语言的「响指」（用户 2026-10-04 提的点子：像《复联 4》灭霸打响指，旧语言的字化成灰被吹走，底下露出新语言）。
@@ -147,7 +148,7 @@ export const switchLocaleWithAsh = async (value: Locale, origin?: AshOrigin, sco
     return;
   }
   const doc = document as ViewTransitionDocument;
-  if (!doc.startViewTransition || reducedMotion()) {
+  if (!canUseViewTransitions() || !doc.startViewTransition || reducedMotion()) {
     localeTarget.value = null;
     setLocale(value);
     return;

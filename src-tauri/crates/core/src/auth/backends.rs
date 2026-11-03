@@ -257,6 +257,12 @@ pub struct FileCredentialBackend {
 }
 
 #[cfg(unix)]
+struct FileCredentialWriteGuard {
+    // Closing the descriptor releases flock, including after a process crash.
+    _file: fs::File,
+}
+
+#[cfg(unix)]
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(super) struct StoredCredentials {
     #[serde(default = "default_credential_file_version")]
@@ -275,6 +281,39 @@ impl FileCredentialBackend {
     pub fn new(data_dir: &Path) -> Self {
         Self {
             path: data_dir.join(CREDENTIAL_FILE),
+        }
+    }
+
+    fn lock_write(&self) -> std::result::Result<FileCredentialWriteGuard, String> {
+        use std::os::{
+            fd::AsRawFd,
+            unix::fs::{OpenOptionsExt, PermissionsExt},
+        };
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| "凭据目录无效".to_string())?;
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建凭据目录：{error}"))?;
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("无法保护凭据目录：{error}"))?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o600)
+            .open(parent.join("credentials.json.lock"))
+            .map_err(|error| format!("无法锁定凭据文件：{error}"))?;
+        loop {
+            // Serialize the whole read-modify-write across official/Advanced
+            // logins and CLI/MCP processes so one token cannot overwrite another.
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+                return Ok(FileCredentialWriteGuard { _file: file });
+            }
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
+                return Err(format!("无法锁定凭据文件：{error}"));
+            }
         }
     }
 
@@ -344,6 +383,7 @@ impl FileCredentialBackend {
 #[cfg(unix)]
 impl CredentialBackend for FileCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
+        let _guard = self.lock_write()?;
         let mut stored = self.read()?;
         stored.version = default_credential_file_version();
         stored.tokens.insert(user_id.to_string(), token.to_string());
@@ -355,6 +395,7 @@ impl CredentialBackend for FileCredentialBackend {
     }
 
     fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
+        let _guard = self.lock_write()?;
         let mut stored = self.read()?;
         if stored.tokens.remove(user_id).is_none() {
             return Ok(());

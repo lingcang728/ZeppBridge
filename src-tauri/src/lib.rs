@@ -4,6 +4,8 @@ mod commands;
 mod diagnostics;
 mod ipc_error;
 mod ipc_types;
+#[cfg(target_os = "linux")]
+mod linux_rendering;
 mod local_api;
 mod main_window;
 mod tray_i18n;
@@ -38,7 +40,8 @@ use commands::{
     get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
     get_workout_detail, get_workout_insight, get_workout_page, get_workout_series,
     get_workout_type_options, list_backups, list_life_events, manual_auth, open_data_folder,
-    prepare_ai_handoff, probe_data_capabilities, reprocess_local_data, reset_coverage_ledger,
+    prepare_ai_handoff, probe_data_capabilities, recover_advanced_credentials,
+    recover_official_credentials, reprocess_local_data, reset_coverage_ledger,
     retry_failed_backfill_chunks, run_database_integrity_check, save_fit_export, save_life_event,
     save_mcp_bundle, set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference,
     set_user_prefs, set_workout_code_label, set_workout_type_override, stage_restore,
@@ -218,45 +221,10 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Linux 上的白屏。
-    //
-    // WebKitGTK 2.42 起默认走 DMABUF 渲染器，而它在相当一批驱动与合成器的
-    // 组合上会直接失败——窗口出来了，是白的，终端一个字都不打印。issue #32
-    // 报的就是这个（openSUSE，AppImage 和 Flatpak 都白）：没有报错不是因为
-    // 没出错，是因为这条失败路径本身就是静默的。
-    //
-    // 关掉它会退回较慢的渲染路径，代价是真实存在的；但「慢一点」和「整个应用
-    // 是一块白板」不是一个量级的问题。留了逃生口：用户自己设过这个变量就尊重
-    // 他的值，想开回去就 `WEBKIT_DISABLE_DMABUF_RENDERER=0`。
-    #[cfg(all(unix, not(target_os = "macos")))]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
-
-    // 只有 AppImage 还是打不开。
-    //
-    // 关掉 DMABUF 之后 Flatpak 好了（issue #32，cchalk 2026-09-02 确认），
-    // AppImage 没好。同一个 issue 里 TheSaneWriter 给了决定性的一句：**同一份
-    // 源码在他自己机器上编出来的 AppImage 能跑**。那就不是代码，是 CI 打包进
-    // 去的那批 webkit / GL / Wayland 库和他的宿主机对不上。
-    //
-    // 合成器那条路是这类不匹配最先崩的地方，所以在 AppImage 里再退一步，连
-    // 加速合成一起关掉。这一步的代价是真实的（滚动和动画会变钝），所以用
-    // `APPIMAGE` 这个变量当门——它由 AppImage 运行时自己设，只有从 AppImage
-    // 启动才有。deb / rpm / Flatpak 三条渠道已经被用户确认能用，不该为一条坏
-    // 掉的渠道跟着变慢。
-    //
-    // 同样留逃生口：用户设过就尊重他的值。
-    //
-    // 注意这里**没有**动 `GDK_BACKEND`。强制 x11 能绕开一部分 Wayland 问题，
-    // 但会打死没装 XWayland 的纯 Wayland 系统——那是把一种打不开换成另一种。
-    // 它作为手动逃生口写在 docs/guides/linux.md 里，由人自己决定。
-    #[cfg(all(unix, not(target_os = "macos")))]
-    if std::env::var_os("APPIMAGE").is_some()
-        && std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none()
-    {
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    }
+    #[cfg(target_os = "linux")]
+    let rendering_script = linux_rendering::configure();
+    #[cfg(not(target_os = "linux"))]
+    let rendering_script = "";
 
     // 便携版刚换完 exe、由旧进程拉起来的这一次：先等旧进程退干净，再初始化单实例——
     // 不然单实例会把这次启动并进还没退出的旧进程，新版本一闪就没了。平常启动只顺手
@@ -302,6 +270,7 @@ pub fn run() {
     diagnostics::install_panic_hook();
     diagnostics::log("Startup: building Tauri runtime");
     let app = tauri::Builder::default()
+        .append_invoke_initialization_script(rendering_script)
         .manage(main_window::MainWindowState::default())
         .manage(updates::SilentUpdater::default())
         // Single-instance must be registered first so a second launch never
@@ -638,10 +607,12 @@ pub fn run() {
             start_official_login,
             cancel_official_login,
             get_official_status,
+            recover_official_credentials,
             disconnect_official,
             start_web_login,
             cancel_web_login,
             get_login_status,
+            recover_advanced_credentials,
             start_history_sync,
             start_incremental_sync,
             cancel_sync,
