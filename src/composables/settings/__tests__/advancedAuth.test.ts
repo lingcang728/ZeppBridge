@@ -31,6 +31,8 @@ vi.mock('../../../lib/bridge', () => ({
     listen: vi.fn(async (_event: string, callback: typeof onLogin) => { onLogin = callback; return () => {}; }),
     getLoginStatus: vi.fn(async () => ({ state: 'idle', message: '', page_url: '' })),
     startWebLogin: vi.fn(async () => ({ state: 'waiting', message: '', page_url: '' })),
+    clearAuth: vi.fn(async () => { appStatus.value = status(); }),
+    manualAuth: vi.fn(async () => {}),
   },
   isDesktop: () => false,
   toUserMessage: (_error: unknown, fallback: string) => fallback,
@@ -50,6 +52,7 @@ let auth: ReturnType<typeof createAuthFlow>;
 const official = {
   connected: ref(true), waiting: ref(false), needsReauth: ref(false), busy: ref(false),
   status: ref({ nickname: 'Test account' }), failureText: ref(null),
+  disconnect: vi.fn(),
 };
 const status = (patch: Partial<AppStatus> = {}): AppStatus => ({
   configured: false, auth_state: 'unconfigured', connection_state: 'connected', data_source: 'official',
@@ -67,6 +70,8 @@ beforeEach(() => {
   appStatus.value = status();
   isSyncing.value = false;
   official.connected.value = true;
+  official.needsReauth.value = false;
+  official.status.value = { nickname: 'Test account' };
   models.value = [];
   deviceError.value = null;
   deviceCache.value = null;
@@ -115,6 +120,55 @@ describe('advanced data authentication is independent of official authorization'
     appStatus.value = status({ connection_state: 'needs_reauth', data_source: 'none' });
     expect(auth.needsReauth.value).toBe(false);
     expect(auth.connected.value).toBe(false);
+  });
+
+  it('unreadable advanced credentials retain sign-out, web login and manual recovery without disabling official', async () => {
+    appStatus.value = status({ auth_configuration_present: true, credential_available: false, auth_state: 'needs_reauth' });
+    expect(auth.needsReauth.value).toBe(true);
+    expect(auth.connected.value).toBe(false);
+    expect(auth.configuredOnly.value).toBe(false);
+    const account = await render(AccountSection);
+    expect(account).toContain('Official connected · Advanced data needs re-authorizing');
+    expect(account).toContain('Connect advanced data');
+    expect(account).toContain('Log out');
+    expect(account).toContain('credentials are temporarily unavailable');
+    const login = await render(AuthSection);
+    expect(login).toMatch(/<details[^>]*open/);
+    auth.showManualAuth.value = true;
+    expect(await render(AuthSection)).toContain('manual-userid');
+  });
+
+  it('sign-out after a denied credential read clears advanced state and leaves official connected', async () => {
+    appStatus.value = status({ auth_configuration_present: true, credential_available: false, auth_state: 'needs_reauth' });
+    vi.stubGlobal('window', { confirm: () => true });
+    try {
+      await auth.clearAuth();
+      expect(backend.clearAuth).toHaveBeenCalledOnce();
+      expect(auth.needsReauth.value).toBe(false);
+      expect(official.disconnect).not.toHaveBeenCalled();
+      expect(await render(AccountSection)).toContain('Official connected · Advanced data not connected');
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('a replacement token can be submitted while old credentials are unreadable', async () => {
+    appStatus.value = status({ auth_configuration_present: true, credential_available: false, auth_state: 'needs_reauth' });
+    auth.showManualAuth.value = true;
+    auth.manualAppToken.value = ' replacement-token ';
+    auth.manualUserId.value = ' user-a ';
+    auth.manualRegionHost.value = 'https://api-mifit.zepp.com';
+    await auth.submitManualAuth();
+    expect(backend.manualAuth).toHaveBeenCalledWith('replacement-token', 'user-a', 'https://api-mifit.zepp.com');
+    expect(auth.manualAppToken.value).toBe('');
+    expect(official.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('official credential recovery keeps its disconnect entry while advanced credentials work', async () => {
+    official.connected.value = false;
+    official.needsReauth.value = true;
+    official.status.value = { nickname: 'Test account', user_id_masked: '••••1234' } as typeof official.status.value;
+    appStatus.value = status({ configured: true, credential_available: true, auth_configuration_present: true, auth_state: 'verified', data_source: 'legacy' });
+    expect(auth.connected.value).toBe(true);
+    expect(await render(AuthSection)).toContain('Disconnect');
   });
 
   it('reacts to advanced credentials being connected and cleared', () => {

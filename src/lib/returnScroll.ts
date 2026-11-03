@@ -17,6 +17,13 @@ import type { Router } from 'vue-router';
 type Memory = { top: number; key: string | null };
 
 const main = () => document.getElementById('main-content');
+
+/** 正在恢复滚动的那一轮（会等页面长高、最多 1.5 秒）：卡 ↔ 页形变期间攒下的滚动要等它结束再补
+    （composables/usePageMorph.ts），不然补上去的量会被下一帧的恢复盖掉。 */
+let restoring: Promise<void> | null = null;
+let restored: (() => void) | null = null;
+const finishRestore = () => { restored?.(); restored = null; restoring = null; };
+export const whenScrollRestored = (): Promise<void> => restoring ?? Promise.resolve();
 const positionOf = (): number | null => {
   const value = (window.history.state as { position?: unknown } | null)?.position;
   return typeof value === 'number' ? value : null;
@@ -53,11 +60,14 @@ export const installReturnScroll = (router: Router) => {
 
   router.afterEach((to, from, failure) => {
     if (failure) return;
+    finishRestore();
     const arrived = positionOf();
     current = arrived;
     const saved = arrived !== null && leaving !== null && arrived < leaving ? memory.get(arrived) : undefined;
     const root = main();
     if (!root) return;
+    // 年轮换年份只更新查询参数，舞台仍在原处，不要把整页拉回顶部。
+    if (to.name === 'Rings' && from.name === 'Rings' && to.path === from.path) return;
     // 同一页只换了参数（设置卡叠从 /settings/privacy 回到 /settings）：没有离场的旧页要垫，
     // 页面也不用等数据长高，直接滚回去。先滚到 0 再下一帧滚回来，中间那一帧整组卡往下跳一截，
     // 关卡的形变正夹在这两帧之间（10-09 录屏「展开全部」滑下去再返回）。
@@ -70,6 +80,8 @@ export const installReturnScroll = (router: Router) => {
     root.scrollTo({ top: 0 });
     if (!saved) return;
     const started = performance.now();
+    const round = new Promise<void>((resolve) => { restored = resolve; });
+    restoring = round;
     /* 离场的旧页是绝对定位、按离开时的滚动距离垫好的（AppShell.vue 的 onPageBeforeLeave）；
        滚动区现在要换一个位置，旧页得跟着挪同样的距离，淡出的那一帧才不会跳。 */
     const scrollKeepingLeaving = (top: number) => {
@@ -88,6 +100,7 @@ export const installReturnScroll = (router: Router) => {
         requestAnimationFrame(restore);
         return;
       }
+      if (restoring === round) finishRestore();
     };
     requestAnimationFrame(restore);
   });

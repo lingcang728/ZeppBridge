@@ -250,6 +250,9 @@ pub struct AiTaskSummary {
     /// 用户置顶的任务排在最前、也不会因为久没动收进「更早」。
     #[serde(default)]
     pub pinned: bool,
+    /// 启用的数据类别（`heart_rate`、`sleep`……），任务页按它筛。
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 /// P2：一个类别在一个窗口里的覆盖事实。

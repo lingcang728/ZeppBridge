@@ -83,7 +83,7 @@ export const read: Chapter = {
       // 3.6 身有起伏，事出有因：添加生活事件——分类玻璃条（身体与恢复 / 旅行与出差 …）、滚轮选日期。
       id: 'events', ms: 6800, pose: 'full', caption: 'events',
       async run(d) {
-        await d.cut(async () => { await d.clear(); await d.go('/', 200); await d.scrollTo(ADD_EVENT, 300, 1); });
+        await d.cut(async () => { await d.clear(); await d.go('/journal', 200); await d.scrollTo(ADD_EVENT, 300, 1); });
         await d.tap(ADD_EVENT, { after: 500 });
         const dialog = await d.find('[data-modal-dialog] .segment-track');
         const box = dialog.closest('[data-modal-dialog]') ?? dialog;

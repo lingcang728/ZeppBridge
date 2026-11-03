@@ -60,22 +60,7 @@ impl Database {
         workout_id: &str,
         user_override: Option<&str>,
     ) -> Result<()> {
-        let normalized = user_override
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_lowercase);
-        if let Some(value) = normalized.as_deref() {
-            if !crate::sport_catalog::is_known_key(value) {
-                return Err(ZeppBridgeError::ConfigError("不支持的运动类型纠正".into()));
-            }
-        }
-        let changed = self.conn.execute(
-            "UPDATE workouts SET workout_type_override = ?2 WHERE workout_id = ?1",
-            params![workout_id, normalized],
-        )?;
-        if changed == 0 {
-            return Err(ZeppBridgeError::DataUnavailable("运动记录不存在".into()));
-        }
+        self.edit_workouts(&[workout_id.to_owned()], Some(user_override), None)?;
         Ok(())
     }
 
@@ -179,29 +164,47 @@ impl Database {
         if device_key.is_empty() {
             return Err(ZeppBridgeError::ConfigError("设备标识不能为空".into()));
         }
-        let Some(catalog_id) = catalog_id.map(str::trim).filter(|value| !value.is_empty()) else {
-            self.conn.execute(
-                "DELETE FROM device_model_overrides WHERE device_key = ?1",
-                params![device_key],
-            )?;
-            return Ok(());
-        };
-        if !crate::device_catalog::catalog_entries()
-            .iter()
-            .any(|entry| entry.catalog_id == catalog_id)
-        {
+        let catalog_id = catalog_id.map(str::trim).filter(|value| !value.is_empty());
+        if catalog_id.is_some_and(|catalog_id| {
+            !crate::device_catalog::catalog_entries()
+                .iter()
+                .any(|entry| entry.catalog_id == catalog_id)
+        }) {
             return Err(ZeppBridgeError::ConfigError(
                 "随包设备目录里没有这个型号".into(),
             ));
         }
+        let previous = self.device_model_override(&[device_key])?;
+        if previous.as_ref().map(|value| value.catalog_id.as_str()) == catalog_id {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        // Device keys are looked up case-insensitively; changing capitalization
+        // must not leave two competing identifications behind.
         self.conn.execute(
-            "INSERT INTO device_model_overrides(device_key, catalog_id, updated_at)
+            "DELETE FROM device_model_overrides WHERE lower(device_key) = lower(?1)",
+            [device_key],
+        )?;
+        if let Some(catalog_id) = catalog_id {
+            self.conn.execute(
+                "INSERT INTO device_model_overrides(device_key, catalog_id, updated_at)
              VALUES(?1, ?2, ?3)
              ON CONFLICT(device_key) DO UPDATE SET
                  catalog_id = excluded.catalog_id,
                  updated_at = excluded.updated_at",
-            params![device_key, catalog_id, Utc::now().to_rfc3339()],
-        )?;
+                params![device_key, catalog_id, Utc::now().to_rfc3339()],
+            )?;
+        }
+        // Type 15 depends on device context. Previously stamped summaries must
+        // be replayed after identifying or clearing a device, including official
+        // sports summaries. Local workout edits live outside the replay stamps.
+        for table in ["raw_normalization", "raw_quarantine"] {
+            self.conn.execute(
+                &format!("DELETE FROM {table} WHERE raw_record_id IN (SELECT id FROM raw_records WHERE stream = 'workouts')"),
+                [],
+            )?;
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -300,5 +303,35 @@ mod tests {
 
         db.set_device_model_override("A1B2C3", None).unwrap();
         assert!(db.device_model_override(&["A1B2C3"]).unwrap().is_none());
+    }
+
+    #[test]
+    fn only_changed_device_assignments_invalidate_workout_replay_stamps() {
+        let db = db();
+        db.insert_raw_record(&crate::models::RawRecord {
+            stream: "workouts".into(),
+            source_key: "sport_history:run:assignment".into(),
+            source_scope: crate::models::SourceScope::Device,
+            device_id: None,
+            start_utc: Utc::now(),
+            end_utc: None,
+            payload: serde_json::json!({"data": []}),
+            capability: crate::models::CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.reprocess_raw_records().unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_none());
+        db.set_device_model_override("AABB", None).unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_none());
+        db.set_device_model_override("AABB", Some("amazfit-balance-2"))
+            .unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_some());
+        db.reprocess_raw_records_if_needed().unwrap();
+        db.set_device_model_override("aabb", Some("amazfit-balance-2"))
+            .unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_none());
+        db.set_device_model_override("aabb", None).unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_some());
+        assert!(db.device_model_override(&["AABB"]).unwrap().is_none());
     }
 }

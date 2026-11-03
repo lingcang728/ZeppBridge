@@ -3,7 +3,7 @@
  * 存储仍是区块数组，旧版多选留下的值照样读得出来。
  *
  * 这是看的偏好，不是数据：和界面语言、置顶指标一样存 `localStorage`，不进库、不进导出。
- * 全局单例——概览的首次提问、概览的排序和设置「显示与语言」里那一行读同一份。
+ * 全局单例——概览的首次提问、概览页头的滑块和概览的排序读同一份（设置里那一行 2026-10-27 去掉了）。
  *
  * - `areas`：当前选中的区块（只读；改走 `setAreas`）。空数组 = 没有偏好，概览就是原样。
  * - `setAreas(next)`：换选中集合，同时算回答过首次提问。设置里那一行和提问行都用它。
@@ -108,7 +108,7 @@ export const useFocusAreas = () => ({
 /** 选择区块时给芯片 / 菜单排顺序用的那份区块列表。 */
 export const focusAreaList = computed(() => FOCUS_AREAS.map((area) => ({ area, label: focusAreaLabel(area) })));
 
-/** 「我关注」滑块的四格（概览页头、首次提问、设置里那一行共用）。 */
+/** 「我关注」滑块的四格（概览页头、首次提问共用）。 */
 export const focusChoiceItems = computed(() => FOCUS_CHOICES.map((value) => ({
   value,
   label: value === 'all' ? words.value.areaAll : focusAreaLabel(value),

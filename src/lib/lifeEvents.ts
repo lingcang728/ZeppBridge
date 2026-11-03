@@ -18,6 +18,7 @@ export const lifeEventMessages = defineMessages(
     active: '持续中', search: '搜索生活事件', noMatch: '没有符合条件的事件。',
     all: '全部', showMore: (count: number) => `再看 ${count} 件`, showLess: '收起', manage: '管理生活事件', related: '相关事件',
     local: '只存本机，随数据库备份；交给 AI 时可勾选带上。',
+    epoch: '作为纪元', epochHint: '给这段日子起个名，所有趋势图都垫一层底色，AI 也会知道。', epochBadge: '纪元',
     categories: { health: '身体与恢复', travel: '旅行与出差', routine: '作息与生活', training: '训练与比赛', other: '其他' },
     // 编辑器里的分类胶囊用短名：五项一行放得下才能拖（全名太长的语言会折成两行）；全名进悬停提示和列表。
     categoryShort: { health: '身体与恢复', travel: '旅行与出差', routine: '作息与生活', training: '训练与比赛', other: '其他' },
@@ -35,6 +36,7 @@ export const lifeEventMessages = defineMessages(
     active: 'Ongoing', search: 'Search life events', noMatch: 'No matching events.',
     all: 'All', showMore: (count: number) => `Show ${count} more`, showLess: 'Show less', manage: 'Manage life events', related: 'Related events',
     local: 'Saved locally, included in backups. Optional in AI handoffs.',
+    epoch: 'Mark as an era', epochHint: 'Name this stretch of time: every trend chart gets a shaded backdrop, and AI sees it too.', epochBadge: 'Era',
     categories: { health: 'Health & recovery', travel: 'Travel', routine: 'Routine & lifestyle', training: 'Training & races', other: 'Other' },
     categoryShort: { health: 'Health', travel: 'Travel', routine: 'Routine', training: 'Training', other: 'Other' },
   },
@@ -51,6 +53,7 @@ export const lifeEventMessages = defineMessages(
     active: 'En curso', search: 'Buscar eventos', noMatch: 'Sin eventos coincidentes.',
     all: 'Todos', showMore: (count: number) => `Ver ${count} más`, showLess: 'Ver menos', manage: 'Administrar eventos', related: 'Eventos relacionados',
     local: 'Solo local, incluido en copias; opcional al pasar a la IA.',
+    epoch: 'Marcar como etapa', epochHint: 'Ponle nombre a esta temporada: todas las gráficas de tendencia la sombrean y la IA también la ve.', epochBadge: 'Etapa',
     categories: { health: 'Salud y recuperación', travel: 'Viajes', routine: 'Rutina y estilo de vida', training: 'Entrenamiento y carreras', other: 'Otros' },
     categoryShort: { health: 'Salud', travel: 'Viajes', routine: 'Rutina', training: 'Entreno', other: 'Otros' },
   },

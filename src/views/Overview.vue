@@ -4,6 +4,8 @@ defineOptions({ name: 'Overview' });
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch, type Component } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
+import BackfillOffer from '../components/BackfillOffer.vue';
+import { addDays, dayKey } from '../lib/aiTask/bridgeScale';
 import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
@@ -17,6 +19,8 @@ import StatusEntryCard, { type EntryFact } from '../components/overview/StatusEn
 import SegmentTrack from '../components/SegmentTrack.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
+import FeedbackCard from '../components/feedback/FeedbackCard.vue';
+import CoachInboxCard from '../components/coachNotes/CoachInboxCard.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -58,6 +62,7 @@ const messages = defineMessages(
     trainingTitle: '训练状态',
     factLoad: '负荷',
     entryWeek: '近 7 天',
+    entrySparse: '近 90 天',
     focusLabel: '我关注',
     trainingThin: '近 7 天记录不足以画出趋势',
     trainingEmpty: '同步后展示 VO₂max 与训练负荷',
@@ -88,6 +93,7 @@ const messages = defineMessages(
     trainingTitle: 'Training status',
     factLoad: 'Load',
     entryWeek: 'Last 7 days',
+    entrySparse: 'Last 90 days',
     focusLabel: 'I care about',
     trainingThin: 'Too few records in the last 7 days for a trend',
     trainingEmpty: 'VO₂max and training load appear after a sync',
@@ -118,6 +124,7 @@ const messages = defineMessages(
     trainingTitle: 'Estado de entrenamiento',
     factLoad: 'Carga',
     entryWeek: 'Últimos 7 días',
+    entrySparse: 'Últimos 90 días',
     focusLabel: 'Me interesa',
     trainingThin: 'No hay suficientes registros en los últimos 7 días para trazar una tendencia',
     trainingEmpty: 'El VO₂máx y la carga de entrenamiento aparecen aquí después de sincronizar',
@@ -179,17 +186,25 @@ const loadBand = computed(() => trainingLoadTierText(trainingLoad.value, overvie
  */
 const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load', 'steps'];
 
+/* 只在跑后才出读数的稀疏项（VO₂max，偶尔血氧）：近 7 天不到两个点时那一行改画近 90 天，行尾标出来；
+   不补点、不拉平线（用户 2026-10-28 截图：概览那条是斜纹，点进去却有趋势）。 */
+const SPARSE_METRICS = ['readiness', 'stress', 'spo2', 'vo2max'];
+const SPARSE_DAYS = 90;
+const sparseSeries = ref<Record<string, MetricSeries>>({});
+const pointsOf = (metric: string) => statusSeries.value[metric]?.points ?? [];
+const widened = (metric: string) => pointsOf(metric).length < 2 && (sparseSeries.value[metric]?.points.length ?? 0) >= 2;
+const seriesOf = (metric: string) => (widened(metric) ? sparseSeries.value[metric] : statusSeries.value[metric]);
 const seriesValues = (metric: string): number[] =>
-  (statusSeries.value[metric]?.points ?? []).map((point) => point.value);
+  (seriesOf(metric)?.points ?? []).map((point) => point.value);
 
 /* 拿不到值就返回 null，让这一项整个消失。
    一排「血氧 —」「VO₂max —」既没告诉用户任何事，又把有数的那几项挤窄了。
    每一项带上自己近 7 天的形状：卡片下半截不再空着，线和数字也一一对得上。 */
 const entryFact = (metric: string, label: string, unit = '', digits = 0): EntryFact | null => {
-  const value = latestValue(statusSeries.value[metric]);
+  const value = latestValue(seriesOf(metric));
   return value === null
     ? null
-    : { key: metric, label, text: formatMetric(value, digits), unit, spark: seriesValues(metric), color: metricColor(metric) };
+    : { key: metric, label, text: formatMetric(value, digits), unit, spark: seriesValues(metric), span: widened(metric) ? t.value.entrySparse : null, color: metricColor(metric), format: (v: number) => formatMetric(v, digits) };
 };
 const present = (facts: (EntryFact | null)[]): EntryFact[] => facts.filter((fact): fact is EntryFact => fact !== null);
 const hasDays = (...metrics: string[]) => metrics.some((metric) => statusSeries.value[metric]?.days_with_data);
@@ -212,6 +227,7 @@ const trainingEntry = computed(() => {
     tag: loadBand.value || null,
     spark: seriesValues('training_load'),
     color: metricColor('training_load'),
+    format: (v: number) => formatMetric(v),
   };
   const facts = present([vo2, load]);
   const thin = facts.every((fact) => (fact.spark?.length ?? 0) < 2);
@@ -283,7 +299,10 @@ const queries = () => ({
   heart: () => publish('heart', () => backend.getHeartRateSeries(6), value => { heartRateSeries.value = value; }),
   sleep: () => publish('sleep', () => backend.getRecentSleep(3), value => { recentSleep.value = value; }),
   workouts: () => publish('workouts', () => backend.getRecentWorkouts(5), value => { recentWorkouts.value = value; }),
-  status: () => publish('status', () => backend.getMetricSeries(ENTRY_METRICS, 7), value => { statusSeries.value = indexSeries(value); }),
+  status: () => publish('status', () => Promise.all([backend.getMetricSeries(ENTRY_METRICS, 7), backend.getMetricSeries(SPARSE_METRICS, SPARSE_DAYS)]), ([week, wide]) => {
+    statusSeries.value = indexSeries(week);
+    sparseSeries.value = indexSeries(wide);
+  }),
 });
 const loadOverview = async () => {
   if (!active) { refreshOnActivate = true; return; }
@@ -382,6 +401,8 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
+    <!-- 补拉入口（3.0.4）：本机不满一年时就地问一句，不只藏在设置页深处。说过「先不用」就不再出现。 -->
+    <BackfillOffer place="overview" :start="addDays(dayKey(), -364)" class="overview-backfill" />
     <OfficialOnlyNote />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
@@ -389,6 +410,10 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 
     <!-- 用户自己固定的 3–4 个指标排在最上面：顺序由用户定，概览不替所有人排（评审 U10）。 -->
     <PinnedMetrics />
+
+    <!-- 跑后打分（批次 7）：练完推到手表的计划后问一句，最多一张、48 小时后自己消失。 -->
+    <FeedbackCard />
+    <CoachInboxCard />
 
     <Transition name="skeleton-out" @before-leave="holdInPlace">
       <div v-if="showSkeleton" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
@@ -442,6 +467,7 @@ useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
 </template>
 
 <style scoped>
+.overview-backfill { margin: 0; }
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
 .overview-header { flex-wrap: wrap; min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }

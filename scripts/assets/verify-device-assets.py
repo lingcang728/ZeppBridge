@@ -21,9 +21,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "src" / "assets" / "devices" / "catalog.json"
 ASSET_DIR = CATALOG_PATH.parent
 AUDIT_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.json"
-EXPECTED_ENTRY_COUNT = 57
-EXPECTED_SUPPORTED_COUNT = 56
-EXPECTED_CANONICAL_COUNT = 54
+EXPECTED_ENTRY_COUNT = 58
+EXPECTED_SUPPORTED_COUNT = 57
+EXPECTED_CANONICAL_COUNT = 55
 # Colour variants share art; name-only additions such as Pace have no art.
 # Their paired null image_key/asset_hash is checked below.
 EXPECTED_ASSET_COUNT = 52

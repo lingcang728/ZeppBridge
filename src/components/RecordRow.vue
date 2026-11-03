@@ -8,7 +8,7 @@ import Icon from './Icon.vue';
 import type { HealthCategory } from '../lib/format';
 
 defineProps<{
-  to: object | string;
+  to?: object | string;
   category: HealthCategory;
   designIcon: DesignIconName;
   kicker: string;
@@ -21,15 +21,15 @@ defineProps<{
 </script>
 
 <template>
-  <RouterLink :class="['record-row', `tone-${category}`]" :to="to">
+  <component :is="to ? RouterLink : 'div'" :class="['record-row', `tone-${category}`]" :to="to">
     <span class="record-when"><span>{{ kicker }}</span><span v-if="time" class="record-time">{{ time }}</span></span>
     <span class="record-node" aria-hidden="true"><GlyphTile :name="designIcon" :size="34" :tone="category" /></span>
     <span class="record-card">
       <strong>{{ title }}</strong>
       <span class="record-facts"><span v-if="factLabel">{{ factLabel }}</span><b>{{ fact }}</b></span>
     </span>
-    <Icon name="chevron-right" :size="16" class="record-go" />
-  </RouterLink>
+    <Icon v-if="to" name="chevron-right" :size="16" class="record-go" />
+  </component>
 </template>
 
 <style scoped>
@@ -46,7 +46,7 @@ defineProps<{
   text-decoration: none;
   transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out);
 }
-.record-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
+.record-row:is(a):hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
 .record-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .record-when { display: grid; min-width: 0; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; }
 .record-when > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -60,6 +60,13 @@ defineProps<{
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
+}
+@media (max-width: 420px) {
+  .record-row.workout-record { grid-template-columns: 34px minmax(0, 1fr); gap: 4px 8px; }
+  .workout-record .record-when { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 8px; text-align: left; }
+  .workout-record .record-node { grid-column: 1; grid-row: 1 / span 2; padding: 0; }
+  .workout-record .record-card { grid-column: 2; padding: 8px; }
+  .workout-record .record-card strong { white-space: normal; overflow-wrap: anywhere; }
 }
 .record-card strong { overflow: hidden; color: var(--ink); font-size: var(--fs-md); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .record-facts { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }

@@ -60,7 +60,7 @@ const pack: LandingPack = {
         "unavailable": "La demostración no está disponible. Puedes leer las secciones o consultar el código."
       },
       "demo": "Ver el ejemplo",
-      "edition": "v3 en desarrollo · Datos sintéticos. La descarga ofrece la versión pública estable; su interfaz y funciones pueden ser distintas."
+      "edition": "ZeppBridge 3 · Datos sintéticos de muestra. Descarga la última versión estable para usar tus propios datos."
     },
     "handoff": {
       "chat": "Chat con la IA",
@@ -136,7 +136,7 @@ const pack: LandingPack = {
       "lead": "Gratis y de código abierto. Usa tu cuenta de Zepp; no necesitas otra de ZeppBridge.",
       "docs": "Instalación y notas de versión",
       "facts": {
-        "channel": "La descarga es la versión pública estable. El ejemplo sintético es v3 en desarrollo; interfaz y funciones pueden variar.",
+        "channel": "La descarga ofrece la última versión estable de ZeppBridge 3. La demo usa datos sintéticos; consulta las notas de versión para conocer los cambios de cada versión.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Consultar y exportar no exige IA. El servicio externo y su cuenta los eliges tú.",
         "windows": "Windows: los instaladores aún no tienen firma de confianza. Puede aparecer un aviso de editor desconocido o SmartScreen. Verifica la fuente oficial.",
@@ -175,7 +175,7 @@ const pack: LandingPack = {
         },
         {
           "question": "¿La descarga coincide con el ejemplo?",
-          "answer": "El ejemplo muestra v3 en desarrollo con datos sintéticos. La descarga es estable. La revisión de planes y la nueva interfaz podrían no estar publicadas; consulta las notas."
+          "answer": "La demo muestra ZeppBridge 3 con datos sintéticos. La descarga ofrece la última versión estable. Consulta las notas de versión y la compatibilidad de tu dispositivo antes de enviar un plan."
         }
       ]
     },
@@ -259,7 +259,7 @@ const pack: LandingPack = {
         {
           "eyebrow": "Revisión de planes",
           "title": "Revisa antes de continuar",
-          "body": "La v3 en desarrollo muestra la importación y revisión de planes. Enviarlos al reloj depende del dispositivo y de su validación; no es una promesa general de la versión estable.",
+          "body": "Importa y revisa planes de entrenamiento en ZeppBridge 3. El envío de un plan al reloj depende de la compatibilidad del dispositivo y de las comprobaciones correspondientes.",
           "bullets": [
             "Vista semanal y revisión diaria",
             "Envío según dispositivo y validación"

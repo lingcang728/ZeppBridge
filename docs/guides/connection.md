@@ -32,6 +32,16 @@ ones that never responded inside the old sign-in window.
 4. The browser shows **Authorized**. Go back to ZeppBridge: it finishes
    connecting by itself within a few seconds. You can close the browser tab.
 
+If the browser says you're authorized but ZeppBridge keeps **waiting for the
+browser**:
+
+- Click **Check now** on that row to check immediately instead of waiting.
+- After a few failed attempts to reach `zeppbridge.com`, Settings says so and
+  suggests what to check; when the main address is unreachable, ZeppBridge
+  automatically tries the backup address `zeppbridge.pages.dev`.
+- If it still fails, a proxy, firewall or company network is probably blocking
+  those two domains. ZeppBridge uses your system proxy settings.
+
 What passes through our server (`zeppbridge.com`, also reachable as `zeppbridge.pages.dev`; Cloudflare) and why:
 Zepp requires a server-held app secret to turn the authorization into tokens,
 so that one step happens there. The tokens are encrypted while they wait,
@@ -66,6 +76,13 @@ inside a window embedded in the app, which third-party providers block — so it
 works with an email or phone number and password, **not** with Google, Xiaomi,
 Facebook or Apple sign-in.
 
+Since 3.0.2 the sign-in window says this at the top and hides the third-party
+buttons; if you still end up on a third-party sign-in page, the window blocks
+it and asks you to use email or phone + password. If you sign in to a different
+Zepp account than the one connected through **Zepp account authorization**,
+ZeppBridge tells you it's another Zepp account and doesn't save it, so the two
+accounts' data never mix.
+
 ### 1. Start the connection
 
 1. Open ZeppBridge and go to **Settings**.
@@ -91,8 +108,7 @@ If the primary page is still untouched after about 90 seconds — nothing typed,
 nothing clicked, and the window still on the page ZeppBridge opened — it switches
 to the fallback page `https://user.huami.com/privacy2/index.html`. That switch is
 for a page that never rendered, so it never happens while you are signing in:
-once you type or click, or the window reaches a Xiaomi, Google, Facebook or
-WeChat page, ZeppBridge leaves it alone for the rest of the session. The whole
+once you type or click, ZeppBridge leaves it alone for the rest of the session. The whole
 session times out after 15 minutes; **Retry** starts it again.
 
 If you are signed in but ZeppBridge says it **could not read the credentials**,
@@ -154,15 +170,24 @@ token is never displayed.
   cleaned up. The manual **Prune by retention** button now lives in
   **Advanced and maintenance → Maintenance**, uses the same day count, and cannot
   be undone.
-- To remove everything, clear credentials in Settings first, then look at the
-  `data\` folder next to the program. Back it up before deleting the install
-  folder.
+- To remove everything, uninstall with **Delete the application data** ticked.
+  This now really removes the `data\` folder next to the program, the
+  tokens in Windows Credential Manager, and the copy an old 2.x install may have
+  left in `%APPDATA%\zeppbridge\ZeppBridge`. Earlier versions left
+  all of it behind, so a reinstall came back with the old account and devices.
+  Back up `data\` first if you may want it again.
 - **One `data\` folder holds one Zepp account.** The database remembers which
   account first wrote to it; signing in or authorizing with a different account
   afterwards is refused without writing anything, and existing data is never
-  wiped automatically. To switch accounts, quit ZeppBridge, move or rename the
-  `data\` folder (your old data stays in it), then start the program and
-  connect again. The legacy connector and the official authorization must use
-  the same account.
+  wiped automatically. To switch accounts, choose **Start over with another
+  account** in the sign-in error: both connections are signed out, the whole
+  `data\` folder is renamed to `data-before-<date>` (nothing is deleted;
+  rename it back to return), and the app restarts with an empty library. The
+  legacy connector and the official authorization must use the same account.
+- **Don't create a new Zepp account or move your watch to another account to
+  get this working.** Pairing a watch with a different account resets the
+  settings on the watch. If your Zepp account was created with Google, Apple
+  or another service, signing in with the same email and a password is a
+  different account to Zepp; use the official authorization instead.
 
 Further boundaries are in [security and privacy](../reference/security-and-privacy.md).

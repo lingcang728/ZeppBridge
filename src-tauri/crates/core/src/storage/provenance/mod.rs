@@ -253,6 +253,9 @@ pub struct DatabaseHealth {
     pub pending_normalization: i64,
     /// Per-stream processing outcomes. `processed_without_output` means the
     /// parser returned no rows; it does not claim the payload is understood.
+    /// `empty_response` means Zepp explicitly answered with an empty list for
+    /// that window (nothing there); `quarantined` is reserved for payloads the
+    /// parser could not read (#143).
     #[serde(default)]
     pub normalization_by_stream: Vec<NormalizationHealth>,
     /// 最近一次 `PRAGMA integrity_check` 的结果，`None` = 从没跑过。
@@ -271,7 +274,8 @@ impl Database {
     fn normalization_health(&self) -> Result<Vec<NormalizationHealth>> {
         let mut stmt = self.conn.prepare(
             "SELECT r.stream,
-                CASE WHEN q.revision = ?1 THEN 'quarantined'
+                CASE WHEN q.revision = ?1 AND q.empty_response = 1 THEN 'empty_response'
+                     WHEN q.revision = ?1 THEN 'quarantined'
                      WHEN n.revision = ?1 AND n.records_written > 0 THEN 'normalized'
                      WHEN n.revision = ?1 THEN 'processed_without_output'
                      ELSE 'pending' END AS state,

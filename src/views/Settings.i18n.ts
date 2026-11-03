@@ -30,6 +30,7 @@ export const settingsMessages = defineMessages(
     officialNote: '官方数据已接入：睡眠、心率、步数、运动、PAI 和体重都会同步；HRV、血氧、压力等仍由「高级数据」补充。',
     copyAuthLink: '复制授权链接',
     copyAuthLinkHint: '浏览器已登录 Zepp 会直接跳到「同意授权」。想换账号（比如 Google、小米登录），把链接粘到无痕窗口打开。',
+    officialWhy: '为什么要经过 zeppbridge.com？',
     linkCopied: '链接已复制',
     authCancelLogin: '取消登录',
     authInUse: '当前使用',
@@ -39,6 +40,9 @@ export const settingsMessages = defineMessages(
     authManualTitle: '手动填写',
     authManualSub: '手动填写 appToken、user_id 等信息',
     authCollapse: '收起',
+    manualTokenLabel: "应用令牌（App Token）",
+    manualUserIdLabel: "用户 ID（User ID）",
+    manualRegionHostLabel: "区域服务器（Region Host）",
     manualFormHint: '从 mitmproxy/Charles 抓包或浏览器开发者工具获取。需要三个字段：',
     manualTokenPlaceholder: '从 HTTP 请求头 apptoken 字段复制',
     manualUserIdPlaceholder: '从 URL 路径 /users/{user_id}/ 提取',
@@ -54,6 +58,7 @@ export const settingsMessages = defineMessages(
     identifyDevices: '重新识别设备',
     deviceErrorPrefix: '设备识别：',
     noDevices: '尚未识别实体设备；Zepp Cloud 仍可作为云服务同步。',
+    noDevicesOfficial: '尚未识别实体设备。只连官方授权时，只能从已同步的运动里认出手表；完整识别要连「高级数据」。',
     deviceFirmware: (firmware: string) => `固件 ${firmware}`,
     unknownDeviceTitle: '检测到未识别设备',
     unknownDeviceBodyA: '有些 Zepp 账号的设备响应里',
@@ -120,9 +125,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: '默认用 Windows 凭据管理器 / macOS 钥匙串 / Linux 密钥环。macOS 和 Linux 可显式改用仅当前用户可读写的明文凭据文件；Linux 也支持环境变量。auth.json 只含账号与区域等元数据，令牌不写进日志、导出或错误报告。',
     privacyTelemetryTitle: '没有埋点，没有使用统计',
     privacyTelemetryBody: '应用不自动上报任何使用行为。只有你手动点「提交错误报告」时，才发送下面那几类脱敏字段。',
-    starTitle: 'ZeppBridge 帮到你了？',
-    starBody: '去 GitHub 点个 Star，让更多人找到它。',
-    starAction: '点个 Star',
     privacyReportTitle: '设备或运动没有识别？',
     privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
 
@@ -153,7 +155,7 @@ export const settingsMessages = defineMessages(
 - MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
 - 它是 stdio 类型的 MCP server，健康数据只读，不监听端口、不需要 token 或 API key；只有在我允许后发布训练计划时才会联网。
 - 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
-- 它有十五个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）。
+- 它有十五个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
 
 告诉我：
 1. 针对你（我现在用的这个工具）具体该把配置写到哪个文件、用什么命令添加；
@@ -179,6 +181,7 @@ export const settingsMessages = defineMessages(
     // ── 8. 软件更新 ──
     updateChecking: '检查中…',
     updateCheck: '检查更新',
+    updateAuto: '自动更新',
     updateVersion: (version: string) => `版本 ${version}`,
     buildStamp: (stamp: string) => `构建 ${stamp}`,
     updateVersionLoading: '读取中',
@@ -273,7 +276,10 @@ export const settingsMessages = defineMessages(
     manualAuthDone: '手动认证成功，认证信息已保存。',
     manualAuthFailed: '手动认证失败',
     verifyFailed: '验证未完成',
-    clearAuthConfirm: '确定退出账号吗？\n\n只清除登录凭据，本机已同步的历史数据全保留。\n\n注意：暂不支持多账号——换一个账号登录会把两个账号的记录写进同一个本机库。',
+    logoutConfirm: '确定退出账号吗？\n\n只清除登录凭据，本机已同步的历史数据全保留。\n\n这个库只装一个 Zepp 账号：之后用别的账号登录会被拒绝。要换账号，请在登录失败的提示里选「换个账号从头开始」。',
+    freshStart: '换个账号从头开始',
+    freshStartConfirm: '把现在的数据整个挪到一边，用空库重新连接？\n\n旧数据不会删除：它会留在应用旁边的「data-before-日期」文件夹，想回去把名字改回 data 即可。两条通道的登录都会退出，应用会重启。',
+    newAccountWarning: '不要为此新建 Zepp 账号，也不要把手表换绑到别的账号：换绑会清掉手表上的设置。',
     authCleared: '已退出账号，本机已同步的历史数据保留。',
     clearAuthFailed: '无法清除认证信息',
     reprocessed: (count: number) => `本地数据已重新解析，共 ${count} 条标准化记录；云端同步时间未改变。`,
@@ -360,6 +366,7 @@ export const settingsMessages = defineMessages(
     officialNote: 'Official data is live: sleep, heart rate, steps, workouts, PAI and weight sync; HRV, blood oxygen and stress still come via "Advanced data".',
     copyAuthLink: 'Copy authorization link',
     copyAuthLinkHint: 'Already signed in to Zepp in the browser? It jumps straight to consent. For another account (e.g. Google or Xiaomi sign-in), paste the link into a private window.',
+    officialWhy: 'Why does this go through zeppbridge.com?',
     linkCopied: 'Link copied',
     authCancelLogin: 'Cancel sign-in',
     authInUse: 'In use',
@@ -369,6 +376,9 @@ export const settingsMessages = defineMessages(
     authManualTitle: 'Enter manually',
     authManualSub: 'Type in the appToken, user_id and region host',
     authCollapse: 'Collapse',
+    manualTokenLabel: "App token",
+    manualUserIdLabel: "User ID",
+    manualRegionHostLabel: "Regional server (Region Host)",
     manualFormHint: 'Take them from a mitmproxy/Charles capture or your browser devtools. Three fields:',
     manualTokenPlaceholder: 'Copy from the apptoken HTTP header',
     manualUserIdPlaceholder: 'Take from the URL path /users/{user_id}/',
@@ -384,6 +394,7 @@ export const settingsMessages = defineMessages(
     identifyDevices: 'Re-identify devices',
     deviceErrorPrefix: 'Device identification: ',
     noDevices: 'No physical device identified yet; Zepp Cloud still syncs as a cloud source.',
+    noDevicesOfficial: 'No physical device identified yet. With official authorization alone, a watch can only be recognized from synced workouts; connect Advanced data for full identification.',
     deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
     unknownDeviceTitle: 'Unidentified device found',
     unknownDeviceBodyA: 'Some Zepp accounts return device records with ',
@@ -450,9 +461,6 @@ export const settingsMessages = defineMessages(
     privacyTokenBody: 'The default is Windows Credential Manager / macOS Keychain / Linux keyring. macOS and Linux can explicitly use a plaintext credential file readable and writable only by your user; Linux also supports environment variables. auth.json holds only account and region metadata. Tokens never enter logs, data exports or error reports.',
     privacyTelemetryTitle: 'No telemetry, no usage statistics',
     privacyTelemetryBody: 'The app reports no usage on its own. Only pressing "Submit error report" sends the de-identified fields listed below.',
-    starTitle: 'Has ZeppBridge helped you?',
-    starBody: 'A star on GitHub helps more people find it.',
-    starAction: 'Star on GitHub',
     privacyReportTitle: 'A device or workout not recognized?',
     privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, firmware version, model-level numbers (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
 
@@ -483,7 +491,7 @@ What I know about it:
 - The MCP program comes from the zeppbridge-tools archive on ZeppBridge's GitHub Releases page; unzip it and zeppbridge-mcp is inside. I may not have downloaded it yet.
 - It is a stdio MCP server. Health data is read-only, it listens on no port and needs no token or API key; it only uses the network to publish a training plan, and only after I allow that.
 - The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- It exposes fifteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings).
+- It exposes fifteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
 
 Please tell me:
 1. For you specifically — the tool I am talking to right now — which file the config goes in, or which command adds it;
@@ -509,6 +517,7 @@ If you need anything from me (which client I use, where the file lives), just as
     // ── 8. Updates ──
     updateChecking: 'Checking…',
     updateCheck: 'Check for updates',
+    updateAuto: 'Auto-update',
     updateVersion: (version: string) => `Version ${version}`,
     buildStamp: (stamp: string) => `Build ${stamp}`,
     updateVersionLoading: 'loading',
@@ -603,7 +612,10 @@ If you need anything from me (which client I use, where the file lives), just as
     manualAuthDone: 'Manual authentication succeeded; credentials saved.',
     manualAuthFailed: 'Manual authentication failed',
     verifyFailed: 'Verification did not complete',
-    clearAuthConfirm: 'Log out of this account?\n\nOnly sign-in credentials are cleared; synced history stays on this machine.\n\nNote: no multi-account support yet — logging in with another account writes both into the same local library.',
+    logoutConfirm: 'Log out of this account?\n\nOnly sign-in credentials are cleared; synced history stays on this machine.\n\nThis library holds one Zepp account: signing in with a different account afterwards is refused. To switch, choose "Start over with another account" in the sign-in error.',
+    freshStart: 'Start over with another account',
+    freshStartConfirm: 'Move all current data aside and reconnect with an empty library?\n\nNothing is deleted: the old data stays in a "data-before-<date>" folder next to the app — rename it back to "data" to return. Both connections are signed out and the app restarts.',
+    newAccountWarning: "Don't create a new Zepp account for this, and don't move your watch to another account: re-pairing wipes the settings on the watch.",
     authCleared: 'Logged out; synced history stays on this machine.',
     clearAuthFailed: 'Could not clear credentials',
     reprocessed: (count: number) => `Reparsed local data into ${count} normalized records; cloud sync time unchanged.`,
@@ -690,6 +702,7 @@ If you need anything from me (which client I use, where the file lives), just as
     officialNote: 'Los datos oficiales ya están conectados: se sincronizan sueño, frecuencia cardíaca, pasos, entrenamientos, PAI y peso; la VFC, el oxígeno en sangre y el estrés siguen llegando de «Datos avanzados».',
     copyAuthLink: 'Copiar enlace de autorización',
     copyAuthLinkHint: 'Si el navegador ya tiene sesión en Zepp, salta directo al consentimiento. Para otra cuenta (p. ej. con Google o Xiaomi), pega el enlace en una ventana de incógnito.',
+    officialWhy: '¿Por qué pasa por zeppbridge.com?',
     linkCopied: 'Enlace copiado',
     authCancelLogin: 'Cancelar inicio de sesión',
     authInUse: 'En uso',
@@ -699,6 +712,9 @@ If you need anything from me (which client I use, where the file lives), just as
     authManualTitle: 'Ingreso manual',
     authManualSub: 'Escribe appToken, user_id y demás datos',
     authCollapse: 'Contraer',
+    manualTokenLabel: "Token de la aplicación (App Token)",
+    manualUserIdLabel: "ID de usuario (User ID)",
+    manualRegionHostLabel: "Servidor regional (Region Host)",
     manualFormHint: 'Tómalas de una captura de mitmproxy/Charles o de las herramientas de desarrollador del navegador. Son tres campos:',
     manualTokenPlaceholder: 'Cópialo del encabezado HTTP apptoken',
     manualUserIdPlaceholder: 'Tómalo de la ruta de la URL /users/{user_id}/',
@@ -714,6 +730,7 @@ If you need anything from me (which client I use, where the file lives), just as
     identifyDevices: 'Volver a identificar dispositivos',
     deviceErrorPrefix: 'Identificación de dispositivos: ',
     noDevices: 'Aún no se ha identificado ningún dispositivo físico; Zepp Cloud sigue sincronizando como fuente en la nube.',
+    noDevicesOfficial: 'Aún no se ha identificado ningún dispositivo físico. Solo con la autorización oficial, el reloj únicamente se reconoce por los entrenamientos sincronizados; conecta «Datos avanzados» para identificarlo por completo.',
     deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
     unknownDeviceTitle: 'Un dispositivo sin identificar',
     unknownDeviceBodyA: 'Algunas cuentas de Zepp devuelven registros de dispositivos ',
@@ -780,9 +797,6 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyTokenBody: 'Por defecto: Administrador de credenciales de Windows, Llavero de macOS o llavero de Linux. En macOS y Linux puedes elegir un archivo de credenciales en texto plano que solo tu usuario puede leer y escribir; Linux también admite variables de entorno. auth.json solo guarda metadatos de cuenta y región; los tokens no entran en registros, exportaciones ni reportes de error.',
     privacyTelemetryTitle: 'Sin telemetría ni estadísticas de uso',
     privacyTelemetryBody: 'La app no reporta tu uso por su cuenta. Solo cuando tú pulsas «Enviar un reporte de error» salen los campos anonimizados listados abajo.',
-    starTitle: '¿Te ha servido ZeppBridge?',
-    starBody: 'Una estrella en GitHub ayuda a que más gente lo encuentre.',
-    starAction: 'Dar una estrella',
     privacyReportTitle: '¿Un dispositivo o entrenamiento no reconocido?',
     privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, la versión de firmware, números de modelo (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 
@@ -813,7 +827,7 @@ Lo que sé:
 - El programa MCP viene en el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub; al descomprimirlo, zeppbridge-mcp está adentro. Puede que todavía no lo haya descargado.
 - Es un servidor MCP por stdio. Los datos de salud son de solo lectura, no abre ningún puerto y no necesita token ni clave de API; solo usa la red para publicar un plan de entrenamiento, y solo si yo lo permito.
 - La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Ofrece quince herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes).
+- Ofrece quince herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes); y propose_coach_note, que deja una frase para recordar en la bandeja de mi expediente de entrenador y solo cuenta cuando pulso Recordar.
 
 Dime:
 1. Para ti específicamente (la herramienta con la que estoy hablando ahora), en qué archivo va la configuración o qué comando la agrega;
@@ -839,6 +853,7 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     // ── 8. Updates ──
     updateChecking: 'Revisando…',
     updateCheck: 'Buscar actualizaciones',
+    updateAuto: 'Actualización automática',
     updateVersion: (version: string) => `Versión ${version}`,
     buildStamp: (stamp: string) => `Compilación ${stamp}`,
     updateVersionLoading: 'cargando',
@@ -933,7 +948,10 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     manualAuthDone: 'Autenticación manual correcta. Credenciales guardadas.',
     manualAuthFailed: 'La autenticación manual falló',
     verifyFailed: 'La verificación no se completó',
-    clearAuthConfirm: '¿Cerrar la sesión de esta cuenta?\n\nSolo se borran las credenciales de inicio de sesión; todo lo ya sincronizado en este equipo se conserva.\n\nNota: todavía no se puede cambiar de cuenta. Si inicias sesión con otra cuenta, ambas escriben en la misma base de datos local.',
+    logoutConfirm: '¿Cerrar la sesión de esta cuenta?\n\nSolo se borran las credenciales de inicio de sesión; todo lo ya sincronizado en este equipo se conserva.\n\nEsta base de datos guarda una sola cuenta de Zepp: después se rechazará iniciar sesión con otra. Para cambiar, elige «Empezar de cero con otra cuenta» en el aviso de error.',
+    freshStart: 'Empezar de cero con otra cuenta',
+    freshStartConfirm: '¿Apartar todos los datos actuales y volver a conectar con una base vacía?\n\nNo se borra nada: los datos antiguos quedan en una carpeta «data-before-<fecha>» junto a la app; cámbiale el nombre a «data» para volver. Se cierran ambas conexiones y la app se reinicia.',
+    newAccountWarning: 'No crees una cuenta de Zepp nueva para esto ni pases el reloj a otra cuenta: al volver a vincularlo se borran sus ajustes.',
     authCleared: 'Sesión cerrada; el historial ya sincronizado se queda en este equipo.',
     clearAuthFailed: 'No se pudieron borrar las credenciales',
     reprocessed: (count: number) => `Los datos locales se volvieron a analizar en ${count} registros normalizados. La hora de sincronización con la nube no cambió.`,

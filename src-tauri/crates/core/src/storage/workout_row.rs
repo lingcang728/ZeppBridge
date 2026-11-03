@@ -19,7 +19,7 @@ pub(crate) const WORKOUT_DETAIL_COLUMNS: &str = "workout_id, workout_type, start
         elevation_gain_m, elevation_loss_m,
         max_altitude_m, min_altitude_m,
         training_effect, anaerobic_training_effect, rpe,
-        avg_cadence_spm, max_cadence_spm, avg_stride_cm";
+        avg_cadence_spm, max_cadence_spm, avg_stride_cm, gear_id";
 
 pub(crate) struct WorkoutDetailRow {
     pub(crate) workout_id: String,
@@ -53,6 +53,7 @@ pub(crate) struct WorkoutDetailRow {
     avg_cadence_spm: Option<f64>,
     max_cadence_spm: Option<f64>,
     avg_stride_cm: Option<f64>,
+    gear_id: Option<String>,
 }
 
 /// 装配时要从别的表补进来的东西。
@@ -100,6 +101,7 @@ impl WorkoutDetailRow {
             avg_cadence_spm: row.get(28)?,
             max_cadence_spm: row.get(29)?,
             avg_stride_cm: row.get(30)?,
+            gear_id: row.get(31)?,
         })
     }
 
@@ -124,6 +126,7 @@ impl WorkoutDetailRow {
             avg_cadence_spm: self.avg_cadence_spm,
             max_cadence_spm: self.max_cadence_spm,
             avg_stride_cm: self.avg_stride_cm,
+            gear_id: self.gear_id,
             hr_zones: extras.hr_zones,
             start_time: parse_datetime(&self.start, "workout.start_time")?,
             end_time: parse_datetime(&self.end, "workout.end_time")?,

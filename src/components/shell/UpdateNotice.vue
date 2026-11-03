@@ -1,42 +1,83 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { computed, ref, watch } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
 import BrandMark from '../BrandMark.vue';
-import { acknowledgeUpdate, notesForLocale, releaseRows, releaseUrl, updateNotice } from '../../services/updateNotice';
+import WhyHalfData from '../WhyHalfData.vue';
+import ReleaseNotesList from './ReleaseNotesList.vue';
+import LetterEnvelope from '../letters/LetterEnvelope.vue';
+import { letterVersions } from '../../services/letters';
+import { baseVersion, lettersBetween } from '../../lib/letters/parse';
+import {
+  acknowledgeUpdate, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale, releaseRows, updateNotice,
+} from '../../services/updateNotice';
 import { locale } from '../../i18n';
 import { useUpdateNoticeText } from './UpdateNotice.i18n';
 
 const t = useUpdateNoticeText();
 const receipt = computed(() => updateNotice.receipt);
-const rows = computed(() => releaseRows(notesForLocale(receipt.value?.notes ?? '', locale.value)));
+
+/* 本版说明随应用打包、按界面语言取；不是本版（或没打包）才用更新清单里带来的那份。 */
+const bundled = ref<string | null>(null);
+watch([() => receipt.value?.version, locale], async ([version, language]) => {
+  bundled.value = null;
+  if (!version) return;
+  const notes = await loadBundledNotes(version, language);
+  if (receipt.value?.version === version && locale.value === language) bundled.value = notes;
+}, { immediate: true });
+const rows = computed(() => releaseRows(bundled.value ?? notesForLocale(receipt.value?.notes ?? '', locale.value)));
+/* 按新增 / 改进 / 修复分组列出，不再每行前面挂一个小标签（用户 2026-10-19：「很难读」）。 */
+const groups = computed(() => groupRows(rows.value));
+
+/* 3.0.7 起每一版都有作者来信：有信就用信封（更新说明是其中一张信纸），跳过几版才更新的人几封捆成一叠。没有信的老版本仍用这张卡。 */
+const letters = computed(() => (receipt.value ? lettersBetween(letterVersions(), receipt.value.from, receipt.value.version) : []));
+
+/* 3.0.2 先放一页「为什么有些数据没有」，再看改了什么。 */
+const page = ref(0);
+watch(() => receipt.value?.version, () => { page.value = 0; });
+const onLeadPage = computed(() => !!receipt.value && leadsWithWhyHalfData(receipt.value.version) && page.value === 0);
+
 const origin = () => document.querySelector<HTMLElement>('.brand');
-const details = () => {
-  if (!receipt.value) return;
-  const url = releaseUrl(receipt.value.version);
-  if ('__TAURI_INTERNALS__' in window) void openUrl(url).catch(() => undefined);
-  else window.open(url, '_blank', 'noopener,noreferrer');
+
+/* 点「知道了」：卡片从这颗按钮往左上角一路化成灰飞走，背后的模糊退掉回到主页（lib/motion/ashDissolve.ts）。
+   放不了（减少动态效果、没有 WebGL）就照常收起。 */
+const dissolving = ref(false);
+const acknowledge = async (event: MouseEvent) => {
+  if (dissolving.value) return;
+  dissolving.value = true;
+  const button = event.currentTarget as HTMLElement;
+  const panel = button.closest<HTMLElement>('[data-modal-dialog]');
+  const rect = button.getBoundingClientRect();
+  try {
+    if (panel) {
+      const { ashDissolve } = await import('../../lib/motion/ashDissolve');
+      await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'));
+    }
+  } catch {
+    // 动画出错不能卡住「知道了」。
+  }
+  acknowledgeUpdate();
+  dissolving.value = false;
 };
 </script>
 
 <template>
-  <ModalDialog v-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
+  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="baseVersion(receipt.version)" :notes="groups" :origin="origin()" @done="acknowledgeUpdate" />
+  <ModalDialog v-else-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
     <div class="release-card">
       <header class="release-header">
         <span class="release-mark"><BrandMark :size="32" /></span>
         <div><h2 id="update-notice-title">{{ t.title(receipt.version) }}</h2><p v-if="receipt.from">{{ t.since(receipt.from) }}</p></div>
       </header>
-      <div class="release-body">
-        <div class="release-version">v{{ receipt.version }}</div>
-        <div v-for="(row, index) in rows" :key="index" :class="['release-row', { 'release-heading': row.heading }]">
-          <span v-if="!row.heading" class="release-tag">{{ t[row.kind] }}</span>
-          <p>{{ row.text }}</p>
-        </div>
-        <p v-if="!rows.length" class="release-empty">{{ t.empty }}</p>
+      <div v-if="onLeadPage" class="release-body">
+        <WhyHalfData title-id="update-notice-why" />
+      </div>
+      <div v-else class="release-body">
+        <ReleaseNotesList :groups="groups" />
+
       </div>
       <footer class="release-actions">
-        <button type="button" class="button secondary" @click="details">{{ t.fullNotes }}</button>
-        <button type="button" class="button primary acknowledge" @click="acknowledgeUpdate">{{ t.acknowledge }}</button>
+        <button v-if="onLeadPage" type="button" class="button primary acknowledge" @click="page = 1">{{ t.next }}</button>
+        <button v-else type="button" class="button primary acknowledge" :disabled="dissolving" @click="acknowledge">{{ t.acknowledge }}</button>
       </footer>
     </div>
   </ModalDialog>
@@ -44,19 +85,14 @@ const details = () => {
 
 <style scoped>
 .release-card { padding: 20px; }
-.release-header { display: flex; align-items: center; gap: 18px; }
-.release-mark { display: grid; place-items: center; width: 58px; height: 58px; flex: none; border-radius: 18px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
-h2 { margin: 0; font-size: 26px; line-height: 1.3; letter-spacing: -.02em; }
-.release-header p { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
-.release-body { margin: 32px 0; max-height: 45vh; overflow-y: auto; overscroll-behavior: contain; }
-.release-version { margin-bottom: 18px; font-weight: 650; font-size: 17px; }
-.release-row { display: flex; align-items: baseline; gap: 16px; margin: 14px 0; }
-.release-row p { margin: 0; min-width: 0; white-space: pre-wrap; font-size: 16px; line-height: 1.75; }
-.release-tag { flex: none; padding: 2px 9px; border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1.6; }
-.release-heading { margin-top: 24px; font-weight: 650; }
-.release-empty { color: var(--muted); line-height: 1.7; }
-.release-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding-top: 8px; }
-.release-actions .button { min-height: 44px; padding-inline: 20px; font-size: 15px; }
-.acknowledge { min-width: 110px; }
-@media (max-width: 600px) { .release-card { padding: 4px; } h2 { font-size: 22px; } .release-header { gap: 12px; } .release-body { margin: 24px 0; } .release-row { gap: 10px; } .release-actions .button { flex: 1; } }
+.release-header { display: flex; align-items: center; gap: 14px; }
+.release-mark { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 15px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+h2 { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.3; letter-spacing: -.015em; }
+.release-header p { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
+.release-body { margin: 24px 0; max-height: 52vh; overflow-y: auto; overscroll-behavior: contain; }
+.release-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.release-actions .button { min-height: 42px; padding-inline: 18px; font-size: var(--fs-xs); }
+.acknowledge { min-width: 104px; }
+
+@media (max-width: 600px) { .release-card { padding: 4px; } h2 { font-size: var(--fs-xl); } .release-header { gap: 12px; } .release-body { margin: 20px 0; } .release-actions .button { flex: 1; } }
 </style>

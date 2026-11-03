@@ -17,6 +17,7 @@ import { useTourText } from './tour.i18n';
 import { autoSupported } from '../../composables/ai/useAutoHandoff';
 import { withPlatformKeys } from '../../lib/platformKeys';
 import { onMotionEscape } from '../../lib/motion/interrupt';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const t = useTourText();
 const { active, box, settling, current, next, prev, skip } = useTour();
@@ -25,7 +26,7 @@ const sandbox = inSandbox();
 const card = ref<HTMLElement | null>(null);
 const cardSize = ref({ width: 360, height: 160 });
 const viewport = ref({ width: window.innerWidth, height: window.innerHeight });
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 
 /* ---------- 说明卡上的字：只在卡藏起来的时候换（淡出途中不换字，不出现「旧卡新字」那一帧） ---------- */
 type Snap = NonNullable<typeof current.value>;

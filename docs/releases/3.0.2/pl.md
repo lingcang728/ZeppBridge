@@ -1,0 +1,6 @@
+- Fixed: **Pobieranie historii (#136)**: opcja „Wszystko (do 10 lat)” nie kończy się już błędem „nieprawidłowa data”, a wybór własnej daty początkowej nie jest już pusty.
+- Improved: **Logowanie do danych zaawansowanych tylko przez e-mail lub telefon + hasło**. Okno logowania wyjaśnia to na górze i ukrywa przyciski usług zewnętrznych; jeśli zalogujesz się na inne konto niż autoryzowane oficjalnie, ZeppBridge od razu to zasygnalizuje.
+- Improved: **Oficjalna autoryzacja nie czeka już w milczeniu**. Gdy zeppbridge.com jest nieosiągalne, aplikacja wyjaśnia przyczynę i podpowiada, co sprawdzić. Nowy przycisk „Sprawdź teraz” sprawdza połączenie od razu, a adres zapasowy jest próbowany automatycznie.
+- Added: **„Dlaczego brakuje części danych?”** jest zawsze dostępne w Ustawienia → Konto.
+- Added: **Interfejs w języku polskim**.
+- Improved: **Informacje o wydaniu dostosowują się do języka interfejsu**, we wszystkich 12 językach.

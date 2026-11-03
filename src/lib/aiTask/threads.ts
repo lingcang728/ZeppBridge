@@ -111,3 +111,56 @@ export const sampleStrand = (tree: ThreadTree, id: string, n = 12): Pt[] => {
   }
   return points;
 };
+
+/* ---------- 交出动画的路线（2026-10-28「加附件」）：按弧长等距取点，牌和收线的虚线才对得上 ---------- */
+
+/** 直线写成三次曲线，好和别的段拼成一条路线。 */
+const line = (a: Pt, d: Pt): Cubic => ({ a, b: { x: lerp(a.x, d.x, 1 / 3), y: lerp(a.y, d.y, 1 / 3) }, c: { x: lerp(a.x, d.x, 2 / 3), y: lerp(a.y, d.y, 2 / 3) }, d });
+const backwards = (q: Cubic): Cubic => ({ a: q.d, b: q.c, c: q.b, d: q.a });
+
+/** 一张牌飞进锁的路线：枝倒着走（牌 → 分叉）、主干倒着走（分叉 → 锁左沿），再钻进锁心 `center`。 */
+export const strandRoute = (tree: ThreadTree, id: string, center: Pt): Cubic[] => {
+  const strand = tree.strands.find((s) => s.id === id);
+  if (!strand) return [];
+  return [...[...strand.branch].reverse().map(backwards), backwards(tree.trunks[strand.trunk]!), line(tree.origin, center)];
+};
+
+/** 附件的路线：从锁心出来，沿右边那束线的中间一根走到右牌左沿，再弯进托盘里它那一格 `slot`。 */
+export const slotRoute = (tree: ThreadTree, center: Pt, radius: number, slot: Pt): Cubic[] => {
+  const mid = tree.right[1] ?? tree.right[0];
+  if (!mid) return [line(center, { x: center.x + radius, y: center.y }), ease({ x: center.x + radius, y: center.y }, slot)];
+  return [line(center, mid.a), mid, ease(mid.d, slot, 0.5)];
+};
+
+/** 一条路线按弧长等距取的 `n` 个点（含两端）；`marks[k]` 是第 k 段走完时的弧长占比（0–1）。 */
+export interface Trace { points: Pt[]; marks: number[] }
+
+export const traceEven = (route: Cubic[], n = 24): Trace => {
+  if (!route.length) return { points: [], marks: [] };
+  const STEPS = 48;
+  const dense: Array<{ p: Pt; s: number }> = [{ p: route[0]!.a, s: 0 }];
+  const ends: number[] = [];
+  let s = 0;
+  for (const q of route) {
+    let last = q.a;
+    for (let i = 1; i <= STEPS; i += 1) {
+      const p = cubicPoint(q, i / STEPS);
+      s += Math.hypot(p.x - last.x, p.y - last.y);
+      dense.push({ p, s });
+      last = p;
+    }
+    ends.push(s);
+  }
+  const total = s || 1;
+  const points: Pt[] = [];
+  let j = 0;
+  for (let i = 0; i < n; i += 1) {
+    const at = (i / Math.max(1, n - 1)) * total;
+    while (j < dense.length - 2 && dense[j + 1]!.s < at) j += 1;
+    const a = dense[j]!;
+    const b = dense[j + 1] ?? a;
+    const f = b.s > a.s ? Math.min(1, (at - a.s) / (b.s - a.s)) : 0;
+    points.push({ x: lerp(a.p.x, b.p.x, f), y: lerp(a.p.y, b.p.y, f) });
+  }
+  return { points, marks: ends.map((e) => e / total) };
+};

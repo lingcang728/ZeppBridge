@@ -83,6 +83,8 @@ struct WindowPlan {
     differs: bool,
     target_empty: bool,
     had_real: bool,
+    /// 账本上这个窗口最后一次发送没有确认结果（断网 / 超时 / 发到一半）。
+    uncertain: bool,
 }
 
 impl Database {
@@ -413,6 +415,7 @@ impl Database {
                 differs: target != sent.days,
                 target_empty: target.values().all(Vec::is_empty),
                 had_real: sent.real_count() > 0,
+                uncertain: sent.uncertain,
             });
         }
         let roll = matches!(request, PublishRequest::Roll);
@@ -424,9 +427,13 @@ impl Database {
         }
 
         // 从最远的窗口往今天排。自动的滚动推送不清空任何窗口。
+        //
+        // 没确认送达的窗口也要重发（issue #143）：`unknown` 在账本里按「发过了」算，
+        // 内容一样的草稿再发一次只会得到 `not_needed`，用户只能改一个字去骗它重发。
+        // 整窗替换是幂等的，重发一次不会在手表上多出训练。
         let mut must: Vec<bool> = plans
             .iter()
-            .map(|plan| plan.differs && !(roll && plan.target_empty))
+            .map(|plan| (plan.differs || plan.uncertain) && !(roll && plan.target_empty))
             .collect();
         if matches!(request, PublishRequest::Clear) {
             // 用户确认过的清空：账本说空的也照发一次，服务端和账本对不上时以它对齐。

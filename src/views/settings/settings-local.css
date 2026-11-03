@@ -12,3 +12,7 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 .alert.success { color: var(--accent); }
 .alert.danger { color: var(--danger); }
 .alert.warning { color: var(--warning); }
+/* 「为什么要经过 zeppbridge.com？」：一行字链接，开常见问题（3.0.6；账号卡和登录方式共用）。 */
+.why-link { justify-self: start; padding: 0; border: 0; background: none; color: var(--accent); font-size: var(--fs-2xs); text-align: left; cursor: pointer; }
+.why-link:hover { text-decoration: underline; }
+.why-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }

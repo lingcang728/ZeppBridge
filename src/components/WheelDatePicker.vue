@@ -7,7 +7,7 @@
  * 三列的先后按界面语言：中文年月日，英文月日年，其余日月年。 */
 import { computed } from 'vue';
 import WheelColumn from './WheelColumn.vue';
-import { clampDate, daysInMonth } from '../lib/wheel/momentum';
+import { clampDate, daysInMonth, wheelDateValue } from '../lib/wheel/momentum';
 import { defineMessages, locale, useMessages } from '../i18n';
 
 const props = withDefaults(defineProps<{
@@ -29,7 +29,7 @@ const today = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
-const value = computed(() => props.modelValue ?? props.min ?? today());
+const value = computed(() => wheelDateValue(props.modelValue, props.min, today()));
 const parts = computed(() => {
   const [y, m, d] = value.value.split('-').map(Number);
   return { y: y!, m: m!, d: d! };
@@ -79,4 +79,9 @@ const order = computed(() => (locale.value === 'zh' ? ['y', 'm', 'd'] : locale.v
 }
 .wheel-date > * { flex: 1 1 0; }
 .wheel-date > .col-y { flex-grow: 1.3; }
+/* 三列 flex-basis 都是 0、WheelColumn 自己又是 min-width: 0：放进按内容定宽的容器（设置页的
+   .s-row-control）就整个缩成一条细杠，「自定义起点」看着一片空白（#136，用户 2026-10-19 截图）。
+   给每列一个保底宽度，放在哪里都撑得开；容器更宽时照常按比例分。 */
+.wheel-date > .col-m, .wheel-date > .col-d { min-width: 68px; }
+.wheel-date > .col-y { min-width: 88px; }
 </style>

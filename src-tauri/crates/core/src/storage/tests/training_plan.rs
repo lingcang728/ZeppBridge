@@ -102,6 +102,19 @@ fn the_ledger_is_written_before_sending_and_doubt_stays_visible() {
     let overview = db.plan_overview(day(TODAY)).unwrap();
     assert!(overview.uncertain);
     assert_eq!(overview.planned.len(), 1);
+
+    // issue #143：没确认送达的那一周可以再发，不会因为「内容没变」被判成 not_needed。
+    let retry = sends(publish(&db, PublishRequest::Roll, false));
+    assert_eq!(retry.len(), 1);
+    assert_eq!(dates(&retry[0].body), ["2026-10-03"]);
+    db.finish_plan_publish(retry[0].publish_id, &SendOutcome::Delivered)
+        .unwrap();
+    assert!(!db.plan_overview(day(TODAY)).unwrap().uncertain);
+    // 送到了就不再重发。
+    assert!(matches!(
+        publish(&db, PublishRequest::Roll, false),
+        Prepared::NotNeeded
+    ));
 }
 
 #[test]
@@ -514,4 +527,49 @@ fn clearing_the_watch_removes_every_week_not_just_this_one() {
     let overview = db.plan_overview(day(TODAY)).unwrap();
     assert!(overview.planned.is_empty(), "两周都不该再算生效");
     assert!(sent_names(&db).is_empty());
+}
+
+#[test]
+fn history_keeps_every_plan_that_reached_the_watch() {
+    let db = Database::in_memory().unwrap();
+    let first = draft(
+        &db,
+        json!({ "summary": "Base week", "workouts": [run("2026-10-03", "A")] }),
+    );
+    deliver(
+        &db,
+        publish(&db, PublishRequest::Draft { id: first }, false),
+    );
+    let second = draft(
+        &db,
+        json!({ "workouts": [run("2026-10-03", "B"), run("2026-10-05", "C")] }),
+    );
+    deliver(
+        &db,
+        publish(&db, PublishRequest::Draft { id: second }, false),
+    );
+    // 滚动推送只是补发同一份，不算一份新计划。
+    let _ = db
+        .prepare_plan_publish(&PublishRequest::Roll, day(TODAY), false)
+        .unwrap();
+    deliver(&db, publish(&db, PublishRequest::UndoLast, false));
+
+    let history = db.plan_history(10).unwrap();
+    let kinds: Vec<&str> = history.iter().map(|e| e.record.kind.as_str()).collect();
+    assert_eq!(kinds, ["undo", "publish", "publish"]);
+    let names = |i: usize| -> Vec<String> {
+        history[i]
+            .workouts
+            .iter()
+            .map(|w| w.workout.name.clone())
+            .collect()
+    };
+    // 撤销换回来的是 A；第二份是 B、C，换下了 A；第一份就是 A。
+    assert_eq!(names(0), ["A"]);
+    assert_eq!(names(1), ["B", "C"]);
+    assert_eq!(history[1].replaced, 1);
+    assert_eq!(history[1].origin, Some(DraftOrigin::User));
+    assert_eq!(names(2), ["A"]);
+    assert_eq!(history[2].summary.as_deref(), Some("Base week"));
+    assert!(history.iter().all(|e| e.record.state == "sent"));
 }

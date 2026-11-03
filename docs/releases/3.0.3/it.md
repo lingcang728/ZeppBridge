@@ -1,0 +1,6 @@
+- Added: **Le date seguono l’area geografica del sistema**. L’ordine delle date e il formato 12/24 ore seguono il formato regionale del sistema operativo, anche con l’interfaccia in inglese; puoi modificarli in Impostazioni → Schermo e lingua.
+- Improved: **Chiarito cosa manca con la sola autorizzazione ufficiale**. L’elenco degli allenamenti, i dispositivi e la scheda dell’alimentazione ora indicano che il ciclismo e gli altri allenamenti, il riconoscimento dei dispositivi e i registri dei pasti richiedono «Dati avanzati».
+- Improved: **Riconosciuti più orologi**. Aggiunti i codici modello per Bip 6, Balance 3, Active 2 Square, Active 3 Premium, T-Rex Ultra 2, Cheetah Pro, Balance Ultra e Helio Strap Pro.
+- Improved: **Le note di rilascio si dissolvono in cenere**. Fai clic su «Ho capito» e la scheda si disgrega dal pulsante per tornare alla pagina principale.
+- Fixed: **Misurazioni singole di SpO₂ incomplete**. Nelle giornate con molte misurazioni, il recupero non si ferma più alla prima pagina e scarica anche tutte le rimanenti.
+- Fixed: **Sonno e frequenza cardiaca sfalsati di un’ora con l’ora legale**. Quando l’orologio trasmette il fuso orario senza l’ora legale, questa viene integrata dal fuso orario del dispositivo; al primo avvio dopo l’aggiornamento, i dati locali vengono rielaborati in background.

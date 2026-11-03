@@ -7,6 +7,7 @@
     "core:default",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-open",
+    "dialog:allow-save",
     "clipboard-manager:allow-read-text",
     "updater:default",
     "process:allow-restart",

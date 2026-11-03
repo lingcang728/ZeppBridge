@@ -25,6 +25,10 @@ import type { AiTask } from '../lib/bridge/types';
 import type { PlanPublishAction } from '../types/trainingPlan';
 import { demoBaselines, demoHeartExtremes, demoHourlySteps, demoInsight, demoTrainingBalance, demoWorkoutSeries, demoZones } from './details';
 import { createDemoOperations } from './operations';
+import { createDemoWorkoutEdits } from './workoutEdits';
+import { createDemoImports } from './imports';
+import { createDemoLogbook } from './logbook';
+import { createDemoDataLetters } from './dataLetters';
 import type { HeartRateZonePreference } from '../types';
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -55,7 +59,14 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   const listeners = new Map<string, number[]>();
   let nextId = 1;
   let status = demoStatus(data);
+  let excludedMetrics: string[] = [];
   let demoPicks: unknown[] = [];
+  const feedbackDone = new Set<string>();
+  /* 教练档案：演示里收件箱有一条 AI 的提议、档案里有一条自己写的。 */
+  const coachNotes: import('../types/coachNotes').CoachNote[] = [
+    { id: 1, text: demoText().noteMine, state: 'accepted', source: 'user', source_name: null, created_at: '2026-10-12T12:00:00Z', updated_at: '2026-10-12T12:00:00Z', decided_at: '2026-10-12T12:00:00Z' },
+    { id: 2, text: demoText().noteProposed, state: 'proposed', source: 'mcp', source_name: 'Claude', created_at: '2026-10-21T09:00:00Z', updated_at: '2026-10-21T09:00:00Z', decided_at: null },
+  ];
 
   const emit = (event: string, payload: unknown) => {
     for (const id of listeners.get(event) ?? []) callbacks.get(id)?.({ event, id: 0, payload });
@@ -86,6 +97,12 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     return { items: all.slice(offset, offset + limit), total: all.length };
   };
 
+  const openUrl = (url: unknown) => {
+    hostPost('open-url', { url: String(url ?? '') });
+    if (/chatgpt|claude|kimi|gemini|deepseek|qwen/i.test(String(url))) window.dispatchEvent(new Event('demo-handoff'));
+    return null;
+  };
+
   const handlers: Record<string, Handler> = {
     app_is_ready: () => true,
     'plugin:app|version': () => FALLBACK_APP_VERSION,
@@ -96,7 +113,9 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     },
     'plugin:event|unlisten': () => null,
     'plugin:webview|set_webview_zoom': () => null,
-    'plugin:opener|open_url': (args) => { hostPost('open-url', { url: String(args.url ?? '') }); if (/chatgpt|claude|kimi|gemini|deepseek|qwen/i.test(String(args.url))) window.dispatchEvent(new Event('demo-handoff')); return null; },
+    'plugin:opener|open_url': (args) => openUrl(args.url),
+    // 交给 AI 打开网站走自家命令（AppImage 要先剥库路径），演示里同样只转给宿主页。
+    open_external_url: (args) => openUrl(args.url),
     'plugin:opener|reveal_item_in_dir': () => null,
     'plugin:drag|start_drag': () => null,
     set_tray_locale: () => null,
@@ -118,7 +137,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     get_pending_restore: () => null,
 
     list_life_events: () => [{
-      id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', createdAt: '', updatedAt: '',
+      id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: '', updatedAt: '',
     }],
     get_health_overview: () => demoOverview(data),
     get_heart_rate_series: (args) => hoursOf(Number(args.hours ?? 24)),
@@ -127,7 +146,13 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
       return data.stress.filter((point) => new Date(point.timestamp).getTime() >= from);
     },
     get_metric_series: (args) => metricSeries(data, Number(args.days ?? 7), (args.metrics as string[] | null) ?? null),
-    get_metric_baselines: a => demoBaselines(data, a.metrics as string[]),
+    get_metric_baselines: a => demoBaselines(data, (a.metrics as string[]).filter(m => !excludedMetrics.includes(m))),
+    metric_exclusions: () => [...excludedMetrics],
+    set_metric_excluded: a => {
+      excludedMetrics = excludedMetrics.filter(m => m !== a.metric);
+      if (a.excluded) excludedMetrics = [...excludedMetrics, String(a.metric)].sort();
+      return [...excludedMetrics];
+    },
     get_daily_heart_rate_extremes: a => demoHeartExtremes(data, Number(a.days ?? 30)),
     get_hourly_steps: a => demoHourlySteps(data, String(a.start), String(a.end)),
     get_training_balance: a => demoTrainingBalance(data, Number(a.days ?? 90)),
@@ -156,6 +181,27 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     ai_exchange_list: () => [],
     training_plan_adherence: a => data.workouts.filter(w => w.start_time.slice(0, 10) >= String(a.from) && w.start_time.slice(0, 10) <= String(a.to)).map(w => ({ date: dayKey(new Date(w.start_time)), planned: { name: w.effective_type, sport: w.effective_type, seconds: w.moving_seconds, hr_low: 130, hr_high: 150 }, actual: [{ workout_id: w.workout_id, seconds: w.moving_seconds, avg_hr: w.avg_hr, sport: w.effective_type, compatible: true }], verdict: 'done' })),
     training_plan_update_draft: (args) => plan.updateDraft(args.document as import('../types/trainingPlan').PlanDocument),
+    /* 跑后打分：演示里拿最近一次跑步当「练完了计划」，打分 / 关掉 / 这周别问后不再问。 */
+    workout_feedback_prompt: () => {
+      const run = data.workouts.find(w => w.effective_type.includes('running'));
+      if (!run || feedbackDone.has(run.workout_id)) return null;
+      const seconds = run.moving_seconds ?? 1800;
+      return { date: dayKey(new Date(run.start_time)), planned: { plan_workout_id: 1, name: 'Tempo 6×800m', sport: 'running', seconds: Math.round(seconds / 0.92 / 60) * 60, meters: null, hr_low: 145, hr_high: 160 },
+        actual: { workout_id: run.workout_id, sport: run.effective_type, start_time: run.start_time, end_time: run.end_time, seconds, meters: run.distance_meters ?? null, avg_hr: run.avg_hr ?? null },
+        completion: 0.92, completion_basis: 'duration', expires_at: new Date(Date.parse(run.end_time) + 48 * 3600e3).toISOString() };
+    },
+    workout_feedback_get: () => null,
+    workout_feedback_save: a => { feedbackDone.add(String((a.input as { workout_id: string }).workout_id)); },
+    workout_feedback_dismiss: a => { feedbackDone.add(String(a.workoutId)); },
+    workout_feedback_snooze: () => { data.workouts.forEach(w => feedbackDone.add(w.workout_id)); return dayKey(new Date(data.now.getTime() + 7 * 864e5)); },
+    workout_feedback_adjusted: () => null,
+    training_plan_history: () => [],
+    coach_notes_list: () => ({ accepted: coachNotes.filter(n => n.state === 'accepted'), proposed: coachNotes.filter(n => n.state === 'proposed').reverse() }),
+    coach_note_add: a => { const id = coachNotes.length + 1; const now = new Date().toISOString(); coachNotes.push({ id, text: String(a.text).trim(), state: 'accepted', source: 'user', source_name: null, created_at: now, updated_at: now, decided_at: now }); return id; },
+    coach_note_decide: a => { const note = coachNotes.find(n => n.id === Number(a.id)); if (note) { note.state = a.accept ? 'accepted' : 'rejected'; note.decided_at = new Date().toISOString(); } },
+    coach_note_edit: a => { const note = coachNotes.find(n => n.id === Number(a.id)); if (note) note.text = String(a.text).trim(); },
+    coach_note_delete: a => { const at = coachNotes.findIndex(n => n.id === Number(a.id)); if (at >= 0) coachNotes.splice(at, 1); },
+    coach_notes_export: a => `C:/Users/demo/Desktop/ZeppBridge AI/${String(a.fileStem)}.md`,
     'plugin:clipboard-manager|read_text': () => clipboard,
     'plugin:clipboard-manager|write_text': a => { clipboard = String(a.text ?? ''); },
     ai_template_list: () => demoTemplates(),
@@ -178,13 +224,17 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     training_plan_set_ai_publish: a => plan.setAiPublish(!!a.allowed),
     training_plan_publish: (args) => plan.publish(args.action as PlanPublishAction, Boolean(args.confirmClear)),
   };
-  Object.assign(handlers, operations.handlers, {
+  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), {
+    // 演示里不发系统通知。
+    workout_feedback_toast_due: () => null, workout_feedback_toast_show: () => null,
+    export_my_records: () => 128,
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
     recover_advanced_credentials: () => handlers.get_login_status({}),
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },
     cancel_web_login: () => ({ state: 'idle', message: '', page_url: '' }),
     start_official_login: () => handlers.get_official_status({}), recover_official_credentials: () => handlers.get_official_status({}), cancel_official_login: () => handlers.get_official_status({}),
+    check_official_login_now: () => handlers.get_official_status({}),
     disconnect_official: () => ({ state: 'disconnected', message: null, message_code: null, user_id_masked: null, nickname: null, connected_at: null, authorize_url: null }),
     cancel_sync: () => null,
     get_workout_type_options: () => ['running', 'cycling', 'walking', 'hiking', 'pool_swim', 'strength', 'yoga'].map(key => ({ key, label: key, family: key })),

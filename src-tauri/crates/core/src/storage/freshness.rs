@@ -163,6 +163,13 @@ impl Database {
     /// 掉出 MIN/MAX；换算失败让这张表不报边界，和「没数据」同等处理，
     /// 而不是把整个查询拖下水。
     pub(super) fn coverage_day_bounds(&self) -> Result<(Option<String>, Option<String>)> {
+        self.coverage_day_bounds_in(false)
+    }
+
+    pub(super) fn coverage_day_bounds_in(
+        &self,
+        visible_only: bool,
+    ) -> Result<(Option<String>, Option<String>)> {
         let mut earliest: Option<String> = None;
         let mut latest: Option<String> = None;
         // 样本表的两端逐指标在唯一索引上取（见 `sample_timestamp_bounds`），
@@ -175,7 +182,14 @@ impl Database {
                 "SELECT MIN(start_time), MAX(end_time) FROM sleep_sessions",
                 true,
             ),
-            ("SELECT MIN(start_time), MAX(end_time) FROM workouts", true),
+            (
+                if visible_only {
+                    "SELECT MIN(start_time), MAX(end_time) FROM workouts_visible"
+                } else {
+                    "SELECT MIN(start_time), MAX(end_time) FROM workouts"
+                },
+                true,
+            ),
         ] {
             let (low, high) = if query.is_empty() {
                 samples.clone()

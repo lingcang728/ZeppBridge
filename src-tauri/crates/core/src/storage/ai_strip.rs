@@ -26,8 +26,8 @@ pub struct DayStripRow {
 
 impl Database {
     pub fn ai_task_day_strip(&self, days_before: i64, end: NaiveDate) -> Result<Vec<DayStripRow>> {
-        // 时间桥只要 90 天；牌桌的「6 个月」要从五个月前的 1 号起，最多 184 天。
-        let count = days_before.clamp(1, 186);
+        // 时间桥只要 90 天；牌桌的「全部」（3.0.4）要从九年前的 1 月 1 日起，最多 3653 天。
+        let count = days_before.clamp(1, 3700);
         let start = end - Duration::days(count - 1);
         let first = start.to_string();
         let last = end.to_string();
@@ -55,7 +55,7 @@ impl Database {
                     }
                 }
                 AiTaskCategory::Workout => {
-                    let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'), workout_id, moving_seconds FROM workouts WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
+                    let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'), workout_id, moving_seconds FROM workouts_visible WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
                     let mut complete = BTreeMap::<String, bool>::new();
                     for row in stmt.query_map(params![first, last], |r| {
                         Ok((

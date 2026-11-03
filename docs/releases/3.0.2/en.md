@@ -1,0 +1,6 @@
+- Fixed: **History backfill (#136)**: “All (up to 10 years)” no longer fails with “invalid date”, and the custom start-date picker is no longer blank.
+- Improved: **Advanced data signs in with email or phone + password only**. The sign-in window says so at the top and hides third-party buttons; signing in to a different account than your official authorization gets flagged right away.
+- Improved: **Official authorization no longer waits silently**. If zeppbridge.com can’t be reached, it says why and what to check. A new “Check now” button checks right away, and a backup address is tried automatically.
+- Added: **“Why is some data missing?”** is always available in Settings → Account.
+- Added: **Polish interface**.
+- Improved: **Release notes follow your interface language**, in all 12 languages.

@@ -8,6 +8,8 @@ const props = defineProps<{
   /** 从哪个元素长出来、缩回哪里（舞台上被点的那张牌）。不给就用打开它时聚焦的元素 / 最近一次按下的位置。
       牌是按 pointerdown 拖的、点开时焦点不在它身上：不显式给的话，关的时候会缩进刚点的「收起」按钮，看上去是凭空消失（10-13）。 */
   origin?: HTMLElement | null;
+  /** 不画玻璃面板、不留内边距：信封这类自己就是「物件」的浮层用（components/letters/LetterEnvelope.vue）。 */
+  bare?: boolean;
 }>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const panel = ref<HTMLElement | null>(null);
@@ -23,7 +25,7 @@ const isTopmost = () => {
 const focusableElements = () => Array.from(panel.value?.querySelectorAll<HTMLElement>(
   'button, a[href], input, select, textarea, [tabindex]',
 ) ?? []).filter((element) => element.tabIndex >= 0
-  && !element.matches(':disabled') && element.getClientRects().length > 0);
+  && !element.matches(':disabled') && !element.closest('[inert]') && element.getClientRects().length > 0);
 
 const onKeydown = (event: KeyboardEvent) => {
   if (!isTopmost()) return;
@@ -79,7 +81,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
-      <section ref="panel" class="dialog-panel" :style="maxWidth ? { maxWidth: `${maxWidth}px` } : undefined" data-modal-dialog role="dialog" aria-modal="true"
+      <section ref="panel" :class="['dialog-panel', { 'is-bare': bare }]" :style="maxWidth ? { maxWidth: `${maxWidth}px` } : undefined" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
         <span class="dialog-glass" aria-hidden="true"></span>
         <div class="dialog-scroll"><slot /></div>
@@ -103,6 +105,21 @@ onUnmounted(() => {
 .dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
 /* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
 .dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
+/* 面板本身只是焦点的落脚点（打开时 focus 它，读屏会念标题），不是控件。启动时弹出的更新提示前面没有
+   任何鼠标操作，Chromium 把这次程序聚焦当成键盘聚焦，全局 :focus-visible 就给整块弹窗描了一圈浅色框
+   （用户 2026-10-19 截图）。里面按钮的焦点框照常。 */
+.dialog-panel:focus, .dialog-panel:focus-visible { outline: none; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
-.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
+.dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
+.is-bare > .dialog-glass { display: none; }
+.is-bare > .dialog-scroll { padding: 0; overflow: visible; }
+.dialog-panel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--surface); z-index: 0; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
+.dialog-panel.is-flying::after { opacity: 1; transition: none; }
+.is-flying > .dialog-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.is-bare::after { display: none; }
+</style>
+
+<style>
+/* 弹窗从它长出来、还没缩回落地的那段时间，来处藏着（lib/motion/dialogFlight.ts 的 hideSource）。 */
+[data-dialog-source] { opacity: 0 !important; transition: none !important; }
 </style>

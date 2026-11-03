@@ -1,4 +1,5 @@
 import type { Directive } from 'vue';
+import { lessMotion } from './motion/lessMotion';
 
 /**
  * 概览卡的立体感：指针在卡上时卡片抬起、投影加深，一层镜面高光跟着指针走；离开时落回。
@@ -25,7 +26,7 @@ type TiltHost = HTMLElement & { __tiltOff?: () => void };
 export const vTilt: Directive<TiltHost> = {
   mounted(el) {
     const media = window.matchMedia?.bind(window);
-    if (!media || media('(prefers-reduced-motion: reduce)').matches || !media('(hover: hover)').matches) return;
+    if (!media || lessMotion() || !media('(hover: hover)').matches) return;
     const glare = document.createElement('span');
     glare.className = 'tilt-glare';
     glare.setAttribute('aria-hidden', 'true');

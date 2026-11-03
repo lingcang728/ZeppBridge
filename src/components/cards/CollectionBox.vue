@@ -168,20 +168,31 @@ const deal = (fresh: boolean, lead = 0) => {
       : animateFromNow(card, end, options);
   })));
 };
+/**
+ * 收回 / 清空时牌一张接一张走：错开铺满整副牌（从最后一张到第一张），不管多少张都是一道波。
+ * 10-28 录屏：以前只有最后 24 张错开，一百多张一起等 288ms 再同时走，背景先淡完了牌还悬着、然后一下子全没了。
+ */
+const GATHER_MS = paced(420);
+const gatherSpread = (count: number) => (reducedMotion() ? 0 : Math.min(paced(360), count * 16));
+/** 整副牌走完要多久：背景淡出按它来。 */
+const gatherTotal = (count: number) => (reducedMotion() ? 140 : GATHER_MS + gatherSpread(count));
 const gather = (toBox = true) => {
   const cards = handCards();
   const count = cards.length;
+  const spread = gatherSpread(count);
   return settled(seq.track(cards.map((card, i) => animateFromNow(
     card,
     toBox ? [{ transform: atBox(card, 0.5, 90), opacity: 1, offset: 0.6 }, { transform: atBox(card, 0.22), opacity: 0 }]
-      // 牌没有内联 transform 时 restTransform 是 'none'，不能拼在别的函数前面（'none translateY(…)' 是无效值，整段动画会被丢掉、牌瞬间消失）。
-      : { transform: `${card.style.transform ? `${card.style.transform} ` : ''}translateY(40px) scale(.8)`, opacity: 0 },
-    { duration: reducedMotion() ? 140 : 420, delay: reducedMotion() ? 0 : Math.min(count - 1 - i, 24) * 12, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' },
+      // 清空：往下沉、缩小、淡掉。牌没有内联 transform 时 restTransform 是 'none'，不能拼在别的函数前面（'none translateY(…)' 是无效值，整段动画会被丢掉、牌瞬间消失）。
+      : [{ opacity: 1, offset: 0.2 }, { transform: `${card.style.transform ? `${card.style.transform} ` : ''}translateY(64px) rotate(${((i * 37) % 9) - 4}deg) scale(.7)`, opacity: 0 }],
+    { duration: reducedMotion() ? 140 : GATHER_MS, delay: count > 1 ? (spread * (count - 1 - i)) / (count - 1) : 0, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' },
   ))));
 };
+/** 收起时背景的模糊跟着牌走：整段两头缓、和最后一张牌同时淡完，不先于牌露出底下的页面。 */
+const BACKDROP_OUT_EASE = 'cubic-bezier(.45, 0, .4, 1)';
 const fadeBackdrop = (to: number, duration: number) => {
   const el = backdrop.value;
-  return el ? settled([animateFromNow(el, { opacity: to }, { duration, easing: to ? OPEN_EASE : CLOSE_EASE, fill: 'forwards' }, ['opacity'])]) : Promise.resolve();
+  return el ? settled([animateFromNow(el, { opacity: to }, { duration, easing: to ? OPEN_EASE : BACKDROP_OUT_EASE, fill: 'forwards' }, ['opacity'])]) : Promise.resolve();
 };
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -210,7 +221,7 @@ const hide = async (toBox = true) => {
   if (!reducedMotion()) await wait(CHROME_MS);
   if (!seq.live(id)) return;
   if (toBox) lidOpen(boxButton.value, 'wide');
-  await Promise.all([gather(toBox), fadeBackdrop(0, 380)]);
+  await Promise.all([gather(toBox), fadeBackdrop(0, Math.max(380, gatherTotal(handCards().length)))]);
   if (!seq.live(id)) return;
   lidClose(boxButton.value);
   open.value = false;

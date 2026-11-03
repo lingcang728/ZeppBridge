@@ -53,6 +53,8 @@ export interface Workout {
   avg_cadence_spm?: number | null;
   max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
+  /** Zepp 里给这次运动选的跑鞋编号；Zepp 不给名称（#143）。 */
+  gear_id?: string | null;
   total_steps?: number | null;
   gps_available?: boolean;
   sample_count?: number;
@@ -267,4 +269,18 @@ export interface HeartRateZoneOptions {
   /** Present only once the preference names a model and its bases. */
   report?: HeartRateZoneReport | null;
   windowDays: number;
+}
+
+/** 用户拿修正过的 .fit 顶替了这条运动（#140）。只在本机生效，撤销后回到云端原值。 */
+export interface WorkoutFitOverride {
+  workoutId: string;
+  fileName: string | null;
+  sha256: string;
+  byteLen: number;
+  importedAt: string;
+  distanceM: number | null;
+  movingSeconds: number | null;
+  /** 云端给的距离，撤销后回到这个值。 */
+  originalDistanceM: number | null;
+  originalMovingSeconds: number | null;
 }

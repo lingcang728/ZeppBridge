@@ -76,7 +76,7 @@
 .button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 
 /* ── 胶囊按钮 ─────────────────────────
-   次要动作和跳转（「添加事件」「查看全部」「管理」）全应用一个样子：和胶囊选择器里
+   次要动作和跳转（「查看全部」「管理」）全应用一个样子：和胶囊选择器里
    选中的那块同一种凸起胶囊，图标用品牌色。quiet 是不需要底的那一档。 */
 .pill-button {
   display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 15px;
@@ -355,6 +355,43 @@ summary { cursor: pointer; }
 /* 「再显示 N 条」新出现的行淡入、轻轻浮上来（审计 B7，2026-10-07；以前一下全冒出来）。行一挂上就放一次，
    已经在的行不动；缓存页回到场上不重放（下面的 page-revisit）。只动 opacity / transform。 */
 @keyframes row-in { from { opacity: 0; transform: translateY(8px); } }
-.tl-row, .le-timeline > li { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
-.page-revisit :is(.tl-row, .le-timeline > li) { animation: none; }
-@media (prefers-reduced-motion: reduce) { .tl-row, .le-timeline > li { animation: none; } }
+.tl-row { animation: row-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.page-revisit .tl-row { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tl-row { animation: none; } }
+
+
+/* ── 履历里的列表行（跑鞋、比赛、伤病、纪元与事件）────────────────────────────
+   悬停是一块内缩的圆角高亮，不再贴着分隔线被直直切开（用户 2026-10-22：「边缘像被裁切了一样」）。
+   分隔线画在行与行之间的缝里、左右各缩一截；悬停行上下两条线淡掉，不穿过高亮块。 */
+.row-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.row-list > li { position: relative; }
+.row-list > li + li::before { content: ''; position: absolute; top: -2.5px; right: 12px; left: 12px; height: 1px; pointer-events: none;
+  background: var(--mat-line); transition: opacity var(--dur-fast) ease; }
+.row-list > li:is(:hover, :focus-within)::before, .row-list > li:is(:hover, :focus-within) + li::before { opacity: 0; }
+.row-hit { width: 100%; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur-fast) ease; }
+.row-hit:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.row-hit:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+
+/* ── 晕涂（sfumato，3.1）────────────────────────────────────────────────
+   不确定的东西不画硬边：分期里「未知」那几段、样本太少的常态参照，边缘往两头晕开。
+   这不是装饰，是对「不确定」的诚实表达。只用静态遮罩，不逐帧、不 backdrop。
+   .sfumato 两头都晕开；.sfumato-end 只晕末端（参照值本身不准，起点 0 是准的）。 */
+.sfumato {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--sfumato-edge, 35%), #000 calc(100% - var(--sfumato-edge, 35%)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--sfumato-edge, 35%), #000 calc(100% - var(--sfumato-edge, 35%)), transparent);
+}
+.sfumato-end {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--sfumato-edge, 40%)), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--sfumato-edge, 40%)), transparent);
+}
+
+/* ── 低特效（composables/useEffects.ts，Linux 默认开，issue #133）──────────────────
+   WebKitGTK 为了不白屏关掉了 DMABUF 渲染，剩下的路径扛不住整页背景滤镜：翻页要好几秒。
+   这里一律换成不透明的玻璃底色；动画那一半在 lib/motion/lessMotion.ts。放在文件最后，
+   盖过 tokens.css 里 `html[data-theme="light"]` 同等优先级的玻璃 token。 */
+html[data-effects="lite"] { --glass: var(--mat-glass-strong); --glass-blur: none; --mat-glass-blur: none; }
+html[data-effects="lite"] *, html[data-effects="lite"] *::before, html[data-effects="lite"] *::after {
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+html[data-effects="lite"] .tl-row { animation: none; }

@@ -1,0 +1,6 @@
+- Fixed: **Reposição do histórico (#136)**: “Tudo (até 10 anos)” já não falha com “data inválida”, e o seletor de data de início personalizada já não aparece vazio.
+- Improved: **Início de sessão dos dados avançados só com e-mail ou telemóvel + palavra-passe**. A janela explica isso no topo e esconde os botões de terceiros; se entrares com uma conta diferente da autorizada oficialmente, o ZeppBridge diz-te logo.
+- Improved: **A autorização oficial já não fica à espera em silêncio**. Se o ZeppBridge não conseguir contactar zeppbridge.com, avisa e sugere o que verificar. O novo botão “Verificar agora” verifica de imediato, e é tentado automaticamente um endereço de reserva.
+- Added: **“Porque faltam alguns dados?”** está sempre disponível em Definições → Conta.
+- Added: **Interface em polaco**.
+- Improved: **As notas de versão seguem o idioma da interface**, nos 12 idiomas.

@@ -19,14 +19,25 @@ const segment = (over: Partial<ClimbSegment>): ClimbSegment => ({
   average_pace_min_per_km: 17.45,
   ...over,
 });
-const render = (climbs: WorkoutClimbs, cycling = false) =>
-  renderToString(createSSRApp({ render: () => h(WorkoutClimbsCard, { climbs, cycling }) }));
+const render = (climbs: WorkoutClimbs, cycling = false, relief: { min: number | null; max: number | null; gain: number | null } | null = null) =>
+  renderToString(createSSRApp({ render: () => h(WorkoutClimbsCard, { climbs, cycling, relief }) }));
 
 describe('workout climbs card', () => {
   it('says there is no notable climb instead of inventing segments', async () => {
     const html = await render({ method, segments: [] });
     expect(html).toContain('class="flat"');
     expect(html).not.toContain('<li');
+  });
+
+  it('puts the real relief into the flat sentence, and drops what is missing', async () => {
+    const flat = await render({ method, segments: [] }, false, { min: 7.2, max: 12.4, gain: 55 });
+    expect(flat).toContain('7–12');
+    expect(flat).toContain('最大落差 5');
+    expect(flat).toContain('累计爬升 55');
+    const noGain = await render({ method, segments: [] }, false, { min: 7, max: 12, gain: null });
+    expect(noGain).not.toContain('累计爬升');
+    const noAltitude = await render({ method, segments: [] }, false, { min: null, max: null, gain: 55 });
+    expect(noAltitude).toContain('落差和坡度都没到下面的门槛');
   });
 
   it('renders each segment with signed change, grade, vertical speed and pace', async () => {

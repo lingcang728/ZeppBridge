@@ -26,6 +26,8 @@ export const pageLanguage = (request) => {
   if (/^\s*es\b/i.test(header)) return 'es';
   if (/^\s*de\b/i.test(header)) return 'de';
   if (/^\s*fr\b/i.test(header)) return 'fr';
+  if (/^\s*it\b/i.test(header)) return 'it';
+  if (/^\s*pl(?:[-_,;\s]|$)/i.test(header)) return 'pl';
   if (/^\s*nl\b/i.test(header)) return 'nl';
   if (/^\s*pt-pt\b/i.test(header)) return 'pt-PT';
   if (/^\s*pt\b/i.test(header)) return 'pt-BR';
@@ -35,6 +37,25 @@ export const pageLanguage = (request) => {
 };
 
 const COPY = {
+  pl: {
+    brand: 'ZeppBridge',
+    steps: ['Zaloguj się na oficjalnej stronie Zepp', 'Zezwól ZeppBridge na odczyt danych', 'Wróć do ZeppBridge'],
+    start: {
+      title: 'Autoryzuj ZeppBridge swoim kontem Zepp',
+      lead: 'ZeppBridge przechowuje Twoje dane zdrowotne z Zepp na Twoim własnym komputerze. W kolejnym kroku otworzy się oficjalna strona autoryzacji Zepp (user.zepp.com); Twój login i hasło trafiają wyłącznie do Zepp.',
+      notes: [
+        'Jeśli w tej przeglądarce jesteś już zalogowany do Zepp, od razu przejdziesz do kroku zatwierdzenia zgody.',
+        'Aby użyć innego konta (np. logowania przez Google, Xiaomi, Facebook lub Apple): wróć do ZeppBridge, kliknij „Kopiuj link autoryzacyjny” i otwórz go w oknie incognito.',
+      ],
+      action: 'Przejdź do Zepp',
+      fine: 'W każdej chwili możesz rozłączyć konto w ustawieniach ZeppBridge.',
+    },
+    ready: { title: 'Autoryzacja zakończona pomyślnie', lead: 'Wróć do ZeppBridge — połączenie zostanie nawiązane automatycznie w ciągu kilku sekund. Możesz już zamknąć tę stronę.' },
+    denied: { title: 'Autoryzacja została anulowana', lead: 'Dostęp nie został przyznany, więc ZeppBridge nie otrzymał żadnych danych. Możesz rozpocząć proces ponownie z poziomu aplikacji.' },
+    expired: { title: 'Autoryzacja wygasła', lead: 'Link autoryzacyjny jest jednorazowy i wygasa po 10 minutach. Wróć do ZeppBridge i kliknij ponownie „Autoryzuj”.' },
+    failed: { title: 'Autoryzacja nie powiodła się', lead: 'Serwis Zepp nie zaakceptował tej autoryzacji, więc nic nie zostało zapisane. Wróć do aplikacji i spróbuj ponownie.' },
+  },
+
   zh: {
     brand: 'ZeppBridge',
     steps: ['在 Zepp 官方页面登录', '同意 ZeppBridge 读取数据', '回到 ZeppBridge'],
@@ -215,6 +236,24 @@ const COPY = {
     expired: { title: 'यह प्राधिकरण समाप्त हो गया', lead: 'प्राधिकरण लिंक एक बार काम करता है और 10 मिनट के बाद समाप्त हो जाता है। ZeppBridge पर वापस जाएँ और फिर से "अधिकृत करें" पर क्लिक करें।' },
     failed: { title: 'प्राधिकरण पूरा नहीं हुआ', lead: 'Zepp ने इस प्राधिकरण को स्वीकार नहीं किया, इसलिए कुछ भी सहेजा नहीं गया। कृपया ऐप पर वापस जाएँ और पुनः प्रयास करें।' },
   },
+  it: {
+    brand: 'ZeppBridge',
+    steps: ['Accedi alla pagina ufficiale di Zepp', 'Consenti a ZeppBridge di leggere i dati', 'Torna a ZeppBridge'],
+    start: {
+      title: 'Autorizza ZeppBridge con il tuo account Zepp',
+      lead: 'ZeppBridge salva i tuoi dati sanitari di Zepp sul tuo computer. Il passaggio successivo aprirà la pagina ufficiale di autorizzazione di Zepp (user.zepp.com); account e password vengono forniti solo a Zepp.',
+      notes: [
+        'Se hai già effettuato l’accesso a Zepp in questo browser, passerai direttamente alla schermata di autorizzazione.',
+        'Per usare un account diverso (ad esempio accesso con Google, Xiaomi, Facebook o Apple): torna a ZeppBridge, fai clic su «Copia link di autorizzazione» e aprilo in una finestra di navigazione in incognito.',
+      ],
+      action: 'Continua su Zepp',
+      fine: 'Puoi disconnettere l’account in qualsiasi momento dalle impostazioni di ZeppBridge.',
+    },
+    ready: { title: 'Autorizzazione completata', lead: 'Torna a ZeppBridge: il collegamento si completerà automaticamente entro pochi secondi. Ora puoi chiudere questa pagina.' },
+    denied: { title: 'Autorizzazione annullata', lead: 'Non hai concesso l’accesso, quindi ZeppBridge non ha ricevuto alcun dato. Puoi riavviare la procedura dall’applicazione.' },
+    expired: { title: 'Questa autorizzazione è scaduta', lead: 'Il link di autorizzazione è monouso e scade dopo 10 minuti. Torna a ZeppBridge e fai di nuovo clic su «Autorizza».' },
+    failed: { title: 'Autorizzazione non completata', lead: 'Zepp non ha accettato questa autorizzazione, quindi non è stato salvato nulla. Torna all’applicazione e riprova.' },
+  },
 };
 
 const STYLE = `
@@ -266,7 +305,7 @@ const BADGES = {
 };
 
 const HTML_LANG = {
-  zh: 'zh-CN', en: 'en', es: 'es', de: 'de', fr: 'fr', nl: 'nl',
+  zh: 'zh-CN', en: 'en', es: 'es', de: 'de', fr: 'fr', it: 'it', pl: 'pl', nl: 'nl',
   'pt-BR': 'pt-BR', 'pt-PT': 'pt-PT', ru: 'ru', 'hi-IN': 'hi-IN',
 };
 

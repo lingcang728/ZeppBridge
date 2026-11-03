@@ -96,7 +96,9 @@ impl Database {
     pub fn workout_hr_zones(&self, workout_id: &str) -> Result<Vec<HeartRateZoneBucket>> {
         let mut stmt = self.conn.prepare(
             "SELECT zone_index, upper_bound_bpm, seconds FROM workout_hr_zones
-              WHERE workout_id = ?1 ORDER BY zone_index",
+              WHERE workout_id = ?1
+                AND EXISTS (SELECT 1 FROM workouts_visible w WHERE w.workout_id = ?1)
+              ORDER BY zone_index",
         )?;
         let rows = stmt.query_map([workout_id], |row| {
             Ok(HeartRateZoneBucket {
@@ -159,7 +161,7 @@ impl Database {
         let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
         let mut stmt = self.conn.prepare(
             "SELECT w.workout_id, w.zepp_source
-             FROM workouts w
+             FROM workouts_visible w
              LEFT JOIN workout_detail_fetch_attempts a
                ON a.workout_id = w.workout_id AND a.source = w.zepp_source
              WHERE w.zepp_source IS NOT NULL
@@ -190,6 +192,26 @@ impl Database {
         )?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
+    }
+
+    /// 这条运动有没有一份读得懂的高级通道明细（`workout_detail:<id>:<source>`，报文在、而且没被隔离）。
+    ///
+    /// 同时连了官方授权和高级通道时，同一次运动两边各有一份明细；两份都会整份替换逐秒序列，
+    /// 重放又按拉取先后走，于是后拉到的官方版把高级版冲掉——逐点距离、功率、触地时间一起没了（#143）。
+    /// 高级版字段更全，以它为准：有它时官方明细不再写序列，只在没有它时兜底。
+    pub fn has_legacy_workout_detail(&self, workout_id: &str) -> Result<bool> {
+        let prefix = format!("workout_detail:{workout_id}:");
+        let found: bool = self.conn.query_row(
+            "SELECT EXISTS (
+                 SELECT 1 FROM raw_records r
+                 WHERE r.stream = 'workout_detail'
+                   AND substr(r.source_key, 1, length(?1)) = ?1
+                   AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)
+             )",
+            [prefix],
+            |row| row.get(0),
+        )?;
+        Ok(found)
     }
 
     /// 记下一次跑步明细拉取的结果。成功就清掉失败计数；失败则累加，过了
@@ -265,8 +287,8 @@ impl Database {
                 "INSERT INTO workout_samples
                     (workout_id, timestamp, heart_rate, pace, speed, cadence, altitude, stride,
                      power_watts, ground_contact_ms, vertical_oscillation_mm, vertical_ratio_pct,
-                     equivalent_pace_s)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                     equivalent_pace_s, distance_m)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             )?;
             for sample in &decoded.samples {
                 insert.execute(params![
@@ -283,6 +305,7 @@ impl Database {
                     sample.vertical_oscillation_mm,
                     sample.vertical_ratio_pct,
                     sample.equivalent_pace_s_per_km,
+                    sample.distance_m,
                 ])?;
             }
         }
@@ -378,11 +401,21 @@ impl Database {
     }
 
     pub fn get_workout_series(&self, workout_id: &str) -> Result<WorkoutSeries> {
+        // All public readers (desktop, MCP, REST and exports) share this gate.
+        // Internal detail persistence deliberately continues to use the base table.
+        let hidden: bool = self.conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM workout_local_state WHERE workout_id = ?1 AND hidden = 1)",
+            [workout_id],
+            |row| row.get(0),
+        )?;
+        if hidden {
+            return Err(ZeppBridgeError::DataUnavailable("运动记录不存在".into()));
+        }
         let mut samples = {
             let mut stmt = self.conn.prepare(
                 "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride,
                         power_watts, ground_contact_ms, vertical_oscillation_mm,
-                        vertical_ratio_pct, equivalent_pace_s
+                        vertical_ratio_pct, equivalent_pace_s, distance_m
                  FROM workout_samples WHERE workout_id = ?1 ORDER BY timestamp",
             )?;
             let rows = stmt.query_map([workout_id], |row| {
@@ -399,6 +432,7 @@ impl Database {
                     vertical_oscillation_mm: row.get(9)?,
                     vertical_ratio_pct: row.get(10)?,
                     equivalent_pace_s_per_km: row.get(11)?,
+                    distance_m: row.get(12)?,
                 })
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
@@ -444,7 +478,7 @@ impl Database {
         let recorded_distance_m: Option<f64> = self
             .conn
             .query_row(
-                "SELECT distance_meters FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                "SELECT distance_meters FROM workouts_visible WHERE workout_id = ?1 LIMIT 1",
                 [workout_id],
                 |row| row.get(0),
             )

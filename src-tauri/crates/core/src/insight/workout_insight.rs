@@ -241,7 +241,7 @@ impl Database {
         let row = self.conn.query_row(
             "SELECT workout_id, start_time, end_time, distance_meters, avg_hr,
                     training_load, source_scope
-             FROM workouts WHERE workout_id = ?1",
+             FROM workouts_visible WHERE workout_id = ?1",
             rusqlite::params![workout_id],
             map_run_row,
         );
@@ -286,7 +286,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, start_time, end_time, distance_meters, avg_hr,
                     training_load, source_scope
-             FROM workouts
+             FROM workouts_visible
              WHERE workout_id <> ?1
                AND COALESCE(workout_type_override, workout_type) = 'run'
                AND start_time < ?2

@@ -1,0 +1,6 @@
+- Added: **Datumnotatie volgt je systeemregio**. De datumvolgorde en 12/24-uursnotatie volgen de regionale opmaak van je besturingssysteem, zelfs bij een Engelstalige interface; pas dit aan in Instellingen → Weergave en taal.
+- Improved: **Duidelijker wat er ontbreekt bij de officiële autorisatie**. De trainingslijst, apparaten en de voedingskaart vermelden nu dat voor fietsen en overige trainingen, apparaatidentificatie en voedingslogboeken ‘Geavanceerde gegevens’ nodig zijn.
+- Improved: **Meer horloges herkend**. Modelcodes toegevoegd voor Bip 6, Balance 3, Active 2 Square, Active 3 Premium, T-Rex Ultra 2, Cheetah Pro, Balance Ultra en Helio Strap Pro.
+- Improved: **Release-opmerkingen lossen op in as**. Klik op ‘Begrepen’ en de kaart verpulvert vanaf de knop tot as, terug naar de hoofdpagina.
+- Fixed: **Ontbrekende losse SpO₂-metingen**. Dagen met veel metingen stoppen niet meer na de eerste pagina; de rest wordt nu ook opgehaald.
+- Fixed: **Slaap en hartslag één uur verschoven tijdens zomertijd**. Wanneer het horloge zijn tijdzone doorgeeft zonder het zomertijduur, wordt dit gecorrigeerd aan de hand van de tijdzone van het apparaat; bij de eerste start na de update worden lokale gegevens op de achtergrond opnieuw verwerkt.

@@ -62,6 +62,7 @@ lib/aiTask/metrics.vo2max
 views/settings/deck.secMcp
 components/overview/DataReadyCapsule.streamSeparator
 views/WorkoutDetail.routeModeLocal
+components/journal/journal.shoeSports.hiking
 
 # nl
 components/DevicePicker.filterBand
@@ -88,6 +89,9 @@ components/overview/DataReadyCapsule.streamSeparator
 composables/useFocusAreas.areaTraining
 views/settings/sections/archive.details
 components/tour/tour.inviteLater
+components/journal/body.parts.hamstring
+components/journal/body.parts.hand
+components/journal/journal.raceSport
 
 # de
 components/DeviceVisual.ring
@@ -181,6 +185,14 @@ views/WorkoutDetail.provenanceTitle
 views/WorkoutDetail.provenanceAria
 components/overview/DataReadyCapsule.streamSeparator
 views/WorkoutDetail.routeModeLocal
+components/journal/body.parts.abdomen
+components/journal/journal.title
+components/journal/journal.distance
+components/journal/journal.raceSports.trail
+components/journal/journal.raceSports.triathlon
+components/journal/journal.distances.marathon
+components/journal/journal.shoeSports.trail
+components/journal/journal.entry
 
 # pt-PT
 components/BackupPanel.kind.manual
@@ -334,3 +346,10 @@ lib/workoutNames.weiqi
 lib/workoutNames.yoga
 lib/workoutNames.zumba
 components/ai/stage/stage.facePlan
+components/workout/workoutImport.sources.gpx
+components/workout/workoutImport.sources.fit
+components/workout/workoutImport.short.gpx
+components/workout/workoutImport.short.fit
+components/workout/workoutImport.short.strava
+components/workout/workoutImport.sources.apple_health
+components/workout/workoutImport.short.apple_health

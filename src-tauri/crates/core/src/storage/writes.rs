@@ -285,9 +285,9 @@ impl Database {
                  workout_type_source, workout_type_override, workout_type_conflict,
                  min_hr, total_steps, moving_seconds, elevation_gain_m, elevation_loss_m,
                  max_altitude_m, min_altitude_m, training_effect, anaerobic_training_effect,
-                 rpe, avg_cadence_spm, max_cadence_spm, avg_stride_cm)
+                 rpe, avg_cadence_spm, max_cadence_spm, avg_stride_cm, gear_id)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21,
-                     ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34)
+                     ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
@@ -313,7 +313,11 @@ impl Database {
                 zepp_source = COALESCE(excluded.zepp_source, workouts.zepp_source),
                 zepp_type = excluded.zepp_type,
                 workout_type_source = excluded.workout_type_source,
-                workout_type_override = COALESCE(workouts.workout_type_override, excluded.workout_type_override),
+                workout_type_override = CASE
+                    WHEN EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = excluded.workout_id)
+                    THEN (SELECT s.type_override FROM workout_local_state s WHERE s.workout_id = excluded.workout_id)
+                    ELSE COALESCE(workouts.workout_type_override, excluded.workout_type_override)
+                END,
                 workout_type_conflict = excluded.workout_type_conflict,
                 -- 一律 COALESCE：补拉回来的摘要可能缺字段，缺的那次不该把上一次
                 -- 已经拿到的值抹成 NULL。
@@ -330,7 +334,8 @@ impl Database {
                 rpe = COALESCE(excluded.rpe, workouts.rpe),
                 avg_cadence_spm = COALESCE(excluded.avg_cadence_spm, workouts.avg_cadence_spm),
                 max_cadence_spm = COALESCE(excluded.max_cadence_spm, workouts.max_cadence_spm),
-                avg_stride_cm = COALESCE(excluded.avg_stride_cm, workouts.avg_stride_cm)",
+                avg_stride_cm = COALESCE(excluded.avg_stride_cm, workouts.avg_stride_cm),
+                gear_id = COALESCE(excluded.gear_id, workouts.gear_id)",
             params![
                 workout.workout_id,
                 merged_type.normalized_type,
@@ -366,6 +371,7 @@ impl Database {
                 workout.avg_cadence_spm,
                 workout.max_cadence_spm,
                 workout.avg_stride_cm,
+                workout.gear_id,
             ],
         )?;
         // 心率区间分布。整条替换而不是逐段 upsert：区间边界会随用户在表上的
@@ -390,6 +396,8 @@ impl Database {
                 ])?;
             }
         }
+        // 用户导入过修正 .fit 的运动：刚写进来的云端值记成原值，再盖回修正值（#140）。
+        self.reapply_fit_override_summary(&workout.workout_id)?;
         Ok(())
     }
 }

@@ -91,7 +91,8 @@ export const demoPreview = (data: DemoData, task: AiTask): AiTaskPreview => {
     const metrics = (CATEGORY_METRICS[category] ?? []).slice(0, 12);
     const rows = anchors.map((anchor, index) => {
       const end = setting.include_workout_day ? anchor : at(anchor, -1);
-      const days = windowDays(at(anchor, -setting.days_before), end);
+      // 挑了日子的类别只交那几天（同真实后端 gather 的筛法），不是从最早那天到今天的整段。
+      const days = setting.picked_days?.length ? [...setting.picked_days].sort() : windowDays(at(anchor, -setting.days_before), end);
       const covered = days.filter((day) => have.has(day));
       return { days, covered, workoutId: picked[index]?.workout_id ?? null };
     });

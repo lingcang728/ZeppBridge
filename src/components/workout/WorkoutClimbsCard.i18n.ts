@@ -7,6 +7,9 @@ export const workoutClimbsMessages = defineMessages(
     title: '主要爬升与下降',
     aria: '主要爬升与下降段',
     flat: '没有明显爬升：落差和坡度都没到下面的门槛。',
+    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+      `没有明显爬升：全程海拔 ${min}–${max} ${unit}，最大落差 ${range} ${unit}` +
+      (gain ? `；累计爬升 ${gain} ${unit} 是一路小起伏加起来的` : '') + '，没有一段到下面的门槛。',
     climb: '上坡',
     descent: '下坡',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -27,6 +30,9 @@ export const workoutClimbsMessages = defineMessages(
     title: 'Main climbs and descents',
     aria: 'Main climb and descent segments',
     flat: 'No notable climbs: nothing reached the elevation and grade thresholds below.',
+    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+      `No notable climbs: altitude stayed between ${min} and ${max} ${unit} (${range} ${unit} at most)` +
+      (gain ? `; the ${gain} ${unit} of total ascent is many small rises added up` : '') + ', and no stretch reached the thresholds below.',
     climb: 'Climb',
     descent: 'Descent',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -47,6 +53,9 @@ export const workoutClimbsMessages = defineMessages(
     title: 'Subidas y bajadas principales',
     aria: 'Tramos principales de subida y bajada',
     flat: 'Sin subidas notables: ningún tramo alcanzó los umbrales de desnivel y pendiente de abajo.',
+    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+      `Sin subidas notables: la altitud se movió entre ${min} y ${max} ${unit} (${range} ${unit} como máximo)` +
+      (gain ? `; los ${gain} ${unit} de ascenso acumulado son muchas subidas pequeñas sumadas` : '') + ', y ningún tramo alcanzó los umbrales de abajo.',
     climb: 'Subida',
     descent: 'Bajada',
     range: (from: string, to: string) => `${from}–${to}`,

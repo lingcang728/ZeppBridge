@@ -3,6 +3,7 @@ import { SERIES_FETCH_DAYS } from './metricSeries';
 import { cached, DEVICE_READ_PREFIXES, peek, type Query } from './readCache';
 import { useTrendRange } from '../composables/useTrendRange';
 import { deviceImageFor } from './deviceCatalog';
+import { journalPageQueries } from './journalQueries';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
 import type {
   DailyHeartRateExtreme, DataHealth, DeviceProfile, HeartRateZoneOptions, HeartRatePoint, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
@@ -164,6 +165,7 @@ const ROUTES: Array<[RegExp, (match: RegExpMatchArray) => readonly Query<unknown
   [/^\/sleep\/?$/, () => [pageQuery.sleepPage(LIST_PAGE_SIZE)]],
   [/^\/workouts\/?$/, () => [pageQuery.workoutPage(LIST_PAGE_SIZE)]],
   [/^\/health-check\/?$/, healthCheckQueries],
+  [/^\/journal\/?$/, journalPageQueries],
 ];
 
 /** 按路径找出那一页首屏的查询（没有登记的页返回空）。 */

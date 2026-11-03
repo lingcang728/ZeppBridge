@@ -5,7 +5,7 @@ export interface DayStripCell { date: string; has: boolean; value: number | null
 export interface DayStripRow { category: AiTaskCategory; metric: string | null; cells: DayStripCell[] }
 export interface AdherenceDay {
   date: string;
-  planned: { name: string; sport: PlanSport; seconds: number | null; hr_low: number | null; hr_high: number | null } | null;
+  planned: { plan_workout_id?: number; name: string; sport: PlanSport; seconds: number | null; meters?: number | null; hr_low: number | null; hr_high: number | null } | null;
   actual: { workout_id: string; seconds: number | null; avg_hr: number | null; sport: string; compatible: boolean }[];
   verdict: 'done' | 'missed' | 'extra' | 'none';
 }

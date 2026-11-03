@@ -110,13 +110,15 @@ pub async fn training_plan_set_ai_publish(
     .await
 }
 
-/// 界面能发起的三种推送。滚动推送只在同步之后自动跑，不从界面发。
+/// 界面能发起的推送。滚动推送平时在同步之后自动跑；`Resend` 是用户手动补一次
+/// （issue #143：断网那一周「未确认」，用户要能自己点重发，而不是等下一次同步）。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum PublishAction {
     Draft { id: String },
     Undo,
     Clear,
+    Resend,
 }
 
 /// 推送的结局。`outcome` 与 core 的 `Prepared` 一致，`send` 时多一份账本结果。
@@ -140,6 +142,7 @@ pub async fn training_plan_publish(
         PublishAction::Draft { id } => PublishRequest::Draft { id },
         PublishAction::Undo => PublishRequest::UndoLast,
         PublishAction::Clear => PublishRequest::Clear,
+        PublishAction::Resend => PublishRequest::Roll,
     };
     publish(&state.data_dir, &state.db, request, confirm_clear, locale).await
 }
@@ -277,6 +280,18 @@ pub(crate) async fn forget_after_revoke(state: &AppState) {
     if let Err(error) = result {
         eprintln!("断开授权后清理训练计划账本失败: {}", error.code);
     }
+}
+
+/// 推过的每一份计划（留档），新的在前。
+#[tauri::command]
+pub async fn training_plan_history(
+    state: tauri::State<'_, AppState>,
+    limit: Option<usize>,
+) -> Result<Vec<zeppbridge_core::storage::training_plan::PlanHistoryEntry>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.plan_history(limit.unwrap_or(60))
+    })
+    .await
 }
 
 #[tauri::command]

@@ -14,6 +14,100 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      advancedDescription:
+        'Je aanmeldgegevens voor Geavanceerde gegevens konden niet worden opgeslagen. Ze blijven maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden of het token opnieuw in te voeren. Ze worden verwijderd als je annuleert, een andere aanmelding start, handmatig opnieuw aanmeldgegevens indient of de app afsluit.',
+      advancedFileWarning:
+        'Hiermee wordt het App Token voor Geavanceerde gegevens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
+      advancedDiscard: 'Deze aanmeldgegevens verwijderen',
+      advancedExpired: 'Deze aanmeldgegevens zijn niet meer beschikbaar. Maak opnieuw verbinding met Geavanceerde gegevens.',
+      title: 'Kies hoe je je aanmelding wilt opslaan',
+      description:
+        'De autorisatie is geslaagd, maar het token kon niet worden opgeslagen. Het blijft maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden. Als je de app afsluit of een nieuwe autorisatie start, wordt het token verwijderd.',
+      systemOption: 'De systeemopslag voor aanmeldgegevens herstellen (aanbevolen)',
+      fileOption: 'Opslaan in een lokaal JSON-bestand',
+      repairLinux:
+        'Open de wachtwoord- of portemonneebeheerder van je systeem. Maak een standaardsleutelbos of -portemonnee aan als die nog niet bestaat en ontgrendel deze. Zorg op desktops zoals Niri dat een Secret Service-provider zoals KWallet of GNOME Keyring actief is. Probeer het daarna hieronder opnieuw.',
+      repairMac:
+        'Open Sleutelhangertoegang, ontgrendel je inlogsleutelhanger en geef ZeppBridge toestemming om aanmeldgegevens op te slaan. Probeer het daarna hieronder opnieuw.',
+      repairWindows:
+        'Controleer of Windows Referentiebeheer beschikbaar is en je account er gebruik van kan maken. Probeer het daarna hieronder opnieuw.',
+      retrySystem: 'Ik heb het hersteld — opnieuw proberen op te slaan',
+      fileWarning:
+        'Hiermee worden toegangs- en vernieuwingstokens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
+      consent: 'Ik begrijp dit en ga ermee akkoord de tokens als platte tekst op dit apparaat op te slaan.',
+      saveFile: 'Akkoord en opslaan als JSON',
+      discard: 'Deze autorisatie verwijderen',
+      expired: 'Deze autorisatie is niet meer beschikbaar. Meld je opnieuw aan.',
+      savedFile: 'Aanmelding opgeslagen in het lokale bestand credentials.json.',
+      fileUnavailable:
+        'Bestandsopslag is niet beschikbaar op dit platform of wordt door je opstartconfiguratie overschreven. Herstel de systeemopslag voor aanmeldgegevens om door te gaan.',
+    },
+    'components/journal/repair': {
+      timelineEmpty: 'Kies een dag op de tijdlijn om een gebeurtenis vast te leggen',
+      timelineToday: 'Vandaag',
+      pbCard: (distance: string, rank: number, total: number, time: string) => `${distance}, #${rank} snelste van ${total}: ${time}`,
+      noRaces: 'Nog geen wedstrijden',
+      noInjuries: 'Geen blessures vastgelegd',
+      untilNow: 'Heden',
+      more: 'Meer',
+      distance: 'Totale afstand',
+      recorded: 'Vastgelegd',
+    },
+    'components/WorkoutTools': {
+      select: 'Trainingen selecteren',
+      done: 'Selectie afronden',
+      selectLoaded: 'Geladen trainingen selecteren',
+      clearSelection: 'Selectie wissen',
+      selected: (n: number) => `${n} geselecteerd`,
+      visible: 'Trainingen',
+      hidden: 'Verborgen trainingen',
+      type: 'Sporttype kiezen',
+      apply: 'Type toepassen',
+      clearType: 'Automatische herkenning herstellen',
+      preview: (n: number, type: string) =>
+        n === 1 ? `1 training wijzigen in ‘${type}’` : `${n} trainingen wijzigen in ‘${type}’`,
+      hide: 'Op deze computer verbergen',
+      restore: 'Weer tonen',
+      undo: 'Laatste wijziging ongedaan maken',
+      localHint:
+        'Trainingen die op deze computer verborgen zijn, tellen niet mee in statistieken, AI en exports. De oorspronkelijke gegevens blijven bewaard; je kunt ze herstellen via ‘Verborgen trainingen’.',
+      saved: (n: number) => (n === 1 ? '1 training bijgewerkt' : `${n} trainingen bijgewerkt`),
+      failed: 'Wijzigen mislukt. Probeer het opnieuw.',
+      detailsTitle: 'Trainingsdetails aanvullen',
+      detailChannel: 'Bron van details',
+      advancedChannel: 'Geavanceerde gegevens',
+      officialChannel: 'Officiële Zepp-verbinding',
+      detailsHint:
+        'Haal voor eerder gesynchroniseerde trainingen afzonderlijk ontbrekende details op. Je kunt op elk moment stoppen en later doorgaan; de cloud biedt mogelijk niet alle details.',
+      start: 'Starten of hervatten',
+      pause: 'Deze taak stoppen',
+      retry: 'Mislukte items opnieuw proberen',
+      detailProgress: (pending: number, persisted: number, empty: number, failed: number, parse: number, unavailable: number) =>
+        `Nog niet opgevraagd ${pending} · Opgeslagen ${persisted} · Geen details in de cloud ${empty} · Mislukte aanvragen ${failed} · Fouten bij het ontleden ${parse} · Huidig kanaal niet beschikbaar ${unavailable}`,
+      stopped: 'Deze taak is gestopt. De voortgang is opgeslagen.',
+      detailFailed: 'Trainingsdetails aanvullen mislukt. Controleer de verbinding en probeer het opnieuw.',
+      retryHint:
+        'Ook mislukte blokken uit oudere versies kun je hier opnieuw proberen, zonder het logboek te wissen of de database te verwijderen.',
+      credentialHint:
+        'Op deze computer is een geavanceerde gegevensverbinding opgeslagen, maar de inloggegevens zijn tijdelijk niet beschikbaar. Log opnieuw in of log uit en maak opnieuw verbinding. De officiële autorisatie blijft apart bewaard.',
+      altitudeHint:
+        'De hoogte is afkomstig van de horlogeregistratie of een lokaal geïmporteerd FIT-bestand. De gekalibreerde hoogte van de Zepp App is nog niet opgehaald; beide waarden kunnen verschillen.',
+      planHint:
+        'Plannen worden verzonden volgens de gekozen sportcategorie. Labels zoals ‘Trail’ worden als toelichting meegestuurd; het is nog niet bevestigd of het horloge naar de bijbehorende sportmodus kan overschakelen. Krachttrainingsplannen kunnen nog niet worden verzonden.',
+      strengthHint:
+        'Bij voltooide krachttrainingen worden alleen gegevens getoond die de cloud daadwerkelijk terugstuurt. Herhalingen en gewichten per set en automatische bloeddrukmetingen moeten nog worden geverifieerd met voorbeeldgegevens uit accounts. Als het model onbekend is, kun je zelf aangeven welk apparaat het is.',
+    },
+
+    'components/BackfillOffer': {
+      offer: (date: string) =>
+        `Deze computer gaat maar terug tot ${date}. Eerdere historie ophalen uit de cloud?`,
+      years: (n: number) => (n === 1 ? '1 jaar' : `${n} jaar`),
+      later: 'Nu niet',
+      running: 'Historie wordt op de achtergrond opgehaald — dit gaat door als je deze pagina verlaat',
+      stop: 'Stoppen',
+      settings: 'Instellingen voor ophalen',
+    },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Geen metingen in de afgelopen 6 maanden: ${list}`,
       separator: ", ",
@@ -39,10 +133,19 @@ export default {
       lifeEvent: 'Begonnen met trainen voor een halve marathon',
       longRun: 'Lange rustige duurloop',
       nickname: 'Demo-gebruiker',
+      noteMine: 'Vaste zwemavond op woensdag; geen hardloopsessies die dag',
+      noteProposed: 'Linkerknie doet pijn na 15 km; lange duurlopen opdelen',
       recoveryRide: 'Herstelrit',
       taskFile: 'Afgelopen 14 dagen',
       taskTitle: (month: number, day: number) => `Afgelopen 14 dagen · ${day}-${month}`,
       tempoRun: 'Tempoloop',
+      shoeDaily: 'Dagelijkse trainingsschoenen',
+      shoeRace: 'Wedstrijdschoenen met carbonplaat',
+      raceHalf: 'Halve marathon van de stad',
+      race10k: '10 km-wegwedstrijd in de herfst',
+      injury: 'Pijn buitenkant rechterknie (IT-band)',
+      capsuleNote:
+        'Van een jaar geleden: ik was net begonnen met drie keer per week hardlopen en mijn knie deed nog een beetje pijn. Ik hoop dat je nog steeds hardloopt, en niet vergeet te rekken.',
     },
     'components/activity/HourlyStepsCard': {
       title: 'Stappen per uur',
@@ -65,8 +168,37 @@ export default {
       failed: 'Stappen per uur nu niet beschikbaar.',
       legend: (peak: string) => `Feller groen betekent meer stappen; het felst is ongeveer ${peak}`,
     },
+    'components/WhyHalfData': {
+      title: 'Waarom ontbreken sommige gegevens?',
+      lead: 'ZeppBridge heeft twee verbindingen, en ze leveren niet dezelfde gegevens op.',
+      officialName: 'Officiële autorisatie',
+      officialHas: 'Hartslag|Slaap|Stappen|Hardlopen en wandelen|PAI|Gewicht',
+      officialLacks: 'Kan geen eerdere historie ophalen',
+      advancedName: 'Geavanceerde gegevens',
+      advancedHas:
+        'HRV|Zuurstofsaturatie|Stress gedurende de dag|Gereedheid|Charge|Trainingsbelasting|Fietsen en overige trainingen|Voedingslogboeken|Apparaatidentificatie|Oudere geschiedenis',
+      advancedLogin: 'Alleen inloggen met Zepp-e-mail of -telefoonnummer + wachtwoord',
+      advancedNoThirdParty: 'Inloggen via Google, Apple, WeChat, Xiaomi en andere derden werkt niet',
+      footer: 'Met alleen de officiële autorisatie komt er niets binnen uit de kolom Geavanceerde gegevens. Dat is een beperking van wat het officiële kanaal biedt, geen fout in ZeppBridge. We hebben dit bij Zepp (Huami) aangekaart, maar nog geen reactie ontvangen.',
+      close: 'Begrepen',
+    },
+    'components/shell/UpdateNotice': {
+      title: (version: string) => `Bijgewerkt naar v${version}`,
+      since: (version: string) => `Was v${version}`,
+      acknowledge: 'Begrepen',
+      star: 'Ster geven op GitHub',
+      next: 'Bekijk wat er nieuw is',
+      empty: 'Deze versie heeft geen release-opmerkingen.',
+      added: 'Nieuw',
+      improved: 'Verbeterd',
+      fixed: 'Opgelost',
+      note: 'Wijziging',
+    },
     'components/OfficialOnlyNote': {
-      text: 'Alleen officiële Zepp-autorisatie verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht synchroniseren. HRV, bloedzuurstof, stress, gereedheid en trainingsbelasting biedt de officiële koppeling niet aan — daarvoor koppel je ‘Geavanceerde gegevens’.',
+      text:
+        'Alleen de officiële Zepp-autorisatie is verbonden: hartslag, slaap, stappen, hardlopen en wandelen, PAI en gewicht worden gesynchroniseerd. De officiële API biedt geen HRV, bloedzuurstof, stress, gereedheid, trainingsbelasting, fietsen en overige trainingen of apparaatidentificatie — verbind ‘Geavanceerde gegevens’ om deze te zien.',
+      workouts:
+        'Alleen de officiële autorisatie is verbonden. De officiële API levert alleen hardlopen, wandelen en enkele andere trainingen; voor fietsen, krachttraining, racketsporten en de rest zijn ‘Geavanceerde gegevens’ nodig.',
       action: 'Verbinden',
     },
     App: {
@@ -414,10 +546,6 @@ export default {
       title: 'Hoe de run ging',
       unsupportedWorkoutType:
         'Inzichten zijn nu alleen beschikbaar voor hardlopen (geverifieerd met echte data). Andere trainingstypen kun je gewoon bekijken, corrigeren en exporteren.',
-      handoff: 'Onderzoek met AI',
-      withRecovery: 'Neem de voorafgaande 7 dagen slaap en herstel mee',
-      withRecoveryHint:
-        'Na een paar dagen rust helpt het meesturen van slaap, rusthartslag en HRV de AI te bepalen of het aan herstel of aan een mindere training lag.',
       currentRun: 'Deze run',
       baselineRun: 'Basislijn',
       reading: 'Lokale gegevens worden gelezen…',
@@ -617,6 +745,7 @@ export default {
       identifyFailed: (reason: string) =>
         `Apparaatherkenning is niet beschikbaar: ${reason}`,
       noDevicesYet: 'Nog geen apparaat herkend',
+      noDevicesOfficial: 'Verbind ‘Geavanceerde gegevens’ om apparaten te herkennen',
       manage: 'Beheren',
       sourcesAria: 'Gegevensbronnen en accountstatus',
       latestData: (when: string) => `Nieuwste gegevens ${when}`,
@@ -961,11 +1090,13 @@ export default {
       chess: 'Schaken',
       core_training: 'Coretraining',
       cricket: 'Cricket',
+      cross_country_skiing: 'Langlaufen',
       cross_training: 'Crosstraining',
       curling: 'Curling',
       dance: 'Dansen',
       darts: 'Darten',
       dodgeball: 'Trefbal',
+      dog_walking: 'Hond uitlaten',
       dragon_boat: 'Drakenboot',
       driving: 'Autorijden',
       e_bike: 'Elektrisch fietsen',
@@ -1011,6 +1142,7 @@ export default {
       martial_arts: 'Vechtsport',
       mass_gymnastics: 'Groepsgymnastiek',
       modern_dance: 'Moderne dans',
+      mountain_biking: 'Mountainbiken',
       muay_thai: 'Muay Thai',
       open_water_swimming: 'Openwaterzwemmen',
       parallel_bars: 'Brug',
@@ -1091,6 +1223,10 @@ export default {
       noMatch: 'Geen passende gebeurtenissen.',
       manage: 'Levensgebeurtenissen beheren',
       related: 'Gerelateerde gebeurtenissen',
+      epoch: 'Als tijdperk markeren',
+      epochHint:
+        'Geef deze periode een naam: elke trendgrafiek krijgt een gekleurde achtergrond en AI ziet het ook.',
+      epochBadge: 'Tijdperk',
       local:
         'Alleen op deze machine opgeslagen, mee in de databaseback-up; bij overdracht aan AI aan te vinken.',
       all: 'Alles',
@@ -1237,6 +1373,7 @@ export default {
       officialNote: 'Officiële gegevens zijn aangesloten: slaap, hartslag, stappen, trainingen, PAI en gewicht worden gesynchroniseerd; HRV, bloedzuurstof, stress en gereedheid komen via ‘Geavanceerde gegevens’.',
       copyAuthLink: 'Autorisatielink kopiëren',
       copyAuthLinkHint: 'Is je browser al bij Zepp ingelogd, dan spring je meteen naar ‘Autorisatie toestaan’. Wil je van account wisselen (bijv. via Google of Xiaomi), plak de link dan in een privévenster.',
+      officialWhy: 'Waarom via zeppbridge.com?',
       linkCopied: 'Link gekopieerd',
       authWebTitle: 'Geavanceerde gegevensverbinding',
       backupLabel: 'Databasemomentopnamen en herstel',
@@ -1265,8 +1402,6 @@ export default {
       cleanupFailed: 'Opschonen van oude gegevens is mislukt',
       cleanupNow: 'Nu opschonen',
       clearAuth: 'Inloggegevens wissen',
-      clearAuthConfirm:
-        'Uitloggen bij dit account?\n\nAlleen de inloggegevens worden gewist; alles wat al naar deze machine is gesynchroniseerd blijft.\n\nLet op: meerdere accounts worden nog niet ondersteund — inloggen met een ander account schrijft beide accounts in dezelfde lokale database.',
       clearAuthFailed: 'De inloggegevens konden niet worden gewist',
       closeDialog: 'Dialoog sluiten',
       codeCleared: (code: number) => `De eigen naam voor code ${code} is gewist.`,
@@ -1326,6 +1461,9 @@ export default {
       loginWindowFailed: 'Het inlogvenster kon niet worden geopend',
       manualAuthDone: 'Handmatig inloggen gelukt; de inloggegevens zijn opgeslagen.',
       manualAuthFailed: 'Handmatig inloggen mislukt',
+      manualTokenLabel: "App-token (App Token)",
+      manualUserIdLabel: "Gebruikers-ID (User ID)",
+      manualRegionHostLabel: "Regionale server (Region Host)",
       manualFormHint:
         'Haal ze uit een mitmproxy/Charles-opname of de devtools van je browser. Drie velden:',
       manualSave: 'Inloggegevens opslaan',
@@ -1349,7 +1487,7 @@ Wat ik erover weet:
 - Het MCP-programma is te vinden in het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; pak het uit en zeppbridge-mcp zit erin. Misschien heb ik het nog niet gedownload.
 - Het is een stdio MCP-server. Gezondheidsgegevens zijn alleen-lezen, de server luistert niet op een poort en vereist geen token of API-sleutel; er is alleen netwerkverbinding nodig om een trainingsplan te publiceren, en alleen nadat ik dat heb toegestaan.
 - De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het programma biedt vijftien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen).
+- Het programma biedt vijftien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen); en propose_coach_note: plaatst een zin die het waard is om te onthouden in de inbox van mijn coachnotities en wordt pas actief nadat ik op Onthouden tik.
 
 Vertel me:
 1. Specifiek voor jou — de tool waarmee ik nu praat — in welk bestand de configuratie moet of met welk commando ik hem toevoeg;
@@ -1372,6 +1510,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       minutes: (minutes: number) => `${minutes} min`,
       noDevices:
         'Nog geen fysiek apparaat herkend; Zepp-cloud synchroniseert nog steeds als cloudbron.',
+      noDevicesOfficial:
+        'Nog geen fysiek apparaat herkend. Met alleen de officiële autorisatie kan een horloge alleen worden herkend uit gesynchroniseerde trainingen; verbind ‘Geavanceerde gegevens’ voor volledige herkenning.',
       noRecords: 'Nog geen gegevens',
       noSyncDiagnostics: 'Nog geen synchronisatiediagnostiek.',
       nothingToCompact:
@@ -1477,9 +1617,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         `Na de volgende geslaagde synchronisatie worden gegevens ouder dan ${date} gesnoeid`,
       retry: 'Opnieuw proberen',
       scaleLabel: 'Interface-schaling',
-      starAction: 'Een ster geven',
-      starBody: 'Een ster op GitHub helpt meer mensen het te vinden.',
-      starTitle: 'Heeft ZeppBridge je geholpen?',
       stream: {
         blood_pressure: 'Bloeddruk',
         daily_activity: 'Dagelijkse activiteit',
@@ -1519,6 +1656,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         'Een foutrapport voegt de nummers van dit apparaat toe aan de ingebouwde catalogus — daarna hoeft niemand het meer handmatig aan te wijzen. Het bevat alleen de vaste whitelist-velden; geen GitHub-account nodig.',
       unknownDeviceTitle: 'Een niet-herkend apparaat',
       updateCheck: 'Controleren op updates',
+      updateAuto: 'Automatisch bijwerken',
       updateChecking: 'Controleren…',
       updateStatusChecking: 'GitHub Releases wordt gecontroleerd',
       updateStatusFailed: 'De update is mislukt',
@@ -1528,6 +1666,13 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       updateVersionLoading: 'laden',
       verifyAndSync: 'Verifiëren en synchroniseren',
       verifyFailed: 'Verificatie is niet afgerond',
+      logoutConfirm:
+        'Wil je uitloggen bij dit account?\n\nAlleen inloggegevens worden gewist; gesynchroniseerde historie blijft op deze computer bewaard.\n\nDeze database bevat één Zepp-account: inloggen met een ander account wordt hierna geweigerd. Om te wisselen, kies je “Met een ander account opnieuw beginnen” in de inlogfoutmelding.',
+      freshStart: 'Met een ander account opnieuw beginnen',
+      freshStartConfirm:
+        'Alle huidige gegevens opzij zetten en opnieuw verbinden met een lege database?\n\nEr wordt niets verwijderd: de oude gegevens blijven in een map “data-before-<datum>” naast de app staan — hernoem deze weer naar “data” om terug te keren. Beide verbindingen worden uitgelogd en de app herstart.',
+      newAccountWarning:
+        'Maak hiervoor geen nieuw Zepp-account aan en koppel je horloge niet aan een ander account: opnieuw koppelen wist de instellingen op het horloge.',
     },
     'views/ActivityDetail': {
       title: 'Dagelijkse activiteit',
@@ -1606,6 +1751,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       intakeGroupTitle: 'Inname',
       intakeGroupEmpty:
         'Geen voedingsgegevens in deze periode. Maaltijden die je in de Zepp-app logt, verschijnen hier na een synchronisatie.',
+      intakeNeedsAdvanced:
+        'Voedingsgegevens komen binnen via de verbinding ‘Geavanceerde gegevens’; met alleen de officiële autorisatie zijn deze niet inbegrepen.',
       intakeCaloriesLabel: 'Gegeten calorieën',
       proteinLabel: 'Eiwit',
       fatIntakeLabel: 'Vet',
@@ -1878,6 +2025,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       showAllModules: 'Alles tonen',
       collapseModules: 'Inklappen',
       entryWeek: 'Afgelopen 7 dagen',
+      entrySparse: 'Afgelopen 90 dagen',
       focusLabel: 'Mijn focus',
     },
     'views/RecentRecords': {
@@ -2032,26 +2180,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       seriesFailedTitle: 'De reeksen per punt konden niet worden geladen',
       exportNeedsSeries:
         'Reeksen per punt ontbreken, waardoor deze training niet kan worden geëxporteerd.',
-      aiPrompt: (label: string) => `Je bent een sportanalist. Hieronder staat het complete overzicht van één ${label} van mij, uit de lokale ZeppBridge-database en geanonimiseerd.
-Analyseer deze sessie alleen aan de hand van de feiten in dit overzicht: de intensiteit, hoe tempo zich verhoudt tot hartslag, of er een duidelijke vertraging of een afwijkend stuk is, en wat er volgende keer concreet anders moet.
-
-Randvoorwaarden:
-- Deze gegevens bevatten geen populatiebasislijn. Vergelijk me niet met ‘gezonde volwassenen’ of met een gemiddelde.
-- Waar iets ontbreekt, zeg dat het ontbreekt. Vul het gat nooit met een 0 of een schatting.
-- Geen medische diagnose, geen oordeel over ziekterisico, geen behandeladvies.
-
-Antwoord in Markdown.`,
-      needDesktop:
-        'De AI-overdracht vereist de desktop-app; deze webpreview opent geen externe sites.',
-      aiRecoveryTitle: (label: string, day: string) => `${day} ${label} · met herstelcontext`,
-      aiRecoveryPrompt: (label: string, gap: number | null) => `Dit is een ${label} van mij${gap === null ? ' (er is geen eerdere training geregistreerd)' : `, ${gap} dagen na mijn vorige training`}. Het bestand bevat ook mijn slaap, rusthartslag, HRV, stress en paraatheid van de 30 dagen ervoor (indien gemeten; ontbrekende gegevens vermelden “niet verstrekt”).
-
-Beantwoord dit graag in deze volgorde:
-1. Beoordeel eerst mijn fysieke gesteldheid vóór deze training: vergelijk het gemiddelde van de afgelopen 7 dagen met de 30-daagse basislijn ervoor – ben ik goed hersteld of niet?
-2. Beoordeel vervolgens de intensiteit en prestaties van deze sessie in dat licht, en onderscheid een herstelprobleem van een slechte trainingssessie.
-3. Geef ten slotte aan ${gap === null ? 'op welke intensiteit ik me de volgende keer moet richten' : `na een onderbreking van ${gap} dagen, naar welke intensiteit ik de volgende keer moet terugkeren`}.
-
-Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddelden; vermeld duidelijk wanneer gegevens ontbreken in plaats van te schatten; geen medische diagnoses.`,
       noCorrection: 'Geen correctie',
       deviceNameMissing: 'Apparaatnaam niet verstrekt',
       notFetchedYet: 'Nog niet opgehaald',
@@ -2171,8 +2299,19 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       provenanceProvider: 'Aanbieder',
       provenanceScope: 'Bereik',
       provenanceSynced: 'Laatst gesynchroniseerd',
+      provenanceImported: 'Geïmporteerd uit een bestand',
+      provenanceImportedAt: 'Geïmporteerd',
       provenanceRecordId: 'Item-id',
       provenanceDevice: 'Apparaat',
+      provenanceFit: 'Lokale correctie',
+      fitCloudDistance: 'Cloudafstand',
+      fitReplace: 'Vervangen door een gecorrigeerd .fit-bestand',
+      fitReplaceAgain: 'Ander .fit-bestand gebruiken',
+      fitRestore: 'Cloudversie herstellen',
+      fitDialogTitle: 'Kies het gecorrigeerde .fit-bestand',
+      fitApplied: 'Alleen op deze computer vervangen — Zepp-cloud blijft ongewijzigd',
+      fitRestored: 'Cloudversie hersteld',
+      fitFailed: 'Kon deze training niet vervangen',
       pageFoot:
         'Gedecodeerd op deze machine. De track is op een lokaal canvas getekend en nooit naar een kaartdienst gestuurd.',
       evidenceSummary: "Onderbouwing en bron van het type",
@@ -2193,6 +2332,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       title: 'Belangrijkste beklimmingen en afdalingen',
       aria: 'Belangrijkste klim- en afdalingssegmenten',
       flat: 'Geen noemenswaardige beklimmingen: niets voldeed aan de onderstaande hoogte- en stijgingsdrempels.',
+      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
+        `Geen noemenswaardige beklimmingen: hoogte bleef tussen ${min} en ${max} ${unit} (maximaal ${range} ${unit})` +
+        (gain ? `; de ${gain} ${unit} totale stijging is opgebouwd uit veel kleine heuveltjes` : '') +
+        ', en geen enkel stuk voldeed aan de onderstaande drempels.',
       climb: 'Klim',
       descent: 'Afdaling',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2493,6 +2636,12 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       themeDark: 'Donker',
       themeSystem: 'Systeem',
       mcpPreview: 'Bekijk wat er gekopieerd wordt',
+      effectsLabel: 'Visuele effecten',
+      effectsSub:
+        'Laag schakelt matglas en vormanimaties uit; Automatisch gebruikt Laag op Linux, tragere apparaten of bij een lage batterij',
+      effectsAuto: 'Automatisch',
+      effectsFull: 'Volledig',
+      effectsLite: 'Laag',
     },
     'views/settings/sections/fileName': {
       example: 'bijv.',
@@ -2575,8 +2724,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       dismiss: 'Begrepen',
       activityWalking: 'Wandelen', activityHiking: 'Wandelen in de bergen', activityStrength: 'Krachttraining',
       activityYoga: 'Yoga / stretchen', activityRowing: 'Roeien', activityElliptical: 'Crosstrainer',
+      activityInlineSkating: 'Inlineskaten', activityCrossCountrySkiing: 'Langlaufen',
       variantOutdoorRun: 'Hardlopen buiten', variantTreadmill: 'Loopband', variantTrack: 'Baanlopen',
       variantOutdoorRide: 'Fietsen buiten', variantIndoorRide: 'Indoor fietsen',
+      variantTrail: 'Trailrunning', variantMountain: 'Mountainbiken',
       variantPick: (name: string) => `Je horloge vraagt opnieuw om het type: kies '${name}'.`,
       variantPickAny: 'Je horloge vraagt opnieuw om het precieze type. Plannen van derden geven alleen de sportcategorie door; dat is een beperking van Zepp.',
       heldBadge: 'Niet naar horloge te sturen',
@@ -2618,9 +2769,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       activity: {
         walking: 'Wandelen', hiking: 'Wandelen in de bergen', strength: 'Krachttraining',
         yoga: 'Yoga / stretchen', rowing: 'Roeien', elliptical: 'Crosstrainer',
+        inline_skating: 'inlineskaten', cross_country_skiing: 'langlaufen',
       },
       'ui.training_plan.issue.sport_not_deliverable': (p: { activity?: string }) => {
-        const label = p.activity === 'walking' ? 'wandelen' : p.activity === 'hiking' ? 'wandelen in de bergen' : p.activity === 'strength' ? 'krachttraining' : p.activity === 'yoga' ? 'yoga / stretchen' : p.activity === 'rowing' ? 'roeien' : p.activity === 'elliptical' ? 'crosstrainer' : p.activity ?? '';
+        const label = p.activity === 'walking' ? 'wandelen' : p.activity === 'hiking' ? 'wandelen in de bergen' : p.activity === 'strength' ? 'krachttraining' : p.activity === 'yoga' ? 'yoga / stretchen' : p.activity === 'rowing' ? 'roeien' : p.activity === 'elliptical' ? 'crosstrainer' : p.activity === 'inline_skating' ? 'inlineskaten' : p.activity === 'cross_country_skiing' ? 'langlaufen' : p.activity ?? '';
         return `Het horloge accepteert alleen hardlopen, fietsen en zwemmen; '${label}' kan niet worden verstuurd.`;
       },
       'ui.training_plan.issue.bad_variant': (p: { value?: string }) => `'${p.value ?? ''}' is geen geldig subtype voor deze sport.`,
@@ -2657,6 +2809,7 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       never: 'Nog niets verzonden',
       undo: 'Laatste verzending ongedaan maken',
       clear: 'Plan op horloge wissen',
+      resend: 'Niet-bevestigde weken opnieuw verzenden',
     },
     'components/plan/library': {
       saveTemplate: 'Opslaan als sjabloon',
@@ -2708,8 +2861,17 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       workoutReview: (label: string) => `Hoe ging deze training (${label})?`,
       workoutRecovery: (label: string) => `Ben ik voldoende hersteld na deze training (${label})?`,
       workoutNext: (label: string) => `Hoe kan ik mijn volgende training (${label}) het beste plannen?`,
+      sleepHint: 'Kies een vraag als begin: er wordt een nieuwe taak gestart met deze nacht en de twee weken slaap en herstel ervoor. De vraag is al ingevuld en je kunt die nog aanpassen voordat je verstuurt.',
+      sleepNight: 'Hoe heb ik deze nacht geslapen?',
+      sleepRecovery: 'Ben ik door deze nacht slaap goed hersteld?',
       above: (delta: string) => `${delta} hoger dan gebruikelijk`, below: (delta: string) => `${delta} lager dan gebruikelijk`,
       baselineHint: (median: string, days: number) => `Vergeleken met jezelf: de mediaan van de afgelopen ${days} dagen is ${median}. Dit is geen diagnose.`,
+      usualWord: 'Gewoonlijk',
+      usualRange: (range: string) => `Gewoonlijk ${range}`,
+      usualHint: (range: string, days: number) =>
+        `Alleen vergeleken met jezelf: over de afgelopen ${days} dagen viel de middelste 80% van de dagen binnen ${range}. Geen diagnose.`,
+      longTermHint: (range: string, since: string, days: number, recent: string) =>
+        `Je langetermijnnorm: over de ${days} dagen met metingen sinds ${since} viel de middelste 80% binnen ${range}${recent ? `; de afgelopen 90 dagen waren ${recent}` : ''}. Alleen vergeleken met jezelf, geen diagnose.`,
     },
     'views/settings/sections/McpTaskScopes': {
       title: 'Taken beschikbaar maken voor MCP',
@@ -2727,6 +2889,9 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       boxEmptyLabel: 'Verzamelbox · leeg',
       boxDropHere: 'Laat los om toe te voegen',
       close: 'Kaarten opruimen', back: 'Eén niveau terug', range7: '7 dagen', range30: '1 maand', range180: '6 maanden', rangeAria: 'Kaartbereik',
+      range365: '1 jaar', rangeAll: 'Alles', quarter: (q: number) => `K${q}`, yearTop: 'Hele jaar',
+      notBackfilled: 'Nog niet opgehaald', cloudEmpty: 'Niets in de cloud',
+      span: 'Reeks', spanAria: 'Reeks kaarten kiezen: tik op de eerste en daarna op de laatste', spanFrom: 'Tik nu op de laatste kaart',
       picked: 'Voor AI', noRecord: 'Geen registratie', recorded: 'Geregistreerd',
       noWorkouts: 'Geen trainingen in deze periode',
       recentWorkouts: 'Afgelopen week',
@@ -2748,7 +2913,14 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     },
     'components/ai/stage/stage': {
       stage: 'Naar AI sturen: links de gedeelde gegevens, in het midden AI, rechts de vraag en het plan',
-      recent: (days: number) => `Laatste ${days} dagen`,
+      recent: (days: number) =>
+        days >= 3650 ? 'Alles (max. 10 jaar)' : days === 365 ? 'Afgelopen jaar' : `Laatste ${days} dagen`,
+      year1: '1 jaar',
+      all: 'Alles',
+      applyAll: 'Toepassen op alle categorieën',
+      appliedAll: 'Toegepast op alle categorieën',
+      sizeHint: (size: string, tokens: string) => `Hele taak ≈ ${size} · ${tokens} tokens`,
+      sizeTooLong: 'Te lang voor de AI om te lezen: behoud van eerdere trainingen alleen een samenvatting, of verkort het bereik',
       picked: (days: number) => plural(days, { one: '1 dag gekozen', other: `${days} dagen gekozen` }),
       haveOf: (have: number, total: number) => `${have} van ${total} dagen met gegevens`,
       extraWorkouts: (count: number) => plural(count, { one: '+1 gekozen training', other: `+${count} gekozen trainingen` }),
@@ -2784,6 +2956,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       editQuestion: 'Vraag bewerken',
       notOpened: 'Tussentijds ingetrokken; de website is niet geopend',
       exchanges: (count: number) => plural(count, { one: '1 interactie', other: `${count} interacties` }),
+      mcpPill: 'Verbind Claude, Codex en meer',
+      mcpPillHint: 'Laat AI-tools je lokale gegevens rechtstreeks via MCP lezen, zonder kopiëren en plakken',
+      autoTip: 'Automatisch: plak en verstuur volgende keer voor mij',
+      autoTipClose: 'Niet meer tonen',
       resetCards: 'Kaarten herstellen',
       restoreAll: 'Opnieuw beginnen',
       restoreAllHint: 'Terug naar het begin: alle gegevenssoorten, standaarddagen, kaarten weer op hun plek; je vraag en taaknaam blijven behouden. Met Ongedaan maken herstel je dit.',
@@ -2792,6 +2968,10 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       facePlan: 'Plan',
       tally: (train: number, rest: number) => `${train} training · ${rest} rust`,
       viewWeek: 'Hele week bekijken',
+      attachments: 'Bijlagen',
+    },
+    'composables/ai/useStageCards': {
+      thisWorkout: 'Deze training',
     },
     'components/ai/bridge/bridge': {
       unitMin: 'min',
@@ -2942,7 +3122,21 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       },
       language: (lang: string) => `- Schrijf name, focus, description, summary en note in het ${lang}: ze worden exact zo getoond in ZeppBridge en op het horloge.`,
     },
+    'views/settings/accountConflict': {
+      official: 'Officiële autorisatie',
+      advanced: 'Geavanceerde gegevens',
+      noNickname: 'Geen bijnaam',
+      advancedOnlyTitle: 'Alleen geavanceerde gegevens volstaat ook',
+      advancedKept:
+        'Geavanceerde gegevens zijn al verbonden en leveren het merendeel van je gegevens, dus je kunt de officiële autorisatie overslaan. Wil je beide gebruiken, start de officiële autorisatie dan opnieuw, kopieer de link naar een privévenster, log in met hetzelfde account als voor geavanceerde gegevens en geef toestemming.',
+      advancedAfterDisconnect:
+        'Ontkoppel eerst de officiële autorisatie en log vervolgens in bij geavanceerde gegevens met het account waaraan je horloge is gekoppeld (e-mailadres of telefoonnummer met wachtwoord). Is dat account aangemaakt via Google of Apple, dan werken geavanceerde gegevens niet; behoud dan alleen de officiële autorisatie.',
+      disconnectOfficial: 'Officiële autorisatie ontkoppelen',
+    },
     'views/settings/sections/account': {
+      whySub: 'Geavanceerde gegevens loggen alleen in met Zepp-e-mail of -telefoonnummer en wachtwoord',
+      waitingHint: 'Sta het toe in je browser, dan verbindt dit vanzelf',
+      checkNow: 'Nu controleren',
       accountFallback: 'Zepp-account',
       official: (state: string) => `Officieel ${state}`,
       advanced: (state: string) => `Geavanceerde gegevens ${state}`,
@@ -2995,6 +3189,18 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       backupLatest: (when: string) => `Laatste momentopname ${when}`,
       backupNone: 'Nog geen momentopnamen',
       open: 'Openen',
+      fill: 'Aanvullen',
+      legendLocal: 'Op deze computer',
+      legendGold: 'Aangevuld',
+      legendGap: 'Ontbreekt',
+      legendEmpty: 'Niet in de cloud',
+      cellAria: (month: string, state: string) => `${month}: ${state}`,
+      takeTitle: 'Neem alles mee',
+      takeSub:
+        'Beoordelingen, notities, schoenen, wedstrijden, plannen, AI-taken, brieven — alles wat je hier hebt geschreven, in één JSON-bestand',
+      takeButton: 'Exporteren',
+      takeDone: (n: number) => (n === 1 ? '1 record geëxporteerd' : `${n} records geëxporteerd`),
+      takeFailed: 'Exporteren mislukt. Probeer het opnieuw.',
     },
     'views/settings/sections/maintenance': {
       secMaintenance: 'Onderhoud',
@@ -3038,10 +3244,6 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       toolTrainingContext: 'Recente training en herstel in één overzicht: een dagtabel, elke workout en het actieve plan',
       toolTrainingPlan: 'Het logboek voor trainingsplannen: actief plan, afleverstatus en concepten',
     },
-    'views/settings/sections/display': {
-      focusTitle: 'Mijn focus',
-      focusSlideSub: 'Het overzicht toont dit blok eerst en vouwt de rest onder ‘Alles tonen’; ‘Gebalanceerd’ laat alles zoals het is',
-    },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
       learnMore: 'Meer informatie',
@@ -3075,6 +3277,19 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       sectionWhat: 'Wat dit is',
       sectionChart: 'Wat deze grafiek toont',
       sectionHow: 'Berekening en bron',
+      sectionTrust: 'Hoe het wordt gemeten',
+      trustChipTitle: 'Black-box-schatting',
+      excludedChipTitle: 'Je hebt dit uitgesloten van de analyse',
+      useInAnalysis: 'Meenemen in analyse',
+      useInAnalysisHint:
+        'Indien uitgeschakeld blijft dit gewoon zichtbaar en worden er geen gegevens verwijderd; het wordt alleen buiten vergelijkingen met je norm gelaten en niet naar AI of MCP verzonden.',
+      trustMeasured: 'Rechtstreeks gemeten door de sensor op het horloge of apparaat.',
+      trustComputed:
+        'Omgerekend uit metingen of je eigen registraties met een openbare, vaste formule.',
+      trustInferred:
+        'Door het horloge afgeleid uit sensormetingen op een bekende manier (zoals slaap uit beweging en hartslag, afstand uit stappen). De details zijn niet gepubliceerd, maar voor trends is het ruim voldoende.',
+      trustEstimated:
+        'Een schatting die Zepp met een eigen algoritme afleidt uit meerdere metingen. Zepp heeft de methode en de foutmarge niet openbaar gemaakt, en laboratoriummetingen kunnen hiervan afwijken.',
     },
     'lib/metricInfo/vitals': {
       readinessWhat: 'Een gereedheidsscore die het horloge berekent op basis van de slaap, HRV en rusthartslag van de afgelopen nacht.',
@@ -3300,34 +3515,515 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       resetTips: 'Eerste-keer-tips opnieuw weergeven',
       resetDone: 'Klaar; ze verschijnen weer wanneer je er de volgende keer komt',
     },
-    'components/CredentialRecovery': {
-      advancedDescription:
-        'Je aanmeldgegevens voor Geavanceerde gegevens konden niet worden opgeslagen. Ze blijven maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden of het token opnieuw in te voeren. Ze worden verwijderd als je annuleert, een andere aanmelding start, handmatig opnieuw aanmeldgegevens indient of de app afsluit.',
-      advancedFileWarning:
-        'Hiermee wordt het App Token voor Geavanceerde gegevens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
-      advancedDiscard: 'Deze aanmeldgegevens verwijderen',
-      advancedExpired: 'Deze aanmeldgegevens zijn niet meer beschikbaar. Maak opnieuw verbinding met Geavanceerde gegevens.',
-      title: 'Kies hoe je je aanmelding wilt opslaan',
-      description:
-        'De autorisatie is geslaagd, maar het token kon niet worden opgeslagen. Het blijft maximaal 10 minuten in het geheugen staan, zodat je het opnieuw kunt proberen zonder je opnieuw aan te melden. Als je de app afsluit of een nieuwe autorisatie start, wordt het token verwijderd.',
-      systemOption: 'De systeemopslag voor aanmeldgegevens herstellen (aanbevolen)',
-      fileOption: 'Opslaan in een lokaal JSON-bestand',
-      repairLinux:
-        'Open de wachtwoord- of portemonneebeheerder van je systeem. Maak een standaardsleutelbos of -portemonnee aan als die nog niet bestaat en ontgrendel deze. Zorg op desktops zoals Niri dat een Secret Service-provider zoals KWallet of GNOME Keyring actief is. Probeer het daarna hieronder opnieuw.',
-      repairMac:
-        'Open Sleutelhangertoegang, ontgrendel je inlogsleutelhanger en geef ZeppBridge toestemming om aanmeldgegevens op te slaan. Probeer het daarna hieronder opnieuw.',
-      repairWindows:
-        'Controleer of Windows Referentiebeheer beschikbaar is en je account er gebruik van kan maken. Probeer het daarna hieronder opnieuw.',
-      retrySystem: 'Ik heb het hersteld — opnieuw proberen op te slaan',
-      fileWarning:
-        'Hiermee worden toegangs- en vernieuwingstokens als platte tekst opgeslagen in credentials.json in de gegevensmap van de app. Op Linux en macOS heeft het bestand de bestandsrechten 0600. Programma’s die onder jouw gebruikersaccount draaien, kunnen het lezen. De app gebruikt dit bestand bij het opnieuw starten, tenzij een opstartinstelling expliciet een andere opslag selecteert.',
-      consent: 'Ik begrijp dit en ga ermee akkoord de tokens als platte tekst op dit apparaat op te slaan.',
-      saveFile: 'Akkoord en opslaan als JSON',
-      discard: 'Deze autorisatie verwijderen',
-      expired: 'Deze autorisatie is niet meer beschikbaar. Meld je opnieuw aan.',
-      savedFile: 'Aanmelding opgeslagen in het lokale bestand credentials.json.',
-      fileUnavailable:
-        'Bestandsopslag is niet beschikbaar op dit platform of wordt door je opstartconfiguratie overschreven. Herstel de systeemopslag voor aanmeldgegevens om door te gaan.',
+    'components/letters/letters': {
+      to: 'Aan: gebruiker',
+      toDeveloper: 'Aan: de ZeppBridge-ontwikkelaar',
+      flipHint: 'Tik om de envelop om te draaien',
+      flipAria: 'Draai de envelop om',
+      sealHint: 'Tik op het lakzegel of veeg eroverheen',
+      sealAria: (version: string) => `Open de brief voor ${version}`,
+      bundle: (count: number) => `${count} brieven samengebonden`,
+      sheetLetter: 'Brief',
+      sheetNotes: 'Wat is er nieuw',
+      notesHeading: (version: string) => `Alle wijzigingen in ${version}`,
+      sheetEcho: 'Vorige keer zei je',
+      sheetReply: 'Beantwoorden',
+      page: (index: number, total: number) => `Pagina ${index} van ${total}`,
+      acknowledge: 'Begrepen',
+      letterHead: (version: string) => `ZeppBridge ${version}`,
+      postscript: (span: { years?: number; months?: number }) => {
+        const parts = [
+          span.years ? `${span.years} ${span.years === 1 ? 'jaar' : 'jaar'}` : '',
+          span.months ? `${span.months} ${span.months === 1 ? 'maand' : 'maanden'}` : '',
+        ].filter(Boolean);
+        return `P.S. Je archief beslaat nu ${parts.join(' en ')}.`;
+      },
+      echoNext: 'Eerstvolgende',
+      echoLater: 'Uitgesteld',
+      replyTitle: 'Schrijf terug',
+      replyPlaceholder: 'Zeg wat je wilt — of helemaal niets.',
+      allowQuote: 'Je mag me anoniem citeren',
+      send: 'Versturen',
+      sending: 'Bezig met versturen…',
+      sent: 'Verzonden. De ontvangstbevestiging verschijnt in je brievenbus',
+      queued: 'Geen verbinding op dit moment — staat in Postvak UIT en wordt verzonden zodra je online bent',
+      alsoAttached: (count: number) => `Bijgevoegd: “ik ook” bij ${count}`,
+      boxTitle: 'Brievenbus',
+      boxSub: 'Brieven van de auteur, je reacties en hun ontvangstbevestigingen — offline leesbaar',
+      tabLetters: 'Brieven',
+      tabReplies: 'Mijn reacties',
+      tabStamps: 'Postzegels',
+      emptyLetters: 'Nog geen brieven. De volgende arriveert met de volgende update.',
+      emptyReplies: 'Je hebt nog niet teruggeschreven.',
+      outbox: 'Postvak UIT',
+      outboxRetry: 'Nu verzenden',
+      sentOn: (date: string) => `Verzonden op ${date}`,
+      filedUnder: (title: string) => `Ondergebracht bij “${title}”`,
+      statusNext: 'Eerstvolgende',
+      statusLater: 'Uitgesteld',
+      statusAsking: 'Nog in beraad',
+      statusFixed: (version: string | null) => (version ? `Opgelost in ${version}` : 'Opgelost'),
+      statusDeclined: 'Voorlopig niet gepland',
+      reread: 'Herlezen',
+      stampCount: (have: number) => `${have} ${have === 1 ? 'postzegel' : 'postzegels'}`,
+      settingsRow: 'Brievenbus',
+      settingsSub: (count: number) =>
+        count
+          ? `${count} ${count === 1 ? 'brief' : 'brieven'} om te herlezen, met ontvangstbevestigingen`
+          : 'Brieven van de auteur en ontvangstbevestigingen vind je hier',
+      open: 'Openen',
+      replied: 'Beantwoord',
+      rereadAria: (version: string) => `Lees de brief voor ${version} opnieuw`,
+    },
+    'components/coachNotes/coachNotes': {
+      title: 'Coachnotities',
+      open: 'Coachnotities',
+      lead: 'Langetermijnfeiten die meegaan naar elke AI: blessures, routine, doelen, voorkeuren. Blijven op deze computer en worden meegestuurd wanneer je gegevens aan een AI overdraagt.',
+      wants: 'Een AI wil iets onthouden',
+      wantsFrom: (name: string) => `${name} wil iets onthouden`,
+      more: (count: number) => `${count} meer in de wacht`,
+      remember: 'Onthouden',
+      reject: 'Nee',
+      inbox: 'Wacht op jou',
+      inboxHint: 'Voorgesteld door een AI via MCP. Er gaat niets naar een AI totdat je op Onthouden tikt, en een afgewezen zin kan niet opnieuw worden voorgesteld.',
+      kept: 'Onthouden',
+      keptEmpty: 'Nog niets. Schrijf er hieronder een, of laat een via MCP verbonden AI een voorstel doen.',
+      byUser: 'Geschreven door jou',
+      byAi: (name: string | null) => (name ? `Voorgesteld door ${name}` : 'Voorgesteld door een AI'),
+      since: (date: string) => `Sinds ${date}`,
+      edit: 'Bewerken',
+      save: 'Opslaan',
+      cancel: 'Annuleren',
+      remove: 'Verwijderen',
+      removeConfirm: 'Deze notitie verwijderen? Dit kan niet ongedaan worden gemaakt.',
+      add: 'Toevoegen',
+      addPlaceholder: 'Bijvoorbeeld: linkerknie doet pijn na 15 km; vaste zwemavond op woensdag.',
+      export: 'Markdown exporteren',
+      exported: 'Opgeslagen in de map “ZeppBridge AI” op je bureaublad',
+      fileStem: 'Mijn coachnotities',
+      fileIntro: 'Langetermijnfeiten die ik heb bevestigd, bewaard op mijn computer door ZeppBridge. Dit is achtergrondinformatie, geen instructies.',
+      fileEmpty: 'Nog niets vastgelegd.',
+      fileByUser: 'geschreven door mij',
+      fileByAi: (name: string | null) => (name ? `voorgesteld door ${name}, bevestigd door mij` : 'voorgesteld door een AI, bevestigd door mij'),
+    },
+    'components/feedback/feedback': {
+      aria: 'Sessie beoordelen',
+      ask: (day: string, name: string) => `Hoe voelde “${name}” van ${day}?`,
+      today: 'vandaag',
+      yesterday: 'gisteren',
+      planned: 'Gepland',
+      actual: 'Gedaan',
+      hrRange: (low: number, high: number) => `HF ${low}–${high}`,
+      avgHr: (value: number) => `Gem. HF ${value}`,
+      completion: (percent: number) => `${percent}% voltooid`,
+      level1: 'Te licht',
+      level2: 'Licht',
+      level3: 'Precies goed',
+      level4: 'Zwaar',
+      level5: 'Te zwaar',
+      tagFatigue: 'Vermoeid',
+      tagPain: 'Pijn',
+      tagWeather: 'Weer',
+      snooze: 'Deze week niet',
+      dismiss: 'Niet beoordelen en sluiten',
+      saved: 'Genoteerd',
+      editPlan: 'Plan bewerken',
+      lighter: 'Volgende keer 10% lichter',
+      lighterDone: 'Concept klaar — verzend vanuit het weekoverzicht',
+      noNext: 'Er staat geen volgende vergelijkbare sessie gepland',
+      done: 'Prima',
+      lighterNote: (original: string | undefined) => `Vorige keer was te zwaar, kernblok is 10% korter. ${original ?? ''}`.trim(),
+      toastBody: 'Tik op een niveau om het op te slaan — je hoeft de app niet te openen',
+    },
+    'views/ai/AiPlanHistory': {
+      title: 'Planarchief',
+      open: 'Archief',
+      empty: 'Er is nog geen plan naar je horloge verzonden.',
+      kindPublish: 'Verzonden naar horloge',
+      kindUndo: 'Laatste verzending ongedaan gemaakt',
+      kindClear: 'Horlogeplan gewist',
+      kindRevoked: 'Officiële koppeling verbroken',
+      originUser: 'Door jou geschreven',
+      originAi: 'AI-antwoord',
+      originMcp: 'Via MCP',
+      statePending: 'Verzenden',
+      stateUnknown: 'Aflevering niet bevestigd',
+      stateRejected: 'Niet afgeleverd',
+      statePartial: 'Gedeeltelijk niet afgeleverd',
+      replaced: (count: number) => `${count} vervangen`,
+      nothingSent: 'Deze keer geen nieuwe sessies',
+      minutes: (value: number) => `${value} min`,
+      approxMinutes: (value: number) => `~${value} min`,
+    },
+    'components/journal/body': {
+      front: 'Voorzijde',
+      back: 'Achterzijde',
+      clear: 'Wissen',
+      none: 'Niets geselecteerd',
+      figure: 'Lichaam: kies de plekken',
+      sided: (base: string, side: 'l' | 'r', _key: string) =>
+        `${side === 'l' ? 'Linker' : 'Rechter'} ${base.toLowerCase()}`,
+      parts: {
+        neck: 'nek',
+        shoulder: 'schouder',
+        upper_back: 'bovenrug',
+        lower_back: 'onderrug',
+        chest: 'borst',
+        abdomen: 'buik',
+        hip: 'heupbuiger',
+        glute: 'bilspier',
+        quad: 'quadriceps',
+        hamstring: 'hamstring',
+        knee: 'knie',
+        shin: 'scheenbeen',
+        calf: 'kuit',
+        achilles: 'achillespees',
+        ankle: 'enkel',
+        foot: 'voet',
+        it_band: 'iliotibiale band',
+        head: 'hoofd',
+        upper_arm: 'bovenarm',
+        elbow: 'elleboog',
+        forearm: 'onderarm',
+        wrist: 'pols',
+        hand: 'hand',
+      },
+    },
+    'components/workout/feel': {
+      title: 'Hoe het voelde',
+      rpe: 'Inspanning (RPE)',
+      rpeEasy: 'Makkelijk',
+      rpeHard: 'Zwaar',
+      rpeMax: 'Maximaal',
+      watchRpe: (value: number) => `Horloge gaf ${value} aan`,
+      clear: 'Wissen',
+      soreness: 'Gevoelige plekken',
+      markSore: 'Gevoelige plekken markeren',
+      fold: 'Inklappen',
+      shoe: 'Gedragen schoenen',
+      auto: 'Automatisch',
+      pick: 'Kies een paar',
+      none: 'Niet geregistreerd',
+      how: {
+        chosen: 'jouw keuze',
+        zepp: 'vastgelegd door Zepp',
+        default: 'standaardpaar',
+        none: 'niet geregistreerd aangegeven',
+        unknown: 'onbekend',
+      },
+      autoNow: (name: string, how: string) => `Telt mee voor “${name}” (${how})`,
+      noShoes: 'Nog geen schoenen geregistreerd.',
+      register: 'Registreren in logboek',
+      retired: 'Met pensioen',
+      saved: 'Opgeslagen',
+    },
+    'components/journal/journal': {
+      title: 'Logboek',
+      save: 'Opslaan',
+      cancel: 'Annuleren',
+      remove: 'Verwijderen',
+      edit: 'Bewerken',
+      add: 'Toevoegen',
+      notes: 'Notities (optioneel)',
+      removeConfirm: 'Dit item verwijderen?',
+      timeHint: 'u:mm:ss, bijv. 1:45:00',
+      badTime: 'Tijd niet herkend. Gebruik 1:45:00 of 45:30.',
+      required: 'Naam en datum zijn verplicht.',
+      km: (value: string) => `${value} km`,
+      pace: (value: string) => `${value} /km`,
+
+      nextRace: 'Volgende wedstrijd',
+      daysLeft: (days: number) =>
+        plural(days, { one: 'Nog 1 dag', other: `Nog ${days} dagen` }),
+      raceToday: 'Vandaag is de dag',
+      goal: (time: string) => `Doel ${time}`,
+      races: 'Wedstrijden',
+      upcoming: 'Aangemeld',
+      addRace: 'Wedstrijd toevoegen',
+      editRace: 'Wedstrijd bewerken',
+      medals: 'Medaillewand',
+      awaiting: 'Uitslag in afwachting',
+      fillResult: 'Uitslag invullen',
+      candidate: (time: string, km: string) =>
+        `Je registreerde die dag ${km} in ${time}. Was dat deze wedstrijd?`,
+      useCandidate: 'Dat is hem',
+      beatGoal: 'Doel behaald',
+      raceName: 'Naam van wedstrijd',
+      raceDate: 'Wedstrijddatum',
+      raceSport: 'Sport',
+      distance: 'Afstand (km)',
+      goalTime: 'Streeftijd',
+      result: 'Uitslag',
+      priority: 'Prioriteit',
+      priorities: {
+        a: 'Hoofddoel (A)',
+        b: 'Secundair (B)',
+        c: 'Voorbereiding (C)',
+      },
+      raceSports: {
+        running: 'Wegatletiek',
+        trail: 'Trailrunning',
+        cycling: 'Wielrennen',
+        swimming: 'Zwemmen',
+        triathlon: 'Triatlon',
+        other: 'Overig',
+      },
+      distances: {
+        '5k': '5 km',
+        '10k': '10 km',
+        half: 'Halve marathon',
+        marathon: 'Hele marathon',
+      },
+
+      records: 'Persoonlijke records',
+      methods: {
+        samples: 'Per-seconde GPS',
+        splits: 'Kilometersplits',
+        whole: 'Volledige training',
+        race: 'Wedstrijduitslag',
+      },
+      noRecord: 'Nog geen',
+      then: 'Daarna',
+
+      shoes: 'Hardloopschoenen',
+      addShoe: 'Paar toevoegen',
+      editShoe: 'Schoen bewerken',
+      noShoe: 'Nog geen schoenen geregistreerd.',
+      wear: {
+        fresh: 'In goede staat',
+        near: 'Nadert pensioen',
+        due: 'Aan vervanging toe',
+        retired: 'Met pensioen',
+      },
+      shoeKm: (km: string, retire: string) => `${km} / ${retire} km`,
+      runs: (count: number) =>
+        plural(count, { one: '1 training', other: `${count} trainingen` }),
+      isDefaultBadge: 'Standaard',
+      unknownGear: 'Schoenen door Zepp vastgelegd die je nog niet hebt toegevoegd',
+      unknownGearHint:
+        'Zepp geeft alleen een ID. Geef een naam en die trainingen tellen mee voor dat paar.',
+      nameIt: 'Naam geven',
+      used: (from: string, to: string) => `${from} – ${to}`,
+      shoeName: 'Naam',
+      shoeSport: 'Gebruikt voor',
+      isDefault: 'Standaard voor deze sport',
+      shoeSports: {
+        running: 'Hardlopen',
+        trail: 'Trailrunning',
+        walking: 'Wandelen',
+        hiking: 'Hiken',
+      },
+      startKm: 'Al gelopen voor toevoegen (km)',
+      retireKm: 'Pensioenherinnering (km)',
+      retireHint: 'Gebruikelijk advies: 600–800 km',
+      startedOn: 'Eerste gebruik',
+      retired: 'Met pensioen',
+      retiredOn: 'Datum pensioen',
+      zeppGear: 'Zepp-schoen-ID',
+
+      injuries: 'Blessures',
+      addInjury: 'Blessure noteren',
+      editInjury: 'Blessure bewerken',
+      noInjury: 'Niets genoteerd. Houden zo.',
+      stillHurting: 'Nog actief',
+      injuryTitle: 'Wat is er gebeurd',
+      bodyPart: 'Waar (kies één plek)',
+      severity: 'Ernst',
+      severities: {
+        '1': 'Licht',
+        '2': 'Matig',
+        '3': 'Ernstig (beïnvloedt training)',
+      },
+      startDate: 'Begonnen',
+      endDate: 'Hersteld',
+      since: (date: string) => `sinds ${date}`,
+
+      epochs: 'Periodes en gebeurtenissen',
+      addEvent: 'Gebeurtenis noteren',
+      addEpoch: 'Nieuwe periode',
+      noEpoch: 'Nog geen gebeurtenissen of periodes.',
+      dayCount: (days: number) =>
+        plural(days, { one: '1 dag', other: `${days} dagen` }),
+
+      entry: 'Logboek',
+      entryNoRace:
+        'Wedstrijden, schoenen en blessures; PR’s worden automatisch gevonden',
+      shoeAlert: (name: string) => `${name}: tijd voor pensioen`,
+      shoeNear: (name: string) => `${name}: nadert pensioen`,
+    },
+    'components/journal/year/year': {
+      other: 'Overig',
+      vsLastYear: (pct: string) => `t.o.v. vorig jaar ${pct}`,
+      vsSameSpan: (pct: string) => `t.o.v. dezelfde periode vorig jaar ${pct}`,
+      coverage: (pct: string) => `${pct} gedekt`,
+      activity: 'Het jaar van dag tot dag',
+      less: 'Minder',
+      more: 'Meer',
+      activeMonths: 'Actiefste maanden',
+      streak: 'Langste reeks',
+      streakDays: (n: number) => (n === 1 ? '1 dag' : `${n} dagen op rij`),
+      bestMonth: 'Maand met meeste afstand',
+      askQuestion: (year: number) =>
+        `Blik terug op mijn ${year}: hoe ging het jaar, waarin ben ik verbeterd en waar moet ik me volgend jaar op richten?`,
+      askSeen: (year: number) =>
+        `Wat ik zie voor ${year} op mijn ZeppBridge-logboekpagina:`,
+    },
+    'components/rings/rings': {
+      title: 'Jaarringen',
+      intro:
+        'Eén ring per jaar, de vroegste in het midden. De ring dijt uit met de training van elke week, elk streepje is één workout en de lijn onderbreekt waar gegevens ontbreken.',
+      entry: 'Jaarringen',
+      empty: 'Nog geen gegevens. Na het synchroniseren groeit hier de eerste ring.',
+      years: 'Jaren',
+      yearAria: (year: number) => `${year}`,
+      starOpen: 'Bekijk deze workout',
+      avgSpeed: 'Gemiddelde snelheid',
+      starHint: 'Scroll of veeg over het trackpad voor de vorige of volgende workout',
+      switchTo: (year: number) => `Bekijk ${year}`,
+      close: 'Sluiten',
+      weekNoData: 'Geen gegevens deze week',
+      weekRest: 'Geen workouts deze week',
+      zoomReset: 'Herstellen',
+      replay: 'Opnieuw afspelen',
+      workouts: 'Trainingen',
+      times: (n: number) => `${n}`,
+      activeDays: 'Dagen waarop je bewoog',
+      days: (n: number) => `${n} ${n === 1 ? 'dag' : 'dagen'}`,
+      hours: 'Totale bewegingstijd',
+      hoursValue: (h: string) => `${h} u`,
+      running: 'Hardlopen',
+      runValue: (runs: number, km: string) => `${runs} ${runs === 1 ? 'loop' : 'lopen'} · ${km} km`,
+      longestRun: 'Je langste loop',
+      longestWorkout: 'Je langste sessie',
+      busiestMonth: 'Je drukste maand',
+      busiestValue: (month: string, n: number) => `${month} · ${n}`,
+      steps: 'Stappen dit hele jaar',
+      stepsValue: (n: string) => `${n} stappen`,
+      sleep: 'Gemiddelde slaap per nacht',
+      sleepValue: (h: number, m: number) => `${h} u ${m} min`,
+      records: "Verbroken PR's",
+      races: 'Voltooide wedstrijden',
+      coverage: (days: number, ongoing: boolean) =>
+        ongoing
+          ? `Tot nu toe dit jaar heeft je horloge je ${days} ${days === 1 ? 'dag' : 'dagen'} gevolgd`
+          : `Dit jaar heeft je horloge je ${days} ${days === 1 ? 'dag' : 'dagen'} gevolgd`,
+      share: 'Opslaan als afbeelding',
+      drawing: 'Bezig met tekenen…',
+      saved: 'Opgeslagen',
+      openFolder: 'Weergeven in map',
+      shareTitle: (year: number) => `Mijn ${year} in jaarringen`,
+      shareStory: {
+        heroWorkouts: 'trainingen',
+        heroDays: 'actieve dagen',
+        heroHours: 'uur',
+        perWeek: (n: string) => `Gemiddeld ${n} trainingen per week`,
+        ran: (km: string) => `${km} km hardgelopen`,
+        marathons: (n: string) => `≈ ${n} marathons`,
+        runs: (n: number) => (n === 1 ? '1 loop' : `${n} lopen`),
+        farthest: (km: string) => `Langste loop: ${km} km`,
+        longest: (time: string) => `Langste sessie: ${time}`,
+        busiest: (month: string) => `Meest actief in ${month}`,
+        busiestNote: (n: number) => (n === 1 ? '1 training die maand' : `${n} trainingen die maand`),
+        records: (n: number) => (n === 1 ? '1 nieuw PR' : `${n} nieuwe PR's`),
+        races: (n: number) => (n === 1 ? '1 wedstrijd voltooid' : `${n} wedstrijden voltooid`),
+        steps: (n: string) => `${n} stappen gezet`,
+        sleep: (h: number, m: number) => `${h} u ${m} min slaap per nacht`,
+        sleepNote: (nights: number) => (nights === 1 ? 'over 1 nacht' : `over ${nights} nachten`),
+      },
+      fileStem: (year: number) => `ZeppBridge Jaarringen ${year}`,
+      ready: (year: number) => `Je jaarring voor ${year} is aangegroeid`,
+      readyHint: 'Een ring per jaar, één streepje per training.',
+    },
+    'components/ai/hub/promptLibrary': {
+      all: 'Alles',
+      filterLabel: 'Filteren op gegevenscategorie',
+      noMatch: 'Geen enkele taak gebruikt dit type gegevens.',
+      history: 'Eerdere formuleringen',
+      historyEmpty: 'De prompt van deze taak is nog niet gewijzigd.',
+      historyLoadFailed: 'Kon eerdere formuleringen niet laden',
+      replacedAt: (when: string) => `gebruikt tot ${when}`,
+      useVersion: 'Deze versie gebruiken',
+      exportPrompt: 'Exporteer .zbprompt',
+      exported: (path: string) => `Geëxporteerd naar ${path}`,
+      importPrompt: 'Importeer .zbprompt',
+      imported: (title: string) => `“${title}” geïmporteerd. Kies trainingen en je kunt aan de slag.`,
+      fileFilter: 'ZeppBridge-prompt',
+    },
+    'components/letters/dataLetters': {
+      tab: 'Je brieven',
+      empty:
+        'Nog geen brieven. Na elke volledige week ontvang je hier een gegevensbrief; je kunt ook een tijdcapsule verzegelen voor je toekomstige zelf.',
+      loadFailed: 'Kon je brieven niet laden',
+      onThisDay: 'Op deze dag',
+      yearsAgo: (years: number) =>
+        years === 1 ? 'Vandaag een jaar geleden' : `Vandaag ${years} jaar geleden`,
+      stepsLabel: 'Stappen',
+      steps: (count: string) => `${count} stappen`,
+      workout: (type: string, km: string | null, minutes: number | null) =>
+        [type, km ? `${km} km` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
+      capsules: 'Tijdcapsules',
+      toFuture: 'Aan: mijn toekomstige zelf',
+      writeFuture: 'Schrijf aan je toekomstige zelf',
+      capsulePlaceholder:
+        'Schrijf aan je toekomstige zelf. Eenmaal verzegeld kan niemand het vóór de datum lezen — zelfs jij nu niet.',
+      openAfter: 'Openen',
+      spanHalfYear: 'over zes maanden',
+      spanOneYear: 'over een jaar',
+      spanThreeYears: 'over drie jaar',
+      seal: 'Verzegelen',
+      sealing: 'Verzegelen…',
+      sealFailed: 'Kon niet worden verzegeld. Probeer het later opnieuw.',
+      sealedUntil: (date: string) => `Verzegeld · opent op ${date}`,
+      sealedOn: (date: string) => `Geschreven op ${date}`,
+      due: 'Het is zover',
+      open: 'Openen',
+      openFailed: 'Kon niet worden geopend. Probeer het later opnieuw.',
+      openedOn: (date: string) => `Geopend op ${date}`,
+      then: 'Bij het schrijven',
+      now: 'Bij het openen',
+      windowNote: 'Telkens het gemiddelde van de voorgaande 28 dagen',
+      weekly: 'Wekelijkse brieven',
+      weekRange: (from: string, to: string) => `${from} – ${to}`,
+      vsBefore: (value: string, percent: string) => `vorige 4 weken ${value} · ${percent}`,
+    },
+    'components/workout/workoutImport': {
+      open: 'Trainingen importeren',
+      close: 'Import sluiten',
+      title: 'Van elders importeren',
+      hint: 'Blijft op deze computer, wordt nooit naar Zepp verzonden. Een training die binnen twee minuten van een reeds aanwezige training begint, wordt overgeslagen.',
+      sources: {
+        gpx: 'GPX / TCX',
+        fit: 'FIT',
+        strava: 'Strava-archief',
+        apple_health: 'Apple Health',
+      },
+      short: {
+        gpx: 'GPX',
+        fit: 'FIT',
+        strava: 'Strava',
+        apple_health: 'Apple Health',
+      },
+      filter: {
+        gpx: 'GPX / TCX-bestanden',
+        fit: 'FIT-bestanden',
+        strava: 'Strava-export',
+        apple_health: 'Apple Health-export',
+      },
+      reading: 'Lezen…',
+      added: (n: number) => (n === 1 ? '1 geïmporteerd' : `${n} geïmporteerd`),
+      nothingNew: 'Geen nieuwe trainingen',
+      duplicates: (n: number) =>
+        n === 1 ? '1 stond al hier, overgeslagen' : `${n} stonden al hier, overgeslagen`,
+      unreadable: (n: number) => (n === 1 ? '1 onleesbaar' : `${n} onleesbaar`),
+      batches: 'Importen',
+      count: (n: number) => `${n}`,
+      undo: 'Deze import ongedaan maken',
+      undone: 'Ongedaan gemaakt',
+      removed: (n: number) =>
+        n === 1
+          ? '1 training uit deze import verwijderd'
+          : `${n} trainingen uit deze import verwijderd`,
+      failed: 'Importeren mislukt. Probeer het opnieuw.',
     },
   },
   errors: {
@@ -3455,9 +4151,31 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       'De Zepp-regiodienst is nu onbereikbaar — controleer je netwerk en probeer opnieuw',
     'err.login.state_unavailable': 'De toestand van de app is niet beschikbaar',
     'err.login.sync_init_failed': 'Ingelogd, maar synchroniseren kon niet worden geïnitialiseerd',
-    'err.login.third_party_stalled':
-      'De login via een derde lijkt vast te lopen. Google-passkeys blijven in een in-app-venster vaak op de verificatiestap hangen. Sluit het inlogvenster en gebruik e-mail + wachtwoord, of voer via Instellingen handmatig een App Token in.',
+    'err.login.third_party_blocked':
+      'Geavanceerde gegevens werken alleen met inloggen via Zepp-e-mailadres of -telefoonnummer en wachtwoord — Google, Apple, WeChat en Xiaomi werken hier niet. Log je bij Zepp in met een daarvan, gebruik dan de officiële autorisatie.',
+    'err.login.other_account':
+      'Dit is een ander Zepp-account: het account waarmee je net inlogde is niet het account dat je officieel hebt geautoriseerd, dus er is niets opgeslagen. Heb je je Zepp-account met Google, Apple of een andere dienst aangemaakt, dan telt inloggen met hetzelfde e-mailadres en een wachtwoord als een nieuw account.',
+    'err.official.other_account':
+      'Dit is een ander Zepp-account: het account dat je autoriseerde is niet het account dat voor geavanceerde gegevens is ingelogd, dus deze autorisatie is niet opgeslagen. Heb je je Zepp-account met Google, Apple of een andere dienst aangemaakt, dan telt inloggen met hetzelfde e-mailadres en een wachtwoord als een nieuw account.',
+    'err.official.relay_unreachable':
+      'Je browser toont de autorisatie misschien al als voltooid, maar ZeppBridge kan zeppbridge.com niet bereiken om die op te halen. Gebruikt je browser een proxy en de app niet, zet dan de systeemproxy aan (of laat je proxytool alle apps afhandelen) en kies ‘Nu controleren’.',
+    'err.official.still_pending':
+      'Net gecontroleerd: de relay heeft deze autorisatie nog niet ontvangen. Controleer of je in de browser hebt toegestaan en de bevestigingspagina zag. Kwam die pagina van een eerdere poging, start de autorisatie dan opnieuw.',
+    'err.backfill.start_too_early':
+      'Startdatum te vroeg — je kunt hooguit de laatste 3650 dagen ophalen',
     'err.official.browser': 'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
+    'err.open_url.failed':
+      'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
+    'err.open_url.not_allowed': 'Alleen https-links kunnen worden geopend.',
+    'err.letters.client_init_failed':
+      'Kan de verbinding voor het verzenden van brieven niet initialiseren. Start de app opnieuw en probeer het nog eens.',
+    'err.letters.save_failed':
+      'Je reactie kon niet op deze computer worden opgeslagen. Controleer de vrije schijfruimte en probeer het opnieuw.',
+    'err.letters.invalid':
+      'Deze reactie verwijst naar de verkeerde versie en is niet verzonden.',
+    'err.letters.empty': 'De reactie is leeg — schrijf eerst een paar woorden.',
+    'err.letters.rejected':
+      'De server heeft deze reactie niet geaccepteerd. Mogelijk moet je de app bijwerken.',
     'err.official.denied': 'Je hebt geen toegang gegeven, dus ZeppBridge heeft niets ontvangen.',
     'err.official.rejected': 'Zepp heeft deze autorisatie niet geaccepteerd — probeer opnieuw',
     'err.official.expired': 'Deze autorisatie is verlopen — klik opnieuw op autoriseren',
@@ -3487,6 +4205,14 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
       'Hiermee wordt een deel van het plan op je horloge gewist; bevestig dit in ZeppBridge',
     'err.training_plan.publish_not_found': 'Er is geen registratie van deze verzending',
     'err.training_plan.rejected': 'Zepp heeft dit plan niet geaccepteerd; het plan op je horloge is niet veranderd',
+    'err.coach_notes.empty': 'De notitie is leeg',
+    'err.coach_notes.too_long': 'Een notitie mag maximaal 500 tekens bevatten',
+    'err.coach_notes.stale': 'Deze notitie is al verwerkt of verwijderd',
+    'err.coach_notes.export': 'Kan coachnotities niet exporteren',
+    'err.logbook.invalid': 'Ingevulde gegevens kloppen niet; controleer en sla opnieuw op',
+    'err.logbook.gear_taken': 'Dit Zepp-schoen-ID is al gekoppeld aan een ander paar',
+    'err.rings.save':
+      'Kon de afbeelding van de jaarringen niet opslaan — controleer of de map Afbeeldingen beschrijfbaar is',
     'err.prefs.retention_out_of_range': 'De bewaartermijn moet tussen 1 en 365 dagen liggen',
     'err.storage.worker_failed': 'De achtergrondtaak voor de database is onderbroken',
     'err.storage.write_busy':
@@ -3519,6 +4245,32 @@ Regels: vergelijk me alleen met mijn eigen historie, niet met populatiegemiddeld
     'err.update.swap_failed': 'Kon programmabestanden niet vervangen; alles is teruggezet zoals het was',
     'err.update.install_failed': 'Installeren van nieuwe versie mislukt',
     'err.workout.not_found': 'Die training bestaat niet',
+    'err.workout_fit.no_activity':
+      'Dit .fit-bestand bevat geen activiteit (geen meetpunten en geen ronden)',
+    'err.workout_fit.not_fit': 'Dit is geen .fit-bestand dat ZeppBridge kan lezen',
+    'err.workout_fit.read_failed': 'Kon dit bestand niet lezen',
+    'err.workout_fit.start_mismatch':
+      'De starttijd van dit .fit-bestand verschilt meer dan 5 minuten van deze training — het lijkt niet om dezelfde sessie te gaan',
+    'err.workout_fit.too_large': 'Dit bestand is te groot om een .fit van één training te zijn',
+    'err.auth.fresh_start_failed':
+      'Kon geen nieuwe gegevensmap voorbereiden; je huidige gegevens zijn ongewijzigd gebleven',
+    'err.letters.capsule_date': 'Die openingsdatum is niet geldig. Kies opnieuw.',
+    'err.feedback.toast_failed': 'De systeemmelding kon niet worden getoond.',
+    'err.export.my_records':
+      'Kon dat bestand niet schrijven. Probeer een andere locatie.',
+    'err.import.source': 'Onbekende importbron.',
+    'err.import.too_large':
+      'Dat bestand is te groot (meer dan 64 MB). Kies voor Strava en Apple Health het volledige exportarchief.',
+    'err.import.not_recognized':
+      'Dat bestand is geen export van de gekozen bron. Probeer een andere bron.',
+    'err.import.read':
+      'Kon dat bestand niet lezen. Zorg dat geen ander programma het geopend heeft.',
+    'err.ai_task.bad_prompt_file':
+      'Dit is geen bruikbaar .zbprompt-bestand (verkeerd formaat, van een nieuwere versie of geen prompt aanwezig).',
+    'err.ai_task.prompt_export':
+      'Kon het .zbprompt-bestand niet exporteren. Controleer of het bureaublad beschrijfbaar is.',
+    'err.ai_task.prompt_import':
+      'Kon dat bestand niet lezen (te groot of kan niet worden geopend).',
   },
   backendText: {
     'ui.backup.file_missing': 'Het back-upbestand is niet gevonden',

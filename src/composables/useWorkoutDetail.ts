@@ -1,20 +1,16 @@
 import { computed, onMounted, ref, watch, type Ref } from 'vue';
 import { useLoadingAfterMotion } from './useFirstLoad';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
-import { useWorkoutRecoveryHandoff } from './useWorkoutRecoveryHandoff';
-import { displayDateTimeFormatter } from '../lib/dateTime';
 import { useSyncController } from './useSyncController';
 import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import { createLoadSeq } from '../lib/loadSeq';
 import { workoutPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
-import { AI_PROVIDER_BY_ID } from '../lib/aiProviders';
-import type { AiTaskPrepareResult } from '../lib/bridge/types';
 import { workoutLabel } from '../lib/labels';
 import { isFiniteNumber } from '../lib/format';
 import { readDefaultExportFormat } from '../lib/exportScope';
-import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
+import { workoutDisplayType } from '../lib/workouts';
 import { intlLocale, useMessages } from '../i18n';
 import { workoutDetailMessages } from '../views/WorkoutDetail.i18n';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample } from '../types';
@@ -80,52 +76,6 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
       if (insightSeq.isCurrent(seq)) insightLoading.value = false;
     }
   };
-
-  /* 「问 AI」就在这一页弹出可拖的 .md，不离开运动页，也不自动打开网站。
-     带不带前 7 天睡眠和恢复，都走同一套任务准备。 */
-  /** 「带上前 7 天睡眠和恢复」：默认勾上（1D·D10）。去掉勾选时只交这一次运动。 */
-  const aiWithRecovery = ref(true);
-  const recoveryHandoff = useWorkoutRecoveryHandoff();
-  const askBusy = ref(false);
-  const askResult = ref<AiTaskPrepareResult | null>(null);
-  const askError = ref<string | null>(null);
-  const askProvider = computed(() => recoveryHandoff.lastProvider.value ?? AI_PROVIDER_BY_ID.chatgpt);
-
-  const sendWorkoutToAi = async () => {
-    if (askBusy.value || !workout.value) return;
-    askError.value = null;
-    askResult.value = null;
-    const current = workout.value;
-    if (!isTauri()) {
-      askError.value = t.value.needDesktop;
-      return;
-    }
-    askBusy.value = true;
-    try {
-      const label = workoutDisplayLabel(current);
-      const day = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(new Date(current.start_time));
-      const withRecovery = aiWithRecovery.value;
-      const result = await recoveryHandoff.prepareSheet(
-        current,
-        askProvider.value,
-        t.value.aiRecoveryTitle(label, day),
-        (gap) => (withRecovery ? t.value.aiRecoveryPrompt(label, gap) : t.value.aiPrompt(label)),
-        withRecovery,
-      );
-      askResult.value = result;
-      if (!result || result.status !== 'ready') {
-        askError.value = recoveryHandoff.failure();
-        return;
-      }
-      askError.value = recoveryHandoff.steps.value.copy.errorText;
-    } finally {
-      askBusy.value = false;
-    }
-  };
-
-  const copyAsk = () => { void recoveryHandoff.copy(); };
-  const openAsk = () => { void recoveryHandoff.open(askProvider.value); };
-  const revealAsk = () => { void recoveryHandoff.reveal(); };
 
   const typeOverrideBusy = ref(false);
   /* 纠正选项直接来自随包运动目录（一百多项），不是一份写死的短名单：目录里有
@@ -251,7 +201,6 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   return {
     workout, series, device, loading: useLoadingAfterMotion(loading), error, actionError, exportedNote, activeFormat, exportBusy, displayType,
     insight, insightLoading, insightError, seriesError,
-    askBusy, askResult, askError, askProvider, sendWorkoutToAi, copyAsk, openAsk, revealAsk, aiWithRecovery,
     typeOverrideBusy, typeOverrideChoices, changeWorkoutOverride,
     loadDetail, exportRecord,
   };

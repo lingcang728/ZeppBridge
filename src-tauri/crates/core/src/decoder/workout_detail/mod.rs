@@ -88,6 +88,11 @@ pub struct WorkoutSample {
     /// 264 s/km, is `bestEquivPace` 264, and the distance-weighted mean
     /// (5428.6 s over `equivDistance` 15257 m = 355.8) is `avgEquivPace` 355.
     pub equivalent_pace_s_per_km: Option<f64>,
+    /// 手表自己的累计距离（`currentDistance`），米。坏点（回退、每秒超过
+    /// 200 m 的跳变）已经去掉。#139：FIT 的 `record.distance` 就写它——
+    /// 它可能和汇总的 `dis` 差一点（一次越野跑 10769.7 m 对 10970 m），
+    /// 会话总距离仍用汇总，这里不改写任何一方。
+    pub distance_m: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -253,7 +258,7 @@ pub fn decode_workout_detail(
     let power_pairs = parse_valued_pairs(data.get("power_meter"));
     let equiv_pace_pairs = parse_valued_pairs(data.get("equivPace"));
     let posture = parse_run_posture(data.get("runPosture"));
-    let pauses = parse_pauses(data.get("pause"));
+    let pauses = parse_pauses(data.get("pause"), from);
 
     let heart_rates = if hr_pairs.is_empty() {
         None
@@ -380,6 +385,31 @@ pub fn decode_workout_detail(
         route_dropped_points = count - route.len();
     }
 
+    let mut distance_by_second: std::collections::BTreeMap<i64, f64> =
+        std::collections::BTreeMap::new();
+    {
+        let mut cursor = from;
+        // 上一个被留下的读数（秒, 米）。`currentDistance` 是累计值，必须单调
+        // 不减：回退是坏点；相对上一个有效读数每秒超过 200 m 的跳变同样是
+        // 坏点——真实遇到过一次跳变在同一秒里切出两万个 0 时长分段。
+        //
+        // 起点按「运动开始时距离为 0」处理，而不是留空：否则第一条读数完全
+        // 绕过这个检查，一个坏掉的首个读数就能让 splits 直接爆炸。
+        let mut previous: Option<(i64, f64)> = Some((from, 0.0));
+        for (delta, centimetres) in &distance_pairs {
+            cursor = cursor.saturating_add((*delta).max(0));
+            let meters = f64::from(*centimetres) / 100.0;
+            if let Some((previous_ts, previous_m)) = previous {
+                let step = meters - previous_m;
+                let elapsed = (cursor - previous_ts).max(1) as f64;
+                if step < 0.0 || step > 200.0 * elapsed {
+                    continue;
+                }
+            }
+            distance_by_second.insert(cursor, meters);
+            previous = Some((cursor, meters));
+        }
+    }
     let mut samples = Vec::with_capacity(duration_secs as usize);
     let mut last_altitude = None;
     for offset in 0..=duration_secs {
@@ -411,34 +441,11 @@ pub fn decode_workout_detail(
             equivalent_pace_s_per_km: finite_at(equiv_paces.as_ref(), unix_ts)
                 .filter(|value| *value > 0.0),
             vertical_ratio_pct: finite_at(vertical_ratios.as_ref(), unix_ts),
+            // 只在有读数的那一秒写，不往后拖：读数之间的距离没人量过。
+            distance_m: distance_by_second.get(&unix_ts).copied(),
         });
     }
 
-    let mut distance_by_second: std::collections::BTreeMap<i64, f64> =
-        std::collections::BTreeMap::new();
-    {
-        let mut cursor = from;
-        // 上一个被留下的读数（秒, 米）。`currentDistance` 是累计值，必须单调
-        // 不减：回退是坏点；相对上一个有效读数每秒超过 200 m 的跳变同样是
-        // 坏点——真实遇到过一次跳变在同一秒里切出两万个 0 时长分段。
-        //
-        // 起点按「运动开始时距离为 0」处理，而不是留空：否则第一条读数完全
-        // 绕过这个检查，一个坏掉的首个读数就能让 splits 直接爆炸。
-        let mut previous: Option<(i64, f64)> = Some((from, 0.0));
-        for (delta, centimetres) in &distance_pairs {
-            cursor = cursor.saturating_add((*delta).max(0));
-            let meters = f64::from(*centimetres) / 100.0;
-            if let Some((previous_ts, previous_m)) = previous {
-                let step = meters - previous_m;
-                let elapsed = (cursor - previous_ts).max(1) as f64;
-                if step < 0.0 || step > 200.0 * elapsed {
-                    continue;
-                }
-            }
-            distance_by_second.insert(cursor, meters);
-            previous = Some((cursor, meters));
-        }
-    }
     let mut splits = compute_splits(&samples, &distance_by_second);
     // 对账：分段数超过「汇总距离能容纳的整公里数 +2」，或任何一段时长为 0，
     // 都说明 `currentDistance` 里的坏点还是混进来了——整份分段当坏数据
@@ -454,7 +461,8 @@ pub fn decode_workout_detail(
     // 上面这一步返回空，整条运动就只剩一圈。云端自己的 `kilo_pace` 在这些
     // 记录上恰恰是有的。
     if splits.is_empty() {
-        if let Some(seconds) = kilometre_seconds(data.get("kilo_pace")) {
+        if let Some(timing) = kilometre_seconds(data.get("kilo_pace"), duration_secs, &pauses) {
+            let seconds = &timing.moving;
             // kilo_pace 一行就是一公里，行数必须和汇总距离对得上（±1 容一截
             // 零头的舍入）。对不上说明列读错了，拒用——和 laps 的对账同一态度。
             let count_agrees = summary_distance_m
@@ -468,8 +476,9 @@ pub fn decode_workout_detail(
                     // 汇总没给距离时，按整公里数兜底：kilo_pace 每一行就是一公里。
                     (!seconds.is_empty()).then_some(seconds.len() as f64 * 1000.0)
                 });
-                splits =
-                    splits_from_kilometre_seconds(&samples, &seconds, start_time, end_time, total);
+                splits = splits_from_kilometre_seconds(
+                    &samples, &timing, &pauses, start_time, end_time, total,
+                );
             }
         }
     }
@@ -497,6 +506,21 @@ pub fn decode_workout_detail(
         splits,
         laps,
     })
+}
+
+/// 按累计距离切整公里分段，给别的来源（用户导入的 .fit，#140）复用同一套
+/// 切法——不另写一份。`distances` 是 `(Unix 秒, 累计米)`。
+pub fn splits_from_cumulative_distance(
+    samples: &[WorkoutSample],
+    distances: &std::collections::BTreeMap<i64, f64>,
+) -> Vec<WorkoutSplit> {
+    let splits = compute_splits(samples, distances);
+    // 和明细解码同一道对账：任何一段时长为 0 都说明距离里有跳变，整份不要。
+    if splits.iter().all(|split| split.duration_seconds > 0) {
+        splits
+    } else {
+        Vec::new()
+    }
 }
 
 #[cfg(test)]

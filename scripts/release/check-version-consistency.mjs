@@ -36,7 +36,7 @@ const SITES = [
   { file: 'src-tauri/crates/core/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/cli/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/mcp/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
-  { file: 'src/lib/appVersion.ts', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
+  { file: 'src/lib/appVersion.ts', pattern: /(const FALLBACK_APP_VERSION(?:: string)? = ')([0-9][^']*)(')/ },
   // 两份架构文档都要盯。只盯一份的话，另一份的版本号会惄惄过期，
   // 而读到它的人没有任何线索知道那个数字是错的。
   {

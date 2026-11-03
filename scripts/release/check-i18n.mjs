@@ -325,8 +325,12 @@ const ALLOWED_PROSE = [
   { file: 'demo/operations.ts', text: 'a.note', why: 'User-authored profile text stays unchanged in this isolated sample session.' },
   { file: 'demo/plan.ts', text: 'input.note', why: 'AI or user-authored workout notes are part of the plan document, not interface copy.' },
   { file: 'components/plan/PlanDetail.vue', text: 'row.rest.note', why: 'AI / 用户填写的休息日原文，不是后端界面文案。' },
+  { file: 'components/journal/year/useYearView.ts', text: 'tile.note', why: '年轮四张卡片的副标题（与去年对比/覆盖率），由 useYearText 组装，不是后端散文字段。' },
+  { file: 'components/journal/year/YearSummary.vue', text: 'tile.note', why: '同上，年轮小结卡副标题展示。' },
+  { file: 'lib/rings/draw.ts', text: 'card.note', why: '年轮分享卡片的副标题，由 share.ts 组装，不是后端散文字段。' },
   { file: 'views/AiComposer.vue', text: 'strips.error.value', why: 'useBridgeStrip 已经通过 toUserMessage 按错误码本地化。' },
   { file: 'views/ai/AiExchanges.vue', text: 'history.error.value', why: 'useExchanges 已经通过 toUserMessage 按错误码本地化。' },
+  { file: 'views/Journal.vue', text: 'logbook.error.value', why: '关闭弹窗时清空错误状态；useLogbook 内部已通过 toUserMessage 本地化。' },
   { file: 'lib/trainingPlan/importWorkout/common.ts', text: 'out.note', why: '从 .zwo / .fit 读出来的步骤备注原文，写进草稿的书写格式，不渲染、不是后端界面文案。' },
   { file: 'lib/trainingPlan/edit.ts', text: 'step.note', why: '训练计划里 AI / 用户写的步骤备注原文，原样写回草稿，不渲染、不是后端界面文案。' },
   { file: 'views/landing/StageWindow.vue', text: 'copy.note', why: '同上，落地页文案。' },
@@ -340,7 +344,13 @@ const ALLOWED_PROSE = [
   { file: 'components/HistoryArchivePanel.vue', text: 'item.error', why: '先按 error_code 查文案，未知码才回落。' },
   { file: 'components/HistoryArchivePanel.vue', text: 'stop_reason', why: '走 storageStopReasonText，先查码。' },
   { file: 'composables/useHistoryBackfill.ts', text: 'stop_reason', why: '只判断有没有停止原因；显示走 storageStopReasonText，先查码。' },
-  { file: 'components/WeeklyReportCard.vue', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文。' },
+  { file: 'composables/useBackfillOffer.ts', text: 'backfill.message', why: '补拉循环自己按界面语言拼的进度句（messagesOf），不是后端散文。' },
+  { file: 'components/BackfillOffer.vue', text: 'offer.message', why: '同上：补拉循环在前端按界面语言写的进度句。' },
+  { file: 'components/BackfillOffer.vue', text: 'offer.error', why: '补拉循环里已经过 toUserMessage（先查码）的错误句。' },
+  { file: 'components/workout/WorkoutProvenanceCard.vue', text: 'fit.note', why: '#140 前端自己的提示（workoutDetailMessages），不是后端散文。' },
+  { file: 'components/workout/WorkoutProvenanceCard.vue', text: 'fit.error', why: '#140 已经过 toUserMessage（先查 err.workout_fit.* 码）的错误句。' },
+  { file: 'components/weeklyFactText.ts', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文（周报卡和每周来信共用）。' },
+  { file: 'components/letters/DataLetterSheet.vue', text: 'letter.note', why: '时间胶囊里用户自己写给将来的话，原样显示。' },
   { file: 'composables/useBackups.ts', text: 'verification.problem', why: 'verifyProblemText 按 problem_code 分支，未知码才回落。' },
   { file: 'components/BackupPanel.vue', text: "verifications[item.id].problem", why: '只用来判断有没有失败，显示走 verifyProblemText。' },
   {
@@ -477,7 +487,7 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
 
 /* —— 极简文案表扫描器 ——
  * 不是真 parser：只对付 `key: '…'`、`key: {…}`、`key: (a,b)=>…`、
@@ -880,7 +890,7 @@ const auditLocalePacks = (writePending) => {
   const missingPack = EXPECTED_PACK_LOCALES.filter((l) => !localesFound.includes(l));
   const extraPack = localesFound.filter((l) => !EXPECTED_PACK_LOCALES.includes(l));
   for (const l of missingPack) problems.push(`  缺语言包文件 src/i18n/locales/${l}.ts`);
-  for (const l of extraPack) problems.push(`  多余的语言包文件 ${l}.ts（十语言注册表里没有它）`);
+  for (const l of extraPack) problems.push(`  多余的语言包文件 ${l}.ts（语言注册表里没有它）`);
 
   const allowlist = new Set(
     parseKeyList(join(LOCALES_DIR, 'allowlist-en.txt')).map((e) => `${e.moduleId}.${e.key}`),

@@ -1,4 +1,5 @@
 import { nextTick, watch, type Ref, type WatchSource } from 'vue';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 /**
  * 胶囊里的字一变，宽度就跟着平滑伸缩，而不是一帧跳过去。
@@ -32,7 +33,7 @@ export const useWidthMorph = (
     // 换语言的涟漪期间不补间（lib/motion/ashSwitch.ts）：新快照是活的，宽度每变一帧整张快照都要重画，
     // 而且胶囊换成新宽度这件事本身就被涟漪盖着。涟漪的标记在换语言之前就挂上了：先看它，连量都不量——
     // 换语言那一刻整页的字都在变，量一次旧宽、一次新宽就是两次整页强制排版（性能审计 11，约 35ms）。
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reduced = lessMotion();
     if (reduced || document.documentElement.dataset.ashMorph !== undefined) {
       running?.cancel();
       await nextTick();

@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import type { TimedValue } from '../../lib/chartGaps';
 import type { ChartPalette } from '../../lib/echartsTheme';
 import { nearestByX, niceTicks, smoothPath, splitAtGaps, timeTicks, type PlotPoint } from '../../lib/miniChart';
+import { gateAxisTicks } from '../../lib/axisTicks';
 
 /* 描线动画整个会话只放一次。概览页是 KeepAlive 缓存的：从详情页返回时它被重新插回文档，
    CSS 动画会从头再放——于是每次回到概览，心率线都「重新画一遍」。第一次画完就摘掉这个类，
@@ -61,7 +62,10 @@ const areas = computed(() => segments.value.map((segment, index) => {
   return `${lines.value[index]} L${last.x.toFixed(1)} ${plotBottom} L${first.x.toFixed(1)} ${plotBottom} Z`;
 }));
 const latest = computed(() => plotted.value[plotted.value.length - 1] ?? null);
-const xTicks = computed(() => (width.value ? timeTicks(range.value.start, range.value.end, plotWidth.value) : []));
+/* 过轴标签门禁：钟面时间重复（夏令时结束那一小时）的刻度不画第二个。 */
+const xTicks = computed(() => (width.value
+  ? gateAxisTicks(timeTicks(range.value.start, range.value.end, plotWidth.value).map((at) => ({ at, label: props.clock(at) }))).map((tick) => tick.at)
+  : []));
 
 /** 读数框的左边沿：以光标为中心，靠边时不出图。框宽取一个够用的定值（框本身 min-width 同值）。 */
 const TIP_W = 150;

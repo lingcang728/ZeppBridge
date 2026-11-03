@@ -58,6 +58,7 @@ mod tests {
             start_date: "2026-09-12".into(),
             end_date: None,
             notes: String::new(),
+            epoch: false,
         };
         let id = with_life_event_write(&dir, &database, |db| db.save_life_event(&input))
             .await

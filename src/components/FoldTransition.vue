@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { lessMotion } from '../lib/motion/lessMotion';
 /**
  * 点了以后插进来 / 收起来的一块（审计 B 组，2026-10-07）：高度从 0 平滑长到自己的高度、同时淡入并轻轻落下；
  * 收起反过来。下面的内容跟着平滑让位，不再「啪」地被推下去。
@@ -15,7 +16,7 @@ const props = withDefaults(defineProps<{
 }>(), { duration: 320, origin: '50% 0', scale: 1 });
 const from = () => `translateY(-6px) scale(${props.scale})`;
 const EASE = 'cubic-bezier(.4, .6, .2, 1)';
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 
 const enter = (el: Element, done: () => void) => {
   const node = el as HTMLElement;

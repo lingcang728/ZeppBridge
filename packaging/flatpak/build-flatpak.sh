@@ -91,7 +91,7 @@ echo "== building =="
 if [[ "$bundle" == true ]]; then
   echo "== exporting a single-file bundle =="
   version=$(node -p "require('$repo/package.json').version")
-  out="$repo/release/ZeppBridge_${version}_x86_64.flatpak"
+  out="$repo/release/ZeppBridge-${version}-Linux-x64.flatpak"
   mkdir -p "$(dirname "$out")"
   flatpak build-bundle "$repo_dir" "$out" "$app_id"
   echo "wrote $out"

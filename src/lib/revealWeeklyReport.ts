@@ -1,3 +1,4 @@
+import { lessMotion } from './motion/lessMotion';
 /**
  * 回到概览后，把「这一周」周报（components/WeeklyReportCard.vue）带进视野。
  *
@@ -11,7 +12,7 @@ export const revealWeeklyReport = (): void => {
   const tick = () => {
     const report = document.querySelector<HTMLElement>('.weekly-card');
     if (report) {
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const reduce = lessMotion();
       report.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
       return;
     }

@@ -4,7 +4,7 @@
 import { computed, inject } from 'vue';
 import { RouterLink } from 'vue-router';
 import Sparkline from '../Sparkline.vue';
-import BaselineTag from '../ask/BaselineTag.vue';
+import UsualRange from '../ask/UsualRange.vue';
 import { pinHref, pinNumberText } from '../../lib/pinnedMetrics';
 import { useMessages } from '../../i18n';
 import { pinnedMetricsMessages } from './PinnedMetrics.i18n';
@@ -21,10 +21,12 @@ const tile = computed(() => tiles.value.get(props.id)!);
     :class="['pin-tile', { 'is-empty': tile.value === '—' }]" :style="{ '--tone': tile.tone }" :aria-label="t.tileAria(tile.label, tile.value)">
     <span class="pin-label"><i class="pin-dot" aria-hidden="true"></i>{{ tile.label }}</span>
     <span class="pin-value"><strong>{{ tile.value }}</strong><small v-if="tile.unit && tile.value !== '—'">{{ tile.unit }}</small></span>
-    <span class="pin-when">{{ tile.when ?? tile.coverage }}<BaselineTag class="pin-baseline" :metric="tile.id" :format="(v: number) => pinNumberText(tile.metric, v)" :unit="tile.unit" /></span>
+    <span class="pin-when">{{ tile.when ?? tile.coverage }}</span>
     <Sparkline v-if="tile.spark.length > 1" class="pin-spark" :values="tile.spark" :color="tile.tone" :label="`${tile.label} · ${tile.coverage}`" />
     <!-- 没有记录不画线（不编数据），留一块和曲线同高的浅槽，几块磁贴照样齐平。 -->
     <span v-else class="pin-spark pin-spark-empty" aria-hidden="true"></span>
+    <!-- 底行：和自己比的结论 ←→ 自己近 90 天的常态（3.1）。数据不够就没有这一行。 -->
+    <UsualRange class="pin-usual" :metric="tile.id" :format="(v: number) => pinNumberText(tile.metric, v)" />
   </RouterLink>
 </template>
 
@@ -70,6 +72,6 @@ const tile = computed(() => tiles.value.get(props.id)!);
 }
 @keyframes pin-content { 0%, 45% { opacity: 0; translate: 0 6px; } 100% { opacity: 1; translate: 0 0; } }
 
-/* 「比平时高 / 低」（只和自己比，精修批次 6.2）跟在测量时间后面。 */
-.pin-baseline { margin-left: 6px; vertical-align: 1px; }
+/* 底行「平时 ←→ 常态 52–60」（只和自己比）。 */
+.pin-usual { margin-top: 4px; }
 </style>

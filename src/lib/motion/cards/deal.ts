@@ -111,11 +111,14 @@ export const stackCards = async (cards: HTMLElement[], center?: Point, angle = 0
     { transform: poseTransform(rests[i]!, stackPose(at, i, n, 1, angle)), opacity: 1 },
     { duration: STACK_MS, delay: (mid - Math.abs(i - mid)) * STACK_STAGGER_MS, easing: STACK_EASE, fill: 'forwards' },
   ));
-  // 叠到七成多（看上去已经齐了）就交给下一段：缓动的尾巴只是在毫米级地挪，等它放完会像停住了一拍。
-  const longest = (mid > 0 ? mid * STACK_STAGGER_MS : 0) + STACK_MS * 0.72;
-  await Promise.race([settled(animations), new Promise<void>((resolve) => window.setTimeout(resolve, longest))]);
+  await Promise.race([settled(animations), new Promise<void>((resolve) => window.setTimeout(resolve, stackHandoffMs(n)))]);
   return animations;
 };
+
+/** 理牌多久交棒给下一段：叠到七成多（看上去已经齐了）就交——缓动的尾巴只是在毫米级地挪，等它放完会像停住了一拍。 */
+export const stackHandoffMs = (n: number): number => (reducedMotion() ? 0 : Math.max(0, (n - 1) / 2) * STACK_STAGGER_MS + STACK_MS * 0.72);
+/** 理牌 + 放回一共多久（收起牌桌时背景按它淡）。 */
+export const stackAndReturnMs = (n: number): number => stackHandoffMs(n) + RETURN_MS + Math.max(0, n - 1) * 6;
 
 /**
  * 放回：整叠（此刻叠在哪就从哪起）沿弧线缩回 `landing`。按钮：最后三成淡掉；一叠：落定后再淡掉露出底下那一叠。

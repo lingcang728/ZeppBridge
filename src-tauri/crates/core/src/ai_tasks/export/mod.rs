@@ -30,7 +30,9 @@ use std::path::{Path, PathBuf};
 mod bundle;
 mod gather;
 mod helpers;
+mod journal;
 pub mod markdown;
+mod workout_extras;
 
 pub(crate) use helpers::*;
 

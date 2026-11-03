@@ -1,4 +1,5 @@
 import type { RouteLocationNormalized } from 'vue-router';
+import { lessMotion } from './lessMotion';
 
 /**
  * 点概览上的小卡（置顶指标、「这一周」）进详情页时，直接停在对应的那张趋势卡上，并圈一下
@@ -42,7 +43,7 @@ export const focusScrollDelta = (target: HTMLElement, scroller: HTMLElement, pag
   return Math.max(-scroller.scrollTop, Math.min(wanted, max));
 };
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 /**
  * 圈一下：卡上叠一层只有描边和光晕的框，淡入、停一下、再淡出（两拍）。只动这一层的透明度，不改卡的布局和样式。

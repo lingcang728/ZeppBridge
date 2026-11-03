@@ -62,6 +62,20 @@ export const wheelSteps = (state: WheelAccelState, delta: number, mode: number, 
 export const daysInMonth = (year: number, month: number): number => new Date(year, month, 0).getDate();
 
 /** 把年月日钳进 [min, max]（YYYY-MM-DD），日子钳进当月天数。 */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * 滚轮此刻该显示哪天。空串、不是 YYYY-MM-DD 的值都当作没有值。
+ *
+ * #136：补拉的自定义起点初始是 `''`，以前用 `??` 取默认——`''` 不算 nullish，
+ * 于是 `''.split('-')` 得到 NaN，年列 `Array.from({ length: NaN })` 为空，三列全空。
+ */
+export const wheelDateValue = (modelValue: string | null | undefined, min: string | undefined, today: string): string => {
+  if (modelValue && ISO_DAY.test(modelValue)) return modelValue;
+  if (min && ISO_DAY.test(min)) return min;
+  return today;
+};
+
 export const clampDate = (year: number, month: number, day: number, min?: string | null, max?: string | null): string => {
   const d = Math.min(Math.max(1, day), daysInMonth(year, month));
   const pad = (n: number) => String(n).padStart(2, '0');

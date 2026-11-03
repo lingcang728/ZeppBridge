@@ -22,6 +22,7 @@ import { MAX_PINS, PINNABLE_METRICS, type PinGroup } from '../../lib/pinnedMetri
 import { useMessages } from '../../i18n';
 import { pinnedMetricsMessages } from './PinnedMetrics.i18n';
 import { paced } from '../../lib/motion/timing';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const props = defineProps<{ pins: string[]; label: (id: string) => string }>();
 const emit = defineEmits<{ close: []; done: [pins: string[]] }>();
@@ -43,7 +44,7 @@ const FILL_MS = paced(340);
 /** 中间那一槽的名字淡掉、后面的名字滑过去的时长。 */
 const FADE_MS = paced(160);
 const SLIDE_MS = paced(360);
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 const wait = (ms: number) => new Promise<void>((resolve) => { window.setTimeout(resolve, reducedMotion() ? 0 : ms); });
 
 const full = computed(() => draft.value.length >= MAX_PINS);

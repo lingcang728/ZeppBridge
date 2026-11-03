@@ -60,7 +60,7 @@ const pack: LandingPack = {
         "unavailable": "A demonstração está indisponível. Pode ler as secções ou consultar o código."
       },
       "demo": "Ver o exemplo",
-      "edition": "v3 em desenvolvimento · Dados sintéticos. A download oferece a versão pública estável; a interface e as funções podem diferir."
+      "edition": "ZeppBridge 3 · Dados de demonstração sintéticos. Baixe a versão estável mais recente para usar seus próprios dados."
     },
     "handoff": {
       "chat": "Conversa com a IA",
@@ -136,7 +136,7 @@ const pack: LandingPack = {
       "lead": "Gratuito e de código aberto. Usa a sua conta Zepp; não exige outra conta ZeppBridge.",
       "docs": "Instalação e notas da versão",
       "facts": {
-        "channel": "A download é a versão pública estável. O exemplo sintético é a v3 em desenvolvimento; a interface e as funções podem diferir.",
+        "channel": "Os downloads oferecem a versão estável mais recente do ZeppBridge 3. A demonstração usa dados sintéticos; consulte as notas de versão para ver as mudanças de cada versão.",
         "systems": "Windows 10 / 11 x64 · macOS Apple Silicon · Linux x86_64",
         "ai": "Consultar e exportar não exige IA. Escolhe o serviço externo e a conta.",
         "windows": "Windows: os instaladores ainda não têm assinatura de confiança. Pode aparecer um aviso de editor desconhecido ou SmartScreen. Verifique a origem oficial.",
@@ -175,7 +175,7 @@ const pack: LandingPack = {
         },
         {
           "question": "A versão baixada coincide com o exemplo?",
-          "answer": "O exemplo é a v3 em desenvolvimento com dados sintéticos. A download é estável. Revisão de planos e nova interface podem ainda não ser públicas; consulte as notas."
+          "answer": "A demonstração mostra o ZeppBridge 3 com dados sintéticos. Os downloads oferecem a versão estável mais recente. Consulte as notas de versão e verifique a compatibilidade do seu dispositivo antes de enviar um plano."
         }
       ]
     },
@@ -259,7 +259,7 @@ const pack: LandingPack = {
         {
           "eyebrow": "Revisão de planos",
           "title": "Reveja antes de avançar",
-          "body": "A v3 em desenvolvimento demonstra a importação e revisão de planos. O envio ao relógio depende do dispositivo e da validação; não é uma promessa geral da versão estável.",
+          "body": "Importe e revise planos de treino no ZeppBridge 3. O envio de um plano ao relógio depende do suporte do dispositivo e das verificações de compatibilidade.",
           "bullets": [
             "Visão semanal e revisão diária",
             "Envio depende do dispositivo validado"

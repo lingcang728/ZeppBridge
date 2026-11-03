@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Fourteen everyday settings, kept in one card stack.',
     items: [
       { id: 'sync', title: 'Automatic sync', text: 'Off, 15, 30 or 60 minutes. Pick one.', icon: 'auto-sync' },
-      { id: 'retention', title: 'How long to keep', text: 'History available in the cloud comes to this computer. You decide how long it stays.', icon: 'database' },
+      { id: 'retention', title: 'Ten years, kept here', text: 'Pull up to ten years of history to this computer and keep it. It doesn’t roll away with the cloud’s window.', icon: 'database' },
       { id: 'data', title: 'Data coverage', text: 'What can be synced and what cannot, at a glance.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Local tools such as Claude Code and Codex can ask directly. Sending plans needs separate permission.', icon: 'structured-data' },
       { id: 'formats', title: 'Four formats', text: 'JSON · CSV · GPX, plus FIT on the workout page.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'Local API', text: 'Bound to 127.0.0.1. Read only, token required.', icon: 'structured-data' },
       { id: 'privacy', title: 'Privacy and security', text: 'Credentials are protected by the system. Tokens never go into logs.', icon: 'browser-login' },
       { id: 'filename', title: 'File names', text: 'You decide what the files for AI are called.', icon: 'document' },
-      { id: 'folder', title: 'Data folder', text: 'See where data is stored on this computer, then back it up or move it.', icon: 'database' },
+      { id: 'folder', title: 'Take it with you', text: 'Your data lives in a folder on this computer, and everything you wrote here — ratings, plans, AI tasks — exports to one JSON file.', icon: 'database' },
     ],
   },
   nav: [

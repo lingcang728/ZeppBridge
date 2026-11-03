@@ -200,7 +200,7 @@ pub(super) fn workout_local_days(
         .collect::<Vec<_>>()
         .join(",");
     let mut stmt = db.conn.prepare(&format!(
-        "SELECT workout_id, date(start_time, 'localtime') FROM workouts
+        "SELECT workout_id, date(start_time, 'localtime') FROM workouts_visible
          WHERE workout_id IN ({placeholders})"
     ))?;
     let rows = stmt.query_map(params_from_iter(workout_ids.iter()), |row| {

@@ -23,29 +23,31 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--url', default='http://127.0.0.1:1532')
     parser.add_argument('--out', default=str(ROOT / '.site-cache/verification'))
+    parser.add_argument('--language', default='zh', help='App locale to verify, for example pl')
     args = parser.parse_args()
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     rows = []
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=installed_chromium())
-        context = browser.new_context(viewport={'width': 1440, 'height': 1000}, locale='zh-CN', timezone_id='Asia/Taipei')
+        expected_lang = 'zh-CN' if args.language == 'zh' else args.language
+        context = browser.new_context(viewport={'width': 1440, 'height': 1000}, locale=expected_lang, timezone_id='Asia/Taipei')
         page = context.new_page(); errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
-        page.goto(args.url + '/?' + urlencode({'demo': '1', 'theme': 'light', 'lang': 'zh'}), wait_until='networkidle')
+        page.goto(args.url + '/?' + urlencode({'demo': '1', 'theme': 'light', 'lang': args.language}), wait_until='networkidle')
         page.wait_for_function('!!window.__ZB_DEMO_API__')
         page.wait_for_timeout(1600)
         page.screenshot(path=str(out / 'overview.png'))
         for route in ['/sleep', '/heart', '/workouts', '/body', '/activity', '/training', '/ai', '/ai/plan', '/ai/tasks', '/ai/exchanges', '/settings/account', '/settings/sync', '/settings/archive', '/settings/privacy', '/health-check']:
             page.evaluate("path => window.postMessage({source:'zeppbridge-site',type:'go',to:path},location.origin)", route)
             page.wait_for_timeout(1400)
-            result = {'route': route, 'path': page.evaluate('location.pathname'), 'missing': page.evaluate('window.__ZB_DEMO_API__.missing'), 'errors': errors.copy()}
+            result = {'route': route, 'path': page.evaluate('location.pathname'), 'language': page.locator('html').get_attribute('lang'), 'missing': page.evaluate('window.__ZB_DEMO_API__.missing'), 'errors': errors.copy()}
             if route in ['/ai', '/ai/plan', '/settings/archive']:
                 page.screenshot(path=str(out / (route.replace('/', '_') + '.png')))
             rows.append(result)
             print(json.dumps(result, ensure_ascii=False), flush=True)
         out.joinpath('demo-routes.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding='utf-8')
         browser.close()
-    assert all(not row['errors'] and not row['missing'] and row['path'] == row['route'] for row in rows), 'Demo route failed: see demo-routes.json'
+    assert all(not row['errors'] and not row['missing'] and row['path'] == row['route'] and row['language'] == expected_lang for row in rows), 'Demo route or locale failed: see demo-routes.json'
 
 if __name__ == '__main__':
     main()

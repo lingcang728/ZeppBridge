@@ -1216,6 +1216,273 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(38,?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v39（3.0.4）：
+        // - `workout_samples.distance_m`：手表自己的累计距离（#139，FIT 的
+        //   `record.distance`）。只加列，旧行为空，推修订号后的重放补上。
+        // - `workout_fit_overrides`：用户拿修正过的 .fit 顶替一条运动（#140）。
+        //   和运动类型纠正一样是第 3 层「用户的本地纠正」：只在本机，不回传云端，
+        //   重放不动它。**故意不挂外键到 workouts**：摘要报文重放会删了再插
+        //   运动行，挂了 CASCADE 修正会跟着没。`original_*` 是最近一次云端给的
+        //   值，撤销修正时原样放回。
+        self.ensure_table_columns("workout_samples", &[("distance_m", "REAL")])?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_fit_overrides (
+                workout_id TEXT PRIMARY KEY,
+                file_name TEXT,
+                sha256 TEXT NOT NULL,
+                byte_len INTEGER NOT NULL,
+                fit BLOB NOT NULL,
+                imported_at TEXT NOT NULL,
+                fit_start_time TEXT NOT NULL,
+                fit_end_time TEXT NOT NULL,
+                fit_distance_m REAL,
+                fit_moving_seconds INTEGER,
+                fit_avg_hr INTEGER,
+                fit_max_hr INTEGER,
+                original_end_time TEXT,
+                original_distance_m REAL,
+                original_moving_seconds INTEGER,
+                original_avg_hr INTEGER,
+                original_max_hr INTEGER
+             );
+             PRAGMA user_version = 39;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(39,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v40（3.0.6，#143）：
+        // - `raw_quarantine.empty_response`：云端明确回了空集合（这段时间没有）。数据健康
+        //   把它和「看不懂」分开报——以前心率接口逐日回空，几千条全算成「隔离」，像是出了错。
+        //   旧行默认 0，推修订号后的重放按报文重新判。
+        // - `workouts.gear_id`：Zepp 摘要里的 `gearId`（用户给这次运动选的鞋）。只有编号，
+        //   云端不给鞋名，不编。旧行为空，重放补上。
+        self.ensure_table_columns(
+            "raw_quarantine",
+            &[("empty_response", "INTEGER NOT NULL DEFAULT 0")],
+        )?;
+        self.ensure_table_columns("workouts", &[("gear_id", "TEXT")])?;
+        self.conn.execute_batch("PRAGMA user_version = 40;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(40,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v41（3.0.6）：不改结构，只修一次覆盖账本。3.0 之前的保留期清理删了数据却没改账本，
+        // 那些月份一直标着「已写入」，补拉永远跳过（见 `reopen_chunks_without_raw`）。
+        // 修复守在 `version < 41` 里：一次性的，不该每次启动都扫一遍。版本号不能放进去——
+        // 上面那几行 `user_version = 40` 每次启动都会重写，这里必须每次都写回 41。
+        if version < 41 {
+            let reopened = self.reopen_chunks_without_raw()?;
+            if reopened > 0 {
+                tracing::info!("覆盖账本：{reopened} 个月标着已写入但本地没有数据，已改回待补拉");
+            }
+        }
+        self.conn.execute_batch("PRAGMA user_version = 41;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(41,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v42（批次 7：让理解留在本地）。
+        //
+        // `workout_feedback`：跑后打分，用户对一次运动「感觉怎么样」。
+        // 和运动类型纠正一样是用户自己的东西：**不挂外键到 workouts**（重放会删了再插运动行），
+        // 保留期清理和重放都不碰它。`plan_workout_id` 指向只增不改的计划行，所以计划以后
+        // 改了，这条打分仍然对得上当时推到手表的那一份。`state`：`rated` 打了分 / `dismissed`
+        // 没打就关掉了（同一条不再问）。评分 1–5 = 太轻松 → 太难。`adjustment`：因为这次打分
+        // 对计划做了什么（目前只有 `lighter_10`：下次同类减 10%，起草后由用户确认再发）。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_feedback (
+                workout_id TEXT PRIMARY KEY,
+                plan_workout_id INTEGER,
+                state TEXT NOT NULL CHECK(state IN ('rated', 'dismissed')),
+                rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+                tags TEXT NOT NULL DEFAULT '[]',
+                note TEXT,
+                adjustment TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK(state = 'dismissed' OR rating IS NOT NULL)
+             );
+             CREATE INDEX IF NOT EXISTS idx_workout_feedback_plan
+                 ON workout_feedback(plan_workout_id);
+             -- AI 记忆收件箱：AI 只能提议（proposed），用户确认才算数（accepted）。
+             -- 拒绝的留着（rejected）：同一句话不会被反复提议。来源 user / mcp，
+             -- source_name 是 MCP 客户端自报的名字（Claude Desktop、Cursor……），只用来显示。
+             CREATE TABLE IF NOT EXISTS coach_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('proposed', 'accepted', 'rejected')),
+                source TEXT NOT NULL CHECK(source IN ('user', 'mcp')),
+                source_name TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                decided_at TEXT
+             );
+             CREATE INDEX IF NOT EXISTS idx_coach_notes_state ON coach_notes(state, id);
+             -- 主观层（批次 7）：跑鞋、每次运动的感受、伤病、比赛。全是用户自己写的，
+             -- 和打分一样不挂外键到 workouts，重放、保留期清理都不碰。
+             -- 跑鞋：`sport` 是鞋的用途（running / trail / walking / hiking）；`zepp_gear_id`
+             -- 把 Zepp 摘要里的 gearId 认到这双鞋（云端只给编号不给名字）；`start_km` 是登记前
+             -- 已经跑过的里程；`retire_km` 是提醒退役的里程（默认 700，常见 600–800）。
+             CREATE TABLE IF NOT EXISTS shoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                zepp_gear_id TEXT,
+                start_km REAL NOT NULL DEFAULT 0,
+                retire_km REAL NOT NULL DEFAULT 700,
+                started_on TEXT NOT NULL,
+                retired_on TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             -- 一次运动的感受：自己的 RPE（1–10，手表记的在 workouts.rpe，不覆盖它）、
+             -- 酸痛部位（人形图上的部位编号，JSON 数组）、穿哪双鞋。`shoe_mode`：
+             -- auto 按 Zepp 编号 / 默认鞋认，none 明说没穿登记过的鞋，chosen 指定 `shoe_id`。
+             CREATE TABLE IF NOT EXISTS workout_annotations (
+                workout_id TEXT PRIMARY KEY,
+                rpe INTEGER CHECK(rpe BETWEEN 1 AND 10),
+                soreness TEXT NOT NULL DEFAULT '[]',
+                shoe_mode TEXT NOT NULL DEFAULT 'auto' CHECK(shoe_mode IN ('auto', 'none', 'chosen')),
+                shoe_id INTEGER,
+                updated_at TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS injuries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body_part TEXT,
+                severity INTEGER CHECK(severity BETWEEN 1 AND 3),
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK(end_date IS NULL OR end_date >= start_date)
+             );
+             -- 比赛：报了名的、跑完的。`result_seconds` 是用户填的成绩（官方成绩优先于手表），
+             -- `workout_id` 是认到的那次运动。
+             CREATE TABLE IF NOT EXISTS races (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                race_date TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                distance_m REAL,
+                goal_seconds INTEGER,
+                priority TEXT NOT NULL DEFAULT 'a' CHECK(priority IN ('a', 'b', 'c')),
+                result_seconds INTEGER,
+                workout_id TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_races_date ON races(race_date);
+             PRAGMA user_version = 42;",
+        )?;
+        // 纪元：给一段日子起名（「备战首马」「伤后恢复」），图表铺一层底色。就是生活事件多一个标记。
+        self.ensure_table_columns("life_events", &[("epoch", "INTEGER NOT NULL DEFAULT 0")])?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(42,?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_local_state (
+                workout_id TEXT PRIMARY KEY,
+                type_override TEXT,
+                hidden INTEGER NOT NULL DEFAULT 0 CHECK(hidden IN (0, 1))
+             );
+             INSERT OR IGNORE INTO workout_local_state(workout_id, type_override)
+                SELECT workout_id, workout_type_override FROM workouts WHERE workout_type_override IS NOT NULL;
+             CREATE TABLE IF NOT EXISTS workout_edit_history (
+                id TEXT PRIMARY KEY, before_json TEXT NOT NULL, after_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE VIEW IF NOT EXISTS workouts_visible AS SELECT * FROM workouts w
+                WHERE NOT EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = w.workout_id AND s.hidden = 1);
+             CREATE VIEW IF NOT EXISTS workouts_hidden AS SELECT * FROM workouts w
+                WHERE EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = w.workout_id AND s.hidden = 1);
+             CREATE TRIGGER IF NOT EXISTS restore_local_workout_type AFTER INSERT ON workouts
+                WHEN EXISTS (SELECT 1 FROM workout_local_state s WHERE s.workout_id = NEW.workout_id)
+                BEGIN UPDATE workouts SET workout_type_override = (SELECT type_override FROM workout_local_state WHERE workout_id = NEW.workout_id)
+                      WHERE workout_id = NEW.workout_id; END;
+             CREATE TABLE IF NOT EXISTS workout_detail_requests (
+                workout_id TEXT PRIMARY KEY, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+                requested_at TEXT, retry_after TEXT, error_code TEXT
+             );
+             PRAGMA user_version = 43;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(43, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v44（批次 7：信匣里的数据来信）。每周数据来信和时间胶囊都是写下那一刻的快照：
+        // 以后重解析、补拉改了派生数据，旧信也不跟着变——信就是当时寄出的样子。
+        // `period_key` 只给每周来信用（`weekly:<那周最后一天>`），同一周只寄一封。
+        // 胶囊的 `note` 是用户写给将来的话，`open_on`（本地日）之前界面拿不到原文。
+        // 和打分、跑鞋一样是用户自己的东西，重放、保留期清理都不碰。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS data_letters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL CHECK(kind IN ('weekly', 'capsule')),
+                period_key TEXT UNIQUE,
+                written_at TEXT NOT NULL,
+                open_on TEXT,
+                opened_at TEXT,
+                note TEXT NOT NULL DEFAULT '',
+                body TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_data_letters_kind ON data_letters(kind, id);
+             PRAGMA user_version = 44;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(44, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v45（批次 7：Prompt 库）。任务提示词每次被改掉前的那一句。不挂外键到 ai_tasks：
+        // 撤销删除是把任务原样存回去，历史要跟着回来。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_prompt_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                replaced_at TEXT NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_ai_prompt_versions_task ON ai_prompt_versions(task_id, id);
+             PRAGMA user_version = 45;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(45, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v46（批次 7：多源导入）。GPX / FIT / Strava 整包 / Apple 健康导入的运动照常写进
+        // workouts（raw_record_id 为空，重放不碰），这里记它们来自哪一批、哪种来源，
+        // 整批撤销按 batch_id 删。撤销过的批次留一行（undone_at），运动已删。
+        // 导入的运动是用户自己带进来的，保留期清理不删。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS import_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL CHECK(source IN ('gpx', 'fit', 'strava', 'apple_health')),
+                file_name TEXT,
+                imported_at TEXT NOT NULL,
+                added INTEGER NOT NULL,
+                duplicates INTEGER NOT NULL,
+                unreadable INTEGER NOT NULL,
+                undone_at TEXT
+             );
+             CREATE TABLE IF NOT EXISTS workout_imports (
+                workout_id TEXT PRIMARY KEY,
+                batch_id INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                name TEXT
+             );
+             CREATE INDEX IF NOT EXISTS idx_workout_imports_batch ON workout_imports(batch_id);
+             PRAGMA user_version = 46;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(46, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

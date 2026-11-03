@@ -64,7 +64,7 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => '要写训练要点，手表上会显示在描述里',
     'ui.training_plan.issue.name_truncated': (p: Params) => `名字超过 ${str(p.max)} 个字，手表列表里会被截断（点开详情仍是全名）`,
     fallback: () => '这条计划有一处无法识别的问题',
-    activity: { walking: '步行', hiking: '徒步', strength: '力量训练', yoga: '瑜伽 / 拉伸', rowing: '划船', elliptical: '椭圆机' },
+    activity: { walking: '步行', hiking: '徒步', strength: '力量训练', yoga: '瑜伽 / 拉伸', rowing: '划船', elliptical: '椭圆机', inline_skating: '轮滑', cross_country_skiing: '越野滑雪' },
   },
   {
     'ui.training_plan.issue.bad_date': (p: Params) => `Write dates as year-month-day (for example 2026-10-07); this one is “${str(p.value)}”`,
@@ -101,7 +101,7 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => 'Add the key points; the watch shows them in the description',
     'ui.training_plan.issue.name_truncated': (p: Params) => `The name is longer than ${str(p.max)} characters and will be cut off in the watch list (the detail view still shows it in full)`,
     fallback: () => 'Something in this plan could not be recognised',
-    activity: { walking: 'walking', hiking: 'hiking', strength: 'strength training', yoga: 'yoga / stretching', rowing: 'rowing', elliptical: 'elliptical' },
+    activity: { walking: 'walking', hiking: 'hiking', strength: 'strength training', yoga: 'yoga / stretching', rowing: 'rowing', elliptical: 'elliptical', inline_skating: 'inline skating', cross_country_skiing: 'cross-country skiing' },
   },
   {
     'ui.training_plan.issue.bad_date': (p: Params) => `Escribe las fechas como año-mes-día (por ejemplo 2026-10-07); esta es «${str(p.value)}»`,
@@ -138,7 +138,7 @@ const messages = defineMessages(
     'ui.training_plan.issue.missing_description': () => 'Añade los puntos clave; el reloj los muestra en la descripción',
     'ui.training_plan.issue.name_truncated': (p: Params) => `El nombre supera ${str(p.max)} caracteres y se cortará en la lista del reloj (el detalle lo muestra completo)`,
     fallback: () => 'No se pudo reconocer algo de este plan',
-    activity: { walking: 'caminata', hiking: 'senderismo', strength: 'fuerza', yoga: 'yoga / estiramientos', rowing: 'remo', elliptical: 'elíptica' },
+    activity: { walking: 'caminata', hiking: 'senderismo', strength: 'fuerza', yoga: 'yoga / estiramientos', rowing: 'remo', elliptical: 'elíptica', inline_skating: 'patinaje en línea', cross_country_skiing: 'esquí de fondo' },
   },
   'lib/trainingPlan/issues',
 );

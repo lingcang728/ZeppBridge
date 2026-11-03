@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Catorze opções do dia a dia, reunidas numa única pilha de cartões.',
     items: [
       { id: 'sync', title: 'Sincronização automática', text: 'Desativado, 15, 30 ou 60 minutos. Basta escolheres.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Tempo de retenção', text: 'O histórico da nuvem fica guardado neste computador. Tu decides durante quanto tempo o manténs.', icon: 'database' },
+      { id: 'retention', title: 'Dez anos, aqui guardados', text: 'Traz até dez anos de histórico para este computador e guarda-o. Não desaparece com a janela temporal da nuvem.', icon: 'database' },
       { id: 'data', title: 'Cobertura de dados', text: 'O que pode e o que não pode ser sincronizado, com total transparência.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Ferramentas locais como o Claude Code e o Codex consultam diretamente. A publicação de planos requer a tua autorização.', icon: 'structured-data' },
       { id: 'formats', title: 'Quatro formatos', text: 'JSON · CSV · GPX, além de FIT na página de treinos.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'API local', text: 'Ligada exclusivamente a 127.0.0.1. Apenas de leitura, protegida por token.', icon: 'structured-data' },
       { id: 'privacy', title: 'Privacidade e segurança', text: 'Credenciais protegidas pelo sistema. Os tokens nunca são gravados nos registos de eventos.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomes de ficheiros', text: 'Tu decides o nome dos ficheiros preparados para a IA.', icon: 'document' },
-      { id: 'folder', title: 'Pasta de dados', text: 'Consulta onde os dados ficam guardados neste computador para cópias e migrações.', icon: 'database' },
+      { id: 'folder', title: 'Leva tudo contigo', text: 'Os teus dados vivem numa pasta deste computador, e tudo o que escreveste aqui — avaliações, planos, tarefas de IA — é exportado para um único ficheiro JSON.', icon: 'database' },
     ],
   },
   nav: [

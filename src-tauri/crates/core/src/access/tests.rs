@@ -14,14 +14,11 @@ struct TestDir(PathBuf);
 
 impl TestDir {
     fn new(tag: &str) -> Self {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        Self::with_nonce(tag, nonce)
+        let nonce = crate::unique_suffix();
+        Self::with_nonce(tag, &nonce)
     }
 
-    fn with_nonce(tag: &str, nonce: u128) -> Self {
+    fn with_nonce(tag: &str, nonce: &str) -> Self {
         // macOS 的时钟精度不足以区分并行测试；序号保证同一时间戳下也不共用目录。
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let serial = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -44,7 +41,7 @@ impl Drop for TestDir {
 fn parallel_test_directories_with_the_same_timestamp_are_independent() {
     let mut dirs: Vec<TestDir> = std::thread::scope(|scope| {
         let threads: Vec<_> = (0..32)
-            .map(|_| scope.spawn(|| TestDir::with_nonce("same-clock", 0)))
+            .map(|_| scope.spawn(|| TestDir::with_nonce("same-clock", "0")))
             .collect();
         threads
             .into_iter()
@@ -632,6 +629,7 @@ fn insert_run(db: &Database, workout_id: &str, month: u32, day: u32) {
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,
         device_id: Some("device-1".into()),

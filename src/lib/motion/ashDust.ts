@@ -1,5 +1,6 @@
 import { LIFE_MIN, LIFE_SPAN, type AshOrigin, type Grains } from './ashGlyphs';
 import { LOCALE_REVEAL_MS } from './timing';
+import { frameFloorMs, recordFrame } from './performance';
 
 /** 换语言「响指」的灰：一张整屏 WebGL 画布，连拨时几圈的灰都画在它上面（lib/motion/ashSwitch.ts）。 */
 
@@ -126,6 +127,8 @@ const createDustLayer = (width: number, height: number): DustLayer | null => {
   const batches: Batch[] = [];
   let raf = 0;
   let disposed = false;
+  /** 上一次真正画的时刻：用电池时跳帧到 30 帧（灰粒的位置按时间算，跳帧不会让它飘得更慢）。 */
+  let drawn = 0;
   const release = (batch: Batch) => {
     const index = batches.indexOf(batch);
     if (index >= 0) batches.splice(index, 1);
@@ -143,6 +146,12 @@ const createDustLayer = (width: number, height: number): DustLayer | null => {
       raf = requestAnimationFrame(tick);
       return;
     }
+    if (drawn && ts - drawn < frameFloorMs()) {
+      raf = requestAnimationFrame(tick);
+      return;
+    }
+    if (drawn) recordFrame(ts - drawn);
+    drawn = ts;
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     for (const batch of [...batches]) {

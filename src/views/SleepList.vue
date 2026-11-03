@@ -64,7 +64,7 @@ const t = useMessages(messages);
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
 const {
-  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
+  items: sessions, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded, sentinelRef,
 } = usePagedRecords<SleepSession>({
   loadPage: (limit, offset) => tauriApi.getSleepPage(limit, offset),
   idOf: (item) => item.sleep_id,
@@ -106,7 +106,7 @@ useRevisionReload(() => void loadList());
       />
     </div>
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore" class="load-more">
+    <div v-if="hasMore" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>

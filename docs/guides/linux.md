@@ -45,16 +45,16 @@ Rust and Node come from Flatpak SDK extensions, so no toolchain is installed
 system-wide. Everything is `--user`; it never asks for root.
 
 `--bundle` also writes a single installable file to
-`release/ZeppBridge_<version>_x86_64.flatpak`.
+`release/ZeppBridge-<version>-Linux-x64.flatpak`.
 
 ### deb / rpm / AppImage
 
 Download from [Releases](https://github.com/lingcang728/ZeppBridge/releases):
 
 ```bash
-sudo apt install ./ZeppBridge_<version>_amd64.deb      # Debian, Ubuntu
-sudo dnf install ./ZeppBridge_<version>_x86_64.rpm     # Fedora, RHEL
-chmod +x ZeppBridge_<version>_x86_64.AppImage && ./ZeppBridge_<version>_x86_64.AppImage
+sudo apt install ./ZeppBridge-<version>-Linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./ZeppBridge-<version>-Linux-x64.rpm     # Fedora, RHEL
+chmod +x ZeppBridge-<version>-Linux-x64.AppImage && ./ZeppBridge-<version>-Linux-x64.AppImage
 ```
 
 These builds are not signed. There is no code-signing story on Linux equivalent
@@ -294,7 +294,13 @@ compositing default above remains an additional compatibility measure.
 If those settings do not help, try X11 through XWayland if it is installed:
 
 ```bash
-GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+# Force X11 through XWayland. Not the app's default: on a pure Wayland system
+# with no XWayland installed this trades one failure for another, so it is
+# yours to decide, not ours.
+GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
+# Another explicit fallback, also available for deb/rpm/Flatpak launches.
+WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+```
 
 # Another explicit fallback, also available for deb/rpm/Flatpak launches.
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge

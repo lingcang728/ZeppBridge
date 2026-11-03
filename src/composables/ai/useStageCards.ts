@@ -15,6 +15,21 @@ import { useAiTaskPreview } from '../useAiTaskPreview';
 import { useBridgeStrip } from '../useBridgeStrip';
 import { useStageText } from '../../components/ai/stage/stage.i18n';
 import { useBridgeText } from '../../components/ai/bridge/bridge.i18n';
+import { defineMessages, useMessages } from '../../i18n';
+import { formatDate, formatDistance } from '../../lib/format';
+import { workoutDisplayLabel } from '../../lib/workouts';
+import { pageQuery } from '../../lib/pageQueries';
+import { peek } from '../../lib/readCache';
+import { useAiDerived } from './useAiHub';
+import type { Workout } from '../../types';
+
+/** 从运动页「问 AI」进来、只交这一次运动时，运动牌叫「本次运动」（10-28：以前写「期间运动记录 · 最近 1 天」，看不出带的是哪次）。 */
+const anchorMessages = defineMessages(
+  { thisWorkout: '本次运动' },
+  { thisWorkout: 'This workout' },
+  { thisWorkout: 'Este entrenamiento' },
+  'composables/ai/useStageCards',
+);
 
 export const STAGE_DATA_ORDER: readonly AiTaskCategory[] = ['sleep', 'recovery', 'resting_hr', 'heart_rate', 'workout', 'training', 'body'];
 
@@ -60,12 +75,32 @@ export const useStageCards = () => {
   const s = useStageText();
   const b = useBridgeText();
   const empty = computed(() => emptyCategories(strips.rows.value));
+  const anchor = useMessages(anchorMessages);
+  const { picked: pickedWorkouts } = useAiDerived();
+
+  /** 只交一次运动（运动类只看那一天、没挑日子）：那一次运动本身；最近列表里没有就看运动页留下的缓存。 */
+  const soloWorkout = (): Workout | null => {
+    const range = categoryRangeOf(draft.value.categories, 'workout');
+    const [id, ...rest] = draft.value.workout_ids;
+    if (!id || rest.length || range.days_before !== 0 || range.picked_days?.length) return null;
+    return pickedWorkouts.value.find((w) => w.workout_id === id) ?? peek(pageQuery.workoutDetail(id))?.value ?? null;
+  };
 
   const dataCard = (category: AiTaskCategory): StageCardModel => {
     const meta = AI_TASK_CATEGORY_META[category];
     const range = categoryRangeOf(draft.value.categories, category);
     const row = freshCoverage(preview.value, previewTask.value, draft.value, category);
     const picked = range.picked_days?.length ?? 0;
+    const solo = category === 'workout' ? soloWorkout() : null;
+    if (solo) {
+      return {
+        id: category, kind: 'data', category, icon: meta.icon, tint: meta.tint, title: anchor.value.thisWorkout,
+        line: formatDate(solo.start_time),
+        have: row ? row.days_with_data : null,
+        total: row ? row.days_in_range : null,
+        sub: [workoutDisplayLabel(solo), formatDistance(solo.distance_meters, '')].filter(Boolean).join(' '),
+      };
+    }
     const extra = category === 'workout' ? draft.value.workout_ids.length : 0;
     return {
       id: category, kind: 'data', category, icon: meta.icon, tint: meta.tint, title: categoryLabel(category),

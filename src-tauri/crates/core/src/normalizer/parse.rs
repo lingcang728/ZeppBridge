@@ -61,6 +61,33 @@ pub(super) fn extract_items(raw: &Value) -> Result<Vec<&Value>> {
     )))
 }
 
+/// 云端明确回了一个空集合（`[]`、`data: []`、`data.items: []` 这类）。
+///
+/// 和 `extract_items` 认同一批容器：它在这里报「为空」的，这里就是 `true`。
+/// 这是「这段时间云端没有」，不是「报文看不懂」——账号开通之前那些年，睡眠接口
+/// 就是逐周回 `{"code":1,"data":[]}`，曾被记成解析失败，补拉页上一排红块、重试也消不掉。
+pub(crate) fn payload_is_explicitly_empty(raw: &Value) -> bool {
+    if let Some(items) = raw.as_array() {
+        return items.is_empty();
+    }
+    let Some(object) = raw.as_object() else {
+        return false;
+    };
+    for key in ["items", "records", "results", "list"] {
+        if let Some(array) = object.get(key).and_then(Value::as_array) {
+            return array.is_empty();
+        }
+    }
+    match object.get("data") {
+        Some(Value::Array(array)) => array.is_empty(),
+        Some(Value::Object(data)) => ["items", "records", "results", "list", "summary"]
+            .iter()
+            .find_map(|key| data.get(*key).and_then(Value::as_array))
+            .is_some_and(Vec::is_empty),
+        _ => false,
+    }
+}
+
 pub(super) fn item_object(value: &Value) -> Option<&Map<String, Value>> {
     let object = value.as_object()?;
     object

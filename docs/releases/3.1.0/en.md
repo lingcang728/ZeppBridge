@@ -1,0 +1,23 @@
+- Added: **Letters from the author**. Every update now comes with a letter. On the last page you can write back, and your reply reaches the author anonymously; drafts save automatically and wait on your computer while you're offline.
+- Added: **The letter box**. A weekly letter about your data, letters to yourself in six months, one year or three years that only open on the day, and what your data looked like on this day in past years.
+- Added: **The Journal page**. A full-year activity calendar, race countdowns and a medal wall, a PB wall from 5K to the marathon, shoe mileage with retirement reminders, injuries and eras, all in one place.
+- Added: **Rings**. One ring grows each year and bulges in the weeks you trained more; open a mark to see that workout. Share it as an image in one click, and your raw data never leaves your computer.
+- Added: **“How it felt” on workouts**. Record your own RPE, where you're sore and which shoes you wore.
+- Added: **Rate a planned workout**. After a plan you sent to your watch, the overview asks how it went; if it was too hard, cut the next one by 10% in one click. On Windows you can answer right in the system notification.
+- Added: **An inbox for AI memories**. Claude and other tools can suggest things to remember, and you decide one by one; only what you keep is shared with AI.
+- Added: **The prompt library**. Filter saved AI tasks by data category, bring back earlier wordings of a prompt, and export tasks as .zbprompt files to share.
+- Added: **Import from other sources**. Import workouts from GPX / TCX, FIT, a full Strava export or an Apple Health export; each import is a batch you can undo as a whole.
+- Added: **Take everything with you**. In Settings › Archive and storage, export everything you wrote and organised in ZeppBridge as one JSON file.
+- Added: **Change types in bulk and hide workouts (#154, #151)**. Select several workouts in the list; hidden workouts stay out of statistics, AI and exports, keep their original data and can be restored any time.
+- Added: **Fetch past workout details on their own (#153)**. Start, pause and resume in Settings › Archive and storage, with “no details in the cloud” kept apart from “request failed”.
+- Improved: **Your own normal range**. Up to ten years of history set your usual range, and after a year the card shows your long-term normal.
+- Improved: **Where each metric comes from**. Every metric says whether it's a sensor reading, a public formula or a Zepp estimate, and you can leave a metric out of analysis without deleting its data.
+- Improved: **A coverage calendar**. Settings shows a row per year and a square per month; months that backfill really fetched turn gold, and a gap is one click away from being filled.
+- Improved: **Clearer when accounts don't match**. If official authorization and advanced data use different Zepp accounts, both are shown side by side with what to do; you can also start over with another account, and the old data is moved aside, not deleted.
+- Improved: **Automatic updates can be turned off**. There's a switch next to Check for updates, and animations step down automatically on slower computers or low battery.
+- Fixed: **Balance 2 workout type 15 is no longer always treated as hiking (#155)**.
+- Fixed: **When both connections have workout details, advanced data wins (#143)**. Per-point distance is no longer overwritten by official details fetched later.
+- Fixed: **Signing out and reconnecting work when the macOS keychain can't be read (#145)**.
+- Fixed: **Command-line backfill beyond 365 days (#152)**. It now switches to month-by-month backfill.
+- Fixed: **The climb card and elevation chart now agree**. On flat routes it states the actual elevation range and largest drop.
+- Fixed: **Uninstalling with “Delete app data” checked now really removes it**.

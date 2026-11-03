@@ -171,7 +171,7 @@ impl Database {
         let observed: Option<(i32, String)> = self
             .conn
             .query_row(
-                "SELECT max_hr, start_time FROM workouts
+                "SELECT max_hr, start_time FROM workouts_visible
                  WHERE max_hr IS NOT NULL AND max_hr > 0
                  ORDER BY max_hr DESC, start_time DESC LIMIT 1",
                 [],
@@ -498,7 +498,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT workout_samples.heart_rate, COUNT(*)
              FROM workout_samples
-             JOIN workouts ON workouts.workout_id = workout_samples.workout_id
+             JOIN workouts_visible AS workouts ON workouts.workout_id = workout_samples.workout_id
              WHERE workout_samples.heart_rate IS NOT NULL
                AND workout_samples.heart_rate > 0
                AND workouts.start_time >= ?4 AND workouts.start_time < ?5

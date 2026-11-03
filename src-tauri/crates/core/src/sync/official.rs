@@ -232,7 +232,7 @@ impl OfficialSync {
         if mode == OfficialMode::Only {
             self.abort_if_cancelled()?;
             on_progress(progress("workout_detail", total, total, "syncing", false));
-            match self.sync_details(&mut tokens).await {
+            match self.sync_details(&mut tokens, false, DETAIL_BATCH).await {
                 Ok(Some(report)) => streams.push(report),
                 Ok(None) => {}
                 Err(error) if error.is_cancelled() || error.needs_reauth() => return Err(error),
@@ -372,10 +372,50 @@ impl OfficialSync {
     }
 
     /// 官方运动里还没有逐秒序列的，补拉明细。没有待补的返回 `None`。
-    async fn sync_details(&self, tokens: &mut OfficialTokens) -> Result<Option<StreamReport>> {
+    pub async fn history_detail_backfill(
+        &self,
+        limit: usize,
+        retry_failed: bool,
+    ) -> Result<crate::storage::detail_queue::DetailCoverage> {
+        let _lease = self.lock(true).await?;
+        self.abort_if_cancelled()?;
+        if crate::storage::compaction_in_progress() || crate::storage::replay_in_progress() {
+            return Err(ZeppBridgeError::Busy("本地维护正在进行".into()));
+        }
+        let Some(mut tokens) =
+            fresh_tokens(&self.store, &self.client, Utc::now().timestamp()).await?
+        else {
+            return Err(ZeppBridgeError::NeedsReauth(
+                "还没有连接 Zepp 官方授权".into(),
+            ));
+        };
+        {
+            let db = self.write_db().await?;
+            db.claim_library_for_sync(&tokens.user_id)?;
+            if retry_failed {
+                db.retry_failed_history_details_for_channel(true)?;
+            }
+        }
+        self.sync_details(&mut tokens, true, limit.clamp(1, 40))
+            .await?;
+        self.db
+            .lock()
+            .await
+            .workout_detail_coverage_for_channel(Some(true))
+    }
+
+    async fn sync_details(
+        &self,
+        tokens: &mut OfficialTokens,
+        _history: bool,
+        limit: usize,
+    ) -> Result<Option<StreamReport>> {
         let pending = {
             let db = self.db.lock().await;
-            db.official_workouts_missing_detail(DETAIL_BATCH)?
+            db.pending_history_details(limit, true)?
+                .into_iter()
+                .map(|item| (item.workout_id, item.start_time))
+                .collect::<Vec<_>>()
         };
         if pending.is_empty() {
             return Ok(None);
@@ -385,6 +425,14 @@ impl OfficialSync {
         let mut set_aside = 0usize;
         for (workout_id, start_time) in pending {
             self.abort_if_cancelled()?;
+            if !self
+                .db
+                .lock()
+                .await
+                .workout_detail_request_ready(&workout_id)?
+            {
+                continue;
+            }
             let day = DateTime::parse_from_rfc3339(&start_time)
                 .map(|time| time.with_timezone(&Utc).date_naive())
                 .unwrap_or_else(|_| Utc::now().date_naive());
@@ -413,6 +461,11 @@ impl OfficialSync {
                     // 不让同一条永久拿不到的明细每次都把同步标成失败。
                     let gone = error.is_unavailable();
                     let db = self.write_db().await?;
+                    db.record_detail_request(
+                        &workout_id,
+                        super::details::detail_failure_status(&error),
+                        Some(error.code()),
+                    )?;
                     if db.record_official_detail_result(&workout_id, false, gone)? {
                         set_aside += 1;
                     } else {
@@ -422,13 +475,27 @@ impl OfficialSync {
                 }
             };
             let db = self.write_db().await?;
-            db.record_official_detail_result(&workout_id, true, false)?;
+            let empty = crate::normalizer::payload_is_explicitly_empty(&raw.payload);
             let record = FetchedRecord {
                 raw,
                 incomplete: false,
                 incomplete_reason: None,
             };
-            reports.push(SyncManager::persist_record(&db, record)?.report);
+            let report = SyncManager::persist_record(&db, record)?.report;
+            let parsed = report.status == StreamStatus::Success;
+            db.record_official_detail_result(&workout_id, parsed, false)?;
+            db.record_detail_request(
+                &workout_id,
+                if empty {
+                    "empty_from_cloud"
+                } else if parsed {
+                    "persisted"
+                } else {
+                    "parse_failed"
+                },
+                None,
+            )?;
+            reports.push(report);
         }
         // 明细没拉到的不能被报成「完成」（代码审查 R14）：汇总照常保留，
         // 这条流标失败、说清几条没拉到，下次同步会再补（它们仍在待补列表里）。

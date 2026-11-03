@@ -72,6 +72,15 @@ impl Normalizer {
     }
 
     pub fn normalize_band_data(raw: &Value) -> Result<BandNormalizedData> {
+        Self::normalize_band_data_in_zone(raw, None)
+    }
+
+    /// 同 [`Self::normalize_band_data`]，另带设备的 IANA 时区（`device_identities.timezone`），
+    /// 用来校正夏令时期间摘要 `tz` 少算的那一小时（见 [`effective_band_offset`]）。
+    pub fn normalize_band_data_in_zone(
+        raw: &Value,
+        zone: Option<&str>,
+    ) -> Result<BandNormalizedData> {
         let items = extract_items(raw)?;
         let mut sleep_sessions = Vec::new();
         let mut heart_rate_samples = Vec::new();
@@ -104,7 +113,7 @@ impl Normalizer {
 
             if let Some(summary) = decoded_summary.as_ref().and_then(Value::as_object) {
                 if let Some(sleep) = summary.get("slp").and_then(Value::as_object) {
-                    match sleep_from_band_item(object, summary, sleep, source_scope.clone()) {
+                    match sleep_from_band_item(object, summary, sleep, source_scope.clone(), zone) {
                         Ok(session) => {
                             if session.stages.is_empty()
                                 && sleep
@@ -131,7 +140,7 @@ impl Normalizer {
                 sleep_sessions.push(session);
             }
 
-            match heart_rate_from_band_item(object, decoded_summary.as_ref()) {
+            match heart_rate_from_band_item(object, decoded_summary.as_ref(), zone) {
                 Ok(samples) => heart_rate_samples.extend(samples),
                 Err(message) => diagnostics.push(format!("item {index}: {message}")),
             }
@@ -161,7 +170,25 @@ impl Normalizer {
 
     pub(super) fn normalize_workouts_with_diagnostics_and_sport(
         raw: &Value,
+        sport: Option<&str>,
+    ) -> Result<NormalizedBatch<Workout>> {
+        Self::normalize_workouts_with_context_batch(raw, sport, |_| Ok(None))
+    }
+
+    /// Resolve a stored device identity only for the identifier carried by
+    /// this workout. Missing identifiers deliberately do not call the resolver.
+    pub fn normalize_workouts_with_device_context(
+        raw: &Value,
+        sport: Option<&str>,
+        resolver: impl FnMut(&str) -> Result<Option<String>>,
+    ) -> Result<Vec<Workout>> {
+        Self::normalize_workouts_with_context_batch(raw, sport, resolver)?.into_result("workouts")
+    }
+
+    fn normalize_workouts_with_context_batch(
+        raw: &Value,
         _sport: Option<&str>,
+        mut resolver: impl FnMut(&str) -> Result<Option<String>>,
     ) -> Result<NormalizedBatch<Workout>> {
         let items = extract_items(raw)?;
         let mut records = Vec::new();
@@ -201,7 +228,23 @@ impl Normalizer {
                 ],
             );
             let (workout_type, type_source) = if let Some(code) = zepp_type {
-                match zepp_sport_type_name(i64::from(code)) {
+                let device_source =
+                    first_number(object, &["deviceSource", "device_source"]).map(|v| v as i64);
+                let device_name = first_string(object, &["deviceName", "productName", "modelName"]);
+                let local_device = if code == 15 {
+                    match device_id(object) {
+                        Some(id) => resolver(&id)?,
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                match crate::sport_catalog::resolve_cloud_with_device(
+                    i64::from(code),
+                    device_source,
+                    device_name.as_deref(),
+                    local_device.as_deref(),
+                ) {
                     Some(mapped) => (mapped.to_owned(), "numeric_mapped".to_owned()),
                     None => match explicit_type {
                         Some(value) => (normalize_type_text(&value), "string_field".to_owned()),
@@ -332,6 +375,10 @@ impl Normalizer {
                     .filter(|value| *value > 0.0),
                 avg_stride_cm: first_number(object, &["avg_stride_length", "avgStrideLength"])
                     .filter(|value| *value > 0.0),
+                // 没选鞋时云端给的是空串，当成没有。
+                gear_id: first_string(object, &["gearId", "gear_id"])
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty()),
                 hr_zones: parse_heart_range(first_string(object, &["heart_range"]).as_deref()),
                 source_scope: source_scope(Some(object), source_device.as_deref()),
                 device_id: source_device,
@@ -569,10 +616,6 @@ fn packed_heart_rate_point(
 /// 1/6/9/223 已与 Zepp APP 真实记录逐一核对（跑步/健走/骑行/AI 活动）；
 /// 8/10/14/23/92 来自社区参考实现；13/22/192 按本地记录动态特征
 /// （步频/步幅/配速/心率）推断，新设备编码出现时可再校正。
-pub(super) fn zepp_sport_type_name(type_id: i64) -> Option<&'static str> {
-    crate::sport_catalog::resolve(type_id)
-}
-
 pub(super) fn normalize_type_text(value: &str) -> String {
     let normalized = value.trim().to_lowercase().replace([' ', '-'], "_");
     if normalized.is_empty() {

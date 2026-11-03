@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Catorce ajustes esenciales, reunidos en una sola baraja.',
     items: [
       { id: 'sync', title: 'Sincronización automática', text: 'Desactivado, 15, 30 o 60 minutos. Elige el tuyo.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Tiempo de conservación', text: 'El historial disponible en la nube se guarda en este equipo. Tú decides cuánto tiempo conservarlo.', icon: 'database' },
+      { id: 'retention', title: 'Diez años, aquí', text: 'Trae hasta diez años de historial a este equipo y consérvalo. No se pierde con la ventana de la nube.', icon: 'database' },
       { id: 'data', title: 'Cobertura de datos', text: 'Lo que se puede sincronizar y lo que no, con total transparencia.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Herramientas locales como Claude Code y Codex consultan directamente. Enviar planes requiere tu visto bueno.', icon: 'structured-data' },
       { id: 'formats', title: 'Cuatro formatos', text: 'JSON · CSV · GPX, además de FIT en la página de entrenamientos.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'API local', text: 'Vinculada a 127.0.0.1. Solo lectura, protegida por token.', icon: 'structured-data' },
       { id: 'privacy', title: 'Privacidad y seguridad', text: 'Credenciales custodiadas por el sistema. Los tokens nunca se escriben en logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Nombres de archivo', text: 'Tú decides cómo se nombran los archivos preparados para la IA.', icon: 'document' },
-      { id: 'folder', title: 'Carpeta de datos', text: 'Consulta la ubicación de los datos en este equipo para crear copias o trasladarlos.', icon: 'database' },
+      { id: 'folder', title: 'Llévatelo', text: 'Tus datos están en una carpeta de este equipo, y todo lo que escribiste aquí —valoraciones, planes, tareas de IA— se exporta en un solo JSON.', icon: 'database' },
     ],
   },
   nav: [

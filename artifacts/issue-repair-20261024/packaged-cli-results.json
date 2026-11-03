@@ -1,0 +1,176 @@
+{
+  "passed": true,
+  "synthetic_only": true,
+  "data_dir": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\library",
+  "commands": [
+    {
+      "args": [
+        "set-type",
+        "--workout",
+        "packaged-cli-1",
+        "--workout",
+        "packaged-cli-2",
+        "--type",
+        "hiking"
+      ],
+      "exit": 0,
+      "result": {
+        "edit": {
+          "changed": 2,
+          "id": "edit-12312-1792811659582616300-0"
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": [
+        "set-type",
+        "--workout",
+        "packaged-cli-1",
+        "--workout",
+        "missing-id",
+        "--type",
+        "road_cycling"
+      ],
+      "exit": 1,
+      "result": {
+        "errorKind": "data_unavailable",
+        "message": "Not available: this library or account does not provide the requested data (err.core.unavailable).",
+        "ok": false
+      }
+    },
+    {
+      "args": [
+        "hide",
+        "--workout",
+        "packaged-cli-1",
+        "--workout",
+        "packaged-cli-2"
+      ],
+      "exit": 0,
+      "result": {
+        "edit": {
+          "changed": 2,
+          "id": "edit-34432-1792811659705369100-0"
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": [
+        "export",
+        "--from",
+        "2026-10-01",
+        "--to",
+        "2026-10-24",
+        "--format",
+        "json",
+        "--out",
+        "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\hidden-export.json"
+      ],
+      "exit": 0,
+      "result": {
+        "format": "json",
+        "ok": true,
+        "out": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\hidden-export.json",
+        "records": 0
+      }
+    },
+    {
+      "args": [
+        "set-type",
+        "--undo",
+        "edit-34432-1792811659705369100-0"
+      ],
+      "exit": 0,
+      "result": {
+        "ok": true,
+        "restored": 2
+      }
+    },
+    {
+      "args": [
+        "export",
+        "--from",
+        "2026-10-01",
+        "--to",
+        "2026-10-24",
+        "--format",
+        "json",
+        "--out",
+        "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\hidden-export.json"
+      ],
+      "exit": 0,
+      "result": {
+        "format": "json",
+        "ok": true,
+        "out": "C:\\Users\\15pro\\AppData\\Local\\Temp\\zeppbridge-beta11-native-dfjnetun\\hidden-export.json",
+        "records": 2
+      }
+    },
+    {
+      "args": [
+        "set-type",
+        "--workout",
+        "packaged-cli-1",
+        "--clear"
+      ],
+      "exit": 0,
+      "result": {
+        "edit": {
+          "changed": 1,
+          "id": "edit-35812-1792811659972613900-0"
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": [
+        "set-type",
+        "--undo",
+        "edit-35812-1792811659972613900-0"
+      ],
+      "exit": 0,
+      "result": {
+        "ok": true,
+        "restored": 1
+      }
+    },
+    {
+      "args": [
+        "set-type",
+        "--undo",
+        "edit-12312-1792811659582616300-0"
+      ],
+      "exit": 0,
+      "result": {
+        "ok": true,
+        "restored": 2
+      }
+    },
+    {
+      "args": [
+        "workout-details",
+        "--status",
+        "--channel",
+        "official"
+      ],
+      "exit": 0,
+      "result": {
+        "cancelled": false,
+        "channel": "official",
+        "complete": true,
+        "coverage": {
+          "empty_from_cloud": 0,
+          "parse_failed": 0,
+          "pending": 0,
+          "persisted": 0,
+          "ready": 0,
+          "request_failed": 0,
+          "unavailable": 0
+        },
+        "ok": true
+      }
+    }
+  ]
+}

@@ -41,6 +41,7 @@ export type IconName =
   | 'compass'
   | 'copy'
   | 'database'
+  | 'download'
   | 'export'
   | 'external'
   | 'file'
@@ -137,6 +138,7 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'database'" d="M4 6c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Zm0 0v6c0 1.1 3.58 2 8 2s8-.9 8-2V6m-16 6v6c0 1.1 3.58 2 8 2s8-.9 8-2v-6" :stroke-width="stroke" />
+    <path v-else-if="name === 'download'" d="M12 4v11m0 0 4-4M12 15 8 11M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" :stroke-width="stroke" />
     <path v-else-if="name === 'export'" d="M12 15V4m0 0 4 4M12 4 8 8M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" :stroke-width="stroke" />
     <path v-else-if="name === 'external'" d="M14 5h5v5m0-5-8 8M17 13v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" :stroke-width="stroke" />
     <path v-else-if="name === 'file'" d="M6 3.5h8l4 4V20H6V3.5Zm8 0v4h4M9 12h6m-6 3h6" :stroke-width="stroke" />

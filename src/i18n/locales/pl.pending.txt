@@ -1,0 +1,2 @@
+# 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
+# 格式：moduleId.键路径。

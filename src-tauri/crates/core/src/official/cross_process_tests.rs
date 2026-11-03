@@ -95,14 +95,15 @@ impl CredentialBackend for PausingBackend {
     }
 }
 
+/// 同一测试进程里的几个用例并行跑；macOS 的时钟只到微秒，光靠 pid + 时间戳
+/// 会让两个用例拿到同一个目录，一边的子进程把另一边的令牌断开（2026-10-20 CI）。
 fn temp_dir() -> PathBuf {
+    static SERIAL: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(
-        "zeppbridge-official-xproc-{}-{}",
+        "zeppbridge-official-xproc-{}-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        SERIAL.fetch_add(1, Ordering::Relaxed),
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -159,7 +160,9 @@ fn child_process_entry() {
     let dir = PathBuf::from(std::env::var(DIR_ENV).unwrap());
     let store = OfficialStore::with_backend(&dir, Arc::new(DiskBackend::new(&dir)));
     match role.as_str() {
-        "disconnect" => store.disconnect().unwrap(),
+        "disconnect" => {
+            store.disconnect().unwrap();
+        }
         "revoke" => {
             store.mark_needs_reauth_if_current(&used()).unwrap();
         }

@@ -1,3 +1,4 @@
+import { lessMotion } from '../lessMotion';
 /**
  * 扑克牌动效的弹簧（精修批次 7.1）：把一根阻尼弹簧从 0 走到 1 的过程采样成 CSS `linear()` 缓动，
  * 交给 WAAPI 在合成器上放——不逐帧跑 JS，也就不会因为主线程忙而掉帧。
@@ -61,7 +62,7 @@ export const springCurve = (spring: Spring, samples = 40): SpringCurve => {
 };
 
 /** 用户要求减少动效。 */
-export const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+export const reducedMotion = (): boolean => lessMotion();
 
 /** 等一组动画放完（被取消的不算报错）。 */
 export const settled = (animations: Animation[]): Promise<void> =>

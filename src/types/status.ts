@@ -22,7 +22,12 @@ export interface CapabilityStatus {
 }
 
 export interface AppStatus {
+  /** Advanced-data credentials are locally readable; remote verification is `auth_state`. */
   configured: boolean;
+  /** Saved metadata survives missing/denied credentials, keeping recovery controls visible. */
+  auth_configuration_present?: boolean;
+  /** Local credential availability; falls back to `configured` for older backends. */
+  credential_available?: boolean;
   auth_state: string;
   connection_state: 'unconfigured' | 'configured' | 'connected' | 'needs_reauth' | string;
   /** 哪几条通道连着：只连官方时界面要说明哪些指标需要「高级数据」。旧后端没有这个字段。 */
@@ -148,6 +153,18 @@ export interface SyncProgress {
 
 export type LoginState = 'idle' | 'waiting' | 'extracting' | 'verifying' | 'connected' | 'failed';
 
+/** 一条连接连到的 Zepp 账号：编号只露后四位，昵称只有官方授权那边有。 */
+export interface AccountBrief {
+  user_id_masked: string;
+  nickname: string | null;
+}
+
+/** 官方授权和高级数据不是同一个账号被拒时，两边各是谁。 */
+export interface AccountPair {
+  official: AccountBrief;
+  advanced: AccountBrief;
+}
+
 export interface LoginStatus {
   credential_recovery?: { platform: string; can_save_file: boolean } | null;
   state: LoginState | string;
@@ -155,6 +172,8 @@ export interface LoginStatus {
   page_url: string;
   /** `message` 那句话的稳定码（`err.login.*`）。界面按它取自己语言的文案。 */
   code?: string;
+  /** 和官方授权不是同一个账号时，两边各是谁。 */
+  conflict?: AccountPair | null;
 }
 
 /** Zepp 官方授权的状态（`official://status` 事件与相关命令的返回值）。 */
@@ -173,6 +192,8 @@ export interface OfficialStatus {
   /** 等待授权时的起始地址（可复制到无痕窗口，换账号用）。 */
   authorize_url?: string | null;
   connected_at: number | null;
+  /** 授权到的账号和高级数据不是同一个时，两边各是谁。 */
+  conflict?: AccountPair | null;
 }
 
 export interface SyncStreamResult {

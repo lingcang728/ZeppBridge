@@ -30,6 +30,7 @@ import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
 import AskAiButton from './ask/AskAiButton.vue';
 import BaselineTag from './ask/BaselineTag.vue';
+import UsualRange from './ask/UsualRange.vue';
 import MetricInfoButton from './MetricInfoButton.vue';
 import PickDaysButton from './cards/PickDaysButton.vue';
 import type { MetricSeries } from '../types';
@@ -180,6 +181,14 @@ const option = computed(() => {
     if (covered.length === 1) {
       lines.push({ xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
         lineStyle: { color, width: lit ? 3 : 2, type: 'solid', opacity: lit ? 0.85 : 0.5 } });
+    } else if (event.epoch) {
+      /* 纪元（批次 7）：一整段更淡的底色，名字小字写在区带里面的左上角（在画布内，不会被裁）。 */
+      areas.push([
+        { xAxis: covered[0], name: event.title, eventId: event.id, emphasis,
+          label: { show: true, position: 'insideTopLeft', formatter: event.title, color: palette.axis, fontSize: 10, padding: [4, 6, 0, 6], overflow: 'truncate' },
+          itemStyle: { color, opacity: lit ? 0.22 : 0.07 } },
+        { xAxis: covered[covered.length - 1] },
+      ]);
     } else {
       areas.push([
         { xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
@@ -253,6 +262,7 @@ const hasEventMarks = computed(() => {
       <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
+      <UsualRange range-only :metric="series?.metric" :format="render" />
       <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
     </p>
 

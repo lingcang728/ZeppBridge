@@ -6,6 +6,7 @@ import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, ty
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import { vEdgeSafe } from '../lib/edgeSafe';
+import { sleepHourTicks } from '../lib/axisTicks';
 
 const messages = defineMessages(
   {
@@ -123,6 +124,7 @@ const timeline = computed<BarSegment[]>(() => {
 });
 
 const isHypnogram = computed(() => timeline.value.length > 0 && range.value !== null);
+
 /**
  * 这一夜有没有认不出来的阶段。
  *
@@ -171,23 +173,13 @@ const timelineStyle = (slice: BarSegment) => {
   };
 };
 
-/* 中间刻度：整点，最多六个；贴着两端的不画（两端已有起止时间）。 */
+/* 中间刻度：整点，最多六个；贴着两端的不画（两端已有起止时间）。过轴标签门禁：夏令时结束那晚
+   01:00 有两次，第二个不画（lib/axisTicks.ts）。 */
 const ticks = computed(() => {
   const current = range.value;
   if (!current) return [];
-  const hour = 3_600_000;
-  const hours = current.span / hour;
-  const step = hours <= 6 ? 1 : hours <= 12 ? 2 : 3;
-  const first = new Date(current.from);
-  first.setMinutes(0, 0, 0);
-  const out: { left: number; label: string }[] = [];
-  for (let at = first.getTime() + hour; at < current.from + current.span; at += hour) {
-    if (new Date(at).getHours() % step !== 0) continue;
-    const left = ((at - current.from) / current.span) * 100;
-    if (left < 6 || left > 94) continue;
-    out.push({ left, label: formatTime(new Date(at).toISOString()) });
-  }
-  return out;
+  return sleepHourTicks(current.from, current.span, (ms) => formatTime(new Date(ms).toISOString()))
+    .map((tick) => ({ left: tick.at, label: tick.label }));
 });
 
 /* 可固定的时间游标：指针位置就是那一刻，点一下固定；键盘左右键逐段走。 */
@@ -282,7 +274,7 @@ const tooltip = computed(() => {
           @keydown="onTrackKey"
         >
           <span v-for="tick in ticks" :key="tick.left" class="timeline-grid" :style="{ left: `${tick.left}%` }" aria-hidden="true" />
-          <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered }]"
+          <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered, sfumato: slice.tone === 'unknown' }]"
             :style="timelineStyle(slice)" aria-hidden="true" />
           <span v-if="cursor !== null" class="timeline-cursor" :style="{ left: `${cursor * 100}%` }" aria-hidden="true" />
         </div>
@@ -299,7 +291,7 @@ const tooltip = computed(() => {
         <span
           v-for="(stage, index) in barSegments"
           :key="`${stage.tone}-${index}`"
-          :class="stage.tone"
+          :class="[stage.tone, { sfumato: stage.tone === 'unknown' }]"
           :style="segmentStyle(stage)"
         />
       </div>

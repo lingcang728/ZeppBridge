@@ -41,7 +41,15 @@ const routes = [
   { path: '/ai/past', redirect: '/ai' },
   { path: '/ai/past/:category', redirect: '/ai' },
   { path: '/ai/plan', name: 'AiPlanWeek', component: () => import('../views/ai/AiPlanWeek.vue') },
+  // 计划留档（批次 7）：推到手表的每一份计划。要排在 :date 前面，不然 history 会被当成日期。
+  { path: '/ai/plan/history', name: 'AiPlanHistory', component: () => import('../views/ai/AiPlanHistory.vue') },
+  // 教练档案（批次 7，AI 记忆收件箱）：AI 经 MCP 提议、你确认的长期事实。
+  { path: '/ai/memory', name: 'AiCoachNotes', component: () => import('../views/ai/AiCoachNotes.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
+  // 履历（批次 7 主观层）：比赛与奖牌墙、PB 墙、跑鞋、伤病、纪元。
+  { path: '/journal', name: 'Journal', component: () => import('../views/Journal.vue') },
+  // 年轮年度回顾（批次 7）：一年一圈年轮、一次运动一颗星。
+  { path: '/rings', name: 'Rings', component: () => import('../views/Rings.vue') },
   {
     path: '/body',
     name: 'BodyStatus',
@@ -88,6 +96,12 @@ const routes = [
     component: () => import('../views/DeviceDetail.vue'),
   },
   {
+    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。入口在设置「同步」卡的版本那一行下面。
+    path: '/letters',
+    name: 'LetterBox',
+    component: () => import('../views/LetterBox.vue'),
+  },
+  {
     path: '/health-check',
     name: 'HealthCheck',
     component: () => import('../views/HealthCheck.vue'),
@@ -116,7 +130,8 @@ const LANDING_ROUTES: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes: isLandingMode() ? LANDING_ROUTES : routes,
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    if (to.name === 'Rings' && from.name === 'Rings' && to.path === from.path) return false;
     return { top: 0 };
   },
 });

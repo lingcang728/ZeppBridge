@@ -1,0 +1,23 @@
+- Added: **Listy od autora**. Do każdej aktualizacji dołączony jest teraz list. Na ostatniej stronie możesz odpisać, a Twoja odpowiedź trafia do autora anonimowo; wersje robocze zapisują się automatycznie i czekają na komputerze, gdy jesteś offline.
+- Added: **Skrzynka na listy**. Cotygodniowy list z Twoimi danymi, listy do siebie za pół roku, rok lub trzy lata otwierające się dopiero w wyznaczonym dniu oraz podgląd danych z tego samego dnia w ubiegłych latach.
+- Added: **Dziennik**. Całoroczny kalendarz aktywności, odliczanie do zawodów i ściana medali, ściana rekordów życiowych (PB) od 5 km do maratonu, przebieg butów z przypomnieniami o emeryturze, rejestr kontuzji oraz epoki — wszystko na jednej stronie.
+- Added: **Słoje roczne**. Jeden słój przyrasta każdego roku i wybrzusza się w tygodniach z większą liczbą treningów; kliknij linię, aby zobaczyć dany trening. Wygeneruj obraz do udostępnienia jednym kliknięciem — surowe dane nigdy nie opuszczają Twojego komputera.
+- Added: **„Twoje odczucia” w szczegółach treningu**. Zapisuj własną ocenę RPE, obolałe miejsca oraz buty użyte podczas danego treningu.
+- Added: **Ocena ukończonego treningu z planu**. Po zakończeniu planu przesłanego na zegarek ekran podsumowania pyta, jak poszło; jeśli trening był za ciężki, jednym kliknięciem zmniejszysz kolejny o 10%. W systemie Windows możesz dokonać wyboru bezpośrednio w powiadomieniu systemowym.
+- Added: **Skrzynka odbiorcza wspomnień AI**. Narzędzia takie jak Claude mogą sugerować fakty do zapamiętania, a Ty decydujesz o każdym z nich z osobna; tylko zatwierdzone informacje są udostępniane AI.
+- Added: **Biblioteka promptów**. Filtruj zapisane zadania AI według kategorii danych, przywracaj wcześniejsze sformułowania promptów i eksportuj zadania jako pliki .zbprompt do udostępniania.
+- Added: **Import z wielu źródeł**. Importuj treningi z plików GPX / TCX, FIT, pełnego eksportu Strava lub eksportu Apple Zdrowie; każdy import stanowi osobną partię, którą można cofnąć w całości.
+- Added: **Zabierz wszystko ze sobą**. W sekcji Ustawienia › Archiwizacja i przechowywanie wyeksportujesz jednym kliknięciem wszystko, co zapisano i uporządkowano w ZeppBridge, do pojedynczego pliku JSON.
+- Added: **Masowa zmiana typu i ukrywanie treningów (#154, #151)**. Wybieraj wiele treningów na liście; ukryte treningi nie trafiają do statystyk, AI ani eksportów, a ich oryginalne dane pozostają nienaruszone i można je w każdej chwili przywrócić.
+- Added: **Samodzielne dociąganie szczegółów historii treningów (#153)**. Uruchamiaj, wstrzymuj i wznawiaj proces w Ustawienia › Archiwizacja i przechowywanie, z wyraźnym rozróżnieniem między „brak szczegółów w chmurze” a „żądanie nie powiodło się”.
+- Improved: **Twój własny zakres normy**. Do dziesięciu lat historii wyznacza Twój typowy zakres, a po zebraniu danych z pełnego roku karta wyświetla długoterminową normę.
+- Improved: **Jasne źródło każdego wskaźnika**. Każdy wskaźnik informuje, czy pochodzi z odczytu czujnika, powszechnie znanego wzoru czy szacunków algorytmu Zepp; możesz też wykluczyć wybrany wskaźnik z analizy bez usuwania jego danych.
+- Improved: **Kalendarz pokrycia danych**. W Ustawieniach każdy rok to jeden wiersz, a każdy miesiąc to kwadracik; miesiące, dla których rzeczywiście pobrano dane, mają złote obramowanie, a brakujące uzupełnisz jednym kliknięciem.
+- Improved: **Czytelniejsze informacje o niezgodności kont**. Jeśli oficjalna autoryzacja i dane zaawansowane korzystają z różnych kont Zepp, oba zostaną wyświetlone obok siebie wraz ze wskazówkami postępowania; możesz też zacząć od nowa z innym kontem jednym kliknięciem, przenosząc stare dane na bok bez ich usuwania.
+- Improved: **Możliwość wyłączenia automatycznych aktualizacji**. W Ustawieniach obok „Sprawdź dostępność aktualizacji” pojawił się przełącznik, a animacje automatycznie redukują intensywność przy słabszej wydajności komputera lub niskim stanie baterii.
+- Fixed: **Typ treningu 15 w zegarku Balance 2 nie jest już zawsze traktowany jako wędrówka (#155)**.
+- Fixed: **Gdy oba połączenia mają szczegóły treningu, dane zaawansowane mają pierwszeństwo (#143)**. Dystans punkt po punkcie nie jest już nadpisywany przez szczegóły z oficjalnego kanału pobrane później.
+- Fixed: **Wylogowanie i ponowne połączenie działają, nawet gdy nie można odczytać pęku kluczy w systemie macOS (#145)**.
+- Fixed: **Dociąganie danych z wiersza poleceń na okres ponad 365 dni (#152)**. Proces automatycznie przełącza się na pobieranie miesiąc po miesiącu.
+- Fixed: **Karta przewyższeń i wykres wysokości są teraz zgodne**. Na płaskich trasach podawany jest rzeczywisty zakres wysokości oraz największy spadek.
+- Fixed: **Odinstalowanie z zaznaczoną opcją „Usuń dane aplikacji” usuwa je teraz całkowicie**.

@@ -80,6 +80,7 @@ zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
 zeppbridge-cli reprocess --json  # replay local payloads with the current normalizer
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # replace a workout on this machine
 zeppbridge-cli contract          # prints the unit, timezone, source and missing-value definitions
 zeppbridge-cli help
 ```
@@ -98,6 +99,46 @@ exit codes are a contract and do not change with any of this.
 
 A misspelled flag is always an error rather than being ignored — silently
 accepting `--form json` would let a script believe the format took effect.
+
+### Historical summaries and workout details
+
+`sync --mode history --days N` accepts 1–3650 days. Up to 365 days uses
+the normal history window; 366–3650 days uses the persistent monthly coverage
+ledger. Enable long-term archive in Settings when the range exceeds local
+retention. `--max-chunks 24` bounds each monthly run (1–720); rerun the same
+command to resume, or add `--retry-failed` to reset exhausted failures. Ctrl+C
+keeps completed chunks and returns exit code `8`. JSON includes `mode`,
+`cancelled`, `backfill` and `replay`; `backfill.complete` describes coverage,
+including confirmed cloud-empty months, rather than promising cloud data exists.
+
+Workout details have a separate persistent queue:
+
+```bash
+zeppbridge-cli workout-details --status --json
+zeppbridge-cli workout-details --channel advanced --max-items 20 --json
+zeppbridge-cli workout-details --channel official --max-items 20 --retry-failed --json
+zeppbridge-cli set-type --workout ID1 --workout ID2 --type run --json
+zeppbridge-cli set-type --workout ID1 --clear --json
+zeppbridge-cli hide --workout ID1 --json
+zeppbridge-cli hide --list --json
+zeppbridge-cli restore --workout ID1 --json
+zeppbridge-cli set-type --undo EDIT_ID --json
+```
+
+Fetching requires an explicit channel and its connected credentials; each run
+requests at most 1–40 details (default 20). `--status` reads without network or
+writes and optionally filters by `--channel`. Rerunning resumes unfinished
+requests. Successful and cloud-empty records are skipped; failed requests use
+backoff, and `--retry-failed` resets failures only for the selected channel.
+Ctrl+C pauses safely. JSON contains `coverage`, `channel`, `complete` and
+`cancelled`. Fetching exits `8` while the selected channel still has pending or
+failed requests, including during backoff; a coverage query exits `0` when the
+query itself succeeds. Summary coverage and detail coverage are independent.
+
+Local edits are atomic across all `--workout` IDs and return an edit ID.
+`--undo EDIT_ID` reverses the entire edit unless a later edit conflicts.
+`--clear` removes the local type correction. Hiding preserves the original
+record and excludes it from normal reads and exports until restored.
 
 ### Normalizer upgrades
 
@@ -124,6 +165,25 @@ safe on a timer: without `--all` it does nothing once the revision matches.
 `status` reports `normalizerRevision` (what the library holds),
 `normalizerRevisionExpected` (what this build produces) and
 `normalizerReplayPending`. Those first two being different is the whole signal.
+
+### Replacing a workout with a corrected .fit
+
+The desktop app can replace a workout with a corrected `.fit` (the workout page's **Replace with a corrected .fit**). `fit-override` does the same from a script:
+
+```bash
+zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # replace
+zeppbridge-cli fit-override --workout <id> --remove --json             # undo; Zepp's values come back
+zeppbridge-cli fit-override --list --json                              # what this machine has replaced
+```
+
+A replacement lives only in that machine's library: Zepp has no endpoint for
+importing a workout, so the cloud copy and the watch stay as they were. It
+survives later syncs, `reprocess` and parser replays, and snapshots include it.
+Workout IDs come from Zepp and are the same on every machine, so with several
+libraries you run the same command on each. The file must start within 5
+minutes of the workout (`errorKind: "fit_start_mismatch"` otherwise) and the
+workout must already be in the library (`workout_not_found`); both exit with 1.
+Undoing something that was never replaced succeeds with `"removed": false`.
 
 ### Exit codes
 
@@ -312,23 +372,31 @@ outside the grants — `error.permittedRanges` lists the actual
 
 | Tool | Returns |
 |---|---|
-| `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
+| `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm. `gearId` is the ID of the shoes picked for that workout in Zepp, or `null`; Zepp sends no shoe names |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
-| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
+| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
+| `get_baselines` | Your own norm per metric, never a population norm: `recent` compares the latest reading (within 3 days) with the previous 28-day median and gives the 90-day middle-80% band; `long_term` is the middle 80% of all local history (up to ten years) with its median, start date and a per-year breakdown (`null` under a year of history). The official API only covers recent windows |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
 | `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
 | `list_life_events` | Locally authored life events in a date window |
-| `get_data_health` | Fetch/parse/write state and coverage per stream |
-| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect), days since the last workout, the active plan and life events |
-| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, and the background the user wrote for AI |
+| `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
+| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect, the watch's RPE plus the user's own `userRpe` and sore spots), days since the last workout, the active plan and life events (`epoch: true` marks a named era such as a marathon build) |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, the coach notes the user has confirmed (`coachNotes`), and the user's journal (`journal`: 5K / 10K / half / marathon PBs computed locally, ongoing and recently healed injuries, upcoming races with A/B/C priority and race results, shoes in use with mileage, named eras) |
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
 | `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
+| `propose_coach_note` | **Writes (a proposal)**: puts one sentence about the user (an injury, a routine, a preference) into the desktop inbox; it reaches `get_athlete_profile` only after the user taps "Remember" |
+
+Metrics the user switched off with **Use in analysis** (the "?" panel on a metric
+card) are removed from every tool result, in any spelling (`vo2max`, `vo2Max`, …),
+and the result then carries `excludedByUser` with the list and a note that this is
+the user's choice, not missing data. Nothing is deleted; the user's own exports
+(CLI, FIT) are not affected.
 
 `get_food_data` returns daily totals and available food-log details: names, descriptions,
 meal types, timestamps, reported weight, and nutrients (including fiber). Reported
@@ -384,17 +452,21 @@ the CLI cannot get either within its wait it exits with code 4 rather than
 racing the GUI.
 
 MCP's read-only queries take no write lock and can run during a sync. Drafting
-or publishing a training plan takes the write lock only for the moment it
-writes (waiting at most 5 seconds), never while it is on the network.
+or publishing a training plan, or proposing a coach note, takes the write lock
+only for the moment it writes (waiting at most 5 seconds), never while it is on
+the network.
 
-### Training-plan tools (the only two that write)
+### Tools that write: the training plan and the coach-notes inbox
 
 Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 
 - `draft_training_plan` only saves a draft, using the same validation as the
   desktop app's "paste the AI's reply" (only running, cycling, pool and open-water
-  swimming reach the watch; purpose and description are required; step syntax is
-  in the tool description). A plan that fails validation leaves no draft. The
+  swimming reach the watch — a Zepp API limit, so walking, hiking, strength,
+  inline skating and cross-country skiing are refused and strength exercises and
+  sets can't be sent; running also takes the `trail` variant and cycling
+  `mountain`; purpose and description are required; step syntax is in the tool
+  description). A plan that fails validation leaves no draft. The
   draft shows up on the desktop "Send to AI" page for the user to confirm.
 - `publish_training_plan` refuses by default with
   `err.training_plan.ai_publish_disabled`. It works only after the user turns on
@@ -407,6 +479,13 @@ Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 - `sent` only means the official API accepted the request (it answers success
   to any body); the content was validated before sending. The watch still asks
   for the sub-type before the workout starts.
-- All five coach tools (including `get_training_context`, `get_athlete_profile`
+- `propose_coach_note` only proposes. The note goes into a separate inbox table
+  (never a health table) and the user confirms or rejects each one in the
+  desktop app; only confirmed notes appear in `get_athlete_profile` as
+  `coachNotes`, labelled with who wrote them (the user, or the MCP client by the
+  name it reported). A sentence the user rejected cannot be proposed again, and
+  at most 20 proposals can wait at once. The user can edit, delete and export
+  every note as Markdown.
+- All six coach tools (including `get_training_context`, `get_athlete_profile`
   and `get_training_plan`) are refused under the `task` scope: they span
   categories and dates and cannot be honestly clipped.

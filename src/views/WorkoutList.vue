@@ -1,8 +1,9 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
-import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
+import WorkoutTools from '../components/WorkoutTools.vue';
+import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
 import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
@@ -15,6 +16,10 @@ import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber 
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
+import WorkoutImport from '../components/workout/WorkoutImport.vue';
+import { workoutImportMessages } from '../components/workout/workoutImport.i18n';
+import type { ImportSourceKey } from '../types/imports';
 
 const messages = defineMessages(
   {
@@ -65,6 +70,25 @@ const messages = defineMessages(
   'views/WorkoutList',
 );
 const t = useMessages(messages);
+const tools = useMessages(workoutToolsMessages);
+const importText = useMessages(workoutImportMessages);
+const importing = ref(false);
+/* 导入的运动在摘要行最前面标来源（GPX / Strava / Apple 健康……）；日期那一栏太窄，放不下。 */
+const importSources = ref<Record<string, ImportSourceKey>>({});
+const loadImportSources = () => tauriApi.workoutImportSources().then((map) => { importSources.value = map; }).catch(() => undefined);
+const selecting = ref(false);
+const hiddenView = ref(false);
+const selected = ref(new Set<string>());
+const selectedIds = computed(() => [...selected.value]);
+const toggleSelected = (id: string) => { if (selected.value.has(id)) selected.value.delete(id); else selected.value.add(id); };
+const switchVisibility = () => {
+  hiddenView.value = !hiddenView.value;
+  selected.value.clear();
+  // Never leave visible records actionable in the hidden view (or vice versa),
+  // including when the replacement query fails.
+  workouts.value = []; total.value = 0;
+  void loadList();
+};
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
@@ -73,37 +97,52 @@ const t = useMessages(messages);
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
  * 把两者混成一句会让人以为应用丢了记录。 */
 const {
-  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded,
+  items: workouts, loading, loadingMore, error, staleError, total, hasMore, load: loadList, loadMore, preloaded, sentinelRef,
 } = usePagedRecords<Workout>({
-  loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
+  loadPage: (limit, offset) => hiddenView.value ? tauriApi.getHiddenWorkoutPage(limit, offset) : tauriApi.getWorkoutPage(limit, offset),
   idOf: (item) => item.workout_id,
   failedText: () => t.value.loadFailed,
-  firstPage: pageQuery.workoutPage(LIST_PAGE_SIZE),
 });
 const initialLoading = useFirstLoad(loading);
-const displayableList = computed(() => displayableWorkouts(workouts.value));
+// Recovery must include hidden records with incomplete summaries too. Otherwise
+// CLI-hidden or partially synced records can disappear from the restore surface.
+const displayableList = computed(() => hiddenView.value ? workouts.value : displayableWorkouts(workouts.value));
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
 const workoutFact = (workout: Workout): string => {
   const parts: string[] = [];
+  const source = importSources.value[workout.workout_id];
+  if (source) parts.push(importText.value.short[source]);
   const minutes = workoutDurationMinutes(workout);
   if (minutes) parts.push(formatDuration(minutes));
   if (isFiniteNumber(workout.avg_hr)) parts.push(t.value.avgHr(Math.round(workout.avg_hr)));
   const meters = workout.distance_meters;
   if (isFiniteNumber(meters) && meters > 0) parts.push(formatDistance(meters));
   else if (isFiniteNumber(workout.calories)) parts.push(`${Math.round(workout.calories)} kcal`);
-  return parts.length ? parts.join(' · ') : t.value.notProvided;
+  return parts.length > (source ? 1 : 0) ? parts.join(' · ') : [...parts, t.value.notProvided].join(' · ');
 };
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
-onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-useRevisionReload(() => void loadList());
+onMounted(() => { void loadImportSources(); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
+useRevisionReload(() => { void loadList(); void loadImportSources(); });
 </script>
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
     <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <OfficialOnlyNote topic="workouts" />
+    <div class="selection-actions">
+      <button class="button secondary" type="button" :aria-pressed="selecting" @click="selecting = !selecting; selected.clear()">{{ selecting ? tools.done : tools.select }}</button>
+      <button class="button secondary" type="button" :aria-pressed="hiddenView" @click="switchVisibility">{{ hiddenView ? tools.visible : tools.hidden }}</button>
+      <button class="button secondary" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">{{ importing ? importText.close : importText.open }}</button>
+      <template v-if="selecting">
+        <button class="button secondary" type="button" @click="displayableList.forEach(w => selected.add(w.workout_id))">{{ tools.selectLoaded }}</button>
+        <button class="button secondary" type="button" @click="selected.clear()">{{ tools.clearSelection }}</button>
+      </template>
+    </div>
+    <WorkoutImport v-if="importing" id="workout-import" />
+    <p class="footnote">{{ tools.localHint }}</p>
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -114,11 +153,12 @@ useRevisionReload(() => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="record-list">
+    <div v-else :class="['record-list', { selecting }]">
+      <div v-for="workout in displayableList" :key="workout.workout_id" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
+      <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time)} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />
       <RecordRow
-        v-for="workout in displayableList"
-        :key="workout.workout_id"
-        :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
+        class="workout-record"
+        :to="hiddenView ? undefined : { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
         :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time)"
@@ -126,9 +166,11 @@ useRevisionReload(() => void loadList());
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout)"
       />
+      </div>
     </div>
+    <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore" class="load-more">
+    <div v-if="hasMore" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
@@ -141,11 +183,35 @@ useRevisionReload(() => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
+.selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+.selectable-record { display: flex; align-items: center; gap: 12px; }
+.selectable-record > :last-child { flex: 1; min-width: 0; }
+/* 多选：圆形勾选框进场时弹出来，勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下（用户 2026-10-27：多选要更生动）。 */
+.selectable-record { border-radius: var(--radius-md); transition: background 200ms ease; }
+.selectable-record input { appearance: none; display: grid; place-content: center; width: 24px; height: 24px; margin: 0 0 0 4px; flex-shrink: 0;
+  border: 2px solid var(--line-control); border-radius: 50%; background: transparent; cursor: pointer;
+  animation: check-in 320ms cubic-bezier(.2, 1.5, .4, 1) both; transition: background 160ms ease, border-color 160ms ease; }
+.selectable-record input::before { content: ''; width: 6px; height: 11px; margin-top: -3px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) scale(0); transition: transform 240ms cubic-bezier(.2, 1.6, .4, 1); }
+.selectable-record input:checked { border-color: var(--accent); background: var(--accent); }
+.selectable-record input:checked::before { transform: rotate(45deg) scale(1); }
+.selectable-record.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); animation: row-pop 300ms cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes check-in { from { transform: scale(0); opacity: 0; } }
+@keyframes row-pop { 40% { transform: scale(1.012); } }
+.list-tools { margin-top: 12px; }
+@media (prefers-reduced-motion: reduce) { .selectable-record input, .selectable-record.selected { animation: none; } .selectable-record input::before { transition: none; } }
+.selectable-record input:focus-visible, .selection-actions .button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.record-list.selecting::before { display: none; }
+.selection-actions .button { max-width: 100%; overflow-wrap: anywhere; }
 .stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);
   font-size: var(--fs-sm);
+}
+@media (max-width: 420px) {
+  .record-list::before { display: none; }
+  .record-list { padding-inline: 10px; }
 }
 </style>

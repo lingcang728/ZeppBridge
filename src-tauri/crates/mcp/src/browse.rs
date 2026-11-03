@@ -255,8 +255,21 @@ pub(super) fn run_workout_detail(
     if scope.is_task_scoped() {
         access::project_workout_detail(&mut value, &permit.workout_excluded_fields(workout_id));
     }
+    // 用户拿修正过的 .fit 顶替了这条运动（#140）：距离和逐点数据都是修正版，
+    // 要让 AI 知道这不是手表原始记录。
+    let local_fit = db
+        .workout_fit_override(workout_id)
+        .map_err(|error| plain(error.user_message()))?
+        .map(|info| {
+            json!({
+                "fileName": info.file_name,
+                "importedAt": info.imported_at,
+                "cloudDistanceMeters": info.original_distance_m,
+            })
+        });
     Ok(json!({
         "workout": value,
+        "localFitCorrection": local_fit,
         "units": { "distance": "m", "heartRate": "bpm", "calories": "kcal", "duration": "s" },
         "missingValues": contract::MISSING_VALUE_CONVENTION,
     }))

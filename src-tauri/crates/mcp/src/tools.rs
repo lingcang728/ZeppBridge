@@ -209,6 +209,12 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
             request.tool = "list_available_metrics";
             request.whole_library = true;
         }
+        // 长期常态要全部历史（最多十年），task 的授权窗裁不出诚实的「常态」，整体拒绝。
+        "get_baselines" => {
+            request.tool = "get_baselines";
+            request.metrics = metric_args(args)?;
+            request.whole_library = true;
+        }
         "list_life_events" => {
             request.tool = "list_life_events";
             date_args(args)?;
@@ -256,7 +262,8 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
         | "get_athlete_profile"
         | "get_training_plan"
         | "draft_training_plan"
-        | "publish_training_plan" => {
+        | "publish_training_plan"
+        | "propose_coach_note" => {
             request.tool = COACH_TOOLS
                 .iter()
                 .find(|tool| **tool == name)
@@ -271,13 +278,14 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
     Ok(request)
 }
 
-/// 3B 的五个教练工具。
-pub(super) const COACH_TOOLS: [&str; 5] = [
+/// 3B 的五个教练工具，加上批次 7 的「提议记住」。
+pub(super) const COACH_TOOLS: [&str; 6] = [
     "get_training_context",
     "get_athlete_profile",
     "get_training_plan",
     "draft_training_plan",
     "publish_training_plan",
+    "propose_coach_note",
 ];
 
 /// `get_food_data` 按天合计的四个摄入指标。
@@ -427,6 +435,12 @@ pub(super) fn execute_tool_with_db(
         },
     };
 
+    // 用户排除的指标（metric_prefs）：从返回里去掉并写明是用户的选择。读不出名单就照常给——
+    // 排除是用户的偏好，不是授权边界。
+    if let Ok(excluded) = db.excluded_metrics() {
+        zeppbridge_core::storage::metric_prefs::apply_exclusions(&mut payload, &excluded);
+    }
+
     // task 范围的第二道保险（R6）：白名单挑字段的出口本来就没有 device_id，
     // 整结构 serde 的出口（sleep detail）靠这道递归剥离兜底。
     if scope.is_task_scoped() {
@@ -464,6 +478,7 @@ pub(super) fn run_tool(
         "get_data_health" => run_data_health(db, args, database_bytes),
         "get_food_data" => run_food_data(db, args, scope, permit),
         "list_available_metrics" => run_available_metrics(db),
+        "get_baselines" => run_baselines(db, args),
         "get_metric_records" => run_metric_records(db, args, scope, permit),
         "list_sleep_sessions" => run_sleep_sessions(db, args, scope, permit),
         "get_workout_detail" => run_workout_detail(db, args, scope, permit),
@@ -474,6 +489,7 @@ pub(super) fn run_tool(
         "get_training_plan" => run_training_plan(db),
         "draft_training_plan" => run_draft_plan(db, args),
         "publish_training_plan" => run_publish_plan(db, args),
+        "propose_coach_note" => run_propose_note(db, args),
         other => Err(CallFailure::plain(format!("没有名为 {other} 的工具。"))),
     }
 }

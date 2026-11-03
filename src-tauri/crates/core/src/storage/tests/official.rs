@@ -264,3 +264,128 @@ fn official_device_source_and_name_parsing() {
     );
     assert_eq!(official_device_name(&serde_json::json!("  ")), None);
 }
+
+// ── #143：同一次运动两条通道都有明细时，以高级通道为准 ─────────────────────
+
+const TRACK: i64 = 1_700_000_000;
+
+/// 高级通道的运动汇总（2600 m）。
+fn insert_workout_summary(db: &Database) {
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:run:precedence".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({ "data": [{ "trackid": TRACK, "end_time": TRACK + 600, "type": 1, "dis": "2600" }] }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+}
+
+/// 高级通道明细：心率 150 起，`currentDistance` 累计到 2600 m。
+fn insert_legacy_detail(db: &Database) {
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: format!("workout_detail:{TRACK}:run.huami.com"),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({ "data": {
+            "trackid": TRACK, "time": "0;300;300;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            "currentDistance": "0,0;300,130000;300,260000;"
+        } }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+}
+
+/// 官方明细：心率 120 起；`distance` 给了才带 `distanceInCentimeter`。
+fn insert_official_detail(db: &Database, distance: Option<&str>) {
+    let mut payload = serde_json::json!({
+        "trackId": TRACK.to_string(), "source": "run.huami.com", "startTime": TRACK,
+        "samplingTime": "0;300;300;", "heartRate": "0,120;300,2;300,-2;", "pause": ""
+    });
+    if let Some(distance) = distance {
+        payload["distanceInCentimeter"] = serde_json::json!(distance);
+    }
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: format!("official:sport_detail:{TRACK}"),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload,
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+}
+
+fn set_fetched_at(db: &Database, source_key_prefix: &str, at: &str) {
+    db.conn
+        .execute(
+            "UPDATE raw_records SET fetched_at = ?2 WHERE substr(source_key, 1, length(?1)) = ?1",
+            params![source_key_prefix, at],
+        )
+        .unwrap();
+}
+
+fn series_shape(db: &Database) -> (Option<i32>, Option<f64>) {
+    let series = db.get_workout_series(&TRACK.to_string()).unwrap();
+    let first_hr = series.samples.first().and_then(|s| s.heart_rate);
+    let last_distance = series
+        .samples
+        .iter()
+        .filter_map(|s| s.distance_m)
+        .fold(None, |m: Option<f64>, v| Some(m.map_or(v, |m| m.max(v))));
+    (first_hr, last_distance)
+}
+
+#[test]
+fn the_legacy_detail_wins_over_the_official_one_whichever_was_fetched_last() {
+    for official_later in [true, false] {
+        let db = Database::in_memory().unwrap();
+        insert_workout_summary(&db);
+        insert_legacy_detail(&db);
+        insert_official_detail(&db, None);
+        let (legacy_at, official_at) = if official_later {
+            ("2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")
+        } else {
+            ("2026-10-02T00:00:00+00:00", "2026-10-01T00:00:00+00:00")
+        };
+        // 汇总总是先到（明细要挂在已有的运动上）。
+        set_fetched_at(&db, "sport_history:", "2026-09-30T00:00:00+00:00");
+        set_fetched_at(&db, "workout_detail:", legacy_at);
+        set_fetched_at(&db, "official:", official_at);
+        db.reprocess_raw_records().unwrap();
+        // 高级版：心率 150 起，逐点距离到 2600 m（官方版是 120、没有距离）。
+        assert_eq!(
+            series_shape(&db),
+            (Some(150), Some(2600.0)),
+            "official_later = {official_later}"
+        );
+    }
+}
+
+#[test]
+fn an_official_only_detail_keeps_distance_that_matches_the_summary() {
+    let db = Database::in_memory().unwrap();
+    insert_workout_summary(&db);
+    insert_official_detail(&db, Some("0,0;300,130000;300,260000;"));
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(series_shape(&db), (Some(120), Some(2600.0)));
+}
+
+#[test]
+fn an_official_only_detail_drops_distance_that_disagrees_with_the_summary() {
+    let db = Database::in_memory().unwrap();
+    insert_workout_summary(&db);
+    // 单位差一百倍（末值 26 m，汇总 2600 m）：对不上就不留，心率照常。
+    insert_official_detail(&db, Some("0,0;300,1300;300,2600;"));
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(series_shape(&db), (Some(120), None));
+}

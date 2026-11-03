@@ -302,7 +302,8 @@ fn task_validation_rejects_bad_input() {
     );
 
     let mut t = task();
-    t.categories = vec![range(AiTaskCategory::Sleep, 400, true)];
+    // 「全部」= 十年（3.0.4）：再往前就拒。
+    t.categories = vec![range(AiTaskCategory::Sleep, 3651, true)];
     assert_eq!(
         err_code(&db.save_ai_task(&t).unwrap_err()),
         "err.ai_task.invalid"

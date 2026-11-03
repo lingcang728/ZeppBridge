@@ -13,8 +13,8 @@
  * 用法：
  *   node scripts/release/merge-latest-json.mjs \
  *     --windows-latest release/latest.json \
- *     --mac-signature dist-macos/ZeppBridge_1.2.3_aarch64.app.tar.gz.sig \
- *     --mac-asset ZeppBridge_1.2.3_aarch64.app.tar.gz \
+ *     --mac-signature dist-macos/ZeppBridge-1.2.3-macOS-AppleSilicon.app.tar.gz.sig \
+ *     --mac-asset ZeppBridge-1.2.3-macOS-AppleSilicon.app.tar.gz \
  *     --version 1.2.3 \
  *     --repo lingcang728/ZeppBridge \
  *     --out release/latest.json

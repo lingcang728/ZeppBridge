@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Quatorze réglages du quotidien, réunis en une seule pile de cartes.',
     items: [
       { id: 'sync', title: 'Synchronisation automatique', text: 'Désactivé, 15, 30 ou 60 minutes. Choisissez votre rythme.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Durée de conservation', text: 'L’historique disponible dans le cloud est rapatrié ici. Vous décidez combien de temps le garder.', icon: 'database' },
+      { id: 'retention', title: 'Dix ans, conservés ici', text: 'Rapatriez jusqu’à dix ans d’historique sur cet ordinateur et gardez-les. Rien ne s’efface avec la fenêtre du cloud.', icon: 'database' },
       { id: 'data', title: 'Couverture des données', text: 'Ce qui peut être synchronisé et ce qui ne l’est pas, en toute transparence.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Les outils locaux comme Claude Code et Codex interrogent directement. La publication de plans nécessite votre accord.', icon: 'structured-data' },
       { id: 'formats', title: 'Quatre formats', text: 'JSON · CSV · GPX, ainsi que FIT sur la page des séances.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'API locale', text: 'Reliée exclusivement à 127.0.0.1. Accès en lecture seule, sécurisé par jeton.', icon: 'structured-data' },
       { id: 'privacy', title: 'Confidentialité et sécurité', text: 'Identifiants protégés par le système. Les jetons ne figurent jamais dans les journaux.', icon: 'browser-login' },
       { id: 'filename', title: 'Nom des fichiers', text: 'Définissez la nomenclature des fichiers exportés vers l’IA.', icon: 'document' },
-      { id: 'folder', title: 'Dossier de données', text: 'Localisez vos données sur cet ordinateur pour vos sauvegardes et migrations.', icon: 'database' },
+      { id: 'folder', title: 'Emportez tout avec vous', text: 'Vos données restent dans un dossier sur cet ordinateur, et tout ce que vous avez consigné ici — évaluations, plans, tâches IA — s’exporte dans un seul fichier JSON.', icon: 'database' },
     ],
   },
   nav: [

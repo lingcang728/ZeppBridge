@@ -18,6 +18,7 @@ import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { addDays } from '../../lib/aiTask/bridgeScale';
 import { errorTextFor } from '../../i18n/errors';
 import type { TrainingPlanState } from '../../types/trainingPlan';
+import { useTrainingPlan } from '../../composables/useTrainingPlan';
 import { usePlanText } from './usePlanText';
 import { useStatusText } from './status.i18n';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
@@ -56,6 +57,16 @@ const weeks = computed(() => (props.state?.weeks ?? []).map((week, index) => ({
       : index === 0 ? s.value.delivered : pt.value.laterDelivered,
 })));
 
+/* 有没确认送达 / 没送到的周时给一个「重发」（issue #143）。账本上的「未确认」以前只能等下一次同步的
+   滚动推送补，或者改一个字骗它重发。模拟发送没有这种周。 */
+const plan = useTrainingPlan();
+const resendable = computed(() => !props.simulated && (props.state?.weeks ?? []).some((week) => week.state !== 'in_sync' && week.planned > 0));
+const resend = async () => {
+  await popover.value?.close();
+  await plan.resend();
+  flash();
+};
+
 const anchor = ref<HTMLElement | null>(null);
 const open = ref(false);
 const popover = ref<InstanceType<typeof GlassPopover> | null>(null);
@@ -90,7 +101,8 @@ defineExpose({ flash });
         <span class="count"><Icon name="run" :size="12" />{{ week.count }}</span><span class="state">{{ week.text }}</span>
       </li>
     </ul>
-    <footer v-if="state?.can_undo || sentDays > 0 || discardable" class="pop-acts" data-pop-item>
+    <footer v-if="state?.can_undo || sentDays > 0 || discardable || resendable" class="pop-acts" data-pop-item>
+      <button v-if="resendable" type="button" class="pill-button quiet" :disabled="busy" @click="resend"><Icon name="refresh" :size="13" />{{ s.resend }}</button>
       <button v-if="discardable" type="button" class="pill-button quiet" :disabled="busy" @click="act('discard')"><Icon name="x" :size="13" />{{ bt.discard }}</button>
       <button v-if="state?.can_undo" type="button" class="pill-button quiet" :disabled="busy" @click="act('undo')"><Icon name="undo" :size="13" />{{ s.undo }}</button>
       <button v-if="sentDays > 0" type="button" class="pill-button quiet danger" :disabled="busy" @click="act('clear')"><Icon name="trash" :size="13" />{{ s.clear }}</button>
