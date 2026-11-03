@@ -117,6 +117,8 @@ pub fn mask_user_id(user_id: &str) -> String {
 /// Web-login progress exposed to the frontend and the `login://status` event.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LoginStatus {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_recovery: Option<crate::commands::credential_recovery::RecoveryStatus>,
     pub state: String,
     pub message: String,
     pub page_url: String,
@@ -132,6 +134,7 @@ pub struct LoginStatus {
 impl LoginStatus {
     pub fn idle() -> Self {
         Self {
+            credential_recovery: None,
             state: "idle".to_string(),
             message: String::new(),
             page_url: String::new(),
@@ -147,6 +150,7 @@ impl LoginStatus {
         page_url: impl Into<String>,
     ) -> Self {
         Self {
+            credential_recovery: None,
             state: state.to_string(),
             message: message.into(),
             page_url: page_url.into(),

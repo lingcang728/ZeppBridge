@@ -401,10 +401,12 @@ export interface BridgeBackend {
   startWebLogin(locale: string): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
+  recoverAdvancedCredentials(storage: 'system' | 'file'): Promise<LoginStatus>;
 
   /** Zepp 官方授权：系统浏览器里授权，桌面端自己去中转站领令牌。 */
   startOfficialLogin(): Promise<OfficialStatus>;
   cancelOfficialLogin(): Promise<OfficialStatus>;
+  recoverOfficialCredentials(storage: 'system' | 'file'): Promise<OfficialStatus>;
   /** 「我已在网页授权，立即检查」：叫醒等待中的那次轮询，结果经 official://status 送回。 */
   checkOfficialLoginNow(): Promise<OfficialStatus>;
   getOfficialStatus(): Promise<OfficialStatus>;

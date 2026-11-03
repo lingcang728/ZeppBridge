@@ -16,6 +16,16 @@ use tokio::sync::{Mutex, RwLock};
 pub(crate) struct LoginSession {
     pub(crate) status: Arc<RwLock<LoginStatus>>,
     pub(crate) epoch: Arc<AtomicU64>,
+    pub(crate) pending_credentials: Arc<std::sync::Mutex<Option<PendingLogin>>>,
+}
+
+// Never derive Serialize or Debug: this receipt contains a live App Token.
+#[derive(Clone)]
+pub(crate) struct PendingLogin {
+    pub(crate) auth: AuthInfo,
+    pub(crate) epoch: u64,
+    pub(crate) confidence: Option<&'static str>,
+    pub(crate) received: std::time::Instant,
 }
 
 impl LoginSession {
@@ -23,6 +33,7 @@ impl LoginSession {
         Self {
             status: Arc::new(RwLock::new(LoginStatus::idle())),
             epoch: Arc::new(AtomicU64::new(0)),
+            pending_credentials: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }
@@ -57,6 +68,26 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Tests must never call the startup migration against the host user's XDG
+    /// directories. This constructor uses only an explicitly supplied new fixture.
+    #[cfg(all(test, unix))]
+    pub(crate) fn isolated_test_state(data_dir: PathBuf) -> Result<Self> {
+        std::fs::create_dir(&data_dir)?;
+        let db = Database::open_migrated(&data_dir.join("zepp.db"))?;
+        Ok(Self {
+            auth: Arc::new(AuthManager::new(data_dir.clone())),
+            data_dir,
+            db: Arc::new(Mutex::new(db)),
+            sync: Arc::new(RwLock::new(None)),
+            sync_command_lock: Arc::new(Mutex::new(())),
+            login: LoginSession::new(),
+            auth_state: Arc::new(RwLock::new("unconfigured".into())),
+            startup_warning: Arc::new(RwLock::new(None)),
+            auth_warning: Arc::new(RwLock::new(None)),
+            region_confidence: Arc::new(RwLock::new("unknown".into())),
+        })
+    }
+
     /// Initialize local storage and restore the saved authentication state.
     ///
     /// A malformed or stale credential is intentionally recoverable: the

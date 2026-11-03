@@ -19,6 +19,9 @@ use zeppbridge_core::official::{
     AUTHORIZATION_WINDOW_SECONDS,
 };
 
+mod recovery;
+pub use recovery::recover_official_credentials;
+
 pub const OFFICIAL_EVENT: &str = "official://status";
 
 /// 领令牌的间隔。用户在浏览器里点完同意到桌面端发现，最多差这么久。
@@ -67,9 +70,13 @@ struct Flow {
 }
 
 static FLOW: Mutex<Option<Flow>> = Mutex::new(None);
+#[cfg(test)]
+static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Serialize)]
 pub struct OfficialStatus {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential_recovery: Option<recovery::RecoveryStatus>,
     /// `idle` / `waiting` / `connected` / `needs_reauth` / `failed`
     pub state: String,
     /// `failed` 时的错误码（`err.official.*`），界面按它取文案。
@@ -91,6 +98,7 @@ pub struct OfficialStatus {
 impl OfficialStatus {
     fn failed(code: &str, message: &str) -> Self {
         Self {
+            credential_recovery: None,
             state: "failed".into(),
             message_code: Some(code.into()),
             message: Some(message.into()),
@@ -177,8 +185,12 @@ fn current_notice() -> Option<Notice> {
 }
 
 fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
+    if let Some(status) = recovery::status(data_dir) {
+        return status;
+    }
     if let Some((url, notice)) = waiting_flow() {
         return OfficialStatus {
+            credential_recovery: None,
             state: "waiting".into(),
             message_code: notice.map(|(code, _)| code.to_string()),
             message: notice.map(|(_, message)| message.to_string()),
@@ -197,6 +209,7 @@ fn stored_account_status(store: &OfficialStore) -> OfficialStatus {
     match meta {
         Some(meta) => OfficialStatus {
             // 过期了还没续上（get_official_status 会先试着续一次）就不能说「已授权」。
+            credential_recovery: None,
             state: if meta.needs_reauth
                 || meta.is_expired(chrono::Utc::now().timestamp())
                 || store.load().ok().flatten().is_none()
@@ -215,6 +228,7 @@ fn stored_account_status(store: &OfficialStore) -> OfficialStatus {
             conflict: None,
         },
         None => OfficialStatus {
+            credential_recovery: None,
             state: "idle".into(),
             message_code: None,
             message: None,
@@ -323,7 +337,9 @@ fn begin_flow(
         wake: wake.clone(),
     });
     // 新的一次登录作废之前所有在途的回执（R05）。
-    Ok(Some((cancel, invalidate_pending_logins(), wake)))
+    let generation = invalidate_pending_logins();
+    recovery::clear();
+    Ok(Some((cancel, generation, wake)))
 }
 
 /// 只清掉自己那一次：取消后立刻重开的新授权不能被旧的轮询任务抹掉。
@@ -516,10 +532,15 @@ async fn save_verified(
     ) {
         // 写了，或者已经被取消 / 取代而没写：都不是失败。
         Ok(_) => None,
-        Err(_) => Some(OfficialStatus::failed(
-            "err.official.store",
-            "官方授权成功了，但令牌没能存进系统凭据存储",
-        )),
+        Err(error) => {
+            if matches!(error, ZeppBridgeError::CredentialStore(_)) {
+                recovery::remember(data_dir, tokens, nickname, generation);
+                recovery::status(data_dir)
+            } else {
+                let error = AppError::from(error);
+                Some(OfficialStatus::failed(&error.code, &error.message))
+            }
+        }
     }
 }
 
@@ -531,6 +552,7 @@ fn cancel_flow() {
         }
     }
     invalidate_pending_logins();
+    recovery::clear();
 }
 
 /// 「我已在网页授权，立即检查」：叫醒正在等的那次轮询，马上去领一次。
@@ -674,6 +696,7 @@ mod tests {
     /// 之后取消和查询照常——以前这条路径在锁里重入同一把锁，永远不返回。
     #[test]
     fn a_second_start_reuses_the_waiting_flow_without_deadlocking() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
         let dir =
             std::env::temp_dir().join(format!("zeppbridge-official-flow-{}", std::process::id()));
         let (done, finished) = std::sync::mpsc::channel();

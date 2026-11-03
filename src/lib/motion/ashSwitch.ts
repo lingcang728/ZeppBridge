@@ -6,6 +6,7 @@ import { breatheCharts, closeSweep, openSweep, settleNewText, startSweep } from 
 import { localeTarget } from './localeTarget';
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
+import { canUseViewTransitions } from './viewTransitions';
 import { lessMotion } from './lessMotion';
 import { beginFrameLog, claimHeavy, endFrameLog } from './performance';
 
@@ -150,7 +151,7 @@ export const switchLocaleWithAsh = async (value: Locale, origin?: AshOrigin, sco
   }
   const doc = document as ViewTransitionDocument;
   /* 别的重特效（信纸化灰）正在放：这次不放涟漪，直接换。 */
-  const release = !doc.startViewTransition || reducedMotion() ? null : claimHeavy('ash-locale');
+  const release = !canUseViewTransitions() || !doc.startViewTransition || reducedMotion() ? null : claimHeavy('ash-locale');
   if (!release) {
     localeTarget.value = null;
     setLocale(value);

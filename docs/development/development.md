@@ -44,12 +44,25 @@ npm run build      # vue-tsc --noEmit && vite build
 npm run build:web  # vite build only, skipping vue-tsc
 npm run preview    # preview dist (does not connect to account data)
 npm test           # Vitest: the pure-function layer in src/lib
+npm run test:dev    # cold Vite style requests and scoped CSS
 npm run version:check   # are the eight version numbers consistent
 npm run budget:check    # first-screen size budget (build first)
 npm run i18n:check      # no hardcoded Chinese; backend codes have English copy
 npm run docs:check      # repo-internal documentation links resolve
 npm run lockfile:check  # package-lock resolved URLs point at registry.npmjs.org (npm 12 refuses mirrors)
 ```
+
+Multiple scoped external style blocks remain supported through the repository's
+patch for the pinned `@vitejs/plugin-vue` 6.0.8. `npm ci` applies it automatically
+via `postinstall`. If you install with `--ignore-scripts`, run
+`npm run postinstall` manually, then fully restart `npm run tauri dev` (or
+`npm run dev`); HMR cannot reload the cached plugin module. Do not make a
+one-off manual edit to `node_modules`: the reproducible patch lives in
+`scripts/dev/patch-vue-external-styles.mjs`. Review or remove that patch when
+upgrading the plugin, and run `npm run test:dev`. This starts Vite and requests
+external styles before their owner components are cached, checking for HTTP
+errors and exact scope IDs. A production build alone misses this development
+failure path; `test:dev` also runs in the `test:functions` CI checks.
 
 `npm test` concentrates on one rule: **missing must never be displayed as 0**. A
 card reading "0 minutes of sleep" is far more dangerous than "—", because users

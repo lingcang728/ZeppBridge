@@ -19,6 +19,13 @@ pub async fn save_auth(
     user_id: String,
     region_host: String,
 ) -> std::result::Result<AppStatus, AppError> {
+    let epoch = state
+        .login
+        .epoch
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        + 1;
+    super::login::recovery::clear(&state);
+    *state.login.status.write().await = crate::ipc_types::LoginStatus::idle();
     let auth = AuthInfo {
         app_token,
         user_id,
@@ -31,8 +38,25 @@ pub async fn save_auth(
 
     // 库属于另一个账号就不存这把令牌（R06）。
     super::claim_library_for_login(&state.data_dir, &auth.user_id).await?;
-    state.auth.save_auth(&auth)?;
+    if state.login.epoch.load(std::sync::atomic::Ordering::SeqCst) != epoch {
+        return Err(AppError::new("err.login.cancelled", "登录已取消"));
+    }
+    if let Err(error) = state.auth.save_auth(&auth) {
+        if super::login::recovery::is_store_error(&error) {
+            super::login::recovery::remember(&state, auth, epoch, None);
+            if let Some(status) = super::login::recovery::status(&state) {
+                *state.login.status.write().await = status;
+            }
+        }
+        return Err(error.into());
+    }
+    install_saved_auth(&state, auth).await
+}
 
+pub(super) async fn install_saved_auth(
+    state: &AppState,
+    auth: AuthInfo,
+) -> Result<AppStatus, AppError> {
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => {
@@ -73,7 +97,7 @@ pub async fn save_auth(
         *warning = None;
     }
 
-    build_app_status(&state).await
+    build_app_status(state).await
 }
 
 /// Verify the saved credential with a real, bounded recent heart-rate query.
@@ -137,6 +161,7 @@ pub async fn clear_auth(
         .login
         .epoch
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    super::login::recovery::clear(&state);
     {
         let mut login = state.login.status.write().await;
         *login = crate::ipc_types::LoginStatus::idle();

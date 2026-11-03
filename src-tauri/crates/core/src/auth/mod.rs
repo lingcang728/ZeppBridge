@@ -79,7 +79,9 @@ pub struct AuthManager {
     /// `clear_auth` can still remove the credential-store entry when the
     /// metadata file itself is unreadable/corrupt.
     user_id_file: PathBuf,
-    credentials: Arc<dyn CredentialBackend>,
+    // Injected backends stay fixed. Production resolves its explicit/default
+    // choice at each operation so consented file storage also works immediately.
+    credentials: Option<Arc<dyn CredentialBackend>>,
 }
 
 impl std::fmt::Debug for AuthManager {
@@ -92,8 +94,11 @@ impl std::fmt::Debug for AuthManager {
 
 impl AuthManager {
     pub fn new(data_dir: PathBuf) -> Self {
-        let credentials = default_credential_backend_in(&data_dir);
-        Self::with_credential_backend(data_dir, credentials)
+        Self {
+            auth_file: data_dir.join("auth.json"),
+            user_id_file: data_dir.join("auth.user-id"),
+            credentials: None,
+        }
     }
 
     /// Construct an auth manager with an injected backend.  Production code
@@ -106,23 +111,30 @@ impl AuthManager {
         Self {
             auth_file: data_dir.join("auth.json"),
             user_id_file: data_dir.join("auth.user-id"),
-            credentials,
+            credentials: Some(credentials),
         }
+    }
+
+    fn credential_backend(&self) -> Arc<dyn CredentialBackend> {
+        self.credentials.clone().unwrap_or_else(|| {
+            default_credential_backend_in(self.auth_file.parent().expect("auth file has a parent"))
+        })
     }
 
     /// Saves metadata atomically and stores the token only in the credential
     /// manager.  Inputs are trimmed and validated before either store is
     /// changed.
     pub fn save_auth(&self, auth: &AuthInfo) -> Result<()> {
+        let credentials = self.credential_backend();
         let user_id = validate_user_id(&auth.user_id)?;
         let token = validate_token(&auth.app_token)?;
         let region_host = normalize_region_host(&auth.region_host)?;
         let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
         // Reading an old Keychain entry may be denied while replacing it is
         // allowed. A fresh login must still get the chance to write its token.
-        let previous = self.credentials.get(&user_id);
+        let previous = credentials.get(&user_id);
 
-        self.credentials
+        credentials
             .set(&user_id, &token)
             .map_err(credential_error)?;
 
@@ -140,10 +152,10 @@ impl AuthManager {
             // never became current.
             match previous {
                 Ok(Some(old)) => {
-                    let _ = self.credentials.set(&user_id, &old);
+                    let _ = credentials.set(&user_id, &old);
                 }
                 Ok(None) => {
-                    let _ = self.credentials.delete(&user_id);
+                    let _ = credentials.delete(&user_id);
                 }
                 Err(_) => {
                     // The previous value is unknown; do not delete an entry
@@ -158,7 +170,7 @@ impl AuthManager {
         if let Some(raw) = previous_user_id {
             if let Ok(old_id) = validate_user_id(&raw) {
                 if old_id != user_id {
-                    let _ = self.credentials.delete(&old_id);
+                    let _ = credentials.delete(&old_id);
                 }
             }
         }
@@ -175,6 +187,7 @@ impl AuthManager {
     /// file without a credential is reported as an actionable auth error, not
     /// as a partially populated `AuthInfo`.
     pub fn load_auth(&self) -> Result<Option<AuthInfo>> {
+        let credentials = self.credential_backend();
         if !self.auth_file.exists() {
             return Ok(None);
         }
@@ -182,12 +195,12 @@ impl AuthManager {
         let (stored, legacy_token) = self.read_stored()?;
         let user_id = validate_user_id(&stored.user_id)?;
         let region_host = normalize_region_host(&stored.region_host)?;
-        let token = match self.credentials.get(&user_id).map_err(credential_error)? {
+        let token = match credentials.get(&user_id).map_err(credential_error)? {
             Some(value) => validate_token(&value)?,
             None => {
                 if let Some(ref value) = legacy_token {
                     let value = validate_token(value)?;
-                    self.credentials
+                    credentials
                         .set(&user_id, &value)
                         .map_err(credential_error)?;
                     value
@@ -245,6 +258,7 @@ impl AuthManager {
     }
 
     pub fn status(&self) -> Result<AuthStatus> {
+        let credentials = self.credential_backend();
         if !self.auth_file.exists() {
             return Ok(AuthStatus {
                 configured: false,
@@ -284,8 +298,7 @@ impl AuthManager {
             Ok(host) => host,
             Err(error) => return Ok(recoverable(error)),
         };
-        let token = self
-            .credentials
+        let token = credentials
             .get(&user_id)
             .map_err(credential_error)
             .and_then(|token| {
@@ -335,9 +348,10 @@ impl AuthManager {
                     .and_then(|id| validate_user_id(&id).ok())
             });
 
+        let credentials = self.credential_backend();
         let mut left_behind = None;
         if let Some(user_id) = user_id {
-            left_behind = self.credentials.delete(&user_id).err();
+            left_behind = credentials.delete(&user_id).err();
         }
         if self.auth_file.exists() {
             fs::remove_file(&self.auth_file)?;

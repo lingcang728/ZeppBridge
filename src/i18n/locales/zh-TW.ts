@@ -194,6 +194,28 @@ export default {
 
   // ── modules ──
   modules: {
+    'components/CredentialRecovery': {
+      title: '選擇登入憑證的儲存方式',
+      description: '授權成功，但權杖未能儲存。權杖最多會在記憶體中保留 10 分鐘，期間可重試儲存，無需重新登入。結束應用程式或發起新的授權會丟棄權杖。',
+      systemOption: '修復系統憑證存放區（建議）',
+      fileOption: '儲存到本機 JSON 檔案',
+      repairLinux: '開啟系統的密碼或錢包管理工具。如果沒有預設金鑰環或錢包，請先建立並解鎖。在 Niri 等桌面環境中，請確認 KWallet 或 GNOME Keyring 等 Secret Service 提供者正在執行，然後在下方重試。',
+      repairMac: '開啟「鑰匙圈存取」，解鎖登入鑰匙圈，並允許 ZeppBridge 儲存憑證，然後在下方重試。',
+      repairWindows: '檢查 Windows 認證管理員是否可用，以及目前帳號是否有權使用，然後在下方重試。',
+      retrySystem: '已修復，重試儲存',
+      fileWarning: '這會將存取權杖和重新整理權杖以明文儲存到應用程式資料目錄的 credentials.json 中。在 Linux 和 macOS 上，該檔案的權限為 0600。以目前使用者身分執行的程式可以讀取它。應用程式重新啟動後會繼續使用此檔案，除非啟動設定明確指定了其他儲存方式。',
+      consent: '我已了解並同意在此裝置上以明文儲存權杖。',
+      saveFile: '同意並儲存到 JSON',
+      discard: '丟棄本次授權',
+      expired: '本次授權已失效，請重新登入。',
+      savedFile: '登入憑證已儲存到本機 credentials.json。',
+      fileUnavailable: '此平台不支援檔案儲存，或啟動設定已指定其他儲存方式。請修復系統憑證存放區後繼續。',
+      advancedDescription: '進階資料的登入憑證未能儲存。憑證最多會在記憶體中保留 10 分鐘，期間可重試儲存，無需重新登入或輸入權杖。取消、發起新的登入、重新送出手動憑證或結束應用程式會丟棄憑證。',
+      advancedFileWarning: '這會將進階資料的 App Token 以明文儲存到應用程式資料目錄的 credentials.json 中。在 Linux 和 macOS 上，該檔案的權限為 0600。以目前使用者身分執行的程式可以讀取它。應用程式重新啟動後會繼續使用此檔案，除非啟動設定明確指定了其他儲存方式。',
+      advancedDiscard: '丟棄本次登入憑證',
+      advancedExpired: '本次登入憑證已失效，請重新連線進階資料。',
+    },
+
     'App': {
       bottomNav: '行動裝置主導航',
       browserPreview: '瀏覽器預覽不讀取帳號資料，請使用桌面應用程式開啟。',

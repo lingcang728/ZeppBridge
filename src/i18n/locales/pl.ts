@@ -17,6 +17,28 @@ const activity = (value: unknown): string => str(value);
 
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      title: 'Wybierz sposób zapisania danych logowania',
+      description: 'Autoryzacja powiodła się, ale nie udało się zapisać tokena. Token pozostaje w pamięci przez maksymalnie 10 minut, więc można ponowić zapis bez ponownego logowania. Odrzucenie tej autoryzacji, rozpoczęcie nowej lub zamknięcie aplikacji powoduje jego usunięcie.',
+      systemOption: 'Napraw systemowy magazyn poświadczeń (zalecane)',
+      fileOption: 'Zapisz do lokalnego pliku JSON',
+      repairLinux: 'Otwórz systemowy menedżer haseł lub portfeli. W razie potrzeby utwórz domyślny pęk kluczy (keyring) lub portfel i odblokuj go. W środowiskach pulpitu takich jak Niri upewnij się, że działa dostawca Secret Service, np. KWallet lub GNOME Keyring. Następnie ponów próbę poniżej.',
+      repairMac: 'Otwórz „Dostęp do pęku kluczy”, odblokuj swój pęk kluczy logowania i zezwól ZeppBridge na zapisywanie poświadczeń. Następnie ponów próbę poniżej.',
+      repairWindows: 'Sprawdź, czy Menedżer poświadczeń Windows jest dostępny i czy Twoje konto może z niego korzystać. Następnie ponów próbę poniżej.',
+      retrySystem: 'Naprawiono — ponów zapis',
+      fileWarning: 'Spowoduje to zapisanie tokenów dostępu i odświeżania w postaci zwykłego tekstu w pliku credentials.json w katalogu danych aplikacji. W systemach Linux i macOS plik ma uprawnienia 0600. Programy działające jako Twój użytkownik mogą go odczytać. Po ponownym uruchomieniu aplikacja będzie nadal korzystać z tego pliku, chyba że konfiguracja startowa wybierze inny magazyn.',
+      consent: 'Rozumiem i zgadzam się na zapisanie tokenów w postaci zwykłego tekstu na tym urządzeniu.',
+      saveFile: 'Zaakceptuj i zapisz do JSON',
+      discard: 'Odrzuć tę autoryzację',
+      expired: 'Ta autoryzacja nie jest już dostępna. Zaloguj się ponownie.',
+      savedFile: 'Dane logowania zapisano w lokalnym pliku credentials.json.',
+      fileUnavailable: 'Zapis do plików nie jest dostępny na tej platformie albo konfiguracja startowa wybrała inny magazyn. Aby kontynuować, napraw systemowy magazyn poświadczeń.',
+      advancedDescription: 'Nie udało się zapisać poświadczeń logowania funkcji Dane zaawansowane. Pozostają w pamięci przez maksymalnie 10 minut, więc można ponowić zapis bez ponownego logowania ani ponownego wpisywania tokena. Anulowanie, rozpoczęcie nowego logowania, ponowne przesłanie ręcznych poświadczeń lub zamknięcie aplikacji powoduje ich usunięcie.',
+      advancedFileWarning: 'Spowoduje to zapisanie tokena aplikacji (App Token) funkcji Dane zaawansowane w postaci zwykłego tekstu w pliku credentials.json w katalogu danych aplikacji. W systemach Linux i macOS plik ma uprawnienia 0600. Programy działające jako Twój użytkownik mogą go odczytać. Po ponownym uruchomieniu aplikacja będzie nadal korzystać z tego pliku, chyba że konfiguracja startowa wybierze inny magazyn.',
+      advancedDiscard: 'Odrzuć te dane logowania',
+      advancedExpired: 'Te dane logowania nie są już dostępne. Połącz się ponownie z Danymi zaawansowanymi.',
+    },
+
     'components/WorkoutTools': {
       select: 'Wybierz treningi',
       done: 'Zakończ wybór',

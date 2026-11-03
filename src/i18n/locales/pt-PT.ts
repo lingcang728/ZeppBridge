@@ -14,6 +14,35 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      title: 'Escolhe como guardar os teus dados de acesso',
+      description:
+        'A autorização foi concluída, mas não foi possível guardar o token. Este permanece na memória durante um máximo de 10 minutos para poderes tentar novamente sem voltar a iniciar sessão. Sair da aplicação ou iniciar uma nova autorização descarta-o.',
+      advancedDescription:
+        'Não foi possível guardar as tuas credenciais de Dados avançados. Estas permanecem na memória durante um máximo de 10 minutos para poderes tentar novamente sem voltar a iniciar sessão ou a introduzir o token. Cancelar, iniciar outra sessão, voltar a enviar credenciais manualmente ou sair da aplicação descarta-as.',
+      advancedFileWarning:
+        'Esta opção guarda o App Token de Dados avançados em texto simples no ficheiro credentials.json, na pasta de dados da aplicação. No Linux e no macOS, o ficheiro usa a permissão 0600. Os programas executados com a tua conta de utilizador podem lê-lo. A aplicação voltará a usar este ficheiro ao reiniciar, a menos que uma definição de arranque selecione explicitamente outro armazenamento.',
+      advancedDiscard: 'Descartar estas credenciais de acesso',
+      advancedExpired: 'Estas credenciais de acesso já não estão disponíveis. Volta a ligar Dados avançados.',
+      systemOption: 'Reparar o armazenamento de credenciais do sistema (recomendado)',
+      fileOption: 'Guardar num ficheiro JSON local',
+      repairLinux:
+        'Abre o gestor de palavras-passe ou de carteiras do sistema. Se não existir um porta-chaves ou uma carteira predefinida, cria um e desbloqueia-o. Em ambientes de trabalho como o Niri, certifica-te de que está em execução um fornecedor de Secret Service, como o KWallet ou o GNOME Keyring. Depois, tenta novamente abaixo.',
+      repairMac:
+        'Abre o Acesso a Porta-chaves, desbloqueia o teu porta-chaves de início de sessão e permite que o ZeppBridge guarde credenciais. Depois, tenta novamente abaixo.',
+      repairWindows:
+        'Verifica se o Gestor de Credenciais do Windows está disponível e se a tua conta o pode utilizar. Depois, tenta novamente abaixo.',
+      retrySystem: 'Já reparei — tentar guardar novamente',
+      fileWarning:
+        'Esta opção guarda os tokens de acesso e de atualização em texto simples no ficheiro credentials.json, na pasta de dados da aplicação. No Linux e no macOS, o ficheiro usa a permissão 0600. Os programas executados com a tua conta de utilizador podem lê-lo. A aplicação voltará a usar este ficheiro ao reiniciar, a menos que uma definição de arranque selecione explicitamente outro armazenamento.',
+      consent: 'Compreendo e aceito guardar os tokens em texto simples neste dispositivo.',
+      saveFile: 'Aceitar e guardar em JSON',
+      discard: 'Descartar esta autorização',
+      expired: 'Esta autorização já não está disponível. Inicia sessão novamente.',
+      savedFile: 'Dados de acesso guardados no ficheiro local credentials.json.',
+      fileUnavailable:
+        'O armazenamento em ficheiro não está disponível nesta plataforma ou foi substituído pela tua configuração de arranque. Repara o armazenamento de credenciais do sistema para continuar.',
+    },
     'components/journal/repair': {
       timelineEmpty: 'Escolhe um dia na cronologia para registar um acontecimento',
       timelineToday: 'Hoje',
