@@ -242,9 +242,10 @@ pub(crate) use official::{
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
-    cancel_sync, get_coverage_ledger, get_workout_detail_coverage, probe_data_capabilities,
-    reset_coverage_ledger, retry_failed_backfill_chunks, start_history_backfill,
-    start_history_sync, start_incremental_sync, start_workout_detail_backfill,
+    background_quick_sync, cancel_sync, get_coverage_ledger, get_workout_detail_coverage,
+    probe_data_capabilities, reset_coverage_ledger, retry_failed_backfill_chunks,
+    start_history_backfill, start_history_sync, start_incremental_sync,
+    start_workout_detail_backfill,
 };
 pub(crate) use system::system_region_locale;
 

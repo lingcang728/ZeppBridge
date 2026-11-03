@@ -477,6 +477,8 @@ export interface BridgeBackend {
   resetCoverageLedger(): Promise<CoverageLedger>;
   retryFailedBackfillChunks(): Promise<CoverageLedger>;
   setTrayLocale(locale: string): Promise<void>;
+  /** 把自动同步的开关和间隔抄给后端：窗口不可见时由后端闹钟接手。 */
+  setAutoSyncPrefs(enabled: boolean, intervalMinutes: number): Promise<void>;
   /** 操作系统的区域格式（如 `pt-PT`），日期顺序与 12/24 小时制跟它走；取不到为 null。 */
   systemRegionLocale(): Promise<string | null>;
   listBackups(): Promise<BackupManifest[]>;

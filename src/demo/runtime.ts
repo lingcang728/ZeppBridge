@@ -119,6 +119,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     'plugin:opener|reveal_item_in_dir': () => null,
     'plugin:drag|start_drag': () => null,
     set_tray_locale: () => null,
+    set_auto_sync_prefs: () => null,
     self_update_supported: () => false,
 
     get_app_status: () => status,

@@ -1,4 +1,5 @@
 mod app_state;
+mod auto_sync;
 mod clipboard_files;
 mod commands;
 mod diagnostics;
@@ -374,6 +375,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(main_window::MainWindowState::default())
         .manage(updates::SilentUpdater::default())
+        .manage(auto_sync::AutoSyncAlarm::default())
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -714,11 +716,13 @@ pub fn run() {
             }
             app.state::<main_window::MainWindowState>().set_ready();
             updates::silent::spawn_periodic_recheck(app.handle().clone());
+            auto_sync::spawn(app.handle().clone());
             diagnostics::log("Startup: application setup complete");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             app_is_ready,
+            auto_sync::set_auto_sync_prefs,
             system_region_locale,
             list_life_events,
             save_life_event,
