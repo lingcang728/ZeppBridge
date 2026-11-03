@@ -109,6 +109,10 @@ const action = computed<Action | null>(() => {
       <div v-if="official.waiting.value" class="s-row">
         <div class="s-row-main"><span class="s-row-sub">{{ a.waitingHint }}</span><button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button></div>
         <div class="s-row-control">
+          <!-- 浏览器没打开授权页（#156）：复制链接自己粘到浏览器里，比「立即检查」要紧。 -->
+          <button v-if="official.browserTrouble.value" class="button primary" type="button" @click="official.copyLink">
+            <Icon :name="official.linkCopied.value ? 'check' : 'link'" :size="14" />{{ official.linkCopied.value ? t.linkCopied : t.copyAuthLink }}
+          </button>
           <button class="button secondary" type="button" :disabled="official.checking.value" @click="official.checkNow">{{ a.checkNow }}</button>
         </div>
       </div>
