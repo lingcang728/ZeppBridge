@@ -57,7 +57,12 @@ const ALLOWED = [
   },
   {
     file: 'services/updateNotice.ts',
-    text: '修复|Fixed|Fix',
+    text: '改进|改進|优化|Improved|Changed',
+    why: 'Release-note category parser: recognized category keywords across simplified and traditional Chinese.',
+  },
+  {
+    file: 'services/updateNotice.ts',
+    text: '修复|修復|Fixed|Fix',
     why: 'Release-note category parser; displayed labels come from UpdateNotice.i18n.ts.',
   },
   {
