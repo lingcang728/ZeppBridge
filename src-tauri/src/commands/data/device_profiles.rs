@@ -43,6 +43,9 @@ pub async fn get_device_profiles(
     }
 
     profiles = enrich_profiles_with_local_data(&state, profiles).await?;
+    let hidden_keys =
+        spawn_independent_read(state.data_dir.clone(), |db| db.hidden_device_keys()).await?;
+    let (hidden_profiles, profiles) = split_hidden_profiles(profiles, &hidden_keys);
     let now = Utc::now();
     let age_seconds = cached_at.map(|value| (now - value).num_seconds().max(0));
     let status = if refreshed {
@@ -63,6 +66,7 @@ pub async fn get_device_profiles(
 
     Ok(DeviceProfilesResult {
         profiles,
+        hidden_profiles,
         cache: DeviceCacheMetadata {
             status: status.to_string(),
             cached_at,
@@ -72,6 +76,37 @@ pub async fn get_device_profiles(
             refresh_error_code,
         },
     })
+}
+
+/// 把藏起来的设备从列表里挑出来，并在它们身上打上 `hidden`。返回（藏起来的，显示的）。
+pub(super) fn split_hidden_profiles(
+    profiles: Vec<DeviceProfile>,
+    hidden_keys: &std::collections::HashSet<String>,
+) -> (Vec<DeviceProfile>, Vec<DeviceProfile>) {
+    let (mut hidden, visible): (Vec<_>, Vec<_>) = profiles.into_iter().partition(|profile| {
+        is_hidden_device(
+            hidden_keys,
+            profile.device_id.as_deref(),
+            profile.serial.as_deref(),
+        )
+    });
+    for profile in &mut hidden {
+        profile.hidden = true;
+    }
+    (hidden, visible)
+}
+
+/// 隐藏或恢复一台设备（只藏列表，数据照旧）。
+#[tauri::command]
+pub async fn set_device_hidden(
+    state: tauri::State<'_, AppState>,
+    device_key: String,
+    hidden: bool,
+) -> std::result::Result<(), AppError> {
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_device_hidden(&device_key, hidden)
+    })
+    .await
 }
 
 pub(crate) async fn refresh_device_profile(state: &AppState) {
@@ -435,6 +470,17 @@ pub(super) async fn enrich_profile_with_local_data(
     };
     profile.has_local_data = has_local_data;
     profile.last_data_at = last_data_at;
+    // 单台档案照常返回（睡眠页、运动详情还要用它的名字和图），只标上藏没藏。
+    if requested_device_id.is_some() {
+        let hidden_keys =
+            spawn_independent_read(state.data_dir.clone(), |db| db.hidden_device_keys()).await?;
+        profile.hidden = is_hidden_device(
+            &hidden_keys,
+            profile.device_id.as_deref(),
+            profile.serial.as_deref(),
+        ) || requested_device_id
+            .is_some_and(|key| is_hidden_device(&hidden_keys, Some(key), None));
+    }
     Ok(profile)
 }
 

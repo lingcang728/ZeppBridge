@@ -223,8 +223,9 @@ pub(crate) use data::{
     get_workout_insight, get_workout_page, get_workout_series, get_workout_type_options,
     import_workout_fit, metric_exclusions, open_data_folder, open_external_url, prepare_ai_handoff,
     remove_workout_fit, reprocess_local_data, run_database_integrity_check, save_fit_export,
-    set_device_model_override, set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs,
-    set_workout_code_label, set_workout_type_override, submit_diagnostic_report,
+    set_device_hidden, set_device_model_override, set_heart_rate_zone_preference,
+    set_metric_excluded, set_user_prefs, set_workout_code_label, set_workout_type_override,
+    submit_diagnostic_report,
 };
 pub(crate) use data_letters::{
     data_letters_open_capsule, data_letters_seal_capsule, data_letters_state,

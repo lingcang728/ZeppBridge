@@ -26,6 +26,7 @@ use crate::models::{
 };
 
 use crate::storage::corrections::WorkoutCodeLabel;
+use crate::storage::device_local_state::is_hidden_device;
 
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
 

@@ -10,7 +10,7 @@ import DiagnosticReportForm from '../DiagnosticReportForm.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSyncController } from '../../../composables/useSyncController';
 import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
-import { deviceStateLabel, useDeviceAssignment, useDevices } from '../../../composables/useDevices';
+import { deviceStateLabel, useDeviceAssignment, useDeviceHiding, useDevices } from '../../../composables/useDevices';
 import { useMessages } from '../../../i18n';
 import { errorTextFor } from '../../../i18n/errors';
 import { backendText } from '../../../i18n/backendText';
@@ -30,6 +30,7 @@ const officialDeviceFallback = computed(() => official.connected.value && appSta
 const canRefreshDevices = computed(() => accountRecognized.value || officialDeviceFallback.value);
 const {
   models: deviceModels,
+  hiddenModels,
   cache: deviceCache,
   loading: devicesLoading,
   error: deviceError,
@@ -53,8 +54,17 @@ const unknownDeviceDetected = computed(() =>
 const officialDevicesPending = computed(() => officialDeviceFallback.value
   && deviceCache.value?.refresh_error_code === 'err.sync.not_connected');
 
-const deviceKeyFor = (model: { profile: { device_id?: string | null; serial?: string | null } }): string =>
-  (model.profile.device_id || model.profile.serial || '').trim();
+/* 隐藏：只藏列表，数据照旧。点「隐藏」先在那一行下面说清这一点，再点一次才藏。 */
+const { hideBusy, hideError, setHidden } = useDeviceHiding();
+const confirmHideKey = ref<string | null>(null);
+const hiddenOpen = ref(false);
+const confirmHide = async (deviceKey: string) => {
+  if (await setHidden(deviceKey, true)) confirmHideKey.value = null;
+};
+const restore = async (deviceKey: string) => {
+  await setHidden(deviceKey, false);
+  if (!hiddenModels.value.length) hiddenOpen.value = false;
+};
 
 const refreshDevices = async () => {
   if (!canRefreshDevices.value) return;
@@ -102,7 +112,8 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
     <FoldTransition><div v-if="deviceRefreshMessage" class="alert success" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div></FoldTransition>
     <FoldTransition><div v-if="canRefreshDevices && !officialDevicesPending && deviceError && !deviceRefreshError" class="alert warning" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div></FoldTransition>
 
-    <div class="s-list">
+    <!-- 全都藏起来了就不再说「没识别到设备」：底下「已隐藏 N 台」就是全部。 -->
+    <div v-if="showSkeleton || deviceModels.length || !hiddenModels.length" class="s-list">
       <template v-if="showSkeleton">
         <div class="s-row skeleton-row"></div>
         <div class="s-row skeleton-row"></div>
@@ -116,13 +127,12 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
         <div v-else class="s-row-main"><span class="s-row-sub">{{ appStatus?.data_source === 'official' ? t.noDevicesOfficial : t.noDevices }}</span></div>
       </div>
       <template v-else>
+        <div v-for="model in deviceModels" :key="model.deviceKey || model.canonicalName" class="device-line">
         <component
-          :is="deviceKeyFor(model) ? RouterLink : 'div'"
-          v-for="model in deviceModels"
-          :key="model.deviceKey || model.canonicalName"
+          :is="model.deviceKey ? RouterLink : 'div'"
           class="s-row device-row"
-          :to="deviceKeyFor(model) ? `/devices/${encodeURIComponent(deviceKeyFor(model))}` : undefined"
-          :aria-label="deviceKeyFor(model) ? `${model.canonicalName} · ${d.deviceOpen}` : undefined"
+          :to="model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : undefined"
+          :aria-label="model.deviceKey ? `${model.canonicalName} · ${d.deviceOpen}` : undefined"
         >
           <span class="device-art">
             <DeviceVisual v-if="model.image" :src="model.image" :alt="model.canonicalName" :kind="model.kind" compact />
@@ -130,14 +140,53 @@ const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.
           </span>
           <div class="s-row-main">
             <span class="s-row-title">{{ model.canonicalName }}</span>
-            <span v-if="deviceKeyFor(model)" class="s-row-sub">{{ a.deviceCheck }}</span>
+            <span v-if="model.deviceKey" class="s-row-sub">{{ a.deviceCheck }}</span>
           </div>
           <div class="s-row-control">
             <span :class="['state-dot', { on: model.state !== 'unknown' }]">{{ deviceStateLabel(model.state) }}</span>
-            <Icon v-if="deviceKeyFor(model)" name="chevron-right" :size="18" class="row-chevron" />
+            <Icon v-if="model.deviceKey" name="chevron-right" :size="18" class="row-chevron" />
           </div>
         </component>
+        <button
+          v-if="model.deviceKey && confirmHideKey !== model.deviceKey"
+          class="hide-btn"
+          type="button"
+          :aria-label="`${a.hideDevice} · ${model.canonicalName}`"
+          @click="confirmHideKey = model.deviceKey"
+        >{{ a.hideDevice }}</button>
+        <FoldTransition>
+        <div v-if="confirmHideKey === model.deviceKey" class="hide-confirm" role="group">
+          <p>{{ a.hideConfirm }}</p>
+          <div class="hide-confirm-actions">
+            <button class="button secondary compact-btn" type="button" :disabled="hideBusy" @click="confirmHideKey = null">{{ a.hideCancel }}</button>
+            <button class="button primary compact-btn" type="button" :disabled="hideBusy" @click="confirmHide(model.deviceKey)">{{ a.hideConfirmYes }}</button>
+          </div>
+        </div>
+        </FoldTransition>
+        </div>
       </template>
+    </div>
+    <p v-if="hideError" class="api-error" role="alert">{{ hideError }}</p>
+
+    <div v-if="hiddenModels.length" class="s-list hidden-list">
+      <button class="s-row hidden-toggle" type="button" :aria-expanded="hiddenOpen" @click="hiddenOpen = !hiddenOpen">
+        <span class="s-row-sub">{{ a.hiddenCount(hiddenModels.length) }}</span>
+        <Icon name="chevron-down" :size="16" :class="['row-chevron', { open: hiddenOpen }]" />
+      </button>
+      <FoldTransition>
+      <div v-if="hiddenOpen" class="hidden-rows">
+        <div v-for="model in hiddenModels" :key="model.deviceKey || model.canonicalName" class="s-row">
+          <span class="device-art small">
+            <DeviceVisual v-if="model.image" :src="model.image" :alt="model.canonicalName" :kind="model.kind" compact />
+            <Icon v-else name="watch" :size="18" />
+          </span>
+          <div class="s-row-main"><span class="s-row-title">{{ model.canonicalName }}</span></div>
+          <div class="s-row-control">
+            <button class="button secondary compact-btn" type="button" :disabled="hideBusy || !model.deviceKey" @click="restore(model.deviceKey)">{{ a.restoreDevice }}</button>
+          </div>
+        </div>
+      </div>
+      </FoldTransition>
     </div>
 
     <div v-if="unknownDeviceDetected && !devicesLoading" class="s-list">
@@ -180,6 +229,24 @@ a.device-row:hover .row-chevron { color: var(--ink); transform: translateX(2px);
 .learn-more > summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: var(--fs-sm); }
 .learn-more[open] > summary { margin-bottom: 6px; color: var(--muted); }
 .row-chevron { color: var(--subtle); transition: transform var(--dur-fast) ease, color var(--dur-fast) ease; }
+.row-chevron.open { transform: rotate(180deg); }
+/* 一台设备一行：整行是链接，「隐藏」是它右边的独立按钮（链接里不能套按钮）。 */
+.device-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.device-line > .device-row { min-width: 0; }
+.hide-btn {
+  margin-right: 12px; padding: 4px 10px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--subtle); font: inherit; font-size: var(--fs-xs); cursor: pointer;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.hide-btn:hover, .hide-btn:focus-visible { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.hide-confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 16px 14px; }
+.hide-confirm p { flex: 1 1 16em; margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.hide-confirm-actions { display: flex; gap: 8px; }
+.hidden-list { margin-top: 10px; }
+.hidden-toggle .row-chevron { margin-left: auto; }
+.hidden-toggle { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.device-art.small { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; }
+.device-art.small :deep(.device-visual) { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; }
 .empty-icon { color: var(--subtle); }
 .skeleton-row { min-height: 72px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 5%, transparent), transparent); background-size: 200% 100%; animation: device-shimmer 1.4s ease-in-out infinite; }
 @keyframes device-shimmer { from { background-position: 0 0; } to { background-position: -200% 0; } }

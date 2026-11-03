@@ -1483,6 +1483,21 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(46, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v47（3.1.1：隐藏设备）。用户在设备列表里藏起来的设备，按设备 key（device_id 或
+        // 序列号，大小写不敏感，和 device_model_overrides 同一套）记一行。只藏列表：
+        // 样本、图表、导出都不看这张表。没有外键，设备从账号里消失了这行也留着无害。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS device_local_state (
+                device_key TEXT PRIMARY KEY,
+                hidden INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+             );
+             PRAGMA user_version = 47;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(47, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

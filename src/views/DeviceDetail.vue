@@ -18,7 +18,7 @@ import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import FoldTransition from '../components/FoldTransition.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
+import { deviceStateLabel, useDeviceAssignment, useDeviceHiding, useDevices } from '../composables/useDevices';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -50,6 +50,12 @@ const messages = defineMessages(
     originNoMatchCloud: '没有匹配到（云端没有给出可识别的产品名）',
     originCatalog: '内置设备目录匹配',
     originNoMatch: '没有匹配到',
+    hideAria: '在设备列表里隐藏',
+    hideTitle: '不想在列表里看到它？',
+    hideSub: '只从设备列表里藏起来，它记下的数据还在，图表和导出照旧。',
+    hideAction: '从设备列表里隐藏',
+    hiddenNote: '这台设备已从列表里隐藏，数据照旧。',
+    unhideAction: '放回设备列表',
   },
   {
     heroEyebrow: 'Device',
@@ -79,6 +85,12 @@ const messages = defineMessages(
     originNoMatchCloud: 'No match (the cloud gave no recognizable product name)',
     originCatalog: 'Matched in the built-in catalog',
     originNoMatch: 'No match',
+    hideAria: 'Hide from the device list',
+    hideTitle: 'Rather not see it in the list?',
+    hideSub: 'Only hides it from the device list — its data stays, and charts and exports are unchanged.',
+    hideAction: 'Hide from the device list',
+    hiddenNote: 'Hidden from the device list; its data is unchanged.',
+    unhideAction: 'Show in the device list again',
   },
   {
     heroEyebrow: 'Dispositivo',
@@ -108,6 +120,12 @@ const messages = defineMessages(
     originNoMatchCloud: 'Sin coincidencia (la nube no dio un nombre de producto reconocible)',
     originCatalog: 'Coincide con el catálogo integrado',
     originNoMatch: 'Sin coincidencia',
+    hideAria: 'Ocultar de la lista de dispositivos',
+    hideTitle: '¿Prefieres no verlo en la lista?',
+    hideSub: 'Solo lo quita de la lista de dispositivos: sus datos se quedan y los gráficos y exportaciones no cambian.',
+    hideAction: 'Ocultar de la lista de dispositivos',
+    hiddenNote: 'Oculto de la lista de dispositivos; sus datos no cambian.',
+    unhideAction: 'Volver a mostrar en la lista',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'views/DeviceDetail',
@@ -115,11 +133,14 @@ const messages = defineMessages(
 const t = useMessages(messages);
 
 const route = useRoute();
-const { models, loading, initialized, error, load, maskIdentifier } = useDevices();
+const { models, hiddenModels, loading, initialized, error, load, maskIdentifier } = useDevices();
+const { hideBusy, hideError, setHidden } = useDeviceHiding();
 const { assignBusy, assignError, assignMessage, assignModel, clearAssignFeedback } = useDeviceAssignment();
 
 const deviceKey = computed(() => String(route.params.deviceKey || '').trim());
-const model = computed(() => models.value.find((entry) => entry.deviceKey === deviceKey.value) ?? null);
+// 藏起来的设备也能打开：「放回设备列表」就在这一页。
+const model = computed(() => [...models.value, ...hiddenModels.value]
+  .find((entry) => entry.deviceKey === deviceKey.value) ?? null);
 
 const pickerOpen = ref(false);
 
@@ -232,6 +253,23 @@ onMounted(() => {
         />
         </FoldTransition>
       </section>
+
+      <section v-if="model.deviceKey" class="surface-card hide-card" :aria-label="t.hideAria">
+        <template v-if="model.hidden">
+          <p class="assign-sub">{{ t.hiddenNote }}</p>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" :disabled="hideBusy" @click="setHidden(model.deviceKey, false)">{{ t.unhideAction }}</button>
+          </div>
+        </template>
+        <template v-else>
+          <h2>{{ t.hideTitle }}</h2>
+          <p class="assign-sub">{{ t.hideSub }}</p>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" :disabled="hideBusy" @click="setHidden(model.deviceKey, true)">{{ t.hideAction }}</button>
+          </div>
+        </template>
+        <p v-if="hideError" class="api-error" role="alert">{{ hideError }}</p>
+      </section>
     </template>
   </section>
 </template>
@@ -254,14 +292,14 @@ onMounted(() => {
 .hero-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
 .hero-state.on i { background: #7da33e; }
 
-.facts-card, .assign-card { padding: 18px 20px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.facts-card, .assign-card, .hide-card { padding: 18px 20px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .facts-card dl { display: grid; gap: 10px; margin: 0; }
 .facts-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .facts-card dt { color: var(--muted); font-size: var(--fs-sm); }
 .facts-card dd { margin: 0; color: var(--ink); font-size: var(--fs-md); text-align: right; }
 .facts-note { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
 
-.assign-card h2 { margin: 0 0 6px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+.assign-card h2, .hide-card h2 { margin: 0 0 6px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .assign-sub { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.65; }
 .inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .hint-line { margin: 10px 0 0; color: var(--muted); font-size: var(--fs-sm); }

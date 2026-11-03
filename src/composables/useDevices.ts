@@ -53,9 +53,12 @@ export interface DeviceCardModel {
    *  又是「你指认的型号」，早先只报前者，于是用户再也找不到改型号的入口。 */
   userAssigned: boolean;
   matchStatus: string;
+  /** 用户把它从列表里藏起来了。 */
+  hidden: boolean;
 }
 
 const profiles = ref<DeviceProfile[]>([]);
+const hiddenProfiles = ref<DeviceProfile[]>([]);
 const cache = ref<DeviceCacheMetadata | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -104,6 +107,7 @@ const normalizeResult = (result: DeviceProfilesResult | DeviceProfile[]): Device
   }
   return {
     profiles: Array.isArray(result?.profiles) ? result.profiles : [],
+    hidden_profiles: Array.isArray(result?.hidden_profiles) ? result.hidden_profiles : [],
     cache: result?.cache ?? { status: 'missing', refreshed: false },
   };
 };
@@ -131,6 +135,7 @@ const refreshErrorText = (meta: DeviceCacheMetadata): string | null => {
 
 const applyResult = (result: DeviceProfilesResult): void => {
   profiles.value = result.profiles;
+  hiddenProfiles.value = result.hidden_profiles ?? [];
   cache.value = result.cache;
   error.value = refreshErrorText(result.cache);
 };
@@ -250,7 +255,7 @@ const reloadAfterLocalWrite = async (opts?: { quiet?: boolean }): Promise<void> 
   }
 };
 
-const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) => ({
+const toModel = (profile: DeviceProfile): DeviceCardModel => ({
   profile,
   canonicalName: profile.canonical_name?.trim() || profile.name?.trim()
     || (isGenericScale(profile) ? copy().genericScale : copy().unidentifiedDevice),
@@ -264,7 +269,11 @@ const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) =>
   deviceKey: (profile.device_id || profile.serial || '').trim(),
   userAssigned: profile.match_status === 'user_assigned',
   matchStatus: profile.match_status || 'unknown',
-})));
+  hidden: profile.hidden === true,
+});
+
+const models = computed<DeviceCardModel[]>(() => profiles.value.map(toModel));
+const hiddenModels = computed<DeviceCardModel[]>(() => hiddenProfiles.value.map(toModel));
 
 const maskIdentifier = (value?: string | null): string => {
   const trimmed = value?.trim();
@@ -306,6 +315,32 @@ const assignModel = async (deviceKey: string, catalogId: string): Promise<void> 
   }
 };
 
+/* 隐藏设备：只藏列表，数据照旧。设置页的行和设备二级页共用这一份 busy/error。 */
+const hideBusy = ref(false);
+const hideError = ref<string | null>(null);
+
+const setHidden = async (deviceKey: string, hidden: boolean): Promise<boolean> => {
+  if (!deviceKey) {
+    hideError.value = copy().noLocalIdentifier;
+    return false;
+  }
+  hideBusy.value = true;
+  hideError.value = null;
+  try {
+    await backend.setDeviceHidden(deviceKey, hidden);
+    forgetReads(...DEVICE_READ_PREFIXES);
+    await reloadAfterLocalWrite({ quiet: true });
+    return true;
+  } catch (cause) {
+    hideError.value = toUserMessage(cause, copy().hideFailed);
+    return false;
+  } finally {
+    hideBusy.value = false;
+  }
+};
+
+export const useDeviceHiding = () => ({ hideBusy, hideError, setHidden });
+
 const clearAssignFeedback = () => {
   assignError.value = null;
   assignMessage.value = null;
@@ -322,6 +357,8 @@ export const useDeviceAssignment = () => ({
 export const useDevices = () => ({
   profiles,
   models,
+  /** 藏起来的设备。设备二级页也要能打开它们（恢复入口在那里）。 */
+  hiddenModels,
   cache,
   loading,
   error,

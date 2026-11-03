@@ -70,6 +70,12 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
     ai_exchange_delete: a => { const i = exchanges.findIndex(x => x.id === a.id); if (i < 0) return false; exchanges.splice(i, 1); return true; },
     get_device_profile: () => devices.profiles[0], get_device_profiles: () => devices,
     set_device_model_override: a => { devices.profiles[0].catalog_id = String(a.catalogId ?? 'amazfit-balance-2'); },
+    set_device_hidden: a => {
+      const key = String(a.deviceKey ?? '').toLowerCase();
+      const [from, to] = a.hidden ? [devices.profiles, devices.hidden_profiles] : [devices.hidden_profiles, devices.profiles];
+      const i = from.findIndex(p => (p.device_id || p.serial || '').toLowerCase() === key);
+      if (i >= 0) to.push({ ...from.splice(i, 1)[0], hidden: !!a.hidden });
+    },
     get_local_api_status: () => ({ ...localApi }),
     get_mcp_sidecar: () => ({ path: 'C:\\Demo\\ZeppBridge\\zeppbridge-mcp.exe', data_dir_env: null }),
     save_mcp_bundle: () => 'Demo/ZeppBridge.mcpb',

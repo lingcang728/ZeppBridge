@@ -19,6 +19,7 @@ export const devicesMessages = defineMessages(
     assignmentCleared: '已撤销型号指认，恢复自动识别结果。',
     assignmentSaved: '已记录型号指认。界面会标成「你指认的型号」，不当作自动识别结果。',
     assignmentFailed: '无法保存型号指认',
+    hideFailed: '没能隐藏或恢复这台设备',
   },
   {
     stateAccount: 'Known from account',
@@ -37,6 +38,7 @@ export const devicesMessages = defineMessages(
     assignmentCleared: 'Pick withdrawn. Back to the automatic match.',
     assignmentSaved: 'Pick saved. Shown as "Model you picked" — never passed off as an automatic match.',
     assignmentFailed: 'Could not save the model pick',
+    hideFailed: 'Could not hide or restore this device',
   },
   {
     stateAccount: 'Conocido por la cuenta',
@@ -55,6 +57,7 @@ export const devicesMessages = defineMessages(
     assignmentCleared: 'Elección retirada; se volvió a la coincidencia automática.',
     assignmentSaved: 'Elección de modelo guardada. Se marca como «Modelo que elegiste», no como coincidencia automática.',
     assignmentFailed: 'No se pudo guardar el modelo elegido',
+    hideFailed: 'No se pudo ocultar ni restaurar este dispositivo',
   },
   'composables/useDevices',
 );

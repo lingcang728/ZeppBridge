@@ -395,6 +395,7 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                 match_status: DeviceMatchStatus::Unknown,
                 has_local_data: false,
                 last_data_at: None,
+                hidden: false,
                 firmware: first_string(
                     &extra,
                     &[
