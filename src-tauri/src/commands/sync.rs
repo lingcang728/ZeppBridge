@@ -84,6 +84,22 @@ pub async fn start_incremental_sync(
     run_sync(&app, &state, window, !skip_probe.unwrap_or(false)).await
 }
 
+/// 后端闹钟发起的定时同步（`auto_sync.rs`，窗口不可见时）：和前端带 `quick` 调
+/// `start_incremental_sync` 是同一条路，同样先探云端、同样发进度事件。
+pub(crate) async fn background_quick_sync(
+    app: &AppHandle,
+    state: &AppState,
+) -> std::result::Result<UiSyncReport, AppError> {
+    if state.auth_state.read().await.as_str() != "verified" && !official_connected(&state.data_dir)
+    {
+        return Err(AppError::new(
+            "err.sync.not_verified",
+            "请先完成连接验证，再同步最近数据",
+        ));
+    }
+    run_sync(app, state, SyncWindow::Quick, true).await
+}
+
 /// 一次同步往回拉多远。
 enum SyncWindow {
     /// 常规整窗（`INCREMENTAL_SYNC_DAYS`）。

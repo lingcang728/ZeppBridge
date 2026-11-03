@@ -31,6 +31,31 @@ export const writeAutoSyncSettings = (settings: AutoSyncSettings): AutoSyncSetti
 };
 
 /**
+ * 自动同步失败之后多久再试：1 / 2 / 4 / 8 分钟，封顶到间隔；没失败就是整个间隔。
+ *
+ * 以前失败一次就要再等满一个间隔：Mac 从息屏唤醒的那一瞬间网络还没通，那一趟必然
+ * 失败，于是又白等一刻钟（10-28 反馈）。后端闹钟（`src-tauri/src/auto_sync.rs` 的
+ * `retry_minutes`）用同一条规则。
+ */
+export const autoSyncRetryMinutes = (failures: number, intervalMinutes: number): number => {
+  const interval = normalizeInterval(intervalMinutes);
+  if (!(failures > 0)) return interval;
+  return Math.min(2 ** Math.min(Math.floor(failures) - 1, 3), interval);
+};
+
+/** 离上一次尝试过去的时间够不够退避。`lastAttemptAt` 为 0 表示本次会话还没试过。 */
+export const autoSyncBackoffElapsed = (
+  lastAttemptAt: number,
+  failures: number,
+  intervalMinutes: number,
+  now: number = Date.now(),
+): boolean => !lastAttemptAt || now - lastAttemptAt >= autoSyncRetryMinutes(failures, intervalMinutes) * 60_000;
+
+/** 一趟自动同步之后的连续失败次数：失败加一，其它结果（成功、没新数据、让路、取消）清零。 */
+export const nextAutoSyncFailures = (previous: number, outcome: string | null | undefined): number =>
+  outcome === 'failed' ? previous + 1 : 0;
+
+/**
  * 启动时该不该立刻同步一次。
  *
  * `useSyncController.initialize()` 的最后一行以前是无条件的：只要自动同步开着、

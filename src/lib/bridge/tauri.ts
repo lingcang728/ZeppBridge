@@ -451,6 +451,9 @@ export const tauriBackend: BridgeBackend = {
   setTrayLocale(locale: string) {
     return call<void>('set_tray_locale', { locale });
   },
+  setAutoSyncPrefs(enabled: boolean, intervalMinutes: number) {
+    return call<void>('set_auto_sync_prefs', { enabled, intervalMinutes });
+  },
   systemRegionLocale() {
     return call<string | null>('system_region_locale');
   },

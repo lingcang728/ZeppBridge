@@ -4,8 +4,8 @@
  * 这里负责事件监听、自动同步定时器和对外的只读视图。 */
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
-import { launchSyncIsDue, writeAutoSyncSettings } from '../lib/autoSync';
-import type { LoginStatus, OfficialStatus, SyncProgress } from '../types';
+import { autoSyncBackoffElapsed, launchSyncIsDue, nextAutoSyncFailures, writeAutoSyncSettings } from '../lib/autoSync';
+import type { LoginStatus, OfficialStatus, SyncProgress, SyncReport } from '../types';
 import { readyOnPickUp } from '../lib/dataReady';
 import { formatClock, formatTime, lastOutcomeLabel, statusErrorText, syncMessage } from './sync/notice';
 import {
@@ -32,21 +32,37 @@ const unlisteners: Array<() => void> = [];
 let autoSyncTimer: number | null = null;
 let removeWakeListeners: (() => void) | null = null;
 
+/** 自动同步连续失败了几次（只数自动发起的）。决定下一次多久后再试。 */
+let autoSyncFailures = 0;
+
 /**
  * 自动同步到没到点：看上一次成功同步和上一次尝试，不数定时器跳了几下。
  *
  * 以前是每分钟 +1、数满间隔就跑：手动同步完一分钟可能又来一趟；电脑睡一夜
  * 醒来，计数器还停在睡前，数据最多再旧一整个间隔。现在每一跳、以及窗口重新
  * 可见 / 拿到焦点时都按时间判断。「上一次尝试」那道门挡的是离线：失败不会写
- * last_cloud_sync_at，只看它的话离线时会每分钟撞一次。
+ * last_cloud_sync_at，只看它的话离线时会每分钟撞一次。失败后按 1 / 2 / 4 / 8 分钟
+ * 退避（`autoSyncRetryMinutes`），不再白等一整个间隔——唤醒那一瞬间网络常常还没通。
+ *
+ * 窗口不可见时 WebView 的定时器会被节流，那段时间由后端闹钟接手（`auto_sync.rs`）。
  */
 const maybeAutoSync = () => {
   if (!autoSyncEnabled.value || appStatus.value?.connection_state !== 'connected' || isRunningSync()) return;
-  const intervalMs = autoSyncInterval.value * 60_000;
-  if (lastSyncAttemptAt() && Date.now() - lastSyncAttemptAt() < intervalMs) return;
+  if (!autoSyncBackoffElapsed(lastSyncAttemptAt(), autoSyncFailures, autoSyncInterval.value)) return;
   if (!launchSyncIsDue(appStatus.value?.last_cloud_sync_at, autoSyncInterval.value)) return;
   // 定时同步只拉最近几天；每天第一次（或上次整窗有流失败）后端照旧整窗。
-  void runSync('incremental', undefined, { silent: true, quick: true });
+  void runSync('incremental', undefined, { silent: true, quick: true }).then((report) => {
+    // 命令抛错时 report 是 null，结果看 syncState（让路也是 null，但不算失败）。
+    autoSyncFailures = nextAutoSyncFailures(autoSyncFailures, report?.outcome ?? (syncState.value === 'failed' ? 'failed' : null));
+  });
+};
+
+/** 把开关和间隔抄给后端闹钟。网页预览里没有后端，失败也不影响前端自己的定时器。 */
+const shareAutoSyncPrefs = () => {
+  if (!isDesktop()) return;
+  void Promise.resolve()
+    .then(() => backend.setAutoSyncPrefs(autoSyncEnabled.value, autoSyncInterval.value))
+    .catch(() => undefined);
 };
 let initializeEpoch = 0;
 let compactionSavedTimer = 0;
@@ -58,11 +74,13 @@ const LAUNCH_SYNC_DELAY_MS = 4_000;
 const setAutoSyncEnabled = (enabled: boolean) => {
   autoSyncEnabled.value = Boolean(enabled);
   writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: autoSyncInterval.value });
+  shareAutoSyncPrefs();
 };
 
 const setAutoSyncInterval = (minutes: number) => {
   autoSyncInterval.value = minutes;
   writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: minutes });
+  shareAutoSyncPrefs();
 };
 
 /**
@@ -153,6 +171,11 @@ const initialize = async () => {
         retryDeferredNow();
       }),
       safeListen<OfficialStatus>('official://status', applyOfficialStatus),
+      // 窗口不可见时后端闹钟跑了一趟：这边没发起它，得自己重读状态、让各页重查。
+      safeListen<SyncReport>('sync://background-finished', (report) => {
+        void refreshStatus({ preserveError: true });
+        if (report?.content_changed ?? (report?.total_records ?? 0) > 0) dataRevision.value += 1;
+      }),
       safeListen<number>('compaction://started', (pending) => {
         compactionPending.value = typeof pending === 'number' ? pending : 0;
         compactingEvent.value = true;
@@ -176,6 +199,7 @@ const initialize = async () => {
     if (initialLogin) applyLoginStatus(initialLogin);
     if (!stillMine()) return;
     autoSyncTimer = window.setInterval(maybeAutoSync, 60_000);
+    shareAutoSyncPrefs();
     const onWake = () => {
       if (document.visibilityState === 'visible') maybeAutoSync();
     };
