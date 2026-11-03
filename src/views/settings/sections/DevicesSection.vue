@@ -2,6 +2,7 @@
 /* 设备：一台设备一行——设备图｜名称｜识别状态｜箭头。整行点进设备二级页
    （固件、最近数据、编号和换型号都在那里）。 */
 import { computed, ref } from 'vue';
+import { useSectionTour } from '../../../composables/useTour';
 import { RouterLink } from 'vue-router';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
@@ -97,10 +98,12 @@ const refreshDevices = async () => {
 /* 列表由设置页进来时拉一次（Settings.vue），这里不再挂载时重拉：以前大卡打开到一半这里又发一次，
    列表先变回骨架、数据回来卡再长高，形变的终点跟着跳。已有列表时刷新也不退回骨架。 */
 const showSkeleton = computed(() => devicesLoading.value && !deviceModels.value.length);
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('devices');
 </script>
 
 <template>
-  <section class="s-section" aria-labelledby="devices-title">
+  <section class="s-section" aria-labelledby="devices-title" data-tour="devices">
     <div class="s-section-head">
       <h3 id="devices-title">{{ d.secDevices }}</h3>
       <button v-if="canRefreshDevices" class="button secondary compact-btn" type="button" :disabled="deviceRefreshBusy" @click="refreshDevices">

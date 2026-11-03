@@ -431,6 +431,7 @@ onBeforeUnmount(() => {
       <article
         ref="cardEl"
         :class="['deck-card', 'open-card', { 'is-narrow': stageCard.narrow }]"
+        :data-deck-open="stageCard.id"
         :style="{ '--card-tone': stageCard.tone }"
         :aria-roledescription="t.goTo(shownIndex + 1, cards.length)"
         @pointermove="onPointerMove"

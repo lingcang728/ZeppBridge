@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
 import { onMounted } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
 import { afterMotion } from '../lib/motion/budget';
@@ -76,6 +77,8 @@ const initialLoading = useFirstLoad(loading);
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
 useRevisionReload(() => void loadList());
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('sleep');
 </script>
 
 <template>

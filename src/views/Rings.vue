@@ -9,6 +9,7 @@
  * 存到图片文件夹，原始数据不离开这台电脑。12 月 15 日起默认看今年，之前默认看去年。
  */
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import TreeRings from '../components/rings/TreeRings.vue';
@@ -115,6 +116,8 @@ const reveal = async () => {
   const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
   await revealItemInDir(savedPath.value).catch(() => undefined);
 };
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('journal');
 </script>
 
 <template>

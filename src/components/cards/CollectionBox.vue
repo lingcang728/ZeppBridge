@@ -17,7 +17,6 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../Icon.vue';
-import { offerInlineSoon } from '../../composables/useTour';
 import { useCardsText } from './cards.i18n';
 import { useCardCollection } from '../../composables/useCardCollection';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
@@ -37,8 +36,6 @@ const box = useCardCollection();
 const ctl = useAiTaskDraft();
 const router = useRouter();
 const open = ref(false);
-/* 第一次铺开收集箱：就地说一句怎么拿牌、怎么开任务（新手引导的就地一章，取代以前的 CoachTip）。 */
-watch(open, (value) => { if (value) offerInlineSoon('box', 800, () => open.value); });
 /** 想要的状态：展开（或正在展开）。中途再点箱子 / Esc 就是朝反方向从此刻起放。 */
 const showing = ref(false);
 const chromeIn = ref(false);

@@ -84,6 +84,11 @@ export function restoreUpdateNotice(currentVersion: string): void {
   } catch { /* Missing or damaged storage must not interrupt launch. */ }
 }
 
+/** 启动前 prepareUpdateNotice 存下了一份更新说明、还没被「知道了」：引导要等它（TourLayer）。 */
+export function pendingUpdateNotice(): boolean {
+  try { return window.localStorage.getItem(KEY) !== null; } catch { return false; }
+}
+
 export function acknowledgeUpdate(): void {
   try { window.localStorage.removeItem(KEY); } catch { /* Close for this session. */ }
   updateNotice.receipt = null;

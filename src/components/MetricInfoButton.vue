@@ -57,6 +57,7 @@ const titleId = computed(() => `metric-info-${props.metric}`);
     ref="button"
     type="button"
     class="metric-info"
+    data-tour="metric-info"
     :data-flag="flag ?? undefined"
     :title="buttonLabel"
     :aria-label="buttonLabel"

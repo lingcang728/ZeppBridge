@@ -2,6 +2,7 @@
 /* 按天趋势的范围开关（U11）：四个详情页同一个位置、同一句标签、同一个全局记忆的范围。
  * 标签后面写出实际日期（「9月1日 – 9月30日」），不读说明也知道它管的是下面这些按天的图。 */
 import { computed } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import SegmentTrack from './SegmentTrack.vue';
 import { useTrendRange } from '../composables/useTrendRange';
 import { seriesRanges, windowStartDate, type SeriesRangeDays } from '../lib/metricSeries';
@@ -35,6 +36,8 @@ const span = computed(() => {
   const to = format.format(parseDisplayDate(windowStartDate(1)));
   return `${from} – ${to}`;
 });
+/* 新手引导「指标与挑日子」一章：四个指标页共用这条时间范围条，挂在这里一处就够。 */
+useSectionTour('metric');
 </script>
 
 <template>

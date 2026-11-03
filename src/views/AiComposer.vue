@@ -12,6 +12,7 @@
  * 原来的柱状条带、底栏、「你的过去」二级页都没有了。
  */
 import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useRoute } from 'vue-router';
 import '../styles/ai-task.css';
 import Icon from '../components/Icon.vue';
@@ -292,6 +293,8 @@ onMounted(() => document.addEventListener('visibilitychange', onVisibility));
 onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility));
 onActivated(() => { paused.value = document.hidden; measure(); });
 onDeactivated(() => { paused.value = true; });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('ai');
 </script>
 
 <template>
