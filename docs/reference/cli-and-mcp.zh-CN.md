@@ -123,6 +123,23 @@ zeppbridge-cli fit-override --list --json                              # 这台�
 
 顶替只存在这台电脑的库里：Zepp 没有导入运动的接口，云端和手表上的那份不会变。之后的同步、`reprocess` 和解析器重放都不会冲掉它，快照也会带上它。运动编号来自 Zepp，几台电脑上是同一个，所以有几份库就在每台上跑同一条命令。文件起点要和那次运动相差 5 分钟以内（否则 `errorKind: "fit_start_mismatch"`），运动得已经在库里（否则 `workout_not_found`），两者都以 1 退出。撤销一条没被顶替过的运动照样成功，返回 `"removed": false`。
 
+### 跑鞋和比赛
+
+桌面端「履历」页里的跑鞋和比赛，脚本也能管：
+
+```bash
+zeppbridge-cli shoes list --json                   # 跑鞋、里程和磨损，外加还没添加的 Zepp 鞋编号
+zeppbridge-cli shoes save --file shoe.json --json  # 新增；JSON 里带 "id" 就是修改，返回编号
+zeppbridge-cli shoes delete --id 3 --json
+zeppbridge-cli races list --json
+cat race.json | zeppbridge-cli races save --file - --json
+zeppbridge-cli races delete --id 2 --json
+```
+
+`save` 收一个 JSON 对象，字段和桌面端的表单一样。跑鞋必填 `name`、`sport`（`running` / `trail` / `walking` / `hiking`）、`retire_km`（100–5000）和 `started_on`（`YYYY-MM-DD`），`is_default`、`zepp_gear_id`、`start_km`、`retired_on`、`notes` 可选。比赛必填 `name`、`race_date`、`sport`（`running` / `trail` / `cycling` / `swimming` / `triathlon` / `other`）和 `priority`（`a` / `b` / `c`），`distance_m`、`goal_seconds`、`result_seconds`、`workout_id`、`notes` 可选。开关叫 `--file` 而不是 `--json`：`--json` 在所有命令里都是「输出成 JSON」。文件格式不对在开库之前就按用法错误（2）退出；库拒收的值（名字为空、不认识的运动）也是 2。删一个不存在的编号以 1 退出，`errorKind: "not_found"`。写入要拿跨进程写锁，同步正在跑时会等，等不到就报 `4`。
+
+AI 通过 MCP 的 `get_athlete_profile`（`journal`）读得到这些，但改不了：MCP 没有写跑鞋和比赛的工具。
+
 ### 退出码
 
 退出码是对调度脚本的契约，只会新增，不会改变含义。

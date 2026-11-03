@@ -1,4 +1,4 @@
-//! 十五个只读工具和两个训练计划写工具的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
+//! 十六个只读工具和三个写工具（训练计划起草、发布，教练档案提议）的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
 //! 由 `the_documented_tools_are_exactly_the_registered_ones` 守着。
 
 use super::*;

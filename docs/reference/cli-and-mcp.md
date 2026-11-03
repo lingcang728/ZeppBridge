@@ -192,6 +192,36 @@ minutes of the workout (`errorKind: "fit_start_mismatch"` otherwise) and the
 workout must already be in the library (`workout_not_found`); both exit with 1.
 Undoing something that was never replaced succeeds with `"removed": false`.
 
+### Shoes and races
+
+The running shoes and races on the desktop **Journal** page can be managed from a
+script too:
+
+```bash
+zeppbridge-cli shoes list --json                 # shoes with distance and wear, plus Zepp gear IDs not added yet
+zeppbridge-cli shoes save --file shoe.json --json  # add, or update when the JSON has "id"; prints the id
+zeppbridge-cli shoes delete --id 3 --json
+zeppbridge-cli races list --json
+cat race.json | zeppbridge-cli races save --file - --json
+zeppbridge-cli races delete --id 2 --json
+```
+
+`save` takes one JSON object with the same fields as the desktop form. A shoe
+needs `name`, `sport` (`running` / `trail` / `walking` / `hiking`), `retire_km`
+(100–5000) and `started_on` (`YYYY-MM-DD`); `is_default`, `zepp_gear_id`,
+`start_km`, `retired_on` and `notes` are optional. A race needs `name`,
+`race_date`, `sport` (`running` / `trail` / `cycling` / `swimming` / `triathlon`
+/ `other`) and `priority` (`a` / `b` / `c`); `distance_m`, `goal_seconds`,
+`result_seconds`, `workout_id` and `notes` are optional. The option is `--file`,
+not `--json`, because `--json` means "machine-readable output" on every command.
+A malformed file is a usage error (2) before the library is opened; values the
+library rejects (an empty name, an unknown sport) are also 2. Deleting an id
+that does not exist exits 1 with `errorKind: "not_found"`. Writes take the
+cross-process write lock, so they wait for (or report `4` against) a running sync.
+
+AI tools read these through MCP `get_athlete_profile` (`journal`) but cannot
+change them; there is no MCP tool that writes shoes or races.
+
 ### Exit codes
 
 Exit codes are a contract for scheduling scripts. New ones may be added; the

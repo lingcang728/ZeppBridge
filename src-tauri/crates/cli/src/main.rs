@@ -40,6 +40,7 @@ mod args;
 mod cmd_details;
 mod cmd_export;
 mod cmd_fit;
+mod cmd_logbook;
 mod cmd_probe;
 mod cmd_reprocess;
 mod cmd_status;
@@ -123,6 +124,8 @@ Commands:
   hide                Hide local workouts: --workout ID (repeatable); --list lists hidden workouts
   restore             Restore hidden workouts: --workout ID (repeatable)
                        Each edit returns an ID; --undo EDIT_ID reverses the whole edit
+  shoes               Running shoes: list | save --file <path|-> | delete --id N
+  races               Races: list | save --file <path|-> | delete --id N
   contract            Print the read contract (units, time zone, source, missing values)
   version             Print the version
   help                Print this help
@@ -175,6 +178,21 @@ fit-override options (exactly one form):
   workout). It survives later syncs, reprocess and parser replays. Workout IDs
   come from Zepp and are the same on every machine, so the same command can be
   scripted on each one.
+
+shoes / races options:
+  list                      Shoes with distance and wear, plus Zepp gear IDs not added yet;
+                            or every race with its matched workout
+  save --file <path|->      Add or update one entry from a JSON object (\"-\" reads stdin).
+                            Shoe: name, sport (running|trail|walking|hiking), retire_km,
+                            started_on (YYYY-MM-DD); optional id, is_default, zepp_gear_id,
+                            start_km, retired_on, notes.
+                            Race: name, race_date, sport (running|trail|cycling|swimming|
+                            triathlon|other), priority (a|b|c); optional id, distance_m,
+                            goal_seconds, result_seconds, workout_id, notes.
+                            Include \"id\" to update an existing entry; prints the id.
+  delete --id <N>           Delete one entry; exits 1 (not_found) if there is no such id
+  These are the same records as the desktop Journal page. AI tools read them through
+  MCP get_athlete_profile but cannot change them.
 
 Common options:
   --json                    Machine-readable output on stdout, human notes on stderr
@@ -232,6 +250,7 @@ fn run(args: &[String]) -> u8 {
         "export" => cmd_export(rest),
         "fit-override" => cmd_fit_override(rest),
         "set-type" | "hide" | "restore" => cmd_workout_edit::cmd_workout_edit(command, rest),
+        "shoes" | "races" => cmd_logbook::cmd_logbook(command, rest),
         other => {
             eprintln!("Unknown command: {other}\n");
             eprint!("{HELP}");

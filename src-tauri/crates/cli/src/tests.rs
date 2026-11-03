@@ -246,7 +246,15 @@ fn sync_accepts_the_escape_hatch_that_skips_the_replay() {
 fn the_help_text_names_every_command_that_can_be_run() {
     // 帮助漏掉一条命令，等于那条命令不存在——无交互的程序没有别的
     // 地方能让人发现它。
-    for command in ["status", "sync", "reprocess", "export", "contract"] {
+    for command in [
+        "status",
+        "sync",
+        "reprocess",
+        "export",
+        "contract",
+        "shoes",
+        "races",
+    ] {
         assert!(HELP.contains(command), "帮助里没有 {command}");
     }
 }
