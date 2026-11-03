@@ -797,6 +797,9 @@ jobs:
             chmod +x appimagetool
             appimagetool=./appimagetool
           fi
+          # --appimage-extract 解出来的目录是 0700，滚动版 appimagetool（2026-11-01 起）
+          # 把「别的用户读不了」当成错误、拒绝打包。装好后是别的用户在跑，本来就该放开。
+          chmod -R a+rX squashfs-root
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" squashfs-root "$image.new"
           mv "$image.new" "$image"
           rm -rf squashfs-root appimagetool

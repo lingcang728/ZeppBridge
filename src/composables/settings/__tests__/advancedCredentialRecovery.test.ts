@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   runSync: vi.fn(async () => {}),
   loadDevices: vi.fn(async () => {}),
 }));
-vi.mock('../../../lib/bridge', () => ({ backend: mocks, toUserMessage: () => 'Store unavailable' }));
+vi.mock('../../../lib/bridge', () => ({ backend: mocks, toUserMessage: () => 'Store unavailable', errorCode: () => undefined }));
 vi.mock('../../useDevices', () => ({ deviceStateLabel: () => '', useDevices: () => ({ load: mocks.loadDevices }) }));
 vi.mock('../../useSyncController', async () => {
   const { ref } = await import('vue');

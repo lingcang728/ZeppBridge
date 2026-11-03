@@ -241,8 +241,7 @@ pub(crate) use login::{
 pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
-    recover_official_credentials,
-    start_official_login,
+    recover_official_credentials, start_official_login,
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
