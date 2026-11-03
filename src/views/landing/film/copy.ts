@@ -143,8 +143,8 @@ export const FILM_PLAYER_LABELS: Record<LandingLocale, PlayerLabels> = {
   pl: { replay: 'Odtwórz ponownie', pause: 'Wstrzymaj', play: 'Odtwórz', mute: 'Wycisz', soundOn: 'Włącz dźwięk', skip: 'Pomiń' },
 
   zh: { replay: '重播', pause: '暂停', play: '播放', mute: '静音', soundOn: '开启声音', skip: '跳过' },
-  // 繁体还没翻（翻译.md 第三十四批）：先用简体。
-  'zh-TW': { replay: '重播', pause: '暂停', play: '播放', mute: '静音', soundOn: '开启声音', skip: '跳过' },
+  // 繁體中文（台灣）文案。
+  'zh-TW': { replay: '重播', pause: '暫停', play: '播放', mute: '靜音', soundOn: '開啟聲音', skip: '略過' },
   en: { replay: 'Replay', pause: 'Pause', play: 'Play', mute: 'Mute', soundOn: 'Sound on', skip: 'Skip' },
   it: { replay: 'Riavvia', pause: 'Pausa', play: 'Riproduci', mute: 'Disattiva audio', soundOn: 'Attiva audio', skip: 'Salta' },
   es: { replay: 'Repetir', pause: 'Pausar', play: 'Reproducir', mute: 'Silenciar', soundOn: 'Activar sonido', skip: 'Saltar' },

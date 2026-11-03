@@ -3,6 +3,7 @@ import type { LandingLocale } from '../composables/useLandingLocale';
 const labels: Partial<Record<LandingLocale, string[]>> = {
   pl: ['Wyślij', 'Analiza zapisów', 'Twój plan jest gotowy', 'Kopiuj plan', 'Przenoszenie planu', 'Wstecz', 'Przykładowa rozmowa', 'Zachowaj dni odpoczynku i przygotuj to jako Plan, który mogę przenieść z powrotem.', 'Plan zawiera daty, aktywności i etapy. Dni odpoczynku pozostają wolne, a brakujące pomiary nie zostały uzupełnione zmyślonymi danymi.\n\nPo powrocie do ZeppBridge sprawdź rozgrzewkę, trening właściwy i schłodzenie dla każdego dnia. Przeciągnij kartę, aby zamienić daty, a następnie zdecyduj, czy wysłać plan na zegarek.'],
 
+  'zh-TW': ['傳送', '正在整理紀錄', '計畫已整理好', '複製計畫', '正在接回計畫', '返回', '範例對話', '保留休息日，整理成可以接回的 Plan。', '已將訓練日期、項目與步驟整理成 Plan。休息日保留為空白，不會用虛構紀錄補齊缺失的資料。\n\n接回 ZeppBridge 後，你可以逐日查看暖身、訓練與放鬆步驟，也可以拖曳卡片交換日期。確認以後再決定是否傳送至手錶。'],
   zh: ['发送', '正在整理记录', '计划已整理好', '复制计划', '正在接回计划', '返回', '示例对话', '保留休息日，整理成可以接回的 Plan。', '已将训练日期、项目和步骤整理成 Plan。休息日保留为空白，不会用虚构记录补齐缺失的数据。\n\n接回 ZeppBridge 后，你可以逐日查看热身、训练和放松步骤，也可以拖动卡片交换日期。确认以后再决定是否发到手表。'],
   en: ['Send', 'Reading the records', 'Your plan is ready', 'Copy plan', 'Bringing the plan back', 'Back', 'Sample conversation', 'Keep the rest days and package this as a Plan I can bring back.', 'The Plan contains the dates, activities and steps. Rest days stay open, and missing measurements have not been filled with invented records.\n\nBack in ZeppBridge, review each warm-up, workout and cooldown. Drag a card to swap dates, then decide whether to send the plan to your watch.'],
   es: ['Enviar', 'Revisando los registros', 'El plan está listo', 'Copiar plan', 'Recuperando el plan', 'Volver', 'Conversación de ejemplo', 'Conserva los días de descanso y prepara un Plan para recuperar.', 'El Plan incluye fechas, actividades y pasos. Se conservan los descansos y no se inventan datos ausentes.\n\nEn ZeppBridge puedes revisar el calentamiento, el entrenamiento y la vuelta a la calma, cambiar las fechas y decidir si lo envías al reloj.'],
@@ -16,8 +17,8 @@ const labels: Partial<Record<LandingLocale, string[]>> = {
   it: ['Invia', 'Lettura dei dati', 'Il tuo piano è pronto', 'Copia piano', 'Recupero del piano', 'Indietro', 'Conversazione di esempio', 'Mantieni i giorni di riposo e crea un piano da importare.', 'Il piano include date, attività e passaggi. I giorni di riposo rimangono aperti e le misurazioni mancanti non sono state integrate con dati fittizi.\n\nIn ZeppBridge puoi controllare riscaldamento, allenamento e defaticamento per ogni giorno. Trascina le schede per scambiare le date e poi decidi se inviare il piano all’orologio.'],
 };
 export function dialogueCopy(locale: LandingLocale) {
-  // 繁体还没翻时先用简体（翻译.md 第三十四批）。
+  // 繁體中文（台灣）已支援。
   const [send, thinking, ready, copy, returning, back, example, prompt, answer] =
-    labels[locale] ?? (locale === 'zh-TW' ? labels.zh : undefined) ?? labels.en!;
+    labels[locale] ?? labels.en!;
   return { send, thinking, ready, copy, returning, back, example, finalTurn: { prompt, answer } };
 }

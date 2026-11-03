@@ -34,6 +34,9 @@ const SKIP_FILES = [
   'views/landing/reelCopy.ts', // Typed ten-language MotionReel controls.
   'views/landing/film/copy.ts', // Film captions per LandingLocale; untranslated locales fall back to English.
   'views/landing/p4Copy.ts', // P4 chapter copy per LandingLocale (zh here, others in p4/<locale>.ts); untranslated locales keep the older layout.
+  'views/landing/zh-TW.ts', // 繁体中文落地页语言包
+  'views/landing/p4/zh-TW.ts', // 繁体中文 P4 章节语言包
+  'views/landing/film/locales/zh-TW.ts', // 繁体中文演示片字幕语言包
   'demo/dialogueCopy.ts', // Typed ten-language demo dialogue strings.
 ];
 
