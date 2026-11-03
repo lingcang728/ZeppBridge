@@ -13,6 +13,27 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      advancedDescription: "Non è stato possibile salvare le credenziali dei Dati avanzati. Rimangono in memoria per un massimo di 10 minuti, così puoi riprovare senza accedere o inserire nuovamente il token. Se annulli, avvii un altro accesso, invii di nuovo le credenziali manuali o chiudi l’applicazione, le credenziali vengono eliminate.",
+      advancedFileWarning: "L’App Token dei Dati avanzati verrà salvato in chiaro nel file credentials.json nella cartella dei dati dell’applicazione. Su Linux e macOS il file usa i permessi 0600. I programmi eseguiti con il tuo account utente possono leggerlo. L’applicazione riutilizzerà questo file al riavvio, a meno che un’impostazione di avvio non selezioni esplicitamente un altro archivio.",
+      advancedDiscard: "Elimina queste credenziali di accesso",
+      advancedExpired: "Queste credenziali di accesso non sono più disponibili. Connetti di nuovo i Dati avanzati.",
+      title: "Scegli come salvare il tuo accesso",
+      description: "L’autorizzazione è riuscita, ma non è stato possibile salvare il token. Rimane in memoria per un massimo di 10 minuti, così puoi riprovare senza accedere di nuovo. Se chiudi l’applicazione o avvii una nuova autorizzazione, il token viene eliminato.",
+      systemOption: "Ripara l’archivio delle credenziali di sistema (consigliato)",
+      fileOption: "Salva in un file JSON locale",
+      repairLinux: "Apri il gestore delle password o del portafoglio di sistema. Se non esiste un portachiavi o un portafoglio predefinito, crealo e sbloccalo. Negli ambienti desktop come Niri, assicurati che sia in esecuzione un fornitore di Secret Service come KWallet o GNOME Keyring. Poi riprova qui sotto.",
+      repairMac: "Apri Accesso Portachiavi, sblocca il portachiavi di login e consenti a ZeppBridge di salvare le credenziali. Poi riprova qui sotto.",
+      repairWindows: "Verifica che Gestione credenziali di Windows sia disponibile e che il tuo account possa utilizzarla. Poi riprova qui sotto.",
+      retrySystem: "Ho risolto il problema — riprova a salvare",
+      fileWarning: "I token di accesso e di aggiornamento verranno salvati in chiaro nel file credentials.json nella cartella dei dati dell’applicazione. Su Linux e macOS il file usa i permessi 0600. I programmi eseguiti con il tuo account utente possono leggerlo. L’applicazione riutilizzerà questo file al riavvio, a meno che un’impostazione di avvio non selezioni esplicitamente un altro archivio.",
+      consent: "Comprendo e accetto di salvare i token in chiaro su questo dispositivo.",
+      saveFile: "Accetta e salva in JSON",
+      discard: "Elimina questa autorizzazione",
+      expired: "Questa autorizzazione non è più disponibile. Accedi di nuovo.",
+      savedFile: "Accesso salvato nel file locale credentials.json.",
+      fileUnavailable: "L’archiviazione su file non è disponibile su questa piattaforma oppure è stata disabilitata dalla configurazione di avvio. Ripara l’archivio delle credenziali di sistema per continuare.",
+    },
     'components/journal/repair': {
       timelineEmpty: 'Seleziona un giorno sulla cronologia per registrare un evento',
       timelineToday: 'Oggi',

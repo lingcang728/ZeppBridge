@@ -37,9 +37,14 @@ npm run build      # vue-tsc --noEmit && vite build
 npm run build:web  # 仅 vite build，跳过 vue-tsc
 npm run preview    # 预览 dist（不会连接账户数据）
 npm test           # Vitest：src/lib 的纯函数层
+npm run test:dev   # Vite 冷缓存 CSS 请求与 scoped 作用域回归检查
 npm run version:check   # 七处版本号是否一致
 npm run budget:check    # 首屏体积预算（需要先 build）
 ```
+
+现有多个外部 scoped 样式块继续保留。`@vitejs/plugin-vue` 固定为 `6.0.8`，其开发服务器在所属组件尚未缓存时请求外部样式，可能返回 500 或丢失作用域 ID。`npm ci` 会通过 `postinstall` 自动运行 `scripts/dev/patch-vue-external-styles.mjs`，修正临时 descriptor 的作用域 ID 和样式索引；脚本校验精确版本及原代码锚点，重复执行安全，遇到不匹配会报错。若安装时使用了 `--ignore-scripts`，请手动运行 `npm run postinstall`。
+
+应用补丁后须完全停止并重新运行 `npm run tauri dev`，HMR 不会重新载入 Vite 插件。不要只手改 `node_modules` 作为修复。升级插件时应复核或移除补丁，并运行 `npm run test:dev`：它通过真实 Vite 服务，在所属组件尚未缓存时请求全部外部样式，检查无 500 且作用域 ID 正确。生产构建通过不能覆盖这条冷请求路径。
 
 `npm test` 集中在一条规则上：**缺失不能被显示成 0**。「0 分钟睡眠」的卡片比「—」危险得多，用户会拿它当真实读数。刻意不做组件快照——它会在每次调样式时红掉，于是被习惯性 `-u` 掉，最后既挡不住回归也没人再看。
 

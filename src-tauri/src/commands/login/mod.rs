@@ -26,7 +26,9 @@ use tauri::{
 mod copy;
 mod extract;
 mod poll;
+pub(crate) mod recovery;
 mod region_probe;
+pub use recovery::recover_advanced_credentials;
 #[cfg(test)]
 mod tests;
 mod url_policy;
@@ -208,6 +210,7 @@ pub async fn start_web_login(
     locale: String,
 ) -> std::result::Result<LoginStatus, AppError> {
     let epoch = state.login.epoch.fetch_add(1, Ordering::SeqCst) + 1;
+    recovery::clear(&state);
     let page_url = PRIMARY_LOGIN_URL.to_string();
 
     // 必须等上一个窗口真的消失，不能只是发出关闭请求，见
@@ -256,6 +259,7 @@ pub async fn cancel_web_login(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<LoginStatus, AppError> {
     state.login.epoch.fetch_add(1, Ordering::SeqCst);
+    recovery::clear(&state);
     close_login_window(&app);
     let status = LoginStatus::idle();
     publish_status(&app, &state, status.clone()).await;
@@ -266,5 +270,12 @@ pub async fn cancel_web_login(
 pub async fn get_login_status(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<LoginStatus, AppError> {
-    Ok(state.login.status.read().await.clone())
+    if let Some(status) = recovery::status(&state) {
+        return Ok(status);
+    }
+    let mut status = state.login.status.read().await.clone();
+    if status.credential_recovery.is_some() {
+        status = recovery::expired();
+    }
+    Ok(status)
 }

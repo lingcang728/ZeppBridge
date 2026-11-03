@@ -13,6 +13,27 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      title: 'Choisir comment enregistrer votre connexion',
+      description: 'L’autorisation a réussi, mais le jeton n’a pas pu être enregistré. Il reste en mémoire pendant 10 minutes au maximum pour vous permettre de réessayer sans vous reconnecter. Quitter l’application ou lancer une nouvelle autorisation le supprime.',
+      advancedDescription: 'Vos identifiants des Données avancées n’ont pas pu être enregistrés. Ils restent en mémoire pendant 10 minutes au maximum pour vous permettre de réessayer sans vous reconnecter ni saisir à nouveau le jeton. Annuler, lancer une autre connexion, envoyer à nouveau des identifiants manuels ou quitter l’application les supprime.',
+      advancedFileWarning: 'L’App Token des Données avancées sera enregistré en texte clair dans credentials.json, dans le dossier de données de l’application. Sous Linux et macOS, le fichier utilise les permissions 0600. Les programmes exécutés sous votre compte peuvent le lire. L’application réutilisera ce fichier au redémarrage, sauf si un paramètre de démarrage sélectionne explicitement un autre stockage.',
+      advancedDiscard: 'Abandonner ces identifiants de connexion',
+      advancedExpired: 'Ces identifiants de connexion ne sont plus disponibles. Veuillez reconnecter les Données avancées.',
+      systemOption: 'Réparer le stockage système des identifiants (recommandé)',
+      fileOption: 'Enregistrer dans un fichier JSON local',
+      repairLinux: 'Ouvrez le gestionnaire de mots de passe ou de portefeuilles de votre système. Si aucun trousseau ou portefeuille par défaut n’existe, créez-en un, puis déverrouillez-le. Sur les environnements de bureau tels que Niri, vérifiez qu’un fournisseur Secret Service tel que KWallet ou GNOME Keyring est en cours d’exécution. Réessayez ensuite ci-dessous.',
+      repairMac: 'Ouvrez Trousseaux d’accès, déverrouillez votre trousseau de session et autorisez ZeppBridge à enregistrer les identifiants. Réessayez ensuite ci-dessous.',
+      repairWindows: 'Vérifiez que le Gestionnaire d’identification Windows est disponible et que votre compte peut l’utiliser. Réessayez ensuite ci-dessous.',
+      retrySystem: 'Réessayer l’enregistrement après réparation',
+      fileWarning: 'Les jetons d’accès et de renouvellement seront enregistrés en texte clair dans credentials.json, dans le dossier de données de l’application. Sous Linux et macOS, le fichier utilise les permissions 0600. Les programmes exécutés sous votre compte peuvent le lire. L’application réutilisera ce fichier au redémarrage, sauf si un paramètre de démarrage sélectionne explicitement un autre stockage.',
+      consent: 'Je comprends et j’accepte d’enregistrer les jetons en texte clair sur cet appareil.',
+      saveFile: 'Accepter et enregistrer en JSON',
+      discard: 'Abandonner cette autorisation',
+      expired: 'Cette autorisation n’est plus disponible. Veuillez vous reconnecter.',
+      savedFile: 'Connexion enregistrée dans le fichier local credentials.json.',
+      fileUnavailable: 'Le stockage dans un fichier est indisponible sur cette plateforme ou remplacé par votre configuration de démarrage. Réparez le stockage système des identifiants pour continuer.',
+    },
     'components/WorkoutTools': {
       select: 'Sélectionner les séances',
       done: 'Terminer la sélection',

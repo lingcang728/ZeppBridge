@@ -3,6 +3,7 @@ mod ai_handoff;
 mod ai_tasks;
 mod auth;
 mod backup;
+pub(crate) mod credential_recovery;
 mod data;
 pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
 mod data_letters;
@@ -234,10 +235,13 @@ pub(crate) use imports::{
     import_batches, import_workouts, undo_import_batch, workout_import_sources,
 };
 pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
-pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
+pub(crate) use login::{
+    cancel_web_login, get_login_status, recover_advanced_credentials, start_web_login,
+};
 pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
+    recover_official_credentials,
     start_official_login,
 };
 pub(crate) use status::get_app_status;

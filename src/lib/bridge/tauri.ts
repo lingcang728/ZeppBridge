@@ -238,6 +238,10 @@ export const tauriBackend: BridgeBackend = {
     return call<OfficialStatus>('cancel_official_login');
   },
 
+  recoverOfficialCredentials(storage: 'system' | 'file') {
+    return call<OfficialStatus>('recover_official_credentials', { storage });
+  },
+
   checkOfficialLoginNow() {
     return call<OfficialStatus>('check_official_login_now');
   },
@@ -248,6 +252,10 @@ export const tauriBackend: BridgeBackend = {
 
   disconnectOfficial() {
     return call<OfficialStatus>('disconnect_official');
+  },
+
+  recoverAdvancedCredentials(storage: 'system' | 'file') {
+    return call<LoginStatus>('recover_advanced_credentials', { storage });
   },
 
   getLoginStatus() {

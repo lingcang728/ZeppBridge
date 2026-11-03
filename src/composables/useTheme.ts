@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import { whenFramesSteady } from '../lib/motion/steady';
 import { OPEN_EASE, REVEAL_MS } from '../lib/motion/timing';
+import { canUseViewTransitions } from '../lib/motion/viewTransitions';
 import { lessMotion } from '../lib/motion/lessMotion';
 
 /**
@@ -101,7 +102,7 @@ export const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
     update();
     return;
   }
-  if (!doc.startViewTransition || reduced || !origin) {
+  if (!canUseViewTransitions() || !doc.startViewTransition || reduced || !origin) {
     update();
     return;
   }

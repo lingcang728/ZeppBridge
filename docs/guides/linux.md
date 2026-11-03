@@ -15,13 +15,13 @@ Read this before deciding whether to rely on it.
 | Compiles, clippy-clean, Rust tests pass on Linux | Covered by CI on every push |
 | Flatpak bundle builds and its metadata validates | Covered by CI on every push |
 | The headless image builds, runs, and resolves its data directory | Covered by CI on every push |
-| Sign-in, sync, keyring behaviour on a real Linux desktop | **Not verified by anyone yet** |
+| Real-desktop usage (Arch x86_64, AMD, Wayland, WebKitGTK 2.54.1): rendering fixes, UI, sign-in, sync and data display | Confirmed on the machine that reported the white screens — they and the animation aborts are gone |
 
-The last row is the one that matters. Nobody has run a full sign-in-and-sync
-cycle on a Linux desktop. The Linux-specific code — the Secret Service
-credential backend and the XDG data directory — is exercised by unit tests and
-by a container, not by a person with a watch. If you try it, an issue saying
-what happened is the most useful thing you can send.
+That row was filled in on a real desktop. The person who reported the white
+screens installed a locally built package and confirmed the interface, sign-in,
+sync and data display all work, with the blank windows and animation aborts
+gone. If you hit a problem on your machine, an issue saying what happened is the
+most useful thing you can send.
 
 This is the same posture the README takes for macOS, and for the same reason:
 saying "supported" when nobody has checked is how people lose data.
@@ -64,12 +64,57 @@ release page instead.
 The AppImage needs FUSE. On systems that only ship FUSE 3, either install
 `libfuse2` or run it with `--appimage-extract-and-run`.
 
+### Arch Linux / AUR recipe
+
+`packaging/arch/PKGBUILD` builds a native x86_64 `zeppbridge-git` package with
+the desktop app, `zeppbridge-cli` and `zeppbridge-mcp`. It uses system libraries
+and does not pass through AppImage packaging. The recipe and `.SRCINFO` are
+provided for AUR submission; they have **not** been published to AUR.
+
+To package the current working tree, including uncommitted fixes, run from the
+repository root with the Arch build dependencies installed:
+
+```bash
+nvm use
+./packaging/arch/build-local.sh
+# Extra arguments are forwarded to makepkg unchanged:
+#   --syncdeps  let makepkg install missing build dependencies
+#   --install   install the finished package with pacman after a successful build
+./packaging/arch/build-local.sh --install
+```
+
+The helper builds by default and installs nothing, but forwards extra arguments
+to `makepkg` unchanged: `--syncdeps` installs missing build dependencies,
+`--install` installs the finished package after a successful build. It snapshots
+tracked and nonignored source files into a local-only Git repository under
+`${XDG_CACHE_HOME:-$HOME/.cache}/zeppbridge/arch`, isolates makepkg and Cargo
+build output, and writes packages to the ignored `release-arch/` directory.
+That directory can hold several packages from earlier builds, so install an
+exact file name rather than a wildcard.
+
+To build the committed upstream `main` branch instead:
+
+```bash
+cd packaging/arch
+makepkg -si
+```
+
+Unlike the local helper, this fetches remote source and does not include your
+uncommitted changes; `-i` installs the resulting package. Only x86_64 is targeted.
+
+The native package build completed on Arch x86_64, including desktop-entry
+validation and a CLI version check, and the package was installed on the test
+machine (`pacman -U`) — the person who reported the white screens confirmed they
+were gone with this build. That snapshot predates the upstream 3.1.0 merge, so
+A clean-chroot build remains unverified;
+there is no Arch CI job.
+
 ## Where things go
 
 | | Path |
 |---|---|
 | Flatpak | `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/` |
-| deb / rpm | `~/.local/share/zeppbridge/data/` |
+| deb / rpm / Arch package | `~/.local/share/zeppbridge/data/` |
 | AppImage, unpacked tarball | `data/` next to the executable |
 | Anywhere, when set | `$ZEPPBRIDGE_DATA_DIR` |
 | Built from source | the repository `data/` folder, **not** next to the binary |
@@ -101,8 +146,33 @@ D-Bus. `auth.json` next to the database keeps only non-secret metadata (user ID,
 region host). This matches Windows Credential Manager and the macOS Keychain.
 
 On a machine with no Secret Service — a headless server, a container, a minimal
-window manager with no keyring daemon — there is nothing to write to, and
-sign-in fails with a message naming the two alternatives:
+window manager with no keyring daemon — the default store cannot save tokens.
+If credential storage fails after official authorization, Advanced data's
+embedded web login or manual App Token submission, the desktop app offers two
+recovery options:
+
+- Repair the system credential store and retry saving. Open your password or
+  wallet manager, create a default keyring or wallet if needed, and unlock it.
+  On desktops such as Niri, ensure a Secret Service provider such as GNOME
+  Keyring or KWallet is running.
+- Explicitly consent to saving official access and refresh tokens, or the
+  Advanced data App Token, as plain text in `credentials.json` in the app data
+  directory. The file uses permission `0600`
+  on Unix, but programs running as your user can read it. This option is blocked
+  when it conflicts with an explicit credential-store or token environment
+  setting.
+
+Pending credentials remain only in backend memory for at most 10 minutes while
+you choose or retry, so storage failures do not require another login or token
+entry. Cancelling recovery, starting a new login, resubmitting manual
+credentials, quitting or reaching the timeout clears them. After expiry, sign
+in or enter the token again. Successful recovery makes the selected store
+available immediately; an existing `credentials.json` preserves the file-store
+choice after restart unless the environment explicitly overrides it. Saving a
+manually entered App Token does not verify it: the existing verification step
+still applies before using Advanced data.
+
+For CLI or headless use, the alternatives remain:
 
 ```bash
 # Store the token in the data directory instead, 0600, in credentials.json.
@@ -171,55 +241,97 @@ by cron and by containers, where nobody is there to answer any of that.
 
 ## If the window is blank, or the app will not start
 
-Two known Linux failures, both with fixes already applied in the app.
+**A white, empty window, or a freeze after changing the theme or language.**
+WebKitGTK's rendering paths depend on the graphics driver, display server and
+compositor. Disabling DMABUF can fix startup white screens on some machines,
+but can expose different bugs on others. DMABUF controls how graphics buffers
+are shared and presented; disabling it does **not** disable all GPU acceleration.
 
-**A white, empty window.** WebKitGTK 2.42 enables a DMABUF renderer by default,
-and on a number of driver and compositor combinations it fails without printing
-anything — the window opens and stays blank. ZeppBridge now disables it on Linux
-by default. If you want the faster path back on a machine where it works:
+ZeppBridge follows a targeted compatibility policy, inspired by
+[Clash Verge Rev's Linux workarounds](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/utils/linux/workarounds.rs):
+
+- When `WEBKIT_DISABLE_DMABUF_RENDERER` is unset, set it to `1` if NVIDIA is
+  detected, or if `XDG_SESSION_TYPE=wayland` and
+  `pkg-config --modversion wayland-client` reports a numeric version at or below
+  `1.23.0`. NVIDIA detection checks `/proc/driver/nvidia/version`,
+  `/sys/module/nvidia`, `/sys/module/nvidia_drm` and DRM card vendor IDs
+  (`0x10de`). Detection is best effort: missing version information does not
+  activate the Wayland rule.
+- Otherwise leave DMABUF to WebKit's default. There is no WebKit-version cutoff.
+  An explicit value of `0` or `1` always takes precedence over both rules.
+- AppImage still defaults `WEBKIT_DISABLE_COMPOSITING_MODE` to `1` when
+  `APPIMAGE` is present, unless the user has set it explicitly. This is
+  independent of the DMABUF policy and WebKit version.
+- When either disabling variable is nonzero, theme and language changes skip
+  native View Transition snapshot animations. The changes themselves still work.
+  ZeppBridge does not force `GDK_BACKEND`.
+
+On one Arch Linux / AMD / Wayland machine with WebKitGTK 2.54.1, forcing
+DMABUF off reproduced a `graphicsLayerFactory()` abort during View Transitions;
+the default DMABUF path completed the same interactions. This supports the
+animation guard and keeping rendering overrides available, but does not prove
+compatibility across all drivers and distributions.
+The person who reported these failures installed a locally built package with
+this policy and confirmed the blank windows and animation aborts were gone.
+
+Close the app before comparing these settings:
 
 ```bash
+# Try the compatibility path for a startup white screen.
+WEBKIT_DISABLE_DMABUF_RENDERER=1 zeppbridge
+
+# Restore WebKit's default DMABUF path, overriding automatic detection.
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
+
+# The same override works in development (run from the repository root).
+WEBKIT_DISABLE_DMABUF_RENDERER=0 npm run tauri dev
+
+# AppImage has an independent compositing override. Explicitly clear both
+# disabling flags when testing its hardware rendering path.
+WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DISABLE_COMPOSITING_MODE=0 ./ZeppBridge_<version>_x86_64.AppImage
 ```
 
-**The AppImage specifically still will not open.** Disabling DMABUF fixed the
-Flatpak — [issue #32][issue-32] has a confirmation on 2.1.0 — but not the
-AppImage, and the same thread has the clue that explains why: the same source
-built on the reporter's own machine produced an AppImage that ran, and the
-reporter guessed it was "something weird with the Wayland display libraries".
+**The AppImage specifically still will not open.** [Issue #32][issue-32]
+records a Flatpak startup fixed by disabling DMABUF in 2.1.0, while the CI-built
+AppImage still failed. Its bundled Wayland libraries were another compatibility
+problem: the AppImage shipped `libwayland-client.so.0`,
+`libwayland-cursor.so.0`, `libwayland-egl.so.1` and `libwayland-server.so.0`,
+which the packaging now removes so the host copies are used. The AppImage
+compositing default above remains an additional compatibility measure.
 
-That turned out to be exactly right. The AppImage is built on `ubuntu-latest`,
-and dumping its bundled `usr/lib` shows it shipped its own
-`libwayland-client.so.0`, `libwayland-cursor.so.0`, `libwayland-egl.so.1` and
-`libwayland-server.so.0`. `libwayland-client` has to agree with the compositor
-actually running on your machine, which is why AppImage's own excludelist marks
-it as must-come-from-the-host — and why an AppImage built on your own machine
-worked while the CI one did not. (The GL/DRM stack — `libEGL`, `libGL`, `libgbm`,
-`libdrm` — turned out not to be bundled at all, so it was never part of this.)
-
-Two changes since 2.1.0. The build now drops those four Wayland libraries so the
-host's own copies are used, and the app disables accelerated compositing when it
-detects it is running from an AppImage (gated on the `APPIMAGE` variable the
-AppImage runtime sets, so the deb, rpm and Flatpak builds — all confirmed
-working — do not pay for it).
-
-Neither of those can be verified from a Windows development machine. If it still
-will not start, these are the escape hatches, in the order worth trying:
+If those settings do not help, try X11 through XWayland if it is installed:
 
 ```bash
 # Force X11 through XWayland. Not the app's default: on a pure Wayland system
 # with no XWayland installed this trades one failure for another, so it is
 # yours to decide, not ours.
 GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
-
-# Turn compositing off explicitly (the AppImage build already does this; set it
-# here if you are on a deb/rpm/Flatpak install that shows the same symptom).
+# Another explicit fallback, also available for deb/rpm/Flatpak launches.
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
 ```
 
-If none of them work, the Flatpak is the channel a user has actually confirmed
-working on 2.1.0, and a comment on that issue saying which distro and compositor
-you are on is the most useful thing you can send.
+For Flatpak, pass overrides with `flatpak run --env=NAME=value
+com.zeppbridge.app`, for example:
+
+```bash
+flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=0 com.zeppbridge.app
+```
+
+When reporting a failure, launch from a terminal and include the startup
+`Linux rendering:` diagnostic and any WebKit assertion or crash output. Include
+the package type, distribution, GPU and driver, whether the session is Wayland
+or X11, and which overrides worked. These commands help collect context:
+
+```bash
+printf 'Session: %s\n' "$XDG_SESSION_TYPE"
+pkg-config --modversion webkit2gtk-4.1 wayland-client
+lspci -nnk | rg -A3 'VGA|3D|Display'
+env | rg '^(WEBKIT_|GDK_BACKEND=|APPIMAGE=)'
+```
+
+The `pkg-config` command may be unavailable or lack metadata; report that too.
+Its Wayland version is a detection hint, not proof of the library used at runtime.
+For background, see [WebKit's graphics architecture](https://docs.webkit.org/Ports/WebKitGTK%20and%20WPE%20WebKit/Graphics.html).
 
 [issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
 
@@ -299,15 +411,53 @@ Three of those are easy to miss, and none is on Tauri's own prerequisites list:
   Missing it fails *after* the deb and rpm have already been written, which
   makes it look like an AppImage-specific bug rather than a missing package.
 
-To avoid installing any of that, use the pinned toolchain container instead —
-same compiler, same webkit, same glibc as CI:
+### AppImage packaging on rolling distributions
+
+On the tested Arch Linux environment, the command above compiled the executable
+and produced the deb and rpm, then failed while packaging the AppImage. This was
+re-confirmed in November 2026 against the source merged with upstream 3.1.0:
+compiling and the deb/rpm bundles succeeded, the AppImage still stopped at
+linuxdeploy. To retry only packaging the existing executable with detailed output:
+
+```bash
+npm run tauri -- bundle --config src-tauri/tauri.linux.conf.json --bundles appimage --verbose
+```
+
+Two separate incompatibilities were reproduced:
+
+- The bundler's older `strip` rejected `.relr.dyn` with an unknown section type
+  `0x13`. Prefixing the packaging command with `NO_STRIP=true` skips that step.
+- After skipping stripping, the GTK packaging plugin failed to copy
+  `/usr/lib/gdk-pixbuf-2.0/2.10.0`. The installed `gdk-pixbuf2` 2.44.8 uses
+  Glycin and has no external loader directory at that path.
+
+`NO_STRIP=true` only bypasses the first failure; it does not fix the GTK plugin's
+loader-directory assumption. These are packaging failures, so for native testing
+run `src-tauri/target/release/zeppbridge` directly. To omit AppImage packaging,
+build with `--bundles deb,rpm`; those packages are not installable with Arch's
+`pacman`. The deb/rpm-only packaging command completed successfully in this
+Arch environment.
+
+For a distributable AppImage, use the existing Debian Bookworm toolchain
+container and compile and package in that same environment. Keep its dependencies
+and Cargo output separate from the host's `node_modules` and target directory:
 
 ```bash
 docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build .
-docker run --rm -v "$PWD:/src" -w /src zeppbridge-build \
+docker run --rm -v "$PWD:/src" \
+  -v zeppbridge-bookworm-node-modules:/src/node_modules \
+  -v zeppbridge-bookworm-target:/build-target \
+  -e CARGO_TARGET_DIR=/build-target -w /src zeppbridge-build \
   bash -c 'npm ci && npm run tauri build -- \
     --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
 ```
+
+Container packages are written to `/build-target/release/bundle` in the
+`zeppbridge-bookworm-target` named volume, rather than the host's
+`src-tauri/target` directory.
+
+The container workflow was not revalidated during this Arch diagnosis because
+neither Docker nor Podman was installed on the test machine.
 
 ## Flathub
 

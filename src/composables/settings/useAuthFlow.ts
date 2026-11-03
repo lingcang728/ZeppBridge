@@ -5,6 +5,7 @@ import { backend, errorCode, toUserMessage } from '../../lib/bridge';
 import { locale, useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
+import { credentialRecoveryMessages } from '../../components/CredentialRecovery.i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { AccountPair, LoginStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
@@ -20,6 +21,7 @@ const idleStatus = (): LoginStatus => ({ state: 'idle', message: '', page_url: '
  */
 export const createAuthFlow = (feedback: SettingsFeedback) => {
   const t = useMessages(settingsMessages);
+  const recoveryText = useMessages(credentialRecoveryMessages);
   const { appStatus, refreshStatus, runSync, isSyncing } = useSyncController();
   const { load: loadDevices } = useDevices();
   const { dataMessage, dataError } = feedback;
@@ -54,6 +56,13 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const manualRegionHost = ref(DEFAULT_REGION_HOST);
   const manualAuthBusy = ref(false);
 
+  const resetManualInput = () => {
+    showManualAuth.value = false;
+    manualAppToken.value = '';
+    manualUserId.value = '';
+    manualRegionHost.value = DEFAULT_REGION_HOST;
+  };
+
   // connection_state 是整个应用的状态，官方授权也能让它变成 connected。
   // 此处只管高级数据：凭据存在且通过验证，才能显示「当前使用」。
   const credentialAvailable = computed(() => appStatus.value?.credential_available ?? Boolean(appStatus.value?.configured));
@@ -69,6 +78,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const loginMessage = computed(() => {
     const status = loginStatus.value;
     if (!status.message && !status.code) return '';
+    if (status.code === 'err.login.timeout') return recoveryText.value.advancedExpired;
     return errorTextFor(status.code) ?? backendText(status.message, '');
   });
 
@@ -92,6 +102,14 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const applyLoginStatus = async (status: LoginStatus, opts?: { replay?: boolean }) => {
     const justConnected = status.state === 'connected' && loginStatus.value.state !== 'connected';
     loginStatus.value = status;
+    if (status.credential_recovery) resetManualInput();
+    if (status.state === 'configured') {
+      reconnecting.value = false;
+      loginError.value = null;
+      resetManualInput();
+      await refreshStatus();
+      dataMessage.value = t.value.manualAuthDone;
+    }
     if (status.state === 'connected') {
       reconnecting.value = false;
       loginError.value = null;
@@ -134,6 +152,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       await applyLoginStatus(await backend.cancelWebLogin());
       reconnecting.value = false;
       loginError.value = null;
+      resetManualInput();
     } catch (error) {
       loginError.value = toUserMessage(error, t.value.loginCancelFailed);
     } finally {
@@ -166,8 +185,28 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     } catch (error) {
       loginError.value = toUserMessage(error, t.value.manualAuthFailed);
       loginErrorCode.value = errorCode(error);
+      try {
+        const current = await backend.getLoginStatus();
+        if (current.credential_recovery) await applyLoginStatus(current, { replay: true });
+      } catch { /* Keep the original save error if status is unavailable. */ }
     } finally {
       manualAuthBusy.value = false;
+    }
+  };
+
+  const recoverCredentials = async (storage: 'system' | 'file') => {
+    if (loginBusy.value || manualAuthBusy.value) return;
+    loginBusy.value = true;
+    try {
+      const next = await backend.recoverAdvancedCredentials(storage);
+      await applyLoginStatus(next);
+      if (['connected', 'configured'].includes(next.state) && storage === 'file') {
+        dataMessage.value = recoveryText.value.savedFile;
+      }
+    } catch (error) {
+      loginError.value = toUserMessage(error, t.value.manualAuthFailed);
+    } finally {
+      loginBusy.value = false;
     }
   };
 
@@ -201,6 +240,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       await refreshStatus();
       reconnecting.value = false;
       loginStatus.value = idleStatus();
+      resetManualInput();
       dataMessage.value = t.value.authCleared;
     } catch (error) {
       dataError.value = toUserMessage(error, t.value.clearAuthFailed);
@@ -252,6 +292,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     startLogin,
     cancelLogin,
     submitManualAuth,
+    recoverCredentials,
     verifyAndSync,
     clearAuth,
     attach,

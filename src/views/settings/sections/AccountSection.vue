@@ -3,6 +3,7 @@
    按钮永远是此刻最该做的那一步。网页登录、手动填写、复制授权链接都在高级卡的「登录方式」。 */
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import CredentialRecovery from '../../../components/CredentialRecovery.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import ModalDialog from '../../../components/ModalDialog.vue';
@@ -44,7 +45,7 @@ const goOverview = () => {
 
 const {
   connected, configuredOnly, needsReauth, accountRecognized, loginBusy, loginInProgress, loginStatus, loginMessage,
-  startLogin, cancelLogin, verifyAndSync, clearAuth,
+  startLogin, cancelLogin, recoverCredentials, manualAuthBusy, verifyAndSync, clearAuth,
 } = useSettingsContext().auth;
 const official = useSettingsContext().official;
 
@@ -142,6 +143,12 @@ const action = computed<Action | null>(() => {
       <p v-if="appStatus?.auth_configuration_present && !appStatus?.credential_available" class="s-note" role="status">{{ tools.credentialHint }}</p>
     </div>
     <FoldTransition><p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p></FoldTransition>
+    <CredentialRecovery v-if="official.status.value.credential_recovery"
+      :recovery="official.status.value.credential_recovery" :busy="official.busy.value"
+      @retry="official.recover" @discard="official.cancel" />
+    <CredentialRecovery v-if="loginStatus.credential_recovery" kind="advanced"
+      :recovery="loginStatus.credential_recovery" :busy="loginBusy || manualAuthBusy"
+      @retry="recoverCredentials" @discard="cancelLogin" />
     <FoldTransition><p v-if="official.waiting.value && official.waitingText.value" class="hint-line" role="status"><Icon name="info" :size="13" />{{ official.waitingText.value }}</p></FoldTransition>
     <FoldTransition>
       <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
