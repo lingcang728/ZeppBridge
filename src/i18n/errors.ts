@@ -70,7 +70,7 @@ const messages = defineMessages(
     'err.login.extracting': '已读取登录凭据，正在确认区域',
     'err.login.verifying': '正在验证账号',
     'err.login.connected': '已连接 Zepp 账号',
-    'err.official.browser': '没能打开系统浏览器，检查默认浏览器设置后重试',
+    'err.official.browser': '没能打开系统浏览器。请点「复制授权链接」，粘到浏览器地址栏里打开，在那里同意授权；这边会自动连上。',
     'err.open_url.failed': '没能打开系统浏览器，检查默认浏览器设置后重试',
     'err.open_url.not_allowed': '只能打开 https 链接',
     'err.letters.client_init_failed': '无法初始化寄信连接，重启应用后再试',
@@ -113,6 +113,8 @@ const messages = defineMessages(
       '浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理（或让代理软件接管所有应用），然后点「立即检查」。',
     'err.official.still_pending':
       '刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意，并看到了授权成功的页面；如果那是之前另一次的授权页，请重新点一次授权。',
+    'err.official.browser_not_opened':
+      '授权页好像没有在浏览器里打开。如果浏览器没弹出来，请点「复制授权链接」，粘到浏览器地址栏里打开；这边会自动连上。',
     'err.backfill.start_too_early':
       '补拉起点太早：最多只能补拉最近 3650 天',
     'err.login.bad_url': '登录地址无效',
@@ -299,7 +301,7 @@ const messages = defineMessages(
     'err.login.extracting': 'Credentials read. Confirming your region',
     'err.login.verifying': 'Verifying the account',
     'err.login.connected': 'Connected to your Zepp account',
-    'err.official.browser': "Could not open the system browser — check your default browser and retry.",
+    'err.official.browser': 'Couldn’t open your browser. Choose “Copy authorization link”, paste it into your browser’s address bar and approve there — the app connects on its own.',
     'err.open_url.failed': "Could not open the system browser — check your default browser and retry.",
     'err.open_url.not_allowed': 'Only https links can be opened.',
     'err.letters.client_init_failed': 'Could not set up the connection for sending letters. Restart the app and try again.',
@@ -345,6 +347,8 @@ const messages = defineMessages(
       'Your browser may already show the authorization as done, but ZeppBridge can’t reach zeppbridge.com to collect it. If your browser uses a proxy and the app doesn’t, turn on the system proxy (or let your proxy tool cover all apps), then choose “Check now”.',
     'err.official.still_pending':
       'Just checked: the relay hasn’t received this authorization yet. Make sure you approved it in the browser and saw the success page. If that page came from an earlier attempt, start the authorization again.',
+    'err.official.browser_not_opened':
+      'The authorization page doesn’t seem to have opened. If no browser window appeared, choose “Copy authorization link” and paste it into your browser’s address bar — the app connects on its own.',
     'err.backfill.start_too_early':
       'Backfill start is too early — at most the last 3650 days can be backfilled',
     'err.login.bad_url': 'Invalid sign-in address',
@@ -542,7 +546,7 @@ const messages = defineMessages(
     'err.login.extracting': 'Credenciales leídas; confirmando región',
     'err.login.verifying': 'Verificando cuenta',
     'err.login.connected': 'Conectado a tu cuenta de Zepp',
-    'err.official.browser': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
+    'err.official.browser': 'No se pudo abrir el navegador. Elige «Copiar enlace de autorización», pégalo en la barra de direcciones del navegador y autoriza allí; la app se conecta sola.',
     'err.open_url.failed': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
     'err.open_url.not_allowed': 'Solo se pueden abrir enlaces https.',
     'err.letters.client_init_failed': 'No se pudo preparar la conexión para enviar cartas. Reinicia la app y reintenta.',
@@ -588,6 +592,8 @@ const messages = defineMessages(
       'Puede que el navegador ya muestre la autorización como hecha, pero ZeppBridge no logra conectar con zeppbridge.com para recogerla. Si el navegador usa un proxy y la app no, activa el proxy del sistema (o deja que tu herramienta de proxy cubra todas las apps) y elige «Comprobar ahora».',
     'err.official.still_pending':
       'Acabamos de comprobar: el intermediario aún no ha recibido esta autorización. Confirma que la aprobaste en el navegador y viste la página de éxito. Si esa página era de un intento anterior, vuelve a iniciar la autorización.',
+    'err.official.browser_not_opened':
+      'Parece que la página de autorización no se abrió. Si no apareció ninguna ventana del navegador, elige «Copiar enlace de autorización» y pégalo en la barra de direcciones; la app se conecta sola.',
     'err.backfill.start_too_early':
       'El inicio del historial es demasiado antiguo: como máximo se pueden recuperar los últimos 3650 días',
     'err.login.bad_url': 'Dirección de inicio de sesión no válida',
