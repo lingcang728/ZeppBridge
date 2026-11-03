@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* 登录方式：平时用不上，默认收起；登录失败或正在登录时自动展开。 */
 import { computed } from 'vue';
+import CredentialRecovery from '../../../components/CredentialRecovery.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
@@ -13,7 +14,7 @@ const d = useMessages(deckMessages);
 const {
   reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly,
   showManualAuth, manualAppToken, manualUserId, manualRegionHost, manualAuthBusy,
-  startLogin, cancelLogin, submitManualAuth,
+  startLogin, cancelLogin, submitManualAuth, recoverCredentials,
 } = useSettingsContext().auth;
 const official = useSettingsContext().official;
 
@@ -109,6 +110,12 @@ const needsAttention = computed(() =>
       </FoldTransition>
     </details>
     <FoldTransition><p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p></FoldTransition>
+    <CredentialRecovery v-if="official.status.value.credential_recovery"
+      :recovery="official.status.value.credential_recovery" :busy="official.busy.value"
+      @retry="official.recover" @discard="official.cancel" />
+    <CredentialRecovery v-if="loginStatus.credential_recovery" kind="advanced"
+      :recovery="loginStatus.credential_recovery" :busy="loginBusy || manualAuthBusy"
+      @retry="recoverCredentials" @discard="cancelLogin" />
     <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
          用手动填写，而不是反复重试网页登录。 -->
     <FoldTransition>

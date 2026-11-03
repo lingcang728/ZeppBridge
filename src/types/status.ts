@@ -149,6 +149,7 @@ export interface SyncProgress {
 export type LoginState = 'idle' | 'waiting' | 'extracting' | 'verifying' | 'connected' | 'failed';
 
 export interface LoginStatus {
+  credential_recovery?: { platform: string; can_save_file: boolean } | null;
   state: LoginState | string;
   message: string;
   page_url: string;
@@ -158,6 +159,8 @@ export interface LoginStatus {
 
 /** Zepp 官方授权的状态（`official://status` 事件与相关命令的返回值）。 */
 export interface OfficialStatus {
+  /** Only public recovery options; authorization tokens remain in backend memory. */
+  credential_recovery?: { platform: string; can_save_file: boolean } | null;
   state: 'idle' | 'waiting' | 'connected' | 'needs_reauth' | 'failed' | string;
   /** 失败时的错误码（`err.official.*`），界面按它取文案。 */
   message_code: string | null;

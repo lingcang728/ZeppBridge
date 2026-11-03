@@ -181,9 +181,10 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
   Object.assign(handlers, operations.handlers, {
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
+    recover_advanced_credentials: () => handlers.get_login_status({}),
     start_web_login: () => { status = demoStatus(data); return { state: 'connected', message: '', page_url: '' }; },
     cancel_web_login: () => ({ state: 'idle', message: '', page_url: '' }),
-    start_official_login: () => handlers.get_official_status({}), cancel_official_login: () => handlers.get_official_status({}),
+    start_official_login: () => handlers.get_official_status({}), recover_official_credentials: () => handlers.get_official_status({}), cancel_official_login: () => handlers.get_official_status({}),
     disconnect_official: () => ({ state: 'disconnected', message: null, message_code: null, user_id_masked: null, nickname: null, connected_at: null, authorize_url: null }),
     cancel_sync: () => null,
     get_workout_type_options: () => ['running', 'cycling', 'walking', 'hiking', 'pool_swim', 'strength', 'yoga'].map(key => ({ key, label: key, family: key })),

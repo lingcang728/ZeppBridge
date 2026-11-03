@@ -3,6 +3,7 @@ import { backend, toUserMessage } from '../../lib/bridge';
 import { useMessages } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
 import { backendText } from '../../i18n/backendText';
+import { credentialRecoveryMessages } from '../../components/CredentialRecovery.i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { OfficialStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
@@ -19,6 +20,7 @@ const idle = (): OfficialStatus => ({
  */
 export const createOfficialAuth = (feedback: SettingsFeedback) => {
   const t = useMessages(settingsMessages);
+  const recoveryText = useMessages(credentialRecoveryMessages);
   const status = ref<OfficialStatus>(idle());
   const busy = ref(false);
   /** 已经按码本地化好的失败说明（后端原文只兜底）。 */
@@ -62,6 +64,21 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     try {
       apply(await backend.cancelOfficialLogin());
       failureText.value = null;
+    } catch (cause) {
+      failureText.value = toUserMessage(cause, t.value.officialFailed);
+    } finally {
+      busy.value = false;
+    }
+  };
+
+  const recover = async (storage: 'system' | 'file') => {
+    busy.value = true;
+    try {
+      const next = await backend.recoverOfficialCredentials(storage);
+      apply(next);
+      if (next.state === 'connected' && storage === 'file') {
+        feedback.dataMessage.value = recoveryText.value.savedFile;
+      }
     } catch (cause) {
       failureText.value = toUserMessage(cause, t.value.officialFailed);
     } finally {
@@ -121,7 +138,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
 
   return {
     status, busy, failureText, waiting, connected, needsReauth, linkCopied,
-    start, cancel, disconnect, copyLink, attach, detach,
+    start, cancel, recover, disconnect, copyLink, attach, detach,
   };
 };
 

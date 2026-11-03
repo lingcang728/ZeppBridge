@@ -14,7 +14,7 @@
     "site:media": "python scripts/site/capture-features.py --all",
     "site:verify": "python scripts/site/verify-landing.py",
     "test:feedback": "node --test tests/feedback-function.test.mjs",
-    "test:functions": "node --test tests/font-subset.test.mjs tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs tests/zepp-oauth-functions.test.mjs tests/site-middleware.test.mjs",
+    "test:functions": "node --test tests/font-subset.test.mjs tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs tests/zepp-oauth-functions.test.mjs tests/site-middleware.test.mjs tests/dev-styles.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
@@ -31,7 +31,9 @@
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
     "feedback:triage": "node scripts/feedback/triage.mjs",
-    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py"
+    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py",
+    "postinstall": "node scripts/dev/patch-vue-external-styles.mjs",
+    "test:dev": "node --test tests/dev-styles.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -48,7 +50,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@types/leaflet": "^1.9.22",
-    "@vitejs/plugin-vue": "^6.0.8",
+    "@vitejs/plugin-vue": "6.0.8",
     "typescript": "~6.0.3",
     "vite": "^7.3.6",
     "vitest": "^4.1.11",

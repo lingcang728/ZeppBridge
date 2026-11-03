@@ -15,6 +15,27 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/CredentialRecovery': {
+      advancedDescription: 'Não foi possível salvar suas credenciais de dados avançados. Elas ficam na memória por até 10 minutos para que você possa tentar novamente sem fazer login ou inserir o token de novo. Cancelar, iniciar outro login, enviar credenciais manualmente de novo ou fechar o aplicativo descarta essas credenciais.',
+      advancedFileWarning: 'Esta opção salva o App Token de dados avançados como texto simples em credentials.json na pasta de dados do aplicativo. No Linux e no macOS, o arquivo usa a permissão 0600. Programas executados com seu usuário podem lê-lo. O aplicativo reutilizará esse arquivo ao reiniciar, a menos que uma configuração de inicialização selecione explicitamente outro armazenamento.',
+      advancedDiscard: 'Descartar estas credenciais de login',
+      advancedExpired: 'Estas credenciais de login não estão mais disponíveis. Conecte os dados avançados novamente.',
+      title: 'Escolha como salvar seu login',
+      description: 'A autorização foi concluída, mas não foi possível salvar o token. Ele fica na memória por até 10 minutos para que você possa tentar novamente sem fazer login de novo. Fechar o aplicativo ou iniciar uma nova autorização descarta o token.',
+      systemOption: 'Reparar o armazenamento de credenciais do sistema (recomendado)',
+      fileOption: 'Salvar em um arquivo JSON local',
+      repairLinux: 'Abra o gerenciador de senhas ou de carteiras do sistema. Crie um chaveiro ou uma carteira padrão, caso não exista, e desbloqueie-o. Em ambientes de desktop como o Niri, verifique se um provedor de Secret Service, como o KWallet ou o GNOME Keyring, está em execução. Depois, tente novamente abaixo.',
+      repairMac: 'Abra o Acesso às Chaves, desbloqueie seu chaveiro de login e permita que o ZeppBridge salve credenciais. Depois, tente novamente abaixo.',
+      repairWindows: 'Verifique se o Gerenciador de Credenciais do Windows está disponível e se sua conta pode usá-lo. Depois, tente novamente abaixo.',
+      retrySystem: 'Já reparei — tentar salvar novamente',
+      fileWarning: 'Esta opção salva os tokens de acesso e de atualização como texto simples em credentials.json na pasta de dados do aplicativo. No Linux e no macOS, o arquivo usa a permissão 0600. Programas executados com seu usuário podem lê-lo. O aplicativo reutilizará esse arquivo ao reiniciar, a menos que uma configuração de inicialização selecione explicitamente outro armazenamento.',
+      consent: 'Entendo e concordo em salvar os tokens como texto simples neste dispositivo.',
+      saveFile: 'Concordar e salvar em JSON',
+      discard: 'Descartar esta autorização',
+      expired: 'Esta autorização não está mais disponível. Faça login novamente.',
+      savedFile: 'Login salvo no arquivo local credentials.json.',
+      fileUnavailable: 'O armazenamento em arquivo não está disponível nesta plataforma ou foi substituído pela sua configuração de inicialização. Repare o armazenamento de credenciais do sistema para continuar.',
+    },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Sem leituras nos últimos 6 meses: ${list}`,
       separator: ", ",
