@@ -16,6 +16,8 @@ const labels: Partial<Record<LandingLocale, string[]>> = {
   it: ['Invia', 'Lettura dei dati', 'Il tuo piano è pronto', 'Copia piano', 'Recupero del piano', 'Indietro', 'Conversazione di esempio', 'Mantieni i giorni di riposo e crea un piano da importare.', 'Il piano include date, attività e passaggi. I giorni di riposo rimangono aperti e le misurazioni mancanti non sono state integrate con dati fittizi.\n\nIn ZeppBridge puoi controllare riscaldamento, allenamento e defaticamento per ogni giorno. Trascina le schede per scambiare le date e poi decidi se inviare il piano all’orologio.'],
 };
 export function dialogueCopy(locale: LandingLocale) {
-  const [send, thinking, ready, copy, returning, back, example, prompt, answer] = labels[locale] ?? labels.en!;
+  // 繁体还没翻时先用简体（翻译.md 第三十四批）。
+  const [send, thinking, ready, copy, returning, back, example, prompt, answer] =
+    labels[locale] ?? (locale === 'zh-TW' ? labels.zh : undefined) ?? labels.en!;
   return { send, thinking, ready, copy, returning, back, example, finalTurn: { prompt, answer } };
 }

@@ -487,7 +487,9 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW'];
+/** 本身就写汉字的语言包：不查「非中文包里出现 CJK」。 */
+const CJK_PACK_LOCALES = new Set(['zh-TW']);
 
 /* —— 极简文案表扫描器 ——
  * 不是真 parser：只对付 `key: '…'`、`key: {…}`、`key: (a,b)=>…`、
@@ -961,7 +963,7 @@ const auditLocalePacks = (writePending) => {
         if (leaf.kind === 'string' && leaf.text.trim() === '') {
           problems.push(`  locales/${l}.ts → ${full}: 空串叶子`);
         }
-        if (CHINESE.test(leaf.text)) {
+        if (!CJK_PACK_LOCALES.has(l) && CHINESE.test(leaf.text)) {
           problems.push(`  locales/${l}.ts → ${full}: 非中文语言包里出现 CJK`);
         }
         if (zhLeaf.kind === 'function') {

@@ -3,6 +3,7 @@
  * 锚点是文档里手写的 `<a id>`，不随标题翻译变。
  */
 import { backend } from './bridge';
+import { isChineseLocale } from '../i18n';
 
 const BASE = 'https://github.com/lingcang728/ZeppBridge/blob/main/docs/guides';
 
@@ -10,10 +11,10 @@ export type FaqAnchor = 'relay' | 'missing-data' | 'helio' | 'windows-warning';
 export type Guide = 'ai';
 
 export const faqUrl = (anchor: FaqAnchor, locale: string): string =>
-  `${BASE}/${locale === 'zh' ? 'faq.zh-CN.md' : 'faq.md'}#${anchor}`;
+  `${BASE}/${isChineseLocale(locale) ? 'faq.zh-CN.md' : 'faq.md'}#${anchor}`;
 
 export const guideUrl = (guide: Guide, locale: string): string =>
-  `${BASE}/${guide}${locale === 'zh' ? '.zh-CN' : ''}.md`;
+  `${BASE}/${guide}${isChineseLocale(locale) ? '.zh-CN' : ''}.md`;
 
 /** 打不开浏览器时什么也不做：这只是一条说明链接，失败不值得弹错。 */
 const openQuietly = (url: string): void => {

@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { FALLBACK_APP_VERSION } from '../lib/appVersion';
+import { isChineseLocale } from '../i18n';
 
 export interface UpdateReceipt {
   from: string;
@@ -29,7 +30,8 @@ export const bundledNoteLocales = (): string[] =>
 export async function loadBundledNotes(version: string, language: string): Promise<string | null> {
   if (version !== BUNDLED_VERSION) return null;
   const pick = (code: string) => BUNDLED_NOTES[`../../docs/releases/${BUNDLED_VERSION}/${code}.md`];
-  const loader = pick(language) ?? pick('en');
+  // 繁体没有自己那份时先落简体（3.1.1 之前的版本都没有繁体说明）。
+  const loader = pick(language) ?? (language === 'zh-TW' ? pick('zh') : undefined) ?? pick('en');
   if (!loader) return null;
   try {
     return await loader();
@@ -63,7 +65,7 @@ export function notesForLocale(raw: string, language: string): string {
   // 3.1.0 的 Release 正文在更新清单后面接过一节英文信（以后不再这样做，信只走信封）；为它保留截断，不混进清单。
   const notes = raw.split(/^## A letter from the author\s*$/m)[0]!;
   const match = /^## 中文\r?\n([\s\S]*?)^## English\r?\n([\s\S]*)/m.exec(notes);
-  return match ? (language === 'zh' ? match[1]! : match[2]!).trim() : notes;
+  return match ? (isChineseLocale(language) ? match[1]! : match[2]!).trim() : notes;
 }
 
 /** Save before the updater exits the process. A failed or cancelled update never qualifies. */

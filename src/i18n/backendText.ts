@@ -15,7 +15,7 @@
  * 代价是英文用户偶尔会看到一句笼统的「原因未记录」而不是具体原因。这个代价
  * 是值得的：看不懂的中文对他既没有信息量，也没法反馈给我们。
  */
-import { activeLocalePack, locale } from './index';
+import { activeLocalePack, isChineseLocale, locale } from './index';
 
 /** 中日韩统一表意文字。够覆盖这个项目里会出现的中文。 */
 const CJK = /[一-鿿]/;
@@ -32,7 +32,7 @@ export const backendText = (
 ): string => {
   const value = (text ?? '').trim();
   if (!value) return fallback;
-  if (locale.value === 'zh') return value;
+  if (isChineseLocale(locale.value)) return value;
   return CJK.test(value) ? fallback : value;
 };
 
