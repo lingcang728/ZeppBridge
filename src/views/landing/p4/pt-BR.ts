@@ -34,11 +34,18 @@ const pack: P4Copy = {
       lead: 'Todas as tendências em uma só tela para entender seu corpo na hora. Abra qualquer métrica para ver o histórico completo.',
       points: [
         { id: 'overview', title: 'Na sua ordem', text: 'Sono ou treinos primeiro: a tela inicial segue suas prioridades. Navegue e abra os detalhes.', scene: 'overview' },
-        { id: 'hourly', title: 'Hora a hora', text: 'Passos, distância e calorias acompanhados hora a hora ao longo do dia.', scene: 'hourly' },
+        { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
         { id: 'workouts', title: 'Cada corrida ecoa', text: 'Compare com treinos anteriores de distância parecida: frequência cardíaca, ritmo e trajeto no mapa.', scene: 'workouts' },
         { id: 'gaps', title: 'Nada inventado', text: 'Se não foi medido, fica em branco. Sem zeros falsos, valores repetidos ou estimativas aproximadas.', scene: 'gaps' },
       ],
     },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
+    ] },
     {
       id: 'ai',
       name: 'Enviar à IA',
@@ -88,6 +95,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacidade e segurança', text: 'Credenciais protegidas pelo sistema operacional. Tokens nunca vão para os logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Nomes de arquivo', text: 'Defina como nomear os arquivos gerados para a IA.', icon: 'document' },
       { id: 'folder', title: 'Leve com você', text: 'Seus dados ficam em uma pasta neste computador, e tudo o que você escreveu aqui — avaliações, planos, tarefas de IA — é exportado em um único JSON.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
@@ -97,6 +105,7 @@ const pack: P4Copy = {
         { id: 'motion', label: 'Design' },
         { id: 'connection', label: 'Conexão' },
         { id: 'records', label: 'Clareza' },
+        { id: 'journal', label: 'Archive' },
       ],
     },
     {

@@ -34,11 +34,18 @@ const pack: P4Copy = {
       lead: 'एक ही पेज पर हर ट्रेंड, ताकि शरीर की स्थिति तुरंत समझ आ सके। पूरा इतिहास देखने के लिए किसी भी मेट्रिक को खोलें।',
       points: [
         { id: 'overview', title: 'आपकी पसंद का क्रम', text: 'नींद या वर्कआउट पहले: होम पेज आपकी प्राथमिकताओं के अनुसार व्यवस्थित होता है। स्क्रॉल करें और विवरण देखें।', scene: 'overview' },
-        { id: 'hourly', title: 'घंटे-दर-घंटे', text: 'दिन के हर घंटे के कदम, दूरी और कैलोरी का सटीक हिसाब।', scene: 'hourly' },
+        { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
         { id: 'workouts', title: 'हर दौड़ की एक गूंज', text: 'समान दूरी की अपनी पिछली दौड़ों से तुलना करें: हृदय गति, गति और मैप रूट।', scene: 'workouts' },
         { id: 'gaps', title: 'कुछ भी मनगढ़ंत नहीं', text: 'जो रिकॉर्ड नहीं हुआ, वह खाली रहता है। कोई फर्जी शून्य, पुराना मान या अनुमान नहीं।', scene: 'gaps' },
       ],
     },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
+    ] },
     {
       id: 'ai',
       name: 'AI को दें',
@@ -88,10 +95,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'गोपनीयता और सुरक्षा', text: 'सिस्टम द्वारा क्रेडेंशियल्स सुरक्षित। टोकन कभी भी लॉग में नहीं जाते।', icon: 'browser-login' },
       { id: 'filename', title: 'फ़ाइल नाम', text: 'AI के लिए तैयार की जाने वाली फ़ाइलों का नाम आप तय करें।', icon: 'document' },
       { id: 'folder', title: 'कभी भी साथ ले जाएं', text: 'आपका डेटा इसी कंप्यूटर के फ़ोल्डर में रहता है, और यहाँ आपके दर्ज किए रेटिंग, प्लान, AI कार्य एक ही JSON फ़ाइल में एक्सपोर्ट हो जाते हैं।', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'ZeppBridge को जानें', links: [{ id: 'motion', label: 'डिज़ाइन' }, { id: 'connection', label: 'कनेक्शन' }, { id: 'records', label: 'समझें' }] },
+    { label: 'ZeppBridge को जानें', links: [{ id: 'motion', label: 'डिज़ाइन' }, { id: 'connection', label: 'कनेक्शन' }, { id: 'records', label: 'समझें' }, { id: 'journal', label: 'Archive' }] },
     { label: 'रिकॉर्ड से एक्शन तक', links: [{ id: 'ai', label: 'AI को दें' }, { id: 'ai-plan', label: 'ट्रेनिंग प्लान' }, { id: 'record-sleep', label: 'नींद और कसरत' }] },
     { label: 'आपकी पसंद', links: [{ id: 'connect', label: 'सेटिंग' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'लोकल API' }] },
   ],
