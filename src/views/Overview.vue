@@ -2,6 +2,7 @@
 
 defineOptions({ name: 'Overview' });
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch, type Component } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import BackfillOffer from '../components/BackfillOffer.vue';
@@ -357,6 +358,8 @@ onMounted(() => {
   void loadDevices();
 });
 useRevisionReload(() => { void loadOverview(); void reloadAfterDataChange(); });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('home');
 </script>
 
 <template>

@@ -38,6 +38,7 @@ vi.mock('../../../lib/bridge', () => ({
   isDesktop: () => false,
   toUserMessage: (_error: unknown, fallback: string) => fallback,
 }));
+vi.mock('../../useTour', () => ({ useSectionTour: () => undefined }));
 vi.mock('../context', () => ({ useSettingsContext: () => ({ auth, official }) }));
 vi.mock('../../../views/settings/DiagnosticReportForm.vue', () => ({ default: { render: () => h('form') } }));
 

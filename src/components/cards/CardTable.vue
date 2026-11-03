@@ -15,7 +15,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 
 import Icon from '../Icon.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import PlayingCard from './PlayingCard.vue';
-import { offerInlineSoon } from '../../composables/useTour';
 import { useCardsText } from './cards.i18n';
 import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
@@ -426,8 +425,6 @@ const measure = () => {
   if (drag.piles.value.length) void nextTick(() => drag.layoutPiles(false));
 };
 onMounted(() => {
-  // 第一次打开牌桌：牌摊开以后就地说一句怎么玩（新手引导的就地一章，取代以前的 CoachTip）。
-  offerInlineSoon('cards', 800);
   returnFocus = document.activeElement as HTMLElement | null;
   releaseEscape = onMotionEscape(() => {
     if (drag.cancel()) return true;

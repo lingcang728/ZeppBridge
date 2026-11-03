@@ -38,7 +38,8 @@ import '../../styles/ai-task.css';
 defineOptions({ name: 'AiPlanWeek' });
 const hub = useAiHub();
 /* 第一次看到一周计划：就地说一句怎么改、怎么发（新手引导的就地一章）。没有计划时不说。 */
-watch(() => !!hub.future.value, (has) => { if (has) offerInlineSoon('planFirst', 900, () => !!hub.future.value); }, { immediate: true });
+// 新手引导「训练计划」一章：有了一周计划才讲（空页不讲），计划接回来的那一刻也会问一句。
+watch(() => !!hub.future.value, (has) => { if (has) offerInlineSoon('plan', 900, () => !!hub.future.value); }, { immediate: true });
 const plan = useTrainingPlan();
 const history = useExchanges();
 const t = useBridgeText();
@@ -103,7 +104,7 @@ const changes = computed(() => (plan.editingSent.value
         <PlanStatusChip ref="chip" :state="plan.state.value" :drafting="!!plan.preview.value && plan.accepted.value" :busy="plan.busy.value" :sending="sending" :simulated="hub.demo.value"
           :discardable="!!plan.preview.value && plan.accepted.value" @undo="plan.undo()" @clear="plan.clear()" @discard="plan.discard()" />
         <ReceiveCapsule v-if="hub.future.value" variant="pill" :target="landing" @received="received" />
-        <RouterLink class="pill-button quiet" to="/ai/plan/history"><Icon name="clock" :size="14" />{{ ht.open }}</RouterLink>
+        <RouterLink class="pill-button quiet" to="/ai/plan/history" data-tour="plan-history"><Icon name="clock" :size="14" />{{ ht.open }}</RouterLink>
       </div>
     </PageHeader>
     <div v-if="plan.preview.value && !plan.accepted.value" class="ai-message"><Icon name="spark" :size="16" /><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>

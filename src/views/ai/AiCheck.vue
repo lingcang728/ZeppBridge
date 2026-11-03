@@ -10,8 +10,7 @@
  * 选项全部平铺、大白话：详细程度玻璃三档、精确路线玻璃开关、每个 AI 各自的「免费版 / 已订阅」玻璃两档。
  * 「允许本机 MCP 查询这个任务」挪到了设置 → MCP。
  */
-import { computed, nextTick, onMounted, ref } from 'vue';
-import { offerInlineSoon } from '../../composables/useTour';
+import { computed, nextTick, ref } from 'vue';
 import PageHeader from '../../components/PageHeader.vue';
 import Icon from '../../components/Icon.vue';
 import HandoffTray from '../../components/ai/HandoffTray.vue';
@@ -31,7 +30,6 @@ import '../../styles/ai-task.css';
 defineOptions({ name: 'AiCheck' });
 const hub = useAiHub();
 /* 第一次来到寄出前检查：就地说一句这页是干什么的（新手引导的就地一章）。等大卡长出来再说。 */
-onMounted(() => { offerInlineSoon('check', 900); });
 const ctl = useAiTaskDraft();
 const { draft } = ctl;
 const bt = useBridgeText();

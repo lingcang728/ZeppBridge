@@ -16,6 +16,7 @@ import { useFirstLoad } from '../composables/useFirstLoad';
  * 稀疏画成故障。
  */
 import { computed, onMounted, ref } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import FoldTransition from '../components/FoldTransition.vue';
@@ -210,6 +211,8 @@ const summary = computed(() => {
 
 // 第一帧用的是先前读好的数据：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('devices');
 </script>
 
 <template>

@@ -11,6 +11,7 @@
 import '../components/letters/paper.css';
 import '../components/letters/letterRail.css';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
@@ -99,12 +100,14 @@ const reread = async (version: string, event: MouseEvent) => {
   const notes = version === BUNDLED_VERSION ? await loadBundledNotes(version, locale.value) : null;
   reading.value = { version, notes: notes ? groupRows(releaseRows(notes)) : null, origin };
 };
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('letters');
 </script>
 
 <template>
   <section class="page letter-box" aria-labelledby="letter-box-title">
     <PageHeader title-id="letter-box-title" :title="t.boxTitle" :intro="t.boxSub">
-      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" />
+      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" data-tour="letter-tabs" />
     </PageHeader>
 
     <!-- 换分栏：旧的淡出、淡完新的淡入，不位移（2026-10-29 用户：以前是硬切）。 -->

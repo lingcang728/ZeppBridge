@@ -38,7 +38,7 @@ const text = computed(() => {
   const copy = t.value.steps[now.chapter] as StepCopy;
   let line = copy[`s${now.step + 1}`] ?? '';
   // 交给 AI 第 3 步的后半句讲「全自动」开关：只有 Windows 有那个开关，别的系统不说。
-  if (now.chapter === 'handoff' && now.step === 2 && copy.s3Auto && autoSupported()) {
+  if (now.chapter === 'ai' && now.step === 2 && copy.s3Auto && autoSupported()) {
     line += /[\u3000-\u9fff]$/.test(line) ? copy.s3Auto : ` ${copy.s3Auto}`;
   }
   return withPlatformKeys(line);
