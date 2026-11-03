@@ -1,0 +1,23 @@
+- Added: **Cartas do autor**. Cada atualização agora vem acompanhada de uma carta. Na última página você pode responder diretamente ao autor de forma anônima; os rascunhos são salvos automaticamente e aguardam no seu computador enquanto você estiver offline.
+- Added: **Caixa de cartas**. Uma carta semanal sobre os seus dados, cartas para o seu eu do futuro em seis meses, um ano ou três anos que só abrem no dia marcado, além de ver como estavam seus dados neste mesmo dia nos anos anteriores.
+- Added: **Página do Diário**. Calendário de atividades do ano inteiro, contagem regressiva para provas e mural de medalhas, mural de recordes pessoais (RP) de 5 km à maratona, quilometragem de tênis com avisos de aposentadoria, lesões e eras, tudo em um só lugar.
+- Added: **Anéis**. Um anel cresce a cada ano e se alarga nas semanas de treino mais intenso; toque em uma linha para ver o treino daquele dia. Compartilhe como imagem em um clique, sem que seus dados brutos saiam do computador.
+- Added: **“Como você se sentiu” nos treinos**. Registre sua própria PSE (RPE), regiões doloridas e qual tênis você usou na sessão.
+- Added: **Avaliação pós-treino planejado**. Após concluir um plano enviado ao relógio, a visão geral pergunta como foi o treino; se foi difícil demais, reduza a intensidade do próximo em 10% com um clique. No Windows, você pode responder direto na notificação do sistema.
+- Added: **Caixa de entrada de memórias da IA**. Claude e outras ferramentas podem sugerir coisas para lembrar, e você decide item por item; somente o que você aprovar será compartilhado com a IA.
+- Added: **Biblioteca de prompts**. Filtre tarefas salvas da IA por categoria de dados, recupere versões anteriores de um prompt e exporte tarefas como arquivos .zbprompt para compartilhar.
+- Added: **Importação de múltiplas fontes**. Importe treinos de arquivos GPX / TCX, FIT, exportações completas do Strava ou do Apple Saúde; cada importação vira um lote que pode ser desfeito por inteiro.
+- Added: **Leve tudo com você**. Em Configurações › Arquivamento e armazenamento, exporte tudo o que você escreveu e organizou no ZeppBridge em um único arquivo JSON.
+- Added: **Alterar tipos em lote e ocultar treinos (#154, #151)**. Selecione múltiplos treinos na lista; treinos ocultados não entram nas estatísticas, IA nem exportações, preservando os dados originais e podendo ser restaurados a qualquer momento.
+- Added: **Obter detalhes de treinos antigos separadamente (#153)**. Inicie, pause e retome em Configurações › Arquivamento e armazenamento, com distinção clara entre “sem detalhes na nuvem” e “falha na requisição”.
+- Improved: **Sua própria faixa habitual**. Até dez anos de histórico definem sua faixa padrão e, após um ano, o cartão exibe seu padrão de longo prazo.
+- Improved: **Origem de cada métrica**. Veja claramente se cada métrica vem de leitura de sensor, fórmula pública ou estimativa do algoritmo da Zepp, e desative métricas da análise sem apagar seus dados.
+- Improved: **Calendário de cobertura**. As Configurações exibem uma linha por ano e um quadrado por mês; os meses em que o preenchimento obteve dados reais ganham contorno dourado, e meses com lacunas podem ser preenchidos com um clique.
+- Improved: **Mais clareza quando as contas não coincidem**. Se a autorização oficial e os dados avançados pertencerem a contas Zepp diferentes, ambas são exibidas lado a lado com orientações sobre o que fazer; você também pode recomeçar com outra conta, arquivando os dados antigos sem excluí-los.
+- Improved: **Atualizações automáticas podem ser desativadas**. Há uma nova chave ao lado de Verificar atualizações nas Configurações, e as animações reduzem a intensidade automaticamente em computadores mais lentos ou com bateria baixa.
+- Fixed: **O tipo de treino 15 do Balance 2 não é mais tratado sempre como trilha (#155)**.
+- Fixed: **Quando ambas as conexões têm detalhes do treino, os dados avançados têm prioridade (#143)**. A distância ponto a ponto não é mais sobrescrita pelos detalhes oficiais obtidos posteriormente.
+- Fixed: **Sair da conta e reconectar agora funcionam mesmo quando as Chaves do macOS não puderem ser lidas (#145)**.
+- Fixed: **Preenchimento histórico via linha de comando acima de 365 dias (#152)**. Agora alterna automaticamente para o preenchimento mês a mês.
+- Fixed: **O cartão de ganho de elevação e o gráfico de altitude agora concordam**. Em percursos planos, passa a exibir a faixa real de altitude e o maior desnível.
+- Fixed: **Desinstalação com a opção “Excluir dados do aplicativo” marcada agora remove tudo completamente**.

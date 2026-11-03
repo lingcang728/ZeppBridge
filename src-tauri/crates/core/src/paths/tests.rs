@@ -18,6 +18,56 @@ use super::*;
 use std::fs;
 
 #[test]
+fn explicit_library_never_discovers_or_moves_a_default_library() {
+    let root = std::env::temp_dir().join(format!(
+        "explicit-library-isolation-{}-{}",
+        std::process::id(),
+        crate::unique_suffix()
+    ));
+    let source = root.join("default");
+    let destination = root.join("isolated");
+    fs::create_dir_all(&source).unwrap();
+    fs::create_dir_all(&destination).unwrap();
+    fs::write(source.join("zepp.db"), b"default library sentinel").unwrap();
+    fs::write(source.join("auth.json"), b"default credential sentinel").unwrap();
+    let candidates = default_library_sources(Some(destination.clone().into_os_string()), || {
+        panic!("must not discover default locations for an explicit library")
+    });
+    for candidate in candidates {
+        relocate_from(&candidate, &destination).unwrap();
+    }
+    assert_eq!(
+        fs::read(source.join("zepp.db")).unwrap(),
+        b"default library sentinel"
+    );
+    assert_eq!(
+        fs::read(source.join("auth.json")).unwrap(),
+        b"default credential sentinel"
+    );
+    assert_eq!(fs::read_dir(&destination).unwrap().count(), 0);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn absent_or_empty_override_keeps_default_discovery_and_invalid_override_fails_closed() {
+    let source = PathBuf::from("default-library-candidate");
+    assert_eq!(
+        default_library_sources(None, || vec![source.clone()]),
+        vec![source.clone()]
+    );
+    assert_eq!(
+        default_library_sources(Some("".into()), || vec![source.clone()]),
+        vec![source]
+    );
+    assert!(
+        default_library_sources(Some("relative/library".into()), || {
+            panic!("invalid overrides must not fall back to a real library")
+        })
+        .is_empty()
+    );
+}
+
+#[test]
 fn app_bundle_takes_priority_even_under_a_build_cache() {
     let path = Path::new("/tmp/target/release/bundle/ZeppBridge.app/Contents/MacOS");
     assert!(is_build_artifact_dir(path));
@@ -35,10 +85,7 @@ fn replacing_the_bundle_preserves_migrated_account_devices_and_library() {
     let root = std::env::temp_dir().join(format!(
         "bundle-update-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let bundle = root.join("ZeppBridge.app");
     let source = bundle.join("Contents/MacOS/data");
@@ -100,10 +147,7 @@ fn bundle_migration_copies_live_wal_and_preserves_existing_library() {
     let root = std::env::temp_dir().join(format!(
         "bundle-copy-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("ZeppBridge.app/Contents/MacOS/data");
     let destination = root.join("support/data");
@@ -163,10 +207,7 @@ fn bundle_migration_tolerates_finder_junk_and_leftover_logs() {
     let root = std::env::temp_dir().join(format!(
         "bundle-junk-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -210,10 +251,7 @@ fn bundle_migration_falls_back_to_file_copy_when_the_source_db_wont_open() {
     let root = std::env::temp_dir().join(format!(
         "bundle-corrupt-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -237,10 +275,7 @@ fn bundle_migration_recreates_symlinks_instead_of_failing() {
     let root = std::env::temp_dir().join(format!(
         "bundle-link-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("source");
     let destination = root.join("destination");
@@ -271,10 +306,7 @@ fn an_app_suffixed_directory_without_contents_is_not_a_bundle() {
     let root = std::env::temp_dir().join(format!(
         "fake-bundle-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let exe_dir = root.join("tools.app").join("release");
     let data = exe_dir.join("data");
@@ -396,10 +428,7 @@ fn relocates_sqlite_group_without_overwriting() {
     let root = std::env::temp_dir().join(format!(
         "zeppbridge-path-test-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("appdata");
     let dest = root.join("install").join("data");
@@ -445,10 +474,7 @@ fn does_not_attach_foreign_wal_to_existing_destination_db() {
     let root = std::env::temp_dir().join(format!(
         "zeppbridge-path-wal-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let source = root.join("appdata");
     let dest = root.join("install").join("data");
@@ -466,15 +492,35 @@ fn does_not_attach_foreign_wal_to_existing_destination_db() {
     let _ = fs::remove_dir_all(root);
 }
 
+/// `ZEPPBRIDGE_DATA_DIR` 或开发版指到别处时，装好的应用那份库原地不动。
+#[test]
+fn the_live_library_is_never_relocated_into_another_data_dir() {
+    let flat = PathBuf::from("/Users/a/Library/Application Support/com.zeppbridge.ZeppBridge");
+    let live = flat.join("data");
+    let custom = PathBuf::from("/tmp/zeppbridge-custom");
+    let candidates = vec![flat.clone(), live.clone()];
+
+    assert_eq!(
+        relocation_sources(&custom, candidates.clone(), Some(&live)),
+        vec![flat.clone()]
+    );
+    // Windows：AppData 那份照旧搬进安装目录旁边。
+    assert_eq!(
+        relocation_sources(&custom, candidates.clone(), None),
+        vec![flat.clone(), live.clone()]
+    );
+    assert_eq!(
+        relocation_sources(&live, candidates, Some(&live)),
+        vec![flat]
+    );
+}
+
 #[test]
 fn atomic_write_replaces_an_existing_file() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-atomic-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("out.json");
@@ -493,4 +539,55 @@ fn atomic_write_replaces_an_existing_file() {
         .collect();
     assert!(leftovers.is_empty(), "temp file was left behind");
     let _ = fs::remove_dir_all(dir);
+}
+
+fn fresh_root(label: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!("zb-fresh-{label}-{}", crate::unique_suffix()));
+    std::fs::create_dir_all(&root).unwrap();
+    root
+}
+
+#[test]
+fn fresh_start_moves_the_whole_library_aside_and_keeps_every_file() {
+    use std::time::Duration;
+    let root = fresh_root("move");
+    let data = root.join("data");
+    std::fs::create_dir_all(data.join("webview")).unwrap();
+    std::fs::write(data.join("zepp.db"), b"library").unwrap();
+    std::fs::write(data.join("official.json"), b"{}").unwrap();
+
+    assert_eq!(
+        fresh_start::apply_with_wait(&data, Duration::ZERO).unwrap(),
+        None,
+        "no marker, no move"
+    );
+    request_fresh_start(&data).unwrap();
+    let aside = fresh_start::apply_with_wait(&data, Duration::ZERO)
+        .unwrap()
+        .expect("moved");
+
+    assert!(data.is_dir());
+    assert_eq!(
+        std::fs::read_dir(&data).unwrap().count(),
+        0,
+        "fresh library is empty"
+    );
+    assert_eq!(std::fs::read(aside.join("zepp.db")).unwrap(), b"library");
+    assert!(aside.join("official.json").is_file() && aside.join("webview").is_dir());
+    assert!(
+        !aside.join(fresh_start::MARKER).exists(),
+        "renaming it back must not move it again"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn fresh_start_never_reuses_an_existing_folder() {
+    let root = fresh_root("reuse");
+    std::fs::create_dir_all(root.join("data-before-x")).unwrap();
+    assert_eq!(
+        fresh_start::aside_path(&root.join("data"), "x").unwrap(),
+        root.join("data-before-x-2")
+    );
+    let _ = std::fs::remove_dir_all(root);
 }

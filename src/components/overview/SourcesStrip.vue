@@ -23,6 +23,7 @@ const messages = defineMessages(
     identifyingDevices: '正在识别实体设备…',
     identifyFailed: (reason: string) => `设备识别暂不可用：${reason}`,
     noDevicesYet: '尚未识别实体设备',
+    noDevicesOfficial: '要识别设备，请连接「高级数据」',
     manage: '管理',
     latestData: (when: string) => `最新数据 ${when}`,
     sourcesAria: '数据来源与账户状态',
@@ -32,6 +33,7 @@ const messages = defineMessages(
     identifyingDevices: 'Identifying your devices…',
     identifyFailed: (reason: string) => `Device identification unavailable: ${reason}`,
     noDevicesYet: 'No device identified yet',
+    noDevicesOfficial: 'Connect Advanced data to identify devices',
     manage: 'Manage',
     latestData: (when: string) => `Latest data ${when}`,
     sourcesAria: 'Data sources and account state',
@@ -41,6 +43,7 @@ const messages = defineMessages(
     identifyingDevices: 'Identificando tus dispositivos…',
     identifyFailed: (reason: string) => `La identificación de dispositivos no está disponible: ${reason}`,
     noDevicesYet: 'Aún no se ha identificado ningún dispositivo',
+    noDevicesOfficial: 'Conecta «Datos avanzados» para identificar dispositivos',
     manage: 'Gestionar',
     latestData: (when: string) => `Datos más recientes ${when}`,
     sourcesAria: 'Fuentes de datos y estado de la cuenta',
@@ -88,7 +91,7 @@ const chips = computed(() => [
     <div class="sources-row">
       <span v-if="devicesLoading" class="sources-feedback" role="status">{{ t.identifyingDevices }}</span>
       <span v-else-if="devicesError" class="sources-feedback error" role="alert">{{ t.identifyFailed(devicesError) }}</span>
-      <span v-else-if="!deviceModels.length" class="sources-feedback" role="status">{{ t.noDevicesYet }}</span>
+      <span v-else-if="!deviceModels.length" class="sources-feedback" role="status">{{ appStatus?.data_source === 'official' ? t.noDevicesOfficial : t.noDevicesYet }}</span>
       <RouterLink v-for="chip in chips" :key="chip.key" class="source-chip" :to="chip.to">
         <span v-if="chip.kind === 'cloud' || (chip.kind === 'device' && chip.model.image)" class="chip-icon">
           <DeviceVisual v-if="chip.kind === 'device'" :src="chip.model.image" :alt="chip.name" :kind="chip.model.kind" compact />

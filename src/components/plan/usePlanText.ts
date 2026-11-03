@@ -37,13 +37,15 @@ export const usePlanText = () => {
     yoga: t.value.activityYoga,
     rowing: t.value.activityRowing,
     elliptical: t.value.activityElliptical,
+    inline_skating: t.value.activityInlineSkating,
+    cross_country_skiing: t.value.activityCrossCountrySkiing,
   })[value] ?? value;
 
   /** 子类型在当前语言里的叫法，尽量和手表上让用户选的那一项同名。 */
   const variant = (sportValue: PlanSport, value: PlanVariant | undefined): string | null => {
     if (!value) return null;
-    if (sportValue === 'running') return ({ outdoor: t.value.variantOutdoorRun, treadmill: t.value.variantTreadmill, track: t.value.variantTrack } as Record<string, string>)[value] ?? null;
-    if (sportValue === 'cycling') return ({ outdoor: t.value.variantOutdoorRide, indoor: t.value.variantIndoorRide } as Record<string, string>)[value] ?? null;
+    if (sportValue === 'running') return ({ outdoor: t.value.variantOutdoorRun, treadmill: t.value.variantTreadmill, track: t.value.variantTrack, trail: t.value.variantTrail } as Record<string, string>)[value] ?? null;
+    if (sportValue === 'cycling') return ({ outdoor: t.value.variantOutdoorRide, indoor: t.value.variantIndoorRide, mountain: t.value.variantMountain } as Record<string, string>)[value] ?? null;
     return null;
   };
 

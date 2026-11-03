@@ -45,7 +45,7 @@ const pack: P4Copy = {
     summaryLead: 'Vierzehn alltägliche Optionen, zusammengefasst in einem Stapel.',
     items: [
       { id: 'sync', title: 'Automatische Synchronisierung', text: 'Aus, 15, 30 oder 60 Minuten. Eine Stufe genügt.', icon: 'auto-sync' },
-      { id: 'retention', title: 'Aufbewahrungsdauer', text: 'Cloud-Daten landen lokal auf diesem Rechner. Wie lange sie bleiben, bestimmst du.', icon: 'database' },
+      { id: 'retention', title: 'Zehn Jahre, hier behalten', text: 'Hole bis zu zehn Jahre Historie auf diesen Rechner und behalte sie. Sie rollt nicht mit dem Zeitfenster der Cloud davon.', icon: 'database' },
       { id: 'data', title: 'Datenumfang', text: 'Welche Werte synchronisiert werden können und welche nicht – auf einen Blick.', icon: 'overview' },
       { id: 'mcp', title: 'MCP', text: 'Lokale Werkzeuge wie Claude Code und Codex fragen direkt ab. Pläne senden erfordert gesonderte Erlaubnis.', icon: 'structured-data' },
       { id: 'formats', title: 'Vier Formate', text: 'JSON · CSV · GPX und auf der Trainingsseite zusätzlich FIT.', icon: 'document' },
@@ -57,7 +57,7 @@ const pack: P4Copy = {
       { id: 'api', title: 'Lokale API', text: 'Nur an 127.0.0.1 gebunden. Schreibgeschützt, geschützt durch Token.', icon: 'structured-data' },
       { id: 'privacy', title: 'Datenschutz und Sicherheit', text: 'Zugangsdaten schützt das Betriebssystem. Tokens tauchen nie in Logs auf.', icon: 'browser-login' },
       { id: 'filename', title: 'Dateinamen', text: 'Bestimme selbst, wie die Exportdateien für die KI heißen.', icon: 'document' },
-      { id: 'folder', title: 'Datenordner', text: 'Finde den Speicherort auf diesem Rechner für einfache Backups und Migrationen.', icon: 'database' },
+      { id: 'folder', title: 'Jederzeit mitnehmen', text: 'Deine Daten liegen in einem Ordner auf diesem Rechner, und alles, was du hier geschrieben hast – Bewertungen, Pläne, KI-Aufgaben –, lässt sich in eine einzige JSON-Datei exportieren.', icon: 'database' },
     ],
   },
   nav: [

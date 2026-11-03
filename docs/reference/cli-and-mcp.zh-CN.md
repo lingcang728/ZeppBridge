@@ -56,6 +56,7 @@ zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
 zeppbridge-cli reprocess --json  # 用当前解析器重放本地报文
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # 在这台电脑上顶替一条运动
 zeppbridge-cli contract          # 打印单位、时区、来源与缺失值的定义
 zeppbridge-cli help
 ```
@@ -69,6 +70,28 @@ zeppbridge-cli help
 `err.core.config`），不让中英文混在同一句话里。`--json` 的字段名和退出码是契约，不受这件事影响。
 
 拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
+
+### 历史摘要、独立明细与本机纠正
+
+`sync --mode history --days N` 支持 1–3650 天。365 天以内使用普通历史窗口，366–3650 天使用持久化的按月覆盖账本；范围超过本机保留期时，先在设置中启用长期归档。`--max-chunks 24` 限制单次最多处理的月份块（允许 1–720），重新执行相同命令会续传；`--retry-failed` 重置已耗尽重试的失败块。Ctrl+C 保留已完成进度并返回退出码 `8`。JSON 中包含 `mode`、`cancelled`、`backfill` 与 `replay`；`backfill.complete` 表示覆盖任务完成，也包括云端明确无数据的月份，不保证每个月都有记录。
+
+运动明细使用独立持久队列，不再将摘要覆盖或零样本数当成明细是否完整的判断：
+
+```bash
+zeppbridge-cli workout-details --status --json
+zeppbridge-cli workout-details --channel advanced --max-items 20 --json
+zeppbridge-cli workout-details --channel official --max-items 20 --retry-failed --json
+zeppbridge-cli set-type --workout ID1 --workout ID2 --type run --json
+zeppbridge-cli set-type --workout ID1 --clear --json
+zeppbridge-cli hide --workout ID1 --json
+zeppbridge-cli hide --list --json
+zeppbridge-cli restore --workout ID1 --json
+zeppbridge-cli set-type --undo EDIT_ID --json
+```
+
+拉取明细必须指定 `advanced` 或 `official` 通道，并具有该通道的可用凭据。单次 1–40 条，默认 20 条。`--status` 只读查询、不联网，可用 `--channel` 筛选。再次执行会接着处理未完成项；已写入和云端明确无明细的记录不重复请求。失败项退避后重试，`--retry-failed` 只重置所选通道。Ctrl+C 安全暂停。JSON 包含 `coverage`、`channel`、`complete`、`cancelled`；所选通道仍有待请求或失败项（含退避中的记录）时返回 `8`，覆盖查询本身成功则返回 `0`。
+
+同次传入的全部 `--workout` ID 在一个事务中修改，并返回编辑 ID。`--undo EDIT_ID` 撤销整批修改；存在冲突的后续修改时拒绝撤销。`--clear` 恢复自动类型识别。类型值使用运动目录的标准 key，例如跑步为 `run`。隐藏保留原始记录，并从正常读取、统计及导出中排除；恢复后重新参与统计。隐藏和纠正仅作用于本机库。
 
 ### 解析器升级
 
@@ -85,6 +108,18 @@ zeppbridge-cli help
 重放全程持有跨进程写锁，不联网，也不改写「上次云端同步」的时间——它有自己的时间线。放进定时任务是安全的：不加 `--all` 时，修订号一旦对上它什么都不做。
 
 `status` 会报 `normalizerRevision`（库里记着的）、`normalizerRevisionExpected`（这个版本会产出的）和 `normalizerReplayPending`。前两者不相等，就是全部信号。
+
+### 用修正过的 .fit 顶替运动
+
+桌面应用里可以拿修正过的 `.fit` 顶替一条运动（运动详情页的「用修正的 .fit 替换」），`fit-override` 让脚本也能做：
+
+```bash
+zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # 顶替
+zeppbridge-cli fit-override --workout <id> --remove --json             # 撤销，回到 Zepp 的数值
+zeppbridge-cli fit-override --list --json                              # 这台电脑顶替过哪些
+```
+
+顶替只存在这台电脑的库里：Zepp 没有导入运动的接口，云端和手表上的那份不会变。之后的同步、`reprocess` 和解析器重放都不会冲掉它，快照也会带上它。运动编号来自 Zepp，几台电脑上是同一个，所以有几份库就在每台上跑同一条命令。文件起点要和那次运动相差 5 分钟以内（否则 `errorKind: "fit_start_mismatch"`），运动得已经在库里（否则 `workout_not_found`），两者都以 1 退出。撤销一条没被顶替过的运动照样成功，返回 `"removed": false`。
 
 ### 退出码
 
@@ -206,23 +241,27 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 | 工具 | 返回 |
 |---|---|
-| `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
+| `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm。`gearId` 是这次运动在 Zepp 里选的跑鞋编号，没选为 `null`；Zepp 不给跑鞋名称 |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
+| `get_baselines` | 每项指标「你的常态」，只和自己比、不用人群常模：`recent` 是最新读数（3 天内）与之前 28 天中位数的比较和 90 天中间八成的常态带；`long_term` 是本机全部历史（最多十年）中间八成、中位数、起始日期和逐年拆分（历史不满一年为 `null`）。官方接口只给近期窗口 |
 | `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
 | `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
-| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
-| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果）、距上次运动几天、已生效的计划、生活事件 |
-| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景 |
+| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
+| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己打的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划、生活事件（`epoch: true` 是用户起了名的纪元，如「备战首马」） |
+| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景、用户确认过的教练档案（`coachNotes`）、用户的履历（`journal`：本机算的 5K / 10K / 半马 / 全马 PB、还没好和 90 天内好的伤病、带 A/B/C 优先级的将来比赛与比赛成绩、还在穿的跑鞋与里程、纪元） |
 | `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
 | `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
 | `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
+| `propose_coach_note` | **写（提议）**：把一句关于用户的话（伤病、作息、偏好）放进桌面端收件箱；用户点了「记住」才会出现在 `get_athlete_profile` 里 |
+
+用户在指标卡「?」浮层里关掉「参与分析」的指标，会从每个工具的返回里去掉（不分 `vo2max` / `vo2Max` 这类写法），返回里同时带 `excludedByUser`：名单和一句说明——这是用户的选择，不是缺数据。数据一行不删，用户自己的导出（CLI、FIT）不受影响。
 
 查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
 `intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
@@ -240,14 +279,15 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 `get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
 
-#### 训练计划工具（会写库的只有这两个）
+#### 会写库的工具：训练计划与教练档案收件箱
 
 健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
 
-- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
+- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表，这是 Zepp 接口的限制：走路、徒步、力量、轮滑、越野滑雪会被拦下，力量训练的动作和组数也发不过去；跑步可写 `trail` 越野跑、骑行可写 `mountain` 山地车；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
 - `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
 - `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
-- 这五个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
+- `propose_coach_note` 只是提议：写进单独一张收件箱表（不碰任何健康数据表），用户在桌面端逐条确认或拒绝；只有确认过的才以 `coachNotes` 出现在 `get_athlete_profile` 里，并标明是谁写的（用户自己，或按客户端自报名字标的 AI）。用户拒绝过的同一句话不能再提，待确认最多 20 条。每一条都能改、能删，能一键导出成 Markdown。
+- 这六个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
 
 ### 契约
 
@@ -264,4 +304,4 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 CLI 的 `sync` 和桌面应用的同步共用同一把跨进程同步租约和同一把写锁，任何时刻只有一个同步、一个写者。等不到时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
 
-MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。
+MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划、提议记住时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。

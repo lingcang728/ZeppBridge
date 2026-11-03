@@ -52,6 +52,8 @@ pub(super) fn run_list_workouts(
                 "calories": workout.calories,
                 "avgHr": workout.avg_hr,
                 "maxHr": workout.max_hr,
+                // 鞋的编号（Zepp 的 gearId，#143）。只有编号，没有鞋名。
+                "gearId": workout.gear_id,
                 "sourceScope": workout.source_scope,
                 "gpsAvailable": workout.gps_available,
                 "sampleCount": workout.sample_count,
@@ -152,6 +154,20 @@ pub(super) fn run_metric_series(
     }
     Ok(json!({
         "series": serde_json::to_value(&series)
+            .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))?,
+        "requestedMetrics": metrics,
+        "missingValues": contract::MISSING_VALUE_CONVENTION,
+        "time": contract::TIME_CONVENTION,
+    }))
+}
+
+pub(super) fn run_baselines(db: &Database, args: &Value) -> Result<Value, CallFailure> {
+    let metrics = metric_args(args).map_err(CallFailure::plain)?;
+    let norms = db
+        .metric_norms(&metrics, Local::now().date_naive())
+        .map_err(|error| CallFailure::plain(error.user_message()))?;
+    Ok(json!({
+        "baselines": serde_json::to_value(&norms)
             .map_err(|error| CallFailure::plain(format!("序列化失败：{error}")))?,
         "requestedMetrics": metrics,
         "missingValues": contract::MISSING_VALUE_CONVENTION,

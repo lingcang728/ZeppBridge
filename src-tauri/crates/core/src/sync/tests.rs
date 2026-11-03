@@ -128,10 +128,7 @@ async fn failure_report_preserves_records_written() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-test-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();
@@ -256,10 +253,7 @@ async fn cancel_and_wait_sets_the_flag_and_returns_when_idle() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-cancel-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();
@@ -362,10 +356,7 @@ async fn empty_pending_details_clears_a_stale_failed_status() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-sync-empty-pending-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let db = Database::new(dir.join("test.db")).unwrap();
@@ -571,4 +562,75 @@ async fn a_sync_for_another_account_stops_before_writing_anything() {
         db.library_owner().unwrap().as_deref(),
         Some("owner-account")
     );
+}
+
+/// 账号开通前那些年，睡眠接口逐周回 `{"code":1,"data":[]}`。睡眠的结构还是
+/// Unverified，但「明确为空」不是「看不懂」：这块要记成云端无，而不是一排
+/// 重试也消不掉的失败。真看不懂的报文仍然是失败。
+#[tokio::test]
+async fn an_explicitly_empty_unverified_week_is_empty_from_cloud_not_failed() {
+    use chrono::TimeZone;
+    let manager = SyncManager::new(
+        DataFetcher::new(
+            ZeppConnector::new(AuthInfo {
+                app_token: "test-token".into(),
+                user_id: "user-1".into(),
+                region_host: "https://api-mifit.zepp.com".into(),
+            })
+            .unwrap(),
+        ),
+        Database::in_memory().unwrap(),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let week = |key: &str, payload: serde_json::Value| FetchedRecord {
+        incomplete: false,
+        incomplete_reason: None,
+        raw: RawRecord {
+            stream: "sleep".into(),
+            source_key: key.into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: Utc.with_ymd_and_hms(2019, 3, 1, 0, 0, 0).unwrap(),
+            end_utc: Some(Utc.with_ymd_and_hms(2019, 3, 8, 0, 0, 0).unwrap()),
+            payload,
+            capability: CapabilityStatus::Unverified,
+        },
+    };
+
+    let empty = manager
+        .persist_records_quietly(
+            "sleep",
+            vec![
+                week(
+                    "band_data:detail:2019-03-01:2019-03-07",
+                    serde_json::json!({"code": 1, "data": [], "message": "success"}),
+                ),
+                week(
+                    "band_data:detail:2019-03-08:2019-03-14",
+                    serde_json::json!({"code": 1, "data": [], "message": "success"}),
+                ),
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.status, StreamStatus::Unavailable);
+    let (status, written, reason) = classify_backfill_report(&empty, false);
+    assert_eq!(status, ChunkStatus::EmptyFromCloud);
+    assert_eq!(written, 0);
+    assert!(reason.is_none());
+
+    let unreadable = manager
+        .persist_records_quietly(
+            "sleep",
+            vec![week(
+                "band_data:detail:2019-04-01:2019-04-07",
+                serde_json::json!({"code": 1, "data": "opaque"}),
+            )],
+        )
+        .await
+        .unwrap();
+    assert_eq!(unreadable.status, StreamStatus::Unverified);
+    let (status, _, reason) = classify_backfill_report(&unreadable, false);
+    assert_eq!(status, ChunkStatus::Failed);
+    assert_eq!(reason.unwrap().0, "err.backfill.no_canonical_records");
 }

@@ -9,9 +9,13 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PlannedDay {
+    /// 账本里这条训练的行号（`training_plan_workouts.id`，只增不改）。跑后打分记它。
+    pub plan_workout_id: i64,
     pub name: String,
     pub sport: Sport,
     pub seconds: Option<u64>,
+    /// 全部按距离写时的总米数；按时间写或混写为 `None`（不估算）。
+    pub meters: Option<u64>,
     pub hr_low: Option<u16>,
     pub hr_high: Option<u16>,
 }
@@ -51,7 +55,7 @@ pub fn compatible_sport(sport: Sport, actual: &str) -> bool {
     }
 }
 
-fn planned(workout: Workout) -> PlannedDay {
+fn planned(plan_workout_id: i64, workout: Workout) -> PlannedDay {
     let mut weight = 0u64;
     let mut low = 0u64;
     let mut high = 0u64;
@@ -79,7 +83,9 @@ fn planned(workout: Workout) -> PlannedDay {
         }
     }
     PlannedDay {
+        plan_workout_id,
         seconds: workout.total_seconds(),
+        meters: workout.total_meters(),
         name: workout.name,
         sport: workout.sport,
         hr_low: (weight > 0).then(|| (low / weight) as u16),
@@ -134,12 +140,12 @@ impl Database {
                     && workout.date >= start
                     && workout.date <= start + Duration::days(6)
                 {
-                    plans.insert(workout.date.to_string(), Some(planned(workout)));
+                    plans.insert(workout.date.to_string(), Some(planned(id, workout)));
                 }
             }
         }
         let mut actual = BTreeMap::<String, Vec<ActualDay>>::new();
-        let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'),workout_id,moving_seconds,avg_hr,COALESCE(workout_type_override,workout_type) FROM workouts WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
+        let mut stmt = self.conn.prepare("SELECT date(start_time,'localtime'),workout_id,moving_seconds,avg_hr,COALESCE(workout_type_override,workout_type) FROM workouts_visible WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2 ORDER BY start_time")?;
         for row in stmt.query_map(params![from.to_string(), to.to_string()], |r| {
             Ok((
                 r.get::<_, String>(0)?,

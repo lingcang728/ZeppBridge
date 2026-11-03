@@ -8,6 +8,9 @@ import { messagesOf, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 import { formatBytes, localDateString } from '../lib/format';
+import {
+  ALL_HISTORY_YEARS, backfillStartDate, defaultCustomFrom, earliestBackfillDate, type BackfillChoice,
+} from '../lib/backfillRange';
 import { createLoadSeq } from '../lib/loadSeq';
 import { archiveMessages } from '../components/HistoryArchivePanel.i18n';
 
@@ -60,11 +63,12 @@ export const useHistoryBackfill = (
   const { isSyncing, markDataChanged } = useSyncController();
 
   const estimate = ref<StorageEstimate | null>(null);
-  const startChoice = ref<'1y' | '2y' | '3y' | 'all' | 'custom'>('1y');
-  const customFrom = ref('');
-
-  /** Zepp 云端本身也不会有更早的记录；给「全部」一个诚实的下界而不是 1970。 */
-  const ALL_HISTORY_YEARS = 10;
+  const startChoice = ref<BackfillChoice>('1y');
+  /* 默认一年前：空字符串会让滚轮三列全空（#136）。 */
+  const customFrom = ref(defaultCustomFrom(new Date()));
+  /** 自定义起点最早能选到哪天：和「全部」同一个下界，后端不会再拒。 */
+  const customMin = computed(() => earliestBackfillDate(new Date()));
+  const customMax = computed(() => localDateString(new Date()));
 
   const START_CHOICES = computed(() => [
     { value: '1y', label: t.value.range1y },
@@ -74,22 +78,8 @@ export const useHistoryBackfill = (
     { value: 'custom', label: t.value.rangeCustom },
   ]);
 
-  const fromDate = computed(() => {
-    const today = new Date();
-    const back = (years: number) => {
-      const date = new Date(today);
-      date.setFullYear(date.getFullYear() - years);
-      // 纯日历日期：用本地年月日，`toISOString()` 会在东八区把清晨推到前一天。
-      return localDateString(date);
-    };
-    switch (startChoice.value) {
-      case '1y': return back(1);
-      case '2y': return back(2);
-      case '3y': return back(3);
-      case 'all': return back(ALL_HISTORY_YEARS);
-      default: return customFrom.value;
-    }
-  });
+  /* 「全部」按天数对齐后端上限，不再按日历年往回退（#136：退 10 年是 3652 天，超了）。 */
+  const fromDate = computed(() => backfillStartDate(startChoice.value, new Date(), customFrom.value));
 
   const requestedDays = computed(() => {
     if (!fromDate.value) return 0;
@@ -277,6 +267,12 @@ export const useHistoryBackfill = (
               message.value = copy().stoppedByUser(remaining.value);
               break;
             }
+            // 重新开跑就换回进度：一轮补拉要几分钟，不换的话「本地维护进行中」会一直
+            // 挂到这一轮跑完，看起来像还在等维护（10-20 用户报过）。
+            message.value = copy().roundProgress(
+              ledger.value?.completed_chunks ?? 0,
+              ledger.value?.total_chunks ?? 0,
+            );
             continue;
           }
           throw cause;
@@ -318,20 +314,32 @@ export const useHistoryBackfill = (
     }
   };
 
+  /** 金继月历的「补上它」：从那个月补到今天。已经补好的月份账本会跳过，不会重拉。 */
+  const fillFrom = async (month: string) => {
+    const from = `${month}-01`;
+    startChoice.value = 'custom';
+    customFrom.value = from < customMin.value ? customMin.value : from;
+    await runBackfill();
+  };
+
   /* 「重试失败项」和「清空账本」是两件事：前者只让失败的月份重新排队，
      已经写入的历史一条都不动。上一版没有前者，用户为了重试一个月份只能清掉
      整个账本，把几年历史重拉一遍。 */
   const retryFailed = async () => {
     busy.value = true;
     error.value = null;
+    let requeued = false;
     try {
       ledger.value = await backend.retryFailedBackfillChunks();
       message.value = t.value.retryFailedDone;
+      requeued = true;
     } catch (cause) {
       error.value = toUserMessage(cause, t.value.retryFailedFailed);
     } finally {
       busy.value = false;
     }
+    // 排好队就接着跑：只排队不跑，用户看到的仍是那排失败，还得再找「继续补拉」。
+    if (requeued) await runBackfill();
   };
 
   const resetLedger = async () => {
@@ -358,6 +366,8 @@ export const useHistoryBackfill = (
     estimate,
     startChoice,
     customFrom,
+    customMin,
+    customMax,
     START_CHOICES,
     fromDate,
     requestedDays,
@@ -375,6 +385,7 @@ export const useHistoryBackfill = (
     toggleArchive,
     stopBackfill,
     runBackfill,
+    fillFrom,
     retryFailed,
     resetLedger,
   };

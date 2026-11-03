@@ -140,3 +140,5 @@ docs/assets/readme/*.mp4
 /packaging/arch/pkg/
 /packaging/arch/zeppbridge/
 /packaging/arch/*.pkg.tar.*
+
+.prepared-release/

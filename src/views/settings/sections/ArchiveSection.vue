@@ -4,6 +4,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import HistoryArchivePanel from '../../../components/HistoryArchivePanel.vue';
+import KintsugiCalendar from '../../../components/archive/KintsugiCalendar.vue';
+import TakeAllRow from './TakeAllRow.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useHistoryBackfill } from '../../../composables/useHistoryBackfill';
@@ -22,7 +24,7 @@ const { feedback, prefs } = useSettingsContext();
 const { userPrefs, retentionDays, retentionCutoffDate, storageEstimate, savePrefs, applyPrefsChange } = prefs;
 
 const backfill = useHistoryBackfill(() => userPrefs.value, applyPrefsChange);
-const { ledger, busy, remaining, stopRequested, isSyncing, fromDate, wouldBeCleanedUp, stopReasonText } = backfill;
+const { ledger, busy, remaining, stopRequested, isSyncing, fromDate, wouldBeCleanedUp, stopReasonText, customMin } = backfill;
 
 const FOREVER = 'forever';
 const keepItems = computed(() => [
@@ -78,6 +80,11 @@ const filledSub = computed(() => {
   return remaining.value > 0 ? a.value.filledToLeft(months[0], remaining.value) : a.value.filledTo(months[0]);
 });
 const detailsOpen = ref(false);
+/* 金继月历上点「补上它」：起点改成那个月，明细跟着打开——进度、出错原因都在那里。 */
+const fillFrom = (month: string) => {
+  detailsOpen.value = true;
+  void backfill.fillFrom(month);
+};
 const runDisabled = computed(() => busy.value || isSyncing.value || !fromDate.value || wouldBeCleanedUp.value || Boolean(stopReasonText.value));
 
 const latestBackup = ref<string | null>(null);
@@ -148,6 +155,15 @@ const openBackup = () => { void router.push({ path: '/settings/advanced', hash: 
           </button>
         </div>
       </div>
+      <div v-if="ledger" class="s-row is-block">
+        <KintsugiCalendar
+          :months="ledger.months ?? []"
+          :earliest="customMin"
+          :busy="busy || isSyncing"
+          :t="a"
+          @fill="fillFrom"
+        />
+      </div>
       <div v-if="detailsOpen" id="archive-details" class="details-rows">
         <HistoryArchivePanel :state="backfill" :prefs="userPrefs" />
       </div>
@@ -160,6 +176,7 @@ const openBackup = () => { void router.push({ path: '/settings/advanced', hash: 
           <button class="button secondary" type="button" @click="openBackup">{{ a.open }}</button>
         </div>
       </div>
+      <TakeAllRow />
     </div>
   </section>
 </template>

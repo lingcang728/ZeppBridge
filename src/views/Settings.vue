@@ -11,6 +11,7 @@ import CardDeck from '../components/deck/CardDeck.vue';
 import CardBody from './settings/CardBody.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
+import AccountConflict from './settings/AccountConflict.vue';
 import { provideSettingsContext } from '../composables/settings/context';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -45,7 +46,12 @@ const router = useRouter();
 const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
 const { feedback, auth, official, prefs, capability } = provideSettingsContext();
 const { dataMessage, dataError } = feedback;
-const { loginError, accountRecognized, connectionLabel } = auth;
+const { loginError, accountConflict, loginConflict, freshStartBusy, accountRecognized, connectionLabel } = auth;
+/* 只用高级数据：断开官方授权后，「不是同一个账号」那句也就过时了。 */
+const disconnectOfficialForAdvanced = async () => {
+  await official.disconnect();
+  if (!official.status.value.user_id_masked) loginError.value = null;
+};
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
@@ -157,7 +163,32 @@ onUnmounted(() => {
       <Icon name="warning" :size="15" />{{ statusError }}
       <button type="button" @click="() => refreshStatus()">{{ t.retry }}</button>
     </div>
-    <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
+    <div v-if="official.accountConflict.value && !loginError" class="alert warning" role="status">
+      <Icon name="info" :size="15" />
+      <span class="alert-body">
+        <template v-if="official.failureConflict.value">
+          {{ official.failureText.value }}
+          <AccountConflict :pair="official.failureConflict.value" rejected="official" />
+        </template>
+        <span :class="{ 'alert-note': official.failureConflict.value }">{{ t.newAccountWarning }}</span>
+      </span>
+      <button type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>
+    </div>
+    <div v-if="loginError" class="alert danger" role="alert">
+      <Icon name="warning" :size="15" />
+      <span class="alert-body">
+        {{ loginError }}
+        <AccountConflict
+          v-if="loginConflict"
+          :pair="loginConflict"
+          rejected="advanced"
+          :busy="official.busy.value"
+          @disconnect-official="disconnectOfficialForAdvanced"
+        />
+        <span v-if="accountConflict" class="alert-note">{{ t.newAccountWarning }}</span>
+      </span>
+      <button v-if="accountConflict" type="button" :disabled="freshStartBusy" @click="auth.startFresh">{{ t.freshStart }}</button>
+    </div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
@@ -215,6 +246,11 @@ h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 .alert.success { color: var(--accent); }
 .alert.danger { color: var(--danger); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: var(--fs-sm); }
+.alert.warning { color: var(--warning); }
+.alert-body { display: grid; gap: 4px; min-width: 0; }
+.alert-note { color: var(--muted); }
+.alert-body ~ button { flex: none; text-decoration: underline; text-underline-offset: 3px; }
+.alert button:disabled { cursor: progress; opacity: .6; }
 
 .card-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 2px; }
 .card-title { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 650; line-height: 1.3; }

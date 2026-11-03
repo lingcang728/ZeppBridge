@@ -8,6 +8,7 @@ export { webBackend } from './web';
 export {
   DesktopUnavailableError,
   TauriUnavailableError,
+  errorCode,
   toUserMessage,
 } from './errors';
 

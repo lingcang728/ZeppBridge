@@ -1,0 +1,6 @@
+- Added: **Format daty dostosowany do regionu systemu**. Kolejność elementów daty i format 12/24-godzinny bazują na formacie regionalnym systemu operacyjnego, nawet przy angielskim interfejsie; możesz to zmienić w Ustawienia → Wygląd i język.
+- Improved: **Jasne informacje o brakach oficjalnej autoryzacji**. Lista treningów, urządzenia i karta posiłków wyjaśniają teraz, że jazda na rowerze i inne treningi, rozpoznawanie urządzeń oraz dzienniki posiłków wymagają „Danych zaawansowanych”.
+- Improved: **Rozpoznawanie większej liczby zegarków**. Dodano kody modeli dla Bip 6, Balance 3, Active 2 Square, Active 3 Premium, T-Rex Ultra 2, Cheetah Pro, Balance Ultra i Helio Strap Pro.
+- Improved: **Informacje o wydaniu rozsypują się w popiół**. Kliknij „Zamknij”, a karta rozsypie się w proch od strony przycisku, wracając do strony głównej.
+- Fixed: **Brakujące odczyty punktowe SpO₂**. W dni z dużą liczbą pomiarów pobieranie nie kończy się już na pierwszej stronie — pozostałe dane są również pobierane.
+- Fixed: **Godzinne przesunięcie snu i tętna w strefach z czasem letnim**. Gdy zegarek zgłasza strefę czasową bez uwzględnienia czasu letniego (DST), jest on uzupełniany na podstawie strefy urządzenia; pierwsze uruchomienie po aktualizacji przetwarza ponownie lokalne dane w tle.

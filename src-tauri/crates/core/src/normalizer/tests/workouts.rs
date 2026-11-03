@@ -1,5 +1,37 @@
 use super::*;
 
+#[test]
+fn cloud_type_15_uses_only_the_workouts_own_device_identity() {
+    let payload = json!({"items": [
+        {"workoutId": "balance", "startTime": 1700000000, "endTime": 1700003600, "type": 15, "deviceId": "AABBCCDDEEFF"},
+        {"workoutId": "other", "startTime": 1700004000, "endTime": 1700007600, "type": 15, "deviceId": "112233445566"},
+        {"workoutId": "missing", "startTime": 1700008000, "endTime": 1700011600, "type": 15},
+        {"workoutId": "conflict", "startTime": 1700012000, "endTime": 1700015600, "type": 15, "deviceId": "AABBCCDDEEFF", "deviceName": "Amazfit T-Rex 3"},
+        {"workoutId": "hike", "startTime": 1700016000, "endTime": 1700019600, "type": 224}
+    ]});
+    let mut queried = Vec::new();
+    let rows = Normalizer::normalize_workouts_with_device_context(&payload, Some("run"), |id| {
+        queried.push(id.to_owned());
+        Ok((id == "AABBCCDDEEFF").then(|| "amazfit-balance-2".to_owned()))
+    })
+    .unwrap();
+    assert_eq!(queried, ["AABBCCDDEEFF", "112233445566", "AABBCCDDEEFF"]);
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.normalized_type.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "open_water_swimming",
+            "unknown:15",
+            "unknown:15",
+            "unknown:15",
+            "hiking"
+        ]
+    );
+    assert_eq!(rows[0].zepp_type, Some(15));
+    assert_eq!(rows[0].type_source, "numeric_mapped");
+}
+
 /// 云端一直在给、以前一个都没取的那批运动汇总字段。
 ///
 /// 取值全部来自真实报文（trackid 1787901817，一次 6.37 km 健走）。

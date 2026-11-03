@@ -352,10 +352,7 @@ impl FileCredentialBackend {
         let temp = parent.join(format!(
             ".{CREDENTIAL_FILE}.tmp-{}-{}",
             std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::unique_suffix()
         ));
         let result = (|| -> io::Result<()> {
             let mut options = OpenOptions::new();
@@ -484,10 +481,7 @@ mod unix_credential_tests {
         let dir = std::env::temp_dir().join(format!(
             "zeppbridge-cred-{tag}-{}-{}",
             std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::unique_suffix()
         ));
         fs::create_dir_all(&dir).unwrap();
         dir

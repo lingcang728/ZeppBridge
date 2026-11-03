@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { flightTransform, matchTransform } from '../motion/dialogFlight';
-import { onMotionSkip, remainingMs, settleMotion, worthInterrupting } from '../motion/interrupt';
+import { hurryAnimation, onMotionSkip, remainingMs, settleMotion, worthInterrupting } from '../motion/interrupt';
 
 const fakeAnimation = (localTime: number, endTime: number, playbackRate = 1, playState = 'running') => ({
   playState,
@@ -10,6 +10,27 @@ const fakeAnimation = (localTime: number, endTime: number, playbackRate = 1, pla
 }) as unknown as Animation;
 
 describe('motion interrupt', () => {
+  it('hurries replaceable CSS transitions synchronously without moving their current position', () => {
+    class Transition {
+      playState = 'running';
+      pending = false;
+      currentTime = 150;
+      private rate = 1;
+      get playbackRate() { return this.rate; }
+      set playbackRate(rate: number) { this.rate = rate; this.currentTime = 0; }
+      updatePlaybackRate = vi.fn();
+      effect = { getComputedTiming: () => ({ localTime: this.currentTime, endTime: 600 }) };
+    }
+    vi.stubGlobal('CSSTransition', Transition);
+    try {
+      const transition = new Transition();
+      hurryAnimation(transition as unknown as Animation, 90);
+      expect(transition.playbackRate).toBe(5);
+      expect(transition.currentTime).toBe(150);
+      expect(transition.updatePlaybackRate).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it('measures what is left of a finite animation, ignoring loops and finished ones', () => {
     expect(remainingMs(fakeAnimation(100, 400))).toBe(300);
     expect(remainingMs(fakeAnimation(100, 400, 2))).toBe(150);

@@ -3,9 +3,9 @@
  * 舞台中间的线（2026-10-08）：门锁散出去的思维树（左，枝绕开别的牌）和一把丝（右），算法在 lib/aiTask/threads.ts。
  * 静止时是静态 SVG，整张只有一个很慢的不透明度呼吸（动在 <svg> 自己身上，上合成器）。
  *
- * 寄出时像收风筝（第二轮，用户：牌飞走了线还留着太乱）：每根枝跟着它那张牌往锁里收（`reeled`），
- * 枝收完主干再收回锁里；牌回来时线再放出去。做法是 `pathLength=1` + 虚线偏移，收线方向就是路径的起点（分叉点 / 锁）。
- * 只在这一两秒里动描边，平时不动。不接收指针。
+ * 交出时线跟着牌收进锁（10-28「加附件」）：做法是 `pathLength=1` + 虚线偏移，收线方向就是路径的起点（分叉点 / 锁）。
+ * 收的那一两秒由 useAttachFlight 逐根放（和牌同一条时间轴，按 `data-id` / `data-i` 找线）；交出去以后（`reeled`）
+ * 左边的树静止地收着、右边那束留着，没有过渡——回场不重放。不接收指针。
  */
 import { computed } from 'vue';
 import { pathD, type ThreadTree } from '../../../lib/aiTask/threads';
@@ -32,8 +32,8 @@ const count = computed(() => Math.max(1, strands.value.length));
       </linearGradient>
     </defs>
     <g class="tree">
-      <path v-for="(d, i) in trunks" :key="`t${i}`" :d="d" class="trunk" pathLength="1" />
-      <path v-for="s in strands" :key="s.id" :d="s.d" :class="['branch', { hot: active === s.id }]" :style="{ '--i': s.i }" pathLength="1" />
+      <path v-for="(d, i) in trunks" :key="`t${i}`" :d="d" class="trunk" :data-i="i" pathLength="1" />
+      <path v-for="s in strands" :key="s.id" :d="s.d" :class="['branch', { hot: active === s.id }]" :data-id="s.id" :style="{ '--i': s.i }" pathLength="1" />
     </g>
     <g class="right">
       <path v-for="(d, i) in right" :key="`r${i}`" :d="d" />
@@ -52,11 +52,7 @@ const count = computed(() => Math.max(1, strands.value.length));
 /* 汇聚：枝依次亮起来。 */
 .threads.lit .branch { stroke: var(--accent); opacity: .7; transition-delay: calc(var(--i) * 45ms); }
 .threads.lit .right path { opacity: .75; }
-/* 收线：枝跟着牌（牌抖 240ms 后起飞，每张晚 55ms），主干等枝收完；放线反过来，主干先出。 */
-.tree .branch { transition: opacity 260ms ease, stroke 260ms ease, stroke-dashoffset 380ms cubic-bezier(.4, .6, .2, 1) calc(var(--i) * 40ms + 120ms); }
-.tree .trunk { transition: opacity 260ms ease, stroke-dashoffset 420ms cubic-bezier(.4, .6, .2, 1); }
-.threads.reeled .branch { stroke-dashoffset: 1; transition: opacity 260ms ease, stroke 260ms ease, stroke-dashoffset 420ms cubic-bezier(.4, 0, .7, .2) calc(240ms + var(--i) * 55ms); }
-.threads.reeled .trunk { stroke-dashoffset: 1; transition: stroke-dashoffset 360ms cubic-bezier(.4, 0, .7, .2) calc(420ms + var(--n) * 55ms); }
+.threads.reeled .tree path { stroke-dashoffset: 1; }
 @keyframes breathe { from { opacity: .75; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .threads { animation: none; } .threads path { transition: none !important; } }
 </style>

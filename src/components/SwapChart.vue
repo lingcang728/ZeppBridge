@@ -21,6 +21,7 @@ import { SMOOTH_CHART_UPDATE } from '../lib/metricSeries';
 import { chartSwapIntent } from '../lib/chartSwap';
 import { currentSweep, sweepDelay, type AshSweep } from '../lib/motion/ashReveal';
 import { paced } from '../lib/motion/timing';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 defineOptions({ inheritAttrs: false });
 
@@ -53,7 +54,7 @@ const shown = shallowRef<Record<string, unknown>>(still(props.option));
 let incoming: Animation | null = null;
 const ghosts = new Set<HTMLCanvasElement>();
 
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 
 /** 把画布上此刻的样子拷一份，铺在同一个位置。 */
 const snapshot = (el: HTMLElement): HTMLCanvasElement | null => {

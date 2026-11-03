@@ -1,0 +1,6 @@
+- Fixed: **Recupero della cronologia (#136)**: «Tutto (fino a 10 anni)» non fallisce più con «data non valida», e il selettore della data di inizio personalizzata non è più vuoto.
+- Improved: **L’accesso ai dati avanzati accetta solo e-mail o telefono Zepp + password**. La finestra di accesso lo spiega in alto e nasconde i pulsanti di terze parti; se accedi con un account diverso da quello autorizzato ufficialmente, ZeppBridge te lo segnala subito.
+- Improved: **L’autorizzazione ufficiale non resta più in attesa silenziosa**. Se zeppbridge.com non è raggiungibile, ora ne viene spiegato il motivo insieme a cosa controllare. Il nuovo pulsante «Controlla ora» verifica subito, e viene provato automaticamente un indirizzo di riserva.
+- Added: **«Perché mancano alcuni dati?»** è sempre disponibile in Impostazioni → Account Zepp.
+- Added: **Interfaccia in polacco**.
+- Improved: **Le note di rilascio seguono la lingua dell’interfaccia**, in tutte le 12 lingue.

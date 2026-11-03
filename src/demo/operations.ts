@@ -22,7 +22,7 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
   const tasks = new Map<string, AiTask>([[initial.id, initial]]), pinned = new Set<string>([initial.id]);
   const templates = new Map<string, AiTaskTemplate>();
   const events: LifeEvent[] = [
-    { id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', createdAt: now(), updatedAt: now() },
+    { id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: now(), updatedAt: now() },
   ];
   const exchanges: AiExchange[] = [{ id: 'demo-exchange-1', task_id: initial.id, provider: 'ChatGPT', question: initial.title, days_before: 14,
     categories: initial.categories, workout_ids: [], personal_note: '', sent_at: now(), md_path: 'ZeppBridge.md',
@@ -51,7 +51,11 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
     list_life_events: a => events.filter(e => (!a.start || (e.endDate ?? e.startDate) >= String(a.start)) && (!a.end || e.startDate <= String(a.end))),
     save_life_event: a => { const input = a.input as LifeEvent, id = input.id ?? Math.max(0, ...events.map(e => e.id)) + 1; const old = events.findIndex(e => e.id === id); const value = { ...input, id, createdAt: now(), updatedAt: now() }; if (old < 0) events.push(value); else events[old] = value; return id; },
     delete_life_event: a => { const i = events.findIndex(e => e.id === a.id); if (i >= 0) events.splice(i, 1); },
-    ai_task_list: () => [...tasks.values()].map(t => ({ id: t.id, title: t.title, template_id: t.template_id, workout_count: t.workout_ids.length, updated_at: t.updated_at, mcp_shared: t.mcp_shared, pinned: pinned.has(t.id) })),
+    ai_task_list: () => [...tasks.values()].map(t => ({ id: t.id, title: t.title, template_id: t.template_id, workout_count: t.workout_ids.length, updated_at: t.updated_at, mcp_shared: t.mcp_shared, pinned: pinned.has(t.id),
+      categories: t.categories.filter(c => c.enabled).map(c => c.category) })),
+    ai_prompt_versions: a => { const t = tasks.get(String(a.id)); return t ? [{ id: 1, prompt: t.prompt.trim() || t.title, replaced_at: new Date(Date.now() - 9 * 864e5).toISOString() }] : []; },
+    ai_prompt_export: a => `C:/Users/demo/Desktop/ZeppBridge AI/${tasks.get(String(a.id))?.title ?? 'prompt'}.zbprompt`,
+    ai_prompt_import: () => { const t = structuredClone([...tasks.values()][0]!); t.id = `demo-task-${tasks.size + 2}`; t.workout_ids = []; t.updated_at = now(); tasks.set(t.id, t); return structuredClone(t); },
     ai_task_get: a => { const t = tasks.get(String(a.id)); if (!t) throw Object.assign(new Error('Unknown sample task'), { code: 'err.ai_task.not_found' }); return structuredClone(t); },
     ai_task_save: a => { const t = structuredClone(a.task as AiTask); t.id ||= `demo-task-${tasks.size + 2}`; t.updated_at = now(); tasks.set(t.id, t); return structuredClone(t); },
     ai_task_delete: a => { tasks.delete(String(a.id)); },
@@ -85,6 +89,8 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
     cleanup_old_data: () => ({ deleted: 0 }), open_data_folder: () => null,
     save_fit_export: () => ({ path: 'Demo/ZeppBridge', record_count: data.workouts.length, bytes: 284_320, generated_at: now(), file_count: data.workouts.length }),
     prepare_ai_handoff: () => ({ mode: 'attachment', clipboardText: '', filePath: 'Demo/ZeppBridge.md', bytes: 24320, records: data.sleeps.length, redactions: [], metadata: { preciseRouteIncluded: false, authenticationFieldsRemoved: true, identityFieldsRemoved: true } }),
+    // The website demonstrates the native file-copy step without touching the visitor's clipboard.
+    ai_handoff_copy_file: () => null,
     submit_diagnostic_report: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
     submit_device_model_assignment: () => ({ status: 'simulated', report_id: 'demo-local', submitted: false }),
   };

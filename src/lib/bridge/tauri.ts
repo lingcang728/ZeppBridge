@@ -14,6 +14,8 @@ import type {
   BridgeBackend,
   McpSidecar,
   UnlistenFn,
+  WorkoutDetailCoverage,
+  WorkoutDetailChannel,
 } from './types';
 import type {
   HourlySteps,
@@ -58,6 +60,7 @@ import type {
   TrainingBalancePoint,
   UserPrefs,
   Workout,
+  WorkoutFitOverride,
   WorkoutSeries,
 } from '../../types';
 
@@ -159,6 +162,35 @@ export const tauriBackend: BridgeBackend = {
   aiProfileSave(note) { return call('ai_profile_save', { note }); },
   trainingPlanAdherence(from, to) { return call('training_plan_adherence', { from, to }); },
   trainingPlanUpdateDraft(id, document) { return call('training_plan_update_draft', { id, document }); },
+  trainingPlanHistory(limit) { return call('training_plan_history', { limit: limit ?? null }); },
+  workoutFeedbackPrompt() { return call('workout_feedback_prompt'); },
+  workoutFeedbackToastDue() { return call('workout_feedback_toast_due'); },
+  workoutFeedbackToastShow(text: import('../../types/feedback').FeedbackToastText) { return call<void>('workout_feedback_toast_show', { text }); },
+  workoutFeedbackGet(workoutId) { return call('workout_feedback_get', { workoutId }); },
+  workoutFeedbackSave(input) { return call<void>('workout_feedback_save', { input }); },
+  workoutFeedbackDismiss(workoutId) { return call<void>('workout_feedback_dismiss', { workoutId }); },
+  workoutFeedbackSnooze() { return call<string>('workout_feedback_snooze'); },
+  workoutFeedbackAdjusted(workoutId, adjustment) { return call<void>('workout_feedback_adjusted', { workoutId, adjustment }); },
+  coachNotesList() { return call('coach_notes_list'); },
+  coachNoteAdd(text) { return call<number>('coach_note_add', { text }); },
+  coachNoteDecide(id, accept) { return call<void>('coach_note_decide', { id, accept }); },
+  coachNoteEdit(id, text) { return call<void>('coach_note_edit', { id, text }); },
+  coachNoteDelete(id) { return call<void>('coach_note_delete', { id }); },
+  coachNotesExport(fileStem, markdown) { return call<string>('coach_notes_export', { fileStem, markdown }); },
+  shoesOverview() { return call('shoes_overview'); },
+  shoeSave(input) { return call<number>('shoe_save', { input }); },
+  shoeDelete(id) { return call<void>('shoe_delete', { id }); },
+  workoutFeelGet(workoutId) { return call('workout_feel_get', { workoutId }); },
+  workoutFeelSave(input) { return call<void>('workout_feel_save', { input }); },
+  injuriesList() { return call('injuries_list'); },
+  injurySave(input) { return call<number>('injury_save', { input }); },
+  injuryDelete(id) { return call<void>('injury_delete', { id }); },
+  racesList() { return call('races_list'); },
+  raceSave(input) { return call<number>('race_save', { input }); },
+  raceDelete(id) { return call<void>('race_delete', { id }); },
+  personalRecords() { return call('personal_records'); },
+  annualRings() { return call('annual_rings'); },
+  ringsSaveImage(fileStem, png) { return call('rings_save_image', { fileStem, png }); },
   trainingPlanState() { return call<TrainingPlanState>('training_plan_state'); },
   trainingPlanSaveDraft(document, pasted) { return call<string>('training_plan_save_draft', { document, pasted }); },
   trainingPlanPreview(id) { return call<PlanDraftPreview>('training_plan_preview', { id }); },
@@ -179,6 +211,10 @@ export const tauriBackend: BridgeBackend = {
 
   clearAuth() {
     return call<AppStatus>('clear_auth');
+  },
+
+  startFreshLibrary() {
+    return call<void>('start_fresh_library');
   },
 
 
@@ -204,6 +240,10 @@ export const tauriBackend: BridgeBackend = {
 
   recoverOfficialCredentials(storage: 'system' | 'file') {
     return call<OfficialStatus>('recover_official_credentials', { storage });
+  },
+
+  checkOfficialLoginNow() {
+    return call<OfficialStatus>('check_official_login_now');
   },
 
   getOfficialStatus() {
@@ -337,6 +377,24 @@ export const tauriBackend: BridgeBackend = {
     });
   },
 
+  editWorkouts(workoutIds: string[], changeType: boolean, workoutType: string | null, hidden: boolean | null) {
+    return call<{ id: string; changed: number }>('edit_workouts', { workoutIds, changeType, workoutType, hidden });
+  },
+  undoWorkoutEdit(id: string) { return call<number>('undo_workout_edit', { id }); },
+  getHiddenWorkoutPage(limit: number, offset: number) { return call<Page<Workout>>('get_hidden_workout_page', { limit, offset }); },
+  getWorkoutDetailCoverage(channel?: WorkoutDetailChannel) { return call<WorkoutDetailCoverage>('get_workout_detail_coverage', { channel: channel ?? null }); },
+  startWorkoutDetailBackfill(maxRecords: number, retryFailed: boolean, channel?: WorkoutDetailChannel) { return call<WorkoutDetailCoverage>('start_workout_detail_backfill', { maxRecords, retryFailed, channel: channel ?? null }); },
+
+  getWorkoutFitOverride(workoutId: string) {
+    return call<WorkoutFitOverride | null>('get_workout_fit_override', { workoutId });
+  },
+  importWorkoutFit(workoutId: string, path: string) {
+    return call<WorkoutFitOverride>('import_workout_fit', { workoutId, path });
+  },
+  removeWorkoutFit(workoutId: string) {
+    return call<boolean>('remove_workout_fit', { workoutId });
+  },
+
   getWorkoutTypeOptions() {
     return call<SportOption[]>('get_workout_type_options');
   },
@@ -398,6 +456,9 @@ export const tauriBackend: BridgeBackend = {
   setTrayLocale(locale: string) {
     return call<void>('set_tray_locale', { locale });
   },
+  systemRegionLocale() {
+    return call<string | null>('system_region_locale');
+  },
   listBackups() {
     return call<BackupManifest[]>('list_backups');
   },
@@ -431,6 +492,39 @@ export const tauriBackend: BridgeBackend = {
   compactRawPayloads() {
     return call<RawPayloadCompaction>('compact_raw_payloads');
   },
+  lettersState() {
+    return call<import('../../types/letters').LetterBoxView>('letters_state');
+  },
+  lettersSendReply(input: import('../../types/letters').LetterReplyInput) {
+    return call<import('../../types/letters').LetterSendResult>('letters_send_reply', { ...input });
+  },
+  lettersSync() {
+    return call<import('../../types/letters').LetterBoxView>('letters_sync');
+  },
+  dataLettersState() {
+    return call<import('../../types/letters').DataLettersView>('data_letters_state');
+  },
+  dataLettersSealCapsule(note: string, openOn: string) {
+    return call<number>('data_letters_seal_capsule', { note, openOn });
+  },
+  dataLettersOpenCapsule(id: number) {
+    return call<import('../../types/letters').DataLetter>('data_letters_open_capsule', { id });
+  },
+  exportMyRecords(path: string) {
+    return call<number>('export_my_records', { path });
+  },
+  importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]) {
+    return call<import('../../types/imports').ImportReport>('import_workouts', { source, paths });
+  },
+  importBatches() {
+    return call<import('../../types/imports').ImportBatch[]>('import_batches');
+  },
+  undoImportBatch(batchId: number) {
+    return call<number>('undo_import_batch', { batchId });
+  },
+  workoutImportSources() {
+    return call<Record<string, import('../../types/imports').ImportSourceKey>>('workout_import_sources');
+  },
   submitDiagnosticReport(note?: string, category?: string) {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
       note: note ?? null,
@@ -443,6 +537,10 @@ export const tauriBackend: BridgeBackend = {
 
   saveFitExport(selection: ExportSelection, directory: string) {
     return call<ExportResult>('save_fit_export', { selection, directory });
+  },
+
+  openExternalUrl(url: string) {
+    return call<void>('open_external_url', { url });
   },
 
   prepareAiHandoff(selection: ExportSelection, prompt: string, includePreciseRoute = false) {
@@ -473,8 +571,23 @@ export const tauriBackend: BridgeBackend = {
   getMetricBaselines(metrics: string[]) {
     return call<MetricBaseline[]>('get_metric_baselines', { metrics });
   },
+  metricExclusions() {
+    return call<string[]>('metric_exclusions');
+  },
+  setMetricExcluded(metric: string, excluded: boolean) {
+    return call<string[]>('set_metric_excluded', { metric, excluded });
+  },
   aiTaskSetPinned(id: string, pinned: boolean) {
     return call<void>('ai_task_set_pinned', { id, pinned });
+  },
+  aiPromptVersions(id: string) {
+    return call<import('./types').AiPromptVersion[]>('ai_prompt_versions', { id });
+  },
+  aiPromptExport(id: string) {
+    return call<string>('ai_prompt_export', { id });
+  },
+  aiPromptImport(path: string) {
+    return call<import('./types').AiTask>('ai_prompt_import', { path });
   },
   cardCollectionGet() {
     return call<CardPick[]>('card_collection_get');

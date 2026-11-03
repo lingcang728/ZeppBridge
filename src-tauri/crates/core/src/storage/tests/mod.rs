@@ -65,16 +65,24 @@ fn sleep_stage_flags(db: &Database, sleep_id: &str) -> (i64, i64, i64, i64) {
         .unwrap()
 }
 
+mod coach_notes;
 mod devices;
 mod event_windows;
 mod export;
+mod fit_override;
+mod imports;
+mod logbook;
+mod metric_prefs;
 mod metrics;
+mod my_records;
 mod official;
 mod queries;
 mod replay;
 mod schema;
 mod time_bridge;
 mod training_plan;
+mod workout_edits;
+mod workout_feedback;
 
 mod open;
 mod owner;

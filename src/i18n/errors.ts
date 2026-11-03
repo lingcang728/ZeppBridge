@@ -59,6 +59,7 @@ const messages = defineMessages(
 
     /* —— 连接与认证 —— */
     'err.auth.sync_init_failed': '无法初始化同步，检查认证区域后重试',
+    'err.auth.fresh_start_failed': '没能准备新的数据文件夹，现有数据没有变动',
     'err.auth.verify_network': '认证验证失败：连不上 Zepp 服务，检查网络后重试',
     'err.auth.verify_needs_reauth': '认证验证失败：认证已失效，重新保存认证信息',
     'err.auth.verify_failed': '认证验证失败',
@@ -70,6 +71,23 @@ const messages = defineMessages(
     'err.login.verifying': '正在验证账号',
     'err.login.connected': '已连接 Zepp 账号',
     'err.official.browser': '没能打开系统浏览器，检查默认浏览器设置后重试',
+    'err.open_url.failed': '没能打开系统浏览器，检查默认浏览器设置后重试',
+    'err.open_url.not_allowed': '只能打开 https 链接',
+    'err.letters.client_init_failed': '无法初始化寄信连接，重启应用后再试',
+    'err.letters.save_failed': '回信没能存到本机，检查磁盘空间后重试',
+    'err.letters.invalid': '这封回信对应的版本不对，没有寄出',
+    'err.letters.empty': '回信是空的，写几句再寄',
+    'err.letters.capsule_date': '开封日期不对，重新选一次',
+    'err.feedback.toast_failed': '系统通知没能发出',
+    'err.export.my_records': '没能写出这份文件，换个位置再试',
+    'err.import.source': '不认识的导入来源',
+    'err.import.too_large': '文件太大（超过 64 MB）。Strava 和 Apple 健康请选整个导出包',
+    'err.import.not_recognized': '这份文件不是所选来源的导出，换一种来源再试',
+    'err.import.read': '读不了这份文件，确认它没被别的程序占着',
+    'err.ai_task.bad_prompt_file': '这不是能用的 .zbprompt 文件（格式不对、来自更新的版本，或者没有提示词）',
+    'err.ai_task.prompt_export': '没能导出 .zbprompt，检查桌面能不能写入',
+    'err.ai_task.prompt_import': '读不了这个文件（太大或打不开）',
+    'err.letters.rejected': '服务端没有收下这封回信，可能需要升级应用',
     'err.official.denied': '你没有同意授权，ZeppBridge 什么也没拿到',
     'err.official.rejected': 'Zepp 没有接受这次授权，重试',
     'err.official.expired': '这次授权已过期，重新点一次授权',
@@ -85,8 +103,18 @@ const messages = defineMessages(
     'err.login.credentials_rejected': 'Zepp 拒绝了这次登录凭据，退出登录窗口后重新登录',
     'err.login.region_unreachable': '暂时连不上 Zepp 区域服务，检查网络后重试',
     'err.login.region_retrying': '暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着，不用重新登录',
-    'err.login.third_party_stalled':
-      '第三方登录好像卡住了。Google 通行密钥在应用内窗口里经常停在验证那一步。可以关掉登录窗口改用邮箱+密码，或者在设置里手动填 App Token。',
+    'err.login.third_party_blocked':
+      '高级数据只支持 Zepp 邮箱 / 手机号 + 密码登录，Google、Apple、微信、小米等第三方登录在这里用不了。用第三方登录的账号请改走官方授权。',
+    'err.login.other_account':
+      '这是另一个 Zepp 账号：刚才登录的和官方授权的不是同一个账号，没有写入任何数据。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。',
+    'err.official.other_account':
+      '这是另一个 Zepp 账号：官方授权的和高级数据登录的不是同一个账号，没有保存这次授权。如果你当初用 Google、Apple 等第三方注册 Zepp，用同一个邮箱加密码登录会被 Zepp 当成新账号。',
+    'err.official.relay_unreachable':
+      '浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理（或让代理软件接管所有应用），然后点「立即检查」。',
+    'err.official.still_pending':
+      '刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意，并看到了授权成功的页面；如果那是之前另一次的授权页，请重新点一次授权。',
+    'err.backfill.start_too_early':
+      '补拉起点太早：最多只能补拉最近 3650 天',
     'err.login.bad_url': '登录地址无效',
     'err.login.window_failed': '无法打开登录窗口',
     'err.login.window_busy': '上一个登录窗口还没关完，稍等一下再试',
@@ -149,6 +177,11 @@ const messages = defineMessages(
 
     /* —— 其它 —— */
     'err.workout.not_found': '运动记录不存在',
+    'err.workout_fit.not_fit': '这不是一个能读懂的 .fit 文件',
+    'err.workout_fit.too_large': '文件太大，不像是一次运动的 .fit',
+    'err.workout_fit.read_failed': '读不了这个文件',
+    'err.workout_fit.no_activity': '这个 .fit 里没有运动记录（没有逐点数据，也没有圈）',
+    'err.workout_fit.start_mismatch': '这个 .fit 的开始时间和这条运动差了 5 分钟以上，不像是同一次运动',
     'err.prefs.retention_out_of_range': '保留天数必须在 1 到 365 天之间',
     'err.storage.write_busy': '另一个 ZeppBridge 写入操作正在进行，等它结束',
     'err.storage.write_lock_unavailable': '无法建立写入锁，检查数据文件夹的权限',
@@ -200,6 +233,13 @@ const messages = defineMessages(
     'err.training_plan.invalid': '这份计划没通过校验，没有发送',
     'err.training_plan.ai_publish_disabled': '没有允许 AI 直接发布训练计划',
     'err.training_plan.needs_clear_confirmation': '这次发布会清空手表上的一段计划，需要你在 ZeppBridge 里确认',
+    'err.coach_notes.empty': '内容是空的',
+    'err.coach_notes.too_long': '一条最多 500 字',
+    'err.coach_notes.stale': '这一条已经处理过或删掉了',
+    'err.coach_notes.export': '导出教练档案失败',
+    'err.logbook.invalid': '填的内容不对，检查一下再存',
+    'err.logbook.gear_taken': '这个 Zepp 鞋编号已经认到另一双鞋上了',
+    'err.rings.save': '年轮图片没存下来，看看图片文件夹能不能写',
   },
   {
     /* —— core —— */
@@ -245,6 +285,7 @@ const messages = defineMessages(
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': "Could not init sync — check the account region and retry",
+    'err.auth.fresh_start_failed': 'Could not prepare a new data folder; your current data is unchanged',
     'err.auth.verify_network':
       "Verification failed: could not reach Zepp — check your network and retry",
     'err.auth.verify_needs_reauth':
@@ -258,6 +299,23 @@ const messages = defineMessages(
     'err.login.verifying': 'Verifying the account',
     'err.login.connected': 'Connected to your Zepp account',
     'err.official.browser': "Could not open the system browser — check your default browser and retry.",
+    'err.open_url.failed': "Could not open the system browser — check your default browser and retry.",
+    'err.open_url.not_allowed': 'Only https links can be opened.',
+    'err.letters.client_init_failed': 'Could not set up the connection for sending letters. Restart the app and try again.',
+    'err.letters.save_failed': 'Your reply could not be saved on this computer. Check free disk space and retry.',
+    'err.letters.invalid': 'This reply points at the wrong version and was not sent.',
+    'err.letters.empty': 'Your reply is empty — write a few words first.',
+    'err.letters.capsule_date': 'That opening date isn’t valid. Pick it again.',
+    'err.feedback.toast_failed': 'The system notification could not be shown.',
+    'err.export.my_records': 'Couldn’t write that file. Try another location.',
+    'err.import.source': 'Unknown import source.',
+    'err.import.too_large': 'That file is too large (over 64 MB). For Strava and Apple Health, pick the whole export archive.',
+    'err.import.not_recognized': 'That file isn’t an export from the source you chose. Try another source.',
+    'err.import.read': 'Couldn’t read that file. Make sure no other program has it open.',
+    'err.ai_task.bad_prompt_file': 'That isn’t a usable .zbprompt file (wrong format, from a newer version, or no prompt).',
+    'err.ai_task.prompt_export': 'Couldn’t export the .zbprompt. Check that the desktop is writable.',
+    'err.ai_task.prompt_import': 'Couldn’t read that file (too large or can’t be opened).',
+    'err.letters.rejected': 'The server did not accept this reply. You may need to update the app.',
     'err.official.denied': 'You did not grant access — ZeppBridge received nothing.',
     'err.official.rejected': 'Zepp did not accept this authorization — retry.',
     'err.official.expired': 'This authorization expired — start it again.',
@@ -276,8 +334,18 @@ const messages = defineMessages(
       "Could not reach the Zepp region service — check your network and retry",
     'err.login.region_retrying':
       "Cannot reach the Zepp region service — retrying. The sign-in window stays open; no need to sign in again",
-    'err.login.third_party_stalled':
-      'Third-party sign-in looks stuck — Google passkeys often stall at verification inside an in-app window. Close the sign-in window and use email + password, or enter an App Token manually in Settings.',
+    'err.login.third_party_blocked':
+      'Advanced data only supports signing in with a Zepp email or phone number and password — Google, Apple, WeChat and Xiaomi sign-in don’t work here. If you sign in to Zepp with one of those, use official authorization instead.',
+    'err.login.other_account':
+      'This is a different Zepp account: the account you just signed in with isn’t the one you authorized officially, so nothing was saved. If you created your Zepp account with Google, Apple or another third party, signing in with the same email and a password counts as a new Zepp account.',
+    'err.official.other_account':
+      'This is a different Zepp account: the account you authorized isn’t the one signed in for advanced data, so this authorization wasn’t saved. If you created your Zepp account with Google, Apple or another third party, signing in with the same email and a password counts as a new Zepp account.',
+    'err.official.relay_unreachable':
+      'Your browser may already show the authorization as done, but ZeppBridge can’t reach zeppbridge.com to collect it. If your browser uses a proxy and the app doesn’t, turn on the system proxy (or let your proxy tool cover all apps), then choose “Check now”.',
+    'err.official.still_pending':
+      'Just checked: the relay hasn’t received this authorization yet. Make sure you approved it in the browser and saw the success page. If that page came from an earlier attempt, start the authorization again.',
+    'err.backfill.start_too_early':
+      'Backfill start is too early — at most the last 3650 days can be backfilled',
     'err.login.bad_url': 'Invalid sign-in address',
     'err.login.window_failed': "Could not open sign-in window",
     'err.login.window_busy':
@@ -350,6 +418,11 @@ const messages = defineMessages(
 
     /* —— misc —— */
     'err.workout.not_found': 'Workout record does not exist',
+    'err.workout_fit.not_fit': 'This is not a .fit file ZeppBridge can read',
+    'err.workout_fit.too_large': 'This file is too large to be a single workout .fit',
+    'err.workout_fit.read_failed': 'Could not read this file',
+    'err.workout_fit.no_activity': 'This .fit has no activity in it (no records and no laps)',
+    'err.workout_fit.start_mismatch': 'This .fit starts more than 5 minutes away from this workout — it does not look like the same session',
     'err.prefs.retention_out_of_range': 'Retention must be between 1 and 365 days',
     'err.storage.write_busy': 'Another ZeppBridge write is in progress — wait for it to finish',
     'err.storage.write_lock_unavailable':
@@ -402,6 +475,13 @@ const messages = defineMessages(
     'err.training_plan.invalid': 'This plan did not pass validation and was not sent',
     'err.training_plan.ai_publish_disabled': 'AI is not allowed to publish training plans directly',
     'err.training_plan.needs_clear_confirmation': 'This would clear part of the plan on your watch; confirm it in ZeppBridge',
+    'err.coach_notes.empty': 'The note is empty',
+    'err.coach_notes.too_long': 'A note can be at most 500 characters',
+    'err.coach_notes.stale': 'This note was already handled or deleted',
+    'err.coach_notes.export': 'Could not export the coach notes',
+    'err.logbook.invalid': 'Something in this entry is not valid — check it and save again',
+    'err.logbook.gear_taken': 'This Zepp shoe ID already belongs to another pair',
+    'err.rings.save': 'Couldn’t save the rings image — check that your Pictures folder is writable',
   },
   {
     /* —— core —— */
@@ -448,6 +528,7 @@ const messages = defineMessages(
 
     /* —— connect & auth —— */
     'err.auth.sync_init_failed': 'No se pudo inicializar la sincronización: revisa tu región y reintenta',
+    'err.auth.fresh_start_failed': 'No se pudo preparar una carpeta de datos nueva; tus datos actuales no cambiaron',
     'err.auth.verify_network':
       'Fallo de verificación: sin conexión con Zepp. Revisa tu red y reintenta',
     'err.auth.verify_needs_reauth':
@@ -461,6 +542,23 @@ const messages = defineMessages(
     'err.login.verifying': 'Verificando cuenta',
     'err.login.connected': 'Conectado a tu cuenta de Zepp',
     'err.official.browser': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
+    'err.open_url.failed': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
+    'err.open_url.not_allowed': 'Solo se pueden abrir enlaces https.',
+    'err.letters.client_init_failed': 'No se pudo preparar la conexión para enviar cartas. Reinicia la app y reintenta.',
+    'err.letters.save_failed': 'No se pudo guardar tu respuesta en este equipo. Revisa el espacio libre y reintenta.',
+    'err.letters.invalid': 'Esta respuesta apunta a una versión incorrecta y no se envió.',
+    'err.letters.empty': 'La respuesta está vacía: escribe unas palabras primero.',
+    'err.letters.capsule_date': 'La fecha de apertura no es válida. Vuelve a elegirla.',
+    'err.feedback.toast_failed': 'No se pudo mostrar la notificación del sistema.',
+    'err.export.my_records': 'No se pudo escribir el archivo. Prueba otra ubicación.',
+    'err.import.source': 'Origen de importación desconocido.',
+    'err.import.too_large': 'El archivo es demasiado grande (más de 64 MB). Para Strava y Apple Salud, elige el archivo de exportación completo.',
+    'err.import.not_recognized': 'Ese archivo no es una exportación del origen elegido. Prueba con otro origen.',
+    'err.import.read': 'No se pudo leer el archivo. Comprueba que ningún otro programa lo tenga abierto.',
+    'err.ai_task.bad_prompt_file': 'No es un archivo .zbprompt válido (formato incorrecto, de una versión más nueva o sin pregunta).',
+    'err.ai_task.prompt_export': 'No se pudo exportar el .zbprompt. Comprueba que se puede escribir en el escritorio.',
+    'err.ai_task.prompt_import': 'No se pudo leer ese archivo (demasiado grande o no se puede abrir).',
+    'err.letters.rejected': 'El servidor no aceptó esta respuesta. Puede que tengas que actualizar la app.',
     'err.official.denied': 'Acceso no concedido: ZeppBridge no recibió datos.',
     'err.official.rejected': 'Zepp rechazó la autorización; reintenta.',
     'err.official.expired': 'Autorización caducada: iníciala de nuevo.',
@@ -479,8 +577,18 @@ const messages = defineMessages(
       'Sin conexión con el servicio de regiones de Zepp: revisa tu red y reintenta',
     'err.login.region_retrying':
       'Sin conexión con el servicio de regiones de Zepp; reintentando. La ventana sigue abierta, no es necesario reiniciar sesión',
-    'err.login.third_party_stalled':
-      'Inicio de sesión externo atascado: las llaves de paso de Google suelen bloquearse en ventanas embebidas. Cierra la ventana y usa correo + contraseña, o ingresa un App Token en Configuración.',
+    'err.login.third_party_blocked':
+      'Los datos avanzados solo admiten iniciar sesión con correo o teléfono de Zepp y contraseña; Google, Apple, WeChat y Xiaomi no funcionan aquí. Si entras en Zepp con uno de ellos, usa la autorización oficial.',
+    'err.login.other_account':
+      'Es otra cuenta de Zepp: la cuenta con la que acabas de entrar no es la que autorizaste oficialmente, así que no se guardó nada. Si creaste tu cuenta de Zepp con Google, Apple u otro servicio, entrar con el mismo correo y una contraseña cuenta como una cuenta nueva.',
+    'err.official.other_account':
+      'Es otra cuenta de Zepp: la cuenta que autorizaste no es la que tiene sesión en los datos avanzados, así que no se guardó esta autorización. Si creaste tu cuenta de Zepp con Google, Apple u otro servicio, entrar con el mismo correo y una contraseña cuenta como una cuenta nueva.',
+    'err.official.relay_unreachable':
+      'Puede que el navegador ya muestre la autorización como hecha, pero ZeppBridge no logra conectar con zeppbridge.com para recogerla. Si el navegador usa un proxy y la app no, activa el proxy del sistema (o deja que tu herramienta de proxy cubra todas las apps) y elige «Comprobar ahora».',
+    'err.official.still_pending':
+      'Acabamos de comprobar: el intermediario aún no ha recibido esta autorización. Confirma que la aprobaste en el navegador y viste la página de éxito. Si esa página era de un intento anterior, vuelve a iniciar la autorización.',
+    'err.backfill.start_too_early':
+      'El inicio del historial es demasiado antiguo: como máximo se pueden recuperar los últimos 3650 días',
     'err.login.bad_url': 'Dirección de inicio de sesión no válida',
     'err.login.window_failed': 'No se pudo abrir la ventana de inicio de sesión',
     'err.login.window_busy':
@@ -553,6 +661,11 @@ const messages = defineMessages(
 
     /* —— misc —— */
     'err.workout.not_found': 'El registro de entrenamiento no existe',
+    'err.workout_fit.not_fit': 'Esto no es un archivo .fit que ZeppBridge pueda leer',
+    'err.workout_fit.too_large': 'El archivo es demasiado grande para un solo entrenamiento .fit',
+    'err.workout_fit.read_failed': 'No se pudo leer este archivo',
+    'err.workout_fit.no_activity': 'Este .fit no contiene ninguna actividad (ni registros ni vueltas)',
+    'err.workout_fit.start_mismatch': 'Este .fit empieza a más de 5 minutos de este entrenamiento; no parece la misma sesión',
     'err.prefs.retention_out_of_range': 'La retención debe estar entre 1 y 365 días',
     'err.storage.write_busy': 'Otra escritura de ZeppBridge en curso; espera a que termine',
     'err.storage.write_lock_unavailable':
@@ -605,6 +718,13 @@ const messages = defineMessages(
     'err.training_plan.invalid': 'Este plan no pasó la validación y no se envió',
     'err.training_plan.ai_publish_disabled': 'La IA no tiene permiso para publicar planes directamente',
     'err.training_plan.needs_clear_confirmation': 'Esto borraría parte del plan de tu reloj; confírmalo en ZeppBridge',
+    'err.coach_notes.empty': 'La nota está vacía',
+    'err.coach_notes.too_long': 'Una nota puede tener como máximo 500 caracteres',
+    'err.coach_notes.stale': 'Esta nota ya se gestionó o se eliminó',
+    'err.coach_notes.export': 'No se pudo exportar el expediente del entrenador',
+    'err.logbook.invalid': 'Algo de esta entrada no es válido; revísalo y vuelve a guardar',
+    'err.logbook.gear_taken': 'Este ID de zapatilla de Zepp ya pertenece a otro par',
+    'err.rings.save': 'No se pudo guardar la imagen de los anillos; comprueba que la carpeta Imágenes admite escritura',
   },
   // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
   // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。

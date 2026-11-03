@@ -21,12 +21,18 @@ import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
 import { useCardTableDrag } from '../../composables/useCardTableDrag';
 import {
-  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackCards, type Landing, type Receded,
+  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackAndReturnMs, stackCards, type Landing, type Receded,
 } from '../../lib/motion/cards';
-import { CLOSE_EASE, OPEN_EASE, paced } from '../../lib/motion/timing';
+import { OPEN_EASE, paced } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
-import { cardIdOf, expandGroup, focusWindow, groupSummary, pickableDates, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
+import { cardIdOf, DECK_RANGES, expandGroup, focusWindow, rangeStart, rootLevel, type DeckDay, type DeckGroup, type DeckLevel, type DeckRange } from '../../lib/cards/deck';
 import { deckToday, type DeckSource } from '../../lib/cards/sources';
+import type { CoverageContext } from '../../lib/cards/coverage';
+import { useGroupViews } from '../../composables/useGroupViews';
+import { whenFramesSteady } from '../../lib/motion/steady';
+import { backend } from '../../lib/bridge';
+import { useSyncController } from '../../composables/useSyncController';
+import { useCardSpan } from '../../composables/useCardSpan';
 import { tableLayerStyle, tableSlotStyle } from '../../lib/cards/tableLayout';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 
@@ -34,7 +40,6 @@ const props = withDefaults(defineProps<{ source: DeckSource; range: DeckRange; o
 const emit = defineEmits<{ close: [] }>();
 const t = useCardsText();
 const box = useCardCollection();
-const RETURN_MS = paced(440);
 /** 换范围时桌角那一叠淡掉的时长：和理牌（~320ms）差不多同时落定。 */
 const PARK_FADE_MS = paced(300);
 
@@ -67,9 +72,15 @@ const cardsOf = (depth: number): HTMLElement[] => [...(layers[depth]?.querySelec
 const cardOf = (id: string) => layers[stack.value.length - 1]?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(id)}"]`) ?? null;
 /** 牌飞进箱子时背景深一下（预先模糊好的那一层只淡入淡出，1A·A6）。连着挑几张时从此刻接着放，不叠。 */
 const deep = ref<HTMLElement | null>(null);
+/** 深一层平时不挂（`hidden`）：一层整屏 40px 的背景模糊哪怕透明也占着合成；只在这 760ms 里出现。 */
+let deepRun: Animation | null = null;
 const deepen = () => {
-  if (!deep.value || reducedMotion()) return;
-  animateFromNow(deep.value, [{ opacity: 1, offset: 0.35 }, { opacity: 0 }], { duration: 760, easing: 'ease-in-out' }, ['opacity']);
+  const el = deep.value;
+  if (!el || reducedMotion()) return;
+  el.hidden = false;
+  const run = animateFromNow(el, [{ opacity: 1, offset: 0.35 }, { opacity: 0 }], { duration: 760, easing: 'ease-in-out' }, ['opacity']);
+  deepRun = run;
+  void run.finished.then(() => { if (deepRun === run) el.hidden = true; }, () => undefined);
 };
 const picking = useCardPicking({ source: () => props.source, busy, cardOf, settle: () => seq.settle(), onFly: deepen });
 
@@ -77,6 +88,25 @@ const picking = useCardPicking({ source: () => props.source, busy, cardOf, settl
 const { drag, scatter, hintId, onDayDown, onDayMove, onDayUp, onDayCancel, onDayTap } = useCardTableDrag({
   level: () => top.value?.level ?? null, cardOf, picking, blocked: () => busy.value || closing.value, has: (date) => box.has(props.source.key, date),
 });
+
+/* ---------- 连选（3.0.4，composables/useCardSpan.ts） ---------- */
+const { on: spanOn, from: spanFrom, tap: spanTap, toggle: toggleSpan, reset: resetSpan } = useCardSpan({
+  level: () => top.value?.level ?? null, picking, blocked: () => busy.value || closing.value,
+});
+const tapDay = (day: DeckDay, event: MouseEvent) => {
+  if (drag.consumeClick() || picking.consumeHold()) return;
+  if (spanTap(event, cardIdOf(day))) return;
+  onDayTap(day, event);
+};
+
+/* ---------- 没有记录的一叠：还没补拉 / 云端没有（3.0.4，lib/cards/coverage.ts） ---------- */
+const { appStatus } = useSyncController();
+const coverageCtx = shallowRef<CoverageContext | null>(null);
+const loadCoverage = async () => {
+  let ledger = null;
+  try { ledger = await backend.getCoverageLedger(); } catch { ledger = null; }
+  coverageCtx.value = { category: props.source.category, earliestLocal: appStatus.value?.coverage?.earliest_day ?? null, ledger };
+};
 
 /* ---------- 文案 ---------- */
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
@@ -93,20 +123,13 @@ const dayAria = (day: DeckDay) => {
   if (state === 'confirm') return t.value.confirmAria(md(day.date));
   return t.value.dayAria(md(day.date), day.text ?? dayAriaValue(day), false);
 };
-const groupTitle = (group: DeckGroup) => (group.kind === 'month' ? monthName(group.start) : t.value.weekRange(md(group.start), md(group.end)));
-const groupTop = (group: DeckGroup) => (group.kind === 'month' ? group.start.slice(0, 4) : yearMonth(group.start));
-const groupValue = (group: DeckGroup) => { const average = numberText(groupSummary(group).average); return average === null ? null : t.value.average(average); };
-const groupSub = (group: DeckGroup) => { const s = groupSummary(group); return t.value.recordedOf(s.recorded, s.total); };
-const pickedIn = (group: DeckGroup) => pickableDates(group).filter((date) => box.has(props.source.key, date)).length;
-const groupBadge = (group: DeckGroup) => { const n = pickedIn(group); return n ? t.value.pickedOf(n, pickableDates(group).length) : null; };
-/** 挑了一部分 = 虚线；整叠挑满 = 实线实底（10-08 H5）。 */
-const groupPicked = (group: DeckGroup): 'some' | 'all' | null => {
-  const n = pickedIn(group);
-  if (!n) return null;
-  return n >= pickableDates(group).length ? 'all' : 'some';
-};
-const rangeLabel = (value: DeckRange) => (value === 7 ? t.value.range7 : value === 30 ? t.value.range30 : t.value.range180);
-const rangeItems = computed(() => ([7, 30, 180] as DeckRange[]).map((value) => ({ value: String(value), label: rangeLabel(value) })));
+/** 每一叠的牌面一次算好（composables/useGroupViews.ts）：按住、拖起这些逐帧状态变了不再重数十年的日子。 */
+const { views: groupViews, groupTitle } = useGroupViews({
+  levels: () => stack.value.map((entry) => entry.level), source: () => props.source, coverage: () => coverageCtx.value, numberText, md, monthName, yearMonth,
+});
+const gv = (group: DeckGroup) => groupViews.value.get(group.id)!;
+const rangeLabel = (value: DeckRange) => ({ 7: t.value.range7, 30: t.value.range30, 180: t.value.range180, 365: t.value.range365, 3650: t.value.rangeAll })[value];
+const rangeItems = computed(() => DECK_RANGES.map((value) => ({ value: String(value), label: rangeLabel(value) })));
 const crumbs = computed(() => stack.value.map((entry) => entry.title).join(' › '));
 const hint = computed(() => (top.value?.level.kind === 'groups' ? t.value.hintGroups : t.value.tipDays));
 const pickedCount = computed(() => box.picks.value.filter((pick) => pick.key === props.source.key).length);
@@ -115,10 +138,14 @@ const pickedCount = computed(() => box.picks.value.filter((pick) => pick.key ===
 const layerStyle = (level: DeckLevel) => tableLayerStyle(level, stageBox.value);
 const slotStyle = (level: DeckLevel, i: number) => (reducedMotion() ? {} : tableSlotStyle(level, i, stageBox.value));
 /** 翻面确认的那张左右的牌往两边让一点。 */
-const slotClass = (depth: number, ids: string[], i: number) => {
-  if (depth !== stack.value.length - 1 || !picking.raisedId.value) return null;
-  const at = ids.indexOf(picking.raisedId.value);
-  return at < 0 || at === i ? null : i < at ? 'shift-l' : 'shift-r';
+const raisedAt = computed(() => {
+  const level = top.value?.level;
+  return picking.raisedId.value && level?.kind === 'days' ? level.days.findIndex((day) => cardIdOf(day) === picking.raisedId.value) : -1;
+});
+const slotClass = (depth: number, i: number) => {
+  const at = raisedAt.value;
+  if (depth !== stack.value.length - 1 || at < 0 || at === i) return null;
+  return i < at ? 'shift-l' : 'shift-r';
 };
 
 /* ---------- 来处 ---------- */
@@ -156,6 +183,21 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
 const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : workouts.value ? t.value.recentWorkouts : rangeLabel(range.value));
 
 /**
+ * 发牌，但先停在第一帧（来处 / 那一叠），等挂载、头一回光栅化这几帧过去、帧节奏稳了再放（10-28）：
+ * 发牌按时间走，新的一副第一次上屏那一帧要卡几十毫秒，动画要是已经在走，放出来就跳掉一截。
+ * 只暂停这次新起的动画；等的时候被打断接力提前放完的（`seq.settle`）不再重放。
+ */
+const dealSteadily = async (cards: HTMLElement[], from: Landing | null, fromStack = false) => {
+  const before = new Set(cards.flatMap((card) => card.getAnimations()));
+  const dealt = dealCards(cards, from, { fromStack, track: seq.track });
+  const fresh = cards.flatMap((card) => card.getAnimations()).filter((animation) => !before.has(animation));
+  for (const animation of fresh) animation.pause();
+  await whenFramesSteady();
+  for (const animation of fresh) if (animation.playState === 'paused') animation.play();
+  await dealt;
+};
+
+/**
  * 进场：取到数据就从按钮发牌。10-08 去掉了「图标先从按钮飞到左上角、落定再发牌」那一拍（1A·A3）——
  * 用户看到的是一张小牌先跑到左上角、再出一副牌，一卡一卡的；标题区只和背景一起淡入。
  */
@@ -166,7 +208,7 @@ const deal = async (id: number) => {
   stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
-  await dealCards(cards, anchorLanding(), { track: seq.track });
+  await dealSteadily(cards, anchorLanding());
   if (!seq.live(id)) return;
   const first = firstPickable(cards);
   first?.focus({ preventScroll: true });
@@ -177,6 +219,7 @@ const push = async (group: DeckGroup, card: HTMLElement) => {
   if (busy.value || closing.value) return;
   const id = seq.handoff();
   scatter();
+  resetSpan();
   busy.value = true;
   await picking.cancelConfirm();
   const depth = stack.value.length - 1;
@@ -190,7 +233,7 @@ const push = async (group: DeckGroup, card: HTMLElement) => {
   await nextTick();
   const cards = cardsOf(depth + 1);
   busy.value = false;
-  await dealCards(cards, receded.now(), { track: seq.track });
+  await dealSteadily(cards, receded.now());
   if (!seq.live(id)) return;
   firstPickable(cards)?.focus({ preventScroll: true });
 };
@@ -201,6 +244,7 @@ const pop = async () => {
   if (depth <= 0) { await close(); return; }
   const id = seq.handoff();
   scatter();
+  resetSpan();
   popping = true;
   busy.value = true;
   await picking.cancelConfirm();
@@ -222,8 +266,10 @@ const pop = async () => {
  * 背景、标题、底下的提示、底下还没退成桌角一叠的层：从此刻的样子淡到 `to`，和放回同起同止。
  * 桌角那一叠不归这里管（`receded.fadeOut / fadeIn`）：以前这里把它淡回 1，收到一半又打开时父牌整张亮在牌缝后面。
  */
+/** 收起时背景淡出两头缓：前快的曲线一上来就把模糊抽掉大半，牌还叠在正中、页面已经露出来了（10-28 录屏）。 */
+const CHROME_OUT_EASE = 'cubic-bezier(.45, 0, .4, 1)';
 const fadeChrome = (to: number, duration: number) => {
-  const easing = to ? OPEN_EASE : CLOSE_EASE;
+  const easing = to ? OPEN_EASE : CHROME_OUT_EASE;
   const under = layers.slice(0, -1).filter((_, i) => !stack.value[i]?.receded);
   const els = [backdrop.value, head.value, foot.value, ...under].filter((el): el is HTMLElement => !!el);
   return els.map((el) => animateFromNow(el, { opacity: to }, { duration, easing, fill: 'forwards' }, ['opacity']));
@@ -243,14 +289,16 @@ const close = async () => {
   picking.holdEnd();
   const cards = cardsOf(stack.value.length - 1).filter((card) => card.style.visibility !== 'hidden');
   const receiver = receive(props.anchor);
-  await stackCards(cards, stageCenter());
-  if (!seq.live(id)) { receiver.cancel(); return; }
-  // 放回：整叠缩回来处，背景模糊、标题、箱子（空的话）同一段时间里淡回去，牌落地那一刻页面正好清楚。
-  setBoxOpen(false);
-  const fadeMs = reducedMotion() ? 160 : RETURN_MS;
+  // 背景模糊、标题、桌角那一叠从理牌这一刻就开始淡，跨过理牌 + 放回整段，牌落地那一刻页面正好清楚
+  // （10-28 录屏：以前理牌时背景纹丝不动、放回才开始淡，又是前快的曲线，牌还叠在正中背景就没了，看着像牌凭空悬着再消失）。
+  const fadeMs = reducedMotion() ? 160 : stackAndReturnMs(cards.length);
   const fades = fadeChrome(0, fadeMs);
   // 桌角那一叠（上一层退下去的）也一起淡掉：以前它的模糊拷贝不在 layers 里，整桌淡完它还亮着，像一块残影。
   const parked = stack.value.map((entry) => entry.receded?.fadeOut(fadeMs));
+  await stackCards(cards, stageCenter());
+  if (!seq.live(id)) { receiver.cancel(); return; }
+  // 放回：整叠缩回来处，箱子（空的话）同时滑走。
+  setBoxOpen(false);
   await Promise.all([returnStack(cards, anchorLanding()), ...fades.map((a) => a.finished.catch(() => undefined)), ...parked]);
   if (!seq.live(id)) { receiver.cancel(); return; }
   receiver.land(props.source.tint);
@@ -286,6 +334,7 @@ const switchRange = async (value: string) => {
   if ((next === range.value && !focusDate.value) || closing.value) return;
   const id = seq.handoff();
   scatter();
+  resetSpan();
   range.value = next;
   focusDate.value = null;
   busy.value = true;
@@ -326,7 +375,7 @@ const switchRange = async (value: string) => {
   await nextTick();
   const cards = cardsOf(0);
   busy.value = false;
-  await dealCards(cards, from, { fromStack: true, track: seq.track });
+  await dealSteadily(cards, from, true);
   if (!seq.live(id)) return;
   firstPickable(cards)?.focus({ preventScroll: true });
 };
@@ -345,6 +394,7 @@ const onBlank = (event: MouseEvent) => {
 };
 const tapGroup = (group: DeckGroup, event: MouseEvent) => {
   if (drag.consumeClick() || picking.consumeHold()) return;
+  if (spanTap(event, group.id)) return;
   void push(group, event.currentTarget as HTMLElement);
 };
 const onCardKey = (event: KeyboardEvent, item: { group?: DeckGroup }) => {
@@ -392,6 +442,7 @@ onMounted(() => {
   backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
   introHead();
   void deal(seq.next());
+  if (!workouts.value) void loadCoverage();
 });
 onBeforeUnmount(() => {
   releaseEscape?.();
@@ -407,39 +458,40 @@ defineExpose({ reopen, isClosing: () => closing.value });
   <Teleport to="body">
     <div :class="['card-table', { closing }]" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="`${titleId}-keys`" :style="{ '--tint': source.tint }">
       <div ref="backdrop" class="table-backdrop" aria-hidden="true" @click="onBlank"></div>
-      <div ref="deep" class="table-backdrop deep" aria-hidden="true"></div>
+      <div ref="deep" class="table-backdrop deep" aria-hidden="true" hidden></div>
       <header ref="head" class="table-head">
         <button v-if="stack.length > 1" type="button" class="table-icon" :aria-label="t.back" @click="pop"><Icon name="arrow-left" :size="17" /></button>
         <span v-else class="table-mark" data-intro aria-hidden="true"><Icon name="cards" :size="18" /></span>
         <div class="table-titles" data-intro>
           <h2 :id="titleId">{{ source.label }}</h2>
-          <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template></p>
+          <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template><template v-if="spanOn"> · <b>{{ spanFrom ? t.spanFrom : t.spanAria }}</b></template></p>
         </div>
         <span v-if="!workouts" data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
+        <button type="button" :class="['table-icon', 'span-toggle', { on: spanOn }]" data-intro :aria-pressed="spanOn" :aria-label="t.spanAria" :title="t.spanAria" @click="toggleSpan"><Icon name="link" :size="16" /><span>{{ t.span }}</span></button>
         <button type="button" class="table-icon" data-intro data-table-close :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
       </header>
       <div ref="stage" class="table-stage" @click.self="onBlank">
         <p v-if="loadFailed || (top && top.level.kind === 'days' && !top.level.days.length)" class="table-empty">{{ workouts ? t.noWorkouts : t.noRecord }}</p>
         <template v-for="(entry, depth) in stack" :key="entry.id">
-          <div :ref="(el) => setLayer(depth, el)" :class="['table-layer', { pending: entry.pending, holding: !!picking.holdId.value }]" :style="layerStyle(entry.level)" @click.self="onBlank">
+          <div :ref="(el) => setLayer(depth, el)" :class="['table-layer', { pending: entry.pending }]" :style="layerStyle(entry.level)" @click.self="onBlank">
             <template v-if="entry.level.kind === 'days'">
-              <span v-for="(day, i) in entry.level.days" :key="cardIdOf(day)" :class="['pslot', slotClass(depth, entry.level.days.map(cardIdOf), i)]" :style="slotStyle(entry.level, i)">
+              <span v-for="(day, i) in entry.level.days" :key="cardIdOf(day)" :class="['pslot', slotClass(depth, i)]" :style="slotStyle(entry.level, i)">
                 <PlayingCard kind="day" :data-card-id="cardIdOf(day)" :top="weekday(day.date)" :title="md(day.date)" :corner="String(Number(day.date.slice(8)))"
                   :value="source.second ? numberText(day.value) : dayValue(day)" :unit="!day.text && numberText(day.value) ? source.unit : null"
                   :value2="source.second && day.value2 != null ? source.second.format(day.value2) : null" :unit2="source.second?.unit ?? null" :tint2="source.second?.tint ?? null" :icon="day.icon" :state="day.has ? picking.stateOf(cardIdOf(day)) : 'front'"
-                  :class="{ lifting: picking.liftId.value === cardIdOf(day), buried: drag.buried(cardIdOf(day)), 'drop-target': drag.targetId.value === cardIdOf(day) }"
+                  :class="{ buried: drag.buried(cardIdOf(day)), 'span-from': spanOn && spanFrom === cardIdOf(day) }"
                   :disabled="!day.has" :focused="day.date === focusDate && (!workouts || i === entry.level.days.findIndex((d) => d.date === focusDate))" :tint="source.tint"
-                  :badge="drag.pileCount(cardIdOf(day)) ? (hintId === cardIdOf(day) ? t.holdPile : `×${drag.pileCount(cardIdOf(day))}`) : null" :holding="picking.holdId.value === cardIdOf(day)"
+                  :badge="drag.pileCount(cardIdOf(day)) ? (hintId === cardIdOf(day) ? t.holdPile : `×${drag.pileCount(cardIdOf(day))}`) : null"
                   :aria-label="dayAria(day)" :aria-pressed="picking.stateOf(cardIdOf(day)) === 'boxed'"
                   @pointerdown="onDayDown($event, day)" @pointermove="onDayMove" @pointerup="onDayUp" @pointercancel="onDayCancel"
-                  @click="onDayTap(day, $event)" @keydown="onCardKey($event, {})" />
+                  @click="tapDay(day, $event)" @keydown="onCardKey($event, {})" />
               </span>
             </template>
             <template v-else>
-              <span v-for="(group, i) in entry.level.groups" :key="group.id" :class="['pslot', { 'is-holding': picking.holdId.value === group.id }]" :style="slotStyle(entry.level, i)">
-                <PlayingCard kind="group" :deck="group.kind" :picked="groupPicked(group)" :data-card-id="group.id" :top="groupTop(group)" :title="groupTitle(group)" :value="groupValue(group)"
-                  :dots="group.days.map((d) => (d.has && box.has(source.key, d.date) ? 'picked' : d.has))" :empty="!groupSummary(group).recorded" :badge="groupBadge(group)" :holding="picking.holdId.value === group.id" :tint="source.tint"
-                  :aria-label="t.groupAria(groupTitle(group), groupSub(group))" :aria-description="pickedIn(group) === pickableDates(group).length && pickedIn(group) ? t.holdToUnpick : t.holdToPick"
+              <span v-for="(group, i) in entry.level.groups" :key="group.id" class="pslot" :style="slotStyle(entry.level, i)">
+                <PlayingCard kind="group" :deck="group.kind" :picked="gv(group).picked" :data-card-id="group.id" :top="gv(group).top" :title="gv(group).title" :value="gv(group).value"
+                  :dots="gv(group).dots" :empty="gv(group).empty" :coverage="gv(group).coverage" :class="{ 'span-from': spanOn && spanFrom === group.id }" :badge="gv(group).badge" :tint="source.tint"
+                  :aria-label="gv(group).aria" :aria-description="gv(group).description"
                   @pointerdown="picking.holdStart(group, $event); drag.down($event, group.id)" @pointermove="picking.holdMove($event); drag.move($event)"
                   @pointerup="picking.holdEnd(); drag.up($event)" @pointercancel="picking.holdEnd(); drag.cancelEvent($event)"
                   @click="tapGroup(group, $event)" @keydown="onCardKey($event, { group })" />

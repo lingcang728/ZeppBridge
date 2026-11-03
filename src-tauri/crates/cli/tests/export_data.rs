@@ -18,10 +18,7 @@ impl Fixture {
         let dir = std::env::temp_dir().join(format!(
             "zeppbridge-export-data-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            zeppbridge_core::unique_suffix()
         ));
         fs::create_dir(&dir).unwrap();
         let fixture = Self(dir);

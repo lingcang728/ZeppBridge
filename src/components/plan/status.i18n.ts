@@ -15,6 +15,7 @@ const messages = defineMessages(
     never: '还没发过',
     undo: '撤销上一次',
     clear: '清空手表计划',
+    resend: '重发未送达的周',
   },
   {
     draft: 'Draft not sent',
@@ -29,6 +30,7 @@ const messages = defineMessages(
     never: 'Nothing sent yet',
     undo: 'Undo last send',
     clear: 'Clear watch plan',
+    resend: 'Resend unconfirmed weeks',
   },
   {
     draft: 'Borrador sin enviar',
@@ -43,6 +45,7 @@ const messages = defineMessages(
     never: 'Aún no se ha enviado nada',
     undo: 'Deshacer el último envío',
     clear: 'Borrar el plan del reloj',
+    resend: 'Reenviar las semanas sin confirmar',
   },
   'components/plan/status',
 );

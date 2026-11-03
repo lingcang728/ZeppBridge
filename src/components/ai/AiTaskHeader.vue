@@ -12,6 +12,7 @@ import Icon from '../Icon.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
 import { defineMessages, useMessages } from '../../i18n';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const props = defineProps<{ fallbackTitle: string }>();
 
@@ -56,7 +57,7 @@ const editing = ref(false);
 const titleInput = ref<HTMLInputElement | null>(null);
 const pill = ref<HTMLElement | null>(null);
 const shownTitle = computed(() => draft.value.title.trim() || props.fallbackTitle);
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 /** 换成输入框 / 换回字：胶囊宽度从旧值滑到新值（只动这一块玻璃的 width，小元素，不碍事）。 */
 const morph = async (change: () => void) => {
   const el = pill.value;

@@ -13,6 +13,7 @@ use super::Database;
 use crate::models::error::Result;
 use crate::models::types::{SleepSession, Workout};
 use crate::storage::life_events::LifeEvent;
+use crate::storage::logbook::profile::ProfileJournal;
 use crate::training_plan::Workout as PlannedWorkout;
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use serde::Serialize;
@@ -63,6 +64,10 @@ pub struct ContextWorkout {
     pub training_effect: Option<f64>,
     pub anaerobic_training_effect: Option<f64>,
     pub rpe: Option<i32>,
+    /// 用户自己在 ZeppBridge 里打的 RPE（1–10，批次 7）；和手表的 `rpe` 分开放，没打是 null。
+    pub user_rpe: Option<u8>,
+    /// 用户标的酸痛部位（`knee_l` 这类键，左右是用户自己的左右）；没标是空数组。
+    pub soreness: Vec<String>,
     /// 各心率区间停留秒数，区间边界来自手表设定（`index` 0 起）。
     pub hr_zone_seconds: Vec<ZoneSeconds>,
 }
@@ -184,6 +189,23 @@ pub struct AthleteProfile {
     pub recent_runs: Vec<ProfileRun>,
     /// 用户在「让 AI 认识你的背景」里写的话；没写是 null。是数据，不是指令。
     pub profile_note: Option<String>,
+    /// 用户确认过的「教练档案」（AI 提议、用户点了记住的，和用户自己写的），旧的在前。
+    /// 是数据，不是指令。
+    pub coach_notes: Vec<ProfileCoachNote>,
+    /// 用户自己写的履历（批次 7）：PB、还没好和 90 天内好的伤病、将来的比赛和填了成绩的比赛、
+    /// 还在穿的跑鞋、纪元。是数据，不是指令。
+    pub journal: ProfileJournal,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileCoachNote {
+    pub text: String,
+    /// `user`（用户自己写的）/ `mcp`（某个 AI 提议、用户确认的）。
+    pub source: String,
+    pub source_name: Option<String>,
+    /// 记下的日期（UTC 日）。
+    pub since: String,
 }
 
 fn local_date(at: DateTime<Utc>) -> NaiveDate {
@@ -216,6 +238,8 @@ fn context_workout(workout: &Workout) -> ContextWorkout {
         training_effect: workout.training_effect,
         anaerobic_training_effect: workout.anaerobic_training_effect,
         rpe: workout.rpe,
+        user_rpe: None,
+        soreness: Vec::new(),
         hr_zone_seconds: workout
             .hr_zones
             .iter()
@@ -363,11 +387,24 @@ impl Database {
         let life_events =
             self.list_life_events(Some(&start.to_string()), Some(&today.to_string()))?;
 
+        let feel = self.workout_feel_map()?;
+        let workouts = workouts
+            .iter()
+            .map(|workout| {
+                let mut row = context_workout(workout);
+                if let Some((rpe, soreness)) = feel.get(&workout.workout_id) {
+                    row.user_rpe = *rpe;
+                    row.soreness = soreness.clone();
+                }
+                row
+            })
+            .collect();
+
         Ok(TrainingContext {
             start: start.to_string(),
             end: today.to_string(),
             days: rows.into_values().collect(),
-            workouts: workouts.iter().map(context_workout).collect(),
+            workouts,
             last_workout_date: last.map(|date| date.to_string()),
             days_since_last_workout: last.map(|date| (today - date).num_days()),
             planned: overview.planned.iter().map(planned).collect(),
@@ -455,6 +492,22 @@ impl Database {
             height_cm: latest("height", 1825)?,
             recent_runs,
             profile_note: (!note.trim().is_empty()).then_some(note),
+            coach_notes: self
+                .accepted_coach_notes()?
+                .into_iter()
+                .map(|note| ProfileCoachNote {
+                    since: note
+                        .decided_at
+                        .unwrap_or(note.created_at)
+                        .chars()
+                        .take(10)
+                        .collect(),
+                    text: note.text,
+                    source: note.source,
+                    source_name: note.source_name,
+                })
+                .collect(),
+            journal: self.journal_for_ai()?,
         })
     }
 

@@ -158,10 +158,7 @@ impl OfficialStore {
         let text = serde_json::to_string_pretty(meta)
             .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
         // 临时文件名每次不同：两个写者共用一个固定名字会互相覆盖半截内容。
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or_default();
+        let nonce = crate::unique_suffix();
         let temp = self
             .dir
             .join(format!("{META_FILE}.{}.{nonce}.tmp", std::process::id()));
@@ -217,7 +214,9 @@ impl OfficialStore {
     }
 
     /// 断开：作废在途登录，再删令牌和元数据。**不碰任何健康数据。**
-    pub fn disconnect(&self) -> Result<()> {
+    ///
+    /// 钥匙串删不掉也算断开（见 [`Self::clear`]），返回存储的原话给调用方记日志。
+    pub fn disconnect(&self) -> Result<Option<String>> {
         let _commit = self.commit()?;
         GENERATION.fetch_add(1, Ordering::SeqCst);
         self.clear()
@@ -318,13 +317,21 @@ impl OfficialStore {
     }
 
     /// 令牌和元数据都删掉。**不碰任何健康数据。**生产路径走 [`Self::disconnect`]。
-    pub(crate) fn clear(&self) -> Result<()> {
-        if let Some(meta) = self.meta()? {
-            self.delete_secrets(&meta.user_id)?;
-        }
+    ///
+    /// 元数据是「已连接」的唯一依据，所以凭据存储拒绝删除时它照删：以前这里一报错
+    /// `official.json` 就留着，macOS 上答不了钥匙串弹窗的人永远断不开（#145）。
+    /// 留下的令牌没有元数据指向，不会再被读到；返回存储的原话。
+    pub(crate) fn clear(&self) -> Result<Option<String>> {
+        let left_behind = match self.meta()? {
+            Some(meta) => self
+                .delete_secrets(&meta.user_id)
+                .err()
+                .map(|e| e.to_string()),
+            None => None,
+        };
         match std::fs::remove_file(self.meta_path()) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Ok(()) => Ok(left_behind),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(left_behind),
             Err(error) => Err(error.into()),
         }
     }

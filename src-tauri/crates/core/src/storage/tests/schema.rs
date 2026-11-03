@@ -163,10 +163,7 @@ fn future_schema_is_refused_without_changing_the_database() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-future-schema-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("zepp.db");
@@ -403,7 +400,14 @@ fn schema_v10_workout_rows_migrate_without_losing_type_facts() {
     let db = Database::in_memory().unwrap();
     db.conn
         .execute_batch(
-            "ALTER TABLE workouts DROP COLUMN workout_type_conflict;
+            // v10 did not have the v43 local-state trigger/views. Remove those
+            // before removing columns they depend on, just as in an actual old DB.
+            "DROP TRIGGER restore_local_workout_type;
+                 DROP VIEW workouts_visible;
+                 DROP VIEW workouts_hidden;
+                 DROP TABLE workout_local_state;
+                 DROP TABLE workout_edit_history;
+                 ALTER TABLE workouts DROP COLUMN workout_type_conflict;
                  ALTER TABLE workouts DROP COLUMN workout_type_override;
                  ALTER TABLE workouts DROP COLUMN workout_type_source;
                  DELETE FROM schema_migrations WHERE version = 11;
@@ -507,10 +511,7 @@ fn v26_library_gains_stage_available_columns_at_v27() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-v26-sleep-available-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        crate::unique_suffix()
     ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

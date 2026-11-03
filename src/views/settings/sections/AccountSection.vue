@@ -1,20 +1,31 @@
 <script setup lang="ts">
 /* 账号：一行连接状态（官方授权 · 高级数据，两条各报各的，互不冒充）+ 一个主按钮，
    按钮永远是此刻最该做的那一步。网页登录、手动填写、复制授权链接都在高级卡的「登录方式」。 */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import CredentialRecovery from '../../../components/CredentialRecovery.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
+import ModalDialog from '../../../components/ModalDialog.vue';
+import WhyHalfData from '../../../components/WhyHalfData.vue';
+import { whyHalfDataMessages } from '../../../components/WhyHalfData.i18n';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSyncController } from '../../../composables/useSyncController';
 import { revealWeeklyReport } from '../../../lib/revealWeeklyReport';
-import { useMessages } from '../../../i18n';
+import { locale, useMessages } from '../../../i18n';
+import { openFaq } from '../../../lib/faqLink';
+import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { accountCardMessages } from './account.i18n';
+import { workoutToolsMessages } from '../../../components/WorkoutTools.i18n';
 
 const d = useMessages(deckMessages);
 const a = useMessages(accountCardMessages);
+const w = useMessages(whyHalfDataMessages);
+const t = useMessages(settingsMessages);
+const tools = useMessages(workoutToolsMessages);
+/* 「为什么有些数据没有？」常驻在这张卡上：只连官方授权的人看到一半数据时，第一个来找的就是这里。 */
+const whyOpen = ref(false);
 const { appStatus, isSyncing, syncProgress, dataReady, pickUpReady } = useSyncController();
 const router = useRouter();
 
@@ -95,12 +106,28 @@ const action = computed<Action | null>(() => {
           </button>
         </div>
       </div>
+      <!-- 官方授权在等浏览器那边：说清楚会自动连上，也给一个马上去查的按钮（浏览器显示已授权、这里还在等的时候）。 -->
+      <div v-if="official.waiting.value" class="s-row">
+        <div class="s-row-main"><span class="s-row-sub">{{ a.waitingHint }}</span><button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button></div>
+        <div class="s-row-control">
+          <button class="button secondary" type="button" :disabled="official.checking.value" @click="official.checkNow">{{ a.checkNow }}</button>
+        </div>
+      </div>
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ w.title }}</span>
+          <span class="s-row-sub">{{ a.whySub }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="pill-button" type="button" @click="whyOpen = true">{{ a.learnMore }}</button>
+        </div>
+      </div>
       <!--
         「退出账号」放在这里，而不是埋在高级里。
         两个人在 Reddit 上问同一句话：「我怎么退出？找不到 logout 按钮。」
         （p71rsj2、p7497lq）后端 `clear_auth` 本来就只清凭据、保留本机历史。
       -->
-      <div v-if="appStatus?.configured" class="s-row">
+      <div v-if="appStatus?.auth_configuration_present || appStatus?.configured" class="s-row">
         <div class="s-row-main">
           <span class="s-row-title">{{ a.logoutTitle }}</span>
           <span class="s-row-sub">{{ a.logoutSub }}</span>
@@ -109,6 +136,7 @@ const action = computed<Action | null>(() => {
           <button class="button danger-button" type="button" @click="clearAuth">{{ a.logoutShort }}</button>
         </div>
       </div>
+      <p v-if="appStatus?.auth_configuration_present && !appStatus?.credential_available" class="s-note" role="status">{{ tools.credentialHint }}</p>
     </div>
     <FoldTransition><p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p></FoldTransition>
     <CredentialRecovery v-if="official.status.value.credential_recovery"
@@ -117,10 +145,17 @@ const action = computed<Action | null>(() => {
     <CredentialRecovery v-if="loginStatus.credential_recovery" kind="advanced"
       :recovery="loginStatus.credential_recovery" :busy="loginBusy || manualAuthBusy"
       @retry="recoverCredentials" @discard="cancelLogin" />
+    <FoldTransition><p v-if="official.waiting.value && official.waitingText.value" class="hint-line" role="status"><Icon name="info" :size="13" />{{ official.waitingText.value }}</p></FoldTransition>
     <FoldTransition>
       <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
       <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert"><Icon name="info" :size="13" />{{ loginMessage }}</p>
     </FoldTransition>
+    <ModalDialog v-if="whyOpen" labelledby="why-half-title" @close="whyOpen = false">
+      <div class="why-dialog">
+        <WhyHalfData title-id="why-half-title" />
+        <footer><button class="button primary" type="button" @click="whyOpen = false">{{ w.close }}</button></footer>
+      </div>
+    </ModalDialog>
   </section>
 </template>
 
@@ -145,5 +180,8 @@ const action = computed<Action | null>(() => {
   font-size: var(--fs-lg);
   font-weight: 700;
 }
+.why-dialog { padding: 20px; }
+.why-dialog footer { display: flex; justify-content: flex-end; margin-top: 24px; }
+.why-dialog footer .button { min-height: 44px; min-width: 110px; }
 .account-avatar.muted { background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--subtle); }
 </style>

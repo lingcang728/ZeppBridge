@@ -25,6 +25,9 @@ import { addStep, removeStep, setRepeat, setStepLength, setStepTarget, setText, 
 import type { PlanDocument, PlanIssue, PlanSport, PlanStepLength, PlanTarget, PlanVariant, PlanWorkout } from '../../types/trainingPlan';
 import { usePlanText } from './usePlanText';
 import { useEditorText } from './editor.i18n';
+import { lessMotion } from '../../lib/motion/lessMotion';
+import { useMessages } from '../../i18n';
+import { workoutToolsMessages } from '../WorkoutTools.i18n';
 
 const props = defineProps<{
   workout: PlanWorkout;
@@ -34,8 +37,9 @@ const props = defineProps<{
   editable: boolean;
 }>();
 const hub = useAiHub();
-const { t, sport, intensity, length, target, variant } = usePlanText();
+const { sport, intensity, length, target, variant } = usePlanText();
 const e = useEditorText();
+const tools = useMessages(workoutToolsMessages);
 const root = ref<HTMLElement | null>(null);
 /** 展开着的那一步（路径键 `i` / `i.j`）和悬停着的那一步：总览条和步骤卡共用。 */
 const open = ref<string | null>(null);
@@ -52,8 +56,7 @@ const sportItems = computed(() => (['running', 'cycling', 'pool_swim', 'open_wat
 const variantItems = computed(() => SPORT_VARIANTS[props.workout.sport].map((value) => ({ value, label: variant(props.workout.sport, value) ?? value })));
 const pickNote = computed(() => {
   if (!SPORT_VARIANTS[props.workout.sport].length) return '';
-  const name = variant(props.workout.sport, props.workout.variant);
-  return name ? t.value.variantPick(name) : t.value.variantPickAny;
+  return tools.value.planHint;
 });
 const setSport = (value: PlanSport) => void apply((doc, i) => retypeWorkout(doc, i, value));
 const setVariant = (value: PlanVariant) => void apply((doc, i) => retypeWorkout(doc, i, props.workout.sport, value));
@@ -131,7 +134,7 @@ const describe = (segment: ProfileSegment) => {
 
 /* 展开 / 收起：高度平滑过渡（只这一块，360ms 开、300ms 收）。 */
 const EASE = 'cubic-bezier(.4, .6, .2, 1)';
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reduced = () => lessMotion();
 const grow = (el: Element, done: () => void) => {
   if (reduced()) { done(); return; }
   const h = (el as HTMLElement).scrollHeight;
@@ -185,9 +188,9 @@ const shrink = (el: Element, done: () => void) => {
         <li v-else class="group-card">
           <div class="group-head">
             <span class="rep-capsule" :title="e.roundsHint" @pointerdown="startSwipe($event, index, group.times)" @pointermove="moveSwipe" @pointerup="endSwipe" @pointercancel="endSwipe">
-              <button type="button" :disabled="!editable || group.times <= 1" :aria-label="`${group.times - 1}`" @click="bump(index, group.times, -1)">−</button>
+              <button type="button" :disabled="!editable || group.times <= 1" :aria-label="`${e.roundsHint}: ${group.times - 1}`" @click="bump(index, group.times, -1)">−</button>
               <b>×{{ timesOf(index, group.times) }}</b>
-              <button type="button" :disabled="!editable || group.times >= 50" :aria-label="`${group.times + 1}`" @click="bump(index, group.times, 1)">+</button>
+              <button type="button" :disabled="!editable || group.times >= 50" :aria-label="`${e.roundsHint}: ${group.times + 1}`" @click="bump(index, group.times, 1)">+</button>
             </span>
           </div>
           <ol>
@@ -218,3 +221,12 @@ const shrink = (el: Element, done: () => void) => {
 </template>
 
 <style scoped src="./PlanWorkoutEditor.css"></style>
+<style scoped>
+.rep-capsule button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 540px) {
+  .step-head { flex-wrap: wrap; padding-left: 10px; gap: 6px; }
+  .step-head > i { display: none; }
+  .what, .aim { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .aim { flex-basis: 100%; }
+}
+</style>

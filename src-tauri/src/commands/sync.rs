@@ -151,9 +151,11 @@ pub async fn start_history_backfill(
     // 按自然月对六条流展开成几十万个同步块，卡住整个 app（同时占着写锁）。
     // 和其它所有时间窗口一样，上限是 `MAX_HISTORY_SYNC_DAYS`：再早 Zepp
     // 也不会有记录。
+    // 和「日期格式不对」是两回事，各有各的码：#136 里「全部」按日历年往回退了
+    // 3652 天，撞上这里却显示成「需要 YYYY-MM-DD」，用户完全看不懂。
     if (to - from).num_days() > UserPrefs::MAX_HISTORY_SYNC_DAYS {
         return Err(AppError::new(
-            "err.backfill.bad_start_date",
+            "err.backfill.start_too_early",
             format!(
                 "补拉起点太早：最多只能补拉最近 {} 天",
                 UserPrefs::MAX_HISTORY_SYNC_DAYS
@@ -190,6 +192,97 @@ pub async fn get_coverage_ledger(
 ) -> std::result::Result<CoverageLedger, AppError> {
     // 补拉进行时界面会反复拉它：走独立只读连接，不和同步收尾抢命令侧的锁。
     super::spawn_independent_read(state.data_dir.clone(), |db| db.coverage_ledger()).await
+}
+
+#[tauri::command]
+pub async fn get_workout_detail_coverage(
+    state: tauri::State<'_, AppState>,
+    channel: Option<String>,
+) -> std::result::Result<zeppbridge_core::storage::detail_queue::DetailCoverage, AppError> {
+    let official = detail_channel(channel.as_deref())?;
+    super::spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.workout_detail_coverage_for_channel(official)
+    })
+    .await
+}
+
+fn detail_channel(channel: Option<&str>) -> std::result::Result<Option<bool>, AppError> {
+    match channel {
+        None => Ok(None),
+        Some("advanced") => Ok(Some(false)),
+        Some("official") => Ok(Some(true)),
+        Some(_) => Err(AppError::new(
+            "err.core.config",
+            "明细通道必须是 advanced 或 official",
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn start_workout_detail_backfill(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    max_records: Option<usize>,
+    retry_failed: Option<bool>,
+    channel: Option<String>,
+) -> std::result::Result<zeppbridge_core::storage::detail_queue::DetailCoverage, AppError> {
+    let _command = state
+        .sync_command_lock
+        .try_lock()
+        .map_err(|_| deferred_app_error(busy_deferred_kind()))?;
+    let requested = detail_channel(channel.as_deref())?;
+    if let Some(kind) = local_maintenance_deferred() {
+        return Err(deferred_app_error(kind));
+    }
+    let limit = max_records.unwrap_or(20).clamp(1, 40);
+    let legacy = if state.auth_state.read().await.as_str() == "verified" {
+        state.sync.read().await.clone()
+    } else {
+        None
+    };
+    let official = official_connected(&state.data_dir);
+    let use_official = requested.unwrap_or(legacy.is_none());
+    if (use_official && !official) || (!use_official && legacy.is_none()) {
+        return Err(AppError::new(
+            "err.sync.not_verified_backfill",
+            "请先完成连接验证，再补拉历史",
+        ));
+    }
+    begin_progress_epoch();
+    if !use_official {
+        return legacy
+            .expect("available advanced manager checked above")
+            .history_detail_backfill(limit, retry_failed.unwrap_or(false), |p| {
+                emit_sync_progress(&app, p)
+            })
+            .await
+            .map_err(AppError::from);
+    } else {
+        let db = Database::open_without_migration(state.data_dir.join("zepp.db"))?;
+        let zone = db
+            .device_time_zone()?
+            .unwrap_or_else(zeppbridge_core::official::fetch::system_time_zone);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let sync = OfficialSync::new(&state.data_dir, db, cancel.clone(), zone)?;
+        if let Ok(mut slot) = OFFICIAL_CANCEL.lock() {
+            *slot = Some(cancel);
+        }
+        let result = sync
+            .history_detail_backfill(limit, retry_failed.unwrap_or(false))
+            .await;
+        if let Ok(mut slot) = OFFICIAL_CANCEL.lock() {
+            *slot = None;
+        }
+        match result {
+            Ok(_) => {}
+            Err(error) if error.is_cancelled() => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    super::spawn_independent_read(state.data_dir.clone(), |db| {
+        db.workout_detail_coverage_for_channel(Some(true))
+    })
+    .await
 }
 
 /// 清空账本，重新规划一次补拉。

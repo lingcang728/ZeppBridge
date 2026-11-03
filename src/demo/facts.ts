@@ -134,6 +134,8 @@ export const demoLedger = (data: DemoData) => {
     streams: streams.map(([stream, metric]) => ({ stream, requested_chunks: months, persisted_chunks: months,
       empty_chunks: 0, failed_chunks: 0, pending_chunks: 0, records: dates[metric].length,
       persisted_from: first, persisted_to: dayKey(data.now), empty_months: [] })),
+    months: [...new Set(data.metrics.steps.map(p => p.date.slice(0, 7)))].sort()
+      .map((month, index) => ({ month, state: index < 8 ? 'gold' : 'local' })),
   };
 };
 

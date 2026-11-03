@@ -13,7 +13,6 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 mod backends;
@@ -63,6 +62,9 @@ fn default_version() -> u32 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AuthStatus {
     pub configured: bool,
+    /// Metadata survives a denied/missing platform credential, so recovery remains reachable.
+    pub configuration_present: bool,
+    pub credential_error: Option<String>,
     pub user_id: Option<String>,
     pub region_host: Option<String>,
     pub token_masked: Option<String>,
@@ -128,7 +130,9 @@ impl AuthManager {
         let token = validate_token(&auth.app_token)?;
         let region_host = normalize_region_host(&auth.region_host)?;
         let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
-        let previous = credentials.get(&user_id).map_err(credential_error)?;
+        // Reading an old Keychain entry may be denied while replacing it is
+        // allowed. A fresh login must still get the chance to write its token.
+        let previous = self.credentials.get(&user_id);
 
         credentials
             .set(&user_id, &token)
@@ -147,11 +151,16 @@ impl AuthManager {
             // Do not delete the previous account's credential: the new id
             // never became current.
             match previous {
-                Some(old) => {
-                    let _ = credentials.set(&user_id, &old);
+                Ok(Some(old)) => {
+                    let _ = self.credentials.set(&user_id, &old);
                 }
-                None => {
-                    let _ = credentials.delete(&user_id);
+                Ok(None) => {
+                    let _ = self.credentials.delete(&user_id);
+                }
+                Err(_) => {
+                    // The previous value is unknown; do not delete an entry
+                    // that may have existed before this recovery attempt.
+                    tracing::warn!("认证元数据保存失败，旧凭据不可读，无法回滚凭据替换");
                 }
             }
             return Err(error);
@@ -253,6 +262,8 @@ impl AuthManager {
         if !self.auth_file.exists() {
             return Ok(AuthStatus {
                 configured: false,
+                configuration_present: false,
+                credential_error: None,
                 user_id: None,
                 region_host: None,
                 token_masked: None,
@@ -261,16 +272,51 @@ impl AuthManager {
             });
         }
 
-        let (stored, legacy_token) = self.read_stored()?;
-        let user_id = validate_user_id(&stored.user_id)?;
-        let region_host = normalize_region_host(&stored.region_host)?;
-        let token = credentials
+        // Invalid metadata must not break the settings snapshot and hide the
+        // very controls needed to replace or clear it.
+        let recoverable = |error: ZeppBridgeError| AuthStatus {
+            configured: false,
+            configuration_present: true,
+            credential_error: Some(error.user_message()),
+            user_id: self
+                .read_user_id_hint()
+                .and_then(|id| validate_user_id(&id).ok()),
+            region_host: None,
+            token_masked: None,
+            version: None,
+            updated_at: None,
+        };
+        let (stored, legacy_token) = match self.read_stored() {
+            Ok(stored) => stored,
+            Err(error) => return Ok(recoverable(error)),
+        };
+        let user_id = match validate_user_id(&stored.user_id) {
+            Ok(id) => id,
+            Err(error) => return Ok(recoverable(error)),
+        };
+        let region_host = match normalize_region_host(&stored.region_host) {
+            Ok(host) => host,
+            Err(error) => return Ok(recoverable(error)),
+        };
+        let token = self
+            .credentials
             .get(&user_id)
-            .map_err(credential_error)?
-            .or(legacy_token);
+            .map_err(credential_error)
+            .and_then(|token| {
+                token
+                    .or(legacy_token)
+                    .ok_or(ZeppBridgeError::Headless(HeadlessProblem::TokenNotInStore))
+            })
+            .and_then(|token| validate_token(&token));
+        let (token, error) = match token {
+            Ok(token) => (Some(token), None),
+            Err(error) => (None, Some(error.user_message())),
+        };
 
         Ok(AuthStatus {
             configured: token.is_some(),
+            configuration_present: true,
+            credential_error: error,
             user_id: Some(user_id),
             region_host: Some(region_host),
             token_masked: token.as_deref().map(mask_token),
@@ -287,18 +333,25 @@ impl AuthManager {
     /// Removes both metadata and the corresponding credential-store entry.
     /// A corrupt `auth.json` no longer leaves the credential behind: the
     /// best-effort user-id hint file is consulted as a fallback.
-    pub fn clear_auth(&self) -> Result<()> {
-        let credentials = self.credential_backend();
+    ///
+    /// 凭据存储拒绝删除时（macOS 上 ad-hoc 签名的新构建读不了旧钥匙串条目、而那个
+    /// 授权弹窗用户答不上来，#145）**照样退出**：本地元数据照删，留下的条目以后不会
+    /// 再被读到，同一账号重新登录时覆盖它。以前这里直接报错，`auth.json` 也留着，
+    /// 用户既退不出去也登不进来。存储的原话返回给调用方记日志。
+    pub fn clear_auth(&self) -> Result<Option<String>> {
         let user_id = self
             .read_stored()
             .ok()
             .map(|(stored, _)| stored.user_id)
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| self.read_user_id_hint());
+            .and_then(|id| validate_user_id(&id).ok())
+            .or_else(|| {
+                self.read_user_id_hint()
+                    .and_then(|id| validate_user_id(&id).ok())
+            });
 
+        let mut left_behind = None;
         if let Some(user_id) = user_id {
-            let user_id = validate_user_id(&user_id)?;
-            credentials.delete(&user_id).map_err(credential_error)?;
+            left_behind = self.credentials.delete(&user_id).err();
         }
         if self.auth_file.exists() {
             fs::remove_file(&self.auth_file)?;
@@ -306,7 +359,7 @@ impl AuthManager {
         if self.user_id_file.exists() {
             let _ = fs::remove_file(&self.user_id_file);
         }
-        Ok(())
+        Ok(left_behind)
     }
 
     fn write_user_id_hint(&self, user_id: &str) -> Result<()> {
@@ -318,10 +371,7 @@ impl AuthManager {
         let temp_path = parent.join(format!(
             ".auth.user-id.tmp-{}-{}",
             std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::unique_suffix()
         ));
         let result = (|| -> io::Result<()> {
             let mut file = OpenOptions::new()
@@ -368,10 +418,7 @@ impl AuthManager {
 
         let json = serde_json::to_vec_pretty(stored)
             .map_err(|e| ZeppBridgeError::ParseError(e.to_string()))?;
-        let suffix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let suffix = crate::unique_suffix();
         let temp_path = parent.join(format!(
             ".{}.tmp-{}-{}",
             self.auth_file

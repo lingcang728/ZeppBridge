@@ -219,7 +219,10 @@ pub(super) const LAP_SUMMARY_TOLERANCE: f64 = 0.05;
 ///
 /// * `[0]` the 0-based kilometre number, which must equal its position;
 /// * `[1]` that kilometre's duration in seconds, which must be plausible;
-/// * `[5]` the elapsed total, which must equal the running sum of `[1]`.
+/// * `[5]` the elapsed total, which must equal the running sum of `[1]` —
+///   or, on watches that count it in wall-clock time (#139: a Balance 2 trail
+///   run with 17 pauses), must grow by at least `[1]` every row. In that case
+///   `[5]` places the boundaries directly, pauses included.
 ///
 /// If any row fails, the whole series is refused and the workout keeps the
 /// single whole-activity lap it has today. On 266 real workouts this accepts
@@ -230,13 +233,27 @@ pub(super) const LAP_SUMMARY_TOLERANCE: f64 = 0.05;
 /// accumulated from our own per-second samples over each kilometre's time
 /// window, exactly as the `currentDistance` path does, because that needs no
 /// guess about which column means what.
-pub(super) fn kilometre_seconds(value: Option<&Value>) -> Option<Vec<i64>> {
+/// `kilo_pace` 读出来的每公里用时。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct KilometreTiming {
+    /// 每公里的**运动**用时（`[1]`），秒。
+    pub(super) moving: Vec<i64>,
+    /// 每公里结束时距运动开始的**墙钟**秒数（`[5]`），只在 `[5]` 含暂停时有。
+    /// 没有时边界要按暂停区间把运动用时换算成墙钟。
+    pub(super) elapsed_end: Option<Vec<i64>>,
+}
+
+pub(super) fn kilometre_seconds(
+    value: Option<&Value>,
+    duration_seconds: i64,
+    pauses: &[PauseInterval],
+) -> Option<KilometreTiming> {
     let text = value.and_then(Value::as_str)?.trim();
     if text.is_empty() {
         return None;
     }
     let mut seconds = Vec::new();
-    let mut elapsed = 0i64;
+    let mut cumulative_column = Vec::new();
     for (position, row) in text.split(';').filter(|row| !row.is_empty()).enumerate() {
         let columns: Vec<&str> = row.split(',').collect();
         if columns.len() < 6 {
@@ -252,14 +269,81 @@ pub(super) fn kilometre_seconds(value: Option<&Value>) -> Option<Vec<i64>> {
         if !(1..=3600).contains(&duration) {
             return None;
         }
-        elapsed = elapsed.checked_add(duration)?;
-        // 允许 1 秒的取整误差：这一列在部分记录里是从毫秒四舍五入来的。
-        if (cumulative - elapsed).abs() > 2 {
+        seconds.push(duration);
+        cumulative_column.push(cumulative);
+    }
+    if seconds.is_empty() {
+        return None;
+    }
+    // 第一种：`[5]` 就是 `[1]` 的累加（本库 263 条都是这样）。
+    // 允许 2 秒的取整误差：这一列在部分记录里是从毫秒四舍五入来的。
+    let mut running = 0i64;
+    let is_moving_sum = seconds
+        .iter()
+        .zip(&cumulative_column)
+        .all(|(duration, cumulative)| {
+            running += duration;
+            (cumulative - running).abs() <= 2
+        });
+    if is_moving_sum {
+        return Some(KilometreTiming {
+            moving: seconds,
+            elapsed_end: None,
+        });
+    }
+    // 第二种：`[5]` 是墙钟累计，含暂停。三条都要成立，否则就是列读错了，
+    // 整份拒用：
+    // * 每一行至少走过这一公里的运动用时；
+    // * 最后一公里不晚于运动结束；
+    // * `[5]` 比运动用时多出来的那部分，不能超过暂停总和（容 5 秒加 2%：
+    //   手表和服务端对暂停起止的取整不一样）。
+    let mut previous = 0i64;
+    for (duration, cumulative) in seconds.iter().zip(&cumulative_column) {
+        let step = cumulative - previous;
+        if step < duration - 2 {
             return None;
         }
-        seconds.push(duration);
+        previous = *cumulative;
     }
-    (!seconds.is_empty()).then_some(seconds)
+    let last_elapsed = *cumulative_column.last()?;
+    if last_elapsed > duration_seconds + 2 {
+        return None;
+    }
+    // 没有暂停却多出一截时间，那多出来的不是暂停——第一种已经接住了 gap≈0。
+    // 最后一公里之后的暂停不在 `[5]` 里，所以只要求 gap 不超过暂停总和。
+    if pauses.is_empty() {
+        return None;
+    }
+    let gap = last_elapsed - seconds.iter().sum::<i64>();
+    let paused: i64 = pauses
+        .iter()
+        .map(|pause| (pause.end_time - pause.start_time).num_seconds())
+        .sum();
+    if gap > paused + 5 + paused / 50 {
+        return None;
+    }
+    Some(KilometreTiming {
+        moving: seconds,
+        elapsed_end: Some(cumulative_column),
+    })
+}
+
+/// 把「开始后运动了 `moving` 秒」换算成墙钟时刻：在这之前开始的每段暂停
+/// 都要把时间往后推。暂停已按起点排好序。
+pub(super) fn wall_clock_after(
+    start: DateTime<Utc>,
+    moving: i64,
+    pauses: &[PauseInterval],
+) -> Option<DateTime<Utc>> {
+    let mut wall = add_seconds(start, moving)?;
+    for pause in pauses {
+        if pause.start_time < wall {
+            wall = wall.checked_add_signed(pause.end_time - pause.start_time)?;
+        } else {
+            break;
+        }
+    }
+    Some(wall)
 }
 
 /// Build kilometre splits from `kilo_pace` durations plus our own samples.
@@ -270,7 +354,8 @@ pub(super) fn kilometre_seconds(value: Option<&Value>) -> Option<Vec<i64>> {
 /// Without it a 4975 m run would report 4 km and quietly lose 975 m.
 pub(super) fn splits_from_kilometre_seconds(
     samples: &[WorkoutSample],
-    kilometre_seconds: &[i64],
+    timing: &KilometreTiming,
+    pauses: &[PauseInterval],
     start: DateTime<Utc>,
     end: DateTime<Utc>,
     total_distance_m: Option<f64>,
@@ -283,8 +368,17 @@ pub(super) fn splits_from_kilometre_seconds(
     let mut splits = Vec::new();
     let mut cursor = start;
     let mut travelled = 0.0f64;
-    for (position, duration) in kilometre_seconds.iter().enumerate() {
-        let Some(end) = add_seconds(cursor, *duration) else {
+    let mut moving = 0i64;
+    for (position, duration) in timing.moving.iter().enumerate() {
+        moving += duration;
+        // 边界放在墙钟上：样本、暂停、FIT 的圈全在墙钟上。以前直接
+        // 「起点 + 运动用时累加」，一次停了 24 分钟的越野跑后半程每个边界
+        // 都早了几分钟。
+        let boundary = match &timing.elapsed_end {
+            Some(elapsed) => add_seconds(start, elapsed[position]),
+            None => wall_clock_after(start, moving, pauses),
+        };
+        let Some(end) = boundary.filter(|end| *end > cursor) else {
             break;
         };
         let mut builder = SplitBuilder::new(position as i32 + 1, cursor, travelled);

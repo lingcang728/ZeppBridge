@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue';
 import { isTauri, toUserMessage } from './useTauriApi';
 import { createLoadSeq } from '../lib/loadSeq';
 import { cached, peek, type Query } from '../lib/readCache';
@@ -95,5 +95,30 @@ export function usePagedRecords<T>(options: {
     }
   };
 
-  return { items, loading, loadingMore, error, staleError, total, hasMore, load, loadMore, preloaded };
+  /*
+   * 滚到底自己读下一页（issue #143：「列表停在 2026 年 6 月，更早的打不开」——那正是第 200 条，
+   * 「加载更多」按钮在底下没被看到）。页面把 `sentinel` 绑在按钮那一行上；按钮留着，
+   * 不支持 IntersectionObserver 或读失败之后还能手动点。提前 600px 开读，滚到底时下一页已经在了。
+   */
+  const sentinel = ref<HTMLElement | null>(null);
+  let observer: IntersectionObserver | null = null;
+  const stop = watch(sentinel, (element) => {
+    observer?.disconnect();
+    observer = null;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    const watcher = new IntersectionObserver(async (entries) => {
+      // 读失败过就停下，等人手动点，不在底下反复撞同一个错误。
+      if (!entries.some((entry) => entry.isIntersecting) || staleError.value) return;
+      await loadMore();
+      // 读完一页它可能仍在视野里（这一页很短）：重新观察一次，让观察器再报一次当前状态。
+      if (observer === watcher && sentinel.value === element) { watcher.unobserve(element); watcher.observe(element); }
+    }, { rootMargin: '600px 0px' });
+    observer = watcher;
+    observer.observe(element);
+  });
+  onBeforeUnmount(() => { stop(); observer?.disconnect(); observer = null; });
+  /** 模板里 `:ref="sentinelRef"` 绑到「加载更多」那一行。 */
+  const sentinelRef = (element: unknown) => { sentinel.value = element instanceof HTMLElement ? element : null; };
+
+  return { items, loading, loadingMore, error, staleError, total, hasMore, load, loadMore, preloaded, sentinelRef };
 }

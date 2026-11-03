@@ -35,15 +35,18 @@ const request = (metric: string | null | undefined) => {
   if (!timer) timer = window.setTimeout(() => void flush(), 30);
 };
 
+/** 名单变了（比如用户排除了一项指标）：作废已取到的结论，挂着的卡片会重取。 */
+export const invalidateMetricBaselines = () => {
+  const known = Object.keys(cache.value);
+  cache.value = {};
+  for (const metric of known) request(metric);
+};
+
 export const useMetricBaselines = () => {
   if (!watching) {
     watching = true;
     const { dataRevision } = useSyncController();
-    watch(dataRevision, () => {
-      const known = Object.keys(cache.value);
-      cache.value = {};
-      for (const metric of known) request(metric);
-    });
+    watch(dataRevision, invalidateMetricBaselines);
   }
   /** 这一项的结论；还没取到或数据不够就是 null。 */
   const baselineOf = (metric: string | null | undefined): MetricBaseline | null => {

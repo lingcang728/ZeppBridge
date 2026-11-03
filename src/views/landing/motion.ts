@@ -5,9 +5,10 @@
  *   - 「减少动态效果」时一切直接落在终态。
  */
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 export const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  typeof window !== 'undefined' && Boolean(lessMotion());
 
 /** Anchors move both focus and the viewport, including when opened through the mobile menu. */
 export const scrollToSection = (id: string, history: 'replace' | 'push' | 'none' = 'replace') => {

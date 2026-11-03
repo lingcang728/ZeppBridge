@@ -26,6 +26,35 @@ export function setDateOrder(value: DateOrder) {
   order.value = value;
   try { localStorage.setItem('zeppbridge-date-order', value); } catch { /* Session only. */ }
 }
+/* 操作系统的区域格式（Windows「区域 → 格式」、macOS「语言与地区」、Linux LC_TIME），开机由后端探一次。
+   「跟随系统地区」以前跟的其实是界面语言：英文界面的欧洲用户因此看到 MM/DD、12 小时制（2026-10 反馈）。
+   探不到（浏览器预览、老后端）就是 null，退回界面语言，和以前一样。 */
+const systemRegion = ref<string | null>(null);
+export function setSystemRegion(value: string | null | undefined) {
+  const tag = value?.trim().split('.')[0]?.split('@')[0]?.replace(/_/g, '-');
+  try {
+    systemRegion.value = tag ? Intl.getCanonicalLocales(tag)[0] ?? null : null;
+  } catch {
+    systemRegion.value = null;
+  }
+}
+
+type ExplicitOrder = Exclude<DateOrder, 'regional'>;
+const orderCache = new Map<string, ExplicitOrder>();
+/** 某个区域把年月日排成什么顺序（数字日期）。 */
+export function regionDateOrder(locale: string): ExplicitOrder {
+  const cached = orderCache.get(locale);
+  if (cached) return cached;
+  const sequence = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(2001, 10, 22))
+    .filter((part) => part.type === 'year' || part.type === 'month' || part.type === 'day')
+    .map((part) => part.type[0])
+    .join('');
+  const found: ExplicitOrder = sequence === 'dmy' ? 'dmy' : sequence === 'mdy' ? 'mdy' : 'ymd';
+  orderCache.set(locale, found);
+  return found;
+}
+
 const words = defineMessages(
   { time: '时间格式', date: '日期格式', regional: '跟随系统地区', '12h': '12 小时', '24h': '24 小时', ymd: '年/月/日', dmy: '日/月/年', mdy: '月/日/年' },
   { time: 'Time format', date: 'Date format', regional: 'System region', '12h': '12-hour', '24h': '24-hour', ymd: 'Year/month/day', dmy: 'Day/month/year', mdy: 'Month/day/year' },
@@ -57,24 +86,56 @@ const optionsKey = (options: Intl.DateTimeFormatOptions): string =>
       .map((name) => [name, (options as Record<string, unknown>)[name]]),
   );
 
-/* 系统 hour12 只跟 OS 地区有关、与任何偏好无关——探一次记住即可。 */
-let systemHour12: boolean | undefined;
-const probeSystemHour12 = (): boolean | undefined =>
-  (systemHour12 ??= new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12);
+/* 系统 hour12 只跟 OS 地区有关、与任何偏好无关——每个区域探一次记住即可。
+   后端给了区域格式就按它；没给就退回 WebView 的默认语言。 */
+const hour12Cache = new Map<string, boolean | undefined>();
+const probeSystemHour12 = (): boolean | undefined => {
+  const region = systemRegion.value ?? '';
+  if (!hour12Cache.has(region)) {
+    hour12Cache.set(region, new Intl.DateTimeFormat(region || undefined, { hour: 'numeric' }).resolvedOptions().hour12);
+  }
+  return hour12Cache.get(region);
+};
+
+/* 界面语言的语种 + 系统区域的国家，例如 en + pt-PT → en-PT。拼不出来就 undefined。 */
+function blendLocale(language: string, systemLocale: string): string | undefined {
+  try {
+    const country = new Intl.Locale(systemLocale).region;
+    if (!country) return undefined;
+    return Intl.getCanonicalLocales(`${new Intl.Locale(language).language}-${country}`)[0];
+  } catch {
+    return undefined;
+  }
+}
 
 /** Shared display policy. Never changes exported timestamps or source timezone semantics. */
 export function displayDateTimeFormatter(options: Intl.DateTimeFormatOptions = {}): Intl.DateTimeFormat {
-  const key = `${intlLocale()}|${time.value}|${order.value}|${optionsKey(options)}`;
+  const key = `${intlLocale()}|${systemRegion.value ?? ''}|${time.value}|${order.value}|${optionsKey(options)}`;
   const cached = formatterCache.get(key);
   if (cached) return cached;
   const adjusted = { ...options };
   delete adjusted.hour12;
   if (adjusted.hour || adjusted.timeStyle) {
     if (time.value !== 'regional') adjusted.hourCycle = time.value === '12h' ? 'h12' : 'h23';
+    else if (systemRegion.value) adjusted.hour12 = probeSystemHour12();
   }
   let region: string | undefined = intlLocale();
-  if (order.value !== 'regional' && (adjusted.day || adjusted.dateStyle)) {
-    region = { ymd: 'sv-SE', dmy: 'en-GB', mdy: 'en-US' }[order.value];
+  /* 「跟随系统地区」且系统区域的数字日期顺序和界面语言不同（英文界面 + 葡萄牙区域）：按系统区域的顺序排，
+     字（月名、星期）仍跟界面语言——先试「界面语言 + 区域国家」（en-PT），CLDR 有这一组就用它；
+     没有的话只给纯数字的格式换顺序，带字的格式宁可照旧，也不能把星期换成英文。 */
+  let effectiveOrder: DateOrder = order.value;
+  if (effectiveOrder === 'regional' && systemRegion.value) {
+    const wanted = regionDateOrder(systemRegion.value);
+    if (wanted !== regionDateOrder(region)) {
+      const blended = blendLocale(region, systemRegion.value);
+      const hasWords = Boolean(adjusted.weekday || adjusted.dateStyle || adjusted.era)
+        || ['short', 'long', 'narrow'].includes(String(adjusted.month));
+      if (blended && regionDateOrder(blended) === wanted) region = blended;
+      else if (!hasWords) effectiveOrder = wanted;
+    }
+  }
+  if (effectiveOrder !== 'regional' && (adjusted.day || adjusted.dateStyle)) {
+    region = { ymd: 'sv-SE', dmy: 'en-GB', mdy: 'en-US' }[effectiveOrder];
     if (!adjusted.dateStyle) {
       adjusted.month = '2-digit';
       adjusted.day = '2-digit';

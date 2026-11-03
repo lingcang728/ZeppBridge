@@ -533,6 +533,7 @@ fn a_truncated_spo2_page_is_not_a_full_window() {
         &slice,
         json!({"items": items}),
         WELLNESS_PAGE_LIMIT,
+        0,
     );
     assert!(record.incomplete);
     assert_eq!(payload_items(&record.raw.payload).len(), 1000);
@@ -543,6 +544,7 @@ fn a_truncated_spo2_page_is_not_a_full_window() {
         &slice,
         json!({"items": [{"timestamp": start.timestamp(), "value": 96}]}),
         WELLNESS_PAGE_LIMIT,
+        0,
     );
     assert!(!short.incomplete);
 }
@@ -575,6 +577,7 @@ fn cancelled_is_still_not_swallowed_by_a_truncated_page() {
         &slice,
         json!({"items": items}),
         WELLNESS_PAGE_LIMIT,
+        0,
     );
     let error =
         conclude_slices(vec![truncated], Some(ZeppBridgeError::Cancelled), "empty").unwrap_err();
@@ -656,4 +659,62 @@ fn sport_history_key_depends_on_content_not_request_window() {
         sport_history_key("run", &more)
     );
     assert!(sport_history_key("run", &page).starts_with("sport_history:run:"));
+}
+
+/// 一分钟一条的血氧，3 天 4320 条，服务端每次只给最新的 1000 条：满页要接着翻，
+/// 直到整窗都拿到；不能只留第一页、把其余三分之二当作「没有读数」。
+#[tokio::test]
+async fn a_capped_spo2_slice_is_continued_until_the_window_is_covered() {
+    let from = 1_790_380_800_000_i64;
+    let to = from + 3 * 86_400_000 - 1;
+    let all: Vec<i64> = (0..4320).map(|minute| from + minute * 60_000).collect();
+    let serve = |low: i64, high: i64| {
+        let mut items: Vec<i64> = all
+            .iter()
+            .copied()
+            .filter(|t| (low..=high).contains(t))
+            .collect();
+        items.reverse();
+        items.truncate(WELLNESS_PAGE_LIMIT as usize);
+        json!({"items": items.iter().map(|t| json!({"timestamp": t.to_string()})).collect::<Vec<_>>()})
+    };
+    let first = serve(from, to);
+    let (pages, gaps) =
+        continue_capped_page_with(&first, from, to, WELLNESS_PAGE_LIMIT, |low, high| {
+            let page = serve(low, high);
+            async move { Ok(page) }
+        })
+        .await
+        .unwrap();
+    assert!(gaps.is_empty(), "{gaps:?}");
+    let mut seen: Vec<i64> = std::iter::once(&first)
+        .chain(pages.iter())
+        .flat_map(payload_items)
+        .filter_map(|item| item["timestamp"].as_str()?.parse().ok())
+        .collect();
+    seen.sort_unstable();
+    seen.dedup();
+    assert_eq!(seen, all);
+    assert!(pages.len() <= WELLNESS_CONTINUATION_PAGES);
+}
+
+/// 续拉失败的那一段要留下原因，切片保持 incomplete，补拉才会重试。
+#[tokio::test]
+async fn a_failed_continuation_keeps_the_slice_incomplete() {
+    let from = 1_790_380_800_000_i64;
+    let to = from + 86_400_000;
+    let first = json!({"items": (0..WELLNESS_PAGE_LIMIT)
+        .map(|i| json!({"timestamp": to - i * 1000}))
+        .collect::<Vec<_>>()});
+    let (pages, gaps) =
+        continue_capped_page_with(&first, from, to, WELLNESS_PAGE_LIMIT, |_, _| async {
+            Err(ZeppBridgeError::HttpStatus {
+                status: 502,
+                message: String::new(),
+            })
+        })
+        .await
+        .unwrap();
+    assert!(pages.is_empty());
+    assert_eq!(gaps.len(), 1);
 }

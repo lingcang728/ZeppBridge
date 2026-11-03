@@ -7,6 +7,8 @@ export interface LifeEventInput {
   startDate: string;
   endDate: string | null;
   notes: string;
+  /** 纪元：给这段日子起的名字，所有趋势图叠一层底色，也交给 AI。 */
+  epoch: boolean;
 }
 
 export interface LifeEvent extends LifeEventInput {

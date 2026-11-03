@@ -547,3 +547,133 @@ fn a_partial_write_is_not_a_complete_local_copy() {
     let json = serde_json::to_value(&ledger).unwrap();
     assert_chinese_carries_a_code(&json, "ledger");
 }
+
+/// 3.0 之前的保留期清理删了数据却没改账本：标着「已写入」、窗口里却一条报文都没有的
+/// 月份，升级时（v41）改回待补拉。还留着报文的、云端确认为空的不动；只修一次。
+#[test]
+fn months_marked_persisted_without_any_raw_are_reopened_once_on_upgrade() {
+    use crate::models::{CapabilityStatus, RawRecord, SourceScope};
+    let db = db();
+    db.plan_backfill(date("2024-08-01"), date("2024-09-30"))
+        .unwrap();
+    for month in ["2024-08-01", "2024-09-01"] {
+        db.record_backfill_chunk("workouts", month, ChunkStatus::Persisted, 19, None, None)
+            .unwrap();
+    }
+    db.record_backfill_chunk(
+        "sleep",
+        "2024-08-01",
+        ChunkStatus::EmptyFromCloud,
+        0,
+        None,
+        None,
+    )
+    .unwrap();
+    // 只有 9 月还留着报文。
+    let kept = to_utc(date("2024-09-03"));
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:run:hkept".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: kept,
+        end_utc: Some(kept + chrono::Duration::days(1)),
+        payload: serde_json::json!({ "data": { "summary": [] } }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+
+    // 一个 3.0.5 的库升级上来。
+    db.conn.execute_batch("PRAGMA user_version = 40;").unwrap();
+    db.migrate().unwrap();
+    let status = |stream: &str, month: &str| -> String {
+        db.conn
+            .query_row(
+                "SELECT status FROM coverage_ledger WHERE stream = ?1 AND chunk_start = ?2",
+                [stream, month],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    assert_eq!(status("workouts", "2024-08-01"), "pending");
+    assert_eq!(status("workouts", "2024-09-01"), "persisted");
+    assert_eq!(status("sleep", "2024-08-01"), "empty_from_cloud");
+    assert!(db
+        .pending_backfill_chunks(100)
+        .unwrap()
+        .iter()
+        .any(|c| c.stream == "workouts" && c.chunk_start == "2024-08-01"));
+
+    // 只修一次：之后每次启动都会重跑迁移，不能再扫（之后的清理自己会改账本）。
+    db.record_backfill_chunk(
+        "workouts",
+        "2024-08-01",
+        ChunkStatus::Persisted,
+        19,
+        None,
+        None,
+    )
+    .unwrap();
+    db.migrate().unwrap();
+    assert_eq!(status("workouts", "2024-08-01"), "persisted");
+    let version: i64 = db
+        .conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, crate::storage::CURRENT_SCHEMA_VERSION);
+}
+
+/// 金继月历：金线只给真写进记录的月份；云端说没有的月份不画成裂缝；
+/// 有一条流失败就仍是裂缝，哪怕别的流写进去了也不能算补好。
+#[test]
+fn month_seams_only_gild_months_that_gained_records() {
+    let db = db();
+    db.plan_backfill(date("2025-01-01"), date("2025-04-30"))
+        .unwrap();
+    for stream in BACKFILL_STREAMS {
+        db.record_backfill_chunk(
+            stream,
+            "2025-01-01",
+            ChunkStatus::EmptyFromCloud,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        db.record_backfill_chunk(stream, "2025-02-01", ChunkStatus::Persisted, 0, None, None)
+            .unwrap();
+    }
+    db.record_backfill_chunk(
+        "sleep",
+        "2025-03-01",
+        ChunkStatus::Persisted,
+        20,
+        None,
+        None,
+    )
+    .unwrap();
+    db.record_backfill_chunk(
+        "workouts",
+        "2025-03-01",
+        ChunkStatus::Failed,
+        0,
+        Some("x"),
+        None,
+    )
+    .unwrap();
+    db.record_backfill_chunk("sleep", "2025-04-01", ChunkStatus::Persisted, 9, None, None)
+        .unwrap();
+    let months = db.coverage_ledger().unwrap().months;
+    let state = |m: &str| {
+        months
+            .iter()
+            .find(|seam| seam.month == m)
+            .map(|seam| seam.state.as_str())
+            .unwrap_or("missing")
+            .to_string()
+    };
+    assert_eq!(state("2025-01"), "empty");
+    assert_eq!(state("2025-02"), "empty");
+    assert_eq!(state("2025-03"), "crack");
+    assert_eq!(state("2025-04"), "gold");
+}

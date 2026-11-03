@@ -91,7 +91,7 @@ impl Database {
             .collect::<Vec<_>>()
             .join(",");
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts WHERE workout_id IN ({placeholders})"
+            "SELECT {WORKOUT_DETAIL_COLUMNS} FROM workouts_visible WHERE workout_id IN ({placeholders})"
         ))?;
         let rows = stmt.query_map(params_from_iter(workout_ids.iter()), WorkoutDetailRow::read)?;
         let mut flat_rows = Vec::new();
@@ -383,7 +383,7 @@ impl Database {
         match category {
             AiTaskCategory::Workout => {
                 let mut stmt = self.conn.prepare(
-                    "SELECT date(start_time,'localtime'), source_scope FROM workouts
+                    "SELECT date(start_time,'localtime'), source_scope FROM workouts_visible
                      WHERE date(start_time,'localtime') BETWEEN ?1 AND ?2",
                 )?;
                 let rows = stmt.query_map(params![start, end], |row| {

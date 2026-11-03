@@ -43,7 +43,7 @@ impl Database {
                     .conn
                     .query_row(
                         "SELECT date(start_time, 'localtime'), start_time, end_time
-                         FROM workouts WHERE workout_id = ?1",
+                         FROM workouts_visible WHERE workout_id = ?1",
                         params![workout_id],
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                     )
@@ -402,7 +402,7 @@ impl Database {
                         max_altitude_m, min_altitude_m,
                         training_effect, anaerobic_training_effect, rpe,
                         avg_cadence_spm, max_cadence_spm, avg_stride_cm
-                 FROM workouts
+                 FROM workouts_visible
                  WHERE start_time >= ?4 AND start_time < ?5
                    AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
                    AND (?3 IS NULL OR workout_id = ?3)
@@ -517,6 +517,14 @@ impl Database {
                     "vo2max": vo2max,
                     "source_scope": source_scope,
                     "device_label": devices.label(device_id.as_deref()),
+                    // 用户的 .fit 修正（#140）：有它时距离和序列都是修正版。
+                    "local_fit_correction": self.workout_fit_override(&workout_id)?.map(|info| {
+                        serde_json::json!({
+                            "file_name": info.file_name,
+                            "imported_at": info.imported_at,
+                            "cloud_distance_meters": info.original_distance_m,
+                        })
+                    }),
                     "sample_count": series.samples.len(),
                     "route_point_count": series.route.len(),
                     "pauses": series.pauses,

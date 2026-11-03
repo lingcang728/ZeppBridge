@@ -45,7 +45,14 @@ $isWindowsHost = $IsWindows -or ($null -eq $IsWindows)
 $exeSuffix = if ($isWindowsHost -and -not $Target) { '.exe' } elseif ($Target -like '*windows*') { '.exe' } else { '' }
 $platform = if ($Target) { $Target } elseif ($isWindowsHost) { 'x86_64-pc-windows-msvc' } else { 'host' }
 
-$stageName = "zeppbridge-tools-$version-$platform"
+# 附件名写人能看懂的平台，而不是 Rust 目标三元组（3.0.5 起；下载接口新旧都认）。
+$friendly = switch -Wildcard ($platform) {
+    '*-windows-*' { 'Windows-x64' }
+    'aarch64-apple-darwin' { 'macOS-AppleSilicon' }
+    'x86_64-unknown-linux-*' { 'Linux-x64' }
+    default { $platform }
+}
+$stageName = "zeppbridge-tools-$version-$friendly"
 $stage = Join-Path $repoRoot "release/$stageName"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null

@@ -2,8 +2,10 @@
  * 舞台上按门锁的那一下（2026-10-08，用户拍板「一按到底，卡是回执」）。
  *
  * 逻辑原样搬自旧底栏（HandoffDock 的 run）：先保存任务 → 按下那一刻的 AI / 方向 / 预览拼 options →
- * 准备**一个** `.md`。不同的是三步拆开放：准备文件和汇聚动画同时跑（动画盖住准备的耗时），回执牌落定以后
- * 才复制开场白、打开网站。中途收回（Esc / 再点锁）：牌原路飞回，文件照常备好落成回执牌，但不自动打开网站。
+ * 准备**一个** `.md`。不同的是三步拆开放：准备文件和交出动画同时跑（牌进锁、附件落进托盘，盖住准备的耗时），
+ * 附件并成 .md、回执那一面落定以后才复制开场白、打开网站（动画见 useAttachFlight，10-28）。
+ * 附件还在路上时收回（Esc / 再点锁）：全部原路退回，右牌留在问题面——牌回来了就不算交出；文件照常在后台备好。
+ * 并成 .md 以后才收回：回执留着，只是不自动打开网站（`recalled`）。
  *
  * 状态是模块级单例：切到 /ai/check 再回来，回执牌还在。
  */
@@ -28,19 +30,19 @@ const handoff = useAiTaskHandoff();
 const provider = ref<AiProvider>(handoff.lastProvider.value ?? AI_PROVIDERS[0]!);
 /** 右牌现在朝外的那一面。 */
 const face = ref<FutureFace>('question');
-/** 这一次是不是半路收回的（回执牌上说一句「没有自动打开」）。 */
+/** 这一次是不是并成 .md 以后才收回的（回执上说一句「没有自动打开」）。 */
 const recalled = ref(false);
-/** 汇聚编排在跑（锁的环在转）。 */
+/** 交出编排在跑（锁的环在转）。 */
 const gathering = ref(false);
 watch(provider, (next) => { currentProviderId.value = next.id; }, { immediate: true });
 
 export interface SendChoreography {
-  /** 牌飞进锁（和准备文件同时开跑）。被 `recall` 打断时提前 resolve。 */
-  gather: () => Promise<void>;
-  /** 回执牌从锁里长出来、落到右边。 */
-  emerge: () => Promise<void>;
-  /** 牌原路飞回（失败、被拦下）。 */
-  scatter: () => Promise<void>;
+  /** 牌沿线进锁、附件落进托盘（和准备文件同时开跑）。被 `recall` 打断时不等它。 */
+  attach: () => Promise<void>;
+  /** 文件备好：附件并成一枚 .md；`swap` 在换成回执那一面的那一刻调用。 */
+  merge: (swap: () => void) => Promise<void>;
+  /** 从此刻原路撤回（收回、失败、被拦下）。 */
+  retract: () => Promise<void>;
 }
 
 /** 交给后端的准备选项：按下那一刻的预览、方向和 AI（同旧底栏）。 */
@@ -91,7 +93,7 @@ export const useStageSend = () => {
 
   let recall: (() => void) | null = null;
 
-  /** 按锁：保存 → 准备（同时汇聚）→ 落回执 → 复制 → 打开。 */
+  /** 按锁：保存 → 准备（同时放交出动画）→ 并成 .md、落回执 → 复制 → 打开。 */
   const send = async (motion: SendChoreography, onPrepared?: (result: AiTaskPrepareResult) => void) => {
     if (disabled.value || busy.value) return;
     recalled.value = false;
@@ -105,20 +107,19 @@ export const useStageSend = () => {
       await handoff.start(() => ctl.saveDraft(derived.title.value), async () => {
         const task = exportTask();
         const preparing = handoff.runPrepare(task, direction, optionsFor(task, preview, direction, target.id));
-        await Promise.race([Promise.all([motion.gather(), preparing]), recalledNow]);
-        // 半路收回：牌从此刻原路飞回；文件照常等它备好，落成回执牌，但不自动打开网站。
+        // 准备失败 / 被拦下不等附件落完：从此刻就原路退回。
+        const failed = preparing.then((r) => (r?.status === 'ready' ? new Promise<void>(() => undefined) : undefined));
+        await Promise.race([Promise.all([motion.attach(), preparing]), recalledNow, failed]);
+        // 附件还在路上就收回：全部原路退回，右牌留在问题面；文件照常在后台备好（下一次按锁会重新准备）。
         if (interrupted) {
-          await motion.scatter();
-          const late = await preparing;
-          if (late?.status === 'ready') { face.value = 'receipt'; recalled.value = true; onPrepared?.(late); }
+          await motion.retract();
+          await preparing;
           return;
         }
         const result = await preparing;
-        if (!result || result.status !== 'ready') { await motion.scatter(); return; }
-        // 先换成回执那一面，再让它从锁里长出来（emerge 等 DOM 换好再放）。
-        face.value = 'receipt';
+        if (!result || result.status !== 'ready') { await motion.retract(); return; }
         onPrepared?.(result);
-        await motion.emerge();
+        await motion.merge(() => { face.value = 'receipt'; });
         await new Promise((resolve) => window.setTimeout(resolve, 400));
         if (interrupted) { recalled.value = true; return; }
         if (await handoff.runCopy()) await handoff.runOpen(target);

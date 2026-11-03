@@ -14,6 +14,7 @@ use super::portable;
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -27,6 +28,9 @@ const PORTABLE_TARGET: &str = "windows-x86_64-portable";
 /// 只换查询地址、不换公钥：指到哪里，下载下来的包都要过内置公钥的签名核对。
 /// 用来在本机对着一份自己起的 latest.json 走一遍整条链路。
 const ENDPOINT_ENV: &str = "ZEPPBRIDGE_UPDATE_ENDPOINT";
+/// 托盘常驻时隔多久再查一次。一天发一版，只在打开时查一次的话，挂在托盘里的人会一连
+/// 错过好几版（#143：3.0.1 一直没见到 3.0.2）。
+const RECHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -87,6 +91,8 @@ struct Inner {
 #[derive(Default)]
 pub(crate) struct SilentUpdater {
     inner: Mutex<Inner>,
+    /// 用户在设置里关了自动更新：定时复查跳过，只有手动「检查更新」才查。
+    manual_only: AtomicBool,
 }
 
 impl SilentUpdater {
@@ -126,15 +132,48 @@ fn is_portable() -> bool {
     super::is_portable_update().unwrap_or(false)
 }
 
+/// 设置里的「自动更新」开关（界面存在本机，每次打开告诉后端一次）。关掉只停定时复查，
+/// 已经在下 / 下好的那一版不撤；打开应用时那一次检查由界面按开关决定发不发。
+#[tauri::command]
+pub(crate) fn update_set_auto(updater: tauri::State<'_, SilentUpdater>, enabled: bool) {
+    updater.manual_only.store(!enabled, Ordering::Relaxed);
+}
+
 #[tauri::command]
 pub(crate) fn update_view(updater: tauri::State<'_, SilentUpdater>) -> UpdateView {
     updater.view()
+}
+
+/// 打开时那一次由界面发起；之后每隔 [`RECHECK_EVERY`] 再查一次。在下 / 下好了 / 在装的时候
+/// `update_start` 原样返回，不会打断它们；这个构建不自己更新就不再查。
+pub(crate) fn spawn_periodic_recheck(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(RECHECK_EVERY).await;
+            if crate::EXIT_GATE.is_exiting() {
+                break;
+            }
+            if app
+                .state::<SilentUpdater>()
+                .manual_only
+                .load(Ordering::Relaxed)
+            {
+                continue;
+            }
+            if update_start(app.clone()).phase == Phase::Unsupported {
+                break;
+            }
+        }
+    });
 }
 
 /// 开始一次后台检查（打开应用时、设置页手动「检查更新」时）。已经在查 / 在下 / 下好了 /
 /// 在装就原样返回当前状态，不重复开。
 #[tauri::command]
 pub(crate) fn update_start(app: AppHandle) -> UpdateView {
+    if crate::EXIT_GATE.is_exiting() {
+        return app.state::<SilentUpdater>().view();
+    }
     let supported = super::self_update_supported();
     let mut start = false;
     let view = publish(&app, |inner| {
@@ -186,6 +225,12 @@ async fn check_and_download(app: AppHandle) {
     let update = match checked {
         Ok(Some(update)) => update,
         Ok(None) => {
+            // 「已是最新」也记一行：以前只记失败和下载完成，用户翻日志时分不清是查过了没有
+            // 新版本，还是根本没查（#143）。
+            crate::diagnostics::log(&format!(
+                "静默更新：已是最新（{}）",
+                app.package_info().version
+            ));
             publish(&app, |inner| inner.view.phase = Phase::UpToDate);
             return;
         }
@@ -345,7 +390,11 @@ pub(crate) async fn update_apply(
             AppError::new("err.update.install_failed", format!("安装失败：{error}"))
         })?;
         // Windows 上 install 自己会退出进程；走到这里的是 macOS，换好了 .app 要重启。
-        app.restart();
+        // restart() never returns on a worker thread, retaining _guards forever.
+        // ExitRequested then waits on this command's own write lock. The request
+        // variant returns so those guards are released before the exit waiter.
+        app.request_restart();
+        Ok(())
     }
     .await;
     if let Err(error) = &result {

@@ -1,6 +1,7 @@
 import { cardFrame } from '../deck/morph';
 import { exemptFromSettle } from './interrupt';
-import { pageBackdrop, WINDOW_OFFSETS, windowPoses, type WindowPose, type WindowRect } from './window';
+import { OPEN_EASE, paced } from './timing';
+import { pageBackdrop, visibleWindow, WINDOW_OFFSETS, windowPoses, type WindowPose, type WindowRect } from './window';
 
 /**
  * 卡 ↔ 页形变里「动页面」的那一段（composables/usePageMorph.ts 管什么时候动、动完怎么交接，这里管怎么动）。
@@ -15,18 +16,71 @@ const rectOf = (el: Element): Rect => {
 };
 
 /**
- * 卡和页的内容先后交替，只在交接处叠一小段（线性时间轴）。卡和详情页的排版本来就不一样（字、图都不在同一个地方），
- * 两边同时半透明叠着就是一屏重影——2026-10-03 第二轮用户说的「表面是延伸，字完全不同」。所以：
- * 打开时卡的拷贝先在前 24% 淡掉，页头 16%–42% 接上，页面其余部分 20%–56% 再出来；收回时页面内容前 28% 先走、
- * 页头 24%–48% 淡掉、卡的拷贝 40%–68% 回来。收回的形状走得靠前（40% 的时间已经缩到卡上八成），卡要跟着它一起回来——
- * 以前按 70%–95% 才回来，窗口早早落在卡上，中间一百多毫秒只剩一个页头标题，像一张空卡。落地那一帧就是卡本身。
+ * 卡 ↔ 页的分段淡入淡出和背后的模糊，照履历页弹窗（lib/motion/dialogFlight.ts 的 windowOpen / windowClose）抄过来
+ * （用户 2026-10-28：「直接照抄履历页卡片的动画，那些动画太好了」）：
+ * 打开：卡拷贝前三成淡完，窗口长到近四成以前里面只有一块卡色的底板在长，之后页面内容才淡入——不在小框里挤一屏字。
+ * 收回：内容先留着跟窗口一起缩，一成半到四成之间淡掉（窗口那时已经缩得不大了，不会剩一整屏空底板）；卡拷贝在四成到七成亮回来，
+ * 落地那一帧就是真卡。
+ * 底板从卡色过渡到页面底色（plateIn / plateOut，见 window.ts 的 pageBackdrop）：中间那一段空板看上去是卡在长，
+ * 不是一块黑板（2026-10-28 录屏）。
+ * 文字按线性时间轴先后交替，卡和页的字永远不同时半透明叠着。
+ * 被打断时从此刻的透明度接着走（`from`），不先跳回起点。
  */
-export const REPLICA_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.24 }, { opacity: 0 }];
-export const HEAD_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.16 }, { opacity: 1, offset: 0.42 }, { opacity: 1 }];
-export const PAGE_BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.2 }, { opacity: 1, offset: 0.56 }, { opacity: 1 }];
-export const PAGE_BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.28 }, { opacity: 0 }];
-export const HEAD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.24 }, { opacity: 0, offset: 0.48 }, { opacity: 0 }];
-export const REPLICA_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1, offset: 0.68 }, { opacity: 1 }];
+export const PAGE_WINDOW_MS = paced(480);
+export const PAGE_WINDOW_EASE = OPEN_EASE;
+/** 起点不是 0：透明度为 0 的层 Chromium 可能不合成，第一帧可见时才去光栅化，又是一跳。 */
+const NEARLY_HIDDEN = 0.001;
+export const replicaOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: 0, offset: 0.3 }, { opacity: 0 }];
+export const replicaIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.4 }, { opacity: 1, offset: 0.7 }, { opacity: 1 }];
+/** 开到一半就返回、窗口里两样都还淡着：卡拷贝立刻亮回来，窗口里一直是那张卡，不留一段空板。 */
+export const replicaBack = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: 1, offset: 0.25 }, { opacity: 1 }];
+export const contentIn = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.38 }, { opacity: 1 }];
+export const contentOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.15 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }];
+/** 底板上层（页面底色）：开的时候跟着窗口长成整页盖上来，收的时候先退成卡色再缩回卡上。 */
+export const plateIn = (from = 0): Keyframe[] => [{ opacity: Math.max(NEARLY_HIDDEN, from) }, { opacity: Math.max(NEARLY_HIDDEN, from), offset: 0.2 }, { opacity: 1, offset: 0.8 }, { opacity: 1 }];
+export const plateOut = (from = 1): Keyframe[] => [{ opacity: from }, { opacity: from, offset: 0.1 }, { opacity: NEARLY_HIDDEN, offset: 0.6 }, { opacity: NEARLY_HIDDEN }];
+/** 背后的模糊：开的时候跟着窗口慢慢糊上（前七成）；收的时候前四成几乎不退、落地时才散掉。 */
+export const veilIn = (from = 0): { frames: Keyframe[]; options: KeyframeAnimationOptions } => ({
+  frames: [{ opacity: Math.max(NEARLY_HIDDEN, from) }, { opacity: 1 }],
+  options: { duration: PAGE_WINDOW_MS * 0.7, easing: 'ease-out', fill: 'both' },
+});
+export const veilOut = (from = 1): { frames: Keyframe[]; options: KeyframeAnimationOptions } => ({
+  frames: [{ opacity: from }, { opacity: from * 0.88, offset: 0.4 }, { opacity: 0 }],
+  options: { duration: PAGE_WINDOW_MS, easing: 'linear', fill: 'both' },
+});
+
+/**
+ * 蒙在来处页上的那层模糊（样式见 shell.css 的 .page-veil，和弹窗遮罩同一组值）：静态的模糊，只动这一层的透明度。
+ * 它是来处页自己的子元素（层次最高）：页面是 KeepAlive 缓存的，挂在它身上就跟着它进出文档；要是挂到页面外面，
+ * 层次会压到正在长的窗口上面。来处页临时 isolation: isolate，页面里 z-index 高的块（吸顶的条）不会穿出来。
+ */
+export const pageVeil = (under: HTMLElement, viewport: Rect): HTMLElement => {
+  const veil = document.createElement('div');
+  veil.className = 'page-veil';
+  veil.setAttribute('aria-hidden', 'true');
+  veil.dataset.morphLayer = '';
+  if (getComputedStyle(under).position === 'static') under.style.position = 'relative';
+  under.style.isolation = 'isolate';
+  under.appendChild(veil);
+  const box = under.getBoundingClientRect();
+  Object.assign(veil.style, {
+    left: `${r1(viewport.left - box.left - under.clientLeft)}px`,
+    top: `${r1(viewport.top - box.top - under.clientTop)}px`,
+    width: `${r1(viewport.width)}px`,
+    height: `${r1(viewport.height)}px`,
+  });
+  return veil;
+};
+/** 撤掉模糊层，来处页的临时样式还原。 */
+export const removeVeil = (under: HTMLElement | null, veil: HTMLElement | null) => {
+  veil?.getAnimations().forEach((animation) => animation.cancel());
+  veil?.remove();
+  if (!under) return;
+  under.style.isolation = '';
+  under.style.position = '';
+};
+
+const opacityOf = (el: Element | null | undefined) => (el ? Number.parseFloat(getComputedStyle(el).opacity) : Number.NaN);
 
 /** 页面的「卡头」（页头）和其余部分。没有页头的页（运动详情）拿第一块当卡头，免得中间有一段什么都没有。 */
 export const partsOf = (page: HTMLElement) => {
@@ -40,9 +94,22 @@ export const partsOf = (page: HTMLElement) => {
 export const hide = (el: HTMLElement) =>
   exemptFromSettle(el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 1, fill: 'forwards' }));
 
+/** 一段窗口形变此刻的样子：被下一次切页打断时，接手的那一段从这里接着走。 */
+export interface FlightSnapshot {
+  /** 屏幕上看得见的那个框（裁切以后）。 */
+  window: Rect;
+  /** 页面左上角此刻在屏幕上的位置。 */
+  anchor: { x: number; y: number };
+  /** 页面内容（以页头为准）、卡拷贝、底板上层此刻的透明度。 */
+  content: number;
+  replica: number;
+  plate: number;
+}
+
 export interface Flight {
   main: Animation;
   anims: Animation[];
+  snapshot: () => FlightSnapshot;
   /** 终点换成另一个位置（收回时真卡晚一点才找到）：时间轴不变。 */
   retarget: (to: WindowPose) => void;
   /** 撤掉全部动画、垫底和卡拷贝，页面回到它自己的样子。 */
@@ -76,6 +143,8 @@ export const fly = (o: {
   replicaFade: Keyframe[];
   head: Keyframe[];
   body: Keyframe[];
+  /** 底板上层（页面底色）的透明度。 */
+  plate: Keyframe[];
 }): Flight => {
   const { page } = o;
   const start = rectOf(page);
@@ -88,24 +157,27 @@ export const fly = (o: {
   const overflowX = page.style.overflowX;
   page.style.overflowX = 'visible';
   const { head, body } = partsOf(page);
-  const main = page.animate(frames(), timing);
-  const anims = [main];
+  // 打断由 usePageMorph 自己接手（停住、从此刻接着走），全局的 settleMotion 不能把它快进成一下跳。
+  const anims: Animation[] = [];
+  const track = (animation: Animation) => { anims.push(exemptFromSettle(animation)); return animation; };
+  const main = track(page.animate(frames(), timing));
   if (o.replica) {
     const { el } = o.replica;
     el.dataset.morphLayer = '';
     Object.assign(el.style, { left: `${r1(o.replicaAt?.x ?? 0)}px`, top: `${r1(o.replicaAt?.y ?? 0)}px`, zIndex: '50' });
     page.appendChild(el);
-    anims.push(el.animate(o.replicaFade, linear));
+    track(el.animate(o.replicaFade, linear));
   }
-  if (head) anims.push(head.animate(o.head, linear));
+  const plate = o.backdrop.firstElementChild;
+  if (plate instanceof HTMLElement) track(plate.animate(o.plate, linear));
+  if (head) track(head.animate(o.head, linear));
   const parts = new Map<HTMLElement, Animation>();
   const leavingParts = new WeakSet<HTMLElement>();
   const fadePart = (part: HTMLElement) => {
-    const animation = part.animate(o.early?.(part) ? o.head : o.body, linear);
+    const animation = track(part.animate(o.early?.(part) ? o.head : o.body, linear));
     animation.currentTime = main.currentTime;
     if (main.playState === 'paused') animation.pause();
     parts.set(part, animation);
-    anims.push(animation);
   };
   for (const part of body) fadePart(part);
 
@@ -133,7 +205,7 @@ export const fly = (o: {
         leavingParts.add(part);
         const now = Number.parseFloat(getComputedStyle(part).opacity) || 0;
         animation.cancel();
-        anims.push(part.animate([{ opacity: now }, { opacity: 0 }], { duration: 320, easing: 'ease', fill: 'forwards' }));
+        track(part.animate([{ opacity: now }, { opacity: 0 }], { duration: 320, easing: 'ease', fill: 'forwards' }));
       }
     })
     : null;
@@ -153,6 +225,19 @@ export const fly = (o: {
   return {
     main,
     anims,
+    snapshot: () => {
+      const box = page.getBoundingClientRect();
+      const content = opacityOf(head);
+      const replica = opacityOf(o.replica?.el);
+      const plateNow = opacityOf(plate);
+      return {
+        window: visibleWindow(page),
+        anchor: { x: box.left, y: box.top },
+        content: Number.isFinite(content) ? content : 1,
+        replica: Number.isFinite(replica) ? replica : 0,
+        plate: Number.isFinite(plateNow) ? plateNow : 1,
+      };
+    },
     retarget: (next) => {
       to = next;
       (main.effect as KeyframeEffect | null)?.setKeyframes(frames());

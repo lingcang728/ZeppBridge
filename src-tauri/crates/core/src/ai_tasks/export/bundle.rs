@@ -1,5 +1,6 @@
 //! 组装任务包：提示词、任务文档、锚点运动（从 ai_tasks/export.rs 拆出，逻辑不变）。
 
+use super::workout_extras::{climbs_json, comparison_json, strip_heart_rate};
 use super::*;
 
 impl Database {
@@ -262,6 +263,27 @@ impl Database {
                 );
             }
         }
+        // 教练档案（批次 7）：用户确认过的长期事实，不是健康数据，不受类别开关管。
+        let coach_notes: Vec<Value> = self
+            .accepted_coach_notes()?
+            .into_iter()
+            .map(|note| {
+                json!({
+                    "text": note.text,
+                    "source": note.source,
+                    "source_name": note.source_name,
+                    "since": note.decided_at.unwrap_or(note.created_at).chars().take(10).collect::<String>(),
+                })
+            })
+            .collect();
+        if !coach_notes.is_empty() {
+            document.insert("coach_notes".into(), Value::Array(coach_notes));
+        }
+        // 履历（批次 7）：用户自己写的 PB / 伤病 / 比赛 / 跑鞋 / 纪元，和教练档案一样不受类别开关管。
+        let journal = self.journal_for_ai()?;
+        if !journal.is_empty() {
+            document.insert("journal".into(), serde_json::to_value(&journal)?);
+        }
         if self.is_demo_library()? {
             document.insert("simulated_data".into(), json!(true));
         }
@@ -391,12 +413,28 @@ impl Database {
         if !workout.hr_zones.is_empty() {
             object.insert("hr_zones".into(), serde_json::to_value(&workout.hr_zones)?);
         }
+        // 用户自己打的 RPE / 酸痛（批次 7）；和手表的 `rpe` 分开。
+        if let Some((rpe, soreness)) = self.workout_feel_map()?.remove(&workout.workout_id) {
+            if let Some(rpe) = rpe {
+                object.insert("user_rpe".into(), json!(rpe));
+            }
+            if !soreness.is_empty() {
+                object.insert("soreness".into(), json!(soreness));
+            }
+        }
         object.insert("sample_count".into(), json!(workout.sample_count));
         object.insert("gps_available".into(), json!(workout.gps_available));
         object.insert("source_scope".into(), json!(workout.source_scope.as_str()));
+        // 和最近同类跑步比的那几项、前后半程（运动页洞察卡那一份），爬升段（爬升卡那一份）。
+        if let Some(comparison) = comparison_json(&self.workout_insight(&workout.workout_id)?)? {
+            object.insert("comparison".into(), comparison);
+        }
+        let series = self.get_workout_series(&workout.workout_id)?;
+        if let Some(climbs) = &series.climbs {
+            object.insert("climbs".into(), climbs_json(climbs)?);
+        }
 
         if task.detail_level == AiTaskDetailLevel::Detailed {
-            let series = self.get_workout_series(&workout.workout_id)?;
             let mut series_json = Map::new();
             series_json.insert("samples".into(), serde_json::to_value(&series.samples)?);
             series_json.insert("pauses".into(), serde_json::to_value(&series.pauses)?);
@@ -426,6 +464,7 @@ fn strip_excluded_workout_fields(object: &mut Map<String, Value>, excluded: &[St
         return;
     }
     object.remove("hr_zones");
+    strip_heart_rate(object);
     if let Some(samples) = object
         .get_mut("series")
         .and_then(|series| series.get_mut("samples"))

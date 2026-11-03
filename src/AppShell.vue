@@ -11,18 +11,21 @@ import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORD
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
+import { useTabFade } from './composables/useTabFade';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { installPrefetch, preloadBeforeOpen } from './lib/motion/prefetch';
 import { installGlassTips } from './lib/glassTip';
 import { whenFramesSteady } from './lib/motion/steady';
 import { useSyncController } from './composables/useSyncController';
+import { useFeedbackToast } from './composables/useFeedbackToast';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
-import { startDesktopUpdate } from './services/updateService';
+import { bootDesktopUpdate } from './services/updateService';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
 import { formatBytes } from './lib/format';
+import { setSystemRegion } from './lib/dateTime';
 
 const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
 /* 收集箱（精修批次 7.3）：全局悬浮在右下角，空的时候不出现；后端就绪后才挂（它要读上次留下的牌）。 */
@@ -62,6 +65,8 @@ const {
   dataReady, pickUpReady,
   initialize, dispose: disposeSyncController, refreshStatus, markDataChanged,
 } = useSyncController();
+// 跑后打分：窗口不在眼前时，同步落地后发一条系统通知（Windows 上带五档按钮）。
+useFeedbackToast();
 
 /* 「数据已备好」一进交给 AI 就算取走了：不管是点胶囊进来的、点导航进来的，
    还是同步落地时人本来就在这一页。 */
@@ -115,8 +120,30 @@ const backLabel = computed(() => {
  * 旧页离场时会被绝对定位，而路由钩子紧接着把滚动区拉回顶部——不处理的话，
  * 旧页会在淡出的那一瞬跳回它自己的顶部。离场前把它按当时的滚动距离往上垫，
  * 画面就停在用户最后看到的那一帧上。 */
-const motion = ref<PageMotion>('none');
+const motion = ref<PageMotion | 'fade'>('none');
 const pageMorph = usePageMorph({ back: () => router.back() });
+/* 换入口（概览 / 交给 AI / 设置互切，或从二级页直接点顶栏）：旧页淡出、淡完新页淡入，不位移（composables/useTabFade.ts）。
+   10-29 先后试过从标签扩散的涟漪和光环水波，用户都否了（乱飞、错位；水波丑）。 */
+const tabFade = useTabFade({ viewport: () => document.getElementById('main-content') });
+const isSwitch = (value: PageMotion) => value === 'left' || value === 'right' || value === 'dismiss';
+const morphing = computed(() => motion.value === 'expand' || motion.value === 'collapse');
+/* 其余走 CSS animation 的切页：等它们自己的动画真放完再告诉 Vue（显式 done）。Vue 自己按墙钟算
+   （animation 时长 + 1ms），而这几种会先停在第一帧等帧稳——计时器先到，旧页没淡完就被整块撤掉（10-29）。 */
+const whenCssDone = (el: Element, done: () => void) => requestAnimationFrame(() => {
+  const own = el.getAnimations().filter((animation) => animation instanceof CSSAnimation);
+  if (!own.length) { done(); return; }
+  Promise.all(own.map((animation) => animation.finished)).then(done, done);
+});
+const enterHook = computed(() => {
+  if (morphing.value) return pageMorph.onMorphEnter;
+  if (motion.value === 'fade') return (el: Element, done: () => void) => { pageMorph.onEnter(el); tabFade.onEnter(el, done); };
+  return (el: Element, done: () => void) => { pageMorph.onEnter(el); whenCssDone(el, done); };
+});
+const leaveHook = computed(() => {
+  if (morphing.value) return pageMorph.onMorphLeave;
+  if (motion.value === 'fade') return (el: Element, done: () => void) => { pageMorph.onLeave(el); tabFade.onLeave(el, done); };
+  return (el: Element, done: () => void) => { pageMorph.onLeave(el); whenCssDone(el, done); };
+});
 let leavingScroll = 0;
 // 留着移除函数：HMR / 外壳重挂载时不卸掉，守卫会一层层叠上去。
 const removeBeforeEach = router.beforeEach(async (to, from) => {
@@ -125,10 +152,12 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
   // 同一页里的子路由（交给 AI 的玻璃大卡 /ai/tasks 等，10-08 H18）：外层页面不换，不做切页动效，大卡自己长出来。
   if (to.matched.length > 1 && from.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   if (from.matched.length > 1 && to.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
-  motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
+  const decided = pageMorph.decide(from, to, pageMotion(from.path, to.path));
+  motion.value = isSwitch(decided) ? 'fade' : decided;
+  if (motion.value === 'fade') tabFade.arm();
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
-  // 走 CSS 动画的几种切页：先停在第一帧，等新页上屏、帧稳了再放（见下面 afterEach 和 shell.css）。
-  pageHold.value = motion.value !== 'expand' && motion.value !== 'collapse';
+  // 走 CSS 动画的几种切页：先停在第一帧，等新页上屏、帧稳了再放（见下面 afterEach 和 shell.css）。换入口的淡入淡出自己等。
+  pageHold.value = motion.value !== 'expand' && motion.value !== 'collapse' && motion.value !== 'fade';
   // 从卡片展开：先把新页首屏的数据备好（多半悬停时已经读好，立刻就过；最多等一小会儿），
   // 新页第一帧就是真内容，而不是长成整页以后再停在骨架上。
   if (motion.value === 'expand') await preloadBeforeOpen(to.fullPath);
@@ -138,6 +167,8 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
 const pageHold = ref(false);
 let holdSeq = 0;
 const removeAfterEach = router.afterEach(() => {
+  // 新页已经换上：被打断的那段形变里没被这次切页用到的页各自收场（usePageMorph.settle）。
+  void nextTick().then(() => pageMorph.settle());
   if (!pageHold.value) return;
   const mine = ++holdSeq;
   void nextTick()
@@ -149,8 +180,13 @@ const onPageBeforeLeave = (el: Element) => {
 };
 const onMainScroll = (event: Event) => {
   const under = (event.target as HTMLElement).scrollTop > 2;
+  // 换入口开跑以前滚动区归零了，旧页还垫在原来的位置从顶栏下面经过：顶栏的模糊先别退（useTabFade 放开它）。
+  if (!under && tabFade.holdEdge.value) return;
   if (under !== contentUnderBar.value) contentUnderBar.value = under;
 };
+watch(tabFade.holdEdge, (held) => {
+  if (!held) contentUnderBar.value = (document.getElementById('main-content')?.scrollTop ?? 0) > 2;
+});
 
 /* 组件名要和 defineOptions({ name }) 对得上，KeepAlive 才认得出来。
    只缓存没有图表的页面：身体 / 训练页各有十几张 ECharts 画布，缓存着就一直占着
@@ -160,6 +196,8 @@ const CACHED_PAGES = [
   'RecentRecords',
   'SleepList',
   'WorkoutList',
+  // Keep the selected year and open workout card when returning from a workout.
+  'Rings',
 ];
 
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
@@ -200,8 +238,17 @@ const syncTrayLocale = () => {
 
 watch(locale, syncTrayLocale);
 
+/* 「跟随系统地区」要的是操作系统的区域格式，不是界面语言；探一次就够（lib/dateTime.ts）。 */
+const loadSystemRegion = () => {
+  if (!desktopRuntime) return;
+  void backend.systemRegionLocale().then(setSystemRegion).catch(() => {
+    // 老后端或探不到：留在 null，日期照旧按界面语言排。
+  });
+};
+
 onMounted(() => {
   syncTrayLocale();
+  loadSystemRegion();
   initializeScale();
   void whenBackendReady().then(() => {
     backendReady.value = true;
@@ -210,8 +257,12 @@ onMounted(() => {
       void refreshStatus();
       markDataChanged();
     }
-    // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts）。走裸 `invoke`，得等后端就绪再发。
-    void startDesktopUpdate();
+    // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts；设置里关了自动更新就不查）。走裸 `invoke`，得等后端就绪再发。
+    void bootDesktopUpdate();
+    // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）；动效档位首启量帧、看电源。
+    // 两样都不在首屏关键路径上，就绪后再按需加载（首屏体积预算）。
+    void import('./services/letterBox').then((letterBox) => letterBox.scheduleLetterBoxSync());
+    void import('./lib/motion/performanceSensing').then((sensing) => sensing.startMotionSensing());
   });
   void initialize();
   document.addEventListener('keydown', onDocumentKeydown);
@@ -250,6 +301,7 @@ onUnmounted(() => {
   disposePrefetch?.();
   disposeTips?.();
   pageMorph.dispose();
+  tabFade.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在
   // `initialize()` 上。这个组件卸载时不放，下一次挂载就会多出一份。
@@ -327,8 +379,9 @@ onUnmounted(() => {
            详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
       <div :class="['page-host', { holding: pageHold }]">
       <RouterView v-slot="{ Component }">
-        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
-          <KeepAlive :include="CACHED_PAGES" :max="4">
+        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" :on-enter="enterHook" :on-leave="leaveHook" @after-leave="pageMorph.onAfterLeave">
+          <!-- 上限和名单一样长：以前名单 5 页、上限 4，年轮页会被挤出缓存，从运动详情返回时卡片已经关了。 -->
+          <KeepAlive :include="CACHED_PAGES" :max="CACHED_PAGES.length">
             <component :is="Component" />
           </KeepAlive>
         </Transition>

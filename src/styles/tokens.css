@@ -51,8 +51,22 @@
   --distance: var(--pace);
   --danger: #F0616A;
   --warning: #F5C33B;
+  /* 金继月历的金线（3.1）：补拉补上的月份。只用在那一处细线上，不当强调色。 */
+  --kintsugi: #E2B65A;
+  /* 全年日历的五档（用户 2026-10-27：照示例图，平涂的橙色台阶，不混香槟金、不发光；试过往黄里调，用户又要回了橙色）。空格是和卡片同色系的中性灰。 */
+  --cal-0: #2A2E35;
+  --cal-future: #212429;
+  --cal-1: #4D2E14;
+  --cal-2: #8C4A12;
+  --cal-3: #D2690F;
+  --cal-4: #FF9124;
+  --cal-tip: #0F1216;
   /* 键盘焦点环：中性的浅灰，不用品牌绿（2026-10-01：「只要有绿色描边的地方，都帮我去掉」）。 */
   --focus: rgba(226, 234, 242, .55);
+  /* PB 墙牌叠右上角的奖牌（1 金 2 银 3 铜）。 */
+  --medal-gold: #E9BC4C;
+  --medal-silver: #C3CAD3;
+  --medal-bronze: #D08A57;
   --route-neutral: #9AA1A9;
   --route-mint: #2FA96B;
   --route-cyan: #4AA8E8;
@@ -181,6 +195,20 @@
     radial-gradient(900px 520px at 12% -8%, rgba(125, 163, 62, .10), transparent 70%),
     radial-gradient(760px 520px at 96% 8%, rgba(100, 119, 215, .09), transparent 70%),
     radial-gradient(900px 600px at 60% 110%, rgba(43, 179, 192, .06), transparent 70%);
+  /* 年轮木片（lib/rings/wood.ts）：木头本身不分主题，只有下面的投影和外面的月份刻度跟着主题。 */
+  --wood-shadow: rgba(0, 0, 0, .55);
+  --wood-guide: rgba(214, 190, 160, .32);
+  /* 点开年轮上一次运动的那张卡（components/rings/StarCard.vue）：和木头同一个色系——深色是一块烤过的胡桃木色玻璃，
+     强调色是边材那种琥珀 / 蜂蜜色；不用应用的绿（用户 2026-10-28：「绿色的，跟年轮界面的颜色不搭」）。 */
+  --wood-card: linear-gradient(160deg, rgba(74, 47, 28, .86), rgba(38, 24, 14, .9));
+  --wood-card-line: rgba(234, 207, 158, .16);
+  --wood-card-ink: #F6EBDA;
+  --wood-card-muted: rgba(234, 207, 158, .66);
+  --wood-card-amber: #E2B26B;
+  --wood-card-amber-hover: #EEC283;
+  --wood-card-amber-ink: #2E1A0A;
+  --wood-card-press: rgba(234, 207, 158, .12);
+  --wood-card-press-hover: rgba(234, 207, 158, .2);
 }
 
 /* 浅色主题：暖白底 + 深绿品牌色。色板方向见
@@ -233,7 +261,18 @@ html[data-theme="light"] {
   --distance: var(--pace);
   --danger: #C43742;
   --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
+  --kintsugi: #A9781F;
+  --cal-0: #EBEDE8;
+  --cal-future: #F4F5F2;
+  --cal-1: #FDDDB6;
+  --cal-2: #F8B064;
+  --cal-3: #EE8722;
+  --cal-4: #CF630A;
+  --cal-tip: #FFFFFF;
   --focus: rgba(38, 52, 41, .42);
+  --medal-gold: #D6A21E;
+  --medal-silver: #A9B1BB;
+  --medal-bronze: #B8703F;
   --route-neutral: #6E7670;
   --route-mint: #22875C;
   --route-cyan: #2E7FC2;
@@ -293,6 +332,17 @@ html[data-theme="light"] {
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
     rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));
   --cap-ink: #2F6B4F;
+  --wood-shadow: rgba(84, 52, 22, .28);
+  --wood-guide: rgba(128, 82, 42, .38);
+  --wood-card: linear-gradient(160deg, rgba(255, 247, 234, .9), rgba(246, 230, 204, .92));
+  --wood-card-line: rgba(128, 82, 42, .18);
+  --wood-card-ink: #3A230F;
+  --wood-card-muted: rgba(98, 60, 28, .7);
+  --wood-card-amber: #A8642C;
+  --wood-card-amber-hover: #95561F;
+  --wood-card-amber-ink: #FFF6E8;
+  --wood-card-press: rgba(128, 82, 42, .1);
+  --wood-card-press-hover: rgba(128, 82, 42, .17);
 }
 
 /* ── 浅色主题的局部补丁 ────────────────────────────────────────────

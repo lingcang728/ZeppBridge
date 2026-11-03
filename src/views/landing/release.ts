@@ -33,10 +33,3 @@ export interface LatestRelease {
     linuxFlatpak?: ReleaseAsset;
   };
 }
-
-/**
- * 下载区说明：每种语言的 downloadLead 都是「免费开源。v3 尚未发布。」两句。有安装包时只留第一句，
- * 不然正式发布以后页面还在说「尚未发布」。句号按语言不同（. 。 ।），__tests__/downloads.test.ts 逐语言守着。
- */
-export const downloadLeadFor = (lead: string, available: boolean): string =>
-  available ? (lead.split(/(?<=[.。।])\s*/u)[0] ?? lead).trim() : lead;

@@ -12,6 +12,7 @@ import { FULL_TOUR, INLINE_CHAPTERS, TOUR_STEPS, type TourChapterId, type TourSt
 import { enterSandbox, leaveSandbox, markSeen, sandboxFlags, seenChapters } from '../lib/tour/sandbox';
 import { locale } from '../i18n';
 import { useTheme } from './useTheme';
+import { lessMotion } from '../lib/motion/lessMotion';
 
 export type TourMode = 'sandbox' | 'inline';
 
@@ -49,7 +50,7 @@ let selector: { css: string; all: boolean } | null = null;
 let refinding = false;
 let measureFrame = 0;
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const findTargets = (css: string, all: boolean, run: number, wait = WAIT_MS): Promise<Element[]> => new Promise((resolve) => {

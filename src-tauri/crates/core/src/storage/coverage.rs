@@ -115,7 +115,7 @@ pub struct StreamCoverage {
     /// 实际写进本机库的最早 / 最晚月份。
     pub persisted_from: Option<String>,
     pub persisted_to: Option<String>,
-    /// 请求过但云端没返回的月份，最多列 12 个。
+    /// 请求过但云端没返回的月份，最多列 120 个（十年）：牌桌按它把一叠标成「云端没有」（3.0.4）。
     pub empty_months: Vec<String>,
     pub records: i64,
 }
@@ -137,6 +137,25 @@ pub struct CoverageLedger {
     pub failed_chunks_detail: Vec<FailedChunk>,
     /// 还有失败块的自动重试次数已用尽，需要用户显式重试。
     pub needs_manual_retry: bool,
+    /// 按月的样子，给「金继」月历（3.1）：哪个月本机有、哪个月是补拉补上的、
+    /// 哪个月云端没有、哪个月还是裂缝。只列账本里排过或本机有数据的月份；
+    /// 两边都没有的月份由界面当作「还没问过云端」的裂缝。
+    #[serde(default)]
+    pub months: Vec<MonthSeam>,
+}
+
+/// 一个月的结论，从新到旧压成一个词。字符串是契约，界面按它分支。
+///
+/// * `crack`：有流失败或只写了一部分，还要再拉（别的流写进去了也算裂缝）；
+/// * `gold`：补拉写进了记录——裂缝被金线补上；
+/// * `local`：本机有数据（平常同步来的），账本里没写进新记录；
+/// * `pending`：排进了补拉计划、还没问过云端；
+/// * `empty`：问过了，云端每条流都说这个月没有。不是失败，不画成裂缝。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MonthSeam {
+    /// `YYYY-MM`。
+    pub month: String,
+    pub state: String,
 }
 
 /// 历史补拉覆盖哪些流。逐条明细（`workout_detail`）跟着运动摘要走，
@@ -287,6 +306,32 @@ impl Database {
         Ok(changed)
     }
 
+    /// 把「账本说写进去了、库里却一条报文都没有」的月份改回待补拉，返回改了几块。
+    ///
+    /// 3.0 之前的保留期清理删了派生行和报文，却没把账本改回来：账本仍是
+    /// `persisted`，补拉就永远跳过这些月份。真实库里运动缺了 2024-08 起整整一年、
+    /// 睡眠缺 19 个月，而 Zepp App 里都还在（#143 跑鞋里程对不上时查出来的）。
+    /// 现在的 `cleanup_old_data` 会顺手改账本，这里只修它修好之前留下的。
+    ///
+    /// 只看原始报文：派生行一定指向报文，报文只在没有派生行指向时才会被删，所以
+    /// 窗口里一条这条流的报文都没有，就是这个月确实什么都不剩了。判错的代价只是
+    /// 多拉一遍（补拉是幂等的 upsert），拉回来就有报文了，不会反复触发。
+    pub fn reopen_chunks_without_raw(&self) -> Result<usize> {
+        let changed = self.conn.execute(
+            "UPDATE coverage_ledger
+                SET status = 'pending', records = 0, persisted_at = NULL,
+                    error = NULL, error_code = NULL, attempts = 0, updated_at = ?1
+              WHERE status IN ('persisted', 'partial')
+                AND NOT EXISTS (
+                    SELECT 1 FROM raw_records r
+                     WHERE r.stream = coverage_ledger.stream
+                       AND r.start_utc < coverage_ledger.chunk_end
+                       AND COALESCE(r.end_utc, r.start_utc) > coverage_ledger.chunk_start)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        Ok(changed)
+    }
+
     /// 记录一块的结果。
     ///
     /// 失败会累加 `attempts`，成功（写入或云端确认为空）把它清零——一块曾经
@@ -367,6 +412,7 @@ impl Database {
         let mut completed = 0i64;
         let mut requested_from: Option<String> = None;
         let mut requested_to: Option<String> = None;
+        let mut month_chunks_seen: Vec<(String, String, i64)> = Vec::new();
 
         for (stream, chunks) in by_stream {
             let mut coverage = StreamCoverage {
@@ -382,6 +428,11 @@ impl Database {
                 records: 0,
             };
             for chunk in &chunks {
+                month_chunks_seen.push((
+                    chunk.chunk_start.clone(),
+                    chunk.status.clone(),
+                    chunk.records,
+                ));
                 total += 1;
                 requested_from = min_option(requested_from.take(), Some(chunk.chunk_start.clone()));
                 requested_to = max_option(requested_to.take(), Some(chunk.chunk_end.clone()));
@@ -402,7 +453,7 @@ impl Database {
                     ChunkStatus::EmptyFromCloud => {
                         completed += 1;
                         coverage.empty_chunks += 1;
-                        if coverage.empty_months.len() < 12 {
+                        if coverage.empty_months.len() < 120 {
                             coverage.empty_months.push(chunk.chunk_start.clone());
                         }
                     }
@@ -418,6 +469,7 @@ impl Database {
 
         let failed_chunks_detail = self.failed_backfill_chunks()?;
         let needs_manual_retry = failed_chunks_detail.iter().any(|chunk| chunk.exhausted);
+        let months = self.month_seams(&month_chunks_seen)?;
 
         Ok(CoverageLedger {
             requested_from,
@@ -430,7 +482,71 @@ impl Database {
             complete: total > 0 && completed == total,
             failed_chunks_detail,
             needs_manual_retry,
+            months,
         })
+    }
+
+    /// 把账本里的块和本机实际有数据的月份合成逐月结论（`MonthSeam`）。
+    ///
+    /// 本机月份只看三张按天 / 按次的表：日概览、睡眠、运动。心率逐分钟样本
+    /// 太大，扫它只为了知道「这个月有没有」不值；有心率的月份几乎都有日概览。
+    fn month_seams(&self, chunks: &[(String, String, i64)]) -> Result<Vec<MonthSeam>> {
+        #[derive(Default)]
+        struct Month {
+            gold: bool,
+            crack: bool,
+            pending: bool,
+            asked: bool,
+            local: bool,
+        }
+        let mut months: std::collections::BTreeMap<String, Month> =
+            std::collections::BTreeMap::new();
+        for (start, status, records) in chunks {
+            let Some(key) = start.get(..7) else { continue };
+            let month = months.entry(key.to_string()).or_default();
+            match ChunkStatus::parse(status) {
+                ChunkStatus::Persisted if *records > 0 => month.gold = true,
+                ChunkStatus::Persisted | ChunkStatus::EmptyFromCloud => {}
+                ChunkStatus::Failed | ChunkStatus::Partial => month.crack = true,
+                ChunkStatus::Pending => month.pending = true,
+            }
+            month.asked = true;
+        }
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT substr(date, 1, 7) FROM daily_metrics
+             UNION SELECT substr(date(start_time, 'localtime'), 1, 7) FROM sleep_sessions
+             UNION SELECT substr(date(start_time, 'localtime'), 1, 7) FROM workouts",
+        )?;
+        let rows = stmt.query_map([], |row| row.get::<_, Option<String>>(0))?;
+        for row in rows {
+            if let Some(key) = row? {
+                if key.len() == 7 {
+                    months.entry(key).or_default().local = true;
+                }
+            }
+        }
+        Ok(months
+            .into_iter()
+            .map(|(month, m)| {
+                let state = if m.crack {
+                    "crack"
+                } else if m.gold {
+                    "gold"
+                } else if m.local {
+                    "local"
+                } else if m.pending {
+                    "pending"
+                } else if m.asked {
+                    "empty"
+                } else {
+                    "local"
+                };
+                MonthSeam {
+                    month,
+                    state: state.to_string(),
+                }
+            })
+            .collect())
     }
 
     /// 清掉整个账本。用户改主意重新规划一次完整补拉时用。

@@ -12,10 +12,7 @@ fn stdio_recovers_from_bad_input_and_returns_tool_errors_in_result() {
     let missing_dir = std::env::temp_dir().join(format!(
         "zeppbridge-mcp-stdio-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     let mut child = Command::new(env!("CARGO_BIN_EXE_zeppbridge-mcp"))
         .env("ZEPPBRIDGE_DATA_DIR", &missing_dir)
@@ -129,6 +126,7 @@ fn workout(id: &str, days_ago: i64) -> Workout {
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,
         device_id: Some("watch-serial-001".into()),
@@ -169,10 +167,7 @@ fn scoped_library() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-mcp-scope-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     {
@@ -285,7 +280,7 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
         assert_eq!(responses[0]["result"]["scope"]["mode"], "full-readonly");
         assert_eq!(
             responses[1]["result"]["tools"].as_array().unwrap().len(),
-            17
+            19
         );
         let ids: Vec<&str> = responses[2]["result"]["structuredContent"]["workouts"]
             .as_array()

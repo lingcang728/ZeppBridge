@@ -116,18 +116,44 @@ export const useCardDrag = (options: {
     layoutPiles(animate);
   };
 
+  /**
+   * 拖起那一刻把这一层别的牌的矩形记下来（10-28 牌桌卡顿）：拖动途中别的牌不动，逐帧按矩形查，
+   * 不再每帧 `elementsFromPoint` 把整屏命中测试一遍。矩形是外接框，扇面上的牌歪一点会互相盖住一角：
+   * 落在几张里就取中心最近的那张。牌被换掉了（换层、重渲染）才退回 `elementsFromPoint`。
+   */
+  let rects: Array<{ el: HTMLElement; rect: DOMRect }> = [];
+  const snapRects = (dragged: HTMLElement) => {
+    const layer = dragged.closest('.table-layer');
+    rects = [...(layer?.querySelectorAll<HTMLElement>('.pcard[data-card-id]') ?? [])].filter((el) => el !== dragged).map((el) => ({ el, rect: el.getBoundingClientRect() }));
+  };
+  const cardAt = (x: number, y: number): HTMLElement | null | undefined => {
+    let best: HTMLElement | null = null;
+    let bestD = Infinity;
+    for (const { el, rect } of rects) {
+      if (!el.isConnected) return undefined;
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+      const d = Math.hypot(x - (rect.left + rect.width / 2), y - (rect.top + rect.height / 2));
+      if (d < bestD) { bestD = d; best = el; }
+    }
+    return best;
+  };
+  const pileTarget = (card: HTMLElement): { kind: 'card'; id: string } | null => {
+    const id = card.dataset.cardId!;
+    const pile = pileOf(id);
+    const top = pile ? topOf(pile) : id;
+    return top !== drag?.id && options.canPileOn(top) ? { kind: 'card', id: top } : null;
+  };
+
   const hit = (x: number, y: number): { kind: 'box' } | { kind: 'card'; id: string } | null => {
     const r = boxRect();
     if (r && x >= r.left - BOX_SLOP && x <= r.right + BOX_SLOP && y >= r.top - BOX_SLOP && y <= r.bottom + BOX_SLOP) return { kind: 'box' };
     if (!drag || !options.isDay(drag.id)) return null;
+    const cached = cardAt(x, y);
+    if (cached !== undefined) return cached ? pileTarget(cached) : null;
     for (const el of document.elementsFromPoint(x, y)) {
       const card = el.closest<HTMLElement>('.pcard[data-card-id]');
       if (!card || card === drag.el) continue;
-      const id = card.dataset.cardId!;
-      const pile = pileOf(id);
-      const top = pile ? topOf(pile) : id;
-      if (top !== drag.id && options.canPileOn(top)) return { kind: 'card', id: top };
-      return null;
+      return pileTarget(card);
     }
     return null;
   };
@@ -135,10 +161,11 @@ export const useCardDrag = (options: {
   const paint = () => {
     if (!drag) return;
     drag.frame = 0;
+    // 先查落点、再写位置：倒过来的话 hit 里读矩形会逼浏览器为刚写的 translate 同步重算一次样式。
+    const over = hit(drag.x, drag.y);
     const dx = drag.base.x + drag.x - drag.x0;
     const dy = drag.base.y + drag.y - drag.y0;
     drag.el.style.translate = `${dx.toFixed(1)}px ${dy.toFixed(1)}px`;
-    const over = hit(drag.x, drag.y);
     box.dropHover.value = over?.kind === 'box';
     targetId.value = over?.kind === 'card' ? over.id : null;
   };
@@ -166,6 +193,7 @@ export const useCardDrag = (options: {
       drag.el.setPointerCapture(event.pointerId);
       drag.el.classList.add('dragging');
       if (drag.el.parentElement) drag.el.parentElement.style.zIndex = '60';
+      if (options.isDay(drag.id)) snapRects(drag.el);
       options.onStart?.();
     }
     if (!drag.frame) drag.frame = requestAnimationFrame(paint);
@@ -175,6 +203,7 @@ export const useCardDrag = (options: {
     const d = drag;
     if (!d) return;
     drag = null;
+    rects = [];
     window.removeEventListener('pointerup', up, true);
     window.removeEventListener('pointercancel', cancelEvent, true);
     cancelAnimationFrame(d.frame);

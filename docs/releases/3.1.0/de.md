@@ -1,0 +1,23 @@
+- Added: **Briefe vom Autor**. Jedes Update wird nun von einem Brief begleitet. Auf der letzten Seite kannst du direkt antworten und deine Nachricht erreicht den Autor anonym; Entwürfe werden automatisch gespeichert und verbleiben offline sicher auf deinem Rechner.
+- Added: **Briefkasten**. Ein wöchentlicher Brief über deine Daten; schreibe deinem zukünftigen Ich in einem halben Jahr, einem Jahr oder drei Jahren – versiegelt bis zum Stichtag; dazu ein Rückblick auf deine Daten am heutigen Tag in vergangenen Jahren.
+- Added: **Logbuch**. Jahres-Aktivitätskalender, Wettkampf-Countdowns und Medaillenwand, Bestzeiten-Wand von 5 km bis Marathon, Schuh-Kilometerstand mit Erinnerung an den Ruhestand, Verletzungsprotokolle und Epochen – alles auf einer Seite.
+- Added: **Jahresringe**. Ein Ring pro Jahr, der sich in intensiveren Trainingswochen sichtbar vorwölbt; ein Klick auf die feinen Linien öffnet das jeweilige Training. Mit einem Klick als Bild teilbar, während die Rohdaten deinen Rechner nie verlassen.
+- Added: **„Dein Empfinden“ in den Trainingsdetails**. Halte deine eigene RPE-Einschätzung, schmerzende Muskelpartien und das getragene Schuhpaar fest.
+- Added: **Bewertung nach dem Training**. Wurde ein an die Uhr übertragener Plan absolviert, fragt die Übersicht nach deinem Befinden; war es zu hart, lässt sich die nächste Einheit mit einem Klick um 10 % reduzieren. Unter Windows geht das direkt in der Systembenachrichtigung.
+- Added: **Posteingang für KI-Erinnerungen**. Tools wie Claude können Vorschläge für erinnerungswürdige Details machen, über die du einzeln entscheidest; nur ausdrücklich Übernommenes wird an die KI weitergegeben.
+- Added: **Prompt-Bibliothek**. An die KI übergebene Aufgaben nach Datenkategorien filtern, frühere Formulierungen jederzeit wiederherstellen und Prompts als .zbprompt-Datei zum Teilen exportieren.
+- Added: **Import aus mehreren Quellen**. Trainings aus GPX / TCX, FIT, vollständigen Strava-Archiven und Apple Health-Exporten importieren; jeder Import bildet einen Stapel, der sich vollständig rückgängig machen lässt.
+- Added: **Nimm alles mit**. Unter Einstellungen › Archiv und Speicher mit einem Klick alle in ZeppBridge erfassten und gepflegten Inhalte als einzelne JSON-Datei exportieren.
+- Added: **Trainingsart im Batch ändern und Trainings ausblenden (#154, #151)**. Mehrfachauswahl in der Trainingsliste; ausgeblendete Trainings fließen nicht in Statistiken, KI oder Exporte ein, bleiben im Original erhalten und können jederzeit wiederhergestellt werden.
+- Added: **Vergangene Trainingsdetails separat nachladen (#153)**. Starten, Pausieren und Fortsetzen unter Einstellungen › Archiv und Speicher, wobei sauber zwischen „Keine Details in der Cloud“ und „Anfrage fehlgeschlagen“ unterschieden wird.
+- Improved: **Dein persönlicher Normalbereich**. Berechnet deinen typischen Wertebereich aus bis zu zehn Jahren Historie; nach einem vollen Jahr zeigt die Karte den langfristigen Normalzustand an.
+- Improved: **Herkunft jedes Messwerts**. Sofort erkennen, ob ein Wert von Sensoren stammt, auf einer offenen Formel beruht oder von Zepp geschätzt wurde; Messwerte lassen sich von der Analyse ausschließen, ohne Daten zu löschen.
+- Improved: **Abdeckungs-Monatskalender**. In den Einstellungen wird jedes Jahr als Zeile und jeder Monat als Kästchen dargestellt; Monate mit tatsächlich nachgeladenen Daten werden golden hervorgehoben, und Lücken lassen sich mit einem Klick schließen.
+- Improved: **Klarere Hinweise bei abweichenden Konten**. Gehören offizielle Autorisierung und erweiterte Daten zu unterschiedlichen Zepp-Konten, werden beide nebeneinander samt Lösungsweg dargestellt; ein Kontowechsel zum Neuanfang verschiebt Altdaten beiseite, ohne sie zu löschen.
+- Improved: **Automatische Updates deaktivierbar**. Neuer Schalter neben „Nach Updates suchen“ in den Einstellungen; Animationen werden bei schwächerer Rechnerleistung oder niedrigem Akkustand automatisch reduziert.
+- Fixed: **Trainingsart 15 der Balance 2 wird nicht mehr pauschal als Wandern eingestuft (#155)**.
+- Fixed: **Erweiterter Kanal hat Vorrang bei beidseitig vorhandenen Trainingsdetails (#143)**. Punktgenaue Distanzdaten werden nicht mehr durch später abgerufene offizielle Details überschrieben.
+- Fixed: **Abmeldung und Neuverbindung klappen auch dann, wenn der macOS-Schlüsselbund nicht lesbar ist (#145)**.
+- Fixed: **Befehlszeilen-Nachladen über mehr als 365 Tage (#152)**. Wechselt nun automatisch zum monatsweisen Nachladen.
+- Fixed: **Höhenmeterkarte und Höhenprofil stimmen überein**. Auf flachen Strecken werden nun der tatsächliche Höhenbereich und der maximale Höhenunterschied ausgewiesen.
+- Fixed: **Deinstallation mit aktivierter Option „Anwendungsdaten löschen“ bereinigt nun restlos**.

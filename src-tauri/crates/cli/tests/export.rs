@@ -5,10 +5,7 @@ fn missing_local_workout_is_not_a_cloud_failure() {
     let dir = std::env::temp_dir().join(format!(
         "zeppbridge-missing-workout-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     drop(zeppbridge_core::storage::Database::open_migrated(&dir.join("zepp.db")).unwrap());
@@ -42,10 +39,7 @@ fn invalid_export_arguments_return_json_usage_errors_before_opening_a_database()
     let missing_data_dir = std::env::temp_dir().join(format!(
         "zeppbridge-export-usage-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        zeppbridge_core::unique_suffix()
     ));
     assert!(!missing_data_dir.exists());
 

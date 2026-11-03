@@ -41,6 +41,7 @@ import type {
   TrainingBalancePoint,
   UserPrefs,
   Workout,
+  WorkoutFitOverride,
   WorkoutSeries,
 } from '../../types';
 
@@ -186,6 +187,21 @@ export interface MetricBaseline {
   /** 最新读数 − 中位数。 */
   delta: number;
   message_code: 'ui.metric_baseline.above' | 'ui.metric_baseline.below' | 'ui.metric_baseline.usual';
+  /** 常态带（3.1）：最新读数之前 90 天第 10 / 第 90 百分位。天数不够为 null；旧后端没有。 */
+  usual_low?: number | null;
+  usual_high?: number | null;
+  usual_days?: number;
+  /** 长期常态：最新读数之前全部历史（最多十年）中间八成与逐年拆分；不满一年为 null。旧后端没有。 */
+  long_term?: LongTermNorm | null;
+}
+
+export interface LongTermNorm {
+  since: string;
+  days: number;
+  median: number;
+  low: number;
+  high: number;
+  years: { year: number; days: number; median: number; low: number; high: number }[];
 }
 
 export interface AiTaskSummary {
@@ -197,6 +213,15 @@ export interface AiTaskSummary {
   mcp_shared: boolean;
   /** 置顶的排在最前，也不会因为久没动收进「更早」。 */
   pinned?: boolean;
+  /** 启用的数据类别（Prompt 库按它筛）。 */
+  categories?: string[];
+}
+
+/** 一个任务以前用过的提示词（`ai_prompt_versions`）。 */
+export interface AiPromptVersion {
+  id: number;
+  prompt: string;
+  replaced_at: string;
 }
 
 /** `ai_task_preview` 的运动摘要行；字段与 Rust `AiTaskWorkoutBrief` 一一对应。 */
@@ -310,6 +335,50 @@ export interface BridgeBackend {
   aiProfileSave(note: string): Promise<void>;
   trainingPlanAdherence(from: string, to: string): Promise<import('../../types/timeBridge').AdherenceDay[]>;
   trainingPlanUpdateDraft(id: string, document: PlanDocument): Promise<boolean>;
+  /** 推过的每一份计划（留档），新的在前。 */
+  trainingPlanHistory(limit?: number): Promise<import('../../types/feedback').PlanHistoryEntry[]>;
+  /** 跑后打分：现在该问哪一条（最多一条，48 小时内、对得上计划、没打过）。 */
+  workoutFeedbackPrompt(): Promise<import('../../types/feedback').FeedbackPrompt | null>;
+  /** 有一条该发系统通知的打分：令牌 + 卡片内容（每条运动只给一次）。 */
+  workoutFeedbackToastDue(): Promise<import('../../types/feedback').FeedbackToastDue | null>;
+  /** 发系统通知：Windows 带五档按钮，其他平台是普通通知。文案由界面组好。 */
+  workoutFeedbackToastShow(text: import('../../types/feedback').FeedbackToastText): Promise<void>;
+  workoutFeedbackGet(workoutId: string): Promise<import('../../types/feedback').WorkoutFeedback | null>;
+  workoutFeedbackSave(input: import('../../types/feedback').FeedbackInput): Promise<void>;
+  workoutFeedbackDismiss(workoutId: string): Promise<void>;
+  /** 「这周别问」：返回到哪天为止（下周一）。 */
+  workoutFeedbackSnooze(): Promise<string>;
+  workoutFeedbackAdjusted(workoutId: string, adjustment: import('../../types/feedback').FeedbackAdjustment): Promise<void>;
+  /** 教练档案（AI 记忆收件箱）：记住的 + 等确认的。 */
+  coachNotesList(): Promise<import('../../types/coachNotes').CoachNotes>;
+  coachNoteAdd(text: string): Promise<number>;
+  /** 记住 / 不要一条 AI 的提议。已经处理过的报 `err.coach_notes.stale`。 */
+  coachNoteDecide(id: number, accept: boolean): Promise<void>;
+  coachNoteEdit(id: number, text: string): Promise<void>;
+  coachNoteDelete(id: number): Promise<void>;
+  /** 把界面排好的 Markdown 存到桌面「ZeppBridge AI」文件夹，返回文件路径。 */
+  coachNotesExport(fileStem: string, markdown: string): Promise<string>;
+  /** 履历：登记的鞋（累计里程、退役提醒）+ Zepp 里记过还没登记的鞋编号。 */
+  shoesOverview(): Promise<import('../../types/logbook').ShoeOverview>;
+  /** 存一双鞋；Zepp 鞋编号已认到别的鞋时报 `err.logbook.gear_taken`。 */
+  shoeSave(input: import('../../types/logbook').ShoeInput): Promise<number>;
+  shoeDelete(id: number): Promise<void>;
+  /** 运动详情「你的感受」：自己的 RPE、酸痛部位、这次算哪双鞋。 */
+  workoutFeelGet(workoutId: string): Promise<import('../../types/logbook').WorkoutFeel | null>;
+  workoutFeelSave(input: import('../../types/logbook').WorkoutFeelInput): Promise<void>;
+  injuriesList(): Promise<import('../../types/logbook').Injury[]>;
+  injurySave(input: import('../../types/logbook').InjuryInput): Promise<number>;
+  injuryDelete(id: number): Promise<void>;
+  /** 比赛，按日期排；过了比赛日没成绩的带一个候选运动。 */
+  racesList(): Promise<import('../../types/logbook').Race[]>;
+  raceSave(input: import('../../types/logbook').RaceInput): Promise<number>;
+  raceDelete(id: number): Promise<void>;
+  /** PB 墙：5K / 10K / 半马 / 全马，本机现算。 */
+  personalRecords(): Promise<import('../../types/logbook').PersonalRecords>;
+  /** 年轮年度回顾：从有数据的第一年到今年，每年一圈。 */
+  annualRings(): Promise<import('../../types/rings').AnnualRings>;
+  /** 把画好的年轮 PNG 存到「图片\ZeppBridge」，返回完整路径。 */
+  ringsSaveImage(fileStem: string, png: number[]): Promise<string>;
   trainingPlanState(): Promise<TrainingPlanState>;
   trainingPlanSaveDraft(document: PlanDocument, pasted: boolean): Promise<string>;
   trainingPlanPreview(id: string): Promise<PlanDraftPreview>;
@@ -324,6 +393,8 @@ export interface BridgeBackend {
   getAppStatus(): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;
+  /** 两条通道都退出、排队把数据文件夹挪到一边，然后重启应用；旧数据不删。 */
+  startFreshLibrary(): Promise<void>;
   manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
   /** 登录窗标题跟随界面语言，后端认十种界面语言标记（认不出回落英文）。 */
@@ -336,6 +407,8 @@ export interface BridgeBackend {
   startOfficialLogin(): Promise<OfficialStatus>;
   cancelOfficialLogin(): Promise<OfficialStatus>;
   recoverOfficialCredentials(storage: 'system' | 'file'): Promise<OfficialStatus>;
+  /** 「我已在网页授权，立即检查」：叫醒等待中的那次轮询，结果经 official://status 送回。 */
+  checkOfficialLoginNow(): Promise<OfficialStatus>;
   getOfficialStatus(): Promise<OfficialStatus>;
   /** 撤销官方授权并删掉本机令牌；不动任何健康数据。 */
   disconnectOfficial(): Promise<OfficialStatus>;
@@ -374,6 +447,16 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
+  editWorkouts(workoutIds: string[], changeType: boolean, workoutType: string | null, hidden: boolean | null): Promise<{ id: string; changed: number }>;
+  undoWorkoutEdit(id: string): Promise<number>;
+  getHiddenWorkoutPage(limit: number, offset: number): Promise<Page<Workout>>;
+  getWorkoutDetailCoverage(channel?: WorkoutDetailChannel): Promise<WorkoutDetailCoverage>;
+  startWorkoutDetailBackfill(maxRecords: number, retryFailed: boolean, channel?: WorkoutDetailChannel): Promise<WorkoutDetailCoverage>;
+  /** #140：本机用修正过的 .fit 顶替这条运动；`path` 是用户在对话框里选的文件。 */
+  getWorkoutFitOverride(workoutId: string): Promise<WorkoutFitOverride | null>;
+  importWorkoutFit(workoutId: string, path: string): Promise<WorkoutFitOverride>;
+  /** 返回 false 表示本来就没有修正。 */
+  removeWorkoutFit(workoutId: string): Promise<boolean>;
   getWorkoutTypeOptions(): Promise<SportOption[]>;
   getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
   setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;
@@ -394,6 +477,8 @@ export interface BridgeBackend {
   resetCoverageLedger(): Promise<CoverageLedger>;
   retryFailedBackfillChunks(): Promise<CoverageLedger>;
   setTrayLocale(locale: string): Promise<void>;
+  /** 操作系统的区域格式（如 `pt-PT`），日期顺序与 12/24 小时制跟它走；取不到为 null。 */
+  systemRegionLocale(): Promise<string | null>;
   listBackups(): Promise<BackupManifest[]>;
   createManualBackup(): Promise<BackupManifest>;
   verifyBackup(backupId: string): Promise<BackupVerification>;
@@ -408,6 +493,28 @@ export interface BridgeBackend {
   compactRawPayloads(): Promise<RawPayloadCompaction>;
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
+  /** 信匣：本机的待寄出、已寄出和上次取回的回执（不联网）。 */
+  lettersState(): Promise<import('../../types/letters').LetterBoxView>;
+  /** 寄一封回信；连不上就放进待寄出，返回 queued。 */
+  lettersSendReply(input: import('../../types/letters').LetterReplyInput): Promise<import('../../types/letters').LetterSendResult>;
+  /** 补寄待寄出、再取一次回执；连不上就原样返回本机的。 */
+  lettersSync(): Promise<import('../../types/letters').LetterBoxView>;
+  /** 信匣的数据来信：顺手寄出上一周的来信，再读出全部来信和那年今天。 */
+  dataLettersState(): Promise<import('../../types/letters').DataLettersView>;
+  /** 封一个时间胶囊，`openOn` 是本地日 YYYY-MM-DD。 */
+  dataLettersSealCapsule(note: string, openOn: string): Promise<number>;
+  /** 开封一个到期的胶囊。 */
+  dataLettersOpenCapsule(id: number): Promise<import('../../types/letters').DataLetter>;
+  /** 带走我的一切：自己写下、整理的记录导出成一份 JSON，返回条数。 */
+  exportMyRecords(path: string): Promise<number>;
+  /** 导入一种来源的一个或多个文件，合成一批。 */
+  importWorkouts(source: import('../../types/imports').ImportSourceKey, paths: string[]): Promise<import('../../types/imports').ImportReport>;
+  /** 全部导入批次，新的在前。 */
+  importBatches(): Promise<import('../../types/imports').ImportBatch[]>;
+  /** 整批撤销，返回删掉的运动条数。 */
+  undoImportBatch(batchId: number): Promise<number>;
+  /** 导入的运动各自的来源（workout_id → 来源）。 */
+  workoutImportSources(): Promise<Record<string, import('../../types/imports').ImportSourceKey>>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   prepareAiHandoff(
@@ -415,6 +522,8 @@ export interface BridgeBackend {
     prompt: string,
     includePreciseRoute?: boolean,
   ): Promise<AiHandoffResult>;
+  /** 用系统浏览器打开 https 链接；AppImage 里会先剥掉运行时注入的库路径（Rust 侧 external_open.rs）。 */
+  openExternalUrl(url: string): Promise<void>;
 
   /* ---------- Beta1 分析任务命令（A7 P3；Rust 侧 `commands/ai_tasks.rs`） ---------- */
 
@@ -428,8 +537,17 @@ export interface BridgeBackend {
   aiTaskDeleteMany(ids: string[]): Promise<Array<{ task: AiTask; pinned: boolean }>>;
   /** 这几项指标「比平时高 / 低」的结论（数据不够的不返回）。 */
   getMetricBaselines(metrics: string[]): Promise<MetricBaseline[]>;
+  /** 用户排除的指标（不参与比较、不交给 AI / MCP；数据不删）。 */
+  metricExclusions(): Promise<string[]>;
+  setMetricExcluded(metric: string, excluded: boolean): Promise<string[]>;
   /** 置顶 / 取消置顶一个已保存的任务（不改 updated_at）。 */
   aiTaskSetPinned(id: string, pinned: boolean): Promise<void>;
+  /** Prompt 库：一个任务以前用过的提示词，新的在前。 */
+  aiPromptVersions(id: string): Promise<AiPromptVersion[]>;
+  /** 把任务导出成 `.zbprompt`（桌面「ZeppBridge AI」），返回路径。 */
+  aiPromptExport(id: string): Promise<string>;
+  /** 导入一份 `.zbprompt`，存成已保存的任务。 */
+  aiPromptImport(path: string): Promise<AiTask>;
   cardCollectionGet(): Promise<CardPick[]>;
   cardCollectionSet(picks: CardPick[]): Promise<CardPick[]>;
   aiTemplateList(): Promise<AiTaskTemplate[]>;
@@ -466,3 +584,10 @@ export interface McpSidecar {
   stale_clients?: McpClientId[];
 }
 export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex';
+
+export type WorkoutDetailChannel = 'advanced' | 'official';
+
+export interface WorkoutDetailCoverage {
+  pending: number; persisted: number; empty_from_cloud: number; request_failed: number;
+  parse_failed: number; unavailable: number; ready: number;
+}

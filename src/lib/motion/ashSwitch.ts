@@ -7,6 +7,8 @@ import { localeTarget } from './localeTarget';
 import { whenFramesSteady } from './steady';
 import { LOCALE_REVEAL_MS, OPEN_EASE } from './timing';
 import { canUseViewTransitions } from './viewTransitions';
+import { lessMotion } from './lessMotion';
+import { beginFrameLog, claimHeavy, endFrameLog } from './performance';
 
 /**
  * 换语言的「响指」（用户 2026-10-04 提的点子：像《复联 4》灭霸打响指，旧语言的字化成灰被吹走，底下露出新语言）。
@@ -53,7 +55,7 @@ type ViewTransitionDocument = Document & { startViewTransition?: (update: () => 
 
 /* ── 换场 ──────────────────────────────── */
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () => lessMotion();
 
 /** 涟漪默认从顶栏的语言轮长出来；顶栏没有语言轮（窄窗口收掉了）时从右上角。 */
 const defaultOrigin = (): AshOrigin => {
@@ -148,18 +150,22 @@ export const switchLocaleWithAsh = async (value: Locale, origin?: AshOrigin, sco
     return;
   }
   const doc = document as ViewTransitionDocument;
-  if (!canUseViewTransitions() || !doc.startViewTransition || reducedMotion()) {
+  /* 别的重特效（信纸化灰）正在放：这次不放涟漪，直接换。 */
+  const release = !canUseViewTransitions() || !doc.startViewTransition || reducedMotion() ? null : claimHeavy('ash-locale');
+  if (!release) {
     localeTarget.value = null;
     setLocale(value);
     return;
   }
   busy = true;
+  beginFrameLog();
   localeTarget.value = value;
   try {
     await ripple(value, origin ?? defaultOrigin(), scope);
   } catch {
     if (locale.value !== value) setLocale(value);
   } finally {
+    release(endFrameLog());
     busy = false;
     const next = queued;
     queued = null;

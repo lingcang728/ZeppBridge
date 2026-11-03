@@ -40,6 +40,16 @@ export interface CoverageLedger {
   failed_chunks_detail: FailedChunk[];
   /** 有块的自动重试次数已用尽，需要用户按「重试失败项」。 */
   needs_manual_retry: boolean;
+  /** 逐月结论（3.1 金继月历）。旧后端没有这个字段。 */
+  months?: MonthSeam[];
+}
+
+/** 一个月压成一个词：`gold` 补拉写进了记录、`crack` 有流失败、`local` 本机本来就有、
+ *  `pending` 排了还没问、`empty` 云端说没有。账本和本机都没有的月份不在列表里。 */
+export interface MonthSeam {
+  /** `YYYY-MM`。 */
+  month: string;
+  state: 'gold' | 'crack' | 'local' | 'pending' | 'empty';
 }
 
 export type BackupKind = 'manual' | 'pre_migration' | 'pre_restore';

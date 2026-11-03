@@ -10,6 +10,15 @@ export interface ReelCopy {
 }
 
 const COPY: Record<LandingLocale, ReelCopy> = {
+  pl: {
+    preparing: 'Przygotowywanie wersji demonstracyjnej',
+    failed: 'Nie udało się kontynuować wersji demonstracyjnej',
+    retry: 'Ponów próbę',
+    replay: 'Odtwórz ponownie',
+    pause: 'Wstrzymaj',
+    play: 'Odtwórz',
+  },
+
   zh: {
     preparing: '正在准备演示',
     failed: '演示暂时未能继续',
@@ -89,6 +98,14 @@ const COPY: Record<LandingLocale, ReelCopy> = {
     replay: 'फिर से चलाएं',
     pause: 'रोकें',
     play: 'चलाएं',
+  },
+  it: {
+    preparing: 'Preparazione della demo',
+    failed: 'Impossibile continuare la demo',
+    retry: 'Riprova',
+    replay: 'Riavvia',
+    pause: 'Pausa',
+    play: 'Riproduci',
   },
 };
 

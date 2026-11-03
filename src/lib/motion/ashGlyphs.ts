@@ -1,4 +1,5 @@
 import { LOCALE_REVEAL_MS } from './timing';
+import { grainBudget } from './performance';
 
 /** 换语言「响指」的取样：把可视区的旧文字变成一粒粒灰（lib/motion/ashSwitch.ts）。
  *
@@ -9,8 +10,7 @@ import { LOCALE_REVEAL_MS } from './timing';
 /** 灰粒寿命：圆扫过以后再各自飘一阵（放慢后飘得更久、更远，收尾减速）。 */
 export const LIFE_MIN = 900;
 export const LIFE_SPAN = 700;
-/** 灰粒上限：超过就按网格隔点取样。 */
-export const MAX_GRAINS = 36000;
+/* 灰粒上限按性能档位和电源给（lib/motion/performance.ts 的 grainBudget），超过就按网格隔点取样。 */
 /** 像素多实才算墨。 */
 export const TEXT_INK = 48;
 
@@ -181,6 +181,30 @@ export const drawVisibleText = (width: number, height: number, scope: Element = 
 };
 
 
+/**
+ * 整块面（信纸）也化灰：按各自的纸色填一块圆角矩形。只取字时，深色主题里纸上的墨字碎成的灰是暗的、看不见，
+ * 纸本身又只被遮罩吃掉——看着像被一个黑圈抹掉，不像烧成灰（2026-10-21 用户：「知道了」后灰烬动效没了）。
+ * 颜色取元素的 `--paper`，没有就取背景色。
+ */
+export const drawSurfaces = (width: number, height: number, surfaces: Element[]): CanvasRenderingContext2D | null => {
+  if (!surfaces.length) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  for (const el of surfaces) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    ctx.fillStyle = cs.getPropertyValue('--paper').trim() || cs.backgroundColor;
+    ctx.beginPath();
+    ctx.roundRect(r.left, r.top, r.width, r.height, Number.parseFloat(cs.borderTopLeftRadius) || 0);
+    ctx.fill();
+  }
+  return ctx;
+};
+
 export type Grains = { data: Float32Array; count: number; size: number };
 
 /** 文字和图表的像素 → 灰粒：位置、颜色、两枚随机数、起飞时刻和寿命（每粒 10 个 float）。 */
@@ -195,7 +219,7 @@ export const grainsOf = (
   let inked = 0;
   for (const { data, ink } of sources) for (let i = 3; i < data.length; i += 4) if (data[i]! > ink) inked += 1;
   if (!inked) return null;
-  const step = Math.max(1, Math.ceil(Math.sqrt(inked / MAX_GRAINS)));
+  const step = Math.max(1, Math.ceil(Math.sqrt(inked / grainBudget())));
   // 隔点取样落在网格上，实际取到的粒数会比 inked / step² 略多：每张来源按一行的量留余地。
   const capacity = Math.ceil(inked / (step * step) + sources.length * (width / step + 2));
   const out = new Float32Array(capacity * 10);

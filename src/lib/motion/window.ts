@@ -46,6 +46,16 @@ export function steadyRadius(from: WindowRect, fromRadius: number, to: WindowRec
   return from.width * from.height <= to.width * to.height ? fromRadius : toRadius;
 }
 
+/** 带着裁切动画的元素此刻在屏幕上看得见的那个框（clip-path 的 inset 从它的布局框里扣掉）。 */
+export function visibleWindow(el: HTMLElement): WindowRect {
+  const box = el.getBoundingClientRect();
+  const clip = getComputedStyle(el).clipPath.match(/^inset\((.*?) round/);
+  const edges = clip?.[1].split(/\s+/).map(Number.parseFloat);
+  if (!edges?.length || edges.some(value => !Number.isFinite(value))) return box;
+  const top = edges[0], right = edges[1] ?? top, bottom = edges[2] ?? top, left = edges[3] ?? right;
+  return { left: box.left + left, top: box.top + top, width: box.width - left - right, height: box.height - top - bottom };
+}
+
 /** 圆角为 0 的那一端：矩形往外多放一个圆角半径，圆弧落到板外，四个角就是方的。 */
 export function bleedRect(rect: WindowRect, radius: number): WindowRect {
   return { left: rect.left - radius, top: rect.top - radius, width: rect.width + radius * 2, height: rect.height + radius * 2 };
@@ -101,8 +111,11 @@ export function windowPoses(from: WindowPose, to: WindowPose): WindowPose[] {
  * 板还停在卡上），新页挂载一占主线程它就停住——改前录屏里「一下变成整屏黑板」也是它。
  *
  * 范围是页面的盒子并上整个可视区（四边各多放一个圆角半径）：形变途中窗口始终落在它里面。
- * 底色分两层：实色 --canvas 铺满；环境光 --ambient 按 `glow`（应用骨架，即 .app-body::before 那一块）的大小和
- * 位置摆——光晕是按盒子大小算的，摆错了落地那一帧颜色会跳。
+ * 底色分两层（2026-10-28：以前只有 --canvas，比卡深一截，卡拷贝淡完、内容还没来的那一段在深色主题下就是一块黑板）：
+ * - 下层是卡的实色（--mat-card-solid）：窗口还小的时候它就是那张卡在长大；
+ * - 上层（第一个子元素，pageFlight 的 plate 动画只动它的透明度）是 --canvas 加环境光，跟着窗口长成整页慢慢盖上来。
+ *   环境光 --ambient 按 `glow`（应用骨架，即 .app-body::before 那一块）的大小和位置摆——光晕是按盒子大小算的，
+ *   摆错了落地那一帧颜色会跳。
  */
 export function pageBackdrop(page: HTMLElement, box: WindowRect, view: WindowRect, glow: WindowRect, radius: number): HTMLElement {
   const bleed = bleedRect(view, radius);
@@ -121,8 +134,10 @@ export function pageBackdrop(page: HTMLElement, box: WindowRect, view: WindowRec
     height: `${r2(bottom - top)}px`,
     zIndex: '-1',
     pointerEvents: 'none',
-    background: 'var(--canvas)',
+    background: 'var(--mat-card-solid)',
   });
+  const canvas = document.createElement('div');
+  Object.assign(canvas.style, { position: 'absolute', inset: '0', overflow: 'hidden', background: 'var(--canvas)' });
   const ambient = document.createElement('div');
   Object.assign(ambient.style, {
     position: 'absolute',
@@ -132,7 +147,8 @@ export function pageBackdrop(page: HTMLElement, box: WindowRect, view: WindowRec
     height: `${r2(glow.height)}px`,
     background: 'var(--ambient)',
   });
-  backdrop.appendChild(ambient);
+  canvas.appendChild(ambient);
+  backdrop.appendChild(canvas);
   page.appendChild(backdrop);
   return backdrop;
 }

@@ -5,10 +5,16 @@ mod auth;
 mod backup;
 pub(crate) mod credential_recovery;
 mod data;
+pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
+mod data_letters;
+mod imports;
+mod letters;
 mod login;
+mod my_records;
 mod official;
 mod status;
 mod sync;
+mod system;
 mod training_plan;
 
 use crate::ipc_error::AppError;
@@ -67,6 +73,15 @@ pub(crate) async fn with_write<T>(
 
 /// 保存新凭据之前核对库归属（代码审查 R06）：库已经属于另一个账号就拒绝，
 /// 什么也不写；空库或同一个账号就认下。旧通道与官方授权共用这一个入口。
+/// 两个 Zepp 账号编号是不是不同的人。任何一边为空都不算对不上——那是还没配置。
+///
+/// 官方授权和高级数据的 user_id 是同一套编号（2026-10-19 用真实库核对过：
+/// 同一账号两边完全相等），可以直接比。
+pub(crate) fn accounts_differ(a: &str, b: &str) -> bool {
+    let (a, b) = (a.trim(), b.trim());
+    !a.is_empty() && !b.is_empty() && a != b
+}
+
 pub(crate) async fn claim_library_for_login(
     data_dir: &Path,
     user_id: &str,
@@ -156,13 +171,13 @@ where
 pub(crate) use ai_clients::{get_mcp_sidecar, save_mcp_bundle};
 pub(crate) use ai_handoff::{ai_handoff_autopaste, ai_handoff_cancel, ai_handoff_copy_file};
 pub(crate) use ai_tasks::{
-    ai_exchange_delete, ai_exchange_list, ai_exchange_rename, ai_profile_save,
-    ai_task_attachment_stat, ai_task_day_strip, ai_task_delete, ai_task_delete_many, ai_task_get,
-    ai_task_list, ai_task_prepare, ai_task_preview, ai_task_save, ai_task_set_pinned,
-    ai_template_delete, ai_template_list, ai_template_save, card_collection_get,
-    card_collection_set,
+    ai_exchange_delete, ai_exchange_list, ai_exchange_rename, ai_profile_save, ai_prompt_export,
+    ai_prompt_import, ai_prompt_versions, ai_task_attachment_stat, ai_task_day_strip,
+    ai_task_delete, ai_task_delete_many, ai_task_get, ai_task_list, ai_task_prepare,
+    ai_task_preview, ai_task_save, ai_task_set_pinned, ai_template_delete, ai_template_list,
+    ai_template_save, card_collection_get, card_collection_set,
 };
-pub(crate) use auth::{clear_auth, manual_auth, verify_auth};
+pub(crate) use auth::{clear_auth, manual_auth, start_fresh_library, verify_auth};
 pub(crate) use backup::{
     cancel_pending_restore, create_manual_backup, get_pending_restore, get_restore_preview,
     list_backups, set_backup_pinned, stage_restore, verify_backup,
@@ -173,31 +188,65 @@ pub(crate) use data::{
     get_heart_rate_series, get_heart_rate_zones, get_hourly_steps, get_metric_baselines,
     get_metric_series, get_recent_sleep, get_recent_workouts, get_sleep_detail, get_sleep_page,
     get_storage_estimate, get_stress_series, get_training_balance, get_unknown_workout_codes,
-    get_user_prefs, get_weekly_report, get_workout_detail, get_workout_insight, get_workout_page,
-    get_workout_series, get_workout_type_options, open_data_folder, prepare_ai_handoff,
-    reprocess_local_data, run_database_integrity_check, save_fit_export, set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, submit_device_model_assignment, submit_diagnostic_report,
+    get_user_prefs, get_weekly_report, get_workout_detail, get_workout_fit_override,
+    get_workout_insight, get_workout_page, get_workout_series, get_workout_type_options,
+    import_workout_fit, metric_exclusions, open_data_folder, open_external_url, prepare_ai_handoff,
+    remove_workout_fit, reprocess_local_data, run_database_integrity_check, save_fit_export,
+    set_device_model_override, set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, submit_device_model_assignment,
+    submit_diagnostic_report,
 };
+pub(crate) use data_letters::{
+    data_letters_open_capsule, data_letters_seal_capsule, data_letters_state,
+};
+pub(crate) use imports::{
+    import_batches, import_workouts, undo_import_batch, workout_import_sources,
+};
+pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{
     cancel_web_login, get_login_status, recover_advanced_credentials, start_web_login,
 };
+pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
-    cancel_official_login, disconnect_official, get_official_status, recover_official_credentials,
+    cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
+    recover_official_credentials,
     start_official_login,
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
-    cancel_sync, get_coverage_ledger, probe_data_capabilities, reset_coverage_ledger,
-    retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
-    start_incremental_sync,
+    cancel_sync, get_coverage_ledger, get_workout_detail_coverage, probe_data_capabilities,
+    reset_coverage_ledger, retry_failed_backfill_chunks, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_workout_detail_backfill,
 };
+pub(crate) use system::system_region_locale;
 
 pub(crate) use training_plan::{
-    training_plan_adherence, training_plan_discard, training_plan_preview, training_plan_publish,
-    training_plan_save_draft, training_plan_set_ai_publish, training_plan_state,
-    training_plan_update_draft,
+    training_plan_adherence, training_plan_discard, training_plan_history, training_plan_preview,
+    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
+    training_plan_state, training_plan_update_draft,
 };
+
+mod coach_notes;
+pub(crate) use coach_notes::{
+    coach_note_add, coach_note_decide, coach_note_delete, coach_note_edit, coach_notes_export,
+    coach_notes_list,
+};
+
+mod feedback;
+pub(crate) use feedback::{
+    workout_feedback_adjusted, workout_feedback_dismiss, workout_feedback_get,
+    workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
+    workout_feedback_toast_due, workout_feedback_toast_show,
+};
+
+mod logbook;
+pub(crate) use logbook::{
+    injuries_list, injury_delete, injury_save, personal_records, race_delete, race_save,
+    races_list, shoe_delete, shoe_save, shoes_overview, workout_feel_get, workout_feel_save,
+};
+
+mod rings;
+pub(crate) use rings::{annual_rings, rings_save_image};
 
 mod life_events;
 pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};

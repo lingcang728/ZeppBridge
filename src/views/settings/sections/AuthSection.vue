@@ -5,21 +5,22 @@ import CredentialRecovery from '../../../components/CredentialRecovery.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
-import { useMessages } from '../../../i18n';
+import { locale, useMessages } from '../../../i18n';
+import { openFaq } from '../../../lib/faqLink';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const {
-  reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly,
+  reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly, needsReauth,
   showManualAuth, manualAppToken, manualUserId, manualRegionHost, manualAuthBusy,
   startLogin, cancelLogin, submitManualAuth, recoverCredentials,
 } = useSettingsContext().auth;
 const official = useSettingsContext().official;
 
 const needsAttention = computed(() =>
-  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value
+  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value || needsReauth.value
   || official.waiting.value || Boolean(official.failureText.value) || official.needsReauth.value
   || !(connected.value || configuredOnly.value || official.connected.value));
 </script>
@@ -43,6 +44,7 @@ const needsAttention = computed(() =>
           <span class="s-row-sub">{{ official.waiting.value ? t.officialWaiting : t.officialSub }}</span>
           <span v-if="official.connected.value" class="s-row-sub">{{ t.officialNote }}</span>
           <span v-if="official.waiting.value && official.status.value.authorize_url" class="s-row-sub">{{ t.copyAuthLinkHint }}</span>
+          <button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button>
         </div>
         <div class="s-row-control">
           <template v-if="official.waiting.value">
@@ -58,6 +60,7 @@ const needsAttention = computed(() =>
           <button v-else class="button primary" type="button" :disabled="official.busy.value" @click="official.start">
             {{ official.busy.value ? t.authOpening : official.needsReauth.value ? t.officialReauth : t.officialConnect }}
           </button>
+          <button v-if="!official.connected.value && !official.waiting.value && official.status.value.user_id_masked" class="button secondary" type="button" :disabled="official.busy.value" @click="official.disconnect">{{ t.officialDisconnect }}</button>
         </div>
       </div>
       <div class="s-row">
@@ -89,15 +92,15 @@ const needsAttention = computed(() =>
       <div v-if="showManualAuth" class="s-row is-block manual-auth-form">
         <p class="s-row-sub">{{ t.manualFormHint }}</p>
         <label class="form-group">
-          <span>App Token *</span>
+          <span>{{ t.manualTokenLabel }} *</span>
           <input id="manual-apptoken" v-model="manualAppToken" class="mat-field mono" type="password" autocomplete="off" :placeholder="t.manualTokenPlaceholder" :disabled="manualAuthBusy" />
         </label>
         <label class="form-group">
-          <span>User ID *</span>
+          <span>{{ t.manualUserIdLabel }} *</span>
           <input id="manual-userid" v-model="manualUserId" class="mat-field mono" type="text" :placeholder="t.manualUserIdPlaceholder" :disabled="manualAuthBusy" />
         </label>
         <label class="form-group">
-          <span>Region Host *</span>
+          <span>{{ t.manualRegionHostLabel }} *</span>
           <input id="manual-host" v-model="manualRegionHost" class="mat-field mono" type="text" placeholder="https://api-mifit-us3.zepp.com" :disabled="manualAuthBusy" />
         </label>
         <div class="s-actions">
@@ -129,6 +132,7 @@ const needsAttention = computed(() =>
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
+.auth-fold { display: block; }
 .auth-fold > summary { cursor: pointer; list-style: none; }
 .auth-fold > summary::-webkit-details-marker { display: none; }
 .fold-caret { color: var(--subtle); transition: transform var(--dur-base) var(--ease-out); }
@@ -145,8 +149,10 @@ const needsAttention = computed(() =>
   color: var(--muted);
 }
 .auth-icon.current { color: var(--accent); }
-.manual-auth-form { gap: 10px; }
-.form-group { display: grid; gap: 4px; }
-.form-group > span { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.manual-auth-form { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.manual-auth-form > .s-row-sub { margin: 0; overflow-wrap: anywhere; }
+.form-group { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 4px; }
+.form-group > span { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
+.form-group > .mat-field { min-width: 0; }
 .mono { font-family: var(--font-mono); }
 </style>
