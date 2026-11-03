@@ -11,14 +11,14 @@ export interface UpdateReceipt {
 const KEY = 'zeppbridge.update.receipt';
 const VERSION_KEY = 'zeppbridge.update.lastLaunchedVersion';
 /** 随应用打包了更新说明的版本。发版时和下面 glob 里的目录一起改。 */
-export const BUNDLED_VERSION = '3.1.0';
+export const BUNDLED_VERSION = '3.1.1';
 
 /*
  * 本版更新说明随应用打包，一种界面语言一个文件（docs/releases/<版本>/<locale>.md），
  * 懒加载：只在弹窗出现时取当前语言那一份。以前只拆 `## 中文 / ## English`，
  * 其余十种语言全回落英文。tests 里有门禁：当前版本十二种语言必须齐全。
  */
-const BUNDLED_NOTES = import.meta.glob('../../docs/releases/3.1.0/*.md', {
+const BUNDLED_NOTES = import.meta.glob('../../docs/releases/3.1.1/*.md', {
   query: '?raw', import: 'default',
 }) as Record<string, () => Promise<string>>;
 
@@ -105,11 +105,11 @@ export function releaseRows(notes: string): NoteRow[] {
   return notes.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
     const heading = /^#{1,6}\s/.test(line);
     let text = line.replace(/^#{1,6}\s+/, '').replace(/^[-*+]\s+/, '');
-    const match = /^(新增|新功能|Added|New|改进|优化|Improved|Changed|修复|Fixed|Fix)\s*[:：]\s*/i.exec(text);
+    const match = /^(新增|新功能|Added|New|改进|改進|优化|Improved|Changed|修复|修復|Fixed|Fix)\s*[:：]\s*/i.exec(text);
     let kind: NoteKind = 'note';
     if (match) {
       kind = /^(新增|新功能|Added|New)$/i.test(match[1]!) ? 'added'
-        : /^(修复|Fixed|Fix)$/i.test(match[1]!) ? 'fixed' : 'improved';
+        : /^(修复|修復|Fixed|Fix)$/i.test(match[1]!) ? 'fixed' : 'improved';
       text = text.slice(match[0].length);
     }
     return { text, kind, heading };
