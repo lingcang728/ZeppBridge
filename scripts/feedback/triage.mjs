@@ -14,7 +14,7 @@
  *   node scripts/feedback/triage.mjs codes            未知运动编号汇总
  *   node scripts/feedback/triage.mjs rejections       云端业务错误码（HTTP 200 但说不成功）
  *   node scripts/feedback/triage.mjs corrections      用户的运动类型纠正（认错了的编号）
- *   node scripts/feedback/triage.mjs devices          用户指认的型号 -> deviceSource 汇总
+ *   node scripts/feedback/triage.mjs devices          反馈里的 deviceSource × 当前目录（哪些仍认不出）
  *   node scripts/feedback/triage.mjs list <status>    列出某个状态的报告 id
  *   node scripts/feedback/triage.mjs mark <status> <id...>   改状态
  *
@@ -245,50 +245,54 @@ const corrections = () => {
   console.log('改运动目录的规则没变：至少两份互相独立的报告，且没有分歧；改完必须推 NORMALIZER_REVISION。');
 };
 
+/**
+ * 设备报表：反馈里带的 deviceSource 编号，对着当前目录（以 Zepp 官方对照表为主）。
+ *
+ * 3.1.1 起不再收用户指认（众包冻结），这里只回答两件事：哪些编号现在已经认得出
+ * （官方表 / 冻结的众包），哪些仍然认不出——后者等官方表更新或有了产品名再补，
+ * 不靠投票。旧报告里的 deviceType 族码一律不看。
+ */
 const devices = () => {
-  const rows = query("SELECT id, user_assigned_models_json FROM feedback_reports WHERE user_assigned_models_json <> '[]'");
-  // hint -> catalogId -> 报告数
-  const byHint = new Map();
-  for (const row of rows) {
-    for (const entry of parseJson(row.user_assigned_models_json, [])) {
-      const catalogId = entry?.catalogId;
-      if (!catalogId) continue;
-      for (const hint of entry.modelIdentifierHints ?? []) {
-        const names = byHint.get(hint) ?? new Map();
-        names.set(catalogId, (names.get(catalogId) ?? 0) + 1);
-        byHint.set(hint, names);
-      }
+  const catalog = JSON.parse(readFileSync(new URL('../../src/assets/devices/catalog.json', import.meta.url), 'utf8'));
+  const known = new Map();
+  for (const entry of catalog.devices) {
+    for (const code of entry.device_source_codes ?? []) {
+      const official = (entry.device_source_official ?? []).includes(code);
+      known.set(code, `${entry.catalog_id}${official ? '' : ' (众包冻结)'}`);
     }
   }
-
-  const rowsOut = [];
-  for (const [hint, names] of byHint) {
-    const sorted = [...names.entries()].sort((a, b) => b[1] - a[1]);
-    const total = sorted.reduce((sum, [, count]) => sum + count, 0);
-    const [topName, topCount] = sorted[0];
-    rowsOut.push({
-      hint,
-      reports: total,
-      distinct_models: sorted.length,
-      top: `${topName} (${topCount})`,
-      eligible: eligibility(hint, sorted),
-    });
+  const rows = query(
+    'SELECT app_version, device_evidence_json FROM feedback_reports WHERE unknown_device_count > 0',
+  );
+  // 编号 -> { 报告数, 最早 / 最新版本 }
+  const byCode = new Map();
+  for (const row of rows) {
+    const evidence = parseJson(row.device_evidence_json, {});
+    const codes = new Set((evidence.modelIdentifierHints ?? [])
+      .map((hint) => /^deviceSource:(\d+)$/.exec(hint)?.[1])
+      .filter(Boolean)
+      .map(Number));
+    for (const code of codes) {
+      const stat = byCode.get(code) ?? { reports: 0, versions: new Set() };
+      stat.reports += 1;
+      stat.versions.add(row.app_version);
+      byCode.set(code, stat);
+    }
   }
-  table(rowsOut.sort((a, b) => b.reports - a.reports));
-  console.log('\n收录规则见 DEVICE_SOURCE_CODES（scripts/assets/build-device-catalog.py）：');
-  console.log('  只收 deviceSource，绝不收 deviceType；只收 >= 1000000；每个编号至少两份独立报告；');
-  console.log('  冲突项人工裁决，裁不下来的不写。eligible=review 的需要人看，不是自动通过。');
-};
-
-/** 一个编号够不够格进目录。只回答「能不能自动排除」，剩下的一律交给人。 */
-const eligibility = (hint, sorted) => {
-  const match = /^deviceSource:(\d+)$/.exec(hint);
-  if (!match) return 'no (不是 deviceSource)';
-  if (Number(match[1]) < 1_000_000) return 'no (低位段自相矛盾)';
-  const total = sorted.reduce((sum, [, count]) => sum + count, 0);
-  if (total < 2) return 'no (只有一份报告)';
-  if (sorted.length === 1) return 'yes';
-  return 'review (多个型号)';
+  const rowsOut = [...byCode.entries()].map(([code, stat]) => ({
+    deviceSource: code,
+    reports: stat.reports,
+    versions: [...stat.versions].sort().join(' '),
+    now: known.get(code) ?? '仍认不出',
+  }));
+  const unknown = rowsOut.filter((row) => row.now === '仍认不出').sort((a, b) => b.reports - a.reports);
+  const resolved = rowsOut.filter((row) => row.now !== '仍认不出').sort((a, b) => b.reports - a.reports);
+  console.log(`仍认不出的编号（${unknown.length}）：`);
+  table(unknown);
+  console.log(`\n现在已经认得出的编号（${resolved.length}）：`);
+  table(resolved);
+  console.log('\n目录以 Zepp 官方 deviceSource 对照表为准（scripts/assets/build-device-catalog.py 的 OFFICIAL_DEVICE_SOURCE_CODES）；');
+  console.log('仍认不出的先去核官方表有没有更新，不按指认票数收。');
 };
 
 const list = (status) => {

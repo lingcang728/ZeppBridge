@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { launchSyncIsDue } from '../autoSync';
+import { autoSyncBackoffElapsed, autoSyncRetryMinutes, launchSyncIsDue, nextAutoSyncFailures } from '../autoSync';
 
 /*
  * 「每次打开 ZeppBridge 都在重新同步账号。」（2026-09-04 的用户反馈）
@@ -12,6 +12,30 @@ import { launchSyncIsDue } from '../autoSync';
  * 下面这组用例钉住的是新规则本身：**看的是离上次成功同步过去了多久，
  * 不是这次是不是启动**。关掉五分钟再打开不该同步；隔了一天再打开该同步。
  */
+describe('auto sync backoff', () => {
+  it('retries after 1 / 2 / 4 / 8 minutes, capped at the interval', () => {
+    expect([0, 1, 2, 3, 4, 5, 9].map((n) => autoSyncRetryMinutes(n, 15))).toEqual([15, 1, 2, 4, 8, 8, 8]);
+    expect(autoSyncRetryMinutes(4, 60)).toBe(8);
+  });
+
+  it('waits the backoff after a failure instead of a whole interval', () => {
+    const now = Date.UTC(2026, 10, 3, 8, 0);
+    expect(autoSyncBackoffElapsed(0, 0, 15, now)).toBe(true);
+    expect(autoSyncBackoffElapsed(now - 60_000, 1, 15, now)).toBe(true);
+    expect(autoSyncBackoffElapsed(now - 60_000, 2, 15, now)).toBe(false);
+    // 没失败：照旧等满整个间隔。
+    expect(autoSyncBackoffElapsed(now - 10 * 60_000, 0, 15, now)).toBe(false);
+    expect(autoSyncBackoffElapsed(now - 15 * 60_000, 0, 15, now)).toBe(true);
+  });
+
+  it('only a failed run counts as a failure', () => {
+    expect(nextAutoSyncFailures(2, 'failed')).toBe(3);
+    for (const outcome of ['success', 'no_new_data', 'cloud_stale', 'deferred', 'cancelled', null]) {
+      expect(nextAutoSyncFailures(2, outcome)).toBe(0);
+    }
+  });
+});
+
 describe('launchSyncIsDue', () => {
   const now = new Date('2026-09-04T12:00:00Z').getTime();
   const minutesAgo = (minutes: number) =>

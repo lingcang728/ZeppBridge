@@ -9,6 +9,7 @@
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
 import { onActivated, onMounted, shallowRef } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import YearDashboard from '../components/journal/year/YearDashboard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import EpochSection from '../components/journal/EpochSection.vue';
@@ -33,6 +34,8 @@ onActivated(() => { void logbook.load(); });
 type Editing = ({ kind: 'race'; value: RaceInput } | { kind: 'shoe'; value: ShoeInput } | { kind: 'injury'; value: InjuryInput }) & { origin?: HTMLElement } | null;
 const editing = shallowRef<Editing>(null);
 const close = () => { editing.value = null; logbook.error.value = null; };
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('journal');
 </script>
 
 <template>

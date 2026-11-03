@@ -356,16 +356,16 @@ export default {
       confirm: 'Dit is mijn apparaat',
       clear: 'Keuze intrekken',
       later: 'Niet nu',
-      contributeTitle: 'Help de volgende release dit apparaat zelf te herkennen',
-      contributeBody:
-        'Stuurt naar ZeppBridge het door jou gekozen model plus de modelnummers van dit apparaat (deviceSource / deviceType, alleen gehele getallen). Beide zeggen alleen welk model het is — geen account, serienummer, MAC of gezondheidsgegevens. Huami publiceert geen nummertabel; dit is de enige manier waarop de ingebouwde catalogus groeit. Wijzen een paar mensen hetzelfde model aan, dan wordt het voor iedereen automatisch herkend.',
-      note: 'Jouw keuze verschijnt als ‘Door jou gekozen model’ en wordt nooit als automatische match voorgedaan. Afbeeldingen en modelnamen komen uit de meegeleverde catalogus; erin bladeren raakt geen netwerk.',
+      pickPrompt: 'Blader erdoorheen of zoek je model',
+      note:
+        'Je keuze wordt gelabeld als ‘Door jou gekozen model’, nooit als automatische match. Deze blijft alleen op deze computer; afbeeldingen en namen komen uit de meegeleverde catalogus en bij het bladeren wordt geen netwerk gebruikt.',
       filterAll: 'Alles',
       filterWatch: 'Horloges',
       filterBand: 'Bands',
       filterStrap: 'Bandjes',
       filterRing: 'Ringen',
       filterEarbuds: 'Oordopjes',
+      filterScale: 'Weegschalen',
     },
     'components/DeviceVisual': {
       watch: 'Horloge',
@@ -832,6 +832,7 @@ export default {
       notFetchedYet: 'Nog niet opgehaald',
       timeUnknown: 'Tijd onbekend',
       unidentifiedDevice: 'Niet-herkend apparaat',
+      genericScale: 'Weegschaal voor lichaamssamenstelling',
       notProvided: 'Niet verstrekt',
       identifyUnavailable: 'Apparaatherkenning nu niet beschikbaar',
       cacheUnavailable: 'Apparaatcache nu niet beschikbaar',
@@ -840,12 +841,8 @@ export default {
       assignmentCleared: 'Modelaanwijzing ingetrokken; terug naar automatische herkenning.',
       assignmentSaved:
         'Je keuze is opgeslagen. Hij verschijnt als ‘Door jou gekozen model’ — nooit als automatische match voorgedaan.',
-      assignmentContributed: (reportId: string) =>
-        `Modelaanwijzing opgeslagen; de modelnummers gingen naar ZeppBridge (${reportId}). De volgende catalogus herkent dit model vanzelf.`,
-      assignmentContributionFailed: (reason: string) =>
-        `Modelaanwijzing opgeslagen (alleen lokaal). De catalogusbijdrage is niet verstuurd: ${reason}`,
-      networkUnavailable: 'Netwerk niet beschikbaar',
       assignmentFailed: 'De modelkeuze kon niet worden opgeslagen',
+      hideFailed: 'Dit apparaat kon niet worden verborgen of hersteld',
     },
     'composables/useSyncController': {
       cleanupFailed: 'Het opruimen van oude gegevens is niet voltooid; de database blijft groeien',
@@ -1066,6 +1063,7 @@ export default {
       aerobic_combo: 'Aerobe combo',
       aerobics: 'Aerobics',
       air_walker: 'Airwalker',
+      alpine_skiing: 'Alpineskiën',
       archery: 'Boogschieten',
       artistic_swimming: 'Synchroonzwemmen',
       badminton: 'Badminton',
@@ -1145,6 +1143,7 @@ export default {
       mountain_biking: 'Mountainbiken',
       muay_thai: 'Muay Thai',
       open_water_swimming: 'Openwaterzwemmen',
+      padel: 'Padel',
       parallel_bars: 'Brug',
       parkour: 'Parkour',
       pilates: 'Pilates',
@@ -1171,6 +1170,7 @@ export default {
       square_dance: 'Squaredance',
       squash: 'Squash',
       stair_climber: 'Traptrainer',
+      stair_climbing: 'Trapklimmen',
       stepper: 'Stepper',
       street_dance: 'Streetdance',
       strength: 'Krachttraining',
@@ -1474,20 +1474,14 @@ export default {
       mcpConfigCopied:
         'Config gekopieerd. Vervang command door het echte pad naar zeppbridge-mcp op je machine.',
       mcpConfigCopyFailed: 'Kopiëren mislukt — selecteer de config hierboven zelf.',
-      mcpConfigPathPlaceholder: '<pad naar zeppbridge-mcp>',
-      mcpCopyConfig: 'Alleen het config-fragment kopiëren',
-      mcpCopyPrompt: 'Kopieer dit en vraag het je AI',
-      mcpPromptCopied:
-        'Gekopieerd. Plak het bij je AI — die geeft de configuratiestappen voor jouw machine.',
-      mcpPromptCopyFailed: 'Kopiëren mislukt — selecteer de tekst hierboven zelf.',
       mcpSetupPrompt: `Ik gebruik een Windows-desktopapp genaamd ZeppBridge die gegevens van mijn Amazfit / Zepp-horloge synchroniseert naar een lokale SQLite-database.
 Er hoort een MCP-programma bij (zeppbridge-mcp) en dat wil ik met jou configureren, zodat je mijn trainingen en gezondheidsgegevens direct kunt opvragen in plaats van dat ik ze telkens moet exporteren en plakken.
 
 Wat ik erover weet:
-- Het MCP-programma is te vinden in het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; pak het uit en zeppbridge-mcp zit erin. Misschien heb ik het nog niet gedownload.
+- zeppbridge-mcp wordt samen met ZeppBridge geïnstalleerd, direct naast het hoofdprogramma; ZeppBridge toont het volledige pad onder Instellingen › AI-tools. Alleen een computer zonder de desktopapp heeft het zeppbridge-tools-archief nodig van de GitHub Releases-pagina van ZeppBridge.
 - Het is een stdio MCP-server. Gezondheidsgegevens zijn alleen-lezen, de server luistert niet op een poort en vereist geen token of API-sleutel; er is alleen netwerkverbinding nodig om een trainingsplan te publiceren, en alleen nadat ik dat heb toegestaan.
 - De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het programma biedt vijftien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen); en propose_coach_note: plaatst een zin die het waard is om te onthouden in de inbox van mijn coachnotities en wordt pas actief nadat ik op Onthouden tik.
+- Het programma biedt zestien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records, get_baselines), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen); en propose_coach_note: plaatst een zin die het waard is om te onthouden in de inbox van mijn coachnotities en wordt pas actief nadat ik op Onthouden tik.
 
 Vertel me:
 1. Specifiek voor jou — de tool waarmee ik nu praat — in welk bestand de configuratie moet of met welk commando ik hem toevoeg;
@@ -1495,6 +1489,12 @@ Vertel me:
 3. Hoe ik kan controleren of het werkt zodra het is geconfigureerd.
 
 Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat), vraag het gerust.`,
+      mcpConfigPathPlaceholder: '<pad naar zeppbridge-mcp>',
+      mcpCopyConfig: 'Alleen het config-fragment kopiëren',
+      mcpCopyPrompt: 'Kopieer dit en vraag het je AI',
+      mcpPromptCopied:
+        'Gekopieerd. Plak het bij je AI — die geeft de configuratiestappen voor jouw machine.',
+      mcpPromptCopyFailed: 'Kopiëren mislukt — selecteer de tekst hierboven zelf.',
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
       mcpToolWorkoutDetail: "Alle opgeslagen samenvattingsvelden en hartslagzones van één training",
       mcpToolWorkoutSeries: "Meetpunten, route, splits en ronden van één training",
@@ -1542,9 +1542,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       privacyPoint5:
         'de hele codebase is open, zonder verborgen naar-huis-bel-logica.',
       privacyPoint5Title: '5. Overal open source: ',
-      privacyReportBody:
-        'Geen GitHub-account of gekopieerde gegevens nodig. Na bevestiging gaan alleen de veldstructuur op productniveau, firmwareversie, modelnummers (gehele getallen — alleen welk model), onbekende trainingscodes en hun aantallen naar de private foutrapportopslag van ZeppBridge; nooit account, tokens, serienummers, apparaat-id\'s, MAC, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
       privacyReportTitle: 'Een apparaat of training niet herkend?',
+      privacyReportBody:
+        'Geen GitHub-account, geen gegevens kopiëren. Na bevestiging gaan alleen veldstructuren op productniveau, modelnummers van niet-herkende apparaten (gehele getallen — alleen welk model) en onbekende trainingscodes met hun aantallen naar de privé-rapportopslag van ZeppBridge. Nooit account, tokens, serienummers, apparaat-id\'s, MAC, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
       privacyTelemetryBody:
         'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf ‘Een foutrapport versturen’ indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
       privacyTelemetryTitle: 'Geen telemetrie, geen gebruiksstatistieken',
@@ -1588,12 +1588,12 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         },
       },
       reportCategoryAria: 'Type probleem om te melden',
-      reportConfirm:
-        'Dit verstuurt alleen de app-versie, het type OS, de parserrevisie, hints op productniveau en de veldstructuur van niet-herkende apparaten, firmwareversie, modelnummers (deviceSource / deviceType — alleen gehele getallen, die beschrijven welk model, niet welk exemplaar), onbekende trainingscodes en hun aantallen, de numerieke foutcode van het laatste door de cloud geweigerde verzoek (alleen nummer, welke stroom en wanneer — zonder de tekst die de cloud teruggaf), plus de notitie die je schreef (lokale paden, e-mailadressen en lange identificaties worden automatisch weggestript). Nooit verstuurd: je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
       reportDoneLine: (id: string, at: string) => `Rapport ${id}, verstuurd op ${at}.`,
       reportDoneNote:
         'Verstuurd zijn precies de veldtypen hierboven plus je notitie — verder niets.',
       reportDoneTitle: 'Ontvangen, bedankt',
+      reportConfirm:
+        'Er wordt alleen verzonden: app-versie, systeemtype, parserrevisie, veldstructuren, producthints en modelnummers van niet-herkende apparaten (deviceSource — gehele getallen die beschrijven welk model, niet welk exemplaar), onbekende trainingscodes en aantallen, de numerieke foutcode van het meest recente door de cloud geweigerde verzoek (alleen het nummer, welke stroom en tijd — nooit de geretourneerde tekst), en je toelichting (lokale paden, e-mailadressen en lange identificaties automatisch verwijderd). Nooit je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
       reportFailed: 'Het foutrapport kon niet worden verstuurd',
       reportNote: 'Extra toelichting',
       reportNoteCounter: (used: number, max: number) =>
@@ -1798,6 +1798,13 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       originNoMatchCloud: 'Geen match (de cloud gaf geen herkenbare productnaam)',
       originCatalog: 'Gematcht in de ingebouwde catalogus',
       originNoMatch: 'Geen match',
+      hideAria: 'In de apparatenlijst verbergen',
+      hideTitle: 'Liever niet in de lijst zien?',
+      hideSub:
+        'Verbergt het alleen in de apparatenlijst — de gegevens blijven bewaard en grafieken en exports veranderen niet.',
+      hideAction: 'In de apparatenlijst verbergen',
+      hiddenNote: 'Verborgen in de apparatenlijst; de gegevens blijven ongewijzigd.',
+      unhideAction: 'Weer in de apparatenlijst tonen',
     },
     'views/HealthCheck': {
       window30: 'Afgelopen 30 dagen',
@@ -2727,7 +2734,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       activityInlineSkating: 'Inlineskaten', activityCrossCountrySkiing: 'Langlaufen',
       variantOutdoorRun: 'Hardlopen buiten', variantTreadmill: 'Loopband', variantTrack: 'Baanlopen',
       variantOutdoorRide: 'Fietsen buiten', variantIndoorRide: 'Indoor fietsen',
-      variantTrail: 'Trailrunning', variantMountain: 'Mountainbiken',
+      variantTrail: 'Hardlopen · trail', variantMountain: 'Mountainbiken',
       variantPick: (name: string) => `Je horloge vraagt opnieuw om het type: kies '${name}'.`,
       variantPickAny: 'Je horloge vraagt opnieuw om het precieze type. Plannen van derden geven alleen de sportcategorie door; dat is een beperking van Zepp.',
       heldBadge: 'Niet naar horloge te sturen',
@@ -2746,6 +2753,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       'ui.training_plan.issue.bad_target': (p: Params) => `Dit doel is niet leesbaar: “${String(p.value ?? '')}”. Schrijf bijvoorbeeld hr 135-150, pace 5:30-5:50 of power 200-220`,
       'ui.training_plan.issue.description_too_long': (p: Params) => `Een trainingsbeschrijving mag maximaal ${String(p.max ?? '')} tekens bevatten`,
       'ui.training_plan.issue.distance_out_of_range': () => 'Elke stap moet tussen 50 m en 100 km lang zijn',
+      'ui.training_plan.issue.pool_distance_out_of_range': () => 'Elke stap in het zwembad moet tussen 25 m en 100 km lang zijn',
+      'ui.training_plan.issue.swim_pace_unsupported': () => 'Zwemmen ondersteunt nog geen tempodoel: gebruik een hartslagbereik of geen doel',
       'ui.training_plan.issue.distance_unverified': () => 'Stappen op basis van afstand zijn nog niet op je horloge geverifieerd; tijd invoeren is voorlopig betrouwbaarder',
       'ui.training_plan.issue.duration_out_of_range': () => 'Elke stap moet tussen 10 seconden en 6 uur duren',
       'ui.training_plan.issue.empty': () => 'Het plan bevat geen trainingen. Geef een begin- en einddatum op om dagen leeg te maken',
@@ -2780,6 +2789,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       'ui.training_plan.issue.focus_too_long': (p: { max?: number }) => 'Het trainingsdoel moet kort zijn en mag niet langer zijn dan ' + String(p.max ?? '') + ' tekens.',
       'ui.training_plan.issue.missing_description': () => 'Vul de trainingspunten in; deze verschijnen in de beschrijving op het horloge.',
       'ui.training_plan.issue.name_truncated': (p: { max?: number }) => `De naam is langer dan ${String(p.max ?? '')} tekens en wordt in de horlogelijst afgekapt (de volledige naam staat wel in de details).`,
+      pastDays: (p: { days?: unknown }) => `${String(p.days ?? '')} zijn al verstreken; trainingen op die dagen worden niet naar het horloge gestuurd`,
     },
     'components/plan/editor': {
       byTime: 'Op tijd', byDistance: 'Op afstand', targetHr: 'Hartslag', targetPace: 'Tempo', targetPower: 'Vermogen', targetOpen: 'Geen',
@@ -2958,6 +2968,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       exchanges: (count: number) => plural(count, { one: '1 interactie', other: `${count} interacties` }),
       mcpPill: 'Verbind Claude, Codex en meer',
       mcpPillHint: 'Laat AI-tools je lokale gegevens rechtstreeks via MCP lezen, zonder kopiëren en plakken',
+      guidePill: 'Hoe het werkt',
+      guidePillHint: 'Open de gids voor overdracht aan AI in je browser',
       autoTip: 'Automatisch: plak en verstuur volgende keer voor mij',
       autoTipClose: 'Niet meer tonen',
       resetCards: 'Kaarten herstellen',
@@ -3100,7 +3112,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         'Bespreek het plan eerst met mij en sta meerdere aanpassingsrondes toe. Geef pas definitieve JSON voor het trainingsplan wanneer ik uitdrukkelijk zeg “definitief” of “stuur het plan”: ',
         'Voeg een ```json-codeblok in het onderstaande formaat toe aan je antwoord. ZeppBridge leest het, ik controleer het en daarna wordt het naar mijn horloge gestuurd.',
         '- date heeft het formaat YYYY-MM-DD, vandaag of later, maximaal 56 dagen vooruit. from / to geven het datumbereik van dit plan aan: dagen zonder training binnen dat bereik gelden als rustdagen en bestaande plannen op die dagen worden gewist. Zonder deze velden loopt het bereik van de vroegste tot de laatste trainingsdatum.',
-        '- Het horloge accepteert alleen deze 4 sporten: running (variant: outdoor / treadmill / track), cycling (variant: outdoor / indoor), pool_swim en open_water_swim (zwemmen heeft geen variant). Het horloge vraagt me het subtype opnieuw te kiezen, dus vul variant correct in.',
+        '- Het horloge accepteert alleen deze 4 sporten: running (variant: outdoor / treadmill / track / trail; het horloge heeft geen optie voor trailrunning, dus trail herinnert eraan om het als hardlopen te starten), cycling (variant: outdoor / indoor), pool_swim en open_water_swim (geen variant voor zwemmen). Het horloge zal me opnieuw om het subtype vragen, dus geef de variant juist op.',
         '- Wandelen, hiken, krachttraining, yoga en vergelijkbare activiteiten kunnen niet naar het horloge worden gestuurd (Zepp laat ze ongemerkt vallen). Zeg tijdens het overleg duidelijk dat zo’n training “niet naar het horloge kan” en laat mij kiezen of ik die vervang door een bovenstaande sport of weglaat. Verstop die nooit in een rustnotitie.',
         '- Elke training heeft focus nodig (het doel, een korte frase zoals “Uithoudingsvermogen opbouwen” of “Drempel”) en description (de belangrijkste punten in één of twee zinnen; gebruik \n voor een nieuwe regel). Beide verschijnen op het horloge, met “doel · subtype” als eerste regel.',
         '- Houd name binnen ongeveer 14 tekens; langere namen worden afgekapt in de horlogelijst.',
@@ -3120,6 +3132,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         rideName: 'Lange rustige fietstocht', rideFocus: 'Uithoudingsvermogen opbouwen',
         rideDescription: 'Cadans 85–95; jaag je hartslag niet omhoog op beklimmingen',
       },
+      swim: '- Zwemafstanden zijn in meters; elke stap in het zwembad is minimaal 25 m (idealiter een geheel veelvoud van de baanlengte die op het horloge is ingesteld). Zwemmen heeft geen tempodoel: gebruik een hartslagbereik of geen doel.',
       language: (lang: string) => `- Schrijf name, focus, description, summary en note in het ${lang}: ze worden exact zo getoond in ZeppBridge en op het horloge.`,
     },
     'views/settings/accountConflict': {
@@ -3158,6 +3171,14 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       deviceCheck: 'Verkeerd model? Klik om te wijzigen',
       unknownShort: 'Een apparaat is niet herkend: klik erop om het model aan te wijzen, of stuur een rapport in om het toe te voegen',
       learnMore: 'Meer informatie',
+      hideDevice: 'Verbergen',
+      hideConfirm:
+        'Verbergt het alleen in deze lijst — de gegevens blijven bewaard en grafieken en exports veranderen niet.',
+      hideConfirmYes: 'Verberg het',
+      hideCancel: 'Annuleren',
+      hiddenCount: (n: number) =>
+        plural(n, { one: '1 verborgen', other: `${n} verborgen` }),
+      restoreDevice: 'Weer tonen',
     },
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisatie',
@@ -3229,6 +3250,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       connectSub: 'De eerste twee kopiëren een paar commando’s om in een terminal te plakken; Claude Desktop slaat een extensie op die je met een dubbelklik installeert',
       connectTitle: 'Verbinden met een AI-tool',
       otherClients: 'Andere clients',
+      cliTitle: 'Opdrachtregelprogramma',
+      cliCopy: 'Pad kopiëren',
+      cliCopied: 'Pad gekopieerd',
       publishOff: 'Uit: AI kan alleen concepten maken; je bevestigt op de pagina ‘Naar de AI’ voordat iets je horloge bereikt',
       publishOn: 'Aan: met jouw toestemming kan AI plannen direct naar je horloge sturen; bestaande plannen worden nooit gewist',
       publishTitle: 'AI direct trainingsplannen laten publiceren',
@@ -3419,101 +3443,105 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       how: 'Experimentele bloeddruksynchronisatie: accepteert expliciete meetwaardeparen. Kandidaat-eindpunten moeten nog worden gecontroleerd met een account dat meet. Methode en kalibratie blijven in het ruwe antwoord bewaard.',
     },
     'components/tour/tour': {
+      cardTitle: 'Rondleiding',
       chapter: {
-        whatsnew: 'Wat is nieuw in V3',
-        basics: 'Taal en thema',
-        connect: 'Account koppelen',
-        overview: 'Overzicht',
-        detail: 'Detailpagina’s',
-        pick: 'Dagen kiezen',
-        handoff: 'Aan AI overdragen',
-        plan: 'Trainingsschema’s',
+        ai: 'Naar AI sturen',
+        devices: 'Apparaten & gegevensstatus',
+        home: 'Overzicht',
+        intro: 'Aan de slag',
+        journal: 'Logboek & jaarringen',
+        letters: 'Brievenbus',
+        metric: 'Statistieken & dagen kiezen',
+        plan: 'Trainingsplannen',
         settings: 'Instellingen',
-        cards: 'Kaarttafel',
-        box: 'Verzamelbox',
-        check: 'Controle vóór verzenden',
-        planFirst: 'Trainingsschema’s',
+        sleep: 'Slaap',
+        workouts: 'Workouts',
       },
-      steps: {
-        whatsnew: {
-          s1: 'Het overzicht toont alleen de door jou gekozen meetwaarden en markeert afwijkingen van je gebruikelijke niveau.',
-          s2: 'Geef enkele dagen aan gegevens door aan een AI en haal het trainingsschema op.',
-          s3: 'Een opgehaald schema kan direct naar je horloge worden gestuurd.',
-          s4: 'Hulpmiddelen zoals Claude Code en Codex kunnen je gegevens rechtstreeks via MCP inzien.',
-          s5: 'Nieuwe officiële verbinding, die naast de oorspronkelijke verbinding kan worden gebruikt.',
-        },
-        basics: {
-          s1: 'Donker, licht of volg het systeem.',
-          s2: 'Wissel op elk moment van taal.',
-        },
-        connect: {
-          s1: 'Koppel met je Zepp-account: officiële autorisatie eerst, het oude kanaal vult ontbrekende gegevens aan (HRV, SpO₂, stress…).',
-          s2: 'Veeg omlaag om te vernieuwen in de Zepp-app op je telefoon vóór synchronisatie: gegevens moeten eerst in de cloud zijn.',
-        },
-        overview: {
-          s1: 'Houd hier de 3–4 meetwaarden die je het vaakst bekijkt; via „Aanpassen” wissel je ze.',
-          s2: 'Dit vergelijkt met je eigen recente niveau, niet met anderen.',
-          s3: 'Rangschik het overzicht op basis van wat je belangrijk vindt.',
-        },
-        detail: {
-          s1: 'Kies een tijdsbereik één keer en elke pagina onthoudt het.',
-        },
-        pick: {
-          s1: 'Kies hier enkele dagen om aan een AI door te geven.',
-          s2: 'Tik op een kaart om deze om te draaien en aan te vinken, of sleep direct naar de box. Tik op een stapel om uit te vouwen, tik op een leeg vak om op te ruimen.',
-        },
-        handoff: {
-          s1: 'Links staan je gekozen gegevens: tik op een kaart om het aantal dagen aan te passen, of veeg hem weg om hem weg te laten.',
-          s2: 'Schrijf rechts je vraag; deze wordt verpakt in één .md voor de AI.',
-          s3: 'Houd het slot in het midden ingedrukt om over te dragen: het bestand belandt op je klembord, dus met Ctrl+V in het chatvenster van de AI voeg je het direct toe.',
-          s3Auto: 'Wil je dat het plakken en verzenden ook voor je wordt gedaan? Schakel dan „Automatisch overdragen aan AI” in op de kaart AI-tools in Instellingen.',
-        },
-        plan: {
-          s1: 'Plak het definitieve antwoord van de AI hier terug om een weekschema te maken.',
-          s2: 'Tik op een specifieke dag om deze apart aan te passen.',
-          s3: 'Houd ingedrukt om naar je horloge te sturen. Bij de start van de training op het horloge kies je het sporttype nog een keer.',
-        },
-        settings: {
-          s1: 'Back-up en herstel vind je hier.',
-          s2: 'MCP laat AI-tools zoals Claude Code en Codex je gegevens direct op deze computer lezen (alleen-lezen, niets gaat online); de opdrachtregel en plug-ins vind je hier ook.',
-          s3: 'Keer terug naar deze kaart om de rondleiding opnieuw te bekijken.',
-        },
-        cards: {
-          s1: 'Tik op een kaart om om te draaien en aan te vinken, of sleep direct naar de box. Tik op een stapel om uit te vouwen, tik op een lege plek om op te ruimen.',
-        },
-        box: {
-          s1: 'Veeg een kaart omhoog of tik op × om deze te verwijderen; tik op de pijl om een taak te starten.',
-        },
-        check: {
-          s1: 'Controleer hier vóór verzenden: alles wat uitgaat staat vermeld; vink uit wat je liever behoudt.',
-        },
-        planFirst: {
-          s1: 'Tik op een dag om aan te passen; houd „Naar horloge sturen” ingedrukt. Op het horloge kies je bij aanvang eenmalig het sporttype.',
-        },
-      },
+      done: 'Klaar',
+      gotIt: 'Begrepen',
+      inviteLater: 'Later',
+      look: 'Bekijken',
       next: 'Volgende',
       prev: 'Vorige',
-      done: 'Klaar',
-      skip: 'Rondleiding overslaan',
-      gotIt: 'Begrepen',
-      tryIt: 'Probeer het direct binnen het kader',
       progress: (index: number, total: number) => `${index} / ${total}`,
+      resetAll: 'Alle tips opnieuw weergeven',
+      resetAllDone: 'Klaar; elk onderdeel legt zichzelf weer uit de volgende keer dat je het opent',
       sample: 'Voorbeeldgegevens',
       sampleHint: 'De rondleiding gebruikt voorbeeldgegevens; je eigen bibliotheek blijft onaangeroerd',
-      welcomePick: 'Kies een taal',
-      welcomeStart: 'Rondleiding starten',
-      welcomeSkip: 'Overslaan en starten',
-      inviteLater: 'Later',
-      toolsText: 'Je AI-tools gebruiken nog de oude ZeppBridge; verbind ze opnieuw',
-      toolsGo: 'Opnieuw verbinden',
-      cardTitle: 'Rondleiding',
-      cardSummary: (seen: number, total: number) => `${seen} van ${total} hoofdstukken bekeken`,
-      fullTour: 'Vanaf het begin',
-      start: 'Beginnen',
-      look: 'Bekijken',
+      seenCount: (seen: number, total: number) => `${seen} van ${total} bekeken`,
       seenMark: 'Bekeken',
-      resetTips: 'Eerste-keer-tips opnieuw weergeven',
-      resetDone: 'Klaar; ze verschijnen weer wanneer je er de volgende keer komt',
+      skip: 'Rondleiding overslaan',
+      start: 'Beginnen',
+      steps: {
+        ai: {
+          s1: 'Je geselecteerde gegevens staan links: tik op een kaart voor de periode of veeg weg om uit te sluiten.',
+          s2: 'Schrijf je vraag rechts; het wordt verpakt in één .md-bestand voor de AI.',
+          s3: 'Houd het slotje in het midden ingedrukt om over te dragen: het bestand landt op je klembord, met Ctrl+V voeg je het toe in de AI-chat.',
+          s3Auto: 'Plakken en verzenden ook automatiseren? Schakel ‘Automatisch overdragen naar AI’ in op de AI-toolskaart in Instellingen.',
+          s4: 'Tools zoals Claude Code en Codex kunnen ook rechtstreeks via MCP lezen, zonder kopiëren en plakken.',
+        },
+        devices: {
+          s1: 'Eén regel per apparaat; open om het model te corrigeren of te verbergen. De gegevens blijven behouden.',
+          s2: 'Bekijk hoever elke gegevensstroom is gesynchroniseerd en wat er ontbreekt; in de kaart Geavanceerd van Instellingen.',
+        },
+        home: {
+          s1: 'Herschik het overzicht op basis van wat jij belangrijk vindt. Tik om te proberen.',
+          s2: 'Elk paneel opent voor een langere periode en meer details.',
+          s3: 'Vertel hier na een geplande workout op je horloge hoe het ging.',
+          s4: 'Dingen die een AI wil onthouden, wachten hier op jouw akkoord.',
+          s5: 'Logboek en jaarringen openen vanaf hier.',
+        },
+        intro: {
+          s1: 'Donker, licht of volg het systeem. Tik om te proberen.',
+          s2: 'Wissel op elk moment van taal; geef een draai aan het wiel.',
+          s3: 'Koppel je Zepp-account op twee manieren: eerst officiële autorisatie, en geavanceerde gegevens voor wat ontbreekt (zoals HRV, SpO₂ en stress).',
+          s4: 'Je favoriete statistieken staan hier vastgezet; de regel eronder is je eigen gebruikelijke bereik, niet dat van anderen.',
+          s5: 'Drie tabbladen bovenaan; slaap, workouts en logboek openen vanuit de kaarten op het Overzicht.',
+          s6: 'Synchronisatiestatus vind je hier; klik om te synchroniseren. Een groene ring op het pictogram linksboven betekent een update.',
+          s7: 'Elk onderdeel legt zichzelf uit wanneer je het voor het eerst opent; keer terug naar deze kaart om het opnieuw te zien.',
+        },
+        journal: {
+          s1: 'Een heel jaar aan activiteit op één pagina; open de jaarringen om ze te zien groeien.',
+          s2: 'Persoonlijke records van 5 km tot de marathon.',
+          s3: 'Aftellen naar wedstrijden en je medaillemuur.',
+          s4: 'Kilometerstand van hardloopschoenen, met herinnering voor vervanging.',
+          s5: 'Eén ring per jaar, breder in trainingsintensieve weken; tik op een fijne lijn voor die workout.',
+        },
+        letters: {
+          s1: 'Brieven van de auteur bij elke update liggen hier; open er een om te lezen.',
+          s2: '‘Jouw brieven’ bevat wekelijkse gegevensbrieven en brieven aan je toekomstige zelf; antwoorden en postzegels in de laatste twee.',
+        },
+        metric: {
+          s1: 'Kies het tijdsbereik één keer en elke pagina onthoudt het.',
+          s2: 'Tik op ‘?’ om te zien wat deze statistiek inhoudt en waar deze vandaan komt, of sluit hem uit van analyse.',
+          s3: 'Kies vanaf hier een paar dagen om aan de AI te overhandigen.',
+          s4: 'Tik op een kaart om hem om te draaien en af te vinken, of sleep hem direct in de doos; tik op een lege plek om op te ruimen.',
+        },
+        plan: {
+          s1: 'Plak het uiteindelijke antwoord van de AI hier terug en het wordt een weekplan.',
+          s2: 'Tik op een dag voor afzonderlijke fijnafstemming.',
+          s3: 'Ingedrukt houden om naar je horloge te sturen; bij het starten op het horloge kies je het sporttype nog een keer.',
+          s4: 'Verzonden plannen blijven hier bewaard.',
+        },
+        settings: {
+          s1: 'Instellingen is een stapel kaarten; tik op een kaart om te openen.',
+          s2: 'Back-up, herstel en historie aanvullen bevinden zich hier.',
+          s3: 'Met MCP kunnen tools zoals Claude Code en Codex lokale gegevens direct lezen (alleen-lezen, offline); de opdrachtregeltool vind je hier ook.',
+        },
+        sleep: {
+          s1: 'Eén regel per nacht; open voor slaapfasen, hartslag en ontwaaktijden.',
+        },
+        workouts: {
+          s1: 'Eén regel per workout; open voor tempo, hartslag, route en persoonlijke notities.',
+          s2: 'Selecteer meerdere om het type te wijzigen of te verbergen; GPX-, FIT- en Strava-import begint hier ook.',
+        },
+      },
+      toolsGo: 'Opnieuw verbinden',
+      toolsText: 'Je AI-tools gebruiken nog de oude ZeppBridge; verbind ze opnieuw',
+      tryIt: 'Probeer het direct binnen het kader',
+      welcomePick: 'Kies een taal',
+      welcomeSkip: 'Overslaan en starten',
+      welcomeStart: 'Rondleiding starten',
     },
     'components/letters/letters': {
       to: 'Aan: gebruiker',
@@ -3574,6 +3602,11 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       open: 'Openen',
       replied: 'Beantwoord',
       rereadAria: (version: string) => `Lees de brief voor ${version} opnieuw`,
+      authorStamp: 'Auteur antwoordde',
+      authorSheet: 'Reactie van de auteur',
+      authorSign: '— de ZeppBridge-ontwikkelaar',
+      authorRepliedOn: (date: string) => `Beantwoord op ${date}`,
+      authorNew: 'De auteur heeft je brief beantwoord',
     },
     'components/coachNotes/coachNotes': {
       title: 'Coachnotities',
@@ -4102,8 +4135,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     'err.diagnostic.empty_report':
       'Kies eerst een probleemtype of schrijf een toelichting — anders bevat dit rapport niets om mee te werken',
     'err.diagnostic.http_error': 'De rapportdienst gaf een fout terug',
-    'err.diagnostic.nothing_to_submit':
-      'Dit apparaat heeft geen modelnummer dat de catalogus aanvult — nu niets in te sturen',
     'err.diagnostic.rate_limited':
       'Te veel rapporten in korte tijd — probeer het later opnieuw. Al verstuurde blijven bewaard; opnieuw insturen hoeft niet.',
     'err.diagnostic.send_failed':
@@ -4126,6 +4157,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       'Deze database is ouder dan de build die hem leest, en een alleen-lezen verbinding kan hem niet bijwerken. Start de desktop-app een keer, of draai zeppbridge-cli reprocess op een headless machine. Beide maken voor het bijwerken een back-up.',
     'err.headless.token_not_in_store':
       'De accountgegevens zijn er, maar de opslag voor inloggegevens heeft er geen token voor. Een database kun je tussen machines kopiëren; een token niet — die blijft in de referentieopslag van de machine waar hij is gemaakt. Meld je opnieuw aan.',
+    'err.local.maintenance_compaction':
+      'Opgeslagen payloads worden gecomprimeerd – probeert het automatisch opnieuw zodra dit klaar is',
+    'err.local.maintenance_replay':
+      'Gegevens worden opnieuw opgebouwd uit lokale payloads – probeert het automatisch opnieuw zodra dit klaar is',
     'err.local_api.bind_failed': 'De lokale API kon niet worden gestart',
     'err.local_api.port_in_use': 'De poort van de lokale API is al door een ander programma in gebruik',
     'err.local_api.state_write_failed':
@@ -4163,7 +4198,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       'Net gecontroleerd: de relay heeft deze autorisatie nog niet ontvangen. Controleer of je in de browser hebt toegestaan en de bevestigingspagina zag. Kwam die pagina van een eerdere poging, start de autorisatie dan opnieuw.',
     'err.backfill.start_too_early':
       'Startdatum te vroeg — je kunt hooguit de laatste 3650 dagen ophalen',
-    'err.official.browser': 'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
+    'err.official.browser':
+      'Kon de systeembrowser niet openen. Klik op „Autorisatielink kopiëren”, plak deze in de adresbalk van je browser en keur de autorisatie daar goed — de app verbindt automatisch.',
+    'err.official.browser_not_opened':
+      'De autorisatiepagina lijkt niet in de browser te zijn geopend. Als er geen browservenster verschijnt, klik dan op „Autorisatielink kopiëren” en plak deze in de adresbalk — de app verbindt automatisch.',
     'err.open_url.failed':
       'De systeembrowser opende niet — controleer de standaardbrowserinstellingen en probeer opnieuw',
     'err.open_url.not_allowed': 'Alleen https-links kunnen worden geopend.',

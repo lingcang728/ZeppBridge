@@ -45,119 +45,101 @@ SCREENSHOTS = [
 
 # Zepp 设备列表里的 `deviceSource` 数字 -> catalog_id。
 #
-# 华米不公开对照表，而有些账号的设备响应里除了这些数字什么都没有（issue #4）。
-# 这一列全部来自用户在应用里主动指认的型号，由 Cloudflare 反馈库汇总。
+# 3.1.1 起以 Zepp 官方开发者文档的对照表为准：
+#   https://docs.zepp.com/docs/reference/related-resources/device-list/
+# 「Equipment name / deviceSource」两张表（Zepp OS 设备 + 旧设备），2026-11-02 逐条核对，
+# 中英两版一致；`*` 标的是国行编号，一样收。Gadgetbridge 各 Coordinator 的
+# `getDeviceSources()` 是同一套数，交叉核过。以前注释里写的「华米不公开对照表」是错的。
 #
-# 收录规则（2026-09-01 那一轮的 104 份带指认报告上逐条验证过）：
-#   * 只收 deviceSource，绝不收 deviceType —— 后者是族码，光 deviceType:0
-#     一个值就横跨 20 款表；
-#   * 只收高位段 >= 1_000_000 —— 低位段（15/101/102/104）在数据里就是自相
-#     矛盾的，同一个数字被指认成四款不同的表；
-#   * 每个数字至少两份互相独立的报告。
+# 收录规则：
+#   * 只收 deviceSource，绝不收 deviceType —— 后者是族码（0 = 表 / 手环、1 = 体脂秤、7 = 耳机），
+#     光 deviceType:0 一个值就横跨 20 款表；
+#   * 官方表列出的编号照收，低位段也一样（250、418 这类老表本来就是低位）；
+#   * 官方表没有的低位段（15 / 101 / 102 / 104 ……）一律不收。101–104 在反馈库里全带
+#     deviceType:1，是体脂秤，界面按「体脂秤」这一类显示，不猜型号。
 #
-# 同一款表有多个相邻数字是正常的：低位是配色/尺寸变体。
-DEVICE_SOURCE_CODES: dict[str, list[int]] = {
-    "amazfit-t-rex-3": [8716544, 8716545, 8716547],
-    "amazfit-balance-46mm": [8519936, 8519937, 8519939],
-    # 9568513 是人工裁决：相邻的 9568512 / 9568515 一致指向 Balance 2，而 8 份
-    # 报告里指认成 Helio Strap 的那 2 份，同一份报告里还指认了另一块表——是
-    # 在设备选择器里挑错了那一台，不是这个数字有歧义。
-    "amazfit-balance-2": [9568512, 9568513, 9568515, 10486017],
-    "amazfit-active-2-44mm": [8913155, 10092800, 10092801, 10092803, 10092807],
-    "amazfit-active-42mm": [8323329],
-    "amazfit-balance-2-xt": [10486019],
-    "amazfit-active-2-square": [10223873, 10223875],
-    "amazfit-bip-6": [9765121, 10158337],
-    "amazfit-cheetah-2-ultra": [9978112, 9978113],
-    # 10289411 同样是人工裁决：17 份里 14 份 Helio Strap，相邻的 10289410
-    # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
-    "amazfit-helio-strap": [10289410, 10289411],
-    # 10551555 是 2026-09-02 那批新增的：2 份报告一致，无异议，且和已经收了
-    # 的 10551552 同族。10682625 是 2026-09-03 这一批（反馈库 183 行）：同样
-    # 2 份一致、零异议，两份分别来自 v1.1.1 和 v1.1.5，不是同一次提交的重复。
-    # 2026-09-11 又收录 10551553 和 10682624，见本轮反馈裁决记录。
-    # 10682627 是 2026-09-13 收录的，见下方裁决记录。
-    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551553, 10551555, 10682624, 10682625, 10682627],
-    # Helio Ring 的第一个编号：2 份独立报告一致，其中一份来自 2.0.0。
-    "amazfit-helio-ring": [8651008],
-    # 11145472 是 2026-09-01 那批新增的：3 份报告一致指向 Balance 3，和已经
-    # 收了的相邻编号 11141379 同族。
-    "amazfit-balance-3": [11141377, 11141379, 11145472, 11145475],
-    "amazfit-gtr-4-46mm": [7930112, 7930113],
-    # 下面两个上一轮还只有一份报告，这一轮凑够了独立第二份：
-    #   10944769 -> Active 3 Premium（3 份，无异议）
-    #   10879233 -> T-Rex Ultra 2（2 份，无异议）
-    "amazfit-active-3-premium": [10944768, 10944769, 10944771],
-    "amazfit-t-rex-ultra-2": [10879232, 10879233],
-    # 2026-09-02 晚上那批（反馈库 175 行）新凑够第二份的三个。三个都在高位段、
-    # 都没有任何异议，报告还跨了多个版本，不是同一次提交的重复：
-    #   10813697 -> Active MAX     3 份（v1.1.1 / v2.1.0 / v2.1.0）
-    #   11206915 -> Bip MAX        2 份（v1.1.5 / v2.0.0）
-    #   10944771 -> Active 3 Premium 2 份（v2.0.0 / v2.0.0），且和已经收了的
-    #                              相邻编号 10944769 同族
-    "amazfit-active-max": [10813697],
+# 同一款表有多个相邻数字是正常的：低位是配色 / 尺寸 / 国行变体。
+OFFICIAL_DEVICE_SOURCE_URL = "https://docs.zepp.com/docs/reference/related-resources/device-list/"
+OFFICIAL_CHECKED_AT = "2026-11-02"
+OFFICIAL_DEVICE_SOURCE_CODES: dict[str, list[int]] = {
+    "amazfit-balance-3": [11141376, 11141377, 11141379],
+    "amazfit-balance-ultra": [11075840, 11075841],
     "amazfit-bip-max": [11206915],
-    # 下面三款是 2026-10-19 那一轮第一次收编号的，见下方裁决记录。
-    "amazfit-cheetah-pro-47mm": [8126720],
-    "amazfit-balance-ultra": [11092224],
+    "amazfit-cheetah-2-ultra": [9961728, 9961729],
+    "amazfit-cheetah-2-pro": [11010304, 11010305, 11010307],
+    "amazfit-active-3-premium": [10944768, 10944769, 10944771, 10948867],
+    "amazfit-t-rex-ultra-2": [10879232, 10879233, 10879235],
+    "amazfit-active-max": [10813697, 10813699],
+    # 官方表把 44mm 和 48mm 分成两行，目录里是同一张卡。
+    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551553, 10551555, 10682624, 10682625, 10682627],
+    "amazfit-active-2-square": [10223872, 10223873, 10223875],
+    "amazfit-balance-2": [9568512, 9568513, 9568515],
+    "amazfit-bip-6": [9765120, 9765121, 10158337],
+    # 官方叫 Active 2 (Round)。
+    "amazfit-active-2-44mm": [8913152, 8913153, 8913155, 8913159, 10092800, 10092801, 10092803, 10092807],
+    "amazfit-t-rex-3": [8716544, 8716545, 8716547],
+    "amazfit-bip-5-unity-46mm": [8782081, 8782088, 8782089],
+    "amazfit-active-edge-46mm": [8388864, 8388865],
+    "amazfit-active-42mm": [8323328, 8323329],
+    "amazfit-balance-46mm": [8519936, 8519937, 8519939],
+    "amazfit-cheetah-square": [8257793],
+    "amazfit-bip-5-46mm": [8454400, 8454401],
+    "amazfit-cheetah-pro-47mm": [8126720, 8126721],
+    "amazfit-cheetah-47mm": [8192256, 8192257],
+    "amazfit-t-rex-ultra-47mm": [6553856, 6553857],
+    "amazfit-gtr-mini-43mm": [250, 251],
+    "amazfit-gtr-4-46mm": [7930112, 7930113, 7864577],
+    "amazfit-gts-4-43mm": [7995648, 7995649],
+    "amazfit-gts-4-mini": [246, 247],
+    "amazfit-falcon-49mm": [414, 415],
+    "amazfit-band-7": [252, 253, 254],
+    "amazfit-gtr-3-pro-46mm": [229, 230, 242, 6095106],
+    "amazfit-gtr-3-46mm": [226, 227],
+    "amazfit-gts-3-42mm": [224, 225],
+    "amazfit-t-rex-2-47mm": [418, 419],
+    # 旧设备那张表。
+    "amazfit-gtr-2-new-46mm": [63, 64, 244],
+    "amazfit-gtr-2e": [206, 209],
+    "zepp-e-round": [57, 81],
+    "zepp-e-square": [61, 82],
+    "amazfit-t-rex-pro": [83, 200],
+    "amazfit-pop": [68],
+    "amazfit-gts-2-mini": [91, 92],
+}
+
+# 官方表之前、用户在应用里指认汇总出来的编号（2026-09 ～ 10-19 各轮裁决，规则是
+# 「至少两份互相独立、零异议的报告」）。官方表里有的已经挪进上面；这里只剩官方表没列的
+# （Helio 系列、Balance 2 XT、国际版 / 新批次的相邻编号）。**3.1.1 起冻结**：应用不再上报
+# 指认，这张表不再增加。最后一笔是 11092225 -> Balance Ultra（2 份，和已收的 11092224 同族）。
+CROWD_DEVICE_SOURCE_CODES: dict[str, list[int]] = {
+    "amazfit-balance-2": [10486017],
+    "amazfit-balance-2-xt": [10486019],
+    "amazfit-cheetah-2-ultra": [9978112, 9978113],
+    "amazfit-helio-strap": [10289410, 10289411],
+    "amazfit-helio-ring": [8651008],
+    "amazfit-balance-3": [11145472, 11145475],
+    "amazfit-balance-ultra": [11092224, 11092225],
     "amazfit-helio-strap-pro": [11272451, 11469059],
 }
-# 2026-09-11: seven additional codes accepted from distinct submission contexts;
-# adjacent-time duplicate reports were counted only once. See the dated feedback
-# triage evidence for counts, conflict exclusions and the privacy limitation that
-# these reports deliberately contain no reporter identity.
-# 明确不收：
-#   * 10813699 —— Active 2 44mm 7 份 vs Active MAX 3 份（2026-09-13 复核）。
-#     前几轮分别是 2:2、3:3、4:3，多数票在这张表上从来不算数：收错一个
-#     编号，所有同款用户的设备名都会错，而且是静默地错。
-#   * 全部低位段编号和全部 deviceType。低位段不是漏收：同一个 102 被指认成
-#     balance-46mm / t-rex-3 / balance-3 / balance-2 / t-rex-3-pro / up 等多个
-#     型号，说明 deviceSource 在低位段根本不唯一标识型号，再多报告也收不出来。
-#
-# 2026-09-13 裁决记录（反馈库 279 份报告）：
-#   * 10682627 -> T-Rex 3 Pro：2 份互相独立的报告（3454a4a9 v2.2.2 macOS
-#     2026-09-10、4c94b421 v2.2.4 macOS 2026-09-11），不同版本不同日期、
-#     零异议，且与已收录的 10682624 / 10682625 同族——和当年收 10682625
-#     的标准一致（两份分别来自不同版本，不是同一次提交的重复）。
-#   * 7930112 -> GTR 4 46mm：6 份 GTR 4 46mm 报告（v1.1.5 ×2、v2.1.0 ×3、
-#     v2.2.2 ×1，至少 4 个独立提交语境）。此前拒收是因为 bbcbafff
-#     （2026-09-02T00:23）把它指认成 T-Rex 3；但 83 秒后同一设备集合
-#     （7930112 + 8716544）的 be7d1466 把 7930112 改指认为 GTR 4 46mm、
-#     把 8716544 指认为 T-Rex 3——是「一个账号两块表、第一次挑错了、马上
-#     改正」，不是真实异议。相邻的 7930113 早已收为 GTR 4 46mm。
-#   * 8913155 -> Active 2 44mm：5 份 Active 2 44mm 报告（v1.1.1、v2.0.0、
-#     v2.1.0 macOS、v2.1.1、v2.1.2，5 个独立语境）。此前拒收的唯一异议
-#     34220252（2026-09-01T18:29 指认 Helio Strap）在 3 分钟后被同一设备
-#     集合（10289411 + 8913155）的 b405ac43 改正为 Active 2 44mm；且该账号
-#     的 10289411 已按名字自动匹配为 Helio Strap，把 8913155 也指认成
-#     Helio Strap 等于说这个账号有两条 Helio Strap——就是挑错了那一台。
-#   * 继续等第二份的编号：9765121、11092224、11469059 各 2 份，但都是同一
-#     分钟内、同一设备集合的重复提交，只算 1 份独立证据；只有一份报告的
-#     高位编号 11272451、8126720、10223872、10223875、10944768、11141376。
-#     原来在这一行里的 10813697、11206915、10944771 在 2026-09-02 那批里
-#     凑够了，10682625 在 2026-09-03 这一批里凑够了，都已经收进上表。
-#
-# 2026-10-19 裁决记录（反馈库 445 份报告）。「独立」= 设备集合（同一份报告里
-# 全部 deviceSource）不同，或系统不同；同一账号隔几天重复提交只算一份：
-#   * 8126720 -> Cheetah Pro：2 份（v2.2.0 Linux、v3.0.1 Windows），零异议。
-#   * 9765121 -> Bip 6：3 个不同设备集合（macOS 五块表、Linux 单表、Windows
-#     表 + 秤），零异议。上一轮因「同一分钟重复」只算 1 份，现在凑够了。
-#   * 10223875 -> Active 2 Square：3 个独立语境（v1.1.1、v3.0.1 Windows、
-#     v3.0.1 macOS 三设备集合），零异议，与已收的 10223873 同族。
-#   * 10879232 -> T-Rex Ultra 2：2 个独立设备集合（单表；表 + Helio Strap），
-#     零异议，与已收的 10879233 同族。
-#   * 10944768 -> Active 3 Premium：3 个独立设备集合，零异议，与 10944769 同族。
-#   * 11092224 -> Balance Ultra：2 个独立设备集合（+102、+1105），零异议。
-#   * 11145475 -> Balance 3：2 份（Windows 单表、macOS 表 + 秤 + Balance 2），
-#     零异议，与已收的 11145472 同族。
-#   * 11272451、11469059 -> Helio Strap Pro：两个编号总是一起出现（同一账号
-#     两条记录），3 个独立账号指认，零异议；11469059 带 deviceType 15。
-# 明确不收（多数票不算数）：
-#   * 11141376 —— Balance 3 3 份 vs Balance 2 1 份（v3.0.1 Linux，同报告另一块
-#     表是 GTR 2，不是挑错了那一台）。
-#   * 7995649 —— GTS 4 43mm 2 份 vs Balance 2 2 份。
-# 只有一份、继续等：7995648、8192257、8257793、8454401、9699584、10223872、
-#   11010305（两份相隔 18 分钟、只是升级了版本，按同一份算）、11010307、11145473。
+
+
+def merged_device_source_codes() -> dict[str, list[int]]:
+    """官方表优先；同一个编号不许挂在两款上（两张表冲突就直接失败，不悄悄选一个）。"""
+    owner: dict[int, str] = {}
+    merged: dict[str, list[int]] = {}
+    for table in (OFFICIAL_DEVICE_SOURCE_CODES, CROWD_DEVICE_SOURCE_CODES):
+        for catalog_id, codes in table.items():
+            for code in codes:
+                if code in owner and owner[code] != catalog_id:
+                    raise SystemExit(f"deviceSource {code} 同时指向 {owner[code]} 和 {catalog_id}")
+                owner[code] = catalog_id
+                merged.setdefault(catalog_id, [])
+                if code not in merged[catalog_id]:
+                    merged[catalog_id].append(code)
+    return {catalog_id: sorted(codes) for catalog_id, codes in merged.items()}
+
+
+DEVICE_SOURCE_CODES: dict[str, list[int]] = merged_device_source_codes()
 
 
 def card(
@@ -183,6 +165,7 @@ def card(
         "kind": kind,
         "model_codes": model_codes or [],
         "device_source_codes": DEVICE_SOURCE_CODES.get(catalog_id, []),
+        "device_source_official": OFFICIAL_DEVICE_SOURCE_CODES.get(catalog_id, []),
         "aliases": aliases or [f"Amazfit {title}", title],
         "region": ["jp"],
         "status": "active",
@@ -212,7 +195,8 @@ def card(
 
 # The exact 48 cards visible in the user-provided official-store captures.
 CARDS: list[dict[str, Any]] = [
-    card("amazfit-balance-3", "Balance 3", "watch", 1, 1, name_zh="Amazfit 跃我 Balance 3"),
+    card("amazfit-balance-3", "Balance 3", "watch", 1, 1, name_zh="Amazfit 跃我 Balance 3",
+         aliases=["Amazfit Balance 3", "Balance 3", "Amazfit Balance 3 Ti", "Balance 3 Ti"]),
     card("amazfit-balance-ultra", "Balance Ultra", "watch", 1, 2),
     card("amazfit-cheetah-2-pro", "Cheetah 2 Pro", "watch", 1, 3),
     card("amazfit-cheetah-2-ultra", "Cheetah 2 Ultra", "watch", 1, 4),
@@ -284,7 +268,7 @@ CARDS: list[dict[str, Any]] = [
         aliases=["Amazfit GTR 4 46mm Black", "GTR 4 46mm Black", "Amazfit GTR 4 Black"],
     ),
     card("amazfit-t-rex-2-47mm", "T-Rex 2 47mm", "watch", 9, 3, variant="47mm"),
-    card("amazfit-gtr-2-new-46mm", "GTR 2 new 46mm", "watch", 9, 4, variant="new 46mm", aliases=["Amazfit GTR 2 new 46mm", "GTR 2 new 46mm", "Amazfit GTR 2 New"]),
+    card("amazfit-gtr-2-new-46mm", "GTR 2 new 46mm", "watch", 9, 4, variant="new 46mm", aliases=["Amazfit GTR 2 new 46mm", "GTR 2 new 46mm", "Amazfit GTR 2 New", "Amazfit GTR 2", "GTR 2"]),
     card("amazfit-gts-3-42mm", "GTS 3 42mm", "watch", 10, 1, variant="42mm"),
     card("amazfit-gtr-3-46mm", "GTR 3 46mm", "watch", 10, 2, variant="46mm"),
     card("amazfit-gtr-3-pro-46mm", "GTR 3 Pro 46mm", "watch", 10, 3, variant="46mm"),
@@ -425,8 +409,7 @@ EXTRAS: list[dict[str, Any]] = [
         "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
     },
     # issue #137：Cheetah Square 不在目录里，用户连「这款不对？手动指认」都选不到。
-    # 和上面的 Balance 2 XT 一样先不带图、不带编号：10-19 那份应用内报告没连高级数据，
-    # 里面没有任何 deviceSource，不猜。收到带编号的报告后再补进 DEVICE_SOURCE_CODES。
+    # 和上面的 Balance 2 XT 一样先不带图；编号 8257793 来自官方对照表（3.1.1）。
     {
         "catalog_id": "amazfit-cheetah-square",
         "canonical_name": "Amazfit Cheetah Square",
@@ -443,7 +426,117 @@ EXTRAS: list[dict[str, Any]] = [
         "asset_source": "pending-official-art",
         "canonical_device_key": "amazfit-cheetah-square",
         "checked_at": "2026-10-20",
-        "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. Manual identification only: the one in-app report had no Advanced data connection and carried no deviceSource, so none is claimed. Product art pending.",
+        "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. deviceSource 8257793 comes from the official Zepp developer device list (checked 2026-11-02). Product art pending.",
+    },
+    # 3.1.1：官方 deviceSource 表里有、目录里还没有卡的三款，以及反馈里报过、目录里没有的三款。
+    # 都没有产品图（界面走内联占位），照 Balance 2 XT 的写法。
+    {
+        "catalog_id": "amazfit-pop",
+        "canonical_name": "Amazfit Pop",
+        "display_name": "Amazfit Pop",
+        "name_zh": "Amazfit Pop",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Amazfit Pop", "Amazfit POP"],
+        "region": ["global"],
+        "official_page": OFFICIAL_DEVICE_SOURCE_URL,
+        "official_url": OFFICIAL_DEVICE_SOURCE_URL,
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-pop",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Listed with deviceSource 68 in the official Zepp developer device list (checked 2026-11-02); reported missing from the model picker on 3.0.4 macOS. Product art pending.",
+    },
+    {
+        "catalog_id": "zepp-e-round",
+        "canonical_name": "Zepp E (Round)",
+        "display_name": "Zepp E (Round)",
+        "name_zh": "Zepp E 圆屏",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Zepp E (Round)", "Zepp E Round", "Zepp E Circle"],
+        "region": ["global"],
+        "official_page": OFFICIAL_DEVICE_SOURCE_URL,
+        "official_url": OFFICIAL_DEVICE_SOURCE_URL,
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "zepp-e-round",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Listed with deviceSource 57 / 81 in the official Zepp developer device list (checked 2026-11-02). Product art pending.",
+    },
+    {
+        "catalog_id": "zepp-e-square",
+        "canonical_name": "Zepp E (Square)",
+        "display_name": "Zepp E (Square)",
+        "name_zh": "Zepp E 方屏",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Zepp E (Square)", "Zepp E Square"],
+        "region": ["global"],
+        "official_page": OFFICIAL_DEVICE_SOURCE_URL,
+        "official_url": OFFICIAL_DEVICE_SOURCE_URL,
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "zepp-e-square",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Listed with deviceSource 61 / 82 in the official Zepp developer device list (checked 2026-11-02). Product art pending.",
+    },
+    {
+        "catalog_id": "amazfit-neo",
+        "canonical_name": "Amazfit Neo",
+        "display_name": "Amazfit Neo",
+        "name_zh": "Amazfit Neo",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Amazfit Neo", "Amazfit NEO"],
+        "region": ["global"],
+        "official_page": "https://support.amazfit.com/en/amazfit_neo/user-guide",
+        "official_url": "https://support.amazfit.com/en/amazfit_neo/user-guide",
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-neo",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Reported missing from the model picker on 2.2.0, 3.0.1 and 3.0.6. Not in the official Zepp developer device list, so no deviceSource is claimed; name matching and manual identification only. Product art pending.",
+    },
+    {
+        "catalog_id": "amazfit-bip-s",
+        "canonical_name": "Amazfit Bip S",
+        "display_name": "Amazfit Bip S",
+        "name_zh": "Amazfit 米动手表青春版 Lite / Bip S",
+        "kind": "watch",
+        "model_codes": [],
+        "aliases": ["Amazfit Bip S", "Bip S", "Amazfit Bip S Lite", "Bip S Lite"],
+        "region": ["global"],
+        "official_page": "https://support.amazfit.com/en/amazfit_bip_s/user-guide",
+        "official_url": "https://support.amazfit.com/en/amazfit_bip_s/user-guide",
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-bip-s",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Reported missing from the model picker on 2.1.1 and 3.0.0. Not in the official Zepp developer device list, so no deviceSource is claimed; name matching and manual identification only. Product art pending.",
+    },
+    {
+        "catalog_id": "mi-smart-band-4-nfc",
+        "canonical_name": "Mi Smart Band 4 NFC",
+        "display_name": "Mi Smart Band 4 NFC",
+        "name_zh": "小米手环 4 NFC 版",
+        "kind": "band",
+        "model_codes": [],
+        "aliases": ["Mi Smart Band 4 NFC", "Mi Band 4 NFC", "Xiaomi Mi Band 4 NFC", "小米手环4 NFC版", "小米手环 4 NFC"],
+        "region": ["cn"],
+        "official_page": "https://www.mi.com/global/mi-smart-band-4/",
+        "official_url": "https://www.mi.com/global/mi-smart-band-4/",
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "mi-smart-band-4-nfc",
+        "checked_at": OFFICIAL_CHECKED_AT,
+        "provenance": "Reported on 3.0.4 as an unidentified device bound to a Zepp account together with a body-composition scale. Not in the official Zepp developer device list, so no deviceSource is claimed; manual identification only. Product art pending.",
     },
 ]
 
@@ -938,8 +1031,16 @@ def build_catalog() -> None:
         document["canonical_device_count"] = len({d["canonical_device_key"] for d in document["devices"] if d.get("supported") and d["status"] == "active"})
         if unknown := sorted(set(DEVICE_SOURCE_CODES) - known_ids):
             raise SystemExit(f"Unknown catalog IDs: {unknown}")
+        definitions = {entry["catalog_id"]: entry for entry in [*CARDS, *EXTRAS]}
         for device in document["devices"]:
             device["device_source_codes"] = DEVICE_SOURCE_CODES.get(device["catalog_id"], [])
+            device["device_source_official"] = OFFICIAL_DEVICE_SOURCE_CODES.get(device["catalog_id"], [])
+            if definition := definitions.get(device["catalog_id"]):
+                device["aliases"] = definition["aliases"]
+                if definition.get("asset_key") is None:
+                    device["provenance"] = definition["provenance"]
+        if OFFICIAL_DEVICE_SOURCE_URL not in document["sources"]:
+            document["sources"].append(OFFICIAL_DEVICE_SOURCE_URL)
         CATALOG_PATH.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(f"DEVICE_CATALOG_UPDATED entries={len(known_ids)}")
         return
@@ -977,6 +1078,7 @@ def build_catalog() -> None:
     # EXTRAS 是手写的条目，不经过 card()，所以在这里统一补一次。
     for device in devices:
         device.setdefault("device_source_codes", DEVICE_SOURCE_CODES.get(device["catalog_id"], []))
+        device.setdefault("device_source_official", OFFICIAL_DEVICE_SOURCE_CODES.get(device["catalog_id"], []))
     unknown = sorted(set(DEVICE_SOURCE_CODES) - {device["catalog_id"] for device in devices})
     if unknown:
         raise SystemExit(f"DEVICE_SOURCE_CODES 指向了目录里没有的型号: {unknown}")
@@ -987,6 +1089,7 @@ def build_catalog() -> None:
             "https://www.amazfit.jp/",
             "https://us.amazfit.com/products.json?limit=250",
             "https://os.zepp.com/compatibility-zepp-os-5",
+            OFFICIAL_DEVICE_SOURCE_URL,
         ],
         "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
         "active_supported_count": sum(1 for device in devices if device.get("supported") and device["status"] == "active"),

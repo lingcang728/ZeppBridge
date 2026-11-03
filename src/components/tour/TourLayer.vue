@@ -1,25 +1,28 @@
 <script setup lang="ts">
 /*
- * 新手引导挂在外壳上的那一层：聚光框与说明卡、沙盒第一屏、老用户的「V3 变了什么」邀请，
- * 以及首次启动时决定走哪条路。AppShell 在后端就绪后异步挂它。
+ * 新手引导挂在外壳上的那一层：聚光框与说明卡、沙盒第一屏，以及启动时决定要不要进总览。
+ * AppShell 在后端就绪后异步挂它。
  *
  * 首次启动（只判断一次，记在真实 localStorage）：
- *   - 新装（没连过账号、也没同步过）→ 直接进示例沙盒，从语言轮开始走完整引导，看完回到「账号与设备」卡去连接；
- *   - 有数据的库（多半是从 2.x 或早期 beta 升上来的）→ 也从语言轮开始把完整引导走一遍，看完回到概览
- *     （10-13 用户定：升级来的也要看全套，不再给「V3 变了什么」那份简略版；看完一次就不再出）。
+ *   - 新装（没连过账号、也没同步过）→ 进示例沙盒，先选语言，再走总览，看完回到「账号与设备」卡去连接；
+ *   - 有数据的库（从 2.x 或早期 beta 升上来、从没见过引导的）→ 同样先选语言再走总览，看完回到概览。
  *     本机 AI 客户端里还登记着旧版 zeppbridge-mcp 时，引导前先记下，回到真实应用后浮一张卡，
  *     请用户去「交给 AI 工具」卡重新连一次。
+ * 老安装、引导版本落后（3.1.1 重写引导，lib/tour/progress.ts 的 TOUR_VERSION）：清空看过，
+ *   **等这一版的作者来信收好**再进总览，不走选语言那一屏；各板块第一次打开时也会重新就地讲。
  */
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import TourOverlay from './TourOverlay.vue';
 import TourWelcome from './TourWelcome.vue';
 import { launchSandbox, startTour, useTour } from '../../composables/useTour';
 import { useSyncController } from '../../composables/useSyncController';
-import { FULL_TOUR } from '../../lib/tour/chapters';
-import { firstLaunchHandled, leaveSandbox, markFirstLaunchHandled, markSeen, markToolsReminder, sandboxFlags, takeToolsReminder } from '../../lib/tour/sandbox';
-import { INLINE_CHAPTERS } from '../../lib/tour/chapters';
+import { INTRO } from '../../lib/tour/chapters';
+import {
+  firstLaunchHandled, leaveSandbox, markFirstLaunchHandled, markSeen, markToolsReminder, markTourVersion, retourDue, sandboxFlags, takeToolsReminder,
+} from '../../lib/tour/sandbox';
 import { backend, isDesktop } from '../../lib/bridge';
+import { pendingUpdateNotice, updateNotice } from '../../services/updateNotice';
 import { useTourText } from './tour.i18n';
 
 const t = useTourText();
@@ -33,9 +36,10 @@ const startFromWelcome = () => {
   welcomeOpen.value = false;
   if (flags) startTour(flags.chapters, 'sandbox');
 };
+/* 第一屏就跳过：只算总览看过，各板块第一次打开时照样就地讲。 */
 const skipFromWelcome = () => {
   welcomeOpen.value = false;
-  markSeen([...FULL_TOUR, ...INLINE_CHAPTERS, 'whatsnew']);
+  markSeen([INTRO]);
   leaveSandbox(flags?.ret ?? '/');
 };
 
@@ -44,12 +48,37 @@ const openTools = () => {
   void router.push('/settings/ai');
 };
 
+/** 这一版的作者来信（更新弹窗里的信封）收好了。启动时说明还在后台读版本号，等它出现；
+    根本没有待显示的说明就不等。 */
+const letterPutAway = (): Promise<void> => new Promise((resolve) => {
+  let seen = updateNotice.receipt !== null;
+  let stop: (() => void) | null = null;
+  const done = () => { stop?.(); window.clearTimeout(timer); resolve(); };
+  // 有存着的说明却迟迟没显示（版本对不上，restoreUpdateNotice 不会出它）：别一直等下去。
+  const timer = window.setTimeout(() => { if (!seen) done(); }, pendingUpdateNotice() ? 15000 : 0);
+  stop = watch(() => updateNotice.receipt, (receipt) => {
+    if (receipt) { seen = true; return; }
+    // 「知道了」之后信封化灰飞走：等它放完再进沙盒。
+    if (seen) window.setTimeout(done, 700);
+  }, { immediate: true });
+});
+
+const decideRetour = async () => {
+  if (!isDesktop() || window.__ZB_DEMO__?.demo || !retourDue()) return;
+  await letterPutAway();
+  if (!retourDue()) return;
+  markTourVersion(true);
+  launchSandbox([INTRO], { ret: router.currentRoute.value.fullPath });
+};
+
 const decideFirstLaunch = async () => {
-  if (!isDesktop() || window.__ZB_DEMO__?.demo || firstLaunchHandled()) return;
+  if (!isDesktop() || window.__ZB_DEMO__?.demo) return;
+  if (firstLaunchHandled()) { await decideRetour(); return; }
   if (!appStatus.value) await refreshStatus().catch(() => undefined);
   const status = appStatus.value;
   if (!status) return;
   markFirstLaunchHandled();
+  markTourVersion(true);
   const fresh = !status.configured && !status.last_sync && !status.streams.some((stream) => (stream.records ?? 0) > 0);
   if (!fresh) {
     // 引导是整页载入进沙盒，回来时这里已经不再走首次启动：旧版 MCP 的提醒先记在真实 localStorage 里。
@@ -59,7 +88,7 @@ const decideFirstLaunch = async () => {
     ]);
     if (sidecar?.stale_clients?.length) markToolsReminder();
   }
-  launchSandbox([...FULL_TOUR], { welcome: true, ret: fresh ? '/settings/account' : '/' });
+  launchSandbox([INTRO], { welcome: true, ret: fresh ? '/settings/account' : '/' });
 };
 
 onMounted(() => {

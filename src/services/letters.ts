@@ -41,7 +41,8 @@ export const letterVersions = (): string[] => [...letters().keys()].sort((a, b) 
 
 const pick = async (byLocale: Map<string, Loader> | undefined, language: string): Promise<{ text: string; locale: string } | null> => {
   if (!byLocale) return null;
-  for (const code of [language, 'en', 'zh']) {
+  // 繁体没有自己那份时先落简体，再落英文（3.1.1 之前的信都没有繁体）。
+  for (const code of language === 'zh-TW' ? [language, 'zh', 'en'] : [language, 'en', 'zh']) {
     const loader = byLocale.get(code);
     if (!loader) continue;
     try {

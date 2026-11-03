@@ -32,7 +32,7 @@ nobody dumps raw rows by accident.
 | `notes` | Every report where the reporter wrote a sentence — usually the highest-signal rows |
 | `codes` | Unknown workout codes: report count, record count, versions seen |
 | `rejections` | Cloud business error codes — HTTP 200 responses that said "not successful" |
-| `devices` | User-assigned models grouped by `deviceSource`/`deviceType`, with an eligibility verdict |
+| `devices` | `deviceSource` numbers from reports against the current catalog: which are still unresolved, which now resolve |
 | `list <status>` | Report ids in one status |
 | `mark <status> <id...>` | Move reports to a status |
 
@@ -107,17 +107,18 @@ about.
 
 ### Device model numbers
 
-`devices` groups user model assignments by their `modelIdentifierHints` and
-prints an eligibility verdict per hint. The admission rules live in
-`DEVICE_SOURCE_CODES` in
-[`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
-and are described in [the device catalog reference](./device-catalog.md).
+`devices` takes the `deviceSource` numbers from reports with unrecognised
+devices and splits them against the current `src/assets/devices/catalog.json`:
+numbers that still do not resolve (with report counts and the app versions they
+appeared in), and numbers that now do (marked as official table or frozen crowd
+entry).
 
-`eligible: review` is not approval. It means the automatic filters could not
-rule the hint out and a person has to decide. Never resolve a conflict by
-majority vote alone — look for whether the dissenting reporters also assigned a
-second watch in the same report, which is the usual sign that someone picked
-the wrong device in the picker.
+From 3.1.1 the catalog follows Zepp's official table and crowd assignments are
+frozen and no longer uploaded (rules in [the device catalog
+reference](./device-catalog.md)). For an unresolved number, check whether the
+official table has been updated — **report counts are not evidence**. The low
+`101`–`104` are scales (every one carries `deviceType:1` in the data) and newer
+versions no longer report them.
 
 ## Credentials
 

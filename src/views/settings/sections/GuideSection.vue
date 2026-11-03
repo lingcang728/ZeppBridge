@@ -1,22 +1,21 @@
 <script setup lang="ts">
-/* 设置里的「新手引导」卡：从头看一遍、只看某一章（都在示例沙盒里跑，见 lib/tour/sandbox.ts），
-   以及让「第一次碰到」的就地提示再出现一次。 */
+/* 设置里的「新手引导」卡：入门和十个板块各自「看看」（都在示例沙盒里跑，见 lib/tour/sandbox.ts），
+   以及让各板块第一次打开时的就地讲解全部再来一遍。 */
 import { ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import { launchSandbox } from '../../../composables/useTour';
-import { FULL_TOUR, INLINE_CHAPTERS, type TourChapterId } from '../../../lib/tour/chapters';
+import { ALL_CHAPTERS, INTRO, SECTIONS, type TourChapterId } from '../../../lib/tour/chapters';
 import { forgetSeen, seenChapters } from '../../../lib/tour/sandbox';
 import { useTourText } from '../../../components/tour/tour.i18n';
 
 const t = useTourText();
 const seen = ref(seenChapters());
-const rows: TourChapterId[] = ['whatsnew', ...FULL_TOUR];
 const resetDone = ref(false);
 
 /* 看完回到这张卡。 */
-const look = (chapters: TourChapterId[], welcome = false) => launchSandbox(chapters, { welcome, ret: '/settings/guide' });
-const resetTips = () => {
-  forgetSeen([...INLINE_CHAPTERS]);
+const look = (chapter: TourChapterId) => launchSandbox([chapter], { ret: '/settings/guide' });
+const resetAll = () => {
+  forgetSeen([...ALL_CHAPTERS]);
   seen.value = seenChapters();
   resetDone.value = true;
 };
@@ -26,27 +25,30 @@ const resetTips = () => {
   <section class="s-section">
     <div class="s-list">
       <div class="s-row">
-        <div class="s-row-main"><span class="s-row-title">{{ t.fullTour }}</span></div>
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.chapter[INTRO] }}</span>
+          <span v-if="seen.has(INTRO)" class="s-row-sub guide-seen"><Icon name="circle-check" :size="13" />{{ t.seenMark }}</span>
+        </div>
         <div class="s-row-control">
-          <button type="button" class="button primary" @click="look([...FULL_TOUR], true)">{{ t.start }}</button>
+          <button type="button" class="button primary" @click="look(INTRO)">{{ t.start }}</button>
         </div>
       </div>
-      <div v-for="id in rows" :key="id" class="s-row">
+      <div v-for="id in SECTIONS" :key="id" class="s-row">
         <div class="s-row-main">
           <span class="s-row-title">{{ t.chapter[id] }}</span>
           <span v-if="seen.has(id)" class="s-row-sub guide-seen"><Icon name="circle-check" :size="13" />{{ t.seenMark }}</span>
         </div>
         <div class="s-row-control">
-          <button type="button" class="button secondary" @click="look([id])">{{ t.look }}</button>
+          <button type="button" class="button secondary" @click="look(id)">{{ t.look }}</button>
         </div>
       </div>
       <div class="s-row">
         <div class="s-row-main">
-          <span class="s-row-title">{{ t.resetTips }}</span>
-          <span v-if="resetDone" class="s-row-sub" role="status">{{ t.resetDone }}</span>
+          <span class="s-row-title">{{ t.resetAll }}</span>
+          <span v-if="resetDone" class="s-row-sub" role="status">{{ t.resetAllDone }}</span>
         </div>
         <div class="s-row-control">
-          <button type="button" class="button secondary" :disabled="resetDone" :aria-label="t.resetTips" :title="t.resetTips" @click="resetTips"><Icon name="refresh" :size="14" /></button>
+          <button type="button" class="button secondary" :disabled="resetDone" :aria-label="t.resetAll" :title="t.resetAll" @click="resetAll"><Icon name="refresh" :size="14" /></button>
         </div>
       </div>
     </div>

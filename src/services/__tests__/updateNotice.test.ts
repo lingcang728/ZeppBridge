@@ -107,7 +107,8 @@ describe('bundled release notes for the current version', () => {
     expect(BUNDLED_VERSION).toBe(FALLBACK_APP_VERSION);
   });
   it('has one file per interface language, each with categorized lines', async () => {
-    expect(bundledNoteLocales()).toEqual([...LOCALES].sort());
+    // 繁体从 3.1.1 起才有自己那份；之前的版本回落简体（下面逐语言读得到就行）。
+    expect(bundledNoteLocales().filter((l) => l !== 'zh-TW')).toEqual([...LOCALES].filter((l) => l !== 'zh-TW').sort());
     for (const language of LOCALES) {
       const notes = await loadBundledNotes(BUNDLED_VERSION, language);
       expect(notes, language).toBeTruthy();

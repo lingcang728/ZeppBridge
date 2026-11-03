@@ -8,7 +8,7 @@
 import { computed } from 'vue';
 import WheelColumn from './WheelColumn.vue';
 import { clampDate, daysInMonth, wheelDateValue } from '../lib/wheel/momentum';
-import { defineMessages, locale, useMessages } from '../i18n';
+import { defineMessages, isChineseLocale, locale, useMessages } from '../i18n';
 
 const props = withDefaults(defineProps<{
   modelValue: string | null;
@@ -55,7 +55,7 @@ const set = (patch: Partial<{ y: number; m: number; d: number }>) => {
   if (iso !== props.modelValue) emit('update:modelValue', iso);
 };
 
-const order = computed(() => (locale.value === 'zh' ? ['y', 'm', 'd'] : locale.value === 'en' ? ['m', 'd', 'y'] : ['d', 'm', 'y']));
+const order = computed(() => (isChineseLocale(locale.value) ? ['y', 'm', 'd'] : locale.value === 'en' ? ['m', 'd', 'y'] : ['d', 'm', 'y']));
 </script>
 
 <template>

@@ -36,6 +36,10 @@ pub struct DeviceProfile {
     pub has_local_data: bool,
     #[serde(default)]
     pub last_data_at: Option<String>,
+    /// 用户在本机把它从设备列表里藏起来了（`device_local_state`）。只影响列表，
+    /// 数据照旧；单台查档案（睡眠页、运动详情）时仍会返回它，带着这个标记。
+    #[serde(default)]
+    pub hidden: bool,
     pub firmware: Option<String>,
     pub serial: Option<String>,
     pub device_id: Option<String>,
@@ -60,7 +64,11 @@ pub struct DeviceCacheMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeviceProfilesResult {
+    /// 列表里显示的设备，不含藏起来的。
     pub profiles: Vec<DeviceProfile>,
+    /// 用户藏起来的设备，设置 › 设备底部「已隐藏 N 台」从这里恢复。
+    #[serde(default)]
+    pub hidden_profiles: Vec<DeviceProfile>,
     pub cache: DeviceCacheMetadata,
 }
 

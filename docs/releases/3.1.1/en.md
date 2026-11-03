@@ -1,0 +1,23 @@
+- Added: **Traditional Chinese**. The 13th interface language. If your system language is Traditional Chinese (Taiwan, Hong Kong or Macau), it is picked automatically; the language wheel shows it as 繁.
+- Added: **The author can answer your letter**. Replies you send can now get a one-to-one answer; the envelope in “My replies” gets a blue “Author replied” stamp, and opening it shows your page first, then the author’s.
+- Added: **Hide devices**. Any device in Settings › Account and devices can be hidden. It only leaves the list, the data stays; bring it back from the bottom of the list at any time.
+- Added: **The command-line tool comes with the app (#157)**. zeppbridge-cli is installed next to the app, and Settings › AI tools lets you copy its path; the new shoes and races commands manage your shoes and races.
+- Added: **A guide to sending data to AI**. A “How it works” link next to MCP on the Send to AI page walks through picking data, planning training and sending it to your watch, and connecting over MCP.
+- Added: **A new onboarding tour**. The first launch walks through the basics, and each section explains itself the first time you open it; Settings › Guide lets you replay any part.
+- Added: **Four workout types get their own codes**. Dog walking, padel and stair climbing (now separate from the stair stepper) are recognized directly; alpine skiing can be set by hand.
+- Improved: **Automatic sync keeps running in the tray**. It syncs on schedule while the window is hidden or the screen is off, and after a failed sync it retries after 1, 2, 4 and 8 minutes instead of waiting a full interval.
+- Improved: **Devices are identified from Zepp’s official list**. Several models that used to be ambiguous are settled, the Korean Cheetah 2 Pro is recognized, and body composition scales show as scales.
+- Improved: **Pool swim steps can be as short as 25 m**. Tested on a T-Rex 3 Pro, with the pool length set on the watch; swim steps take no pace target for now, so use heart rate.
+- Improved: **A calmer week view for training plans**. Each workout in a day gets its own shape, so short pool sessions stay readable, and the wall of yellow warnings is now one quiet note.
+- Improved: **Trail run plans say to pick Run on the watch (#143)**. The watch has no trail subtype, so the label reads “Run · trail” and you start it as a run.
+- Improved: **Send to AI includes your basal metabolic rate**. With a body composition scale, the training and activity category now carries BMR.
+- Improved: **No more “database unavailable” while data is being rebuilt**. The Send to AI page says it is rebuilding or compacting and reloads by itself when done.
+- Improved: **Where resting heart rate comes from (#158)**. The export and MCP descriptions now say resting_hr is taken from the band’s sleep summary, not the average heart rate during sleep.
+- Improved: **Local data is reprocessed once after updating**. A large library takes about 15 minutes and sync waits until it is done; kilometer splits and sleep durations in older data are corrected along the way.
+- Fixed: **Kilometer splits are no longer dropped (#159)**. Some watches write the distance with decimals, which used to discard all of a workout’s splits.
+- Fixed: **The default shoe no longer swallows your shoe list (#157)**. Workouts with an unregistered shoe are no longer counted on the default shoe, and that pair appears in the Journal under “Shoes Zepp recorded that you haven’t added”.
+- Fixed: **Mountain bike rides export to FIT as mountain biking (#157)**.
+- Fixed: **Weight sync no longer keeps timing out (#157)**.
+- Fixed: **Sleep edited in the Zepp app now matches**. If you changed when you fell asleep or woke up in the app, one night stays one entry, and unmeasured awake time is no longer recorded as 0 minutes.
+- Fixed: **The pace chart on workout details is the right way up**. Faster is higher.
+- Fixed: **Linux no longer says the authorization expired when the browser did not open (#156)**. It suggests copying the authorization link into your browser.

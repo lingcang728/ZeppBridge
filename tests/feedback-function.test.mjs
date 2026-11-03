@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { contentHashInput, onRequestPost, validateFeedbackReport } from '../functions/api/feedback.js';
+import { contentHashInput, onRequestPost, retiredFieldsDropped, validateFeedbackReport } from '../functions/api/feedback.js';
 
 const report = () => ({
   format: 'zeppbridge.feedback.v1',
@@ -93,6 +93,45 @@ test('user-assigned model pairings are model-class only, and optional', () => {
     invalid.userAssignedModels = bad;
     assert.equal(validateFeedbackReport(invalid), false, `不该接受 ${JSON.stringify(bad)}`);
   }
+});
+
+test('assignments, firmware and deviceType hints from old clients are accepted but not stored', async () => {
+  const old = report();
+  old.deviceEvidence.candidates = [
+    { catalogId: 'amazfit-balance-2', canonicalName: 'Amazfit Balance 2', firmware: '6.2.208.7', matchStatus: 'exact' },
+  ];
+  old.userAssignedModels = [
+    { catalogId: 'amazfit-active-2-44mm', modelIdentifierHints: ['deviceSource:10813699'] },
+  ];
+  assert.equal(validateFeedbackReport(old), true, '旧客户端发来的不能 422');
+
+  const kept = retiredFieldsDropped(old);
+  assert.deepEqual(kept.userAssignedModels, []);
+  assert.equal(kept.deviceEvidence.candidates[0].firmware, undefined);
+  assert.equal(kept.deviceEvidence.candidates[0].catalogId, 'amazfit-balance-2');
+  assert.deepEqual(kept.deviceEvidence.modelIdentifierHints, ['deviceSource:7930112']);
+
+  let values;
+  const db = {
+    prepare() {
+      return {
+        bind(...bound) {
+          values = bound;
+          return { run: async () => ({ success: true }), first: async () => null };
+        },
+      };
+    },
+  };
+  const request = new Request('https://zeppbridge.pages.dev/api/feedback', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(old),
+  });
+  const result = await onRequestPost({ request, env: { FEEDBACK_DB: db } });
+  assert.equal(result.status, 201);
+  assert.equal(values[11], '[]');
+  assert.ok(!values[8].includes('6.2.208.7'));
+  assert.ok(!values[8].includes('deviceType:'));
 });
 
 test('stores accepted reports and returns an opaque report id', async () => {

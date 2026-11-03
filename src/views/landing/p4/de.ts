@@ -10,16 +10,23 @@ const pack: P4Copy = {
       { id: 'theme', title: 'Tag und Nacht', text: 'Helles und dunkles Design. Ein Fingertipp, und es wird Nacht.', scene: 'theme' },
     ] },
     { id: 'connection', name: 'Verbindung', title: 'Deine Daten aus der Cloud. Zurück auf deinem Schreibtisch.', lead: 'Verbinde dein Zepp-Konto und deine Daten landen auf diesem Rechner. Intervall wählen, den Rest erledigt die automatische Synchronisierung.', points: [
-      { id: 'account', title: 'Offizieller Login', text: 'Melde dich im System-Browser bei Zepp an – auch mit Drittanbieter-Konten. Autorisierungsstatus jederzeit einsehbar.', scene: 'account' },
+      { id: 'account', title: 'Offizieller Login', text: 'Melde dich im System-Browser bei Zepp an – auch Konten mit Google, Apple, Xiaomi oder Facebook funktionieren. Autorisierungsstatus jederzeit einsehbar.', scene: 'account' },
       { id: 'sync', title: 'Automatische Synchronisierung', text: 'Aus, 15, 30 oder 60 Minuten. Du schläfst, die Daten synchronisieren sich.', scene: 'sync' },
       { id: 'devices', title: 'Kennt deine Uhr', text: 'Automatische Modell-Erkennung. Falls mal etwas nicht stimmt, bestimmst du das Modell selbst.', scene: 'devices' },
       { id: 'local', title: 'Bleibt auf deinem Rechner', text: 'Von Zepp synchronisierte Gesundheitsdaten bleiben lokal und berühren nie unsere Server. Was an die KI geht, entscheidest du.', scene: 'local' },
     ] },
     { id: 'records', name: 'Überblick', title: 'Dutzende Messwerte auf einen Blick.', lead: 'Alle Trends auf einer Seite, damit du deine Verfassung sofort verstehst. Öffne jeden Wert für den vollständigen Verlauf.', points: [
       { id: 'overview', title: 'Nach deinen Wünschen', text: 'Schlaf oder Training zuerst: Die Startseite richtet sich nach deinen Prioritäten. Scrollen, dann Details öffnen.', scene: 'overview' },
-      { id: 'hourly', title: 'Stunde für Stunde', text: 'Schritte, Distanz und Kalorien für jede Stunde des Tages.', scene: 'hourly' },
+      { id: 'normal', title: 'Dein Normalbereich', text: 'Die Zeile unter jedem Messwert ist dein eigener Normalbereich – kein Vergleich mit anderen. Tippe auf „?“, um zu sehen, woher er stammt.', scene: 'normal' },
       { id: 'workouts', title: 'Jeder Lauf hallt nach', text: 'Vergleiche deine Einheiten mit ähnlichen Distanzen aus der Vergangenheit: Puls, Tempo und GPS-Strecke.', scene: 'workouts' },
       { id: 'gaps', title: 'Nichts erfunden', text: 'Was nicht gemessen wurde, bleibt leer. Keine erfundenen Nullen, vorherigen Werte oder Schätzungen.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archiv', title: 'Jedes Training zählt.', lead: 'Jahresringe, dein Tagebuch, das Gefühl nach jeder Einheit und Briefe vom Autor – alles bleibt auf diesem Rechner.', points: [
+      { id: 'rings', title: 'Jahresringe', text: 'Ein Ring pro Jahr. In Wochen mit mehr Training wächst er breiter.', scene: 'rings' },
+      { id: 'journal', title: 'Tagebuch', text: 'Persönliche Bestleistungen, Wettkampf-Countdowns und eine Medaillenwand. Laufschuhe erinnern dich, sobald ihre Distanz erreicht ist.', scene: 'journal' },
+      { id: 'feel', title: 'Nach dem Training', text: 'Bewerte die Einheit, markiere schmerzende Stellen und notiere, welche Schuhe du getragen hast.', scene: 'feel' },
+      { id: 'import', title: 'Importieren und aufräumen', text: 'GPX-, FIT- und Strava-Exporte lassen sich direkt importieren. Wähle mehrere Einheiten aus, um ihren Typ auf einmal zu ändern oder sie auszublenden.', scene: 'import' },
+      { id: 'letters', title: 'Briefkasten', text: 'Zu jeder Version ein Brief vom Autor. Wenn du antwortest, liest er mit und antwortet dir. Dazu jede Woche ein Brief über deine Daten.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'An KI geben', title: 'Nutze Abos, die du schon hast. Ohne Extrakosten.', lead: 'Wähle den Zeitraum: Deine Einträge werden zu einer Datei. Gib sie deiner gewohnten KI, sprich weiter und bring den Planentwurf zurück.', points: [
       { id: 'providers', title: 'Sieben Modelle zur Wahl', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao und Grok. Mit deinem bestehenden Konto und Kontingent.', scene: 'ai' },
@@ -29,7 +36,7 @@ const pack: P4Copy = {
     ] },
     { id: 'ai-plan', name: 'Trainingsplan', title: 'Am Computer vollenden. Am Handgelenk trainieren.', lead: 'Teile der KI deine Verfassung mit und sie plant die Woche. Zurückkopieren, feinjustieren und direkt an die Uhr senden.', points: [
       { id: 'receive', title: 'Mit einem Klick zurück', text: 'Vom Chat zum Entwurf: Einmal einfügen und der Wochenplan steht.', scene: 'receive' },
-      { id: 'edit', title: 'Dein Plan', text: 'Ziehe Tage hin und her, öffne jede Einheit und passe Dauer und Intensität Schritt für Schritt an.', scene: 'plan-edit' },
+      { id: 'edit', title: 'Dein Plan', text: 'Ziehe zwei Tage zum Tauschen, öffne jeden Tag und passe Dauer und Intensität Schritt für Schritt an. Gedrückt halten, um ihn an die Uhr zu senden.', scene: 'plan-edit' },
       { id: 'templates', title: 'Vorlagen und Import', text: 'Als Vorlage speichern und wieder trainieren. Unterstützt auch .zwo- und Workout-.fit-Dateien.', scene: 'templates' },
       { id: 'easy', title: 'Heute erschöpft', text: 'Sind Intervalle geplant, aber die Erholung ist gering, wechselst du mit einem Klick auf lockeres Training. Vor dem Absenden bestätigst du.', scene: 'easy' },
     ] },
@@ -42,7 +49,7 @@ const pack: P4Copy = {
     title: 'Einstellungen',
     lead: 'Große Karten einzeln durchblättern, kleine als Kartenstapel. Konto, Synchronisierung, Anzeige und Datenverwaltung mit einem Tipp.',
     summaryTitle: 'Die Details stecken in den Einstellungen.',
-    summaryLead: 'Vierzehn alltägliche Optionen, zusammengefasst in einem Stapel.',
+    summaryLead: 'Fünfzehn alltägliche Optionen, zusammengefasst in einem Stapel.',
     items: [
       { id: 'sync', title: 'Automatische Synchronisierung', text: 'Aus, 15, 30 oder 60 Minuten. Eine Stufe genügt.', icon: 'auto-sync' },
       { id: 'retention', title: 'Zehn Jahre, hier behalten', text: 'Hole bis zu zehn Jahre Historie auf diesen Rechner und behalte sie. Sie rollt nicht mit dem Zeitfenster der Cloud davon.', icon: 'database' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Datenschutz und Sicherheit', text: 'Zugangsdaten schützt das Betriebssystem. Tokens tauchen nie in Logs auf.', icon: 'browser-login' },
       { id: 'filename', title: 'Dateinamen', text: 'Bestimme selbst, wie die Exportdateien für die KI heißen.', icon: 'document' },
       { id: 'folder', title: 'Jederzeit mitnehmen', text: 'Deine Daten liegen in einem Ordner auf diesem Rechner, und alles, was du hier geschrieben hast – Bewertungen, Pläne, KI-Aufgaben –, lässt sich in eine einzige JSON-Datei exportieren.', icon: 'database' },
+      { id: 'language', title: 'Dreizehn Sprachen', text: 'Vereinfachtes und traditionelles Chinesisch, English, Español und mehr. Jederzeit wechseln.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'ZeppBridge entdecken', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Verbindung' }, { id: 'records', label: 'Überblick' }] },
+    { label: 'ZeppBridge entdecken', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Verbindung' }, { id: 'records', label: 'Überblick' }, { id: 'journal', label: 'Archiv' }] },
     { label: 'Von Daten zur Tat', links: [{ id: 'ai', label: 'An KI geben' }, { id: 'ai-plan', label: 'Trainingsplan' }, { id: 'record-sleep', label: 'Schlaf und Training' }] },
     { label: 'Nach deinen Regeln', links: [{ id: 'connect', label: 'Einstellungen' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Lokale API' }] },
   ],

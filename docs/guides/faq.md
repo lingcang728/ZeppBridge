@@ -129,3 +129,6 @@ Two ways:
   file and the opening line, and sends them. Press Esc at any time to stop.
   Without it, the file is on your clipboard: press Ctrl+V (⌘V on a Mac) in the
   chat box.
+
+The full walk-through, training plans to the watch included, is in
+[Handing your data to AI](ai.md).

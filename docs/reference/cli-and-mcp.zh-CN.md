@@ -2,13 +2,15 @@
 
 [English](cli-and-mcp.md)
 
-`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口，随每个 Release 以独立压缩包分发：需要它们的人不该被迫先装一个 GUI，装了 GUI 的人也不该被塞进两个用不到的程序。
+`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口。3.1.1 起它们随桌面应用一起安装、一起升级（就在主程序旁边，设置 › 交给 AI 工具里能复制路径）；每个 Release 也照旧附一个独立压缩包，给没有桌面的机器：需要它们的人不该被迫先装一个 GUI。
 
 两者都只是 [`zeppbridge-core`](architecture.zh-CN.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
 
 ## 安装
 
-从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
+**装了桌面应用**：不用另装。Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`；设置 › 交给 AI 工具会显示两个程序的完整路径。它们就在应用旁边，读的自然是同一个库。
+
+**没有桌面的机器**：从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
 
 把两个程序放到 ZeppBridge 可执行文件旁边，它们就会读同一个库。数据目录由 `paths.rs` 决定：
 
@@ -121,6 +123,23 @@ zeppbridge-cli fit-override --list --json                              # 这台�
 
 顶替只存在这台电脑的库里：Zepp 没有导入运动的接口，云端和手表上的那份不会变。之后的同步、`reprocess` 和解析器重放都不会冲掉它，快照也会带上它。运动编号来自 Zepp，几台电脑上是同一个，所以有几份库就在每台上跑同一条命令。文件起点要和那次运动相差 5 分钟以内（否则 `errorKind: "fit_start_mismatch"`），运动得已经在库里（否则 `workout_not_found`），两者都以 1 退出。撤销一条没被顶替过的运动照样成功，返回 `"removed": false`。
 
+### 跑鞋和比赛
+
+桌面端「履历」页里的跑鞋和比赛，脚本也能管：
+
+```bash
+zeppbridge-cli shoes list --json                   # 跑鞋、里程和磨损，外加还没添加的 Zepp 鞋编号
+zeppbridge-cli shoes save --file shoe.json --json  # 新增；JSON 里带 "id" 就是修改，返回编号
+zeppbridge-cli shoes delete --id 3 --json
+zeppbridge-cli races list --json
+cat race.json | zeppbridge-cli races save --file - --json
+zeppbridge-cli races delete --id 2 --json
+```
+
+`save` 收一个 JSON 对象，字段和桌面端的表单一样。跑鞋必填 `name`、`sport`（`running` / `trail` / `walking` / `hiking`）、`retire_km`（100–5000）和 `started_on`（`YYYY-MM-DD`），`is_default`、`zepp_gear_id`、`start_km`、`retired_on`、`notes` 可选。比赛必填 `name`、`race_date`、`sport`（`running` / `trail` / `cycling` / `swimming` / `triathlon` / `other`）和 `priority`（`a` / `b` / `c`），`distance_m`、`goal_seconds`、`result_seconds`、`workout_id`、`notes` 可选。开关叫 `--file` 而不是 `--json`：`--json` 在所有命令里都是「输出成 JSON」。文件格式不对在开库之前就按用法错误（2）退出；库拒收的值（名字为空、不认识的运动）也是 2。删一个不存在的编号以 1 退出，`errorKind: "not_found"`。写入要拿跨进程写锁，同步正在跑时会等，等不到就报 `4`。
+
+AI 通过 MCP 的 `get_athlete_profile`（`journal`）读得到这些，但改不了：MCP 没有写跑鞋和比赛的工具。
+
 ### 退出码
 
 退出码是对调度脚本的契约，只会新增，不会改变含义。
@@ -184,7 +203,7 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 ### 从桌面应用连接
 
-安装包会把 `zeppbridge-mcp` 放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
+安装包会把 `zeppbridge-mcp`（3.1.1 起还有 `zeppbridge-cli`）放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
 **设置 › 交给 AI 工具 › 连到 AI 工具**会替你填好真实路径：
 
 - **Claude Code** 和 **Codex**：复制三行命令——注册 MCP（带 `--scope task`）、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
@@ -254,8 +273,8 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
 | `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
-| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己打的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划、生活事件（`epoch: true` 是用户起了名的纪元，如「备战首马」） |
-| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景、用户确认过的教练档案（`coachNotes`）、用户的履历（`journal`：本机算的 5K / 10K / 半马 / 全马 PB、还没好和 90 天内好的伤病、带 A/B/C 优先级的将来比赛与比赛成绩、还在穿的跑鞋与里程、纪元） |
+| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线（取自睡眠汇总的 `rhr`，不是睡眠期间的平均心率）、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己打的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划、生活事件（`epoch: true` 是用户起了名的纪元，如「备战首马」） |
+| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率（睡眠汇总的 `rhr`，不是睡眠期间的平均心率）、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景、用户确认过的教练档案（`coachNotes`）、用户的履历（`journal`：本机算的 5K / 10K / 半马 / 全马 PB、还没好和 90 天内好的伤病、带 A/B/C 优先级的将来比赛与比赛成绩、还在穿的跑鞋与里程、纪元） |
 | `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
 | `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
 | `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |

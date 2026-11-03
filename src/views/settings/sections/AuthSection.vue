@@ -48,7 +48,7 @@ const needsAttention = computed(() =>
         </div>
         <div class="s-row-control">
           <template v-if="official.waiting.value">
-            <button v-if="official.status.value.authorize_url" class="button secondary" type="button" @click="official.copyLink">
+            <button v-if="official.status.value.authorize_url" :class="['button', official.browserTrouble.value ? 'primary' : 'secondary']" type="button" @click="official.copyLink">
               <Icon :name="official.linkCopied.value ? 'check' : 'link'" :size="14" />{{ official.linkCopied.value ? t.linkCopied : t.copyAuthLink }}
             </button>
             <button class="button secondary" type="button" :disabled="official.busy.value" @click="official.cancel">{{ t.authCancelLogin }}</button>

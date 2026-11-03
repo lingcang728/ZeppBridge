@@ -82,3 +82,5 @@ macOS 首次打开另有步骤，见 [README 的 macOS 首次打开](../../READM
 
 - **MCP。** 在**设置 › 交给 AI 工具**里，一键接入 Claude Desktop、Claude Code 或 Codex；别的 MCP 客户端用那里给出的配置。之后 AI 会自己查询本机记录，健康数据只读。ChatGPT 接不了本机的 MCP，用「交给 AI」就好。详见 [CLI 与 MCP](../reference/cli-and-mcp.zh-CN.md)。
 - **全自动交给 AI（Windows）。** 打开**设置 › 交给 AI 工具 › 全自动交给 AI**：交出去以后，ZeppBridge 会打开 AI 网站，替你粘贴文件和开场白并发送，随时按 Esc 停下。不开的话，文件已经在剪贴板里，在对话框里按 Ctrl+V（Mac 上 ⌘V）就行。
+
+完整用法（包括让 AI 排训练计划、发到手表）见[交给 AI 指南](ai.zh-CN.md)。

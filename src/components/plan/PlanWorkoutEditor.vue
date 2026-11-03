@@ -150,15 +150,15 @@ const shrink = (el: Element, done: () => void) => {
 <template>
   <article ref="root" class="workout-editor">
     <header class="fields">
-      <label class="field name"><span>{{ e.nameLabel }}</span>
-        <input class="ai-input" type="text" :value="workout.name" :disabled="!editable" maxlength="60" @change="setField('name', $event)" />
+      <label class="ai-field field name"><span class="ai-field-label">{{ e.nameLabel }}</span>
+        <input class="ai-field-input" type="text" :value="workout.name" :disabled="!editable" maxlength="60" @change="setField('name', $event)" />
       </label>
-      <label :class="['field', { bad: missing('ui.training_plan.issue.missing_focus') }]"><span>{{ e.focusLabel }}</span>
-        <input class="ai-input" type="text" :value="workout.focus ?? ''" :placeholder="e.focusPlaceholder" :disabled="!editable" maxlength="20" @change="setField('focus', $event)" />
+      <label :class="['ai-field', 'field', { bad: missing('ui.training_plan.issue.missing_focus') }]"><span class="ai-field-label">{{ e.focusLabel }}</span>
+        <input class="ai-field-input" type="text" :value="workout.focus ?? ''" :placeholder="e.focusPlaceholder" :disabled="!editable" maxlength="20" @change="setField('focus', $event)" />
         <small v-if="missing('ui.training_plan.issue.missing_focus')">{{ e.required }}</small>
       </label>
-      <label :class="['field', 'wide', { bad: missing('ui.training_plan.issue.missing_description') }]"><span>{{ e.descriptionLabel }}</span>
-        <textarea class="ai-input" rows="2" :value="workout.description ?? ''" :placeholder="e.descriptionPlaceholder" :disabled="!editable" @change="setField('description', $event)"></textarea>
+      <label :class="['ai-field', 'field', 'wide', { bad: missing('ui.training_plan.issue.missing_description') }]"><span class="ai-field-label">{{ e.descriptionLabel }}</span>
+        <textarea class="ai-field-input" rows="2" :value="workout.description ?? ''" :placeholder="e.descriptionPlaceholder" :disabled="!editable" @change="setField('description', $event)"></textarea>
         <small v-if="missing('ui.training_plan.issue.missing_description')">{{ e.required }}</small>
       </label>
     </header>

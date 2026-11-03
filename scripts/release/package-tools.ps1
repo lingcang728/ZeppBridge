@@ -3,10 +3,10 @@
   打包 zeppbridge-cli 与 zeppbridge-mcp 为一个版本化压缩包。
 
 .DESCRIPTION
-  桌面应用是双击运行的，命令行和 MCP 不是——它们要被 Task Scheduler、cron
-  或某个 MCP 客户端按路径调起来。所以这两个 binary 单独分发，而不是塞进
-  NSIS/MSI 安装包里：装了桌面应用的人不一定需要它们，需要它们的人也不该被
-  迫先装一个 GUI。
+  3.1.1 起两个 binary 也作为 sidecar 随桌面应用安装（stage-mcp-sidecar.ps1），
+  装了应用的人在设置 › 交给 AI 工具里就能拿到路径。这个压缩包照旧随每个
+  Release 发，给没有桌面的机器（NAS、服务器、跑 AI 智能体的机器）：需要
+  命令行的人不该被迫先装一个 GUI。
 
   压缩包里除了两个 binary，还有 SHA256SUMS.txt、一份说明和一段可以直接粘进
   MCP 客户端配置的 JSON 示例。文件名带版本和平台，不与主程序 ZeppBridge.exe

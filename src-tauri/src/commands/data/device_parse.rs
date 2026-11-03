@@ -197,44 +197,33 @@ pub(super) fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence
     let mut shapes = BTreeSet::new();
     collect_device_shapes(value, "$", &mut evidence, &mut shapes, 0);
     evidence.shapes = shapes.into_iter().collect();
-    let mut seen = BTreeSet::new();
+    // 3.1.1 起只交「认不出的那几台」：已经认出的设备（型号、固件号）和体脂秤都不再上报，
+    // `candidates` 恒为空（字段留着，旧服务端的校验要求它在）。
     let mut unmatched_product_hints = BTreeSet::new();
     let mut model_identifier_hints = BTreeSet::new();
     for item in device_items(value) {
-        collect_model_identifier_hints(&item, &mut model_identifier_hints);
         let Some(profile) = parse_device_profiles(&item).into_iter().next() else {
             continue;
         };
-        if profile.match_status == DeviceMatchStatus::Unknown {
-            evidence.unknown_device_count += 1;
-            collect_unmatched_product_hints(&item, &mut unmatched_product_hints, 0);
-        }
-        let (Some(catalog_id), Some(canonical_name)) = (profile.catalog_id, profile.canonical_name)
-        else {
+        if profile.match_status != DeviceMatchStatus::Unknown
+            || profile.kind.as_deref() == Some("scale")
+        {
             continue;
-        };
-        if seen.insert(catalog_id.clone()) {
-            evidence.candidates.push(DiagnosticDeviceCandidate {
-                catalog_id,
-                canonical_name,
-                firmware: profile.firmware,
-                match_status: profile.match_status,
-            });
+        }
+        evidence.unknown_device_count += 1;
+        collect_unmatched_product_hints(&item, &mut unmatched_product_hints, 0);
+        let extra = flattened_device_metadata(&item);
+        for code in device_source_numbers(&item, &extra) {
+            if code <= 99_999_999 {
+                model_identifier_hints.insert(format!("deviceSource:{code}"));
+            }
         }
     }
-    evidence
-        .candidates
-        .sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
     evidence.unmatched_product_hints = unmatched_product_hints.into_iter().collect();
     evidence.model_identifier_hints = model_identifier_hints.into_iter().take(8).collect();
     evidence
 }
 
-/// 收集型号类的数字标识。
-///
-/// 这些是「哪一款表」而不是「哪一台表」：只取整数，`deviceSource` 和
-/// `deviceType` 在 Zepp 的接口里都是型号维度的取值。序列号、MAC、绑定时间和
-/// 任何字符串一律不收 —— 没有它们这份报告也够补目录，收了就越界了。
 /// 设备条目里的 `deviceSource` 数字。
 ///
 /// **只取 `deviceSource`**。`deviceType` 长得像同一类东西，却是族码：反馈库里
@@ -259,39 +248,21 @@ pub(super) fn device_source_numbers(item: &Value, extra: &Value) -> Vec<i64> {
     out
 }
 
-pub(super) fn collect_model_identifier_hints(item: &Value, out: &mut BTreeSet<String>) {
-    let extra = flattened_device_metadata(item);
-    for (source, keys) in [
-        (
-            item,
-            ["deviceSource", "device_source", "deviceType", "device_type"],
-        ),
-        (
-            &extra,
-            ["deviceSource", "device_source", "deviceType", "device_type"],
-        ),
-    ] {
-        let Some(object) = source.as_object() else {
-            continue;
-        };
-        for key in keys {
-            let Some(Value::Number(number)) = object.get(key) else {
-                continue;
-            };
-            let Some(value) = number.as_i64() else {
-                continue;
-            };
-            if !(0..=99_999_999).contains(&value) {
-                continue;
-            }
-            let canonical = if key.starts_with("deviceS") || key.starts_with("device_s") {
-                "deviceSource"
-            } else {
-                "deviceType"
-            };
-            out.insert(format!("{canonical}:{value}"));
-        }
-    }
+/// Zepp 设备列表里 `deviceType` 的「体脂秤」族码。
+pub(super) const SCALE_DEVICE_TYPE: i64 = 1;
+
+/// 设备条目里的 `deviceType` 族码。只用来分大类（是不是秤），从不拿去认型号。
+pub(super) fn device_type_number(item: &Value, extra: &Value) -> Option<i64> {
+    [item, extra].into_iter().find_map(|source| {
+        let object = source.as_object()?;
+        ["deviceType", "device_type"]
+            .into_iter()
+            .find_map(|key| match object.get(key)? {
+                Value::Number(number) => number.as_i64(),
+                Value::String(text) => text.trim().parse().ok(),
+                _ => None,
+            })
+    })
 }
 
 pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProfile> {
@@ -424,6 +395,7 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                 match_status: DeviceMatchStatus::Unknown,
                 has_local_data: false,
                 last_data_at: None,
+                hidden: false,
                 firmware: first_string(
                     &extra,
                     &[
@@ -441,6 +413,14 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             };
             if let Some(matched) = matched {
                 apply_catalog_match(&mut profile, matched.entry, matched.status);
+            } else if device_type_number(&item, &extra) == Some(SCALE_DEVICE_TYPE) {
+                // 认不出型号的体脂秤：只标「类」，不猜型号。
+                //
+                // `deviceType` 是族码（0 = 表 / 手环、1 = 体脂秤、7 = 耳机），**只能**
+                // 用来分大类。反馈库里 101–104 这些低位编号全都带着 `deviceType:1`，
+                // 被用户在选择器里指认成了好几块不同的表——其实是秤那一行。
+                // 界面据此显示「体脂秤」而不是「未识别设备」，也不再催用户去指认。
+                profile.kind = Some("scale".into());
             }
             profile
         })

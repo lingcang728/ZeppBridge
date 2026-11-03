@@ -3,13 +3,8 @@
 use super::*;
 
 /// 组装诊断报告。
-///
-/// `include_assignments` 为真时附上「用户指认的型号 ↔ 这台设备的型号类编号」。
-/// 这一对是内置目录唯一可能的成长来源，但它仍然是用户主动交出来的东西：
-/// 只有在选择器里勾选了「帮忙补充目录」的那一次提交才会带上。
 pub(super) async fn build_diagnostic_report(
     state: &AppState,
-    include_assignments: bool,
     user_note: Option<&str>,
 ) -> std::result::Result<DiagnosticReport, AppError> {
     let device_payload = match state.auth.load_auth() {
@@ -28,10 +23,6 @@ pub(super) async fn build_diagnostic_report(
         Err(status) => empty_device_diagnostic(status),
     };
     let db = state.db.lock().await;
-    let user_assigned_models = match (&device_payload, include_assignments) {
-        (Ok(payload), true) => collect_assigned_models(&db, payload),
-        _ => Vec::new(),
-    };
     Ok(DiagnosticReport {
         format: "zeppbridge.feedback.v1".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
@@ -39,7 +30,6 @@ pub(super) async fn build_diagnostic_report(
         normalizer_revision: NORMALIZER_REVISION.into(),
         operating_system: std::env::consts::OS.into(),
         device_evidence,
-        user_assigned_models,
         unknown_workout_codes: db.diagnostic_unknown_workout_codes()?,
         workout_type_corrections: report_safe_corrections(
             db.diagnostic_workout_type_corrections()?,
@@ -126,47 +116,6 @@ pub(super) fn sanitize_diagnostic_note(note: &str) -> Option<String> {
 /// 一个词看起来像不像凭据、序列号或设备 ID（规则在 core，回信脱敏也用同一份）。
 pub(super) use zeppbridge_core::redact::looks_like_secret;
 
-/// 逐台设备把「用户指认的型号」和「这台设备的型号类编号」配成对。
-///
-/// 一份响应里可能有好几台设备，所以配对必须在设备粒度上做，不能把一堆编号和
-/// 一堆型号平铺在一起让服务端去猜。没有编号可交的设备直接跳过：只有型号没有
-/// 编号，对补目录没有任何用处。
-pub(super) fn collect_assigned_models(
-    db: &zeppbridge_core::storage::Database,
-    payload: &Value,
-) -> Vec<DiagnosticAssignedModel> {
-    let mut out = Vec::new();
-    for item in device_items(payload) {
-        let mut hints = BTreeSet::new();
-        collect_model_identifier_hints(&item, &mut hints);
-        if hints.is_empty() {
-            continue;
-        }
-        let extra = flattened_device_metadata(&item);
-        let device_id = first_string(&item, &["deviceId", "device_id", "macAddress"])
-            .or_else(|| first_string(&extra, &["deviceId", "device_id"]));
-        let serial = first_string(&extra, &["sn", "serial", "serialNumber"])
-            .or_else(|| first_string(&item, &["sn", "serial", "serialNumber"]));
-        let keys = [device_id.as_deref(), serial.as_deref()]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
-        if keys.is_empty() {
-            continue;
-        }
-        let Ok(Some(assigned)) = db.device_model_override(&keys) else {
-            continue;
-        };
-        out.push(DiagnosticAssignedModel {
-            catalog_id: assigned.catalog_id,
-            model_identifier_hints: hints.into_iter().take(8).collect(),
-        });
-    }
-    out.sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
-    out.dedup();
-    out
-}
-
 pub(super) const FEEDBACK_ENDPOINT: &str = "https://zeppbridge.com/api/feedback";
 
 #[tauri::command]
@@ -175,7 +124,7 @@ pub async fn submit_diagnostic_report(
     note: Option<String>,
     category: Option<String>,
 ) -> std::result::Result<FeedbackSubmissionResult, AppError> {
-    let mut report = build_diagnostic_report(&state, false, note.as_deref()).await?;
+    let mut report = build_diagnostic_report(&state, note.as_deref()).await?;
     report.category = normalize_report_category(category.as_deref());
     post_diagnostic_report(report).await
 }
@@ -190,26 +139,6 @@ pub(super) fn normalize_report_category(value: Option<&str>) -> Option<String> {
         .map(|allowed| (*allowed).to_string())
 }
 
-/// 把「用户指认的型号 ↔ 这台设备的型号类编号」交回来，让下一版目录能自动
-/// 识别同款设备。
-///
-/// 单独一个命令而不是在指认时自动发送：用户在选择器里勾选了才会走到这里，
-/// 设置页那句「应用不会自动上报任何使用行为」才不会变成空话。
-#[tauri::command]
-pub async fn submit_device_model_assignment(
-    state: tauri::State<'_, AppState>,
-    note: Option<String>,
-) -> std::result::Result<FeedbackSubmissionResult, AppError> {
-    let report = build_diagnostic_report(&state, true, note.as_deref()).await?;
-    if report.user_assigned_models.is_empty() {
-        return Err(AppError::new(
-            "err.diagnostic.nothing_to_submit",
-            "这台设备没有可用于补充目录的型号编号，暂时不需要提交",
-        ));
-    }
-    post_diagnostic_report(report).await
-}
-
 pub(super) async fn post_diagnostic_report(
     report: DiagnosticReport,
 ) -> std::result::Result<FeedbackSubmissionResult, AppError> {
@@ -219,7 +148,6 @@ pub(super) async fn post_diagnostic_report(
     // 「无需提交报告」顶回去，而界面上又没有任何地方让他说明报的是什么。
     // 用户比检测器更清楚自己遇到了什么。
     let has_reportable_issue = report.device_evidence.unknown_device_count > 0
-        || !report.user_assigned_models.is_empty()
         || !report.unknown_workout_codes.is_empty()
         // 一次运动类型纠正本身就是一条可处理的线索：它说的是「这个编号你们
         // 认错了」。以前这种情况本机检测不到——编号我们认识，只是认错了——

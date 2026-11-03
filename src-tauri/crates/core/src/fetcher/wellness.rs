@@ -154,7 +154,10 @@ impl DataFetcher {
     /// its own surface: a different path, a different member dimension, and a
     /// window in **seconds** instead of milliseconds.
     ///
-    /// Sliced by year. The endpoint truncates at `limit` instead of paging, so
+    /// Sliced by 90 days (it used to be a year). The endpoint is slow — #157
+    /// measured 20 s+ even for small pages — and a smaller window both answers
+    /// sooner and lets an interrupted sync resume from the slice it reached.
+    /// The endpoint truncates at `limit` instead of paging, so
     /// asking for five years in one request and taking what comes back would
     /// silently drop the oldest readings — which is what someone backfilling
     /// "at least 5 years of weigh-ins" is asking for in the first place.
@@ -166,7 +169,7 @@ impl DataFetcher {
     pub async fn fetch_weight_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
-        for slice in window.chunks(365) {
+        for slice in window.chunks(90) {
             match self
                 .connector
                 .fetch_weight_records(

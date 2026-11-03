@@ -460,6 +460,39 @@ fn the_watch_description_leads_with_purpose_and_the_sub_type_to_pick() {
 }
 
 #[test]
+fn a_trail_run_says_to_start_it_as_a_run_on_the_watch() {
+    // #143：手表上没有越野跑可选，标签先写跑步，再说一句手表上怎么开始。
+    let mut trail = easy_run("2026-10-04");
+    trail["variant"] = json!("trail");
+    let check = check_plan(&document(json!({ "workouts": [trail] })), context());
+    assert!(check.publishable(), "{:?}", check.issues);
+    let numbered = vec![NumberedWorkout {
+        id: 7,
+        workout: check.workouts[0].clone(),
+    }];
+    let window = Window::starting(day("2026-10-02"));
+    let description = |locale| {
+        let body = window_body(window, &numbered, locale);
+        body["workouts"][0]["description"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(
+        description(WatchLocale::Zh),
+        "强化耐力 · 跑步 · 越野路线，手表上选跑步开始\n全程放松"
+    );
+    assert_eq!(
+        description(WatchLocale::En),
+        "强化耐力 · Run · trail, start it as a run on the watch\n全程放松"
+    );
+    assert_eq!(
+        description(WatchLocale::Es),
+        "强化耐力 · Carrera · montaña, en el reloj, empieza una carrera\n全程放松"
+    );
+}
+
+#[test]
 fn clearing_a_future_window_parks_one_placeholder_the_day_before() {
     let window = Window::starting(day("2026-10-09"));
     let body = clear_future_window(window, 1_000_000_042);
@@ -469,4 +502,43 @@ fn clearing_a_future_window_parks_one_placeholder_the_day_before() {
     assert_eq!(workouts.len(), 1, "绝不能对未来窗口发空数组：那清的是本周");
     assert_eq!(workouts[0]["workoutDate"], "2026-10-08");
     assert_eq!(workouts[0]["workoutId"], 1_000_000_042);
+}
+
+/// 泳池一步最少一个池长（25 米，2026-11-02 手表实测收下 25 米和 75 米）；别的运动仍是 50 米。
+/// 游泳的配速没法按每公里读，先整条拦下，不偷偷当成跑步配速发出去。
+#[test]
+fn pool_steps_go_down_to_one_length_and_swims_refuse_pace() {
+    let swim = |sport: &str, duration: &str, target: Option<&str>| {
+        let mut step = json!({ "kind": "interval", "duration": duration });
+        if let Some(target) = target {
+            step["target"] = json!(target);
+        }
+        let plan = document(json!({
+            "format": "zeppbridge-plan/3",
+            "workouts": [{
+                "date": "2026-10-03", "sport": sport, "name": "测试",
+                "focus": "实测", "description": "实测", "steps": [step]
+            }]
+        }));
+        let check = check_plan(&plan, context());
+        check
+            .issues
+            .iter()
+            .map(|issue| issue.message_code)
+            .collect::<Vec<_>>()
+    };
+    assert!(swim("pool_swim", "25m", None).is_empty());
+    assert!(swim("pool_swim", "75m", Some("hr 120-150")).is_empty());
+    assert_eq!(
+        swim("pool_swim", "20m", None),
+        ["ui.training_plan.issue.pool_distance_out_of_range"]
+    );
+    assert_eq!(
+        swim("running", "25m", None),
+        ["ui.training_plan.issue.distance_out_of_range"]
+    );
+    assert_eq!(
+        swim("open_water_swim", "400m", Some("pace 2:00-2:15")),
+        ["ui.training_plan.issue.swim_pace_unsupported"]
+    );
 }

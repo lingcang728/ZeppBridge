@@ -125,7 +125,7 @@ pub const METRICS: [MetricContract; 41] = [
     MetricContract {
         metric: "bmr",
         unit: "kcal/day",
-        description: "基础代谢率。同上",
+        description: "基础代谢率（静息消耗），体脂秤按体成分估算。同上。交给 AI 时勾日常活动也会带上；没有秤就没有，不从总消耗或活动消耗推算",
     },
     MetricContract {
         metric: "body_balance_score",
@@ -197,7 +197,9 @@ pub const METRICS: [MetricContract; 41] = [
     MetricContract {
         metric: "resting_hr",
         unit: "bpm",
-        description: "静息心率",
+        // #158：AI 把它当成了「睡眠心率」。它是手环睡眠汇总里的 rhr 字段，
+        // 和睡眠区间的平均心率不是一回事，两者数值相等也不说明是同一个量。
+        description: "静息心率：取自手环睡眠汇总的 rhr 字段，不是睡眠期间的平均心率",
     },
     MetricContract {
         metric: "spo2_odi",

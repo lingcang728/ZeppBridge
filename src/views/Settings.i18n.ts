@@ -80,7 +80,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: '已收到，谢谢',
     reportDoneLine: (id: string, at: string) => `报告编号 ${id}，提交时间 ${at}。`,
     reportDoneNote: '发出去的就是上面那几类字段和你写的说明，没有别的。',
-    reportConfirm: '只发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述「哪一款表」而非「哪一台表」）、未知运动编号和数量、云端最近一次拒绝请求的数字错误码（只有编号、哪条流和时间，不含云端返回的文字），以及你写的说明（自动去掉本机路径、邮箱和长串标识）。不发 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
+    reportConfirm: '只发送应用版本、系统类型、解析器版本、字段结构、认不出的设备的产品级提示和型号编号（deviceSource，只有整数，描述「哪一款表」而非「哪一台表」）、未知运动编号和数量、云端最近一次拒绝请求的数字错误码（只有编号、哪条流和时间，不含云端返回的文字），以及你写的说明（自动去掉本机路径、邮箱和长串标识）。不发 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
     reportFailed: '错误报告提交失败',
 
     // ── 能力清单 ──
@@ -126,7 +126,7 @@ export const settingsMessages = defineMessages(
     privacyTelemetryTitle: '没有埋点，没有使用统计',
     privacyTelemetryBody: '应用不自动上报任何使用行为。只有你手动点「提交错误报告」时，才发送下面那几类脱敏字段。',
     privacyReportTitle: '设备或运动没有识别？',
-    privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
+    privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、认不出的设备的型号编号（整数，只说明哪一款表）、未知运动编号和数量发到 ZeppBridge 私有错误报告库；绝不发账号、Token、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机路径。',
 
     // ── 5. MCP ──
     mcpBadge: '健康数据只读 · 不监听端口',
@@ -152,10 +152,10 @@ export const settingsMessages = defineMessages(
 它附带一个 MCP 程序（zeppbridge-mcp），我想配到你这里，让你直接查我的运动和健康数据，不用每次导出再粘贴。
 
 已知信息：
-- MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
+- zeppbridge-mcp 随 ZeppBridge 一起安装，就在主程序旁边；完整路径在 ZeppBridge 的「设置 › 交给 AI 工具」里能看到。没装桌面应用的机器才需要从 GitHub Release 页下载 zeppbridge-tools 压缩包。
 - 它是 stdio 类型的 MCP server，健康数据只读，不监听端口、不需要 token 或 API key；只有在我允许后发布训练计划时才会联网。
 - 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
-- 它有十五个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
+- 它有十六个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
 
 告诉我：
 1. 针对你（我现在用的这个工具）具体该把配置写到哪个文件、用什么命令添加；
@@ -416,7 +416,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: 'Received, thank you',
     reportDoneLine: (id: string, at: string) => `Report ${id}, submitted ${at}.`,
     reportDoneNote: 'What went out is exactly the field types listed above plus the note you wrote. Nothing else.',
-    reportConfirm: 'This sends the app version, OS type, parser revision, product-level hints and field shapes for unidentified devices, firmware version, model-level numbers (deviceSource / deviceType — integers describing which model, not which unit), unknown workout codes and counts, the numeric error code from the most recent request the cloud rejected (just the number, stream and time — never the returned text), and the note above (local paths, emails and long identifiers stripped). Never your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
+    reportConfirm: 'This sends the app version, OS type, parser revision, field shapes, product-level hints and model numbers for devices that could not be identified (deviceSource — integers describing which model, not which unit), unknown workout codes and counts, the numeric error code from the most recent request the cloud rejected (just the number, stream and time — never the returned text), and the note above (local paths, emails and long identifiers stripped). Never your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
     reportFailed: 'Could not submit error report',
 
     // ── Capability board ──
@@ -462,7 +462,7 @@ export const settingsMessages = defineMessages(
     privacyTelemetryTitle: 'No telemetry, no usage statistics',
     privacyTelemetryBody: 'The app reports no usage on its own. Only pressing "Submit error report" sends the de-identified fields listed below.',
     privacyReportTitle: 'A device or workout not recognized?',
-    privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, firmware version, model-level numbers (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
+    privacyReportBody: 'No GitHub account, no copying data. On confirm, only product-level field shapes, model numbers of devices that could not be identified (integers — which model only), and unknown workout codes with counts go to ZeppBridge\'s private report store. Never account, tokens, serials, device IDs, MAC, GPS, health values, raw responses or local paths.',
 
     // ── 5. MCP ──
     mcpBadge: 'Health data read-only · listens on no port',
@@ -488,10 +488,10 @@ export const settingsMessages = defineMessages(
 It ships an MCP program (zeppbridge-mcp) and I want to configure it with you, so you can query my workouts and health data directly instead of me exporting and pasting every time.
 
 What I know about it:
-- The MCP program comes from the zeppbridge-tools archive on ZeppBridge's GitHub Releases page; unzip it and zeppbridge-mcp is inside. I may not have downloaded it yet.
+- zeppbridge-mcp is installed together with ZeppBridge, right next to the main program; ZeppBridge shows its full path under Settings › AI tools. Only a machine without the desktop app needs the zeppbridge-tools archive from ZeppBridge's GitHub Releases page.
 - It is a stdio MCP server. Health data is read-only, it listens on no port and needs no token or API key; it only uses the network to publish a training plan, and only after I allow that.
 - The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- It exposes fifteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
+- It exposes sixteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
 
 Please tell me:
 1. For you specifically — the tool I am talking to right now — which file the config goes in, or which command adds it;
@@ -752,7 +752,7 @@ If you need anything from me (which client I use, where the file lives), just as
     reportDoneTitle: 'Recibido, gracias',
     reportDoneLine: (id: string, at: string) => `Reporte ${id}, enviado el ${at}.`,
     reportDoneNote: 'Se envió exactamente lo listado arriba más tu nota. Nada más.',
-    reportConfirm: 'Se envía solo: versión de la app, tipo de sistema, revisión del analizador, pistas de producto y forma de los campos de dispositivos sin identificar, versión de firmware, números de modelo (deviceSource / deviceType: enteros que dicen qué modelo de reloj, no qué unidad), códigos de entrenamiento desconocidos con su conteo, el código numérico del último rechazo de la nube (solo el número, qué flujo y cuándo; jamás el texto devuelto) y tu nota (sin rutas, correos ni identificadores largos). Jamás tu cuenta de Zepp, tokens, números de serie, IDs de dispositivo, MAC, GPS, valores de salud ni respuestas originales. ¿Enviar?',
+    reportConfirm: 'Se envía solo: versión de la app, tipo de sistema, revisión del analizador, forma de los campos, pistas de producto y números de modelo de los dispositivos sin identificar (deviceSource: enteros que dicen qué modelo de reloj, no qué unidad), códigos de entrenamiento desconocidos con su conteo, el código numérico del último rechazo de la nube (solo el número, qué flujo y cuándo; jamás el texto devuelto) y tu nota (sin rutas, correos ni identificadores largos). Jamás tu cuenta de Zepp, tokens, números de serie, IDs de dispositivo, MAC, GPS, valores de salud ni respuestas originales. ¿Enviar?',
     reportFailed: 'No se pudo enviar el reporte de error',
 
     // ── Capability board ──
@@ -798,7 +798,7 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyTelemetryTitle: 'Sin telemetría ni estadísticas de uso',
     privacyTelemetryBody: 'La app no reporta tu uso por su cuenta. Solo cuando tú pulsas «Enviar un reporte de error» salen los campos anonimizados listados abajo.',
     privacyReportTitle: '¿Un dispositivo o entrenamiento no reconocido?',
-    privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, la versión de firmware, números de modelo (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
+    privacyReportBody: 'Sin cuenta de GitHub ni copiar datos. Al confirmar solo van al almacén privado de reportes de ZeppBridge la forma de los campos a nivel de producto, los números de modelo de los dispositivos sin identificar (enteros, solo qué modelo de reloj) y los códigos de entrenamiento desconocidos con su conteo. Jamás cuenta, tokens, series, IDs de dispositivo, MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 
     // ── 5. MCP ──
     mcpBadge: 'Datos de salud de solo lectura · no abre ningún puerto',
@@ -824,10 +824,10 @@ If you need anything from me (which client I use, where the file lives), just as
 Incluye un programa MCP (zeppbridge-mcp) y quiero configurarlo contigo, para que puedas consultar mis entrenamientos y datos de salud directamente en vez de que yo exporte y pegue cada vez.
 
 Lo que sé:
-- El programa MCP viene en el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub; al descomprimirlo, zeppbridge-mcp está adentro. Puede que todavía no lo haya descargado.
+- zeppbridge-mcp se instala junto con ZeppBridge, al lado del programa principal; ZeppBridge muestra su ruta completa en Ajustes › Herramientas de IA. Solo un equipo sin la app de escritorio necesita el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub.
 - Es un servidor MCP por stdio. Los datos de salud son de solo lectura, no abre ningún puerto y no necesita token ni clave de API; solo usa la red para publicar un plan de entrenamiento, y solo si yo lo permito.
 - La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Ofrece quince herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes); y propose_coach_note, que deja una frase para recordar en la bandeja de mi expediente de entrenador y solo cuenta cuando pulso Recordar.
+- Ofrece dieciséis herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events), salud de los datos (get_data_health) y entrenador (get_training_context, get_athlete_profile, get_training_plan); además de dos herramientas de planes: draft_training_plan (solo guarda un borrador) y publish_training_plan (envía al reloj solo si lo permito en los ajustes); y propose_coach_note, que deja una frase para recordar en la bandeja de mi expediente de entrenador y solo cuenta cuando pulso Recordar.
 
 Dime:
 1. Para ti específicamente (la herramienta con la que estoy hablando ahora), en qué archivo va la configuración o qué comando la agrega;

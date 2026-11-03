@@ -29,7 +29,7 @@ const fakeDb = () => {
         async run() {
           if (sql.includes('INSERT INTO letter_replies')) {
             const [id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash] = args;
-            rows.push({ id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash, read_at: null, category: '', status: '', fixed_in: '' });
+            rows.push({ id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash, read_at: null, category: '', status: '', fixed_in: '', author_reply: '', author_reply_at: null });
           } else if (sql.includes('INSERT INTO feedback_intake_counters')) {
             counters.set(args[0], { window_started_at: args[1], count: 1 });
           } else if (sql.includes('UPDATE feedback_intake_counters')) {
@@ -85,8 +85,24 @@ test('the same reply sent twice is one letter; receipts return status, never the
   assert.deepEqual(receipts.receipts, [{
     replyId, letterVersion: '3.1.0', receivedAt: db.rows[0].received_at,
     readAt: '2026-10-22T08:00:00Z', category: 'backfill-stuck', status: 'fixed', fixedIn: '3.1.1',
+    authorReply: null, authorReplyAt: null,
   }]);
   assert.ok(!JSON.stringify(receipts).includes('补拉还是卡住'));
+});
+
+test('the author reply comes back with the receipt; a retracted one does not', async () => {
+  const db = fakeDb();
+  await post(db, 'reply', reply());
+  db.rows[0].author_reply = '3.1.1 修好了，谢谢你。';
+  db.rows[0].author_reply_at = '2026-11-03T08:00:00Z';
+  const [receipt] = (await (await post(db, 'receipts', { format: 'zeppbridge.letter-receipts.v1', installId: INSTALL })).json()).receipts;
+  assert.equal(receipt.authorReply, '3.1.1 修好了，谢谢你。');
+  assert.equal(receipt.authorReplyAt, '2026-11-03T08:00:00Z');
+  // 撤回 = 空串：时间也不再返回。
+  db.rows[0].author_reply = '';
+  const [retracted] = (await (await post(db, 'receipts', { format: 'zeppbridge.letter-receipts.v1', installId: INSTALL })).json()).receipts;
+  assert.equal(retracted.authorReply, null);
+  assert.equal(retracted.authorReplyAt, null);
 });
 
 test('unknown actions and malformed bodies are refused', async () => {

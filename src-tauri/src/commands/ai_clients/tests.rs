@@ -28,6 +28,23 @@ fn missing_sidecar_gives_no_path() {
     let found = locate_sidecar(dir.path(), &dir.path().join("data"));
     assert!(found.path.is_none());
     assert!(found.data_dir_env.is_none());
+    assert!(found.cli_path.is_none());
+}
+
+/// CLI 和 MCP 各找各的：只附带了 CLI 也照样给出它的路径。
+#[test]
+fn the_cli_is_found_on_its_own() {
+    let dir = Scratch::new("cli");
+    let cli = dir
+        .path()
+        .join(format!("zeppbridge-cli{}", std::env::consts::EXE_SUFFIX));
+    std::fs::write(&cli, b"stub").unwrap();
+    let found = locate_sidecar(dir.path(), &dir.path().join("data"));
+    assert!(found.path.is_none());
+    assert_eq!(
+        found.cli_path.as_deref(),
+        Some(cli.to_string_lossy().as_ref())
+    );
 }
 
 /// sidecar 旁边就是应用的库时不带环境变量；库在别处（开发构建、回退目录）

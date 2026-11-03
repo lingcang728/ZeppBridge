@@ -407,6 +407,9 @@ export const tauriBackend: BridgeBackend = {
   setDeviceModelOverride(deviceKey: string, catalogId: string | null) {
     return call<void>('set_device_model_override', { deviceKey, catalogId });
   },
+  setDeviceHidden(deviceKey: string, hidden: boolean) {
+    return call<void>('set_device_hidden', { deviceKey, hidden });
+  },
   getLocalApiStatus() {
     return call<LocalApiStatus>('get_local_api_status');
   },
@@ -455,6 +458,9 @@ export const tauriBackend: BridgeBackend = {
   },
   setTrayLocale(locale: string) {
     return call<void>('set_tray_locale', { locale });
+  },
+  setAutoSyncPrefs(enabled: boolean, intervalMinutes: number) {
+    return call<void>('set_auto_sync_prefs', { enabled, intervalMinutes });
   },
   systemRegionLocale() {
     return call<string | null>('system_region_locale');
@@ -530,9 +536,6 @@ export const tauriBackend: BridgeBackend = {
       note: note ?? null,
       category: category ?? null,
     });
-  },
-  submitDeviceModelAssignment(note?: string) {
-    return call<FeedbackSubmissionResult>('submit_device_model_assignment', { note: note ?? null });
   },
 
   saveFitExport(selection: ExportSelection, directory: string) {

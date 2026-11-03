@@ -274,6 +274,11 @@ pub(in crate::storage) fn export_sample_matched_type(
         Some("steps".to_string())
     } else if selected.contains("weight") && BODY_COMPOSITION_METRICS.contains(&metric) {
         Some("weight".to_string())
+    } else if metric == "bmr" && selected.contains("daily_activity") {
+        // 静息消耗（3.1.0 反馈）：只勾了日常活动的人也要拿到。只有体脂秤测的 bmr 是
+        // 真值；日指标里的 `calories` 在真实库里逐日等于 `active_calories`（11-03 核过），
+        // 不是全日总消耗，所以不导「总消耗」，也不拿总减活动去推静息。
+        Some("daily_activity".to_string())
     } else if selected.contains("blood_pressure")
         && matches!(
             metric,

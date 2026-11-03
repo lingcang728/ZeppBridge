@@ -10,16 +10,23 @@ const pack: P4Copy = {
       { id: 'theme', title: 'Day and night', text: 'Dark and light themes. One tap and it is night.', scene: 'theme' },
     ] },
     { id: 'connection', name: 'Connect', title: 'Your records, back from the cloud.', lead: 'Connect your Zepp account and your records sync to this computer. Pick a frequency, then let automatic sync take over.', points: [
-      { id: 'account', title: 'Official sign-in', text: 'Sign in to Zepp in your system browser. Third-party accounts work too. Check the authorization status any time.', scene: 'account' },
+      { id: 'account', title: 'Official sign-in', text: 'Sign in to Zepp in your system browser, so accounts that use Google, Apple, Xiaomi or Facebook sign-in work too. Check the authorization status any time.', scene: 'account' },
       { id: 'sync', title: 'Automatic sync', text: 'Off, 15, 30 or 60 minutes. You sleep, it syncs.', scene: 'sync' },
       { id: 'devices', title: 'Knows your watch', text: 'Models are recognized automatically. If one is wrong, point out the right one.', scene: 'devices' },
       { id: 'local', title: 'Stays on this computer', text: 'Health records synced from Zepp are stored on this computer and never pass through our servers. You choose what goes to AI.', scene: 'local' },
     ] },
     { id: 'records', name: 'Understand', title: 'Dozens of metrics at a glance.', lead: 'Every trend on one page, so you can see how your body is doing. Open a metric to read the full record.', points: [
       { id: 'overview', title: 'Your order', text: 'Sleep or training first: the home page follows what you care about. Scroll, then open the details.', scene: 'overview' },
-      { id: 'hourly', title: 'Hour by hour', text: 'Steps, distance and calories for every hour of the day.', scene: 'hourly' },
+      { id: 'normal', title: 'Your normal', text: 'The line under each metric is your own usual range, not anyone else’s. Tap “?” to see where it comes from.', scene: 'normal' },
       { id: 'workouts', title: 'Every run has an echo', text: 'Compare with your own workouts of a similar distance, then look at heart rate, pace and the route.', scene: 'workouts' },
       { id: 'gaps', title: 'Nothing made up', text: 'If it was not measured, it stays blank. No zeros, no previous values, no estimates.', scene: 'gaps' },
+    ] },
+    { id: 'journal', name: 'Archive', title: 'Every session counts.', lead: 'Tree rings, your journal, how each workout felt and letters from the author, all kept on this computer.', points: [
+      { id: 'rings', title: 'Tree rings', text: 'One ring a year. The weeks you trained more grow wider.', scene: 'rings' },
+      { id: 'journal', title: 'Journal', text: 'Personal bests, race countdowns and a medal wall. Shoes remind you when they have run their distance.', scene: 'journal' },
+      { id: 'feel', title: 'After the workout', text: 'Rate the session, mark what hurts and note which shoes you wore.', scene: 'feel' },
+      { id: 'import', title: 'Import and tidy up', text: 'Bring in GPX, FIT and Strava exports. Select several to change their type or hide them at once.', scene: 'import' },
+      { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Send to AI', title: 'Use the subscription you already have.', lead: 'Pick the days and your records become one file. Hand it to the AI you already use, keep talking, then bring the draft back.', points: [
       { id: 'providers', title: 'Seven to choose from', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao and Grok. Your existing account and quota.', scene: 'ai' },
@@ -29,7 +36,7 @@ const pack: P4Copy = {
     ] },
     { id: 'ai-plan', name: 'Training plan', title: 'Finish it on the computer. Train with it on your wrist.', lead: 'Tell the AI how you feel and it plans the week. Paste it back, adjust until it fits, then send it to your watch.', points: [
       { id: 'receive', title: 'Paste it back', text: 'From conversation to draft: copy it back and you have a week plan.', scene: 'receive' },
-      { id: 'edit', title: 'Your plan', text: 'Drag to swap two days, open any day and change each step’s duration and intensity. Hover for details.', scene: 'plan-edit' },
+      { id: 'edit', title: 'Your plan', text: 'Drag to swap two days, open any day and change each step’s duration and intensity. Press and hold to send it to your watch.', scene: 'plan-edit' },
       { id: 'templates', title: 'Templates and import', text: 'Save it as a template for next time. Import .zwo and workout .fit files too.', scene: 'templates' },
       { id: 'easy', title: 'Tired today', text: 'When intervals are planned and readiness is below your usual, swap to an easy session in one tap. You confirm before it is sent.', scene: 'easy' },
     ] },
@@ -42,7 +49,7 @@ const pack: P4Copy = {
     title: 'Settings',
     lead: 'Flip through the large cards one by one; the small ones stack into a wallet. Account, sync, display and data are a tap away.',
     summaryTitle: 'The details live in Settings.',
-    summaryLead: 'Fourteen everyday settings, kept in one card stack.',
+    summaryLead: 'Fifteen everyday settings, kept in one card stack.',
     items: [
       { id: 'sync', title: 'Automatic sync', text: 'Off, 15, 30 or 60 minutes. Pick one.', icon: 'auto-sync' },
       { id: 'retention', title: 'Ten years, kept here', text: 'Pull up to ten years of history to this computer and keep it. It doesn’t roll away with the cloud’s window.', icon: 'database' },
@@ -58,10 +65,11 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacy and security', text: 'Credentials are protected by the system. Tokens never go into logs.', icon: 'browser-login' },
       { id: 'filename', title: 'File names', text: 'You decide what the files for AI are called.', icon: 'document' },
       { id: 'folder', title: 'Take it with you', text: 'Your data lives in a folder on this computer, and everything you wrote here — ratings, plans, AI tasks — exports to one JSON file.', icon: 'database' },
+      { id: 'language', title: 'Thirteen languages', text: 'Simplified and Traditional Chinese, English, Español and more. Switch any time.', icon: 'profile' },
     ],
   },
   nav: [
-    { label: 'Meet ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Connect' }, { id: 'records', label: 'Understand' }] },
+    { label: 'Meet ZeppBridge', links: [{ id: 'motion', label: 'Design' }, { id: 'connection', label: 'Connect' }, { id: 'records', label: 'Understand' }, { id: 'journal', label: 'Archive' }] },
     { label: 'From records to action', links: [{ id: 'ai', label: 'Send to AI' }, { id: 'ai-plan', label: 'Training plan' }, { id: 'record-sleep', label: 'Sleep and workouts' }] },
     { label: 'Your way', links: [{ id: 'connect', label: 'Settings' }, { id: 'set-mcp', label: 'MCP' }, { id: 'set-api', label: 'Local API' }] },
   ],

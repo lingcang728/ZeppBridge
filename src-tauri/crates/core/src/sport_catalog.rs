@@ -104,6 +104,47 @@ pub fn resolve_cloud_with_device(
     Some("open_water_swimming")
 }
 
+/// 文字的运动类型名 → 运动目录 key：导入文件（GPX `<type>`、Strava、TCX）、
+/// 旧通道报文里的文字类型、官方接口认不出的类型名共用这一张表（#157：山地车
+/// 写成 `mountain_bike` / `MTB` 时以前留成原样，导出 FIT 就成了通用运动）。
+///
+/// 只收没有歧义的名字；认不出返回 `None`，由调用方决定怎么兜。「游泳」这种
+/// 分不清泳池还是公开水域的不在这里——导入那边自己按它的习惯兜。
+pub fn text_alias(value: &str) -> Option<&'static str> {
+    let key: String = value
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect();
+    Some(match key.as_str() {
+        "run" | "running" => "run",
+        "trailrun" | "trailrunning" => "trail_running",
+        "virtualrun" | "treadmill" => "treadmill",
+        "ride" | "biking" | "cycling" | "bike" | "gravelride" => "ride",
+        "virtualride" | "indoorcycling" => "indoor_cycling",
+        "mountainbikeride" | "mountainbiking" | "mountainbike" | "mountaincycling" | "mtb" => {
+            "mountain_biking"
+        }
+        "ebikeride" | "ebike" => "e_bike",
+        "walk" | "walking" => "walking",
+        "hike" | "hiking" => "hiking",
+        "weighttraining" | "strengthtraining" | "strength" => "strength",
+        "yoga" => "yoga",
+        "pilates" => "pilates",
+        "rowing" => "rowing",
+        "elliptical" => "elliptical",
+        "nordicski" | "crosscountryskiing" => "cross_country_skiing",
+        "hiit" | "highintensityintervaltraining" => "hiit",
+        "kayaking" => "kayaking",
+        "rockclimbing" | "rockclimb" => "rock_climbing",
+        "soccer" | "football" => "soccer",
+        "tennis" => "tennis",
+        "badminton" => "badminton",
+        "basketball" => "basketball",
+        _ => return None,
+    })
+}
+
 fn known_keys() -> &'static HashSet<String> {
     static KEYS: OnceLock<HashSet<String>> = OnceLock::new();
     KEYS.get_or_init(|| options().iter().map(|entry| entry.key.clone()).collect())
@@ -173,6 +214,54 @@ mod tests {
         assert_eq!(resolve_cloud(224, None, None), Some("hiking"));
     }
 
+    /// #157：文字写的山地车（`mountain_bike`、`MTB`、官方的 `MOUNTAIN_BIKING`）
+    /// 都归到 `mountain_biking`，别名表里的每个 key 都必须是目录里有的。
+    #[test]
+    fn text_aliases_reach_catalog_keys() {
+        for name in [
+            "mountain_bike",
+            "MTB",
+            "MOUNTAIN_BIKING",
+            "Mountain Bike Ride",
+        ] {
+            assert_eq!(text_alias(name), Some("mountain_biking"), "{name}");
+        }
+        assert_eq!(text_alias("Running"), Some("run"));
+        assert_eq!(
+            text_alias("swimming"),
+            None,
+            "分不清泳池还是公开水域，不替它猜"
+        );
+        assert_eq!(text_alias("tug_of_war"), None);
+        for name in [
+            "run",
+            "trailrun",
+            "treadmill",
+            "ride",
+            "indoorcycling",
+            "mtb",
+            "ebike",
+            "walk",
+            "hike",
+            "strength",
+            "yoga",
+            "pilates",
+            "rowing",
+            "elliptical",
+            "nordicski",
+            "hiit",
+            "kayaking",
+            "rockclimbing",
+            "soccer",
+            "tennis",
+            "badminton",
+            "basketball",
+        ] {
+            let key = text_alias(name).unwrap();
+            assert!(is_known_key(key), "{name} → {key} 不在目录里");
+        }
+    }
+
     #[test]
     fn catalog_keeps_cloud_overrides_and_covers_extended_types() {
         assert_eq!(resolve(6), Some("walking"));
@@ -197,8 +286,26 @@ mod tests {
         assert_eq!(resolve(47), Some("mountain_biking"));
         assert_eq!(resolve(141), Some("water_rowing"));
         assert_eq!(resolve(193), Some("fishing"));
-        // 遛狗只开放手动纠正：还不知道哪个编号会产生它，不猜。
-        assert!(is_known_key("dog_walking"));
+    }
+
+    /// 3.1.1：215 遛狗、216 板式网球、108 爬楼（用户对着 Zepp App 核对）。爬楼和
+    /// 54 的爬楼机是两回事，分成两个 key；高山滑雪（#157）还不知道编号，只供手改。
+    #[test]
+    fn codes_added_in_3_1_1() {
+        assert_eq!(resolve(215), Some("dog_walking"));
+        assert_eq!(resolve(216), Some("padel"));
+        assert_eq!(resolve(108), Some("stair_climbing"));
+        assert_eq!(resolve(54), Some("stair_climber"));
+        assert!(is_known_key("alpine_skiing"));
+    }
+
+    /// #155：按官方对照表的 deviceSource（9568515 是官方表列出的 Balance 2）认出的表上，15 是公开水域游泳。
+    #[test]
+    fn issue_155_balance_2_by_official_device_source_swims_in_open_water() {
+        assert_eq!(
+            resolve_cloud_with_device(15, Some(9568515), None, None),
+            Some("open_water_swimming")
+        );
     }
 
     /// 211 是公路骑行。

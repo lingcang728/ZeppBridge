@@ -28,3 +28,8 @@ test('an echo is optional, but once written every language carries the same #ids
   assert.match(problems, /echo\/fr\.md 这一行不是回音格式/);
   assert.match(problems, /缺上期回音 .*echo\/pl\.md/);
 });
+
+test('from 3.1.1 every release ships 13 languages, Traditional Chinese included', () => {
+  assert.equal(NOTE_LOCALES.length, 13);
+  assert.ok(NOTE_LOCALES.includes('zh-TW'));
+});

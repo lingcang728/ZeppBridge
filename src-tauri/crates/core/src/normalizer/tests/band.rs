@@ -201,6 +201,10 @@ fn missing_rem_is_not_invented_from_in_bed_subtraction() {
     }))
     .unwrap();
     assert_eq!(result.sleep_sessions[0].rem_minutes, None);
+    // 没有清醒段也没有 `wk`：清醒是不知道，不是 0；睡着按深睡 61 + 浅睡 140，
+    // 不拿 360 分钟的在床时长顶。
+    assert_eq!(result.sleep_sessions[0].awake_minutes, None);
+    assert_eq!(result.sleep_sessions[0].duration_minutes, 61 + 140);
     assert_eq!(result.sleep_sessions[0].time_in_bed_minutes, None);
     assert_eq!(result.sleep_sessions[0].stages.len(), 2);
     assert_eq!(result.sleep_sessions[0].stages[0].stage, "deep");

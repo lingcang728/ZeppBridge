@@ -34,6 +34,9 @@ const SKIP_FILES = [
   'views/landing/reelCopy.ts', // Typed ten-language MotionReel controls.
   'views/landing/film/copy.ts', // Film captions per LandingLocale; untranslated locales fall back to English.
   'views/landing/p4Copy.ts', // P4 chapter copy per LandingLocale (zh here, others in p4/<locale>.ts); untranslated locales keep the older layout.
+  'views/landing/zh-TW.ts', // 繁体中文落地页语言包
+  'views/landing/p4/zh-TW.ts', // 繁体中文 P4 章节语言包
+  'views/landing/film/locales/zh-TW.ts', // 繁体中文演示片字幕语言包
   'demo/dialogueCopy.ts', // Typed ten-language demo dialogue strings.
 ];
 
@@ -54,7 +57,12 @@ const ALLOWED = [
   },
   {
     file: 'services/updateNotice.ts',
-    text: '修复|Fixed|Fix',
+    text: '改进|改進|优化|Improved|Changed',
+    why: 'Release-note category parser: recognized category keywords across simplified and traditional Chinese.',
+  },
+  {
+    file: 'services/updateNotice.ts',
+    text: '修复|修復|Fixed|Fix',
     why: 'Release-note category parser; displayed labels come from UpdateNotice.i18n.ts.',
   },
   {
@@ -487,7 +495,9 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW'];
+/** 本身就写汉字的语言包：不查「非中文包里出现 CJK」。 */
+const CJK_PACK_LOCALES = new Set(['zh-TW']);
 
 /* —— 极简文案表扫描器 ——
  * 不是真 parser：只对付 `key: '…'`、`key: {…}`、`key: (a,b)=>…`、
@@ -961,7 +971,7 @@ const auditLocalePacks = (writePending) => {
         if (leaf.kind === 'string' && leaf.text.trim() === '') {
           problems.push(`  locales/${l}.ts → ${full}: 空串叶子`);
         }
-        if (CHINESE.test(leaf.text)) {
+        if (!CJK_PACK_LOCALES.has(l) && CHINESE.test(leaf.text)) {
           problems.push(`  locales/${l}.ts → ${full}: 非中文语言包里出现 CJK`);
         }
         if (zhLeaf.kind === 'function') {

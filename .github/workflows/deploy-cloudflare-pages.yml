@@ -18,6 +18,9 @@ jobs:
       CLOUDFLARE_D1_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_API_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # 更新日志页只收打了 v* 标签的版本（scripts/site/changelog.mjs），浅克隆没有标签。
+          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:

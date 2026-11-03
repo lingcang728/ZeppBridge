@@ -1,6 +1,6 @@
 {
-  "version": 9,
-  "checked_at": "2026-10-23",
+  "version": 10,
+  "checked_at": "2026-11-02",
   "notes": "Zepp cloud-history observations take precedence where its numeric types differ from the Zepp OS device protocol. Extended identifiers are cross-checked against Gadgetbridge's Zepp OS catalog and user-supplied Zepp App screenshots. A null code means the sport is offered as a manual correction but no Zepp numeric type is known to produce it -- never guess one in to make the entry look complete.",
   "sports": [
     { "code": 224, "key": "hiking", "label_zh": "徒步", "label_en": "Hiking", "label_es": "Senderismo", "source": "user_reported", "evidence": "https://github.com/lingcang728/ZeppBridge/issues/125" },
@@ -139,10 +139,13 @@
     { "code": 192, "key": "run", "label_zh": "户外跑步", "label_en": "Outdoor Running", "label_es": "Carrera al aire libre", "source": "cloud_inferred" },
     { "code": 193, "key": "fishing", "label_zh": "钓鱼", "label_en": "Fishing", "label_es": "Pesca", "source": "user_reported" },
     { "code": 206, "key": "e_bike", "label_zh": "电助力骑行", "label_en": "E-Bike Ride", "label_es": "Bicicleta eléctrica", "source": "extended_catalog" },
+    { "code": 108, "key": "stair_climbing", "label_zh": "爬楼", "label_en": "Stair Climbing", "label_es": "Subir escaleras", "source": "user_reported" },
     { "code": 211, "key": "road_cycling", "label_zh": "公路骑行", "label_en": "Road Cycling", "label_es": "Ciclismo de ruta", "source": "user_reported" },
+    { "code": 215, "key": "dog_walking", "label_zh": "遛狗", "label_en": "Dog Walking", "label_es": "Pasear al perro", "source": "user_reported" },
+    { "code": 216, "key": "padel", "label_zh": "板式网球", "label_en": "Padel", "label_es": "Pádel", "source": "user_reported" },
     { "code": 223, "key": "activity", "label_zh": "AI 识别活动", "label_en": "AI-Detected Activity", "label_es": "Actividad detectada por IA", "source": "cloud_verified" },
     { "code": 225, "key": "rucking", "label_zh": "负重徒步", "label_en": "Rucking", "label_es": "Rucking", "source": "user_reported" },
     { "code": null, "key": "open_water_swimming", "label_zh": "公开水域游泳", "label_en": "Open Water Swimming", "label_es": "Natación en aguas abiertas", "source": "correction_only" },
-    { "code": null, "key": "dog_walking", "label_zh": "遛狗", "label_en": "Dog Walking", "label_es": "Pasear al perro", "source": "correction_only" }
+    { "code": null, "key": "alpine_skiing", "label_zh": "高山滑雪", "label_en": "Alpine Skiing", "label_es": "Esquí alpino", "source": "correction_only" }
   ]
 }

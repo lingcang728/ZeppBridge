@@ -1,8 +1,8 @@
 //! 便携版的原地替换（静默更新）。
 //!
-//! 便携版就是一个文件夹：`ZeppBridge.exe`、`zeppbridge-mcp.exe`，旁边是 `data\`。它的更新包是
-//! 一份签过名的 zip，只装这两个程序（CI 的 `scripts/release/package-portable.ps1` 打出来，
-//! `latest.json` 里的 `windows-x86_64-portable` 条目）。签名由 updater 插件在下载时按内置公钥核对，
+//! 便携版就是一个文件夹：`ZeppBridge.exe`、`zeppbridge-mcp.exe`、`zeppbridge-cli.exe`（3.1.1 起），旁边是
+//! `data\`。它的更新包是一份签过名的 zip，只装这几个程序（CI 的 `scripts/release/package-portable.ps1` 打出来，
+//! `latest.json` 里的 `windows-x86_64-portable-cli` 条目；老的 `windows-x86_64-portable` 不带 CLI，留给 3.1.0 及更早的应用）。签名由 updater 插件在下载时按内置公钥核对，
 //! 到这里的字节已经验过。
 //!
 //! Windows 不让覆盖正在运行的 exe，但允许给它改名，所以不用另起一个助手进程等主进程退出：
@@ -13,7 +13,8 @@
 //! 3. 调用方拉起新 exe（带 [`AFTER_UPDATE_ARG`]）后退出。新进程在初始化单实例之前先等
 //!    `ZeppBridge.exe.old` 删得掉——删得掉就说明旧进程已经退了（[`wait_for_previous`]）。
 //!
-//! `zeppbridge-mcp.exe.old` 可能还被某个 AI 客户端开着，删不掉就留着，下次启动再删（[`sweep`]）。
+//! `zeppbridge-mcp.exe.old` 可能还被某个 AI 客户端开着（`zeppbridge-cli.exe.old` 可能正被脚本调用），
+//! 删不掉就留着，下次启动再删（[`sweep`]）。
 
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -23,6 +24,8 @@ use std::time::{Duration, Instant};
 const APP_ENTRY: &str = "ZeppBridge.exe";
 /// 包里 MCP 的名字（和 tauri.sidecar.conf.json 的 externalBin 打出来的一致）。
 const MCP_ENTRY: &str = "zeppbridge-mcp.exe";
+/// 包里 CLI 的名字（3.1.1 起随应用一起分发、一起升级）。3.1.0 及更早的包里没有它。
+const CLI_ENTRY: &str = "zeppbridge-cli.exe";
 const STAGING_DIR: &str = ".update-staging";
 const OLD_SUFFIX: &str = "old";
 /// 单个文件的上限：真实的 exe 几十 MB，超过这个数的条目不是我们打的包。
@@ -46,7 +49,7 @@ fn exe_dir(exe: &Path) -> io::Result<&Path> {
     exe.parent().ok_or_else(|| invalid("程序路径没有上级目录"))
 }
 
-/// 把更新包解到暂存目录。包里只许有 `ZeppBridge.exe`（必须有）和 `zeppbridge-mcp.exe`，
+/// 把更新包解到暂存目录。包里只许有 `ZeppBridge.exe`（必须有）、`zeppbridge-mcp.exe` 和 `zeppbridge-cli.exe`，
 /// 平铺、不带目录——别的条目一律拒绝，不往用户文件夹里写任何意料之外的东西。
 pub(crate) fn stage(exe: &Path, payload: &[u8]) -> io::Result<Staged> {
     let dir = exe_dir(exe)?;
@@ -62,6 +65,8 @@ pub(crate) fn stage(exe: &Path, payload: &[u8]) -> io::Result<Staged> {
             exe.to_path_buf()
         } else if name.eq_ignore_ascii_case(MCP_ENTRY) {
             dir.join(MCP_ENTRY)
+        } else if name.eq_ignore_ascii_case(CLI_ENTRY) {
+            dir.join(CLI_ENTRY)
         } else {
             return Err(invalid(format!("更新包里有意料之外的条目：{name}")));
         };
@@ -189,6 +194,7 @@ pub(crate) fn sweep(exe: &Path) {
         exe.file_name()
             .map(|name| name.to_string_lossy().into_owned()),
         Some(MCP_ENTRY.to_string()),
+        Some(CLI_ENTRY.to_string()),
     ];
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;

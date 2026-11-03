@@ -22,6 +22,8 @@ export interface JourneyCopy {
   macInstall: string; copyCommand: string; copied: string;
   system: string;
   starOnGithub: string;
+  /** 下载区版本号旁的小链接，去 /changelog/。 */
+  changelog: string;
 }
 
 const zh: JourneyCopy = {
@@ -85,7 +87,72 @@ const zh: JourneyCopy = {
   copyCommand: '复制', copied: '已复制',
   system: '跟随系统',
   starOnGithub: '在 GitHub 上加星',
+  changelog: '更新日志',
 };
+const zhTW: JourneyCopy = {
+  title: ['腕上所記，', '盡歸於你。'],
+  lead: '從 Zepp 同步至本機。概覽、睡眠分期、運動對比與訓練計畫在同一處查看。',
+  nav: { product: '產品', motion: '外觀', try: '親自試試', download: '下載', menu: '開啟選單' },
+  groups: { records: '紀錄', ai: '交給 AI', connect: '向外串接' },
+  links: { overview: '概覽', sleep: '睡眠與恢復', workouts: '運動', ask: '問答', plan: '訓練計畫', arrange: '理牌', mcp: 'MCP', api: '本機 API', settings: '設定頁' },
+  themes: ['深色', '淺色', '系統'],
+  motionTitle: '動態效果',
+  motionLead: '從一次輕觸到鬆手回彈。五段操作，自動依序展示。',
+  motions: [
+    { id: 'glass', title: '底部玻璃', text: '按住、拖曳、放開。透鏡跟隨指標，邊緣折射掠過背景。' },
+    { id: 'poker', title: '挑日子與翻牌', text: '連翻數張日牌，再展開整月、整週。其餘卡牌退至一旁，選中的日子鋪展於眼前。' },
+    { id: 'seasons', title: '四季卡', text: '從空白新增四個釘選指標，回首頁查看，再一一移除。' },
+    { id: 'notes', title: '附註與回彈', text: '點開睡眠時長的說明，再拖起卡牌，體驗聚焦與鬆手回彈。' },
+    { id: 'box', title: '收集箱', text: '收集箱展開，項目納入，再行閉合。' },
+  ],
+  recordsTitle: '紀錄',
+  records: [
+    { id: 'overview', title: '概覽', text: '在一頁中看清所有趨勢，身體狀態一目了然。點開任一指標，繼續查看詳細紀錄。' },
+    { id: 'sleep', title: '睡眠', text: '每晚的時長、評分與分期。沒有測得的時段留白。' },
+    { id: 'workouts', title: '運動', text: '這次與自己以往相近距離的對比，加上心率、配速與軌跡。' },
+  ],
+  aiTitle: '交給 AI',
+  aiLead: '帶上紀錄交給 AI，對話生成初稿，複製回來排成計畫。再點入每一天，微調每一段訓練。',
+  you: '你', reply: '回覆',
+  turns: [
+    { prompt: '用這份睡眠和運動紀錄排接下來一週。沒有測到的標記為未提供，保留休息日。', answer: '我會把這份範例紀錄中的睡眠與運動分開整理。未採樣的日期保留為「未提供」，不推測原因，也不把缺失寫成零。\n\n這一週先安排輕鬆跑、恢復騎乘、節奏跑與間歇，再排入休息日。每次訓練都拆解為可查看的步驟，暖身與放鬆單獨保留。你可以繼續微調時長；這仍是一份待確認的草稿。' },
+    { prompt: '第一場輕鬆跑改為 40 分鐘，保留暖身與放鬆。', answer: '已將第一場輕鬆跑調整為 40 分鐘：6 分鐘暖身、28 分鐘輕鬆跑、6 分鐘放鬆。三段會分別顯示在計畫卡中。\n\n其餘日期與項目維持原有安排，休息日亦予以保留。接下來可以將草稿整理為 Plan，再返回 ZeppBridge 逐日檢視、交換日期或修改細節。' },
+  ],
+  beats: [
+    { id: 'plan', title: '一週計畫', text: '從一週到一天，再到暖身、訓練與放鬆。懸停查看強度，點開修改細節。' },
+    { id: 'arrange', title: '理牌與刪除', text: '拖曳即可交換兩天，也可以刪除一張卡牌。' },
+    { id: 'prompt', title: '自訂問題', text: '傳送前可以修改這段文字。' },
+    { id: 'types', title: '日期與運動類型', text: '先勾選日期範圍，再勾選要帶入的運動類型。' },
+  ],
+  settingsTitle: '設定頁',
+  settingsLead: '大卡片逐張翻看，小卡片收納成卡包。帳號、同步、顯示與資料管理，點開就能調整。',
+  settings: [
+    { id: 'mcp', title: 'MCP', text: '外部工具透過本機唯讀 MCP 讀取檔案。' },
+    { id: 'api', title: '本機 API', text: '僅綁定 127.0.0.1，唯讀。' },
+    { id: 'timezone', title: '時區', text: '同一筆紀錄依所選時區顯示日期。' },
+    { id: 'units', title: '單位', text: '距離與配速依所選單位顯示。' },
+    { id: 'time', title: '時間', text: '時間的顯示格式在此調整。' },
+    { id: 'year', title: '年份', text: '按年份查看檔案。' },
+    { id: 'range', title: '範圍', text: '選擇要檢視的起訖日期。' },
+    { id: 'events', title: '生活事件', text: '把一件事記在某一天，與睡眠、運動並列呈現。' },
+  ],
+  demoTitle: '猶豫不決？不妨試玩一下。',
+  demoLead: '一整年的虛構紀錄，隨意點擊。變更僅保留於本次示範中。',
+  demoStart: '點擊開始', demoReset: '重置範例',
+  demoTabs: ['本機檔案', '睡眠紀錄', '運動與訓練', '交給 AI', '計畫'],
+  back: '返回介紹',
+  downloadTitle: '安裝至這台電腦',
+  downloadLead: '免費開源。下載 ZeppBridge 3 最新穩定版。',
+  downloadPending: '目前沒有適用的相容安裝檔',
+  install: 'Windows 執行安裝檔。macOS 拖入「應用程式」資料夾。Linux 選擇對應套件。',
+  windowsBlocked: '安裝檔暫未簽章：瀏覽器攔截請選擇「保留」，Windows 出現提示請點擊「其他資訊 → 仍要執行」。',
+  macInstall: '拖入「應用程式」資料夾後，在終端機中執行一次：',
+  copyCommand: '複製', copied: '已複製',
+  system: '跟隨系統',
+  starOnGithub: '在 GitHub 上給予星標',
+  changelog: '更新紀錄',
+};
+
 
 const en: JourneyCopy = {
   title: ['Everything your wrist remembers.', 'Yours to keep.'],
@@ -148,11 +215,12 @@ const en: JourneyCopy = {
   copyCommand: 'Copy', copied: 'Copied',
   system: 'System',
   starOnGithub: 'Star on GitHub',
+  changelog: 'Changelog',
 };
 
-function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | 'links' | 'themes' | 'motionTitle' | 'motionLead' | 'motions' | 'recordsTitle' | 'records' | 'aiTitle' | 'aiLead' | 'you' | 'reply' | 'turns' | 'beats' | 'settingsTitle' | 'settingsLead' | 'settings' | 'demoTitle' | 'demoLead' | 'demoStart' | 'demoReset' | 'demoTabs' | 'back' | 'downloadTitle' | 'downloadLead' | 'downloadPending' | 'install' | 'system' | 'starOnGithub'> & Partial<Pick<JourneyCopy, 'windowsBlocked' | 'macInstall' | 'copyCommand' | 'copied'>>): JourneyCopy {
+function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | 'links' | 'themes' | 'motionTitle' | 'motionLead' | 'motions' | 'recordsTitle' | 'records' | 'aiTitle' | 'aiLead' | 'you' | 'reply' | 'turns' | 'beats' | 'settingsTitle' | 'settingsLead' | 'settings' | 'demoTitle' | 'demoLead' | 'demoStart' | 'demoReset' | 'demoTabs' | 'back' | 'downloadTitle' | 'downloadLead' | 'downloadPending' | 'install' | 'system' | 'starOnGithub'> & Partial<Pick<JourneyCopy, 'windowsBlocked' | 'macInstall' | 'copyCommand' | 'copied' | 'changelog'>>): JourneyCopy {
   // 还没翻的语言先回落英文；待翻清单在桌面《翻译.md》。
-  return { windowsBlocked: en.windowsBlocked, macInstall: en.macInstall, copyCommand: en.copyCommand, copied: en.copied, ...partial };
+  return { windowsBlocked: en.windowsBlocked, macInstall: en.macInstall, copyCommand: en.copyCommand, copied: en.copied, changelog: en.changelog, ...partial };
 }
 
 export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
@@ -217,6 +285,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Kopiuj', copied: 'Skopiowano',
     system: 'Systemowy',
     starOnGithub: 'Dodaj gwiazdkę na GitHubie',
+    changelog: 'Dziennik zmian',
   }),
 
   it: pack({
@@ -280,8 +349,11 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Copia', copied: 'Copiato',
     system: 'Sistema',
     starOnGithub: 'Lascia una stella su GitHub',
+    changelog: 'Registro modifiche',
   }) satisfies JourneyCopy,
   zh, en,
+  // 繁體中文（台灣）文案。
+  'zh-TW': zhTW,
   es: pack({
     title: ['Todo lo que recuerda tu muñeca.', 'Tuyo para siempre.'],
     lead: 'Sincroniza desde Zepp a este equipo. Resumen, fases del sueño, comparación de entrenos y plan quedan juntos.',
@@ -338,6 +410,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Copiar', copied: 'Copiado',
     system: 'Sistema',
     starOnGithub: 'Dar estrella en GitHub',
+    changelog: 'Registro de cambios',
   }),
   fr: pack({
     title: ['Tout ce que retient votre poignet.', 'Rien qu’à vous.'],
@@ -395,6 +468,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Copier', copied: 'Copié',
     system: 'Système',
     starOnGithub: 'Star sur GitHub',
+    changelog: 'Notes de version',
   }),
   de: pack({
     title: ['Alles, was dein Handgelenk festhält.', 'Ganz und gar deins.'],
@@ -452,6 +526,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Kopieren', copied: 'Kopiert',
     system: 'System',
     starOnGithub: 'Stern auf GitHub',
+    changelog: 'Changelog',
   }),
   nl: pack({
     title: ['Alles wat je pols onthoudt.', 'Helemaal van jou.'],
@@ -509,6 +584,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Kopiëren', copied: 'Gekopieerd',
     system: 'Systeem',
     starOnGithub: 'Ster op GitHub',
+    changelog: 'Wijzigingsoverzicht',
   }),
   'pt-BR': pack({
     title: ['Tudo o que seu pulso registra.', 'É seu, de verdade.'],
@@ -566,6 +642,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Copiar', copied: 'Copiado',
     system: 'Sistema',
     starOnGithub: 'Dar estrela no GitHub',
+    changelog: 'Histórico de alterações',
   }),
   'pt-PT': pack({
     title: ['Tudo o que o teu pulso regista.', 'É teu, de verdade.'],
@@ -623,6 +700,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Copiar', copied: 'Copiado',
     system: 'Sistema',
     starOnGithub: 'Dar estrela no GitHub',
+    changelog: 'Registo de alterações',
   }),
   ru: pack({
     title: ['Всё, что запомнило запястье,', 'остаётся вашим.'],
@@ -680,6 +758,7 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'Копировать', copied: 'Скопировано',
     system: 'Системная',
     starOnGithub: 'Оценить на GitHub',
+    changelog: 'История изменений',
   }),
   'hi-IN': pack({
     title: ['आपकी कलाई ने जो कुछ सहेजा,', 'वह सब आपका।'],
@@ -737,5 +816,6 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
     copyCommand: 'कॉपी करें', copied: 'कॉपी किया गया',
     system: 'सिस्टम',
     starOnGithub: 'GitHub पर स्टार दें',
+    changelog: 'बदलावों का विवरण',
   }),
 };

@@ -25,7 +25,8 @@ const { locale, localeLoadError, initializeLocale, setLocale, landingCopyFor } =
 const t = computed(() => (locale.value === 'zh' || locale.value === 'en' ? COPY[locale.value] : landingCopyFor(locale.value) ?? COPY.en));
 const journey = computed(() => JOURNEY[locale.value]);
 /** 新版章节只给已有译文的语言；其余语言保持旧版布局，不出现半页中文。 */
-const p4 = computed(() => P4_COPY[locale.value]);
+// 繁体还没翻时先用简体（翻译.md 第三十四批）。
+const p4 = computed(() => P4_COPY[locale.value] ?? (locale.value === 'zh-TW' ? P4_COPY.zh : undefined));
 const downloads = useDownloads(t);
 const page = ref<HTMLElement | null>(null);
 useScrollMotion(page);
@@ -114,7 +115,7 @@ onBeforeUnmount(() => {
       </template>
       <SettingsBoard :journey="journey" :locale="locale" :p4="p4" />
       <InteractiveDemoSection :copy="t" :journey="journey" :locale="locale" @back="go('top')" />
-      <FinalCta :copy="t" :journey="journey" :windows="downloads.windows.value" :macos="downloads.macos.value" :linux="downloads.linux.value" :available="downloads.state.value === 'ready'" :unreachable="downloads.state.value === 'fallback' && !downloads.notYet.value" />
+      <FinalCta :copy="t" :journey="journey" :windows="downloads.windows.value" :macos="downloads.macos.value" :linux="downloads.linux.value" :available="downloads.state.value === 'ready'" :unreachable="downloads.state.value === 'fallback' && !downloads.notYet.value" :version="downloads.latest.value?.version" :locale="locale" />
     </main>
   </div>
 </template>

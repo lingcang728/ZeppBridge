@@ -23,7 +23,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!needsLetter(version)) {
     console.log(`${version} 早于作者来信流程，不需要信。`);
   } else if (missing.length === 0) {
-    console.log(`${version} 的信 12 种语言都在。`);
+    console.log(`${version} 的信 ${NOTE_LOCALES.length} 种语言都在。`);
   } else if (missing.includes('zh')) {
     console.error(`这版的信写了吗？还没有 ${letterPath(version, 'zh')}。先写中文原稿，再审英文，其余语言交给翻译 agent。`);
     process.exitCode = 1;

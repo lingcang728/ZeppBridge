@@ -31,14 +31,15 @@ import { useHubText } from '../../components/ai/hub/hub.i18n';
 import { usePlanText } from '../../components/plan/usePlanText';
 import { foreignToUi, langOf } from '../../lib/trainingPlan/foreignText';
 import { issueDate } from '../../lib/trainingPlan/week';
-import { planIssueText } from '../../lib/trainingPlan/issues';
+import { planIssueLines } from '../../lib/trainingPlan/issues';
 import { usePlanHistoryText } from './AiPlanHistory.i18n';
 import '../../styles/ai-task.css';
 
 defineOptions({ name: 'AiPlanWeek' });
 const hub = useAiHub();
 /* 第一次看到一周计划：就地说一句怎么改、怎么发（新手引导的就地一章）。没有计划时不说。 */
-watch(() => !!hub.future.value, (has) => { if (has) offerInlineSoon('planFirst', 900, () => !!hub.future.value); }, { immediate: true });
+// 新手引导「训练计划」一章：有了一周计划才讲（空页不讲），计划接回来的那一刻也会问一句。
+watch(() => !!hub.future.value, (has) => { if (has) offerInlineSoon('plan', 900, () => !!hub.future.value); }, { immediate: true });
 const plan = useTrainingPlan();
 const history = useExchanges();
 const t = useBridgeText();
@@ -59,7 +60,7 @@ const startFromFile = async () => { await startPop.value?.close(); library.openF
 const root = ref<HTMLElement | null>(null);
 const chip = ref<InstanceType<typeof PlanStatusChip> | null>(null);
 /** 挂不到某一天的问题（整份计划的、日期写坏的）列在这里；挂得到的在那一天的单天页里。 */
-const looseIssues = computed(() => (hub.future.value?.check.issues ?? []).filter((issue) => !issueDate(issue, hub.written.value)));
+const looseIssues = computed(() => planIssueLines((hub.future.value?.check.issues ?? []).filter((issue) => !issueDate(issue, hub.written.value))));
 /** 纸片落在七天的格子上；还没有计划时落在空态那一块。 */
 const landing = () => root.value?.querySelector<HTMLElement>('.future-days') ?? root.value?.querySelector<HTMLElement>('.ai-empty') ?? null;
 const received = () => {
@@ -103,7 +104,7 @@ const changes = computed(() => (plan.editingSent.value
         <PlanStatusChip ref="chip" :state="plan.state.value" :drafting="!!plan.preview.value && plan.accepted.value" :busy="plan.busy.value" :sending="sending" :simulated="hub.demo.value"
           :discardable="!!plan.preview.value && plan.accepted.value" @undo="plan.undo()" @clear="plan.clear()" @discard="plan.discard()" />
         <ReceiveCapsule v-if="hub.future.value" variant="pill" :target="landing" @received="received" />
-        <RouterLink class="pill-button quiet" to="/ai/plan/history"><Icon name="clock" :size="14" />{{ ht.open }}</RouterLink>
+        <RouterLink class="pill-button quiet" to="/ai/plan/history" data-tour="plan-history"><Icon name="clock" :size="14" />{{ ht.open }}</RouterLink>
       </div>
     </PageHeader>
     <div v-if="plan.preview.value && !plan.accepted.value" class="ai-message"><Icon name="spark" :size="16" /><span>{{ t.mcp }}</span><button class="pill-button" @click="plan.accept()">{{ t.accept }}</button><button class="pill-button quiet" @click="plan.discard()">{{ t.discard }}</button></div>
@@ -116,7 +117,7 @@ const changes = computed(() => (plan.editingSent.value
       <BridgeFuture :preview="hub.future.value" :readonly="!hub.editable.value" :stamped="hub.stamped.value" :today="hub.today.value"
         :swap="hub.changeDay" :insert="hub.insertAt" :changes="changes"
         @move="hub.changeDay" @delete="hub.removeDay" @publish="deliver" />
-      <ul v-if="looseIssues.length" class="whole-issues"><li v-for="(issue, i) in looseIssues" :key="i"><Icon name="warning" :size="14" />{{ planIssueText(issue) }}</li></ul>
+      <div v-if="looseIssues.length" class="whole-issues"><Icon name="info" :size="15" /><ul><li v-for="line in looseIssues" :key="line">{{ line }}</li></ul></div>
     </div>
     <div v-else class="ai-panel ai-empty">
       <p>{{ h.planEmpty }}</p>
@@ -139,6 +140,9 @@ const changes = computed(() => (plan.editingSent.value
 .plan-summary { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .ai-original { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; vertical-align: 1px; cursor: help; }
-.whole-issues { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--warning); font-size: var(--fs-xs); }
-.whole-issues li { display: flex; align-items: center; gap: 8px; }
+/* 整份计划的提醒：一块安静的底，图标只出现一次，字用次要色，不再满屏黄字。 */
+.whole-issues { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 14px;
+  background: color-mix(in srgb, var(--warning) 6%, transparent); color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; }
+.whole-issues > svg { flex: 0 0 auto; margin-top: 2px; color: color-mix(in srgb, var(--warning) 80%, var(--muted)); }
+.whole-issues ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 </style>

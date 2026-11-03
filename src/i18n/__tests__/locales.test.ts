@@ -48,7 +48,10 @@ describe('pickLocale：navigator.languages 逐条匹配', () => {
   it('地区变体落回基础语言', () => {
     expect(pickLocale(['de-AT'])).toBe('de');
     expect(pickLocale(['de-CH'])).toBe('de');
-    expect(pickLocale(['zh-TW'])).toBe('zh');
+    expect(pickLocale(['zh-SG'])).toBe('zh');
+    expect(pickLocale(['zh-Hans-HK'])).toBe('zh');
+    // 繁体（3.1.1）：台湾、香港、澳门和 Hant 标记都给繁体。
+    for (const tag of ['zh-TW', 'zh-HK', 'zh-MO', 'zh-Hant', 'zh-Hant-TW', 'zh_TW']) expect(pickLocale([tag]), tag).toBe('zh-TW');
     expect(pickLocale(['en-GB'])).toBe('en');
     expect(pickLocale(['fr-CA'])).toBe('fr');
     expect(pickLocale(['it-IT'])).toBe('it');

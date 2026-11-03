@@ -5,11 +5,13 @@
  * 我的回信（2026-10-29 用户：以前像一张被截断的纸）：一只只寄出去的信封——蓝墨水写「致：ZeppBridge 开发者」，
  * 贴回的那一版的邮票，盖寄出那天的邮戳；作者处理过的，处理结果像一枚红章盖在信封右下。点开和来信同一套：
  * 翻面、拆火漆、抽出自己写的那封。还没寄出去的（离线待寄）没有邮戳。
+ * 作者一对一回复过的（3.1.1）：信封左下多一枚「作者回信」章，拆开先是自己写的那页，再是作者那页（黑墨水）。
  * 批次 7 的每周数据来信、时间胶囊、那年今天收在「你的信」（DataLetters.vue）。
  */
 import '../components/letters/paper.css';
 import '../components/letters/letterRail.css';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import PostageStamp from '../components/letters/PostageStamp.vue';
@@ -19,7 +21,7 @@ import DataLetters from '../components/letters/DataLetters.vue';
 import { useDataLetterText } from '../components/letters/dataLetters.i18n';
 import { useLetterText } from '../components/letters/letters.i18n';
 import { echoTitles, letterVersions } from '../services/letters';
-import { letterBox, loadLetterBox, repliedTo, syncLetterBox } from '../services/letterBox';
+import { isNewAuthorReply, letterBox, loadLetterBox, markAuthorReplySeen, repliedTo, syncLetterBox } from '../services/letterBox';
 import { BUNDLED_VERSION, groupRows, loadBundledNotes, releaseRows, type NoteGroup } from '../services/updateNotice';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { dayKey } from '../lib/aiTask/bridgeScale';
@@ -75,12 +77,16 @@ const postmarkOf = (iso: string) => {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? '' : dayKey(date);
 };
+const authorOf = (reply: SentLetterReply | PendingLetterReply) => ('reply_id' in reply && reply.author_reply ? reply : null);
 const readMine = (reply: SentLetterReply | PendingLetterReply, event: MouseEvent) => {
+  const answered = authorOf(reply);
+  if (answered) markAuthorReplySeen(answered);
   const sentAt = 'sent_at' in reply ? reply.sent_at : null;
   mine.value = {
     custom: {
       title: t.value.letterHead(reply.letter_version), to: t.value.toDeveloper, stamp: '', mine: true,
-      postmark: sentAt ? postmarkOf(sentAt) : '', sheets: [{ id: 'mine', label: t.value.tabReplies }],
+      postmark: sentAt ? postmarkOf(sentAt) : '',
+      sheets: [{ id: 'mine', label: t.value.tabReplies }, ...(authorOf(reply) ? [{ id: 'author', label: t.value.authorSheet }] : [])],
     },
     version: reply.letter_version, reply, sentAt, origin: event.currentTarget as HTMLElement,
   };
@@ -94,12 +100,14 @@ const reread = async (version: string, event: MouseEvent) => {
   const notes = version === BUNDLED_VERSION ? await loadBundledNotes(version, locale.value) : null;
   reading.value = { version, notes: notes ? groupRows(releaseRows(notes)) : null, origin };
 };
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('letters');
 </script>
 
 <template>
   <section class="page letter-box" aria-labelledby="letter-box-title">
     <PageHeader title-id="letter-box-title" :title="t.boxTitle" :intro="t.boxSub">
-      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" />
+      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" data-tour="letter-tabs" />
     </PageHeader>
 
     <!-- 换分栏：旧的淡出、淡完新的淡入，不位移（2026-10-29 用户：以前是硬切）。 -->
@@ -134,6 +142,7 @@ const reread = async (version: string, event: MouseEvent) => {
             <span v-if="verdict(sent.reply_id)" class="verdict">
               <b>{{ verdict(sent.reply_id)!.status }}</b><small v-if="verdict(sent.reply_id)!.filed">{{ verdict(sent.reply_id)!.filed }}</small>
             </span>
+            <span v-if="sent.author_reply" class="answered" :class="{ fresh: isNewAuthorReply(sent) }">{{ t.authorStamp }}</span>
           </EnvelopeTile>
           <p class="letter-rail-caption">{{ t.sentOn(day(sent.sent_at)) }}</p>
         </li>
@@ -155,8 +164,13 @@ const reread = async (version: string, event: MouseEvent) => {
 
     <LetterEnvelope v-if="reading" :versions="[reading.version]" :current="reading.version" :notes="reading.notes" :origin="reading.origin" @done="reading = null" />
     <LetterEnvelope v-if="mine" :versions="[]" :current="mine.version" :custom="mine.custom" :origin="mine.origin" @done="mine = null">
-      <template #sheet>
-        <div class="mine-sheet">
+      <template #sheet="{ sheet }">
+        <div v-if="sheet.id === 'author' && authorOf(mine.reply)" class="author-sheet">
+          <p class="author-text no-indent">{{ authorOf(mine.reply)!.author_reply }}</p>
+          <p class="author-sign no-indent">{{ t.authorSign }}</p>
+          <p v-if="authorOf(mine.reply)!.author_reply_at" class="mine-date no-indent">{{ t.authorRepliedOn(day(authorOf(mine.reply)!.author_reply_at!)) }}</p>
+        </div>
+        <div v-else class="mine-sheet">
           <p class="mine-text no-indent">{{ mine.reply.text || t.alsoAttached(mine.reply.also_hit.length) }}</p>
           <p v-if="mine.reply.text && mine.reply.also_hit.length" class="mine-also no-indent">{{ t.alsoAttached(mine.reply.also_hit.length) }}</p>
           <p class="mine-date no-indent">{{ mine.sentAt ? t.sentOn(day(mine.sentAt)) : t.outbox }}</p>
@@ -197,6 +211,15 @@ const reread = async (version: string, event: MouseEvent) => {
 .mine-date { margin: var(--paper-line) 0 0; color: var(--paper-muted); text-align: right; }
 .verdict.on-paper { position: relative; right: auto; bottom: auto; width: max-content; max-width: 100%; margin: 6px 0 0 auto; break-inside: avoid; }
 .verdict.on-paper small { white-space: normal; }
+/* 作者回过信：信封左下一枚蓝章（和右下的红章分开），没拆开看过的新回复章色深一些。作者那页用黑墨水。 */
+.answered {
+  position: absolute; left: 16px; bottom: 16px; z-index: 8; padding: 3px 10px; border: 2px solid rgb(36 70 126 / .55); border-radius: 4px;
+  color: rgb(36 70 126 / .7); font: 800 var(--fs-2xs)/1.4 var(--font-sans); letter-spacing: .12em; rotate: 6deg; pointer-events: none;
+}
+.answered.fresh { border-color: rgb(36 70 126 / .9); color: rgb(36 70 126); box-shadow: 0 0 0 3px rgb(36 70 126 / .12); }
+.author-sheet { color: #1f2328; }
+.author-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.author-sign { margin: var(--paper-line) 0 0; text-align: right; }
 
 .stamp-count { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 .stamp-album { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 26px 14px; padding: 26px; border-radius: var(--radius-lg); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }

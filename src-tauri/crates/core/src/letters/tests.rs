@@ -95,7 +95,71 @@ fn also_hit_ids_and_locales_are_shaped_like_the_server_expects() {
         vec!["backfill-stuck", "linux-lag"]
     );
     assert_eq!(normalize_locale("pt-BR"), Some("pt-BR"));
+    assert_eq!(normalize_locale("zh-TW"), Some("zh-TW"));
     assert_eq!(normalize_locale("xx"), None);
     assert!(is_letter_version("3.1.0"));
     assert!(!is_letter_version("3.1"));
+}
+
+fn receipt(reply_id: &str, author_reply: Option<&str>) -> LetterReceipt {
+    LetterReceipt {
+        reply_id: reply_id.into(),
+        letter_version: "3.1.0".into(),
+        received_at: "2026-10-21T11:00:00Z".into(),
+        read_at: None,
+        category: None,
+        status: None,
+        fixed_in: None,
+        author_reply: author_reply.map(str::to_string),
+        author_reply_at: author_reply.map(|_| "2026-11-03T08:00:00Z".to_string()),
+    }
+}
+
+#[test]
+fn a_state_file_from_before_author_replies_still_loads() {
+    let dir = temp_dir();
+    let path = state_path(&dir);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    // 3.1.0 写的文件：已寄出和回执都没有作者回复字段。
+    std::fs::write(
+        &path,
+        r#"{"install_id":null,"outbox":[],"sent":[{"reply_id":"r1","local_id":"a","letter_version":"3.1.0","text":"hi","also_hit":[],"sent_at":"2026-10-21T11:00:00Z"}],"receipts":[{"replyId":"r1","letterVersion":"3.1.0","receivedAt":"2026-10-21T11:00:00Z","readAt":null,"category":null,"status":null,"fixedIn":null}],"receipts_checked_at":null}"#,
+    )
+    .unwrap();
+    let state = LetterBoxState::load(&dir);
+    assert_eq!(state.sent.len(), 1, "旧文件不能被当成坏文件挪走");
+    assert_eq!(state.sent[0].author_reply, None);
+    assert_eq!(state.receipts[0].author_reply, None);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn the_author_reply_outlives_its_receipt_but_follows_a_retraction() {
+    let mut state = LetterBoxState::default();
+    state.queue(pending("a"));
+    let queued = state.outbox[0].clone();
+    state.mark_sent(&queued, "r1".into(), "2026-10-21T11:00:00Z".into());
+
+    state.apply_receipts(vec![receipt("r1", Some("  3.1.1 修好了。 "))], "t1".into());
+    assert_eq!(
+        state.sent[0].author_reply.as_deref(),
+        Some("3.1.1 修好了。")
+    );
+    assert_eq!(
+        state.sent[0].author_reply_at.as_deref(),
+        Some("2026-11-03T08:00:00Z")
+    );
+
+    // 服务端 180 天后删了回执：本机那封信上的回复还在。
+    state.apply_receipts(vec![], "t2".into());
+    assert!(state.receipts.is_empty());
+    assert_eq!(
+        state.sent[0].author_reply.as_deref(),
+        Some("3.1.1 修好了。")
+    );
+
+    // 作者撤回（回执还在、回复为空）：本机跟着清掉。
+    state.apply_receipts(vec![receipt("r1", None)], "t3".into());
+    assert_eq!(state.sent[0].author_reply, None);
+    assert_eq!(state.sent[0].author_reply_at, None);
 }
