@@ -460,6 +460,39 @@ fn the_watch_description_leads_with_purpose_and_the_sub_type_to_pick() {
 }
 
 #[test]
+fn a_trail_run_says_to_start_it_as_a_run_on_the_watch() {
+    // #143：手表上没有越野跑可选，标签先写跑步，再说一句手表上怎么开始。
+    let mut trail = easy_run("2026-10-04");
+    trail["variant"] = json!("trail");
+    let check = check_plan(&document(json!({ "workouts": [trail] })), context());
+    assert!(check.publishable(), "{:?}", check.issues);
+    let numbered = vec![NumberedWorkout {
+        id: 7,
+        workout: check.workouts[0].clone(),
+    }];
+    let window = Window::starting(day("2026-10-02"));
+    let description = |locale| {
+        let body = window_body(window, &numbered, locale);
+        body["workouts"][0]["description"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(
+        description(WatchLocale::Zh),
+        "强化耐力 · 跑步 · 越野路线，手表上选跑步开始\n全程放松"
+    );
+    assert_eq!(
+        description(WatchLocale::En),
+        "强化耐力 · Run · trail, start it as a run on the watch\n全程放松"
+    );
+    assert_eq!(
+        description(WatchLocale::Es),
+        "强化耐力 · Carrera · montaña, en el reloj, empieza una carrera\n全程放松"
+    );
+}
+
+#[test]
 fn clearing_a_future_window_parks_one_placeholder_the_day_before() {
     let window = Window::starting(day("2026-10-09"));
     let body = clear_future_window(window, 1_000_000_042);
