@@ -75,10 +75,10 @@ export function groupNotes(text) {
     const line = raw.trim();
     if (!line || /^#{1,6}\s/.test(line)) continue;
     let item = line.replace(/^[-*+]\s+/, '');
-    const match = /^(新增|新功能|Added|New|改进|优化|Improved|Changed|修复|Fixed|Fix)\s*[:：]\s*/i.exec(item);
+    const match = /^(新增|新功能|Added|New|改进|改進|优化|Improved|Changed|修复|修復|Fixed|Fix)\s*[:：]\s*/i.exec(item);
     let kind = 'note';
     if (match) {
-      kind = /^(新增|新功能|Added|New)$/i.test(match[1]) ? 'added' : /^(修复|Fixed|Fix)$/i.test(match[1]) ? 'fixed' : 'improved';
+      kind = /^(新增|新功能|Added|New)$/i.test(match[1]) ? 'added' : /^(修复|修復|Fixed|Fix)$/i.test(match[1]) ? 'fixed' : 'improved';
       item = item.slice(match[0].length);
     }
     groups[kind].push(item);
