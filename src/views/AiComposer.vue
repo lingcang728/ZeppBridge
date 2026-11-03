@@ -12,6 +12,7 @@
  * 原来的柱状条带、底栏、「你的过去」二级页都没有了。
  */
 import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useRoute } from 'vue-router';
 import '../styles/ai-task.css';
 import Icon from '../components/Icon.vue';
@@ -53,6 +54,8 @@ import { onMotionEscape } from '../lib/motion/interrupt';
 import { useBridgeText } from '../components/ai/bridge/bridge.i18n';
 import { useHandoffText } from '../components/ai/HandoffDock.i18n';
 import { useStageText } from '../components/ai/stage/stage.i18n';
+import { locale } from '../i18n';
+import { openGuide } from '../lib/faqLink';
 
 defineOptions({ name: 'AiComposer' });
 const route = useRoute();
@@ -290,6 +293,8 @@ onMounted(() => document.addEventListener('visibilitychange', onVisibility));
 onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility));
 onActivated(() => { paused.value = document.hidden; measure(); });
 onDeactivated(() => { paused.value = true; });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('ai');
 </script>
 
 <template>
@@ -303,6 +308,10 @@ onDeactivated(() => { paused.value = true; });
       <RouterLink v-if="!hub.demo.value" to="/settings/ai" class="exchanges-pill mcp-pill" :title="s.mcpPillHint">
         <Icon name="terminal" :size="13" />{{ s.mcpPill }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
+      <!-- 指南在 GitHub 上（docs/guides/ai*.md，3.1.1）：回信里有人问英文的 AI 教程。 -->
+      <button v-if="!hub.demo.value" type="button" class="exchanges-pill" :title="s.guidePillHint" @click="openGuide('ai', locale)">
+        {{ s.guidePill }}<Icon name="chevron-right" :size="13" />
+      </button>
       <div v-if="hub.demo.value" class="demo-banner" role="status"><Icon name="database" :size="14" /><div><strong>{{ t.fullDemo }}</strong><span>{{ t.demoHint }}</span></div></div>
       <div class="head-tools">
         <Transition name="undo-fade">

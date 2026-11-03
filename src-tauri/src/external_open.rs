@@ -6,8 +6,15 @@
 //! 去加载我们打包的那批旧 GTK / GIO 模块，于是一声不吭地退出——`xdg-open` 自己却返回成功，
 //! 应用以为浏览器开了，界面一直停在「等待浏览器授权」。（3.0 的 Linux 反馈：AppImage 点登录不弹浏览器。）
 //!
-//! 所以在 AppImage 里由我们自己调 `xdg-open`，先把这些变量恢复成宿主机的样子；
-//! deb / rpm / Flatpak 和其他平台照旧走 opener 插件。
+//! 所以在 AppImage 里由我们自己调 `xdg-open`，先把这些变量恢复成宿主机的样子。
+//!
+//! deb / Flatpak 也自己调（#156：3.0.6 的 deb、Flatpak、AppImage 点「连接」都不弹浏览器）。
+//! opener 插件只管把打开程序拉起来，它退出码非零（没有默认浏览器、Flatpak 门户拒绝）也
+//! 报成功，应用就一直等一个永远不会打开的授权页。这里依次试 `xdg-open`、`gio open`，
+//! 看退出码；都不行就如实报错，界面把「复制授权链接」顶到前面。其他平台照旧走 opener 插件。
+
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
@@ -87,39 +94,79 @@ fn appimage_dir() -> Option<String> {
     )
 }
 
-/// 用宿主机的环境跑一次 `xdg-open <target>`。
-fn host_xdg_open(target: &std::ffi::OsStr, appdir: &str) -> std::io::Result<()> {
-    let mut command = std::process::Command::new("xdg-open");
-    command.arg(target);
-    for (name, value) in appimage_env_fixes(std::env::vars(), appdir) {
-        match value {
-            Some(value) => command.env(name, value),
-            None => command.env_remove(name),
-        };
+/// Linux 上依次试的打开程序。`xdg-open` 是标准做法（Flatpak 里它转给桌面门户）；
+/// 它没装或者失败了，再试 GNOME / GTK 系桌面都有的 `gio open`。
+const LINUX_OPENERS: &[(&str, &[&str])] = &[("xdg-open", &[]), ("gio", &["open"])];
+
+/// 等打开程序退出最多这么久。正常几百毫秒内交给浏览器就退出；过了还没退，多半是它
+/// 把浏览器直接跑在了自己的进程里（某些 `xdg-open` 的回退路径），算打开了。
+const OPENER_EXIT_WAIT: Duration = Duration::from_secs(3);
+
+/// 等打开程序给个结果：退出码 0 算成功，非零算失败；一直不退就当成功，另起线程收尸。
+fn wait_for_opener(mut child: Child) -> std::io::Result<()> {
+    let deadline = Instant::now() + OPENER_EXIT_WAIT;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return if status.success() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(format!(
+                    "opener exited with {status}"
+                )))
+            };
+        }
+        if Instant::now() >= deadline {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(50));
     }
-    command.spawn().map(|_| ())
 }
 
-/// 用系统浏览器打开一个链接。
+/// Linux：依次试 `LINUX_OPENERS`，第一个成功的为准。AppImage 里先把环境恢复成宿主机的。
+fn linux_open(target: &std::ffi::OsStr) -> std::io::Result<()> {
+    let appdir = appimage_dir();
+    let mut last = std::io::Error::new(std::io::ErrorKind::NotFound, "no opener available");
+    for (program, args) in LINUX_OPENERS {
+        let mut command = Command::new(program);
+        command
+            .args(*args)
+            .arg(target)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        if let Some(appdir) = &appdir {
+            for (name, value) in appimage_env_fixes(std::env::vars(), appdir) {
+                match value {
+                    Some(value) => command.env(name, value),
+                    None => command.env_remove(name),
+                };
+            }
+        }
+        match command.spawn().and_then(wait_for_opener) {
+            Ok(()) => return Ok(()),
+            Err(error) => last = error,
+        }
+    }
+    Err(last)
+}
+
+/// 用系统浏览器打开一个链接。打不开时返回错误（Linux 上按打开程序的退出码判断）。
 pub(crate) fn open_url(app: &AppHandle, url: &str) -> Result<(), String> {
-    if let Some(appdir) = appimage_dir() {
-        return host_xdg_open(url.as_ref(), &appdir).map_err(|error| error.to_string());
+    if cfg!(target_os = "linux") {
+        return linux_open(url.as_ref()).map_err(|error| error.to_string());
     }
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|error| error.to_string())
 }
 
-/// 用文件管理器打开一个文件夹（Linux 走 `xdg-open`）。
+/// 用文件管理器打开一个文件夹（Linux 走 `xdg-open`，不行再 `gio open`）。
 #[cfg(target_os = "linux")]
 pub(crate) fn open_folder(path: &std::path::Path) -> std::io::Result<()> {
-    match appimage_dir() {
-        Some(appdir) => host_xdg_open(path.as_os_str(), &appdir),
-        None => std::process::Command::new("xdg-open")
-            .arg(path)
-            .spawn()
-            .map(|_| ()),
-    }
+    linux_open(path.as_os_str())
 }
 
 #[cfg(test)]

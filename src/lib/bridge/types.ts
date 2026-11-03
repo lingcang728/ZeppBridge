@@ -461,6 +461,8 @@ export interface BridgeBackend {
   getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
   setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;
   setDeviceModelOverride(deviceKey: string, catalogId: string | null): Promise<void>;
+  /** 隐藏 / 恢复一台设备。只藏列表，数据照旧。 */
+  setDeviceHidden(deviceKey: string, hidden: boolean): Promise<void>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
   setLocalApiEnabled(enabled: boolean): Promise<LocalApiStatus>;
   revealLocalApiToken(): Promise<string>;
@@ -477,6 +479,8 @@ export interface BridgeBackend {
   resetCoverageLedger(): Promise<CoverageLedger>;
   retryFailedBackfillChunks(): Promise<CoverageLedger>;
   setTrayLocale(locale: string): Promise<void>;
+  /** 把自动同步的开关和间隔抄给后端：窗口不可见时由后端闹钟接手。 */
+  setAutoSyncPrefs(enabled: boolean, intervalMinutes: number): Promise<void>;
   /** 操作系统的区域格式（如 `pt-PT`），日期顺序与 12/24 小时制跟它走；取不到为 null。 */
   systemRegionLocale(): Promise<string | null>;
   listBackups(): Promise<BackupManifest[]>;
@@ -492,7 +496,6 @@ export interface BridgeBackend {
   /** 把存量原始报文压缩掉，返回压缩前后的字节数。耗时随库大小增长。 */
   compactRawPayloads(): Promise<RawPayloadCompaction>;
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
-  submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
   /** 信匣：本机的待寄出、已寄出和上次取回的回执（不联网）。 */
   lettersState(): Promise<import('../../types/letters').LetterBoxView>;
   /** 寄一封回信；连不上就放进待寄出，返回 queued。 */
@@ -582,6 +585,8 @@ export interface McpSidecar {
   appimage?: boolean;
   /** 本机 AI 客户端里登记了另一份 zeppbridge-mcp 的（多半是 2.x 的旧版，读不了升级后的库）。 */
   stale_clients?: McpClientId[];
+  /** 附带的 zeppbridge-cli 的绝对路径（3.1.1 起）；旧安装包、开发构建、AppImage 里为空。 */
+  cli_path?: string | null;
 }
 export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex';
 

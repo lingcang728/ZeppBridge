@@ -19,6 +19,8 @@ const COPY: Record<LandingLocale, ReelCopy> = {
     play: 'Odtwórz',
   },
 
+  // 繁體中文（台灣）文案。
+  'zh-TW': { preparing: '正在準備展示', failed: '展示暫時無法繼續', retry: '重試', replay: '重播', pause: '暫停', play: '播放' },
   zh: {
     preparing: '正在准备演示',
     failed: '演示暂时未能继续',

@@ -630,3 +630,35 @@ fn device_data_summary_excludes_fused_records_and_keeps_identity_aliases() {
         .unwrap();
     assert!(!has_unknown);
 }
+
+/// 隐藏设备只是本机的一行状态：藏了列表里就没有，恢复就回来，手动指认不受影响。
+#[test]
+fn hiding_a_device_only_hides_it_and_restoring_brings_it_back() {
+    use crate::storage::device_local_state::is_hidden_device;
+
+    let db = Database::in_memory().unwrap();
+    db.set_device_model_override("ABC123", Some("amazfit-balance-2"))
+        .unwrap();
+
+    db.set_device_hidden("ABC123", true).unwrap();
+    let hidden = db.hidden_device_keys().unwrap();
+    // 大小写不敏感；按序列号拼出来的那份档案也要认得出是同一台。
+    assert!(is_hidden_device(&hidden, Some("abc123"), None));
+    assert!(!is_hidden_device(&hidden, Some("OTHER"), Some("SN9")));
+    // 换了大小写再藏一次，不会留两行。
+    db.set_device_hidden("abc123", true).unwrap();
+    assert_eq!(db.hidden_device_keys().unwrap().len(), 1);
+
+    // 指认照旧在。
+    assert_eq!(
+        db.device_model_override(&["ABC123"])
+            .unwrap()
+            .map(|value| value.catalog_id),
+        Some("amazfit-balance-2".to_string())
+    );
+
+    db.set_device_hidden("ABC123", false).unwrap();
+    assert!(db.hidden_device_keys().unwrap().is_empty());
+    assert!(db.device_model_override(&["ABC123"]).unwrap().is_some());
+    assert!(db.set_device_hidden("  ", true).is_err());
+}

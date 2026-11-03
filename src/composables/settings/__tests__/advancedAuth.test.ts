@@ -23,8 +23,9 @@ vi.mock('../../useSyncController', () => ({
 }));
 vi.mock('../../useDevices', () => ({
   deviceStateLabel: (state: string) => state,
-  useDevices: () => ({ models, cache: deviceCache, loading: ref(false), error: deviceError, load: loadDevices }),
+  useDevices: () => ({ models, hiddenModels: ref([]), cache: deviceCache, loading: ref(false), error: deviceError, load: loadDevices }),
   useDeviceAssignment: () => ({ assignError: ref(null), assignMessage: ref(null) }),
+  useDeviceHiding: () => ({ hideBusy: ref(false), hideError: ref(null), setHidden: vi.fn() }),
 }));
 vi.mock('../../../lib/bridge', () => ({
   backend: {
@@ -37,6 +38,7 @@ vi.mock('../../../lib/bridge', () => ({
   isDesktop: () => false,
   toUserMessage: (_error: unknown, fallback: string) => fallback,
 }));
+vi.mock('../../useTour', () => ({ useSectionTour: () => undefined }));
 vi.mock('../context', () => ({ useSettingsContext: () => ({ auth, official }) }));
 vi.mock('../../../views/settings/DiagnosticReportForm.vue', () => ({ default: { render: () => h('form') } }));
 
@@ -199,7 +201,7 @@ describe('device list evidence', () => {
   });
 
   it('official-only: an actual unknown workout device can be opened and assigned', async () => {
-    models.value = [{ profile: { device_id: '99999999', match_status: 'unknown' }, canonicalName: 'Amazfit Prototype', state: 'unknown' } as DeviceCardModel];
+    models.value = [{ profile: { device_id: '99999999', match_status: 'unknown' }, deviceKey: '99999999', canonicalName: 'Amazfit Prototype', state: 'unknown' } as DeviceCardModel];
     const html = await render(DevicesSection);
     expect(html).toContain('Unidentified device found');
     expect(html).toContain('/devices/99999999');
@@ -207,7 +209,7 @@ describe('device list evidence', () => {
   });
 
   it('official-only: a recognized workout device leaves advanced data disconnected', async () => {
-    models.value = [{ profile: { device_id: '10551555', match_status: 'exact' }, canonicalName: 'Amazfit T-Rex 3 Pro', state: 'account' } as DeviceCardModel];
+    models.value = [{ profile: { device_id: '10551555', match_status: 'exact' }, deviceKey: '10551555', canonicalName: 'Amazfit T-Rex 3 Pro', state: 'account' } as DeviceCardModel];
     const html = await render(DevicesSection);
     expect(html).toContain('Amazfit T-Rex 3 Pro');
     expect(html).toContain('/devices/10551555');
@@ -231,14 +233,14 @@ describe('device list evidence', () => {
 
   it('an actual unknown device still gets model assignment guidance', async () => {
     appStatus.value = status({ configured: true, auth_state: 'verified', data_source: 'both' });
-    models.value = [{ profile: { device_id: 'test-device', match_status: 'unknown' }, canonicalName: 'Unknown watch', state: 'unknown' } as DeviceCardModel];
+    models.value = [{ profile: { device_id: 'test-device', match_status: 'unknown' }, deviceKey: 'test-device', canonicalName: 'Unknown watch', state: 'unknown' } as DeviceCardModel];
     const html = await render(DevicesSection);
     expect(html).toContain('Unidentified device found');
     expect(html).toContain('/devices/test-device');
   });
 
   it('cached known devices remain visible after advanced credentials are cleared', async () => {
-    models.value = [{ profile: { device_id: 'test-device', match_status: 'exact' }, canonicalName: 'Amazfit T-Rex 3 Pro', state: 'cached' } as DeviceCardModel];
+    models.value = [{ profile: { device_id: 'test-device', match_status: 'exact' }, deviceKey: 'test-device', canonicalName: 'Amazfit T-Rex 3 Pro', state: 'cached' } as DeviceCardModel];
     expect(await render(DevicesSection)).toContain('Amazfit T-Rex 3 Pro');
   });
 });

@@ -240,6 +240,41 @@ impl Database {
             ],
         )?;
         self.replace_sleep_stages(&sleep.sleep_id, &sleep.stages)?;
+        if sleep.sleep_id.starts_with("band:") {
+            self.drop_superseded_band_sleep(sleep, raw_record_id)?;
+        }
+        Ok(())
+    }
+
+    /// 没有云端 id 的旧通道睡眠，id 由起止时刻拼成。用户在 App 里改了入睡 / 醒来，
+    /// 新的一晚换了 id，旧的那条还留着，于是一晚两条（10-30 / 11-01 反馈）。
+    /// 新行入库后删掉同一台设备、时间和它重叠的旧通道行——只删不比它新的那些，
+    /// 免得重放时一份过期报文把改过的那晚顶掉。
+    fn drop_superseded_band_sleep(
+        &self,
+        sleep: &SleepSession,
+        raw_record_id: Option<i64>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM sleep_sessions
+              WHERE sleep_id LIKE 'band:%'
+                AND sleep_id <> ?1
+                AND COALESCE(device_id, '') = COALESCE(?2, '')
+                AND julianday(start_time) < julianday(?4)
+                AND julianday(end_time) > julianday(?3)
+                AND (?5 IS NULL
+                     OR raw_record_id IS NULL
+                     OR raw_record_id = ?5
+                     OR COALESCE((SELECT fetched_at FROM raw_records WHERE id = sleep_sessions.raw_record_id), '')
+                        <= COALESCE((SELECT fetched_at FROM raw_records WHERE id = ?5), ''))",
+            params![
+                sleep.sleep_id,
+                sleep.device_id,
+                sleep.start_time.to_rfc3339(),
+                sleep.end_time.to_rfc3339(),
+                raw_record_id,
+            ],
+        )?;
         Ok(())
     }
 

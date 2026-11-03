@@ -135,7 +135,7 @@ If the Windows install folder is not writable, the app uses your user data folde
 
 The desktop app is not needed day to day. On a NAS, a home server or a machine where an AI agent runs, use the headless tools instead:
 
-- **CLI and MCP tools.** Each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
+- **CLI and MCP tools.** The desktop app installs both next to itself (since 3.1.1); for a machine without it, each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
 - **Docker.** `packaging/docker` builds a headless image for scheduled syncs. See [Docker](docs/guides/docker.md).
 
 Signing in still needs a browser once: connect the account in the desktop app on any machine, then bring `auth.json` and the token over as the [Docker guide](docs/guides/docker.md#getting-the-credentials-in) describes. MCP only reads the local database and needs no token at all.
@@ -167,6 +167,7 @@ ZeppBridge is an independent open-source project with official Zepp approval. Se
 ## Docs and feedback
 
 - [FAQ](docs/guides/faq.md): why sign-in goes through zeppbridge.com, why some data is missing, Helio Strap, download warnings, AI without copy-paste
+- [Handing your data to AI](docs/guides/ai.md): copy and paste, MCP, training plans to the watch, coach notes
 - [Backup, restore and full history](docs/guides/backup-and-restore.md)
 - [CLI and MCP](docs/reference/cli-and-mcp.md) · [Docker](docs/guides/docker.md)
 - [Development](docs/development/development.md) · [Changelog](CHANGELOG.md)

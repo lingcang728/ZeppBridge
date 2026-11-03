@@ -10,6 +10,10 @@ import type { DayStripRow, AdherenceDay } from '../types/timeBridge';
 import { addDays, dayKey } from '../lib/aiTask/bridgeScale';
 import { emptyCategories } from '../lib/aiTask/emptyCategories';
 import { useAiTaskDraft } from './useAiTaskDraft';
+import { isLocalMaintenanceError } from '../lib/syncDeferred';
+
+/** 本机重放 / 压缩期间读不出来：隔这么久再读一次，做完了自然就读到了。 */
+const MAINTENANCE_RETRY_MS = 30_000;
 
 const rows = ref<DayStripRow[]>([]);
 const adherence = ref<AdherenceDay[]>([]);
@@ -19,9 +23,11 @@ const loading = ref(false);
 const end = ref(dayKey());
 let sequence = 0;
 let watching = false;
+let retryTimer = 0;
 
 const load = async () => {
   const mine = ++sequence;
+  window.clearTimeout(retryTimer);
   loading.value = true; error.value = null;
   try {
     const [next, compared] = await Promise.all([backend.aiTaskDayStrip(90, end.value), backend.trainingPlanAdherence(addDays(end.value, -89), end.value)]);
@@ -29,7 +35,12 @@ const load = async () => {
     rows.value = next; adherence.value = compared;
     // 90 天一天都没有的类别：新草稿默认不勾（1D·D8）。
     useAiTaskDraft().setEmptyCategories(emptyCategories(next));
-  } catch (e) { if (mine === sequence) error.value = toUserMessage(e, ''); }
+  } catch (e) {
+    if (mine !== sequence) return;
+    error.value = toUserMessage(e, '');
+    // 「完成后自动重试」要说到做到：不等用户点重试。
+    if (isLocalMaintenanceError(e)) retryTimer = window.setTimeout(() => { void load(); }, MAINTENANCE_RETRY_MS);
+  }
   finally { if (mine === sequence) loading.value = false; }
 };
 

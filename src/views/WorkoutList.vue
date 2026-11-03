@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
 import { computed, onMounted, ref } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import WorkoutTools from '../components/WorkoutTools.vue';
 import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
@@ -126,6 +127,8 @@ const workoutFact = (workout: Workout): string => {
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { void loadImportSources(); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
 useRevisionReload(() => { void loadList(); void loadImportSources(); });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('workouts');
 </script>
 
 <template>

@@ -454,6 +454,11 @@ fn native_login_title_follows_the_interface_locale() {
     assert_eq!(login_window_title("en-US"), "Sign in to Zepp");
     assert_eq!(login_window_title("zh"), "登录 Zepp");
     assert_eq!(login_window_title("zh-CN"), "登录 Zepp");
+    // 繁体（3.1.1）：台湾、香港、澳门与 Hant 标记都给繁体；新加坡仍是简体。
+    for tag in ["zh-TW", "zh-HK", "zh-MO", "zh-Hant-TW"] {
+        assert_eq!(login_window_title(tag), "登入 Zepp", "{tag}");
+    }
+    assert_eq!(login_window_title("zh-SG"), "登录 Zepp");
     // P7 十语言：地区变体归到基础语言，认不出的回落英文。
     assert_eq!(login_window_title("es"), "Iniciar sesión en Zepp");
     assert_eq!(login_window_title("pt-BR"), "Entrar no Zepp");

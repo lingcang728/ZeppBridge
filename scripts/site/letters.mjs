@@ -11,14 +11,15 @@ import { join } from 'node:path';
 
 /** 和 scripts/release/release-core.mjs 的 NOTE_LOCALES 一致；第二列是 <html lang>，第三列是语言自称。 */
 export const LETTER_LANGUAGES = [
-  ['en', 'en', 'English'], ['zh', 'zh-CN', '中文'], ['es', 'es', 'Español'], ['nl', 'nl', 'Nederlands'],
+  ['en', 'en', 'English'], ['zh', 'zh-CN', '简'], ['es', 'es', 'Español'], ['nl', 'nl', 'Nederlands'],
   ['pt-BR', 'pt-BR', 'Português (Brasil)'], ['pt-PT', 'pt-PT', 'Português (Portugal)'], ['de', 'de', 'Deutsch'],
   ['ru', 'ru', 'Русский'], ['hi-IN', 'hi-IN', 'हिन्दी'], ['fr', 'fr', 'Français'], ['it', 'it', 'Italiano'], ['pl', 'pl', 'Polski'],
+  ['zh-TW', 'zh-Hant', '繁'],
 ];
 
 const VERSION = /^\d+\.\d+\.\d+$/;
-const escape = (text) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const strong = (text) => escape(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+export const escape = (text) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const strong = (text) => escape(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 const byVersionDesc = (a, b) => b.localeCompare(a, 'en', { numeric: true });
 
 /** 一封信 → 段落数组；最后一段以破折号开头就是落款。和应用里 lib/letters.ts 的 parseLetter 同一套规则。 */
@@ -29,7 +30,7 @@ export function parseLetter(text) {
   return { paragraphs: signature ? paragraphs.slice(0, -1) : paragraphs, signature };
 }
 
-const page = ({ lang, title, body }) => `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">`
+export const page = ({ lang, title, body, style = '' }) => `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">`
   + '<meta name="viewport" content="width=device-width, initial-scale=1">'
   + `<title>${escape(title)}</title><link rel="icon" href="/favicon.png">`
   + '<style>'
@@ -45,7 +46,7 @@ const page = ({ lang, title, body }) => `<!doctype html><html lang="${lang}"><he
   + '.langs [aria-current]{color:var(--ink);font-weight:700;text-decoration:none}'
   + 'ul.list{list-style:none;padding:0;margin:0;font-family:system-ui,sans-serif}ul.list li{padding:14px 0;border-bottom:1px solid var(--line)}'
   + 'ul.list a{font-size:18px;text-decoration:none}ul.list span{display:block;color:var(--muted);font-size:14px}'
-  + '</style></head><body><main>' + body + '</main></body></html>\n';
+  + style + '</style></head><body><main>' + body + '</main></body></html>\n';
 
 /** 读出所有已写好的信：{ version → { locale → 原文 } }。缺语言的版本照样收录，只是少几个语言链接。 */
 export function readLetters(root) {

@@ -276,14 +276,17 @@ pub(super) fn kilometre_seconds(
         return None;
     }
     // 第一种：`[5]` 就是 `[1]` 的累加（本库 263 条都是这样）。
-    // 允许 2 秒的取整误差：这一列在部分记录里是从毫秒四舍五入来的。
-    let mut running = 0i64;
+    // 逐公里比增量，每一公里容 2 秒的取整误差，不累积：这一列在部分记录里
+    // 是从毫秒四舍五入来的，#159 那种每公里多 1 秒的，跑到第三公里累计差
+    // 就过了 2 秒，以前整份被拒、一个公里段都没有。
+    let mut previous = 0i64;
     let is_moving_sum = seconds
         .iter()
         .zip(&cumulative_column)
         .all(|(duration, cumulative)| {
-            running += duration;
-            (cumulative - running).abs() <= 2
+            let step = cumulative - previous;
+            previous = *cumulative;
+            (step - duration).abs() <= 2
         });
     if is_moving_sum {
         return Some(KilometreTiming {
@@ -309,10 +312,15 @@ pub(super) fn kilometre_seconds(
     if last_elapsed > duration_seconds + 2 {
         return None;
     }
-    // 没有暂停却多出一截时间，那多出来的不是暂停——第一种已经接住了 gap≈0。
+    // 没有暂停却多出一截时间，那多出来的不是暂停，`[5]` 不能拿来放边界；
+    // 但 `[1]` 的每公里用时已经过了校验，退回只用它（和第一种一样按运动
+    // 用时放边界），不要整份拒掉。
     // 最后一公里之后的暂停不在 `[5]` 里，所以只要求 gap 不超过暂停总和。
     if pauses.is_empty() {
-        return None;
+        return Some(KilometreTiming {
+            moving: seconds,
+            elapsed_end: None,
+        });
     }
     let gap = last_elapsed - seconds.iter().sum::<i64>();
     let paused: i64 = pauses

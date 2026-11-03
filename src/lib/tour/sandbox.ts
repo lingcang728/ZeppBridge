@@ -11,6 +11,7 @@
  */
 import type { TourChapterId } from './chapters';
 import { isTourChapter } from './chapters';
+import { TOUR_VERSION, needsRetour } from './progress';
 
 declare global {
   interface Window { __ZB_REAL_STORAGE__?: Storage }
@@ -18,6 +19,8 @@ declare global {
 
 const SEEN_KEY = 'zeppbridge.tour.seen';
 const FIRST_LAUNCH_KEY = 'zeppbridge.tour.firstLaunch';
+/** 引导内容的版本（lib/tour/progress.ts 的 TOUR_VERSION）。老安装落后就清空看过、重看总览。 */
+const VERSION_KEY = 'zeppbridge.tour.version';
 const TOOLS_REMINDER_KEY = 'zeppbridge.tour.toolsReminder';
 const THEME_KEY = 'zeppbridge-theme';
 const LOCALE_KEY = 'zeppbridge-locale';
@@ -30,16 +33,12 @@ const realStorage = (): Storage | null => {
   }
 };
 
-/** 以前的一次性提示（CoachTip）点过「知道了」的，对应的就地一章算看过。 */
-const LEGACY_COACH: Record<string, string> = { 'zeppbridge.coach.card-table': 'cards', 'zeppbridge.coach.collection-box': 'box' };
-
 export const seenChapters = (): Set<string> => {
   const seen = new Set<string>();
   try {
     const storage = realStorage();
     const parsed = JSON.parse(storage?.getItem(SEEN_KEY) ?? '[]') as unknown;
-    if (Array.isArray(parsed)) for (const item of parsed) if (typeof item === 'string') seen.add(item);
-    for (const [key, chapter] of Object.entries(LEGACY_COACH)) if (storage?.getItem(key) === '1') seen.add(chapter);
+    if (Array.isArray(parsed)) for (const item of parsed) if (typeof item === 'string' && isTourChapter(item)) seen.add(item);
   } catch {
     // 读不到就当都没看过。
   }
@@ -56,12 +55,11 @@ export const markSeen = (ids: readonly string[]): void => {
   }
 };
 
-/** 设置里「首次提示再出现一次」。 */
+/** 设置里「全部重新提示」。 */
 export const forgetSeen = (ids: readonly string[]): void => {
   const seen = seenChapters();
   for (const id of ids) seen.delete(id);
   try {
-    for (const [key, chapter] of Object.entries(LEGACY_COACH)) if (ids.includes(chapter)) realStorage()?.removeItem(key);
     realStorage()?.setItem(SEEN_KEY, JSON.stringify([...seen]));
   } catch {
     // 同上。
@@ -82,6 +80,30 @@ export const markFirstLaunchHandled = (): void => {
     realStorage()?.setItem(FIRST_LAUNCH_KEY, '1');
   } catch {
     // 存不下就每次启动问一次，比不问强。
+  }
+};
+
+/** 老安装、引导版本落后：该清空看过、重看总览了（新装走首次启动，不算）。 */
+export const retourDue = (): boolean => {
+  try {
+    const storage = realStorage();
+    return needsRetour(storage?.getItem(FIRST_LAUNCH_KEY) === '1', storage?.getItem(VERSION_KEY) ?? null);
+  } catch {
+    return false;
+  }
+};
+
+/** 启动时马上要整页载入进总览（首次启动还没处理、或老安装该重看了）：这时不出就地讲解，免得讲到一半被载入打断。 */
+export const introPending = (): boolean => !firstLaunchHandled() || retourDue();
+
+/** 记下引导已是当前版本；`fresh` 时连带清空看过（老安装重看，各板块也重新就地讲）。 */
+export const markTourVersion = (fresh = false): void => {
+  try {
+    const storage = realStorage();
+    if (fresh) storage?.removeItem(SEEN_KEY);
+    storage?.setItem(VERSION_KEY, String(TOUR_VERSION));
+  } catch {
+    // 存不下：下次启动还会再走一遍，不算坏事。
   }
 };
 

@@ -24,7 +24,10 @@ use zeppbridge_core::storage::write_lock::{self, WritePurpose};
 /// 状态变化推给前端的事件名。
 pub(crate) const EVENT: &str = "update://state";
 /// `latest.json` 里便携版更新包的平台条目（CI 的 package-portable.ps1 写进去）。
-const PORTABLE_TARGET: &str = "windows-x86_64-portable";
+///
+/// 3.1.1 起读带 CLI 的那一份。老的 `windows-x86_64-portable` 仍然照发、只装主程序和 MCP：
+/// 3.1.0 及更早的应用读它，而它们的白名单里没有 CLI，收到带 CLI 的包会整包拒绝。
+const PORTABLE_TARGET: &str = "windows-x86_64-portable-cli";
 /// 只换查询地址、不换公钥：指到哪里，下载下来的包都要过内置公钥的签名核对。
 /// 用来在本机对着一份自己起的 latest.json 走一遍整条链路。
 const ENDPOINT_ENV: &str = "ZEPPBRIDGE_UPDATE_ENDPOINT";

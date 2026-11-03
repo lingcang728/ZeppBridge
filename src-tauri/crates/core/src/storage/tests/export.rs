@@ -854,3 +854,26 @@ fn ai_export_reads_only_the_metrics_the_selection_maps_to() {
     assert_eq!(samples[0]["metric"], "heart_rate");
     assert_eq!(export["record_count"], 1);
 }
+
+/// 静息消耗（bmr）只勾日常活动也带上；两样都勾时仍归在体重 / 体成分下，不导两遍。
+#[test]
+fn resting_energy_rides_along_with_daily_activity() {
+    use crate::storage::ai_export::export_sample_matched_type;
+    use std::collections::BTreeSet;
+
+    let only_activity: BTreeSet<String> = ["daily_activity".to_string()].into();
+    assert_eq!(
+        export_sample_matched_type("bmr", &only_activity).as_deref(),
+        Some("daily_activity")
+    );
+    // 别的体成分指标不跟着进日常活动。
+    assert_eq!(
+        export_sample_matched_type("body_fat_rate", &only_activity),
+        None
+    );
+    let both: BTreeSet<String> = ["daily_activity".to_string(), "weight".to_string()].into();
+    assert_eq!(
+        export_sample_matched_type("bmr", &both).as_deref(),
+        Some("weight")
+    );
+}

@@ -1,10 +1,10 @@
 # Command line and MCP
 
 `zeppbridge-cli` and `zeppbridge-mcp` are two companion tools alongside the
-desktop app,
-shipped as a separate archive with every release: people who need them should
-not be forced to install a GUI first, and people who installed the GUI should
-not be handed two programs they will never run.
+desktop app. Since 3.1.1 they are installed and updated together with it (right
+next to the main program; Settings › AI tools shows their paths).
+Every release still carries a separate archive for machines without a desktop:
+people who need them should not be forced to install a GUI first.
 
 [简体中文](cli-and-mcp.zh-CN.md)
 
@@ -13,7 +13,14 @@ same `data/zepp.db` the desktop app uses.
 
 ## Installing
 
-Download `zeppbridge-tools-<version>-<platform>.zip` for your platform from
+**With the desktop app installed** there is nothing more to install. On Windows
+(installer and portable build) they sit next to `ZeppBridge.exe`, on macOS inside
+`ZeppBridge.app/Contents/MacOS/`, and the Linux deb / rpm put them in `/usr/bin`.
+Settings › AI tools shows the full path of both. Living next to the
+app, they read the same library.
+
+**On a machine without a desktop**, download
+`zeppbridge-tools-<version>-<platform>.zip` for your platform from
 [Releases](https://github.com/lingcang728/ZeppBridge/releases), unpack it, and
 check it against `SHA256SUMS.txt`.
 
@@ -184,6 +191,36 @@ libraries you run the same command on each. The file must start within 5
 minutes of the workout (`errorKind: "fit_start_mismatch"` otherwise) and the
 workout must already be in the library (`workout_not_found`); both exit with 1.
 Undoing something that was never replaced succeeds with `"removed": false`.
+
+### Shoes and races
+
+The running shoes and races on the desktop **Journal** page can be managed from a
+script too:
+
+```bash
+zeppbridge-cli shoes list --json                 # shoes with distance and wear, plus Zepp gear IDs not added yet
+zeppbridge-cli shoes save --file shoe.json --json  # add, or update when the JSON has "id"; prints the id
+zeppbridge-cli shoes delete --id 3 --json
+zeppbridge-cli races list --json
+cat race.json | zeppbridge-cli races save --file - --json
+zeppbridge-cli races delete --id 2 --json
+```
+
+`save` takes one JSON object with the same fields as the desktop form. A shoe
+needs `name`, `sport` (`running` / `trail` / `walking` / `hiking`), `retire_km`
+(100–5000) and `started_on` (`YYYY-MM-DD`); `is_default`, `zepp_gear_id`,
+`start_km`, `retired_on` and `notes` are optional. A race needs `name`,
+`race_date`, `sport` (`running` / `trail` / `cycling` / `swimming` / `triathlon`
+/ `other`) and `priority` (`a` / `b` / `c`); `distance_m`, `goal_seconds`,
+`result_seconds`, `workout_id` and `notes` are optional. The option is `--file`,
+not `--json`, because `--json` means "machine-readable output" on every command.
+A malformed file is a usage error (2) before the library is opened; values the
+library rejects (an empty name, an unknown sport) are also 2. Deleting an id
+that does not exist exits 1 with `errorKind: "not_found"`. Writes take the
+cross-process write lock, so they wait for (or report `4` against) a running sync.
+
+AI tools read these through MCP `get_athlete_profile` (`journal`) but cannot
+change them; there is no MCP tool that writes shoes or races.
 
 ### Exit codes
 
@@ -385,8 +422,8 @@ outside the grants — `error.permittedRanges` lists the actual
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
-| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline, sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect, the watch's RPE plus the user's own `userRpe` and sore spots), days since the last workout, the active plan and life events (`epoch: true` marks a named era such as a marathon build) |
-| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate, the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, the coach notes the user has confirmed (`coachNotes`), and the user's journal (`journal`: 5K / 10K / half / marathon PBs computed locally, ongoing and recently healed injuries, upcoming races with A/B/C priority and race results, shoes in use with mileage, named eras) |
+| `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline — taken from the sleep summary's `rhr`, not the average heart rate during sleep — sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect, the watch's RPE plus the user's own `userRpe` and sore spots), days since the last workout, the active plan and life events (`epoch: true` marks a named era such as a marathon build) |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate (the sleep summary's `rhr`, not the average heart rate during sleep), the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, the coach notes the user has confirmed (`coachNotes`), and the user's journal (`journal`: 5K / 10K / half / marathon PBs computed locally, ongoing and recently healed injuries, upcoming races with A/B/C priority and race results, shoes in use with mileage, named eras) |
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
 | `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |

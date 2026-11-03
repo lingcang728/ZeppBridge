@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classify, markSql, pruneSql, renderReplies, tallyAlsoHit } from '../scripts/letters/replies-core.mjs';
+import { AUTHOR_REPLY_MAX_CHARS, classify, markSql, pruneSql, renderReplies, replySql, selectOneSql, tallyAlsoHit } from '../scripts/letters/replies-core.mjs';
 
 const ID = '3f1c2e4a-1b2c-4d5e-8f90-123456789abc';
 
@@ -40,4 +40,16 @@ test('the export groups by rough kind and counts “me too” once per reply', (
   assert.match(text, /> 补拉卡住了\n> 第二行/);
   assert.match(text, /只点了「我也遇到」/);
   assert.deepEqual(tallyAlsoHit(rows), [['backfill-stuck', 2], ['watch-faces', 1]]);
+});
+
+test('the author reply is trimmed, bounded, quoted safely, and empty means retract', () => {
+  const now = '2026-11-03T00:00:00.000Z';
+  assert.throws(() => replySql('nope', 'hi'), /不是回信 id/);
+  assert.throws(() => selectOneSql("x' OR 1=1 --"), /不是回信 id/);
+  assert.throws(() => replySql(ID, '字'.repeat(AUTHOR_REPLY_MAX_CHARS + 1)), /最长/);
+  const sql = replySql(ID, "  It's fixed in 3.1.1.\n\nThanks!  ", now);
+  assert.ok(sql.includes("author_reply = 'It''s fixed in 3.1.1.\n\nThanks!'"));
+  assert.ok(sql.includes("author_reply_at = '2026-11-03T00:00:00.000Z'"));
+  assert.ok(sql.includes("read_at = COALESCE(read_at, '2026-11-03T00:00:00.000Z')"));
+  assert.equal(replySql(ID, '  \n ', now), `UPDATE letter_replies SET author_reply = '', author_reply_at = NULL WHERE id = '${ID}'`);
 });

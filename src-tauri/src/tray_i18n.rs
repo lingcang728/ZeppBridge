@@ -1,12 +1,13 @@
-//! 托盘菜单文案的十语言表。
+//! 托盘菜单文案的多语言表（没有的语言落英文）。
 //!
 //! 原生菜单走不了前端的 i18n，只能在这里备一份。前端定好界面语言后经
 //! `set_tray_locale` 命令把语言码喂进来；建托盘时（前端还没加载）用系统
 //! 界面语言先猜一次。
 //!
 //! 匹配规则和前端 `detectLocale` 一致：完整标记精确匹配（`pt-BR`、
-//! `pt-PT`、`hi-IN`），否则按基础语言分（`de-AT`→de、`zh-TW`→zh），
-//! 裸 `pt` 给欧洲葡萄牙语，认不出的一律英文。
+//! `pt-PT`、`hi-IN`），否则按基础语言分（`de-AT`→de、`zh-SG`→zh），
+//! 裸 `pt` 给欧洲葡萄牙语，认不出的一律英文。`zh-TW` / `zh-HK` / `zh-MO` /
+//! `zh-Hant` 给繁体（3.1.1）。
 
 /// 托盘菜单的三条文案。
 pub struct TrayLabels {
@@ -19,6 +20,12 @@ const ZH: TrayLabels = TrayLabels {
     show: "打开窗口",
     sync: "立即同步",
     quit: "退出",
+};
+
+const ZH_TW: TrayLabels = TrayLabels {
+    show: "打開視窗",
+    sync: "立即同步",
+    quit: "結束",
 };
 
 const EN: TrayLabels = TrayLabels {
@@ -95,6 +102,7 @@ pub fn tray_labels(locale: &str) -> TrayLabels {
     while !tag.is_empty() {
         match tag.as_str() {
             "zh" => return ZH,
+            "zh-tw" | "zh-hk" | "zh-mo" | "zh-hant" => return ZH_TW,
             "en" => return EN,
             "es" => return ES,
             "nl" => return NL,
@@ -134,7 +142,18 @@ mod tests {
     #[test]
     fn base_language_fallback() {
         assert_eq!(tray_labels("de-AT").quit, "Beenden");
-        assert_eq!(tray_labels("zh-TW").quit, "退出");
+        assert_eq!(tray_labels("zh-SG").quit, "退出");
+        assert_eq!(tray_labels("zh-Hans-HK").quit, "退出");
+        for tag in [
+            "zh-TW",
+            "zh-HK",
+            "zh-MO",
+            "zh-Hant",
+            "zh-Hant-TW",
+            "zh_TW.UTF-8",
+        ] {
+            assert_eq!(tray_labels(tag).quit, "結束", "{tag}");
+        }
         // 裸 pt 和未列出的葡语地区一律 → 欧洲葡语（带冠词那份）。
         assert_eq!(tray_labels("pt").show, "Abrir o ZeppBridge");
         assert_eq!(tray_labels("pt-AO").show, "Abrir o ZeppBridge");

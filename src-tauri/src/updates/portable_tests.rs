@@ -49,17 +49,29 @@ fn both_programs_are_replaced_and_the_leftovers_are_swept_next_start() {
     std::fs::create_dir_all(dir.join("data")).unwrap();
     std::fs::write(dir.join("data").join("zepp.db"), b"library").unwrap();
 
-    let bytes = payload(&[(APP_ENTRY, b"new app"), (MCP_ENTRY, b"new mcp")], true);
+    // 3.1.0 的文件夹里还没有 CLI：更新包第一次把它放进来。
+    let bytes = payload(
+        &[
+            (APP_ENTRY, b"new app"),
+            (MCP_ENTRY, b"new mcp"),
+            (CLI_ENTRY, b"new cli"),
+        ],
+        true,
+    );
     swap(stage(&exe, &bytes).unwrap()).unwrap();
 
     assert_eq!(read(&exe), b"new app");
     assert_eq!(read(&dir.join(MCP_ENTRY)), b"new mcp");
+    assert_eq!(read(&dir.join(CLI_ENTRY)), b"new cli");
     assert_eq!(read(&dir.join("ZeppBridge.exe.old")), b"old app");
     assert_eq!(read(&dir.join("data").join("zepp.db")), b"library");
     assert!(!dir.join(STAGING_DIR).exists());
 
     sweep(&exe);
-    assert_eq!(names(&dir), ["ZeppBridge.exe", "data", MCP_ENTRY]);
+    assert_eq!(
+        names(&dir),
+        ["ZeppBridge.exe", "data", CLI_ENTRY, MCP_ENTRY]
+    );
     wait_for_previous(&exe, Duration::from_millis(10));
     let _ = std::fs::remove_dir_all(dir);
 }

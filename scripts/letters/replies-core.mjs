@@ -59,6 +59,28 @@ export function markSql(ids, { category = null, status = null, fixedIn = null, n
   return `UPDATE letter_replies SET ${sets.join(', ')} WHERE id IN (${ids.map(q).join(', ')})`;
 }
 
+/** 作者一对一回复的长度上限（字符数）。ZeppDock 的回复框用同一个数。 */
+export const AUTHOR_REPLY_MAX_CHARS = 2000;
+
+/** 取一封回信给 agent 读（`show`）：语言、版本、原文、已有的作者回复。 */
+export function selectOneSql(id) {
+  if (!REPLY_ID.test(id)) throw new Error(`不是回信 id：${id}`);
+  return `SELECT id, received_at, app_version, letter_version, locale, body, also_hit_json, status, category, author_reply, author_reply_at
+FROM letter_replies WHERE id = ${q(id)}`;
+}
+
+/**
+ * 作者对一封回信的一对一回复（migrations/0009）。去掉首尾空白；空串 = 撤回（时间一起清掉）。
+ * 回复了就算读过（read_at 只补不改）。
+ */
+export function replySql(id, text, now = new Date().toISOString()) {
+  if (!REPLY_ID.test(id)) throw new Error(`不是回信 id：${id}`);
+  const body = String(text ?? '').trim();
+  if (Array.from(body).length > AUTHOR_REPLY_MAX_CHARS) throw new Error(`回复最长 ${AUTHOR_REPLY_MAX_CHARS} 字`);
+  if (!body) return `UPDATE letter_replies SET author_reply = '', author_reply_at = NULL WHERE id = ${q(id)}`;
+  return `UPDATE letter_replies SET author_reply = ${q(body)}, author_reply_at = ${q(now)}, read_at = COALESCE(read_at, ${q(now)}) WHERE id = ${q(id)}`;
+}
+
 /** 处理完满 180 天的回信从线上删除（删之前先 export，本地留底）。 */
 export function pruneSql(now = new Date()) {
   const cutoff = new Date(now.getTime() - RETENTION_DAYS * 86_400_000).toISOString();

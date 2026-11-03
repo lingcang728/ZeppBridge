@@ -55,6 +55,9 @@ const copy = async (text: string, done: string, failed: string) => {
     mcpMessage.value = failed;
   }
 };
+const copyCliPath = () => {
+  if (sidecar.value?.cli_path) void copy(sidecar.value.cli_path, a.value.cliCopied, t.value.mcpConfigCopyFailed);
+};
 const copyMcpPrompt = () => copy(t.value.mcpSetupPrompt, t.value.mcpPromptCopied, t.value.mcpPromptCopyFailed);
 const copyMcpConfig = () => copy(
   mcpConfigExample.value,
@@ -76,6 +79,16 @@ const copyMcpConfig = () => copy(
         </div>
       </div>
       <McpConnectRow @sidecar="sidecar = $event" />
+      <!-- 命令行工具随应用附带（3.1.1 起）：只给路径，脚本、计划任务怎么调由用户自己定。 -->
+      <div v-if="sidecar?.cli_path" class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ a.cliTitle }}</span>
+          <code class="s-row-sub cli-path">{{ sidecar.cli_path }}</code>
+        </div>
+        <button class="button secondary" type="button" @click="copyCliPath">
+          <Icon name="copy" :size="14" />{{ a.cliCopy }}
+        </button>
+      </div>
       <div class="s-row">
         <span class="s-row-sub other-label">{{ a.otherClients }}</span>
         <div class="s-actions">
@@ -110,6 +123,7 @@ const copyMcpConfig = () => copy(
 .mcp-config code { color: inherit; font-size: inherit; }
 .tools-label { margin: 12px 0 0; }
 .other-label { flex: none; }
+.cli-path { font-family: var(--font-mono); word-break: break-all; }
 .mcp-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mcp-tools .chip { color: var(--ink); font-family: var(--font-mono); cursor: help; }
 </style>

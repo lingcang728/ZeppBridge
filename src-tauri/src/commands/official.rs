@@ -40,6 +40,20 @@ const RELAY_UNREACHABLE: Notice = (
     "浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理或让代理软件接管全部应用，然后点「立即检查」。",
 );
 
+/// 中转站只在浏览器打开授权页时才记下这次授权，在那之前领取一律是 404。连着这么多次
+/// （约 10 秒）都是 404，就当浏览器没打开授权页，提示复制链接（#156）。
+const BROWSER_NOT_OPENED_AFTER: u32 = 5;
+
+const BROWSER_OPEN_FAILED: Notice = (
+    "err.official.browser",
+    "没能打开系统浏览器。请点「复制授权链接」，粘到浏览器地址栏里打开，在那里同意授权；这边会自动连上。",
+);
+
+const BROWSER_NOT_OPENED: Notice = (
+    "err.official.browser_not_opened",
+    "授权页好像没有在浏览器里打开。如果浏览器没弹出来，请点「复制授权链接」，粘到浏览器地址栏里打开；这边会自动连上。",
+);
+
 const STILL_PENDING: Notice = (
     "err.official.still_pending",
     "刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意并看到授权成功的页面；如果那是另一个浏览器窗口里的旧授权，请重新点一次授权。",
@@ -119,16 +133,51 @@ fn set_notice(mine: &Arc<AtomicBool>, notice: Option<Notice>) -> bool {
     }
 }
 
-/// 等待中的下一句话：手动查过、还没结果就说「还没收到」；网络恢复后撤掉「连不上」；
-/// 其余保持原样，免得那句话在两次自动轮询之间一闪而过。
+/// 等待中的下一句话：手动查过、还没结果就说「还没收到」；网络恢复后撤掉「连不上」，
+/// 授权页打开了就撤掉「浏览器没打开」；其余保持原样，免得那句话在两次自动轮询之间一闪而过。
 fn notice_after_pending(current: Option<Notice>, woken: bool) -> Option<Notice> {
     if woken {
         Some(STILL_PENDING)
-    } else if current == Some(RELAY_UNREACHABLE) {
+    } else if current.is_some_and(|notice| {
+        [RELAY_UNREACHABLE, BROWSER_OPEN_FAILED, BROWSER_NOT_OPENED].contains(&notice)
+    }) {
         None
     } else {
         current
     }
+}
+
+/// 中转站说「没有这次授权」（404）之后怎么办。`seen`：中转站回过「还在等」，即授权页
+/// 在浏览器里打开过；`unseen_replies`：到现在为止连着几次 404。
+///
+/// 中转站只在授权页被打开时才记下这次授权，所以**没见过**时的 404 不是过期，而是授权页
+/// 根本没打开——以前一律当过期，Linux 上浏览器没弹出来时用户看到的就是「这次授权已
+/// 过期」（#156）。接着等，过一会儿（或用户点了「立即检查」）提示复制链接自己打开。
+/// 见过之后的 404 才是真的过期（或已经被领走）。
+fn after_unknown_state(
+    seen: bool,
+    unseen_replies: u32,
+    woken: bool,
+    current: Option<Notice>,
+) -> Unclaimed {
+    if seen {
+        return Unclaimed::Expired;
+    }
+    if current == Some(BROWSER_OPEN_FAILED) {
+        return Unclaimed::KeepWaiting(current);
+    }
+    if woken || unseen_replies >= BROWSER_NOT_OPENED_AFTER {
+        return Unclaimed::KeepWaiting(Some(BROWSER_NOT_OPENED));
+    }
+    // 领到了回答，网络就是通的。
+    Unclaimed::KeepWaiting(current.filter(|notice| *notice != RELAY_UNREACHABLE))
+}
+
+/// `after_unknown_state` 的结论：真过期了，或者接着等、附带这一句。
+#[derive(Debug, PartialEq)]
+enum Unclaimed {
+    Expired,
+    KeepWaiting(Option<Notice>),
 }
 
 fn current_notice() -> Option<Notice> {
@@ -233,12 +282,17 @@ pub async fn start_official_login(
         return Ok(stored_status(&state.data_dir));
     };
     // AppImage 里要先把运行时注入的库路径剥掉，浏览器才起得来（见 external_open.rs）。
-    if crate::external_open::open_url(&app, &request.start_url()).is_err() {
-        clear_flow();
-        return Err(AppError::new(
-            "err.official.browser",
-            "没能打开系统浏览器，请检查默认浏览器设置后重试",
-        ));
+    // 打不开不算失败（#156）：照样等着，把「复制授权链接」顶到前面，用户自己粘到浏览器里。
+    // Linux 上要等打开程序的退出码（最多几秒），别占着异步线程。
+    let opened = {
+        let app = app.clone();
+        let url = request.start_url();
+        tauri::async_runtime::spawn_blocking(move || crate::external_open::open_url(&app, &url))
+            .await
+    };
+    if !matches!(opened, Ok(Ok(()))) {
+        crate::diagnostics::log("Official login: could not open the system browser");
+        set_notice(&cancel, Some(BROWSER_OPEN_FAILED));
     }
     let waiting = stored_status(&state.data_dir);
     publish(&app, &waiting);
@@ -288,12 +342,6 @@ fn begin_flow(
     Ok(Some((cancel, generation, wake)))
 }
 
-fn clear_flow() {
-    if let Ok(mut flow) = FLOW.lock() {
-        *flow = None;
-    }
-}
-
 /// 只清掉自己那一次：取消后立刻重开的新授权不能被旧的轮询任务抹掉。
 fn clear_flow_if(mine: &Arc<AtomicBool>) {
     if let Ok(mut flow) = FLOW.lock() {
@@ -327,6 +375,9 @@ async fn poll_claim(
     };
     let deadline = Instant::now() + Duration::from_secs(AUTHORIZATION_WINDOW_SECONDS);
     let mut network_failures = 0u32;
+    // 中转站回过「还在等」没有：回过才说明授权页在浏览器里打开过（见 after_unknown_state）。
+    let mut seen = false;
+    let mut unseen_replies = 0u32;
     loop {
         let woken = tokio::select! {
             _ = tokio::time::sleep(CLAIM_INTERVAL) => false,
@@ -348,6 +399,7 @@ async fn poll_claim(
         {
             Ok(ClaimOutcome::Pending) => {
                 network_failures = 0;
+                seen = true;
                 // 手动查的那一次无论变没变都回一句，界面上的「正在检查」才停得下来。
                 if set_notice(cancel, notice_after_pending(current_notice(), woken)) || woken {
                     publish(app, &stored_status(data_dir));
@@ -381,10 +433,22 @@ async fn poll_claim(
                 ))
             }
             Ok(ClaimOutcome::Expired) => {
-                return Some(OfficialStatus::failed(
-                    "err.official.expired",
-                    "这次授权已过期，请重新点一次授权",
-                ))
+                network_failures = 0;
+                unseen_replies += 1;
+                match after_unknown_state(seen, unseen_replies, woken, current_notice()) {
+                    Unclaimed::KeepWaiting(notice) => {
+                        if set_notice(cancel, notice) || woken {
+                            publish(app, &stored_status(data_dir));
+                        }
+                        continue;
+                    }
+                    Unclaimed::Expired => {
+                        return Some(OfficialStatus::failed(
+                            "err.official.expired",
+                            "这次授权已过期，请重新点一次授权",
+                        ))
+                    }
+                }
             }
             Err(ZeppBridgeError::Unavailable(_)) => {
                 return Some(OfficialStatus::failed(
@@ -587,6 +651,45 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #156：浏览器没打开（或打开失败）时，中转站从没见过这次授权，领取一直是 404——
+    /// 那不是过期，要接着等并提示复制链接；见过之后的 404 才是过期。
+    #[test]
+    fn a_browser_that_never_opened_is_not_an_expired_authorization() {
+        // 打开失败：一开始就提示复制链接，之后再多 404 也不变成过期，提示也不被换掉。
+        for replies in 1..=20 {
+            assert_eq!(
+                after_unknown_state(false, replies, false, Some(BROWSER_OPEN_FAILED)),
+                Unclaimed::KeepWaiting(Some(BROWSER_OPEN_FAILED))
+            );
+        }
+        // 「打开」成功了但授权页没出现：先安静等几轮，再提示；手动检查立刻提示。
+        assert_eq!(
+            after_unknown_state(false, 1, false, None),
+            Unclaimed::KeepWaiting(None)
+        );
+        assert_eq!(
+            after_unknown_state(false, 1, false, Some(RELAY_UNREACHABLE)),
+            Unclaimed::KeepWaiting(None),
+            "领到了 404 就说明中转站连得上"
+        );
+        assert_eq!(
+            after_unknown_state(false, BROWSER_NOT_OPENED_AFTER, false, None),
+            Unclaimed::KeepWaiting(Some(BROWSER_NOT_OPENED))
+        );
+        assert_eq!(
+            after_unknown_state(false, 1, true, None),
+            Unclaimed::KeepWaiting(Some(BROWSER_NOT_OPENED))
+        );
+        // 授权页打开过（回过「还在等」）之后的 404 才是真过期。
+        assert_eq!(
+            after_unknown_state(true, 1, false, None),
+            Unclaimed::Expired
+        );
+        // 用户粘链接打开之后，「浏览器没打开」那句要撤掉。
+        assert_eq!(notice_after_pending(Some(BROWSER_OPEN_FAILED), false), None);
+        assert_eq!(notice_after_pending(Some(BROWSER_NOT_OPENED), false), None);
     }
 
     /// R04：已有一次在等时再点「授权」，要在有限时间内拿到同一个等待状态，

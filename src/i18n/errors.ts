@@ -70,7 +70,7 @@ const messages = defineMessages(
     'err.login.extracting': '已读取登录凭据，正在确认区域',
     'err.login.verifying': '正在验证账号',
     'err.login.connected': '已连接 Zepp 账号',
-    'err.official.browser': '没能打开系统浏览器，检查默认浏览器设置后重试',
+    'err.official.browser': '没能打开系统浏览器。请点「复制授权链接」，粘到浏览器地址栏里打开，在那里同意授权；这边会自动连上。',
     'err.open_url.failed': '没能打开系统浏览器，检查默认浏览器设置后重试',
     'err.open_url.not_allowed': '只能打开 https 链接',
     'err.letters.client_init_failed': '无法初始化寄信连接，重启应用后再试',
@@ -113,6 +113,8 @@ const messages = defineMessages(
       '浏览器那边可能已经授权了，但 ZeppBridge 连不上 zeppbridge.com 去领取结果。如果浏览器走了代理而 App 没走，请打开系统代理（或让代理软件接管所有应用），然后点「立即检查」。',
     'err.official.still_pending':
       '刚查过：中转站还没收到这次授权。请确认浏览器里已经点了同意，并看到了授权成功的页面；如果那是之前另一次的授权页，请重新点一次授权。',
+    'err.official.browser_not_opened':
+      '授权页好像没有在浏览器里打开。如果浏览器没弹出来，请点「复制授权链接」，粘到浏览器地址栏里打开；这边会自动连上。',
     'err.backfill.start_too_early':
       '补拉起点太早：最多只能补拉最近 3650 天',
     'err.login.bad_url': '登录地址无效',
@@ -131,6 +133,8 @@ const messages = defineMessages(
     'err.sync.deferred_compaction': '正在压缩历史报文省磁盘空间，本次云端同步稍后自动重试',
     'err.sync.deferred_replay': '正在用本地原始报文重建派生数据，本次云端同步稍后自动重试',
     'err.sync.deferred_busy': '另一个写入操作正在进行，本次云端同步稍后自动重试',
+    'err.local.maintenance_compaction': '正在压缩历史报文，完成后自动重试',
+    'err.local.maintenance_replay': '正在用本地原始报文重建数据，完成后自动重试',
     'err.backfill.bad_start_date': '补拉起点日期无效，需要 YYYY-MM-DD',
     'err.backfill.no_canonical_records': '云端返回了报文，但没解析出可用记录',
     'err.backfill.partial_window': '这一块只写入部分数据，还需要重试',
@@ -165,7 +169,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': '编码脱敏 AI 导出失败',
 
     /* —— 问题反馈 —— */
-    'err.diagnostic.nothing_to_submit': '这台设备没有可补充目录的型号编号，暂时不用提交',
     'err.diagnostic.empty_report':
       '先选要反馈的问题类型，或写一句说明——否则这份报告里没有任何可处理的内容',
     'err.diagnostic.client_init_failed': '无法初始化错误报告连接',
@@ -298,7 +301,7 @@ const messages = defineMessages(
     'err.login.extracting': 'Credentials read. Confirming your region',
     'err.login.verifying': 'Verifying the account',
     'err.login.connected': 'Connected to your Zepp account',
-    'err.official.browser': "Could not open the system browser — check your default browser and retry.",
+    'err.official.browser': 'Couldn’t open your browser. Choose “Copy authorization link”, paste it into your browser’s address bar and approve there — the app connects on its own.',
     'err.open_url.failed': "Could not open the system browser — check your default browser and retry.",
     'err.open_url.not_allowed': 'Only https links can be opened.',
     'err.letters.client_init_failed': 'Could not set up the connection for sending letters. Restart the app and try again.',
@@ -344,6 +347,8 @@ const messages = defineMessages(
       'Your browser may already show the authorization as done, but ZeppBridge can’t reach zeppbridge.com to collect it. If your browser uses a proxy and the app doesn’t, turn on the system proxy (or let your proxy tool cover all apps), then choose “Check now”.',
     'err.official.still_pending':
       'Just checked: the relay hasn’t received this authorization yet. Make sure you approved it in the browser and saw the success page. If that page came from an earlier attempt, start the authorization again.',
+    'err.official.browser_not_opened':
+      'The authorization page doesn’t seem to have opened. If no browser window appeared, choose “Copy authorization link” and paste it into your browser’s address bar — the app connects on its own.',
     'err.backfill.start_too_early':
       'Backfill start is too early — at most the last 3650 days can be backfilled',
     'err.login.bad_url': 'Invalid sign-in address',
@@ -366,6 +371,8 @@ const messages = defineMessages(
       'Rebuilding derived data from local payloads — this sync retries automatically',
     'err.sync.deferred_busy':
       'Another write is in progress — this sync retries automatically',
+    'err.local.maintenance_compaction': 'Compacting stored payloads — retries automatically when done',
+    'err.local.maintenance_replay': 'Rebuilding data from local payloads — retries automatically when done',
     'err.backfill.bad_start_date': 'Invalid backfill start date — needs YYYY-MM-DD',
     'err.backfill.no_canonical_records':
       'The cloud returned a payload, but no usable records were parsed',
@@ -405,8 +412,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': "Could not encode the de-identified AI export",
 
     /* —— feedback —— */
-    'err.diagnostic.nothing_to_submit':
-      "This device has no model number that would help the catalog — nothing to submit",
     'err.diagnostic.empty_report':
       "Pick a problem type or write a note first — otherwise the report has nothing actionable",
     'err.diagnostic.client_init_failed': "Could not initialize the report connection",
@@ -541,7 +546,7 @@ const messages = defineMessages(
     'err.login.extracting': 'Credenciales leídas; confirmando región',
     'err.login.verifying': 'Verificando cuenta',
     'err.login.connected': 'Conectado a tu cuenta de Zepp',
-    'err.official.browser': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
+    'err.official.browser': 'No se pudo abrir el navegador. Elige «Copiar enlace de autorización», pégalo en la barra de direcciones del navegador y autoriza allí; la app se conecta sola.',
     'err.open_url.failed': 'No se pudo abrir el navegador. Revisa el navegador predeterminado y reintenta.',
     'err.open_url.not_allowed': 'Solo se pueden abrir enlaces https.',
     'err.letters.client_init_failed': 'No se pudo preparar la conexión para enviar cartas. Reinicia la app y reintenta.',
@@ -587,6 +592,8 @@ const messages = defineMessages(
       'Puede que el navegador ya muestre la autorización como hecha, pero ZeppBridge no logra conectar con zeppbridge.com para recogerla. Si el navegador usa un proxy y la app no, activa el proxy del sistema (o deja que tu herramienta de proxy cubra todas las apps) y elige «Comprobar ahora».',
     'err.official.still_pending':
       'Acabamos de comprobar: el intermediario aún no ha recibido esta autorización. Confirma que la aprobaste en el navegador y viste la página de éxito. Si esa página era de un intento anterior, vuelve a iniciar la autorización.',
+    'err.official.browser_not_opened':
+      'Parece que la página de autorización no se abrió. Si no apareció ninguna ventana del navegador, elige «Copiar enlace de autorización» y pégalo en la barra de direcciones; la app se conecta sola.',
     'err.backfill.start_too_early':
       'El inicio del historial es demasiado antiguo: como máximo se pueden recuperar los últimos 3650 días',
     'err.login.bad_url': 'Dirección de inicio de sesión no válida',
@@ -609,6 +616,8 @@ const messages = defineMessages(
       'Reconstruyendo datos derivados desde registros locales; esta sincronización se reintentará automáticamente',
     'err.sync.deferred_busy':
       'Otra escritura en curso; esta sincronización se reintentará automáticamente',
+    'err.local.maintenance_compaction': 'Compactando registros; se reintentará al terminar',
+    'err.local.maintenance_replay': 'Reconstruyendo datos desde registros locales; se reintentará al terminar',
     'err.backfill.bad_start_date': 'Fecha de inicio de historial no válida: usa AAAA-MM-DD',
     'err.backfill.no_canonical_records':
       'La nube devolvió datos, pero no se hallaron registros utilizables',
@@ -648,8 +657,6 @@ const messages = defineMessages(
     'err.handoff.encode_failed': 'Error al codificar la exportación anonimizada para la IA',
 
     /* —— feedback —— */
-    'err.diagnostic.nothing_to_submit':
-      'Este dispositivo no aporta números de modelo útiles para el catálogo; nada que enviar ahora',
     'err.diagnostic.empty_report':
       'Elige primero el tipo de problema o escribe una nota; si no, el reporte no trae nada procesable',
     'err.diagnostic.client_init_failed': 'No se pudo iniciar la conexión del reporte de error',

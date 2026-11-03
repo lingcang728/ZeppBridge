@@ -21,19 +21,37 @@ pub(super) fn sleep_from_band_item(
 
     let deep_minutes = optional_band_stage_minutes(sleep, &["dp", "deepMinutes"], &[5]);
     let light_minutes = optional_band_stage_minutes(sleep, &["lt", "lightMinutes"], &[4]);
-    let awake_minutes = optional_band_stage_minutes(sleep, &["wk", "awakeMinutes"], &[7]);
+    // 清醒只在有 `wk` 字段或真有 mode=7 段时才算知道。以前只要有 stage 数组
+    // 就给 0，App 里改过的睡眠（不带清醒段）于是「清醒 0 分钟、睡着 = 在床」，
+    // 和 App 对不上（10-30 / 11-01 反馈）。
+    let awake_minutes = first_number(sleep, &["wk", "awakeMinutes"])
+        .map(|value| value.round() as i32)
+        .or_else(|| {
+            let minutes = band_stage_minutes(sleep, 7);
+            (minutes > 0).then_some(minutes)
+        });
     let rem_from_field = first_number(sleep, &["rm", "remMinutes", "rem"])
         .map(|value| value.round() as i32)
         .filter(|value| *value >= 0);
     let rem_from_stages = band_stage_minutes(sleep, 8) + band_stage_minutes(sleep, 11);
     let span_minutes = (end_time - start_time).num_minutes().max(0) as i32;
     let rem_minutes = rem_from_field.or_else(|| (rem_from_stages > 0).then_some(rem_from_stages));
-    let duration_minutes = first_number(sleep, &["duration", "durationMinutes"])
-        .map(|value| value.round() as i32)
-        .unwrap_or_else(|| match awake_minutes {
-            Some(awake) => (span_minutes - awake).max(0),
-            None => span_minutes,
-        });
+    // 睡着的时长：字段 > 在床 − 清醒（清醒确实知道时）> 深睡 + 浅睡 + REM。
+    // 三样都没有才只剩在床时长可给，同时记进 time_in_bed 让界面知道它是什么
+    // （库里这一列不能为空，和官方通道同一个兜法）。
+    let staged_minutes = [deep_minutes, light_minutes, rem_minutes]
+        .into_iter()
+        .flatten()
+        .sum::<i32>();
+    let (duration_minutes, time_in_bed_minutes) =
+        match first_number(sleep, &["duration", "durationMinutes"]) {
+            Some(value) => (value.round() as i32, None),
+            None => match awake_minutes {
+                Some(awake) => ((span_minutes - awake).max(0), None),
+                None if staged_minutes > 0 => (staged_minutes, None),
+                None => (span_minutes, Some(span_minutes)),
+            },
+        };
     let source_device = device_id(item)
         .or_else(|| first_string(summary, &["sn"]))
         .filter(|value| !value.is_empty());
@@ -62,7 +80,7 @@ pub(super) fn sleep_from_band_item(
         source_scope: scope,
         device_id: source_device,
         synced_at: None,
-        time_in_bed_minutes: None,
+        time_in_bed_minutes,
         stages,
         wake_count: first_number(sleep, &["wc", "wakeCount"])
             .map(|value| value.round() as i32)

@@ -163,14 +163,16 @@ impl Normalizer {
             // 睡着的时长：有清醒时长就用「在床 − 清醒」；没有就用实测的深睡 + 浅睡
             // （+ REM）——不把未知的清醒当成 0，把在床时长冒充睡着时长（R10）。
             // 两样都没有时只剩在床时长可给，同时记进 time_in_bed 让界面知道。
-            let (duration_minutes, time_in_bed_minutes) =
-                match (awake_minutes, deep_minutes, light_minutes) {
-                    (Some(awake), _, _) => ((span - awake).max(0), None),
-                    (None, Some(deep), Some(light)) => {
-                        (deep + light + rem_minutes.unwrap_or(0), Some(span))
-                    }
-                    (None, _, _) => (span, Some(span)),
-                };
+            // 深睡、浅睡、REM 有哪样算哪样（以前要深浅两样都在才算，缺一样就退回在床时长）。
+            let staged = [deep_minutes, light_minutes, rem_minutes]
+                .into_iter()
+                .flatten()
+                .sum::<i32>();
+            let (duration_minutes, time_in_bed_minutes) = match awake_minutes {
+                Some(awake) => ((span - awake).max(0), None),
+                None if staged > 0 => (staged, Some(span)),
+                None => (span, Some(span)),
+            };
             out.push(OfficialSleep {
                 session: SleepSession {
                     sleep_id: format!("official:{start}"),

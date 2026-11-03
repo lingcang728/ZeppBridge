@@ -286,6 +286,9 @@ pub(crate) fn category_metric_specs(category: AiTaskCategory) -> Vec<CategoryMet
             "steps",
             "active_calories",
             "active_minutes",
+            // 静息消耗：体脂秤测的基础代谢，和活动消耗放在一起 AI 才算得出一天大概烧了多少。
+            // 身体类里也有它；没有秤的账号这一项就是「未提供」，不拿别的数推。
+            "bmr",
         ],
         AiTaskCategory::Body => &[
             "blood_pressure_systolic",

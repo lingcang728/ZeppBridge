@@ -62,9 +62,11 @@ pub fn variant_label(sport: Sport, variant: Variant, locale: WatchLocale) -> Opt
         (Sport::Cycling, Variant::Indoor, Zh) => "室内骑行",
         (Sport::Cycling, Variant::Indoor, En) => "Indoor cycling",
         (Sport::Cycling, Variant::Indoor, Es) => "Ciclismo en interior",
-        (Sport::Running, Variant::Trail, Zh) => "越野跑",
-        (Sport::Running, Variant::Trail, En) => "Trail run",
-        (Sport::Running, Variant::Trail, Es) => "Trail running",
+        // 手表上第三方计划没有「越野跑」可选，只能当跑步开始（#143）：标签先写大类，
+        // 别让人在手表上找一个不存在的子类型。
+        (Sport::Running, Variant::Trail, Zh) => "跑步 · 越野路线",
+        (Sport::Running, Variant::Trail, En) => "Run · trail",
+        (Sport::Running, Variant::Trail, Es) => "Carrera · montaña",
         (Sport::Cycling, Variant::Mountain, Zh) => "山地骑行",
         (Sport::Cycling, Variant::Mountain, En) => "Mountain biking",
         (Sport::Cycling, Variant::Mountain, Es) => "Ciclismo de montaña",
@@ -72,12 +74,29 @@ pub fn variant_label(sport: Sport, variant: Variant, locale: WatchLocale) -> Opt
     })
 }
 
+/// 手表上让人选的子类型里没有它时，告诉人在手表上怎么开始（#143）。
+fn variant_hint(variant: Variant, locale: WatchLocale) -> Option<&'static str> {
+    use WatchLocale::{En, Es, Zh};
+    Some(match (variant, locale) {
+        (Variant::Trail, Zh) => "手表上选跑步开始",
+        (Variant::Trail, En) => "start it as a run on the watch",
+        (Variant::Trail, Es) => "en el reloj, empieza una carrera",
+        _ => return None,
+    })
+}
+
 /// 手表上的描述：第一行「目的 · 子类型」（缺哪个就省哪个），第二行起是要点。
+/// 子类型在手表上选不到的（越野跑），第一行后面再接半句怎么开始。
 /// 账本里 2026-10 之前的训练没有目的和子类型，就只有要点。
 pub fn watch_description(workout: &Workout, locale: WatchLocale) -> Option<String> {
-    let variant = workout
-        .variant
-        .and_then(|variant| variant_label(workout.sport, variant, locale));
+    let variant = workout.variant.and_then(|variant| {
+        let label = variant_label(workout.sport, variant, locale)?;
+        Some(match variant_hint(variant, locale) {
+            Some(hint) if locale == WatchLocale::Zh => format!("{label}，{hint}"),
+            Some(hint) => format!("{label}, {hint}"),
+            None => label.to_string(),
+        })
+    });
     let head = match (workout.focus.as_deref(), variant) {
         (Some(focus), Some(variant)) => Some(format!("{focus} · {variant}")),
         (Some(focus), None) => Some(focus.to_string()),

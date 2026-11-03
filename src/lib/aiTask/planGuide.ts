@@ -80,7 +80,7 @@ const messages = defineMessages(
       '先跟我商量，允许多轮修改。只有我明确说「定稿」「发计划」时，才输出最终训练计划 JSON：',
       '请在回复里附一个 ```json 代码块，用下面的格式；ZeppBridge 会读它，让我看过确认后发到手表。',
       '- date 写 YYYY-MM-DD，只排今天及以后，最远 56 天后。from / to 是这份计划管的日期范围：范围内你没写训练的日子会被当作休息日，原有的计划会被清掉；不写就取训练日期的最早到最晚。',
-      '- 手表只收这 4 种 sport：running（variant 写 outdoor 户外 / treadmill 跑步机 / track 操场）、cycling（variant 写 outdoor 户外 / indoor 室内）、pool_swim、open_water_swim（游泳不写 variant）。手表上会让我再选一次子类型，所以 variant 一定要写对。',
+      '- 手表只收这 4 种 sport：running（variant 写 outdoor 户外 / treadmill 跑步机 / track 操场 / trail 越野路线；手表上没有越野跑可选，trail 会提醒在手表上选跑步开始）、cycling（variant 写 outdoor 户外 / indoor 室内）、pool_swim、open_water_swim（游泳不写 variant）。手表上会让我再选一次子类型，所以 variant 一定要写对。',
       '- 走路、徒步、力量、瑜伽这类活动发不到手表（Zepp 会直接丢掉）。讨论时就明确告诉我「这条发不到手表」，由我决定换成上面能发的类型还是不排；不要把它藏进 rest 的 note 里。',
       '- 每条训练都要写 focus（训练目的，一个短词，例如「强化耐力」「提升乳酸阈」）和 description（要点，一两句，可以用 \\n 换行）；它们会显示在手表上，第一行是「目的 · 子类型」。',
       '- name 控制在 14 个字以内，太长手表列表会截断。',
@@ -93,6 +93,7 @@ const messages = defineMessages(
       '```',
     ].join('\n'),
     language: (lang: string) => `- name、focus、description、summary、note 这些文字一律用${lang}写：它们会原样显示在 ZeppBridge 和手表上。`,
+    swim: '- 游泳的距离按米写，泳池每一步至少 25 米（最好是池长的整数倍，池长在手表上设）；游泳不写配速目标，用心率区间或不设目标。',
   },
   {
     example: {
@@ -109,7 +110,7 @@ const messages = defineMessages(
       'Discuss the plan with me first, across multiple rounds if needed. Only output final plan JSON when I explicitly say “finalize” or “send the plan”:',
       'Add a ```json code block to your reply in the format below. ZeppBridge reads it, I review it, and then it is sent to my watch.',
       '- date is YYYY-MM-DD, today or later, at most 56 days ahead. from / to is the range this plan covers: days in that range with no workout are treated as rest days and any existing plan on them is cleared. If omitted, it spans the earliest to the latest workout date.',
-      '- The watch only accepts these 4 sports: running (variant: outdoor / treadmill / track), cycling (variant: outdoor / indoor), pool_swim and open_water_swim (no variant for swimming). The watch asks me to pick the sub type again, so get variant right.',
+      '- The watch only accepts these 4 sports: running (variant: outdoor / treadmill / track / trail; the watch has no trail run to pick, so trail tells me to start it as a run), cycling (variant: outdoor / indoor), pool_swim and open_water_swim (no variant for swimming). The watch asks me to pick the sub type again, so get variant right.',
       '- Walking, hiking, strength, yoga and similar activities cannot be sent to the watch (Zepp silently drops them). Tell me during the discussion that such a session “cannot go to the watch” and let me decide whether to swap it for a sport above or leave it out. Never hide it in a rest note.',
       '- Every workout needs focus (its purpose, a short phrase such as “Build endurance” or “Threshold”) and description (the key points in a sentence or two; \\n for a new line). Both appear on the watch, with “purpose · sub type” as the first line.',
       '- Keep name within about 14 characters; longer names get cut off in the watch list.',
@@ -121,6 +122,7 @@ const messages = defineMessages(
       example,
       '```',
     ].join('\n'),
+    swim: '- Swim distances are in metres; each pool step is at least 25 m (ideally a whole number of pool lengths, which are set on the watch). Swims take no pace target: use a heart-rate range or none.',
     language: (lang: string) => `- Write name, focus, description, summary and note in ${lang}: they are shown as-is in ZeppBridge and on the watch.`,
   },
   {
@@ -138,7 +140,7 @@ const messages = defineMessages(
       'Hablemos primero del plan y revisémoslo juntos. Solo entrega el JSON final cuando diga «versión final» o «envía el plan»:',
       'Añade a tu respuesta un bloque de código ```json con el formato siguiente. ZeppBridge lo lee, yo lo reviso y luego se envía a mi reloj.',
       '- date es AAAA-MM-DD, de hoy en adelante y como máximo a 56 días. from / to es el rango que cubre este plan: los días de ese rango sin entrenamiento se tratan como descanso y se borra el plan que tuvieran. Si se omite, abarca de la primera a la última fecha de entrenamiento.',
-      '- El reloj solo acepta estos 4 deportes: running (variant: outdoor / treadmill / track), cycling (variant: outdoor / indoor), pool_swim y open_water_swim (la natación no lleva variant). El reloj me pide elegir el subtipo otra vez, así que acierta con variant.',
+      '- El reloj solo acepta estos 4 deportes: running (variant: outdoor / treadmill / track / trail; el reloj no tiene carrera de montaña, así que trail me recuerda empezarla como carrera), cycling (variant: outdoor / indoor), pool_swim y open_water_swim (la natación no lleva variant). El reloj me pide elegir el subtipo otra vez, así que acierta con variant.',
       '- Caminar, senderismo, fuerza, yoga y actividades parecidas no llegan al reloj (Zepp las descarta sin avisar). Dímelo durante la conversación («esta sesión no llega al reloj») y déjame decidir si la cambio por un deporte de arriba o la quito. Nunca la escondas en una nota de rest.',
       '- Cada entrenamiento necesita focus (su objetivo, una frase corta como «Mejorar resistencia» o «Umbral») y description (los puntos clave en una o dos frases; \\n para un salto de línea). Ambos se ven en el reloj, con «objetivo · subtipo» en la primera línea.',
       '- Mantén name en unos 14 caracteres; los nombres largos se cortan en la lista del reloj.',
@@ -150,6 +152,7 @@ const messages = defineMessages(
       example,
       '```',
     ].join('\n'),
+    swim: '- En natación la distancia va en metros; cada paso en piscina es de al menos 25 m (mejor un número entero de largos, que se configuran en el reloj). La natación no lleva objetivo de ritmo: usa un rango de frecuencia cardiaca o ninguno.',
     language: (lang: string) => `- Escribe name, focus, description, summary y note en ${lang}: se muestran tal cual en ZeppBridge y en el reloj.`,
   },
   'lib/aiTask/planGuide',
@@ -159,5 +162,5 @@ export const planGuide = (now: Date = new Date()): string => {
   const text = messagesOf(messages);
   // 计划里的文字跟着界面语言写（10-13：中文对话里排的计划，换成葡语界面后满屏中文）。语言名用它的自称，
   // 语言包还没翻这一句时回落英文那句，也照样写对语言。
-  return `${text.guide(exampleFor(now, text.example))}\n${text.language(LOCALE_LABELS[locale.value])}`;
+  return `${text.guide(exampleFor(now, text.example))}\n${text.swim}\n${text.language(LOCALE_LABELS[locale.value])}`;
 };

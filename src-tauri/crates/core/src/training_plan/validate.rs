@@ -99,7 +99,9 @@ fn held_workout(index: usize, workout: &PlanWorkout, context: PlanContext) -> Op
     let date = NaiveDate::parse_from_str(workout.date.trim(), "%Y-%m-%d").ok()?;
     // 步骤的问题已经在正式校验里报过了，这里只取读得懂的结构。
     let mut scratch = Issues { list: Vec::new() };
-    let steps = check_steps(index, &workout.steps, context, &mut scratch).unwrap_or_default();
+    let sport = Sport::parse(&workout.sport);
+    let steps =
+        check_steps(index, sport, &workout.steps, context, &mut scratch).unwrap_or_default();
     let text = |value: &Option<String>| {
         value
             .as_deref()
@@ -136,6 +138,10 @@ const MAX_REPEAT: u32 = 50;
 const MIN_STEP_SECONDS: u32 = 10;
 const MAX_STEP_SECONDS: u32 = 6 * 3600;
 const MIN_STEP_METERS: u32 = 50;
+/// 泳池一步最少一个池长。池长是手表上的设置（25 / 50 米、25 / 50 码、自定义），官方报文里没有；
+/// 2026-11-02 用 T-Rex 3 Pro 实测：25 米、75 米的步骤原样收下并显示。不要求 25 的倍数——自定义池长
+/// 什么数都有。
+const MIN_POOL_STEP_METERS: u32 = 25;
 const MAX_STEP_METERS: u32 = 100_000;
 const MAX_WORKOUT_SECONDS: u64 = 8 * 3600;
 const MIN_HR: u16 = 30;
@@ -496,7 +502,7 @@ fn check_workout(
         );
     }
 
-    let steps = check_steps(index, &workout.steps, context, issues);
+    let steps = check_steps(index, sport, &workout.steps, context, issues);
     if let Some(steps) = steps.as_ref() {
         let leaves: usize = steps
             .iter()
@@ -555,6 +561,7 @@ fn check_workout(
 
 fn check_steps(
     workout: usize,
+    sport: Option<Sport>,
     steps: &[PlanStep],
     context: PlanContext,
     issues: &mut Issues,
@@ -575,10 +582,12 @@ fn check_steps(
     for (position, step) in steps.iter().enumerate() {
         let path = (position + 1).to_string();
         match step {
-            PlanStep::Single { .. } => match check_single(workout, &path, step, context, issues) {
-                Some(step) => nodes.push(StepNode::Step(step)),
-                None => ok = false,
-            },
+            PlanStep::Single { .. } => {
+                match check_single(workout, sport, &path, step, context, issues) {
+                    Some(step) => nodes.push(StepNode::Step(step)),
+                    None => ok = false,
+                }
+            }
             PlanStep::Repeat { repeat, steps } => {
                 if *repeat == 0 || *repeat > MAX_REPEAT {
                     ok = false;
@@ -617,7 +626,7 @@ fn check_steps(
                         );
                         continue;
                     }
-                    match check_single(workout, &sub_path, step, context, issues) {
+                    match check_single(workout, sport, &sub_path, step, context, issues) {
                         Some(step) => inner.push(step),
                         None => ok = false,
                     }
@@ -634,6 +643,7 @@ fn check_steps(
 
 fn check_single(
     workout: usize,
+    sport: Option<Sport>,
     path: &str,
     step: &PlanStep,
     context: PlanContext,
@@ -689,7 +699,19 @@ fn check_single(
             )
         }
         Some(StepLength::Distance { meters })
-            if !(MIN_STEP_METERS..=MAX_STEP_METERS).contains(&meters) =>
+            if sport == Some(Sport::PoolSwim)
+                && !(MIN_POOL_STEP_METERS..=MAX_STEP_METERS).contains(&meters) =>
+        {
+            push(
+                Severity::Error,
+                "ui.training_plan.issue.pool_distance_out_of_range",
+                "泳池每一步在 25 米到 100 公里之间".into(),
+                json!({ "value": duration }),
+            )
+        }
+        Some(StepLength::Distance { meters })
+            if sport != Some(Sport::PoolSwim)
+                && !(MIN_STEP_METERS..=MAX_STEP_METERS).contains(&meters) =>
         {
             push(
                 Severity::Error,
@@ -731,6 +753,17 @@ fn check_single(
                 "ui.training_plan.issue.hr_out_of_range",
                 format!("心率区间要在 {MIN_HR} 到 {max_hr} 之间，且两端不相等"),
                 json!({ "low": low, "high": high, "max": max_hr }),
+            )
+        }
+        // 游泳配速习惯按每 100 米说，按每公里读会差十倍；手表上游泳的配速目标还没实测过，先不收。
+        Some(Target::Pace { .. })
+            if matches!(sport, Some(Sport::PoolSwim | Sport::OpenWaterSwim)) =>
+        {
+            push(
+                Severity::Error,
+                "ui.training_plan.issue.swim_pace_unsupported",
+                "游泳先不设配速目标：用心率区间，或者不设目标".into(),
+                json!({ "value": target }),
             )
         }
         Some(Target::Pace { fast, slow })

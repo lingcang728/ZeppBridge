@@ -1,15 +1,18 @@
 /*
  * 新手引导的状态机（全局单例）。章节和步骤是 lib/tour/chapters.ts 的数据，界面是
  * components/tour/TourOverlay.vue（聚光框 + 玻璃说明卡）和 TourWelcome.vue（第一屏语言轮）。
+ * 什么时候算看过见 lib/tour/progress.ts：走完才算；跳过只记当前章；就地讲解离开页面只是暂停。
  *
  * 一步 = 收起上一步摊开的东西（牌桌）→ 必要时换页 → 等目标元素出现（最多几秒，等不到就退成居中说明卡，
  * 不卡住）→ 滚到视野里 → **等它停稳**（设置卡的形变、牌的发牌都在动，10-13 录屏里聚光框量在半路，
  * 说明卡跟着跳、点「下一步」点空）→ 量出位置交给聚光框。窗口尺寸变化、滚动时重量；位置没变就不动。
  */
-import { computed, getCurrentInstance, ref, shallowRef } from 'vue';
+import { computed, getCurrentInstance, onActivated, onMounted, ref, shallowRef } from 'vue';
 import router from '../router';
-import { FULL_TOUR, INLINE_CHAPTERS, TOUR_STEPS, type TourChapterId, type TourStep } from '../lib/tour/chapters';
-import { enterSandbox, leaveSandbox, markSeen, sandboxFlags, seenChapters } from '../lib/tour/sandbox';
+import { TOUR_STEPS, type SectionId, type TourChapterId, type TourStep } from '../lib/tour/chapters';
+import { chaptersToMark, presentSteps, type TourEnd } from '../lib/tour/progress';
+import { enterSandbox, introPending, leaveSandbox, markSeen, sandboxFlags, seenChapters } from '../lib/tour/sandbox';
+import { updateNotice } from '../services/updateNotice';
 import { locale } from '../i18n';
 import { useTheme } from './useTheme';
 import { lessMotion } from '../lib/motion/lessMotion';
@@ -18,10 +21,13 @@ export type TourMode = 'sandbox' | 'inline';
 
 interface ActiveTour {
   chapters: TourChapterId[];
+  /** 每章要走的步骤（TOUR_STEPS 里的下标）：沙盒是全部，就地讲解只留眼前出现了的。 */
+  keys: number[][];
   chapter: number;
+  /** keys[chapter] 里的位置。 */
   step: number;
   mode: TourMode;
-  /** 就地提示是在哪一页出的：换了页就收起（它说的那样东西已经不在眼前了）。 */
+  /** 就地讲解是在哪一页出的：换了页就暂停（它说的那样东西已经不在眼前了）。 */
   path: string;
 }
 
@@ -36,6 +42,10 @@ const settling = ref(false);
 const welcomeOpen = ref(false);
 
 const WAIT_MS = 4000;
+/** 就地讲解开讲前目标都在；讲到某一步时它没了，不久等，跳过。 */
+const INLINE_WAIT_MS = 1200;
+/** 就地讲解开讲前等页面摊开、目标出现，最多这么久；一个都没等到就不讲。 */
+const OFFER_WAIT_MS = 3000;
 /** 有 `fallback` 的步骤先在本页找这么久，找不到再去后备那一页。 */
 const FALLBACK_WAIT_MS = 900;
 /** 等目标停稳：连续这么多帧外接框不动（< 0.5px）才算，最多等 STEADY_MAX_MS。 */
@@ -49,6 +59,10 @@ let targets: Element[] = [];
 let selector: { css: string; all: boolean } | null = null;
 let refinding = false;
 let measureFrame = 0;
+/** 换步的方向：圈不到的步骤顺着这个方向跳过。 */
+let direction: 1 | -1 = 1;
+/** 这一趟真的讲出来了几步：一步都没讲就走到头，不算看过。 */
+let shownSteps = 0;
 
 const reducedMotion = () => lessMotion();
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -133,7 +147,11 @@ const listen = (on: boolean) => {
   document[method]('scroll', scheduleMeasure, { capture: true, passive: true } as AddEventListenerOptions);
 };
 
-const stepOf = (tour: ActiveTour): TourStep | undefined => TOUR_STEPS[tour.chapters[tour.chapter]]?.[tour.step];
+const keyOf = (tour: ActiveTour): number | undefined => tour.keys[tour.chapter]?.[tour.step];
+const stepOf = (tour: ActiveTour): TourStep | undefined => {
+  const key = keyOf(tour);
+  return key === undefined ? undefined : TOUR_STEPS[tour.chapters[tour.chapter]!]?.[key];
+};
 
 /** 这一步摊开过的牌桌：离开这一步时收回去（点它自己的 ×，走它原本的收牌动画）。 */
 let openedTable = false;
@@ -163,15 +181,18 @@ async function show() {
   settling.value = true;
   targets = [];
   selector = null;
+  const sandbox = tour.mode === 'sandbox';
   if (!step.open) await closeOpened();
   if (run !== token) return;
-  if (step.route && router.currentRoute.value.path !== step.route) await router.push(step.route).catch(() => undefined);
+  // 就地讲解不换页：讲的就是眼前这一页。
+  if (sandbox && step.route && router.currentRoute.value.path !== step.route) await router.push(step.route).catch(() => undefined);
   if (run !== token) return;
   if (step.open === 'pickDays') await openPickDays(run);
   let css = step.target;
-  let found = css ? await findTargets(css, step.all === true, run, step.fallback ? FALLBACK_WAIT_MS : WAIT_MS) : [];
+  const wait = !sandbox ? INLINE_WAIT_MS : step.fallback ? FALLBACK_WAIT_MS : WAIT_MS;
+  let found = css ? await findTargets(css, step.all === true, run, wait) : [];
   if (run !== token) return;
-  if (!found.length && step.fallback) {
+  if (!found.length && step.fallback && sandbox) {
     if (router.currentRoute.value.path !== step.fallback.route) await router.push(step.fallback.route).catch(() => undefined);
     css = step.fallback.target;
     found = await findTargets(css, false, run);
@@ -193,21 +214,28 @@ async function show() {
     targets = found;
     selector = { css, all: step.all === true };
     measure();
+  } else if (css) {
+    // 圈不到（示例数据里没有、页面变了）：不出一张对着空气说话的卡，顺着方向跳过这一步。
+    skipMissing();
+    return;
   } else {
     box.value = null;
   }
+  shownSteps += 1;
   settling.value = false;
 }
 
-const finish = (completed: boolean) => {
+function skipMissing() {
   const tour = active.value;
   if (!tour) return;
-  // 跳过整套引导：就地的首次提示也一并算看过（不想被打扰）；跳过单章、某个就地提示只算它自己。
-  const wholeTour = FULL_TOUR.every((id) => tour.chapters.includes(id));
-  const ids: string[] = !completed && wholeTour ? [...tour.chapters, ...INLINE_CHAPTERS] : [...tour.chapters];
-  // 看完训练计划那一章，第一次进计划页就不必再圈一遍。
-  if (tour.chapters.includes('plan')) ids.push('planFirst');
-  markSeen(ids);
+  const atStart = tour.chapter === 0 && tour.step === 0;
+  move(direction === -1 && !atStart ? -1 : 1);
+}
+
+const finish = (end: TourEnd) => {
+  const tour = active.value;
+  if (!tour) return;
+  markSeen(chaptersToMark(end, tour.chapters, tour.chapter));
   token += 1;
   targets = [];
   selector = null;
@@ -219,17 +247,25 @@ const finish = (completed: boolean) => {
   if (tour.mode === 'sandbox') leaveSandbox(sandboxFlags()?.ret ?? '/');
 };
 
+// 就地讲解时离开了这一页：只是暂停，不记看过，下次打开再讲。
 router.afterEach((to) => {
   const tour = active.value;
-  if (tour?.mode === 'inline' && to.path !== tour.path) finish(false);
+  if (tour?.mode === 'inline' && to.path !== tour.path) finish('pause');
 });
 
+const begin = (chapters: TourChapterId[], keys: number[][], mode: TourMode) => {
+  if (!chapters.length) return;
+  if (!active.value) listen(true);
+  direction = 1;
+  shownSteps = 0;
+  active.value = { chapters, keys, chapter: 0, step: 0, mode, path: router.currentRoute.value.path };
+  void show();
+};
+
+/** 沙盒里按顺序走这几章的全部步骤。 */
 export const startTour = (chapters: TourChapterId[], mode: TourMode): void => {
   const list = chapters.filter((id) => TOUR_STEPS[id]?.length);
-  if (!list.length) return;
-  if (!active.value) listen(true);
-  active.value = { chapters: list, chapter: 0, step: 0, mode, path: router.currentRoute.value.path };
-  void show();
+  begin(list, list.map((id) => TOUR_STEPS[id].map((_, index) => index)), mode);
 };
 
 /** 进示例沙盒看这几章（整页重新载入，见 lib/tour/sandbox.ts）。`ret`：看完回哪一页。 */
@@ -245,39 +281,63 @@ export const launchSandbox = (chapters: TourChapterId[], options: { welcome?: bo
   });
 };
 
-/** 第一次碰到某个功能：没看过就就地圈一下。沙盒里、别的引导正在跑时不插队；落地页的演示
-    （也是演示模式）不出——整屏的引导层会挡住那边自己编排的演示。 */
-export const offerInline = (chapter: TourChapterId): void => {
+const isVisible = (css: string) => [...document.querySelectorAll(css)]
+  .some((element) => element.getClientRects().length > 0 && !element.closest('[class*="-leave-active"]'));
+
+let offering = 0;
+/** 某个板块第一次打开：没看过就就地讲一遍，只讲眼前已经出现的那几步；一步都没有就不讲（空页不讲）。
+    沙盒里、别的引导正在跑时不插队；落地页的演示（也是演示模式）不出——整屏的引导层会挡住那边自己编排的演示。
+    更新后的作者来信还开着、或马上要载入进总览时也不出（下次打开这一页再讲）。 */
+export const offerInline = async (chapter: SectionId): Promise<void> => {
   if (active.value || window.__ZB_DEMO__?.demo || welcomeOpen.value) return;
-  if (seenChapters().has(chapter)) return;
-  startTour([chapter], 'inline');
+  if (updateNotice.receipt || introPending() || seenChapters().has(chapter)) return;
+  const run = ++offering;
+  const path = router.currentRoute.value.path;
+  const steps = TOUR_STEPS[chapter];
+  const started = performance.now();
+  let keys = presentSteps(steps, isVisible);
+  while (!keys.length && performance.now() - started < OFFER_WAIT_MS) {
+    await sleep(120);
+    if (run !== offering || router.currentRoute.value.path !== path) return;
+    keys = presentSteps(steps, isVisible);
+  }
+  if (!keys.length || active.value || router.currentRoute.value.path !== path) return;
+  begin([chapter], [keys], 'inline');
 };
 
 /** 等界面摊开（`delay` 毫秒）再提示；到点时调用它的组件已经卸载 / 被 KeepAlive 收起，或者
     `stillThere()` 说那样东西已经关了，就不出——免得提示浮在别的页面上。 */
-export const offerInlineSoon = (chapter: TourChapterId, delay: number, stillThere: () => boolean = () => true): void => {
+export const offerInlineSoon = (chapter: SectionId, delay: number, stillThere: () => boolean = () => true): void => {
   const instance = getCurrentInstance();
   window.setTimeout(() => {
     if (instance && (instance.isUnmounted || instance.isDeactivated)) return;
-    if (stillThere()) offerInline(chapter);
+    if (stillThere()) void offerInline(chapter);
   }, delay);
 };
 
-const move = (delta: 1 | -1) => {
+/** 板块页面的根组件里调一次：挂上和（KeepAlive 下）再回到这一页时都问一句，中途离开过的下次接着讲。 */
+export const useSectionTour = (chapter: SectionId, stillThere?: () => boolean, delay = 900): void => {
+  const offer = () => offerInlineSoon(chapter, delay, stillThere);
+  onMounted(offer);
+  onActivated(offer);
+};
+
+function move(delta: 1 | -1) {
   const tour = active.value;
   if (!tour) return;
+  direction = delta;
   let { chapter, step } = tour;
   step += delta;
-  if (step >= TOUR_STEPS[tour.chapters[chapter]].length) { chapter += 1; step = 0; }
+  if (step >= tour.keys[chapter]!.length) { chapter += 1; step = 0; }
   if (step < 0) {
     if (chapter === 0) return;
     chapter -= 1;
-    step = TOUR_STEPS[tour.chapters[chapter]].length - 1;
+    step = tour.keys[chapter]!.length - 1;
   }
-  if (chapter >= tour.chapters.length) { finish(true); return; }
+  if (chapter >= tour.chapters.length) { finish(shownSteps ? 'done' : 'abort'); return; }
   active.value = { ...tour, chapter, step };
   void show();
-};
+}
 
 export const useTour = () => ({
   active,
@@ -287,24 +347,25 @@ export const useTour = () => ({
   current: computed(() => {
     const tour = active.value;
     if (!tour) return null;
-    const steps = TOUR_STEPS[tour.chapters[tour.chapter]];
-    const total = tour.chapters.reduce((sum, id) => sum + TOUR_STEPS[id].length, 0);
-    const done = tour.chapters.slice(0, tour.chapter).reduce((sum, id) => sum + TOUR_STEPS[id].length, 0) + tour.step;
+    const keys = tour.keys[tour.chapter]!;
+    const total = tour.keys.reduce((sum, list) => sum + list.length, 0);
+    const done = tour.keys.slice(0, tour.chapter).reduce((sum, list) => sum + list.length, 0) + tour.step;
     return {
-      chapter: tour.chapters[tour.chapter],
-      step: tour.step,
-      stepsInChapter: steps.length,
+      chapter: tour.chapters[tour.chapter]!,
+      /** 这一步在 TOUR_STEPS 里的下标：文案按它取（s1、s2…），筛掉的步骤不改序号。 */
+      step: keys[tour.step]!,
+      stepsInChapter: keys.length,
       index: done,
       total,
       first: done === 0,
       last: done === total - 1,
       mode: tour.mode,
       /** 圈住的那一块可以直接上手。 */
-      interactive: steps[tour.step]?.interactive === true,
+      interactive: stepOf(tour)?.interactive === true,
     };
   }),
   next: () => move(1),
   prev: () => move(-1),
-  /** 跳过：这几章连同就地的首次提示都算看过，别再打扰。 */
-  skip: () => finish(false),
+  /** 跳过：只把当前这一章记为看过（跳过总览不连带各板块）。 */
+  skip: () => finish('skip'),
 });

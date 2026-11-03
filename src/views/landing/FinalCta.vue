@@ -5,7 +5,10 @@ import SegmentTrack from '../../components/SegmentTrack.vue';
 import { GITHUB_URL, RELEASES_URL, isMobileVisitor } from './useDownloads';
 import type { LandingCopy } from './types';
 import type { JourneyCopy } from './journeyCopy';
-const props = defineProps<{ copy: LandingCopy; journey: JourneyCopy; windows: { label: string; hint: string; href: string }; macos: { label: string; hint: string; href: string }; linux: Array<{label: string; url: string}>; available: boolean; unreachable?: boolean }>();
+import type { LandingLocale } from '../../composables/useLandingLocale';
+const props = defineProps<{ copy: LandingCopy; journey: JourneyCopy; windows: { label: string; hint: string; href: string }; macos: { label: string; hint: string; href: string }; linux: Array<{label: string; url: string}>; available: boolean; unreachable?: boolean; version?: string | null; locale: LandingLocale }>();
+/* 更新日志是 finish-dist.mjs 生成的静态页：英文在 /changelog/，其余语言 /changelog/<locale>.html。 */
+const changelogHref = computed(() => (props.locale === 'en' ? '/changelog/' : `/changelog/${props.locale}.html`));
 const platform = ref('windows');
 onMounted(() => { if (!isMobileVisitor()) { if (/Mac/i.test(navigator.platform)) platform.value = 'macos'; else if (/Linux/i.test(navigator.platform)) platform.value = 'linux'; } });
 const selected = computed(() => platform.value === 'macos' ? props.macos : props.windows);
@@ -34,6 +37,7 @@ async function copyCommand() {
       <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="download" :size="22" />{{ journey.downloadPending }}</button>
       <a class="star-button lp-btn" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><Icon name="star" :size="20" /><span>{{ journey.starOnGithub }}</span><Icon name="external" :size="16" /></a>
     </div>
+    <p class="version-line"><span v-if="version">v{{ version }} · </span><a :href="changelogHref">{{ journey.changelog }}</a></p>
     <p v-if="platform === 'windows'" class="blocked-line">{{ journey.windowsBlocked }}</p>
     <div v-else-if="platform === 'macos'" class="mac-line">
       <p class="blocked-line">{{ journey.macInstall }}</p>
@@ -51,6 +55,9 @@ async function copyCommand() {
 h2 { margin: 0 auto; max-width: 16em; font-size: clamp(36px, 4.4vw, 64px); line-height: 1.14; letter-spacing: -.04em; font-weight: 600; text-wrap: balance; }
 .final .lp-lead { margin: 18px auto 0; }
 .install-line { margin: 10px auto 0; max-width: 36em; color: var(--subtle); font-size: 15px; line-height: 1.6; }
+.version-line { margin: 18px auto 0; color: var(--subtle); font-size: 13px; }
+.version-line a { color: inherit; text-underline-offset: 3px; }
+.version-line a:hover { color: var(--ink); }
 .blocked-line { margin: 26px auto 0; max-width: 40em; color: var(--subtle); font-size: 14px; line-height: 1.7; text-wrap: balance; }
 .mac-line .blocked-line { margin-bottom: 10px; }
 .mac-command { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 4px 4px 4px 16px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--ink) 5%, transparent); }

@@ -248,7 +248,7 @@ pub fn decode_workout_detail(
     let altitude_pairs = parse_delta_pairs(data.get("time_delta_altitude"), true);
     // `currentDistance` is `(dt, cumulative centimetres)`. Verified against a
     // 15 km run: its final value, 1521722 cm, matches the summary's 15217 m.
-    let distance_pairs = parse_delta_pairs(data.get("currentDistance"), true);
+    let distance_pairs = parse_rounded_delta_pairs(data.get("currentDistance"), true);
     let hr_pairs = parse_delta_pairs(data.get("heart_rate"), true);
     let speed_pairs = parse_float_pairs(data.get("speed"));
     let gait = parse_gait(data.get("gait"));

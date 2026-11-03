@@ -6,6 +6,7 @@
  * 各区块的界面和逻辑在 views/settings/sections/，共享状态在 composables/settings/context.ts。 */
 import GlassSwitch from '../components/GlassSwitch.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useSectionTour } from '../composables/useTour';
 import { useRoute, useRouter } from 'vue-router';
 import CardDeck from '../components/deck/CardDeck.vue';
 import CardBody from './settings/CardBody.vue';
@@ -24,7 +25,7 @@ import { settingsMessages } from './Settings.i18n';
 import { deckMessages } from './settings/deck.i18n';
 import { syncCardMessages } from './settings/sections/sync.i18n';
 import { useTourText } from '../components/tour/tour.i18n';
-import { FULL_TOUR } from '../lib/tour/chapters';
+import { ALL_CHAPTERS } from '../lib/tour/chapters';
 import { seenChapters } from '../lib/tour/sandbox';
 import {
   SETTINGS_CARD_ICONS,
@@ -90,7 +91,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
     ai: d.value.sumAi(exportFormat.value.toUpperCase()),
     display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
     feedback: d.value.sumFeedback,
-    guide: tour.value.cardSummary(FULL_TOUR.filter((id) => seenChapters().has(id)).length, FULL_TOUR.length),
+    guide: tour.value.seenCount(ALL_CHAPTERS.filter((id) => seenChapters().has(id)).length, ALL_CHAPTERS.length),
     privacy: d.value.sumPrivacy,
     advanced: d.value.sumAdvanced,
   };
@@ -148,6 +149,8 @@ onUnmounted(() => {
   auth.detach();
   official.detach();
 });
+/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+useSectionTour('settings', () => route.path === '/settings');
 </script>
 
 <template>

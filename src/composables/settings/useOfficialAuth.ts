@@ -48,6 +48,11 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   let copiedTimer: number | undefined;
 
   const waiting = computed(() => status.value.state === 'waiting');
+  /** 浏览器没打开授权页（打开失败，或中转站一直没见到这次授权）：「复制授权链接」顶到前面（#156）。 */
+  const browserTrouble = computed(() => waiting.value && Boolean(status.value.authorize_url) && (
+    status.value.message_code === 'err.official.browser'
+    || status.value.message_code === 'err.official.browser_not_opened'
+  ));
   const connected = computed(() => status.value.state === 'connected');
   const needsReauth = computed(() => status.value.state === 'needs_reauth');
 
@@ -171,7 +176,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   };
 
   return {
-    status, busy, failureText, accountConflict, failureConflict, waitingText, checking, waiting, connected, needsReauth, linkCopied,
+    status, busy, failureText, accountConflict, failureConflict, waitingText, checking, waiting, browserTrouble, connected, needsReauth, linkCopied,
     start, cancel, recover, checkNow, disconnect, copyLink, attach, detach,
   };
 };

@@ -5,11 +5,12 @@
     "https://www.amazfit.jp/",
     "https://us.amazfit.com/products.json?limit=250",
     "https://os.zepp.com/compatibility-zepp-os-5",
-    "https://amazfit-en.cdn.bcebos.com/smart-scale.html"
+    "https://amazfit-en.cdn.bcebos.com/smart-scale.html",
+    "https://docs.zepp.com/docs/reference/related-resources/device-list/"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 57,
-  "canonical_device_count": 55,
+  "active_supported_count": 63,
+  "canonical_device_count": 61,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -20,7 +21,9 @@
       "model_codes": [],
       "aliases": [
         "Amazfit Balance 3",
-        "Balance 3"
+        "Balance 3",
+        "Amazfit Balance 3 Ti",
+        "Balance 3 Ti"
       ],
       "region": [
         "jp"
@@ -44,10 +47,16 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-3",
       "device_source_codes": [
+        11141376,
         11141377,
         11141379,
         11145472,
         11145475
+      ],
+      "device_source_official": [
+        11141376,
+        11141377,
+        11141379
       ]
     },
     {
@@ -83,7 +92,14 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-ultra",
       "device_source_codes": [
-        11092224
+        11075840,
+        11075841,
+        11092224,
+        11092225
+      ],
+      "device_source_official": [
+        11075840,
+        11075841
       ]
     },
     {
@@ -118,7 +134,16 @@
       "asset_hash": "sha256:BACE4A952D1699FC0D156BAB9B19923784ED0B8084D6B9D4915654E67751BFE8",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-2-pro",
-      "device_source_codes": []
+      "device_source_codes": [
+        11010304,
+        11010305,
+        11010307
+      ],
+      "device_source_official": [
+        11010304,
+        11010305,
+        11010307
+      ]
     },
     {
       "catalog_id": "amazfit-cheetah-2-ultra",
@@ -153,8 +178,14 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-2-ultra",
       "device_source_codes": [
+        9961728,
+        9961729,
         9978112,
         9978113
+      ],
+      "device_source_official": [
+        9961728,
+        9961729
       ]
     },
     {
@@ -190,6 +221,9 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-max",
       "device_source_codes": [
+        11206915
+      ],
+      "device_source_official": [
         11206915
       ]
     },
@@ -228,7 +262,14 @@
       "device_source_codes": [
         10944768,
         10944769,
-        10944771
+        10944771,
+        10948867
+      ],
+      "device_source_official": [
+        10944768,
+        10944769,
+        10944771,
+        10948867
       ]
     },
     {
@@ -265,7 +306,13 @@
       "image_key": "amazfit-t-rex-ultra-2",
       "device_source_codes": [
         10879232,
-        10879233
+        10879233,
+        10879235
+      ],
+      "device_source_official": [
+        10879232,
+        10879233,
+        10879235
       ]
     },
     {
@@ -301,7 +348,12 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-max",
       "device_source_codes": [
-        10813697
+        10813697,
+        10813699
+      ],
+      "device_source_official": [
+        10813697,
+        10813699
       ]
     },
     {
@@ -340,6 +392,14 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-3-pro-48-44mm",
       "device_source_codes": [
+        10551552,
+        10551553,
+        10551555,
+        10682624,
+        10682625,
+        10682627
+      ],
+      "device_source_official": [
         10551552,
         10551553,
         10551555,
@@ -385,6 +445,11 @@
         9568513,
         9568515,
         10486017
+      ],
+      "device_source_official": [
+        9568512,
+        9568513,
+        9568515
       ]
     },
     {
@@ -420,6 +485,12 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-2-square",
       "device_source_codes": [
+        10223872,
+        10223873,
+        10223875
+      ],
+      "device_source_official": [
+        10223872,
         10223873,
         10223875
       ]
@@ -458,7 +529,20 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-2-44mm",
       "device_source_codes": [
+        8913152,
+        8913153,
         8913155,
+        8913159,
+        10092800,
+        10092801,
+        10092803,
+        10092807
+      ],
+      "device_source_official": [
+        8913152,
+        8913153,
+        8913155,
+        8913159,
         10092800,
         10092801,
         10092803,
@@ -498,6 +582,12 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-6",
       "device_source_codes": [
+        9765120,
+        9765121,
+        10158337
+      ],
+      "device_source_official": [
+        9765120,
         9765121,
         10158337
       ]
@@ -543,6 +633,11 @@
         8716544,
         8716545,
         8716547
+      ],
+      "device_source_official": [
+        8716544,
+        8716545,
+        8716547
       ]
     },
     {
@@ -581,7 +676,8 @@
       "device_source_codes": [
         10289410,
         10289411
-      ]
+      ],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-balance-46mm",
@@ -620,6 +716,11 @@
         8519936,
         8519937,
         8519939
+      ],
+      "device_source_official": [
+        8519936,
+        8519937,
+        8519939
       ]
     },
     {
@@ -655,7 +756,14 @@
       "asset_hash": "sha256:8603FDD1EA930374F49786287775BE23C830D8033C56FA66F530F36783D54E54",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-edge-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8388864,
+        8388865
+      ],
+      "device_source_official": [
+        8388864,
+        8388865
+      ]
     },
     {
       "catalog_id": "amazfit-up",
@@ -690,7 +798,8 @@
       "asset_hash": "sha256:C088313EE9CD1770DAAD005AD90ACF322D736A9C22C9C333C3E679B08DDABF19",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-up",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-bip-5-unity-46mm",
@@ -725,7 +834,16 @@
       "asset_hash": "sha256:E573AA2FB75226C58E3A22EFA065F705CC7EABE5F3879B8498F5C11102BAF1CA",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-5-unity-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8782081,
+        8782088,
+        8782089
+      ],
+      "device_source_official": [
+        8782081,
+        8782088,
+        8782089
+      ]
     },
     {
       "catalog_id": "amazfit-active-42mm",
@@ -761,6 +879,11 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-42mm",
       "device_source_codes": [
+        8323328,
+        8323329
+      ],
+      "device_source_official": [
+        8323328,
         8323329
       ]
     },
@@ -797,7 +920,14 @@
       "asset_hash": "sha256:4A47E3ABF6E6F7C99E71EB41AC1037AF266015393E89FEE7288DDD6F6B15E6FA",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-5-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8454400,
+        8454401
+      ],
+      "device_source_official": [
+        8454400,
+        8454401
+      ]
     },
     {
       "catalog_id": "amazfit-cheetah-pro-47mm",
@@ -833,7 +963,12 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-pro-47mm",
       "device_source_codes": [
-        8126720
+        8126720,
+        8126721
+      ],
+      "device_source_official": [
+        8126720,
+        8126721
       ]
     },
     {
@@ -868,7 +1003,14 @@
       "asset_hash": "sha256:3D6C123B8F16EE638CFD8DE3348E84B9F889E54D4556A83ECB705CB7E29126FD",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-47mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8192256,
+        8192257
+      ],
+      "device_source_official": [
+        8192256,
+        8192257
+      ]
     },
     {
       "catalog_id": "amazfit-falcon-49mm",
@@ -903,7 +1045,14 @@
       "asset_hash": "sha256:3D5CDC649E480347CBA19DFC26A5A8D169C60E42D49736DEE93D0D32C8F7AE24",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-falcon-49mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        414,
+        415
+      ],
+      "device_source_official": [
+        414,
+        415
+      ]
     },
     {
       "catalog_id": "amazfit-t-rex-ultra-47mm",
@@ -938,7 +1087,14 @@
       "asset_hash": "sha256:D68CB51E5A4355A742765640CAEFA3F04184761F60455A8D8198F97B74C1A252",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-ultra-47mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        6553856,
+        6553857
+      ],
+      "device_source_official": [
+        6553856,
+        6553857
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-mini-43mm",
@@ -972,7 +1128,14 @@
       "asset_hash": "sha256:34B02EF5BAEF9C8F927A0B467939251C436CBFD339B7C15390E73C0B4AA1104E",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-mini-43mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        250,
+        251
+      ],
+      "device_source_official": [
+        250,
+        251
+      ]
     },
     {
       "catalog_id": "amazfit-bip-3",
@@ -1006,7 +1169,8 @@
       "asset_hash": "sha256:F77F3A369965B4446F67C1A7F40C77D7DEF451F1040157E63BFC7EDB4B15CA0A",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-3",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gts-4-43mm",
@@ -1040,7 +1204,14 @@
       "asset_hash": "sha256:A2D3DE733F1E98662BA776C44F7A01CC93606B0196E20863A491EECCB24E915A",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-4-43mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        7995648,
+        7995649
+      ],
+      "device_source_official": [
+        7995648,
+        7995649
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-4-46mm",
@@ -1076,8 +1247,14 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-4-46mm",
       "device_source_codes": [
+        7864577,
         7930112,
         7930113
+      ],
+      "device_source_official": [
+        7930112,
+        7930113,
+        7864577
       ]
     },
     {
@@ -1112,7 +1289,16 @@
       "asset_hash": "sha256:79E0F10281EBF665BEBBF85AD18D91A9BC201D4FA73117BC30EB35D09A6F9E76",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-band-7",
-      "device_source_codes": []
+      "device_source_codes": [
+        252,
+        253,
+        254
+      ],
+      "device_source_official": [
+        252,
+        253,
+        254
+      ]
     },
     {
       "catalog_id": "amazfit-gts-4-mini",
@@ -1147,7 +1333,14 @@
       "asset_hash": "sha256:982FF6DE6E49311D6871D2C09191FF94F2779C08D1461AA7FE5A075BA5B3A859",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-4-mini",
-      "device_source_codes": []
+      "device_source_codes": [
+        246,
+        247
+      ],
+      "device_source_official": [
+        246,
+        247
+      ]
     },
     {
       "catalog_id": "amazfit-bip-3-pro",
@@ -1181,7 +1374,8 @@
       "asset_hash": "sha256:D9E828B29C8BE49C4A2C513798CE750F05F43D1EB0266725EBB157F4D062007C",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-3-pro",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gts-2-new-43mm",
@@ -1216,7 +1410,8 @@
       "asset_hash": "sha256:4CEC170234882088BE716ABBA95E3A3EDC2D7E2B8BDDF52318B689AE3FF810B3",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-2-new-43mm",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gtr-4-46mm-black",
@@ -1251,7 +1446,8 @@
       "asset_hash": "sha256:EB703AE812B44F9AD09E98BC3DB2FFDF89ED96E50AA05F193F441EF88F609555",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-4-46mm",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-t-rex-2-47mm",
@@ -1285,7 +1481,14 @@
       "asset_hash": "sha256:4AB8A5DAFACF4A1581ECE5CA681AE3701C33F85B2C090F6F12C57FEA6BFC3AF4",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-2-47mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        418,
+        419
+      ],
+      "device_source_official": [
+        418,
+        419
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-2-new-46mm",
@@ -1297,7 +1500,9 @@
       "aliases": [
         "Amazfit GTR 2 new 46mm",
         "GTR 2 new 46mm",
-        "Amazfit GTR 2 New"
+        "Amazfit GTR 2 New",
+        "Amazfit GTR 2",
+        "GTR 2"
       ],
       "region": [
         "jp"
@@ -1320,7 +1525,16 @@
       "asset_hash": "sha256:1560BD2D922B1CB2CB1D81C15214E190B9591814C8F410B22F8729888704D6B9",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-2-new-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        63,
+        64,
+        244
+      ],
+      "device_source_official": [
+        63,
+        64,
+        244
+      ]
     },
     {
       "catalog_id": "amazfit-gts-3-42mm",
@@ -1354,7 +1568,14 @@
       "asset_hash": "sha256:780D71624694557B0648BD190F04BAF3FE1301C4EFBAF76B85A5E8BFD9D9DD26",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-3-42mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        224,
+        225
+      ],
+      "device_source_official": [
+        224,
+        225
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-3-46mm",
@@ -1388,7 +1609,14 @@
       "asset_hash": "sha256:E5843FE15F3A25C4C87EF2507CE769A4B6F6E0393457CA213EEA31CA3D31F6FE",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-3-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        226,
+        227
+      ],
+      "device_source_official": [
+        226,
+        227
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-3-pro-46mm",
@@ -1422,7 +1650,18 @@
       "asset_hash": "sha256:85F2D5A49935EC2EE8F500643E694669D37CD114AB8C1C1723F56624DBD617A9",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-3-pro-46mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        229,
+        230,
+        242,
+        6095106
+      ],
+      "device_source_official": [
+        229,
+        230,
+        242,
+        6095106
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-2e",
@@ -1456,7 +1695,14 @@
       "asset_hash": "sha256:627262817C10C2BA0D01D0B51510668DB828F704230405C0333B942EDE4005F9",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-2e",
-      "device_source_codes": []
+      "device_source_codes": [
+        206,
+        209
+      ],
+      "device_source_official": [
+        206,
+        209
+      ]
     },
     {
       "catalog_id": "amazfit-gts-2e",
@@ -1490,7 +1736,8 @@
       "asset_hash": "sha256:C74F0052425C6DF637B01D988922203EC4A2A73E4462A3CB6EBECB0EF2B2DD92",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-2e",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-t-rex-pro",
@@ -1524,7 +1771,14 @@
       "asset_hash": "sha256:97AA4D9D4C5D9286BE9BB8021D5A20EC38CADCAAADB65EB46AE0169F2447E6D3",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-pro",
-      "device_source_codes": []
+      "device_source_codes": [
+        83,
+        200
+      ],
+      "device_source_official": [
+        83,
+        200
+      ]
     },
     {
       "catalog_id": "amazfit-bip-u-series",
@@ -1559,7 +1813,8 @@
       "asset_hash": "sha256:2648A5027720CEF026998EA4E95D6CECF0CC1AE33976F465B237E38116662DBF",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-u-series",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gts",
@@ -1593,7 +1848,8 @@
       "asset_hash": "sha256:67851753EBD59D9608F06B6A714E4E3A52BAF1B0299BC6BA502F3B6A49BCEDFC",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gts-2",
@@ -1627,7 +1883,8 @@
       "asset_hash": "sha256:71E5565E613F572D463355C9DC43E38504A6D98FFF9E6EA4D7E249497342113B",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-2",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-gts-2-mini",
@@ -1661,7 +1918,14 @@
       "asset_hash": "sha256:30123F18E4F46DE97AD43EAB65B91B07B780CDC15D79E429090F5E54E6B5228D",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gts-2-mini",
-      "device_source_codes": []
+      "device_source_codes": [
+        91,
+        92
+      ],
+      "device_source_official": [
+        91,
+        92
+      ]
     },
     {
       "catalog_id": "amazfit-gtr-42mm",
@@ -1695,7 +1959,8 @@
       "asset_hash": "sha256:351611A505DCED0AED21625104E05AB23A4FA75BF88B20FEDD25D8A7695FEF07",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-42mm",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-band-5",
@@ -1729,7 +1994,8 @@
       "asset_hash": "sha256:21726177A2E7EDD1D12D8F2D31ABE903628CAF3E5778EC795A96499C896B5510",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-band-5",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-helio-strap-pro",
@@ -1760,7 +2026,8 @@
       "device_source_codes": [
         11272451,
         11469059
-      ]
+      ],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-helio-core",
@@ -1788,7 +2055,8 @@
       "status": "active",
       "supported": true,
       "checked_at": "2026-08-15",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-helio-armband",
@@ -1817,7 +2085,8 @@
       "asset_hash": "sha256:887BF7A8904396AE2A2D57B5BE6D28285FFB7CC051B0C1DBC0EF245A76A9FDA6",
       "image_key": "amazfit-helio-armband",
       "checked_at": "2026-08-15",
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-helio-ring",
@@ -1852,7 +2121,8 @@
       "checked_at": "2026-08-15",
       "device_source_codes": [
         8651008
-      ]
+      ],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-balance-2-xt",
@@ -1884,7 +2154,8 @@
       "supported": true,
       "device_source_codes": [
         10486019
-      ]
+      ],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-smart-scale",
@@ -1916,7 +2187,8 @@
       "image_key": "amazfit-smart-scale",
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "mi-body-composition-scale-2",
@@ -1949,7 +2221,8 @@
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-bip",
@@ -1979,7 +2252,8 @@
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-pace",
@@ -2006,7 +2280,8 @@
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [],
+      "device_source_official": []
     },
     {
       "catalog_id": "amazfit-cheetah-square",
@@ -2029,12 +2304,207 @@
       "asset_source": "pending-official-art",
       "canonical_device_key": "amazfit-cheetah-square",
       "checked_at": "2026-10-20",
-      "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. Manual identification only: the one in-app report had no Advanced data connection and carried no deviceSource, so none is claimed. Product art pending.",
+      "provenance": "Reported missing in GitHub issue #137; name verified against the official Amazfit user guide (Amazfit Cheetah(Square)) on 2026-10-20. deviceSource 8257793 comes from the official Zepp developer device list (checked 2026-11-02). Product art pending.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [
+        8257793
+      ],
+      "device_source_official": [
+        8257793
+      ]
+    },
+    {
+      "catalog_id": "amazfit-pop",
+      "canonical_name": "Amazfit Pop",
+      "display_name": "Amazfit Pop",
+      "name_zh": "Amazfit Pop",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Pop",
+        "Amazfit POP"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "official_url": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-pop",
+      "checked_at": "2026-11-02",
+      "provenance": "Listed with deviceSource 68 in the official Zepp developer device list (checked 2026-11-02); reported missing from the model picker on 3.0.4 macOS. Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [
+        68
+      ],
+      "device_source_official": [
+        68
+      ]
+    },
+    {
+      "catalog_id": "zepp-e-round",
+      "canonical_name": "Zepp E (Round)",
+      "display_name": "Zepp E (Round)",
+      "name_zh": "Zepp E 圆屏",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Zepp E (Round)",
+        "Zepp E Round",
+        "Zepp E Circle"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "official_url": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "zepp-e-round",
+      "checked_at": "2026-11-02",
+      "provenance": "Listed with deviceSource 57 / 81 in the official Zepp developer device list (checked 2026-11-02). Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [
+        57,
+        81
+      ],
+      "device_source_official": [
+        57,
+        81
+      ]
+    },
+    {
+      "catalog_id": "zepp-e-square",
+      "canonical_name": "Zepp E (Square)",
+      "display_name": "Zepp E (Square)",
+      "name_zh": "Zepp E 方屏",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Zepp E (Square)",
+        "Zepp E Square"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "official_url": "https://docs.zepp.com/docs/reference/related-resources/device-list/",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "zepp-e-square",
+      "checked_at": "2026-11-02",
+      "provenance": "Listed with deviceSource 61 / 82 in the official Zepp developer device list (checked 2026-11-02). Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [
+        61,
+        82
+      ],
+      "device_source_official": [
+        61,
+        82
+      ]
+    },
+    {
+      "catalog_id": "amazfit-neo",
+      "canonical_name": "Amazfit Neo",
+      "display_name": "Amazfit Neo",
+      "name_zh": "Amazfit Neo",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Neo",
+        "Amazfit NEO"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_neo/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_neo/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-neo",
+      "checked_at": "2026-11-02",
+      "provenance": "Reported missing from the model picker on 2.2.0, 3.0.1 and 3.0.6. Not in the official Zepp developer device list, so no deviceSource is claimed; name matching and manual identification only. Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [],
+      "device_source_official": []
+    },
+    {
+      "catalog_id": "amazfit-bip-s",
+      "canonical_name": "Amazfit Bip S",
+      "display_name": "Amazfit Bip S",
+      "name_zh": "Amazfit 米动手表青春版 Lite / Bip S",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Bip S",
+        "Bip S",
+        "Amazfit Bip S Lite",
+        "Bip S Lite"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_bip_s/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_bip_s/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-bip-s",
+      "checked_at": "2026-11-02",
+      "provenance": "Reported missing from the model picker on 2.1.1 and 3.0.0. Not in the official Zepp developer device list, so no deviceSource is claimed; name matching and manual identification only. Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [],
+      "device_source_official": []
+    },
+    {
+      "catalog_id": "mi-smart-band-4-nfc",
+      "canonical_name": "Mi Smart Band 4 NFC",
+      "display_name": "Mi Smart Band 4 NFC",
+      "name_zh": "小米手环 4 NFC 版",
+      "kind": "band",
+      "model_codes": [],
+      "aliases": [
+        "Mi Smart Band 4 NFC",
+        "Mi Band 4 NFC",
+        "Xiaomi Mi Band 4 NFC",
+        "小米手环4 NFC版",
+        "小米手环 4 NFC"
+      ],
+      "region": [
+        "cn"
+      ],
+      "official_page": "https://www.mi.com/global/mi-smart-band-4/",
+      "official_url": "https://www.mi.com/global/mi-smart-band-4/",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "mi-smart-band-4-nfc",
+      "checked_at": "2026-11-02",
+      "provenance": "Reported on 3.0.4 as an unidentified device bound to a Zepp account together with a body-composition scale. Not in the official Zepp developer device list, so no deviceSource is claimed; manual identification only. Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [],
+      "device_source_official": []
     }
   ]
 }

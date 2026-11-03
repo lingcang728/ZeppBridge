@@ -634,3 +634,45 @@ async fn an_explicitly_empty_unverified_week_is_empty_from_cloud_not_failed() {
     assert_eq!(status, ChunkStatus::Failed);
     assert_eq!(reason.unwrap().0, "err.backfill.no_canonical_records");
 }
+
+/// #157：Charge 报文里有东西、我们却一条都没认出来，不能静默记成「云端没有」，
+/// 补拉要把这一块留成失败，等下一版看懂了再补。
+#[tokio::test]
+async fn an_unreadable_charge_day_is_not_empty_from_cloud() {
+    let manager = SyncManager::new(
+        DataFetcher::new(
+            ZeppConnector::new(AuthInfo {
+                app_token: "test-token".into(),
+                user_id: "user-1".into(),
+                region_host: "https://api-mifit.zepp.com".into(),
+            })
+            .unwrap(),
+        ),
+        Database::in_memory().unwrap(),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let record = FetchedRecord {
+        incomplete: false,
+        incomplete_reason: None,
+        raw: RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "events:Charge:real_data:day:2026-10-29".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: Utc::now(),
+            end_utc: None,
+            payload: serde_json::json!({"items": [{
+                "eventType": "Charge", "subType": "real_data", "timestamp": 1_793_232_000_000i64,
+                "value": {"startTime": 1_793_232_000_000i64, "timeZone": "Asia/Shanghai", "points": "opaque"}
+            }]}),
+            capability: CapabilityStatus::Verified,
+        },
+    };
+    let report = manager
+        .persist_records_quietly("daily_summary", vec![record])
+        .await
+        .unwrap();
+    assert_eq!(report.status, StreamStatus::Unverified);
+    let (status, _, _) = classify_backfill_report(&report, false);
+    assert_eq!(status, ChunkStatus::Failed);
+}

@@ -295,7 +295,15 @@ impl ZeppBridgeError {
             // 全部价值就在于把两个环境变量名和该跑哪条命令说完整。它们是
             // 我们自己写死的常量，里面没有地址，也没有云端回来的内容。
             Self::Headless(problem) => problem.to_string(),
-            Self::ParseError(_) => "Zepp 返回的数据无法解析".into(),
+            // 结构认不出时带上顶层键名（只有键名、没有值）：#157 当月 Charge
+            // 报「无法解析」，没有这几个字拿到反馈也无从下手。
+            Self::ParseError(detail) => match detail.split_once(PARSE_KEYS_MARKER) {
+                Some((_, keys)) => sanitize_user_text(&format!(
+                    "Zepp 返回的数据无法解析（可用字段：{}）",
+                    keys.trim()
+                )),
+                None => "Zepp 返回的数据无法解析".into(),
+            },
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),
             Self::AiTask(inner) => inner.user_message(),
@@ -307,6 +315,10 @@ impl ZeppBridgeError {
         }
     }
 }
+
+/// `ParseError` 里这个标记之后是报文的顶层键名，`user_message` 会原样带出去。
+/// 只在 `extract_items` 认不出结构时用；标记后面只许放键名，不许放值。
+pub const PARSE_KEYS_MARKER: &str = "可用字段: ";
 
 pub fn sanitize_user_text(source: &str) -> String {
     let without_url = regex_replace_urls(source);
@@ -350,5 +362,18 @@ mod tests {
         assert!(!message.contains("abc123"));
         assert!(!message.contains("https://"));
         assert!(message.contains("已隐藏地址"));
+    }
+
+    #[test]
+    fn an_unrecognised_structure_names_its_top_level_keys() {
+        let error = ZeppBridgeError::ParseError(format!(
+            "响应缺少 items/data 数组，{PARSE_KEYS_MARKER}code, message"
+        ));
+        assert_eq!(
+            error.user_message(),
+            "Zepp 返回的数据无法解析（可用字段：code, message）"
+        );
+        let other = ZeppBridgeError::ParseError("JSON 处理失败: eof".into());
+        assert_eq!(other.user_message(), "Zepp 返回的数据无法解析");
     }
 }

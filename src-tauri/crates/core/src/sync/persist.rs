@@ -247,9 +247,12 @@ impl SyncManager {
                 db.record_stream_stage(&stream, Stage::Write, &StageOutcome::Ok)?;
             }
             // 云端明确回了空集合：哪怕这条流的结构还没逐字段核实，「空」也不是「看不懂」。
+            // Charge 也走这条：认得出的「那天没分数」已经是 Ok(空)，剩下的
+            // DataUnavailable 是报文里有东西我们没看懂，不能静默记成「云端没有」（#157）。
             Err(error)
                 if error.is_unavailable()
-                    && capability == CapabilityStatus::Unverified
+                    && (capability == CapabilityStatus::Unverified
+                        || record.raw.source_key.starts_with("events:Charge:"))
                     && !crate::normalizer::payload_is_explicitly_empty(&record.raw.payload) =>
             {
                 report.status = StreamStatus::Unverified;

@@ -188,6 +188,8 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `is_portable_update` / `launch_migrated_install` | Detect a non-installed entry point and launch `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` after an update | Windows only; errors rather than exiting silently when no installed build is found |
 | `retry_failed_backfill_chunks` | Re-queue failed backfill chunks | Touches `failed` rows only; written and empty-from-cloud chunks are untouched |
 | `set_tray_locale` | Correct the native tray menu language | Called by the frontend once the interface language is known |
+| `set_auto_sync_prefs` | Copy the auto-sync switch and interval to the backend | Called at startup and when the setting changes; while the window is not visible (closed to the tray, minimised, screen off) a backend alarm checks every 60 s and runs the sync, backing off 1 / 2 / 4 / 8 minutes after failures; it stays idle until the frontend has reported |
+| `set_device_hidden` | Hide or restore a device | Hides it from the device list only (`get_device_profiles` moves it to `hidden_profiles`); data, charts and exports are unchanged |
 
 `LoginStatus.state` may only be: `idle`, `waiting`, `extracting`, `verifying`,
 `connected`, `failed`.

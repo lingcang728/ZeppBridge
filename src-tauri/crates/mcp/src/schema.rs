@@ -1,4 +1,4 @@
-//! 十五个只读工具和两个训练计划写工具的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
+//! 十六个只读工具和三个写工具（训练计划起草、发布，教练档案提议）的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
 //! 由 `the_documented_tools_are_exactly_the_registered_ones` 守着。
 
 use super::*;
@@ -280,6 +280,7 @@ const PLAN_FORMAT: &str = "plan 是一个 JSON 对象（格式 zeppbridge-plan/3
     steps 每一步 {kind, duration, target, note}：kind 是 warmup / active / interval / recovery / rest / cooldown；\
     duration 写 \"20min\"、\"90s\"、\"1h\"、\"400m\"、\"5km\"（m 是米不是分钟）；\
     target 写 \"hr 135-150\"、\"pace 5:30-5:50\"、\"power 200-220\"，不写就是不设目标。\
+    游泳：泳池每一步至少 25 米，不写配速目标（用心率或不设）。\
     重复组 {repeat: 3, steps: [...]}，不能嵌套。最远排到今天之后 56 天，日期不能早于今天。";
 
 fn coach_tool_definitions() -> Vec<Value> {
@@ -288,7 +289,7 @@ fn coach_tool_definitions() -> Vec<Value> {
         json!({
             "name": "get_training_context",
             "description": format!(
-                "近期训练与恢复一次给齐：按本地日对齐的每日表（准备度、静息心率及基线、睡眠 HRV 及基线、\
+                "近期训练与恢复一次给齐：按本地日对齐的每日表（准备度、静息心率及基线（取自睡眠汇总的 rhr，不是睡眠平均心率）、睡眠 HRV 及基线、\
                  压力、每日训练负荷、步数、睡眠时长与评分、小睡、当天练了几次）、窗口内每次运动的摘要\
                  （时长、距离、配速 s/km、心率、爬升、负荷、训练效果、手表 RPE、用户自己打的 userRpe 与酸痛部位 soreness、\
                  各心率区间秒数）、距上次运动几天、今天起已生效的训练计划、窗口内的生活事件（epoch=true 的是用户起了名的纪元，\
@@ -309,7 +310,7 @@ fn coach_tool_definitions() -> Vec<Value> {
         json!({
             "name": "get_athlete_profile",
             "description": format!(
-                "运动员档案：手表自报与近一年实测的最大心率、静息心率（最近一天与 30 天均值）、\
+                "运动员档案：手表自报与近一年实测的最大心率、静息心率（最近一天与 30 天均值；取自睡眠汇总的 rhr，不是睡眠平均心率）、\
                  手表设定的心率区间边界、乳酸阈值心率与配速（s/km）、VO₂max（手表估算）、身高体重、\
                  近 90 天的跑步（距离、移动时间、配速、心率、爬升，最多 40 条）、用户写给 AI 的背景，\
                  用户确认过的教练档案（coachNotes：AI 提议后用户点了记住的、和用户自己写的），以及用户的履历 journal：\

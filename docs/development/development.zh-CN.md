@@ -136,6 +136,8 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `is_portable_update` / `launch_migrated_install` | 判断当前是否为非安装版入口，并在更新后拉起 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` | 仅 Windows；找不到安装版时报错而不是静默退出 |
 | `retry_failed_backfill_chunks` | 让失败的补拉块重新排队 | 只碰 `failed`；已写入和云端确认为空的块不动 |
 | `set_tray_locale` | 校正原生托盘菜单的语言 | 前端确定界面语言后调用 |
+| `set_auto_sync_prefs` | 把自动同步的开关和间隔抄给后端 | 前端启动和改设置时调用；窗口不可见（关到托盘、最小化、息屏）时由后端每 60 秒的闹钟接手同步，失败按 1 / 2 / 4 / 8 分钟退避；没抄过来之前闹钟不动 |
+| `set_device_hidden` | 隐藏 / 恢复一台设备 | 只藏设备列表（`get_device_profiles` 挪进 `hidden_profiles`），数据、图表、导出照旧 |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
 

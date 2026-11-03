@@ -37,7 +37,7 @@ try {
     $loadedLocalSigningKey = $true
   }
 
-  # zeppbridge-mcp 作为 sidecar 随安装包放到 exe 旁边（3B 打包决定）。
+  # zeppbridge-mcp、zeppbridge-cli 作为 sidecar 随安装包放到 exe 旁边（3B 打包决定；CLI 从 3.1.1 起）。
   & (Join-Path $root 'scripts\release\stage-mcp-sidecar.ps1') | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'MCP sidecar 构建失败。' }
 
@@ -48,10 +48,12 @@ try {
   $built = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge.exe'
   New-Item -ItemType Directory -Force -Path (Split-Path $portable) | Out-Null
   Copy-Item -LiteralPath $built -Destination $portable -Force
-  # 便携版也把 MCP 放在 exe 旁边：设置卡按 exe 所在目录找它。
-  $sidecar = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge-mcp.exe'
-  if (-not (Test-Path -LiteralPath $sidecar)) { throw "打包后没找到 sidecar：$sidecar" }
-  Copy-Item -LiteralPath $sidecar -Destination (Join-Path (Split-Path $portable) 'zeppbridge-mcp.exe') -Force
+  # 便携版也把 MCP 和 CLI 放在 exe 旁边：设置卡按 exe 所在目录找它们。
+  foreach ($name in 'zeppbridge-mcp', 'zeppbridge-cli') {
+    $sidecar = Join-Path $env:CARGO_TARGET_DIR "release\$name.exe"
+    if (-not (Test-Path -LiteralPath $sidecar)) { throw "打包后没找到 sidecar：$sidecar" }
+    Copy-Item -LiteralPath $sidecar -Destination (Join-Path (Split-Path $portable) "$name.exe") -Force
+  }
   & (Join-Path $PSScriptRoot 'publish-local.ps1') -SkipStaleInstall
   if ($LASTEXITCODE -ne 0) { throw '本机发布同步失败。' }
 } finally {

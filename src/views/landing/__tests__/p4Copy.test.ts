@@ -17,7 +17,7 @@ describe('P4 landing copy', () => {
     expect(shape(copy!)).toEqual(shape(zh));
   });
 
-  it.each(Object.entries(P4_COPY).filter(([locale]) => locale !== 'zh'))('%s has no Chinese left in it', (_locale, copy) => {
+  it.each(Object.entries(P4_COPY).filter(([locale]) => !locale.startsWith('zh')))('%s has no Chinese left in it', (_locale, copy) => {
     expect(strings(copy).filter((text) => /[一-鿿]/.test(text))).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 mod app_state;
+mod auto_sync;
 mod clipboard_files;
 mod commands;
 mod diagnostics;
@@ -55,19 +56,18 @@ use commands::{
     races_list, recover_advanced_credentials, recover_official_credentials, remove_workout_fit,
     reprocess_local_data, reset_coverage_ledger,
     retry_failed_backfill_chunks, rings_save_image, run_database_integrity_check, save_fit_export,
-    save_life_event, save_mcp_bundle, set_backup_pinned, set_device_model_override,
-    set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, shoe_delete, shoe_save, shoes_overview, stage_restore,
-    start_fresh_library, start_history_backfill, start_history_sync, start_incremental_sync,
-    start_official_login, start_web_login, start_workout_detail_backfill,
-    submit_device_model_assignment, submit_diagnostic_report, system_region_locale,
-    training_plan_adherence, training_plan_discard, training_plan_history, training_plan_preview,
-    training_plan_publish, training_plan_save_draft, training_plan_set_ai_publish,
-    training_plan_state, training_plan_update_draft, undo_import_batch, undo_workout_edit,
-    verify_auth, verify_backup, workout_feedback_adjusted, workout_feedback_dismiss,
-    workout_feedback_get, workout_feedback_prompt, workout_feedback_save, workout_feedback_snooze,
-    workout_feedback_toast_due, workout_feedback_toast_show, workout_feel_get, workout_feel_save,
-    workout_import_sources,
+    save_life_event, save_mcp_bundle, set_backup_pinned, set_device_hidden,
+    set_device_model_override, set_heart_rate_zone_preference, set_metric_excluded, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, shoe_delete, shoe_save, shoes_overview,
+    stage_restore, start_fresh_library, start_history_backfill, start_history_sync,
+    start_incremental_sync, start_official_login, start_web_login, start_workout_detail_backfill,
+    submit_diagnostic_report, system_region_locale, training_plan_adherence, training_plan_discard,
+    training_plan_history, training_plan_preview, training_plan_publish, training_plan_save_draft,
+    training_plan_set_ai_publish, training_plan_state, training_plan_update_draft,
+    undo_import_batch, undo_workout_edit, verify_auth, verify_backup, workout_feedback_adjusted,
+    workout_feedback_dismiss, workout_feedback_get, workout_feedback_prompt, workout_feedback_save,
+    workout_feedback_snooze, workout_feedback_toast_due, workout_feedback_toast_show,
+    workout_feel_get, workout_feel_save, workout_import_sources,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -344,6 +344,7 @@ pub fn run() {
         .append_invoke_initialization_script(rendering_script)
         .manage(main_window::MainWindowState::default())
         .manage(updates::SilentUpdater::default())
+        .manage(auto_sync::AutoSyncAlarm::default())
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -684,11 +685,13 @@ pub fn run() {
             }
             app.state::<main_window::MainWindowState>().set_ready();
             updates::silent::spawn_periodic_recheck(app.handle().clone());
+            auto_sync::spawn(app.handle().clone());
             diagnostics::log("Startup: application setup complete");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             app_is_ready,
+            auto_sync::set_auto_sync_prefs,
             system_region_locale,
             list_life_events,
             save_life_event,
@@ -756,8 +759,8 @@ pub fn run() {
             get_workout_type_options,
             get_unknown_workout_codes,
             set_workout_code_label,
+            set_device_hidden,
             set_device_model_override,
-            submit_device_model_assignment,
             get_data_health,
             run_database_integrity_check,
             get_workout_insight,

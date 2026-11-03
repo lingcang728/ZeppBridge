@@ -28,16 +28,19 @@ import { computed, ref, type ComputedRef } from 'vue';
  */
 export type Locale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'zh-TW';
 
 /** 语言选择器按这个顺序排：先内联三语，再语言包语言。 */
 export const LOCALES: readonly Locale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
 ];
 
-/** 每种语言在界面上的自称——不翻译，「English」在中文界面里也写 English。 */
+/**
+ * 每种语言在界面上的自称——不翻译，「English」在中文界面里也写 English。
+ * 两种中文只写一个字：简体「简」、繁体「繁」（3.1.1 用户定）。
+ */
 export const LOCALE_LABELS: Record<Locale, string> = {
-  zh: '中文',
+  zh: '简',
   en: 'English',
   es: 'Español',
   nl: 'Nederlands',
@@ -49,17 +52,24 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   fr: 'Français',
   it: 'Italiano',
   pl: 'Polski',
+  'zh-TW': '繁',
 };
 
 /** 靠语言包覆盖的语言；zh/en/es 的文案就地定义，没有语言包。 */
 export const PACK_LOCALES: readonly Locale[] = [
-  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl',
+  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
 ];
 
 const isPackLocale = (value: Locale): boolean =>
   (PACK_LOCALES as readonly string[]).includes(value);
 
 const STORAGE_KEY = 'zeppbridge-locale';
+
+/**
+ * 简体或繁体中文。凡是「中文读者」该走的分支（后端中文原文直接显示、拆 `## 中文` 段、
+ * 年月日顺序……）都用它，别再写死 `=== 'zh'`——那样繁体用户会被当成外语读者。
+ */
+export const isChineseLocale = (value: string): boolean => value === 'zh' || value === 'zh-TW';
 
 /** `<html lang>` 用的标记。 */
 export const HTML_LANG: Record<Locale, string> = {
@@ -75,6 +85,7 @@ export const HTML_LANG: Record<Locale, string> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  'zh-TW': 'zh-Hant',
 };
 
 /**
@@ -95,6 +106,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
   fr: 'fr-FR',
   it: 'it-IT',
   pl: 'pl-PL',
+  'zh-TW': 'zh-TW',
 };
 
 const isLocale = (value: unknown): value is Locale =>
@@ -102,9 +114,12 @@ const isLocale = (value: unknown): value is Locale =>
 
 /**
  * 把一个语言标记匹配到注册表里的语言：先精确匹配（`pt-BR`→`pt-BR`、
- * `hi-IN`→`hi-IN`），再逐段砍地区子标签（`de-AT`→`de`、`zh-TW`→`zh`），
+ * `hi-IN`→`hi-IN`），再逐段砍地区子标签（`de-AT`→`de`、`zh-SG`→`zh`），
  * 最后裸语言查基础映射。**裸 `pt` 给欧洲葡萄牙语**（`pt-PT`）——两个葡语
  * 是独立条目，巴西葡语只认显式的 `pt-BR` 及其地区变体。
+ *
+ * **繁体**：`zh-TW`、`zh-HK`、`zh-MO`、`zh-Hant`（及 `zh-Hant-*`）给繁体中文；
+ * `zh-Hans-*` 砍到 `zh`，仍是简体。以前它们一律落到简体（3.1.1 加繁体）。
  */
 const BASE_LANGUAGE: Record<string, Locale> = {
   zh: 'zh',
@@ -120,9 +135,12 @@ const BASE_LANGUAGE: Record<string, Locale> = {
   pl: 'pl',
 };
 
-const EXACT_LOCALE = new Map<string, Locale>(
-  LOCALES.map((l) => [l.toLowerCase(), l]),
-);
+const EXACT_LOCALE = new Map<string, Locale>([
+  ...LOCALES.map((l): [string, Locale] => [l.toLowerCase(), l]),
+  ['zh-hk', 'zh-TW'],
+  ['zh-mo', 'zh-TW'],
+  ['zh-hant', 'zh-TW'],
+]);
 
 const matchLanguageTag = (raw: string | undefined): Locale | null => {
   let tag = (raw ?? '').trim().toLowerCase().replace(/_/g, '-');
@@ -395,9 +413,9 @@ const resolveBundle = <T extends MessageTree>(bundle: MessageBundle<T>): T => {
     : undefined;
   // 合并顺序：zh 兜底 → en 全量覆盖 → 语言包覆盖。语言包缺的键落 en，
   // en 因编译期约束必定全量，zh 这层只是双保险。
-  const tree = overlay
-    ? mergeOver(mergeOver(bundle.zh, bundle.en), overlay)
-    : bundle.en;
+  // 繁体例外：缺的键先落简体（读得懂），不落英文；包还没到时整页是简体。
+  const fallback = value === 'zh-TW' ? bundle.zh : mergeOver(bundle.zh, bundle.en);
+  const tree = overlay ? mergeOver(fallback, overlay) : value === 'zh-TW' ? bundle.zh : bundle.en;
   // 这里不再顺手触发加载：computed 里带副作用，失败时会自我循环。加载由
   // initializeLocale / setLocale 负责。
   resolvedCache.set(bundle, { locale: value, rev, tree });

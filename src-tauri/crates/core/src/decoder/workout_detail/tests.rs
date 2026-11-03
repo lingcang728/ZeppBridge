@@ -773,3 +773,43 @@ fn samples_carry_the_watchs_cumulative_distance_only_where_it_was_read() {
         .collect();
     assert_eq!(with_distance, vec![(5, 15.0), (10, 30.0)]);
 }
+
+/// #159：`currentDistance` 写成带小数的厘米（`100000.00000`）也要读出来，
+/// 不然累计距离一个读数都没有，公里分段全丢。
+#[test]
+fn a_cumulative_distance_written_with_decimals_is_kept() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;5;5;5;5;5;",
+        "currentDistance": "0,0.00000;5,40000.00000;5,100000.00000;5,160000.00000;5,240000.00000;5,240000.00000;",
+        "heart_rate": "0,150;5,10;5,0;5,-10;5,0;",
+    });
+    let decoded = decode_workout_detail(&raw, None, Some(2400.0)).unwrap();
+    assert_eq!(decoded.splits.len(), 3, "两个整公里加一截零头");
+    assert!(decoded
+        .samples
+        .iter()
+        .any(|sample| sample.distance_m == Some(1000.0)));
+}
+
+/// #159：`[5]` 每公里比 `[1]` 多 1 秒（取整差），逐公里看都在容差里，
+/// 不能因为累计到第三公里差了 3 秒就整份拒掉。
+#[test]
+fn kilo_pace_one_second_slower_per_kilometre_still_splits() {
+    let raw = json!({
+        "trackid": 1_700_000_000i64,
+        "time": "0;400;400;400;400;",
+        "currentDistance": "",
+        "kilo_pace": "0,300,geo,1,-1,301,300266,69,0,109,0,4,0,164;\
+    1,300,geo,1,-1,602,300266,69,0,109,0,4,0,164;\
+    2,300,geo,1,-1,903,300266,69,0,109,0,4,0,164;\
+    3,300,geo,1,-1,1204,300266,69,0,109,0,4,0,164;",
+    });
+    let decoded = decode_workout_detail(&raw, None, Some(4500.0)).unwrap();
+    assert_eq!(decoded.splits.len(), 5, "四个整公里加一截零头");
+    assert!(decoded
+        .splits
+        .iter()
+        .take(4)
+        .all(|split| split.duration_seconds == 300));
+}

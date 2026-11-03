@@ -9,7 +9,7 @@
 
 | 部件 | 在哪 |
 |---|---|
-| `zeppbridge-mcp` | Windows 安装包和便携版里，紧挨 `ZeppBridge.exe`（sidecar，`src-tauri/tauri.sidecar.conf.json` + `scripts/release/stage-mcp-sidecar.ps1`）；无界面使用另有单独的 `zeppbridge-tools` 压缩包 |
+| `zeppbridge-mcp`（3.1.1 起还有 `zeppbridge-cli`） | Windows 安装包和便携版里，紧挨 `ZeppBridge.exe`（sidecar，`src-tauri/tauri.sidecar.conf.json` + `scripts/release/stage-mcp-sidecar.ps1`）；无界面使用另有单独的 `zeppbridge-tools` 压缩包 |
 | Claude Code 插件 | 仓库根的 `.claude-plugin/marketplace.json` → 本目录（`.claude-plugin/plugin.json`） |
 | Codex 插件 | 仓库根的 `.agents/plugins/marketplace.json` → 本目录（`.codex-plugin/plugin.json`） |
 | Claude Desktop | `ZeppBridge.mcpb`，由应用写出（`save_mcp_bundle`），因为它的清单必须指向已安装的 sidecar |
@@ -21,7 +21,7 @@
 | 客户端 | 按钮做什么 |
 |---|---|
 | Claude Code | 复制 `claude mcp add --scope user zeppbridge "--" "<path>" --scope task`、`claude plugin marketplace add lingcang728/ZeppBridge#v3`、`claude plugin install zepp-coach@zeppbridge` |
-| Codex | 复制 `codex mcp add zeppbridge "--" "<path>" --scope task`、`codex plugin marketplace add lingcang728/ZeppBridge --ref v3`、`codex plugin add zepp-coach@zeppbridge` |
+| Codex | 复制 `codex mcp add zeppbridge "--" "<path>" --scope task`、`codex plugin marketplace add lingcang728/ZeppBridge --ref main`、`codex plugin add zepp-coach@zeppbridge` |
 | Claude Desktop | 让你选一个文件夹，把 `ZeppBridge.mcpb` 存进去并在资源管理器里显示 |
 
 命令来自 `src/lib/mcpClients.ts`。在 Windows 上有两个细节要紧：`"--"` 要加引号，因为

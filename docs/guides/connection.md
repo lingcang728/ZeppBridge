@@ -32,6 +32,11 @@ ones that never responded inside the old sign-in window.
 4. The browser shows **Authorized**. Go back to ZeppBridge: it finishes
    connecting by itself within a few seconds. You can close the browser tab.
 
+If clicking **Authorize** doesn't open a browser (this happens on some Linux
+setups), ZeppBridge keeps waiting and moves **Copy authorization link** to the
+front. Paste the link into your browser's address bar and approve there; the
+app connects by itself, with no need to click **Authorize** again.
+
 If the browser says you're authorized but ZeppBridge keeps **waiting for the
 browser**:
 

@@ -5,7 +5,7 @@ import { P4_COPY } from './p4Copy';
 
 export const REEL_IDS = ['glass', 'poker', 'seasons', 'notes', 'box'] as const;
 export type ReelId = typeof REEL_IDS[number];
-export const reelRoute = (id: string) => ['ai', 'receive', 'prompt'].includes(id) ? '/ai' : ['plan-edit', 'templates', 'easy'].includes(id) ? '/ai/plan' : id === 'sleep' ? '/sleep' : id === 'workouts' ? '/workouts' : id === 'settings' ? '/settings' : '/';
+export const reelRoute = (id: string) => ['ai', 'receive', 'prompt'].includes(id) ? '/ai' : ['plan-edit', 'templates', 'easy'].includes(id) ? '/ai/plan' : id === 'sleep' ? '/sleep' : ['workouts', 'feel', 'import'].includes(id) ? '/workouts' : id === 'settings' ? '/settings' : ['rings', 'journal'].includes(id) ? '/journal' : id === 'letters' ? '/letters' : '/';
 /** 「问什么，你说了算」一镜里逐字打进去的问题：按演示窗口的界面语言取 P4 文案，没有译文的语言用英文。 */
 const promptFor = (lang: string) => (P4_COPY[lang as LandingLocale] ?? P4_COPY[lang.split('-')[0] as LandingLocale] ?? P4_COPY.en!).demoPrompt;
 export const reelSize = (_id?: string) => ({ width: 1280, height: 800 });
@@ -316,6 +316,48 @@ export async function runReel(view: Window, id: string, clock: PlaybackClock, st
       stage.beat('send-watch'); api.pointer(publish, 'pointerdown', at.x, at.y); stage.pointer(at.x, at.y, true);
       try { await clock.wait(1000); } finally { api.pointer(publish, 'pointerup', at.x, at.y); stage.pointer(at.x, at.y, false); }
       await wait(2600);
+    }
+  } else if (id === 'normal') {
+    await go('/'); const pins = await find('.pins'); await scrollTo(pins);
+    await focus(pins, 1.4); stage.beat('normal-range'); await wait(2200); await focus(null);
+    await tap('a.hr-panel[href]', 1100); await find('.main-content .page');
+    const help = await find('[data-tour="metric-info"]'); await tap(help, 300);
+    stage.beat('metric-note'); await wait(2400); api.escape(); await wait(700); await focus(null);
+  } else if (id === 'rings') {
+    await go('/journal'); const card = await find('a.rings-card'); await focus(card, 1.3); await wait(900);
+    await focus(null); await tap(card, 1200); await find('.tree-rings'); stage.beat('growing'); await wait(3800);
+  } else if (id === 'journal') {
+    await go('/journal');
+    for (const selector of ['.pb-card', '.countdown', '.medal', '.shoe']) {
+      const el = await find(selector); await scrollTo(el); await focus(el, 1.3); stage.beat(selector.slice(1)); await wait(1700);
+    }
+    await focus(null); await scroll(0);
+  } else if (id === 'feel') {
+    await go('/workouts'); await tap('.record-list a[href]', 1100);
+    const card = await find('.feel-card'); await scrollTo(card); await focus(card, 1.2); stage.beat('feel');
+    const rpe = card.querySelectorAll('.rpe button');
+    if (rpe[6]) await tap(rpe[6], 1300);
+    // 第二块是酸痛：展开身体图点一处（找按钮不按文字，界面语言一变就找不到）。
+    const sore = card.querySelectorAll('.block')[1]?.querySelector('.link');
+    if (sore) { await tap(sore, 1000); await tap(await find('.feel-card .body-map .hit'), 1800); stage.beat('soreness'); }
+    await focus(null); await wait(800);
+  } else if (id === 'import') {
+    await go('/workouts'); const actions = () => doc.querySelectorAll('.selection-actions > button');
+    await tap(actions()[2]!, 1000); const panel = await find('#workout-import'); await scrollTo(panel);
+    await focus(panel, 1.2); stage.beat('import'); await wait(2400); await focus(null); await tap(actions()[2]!, 700);
+    await tap(actions()[0]!, 800); stage.beat('select');
+    for (const box of [...doc.querySelectorAll('.selectable-record input[type="checkbox"]')].slice(0, 3)) await tap(box, 450);
+    await focus(await find('.list-tools .tool-bar'), 1.3); stage.beat('batch'); await wait(2400); await focus(null);
+    await tap(actions()[0]!, 700);
+  } else if (id === 'letters') {
+    await go('/letters'); await tap(await find('.envelope-tile'), 1400); stage.beat('letter');
+    // 和真拆信一样：点正面翻到背面，点火漆印拆开。
+    await tap(await find('.side-front:not(:disabled)'), 1400); stage.beat('flip');
+    await tap(await find('.wax-seal:not(:disabled)'), 300); stage.beat('opened'); await wait(2600);
+    api.escape(); await wait(900); await settle();
+    for (const index of [1, 2, 3, 0]) {
+      const tabs = doc.querySelectorAll('[data-tour="letter-tabs"] .segment-item');
+      if (tabs[index]) { await tap(tabs[index]!, 1700); stage.beat(`tab-${index}`); }
     }
   } else if (id === 'overview') {
     await go('/'); await find('.dashboard-grid'); stage.beat('trends'); await wait(1200);

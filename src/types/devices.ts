@@ -11,6 +11,8 @@ export interface DeviceProfile {
   match_status?: 'exact' | 'alias' | 'user_assigned' | 'unknown';
   has_local_data?: boolean;
   last_data_at?: string | null;
+  /** 用户在本机把它从设备列表里藏起来了。只藏列表，数据照旧。 */
+  hidden?: boolean;
   firmware?: string;
   serial?: string;
   device_id?: string;
@@ -29,6 +31,8 @@ export interface DeviceCacheMetadata {
 
 export interface DeviceProfilesResult {
   profiles: DeviceProfile[];
+  /** 藏起来的设备（设置 › 设备底部「已隐藏 N 台」）。旧后端没有这个字段。 */
+  hidden_profiles?: DeviceProfile[];
   cache: DeviceCacheMetadata;
 }
 

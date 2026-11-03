@@ -56,7 +56,8 @@ pub(super) fn extract_items(raw: &Value) -> Result<Vec<&Value>> {
         }
     }
     Err(ZeppBridgeError::ParseError(format!(
-        "响应缺少 items/data 数组，可用字段: {}",
+        "响应缺少 items/data 数组，{}{}",
+        crate::models::error::PARSE_KEYS_MARKER,
         object.keys().cloned().collect::<Vec<_>>().join(", ")
     )))
 }
