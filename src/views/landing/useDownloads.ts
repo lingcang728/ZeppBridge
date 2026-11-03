@@ -80,5 +80,5 @@ export const useDownloads = (t: Ref<LandingCopy>) => {
 
   const windows = computed(() => ({ ...t.value.downloads.windows, href: assetFor('windows')?.url ?? RELEASE_URL }));
   const macos = computed(() => ({ ...t.value.downloads.macos, href: assetFor('macos')?.url ?? RELEASE_URL }));
-  return { load, primary, secondary, windows, macos, state, notYet, msiHref, linux, linuxIsPreview, statusText };
+  return { load, latest, primary, secondary, windows, macos, state, notYet, msiHref, linux, linuxIsPreview, statusText };
 };

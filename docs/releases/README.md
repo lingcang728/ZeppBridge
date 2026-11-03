@@ -43,6 +43,7 @@
 ## 文件
 
 - 一版一个目录：`docs/releases/<版本>/<locale>.md`，13 种界面语言各一份（zh、en、es、nl、pt-BR、pt-PT、de、ru、hi-IN、fr、it、pl、zh-TW；繁体 zh-TW 从 3.1.1 起，之前的版本是 12 种）。
+- 官网更新日志 `zeppbridge.com/changelog/` 也从这些文件生成（`scripts/site/changelog.mjs`，部署时由 `finish-dist.mjs` 写出），**只收已经打了 `v<版本>` 标签的版本**；3.0.1 是单文件旧格式 `docs/releases/3.0.1.md`，按 `## 中文` / `## English` 分段。
 - 发版时把 `src/services/updateNotice.ts` 里的 `BUNDLED_VERSION` 和 glob 目录一起改成新版本；`updateNotice.test.ts` 会检查各语言齐全（繁体缺了回落简体）、和应用版本一致。
 - **开发会话只写 `zh.md` 和 `en.md`**，其余 11 种语言（含繁体 zh-TW）登记到桌面《翻译.md》，交给翻译 agent。缺语言时弹窗回落英文，但门禁会挂，所以打 tag 前要翻齐。
 
