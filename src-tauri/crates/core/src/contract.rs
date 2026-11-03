@@ -125,7 +125,7 @@ pub const METRICS: [MetricContract; 41] = [
     MetricContract {
         metric: "bmr",
         unit: "kcal/day",
-        description: "基础代谢率。同上",
+        description: "基础代谢率（静息消耗），体脂秤按体成分估算。同上。交给 AI 时勾日常活动也会带上；没有秤就没有，不从总消耗或活动消耗推算",
     },
     MetricContract {
         metric: "body_balance_score",

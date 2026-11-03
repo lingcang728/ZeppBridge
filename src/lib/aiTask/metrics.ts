@@ -101,6 +101,6 @@ export const CATEGORY_METRICS: Readonly<Partial<Record<AiTaskCategory, readonly 
   recovery: ['resting_hr', 'readiness', 'stress', 'respiratory_rate', 'sleep_hrv', 'hrv', 'hrv_rmssd', 'spo2'],
   resting_hr: ['resting_hr'],
   heart_rate: ['heart_rate'],
-  training: ['training_load', 'vo2max', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_daily', 'steps', 'active_calories', 'active_minutes'],
+  training: ['training_load', 'vo2max', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_daily', 'steps', 'active_calories', 'active_minutes', 'bmr'],
   body: ['blood_pressure_systolic', 'blood_pressure_diastolic', 'blood_pressure_pulse', 'weight', 'bmi', 'body_fat_rate', 'body_water_rate', 'muscle_mass', 'bone_mass', 'visceral_fat', 'bmr'],
 };
