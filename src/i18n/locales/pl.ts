@@ -39,6 +39,20 @@ export default {
       advancedExpired: 'Te dane logowania nie są już dostępne. Połącz się ponownie z Danymi zaawansowanymi.',
     },
 
+    'components/StoreImportPrompt': {
+      title: 'Zaimportować dane z wersji GitHub?',
+      summary: 'Wersja ze sklepu Microsoft Store i wersja GitHub używają oddzielnych katalogów danych. Import skopiuje lokalną bazę danych i ustawienia, które można przenieść; oryginalny katalog pozostanie bez zmian.',
+      credential: 'Dane logowania i lokalne klucze API są oddzielne dla każdej wersji i nie zostaną skopiowane z wersji GitHub. Po imporcie zaloguj się ponownie w wersji ze sklepu Microsoft Store i ponownie skonfiguruj klucze API dla klientów korzystających z lokalnego API.',
+      found: 'Wykryte katalogi danych',
+      noSource: 'Możesz wybrać folder data zawierający plik zepp.db.',
+      browseTitle: 'Wybierz folder danych ZeppBridge',
+      choose: 'Wybierz folder danych',
+      import: 'Kopiuj i importuj',
+      empty: 'Na razie nie importuj; użyj pustej bazy danych.',
+      busy: 'Trwa bezpieczne kopiowanie danych…',
+      error: 'Importowanie nie powiodło się. Sprawdź, czy wybrany folder zawiera plik zepp.db i czy na dysku docelowym jest wystarczająco dużo miejsca, a następnie spróbuj ponownie.',
+    },
+
     'components/WorkoutTools': {
       select: 'Wybierz treningi',
       done: 'Zakończ wybór',

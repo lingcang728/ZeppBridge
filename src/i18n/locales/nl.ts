@@ -43,6 +43,22 @@ export default {
       fileUnavailable:
         'Bestandsopslag is niet beschikbaar op dit platform of wordt door je opstartconfiguratie overschreven. Herstel de systeemopslag voor aanmeldgegevens om door te gaan.',
     },
+    'components/StoreImportPrompt': {
+      title: 'Gegevens van de GitHub-versie importeren?',
+      summary:
+        'De Microsoft Store-versie en de GitHub-versie hebben elk een eigen gegevensmap. Importeren kopieert de lokale database en overdraagbare instellingen; de oorspronkelijke map blijft ongewijzigd.',
+      credential:
+        'Aanmeldgegevens en lokale API-sleutels zijn per versie gescheiden en worden niet uit de GitHub-versie gekopieerd. Meld je na het importeren opnieuw aan in de Microsoft Store-versie en configureer de API-sleutels opnieuw voor clients die de lokale API gebruiken.',
+      found: 'Gevonden gegevensmappen',
+      noSource: 'Je kunt een map kiezen die zepp.db bevat.',
+      browseTitle: 'Gegevensmap voor ZeppBridge kiezen',
+      choose: 'Gegevensmap kiezen',
+      import: 'Kopiëren en importeren',
+      empty: 'Importeren overslaan en met een lege bibliotheek starten',
+      busy: 'Gegevens worden veilig gekopieerd…',
+      error:
+        'Importeren mislukt. Controleer of de gekozen map zepp.db bevat en of er voldoende vrije schijfruimte is. Probeer het daarna opnieuw.',
+    },
     'components/journal/repair': {
       timelineEmpty: 'Kies een dag op de tijdlijn om een gebeurtenis vast te leggen',
       timelineToday: 'Vandaag',

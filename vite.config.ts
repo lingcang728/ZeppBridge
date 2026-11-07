@@ -53,6 +53,7 @@ export default defineConfig(async ({ mode }) => ({
   base: './',
   define: {
     __BUILD_STAMP__: JSON.stringify(buildStamp()),
+    __STORE_BUILD__: JSON.stringify(process.env.ZB_STORE_BUILD === "1"),
   },
   build: {
     outDir: mode === 'site' ? '.site-cache/site-dist' : 'dist',

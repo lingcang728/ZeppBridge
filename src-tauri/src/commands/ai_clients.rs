@@ -17,7 +17,14 @@ use zeppbridge_core::paths::write_file_atomically;
 /// `externalBin` 同名；Tauri 打包时会去掉目标三元组后缀。
 const SIDECAR_STEM: &str = "zeppbridge-mcp";
 /// 同样随安装包附带的命令行工具（3.1.1 起）。设置里只给出它的路径，不登记到任何地方。
+#[cfg(not(all(windows, feature = "store")))]
 const CLI_STEM: &str = "zeppbridge-cli";
+/// Store aliases have a package-specific name so they can coexist with PATH
+/// users of the GitHub edition without sharing the WindowsApps alias entry.
+#[cfg(all(windows, feature = "store"))]
+const STORE_SIDECAR_ALIAS_STEM: &str = "zeppbridge-store-mcp";
+#[cfg(all(windows, feature = "store"))]
+const STORE_CLI_ALIAS_STEM: &str = "zeppbridge-store-cli";
 /// 写出的 `.mcpb` 文件名。
 const BUNDLE_FILE: &str = "ZeppBridge.mcpb";
 
@@ -50,6 +57,7 @@ fn not_bundled(appimage: bool) -> McpSidecar {
     }
 }
 
+#[cfg(not(all(windows, feature = "store")))]
 pub(crate) fn locate_sidecar(exe_dir: &Path, data_dir: &Path) -> McpSidecar {
     let cli = exe_dir.join(format!("{CLI_STEM}{}", std::env::consts::EXE_SUFFIX));
     let cli_path = cli.is_file().then(|| cli.to_string_lossy().into_owned());
@@ -72,10 +80,33 @@ pub(crate) fn locate_sidecar(exe_dir: &Path, data_dir: &Path) -> McpSidecar {
 }
 
 /// AppImage 的运行时会给进程设 `APPIMAGE`（包本身的路径）。
+#[cfg(not(all(windows, feature = "store")))]
 fn running_from_appimage() -> bool {
     cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some()
 }
 
+#[cfg(all(windows, feature = "store"))]
+fn current_sidecar(data_dir: &Path) -> McpSidecar {
+    // Register MCP clients against the package execution alias. A WindowsApps
+    // path is stable across Store updates; the package install directory is
+    // versioned and changes on each update. Explicitly pass the package-local
+    // data directory as a fallback for MCP hosts that start an alias without
+    // propagating package identity to the child process.
+    let Ok(windows_apps) = zeppbridge_core::paths::windows_apps_alias_dir() else {
+        return not_bundled(false);
+    };
+    let path = windows_apps.join(format!("{STORE_SIDECAR_ALIAS_STEM}.exe"));
+    let cli_path = windows_apps.join(format!("{STORE_CLI_ALIAS_STEM}.exe"));
+    McpSidecar {
+        path: Some(path.to_string_lossy().into_owned()),
+        data_dir_env: Some(data_dir.to_string_lossy().into_owned()),
+        stale_clients: Vec::new(),
+        appimage: false,
+        cli_path: Some(cli_path.to_string_lossy().into_owned()),
+    }
+}
+
+#[cfg(not(all(windows, feature = "store")))]
 fn current_sidecar(data_dir: &Path) -> McpSidecar {
     if running_from_appimage() {
         return not_bundled(true);
@@ -139,8 +170,17 @@ pub(crate) fn bundle_manifest(sidecar_path: &str, data_dir_env: Option<&str>) ->
     })
 }
 
+#[cfg(test)]
 pub(crate) fn build_bundle(
     sidecar: &Path,
+    data_dir_env: Option<&str>,
+) -> Result<Vec<u8>, AppError> {
+    build_bundle_with_command(sidecar, &sidecar.to_string_lossy(), data_dir_env)
+}
+
+fn build_bundle_with_command(
+    sidecar: &Path,
+    command: &str,
     data_dir_env: Option<&str>,
 ) -> Result<Vec<u8>, AppError> {
     let failed = |detail: String| {
@@ -149,7 +189,7 @@ pub(crate) fn build_bundle(
             format!("生成 Claude Desktop 扩展包失败：{detail}"),
         )
     };
-    let manifest = bundle_manifest(&sidecar.to_string_lossy(), data_dir_env);
+    let manifest = bundle_manifest(command, data_dir_env);
     let binary = std::fs::read(sidecar).map_err(|error| failed(error.to_string()))?;
     let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let options =
@@ -186,14 +226,32 @@ pub async fn save_mcp_bundle(
         ));
     }
     let sidecar = current_sidecar(&state.data_dir);
-    let Some(path) = sidecar.path else {
+    let Some(command_path) = sidecar.path else {
+        return Err(AppError::new(
+            "err.mcp.sidecar_missing",
+            "这个版本没有附带 zeppbridge-mcp",
+        ));
+    };
+    #[cfg(all(windows, feature = "store"))]
+    let payload_path = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf))
+        .map(|dir| dir.join(format!("{SIDECAR_STEM}.exe")))
+        .filter(|path| path.is_file());
+    #[cfg(not(all(windows, feature = "store")))]
+    let payload_path = Some(PathBuf::from(command_path.clone()));
+    let Some(payload_path) = payload_path else {
         return Err(AppError::new(
             "err.mcp.sidecar_missing",
             "这个版本没有附带 zeppbridge-mcp",
         ));
     };
     let bytes = tokio::task::spawn_blocking(move || {
-        build_bundle(Path::new(&path), sidecar.data_dir_env.as_deref())
+        build_bundle_with_command(
+            &payload_path,
+            &command_path,
+            sidecar.data_dir_env.as_deref(),
+        )
     })
     .await
     .map_err(|_| AppError::new("err.mcp.bundle_failed", "生成 Claude Desktop 扩展包失败"))??;

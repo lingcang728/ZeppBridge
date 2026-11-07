@@ -13,3 +13,6 @@ declare module "*.svg?raw" {
 
 /** 构建时由 vite.config.ts 注入：短 SHA + 构建时间（UTC）。 */
 declare const __BUILD_STAMP__: string;
+
+/** True only for the Microsoft Store package build. */
+declare const __STORE_BUILD__: boolean;

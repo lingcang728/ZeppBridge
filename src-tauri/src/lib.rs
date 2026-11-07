@@ -15,6 +15,8 @@ mod tray_i18n;
 mod uninstall;
 pub use uninstall::{purge_credentials_for_uninstall, PURGE_CREDENTIALS_ARG};
 pub mod feedback_toast;
+mod store_import;
+#[cfg(feature = "github-updater")]
 mod updates;
 #[cfg(windows)]
 mod web_composer;
@@ -104,6 +106,22 @@ fn app_is_ready() -> bool {
 /// 拖动时才强制最小尺寸，`set_size` 传什么就是什么。
 const MIN_WINDOW_WIDTH: f64 = 520.0;
 const MIN_WINDOW_HEIGHT: f64 = 560.0;
+
+/// Desktop startup may prepare the Store's LocalState path before the user
+/// answers the import prompt. CLI and MCP go through `resolve_data_dir`, which
+/// intentionally blocks until that choice has been recorded.
+#[cfg(feature = "store")]
+fn desktop_data_dir() -> std::io::Result<std::path::PathBuf> {
+    match paths::prepare_package_local_data_dir()? {
+        Some(dir) => Ok(dir),
+        None => paths::resolve_data_dir(),
+    }
+}
+
+#[cfg(not(feature = "store"))]
+fn desktop_data_dir() -> std::io::Result<std::path::PathBuf> {
+    paths::resolve_data_dir()
+}
 
 /// 主窗口的初始尺寸，按显示器工作区算。
 ///
@@ -282,6 +300,7 @@ pub fn run() {
     // 便携版刚换完 exe、由旧进程拉起来的这一次：先等旧进程退干净，再初始化单实例——
     // 不然单实例会把这次启动并进还没退出的旧进程，新版本一闪就没了。平常启动只顺手
     // 清掉上一次更新留下的 `*.old`（updates/portable.rs）。
+    #[cfg(feature = "github-updater")]
     if let Ok(exe) = std::env::current_exe() {
         if std::env::args().any(|arg| arg == updates::portable::AFTER_UPDATE_ARG) {
             updates::portable::wait_for_previous(&exe, std::time::Duration::from_secs(20));
@@ -318,7 +337,7 @@ pub fn run() {
     // 至少还能开。
     #[cfg(target_os = "windows")]
     {
-        let resolved = paths::resolve_data_dir();
+        let resolved = desktop_data_dir();
         // 日志要先装起来，否则下面这几条 `log` 全部落空——而它们正是
         // 「窗口一片空白」这一类问题唯一能拿到的证据。`init` 是幂等的。
         diagnostics::init(resolved.as_deref().ok());
@@ -340,10 +359,9 @@ pub fn run() {
     }
     diagnostics::install_panic_hook();
     diagnostics::log("Startup: building Tauri runtime");
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .append_invoke_initialization_script(rendering_script)
         .manage(main_window::MainWindowState::default())
-        .manage(updates::SilentUpdater::default())
         .manage(auto_sync::AutoSyncAlarm::default())
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
@@ -362,7 +380,6 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(main_window::on_window_event)
         .on_page_load(|webview, payload| {
             if webview.label() == "main" {
@@ -376,7 +393,7 @@ pub fn run() {
             // 进程就没了——而 Windows 上既没有终端也没有日志，用户只能看到
             // 通知区里一个点不动的死图标。现在每一条都会写日志、弹对话框，
             // 把具体路径和系统错误摆给用户。见 `diagnostics.rs`。
-            let data_dir = match paths::resolve_data_dir() {
+            let data_dir = match desktop_data_dir() {
                 Ok(dir) => {
                     diagnostics::init(Some(&dir));
                     dir
@@ -386,6 +403,8 @@ pub fn run() {
                     return Err(diagnostics::fatal_startup("无法使用数据文件夹", error).into());
                 }
             };
+            let store_import_gate = store_import::StoreImportGate::new(data_dir.clone());
+            app.manage(store_import_gate.clone());
             // Available before the slow initializer publishes AppState, so a
             // quit during migration/restoration still waits for its writer.
             app.manage(ExitDataDir(data_dir.clone()));
@@ -393,6 +412,7 @@ pub fn run() {
             // 而真相是这次解析到了另一个目录（NSIS 装在 %LOCALAPPDATA%、MSI 装在
             // Program Files，两者的落点不同）。只记录，不搬动——见
             // `paths::other_libraries_on_this_machine` 的注释。
+            #[cfg(not(feature = "store"))]
             for other in paths::other_libraries_on_this_machine(&data_dir) {
                 diagnostics::log(&format!(
                     "注意：{} 里也有一个 zepp.db，本次用的是 {}。要固定用哪一个，请设 {}",
@@ -423,10 +443,15 @@ pub fn run() {
             // 放行，真正的查询才开始。
             let app_handle = app.handle().clone();
             let init_data_dir = data_dir.clone();
+            let init_store_import_gate = store_import_gate.clone();
             let init_spawned =
                 std::thread::Builder::new()
                     .name("app-init".into())
                     .spawn(move || {
+                        if EXIT_GATE.is_exiting() {
+                            return;
+                        }
+                        init_store_import_gate.wait_for_decision(|| EXIT_GATE.is_exiting());
                         if EXIT_GATE.is_exiting() {
                             return;
                         }
@@ -684,13 +709,21 @@ pub fn run() {
                 }
             }
             app.state::<main_window::MainWindowState>().set_ready();
+            #[cfg(feature = "github-updater")]
             updates::silent::spawn_periodic_recheck(app.handle().clone());
             auto_sync::spawn(app.handle().clone());
             diagnostics::log("Startup: application setup complete");
             Ok(())
-        })
+        });
+    #[cfg(feature = "github-updater")]
+    let builder = builder
+        .manage(updates::SilentUpdater::default())
+        .plugin(tauri_plugin_updater::Builder::new().build());
+    let app = builder
         .invoke_handler(tauri::generate_handler![
             app_is_ready,
+            store_import::store_import_status,
+            store_import::store_import_decide,
             auto_sync::set_auto_sync_prefs,
             system_region_locale,
             list_life_events,
@@ -831,9 +864,13 @@ pub fn run() {
             compact_raw_payloads,
             open_data_folder,
             open_external_url,
+            #[cfg(feature = "github-updater")]
             updates::silent::update_start,
+            #[cfg(feature = "github-updater")]
             updates::silent::update_view,
+            #[cfg(feature = "github-updater")]
             updates::silent::update_set_auto,
+            #[cfg(feature = "github-updater")]
             updates::silent::update_apply,
             list_backups,
             create_manual_backup,

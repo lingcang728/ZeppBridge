@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://zeppbridge.com/privacy/">
+  <title>ZeppBridge Privacy Policy</title>
+  <meta name="description" content="How ZeppBridge and its website process, store, and protect data.">
+  <style>
+    :root{color-scheme:dark;--bg:#090b0e;--panel:#12161b;--ink:#f0f3ee;--muted:#bbc2c8;--line:#29313a;--accent:#a4d65e}
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif}
+    body{margin:0;background:radial-gradient(ellipse at 50% -10%,#1b2821 0,transparent 42%),var(--bg)}
+    a{color:var(--accent);text-underline-offset:3px}
+    a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    header,main,footer{width:min(920px,calc(100% - 36px));margin-inline:auto}
+    header{padding:40px 0 22px;border-bottom:1px solid var(--line)}
+    header p{color:var(--muted);margin:8px 0 0}
+    h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.15;margin:0;letter-spacing:-.035em}
+    h2{margin:2.3rem 0 .6rem;font-size:1.45rem;line-height:1.3}
+    h3{margin:1.4rem 0 .4rem;font-size:1.08rem}
+    p,ul{margin:.65rem 0}
+    li{margin:.35rem 0}
+    .lang{display:flex;gap:14px;margin-top:18px}
+    .lang a{padding:7px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none}
+    main{padding:24px 0 60px}
+    section.policy{padding:0 0 42px;border-bottom:1px solid var(--line)}
+    .notice{padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--muted)}
+    .notice strong{color:var(--ink)}
+    .muted{color:var(--muted)}
+    footer{padding:20px 0 42px;border-top:1px solid var(--line);color:var(--muted);font-size:.92rem}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Privacy Policy</h1>
+    <p>ZeppBridge · Published under the Linc Studio publisher display name · Effective 6 November 2026</p>
+    <nav class="lang" aria-label="Language">
+      <a href="#en-policy">English</a>
+      <a href="#zh-cn-policy" lang="zh-CN">简体中文</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="policy" id="en-policy" lang="en">
+      <p class="notice">Health and workout records are stored in a local SQLite database on your computer; ZeppBridge does not encrypt the whole database. The app sends no automatic usage telemetry or background crash reports. It contacts Zepp for sign-in and sync, and uses ZeppBridge services for the authorization relay and only for reports or letters that you choose to send.</p>
+
+      <h2>1. Who and what this policy covers</h2>
+      <p>ZeppBridge is developed and published under the Linc Studio publisher display name. This policy covers the ZeppBridge desktop app, the <a href="https://zeppbridge.com/">zeppbridge.com</a> website, and the Cloudflare Pages services used for official Zepp authorization, voluntary problem reports, and letters to the author. ZeppBridge is an independent project, not an official Zepp or Amazfit product.</p>
+
+      <h2>2. Data stored on your computer</h2>
+      <p>When you connect your Zepp account and sync, ZeppBridge downloads the records available from the connection you chose and processes them locally. Depending on the source and your device, records can include sleep, heart rate, steps, workouts, body measurements, other health metrics, and precise route coordinates. Some raw service responses may also be kept locally so records can be checked and reprocessed.</p>
+      <ul>
+        <li>The health database is a plain SQLite database in the app data folder. ZeppBridge does not encrypt the whole database and does not upload a remote backup.</li>
+        <li>You choose local record retention from 1 to 365 days; the default is 365 days. Cleanup removes older records and cannot be undone.</li>
+        <li>On Windows, the Zepp access token is kept in Windows Credential Manager. macOS and Linux use their system credential stores by default. On supported non-Windows setups, an explicitly selected file or environment-variable credential store has different protection properties described in the technical privacy notes.</li>
+        <li><code>auth.json</code> contains non-secret account and region metadata, not the token. Locally entered notes, labels, plans, preferences, exports, and backups remain on your computer unless you choose to share them.</li>
+      </ul>
+      <p>Disconnecting official Zepp authorization revokes it with Zepp and removes local tokens, but it does not delete your local health database. The in-app data cleanup and clear-credentials actions are separate. A complete local wipe requires handling both the database and credentials.</p>
+
+      <h2>3. Connections and data sent to other services</h2>
+      <h3>Zepp sign-in and sync</h3>
+      <p>Sign-in takes place on a Zepp-hosted page. Your Zepp password is entered with Zepp, not sent to ZeppBridge. During official authorization, ZeppBridge's relay exchanges the authorization code and briefly handles encrypted access and refresh tokens so the app can claim them once. An unclaimed authorization is purged after 10 minutes; after the app claims it, the pending token row is deleted. Refresh requests pass through the relay to Zepp and are not stored there. Sync requests go from the app to the Zepp service for your account region, and the returned records are processed locally.</p>
+      <p>The relay keeps a SHA-256 hash of the Zepp user ID, with registration and last-seen timestamps, as a long-term allow-list record for accounts that completed authorization. It does not keep the raw user ID or account name in this record. There is currently no automatic expiry for this hash; you can request its removal through the in-app privacy contact described below.</p>
+
+      <h3>Optional AI handoff</h3>
+      <p>AI exports are prepared on your computer for the range and record types you select. ZeppBridge removes authentication fields and account, device, and serial identifiers; precise GPS coordinates are excluded by default. You may deliberately include a precise route only after changing the setting and confirming it. The app copies the prepared content to your clipboard or creates a local file, then opens the AI site you selected. It does not paste, upload, or submit the content for you. The AI provider receives data only if you paste or upload it there; that provider's privacy terms then apply.</p>
+
+      <h3>Map tiles</h3>
+      <p>A workout route is drawn locally. If you explicitly switch the route card to the online map and consent to load tiles, your computer requests map tiles from OpenStreetMap. Those requests can reveal the approximate area being viewed to the tile service. Tiles are not prefetched when the map is off.</p>
+
+      <h3>Local API and MCP</h3>
+      <p>The optional read-only local API is off by default and listens only on <code>127.0.0.1</code> when enabled. It can expose workout series, including health measurements and precise GPS, to software on the same computer. The MCP server communicates with its client over standard input/output. Most MCP tools read local data, but it also has tools that write a training-plan draft or a proposed coach note to the local database; a note stays in the inbox until you accept it in ZeppBridge. If you enable <strong>Allow AI to publish</strong> and approve a plan, <code>publish_training_plan</code> sends the validated plan to Zepp's official service and records the result locally. The MCP client may send tool requests and results to its AI provider under that provider's terms.</p>
+
+      <h2>4. Reports and letters you choose to send</h2>
+      <h3>Problem reports</h3>
+      <p>ZeppBridge never sends usage telemetry or crash reports automatically. A problem report is sent only after you choose the report and confirm. It can contain app and parser versions, operating-system type, database schema version, response field names and types, counts and codes for unrecognized devices or workouts, a numeric Zepp rejection code, and an optional short note. It does not contain Zepp account IDs, tokens, cookies, serial numbers, device IDs, MAC addresses, GPS, health values, raw responses, or local file paths. The client removes common email, path, and long-identifier patterns from the optional note before sending; please review the note yourself before you confirm.</p>
+      <p>Reports are stored in a private Cloudflare D1 database and are not available through a public read endpoint. A random report number is returned so you can refer to a report later. The service computes a daily hash of the request source IP for rate limiting; the raw IP is not stored in the report record. Report rows do not currently have an automatic expiry date. They remain until the maintainer removes them; you can request removal by quoting the report number through the in-app contact path below.</p>
+
+      <h3>Letters to the author</h3>
+      <p>If you send a letter from <strong>Settings → Sync → Letters to the author</strong>, the app uses a random installation ID that is not tied to your Zepp account. The server stores a salted hash of that ID with the message, app and letter versions, language, and your optional permission to quote your message anonymously. The app removes local paths and common patterns that look like email addresses or credentials before sending, but you should still check your message and leave out health records and account secrets.</p>
+      <p>The private inbox lets the maintainer set a handling status and, if needed, send a one-to-one reply that the app retrieves using the installation ID. Handled entries are removed by maintenance after 180 days. Your message is stored locally in the app as well. A message is quoted publicly only if you explicitly permit anonymous quotation.</p>
+
+      <h2>5. The website and hosting</h2>
+      <p>The website remembers your selected language and theme in your browser's local storage. The website and its service endpoints are hosted on Cloudflare Pages and use Cloudflare D1 for the limited server-side records described above. Cloudflare may process connection and request metadata to deliver and protect the service under its own privacy terms. See <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's Privacy Policy</a>.</p>
+
+      <h2>6. Retention and your choices</h2>
+      <ul>
+        <li>Use the app's data-retention and cleanup controls to remove older local health records. To remove all local records, close the app and delete its data folder after you have made any backup you want to keep.</li>
+        <li>Use the app's credential controls to revoke the Zepp connection and remove local credentials.</li>
+        <li>Use the in-app letter feature to ask us to locate or delete a problem report or authorization hash. Include a random report number if your request concerns a report. Do not send passwords, tokens, or health data with the request.</li>
+        <li>To request deletion of a handled letter, use the same in-app letter feature and include the letter's version and approximate sent date. Handled letter entries are also removed by maintenance after 180 days.</li>
+      </ul>
+      <p>ZeppBridge has no separate user account, so requests are matched only using the limited references you provide and the pseudonymous installation ID. We may ask for the minimum detail needed to locate a server-side record.</p>
+
+      <h2>7. Security and third-party services</h2>
+      <p>ZeppBridge uses HTTPS for remote requests, system credential storage for Windows tokens, strict schemas for voluntary reports, and encrypted storage for the short-lived authorization tokens held by the relay. The local health database remains unencrypted SQLite. No method of storage or transmission is perfectly secure.</p>
+      <p>Data sent to Zepp, OpenStreetMap, Cloudflare, Microsoft Store, GitHub, or an AI service you choose is handled under that service's own privacy terms. ZeppBridge does not sell health or account data.</p>
+
+      <h2>8. Privacy questions and requests</h2>
+      <p>Use <strong>Settings → Sync → Letters to the author</strong> inside ZeppBridge to contact the maintainer about this policy or a privacy request. For a problem-report deletion request, include the random report number. Do not include passwords, tokens, serial numbers, precise location, or health records.</p>
+
+      <h2>9. Changes</h2>
+      <p>This policy may be updated when the app's data flows change. The date at the top shows the current version of this policy.</p>
+      <p class="muted">Related technical details: <a href="https://github.com/lingcang728/ZeppBridge/blob/main/docs/reference/security-and-privacy.md">Security and privacy boundaries in the source repository</a>.</p>
+    </section>
+
+    <section class="policy" id="zh-cn-policy" lang="zh-CN">
+      <h2>ZeppBridge 隐私政策</h2>
+      <p class="muted">发布者显示名称：Linc Studio · 生效日期：2026 年 11 月 6 日</p>
+      <p class="notice"><strong>简要说明：</strong>健康与运动记录保存在你自己的电脑本地 SQLite 数据库里；ZeppBridge 不会加密整库。应用没有自动使用行为埋点或后台崩溃上报。登录与同步会连接 Zepp；授权中转会连接 ZeppBridge 服务；只有你主动确认后，错误报告或写给作者的信才会发送。</p>
+
+      <h2>1. 适用范围与负责方</h2>
+      <p>ZeppBridge 由以 Linc Studio 为发布者显示名称的开发者维护。本政策涵盖 ZeppBridge 桌面应用、<a href="https://zeppbridge.com/">zeppbridge.com</a> 网站，以及用于 Zepp 官方授权中转、自愿错误报告和作者来信的 Cloudflare Pages 服务。ZeppBridge 是独立项目，并非 Zepp 或 Amazfit 官方产品。</p>
+
+      <h2>2. 存在你电脑上的数据</h2>
+      <p>你连接 Zepp 账号并同步时，ZeppBridge 会获取所选连接方式能够提供的记录，并在本机处理。按数据源和设备能力，记录可能包括睡眠、心率、步数、运动、身体测量值、其他健康指标和精确路线坐标。部分原始服务响应也可能保留在本机，以便检查和重新处理。</p>
+      <ul>
+        <li>健康数据库是保存在应用数据目录中的普通 SQLite 文件。ZeppBridge 不会加密整库，也没有远程备份。</li>
+        <li>本地记录保留期可在 1 到 365 天之间选择，默认 365 天。清理会删除超出期限的记录，无法撤销。</li>
+        <li>Windows 上的 Zepp 访问令牌默认放在 Windows 凭据管理器。macOS 和 Linux 默认使用系统凭据存储。受支持的非 Windows 环境可明确选择文件或环境变量凭据存储，其保护方式不同，见技术隐私说明。</li>
+        <li><code>auth.json</code> 只含账号与区域等非机密元数据，不含令牌。你在本机填写的笔记、标签、计划、偏好、导出与备份留在本机，除非你主动选择分享。</li>
+      </ul>
+      <p>在应用中断开 Zepp 官方授权时，应用会请求 Zepp 撤销授权并删除本机令牌，但不会删除本地健康数据库。应用内的清理数据与清除凭据是两项独立操作。若要完整清除本机数据，需要分别处理数据库和凭据。</p>
+
+      <h2>3. 连接与发送给其他服务的数据</h2>
+      <h3>Zepp 登录与同步</h3>
+      <p>登录发生在 Zepp 托管的页面。你的 Zepp 密码由 Zepp 接收，不会发送给 ZeppBridge。使用官方授权时，ZeppBridge 中转服务会向 Zepp 兑换授权码，并短暂处理加密的访问令牌和刷新令牌，供应用领取一次。10 分钟内未领取的授权记录会清理；应用领取后待领令牌行立即删除。刷新请求会经中转服务转给 Zepp，不会在中转服务保存。健康数据同步请求由应用发送到账号所在区域的 Zepp 服务，返回的记录在本机处理。</p>
+      <p>中转服务会长期保留 Zepp 用户 ID 的 SHA-256 哈希，以及注册时间和最近使用时间，用作已完成授权账号的长期允许清单。这个记录不保存原始用户 ID 或账号名称。目前该哈希没有自动过期机制；你可以通过下文的应用内联系途径申请删除。</p>
+
+      <h3>你主动进行的 AI 数据交接</h3>
+      <p>AI 导出在本机按你选择的日期范围和数据类型生成。ZeppBridge 会删除认证字段、账号、设备和序列号等标识；精确 GPS 坐标默认排除。你只有在主动更改设置并再次确认后，才可以包含精确路线。应用会把准备好的内容复制到剪贴板或生成本地文件，再打开你选择的 AI 网站；应用不会替你粘贴、上传或提交。只有你在该网站粘贴或上传内容时，AI 服务才会收到数据；该服务自己的隐私规则随后适用。</p>
+
+      <h3>地图瓦片</h3>
+      <p>运动路线在本机绘制。只有当你明确把路线卡切换到在线地图并同意加载瓦片后，电脑才会向 OpenStreetMap 请求地图瓦片；这些请求可能让地图服务知道你查看的大致区域。关闭地图时不会预取瓦片。</p>
+
+      <h3>本地 API 与 MCP</h3>
+      <p>可选的只读本地 API 默认关闭，开启后只监听 <code>127.0.0.1</code>，可向同一台电脑上的软件提供运动序列，其中可能包含健康测量值和精确 GPS。MCP 服务端通过标准输入输出与客户端通信。多数 MCP 工具读取本机数据；另有工具会把训练计划草稿或教练备注提议写入本地数据库。备注会留在收件箱，直到你在 ZeppBridge 中接受。如果你在设置中开启<strong>允许 AI 直接发布</strong>并确认计划，<code>publish_training_plan</code> 会把通过校验的计划发送给 Zepp 官方服务，并在本地记录结果。MCP 客户端可能按对应 AI 服务商的规则将工具请求和结果发送给该服务商。</p>
+
+      <h2>4. 你主动发送的报告与来信</h2>
+      <h3>错误报告</h3>
+      <p>ZeppBridge 不会自动上报使用行为或崩溃报告。只有你选择报告并确认后，应用才会发送错误报告。内容可能包括应用与解析器版本、操作系统类型、数据库模式版本、响应字段名称与类型、未识别设备或运动的编号与数量、Zepp 返回的数字错误码，以及可选短备注。报告不包含 Zepp 账号 ID、令牌、Cookie、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机文件路径。发送前客户端会尝试删除备注里的常见邮箱、路径和长标识符格式；请在确认前自行检查备注。</p>
+      <p>报告保存在 Cloudflare D1 私有数据库中，没有公开读取接口。应用会返回随机报告编号，方便之后查询。服务会计算请求来源 IP 的每日哈希用于限流；原始 IP 不写入报告记录。目前报告没有自动到期时间，会保留到维护者手动删除为止。你可以在应用内联系开发者，并提供报告编号申请删除。</p>
+
+      <h3>给作者的信</h3>
+      <p>如果你在应用中打开<strong>设置 → 同步 → 给作者的信</strong>，应用会使用随机安装 ID，不会关联 Zepp 账号。服务器将该 ID 的加盐哈希与来信内容、应用和来信版本、语言，以及你是否允许匿名引用等信息一起保存。发送前应用会删除本机路径和常见的邮箱、凭据格式；仍请自行检查内容，不要附上健康记录或账号机密。</p>
+      <p>私有信箱允许维护者标记处理状态，并按需给你发送一对一回复，应用通过安装 ID 取回。已处理的信件会在处理满 180 天后由维护者运行维护清理删除。你的来信也保存在本机。只有你明确同意匿名引用时，来信才可能被公开引用。</p>
+
+      <h2>5. 网站与托管</h2>
+      <p>网站会在浏览器本地存储你选择的语言和主题。网站及其服务接口托管在 Cloudflare Pages，并使用 Cloudflare D1 保存上文说明的少量服务器端记录。Cloudflare 可能依据其隐私规则处理连接和请求元数据，以提供并保护服务。详见 <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare 隐私政策</a>。</p>
+
+      <h2>6. 保留期限与管理方式</h2>
+      <ul>
+        <li>使用应用的数据保留与清理设置删除较早的本地健康记录。若要清除所有本地记录，请先退出应用；保留需要的备份后，再删除应用数据目录。</li>
+        <li>使用应用内凭据控件撤销 Zepp 连接并删除本地凭据。</li>
+        <li>若要申请定位或删除服务器端错误报告或授权哈希，请通过应用内的作者来信联系我们。关于报告的申请请附随机报告编号；不要发送密码、令牌或健康数据。</li>
+        <li>若要申请删除已处理的来信，也可通过相同途径联系，并注明来信版本和大致发送日期。已处理来信也会由维护者在 180 天后清理。</li>
+      </ul>
+      <p>ZeppBridge 没有单独的用户账号，服务器请求只会使用你提供的有限参考信息及化名安装 ID 来匹配记录。我们可能会询问定位服务器记录所必需的最少信息。</p>
+
+      <h2>7. 安全措施与第三方服务</h2>
+      <p>ZeppBridge 对远程请求使用 HTTPS，Windows 令牌使用系统凭据存储，自愿报告使用严格字段白名单，中转服务短暂保存的授权令牌使用加密存储。本地健康数据库仍是未加密的 SQLite 文件。任何存储或传输方式都不能保证绝对安全。</p>
+      <p>发送给 Zepp、OpenStreetMap、Cloudflare、Microsoft Store、GitHub 或你选择的 AI 服务的数据，按照对应服务自己的隐私条款处理。ZeppBridge 不出售健康数据或账号数据。</p>
+
+      <h2>8. 隐私问题与请求</h2>
+      <p>如要咨询本政策或提交隐私请求，请在 ZeppBridge 中打开<strong>设置 → 同步 → 给作者的信</strong>联系维护者。申请删除错误报告时请附随机报告编号。请勿发送密码、令牌、序列号、精确位置或健康记录。</p>
+
+      <h2>9. 政策更新</h2>
+      <p>当应用的数据流发生变化时，本政策可能更新。页面顶部日期表示当前政策版本。</p>
+      <p class="muted">技术细节见：<a href="https://github.com/lingcang728/ZeppBridge/blob/main/docs/reference/security-and-privacy.md">源码仓库中的安全与隐私边界说明</a>。</p>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/">ZeppBridge</a>
+    <span aria-hidden="true"> · </span>
+    <a href="https://github.com/lingcang728/ZeppBridge">Source code</a>
+  </footer>
+</body>
+</html>

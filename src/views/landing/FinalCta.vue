@@ -37,7 +37,7 @@ async function copyCommand() {
       <button v-else class="lp-btn download-button unavailable-download" type="button" disabled><Icon name="download" :size="22" />{{ journey.downloadPending }}</button>
       <a class="star-button lp-btn" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer"><Icon name="star" :size="20" /><span>{{ journey.starOnGithub }}</span><Icon name="external" :size="16" /></a>
     </div>
-    <p class="version-line"><span v-if="version">v{{ version }} · </span><a :href="changelogHref">{{ journey.changelog }}</a></p>
+    <p class="version-line"><span v-if="version">v{{ version }} · </span><a :href="changelogHref">{{ journey.changelog }}</a><span aria-hidden="true"> · </span><a href="/privacy/">{{ copy.rebuild.privacyDoc }}</a></p>
     <p v-if="platform === 'windows'" class="blocked-line">{{ journey.windowsBlocked }}</p>
     <div v-else-if="platform === 'macos'" class="mac-line">
       <p class="blocked-line">{{ journey.macInstall }}</p>

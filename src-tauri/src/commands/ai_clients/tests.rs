@@ -23,6 +23,7 @@ impl Drop for Scratch {
 /// 没附带 sidecar 时不给路径——界面据此显示「这一版没附带」，而不是拼一条
 /// 指向不存在文件的命令让用户去撞。
 #[test]
+#[cfg(not(all(windows, feature = "store")))]
 fn missing_sidecar_gives_no_path() {
     let dir = Scratch::new("missing");
     let found = locate_sidecar(dir.path(), &dir.path().join("data"));
@@ -33,6 +34,7 @@ fn missing_sidecar_gives_no_path() {
 
 /// CLI 和 MCP 各找各的：只附带了 CLI 也照样给出它的路径。
 #[test]
+#[cfg(not(all(windows, feature = "store")))]
 fn the_cli_is_found_on_its_own() {
     let dir = Scratch::new("cli");
     let cli = dir
@@ -50,6 +52,7 @@ fn the_cli_is_found_on_its_own() {
 /// sidecar 旁边就是应用的库时不带环境变量；库在别处（开发构建、回退目录）
 /// 时必须带上，否则 AI 读到的是一个空库却以为「没有数据」。
 #[test]
+#[cfg(not(all(windows, feature = "store")))]
 fn data_dir_env_only_when_the_library_is_elsewhere() {
     let dir = Scratch::new("env");
     let exe = dir
@@ -100,6 +103,43 @@ fn bundle_carries_manifest_and_entry_point() {
     assert_eq!(config["command"], exe.to_string_lossy().as_ref());
     assert_eq!(config["args"], serde_json::json!(["--scope", "task"]));
     assert_eq!(config["env"]["ZEPPBRIDGE_DATA_DIR"], "D:\\data");
+}
+
+#[cfg(all(windows, feature = "store"))]
+#[test]
+fn store_mcp_uses_its_unique_windowsapps_alias_for_both_commands() {
+    let data_dir = Path::new(
+        r"C:\Users\example\AppData\Local\Packages\LincStudio.ZeppBridge_abcd\LocalState\ZeppBridge\data",
+    );
+    let sidecar = current_sidecar(data_dir);
+    let expected_dir = zeppbridge_core::paths::windows_apps_alias_dir().unwrap();
+    let expected_mcp = expected_dir.join("zeppbridge-store-mcp.exe");
+    let expected_cli = expected_dir.join("zeppbridge-store-cli.exe");
+    assert_eq!(
+        sidecar.path.as_deref(),
+        Some(expected_mcp.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        sidecar.cli_path.as_deref(),
+        Some(expected_cli.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        sidecar.data_dir_env.as_deref(),
+        Some(data_dir.to_string_lossy().as_ref())
+    );
+
+    let manifest = bundle_manifest(
+        sidecar.path.as_deref().unwrap(),
+        sidecar.data_dir_env.as_deref(),
+    );
+    assert_eq!(
+        manifest["server"]["mcp_config"]["command"],
+        expected_mcp.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"]["ZEPPBRIDGE_DATA_DIR"],
+        data_dir.to_string_lossy().as_ref()
+    );
 }
 
 /// 2.x 升上来的用户在 AI 客户端里登记的是旧工具包里的 zeppbridge-mcp：三家各认一种写法，

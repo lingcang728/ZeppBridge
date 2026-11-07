@@ -37,6 +37,11 @@ description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"
 
+[features]
+default = ["github-updater"]
+github-updater = ["dep:tauri-plugin-updater"]
+store = ["zeppbridge-core/store"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -53,7 +58,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-process = "2.3.1"
-tauri-plugin-updater = "2.10.1"
+tauri-plugin-updater = { version = "2.10.1", optional = true }
 # 把准备好的交给 AI 的文件从应用里直接拖进浏览器的对话框（批次 ⑦）。
 tauri-plugin-drag = "2.1.1"
 serde = { workspace = true }

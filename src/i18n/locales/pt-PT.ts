@@ -43,6 +43,22 @@ export default {
       fileUnavailable:
         'O armazenamento em ficheiro não está disponível nesta plataforma ou foi substituído pela tua configuração de arranque. Repara o armazenamento de credenciais do sistema para continuar.',
     },
+    'components/StoreImportPrompt': {
+      title: 'Importar os dados da versão GitHub?',
+      summary:
+        'A versão da Microsoft Store e a versão do GitHub usam pastas de dados separadas. A importação copia a base de dados local e as definições que podem ser transferidas; a pasta original permanece inalterada.',
+      credential:
+        'As credenciais de acesso e as chaves de API locais são isoladas por versão e não são copiadas da versão do GitHub. Depois de importar, inicia sessão novamente na versão da Microsoft Store e configura de novo as chaves para os clientes que usam a API local.',
+      found: 'Pastas de dados detetadas',
+      noSource: 'Podes selecionar uma pasta de dados que contenha zepp.db.',
+      browseTitle: 'Seleciona a pasta de dados do ZeppBridge',
+      choose: 'Selecionar pasta de dados',
+      import: 'Copiar e importar',
+      empty: 'Não importar agora; usar uma base de dados vazia',
+      busy: 'A copiar os dados em segurança…',
+      error:
+        'A importação falhou. Confirma que a pasta selecionada contém zepp.db e que há espaço suficiente no disco de destino. Depois, tenta novamente.',
+    },
     'components/journal/repair': {
       timelineEmpty: 'Escolhe um dia na cronologia para registar um acontecimento',
       timelineToday: 'Hoje',

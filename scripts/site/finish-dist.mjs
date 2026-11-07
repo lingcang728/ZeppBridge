@@ -14,7 +14,7 @@
  * 部署前先看 `npx wrangler d1 migrations list zeppbridge-feedback --remote`，有没跑的迁移先 apply。
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readReleaseNotes, renderChangelog } from './changelog.mjs';
@@ -23,6 +23,13 @@ import { readLetters, renderLetterArchive } from './letters.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const site = join(repo, '.site-cache/site-dist');
 if (!existsSync(join(site, 'index.html'))) throw new Error(`No website build at ${site}; run npm run build:web first.`);
+
+// Vite has publicDir disabled for the landing build, so copy the standalone
+// Microsoft Store privacy page explicitly into the Pages output.
+const privacySource = join(repo, 'public/privacy/index.html');
+const privacyTarget = join(site, 'privacy/index.html');
+mkdirSync(dirname(privacyTarget), { recursive: true });
+copyFileSync(privacySource, privacyTarget);
 
 writeFileSync(join(site, 'robots.txt'), 'User-agent: *\nAllow: /\nDisallow: /api/\n');
 writeFileSync(join(site, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n');
