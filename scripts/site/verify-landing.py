@@ -29,6 +29,8 @@ def context(browser,width=1440,lang='zh',theme='light',**kwargs):
 def load(c,url):
     p=c.new_page();errors=[];p.on('pageerror',lambda e:errors.append(e.stack))
     p.goto(url,wait_until='domcontentloaded');p.locator('h1').wait_for();p.evaluate('document.fonts.ready')
+    privacy=p.locator('a[href="/privacy/"]')
+    assert privacy.count()==1 and privacy.inner_text().strip(), 'Landing page must expose its privacy policy link'
     return p,errors
 
 def shot(p,name): p.screenshot(path=str(OUT/(name+'.png')))

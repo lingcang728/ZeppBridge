@@ -32,6 +32,10 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SITES = [
   { file: 'package.json', pattern: /("version":\s*")([0-9][^"]*)(")/ },
   { file: 'src-tauri/tauri.conf.json', pattern: /("version":\s*")([0-9][^"]*)(")/ },
+  // 商店版的配置覆盖层（CI 的商店测试和 build-store-msix.ps1 都合并它）。它自带 version，
+  // 漏改的话商店版界面和 CLI 报的仍是上一版，而 GitHub 版的门禁完全看不出来。
+  // MSIX 包版本（AppxManifest 的 x.y.z.0）是每次提交商店时单独递增的，不归这里管。
+  { file: 'src-tauri/tauri.store.conf.json', pattern: /("version":\s*")([0-9][^"]*)(")/ },
   { file: 'src-tauri/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/core/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/cli/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },

@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $loadedLocalSigningKey = $false
+$previousStoreBuild = [Environment]::GetEnvironmentVariable('ZB_STORE_BUILD', 'Process')
 $env:CARGO_TARGET_DIR = 'G:\build_cache\cargo-target-v3'
 
 $tauriConf = Get-Content -LiteralPath (Join-Path $root 'src-tauri\tauri.conf.json') -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -10,6 +11,7 @@ if ([string]$tauriConf.productName -ne 'ZeppBridge') {
 
 Push-Location $root
 try {
+  Remove-Item Env:ZB_STORE_BUILD -ErrorAction SilentlyContinue
   # 每一版都要有作者来信（docs/releases/README.md「发版第一步」）。自测包可以先打，只提醒；打 tag 前必须补齐。
   node scripts/release/check-letter.mjs
   if ($LASTEXITCODE -ne 0) { Write-Warning '这版的信还没齐：打 tag 前要补上（node scripts/release/check-letter.mjs）。' }
@@ -60,6 +62,11 @@ try {
   if ($loadedLocalSigningKey) {
     Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+  }
+  if ($null -eq $previousStoreBuild) {
+    Remove-Item Env:ZB_STORE_BUILD -ErrorAction SilentlyContinue
+  } else {
+    $env:ZB_STORE_BUILD = $previousStoreBuild
   }
   Pop-Location
 }

@@ -129,6 +129,43 @@ jobs:
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 
+      - name: Test Microsoft Store channel
+        shell: pwsh
+        run: |
+          $env:TAURI_CONFIG = Get-Content src-tauri/tauri.store.conf.json -Raw
+          $env:ZB_STORE_BUILD = '1'
+          cargo test --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --locked --jobs 1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Verify Microsoft Store build excludes the GitHub updater
+        shell: pwsh
+        run: |
+          $tree = cargo tree --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --edges normal,build --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($tree -match 'tauri-plugin-updater v') { throw 'Updater present in Microsoft Store dependency tree' }
+
+  store-package:
+    name: Prepare unsigned Microsoft Store package
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build MSIX with CLI and MCP aliases
+        run: ./scripts/windows/build-store-msix.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZeppBridge-Microsoft-Store
+          path: release/store-msix/*.msix
+          if-no-files-found: error
+          retention-days: 14
+
   verify-linux:
     name: Linux verification
     needs: changes

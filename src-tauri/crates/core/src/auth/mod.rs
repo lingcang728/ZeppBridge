@@ -29,6 +29,9 @@ pub use select::*;
 /// and Secret Service respectively — so the `allow(dead_code)` that used to sit
 /// here for the platforms without a real backend is gone, as its own comment
 /// said it should be once one appeared.
+#[cfg(feature = "store")]
+pub const CREDENTIAL_SERVICE: &str = "com.zeppbridge.app.store";
+#[cfg(not(feature = "store"))]
 pub const CREDENTIAL_SERVICE: &str = "com.zeppbridge.app";
 
 /// 令牌最多能有多少个 UTF-16 码元。

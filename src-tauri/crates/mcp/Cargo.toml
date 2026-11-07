@@ -4,6 +4,10 @@ version = "3.1.1"
 description = "ZeppBridge MCP 服务：只读、stdio、不监听任何端口"
 edition = "2021"
 
+[features]
+default = []
+store = ["zeppbridge-core/store"]
+
 [[bin]]
 name = "zeppbridge-mcp"
 path = "src/main.rs"

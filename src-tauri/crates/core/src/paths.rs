@@ -2,7 +2,16 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 mod fresh_start;
+#[path = "paths/store.rs"]
+mod store;
 pub use fresh_start::{apply_pending_fresh_start, request_fresh_start};
+pub use store::{
+    current_executable_is_windows_apps_alias, current_package_identity_mismatch,
+    import_store_library, mark_store_import_reviewed, package_local_data_dir,
+    prepare_configured_store_data_dir, prepare_package_local_data_dir,
+    recover_interrupted_store_import, require_store_import_decision, store_import_candidates,
+    store_import_required, store_import_reviewed, windows_apps_alias_dir,
+};
 
 const SQLITE_GROUP: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
 const LEGACY_FILES: [&str; 8] = [
@@ -47,11 +56,67 @@ pub const DATA_DIR_ENV: &str = "ZEPPBRIDGE_DATA_DIR";
 /// the install-local layout, because for those the folder really is the
 /// user's.
 pub fn resolve_data_dir() -> io::Result<PathBuf> {
+    // A packaged Store process must always use its package's real LocalState.
+    // Ignore ZEPPBRIDGE_DATA_DIR here so a sidecar cannot accidentally attach to
+    // the GitHub library or a redirected AppData view. Until the desktop app has
+    // recorded an import/skip choice, CLI and MCP fail closed instead of
+    // creating a fresh empty database on first use.
+    #[cfg(feature = "store")]
+    {
+        if let Some(dir) = prepare_package_local_data_dir()? {
+            require_store_import_decision(&dir)?;
+            return Ok(dir);
+        }
+
+        let explicit = data_dir_from_env()?;
+        if let Some(dir) = explicit {
+            if prepare_configured_store_data_dir(&dir)? {
+                require_store_import_decision(&dir)?;
+                return Ok(dir);
+            }
+            if let Some(family) = current_package_identity_mismatch()? {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!(
+                        "Store build expected package family LincStudio.ZeppBridge_pwftgd5x5w3va, but this process has {family}. Only a validated ZeppBridge Store LocalState path may be used."
+                    ),
+                ));
+            }
+            if current_executable_is_windows_apps_alias() {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "Store execution aliases require package identity or their Store LocalState path. Open ZeppBridge from the Start menu or use its generated MCP configuration.",
+                ));
+            }
+            ensure_writable_dir(&dir)?;
+            return Ok(dir);
+        }
+        if let Some(family) = current_package_identity_mismatch()? {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!(
+                    "Store build expected package family LincStudio.ZeppBridge_pwftgd5x5w3va, but this process has {family}. Launch it with the Store identity or its validated Store LocalState path."
+                ),
+            ));
+        }
+        if current_executable_is_windows_apps_alias() {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "Store execution aliases require package identity or their Store LocalState path. Open ZeppBridge from the Start menu or use its generated MCP configuration.",
+            ));
+        }
+    }
+
+    #[cfg(not(feature = "store"))]
     if let Some(dir) = data_dir_from_env()? {
         ensure_writable_dir(&dir)?;
         return Ok(dir);
     }
 
+    // The Store build runs with package identity. Keep its user library in the
+    // package's LocalState so it is separate from the GitHub portable build and
+    // is removed with the package. Unpackaged developer runs still use the
+    // ordinary install-local layout below.
     let exe = std::env::current_exe()?;
     let exe_dir = exe.parent().ok_or_else(|| {
         io::Error::new(

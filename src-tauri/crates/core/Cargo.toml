@@ -4,6 +4,10 @@ version = "3.1.1"
 description = "ZeppBridge 的共享数据核心：模型、存储、迁移、归一化、查询、导出与写入协调"
 edition = "2021"
 
+[features]
+default = []
+store = []
+
 [lib]
 name = "zeppbridge_core"
 path = "src/lib.rs"
@@ -54,6 +58,16 @@ keyring = { version = "3.6.3", default-features = false, features = [
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_Storage_Packaging_Appx",
+  "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }

@@ -392,6 +392,7 @@ const ALLOWED_PROSE = [
   { file: 'composables/settings/useLocalApi.ts', text: 'localApiStatus.value?.error', why: '同上。' },
   { file: 'views/settings/sections/UpdateSection.vue', text: 'updateState.error', why: '更新服务自己的本地化错误，不是后端中文字段。' },
   { file: 'services/updateService.ts', text: 'updateState.error', why: '更新服务自己写的本地化错误，经 errorMessage/toUserMessage。' },
+  { file: 'components/StoreImportPrompt.vue', text: 'copy.error', why: 'Store 导入错误前缀是本组件的 13 语言本地化文案；底层安全错误详情另行显示。' },
   { file: 'composables/useBackups.ts', text: 'preview.blocker', why: 'restoreBlockerText 按 compatibility / problem_code 分支，原文只作兜底。' },
   { file: 'components/DeviceMarquee.vue', text: 'entry.display_name', why: '设备目录里的商品名，不是界面文案。' },
   { file: 'views/landing/DeviceRibbon.vue', text: 'd.display_name', why: '落地页设备带用的设备目录商品名，同 DeviceMarquee，不是界面文案。' },

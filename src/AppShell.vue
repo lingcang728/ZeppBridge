@@ -20,7 +20,6 @@ import { useSyncController } from './composables/useSyncController';
 import { useFeedbackToast } from './composables/useFeedbackToast';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
-import { bootDesktopUpdate } from './services/updateService';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
@@ -33,6 +32,7 @@ const CollectionBox = defineAsyncComponent(() => import('./components/cards/Coll
 /* 新手引导（聚光框、沙盒第一屏、首次启动的判断）：后端就绪后才挂，见 components/tour/TourLayer.vue。 */
 const TourLayer = defineAsyncComponent(() => import('./components/tour/TourLayer.vue'));
 const UpdateNotice = defineAsyncComponent(() => import('./components/shell/UpdateNotice.vue'));
+const StoreImportPrompt = defineAsyncComponent(() => import('./components/StoreImportPrompt.vue'));
 
 const t = useMessages(messages);
 
@@ -42,6 +42,7 @@ const t = useMessages(messages);
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
+const storeBuild = __STORE_BUILD__;
 /* 后端就绪以前（迁移备份、排队恢复那一小段）顶栏挂一条说明，
    不然那几秒里窗口画了壳却所有数字都是空的，看起来像卡死。
    浏览器预览没有后端，直接当真就绪。 */
@@ -258,7 +259,9 @@ onMounted(() => {
       markDataChanged();
     }
     // 静默更新：一打开就查，有新版本在后台下载（services/updateService.ts；设置里关了自动更新就不查）。走裸 `invoke`，得等后端就绪再发。
-    void bootDesktopUpdate();
+    if (!storeBuild) {
+      void import('./services/updateService').then(({ bootDesktopUpdate }) => bootDesktopUpdate());
+    }
     // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）；动效档位首启量帧、看电源。
     // 两样都不在首屏关键路径上，就绪后再按需加载（首屏体积预算）。
     void import('./services/letterBox').then((letterBox) => letterBox.scheduleLetterBoxSync());
@@ -311,6 +314,7 @@ onUnmounted(() => {
 
 <template>
   <LifeEventEditor />
+  <StoreImportPrompt v-if="storeBuild" />
   <CollectionBox v-if="backendReady" />
   <TourLayer v-if="backendReady" />
   <UpdateNotice v-if="backendReady" />

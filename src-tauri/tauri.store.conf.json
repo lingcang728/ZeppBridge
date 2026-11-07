@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ZeppBridge",
+  "version": "3.1.1",
+  "identifier": "com.lincstudio.zeppbridge.store",
+  "app": {
+    "security": {
+      "capabilities": ["store"]
+    }
+  },
+  "plugins": {
+    "updater": null
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "targets": [],
+    "category": "HealthcareAndFitness",
+    "shortDescription": "Local-first Zepp health data bridge",
+    "longDescription": "ZeppBridge is a local-first desktop companion for syncing and exploring Zepp wearable health data.",
+    "copyright": "Copyright © 2026 Linc Studio contributors"
+  }
+}

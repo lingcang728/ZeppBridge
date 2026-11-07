@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
@@ -10,7 +10,7 @@ import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { syncCardMessages } from './sync.i18n';
-import UpdateSection from './UpdateSection.vue';
+const UpdateSection = __STORE_BUILD__ ? null : defineAsyncComponent(() => import('./UpdateSection.vue'));
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
@@ -86,7 +86,7 @@ const freshness = computed(() => {
           </button>
         </div>
       </div>
-      <UpdateSection />
+      <UpdateSection v-if="UpdateSection" />
     </div>
   </section>
 </template>
