@@ -3145,6 +3145,8 @@ export default {
     officialNote: 'Dati ufficiali connessi: sonno, frequenza cardiaca, passi, allenamenti, PAI e peso vengono sincronizzati; HRV, SpO₂ e stress provengono da "Dati avanzati".',
     copyAuthLink: 'Copia link di autorizzazione',
     copyAuthLinkHint: 'Un browser già connesso a Zepp andrà direttamente al consenso. Per cambiare account (ad esempio con Google o Xiaomi), apri il link in una finestra in incognito.',
+    officialCallbackSlow:
+      'Browser bloccato su una pagina zeppbridge.pages.dev irraggiungibile dopo aver acconsentito? Significa che la tua rete non riesce a raggiungere questo indirizzo. Cambia rete, usa un altro DNS o un proxy, poi annulla e autorizza di nuovo.',
     officialWhy: 'Perché passa attraverso zeppbridge.com?',
     linkCopied: 'Link copiato',
     authCancelLogin: 'Annulla accesso',
@@ -3467,6 +3469,8 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
     stagesTitle: 'Fasi del sonno',
     stagesAria: 'Fasi del sonno',
+    napsTitle: 'Pisolino',
+    napAsleep: (duration: string) => `${duration} di sonno`,
     footnote: 'Vengono mostrati solo i riepiloghi delle fasi ricevuti dal cloud. Senza dati REM, viene visualizzato «Non fornito» senza calcoli deduttivi, e non viene tracciata alcuna linea temporale.',
 
     weeklyTitle: 'Struttura del sonno, ultimi 7 giorni',

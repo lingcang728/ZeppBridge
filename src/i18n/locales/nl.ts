@@ -1389,6 +1389,8 @@ export default {
       officialNote: 'Officiële gegevens zijn aangesloten: slaap, hartslag, stappen, trainingen, PAI en gewicht worden gesynchroniseerd; HRV, bloedzuurstof, stress en gereedheid komen via ‘Geavanceerde gegevens’.',
       copyAuthLink: 'Autorisatielink kopiëren',
       copyAuthLinkHint: 'Is je browser al bij Zepp ingelogd, dan spring je meteen naar ‘Autorisatie toestaan’. Wil je van account wisselen (bijv. via Google of Xiaomi), plak de link dan in een privévenster.',
+      officialCallbackSlow:
+        'Blijft je browser na het toestaan hangen op een zeppbridge.pages.dev-pagina die niet bereikbaar is? Dat betekent dat je netwerk dit adres niet kan bereiken. Wissel van netwerk, gebruik een andere DNS of zet een proxy aan, annuleer daarna en autoriseer opnieuw.',
       officialWhy: 'Waarom via zeppbridge.com?',
       linkCopied: 'Link gekopieerd',
       authWebTitle: 'Geavanceerde gegevensverbinding',
@@ -2098,6 +2100,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       scoreKicker: 'Slaapscore',
       stagesAria: 'Slaapstadia',
       stagesTitle: 'Slaapstadia',
+      napsTitle: 'Dutje',
+      napAsleep: (duration: string) => `${duration} in slaap`,
       weeklyAria: 'Slaap over de afgelopen 7 dagen',
       weeklyTitle: 'Slaapstructuur, afgelopen 7 dagen',
       weeklySub: 'Stadia gestapeld per nacht',

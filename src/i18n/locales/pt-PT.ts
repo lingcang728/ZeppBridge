@@ -204,6 +204,8 @@ export default {
       officialNote: 'Dados oficiais ligados: sincroniza sono, frequência cardíaca, passos, treinos, PAI e peso; VFC, oxigénio no sangue e stress continuam via «Dados avançados».',
       copyAuthLink: 'Copiar ligação de autorização',
       copyAuthLinkHint: 'Com sessão já iniciada no Zepp, o navegador avança logo para o consentimento. Para outra conta (ex.: Google ou Xiaomi), cola a ligação numa janela privada.',
+      officialCallbackSlow:
+        'O navegador ficou bloqueado numa página de zeppbridge.pages.dev que não abre após aceitares? A tua rede não consegue aceder a este endereço. Muda de rede, utiliza outro DNS ou um proxy, depois cancela e autoriza novamente.',
       officialWhy: 'Porquê passar por zeppbridge.com?',
       linkCopied: 'Ligação copiada',
       authCancelLogin: 'Cancelar início de sessão',
@@ -1861,6 +1863,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       scoreKicker: 'Pontuação de sono',
       stagesAria: 'Fases de sono',
       stagesTitle: 'Fases de sono',
+      napsTitle: 'Sesta',
+      napAsleep: (duration: string) => `${duration} a dormir`,
       weeklyAria: 'Sono nos últimos 7 dias',
       weeklyTitle: 'Estrutura do sono (últimos 7 dias)',
       weeklySub: 'Fases por noite',
