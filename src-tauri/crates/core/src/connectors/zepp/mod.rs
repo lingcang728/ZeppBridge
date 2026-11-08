@@ -423,7 +423,8 @@ impl ZeppConnector {
     ///
     /// `member_id` is `-1` for the account holder. A scale can be shared and
     /// `/users/{id}/members` lists the rest; only the account holder is read,
-    /// because the others are other people.
+    /// because the others are other people. Records of other members can still
+    /// come back on this path; `Normalizer::normalize_weight` filters them.
     pub async fn fetch_weight_records(
         &self,
         member_id: &str,

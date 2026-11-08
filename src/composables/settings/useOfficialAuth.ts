@@ -46,6 +46,19 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   /** 挂载代次：detach 一次就作废之前所有还没回来的 attach（R16）。 */
   let attachGen = 0;
   let copiedTimer: number | undefined;
+  /** 授权回调落在 zeppbridge.pages.dev；有的网络连不上它（#160）。等了这么久还没领到，就提示。 */
+  const CALLBACK_SLOW_MS = 45_000;
+  const callbackSlow = ref(false);
+  let slowTimer: ReturnType<typeof setTimeout> | undefined;
+  const trackWaiting = (waitingNow: boolean) => {
+    if (!waitingNow) {
+      clearTimeout(slowTimer);
+      slowTimer = undefined;
+      callbackSlow.value = false;
+    } else if (slowTimer === undefined && !callbackSlow.value) {
+      slowTimer = setTimeout(() => { callbackSlow.value = true; }, CALLBACK_SLOW_MS);
+    }
+  };
 
   const waiting = computed(() => status.value.state === 'waiting');
   /** 浏览器没打开授权页（打开失败，或中转站一直没见到这次授权）：「复制授权链接」顶到前面（#156）。 */
@@ -58,6 +71,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
 
   const apply = (next: OfficialStatus) => {
     status.value = next;
+    trackWaiting(next.state === 'waiting');
     // 全局状态（顶栏、自动同步、首次同步）由同步控制器统一处理，这里只渲染。
     applyOfficialStatus(next);
     waitingText.value = next.state === 'waiting' && next.message_code ? errorTextFor(next.message_code) ?? null : null;
@@ -173,10 +187,11 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     unlisten?.();
     unlisten = undefined;
     clearTimeout(copiedTimer);
+    trackWaiting(false);
   };
 
   return {
-    status, busy, failureText, accountConflict, failureConflict, waitingText, checking, waiting, browserTrouble, connected, needsReauth, linkCopied,
+    status, busy, failureText, accountConflict, failureConflict, waitingText, checking, waiting, browserTrouble, callbackSlow, connected, needsReauth, linkCopied,
     start, cancel, recover, checkNow, disconnect, copyLink, attach, detach,
   };
 };

@@ -61,7 +61,7 @@ and panel are a deliberate local exception).
 | Type scale | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | Brand and actions | `--brand` `#7DA33E` = `--accent`, plus `--accent-hover` `#93B952`, `--accent-soft`, `--accent-ink` `#12170A`, `--action-green` |
 | Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#A3CC5C` (light `#4E8A2E`, same family as the brand lime), each with a translucent `*-wash` |
-| Sleep stages | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
+| Sleep stages | `--sleep-deep` `#3F4FB8` / `--sleep-light` `#7C9CF5` / `--sleep-rem` `#2EC4B6` / `--sleep-awake` `#E8833A` |
 | Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` neutral `rgba(226,234,242,.55)` (never brand green) |
 | Route pace spectrum | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | Spacing / radius | `--space-1…8`, `--radius-sm` 10px / `-md` 14px / `-lg` 18px |

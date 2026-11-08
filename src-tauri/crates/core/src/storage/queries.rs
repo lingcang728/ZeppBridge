@@ -108,6 +108,33 @@ impl Database {
         Ok(stages)
     }
 
+    /// 这一晚所属那天的小睡阶段片（只有官方通道给）。没有就是空列表。
+    pub fn get_sleep_nap_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stage, start_time, end_time, raw_mode FROM sleep_nap_stages
+             WHERE sleep_id = ?1 ORDER BY start_time, id",
+        )?;
+        let rows = stmt.query_map([sleep_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+            ))
+        })?;
+        let mut stages = Vec::new();
+        for row in rows {
+            let (stage, start, end, raw_mode) = row?;
+            stages.push(SleepStageSlice {
+                stage,
+                start_time: parse_datetime(&start, "sleep_nap_stages.start_time")?,
+                end_time: parse_datetime(&end, "sleep_nap_stages.end_time")?,
+                raw_mode,
+            });
+        }
+        Ok(stages)
+    }
+
     /// 本机一共有多少条睡眠记录。
     ///
     /// 分页要它：没有总数，界面只能说「显示了 500 条」，说不出「共 2317 条」，

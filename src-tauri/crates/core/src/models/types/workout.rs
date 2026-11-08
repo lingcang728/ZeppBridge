@@ -238,6 +238,10 @@ pub struct WorkoutSplitRow {
     pub elevation_gain_m: Option<f64>,
     pub elevation_loss_m: Option<f64>,
     pub partial: bool,
+    /// 这一段里逐点步频（步/分）的平均，只算大于 0 的读数。没有逐点步频
+    /// 就是 `None`——不拿整次运动的平均顶替，也不写 0。
+    #[serde(default)]
+    pub avg_cadence_spm: Option<f64>,
 }
 
 /// 手表自己记的一圈，从库里读出来的形状。
@@ -254,6 +258,9 @@ pub struct WorkoutLapRow {
     pub duration_seconds: i64,
     pub avg_hr: Option<i32>,
     pub max_hr: Option<i32>,
+    /// 同 [`WorkoutSplitRow::avg_cadence_spm`]。间歇课每一段的步频靠它。
+    #[serde(default)]
+    pub avg_cadence_spm: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

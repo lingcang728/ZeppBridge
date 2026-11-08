@@ -1,6 +1,6 @@
 //! storage 的测试，按领域分文件。共享的小工具放在这里。
 
-use super::workout_series::workout_series_summary;
+use super::workout_series::{mean_cadence, workout_series_summary};
 use super::*;
 
 use chrono::{Datelike, TimeZone};

@@ -84,6 +84,9 @@ impl ProbeCadence {
 /// API — m4ary/zepp-health-cli and Thejuampi/icu — which agree on every entry.
 /// The account holder on the scale. Family members have their own positive ids
 /// (see `/users/{id}/members`); reading theirs would be reading other people.
+/// The path alone does not keep them out: a user with a profile for their son
+/// got both timelines from this member (2026-11), so `normalize_weight` also
+/// drops every record whose `memberId` is not the holder's.
 pub const SCALE_ACCOUNT_MEMBER: &str = "-1";
 
 /// How many weight readings to ask for per window.

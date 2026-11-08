@@ -93,7 +93,7 @@ fn sample_document(seconds: usize) -> Value {
                 "samples": samples, "pauses": [], "laps": [],
                 "splits": [{ "index": 1, "start_time": "2026-09-20T07:00:00+00:00", "end_time": "2026-09-20T07:05:30+00:00",
                     "distance_m": 1000.0, "duration_seconds": 330, "pace_min_per_km": 5.5, "avg_hr": 140, "max_hr": 150,
-                    "elevation_gain_m": null, "elevation_loss_m": null, "partial": false }],
+                    "elevation_gain_m": null, "elevation_loss_m": null, "partial": false, "avg_cadence_spm": 172.5 }],
                 "summary": { "average_pace": 5.6, "average_cadence": null }
             }
         }],
@@ -159,6 +159,8 @@ fn markdown_round_trips_every_value_and_leaves_missing_cells_empty() {
     let splits = table(&all, "Splits");
     assert_eq!(cell_of(splits, "1", "pace_min_per_km (min/km)"), "5.5");
     assert_eq!(cell_of(splits, "1", "elevation_gain_m"), "");
+    // 间歇课每段的步频：分段表里要有这一列（2026-11 来信）。
+    assert_eq!(cell_of(splits, "1", "avg_cadence_spm (spm)"), "172.5");
 
     let attachments = table(&all, "Attachments");
     assert_eq!(
@@ -213,6 +215,11 @@ fn budget_ladder_coarsens_curves_then_summarizes_then_flags() {
     let summarized = render_task_markdown(&document, "", at_60.approx_tokens - 1);
     assert_eq!(summarized.summarized_workouts, vec!["w-1".to_string()]);
     assert!(!summarized.text.contains("#### Samples"));
+    // 分段表被省掉时要明说，不能让 AI 以为这次运动没有分段。
+    assert!(!summarized.text.contains("#### Splits"));
+    assert!(summarized
+        .text
+        .contains("_splits omitted to fit the size budget."));
     // 概要行与区间仍在。
     assert!(summarized.text.contains("### Selected workouts"));
     assert!(!summarized.over_budget);

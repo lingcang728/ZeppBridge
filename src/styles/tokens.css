@@ -40,12 +40,12 @@
   /* 训练 / 准备度：和品牌青柠同一家族，不再用荧光绿。 */
   --training: #A3CC5C;
   --readiness: #A3CC5C;
-  --sleep-deep: #6477D7;
-  --sleep-light: #7C8FF0;
-  --sleep-rem: #8B5CF6;
+  --sleep-deep: #3F4FB8;
+  --sleep-light: #7C9CF5;
+  --sleep-rem: #2EC4B6;
   --sleep-awake: #E8833A;
   --sleep: var(--sleep-light);
-  --sleep-wash: rgba(124, 143, 240, .12);
+  --sleep-wash: rgba(124, 156, 245, .12);
   --activity: #2BB3C0;
   --activity-wash: rgba(43, 179, 192, .12);
   --distance: var(--pace);
@@ -250,12 +250,12 @@ html[data-theme="light"] {
   --cadence: #2E7FC2;
   --training: #4E8A2E;
   --readiness: #4E8A2E;
-  --sleep-deep: #5565C9;
-  --sleep-light: #6B7FE0;
-  --sleep-rem: #7C4DDB;
+  --sleep-deep: #3546A8;
+  --sleep-light: #5F82E8;
+  --sleep-rem: #12968A;
   --sleep-awake: #D9732B;
   --sleep: var(--sleep-light);
-  --sleep-wash: rgba(107, 127, 224, .10);
+  --sleep-wash: rgba(95, 130, 232, .10);
   --activity: #1E96A6;
   --activity-wash: rgba(30, 150, 166, .10);
   --distance: var(--pace);

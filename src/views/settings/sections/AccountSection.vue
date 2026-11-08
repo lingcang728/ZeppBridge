@@ -150,6 +150,8 @@ const action = computed<Action | null>(() => {
       :recovery="loginStatus.credential_recovery" :busy="loginBusy || manualAuthBusy"
       @retry="recoverCredentials" @discard="cancelLogin" />
     <FoldTransition><p v-if="official.waiting.value && official.waitingText.value" class="hint-line" role="status"><Icon name="info" :size="13" />{{ official.waitingText.value }}</p></FoldTransition>
+    <!-- 等了 45 秒还没领到：多半是浏览器连不上回调地址 zeppbridge.pages.dev（#160）。 -->
+    <FoldTransition><p v-if="official.waiting.value && official.callbackSlow.value && !official.browserTrouble.value" class="hint-line" role="status"><Icon name="info" :size="13" />{{ t.officialCallbackSlow }}</p></FoldTransition>
     <FoldTransition>
       <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
       <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert"><Icon name="info" :size="13" />{{ loginMessage }}</p>

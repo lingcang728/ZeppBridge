@@ -44,6 +44,7 @@ const needsAttention = computed(() =>
           <span class="s-row-sub">{{ official.waiting.value ? t.officialWaiting : t.officialSub }}</span>
           <span v-if="official.connected.value" class="s-row-sub">{{ t.officialNote }}</span>
           <span v-if="official.waiting.value && official.status.value.authorize_url" class="s-row-sub">{{ t.copyAuthLinkHint }}</span>
+          <span v-if="official.waiting.value && official.callbackSlow.value && !official.browserTrouble.value" class="s-row-sub" role="status">{{ t.officialCallbackSlow }}</span>
           <button type="button" class="why-link" @click="openFaq('relay', locale)">{{ t.officialWhy }}</button>
         </div>
         <div class="s-row-control">

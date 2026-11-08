@@ -23,7 +23,9 @@ import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { minutesToHours } from '../lib/missingValues';
-import type { DeviceProfile, SleepSession } from '../types';
+import { backend } from '../lib/bridge';
+import { groupNaps } from '../lib/sleepNaps';
+import type { DeviceProfile, SleepSession, SleepStageSlice } from '../types';
 import { sleepDetailMessages as messages } from './SleepDetail.i18n';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import { pageQuery, sleepPageQueries } from '../lib/pageQueries';
@@ -37,6 +39,12 @@ const session = ref<SleepSession | null>(null);
 /* 问 AI 的窗口以这一晚醒来那天为终点（交给 AI 的睡眠也按醒来日归属）。 */
 const night = computed(() => (session.value ? { date: dayKey(new Date(session.value.end_time)) } : null));
 const weekSessions = ref<SleepSession[]>([]);
+/* 同一天的小睡阶段片（只有官方授权给；2026-11 T-Rex 3 用户想看午睡的分段）。 */
+const napSlices = ref<SleepStageSlice[]>([]);
+const naps = computed(() => groupNaps(napSlices.value).map((nap) => ({
+  ...nap,
+  stages: (['deep', 'light', 'rem', 'awake'] as const).map((tone) => ({ label: sleepStageLabel(tone), minutes: nap.minutes[tone], tone })),
+})));
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -199,9 +207,10 @@ const loadDetail = async () => {
   }
   try {
     const [detailQuery, recentQuery] = sleepPageQueries(sleepId.value);
-    const [detail, recent] = await Promise.all([
+    const [detail, recent, napStages] = await Promise.all([
       cached(detailQuery),
       cached(recentQuery).catch(() => []),
+      backend.getSleepNapStages(sleepId.value).catch(() => []),
     ]);
     if (seq !== detailSeq) return;
     const profile = detail
@@ -211,6 +220,7 @@ const loadDetail = async () => {
     if (seq !== detailSeq) return;
     session.value = detail;
     weekSessions.value = recent;
+    napSlices.value = napStages;
     device.value = profile;
   } catch (cause) {
     if (seq !== detailSeq) return;
@@ -291,6 +301,19 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
           :range-start="session.start_time"
           :range-end="session.end_time"
         />
+      </section>
+
+      <!-- 小睡：一段一条阶段条，没有就整张卡不出现。 -->
+      <section v-if="naps.length" class="surface-card stage-card" :aria-label="t.napsTitle">
+        <div v-for="nap in naps" :key="nap.start" class="nap-block">
+          <div class="stage-head">
+            <h2>{{ t.napsTitle }}</h2>
+            <div class="stage-actions">
+              <p>{{ formatTime(nap.start) }} – {{ formatTime(nap.end) }} · {{ t.napAsleep(formatDuration(nap.asleepMinutes)) }}</p>
+            </div>
+          </div>
+          <StageBar :stages="nap.stages" :slices="nap.slices" :range-start="nap.start" :range-end="nap.end" />
+        </div>
       </section>
 
       <!-- 近 7 天结构、来源与设备直接摊开。 -->

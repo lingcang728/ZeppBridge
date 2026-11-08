@@ -487,13 +487,15 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// 一天多行时的取法和 `daily_metric_points`（图表、交给 AI 的逐日表）一字不差：
+    /// 账号合并值优先，没有就取最大的那行。以前这里取「最新插入的设备行」，同时戴
+    /// 两只表的人首页卡和图表、活动环各是一个数（2026-11 反馈「步数显示对不上」）。
     pub(super) fn latest_daily_f64(&self, metric: &str) -> Result<Option<f64>> {
         self.conn
             .query_row(
                 "SELECT value FROM daily_metrics WHERE metric = ?1
-                 ORDER BY date DESC,
-                    CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
-                    id DESC LIMIT 1",
+                 ORDER BY date DESC, (source_scope = 'user_fused') DESC, value DESC, id DESC
+                 LIMIT 1",
                 [metric],
                 |row| row.get(0),
             )
@@ -515,8 +517,7 @@ impl Database {
         self.conn
             .query_row(
                 "SELECT value FROM daily_metrics WHERE metric = ?1 AND date = ?2
-                 ORDER BY CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
-                          id DESC LIMIT 1",
+                 ORDER BY (source_scope = 'user_fused') DESC, value DESC, id DESC LIMIT 1",
                 params![metric, date.format("%Y-%m-%d").to_string()],
                 |row| row.get::<_, f64>(0),
             )

@@ -39,6 +39,22 @@ fn official_sleep_anchors_stages_to_the_local_midnight_behind_the_session() {
     assert_eq!(session.rem_minutes, Some(100));
     assert_eq!(nights[0].rem_seconds, Some(6000));
     assert_eq!(nights[0].nap_total_seconds, Some(20 * 60));
+    // 小睡阶段片和夜间同一个零点：800 分 = 9-22 13:20（+08:00），20 分钟浅睡（#ede65b0a）。
+    let nap = &nights[0].nap_stages;
+    assert_eq!(nap.len(), 1);
+    assert_eq!(nap[0].stage, "light");
+    assert_eq!(nap[0].start_time.timestamp(), SHANGHAI_MIDNIGHT + 800 * 60);
+    assert_eq!(nap[0].end_time.timestamp(), SHANGHAI_MIDNIGHT + 820 * 60);
+}
+
+/// 夜间阶段对不上零点时，小睡也一片不放：不按猜的零点把午睡平移到别的时刻。
+#[test]
+fn naps_are_not_placed_without_a_trusted_anchor() {
+    let mut no_stages = night(1443, 1893);
+    no_stages["stage"] = json!([]);
+    let nights = Normalizer::normalize_official_sleep(&json!({ "items": [no_stages] }));
+    assert!(nights[0].nap_stages.is_empty());
+    assert_eq!(nights[0].nap_total_seconds, Some(20 * 60), "总时长照旧");
 }
 
 #[test]

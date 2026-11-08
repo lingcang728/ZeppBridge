@@ -567,7 +567,25 @@ fn workouts_section(
             continue;
         };
         if summarized.contains(&id) {
-            // 预算不够时最旧的运动只留上面那行概要与区间，曲线不写。
+            // 预算不够时最旧的运动只留上面那行概要与区间，曲线不写。但要明说：
+            // 悄悄省掉，AI 只会以为这次运动没有分段，回一句「数据不全」
+            // （2026-11 来信：间歇跑每段数据读不到）。
+            let omitted: Vec<&str> = ["splits", "laps"]
+                .into_iter()
+                .filter(|key| {
+                    series
+                        .get(*key)
+                        .and_then(Value::as_array)
+                        .is_some_and(|rows| !rows.is_empty())
+                })
+                .collect();
+            if !omitted.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "_{} omitted to fit the size budget. The data exists locally; select only this workout or narrow the date range to include it._\n",
+                    omitted.join(" and ")
+                );
+            }
             continue;
         }
         let spans: &[&str] = &["index", "start_time", "end_time"];
@@ -580,13 +598,18 @@ fn workouts_section(
                     ("distance_m", "m"),
                     ("duration_seconds", "s"),
                     ("pace_min_per_km", "min/km"),
+                    ("avg_cadence_spm", "spm"),
                 ][..],
             ),
             (
                 "laps",
                 "Laps",
                 spans,
-                &[("distance_m", "m"), ("duration_seconds", "s")][..],
+                &[
+                    ("distance_m", "m"),
+                    ("duration_seconds", "s"),
+                    ("avg_cadence_spm", "spm"),
+                ][..],
             ),
             (
                 "pauses",
