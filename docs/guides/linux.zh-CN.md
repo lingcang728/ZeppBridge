@@ -187,6 +187,12 @@ Wayland / X11 和合成器影响。关闭 DMABUF 是切换缓冲区传递与呈�
 - `XDG_SESSION_TYPE=wayland`，且 `pkg-config --modversion wayland-client` 检测到的数值版本不高于 `1.23.0` 时，也设置为 `1`。缺少 `pkg-config` 或版本未知时不触发这一条。
 - AppImage 保留默认 `WEBKIT_DISABLE_COMPOSITING_MODE=1` 的兼容措施。
 
+NVIDIA 策略有一条例外：niri 的原生 Wayland 路径保留 WebKit 默认 DMABUF 渲染。
+本机 RTX 5070 Ti / NVIDIA 615.78.08 / WebKitGTK 2.54.2 的独立滚动测试中，关闭
+DMABUF 约为 26 FPS，默认路径约为 61 FPS；这是渲染探针结果，不代表所有应用操作的
+帧率。在 niri 中显式指定 `GDK_BACKEND=x11` 时仍走 NVIDIA 回退；用户设置的禁用变量、
+旧版 Wayland 规则和 AppImage 禁用合成的措施仍然生效。
+
 这些探测是尽力而为；用户已经设置的变量始终优先，包括显式设为 `0`。应用不强制
 `GDK_BACKEND`。任一禁用变量为非 `0` 时，主题和语言切换会跳过 View Transition
 快照动效，切换功能仍然保留。
