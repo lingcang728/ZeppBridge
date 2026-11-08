@@ -266,6 +266,14 @@ ZeppBridge follows a targeted compatibility policy, inspired by
   native View Transition snapshot animations. The changes themselves still work.
   ZeppBridge does not force `GDK_BACKEND`.
 
+The NVIDIA fallback has one exception: native Wayland on niri keeps WebKit's
+default DMABUF path. On a local RTX 5070 Ti / NVIDIA 615.78.08 / WebKitGTK 2.54.2
+system, an isolated scrolling test ran at about 26 FPS with DMABUF disabled and
+61 FPS with the default path. This is a rendering probe, not an application-wide
+performance guarantee. `GDK_BACKEND=x11` still selects the NVIDIA fallback even
+inside niri; explicit disabling flags, the old-Wayland rule and the AppImage
+compositing workaround still apply.
+
 On one Arch Linux / AMD / Wayland machine with WebKitGTK 2.54.1, forcing
 DMABUF off reproduced a `graphicsLayerFactory()` abort during View Transitions;
 the default DMABUF path completed the same interactions. This supports the

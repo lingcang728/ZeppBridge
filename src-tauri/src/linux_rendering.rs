@@ -68,18 +68,61 @@ fn disabled(value: Option<&OsStr>) -> bool {
     value.is_some_and(|value| value != "0")
 }
 
+fn is_wayland_backend(gdk_backend: Option<&str>, session_type: Option<&str>) -> bool {
+    // An explicit X11 backend still needs the NVIDIA fallback inside a Wayland
+    // desktop. GTK accepts an ordered comma-separated list of backends.
+    if let Some(backends) = gdk_backend {
+        for backend in backends.split(',').map(str::trim) {
+            match backend {
+                "wayland" => return true,
+                "x11" => return false,
+                _ => {}
+            }
+        }
+        // Unknown/unsupported backend choices are not evidence for an exception.
+        return false;
+    }
+    session_type == Some("wayland")
+}
+
+fn native_niri(is_wayland: bool, desktop: Option<&str>, niri_socket: Option<&OsStr>) -> bool {
+    is_wayland
+        && (desktop.is_some_and(|value| {
+            value
+                .split(':')
+                .any(|part| part.trim().eq_ignore_ascii_case("niri"))
+        }) || niri_socket.is_some_and(|value| !value.is_empty()))
+}
+
 pub fn configure() -> &'static str {
     let current_dmabuf = std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER");
     let mut reason = "WebKit default or user override";
     if current_dmabuf.is_none() {
         let nvidia = has_nvidia_gpu(Path::new("/"));
-        let is_wayland =
-            std::env::var_os("XDG_SESSION_TYPE").as_deref() == Some(OsStr::new("wayland"));
-        let older_wayland = !nvidia && is_wayland && old_wayland(true, wayland_client_version());
-        if let Some(value) = automatic_override(current_dmabuf.as_deref(), nvidia || older_wayland)
+        let is_wayland = is_wayland_backend(
+            std::env::var("GDK_BACKEND").ok().as_deref(),
+            std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+        );
+        // On NVIDIA + niri, disabling DMABUF drops the accelerated backing
+        // store on modern WebKitGTK and makes scrolling visibly sluggish.
+        // Keep the working native path; retain the fallback for other desktops.
+        // https://github.com/tw93/Pake/issues/1226
+        let nvidia_fallback = nvidia
+            && !native_niri(
+                is_wayland,
+                std::env::var("XDG_CURRENT_DESKTOP").ok().as_deref(),
+                std::env::var_os("NIRI_SOCKET").as_deref(),
+            );
+        let older_wayland =
+            !nvidia_fallback && is_wayland && old_wayland(true, wayland_client_version());
+        if nvidia && !nvidia_fallback {
+            reason = "NVIDIA / niri native Wayland";
+        }
+        if let Some(value) =
+            automatic_override(current_dmabuf.as_deref(), nvidia_fallback || older_wayland)
         {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", value);
-            reason = if nvidia {
+            reason = if nvidia_fallback {
                 "NVIDIA"
             } else {
                 "Wayland client <= 1.23.0"
@@ -206,5 +249,46 @@ mod tests {
         assert!(!disabled(None));
         assert!(!disabled(Some(OsStr::new("0"))));
         assert!(disabled(Some(OsStr::new("1"))));
+    }
+
+    #[test]
+    fn niri_exception_requires_native_wayland_and_a_positive_compositor_match() {
+        for desktop in ["niri", "Niri", "custom:niri"] {
+            assert!(native_niri(true, Some(desktop), None));
+            assert!(!native_niri(false, Some(desktop), None));
+        }
+        assert!(native_niri(
+            true,
+            None,
+            Some(OsStr::new("/run/user/1000/niri.sock"))
+        ));
+        assert!(!native_niri(
+            false,
+            None,
+            Some(OsStr::new("/run/user/1000/niri.sock"))
+        ));
+        for desktop in [
+            None,
+            Some(""),
+            Some("GNOME"),
+            Some("KDE"),
+            Some("Hyprland"),
+            Some("not-niri"),
+        ] {
+            assert!(!native_niri(true, desktop, None));
+            assert!(!native_niri(true, desktop, Some(OsStr::new(""))));
+        }
+    }
+
+    #[test]
+    fn explicit_gdk_backend_takes_precedence_over_the_desktop_session() {
+        assert!(is_wayland_backend(None, Some("wayland")));
+        assert!(is_wayland_backend(Some("wayland"), Some("x11")));
+        assert!(is_wayland_backend(Some("wayland,x11"), Some("wayland")));
+        for backend in ["x11", "x11,wayland", "broadway", ""] {
+            assert!(!is_wayland_backend(Some(backend), Some("wayland")));
+        }
+        assert!(!is_wayland_backend(None, Some("x11")));
+        assert!(!is_wayland_backend(None, None));
     }
 }

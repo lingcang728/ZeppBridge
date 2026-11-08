@@ -292,11 +292,6 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(target_os = "linux")]
-    let rendering_script = linux_rendering::configure();
-    #[cfg(not(target_os = "linux"))]
-    let rendering_script = "";
-
     // 便携版刚换完 exe、由旧进程拉起来的这一次：先等旧进程退干净，再初始化单实例——
     // 不然单实例会把这次启动并进还没退出的旧进程，新版本一闪就没了。平常启动只顺手
     // 清掉上一次更新留下的 `*.old`（updates/portable.rs）。
@@ -357,6 +352,17 @@ pub fn run() {
             }
         }
     }
+    // Record the selected Linux graphics policy before creating GTK/WebKit.
+    // Previously configure() ran before log initialization, losing this line in
+    // release builds precisely when it was needed to diagnose rendering issues.
+    #[cfg(target_os = "linux")]
+    let rendering_script = {
+        let resolved = paths::resolve_data_dir();
+        diagnostics::init(resolved.as_deref().ok());
+        linux_rendering::configure()
+    };
+    #[cfg(not(target_os = "linux"))]
+    let rendering_script = "";
     diagnostics::install_panic_hook();
     diagnostics::log("Startup: building Tauri runtime");
     let builder = tauri::Builder::default()
