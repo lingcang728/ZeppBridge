@@ -180,6 +180,8 @@ export default {
       officialNote: 'Données officielles connectées : sommeil, fréquence cardiaque, pas, séances, PAI et poids se synchronisent ; VFC, SpO₂ et stress proviennent de « Données avancées ».',
       copyAuthLink: 'Copier le lien d’autorisation',
       copyAuthLinkHint: 'Un navigateur déjà connecté à Zepp va droit au consentement. Pour changer de compte (connexion Google ou Xiaomi, par exemple), ouvrez le lien dans une fenêtre privée.',
+      officialCallbackSlow:
+        'Le navigateur reste bloqué sur une page zeppbridge.pages.dev inaccessible après avoir accepté ? Votre réseau ne parvient pas à joindre cette adresse. Changez de réseau, utilisez un autre DNS ou un proxy, puis annulez et relancez l’autorisation.',
       officialWhy: 'Pourquoi passer par zeppbridge.com ?',
       linkCopied: 'Lien copié',
       authCancelLogin: 'Annuler la connexion',
@@ -1817,6 +1819,8 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
 
       stagesTitle: 'Phases de sommeil',
       stagesAria: 'Phases de sommeil',
+      napsTitle: 'Sieste',
+      napAsleep: (duration: string) => `${duration} endormi`,
       footnote: 'Seuls les résumés de phases reçus du cloud sont affichés. Sans donnée REM, « Non fourni » apparaît sans calcul déductif, et aucune frise n’est tracée.',
 
       weeklyTitle: 'Structure du sommeil, 7 derniers jours',

@@ -104,6 +104,8 @@ export const sleepDetailMessages = defineMessages(
     scoreKicker: 'Puntuación de sueño',
     stagesAria: 'Fases del sueño',
     stagesTitle: 'Fases del sueño',
+    napsTitle: 'Siesta',
+    napAsleep: (duration: string) => `${duration} dormido`,
     weeklyAria: 'Sueño de los últimos 7 días',
     weeklyTitle: 'Estructura del sueño, últimos 7 días',
     weeklySub: 'Fases apiladas por noche',

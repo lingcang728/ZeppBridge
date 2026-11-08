@@ -704,6 +704,7 @@ If you need anything from me (which client I use, where the file lives), just as
     officialNote: 'Los datos oficiales ya están conectados: se sincronizan sueño, frecuencia cardíaca, pasos, entrenamientos, PAI y peso; la VFC, el oxígeno en sangre y el estrés siguen llegando de «Datos avanzados».',
     copyAuthLink: 'Copiar enlace de autorización',
     copyAuthLinkHint: 'Si el navegador ya tiene sesión en Zepp, salta directo al consentimiento. Para otra cuenta (p. ej. con Google o Xiaomi), pega el enlace en una ventana de incógnito.',
+    officialCallbackSlow: '¿El navegador se queda en una página de zeppbridge.pages.dev que no abre tras aceptar? Tu red no puede conectarse a esa dirección. Cambia de red, usa otro DNS o un proxy, luego cancela y autoriza de nuevo.',
     officialWhy: '¿Por qué pasa por zeppbridge.com?',
     linkCopied: 'Enlace copiado',
     authCancelLogin: 'Cancelar inicio de sesión',

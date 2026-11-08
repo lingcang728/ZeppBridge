@@ -482,6 +482,8 @@ export default {
       officialNote: 'Offizielle Daten angebunden: Schlaf, Herzfrequenz, Schritte, Trainings, PAI und Gewicht werden synchronisiert; HRV, Blutsauerstoff, Stress u. a. kommen weiterhin von „Erweiterte Daten".',
       copyAuthLink: 'Autorisierungslink kopieren',
       copyAuthLinkHint: 'Ist dein Browser bei Zepp angemeldet, geht es direkt zu „Zustimmen". Für ein anderes Konto (z. B. Google- oder Xiaomi-Login) den Link in ein privates Fenster einfügen.',
+      officialCallbackSlow:
+        'Bleibt der Browser nach dem Zustimmen auf zeppbridge.pages.dev hängen und öffnet die Seite nicht? Das bedeutet, dass dein Netzwerk diese Adresse nicht erreichen kann. Wechsle das Netzwerk, nutze ein anderes DNS oder einen Proxy, brich dann ab und autorisiere erneut.',
       officialWhy: 'Warum läuft das über zeppbridge.com?',
       linkCopied: 'Link kopiert',
       authCancelLogin: 'Anmeldung abbrechen',
@@ -2351,6 +2353,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       sourceTitle: 'Quelle',
       stagesAria: 'Schlafphasen',
       stagesTitle: 'Schlafphasen',
+      napsTitle: 'Nickerchen',
+      napAsleep: (duration: string) => `${duration} geschlafen`,
       syncTimeMissing: 'Synchronisierungszeit nicht angegeben',
       syncedAt: 'Synchronisiert',
       timezone: 'Zeitzone',
