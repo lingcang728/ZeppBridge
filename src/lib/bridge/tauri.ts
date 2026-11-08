@@ -55,6 +55,7 @@ import type {
   WorkoutCodeLabel,
   ReprocessResult,
   SleepSession,
+  SleepStageSlice,
   StressPoint,
   SyncReport,
   TrainingBalancePoint,
@@ -351,6 +352,10 @@ export const tauriBackend: BridgeBackend = {
 
   getSleepDetail(sleepId: string) {
     return call<SleepSession | null>('get_sleep_detail', { sleepId });
+  },
+
+  getSleepNapStages(sleepId: string) {
+    return call<SleepStageSlice[]>('get_sleep_nap_stages', { sleepId });
   },
 
   getRecentWorkouts(limit = 500) {

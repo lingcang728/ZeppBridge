@@ -162,6 +162,8 @@ export interface WorkoutLapRow {
   duration_seconds: number;
   avg_hr: number | null;
   max_hr: number | null;
+  /** Mean of per-point cadence inside the lap (steps/min); null without samples. */
+  avg_cadence_spm?: number | null;
 }
 
 /** One kilometre of a workout, cut from the server's cumulative distance. */
@@ -178,6 +180,8 @@ export interface WorkoutSplitRow {
   elevation_loss_m?: number | null;
   /** A trailing partial kilometre, never to be read as a slow full one. */
   partial: boolean;
+  /** Mean of per-point cadence inside the split (steps/min); null without samples. */
+  avg_cadence_spm?: number | null;
 }
 
 export interface WorkoutSeriesSummary {

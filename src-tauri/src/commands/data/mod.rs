@@ -20,8 +20,8 @@ use crate::models::{
     DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
     DiagnosticWorkoutCorrection, ExportDetail, ExportResult, ExportSelection,
     FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
-    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, StorageEstimate,
-    StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, SleepStageSlice,
+    StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
     DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 
@@ -157,6 +157,18 @@ pub async fn get_sleep_detail(
 ) -> std::result::Result<Option<SleepSession>, AppError> {
     spawn_independent_read(state.data_dir.clone(), move |db| {
         db.get_sleep_detail(&sleep_id)
+    })
+    .await
+}
+
+/// The nap stage slices recorded on the same day as this night (official channel only).
+#[tauri::command]
+pub async fn get_sleep_nap_stages(
+    state: tauri::State<'_, AppState>,
+    sleep_id: String,
+) -> std::result::Result<Vec<SleepStageSlice>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.get_sleep_nap_stages(&sleep_id)
     })
     .await
 }

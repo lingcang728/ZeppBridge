@@ -21,6 +21,9 @@ pub struct OfficialSleep {
     /// 当天小睡总时长（秒）。报文里有 `napStage` 数组而数组是空的——那是「这天没睡午觉」，记 0；
     /// 字段压根没有才是未知。
     pub nap_total_seconds: Option<i64>,
+    /// 小睡的阶段片（`napStage` 每一项也是 `{mode, start, stop}`，和夜间同一套码、
+    /// 同一个本地零点）。夜间阶段对不上零点时一片也不放——不按猜的零点平移午睡。
+    pub nap_stages: Vec<SleepStageSlice>,
 }
 
 fn items(raw: &Value) -> &[Value] {
@@ -136,7 +139,7 @@ impl Normalizer {
             let awake_minutes = minutes("wakeTime");
             let rem_minutes = minutes("rem");
             let span = ((stop - start) / 60) as i32;
-            let stages = item
+            let anchor = item
                 .get("stage")
                 .and_then(Value::as_array)
                 .and_then(|stages| {
@@ -145,9 +148,19 @@ impl Normalizer {
                         .filter_map(Value::as_object)
                         .filter_map(|stage| int(stage, "start"))
                         .min()?;
-                    let anchor = official_stage_anchor(start, earliest)?;
-                    Some(official_stages(stages, anchor))
-                })
+                    official_stage_anchor(start, earliest)
+                });
+            let stages = item
+                .get("stage")
+                .and_then(Value::as_array)
+                .zip(anchor)
+                .map(|(stages, anchor)| official_stages(stages, anchor))
+                .unwrap_or_default();
+            let nap_stages = item
+                .get("napStage")
+                .and_then(Value::as_array)
+                .zip(anchor)
+                .map(|(naps, anchor)| official_stages(naps, anchor))
                 .unwrap_or_default();
             // 空数组 = 确实没睡午觉（0）；有条目但任何一条认不出 = 不知道（None），
             // 不拿认得出的那几条凑一个偏小的总数，更不把全坏的数组加成 0（R10）。
@@ -195,6 +208,7 @@ impl Normalizer {
                 },
                 rem_seconds: rem_minutes.map(|value| i64::from(value) * 60),
                 nap_total_seconds,
+                nap_stages,
             });
         }
         out

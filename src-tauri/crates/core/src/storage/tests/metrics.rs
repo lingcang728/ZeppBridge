@@ -47,6 +47,33 @@ fn daily_metric_sources_fold_with_the_fused_reading_first() {
     assert_eq!(alternates[0]["source_scope"], "device");
 }
 
+/// 2026-11 反馈「步数显示对不上」：同时戴两只表、没有合并值的一天，首页卡以前取
+/// 最新插入的那行（这里是 0），图表取最大的那行——同一天两个数。现在两边同一条规则。
+#[test]
+fn the_overview_and_the_chart_pick_the_same_steps_for_a_two_device_day() {
+    let db = Database::in_memory().unwrap();
+    for (device, value) in [("SN-WATCH", 8000.0), ("SN-STRAP", 0.0)] {
+        db.insert_daily_metric(&DailyMetric {
+            date: "2026-11-05".into(),
+            metric: "steps".into(),
+            value,
+            unit: "steps".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some(device.into()),
+        })
+        .unwrap();
+    }
+    let date = NaiveDate::from_ymd_opt(2026, 11, 5).unwrap();
+    let card = db.latest_daily_i32_for_date("steps", date).unwrap();
+    let chart = db
+        .daily_metric_points("steps", None, "2026-11-05", "2026-11-05")
+        .unwrap();
+    assert_eq!(card, Some(8000));
+    assert_eq!(chart.len(), 1);
+    assert_eq!(chart[0].value, 8000.0, "首页卡和图表是同一个数");
+    assert_eq!(db.latest_daily_f64("steps").unwrap(), Some(8000.0));
+}
+
 #[test]
 fn heart_rate_zones_offer_every_measured_basis_and_preselect_none() {
     let db = Database::in_memory().unwrap();
@@ -235,6 +262,28 @@ fn standing_still_is_not_an_equivalent_pace() {
     ];
     let summary = workout_series_summary(&samples);
     assert_eq!(summary.best_equivalent_pace_s_per_km, Some(264.0));
+}
+
+/// 间歇课每一段的步频（2026-11 来信）：按段的起止时间取逐点步频求平均，
+/// 0 不算（站着不动），段里一个读数都没有就是 None，不拿整次平均顶替。
+#[test]
+fn each_split_gets_the_cadence_measured_inside_it() {
+    let at = |second: i64| {
+        (Utc.with_ymd_and_hms(2026, 11, 5, 6, 0, 0).unwrap() + chrono::Duration::seconds(second))
+            .to_rfc3339()
+    };
+    let samples: Vec<WorkoutSeriesSample> = [(0, 170.0), (10, 174.0), (20, 0.0), (60, 150.0)]
+        .into_iter()
+        .map(|(second, cadence)| WorkoutSeriesSample {
+            timestamp: at(second),
+            cadence: Some(cadence),
+            ..Default::default()
+        })
+        .collect();
+    let points = super::super::workout_series::cadence_points(&samples);
+    assert_eq!(mean_cadence(&points, &at(0), &at(60)), Some(172.0));
+    assert_eq!(mean_cadence(&points, &at(60), &at(120)), Some(150.0));
+    assert_eq!(mean_cadence(&points, &at(120), &at(180)), None);
 }
 
 #[test]

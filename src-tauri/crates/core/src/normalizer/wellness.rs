@@ -201,10 +201,20 @@ impl Normalizer {
             return out;
         };
         let mut unknown: BTreeMap<String, usize> = BTreeMap::new();
+        let mut family_members_skipped = 0usize;
         for item in items {
             let Some(object) = item.as_object() else {
                 continue;
             };
+            // 家庭秤上每个成员一条时间线。本人是 `memberId: "-1"`，家人是各自的
+            // 正数 id。2026-11 一位用户给自己和儿子各建了档案，导入后同一条体重
+            // 线上一天 75 kg、第二天 23 kg——请求路径里的 `-1` 并不保证只回本人。
+            // 带着别人的 id 的记录一定不是本人，跳过；没有这个字段的（官方通道
+            // 按用户授权，本来就只有本人）照常读。
+            if !is_account_holder(object.get("memberId")) {
+                family_members_skipped += 1;
+                continue;
+            }
             // Unix **seconds**, not milliseconds. This endpoint differs from
             // every event surface, and the shared `parse_timestamp` would read a
             // millisecond value as a date fifty thousand years from now.
@@ -270,6 +280,11 @@ impl Normalizer {
                 *unknown.entry(key.clone()).or_default() += 1;
             }
         }
+        if family_members_skipped > 0 {
+            out.diagnostics.push(format!(
+                "weight: 跳过 {family_members_skipped} 条家庭成员的记录（只读本人）"
+            ));
+        }
         if !unknown.is_empty() {
             let listed = unknown
                 .iter()
@@ -280,5 +295,16 @@ impl Normalizer {
                 .push(format!("weight: summary 里尚未解析的字段：{listed}"));
         }
         out
+    }
+}
+
+/// 家庭秤记录是不是账号本人的。本人是 `"-1"`（也接受数字 -1）；没有这个字段
+/// 的报文（官方通道、旧样本）只可能是本人。其余任何值都是家人。
+fn is_account_holder(member_id: Option<&Value>) -> bool {
+    match member_id {
+        None | Some(Value::Null) => true,
+        Some(Value::String(id)) => id.trim() == "-1" || id.trim().is_empty(),
+        Some(Value::Number(id)) => id.as_i64() == Some(-1),
+        Some(_) => false,
     }
 }

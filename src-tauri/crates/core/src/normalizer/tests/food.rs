@@ -283,6 +283,43 @@ fn an_empty_page_is_not_an_error() {
     assert!(batch.diagnostics.is_empty(), "空不是需要解释的事");
 }
 
+/// 2026-11 来信：家庭秤上给自己和儿子各建了档案，导入后同一条体重线上
+/// 一天 75 kg、第二天 23 kg。家人的记录带着各自的正数 memberId，一条也不能
+/// 进本人的时间线；没有 memberId 的（官方通道）照常是本人。
+#[test]
+fn family_members_on_a_shared_scale_never_enter_the_holders_timeline() {
+    let payload = serde_json::json!({
+        "items": [
+            { "generatedTime": 1764743530_i64, "memberId": "-1",
+              "summary": { "weight": 75.0 } },
+            { "generatedTime": 1764829930_i64, "memberId": "1234567",
+              "summary": { "weight": 23.0, "bmi": 15.0 } },
+            { "generatedTime": 1764916330_i64, "memberId": 7654321_i64,
+              "summary": { "weight": 31.0 } },
+            { "generatedTime": 1765002730_i64, "memberId": -1_i64,
+              "summary": { "weight": 74.6 } },
+            { "generatedTime": 1765089130_i64,
+              "summary": { "weight": 74.9 } }
+        ]
+    });
+    let batch = Normalizer::normalize_weight(&payload);
+    let weights: Vec<f64> = samples_named(&batch, "weight")
+        .iter()
+        .map(|sample| sample.value)
+        .collect();
+    assert_eq!(weights, vec![75.0, 74.6, 74.9], "只剩本人的三次称重");
+    assert!(
+        samples_named(&batch, "bmi").is_empty(),
+        "家人的体成分也不能混进来"
+    );
+    let joined = batch.diagnostics.join(" ");
+    assert!(
+        joined.contains("跳过 2 条家庭成员"),
+        "跳过的要说出来：{joined}"
+    );
+    assert!(!joined.contains("23"), "诊断里不带家人的读数：{joined}");
+}
+
 /// 导出按类型选，库里按指标名存，两边的名单必须对得上。
 #[test]
 fn every_body_metric_is_exportable() {

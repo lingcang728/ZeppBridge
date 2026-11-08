@@ -39,6 +39,7 @@ impl Database {
                         "UPDATE sleep_sessions SET rem_seconds = ?2, nap_total_seconds = ?3 WHERE sleep_id = ?1",
                         params![night.session.sleep_id, night.rem_seconds, night.nap_total_seconds],
                     )?;
+                    self.replace_sleep_nap_stages(&night.session.sleep_id, &night.nap_stages)?;
                 }
                 counts.primary_records = nights.len() as i64;
             }

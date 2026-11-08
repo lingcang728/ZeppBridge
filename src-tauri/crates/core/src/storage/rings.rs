@@ -316,8 +316,10 @@ impl Database {
             .filter_map(|d| day(&d))
             .collect();
         let mut statement = self.conn.prepare(
-            "SELECT date, CAST(MAX(value) AS INTEGER) FROM daily_metrics
-              WHERE metric = 'steps' AND value > 0 GROUP BY date",
+            // 同一天多行：合并值优先，没有才取最大——和首页卡、图表同一条规则。
+            "SELECT date, CAST(COALESCE(MAX(CASE WHEN source_scope = 'user_fused' THEN value END),
+                                        MAX(value)) AS INTEGER)
+               FROM daily_metrics WHERE metric = 'steps' AND value > 0 GROUP BY date",
         )?;
         extras.steps = statement
             .query_map([], |row| {

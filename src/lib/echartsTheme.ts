@@ -38,9 +38,9 @@ export const zeppSemanticColors: ZeppSemanticColors = {
   vo2: '#A3CC5C',
   readiness: '#A3CC5C',
   sleep: {
-    deep: '#6477D7',
-    light: '#7C8FF0',
-    rem: '#8B5CF6',
+    deep: '#3F4FB8',
+    light: '#7C9CF5',
+    rem: '#2EC4B6',
     awake: '#E8833A',
   },
 };
@@ -60,9 +60,9 @@ export const zeppSemanticColorsLight: ZeppSemanticColors = {
   vo2: '#4E8A2E',
   readiness: '#4E8A2E',
   sleep: {
-    deep: '#5565C9',
-    light: '#6B7FE0',
-    rem: '#7C4DDB',
+    deep: '#3546A8',
+    light: '#5F82E8',
+    rem: '#12968A',
     awake: '#D9732B',
   },
 };

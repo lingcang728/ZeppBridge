@@ -1498,6 +1498,27 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(47, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v48（3.1.2：小睡阶段）。官方睡眠的 `napStage` 是带阶段的片段（浅 / 深 / REM / 清醒），
+        // 和夜间同一套码。单独一张表而不是塞进 sleep_stages：那张表是「这一晚」的阶段条，
+        // 混进下午的片段会把整晚的时间轴拉到第二天下午。随所属的睡眠会话级联删除。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS sleep_nap_stages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sleep_id TEXT NOT NULL,
+                stage TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                raw_mode INTEGER,
+                FOREIGN KEY(sleep_id) REFERENCES sleep_sessions(sleep_id) ON DELETE CASCADE
+             );
+             CREATE INDEX IF NOT EXISTS idx_sleep_nap_stages_sleep
+                ON sleep_nap_stages(sleep_id, start_time);
+             PRAGMA user_version = 48;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(48, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

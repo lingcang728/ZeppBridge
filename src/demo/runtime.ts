@@ -165,6 +165,8 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
       const found = data.sleeps.find((item) => item.sleep_id === args.sleepId);
       return found ? { ...found, stages: sleepStageSlices(found) } : null;
     },
+    // 小睡阶段只有官方授权通道给；演示数据不编午睡。
+    get_sleep_nap_stages: () => [],
     get_recent_workouts: (args) => data.workouts.slice(0, Number(args.limit ?? 20)),
     get_workout_page: (args) => page(data.workouts, args),
     get_workout_detail: a => data.workouts.find(w => w.workout_id === a.workoutId) ?? null,

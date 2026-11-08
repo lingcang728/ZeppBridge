@@ -31,7 +31,7 @@
 | 字号阶梯 | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | 品牌与动作 | `--brand` `#7DA33E` = `--accent`，`--accent-hover` `#93B952`、`--accent-soft`、`--accent-ink` `#12170A`、`--action-green` |
 | 分类色 | `--heart` `#F0616A`、`--pace` / `--cadence` `#4AA8E8`、`--calories` `#F5860B`、`--altitude` `#F5C33B`、`--activity` `#2BB3C0`、`--training` / `--readiness` `#A3CC5C`（浅色 `#4E8A2E`，与品牌青柠同一家族），各自配 `*-wash` 半透明底 |
-| 睡眠阶段 | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
+| 睡眠阶段 | `--sleep-deep` `#3F4FB8` / `--sleep-light` `#7C9CF5` / `--sleep-rem` `#2EC4B6` / `--sleep-awake` `#E8833A` |
 | 状态 | `--danger` `#F0616A`、`--warning` `#F5C33B`、`--focus` `#7DA33E` |
 | 轨迹配速色谱 | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | 间距 / 圆角 | `--space-1…8`、`--radius-sm` 10px / `-md` 14px / `-lg` 18px |

@@ -2,6 +2,35 @@
 
 use super::*;
 
+/// 有步频的采样点：(时刻, 步/分)。和 `workout_series_summary` 用同一个合理范围。
+pub(super) fn cadence_points(samples: &[WorkoutSeriesSample]) -> Vec<(DateTime<Utc>, f64)> {
+    samples
+        .iter()
+        .filter_map(|sample| {
+            let cadence = sample
+                .cadence
+                .filter(|value| value.is_finite() && *value > 0.0 && *value < 300.0)?;
+            let at = DateTime::parse_from_rfc3339(&sample.timestamp).ok()?;
+            Some((at.with_timezone(&Utc), cadence))
+        })
+        .collect()
+}
+
+/// `[start, end)` 里步频的平均，保留一位小数；区间里一个读数都没有就是 `None`。
+pub(super) fn mean_cadence(points: &[(DateTime<Utc>, f64)], start: &str, end: &str) -> Option<f64> {
+    let start = DateTime::parse_from_rfc3339(start)
+        .ok()?
+        .with_timezone(&Utc);
+    let end = DateTime::parse_from_rfc3339(end).ok()?.with_timezone(&Utc);
+    let mean = average_finite(
+        points
+            .iter()
+            .filter(|(at, _)| *at >= start && *at < end)
+            .map(|(_, cadence)| *cadence),
+    )?;
+    Some((mean * 10.0).round() / 10.0)
+}
+
 pub(super) fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSummary {
     let average_pace = average_finite(
         samples
@@ -486,8 +515,17 @@ impl Database {
             .flatten();
         let climbs = crate::workout_climbs::detect_climbs(&samples, recorded_distance_m);
 
-        let splits = self.load_workout_splits(workout_id)?;
-        let laps = self.load_workout_laps(workout_id)?;
+        let mut splits = self.load_workout_splits(workout_id)?;
+        let mut laps = self.load_workout_laps(workout_id)?;
+        // 分段和记圈本身不存步频；按它们的起止时间从逐点采样里求平均。
+        // 交给 AI 的间歇课「每段步频」就是这样来的（2026-11 来信）。
+        let cadence_at = cadence_points(&samples);
+        for split in &mut splits {
+            split.avg_cadence_spm = mean_cadence(&cadence_at, &split.start_time, &split.end_time);
+        }
+        for lap in &mut laps {
+            lap.avg_cadence_spm = mean_cadence(&cadence_at, &lap.start_time, &lap.end_time);
+        }
 
         Ok(WorkoutSeries {
             workout_id: workout_id.to_owned(),
@@ -540,6 +578,30 @@ impl Database {
         Ok(())
     }
 
+    pub(super) fn replace_sleep_nap_stages(
+        &self,
+        sleep_id: &str,
+        stages: &[SleepStageSlice],
+    ) -> Result<()> {
+        self.conn
+            .prepare_cached("DELETE FROM sleep_nap_stages WHERE sleep_id = ?1")?
+            .execute([sleep_id])?;
+        let mut insert = self.conn.prepare_cached(
+            "INSERT INTO sleep_nap_stages (sleep_id, stage, start_time, end_time, raw_mode)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+        )?;
+        for stage in stages {
+            insert.execute(params![
+                sleep_id,
+                stage.stage,
+                stage.start_time.to_rfc3339(),
+                stage.end_time.to_rfc3339(),
+                stage.raw_mode,
+            ])?;
+        }
+        Ok(())
+    }
+
     pub(super) fn load_workout_laps(&self, workout_id: &str) -> Result<Vec<WorkoutLapRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT lap_index, start_time, end_time, distance_m, duration_seconds,
@@ -555,6 +617,7 @@ impl Database {
                 duration_seconds: row.get(4)?,
                 avg_hr: row.get(5)?,
                 max_hr: row.get(6)?,
+                avg_cadence_spm: None,
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
@@ -579,6 +642,7 @@ impl Database {
                 elevation_gain_m: row.get(8)?,
                 elevation_loss_m: row.get(9)?,
                 partial: row.get::<_, i64>(10)? != 0,
+                avg_cadence_spm: None,
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)

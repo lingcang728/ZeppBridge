@@ -35,6 +35,7 @@ import type {
   DeviceProfilesResult,
   FeedbackSubmissionResult,
   SleepSession,
+  SleepStageSlice,
   RawPayloadCompaction,
   StorageEstimate,
   SyncReport,
@@ -442,6 +443,8 @@ export interface BridgeBackend {
   getRecentSleep(limit?: number): Promise<SleepSession[]>;
   getSleepPage(limit: number, offset: number): Promise<Page<SleepSession>>;
   getSleepDetail(sleepId: string): Promise<SleepSession | null>;
+  /** 同一天的小睡阶段片（只有官方授权通道给），没有就是空数组。 */
+  getSleepNapStages(sleepId: string): Promise<SleepStageSlice[]>;
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
   getWorkoutPage(limit: number, offset: number): Promise<Page<Workout>>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
