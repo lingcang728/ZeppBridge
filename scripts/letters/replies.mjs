@@ -78,7 +78,7 @@ if (command === 'export') {
   const [row] = d1(selectOneSql(positional()[0] ?? ''));
   if (dryRun) process.exit(0);
   if (!row) { console.error('没有这封回信（可能已经被 prune）。'); process.exit(1); }
-  console.log(`${row.id}\n${row.received_at} · 语言 ${row.locale} · 信 ${row.letter_version} · 应用 ${row.app_version} · ${row.status || '未定'}${row.category ? ` · #${row.category}` : ''}`);
+  console.log(`${row.id}\n${row.received_at} · 语言 ${row.locale} · 信 ${row.letter_version} · 应用 ${row.app_version} · ${row.status || '未定'}${row.category ? ` · #${row.category}` : ''}${row.report_id ? ` · 附诊断报告 ${row.report_id}` : ''}`);
   console.log(`\n${row.body || '（没写字，只点了「我也遇到」）'}`);
   if (row.author_reply) console.log(`\n—— 已回复（${row.author_reply_at}）——\n${row.author_reply}`);
 } else if (command === 'reply') {

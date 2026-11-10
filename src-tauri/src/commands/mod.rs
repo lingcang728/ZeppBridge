@@ -229,7 +229,8 @@ pub(crate) use data::{
     set_workout_code_label, set_workout_type_override, submit_diagnostic_report,
 };
 pub(crate) use data_letters::{
-    data_letters_open_capsule, data_letters_seal_capsule, data_letters_state,
+    data_letters_mail_status, data_letters_open_capsule, data_letters_seal_capsule,
+    data_letters_state,
 };
 pub(crate) use imports::{
     import_batches, import_workouts, undo_import_batch, workout_import_sources,

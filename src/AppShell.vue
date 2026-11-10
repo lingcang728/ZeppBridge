@@ -265,6 +265,8 @@ onMounted(() => {
     // 信匣：启动一会儿后补寄没寄出的回信、取回执（只有寄过信的人才联网）；动效档位首启量帧、看电源。
     // 两样都不在首屏关键路径上，就绪后再按需加载（首屏体积预算）。
     void import('./services/letterBox').then((letterBox) => letterBox.scheduleLetterBoxSync());
+    // 来信提醒：作者回信、新一周的来信、到期的胶囊会让左上角的 Z 变成信封（services/mailStatus.ts）。
+    void import('./services/mailStatus').then((mail) => mail.startMailWatch());
     void import('./lib/motion/performanceSensing').then((sensing) => sensing.startMotionSensing());
   });
   void initialize();

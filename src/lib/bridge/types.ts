@@ -507,6 +507,8 @@ export interface BridgeBackend {
   lettersSync(): Promise<import('../../types/letters').LetterBoxView>;
   /** 信匣的数据来信：顺手寄出上一周的来信，再读出全部来信和那年今天。 */
   dataLettersState(): Promise<import('../../types/letters').DataLettersView>;
+  /** 来信提醒要看的状态：最新一封每周来信的 id、到了日子还封着的胶囊（顺手寄出上一周的来信）。 */
+  dataLettersMailStatus(): Promise<import('../../types/letters').DataLetterMailStatus>;
   /** 封一个时间胶囊，`openOn` 是本地日 YYYY-MM-DD。 */
   dataLettersSealCapsule(note: string, openOn: string): Promise<number>;
   /** 开封一个到期的胶囊。 */

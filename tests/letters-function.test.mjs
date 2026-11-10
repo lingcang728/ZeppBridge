@@ -28,8 +28,8 @@ const fakeDb = () => {
         },
         async run() {
           if (sql.includes('INSERT INTO letter_replies')) {
-            const [id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash] = args;
-            rows.push({ id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash, read_at: null, category: '', status: '', fixed_in: '', author_reply: '', author_reply_at: null });
+            const [id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash, report_id] = args;
+            rows.push({ id, received_at, install_hash, app_version, letter_version, locale, body, allow_quote, also_hit_json, content_hash, report_id, read_at: null, category: '', status: '', fixed_in: '', author_reply: '', author_reply_at: null });
           } else if (sql.includes('INSERT INTO feedback_intake_counters')) {
             counters.set(args[0], { window_started_at: args[1], count: 1 });
           } else if (sql.includes('UPDATE feedback_intake_counters')) {
@@ -63,6 +63,20 @@ test('a reply carries only its own fields, a bounded text, and something to say'
   assert.equal(validateReply(reply({ installId: 'not-a-uuid' })), false);
   assert.equal(validateReply(reply({ alsoHit: ['Bad Id'] })), false);
   assert.equal(validateReply(reply({ alsoHit: ['a', 'a'] })), false);
+  // 写给作者的信可以附诊断报告编号（只认 /api/feedback 发的 UUID）。
+  assert.equal(validateReply(reply({ reportId: '0b6f3a52-6c1e-4d7a-9f20-6a1d2c3b4e5f' })), true);
+  assert.equal(validateReply(reply({ reportId: 'C:\\Users\\me\\report.json' })), false);
+  assert.equal(validateReply(reply({ reportId: null })), false);
+});
+
+test('an attached diagnostic report id is stored with the letter', async () => {
+  const db = fakeDb();
+  const reportId = '0b6f3a52-6c1e-4d7a-9f20-6a1d2c3b4e5f';
+  const sent = await post(db, 'reply', reply({ text: '设备一直显示未识别。', reportId }));
+  assert.equal(sent.status, 201);
+  assert.equal(db.rows[0].report_id, reportId);
+  await post(db, 'reply', reply({ text: '没附报告的一封。' }));
+  assert.equal(db.rows[1].report_id, null);
 });
 
 test('the same reply sent twice is one letter; receipts return status, never the text', async () => {

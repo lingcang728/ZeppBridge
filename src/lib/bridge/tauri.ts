@@ -515,6 +515,9 @@ export const tauriBackend: BridgeBackend = {
   dataLettersState() {
     return call<import('../../types/letters').DataLettersView>('data_letters_state');
   },
+  dataLettersMailStatus() {
+    return call<import('../../types/letters').DataLetterMailStatus>('data_letters_mail_status');
+  },
   dataLettersSealCapsule(note: string, openOn: string) {
     return call<number>('data_letters_seal_capsule', { note, openOn });
   },

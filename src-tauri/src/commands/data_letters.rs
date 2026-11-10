@@ -5,7 +5,7 @@ use crate::commands::{spawn_independent_read, with_write};
 use crate::ipc_error::AppError;
 use chrono::{Local, NaiveDate, Utc};
 use serde::Serialize;
-use zeppbridge_core::insight::letters::{DataLetter, OnThisDayYear};
+use zeppbridge_core::insight::letters::{DataLetter, MailStatus, OnThisDayYear};
 use zeppbridge_core::storage::write_lock::WritePurpose;
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +33,26 @@ pub async fn data_letters_state(
             letters: db.data_letters()?,
             on_this_day: db.on_this_day(today)?,
         })
+    })
+    .await
+}
+
+/// 来信提醒（左上角标志变成信封）要看的状态。和打开信匣一样先把上一周的来信寄出
+/// （写锁被占着这次就不寄），再读最新一封每周来信的 id 和到了日子还封着的胶囊。
+#[tauri::command]
+pub async fn data_letters_mail_status(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<MailStatus, AppError> {
+    let today = Local::now().date_naive();
+    let _ = with_write(
+        &state.data_dir,
+        &state.db,
+        WritePurpose::Metadata,
+        move |db| db.ensure_weekly_letter(today, Utc::now()),
+    )
+    .await;
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.data_letter_mail_status(today)
     })
     .await
 }

@@ -35,7 +35,7 @@ const q = (value) => `'${String(value).replace(/'/g, "''")}'`;
 
 /** 还没处理完的回信（导出读信用），从旧到新。 */
 export function selectOpenSql() {
-  return `SELECT id, received_at, app_version, letter_version, locale, body, allow_quote, also_hit_json, read_at, category, status, fixed_in
+  return `SELECT id, received_at, app_version, letter_version, locale, body, allow_quote, also_hit_json, read_at, category, status, fixed_in, report_id
 FROM letter_replies WHERE handled_at IS NULL ORDER BY received_at ASC`;
 }
 
@@ -65,7 +65,7 @@ export const AUTHOR_REPLY_MAX_CHARS = 2000;
 /** 取一封回信给 agent 读（`show`）：语言、版本、原文、已有的作者回复。 */
 export function selectOneSql(id) {
   if (!REPLY_ID.test(id)) throw new Error(`不是回信 id：${id}`);
-  return `SELECT id, received_at, app_version, letter_version, locale, body, also_hit_json, status, category, author_reply, author_reply_at
+  return `SELECT id, received_at, app_version, letter_version, locale, body, also_hit_json, status, category, author_reply, author_reply_at, report_id
 FROM letter_replies WHERE id = ${q(id)}`;
 }
 
@@ -103,7 +103,8 @@ export function renderReplies(rows, exportedAt = new Date().toISOString()) {
     for (const row of list) {
       let alsoHit = [];
       try { alsoHit = JSON.parse(row.also_hit_json || '[]'); } catch { /* 坏数据就当没有 */ }
-      const tags = [row.letter_version, row.locale, row.allow_quote ? '可引用' : '不可引用', row.status || '未定', row.category ? `#${row.category}` : '']
+      const tags = [row.letter_version, row.locale, row.allow_quote ? '可引用' : '不可引用', row.status || '未定', row.category ? `#${row.category}` : '',
+        row.report_id ? `附诊断报告 ${row.report_id}` : '']
         .filter(Boolean).join(' · ');
       lines.push(`### ${row.id}`, '', `${row.received_at} · ${tags}${alsoHit.length ? ` · 我也遇到：${alsoHit.map((id) => `#${id}`).join(' ')}` : ''}`, '');
       lines.push(row.body ? row.body.split(/\r?\n/).map((line) => `> ${line}`).join('\n') : '> （没写字，只点了「我也遇到」）', '');

@@ -19,9 +19,23 @@ fn pending(local_id: &str) -> PendingReply {
         text: "补拉卡住了".into(),
         allow_quote: false,
         also_hit: vec![],
+        report_id: None,
         queued_at: "2026-10-21T10:00:00Z".into(),
         attempts: 0,
     }
+}
+
+#[test]
+fn only_server_issued_report_ids_ride_along_and_old_outboxes_still_load() {
+    assert!(is_report_id("0b6f3a52-6c1e-4d7a-9f20-6a1d2c3b4e5f"));
+    assert!(!is_report_id("0B6F3A52-6C1E-4D7A-9F20-6A1D2C3B4E5F"));
+    assert!(!is_report_id("C:\\Users\\me\\report.json"));
+    assert!(!is_report_id("0b6f3a52-6c1e-1d7a-9f20-6a1d2c3b4e5f"));
+    // 没附报告时不写这个键；旧版本存下的待寄出没有这个键也照样读得出来。
+    let json = serde_json::to_string(&pending("a")).unwrap();
+    assert!(!json.contains("report_id"));
+    let back: PendingReply = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.report_id, None);
 }
 
 #[test]

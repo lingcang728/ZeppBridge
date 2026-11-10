@@ -35,6 +35,9 @@ pub struct PendingReply {
     pub text: String,
     pub allow_quote: bool,
     pub also_hit: Vec<String>,
+    /// 写给作者的信附上的脱敏诊断报告编号（/api/feedback 返回的 UUID）。没附就没有这个键。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report_id: Option<String>,
     pub queued_at: String,
     #[serde(default)]
     pub attempts: u32,
@@ -296,6 +299,19 @@ pub fn normalize_locale(value: &str) -> Option<&'static str> {
         "zh", "en", "es", "nl", "pt-BR", "pt-PT", "de", "ru", "hi-IN", "fr", "it", "pl", "zh-TW",
     ];
     LOCALES.iter().copied().find(|locale| *locale == value)
+}
+
+/// 诊断报告编号：网站 /api/feedback 用 `crypto.randomUUID()` 生成的小写 v4 UUID。
+/// 和 functions/api/letters/[action].js 的 `REPORT_ID` 一致。
+pub fn is_report_id(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && bytes.iter().enumerate().all(|(i, &b)| match i {
+            8 | 13 | 18 | 23 => b == b'-',
+            14 => b == b'4',
+            19 => matches!(b, b'8' | b'9' | b'a' | b'b'),
+            _ => b.is_ascii_digit() || (b'a'..=b'f').contains(&b),
+        })
 }
 
 pub fn is_letter_version(value: &str) -> bool {

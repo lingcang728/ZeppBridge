@@ -60,6 +60,8 @@ export interface LetterReplyInput {
   text: string;
   allowQuote: boolean;
   alsoHit: string[];
+  /** 写给作者的信附上的脱敏诊断报告编号（submitDiagnosticReport 返回的）。没附就不给。 */
+  reportId?: string;
 }
 
 /* 信匣里的数据来信（批次 7）：每周数据来信、时间胶囊、那年今天。 */
@@ -103,6 +105,12 @@ export interface OnThisDayYear {
   years_ago: number;
   values: SnapshotValue[];
   workouts: OnThisDayWorkout[];
+}
+
+/** 来信提醒要看的状态（后端 insight::letters::MailStatus）。看没看过由界面自己记。 */
+export interface DataLetterMailStatus {
+  latest_weekly_id: number | null;
+  due_capsule_ids: number[];
 }
 
 export interface DataLettersView {
