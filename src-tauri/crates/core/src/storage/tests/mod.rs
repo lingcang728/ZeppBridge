@@ -72,6 +72,7 @@ mod export;
 mod fit_override;
 mod imports;
 mod logbook;
+mod mcp_writes;
 mod metric_prefs;
 mod metrics;
 mod my_records;

@@ -7,6 +7,15 @@
 ; With the box ticked nothing was removed, and a reinstall brought the old account and
 ; devices back (user report, 2026-10). Updates run with /UPDATE and never reach this.
 
+; AI apps (Claude Desktop and others) keep zeppbridge-mcp.exe running between calls. The
+; installer cannot replace a running file, so an update left the old MCP behind and it then
+; refused the newer library ("database v47, program v41", user report on 3.1.1). Close it
+; before copying files; the AI app starts it again on its next call.
+!macro NSIS_HOOK_PREINSTALL
+  nsExec::Exec 'taskkill /F /IM zeppbridge-mcp.exe'
+  Pop $0
+!macroend
+
 !macro NSIS_HOOK_PREUNINSTALL
   ${If} $DeleteAppDataCheckboxState = 1
   ${AndIf} $UpdateMode <> 1

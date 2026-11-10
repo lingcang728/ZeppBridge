@@ -1,4 +1,4 @@
-//! 设置「交给 AI 工具」卡的「连到 Claude Code / Codex / Claude Desktop」。
+//! 设置「交给 AI 工具」卡的「连到本地 AI」（Claude Code、Codex、Claude Desktop、OpenCode、Grok、Factory……）。
 //!
 //! 安装包把 `zeppbridge-mcp` 作为 sidecar 放在 `ZeppBridge.exe` 旁边（3B 打包决定；
 //! macOS 在 `ZeppBridge.app/Contents/MacOS/`，deb / rpm 在 `/usr/bin/`，都在主程序旁边），
@@ -37,8 +37,15 @@ pub struct McpSidecar {
     /// 带上这个环境变量，否则 AI 看到的是一个空库。
     pub data_dir_env: Option<String>,
     /// 本机 AI 客户端里登记了**另一份** zeppbridge-mcp 的（多半是 2.x 工具包里的旧版）：
-    /// `claude_desktop` / `claude_code` / `codex`。没附带 sidecar 时为空。见 [`stale`]。
+    /// `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory`。没附带 sidecar 时为空。见 [`stale`]。
     pub stale_clients: Vec<&'static str>,
+    /// 登记的是这一份、但读取范围和「只给共享任务」开关对不上的客户端（3.1.2 起默认读整个库）。
+    pub scope_stale_clients: Vec<&'static str>,
+    /// 「只给共享任务」开着：生成的配置带 `--scope task`。
+    pub task_only: bool,
+    /// 应用旁边那份 zeppbridge-mcp 比应用旧：AI 客户端占着它时，更新换不掉这个文件
+    /// （3.1.1 用户报告：Claude Desktop 里一直报「数据库 v47、程序 v41」）。
+    pub outdated: bool,
     /// 正从 AppImage 里运行（Linux）：sidecar 虽然在包里，但每次启动都挂到一个新的
     /// `/tmp/.mount_*` 下，登记进 AI 客户端的路径下次就不存在了。这时 `path` 为空，
     /// 界面说清原因、指向单独的工具包。
@@ -52,6 +59,9 @@ fn not_bundled(appimage: bool) -> McpSidecar {
         path: None,
         data_dir_env: None,
         stale_clients: Vec::new(),
+        scope_stale_clients: Vec::new(),
+        task_only: false,
+        outdated: false,
         appimage,
         cli_path: None,
     }
@@ -74,6 +84,9 @@ pub(crate) fn locate_sidecar(exe_dir: &Path, data_dir: &Path) -> McpSidecar {
         path: Some(candidate.to_string_lossy().into_owned()),
         data_dir_env,
         stale_clients: Vec::new(),
+        scope_stale_clients: Vec::new(),
+        task_only: false,
+        outdated: false,
         appimage: false,
         cli_path,
     }
@@ -101,6 +114,9 @@ fn current_sidecar(data_dir: &Path) -> McpSidecar {
         path: Some(path.to_string_lossy().into_owned()),
         data_dir_env: Some(data_dir.to_string_lossy().into_owned()),
         stale_clients: Vec::new(),
+        scope_stale_clients: Vec::new(),
+        task_only: false,
+        outdated: false,
         appimage: false,
         cli_path: Some(cli_path.to_string_lossy().into_owned()),
     }
@@ -120,16 +136,57 @@ fn current_sidecar(data_dir: &Path) -> McpSidecar {
     }
 }
 
+/// 「只给共享任务」开关；读不到按默认的「关」（读整个库）。
+async fn task_only(data_dir: &Path) -> bool {
+    super::spawn_independent_read(data_dir.to_path_buf(), |db| db.mcp_task_scope_only())
+        .await
+        .unwrap_or(false)
+}
+
+/// 问 sidecar 自己是哪一版。3.1.2 之前的程序不认 `--version`（退出码 2），也算旧。
+/// 起不来（权限、杀毒拦截）就不下结论。
+fn sidecar_outdated(path: &Path) -> bool {
+    let mut command = std::process::Command::new(path);
+    command
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW：sidecar 是控制台程序，别在用户眼前闪一个黑框。
+        command.creation_flags(0x0800_0000);
+    }
+    match command.output() {
+        Ok(output) => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            text.trim() != format!("zeppbridge-mcp {}", env!("CARGO_PKG_VERSION"))
+        }
+        Err(_) => false,
+    }
+}
+
 #[tauri::command]
 pub async fn get_mcp_sidecar(state: tauri::State<'_, AppState>) -> Result<McpSidecar, AppError> {
     let mut sidecar = current_sidecar(&state.data_dir);
+    sidecar.task_only = task_only(&state.data_dir).await;
     if let Some(path) = sidecar.path.clone() {
-        // .claude.json 可能有几 MB，读文件放到阻塞线程里。
-        sidecar.stale_clients = tokio::task::spawn_blocking(move || {
-            stale::stale_clients(&stale::ClientConfigRoots::from_env(), Path::new(&path))
+        let task_only = sidecar.task_only;
+        // .claude.json 可能有几 MB，读文件、起 sidecar 都放到阻塞线程里。
+        let (stale, scope_stale, outdated) = tokio::task::spawn_blocking(move || {
+            let roots = stale::ClientConfigRoots::from_env();
+            let path = Path::new(&path);
+            (
+                stale::stale_clients(&roots, path),
+                stale::scope_stale_clients(&roots, path, task_only),
+                sidecar_outdated(path),
+            )
         })
         .await
         .unwrap_or_default();
+        sidecar.stale_clients = stale;
+        sidecar.scope_stale_clients = scope_stale;
+        sidecar.outdated = outdated;
     }
     Ok(sidecar)
 }
@@ -139,11 +196,17 @@ pub async fn get_mcp_sidecar(state: tauri::State<'_, AppState>) -> Result<McpSid
 /// 包里带一份 sidecar 让 `entry_point` 指得到真文件（规范里 binary 型要求
 /// 自带可执行文件），但真正启动的是 `command` 指向的安装目录里那一份：
 /// 应用升级后 MCP 跟着升级，不会拿旧程序去读新版本的库。
-pub(crate) fn bundle_manifest(sidecar_path: &str, data_dir_env: Option<&str>) -> serde_json::Value {
+pub(crate) fn bundle_manifest(
+    sidecar_path: &str,
+    data_dir_env: Option<&str>,
+    task_only: bool,
+) -> serde_json::Value {
     let entry_point = format!("server/{SIDECAR_STEM}{}", std::env::consts::EXE_SUFFIX);
+    // 3.1.2 起默认读整个库；「只给共享任务」开着时才带 `--scope task`。
+    let args: &[&str] = if task_only { &["--scope", "task"] } else { &[] };
     let mut mcp_config = serde_json::json!({
         "command": sidecar_path,
-        "args": ["--scope", "task"],
+        "args": args,
     });
     if let Some(dir) = data_dir_env {
         mcp_config["env"] = serde_json::json!({ "ZEPPBRIDGE_DATA_DIR": dir });
@@ -174,14 +237,16 @@ pub(crate) fn bundle_manifest(sidecar_path: &str, data_dir_env: Option<&str>) ->
 pub(crate) fn build_bundle(
     sidecar: &Path,
     data_dir_env: Option<&str>,
+    task_only: bool,
 ) -> Result<Vec<u8>, AppError> {
-    build_bundle_with_command(sidecar, &sidecar.to_string_lossy(), data_dir_env)
+    build_bundle_with_command(sidecar, &sidecar.to_string_lossy(), data_dir_env, task_only)
 }
 
 fn build_bundle_with_command(
     sidecar: &Path,
     command: &str,
     data_dir_env: Option<&str>,
+    task_only: bool,
 ) -> Result<Vec<u8>, AppError> {
     let failed = |detail: String| {
         AppError::new(
@@ -189,7 +254,7 @@ fn build_bundle_with_command(
             format!("生成 Claude Desktop 扩展包失败：{detail}"),
         )
     };
-    let manifest = bundle_manifest(command, data_dir_env);
+    let manifest = bundle_manifest(command, data_dir_env, task_only);
     let binary = std::fs::read(sidecar).map_err(|error| failed(error.to_string()))?;
     let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let options =
@@ -246,11 +311,13 @@ pub async fn save_mcp_bundle(
             "这个版本没有附带 zeppbridge-mcp",
         ));
     };
+    let task_only = task_only(&state.data_dir).await;
     let bytes = tokio::task::spawn_blocking(move || {
         build_bundle_with_command(
             &payload_path,
             &command_path,
             sidecar.data_dir_env.as_deref(),
+            task_only,
         )
     })
     .await

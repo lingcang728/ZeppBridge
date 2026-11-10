@@ -1519,6 +1519,29 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(48, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v49（3.1.2：本地 AI 的改动账本）。MCP 写工具（伤病、生活事件、比赛、跑鞋、运动标注、
+        // 改类型、教练档案）每写一次记一行：改之前和改之后的快照，桌面端据此逐条撤销。
+        // 同步和导出不进这张表——它们是动作，不改记录。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS mcp_writes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tool TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                before_json TEXT,
+                after_json TEXT NOT NULL,
+                source_name TEXT,
+                created_at TEXT NOT NULL,
+                undone_at TEXT
+             );
+             CREATE INDEX IF NOT EXISTS idx_mcp_writes_target ON mcp_writes(kind, target_id);
+             PRAGMA user_version = 49;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(49, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

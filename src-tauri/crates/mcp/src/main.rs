@@ -15,21 +15,26 @@ use zeppbridge_core::paths;
 
 use zeppbridge_core::storage::Database;
 
+mod actions;
 mod browse;
 mod coach;
 mod protocol;
 mod runners;
 mod schema;
+mod schema_writes;
 #[cfg(test)]
 mod tests;
 mod tools;
+mod writes;
 
+use actions::*;
 use browse::*;
 use coach::*;
 use protocol::*;
 use runners::*;
 use schema::*;
 use tools::*;
+use writes::*;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -127,6 +132,11 @@ fn main() {
     // argv 是这个进程唯一的授权入口。scope 定了，服务才开始读 stdin——
     // 解析失败不进入服务循环。
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // 桌面端靠它判断这份 sidecar 有没有跟着升级（Claude Desktop 占着旧文件时，更新换不掉它）。
+    if args == ["--version"] {
+        println!("zeppbridge-mcp {VERSION}");
+        return;
+    }
     let scope = match parse_scope_args(&args) {
         Ok(scope) => scope,
         Err(message) => {

@@ -6,13 +6,11 @@
 //! - `draft_training_plan` 只存草稿，用户在 ZeppBridge 里确认后才发；
 //! - `publish_training_plan` 只有用户在设置里打开「允许 AI 直接发布」才放行，否则回
 //!   `err.training_plan.ai_publish_disabled`，让 AI 请用户自己去确认；
-//! - `propose_coach_note` 只把一句话放进收件箱，用户在 ZeppBridge 里点了「记住」才进
-//!   `get_athlete_profile` 的 `coachNotes`。从「只读」变成「可提议」，但永远不能自己生效。
+//! - `propose_coach_note` 3.1.2 起直接记住、记进改动账本，用户在桌面端撤销（见 `writes.rs`）。
 //!
 //! 这几个工具在 task 范围里整体拒绝（`whole_library`）：它们跨类别、跨日期，裁不出诚实子集。
 
 use super::*;
-use zeppbridge_core::storage::coach_notes::Proposal;
 use zeppbridge_core::storage::training_plan::Prepared;
 use zeppbridge_core::storage::workout_feedback::rating_code;
 use zeppbridge_core::training_plan::standalone;
@@ -179,31 +177,6 @@ pub(super) fn run_draft_plan(db: &Database, args: &Value) -> Result<Value, CallF
             "days": preview.days,
         })),
         "aiMayPublish": ai_may_publish,
-        "next": next,
-        "missingValues": contract::MISSING_VALUE_CONVENTION,
-    }))
-}
-
-pub(super) fn run_propose_note(db: &Database, args: &Value) -> Result<Value, CallFailure> {
-    let text = args
-        .get("note")
-        .and_then(Value::as_str)
-        .ok_or_else(|| CallFailure::plain("缺少 note"))?;
-    let dir = writable_dir(db)?;
-    let client = super::protocol::client_name();
-    let outcome = standalone::write_once(&dir, |db| db.propose_coach_note(text, client.as_deref()))
-        .map_err(db_failure)?;
-    let next = match &outcome {
-        Proposal::Proposed { .. } => {
-            "已放进 ZeppBridge 的收件箱，等用户确认。用户点了「记住」之前，它不会出现在 get_athlete_profile 里；不用再提一遍。"
-        }
-        Proposal::AlreadyKnown { .. } => "用户已经记着这句话了（见 get_athlete_profile 的 coachNotes），不用再提。",
-        Proposal::AlreadyProposed { .. } => "这句话已经在收件箱里等用户确认，不用再提。",
-        Proposal::RejectedBefore => "用户之前拒绝过这句话。不要再提，也不要换个说法再提。",
-        Proposal::InboxFull => "收件箱里待确认的已经有 20 条，这次没有放进去。请用户先在 ZeppBridge 里处理收件箱。",
-    };
-    Ok(json!({
-        "outcome": to_value!(&outcome)?,
         "next": next,
         "missingValues": contract::MISSING_VALUE_CONVENTION,
     }))

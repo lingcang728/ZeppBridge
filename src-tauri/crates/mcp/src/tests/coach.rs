@@ -165,37 +165,42 @@ fn task_scope_refuses_every_coach_tool() {
 }
 
 #[test]
-fn a_proposed_note_waits_in_the_inbox_until_the_user_accepts_it() {
+fn a_remembered_note_counts_at_once_and_the_user_can_undo_it() {
     let library = TestLibrary::empty();
     let first = library.call(
         &AccessScope::FullReadOnly,
         "propose_coach_note",
         json!({ "note": "左膝跑 15 km 以上会痛" }),
     );
-    assert_eq!(ok(&first)["outcome"]["outcome"], "proposed");
+    assert_eq!(ok(&first)["applied"]["note"]["outcome"], "remembered");
     let again = library.call(
         &AccessScope::FullReadOnly,
         "propose_coach_note",
         json!({ "note": "左膝跑 15 km 以上会痛" }),
     );
-    assert_eq!(ok(&again)["outcome"]["outcome"], "already_proposed");
+    assert_eq!(ok(&again)["applied"]["note"]["outcome"], "already_known");
 
-    // 没点「记住」之前，档案里没有它。
-    let profile = library.call(&AccessScope::FullReadOnly, "get_athlete_profile", json!({}));
-    assert_eq!(ok(&profile)["coachNotes"], json!([]));
-
-    let id = {
-        let db = Database::open_read_only(library.0.join("zepp.db")).unwrap();
-        db.proposed_coach_notes().unwrap()[0].id
-    };
-    Database::open_migrated(&library.0.join("zepp.db"))
-        .unwrap()
-        .decide_coach_note(id, true)
-        .unwrap();
+    // 3.1.2 起不进收件箱：马上就在档案里，来源仍标 mcp。
     let profile = library.call(&AccessScope::FullReadOnly, "get_athlete_profile", json!({}));
     assert_eq!(
         ok(&profile)["coachNotes"][0]["text"],
         "左膝跑 15 km 以上会痛"
     );
     assert_eq!(ok(&profile)["coachNotes"][0]["source"], "mcp");
+
+    let write_id = ok(&first)["applied"]["writeId"].as_i64().unwrap();
+    let db = Database::open_migrated(&library.0.join("zepp.db")).unwrap();
+    db.undo_mcp_write(write_id).unwrap();
+    drop(db);
+    let profile = library.call(&AccessScope::FullReadOnly, "get_athlete_profile", json!({}));
+    assert_eq!(ok(&profile)["coachNotes"], json!([]));
+    let rewrite = library.call(
+        &AccessScope::FullReadOnly,
+        "propose_coach_note",
+        json!({ "note": "左膝跑 15 km 以上会痛" }),
+    );
+    assert_eq!(
+        ok(&rewrite)["applied"]["note"]["outcome"],
+        "rejected_before"
+    );
 }

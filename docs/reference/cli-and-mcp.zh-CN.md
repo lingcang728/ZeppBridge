@@ -198,16 +198,17 @@ macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
 
 ## zeppbridge-mcp
 
-stdio 传输，**不监听任何端口，不发出任何网络请求**。只读由连接层保证（`PRAGMA query_only`），不是靠工具列表里恰好没有写操作。
+stdio 传输，**不监听任何端口，自己不发任何网络请求**（`sync_now` 是启动随附的 `zeppbridge-cli`，`publish_training_plan` 把计划发给 Zepp——都只在被调用时）。读走 `PRAGMA query_only` 连接；会写的那几个工具在跨进程写锁下另开一条短连接。
 每行请求上限为 1 MiB；非法 UTF-8/JSON 和超长行会收到错误响应，后续行仍可继续处理。工具执行失败通过 `result` 返回 `isError: true` 和说明文字；未知工具及调用结构错误仍使用 JSON-RPC 错误。
 
 ### 从桌面应用连接
 
 安装包会把 `zeppbridge-mcp`（3.1.1 起还有 `zeppbridge-cli`）放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
-**设置 › 交给 AI 工具 › 连到 AI 工具**会替你填好真实路径：
+**设置 › 交给 AI 工具 › 连到本地 AI**会替你填好真实路径。3.1.2 起生成的配置读整个库（不带 `--scope`）；那里的「只给共享任务」开关打开时才加 `--scope task`，卡片还会标出仍按另一种设置登记的客户端。预设：Claude Code、Codex、Claude Desktop、OpenCode、Grok Build、Factory，其余（含 DeepSeek Harness）用通用 `mcpServers` JSON：
 
-- **Claude Code** 和 **Codex**：复制三行命令——注册 MCP（带 `--scope task`）、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
-- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。扩展启动的是装在应用旁边的那份 `zeppbridge-mcp`，随 ZeppBridge 一起升级。
+- **Claude Code** 和 **Codex**：复制三行命令——注册 MCP、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
+- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。扩展启动的是装在应用旁边的那份 `zeppbridge-mcp`，随 ZeppBridge 一起升级。Claude Desktop 会一直占着这个程序，以前更新因此换不掉它（旧 MCP 再读新库就报版本不符）；3.1.2 起安装器先把它关掉，设置卡也会在应用旁边那份比应用旧时提醒。
+- **OpenCode**、**Grok Build**：复制一行 `mcp add` 命令；**Factory**：复制一段 `~/.factory/mcp.json`。
 
 应用用的库不是可执行文件旁边的 `data` 时，生成的配置会带上 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的构建（开发构建）里这几个按钮不可点，照下面的配置手动接。Linux 的 AppImage 里也带了一份，但它每次启动都挂到新的临时路径，应用不会把这个路径交给 AI 工具：请下载单独的 CLI / MCP 工具包，照下面的配置接。
 
@@ -278,7 +279,15 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 | `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
 | `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
 | `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
-| `propose_coach_note` | **写（提议）**：把一句关于用户的话（伤病、作息、偏好）放进桌面端收件箱；用户点了「记住」才会出现在 `get_athlete_profile` 里 |
+| `propose_coach_note` | **写**：记住一句关于用户的话（伤病、作息、偏好）。3.1.2 起直接生效、马上出现在 `get_athlete_profile` 里，并记进改动账本；用户拒绝或撤销过的同一句话不会再写进去 |
+| `save_injury` | **写**：新增或修改一条伤病（部位、程度 1–3、开始日；好了就填 `endDate`） |
+| `save_life_event` | **写**：新增或修改一条生活事件（类别、日期，`epoch` 表示起了名的纪元） |
+| `save_race` | **写**：新增或修改一场比赛（日期、项目、距离 m、目标与成绩 s、A/B/C 优先级） |
+| `save_shoe` | **写**：新增或修改一双鞋（用途、起始与退役里程 km；退役就填 `retiredOn`） |
+| `annotate_workout` | **写**：一次运动里用户自己的 RPE（1–10）和酸痛部位；手表的 RPE 和选鞋不动 |
+| `set_workout_type` | **写**：纠正运动类型，和桌面「改类型」同一条路径（云端原始记录不变） |
+| `sync_now` | **动作**：启动旁边那份 `zeppbridge-cli`（`sync --json --no-reprocess`）从云端拉一次新数据；最多等 45 秒，没完就回 `running`、由 CLI 自己跑完；本机欠着重解析时回 `deferred` |
+| `export_data` | **动作**：把一段日子（最多 366 天，不含轨迹）的摘要写成 JSON，放进数据目录的 `exports`，只回相对这个目录的文件名 |
 
 用户在指标卡「?」浮层里关掉「参与分析」的指标，会从每个工具的返回里去掉（不分 `vo2max` / `vo2Max` 这类写法），返回里同时带 `excludedByUser`：名单和一句说明——这是用户的选择，不是缺数据。数据一行不删，用户自己的导出（CLI、FIT）不受影响。
 
@@ -298,15 +307,26 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 `get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
 
-#### 会写库的工具：训练计划与教练档案收件箱
+#### 会写库的工具：训练计划、教练档案、履历——都能撤销
+
+云端来的健康数据始终只读。3.1.2 起本地 AI 还能写用户自己的那几本账，每次写入都记进改动账本
+（`mcp_writes`，存改之前和改之后的样子）。用户在**设置 › 本地 AI › AI 最近的改动**里逐条撤销：
+新增的删掉，修改的改回原样，AI 写的教练档案改成「拒绝」（同一句话 AI 不能再写回来）。之后又被改过的不回滚
+（`err.mcp_writes.stale`）。**没有删除工具**：伤病好了填 `endDate`，跑鞋退役填 `retiredOn`；修改时传 `id`
+和要改的字段即可。校验沿用桌面端那一套。`sync_now` 和 `export_data` 是动作、不改记录，不进账本。
+
+服务还给任何 MCP 客户端发一份说明书 `zeppbridge://guide`（`resources/list` / `resources/read`，握手的
+`instructions` 里也点了名）：工具清单、推荐顺序（先 `get_training_context`）、数据口径、三条禁令、怎么撤销。
+
+#### 训练计划
 
 健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
 
 - `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表，这是 Zepp 接口的限制：走路、徒步、力量、轮滑、越野滑雪会被拦下，力量训练的动作和组数也发不过去；跑步可写 `trail` 越野跑、骑行可写 `mountain` 山地车；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
 - `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
 - `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
-- `propose_coach_note` 只是提议：写进单独一张收件箱表（不碰任何健康数据表），用户在桌面端逐条确认或拒绝；只有确认过的才以 `coachNotes` 出现在 `get_athlete_profile` 里，并标明是谁写的（用户自己，或按客户端自报名字标的 AI）。用户拒绝过的同一句话不能再提，待确认最多 20 条。每一条都能改、能删，能一键导出成 Markdown。
-- 这六个教练工具（含 `get_training_context`、`get_athlete_profile`、`get_training_plan`）在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
+- `propose_coach_note` 为兼容已装的配置保留原名，但不再进收件箱：写进单独一张表（不碰任何健康数据表），马上以 `coachNotes` 出现在 `get_athlete_profile` 里，标明是哪个客户端写的。每一条都能撤销、改、删，能一键导出成 Markdown。
+- 教练工具、所有写工具和两个动作在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
 
 ### 契约
 
@@ -323,4 +343,4 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 
 CLI 的 `sync` 和桌面应用的同步共用同一把跨进程同步租约和同一把写锁，任何时刻只有一个同步、一个写者。等不到时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
 
-MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划、提议记住时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。
+MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划、记住教练档案、写履历时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。

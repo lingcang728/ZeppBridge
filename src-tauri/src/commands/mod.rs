@@ -10,6 +10,7 @@ mod data_letters;
 mod imports;
 mod letters;
 mod login;
+mod mcp_writes;
 mod my_records;
 mod official;
 mod status;
@@ -239,6 +240,7 @@ pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
 pub(crate) use login::{
     cancel_web_login, get_login_status, recover_advanced_credentials, start_web_login,
 };
+pub(crate) use mcp_writes::{mcp_write_undo, mcp_writes_list, set_mcp_task_only};
 pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,

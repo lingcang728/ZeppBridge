@@ -15,7 +15,7 @@ import type { DemoPlan } from './plan';
 export type DemoHandler = (args: Record<string, unknown>) => unknown;
 export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
   const now = () => iso(data.now), first = dayKey(at(data.now, 1 - DAYS));
-  let prefs = { ...demoPrefs(), ai_profile_note: '' }, localApi = demoLocalApi(), token = 'demo-only-not-a-real-token';
+  let prefs = { ...demoPrefs(), ai_profile_note: '' }, localApi = demoLocalApi(), token = 'demo-only-not-a-real-token', mcpTaskOnly = false;
   let pending: PendingRestore | null = null;
   const devices = demoDevices(data);
   const initial = { ...newTaskDraft(), id: 'demo-task-1', title: demoTaskList(data)[0].title, created_at: now(), updated_at: now() };
@@ -77,7 +77,10 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
       if (i >= 0) to.push({ ...from.splice(i, 1)[0], hidden: !!a.hidden });
     },
     get_local_api_status: () => ({ ...localApi }),
-    get_mcp_sidecar: () => ({ path: 'C:\\Demo\\ZeppBridge\\zeppbridge-mcp.exe', data_dir_env: null }),
+    get_mcp_sidecar: () => ({ path: 'C:\\Demo\\ZeppBridge\\zeppbridge-mcp.exe', data_dir_env: null, task_only: mcpTaskOnly }),
+    mcp_writes_list: () => [],
+    mcp_write_undo: () => [],
+    set_mcp_task_only: a => { mcpTaskOnly = !!a.on; return mcpTaskOnly; },
     save_mcp_bundle: () => 'Demo/ZeppBridge.mcpb',
     set_local_api_enabled: a => { localApi = { ...localApi, enabled: !!a.enabled, running: !!a.enabled, token_present: !!a.enabled }; return { ...localApi }; },
     reveal_local_api_token: () => token, rotate_local_api_token: () => { token += '-rotated'; return token; },

@@ -154,9 +154,11 @@ export const settingsMessages = defineMessages(
 
 已知信息：
 - zeppbridge-mcp 随 ZeppBridge 一起安装，就在主程序旁边；完整路径在 ZeppBridge 的「设置 › 交给 AI 工具」里能看到。没装桌面应用的机器才需要从 GitHub Release 页下载 zeppbridge-tools 压缩包。
-- 它是 stdio 类型的 MCP server，健康数据只读，不监听端口、不需要 token 或 API key；只有在我允许后发布训练计划时才会联网。
-- 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
-- 它有十六个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）；另有两个训练计划工具：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；还有 propose_coach_note：把想长期记住的一句话放进我的「教练档案」收件箱，我点了「记住」才生效。
+- 它是 stdio 类型的 MCP server，不监听端口、不需要 token 或 API key；云端来的健康数据只读，只有我让它同步、或我允许后发布训练计划时才会联网。
+- 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": []}}}（我在设置里打开「只给共享任务」时 args 是 ["--scope", "task"]）
+- 连上后先读资源 zeppbridge://guide，那是它的说明书：工具清单、推荐顺序、数据口径、撤销方式。
+- 读的工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）、数据健康（get_data_health）和训练教练（get_training_context、get_athlete_profile、get_training_plan）。
+- 写的工具（都记进改动账本，我能在 ZeppBridge 里逐条撤销，没有删除）：save_injury、save_life_event、save_race、save_shoe、annotate_workout、set_workout_type，以及 propose_coach_note（直接记住一句关于我的话）；训练计划：draft_training_plan（只存草稿）和 publish_training_plan（我在设置里允许后才能发到手表）；动作：sync_now（从云端同步一次）、export_data（导出成本机文件）。
 
 告诉我：
 1. 针对你（我现在用的这个工具）具体该把配置写到哪个文件、用什么命令添加；
@@ -491,9 +493,11 @@ It ships an MCP program (zeppbridge-mcp) and I want to configure it with you, so
 
 What I know about it:
 - zeppbridge-mcp is installed together with ZeppBridge, right next to the main program; ZeppBridge shows its full path under Settings › AI tools. Only a machine without the desktop app needs the zeppbridge-tools archive from ZeppBridge's GitHub Releases page.
-- It is a stdio MCP server. Health data is read-only, it listens on no port and needs no token or API key; it only uses the network to publish a training plan, and only after I allow that.
-- The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- It exposes sixteen read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan); plus two training-plan tools: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); and propose_coach_note, which puts one sentence worth remembering into my coach-notes inbox and takes effect only after I tap Remember.
+- It is a stdio MCP server. It listens on no port and needs no token or API key; health data from the cloud is read-only, and it only uses the network when I ask it to sync, or to publish a training plan after I allow that.
+- The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": []}}} (args are ["--scope", "task"] if I turn on "Only shared tasks" in settings)
+- Once connected, read the resource zeppbridge://guide first: it is the server's guide — tool list, recommended order, data rules and how undo works.
+- Read tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events), data health (get_data_health) and coaching (get_training_context, get_athlete_profile, get_training_plan).
+- Write tools (each one is recorded in a change ledger that I can undo item by item in ZeppBridge; nothing can be deleted): save_injury, save_life_event, save_race, save_shoe, annotate_workout, set_workout_type, and propose_coach_note (remembers one sentence about me at once); training plans: draft_training_plan (saves a draft only) and publish_training_plan (sends to the watch only after I allow it in settings); actions: sync_now (one sync from the cloud) and export_data (writes a file on this computer).
 
 Please tell me:
 1. For you specifically — the tool I am talking to right now — which file the config goes in, or which command adds it;
