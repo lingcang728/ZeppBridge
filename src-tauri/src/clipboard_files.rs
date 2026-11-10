@@ -105,14 +105,18 @@ mod imp {
         units.iter().flat_map(|unit| unit.to_le_bytes()).collect()
     }
 
-    pub fn copy_file(path: &Path) -> Result<(), ClipboardError> {
-        // DROPFILES 头 + 宽字符路径 + 结尾两个 0（路径列表以空串结束）。
-        let mut drop = Vec::with_capacity(DROPFILES_SIZE + 512);
+    pub fn copy_files(paths: &[&Path]) -> Result<(), ClipboardError> {
+        // DROPFILES 头 + 每个路径（宽字符、各自以 0 结尾）+ 再一个 0（路径列表以空串结束）。
+        let mut drop = Vec::with_capacity(DROPFILES_SIZE + 512 * paths.len());
         drop.extend_from_slice(&(DROPFILES_SIZE as u32).to_le_bytes());
         drop.extend_from_slice(&[0u8; 12]);
         drop.extend_from_slice(&1u32.to_le_bytes());
-        let mut units: Vec<u16> = path.as_os_str().encode_wide().collect();
-        units.extend_from_slice(&[0, 0]);
+        let mut units: Vec<u16> = Vec::new();
+        for path in paths {
+            units.extend(path.as_os_str().encode_wide());
+            units.push(0);
+        }
+        units.push(0);
         drop.extend_from_slice(&u16_bytes(&units));
         // 「复制」而不是「剪切」：用户顺手粘进资源管理器时，原文件不能被挪走。
         // SAFETY: 传入以 0 结尾的宽字符串。
@@ -214,13 +218,18 @@ mod imp {
         put(clipboard).map_err(|_| ClipboardError::Busy)
     }
 
-    pub fn copy_file(path: &Path) -> Result<(), ClipboardError> {
-        with(|clipboard| clipboard.set().file_list(&[path]))
+    pub fn copy_files(paths: &[&Path]) -> Result<(), ClipboardError> {
+        with(|clipboard| clipboard.set().file_list(paths))
     }
 }
 
 pub fn copy_file(path: &Path) -> Result<(), ClipboardError> {
-    imp::copy_file(path)
+    imp::copy_files(&[path])
+}
+
+/// 一次放几个文件（交给 AI 时 `.md` + 完整轨迹）：粘进对话框就是几个附件。
+pub fn copy_files(paths: &[&Path]) -> Result<(), ClipboardError> {
+    imp::copy_files(paths)
 }
 
 // 下面这些只给全自动用，全自动只有 Windows（commands/ai_handoff.rs 的 `auto`）。

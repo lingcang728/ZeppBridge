@@ -32,7 +32,10 @@ mod gather;
 mod helpers;
 mod journal;
 pub mod markdown;
+mod route_gpx;
 mod workout_extras;
+
+pub use route_gpx::route_file_name;
 
 pub(crate) use helpers::*;
 
@@ -128,6 +131,8 @@ pub struct AiTaskPreparePlan {
     attachment_sources: Vec<(PathBuf, String)>,
     /// 单个 `.md` 交付：`(文件名, 渲染结果, 预算)`。有它就不写 JSON + txt。
     markdown: Option<(String, markdown::MarkdownRender, usize)>,
+    /// 打开「精确路线」时 `.md` 旁边的完整轨迹：`(文件名, GPX)`（见 route_gpx.rs）。
+    route_gpx: Option<(String, String)>,
 }
 
 impl AiTaskPreparePlan {
@@ -160,6 +165,11 @@ impl AiTaskPreparePlan {
             let md_path = self.output_dir.join(&md_name);
             write_file_atomically(&md_path, render.text.as_bytes())
                 .map_err(|error| AiTaskError::write_failed(format!("写入交接文件失败: {error}")))?;
+            if let Some((gpx_name, gpx)) = &self.route_gpx {
+                write_file_atomically(&self.output_dir.join(gpx_name), gpx.as_bytes()).map_err(
+                    |error| AiTaskError::write_failed(format!("写入完整轨迹失败: {error}")),
+                )?;
+            }
             let copied_attachments = copy_attachments(&self.output_dir, &self.attachment_sources)?;
             return Ok(AiTaskPrepareResult {
                 status: AiTaskPrepareStatus::Ready,
@@ -399,11 +409,12 @@ impl Database {
                 json_text: None,
                 attachment_sources: Vec::new(),
                 markdown: None,
+                route_gpx: None,
             });
         }
 
         let bundle = self.build_ai_task_bundle(&task, &anchors, attachments)?;
-        let markdown = parts.markdown.map(|md| {
+        let mut markdown = parts.markdown.map(|md| {
             let guide = md.guide.map(str::trim).unwrap_or_default();
             let header = [prompt_text.trim(), guide]
                 .into_iter()
@@ -416,6 +427,17 @@ impl Database {
                 md.token_budget,
             )
         });
+        // 精确路线 + 详细：`.md` 里的轨迹是抽过点的，完整的另写一份 GPX 放在旁边。
+        let mut route_file = None;
+        if let Some((md_name, render, _)) = markdown.as_mut() {
+            if task.include_precise_gps && task.detail_level == AiTaskDetailLevel::Detailed {
+                if let Some((gpx, points)) = route_gpx::route_gpx(&bundle.document) {
+                    let name = route_gpx::route_file_name(md_name);
+                    render.text.push_str(&route_gpx::route_note(&name, points));
+                    route_file = Some((name, gpx));
+                }
+            }
+        }
         let json_text = serde_json::to_string_pretty(&bundle.document)
             .map_err(|error| AiTaskError::write_failed(format!("序列化交接数据失败: {error}")))?;
         let attachment_sources = task
@@ -440,6 +462,7 @@ impl Database {
             json_text: Some(json_text),
             attachment_sources,
             markdown,
+            route_gpx: route_file,
         })
     }
 }
