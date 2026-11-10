@@ -3678,10 +3678,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'components/letters/stamps': {
       kind: {
-        device: 'Apparaat niet herkend',
-        workout: 'Workout niet herkend',
-        data: 'Cijfers kloppen niet',
-        other: 'Ander probleem',
+        device: 'Apparaat',
+        workout: 'Trainingstype',
+        data: 'Cijfers',
+        other: 'Overig',
       },
     },
     'components/coachNotes/coachNotes': {
@@ -4114,22 +4114,29 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         fit: 'FIT',
         strava: 'Strava-archief',
         apple_health: 'Apple Health',
+        unstrap: 'unstrap-back-up',
       },
       short: {
         gpx: 'GPX',
         fit: 'FIT',
         strava: 'Strava',
         apple_health: 'Apple Health',
+        unstrap: 'unstrap',
       },
       filter: {
         gpx: 'GPX / TCX-bestanden',
         fit: 'FIT-bestanden',
         strava: 'Strava-export',
         apple_health: 'Apple Health-export',
+        unstrap: 'unstrap-back-up',
       },
       reading: 'Lezen…',
       added: (n: number) => (n === 1 ? '1 geïmporteerd' : `${n} geïmporteerd`),
       nothingNew: 'Geen nieuwe trainingen',
+      health: (n: number) =>
+        plural(n, { one: '1 gezondheidsgegeven aangevuld', other: `${n} gezondheidsgegevens aangevuld` }),
+      healthCount: (n: number) =>
+        plural(n, { one: '1 gezondheidsgegeven', other: `${n} gezondheidsgegevens` }),
       duplicates: (n: number) =>
         n === 1 ? '1 stond al hier, overgeslagen' : `${n} stonden al hier, overgeslagen`,
       unreadable: (n: number) => (n === 1 ? '1 onleesbaar' : `${n} onleesbaar`),
@@ -4142,6 +4149,34 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
           ? '1 training uit deze import verwijderd'
           : `${n} trainingen uit deze import verwijderd`,
       failed: 'Importeren mislukt. Probeer het opnieuw.',
+    },
+    'views/settings/sections/labs': {
+      cardTitle: 'Bètalab',
+      summary: 'Functies die nog worden uitgeprobeerd, standaard uitgeschakeld',
+      lead:
+        'Alles hier is experimenteel: het kan veranderen of verdwijnen. Als er iets misgaat, schrijf de auteur vanuit de brievenbus.',
+      badge: 'Experimenteel',
+      glassTitle: 'Samenvoegend glas',
+      glassSub:
+        'Glasbedieningen die dicht bij elkaar staan vloeien samen tijdens het slepen en splitsen bij loslaten. Alleen uiterlijk — uitschakelen verandert verder niets.',
+      unstrapImportTitle: 'Trainingen importeren uit unstrap',
+      unstrapImportSub:
+        'Kies een unstrap-back-up-zip: de trainingen die de band en de telefoon hebben vastgelegd (hartslag, route, pauzes) worden geïmporteerd, één per sessie, plus eventuele hartslag, SpO₂, rusthartslag en slaap die nog niet op deze computer staan. Aan gegevens gesynchroniseerd vanuit Zepp verandert niets. Scores die unstrap zelf berekent worden overgeslagen. Geïmporteerde sessies staan op de pagina Trainingen, waar ze per stuk ongedaan kunnen worden gemaakt.',
+      unstrapImportButton: 'Kies back-up',
+      unstrapExportTitle: 'Exporteren voor unstrap',
+      unstrapExportSub:
+        'Schrijft de trainingen op deze computer weg als een zip die unstrap kan importeren (samenvatting en hartslag per training); kies deze onder „Herstellen uit back-up” in unstrap. Ontbrekende waarden blijven leeg, nooit 0. Trainingsbelasting en VO₂max van Zepp worden niet meegenomen.',
+      unstrapExportButton: 'Exporteren',
+      unstrapRange: 'Bereik',
+      unstrapRangeDays: (n: number) =>
+        plural(n, { one: `Laatste ${n} dag`, other: `Laatste ${n} dagen` }),
+      unstrapRangeAll: 'Alles',
+      unstrapExported: (workouts: number) =>
+        plural(workouts, {
+          one: '1 training weggeschreven',
+          other: `${workouts} trainingen weggeschreven`,
+        }),
+      unstrapShow: 'Weergeven in map',
     },
   },
   errors: {
@@ -4387,6 +4422,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     'err.feedback.toast_failed': 'De systeemmelding kon niet worden getoond.',
     'err.export.my_records':
       'Kon dat bestand niet schrijven. Probeer een andere locatie.',
+    'err.export.unstrap':
+      'Kon het bestand voor unstrap niet wegschrijven. Controleer of de gegevensmap beschrijfbaar is.',
     'err.import.source': 'Onbekende importbron.',
     'err.import.too_large':
       'Dat bestand is te groot (meer dan 64 MB). Kies voor Strava en Apple Health het volledige exportarchief.',

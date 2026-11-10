@@ -3276,10 +3276,10 @@ export default {
 
     'components/letters/stamps': {
       kind: {
-        device: 'डिवाइस पहचानी नहीं गई',
-        workout: 'वर्कआउट पहचाना नहीं गया',
-        data: 'डेटा मेल नहीं खा रहा',
-        other: 'अन्य समस्या',
+        device: 'डिवाइस',
+        workout: 'वर्कआउट प्रकार',
+        data: 'आंकड़े',
+        other: 'अन्य',
       },
     },
 
@@ -3710,18 +3710,21 @@ export default {
         fit: 'FIT',
         strava: 'Strava संग्रह',
         apple_health: 'Apple Health',
+        unstrap: 'unstrap बैकअप',
       },
       short: {
         gpx: 'GPX',
         fit: 'FIT',
         strava: 'Strava',
         apple_health: 'Apple Health',
+        unstrap: 'unstrap',
       },
       filter: {
         gpx: 'GPX / TCX फ़ाइलें',
         fit: 'FIT फ़ाइलें',
         strava: 'Strava निर्यात संग्रह',
         apple_health: 'Apple Health निर्यात संग्रह',
+        unstrap: 'unstrap बैकअप',
       },
       reading: 'पढ़ा जा रहा है…',
       added: (n: number) =>
@@ -3730,6 +3733,10 @@ export default {
           other: `${n} आयात हुए`,
         }),
       nothingNew: 'कोई नया वर्कआउट नहीं',
+      health: (n: number) =>
+        plural(n, { one: '1 स्वास्थ्य रिकॉर्ड जोड़ा गया', other: `${n} स्वास्थ्य रिकॉर्ड जोड़े गए` }),
+      healthCount: (n: number) =>
+        plural(n, { one: '1 स्वास्थ्य रिकॉर्ड', other: `${n} स्वास्थ्य रिकॉर्ड` }),
       duplicates: (n: number) =>
         plural(n, {
           one: `${n} पहले से मौजूद है, छोड़ दिया गया`,
@@ -3761,6 +3768,33 @@ export default {
       advancedAfterDisconnect:
         'पहले आधिकारिक प्रमाणीकरण डिस्कनेक्ट करें, फिर उस खाते (ईमेल या फ़ोन नंबर और पासवर्ड) से उन्नत डेटा में लॉगिन करें जिससे आपकी घड़ी जुड़ी है। अगर वह खाता Google या Apple से बनाया गया था, तो उन्नत डेटा में लॉगिन नहीं हो सकता; ऐसी स्थिति में केवल आधिकारिक प्रमाणीकरण ही रखें।',
       disconnectOfficial: 'आधिकारिक प्रमाणीकरण डिस्कनेक्ट करें',
+    },
+    'views/settings/sections/labs': {
+      cardTitle: 'बीटा लैब',
+      summary: 'परीक्षण में चल रही सुविधाएं, डिफ़ॉल्ट रूप से बंद',
+      lead:
+        'यहाँ सब कुछ प्रायोगिक है: यह बदल सकता है या हटाया जा सकता है। अगर कुछ ख़राब होता है, तो पत्र पेटी से लेखक को लिखें।',
+      badge: 'प्रायोगिक',
+      glassTitle: 'ग्लास का विलय',
+      glassSub:
+        'पास-पास मौजूद ग्लास नियंत्रण खींचने पर आपस में मिल जाते हैं और छोड़ने पर अलग हो जाते हैं। केवल दिखावट — इसे बंद करने से कुछ और नहीं बदलता।',
+      unstrapImportTitle: 'unstrap से वर्कआउट आयात करें',
+      unstrapImportSub:
+        'एक unstrap बैकअप zip चुनें: स्ट्रैप और फोन द्वारा रिकॉर्ड किए गए वर्कआउट (हार्ट रेट, रूट, पॉज़) शामिल होते हैं, प्रति सत्र एक, साथ ही कोई भी हार्ट रेट, SpO₂, विश्राम हार्ट रेट और नींद जो इस कंप्यूटर पर पहले से मौजूद नहीं है। Zepp से समन्वयित किसी भी डेटा में बदलाव नहीं होता है। unstrap द्वारा स्वयं गणना किए गए स्कोर आयात नहीं होते। आयात वर्कआउट पृष्ठ पर सूचीबद्ध होते हैं, जहां प्रत्येक को पूर्ववत किया जा सकता है।',
+      unstrapImportButton: 'बैकअप चुनें',
+      unstrapExportTitle: 'unstrap के लिए निर्यात करें',
+      unstrapExportSub:
+        'इस कंप्यूटर के वर्कआउट को unstrap द्वारा आयात की जा सकने वाली zip में लिखें (प्रत्येक वर्कआउट का सारांश और हार्ट रेट); unstrap में «बैकअप से पुनर्स्थापित करें» के तहत इसे चुनें। छूटे हुए मान रिक्त रहते हैं, कभी 0 नहीं। Zepp का प्रशिक्षण लोड और VO₂max शामिल नहीं हैं।',
+      unstrapExportButton: 'निर्यात करें',
+      unstrapRange: 'अवधि',
+      unstrapRangeDays: (n: number) => `पिछले ${n} दिन`,
+      unstrapRangeAll: 'सभी',
+      unstrapExported: (workouts: number) =>
+        plural(workouts, {
+          one: 'पूर्ण: 1 वर्कआउट लिखा गया',
+          other: `पूर्ण: ${workouts} वर्कआउट लिखे गए`,
+        }),
+      unstrapShow: 'फ़ोल्डर में दिखाएं',
     },
   },
   errors: {
@@ -3985,6 +4019,8 @@ export default {
     'err.letters.capsule_date': 'खोलने की वह तारीख मान्य नहीं है। कृपया दोबारा चुनें।',
     'err.feedback.toast_failed': 'सिस्टम नोटिफ़िकेशन नहीं दिखाया जा सका।',
     'err.export.my_records': 'फ़ाइल नहीं लिखी जा सकी। किसी अन्य स्थान पर पुनः प्रयास करें।',
+    'err.export.unstrap':
+      'unstrap के लिए फ़ाइल नहीं लिखी जा सकी। जांचें कि डेटा फ़ोल्डर में लिखने की अनुमति है।',
     'err.import.source': 'अज्ञात आयात स्रोत।',
     'err.import.too_large':
       'वह फ़ाइल बहुत बड़ी है (64 MB से अधिक)। Strava और Apple Health के लिए पूरा निर्यात संग्रह चुनें।',

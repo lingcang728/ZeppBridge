@@ -3284,6 +3284,29 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       compactSub: 'Executa-se automaticamente no primeiro arranque de uma nova versão; aqui podes executá-la manualmente',
       compactMore: 'Detalhes',
     },
+    'views/settings/sections/labs': {
+      cardTitle: 'Laboratório Beta',
+      summary: 'Funcionalidades ainda em teste, desativadas por predefinição',
+      lead: 'Tudo aqui é experimental: pode mudar ou ser removido. Se algo falhar, escreve ao autor através da caixa de correio.',
+      badge: 'Experimental',
+      glassTitle: 'Fusão de vidro',
+      glassSub:
+        'Os controlos de vidro muito próximos fundem-se ao arrastar e separam-se ao soltar. Apenas visual — desativar não altera mais nada.',
+      unstrapImportTitle: 'Importar treinos do unstrap',
+      unstrapImportSub:
+        'Escolhe um zip de cópia de segurança do unstrap: os treinos gravados pela banda e pelo telemóvel (frequência cardíaca, trajeto, pausas) entram, um por sessão, juntamente com quaisquer dados de frequência cardíaca, SpO₂, frequência em repouso e sono ainda não presentes neste computador. Nada do que foi sincronizado do Zepp é alterado. As pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde podes anular cada uma.',
+      unstrapImportButton: 'Escolher cópia',
+      unstrapExportTitle: 'Exportar para o unstrap',
+      unstrapExportSub:
+        'Grava os treinos deste computador num zip que o unstrap pode importar (resumo e frequência cardíaca de cada treino); seleciona-o em «Restaurar a partir de cópia de segurança» no unstrap. Os valores em falta ficam em branco, nunca 0. A carga de treino e o VO₂máx do Zepp não são incluídos.',
+      unstrapExportButton: 'Exportar',
+      unstrapRange: 'Intervalo',
+      unstrapRangeDays: (n: number) => `Últimos ${n} dias`,
+      unstrapRangeAll: 'Tudo',
+      unstrapExported: (workouts: number) =>
+        plural(workouts, { one: 'Concluído: 1 treino gravado', other: `Concluído: ${workouts} treinos gravados` }),
+      unstrapShow: 'Mostrar na pasta',
+    },
     'composables/useFocusAreas': {
       areaAll: 'Equilibrado',
       areaSleep: 'Sono',
@@ -3613,10 +3636,10 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     },
     'components/letters/stamps': {
       kind: {
-        device: 'Dispositivo não reconhecido',
-        workout: 'Treino não reconhecido',
-        data: 'Dados não coincidem',
-        other: 'Outro problema',
+        device: 'Dispositivo',
+        workout: 'Tipo de treino',
+        data: 'Números',
+        other: 'Outro',
       },
     },
     'components/coachNotes/coachNotes': {
@@ -4039,17 +4062,28 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       close: 'Fechar importação',
       title: 'Importar de outra origem',
       hint: 'Fica apenas neste computador, nunca é enviado para a Zepp. Um treino com início a menos de dois minutos de um já existente é ignorado.',
-      sources: { gpx: 'GPX / TCX', fit: 'FIT', strava: 'Arquivo Strava', apple_health: 'Apple Health' },
-      short: { gpx: 'GPX', fit: 'FIT', strava: 'Strava', apple_health: 'Apple Health' },
+      sources: {
+        gpx: 'GPX / TCX',
+        fit: 'FIT',
+        strava: 'Arquivo Strava',
+        apple_health: 'Apple Health',
+        unstrap: 'Cópia de segurança do unstrap',
+      },
+      short: { gpx: 'GPX', fit: 'FIT', strava: 'Strava', apple_health: 'Apple Health', unstrap: 'unstrap' },
       filter: {
         gpx: 'Ficheiros GPX / TCX',
         fit: 'Ficheiros FIT',
         strava: 'Exportação do Strava',
         apple_health: 'Exportação do Apple Health',
+        unstrap: 'Cópia de segurança do unstrap',
       },
       reading: 'A ler…',
       added: (n: number) => (n === 1 ? '1 treino importado' : `${n} treinos importados`),
       nothingNew: 'Sem novos treinos',
+      health: (n: number) =>
+        plural(n, { one: '1 registo de saúde preenchido', other: `${n} registos de saúde preenchidos` }),
+      healthCount: (n: number) =>
+        plural(n, { one: '1 registo de saúde', other: `${n} registos de saúde` }),
       duplicates: (n: number) =>
         n === 1 ? '1 já existente neste computador, ignorado' : `${n} já existentes neste computador, ignorados`,
       unreadable: (n: number) => (n === 1 ? '1 ilegível' : `${n} ilegíveis`),
@@ -4295,6 +4329,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     'err.letters.capsule_date': 'A data de abertura não é válida. Escolhe-a novamente.',
     'err.feedback.toast_failed': 'Não foi possível apresentar a notificação do sistema.',
     'err.export.my_records': 'Não foi possível gravar o ficheiro. Tenta outra localização.',
+    'err.export.unstrap':
+      'Não foi possível gravar o ficheiro para o unstrap. Verifica se a pasta de dados tem permissão de escrita.',
     'err.import.source': 'Origem de importação desconhecida.',
     'err.import.too_large':
       'O ficheiro é demasiado grande (mais de 64 MB). Para o Strava e o Apple Health, seleciona o ficheiro de exportação completo.',

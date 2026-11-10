@@ -997,10 +997,10 @@ export default {
 
   'components/letters/stamps': {
     kind: {
-      device: 'Nierozpoznane urządzenie',
-      workout: 'Nierozpoznany trening',
-      data: 'Dane się nie zgadzają',
-      other: 'Inny problem',
+      device: 'Urządzenie',
+      workout: 'Typ treningu',
+      data: 'Liczby',
+      other: 'Inne',
     },
   },
 
@@ -2078,6 +2078,8 @@ export default {
     'err.letters.capsule_date': 'Nieprawidłowa data otwarcia — wybierz ją ponownie',
     'err.feedback.toast_failed': 'Nie udało się wyświetlić powiadomienia systemowego',
     'err.export.my_records': 'Nie udało się zapisać tego pliku — spróbuj w innej lokalizacji',
+    'err.export.unstrap':
+      'Nie udało się zapisać pliku dla unstrap. Sprawdź uprawnienia do zapisu w folderze danych.',
     'err.import.source': 'Nieznane źródło importu',
     'err.import.too_large': 'Plik jest zbyt duży (ponad 64 MB). W przypadku Strava i Apple Health wybierz całe archiwum eksportu',
     'err.import.not_recognized': 'Ten plik nie jest eksportem z wybranego źródła — wybierz inne źródło i spróbuj ponownie',
@@ -4470,18 +4472,21 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
       fit: 'FIT',
       strava: 'Paczka Strava',
       apple_health: 'Apple Health',
+      unstrap: 'Kopia zapasowa unstrap',
     },
     short: {
       gpx: 'GPX',
       fit: 'FIT',
       strava: 'Strava',
       apple_health: 'Apple Health',
+      unstrap: 'unstrap',
     },
     filter: {
       gpx: 'Pliki GPX / TCX',
       fit: 'Pliki FIT',
       strava: 'Eksport ze Strava',
       apple_health: 'Eksport z Apple Health',
+      unstrap: 'Kopia zapasowa unstrap',
     },
     reading: 'Odczytywanie…',
     added: (n: number) =>
@@ -4492,6 +4497,20 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
         other: 'treningu',
       })}`,
     nothingNew: 'Brak nowych treningów',
+    health: (n: number) =>
+      plural(n, {
+        one: 'uzupełniono 1 wpis zdrowotny',
+        few: `uzupełniono ${n} wpisy zdrowotne`,
+        many: `uzupełniono ${n} wpisów zdrowotnych`,
+        other: `uzupełniono ${n} wpisów zdrowotnych`,
+      }),
+    healthCount: (n: number) =>
+      plural(n, {
+        one: '1 wpis zdrowotny',
+        few: `${n} wpisy zdrowotne`,
+        many: `${n} wpisów zdrowotnych`,
+        other: `${n} wpisów zdrowotnych`,
+      }),
     duplicates: (n: number) =>
       `${n} ${plural(n, {
         one: 'trening był',
@@ -4832,6 +4851,43 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     fileStem: (year: number) => `ZeppBridge Sloje ${year}`,
     ready: (year: number) => `Twój słój za rok ${year} już urósł`,
     readyHint: 'Jeden słój na rok, jedna kreska na trening.',
+  },
+
+  // Source: src/views/settings/sections/labs.i18n.ts
+  'views/settings/sections/labs': {
+    cardTitle: 'Laboratorium beta',
+    summary: 'Funkcje w fazie testów, domyślnie wyłączone',
+    lead:
+      'Wszystko tutaj jest eksperymentalne: może się zmienić lub zostać usunięte. Jeśli coś pójdzie nie tak, napisz do twórcy ze skrzynki na listy.',
+    badge: 'Eksperymentalne',
+    glassTitle: 'Łączenie szkła',
+    glassSub:
+      'Blisko położone kontrolki ze szkła łączą się podczas przeciągania i rozdzielają po upuszczeniu. Tylko efekt wizualny — wyłączenie niczego innego nie zmienia.',
+    unstrapImportTitle: 'Importuj treningi z unstrap',
+    unstrapImportSub:
+      'Wybierz plik zip kopii zapasowej unstrap: treningi zarejestrowane przez pas i telefon (tętno, trasa, pauzy) zostaną zaimportowane, po jednym na sesję, wraz z wszelkimi danymi tętna, SpO₂, tętna spoczynkowego i snu, których jeszcze nie ma na tym komputerze. Żadne dane zsynchronizowane z Zepp nie zostaną zmienione. Wyniki obliczone przez unstrap nie są importowane. Importy znajdują się na stronie Treningi, gdzie każdy można cofnąć.',
+    unstrapImportButton: 'Wybierz kopię',
+    unstrapExportTitle: 'Eksportuj dla unstrap',
+    unstrapExportSub:
+      'Zapisuje treningi z tego komputera jako plik zip zrozumiały dla unstrap (podsumowanie i tętno każdego treningu); wybierz go w opcji „Przywróć z kopii zapasowej” w unstrap. Brakujące wartości pozostają puste, nigdy 0. Obciążenie treningowe i VO₂max z Zepp nie są dołączane.',
+    unstrapExportButton: 'Eksportuj',
+    unstrapRange: 'Zakres',
+    unstrapRangeDays: (n: number) =>
+      plural(n, {
+        one: `Ostatni ${n} dzień`,
+        few: `Ostatnie ${n} dni`,
+        many: `Ostatnie ${n} dni`,
+        other: `Ostatnie ${n} dni`,
+      }),
+    unstrapRangeAll: 'Wszystko',
+    unstrapExported: (workouts: number) =>
+      plural(workouts, {
+        one: 'Gotowe: zapisano 1 trening',
+        few: `Gotowe: zapisano ${workouts} treningi`,
+        many: `Gotowe: zapisano ${workouts} treningów`,
+        other: `Gotowe: zapisano ${workouts} treningów`,
+      }),
+    unstrapShow: 'Pokaż w folderze',
   },
   },
 } satisfies LocalePack;

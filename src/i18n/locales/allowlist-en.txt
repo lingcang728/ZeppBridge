@@ -359,5 +359,7 @@ components/workout/workoutImport.short.fit
 components/workout/workoutImport.short.strava
 components/workout/workoutImport.sources.apple_health
 components/workout/workoutImport.short.apple_health
+components/workout/workoutImport.short.unstrap
 views/ai/AiPlanHistory.originMcp
+views/settings/sections/labs.badge
 

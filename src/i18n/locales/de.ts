@@ -238,6 +238,8 @@ export default {
     'err.feedback.toast_failed': 'Die Systembenachrichtigung konnte nicht angezeigt werden.',
     'err.export.my_records':
       'Diese Datei konnte nicht geschrieben werden. Versuche es an einem anderen Speicherort.',
+    'err.export.unstrap':
+      'Die Exportdatei für unstrap konnte nicht geschrieben werden. Prüfe, ob in den Datenordner geschrieben werden kann.',
     'err.import.source': 'Unbekannte Importquelle.',
     'err.import.too_large':
       'Die Datei ist zu groß (über 64 MB). Wähle für Strava und Apple Health das gesamte Export-Archiv.',
@@ -408,10 +410,10 @@ export default {
     },
     'components/letters/stamps': {
       kind: {
-        device: 'Gerät nicht erkannt',
-        workout: 'Training nicht erkannt',
-        data: 'Daten stimmen nicht',
-        other: 'Anderes Problem',
+        device: 'Gerät',
+        workout: 'Trainingsart',
+        data: 'Zahlen',
+        other: 'Sonstiges',
       },
     },
     'lib/aiTask/markdownGuide': {
@@ -4359,18 +4361,35 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       close: 'Import schließen',
       title: 'Von extern importieren',
       hint: 'Bleibt auf diesem Rechner, wird nie an Zepp gesendet. Trainings, deren Startzeit weniger als zwei Minuten von einem bereits vorhandenen abweicht, werden übersprungen.',
-      sources: { gpx: 'GPX / TCX', fit: 'FIT', strava: 'Strava-Archiv', apple_health: 'Apple Health' },
-      short: { gpx: 'GPX', fit: 'FIT', strava: 'Strava', apple_health: 'Apple Health' },
+      sources: {
+        gpx: 'GPX / TCX',
+        fit: 'FIT',
+        strava: 'Strava-Archiv',
+        apple_health: 'Apple Health',
+        unstrap: 'unstrap-Backup',
+      },
+      short: { gpx: 'GPX', fit: 'FIT', strava: 'Strava', apple_health: 'Apple Health', unstrap: 'unstrap' },
       filter: {
         gpx: 'GPX- / TCX-Dateien',
         fit: 'FIT-Dateien',
         strava: 'Strava-Exportarchiv',
         apple_health: 'Apple Health-Export',
+        unstrap: 'unstrap-Backup',
       },
       reading: 'Wird gelesen…',
       added: (n: number) =>
         plural(n, { one: '1 Training importiert', other: `${n} Trainings importiert` }),
       nothingNew: 'Keine neuen Trainings',
+      health: (n: number) =>
+        plural(n, {
+          one: '1 Gesundheitsdatensatz ergänzt',
+          other: `${n} Gesundheitsdatensätze ergänzt`,
+        }),
+      healthCount: (n: number) =>
+        plural(n, {
+          one: '1 Gesundheitsdatensatz',
+          other: `${n} Gesundheitsdatensätze`,
+        }),
       duplicates: (n: number) =>
         plural(n, {
           one: '1 bereits vorhanden, übersprungen',
@@ -4399,6 +4418,33 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       advancedAfterDisconnect:
         'Trenne zuerst die offizielle Autorisierung und melde dich dann bei den erweiterten Daten mit dem Konto an, mit dem deine Uhr gekoppelt ist (E-Mail oder Telefonnummer und Passwort). Wurde dieses Konto über Google oder Apple erstellt, ist eine Anmeldung für erweiterte Daten nicht möglich – behalte in diesem Fall nur die offizielle Autorisierung.',
       disconnectOfficial: 'Offizielle Autorisierung trennen',
+    },
+    'views/settings/sections/labs': {
+      cardTitle: 'Beta-Labor',
+      summary: 'Funktionen, die noch erprobt werden; standardmäßig deaktiviert',
+      lead:
+        'Alles hier ist experimentell: Es kann sich ändern oder wieder entfernt werden. Wenn etwas hakt, schreibe dem Autor über den Briefkasten.',
+      badge: 'Experimentell',
+      glassTitle: 'Verschmelzendes Glas',
+      glassSub:
+        'Glas-Bedienelemente, die nah beieinander liegen, verschmelzen beim Ziehen und trennen sich beim Loslassen wieder. Reine Optik – das Deaktivieren ändert sonst nichts.',
+      unstrapImportTitle: 'Trainings aus unstrap importieren',
+      unstrapImportSub:
+        'Wähle eine unstrap-Backup-ZIP: Die vom Brustgurt und Telefon aufgezeichneten Trainings (Herzfrequenz, Strecke, Pausen) werden übernommen, eins pro Einheit, zusammen mit allen noch nicht auf diesem Rechner vorhandenen Herzfrequenz-, SpO₂-, Ruheherzfrequenz- und Schlafdaten. Von Zepp synchronisierte Daten bleiben unberührt. Von unstrap selbst berechnete Werte werden weggelassen. Importe werden auf der Trainings-Seite aufgeführt und können einzeln rückgängig gemacht werden.',
+      unstrapImportButton: 'Backup auswählen',
+      unstrapExportTitle: 'Für unstrap exportieren',
+      unstrapExportSub:
+        'Schreibt die Trainings auf diesem Rechner als ZIP, die unstrap importieren kann (Zusammenfassung und Herzfrequenz jedes Trainings); wähle diese unter „Aus Backup wiederherstellen“ in unstrap aus. Fehlende Werte bleiben leer, nie 0. Trainingsbelastung und VO₂max von Zepp werden weggelassen.',
+      unstrapExportButton: 'Exportieren',
+      unstrapRange: 'Zeitraum',
+      unstrapRangeDays: (n: number) => `Letzte ${n} Tage`,
+      unstrapRangeAll: 'Alle',
+      unstrapExported: (workouts: number) =>
+        plural(workouts, {
+          one: 'Fertig: 1 Training geschrieben',
+          other: `Fertig: ${workouts} Trainings geschrieben`,
+        }),
+      unstrapShow: 'Im Ordner anzeigen',
     },
   },
 } satisfies LocalePack;

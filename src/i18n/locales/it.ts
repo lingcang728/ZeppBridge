@@ -509,10 +509,10 @@ export default {
 
   'components/letters/stamps': {
     kind: {
-      device: 'Dispositivo non riconosciuto',
-      workout: 'Allenamento non riconosciuto',
-      data: 'I dati non coincidono',
-      other: 'Altro problema',
+      device: 'Dispositivo',
+      workout: 'Tipo di allenamento',
+      data: 'Numeri',
+      other: 'Altro',
     },
   },
 
@@ -4161,22 +4161,29 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
       fit: 'FIT',
       strava: 'Archivio Strava',
       apple_health: 'Apple Health',
+      unstrap: 'Backup di unstrap',
     },
     short: {
       gpx: 'GPX',
       fit: 'FIT',
       strava: 'Strava',
       apple_health: 'Apple Health',
+      unstrap: 'unstrap',
     },
     filter: {
       gpx: 'File GPX / TCX',
       fit: 'File FIT',
       strava: 'Archivio di esportazione Strava',
       apple_health: 'Archivio di esportazione Apple Health',
+      unstrap: 'Backup di unstrap',
     },
     reading: 'Lettura in corso…',
     added: (n: number) => `${n} importati`,
     nothingNew: 'Nessun nuovo allenamento',
+    health: (n: number) =>
+      plural(n, { one: '1 dato sanitario aggiunto', other: `${n} dati sanitari aggiunti` }),
+    healthCount: (n: number) =>
+      plural(n, { one: '1 dato sanitario', other: `${n} dati sanitari` }),
     duplicates: (n: number) => `${n} già presenti, ignorati`,
     unreadable: (n: number) => `${n} illeggibili`,
     batches: 'Importazioni',
@@ -4403,6 +4410,35 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     fileStem: (year: number) => `ZeppBridge Anelli ${year}`,
     ready: (year: number) => `Il tuo anello del ${year} è cresciuto`,
     readyHint: 'Un anello all’anno, un segno per ogni allenamento.',
+  },
+
+  // Source: src/views/settings/sections/labs.i18n.ts
+  'views/settings/sections/labs': {
+    cardTitle: 'Laboratorio beta',
+    summary: 'Funzionalità ancora in fase di prova, disattivate per impostazione predefinita',
+    lead:
+      'Tutto qui è sperimentale: potrebbe cambiare o essere rimosso. Se qualcosa non va, scrivi all’autore dalla cassetta delle lettere.',
+    badge: 'Sperimentale',
+    glassTitle: 'Vetro a fusione',
+    glassSub:
+      'I controlli in vetro molto vicini si fondono durante il trascinamento e si separano al rilascio. Solo aspetto visivo — disattivarlo non cambia nient’altro.',
+    unstrapImportTitle: 'Importa allenamenti da unstrap',
+    unstrapImportSub:
+      'Scegli un file zip di backup di unstrap: gli allenamenti registrati dalla fascia e dal telefono (frequenza cardiaca, percorso, pause) vengono importati, uno per sessione, insieme a tutti i dati di frequenza cardiaca, SpO₂, frequenza a riposo e sonno non ancora presenti su questo computer. Nessun dato sincronizzato da Zepp viene modificato. I punteggi calcolati da unstrap non vengono importati. Gli elementi importati compaiono nella pagina Allenamenti, dove ognuno può essere annullato.',
+    unstrapImportButton: 'Scegli backup',
+    unstrapExportTitle: 'Esporta per unstrap',
+    unstrapExportSub:
+      'Salva gli allenamenti di questo computer in uno zip importabile da unstrap (riepilogo e frequenza cardiaca di ogni allenamento); selezionalo in «Ripristina da backup» in unstrap. I valori mancanti rimangono vuoti, mai 0. Il carico di allenamento e il VO₂max di Zepp non vengono inclusi.',
+    unstrapExportButton: 'Esporta',
+    unstrapRange: 'Intervallo',
+    unstrapRangeDays: (n: number) => `Ultimi ${n} giorni`,
+    unstrapRangeAll: 'Tutto',
+    unstrapExported: (workouts: number) =>
+      plural(workouts, {
+        one: 'Completato: 1 allenamento salvato',
+        other: `Completato: ${workouts} allenamenti salvati`,
+      }),
+    unstrapShow: 'Mostra nella cartella',
   },
   },
 
@@ -4728,6 +4764,8 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
   'err.feedback.toast_failed': 'Impossibile mostrare la notifica di sistema.',
   'err.export.my_records':
     'Impossibile scrivere questo file. Prova in un’altra posizione.',
+  'err.export.unstrap':
+    'Impossibile scrivere il file per unstrap. Verifica che la cartella dei dati consenta la scrittura.',
   'err.import.source': 'Origine di importazione sconosciuta.',
   'err.import.too_large':
     'Il file è troppo grande (superiore a 64 MB). Per Strava e Apple Health, seleziona l’intero archivio di esportazione.',
