@@ -57,6 +57,11 @@ const messages = defineMessages({
   authorSign: '—— ZeppBridge 开发者',
   authorRepliedOn: (date: string) => `${date} 回`,
   authorNew: '作者回了你的信',
+  writeAuthor: '写给作者',
+  authorPlaceholder: '遇到的问题、想要的功能、随便说几句都行。作者会回信。',
+  attachReport: '附上脱敏诊断报告',
+  attachHint: '只含应用版本、字段结构和认不出的型号编号，不含账号、健康数值和位置',
+  reportFailedPlain: '诊断报告没交上去，已取消附带；再点「寄出」就只寄信',
 }, {
   to: 'To: User',
   toDeveloper: 'To: the ZeppBridge developer',
@@ -115,6 +120,11 @@ const messages = defineMessages({
   authorSign: '— the ZeppBridge developer',
   authorRepliedOn: (date: string) => `Replied ${date}`,
   authorNew: 'The author replied to your letter',
+  writeAuthor: 'Write to the author',
+  authorPlaceholder: 'A problem, a feature you want, or just a few words. The author writes back.',
+  attachReport: 'Attach a de-identified diagnostic report',
+  attachHint: 'Only the app version, field shapes and unrecognized model numbers — no account, health values or location',
+  reportFailedPlain: 'The diagnostic report did not go through, so it is no longer attached. Press Send again to send just the letter.',
 }, {
   to: 'Para: usuario',
   toDeveloper: 'Para: el desarrollador de ZeppBridge',

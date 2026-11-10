@@ -1,2 +1,11 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
+components/letters/letters.attachHint
+components/letters/letters.attachReport
+components/letters/letters.authorPlaceholder
+components/letters/letters.reportFailedPlain
+components/letters/letters.writeAuthor
+components/shell/AppTopBar.holdForLetters
+components/shell/AppTopBar.mailTitle
+views/settings/sections/account.writeToAuthor
+views/settings/sections/account.writeToAuthorBody

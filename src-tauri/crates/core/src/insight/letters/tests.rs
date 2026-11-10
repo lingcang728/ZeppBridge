@@ -119,6 +119,37 @@ fn a_sealed_capsule_hides_its_words_until_the_day_comes() {
 }
 
 #[test]
+fn mail_status_reports_only_the_newest_weekly_and_capsules_whose_day_has_come() {
+    let db = db();
+    let today = day("2026-10-26");
+    let empty = db.data_letter_mail_status(today).unwrap();
+    assert_eq!(empty.latest_weekly_id, None);
+    assert!(empty.due_capsule_ids.is_empty());
+
+    daily(&db, "2026-10-22", "resting_hr", 52.0);
+    db.ensure_weekly_letter(today, now()).unwrap();
+    let later = db
+        .seal_capsule("以后再看", day("2027-01-01"), today, now())
+        .unwrap();
+    let sooner = db
+        .seal_capsule("先到的这封", day("2026-11-01"), today, now())
+        .unwrap();
+
+    let before = db.data_letter_mail_status(day("2026-10-31")).unwrap();
+    assert!(before.latest_weekly_id.is_some());
+    assert!(before.due_capsule_ids.is_empty(), "没到日子的胶囊不提醒");
+
+    let due = db.data_letter_mail_status(day("2026-11-01")).unwrap();
+    assert_eq!(due.due_capsule_ids, vec![sooner], "开封日当天就算到了");
+    assert!(!due.due_capsule_ids.contains(&later));
+
+    // 拆过的不再提醒。
+    db.open_capsule(sooner, day("2026-11-01"), now()).unwrap();
+    let after = db.data_letter_mail_status(day("2026-11-01")).unwrap();
+    assert!(after.due_capsule_ids.is_empty());
+}
+
+#[test]
 fn on_this_day_skips_empty_years_and_keeps_leap_days() {
     let db = db();
     daily(&db, "2024-02-29", "steps", 8000.0);

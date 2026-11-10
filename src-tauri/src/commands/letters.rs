@@ -8,8 +8,8 @@ use std::path::Path;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use zeppbridge_core::letters::{
-    is_letter_version, normalize_also_hit, normalize_locale, random_install_bytes, sanitize_reply,
-    LetterBoxState, LetterReceipt, PendingReply, SentReply,
+    is_letter_version, is_report_id, normalize_also_hit, normalize_locale, random_install_bytes,
+    sanitize_reply, LetterBoxState, LetterReceipt, PendingReply, SentReply,
 };
 
 const REPLY_ENDPOINT: &str = "https://zeppbridge.com/api/letters/reply";
@@ -76,7 +76,22 @@ fn client() -> Result<reqwest::Client, AppError> {
 }
 
 async fn deliver(client: &reqwest::Client, install_id: &str, reply: &PendingReply) -> Delivery {
-    let body = serde_json::json!({
+    let delivery = post_reply(client, install_id, reply, true).await;
+    // 附了诊断报告编号、服务端却说字段不对：多半是网站那边还没上新接口。去掉编号再寄一次，信不能丢；
+    // 报告本身已经单独交上去了。
+    if matches!(delivery, Delivery::Rejected(422)) && reply.report_id.is_some() {
+        return post_reply(client, install_id, reply, false).await;
+    }
+    delivery
+}
+
+async fn post_reply(
+    client: &reqwest::Client,
+    install_id: &str,
+    reply: &PendingReply,
+    with_report: bool,
+) -> Delivery {
+    let mut body = serde_json::json!({
         "format": "zeppbridge.letter-reply.v1",
         "installId": install_id,
         "appVersion": reply.app_version,
@@ -86,6 +101,9 @@ async fn deliver(client: &reqwest::Client, install_id: &str, reply: &PendingRepl
         "allowQuote": reply.allow_quote,
         "alsoHit": reply.also_hit,
     });
+    if let (true, Some(report_id)) = (with_report, reply.report_id.as_ref()) {
+        body["reportId"] = serde_json::Value::String(report_id.clone());
+    }
     let Ok(response) = client.post(REPLY_ENDPOINT).json(&body).send().await else {
         return Delivery::Retry;
     };
@@ -151,6 +169,7 @@ pub async fn letters_state(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri 命令的参数就是前端传来的字段
 pub async fn letters_send_reply(
     state: tauri::State<'_, AppState>,
     local_id: String,
@@ -159,7 +178,10 @@ pub async fn letters_send_reply(
     text: String,
     allow_quote: bool,
     also_hit: Vec<String>,
+    report_id: Option<String>,
 ) -> std::result::Result<LetterSendResult, AppError> {
+    // 只收 /api/feedback 发的那种编号（小写 UUID），别的一律不带，免得把奇怪的东西寄出去。
+    let report_id = report_id.filter(|id| is_report_id(id));
     let text = sanitize_reply(&text);
     let also_hit = normalize_also_hit(&also_hit);
     let locale = normalize_locale(&locale).unwrap_or("en");
@@ -188,6 +210,7 @@ pub async fn letters_send_reply(
         text,
         allow_quote,
         also_hit,
+        report_id,
         queued_at: chrono::Utc::now().to_rfc3339(),
         attempts: 0,
     });

@@ -3,6 +3,8 @@
  * 但单独一张表（migrations/0008_letter_replies.sql）——回信是人写给人的话，不是诊断证据。
  *
  *   POST /api/letters/reply     寄一封回信（可以只按「我也遇到」，不写字）
+ *                               写给作者的信可以附一份脱敏诊断报告的编号 `reportId`（/api/feedback 返回的那个，
+ *                               migrations/0010_letter_report_id.sql）；作者读信时据此找到那份报告
  *   POST /api/letters/receipts  按本机随机 install id 取回自己回信的状态（已读 / 归类 / 哪版修），
  *                               以及作者对这封信的一对一回复（migrations/0009_letter_author_reply.sql）
  *
@@ -22,6 +24,8 @@ const LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 
 const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const ECHO_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
+/** 诊断报告编号：/api/feedback 用 crypto.randomUUID() 生成。 */
+const REPORT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const response = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -37,7 +41,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const hasOnlyKeys = (value, keys) => isObject(value) && Object.keys(value).every((key) => keys.includes(key));
 const chars = (text) => Array.from(text).length;
 
-export const validateReply = (reply) => hasOnlyKeys(reply, ['format', 'installId', 'appVersion', 'letterVersion', 'locale', 'text', 'allowQuote', 'alsoHit'])
+export const validateReply = (reply) => hasOnlyKeys(reply, ['format', 'installId', 'appVersion', 'letterVersion', 'locale', 'text', 'allowQuote', 'alsoHit', 'reportId'])
   && reply.format === 'zeppbridge.letter-reply.v1'
   && typeof reply.installId === 'string' && INSTALL_ID.test(reply.installId)
   && typeof reply.appVersion === 'string' && reply.appVersion.length <= 32 && /^[0-9A-Za-z.+-]+$/.test(reply.appVersion)
@@ -48,6 +52,8 @@ export const validateReply = (reply) => hasOnlyKeys(reply, ['format', 'installId
   && Array.isArray(reply.alsoHit) && reply.alsoHit.length <= MAX_ALSO_HIT
   && reply.alsoHit.every((id) => typeof id === 'string' && ECHO_ID.test(id))
   && new Set(reply.alsoHit).size === reply.alsoHit.length
+  // 可选：附上的诊断报告编号。没附就不带这个键。
+  && (!('reportId' in reply) || (typeof reply.reportId === 'string' && REPORT_ID.test(reply.reportId)))
   // 一个字没写、也没按「我也遇到」：没什么可寄的。
   && (reply.text.trim().length > 0 || reply.alsoHit.length > 0);
 
@@ -117,11 +123,11 @@ async function reply(context, body) {
     await db.prepare(`
       INSERT INTO letter_replies (
         id, received_at, install_hash, app_version, letter_version, locale,
-        body, allow_quote, also_hit_json, content_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        body, allow_quote, also_hit_json, content_hash, report_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       replyId, receivedAt, hash, body.appVersion, body.letterVersion, body.locale,
-      body.text.trim(), body.allowQuote ? 1 : 0, JSON.stringify(body.alsoHit), contentHash,
+      body.text.trim(), body.allowQuote ? 1 : 0, JSON.stringify(body.alsoHit), contentHash, body.reportId ?? null,
     ).run();
   } catch {
     return response({ ok: false, error: 'storage_unavailable' }, 503);

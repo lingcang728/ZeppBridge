@@ -55,6 +55,10 @@ export const createDemoDataLetters = (data: DemoData): Record<string, DemoHandle
   };
   return {
     data_letters_state: () => ({ letters: letters(), on_this_day: yearAgo() }),
+    data_letters_mail_status: () => ({
+      latest_weekly_id: 1,
+      due_capsule_ids: capsules.filter(c => c.sealed && (c.open_on ?? '9999') <= day(0)).map(c => c.id),
+    }),
     data_letters_seal_capsule: a => {
       const id = 100 + capsules.length;
       capsules = [{ id, kind: 'capsule', written_at: iso(new Date()), open_on: String(a.openOn), opened_at: null, sealed: true, note: null, weekly: null, written_snapshot: null, opened_snapshot: null }, ...capsules];

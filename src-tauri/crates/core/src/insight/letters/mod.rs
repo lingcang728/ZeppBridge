@@ -93,6 +93,14 @@ pub struct OnThisDayYear {
     pub workouts: Vec<OnThisDayWorkout>,
 }
 
+/// 来信提醒要看的两样：最新一封每周来信、到了日子还没拆的胶囊。
+/// 「看没看过」不在这里判断——每周来信的已读记在界面那一侧，这里只报事实。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MailStatus {
+    pub latest_weekly_id: Option<i64>,
+    pub due_capsule_ids: Vec<i64>,
+}
+
 /// 最近一个已经过完的周（周一到周日）的最后一天。今天是周日时那周还没完，取上周日。
 pub fn last_completed_week_end(today: NaiveDate) -> NaiveDate {
     let back = match today.weekday().num_days_from_sunday() {
@@ -210,6 +218,33 @@ impl Database {
             .into_iter()
             .find(|letter| letter.id == id)
             .ok_or_else(|| invalid("没有这个胶囊"))
+    }
+
+    /// 来信提醒用的状态：最新一封每周来信的 id，和开封日已到、还封着的胶囊（按开封日从早到晚）。
+    /// 不读正文，封着的胶囊照样一个字都不给。
+    pub fn data_letter_mail_status(&self, today: NaiveDate) -> Result<MailStatus> {
+        let latest_weekly_id = self
+            .conn
+            .query_row(
+                "SELECT id FROM data_letters WHERE kind = 'weekly'
+                 ORDER BY written_at DESC, id DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let mut stmt = self.conn.prepare(
+            "SELECT id FROM data_letters
+             WHERE kind = 'capsule' AND opened_at IS NULL
+               AND open_on IS NOT NULL AND open_on <= ?1
+             ORDER BY open_on, id",
+        )?;
+        let due_capsule_ids = stmt
+            .query_map([today.to_string()], |row| row.get(0))?
+            .collect::<std::result::Result<_, _>>()?;
+        Ok(MailStatus {
+            latest_weekly_id,
+            due_capsule_ids,
+        })
     }
 
     /// 全部数据来信，新的在前；去掉用户排除的指标。

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fontsReady } from '../../lib/fontsReady';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { revealWeeklyReport } from '../../lib/revealWeeklyReport';
 import BrandUpdate from './BrandUpdate.vue';
 import { applyDesktopUpdate, downloadRatio, updateState, watchDesktopUpdate } from '../../services/updateService';
+import { mailState } from '../../services/mailState';
 import { useUpdateText } from './update.i18n';
 import Icon, { type IconName } from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
@@ -50,6 +51,8 @@ const messages = defineMessages(
     readyTitle: '同步完成，本机数据最新。点一下交给 AI。',
     readyFirstPill: '第一批数据到了 · 看这一周',
     readyFirstTitle: '第一次同步完成。点一下回概览，看这一周和平时比哪里变了。',
+    mailTitle: '有新来信 · 点开信匣',
+    holdForLetters: '长按打开信匣',
   },
   {
     mainNav: 'Main navigation',
@@ -76,6 +79,8 @@ const messages = defineMessages(
     readyTitle: 'Sync done — local data is current. Click to send it to AI.',
     readyFirstPill: 'First data is in · see this week',
     readyFirstTitle: 'First sync done. Click to go to the overview and see how this week compares with usual.',
+    mailTitle: 'New mail · open the letter box',
+    holdForLetters: 'Press and hold to open the letter box',
   },
   {
     mainNav: 'Navegación principal',
@@ -123,15 +128,39 @@ const router = useRouter();
 const u = useUpdateText();
 const updateReady = computed(() => updateState.phase === 'ready' || updateState.phase === 'applying');
 onMounted(watchDesktopUpdate);
+/* 有新来信（services/mailStatus.ts）：Z 变成信封，点一下进信匣，优先于「点一下装更新」——看完信 Z 变回来，更新的绿环还在。 */
+const hasMail = computed(() => mailState.tab !== null);
 const brandTitle = computed(() => {
+  if (hasMail.value) return t.value.mailTitle;
   if (updateState.phase === 'applying') return updateState.waiting_for_sync ? u.value.waitingSync : u.value.applying;
   if (updateReady.value && updateState.version) return u.value.ready(updateState.version);
   if (updateState.phase === 'downloading') {
     const ratio = downloadRatio(updateState);
     return u.value.downloading(ratio === null ? null : Math.round(ratio * 100));
   }
-  return props.versionTitle || t.value.brandHome;
+  return `${props.versionTitle || t.value.brandHome} · ${t.value.holdForLetters}`;
 });
+/* 平时长按标志进信匣（用户 2026-11-10 定）。长按触发后随之而来的那次 click 吞掉，不再回概览 / 装更新。 */
+const LONG_PRESS_MS = 450;
+let pressTimer = 0;
+let swallowClick = false;
+const openLetters = () => {
+  void router.push({ path: '/letters', query: mailState.tab ? { tab: mailState.tab } : {} });
+};
+const onBrandDown = (event: PointerEvent) => {
+  if (event.button !== 0) return;
+  swallowClick = false;
+  window.clearTimeout(pressTimer);
+  pressTimer = window.setTimeout(() => { swallowClick = true; openLetters(); }, LONG_PRESS_MS);
+};
+const cancelBrandPress = () => window.clearTimeout(pressTimer);
+const onBrandClick = () => {
+  if (swallowClick) { swallowClick = false; return; }
+  if (hasMail.value) openLetters();
+  else if (updateReady.value) void applyDesktopUpdate();
+  else if (route.path !== '/') void router.push('/');
+};
+onBeforeUnmount(cancelBrandPress);
 const activeBranch = computed(() => navigationBranch(route.path));
 const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
 const goTo = (to: string | number) => { void router.push(String(to)); };
@@ -428,31 +457,27 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
         <GlassRim />
         <Icon name="arrow-left" :size="20" />
       </button>
+      <!-- 只留标志（用户 2026-10-04）：以前旁边还有「ZeppBridge 3」字标，英文等标签长的语言里顶栏放不下，
+           字标先画出来、量完再被收掉，切语言时闪一下。
+           平时 / 有新信 / 更新下好了是同一个按钮（换元素会重挂载，Z ↔ 信封的过渡就播不出来）：
+           点一下按状态回概览、进信匣或装更新；长按进信匣。 -->
       <button
-        v-if="updateReady"
         type="button"
         :class="['brand', 'brand-button', { 'is-off': backTo }]"
         :title="brandTitle"
         :aria-label="brandTitle"
-        :disabled="updateState.phase === 'applying'"
+        :disabled="!hasMail && updateState.phase === 'applying'"
         :aria-hidden="backTo ? 'true' : undefined"
         :inert="backTo ? true : undefined"
-        @click="applyDesktopUpdate()"
+        @pointerdown="onBrandDown"
+        @pointerup="cancelBrandPress"
+        @pointerleave="cancelBrandPress"
+        @pointercancel="cancelBrandPress"
+        @contextmenu.prevent
+        @click="onBrandClick"
       >
-        <BrandUpdate :size="30" />
+        <BrandUpdate :size="30" :mail="hasMail" />
       </button>
-      <RouterLink
-        v-else
-        to="/"
-        :class="['brand', { 'is-off': backTo }]"
-        :title="brandTitle"
-        :aria-hidden="backTo ? 'true' : undefined"
-        :inert="backTo ? true : undefined"
-      >
-        <!-- 只留标志（用户 2026-10-04）：以前旁边还有「ZeppBridge 3」字标，英文等标签长的语言里顶栏放不下，
-             字标先画出来、量完再被收掉，切语言时闪一下。 -->
-        <BrandUpdate :size="30" />
-      </RouterLink>
 
     </div>
 

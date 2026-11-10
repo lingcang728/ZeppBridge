@@ -10,7 +10,9 @@
  */
 import '../components/letters/paper.css';
 import '../components/letters/letterRail.css';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { mailState } from '../services/mailState';
 import { useSectionTour } from '../composables/useTour';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
@@ -18,10 +20,12 @@ import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeTile from '../components/letters/EnvelopeTile.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import DataLetters from '../components/letters/DataLetters.vue';
+import AuthorCompose, { type ReportCategory } from '../components/letters/AuthorCompose.vue';
+import { backend, toUserMessage } from '../lib/bridge';
 import { useDataLetterText } from '../components/letters/dataLetters.i18n';
 import { useLetterText } from '../components/letters/letters.i18n';
 import { echoTitles, letterVersions } from '../services/letters';
-import { isNewAuthorReply, letterBox, loadLetterBox, markAuthorReplySeen, repliedTo, syncLetterBox } from '../services/letterBox';
+import { clearDraft, isNewAuthorReply, letterBox, loadDraft, loadLetterBox, markAuthorReplySeen, repliedTo, saveDraft, sendLetterReply, syncLetterBox } from '../services/letterBox';
 import { BUNDLED_VERSION, groupRows, loadBundledNotes, releaseRows, type NoteGroup } from '../services/updateNotice';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { dayKey } from '../lib/aiTask/bridgeScale';
@@ -30,9 +34,16 @@ import type { CustomLetter } from '../composables/useLetterEnvelope';
 import type { LetterReceipt, PendingLetterReply, SentLetterReply } from '../types/letters';
 
 type Tab = 'letters' | 'mine' | 'replies' | 'stamps';
+const TABS: Tab[] = ['letters', 'mine', 'replies', 'stamps'];
 const t = useLetterText();
 const dataText = useDataLetterText();
-const tab = ref<Tab>('letters');
+/* 从左上角的信封点进来带着 `?tab=`（新信在哪一栏就落在哪一栏）。 */
+const route = useRoute();
+const queryTab = () => (TABS.includes(route.query.tab as Tab) ? (route.query.tab as Tab) : null);
+const tab = ref<Tab>(queryTab() ?? 'letters');
+watch(() => route.query.tab, () => { const next = queryTab(); if (next) tab.value = next; });
+/* 有新信的分栏在名字后面点一个小圆点（作者回信 → 我的回信；每周来信 / 到期胶囊 → 你的信）。 */
+const freshTab = (value: Tab) => mailState.tab === value;
 const tabs = computed(() => [
   { value: 'letters' as const, label: t.value.tabLetters },
   { value: 'mine' as const, label: dataText.value.tab },
@@ -100,6 +111,73 @@ const reread = async (version: string, event: MouseEvent) => {
   const notes = version === BUNDLED_VERSION ? await loadBundledNotes(version, locale.value) : null;
   reading.value = { version, notes: notes ? groupRows(releaseRows(notes)) : null, origin };
 };
+/* 写给作者（2026-11-10「写信 = 反馈」）：「我的回信」第一只是没封口的空信封，点开抽出一张空信纸来写；
+   可以附一份脱敏诊断报告（先交报告拿编号，再随信寄出）。草稿存本机（和回信草稿同一套，键是 author）。
+   设置里原来的「反馈问题」卡跳到这里：/letters?write=1。 */
+const AUTHOR_DRAFT = 'author';
+const authorDraft = ref(loadDraft(AUTHOR_DRAFT));
+watch(authorDraft, (draft) => saveDraft(AUTHOR_DRAFT, draft), { deep: true });
+const attach = ref(route.query.write === 'device' || route.query.write === 'report');
+const category = ref<ReportCategory>(route.query.write === 'device' ? 'device' : 'other');
+const writing = ref<{ custom: CustomLetter; origin: HTMLElement } | null>(null);
+const composer = ref<InstanceType<typeof AuthorCompose> | null>(null);
+const sendingAuthor = ref(false);
+const authorError = ref('');
+const writeAuthor = (origin: HTMLElement) => {
+  authorError.value = '';
+  writing.value = {
+    custom: { title: t.value.writeAuthor, to: t.value.toDeveloper, stamp: '', mine: true, sheets: [{ id: 'compose', label: t.value.writeAuthor, fixed: true }], compose: true },
+    origin,
+  };
+};
+const sendAuthor = async (close: () => Promise<void>) => {
+  if (sendingAuthor.value) return;
+  sendingAuthor.value = true;
+  authorError.value = '';
+  const text = authorDraft.value.text.trim();
+  let reportId: string | undefined;
+  if (attach.value) {
+    try {
+      reportId = (await backend.submitDiagnosticReport(undefined, category.value)).reportId;
+    } catch {
+      /* 报告没交上去：取消附带、留着草稿，再点一次就只寄信。 */
+      attach.value = false;
+      authorError.value = t.value.reportFailedPlain;
+      sendingAuthor.value = false;
+      return;
+    }
+  }
+  try {
+    await sendLetterReply({
+      localId: authorDraft.value.localId, letterVersion: BUNDLED_VERSION, locale: locale.value, text,
+      allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}),
+    });
+  } catch (error) {
+    authorError.value = toUserMessage(error, t.value.queued);
+    sendingAuthor.value = false;
+    return;
+  }
+  clearDraft(AUTHOR_DRAFT);
+  authorDraft.value = loadDraft(AUTHOR_DRAFT);
+  attach.value = false;
+  await composer.value?.fold();
+  sendingAuthor.value = false;
+  tab.value = 'replies';
+  await close();
+};
+/* 带着 ?write= 进来：落在「我的回信」，从那只空信封里抽出信纸。 */
+const composeTile = ref<HTMLElement | null>(null);
+const openFromQuery = async () => {
+  if (!route.query.write) return;
+  tab.value = 'replies';
+  await nextTick();
+  await new Promise((resolve) => window.setTimeout(resolve, 320));
+  const tile = composeTile.value?.querySelector<HTMLElement>('.envelope-tile, button') ?? composeTile.value;
+  if (tile) writeAuthor(tile);
+};
+onMounted(openFromQuery);
+watch(() => route.query.write, openFromQuery);
+
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('letters');
 </script>
@@ -107,7 +185,12 @@ useSectionTour('letters');
 <template>
   <section class="page letter-box" aria-labelledby="letter-box-title">
     <PageHeader title-id="letter-box-title" :title="t.boxTitle" :intro="t.boxSub">
-      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" data-tour="letter-tabs" />
+      <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" data-tour="letter-tabs">
+        <template #default="{ item }">
+          <span class="seg-label" :data-label="item.label">{{ item.label }}</span>
+          <i v-if="freshTab(item.value)" class="tab-dot" aria-hidden="true"></i>
+        </template>
+      </SegmentTrack>
     </PageHeader>
 
     <!-- 换分栏：旧的淡出、淡完新的淡入，不位移（2026-10-29 用户：以前是硬切）。 -->
@@ -129,8 +212,11 @@ useSectionTour('letters');
     </section>
 
     <section v-else-if="tab === 'replies'" key="replies" class="box-section" :aria-busy="syncing">
-      <p v-if="!letterBox.view.sent.length && !letterBox.view.outbox.length" class="box-empty">{{ t.emptyReplies }}</p>
-      <ul v-else class="letter-rail">
+      <ul class="letter-rail">
+        <li ref="composeTile" class="letter-rail-item">
+          <EnvelopeTile :label="t.writeAuthor" face="back" :tilt="-0.8" @open="writeAuthor($event.currentTarget as HTMLElement)" />
+          <p class="letter-rail-caption">{{ t.writeAuthor }}</p>
+        </li>
         <li v-for="(pending, i) in letterBox.view.outbox" :key="pending.local_id" class="letter-rail-item">
           <EnvelopeTile :label="`${t.letterHead(pending.letter_version)} · ${t.outbox}`" :version="pending.letter_version" :to="t.toDeveloper" mine
             :tilt="(i % 3 - 1) * 0.8" @open="readMine(pending, $event)" />
@@ -162,6 +248,12 @@ useSectionTour('letters');
     </section>
     </Transition>
 
+    <LetterEnvelope v-if="writing" :versions="[]" current="" :custom="writing.custom" :origin="writing.origin" @done="writing = null">
+      <template #sheet="{ close }">
+        <AuthorCompose ref="composer" v-model:text="authorDraft.text" v-model:attach="attach" v-model:category="category"
+          :busy="sendingAuthor" :error="authorError" @send="sendAuthor(close)" />
+      </template>
+    </LetterEnvelope>
     <LetterEnvelope v-if="reading" :versions="[reading.version]" :current="reading.version" :notes="reading.notes" :origin="reading.origin" @done="reading = null" />
     <LetterEnvelope v-if="mine" :versions="[]" :current="mine.version" :custom="mine.custom" :origin="mine.origin" @done="mine = null">
       <template #sheet="{ sheet }">
@@ -184,6 +276,7 @@ useSectionTour('letters');
 <style scoped>
 .box-section { display: grid; gap: 14px; margin-top: 14px; }
 .box-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.tab-dot { width: 6px; height: 6px; flex: 0 0 6px; margin-inline-start: 6px; border-radius: 50%; background: #a82c24; }
 .box-section > .button { justify-self: start; }
 
 /* 换分栏只淡入淡出：旧的快快淡掉，新的慢一点浮现。 */

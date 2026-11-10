@@ -7,10 +7,8 @@ import { RouterLink } from 'vue-router';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
-import DiagnosticReportForm from '../DiagnosticReportForm.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSyncController } from '../../../composables/useSyncController';
-import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
 import { deviceStateLabel, useDeviceAssignment, useDeviceHiding, useDevices } from '../../../composables/useDevices';
 import { useMessages } from '../../../i18n';
 import { errorTextFor } from '../../../i18n/errors';
@@ -42,7 +40,6 @@ const {
    字段。指认动作本身住在设备二级页；这里只显示它留下的结果，状态共享自
    useDeviceAssignment，两处不会各说各话。 */
 const { assignError: deviceAssignError, assignMessage: deviceAssignMessage } = useDeviceAssignment();
-const deviceDiagnostic = createDiagnosticForm();
 
 const deviceRefreshBusy = ref(false);
 const deviceRefreshMessage = ref<string | null>(null);
@@ -203,7 +200,8 @@ useSectionTour('devices');
         </details>
         <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
         <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
-        <DiagnosticReportForm :form="deviceDiagnostic" />
+        <!-- 报告随信寄（2026-11-10「写信 = 反馈」）：进信匣写给作者，默认附上诊断报告、类型选好「设备」。 -->
+        <RouterLink class="button secondary compact-btn write-author" :to="{ path: '/letters', query: { write: 'device' } }">{{ a.writeToAuthor }}</RouterLink>
       </div>
     </div>
   </section>
@@ -212,6 +210,7 @@ useSectionTour('devices');
 <style scoped src="../settings-local.css"></style>
 <style scoped>
 .compact-btn { min-height: 30px; padding: 4px 12px; font-size: var(--fs-xs); }
+.write-author { justify-self: start; text-decoration: none; }
 .device-row { color: inherit; text-decoration: none; transition: background var(--dur-fast) ease; }
 a.device-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 a.device-row:hover .row-chevron { color: var(--ink); transform: translateX(2px); }

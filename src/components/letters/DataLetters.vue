@@ -23,6 +23,7 @@ import { useDataLetterFormat } from './useDataLetterFormat';
 import { useLetterText } from './letters.i18n';
 import { backend } from '../../lib/bridge';
 import { lessMotion } from '../../lib/motion/lessMotion';
+import { markWeeklySeen, refreshMail } from '../../services/mailStatus';
 import type { CustomLetter } from '../../composables/useLetterEnvelope';
 import type { DataLetter, DataLettersView, OnThisDayYear } from '../../types/letters';
 
@@ -60,6 +61,7 @@ const reading = ref<Reading | null>(null);
 const actionError = ref('');
 
 const openWeekly = (letter: DataLetter, event: MouseEvent) => {
+  markWeeklySeen(letter.id);
   const range = t.value.weekRange(f.shortDate(letter.weekly!.recent_start), f.shortDate(letter.weekly!.recent_end));
   reading.value = {
     custom: { title: range, to: lt.value.to, stamp: f.stampDay(letter.weekly!.recent_start), sheets: [{ id: String(letter.id), label: t.value.weekly }] },
@@ -87,6 +89,7 @@ const openCapsule = async (letter: DataLetter, event: MouseEvent) => {
     try {
       await backend.dataLettersOpenCapsule(letter.id);
       await load();
+      void refreshMail();
       shown = capsules.value.find((item) => item.id === letter.id) ?? letter;
     } catch {
       actionError.value = t.value.openFailed;
