@@ -78,7 +78,7 @@ fn bundle_carries_manifest_and_entry_point() {
     let dir = Scratch::new("bundle");
     let exe = dir.path().join("zeppbridge-mcp.exe");
     std::fs::write(&exe, b"binary").unwrap();
-    let bytes = build_bundle(&exe, Some("D:\\data")).unwrap();
+    let bytes = build_bundle(&exe, Some("D:\\data"), false).unwrap();
 
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
     let mut manifest = String::new();
@@ -101,7 +101,13 @@ fn bundle_carries_manifest_and_entry_point() {
     assert_eq!(binary, b"binary");
     let config = &manifest["server"]["mcp_config"];
     assert_eq!(config["command"], exe.to_string_lossy().as_ref());
-    assert_eq!(config["args"], serde_json::json!(["--scope", "task"]));
+    // 3.1.2 起默认读整个库：不带 --scope。
+    assert_eq!(config["args"], serde_json::json!([]));
+    let task = bundle_manifest("x", None, true);
+    assert_eq!(
+        task["server"]["mcp_config"]["args"],
+        serde_json::json!(["--scope", "task"])
+    );
     assert_eq!(config["env"]["ZEPPBRIDGE_DATA_DIR"], "D:\\data");
 }
 
@@ -131,6 +137,7 @@ fn store_mcp_uses_its_unique_windowsapps_alias_for_both_commands() {
     let manifest = bundle_manifest(
         sidecar.path.as_deref().unwrap(),
         sidecar.data_dir_env.as_deref(),
+        false,
     );
     assert_eq!(
         manifest["server"]["mcp_config"]["command"],
@@ -208,4 +215,57 @@ fn stale_clients_are_the_ones_pointing_at_another_mcp_program() {
     std::fs::remove_dir_all(appdata.join("Claude")).unwrap();
     std::fs::write(home.join(".claude.json"), "{\"mcpServers\":{}}").unwrap();
     assert!(stale_clients(&roots, &sidecar).is_empty());
+}
+
+/// 3.1.2 起默认读整个库：指向这一份、但读取范围和开关对不上的客户端要提醒重新连。
+/// 也认 OpenCode（v2 的 `mcp.servers`）、Grok（和 Codex 同一套 TOML）、Factory（`mcpServers`）。
+#[test]
+fn scope_stale_clients_are_the_ones_registered_with_the_other_scope() {
+    use super::stale::{scope_stale_clients, stale_clients, ClientConfigRoots};
+    let dir = Scratch::new("scope-stale");
+    let home = dir.path().join("home");
+    let sidecar = dir.path().join("app").join("zeppbridge-mcp.exe");
+    let current = sidecar.to_string_lossy().to_string();
+    let roots = ClientConfigRoots {
+        home: Some(home.clone()),
+        appdata: None,
+    };
+    std::fs::create_dir_all(home.join(".grok")).unwrap();
+    std::fs::create_dir_all(home.join(".config").join("opencode")).unwrap();
+    std::fs::create_dir_all(home.join(".factory")).unwrap();
+    std::fs::write(
+        home.join(".claude.json"),
+        serde_json::json!({ "mcpServers": { "zeppbridge": { "command": current, "args": ["--scope", "task"] } } })
+            .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        home.join(".grok").join("config.toml"),
+        format!(
+            "[mcp_servers.zeppbridge]\ncommand = '{current}'\nargs = []\n\n[mcp_servers.zeppbridge.env]\nX = \"1\"\n"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        home.join(".config").join("opencode").join("opencode.json"),
+        serde_json::json!({ "mcp": { "servers": { "zeppbridge": {
+            "type": "local", "command": [current, "--scope=task"]
+        } } } })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        home.join(".factory").join("mcp.json"),
+        serde_json::json!({ "mcpServers": { "zeppbridge": {
+            "type": "stdio", "command": "D:/old/zeppbridge-mcp.exe", "args": []
+        } } })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(stale_clients(&roots, &sidecar), ["factory"]);
+    assert_eq!(
+        scope_stale_clients(&roots, &sidecar, false),
+        ["claude_code", "opencode"]
+    );
+    assert_eq!(scope_stale_clients(&roots, &sidecar, true), ["grok"]);
 }

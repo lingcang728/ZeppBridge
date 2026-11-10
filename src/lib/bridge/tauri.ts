@@ -13,6 +13,7 @@ import type {
   AiTaskTemplate,
   BridgeBackend,
   McpSidecar,
+  McpWrite,
   UnlistenFn,
   WorkoutDetailCoverage,
   WorkoutDetailChannel,
@@ -199,6 +200,9 @@ export const tauriBackend: BridgeBackend = {
   trainingPlanSetAiPublish(allowed) { return call<boolean>('training_plan_set_ai_publish', { allowed }); },
   getMcpSidecar() { return call<McpSidecar>('get_mcp_sidecar'); },
   saveMcpBundle(directory) { return call<string>('save_mcp_bundle', { directory }); },
+  mcpWritesList() { return call<McpWrite[]>('mcp_writes_list'); },
+  mcpWriteUndo(id) { return call<McpWrite[]>('mcp_write_undo', { id }); },
+  setMcpTaskOnly(on) { return call<boolean>('set_mcp_task_only', { on }); },
   trainingPlanPublish(action, confirmClear, locale) {
     return call<PlanPublishResult>('training_plan_publish', { action, confirmClear, locale: locale ?? null });
   },

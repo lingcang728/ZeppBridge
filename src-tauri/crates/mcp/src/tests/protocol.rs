@@ -84,18 +84,29 @@ fn every_tool_declares_units_and_the_missing_value_rule() {
 }
 
 #[test]
-fn only_the_training_plan_and_coach_note_tools_write() {
-    // 健康数据只读是这个进程存在的前提。3B 起的例外是训练计划账本的起草 / 发布，批次 7 加了
-    // 教练档案的「提议」，而且必须在注解里如实声明自己会写；再加任何会写库的工具都应当先推翻这条测试。
-    const WRITERS: [&str; 3] = [
+fn only_the_declared_writers_write_and_none_of_them_deletes() {
+    // 健康数据只读是这个进程存在的前提。会写的只有用户自己的几本账（训练计划、教练档案、
+    // 3.1.2 的履历与运动标注）和两个动作，而且必须在注解里如实声明；再加会写的工具要先改这张名单。
+    const WRITERS: [&str; 11] = [
         "draft_training_plan",
         "publish_training_plan",
         "propose_coach_note",
+        "save_injury",
+        "save_life_event",
+        "save_race",
+        "save_shoe",
+        "annotate_workout",
+        "set_workout_type",
+        "sync_now",
+        "export_data",
     ];
     let tools = tool_definitions();
     for tool in &tools {
         let name = tool["name"].as_str().unwrap_or_default();
         let read_only = tool["annotations"]["readOnlyHint"].as_bool();
+        for verb in ["delete", "remove", "drop", "purge", "clear"] {
+            assert!(!name.contains(verb), "{name}：本地 AI 没有删除工具");
+        }
         if WRITERS.contains(&name) {
             assert_eq!(read_only, Some(false), "{name} 会写库，注解必须说出来");
             continue;
@@ -116,13 +127,63 @@ fn only_the_training_plan_and_coach_note_tools_write() {
         .find(|tool| tool["name"] == "publish_training_plan")
         .unwrap();
     assert_eq!(publish["annotations"]["destructiveHint"], true);
-    // 提议只进收件箱，不覆盖任何东西。
+    // 记住一句话不覆盖任何东西（撤销在桌面端）。
     let propose = tools
         .iter()
         .find(|tool| tool["name"] == "propose_coach_note")
         .unwrap();
     assert_eq!(propose["annotations"]["destructiveHint"], false);
-    assert_eq!(tools.len(), 19);
+    assert_eq!(tools.len(), 27);
+}
+
+#[test]
+fn the_guide_names_exactly_the_registered_tools() {
+    // 说明书是给任何 MCP 客户端读的：少写一个工具，AI 就不知道它；多写一个，AI 会去调不存在的工具。
+    let registered: BTreeSet<String> = tool_definitions()
+        .iter()
+        .filter_map(|tool| tool["name"].as_str().map(str::to_string))
+        .collect();
+    let prefixes = [
+        "get_",
+        "list_",
+        "save_",
+        "set_",
+        "draft_",
+        "publish_",
+        "propose_",
+        "annotate_",
+        "sync_",
+        "export_",
+    ];
+    let mentioned: BTreeSet<String> = protocol::GUIDE
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| {
+            prefixes.iter().any(|prefix| token.starts_with(prefix))
+                && token.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+        })
+        .map(str::to_string)
+        .collect();
+    assert_eq!(mentioned, registered);
+}
+
+#[test]
+fn the_guide_is_listed_and_readable_as_a_resource() {
+    let list = handle("resources/list", &json!({})).unwrap();
+    assert_eq!(list["resources"][0]["uri"], "zeppbridge://guide");
+    let read = handle("resources/read", &json!({ "uri": "zeppbridge://guide" })).unwrap();
+    assert!(read["contents"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("no delete tools"));
+    assert!(handle("resources/read", &json!({ "uri": "zeppbridge://nope" })).is_err());
+    let init = handle("initialize", &json!({})).unwrap();
+    assert_eq!(init["capabilities"]["resources"], json!({}));
+    assert!(init["instructions"]
+        .as_str()
+        .unwrap()
+        .contains("zeppbridge://guide"));
 }
 
 #[test]
@@ -182,7 +243,7 @@ fn a_modern_tools_list_carries_the_required_envelope() {
     assert_eq!(result["resultType"], json!("complete"));
     assert!(result["ttlMs"].as_i64().unwrap() > 0);
     assert_eq!(result["cacheScope"], json!("public"));
-    assert_eq!(result["tools"].as_array().unwrap().len(), 19);
+    assert_eq!(result["tools"].as_array().unwrap().len(), 27);
 }
 
 /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
@@ -264,7 +325,7 @@ fn argv_parsing_is_fail_closed() {
 /// 映射，这条测试就红。
 #[test]
 fn every_registered_tool_builds_a_data_request() {
-    let minimal_args: [(&str, Value); 19] = [
+    let minimal_args: [(&str, Value); 27] = [
         ("list_workouts", json!({})),
         ("get_workout_insight", json!({"workoutId": "w"})),
         ("get_metric_series", json!({"metrics": ["spo2_odi"]})),
@@ -287,6 +348,17 @@ fn every_registered_tool_builds_a_data_request() {
         ("draft_training_plan", json!({"plan": {"workouts": []}})),
         ("publish_training_plan", json!({"draftId": "plan-x"})),
         ("propose_coach_note", json!({"note": "n"})),
+        ("save_injury", json!({})),
+        ("save_life_event", json!({})),
+        ("save_race", json!({})),
+        ("save_shoe", json!({})),
+        ("annotate_workout", json!({"workoutId": "w"})),
+        ("set_workout_type", json!({"workoutId": "w", "type": null})),
+        ("sync_now", json!({})),
+        (
+            "export_data",
+            json!({"startDate": "2026-01-01", "endDate": "2026-01-02"}),
+        ),
     ];
     for tool in tool_definitions() {
         let name = tool["name"].as_str().unwrap();

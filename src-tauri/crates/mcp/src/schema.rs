@@ -1,4 +1,4 @@
-//! 十六个只读工具和三个写工具（训练计划起草、发布，教练档案提议）的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
+//! 十六个只读工具、训练计划起草 / 发布与教练档案三个写工具，加上 `schema_writes` 里 3.1.2 的六个写工具和两个动作的声明（名称、说明、参数结构、注解）。和 `docs/reference/cli-and-mcp*.md` 的工具表一一对应，
 //! 由 `the_documented_tools_are_exactly_the_registered_ones` 守着。
 
 use super::*;
@@ -6,6 +6,7 @@ use super::*;
 pub(super) fn tool_definitions() -> Vec<Value> {
     let mut tools = data_tool_definitions();
     tools.extend(coach_tool_definitions());
+    tools.extend(schema_writes::write_tool_definitions());
     // 没写注解的都是只读查询：告诉客户端可以放心自动调用。
     for tool in &mut tools {
         if tool.get("annotations").is_none() {
@@ -370,11 +371,7 @@ fn coach_tool_definitions() -> Vec<Value> {
         json!({
             "name": "propose_coach_note",
             "description": format!(
-                "提议让 ZeppBridge 记住一句关于用户的长期事实或偏好（伤病史、作息、目标、喜欢 / 不喜欢的训练……），\
-                 换任何 AI 都带得走。只是提议：放进用户的收件箱，用户在 ZeppBridge 里点了「记住」才会出现在\
-                 get_athlete_profile 的 coachNotes 里；用户拒绝过的同一句话不能再提。一条一句、写成第三人称的事实\
-                 （例：「左膝跑 15 km 以上会痛」），最多 500 字；不要记一次性的数据（今天的心率、某次运动），\
-                 那些本来就在健康数据里。不写任何健康数据表。{missing}"
+                "让 ZeppBridge 记住一句关于用户的长期事实或偏好（伤病史、作息、目标、喜欢 / 不喜欢的训练……），                 换任何 AI 都带得走。3.1.2 起直接生效：马上出现在 get_athlete_profile 的 coachNotes 里，                 并记进改动账本，用户可以在 ZeppBridge 里撤销或改写；用户拒绝或撤销过的同一句话不会再写进去。                 一条一句、写成第三人称的事实（例：「左膝跑 15 km 以上会痛」），最多 500 字；不要记一次性的数据                 （今天的心率、某次运动），那些本来就在健康数据里。不写任何健康数据表。{missing}"
             ),
             "inputSchema": {
                 "type": "object",

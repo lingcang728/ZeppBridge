@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* MCP：一句话说清是什么，两个按钮，工具名做成小标签。
+/* MCP（3.1.2 起界面叫「本地 AI」）：一句话说清是什么，连接按钮，工具名做成小标签。
  *
  * 以前这里有六段说明（跳过提示、和「交给 AI」的比较、为什么不写教程、工具列表、
  * 分发方式…），配置步骤本来就是让用户把提示词丢给 AI 去问的，界面上不用再讲一遍。
@@ -10,6 +10,8 @@ import McpConnectRow from './McpConnectRow.vue';
 import McpPublishRow from './McpPublishRow.vue';
 import AutoPasteRow from './AutoPasteRow.vue';
 import McpTaskScopes from './McpTaskScopes.vue';
+import McpScopeRow from './McpScopeRow.vue';
+import McpWritesRow from './McpWritesRow.vue';
 import type { McpSidecar } from '../../../lib/bridge/types';
 import { genericMcpConfig } from '../../../lib/mcpClients';
 import { useMessages } from '../../../i18n';
@@ -40,10 +42,22 @@ const MCP_TOOLS = computed(() => [
   { name: 'get_training_plan', detail: a.value.toolTrainingPlan },
   { name: 'draft_training_plan', detail: a.value.toolDraftPlan },
   { name: 'publish_training_plan', detail: a.value.toolPublishPlan },
+  { name: 'propose_coach_note', detail: a.value.toolCoachNote },
+  { name: 'save_injury', detail: a.value.toolSaveInjury },
+  { name: 'save_life_event', detail: a.value.toolSaveLifeEvent },
+  { name: 'save_race', detail: a.value.toolSaveRace },
+  { name: 'save_shoe', detail: a.value.toolSaveShoe },
+  { name: 'annotate_workout', detail: a.value.toolAnnotate },
+  { name: 'set_workout_type', detail: a.value.toolSetType },
+  { name: 'sync_now', detail: a.value.toolSync },
+  { name: 'export_data', detail: a.value.toolExport },
 ]);
 
 /* 安装包附带了 zeppbridge-mcp 时，配置里直接填真实路径（由 McpConnectRow 读回）。 */
 const sidecar = ref<McpSidecar | null>(null);
+const connectRow = ref<InstanceType<typeof McpConnectRow> | null>(null);
+/* 「只给共享任务」改了：重读一次，连接按钮复制的命令和「范围对不上」的提示跟着变。 */
+const onScopeChanged = () => { void connectRow.value?.refresh(); };
 const mcpConfigExample = computed(() => genericMcpConfig(sidecar.value, t.value.mcpConfigPathPlaceholder));
 
 const mcpMessage = ref<string | null>(null);
@@ -78,7 +92,7 @@ const copyMcpConfig = () => copy(
           <span class="s-row-title">{{ a.lead }}</span>
         </div>
       </div>
-      <McpConnectRow @sidecar="sidecar = $event" />
+      <McpConnectRow ref="connectRow" @sidecar="sidecar = $event" />
       <!-- 命令行工具随应用附带（3.1.1 起）：只给路径，脚本、计划任务怎么调由用户自己定。 -->
       <div v-if="sidecar?.cli_path" class="s-row">
         <div class="s-row-main">
@@ -111,6 +125,8 @@ const copyMcpConfig = () => copy(
       </details>
       <AutoPasteRow />
       <McpPublishRow />
+      <McpWritesRow />
+      <McpScopeRow v-if="sidecar" :initial="!!sidecar.task_only" @changed="onScopeChanged" />
       <McpTaskScopes />
     </div>
   </section>

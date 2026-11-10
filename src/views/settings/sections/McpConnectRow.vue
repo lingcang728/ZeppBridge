@@ -1,16 +1,16 @@
 <script setup lang="ts">
 /**
- * 「连到 Claude Code / Codex / Claude Desktop」（3B 打包）。
+ * 「连到本地 AI」（3B 打包；3.1.2 加 OpenCode / Grok Build / Factory）。
  *
  * 安装包把 zeppbridge-mcp 放在 exe 旁边，后端告诉我们它在哪，按钮就能给出
- * 能直接跑的命令；Claude Desktop 则存一个 .mcpb 让用户双击安装。
- * 开发构建、浏览器预览里没有 sidecar，三个按钮不可点，退回下面的提示词 / 配置。
+ * 能直接跑的命令；Claude Desktop 则存一个 .mcpb 让用户双击安装，Factory 复制一段 JSON。
+ * 开发构建、浏览器预览里没有 sidecar，按钮不可点，退回下面的提示词 / 配置。
  */
 import { computed, onMounted, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../../../lib/bridge';
-import type { McpSidecar } from '../../../lib/bridge/types';
-import { claudeCodeCommands, codexCommands, MCP_CLIENT_NAMES } from '../../../lib/mcpClients';
+import type { McpClientId, McpSidecar } from '../../../lib/bridge/types';
+import { COMMAND_PRESETS, factoryConfig, MCP_CLIENT_NAMES } from '../../../lib/mcpClients';
 import { locale, useMessages } from '../../../i18n';
 import { aiCardMessages } from './ai.i18n';
 
@@ -19,12 +19,14 @@ const emit = defineEmits<{ sidecar: [McpSidecar | null] }>();
 const sidecar = ref<McpSidecar | null>(null);
 const note = ref<{ text: string; ok: boolean } | null>(null);
 const busy = ref(false);
-/** 登记了旧版 MCP 的客户端（产品名不翻译）：中文用顿号，其他语言用逗号。 */
-const staleNames = computed(() => (sidecar.value?.stale_clients ?? [])
+/** 产品名不翻译：中文用顿号，其他语言用逗号。 */
+const names = (clients: McpClientId[] | undefined) => (clients ?? [])
   .map((client) => MCP_CLIENT_NAMES[client])
-  .join(locale.value.startsWith('zh') ? '、' : ', '));
+  .join(locale.value.startsWith('zh') ? '、' : ', ');
+const staleNames = computed(() => names(sidecar.value?.stale_clients));
+const scopeStaleNames = computed(() => names(sidecar.value?.scope_stale_clients));
 
-onMounted(async () => {
+const refresh = async () => {
   if (!isDesktop()) return;
   try {
     sidecar.value = await backend.getMcpSidecar();
@@ -32,18 +34,23 @@ onMounted(async () => {
     sidecar.value = null;
   }
   emit('sidecar', sidecar.value);
-});
+};
+onMounted(refresh);
+defineExpose({ refresh });
 
-const copyCommands = async (build: (s: McpSidecar) => string | null) => {
-  const text = sidecar.value ? build(sidecar.value) : null;
+const copyText = async (text: string | null, done: string) => {
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    note.value = { text: a.value.connectCopied, ok: true };
+    note.value = { text: done, ok: true };
   } catch (e) {
     note.value = { text: toUserMessage(e, ''), ok: false };
   }
 };
+const copyCommands = (build: (s: McpSidecar) => string | null) =>
+  copyText(sidecar.value ? build(sidecar.value) : null, a.value.connectCopied);
+const copyFactory = () =>
+  copyText(sidecar.value?.path ? factoryConfig(sidecar.value, '') : null, a.value.factoryCopied);
 
 const saveBundle = async () => {
   busy.value = true;
@@ -71,23 +78,26 @@ const saveBundle = async () => {
       <span class="s-row-sub">{{ sidecar?.path ? a.connectSub : sidecar?.appimage ? a.sidecarAppImage : a.sidecarMissing }}</span>
     </div>
     <div class="s-actions connect-actions">
-      <button class="button secondary" type="button" :disabled="!sidecar?.path" @click="copyCommands(claudeCodeCommands)">
-        <Icon name="terminal" :size="14" />Claude Code
-      </button>
-      <button class="button secondary" type="button" :disabled="!sidecar?.path" @click="copyCommands(codexCommands)">
-        <Icon name="terminal" :size="14" />Codex
+      <button v-for="preset in COMMAND_PRESETS" :key="preset.id" class="button secondary" type="button"
+        :disabled="!sidecar?.path" @click="copyCommands(preset.build)">
+        <Icon name="terminal" :size="14" />{{ MCP_CLIENT_NAMES[preset.id] }}
       </button>
       <button class="button secondary" type="button" :disabled="!sidecar?.path || busy" @click="saveBundle">
-        <Icon name="export" :size="14" />Claude Desktop
+        <Icon name="export" :size="14" />{{ MCP_CLIENT_NAMES.claude_desktop }}
+      </button>
+      <button class="button secondary" type="button" :disabled="!sidecar?.path" @click="copyFactory">
+        <Icon name="copy" :size="14" />{{ MCP_CLIENT_NAMES.factory }}
       </button>
     </div>
+    <p v-if="sidecar?.outdated" class="hint-line stale-line" role="alert">{{ a.sidecarOutdated }}</p>
     <p v-if="staleNames" class="hint-line stale-line" role="status">{{ a.staleClients(staleNames) }}</p>
+    <p v-if="scopeStaleNames" class="hint-line stale-line" role="status">{{ a.scopeStale(scopeStaleNames) }}</p>
     <p v-if="note" class="hint-line" :class="{ ok: note.ok }" :role="note.ok ? 'status' : 'alert'">{{ note.text }}</p>
   </div>
 </template>
 
 <style scoped src="../settings-local.css"></style>
 <style scoped>
-.connect-actions { margin-top: 10px; }
+.connect-actions { flex-wrap: wrap; margin-top: 10px; }
 .stale-line { color: var(--warning); }
 </style>

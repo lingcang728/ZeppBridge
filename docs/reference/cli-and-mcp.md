@@ -286,30 +286,41 @@ On macOS, cron needs Full Disk Access to read the data directory.
 
 ## zeppbridge-mcp
 
-Uses stdio transport. It **listens on no port and makes no network requests**.
+Uses stdio transport. It **listens on no port and makes no network requests** of its
+own (`sync_now` starts the bundled `zeppbridge-cli`, and `publish_training_plan` sends a
+plan to Zepp — both only when called).
 Each request line is limited to 1 MiB. Malformed UTF-8/JSON and oversized lines
 receive an error; subsequent lines can still be processed. Tool execution
 failures are returned in `result` with `isError: true` and explanatory text.
 Unknown tools and malformed call envelopes remain JSON-RPC errors.
-Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
-tool list happening to contain no write operations.
+Reads go through a `PRAGMA query_only` connection; the few tools that write open
+their own short write connection under the cross-process write lock.
 
 ### Connecting from the desktop app
 
 The installers put `zeppbridge-mcp` next to the app's own executable: beside
 `ZeppBridge.exe` on Windows (installer and portable build), inside
 `ZeppBridge.app/Contents/MacOS/` on macOS, and in `/usr/bin` for the Linux deb
-and rpm packages. **Settings › AI tools › Connect an AI tool** then fills in the
-real path for you:
+and rpm packages. **Settings › AI tools › Connect a local AI** then fills in the
+real path for you. From 3.1.2 the generated configuration reads the whole library
+(no `--scope` flag); the **Only shared tasks** switch there adds `--scope task`, and
+the card flags clients still registered with the other setting. Presets: Claude Code,
+Codex, Claude Desktop, OpenCode, Grok Build, Factory, and a generic `mcpServers` JSON
+for anything else (DeepSeek Harness included):
 
-- **Claude Code** and **Codex** copy three commands: register the MCP server
-  (with `--scope task`), add this repository as a plugin marketplace, and
+- **Claude Code** and **Codex** copy three commands: register the MCP server,
+  add this repository as a plugin marketplace, and
   install the `zepp-coach` coaching skill. Paste them into a terminal. The
   `--` separator is written as `"--"` because PowerShell swallows a bare `--`
   before it reaches the npm-installed CLIs.
 - **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. The
   extension starts the `zeppbridge-mcp` installed next to the app, so it
-  updates together with ZeppBridge.
+  updates together with ZeppBridge. Claude Desktop keeps that program running,
+  which used to stop an update from replacing it (an old MCP then refused the
+  newer library); from 3.1.2 the installer closes it first, and the settings card
+  warns when the program next to the app is older than the app.
+- **OpenCode** and **Grok Build** copy one `mcp add` command; **Factory** copies a
+  `~/.factory/mcp.json` entry.
 
 When the app's library is not the `data` folder next to the executable, the
 generated configuration also sets `ZEPPBRIDGE_DATA_DIR`. Builds without the
@@ -427,7 +438,15 @@ outside the grants — `error.permittedRanges` lists the actual
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
 | `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
-| `propose_coach_note` | **Writes (a proposal)**: puts one sentence about the user (an injury, a routine, a preference) into the desktop inbox; it reaches `get_athlete_profile` only after the user taps "Remember" |
+| `propose_coach_note` | **Writes**: remembers one sentence about the user (an injury, a routine, a preference). From 3.1.2 it takes effect at once in `get_athlete_profile` and is recorded in the change ledger; a sentence the user rejected or undid is never written again |
+| `save_injury` | **Writes**: adds or edits an injury (body part, severity 1–3, start date; set `endDate` when healed) |
+| `save_life_event` | **Writes**: adds or edits a life event (category, dates, `epoch` for a named era) |
+| `save_race` | **Writes**: adds or edits a race (date, sport, distance in m, goal and result in s, priority a/b/c) |
+| `save_shoe` | **Writes**: adds or edits a pair of shoes (sport, start and retire km; set `retiredOn` to retire) |
+| `annotate_workout` | **Writes**: the user's own RPE (1–10) and sore body parts for one workout; the watch's RPE and the shoe choice are untouched |
+| `set_workout_type` | **Writes**: corrects a workout's sport type, the same path as the desktop's "Change type" (the cloud record is not changed) |
+| `sync_now` | **Action**: pulls new data from Zepp cloud by starting the `zeppbridge-cli` next to it (`sync --json --no-reprocess`); waits up to 45 s, then reports `running` and lets the CLI finish. `deferred` while a local reparse is pending |
+| `export_data` | **Action**: writes a summary JSON for a date range (≤ 366 days, no routes) into the data folder's `exports`, returning the file name relative to that folder |
 
 Metrics the user switched off with **Use in analysis** (the "?" panel on a metric
 card) are removed from every tool result, in any spelling (`vo2max`, `vo2Max`, …),
@@ -489,11 +508,29 @@ the CLI cannot get either within its wait it exits with code 4 rather than
 racing the GUI.
 
 MCP's read-only queries take no write lock and can run during a sync. Drafting
-or publishing a training plan, or proposing a coach note, takes the write lock
-only for the moment it writes (waiting at most 5 seconds), never while it is on
-the network.
+or publishing a training plan, remembering a coach note or saving a logbook record
+takes the write lock only for the moment it writes (waiting at most 5 seconds),
+never while it is on the network.
 
-### Tools that write: the training plan and the coach-notes inbox
+### Tools that write: plans, coach notes, the logbook — all undoable
+
+Health data from the cloud stays read-only. From 3.1.2 a local AI can also write the
+records the user authors themselves, and every write is recorded in a change ledger
+(`mcp_writes`) with the record as it was before and after. The user undoes any of them,
+one by one, in **Settings › Local AI › Recent AI changes**: an added record is removed,
+an edited one goes back to how it was, and a coach note the AI wrote becomes "rejected"
+so the AI cannot write the same sentence back. A record that changed again afterwards is
+not rolled back (`err.mcp_writes.stale`). There are **no delete tools**: an injury heals
+with `endDate`, a shoe retires with `retiredOn`. When editing, pass the `id` and only the
+fields to change. Validation is the desktop's own, unchanged. `sync_now` and
+`export_data` are actions, not record changes, so they are not in the ledger.
+
+The server also publishes a guide for any MCP client, `zeppbridge://guide`
+(`resources/list` / `resources/read`, and named in the handshake `instructions`): the
+tool list, a recommended order (start with `get_training_context`), data rules, the
+three prohibitions, and how undo works.
+
+### Training plans
 
 Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 
@@ -516,13 +553,9 @@ Health data stays read-only. From 3.0 MCP can draft and publish training plans:
 - `sent` only means the official API accepted the request (it answers success
   to any body); the content was validated before sending. The watch still asks
   for the sub-type before the workout starts.
-- `propose_coach_note` only proposes. The note goes into a separate inbox table
-  (never a health table) and the user confirms or rejects each one in the
-  desktop app; only confirmed notes appear in `get_athlete_profile` as
-  `coachNotes`, labelled with who wrote them (the user, or the MCP client by the
-  name it reported). A sentence the user rejected cannot be proposed again, and
-  at most 20 proposals can wait at once. The user can edit, delete and export
-  every note as Markdown.
-- All six coach tools (including `get_training_context`, `get_athlete_profile`
-  and `get_training_plan`) are refused under the `task` scope: they span
-  categories and dates and cannot be honestly clipped.
+- `propose_coach_note` keeps its name for existing setups but no longer waits in
+  an inbox: the note is stored in its own table (never a health table) and appears
+  in `get_athlete_profile` as `coachNotes` at once, labelled with the MCP client's
+  reported name. The user can undo, edit, delete and export every note.
+- All coach tools, every write tool and both actions are refused under the `task`
+  scope: they span categories and dates and cannot be honestly clipped.

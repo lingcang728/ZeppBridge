@@ -199,4 +199,76 @@ impl Database {
         let rows = statement.query_map([state], note_row)?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
+
+    /// 本地 AI 直接记住一句话（3.1.2 起 MCP 的 `propose_coach_note` 不再进收件箱）。
+    /// 用户拒绝过的同一句话照旧不收；还在收件箱里的那条直接转成记住。
+    /// 写进了库的才在 `mcp_writes` 记账（调用方负责），桌面端可以逐条撤销。
+    pub fn remember_coach_note(&self, text: &str, source_name: Option<&str>) -> Result<Remembered> {
+        let text = clean_note(text)?;
+        let existing: Option<(i64, String)> = self
+            .conn
+            .query_row(
+                "SELECT id, state FROM coach_notes WHERE text = ?1 ORDER BY id DESC LIMIT 1",
+                [&text],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        match existing {
+            Some((id, state)) if state == "accepted" => Ok(Remembered::AlreadyKnown { id }),
+            Some((id, state)) if state == "proposed" => {
+                self.decide_coach_note(id, true)?;
+                Ok(Remembered::Remembered {
+                    id,
+                    was_proposed: true,
+                })
+            }
+            Some(_) => Ok(Remembered::RejectedBefore),
+            None => {
+                let now = Utc::now().to_rfc3339();
+                self.conn.execute(
+                    "INSERT INTO coach_notes(text, state, source, source_name, created_at, updated_at, decided_at)
+                     VALUES(?1, 'accepted', 'mcp', ?2, ?3, ?3, ?3)",
+                    params![text, clean_source_name(source_name), now],
+                )?;
+                Ok(Remembered::Remembered {
+                    id: self.conn.last_insert_rowid(),
+                    was_proposed: false,
+                })
+            }
+        }
+    }
+
+    /// 一条的状态和文字；找不到为 `None`。撤销前用它判断用户有没有动过。
+    pub fn coach_note_state(&self, id: i64) -> Result<Option<(String, String)>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT state, text FROM coach_notes WHERE id = ?1",
+                [id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?)
+    }
+
+    /// 撤销 AI 记住的一条：新写的改成「拒绝」（同一句话 AI 不能再写回来），
+    /// 原本在收件箱里的退回收件箱。
+    pub(crate) fn set_coach_note_state(&self, id: i64, state: &str) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "UPDATE coach_notes SET state = ?2, updated_at = ?3,
+                    decided_at = CASE WHEN ?2 = 'proposed' THEN NULL ELSE ?3 END
+              WHERE id = ?1",
+            params![id, state, now],
+        )?;
+        Ok(())
+    }
+}
+
+/// 本地 AI 直接记住的结果。只有 `Remembered` 写了库。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "outcome")]
+pub enum Remembered {
+    Remembered { id: i64, was_proposed: bool },
+    AlreadyKnown { id: i64 },
+    RejectedBefore,
 }

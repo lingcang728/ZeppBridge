@@ -50,9 +50,10 @@ pub(super) fn server_info() -> Value {
 pub(super) fn instructions(scope: &AccessScope) -> String {
     let scope_note = match scope {
         AccessScope::FullReadOnly => {
-            "full-readonly：本机全部健康数据的只读视图。会写库的只有训练计划和教练档案收件箱：\
-             draft_training_plan 只存草稿，publish_training_plan 要用户在设置里打开「允许 AI 直接发布」才放行；\
-             propose_coach_note 只把一句话放进收件箱，用户点了「记住」才生效。"
+            "full-readonly：本机全部健康数据只读。会写库的只有用户自己的那几本账：训练计划草稿\
+             （publish_training_plan 要用户在设置里打开「允许 AI 直接发布」才放行）、教练档案、伤病 / 生活事件 / 比赛 / 跑鞋、\
+             运动感受与改类型——每次写入都进改动账本，用户在 ZeppBridge 里逐条撤销；没有删除工具。\
+             sync_now 从云端拉一次新数据，export_data 把摘要写成本机文件。"
         }
         AccessScope::TaskScoped => {
             "task：只看得到桌面端标为「开放给 MCP」的任务所授权的运动与日期窗口内的数据；\
@@ -61,12 +62,42 @@ pub(super) fn instructions(scope: &AccessScope) -> String {
         }
     };
     format!(
-        "ZeppBridge 健康数据（只读）与训练计划。{}\n时间：{}\n缺失值：{}\n来源：{}\n范围：{scope_note}",
+        "ZeppBridge 健康数据与训练计划。先读资源 {GUIDE_URI}（说明书：工具清单、推荐顺序、数据口径、禁令和撤销方式），\
+         再从 get_training_context 开始。{}\n时间：{}\n缺失值：{}\n来源：{}\n范围：{scope_note}",
         contract::PRIVACY_NOTE,
         contract::TIME_CONVENTION,
         contract::MISSING_VALUE_CONVENTION,
         contract::SOURCE_CONVENTION,
     )
+}
+
+/// 只给本地 AI 读的说明书（`guide.md`，编进程序里）。
+pub(super) const GUIDE_URI: &str = "zeppbridge://guide";
+pub(super) const GUIDE: &str = include_str!("guide.md");
+
+fn resource_list() -> Value {
+    json!({ "resources": [{
+        "uri": GUIDE_URI,
+        "name": "guide",
+        "title": "ZeppBridge guide for local AI",
+        "description": "Tools, recommended order, data rules, the three prohibitions, and how the user undoes AI writes.",
+        "mimeType": "text/markdown",
+    }] })
+}
+
+fn resource_read(params: &Value) -> Result<Value, RpcError> {
+    match params.get("uri").and_then(Value::as_str) {
+        Some(GUIDE_URI) => Ok(json!({ "contents": [{
+            "uri": GUIDE_URI,
+            "mimeType": "text/markdown",
+            "text": GUIDE,
+        }] })),
+        // 规范里资源不存在用 -32002；我们这个码段里 -32002 已经是「数据库」，这里沿用无效参数。
+        other => Err(RpcError::new(
+            ERR_INVALID_PARAMS,
+            format!("没有这个资源：{}", other.unwrap_or("（缺少 uri）")),
+        )),
+    }
 }
 
 /// 请求的 `_meta` 里声明的协议版本。没有就说明这是个 legacy 客户端。
@@ -156,7 +187,7 @@ pub(super) fn handle_scoped(
         }
         return Ok(modern_result(json!({
             "supportedVersions": SUPPORTED_PROTOCOL_VERSIONS,
-            "capabilities": { "tools": {} },
+            "capabilities": { "tools": {}, "resources": {} },
             "instructions": instructions(scope),
             // 握手阶段不打开数据库，所以这里只报模式不报授权数；
             // 每个 tools/call 结果里的 scope.grants 才是实时值。
@@ -182,11 +213,13 @@ pub(super) fn handle_scoped(
             "tools/call" => call_tool(params, scope)
                 .map(modern_result)
                 .map_err(RpcError::from),
+            "resources/list" => Ok(modern_result(resource_list())),
+            "resources/read" => resource_read(params).map(modern_result),
             // `initialize` / `ping` 在这一版里已经没有了。收到它们说明客户端
             // 把两个时代混着用，明确说清楚比默默照办好。
             other => Err(RpcError::new(
                 ERR_METHOD_NOT_FOUND,
-                format!("不支持的方法：{other}。本服务只提供只读工具调用。"),
+                format!("不支持的方法：{other}。本服务只提供工具调用和说明书资源。"),
             )),
         };
     }
@@ -202,7 +235,7 @@ pub(super) fn handle_scoped(
                 .unwrap_or(LEGACY_PROTOCOL_VERSION);
             Ok(json!({
                 "protocolVersion": requested,
-                "capabilities": { "tools": {} },
+                "capabilities": { "tools": {}, "resources": {} },
                 "serverInfo": server_info(),
                 "instructions": instructions(scope),
                 // 握手只报模式：授权数按调用时实况在每个 tools/call 里给。
@@ -212,9 +245,11 @@ pub(super) fn handle_scoped(
         "notifications/initialized" | "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
         "tools/call" => call_tool(params, scope).map_err(RpcError::from),
+        "resources/list" => Ok(resource_list()),
+        "resources/read" => resource_read(params),
         other => Err(RpcError::new(
             ERR_METHOD_NOT_FOUND,
-            format!("不支持的方法：{other}。本服务只提供只读工具调用。"),
+            format!("不支持的方法：{other}。本服务只提供工具调用和说明书资源。"),
         )),
     }
 }

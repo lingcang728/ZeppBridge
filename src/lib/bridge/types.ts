@@ -389,6 +389,12 @@ export interface BridgeBackend {
   getMcpSidecar(): Promise<McpSidecar>;
   /** 把 Claude Desktop 的 ZeppBridge.mcpb 写进 directory，返回完整路径。 */
   saveMcpBundle(directory: string): Promise<string>;
+  /** 本地 AI 最近的改动（MCP 写工具的账本，新的在前，含已撤销的）。 */
+  mcpWritesList(): Promise<McpWrite[]>;
+  /** 撤销一条；之后又被改过的回 err.mcp_writes.stale。返回刷新后的列表。 */
+  mcpWriteUndo(id: number): Promise<McpWrite[]>;
+  /** 「只给共享任务」：开着时生成的配置带 --scope task。返回存下的值。 */
+  setMcpTaskOnly(on: boolean): Promise<boolean>;
   /** `locale`：界面语言，手表描述第一行的子类型按它写。 */
   trainingPlanPublish(action: PlanPublishAction, confirmClear: boolean, locale?: string): Promise<PlanPublishResult>;
   getAppStatus(): Promise<AppStatus>;
@@ -592,8 +598,28 @@ export interface McpSidecar {
   stale_clients?: McpClientId[];
   /** 附带的 zeppbridge-cli 的绝对路径（3.1.1 起）；旧安装包、开发构建、AppImage 里为空。 */
   cli_path?: string | null;
+  /** 登记的是这一份、但读取范围和「只给共享任务」对不上的客户端（3.1.2）。 */
+  scope_stale_clients?: McpClientId[];
+  /** 「只给共享任务」开着（生成的配置带 --scope task）。 */
+  task_only?: boolean;
+  /** 应用旁边那份 zeppbridge-mcp 比应用旧（更新时被 AI 客户端占着、没换掉）。 */
+  outdated?: boolean;
 }
-export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex';
+export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex' | 'opencode' | 'grok' | 'factory';
+
+/** 本地 AI 的一次写入（设置 › 本地 AI › AI 最近的改动）。 */
+export interface McpWrite {
+  id: number;
+  tool: string;
+  kind: 'injury' | 'life_event' | 'race' | 'shoe' | 'workout_feel' | 'workout_type' | 'coach_note';
+  target_id: string;
+  /** 记录的标题 / 名字 / 那句话（用户或 AI 写的数据，原样显示）。 */
+  label: string;
+  action: 'created' | 'updated';
+  source_name: string | null;
+  created_at: string;
+  undone_at: string | null;
+}
 
 export type WorkoutDetailChannel = 'advanced' | 'official';
 

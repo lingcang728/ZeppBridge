@@ -271,6 +271,16 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
                 .unwrap_or_default();
             request.whole_library = true;
         }
+        // 3.1.2 的写工具和动作：改的是整本履历、整个库，task 范围一律拒绝。
+        name if WRITE_TOOLS.contains(&name) || ACTION_TOOLS.contains(&name) => {
+            request.tool = WRITE_TOOLS
+                .iter()
+                .chain(ACTION_TOOLS.iter())
+                .find(|tool| **tool == name)
+                .copied()
+                .unwrap_or_default();
+            request.whole_library = true;
+        }
         other => {
             return Err(format!("没有名为 {other} 的工具。"));
         }
@@ -489,7 +499,10 @@ pub(super) fn run_tool(
         "get_training_plan" => run_training_plan(db),
         "draft_training_plan" => run_draft_plan(db, args),
         "publish_training_plan" => run_publish_plan(db, args),
-        "propose_coach_note" => run_propose_note(db, args),
+        "propose_coach_note" => run_remember_note(db, args),
+        "sync_now" => run_sync(db),
+        "export_data" => run_export(db, args),
+        name if WRITE_TOOLS.contains(&name) => run_write(db, name, args),
         other => Err(CallFailure::plain(format!("没有名为 {other} 的工具。"))),
     }
 }
