@@ -134,3 +134,32 @@ export function groupState(members: readonly GroupMember[], reach: number): Grou
   }
   return { active: members.some((m) => m.pose.active), amount, merged: amount >= 0.5, union: unionRect(rects) };
 }
+
+/**
+ * 两块玻璃之间的「颈」（D2 样机）：并拢时从 `from` 那边长出来、连住 `to`，分开时从中间掐断。
+ * 只有两块在 `axis` 方向上隔着一道缝、另一个方向上有重叠，且缝小于 `reach` 时才有颈；否则 null。
+ * 两端各伸进成员 `tuck` 像素，藏在成员的圆角底下，看起来是长在一起的。
+ * 粗细取两块较小那边的 `ratio`，上限 `max`。坐标系和传进来的矩形一样。
+ */
+export function bridgeRect(
+  from: LensRect,
+  to: LensRect,
+  axis: 'x' | 'y',
+  reach: number,
+  { tuck = 8, ratio = 0.5, max = 28 } = {},
+): LensRect | null {
+  const [lead, trail] = axis === 'y'
+    ? (from.y <= to.y ? [from, to] : [to, from])
+    : (from.x <= to.x ? [from, to] : [to, from]);
+  const gap = axis === 'y' ? trail.y - (lead.y + lead.h) : trail.x - (lead.x + lead.w);
+  if (gap < 0 || gap >= reach) return null;
+  // 另一个方向上两块的重叠段，颈放在它中间。
+  const lo = axis === 'y' ? Math.max(lead.x, trail.x) : Math.max(lead.y, trail.y);
+  const hi = axis === 'y' ? Math.min(lead.x + lead.w, trail.x + trail.w) : Math.min(lead.y + lead.h, trail.y + trail.h);
+  if (hi <= lo) return null;
+  const smaller = axis === 'y' ? Math.min(lead.w, trail.w) : Math.min(lead.h, trail.h);
+  const thick = Math.min(max, smaller * ratio, hi - lo);
+  const centre = (lo + hi) / 2;
+  if (axis === 'y') return { x: centre - thick / 2, y: lead.y + lead.h - tuck, w: thick, h: gap + tuck * 2 };
+  return { x: lead.x + lead.w - tuck, y: centre - thick / 2, w: gap + tuck * 2, h: thick };
+}
