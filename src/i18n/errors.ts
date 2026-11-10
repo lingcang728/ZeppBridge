@@ -570,6 +570,11 @@ const messages = defineMessages(
     'err.ai_task.prompt_export': 'No se pudo exportar el .zbprompt. Comprueba que se puede escribir en el escritorio.',
     'err.ai_task.prompt_import': 'No se pudo leer ese archivo (demasiado grande o no se puede abrir).',
     'err.letters.rejected': 'El servidor no aceptó esta respuesta. Puede que tengas que actualizar la app.',
+    'err.mcp_writes.stale':
+      'Este registro se volvió a modificar después, así que no se puede revertir a como estaba antes del cambio de la IA; edítalo en su propia página',
+    'err.mcp_writes.missing': 'Este cambio ya se había deshecho o no se encuentra',
+    'err.mcp.cli_missing':
+      'zeppbridge-cli no está junto al programa MCP, así que la IA no puede sincronizar por ti; hazlo desde ZeppBridge',
     'err.official.denied': 'Acceso no concedido: ZeppBridge no recibió datos.',
     'err.official.rejected': 'Zepp rechazó la autorización; reintenta.',
     'err.official.expired': 'Autorización caducada: iníciala de nuevo.',

@@ -27,8 +27,9 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 
 <style scoped>
 .comparison-bars { display: grid; gap: 10px; margin-block: 10px 6px; }
-.comparison-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 10px; color: var(--subtle); font-size: var(--fs-2xs); }
-.comparison-number { text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+/* 数字整段不拆：窄卡里让左边的说明换行，不把「7 uur 30 min」拆成两行（11-10 普查）。 */
+.comparison-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; color: var(--subtle); font-size: var(--fs-2xs); }
+.comparison-number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .comparison-track { grid-column: 1 / -1; height: 6px; border-radius: 6px; overflow: hidden; background: rgba(232,238,244,.08); }
 .comparison-track i { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
 /* 斜纹流动：条纹画在伪元素上、整层平移一格（24px）循环——只走合成器。以前动的是

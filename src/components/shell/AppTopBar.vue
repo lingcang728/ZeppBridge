@@ -107,6 +107,8 @@ const messages = defineMessages(
     readyTitle: 'Sincronización completada: datos al día. Clic para pasar a la IA.',
     readyFirstPill: 'Ya llegaron tus datos · ver esta semana',
     readyFirstTitle: 'Primera sincronización completada. Haz clic para ir al resumen y ver cómo va esta semana frente a lo habitual.',
+    mailTitle: 'Nueva carta · abrir el buzón',
+    holdForLetters: 'Mantén pulsado para abrir el buzón',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/shell/AppTopBar',

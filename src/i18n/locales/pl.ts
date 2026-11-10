@@ -807,9 +807,9 @@ export default {
       threshold_hr: 'Baza tętna progowego',
     },
     model: {
-      max_hr: { label: 'Strefy tętna maksymalnego', formula: 'Dolna granica strefy = tętno maks. x procent' },
-      hr_reserve: { label: 'Strefy rezerwy tętna', formula: 'Dolna granica strefy = tętno spocz. + (tętno maks. - tętno spocz.) x procent' },
-      lactate_threshold: { label: 'Strefy progu mleczanowego', formula: 'Dolna granica strefy = tętno progowe x procent' },
+      max_hr: { label: 'Strefy tętna maksymalnego', short: 'Maks. HR', formula: 'Dolna granica strefy = tętno maks. x procent' },
+      hr_reserve: { label: 'Strefy rezerwy tętna', short: 'Rezerwa HR', formula: 'Dolna granica strefy = tętno spocz. + (tętno maks. - tętno spocz.) x procent' },
+      lactate_threshold: { label: 'Strefy progu mleczanowego', short: 'Próg mleczanowy', formula: 'Dolna granica strefy = tętno progowe x procent' },
     },
     percentBands: ['Rozgrzewka', 'Spalanie tłuszczu', 'Aerobowa', 'Anaerobowa', 'Maksymalna'],
     thresholdBands: ['Spokojny', 'Wytrzymałość', 'Tempo', 'Próg', 'Anaerobowy'],
@@ -988,6 +988,20 @@ export default {
     authorSign: '— twórca ZeppBridge',
     authorRepliedOn: (date: string) => `Odpowiedź z ${date}`,
     authorNew: 'Autor odpowiedział na Twój list',
+    writeAuthor: 'Napisz do twórcy',
+    authorPlaceholder: 'Napotkany problem, wymarzona funkcja albo po prostu kilka słów. Twórca odpowiada.',
+    attachReport: 'Dołącz zanonimizowany raport diagnostyczny',
+    attachHint: 'Tylko wersja aplikacji, struktura pól i nierozpoznane numery modeli — bez konta, danych zdrowotnych i lokalizacji',
+    reportFailedPlain: 'Nie udało się przesłać raportu diagnostycznego, został odłączony. Kliknij ponownie „Wyślij”, aby wysłać sam list.',
+  },
+
+  'components/letters/stamps': {
+    kind: {
+      device: 'Nierozpoznane urządzenie',
+      workout: 'Nierozpoznany trening',
+      data: 'Dane się nie zgadzają',
+      other: 'Inny problem',
+    },
   },
 
   // Source: src/components/letters/dataLetters.i18n.ts
@@ -1494,6 +1508,8 @@ export default {
     readyTitle: 'Synchronizacja zakończona — dane lokalne są aktualne. Kliknij, aby przekazać je do AI.',
     readyFirstPill: 'Pierwsze dane pobrane · zobacz ten tydzień',
     readyFirstTitle: 'Pierwsza synchronizacja zakończona. Kliknij, aby przejść do podsumowania i sprawdzić ten tydzień w odniesieniu do normy.',
+    mailTitle: 'Nowy list · otwórz skrzynkę na listy',
+    holdForLetters: 'Przytrzymaj dłużej, aby otworzyć skrzynkę na listy',
   },
 // Source: src/components/shell/update.i18n.ts
 "components/shell/update": {
@@ -2069,6 +2085,9 @@ export default {
     'err.ai_task.bad_prompt_file': 'To nie jest poprawny plik .zbprompt (nieprawidłowy format, pochodzi z nowszej wersji lub brak promptu)',
     'err.ai_task.prompt_export': 'Nie udało się wyeksportować .zbprompt — sprawdź, czy pulpit jest dostępny do zapisu',
     'err.ai_task.prompt_import': 'Nie udało się odczytać tego pliku (jest zbyt duży lub nie można go otworzyć)',
+    'err.mcp_writes.stale': 'Ten wpis został później ponownie zmodyfikowany i nie można go przywrócić do stanu sprzed zmiany przez AI; zmień go ręcznie na odpowiedniej stronie',
+    'err.mcp_writes.missing': 'Ta zmiana została już cofnięta lub nie można jej znaleźć',
+    'err.mcp.cli_missing': 'Obok programu MCP nie ma narzędzia zeppbridge-cli, więc AI nie może zsynchronizować danych; zsynchronizuj w ZeppBridge',
   },
 
 // --- Batch 3 ---
@@ -3431,13 +3450,15 @@ Zawiera ona program MCP (zeppbridge-mcp) i chcę go z Tobą skonfigurować, aby�
 
 Co o nim wiem:
 - Program zeppbridge-mcp jest instalowany razem z aplikacją ZeppBridge, bezpośrednio obok głównego programu; ZeppBridge wyświetla jego pełną ścieżkę w „Ustawienia › Narzędzia AI”. Tylko komputer bez zainstalowanej aplikacji desktopowej potrzebuje archiwum zeppbridge-tools ze strony wydań ZeppBridge w serwisie GitHub.
-- Jest to serwer MCP typu stdio. Dane zdrowotne są tylko do odczytu, serwer nie nasłuchuje na żadnym porcie sieciowym i nie wymaga tokena ani klucza API; korzysta z sieci wyłącznie do publikowania planu treningowego i tylko po wyrażeniu na to przeze mnie zgody.
-- Typowa struktura konfiguracji to: {"mcpServers": {"zeppbridge": {"command": "<pełna ścieżka do zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Udostępnia szesnaście narzędzi tylko do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan); plus dwa narzędzia do obsługi planu treningowego: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek tylko wtedy, gdy zezwolę na to w ustawieniach); oraz propose_coach_note: umieszcza zdanie warte zapamiętania w skrzynce moich notatek trenera i zaczyna obowiązywać dopiero po kliknięciu „Zapamiętaj”.
+- Jest to serwer MCP typu stdio, nie nasłuchuje na żadnym porcie sieciowym i nie wymaga tokena ani klucza API; dane zdrowotne z chmury są tylko do odczytu, a serwer łączy się z siecią wyłącznie wtedy, gdy poproszę go o synchronizację, lub gdy zezwolę na opublikowanie planu treningowego.
+- Typowa struktura konfiguracji to: {"mcpServers": {"zeppbridge": {"command": "<pełna ścieżka do zeppbridge-mcp>", "args": []}}} (gdy w ustawieniach włączę opcję „Tylko udostępnione zadania”, args to ["--scope", "task"])
+- Po połączeniu przeczytaj najpierw zasób zeppbridge://guide — to jego przewodnik: lista narzędzi, zalecana kolejność, reguły danych i sposób cofania zmian.
+- Narzędzia do odczytu: treningi (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), wskaźniki (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sen (list_sleep_sessions, get_sleep_detail), odżywianie (get_food_data), wydarzenia życiowe (list_life_events), stan kondycji danych (get_data_health) oraz coaching (get_training_context, get_athlete_profile, get_training_plan).
+- Narzędzia do zapisu (każda zmiana jest zapisywana w rejestrze modyfikacji, który mogę cofać wpis po wpisie w ZeppBridge; niczego nie można usunąć): save_injury, save_life_event, save_race, save_shoe, annotate_workout, set_workout_type oraz propose_coach_note (zapamiętuje od razu jedno zdanie o mnie); plany treningowe: draft_training_plan (zapisuje tylko wersję roboczą) i publish_training_plan (wysyła na zegarek dopiero po zezwoleniu w ustawieniach); operacje: sync_now (jednorazowa synchronizacja z chmury) i export_data (eksportuje do pliku na tym komputerze).
 
 Powiedz mi proszę:
 1. Konkretnie w Twoim przypadku — narzędzia, z którym teraz rozmawiam — do jakiego pliku należy wpisać konfigurację lub jakim poleceniem ją dodać;
-2. Jak poprawnie zapisać ścieżkę w systemie Windows (czy ukośniki odwrotne wymagają znaków ucieczki, np. \\\\);
+2. Jak poprawnie zapisać ścieżkę w systemie Windows (czy ukośniki odwrotne wymagają znaków ucieczki);
 3. Jak sprawdzić, czy działa po skonfigurowaniu.
 
 Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego klienta korzystam, gdzie znajduje się plik), po prostu zapytaj.`,
@@ -3793,6 +3814,8 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     deviceCheck: 'Niepoprawny model? Otwórz, aby zmienić',
     unknownShort: 'Nie rozpoznano urządzenia: otwórz, aby wybrać model, lub wyślij raport, aby go dodać',
     learnMore: 'Dowiedz się więcej',
+    writeToAuthor: 'Napisz do twórcy',
+    writeToAuthorBody: 'Opinie to teraz listy: napisz do twórcy w skrzynce na listy, opcjonalnie dołączając zanonimizowany raport diagnostyczny. Twórca odpowiada.',
     hideDevice: 'Ukryj',
     hideConfirm: 'Tylko ukrywa na tej liście — jego dane pozostają, a wykresy i eksporty bez zmian.',
     hideConfirmYes: 'Ukryj je',
@@ -3819,7 +3842,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
 
   // Source: src/views/settings/sections/ai.i18n.ts
   "views/settings/sections/ai": {
-    lead: 'Zezwalaj narzędziom AI na tym komputerze (Claude Code, Codex i podobnym) na bezpośrednie sprawdzanie Twoich danych',
+    lead: 'Pozwól lokalnemu AI (Claude Code, Codex, OpenCode, Grok itp.) bezpośrednio odpytywać Twoje dane oraz zapisywać dla Ciebie kontuzje, zawody i buty biegowe',
     toolsLabel: 'Narzędzia dostępne dla AI (najedź kursorem, aby zobaczyć szczegóły)',
     scopesHint: 'Dotyczy tylko MCP uruchomionego z parametrem --scope task',
     publishTitle: 'Zezwalaj AI na bezpośrednie publikowanie planów treningowych',
@@ -3830,8 +3853,37 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     toolTrainingPlan: 'Rejestr planów treningowych: aktywny plan, stan doręczenia, wersje robocze',
     toolDraftPlan: 'Tworzy wersję roboczą planu treningowego (zapisywana jako szkic, niewysyłana na zegarek)',
     toolPublishPlan: 'Wysyła wersję roboczą na zegarek (wymaga włączenia powyższego przełącznika)',
-    connectTitle: 'Połącz narzędzie AI',
-    connectSub: 'Pierwsze dwa kopiują polecenia do wklejenia w terminalu; Claude Desktop zapisuje rozszerzenie instalowane dwuklikiem',
+    connectTitle: 'Połącz lokalne AI',
+    connectSub: 'Narzędzia wiersza poleceń kopiują polecenia do wklejenia w terminalu; Claude Desktop zapisuje rozszerzenie instalowane dwuklikiem; Factory kopiuje wpis konfiguracji',
+    factoryCopied: 'Konfiguracja skopiowana; umieść ją pod mcpServers w ~/.factory/mcp.json',
+    scopeStale: (names: string) => `${names} używają innego zakresu odczytu niż „Tylko udostępnione zadania” poniżej: użyj odpowiedniego przycisku, aby połączyć ponownie`,
+    sidecarOutdated: 'Program MCP obok aplikacji nie został zaktualizowany (był otwarty przez aplikację AI podczas aktualizacji). Zamknij Claude Desktop i inne aplikacje AI, a następnie pobierz i zainstaluj ZeppBridge ponownie ze strony internetowej',
+    taskOnlyTitle: 'Tylko udostępnione zadania',
+    taskOnlyOff: 'Wyłączone: AI może czytać całą bibliotekę i zapisywać kontuzje, zawody i buty (każdą zmianę można cofnąć poniżej)',
+    taskOnlyOn: 'Włączone: AI widzi tylko zadania udostępnione dla MCP poniżej i nie może niczego zapisywać',
+    taskOnlyReconnect: 'Po zmianie połącz każde AI ponownie za pomocą powyższych przycisków',
+    writesTitle: 'Ostatnie zmiany wprowadzone przez AI',
+    writesEmpty: 'Jeszcze brak. Kontuzje, zawody, buty, odczucia z treningów i notatki trenera zapisane przez lokalne AI pojawią się tutaj, a każdą można cofnąć',
+    writesUndo: 'Cofnij',
+    writesUndone: 'Cofnięto',
+    writeCreated: 'Dodano',
+    writeUpdated: 'Zmieniono',
+    writeKindInjury: 'Kontuzja',
+    writeKindLifeEvent: 'Wydarzenie życiowe',
+    writeKindRace: 'Zawody',
+    writeKindShoe: 'Buty biegowe',
+    writeKindWorkoutFeel: 'Odczucia z treningu',
+    writeKindWorkoutType: 'Dyscyplina',
+    writeKindCoachNote: 'Notatka trenera',
+    toolCoachNote: 'Zapamiętaj jedno zdanie o Tobie (można cofnąć)',
+    toolSaveInjury: 'Zapisz kontuzję; po wyleczeniu podaj datę zakończenia (bez usuwania)',
+    toolSaveLifeEvent: 'Zapisuj wydarzenia życiowe i epoki',
+    toolSaveRace: 'Zapisuj zawody i wyniki',
+    toolSaveShoe: 'Zapisuj buty biegowe i wycofanie z użytku',
+    toolAnnotate: 'Zapisz RPE i bolesność treningu',
+    toolSetType: 'Popraw dyscyplinę treningu',
+    toolSync: 'Zsynchronizuj jednorazowo z chmury',
+    toolExport: 'Eksportuj zakres dat do pliku lokalnego',
     connectCopied: 'Polecenia skopiowane; wklej je w terminalu',
     bundleSaved: 'Rozszerzenie zapisane; kliknij je dwukrotnie, aby dodać do Claude Desktop',
     bundlePick: 'Wybierz folder dla rozszerzenia',
@@ -3854,6 +3906,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     keepTitle: 'Czas przechowywania danych',
     year: '1 rok',
     forever: 'Bezterminowo',
+    foreverShort: 'Na zawsze',
     keepForeverSub: 'Żadne dane nie są usuwane; baza rośnie z czasem',
     sizeTitle: 'Na tym komputerze',
     sizeSince: (month: string) => `Od ${month}`,
@@ -4523,6 +4576,14 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
       triathlon: 'Triathlon',
       other: 'Inne',
     },
+    raceSportsShort: {
+      running: 'Ulica',
+      trail: 'Przełaj',
+      cycling: 'Rower',
+      swimming: 'Pływanie',
+      triathlon: 'Tri',
+      other: 'Inne',
+    },
     distances: {
       '5k': '5 km',
       '10k': '10 km',
@@ -4593,6 +4654,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
       '2': 'Umiarkowana',
       '3': 'Poważna (wpływa na trening)',
     },
+    severityShort: 'Ciężka',
     startDate: 'Początek',
     endDate: 'Wyleczona',
     since: (date: string) => `od ${date}`,

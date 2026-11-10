@@ -183,6 +183,11 @@ const messages = defineMessages({
   authorSign: '— el desarrollador de ZeppBridge',
   authorRepliedOn: (date: string) => `Respondida el ${date}`,
   authorNew: 'El autor respondió a tu carta',
+  writeAuthor: 'Escribir al autor',
+  authorPlaceholder: 'Un problema, una función que quieras o solo unas palabras. El autor responde.',
+  attachReport: 'Adjuntar informe de diagnóstico anonimizado',
+  attachHint: 'Solo la versión de la app, estructura de campos y modelos no reconocidos; jamás cuenta, datos de salud ni ubicación',
+  reportFailedPlain: 'El informe de diagnóstico no se pudo enviar y se ha quitado. Pulsa «Enviar» otra vez para mandar solo la carta.',
 }, 'components/letters/letters');
 
 export const useLetterText = () => useMessages(messages);

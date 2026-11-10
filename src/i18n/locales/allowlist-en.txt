@@ -192,6 +192,9 @@ components/journal/journal.title
 components/journal/journal.distance
 components/journal/journal.raceSports.trail
 components/journal/journal.raceSports.triathlon
+components/journal/journal.raceSportsShort.trail
+components/journal/journal.raceSportsShort.triathlon
+components/journal/journal.raceSportsShort.cycling
 components/journal/journal.distances.marathon
 components/journal/journal.shoeSports.trail
 components/journal/journal.entry

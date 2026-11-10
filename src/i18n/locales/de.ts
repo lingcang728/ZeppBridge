@@ -205,6 +205,12 @@ export default {
     'err.mcp.bundle_failed': 'Claude Desktop-Erweiterung konnte nicht erstellt werden',
     'err.mcp.sidecar_missing':
       'Dieser Build enthält kein MCP-Programm – lade zeppbridge-tools von GitHub herunter',
+    'err.mcp.cli_missing':
+      'zeppbridge-cli befindet sich nicht neben dem MCP-Programm, die KI kann nicht für dich synchronisieren; bitte in ZeppBridge synchronisieren',
+    'err.mcp_writes.stale':
+      'Dieser Eintrag wurde danach erneut geändert und kann nicht auf den Stand vor der KI-Änderung zurückgesetzt werden; bitte auf der entsprechenden Seite manuell anpassen',
+    'err.mcp_writes.missing':
+      'Diese Änderung wurde bereits rückgängig gemacht oder konnte nicht gefunden werden',
     'err.training_plan.ai_publish_disabled': 'Die KI darf Trainingspläne nicht direkt veröffentlichen',
     'err.training_plan.format': 'Der Trainingsplan ist fehlerhaft aufgebaut und wurde nicht gespeichert',
     'err.training_plan.invalid': 'Dieser Plan hat die Prüfung nicht bestanden und wurde nicht gesendet',
@@ -394,6 +400,19 @@ export default {
       authorSign: '— der ZeppBridge-Entwickler',
       authorRepliedOn: (date: string) => `Geantwortet am ${date}`,
       authorNew: 'Der Autor hat auf deinen Brief geantwortet',
+      writeAuthor: 'Dem Autor schreiben',
+      authorPlaceholder: 'Ein Problem, ein Funktionswunsch oder einfach ein paar Worte. Der Autor antwortet.',
+      attachReport: 'Anonymisierten Diagnosebericht anhängen',
+      attachHint: 'Nur App-Version, Feldstrukturen und nicht erkannte Modellnummern – keine Konten, Gesundheitswerte oder Standorte',
+      reportFailedPlain: 'Diagnosebericht konnte nicht gesendet werden und wurde entfernt. Tippe erneut auf „Absenden“, um nur den Brief zu verschicken.',
+    },
+    'components/letters/stamps': {
+      kind: {
+        device: 'Gerät nicht erkannt',
+        workout: 'Training nicht erkannt',
+        data: 'Daten stimmen nicht',
+        other: 'Anderes Problem',
+      },
     },
     'lib/aiTask/markdownGuide': {
       guide: [
@@ -616,17 +635,19 @@ export default {
 Sie enthält ein MCP-Programm (zeppbridge-mcp), das ich bei dir einrichten möchte, damit du meine Trainings- und Gesundheitsdaten direkt abfragen kannst, statt dass ich sie jedes Mal exportieren und einfügen muss.
 
 Bekannte Informationen:
-- zeppbridge-mcp wird zusammen mit ZeppBridge installiert, direkt neben dem Hauptprogramm; den vollständigen Pfad findest du in ZeppBridge unter „Einstellungen › KI-Werkzeuge“. Nur ein Computer ohne Desktop-App benötigt das Archiv zeppbridge-tools von der GitHub-Releases-Seite von ZeppBridge.
-- Es ist ein stdio-basierter MCP-Server. Gesundheitsdaten sind schreibgeschützt (read-only); er lauscht auf keinem Port und benötigt weder Token noch API-Key. Er nutzt das Netzwerk nur zum Veröffentlichen von Trainingsplänen, und auch das erst nach meiner Erlaubnis.
-- Typischer Aufbau der Konfiguration: {"mcpServers": {"zeppbridge": {"command": "<vollständiger Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Es stellt sechzehn Nur-Lese-Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records, get_baselines), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events), Datenzustand (get_data_health) und Coaching (get_training_context, get_athlete_profile, get_training_plan); dazu zwei Trainingsplan-Werkzeuge: draft_training_plan (speichert nur einen Entwurf) und publish_training_plan (überträgt erst nach Aktivierung in den Einstellungen an die Uhr); und propose_coach_note: legt einen Satz, den sich die KI dauerhaft merken soll, in das Postfach meiner „Trainer-Notizen“; wird erst wirksam, wenn ich auf „Merken“ tippe.
+- zeppbridge-mcp wird zusammen mit ZeppBridge installiert, direkt neben dem Hauptprogramm; den vollständigen Pfad findest du in ZeppBridge unter „Einstellungen › Lokale KI verbinden“. Nur ein Computer ohne Desktop-App benötigt das Archiv zeppbridge-tools von der GitHub-Releases-Seite von ZeppBridge.
+- Es ist ein stdio-basierter MCP-Server. Er lauscht auf keinem Port und benötigt weder Token noch API-Key; aus der Cloud stammende Gesundheitsdaten sind schreibgeschützt (read-only), und er nutzt das Netzwerk nur, wenn ich ihn zur Synchronisierung auffordere oder nachdem ich die Veröffentlichung eines Trainingsplans erlaubt habe.
+- Typischer Aufbau der Konfiguration: {"mcpServers": {"zeppbridge": {"command": "<vollständiger Pfad zu zeppbridge-mcp>", "args": []}}} (wenn ich in den Einstellungen „Nur freigegebene Aufgaben“ aktiviere, lautet args ["--scope", "task"])
+- Lies nach dem Verbinden zuerst die Ressource zeppbridge://guide: Das ist das Handbuch des Servers mit Werkzeugliste, empfohlener Reihenfolge, Datendefinitionen und Hinweisen zum Rückgängigmachen.
+- Lese-Werkzeuge: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records, get_baselines), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events), Datenzustand (get_data_health) und Coaching (get_training_context, get_athlete_profile, get_training_plan).
+- Schreib-Werkzeuge (alle werden in einem Änderungsprotokoll erfasst, das ich in ZeppBridge Eintrag für Eintrag rückgängig machen kann; es gibt kein Löschen): save_injury, save_life_event, save_race, save_shoe, annotate_workout, set_workout_type sowie propose_coach_note (merkt sich direkt einen Satz über mich); Trainingspläne: draft_training_plan (speichert nur einen Entwurf) und publish_training_plan (wird erst nach meiner Freigabe in den Einstellungen an die Uhr übertragen); Aktionen: sync_now (einmal aus der Cloud synchronisieren) und export_data (als lokale Datei exportieren).
 
 Bitte sag mir:
 1. Wo genau bei dir (dem Werkzeug, mit dem ich gerade spreche) die Konfiguration eingetragen wird bzw. mit welchem Befehl sie hinzugefügt wird;
 2. Wie der Pfad unter Windows formatiert wird (müssen Backslashes maskiert werden?);
 3. Wie ich nach der Einrichtung überprüfe, ob alles funktioniert.
 
-Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei liegt), frag mich einfach.`,
+Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, wo die Datei liegt), frag mich einfach.`,
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
 
       // ── 6. Aufbewahrung ──
@@ -1077,14 +1098,17 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
         hr_reserve: {
           formula: 'Zonenuntergrenze = Ruheherzfrequenz + (max. Herzfrequenz − Ruheherzfrequenz) × Prozentsatz',
           label: 'Herzfrequenzreserve-Zonen',
+          short: 'HF-Reserve',
         },
         lactate_threshold: {
           formula: 'Zonenuntergrenze = Schwellen-Herzfrequenz × Prozentsatz',
           label: 'Laktatschwellen-Zonen',
+          short: 'Laktatschwelle',
         },
         max_hr: {
           formula: 'Zonenuntergrenze = max. Herzfrequenz × Prozentsatz',
           label: 'Zonen nach maximaler Herzfrequenz',
+          short: 'Max. HF',
         },
       },
       modelAria: 'Herzfrequenzzonen-Modell',
@@ -1454,6 +1478,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       connectPill: 'Konto verbinden',
       syncingProgress: (current: number, total: number) => `Synchronisieren ${current}/${total}`,
       syncWait: "Bitte warte, bis die Synchronisierung fertig ist",
+      mailTitle: 'Neue Post · Briefkasten öffnen',
+      holdForLetters: 'Gedrückt halten, um den Briefkasten zu öffnen',
     },
     'components/shell/update': {
       newVersion: (version: string) => `Version ${version}`,
@@ -2718,6 +2744,14 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
         triathlon: 'Triathlon',
         other: 'Sonstiges',
       },
+      raceSportsShort: {
+        running: 'Straße',
+        trail: 'Trail',
+        cycling: 'Rad',
+        swimming: 'Schwimmen',
+        triathlon: 'Tri',
+        other: 'Sonstiges',
+      },
       distances: {
         '5k': '5 km',
         '10k': '10 km',
@@ -2782,6 +2816,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
         '2': 'Mäßig',
         '3': 'Schwer (beeinträchtigt Training)',
       },
+      severityShort: 'Schwer',
       startDate: 'Beginn',
       endDate: 'Ausgeheilt',
       since: (date: string) => `seit ${date}`,
@@ -3774,6 +3809,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       deviceCheck: 'Falsches Modell? Zum Ändern öffnen',
       unknownShort: 'Ein Gerät wurde nicht erkannt: Zum Zuweisen des Modells öffnen oder Bericht senden, um es hinzuzufügen',
       learnMore: 'Mehr erfahren',
+      writeToAuthor: 'Dem Autor schreiben',
+      writeToAuthorBody: 'Feedback ist jetzt ein Brief: Schreibe dem Autor im Briefkasten, optional mit anonymisiertem Diagnosebericht. Der Autor antwortet.',
       hideDevice: 'Ausblenden',
       hideConfirm:
         'Wird nur aus dieser Liste ausgeblendet – die aufgezeichneten Daten bleiben erhalten, Diagramme und Exporte bleiben unverändert.',
@@ -3797,6 +3834,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       keepTitle: 'Wie lange aufbewahren',
       year: '1 Jahr',
       forever: 'Dauerhaft',
+      foreverShort: 'Dauerhaft',
       keepForeverSub: 'Keine automatische Bereinigung; die Datenbank wächst mit der Zeit',
       sizeTitle: 'Auf diesem Rechner',
       sizeSince: (month: string) => `Seit ${month}`,
@@ -3841,39 +3879,74 @@ Wenn du weitere Informationen von mir brauchst (welcher Client, wo die Datei lie
       codesFix: 'Benennen',
     },
     'views/settings/sections/ai': {
-      lead: 'Lokalen KI-Werkzeugen (Claude Code, Codex usw.) direkten Zugriff auf deine Daten geben',
+      lead: 'Lokaler KI (Claude Code, Codex, OpenCode, Grok usw.) direkten Zugriff auf deine Daten geben und Verletzungen, Wettkämpfe und Laufschuhe für dich erfassen lassen',
       toolsLabel: 'Verfügbare KI-Werkzeuge (für Details mit der Maus darüberfahren)',
       scopesHint: 'Gilt nur für MCP, das mit --scope task gestartet wurde',
-      bundlePick: 'Ordner für die Erweiterung wählen',
-      bundleSaved: 'Erweiterung gespeichert; per Doppelklick in Claude Desktop installieren',
-      configReady: 'Konfiguration kopiert, Pfad ist bereits eingetragen',
-      connectCopied: 'Befehle kopiert; im Terminal einfügen und ausführen',
-      connectSub:
-        'Die ersten beiden kopieren Befehle für das Terminal; Claude Desktop speichert eine Erweiterung, die du per Doppelklick installierst',
-      connectTitle: 'KI-Werkzeug verbinden',
-      otherClients: 'Andere Clients',
-      cliTitle: 'Kommandozeilen-Tool',
-      cliCopy: 'Pfad kopieren',
-      cliCopied: 'Pfad kopiert',
+      publishTitle: 'Der KI erlauben, Trainingspläne direkt zu veröffentlichen',
       publishOff:
         'Aus: Die KI erstellt nur Entwürfe; du bestätigst sie unter „An die KI“, bevor etwas auf deine Uhr gelangt',
       publishOn:
         'Ein: Mit deiner Zustimmung kann die KI Pläne direkt an deine Uhr senden; bestehende Pläne werden nie gelöscht',
-      publishTitle: 'Der KI erlauben, Trainingspläne direkt zu veröffentlichen',
+      toolTrainingContext:
+        'Jüngstes Training und Erholung in einem Aufruf: Tagestabelle, jedes Training, der aktive Plan',
+      toolAthleteProfile:
+        'Herzfrequenzzonen, Schwellenwerte, jüngste Lauftempos und dein Hintergrund für die KI',
+      toolTrainingPlan: 'Trainingsplan-Register: aktiver Plan, Übertragungsstatus, Entwürfe',
+      toolDraftPlan:
+        'Entwirft einen Trainingsplan (nur als Entwurf gespeichert, nicht an die Uhr gesendet)',
+      toolPublishPlan: 'Sendet einen Entwurf an die Uhr (erfordert den Schalter oben)',
+      connectTitle: 'Lokale KI verbinden',
+      connectSub:
+        'Die Befehlszeilen-Clients kopieren Befehle für das Terminal; Claude Desktop speichert eine Erweiterung per Doppelklick; Factory kopiert einen Konfigurationseintrag',
+      factoryCopied: 'Konfiguration kopiert; unter mcpServers in ~/.factory/mcp.json einfügen',
+      scopeStale: (names: string) =>
+        `${names} verwenden einen anderen Lesebereich als „Nur freigegebene Aufgaben“ unten: über die passende Schaltfläche erneut verbinden`,
+      sidecarOutdated:
+        'Das MCP-Programm neben der App wurde nicht aktualisiert (eine KI-App hielt es während des Updates geöffnet). Beende Claude Desktop und andere KI-Apps und lade ZeppBridge erneut von der Website herunter und installiere es',
+      taskOnlyTitle: 'Nur freigegebene Aufgaben',
+      taskOnlyOff:
+        'Aus: Die KI kann die gesamte Bibliothek lesen und Verletzungen, Wettkämpfe und Laufschuhe erfassen (jede Änderung kann unten rückgängig gemacht werden)',
+      taskOnlyOn:
+        'An: Die KI sieht nur die unten für MCP freigegebenen Aufgaben und kann nichts schreiben',
+      taskOnlyReconnect:
+        'Nach einer Änderung jede KI über die oberen Schaltflächen erneut verbinden',
+      writesTitle: 'Letzte KI-Änderungen',
+      writesEmpty:
+        'Noch keine. Von einer lokalen KI erfasste Verletzungen, Wettkämpfe, Laufschuhe, Trainingsgefühle und Trainer-Notizen erscheinen hier, jede einzeln rückgängig machbar',
+      writesUndo: 'Rückgängig',
+      writesUndone: 'Rückgängig gemacht',
+      writeCreated: 'Hinzugefügt',
+      writeUpdated: 'Geändert',
+      writeKindInjury: 'Verletzung',
+      writeKindLifeEvent: 'Lebensereignis',
+      writeKindRace: 'Wettkampf',
+      writeKindShoe: 'Laufschuhe',
+      writeKindWorkoutFeel: 'Trainingsgefühl',
+      writeKindWorkoutType: 'Sportart',
+      writeKindCoachNote: 'Trainer-Notiz',
+      toolCoachNote: 'Einen Satz über dich merken (rückgängig machbar)',
+      toolSaveInjury: 'Verletzung erfassen; nach Genesung Enddatum setzen (kein Löschen)',
+      toolSaveLifeEvent: 'Lebensereignisse und Epochen erfassen',
+      toolSaveRace: 'Wettkämpfe und Ergebnisse erfassen',
+      toolSaveShoe: 'Laufschuhe und Ausmusterung erfassen',
+      toolAnnotate: 'RPE und Beschwerden eines Trainings erfassen',
+      toolSetType: 'Sportart korrigieren',
+      toolSync: 'Einmal aus der Cloud synchronisieren',
+      toolExport: 'Einen Datumsbereich als lokale Datei exportieren',
+      connectCopied: 'Befehle kopiert; im Terminal einfügen und ausführen',
+      bundleSaved: 'Erweiterung gespeichert; per Doppelklick in Claude Desktop installieren',
+      bundlePick: 'Ordner für die Erweiterung wählen',
       sidecarMissing:
         'Dieser Build enthält kein MCP-Programm; verbinde manuell über den Prompt oder die Konfiguration unten',
       sidecarAppImage:
         'Ein AppImage startet jedes Mal an einem neuen temporären Ort, sodass KI-Werkzeuge den Pfad nicht behalten können: Lade das separate CLI-/MCP-Paket herunter und verbinde es mit der Konfiguration unten',
       staleClients: (names: string) =>
         `${names} verweisen noch auf ein anderes zeppbridge-mcp, vermutlich eine veraltete Version, die diese Datenbank nicht lesen kann: Klicke auf die entsprechende Schaltfläche, um die Verbindung zu erneuern`,
-      toolAthleteProfile:
-        'Herzfrequenzzonen, Schwellenwerte, jüngste Lauftempos und dein Hintergrund für die KI',
-      toolDraftPlan:
-        'Entwirft einen Trainingsplan (nur als Entwurf gespeichert, nicht an die Uhr gesendet)',
-      toolPublishPlan: 'Sendet einen Entwurf an die Uhr (erfordert den Schalter oben)',
-      toolTrainingContext:
-        'Jüngstes Training und Erholung in einem Aufruf: Tagestabelle, jedes Training, der aktive Plan',
-      toolTrainingPlan: 'Trainingsplan-Register: aktiver Plan, Übertragungsstatus, Entwürfe',
+      otherClients: 'Andere Clients',
+      cliTitle: 'Kommandozeilen-Tool',
+      cliCopy: 'Pfad kopieren',
+      cliCopied: 'Pfad kopiert',
+      configReady: 'Konfiguration kopiert, Pfad ist bereits eingetragen',
       autoTitle: 'Automatisch an die KI übergeben',
       autoOff:
         'Aus: Die Datei landet in der Zwischenablage; drücke im KI-Chat Ctrl+V zum Einfügen und Enter zum Senden',

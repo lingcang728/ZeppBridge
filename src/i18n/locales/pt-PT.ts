@@ -335,9 +335,11 @@ Inclui um programa MCP (zeppbridge-mcp) e pretendo configurá-lo contigo, para q
 
 O que sei sobre ele:
 - O zeppbridge-mcp é instalado juntamente com o ZeppBridge, mesmo ao lado do programa principal; o ZeppBridge mostra o seu caminho completo em Definições › Ferramentas de IA. Apenas um computador sem a aplicação de desktop necessita do pacote zeppbridge-tools da página de Releases do ZeppBridge no GitHub.
-- É um servidor MCP por stdio. Os dados de saúde são apenas de leitura, não escuta em nenhuma porta e não necessita de token nem chave de API; só utiliza a rede para publicar um plano de treino, e apenas após eu o permitir.
-- O formato habitual da configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Disponibiliza dezasseis ferramentas de leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), acontecimentos de vida (list_life_events), integridade dos dados (get_data_health) e treinador (get_training_context, get_athlete_profile, get_training_plan); além de duas ferramentas de planos: draft_training_plan (guarda apenas um rascunho) e publish_training_plan (envia para o relógio apenas se eu autorizar nas definições); e propose_coach_note: coloca uma frase que vale a pena memorizar na caixa de entrada das minhas notas do treinador e só tem efeito após eu tocar em Memorizar.
+- É um servidor MCP por stdio, não escuta em nenhuma porta e não necessita de token nem chave de API; os dados de saúde provenientes da nuvem são apenas de leitura e só utiliza a rede quando peço para sincronizar ou após eu permitir a publicação de um plano de treino.
+- O formato habitual da configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": []}}} (se eu ativar «Apenas tarefas partilhadas» nas definições, args passa a ser ["--scope", "task"])
+- Após ligar, lê primeiro o recurso zeppbridge://guide: é o seu manual de instruções — lista de ferramentas, ordem recomendada, critérios dos dados e como funciona a anulação.
+- Ferramentas de leitura: treinos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records, get_baselines), sono (list_sleep_sessions, get_sleep_detail), alimentação (get_food_data), acontecimentos de vida (list_life_events), integridade dos dados (get_data_health) e treinador (get_training_context, get_athlete_profile, get_training_plan).
+- Ferramentas de escrita (todas são registadas num histórico de alterações que posso anular item a item no ZeppBridge; nada pode ser eliminado): save_injury, save_life_event, save_race, save_shoe, annotate_workout, set_workout_type e propose_coach_note (memoriza diretamente uma frase sobre mim); planos de treino: draft_training_plan (guarda apenas rascunho) e publish_training_plan (só envia para o relógio após eu autorizar nas definições); ações: sync_now (sincroniza uma vez a partir da nuvem) e export_data (exporta para um ficheiro local neste computador).
 
 Indica-me:
 1. No teu caso específico — a ferramenta com quem estou a falar agora —, em que ficheiro deve ficar a configuração ou que comando a adiciona;
@@ -757,14 +759,17 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       model: {
         max_hr: {
           label: 'Zonas de frequência cardíaca máxima',
+          short: 'FC máx.',
           formula: 'Limite da zona = frequência cardíaca máxima × percentagem',
         },
         hr_reserve: {
           label: 'Zonas de reserva de frequência cardíaca',
+          short: 'FC de reserva',
           formula: 'Limite da zona = FC em repouso + (FC máx. − FC em repouso) × percentagem',
         },
         lactate_threshold: {
           label: 'Zonas de limiar de lactato',
+          short: 'Limiar de lactato',
           formula: 'Limite da zona = frequência cardíaca limiar × percentagem',
         },
       },
@@ -1127,6 +1132,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       connectPill: 'Ligar conta',
       syncingProgress: (current: number, total: number) => `A sincronizar ${current}/${total}`,
       syncWait: "Aguarda até a sincronização terminar",
+      mailTitle: 'Novo correio · abrir a caixa de correio',
+      holdForLetters: 'Mantém premido para abrir a caixa de correio',
     },
     'components/shell/update': {
       newVersion: (version: string) => `Versão ${version}`,
@@ -3136,6 +3143,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       deviceCheck: 'Modelo incorreto? Clica para alterar',
       unknownShort: 'Dispositivo não reconhecido: clica para indicar o modelo ou envia um relatório para o adicionar',
       learnMore: 'Saber mais',
+      writeToAuthor: 'Escrever ao autor',
+      writeToAuthorBody: 'O feedback é agora uma carta: escreve ao autor na caixa de correio, opcionalmente com um relatório de diagnóstico anonimizado. O autor responde.',
       hideDevice: 'Ocultar',
       hideConfirm:
         'Apenas o oculta desta lista — os seus dados mantêm-se, e os gráficos e exportações permanecem inalterados.',
@@ -3159,6 +3168,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       keepTitle: 'Guardar dados durante',
       year: '1 ano',
       forever: 'Para sempre',
+      foreverShort: 'Sempre',
       keepForeverSub: 'Nada é eliminado automaticamente; a base de dados cresce com o tempo',
       sizeTitle: 'Espaço ocupado neste computador',
       sizeSince: (month: string) => `Desde ${month}`,
@@ -3202,7 +3212,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       codesFix: 'Atribuir nomes',
     },
     'views/settings/sections/ai': {
-      lead: 'Permite que as ferramentas de IA deste computador (Claude Code, Codex, etc.) consultem os teus dados diretamente',
+      lead: 'Permite que a IA neste computador (Claude Code, Codex, OpenCode, Grok e similares) consulte os teus dados diretamente e registe lesões, provas e sapatilhas por ti',
       toolsLabel: 'Ferramentas disponíveis para a IA (passa o cursor para ver os detalhes)',
       scopesHint: 'Aplica-se apenas ao MCP iniciado com --scope task',
       publishTitle: 'Permitir que a IA publique planos de treino diretamente',
@@ -3213,8 +3223,37 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       toolTrainingPlan: 'Registo de planos de treino: plano ativo, estado de entrega e rascunhos',
       toolDraftPlan: 'Cria um plano de treino (guardado apenas como rascunho, não é enviado para o relógio)',
       toolPublishPlan: 'Envia um rascunho para o relógio (requer o interruptor acima)',
-      connectTitle: 'Ligar a uma ferramenta de IA',
-      connectSub: 'Os dois primeiros copiam comandos para colar num terminal; o Claude Desktop guarda uma extensão que instalas com duplo clique',
+      connectTitle: 'Ligar uma IA local',
+      connectSub: 'As ferramentas de linha de comandos copiam instruções para colar no terminal; o Claude Desktop guarda uma extensão que instalas com dois cliques; o Factory copia uma configuração',
+      factoryCopied: 'Configuração copiada; coloca-a sob mcpServers em ~/.factory/mcp.json',
+      scopeStale: (names: string) => `${names} utilizam um âmbito de leitura diferente de «Apenas tarefas partilhadas» abaixo: utiliza o botão correspondente para voltar a ligar`,
+      sidecarOutdated: 'O programa MCP junto à aplicação não foi atualizado (uma aplicação de IA manteve-o aberto durante a atualização). Fecha o Claude Desktop e outras aplicações de IA, depois descarrega e instala o ZeppBridge novamente a partir do site',
+      taskOnlyTitle: 'Apenas tarefas partilhadas',
+      taskOnlyOff: 'Desativado: a IA pode ler toda a biblioteca e registar lesões, provas e sapatilhas (cada alteração pode ser anulada abaixo)',
+      taskOnlyOn: 'Ativado: a IA vê apenas as tarefas partilhadas para MCP abaixo e não pode escrever nada',
+      taskOnlyReconnect: 'Depois de alterares isto, volta a ligar cada IA com os botões acima',
+      writesTitle: 'Alterações recentes da IA',
+      writesEmpty: 'Nenhuma ainda. Lesões, provas, sapatilhas, sensações de treino e notas do treinador registadas por uma IA local surgirão aqui, e cada uma pode ser anulada',
+      writesUndo: 'Anular',
+      writesUndone: 'Anulado',
+      writeCreated: 'Adicionado',
+      writeUpdated: 'Modificado',
+      writeKindInjury: 'Lesão',
+      writeKindLifeEvent: 'Evento de vida',
+      writeKindRace: 'Prova',
+      writeKindShoe: 'Sapatilhas',
+      writeKindWorkoutFeel: 'Sensação de treino',
+      writeKindWorkoutType: 'Tipo de treino',
+      writeKindCoachNote: 'Nota do treinador',
+      toolCoachNote: 'Lembrar uma frase sobre ti (pode ser anulado)',
+      toolSaveInjury: 'Registar lesão; preenche a data de fim ao recuperares (sem eliminação)',
+      toolSaveLifeEvent: 'Registar eventos de vida e épocas',
+      toolSaveRace: 'Registar provas e resultados',
+      toolSaveShoe: 'Registar sapatilhas e abate',
+      toolAnnotate: 'Registar RPE e dores musculares de um treino',
+      toolSetType: 'Corrigir tipo de treino',
+      toolSync: 'Sincronizar uma vez a partir da nuvem',
+      toolExport: 'Exportar um intervalo de datas para um ficheiro local',
       connectCopied: 'Comandos copiados; cola-os num terminal',
       bundleSaved: 'Extensão guardada; faz duplo clique para a adicionar ao Claude Desktop',
       bundlePick: 'Escolhe uma pasta para a extensão',
@@ -3566,6 +3605,19 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       authorSign: '— o programador do ZeppBridge',
       authorRepliedOn: (date: string) => `Respondida a ${date}`,
       authorNew: 'O autor respondeu à tua carta',
+      writeAuthor: 'Escrever ao autor',
+      authorPlaceholder: 'Um problema, uma funcionalidade pretendida ou apenas duas palavras. O autor responde.',
+      attachReport: 'Anexar relatório de diagnóstico anonimizado',
+      attachHint: 'Apenas versão da aplicação, estrutura de campos e modelos não reconhecidos — sem conta, dados de saúde ou localização',
+      reportFailedPlain: 'Não foi possível enviar o relatório de diagnóstico e o anexo foi retirado. Clica novamente em «Enviar» para enviares apenas a carta.',
+    },
+    'components/letters/stamps': {
+      kind: {
+        device: 'Dispositivo não reconhecido',
+        workout: 'Treino não reconhecido',
+        data: 'Dados não coincidem',
+        other: 'Outro problema',
+      },
     },
     'components/coachNotes/coachNotes': {
       title: 'Notas do treinador',
@@ -3760,6 +3812,14 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
         triathlon: 'Triatlo',
         other: 'Outro',
       },
+      raceSportsShort: {
+        running: 'Estrada',
+        trail: 'Trail',
+        cycling: 'Ciclismo',
+        swimming: 'Natação',
+        triathlon: 'Tri',
+        other: 'Outro',
+      },
       distances: {
         '5k': '5 km',
         '10k': '10 km',
@@ -3824,6 +3884,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
         '2': 'Moderada',
         '3': 'Grave (afeta o treino)',
       },
+      severityShort: 'Grave',
       startDate: 'Início',
       endDate: 'Recuperada',
       since: (date: string) => `desde ${date}`,
@@ -4247,6 +4308,11 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       'Não foi possível exportar o .zbprompt. Verifica se é possível escrever no ambiente de trabalho.',
     'err.ai_task.prompt_import':
       'Não foi possível ler esse ficheiro (demasiado grande ou inacessível).',
+    'err.mcp_writes.stale':
+      'Este registo foi novamente alterado depois e não pode ser revertido para o estado anterior à alteração da IA; edita-o manualmente na página correspondente',
+    'err.mcp_writes.missing': 'Esta alteração já foi anulada ou não foi encontrada',
+    'err.mcp.cli_missing':
+      'O zeppbridge-cli não está junto ao programa MCP, pelo que a IA não pode sincronizar por ti; sincroniza através do ZeppBridge',
   },
   backendText: {
     'ui.backup.file_missing': 'Ficheiro de cópia de segurança não encontrado na pasta',
