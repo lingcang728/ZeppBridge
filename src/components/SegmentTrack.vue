@@ -31,7 +31,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, FLICK_VELOCITY, snapStop, type SegmentStop } from '../lib/navigation';
-import { flickDeform, liftRect, rubberStretch, squash, stretchLimit } from '../lib/segmentGlass';
+import { flickDeform, liftRect, rubberStretch, stretchLimit } from '../lib/segmentGlass';
+import { poseStyle, springFrames, stretchPose } from '../lib/glassGroup';
+import { useGlassMember } from '../composables/useGlassGroup';
 import { useGlassLens } from '../composables/useGlassLens';
 import { exemptFromSettle } from '../lib/motion/interrupt';
 import { lessMotion } from '../lib/motion/lessMotion';
@@ -264,14 +266,13 @@ const trackStyle = computed(() => {
     '--lens-h': `${lens.h}px`,
   };
   // 拖过两端：整条胶囊朝手指那边被拉长（钉住另一端），玻璃在里面跟着一起被拉，不会出界。
-  if (stretch.value) {
-    style.scale = squash(1 + Math.abs(stretch.value) / Math.max(1, trackSize.value.w));
-    style.transformOrigin = stretch.value < 0 ? 'right center' : 'left center';
-  }
-  return style;
+  return { ...style, ...poseStyle(pose.value) };
 });
 /** 透镜浮起来的时候：按住、拖动、浮着飞过去。 */
 const lifted = computed(() => thumbLens.active.value && (pressed.value || dragging.value || flyLift.value));
+/** 这块玻璃此刻的姿态（lib/glassGroup.ts）：拉长多少、钉哪端、浮没浮起来。外层有玻璃组时报给组。 */
+const pose = computed(() => stretchPose(stretch.value, trackSize.value.w, lifted.value));
+useGlassMember('segment', () => track.value, () => pose.value);
 /** 折行时不在滑块那一行的项：不挖空（挖空只按横坐标算，会误伤别的行）。 */
 const offRow = (index: number) => wrapped.value && (stops.value[index]?.top ?? 0) !== thumb.value.top;
 const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
@@ -459,20 +460,10 @@ watch(lifted, async (up) => {
 let elastic: Animation | null = null;
 const springBack = (from: number, flick: number) => {
   const el = track.value;
-  const width = trackSize.value.w;
-  const dir = from ? Math.sign(from) : Math.sign(flick);
-  if (!el || !width || !dir || reducedMotion()) return;
-  const start = 1 + Math.abs(from) / width;
-  const peak = Math.max(start, 1 + Math.abs(flick));
-  const origin = dir < 0 ? 'right center' : 'left center';
-  const frames: Keyframe[] = [{ scale: squash(start), transformOrigin: origin, easing: 'cubic-bezier(.3, .7, .4, 1)' }];
-  if (peak > start + 0.001) frames.push({ scale: squash(peak), transformOrigin: origin, offset: 0.26, easing: 'cubic-bezier(.4, 0, .4, 1)' });
-  frames.push(
-    { scale: squash(1 - (peak - 1) * 0.3), transformOrigin: origin, offset: 0.62, easing: 'cubic-bezier(.4, 0, .4, 1)' },
-    { scale: '1 1', transformOrigin: origin },
-  );
+  const spring = springFrames(from, flick, trackSize.value.w);
+  if (!el || !spring || reducedMotion()) return;
   elastic?.cancel();
-  elastic = exemptFromSettle(el.animate(frames, { duration: peak > start + 0.001 ? 560 : 460 }));
+  elastic = exemptFromSettle(el.animate(spring.frames, { duration: spring.duration }));
 };
 
 const clearGesture = () => {
