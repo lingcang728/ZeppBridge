@@ -28,6 +28,20 @@ const TITLES: &[(&str, &[&str])] = &[
 
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
+/// `.md` 和它旁边的完整轨迹一起放进剪贴板。轨迹只在打开「精确路线」且是「详细」时才写
+/// （zeppbridge_core 的 ai_tasks/export/route_gpx.rs），文件名由同一个函数推出来，不另传。
+fn copy_handoff(md: &Path) -> Result<(), ClipboardError> {
+    let route = md
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| md.with_file_name(zeppbridge_core::ai_tasks::export::route_file_name(name)))
+        .filter(|path| path.is_file());
+    match route {
+        Some(route) => clipboard_files::copy_files(&[md, route.as_path()]),
+        None => clipboard_files::copy_file(md),
+    }
+}
+
 /// 只交 `ai_task_prepare` 写出来的那种文件：输出目录里的 `.md`。
 fn handoff_file(state: &AppState, raw: &str) -> Result<PathBuf, AppError> {
     let missing = || AppError::new("err.ai_handoff.file", "找不到要交出去的文件");
@@ -73,7 +87,7 @@ pub async fn ai_handoff_copy_file(
     md_path: String,
 ) -> std::result::Result<(), AppError> {
     let path = handoff_file(&state, &md_path)?;
-    clipboard_files::copy_file(&path).map_err(clipboard_error)
+    copy_handoff(&path).map_err(clipboard_error)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -101,7 +115,7 @@ pub async fn ai_handoff_autopaste(
     let path = handoff_file(&state, &request.md_path)?;
     #[cfg(windows)]
     {
-        clipboard_files::copy_file(&path).map_err(clipboard_error)?;
+        copy_handoff(&path).map_err(clipboard_error)?;
         let ticket = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
         auto::spawn(app, ticket, titles, path, request.kickoff, request.send);
         Ok(ticket)
@@ -122,10 +136,10 @@ pub fn ai_handoff_cancel() {
 
 #[cfg(windows)]
 mod auto {
+    use super::copy_handoff as copy_file;
     use super::GENERATION;
     use crate::clipboard_files::{
-        copy_file, copy_text, escape_down, foreground_title, foreground_window, press_enter,
-        press_paste,
+        copy_text, escape_down, foreground_title, foreground_window, press_enter, press_paste,
     };
     use crate::web_composer::Composer;
     use std::path::{Path, PathBuf};
