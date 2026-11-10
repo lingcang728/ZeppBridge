@@ -21,3 +21,5 @@ views/settings/sections/labs.unstrapRange
 views/settings/sections/labs.unstrapRangeAll
 views/settings/sections/labs.unstrapRangeDays
 views/settings/sections/labs.unstrapShow
+components/workout/workoutImport.health
+components/workout/workoutImport.healthCount

@@ -15,6 +15,8 @@ export interface ImportReport {
   added: number;
   duplicates: number;
   unreadable: number;
+  /** 补进来的健康数据条数（只有 unstrap 备份有；本机已有的不算）。 */
+  health_added: number;
 }
 
 export interface ImportBatch {
@@ -25,6 +27,7 @@ export interface ImportBatch {
   added: number;
   duplicates: number;
   unreadable: number;
+  health_added: number;
   /** 撤销过的批次：运动已删，只留记录。 */
   undone_at: string | null;
   first_start: string | null;

@@ -7,8 +7,8 @@ import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { tauriApi, toUserMessage } from '../../../composables/useTauriApi';
 import { useSyncController } from '../../../composables/useSyncController';
 import { useMessages } from '../../../i18n';
-import type { ImportReport } from '../../../types/imports';
 import { workoutImportMessages } from '../../../components/workout/workoutImport.i18n';
+import { importReportText } from '../../../lib/importReportText';
 import { labsMessages } from './labs.i18n';
 
 const t = useMessages(labsMessages);
@@ -18,13 +18,6 @@ const { markDataChanged } = useSyncController();
 const busy = ref(false);
 const note = ref('');
 const error = ref('');
-
-const reportText = (report: ImportReport): string => {
-  const parts = [report.added ? w.value.added(report.added) : w.value.nothingNew];
-  if (report.duplicates) parts.push(w.value.duplicates(report.duplicates));
-  if (report.unreadable) parts.push(w.value.unreadable(report.unreadable));
-  return parts.join(' · ');
-};
 
 const importBackup = async () => {
   if (busy.value) return;
@@ -36,8 +29,8 @@ const importBackup = async () => {
     if (!path) return;
     busy.value = true; note.value = w.value.reading;
     const report = await tauriApi.importWorkouts('unstrap', [path]);
-    note.value = reportText(report);
-    if (report.added) markDataChanged();
+    note.value = importReportText(report, w.value);
+    if (report.added || report.health_added) markDataChanged();
   } catch (cause) { note.value = ''; error.value = toUserMessage(cause, w.value.failed); }
   finally { busy.value = false; }
 };

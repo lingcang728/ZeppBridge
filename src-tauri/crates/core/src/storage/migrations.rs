@@ -1567,6 +1567,31 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(50, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v51（Beta 实验室：unstrap 健康样本导入）。导入的样本 / 日值 / 睡眠记着自己是哪一批，
+        // 整批撤销按它删，保留期清理和「最新数据」都跳过它；批次另记补进来几条健康数据。
+        // 按列是否存在来加（不按版本号）：v50 重建 import_batches 时会丢掉这一列，降版本重跑也要补回来。
+        {
+            for table in ["metric_samples", "daily_metrics", "sleep_sessions"] {
+                self.ensure_table_columns(table, &[("import_batch_id", "INTEGER")])?;
+            }
+            self.ensure_table_columns(
+                "import_batches",
+                &[("health_added", "INTEGER NOT NULL DEFAULT 0")],
+            )?;
+            self.conn.execute_batch(
+                "CREATE INDEX IF NOT EXISTS idx_metric_samples_import
+                    ON metric_samples(import_batch_id) WHERE import_batch_id IS NOT NULL;
+                 CREATE INDEX IF NOT EXISTS idx_daily_metrics_import
+                    ON daily_metrics(import_batch_id) WHERE import_batch_id IS NOT NULL;
+                 CREATE INDEX IF NOT EXISTS idx_sleep_sessions_import
+                    ON sleep_sessions(import_batch_id) WHERE import_batch_id IS NOT NULL;",
+            )?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 51;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(51, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

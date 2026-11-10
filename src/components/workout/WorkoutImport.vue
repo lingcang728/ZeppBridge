@@ -6,7 +6,8 @@ import { tauriApi, toUserMessage } from '../../composables/useTauriApi';
 import { useSyncController } from '../../composables/useSyncController';
 import { useMessages } from '../../i18n';
 import { formatDate } from '../../lib/format';
-import type { ImportBatch, ImportReport, ImportSourceKey } from '../../types/imports';
+import { importReportText } from '../../lib/importReportText';
+import type { ImportBatch, ImportSourceKey } from '../../types/imports';
 import { workoutImportMessages } from './workoutImport.i18n';
 
 const t = useMessages(workoutImportMessages);
@@ -29,13 +30,6 @@ const loadBatches = async () => {
 };
 onMounted(() => { void loadBatches(); });
 
-const reportText = (report: ImportReport): string => {
-  const parts = [report.added ? t.value.added(report.added) : t.value.nothingNew];
-  if (report.duplicates) parts.push(t.value.duplicates(report.duplicates));
-  if (report.unreadable) parts.push(t.value.unreadable(report.unreadable));
-  return parts.join(' · ');
-};
-
 const pick = async (source: (typeof SOURCES)[number]) => {
   if (busy.value) return;
   error.value = ''; note.value = '';
@@ -50,9 +44,9 @@ const pick = async (source: (typeof SOURCES)[number]) => {
     if (!paths.length) return;
     busy.value = true; note.value = t.value.reading;
     const report = await tauriApi.importWorkouts(source.key, paths);
-    note.value = reportText(report);
+    note.value = importReportText(report, t.value);
     await loadBatches();
-    if (report.added) { markDataChanged(); }
+    if (report.added || report.health_added) { markDataChanged(); }
   } catch (cause) { note.value = ''; error.value = toUserMessage(cause, t.value.failed); }
   finally { busy.value = false; }
 };
@@ -61,7 +55,9 @@ const undo = async (batch: ImportBatch) => {
   if (busy.value) return;
   busy.value = true; error.value = ''; note.value = '';
   try {
-    note.value = t.value.removed(await tauriApi.undoImportBatch(batch.id));
+    const removed = await tauriApi.undoImportBatch(batch.id);
+    // 只有健康数据的一批（unstrap）没有运动可数，只说撤销了。
+    note.value = removed || !batch.health_added ? t.value.removed(removed) : t.value.undone;
     await loadBatches();
     markDataChanged();
   } catch (cause) { error.value = toUserMessage(cause, t.value.failed); }
@@ -95,7 +91,7 @@ const span = (batch: ImportBatch): string => {
           <span class="batch-name">{{ batch.file_name ?? '' }}</span>
           <span class="batch-meta">
             <template v-if="batch.undone_at">{{ t.undone }}</template>
-            <template v-else>{{ t.count(batch.added) }}<template v-if="span(batch)"> · {{ span(batch) }}</template></template>
+            <template v-else>{{ t.count(batch.added) }}<template v-if="batch.health_added"> · {{ t.healthCount(batch.health_added) }}</template><template v-if="span(batch)"> · {{ span(batch) }}</template></template>
           </span>
           <button v-if="!batch.undone_at" class="button secondary batch-undo" type="button" :disabled="busy" @click="undo(batch)">{{ t.undo }}</button>
         </li>
