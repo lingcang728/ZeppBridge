@@ -3812,10 +3812,10 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
 
     'components/letters/stamps': {
       kind: {
-        device: 'Appareil non reconnu',
-        workout: 'Séance non reconnue',
-        data: 'Chiffres incohérents',
-        other: 'Autre problème',
+        device: 'Appareil',
+        workout: 'Type de séance',
+        data: 'Chiffres',
+        other: 'Autre',
       },
     },
 
@@ -3829,23 +3829,36 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
         fit: 'FIT',
         strava: 'Archive Strava',
         apple_health: 'Apple Health',
+        unstrap: 'Sauvegarde unstrap',
       },
       short: {
         gpx: 'GPX',
         fit: 'FIT',
         strava: 'Strava',
         apple_health: 'Apple Health',
+        unstrap: 'unstrap',
       },
       filter: {
         gpx: 'Fichiers GPX / TCX',
         fit: 'Fichiers FIT',
         strava: 'Export Strava',
         apple_health: 'Export Apple Health',
+        unstrap: 'Sauvegarde unstrap',
       },
       reading: 'Lecture en cours…',
       added: (n: number) =>
         plural(n, { one: `${n} séance importée`, other: `${n} séances importées` }),
       nothingNew: 'Aucune nouvelle séance',
+      health: (n: number) =>
+        plural(n, {
+          one: '1 enregistrement de santé complété',
+          other: `${n} enregistrements de santé complétés`,
+        }),
+      healthCount: (n: number) =>
+        plural(n, {
+          one: '1 enregistrement de santé',
+          other: `${n} enregistrements de santé`,
+        }),
       duplicates: (n: number) =>
         plural(n, { one: `${n} déjà présente, ignorée`, other: `${n} déjà présentes, ignorées` }),
       unreadable: (n: number) =>
@@ -3871,6 +3884,33 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       advancedAfterDisconnect:
         'Déconnectez d’abord l’autorisation officielle, puis connectez-vous aux données avancées avec le compte associé à votre montre (e-mail ou téléphone et mot de passe). Si ce compte a été créé via Google ou Apple, les données avancées ne peuvent pas s’y connecter ; conservez alors uniquement l’autorisation officielle.',
       disconnectOfficial: 'Déconnecter l’autorisation officielle',
+    },
+    'views/settings/sections/labs': {
+      cardTitle: 'Laboratoire bêta',
+      summary: 'Fonctionnalités en cours d’expérimentation, désactivées par défaut',
+      lead:
+        'Tout ici est expérimental : cela peut changer ou être retiré. En cas de problème, écrivez à l’auteur depuis la boîte aux lettres.',
+      badge: 'Expérimental',
+      glassTitle: 'Verre fusionnant',
+      glassSub:
+        'Les commandes en verre très proches fusionnent lors du glissement et se séparent au relâchement. Purement esthétique — désactiver ne change rien d’autre.',
+      unstrapImportTitle: 'Importer des entraînements depuis unstrap',
+      unstrapImportSub:
+        'Choisissez un zip de sauvegarde unstrap : les séances enregistrées par la ceinture et le téléphone (fréquence cardiaque, tracé, pauses) sont importées, une par session, ainsi que les données de fréquence cardiaque, SpO₂, fréquence au repos et sommeil qui ne sont pas encore sur cet ordinateur. Rien de ce qui est synchronisé depuis Zepp n’est modifié. Les scores calculés par unstrap ne sont pas importés. Les imports figurent sur la page Entraînements et peuvent être annulés un par un.',
+      unstrapImportButton: 'Choisir la sauvegarde',
+      unstrapExportTitle: 'Exporter pour unstrap',
+      unstrapExportSub:
+        'Enregistre les entraînements de cet ordinateur dans un zip importable par unstrap (résumé et fréquence cardiaque de chaque séance) ; sélectionnez-le sous « Restaurer depuis une sauvegarde » dans unstrap. Les valeurs manquantes restent vides, jamais 0. La charge d’entraînement et le VO₂max de Zepp ne sont pas inclus.',
+      unstrapExportButton: 'Exporter',
+      unstrapRange: 'Période',
+      unstrapRangeDays: (n: number) => `${n} derniers jours`,
+      unstrapRangeAll: 'Tout',
+      unstrapExported: (workouts: number) =>
+        plural(workouts, {
+          one: 'Terminé : 1 entraînement enregistré',
+          other: `Terminé : ${workouts} entraînements enregistrés`,
+        }),
+      unstrapShow: 'Afficher dans le dossier',
     },
   },
   errors: {
@@ -4074,6 +4114,8 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'err.letters.capsule_date': 'La date d’ouverture n’est pas valide. Veuillez la sélectionner à nouveau.',
     'err.feedback.toast_failed': 'Impossible d’afficher la notification système.',
     'err.export.my_records': 'Impossible d’écrire ce fichier. Choisissez un autre emplacement et réessayez.',
+    'err.export.unstrap':
+      'Impossible d’écrire le fichier pour unstrap. Vérifiez que le dossier de données est accessible en écriture.',
     'err.import.source': 'Source d’importation inconnue.',
     'err.import.too_large':
       'Ce fichier est trop volumineux (plus de 64 Mo). Pour Strava et Apple Health, choisissez l’archive d’exportation complète.',

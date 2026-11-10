@@ -1,25 +1,2 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
-components/workout/workoutImport.filter.unstrap
-components/workout/workoutImport.short.unstrap
-components/workout/workoutImport.sources.unstrap
-i18n/errors.err.export.unstrap
-views/settings/sections/labs.badge
-views/settings/sections/labs.cardTitle
-views/settings/sections/labs.glassSub
-views/settings/sections/labs.glassTitle
-views/settings/sections/labs.lead
-views/settings/sections/labs.summary
-views/settings/sections/labs.unstrapExportButton
-views/settings/sections/labs.unstrapExportSub
-views/settings/sections/labs.unstrapExportTitle
-views/settings/sections/labs.unstrapExported
-views/settings/sections/labs.unstrapImportButton
-views/settings/sections/labs.unstrapImportSub
-views/settings/sections/labs.unstrapImportTitle
-views/settings/sections/labs.unstrapRange
-views/settings/sections/labs.unstrapRangeAll
-views/settings/sections/labs.unstrapRangeDays
-views/settings/sections/labs.unstrapShow
-components/workout/workoutImport.health
-components/workout/workoutImport.healthCount
