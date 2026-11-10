@@ -1,6 +1,13 @@
-/** 从别处导入的运动（GPX / FIT / Strava 整包 / Apple 健康）。和后端 core::storage::imports 同形。 */
+/** 从别处导入的运动（GPX / FIT / Strava 整包 / Apple 健康 / unstrap 备份）。和后端 core::storage::imports 同形。 */
 
-export type ImportSourceKey = 'gpx' | 'fit' | 'strava' | 'apple_health';
+export type ImportSourceKey = 'gpx' | 'fit' | 'strava' | 'apple_health' | 'unstrap';
+
+/** Beta 实验室：给 unstrap 的导出包（后端 commands/imports.rs 的 UnstrapExportResult）。 */
+export interface UnstrapExportResult {
+  path: string;
+  workouts: number;
+  heart_rate_points: number;
+}
 
 export interface ImportReport {
   /** 一条都没加进来时没有批次。 */

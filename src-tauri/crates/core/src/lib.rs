@@ -14,6 +14,7 @@ pub mod device_catalog;
 pub mod event_days;
 pub mod export_fit;
 pub mod export_formats;
+pub mod export_unstrap;
 pub mod fetcher;
 pub mod import;
 pub mod insight;

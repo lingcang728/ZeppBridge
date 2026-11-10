@@ -529,6 +529,8 @@ export interface BridgeBackend {
   undoImportBatch(batchId: number): Promise<number>;
   /** 导入的运动各自的来源（workout_id → 来源）。 */
   workoutImportSources(): Promise<Record<string, import('../../types/imports').ImportSourceKey>>;
+  /** Beta 实验室：最近 days 天（null = 全部）的运动写成 unstrap 能导入的 zip，存到 exports\。 */
+  exportForUnstrap(days: number | null): Promise<import('../../types/imports').UnstrapExportResult>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   prepareAiHandoff(

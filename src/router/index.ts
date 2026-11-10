@@ -107,6 +107,11 @@ const routes = [
     component: () => import('../views/HealthCheck.vue'),
   },
   {
+    // 「反馈问题」卡让位给 Beta 实验室（2026-11-10）：旧链接直接去信匣写信。
+    path: '/settings/feedback',
+    redirect: { path: '/letters', query: { write: 'report' } },
+  },
+  {
     // /settings 是卡叠总览，/settings/:card 是展开的某一张（account / sync / archive …）。
     path: '/settings/:card?',
     name: 'Settings',

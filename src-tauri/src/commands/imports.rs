@@ -91,3 +91,42 @@ pub async fn workout_import_sources(
     })
     .await
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct UnstrapExportResult {
+    /// 写好的文件（`data\exports\` 下），界面用它「在文件夹中显示」。
+    pub path: String,
+    pub workouts: usize,
+    pub heart_rate_points: usize,
+}
+
+/// Beta 实验室：把最近 `days` 天（空 = 全部）的运动写成 unstrap 能导入的 zip，存到 `exports\`。
+#[tauri::command]
+pub async fn export_for_unstrap(
+    state: tauri::State<'_, AppState>,
+    days: Option<u32>,
+) -> std::result::Result<UnstrapExportResult, AppError> {
+    let failed = || AppError::new("err.export.unstrap", "没能写出给 unstrap 的导出包");
+    let since = days.map(|days| Utc::now() - chrono::Duration::days(i64::from(days)));
+    let export = spawn_independent_read(state.data_dir.clone(), move |db| {
+        zeppbridge_core::export_unstrap::build_unstrap_export(db, since)
+    })
+    .await?;
+    let dir = state.data_dir.join("exports");
+    let path = dir.join(zeppbridge_core::export_unstrap::export_file_name(
+        chrono::Local::now().date_naive(),
+    ));
+    let written = path.clone();
+    join_blocking(
+        tokio::task::spawn_blocking(move || {
+            std::fs::create_dir_all(&dir).map_err(|_| failed())?;
+            std::fs::write(&written, &export.bytes).map_err(|_| failed())
+        })
+        .await,
+    )??;
+    Ok(UnstrapExportResult {
+        path: path.to_string_lossy().into_owned(),
+        workouts: export.workouts,
+        heart_rate_points: export.heart_rate_points,
+    })
+}

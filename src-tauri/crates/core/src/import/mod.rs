@@ -1,4 +1,5 @@
-//! 从别处导入运动（批次 7）：GPX、FIT、Strava 的整包导出、Apple 健康的导出。
+//! 从别处导入运动（批次 7）：GPX、FIT、Strava 的整包导出、Apple 健康的导出；
+//! 2026-11 起还有 unstrap（Helio Strap 伴侣应用）的备份 zip（Beta 实验室）。
 //!
 //! 导入的运动混进运动列表，界面标出来源；**不进 Zepp 同步**，也不回传云端。它们是
 //! 用户自己带进来的东西，和打分、跑鞋一样：重放不碰（重放只按 `raw_record_id` 删），
@@ -11,6 +12,7 @@
 pub mod apple;
 pub mod gpx;
 pub mod strava;
+pub mod unstrap;
 mod xml;
 
 #[cfg(test)]
@@ -32,6 +34,7 @@ pub enum ImportSource {
     Fit,
     Strava,
     AppleHealth,
+    Unstrap,
 }
 
 impl ImportSource {
@@ -41,6 +44,7 @@ impl ImportSource {
             Self::Fit => "fit",
             Self::Strava => "strava",
             Self::AppleHealth => "apple_health",
+            Self::Unstrap => "unstrap",
         }
     }
 
@@ -50,6 +54,7 @@ impl ImportSource {
             "fit" => Some(Self::Fit),
             "strava" => Some(Self::Strava),
             "apple_health" => Some(Self::AppleHealth),
+            "unstrap" => Some(Self::Unstrap),
             _ => None,
         }
     }
@@ -312,6 +317,8 @@ pub fn read_import_file(
             .ok_or(ImportReadError::NotRecognized)?,
         ImportSource::AppleHealth if name.ends_with(".xml") => apple::parse_apple_xml(file),
         ImportSource::AppleHealth => apple::parse_apple_archive(BufReader::new(file))
+            .ok_or(ImportReadError::NotRecognized)?,
+        ImportSource::Unstrap => unstrap::parse_unstrap_archive(BufReader::new(file))
             .ok_or(ImportReadError::NotRecognized)?,
     };
     Ok(parsed)
