@@ -93,6 +93,8 @@ export const accountCardMessages = defineMessages(
     deviceCheck: '¿Modelo equivocado? Ábrelo para cambiarlo',
     unknownShort: 'Hay un dispositivo sin reconocer: ábrelo para elegir el modelo, o envía un informe para añadirlo',
     learnMore: 'Más información',
+    writeToAuthor: 'Escribir al autor',
+    writeToAuthorBody: 'Los comentarios ahora son cartas: escribe al autor en el buzón, con opción de adjuntar un informe de diagnóstico anonimizado. El autor responde.',
     hideDevice: 'Ocultar',
     hideConfirm: 'Solo lo quita de esta lista: sus datos se quedan y los gráficos y exportaciones no cambian.',
     hideConfirmYes: 'Ocultarlo',

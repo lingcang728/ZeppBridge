@@ -134,9 +134,12 @@ export default {
     "err.login.window_busy": '上一個登入視窗還沒關閉完畢，請稍等一下再試',
     "err.login.window_failed": '無法開啟登入視窗',
     "err.mcp.bundle_failed": '產生 Claude Desktop 擴充套件包失敗',
+    "err.mcp.cli_missing": 'MCP 程式旁邊沒有 zeppbridge-cli，AI 無法為你同步；請在 ZeppBridge 裡點選同步',
     "err.mcp.scope_denied": '這條查詢超出了開放給 MCP 的任務範圍',
     "err.mcp.scope_no_grants": '還沒有任務開放給 MCP。在任務頁將任務標記為「開放給 MCP」後再試',
     "err.mcp.sidecar_missing": '這個版本沒有隨附 MCP 程式，請至 GitHub 下載 zeppbridge-tools',
+    "err.mcp_writes.missing": '這次變更已經復原過，或是找不到',
+    "err.mcp_writes.stale": '這筆記錄之後又被修改過，無法照 AI 變更前的樣子復原；請至對應頁面手動修改',
     "err.official.browser": '沒能開啟系統瀏覽器。請點「複製授權連結」，貼到瀏覽器網址列裡開啟，並在那裡同意授權；這邊會自動連上。',
     "err.official.browser_not_opened": '授權頁好像沒有在瀏覽器裡打開。如果瀏覽器沒彈出來，請點「複製授權連結」，貼到瀏覽器網址列裡開啟；這邊會自動連上。',
     "err.official.denied": '你沒有同意授權，ZeppBridge 什麼也沒拿到',
@@ -407,14 +410,17 @@ export default {
         hr_reserve: {
           formula: '區間下限 = 靜息心率 + (最大心率 - 靜息心率) x 百分比',
           label: '儲備心率區間',
+          short: '儲備心率',
         },
         lactate_threshold: {
           formula: '區間下限 = 乳酸閾值心率 x 百分比',
           label: '乳酸閾值區間',
+          short: '乳酸閾值',
         },
         max_hr: {
           formula: '區間下限 = 最大心率 x 百分比',
           label: '最大心率區間',
+          short: '最大心率',
         },
       },
       modelAria: '心率區間演算法',
@@ -1261,6 +1267,14 @@ export default {
         trail: '越野跑',
         triathlon: '鐵人三項',
       },
+      raceSportsShort: {
+        cycling: '自行車',
+        other: '其他',
+        running: '路跑',
+        swimming: '游泳',
+        trail: '越野',
+        triathlon: '鐵三',
+      },
       raceToday: '就是今天',
       races: '比賽',
       records: 'PB 牆',
@@ -1280,6 +1294,7 @@ export default {
         "3": '嚴重（影響訓練）',
       },
       severity: '嚴重程度',
+      severityShort: '重',
       shoeAlert: (name: string) => `${name} 該退役了`,
       shoeKm: (km: string, retire: string) => `${km} / ${retire} km`,
       shoeName: '名稱',
@@ -1377,7 +1392,10 @@ export default {
       acknowledge: '知道了',
       allowQuote: '允許匿名引用我的話',
       alsoAttached: (count: number) => `附上：我也遇到 ${count} 則`,
+      attachHint: '只含應用程式版本、欄位結構和認不出的型號編號，不含帳號、健康數值和位置',
+      attachReport: '附上去識別化診斷報告',
       authorNew: '作者回覆了你的信',
+      authorPlaceholder: '遇到的問題、想要的功能、隨便聊幾句都行。作者會回信。',
       authorRepliedOn: (date: string) => `${date} 回覆`,
       authorSheet: '作者的回信',
       authorSign: '—— ZeppBridge 開發者',
@@ -1403,6 +1421,7 @@ export default {
       replied: '已回覆',
       replyPlaceholder: '想說什麼都可以，不寫也行。',
       replyTitle: '給作者回信',
+      reportFailedPlain: '診斷報告未成功提交，已取消附帶；再次點選「寄出」將僅寄送信件',
       reread: '重讀',
       rereadAria: (version: string) => `重讀 ${version} 的信`,
       sealAria: (version: string) => `拆開 ${version} 的信`,
@@ -1428,6 +1447,15 @@ export default {
       tabStamps: '集郵冊',
       to: '致：使用者',
       toDeveloper: '致：ZeppBridge 開發者',
+      writeAuthor: '寫給作者',
+    },
+    'components/letters/stamps': {
+      kind: {
+        device: '裝置沒認出',
+        workout: '運動沒認出',
+        data: '資料對不上',
+        other: '其他問題',
+      },
     },
     'components/overview/HeartRateCard': {
       bpm: '次/分',
@@ -1788,8 +1816,10 @@ export default {
       brandHome: 'ZeppBridge 3 · 概覽',
       connectPill: '連線帳號',
       connectionTitle: '雲端連線狀態',
+      holdForLetters: '長按開啟信匣',
       lastSyncPrefix: '上次同步：',
       localeLabel: '介面語言',
+      mailTitle: '有新來信 · 開啟信匣',
       mainNav: '主導航',
       notFetchedYet: '尚未擷取',
       readyFirstPill: '第一批資料已送達 · 查看本週',
@@ -3296,12 +3326,14 @@ export default {
 
 已知資訊：
 - zeppbridge-mcp 隨 ZeppBridge 一起安裝，就在主程式旁邊；完整路徑在 ZeppBridge 的「設定 › 交給 AI 工具」裡能看到。沒裝桌面應用程式的電腦才需要從 GitHub Release 頁面下載 zeppbridge-tools 壓縮檔。
-- 它是 stdio 類型的 MCP server，健康資料唯讀，不監聽連接埠、不需要 token 或 API key；只有在我允許後發布訓練計畫時才會連網。
-- 典型設定形狀：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路徑>", "args": ["--scope", "task"]}}}
-- 它有十六個唯讀工具：運動（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指標（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、飲食（get_food_data）、生活事件（list_life_events）、資料健康（get_data_health）和訓練教練（get_training_context、get_athlete_profile、get_training_plan）；另有兩個訓練計畫工具：draft_training_plan（只存草稿）和 publish_training_plan（我在設定裡允許後才能發送到手錶）；還有 propose_coach_note：把想長期記住的一句話放進我的「教練檔案」收件匣，我點了「記住」才生效。
+- 它是 stdio 類型的 MCP server，不監聽連接埠、不需要 token 或 API key；雲端來的健康資料唯讀，只有我讓它同步、或我允許後發布訓練計畫時才會連網。
+- 典型設定形狀：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路徑>", "args": []}}}（我在設定裡開啟「僅限共享任務」時 args 是 ["--scope", "task"]）
+- 連上後先讀取資源 zeppbridge://guide，那是它的說明書：工具清單、推薦順序、資料口徑、復原方式。
+- 讀取工具：運動（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指標（list_available_metrics、get_metric_series、get_metric_records、get_baselines）、睡眠（list_sleep_sessions、get_sleep_detail）、飲食（get_food_data）、生活事件（list_life_events）、資料健康（get_data_health）和訓練教練（get_training_context、get_athlete_profile、get_training_plan）。
+- 寫入工具（都記進變更帳本，我能在 ZeppBridge 裡逐筆復原，沒有刪除）：save_injury、save_life_event、save_race、save_shoe、annotate_workout、set_workout_type，以及 propose_coach_note（直接記住一句關於我的話）；訓練計畫：draft_training_plan（只存草稿）和 publish_training_plan（我在設定裡允許後才能發送到手錶）；動作：sync_now（從雲端同步一次）、export_data（匯出為本機檔案）。
 
 告訴我：
-1. 針對你（我現在用的這個工具）具體該把設定寫到哪個檔案、用什麼指令新增；
+1. 針對你（我現在用的這個工具）具體該把設定寫到哪個檔案、用什麼命令新增；
 2. Windows 上路徑怎麼寫（反斜線要不要跳脫）；
 3. 設定完怎麼驗證生效。
 
@@ -3827,6 +3859,8 @@ export default {
       verify: '驗證',
       waitingHint: '在瀏覽器中點選同意後，此處會自動連線',
       whySub: '進階資料僅支援使用 Zepp 電子郵件 / 手機號碼 + 密碼登入',
+      writeToAuthor: '寫信告訴作者',
+      writeToAuthorBody: '意見回饋現在就是寫信：在信匣裡寫給作者，可附上一份去識別化診斷報告，作者會回信。',
     },
     'views/settings/sections/advanced': {
       compactMore: '詳細說明',
@@ -3847,23 +3881,52 @@ export default {
       cliTitle: '命令列工具',
       configReady: '設定已複製，路徑已填入',
       connectCopied: '指令已複製，貼到終端機執行',
-      connectSub: '前兩者複製數行指令，貼到終端機執行；Claude Desktop 會儲存擴充套件包，按兩下安裝',
-      connectTitle: '連線至 AI 工具',
-      lead: '讓本機的 AI 工具（Claude Code、Codex 等）直接查詢你的資料',
+      connectSub: '命令列工具可複製命令貼到終端機執行；Claude Desktop 會儲存擴充套件，按兩下安裝；Factory 可複製一段設定',
+      connectTitle: '連線至本機 AI',
+      factoryCopied: '設定已複製，貼進 ~/.factory/mcp.json 的 mcpServers 裡',
+      lead: '讓本機的 AI（Claude Code、Codex、OpenCode、Grok 等）直接查詢你的資料，也能幫你記錄傷病、比賽和跑鞋',
       otherClients: '其他用戶端',
       publishOff: '關閉：AI 僅能起草，你在「交給 AI」頁面確認後才傳送至手錶',
       publishOn: '開啟：經你同意後，AI 可直接傳送至手錶，不會清空現有計劃',
       publishTitle: '允許 AI 直接發布訓練計劃',
       scopesHint: '僅對以 --scope task 啟動的 MCP 生效',
+      scopeStale: (names: string) => `${names} 登記的讀取範圍與下方的「僅限共享任務」不一致：點選對應按鈕重新連線`,
       sidecarAppImage: 'AppImage 每次啟動都會更換暫存位置，AI 工具無法記住其路徑：請下載獨立的 CLI / MCP 工具包，使用下方設定進行介接',
       sidecarMissing: '此版本未隨附 MCP 程式，請使用下方提示詞或設定手動介接',
+      sidecarOutdated: '應用程式旁的 MCP 程式未能跟著升級（更新時正被某個 AI 應用程式佔用）。請先結束 Claude Desktop 等 AI 應用程式，再至官網下載安裝一次 ZeppBridge',
       staleClients: (names: string) => `${names} 中連線的是另一份 zeppbridge-mcp，多半為舊版、無法讀取目前的資料庫：請點選對應按鈕重新連線一次`,
+      taskOnlyOff: '關閉：AI 能讀取整個資料庫，也能記錄傷病、比賽、跑鞋（每筆都能在下方復原）',
+      taskOnlyOn: '開啟：AI 僅看得到下方開放給 MCP 的任務，無法寫入任何內容',
+      taskOnlyReconnect: '修改後，請使用上方按鈕將每個 AI 重新連線一次',
+      taskOnlyTitle: '僅限共享任務',
+      toolAnnotate: '記錄單次運動的 RPE 與痠痛',
       toolAthleteProfile: '心率區間、閾值、近期跑步配速，以及你寫給 AI 的背景資訊',
+      toolCoachNote: '記住一句關於你的話（可復原）',
       toolDraftPlan: '起草訓練計劃（僅儲存草稿，不傳送至手錶）',
+      toolExport: '將一段時間的資料匯出為本機檔案',
       toolPublishPlan: '將草稿傳送至手錶（需開啟上方開關）',
+      toolSaveInjury: '記傷病，痊癒後填寫結束日（不刪除）',
+      toolSaveLifeEvent: '記錄生活事件與紀元',
+      toolSaveRace: '記錄比賽與成績',
+      toolSaveShoe: '記錄跑鞋與退役',
+      toolSetType: '更正運動類型',
+      toolSync: '從雲端同步一次',
       toolTrainingContext: '近期訓練與恢復一次提供：每日表、每次運動、已生效的計劃',
       toolTrainingPlan: '訓練計劃帳本：已生效的計劃、傳送狀態、草稿',
       toolsLabel: 'AI 可用的工具（懸停查看說明）',
+      writeCreated: '新增',
+      writeKindCoachNote: '教練檔案',
+      writeKindInjury: '傷病',
+      writeKindLifeEvent: '生活事件',
+      writeKindRace: '比賽',
+      writeKindShoe: '跑鞋',
+      writeKindWorkoutFeel: '運動感受',
+      writeKindWorkoutType: '運動類型',
+      writesEmpty: '尚無變更。本機 AI 記錄的傷病、比賽、跑鞋、運動感受和教練檔案會列在此處，每筆皆可復原',
+      writesTitle: 'AI 最近的變更',
+      writesUndo: '復原',
+      writesUndone: '已復原',
+      writeUpdated: '修改',
     },
     'views/settings/sections/archive': {
       backupLatest: (when: string) => `上次快照 ${when}`,
@@ -3876,6 +3939,7 @@ export default {
       filledTo: (month: string) => `已補至 ${month}`,
       filledToLeft: (month: string, left: number) => `已補至 ${month} · 還剩 ${left} 塊`,
       forever: '永久保留',
+      foreverShort: '永久',
       keepForeverSub: '不自動清理，資料庫會逐漸變大',
       keepTitle: '保留時間',
       legendEmpty: '雲端沒有',

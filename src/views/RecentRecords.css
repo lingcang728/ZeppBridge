@@ -11,7 +11,7 @@
 .timeline { position: relative; display: grid; gap: 22px; padding: 18px 20px 22px; border-radius: var(--radius-lg); background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow); }
 .tl-day { position: relative; display: grid; gap: 6px; }
-.tl-day::before { content: ''; position: absolute; top: 34px; bottom: 16px; left: 97px; width: 2px; border-radius: 2px;
+.tl-day::before { content: ''; position: absolute; top: 34px; bottom: 16px; left: 107px; width: 2px; border-radius: 2px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent)); }
 /* 吸顶日期：整行不铺底，只有日期那一枚胶囊是磨砂玻璃——记录从它下面滚过去时被模糊掉，不会字叠字。
    以前为了挡字给整行铺了页面底色，可时间线在卡片里、卡片比页面亮，于是每一天上面都横着一条黑带
@@ -22,8 +22,9 @@
   background: var(--mat-card-frost); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent), var(--glass-shadow); color: var(--muted); }
 
-/* 时间列 66px：英文「10:57 PM」在 58px 里会把 PM 折到第二行。改宽要同步上面竖线的 left（列宽 + 间距 + 节点半宽 - 1）。 */
-.tl-row { position: relative; display: grid; grid-template-columns: 66px 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+/* 时间列 76px：英文「10:57 PM」在 58px 里会把 PM 折到第二行，西语「10:57 p. m.」66px 也放不下。
+   改宽要同步上面竖线的 left（列宽 + 间距 + 节点半宽 - 1）。 */
+.tl-row { position: relative; display: grid; grid-template-columns: 76px 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 4px 10px 4px 0; border-radius: var(--radius-md); color: inherit; text-decoration: none; transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out); }
 .tl-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
 .tl-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -38,7 +39,7 @@
 .tl-more { display: flex; justify-content: center; }
 
 @media (max-width: 640px) {
-  .tl-row { grid-template-columns: 56px 40px minmax(0, 1fr); }
-  .tl-day::before { left: 85px; }
+  .tl-row { grid-template-columns: 66px 40px minmax(0, 1fr); }
+  .tl-day::before { left: 95px; }
   .tl-go { display: none; }
 }

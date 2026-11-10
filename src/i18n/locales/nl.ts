@@ -428,14 +428,17 @@ export default {
       model: {
         max_hr: {
           label: 'Zones op maximale hartslag',
+          short: 'Max. HR',
           formula: 'Zone-ondergrens = maximale hartslag × percentage',
         },
         hr_reserve: {
           label: 'Hartslagreservezones',
+          short: 'HR-reserve',
           formula: 'Zone-ondergrens = rusthartslag + (max. hartslag − rusthartslag) × percentage',
         },
         lactate_threshold: {
           label: 'Lactaatdrempelzones',
+          short: 'Lactaatdrempel',
           formula: 'Zone-ondergrens = drempelhartslag × percentage',
         },
       },
@@ -810,6 +813,8 @@ export default {
       connectPill: 'Account koppelen',
       syncingProgress: (current: number, total: number) => `Synchroniseren ${current}/${total}`,
       syncWait: "Wacht tot de synchronisatie klaar is",
+      mailTitle: 'Nieuwe post · brievenbus openen',
+      holdForLetters: 'Ingedrukt houden om de brievenbus te openen',
     },
     'components/shell/update': {
       newVersion: (version: string) => `Versie ${version}`,
@@ -1497,9 +1502,11 @@ Er hoort een MCP-programma bij (zeppbridge-mcp) en dat wil ik met jou configurer
 
 Wat ik erover weet:
 - zeppbridge-mcp wordt samen met ZeppBridge geïnstalleerd, direct naast het hoofdprogramma; ZeppBridge toont het volledige pad onder Instellingen › AI-tools. Alleen een computer zonder de desktopapp heeft het zeppbridge-tools-archief nodig van de GitHub Releases-pagina van ZeppBridge.
-- Het is een stdio MCP-server. Gezondheidsgegevens zijn alleen-lezen, de server luistert niet op een poort en vereist geen token of API-sleutel; er is alleen netwerkverbinding nodig om een trainingsplan te publiceren, en alleen nadat ik dat heb toegestaan.
-- De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het programma biedt zestien alleen-lezen tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records, get_baselines), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan); plus twee tools voor trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat toesta in de instellingen); en propose_coach_note: plaatst een zin die het waard is om te onthouden in de inbox van mijn coachnotities en wordt pas actief nadat ik op Onthouden tik.
+- Het is een stdio MCP-server. Hij luistert niet op een poort en vereist geen token of API-sleutel; gezondheidsgegevens uit de cloud zijn alleen-lezen, en hij maakt alleen verbinding met het netwerk wanneer ik vraag om te synchroniseren, of om na mijn toestemming een trainingsplan te publiceren.
+- De typische configuratievorm is: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": []}}} (args is ["--scope", "task"] als ik in de instellingen "Alleen gedeelde taken" inschakel)
+- Lees na het verbinden eerst de bron zeppbridge://guide: dat is de handleiding van de server — lijst met tools, aanbevolen volgorde, gegevensregels en hoe ongedaan maken werkt.
+- Leestools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records, get_baselines), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events), gegevensgezondheid (get_data_health) en coaching (get_training_context, get_athlete_profile, get_training_plan).
+- Schrijftools (elke actie wordt vastgelegd in een wijzigingslogboek dat ik in ZeppBridge stuk voor stuk ongedaan kan maken; niets kan worden verwijderd): save_injury, save_life_event, save_race, save_shoe, annotate_workout, set_workout_type en propose_coach_note (onthoudt direct één zin over mij); trainingsplannen: draft_training_plan (slaat alleen een concept op) en publish_training_plan (stuurt pas naar het horloge nadat ik dat in de instellingen toesta); acties: sync_now (eenmalig synchroniseren vanuit de cloud) en export_data (schrijft een lokaal bestand op deze computer).
 
 Vertel me:
 1. Specifiek voor jou — de tool waarmee ik nu praat — in welk bestand de configuratie moet of met welk commando ik hem toevoeg;
@@ -3191,6 +3198,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       deviceCheck: 'Verkeerd model? Klik om te wijzigen',
       unknownShort: 'Een apparaat is niet herkend: klik erop om het model aan te wijzen, of stuur een rapport in om het toe te voegen',
       learnMore: 'Meer informatie',
+      writeToAuthor: 'Schrijf de auteur',
+      writeToAuthorBody:
+        'Feedback is nu een brief: schrijf de auteur in de brievenbus, eventueel met een geanonimiseerd diagnoserapport. De auteur schrijft terug.',
       hideDevice: 'Verbergen',
       hideConfirm:
         'Verbergt het alleen in deze lijst — de gegevens blijven bewaard en grafieken en exports veranderen niet.',
@@ -3215,6 +3225,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       keepTitle: 'Gegevens bewaren voor',
       year: '1 jaar',
       forever: 'Altijd',
+      foreverShort: 'Altijd',
       keepForeverSub: 'Er wordt niets opgeruimd; de database groeit in de loop van de tijd',
       sizeTitle: 'Opslag op deze computer',
       sizeSince: (month: string) => `Sinds ${month}`,
@@ -3260,33 +3271,62 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       codesFix: 'Geef ze een naam',
     },
     'views/settings/sections/ai': {
-      lead: 'Laat AI-tools op deze computer (Claude Code, Codex enz.) je gegevens rechtstreeks raadplegen',
+      lead: 'Laat lokale AI (Claude Code, Codex, OpenCode, Grok enz.) direct je gegevens raadplegen en blessures, wedstrijden en hardloopschoenen voor je bijhouden',
       toolsLabel: 'Tools die de AI kan gebruiken (beweeg de muis erover voor details)',
       scopesHint: 'Geldt alleen voor MCP die is gestart met --scope task',
-      bundlePick: 'Kies een map voor de extensie',
-      bundleSaved: 'Extensie opgeslagen; dubbelklik erop om toe te voegen aan Claude Desktop',
-      configReady: 'Configuratie gekopieerd met het pad al ingevuld',
+      publishTitle: 'AI direct trainingsplannen laten publiceren',
+      publishOff: 'Uit: AI kan alleen concepten maken; je bevestigt op de pagina ‘Naar de AI’ voordat iets je horloge bereikt',
+      publishOn: 'Aan: met jouw toestemming kan AI plannen direct naar je horloge sturen; bestaande plannen worden nooit gewist',
+      toolTrainingContext: 'Recente training en herstel in één overzicht: een dagtabel, elke workout en het actieve plan',
+      toolAthleteProfile: 'Hartslagzones, drempels, recente hardlooptempo’s en de achtergrond die je voor AI hebt geschreven',
+      toolTrainingPlan: 'Het logboek voor trainingsplannen: actief plan, afleverstatus en concepten',
+      toolDraftPlan: 'Stelt een trainingsplan op (alleen als concept opgeslagen, niet naar het horloge gestuurd)',
+      toolPublishPlan: 'Stuurt een concept naar het horloge (vereist de schakelaar hierboven)',
+      connectTitle: 'Lokale AI verbinden',
+      connectSub: 'De opdrachtregelprogramma’s kopiëren commando’s om in een terminal te plakken; Claude Desktop slaat een extensie op die je met een dubbelklik installeert; Factory kopieert een configuratie',
+      factoryCopied: 'Configuratie gekopieerd; plaats deze onder mcpServers in ~/.factory/mcp.json',
+      scopeStale: (names: string) => `${names} gebruiken een ander leesbereik dan "Alleen gedeelde taken" hieronder: gebruik de bijbehorende knop om opnieuw te verbinden`,
+      sidecarOutdated: 'Het MCP-programma naast de app is niet bijgewerkt (een AI-app hield het geopend tijdens de update). Sluit Claude Desktop en andere AI-apps af, download en installeer ZeppBridge daarna opnieuw via de website',
+      taskOnlyTitle: 'Alleen gedeelde taken',
+      taskOnlyOff: 'Uit: AI kan de hele bibliotheek lezen en blessures, wedstrijden en hardloopschoenen vastleggen (elke wijziging kan hieronder ongedaan worden gemaakt)',
+      taskOnlyOn: 'Aan: AI ziet alleen de hieronder voor MCP geopende taken en kan niets schrijven',
+      taskOnlyReconnect: 'Verbind na een wijziging elke AI opnieuw met de bovenstaande knoppen',
+      writesTitle: 'Recente AI-wijzigingen',
+      writesEmpty: 'Nog geen. Blessures, wedstrijden, schoenen, trainingsgevoel en coachnotities die door een lokale AI zijn vastgelegd, verschijnen hier en kunnen stuk voor stuk ongedaan worden gemaakt',
+      writesUndo: 'Ongedaan maken',
+      writesUndone: 'Ongedaan gemaakt',
+      writeCreated: 'Toegevoegd',
+      writeUpdated: 'Gewijzigd',
+      writeKindInjury: 'Blessure',
+      writeKindLifeEvent: 'Levensgebeurtenis',
+      writeKindRace: 'Wedstrijd',
+      writeKindShoe: 'Hardloopschoenen',
+      writeKindWorkoutFeel: 'Trainingsgevoel',
+      writeKindWorkoutType: 'Sporttype',
+      writeKindCoachNote: 'Coachnotitie',
+      toolCoachNote: 'Een zin over jou onthouden (kan ongedaan worden gemaakt)',
+      toolSaveInjury: 'Blessure vastleggen; bij herstel einddatum invullen (niet verwijderen)',
+      toolSaveLifeEvent: 'Levensgebeurtenissen en tijdperken vastleggen',
+      toolSaveRace: 'Wedstrijden en uitslagen vastleggen',
+      toolSaveShoe: 'Hardloopschoenen en buitengebruikstelling vastleggen',
+      toolAnnotate: 'RPE en spierpijn van een workout vastleggen',
+      toolSetType: 'Sporttype corrigeren',
+      toolSync: 'Eenmalig synchroniseren vanuit de cloud',
+      toolExport: 'Een datumbereik exporteren naar een lokaal bestand',
       connectCopied: 'Commando’s gekopieerd; plak ze in een terminal om uit te voeren',
-      connectSub: 'De eerste twee kopiëren een paar commando’s om in een terminal te plakken; Claude Desktop slaat een extensie op die je met een dubbelklik installeert',
-      connectTitle: 'Verbinden met een AI-tool',
+      bundleSaved: 'Extensie opgeslagen; dubbelklik erop om toe te voegen aan Claude Desktop',
+      bundlePick: 'Kies een map voor de extensie',
+      sidecarMissing: 'Deze versie bevat het MCP-programma niet; koppel handmatig met de prompt of configuratie hieronder',
+      sidecarAppImage: 'Een AppImage draait bij elke start vanaf een nieuwe tijdelijke locatie, waardoor AI-tools het pad niet kunnen onthouden: download het losse CLI/MCP-pakket en koppel met de onderstaande configuratie',
+      staleClients: (names: string) => `${names} verwijzen nog naar een andere zeppbridge-mcp, waarschijnlijk een oude versie die deze bibliotheek niet kan lezen: gebruik de bijbehorende knop om opnieuw te verbinden`,
       otherClients: 'Andere clients',
       cliTitle: 'Opdrachtregelprogramma',
       cliCopy: 'Pad kopiëren',
       cliCopied: 'Pad gekopieerd',
-      publishOff: 'Uit: AI kan alleen concepten maken; je bevestigt op de pagina ‘Naar de AI’ voordat iets je horloge bereikt',
-      publishOn: 'Aan: met jouw toestemming kan AI plannen direct naar je horloge sturen; bestaande plannen worden nooit gewist',
-      publishTitle: 'AI direct trainingsplannen laten publiceren',
+      configReady: 'Configuratie gekopieerd met het pad al ingevuld',
       autoTitle: 'Automatisch overdragen aan AI',
       autoOff: 'Uit: het bestand gaat naar het klembord; druk op Ctrl+V in het chatvenster van de AI en druk op Enter',
       autoOn: 'Aan: zodra de AI-site opent, worden het bestand en de openingszin voor je geplakt en verzonden; druk op Esc om te stoppen',
-      sidecarMissing: 'Deze versie bevat het MCP-programma niet; koppel handmatig met de prompt of configuratie hieronder',
-      sidecarAppImage: 'Een AppImage draait bij elke start vanaf een nieuwe tijdelijke locatie, waardoor AI-tools het pad niet kunnen onthouden: download het losse CLI/MCP-pakket en koppel met de onderstaande configuratie',
-      staleClients: (names: string) => `${names} verwijzen nog naar een andere zeppbridge-mcp, waarschijnlijk een oude versie die deze bibliotheek niet kan lezen: gebruik de bijbehorende knop om opnieuw te verbinden`,
-      toolAthleteProfile: 'Hartslagzones, drempels, recente hardlooptempo’s en de achtergrond die je voor AI hebt geschreven',
-      toolDraftPlan: 'Stelt een trainingsplan op (alleen als concept opgeslagen, niet naar het horloge gestuurd)',
-      toolPublishPlan: 'Stuurt een concept naar het horloge (vereist de schakelaar hierboven)',
-      toolTrainingContext: 'Recente training en herstel in één overzicht: een dagtabel, elke workout en het actieve plan',
-      toolTrainingPlan: 'Het logboek voor trainingsplannen: actief plan, afleverstatus en concepten',
     },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
@@ -3627,6 +3667,22 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       authorSign: '— de ZeppBridge-ontwikkelaar',
       authorRepliedOn: (date: string) => `Beantwoord op ${date}`,
       authorNew: 'De auteur heeft je brief beantwoord',
+      writeAuthor: 'Schrijf naar de auteur',
+      authorPlaceholder:
+        'Een probleem, een gewenste functie of gewoon een paar woorden. De auteur schrijft terug.',
+      attachReport: 'Geanonimiseerd diagnoserapport bijvoegen',
+      attachHint:
+        'Alleen app-versie, veldstructuren en niet-herkende modelnummers — geen account, gezondheidswaarden of locatie',
+      reportFailedPlain:
+        'Diagnoserapport kon niet worden verzonden en is ontkoppeld. Klik opnieuw op ‘Verzenden’ om alleen de brief te sturen.',
+    },
+    'components/letters/stamps': {
+      kind: {
+        device: 'Apparaat niet herkend',
+        workout: 'Workout niet herkend',
+        data: 'Cijfers kloppen niet',
+        other: 'Ander probleem',
+      },
     },
     'components/coachNotes/coachNotes': {
       title: 'Coachnotities',
@@ -3821,6 +3877,14 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         triathlon: 'Triatlon',
         other: 'Overig',
       },
+      raceSportsShort: {
+        running: 'Weg',
+        trail: 'Trail',
+        cycling: 'Fiets',
+        swimming: 'Zwemmen',
+        triathlon: 'Tri',
+        other: 'Overig',
+      },
       distances: {
         '5k': '5 km',
         '10k': '10 km',
@@ -3887,6 +3951,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         '2': 'Matig',
         '3': 'Ernstig (beïnvloedt training)',
       },
+      severityShort: 'Ernstig',
       startDate: 'Begonnen',
       endDate: 'Hersteld',
       since: (date: string) => `sinds ${date}`,
@@ -4234,6 +4299,12 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     'err.letters.empty': 'De reactie is leeg — schrijf eerst een paar woorden.',
     'err.letters.rejected':
       'De server heeft deze reactie niet geaccepteerd. Mogelijk moet je de app bijwerken.',
+    'err.mcp_writes.stale':
+      'Deze record is daarna opnieuw gewijzigd en kan niet worden teruggezet naar de staat van vóór de AI-wijziging; pas dit handmatig aan op de betreffende pagina',
+    'err.mcp_writes.missing':
+      'Deze wijziging is al ongedaan gemaakt of kon niet worden gevonden',
+    'err.mcp.cli_missing':
+      'zeppbridge-cli staat niet naast het MCP-programma, de AI kan niet voor je synchroniseren; synchroniseer vanuit ZeppBridge',
     'err.official.denied': 'Je hebt geen toegang gegeven, dus ZeppBridge heeft niets ontvangen.',
     'err.official.rejected': 'Zepp heeft deze autorisatie niet geaccepteerd — probeer opnieuw',
     'err.official.expired': 'Deze autorisatie is verlopen — klik opnieuw op autoriseren',

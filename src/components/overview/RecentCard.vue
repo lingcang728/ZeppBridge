@@ -139,7 +139,8 @@ const recentItems = computed<RecentItem[]>(() => {
   transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
 .tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); translate: 0 -2px; }
 .tl-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.tl-when { display: inline-flex; min-height: 20px; align-items: center; gap: 6px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+/* 时间和「最新」整块不拆：放不下时「最新」换到时间下面，不把「10:57 p. m.」拆开（11-10 普查）。 */
+.tl-when { display: inline-flex; flex-wrap: wrap; justify-content: center; min-height: 20px; align-items: center; gap: 2px 6px; white-space: nowrap; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
 .tl-when em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-style: normal; font-weight: 600; }
 /* 节点压在线上：底下垫一圈卡片底色，线从节点背后穿过去而不是从中间切开它。 */
 .tl-node { display: grid; padding: 3px; border-radius: 16px; background: var(--mat-card-solid); }
