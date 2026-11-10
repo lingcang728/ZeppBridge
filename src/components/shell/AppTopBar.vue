@@ -23,6 +23,8 @@ import type { ThemeMode } from '../../composables/useTheme';
 import { backend } from '../../lib/bridge';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
 import { syncControllerMessages } from '../../composables/useSyncController.i18n';
+import GlassBridge from '../glass/GlassBridge.vue';
+import { labFlag } from '../../lib/labs';
 const demoLibrary = ref(false), bridgeText = useBridgeText();
 
 const messages = defineMessages(
@@ -318,6 +320,9 @@ const onLocaleChange = (value: string | number) => {
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
+/* Beta 实验室「玻璃组合并动效」（D2 样机，默认关）：「云端还没有新数据」气泡从同步胶囊里长出来，收起时掐断。 */
+const glassLab = labFlag('glassGroup');
+const staleTip = ref<HTMLElement | null>(null);
 // 伸缩放完再量一次放不放得下（变窄时回到该有的档位），见下面 watch 的注释。
 useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.value), undefined, () => scheduleFit());
 
@@ -514,7 +519,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       </button>
       <!-- 手动同步时云端还没有新数据（1E）：教人去手机上下拉一下，带「再试」。下一次同步开始就收起。 -->
       <Transition name="stale-tip">
-        <div v-if="cloudStaleText && !isSyncing" class="cloud-stale-tip glass-control" role="status">
+        <div v-if="cloudStaleText && !isSyncing" ref="staleTip" :class="['cloud-stale-tip', 'glass-control', { 'from-pill': glassLab }]" role="status">
           <p>{{ cloudStaleText }}</p>
           <div class="stale-actions">
             <button type="button" class="pill-button quiet" @click="dismissCloudStale()">{{ syncCopy.cloudStaleDismiss }}</button>
@@ -522,6 +527,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
           </div>
         </div>
       </Transition>
+      <GlassBridge v-if="glassLab" :from="syncPill" :to="staleTip" axis="y" :connected="!!(cloudStaleText && !isSyncing)" />
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
@@ -682,6 +688,11 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   padding: 12px 12px 10px 16px; border-radius: 20px; color: var(--ink); font-size: var(--fs-sm); line-height: 1.55; }
 .cloud-stale-tip p { margin: 0; }
 .stale-actions { display: flex; justify-content: flex-end; gap: 6px; }
+/* 实验室开着时气泡从胶囊那边落下来（颈在 GlassBridge 里）；胶囊要压在颈上面。 */
+.cloud-stale-tip.from-pill { transform-origin: top right; }
+.cloud-stale-tip.from-pill.stale-tip-enter-from { scale: .92; }
+.cloud-stale-tip.from-pill.stale-tip-enter-active { transition: opacity 260ms ease, translate 360ms cubic-bezier(.2, .8, .2, 1), scale 420ms cubic-bezier(.2, .9, .25, 1.15); }
+.topbar-actions:has(.glass-neck) .sync-pill { position: relative; z-index: 1; }
 .stale-tip-enter-active { transition: opacity 260ms ease, translate 360ms cubic-bezier(.2, .8, .2, 1); }
 .stale-tip-leave-active { transition: opacity 180ms ease, translate 200ms ease-in; }
 .stale-tip-enter-from, .stale-tip-leave-to { opacity: 0; translate: 0 -6px; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gapBetween, groupState, lensSpan, mergeAmount, poseStyle, RESTING, springFrames, stretchPose, unionRect } from '../glassGroup';
+import { bridgeRect, gapBetween, groupState, lensSpan, mergeAmount, poseStyle, RESTING, springFrames, stretchPose, unionRect } from '../glassGroup';
 import { squash } from '../segmentGlass';
 
 /*
@@ -85,5 +85,27 @@ describe('成组', () => {
     expect(state.merged).toBe(true);
     expect(state.union).toEqual({ x: 0, y: 0, w: 164, h: 40 });
     expect(groupState([{ id: 'a', rect: a, pose: RESTING }], 24)).toMatchObject({ active: false, amount: 0, merged: false });
+  });
+});
+
+describe('bridgeRect（D2 的颈）', () => {
+  const pill = { x: 200, y: 0, w: 120, h: 36 };
+
+  it('竖着：放在横向重叠段的中间，两端各伸进 8px', () => {
+    const tip = { x: 100, y: 46, w: 380, h: 90 };
+    expect(bridgeRect(pill, tip, 'y', 24)).toEqual({ x: 246, y: 28, w: 28, h: 26 });
+    // 谁在上谁在下无所谓。
+    expect(bridgeRect(tip, pill, 'y', 24)).toEqual({ x: 246, y: 28, w: 28, h: 26 });
+  });
+
+  it('横着：粗细取较矮那块的一半', () => {
+    const saved = { x: 330, y: 2, w: 90, h: 32 };
+    expect(bridgeRect(pill, saved, 'x', 24)).toEqual({ x: 312, y: 10, w: 26, h: 16 });
+  });
+
+  it('隔太远、换了行、另一个方向不重叠：没有颈', () => {
+    expect(bridgeRect(pill, { x: 360, y: 0, w: 60, h: 36 }, 'x', 24)).toBeNull();
+    expect(bridgeRect(pill, { x: 0, y: 50, w: 90, h: 36 }, 'x', 24)).toBeNull();
+    expect(bridgeRect(pill, { x: 0, y: 46, w: 100, h: 36 }, 'y', 24)).toBeNull();
   });
 });
