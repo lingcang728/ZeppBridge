@@ -19,6 +19,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fontsReady } from '../lib/fontsReady';
 import Icon, { type IconName } from './Icon.vue';
 import { useGlassLens } from '../composables/useGlassLens';
+import { lensSpan, RESTING } from '../lib/glassGroup';
+import { useGlassMember } from '../composables/useGlassGroup';
 import { lessMotion } from '../lib/motion/lessMotion';
 
 export type WheelItem<T extends string | number> = { value: T; label: string; icon?: IconName; image?: string };
@@ -185,15 +187,9 @@ const itemStyle = (index: number) => {
 };
 
 /** 中间那块镜片的尺寸在相邻两项之间插值，拖动时跟着内容伸缩。 */
-const lensSize = computed(() => {
-  if (!sizes.value.length) return 0;
-  const n = sizes.value.length;
-  const p = looping() ? mod(pos.value, n) : clampPos(pos.value);
-  const lo = Math.floor(p);
-  const hi = looping() ? (lo + 1) % n : Math.min(n - 1, lo + 1);
-  const f = p - lo;
-  return (sizes.value[lo] ?? 0) * (1 - f) + (sizes.value[hi] ?? 0) * f;
-});
+const lensSize = computed(() => lensSpan(sizes.value, looping() ? pos.value : clampPos(pos.value), looping()));
+/** 外层有玻璃组时报上去：转动 / 吸附中算浮起（lib/glassGroup.ts）。 */
+useGlassMember('wheel', () => refractEl.value, () => ({ ...RESTING, active: dragging.value || animating.value }));
 const lensStyle = computed(() => {
   if (vertical.value) return { height: `${lensSize.value + 14}px` };
   return { width: `${lensSize.value + (props.iconOnly ? 14 : 22)}px` };
