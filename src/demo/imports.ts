@@ -8,13 +8,13 @@ export const createDemoImports = (data: DemoData): Record<string, DemoHandler> =
   const sources = new Map<string, ImportSourceKey>(oldest.map(w => [w.workout_id, 'strava']));
   const batches: ImportBatch[] = oldest.length ? [{
     id: 1, source: 'strava', file_name: 'export_12345678.zip', imported_at: new Date().toISOString(),
-    added: oldest.length, duplicates: 2, unreadable: 1, undone_at: null,
+    added: oldest.length, duplicates: 2, unreadable: 1, health_added: 0, undone_at: null,
     first_start: oldest[0].start_time, last_start: oldest[oldest.length - 1].start_time,
   }] : [];
   return {
     import_batches: () => structuredClone(batches),
     workout_import_sources: () => Object.fromEntries(sources),
-    import_workouts: args => ({ batch_id: null, added: 0, duplicates: (args.paths as string[]).length, unreadable: 0 }),
+    import_workouts: args => ({ batch_id: null, added: 0, duplicates: (args.paths as string[]).length, unreadable: 0, health_added: 0 }),
     undo_import_batch: args => {
       const batch = batches.find(b => b.id === Number(args.batchId));
       if (!batch || batch.undone_at) return 0;

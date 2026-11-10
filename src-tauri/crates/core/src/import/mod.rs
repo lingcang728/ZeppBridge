@@ -13,6 +13,7 @@ pub mod apple;
 pub mod gpx;
 pub mod strava;
 pub mod unstrap;
+pub mod unstrap_health;
 mod xml;
 
 #[cfg(test)]
@@ -85,6 +86,8 @@ pub struct ParsedFile {
     pub activities: Vec<ParsedActivity>,
     /// 读不懂、或者格式不支持的条目数。
     pub unreadable: usize,
+    /// 健康样本（只有 unstrap 备份有，见 `unstrap_health`）。
+    pub health: Option<unstrap_health::ParsedHealth>,
 }
 
 /// 一个轨迹点。GPX 与 TCX 都先读成这个。

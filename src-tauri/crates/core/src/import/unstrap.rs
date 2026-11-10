@@ -72,10 +72,13 @@ impl Table {
     }
 }
 
-/// 包里有没有 unstrap 的运动表——没有就不是 unstrap 的备份。
+/// 包里有没有 unstrap 的运动表或健康表——都没有就不是 unstrap 的备份。
 pub fn is_unstrap_archive<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> bool {
     entry_name(archive, |name| {
-        name == "workout.csv" || name == "app_workout.csv"
+        matches!(
+            name,
+            "workout.csv" | "app_workout.csv" | "heart_rate.csv" | "sleep_session.csv"
+        )
     })
     .is_some()
 }
@@ -330,6 +333,9 @@ pub fn parse_unstrap_archive<R: Read + Seek>(reader: R) -> Option<ParsedFile> {
             .map(|(summary, points)| build(summary, points)),
     );
     file.activities.sort_by_key(|activity| activity.start_time);
+    let (health, unreadable) = super::unstrap_health::parse_unstrap_health(&mut archive);
+    file.unreadable += unreadable;
+    file.health = (!health.is_empty()).then_some(health);
     Some(file)
 }
 

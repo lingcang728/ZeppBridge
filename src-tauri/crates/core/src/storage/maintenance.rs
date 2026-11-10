@@ -322,13 +322,15 @@ impl Database {
         self.conn.execute_batch("BEGIN IMMEDIATE;")?;
         let deleted = (|| -> Result<()> {
             self.conn.execute(
-                "DELETE FROM metric_samples WHERE timestamp < ?1",
+                "DELETE FROM metric_samples WHERE timestamp < ?1 AND import_batch_id IS NULL",
                 [&cutoff_timestamp],
             )?;
-            self.conn
-                .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
             self.conn.execute(
-                "DELETE FROM sleep_sessions WHERE start_time < ?1",
+                "DELETE FROM daily_metrics WHERE date < ?1 AND import_batch_id IS NULL",
+                [&cutoff_date],
+            )?;
+            self.conn.execute(
+                "DELETE FROM sleep_sessions WHERE start_time < ?1 AND import_batch_id IS NULL",
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(

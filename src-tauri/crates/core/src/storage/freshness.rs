@@ -109,14 +109,23 @@ impl Database {
         for (stream, query) in [
             (
                 "heart_rate",
-                "SELECT MAX(timestamp) FROM metric_samples WHERE metric = 'heart_rate'",
+                "SELECT MAX(timestamp) FROM metric_samples
+                 WHERE metric = 'heart_rate' AND import_batch_id IS NULL",
             ),
             (
                 "hrv",
-                "SELECT MAX(timestamp) FROM metric_samples WHERE metric = 'hrv'",
+                "SELECT MAX(timestamp) FROM metric_samples
+                 WHERE metric = 'hrv' AND import_batch_id IS NULL",
             ),
-            ("daily_summary", "SELECT MAX(date) FROM daily_metrics"),
-            ("sleep", "SELECT MAX(end_time) FROM sleep_sessions"),
+            // 从别的应用导入的不算「云端拉到哪了」：同步前的探测拿心率最新时刻比云端。
+            (
+                "daily_summary",
+                "SELECT MAX(date) FROM daily_metrics WHERE import_batch_id IS NULL",
+            ),
+            (
+                "sleep",
+                "SELECT MAX(end_time) FROM sleep_sessions WHERE import_batch_id IS NULL",
+            ),
             ("workouts", "SELECT MAX(end_time) FROM workouts"),
         ] {
             let timestamp = self

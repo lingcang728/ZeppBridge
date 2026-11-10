@@ -50,6 +50,12 @@ pub async fn import_workouts(
                     )?;
                 merged.unreadable += one.unreadable;
                 merged.activities.extend(one.activities);
+                if let Some(health) = one.health {
+                    let into = merged.health.get_or_insert_with(Default::default);
+                    into.samples.extend(health.samples);
+                    into.daily.extend(health.daily);
+                    into.sleeps.extend(health.sleeps);
+                }
             }
             Ok::<_, AppError>(merged)
         })

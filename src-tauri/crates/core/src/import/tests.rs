@@ -299,6 +299,91 @@ mod unstrap {
     }
 
     #[test]
+    fn reads_health_tables_keeping_only_what_maps_cleanly() {
+        let heart = format!(
+            "epoch,bpm,source
+{t},62,0
+{t1},180,1
+{t2},300,0
+",
+            t = T0,
+            t1 = T0 + 60,
+            t2 = T0 + 120
+        );
+        let spo2 = format!(
+            "epoch,percent
+{T0},97
+"
+        );
+        let resting = "date,bpm
+2024-05-01,51
+not-a-day,50
+";
+        let sessions = format!(
+            "start_epoch,end_epoch,nap,score,deep_min,light_min,rem_min,awake_min,wake_count
+             {a},{a_end},false,88,60,200,,12,2
+             {b},{b_end},true,,,,,,
+             {c},{c_end},false,70,,,,,
+",
+            a = T0,
+            a_end = T0 + 8 * 3600,
+            b = T0 + 14 * 3600,
+            b_end = T0 + 15 * 3600,
+            c = T0 + 86_400,
+            c_end = T0 + 86_400 + 7 * 3600,
+        );
+        let stages = format!(
+            "session_start_epoch,start,end,stage
+             {a},2024-05-01T01:00:00Z,2024-05-01T02:00:00Z,2
+             {a},2024-05-01T00:00:00Z,2024-05-01T01:00:00Z,1
+",
+            a = T0
+        );
+        // 用户在 unstrap 里删掉了第二晚。
+        let edits = format!(
+            "strap_start_epoch,deleted,start_epoch,end_epoch
+{c},true,,
+",
+            c = T0 + 86_400
+        );
+        let bytes = zip_of(&[
+            (
+                "workout.csv",
+                b"start_epoch,end_epoch,sport_type
+",
+            ),
+            ("heart_rate.csv", heart.as_bytes()),
+            ("spo2.csv", spo2.as_bytes()),
+            ("resting_hr.csv", resting.as_bytes()),
+            ("sleep_session.csv", sessions.as_bytes()),
+            ("sleep_stage.csv", stages.as_bytes()),
+            ("sleep_edit.csv", edits.as_bytes()),
+            (
+                "hrv.csv",
+                b"epoch,ms
+1714521600,40
+",
+            ),
+        ]);
+        let file = parse_unstrap_archive(Cursor::new(bytes)).unwrap();
+        let health = file.health.unwrap();
+        // 手机实时收的（source 1）运动已带；300 bpm 超出范围算读不出。
+        let points: Vec<(&str, f64)> = health.samples.iter().map(|s| (s.metric, s.value)).collect();
+        assert_eq!(points, [("heart_rate", 62.0), ("spo2", 97.0)]);
+        assert_eq!(health.daily.len(), 1);
+        assert_eq!(health.daily[0].date, "2024-05-01");
+        // 小睡和删掉的那晚不要；分数不收；阶段按时间排好。
+        assert_eq!(health.sleeps.len(), 1);
+        let sleep = &health.sleeps[0];
+        assert_eq!(sleep.score, None);
+        assert_eq!((sleep.deep_minutes, sleep.rem_minutes), (Some(60), None));
+        let order: Vec<&str> = sleep.stages.iter().map(|s| s.stage.as_str()).collect();
+        assert_eq!(order, ["light", "deep"]);
+        // 300 bpm 一条、坏日期一条。
+        assert_eq!(file.unreadable, 2);
+    }
+
+    #[test]
     fn other_zips_are_not_unstrap_backups() {
         let other = zip_of(&[("activities.csv", b"Filename\n")]);
         assert!(parse_unstrap_archive(Cursor::new(other)).is_none());

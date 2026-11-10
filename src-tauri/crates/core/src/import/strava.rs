@@ -49,6 +49,7 @@ pub fn parse_strava_archive<R: Read + Seek>(reader: R) -> Option<ParsedFile> {
                     .unwrap_or_else(|| ParsedFile {
                         activities: Vec::new(),
                         unreadable: 1,
+                        ..Default::default()
                     });
                 file.unreadable += one.unreadable;
                 file.activities
@@ -99,6 +100,7 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
                 return ParsedFile {
                     activities: Vec::new(),
                     unreadable: 1,
+                    ..Default::default()
                 };
             }
             (stem.to_string(), out)
@@ -109,10 +111,12 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
         Some(activity) => ParsedFile {
             activities: vec![activity],
             unreadable: 0,
+            ..Default::default()
         },
         None => ParsedFile {
             activities: Vec::new(),
             unreadable: 1,
+            ..Default::default()
         },
     };
     if stem.ends_with(".fit") {
@@ -127,6 +131,7 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
         return ParsedFile {
             activities: Vec::new(),
             unreadable: 1,
+            ..Default::default()
         };
     };
     if stem.ends_with(".gpx") {
@@ -138,6 +143,7 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
         ParsedFile {
             activities: Vec::new(),
             unreadable: 1,
+            ..Default::default()
         }
     }
 }

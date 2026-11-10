@@ -26,6 +26,8 @@ pub struct ImportReport {
     pub added: usize,
     pub duplicates: usize,
     pub unreadable: usize,
+    /// 补进来的健康数据条数（样本 + 日值 + 睡眠，只有 unstrap 备份有；本机已有的不算）。
+    pub health_added: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -37,6 +39,7 @@ pub struct ImportBatch {
     pub added: i64,
     pub duplicates: i64,
     pub unreadable: i64,
+    pub health_added: i64,
     /// 撤销过的批次留一行记录（什么时候撤的），运动已经删掉。
     pub undone_at: Option<String>,
     /// 这一批运动的起止日期（还在库里的那些）。
@@ -53,6 +56,7 @@ impl Database {
         parsed: ParsedFile,
         now: DateTime<Utc>,
     ) -> Result<ImportReport> {
+        let health = parsed.health.unwrap_or_default();
         let mut activities = parsed.activities;
         activities.sort_by_key(|activity| activity.start_time);
         let mut fresh: Vec<ParsedActivity> = Vec::new();
@@ -70,17 +74,19 @@ impl Database {
                 fresh.push(activity);
             }
         }
-        if fresh.is_empty() {
-            return Ok(ImportReport {
-                batch_id: None,
-                added: 0,
-                duplicates,
-                unreadable: parsed.unreadable,
-            });
+        let nothing = || ImportReport {
+            batch_id: None,
+            added: 0,
+            duplicates,
+            unreadable: parsed.unreadable,
+            health_added: 0,
+        };
+        if fresh.is_empty() && health.is_empty() {
+            return Ok(nothing());
         }
 
         self.conn.execute_batch("BEGIN IMMEDIATE;")?;
-        let written = (|| -> Result<i64> {
+        let written = (|| -> Result<(i64, usize)> {
             self.conn.execute(
                 "INSERT INTO import_batches(source, file_name, imported_at, added, duplicates, unreadable)
                  VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
@@ -105,16 +111,27 @@ impl Database {
                     params![workout_id, batch_id, source.as_str(), activity.name],
                 )?;
             }
-            Ok(batch_id)
+            let health = self.insert_imported_health(batch_id, &health, now)?;
+            self.conn.execute(
+                "UPDATE import_batches SET health_added = ?2 WHERE id = ?1",
+                params![batch_id, health.total() as i64],
+            )?;
+            Ok((batch_id, health.total()))
         })();
         match written {
-            Ok(batch_id) => {
+            // 运动全是重复、健康数据本机也都有：什么都没加，不留空批次。
+            Ok((_, 0)) if fresh.is_empty() => {
+                self.conn.execute_batch("ROLLBACK;")?;
+                Ok(nothing())
+            }
+            Ok((batch_id, health_added)) => {
                 self.conn.execute_batch("COMMIT;")?;
                 Ok(ImportReport {
                     batch_id: Some(batch_id),
                     added: fresh.len(),
                     duplicates,
                     unreadable: parsed.unreadable,
+                    health_added,
                 })
             }
             Err(error) => {
@@ -134,7 +151,8 @@ impl Database {
         )?)
     }
 
-    /// 撤销一批：删掉这一批的运动和它们的序列，批次留一行「什么时候撤的」。返回删了几条。
+    /// 撤销一批：删掉这一批的运动和它们的序列、它补进来的健康数据，批次留一行「什么时候撤的」。
+    /// 返回删了几条运动。
     pub fn undo_import_batch(&self, batch_id: i64, now: DateTime<Utc>) -> Result<usize> {
         self.conn.execute_batch("BEGIN IMMEDIATE;")?;
         let done = (|| -> Result<usize> {
@@ -169,6 +187,7 @@ impl Database {
                 "DELETE FROM workout_imports WHERE batch_id = ?1",
                 [batch_id],
             )?;
+            self.delete_imported_health(batch_id)?;
             self.conn.execute(
                 "UPDATE import_batches SET undone_at = ?2 WHERE id = ?1 AND undone_at IS NULL",
                 params![batch_id, now.to_rfc3339()],
@@ -191,7 +210,7 @@ impl Database {
     pub fn import_batches(&self) -> Result<Vec<ImportBatch>> {
         let mut stmt = self.conn.prepare(
             "SELECT b.id, b.source, b.file_name, b.imported_at, b.added, b.duplicates, b.unreadable,
-                    b.undone_at, MIN(w.start_time), MAX(w.start_time)
+                    b.health_added, b.undone_at, MIN(w.start_time), MAX(w.start_time)
              FROM import_batches b
              LEFT JOIN workout_imports i ON i.batch_id = b.id
              LEFT JOIN workouts w ON w.workout_id = i.workout_id
@@ -206,9 +225,10 @@ impl Database {
                 added: row.get(4)?,
                 duplicates: row.get(5)?,
                 unreadable: row.get(6)?,
-                undone_at: row.get(7)?,
-                first_start: row.get(8)?,
-                last_start: row.get(9)?,
+                health_added: row.get(7)?,
+                undone_at: row.get(8)?,
+                first_start: row.get(9)?,
+                last_start: row.get(10)?,
             })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
