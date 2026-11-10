@@ -4,7 +4,8 @@ import { computed, ref, watch } from 'vue';
 import EditorShell from './EditorShell.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import DateRows from '../DateRows.vue';
-import { useJournalText } from './journal.i18n';
+import { journalMessages, useJournalText } from './journal.i18n';
+import { ownShort } from '../../lib/shortLabel';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
 import { clockText, parseClock, RACE_DISTANCES } from '../../lib/logbook/clock';
@@ -29,7 +30,7 @@ watch(() => props.race, (race) => {
 }, { immediate: true });
 
 const sports = computed(() => (['running', 'trail', 'cycling', 'swimming', 'triathlon', 'other'] as RaceSport[])
-  .map(value => ({ value, label: t.value.raceSports[value] })));
+  .map(value => ({ value, label: t.value.raceSports[value], short: ownShort(journalMessages, (tree) => tree.raceSportsShort[value]) })));
 const priorities = computed(() => (['a', 'b', 'c'] as RacePriority[]).map(value => ({ value, label: t.value.priorities[value] })));
 const pickDistance = (meters: number) => { km.value = String(+(meters / 1000).toFixed(4)); };
 

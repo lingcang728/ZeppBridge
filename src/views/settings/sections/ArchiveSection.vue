@@ -15,6 +15,7 @@ import { formatBytes, formatWhen } from '../../../lib/format';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { archiveCardMessages } from './archive.i18n';
+import { ownShort } from '../../../lib/shortLabel';
 
 const t = useMessages(settingsMessages);
 const a = useMessages(archiveCardMessages);
@@ -30,7 +31,8 @@ const FOREVER = 'forever';
 const keepItems = computed(() => [
   ...[30, 90, 180].map((days) => ({ value: days, label: t.value.days(days) })),
   { value: 365, label: a.value.year },
-  { value: FOREVER, label: a.value.forever },
+  // 葡语五项加起来比这一行宽 2px：放不下时「永久」退到短名（SegmentTrack 的回退梯子）。
+  { value: FOREVER, label: a.value.forever, short: ownShort(archiveCardMessages, (tree) => tree.foreverShort) },
 ]);
 const keepChoice = computed<number | string>(() => (userPrefs.value?.archive_enabled ? FOREVER : retentionDays.value));
 const keepSub = computed(() => (keepChoice.value === FOREVER ? a.value.keepForeverSub : t.value.retentionCutoff(retentionCutoffDate.value)));

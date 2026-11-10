@@ -12,6 +12,7 @@ import { afterMotion } from '../lib/motion/budget';
 import { createLoadSeq } from '../lib/loadSeq';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
 import { useMessages } from '../i18n';
+import { ownShort } from '../lib/shortLabel';
 import { heartRateZonePickerMessages as messages } from './HeartRateZonePicker.i18n';
 
 const t = useMessages(messages);
@@ -19,7 +20,7 @@ const t = useMessages(messages);
 const kindLabel = (kind: string): string =>
   (t.value.kind as Record<string, string | undefined>)[kind] ?? kind;
 
-type ModelCopy = { label: string; formula: string };
+type ModelCopy = { label: string; short?: string; formula: string };
 type BasisCopy = { label: string; note: string };
 
 const modelCopy = (id: string): ModelCopy | undefined =>
@@ -63,7 +64,8 @@ const preference = computed(() => options.value?.preference ?? {});
 const models = computed(() => options.value?.models ?? []);
 /* 三种算法是一枚可拖动的胶囊（和全应用「从几项里挑一个」同一种控件），不再是三块贴片。
    没选过时停在第一项上但不算选中：拨一下才保存。 */
-const modelItems = computed(() => models.value.map((model) => ({ value: model.id, label: modelLabel(model.id, model.label) })));
+// 放不下时退到短名（SegmentTrack 的回退梯子）：法语、意大利语的三个全名在 1040 宽下排不进一行。
+const modelItems = computed(() => models.value.map((model) => ({ value: model.id, label: modelLabel(model.id, model.label), short: ownShort(messages, (tree) => (tree.model as Record<string, ModelCopy | undefined>)[model.id]?.short) })));
 const focusedModel = ref<string | null>(null);
 const shownModel = computed(() => models.value.find((model) => model.id === (focusedModel.value ?? preference.value.model))
   ?? models.value[0] ?? null);
@@ -329,13 +331,21 @@ watch(() => props.revision, () => { void load(); });
 
 .zone-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-top: 6px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .zone-window { color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-/* 四列：区间名 | 心率范围 | 条 | 时长。名字和范围列定宽、时长列右对齐定宽，五行上下对齐。 */
-.zone-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+/* 四列：区间名 | 心率范围 | 条 | 时长。列宽定在列表上、各行用 subgrid 共用，五行上下对齐；
+   名字和时长列按最长的那行撑开（波兰语「2 godz. 35 min」、「Spalanie tłuszczu」放不进原来的 112 / 128px 定宽）。 */
+.zone-list {
+  display: grid;
+  grid-template-columns: minmax(128px, max-content) 92px minmax(60px, 1fr) minmax(88px, max-content);
+  gap: 10px var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .zone-list li {
   display: grid;
-  grid-template-columns: 128px 92px minmax(60px, 1fr) 112px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: var(--space-4);
   font-size: var(--fs-sm);
 }
 .zone-name { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); white-space: nowrap; }
@@ -347,7 +357,7 @@ watch(() => props.revision, () => { void load(); });
 .zone-outside, .zone-formula { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
 @media (max-width: 720px) {
   .zone-card { padding: var(--space-4); }
-  .zone-list li { grid-template-columns: minmax(0, 1fr) auto; }
+  .zone-list { grid-template-columns: minmax(0, 1fr) auto; }
   .zone-bar, .zone-range { display: none; }
 }
 </style>

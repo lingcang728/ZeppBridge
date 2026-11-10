@@ -8,7 +8,8 @@ import EditorShell from './EditorShell.vue';
 import GlassSwitch from '../GlassSwitch.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import DateRows from '../DateRows.vue';
-import { useJournalText } from './journal.i18n';
+import { journalMessages, useJournalText } from './journal.i18n';
+import { ownShort } from '../../lib/shortLabel';
 import { useLogbook } from '../../composables/useLogbook';
 import { backend } from '../../lib/bridge';
 import type { InjuryInput } from '../../types/logbook';
@@ -26,7 +27,11 @@ const parts = computed({
   get: () => (draft.value.body_part ? [draft.value.body_part] : []),
   set: (value: string[]) => { draft.value.body_part = value[0] ?? null; },
 });
-const severities = computed(() => [1, 2, 3].map(value => ({ value, label: (t.value.severities as Record<number, string>)[value] })));
+const severities = computed(() => [1, 2, 3].map(value => ({
+  value,
+  label: (t.value.severities as Record<number, string>)[value],
+  short: value === 3 ? ownShort(journalMessages, (tree) => tree.severityShort) : undefined,
+})));
 const ongoing = computed({
   get: () => draft.value.end_date === null,
   set: (value: boolean) => { draft.value.end_date = value ? null : draft.value.start_date; },

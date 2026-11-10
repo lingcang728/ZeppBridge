@@ -22,7 +22,9 @@
  * 选中字是粗体、普通字是常规体：按钮宽度按粗体预留（隐形的粗体副本撑宽），不然选中
  * 那一项的粗体比按钮宽，两头被裁掉（葡语「Zonas de reserva de frequência cardíaca」）。
  *
- * 放不下就折行（is-wrapped）：以前项被压窄、字互相叠在一起（葡语的生活事件分类、补拉
+ * 放不下时一档一档退（fit，2026-11-10）：原样 → 紧凑（is-compact）→ 短名（项的 `short`）→ 最后才
+ * 折行。每次从原样起一档档试，同一个微任务里定档，中间不出帧，看不到收的过程。
+ * 折行（is-wrapped）：以前项被压窄、字互相叠在一起（葡语的生活事件分类、补拉
  * 起点）。折行后滑块按行定位（--thumb-t / --thumb-h）：横拖在手指那一行里吸附，上下越过行中线换行；
  * 点到别的行时平胶囊原处缩小、目标处长出来，不斜穿两行字（rowAt / slideRow / fly 的 hop）。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
@@ -34,8 +36,11 @@ import { useGlassLens } from '../composables/useGlassLens';
 import { exemptFromSettle } from '../lib/motion/interrupt';
 import { lessMotion } from '../lib/motion/lessMotion';
 
-/** `title`：标签是缩写时的全名（悬停提示和读屏用）。 */
-export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName; title?: string };
+/**
+ * `title`：标签是缩写时的全名（悬停提示和读屏用）。
+ * `short`：放不下时退到的短名（紧凑了还放不下才用，全名进悬停提示）；没有就跳过这一档。
+ */
+export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName; title?: string; short?: string };
 
 const props = withDefaults(defineProps<{
   items: SegmentItem<T>[];
@@ -72,8 +77,16 @@ const emit = defineEmits<{
 const track = ref<HTMLElement | null>(null);
 const stops = ref([]) as Ref<SegmentStop<T>[]>;
 const thumb = ref({ left: 0, width: 0, top: 0, height: 0, visible: false });
+/** 放不下时退到哪一档：0 原样，1 紧凑，2 短名，3 折行。 */
+const fit = ref(0);
+const FIT_WRAP = 3;
 /** 一行放不下，折成多行。 */
-const wrapped = ref(false);
+const wrapped = computed(() => fit.value >= FIT_WRAP);
+const compactNow = computed(() => props.compact || fit.value >= 1);
+const shortNow = computed(() => fit.value >= 2);
+const shown = (item: SegmentItem<T>) => (shortNow.value && item.short ? item.short : item.label);
+/** 显示短名时全名进悬停提示和读屏。 */
+const fullTitle = (item: SegmentItem<T>) => item.title ?? (shortNow.value && item.short && item.short !== item.label ? item.label : undefined);
 const dragging = ref(false);
 /** 滑块飞向新位置的那一段（松手、点击、键盘、外面换了值）：和拖动一样不按裁切分色，免得途中出现半个字。 */
 const settling = ref(false);
@@ -175,26 +188,43 @@ const restsOn = (value: T) => {
   return !!stop && stop.left === thumb.value.left && stop.top === thumb.value.top && thumb.value.visible;
 };
 
-/* 一行时轨道内容比轨道宽就折；折了以后各项原宽之和放得下了再合回一行。项本身不收缩，
-   所以两种状态下量出来的是同一个数，不会来回翻。铺满型（fill）和浮动导航 / 按钮组不折。 */
-const checkWrap = () => {
-  const el = track.value;
-  if (!el || props.fill || props.noWrap || props.variant !== 'inset') return;
+/* 一档档退：每次都从原样（0）起，量「各项原宽之和」是否比轨道宽（轨道 max-width: 100%，放不下时
+   clientWidth 就是能给的宽度），放不下就退一档、等 DOM 更新（nextTick 是微任务，中间不出帧）再量。
+   项本身不收缩，同一个宽度永远落在同一档，不会来回翻。铺满型（fill）、noWrap 和浮动导航 / 按钮组不参与。 */
+const ladderOn = () => !props.fill && !props.noWrap && props.variant === 'inset';
+const overflows = (el: HTMLElement) => {
   // 按各项原宽之和算，不看 scrollWidth：浮起来的透镜会伸出轨道，把 scrollWidth 撑大。
   const pad = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
   const natural = buttons().reduce((sum, button) => sum + button.offsetWidth, 0) + pad * 2;
-  if (!wrapped.value) {
-    if (natural > el.clientWidth + 1) wrapped.value = true;
-    return;
+  return natural > el.clientWidth + 1;
+};
+let fitting = false;
+let refitAgain = false;
+const refit = async () => {
+  const el = track.value;
+  if (!el || !ladderOn()) { fit.value = 0; return; }
+  if (fitting) { refitAgain = true; return; }
+  fitting = true;
+  try {
+    fit.value = 0;
+    await nextTick();
+    while (fit.value < FIT_WRAP && overflows(el)) {
+      fit.value += 1;
+      // 已经是紧凑 / 没有短名的档位和上一档长得一样，不用再等一次 DOM。
+      if (fit.value === 1 && props.compact) continue;
+      if (fit.value === 2 && !props.items.some((item) => item.short && item.short !== item.label)) continue;
+      await nextTick();
+    }
+  } finally {
+    fitting = false;
   }
-  if (natural <= el.clientWidth) wrapped.value = false;
+  if (refitAgain) { refitAgain = false; await refit(); }
 };
 
 const measure = () => {
   if (!track.value) return;
   trackSize.value = { w: track.value.offsetWidth, h: track.value.offsetHeight };
   trackPad.value = Number.parseFloat(getComputedStyle(track.value).paddingTop) || 0;
-  checkWrap();
   stops.value = readStops();
   if (!gesture && !settling.value) placeOn(props.modelValue);
   // 飞行途中量到新尺寸（典型是字体刚加载完、各项变宽）：落地后再按新尺寸摆一次，否则滑块停在旧宽度上，
@@ -202,10 +232,18 @@ const measure = () => {
   else if (settling.value) staleStops = true;
 };
 
+/** 尺寸变了：先定档，再按定好的样子量位置。拖动中不换档（手指下面的项不能变样）。 */
+const fitAndMeasure = async () => {
+  if (!gesture) await refit();
+  measure();
+};
+
 const observeItems = () => {
   if (!observer || !track.value) return;
   observer.disconnect();
   observer.observe(track.value);
+  // 退了档的轨道比能给的宽度窄：窗口变宽时轨道自己不变，要看父元素才知道能退回去。
+  if (track.value.parentElement) observer.observe(track.value.parentElement);
   for (const el of buttons()) observer.observe(el);
 };
 
@@ -658,16 +696,17 @@ watch(wrapped, async () => {
   stops.value = readStops();
   if (!gesture) placeOn(props.modelValue);
 });
-watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('\u0001'), async () => {
+watch(() => props.items.map((item) => `${item.value}\u0000${item.label}\u0000${item.short ?? ''}`).join('\u0001'), async () => {
   await nextTick();
   observeItems();
-  measure();
+  await fitAndMeasure();
 });
 
+const onResize = () => { void fitAndMeasure(); };
 onMounted(() => {
   void nextTick(() => {
-    measure();
-    observer = new ResizeObserver(() => measure());
+    void fitAndMeasure();
+    observer = new ResizeObserver(() => { void fitAndMeasure(); });
     observeItems();
     // 入场：先停在最左一项，下一拍飞到选中项（复用点击的飞行，不另写一套）。
     const first = props.items[0]?.value;
@@ -676,8 +715,8 @@ onMounted(() => {
       void nextTick(() => requestAnimationFrame(() => { void fly(props.modelValue, false, first); }));
     }
   });
-  void fontsReady().then(() => measure());
-  window.addEventListener('resize', measure);
+  void fontsReady().then(() => fitAndMeasure());
+  window.addEventListener('resize', onResize);
 });
 onBeforeUnmount(() => {
   clearGesture();
@@ -687,7 +726,7 @@ onBeforeUnmount(() => {
   elastic?.cancel();
   cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
-  window.removeEventListener('resize', measure);
+  window.removeEventListener('resize', onResize);
 });
 </script>
 
@@ -695,7 +734,7 @@ onBeforeUnmount(() => {
   <div
     ref="track"
     :class="['segment-track', `is-${variant}`, {
-      'is-dragging': dragging, 'is-settling': settling, 'is-lens-fade': lensFade, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill,
+      'is-dragging': dragging, 'is-settling': settling, 'is-lens-fade': lensFade, 'is-compact': compactNow, 'is-disabled': disabled, 'is-fill': fill,
       'is-wrapped': wrapped,
       'is-icon-only': iconOnly,
       'has-lens': thumbLens.active.value,
@@ -724,15 +763,15 @@ onBeforeUnmount(() => {
       :class="['segment-item', { 'is-lensed': lensValue !== null && item.value === lensValue, 'is-offrow': offRow(index) }]"
       :style="itemLeft(index)"
       :aria-checked="item.value === modelValue"
-      :aria-label="iconOnly ? item.label : item.title"
-      :title="iconOnly ? item.label : item.title"
+      :aria-label="iconOnly ? item.label : fullTitle(item)"
+      :title="iconOnly ? item.label : fullTitle(item)"
       :disabled="disabled"
       :tabindex="item.value === modelValue ? 0 : -1"
       @click="onClick(item.value)"
     >
       <slot :item="item" :active="false">
         <Icon v-if="item.icon" :name="item.icon" :size="iconOnly ? 17 : 15" />
-        <span v-if="!iconOnly" class="seg-label" :data-label="item.label">{{ item.label }}</span>
+        <span v-if="!iconOnly" class="seg-label" :data-label="shown(item)">{{ shown(item) }}</span>
       </slot>
     </button>
     <!-- 选中字：同样的标签按量好的位置摆一遍，只露出滑块覆盖的那一段。 -->
@@ -746,7 +785,7 @@ onBeforeUnmount(() => {
       >
         <slot v-if="items[index]" :item="items[index]!" :active="true">
           <Icon v-if="items[index]!.icon" :name="items[index]!.icon!" :size="iconOnly ? 17 : 15" />
-          <span v-if="!iconOnly">{{ items[index]!.label }}</span>
+          <span v-if="!iconOnly">{{ shown(items[index]!) }}</span>
         </slot>
       </span>
     </span>
