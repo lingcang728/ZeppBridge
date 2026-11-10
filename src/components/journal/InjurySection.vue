@@ -39,7 +39,7 @@ const span = (injury: Injury) => (injury.end_date ? `${journalDay(injury.start_d
             <span class="i-title">{{ injury.title }}<em v-if="!injury.end_date">{{ t.stillHurting }}</em></span>
             <span class="i-meta">
               <template v-if="injury.body_part">{{ partName(injury.body_part) }} · </template>
-              <template v-if="injury.severity">{{ t.severities[injury.severity] }} · </template>{{ span(injury) }}
+              <template v-if="injury.severity">{{ t.severities[injury.severity] }} · </template><span class="i-span">{{ span(injury) }}</span>
             </span>
           </button>
         </li>
@@ -56,5 +56,7 @@ const span = (injury: Injury) => (injury.end_date ? `${journalDay(injury.start_d
 .i-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .i-title em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--heart) 16%, transparent); color: var(--heart); font-size: var(--fs-2xs); font-style: normal; font-weight: 600; }
 .i-meta { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+/* 起止日期整段不拆：放不下就整段换到下一行，不在「6 aug / 2026」中间断（11-10 普查）。 */
+.i-span { white-space: nowrap; }
 @container journal (max-width: 560px) { .injury-body { grid-template-columns: minmax(0, 1fr); } .map { max-width: 260px; justify-self: center; width: 100%; } }
 </style>

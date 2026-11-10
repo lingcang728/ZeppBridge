@@ -12,6 +12,8 @@ import { useMessages } from '../../i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import { LETTER_REPLY_MAX } from '../../services/letterBox';
 import { useLetterText } from './letters.i18n';
+import { stampMessages } from './stamps.i18n';
+import { ownShort } from '../../lib/shortLabel';
 
 export type ReportCategory = 'device' | 'workout' | 'data' | 'other';
 const CATEGORIES: ReportCategory[] = ['device', 'workout', 'data', 'other'];
@@ -27,6 +29,12 @@ const t = useLetterText();
 const s = useMessages(settingsMessages);
 
 const canSend = computed(() => !props.busy && props.text.trim().length > 0);
+/** 章上写短名（没翻的语言写全称），悬停提示是全称 + 说明。 */
+const stamps = computed(() => Object.fromEntries(CATEGORIES.map((kind) => {
+  const full = s.value.reportCategory[kind];
+  const label = ownShort(stampMessages, (tree) => tree.kind[kind]) ?? full.label;
+  return [kind, { label, title: label === full.label ? full.hint : `${full.label} — ${full.hint}` }];
+})) as Record<ReportCategory, { label: string; title: string }>);
 
 const press = (event: MouseEvent) => {
   if (lessMotion()) return;
@@ -72,8 +80,8 @@ const snap = (event: Event) => {
         </button>
         <div v-if="attach" class="kinds" role="radiogroup" :aria-label="s.reportCategoryAria">
           <button v-for="kind in CATEGORIES" :key="kind" type="button" role="radio" :aria-checked="category === kind"
-            :class="['mark', 'kind', { picked: category === kind }]" :title="s.reportCategory[kind].hint" :disabled="busy" @click="pick(kind, $event)">
-            <span class="mark-label">{{ s.reportCategory[kind].label }}</span>
+            :class="['mark', 'kind', { picked: category === kind }]" :title="stamps[kind].title" :aria-label="s.reportCategory[kind].label" :disabled="busy" @click="pick(kind, $event)">
+            <span class="mark-label">{{ stamps[kind].label }}</span>
           </button>
         </div>
       </div>
@@ -100,7 +108,8 @@ const snap = (event: Event) => {
 .compose-text::placeholder { color: var(--paper-muted); opacity: .75; }
 /* 章：双线圆角框、印泥色；没盖的淡、平放，盖上的墨色深、歪一点。占两行横线高。 */
 .marks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: calc(var(--paper-line) * 2); margin-top: var(--paper-line); }
-.kinds { display: contents; }
+/* 问题类型章自成一排，排在「附上报告」章下面；章名用短名，一排放得下。 */
+.kinds { display: flex; flex: 1 0 100%; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .mark {
   display: grid; justify-items: center; padding: 6px 14px 5px; border: 1.5px solid currentColor; border-radius: 12px; background: none; cursor: pointer;
   color: rgb(60 50 40 / .4); outline: 1px solid transparent; outline-offset: 2px;

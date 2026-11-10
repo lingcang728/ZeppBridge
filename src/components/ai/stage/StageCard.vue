@@ -38,7 +38,11 @@ const longestWord = (title: string) => Math.max(1, ...title.split(/\s+/).map((wo
 .scard-title { display: block; max-height: 2.5em; overflow: hidden; font-size: min(max(12px, calc(var(--w) * .118)), calc(var(--w) * .8 / var(--wfit, 6))); font-weight: 700; line-height: 1.2;
   letter-spacing: -.01em; overflow-wrap: normal; word-break: normal; hyphens: manual; }
 /* 长名字（俄 / 德「全天心率」「训练负荷」）小一号，三行内放下；最长的那个词决定字号上限，词不从中间断开。 */
-.scard.long .scard-title { max-height: 3.7em; font-size: min(max(10px, calc(var(--w) * .094)), calc(var(--w) * .8 / var(--wfit, 6))); }
+.scard.long .scard-title { max-height: 3.4em; font-size: min(max(10px, calc(var(--w) * .094)), calc(var(--w) * .8 / var(--wfit, 6))); line-height: 1.1; }
+/* 名字折成三行时牌面高度不够：行被压扁，第三行叠在「最近 14 天」下面（11-10 普查，波兰语「Treningi w wybranym okresie」）。
+   长名字的牌收紧行距、行间距和图标下沿，三行也放得下。 */
+.scard.long { gap: calc(var(--w) * .02); }
+.scard.long .scard-icon { margin-bottom: 0; }
 .scard-line { overflow: hidden; color: var(--muted); font-size: max(10px, calc(var(--w) * .084)); text-overflow: ellipsis; white-space: nowrap; }
 .scard-value { align-self: end; color: var(--tint); line-height: 1; white-space: nowrap; }
 .scard-value b { font: 700 calc(var(--w) * .25) / 1 var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }

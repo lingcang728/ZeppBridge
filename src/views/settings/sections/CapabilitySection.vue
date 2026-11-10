@@ -96,7 +96,8 @@ const openCodes = () => { void router.push({ path: '/settings/advanced', hash: '
 
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  /* 196px 时长名字语言里「Ciśnienie krwi (eksperymentalne)」的括号单独掉一行、日期在连字符处断开（11-10 普查）。 */
+  grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
   gap: var(--space-2);
   margin: 0;
   padding: 0;
@@ -110,7 +111,7 @@ const openCodes = () => { void router.push({ path: '/settings/advanced', hash: '
   min-width: 0;
 }
 .cell-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.cell-head strong { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
+.cell-head strong { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; overflow-wrap: break-word; }
 .capability-cell.off .cell-head strong { color: var(--muted); }
 .cell-detail { color: var(--muted); font-size: var(--fs-xs); }
 .cell-note { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }

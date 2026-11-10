@@ -193,7 +193,7 @@ onBeforeUnmount(() => { window.clearTimeout(launchTimer); stopHum(); });
 .export-only:hover:not(:disabled) { background: var(--glass-press); color: var(--ink); }
 .export-only:disabled { opacity: .5; cursor: default; }
 /* 就绪度那两行也是一枚小玻璃（H19：以前硬印在版面上，看不出能点）；悬停浮起一点。 */
-.ready-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; justify-items: center; column-gap: 6px; max-width: 260px; padding: 6px 10px 6px 14px; border: 1px solid var(--mat-glass-line);
+.ready-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; justify-items: center; column-gap: 6px; max-width: 300px; text-wrap: balance; padding: 6px 10px 6px 14px; border: 1px solid var(--mat-glass-line);
   border-radius: 16px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
   color: var(--muted); font-size: var(--fs-xs); text-align: center; text-decoration: none; transition: translate 200ms cubic-bezier(.3, 1.3, .5, 1), color var(--dur-base) ease; }
 .ready-line > span, .ready-line > small { grid-column: 1; }

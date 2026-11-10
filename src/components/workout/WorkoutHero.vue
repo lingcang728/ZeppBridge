@@ -148,9 +148,10 @@ const missingLine = computed(() => {
 .metric-tile.tone-activity { --tile-tone: var(--activity); }
 .metric-tile.tone-sleep { --tile-tone: var(--sleep); }
 .metric-tile.tone-calories { --tile-tone: var(--calories); }
-.metric-tile > div { min-width: 0; max-width: 100%; }
+/* 名字折成两行的牌（波兰语「Obciążenie treningowe」）数值仍和同一排的对齐：数值贴牌底。 */
+.metric-tile > div { display: flex; flex: 1; flex-direction: column; min-width: 0; max-width: 100%; }
 .metric-label { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.metric-value { display: flex; align-items: baseline; gap: 5px; margin: 3px 0 0; flex-wrap: wrap; }
+.metric-value { display: flex; align-items: baseline; gap: 5px; margin: auto 0 0; padding-top: 3px; flex-wrap: wrap; }
 .metric-value strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-xl); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
 .metric-value span { color: var(--muted); font-size: var(--fs-xs); }
 

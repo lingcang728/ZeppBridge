@@ -29,6 +29,8 @@ const messages = defineMessages(
     raceName: '比赛名', raceDate: '比赛日', raceSport: '项目', distance: '距离（公里）', goalTime: '目标成绩', result: '成绩', priority: '优先级',
     priorities: { a: '主要目标', b: '次要', c: '练兵' },
     raceSports: { running: '路跑', trail: '越野跑', cycling: '骑行', swimming: '游泳', triathlon: '铁三', other: '其他' },
+    /** 比赛编辑器里项目胶囊放不下时的短名（全名进悬停提示）；一个词、越短越好。 */
+    raceSportsShort: { running: '路跑', trail: '越野', cycling: '骑行', swimming: '游泳', triathlon: '铁三', other: '其他' },
     distances: { '5k': '5 公里', '10k': '10 公里', half: '半程马拉松', marathon: '全程马拉松' },
 
     records: 'PB 墙',
@@ -58,6 +60,8 @@ const messages = defineMessages(
     stillHurting: '还没好',
     injuryTitle: '怎么了', bodyPart: '部位（点一处）', severity: '程度',
     severities: { '1': '轻', '2': '中', '3': '重（影响训练）' },
+    /** 放不下时胶囊里用的短名（全名进悬停提示）。 */
+    severityShort: '重',
     startDate: '开始', endDate: '好了', since: (date: string) => `${date} 起`,
 
     epochs: '纪元与事件',
@@ -98,6 +102,7 @@ const messages = defineMessages(
     raceName: 'Race name', raceDate: 'Race day', raceSport: 'Sport', distance: 'Distance (km)', goalTime: 'Goal time', result: 'Result', priority: 'Priority',
     priorities: { a: 'A race', b: 'B race', c: 'Tune-up' },
     raceSports: { running: 'Road', trail: 'Trail', cycling: 'Cycling', swimming: 'Swimming', triathlon: 'Triathlon', other: 'Other' },
+    raceSportsShort: { running: 'Road', trail: 'Trail', cycling: 'Bike', swimming: 'Swim', triathlon: 'Tri', other: 'Other' },
     distances: { '5k': '5K', '10k': '10K', half: 'Half marathon', marathon: 'Marathon' },
 
     records: 'Personal bests',
@@ -127,6 +132,7 @@ const messages = defineMessages(
     stillHurting: 'Ongoing',
     injuryTitle: 'What happened', bodyPart: 'Where (pick one)', severity: 'Severity',
     severities: { '1': 'Mild', '2': 'Moderate', '3': 'Severe (affects training)' },
+    severityShort: 'Severe',
     startDate: 'Started', endDate: 'Healed', since: (date: string) => `since ${date}`,
 
     epochs: 'Eras & life events',
@@ -167,6 +173,7 @@ const messages = defineMessages(
     raceName: 'Nombre', raceDate: 'Fecha', raceSport: 'Modalidad', distance: 'Distancia (km)', goalTime: 'Tiempo objetivo', result: 'Resultado', priority: 'Prioridad',
     priorities: { a: 'Objetivo principal', b: 'Secundaria', c: 'Preparatoria' },
     raceSports: { running: 'Ruta', trail: 'Trail', cycling: 'Ciclismo', swimming: 'Natación', triathlon: 'Triatlón', other: 'Otra' },
+    raceSportsShort: { running: 'Ruta', trail: 'Trail', cycling: 'Bici', swimming: 'Nado', triathlon: 'Tri', other: 'Otra' },
     distances: { '5k': '5K', '10k': '10K', half: 'Media maratón', marathon: 'Maratón' },
 
     records: 'Mejores marcas',
@@ -196,6 +203,7 @@ const messages = defineMessages(
     stillHurting: 'Sigue abierta',
     injuryTitle: 'Qué pasó', bodyPart: 'Dónde (marca una zona)', severity: 'Gravedad',
     severities: { '1': 'Leve', '2': 'Moderada', '3': 'Grave (afecta al entrenamiento)' },
+    severityShort: 'Grave',
     startDate: 'Empezó', endDate: 'Curada', since: (date: string) => `desde ${date}`,
 
     epochs: 'Etapas y eventos',
@@ -213,3 +221,4 @@ const messages = defineMessages(
 );
 
 export const useJournalText = () => useMessages(messages);
+export const journalMessages = messages;

@@ -145,6 +145,6 @@ const recentItems = computed<RecentItem[]>(() => {
 .tl-node { display: grid; padding: 3px; border-radius: 16px; background: var(--mat-card-solid); }
 .tl-item.newest .tl-node { box-shadow: 0 0 18px -2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .tl-title { max-width: 100%; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-.tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-wrap: balance; }
 .recent-empty { min-height: 120px; }
 </style>

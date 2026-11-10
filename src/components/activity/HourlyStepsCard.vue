@@ -206,11 +206,14 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
 .bar.empty { height: 2px !important; background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .hourly-bars small { position: absolute; bottom: -16px; left: 0; color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; }
 
-.hourly-heat { display: grid; gap: 3px; }
-.hourly-heat.dense { gap: 2px; }
+/* 标签列定在外层、各行用 subgrid 共用：按最长的标签撑开（波兰语「Tydzień od 28.10」放不进原来的 88px），
+   格子仍然上下对齐。 */
+.hourly-heat { display: grid; grid-template-columns: minmax(88px, max-content) minmax(0, 1fr); gap: 3px 0; }
+.hourly-heat.dense { row-gap: 2px; }
 .heat-row {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: 8px;
   min-height: 24px;

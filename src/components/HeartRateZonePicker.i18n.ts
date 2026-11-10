@@ -33,9 +33,9 @@ export const heartRateZonePickerMessages = defineMessages(
     /* 算法名、公式、区间名和基准说明都按后端发来的稳定 id 查表。
        后端也带着一份中文，那是给 CLI / MCP 的：它们的输出不跟界面语言走。 */
     model: {
-      max_hr: { label: '最大心率区间', formula: '区间下界 = 最大心率 x 百分比' },
-      hr_reserve: { label: '储备心率区间', formula: '区间下界 = 静息心率 + (最大心率 - 静息心率) x 百分比' },
-      lactate_threshold: { label: '乳酸阈值区间', formula: '区间下界 = 乳酸阈值心率 x 百分比' },
+      max_hr: { label: '最大心率区间', short: '最大心率', formula: '区间下界 = 最大心率 x 百分比' },
+      hr_reserve: { label: '储备心率区间', short: '储备心率', formula: '区间下界 = 静息心率 + (最大心率 - 静息心率) x 百分比' },
+      lactate_threshold: { label: '乳酸阈值区间', short: '乳酸阈值', formula: '区间下界 = 乳酸阈值心率 x 百分比' },
     },
     percentBands: ['热身', '燃脂', '有氧耐力', '无氧耐力', '极限'],
     thresholdBands: ['轻松', '耐力', '节奏', '阈值', '无氧'],
@@ -92,9 +92,9 @@ export const heartRateZonePickerMessages = defineMessages(
       threshold_hr: 'Threshold HR basis',
     },
     model: {
-      max_hr: { label: 'Max heart rate zones', formula: 'Zone floor = max heart rate x percentage' },
-      hr_reserve: { label: 'Heart rate reserve zones', formula: 'Zone floor = resting HR + (max HR - resting HR) x percentage' },
-      lactate_threshold: { label: 'Lactate threshold zones', formula: 'Zone floor = threshold heart rate x percentage' },
+      max_hr: { label: 'Max heart rate zones', short: 'Max HR', formula: 'Zone floor = max heart rate x percentage' },
+      hr_reserve: { label: 'Heart rate reserve zones', short: 'HR reserve', formula: 'Zone floor = resting HR + (max HR - resting HR) x percentage' },
+      lactate_threshold: { label: 'Lactate threshold zones', short: 'Lactate threshold', formula: 'Zone floor = threshold heart rate x percentage' },
     },
     percentBands: ['Warm-up', 'Fat burn', 'Aerobic', 'Anaerobic', 'Maximum'],
     thresholdBands: ['Easy', 'Endurance', 'Tempo', 'Threshold', 'Anaerobic'],
@@ -151,9 +151,9 @@ export const heartRateZonePickerMessages = defineMessages(
       threshold_hr: 'Base de FC de umbral',
     },
     model: {
-      max_hr: { label: 'Zonas por FC máxima', formula: 'Límite inferior de la zona = FC máxima x porcentaje' },
-      hr_reserve: { label: 'Zonas por FC de reserva', formula: 'Límite inferior de la zona = FC en reposo + (FC máxima - FC en reposo) x porcentaje' },
-      lactate_threshold: { label: 'Zonas por umbral de lactato', formula: 'Límite inferior de la zona = FC de umbral x porcentaje' },
+      max_hr: { label: 'Zonas por FC máxima', short: 'FC máx.', formula: 'Límite inferior de la zona = FC máxima x porcentaje' },
+      hr_reserve: { label: 'Zonas por FC de reserva', short: 'FC reserva', formula: 'Límite inferior de la zona = FC en reposo + (FC máxima - FC en reposo) x porcentaje' },
+      lactate_threshold: { label: 'Zonas por umbral de lactato', short: 'Umbral lactato', formula: 'Límite inferior de la zona = FC de umbral x porcentaje' },
     },
     percentBands: ['Calentamiento', 'Quema de grasa', 'Aeróbica', 'Anaeróbica', 'Máxima'],
     thresholdBands: ['Suave', 'Resistencia', 'Tempo', 'Umbral', 'Anaeróbica'],
