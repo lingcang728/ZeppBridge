@@ -231,6 +231,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     // 演示里不发系统通知。
     workout_feedback_toast_due: () => null, workout_feedback_toast_show: () => null,
     export_my_records: () => 128,
+    export_for_unstrap: () => ({ path: 'exports/zeppbridge-for-unstrap-demo.zip', workouts: 12, heart_rate_points: 8400 }),
     clear_auth: () => { status = { ...status, configured: false, connection_state: 'not_configured' }; return status; },
     manual_auth: () => { status = demoStatus(data); return status; },
     recover_advanced_credentials: () => handlers.get_login_status({}),

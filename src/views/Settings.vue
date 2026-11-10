@@ -23,6 +23,7 @@ import { distanceUnit, distanceUnitOptionLabel } from '../lib/units';
 import { locale, LOCALE_LABELS, useMessages } from '../i18n';
 import { settingsMessages } from './Settings.i18n';
 import { deckMessages } from './settings/deck.i18n';
+import { labsMessages } from './settings/sections/labs.i18n';
 import { syncCardMessages } from './settings/sections/sync.i18n';
 import { useTourText } from '../components/tour/tour.i18n';
 import { ALL_CHAPTERS } from '../lib/tour/chapters';
@@ -41,6 +42,7 @@ defineOptions({ name: 'Settings' });
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const syncCard = useMessages(syncCardMessages);
+const labs = useMessages(labsMessages);
 const tour = useTourText();
 const route = useRoute();
 const router = useRouter();
@@ -70,7 +72,7 @@ const titles = computed<Record<SettingsCardId, string>>(() => ({
   data: d.value.cardData,
   ai: d.value.cardAi,
   display: d.value.cardDisplay,
-  feedback: d.value.secFeedback,
+  labs: labs.value.cardTitle,
   guide: tour.value.cardTitle,
   privacy: d.value.cardPrivacy,
   advanced: d.value.cardAdvanced,
@@ -90,7 +92,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
     data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
     ai: d.value.sumAi(exportFormat.value.toUpperCase()),
     display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
-    feedback: d.value.sumFeedback,
+    labs: labs.value.summary,
     guide: tour.value.seenCount(ALL_CHAPTERS.filter((id) => seenChapters().has(id)).length, ALL_CHAPTERS.length),
     privacy: d.value.sumPrivacy,
     advanced: d.value.sumAdvanced,
@@ -99,7 +101,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
 
 const toneColor = (tone: string) => (tone === 'neutral' ? 'var(--glyph-neutral)' : `var(--${tone})`);
 /** 内容只有几行的卡：展开后收窄（CardDeck 的 is-narrow）。 */
-const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'feedback', 'guide', 'privacy'];
+const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'labs', 'guide', 'privacy'];
 const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
   id,
   narrow: NARROW_CARDS.includes(id),

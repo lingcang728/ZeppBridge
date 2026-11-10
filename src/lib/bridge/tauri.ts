@@ -543,6 +543,9 @@ export const tauriBackend: BridgeBackend = {
   workoutImportSources() {
     return call<Record<string, import('../../types/imports').ImportSourceKey>>('workout_import_sources');
   },
+  exportForUnstrap(days: number | null) {
+    return call<import('../../types/imports').UnstrapExportResult>('export_for_unstrap', { days });
+  },
   submitDiagnosticReport(note?: string, category?: string) {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
       note: note ?? null,

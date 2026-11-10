@@ -1,0 +1,13 @@
+/* Beta 实验室：每一项标题后面的「实验性」小章（LabsSection 与 UnstrapRows 共用）。 */
+.lab-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--calories) 16%, transparent);
+  color: var(--calories);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  vertical-align: 2px;
+  white-space: nowrap;
+}

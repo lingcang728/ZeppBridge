@@ -192,3 +192,129 @@ fn read_import_file_rejects_a_file_of_the_wrong_kind() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+mod unstrap {
+    use super::super::unstrap::{parse_unstrap_archive, unstrap_sport};
+    use super::zip_of;
+    use std::io::Cursor;
+
+    // 2024-05-01T00:00:00Z = 1714521600。
+    const T0: i64 = 1_714_521_600;
+
+    fn backup() -> Vec<u8> {
+        let workout = format!(
+            "start,start_epoch,end_epoch,sport_type,exercise_seconds,calories,avg_hr,max_hr,min_hr,aerobic_te,anaerobic_te,training_load,vo2max,steps,subtype\n\
+             x,{a},{a_end},52,1500,180,120,150,80,2.5,0.4,40,,,\n\
+             x,{b},{b_end},1,1700,300,140,170,90,3.1,,55,48,,\n\
+             x,{c},{c_end},6,,,,,,,,,,,\n",
+            a = T0,
+            a_end = T0 + 1800,
+            b = T0 + 86_400 + 30,
+            b_end = T0 + 86_400 + 1830,
+            c = T0 + 2 * 86_400,
+            c_end = T0 + 2 * 86_400 + 900,
+        );
+        let workout_hr = format!(
+            "workout_start_epoch,epoch,bpm\n{a},{a},110\n{a},{a1},130\n{a},{a2},0\n{b},{b},150\n",
+            a = T0,
+            a1 = T0 + 60,
+            a2 = T0 + 120,
+            b = T0 + 86_400 + 30,
+        );
+        // 手机上的跑步和带子记的第二条是同一次（起点差 30 秒）：并成一条，心率从带子补。
+        let app_workout = format!(
+            "start,start_epoch,end_epoch,sport_type,source,pauses,end_reason,avg_hr,max_hr,distance_m,distance_from_steps,total_kcal\n\
+             x,{b},{b_end},1,1,\"{p0}-{p1}\",0,,,5000.0,false,310.4\n\
+             x,{d},{d_end},3,0,,0,100,120,1234.0,true,\n",
+            b = T0 + 86_400,
+            b_end = T0 + 86_400 + 1860,
+            p0 = T0 + 86_400 + 600,
+            p1 = T0 + 86_400 + 660,
+            d = T0 + 3 * 86_400,
+            d_end = T0 + 3 * 86_400 + 1200,
+        );
+        let route = format!(
+            "workout_start_epoch,epoch,lat,lon,accuracy_m,speed_ms,bearing_deg,altitude_m\n\
+             {b},{b},31.0,121.0,5,,,10\n{b},{b1},31.01,121.0,5,,,12\n",
+            b = T0 + 86_400,
+            b1 = T0 + 86_400 + 300,
+        );
+        let deleted = format!(
+            "start_epoch,effect_end_epoch,deleted_epoch\n{c},,{c}\n",
+            c = T0 + 2 * 86_400
+        );
+        zip_of(&[
+            ("workout.csv", workout.as_bytes()),
+            ("workout_hr.csv", workout_hr.as_bytes()),
+            ("app_workout.csv", app_workout.as_bytes()),
+            ("app_workout_route.csv", route.as_bytes()),
+            ("workout_deleted.csv", deleted.as_bytes()),
+            ("settings.json", b"{}"),
+        ])
+    }
+
+    #[test]
+    fn reads_strap_and_phone_workouts_merging_the_same_session() {
+        let file = parse_unstrap_archive(Cursor::new(backup())).unwrap();
+        assert_eq!(file.unreadable, 0);
+        // 力量（带子）、跑步（手机 + 带子并成一条）、步行（手机）；删掉的泳池那条不回来。
+        let sports: Vec<&str> = file.activities.iter().map(|a| a.sport.as_str()).collect();
+        assert_eq!(sports, ["strength", "run", "walking"]);
+
+        let lift = &file.activities[0];
+        assert_eq!(lift.moving_seconds, Some(1500));
+        assert_eq!(
+            (lift.calories, lift.avg_hr, lift.max_hr),
+            (Some(180), Some(120), Some(150))
+        );
+        let samples = &lift.decoded.as_ref().unwrap().samples;
+        // 0 bpm 是没测到，不是心率 0。
+        assert_eq!(
+            samples
+                .iter()
+                .filter_map(|s| s.heart_rate)
+                .collect::<Vec<_>>(),
+            [110, 130]
+        );
+        assert!(lift.decoded.as_ref().unwrap().route.is_empty());
+        assert_eq!(lift.distance_m, None);
+
+        let run = &file.activities[1];
+        assert_eq!(run.start_time.timestamp(), T0 + 86_400);
+        assert_eq!(run.distance_m, Some(5000.0));
+        assert_eq!(run.calories, Some(310));
+        // 手机没记心率汇总，用带子那条的。
+        assert_eq!((run.avg_hr, run.max_hr), (Some(140), Some(170)));
+        let decoded = run.decoded.as_ref().unwrap();
+        assert_eq!(decoded.route.len(), 2);
+        assert_eq!(decoded.pauses.len(), 1);
+        assert_eq!(decoded.end_time.timestamp(), T0 + 86_400 + 1860);
+        assert!(decoded.samples.iter().any(|s| s.heart_rate == Some(150)));
+
+        // 按步数估的距离不要。
+        let walk = &file.activities[2];
+        assert_eq!(walk.distance_m, None);
+        assert!(walk.decoded.is_none());
+        assert_eq!((walk.avg_hr, walk.calories), (Some(100), None));
+    }
+
+    #[test]
+    fn other_zips_are_not_unstrap_backups() {
+        let other = zip_of(&[("activities.csv", b"Filename\n")]);
+        assert!(parse_unstrap_archive(Cursor::new(other)).is_none());
+    }
+
+    #[test]
+    fn sport_numbers_are_the_strap_protocol_not_cloud_history() {
+        // 6 在云端历史里是步行，在 unstrap 里是泳池游泳。
+        assert_eq!(unstrap_sport(6), "pool_swimming");
+        assert_eq!(unstrap_sport(83), "activity");
+        for code in 0..300 {
+            let key = unstrap_sport(code);
+            assert!(
+                key == "activity" || crate::sport_catalog::is_known_key(key),
+                "{code} → {key}"
+            );
+        }
+    }
+}

@@ -142,7 +142,7 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
     }
 }
 
-fn entry_name<R: Read + Seek>(
+pub(super) fn entry_name<R: Read + Seek>(
     archive: &mut zip::ZipArchive<R>,
     matches: impl Fn(&str) -> bool,
 ) -> Option<String> {
@@ -155,7 +155,10 @@ fn entry_name<R: Read + Seek>(
     })
 }
 
-fn read_entry<R: Read + Seek>(archive: &mut zip::ZipArchive<R>, name: &str) -> Option<Vec<u8>> {
+pub(super) fn read_entry<R: Read + Seek>(
+    archive: &mut zip::ZipArchive<R>,
+    name: &str,
+) -> Option<Vec<u8>> {
     let name = if archive.index_for_name(name).is_some() {
         name.to_string()
     } else {

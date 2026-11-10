@@ -1542,6 +1542,31 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(49, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v50（Beta 实验室：unstrap 备份导入）。import_batches.source 的 CHECK 加上 'unstrap'。
+        // SQLite 改不了 CHECK，只能照原样重建再搬数据；workout_imports.source 没有约束，不动。
+        if version < 50 {
+            self.conn.execute_batch(
+                "CREATE TABLE import_batches_v50 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL CHECK(source IN ('gpx', 'fit', 'strava', 'apple_health', 'unstrap')),
+                    file_name TEXT,
+                    imported_at TEXT NOT NULL,
+                    added INTEGER NOT NULL,
+                    duplicates INTEGER NOT NULL,
+                    unreadable INTEGER NOT NULL,
+                    undone_at TEXT
+                 );
+                 INSERT INTO import_batches_v50(id, source, file_name, imported_at, added, duplicates, unreadable, undone_at)
+                    SELECT id, source, file_name, imported_at, added, duplicates, unreadable, undone_at FROM import_batches;
+                 DROP TABLE import_batches;
+                 ALTER TABLE import_batches_v50 RENAME TO import_batches;",
+            )?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 50;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(50, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

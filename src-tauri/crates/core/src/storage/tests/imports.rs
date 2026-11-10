@@ -102,3 +102,34 @@ fn retention_cleanup_keeps_imported_workouts() {
         .unwrap();
     assert_eq!(samples, 2);
 }
+
+#[test]
+fn unstrap_batches_pass_the_rebuilt_source_check_and_keep_older_batches() {
+    // 新库也会先按 v46 建表、再走 v50 重建：旧批次照搬，'unstrap' 能写进去。
+    let db = Database::in_memory().unwrap();
+    let day = chrono::Duration::days(1);
+    db.import_activities(ImportSource::Gpx, Some("a.gpx"), file(&[ts()]), ts())
+        .unwrap();
+    let report = db
+        .import_activities(
+            ImportSource::Unstrap,
+            Some("unstrap-backup-2026-11-09.zip"),
+            file(&[ts() + day]),
+            ts(),
+        )
+        .unwrap();
+    assert_eq!(report.added, 1);
+    let sources: Vec<String> = db
+        .import_batches()
+        .unwrap()
+        .into_iter()
+        .map(|batch| batch.source)
+        .collect();
+    assert_eq!(sources.len(), 2);
+    assert!(sources.contains(&"gpx".to_string()) && sources.contains(&"unstrap".to_string()));
+    let rejected = db.conn.execute(
+        "INSERT INTO import_batches(source, imported_at, added, duplicates, unreadable) VALUES('nope', 'x', 0, 0, 0)",
+        [],
+    );
+    assert!(rejected.is_err());
+}
