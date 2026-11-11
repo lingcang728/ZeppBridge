@@ -3328,6 +3328,94 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       autoOff: 'Uit: het bestand gaat naar het klembord; druk op Ctrl+V in het chatvenster van de AI en druk op Enter',
       autoOn: 'Aan: zodra de AI-site opent, worden het bestand en de openingszin voor je geplakt en verzonden; druk op Esc om te stoppen',
     },
+    'views/settings/sections/cloud': {
+      labTitle: 'Naar de cloud sturen',
+      labSub:
+        'Voor cloud-AI’s die geen bestanden op deze computer kunnen lezen: een apart geïnstalleerde cloudcomponent stuurt een kopie van je gegevens naar je eigen site. Zet je dit aan, dan tonen de kaart ‘AI-tools’ en de pagina ‘Naar de AI’ de status en instellingen; staat dit uit, dan is er nergens iets van te zien.',
+      secTitle: 'Naar de cloud sturen',
+      lead: 'Cloud-AI’s kunnen niet bij deze computer. De cloudcomponent stuurt een kopie van je gegevens naar je eigen site, waar ze die ophalen met een alleen-lezen sleutel. De component verzorgt het uploaden; sleutels gaan nooit via ZeppBridge.',
+      checking: 'Cloudcomponent controleren…',
+      unsupported: 'De cloudcomponent is alleen voor Windows',
+      notInstalled: 'Cloudcomponent niet gevonden',
+      notInstalledSub:
+        'Deze wordt apart geïnstalleerd (ZeppBridge-Cloud). Wijs na installatie de uploader-map aan in de instellingen hieronder.',
+      configBroken: 'config.json van component onleesbaar',
+      configBrokenSub:
+        'Het is geen geldige JSON. Herstel het eerst handmatig; hier wordt niets overschreven.',
+      notConfigured: 'Nog geen site ingesteld',
+      running: 'Bezig met uploaden…',
+      neverRan: 'Nog niets geüpload',
+      result: {
+        ok: 'Geüpload',
+        skipped_unchanged: 'Niets nieuws, dus niets verzonden',
+        skipped_busy: 'ZeppBridge was bezig, dus overgeslagen',
+        skipped_locked: 'Er loopt nog een andere upload',
+        config_error: 'De instellingen van de component kloppen niet',
+        version_mismatch: 'Versies van component en ZeppBridge komen niet overeen',
+        failed: 'Uploaden mislukt',
+      },
+      resultUnknown: 'Laatste resultaat niet herkend',
+      statusAt: (text: string, when: string) => `${text} · ${when}`,
+      uploadNow: 'Nu uploaden',
+      uploading: 'Uploaden…',
+      openSite: 'Site openen',
+      openLogs: 'Logboeken',
+      openFolder: 'Componentmap',
+      logLine: 'Logregel van de component',
+      tasks: 'Geplande taken',
+      taskFollow: 'Na elke synchronisatie uploaden',
+      taskUpload: 'Dagelijkse opruimupload',
+      taskOn: 'Geregistreerd',
+      taskOff: 'Niet geregistreerd',
+      copyTaskCommands: 'Commando’s kopiëren',
+      taskCopied:
+        'Commando’s gekopieerd — bekijk ze eerst in PowerShell voordat je ze uitvoert',
+      copyFailed: 'Kon niet naar het klembord schrijven',
+      config: 'Instellingen',
+      siteLabel: 'Site',
+      siteHint:
+        'Een los domein wordt aangevuld tot https://health.<domein>; een volledig https-adres wordt ongewijzigd gebruikt.',
+      sitePlaceholder: 'example.com',
+      binDir: 'ZeppBridge-map',
+      binDirHint: 'Hierin moet zeppbridge-cli staan.',
+      useThis: 'Deze kopie gebruiken',
+      dataDir: 'Gegevensmap',
+      dataDirHint:
+        'Laat leeg om de map te gebruiken die bij de ZeppBridge hierboven hoort.',
+      uploaderDir: 'De uploader-map van de component',
+      choose: 'Map kiezen',
+      sync: 'Synchroniseren vóór het uploaden',
+      syncSub:
+        'Wanneer dit uitstaat, wordt alleen verzonden wat al op deze computer staat.',
+      retentionDays: 'Dagen bewaard in de cloud',
+      summaryDays: 'Dagen in de dagelijkse samenvatting',
+      summaryHint: 'Nooit meer dan het aantal bewaarde dagen.',
+      fullRes: 'Trainingscurves per seconde bewaren',
+      fullResSub:
+        'Wanneer dit uitstaat, blijft er één echt meetpunt per 15 seconden bewaard — veel kleiner.',
+      save: 'Opslaan',
+      saving: 'Opslaan…',
+      saved: 'Opgeslagen',
+      readers: 'Alleen-lezen sleutels',
+      readersLead:
+        'Eén per cloud-AI; één intrekken laat de andere ongemoeid. De component zet de sleutel rechtstreeks op het klembord.',
+      readersNone: 'Nog geen alleen-lezen sleutels',
+      init: 'Site instellen',
+      initSub:
+        'Eerste keer op een nieuwe site: maakt de tenant aan en geeft twee alleen-lezen sleutels uit, hark en browser.',
+      initDone: 'Klaar — beide sleutels staan in Referentiebeheer',
+      addLabel: 'Naam, bijv. muse',
+      add: 'Sleutel uitgeven',
+      copy: 'Kopiëren',
+      copied: (label: string) =>
+        `De sleutel voor ${label} staat op het klembord`,
+      revoke: 'Intrekken',
+      revokeConfirm: 'Intrekken bevestigen',
+      revoked: (label: string) => `${label} ingetrokken`,
+      createdAt: (when: string) => `Uitgegeven op ${when}`,
+      working: 'Bezig…',
+      failed: 'Dat is niet gelukt',
+    },
     'views/settings/sections/privacy': {
       lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
       learnMore: 'Meer informatie',
@@ -4226,6 +4314,31 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     'err.capability.unavailable': 'Niet beschikbaar',
     'err.capability.unknown': 'Status onbekend',
     'err.capability.unverified': 'Nog niet geverifieerd',
+    'err.cloud.bin_dir_invalid': 'Die map bevat geen zeppbridge-cli',
+    'err.cloud.busy': 'De vorige cloudactie is nog niet klaar',
+    'err.cloud.config_unreadable':
+      'De config.json van de cloudcomponent kan niet worden gelezen. Herstel of verwijder het bestand eerst.',
+    'err.cloud.config_write_failed':
+      'Kon de instellingen van de cloudcomponent niet wegschrijven',
+    'err.cloud.data_dir_invalid':
+      'De gegevensmap moet het volledige pad zijn naar een bestaande map',
+    'err.cloud.days_invalid':
+      'Het aantal bewaardagen en samenvattingsdagen moet tussen 1 en 365 liggen',
+    'err.cloud.label_invalid':
+      'Namen mogen alleen letters, cijfers, - en _ bevatten, maximaal 32 tekens',
+    'err.cloud.not_configured':
+      'De cloudcomponent heeft nog geen instellingen. Vul eerst een site in en sla op.',
+    'err.cloud.open_failed': 'Kon dit niet openen',
+    'err.cloud.pwsh_missing':
+      'PowerShell 7 (pwsh) is niet gevonden; de cloudcomponent heeft dit nodig',
+    'err.cloud.run_failed':
+      'De cloudcomponent is mislukt. De details staan in het logboek.',
+    'err.cloud.site_invalid':
+      'Dat siteadres klopt niet: vul alleen een domein in (zoals example.com) of een volledig https://-adres',
+    'err.cloud.timeout': 'De cloudcomponent was niet op tijd klaar',
+    'err.cloud.unsupported': 'De cloudcomponent werkt alleen op Windows',
+    'err.cloud.uploader_not_found':
+      'De uploadscripts van de cloudcomponent (run.ps1, setup.ps1, upload.mjs) zijn niet gevonden',
     'err.core.auth': 'Authenticatiefout',
     'err.core.busy': 'Er loopt een andere schrijfbewerking — wacht tot die klaar is',
     'err.core.account_mismatch':

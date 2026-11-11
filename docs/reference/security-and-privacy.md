@@ -169,6 +169,27 @@ injection, no automatic sign-in and no automatic submission. The account,
 network, retention and privacy policy of the external AI site are yours to
 confirm; seeing the page in a preview does not mean anything was submitted.
 
+## The optional cloud component (Beta lab)
+
+ZeppBridge itself never uploads health data. Pushing a copy to your own site —
+for cloud AIs that cannot read files on this computer — is done by a separately
+installed component (ZeppBridge-Cloud, Windows only) that calls the bundled
+`zeppbridge-cli`. Nothing about it appears in the app unless you turn on
+"Cloud push" in Settings › Beta lab; while that switch is off the app does not
+even look for the component.
+
+With the switch on, the app does three things and no more: it reads the
+component's own state files (`config.json`, `last-run.json`, the names and dates
+in `readers.json`, and whether its two scheduled tasks exist); it edits
+`config.json`, which holds no keys, validating every field first and leaving
+fields it does not know untouched; and it starts the component's own scripts
+(`run.ps1`, `setup.ps1`) without a window. Upload and read-only keys stay in
+Windows Credential Manager, where the component put them. A read-only key you
+ask for goes from the component straight to the clipboard; the app never reads
+it, and key hashes are not passed to the interface. The commands that register
+the scheduled tasks are copied for you to read and run yourself — the app does
+not register tasks.
+
 ## Voluntary problem reports
 
 When a device or workout type is not recognised, you can press "submit a problem

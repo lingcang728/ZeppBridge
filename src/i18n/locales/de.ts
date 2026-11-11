@@ -163,6 +163,30 @@ export default {
     'err.local_api.state_write_failed': 'Der An/Aus-Zustand der lokalen API konnte nicht gespeichert werden',
     'err.data_folder.open_failed': 'Der Datenordner konnte nicht geöffnet werden',
     'err.data_folder.unsupported_os': 'Datenordner öffnen geht nur unter Windows und macOS',
+    'err.cloud.unsupported': 'Die Cloud-Komponente funktioniert nur unter Windows',
+    'err.cloud.not_configured':
+      'Die Cloud-Komponente hat noch keine Einstellungen. Gib zuerst eine Website ein und speichere.',
+    'err.cloud.site_invalid':
+      'Die Website-Adresse stimmt nicht: Gib nur eine Domain (z. B. example.com) oder eine vollständige https://-Adresse ein',
+    'err.cloud.days_invalid':
+      'Die Tage in der Cloud und in der Tagesübersicht müssen zwischen 1 und 365 liegen',
+    'err.cloud.bin_dir_invalid': 'Dieser Ordner enthält kein zeppbridge-cli',
+    'err.cloud.data_dir_invalid':
+      'Der Datenordner muss der vollständige Pfad zu einem vorhandenen Ordner sein',
+    'err.cloud.uploader_not_found':
+      'Die Upload-Skripte der Cloud-Komponente wurden nicht gefunden (run.ps1, setup.ps1, upload.mjs)',
+    'err.cloud.config_unreadable':
+      'Die config.json der Cloud-Komponente lässt sich nicht lesen. Repariere oder lösche sie zuerst.',
+    'err.cloud.config_write_failed': 'Die Einstellungen der Cloud-Komponente konnten nicht geschrieben werden',
+    'err.cloud.pwsh_missing':
+      'PowerShell 7 (pwsh) wurde nicht gefunden – die Cloud-Komponente benötigt es',
+    'err.cloud.busy': 'Der vorherige Cloud-Vorgang ist noch nicht abgeschlossen',
+    'err.cloud.timeout': 'Die Cloud-Komponente wurde nicht rechtzeitig fertig',
+    'err.cloud.run_failed':
+      'Die Cloud-Komponente ist fehlgeschlagen. Einzelheiten stehen in ihrem Protokoll.',
+    'err.cloud.label_invalid':
+      'Namen dürfen nur Buchstaben, Ziffern, - und _ enthalten (höchstens 32 Zeichen)',
+    'err.cloud.open_failed': 'Konnte nicht geöffnet werden',
     'err.update.localappdata_missing': 'Der Windows-Pfad LOCALAPPDATA ist nicht verfügbar',
     'err.update.unsafe_data_location':
       'Installation gestoppt: Es ließ sich nicht bestätigen, dass der Datenort das Update übersteht. Beende ZeppBridge, kopiere den data-Ordner aus dem App-Paket vollständig in den Benutzer-Ordner „Application Support", korrigiere ZEPPBRIDGE_DATA_DIR und versuche es erneut. Alte Daten nicht löschen.',
@@ -3954,6 +3978,91 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         'Aus: Die Datei landet in der Zwischenablage; drücke im KI-Chat Ctrl+V zum Einfügen und Enter zum Senden',
       autoOn:
         'Ein: Sobald die KI-Website öffnet, werden Datei und Einleitungstext für dich eingefügt und gesendet; mit Esc jederzeit stoppen',
+    },
+    'views/settings/sections/cloud': {
+      labTitle: 'Cloud-Upload',
+      labSub:
+        'Für Cloud-KIs, die Dateien auf diesem Rechner nicht lesen können: Eine separat installierte Cloud-Komponente lädt eine Kopie deiner Daten auf deine eigene Website hoch. Schaltest du das ein, zeigen die Karte „KI-Werkzeuge“ und die Seite „An die KI“ Status und Einstellungen an; ausgeschaltet erscheint davon nirgends etwas.',
+      secTitle: 'Cloud-Upload',
+      lead:
+        'Cloud-KIs erreichen diesen Rechner nicht. Die Cloud-Komponente lädt eine Kopie deiner Daten auf deine eigene Website hoch, und sie holen sie dort mit einem Nur-Lese-Schlüssel ab. Das Hochladen übernimmt die Komponente; Schlüssel laufen nie über ZeppBridge.',
+      checking: 'Cloud-Komponente wird geprüft…',
+      unsupported: 'Die Cloud-Komponente gibt es nur für Windows',
+      notInstalled: 'Cloud-Komponente nicht gefunden',
+      notInstalledSub:
+        'Sie wird separat installiert (ZeppBridge-Cloud). Gib nach der Installation unten in den Einstellungen ihren uploader-Ordner an.',
+      configBroken: 'Die config.json der Komponente lässt sich nicht lesen',
+      configBrokenSub:
+        'Sie ist kein gültiges JSON. Repariere sie zuerst von Hand; hier wird nichts überschrieben.',
+      notConfigured: 'Noch keine Website angegeben',
+      running: 'Wird hochgeladen…',
+      neverRan: 'Noch nichts hochgeladen',
+      result: {
+        ok: 'Hochgeladen',
+        skipped_unchanged: 'Nichts Neues, nichts gesendet',
+        skipped_busy: 'ZeppBridge war belegt, Upload zurückgestellt',
+        skipped_locked: 'Ein anderer Upload läuft noch',
+        config_error: 'Einstellungen der Komponente fehlerhaft',
+        version_mismatch: 'Versionen von Komponente und ZeppBridge passen nicht zusammen',
+        failed: 'Upload fehlgeschlagen',
+      },
+      resultUnknown: 'Letztes Ergebnis nicht erkannt',
+      statusAt: (text: string, when: string) => `${text} · ${when}`,
+      uploadNow: 'Jetzt hochladen',
+      uploading: 'Wird hochgeladen…',
+      openSite: 'Website öffnen',
+      openLogs: 'Protokolle',
+      openFolder: 'Komponentenordner',
+      logLine: 'Originalzeile aus dem Komponentenprotokoll',
+      tasks: 'Geplante Aufgaben',
+      taskFollow: 'Nach jeder Synchronisierung hochladen',
+      taskUpload: 'Täglicher Aufräum-Upload',
+      taskOn: 'Registriert',
+      taskOff: 'Nicht registriert',
+      copyTaskCommands: 'Befehle kopieren',
+      taskCopied: 'Befehle kopiert – vor dem Ausführen in PowerShell prüfen',
+      copyFailed: 'Konnte nicht in die Zwischenablage geschrieben werden',
+      config: 'Einstellungen',
+      siteLabel: 'Website',
+      siteHint:
+        'Eine reine Domain wird zu https://health.<Domain> ergänzt; eine vollständige https-Adresse wird unverändert übernommen.',
+      sitePlaceholder: 'example.com',
+      binDir: 'ZeppBridge-Ordner',
+      binDirHint: 'Muss zeppbridge-cli enthalten.',
+      useThis: 'Diese Kopie verwenden',
+      dataDir: 'Datenordner',
+      dataDirHint: 'Leer lassen, um den Datenordner des oben angegebenen ZeppBridge zu verwenden.',
+      uploaderDir: 'uploader-Ordner der Komponente',
+      choose: 'Ordner wählen',
+      sync: 'Vor dem Hochladen synchronisieren',
+      syncSub: 'Aus: Es wird nur das hochgeladen, was bereits auf diesem Rechner liegt.',
+      retentionDays: 'Tage in der Cloud',
+      summaryDays: 'Tage in der Tagesübersicht',
+      summaryHint: 'Nie mehr als die gespeicherten Tage.',
+      fullRes: 'Sekundengenaue Trainingskurven behalten',
+      fullResSub:
+        'Aus: Alle 15 Sekunden bleibt ein echter Messpunkt erhalten – deutlich kleiner.',
+      save: 'Speichern',
+      saving: 'Wird gespeichert…',
+      saved: 'Gespeichert',
+      readers: 'Nur-Lese-Schlüssel',
+      readersLead:
+        'Einer pro Cloud-KI; beim Widerrufen bleiben die anderen unberührt. Die Komponente legt den Schlüssel direkt in die Zwischenablage.',
+      readersNone: 'Noch keine Nur-Lese-Schlüssel',
+      init: 'Website einrichten',
+      initSub:
+        'Beim ersten Mal auf einer neuen Website: Legt den Mandanten an und stellt die beiden Nur-Lese-Schlüssel hark und browser aus.',
+      initDone: 'Fertig – beide Schlüssel liegen in der Anmeldeinformationsverwaltung',
+      addLabel: 'Name, z. B. muse',
+      add: 'Schlüssel ausstellen',
+      copy: 'Kopieren',
+      copied: (label: string) => `Der Schlüssel für ${label} liegt in der Zwischenablage`,
+      revoke: 'Widerrufen',
+      revokeConfirm: 'Widerruf bestätigen',
+      revoked: (label: string) => `${label} widerrufen`,
+      createdAt: (when: string) => `Ausgestellt am ${when}`,
+      working: 'Wird ausgeführt…',
+      failed: 'Das hat nicht geklappt',
     },
     'views/settings/sections/privacy': {
       lead: 'Deine Daten bleiben auf diesem Rechner: kein Hochladen, keine Nutzungsstatistiken',

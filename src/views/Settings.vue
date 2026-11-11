@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 设置页：钱包式卡叠。
  *
- * 总览（/settings）是十张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
+ * 总览（/settings）是十一张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
  * 那张升到最上面摊开，展开后可以左右拖、按按钮或方向键翻到相邻的一张，Esc 回到总览。
  * 各区块的界面和逻辑在 views/settings/sections/，共享状态在 composables/settings/context.ts。 */
 import GlassSwitch from '../components/GlassSwitch.vue';
@@ -25,6 +25,9 @@ import { settingsMessages } from './Settings.i18n';
 import { deckMessages } from './settings/deck.i18n';
 import { labsMessages } from './settings/sections/labs.i18n';
 import { syncCardMessages } from './settings/sections/sync.i18n';
+import { useLetterText } from '../components/letters/letters.i18n';
+import { openAuthorCompose } from '../composables/useAuthorCompose';
+import { useCloudCompanion } from '../composables/useCloudCompanion';
 import { useTourText } from '../components/tour/tour.i18n';
 import { ALL_CHAPTERS } from '../lib/tour/chapters';
 import { seenChapters } from '../lib/tour/sandbox';
@@ -43,6 +46,7 @@ const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const syncCard = useMessages(syncCardMessages);
 const labs = useMessages(labsMessages);
+const letters = useLetterText();
 const tour = useTourText();
 const route = useRoute();
 const router = useRouter();
@@ -58,6 +62,8 @@ const disconnectOfficialForAdvanced = async () => {
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
+/* 「推给云端」开着时（Beta 实验室），「本地 AI」卡头上多一枚小标：不点开也知道上一次传得怎么样。 */
+const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
 
 const activeId = computed<SettingsCardId | null>(() =>
   (isSettingsCardId(route.params.card) ? route.params.card : null));
@@ -72,6 +78,7 @@ const titles = computed<Record<SettingsCardId, string>>(() => ({
   data: d.value.cardData,
   ai: d.value.cardAi,
   display: d.value.cardDisplay,
+  feedback: letters.value.writeAuthor,
   labs: labs.value.cardTitle,
   guide: tour.value.cardTitle,
   privacy: d.value.cardPrivacy,
@@ -92,6 +99,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
     data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
     ai: d.value.sumAi(exportFormat.value.toUpperCase()),
     display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
+    feedback: letters.value.authorPlaceholder,
     labs: labs.value.summary,
     guide: tour.value.seenCount(ALL_CHAPTERS.filter((id) => seenChapters().has(id)).length, ALL_CHAPTERS.length),
     privacy: d.value.sumPrivacy,
@@ -101,7 +109,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
 
 const toneColor = (tone: string) => (tone === 'neutral' ? 'var(--glyph-neutral)' : `var(--${tone})`);
 /** 内容只有几行的卡：展开后收窄（CardDeck 的 is-narrow）。 */
-const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'labs', 'guide', 'privacy'];
+const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'feedback', 'labs', 'guide', 'privacy'];
 const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
   id,
   narrow: NARROW_CARDS.includes(id),
@@ -223,10 +231,18 @@ useSectionTour('settings', () => route.path === '/settings');
           :model-value="autoSyncEnabled"
           @update:model-value="setAutoSyncEnabled(!autoSyncEnabled)"
         />
+        <!-- 写给作者：不用点开卡，卡头上的笔一点，信纸就从这里抽出来。 -->
+        <button v-else-if="card.id === 'feedback'" type="button" class="button secondary quick-write" :title="letters.writeAuthor"
+          :aria-label="letters.writeAuthor" @click.stop="openAuthorCompose($event.currentTarget as HTMLElement)">
+          <Icon name="edit" :size="15" />
+        </button>
+        <span v-else-if="card.id === 'ai' && cloudOn" :class="['cloud-mark', cloudState.tone]" :title="cloudState.line">
+          <Icon name="cloud" :size="14" />{{ cloudState.text }}
+        </span>
       </template>
 
       <template #body="{ card }">
-        <KeepAlive :max="10">
+        <KeepAlive :max="11">
           <CardBody :key="card.id" :id="card.id" />
         </KeepAlive>
       </template>
@@ -272,4 +288,10 @@ h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
   opacity: 0; translate: 0 6px; transition: opacity var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
 .face.centered .face-open { opacity: 1; translate: 0 0; }
 .card-body > :deep(.s-section + .s-section) { margin-top: 0; }
+.quick-write { min-width: 0; padding-inline: 10px; }
+.cloud-mark { display: inline-flex; max-width: 15em; align-items: center; gap: 5px; padding: 4px 10px; overflow: hidden; border-radius: 999px;
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.cloud-mark > svg { flex: none; }
+.cloud-mark.ok { color: var(--accent); }
+.cloud-mark.warn { color: var(--danger); }
 </style>

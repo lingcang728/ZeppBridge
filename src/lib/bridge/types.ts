@@ -586,8 +586,73 @@ export interface BridgeBackend {
 
   cleanupOldData(days: number): Promise<Record<string, unknown>>;
   openDataFolder(): Promise<void>;
+  /** 云端组件（ZeppBridge-Cloud）在本机的状态。只在 Beta 实验室开了「推给云端」后才调。 */
+  cloudCompanionState(): Promise<CloudCompanionState>;
+  /** 改它的 config.json（不含密钥）；校验不过不写。返回刷新后的状态。 */
+  cloudCompanionSaveConfig(input: CloudConfigInput): Promise<CloudCompanionState>;
+  /** 让组件现在上传一次（不先同步）。结果看返回状态里的 last_run。 */
+  cloudCompanionUpload(): Promise<CloudCompanionState>;
+  /** 组件 setup.ps1 里放给界面的几条；密钥由组件自己放进剪贴板，不经过这里。 */
+  cloudCompanionSetup(command: CloudSetupCommand, label?: string): Promise<CloudSetupOutcome>;
+  cloudCompanionOpen(target: 'site' | 'logs' | 'folder'): Promise<void>;
 
   listen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn>;
+}
+
+/** 云端组件 config.json 里界面管的那几项（密钥不在这个文件里）。 */
+export interface CloudConfig {
+  /** 用户填的原样：域名或完整 https 网址。 */
+  site: string;
+  bin_dir: string | null;
+  data_dir: string | null;
+  sync: boolean;
+  retention_days: number;
+  summary_days: number;
+  full_resolution_workouts: boolean;
+}
+
+export interface CloudConfigInput extends CloudConfig {
+  /** 组件的 uploader 文件夹；不传就不改已经记下的。 */
+  uploader_dir: string | null;
+}
+
+export interface CloudLastRun {
+  at: string;
+  mode: string;
+  /** 组件给的结果码（ok / skipped_unchanged / skipped_busy / skipped_locked / config_error / version_mismatch / failed）。 */
+  result: string;
+  exit_code: number;
+  /** 组件日志里的那一行原文：只当诊断原文折叠着给看，界面说话按 result。 */
+  log_line: string;
+}
+
+export interface CloudReader {
+  label: string;
+  created_at: string | null;
+}
+
+export interface CloudCompanionState {
+  supported: boolean;
+  configured: boolean;
+  config_unreadable: boolean;
+  state_dir: string | null;
+  uploader_dir: string | null;
+  config: CloudConfig | null;
+  site_url: string | null;
+  last_run: CloudLastRun | null;
+  readers: CloudReader[];
+  task_follow: boolean;
+  task_upload: boolean;
+  running: boolean;
+  default_bin_dir: string | null;
+}
+
+export type CloudSetupCommand = 'init' | 'task-commands' | 'add-reader' | 'copy-reader' | 'revoke-reader';
+
+export interface CloudSetupOutcome {
+  state: CloudCompanionState;
+  /** 只有 task-commands 有：登记计划任务的命令（不含密钥）。 */
+  output: string | null;
 }
 
 /** `get_mcp_sidecar`：data_dir_env 不为空时配置里要带 ZEPPBRIDGE_DATA_DIR。 */

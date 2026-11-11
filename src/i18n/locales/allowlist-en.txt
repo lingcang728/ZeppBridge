@@ -362,4 +362,7 @@ components/workout/workoutImport.short.apple_health
 components/workout/workoutImport.short.unstrap
 views/ai/AiPlanHistory.originMcp
 views/settings/sections/labs.badge
+views/settings/sections/cloud.siteLabel
+views/settings/sections/cloud.sitePlaceholder
+views/settings/sections/cloud.openLogs
 

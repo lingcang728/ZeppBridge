@@ -3307,6 +3307,91 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
         plural(workouts, { one: 'Concluído: 1 treino gravado', other: `Concluído: ${workouts} treinos gravados` }),
       unstrapShow: 'Mostrar na pasta',
     },
+    'views/settings/sections/cloud': {
+      labTitle: 'Envio para a nuvem',
+      labSub:
+        'Para as IAs na nuvem que não conseguem ler ficheiros neste computador: um componente da nuvem instalado à parte envia uma cópia dos teus dados para o teu próprio site. Se o ativares, o cartão «Ferramentas de IA» e a página «Enviar à IA» mostram o respetivo estado e definições; enquanto estiver desativado, não aparece em lado nenhum.',
+      secTitle: 'Envio para a nuvem',
+      lead:
+        'As IAs na nuvem não chegam a este computador. O componente da nuvem envia uma cópia dos teus dados para o teu próprio site, e elas obtêm-na aí com uma chave só de leitura. O envio é feito pelo componente; as chaves nunca passam pelo ZeppBridge.',
+      checking: 'A verificar o componente da nuvem…',
+      unsupported: 'O componente da nuvem só está disponível para Windows',
+      notInstalled: 'Componente da nuvem não encontrado',
+      notInstalledSub:
+        'É instalado à parte (ZeppBridge-Cloud). Depois de o instalares, indica a respetiva pasta uploader nas definições abaixo.',
+      configBroken: 'Não é possível ler o config.json do componente',
+      configBrokenSub:
+        'Não é um JSON válido. Corrige-o manualmente primeiro; nada aqui o irá substituir.',
+      notConfigured: 'Ainda sem site',
+      running: 'A enviar…',
+      neverRan: 'Ainda nada enviado',
+      result: {
+        ok: 'Enviado',
+        skipped_unchanged: 'Sem dados novos, nada enviado',
+        skipped_busy: 'O ZeppBridge estava ocupado, por isso cedeu a vez',
+        skipped_locked: 'Outro envio ainda está em curso',
+        config_error: 'As definições do componente estão incorretas',
+        version_mismatch: 'As versões do componente e do ZeppBridge não coincidem',
+        failed: 'O envio falhou',
+      },
+      resultUnknown: 'Último resultado não reconhecido',
+      statusAt: (text: string, when: string) => `${text} · ${when}`,
+      uploadNow: 'Enviar agora',
+      uploading: 'A enviar…',
+      openSite: 'Abrir site',
+      openLogs: 'Registos',
+      openFolder: 'Pasta do componente',
+      logLine: 'Linha do registo do componente',
+      tasks: 'Tarefas agendadas',
+      taskFollow: 'Enviar após cada sincronização',
+      taskUpload: 'Envio diário de organização',
+      taskOn: 'Registada',
+      taskOff: 'Não registada',
+      copyTaskCommands: 'Copiar os comandos',
+      taskCopied: 'Comandos copiados — lê-os no PowerShell antes de os executares',
+      copyFailed: 'Não foi possível escrever na área de transferência',
+      config: 'Definições',
+      siteLabel: 'Site',
+      siteHint:
+        'Se indicares apenas o domínio, torna-se https://health.<domínio>; um endereço https completo é usado tal como está.',
+      sitePlaceholder: 'example.com',
+      binDir: 'Pasta do ZeppBridge',
+      binDirHint: 'Tem de conter zeppbridge-cli.',
+      useThis: 'Usar esta cópia',
+      dataDir: 'Pasta de dados',
+      dataDirHint: 'Deixa em branco para usar a do ZeppBridge indicado acima.',
+      uploaderDir: 'Pasta uploader do componente',
+      choose: 'Escolher pasta',
+      sync: 'Sincronizar antes de enviar',
+      syncSub: 'Quando desativado, só é enviado o que já existe neste computador.',
+      retentionDays: 'Dias guardados na nuvem',
+      summaryDays: 'Dias do resumo diário',
+      summaryHint: 'Nunca mais do que os dias guardados.',
+      fullRes: 'Manter curvas de treino segundo a segundo',
+      fullResSub:
+        'Quando desativado, é guardada uma amostra real a cada 15 segundos — ocupa muito menos espaço.',
+      save: 'Guardar',
+      saving: 'A guardar…',
+      saved: 'Guardado',
+      readers: 'Chaves só de leitura',
+      readersLead:
+        'Uma por cada IA na nuvem; revogar uma não afeta as outras. O componente coloca a chave diretamente na área de transferência.',
+      readersNone: 'Ainda não há chaves só de leitura',
+      init: 'Configurar o site',
+      initSub:
+        'Na primeira vez num site novo: cria o inquilino e emite duas chaves só de leitura, hark e browser.',
+      initDone: 'Concluído — ambas as chaves estão no Gestor de Credenciais',
+      addLabel: 'Nome, ex.: muse',
+      add: 'Emitir chave',
+      copy: 'Copiar',
+      copied: (label: string) => `A chave de ${label} está na área de transferência`,
+      revoke: 'Revogar',
+      revokeConfirm: 'Confirmar revogação',
+      revoked: (label: string) => `${label} revogada`,
+      createdAt: (when: string) => `Emitida ${when}`,
+      working: 'A processar…',
+      failed: 'Não funcionou',
+    },
     'composables/useFocusAreas': {
       areaAll: 'Equilibrado',
       areaSleep: 'Sono',
@@ -4349,6 +4434,31 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     'err.mcp_writes.missing': 'Esta alteração já foi anulada ou não foi encontrada',
     'err.mcp.cli_missing':
       'O zeppbridge-cli não está junto ao programa MCP, pelo que a IA não pode sincronizar por ti; sincroniza através do ZeppBridge',
+    'err.cloud.unsupported': 'O componente da nuvem só funciona no Windows',
+    'err.cloud.not_configured':
+      'O componente da nuvem ainda não tem definições. Indica um site e guarda primeiro.',
+    'err.cloud.site_invalid':
+      'Esse site não é válido: introduz apenas o domínio (como example.com) ou um endereço https:// completo',
+    'err.cloud.days_invalid':
+      'Os dias guardados e os dias do resumo devem estar entre 1 e 365',
+    'err.cloud.bin_dir_invalid': 'Essa pasta não contém zeppbridge-cli',
+    'err.cloud.data_dir_invalid':
+      'A pasta de dados tem de ser o caminho completo de uma pasta existente',
+    'err.cloud.uploader_not_found':
+      'Não foi possível encontrar os scripts de envio do componente da nuvem (run.ps1, setup.ps1, upload.mjs)',
+    'err.cloud.config_unreadable':
+      'Não é possível ler o config.json do componente da nuvem. Corrige-o ou elimina-o primeiro.',
+    'err.cloud.config_write_failed':
+      'Não foi possível gravar as definições do componente da nuvem',
+    'err.cloud.pwsh_missing':
+      'Não foi encontrado o PowerShell 7 (pwsh); o componente da nuvem precisa dele',
+    'err.cloud.busy': 'A ação anterior na nuvem ainda não terminou',
+    'err.cloud.timeout': 'O componente da nuvem não terminou a tempo',
+    'err.cloud.run_failed':
+      'O componente da nuvem falhou. Os detalhes estão no seu registo.',
+    'err.cloud.label_invalid':
+      'O nome só pode usar letras, dígitos, - e _, até 32 caracteres',
+    'err.cloud.open_failed': 'Não foi possível abrir',
   },
   backendText: {
     'ui.backup.file_missing': 'Ficheiro de cópia de segurança não encontrado na pasta',

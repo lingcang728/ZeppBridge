@@ -9,15 +9,20 @@ import AdvancedSection from './sections/AdvancedSection.vue';
 import ArchiveSection from './sections/ArchiveSection.vue';
 import AutoSyncSection from './sections/AutoSyncSection.vue';
 import CapabilitySection from './sections/CapabilitySection.vue';
+import CloudSection from './sections/CloudSection.vue';
 import DevicesSection from './sections/DevicesSection.vue';
 import DisplayPrefsSection from './sections/DisplayPrefsSection.vue';
 import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
+import FeedbackSection from './sections/FeedbackSection.vue';
 import GuideSection from './sections/GuideSection.vue';
 import LabsSection from './sections/LabsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
+import { labFlag } from '../../lib/labs';
 
 defineProps<{ id: string }>();
+/* 「推给云端」在 Beta 实验室里自己打开才有；没开的人这张卡和以前一模一样。 */
+const cloud = labFlag('cloud');
 </script>
 
 <template>
@@ -30,10 +35,12 @@ defineProps<{ id: string }>();
     <ArchiveSection v-else-if="id === 'archive'" />
     <CapabilitySection v-else-if="id === 'data'" />
     <template v-else-if="id === 'ai'">
+      <CloudSection v-if="cloud" />
       <McpSection />
       <ExportDefaultsSection />
     </template>
     <DisplayPrefsSection v-else-if="id === 'display'" />
+    <FeedbackSection v-else-if="id === 'feedback'" />
     <LabsSection v-else-if="id === 'labs'" />
     <GuideSection v-else-if="id === 'guide'" />
     <PrivacySection v-else-if="id === 'privacy'" />

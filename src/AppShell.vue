@@ -18,6 +18,7 @@ import { installGlassTips } from './lib/glassTip';
 import { whenFramesSteady } from './lib/motion/steady';
 import { useSyncController } from './composables/useSyncController';
 import { useFeedbackToast } from './composables/useFeedbackToast';
+import { useAuthorCompose } from './composables/useAuthorCompose';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { locale, useMessages } from './i18n';
@@ -33,6 +34,9 @@ const CollectionBox = defineAsyncComponent(() => import('./components/cards/Coll
 const TourLayer = defineAsyncComponent(() => import('./components/tour/TourLayer.vue'));
 const UpdateNotice = defineAsyncComponent(() => import('./components/shell/UpdateNotice.vue'));
 const StoreImportPrompt = defineAsyncComponent(() => import('./components/StoreImportPrompt.vue'));
+/* 写给作者的信封（顶栏的笔、设置里的卡、信匣里的空信封都开它）：第一次打开才加载。 */
+const AuthorComposeLayer = defineAsyncComponent(() => import('./components/letters/AuthorComposeLayer.vue'));
+const { writing: authorWriting } = useAuthorCompose();
 
 const t = useMessages(messages);
 
@@ -320,6 +324,7 @@ onUnmounted(() => {
   <CollectionBox v-if="backendReady" />
   <TourLayer v-if="backendReady" />
   <UpdateNotice v-if="backendReady" />
+  <AuthorComposeLayer v-if="authorWriting" />
   <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
   <div class="app-body">
