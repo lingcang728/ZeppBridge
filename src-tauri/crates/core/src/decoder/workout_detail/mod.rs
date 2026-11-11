@@ -1,4 +1,5 @@
 use crate::models::error::*;
+use crate::models::StrengthSetRow;
 
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -172,6 +173,8 @@ pub struct DecodedWorkout {
     pub splits: Vec<WorkoutSplit>,
     /// 手表自己记的圈。和 `splits` 并存，不互相替代——见 [`WorkoutLap`]。
     pub laps: Vec<WorkoutLap>,
+    /// 力量训练的逐组动作明细（来自 62 列 `lap`）。非力量运动为空数组。
+    pub strength_sets: Vec<StrengthSetRow>,
 }
 
 /// 解码一条运动明细。
@@ -483,9 +486,14 @@ pub fn decode_workout_detail(
         }
     }
 
+    let strength_sets = crate::decoder::strength::parse_strength_sets(data);
+
     // 手表自己记的圈。解出来之后还要和汇总对一遍账：距离加起来对不上、
     // 或者最后一圈不在运动结束的时刻，就说明列读错了，整份丢掉。
-    let laps = {
+    // 力量训练的 62 列 lap 存的是逐组动作（距离与累计秒恒为 0），不进分圈分支。
+    let laps = if !strength_sets.is_empty() {
+        Vec::new()
+    } else {
         let candidate = parse_laps(data.get("lap"), start_time);
         if laps_agree_with_summary(&candidate, summary_distance_m, duration_secs) {
             candidate
@@ -505,6 +513,7 @@ pub fn decode_workout_detail(
         pauses,
         splits,
         laps,
+        strength_sets,
     })
 }
 

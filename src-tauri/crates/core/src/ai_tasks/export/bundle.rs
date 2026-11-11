@@ -433,6 +433,9 @@ impl Database {
         if let Some(climbs) = &series.climbs {
             object.insert("climbs".into(), climbs_json(climbs)?);
         }
+        if let Some(strength) = &series.strength {
+            object.insert("strength".into(), serde_json::to_value(strength)?);
+        }
 
         if task.detail_level == AiTaskDetailLevel::Detailed {
             let mut series_json = Map::new();
@@ -457,6 +460,20 @@ fn strip_excluded_workout_fields(object: &mut Map<String, Value>, excluded: &[St
     for field in excluded {
         object.remove(field);
     }
+    let calories_hidden = excluded.iter().any(|field| field == "calories");
+    if calories_hidden {
+        if let Some(sets) = object
+            .get_mut("strength")
+            .and_then(|s| s.get_mut("sets"))
+            .and_then(Value::as_array_mut)
+        {
+            for set in sets {
+                if let Some(set) = set.as_object_mut() {
+                    set.remove("calories_kcal");
+                }
+            }
+        }
+    }
     let heart_rate_hidden = excluded
         .iter()
         .any(|field| matches!(field.as_str(), "avg_hr" | "max_hr" | "min_hr"));
@@ -465,6 +482,17 @@ fn strip_excluded_workout_fields(object: &mut Map<String, Value>, excluded: &[St
     }
     object.remove("hr_zones");
     strip_heart_rate(object);
+    if let Some(sets) = object
+        .get_mut("strength")
+        .and_then(|s| s.get_mut("sets"))
+        .and_then(Value::as_array_mut)
+    {
+        for set in sets {
+            if let Some(set) = set.as_object_mut() {
+                set.remove("avg_hr");
+            }
+        }
+    }
     if let Some(samples) = object
         .get_mut("series")
         .and_then(|series| series.get_mut("samples"))

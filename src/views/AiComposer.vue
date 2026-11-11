@@ -57,6 +57,9 @@ import { useHandoffText } from '../components/ai/HandoffDock.i18n';
 import { useStageText } from '../components/ai/stage/stage.i18n';
 import { locale } from '../i18n';
 import { openGuide } from '../lib/faqLink';
+import { backend, isDesktop } from '../lib/bridge';
+import type { McpSidecar } from '../lib/bridge/types';
+import { MCP_CLIENT_NAMES } from '../lib/mcpClients';
 
 defineOptions({ name: 'AiComposer' });
 const route = useRoute();
@@ -73,6 +76,23 @@ const t = useBridgeText();
 const ht = useHandoffText();
 const s = useStageText();
 const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
+const mcpSidecar = ref<McpSidecar | null>(null);
+const refreshMcpSidecar = async () => {
+  if (!isDesktop()) return;
+  try {
+    mcpSidecar.value = await backend.getMcpSidecar();
+  } catch {
+    mcpSidecar.value = null;
+  }
+};
+const mcpWarnClients = computed(() => {
+  const seen = new Set([
+    ...(mcpSidecar.value?.scope_stale_clients ?? []),
+    ...(mcpSidecar.value?.stale_clients ?? []),
+  ]);
+  if (!seen.size) return '';
+  return [...seen].map((id) => MCP_CLIENT_NAMES[id]).join(locale.value.startsWith('zh') ? '、' : ', ');
+});
 
 /** 从别处带着 ?task= 打开：接着那个任务。 */
 watch(() => route.query.task, (id) => {
@@ -94,6 +114,7 @@ onMounted(() => {
   observer = new ResizeObserver(measure);
   if (stage.value) observer.observe(stage.value);
   window.addEventListener('resize', measure);
+  void refreshMcpSidecar();
 });
 onBeforeUnmount(() => { observer?.disconnect(); window.removeEventListener('resize', measure); });
 const layout = computed(() => stageLayout(size.value.width, size.value.height));
@@ -293,7 +314,7 @@ const paused = ref(false);
 const onVisibility = () => { paused.value = document.hidden; };
 onMounted(() => document.addEventListener('visibilitychange', onVisibility));
 onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility));
-onActivated(() => { paused.value = document.hidden; measure(); });
+onActivated(() => { paused.value = document.hidden; measure(); void refreshMcpSidecar(); });
 onDeactivated(() => { paused.value = true; });
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('ai');
@@ -306,11 +327,12 @@ useSectionTour('ai');
       <RouterLink v-if="history.exchanges.value.length" to="/ai/exchanges" class="exchanges-pill" data-sheet="exchanges">
         {{ s.exchanges(history.exchanges.value.length) }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
-      <!-- MCP 一键接入早就在设置 → AI 卡里，但没人知道（3.0.6）：这里放一枚胶囊直达。不写 ChatGPT：它不接本机 stdio MCP。 -->
-      <RouterLink v-if="!hub.demo.value" to="/settings/ai" class="exchanges-pill mcp-pill" :title="s.mcpPillHint">
-        <Icon name="terminal" :size="13" />{{ s.mcpPill }}<Icon name="chevron-right" :size="13" />
+      <!-- MCP 一键接入早就在设置 → AI 卡里，但没人知道（3.0.6）：这里放一枚胶囊直达；检测到旧配置时变琥珀提醒。 -->
+      <RouterLink v-if="!hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', { stale: Boolean(mcpWarnClients) }]" :title="mcpWarnClients ? s.mcpStaleHint(mcpWarnClients) : s.mcpPillHint">
+        <span v-if="mcpWarnClients" class="mcp-stale-dot" aria-hidden="true"></span>
+        <Icon v-else name="terminal" :size="13" />{{ mcpWarnClients ? s.mcpStalePill : s.mcpPill }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
-      <!-- 「推给云端」（Beta 实验室里自己打开才有）：给读不到本机文件的云端 AI 的那条路，上一次传得怎么样写在胶囊上。 -->
+      <!-- 「Personal Agent 选项」（Beta 实验室里自己打开才有）：给 Personal Agent 用的那条路，上一次传得怎么样写在胶囊上。 -->
       <RouterLink v-if="cloudOn && !hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', 'cloud-pill', cloudState.tone]" :title="cloudState.line">
         <Icon name="cloud" :size="13" />{{ cloudState.text }}<Icon name="chevron-right" :size="13" />
       </RouterLink>

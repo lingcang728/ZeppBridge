@@ -185,7 +185,7 @@ const loadBand = computed(() => trainingLoadTierText(trainingLoad.value, overvie
  * reading of those numbers belongs on the page behind the card, and the
  * interpreting of them belongs to the AI the user chooses.
  */
-const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load', 'steps'];
+const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load', 'steps', 'distance'];
 
 /* 只在跑后才出读数的稀疏项（VO₂max，偶尔血氧）：近 7 天不到两个点时那一行改画近 90 天，行尾标出来；
    不补点、不拉平线（用户 2026-10-28 截图：概览那条是斜纹，点进去却有趋势）。 */
@@ -238,6 +238,11 @@ const trainingEntry = computed(() => {
   };
 });
 const stepsWeek = computed(() => statusSeries.value.steps?.points ?? []);
+const distanceToday = computed(() => {
+  const latest = statusSeries.value.distance?.latest;
+  if (!latest || latest.date !== dayKey(currentToday()) || !isFiniteNumber(latest.value)) return null;
+  return latest.value;
+});
 
 /* 「我关注」：选中的区块把对应模块排到最上面，其余收在「查看全部」后面；
    一个没选（或三个全选）时页面就是原样。跨区块的模块（最近记录、这一周、
@@ -258,7 +263,7 @@ const focusCells = computed(() => {
       };
       case 'steps': return {
         id, component: StepsCard,
-        props: { steps: stepsToday.value, goal: overview.value?.steps_goal ?? null, latestAt: overview.value?.latest_heart_rate_at ?? null, week: stepsWeek.value },
+        props: { steps: stepsToday.value, distanceMeters: distanceToday.value, goal: overview.value?.steps_goal ?? null, latestAt: overview.value?.latest_heart_rate_at ?? null, week: stepsWeek.value },
       };
       case 'sleep': return { id, component: SleepCard, props: { sleep: lastSleep.value } };
       case 'body': return {
@@ -435,7 +440,7 @@ useSectionTour('home');
         <div class="hr-card-slot">
           <HeartRateCard v-tilt :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
         </div>
-        <StepsCard v-tilt :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" :week="stepsWeek" />
+        <StepsCard v-tilt :steps="stepsToday" :distance-meters="distanceToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" :week="stepsWeek" />
         <SleepCard v-tilt :sleep="lastSleep" />
       </template>
       <template v-else>

@@ -20,7 +20,7 @@ import { metricColor } from '../../lib/metricTone';
 import { coverageLabel, indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../../lib/metricSeries';
 import { today as currentToday } from '../../lib/currentDay';
 import {
-  pinLatestDate, pinMassUnit, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
+  pinDistanceUnit, pinLatestDate, pinMassUnit, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types';
 import { useMessages } from '../../i18n';
@@ -43,10 +43,11 @@ const justPinned = ref(false);
 
 const label = (id: string) => (t.value.names as Record<string, string>)[id] ?? id;
 const unitText = (metric: PinnableMetric) => {
-  void distanceUnit.value; // kg / lb 跟着单位制切换重算（和身体页一样显式依赖一次）
+  void distanceUnit.value; // kg / lb、km / mi 跟着单位制切换重算（和身体页 / 活动页一样显式依赖一次）
   return ({
-    bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, kcal: t.value.unitKcal, min: t.value.unitMin,
-    pai: t.value.unitPai, ms: 'ms', percent: '%', mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
+    bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, distance: pinDistanceUnit(),
+    kcal: t.value.unitKcal, min: t.value.unitMin, pai: t.value.unitPai, ms: 'ms', percent: '%',
+    mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
   } as Record<string, string>)[metric.unit] ?? '';
 };
 

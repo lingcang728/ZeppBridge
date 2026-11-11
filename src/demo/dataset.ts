@@ -6,6 +6,7 @@
  * 因为 ZeppBridge 的特点之一就是「没测到就是没测到」，演示里也要看得见。
  */
 import { at, clamp, dayKey, iso, makeRng, round, type Rng } from './rng';
+import { buildStrengthWorkouts } from './strength';
 import { metricExtrema } from '../lib/metricSeries';
 import type { MetricSeries, MetricSeriesPoint, SleepSession, SleepStageSlice, Workout } from '../types';
 
@@ -33,7 +34,7 @@ const MISSED_NIGHTS = new Set([3, 9, 31, 47, 62, 80]);
 const METRIC_UNITS: Record<string, string> = {
   blood_pressure_systolic: 'mmHg', blood_pressure_diastolic: 'mmHg', blood_pressure_pulse: 'bpm',
   readiness: 'score', stress: 'score', spo2: '%', vo2max: 'ml/kg/min', training_load: 'load', resting_hr: 'bpm',
-  hrv: 'ms', hrv_rmssd: 'ms', steps: '步', sleep_score: 'score', respiratory_rate: '次/分',
+  hrv: 'ms', hrv_rmssd: 'ms', steps: '步', distance: '米', sleep_score: 'score', respiratory_rate: '次/分',
   weight: 'kg', bmi: 'kg/m²', body_fat_rate: '%', body_water_rate: '%', muscle_mass: 'kg',
   bone_mass: 'kg', visceral_fat: 'level', bmr: 'kcal', height: 'cm', protein_rate: '%',
   active_calories: 'kcal', active_minutes: 'min', pai_daily: 'score', pai_total: 'score',
@@ -176,15 +177,17 @@ const buildWorkouts = (now: Date, rng: Rng): Workout[] => {
 };
 
 /* —— 日指标 —— */
-const buildMetrics = (now: Date, rng: Rng, sleeps: SleepSession[], workouts: Workout[]): Record<string, MetricSeriesPoint[]> => {
+/** `strength` 只计入训练负荷：不改「这天跑没跑」，也就不改步数等随机序列。 */
+const buildMetrics = (now: Date, rng: Rng, sleeps: SleepSession[], workouts: Workout[], strength: Workout[] = []): Record<string, MetricSeriesPoint[]> => {
   const sleepScore = new Map(sleeps.map((s) => [dayKey(new Date(s.end_time)), s.score ?? 0]));
+  const ranDays = new Set(workouts.map((w) => dayKey(new Date(w.start_time))));
   const loadByDay = new Map<string, number>();
-  for (const w of workouts) loadByDay.set(dayKey(new Date(w.start_time)), (loadByDay.get(dayKey(new Date(w.start_time))) ?? 0) + (w.training_load ?? 0));
+  for (const w of [...workouts, ...strength]) loadByDay.set(dayKey(new Date(w.start_time)), (loadByDay.get(dayKey(new Date(w.start_time))) ?? 0) + (w.training_load ?? 0));
   const out: Record<string, MetricSeriesPoint[]> = Object.fromEntries(Object.keys(METRIC_UNITS).map((name) => [name, []]));
   for (let back = DAYS - 1; back >= 0; back -= 1) {
     const date = dayKey(at(now, -back));
     const week = Math.sin((back / 7) * Math.PI * 2);
-    const ran = loadByDay.has(date);
+    const ran = ranDays.has(date);
     const push = (name: string, point: Omit<MetricSeriesPoint, 'date'>) => out[name].push({ date, ...point });
     // Sparse mock readings for the experimental BP cards, deliberately with
     // missing days. These are synthetic and never enter a user's database.
@@ -208,6 +211,7 @@ const buildMetrics = (now: Date, rng: Rng, sleeps: SleepSession[], workouts: Wor
     push('resting_hr', { value: Math.round(clamp(55 + 1.6 * week + rng.between(-1.6, 1.6), 51, 60)) });
     const steps = Math.round((ran ? rng.between(10500, 15200) : rng.between(4200, 9300)) * (back === 0 ? Math.min(1, now.getHours() / 20) : 1));
     push('steps', { value: steps });
+    push('distance', { value: Math.round(steps * 0.74) });
     push('active_calories', { value: Math.round(steps * 0.038) });
     push('active_minutes', { value: Math.round(steps / 150) });
     push('pai_daily', { value: ran ? rng.int(12, 28) : rng.int(2, 6) });
@@ -280,15 +284,18 @@ export const buildDemoData = (now: Date = new Date()): DemoData => {
   const rng = makeRng(DEMO_SEED);
   const sleeps = buildSleeps(now, rng);
   const workouts = buildWorkouts(now, rng);
+  // 力量训练不吃随机序列：跑步、睡眠、步数、心率等既有演示数据逐字不变，只多进训练负荷。
+  const strength = buildStrengthWorkouts(now, DAYS, DEMO_DEVICE_ID);
+  const allWorkouts = [...workouts, ...strength].sort((a, b) => b.start_time.localeCompare(a.start_time));
   return {
     now,
     sleeps,
-    workouts,
-    metrics: buildMetrics(now, rng, sleeps, workouts),
+    workouts: allWorkouts,
+    metrics: buildMetrics(now, rng, sleeps, workouts, strength),
     heart: buildHeart(now, rng, workouts),
     stress: buildStress(now, rng),
     sleepDays: new Set(sleeps.map((s) => dayKey(new Date(s.end_time)))),
-    workoutDays: new Set(workouts.map((w) => dayKey(new Date(w.start_time)))),
+    workoutDays: new Set(allWorkouts.map((w) => dayKey(new Date(w.start_time)))),
   };
 };
 

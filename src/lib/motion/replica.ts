@@ -161,11 +161,14 @@ export function cardReplica(card: HTMLElement): { el: HTMLElement; rect: Replica
   const copy = card.cloneNode(true) as HTMLElement;
   copy.removeAttribute('href');
   copy.removeAttribute('id');
+  copy.removeAttribute('inert');
+  copy.removeAttribute('aria-hidden');
   for (const node of copy.querySelectorAll('[id]')) node.removeAttribute('id');
   Object.assign(copy.style, FROZEN, offsetIn(box, host), {
     width: `${box.width}px`,
     height: `${box.height}px`,
     opacity: '1',
+    visibility: 'visible',
     // 此刻的样子（含 :hover）：卡自身的底、投影、边框和文字颜色。
     backgroundImage: style.backgroundImage,
     backgroundColor: style.backgroundColor,

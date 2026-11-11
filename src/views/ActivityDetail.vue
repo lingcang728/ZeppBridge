@@ -28,6 +28,8 @@ import { metricColor } from '../lib/metricTone';
 import { metricInfo } from '../lib/metricInfo';
 import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, sliceIndexed } from '../lib/metricSeries';
+import { distanceUnitLabel, toBigDistance } from '../lib/units';
+import { convertSeries } from './body/bodyCards';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { holdInPlace } from '../lib/motion/holdInPlace';
 import type { MetricSeries } from '../types';
@@ -44,6 +46,7 @@ interface ActivityCard {
   color: string;
   unit: string;
   decimals?: number;
+  convert?: (value: number) => number;
 }
 
 
@@ -58,7 +61,9 @@ const CARDS = computed<ActivityCard[]>(() => [
     metric: 'distance',
     label: t.value.distanceLabel,
     color: metricColor('distance'),
-    unit: t.value.distanceUnit,
+    unit: distanceUnitLabel(),
+    decimals: 2,
+    convert: toBigDistance,
   },
   {
     metric: 'active_calories',
@@ -90,7 +95,10 @@ const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 
-const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
+const cards = computed(() => CARDS.value.map((card) => ({
+  ...card,
+  series: convertSeries(series.value[card.metric] ?? null, card.convert),
+})));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 /* 按整段（6 个月）有没有读数分两拨（U09）：有的照常画卡，一条都没有的收成一行。
    按整段而不是当前范围定，切 7 天时卡片不会增减、网格不会跳。 */

@@ -119,10 +119,23 @@ const pending = new WeakSet<HTMLElement>();
 /** 正在打开的那几个弹窗各自的 Esc 登记，开完或关掉时注销。 */
 const escapes = new WeakMap<HTMLElement, () => void>();
 const forgetEscape = (backdrop: HTMLElement) => { escapes.get(backdrop)?.(); escapes.delete(backdrop); };
+/** 弹窗入场动画落定信号：供内部二级动画（如写信信封自动拆封抽纸）等待面板缩放到位后再量几何。 */
+const landings = new WeakMap<HTMLElement, Promise<void>>();
+export const whenDialogLanded = (panel: HTMLElement | null | undefined): Promise<void> =>
+  (panel ? landings.get(panel) : undefined) ?? Promise.resolve();
 
 /** `onEscape`：开到一半按 Esc 时调用（弹窗据此关掉自己，关的动画从此刻原路收回）。 */
 const scaleOpen = async (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | null, onEscape?: () => void) => {
-  if (reducedMotion()) { ghost?.remove(); ghost = null; return; }
+  let markLanded: () => void = () => {};
+  landings.set(panel, new Promise<void>((resolve) => { markLanded = resolve; }));
+  if (reducedMotion()) {
+    ghost?.remove();
+    ghost = null;
+    backdrop.animate([{ opacity: NEARLY_HIDDEN }, { opacity: 1 }], { duration: 180, easing: 'ease-out', fill: 'backwards', pseudoElement: '::before' });
+    const quick = panel.animate([{ opacity: 0, transform: 'scale(.95)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out', fill: 'backwards' });
+    quick.finished.then(markLanded, markLanded);
+    return;
+  }
   const handoff = takeGhost();
   if (handoff) {
     // 接着收起的那一刻往回长：画面刚刚还在动，不用再等它跟上。
@@ -136,7 +149,7 @@ const scaleOpen = async (backdrop: HTMLElement, panel: HTMLElement, origin: Flig
     }
     const flight = panel.animate([{ transform: matchTransform(handoff.seen, panel.getBoundingClientRect()) }, { transform: 'none' }],
       { duration: OPEN_MS * rest, easing: OPEN_EASE, fill });
-    const done = () => forgetEscape(backdrop);
+    const done = () => { forgetEscape(backdrop); markLanded(); };
     flight.finished.then(done, done);
     return;
   }
@@ -150,7 +163,7 @@ const scaleOpen = async (backdrop: HTMLElement, panel: HTMLElement, origin: Flig
   const start = (rect: DOMRect | null) => (rect ? flightTransform(rect, final) : 'scale(.96)');
   panel.style.transform = start(currentRect(origin));
   await whenFramesSteady(160);
-  if (!pending.has(backdrop) || !backdrop.isConnected) { panel.style.transform = ''; return; }
+  if (!pending.has(backdrop) || !backdrop.isConnected) { panel.style.transform = ''; markLanded(); return; }
   pending.delete(backdrop);
   const from = currentRect(origin);
   // 玻璃底先出来（前三成）、字晚一点（三成半以后）才淡入：面板还小的时候不挤着一屏字——10-08 H8 说的
@@ -164,7 +177,7 @@ const scaleOpen = async (backdrop: HTMLElement, panel: HTMLElement, origin: Flig
   }
   const flight = panel.animate([{ transform: start(from) }, { transform: 'none' }], { duration: from ? OPEN_MS : 220, easing: OPEN_EASE, fill });
   panel.style.transform = '';
-  const done = () => forgetEscape(backdrop);
+  const done = () => { forgetEscape(backdrop); markLanded(); };
   flight.finished.then(done, done);
   // 动画已经接手了起点的样子，把隐身撤掉。
   backdrop.classList.remove('is-entering');
@@ -174,7 +187,24 @@ const scaleClose = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOri
   pending.delete(backdrop);
   forgetEscape(backdrop);
   // 已经化成灰飞走了（ashDissolve.ts）：不再挂回去缩一遍。
-  if (reducedMotion() || backdrop.isConnected || backdrop.dataset.dissolved !== undefined) return;
+  if (backdrop.isConnected || backdrop.dataset.dissolved !== undefined) return;
+  if (reducedMotion()) {
+    panel.removeAttribute('data-modal-dialog');
+    panel.removeAttribute('role');
+    backdrop.setAttribute('aria-hidden', 'true');
+    backdrop.inert = true;
+    backdrop.style.pointerEvents = 'none';
+    document.body.appendChild(backdrop);
+    for (const animation of backdrop.getAnimations({ subtree: true })) animation.cancel();
+    backdrop.classList.remove('is-entering');
+    const quickTiming = { duration: 180, easing: 'ease-in', fill: 'forwards' as const };
+    exemptFromSettle(panel.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.95)' }], quickTiming));
+    const quickFade = exemptFromSettle(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { ...quickTiming, pseudoElement: '::before' }));
+    const cleanup = () => backdrop.remove();
+    quickFade.finished.then(cleanup, cleanup);
+    quickFade.addEventListener('cancel', cleanup);
+    return;
+  }
   // 挂回去的只是一段收起的画面：不再是对话框，不能被聚焦、点中，也不能被别的逻辑当成「还有弹窗开着」。
   panel.removeAttribute('data-modal-dialog');
   panel.removeAttribute('role');

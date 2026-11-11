@@ -22,6 +22,7 @@ import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
 import TrendRangeBar from '../components/TrendRangeBar.vue';
@@ -85,9 +86,33 @@ const extremesError = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 const dayLoadSeq = createLoadSeq();
 
-const points = computed(() => dayPoints.value
+type HrWindowHours = 24 | 48 | 168;
+const windowHours = ref<HrWindowHours>(24);
+const windowItems = computed(() => [
+  { value: 24, label: t.value.window24h },
+  { value: 48, label: t.value.window48h },
+  { value: 168, label: t.value.window7d },
+]);
+const dayWindowTitle = computed(() => (
+  windowHours.value === 48 ? t.value.windowTitle48h
+    : windowHours.value === 168 ? t.value.windowTitle7d
+      : t.value.dayTitle
+));
+const pickWindow = (value: string | number) => {
+  const next = Number(value);
+  if (next === 24 || next === 48 || next === 168) windowHours.value = next;
+};
+
+const allParsedPoints = computed(() => dayPoints.value
   .map((point) => ({ ts: new Date(point.timestamp).getTime(), value: point.value }))
   .filter((point) => Number.isFinite(point.ts) && isFiniteNumber(point.value)));
+
+const points = computed(() => {
+  const all = allParsedPoints.value;
+  if (windowHours.value === 168 || !all.length) return all;
+  const cutoff = Date.now() - windowHours.value * 3_600_000;
+  return all.filter((point) => point.ts >= cutoff);
+});
 
 const latest = computed(() => points.value[points.value.length - 1]?.value ?? null);
 const lowest = computed(() => (points.value.length
@@ -104,8 +129,19 @@ const clock = (value: number) => displayDateTimeFormatter({
   hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(value));
 
+const shortDateTime = (value: number) => displayDateTimeFormatter({
+  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date(value));
+
+const shortDateLabel = (value: number) => displayDateTimeFormatter({
+  month: 'numeric', day: 'numeric',
+}).format(new Date(value));
+
 const dayChartOption = computed(() => {
   const data = insertNullBreaks(points.value, HR_GAP_BREAK_MS);
+  const multiDay = windowHours.value > 24;
+  const axisFormatter = windowHours.value === 168 ? shortDateLabel : multiDay ? shortDateTime : clock;
+  const tipClock = multiDay ? shortDateTime : clock;
   return {
     // 不扫入：这张图每次进页面都是新建的，从左往右画一遍读起来就是「心率又重画了」。
     animationDuration: 0,
@@ -121,14 +157,14 @@ const dayChartOption = computed(() => {
       formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point || point.value[1] == null) return '';
-        return t.value.bpmTooltip(clock(point.value[0]), Math.round(point.value[1]));
+        return t.value.bpmTooltip(tipClock(point.value[0]), Math.round(point.value[1]));
       },
     },
     xAxis: {
       type: 'time',
       min: data[0]?.[0],
       max: data[data.length - 1]?.[0],
-      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
+      axisLabel: { formatter: axisFormatter, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { lineStyle: { color: chartPalette.value.grid } },
       axisTick: { show: false },
       splitLine: { show: false },
@@ -228,10 +264,11 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
    而那正是这条功能要避免的事。 */
 const dailyMaxChartOption = computed(() => {
   const rows = dailyExtremes.value;
+  const minColor = chartPalette.value.series.pace;
   return {
     grid: { left: 40, right: 12, top: 28, bottom: 26 },
     legend: {
-      data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
+      data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg, t.value.dailyMaxLegendMin],
       top: 0,
       textStyle: { color: chartPalette.value.axis, fontSize: 14.5 },
     },
@@ -240,7 +277,7 @@ const dailyMaxChartOption = computed(() => {
       formatter: (params: Array<{ dataIndex: number }>) => {
         const row = rows[params?.[0]?.dataIndex ?? -1];
         if (!row) return '';
-        return t.value.dailyMaxTooltip(row.date, row.max, row.average, row.samples);
+        return t.value.dailyRangeTooltip(row.date, row.max, row.average, row.min, row.samples);
       },
     },
     xAxis: {
@@ -281,6 +318,22 @@ const dailyMaxChartOption = computed(() => {
         data: rows.map((row) => row.average),
         showSymbol: false,
         lineStyle: { width: 1.4, type: 'dashed', color: chartPalette.value.mark },
+      },
+      {
+        name: t.value.dailyMaxLegendMin,
+        type: 'line',
+        data: rows.map((row) => row.min),
+        showSymbol: true,
+        symbolSize: 5.5,
+        lineStyle: { width: 1.8, color: minColor },
+        itemStyle: {
+          color: (params: { dataIndex: number }) =>
+            (rows[params.dataIndex]?.samples ?? 0) < SPARSE_SAMPLE_THRESHOLD
+              ? 'transparent'
+              : minColor,
+          borderColor: minColor,
+          borderWidth: 1.5,
+        },
       },
     ],
   };
@@ -340,15 +393,23 @@ const daySpan = computed(() => {
       <section class="surface-card day-card" :aria-label="t.dayCardAria">
         <header class="day-head">
           <div>
-            <h2>{{ t.dayTitle }}<MetricInfoButton metric="heart_rate_24h" :label="t.dayTitle" /></h2>
+            <h2>{{ dayWindowTitle }}<MetricInfoButton metric="heart_rate_24h" :label="dayWindowTitle" /></h2>
             <p>{{ daySpan ?? t.daySub }}</p>
           </div>
-          <dl class="day-stats">
-            <div><dt>{{ t.statLatest }}</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
-            <div><dt>{{ t.statAverage }}</dt><dd>{{ average === null ? '—' : average }}</dd></div>
-            <div><dt>{{ t.statLowest }}</dt><dd>{{ lowest === null ? '—' : Math.round(lowest) }}</dd></div>
-            <div><dt>{{ t.statHighest }}</dt><dd>{{ highest === null ? '—' : Math.round(highest) }}</dd></div>
-          </dl>
+          <div class="day-head-end">
+            <SegmentTrack
+              :items="windowItems"
+              :model-value="windowHours"
+              :aria-label="t.windowSwitchAria"
+              @update:model-value="pickWindow"
+            />
+            <dl class="day-stats">
+              <div><dt>{{ t.statLatest }}</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
+              <div><dt>{{ t.statAverage }}</dt><dd>{{ average === null ? '—' : average }}</dd></div>
+              <div><dt>{{ t.statLowest }}</dt><dd>{{ lowest === null ? '—' : Math.round(lowest) }}</dd></div>
+              <div><dt>{{ t.statHighest }}</dt><dd>{{ highest === null ? '—' : Math.round(highest) }}</dd></div>
+            </dl>
+          </div>
         </header>
         <VChart
           v-if="points.length"
@@ -364,7 +425,7 @@ const daySpan = computed(() => {
           <Icon name="warning" :size="14" />{{ dayError }}
         </p>
         <p v-else class="inline-alert" role="status">
-          <Icon name="info" :size="14" />{{ t.noSamples }}
+          <Icon name="info" :size="14" />{{ windowHours === 24 ? t.noSamples : t.noSamplesWindow(dayWindowTitle) }}
         </p>
       </section>
 

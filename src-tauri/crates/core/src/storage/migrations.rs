@@ -1592,6 +1592,40 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(51, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v52（#163：力量训练逐组明细与汇总兜底）。detail 的 62 列 lap 解进 workout_strength_sets，
+        // 汇总流的组数、总次数、组间总休息与动作列表落 workouts 列，配合修订号重放让老库自动补齐。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_strength_sets (
+                workout_id TEXT NOT NULL,
+                set_index INTEGER NOT NULL,
+                action_code INTEGER NOT NULL,
+                exercise_key TEXT,
+                muscle_group TEXT,
+                reps INTEGER NOT NULL,
+                weight_value REAL,
+                weight_unit TEXT NOT NULL CHECK(weight_unit IN ('kg', 'lb')),
+                weight_kg REAL,
+                duration_ms INTEGER,
+                avg_hr INTEGER,
+                calories_kcal REAL,
+                PRIMARY KEY (workout_id, set_index),
+                FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+             );",
+        )?;
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("strength_total_sets", "INTEGER"),
+                ("strength_total_reps", "INTEGER"),
+                ("strength_rest_seconds", "INTEGER"),
+                ("strength_groups_json", "TEXT"),
+            ],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 52;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(52, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

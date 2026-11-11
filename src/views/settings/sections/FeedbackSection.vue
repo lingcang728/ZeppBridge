@@ -21,23 +21,22 @@ const write = (event: MouseEvent, withReport = false) =>
     <div class="s-list">
       <div class="s-row">
         <div class="s-row-main">
-          <span class="s-row-title">{{ l.toDeveloper }}</span>
+          <span class="s-row-title">{{ l.writeRowTitle }}</span>
         </div>
         <div class="s-row-control">
           <button type="button" class="button primary" data-setting="feedback-write" @click="write($event)">
-            <Icon name="edit" :size="14" />{{ l.writeAuthor }}
+            <Icon name="edit" :size="14" />{{ l.writeAction }}
           </button>
         </div>
       </div>
       <div class="s-row">
         <div class="s-row-main">
-          <span class="s-row-title">{{ l.attachReport }}</span>
+          <span class="s-row-title">{{ l.attachReportRow }}</span>
           <span class="s-row-sub">{{ l.attachHint }}</span>
         </div>
         <div class="s-row-control">
-          <button type="button" class="button secondary" data-setting="feedback-write-report" :title="l.attachReport" :aria-label="l.attachReport"
-            @click="write($event, true)">
-            <Icon name="edit" :size="14" />
+          <button type="button" class="button secondary" data-setting="feedback-write-report" @click="write($event, true)">
+            <Icon name="edit" :size="14" />{{ l.attachAction }}
           </button>
         </div>
       </div>
@@ -48,7 +47,7 @@ const write = (event: MouseEvent, withReport = false) =>
           <span v-else class="s-row-sub">{{ l.settingsSub(letterCount) }}</span>
         </div>
         <div class="s-row-control">
-          <RouterLink class="button secondary" to="/letters">{{ l.open }}</RouterLink>
+          <RouterLink class="button secondary" to="/letters">{{ l.openBox }}</RouterLink>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import WorkoutClimbsCard from '../components/workout/WorkoutClimbsCard.vue';
 import WorkoutHero from '../components/workout/WorkoutHero.vue';
 import WorkoutRouteCard from '../components/workout/WorkoutRouteCard.vue';
 import WorkoutSidePanels from '../components/workout/WorkoutSidePanels.vue';
+import WorkoutStrengthCard from '../components/workout/WorkoutStrengthCard.vue';
 import WorkoutFeelCard from '../components/workout/WorkoutFeelCard.vue';
 import WorkoutProvenanceCard from '../components/workout/WorkoutProvenanceCard.vue';
 import AskAiButton from '../components/ask/AskAiButton.vue';
@@ -125,7 +126,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           <AskAiButton :workout="{ id: workout.workout_id, label: sportName }" :label="sportName" card=".workout-hero" />
         </template>
       </WorkoutHero>
-      <p v-if="workout.effective_type === 'strength'" class="footnote">{{ tools.strengthHint }}</p>
+      <p v-if="workout.effective_type === 'strength' && !series?.strength?.sets?.length" class="footnote">{{ tools.strengthHint }}</p>
 
       <!-- 不支持这类运动的洞察时整块不渲染：一张只会说「暂不支持」的卡片
            除了占地方和让人困惑之外没有别的作用。 -->
@@ -138,6 +139,7 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
 
       <div ref="lower" class="lower">
         <div class="main-col">
+          <WorkoutStrengthCard v-if="series?.strength" :strength="series.strength" />
           <WorkoutRouteCard :canvas="routeCanvas" />
           <WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" :relief="relief" />
           <WorkoutCharts :cards="chartCards" :series-error="seriesError" :hr-zones="hrZones" @retry="loadDetail" />

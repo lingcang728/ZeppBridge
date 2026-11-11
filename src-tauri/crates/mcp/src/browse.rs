@@ -252,6 +252,14 @@ pub(super) fn run_workout_detail(
         return Ok(json!({ "workout": Value::Null, "reason": "本机没有匹配的运动记录。" }));
     };
     let mut value = to_json!(&workout)?;
+    if let Some(strength) = db
+        .load_workout_strength(workout_id)
+        .map_err(|error| plain(error.user_message()))?
+    {
+        if let Some(object) = value.as_object_mut() {
+            object.insert("strength".into(), to_json!(strength)?);
+        }
+    }
     if scope.is_task_scoped() {
         access::project_workout_detail(&mut value, &permit.workout_excluded_fields(workout_id));
     }
@@ -275,8 +283,8 @@ pub(super) fn run_workout_detail(
     }))
 }
 
-const WORKOUT_SECTIONS: [&str; 7] = [
-    "summary", "samples", "route", "pauses", "splits", "laps", "climbs",
+const WORKOUT_SECTIONS: [&str; 8] = [
+    "summary", "samples", "route", "pauses", "splits", "laps", "climbs", "strength",
 ];
 
 pub(super) fn run_workout_series(
@@ -292,7 +300,7 @@ pub(super) fn run_workout_series(
         .unwrap_or("summary");
     if !WORKOUT_SECTIONS.contains(&section) {
         return Err(CallFailure::plain(format!(
-            "未知的 section：{section}。可选 summary、samples、route、pauses、splits、laps、climbs。"
+            "未知的 section：{section}。可选 summary、samples、route、pauses、splits、laps、climbs、strength。"
         )));
     }
     if scope.is_task_scoped() {
@@ -345,6 +353,28 @@ pub(super) fn run_workout_series(
                 "section": section,
                 "climbs": null,
                 "reason": "这次运动没有海拔采样，或缺少足够的速度采样来算距离，无法识别爬升段。",
+            }),
+        });
+    }
+    if section == "strength" {
+        return Ok(match series.strength {
+            Some(strength) => json!({
+                "workoutId": workout_id,
+                "section": section,
+                "strength": to_json!(strength)?,
+                "units": {
+                    "weight": "kg | lb (weight_kg always kg)",
+                    "volume": "kg",
+                    "duration": "ms (sets) / s (rest_seconds)",
+                    "heartRate": "bpm",
+                    "calories": "kcal",
+                },
+            }),
+            None => json!({
+                "workoutId": workout_id,
+                "section": section,
+                "strength": null,
+                "reason": "这次运动没有力量训练分组记录。",
             }),
         });
     }

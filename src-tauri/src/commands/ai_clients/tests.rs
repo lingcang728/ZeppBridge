@@ -268,4 +268,23 @@ fn scope_stale_clients_are_the_ones_registered_with_the_other_scope() {
         ["claude_code", "opencode"]
     );
     assert_eq!(scope_stale_clients(&roots, &sidecar, true), ["grok"]);
+
+    // macOS：Claude Desktop 配置在 ~/Library/Application Support/Claude 下（无 APPDATA）。
+    let mac_claude = home
+        .join("Library")
+        .join("Application Support")
+        .join("Claude");
+    std::fs::create_dir_all(&mac_claude).unwrap();
+    std::fs::write(
+        mac_claude.join("claude_desktop_config.json"),
+        serde_json::json!({ "mcpServers": { "zeppbridge": {
+            "command": current, "args": ["--scope", "task"]
+        } } })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(
+        scope_stale_clients(&roots, &sidecar, false),
+        ["claude_desktop", "claude_code", "opencode"]
+    );
 }

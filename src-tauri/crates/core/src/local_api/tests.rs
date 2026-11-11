@@ -67,6 +67,7 @@ fn empty_series(id: &str) -> WorkoutSeries {
         laps: vec![],
         summary: WorkoutSeriesSummary::default(),
         climbs: None,
+        strength: None,
     }
 }
 

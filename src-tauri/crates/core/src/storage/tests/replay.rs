@@ -210,6 +210,7 @@ fn replaying_twice_does_not_duplicate_derived_rows() {
             "workout_splits",
             "workout_samples",
             "workout_pauses",
+            "workout_strength_sets",
         ]
         .into_iter()
         .map(|table| {
@@ -1026,4 +1027,114 @@ fn nested_replay_guards_keep_the_flag_until_the_outer_drops() {
         );
     }
     drop(outer);
+}
+
+#[test]
+fn replaying_strength_workout_extracts_sets_volume_and_rest_without_polluting_laps() {
+    let db = Database::in_memory().unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:run:strength-1".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "items": [{
+                "workoutId": "str-1",
+                "startTime": 1700000000,
+                "endTime": 1700001800,
+                "type": 52,
+                "total_group": 2,
+                "restTimeBetweenGroupsWithMillis": 95000,
+                "strength_training_group": "[{\"actionType\":65,\"count\":12},{\"actionType\":1030,\"count\":10}]"
+            }]
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.reprocess_raw_records().unwrap();
+
+    // Detail 尚未拉取前，回退使用 history 汇总，不编造重量与单组时长。
+    let fallback = db.get_workout_series("str-1").unwrap().strength.unwrap();
+    assert_eq!(fallback.total_sets, 2);
+    assert_eq!(fallback.total_reps, 22);
+    assert_eq!(fallback.total_volume_kg, None);
+    assert_eq!(fallback.rest_seconds, Some(95));
+    assert!(fallback.sets.is_empty());
+    assert_eq!(fallback.exercise_groups.len(), 2);
+
+    // 合成最小脱敏 62 列力量 lap（第 1 组 20 kg × 12 Biceps Curl，第 2 组 20 lb × 10 未知码 1030）。
+    let make_row = |idx: i32,
+                    sec: i32,
+                    hr: i32,
+                    kcal: i32,
+                    weight: &str,
+                    reps: i32,
+                    unit: i32,
+                    code: i32,
+                    ms: i32| {
+        let mut cols = vec!["0".to_string(); 62];
+        cols[0] = idx.to_string();
+        cols[1] = sec.to_string();
+        cols[2] = "0.0".into();
+        cols[4] = hr.to_string();
+        cols[5] = "0".into();
+        cols[15] = kcal.to_string();
+        cols[21] = weight.into();
+        cols[22] = reps.to_string();
+        cols[23] = unit.to_string();
+        cols[28] = code.to_string();
+        cols[43] = ms.to_string();
+        cols.join(",")
+    };
+    let lap_str = format!(
+        "{};{}",
+        make_row(0, 22, 112, 4, "20.0", 12, 0, 65, 22400),
+        make_row(1, 25, 118, 5, "20.0", 10, 1, 1030, 25100),
+    );
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: "workout_detail:str-1:test".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "data": {
+                "trackid": 1700000000,
+                "type": 52,
+                "lap": lap_str,
+                "strengthSets": "[]",
+                "strengthAssess": "[{\"eq\":[{\"sce\":80}]}]"
+            }
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.reprocess_raw_records().unwrap();
+    // 再重放一次，确认 workout_strength_sets 幂等替换不翻倍。
+    db.reprocess_raw_records().unwrap();
+
+    let series = db.get_workout_series("str-1").unwrap();
+    assert!(
+        series.laps.is_empty(),
+        "0 米力量训练组不能落进跑步 workout_laps"
+    );
+    let strength = series.strength.expect("应产出力量明细");
+    assert_eq!(strength.total_sets, 2);
+    assert_eq!(strength.total_reps, 22);
+    // 20 kg * 12 + (20 * 0.45359237 -> 9.072 kg) * 10 = 240 + 90.72 = 330.72 kg
+    assert_eq!(strength.total_volume_kg, Some(330.72));
+    assert_eq!(strength.rest_seconds, Some(95));
+    assert_eq!(strength.sets.len(), 2);
+    assert_eq!(
+        strength.sets[0].exercise_key.as_deref(),
+        Some("biceps_curl")
+    );
+    assert_eq!(strength.sets[0].muscle_group.as_deref(), Some("biceps"));
+    assert_eq!(strength.sets[0].weight_unit, "kg");
+    assert_eq!(strength.sets[1].action_code, 1030);
+    assert_eq!(strength.sets[1].exercise_key, None);
+    assert_eq!(strength.sets[1].weight_unit, "lb");
 }

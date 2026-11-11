@@ -199,6 +199,7 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
             pauses,
             splits,
             laps,
+            strength_sets: Vec::new(),
         },
         summary,
         sport: (sport.0 != u8::MAX).then_some(sport.0),

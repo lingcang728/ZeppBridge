@@ -184,8 +184,9 @@ fn data_tool_definitions() -> Vec<Value> {
         json!({
             "name": "get_workout_series",
             "description": format!(
-                "按 workoutId 查询运动摘要、逐点采样、GPS 轨迹、暂停、分段、手表记圈或主要爬升 / 下降段\
-                 （climbs：起止距离、落差、平均坡度、垂直速度、段内心率与配速），逐点数据分页，\
+                "按 workoutId 查询运动摘要、逐点采样、GPS 轨迹、暂停、分段、手表记圈、主要爬升 / 下降段\
+                 （climbs：起止距离、落差、平均坡度、垂直速度、段内心率与配速）或力量训练明细\
+                 （strength：总组数、总次数、总容量 kg、组间总休息秒数及逐组动作/重量/次数/心率），逐点数据分页，\
                  单位随字段名给出。GPS 轨迹含精确坐标，只在 section 为 route 时返回，任务范围里不提供；\
                  任务里排除了字段的运动，任务范围里改用 get_workout_detail。{missing}"
             ),
@@ -195,7 +196,7 @@ fn data_tool_definitions() -> Vec<Value> {
                     "workoutId": { "type": "string" },
                     "section": {
                         "type": "string",
-                        "enum": ["summary", "samples", "route", "pauses", "splits", "laps", "climbs"],
+                        "enum": ["summary", "samples", "route", "pauses", "splits", "laps", "climbs", "strength"],
                         "default": "summary"
                     },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 100 },

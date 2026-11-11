@@ -66,6 +66,19 @@ const layoutCenter = (el: HTMLElement): Point => {
   };
 };
 
+/** 元素不受自身 transform / clip-path 影响的真实布局外接框。 */
+const layoutBox = (el: HTMLElement, fallback: Box): Box => {
+  const parent = el.offsetParent as HTMLElement | null;
+  if (!parent) return { left: fallback.left, top: fallback.top, width: el.offsetWidth, height: el.offsetHeight };
+  const host = parent.getBoundingClientRect();
+  return {
+    left: host.left + parent.clientLeft + el.offsetLeft,
+    top: host.top + parent.clientTop + el.offsetTop,
+    width: el.offsetWidth,
+    height: el.offsetHeight,
+  };
+};
+
 /** 计算样式里的 `translate` / `scale` 读回数字（'none' 就是没有）。 */
 const translateOf = (value: string): Point => {
   if (!value || value === 'none') return { x: 0, y: 0 };
@@ -190,7 +203,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const fromCover = Boolean(source?.closest('.cover-stage'));
     const start = boxOf(el);
     const radius = radiusOf(el);
-    const layout = (): Box => ({ left: start.left, top: start.top, width: el.offsetWidth, height: el.offsetHeight });
+    const layout = (): Box => layoutBox(el, start);
     const frames = () => {
       const box = layout();
       return morphFrames(
@@ -487,8 +500,20 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   /** 正在打开：这时按 Esc 是「不开了」，把它倒回去。 */
   const opening = () => Boolean(morph && morph.kind === 'open' && running(morph));
 
+  /** 切卡、拖拽或按键翻页前立刻收清正在进行的开合形变及旧滑入动画，避免多段 WAAPI 叠加跳变。 */
+  const settleNow = () => {
+    stopCurrent();
+    const el = card.value;
+    if (!el) return;
+    for (const animation of el.getAnimations()) animation.cancel();
+    for (const part of [...partsOf(el), ...headOf(el)]) {
+      for (const animation of part.getAnimations()) animation.cancel();
+    }
+  };
+
   /** 翻到另一张（点下面的圆点跳过去）时，新内容从跳去的那一侧滑进来（和拖着甩是同一种动作）。 */
   const swap = (direction: -1 | 1 = 1) => {
+    settleNow();
     const el = card.value;
     if (!el || reducedMotion()) return;
     el.animate(slideInFrames(direction, el.clientWidth), { duration: SLIDE_IN_MS, easing: SLIDE_IN_EASE });
@@ -499,5 +524,5 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     dropFlights();
   });
 
-  return { open, close, seenBoxes, snapshot, fly, opening, swap };
+  return { open, close, seenBoxes, snapshot, fly, opening, settleNow, swap };
 };

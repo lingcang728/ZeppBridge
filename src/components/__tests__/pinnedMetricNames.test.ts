@@ -29,6 +29,7 @@ const SOURCES: Record<string, Source[]> = {
   stress: [{ bundle: bodyStatusMessages, key: 'stressLabel' }],
   spo2: [{ bundle: bodyStatusMessages, key: 'spo2Label' }],
   steps: [{ bundle: activityDetailMessages, key: 'stepsLabel' }],
+  distance: [{ bundle: activityDetailMessages, key: 'distanceLabel' }],
   active_calories: [{ bundle: activityDetailMessages, key: 'caloriesLabel' }],
   active_minutes: [{ bundle: activityDetailMessages, key: 'minutesLabel' }],
   training_load: [{ bundle: trainingStatusMessages, key: 'loadLabel' }],
@@ -40,7 +41,18 @@ const SOURCES: Record<string, Source[]> = {
 };
 
 type Pack = { modules: Record<string, Record<string, unknown>> };
-const PACKS: Record<string, Pack> = { de, fr, 'hi-IN': hiIN, nl, 'pt-BR': ptBR, 'pt-PT': ptPT, ru } as unknown as Record<string, Pack>;
+const PACKS: Record<string, Pack> = {
+  de, fr, 'hi-IN': hiIN, nl, 'pt-BR': ptBR, 'pt-PT': ptPT, ru,
+} as unknown as Record<string, Pack>;
+const PENDING_RAW = import.meta.glob('../../i18n/locales/*.pending.txt', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+const pendingFor = (locale: string): Set<string> => {
+  const raw = PENDING_RAW[`../../i18n/locales/${locale}.pending.txt`] ?? '';
+  return new Set(raw.split(/\r?\n/).map((line: string) => line.trim()).filter(Boolean));
+};
 
 /** 某语言下一条文案的实际显示值：语言包有就用语言包，没有回落英文（和 i18n 运行时一样）。 */
 const resolve = (bundle: Bundle, path: string[], locale: string): unknown => {
@@ -59,8 +71,10 @@ describe('置顶指标的名字和详情页卡片标题一致', () => {
 
   for (const locale of LOCALES) {
     it(locale, () => {
+      const pending = locale in PACKS ? pendingFor(locale) : null;
       const wrong: string[] = [];
       for (const [id, sources] of Object.entries(SOURCES)) {
+        if (pending?.has(`components/overview/PinnedMetrics.names.${id}`)) continue;
         const pin = resolve(pinnedMetricsMessages as Bundle, ['names', id], locale);
         for (const source of sources) {
           const detail = 'literal' in source ? source.literal : resolve(source.bundle, [source.key], locale);

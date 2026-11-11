@@ -310,6 +310,10 @@ impl Database {
             "DELETE FROM workout_laps WHERE workout_id = ?1",
             [workout_id],
         )?;
+        self.conn.execute(
+            "DELETE FROM workout_strength_sets WHERE workout_id = ?1",
+            [workout_id],
+        )?;
 
         {
             let mut insert = self.conn.prepare(
@@ -411,6 +415,30 @@ impl Database {
                     lap.duration_seconds,
                     lap.avg_hr,
                     lap.max_hr,
+                ])?;
+            }
+        }
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO workout_strength_sets
+                    (workout_id, set_index, action_code, exercise_key, muscle_group,
+                     reps, weight_value, weight_unit, weight_kg, duration_ms, avg_hr, calories_kcal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            )?;
+            for set in &decoded.strength_sets {
+                insert.execute(params![
+                    workout_id,
+                    set.set_index,
+                    set.action_code,
+                    set.exercise_key,
+                    set.muscle_group,
+                    set.reps,
+                    set.weight_value,
+                    set.weight_unit,
+                    set.weight_kg,
+                    set.duration_ms,
+                    set.avg_hr,
+                    set.calories_kcal,
                 ])?;
             }
         }
@@ -526,6 +554,7 @@ impl Database {
         for lap in &mut laps {
             lap.avg_cadence_spm = mean_cadence(&cadence_at, &lap.start_time, &lap.end_time);
         }
+        let strength = self.load_workout_strength(workout_id)?;
 
         Ok(WorkoutSeries {
             workout_id: workout_id.to_owned(),
@@ -536,7 +565,89 @@ impl Database {
             laps,
             summary,
             climbs,
+            strength,
         })
+    }
+
+    pub fn load_workout_strength(&self, workout_id: &str) -> Result<Option<StrengthWorkoutDetail>> {
+        let sets = {
+            let mut stmt = self.conn.prepare(
+                "SELECT set_index, action_code, exercise_key, muscle_group,
+                        reps, weight_value, weight_unit, weight_kg,
+                        duration_ms, avg_hr, calories_kcal
+                 FROM workout_strength_sets
+                 WHERE workout_id = ?1
+                 ORDER BY set_index",
+            )?;
+            let rows = stmt.query_map([workout_id], |row| {
+                Ok(StrengthSetRow {
+                    set_index: row.get(0)?,
+                    action_code: row.get(1)?,
+                    exercise_key: row.get(2)?,
+                    muscle_group: row.get(3)?,
+                    reps: row.get(4)?,
+                    weight_value: row.get(5)?,
+                    weight_unit: row.get(6)?,
+                    weight_kg: row.get(7)?,
+                    duration_ms: row.get(8)?,
+                    avg_hr: row.get(9)?,
+                    calories_kcal: row.get(10)?,
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        struct StrengthRowMeta {
+            is_strength: bool,
+            total_sets: Option<i32>,
+            total_reps: Option<i32>,
+            rest_seconds: Option<i64>,
+            groups_json: Option<String>,
+        }
+
+        let meta = self
+            .conn
+            .query_row(
+                "SELECT workout_type, workout_type_override, zepp_type,
+                        strength_total_sets, strength_total_reps,
+                        strength_rest_seconds, strength_groups_json
+                 FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                [workout_id],
+                |row| {
+                    let wtype: String = row.get(0)?;
+                    let override_type: Option<String> = row.get(1)?;
+                    let zepp_type: Option<i32> = row.get(2)?;
+                    let effective = override_type.as_deref().unwrap_or(wtype.as_str());
+                    Ok(StrengthRowMeta {
+                        is_strength: effective == "strength" || zepp_type == Some(52),
+                        total_sets: row.get(3)?,
+                        total_reps: row.get(4)?,
+                        rest_seconds: row.get(5)?,
+                        groups_json: row.get(6)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        let (is_strength_workout, total_sets, total_reps, rest_seconds, groups_json) = match meta {
+            Some(m) => (
+                m.is_strength,
+                m.total_sets,
+                m.total_reps,
+                m.rest_seconds,
+                m.groups_json,
+            ),
+            None => (false, None, None, None, None),
+        };
+
+        Ok(crate::decoder::strength::build_strength_workout_detail(
+            sets,
+            is_strength_workout,
+            total_sets,
+            total_reps,
+            rest_seconds,
+            groups_json.as_deref(),
+        ))
     }
 
     pub(super) fn fetched_at_for_raw(&self, raw_record_id: Option<i64>) -> Option<DateTime<Utc>> {

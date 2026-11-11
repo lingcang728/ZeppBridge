@@ -435,4 +435,27 @@ impl Database {
         self.reapply_fit_override_summary(&workout.workout_id)?;
         Ok(())
     }
+
+    pub(super) fn upsert_workout_strength_summary(
+        &self,
+        workout_id: &str,
+        summary: &crate::decoder::strength::HistoryStrengthSummary,
+    ) -> Result<()> {
+        self.conn.execute(
+            "UPDATE workouts
+             SET strength_total_sets = COALESCE(?2, strength_total_sets),
+                 strength_total_reps = COALESCE(?3, strength_total_reps),
+                 strength_rest_seconds = COALESCE(?4, strength_rest_seconds),
+                 strength_groups_json = COALESCE(?5, strength_groups_json)
+             WHERE workout_id = ?1",
+            params![
+                workout_id,
+                summary.total_sets,
+                summary.total_reps,
+                summary.rest_seconds,
+                summary.groups_json,
+            ],
+        )?;
+        Ok(())
+    }
 }

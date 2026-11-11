@@ -263,8 +263,8 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 |---|---|
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm。`gearId` 是这次运动在 Zepp 里选的跑鞋编号，没选为 `null`；Zepp 不给跑鞋名称 |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
-| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）；仅选择 `section: "route"` 才返回精确坐标 |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段、心率区间以及力量训练汇总与逐组明细（有记录时附带 `strength`）；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
+| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）与力量训练逐组/容量明细（`section: "strength"`）；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
 | `get_baselines` | 每项指标「你的常态」，只和自己比、不用人群常模：`recent` 是最新读数（3 天内）与之前 28 天中位数的比较和 90 天中间八成的常态带；`long_term` 是本机全部历史（最多十年）中间八成、中位数、起始日期和逐年拆分（历史不满一年为 `null`）。官方接口只给近期窗口 |

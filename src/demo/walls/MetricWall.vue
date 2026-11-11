@@ -7,7 +7,7 @@ import { backend } from '../../lib/bridge';
 import { useMessages } from '../../i18n';
 import { metricColor } from '../../lib/metricTone';
 import { coverageLabel } from '../../lib/metricSeries';
-import { PINNABLE_METRICS, pinMassUnit, pinSparkValues, pinValueText, type PinnableMetric } from '../../lib/pinnedMetrics';
+import { PINNABLE_METRICS, pinDistanceUnit, pinMassUnit, pinSparkValues, pinValueText, type PinnableMetric } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types/health';
 
 /**
@@ -19,8 +19,9 @@ const t = useMessages(pinnedMetricsMessages);
 const metrics = PINNABLE_METRICS.filter((metric) => metric.id !== 'vo2max');
 const series = ref<Record<string, MetricSeries>>({});
 const unitText = (metric: PinnableMetric) => ({
-  bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, kcal: t.value.unitKcal, min: t.value.unitMin,
-  pai: t.value.unitPai, ms: 'ms', percent: '%', mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
+  bpm: t.value.unitBpm, score: t.value.unitScore, steps: t.value.unitSteps, distance: pinDistanceUnit(),
+  kcal: t.value.unitKcal, min: t.value.unitMin, pai: t.value.unitPai, ms: 'ms', percent: '%',
+  mass: pinMassUnit(), vo2: 'ml/kg/min', '': '',
 } as Record<string, string>)[metric.unit] ?? '';
 const tiles = computed(() => new Map<string, PinTileData>(metrics.map((metric) => {
   const data = series.value[metric.id];

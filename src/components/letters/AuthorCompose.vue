@@ -47,10 +47,11 @@ const toggleAttach = (event: MouseEvent) => { emit('update:attach', !props.attac
 const pick = (value: ReportCategory, event: MouseEvent) => { emit('update:category', value); press(event); };
 
 const written = ref<HTMLElement | null>(null);
-/** 寄出以后调用：把写好的那页对折起来，折完再交给信封飞回去。 */
+/** 寄出以后调用：把整张信纸对折起来，折完再交给信封飞回去。 */
 const fold = async () => {
-  const page = written.value;
+  const page = written.value?.closest<HTMLElement>('.leaf.current .paper') ?? written.value;
   if (!page || lessMotion()) return;
+  page.style.transformOrigin = '50% 50%';
   await page.animate([
     { transform: 'perspective(900px) rotateX(0deg) scale(1)', opacity: 1 },
     { transform: 'perspective(900px) rotateX(78deg) scale(.92, .5)', opacity: .85 },

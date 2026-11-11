@@ -1,3 +1,4 @@
+pub mod strength;
 pub mod workout_detail;
 
 pub use workout_detail::{

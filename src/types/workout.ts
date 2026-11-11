@@ -112,6 +112,39 @@ export interface WorkoutPause {
   kind: string;
 }
 
+export type StrengthWeightUnit = 'kg' | 'lb';
+
+export interface StrengthSetRow {
+  set_index: number;
+  action_code: number;
+  exercise_key?: string | null;
+  muscle_group?: string | null;
+  reps: number;
+  weight_value?: number | null;
+  weight_unit: StrengthWeightUnit;
+  weight_kg?: number | null;
+  duration_ms?: number | null;
+  avg_hr?: number | null;
+  calories_kcal?: number | null;
+}
+
+export interface StrengthExerciseGroup {
+  action_code: number;
+  exercise_key?: string | null;
+  muscle_group?: string | null;
+  sets: number;
+  total_reps: number;
+}
+
+export interface StrengthWorkoutDetail {
+  total_sets: number;
+  total_reps: number;
+  total_volume_kg?: number | null;
+  rest_seconds?: number | null;
+  sets: StrengthSetRow[];
+  exercise_groups: StrengthExerciseGroup[];
+}
+
 export interface WorkoutSeries {
   workout_id: string;
   samples: WorkoutSeriesSample[];
@@ -122,6 +155,8 @@ export interface WorkoutSeries {
   summary: WorkoutSeriesSummary;
   /** null / 缺省 = 没有海拔采样或距离不可信，不出爬升卡；segments 为空 = 没有明显爬升。 */
   climbs?: WorkoutClimbs | null;
+  /** 力量训练（type=52）的逐组与容量明细；非力量训练或无分组记录时为 null / 缺省。 */
+  strength?: StrengthWorkoutDetail | null;
 }
 
 /** 识别爬升段用的参数，「怎么算的」只读这里。 */

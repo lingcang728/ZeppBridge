@@ -422,8 +422,8 @@ outside the grants — `error.permittedRanges` lists the actual
 |---|---|
 | `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm. `gearId` is the ID of the shoes picked for that workout in Zepp, or `null`; Zepp sends no shoe names |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
-| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
-| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series); precise coordinates are returned only for `section: "route"` |
+| `get_workout_detail` | All stored summary fields, heart-rate zones, and strength-training summary/sets (when present) for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
+| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series) and strength-training sets/volume (`section: "strength"`); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
 | `get_baselines` | Your own norm per metric, never a population norm: `recent` compares the latest reading (within 3 days) with the previous 28-day median and gives the 90-day middle-80% band; `long_term` is the middle 80% of all local history (up to ten years) with its median, start date and a per-year breakdown (`null` under a year of history). The official API only covers recent windows |

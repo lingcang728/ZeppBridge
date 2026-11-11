@@ -273,10 +273,14 @@ impl Database {
                 // 先算出新行，再只删「这条报文以前产出、现在不再产出」的那些。
                 // 别的流是「先清空，再插」；workouts 不能那么做，见
                 // `clear_workouts_for_raw_except`。
+                let strength_summaries = Normalizer::extract_workout_strength_summaries(payload);
                 let keep: Vec<String> = rows.iter().map(|row| row.workout_id.clone()).collect();
                 self.clear_workouts_for_raw_except(raw_record_id, &keep)?;
                 for row in rows {
                     self.insert_workout_with_raw(&row, Some(raw_record_id))?;
+                    if let Some(summary) = strength_summaries.get(&row.workout_id) {
+                        self.upsert_workout_strength_summary(&row.workout_id, summary)?;
+                    }
                 }
                 self.harvest_device_identities(payload)?;
             }
@@ -294,8 +298,10 @@ impl Database {
                 let decoded = decode_workout_detail(payload, summary_end, summary_distance)?;
                 // 用户导入过修正 .fit 的运动，云端明细只留在 raw_records 里（#140）。
                 self.apply_cloud_series(&workout_id, &decoded)?;
-                counts.primary_records =
-                    (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
+                counts.primary_records = (decoded.samples.len()
+                    + decoded.route.len()
+                    + decoded.pauses.len()
+                    + decoded.strength_sets.len()) as i64;
             }
             other => return Err(ZeppBridgeError::ConfigError(format!("未知同步流: {other}"))),
         }
