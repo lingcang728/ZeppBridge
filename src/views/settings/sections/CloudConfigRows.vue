@@ -46,8 +46,9 @@ const save = () => saveConfig({
   data_dir: blank(form.value.data_dir),
   // 自己从计划任务里认出来的位置不用再写进配置：只有用户改过才传。
   uploader_dir: form.value.uploader_dir === baseline.value.uploader_dir ? null : blank(form.value.uploader_dir),
-  retention_days: Math.round(Number(form.value.retention_days) || 0),
-  summary_days: Math.round(Number(form.value.summary_days) || 0),
+  // 负数在后端反序列化（u32）就会被拒、只剩一句英文原文；收成 0，让后端按天数范围给有码的错误。
+  retention_days: Math.max(0, Math.round(Number(form.value.retention_days) || 0)),
+  summary_days: Math.max(0, Math.round(Number(form.value.summary_days) || 0)),
 }, t.value.saved);
 </script>
 
