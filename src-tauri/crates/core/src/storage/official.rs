@@ -98,11 +98,15 @@ impl Database {
                     Normalizer::normalize_workouts_with_device_context(&legacy, None, |id| {
                         self.workout_device_catalog_id(id)
                     })?;
+                let strength_summaries = Normalizer::extract_workout_strength_summaries(&legacy);
                 let keep: Vec<String> = rows.iter().map(|row| row.workout_id.clone()).collect();
                 // 和旧通道一样只删「不再产出」的：先删再插会级联带走逐秒序列和轨迹。
                 self.clear_workouts_for_raw_except(raw_record_id, &keep)?;
                 for row in &rows {
                     self.insert_workout_with_raw(row, Some(raw_record_id))?;
+                    if let Some(summary) = strength_summaries.get(&row.workout_id) {
+                        self.upsert_workout_strength_summary(&row.workout_id, summary)?;
+                    }
                 }
                 counts.primary_records = rows.len() as i64;
             }
@@ -135,8 +139,11 @@ impl Database {
                     drop_unreconciled_distance(&mut decoded, summary_distance);
                     // 用户导入过修正 .fit 的运动，云端明细只留在 raw_records 里（#140）。
                     self.apply_cloud_series(&workout_id, &decoded)?;
-                    counts.primary_records =
-                        (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
+                    counts.primary_records = (decoded.samples.len()
+                        + decoded.route.len()
+                        + decoded.pauses.len()
+                        + decoded.strength_sets.len())
+                        as i64;
                 }
             }
         }

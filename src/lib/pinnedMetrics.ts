@@ -9,15 +9,15 @@
  */
 import type { MetricSeries } from '../types';
 import { formatMetric } from './format';
-import { bodyMassUnitLabel, toBodyMass } from './units';
+import { bodyMassUnitLabel, distanceUnitLabel, toBigDistance, toBodyMass } from './units';
 
 export type PinGroup = 'recovery' | 'activity' | 'body';
 
 /**
  * 磁贴上的单位码（文案见 PinnedMetrics.i18n.ts，和详情页那张卡写的单位一样）；空串 = 不写单位。
- * `mass` 跟着用户选的单位制走（kg / lb），和身体页同一个换算。
+ * `mass` 与 `distance` 跟着用户选的单位制走（kg / lb、km / mi），和身体页 / 活动页同一个换算。
  */
-export type PinUnit = 'bpm' | 'ms' | 'score' | 'percent' | 'steps' | 'kcal' | 'min' | 'mass' | 'vo2' | 'pai' | '';
+export type PinUnit = 'bpm' | 'ms' | 'score' | 'percent' | 'steps' | 'distance' | 'kcal' | 'min' | 'mass' | 'vo2' | 'pai' | '';
 
 export interface PinnableMetric {
   id: string;
@@ -50,6 +50,7 @@ export const PINNABLE_METRICS: readonly PinnableMetric[] = [
   { id: 'stress', group: 'recovery', route: '/body', digits: 0, unit: 'score' },
   { id: 'spo2', group: 'recovery', route: '/body', digits: 0, unit: 'percent' },
   { id: 'steps', group: 'activity', route: '/activity', digits: 0, unit: 'steps' },
+  { id: 'distance', group: 'activity', route: '/activity', digits: 2, unit: 'distance' },
   { id: 'active_calories', group: 'activity', route: '/activity', digits: 0, unit: 'kcal' },
   { id: 'active_minutes', group: 'activity', route: '/activity', digits: 0, unit: 'min' },
   { id: 'training_load', group: 'activity', route: '/training', digits: 0, unit: '' },
@@ -120,8 +121,12 @@ export const writePins = (pins: string[]): void => {
   }
 };
 
-/** 显示前的换算：只有体重跟着单位制换（库里一律千克，和身体页同一个换算）。 */
-const shown = (metric: PinnableMetric, value: number) => (metric.unit === 'mass' ? toBodyMass(value) : value);
+/** 显示前的换算：体重与距离跟着单位制换（库里一律千克 / 米，和身体页 / 日常活动页同一个换算）。 */
+const shown = (metric: PinnableMetric, value: number) => {
+  if (metric.unit === 'mass') return toBodyMass(value);
+  if (metric.unit === 'distance') return toBigDistance(value);
+  return value;
+};
 
 /** 最新一个点的数值文本；没有就是「—」。 */
 export const pinValueText = (metric: PinnableMetric, series?: MetricSeries | null): string => {
@@ -134,6 +139,9 @@ export const pinNumberText = (metric: PinnableMetric, value: number): string => 
 
 /** 质量单位此刻写 kg 还是 lb。 */
 export const pinMassUnit = (): string => bodyMassUnitLabel();
+
+/** 距离单位此刻写 km / 公里 还是 mi / 英里。 */
+export const pinDistanceUnit = (): string => distanceUnitLabel();
 
 /** 最新一个点是哪天（本地日历日 YYYY-MM-DD），没有就是 null。 */
 export const pinLatestDate = (series?: MetricSeries | null): string | null => series?.latest?.date ?? null;

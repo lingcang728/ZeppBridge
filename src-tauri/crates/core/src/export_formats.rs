@@ -181,6 +181,77 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
             );
             count += 1;
         }
+
+        if let Some(strength) = workout.get("strength").and_then(Value::as_object) {
+            for (field, metric, unit) in [
+                ("total_sets", "strength_total_sets", "sets"),
+                ("total_reps", "strength_total_reps", "reps"),
+                ("total_volume_kg", "strength_total_volume_kg", "kg"),
+                ("rest_seconds", "strength_rest_seconds", "seconds"),
+            ] {
+                let Some(value) = number_text(strength.get(field)) else {
+                    continue;
+                };
+                push_numeric_row(
+                    &mut rows,
+                    &[
+                        "workout", workout_id, start, end, metric, &value, unit, scope, device,
+                    ],
+                );
+                count += 1;
+            }
+            if let Some(sets) = strength.get("sets").and_then(Value::as_array) {
+                for set in sets {
+                    let set_idx = number_text(set.get("set_index")).unwrap_or_default();
+                    let set_id = format!("{workout_id}#set{set_idx}");
+                    let exercise = text(set.get("exercise_key"));
+                    if !exercise.is_empty() {
+                        push_row(
+                            &mut rows,
+                            &[
+                                "workout_strength_set",
+                                &set_id,
+                                start,
+                                end,
+                                "exercise_key",
+                                exercise,
+                                "",
+                                scope,
+                                device,
+                            ],
+                        );
+                        count += 1;
+                    }
+                    for (field, unit) in [
+                        ("action_code", ""),
+                        ("reps", "reps"),
+                        ("weight_kg", "kg"),
+                        ("duration_ms", "ms"),
+                        ("avg_hr", "bpm"),
+                        ("calories_kcal", "kcal"),
+                    ] {
+                        let Some(value) = number_text(set.get(field)) else {
+                            continue;
+                        };
+                        push_numeric_row(
+                            &mut rows,
+                            &[
+                                "workout_strength_set",
+                                &set_id,
+                                start,
+                                end,
+                                field,
+                                &value,
+                                unit,
+                                scope,
+                                device,
+                            ],
+                        );
+                        count += 1;
+                    }
+                }
+            }
+        }
     }
 
     if count == 0 {

@@ -660,6 +660,30 @@ pub fn project_workout_detail(value: &mut serde_json::Value, excluded: &BTreeSet
         .any(|field| excluded.contains(*field))
     {
         object.remove("hr_zones");
+        if let Some(sets) = object
+            .get_mut("strength")
+            .and_then(|s| s.get_mut("sets"))
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for set in sets {
+                if let Some(set) = set.as_object_mut() {
+                    set.remove("avg_hr");
+                }
+            }
+        }
+    }
+    if excluded.contains("calories") {
+        if let Some(sets) = object
+            .get_mut("strength")
+            .and_then(|s| s.get_mut("sets"))
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for set in sets {
+                if let Some(set) = set.as_object_mut() {
+                    set.remove("calories_kcal");
+                }
+            }
+        }
     }
     if excluded.contains("distance_meters") {
         object.remove("avg_stride_cm");

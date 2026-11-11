@@ -366,3 +366,31 @@ views/settings/sections/cloud.siteLabel
 views/settings/sections/cloud.sitePlaceholder
 views/settings/sections/cloud.openLogs
 
+# Batch 47：力量训练词条（Biceps/Triceps/Core/Burpees/Plank 等健身外来词及 nl 动作名）与 Distance（fr）
+lib/strengthCatalog.muscles.biceps
+lib/strengthCatalog.muscles.triceps
+lib/strengthCatalog.muscles.core
+lib/strengthCatalog.exercises.dumbbell_flys
+lib/strengthCatalog.exercises.burpees
+lib/strengthCatalog.exercises.jumping_jacks
+lib/strengthCatalog.exercises.quadriceps
+lib/strengthCatalog.exercises.hamstrings
+lib/strengthCatalog.exercises.deadlift
+lib/strengthCatalog.exercises.shoulder_press
+lib/strengthCatalog.exercises.upright_row
+lib/strengthCatalog.exercises.t_bar_row
+lib/strengthCatalog.exercises.chest_flyes
+lib/strengthCatalog.exercises.plank
+lib/strengthCatalog.exercises.v_up
+lib/strengthCatalog.exercises.battle_rope
+lib/strengthCatalog.exercises.pec_deck_fly
+lib/strengthCatalog.exercises.reverse_pec_deck_fly
+lib/strengthCatalog.exercises.trx_triceps_press
+lib/strengthCatalog.exercises.trx_reverse_flys
+lib/strengthCatalog.exercises.cable_crossover
+components/workout/WorkoutStrengthCard.unitSets
+components/workout/WorkoutStrengthCard.colSet
+components/workout/WorkoutStrengthCard.colSets
+components/overview/PinnedMetrics.names.distance
+components/overview/StepsCard.factDistance
+

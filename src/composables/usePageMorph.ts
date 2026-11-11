@@ -533,9 +533,14 @@ export const usePageMorph = (options: { back: () => void }) => {
 
   /* ---------- 收回 ---------- */
 
-  /** 来处页此刻已经在场的话，当初那张卡。页面里没有就看页面外面标了 data-morph-card 的（底栏）。 */
+  /** 来处页此刻已经在场的话，当初那张卡。页面里没有就看顶栏或页面外面标了 data-morph-card 的（底栏）。 */
   const currentCard = (trail: Trail): HTMLElement | null => {
-    if (trail.source) return main()?.querySelector<HTMLElement>(`${STAYING} [data-morph-source="${CSS.escape(trail.source)}"]`) ?? null;
+    if (trail.source) {
+      const sel = `[data-morph-source="${CSS.escape(trail.source)}"]`;
+      return main()?.querySelector<HTMLElement>(`${STAYING} ${sel}`)
+        ?? document.querySelector<HTMLElement>(`.app-topbar ${sel}`)
+        ?? null;
+    }
     const link = linksTo(trail.href, STAYING)[trail.index]
       ?? document.querySelector<HTMLElement>(`body > :not(#app) a[data-morph-card][href="${CSS.escape(trail.href)}"]`)
       ?? null;
@@ -620,7 +625,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     const veil = staying ? pageVeil(staying, viewport) : null;
     const veilFrom = veilOut(previous ? previous.veilNow : 1);
     const veilAnim = veil ? veil.animate(veilFrom.frames, veilFrom.options) : null;
-    const hidden = present && main()?.contains(present) ? hide(present) : null;
+    const hidden = present && (main()?.contains(present) || present.closest('.app-topbar')) ? hide(present) : null;
     const me: Live = {
       kind: 'collapse', page: el, path: '', under: staying, flight, veil, veilAnim, hidden,
       release: job.release, pageDone: job.done, underDone: job.stayingDone, stop: noop, hurry: noop,

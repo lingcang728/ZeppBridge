@@ -397,6 +397,146 @@ impl Normalizer {
         })
     }
 
+    pub fn extract_workout_strength_summaries(
+        raw: &Value,
+    ) -> BTreeMap<String, crate::decoder::strength::HistoryStrengthSummary> {
+        let Ok(items) = extract_items(raw) else {
+            return BTreeMap::new();
+        };
+        let mut out = BTreeMap::new();
+        for item in items {
+            let Some(object) = item_object(item) else {
+                continue;
+            };
+            let start = first_value(object, &["start_time", "startTime", "beginTime", "trackid"])
+                .and_then(parse_timestamp);
+            let end = first_value(object, &["end_time", "endTime", "finishTime"])
+                .and_then(parse_timestamp);
+            let (Some(start_time), Some(end_time)) = (start, end) else {
+                continue;
+            };
+            if end_time <= start_time {
+                continue;
+            }
+            let zepp_type =
+                first_number(object, &["type", "sport_mode"]).map(|value| value.round() as i32);
+            let explicit_type = first_string(
+                object,
+                &[
+                    "workout_type",
+                    "sportType",
+                    "sport_title",
+                    "sportTitle",
+                    "sport_name",
+                    "sportName",
+                ],
+            );
+            let workout_type = if let Some(code) = zepp_type {
+                let device_source =
+                    first_number(object, &["deviceSource", "device_source"]).map(|v| v as i64);
+                let device_name = first_string(object, &["deviceName", "productName", "modelName"]);
+                match crate::sport_catalog::resolve_cloud_with_device(
+                    i64::from(code),
+                    device_source,
+                    device_name.as_deref(),
+                    None,
+                ) {
+                    Some(mapped) => mapped.to_owned(),
+                    None => match explicit_type {
+                        Some(value) => normalize_type_text(&value),
+                        None => format!("unknown:{code}"),
+                    },
+                }
+            } else if let Some(value) = explicit_type {
+                normalize_type_text(&value)
+            } else {
+                "unknown".to_owned()
+            };
+
+            let groups = crate::decoder::strength::parse_history_strength_groups(first_value(
+                object,
+                &["strength_training_group", "strengthTrainingGroup"],
+            ));
+            let is_strength =
+                zepp_type == Some(52) || workout_type == "strength" || !groups.is_empty();
+            if !is_strength {
+                continue;
+            }
+
+            let workout_id = first_string(
+                object,
+                &["workout_id", "workoutId", "trackId", "trackid", "id"],
+            )
+            .unwrap_or_else(|| {
+                format!(
+                    "{workout_type}:{}:{}",
+                    start_time.timestamp(),
+                    end_time.timestamp()
+                )
+            });
+
+            let total_sets = first_number(
+                object,
+                &["total_group", "totalGroup", "strength_total_sets"],
+            )
+            .filter(|value| *value > 0.0)
+            .map(|value| value.round() as i32)
+            .or_else(|| (!groups.is_empty()).then_some(groups.len() as i32));
+
+            let total_reps =
+                first_number(object, &["strength_total_reps", "total_reps", "totalReps"])
+                    .filter(|value| *value >= 0.0)
+                    .map(|value| value.round() as i32)
+                    .or_else(|| {
+                        (!groups.is_empty()).then(|| groups.iter().map(|g| g.reps.max(0)).sum())
+                    });
+
+            let rest_seconds = first_number(
+                object,
+                &[
+                    "restTimeBetweenGroupsWithMillis",
+                    "rest_time_between_groups_with_millis",
+                ],
+            )
+            .filter(|value| *value >= 0.0)
+            .map(|value| (value / 1000.0).round() as i64)
+            .or_else(|| {
+                first_number(
+                    object,
+                    &[
+                        "rope_skipping_rest_time",
+                        "ropeSkippingRestTime",
+                        "rest_seconds",
+                        "restTime",
+                    ],
+                )
+                .filter(|value| *value >= 0.0)
+                .map(|value| value.round() as i64)
+            });
+
+            let groups_json = (!groups.is_empty())
+                .then(|| serde_json::to_string(&groups).ok())
+                .flatten();
+
+            if total_sets.is_some()
+                || total_reps.is_some()
+                || rest_seconds.is_some()
+                || groups_json.is_some()
+            {
+                out.insert(
+                    workout_id,
+                    crate::decoder::strength::HistoryStrengthSummary {
+                        total_sets,
+                        total_reps,
+                        rest_seconds,
+                        groups_json,
+                    },
+                );
+            }
+        }
+        out
+    }
+
     pub fn normalize_hrv(raw: &Value) -> Result<Vec<MetricSample>> {
         Self::normalize_hrv_with_diagnostics(raw)?.into_result("hrv")
     }

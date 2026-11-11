@@ -17,6 +17,8 @@ import type {
  * 这个模块不进首屏：prefetch.ts 第一次用到时才动态 import（它带着身体页的指标清单）。
  */
 export const HEART_TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
+/** 心率详情顶部曲线最长可切到 7 天（168 小时），首屏一次读好后本地切换 24h / 48h / 7d。 */
+export const HEART_SERIES_MAX_HOURS = 168;
 export const TRAINING_METRICS = ['vo2max', 'training_load', 'lactate_threshold_hr', 'lactate_threshold_pace', 'pai_total'] as const;
 export const ACTIVITY_METRICS = ['steps', 'distance', 'active_calories', 'active_minutes'] as const;
 /** 训练负荷平衡至少看一个月：28 天窗口要先有这么长的跑道才算得出比值。 */
@@ -124,7 +126,7 @@ export const pageQuery = {
 
 /** 每个详情页首屏的那一组（顺序和页面里 Promise.allSettled 的顺序一致）。 */
 export const heartPageQueries = () => [
-  pageQuery.heartRateSeries(24),
+  pageQuery.heartRateSeries(HEART_SERIES_MAX_HOURS),
   pageQuery.metricSeries(HEART_TREND_METRICS),
   pageQuery.dailyHeartRateExtremes(SERIES_FETCH_DAYS),
 ] as const;

@@ -35,10 +35,11 @@ const pick = (span: number, event: MouseEvent) => {
 };
 
 const written = ref<HTMLElement | null>(null);
-/** 外面封好以后调用：把写好的那页对折起来，折完再交给信封飞回去。 */
+/** 外面封好以后调用：把整张信纸对折起来，折完再交给信封飞回去。 */
 const fold = async () => {
-  const page = written.value;
+  const page = written.value?.closest<HTMLElement>('.leaf.current .paper') ?? written.value;
   if (!page || lessMotion()) return;
+  page.style.transformOrigin = '50% 50%';
   await page.animate([
     { transform: 'perspective(900px) rotateX(0deg) scale(1)', opacity: 1 },
     { transform: 'perspective(900px) rotateX(78deg) scale(.92, .5)', opacity: .85 },

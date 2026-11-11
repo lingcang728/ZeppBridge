@@ -339,6 +339,11 @@ impl Database {
                 [&cutoff_timestamp],
             )?;
             self.conn.execute(
+                "DELETE FROM workout_strength_sets
+                 WHERE workout_id IN (SELECT workout_id FROM workouts WHERE start_time < ?1) AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
                 "DELETE FROM workouts WHERE start_time < ?1 AND workout_id NOT IN (SELECT workout_id FROM workout_imports)",
                 [&cutoff_timestamp],
             )?;

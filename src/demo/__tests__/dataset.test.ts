@@ -100,8 +100,24 @@ describe('演示数据集', () => {
     expect(score.points.every((p) => p.value > 0)).toBe(true);
   });
 
+  it('力量训练：每周二一练，逐组明细与汇总一致，没有距离和分段', () => {
+    const strength = data.workouts.filter(w => w.effective_type === 'strength');
+    expect(strength.length).toBeGreaterThan(30);
+    for (const w of strength.slice(0, 4)) {
+      expect(new Date(w.start_time).getDay()).toBe(2);
+      const series = demoWorkoutSeries(w);
+      const detail = series.strength!;
+      expect(series.splits).toHaveLength(0);
+      expect(series.samples.length).toBe(w.sample_count);
+      expect(detail.total_sets).toBe(detail.sets.length);
+      expect(detail.total_reps).toBe(detail.sets.reduce((s, x) => s + x.reps, 0));
+      expect(detail.total_volume_kg).toBeCloseTo(detail.sets.reduce((s, x) => s + (x.weight_kg ?? 0) * x.reps, 0), 1);
+      expect(detail.exercise_groups.reduce((s, g) => s + g.sets, 0)).toBe(detail.total_sets);
+    }
+  });
+
   it('运动详情分段累计与总距离和总时长相符，步幅对应总步数', () => {
-    for (const workout of data.workouts.slice(0, 12)) {
+    for (const workout of data.workouts.filter(w => w.effective_type !== 'strength').slice(0, 12)) {
       const series = demoWorkoutSeries(workout);
       expect(series.splits.reduce((s, split) => s + split.distance_m, 0)).toBe(workout.distance_meters);
       expect(series.splits.reduce((s, split) => s + split.duration_seconds, 0)).toBeCloseTo(workout.moving_seconds!, 0);

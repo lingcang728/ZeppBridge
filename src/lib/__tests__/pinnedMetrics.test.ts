@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PINS, MAX_PINS, normalizePins, pinnableMetric, pinsFromStored, pinSparkValues, pinValueText } from '../pinnedMetrics';
+import { DEFAULT_PINS, MAX_PINS, normalizePins, pinDistanceUnit, pinnableMetric, pinsFromStored, pinSparkValues, pinValueText } from '../pinnedMetrics';
+import { setDistanceUnit } from '../units';
 
 describe('pinnedMetrics', () => {
   it('从没挑过时给一套默认的四块；自己清空过就保持空', () => {
@@ -32,5 +33,18 @@ describe('pinnedMetrics', () => {
   it('体重保留一位小数', () => {
     const metric = pinnableMetric('weight')!;
     expect(pinValueText(metric, { latest: { date: '2026-09-27', value: 68.25 } } as never)).toMatch(/^68[.,]3$/);
+  });
+
+  it('距离按用户单位制从米换算成 km / mi（最多两位小数）', () => {
+    const metric = pinnableMetric('distance')!;
+    try {
+      setDistanceUnit('metric');
+      expect(pinValueText(metric, { latest: { date: '2026-09-27', value: 5326 } } as never)).toMatch(/^5[.,]33$/);
+      expect(pinDistanceUnit()).toBeTruthy();
+      setDistanceUnit('imperial');
+      expect(pinValueText(metric, { latest: { date: '2026-09-27', value: 5326 } } as never)).toMatch(/^3[.,]31$/);
+    } finally {
+      setDistanceUnit('metric');
+    }
   });
 });

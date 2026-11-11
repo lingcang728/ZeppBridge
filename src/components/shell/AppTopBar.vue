@@ -26,6 +26,8 @@ import { syncControllerMessages } from '../../composables/useSyncController.i18n
 import GlassBridge from '../glass/GlassBridge.vue';
 import { labFlag } from '../../lib/labs';
 import { openAuthorCompose } from '../../composables/useAuthorCompose';
+import { armPageMorph } from '../../composables/usePageMorph';
+import { lessMotion } from '../../lib/motion/lessMotion';
 import { useLetterText } from '../letters/letters.i18n';
 const demoLibrary = ref(false), bridgeText = useBridgeText(), letterText = useLetterText();
 
@@ -148,18 +150,51 @@ const brandTitle = computed(() => {
 });
 /* 平时长按标志进信匣（用户 2026-11-10 定）。长按触发后随之而来的那次 click 吞掉，不再回概览 / 装更新。 */
 const LONG_PRESS_MS = 450;
+const brandBtn = ref<HTMLElement | null>(null);
 let pressTimer = 0;
 let swallowClick = false;
+let chargeAnim: Animation | null = null;
+
+const releaseCharge = (smooth = true) => {
+  if (!chargeAnim) return;
+  const anim = chargeAnim;
+  chargeAnim = null;
+  const el = brandBtn.value;
+  anim.cancel();
+  if (smooth && el && !lessMotion()) {
+    el.animate([{ transform: 'scale(0.92)' }, { transform: 'scale(1)' }], {
+      duration: 160,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    });
+  }
+};
+
 const openLetters = () => {
-  void router.push({ path: '/letters', query: mailState.tab ? { tab: mailState.tab } : {} });
+  const query = mailState.tab ? { tab: mailState.tab } : {};
+  if (brandBtn.value && route.path !== '/letters') {
+    const resolved = router.resolve({ path: '/letters', query });
+    armPageMorph(brandBtn.value, resolved.fullPath, { anySize: true });
+  }
+  releaseCharge(false);
+  void router.push({ path: '/letters', query });
 };
 const onBrandDown = (event: PointerEvent) => {
   if (event.button !== 0) return;
   swallowClick = false;
   window.clearTimeout(pressTimer);
+  releaseCharge(false);
+  if (brandBtn.value && route.path !== '/letters' && !lessMotion()) {
+    chargeAnim = brandBtn.value.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(0.88)' }],
+      { duration: LONG_PRESS_MS, easing: 'cubic-bezier(0.32, 0, 0.24, 1)', fill: 'forwards' },
+    );
+  }
   pressTimer = window.setTimeout(() => { swallowClick = true; openLetters(); }, LONG_PRESS_MS);
 };
-const cancelBrandPress = () => window.clearTimeout(pressTimer);
+const cancelBrandPress = () => {
+  window.clearTimeout(pressTimer);
+  releaseCharge(true);
+};
 const onBrandClick = () => {
   if (swallowClick) { swallowClick = false; return; }
   if (hasMail.value) openLetters();
@@ -471,6 +506,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
            平时 / 有新信 / 更新下好了是同一个按钮（换元素会重挂载，Z ↔ 信封的过渡就播不出来）：
            点一下按状态回概览、进信匣或装更新；长按进信匣。 -->
       <button
+        ref="brandBtn"
         type="button"
         :class="['brand', 'brand-button', { 'is-off': backTo }]"
         :title="brandTitle"

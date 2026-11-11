@@ -7,6 +7,7 @@ import GlyphTile from '../GlyphTile.vue';
 import { metricColor } from '../../lib/metricTone';
 import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
+import { distanceUnitLabel, toBigDistance } from '../../lib/units';
 import type { MetricSeriesPoint } from '../../types';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -23,6 +24,7 @@ const messages = defineMessages(
     seeMore: '看更多',
     stepsNotYet: '今天的步数还没到云端',
     stepsLatest: (when: string) => `云端最新数据停在${when}`,
+    factDistance: '今日距离',
     factGoal: '目标',
     factDone: '已完成',
     factLeft: '还差',
@@ -40,6 +42,7 @@ const messages = defineMessages(
     seeMore: 'See more',
     stepsNotYet: "Today's steps haven't reached the cloud yet",
     stepsLatest: (when: string) => `Newest cloud data is from ${when}`,
+    factDistance: 'Distance',
     factGoal: 'Goal',
     factDone: 'Done',
     factLeft: 'To go',
@@ -57,6 +60,7 @@ const messages = defineMessages(
     seeMore: 'Ver más',
     stepsNotYet: 'Los pasos de hoy aún no han llegado a la nube',
     stepsLatest: (when: string) => `Los datos más recientes en la nube son de ${when}`,
+    factDistance: 'Distancia',
     factGoal: 'Meta',
     factDone: 'Hecho',
     factLeft: 'Faltan',
@@ -71,6 +75,7 @@ const t = useMessages(messages);
 
 const props = defineProps<{
   steps: number | null;
+  distanceMeters?: number | null;
   goal: number | null;
   /** 库里最新一条样本（任何一种）的时间：今天还没有步数时，告诉用户云端的数据停在哪儿。
       有步数时不拿它当「更新于」——它其实是心率样本的时间，步数没有自己的时刻。 */
@@ -79,6 +84,10 @@ const props = defineProps<{
   week?: MetricSeriesPoint[];
 }>();
 const latestWhen = computed(() => formatWhen(props.latestAt));
+const distanceText = computed(() => {
+  if (!isFiniteNumber(props.distanceMeters)) return null;
+  return `${formatMetric(toBigDistance(props.distanceMeters), 2)} ${distanceUnitLabel()}`;
+});
 
 const weekBars = computed(() => {
   const points = (props.week ?? []).filter((point) => isFiniteNumber(point.value));
@@ -126,6 +135,7 @@ const ringColor = computed(() => metricColor('steps'));
       <div class="panel-meter" role="img" :aria-label="t.stepsGoalLine(formatMetric(stepGoal), stepsPercent)"><i :style="{ width: `${Math.max(2, stepsPercent)}%`, background: ringColor }"></i></div>
       <!-- 和睡眠卡的分期列表同一种排法：左边是什么，右边多少。 -->
       <ul class="steps-facts">
+        <li v-if="distanceText"><span>{{ t.factDistance }}</span><strong>{{ distanceText }}</strong></li>
         <li><span>{{ t.factGoal }}</span><strong>{{ formatMetric(stepGoal) }}</strong></li>
         <li><span>{{ t.factDone }}</span><strong>{{ stepsPercent }}%</strong></li>
         <li><span>{{ t.factLeft }}</span><strong>{{ steps >= stepGoal ? t.factReached : formatMetric(stepGoal - steps) }}</strong></li>

@@ -31,6 +31,7 @@ import ReplySheet from './ReplySheet.vue';
 import { useLetterText } from './letters.i18n';
 import { useLetterEnvelope, type CustomLetter, type Sheet } from '../../composables/useLetterEnvelope';
 import { lessMotion } from '../../lib/motion/lessMotion';
+import { whenDialogLanded } from '../../lib/motion/dialogFlight';
 import { exemptFromSettle } from '../../lib/motion/interrupt';
 import { paced } from '../../lib/motion/timing';
 import { whenFramesSteady } from '../../lib/motion/steady';
@@ -92,13 +93,31 @@ const pages = computed<Page[]>(() => sheets.value.flatMap((sheet, sheetIndex) =>
 
 const timers: number[] = [];
 const later = (ms: number, run: () => void) => { timers.push(window.setTimeout(run, ms)); };
-onBeforeUnmount(() => timers.forEach((id) => window.clearTimeout(id)));
+let unmounted = false;
+onBeforeUnmount(() => {
+  unmounted = true;
+  timers.forEach((id) => window.clearTimeout(id));
+});
 
 const stage = ref<HTMLElement | null>(null);
 const reader = ref<HTMLElement | null>(null);
-onMounted(() => { if (!props.opened) later(lessMotion() ? 0 : 900, () => { staged.value = true; }); });
-/* 写胶囊：信封飞到位、稍停一下就自己打开。 */
-onMounted(() => { if (composing.value) later(lessMotion() ? 0 : 520, () => { void open(); }); });
+let initialOriginRect: DOMRect | null = null;
+onMounted(() => {
+  if (props.origin?.isConnected) {
+    const r = props.origin.getBoundingClientRect();
+    if (r.width && r.height) initialOriginRect = r;
+  }
+  if (!props.opened) later(lessMotion() ? 0 : 900, () => { staged.value = true; });
+});
+/* 写信 / 写胶囊：先等弹窗从起点缩放到位落定，再按真实几何自动拆封、抽出空信纸。 */
+onMounted(async () => {
+  if (!composing.value) return;
+  await nextTick();
+  const panel = stage.value?.closest<HTMLElement>('[data-modal-dialog]');
+  await whenDialogLanded(panel);
+  if (unmounted) return;
+  later(lessMotion() ? 0 : 60, () => { if (!unmounted) void open(); });
+});
 
 /* ── 信封：摆正放着，可以拖着转（像 3D 模型），松手落回最近的一面；点正面翻到背面 ── */
 const flipper = ref<HTMLElement | null>(null);
@@ -181,7 +200,14 @@ const padH = ref(0);
 let unfolding = false;
 const open = async () => {
   if (phase.value !== 'sealed' || unfolding) return;
-  if (lessMotion()) { phase.value = 'reading'; return; }
+  if (lessMotion()) {
+    phase.value = 'reading';
+    inked.value = true;
+    await nextTick();
+    const shell = reader.value?.querySelector<HTMLElement>('.pad-shell');
+    shell?.animate([{ opacity: 0, transform: 'scale(.95)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out', fill: 'backwards' });
+    return;
+  }
   unfolding = true;
   staged.value = true;
   await nextTick();
@@ -267,9 +293,19 @@ const flyHome = async () => {
   const el = stage.value;
   const panel = el?.closest<HTMLElement>('[data-modal-dialog]');
   const veil = panel?.closest<HTMLElement>('.dialog-backdrop');
-  const home = props.origin?.isConnected ? props.origin.getBoundingClientRect() : null;
+  const liveHome = props.origin?.isConnected ? props.origin.getBoundingClientRect() : null;
+  const home = (liveHome && liveHome.width ? liveHome : null) ?? initialOriginRect;
   const subject = el?.querySelector<HTMLElement>(phase.value === 'reading' || phase.value === 'opening' ? '.pad-shell' : '.flipper');
-  if (!el || !veil || !home || !home.width || !subject || lessMotion()) return;
+  if (!el || !veil || !subject) return;
+  if (lessMotion() || !home || !home.width) {
+    const quick = { duration: 180, easing: 'ease-in', fill: 'forwards' as const };
+    const away = exemptFromSettle(el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.95)' }], quick));
+    const now = Number(getComputedStyle(veil, '::before').opacity) || 1;
+    exemptFromSettle(veil.animate([{ opacity: now }, { opacity: 0 }], { ...quick, pseudoElement: '::before' }));
+    await away.finished.catch(() => undefined);
+    veil.dataset.dissolved = '';
+    return;
+  }
   const seen = subject.getBoundingClientRect();
   const frame = el.getBoundingClientRect();
   const cx = seen.left + seen.width / 2;

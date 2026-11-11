@@ -215,6 +215,7 @@ pub(crate) fn activity_from_track(
             pauses: Vec::new(),
             splits,
             laps: Vec::new(),
+            strength_sets: Vec::new(),
         }),
         name,
     })

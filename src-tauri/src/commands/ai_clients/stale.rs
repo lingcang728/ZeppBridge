@@ -52,10 +52,26 @@ impl Server {
 /// 各客户端登记的服务，按 `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory` 的顺序。
 fn registered(roots: &ClientConfigRoots) -> Vec<(&'static str, Vec<Server>)> {
     let mut out = Vec::new();
+    let mut claude_desktop_dirs = Vec::new();
     if let Some(appdata) = &roots.appdata {
-        let claude = appdata.join("Claude");
-        let mut servers = json_servers(&claude.join("claude_desktop_config.json"), &[]);
-        servers.extend(extension_servers(&claude.join("Claude Extensions")));
+        claude_desktop_dirs.push(appdata.join("Claude"));
+    }
+    if let Some(home) = &roots.home {
+        claude_desktop_dirs.push(
+            home.join("Library")
+                .join("Application Support")
+                .join("Claude"),
+        );
+    }
+    if !claude_desktop_dirs.is_empty() {
+        let mut servers = Vec::new();
+        for claude in claude_desktop_dirs {
+            servers.extend(json_servers(
+                &claude.join("claude_desktop_config.json"),
+                &[],
+            ));
+            servers.extend(extension_servers(&claude.join("Claude Extensions")));
+        }
         out.push(("claude_desktop", servers));
     }
     if let Some(home) = &roots.home {

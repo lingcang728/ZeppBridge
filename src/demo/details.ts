@@ -2,9 +2,22 @@ import type { DemoData } from './dataset';
 import { at, dayKey, round } from './rng';
 import type { MetricBaseline } from '../lib/bridge/types';
 import type { DailyHeartRateExtreme, HeartRateZoneOptions, HeartRateZonePreference, HourlySteps, TrainingBalancePoint, Workout, WorkoutInsight, WorkoutSeries } from '../types';
+import { demoStrengthDetail } from './strength';
+
+/** 力量训练：只有心率曲线（组间回落）和逐组明细，没有配速、分段和轨迹。 */
+const strengthSeries = (workout: Workout): WorkoutSeries => {
+  const start = Date.parse(workout.start_time), seconds = workout.moving_seconds ?? 1;
+  const samples = Array.from({ length: Math.floor(seconds / 10) + 1 }, (_, i) => ({
+    timestamp: new Date(start + i * 10_000).toISOString(),
+    heart_rate: Math.round((workout.avg_hr ?? 115) + Math.sin(i / 6) * 14 - Math.max(0, 15 - i)),
+  }));
+  return { workout_id: workout.workout_id, samples, route: [], pauses: [], splits: [], laps: [],
+    summary: {}, climbs: null, strength: demoStrengthDetail(workout) };
+};
 
 /** All detail views derive from the same sample records, never an unrelated set of totals. */
 export const demoWorkoutSeries = (workout: Workout): WorkoutSeries => {
+  if (workout.effective_type === 'strength') return strengthSeries(workout);
   const start = Date.parse(workout.start_time), seconds = workout.moving_seconds ?? 1;
   const distance = workout.distance_meters ?? 1, pace = seconds / distance * 1000;
   const running = workout.effective_type === 'running';

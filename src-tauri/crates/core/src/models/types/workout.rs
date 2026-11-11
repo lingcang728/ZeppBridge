@@ -263,6 +263,59 @@ pub struct WorkoutLapRow {
     pub avg_cadence_spm: Option<f64>,
 }
 
+/// 力量训练的一组明细（来自云端 detail `lap` 62 列）。
+///
+/// 只带稳定的英文码与数值，不拼任何自然语言名称（遵守界面语言契约）。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StrengthSetRow {
+    /// 1 起的组号。
+    pub set_index: i32,
+    /// Zepp 原始 `actionType` 编号（0 = 未选动作；1..=130 标准库；>130 表外固件编号）。
+    pub action_code: i32,
+    /// 标准库命中的动作键（如 `"biceps_curl"`）；表外编号为 `None`，绝不猜名。
+    pub exercise_key: Option<String>,
+    /// 标准库命中的主肌群键（如 `"biceps"`）；未选动作或表外编号为 `None`。
+    pub muscle_group: Option<String>,
+    pub reps: i32,
+    /// 表上录入的原始正数重量；自重动作或未录重量为 `None`。
+    pub weight_value: Option<f64>,
+    /// `"kg"` 或 `"lb"`（由每组自己的 `col[23]` 决定，不是整场运动统一）。
+    pub weight_unit: String,
+    /// 换算成千克的重量（`lb * 0.45359237`），供总容量汇总用。
+    pub weight_kg: Option<f64>,
+    /// 单组用时（毫秒）：优先 `col[43]`，缺失回退 `col[1] * 1000`。
+    pub duration_ms: Option<i64>,
+    /// 组内平均心率（bpm，`> 0` 才有值）。
+    pub avg_hr: Option<i32>,
+    /// 组内消耗千卡（`>= 0` 才有值）。
+    pub calories_kcal: Option<f64>,
+}
+
+/// 按动作聚合的组数与总次数（有逐组明细时由明细聚合，未拉到明细时由汇总流兜底）。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StrengthExerciseGroup {
+    pub action_code: i32,
+    pub exercise_key: Option<String>,
+    pub muscle_group: Option<String>,
+    pub sets: i32,
+    pub total_reps: i32,
+}
+
+/// 一场力量训练的汇总与逐组明细。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StrengthWorkoutDetail {
+    pub total_sets: i32,
+    pub total_reps: i32,
+    /// 总容量（`Σ reps * weight_kg`）；全自重或尚未拿到逐组重量时为 `None`。
+    pub total_volume_kg: Option<f64>,
+    /// 组间总休息时长（秒，来自汇总流 `restTimeBetweenGroupsWithMillis / 1000` 或 `rope_skipping_rest_time`）。
+    pub rest_seconds: Option<i64>,
+    /// 逐组明细；尚未抓到 detail 时为空数组，前端退化显示 `exercise_groups`。
+    pub sets: Vec<StrengthSetRow>,
+    /// 按动作聚合的组数与总次数。
+    pub exercise_groups: Vec<StrengthExerciseGroup>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorkoutSeries {
     pub workout_id: String,
@@ -278,6 +331,9 @@ pub struct WorkoutSeries {
     /// 空段列表 = 有海拔但没有明显爬升。
     #[serde(default)]
     pub climbs: Option<crate::workout_climbs::WorkoutClimbs>,
+    /// 力量训练的汇总与逐组明细；非力量运动或无任何力量字段时为 `None`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strength: Option<StrengthWorkoutDetail>,
 }
 
 #[derive(Debug, Clone)]

@@ -62,7 +62,7 @@ const disconnectOfficialForAdvanced = async () => {
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
-/* 「推给云端」开着时（Beta 实验室），「本地 AI」卡头上多一枚小标：不点开也知道上一次传得怎么样。 */
+/* 「Personal Agent 选项」开着时（Beta 实验室），「本地 AI」卡头上多一枚小标：不点开也知道上一次传得怎么样。 */
 const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
 
 const activeId = computed<SettingsCardId | null>(() =>
@@ -99,7 +99,7 @@ const summaries = computed<Record<SettingsCardId, string>>(() => {
     data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
     ai: d.value.sumAi(exportFormat.value.toUpperCase()),
     display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
-    feedback: letters.value.authorPlaceholder,
+    feedback: letters.value.writeAuthorSub,
     labs: labs.value.summary,
     guide: tour.value.seenCount(ALL_CHAPTERS.filter((id) => seenChapters().has(id)).length, ALL_CHAPTERS.length),
     privacy: d.value.sumPrivacy,
@@ -127,10 +127,12 @@ const closeDeck = () => {
   if (target.viaHistory) router.back();
   else void router.push(target.path);
 };
+let changeSeq = 0;
 const changeCard = async (id: string, done: () => void) => {
+  const seq = ++changeSeq;
   await router.replace(`/settings/${id}`);
   await nextTick();
-  done();
+  if (seq === changeSeq) done();
 };
 
 /* 旧链接（数据健康页的「去重新连接」等）指向 #connection，重新连接的按钮在「账号与设备」卡上。 */

@@ -191,18 +191,23 @@ const warmNext = () => {
 };
 const activeIndex = computed(() => props.cards.findIndex((card) => card.id === props.activeId));
 
-/** 这次换卡是卡组自己发起的（拖着甩、圆点跳）：它自己放过渡，watch 里不用再补一段。 */
-let ownSwap = false;
+/** 这次换卡是卡组自己发起的（拖着甩、圆点跳）：按目标 id 登记，watch 里不用再补一段。 */
+const ownSwapIds = new Set<string>();
 const step = (direction: -1 | 1) => new Promise<void>((resolve) => {
   const next = props.cards[wrapIndex(activeIndex.value + direction, props.cards.length)];
   if (!next) { resolve(); return; }
-  ownSwap = true;
+  morph.settleNow();
+  ownSwapIds.add(next.id);
   emit('change', next.id, resolve);
 });
 
 const {
-  dragging, busy: flinging, cycle, reset, onPointerDown, onPointerMove, onPointerUp, onPointerCancel,
+  dragging, busy: flinging, cycle, reset, onPointerDown: rawPointerDown, onPointerMove, onPointerUp, onPointerCancel,
 } = useCardDeck({ stage, card: cardEl, step, reducedMotion });
+const onPointerDown = (event: PointerEvent) => {
+  morph.settleNow();
+  rawPointerDown(event);
+};
 
 /* 连点保护：「打开」和打开后的「×」落在同一片区域，手快连点两下，卡会刚飞出来又
    飞回去、来回折腾。两次开关之间少于 320ms 的点击当作误触忽略；Esc、拖动、圆点不受限。 */
@@ -222,11 +227,12 @@ const requestClose = () => guardedToggle(() => emit('close'));
 
 const jumpTo = (id: string) => {
   if (id === props.activeId) return;
+  morph.settleNow();
   reset();
   // 圆点跳转也带方向：往后跳从右边滑进来，往前跳从左边。
   const target = props.cards.findIndex((card) => card.id === id);
   const direction: -1 | 1 = target < activeIndex.value ? -1 : 1;
-  ownSwap = true;
+  ownSwapIds.add(id);
   deferSettle();
   emit('change', id, () => morph.swap(direction));
 };
@@ -255,8 +261,9 @@ const onListPointerMove = (event: PointerEvent) => {
 
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
-  lastToggleAt = performance.now();
   if (id && !previous) {
+    lastToggleAt = performance.now();
+    ownSwapIds.clear();
     closingId.value = null;
     reset();
     if (id) markWarm(id);
@@ -265,6 +272,8 @@ watch(() => props.activeId, async (id, previous) => {
     await nextTick();
     morph.open(id, from);
   } else if (!id && previous) {
+    lastToggleAt = performance.now();
+    ownSwapIds.clear();
     reset();
     closingId.value = previous;
     const fromTop = closeFromTop;
@@ -277,11 +286,10 @@ watch(() => props.activeId, async (id, previous) => {
       if (closingId.value === previous) closingId.value = null;
     }, fromTop);
   } else if (id && previous && id !== previous) {
-    const own = ownSwap;
-    ownSwap = false;
-    if (own) return;
+    if (ownSwapIds.delete(id)) return;
     // 卡里的链接把人带到另一张卡（隐私卡「去设置」→ 高级卡的本机 API），或从那里按返回回来：
     // 以前是一帧硬换内容。和圆点跳转一样，新卡从它所在的那一侧滑进来。
+    morph.settleNow();
     reset();
     markWarm(id);
     const from = props.cards.findIndex((card) => card.id === previous);
@@ -309,9 +317,11 @@ const onKeydown = (event: KeyboardEvent) => {
     emit('close');
   } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
     event.preventDefault();
+    morph.settleNow();
     void cycle(1);
   } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
     event.preventDefault();
+    morph.settleNow();
     void cycle(-1);
   }
 };

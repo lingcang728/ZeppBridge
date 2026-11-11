@@ -68,12 +68,16 @@ export const installReturnScroll = (router: Router) => {
     if (!root) return;
     // 年轮换年份只更新查询参数，舞台仍在原处，不要把整页拉回顶部。
     if (to.name === 'Rings' && from.name === 'Rings' && to.path === from.path) return;
-    // 同一页只换了参数（设置卡叠从 /settings/privacy 回到 /settings）：没有离场的旧页要垫，
-    // 页面也不用等数据长高，直接滚回去。先滚到 0 再下一帧滚回来，中间那一帧整组卡往下跳一截，
-    // 关卡的形变正夹在这两帧之间（10-09 录屏「展开全部」滑下去再返回）。
-    if (saved && to.matched[0] && to.matched[0] === from.matched[0]) {
-      root.scrollTo({ top: saved.top });
-      return;
+    // 同一页只换了参数（设置卡叠从 /settings/privacy 回到 /settings，或在已展开的卡之间圆点/拖拽切换）：
+    // 没有离场的旧页要垫，页面也不用等数据长高。若在展开卡之间切换或无历史直接收回到总览时强行滚到 0，
+    // 整张卡和底部的圆点会在指针下突然跳走。只有从总览新打开一张卡（!from.params.card && to.params.card）
+    // 才照旧回到顶部，配合 useDeckMorph.open 的总览位移补偿把新大卡顶边对齐视口。
+    if (to.matched[0] && to.matched[0] === from.matched[0]) {
+      if (saved) {
+        root.scrollTo({ top: saved.top });
+        return;
+      }
+      if (from.params.card) return;
     }
     // 先照旧回到顶部：离场旧页的垫高就是按「滚动区回到 0」算的；要恢复的话下一帧再滚过去，
     // 并把旧页一起挪同样的距离。

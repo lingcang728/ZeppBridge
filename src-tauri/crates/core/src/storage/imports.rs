@@ -170,6 +170,7 @@ impl Database {
                     "workout_pauses",
                     "workout_splits",
                     "workout_laps",
+                    "workout_strength_sets",
                     "workout_hr_zones",
                     "workout_local_state",
                     "workout_annotations",

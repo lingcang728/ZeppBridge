@@ -28,6 +28,7 @@ const messages = defineMessages(
     hrStale: (hours: number, when: string) => `最近 ${hours} 小时云端还没有心率，最新一条在${when}。`,
     cloudLag: '手表的数据要先经 Zepp App 传到云端，ZeppBridge 才拉得到——拉取时间不等于数据时间。',
     latestAt: (when: string) => `最新一条 · ${when}`,
+    windowRange: (min: number, max: number) => `范围 ${min}–${max}`,
     hrMore: '完整 24 小时',
     zoneRest: '休息 0–99',
     zoneFat: '燃脂 100–139',
@@ -46,6 +47,7 @@ const messages = defineMessages(
     hrStale: (hours: number, when: string) => `No heart rate in the cloud for the last ${hours} hours; latest reading is from ${when}.`,
     cloudLag: 'Watch data reaches the cloud via the Zepp app before ZeppBridge can fetch it — fetch time is not data time.',
     latestAt: (when: string) => `Newest reading · ${when}`,
+    windowRange: (min: number, max: number) => `Range ${min}–${max}`,
     hrMore: 'Full 24 hours',
     zoneRest: 'Rest 0–99',
     zoneFat: 'Fat burn 100–139',
@@ -64,6 +66,7 @@ const messages = defineMessages(
     hrStale: (hours: number, when: string) => `Aún no hay frecuencia cardíaca en la nube de las últimas ${hours} horas; la lectura más reciente es de ${when}.`,
     cloudLag: 'Los datos del reloj tienen que llegar a la nube a través de la app Zepp antes de que ZeppBridge pueda descargarlos: la hora de descarga no es la hora de los datos.',
     latestAt: (when: string) => `Lectura más reciente · ${when}`,
+    windowRange: (min: number, max: number) => `Rango ${min}–${max}`,
     hrMore: '24 horas completas',
     zoneRest: 'Reposo 0–99',
     zoneFat: 'Quema de grasa 100–139',
@@ -127,6 +130,16 @@ const hrAverage = computed(() => {
   const sum = hrPoints.value.reduce((total, point) => total + point.value, 0);
   return Math.round(sum / hrPoints.value.length);
 });
+const hrSpread = computed(() => {
+  if (hrPoints.value.length < 2) return null;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const point of hrPoints.value) {
+    if (point.value < min) min = point.value;
+    if (point.value > max) max = point.value;
+  }
+  return { min: Math.round(min), max: Math.round(max) };
+});
 
 const num = (value: unknown) => isFiniteNumber(value) ? formatMetric(value) : '—';
 
@@ -142,7 +155,11 @@ const clock = (value: number) =>
     </div>
     <p class="panel-figure">
       <span class="figure-value">{{ num(hrLatest) }}<i>{{ t.bpm }}</i></span>
-      <span v-if="latestWhen" class="figure-meta">{{ t.latestAt(latestWhen) }}</span>
+      <span v-if="hrSpread || latestWhen" class="figure-meta">
+        <template v-if="hrSpread">{{ t.windowRange(hrSpread.min, hrSpread.max) }}</template>
+        <template v-if="hrSpread && latestWhen"> · </template>
+        <template v-if="latestWhen">{{ t.latestAt(latestWhen) }}</template>
+      </span>
     </p>
     <HrMiniChart v-if="hrPoints.length > 1" :points="hrPoints" :color="chartPalette.series.heart" :chrome="chartPalette"
       :gap-ms="HR_GAP_BREAK_MS" :average="hrAverage" :clock="clock" :unit="t.bpm" :label="t.hrChartAria" />

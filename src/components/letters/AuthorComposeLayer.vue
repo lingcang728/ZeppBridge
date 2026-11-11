@@ -63,10 +63,10 @@ const send = async (close: () => Promise<void>) => {
   clearDraft(AUTHOR_DRAFT);
   draft.value = loadDraft(AUTHOR_DRAFT);
   attach.value = false;
-  sent.value += 1;
   await composer.value?.fold();
   sending.value = false;
   await close();
+  sent.value += 1;
 };
 </script>
 

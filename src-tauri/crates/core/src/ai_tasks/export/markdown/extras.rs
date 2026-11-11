@@ -4,7 +4,9 @@ use super::*;
 
 /// 这次运动有没有这几块（决定要不要为它单开一节）。
 pub(super) fn present(workout: &Value) -> bool {
-    workout.get("comparison").is_some() || workout.get("climbs").is_some()
+    workout.get("comparison").is_some()
+        || workout.get("climbs").is_some()
+        || workout.get("strength").is_some()
 }
 
 pub(super) fn render(out: &mut String, workout: &Value) {
@@ -98,6 +100,71 @@ pub(super) fn render(out: &mut String, workout: &Value) {
                     field("min_grade_pct"),
                 );
             }
+        }
+    }
+    if let Some(strength) = workout.get("strength").and_then(Value::as_object) {
+        out.push_str("#### Strength training\n\n");
+        let mut summary_rows = Vec::new();
+        for (key, label) in [
+            ("total_sets", "total_sets"),
+            ("total_reps", "total_reps"),
+            ("total_volume_kg", "total_volume_kg"),
+            ("rest_seconds", "rest_seconds"),
+        ] {
+            if let Some(val) = strength.get(key).filter(|val| !val.is_null()) {
+                summary_rows.push(vec![label.to_string(), cell(val)]);
+            }
+        }
+        if !summary_rows.is_empty() {
+            csv_block(
+                out,
+                &["field".to_string(), "value".to_string()],
+                summary_rows,
+            );
+        }
+        if let Some(sets) = strength
+            .get("sets")
+            .and_then(Value::as_array)
+            .filter(|sets| !sets.is_empty())
+        {
+            object_table(
+                out,
+                sets,
+                &[
+                    "set_index",
+                    "action_code",
+                    "exercise_key",
+                    "muscle_group",
+                    "reps",
+                    "weight_value",
+                    "weight_unit",
+                    "weight_kg",
+                    "duration_ms",
+                ],
+                &[
+                    ("weight_kg", "kg"),
+                    ("duration_ms", "ms"),
+                    ("avg_hr", "bpm"),
+                    ("calories_kcal", "kcal"),
+                ],
+            );
+        } else if let Some(groups) = strength
+            .get("exercise_groups")
+            .and_then(Value::as_array)
+            .filter(|groups| !groups.is_empty())
+        {
+            object_table(
+                out,
+                groups,
+                &[
+                    "action_code",
+                    "exercise_key",
+                    "muscle_group",
+                    "sets",
+                    "total_reps",
+                ],
+                &[],
+            );
         }
     }
 }

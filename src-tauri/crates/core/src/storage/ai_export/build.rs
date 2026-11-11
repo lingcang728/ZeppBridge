@@ -533,6 +533,13 @@ impl Database {
                     // 可以同时有每公里分段和手表按圈键记下的圈，含义不同。
                     "laps": series.laps,
                 });
+                if let Some(strength) = series.strength {
+                    let strength_val = serde_json::to_value(strength)
+                        .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                    if let Some(object) = workout.as_object_mut() {
+                        object.insert("strength".into(), strength_val);
+                    }
+                }
                 if full {
                     let samples = serde_json::to_value(series.samples)
                         .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;

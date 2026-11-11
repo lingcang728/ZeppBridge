@@ -16,7 +16,7 @@ export const pinnedMetricsMessages = defineMessages(
     tileAria: (label: string, value: string) => `${label} ${value}，打开详情`,
     names: {
       resting_hr: '静息心率', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: '睡眠评分', readiness: '恢复状态',
-      stress: '压力', spo2: '血氧', steps: '步数', active_calories: '活动热量', active_minutes: '活动时长',
+      stress: '压力', spo2: '血氧', steps: '步数', distance: '距离', active_calories: '活动热量', active_minutes: '活动时长',
       training_load: '训练负荷', vo2max: 'VO₂max', pai_total: 'PAI 活力指数', weight: '体重', body_fat_rate: '体脂率', bmi: 'BMI',
     },
     unitBpm: 'bpm',
@@ -50,7 +50,7 @@ export const pinnedMetricsMessages = defineMessages(
     tileAria: (label: string, value: string) => `${label} ${value}, open details`,
     names: {
       resting_hr: 'Resting heart rate', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: 'Sleep score', readiness: 'Readiness',
-      stress: 'Stress', spo2: 'Blood oxygen', steps: 'Steps', active_calories: 'Active burn', active_minutes: 'Active minutes',
+      stress: 'Stress', spo2: 'Blood oxygen', steps: 'Steps', distance: 'Distance', active_calories: 'Active burn', active_minutes: 'Active minutes',
       training_load: 'Training load', vo2max: 'VO₂max', pai_total: 'PAI', weight: 'Weight', body_fat_rate: 'Body fat', bmi: 'BMI',
     },
     unitBpm: 'bpm',
@@ -84,7 +84,7 @@ export const pinnedMetricsMessages = defineMessages(
     tileAria: (label: string, value: string) => `${label} ${value}, abrir detalle`,
     names: {
       resting_hr: 'Frecuencia cardíaca en reposo', hrv: 'HRV (SDNN)', hrv_rmssd: 'HRV (RMSSD)', sleep_score: 'Puntuación de sueño',
-      readiness: 'Recuperación', stress: 'Estrés', spo2: 'Oxígeno en sangre', steps: 'Pasos', active_calories: 'Calorías activas',
+      readiness: 'Recuperación', stress: 'Estrés', spo2: 'Oxígeno en sangre', steps: 'Pasos', distance: 'Distancia', active_calories: 'Calorías activas',
       active_minutes: 'Minutos activos', training_load: 'Carga de entrenamiento', vo2max: 'VO₂max', pai_total: 'PAI', weight: 'Peso',
       body_fat_rate: 'Grasa corporal', bmi: 'IMC',
     },
