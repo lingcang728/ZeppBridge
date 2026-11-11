@@ -6,6 +6,8 @@
 .exchanges-pill:hover { color: var(--ink); }
 .exchanges-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .mcp-pill { gap: 5px; padding-left: 12px; }
+.cloud-pill.ok > svg:first-child { color: var(--accent); }
+.cloud-pill.warn { color: var(--danger); }
 button.exchanges-pill { border: 0; font-family: inherit; cursor: pointer; }
 .demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
 .demo-banner div { display: flex; flex-direction: column; gap: 2px; }

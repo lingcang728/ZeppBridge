@@ -4,6 +4,7 @@
 import { computed, ref } from 'vue';
 import { useSectionTour } from '../../../composables/useTour';
 import { RouterLink } from 'vue-router';
+import { openAuthorCompose } from '../../../composables/useAuthorCompose';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
 import FoldTransition from '../../../components/FoldTransition.vue';
@@ -200,8 +201,8 @@ useSectionTour('devices');
         </details>
         <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
         <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
-        <!-- 报告随信寄（2026-11-10「写信 = 反馈」）：进信匣写给作者，默认附上诊断报告、类型选好「设备」。 -->
-        <RouterLink class="button secondary compact-btn write-author" :to="{ path: '/letters', query: { write: 'device' } }">{{ a.writeToAuthor }}</RouterLink>
+        <!-- 报告随信寄（2026-11-10「写信 = 反馈」）：信纸就地抽出来（2026-11-11 起不用先进信匣），默认附上诊断报告、类型选好「设备」。 -->
+        <button type="button" class="button secondary compact-btn write-author" @click="openAuthorCompose($event.currentTarget as HTMLElement, 'device')">{{ a.writeToAuthor }}</button>
       </div>
     </div>
   </section>

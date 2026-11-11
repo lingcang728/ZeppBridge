@@ -25,7 +25,9 @@ import { useBridgeText } from '../ai/bridge/bridge.i18n';
 import { syncControllerMessages } from '../../composables/useSyncController.i18n';
 import GlassBridge from '../glass/GlassBridge.vue';
 import { labFlag } from '../../lib/labs';
-const demoLibrary = ref(false), bridgeText = useBridgeText();
+import { openAuthorCompose } from '../../composables/useAuthorCompose';
+import { useLetterText } from '../letters/letters.i18n';
+const demoLibrary = ref(false), bridgeText = useBridgeText(), letterText = useLetterText();
 
 const messages = defineMessages(
   {
@@ -501,6 +503,18 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
+      <!-- 写给作者（2026-11-11 用户：写信入口藏得太深）：常驻的一支笔，点一下信封从这里飞出来、抽出信纸就能写。
+           用纸笔图标，不用信封：左上角的 Z 有新信时会变成信封，两只信封分不清。 -->
+      <button
+        type="button"
+        class="write-pill glass-control is-lens-host has-rim"
+        :title="letterText.writeAuthor"
+        :aria-label="letterText.writeAuthor"
+        @click="openAuthorCompose($event.currentTarget as HTMLElement)"
+      >
+        <GlassRim />
+        <Icon name="edit" :size="17" />
+      </button>
       <button
         ref="syncPill"
         :class="['sync-pill', 'glass-control', 'is-lens-host', 'has-rim', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
@@ -609,6 +623,12 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   align-items: center;
   gap: 8px;
 }
+
+/* 写给作者：和同步胶囊一样高的一枚圆玻璃。 */
+.write-pill { display: inline-flex; width: 36px; height: 36px; flex: 0 0 36px; align-items: center; justify-content: center; padding: 0;
+  border-radius: 50%; color: var(--muted); cursor: pointer; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease); }
+.write-pill:hover { color: var(--ink); }
+.write-pill:active { scale: .94; }
 
 .sync-pill {
   display: inline-flex;

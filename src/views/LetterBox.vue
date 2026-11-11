@@ -20,12 +20,11 @@ import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeTile from '../components/letters/EnvelopeTile.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import DataLetters from '../components/letters/DataLetters.vue';
-import AuthorCompose, { type ReportCategory } from '../components/letters/AuthorCompose.vue';
-import { backend, toUserMessage } from '../lib/bridge';
+import { openAuthorCompose, useAuthorCompose, type AuthorComposePreset } from '../composables/useAuthorCompose';
 import { useDataLetterText } from '../components/letters/dataLetters.i18n';
 import { useLetterText } from '../components/letters/letters.i18n';
 import { echoTitles, letterVersions } from '../services/letters';
-import { clearDraft, isNewAuthorReply, letterBox, loadDraft, loadLetterBox, markAuthorReplySeen, repliedTo, saveDraft, sendLetterReply, syncLetterBox } from '../services/letterBox';
+import { isNewAuthorReply, letterBox, loadLetterBox, markAuthorReplySeen, repliedTo, syncLetterBox } from '../services/letterBox';
 import { BUNDLED_VERSION, groupRows, loadBundledNotes, releaseRows, type NoteGroup } from '../services/updateNotice';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { dayKey } from '../lib/aiTask/bridgeScale';
@@ -111,69 +110,22 @@ const reread = async (version: string, event: MouseEvent) => {
   const notes = version === BUNDLED_VERSION ? await loadBundledNotes(version, locale.value) : null;
   reading.value = { version, notes: notes ? groupRows(releaseRows(notes)) : null, origin };
 };
-/* 写给作者（2026-11-10「写信 = 反馈」）：「我的回信」第一只是没封口的空信封，点开抽出一张空信纸来写；
-   可以附一份脱敏诊断报告（先交报告拿编号，再随信寄出）。草稿存本机（和回信草稿同一套，键是 author）。
-   设置里原来的「反馈问题」卡跳到这里：/letters?write=1。 */
-const AUTHOR_DRAFT = 'author';
-const authorDraft = ref(loadDraft(AUTHOR_DRAFT));
-watch(authorDraft, (draft) => saveDraft(AUTHOR_DRAFT, draft), { deep: true });
-const attach = ref(route.query.write === 'device' || route.query.write === 'report');
-const category = ref<ReportCategory>(route.query.write === 'device' ? 'device' : 'other');
-const writing = ref<{ custom: CustomLetter; origin: HTMLElement } | null>(null);
-const composer = ref<InstanceType<typeof AuthorCompose> | null>(null);
-const sendingAuthor = ref(false);
-const authorError = ref('');
-const writeAuthor = (origin: HTMLElement) => {
-  authorError.value = '';
-  writing.value = {
-    custom: { title: t.value.writeAuthor, to: t.value.toDeveloper, stamp: '', mine: true, sheets: [{ id: 'compose', label: t.value.writeAuthor, fixed: true }], compose: true },
-    origin,
-  };
-};
-const sendAuthor = async (close: () => Promise<void>) => {
-  if (sendingAuthor.value) return;
-  sendingAuthor.value = true;
-  authorError.value = '';
-  const text = authorDraft.value.text.trim();
-  let reportId: string | undefined;
-  if (attach.value) {
-    try {
-      reportId = (await backend.submitDiagnosticReport(undefined, category.value)).reportId;
-    } catch {
-      /* 报告没交上去：取消附带、留着草稿，再点一次就只寄信。 */
-      attach.value = false;
-      authorError.value = t.value.reportFailedPlain;
-      sendingAuthor.value = false;
-      return;
-    }
-  }
-  try {
-    await sendLetterReply({
-      localId: authorDraft.value.localId, letterVersion: BUNDLED_VERSION, locale: locale.value, text,
-      allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}),
-    });
-  } catch (error) {
-    authorError.value = toUserMessage(error, t.value.queued);
-    sendingAuthor.value = false;
-    return;
-  }
-  clearDraft(AUTHOR_DRAFT);
-  authorDraft.value = loadDraft(AUTHOR_DRAFT);
-  attach.value = false;
-  await composer.value?.fold();
-  sendingAuthor.value = false;
-  tab.value = 'replies';
-  await close();
-};
-/* 带着 ?write= 进来：落在「我的回信」，从那只空信封里抽出信纸。 */
+/* 写给作者（2026-11-10「写信 = 反馈」）：「我的回信」第一只是没封口的空信封，点开抽出一张空信纸来写。
+   信封和信纸是全局的一份（components/letters/AuthorComposeLayer.vue；2026-11-11 起顶栏的笔和设置里的卡也开它），
+   这里只管从那只空信封开它；在哪里寄出的，寄完都落在「我的回信」。 */
+const { sent: authorSent } = useAuthorCompose();
+watch(authorSent, () => { tab.value = 'replies'; });
+const writeAuthor = (origin: HTMLElement, preset?: AuthorComposePreset) => openAuthorCompose(origin, preset);
+/* 带着 ?write= 进来（旧的「反馈问题」链接、设备卡的「写给作者」）：落在「我的回信」，从那只空信封里抽出信纸。 */
 const composeTile = ref<HTMLElement | null>(null);
 const openFromQuery = async () => {
-  if (!route.query.write) return;
+  const preset = route.query.write;
+  if (!preset) return;
   tab.value = 'replies';
   await nextTick();
   await new Promise((resolve) => window.setTimeout(resolve, 320));
   const tile = composeTile.value?.querySelector<HTMLElement>('.envelope-tile, button') ?? composeTile.value;
-  if (tile) writeAuthor(tile);
+  if (tile) writeAuthor(tile, preset === 'device' || preset === 'report' ? preset : undefined);
 };
 onMounted(openFromQuery);
 watch(() => route.query.write, openFromQuery);
@@ -248,12 +200,6 @@ useSectionTour('letters');
     </section>
     </Transition>
 
-    <LetterEnvelope v-if="writing" :versions="[]" current="" :custom="writing.custom" :origin="writing.origin" @done="writing = null">
-      <template #sheet="{ close }">
-        <AuthorCompose ref="composer" v-model:text="authorDraft.text" v-model:attach="attach" v-model:category="category"
-          :busy="sendingAuthor" :error="authorError" @send="sendAuthor(close)" />
-      </template>
-    </LetterEnvelope>
     <LetterEnvelope v-if="reading" :versions="[reading.version]" :current="reading.version" :notes="reading.notes" :origin="reading.origin" @done="reading = null" />
     <LetterEnvelope v-if="mine" :versions="[]" :current="mine.version" :custom="mine.custom" :origin="mine.origin" @done="mine = null">
       <template #sheet="{ sheet }">

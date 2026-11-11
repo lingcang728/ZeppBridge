@@ -3955,6 +3955,91 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     takeFailed: 'Esportazione non riuscita, riprova',
   },
 
+  'views/settings/sections/cloud': {
+    labTitle: 'Invio al cloud',
+    labSub:
+      'Per le IA nel cloud che non possono leggere i file su questo computer: un componente cloud installato separatamente invia una copia dei tuoi dati al tuo sito. Attivando questa opzione, la scheda «Strumenti IA» e la pagina «Passa all’IA» ne mostrano stato e configurazione; quando è disattivata, non compare nulla da nessuna parte.',
+    secTitle: 'Invio al cloud',
+    lead:
+      'Le IA nel cloud non possono accedere a questo computer. Il componente cloud invia una copia dei tuoi dati al tuo sito, dove possono recuperarla con una chiave di sola lettura. Il caricamento è eseguito dal componente; le chiavi non passano mai attraverso ZeppBridge.',
+    checking: 'Controllo del componente cloud…',
+    unsupported: 'Il componente cloud è solo per Windows',
+    notInstalled: 'Componente cloud non trovato',
+    notInstalledSub:
+      'Viene installato separatamente (ZeppBridge-Cloud). Una volta installato, indica la sua cartella uploader nella configurazione qui sotto.',
+    configBroken: 'Impossibile leggere config.json del componente',
+    configBrokenSub:
+      'Non è un JSON valido. Correggilo prima manualmente; da qui non verrà sovrascritto.',
+    notConfigured: 'Nessun sito impostato',
+    running: 'Caricamento in corso…',
+    neverRan: 'Ancora nessun caricamento',
+    result: {
+      ok: 'Caricato',
+      skipped_unchanged: 'Nessun nuovo dato, nulla inviato',
+      skipped_busy: 'ZeppBridge era occupato e ha ceduto il passo',
+      skipped_locked: 'Un altro caricamento è ancora in corso',
+      config_error: 'Configurazione del componente errata',
+      version_mismatch: 'Le versioni del componente e di ZeppBridge non coincidono',
+      failed: 'Caricamento non riuscito',
+    },
+    resultUnknown: 'Ultimo risultato non riconosciuto',
+    statusAt: (text: string, when: string) => `${text} · ${when}`,
+    uploadNow: 'Carica ora',
+    uploading: 'Caricamento in corso…',
+    openSite: 'Apri sito',
+    openLogs: 'Log',
+    openFolder: 'Cartella del componente',
+    logLine: 'Riga del log del componente',
+    tasks: 'Attività pianificate',
+    taskFollow: 'Carica dopo ogni sincronizzazione',
+    taskUpload: 'Carica e riordina ogni giorno',
+    taskOn: 'Registrata',
+    taskOff: 'Non registrata',
+    copyTaskCommands: 'Copia i comandi',
+    taskCopied: 'Comandi copiati — leggili in PowerShell prima di eseguirli',
+    copyFailed: 'Impossibile scrivere negli appunti',
+    config: 'Configurazione',
+    siteLabel: 'Sito',
+    siteHint:
+      'Se inserisci solo il dominio verrà completato in https://health.<dominio>; un indirizzo https completo viene usato così com’è.',
+    sitePlaceholder: 'example.com',
+    binDir: 'Cartella di ZeppBridge',
+    binDirHint: 'Deve contenere zeppbridge-cli.',
+    useThis: 'Usa questa copia',
+    dataDir: 'Cartella dei dati',
+    dataDirHint: 'Lascia vuoto per usare quella dello ZeppBridge indicato sopra.',
+    uploaderDir: 'Cartella uploader del componente',
+    choose: 'Scegli cartella',
+    sync: 'Sincronizza prima di caricare',
+    syncSub: 'Se disattivato, vengono inviati solo i dati già presenti su questo computer.',
+    retentionDays: 'Giorni di conservazione nel cloud',
+    summaryDays: 'Giorni nel riepilogo giornaliero',
+    summaryHint: 'Mai superiore ai giorni di conservazione.',
+    fullRes: 'Conserva le curve degli allenamenti secondo per secondo',
+    fullResSub: 'Se disattivato, viene conservato un campione reale ogni 15 secondi: occupa molto meno spazio.',
+    save: 'Salva',
+    saving: 'Salvataggio in corso…',
+    saved: 'Salvato',
+    readers: 'Chiavi di sola lettura',
+    readersLead:
+      'Una per ogni IA nel cloud; revocarne una non influisce sulle altre. Il componente copia la chiave direttamente negli appunti.',
+    readersNone: 'Ancora nessuna chiave di sola lettura',
+    init: 'Inizializza sito',
+    initSub:
+      'Prima volta su un nuovo sito: crea il tenant ed emette due chiavi di sola lettura, hark e browser.',
+    initDone: 'Fatto — entrambe le chiavi sono in Gestione credenziali',
+    addLabel: 'Nome, ad es. muse',
+    add: 'Emetti chiave',
+    copy: 'Copia',
+    copied: (label: string) => `La chiave per ${label} è negli appunti`,
+    revoke: 'Revoca',
+    revokeConfirm: 'Conferma revoca',
+    revoked: (label: string) => `${label} revocata`,
+    createdAt: (when: string) => `Emessa ${when}`,
+    working: 'Elaborazione in corso…',
+    failed: 'Operazione non riuscita',
+  },
+
   'views/settings/sections/data': {
     intro: 'Aggiornato a ogni sincronizzazione; un elemento attenuato non indica che il dispositivo ne sia sprovvisto',
     codesHint: (count: number) => `${count} ${count === 1 ? 'tipo di attività non riconosciuto' : 'tipi di attività non riconosciuti'}`,
@@ -4675,6 +4760,35 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     'Apertura della cartella dei dati non riuscita',
   'err.data_folder.unsupported_os':
     'L’apertura della cartella dati è supportata solo su Windows e macOS',
+  'err.cloud.unsupported':
+    'Il componente cloud funziona solo su Windows',
+  'err.cloud.not_configured':
+    'Il componente cloud non è ancora configurato: inserisci prima un sito e salva.',
+  'err.cloud.site_invalid':
+    'Indirizzo del sito non valido: inserisci solo il dominio (ad es. example.com) oppure un indirizzo https:// completo',
+  'err.cloud.days_invalid':
+    'I giorni di conservazione e i giorni del riepilogo devono essere compresi tra 1 e 365',
+  'err.cloud.bin_dir_invalid':
+    'Questa cartella non contiene zeppbridge-cli',
+  'err.cloud.data_dir_invalid':
+    'La cartella dei dati deve essere il percorso completo di una cartella esistente',
+  'err.cloud.uploader_not_found':
+    'Impossibile trovare gli script di caricamento del componente cloud (run.ps1, setup.ps1, upload.mjs)',
+  'err.cloud.config_unreadable':
+    'Impossibile leggere config.json del componente cloud. Correggilo o eliminalo prima.',
+  'err.cloud.config_write_failed':
+    'Impossibile salvare la configurazione del componente cloud',
+  'err.cloud.pwsh_missing':
+    'PowerShell 7 (pwsh) non trovato; il componente cloud ne ha bisogno',
+  'err.cloud.busy':
+    'L’operazione cloud precedente non è ancora terminata',
+  'err.cloud.timeout':
+    'Il componente cloud non ha terminato entro il tempo limite',
+  'err.cloud.run_failed':
+    'Esecuzione del componente cloud non riuscita. I dettagli sono nel suo log.',
+  'err.cloud.label_invalid':
+    'Il nome può contenere solo lettere, cifre, - e _, fino a 32 caratteri',
+  'err.cloud.open_failed': 'Impossibile aprire',
   'err.update.localappdata_missing':
     'Percorso LOCALAPPDATA di Windows non disponibile',
   'err.update.launch_failed':

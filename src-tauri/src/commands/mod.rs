@@ -3,6 +3,7 @@ mod ai_handoff;
 mod ai_tasks;
 mod auth;
 mod backup;
+mod cloud_companion;
 pub(crate) mod credential_recovery;
 mod data;
 pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
@@ -214,6 +215,10 @@ pub(crate) use auth::{clear_auth, manual_auth, start_fresh_library, verify_auth}
 pub(crate) use backup::{
     cancel_pending_restore, create_manual_backup, get_pending_restore, get_restore_preview,
     list_backups, set_backup_pinned, stage_restore, verify_backup,
+};
+pub(crate) use cloud_companion::{
+    cloud_companion_open, cloud_companion_save_config, cloud_companion_setup,
+    cloud_companion_state, cloud_companion_upload,
 };
 pub(crate) use data::{
     cleanup_old_data, compact_raw_payloads, get_capability_overview, get_daily_heart_rate_extremes,

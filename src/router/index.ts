@@ -96,7 +96,8 @@ const routes = [
     component: () => import('../views/DeviceDetail.vue'),
   },
   {
-    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。入口在设置「同步」卡的版本那一行下面。
+    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。长按左上角标志进来；写信不用先到这里——
+    // 顶栏的笔和设置的「写给作者」卡（/settings/feedback）直接抽信纸。
     path: '/letters',
     name: 'LetterBox',
     component: () => import('../views/LetterBox.vue'),
@@ -105,11 +106,6 @@ const routes = [
     path: '/health-check',
     name: 'HealthCheck',
     component: () => import('../views/HealthCheck.vue'),
-  },
-  {
-    // 「反馈问题」卡让位给 Beta 实验室（2026-11-10）：旧链接直接去信匣写信。
-    path: '/settings/feedback',
-    redirect: { path: '/letters', query: { write: 'report' } },
   },
   {
     // /settings 是卡叠总览，/settings/:card 是展开的某一张（account / sync / archive …）。

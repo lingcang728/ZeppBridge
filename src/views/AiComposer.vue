@@ -41,6 +41,7 @@ import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useBridgeStrip } from '../composables/useBridgeStrip';
 import { useExchanges } from '../composables/useExchanges';
 import { useSyncController } from '../composables/useSyncController';
+import { useCloudCompanion } from '../composables/useCloudCompanion';
 import { useTrainingPlan } from '../composables/useTrainingPlan';
 import { cloudLayout } from '../lib/aiTask/cloud';
 import { stageLayout } from '../lib/aiTask/stageLayout';
@@ -71,6 +72,7 @@ const { dataReady, isSyncing, syncProgress } = useSyncController();
 const t = useBridgeText();
 const ht = useHandoffText();
 const s = useStageText();
+const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
 
 /** 从别处带着 ?task= 打开：接着那个任务。 */
 watch(() => route.query.task, (id) => {
@@ -307,6 +309,10 @@ useSectionTour('ai');
       <!-- MCP 一键接入早就在设置 → AI 卡里，但没人知道（3.0.6）：这里放一枚胶囊直达。不写 ChatGPT：它不接本机 stdio MCP。 -->
       <RouterLink v-if="!hub.demo.value" to="/settings/ai" class="exchanges-pill mcp-pill" :title="s.mcpPillHint">
         <Icon name="terminal" :size="13" />{{ s.mcpPill }}<Icon name="chevron-right" :size="13" />
+      </RouterLink>
+      <!-- 「推给云端」（Beta 实验室里自己打开才有）：给读不到本机文件的云端 AI 的那条路，上一次传得怎么样写在胶囊上。 -->
+      <RouterLink v-if="cloudOn && !hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', 'cloud-pill', cloudState.tone]" :title="cloudState.line">
+        <Icon name="cloud" :size="13" />{{ cloudState.text }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
       <!-- 指南在 GitHub 上（docs/guides/ai*.md，3.1.1）：回信里有人问英文的 AI 教程。 -->
       <button v-if="!hub.demo.value" type="button" class="exchanges-pill" :title="s.guidePillHint" @click="openGuide('ai', locale)">
