@@ -196,23 +196,33 @@ forbidden. The provenance of the algorithms and percentages is in the
 - **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`,
   2026-10-03): the new page itself is cropped out of the card (`translate` + a
   fixed-radius `clip-path`, 1:1, no scaling) and slides from the card's corner
-  home, so its header lands where the card was; a copy of the card fades out on
-  top, the header fades in at 6–34 %, the rest at 12–50 %, and the page it came
-  from recedes to .94 / .32. The backing surface and the card copy are children
+  home, so its header lands where the card was; a copy of the card hands over
+  to the page content as soon as the window starts to grow (`OPEN_AT` in
+  `lib/motion/pageFlight.ts`), and the
+  page it came from blurs behind a veil. The backing surface and the card copy are children
   of the page, so one clip animation carries all three. Card and page contents
   take turns with only a short overlap (no double exposure). Going back is the
-  exact reverse and the last frame is the real card. **Prepared before it
-  opens**: page chunks and first-screen data are fetched on hover, press and
-  idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`,
-  stale-while-revalidate across syncs), the new page draws its first frame
-  with real content, and only then does the morph start. Small tiles that link
+  exact reverse and the last frame is the real card. **It reacts at once and
+  flies when the content is ready** (2026-11-12, second pass): the new page
+  mounts light (charts as empty shells) and the veil starts blurring on that
+  frame; the window waits on the card while charts mount one per frame and the
+  frame pace recovers (both capped, `composables/pageMorph/expand.ts`), then
+  grows with the real, fully drawn page inside — nothing is redrawn after
+  landing. Page chunks and first-screen data are still fetched on hover, press
+  and idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`)
+  and are not waited for. The same morning's "fly at once, mount charts after
+  landing" was rejected by the user the same day (an empty plate growing, then
+  charts fading in again on every open). Re-opening the same card while it is
+  still collapsing continues from the live window. Small tiles that link
   with `?focus=<metric>` (pinned metrics, the week digest) grow straight into
   that trend card on the detail page, which gets a brief ring
   (`lib/motion/focusTarget.ts`). Going back from a scrolled page shrinks the
-  part you are looking at, so it keeps the same pace. Timing is shared with the
-  deck (`lib/motion/timing.ts`; slowed on 2026-10-03 to 500 / 440 ms with
-  `cubic-bezier(.4, .6, .2, 1)`); while it runs, `lib/motion/budget.ts` holds
-  back late chart mounts and skeleton-to-content swaps.
+  part you are looking at, so it keeps the same pace. Timing lives in
+  `lib/motion/pageFlight.ts` (`PAGE_WINDOW_MS` = 540 ms × `PACE`,
+  `cubic-bezier(.3, .1, .15, 1)`: a soft start and a long settle — slowed again
+  on 2026-11-12 from 500 / 440 ms with `cubic-bezier(.4, .6, .2, 1)`); once it
+  has taken off, `lib/motion/budget.ts` holds back late chart mounts and
+  skeleton-to-content swaps.
 - **Floating top bar** (round 4, after iPadOS / macOS 26): the bar sits about
   12 px below the window edge with inset sides; content scrolls under it and a
   fading "scroll edge" mask sits below it. Each control stays its own piece of
@@ -227,6 +237,60 @@ forbidden. The provenance of the algorithms and percentages is in the
   the ring is masked to the edge and the light is an outer `box-shadow`;
   neither may tint the inside of the capsule.
 
+### Motion: one primitive, six rules (2026-11-12)
+
+Every "walk somewhere" transition — the settings deck, card ↔ detail page,
+dialogs, the letter envelope — is a flight from `lib/motion/flight.ts`: one group
+of WAAPI animations on one timeline, a direction, and a list of what it hid and
+what it put on stage. Measurements before and after the rewrite are in
+[`motion-baseline.md`](motion-baseline.md); the bench is `scripts/motion/`.
+
+1. **It reacts when you press; waiting hides inside the motion.** Something
+   visible changes within a frame or two (the veil starts blurring, the
+   stand-in appears). Data and code chunks are never waited for (prefetch on
+   hover, in parallel). One exception: the card → page window stays on the card
+   until the new page's charts have mounted and frames are steady (capped,
+   `composables/pageMorph/expand.ts`) — taking off a little later beats growing
+   an empty plate and redrawing charts after landing.
+2. **An interruption is a turn.** Pressing again, Esc or Back mid-flight flips
+   the same group (`turn()`, `updatePlaybackRate(-rate)`): the way back is the
+   way in, and going back takes as long as it had run. No freezing, no
+   re-measuring into a new path, no swallowed clicks — ten quick toggles end in
+   the state of the last one. When the DOM really changes under a flight
+   (card → page, Vue re-inserts both pages), the flight turns on the spot in
+   the router guard and the return leg continues from the live pose on the
+   mirrored curve (`turnedEase`).
+3. **No empty plate mid-way.** The stand-in (card copy, envelope) stays until
+   the content has painted; the swap happens at a shared handoff point
+   (`HANDOFF_EARLIEST` / `HANDOFF_BACK` / `HANDOFF_SPAN`; card → page content is
+   drawn before take-off, so its swap is earlier — `OPEN_AT` in
+   `pageFlight.ts`), not at a hard-coded percentage per component. Stand-in and
+   content take turns; they are never both half-transparent on top of each
+   other. When closing, the body stays on the board until the
+   board is almost card-sized.
+4. **Whatever is hidden has a stand-in.** Hiding the source and showing its
+   stand-in happen in the same frame (`cover()`); a stand-in is never cloned
+   from a hidden source (`whileShown()`); whoever hid it restores it when the
+   flight lands or is disposed.
+5. **One primitive, one timing file.** Durations, curves and handoff points
+   live only in `lib/motion/timing.ts`. Flights are exempt from the global
+   `settleMotion` hurry (Esc / navigation); deck open / close on the same route
+   does not trigger it at all.
+6. **Landing is a crossfade, never a swap** (2026-11-12, third round; the
+   user's 4K recording: "the last moment freezes like a screenshot, then
+   jumps"). On the way back (page → card, big card → small card, dialog →
+   button) the real card lights up underneath the still-shrinking window, then
+   the whole window fades; by the landing frame only the real card is left.
+   Returns use `BACK_EASE` (still moving at 0.8, so the swap happens while it
+   is still shrinking, not in a dead stop). A dialog closes on
+   `turnedEase(OPEN_EASE)` played backwards, which reads as a decelerating
+   landing; switching between open and close mid-way maps time by where the
+   window is (`closeTimeFor` / `openTimeFor`). Page → card waits for the
+   staying page to paint steadily first (capped at 120 ms,
+   `pageMorph/collapse.ts`). Closing a settings card scrolled far down first
+   rolls the whole card back to where its head shows, then shrinks into its
+   source — it never vanishes in place.
+
 ### Hard rules: where things come from, how choices look (2026-10-07)
 
 These four rules apply to every page. A page that breaks one is a bug, not a
@@ -238,10 +302,10 @@ style choice; the open list of pages that still do is
    page goes through a route and `usePageMorph` (mark the source with
    `data-morph-card`; rows and capsules smaller than 140×56 work too), a
    dialog goes through `ModalDialog` + `lib/motion/dialogFlight.ts`, a card
-   table through `lib/motion/cards`. Timing is `lib/motion/timing.ts` (open
-   500 ms, close 440 ms, `cubic-bezier(.4, .6, .2, 1)`). Esc halfway reverses
-   from the current computed style — never jump to "fully open" first, never
-   `reverse()` a finished animation. Do not write a second morph engine.
+   table through `lib/motion/cards`. Timing is `lib/motion/timing.ts`. An
+   interruption turns the flight around (see "Motion: one primitive, five
+   rules" below) — never jump to "fully open" first, never `reverse()` a
+   finished animation. Do not write a second morph engine.
 2. **Every switch fades with a blur; nothing hard-cuts.** Toggling a panel,
    swapping tab contents, replacing a skeleton: cross-fade plus a short blur
    on a *static* layer (blur is set once, only opacity / transform animate —

@@ -32,11 +32,11 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .comparison-number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .comparison-track { grid-column: 1 / -1; height: 6px; border-radius: 6px; overflow: hidden; background: rgba(232,238,244,.08); }
 .comparison-track i { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
-/* 斜纹流动：条纹画在伪元素上、整层平移一格（24px）循环——只走合成器。以前动的是
-   background-position，每帧都要把「这一周」十几条进度条重画一遍，静止时也不停。
-   流四圈就停：合成器动画也要整窗重新合成，页面静止时不该还在出帧。 */
+/* 斜纹：静止的条纹。以前伪元素整层平移流四圈（comparison-flow），以为只走合成器，实测（2026-11-12 第四轮，
+   4K 真显卡 trace）它每帧都让整页重画、重新分层 11–15ms，而且概览 / 运动详情每次插回文档都从头再流 7 秒，
+   正好压在卡 ↔ 页形变上：运动详情展开掉到二十几帧。去掉流动以后同一段分层从 400ms 降到 115ms。 */
 .comparison-track .good, .comparison-track .bad { position: relative; overflow: hidden; background-color: var(--accent); }
-.comparison-track .good::before, .comparison-track .bad::before { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; width: calc(100% + 24px); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.28) 6px 10px, transparent 10px 16px); background-size: 24px 24px; animation: comparison-flow 1.8s linear 4; }
+.comparison-track .good::before, .comparison-track .bad::before { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; width: calc(100% + 24px); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.28) 6px 10px, transparent 10px 16px); background-size: 24px 24px; }
 .comparison-track .bad { background-color: var(--danger); }
 .comparison-track .neutral { background: color-mix(in srgb, var(--ink) 55%, transparent); }
 .comparison-track .baseline { background: rgba(232,238,244,.24); }
@@ -52,6 +52,4 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .tinted .comparison-track, .tinted .comparison-track[class*='track-'] { background: color-mix(in srgb, var(--bar) 10%, transparent); }
 .tinted .comparison-track i:not(.baseline) { background-color: var(--bar); }
 .tinted .comparison-track .baseline { background: color-mix(in srgb, var(--bar) 36%, transparent); }
-@keyframes comparison-flow { to { transform: translateX(24px); } }
-@media (prefers-reduced-motion: reduce) { .comparison-track .good::before, .comparison-track .bad::before { animation: none; } }
 </style>

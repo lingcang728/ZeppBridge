@@ -173,9 +173,10 @@ export function planUnfold({ envelope, wrap, paper, shell }: UnfoldInput): Unfol
       opacity: t < HANDOFF ? 0 : r(0.85 * Math.sin(Math.PI * s.w) ** 0.6),
     });
   }
-  /* 接手：同一个采样点上，信封里那张消失、外面那张出现（不透明度的阶跃落在两帧之间）。 */
+  /* 接手：同一个采样点上，信封里那张消失、外面那张出现。两帧放在同一个 offset 上，是真正的阶跃：
+     以前留了 0.0005 的插值窗（收信倒放 ×2 时约 1.5ms），偶尔有一帧落进去，两张都半透明、透出底下的封盖（2026-11-12）。 */
   const handoffAt = HANDOFF / duration;
-  const cut = Math.min(1, handoffAt + 0.0005);
+  const cut = handoffAt;
   const last = paperAt(HANDOFF);
   const parked = `perspective(${PERSPECTIVE}px) translateY(${r(last.y)}px) translateZ(${r(last.z)}px)`;
   paperFrames.push({ offset: cut, transform: parked, opacity: 0 }, { offset: 1, transform: parked, opacity: 0 });

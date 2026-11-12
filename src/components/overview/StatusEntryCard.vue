@@ -49,7 +49,7 @@ withDefaults(defineProps<{
 
 <template>
   <!-- 调用方传的 :aria-label 作为透传属性落在这张卡的根 <a> 上。 -->
-  <RouterLink :class="['metric-panel', 'entry-panel', `tone-${tone}`]" :to="to">
+  <RouterLink :class="['metric-panel', 'entry-panel', `tone-${tone}`]" data-morph-card :to="to">
     <div class="entry-head">
       <GlyphTile :name="icon" :size="38" />
       <p class="entry-label">{{ title }}</p>

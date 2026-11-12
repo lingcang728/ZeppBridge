@@ -7,9 +7,7 @@
  * 任务名单击就地改（第四轮 1D·D6：胶囊里只留任务名，去掉铅笔——以前左上角那枚「⏱ 5」看不懂）。
  * 右边另起一枚小玻璃胶囊「已保存 N 个 ›」，是去「已保存的任务」二级页的入口（/ai/tasks，从这枚胶囊长出来）。
  */
-import { computed, nextTick, ref, watch } from 'vue';
-import GlassBridge from '../glass/GlassBridge.vue';
-import { labFlag } from '../../lib/labs';
+import { computed, nextTick, ref } from 'vue';
 import Icon from '../Icon.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
@@ -84,13 +82,6 @@ const commitRename = (event: Event) => {
 };
 const cancelRename = () => { void morph(() => { editing.value = false; }); };
 
-/* Beta 实验室「玻璃组合并动效」（D2 样机，默认关）：多存了一个任务时，任务名胶囊和「已保存」入口连一下再分开。 */
-const glassLab = labFlag('glassGroup');
-const savedLink = ref<{ $el: HTMLElement } | null>(null);
-const savedEl = computed(() => savedLink.value?.$el ?? null);
-const savedPulse = ref(0);
-watch(() => taskList.value.length, (count, before) => { if (before !== undefined && count > before) savedPulse.value += 1; });
-
 </script>
 
 <template>
@@ -108,10 +99,9 @@ watch(() => taskList.value.length, (count, before) => { if (before !== undefined
         <span class="title-text">{{ shownTitle }}</span>
       </button>
     </div>
-    <RouterLink v-if="taskList.length" ref="savedLink" to="/ai/tasks" class="saved-link glass-control is-lens-host" data-sheet="tasks" :title="t.historyCount(taskList.length)">
+    <RouterLink v-if="taskList.length" to="/ai/tasks" class="saved-link glass-control is-lens-host" data-sheet="tasks" :title="t.historyCount(taskList.length)">
       <span>{{ t.savedCount(taskList.length) }}</span><Icon name="chevron-right" :size="14" />
     </RouterLink>
-    <GlassBridge v-if="glassLab" :from="pill" :to="savedEl" axis="x" :pulse="savedPulse" />
     </div>
     <p v-if="savedNotice" class="ai-note ok status" role="status"><Icon name="circle-check" :size="13" />{{ t.saved }}</p>
     <p v-if="lastError || libraryError" class="ai-note bad status" role="alert"><Icon name="warning" :size="13" />{{ lastError || libraryError }}</p>
@@ -129,8 +119,6 @@ watch(() => taskList.value.length, (count, before) => { if (before !== undefined
 .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 任务名胶囊和「已保存 N 个」各是一块玻璃，并排；放不下时「已保存」换到下一行。 */
 .head-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
-/* 实验室的颈（GlassBridge）压在两块玻璃底下。 */
-.head-row:has(.glass-neck) :is(.head-task, .saved-link) { position: relative; z-index: 1; }
 .saved-link { display: inline-flex; height: 36px; align-items: center; gap: 4px; padding: 0 10px 0 14px; border-radius: 999px; color: var(--muted);
   font-size: var(--fs-xs); font-weight: 650; text-decoration: none; white-space: nowrap; transition: color var(--dur-base) ease, scale var(--dur-fast, 140ms) ease; }
 .saved-link:hover { color: var(--ink); }

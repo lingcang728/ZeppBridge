@@ -10,7 +10,8 @@ import { whenMotionIdle } from './budget';
  * ——用户看到的是「点开心率卡每次都要加载一秒」。现在三个时机提前备：
  * - 指针移到页面里的链接上、键盘聚焦到它、按下去：取那一页的代码块和首屏数据；
  * - 应用空闲时（启动后、每次同步落了新数据后）：把概览上那几张卡要去的页一张张先读好；
- * - 真的点开时，切页前最多再等一小会儿（`preloadBeforeOpen`），读好了新页第一帧就是真内容。
+ * - 真的点开时（`preloadOnOpen`）：和形变并行去读，不等——点下去就动（2026-11-12 修复计划 A4），
+ *   窗口里的卡拷贝一直顶到内容接手。
  * 数据缓存跟着数据版本走，同步落了新数据就作废（lib/readCache.ts）。
  */
 type Loader = () => Promise<unknown>;
@@ -29,14 +30,10 @@ const warmData = (href: string) => {
   void whenMotionIdle().then(queries).then((module) => module.preloadRoute(href)).catch(() => undefined);
 };
 
-/**
- * 从卡片展开之前（router.beforeEach 里）：那一页的首屏数据最多再等 `capMs`。
- * 大多数时候悬停时已经读好了，这里立刻就过；读不完也不让人干等，页面自己的骨架接着。
- */
-export const preloadBeforeOpen = (href: string, capMs = 220): Promise<void> => Promise.race([
-  queries().then((module) => module.preloadRoute(href)).catch(() => undefined),
-  new Promise<void>((resolve) => { setTimeout(resolve, capMs); }),
-]);
+/** 从卡片展开（router.beforeEach 里）：那一页的首屏数据现在就去读，不等。 */
+export const preloadOnOpen = (href: string): void => {
+  void queries().then((module) => module.preloadRoute(href)).catch(() => undefined);
+};
 
 /** 空闲预备一轮最多备几页（一页就是那一页首屏的一组查询）。 */
 const IDLE_BUDGET = 12;

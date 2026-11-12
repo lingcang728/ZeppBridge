@@ -49,6 +49,7 @@ export const TOUR_STEPS: Record<TourChapterId, TourStep[]> = {
     // 宽屏是顶栏导航胶囊，窄屏是底部导航；哪个看得见圈哪个。
     { route: '/', target: '.pill-nav, .bottom-track' },
     { route: '/', target: '.sync-pill' },
+    { route: '/', target: '[data-tour="letter-pill"]' },
     { route: '/settings/guide', target: openCard('guide') },
   ],
   home: [
@@ -93,6 +94,7 @@ export const TOUR_STEPS: Record<TourChapterId, TourStep[]> = {
     { route: '/rings', target: '.rings-page .tree-rings' },
   ],
   letters: [
+    { route: '/letters', target: '[data-tour="letter-pill"]' },
     { route: '/letters', target: '.letter-box .letter-rail' },
     { route: '/letters', target: '.letter-box [data-tour="letter-tabs"]', interactive: true },
   ],

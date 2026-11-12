@@ -115,7 +115,13 @@ export const revealFocusLater = (page: HTMLElement, key: string, waitMs = 2500):
     }
     const userScrolled = Math.abs(scroller.scrollTop - startTop) > 4;
     const delta = userScrolled ? 0 : focusScrollDelta(target, scroller, page);
-    if (Math.abs(delta) <= 4) {
+    const box = target.getBoundingClientRect();
+    const view = scroller.getBoundingClientRect();
+    const alreadyInSafeZone = !userScrolled
+      && box.top >= view.top + 64
+      && box.bottom <= view.bottom - 24
+      && Math.abs(delta) < 120;
+    if (Math.abs(delta) <= 4 || alreadyInSafeZone) {
       ringFocus(target);
       return;
     }

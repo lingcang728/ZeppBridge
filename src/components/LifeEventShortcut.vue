@@ -9,6 +9,7 @@
 import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useLifeEvents } from '../composables/useLifeEvents';
+import { armPageMorph } from '../composables/usePageMorph';
 import { eventSpanLabel, eventTone, lifeEventMessages, overlapsEvent } from '../lib/lifeEvents';
 import { localDateString } from '../lib/format';
 import { useMessages } from '../i18n';
@@ -21,7 +22,9 @@ const today = () => localDateString(new Date());
 const rangeStart = () => { const date = new Date(); date.setDate(date.getDate() - Math.max(0, (props.days ?? 1) - 1)); return props.start || localDateString(date); };
 const related = computed(() => events.value.filter(e => overlapsEvent(e, rangeStart(), props.end || today())));
 /* 生活事件的家在履历页的「纪元与事件」卡里（以前在概览底部，用户 2026-10-22 定：生活事件就是履历）。 */
-async function manage() {
+async function manage(event: MouseEvent) {
+  const button = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (button) armPageMorph(button, '/journal', { anySize: true });
   await router.push({ name: 'Journal' });
   // 履历页是异步挂上来的（还要等换页动画），卡出现了再滚过去；等不到就算了。
   const until = performance.now() + 1500;
@@ -44,7 +47,7 @@ onMounted(reload);
       @mouseenter="chipFocus = event.id" @mouseleave="chipFocus = null" @focus="chipFocus = event.id" @blur="chipFocus = null">
       <i aria-hidden="true"></i><span>{{ event.title }}</span><small>{{ eventSpanLabel(event) }}</small>
     </button>
-    <button v-if="related.length > 3" type="button" class="pill-button quiet" @click="manage">{{ t.related }} · {{ related.length }}</button>
+    <button v-if="related.length > 3" type="button" class="pill-button quiet" @click="manage($event)">{{ t.related }} · {{ related.length }}</button>
   </div>
 </template>
 

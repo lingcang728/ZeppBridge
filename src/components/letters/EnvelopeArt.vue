@@ -11,7 +11,8 @@
  * 邮票左下压一枚寄出那天的圆邮戳（postmark，两行：月.日 / 年；双圈、印泥色，不用混合模式）。
  *
  * face：front 正面 / back 背面（翻面由外面的容器做，这里只画一面）。state 只对背面有意义：
- * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）。信纸往上抽由外面按 lib/letters/unfold.ts 的时间线放（WAAPI）。
+ * sealed 封着 → opening 封盖翻开（火漆上半块跟着封盖走）；open 一出现就是翻开的（收信时重新摆出来，不再放翻开的动画）。
+ * 信纸往上抽由外面按 lib/letters/unfold.ts 的时间线放（WAAPI）。
  *
  * 性能（2026-10-21 录屏：点了翻面，整段翻面动画被跳过）：两面都在 3D 翻转的合成层里，所以这里不用 SVG 滤镜、
  * 不用 mix-blend-mode——影子是错开一点的同形暗色路径，纸纹是自带透明度的图。动的只有 transform / opacity；
@@ -23,7 +24,7 @@ import PostageStamp from './PostageStamp.vue';
 withDefaults(defineProps<{
   version: string;
   face?: 'front' | 'back';
-  state?: 'sealed' | 'opening' | 'still';
+  state?: 'sealed' | 'opening' | 'open' | 'still';
   bundled?: number;
   to?: string;
   /** 邮票面值另印（每周来信、时间胶囊）；不给就印版本号。 */
@@ -214,4 +215,10 @@ const SIDE_EDGES = 'M0 0C20 12 60 37 75 47Q83 52 75 57M160 0C140 12 100 37 85 47
 /* 这条缓动约在 37% 的时间翻到竖直。 */
 @keyframes flap-depth { 0%, 36% { z-index: 4; } 37%, 100% { z-index: 0; } }
 @keyframes seal-hide { 0%, 36% { opacity: 1; } 37%, 100% { opacity: 0; } }
+/* 已经拆开的样子（读着信关掉、信纸收回信封时重新摆出来的那只）：封盖一出现就是翻开的，不把「翻开」从头再放一遍——
+   那样信纸还在外面，信封先合着出现、再弹开一次（2026-11-12 用户录屏：信件这块一闪一闪）。 */
+/* animation: none 不能省：外面的舞台此刻也带着 is-opening（LetterEnvelope 的 phase），上面那两条照样会命中。 */
+.is-open .env-flap { z-index: 0; transform: perspective(1200px) rotateX(178deg); animation: none; }
+.is-open .env-seal :deep(.wax.top) { opacity: 0; animation: none; }
+.is-open .env-twine { opacity: 0; transition: none; }
 </style>

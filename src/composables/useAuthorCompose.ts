@@ -16,7 +16,7 @@ const category = ref<ReportCategory>('other');
 /** 每寄出一封加一：信匣据此切到「我的回信」。 */
 const sent = ref(0);
 
-/** 从 origin 那里飞出信封、抽出信纸；关掉时飞回 origin。已经开着就不再开第二张。 */
+/** 从 origin 那里一镜到底展开成写信信纸；关掉时原路缩回 origin。已经开着就不再开第二张。 */
 export function openAuthorCompose(origin: HTMLElement | null, preset?: AuthorComposePreset): void {
   if (writing.value) return;
   if (preset) {
@@ -24,6 +24,14 @@ export function openAuthorCompose(origin: HTMLElement | null, preset?: AuthorCom
     category.value = preset === 'device' ? 'device' : 'other';
   }
   writing.value = { origin };
+}
+
+/** 指针移到笔上 / 聚焦时先把信封那一块取回来：点下去信封第一帧就能从笔里飞出来，不等这块代码（2026-11-12 修复计划 A2）。 */
+let prefetched = false;
+export function prefetchAuthorCompose(): void {
+  if (prefetched) return;
+  prefetched = true;
+  void import('../components/letters/AuthorComposeLayer.vue').catch(() => { prefetched = false; });
 }
 
 export function closeAuthorCompose(): void {

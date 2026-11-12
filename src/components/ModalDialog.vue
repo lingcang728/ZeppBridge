@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { dialogFlight, originOf, type FlightOrigin } from '../lib/motion/dialogFlight';
 
 const props = defineProps<{
@@ -53,6 +53,10 @@ const keepFocusInside = (event: FocusEvent) => {
   if (isTopmost() && !panel.value?.contains(event.target as Node)) panel.value?.focus();
 };
 
+watch(() => props.origin, (next) => {
+  if (next) origin = originOf(next);
+});
+
 onMounted(() => {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   // 从打开它的那个按钮里长出来，关的时候缩回去（lib/motion/dialogFlight.ts）。
@@ -100,11 +104,9 @@ onUnmounted(() => {
 .dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
 /* 背后虚化得更深一点（10-08 H8「缺少背景高斯模糊」）：静态模糊，只淡入淡出这一层。 */
 .dialog-backdrop::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
-/* 等画面跟得上的那一小会儿：面板隐身（不用 0，免得这一层不合成）；遮罩已经在淡入了（10-08 H3）。 */
-.dialog-backdrop.is-entering .dialog-glass,
-.dialog-backdrop.is-entering .dialog-scroll { opacity: .001; }
+.dialog-backdrop.is-ghost-panel-only::before { opacity: 0 !important; backdrop-filter: none; -webkit-backdrop-filter: none; }
 /* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
-.dialog-panel { position: relative; z-index: 1; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
+.dialog-panel { position: relative; z-index: 1; isolation: isolate; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
 /* 面板本身只是焦点的落脚点（打开时 focus 它，读屏会念标题），不是控件。启动时弹出的更新提示前面没有
    任何鼠标操作，Chromium 把这次程序聚焦当成键盘聚焦，全局 :focus-visible 就给整块弹窗描了一圈浅色框
    （用户 2026-10-19 截图）。里面按钮的焦点框照常。 */
@@ -113,13 +115,16 @@ onUnmounted(() => {
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }
 .is-bare > .dialog-glass { display: none; }
 .is-bare > .dialog-scroll { padding: 0; overflow: visible; }
-.dialog-panel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--surface); z-index: 0; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
+/* 飞行期间衬在 .dialog-glass 底下一层与源卡同色系的实底（z-index: -1，不盖玻璃描边），落地后淡出交还给静态毛玻璃。 */
+.dialog-panel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--mat-card-solid); z-index: -1; pointer-events: none; opacity: 0; transition: opacity 160ms ease-out; }
 .dialog-panel.is-flying::after { opacity: 1; transition: none; }
 .is-flying > .dialog-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
 .is-bare::after { display: none; }
 </style>
 
 <style>
-/* 弹窗从它长出来、还没缩回落地的那段时间，来处藏着（lib/motion/dialogFlight.ts 的 hideSource）。 */
-[data-dialog-source] { opacity: 0 !important; transition: none !important; }
+/* 弹窗从它长出来、还没缩回落地的那段时间，来处藏着（lib/motion/dialogFlight.ts 的 hideSource；替身是窗口里那份拷贝）。 */
+[data-dialog-source]:not([data-dialog-source='fading']) { opacity: 0 !important; transition: none !important; }
+/* 关到最后真按钮在面板底下亮起来：透明度交给 dialogFlight 的那段动画（lib/motion/dialogFlight.ts）。 */
+[data-dialog-source='fading'] { transition: none !important; }
 </style>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ALL_CHAPTERS, SECTIONS, TOUR_STEPS, type TourStep } from '../tour/chapters';
 import { tourMessages } from '../../components/tour/tour.i18n';
 import { TOUR_VERSION, chaptersToMark, needsRetour, presentSteps, storedTourVersion } from '../tour/progress';
+import { forgetLetterPillSeen, forgetSeen, letterPillSeen, markLetterPillSeen, markSeen } from '../tour/sandbox';
 
 describe('新手引导：什么时候算看过', () => {
   it('走完记整趟，跳过只记当前这一章，离开页面和没东西可讲都不记', () => {
@@ -47,11 +48,12 @@ describe('新手引导：就地讲解只讲眼前有的', () => {
 });
 
 describe('新手引导：章节', () => {
-  it('入门 + 十个板块，每章都有步骤，入门不超过 7 步', () => {
+  it('入门 + 十个板块，每章都有步骤，入门不超过 8 步', () => {
     expect(SECTIONS).toHaveLength(10);
     expect(ALL_CHAPTERS).toHaveLength(11);
     for (const id of ALL_CHAPTERS) expect(TOUR_STEPS[id].length).toBeGreaterThan(0);
-    expect(TOUR_STEPS.intro).toHaveLength(7);
+    expect(TOUR_STEPS.intro).toHaveLength(8);
+    expect(TOUR_STEPS.letters).toHaveLength(3);
   });
 
   it('每一步都有中英西三份文案，没有多出来的', () => {
@@ -66,5 +68,31 @@ describe('新手引导：章节', () => {
 
   it('沙盒要换页：每一步都写明在哪一页', () => {
     for (const id of ALL_CHAPTERS) for (const step of TOUR_STEPS[id]) expect(step.route).toMatch(/^\//);
+  });
+
+  it('右上角信件圆钮提示：intro 或 letters 看过即置位，重置引导时一并清空', () => {
+    const store = new Map<string, string>();
+    const fakeStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    } as unknown as Storage;
+    const prev = (globalThis as { window?: { __ZB_REAL_STORAGE__?: Storage } }).window;
+    (globalThis as { window: { __ZB_REAL_STORAGE__?: Storage } }).window = { __ZB_REAL_STORAGE__: fakeStorage };
+    try {
+      forgetLetterPillSeen();
+      expect(letterPillSeen()).toBe(false);
+      markLetterPillSeen();
+      expect(letterPillSeen()).toBe(true);
+      forgetSeen(['letters']);
+      expect(letterPillSeen()).toBe(false);
+      markSeen(['intro']);
+      expect(letterPillSeen()).toBe(true);
+      forgetSeen(['intro']);
+      expect(letterPillSeen()).toBe(false);
+    } finally {
+      if (prev === undefined) delete (globalThis as { window?: unknown }).window;
+      else (globalThis as { window: unknown }).window = prev;
+    }
   });
 });

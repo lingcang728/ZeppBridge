@@ -1519,7 +1519,7 @@ export default {
     readyTitle: 'Synchronizacja zakończona — dane lokalne są aktualne. Kliknij, aby przekazać je do AI.',
     readyFirstPill: 'Pierwsze dane pobrane · zobacz ten tydzień',
     readyFirstTitle: 'Pierwsza synchronizacja zakończona. Kliknij, aby przejść do podsumowania i sprawdzić ten tydzień w odniesieniu do normy.',
-    mailTitle: 'Nowy list · otwórz skrzynkę na listy',
+    mailTitle: 'Nowa wiadomość · kliknij, aby napisać, przytrzymaj, aby otworzyć skrzynkę na listy',
     holdForLetters: 'Przytrzymaj dłużej, aby otworzyć skrzynkę na listy',
   },
 // Source: src/components/shell/update.i18n.ts
@@ -1597,7 +1597,8 @@ export default {
         s4: 'Twoje ulubione wskaźniki są przypięte tutaj; wiersz poniżej to Twój zwykły zakres, bez porównań z innymi.',
         s5: 'Trzy karty na górze; sen, treningi i dziennik otwierają się z kart w Przeglądzie.',
         s6: 'Stan synchronizacji jest tutaj; kliknij, aby zsynchronizować. Zielony pierścień na ikonie w lewym górnym rogu oznacza aktualizację.',
-        s7: 'Każda sekcja wyjaśnia się przy pierwszym otwarciu; wróć do tej karty, aby zobaczyć ją ponownie.',
+        s7: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora, albo przytrzymaj, aby otworzyć skrzynkę na listy; czerwona kropka oznacza nową wiadomość lub odpowiedź.',
+        s8: 'Każda sekcja wyjaśnia się przy pierwszym otwarciu; wróć do tej karty, aby zobaczyć ją ponownie.',
       },
       journal: {
         s1: 'Cały rok aktywności na jednej stronie; otwórz słoje roczne, aby obserwować ich wzrost.',
@@ -1607,8 +1608,9 @@ export default {
         s5: 'Jeden słój na rok, szerszy w tygodniach z większą liczbą treningów; dotknij cienkiej linii, aby zobaczyć trening.',
       },
       letters: {
-        s1: 'Listy od autora przy każdej aktualizacji są tutaj; otwórz, aby przeczytać.',
-        s2: '„Twoje listy” zawierają cotygodniowe podsumowania danych i listy do przyszłego siebie; odpowiedzi i znaczki w dwóch ostatnich.',
+        s1: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora, albo przytrzymaj, aby otworzyć skrzynkę na listy; czerwona kropka oznacza nową wiadomość lub odpowiedź.',
+        s2: 'Listy od autora przy każdej aktualizacji są tutaj; otwórz, aby przeczytać.',
+        s3: '„Twoje listy” zawierają cotygodniowe podsumowania danych i listy do przyszłego siebie; odpowiedzi i znaczki w dwóch ostatnich.',
       },
       metric: {
         s1: 'Wybierz zakres czasu raz, a każda strona go zapamięta.',
@@ -5155,9 +5157,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     lead:
       'Wszystko tutaj jest eksperymentalne: może się zmienić lub zostać usunięte. Jeśli coś pójdzie nie tak, napisz do twórcy ze skrzynki na listy.',
     badge: 'Eksperymentalne',
-    glassTitle: 'Łączenie szkła',
-    glassSub:
-      'Blisko położone kontrolki ze szkła łączą się podczas przeciągania i rozdzielają po upuszczeniu. Tylko efekt wizualny — wyłączenie niczego innego nie zmienia.',
     unstrapImportTitle: 'Importuj treningi z unstrap',
     unstrapImportSub:
       'Wybierz plik zip kopii zapasowej unstrap: treningi zarejestrowane przez pas i telefon (tętno, trasa, pauzy) zostaną zaimportowane, po jednym na sesję, wraz z wszelkimi danymi tętna, SpO₂, tętna spoczynkowego i snu, których jeszcze nie ma na tym komputerze. Żadne dane zsynchronizowane z Zepp nie zostaną zmienione. Wyniki obliczone przez unstrap nie są importowane. Importy znajdują się na stronie Treningi, gdzie każdy można cofnąć.',

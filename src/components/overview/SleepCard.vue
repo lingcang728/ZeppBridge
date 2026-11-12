@@ -129,7 +129,7 @@ const hoverStage = (event: PointerEvent) => {
 </script>
 
 <template>
-  <RouterLink class="metric-panel sleep-panel" :to="sleep ? `/sleep/${sleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
+  <RouterLink class="metric-panel sleep-panel" data-morph-card :to="sleep ? `/sleep/${sleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
     <div class="panel-head">
       <span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ title }}</strong><small>{{ t.sleepSub }}</small></span></span>
       <span class="panel-head-end">

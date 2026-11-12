@@ -25,4 +25,12 @@ describe('dialog window geometry', () => {
       expect(String(frame.transform)).not.toContain('scale');
     }
   });
+
+  it('morphs a circular pill cleanly into a square-cornered paper sheet with bleedEnd', () => {
+    const pill = { left: 1780, top: 18, width: 36, height: 36 };
+    const sheet = { left: 640, top: 180, width: 640, height: 480 };
+    const open = dialogWindowFrames(pill, sheet, sheet, 18, true);
+    expect(open[0].clipPath).toBe('inset(0px 604px 444px 0px round 18px)');
+    expect(open[open.length - 1].clipPath).toBe('inset(-36px -36px -36px -36px round 18px)');
+  });
 });

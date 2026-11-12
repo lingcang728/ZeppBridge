@@ -9,8 +9,7 @@
  * 把真实的那份挂在 `window.__ZB_REAL_STORAGE__` 上，只有这里读它。不存后端偏好：沙盒里后端是
  * 假的，存后端还得新增 command；以前的一次性提示（CoachTip）也一直存在这里。
  */
-import type { TourChapterId } from './chapters';
-import { isTourChapter } from './chapters';
+import { INTRO, isTourChapter, type TourChapterId } from './chapters';
 import { TOUR_VERSION, needsRetour } from './progress';
 
 declare global {
@@ -22,6 +21,8 @@ const FIRST_LAUNCH_KEY = 'zeppbridge.tour.firstLaunch';
 /** 引导内容的版本（lib/tour/progress.ts 的 TOUR_VERSION）。老安装落后就清空看过、重看总览。 */
 const VERSION_KEY = 'zeppbridge.tour.version';
 const TOOLS_REMINDER_KEY = 'zeppbridge.tour.toolsReminder';
+/** 右上角信件圆钮改版后的一次性轻量聚光提示（intro 或 letters 看过即视为已知）。 */
+const LETTER_PILL_KEY = 'zeppbridge.tour.letterPill';
 const THEME_KEY = 'zeppbridge-theme';
 const LOCALE_KEY = 'zeppbridge-locale';
 
@@ -30,6 +31,30 @@ const realStorage = (): Storage | null => {
     return window.__ZB_REAL_STORAGE__ ?? window.localStorage;
   } catch {
     return null;
+  }
+};
+
+export const letterPillSeen = (): boolean => {
+  try {
+    return realStorage()?.getItem(LETTER_PILL_KEY) === '1';
+  } catch {
+    return true;
+  }
+};
+
+export const markLetterPillSeen = (): void => {
+  try {
+    realStorage()?.setItem(LETTER_PILL_KEY, '1');
+  } catch {
+    // 存不下：下次再提示一次，不算坏事。
+  }
+};
+
+export const forgetLetterPillSeen = (): void => {
+  try {
+    realStorage()?.removeItem(LETTER_PILL_KEY);
+  } catch {
+    // 同上。
   }
 };
 
@@ -53,6 +78,7 @@ export const markSeen = (ids: readonly string[]): void => {
   } catch {
     // 存不下：下次还会再提示一次，不算坏事。
   }
+  if (ids.includes(INTRO) || ids.includes('letters')) markLetterPillSeen();
 };
 
 /** 设置里「全部重新提示」。 */
@@ -64,6 +90,7 @@ export const forgetSeen = (ids: readonly string[]): void => {
   } catch {
     // 同上。
   }
+  if (ids.includes(INTRO) || ids.includes('letters')) forgetLetterPillSeen();
 };
 
 /** 首次启动的那一问已经处理过（看了、跳过了、或者是老用户点了「以后再说」）。 */
@@ -100,7 +127,10 @@ export const introPending = (): boolean => !firstLaunchHandled() || retourDue();
 export const markTourVersion = (fresh = false): void => {
   try {
     const storage = realStorage();
-    if (fresh) storage?.removeItem(SEEN_KEY);
+    if (fresh) {
+      storage?.removeItem(SEEN_KEY);
+      storage?.removeItem(LETTER_PILL_KEY);
+    }
     storage?.setItem(VERSION_KEY, String(TOUR_VERSION));
   } catch {
     // 存不下：下次启动还会再走一遍，不算坏事。

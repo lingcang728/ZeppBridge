@@ -18,22 +18,31 @@ const records = ref<PersonalRecords | null>(null);
 const busy = ref(false);
 const error = ref<string | null>(null);
 
-/** 一块状态和读它的查询（键和预读的一样，见 lib/journalQueries.ts）。 */
-const part = <T>(target: Ref<T | null>, query: () => Query<T>) => ({
-  /** 读好过的（可能是同步前的旧结果）先拿来画；返回有没有。 */
-  seed: () => {
-    const hit = peek(query());
-    if (hit) target.value = hit.value;
-    return Boolean(hit);
-  },
-  read: async () => {
-    const value = await cached(query());
-    // 正在放形变就等它放完再换上：PB 墙、跑鞋整块重画要上百毫秒，压在形变上就是一下顿挫（冷库时 PB 要读半秒多）。
-    await new Promise<void>((resolve) => { afterMotion(resolve); });
+/** 一块状态和读它的查询（键和预读的一样，见 lib/journalQueries.ts）。内容没变时不替换引用，避免缓存页回场白白重绘。 */
+const part = <T>(target: Ref<T | null>, query: () => Query<T>) => {
+  let lastSig = '';
+  const assignIfChanged = (value: T) => {
+    const nextSig = JSON.stringify(value);
+    if (target.value !== null && nextSig === lastSig) return;
+    lastSig = nextSig;
     target.value = value;
-  },
-  forget: () => forgetReads(query().key),
-});
+  };
+  return {
+    /** 读好过的（可能是同步前的旧结果）先拿来画；返回有没有。 */
+    seed: () => {
+      const hit = peek(query());
+      if (hit) assignIfChanged(hit.value);
+      return Boolean(hit);
+    },
+    read: async () => {
+      const value = await cached(query());
+      // 正在放形变就等它放完再换上：PB 墙、跑鞋整块重画要上百毫秒，压在形变上就是一下顿挫（冷库时 PB 要读半秒多）。
+      await new Promise<void>((resolve) => { afterMotion(resolve); });
+      assignIfChanged(value);
+    },
+    forget: () => forgetReads(query().key),
+  };
+};
 
 type Part = 'shoes' | 'races' | 'injuries' | 'records';
 const ALL: Part[] = ['shoes', 'races', 'injuries', 'records'];
@@ -58,18 +67,21 @@ export const useLogbook = () => {
     await read(which.filter(name => !ready.includes(name)));
   };
 
-  /** 跑一次写入；成功返回 true 并重读受影响的几块，失败把原因放进 `error`。 */
+  /** 跑一次写入；成功后立即返回 true 让弹窗启动收拢动画，列表后台重读，失败把原因放进 `error`。 */
   const write = async (run: () => Promise<unknown>, reload: Part[]): Promise<boolean> => {
     if (busy.value) return false;
     busy.value = true;
     error.value = null;
-    try { await run(); return true; }
-    catch (e) { error.value = toUserMessage(e, ''); return false; }
-    finally {
-      busy.value = false;
-      // 写过了：读好的那几份作废，现读。
+    try {
+      await run();
       for (const name of reload) parts[name].forget();
-      await read(reload);
+      void read(reload);
+      return true;
+    } catch (e) {
+      error.value = toUserMessage(e, '');
+      return false;
+    } finally {
+      busy.value = false;
     }
   };
 

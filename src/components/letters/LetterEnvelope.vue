@@ -14,7 +14,8 @@
  * 信封有厚度：正反两面各往外让半个厚度，四条侧边是纸边（2026-10-21 用户：转到侧面薄得像一张二维的纸）。
  *
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
- * 半路关掉（Esc、点背后，还没读到最后一页也一样）：从哪里来回哪里去——信纸（或还没拆的信封）缩小飞回打开它的地方。
+ * 半路关掉（Esc、点背后，还没读到最后一页也一样）：从哪里来回哪里去——信纸先原路收回信封（拆信那一段倒着放），
+ * 收到一半整只信封就沿飞出来的那条路飞回按钮（ModalDialog → lib/motion/dialogFlight.ts，2026-11-12 修复计划 A2）。
  * 减少动态效果 / 低特效：不放封盖和展开，火漆一点就开，翻页交叉淡入，「知道了」直接收起。重读（opened）时直接是信纸。
  */
 import './paper.css';
@@ -32,8 +33,6 @@ import { useLetterText } from './letters.i18n';
 import { useLetterEnvelope, type CustomLetter, type Sheet } from '../../composables/useLetterEnvelope';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { whenDialogLanded } from '../../lib/motion/dialogFlight';
-import { exemptFromSettle } from '../../lib/motion/interrupt';
-import { paced } from '../../lib/motion/timing';
 import { whenFramesSteady } from '../../lib/motion/steady';
 import { playPaperSlide } from '../../lib/letters/sound';
 import { planUnfold } from '../../lib/letters/unfold';
@@ -101,12 +100,7 @@ onBeforeUnmount(() => {
 
 const stage = ref<HTMLElement | null>(null);
 const reader = ref<HTMLElement | null>(null);
-let initialOriginRect: DOMRect | null = null;
 onMounted(() => {
-  if (props.origin?.isConnected) {
-    const r = props.origin.getBoundingClientRect();
-    if (r.width && r.height) initialOriginRect = r;
-  }
   if (!props.opened) later(lessMotion() ? 0 : 900, () => { staged.value = true; });
 });
 /* 写信 / 写胶囊：先等弹窗从起点缩放到位落定，再按真实几何自动拆封、抽出空信纸。 */
@@ -198,6 +192,9 @@ const flip = () => {
 const foldH = ref(0);
 const padH = ref(0);
 let unfolding = false;
+/** 拆信那几段动画（拆到一半就关：原地倒回去）。 */
+let unfoldMoves: Animation[] = [];
+let unfoldMs = 0;
 const open = async () => {
   if (phase.value !== 'sealed' || unfolding) return;
   if (lessMotion()) {
@@ -232,12 +229,17 @@ const open = async () => {
   const shadow = reader.value?.querySelector<HTMLElement>('.lift-shadow');
   if (shadow) moves.push(shadow.animate(plan.shadow, timing));
   if (flap) moves.push(flap.animate(plan.flap.keyframes, { duration: plan.flap.duration, delay: plan.flap.delay, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'backwards' }));
+  unfoldMoves = moves;
+  unfoldMs = plan.duration;
+  // 火漆裂开那一下就是点下去的反馈；这里最多等 100ms 让第一帧画好（拆信不是走一段路的转场，等得起这一点）。
   moves.forEach((move) => move.pause());
-  await whenFramesSteady(200);
+  await whenFramesSteady(100);
   phase.value = 'opening';
   moves.forEach((move) => move.play());
   later(220, playPaperSlide);
   await Promise.all(moves.map((move) => move.finished.catch(() => undefined)));
+  if (homing) return;
+  unfoldMoves = [];
   phase.value = 'reading';
   foldH.value = 0;
   inked.value = true;
@@ -285,45 +287,70 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 
 /*
  * 半路关掉（Esc、点背后）：从哪里来回哪里去（2026-10-21 用户：读到第二、三页直接退出时没有回去的动效）。
- * 整格（信纸那一沓，或还没拆的信封）绕看得见的那样东西的中心缩小、飞回打开它的地方（左上角的标志 / 信匣里那只信封），
- * 路上微微转一点，快到时才淡掉；背后的暗色和模糊同时退。放完给遮罩打上 dissolved，弹窗卸载时就不再缩一遍。
+ * 2026-11-12 修复计划 A2：以前整格绕中心缩小、带着旋转飞回去，路线、时长、旋转都和飞出来时不一样，遮罩先褪完、
+ * 信封后到，页面清楚了还挂着一个小信封。现在：
+ *   信纸已经抽出来（或正抽到一半）→ 拆信那一段原路倒着放，信纸收回信封；收到一半就交给弹窗——
+ *   整只信封沿飞出来的那条路飞回按钮（dialogFlight：开的那一段倒着放），遮罩和它同一刻散掉。
+ *   信封还没拆 → 直接交给弹窗飞回去。
  */
-const FLY_HOME_MS = paced(460);
-const flyHome = async () => {
-  const el = stage.value;
-  const panel = el?.closest<HTMLElement>('[data-modal-dialog]');
-  const veil = panel?.closest<HTMLElement>('.dialog-backdrop');
-  const liveHome = props.origin?.isConnected ? props.origin.getBoundingClientRect() : null;
-  const home = (liveHome && liveHome.width ? liveHome : null) ?? initialOriginRect;
-  const subject = el?.querySelector<HTMLElement>(phase.value === 'reading' || phase.value === 'opening' ? '.pad-shell' : '.flipper');
-  if (!el || !veil || !subject) return;
-  if (lessMotion() || !home || !home.width) {
-    const quick = { duration: 180, easing: 'ease-in', fill: 'forwards' as const };
-    const away = exemptFromSettle(el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.95)' }], quick));
-    const now = Number(getComputedStyle(veil, '::before').opacity) || 1;
-    exemptFromSettle(veil.animate([{ opacity: now }, { opacity: 0 }], { ...quick, pseudoElement: '::before' }));
-    await away.finished.catch(() => undefined);
-    veil.dataset.dissolved = '';
-    return;
+const FOLD_RATE = 2;
+/*
+ * 把拆信的一段改成从正向时刻 `at`（默认终点）倒着放。用 direction: 'reverse' + 正速率，不用负速率：
+ * 收到一半弹窗就卸载、节点被摘下再挂回 body（ModalDialog → dialogFlight），负速率的动画这时 Chromium 合成器会跳回时间 0——
+ * 信忽然整张塞进信封、几帧后又弹回半空接着收（2026-11-12 录屏）。原先的 delay 挪到 endDelay，倒放时机和负速率一样。
+ */
+const rewind = (move: Animation, at?: number): Animation => {
+  const effect = move.effect as KeyframeEffect | null;
+  const target = effect?.target;
+  if (!effect || !target) return move;
+  const timing = effect.getTiming();
+  const delay = Number(timing.delay) || 0;
+  const span = Number(timing.duration) || 0;
+  move.cancel();
+  const back = target.animate(effect.getKeyframes(), { duration: span, easing: timing.easing, endDelay: delay, direction: 'reverse', fill: 'both' });
+  back.playbackRate = FOLD_RATE;
+  back.currentTime = Math.max(0, delay + span - (at ?? delay + span));
+  return back;
+};
+let homing = false;
+/* 读着信关掉：重新摆出来的信封一出现就是拆开的样子（封盖翻着、火漆裂着），不把「翻开」再放一遍。 */
+const refolding = ref(false);
+const foldBack = async () => {
+  if (lessMotion() || (phase.value !== 'reading' && phase.value !== 'opening')) return;
+  homing = true;
+  let moves = unfoldMoves.filter((move) => move.playState === 'running' || move.playState === 'paused');
+  let total = unfoldMs;
+  if (!moves.length) {
+    // 已经读着信：把信封重新摆回来（拆完时的样子），拆信那几段从终点倒着放。
+    refolding.value = true;
+    phase.value = 'opening';
+    staged.value = true;
+    await nextTick();
+    const envelope = stage.value?.querySelector<HTMLElement>('.side-back .envelope');
+    const wrap = stage.value?.querySelector<HTMLElement>('.envelope-wrap');
+    const sheet = stage.value?.querySelector<HTMLElement>('.env-paper');
+    const shell = reader.value?.querySelector<HTMLElement>('.pad-shell');
+    if (!envelope || !wrap || !sheet || !shell || !shell.offsetWidth) return;
+    const box = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; };
+    const plan = planUnfold({ envelope: box(envelope), wrap: box(wrap), paper: box(sheet), shell: box(shell) });
+    foldH.value = plan.foldH < shell.offsetHeight ? plan.foldH : 0;
+    padH.value = shell.offsetHeight;
+    await nextTick();
+    const flap = reader.value?.querySelector<HTMLElement>('.fold-flap');
+    printFirstPage(shell, sheet, flap);
+    const both = { duration: plan.duration, fill: 'both' as const };
+    moves = [wrap.animate(plan.envelope, both), sheet.animate(plan.paper, both), shell.animate(plan.shell, both)];
+    const shadow = reader.value?.querySelector<HTMLElement>('.lift-shadow');
+    if (shadow) moves.push(shadow.animate(plan.shadow, both));
+    if (flap) moves.push(flap.animate(plan.flap.keyframes, { duration: plan.flap.duration, delay: plan.flap.delay, easing: 'cubic-bezier(.35, .1, .25, 1)', fill: 'both' }));
+    total = plan.duration;
   }
-  const seen = subject.getBoundingClientRect();
-  const frame = el.getBoundingClientRect();
-  const cx = seen.left + seen.width / 2;
-  const cy = seen.top + Math.min(seen.height, foldH.value || seen.height) / 2;
-  const scale = Math.max(0.05, Math.min(home.width / seen.width, home.height / Math.max(1, seen.height)));
-  const dx = home.left + home.width / 2 - cx;
-  const dy = home.top + home.height / 2 - cy;
-  el.style.transformOrigin = `${cx - frame.left}px ${cy - frame.top}px`;
-  const timing = { duration: FLY_HOME_MS, easing: 'cubic-bezier(.4, .6, .2, 1)', fill: 'forwards' as const };
-  const away = exemptFromSettle(el.animate([
-    { transform: 'none', opacity: 1 },
-    { transform: `translate(${dx * 0.55}px, ${dy * 0.42}px) scale(${0.35 + scale * 0.65}) rotate(-3deg)`, opacity: 1, offset: 0.55 },
-    { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(-5deg)`, opacity: 0 },
-  ], timing));
-  const now = Number(getComputedStyle(veil, '::before').opacity) || 1;
-  exemptFromSettle(veil.animate([{ opacity: now }, { opacity: 0 }], { ...timing, easing: 'ease-in', pseudoElement: '::before' }));
-  await away.finished.catch(() => undefined);
-  veil.dataset.dissolved = '';
+  // 拆完了就从终点倒着放；拆到一半就从此刻倒着放。以前「拨到终点 + updatePlaybackRate(负)」第一帧按起点画：
+  // 先闪一帧「信已经塞回信封」，主线程一卡就停在那帧上（2026-11-12 录屏）。
+  const longest = refolding.value ? total : Math.max(0, ...moves.map((move) => Number(move.currentTime) || 0));
+  moves = moves.map((move) => rewind(move, refolding.value ? undefined : Number(move.currentTime) || 0));
+  // 收到一半多（信纸大半进了信封）就起飞：和收信封重叠，不一段一段地顿。
+  await new Promise((resolve) => { window.setTimeout(resolve, Math.min(longest, total) / FOLD_RATE * 0.4); });
 };
 
 const closing = ref(false);
@@ -340,7 +367,7 @@ const acknowledge = async (event?: MouseEvent) => {
       const sheet = panel.querySelector('.leaf.current .paper');
       await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'), sheet ? [sheet] : []);
     } else {
-      await flyHome();
+      await foldBack();
     }
   } catch { /* 动画出错不能卡住关信 */ }
   emit('done');
@@ -351,7 +378,7 @@ const acknowledge = async (event?: MouseEvent) => {
   <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="acknowledge()">
     <h2 id="letter-envelope-title" class="sr-only">{{ custom ? custom.title : t.letterHead(newest) }}</h2>
     <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0 }]">
-      <div v-if="phase !== 'reading'" class="envelope-wrap">
+      <div v-if="phase !== 'reading'" class="envelope-wrap" data-flight-subject>
         <div ref="flipper" class="flipper" :style="flipperStyle"
           @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
           <!-- 信封的四条纸边（有厚度，转到侧面不再是一条线）。 -->
@@ -362,9 +389,9 @@ const acknowledge = async (event?: MouseEvent) => {
               :mine="custom?.mine" :postmark="custom?.postmark" />
           </button>
           <div class="side side-back" :inert="phase === 'front' || undefined">
-            <EnvelopeArt :version="newest" :state="phase === 'opening' ? 'opening' : 'sealed'"
+            <EnvelopeArt :version="newest" :state="phase === 'opening' ? (refolding ? 'open' : 'opening') : 'sealed'"
               :bundled="custom ? 0 : versions.length">
-              <template v-if="!composing" #seal><WaxSeal :label="custom ? custom.title : t.sealAria(newest)" :size="96" @break="open" /></template>
+              <template v-if="!composing" #seal><WaxSeal :label="custom ? custom.title : t.sealAria(newest)" :size="96" :cracked="refolding" :still="refolding" @break="open" /></template>
             </EnvelopeArt>
           </div>
         </div>

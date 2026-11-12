@@ -166,6 +166,13 @@
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
    不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
 .window-replica, .window-replica * { animation: none !important; transition: none !important; }
+/* 形变途中（lib/motion/budget.ts 挂的 html[data-motion]）：动着的那一页不接指针，来处页上的模糊层把指针接住。
+   指针不动、内容在它底下滑过时，一行接一行地换悬停样式、放悬停底色 / 位移过渡，每帧都要整页重画重分层
+   （2026-11-12 第四轮实测：睡眠列表收回每帧分层 14ms）。落地即撤（holdMotion 释放）。
+   别在这里写 `html[data-motion] … *` 这种后代全选的规则：切这个属性会让整页样式重算一遍（实测 27ms）。 */
+html[data-motion] [class*='page-'].page-collapse-leave-active,
+html[data-motion] [class*='page-'].page-expand-enter-active { pointer-events: none; }
+html[data-motion] .page-veil { pointer-events: auto; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

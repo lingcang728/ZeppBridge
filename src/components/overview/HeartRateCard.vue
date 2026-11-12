@@ -148,7 +148,7 @@ const clock = (value: number) =>
 </script>
 
 <template>
-  <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
+  <RouterLink class="metric-panel hr-panel" data-morph-card to="/heart" :aria-label="t.hrPanelAria">
     <div class="panel-head">
       <span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span>
       <span class="panel-go" :title="t.hrMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>

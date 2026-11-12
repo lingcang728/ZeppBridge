@@ -47,9 +47,13 @@ const toggleAttach = (event: MouseEvent) => { emit('update:attach', !props.attac
 const pick = (value: ReportCategory, event: MouseEvent) => { emit('update:category', value); press(event); };
 
 const written = ref<HTMLElement | null>(null);
-/** 寄出以后调用：把整张信纸对折起来，折完再交给信封飞回去。 */
+const textInput = ref<HTMLTextAreaElement | null>(null);
+const focusInput = () => {
+  textInput.value?.focus({ preventScroll: true });
+};
+/** 寄出以后可选调用：把整张信纸对折起来。 */
 const fold = async () => {
-  const page = written.value?.closest<HTMLElement>('.leaf.current .paper') ?? written.value;
+  const page = written.value?.closest<HTMLElement>('.leaf.current .paper, .compose-sheet') ?? written.value;
   if (!page || lessMotion()) return;
   page.style.transformOrigin = '50% 50%';
   await page.animate([
@@ -57,7 +61,7 @@ const fold = async () => {
     { transform: 'perspective(900px) rotateX(78deg) scale(.92, .5)', opacity: .85 },
   ], { duration: 360, easing: 'cubic-bezier(.45, .05, .55, .95)', fill: 'forwards' }).finished.catch(() => undefined);
 };
-defineExpose({ fold });
+defineExpose({ fold, focusInput });
 
 const input = (event: Event) => emit('update:text', Array.from((event.target as HTMLTextAreaElement).value).slice(0, LETTER_REPLY_MAX).join(''));
 const snap = (event: Event) => {
@@ -72,7 +76,7 @@ const snap = (event: Event) => {
   <div class="compose">
     <label class="compose-label" for="author-text">{{ t.toDeveloper }}</label>
     <div ref="written" class="written">
-      <textarea id="author-text" class="compose-text" :value="text" :placeholder="t.authorPlaceholder" :maxlength="LETTER_REPLY_MAX"
+      <textarea id="author-text" ref="textInput" class="compose-text" :value="text" :placeholder="t.authorPlaceholder" :maxlength="LETTER_REPLY_MAX"
         :readonly="busy" rows="6" @input="input" @scroll="snap"></textarea>
       <div class="marks">
         <button type="button" role="switch" :aria-checked="attach" :class="['mark', 'attach', { picked: attach }]" :title="t.attachHint"

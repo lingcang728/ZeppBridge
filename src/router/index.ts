@@ -96,8 +96,8 @@ const routes = [
     component: () => import('../views/DeviceDetail.vue'),
   },
   {
-    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。长按左上角标志进来；写信不用先到这里——
-    // 顶栏的笔和设置的「写给作者」卡（/settings/feedback）直接抽信纸。
+    // 信匣：作者来信、自己的回信与回执、集邮册（批次 6）。长按右上角信件图标进来；短按该图标或设置的
+    // 「写给作者」卡（/settings/feedback）直接展开写信信纸。
     path: '/letters',
     name: 'LetterBox',
     component: () => import('../views/LetterBox.vue'),

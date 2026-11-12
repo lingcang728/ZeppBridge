@@ -27,9 +27,11 @@ describe('拆信时间线', () => {
   const seen = { top: cy - (paper.height * k) / 2, bottom: cy + (paper.height * k) / 2, cx: ox + ke * (paper.left + paper.width / 2 - ox), width: paper.width * k };
 
   it('接手那一刻外面那张和信封里那张重合（位置、宽度），而且只有一张看得见', () => {
+    // 同一个 offset 上两帧：先是藏着的，紧接着露出来（阶跃，中间没有两张都半透明的插值）。
     const shellFrames = plan.shell.filter((frame) => frame.offset === at);
-    expect(shellFrames).toHaveLength(1);
+    expect(shellFrames).toHaveLength(2);
     const shellFrame = shellFrames[0]!;
+    expect(shellFrames[1]!.transform).toBe(shellFrame.transform);
     expect(String(shellFrame.transform)).toContain('translateZ(0px)');
     expect(shell.top + num(String(shellFrame.transform), 'translate', 1)).toBeCloseTo(seen.top, 0);
     expect(shell.left + shell.width / 2 + num(String(shellFrame.transform), 'translate', 0)).toBeCloseTo(seen.cx, 0);
@@ -38,7 +40,8 @@ describe('拆信时间线', () => {
     expect(shellFrame.opacity).toBe(0);
     const after = plan.shell[plan.shell.indexOf(shellFrame) + 1]!;
     expect(after.opacity).toBe(1);
-    expect(plan.paper.find((frame) => Number(frame.offset) > at)!.opacity).toBe(0);
+    const papers = plan.paper.filter((frame) => frame.offset === at);
+    expect(papers.map((frame) => frame.opacity)).toEqual([1, 0]);
   });
 
   it('抽出来时信纸和信封分开纵深：信纸往前抬、信封往后退，下沿离信封口留开一截', () => {

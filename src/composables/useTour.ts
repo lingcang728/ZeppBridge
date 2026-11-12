@@ -11,7 +11,9 @@ import { computed, getCurrentInstance, onActivated, onMounted, ref, shallowRef }
 import router from '../router';
 import { TOUR_STEPS, type SectionId, type TourChapterId, type TourStep } from '../lib/tour/chapters';
 import { chaptersToMark, presentSteps, type TourEnd } from '../lib/tour/progress';
-import { enterSandbox, introPending, leaveSandbox, markSeen, sandboxFlags, seenChapters } from '../lib/tour/sandbox';
+import {
+  enterSandbox, introPending, leaveSandbox, letterPillSeen, markLetterPillSeen, markSeen, sandboxFlags, seenChapters,
+} from '../lib/tour/sandbox';
 import { updateNotice } from '../services/updateNotice';
 import { locale } from '../i18n';
 import { useTheme } from './useTheme';
@@ -29,6 +31,9 @@ interface ActiveTour {
   mode: TourMode;
   /** 就地讲解是在哪一页出的：换了页就暂停（它说的那样东西已经不在眼前了）。 */
   path: string;
+  /** 单步轻量提示用：结束时不把所属章节记进 seenChapters，改走 onDone 自己记。 */
+  keepUnseen?: boolean;
+  onDone?: (end: TourEnd) => void;
 }
 
 export interface TargetBox { x: number; y: number; width: number; height: number }
@@ -235,7 +240,7 @@ function skipMissing() {
 const finish = (end: TourEnd) => {
   const tour = active.value;
   if (!tour) return;
-  markSeen(chaptersToMark(end, tour.chapters, tour.chapter));
+  if (!tour.keepUnseen) markSeen(chaptersToMark(end, tour.chapters, tour.chapter));
   token += 1;
   targets = [];
   selector = null;
@@ -244,6 +249,7 @@ const finish = (end: TourEnd) => {
   settling.value = false;
   listen(false);
   void closeOpened();
+  tour.onDone?.(end);
   if (tour.mode === 'sandbox') leaveSandbox(sandboxFlags()?.ret ?? '/');
 };
 
@@ -253,12 +259,26 @@ router.afterEach((to) => {
   if (tour?.mode === 'inline' && to.path !== tour.path) finish('pause');
 });
 
-const begin = (chapters: TourChapterId[], keys: number[][], mode: TourMode) => {
+const begin = (
+  chapters: TourChapterId[],
+  keys: number[][],
+  mode: TourMode,
+  options: { keepUnseen?: boolean; onDone?: (end: TourEnd) => void } = {},
+) => {
   if (!chapters.length) return;
   if (!active.value) listen(true);
   direction = 1;
   shownSteps = 0;
-  active.value = { chapters, keys, chapter: 0, step: 0, mode, path: router.currentRoute.value.path };
+  active.value = {
+    chapters,
+    keys,
+    chapter: 0,
+    step: 0,
+    mode,
+    path: router.currentRoute.value.path,
+    keepUnseen: options.keepUnseen,
+    onDone: options.onDone,
+  };
   void show();
 };
 
@@ -294,15 +314,40 @@ export const offerInline = async (chapter: SectionId): Promise<void> => {
   const run = ++offering;
   const path = router.currentRoute.value.path;
   const steps = TOUR_STEPS[chapter];
+  const filterSeenPill = (indices: number[]) => (chapter === 'letters' && letterPillSeen()
+    ? indices.filter((idx) => steps[idx]?.target !== '[data-tour="letter-pill"]')
+    : indices);
   const started = performance.now();
-  let keys = presentSteps(steps, isVisible);
+  let keys = filterSeenPill(presentSteps(steps, isVisible));
   while (!keys.length && performance.now() - started < OFFER_WAIT_MS) {
     await sleep(120);
     if (run !== offering || router.currentRoute.value.path !== path) return;
-    keys = presentSteps(steps, isVisible);
+    keys = filterSeenPill(presentSteps(steps, isVisible));
   }
   if (!keys.length || active.value || router.currentRoute.value.path !== path) return;
   begin([chapter], [keys], 'inline');
+};
+
+/** 老用户首次见到改版后的右上角信件圆钮时，单步聚光提示一次（「知道了」收起，不影响信匣章节本体）。 */
+export const offerLetterPillTip = async (): Promise<boolean> => {
+  if (active.value || window.__ZB_DEMO__?.demo || welcomeOpen.value) return false;
+  if (updateNotice.receipt || introPending() || letterPillSeen()) return false;
+  const started = performance.now();
+  while (!isVisible('[data-tour="letter-pill"]') && performance.now() - started < OFFER_WAIT_MS) {
+    await sleep(120);
+    if (active.value || welcomeOpen.value || updateNotice.receipt || letterPillSeen()) return false;
+  }
+  if (!isVisible('[data-tour="letter-pill"]') || active.value || welcomeOpen.value || updateNotice.receipt || letterPillSeen()) {
+    return false;
+  }
+  if (document.querySelector('[data-modal-dialog], [role="dialog"][aria-modal="true"]')) return false;
+  begin(['letters'], [[0]], 'inline', {
+    keepUnseen: true,
+    onDone: (end) => {
+      if (end === 'done' || end === 'skip') markLetterPillSeen();
+    },
+  });
+  return true;
 };
 
 /** 等界面摊开（`delay` 毫秒）再提示；到点时调用它的组件已经卸载 / 被 KeepAlive 收起，或者

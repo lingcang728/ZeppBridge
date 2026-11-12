@@ -18,7 +18,8 @@ const messages = defineMessages(
         s4: '常看的几项放在这里；每张下面那行是你自己的常态范围，不和别人比。',
         s5: '顶上三个入口；睡眠、运动、履历从概览的卡片点进去。',
         s6: '这里看同步到哪了，点一下就同步；左上角图标亮起绿圈就是有更新。',
-        s7: '各板块第一次打开时会就地讲一遍；想再看，回这张卡。',
+        s7: '右上角这枚信件图标：点一下给作者写信，长按打开信匣；有新来信或回信会亮起红点。',
+        s8: '各板块第一次打开时会就地讲一遍；想再看，回这张卡。',
       },
       home: {
         s1: '按你关注的方向重排概览，点一下试试。',
@@ -59,8 +60,9 @@ const messages = defineMessages(
         s5: '一年长一圈，哪周练得多那圈就更宽；点一圈看那次运动。',
       },
       letters: {
-        s1: '作者每次更新寄来的信都在这里，点开就拆。',
-        s2: '「你的信」是每周的数据来信和写给未来自己的信；回信和集邮册在后两格。',
+        s1: '右上角这枚信件图标：点一下给作者写信，长按打开信匣；有新来信或回信会亮起红点。',
+        s2: '作者每次更新寄来的信都在这里，点开就拆。',
+        s3: '「你的信」是每周的数据来信和写给未来自己的信；回信和集邮册在后两格。',
       },
       devices: {
         s1: '每台设备一行；认错了点进去改型号，不想看见可以隐藏，数据都还在。',
@@ -97,7 +99,8 @@ const messages = defineMessages(
         s4: 'Your go-to metrics are pinned here; the line under each is your own usual range, not anyone else’s.',
         s5: 'Three tabs up top; sleep, workouts and your journal open from the cards on Overview.',
         s6: 'Sync status lives here; click to sync. A green ring on the top-left icon means an update is ready.',
-        s7: 'Each section explains itself the first time you open it; come back to this card to see any of it again.',
+        s7: 'Top-right mail icon: click to write to the author, or press and hold to open the letter box; a red dot marks new mail or replies.',
+        s8: 'Each section explains itself the first time you open it; come back to this card to see any of it again.',
       },
       home: {
         s1: 'Reorder the overview by what you care about. Try it.',
@@ -138,8 +141,9 @@ const messages = defineMessages(
         s5: 'One ring a year, bulging in the weeks you trained more; tap a fine line to see that workout.',
       },
       letters: {
-        s1: 'The author’s letters, one with each update, are kept here; open one to read it.',
-        s2: '“Your letters” holds the weekly data letters and the ones you write to your future self; replies and stamps are in the last two.',
+        s1: 'Top-right mail icon: click to write to the author, or press and hold to open the letter box; a red dot marks new mail or replies.',
+        s2: 'The author’s letters, one with each update, are kept here; open one to read it.',
+        s3: '“Your letters” holds the weekly data letters and the ones you write to your future self; replies and stamps are in the last two.',
       },
       devices: {
         s1: 'One row per device; open one to correct its model, or hide it. Its data stays either way.',
@@ -176,7 +180,8 @@ const messages = defineMessages(
         s4: 'Tus métricas de siempre quedan fijadas aquí; la línea de debajo es tu propio rango habitual, no el de otros.',
         s5: 'Tres pestañas arriba; el sueño, los entrenamientos y el diario se abren desde las tarjetas del Resumen.',
         s6: 'Aquí ves el estado de la sincronización; haz clic para sincronizar. Un anillo verde en el icono de arriba a la izquierda indica que hay una actualización.',
-        s7: 'Cada sección se explica la primera vez que la abres; vuelve a esta tarjeta para verlo de nuevo.',
+        s7: 'Icono de correo arriba a la derecha: haz clic para escribir al autor o mantén pulsado para abrir el buzón; un punto rojo avisa de cartas o respuestas nuevas.',
+        s8: 'Cada sección se explica la primera vez que la abres; vuelve a esta tarjeta para verlo de nuevo.',
       },
       home: {
         s1: 'Reordena el resumen según lo que te interesa. Pruébalo.',
@@ -217,8 +222,9 @@ const messages = defineMessages(
         s5: 'Un anillo por año, más ancho en las semanas que entrenaste más; toca una línea fina para ver ese entrenamiento.',
       },
       letters: {
-        s1: 'Aquí se guardan las cartas del autor, una con cada actualización; abre una para leerla.',
-        s2: 'En «Tus cartas» están las cartas semanales de datos y las que escribes a tu yo futuro; las respuestas y los sellos, en las dos últimas.',
+        s1: 'Icono de correo arriba a la derecha: haz clic para escribir al autor o mantén pulsado para abrir el buzón; un punto rojo avisa de cartas o respuestas nuevas.',
+        s2: 'Aquí se guardan las cartas del autor, una con cada actualización; abre una para leerla.',
+        s3: 'En «Tus cartas» están las cartas semanales de datos y las que escribes a tu yo futuro; las respuestas y los sellos, en las dos últimas.',
       },
       devices: {
         s1: 'Una fila por dispositivo; ábrelo para corregir el modelo u ocúltalo. Sus datos se quedan igual.',

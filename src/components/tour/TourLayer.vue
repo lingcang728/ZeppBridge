@@ -15,18 +15,18 @@ import { onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import TourOverlay from './TourOverlay.vue';
 import TourWelcome from './TourWelcome.vue';
-import { launchSandbox, startTour, useTour } from '../../composables/useTour';
+import { launchSandbox, offerLetterPillTip, startTour, useTour } from '../../composables/useTour';
 import { useSyncController } from '../../composables/useSyncController';
 import { INTRO } from '../../lib/tour/chapters';
 import {
-  firstLaunchHandled, leaveSandbox, markFirstLaunchHandled, markSeen, markToolsReminder, markTourVersion, retourDue, sandboxFlags, takeToolsReminder,
+  firstLaunchHandled, leaveSandbox, letterPillSeen, markFirstLaunchHandled, markSeen, markToolsReminder, markTourVersion, retourDue, sandboxFlags, takeToolsReminder,
 } from '../../lib/tour/sandbox';
 import { backend, isDesktop } from '../../lib/bridge';
 import { pendingUpdateNotice, updateNotice } from '../../services/updateNotice';
 import { useTourText } from './tour.i18n';
 
 const t = useTourText();
-const { welcomeOpen } = useTour();
+const { active, welcomeOpen } = useTour();
 const { appStatus, refreshStatus } = useSyncController();
 const toolsStale = ref(false);
 const router = useRouter();
@@ -63,8 +63,29 @@ const letterPutAway = (): Promise<void> => new Promise((resolve) => {
   }, { immediate: true });
 });
 
+const scheduleLetterPillTip = async () => {
+  if (!isDesktop() || window.__ZB_DEMO__?.demo || letterPillSeen() || retourDue()) return;
+  await letterPutAway();
+  if (letterPillSeen() || retourDue()) return;
+  // 让页面自带的板块引导（900ms）先出手；如果正在跑引导，等它收尾后再提示。
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 1100));
+  if (letterPillSeen() || retourDue()) return;
+  if (active.value) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(active, (val) => {
+        if (!val) { stop(); window.setTimeout(resolve, 500); }
+      });
+    });
+  }
+  if (!letterPillSeen() && !retourDue()) void offerLetterPillTip();
+};
+
 const decideRetour = async () => {
-  if (!isDesktop() || window.__ZB_DEMO__?.demo || !retourDue()) return;
+  if (!isDesktop() || window.__ZB_DEMO__?.demo) return;
+  if (!retourDue()) {
+    void scheduleLetterPillTip();
+    return;
+  }
   await letterPutAway();
   if (!retourDue()) return;
   markTourVersion(true);

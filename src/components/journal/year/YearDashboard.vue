@@ -21,8 +21,18 @@ const y = useYearText();
 const j = useJournalText();
 /* 全应用一份（composables/useAnnualRings.ts）：返回履历页时直接用上次的数据画，形变量到的卡位置才对。 */
 const { data, error, loaded, load } = useAnnualRings();
-onMounted(load);
-onActivated(load);
+let mountedOnce = false;
+onMounted(() => {
+  mountedOnce = true;
+  void load();
+});
+onActivated(() => {
+  if (mountedOnce) {
+    mountedOnce = false;
+    return;
+  }
+  void load();
+});
 
 /* 看哪一年：默认和年轮页一样（12 月 15 日起看今年）；翻过就记住，数据重读也不跳回去。 */
 const picked = ref<number | null>(null);

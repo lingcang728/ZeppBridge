@@ -816,7 +816,7 @@ export default {
       connectPill: 'Account koppelen',
       syncingProgress: (current: number, total: number) => `Synchroniseren ${current}/${total}`,
       syncWait: "Wacht tot de synchronisatie klaar is",
-      mailTitle: 'Nieuwe post · brievenbus openen',
+      mailTitle: 'Nieuwe post · tik om te schrijven, ingedrukt houden voor de brievenbus',
       holdForLetters: 'Ingedrukt houden om de brievenbus te openen',
     },
     'components/shell/update': {
@@ -3833,7 +3833,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
           s4: 'Je favoriete statistieken staan hier vastgezet; de regel eronder is je eigen gebruikelijke bereik, niet dat van anderen.',
           s5: 'Drie tabbladen bovenaan; slaap, workouts en logboek openen vanuit de kaarten op het Overzicht.',
           s6: 'Synchronisatiestatus vind je hier; klik om te synchroniseren. Een groene ring op het pictogram linksboven betekent een update.',
-          s7: 'Elk onderdeel legt zichzelf uit wanneer je het voor het eerst opent; keer terug naar deze kaart om het opnieuw te zien.',
+          s7: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven, of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
+          s8: 'Elk onderdeel legt zichzelf uit wanneer je het voor het eerst opent; keer terug naar deze kaart om het opnieuw te zien.',
         },
         journal: {
           s1: 'Een heel jaar aan activiteit op één pagina; open de jaarringen om ze te zien groeien.',
@@ -3843,8 +3844,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
           s5: 'Eén ring per jaar, breder in trainingsintensieve weken; tik op een fijne lijn voor die workout.',
         },
         letters: {
-          s1: 'Brieven van de auteur bij elke update liggen hier; open er een om te lezen.',
-          s2: '‘Jouw brieven’ bevat wekelijkse gegevensbrieven en brieven aan je toekomstige zelf; antwoorden en postzegels in de laatste twee.',
+          s1: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven, of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
+          s2: 'Brieven van de auteur bij elke update liggen hier; open er een om te lezen.',
+          s3: '‘Jouw brieven’ bevat wekelijkse gegevensbrieven en brieven aan je toekomstige zelf; antwoorden en postzegels in de laatste twee.',
         },
         metric: {
           s1: 'Kies het tijdsbereik één keer en elke pagina onthoudt het.',
@@ -4438,9 +4440,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       lead:
         'Alles hier is experimenteel: het kan veranderen of verdwijnen. Als er iets misgaat, schrijf de auteur vanuit de brievenbus.',
       badge: 'Experimenteel',
-      glassTitle: 'Samenvoegend glas',
-      glassSub:
-        'Glasbedieningen die dicht bij elkaar staan vloeien samen tijdens het slepen en splitsen bij loslaten. Alleen uiterlijk — uitschakelen verandert verder niets.',
       unstrapImportTitle: 'Trainingen importeren uit unstrap',
       unstrapImportSub:
         'Kies een unstrap-back-up-zip: de trainingen die de band en de telefoon hebben vastgelegd (hartslag, route, pauzes) worden geïmporteerd, één per sessie, plus eventuele hartslag, SpO₂, rusthartslag en slaap die nog niet op deze computer staan. Aan gegevens gesynchroniseerd vanuit Zepp verandert niets. Scores die unstrap zelf berekent worden overgeslagen. Geïmporteerde sessies staan op de pagina Trainingen, waar ze per stuk ongedaan kunnen worden gemaakt.',

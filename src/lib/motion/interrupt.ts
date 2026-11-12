@@ -14,6 +14,8 @@
  * 「走一段路」的动效可以自己接管 Esc（onMotionEscape）：从卡片展开进详情页、打开设置卡，
  * 放到一半按 Esc 的意思是「不进去了」，应该原路缩回去——快进到终点反而是把人塞进了
  * 二级页。接管的处理函数返回 true 表示这次 Esc 它用掉了，不再快进别的动画。
+ * 这些飞行（lib/motion/flight.ts、卡 ↔ 页、弹窗）都登记成不被快进（exemptFromSettle）：打断它们就是掉头，
+ * 不再需要「接下来一小段别快进」的招呼（deferSettle，2026-11-12 修复计划 A5 删掉）。
  */
 const FAST_MS = 90;
 
@@ -23,16 +25,6 @@ const escapers: Array<() => boolean> = [];
 const firstEscapers: Array<() => boolean> = [];
 /** 已经在「撤回 / 收尾」的动画：它们本身就是对打断的回应，再被快进就又成了一下硬跳。 */
 const exempt = new WeakSet<Animation>();
-
-let skipUntil = 0;
-
-/**
- * 接下来一小段时间里的 settleMotion 不快进任何东西。Esc 撤回一段动效时，紧跟着的切页
- * （router.beforeEach 里的 settleMotion）会把正在倒放的动画压成一下跳——先打个招呼。
- */
-export const deferSettle = (ms = 300): void => {
-  skipUntil = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + ms;
-};
 
 /** 这段动画不参与 settleMotion 的快进。 */
 export const exemptFromSettle = (animation: Animation): Animation => {
@@ -114,7 +106,6 @@ const running = (): Animation[] =>
  * 比如关弹窗、合上设置卡）。
  */
 export const settleMotion = (ms = FAST_MS): boolean => {
-  if ((typeof performance !== 'undefined' ? performance.now() : Date.now()) < skipUntil) return false;
   const hooks = [...waiting];
   waiting.clear();
   for (const hook of hooks) hook();
