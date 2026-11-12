@@ -131,7 +131,7 @@ const dayAria = (day: UpcomingDay) => {
 
     <template v-else>
       <div class="weekly-grid" :style="trendGridStyle(facts.length)">
-        <RouterLink v-for="fact in facts" :key="fact.fact_id" class="weekly-item" :to="detailRoute(fact.fact_id)">
+        <RouterLink v-for="fact in facts" :key="fact.fact_id" class="weekly-item" data-morph-card :to="detailRoute(fact.fact_id)">
           <span class="weekly-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
 
@@ -160,6 +160,7 @@ const dayAria = (day: UpcomingDay) => {
           v-for="day in nextDays"
           :key="day.date"
           :to="`/ai/plan/${day.date}`"
+          data-morph-card
           :class="['upcoming-day', { rest: day.rest, interval: !day.rest && day.interval }]"
           :aria-label="dayAria(day)"
         >

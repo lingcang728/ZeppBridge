@@ -387,6 +387,7 @@ useSectionTour('home');
       v-for="device in unrecognizedDevices"
       :key="device.key"
       class="unrecognized-banner"
+      data-morph-card
       :to="device.to"
     >
       <Icon name="warning" :size="15" />

@@ -4,9 +4,13 @@
  * 只有在 Beta 实验室里自己打开了开关才挂这个组件（CardBody 按 labFlag('cloud') 决定）；
  * 没开的人看不到任何云端的字样，后端也不会被问一次。
  * 上传是单独安装的组件（ZeppBridge-Cloud）做的：这里读它的状态、叫它现在跑一次、改它的配置。
- * 配置表单在 CloudConfigRows，只读密钥在 CloudReaderRows。 */
-import { computed, onActivated, onMounted } from 'vue';
+ * 配置表单在 CloudConfigRows，只读密钥在 CloudReaderRows。
+ *
+ * 2026-11-12（用户：「默认应该处于折叠状态，避免占这么大空间」）：默认只露一行状态和「立即上传」，
+ * 说明、站点 / 日志 / 文件夹、计划任务、配置、只读密钥都收在「更多」里。开关仍只在 Beta 实验室。 */
+import { computed, onActivated, onMounted, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
+import { useHandoffText } from '../../../components/ai/HandoffDock.i18n';
 import { useCloudCompanion } from '../../../composables/useCloudCompanion';
 import { useMessages } from '../../../i18n';
 import { cloudMessages } from './cloud.i18n';
@@ -16,6 +20,8 @@ import CloudReaderRows from './CloudReaderRows.vue';
 
 const t = useMessages(cloudMessages);
 const labs = useMessages(labsMessages);
+/* 「更多」借「交给 AI」浮条里已经译好的那一个词（十三种语言都有），不另起新文案。 */
+const handoff = useHandoffText();
 const { state, busy, outcome, status, refresh, upload, copyTaskCommands, open } = useCloudCompanion();
 
 /* 组件是别的进程在跑（计划任务）：每次回到这张卡都重读一次。 */
@@ -33,6 +39,8 @@ const canRun = computed(() => !!state.value?.configured && !!state.value.uploade
 const uploading = computed(() => busy.value === 'upload' || !!state.value?.running);
 const diagnostic = computed(() => (status.value.tone === 'warn' ? state.value?.last_run?.log_line ?? '' : ''));
 const feedback = computed(() => (outcome.value?.area === 'status' ? outcome.value : null));
+/** 「更多」展开着没有。每次进卡都是收着的。 */
+const expanded = ref(false);
 </script>
 
 <template>
@@ -41,7 +49,6 @@ const feedback = computed(() => (outcome.value?.area === 'status' ? outcome.valu
       <h3 id="cloud-title">{{ t.secTitle }}</h3>
       <span class="lab-badge">{{ labs.badge }}</span>
     </div>
-    <p class="s-note">{{ t.lead }}</p>
     <div class="s-list">
       <div class="s-row">
         <div class="s-row-main">
@@ -61,6 +68,15 @@ const feedback = computed(() => (outcome.value?.area === 'status' ? outcome.valu
           </button>
         </div>
       </div>
+      <div class="s-row cloud-more-row">
+        <button class="cloud-more" type="button" data-setting="cloud-more" :aria-expanded="expanded" aria-controls="cloud-more-body"
+          @click="expanded = !expanded">
+          <Icon name="chevron-right" :size="14" :class="['cloud-more-chevron', { open: expanded }]" />{{ handoff.more }}
+        </button>
+      </div>
+    </div>
+    <div v-if="expanded" id="cloud-more-body" class="s-list cloud-more-body">
+      <p class="s-note cloud-lead">{{ t.lead }}</p>
       <div v-if="state?.supported" class="s-row">
         <div class="s-actions">
           <button class="button secondary" type="button" :disabled="!state.site_url" @click="open('site')">{{ t.openSite }}</button>
@@ -103,4 +119,12 @@ const feedback = computed(() => (outcome.value?.area === 'status' ? outcome.valu
 .task-line { display: flex; flex-wrap: wrap; gap: 2px 14px; }
 .task-line .on { color: var(--accent); }
 .s-section-head .lab-badge { margin-left: 0; }
+.cloud-more-row { padding-block: 6px; }
+.cloud-more { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.cloud-more:hover { color: var(--ink); }
+.cloud-more:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; border-radius: 6px; }
+.cloud-more-chevron { transition: rotate var(--dur-std, .2s) ease; }
+.cloud-more-chevron.open { rotate: 90deg; }
+.cloud-more-body { margin-top: 10px; }
+.cloud-lead { margin: 4px 0 6px; }
 </style>

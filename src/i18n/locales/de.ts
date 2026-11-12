@@ -1513,7 +1513,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       connectPill: 'Konto verbinden',
       syncingProgress: (current: number, total: number) => `Synchronisieren ${current}/${total}`,
       syncWait: "Bitte warte, bis die Synchronisierung fertig ist",
-      mailTitle: 'Neue Post · Briefkasten öffnen',
+      mailTitle: 'Neue Post · zum Schreiben klicken, gedrückt halten für den Briefkasten',
       holdForLetters: 'Gedrückt halten, um den Briefkasten zu öffnen',
     },
     'components/shell/update': {
@@ -4340,7 +4340,8 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           s4: 'Wichtige Metriken sind hier angepinnt; die Zeile darunter ist dein üblicher Bereich, kein Vergleich mit anderen.',
           s5: 'Drei Reiter oben; Schlaf, Workouts und Verlauf öffnen sich über die Karten in der Übersicht.',
           s6: 'Hier siehst du den Synchronisierungsstatus; klicke zum Synchronisieren. Ein grüner Ring am Symbol oben links zeigt ein Update an.',
-          s7: 'Jeder Bereich erklärt sich beim ersten Öffnen; kehre zu dieser Karte zurück, um alles noch einmal zu sehen.',
+          s7: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben, oder halte es gedrückt, um den Briefkasten zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
+          s8: 'Jeder Bereich erklärt sich beim ersten Öffnen; kehre zu dieser Karte zurück, um alles noch einmal zu sehen.',
         },
         journal: {
           s1: 'Ein ganzes Jahr Aktivität auf einer Seite; öffne die Ringe und sieh sie wachsen.',
@@ -4350,8 +4351,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           s5: 'Ein Ring pro Jahr, breiter in trainingsreichen Wochen; tippe auf eine feine Linie für das jeweilige Workout.',
         },
         letters: {
-          s1: 'Die Briefe des Autors zu jedem Update liegen hier; öffne einen zum Lesen.',
-          s2: '„Deine Briefe“ enthält wöchentliche Datenbriefe und Briefe an dein zukünftiges Ich; Antworten und Briefmarken in den letzten beiden.',
+          s1: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben, oder halte es gedrückt, um den Briefkasten zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
+          s2: 'Die Briefe des Autors zu jedem Update liegen hier; öffne einen zum Lesen.',
+          s3: '„Deine Briefe“ enthält wöchentliche Datenbriefe und Briefe an dein zukünftiges Ich; Antworten und Briefmarken in den letzten beiden.',
         },
         metric: {
           s1: 'Wähle den Zeitraum einmal aus – alle Seiten merken ihn sich.',
@@ -4724,9 +4726,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       lead:
         'Alles hier ist experimentell: Es kann sich ändern oder wieder entfernt werden. Wenn etwas hakt, schreibe dem Autor über den Briefkasten.',
       badge: 'Experimentell',
-      glassTitle: 'Verschmelzendes Glas',
-      glassSub:
-        'Glas-Bedienelemente, die nah beieinander liegen, verschmelzen beim Ziehen und trennen sich beim Loslassen wieder. Reine Optik – das Deaktivieren ändert sonst nichts.',
       unstrapImportTitle: 'Trainings aus unstrap importieren',
       unstrapImportSub:
         'Wähle eine unstrap-Backup-ZIP: Die vom Brustgurt und Telefon aufgezeichneten Trainings (Herzfrequenz, Strecke, Pausen) werden übernommen, eins pro Einheit, zusammen mit allen noch nicht auf diesem Rechner vorhandenen Herzfrequenz-, SpO₂-, Ruheherzfrequenz- und Schlafdaten. Von Zepp synchronisierte Daten bleiben unberührt. Von unstrap selbst berechnete Werte werden weggelassen. Importe werden auf der Trainings-Seite aufgeführt und können einzeln rückgängig gemacht werden.',

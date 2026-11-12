@@ -116,7 +116,7 @@ const recentItems = computed<RecentItem[]>(() => {
     <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="pill-button" to="/recent">{{ t.seeAll }}<Icon name="chevron-right" :size="14" /></RouterLink></div>
     <ol v-if="recentItems.length" class="timeline">
       <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === 0 }]">
-        <RouterLink :to="item.to" class="tl-link">
+        <RouterLink :to="item.to" class="tl-link" data-morph-card>
           <span class="tl-when">{{ item.kicker }}<em v-if="index === 0">{{ t.newest }}</em></span>
           <span class="tl-node" aria-hidden="true"><GlyphTile :name="item.designIcon" :size="40" :tone="item.category" /></span>
           <strong class="tl-title">{{ item.title }}</strong>

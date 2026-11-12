@@ -11,13 +11,16 @@
  * 一次取最长那档（6 个月），换范围只在本地重排，不再每切一次查一次库。
  * 指针停在柱子或格子上立刻浮出读数（和心率图一样），不用原生 title——那个要停一秒多才出来。
  */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRevisionReload } from '../../composables/useRevisionReload';
-import { backend, isDesktop } from '../../lib/bridge';
+import { isDesktop } from '../../lib/bridge';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { formatNumber } from '../../lib/format';
 import { averageRow, hourRows, rangeBounds, type HourRow } from '../../lib/hourlySteps';
 import { SERIES_FETCH_DAYS } from '../../lib/metricSeries';
+import { afterMotion } from '../../lib/motion/budget';
+import { pageQuery } from '../../lib/pageQueries';
+import { cached, peek } from '../../lib/readCache';
 import type { HourlySteps } from '../../types';
 import { useMessages } from '../../i18n';
 import { hourlyStepsMessages as messages } from './HourlyStepsCard.i18n';
@@ -29,8 +32,16 @@ const t = useMessages(messages);
 const rows = ref<HourlySteps[]>([]);
 const failed = ref(false);
 const loaded = ref(false);
+const animateChanges = ref(false);
 /** 点中的那一行（按它的首日认）；null = 看整段平均。 */
 const picked = ref<string | null>(null);
+
+const queryFor = () => pageQuery.hourlySteps(Math.max(SERIES_FETCH_DAYS, props.days));
+const preloaded = isDesktop() ? peek(queryFor()) : null;
+if (preloaded) {
+  rows.value = preloaded.value;
+  loaded.value = true;
+}
 
 const bounds = computed(() => rangeBounds(props.days));
 /* 一个月以上按周合成一行：一个月按天摊开是 30 行热力图，比整页还高（用户 2026-09-30 嫌「过于庞大」）。
@@ -42,8 +53,7 @@ const load = async () => {
   if (!isDesktop()) return;
   const mine = ++seq;
   try {
-    const whole = rangeBounds(Math.max(SERIES_FETCH_DAYS, props.days));
-    const next = await backend.getHourlySteps(whole.start, whole.end);
+    const next = await cached(queryFor());
     if (mine !== seq) return;
     rows.value = next;
     failed.value = false;
@@ -55,7 +65,19 @@ const load = async () => {
     if (mine === seq) loaded.value = true;
   }
 };
-onMounted(() => { void load(); });
+const armBarTransition = () => {
+  void nextTick(() => afterMotion(() => {
+    requestAnimationFrame(() => { animateChanges.value = true; });
+  }));
+};
+onMounted(() => {
+  if (preloaded) {
+    armBarTransition();
+    afterMotion(() => { void load(); });
+  } else {
+    void load().then(armBarTransition);
+  }
+});
 watch(() => props.days, () => { picked.value = null; hover.value = null; });
 useRevisionReload(() => { void load(); });
 
@@ -137,7 +159,7 @@ const pick = (row: HourRow) => {
 </script>
 
 <template>
-  <section ref="card" class="hourly-card" :aria-label="t.title">
+  <section ref="card" :class="['hourly-card', { 'is-animated': animateChanges }]" :aria-label="t.title">
     <header>
       <span class="hourly-head">
         <strong>{{ t.title }}</strong>
@@ -201,7 +223,8 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
 .hourly-facts b { color: var(--ink); font-size: 22px; font-variant-numeric: tabular-nums; }
 .hourly-bars { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 120px; margin: 0; padding: 0 0 16px; list-style: none; }
 .hourly-bars li { position: relative; display: flex; align-items: flex-end; height: 100%; }
-.bar { width: 100%; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--accent) 78%, transparent); transition: height 420ms var(--ease-out); }
+.bar { width: 100%; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--accent) 78%, transparent); }
+.hourly-card.is-animated .bar { transition: height 420ms var(--ease-out); }
 .bar.hot { background: var(--accent); }
 .bar.empty { height: 2px !important; background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .hourly-bars small { position: absolute; bottom: -16px; left: 0; color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; }
@@ -239,8 +262,8 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
 .heat-cells i, .heat-ramp i {
   border-radius: 3px;
   background: color-mix(in srgb, var(--accent) calc(var(--v) * 86% + 14%), transparent);
-  transition: background-color 360ms ease;
 }
+.hourly-card.is-animated .heat-cells i { transition: background-color 360ms ease; }
 .heat-cells i.hot { box-shadow: 0 0 0 1.5px var(--ink); }
 .heat-cells i.empty { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .heat-row.blank .heat-cells i { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent); }

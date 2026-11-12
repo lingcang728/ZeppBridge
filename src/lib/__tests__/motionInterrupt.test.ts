@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flightTransform, matchTransform } from '../motion/dialogFlight';
+import { objectTransform } from '../motion/dialogFlight';
 import { hurryAnimation, onMotionSkip, remainingMs, settleMotion, worthInterrupting } from '../motion/interrupt';
 
 const fakeAnimation = (localTime: number, endTime: number, playbackRate = 1, playState = 'running') => ({
@@ -64,16 +64,22 @@ describe('motion interrupt', () => {
 });
 
 describe('dialog flight', () => {
-  it('starts from the centre of the button, scaled by width within bounds', () => {
-    const panel = { left: 400, top: 200, width: 560, height: 600 };
-    const button = { left: 100, top: 900, width: 112, height: 36 };
-    expect(flightTransform(button, panel)).toBe('translate(-524.0px, 418.0px) scale(0.200)');
-    expect(flightTransform({ left: 670, top: 490, width: 20, height: 20 }, panel)).toBe('translate(0.0px, 0.0px) scale(0.120)');
+  it('an object (the envelope) starts at the button: its centre on the button centre, its width the button width', () => {
+    const panel = { left: 400, top: 200, width: 680, height: 600 };
+    const subject = { left: 460, top: 260, width: 560, height: 380 };
+    const button = { left: 1200, top: 20, width: 36, height: 36 };
+    const t = objectTransform(button, panel, subject);
+    const [, dx, dy, s] = /translate\((-?[\d.]+)px, (-?[\d.]+)px\) scale\(([\d.]+)\)/.exec(t)!.map(Number);
+    expect(s).toBeCloseTo(36 / 560, 3);
+    // 物件中心经过「绕面板中心缩放 + 平移」以后落在按钮中心。
+    const c = { x: 740, y: 500 };
+    const q = { x: 740, y: 450 };
+    expect(c.x + s * (q.x - c.x) + dx).toBeCloseTo(1218, 0);
+    expect(c.y + s * (q.y - c.y) + dy).toBeCloseTo(38, 0);
   });
 
-  it('a reopened dialog picks up exactly where the half-closed one is, without the scale clamp', () => {
-    const panel = { left: 400, top: 200, width: 560, height: 600 };
-    expect(matchTransform({ left: 414, top: 215, width: 532, height: 570 }, panel)).toBe('translate(0.0px, 0.0px) scale(0.950)');
-    expect(matchTransform(panel, panel)).toBe('translate(0.0px, 0.0px) scale(1.000)');
+  it('never enlarges past the real size', () => {
+    const panel = { left: 0, top: 0, width: 100, height: 100 };
+    expect(objectTransform({ left: 0, top: 0, width: 400, height: 400 }, panel)).toContain('scale(1.000)');
   });
 });

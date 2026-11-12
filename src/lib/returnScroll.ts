@@ -96,6 +96,9 @@ export const installReturnScroll = (router: Router) => {
       for (const el of root.querySelectorAll<HTMLElement>('.page-host > [class*="-leave-active"]')) {
         el.style.top = `${(Number.parseFloat(el.style.top) || 0) + delta}px`;
       }
+      for (const veil of root.querySelectorAll<HTMLElement>('.page-host > * > .page-veil')) {
+        veil.style.top = `${(Number.parseFloat(veil.style.top) || 0) + delta}px`;
+      }
     };
     const restore = () => {
       const maxTop = root.scrollHeight - root.clientHeight;

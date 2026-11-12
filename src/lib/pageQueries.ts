@@ -1,4 +1,5 @@
 import { backend, isDesktop } from './bridge';
+import { rangeBounds } from './hourlySteps';
 import { SERIES_FETCH_DAYS } from './metricSeries';
 import { cached, DEVICE_READ_PREFIXES, peek, type Query } from './readCache';
 import { useTrendRange } from '../composables/useTrendRange';
@@ -6,7 +7,7 @@ import { deviceImageFor } from './deviceCatalog';
 import { journalPageQueries } from './journalQueries';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
 import type {
-  DailyHeartRateExtreme, DataHealth, DeviceProfile, HeartRateZoneOptions, HeartRatePoint, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
+  DailyHeartRateExtreme, DataHealth, DeviceProfile, HeartRateZoneOptions, HeartRatePoint, HourlySteps, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
   WorkoutSeries,
 } from '../types';
 
@@ -122,6 +123,13 @@ export const pageQuery = {
     key: `data_health:${windowDays}`,
     fetch: () => backend.getDataHealth(windowDays),
   }),
+  hourlySteps: (days = SERIES_FETCH_DAYS): Query<HourlySteps[]> => {
+    const whole = rangeBounds(days);
+    return {
+      key: `hourly_steps:${whole.start}:${whole.end}`,
+      fetch: () => backend.getHourlySteps(whole.start, whole.end),
+    };
+  },
 };
 
 /** 每个详情页首屏的那一组（顺序和页面里 Promise.allSettled 的顺序一致）。 */
@@ -137,7 +145,10 @@ export const trainingPageQueries = () => [
 ] as const;
 /** 训练页底部的心率区间卡（components/HeartRateZonePicker.vue）：至少看一个月，跟着全局的趋势范围。 */
 export const heartRateZonesQuery = (rangeDays: number = useTrendRange().value) => pageQuery.heartRateZones(Math.max(30, rangeDays));
-export const activityPageQueries = () => [pageQuery.metricSeries(ACTIVITY_METRICS)] as const;
+export const activityPageQueries = () => [
+  pageQuery.metricSeries(ACTIVITY_METRICS),
+  pageQuery.hourlySteps(SERIES_FETCH_DAYS),
+] as const;
 export const sleepPageQueries = (sleepId: string) => [pageQuery.sleepDetail(sleepId), pageQuery.recentSleep(7)] as const;
 export const workoutPageQueries = (workoutId: string) => [
   pageQuery.workoutDetail(workoutId),

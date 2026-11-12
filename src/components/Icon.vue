@@ -22,6 +22,7 @@ export type IconName =
   | 'globe'
   | 'help'
   | 'key'
+  | 'mail'
   | 'map'
   | 'mountain'
   | 'pin'
@@ -307,6 +308,10 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     <g v-else-if="name === 'edit'">
       <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" :stroke-width="stroke" />
       <path d="M17.7 3.9a2 2 0 0 1 2.8 2.8L12 15.2l-3.7.9.9-3.7 8.5-8.5Z" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'mail'">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.4" :stroke-width="stroke" />
+      <path d="m4.2 7 7.8 5.8L19.8 7" :stroke-width="stroke" />
     </g>
     <g v-else-if="name === 'key'">
       <circle cx="8" cy="15" r="4" :stroke-width="stroke" />

@@ -23,9 +23,7 @@ import type { ThemeMode } from '../../composables/useTheme';
 import { backend } from '../../lib/bridge';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
 import { syncControllerMessages } from '../../composables/useSyncController.i18n';
-import GlassBridge from '../glass/GlassBridge.vue';
-import { labFlag } from '../../lib/labs';
-import { openAuthorCompose } from '../../composables/useAuthorCompose';
+import { openAuthorCompose, prefetchAuthorCompose } from '../../composables/useAuthorCompose';
 import { armPageMorph } from '../../composables/usePageMorph';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { useLetterText } from '../letters/letters.i18n';
@@ -57,7 +55,7 @@ const messages = defineMessages(
     readyTitle: '同步完成，本机数据最新。点一下交给 AI。',
     readyFirstPill: '第一批数据到了 · 看这一周',
     readyFirstTitle: '第一次同步完成。点一下回概览，看这一周和平时比哪里变了。',
-    mailTitle: '有新来信 · 点开信匣',
+    mailTitle: '有新来信 · 点一下写信，长按打开信匣',
     holdForLetters: '长按打开信匣',
   },
   {
@@ -85,7 +83,7 @@ const messages = defineMessages(
     readyTitle: 'Sync done — local data is current. Click to send it to AI.',
     readyFirstPill: 'First data is in · see this week',
     readyFirstTitle: 'First sync done. Click to go to the overview and see how this week compares with usual.',
-    mailTitle: 'New mail · open the letter box',
+    mailTitle: 'New mail · click to write, press and hold for the letter box',
     holdForLetters: 'Press and hold to open the letter box',
   },
   {
@@ -113,7 +111,7 @@ const messages = defineMessages(
     readyTitle: 'Sincronización completada: datos al día. Clic para pasar a la IA.',
     readyFirstPill: 'Ya llegaron tus datos · ver esta semana',
     readyFirstTitle: 'Primera sincronización completada. Haz clic para ir al resumen y ver cómo va esta semana frente a lo habitual.',
-    mailTitle: 'Nueva carta · abrir el buzón',
+    mailTitle: 'Nueva carta · haz clic para escribir, mantén pulsado para abrir el buzón',
     holdForLetters: 'Mantén pulsado para abrir el buzón',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
@@ -136,30 +134,37 @@ const router = useRouter();
 const u = useUpdateText();
 const updateReady = computed(() => updateState.phase === 'ready' || updateState.phase === 'applying');
 onMounted(watchDesktopUpdate);
-/* 有新来信（services/mailStatus.ts）：Z 变成信封，点一下进信匣，优先于「点一下装更新」——看完信 Z 变回来，更新的绿环还在。 */
+/* 左上角标志只管回概览与装更新；信件相关交互统一收在右上角信件圆钮（短按写信，长按进信匣，新信亮红点）。 */
 const hasMail = computed(() => mailState.tab !== null);
 const brandTitle = computed(() => {
-  if (hasMail.value) return t.value.mailTitle;
   if (updateState.phase === 'applying') return updateState.waiting_for_sync ? u.value.waitingSync : u.value.applying;
   if (updateReady.value && updateState.version) return u.value.ready(updateState.version);
   if (updateState.phase === 'downloading') {
     const ratio = downloadRatio(updateState);
     return u.value.downloading(ratio === null ? null : Math.round(ratio * 100));
   }
-  return `${props.versionTitle || t.value.brandHome} · ${t.value.holdForLetters}`;
+  return props.versionTitle || t.value.brandHome;
 });
-/* 平时长按标志进信匣（用户 2026-11-10 定）。长按触发后随之而来的那次 click 吞掉，不再回概览 / 装更新。 */
+const mailPillTitle = computed(() => (hasMail.value
+  ? t.value.mailTitle
+  : `${letterText.value.writeAuthor} · ${t.value.holdForLetters}`));
+
+const onBrandClick = () => {
+  if (updateReady.value) void applyDesktopUpdate();
+  else if (route.path !== '/') void router.push('/');
+};
+
 const LONG_PRESS_MS = 450;
-const brandBtn = ref<HTMLElement | null>(null);
+const mailBtn = ref<HTMLElement | null>(null);
 let pressTimer = 0;
-let swallowClick = false;
+let swallowMailClick = false;
 let chargeAnim: Animation | null = null;
 
-const releaseCharge = (smooth = true) => {
+const releaseMailCharge = (smooth = true) => {
   if (!chargeAnim) return;
   const anim = chargeAnim;
   chargeAnim = null;
-  const el = brandBtn.value;
+  const el = mailBtn.value;
   anim.cancel();
   if (smooth && el && !lessMotion()) {
     el.animate([{ transform: 'scale(0.92)' }, { transform: 'scale(1)' }], {
@@ -171,37 +176,44 @@ const releaseCharge = (smooth = true) => {
 
 const openLetters = () => {
   const query = mailState.tab ? { tab: mailState.tab } : {};
-  if (brandBtn.value && route.path !== '/letters') {
+  if (mailBtn.value && route.path !== '/letters') {
     const resolved = router.resolve({ path: '/letters', query });
-    armPageMorph(brandBtn.value, resolved.fullPath, { anySize: true });
+    armPageMorph(mailBtn.value, resolved.fullPath, { anySize: true });
   }
-  releaseCharge(false);
+  releaseMailCharge(false);
   void router.push({ path: '/letters', query });
 };
-const onBrandDown = (event: PointerEvent) => {
+
+const onMailDown = (event: PointerEvent) => {
   if (event.button !== 0) return;
-  swallowClick = false;
+  swallowMailClick = false;
   window.clearTimeout(pressTimer);
-  releaseCharge(false);
-  if (brandBtn.value && route.path !== '/letters' && !lessMotion()) {
-    chargeAnim = brandBtn.value.animate(
+  releaseMailCharge(false);
+  if (mailBtn.value && route.path !== '/letters' && !lessMotion()) {
+    chargeAnim = mailBtn.value.animate(
       [{ transform: 'scale(1)' }, { transform: 'scale(0.88)' }],
       { duration: LONG_PRESS_MS, easing: 'cubic-bezier(0.32, 0, 0.24, 1)', fill: 'forwards' },
     );
   }
-  pressTimer = window.setTimeout(() => { swallowClick = true; openLetters(); }, LONG_PRESS_MS);
+  pressTimer = window.setTimeout(() => {
+    swallowMailClick = true;
+    openLetters();
+  }, LONG_PRESS_MS);
 };
-const cancelBrandPress = () => {
+
+const cancelMailPress = () => {
   window.clearTimeout(pressTimer);
-  releaseCharge(true);
+  releaseMailCharge(true);
 };
-const onBrandClick = () => {
-  if (swallowClick) { swallowClick = false; return; }
-  if (hasMail.value) openLetters();
-  else if (updateReady.value) void applyDesktopUpdate();
-  else if (route.path !== '/') void router.push('/');
+
+const onMailClick = (event: MouseEvent) => {
+  if (swallowMailClick) {
+    swallowMailClick = false;
+    return;
+  }
+  openAuthorCompose((event.currentTarget as HTMLElement | null) ?? mailBtn.value);
 };
-onBeforeUnmount(cancelBrandPress);
+onBeforeUnmount(cancelMailPress);
 const activeBranch = computed(() => navigationBranch(route.path));
 const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
 const goTo = (to: string | number) => { void router.push(String(to)); };
@@ -357,9 +369,6 @@ const onLocaleChange = (value: string | number) => {
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
-/* Beta 实验室「玻璃组合并动效」（D2 样机，默认关）：「云端还没有新数据」气泡从同步胶囊里长出来，收起时掐断。 */
-const glassLab = labFlag('glassGroup');
-const staleTip = ref<HTMLElement | null>(null);
 // 伸缩放完再量一次放不放得下（变窄时回到该有的档位），见下面 watch 的注释。
 useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.value), undefined, () => scheduleFit());
 
@@ -437,16 +446,28 @@ const settleLayout = async () => {
 };
 let fitting = false;
 const refit = async () => {
-  if (fitting) return;
+  if (fitting || !bar.value) return;
   fitting = true;
   // 量的时候关掉宽度过渡：半路量到的是动画中间的宽度，会误判成「放得下」。
-  bar.value?.classList.add('is-measuring');
+  // 从当前档位就地升降档，不再无条件重置为 0（避免切页或微变时把已收起的导航闪回顶栏再收走）。
+  bar.value.classList.add('is-measuring');
   try {
-    fit.value = 0;
     await settleLayout();
-    while (fit.value < FIT_MAX && overlaps()) {
-      fit.value += 1;
-      await settleLayout();
+    if (overlaps()) {
+      while (fit.value < FIT_MAX && overlaps()) {
+        fit.value += 1;
+        await settleLayout();
+      }
+    } else {
+      while (fit.value > 0) {
+        fit.value -= 1;
+        await settleLayout();
+        if (overlaps()) {
+          fit.value += 1;
+          await settleLayout();
+          break;
+        }
+      }
     }
     // 在过渡关着的时候把最终宽度落定，撤掉 is-measuring 后不会再补一段宽度动画。
     void bar.value?.offsetWidth;
@@ -457,6 +478,7 @@ const refit = async () => {
 };
 let fitObserver: ResizeObserver | null = null;
 let fitFrame = 0;
+let lastBarWidth = -1;
 const scheduleFit = () => {
   cancelAnimationFrame(fitFrame);
   fitFrame = requestAnimationFrame(() => { void refit(); });
@@ -464,8 +486,16 @@ const scheduleFit = () => {
 onMounted(() => {
   void backend.getUserPrefs().then(prefs => { demoLibrary.value = !!prefs.demo_mode; }).catch(() => undefined);
   window.addEventListener('keydown', onEscapeBack);
-  fitObserver = new ResizeObserver(scheduleFit);
-  if (bar.value) fitObserver.observe(bar.value);
+  fitObserver = new ResizeObserver((entries) => {
+    const width = Math.round(entries[0]?.contentRect.width ?? bar.value?.clientWidth ?? 0);
+    if (width === lastBarWidth) return;
+    lastBarWidth = width;
+    scheduleFit();
+  });
+  if (bar.value) {
+    lastBarWidth = Math.round(bar.value.clientWidth);
+    fitObserver.observe(bar.value);
+  }
   void fontsReady().then(() => { measuredKey = ''; scheduleFit(); });
   scheduleFit();
 });
@@ -474,7 +504,6 @@ onBeforeUnmount(() => {
   fitObserver?.disconnect();
   cancelAnimationFrame(fitFrame);
 });
-watch(() => props.backTo, scheduleFit);
 /* 换语言：新标签一上 DOM 就量（post flush），同一帧里定好档位，不等下一帧——
    语言轮在 rAF 里提交选择时，等一帧就会先画出一帧放不下的顶栏再收（「闪一下」）。 */
 watch(locale, () => { cancelAnimationFrame(fitFrame); void refit(); }, { flush: 'post' });
@@ -506,22 +535,16 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
            平时 / 有新信 / 更新下好了是同一个按钮（换元素会重挂载，Z ↔ 信封的过渡就播不出来）：
            点一下按状态回概览、进信匣或装更新；长按进信匣。 -->
       <button
-        ref="brandBtn"
         type="button"
         :class="['brand', 'brand-button', { 'is-off': backTo }]"
         :title="brandTitle"
         :aria-label="brandTitle"
-        :disabled="!hasMail && updateState.phase === 'applying'"
+        :disabled="updateState.phase === 'applying'"
         :aria-hidden="backTo ? 'true' : undefined"
         :inert="backTo ? true : undefined"
-        @pointerdown="onBrandDown"
-        @pointerup="cancelBrandPress"
-        @pointerleave="cancelBrandPress"
-        @pointercancel="cancelBrandPress"
-        @contextmenu.prevent
         @click="onBrandClick"
       >
-        <BrandUpdate :size="30" :mail="hasMail" />
+        <BrandUpdate :size="30" />
       </button>
 
     </div>
@@ -539,17 +562,26 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
-      <!-- 写给作者（2026-11-11 用户：写信入口藏得太深）：常驻的一支笔，点一下信封从这里飞出来、抽出信纸就能写。
-           用纸笔图标，不用信封：左上角的 Z 有新信时会变成信封，两只信封分不清。 -->
+      <!-- 信件总入口：短按圆图标直接丝滑展开成写信信纸；长按展开信匣；有新回信 / 每周来信 / 到期胶囊时亮红点。 -->
       <button
+        ref="mailBtn"
         type="button"
-        class="write-pill glass-control is-lens-host has-rim"
-        :title="letterText.writeAuthor"
-        :aria-label="letterText.writeAuthor"
-        @click="openAuthorCompose($event.currentTarget as HTMLElement)"
+        :class="['write-pill', 'glass-control', 'is-lens-host', 'has-rim', { 'has-mail': hasMail }]"
+        :title="mailPillTitle"
+        :aria-label="mailPillTitle"
+        data-tour="letter-pill"
+        @pointerenter="prefetchAuthorCompose"
+        @focus="prefetchAuthorCompose"
+        @pointerdown="onMailDown"
+        @pointerup="cancelMailPress"
+        @pointerleave="cancelMailPress"
+        @pointercancel="cancelMailPress"
+        @contextmenu.prevent
+        @click="onMailClick"
       >
         <GlassRim />
-        <Icon name="edit" :size="17" />
+        <Icon name="mail" :size="17" />
+        <span v-if="hasMail" class="mail-dot" aria-hidden="true"></span>
       </button>
       <button
         ref="syncPill"
@@ -569,7 +601,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       </button>
       <!-- 手动同步时云端还没有新数据（1E）：教人去手机上下拉一下，带「再试」。下一次同步开始就收起。 -->
       <Transition name="stale-tip">
-        <div v-if="cloudStaleText && !isSyncing" ref="staleTip" :class="['cloud-stale-tip', 'glass-control', { 'from-pill': glassLab }]" role="status">
+        <div v-if="cloudStaleText && !isSyncing" class="cloud-stale-tip glass-control" role="status">
           <p>{{ cloudStaleText }}</p>
           <div class="stale-actions">
             <button type="button" class="pill-button quiet" @click="dismissCloudStale()">{{ syncCopy.cloudStaleDismiss }}</button>
@@ -577,7 +609,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
           </div>
         </div>
       </Transition>
-      <GlassBridge v-if="glassLab" :from="syncPill" :to="staleTip" axis="y" :connected="!!(cloudStaleText && !isSyncing)" />
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
@@ -633,7 +664,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 /* 左上角那一格：返回键和品牌叠在一起，看得见的那个占位置，另一个绝对定位叠在同一处、淡出。
    新的晚 60ms 开始淡入：旧的先让一让，两个不会同时以半透明叠成一团。只淡透明度：
    缩放留给返回键自己按下去的那一下（:active），不能被交接的延迟拖慢。 */
-.lead { position: relative; display: grid; min-width: 0; justify-self: start; align-items: center; }
+.lead { position: relative; display: grid; width: 40px; min-width: 40px; min-height: 40px; justify-self: start; align-items: center; justify-items: center; }
 .lead > * {
   grid-area: 1 / 1;
   transition: opacity 180ms ease 60ms, visibility 0s linear 0s, scale var(--dur-fast, 140ms) var(--ease-out, ease);
@@ -660,11 +691,14 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   gap: 8px;
 }
 
-/* 写给作者：和同步胶囊一样高的一枚圆玻璃。 */
-.write-pill { display: inline-flex; width: 36px; height: 36px; flex: 0 0 36px; align-items: center; justify-content: center; padding: 0;
-  border-radius: 50%; color: var(--muted); cursor: pointer; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease); }
+/* 信件入口：和同步胶囊一样高的一枚圆玻璃；有新信时右上角亮一枚红点。 */
+.write-pill { position: relative; display: inline-flex; width: 36px; height: 36px; flex: 0 0 36px; align-items: center; justify-content: center; padding: 0;
+  border-radius: 50%; color: var(--muted); cursor: pointer; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease), color var(--dur-fast, 140ms) ease; }
+.write-pill.has-mail { color: var(--ink); }
 .write-pill:hover { color: var(--ink); }
 .write-pill:active { scale: .94; }
+.mail-dot { position: absolute; top: 1px; right: 1px; z-index: 3; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger); box-shadow: 0 0 0 2px var(--canvas); pointer-events: none; }
 
 .sync-pill {
   display: inline-flex;
@@ -744,11 +778,6 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   padding: 12px 12px 10px 16px; border-radius: 20px; color: var(--ink); font-size: var(--fs-sm); line-height: 1.55; }
 .cloud-stale-tip p { margin: 0; }
 .stale-actions { display: flex; justify-content: flex-end; gap: 6px; }
-/* 实验室开着时气泡从胶囊那边落下来（颈在 GlassBridge 里）；胶囊要压在颈上面。 */
-.cloud-stale-tip.from-pill { transform-origin: top right; }
-.cloud-stale-tip.from-pill.stale-tip-enter-from { scale: .92; }
-.cloud-stale-tip.from-pill.stale-tip-enter-active { transition: opacity 260ms ease, translate 360ms cubic-bezier(.2, .8, .2, 1), scale 420ms cubic-bezier(.2, .9, .25, 1.15); }
-.topbar-actions:has(.glass-neck) .sync-pill { position: relative; z-index: 1; }
 .stale-tip-enter-active { transition: opacity 260ms ease, translate 360ms cubic-bezier(.2, .8, .2, 1); }
 .stale-tip-leave-active { transition: opacity 180ms ease, translate 200ms ease-in; }
 .stale-tip-enter-from, .stale-tip-leave-to { opacity: 0; translate: 0 -6px; }

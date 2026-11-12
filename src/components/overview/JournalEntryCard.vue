@@ -12,8 +12,18 @@ import { todayKey } from '../../lib/logbook/display';
 defineOptions({ name: 'OverviewJournalEntryCard' });
 const t = useJournalText();
 const { races, shoes, load } = useLogbook();
-onMounted(() => { void load(['races', 'shoes']); });
-onActivated(() => { void load(['races', 'shoes']); });
+let mountedOnce = false;
+onMounted(() => {
+  mountedOnce = true;
+  void load(['races', 'shoes']);
+});
+onActivated(() => {
+  if (mountedOnce) {
+    mountedOnce = false;
+    return;
+  }
+  void load(['races', 'shoes']);
+});
 
 const next = computed(() => {
   const today = todayKey();
@@ -31,7 +41,7 @@ const alert = computed(() => {
 </script>
 
 <template>
-  <RouterLink class="metric-panel journal-entry" to="/journal" :aria-label="t.entry">
+  <RouterLink class="metric-panel journal-entry" data-morph-card to="/journal" :aria-label="t.entry">
     <GlyphTile name="outdoor-run" :size="38" />
     <span class="je-main">
       <span class="je-title">{{ t.entry }}</span>

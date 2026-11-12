@@ -27,7 +27,7 @@ import VChartBase from 'vue-echarts';
 import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef, type Component, type VNode } from 'vue';
 import { resolvedTheme } from '../composables/useTheme';
 import { chartPalettes, zeppThemeDark, zeppThemeLight } from './echartsTheme';
-import { motionBusy, whenMotionIdle } from './motion/budget';
+import { motionBusy, nextSlot, whenMotionIdle } from './motion/budget';
 
 use([
   LineChart,
@@ -45,18 +45,9 @@ registerTheme('zeppbridge-light', zeppThemeLight);
 
 /* 卡 ↔ 页形变放着的时候不挂图表（lib/motion/budget.ts）：vue-echarts 挂载时同步建画布、算布局、画第一帧，
    十几张图压在形变的第一帧上，窗口就要等它们做完才动——录屏里「一下变黑」的那一截。形变期间先放一个同样
-   类名（同样高度）的空壳，放完以后一帧挂一张、轻轻淡入，主线程每帧都还有空。不在形变里挂载的图照旧直接画。 */
-const queue: Array<() => void> = [];
-let frame = 0;
-const pump = () => {
-  frame = 0;
-  queue.shift()?.();
-  if (queue.length) frame = requestAnimationFrame(pump);
-};
-const nextSlot = (job: () => void) => {
-  queue.push(job);
-  if (!frame) frame = requestAnimationFrame(pump);
-};
+   类名（同样高度）的空壳，让路结束以后一帧挂一张（lib/motion/budget.ts 的 nextSlot）、轻轻淡入，主线程每帧都还有空。
+   展开时这段「让路」只到新页上屏为止：图表在窗口起飞前就挂完了，淡入发生在卡拷贝后面，看不见。
+   不在形变里挂载的图照旧直接画。 */
 
 /* `autoresize` 由这里接管，不交给 vue-echarts（性能审计 03）。
    vue-echarts 的 autoresize 在图刚建好的下一拍还要读一次容器尺寸、再无条件 resize() 一次——resize 会把画布
@@ -94,12 +85,13 @@ const DeferredChart = defineComponent({
   inheritAttrs: false,
   setup(_, { attrs, slots }) {
     const ready = ref(!motionBusy.value);
+    const born = performance.now();
     let alive = true;
     let late = false;
     if (!ready.value) {
       void whenMotionIdle().then(() => nextSlot(() => {
         if (!alive) return;
-        late = true;
+        late = performance.now() - born > 160;
         ready.value = true;
       }));
     }

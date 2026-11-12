@@ -1465,7 +1465,7 @@ export default {
     connectPill: 'Collega account',
     syncingProgress: (current: number, total: number) => `Sincronizzazione ${current}/${total}`,
     syncWait: 'Attendi il completamento della sincronizzazione',
-    mailTitle: 'Nuova posta · apri la cassetta delle lettere',
+    mailTitle: 'Nuova posta · clicca per scrivere, tieni premuto per la cassetta delle lettere',
     holdForLetters: 'Tieni premuto per aprire la cassetta delle lettere',
   },
 
@@ -1501,7 +1501,8 @@ export default {
         s4: 'Le tue metriche preferite sono fissate qui; la riga sotto indica il tuo intervallo abituale, senza confronti con altri.',
         s5: 'Tre schede in alto; sonno, allenamenti e registro si aprono dalle schede nella Panoramica.',
         s6: 'Lo stato di sincronizzazione è qui; clicca per sincronizzare. Un anello verde sull’icona in alto a sinistra indica un aggiornamento.',
-        s7: 'Ogni sezione si spiega alla prima apertura; torna a questa scheda per rivederla.',
+        s7: 'Icona della posta in alto a destra: clicca per scrivere all’autore, oppure tieni premuto per aprire la cassetta delle lettere; un punto rosso segnala nuova posta o risposte.',
+        s8: 'Ogni sezione si spiega alla prima apertura; torna a questa scheda per rivederla.',
       },
       home: {
         s1: 'Riorganizza la panoramica secondo le tue priorità. Tocca per provare.',
@@ -1544,8 +1545,9 @@ export default {
         s5: 'Un anello all’anno, più spesso nelle settimane con più allenamenti; tocca una linea sottile per vedere quella sessione.',
       },
       letters: {
-        s1: 'Le lettere dell’autore ad ogni aggiornamento sono qui; aprine una per leggerla.',
-        s2: '«Le tue lettere» raccoglie i riepiloghi settimanali e le lettere per il tuo io futuro; risposte e francobolli negli ultimi due.',
+        s1: 'Icona della posta in alto a destra: clicca per scrivere all’autore, oppure tieni premuto per aprire la cassetta delle lettere; un punto rosso segnala nuova posta o risposte.',
+        s2: 'Le lettere dell’autore ad ogni aggiornamento sono qui; aprine una per leggerla.',
+        s3: '«Le tue lettere» raccoglie i riepiloghi settimanali e le lettere per il tuo io futuro; risposte e francobolli negli ultimi due.',
       },
       devices: {
         s1: 'Una riga per dispositivo; aprilo per correggere il modello o nasconderlo. I dati rimangono comunque.',
@@ -4698,9 +4700,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     lead:
       'Tutto qui è sperimentale: potrebbe cambiare o essere rimosso. Se qualcosa non va, scrivi all’autore dalla cassetta delle lettere.',
     badge: 'Sperimentale',
-    glassTitle: 'Vetro a fusione',
-    glassSub:
-      'I controlli in vetro molto vicini si fondono durante il trascinamento e si separano al rilascio. Solo aspetto visivo — disattivarlo non cambia nient’altro.',
     unstrapImportTitle: 'Importa allenamenti da unstrap',
     unstrapImportSub:
       'Scegli un file zip di backup di unstrap: gli allenamenti registrati dalla fascia e dal telefono (frequenza cardiaca, percorso, pause) vengono importati, uno per sessione, insieme a tutti i dati di frequenza cardiaca, SpO₂, frequenza a riposo e sonno non ancora presenti su questo computer. Nessun dato sincronizzato da Zepp viene modificato. I punteggi calcolati da unstrap non vengono importati. Gli elementi importati compaiono nella pagina Allenamenti, dove ognuno può essere annullato.',

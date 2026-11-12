@@ -22,7 +22,7 @@ import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { isDesktop, toUserMessage } from '../lib/bridge';
 import { activityPageQueries } from '../lib/pageQueries';
-import { cached, peekAll } from '../lib/readCache';
+import { cached, peek } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { metricColor } from '../lib/metricTone';
 import { metricInfo } from '../lib/metricInfo';
@@ -86,9 +86,9 @@ const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
 trackRangeSwap(rangeDays);
 const loading = ref(true);
 // 从概览点进来之前，这一页要的数据多半已经预先读好了（lib/pageQueries.ts）：第一帧就用它，不放骨架。
-const preloaded = isDesktop() ? peekAll(activityPageQueries()) : null;
+const preloaded = isDesktop() ? peek(activityPageQueries()[0]) : null;
 if (preloaded) {
-  fullSeries.value = indexSeries(preloaded[0]);
+  fullSeries.value = indexSeries(preloaded.value);
   loading.value = false;
 }
 const initialLoading = useFirstLoad(loading);

@@ -21,7 +21,7 @@ import { useCardDeck } from '../../composables/useCardDeck';
 import { useDeckMorph } from '../../composables/useDeckMorph';
 import { staggerOrder } from '../../lib/deck/morph';
 import { wrapIndex } from '../../lib/deck/physics';
-import { deferSettle, onMotionEscape } from '../../lib/motion/interrupt';
+import { onMotionEscape } from '../../lib/motion/interrupt';
 import { defineMessages, useMessages } from '../../i18n';
 import { lessMotion } from '../../lib/motion/lessMotion';
 
@@ -149,7 +149,9 @@ const switchLayout = async (next: Layout) => {
 /* —— 打开态 —— */
 /** 正在关上的那张：关卡动画放完之前它还得留在画面上。 */
 const closingId = ref<string | null>(null);
-const shownId = computed(() => props.activeId ?? closingId.value);
+/** 关到一半又点开另一张：关的那张压缩收完之前，台上还是它。 */
+const holdId = ref<string | null>(null);
+const shownId = computed(() => holdId.value ?? props.activeId ?? closingId.value);
 const shownIndex = computed(() => props.cards.findIndex((card) => card.id === shownId.value));
 const shownCard = computed(() => (shownIndex.value >= 0 ? props.cards[shownIndex.value] : null));
 
@@ -209,21 +211,10 @@ const onPointerDown = (event: PointerEvent) => {
   rawPointerDown(event);
 };
 
-/* 连点保护：「打开」和打开后的「×」落在同一片区域，手快连点两下，卡会刚飞出来又
-   飞回去、来回折腾。两次开关之间少于 320ms 的点击当作误触忽略；Esc、拖动、圆点不受限。 */
-const TOGGLE_GUARD_MS = 320;
-let lastToggleAt = -Infinity;
-const guardedToggle = (fn: () => void) => {
-  const now = performance.now();
-  if (now - lastToggleAt < TOGGLE_GUARD_MS) return;
-  lastToggleAt = now;
-  // 开 / 关会换路由，路由钩子里的 settleMotion 会把正在放的形变（以及总览退后的 CSS 过渡）压进 90ms：
-  // 关到一半又点开，倒放就被压成「嗖」一下，总览和卡各走各的——快速开合时的那一顿。卡组自己会原路倒回，不用它快进。
-  deferSettle();
-  fn();
-};
-const requestOpen = (id: string) => guardedToggle(() => emit('open', id));
-const requestClose = () => guardedToggle(() => emit('close'));
+/* 开 / 关不设连点保护（2026-11-12 修复计划 A3）：开到一半再点是掉头、原路回去，点几下就来回翻几下，
+   停在最后一次要的那一头（composables/useDeckMorph.ts）。以前 320ms 内的第二下直接吞掉，快点时就是「点了没反应」。 */
+const requestOpen = (id: string) => emit('open', id);
+const requestClose = () => emit('close');
 
 const jumpTo = (id: string) => {
   if (id === props.activeId) return;
@@ -233,7 +224,6 @@ const jumpTo = (id: string) => {
   const target = props.cards.findIndex((card) => card.id === id);
   const direction: -1 | 1 = target < activeIndex.value ? -1 : 1;
   ownSwapIds.add(id);
-  deferSettle();
   emit('change', id, () => morph.swap(direction));
 };
 
@@ -247,8 +237,11 @@ let openFrom: ReturnType<typeof morph.seenBoxes> | null = null;
    「高级与维护」：越靠下跳得越多，源卡被拉出屏幕时干脆原地淡掉）。关卡前先同步滚回去再量。 */
 let listScroll = 0;
 const scroller = () => document.getElementById('main-content');
+/** 关卡那一刻滚动区停在哪：正在打开时关（掉头），路由钩子会先把滚动区滚回总览的位置，掉头期间要按住它。 */
+let closeScroll = 0;
 onBeforeRouteUpdate(() => {
   closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
+  closeScroll = props.activeId ? scroller()?.scrollTop ?? 0 : 0;
   openFrom = props.activeId ? null : morph.seenBoxes();
   if (!props.activeId) listScroll = scroller()?.scrollTop ?? 0;
 });
@@ -262,27 +255,46 @@ const onListPointerMove = (event: PointerEvent) => {
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
   if (id && !previous) {
-    lastToggleAt = performance.now();
     ownSwapIds.clear();
-    closingId.value = null;
-    reset();
-    if (id) markWarm(id);
     const from = openFrom?.get(id) ?? null;
     openFrom = null;
+    // 另一张还在关：先在很短的时间里把它收完（压缩，不是硬切），收完那一刻再开这张；关的那张先留在台上。
+    const leaving = closingId.value;
+    if (leaving && leaving !== id && morph.closing()) {
+      holdId.value = leaving;
+      await morph.compress();
+      if (props.activeId !== id) return;
+      holdId.value = null;
+    }
+    closingId.value = null;
+    reset();
+    markWarm(id);
     await nextTick();
     morph.open(id, from);
   } else if (!id && previous) {
-    lastToggleAt = performance.now();
     ownSwapIds.clear();
     reset();
     closingId.value = previous;
     const fromTop = closeFromTop;
     closeFromTop = null;
-    await nextTick();
-    const root = scroller();
-    if (root && listScroll > 0 && Math.abs(root.scrollTop - listScroll) > 1) root.scrollTop = listScroll;
+    // 正在打开就关：原路掉头。滚动区等落回原处那一刻再滚回去（打开时总览带着同样的位移补偿，两者正好抵消）。
+    const turning = morph.opening(previous);
+    const scrollBack = listScroll;
     listScroll = 0;
+    const restoreScroll = () => {
+      const root = scroller();
+      if (root && scrollBack > 0 && Math.abs(root.scrollTop - scrollBack) > 1) root.scrollTop = scrollBack;
+    };
+    if (turning) {
+      // 路由钩子（lib/returnScroll.ts）已经把滚动区滚回总览的位置了：掉头的整段动画是按打开时的版面算的，
+      // 先按回去，落地那一刻再滚过去。
+      const root = scroller();
+      if (root && Math.abs(root.scrollTop - closeScroll) > 1) root.scrollTop = closeScroll;
+    }
+    await nextTick();
+    if (!turning) restoreScroll();
     morph.close(previous, () => {
+      if (turning) restoreScroll();
       if (closingId.value === previous) closingId.value = null;
     }, fromTop);
   } else if (id && previous && id !== previous) {
@@ -351,15 +363,15 @@ const onDocClick = (event: MouseEvent) => {
   requestClose();
 };
 
-/* 打开到一半按 Esc：不开了——大卡和板一起倒回源卡（lib/motion/interrupt.ts 先问这里）。
-   紧接着的路由切换会调 settleMotion，先让它这一次别快进，不然倒放会被压成一下跳。 */
+/* 打开到一半按 Esc：不开了——大卡原路掉头缩回源卡（lib/motion/interrupt.ts 先问这里）。
+   关到一半按 Esc：已经在往回走了，这一下吞掉就好——不然全局的 settleMotion 会把总览回位的过渡压成一下跳，
+   卡包里还会被当成「收起全部」。 */
 let forgetEscape: (() => void) | null = null;
 
 onMounted(() => {
   forgetEscape = onMotionEscape(() => {
+    if (!props.activeId && morph.closing()) return true;
     if (!props.activeId || !morph.opening()) return false;
-    deferSettle();
-    lastToggleAt = performance.now();
     emit('close');
     return true;
   });

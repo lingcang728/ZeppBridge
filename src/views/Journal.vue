@@ -8,7 +8,7 @@
  *
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
-import { onActivated, onMounted, shallowRef } from 'vue';
+import { onActivated, onMounted, ref, shallowRef } from 'vue';
 import { useSectionTour } from '../composables/useTour';
 import YearDashboard from '../components/journal/year/YearDashboard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -27,12 +27,27 @@ import type { InjuryInput, RaceInput, ShoeInput } from '../types/logbook';
 defineOptions({ name: 'Journal' });
 const t = useJournalText();
 const logbook = useLogbook();
-onMounted(() => { void logbook.load(); });
-onActivated(() => { void logbook.load(); });
+let mountedOnce = false;
+onMounted(() => {
+  mountedOnce = true;
+  void logbook.load();
+});
+onActivated(() => {
+  if (mountedOnce) {
+    mountedOnce = false;
+    return;
+  }
+  void logbook.load();
+});
 
 /* origin：被点的按钮 / 那一行。弹窗从它长出来、关的时候缩回去（从哪里来，回哪里去）。 */
 type Editing = ({ kind: 'race'; value: RaceInput } | { kind: 'shoe'; value: ShoeInput } | { kind: 'injury'; value: InjuryInput }) & { origin?: HTMLElement } | null;
 const editing = shallowRef<Editing>(null);
+const editSession = ref(0);
+const openEdit = (next: NonNullable<Editing>) => {
+  editSession.value += 1;
+  editing.value = next;
+};
 const close = () => { editing.value = null; logbook.error.value = null; };
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('journal');
@@ -45,13 +60,13 @@ useSectionTour('journal');
       <YearDashboard class="span-full" />
       <RecordWall class="span-full" />
       <EpochSection class="span-full" />
-      <RaceSection class="span-half" @edit="(race, origin) => (editing = { kind: 'race', value: race, origin })" />
-      <InjurySection class="span-half" @edit="(injury, origin) => (editing = { kind: 'injury', value: injury, origin })" />
-      <ShoeSection class="span-full" @edit="(shoe, origin) => (editing = { kind: 'shoe', value: shoe, origin })" />
+      <RaceSection class="span-half" @edit="(race, origin) => openEdit({ kind: 'race', value: race, origin })" />
+      <InjurySection class="span-half" @edit="(injury, origin) => openEdit({ kind: 'injury', value: injury, origin })" />
+      <ShoeSection class="span-full" @edit="(shoe, origin) => openEdit({ kind: 'shoe', value: shoe, origin })" />
     </div>
-    <RaceEditor v-if="editing?.kind === 'race'" :race="editing.value" :origin="editing.origin" @close="close" />
-    <ShoeEditor v-if="editing?.kind === 'shoe'" :shoe="editing.value" :origin="editing.origin" @close="close" />
-    <InjuryEditor v-if="editing?.kind === 'injury'" :injury="editing.value" :origin="editing.origin" @close="close" />
+    <RaceEditor v-if="editing?.kind === 'race'" :key="`race-${editSession}`" :race="editing.value" :origin="editing.origin" @close="close" />
+    <ShoeEditor v-if="editing?.kind === 'shoe'" :key="`shoe-${editSession}`" :shoe="editing.value" :origin="editing.origin" @close="close" />
+    <InjuryEditor v-if="editing?.kind === 'injury'" :key="`injury-${editSession}`" :injury="editing.value" :origin="editing.origin" @close="close" />
   </section>
 </template>
 

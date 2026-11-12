@@ -1135,7 +1135,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       connectPill: 'Ligar conta',
       syncingProgress: (current: number, total: number) => `A sincronizar ${current}/${total}`,
       syncWait: "Aguarda até a sincronização terminar",
-      mailTitle: 'Novo correio · abrir a caixa de correio',
+      mailTitle: 'Nova carta · clica para escrever, mantém premido para abrir a caixa de correio',
       holdForLetters: 'Mantém premido para abrir a caixa de correio',
     },
     'components/shell/update': {
@@ -3477,9 +3477,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       summary: 'Funcionalidades ainda em teste, desativadas por predefinição',
       lead: 'Tudo aqui é experimental: pode mudar ou ser removido. Se algo falhar, escreve ao autor através da caixa de correio.',
       badge: 'Experimental',
-      glassTitle: 'Fusão de vidro',
-      glassSub:
-        'Os controlos de vidro muito próximos fundem-se ao arrastar e separam-se ao soltar. Apenas visual — desativar não altera mais nada.',
       unstrapImportTitle: 'Importar treinos do unstrap',
       unstrapImportSub:
         'Escolhe um zip de cópia de segurança do unstrap: os treinos gravados pela banda e pelo telemóvel (frequência cardíaca, trajeto, pausas) entram, um por sessão, juntamente com quaisquer dados de frequência cardíaca, SpO₂, frequência em repouso e sono ainda não presentes neste computador. Nada do que foi sincronizado do Zepp é alterado. As pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde podes anular cada uma.',
@@ -3798,7 +3795,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
           s4: 'As tuas métricas habituais ficam afixadas aqui; a linha abaixo é o teu intervalo habitual, sem comparações com outros.',
           s5: 'Três separadores no topo; sono, treinos e histórico abrem pelos cartões na Visão geral.',
           s6: 'O estado de sincronização fica aqui; clica para sincronizar. O anel verde no ícone superior esquerdo indica atualizações.',
-          s7: 'Cada secção explica-se ao ser aberta pela primeira vez; regressa a este cartão para rever tudo.',
+          s7: 'O ícone de carta no canto superior direito: clica para escrever ao autor ou mantém premido para abrir a caixa de correio; um ponto vermelho assinala novas cartas ou respostas.',
+          s8: 'Cada secção explica-se ao ser aberta pela primeira vez; regressa a este cartão para rever tudo.',
         },
         journal: {
           s1: 'Um ano inteiro de atividades numa só página; abre os anéis para os veres crescer.',
@@ -3808,8 +3806,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
           s5: 'Um anel por ano, mais largo nas semanas com mais treinos; toca numa linha fina para ver essa sessão.',
         },
         letters: {
-          s1: 'As cartas do autor a cada atualização ficam aqui; abre uma para ler.',
-          s2: '«As tuas cartas» reúne resumos semanais de dados e cartas para o teu eu do futuro; respostas e selos nos dois últimos.',
+          s1: 'O ícone de carta no canto superior direito: clica para escrever ao autor ou mantém premido para abrir a caixa de correio; um ponto vermelho assinala novas cartas ou respostas.',
+          s2: 'As cartas do autor a cada atualização ficam aqui; abre uma para ler.',
+          s3: '«As tuas cartas» reúne resumos semanais de dados e cartas para o teu eu do futuro; respostas e selos nos dois últimos.',
         },
         metric: {
           s1: 'Escolhe o período uma vez e todas as páginas irão lembrar-se dele.',

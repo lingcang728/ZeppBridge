@@ -20,7 +20,7 @@ import PostageStamp from '../components/letters/PostageStamp.vue';
 import EnvelopeTile from '../components/letters/EnvelopeTile.vue';
 import LetterEnvelope from '../components/letters/LetterEnvelope.vue';
 import DataLetters from '../components/letters/DataLetters.vue';
-import { openAuthorCompose, useAuthorCompose, type AuthorComposePreset } from '../composables/useAuthorCompose';
+import { openAuthorCompose, prefetchAuthorCompose, useAuthorCompose, type AuthorComposePreset } from '../composables/useAuthorCompose';
 import { useDataLetterText } from '../components/letters/dataLetters.i18n';
 import { useLetterText } from '../components/letters/letters.i18n';
 import { echoTitles, letterVersions } from '../services/letters';
@@ -128,6 +128,8 @@ const openFromQuery = async () => {
   if (tile) writeAuthor(tile, preset === 'device' || preset === 'report' ? preset : undefined);
 };
 onMounted(openFromQuery);
+// 信匣里那只空信封随时会被点：信纸那块代码先取回来，点下去第一帧就飞（顶栏的笔是悬停时取）。
+onMounted(prefetchAuthorCompose);
 watch(() => route.query.write, openFromQuery);
 
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */

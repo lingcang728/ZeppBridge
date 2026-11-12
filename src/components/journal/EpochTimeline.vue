@@ -237,9 +237,11 @@ function add(e: PointerEvent) {
   const rect = viewport.value!.getBoundingClientRect();
   const at = dayAt(e.clientX);
   picked.value = at; cursor.value = null;
-  // 锚点先摆到那一天的竖线上（同步布局），编辑器量它的矩形、从那里长出来，关上时也缩回这里。
-  anchor.value!.style.left = `${at.x + offset.value - maxOffset.value - 12}px`;
-  anchor.value!.style.top = `${e.clientY - rect.top - 16}px`;
+  // 锚点给足胶囊大小的稳态起点（96×38 圆角），摆到那一天的竖线上，避免 24px 极小框造成急促缩放。
+  const anchorLeft = Math.max(4, Math.min(rect.width - 100, at.x + offset.value - maxOffset.value - 48));
+  const anchorTop = Math.max(4, Math.min(rect.height - 42, e.clientY - rect.top - 19));
+  anchor.value!.style.left = `${anchorLeft}px`;
+  anchor.value!.style.top = `${anchorTop}px`;
   life.open(undefined, at.date, anchor.value);
 }
 function key(e: KeyboardEvent) {
@@ -351,5 +353,5 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .timeline-tip span + span::before { content: ' · '; }
 .timeline-tip.below { transform: none; }
 .timeline-empty { position: absolute; left: 0; right: 0; margin: 0; text-align: center; color: var(--subtle); font-size: var(--fs-sm); pointer-events: none; }
-.day-anchor { position: absolute; width: 24px; height: 32px; pointer-events: none; }
+.day-anchor { position: absolute; width: 96px; height: 38px; border-radius: 14px; pointer-events: none; }
 </style>

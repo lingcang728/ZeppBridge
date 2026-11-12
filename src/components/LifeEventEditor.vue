@@ -9,7 +9,7 @@ import { backend } from '../lib/bridge';
 import { eventCategories, lifeEventMessages, validLifeEvent } from '../lib/lifeEvents';
 import { useMessages } from '../i18n';
 const t = useMessages(lifeEventMessages);
-const { draft, origin, reload } = useLifeEvents();
+const { draft, session, origin, reload } = useLifeEvents();
 const busy = ref(false);
 const error = ref('');
 const titleInput = ref<HTMLInputElement>();
@@ -42,20 +42,32 @@ async function save() {
   if (!draft.value || busy.value) return;
   if (!validLifeEvent(draft.value)) { error.value = 'invalid'; await nextTick(); titleInput.value?.scrollIntoView({ block: 'center', behavior: 'instant' }); titleInput.value?.focus({ preventScroll: true }); return; }
   busy.value = true; error.value = '';
-  try { await backend.saveLifeEvent({ ...draft.value }); await reload(); draft.value = null; }
-  catch { error.value = 'failed'; }
-  finally { busy.value = false; }
+  try {
+    await backend.saveLifeEvent({ ...draft.value });
+    draft.value = null;
+    void reload();
+  } catch {
+    error.value = 'failed';
+  } finally {
+    busy.value = false;
+  }
 }
 async function remove() {
   if (!draft.value?.id || busy.value) return;
   busy.value = true; error.value = '';
-  try { await backend.deleteLifeEvent(draft.value.id); await reload(); draft.value = null; }
-  catch { error.value = 'failed'; }
-  finally { busy.value = false; }
+  try {
+    await backend.deleteLifeEvent(draft.value.id);
+    draft.value = null;
+    void reload();
+  } catch {
+    error.value = 'failed';
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 <template>
-  <ModalDialog v-if="draft" labelledby="life-event-editor-title" :origin="origin" @close="close">
+  <ModalDialog v-if="draft" :key="session" labelledby="life-event-editor-title" :origin="origin" @close="close">
     <form novalidate class="event-form" @submit.prevent="save">
       <h2 id="life-event-editor-title">{{ draft.id ? t.edit : t.add }}</h2>
       <fieldset :disabled="busy">

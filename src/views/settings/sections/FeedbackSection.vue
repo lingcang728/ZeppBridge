@@ -5,13 +5,14 @@
 import { onMounted } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import { useLetterText } from '../../../components/letters/letters.i18n';
-import { openAuthorCompose } from '../../../composables/useAuthorCompose';
+import { openAuthorCompose, prefetchAuthorCompose } from '../../../composables/useAuthorCompose';
 import { letterVersions } from '../../../services/letters';
 import { hasNewAuthorReply, loadLetterBox } from '../../../services/letterBox';
 
 const l = useLetterText();
 const letterCount = letterVersions().length;
-onMounted(() => { void loadLetterBox(); });
+// 卡一展开就把信封那块代码取回来：点「动笔写信」时信封第一帧就从按钮里飞出来（和顶栏的笔一样，不等加载）。
+onMounted(() => { void loadLetterBox(); prefetchAuthorCompose(); });
 const write = (event: MouseEvent, withReport = false) =>
   openAuthorCompose(event.currentTarget as HTMLElement, withReport ? 'report' : undefined);
 </script>

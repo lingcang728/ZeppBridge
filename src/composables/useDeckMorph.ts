@@ -3,8 +3,10 @@ import {
   centerOf, flightOffset, morphFrames, peekBox, shownRect, unscaledBox, type Box, type Point,
 } from '../lib/deck/morph';
 import { SLIDE_IN_EASE, SLIDE_IN_MS, slideInFrames } from '../lib/deck/physics';
-import { exemptFromSettle } from '../lib/motion/interrupt';
-import { BODY_IN, BODY_OUT, CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, paced } from '../lib/motion/timing';
+import { createFlight, type Flight } from '../lib/motion/flight';
+import {
+  BACK_EASE, BODY_IN, BODY_OUT, CLOSE_MS, COMPRESS_MS, OPEN_EASE, OPEN_MS, RECEDE_SCALE, paced,
+} from '../lib/motion/timing';
 
 /**
  * 设置卡组在三种形态之间的形变：coverflow ↔ 卡包（洗牌式飞出 / 收拢）、总览 ↔ 打开一张。
@@ -15,7 +17,8 @@ import { BODY_IN, BODY_OUT, CLOSE_EASE, CLOSE_MS, OPEN_EASE, OPEN_MS, paced } fr
  * 不能只动 transform：小卡 760×78 变大卡约 900×1400，宽高比变了，纯缩放会把字拉变形。
  * 裁切的圆角整段固定（半径一变就退回主线程，见 lib/motion/window.ts 文件头），四边的 inset 交给合成器。
  *
- * 都可以打断：打开到一半关，所有动画一起 `reverse()` 原路倒回；关到一半再开同理。
+ * 都可以打断（lib/motion/flight.ts）：打开到一半关，整组动画掉头原路回去、走了多久就花多久；关到一半再开同理。
+ * 整组不被 settleMotion 快进，连点不设保护：点几下就来回翻几下，停在最后一次要的那一头。
  */
 export interface DeckMorphRefs {
   /** 总览那一层（coverflow 或平铺）：打开一张卡时它整体往后退。 */
@@ -36,6 +39,14 @@ const COVER_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { op
 const FLIGHT_MS = paced(520);
 const FLIGHT_STAGGER_MS = 8;
 const FLIGHT_EASE = 'cubic-bezier(.3, .7, .2, 1)';
+/** 关回小卡的落地（2026-11-12 第三轮）：源卡在大卡底下先亮好，大卡最后一段整张淡掉——不在小卡上停一下再一帧换掉。 */
+const SOURCE_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.58 }, { opacity: 1, offset: 0.8 }, { opacity: 1 }];
+const CARD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }];
+/** 大卡滚下去很远再关（卡头远在屏幕上方）：内容钉在窗口上跟着走、前三成就淡掉，窗口缩回源卡的途中源卡在底下亮起来，
+    大卡后半程整张化开——不再先把大卡「卷」回顶上再缩（2026-11-12 第四轮录屏：那一下像往上回弹）。 */
+const FAR_BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.32 }, { opacity: 0 }];
+const FAR_SOURCE_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.28 }, { opacity: 1, offset: 0.62 }, { opacity: 1 }];
+const FAR_CARD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0, offset: 0.82 }, { opacity: 0 }];
 
 const r2 = (value: number) => Number(value.toFixed(2));
 const r4 = (value: number) => Number(value.toFixed(4));
@@ -107,16 +118,21 @@ export interface DeckSnapshot {
 
 interface Morph {
   id: string;
-  kind: 'open' | 'close';
-  /** 一起放、一起倒放的那几段（大卡的形状、卡身淡入淡出、coverflow 的交叉淡化）。 */
-  anims: Animation[];
-  main: Animation;
-  /** 收尾：撤掉动画、把源卡露回来、停掉尺寸监听。 */
-  cleanup: () => void;
-  /** 不跟着倒放的附带动画（总览的滚动补偿）：倒放时直接撤掉。 */
-  extra?: Animation | null;
+  /** 这次飞行建起来时往哪走；掉头以后实际方向看 `kindOf()`。 */
+  forward: 'open' | 'close';
+  flight: Flight;
+  /** 原地淡出（fadeOut）带着滚动补偿，倒回去落不到原处：不掉头，另起一段打开。 */
+  turnable: boolean;
+  /** 落在「关上」那一头时调：大卡下场（清掉 closingId）。在撤动画之前调，中间不闪整张大卡。 */
   closed?: () => void;
+  done: Promise<void>;
+  resolve: () => void;
 }
+
+const kindOf = (current: Morph): 'open' | 'close' => {
+  if (current.flight.direction === 1) return current.forward;
+  return current.forward === 'open' ? 'close' : 'open';
+};
 
 export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) => {
   let morph: Morph | null = null;
@@ -135,39 +151,52 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   const headOf = (el: HTMLElement) => [
     ...el.querySelectorAll<HTMLElement>(':scope > .open-head > :not(.deck-grip):not(.deck-close)'),
   ];
-
-  const running = (current: Morph | null) => Boolean(current && current.main.playState === 'running');
-
-  const settle = (current: Morph) => {
-    if (morph !== current) return;
-    morph = null;
-    // 先让大卡下场（closed 清掉 closingId，Vue 在这一帧画之前就把它藏起来），再撤动画：中间不会闪出整张大卡。
-    if (current.kind === 'close') current.closed?.();
-    current.cleanup();
+  /** 卡组上面同一页里的东西（页头、提示条）：路由一换滚动区回顶，它们和总览一起跳。 */
+  const aboveDeck = (): HTMLElement[] => {
+    const deck = overview.value?.closest<HTMLElement>('.card-deck');
+    const page = deck?.parentElement;
+    if (!deck || !page) return [];
+    const out: HTMLElement[] = [];
+    for (const child of page.children) {
+      if (child === deck) break;
+      if (child instanceof HTMLElement) out.push(child);
+    }
+    return out;
   };
 
-  const begin = (next: Morph) => {
-    morph = next;
-    next.main.finished.then(() => settle(next), () => undefined);
+  /** 收尾：落在「关上」那头先让大卡下场，再撤动画、还原源卡。 */
+  const finish = (current: Morph) => {
+    if (morph === current) morph = null;
+    if (kindOf(current) === 'close') current.closed?.();
+    current.closed = undefined;
+    current.flight.dispose();
+    current.resolve();
+  };
+
+  const begin = (id: string, forward: Morph['forward'], duration: number, closed?: () => void, turnable = true): Morph => {
+    let resolve = () => {};
+    const done = new Promise<void>((r) => { resolve = r; });
+    let current: Morph | null = null;
+    const flight = createFlight({ duration, keepOnLand: true, onLand: () => { if (current) finish(current); } });
+    current = { id, forward, flight, turnable, closed, done, resolve };
+    morph = current;
+    return current;
   };
 
   const stopCurrent = () => {
     const previous = morph;
     morph = null;
-    previous?.cleanup();
+    if (previous) finish(previous);
   };
 
-  const reverse = (current: Morph, kind: 'open' | 'close', closed?: () => void) => {
-    current.kind = kind;
-    current.closed = closed;
-    current.extra?.cancel();
-    current.extra = null;
-    for (const animation of current.anims) animation.reverse();
+  /** 同一张卡正在往反方向走：掉头（同一组动画翻速率，原路、原时长回去）。 */
+  const turnTo = (id: string, kind: 'open' | 'close', closed?: () => void) => {
+    const current = morph;
+    if (!current || current.id !== id || !current.turnable || kindOf(current) === kind) return false;
+    if (!current.flight.turn()) return false;
+    current.closed = kind === 'close' ? closed : undefined;
+    return true;
   };
-
-  /** 源卡在形变期间藏着（行内样式不动，用一段不参与快进的动画盖住）。 */
-  const hide = (el: HTMLElement | null) =>
-    el ? exemptFromSettle(el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 1, fill: 'forwards' })) : null;
 
   /** 没有源卡可对（直接打开的链接、源卡不在画面里）：从后面浮上来。 */
   const rise = (el: HTMLElement) => {
@@ -186,13 +215,10 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
    */
   const open = (id: string, seen: Box | null = null) => {
     const el = card.value;
-    if (!el || reducedMotion()) return;
-    if (morph && morph.id === id && morph.kind === 'close' && running(morph)) {
-      reverse(morph, 'open');
-      return;
-    }
-    if (morph?.kind === 'close') morph.closed?.();
+    if (!el) return;
+    if (turnTo(id, 'open')) return;
     stopCurrent();
+    if (reducedMotion()) return;
     for (const animation of el.getAnimations()) animation.cancel();
     const source = sourceOf(id);
     const from = seen ?? (source ? seenBoxOf(source) : null);
@@ -213,44 +239,34 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
         radius,
       );
     };
-    const timing: KeyframeAnimationOptions = { duration: OPEN_MS, easing: OPEN_EASE, fill: 'both' };
-    const main = el.animate(frames(), timing);
-    const linear: KeyframeAnimationOptions = { duration: OPEN_MS, easing: 'linear', fill: 'both' };
-    const anims = [
-      main,
-      ...[...partsOf(el), ...(fromCover ? headOf(el) : [])].map((part) => part.animate(BODY_IN, linear)),
-    ];
-    if (fromCover) anims.push(el.animate([{ opacity: 0 }, { opacity: 1, offset: COVER_FADE }, { opacity: 1 }], linear));
-    const hidden = fromCover ? null : hide(source);
-    // 卡包往下滚过再点开：路由一换滚动区就被拉回顶部，总览第一帧整体跳一截。让它从人刚才看到的位置
-    // 退到后面去（终点和 .is-receded 的 CSS 一样，放完交还给 CSS）。
+    const current = begin(id, 'open', OPEN_MS);
+    const { flight } = current;
+    const main = flight.add(el, frames(), { easing: OPEN_EASE });
+    for (const part of [...partsOf(el), ...(fromCover ? headOf(el) : [])]) flight.add(part, BODY_IN);
+    if (fromCover) flight.add(el, [{ opacity: 0 }, { opacity: 1, offset: COVER_FADE }, { opacity: 1 }]);
+    else flight.cover(source);
+    // 卡包往下滚过再点开：路由一换滚动区就被拉回顶部，总览和页头第一帧整体跳一截。让它们从人刚才看到的位置
+    // 走到新位置（总览的终点和 .is-receded 的 CSS 一样，放完交还给 CSS）。在同一组里：掉头时一起原路回去。
     const shift = source ? from.top - boxOf(source).top : 0;
-    const extra = Math.abs(shift) > 1 && overview.value
-      ? overview.value.animate(
-        [{ transform: `translateY(${r2(shift)}px)` }, { transform: 'scale(.94)' }],
-        { duration: paced(300), easing: OPEN_EASE },
-      )
-      : null;
+    if (Math.abs(shift) > 1 && overview.value) {
+      const layer = overview.value;
+      flight.add(layer, [{ transform: `translateY(${r2(shift)}px)` }, { transform: `scale(${RECEDE_SCALE})` }], { easing: OPEN_EASE });
+      for (const above of aboveDeck()) flight.add(above, [{ transform: `translateY(${r2(shift)}px)` }, { transform: 'none' }], { easing: OPEN_EASE });
+      // 掉头落回起点时总览的 CSS 过渡可能还没走完：一并收掉，免得撤补偿那一帧它还在半路。
+      flight.own(() => {
+        for (const animation of layer.getAnimations()) {
+          if (typeof CSSTransition !== 'undefined' && animation instanceof CSSTransition) animation.finish();
+        }
+      });
+    }
     // 卡里的内容晚一点长高（数据回来）：形状还在走时换终点，时间轴不变。
     const resized = typeof ResizeObserver === 'function'
       ? new ResizeObserver(() => {
-        if (morph?.main === main && main.playState === 'running') (main.effect as KeyframeEffect | null)?.setKeyframes(frames());
+        if (morph === current && flight.running() && flight.direction === 1) (main.effect as KeyframeEffect | null)?.setKeyframes(frames());
       })
       : null;
     resized?.observe(el);
-    begin({
-      id,
-      kind: 'open',
-      anims,
-      main,
-      extra,
-      cleanup: () => {
-        resized?.disconnect();
-        extra?.cancel();
-        hidden?.cancel();
-        for (const animation of anims) animation.cancel();
-      },
-    });
+    flight.own(() => resized?.disconnect());
   };
 
   /** 源卡在总览回到原大以后的样子（总览此刻正从「退后一层」往回放大）：卡包里只算露在外面的那一段。 */
@@ -276,14 +292,11 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   const fadeOut = (el: HTMLElement, id: string, closed: () => void, lift: number) => {
     const top = el.getBoundingClientRect().top + lift;
     const origin = `50% ${r2(window.innerHeight / 2 - top)}px`;
-    const main = el.animate(
-      [
-        { opacity: 1, transformOrigin: origin, transform: `translate(0px, ${lift}px)` },
-        { opacity: 0, transformOrigin: origin, transform: `translate(0px, ${lift + 12}px) scale(.97)` },
-      ],
-      { duration: paced(260), easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'both' },
-    );
-    begin({ id, kind: 'close', anims: [main], main, closed, cleanup: () => main.cancel() });
+    const { flight } = begin(id, 'close', paced(260), closed, false);
+    flight.add(el, [
+      { opacity: 1, transformOrigin: origin, transform: `translate(0px, ${lift}px)` },
+      { opacity: 0, transformOrigin: origin, transform: `translate(0px, ${lift + 12}px) scale(.97)` },
+    ], { easing: 'cubic-bezier(.4, 0, .2, 1)' });
   };
 
   /**
@@ -296,12 +309,10 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
    */
   const close = (id: string, closed: () => void, fromTop: number | null = null) => {
     const el = card.value;
-    if (!el || reducedMotion()) { stopCurrent(); closed(); return; }
-    if (morph && morph.id === id && morph.kind === 'open' && running(morph)) {
-      reverse(morph, 'close', closed);
-      return;
-    }
+    if (!el) { stopCurrent(); closed(); return; }
+    if (turnTo(id, 'close', closed)) return;
     stopCurrent();
+    if (reducedMotion()) { closed(); return; }
     for (const animation of el.getAnimations()) animation.cancel();
     const start = boxOf(el);
     const lift = fromTop === null ? 0 : fromTop - start.top;
@@ -309,35 +320,30 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const target = source ? settledSeenBoxOf(source) : null;
     const onScreen = Boolean(target && target.width >= 24 && target.top < window.innerHeight && target.top + target.height > 0);
     const far = lift < -window.innerHeight * 0.5;
-    if (!source || !target || !onScreen || far) { fadeOut(el, id, closed, lift); return; }
+    if (!source || !target || !onScreen) { fadeOut(el, id, closed, lift); return; }
     const toCover = Boolean(source.closest('.cover-stage'));
     const box: Box = { left: start.left, top: start.top, width: el.offsetWidth, height: el.offsetHeight };
     const lifted: Box = { ...box, top: box.top + lift };
+    const shown = shownRect(lifted, window.innerHeight);
+    // 滚得很远：内容钉在窗口上跟着走（不从上千像素外把卡头拉回来），看得见的那一段就地淡掉。
+    const toAnchor = far
+      ? { x: target.left, y: target.top + (lifted.top - shown.top) }
+      : { x: target.left, y: target.top };
     const frames = morphFrames(
-      { rect: shownRect(lifted, window.innerHeight), anchor: { x: lifted.left, y: lifted.top } },
-      { rect: target, anchor: { x: target.left, y: target.top } },
+      { rect: shown, anchor: { x: lifted.left, y: lifted.top } },
+      { rect: target, anchor: toAnchor },
       box,
       radiusOf(el),
     );
-    const main = el.animate(frames, { duration: CLOSE_MS, easing: CLOSE_EASE, fill: 'both' });
-    const linear: KeyframeAnimationOptions = { duration: CLOSE_MS, easing: 'linear', fill: 'both' };
-    const anims = [
-      main,
-      ...[...partsOf(el), ...(toCover ? headOf(el) : [])].map((part) => part.animate(BODY_OUT, linear)),
-    ];
-    if (toCover) anims.push(el.animate(COVER_OUT, linear));
-    const hidden = toCover ? null : hide(source);
-    begin({
-      id,
-      kind: 'close',
-      anims,
-      main,
-      closed,
-      cleanup: () => {
-        hidden?.cancel();
-        for (const animation of anims) animation.cancel();
-      },
-    });
+    const { flight } = begin(id, 'close', CLOSE_MS, closed);
+    flight.add(el, frames, { easing: BACK_EASE });
+    for (const part of [...partsOf(el), ...(toCover || far ? headOf(el) : [])]) flight.add(part, far ? FAR_BODY_OUT : BODY_OUT);
+    if (toCover) flight.add(el, COVER_OUT);
+    else {
+      // 源卡在大卡底下亮起来（大卡一直包着它，看不见），大卡最后整张淡掉。掉头时两段跟着原路倒回去。
+      flight.add(source, far ? FAR_SOURCE_IN : SOURCE_IN);
+      flight.add(el, far ? FAR_CARD_OUT : CARD_OUT);
+    }
   };
 
   /** 拍下画面里那组卡（不带拷贝）：开卡时要的是每张小卡露在外面的那一段。 */
@@ -497,8 +503,17 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       });
   };
 
-  /** 正在打开：这时按 Esc 是「不开了」，把它倒回去。 */
-  const opening = () => Boolean(morph && morph.kind === 'open' && running(morph));
+  /** 正在打开（给了 `id` 就只认这一张）：这时按 Esc / 再点一下是「不开了」，原路掉头。 */
+  const opening = (id?: string) => Boolean(morph && morph.flight.running() && kindOf(morph) === 'open' && (!id || morph.id === id));
+  /** 正在关上。 */
+  const closing = () => Boolean(morph && morph.flight.running() && kindOf(morph) === 'close');
+  /** 正在关的那张在 COMPRESS_MS 内收完（又点开了另一张：不硬切，压缩收尾）；返回它下场的时刻。 */
+  const compress = (): Promise<void> => {
+    const current = morph;
+    if (!current || !closing()) return Promise.resolve();
+    current.flight.hurry(COMPRESS_MS);
+    return current.done;
+  };
 
   /** 切卡、拖拽或按键翻页前立刻收清正在进行的开合形变及旧滑入动画，避免多段 WAAPI 叠加跳变。 */
   const settleNow = () => {
@@ -524,5 +539,5 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     dropFlights();
   });
 
-  return { open, close, seenBoxes, snapshot, fly, opening, settleNow, swap };
+  return { open, close, seenBoxes, snapshot, fly, opening, closing, compress, settleNow, swap };
 };

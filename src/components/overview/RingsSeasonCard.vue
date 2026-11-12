@@ -20,7 +20,7 @@ const season = computed(() => {
 </script>
 
 <template>
-  <RouterLink v-if="season" class="metric-panel rings-season" :to="{ name: 'Rings', query: { year: String(season) } }">
+  <RouterLink v-if="season" class="metric-panel rings-season" data-morph-card :to="{ name: 'Rings', query: { year: String(season) } }">
     <svg class="mini-ring" viewBox="-20 -20 40 40" aria-hidden="true">
       <circle r="17" /><circle r="11.5" /><circle r="6" /><circle class="core" r="1.6" />
     </svg>
