@@ -131,3 +131,61 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
     }],
   };
 };
+
+/* ── 卡变大就多画细节（2026-11-13 用户：卡拉大了内容也该多，不是同一张图放大）。 ──
+   整场一直都画（不截取一段）；中档：时间刻度更密、平均线标上数；大档：再标出最高 / 最低点，心率图叠上手表划的区间色带。
+   只画已有的数：没有区间就不画色带，不编数据。 */
+export type ChartTier = 'sm' | 'md' | 'lg';
+export const chartTier = (width: number): ChartTier => (width >= 820 ? 'lg' : width >= 520 ? 'md' : 'sm');
+export interface ChartBand { index: number; low: number | null; high: number }
+export interface ChartDetail {
+  color: string;
+  palette: ChartPalette;
+  format?: (value: number) => string;
+  /** 心率区间（手表随运动下发的上界），从低到高。 */
+  bands?: ChartBand[];
+}
+type LineOption = NonNullable<ReturnType<typeof lineOption>>;
+
+export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDetail): LineOption => {
+  if (tier === 'sm') return option;
+  const [series] = option.series;
+  const data = series.data;
+  const span = data[data.length - 1]![0] - data[0]![0];
+  const parts = tier === 'lg' ? 8 : 6;
+  const tick = Math.max(60_000, Math.ceil(span / parts / 60_000) * 60_000);
+  const fmt = (value: number) => (detail.format ? detail.format(value) : String(Math.round(value)));
+  const { palette, color } = detail;
+  const label = { color: palette.axis, fontSize: 12.5, fontWeight: 600 };
+  const next: LineOption & { series: Array<LineOption['series'][number] & Record<string, unknown>> } = {
+    ...option,
+    xAxis: { ...option.xAxis, splitNumber: parts, minInterval: tick, maxInterval: tick },
+    series: [{
+      ...series,
+      markLine: {
+        ...series.markLine,
+        label: { show: true, position: 'insideEndTop', ...label, formatter: (p: { value: number }) => fmt(p.value) },
+      },
+    }],
+  };
+  if (tier === 'lg') {
+    next.series[0].markPoint = {
+      symbol: 'circle',
+      symbolSize: 8,
+      itemStyle: { color, borderColor: palette.surface, borderWidth: 2 },
+      label: { show: true, position: 'top', distance: 6, ...label, color: palette.tooltipText, formatter: (p: { value: number }) => fmt(p.value) },
+      data: [{ type: 'max' }, { type: 'min' }],
+    };
+    if (detail.bands?.length) {
+      next.series[0].markArea = {
+        silent: true,
+        label: { show: true, position: 'insideRight', color: palette.axis, fontSize: 11 },
+        data: detail.bands.map((band, i) => [
+          { yAxis: band.low ?? 0, name: `Z${band.index}`, itemStyle: { color: `${color}${i % 2 ? '14' : '08'}` } },
+          { yAxis: band.high },
+        ]),
+      };
+    }
+  }
+  return next;
+};

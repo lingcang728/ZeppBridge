@@ -14,6 +14,8 @@ const props = defineProps<{
   activeRow: string | null;
   /** 这里正停着的那块（`view:slug:side`）。 */
   activeShape: string | null;
+  /** 右栏肌群胶囊正停着时，这个肌群的那几块（可能左右两侧、正反两面）。 */
+  activeShapes?: ReadonlySet<string> | null;
 }>();
 const emit = defineEmits<{
   (event: 'hover-shape', key: string | null): void;
@@ -47,7 +49,10 @@ const states = computed(() => {
       else if (row.secondary.has(key)) out[key] = { level: 2, hatched: true };
       else out[key] = { level: load.level, hatched: load.secondaryOnly, dim: true };
     } else {
-      out[key] = { level: load.level, hatched: load.secondaryOnly, hot: props.activeShape === key, dim: !!props.activeShape && props.activeShape !== key };
+      const group = props.activeShapes?.size ? props.activeShapes : null;
+      const hot = props.activeShape === key || !!group?.has(key);
+      const focused = !!props.activeShape || !!group;
+      out[key] = { level: load.level, hatched: load.secondaryOnly, hot, dim: focused && !hot };
     }
   }
   return out;

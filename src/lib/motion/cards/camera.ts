@@ -21,6 +21,7 @@ import { fanBack, stackCards, type Landing } from './deal';
 import { angleOf, centerOfRect, restOf } from './pose';
 import { animateFromNow, cancelOn } from './reversible';
 import { reducedMotion, settled } from './spring';
+import { settleCssAnimations } from '../settle';
 
 const RECEDE_MS = paced(340);
 const PULL_MS = paced(440);
@@ -51,6 +52,8 @@ const blurredCopy = (layer: HTMLElement): HTMLElement => {
   const style = getComputedStyle(layer);
   Object.assign(copy.style, { transform: style.transform, transformOrigin: style.transformOrigin, opacity: '0', filter: BLUR, pointerEvents: 'none', transition: 'none' });
   layer.before(copy);
+  // 拷贝出来的 DOM 停在终态：CSS 入场动画别从头再放（settle.ts）。
+  settleCssAnimations(copy);
   return copy;
 };
 

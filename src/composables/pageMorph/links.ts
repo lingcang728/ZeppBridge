@@ -56,7 +56,9 @@ export const linksTo = (href: string, scope: string) => {
 export const STAYING = '.page-host > :not([class*="-leave"])';
 
 /** `source`：不是从链接、而是从一张卡直接开的（armPageMorph）：返回时按这个标记找回那张卡。 */
-export type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; source?: string };
+/** `small`：来处是一枚小按钮 / 胶囊（armPageMorph 的 anySize）而不是一张卡：收回时拷贝不跟着窗口缩放（按窗口宽缩放会把
+    一颗 30px 的圆钮放大几十倍，2026-11-13 录屏里的「巨型信封」），整页缩到它跟前才换成它。 */
+export type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; source?: string; small?: boolean };
 
 /**
  * 从一张卡直接形变进某一页（不是点卡里的链接）：指标卡上的「问 AI」选了问题以后从这张卡长进「交给 AI」，

@@ -1,28 +1,10 @@
 /* 两种形态（落地页、桌面外壳）都要的全局基础规则：滚动条、盒模型、html/body、表单元素继承字体、焦点环。
    经 App.vue 的 <style src> 进首屏。桌面外壳自己的布局在 shell.css，跟着懒加载的 AppShell.vue 走。 */
 
-/* ── 全局自定义细滚动条（覆盖原生灰条） ─────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--surface-hover);
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--subtle);
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--surface-hover) transparent;
-}
+/* ── 滚动条一律藏起来（2026-11-13 用户：独立悬在一边的细条太丑，全局都去掉）。
+   滚轮 / 触控板 / 键盘照滚；横向内容别靠滚动条（按宽收列、折行或给按钮）。 */
+* { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; min-height: 100%; margin: 0; overflow: hidden; }

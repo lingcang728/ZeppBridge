@@ -20,6 +20,7 @@ import {
   LegendComponent,
   MarkAreaComponent,
   MarkLineComponent,
+  MarkPointComponent,
   TooltipComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -38,6 +39,7 @@ use([
   LegendComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  MarkPointComponent,
   CanvasRenderer,
 ]);
 registerTheme('zeppbridge-dark', zeppThemeDark);

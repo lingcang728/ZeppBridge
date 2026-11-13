@@ -60,7 +60,13 @@ const props = withDefaults(defineProps<{
   intro?: boolean;
   /** 永不折行：放不下由父布局让位（两项的分段，第三轮 B1）。 */
   noWrap?: boolean;
+  /**
+   * 还没选（modelValue 不在任何一项上）时滑块停在哪一项，画成「未选」的样子：平胶囊半透明、字不变色不加粗。
+   * 2026-11-13 用户：没打分时没有滑块、点一下才冒出来，很怪——滑块一开始就在，只是没选。点 / 拖到哪一项才算选。
+   */
+  placeholder?: T;
 }>(), {
+  placeholder: undefined,
   intro: false,
   noWrap: false,
   disabled: false,
@@ -178,8 +184,11 @@ const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({
   value: props.items[index]!.value,
 }));
 
+/** 还没选：滑块停在 placeholder 那一项上，画成「未选」。 */
+const parked = computed(() => props.placeholder !== undefined && !props.items.some((item) => item.value === props.modelValue));
 const placeOn = (value: T) => {
-  const stop = stops.value.find((item) => item.value === value);
+  const stop = stops.value.find((item) => item.value === value)
+    ?? (parked.value && value === props.modelValue ? stops.value.find((item) => item.value === props.placeholder) : undefined);
   thumb.value = stop
     ? { left: stop.left, width: stop.width, top: stop.top ?? 0, height: stop.height ?? 0, visible: true }
     : { ...thumb.value, visible: false };
@@ -730,6 +739,7 @@ onBeforeUnmount(() => {
       'is-icon-only': iconOnly,
       'has-lens': thumbLens.active.value,
       'is-lifted': lifted,
+      'is-parked': parked,
     }]"
     :style="trackStyle"
     role="radiogroup"
@@ -757,7 +767,7 @@ onBeforeUnmount(() => {
       :aria-label="iconOnly ? item.label : fullTitle(item)"
       :title="iconOnly ? item.label : fullTitle(item)"
       :disabled="disabled"
-      :tabindex="item.value === modelValue ? 0 : -1"
+      :tabindex="item.value === modelValue || (parked && item.value === placeholder) ? 0 : -1"
       @click="onClick(item.value)"
     >
       <slot :item="item" :active="false">
@@ -886,6 +896,10 @@ onBeforeUnmount(() => {
 }
 .segment-item:hover:not(:disabled) { color: var(--ink); }
 .segment-item.is-offrow { -webkit-mask-image: none; mask-image: none; }
+/* 未选：滑块在，但字照常是普通字（不挖空、上层选中字不画），平胶囊半透明。 */
+.segment-track.is-parked:not(.is-dragging):not(.is-settling) .segment-item { -webkit-mask-image: none; mask-image: none; }
+.segment-track.is-parked:not(.is-dragging):not(.is-settling) .segment-ink { opacity: 0; }
+.segment-track.is-parked:not(.is-dragging):not(.is-settling) .segment-plate { opacity: .5; }
 /* 按钮宽度按粗体留：隐形的粗体副本和字叠在同一格里，取两者较宽的那个。 */
 .seg-label { display: inline-grid; }
 .seg-label::after {

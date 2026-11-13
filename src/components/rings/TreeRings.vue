@@ -344,7 +344,7 @@ watch(() => props.selected, () => { open.value = null; closing.value = false; ai
               <text :x="m.label.x" :y="m.label.y">{{ m.text }}</text>
             </g>
           </g>
-          <g class="bark" aria-hidden="true">
+          <g class="bark" aria-hidden="true" data-morph-focus>
             <path class="bark-side" :d="bark.outer" transform="translate(0 6)" />
             <path class="bark-body" :d="bark.ring" fill-rule="evenodd" />
             <path class="bark-cracks" :d="bark.cracks" />

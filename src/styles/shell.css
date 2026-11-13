@@ -186,11 +186,14 @@ html[data-motion] .page-veil { pointer-events: auto; }
    也挪下来——导航先让位，语言入口留在顶栏（2026-10-01）。两处写同一份。 */
 @media (max-width: 760px) {
   .main-content { padding-bottom: 64px; }
+  .stage-shell { --stage-below: 126px; }
   .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
   .bottom-track { width: 100%; }
   .bottom-track .segment-item, .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 }
 :root.nav-at-bottom .main-content { padding-bottom: 64px; }
+/* 运动详情的台前调度：舞台高要把底部导航那一条也让出来（StageShell.css 的 --stage-below）。 */
+:root.nav-at-bottom .stage-shell { --stage-below: 126px; }
 :root.nav-at-bottom .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
 :root.nav-at-bottom .bottom-track { width: 100%; }
 :root.nav-at-bottom .bottom-track .segment-item, :root.nav-at-bottom .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }

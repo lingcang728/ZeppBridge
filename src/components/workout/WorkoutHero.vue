@@ -1,16 +1,12 @@
 <script setup lang="ts">
-/* 运动详情的头图：设备、运动名、时间、类型依据（含手动纠正）和一排指标卡。 */
-import type { DesignIconName } from '../DesignIcon.vue';
+/* 运动详情的「概要」卡（原头图，2026-11-13 起是台前调度里的一张卡，能拖能缩）：设备、类型依据和一排指标。
+ * 运动名、时间、纠正类型和问 AI 这些作用于整条运动的东西挪到了页面最上面一行（WorkoutDetail 的 #title / #actions）。 */
 import DeviceVisual from '../DeviceVisual.vue';
 import GlyphTile from '../GlyphTile.vue';
-import Icon from '../Icon.vue';
-import TypePicker from './TypePicker.vue';
 import type { HeroMetric } from '../../composables/useWorkoutPresentation';
 import type { WorkoutMetrics } from '../../composables/useWorkoutDetail';
 import { computed } from 'vue';
 import { dataScopeLabel, workoutLabel } from '../../lib/labels';
-import { formatDate, formatTime } from '../../lib/format';
-import { workoutDisplayLabel } from '../../lib/workouts';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
@@ -20,15 +16,10 @@ const props = defineProps<{
   deviceName: string;
   deviceImage: string | null | undefined;
   deviceKind: string;
-  workoutArt: DesignIconName;
-  durationLabel: string;
   metrics: HeroMetric[];
-  overrideChoices: { value: string; label: string }[];
-  overrideBusy: boolean;
   /** 海拔从哪来：挂在海拔那格的悬停提示上。 */
   altitudeNote?: string;
 }>();
-const emit = defineEmits<{ override: [value: string | number] }>();
 const t = useMessages(workoutDetailMessages);
 /* 这次没给的指标不再各占一格「未提供」，收到网格末尾一行（U09），有数的格子按实际项数均分。 */
 const isMissing = (metric: HeroMetric) => metric.value === t.value.notProvided || metric.value === '—';
@@ -41,30 +32,13 @@ const missingLine = computed(() => {
 
 <template>
   <section class="workout-hero" :aria-label="t.heroAria">
-    <!-- 右上角：问 AI（和睡眠详情同一个组件、同一个位置）。 -->
-    <div v-if="$slots.actions" class="hero-actions"><slot name="actions" /></div>
     <div class="hero-copy">
       <div class="hero-device">
         <DeviceVisual v-if="deviceImage" :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
-        <span class="device-live"><i></i>{{ deviceName }}</span>
       </div>
       <div class="hero-title-group">
-        <div class="sport-line">
-          <GlyphTile :name="workoutArt" :size="60" />
-          <h1 id="workout-detail-title">{{ workoutDisplayLabel(workout) || workoutLabel(displayType) }}</h1>
-        </div>
-        <p class="sport-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ durationLabel }}</p>
+        <p class="hero-device-name">{{ deviceName }}</p>
         <div class="type-evidence">
-          <span class="type-correct">
-            {{ t.myCorrection }}
-            <TypePicker
-              :model-value="workout.user_override || ''"
-              :items="overrideChoices"
-              :disabled="overrideBusy"
-              :label="t.correctionAria"
-              @update:model-value="(value) => emit('override', value)"
-            />
-          </span>
           <!-- 追溯用的依据一次展开就全看到；平时不占主阅读区（U16）。 -->
           <details class="type-details">
             <summary>{{ t.evidenceSummary }}</summary>
@@ -92,7 +66,6 @@ const missingLine = computed(() => {
 <style scoped>
 /* 头图是一张带类别微光的材质卡；指标卡是凹下去的小格，底色带一点各自类别的颜色。
    颜色全部来自 token，深浅两套主题不用再单独打补丁。 */
-.hero-actions { position: absolute; top: 16px; right: 16px; z-index: 3; display: inline-flex; gap: 8px; }
 .workout-hero {
   position: relative;
   overflow: hidden;
@@ -108,24 +81,19 @@ const missingLine = computed(() => {
 }
 .hero-copy { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; min-width: 0; }
 .hero-device { display: grid; justify-items: center; gap: 7px; flex: 0 0 auto; }
-.hero-device :deep(.device-visual) { width: 112px; height: 112px; flex-basis: 112px; border-radius: 22px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+.hero-device :deep(.device-visual) { width: 84px; height: 84px; flex-basis: 84px; border-radius: 18px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .hero-device :deep(.device-visual img) { padding: 8px; }
-.device-live { display: inline-flex; align-items: center; gap: 5px; max-width: 132px; overflow: hidden; color: var(--muted); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
-.device-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--readiness); box-shadow: 0 0 0 4px color-mix(in srgb, var(--readiness) 14%, transparent); }
 .hero-title-group { min-width: 0; }
 .source-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 3px 10px 3px 5px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: var(--fs-xs); }
-.sport-line { display: flex; align-items: center; gap: 12px; }
-.sport-line h1 { margin: 0; color: var(--ink); font-size: clamp(25px, 3vw, 38px); line-height: 1.1; letter-spacing: -.04em; }
-.sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: var(--fs-sm); }
-.type-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-xs); }
-.type-correct { display: inline-flex; align-items: center; gap: 7px; }
+.hero-device-name { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
+.type-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin-top: 6px; color: var(--muted); font-size: var(--fs-xs); }
 .type-details summary { display: inline-flex; align-items: center; min-height: 28px; color: var(--subtle); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .type-details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
 .type-details[open] summary { color: var(--muted); }
 .type-details-body { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin-top: 6px; }
 .metric-missing { position: relative; z-index: 1; margin: -6px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
 /* 一行能放下就按实际项数均分；放不下再退回自动换行。 */
-.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 150px), calc((100% - (var(--tiles, 6) - 1) * 9px) / var(--tiles, 6))), 1fr)); gap: 9px; }
+.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(max(min(100%, 124px), calc((100% - (var(--tiles, 6) - 1) * 9px) / var(--tiles, 6))), 1fr)); gap: 9px; }
 .metric-tile {
   --tile-tone: var(--accent);
   display: flex;
@@ -158,9 +126,7 @@ const missingLine = computed(() => {
 @media (max-width: 760px) {
   .workout-hero { padding: 16px; border-radius: var(--radius-lg); }
   .hero-copy { align-items: flex-start; gap: 12px; }
-  .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; }
-  .device-live { display: none; }
-  .sport-line h1 { font-size: 24px; }
+  .hero-device :deep(.device-visual) { width: 64px; height: 64px; flex-basis: 64px; }
   .source-chip { font-size: var(--fs-2xs); }
   .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-tile { min-height: 70px; }

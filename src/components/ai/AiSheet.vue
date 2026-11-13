@@ -49,12 +49,9 @@ const label = computed(() => t.value.close);
   -webkit-backdrop-filter: blur(18px) saturate(1.1); backdrop-filter: blur(18px) saturate(1.1); }
 .sheet-panel { position: relative; display: flex; width: min(960px, 100%); max-height: 100%; min-height: 0; pointer-events: auto; border: 1px solid var(--mat-glass-line); border-radius: 28px;
   background: var(--mat-glass-strong); box-shadow: var(--mat-glass-shadow), 0 40px 90px -40px rgba(0, 0, 0, .7); transform-origin: 50% 50%; }
-/* 滚动条收在卡里面：上下各让出圆角那么高，不从右上角的圆弧外面探出去（10-13「边缘导航条出界」）；细一点、跟主题走。 */
+/* 滚动区上下各让出圆角那么高；滚动条全局藏起来了（2026-11-13）。 */
 .sheet-body { flex: 1 1 auto; min-width: 0; margin: 18px 6px 18px 0; overflow-y: auto; overscroll-behavior: contain; border-radius: 0;
-  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent; }
-.sheet-body::-webkit-scrollbar { width: 8px; }
-.sheet-body::-webkit-scrollbar-track { background: transparent; }
-.sheet-body::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--ink) 22%, transparent) padding-box; }
+  scrollbar-width: none; }
 /* 里面的页照旧是「页」的版式，去掉整页才需要的上下留白。 */
 .sheet-body :deep(.page) { padding-top: 4px; padding-bottom: 10px; }
 .sheet-close { position: absolute; top: 14px; right: 14px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--mat-glass-line);

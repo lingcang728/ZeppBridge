@@ -123,7 +123,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       const radius = Math.min(radiusOf(direct.card), rect.width / 2, rect.height / 2);
       expandFrom = { card: direct.card, rect, radius, replica: cardReplica(direct.card) };
       state.expandPath = to.fullPath;
-      state.trails.set(to.fullPath, { back: from.fullPath, href: direct.href, index: 0, rect: expandFrom.rect, radius: expandFrom.radius, source: direct.id });
+      state.trails.set(to.fullPath, { back: from.fullPath, href: direct.href, index: 0, rect: expandFrom.rect, radius: expandFrom.radius, source: direct.id, small: !bigEnough(direct.card) });
       return 'expand';
     }
     // 标了 data-morph-card 的条带跨入口（概览 → 设置卡）也展开：从哪里来回哪里去。

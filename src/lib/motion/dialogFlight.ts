@@ -24,7 +24,8 @@ import { createFlight, NEARLY_HIDDEN, whileShown, type Flight } from './flight';
 import { onMotionEscape } from './interrupt';
 import { easeAt, HANDOFF_EARLIEST, OPEN_EASE as WINDOW_EASE, OPEN_MS, timeAt, turnedEase } from './timing';
 import { lessMotion } from './lessMotion';
-import { bleedRect, cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
+import { settleCssAnimations } from './settle';
+import { belowLine, bleedRect, cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
 
 export { visibleWindow };
 
@@ -52,10 +53,20 @@ const WINDOW_MS = OPEN_MS;
  */
 const CLOSE_CONTENT_OUT: readonly [number, number] = [0.64, 0.9];
 const CLOSE_REPLICA_IN: readonly [number, number] = [0.46, 0.68];
-/** 关的最后这一段整块面板淡掉（此刻面板已经缩在按钮上）。 */
-const CLOSE_FADE = 0.2;
-/** 真按钮在面板底下亮起来的那一段。 */
-const SOURCE_IN: readonly [number, number] = [0.12, 0.3];
+/*
+ * 落地（2026-11-13 用户 4K 录屏：伤病、年轮小结、信匣收回最后一刻「闪一下 / 重影」；慢放条带里是面板还在往按钮上落，
+ * 底下的真按钮已经亮了、面板也在淡——两份错开几个像素叠着，信件钮上的小红点成了两颗）：
+ * 关的时候形状**先落定**，再交接：开那条时间轴的前 LAND_HOLD 是停留段（形状动画的 delay，倒着放就是落地以后那一段），
+ * 形状落到按钮上、速度减到零以后，前一半真按钮在面板底下亮起来（面板正好盖着它，看不见），后一半面板淡掉。
+ * 先后交替、不同时半透明——两层同时半透明会透出背景，又是一闪。
+ */
+const LAND_HOLD = 0.2;
+/** 关的最后这一段整块面板淡掉（此刻面板已经停在按钮上，真按钮在它底下已经亮好）。 */
+const CLOSE_FADE = LAND_HOLD / 2;
+/** 真按钮在面板底下亮起来的那一段：形状落定以后、面板淡掉以前。 */
+const SOURCE_IN: readonly [number, number] = [LAND_HOLD / 2, LAND_HOLD];
+/** 关这一组里跟着形状走的那几段（换手）：形状只占停留段以后的时间，按它的进度换算。 */
+const onShape = (offset: number) => LAND_HOLD + (1 - LAND_HOLD) * offset;
 /** 背后的暗色和模糊在关的时候散得早一点：面板淡掉时露出来的是清楚的按钮。 */
 const CLOSE_VEIL: Keyframe[] = [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: 0.1 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }];
 /** 关这一组的形状曲线：倒着放时画面上是 WINDOW_EASE 那样减速落定。 */
@@ -63,6 +74,8 @@ const CLOSE_EASE = turnedEase(WINDOW_EASE);
 /** 开到一半被关 / 关到一半又开：两组曲线不一样，按「窗口此刻在哪」换算成另一组的时间进度，不跳。 */
 export const closeTimeFor = (openProgress: number) => 1 - timeAt(WINDOW_EASE, 1 - easeAt(WINDOW_EASE, openProgress));
 export const openTimeFor = (closeBuildProgress: number) => timeAt(WINDOW_EASE, easeAt(CLOSE_EASE, closeBuildProgress));
+/** 带停留段的关那一组：整组时间进度 ↔ 形状自己的进度（停留段里形状停在按钮上）。 */
+const shapeOfClose = (progress: number) => Math.max(0, (progress - LAND_HOLD) / (1 - LAND_HOLD));
 /** 异源快速切换时，旧弹窗独立收拢的轻快时长。 */
 const RELAY_CLOSE_MS = 260;
 
@@ -83,8 +96,18 @@ export const originOf = (el: HTMLElement | null): FlightOrigin => {
   return { el: null, rect: null };
 };
 
-const currentRect = (origin: FlightOrigin | null): DOMRect | null =>
-  usable(origin?.el ?? null) ? whileShown(origin!.el!, () => origin!.el!.getBoundingClientRect()) : origin?.rect ?? null;
+/** 页面里的来处从顶栏下面滚过：顶栏下沿（来处本身在顶栏里、或不在滚动区里时不算）。 */
+const barLine = (el: HTMLElement | null | undefined): number => {
+  if (!el || el.closest('.shell-head') || !el.closest('#main-content')) return -Infinity;
+  return document.querySelector('.shell-head')?.getBoundingClientRect().bottom ?? -Infinity;
+};
+const currentRect = (origin: FlightOrigin | null): WindowRect | null => {
+  const el = origin?.el ?? null;
+  const rect = usable(el) ? whileShown(el, () => el.getBoundingClientRect()) : origin?.rect ?? null;
+  if (!rect) return null;
+  const line = barLine(el);
+  return Number.isFinite(line) ? belowLine(rect, line) : rect;
+};
 
 type Box = { left: number; top: number; width: number; height: number };
 
@@ -177,6 +200,21 @@ const subjectOf = (panel: HTMLElement): Box => {
   return box.width && box.height ? box : panel.getBoundingClientRect();
 };
 
+/**
+ * 来处自己没底色（列表里的一行，比如履历页的一双跑鞋）时，替身铺上它所在那张卡的底：
+ * 面板比那一行窄时，收回落地那几帧窗口的形状 = 面板的白底 ∪ 替身；替身透明就露出底下（真行藏着），
+ * 看起来右下角被切掉一块（2026-11-13 用户录屏）。替身有了底，整块来处都是实的。
+ */
+const fillBehind = (source: HTMLElement): string | null => {
+  const opaque = (style: CSSStyleDeclaration) => style.backgroundImage !== 'none' || !/^(transparent|rgba\(.*,\s*0\))$/.test(style.backgroundColor);
+  if (opaque(getComputedStyle(source))) return null;
+  for (let el = source.parentElement; el && el !== document.body; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (opaque(style)) return `${style.backgroundImage === 'none' ? '' : `${style.backgroundImage}, `}${style.backgroundColor}`;
+  }
+  return null;
+};
+
 const radiusFor = (origin: FlightOrigin | null, panel: HTMLElement) => {
   const from = currentRect(origin);
   return Math.min(parseFloat(getComputedStyle(origin?.el ?? panel).borderRadius) || 16, (from?.height ?? 32) / 2, (from?.width ?? 32) / 2, 24);
@@ -217,7 +255,7 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   if (closing && from) flight.add(panel, [{ opacity: NEARLY_HIDDEN }, { opacity: 1, offset: CLOSE_FADE }, { opacity: 1 }]);
   if (objectMode) {
     const start = from ? objectTransform(from, final, subjectOf(panel)) : 'scale(.96)';
-    flight.add(panel, [{ transform: start }, { transform: 'none' }], { easing: shapeEase });
+    flight.add(panel, [{ transform: start }, { transform: 'none' }], { easing: shapeEase, hold: closing ? LAND_HOLD : 0 });
     // 没有来处（键盘打开、来处没了）：原地浮现。有来处时第一帧就看得见（在按钮那里）。
     if (!from) flight.add(panel, [{ opacity: NEARLY_HIDDEN }, { opacity: 1, offset: 0.4 }, { opacity: 1 }]);
   } else {
@@ -226,7 +264,7 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
       panel.classList.add('is-flying');
       flight.own(() => panel.classList.remove('is-flying'));
     }
-    flight.add(panel, dialogWindowFrames(start, target, final, radiusFor(origin, windowEl ?? panel), true), { easing: shapeEase });
+    flight.add(panel, dialogWindowFrames(start, target, final, radiusFor(origin, windowEl ?? panel), true), { easing: shapeEase, hold: closing ? LAND_HOLD : 0 });
     const content = windowEl
       ? (windowEl.querySelector<HTMLElement>('[data-dialog-content]') ?? windowEl)
       : panel.querySelector<HTMLElement>(':scope > .dialog-scroll');
@@ -236,10 +274,25 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
     if (replica) {
       replica.querySelectorAll('[data-dialog-source]').forEach((node) => node.removeAttribute('data-dialog-source'));
       replica.dataset.dialogReplica = '';
-      Object.assign(replica.style, { position: 'absolute', left: '0', top: '0', zIndex: '4', pointerEvents: 'none' });
+      // 来处顶上那截在顶栏底下、窗口从顶栏下沿长出来（belowLine）：拷贝往上挪同样多，字留在原处，被窗口裁掉的是顶栏底下那截。
+      const cut = from ? Math.max(0, from.top - source!.getBoundingClientRect().top) : 0;
+      Object.assign(replica.style, { position: 'absolute', left: '0', top: `${-Math.round(cut * 10) / 10}px`, zIndex: '4', pointerEvents: 'none' });
+      const fill = source ? fillBehind(source) : null;
+      if (fill) replica.style.background = fill;
       panel.appendChild(replica);
+      // 拷贝里的 CSS 入场动画（描线、条形长出来）别从头再放（settle.ts）。
+      settleCssAnimations(replica);
       flight.own(() => replica.remove());
       flight.add(replica, [{ opacity: 1 }, { opacity: 1 }]);
+      // 来处比面板宽 / 高：窗口裁切会伸出面板的盒子，伸出去那块没有底（白底只画在面板自己的盒子里），
+      // 收回途中窗口右下角缺一块。垫一层和面板同色的底，盖满两者的并集。
+      // 面板跟着窗口左上角平移（dialogWindowFrames），窗口在面板自己的坐标里总从 (0,0) 起，所以底也从 (0,0) 铺。
+      // 底画在 .dialog-glass 和 ::after 上（面板本身透明），飞行期间经 --flight-w / --flight-h 撑到两者的并集（ModalDialog.vue）。
+      if (from && (from.width > final.width + 0.5 || from.height > final.height + 0.5)) {
+        panel.style.setProperty('--flight-w', `${Math.max(final.width, from.width)}px`);
+        panel.style.setProperty('--flight-h', `${Math.max(final.height, from.height)}px`);
+        flight.own(() => { panel.style.removeProperty('--flight-w'); panel.style.removeProperty('--flight-h'); });
+      }
     }
     if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN }]);
     hideSource(backdrop, source);
@@ -254,8 +307,8 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
     const earliest = windowEl || small ? 0.04 : HANDOFF_EARLIEST;
     if (closing) {
       // 关：倒着放。内容在回程前段淡掉，替身接着亮起来（CLOSE_CONTENT_OUT / CLOSE_REPLICA_IN 上面的说明）。
-      if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: CLOSE_CONTENT_OUT[0] }, { opacity: 1, offset: CLOSE_CONTENT_OUT[1] }, { opacity: 1 }]);
-      if (replica) flight.add(replica, [{ opacity: 1 }, { opacity: 1, offset: CLOSE_REPLICA_IN[0] }, { opacity: 0, offset: CLOSE_REPLICA_IN[1] }, { opacity: 0 }]);
+      if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: onShape(CLOSE_CONTENT_OUT[0]) }, { opacity: 1, offset: onShape(CLOSE_CONTENT_OUT[1]) }, { opacity: 1 }]);
+      if (replica) flight.add(replica, [{ opacity: 1 }, { opacity: 1, offset: onShape(CLOSE_REPLICA_IN[0]) }, { opacity: 0, offset: onShape(CLOSE_REPLICA_IN[1]) }, { opacity: 0 }]);
     } else {
       // 开：内容画好了（下一帧以后）才和替身换手，最早在 earliest。
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -303,7 +356,7 @@ const open = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin | 
     const same = previous.origin?.el && previous.origin.el === origin?.el
       && previous.panel.classList.contains('is-bare') === panel.classList.contains('is-bare');
     if (same && resumeAt === null) {
-      resumeAt = previous.flight.progress();
+      resumeAt = shapeOfClose(previous.flight.progress());
       previous.flight.dispose();
       removeGhost(previous);
     } else {
@@ -328,6 +381,8 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   if (backdrop.isConnected || backdrop.dataset.dissolved !== undefined) { showSource(backdrop); landings.get(panel)?.resolve(); return; }
   if (reducedMotion()) { quickClose(backdrop, panel); return; }
   detachAsPicture(backdrop, panel);
+  // 面板刚挂回 body：里面的 CSS 入场动画（年轮小结的 bar-grow 之类）会从头再放一遍，直接放完（settle.ts）。
+  settleCssAnimations(backdrop);
   for (const old of [...ghosts]) {
     if (old !== lives.get(backdrop) && !old.flight.running()) {
       old.flight.dispose();
@@ -340,7 +395,7 @@ const close = (backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   const live = build(backdrop, panel, origin, true);
   if (live) {
     if (interruptedAt !== null && interruptedAt < 1) {
-      const pos = Math.max(16, closeTimeFor(interruptedAt) * live.flight.duration);
+      const pos = Math.max(16, onShape(closeTimeFor(interruptedAt)) * live.flight.duration);
       const rate = pos < 150 ? -(pos / 150) : -1;
       for (const animation of live.flight.anims) {
         animation.currentTime = pos;

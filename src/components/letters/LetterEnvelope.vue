@@ -21,6 +21,7 @@
 import './paper.css';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
+import { settleCssAnimations } from '../../lib/motion/settle';
 import ReleaseNotesList from '../shell/ReleaseNotesList.vue';
 import WaxSeal from './WaxSeal.vue';
 import EnvelopeArt from './EnvelopeArt.vue';
@@ -265,6 +266,8 @@ const printFirstPage = (shell: HTMLElement, sheet: HTMLElement, flap: HTMLElemen
     Object.assign(copy.style, { position: 'absolute', left: '0', top: `${top}px`, width: `${W}px`, height: `${H}px`, margin: '0', transformOrigin: '0 0', transform: `scale(${scale})` });
     holder.append(copy);
     host.append(holder);
+    // 拷贝出来的信纸停在终态：签名描线、落款淡入别从头再放（settle.ts）。
+    settleCssAnimations(holder);
   };
   print(sheet, sheet.offsetWidth / W, 0);
   if (flap) print(flap, 1, -foldH.value);

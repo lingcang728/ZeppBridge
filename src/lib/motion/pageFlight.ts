@@ -2,6 +2,7 @@ import { cardFrame } from '../deck/morph';
 import { NEARLY_HIDDEN } from './flight';
 import { exemptFromSettle } from './interrupt';
 import { BACK_EASE, paced } from './timing';
+import { settleCssAnimations } from './settle';
 import { pageBackdrop, visibleWindow, WINDOW_OFFSETS, windowPoses, type WindowPose, type WindowRect } from './window';
 
 /**
@@ -65,12 +66,21 @@ export const PAGE_BACK_EASE = BACK_EASE;
  * 时长也放慢一点（用户：「可以把动画速度放慢一点」）。
  */
 export const PAGE_BACK_MS = PAGE_WINDOW_MS;
+/*
+ * 2026-11-13（用户 4K 录屏：睡眠卡「收回去最后一刻像闪烁或重影一样闪一下」）：慢放条带里 0.80–1.00 那段窗口一边淡、
+ * 一边还在按曲线往卡上落，拷贝和底下的真卡错开两三个像素、拷贝也还没回到 1:1——「70 分」「今天」和折线都是双影。
+ * 现在形状（裁切、位移、容器缩放）在线性 PAGE_LAND_AT 就落定（曲线照样一路减速到零，只是放在这段时间里），
+ * 剩下的是停留段：先真卡在窗口底下亮好（窗口和它严丝合缝地盖着），再整个窗口淡掉。先后交替，不同时半透明。
+ */
+export const PAGE_LAND_AT = 0.8;
 const BACK_AT = 0.4;
 const BACK_SPAN = 0.22;
-/** 真卡在窗口底下亮起来的那一段，和窗口整个淡掉的那一段（线性时间）。 */
-const CARD_IN_AT = 0.58;
-const CARD_IN_END = 0.8;
-const WINDOW_OUT_AT = 0.8;
+/** 真卡在窗口底下亮起来的那一段，和窗口整个淡掉的那一段（线性时间）：都在形状落定以后。 */
+const CARD_IN_AT = PAGE_LAND_AT;
+const CARD_IN_END = PAGE_LAND_AT + (1 - PAGE_LAND_AT) / 2;
+const WINDOW_OUT_AT = CARD_IN_END;
+/** 收回里跟着形状走的换手：形状只占前 PAGE_LAND_AT 的时间，按它换算（数是按整段时间调的）。 */
+const onShape = (offset: number) => offset * PAGE_LAND_AT;
 const keep = (from: number, at: number, to: number, end: number): Keyframe[] => [
   { opacity: from }, { opacity: from, offset: at }, { opacity: to, offset: Math.min(1, end) }, { opacity: to },
 ];
@@ -79,10 +89,15 @@ export const contentIn = (from = 0): Keyframe[] => keep(Math.max(NEARLY_HIDDEN, 
 export const contentOut = (from = 1): Keyframe[] => keep(from, BACK_AT, 0, BACK_AT + BACK_SPAN * OUT_PART);
 export const replicaIn = (from = 0): Keyframe[] => keep(Math.max(NEARLY_HIDDEN, from), BACK_AT + BACK_SPAN * IN_FROM, 1, BACK_AT + BACK_SPAN);
 /** 容器形变的换手（线性时间）：拷贝叠在内容上面先变实，内容随后才淡掉——拷贝盖住的那块里一直是实的。 */
-const MORPH_REPLICA = [0.1, 0.46] as const;
-const MORPH_CONTENT = [0.18, 0.56] as const;
+const MORPH_REPLICA = [onShape(0.1), onShape(0.46)] as const;
+const MORPH_CONTENT = [onShape(0.18), onShape(0.56)] as const;
 export const contentMorphOut = (from = 1): Keyframe[] => keep(from, MORPH_CONTENT[0], 0, MORPH_CONTENT[1]);
 export const replicaMorphIn = (from = 0): Keyframe[] => keep(Math.max(NEARLY_HIDDEN, from), MORPH_REPLICA[0], 1, MORPH_REPLICA[1]);
+/** 小来处（一枚按钮）：拷贝不缩放，窗口缩到它跟前才换手——内容晚一点淡、拷贝晚一点亮（线性时间）。 */
+const SMALL_CONTENT = [onShape(0.46), onShape(0.74)] as const;
+const SMALL_REPLICA = [onShape(0.6), onShape(0.8)] as const;
+export const contentShrinkOut = (from = 1): Keyframe[] => keep(from, SMALL_CONTENT[0], 0, SMALL_CONTENT[1]);
+export const replicaLateIn = (from = 0): Keyframe[] => keep(Math.max(NEARLY_HIDDEN, from), SMALL_REPLICA[0], 1, SMALL_REPLICA[1]);
 /** 开到一半就返回、窗口里两样都还淡着：卡拷贝立刻亮回来，窗口里一直是那张卡，不留一段空板。 */
 export const replicaBack = (from = 0): Keyframe[] => [{ opacity: from }, { opacity: 1, offset: 0.25 }, { opacity: 1 }];
 /** 底板上层（页面底色）：开的时候跟着窗口长成整页盖上来，收的时候在换手结束前平滑退成卡色。 */
@@ -202,6 +217,44 @@ export const backdropFor = (page: HTMLElement, viewport: Rect, host: HTMLElement
  * 页面的左上角正是锚点（打开时从卡的左上角出发、收回时落到卡的左上角），所以拷贝自然跟着走。
  * 页头、其余部分和拷贝的透明度按线性时间轴分段走。
  */
+/**
+ * focus 那块内容的关键帧：和窗口同一组进度。卡拷贝跟着窗口缩放（容器形变），所以每一帧追的是**拷贝里**那个小年轮此刻的位置、
+ * 大小，按「走了几成」从自己原来的样子过渡过去：起点是自己，终点正好叠在拷贝上，途中不会一边一个。
+ */
+const focusFramesFor = (
+  o: { from: WindowPose; to: WindowPose; focus?: { el: Element; to: Rect }; replica: { rect: Rect } | null; replicaAt?: { x: number; y: number }; scaleReplica?: boolean },
+  start: Rect,
+  current: () => WindowPose,
+) => {
+  if (!o.focus) return null;
+  const a = rectOf(o.focus.el);
+  if (a.width < 1 || a.height < 1) return null;
+  // 卡上那一个相对卡框（= 拷贝左上角）的中心和宽：终点换了（卡被往下推）跟着卡一起挪。
+  const card = o.replica?.rect ?? o.to.rect;
+  const rel = { x: o.focus.to.left + o.focus.to.width / 2 - card.left, y: o.focus.to.top + o.focus.to.height / 2 - card.top, w: o.focus.to.width };
+  const at = o.replicaAt ?? { x: 0, y: 0 };
+  const scales = o.replica && o.scaleReplica !== false;
+  const ca = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+  return (part: Rect) => () => {
+    const poses = windowPoses(o.from, current());
+    const w0 = poses[0].rect.width, w1 = poses[poses.length - 1].rect.width;
+    const origin = `${r1(ca.x - part.left)}px ${r1(ca.y - part.top)}px`;
+    return poses.map((pose, index) => {
+      const f = Math.abs(w1 - w0) > 0.5 ? (pose.rect.width - w0) / (w1 - w0) : index / Math.max(1, poses.length - 1);
+      const k = scales ? pose.rect.width / Math.max(1, card.width) : 1;
+      // 前段就贴上去（ease-out）：线性地追，半路两个年轮还各在一边。
+      const g = 1 - (1 - f) ** 3;
+      // 拷贝此刻的左上角 = 页面左上角（锚点）+ replicaAt；它里面那个小年轮跟着 k 缩放。
+      const goal = { x: pose.anchor.x + at.x + rel.x * k, y: pose.anchor.y + at.y + rel.y * k };
+      const dx = pose.anchor.x - start.left, dy = pose.anchor.y - start.top;
+      const tx = (goal.x - ca.x) * g - dx;
+      const ty = (goal.y - ca.y) * g - dy;
+      const s = Math.exp(Math.log(Math.max(0.01, (rel.w * k) / a.width)) * g);
+      return { transform: `translate(${r1(tx)}px, ${r1(ty)}px) scale(${r4(s)})`, transformOrigin: origin, offset: WINDOW_OFFSETS[index] };
+    });
+  };
+};
+
 export const fly = (o: {
   page: HTMLElement;
   backdrop: HTMLElement;
@@ -225,12 +278,24 @@ export const fly = (o: {
   fade?: Keyframe[];
   /** 容器形变：页面内容和卡拷贝跟着窗口一起缩放（宽度始终等于窗口宽，左上角钉在窗口左上角）。收回用。 */
   scale?: boolean;
+  /** 容器形变时拷贝也跟着缩放（卡片类来处）。小来处给 false：拷贝保持原尺寸，钉在落点上。 */
+  scaleReplica?: boolean;
+  /** 形状在这个线性进度上落定，之后停住（WAAPI 的 endDelay）：收回落地前先对齐，再交接（PAGE_LAND_AT）。 */
+  landAt?: number;
+  /**
+   * 页面和卡上画着同一样东西（年轮页的大木头 ↔ 卡上的小年轮，都标了 data-morph-focus）：含它的那块内容不按窗口宽缩放，
+   * 而是让它从自己的位置、大小一路缩到卡上那一个的位置、大小，内容淡掉时正好叠在拷贝里的那一个上。
+   * 2026-11-13 用户：年轮页一路返回时年轮会跳一下——按窗口宽缩放，大木头落在卡的正中、卡上的小年轮在左边，交叉淡化时一个跳到另一个。
+   * `to` 是卡上那一个此刻的框（屏幕坐标）；终点换了（retarget）跟着卡一起挪。
+   */
+  focus?: { el: Element; to: Rect };
 }): Flight => {
   const { page } = o;
   const start = rectOf(page);
   let box: Rect = { left: start.left, top: start.top, width: page.offsetWidth, height: page.offsetHeight };
   let to = o.to;
-  const timing: KeyframeAnimationOptions = { duration: o.duration, easing: o.easing, fill: 'both' };
+  const land = Math.min(1, Math.max(0.5, o.landAt ?? 1));
+  const timing: KeyframeAnimationOptions = { duration: o.duration * land, endDelay: o.duration * (1 - land), easing: o.easing, fill: 'both' };
   const linear: KeyframeAnimationOptions = { duration: o.duration, easing: 'linear', fill: 'both' };
   const frames = () => windowPoses(o.from, to).map((pose, index) => ({ ...cardFrame(pose, box, o.radius), offset: WINDOW_OFFSETS[index] }));
   // 页面平时横向是 clip 的（.page 的 overflow-x）：垫底要伸出页面两侧一点，形变期间放开（外面有 clip-path 裁着）。
@@ -247,6 +312,8 @@ export const fly = (o: {
     el.dataset.morphLayer = '';
     Object.assign(el.style, { left: `${r1(o.replicaAt?.x ?? 0)}px`, top: `${r1(o.replicaAt?.y ?? 0)}px`, zIndex: '50' });
     page.appendChild(el);
+    // 拷贝里的 CSS 入场动画（描线、淡入）别从头再放（settle.ts）。
+    settleCssAnimations(el);
     track(el.animate(o.replicaFade, linear));
   }
   const plate = o.backdrop.firstElementChild;
@@ -271,14 +338,20 @@ export const fly = (o: {
     const base = Math.max(1, o.from.rect.width);
     const scaleFrames = (of: number, origin: string) => () =>
       widths().map((width, index) => ({ transform: `scale(${r4(width / of)})`, transformOrigin: origin, offset: WINDOW_OFFSETS[index] }));
+    const focusFrames = focusFramesFor(o, start, () => to);
     for (const part of [head, ...body]) {
       if (!part) continue;
+      if (focusFrames && part.contains(o.focus!.el)) {
+        const frames = focusFrames(rectOf(part));
+        scaled.push({ animation: track(part.animate(frames(), timing)), frames });
+        continue;
+      }
       const box = rectOf(part);
       const origin = `${r1(start.left + pin.x - box.left)}px ${r1(start.top + pin.y - box.top)}px`;
       const frames = scaleFrames(base, origin);
       scaled.push({ animation: track(part.animate(frames(), timing)), frames });
     }
-    if (o.replica) {
+    if (o.replica && o.scaleReplica !== false) {
       const frames = scaleFrames(Math.max(1, o.replica.rect.width), '0 0');
       scaled.push({ animation: track(o.replica.el.animate(frames(), timing)), frames });
     }

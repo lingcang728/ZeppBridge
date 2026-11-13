@@ -380,6 +380,9 @@ export async function runReel(view: Window, id: string, clock: PlaybackClock, st
     await go('/sleep'); stage.focus(null);
   } else if (id === 'workouts') {
     await go('/workouts'); await wait(1000); await tap('.record-list a[href]', 1100); stage.beat('detail');
+    // 运动详情是台前调度（2026-11-13）：洞察卡可能在侧栏里缩着，先请它上舞台。
+    await find('.stage-shell');
+    view.dispatchEvent(new (view as Window & typeof globalThis).CustomEvent('zb:stage-show', { detail: 'insight' }));
     await find('.insight-card'); await wait(1400);
     // Keep the full width: the comparison needs all three columns in view.
     await scrollTo(await find('.insight-card')); stage.beat('comparison'); await wait(2000);

@@ -1,8 +1,9 @@
 import { onMotionEscape, onMotionSkip, hurryAnimation } from '../../lib/motion/interrupt';
 import {
-  cardIn, contentMorphOut, fly, hide, PAGE_BACK_EASE, PAGE_BACK_MS, PAGE_WINDOW_MS, pageVeil, plateOut, replicaBack, replicaMorphIn, settleTransitions, veilOut, windowOut,
+  cardIn, contentMorphOut, PAGE_LAND_AT, contentShrinkOut, fly, hide, PAGE_BACK_EASE, PAGE_BACK_MS, PAGE_WINDOW_MS, pageVeil, plateOut, replicaBack, replicaLateIn, replicaMorphIn, settleTransitions, veilOut, windowOut,
 } from '../../lib/motion/pageFlight';
 import { exemptFromSettle } from '../../lib/motion/interrupt';
+import { settleCssAnimations } from '../../lib/motion/settle';
 import { whenFramesSteady } from '../../lib/motion/steady';
 import { bleedRect, cardReplica } from '../../lib/motion/window';
 import { whenScrollRestored } from '../../lib/returnScroll';
@@ -49,12 +50,7 @@ const findCard = (trail: Trail): Promise<HTMLElement | null> =>
 /** 缓存的来处页重新插回文档时，里面的 CSS 入场动画会从头再放一遍：卡片入场（material.css 的 card-enter）让窗口
     落到卡的最终位置上时卡还在往上浮；其余的装饰动画压在收回上，每帧都要整页重画。有限次的一律直接放完
     （循环的转圈、呼吸点不动）。 */
-const settleStaying = () => {
-  const staying = main()?.querySelector<HTMLElement>(STAYING);
-  for (const animation of staying?.getAnimations({ subtree: true }) ?? []) {
-    if (animation instanceof CSSAnimation && Number.isFinite(animation.effect?.getTiming().iterations ?? 1)) animation.finish();
-  }
-};
+const settleStaying = () => settleCssAnimations(main()?.querySelector<HTMLElement>(STAYING));
 
 /** 返回：展开的逆过程。详情页从整个可视区（开到一半被返回时，从它此刻的那个框）裁回那张卡，内容先淡掉，
     卡拷贝快落地时亮回来；来处页上的模糊前四成几乎不退、落地才散。 */
@@ -90,6 +86,10 @@ export const startCollapse = (ctx: MorphCtx, job: Collapse) => {
   const target = present ? rectOf(present) : trail.rect;
   const box = rectOf(el);
   const duration = reversing ? Math.max(MIN_REVERSE_MS, reversing.elapsed) : PAGE_BACK_MS;
+  const small = !!trail.small;
+  // 两头画着同一样东西（年轮）：大的一路缩到卡上那个小的上（pageFlight.ts 的 focus）。
+  const focusFrom = present ? el.querySelector('[data-morph-focus]') : null;
+  const focusTo = focusFrom ? present?.querySelector<HTMLElement>('[data-morph-focus]') : null;
   const flight = fly({
     page: el,
     backdrop,
@@ -103,14 +103,19 @@ export const startCollapse = (ctx: MorphCtx, job: Collapse) => {
     replicaAt: { x: 0, y: job.lift },
     replicaFade: reversing && reversing.snap.content < 0.5
       ? replicaBack(reversing.snap.replica)
-      : replicaMorphIn(reversing ? reversing.snap.replica : 0),
-    head: contentMorphOut(reversing ? reversing.snap.content : 1),
-    body: contentMorphOut(reversing ? reversing.snap.content : 1),
+      : (small ? replicaLateIn : replicaMorphIn)(reversing ? reversing.snap.replica : 0),
+    head: (small ? contentShrinkOut : contentMorphOut)(reversing ? reversing.snap.content : 1),
+    body: (small ? contentShrinkOut : contentMorphOut)(reversing ? reversing.snap.content : 1),
     // 容器形变：内容和卡拷贝跟着窗口一起缩放，整页逐渐变成那张卡（pageFlight.ts 的 PAGE_BACK_MS 上面的说明）。
+    // 小来处的拷贝不缩放（trail.small）：按窗口宽缩放会把一颗小按钮放大成一整屏。
     scale: true,
+    scaleReplica: !small,
+    focus: focusFrom && focusTo ? { el: focusFrom, to: rectOf(focusTo) } : undefined,
     plate: plateOut(reversing ? reversing.snap.plate : 1),
     // 最后一段整个窗口淡掉，露出底下已经亮好的真卡（找不到卡时不淡：落地后另有一段淡出）。
     fade: present ? windowOut(reversing ? reversing.snap.page : 1) : undefined,
+    // 有真卡可落：形状先落定、再交接（PAGE_LAND_AT 上面的说明）。没有就一路落到底，落地后另有一段淡出。
+    landAt: present ? PAGE_LAND_AT : undefined,
     // 滚下去时页头早就不在画面里：此刻看得见的那几块按页头的节奏走，窗口里一直有东西。
     early: job.lift > 40 ? (part) => {
       const shown = part.getBoundingClientRect();
