@@ -204,8 +204,12 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                 for set in sets {
                     let set_idx = number_text(set.get("set_index")).unwrap_or_default();
                     let set_id = format!("{workout_id}#set{set_idx}");
-                    let exercise = text(set.get("exercise_key"));
-                    if !exercise.is_empty() {
+                    // 动作键（老动作）和 Zepp 目录里的英文名（1001 起的新动作只有它）。
+                    for field in ["exercise_key", "exercise_name"] {
+                        let value = text(set.get(field));
+                        if value.is_empty() {
+                            continue;
+                        }
                         push_row(
                             &mut rows,
                             &[
@@ -213,8 +217,8 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                                 &set_id,
                                 start,
                                 end,
-                                "exercise_key",
-                                exercise,
+                                field,
+                                value,
                                 "",
                                 scope,
                                 device,

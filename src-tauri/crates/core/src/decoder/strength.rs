@@ -300,6 +300,8 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
             duration_ms,
             avg_hr,
             calories_kcal,
+            exercise_name: None,
+            secondary_muscle_groups: Vec::new(),
         });
     }
 
@@ -461,6 +463,8 @@ fn aggregate_groups(items: impl IntoIterator<Item = (i32, i32)>) -> Vec<Strength
                 muscle_group: muscle_group.map(str::to_string),
                 sets: 1,
                 total_reps: reps.max(0),
+                exercise_name: None,
+                secondary_muscle_groups: Vec::new(),
             });
         }
     }

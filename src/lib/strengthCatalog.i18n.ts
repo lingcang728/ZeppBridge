@@ -161,15 +161,19 @@ export const strengthCatalogMessages = defineMessages(
 
 export type StrengthCatalogShape = typeof strengthCatalogMessages.zh;
 
+/** 动作名：自己逐条核过的 125 个老动作用自己的译名；其余用 Zepp 目录给的名字
+ * （先当前语言那份，再后端带来的英文名）；都没有才显示 `#编号`，不猜。 */
 export const resolveStrengthExerciseLabel = (
   exerciseKey: string | null | undefined,
   actionCode: number,
   catalog: StrengthCatalogShape,
+  ...zeppNames: Array<string | null | undefined>
 ): string => {
   if (exerciseKey && Object.prototype.hasOwnProperty.call(catalog.exercises, exerciseKey)) {
     return catalog.exercises[exerciseKey as keyof StrengthCatalogShape['exercises']];
   }
-  return catalog.unknownAction(actionCode);
+  const zeppName = zeppNames.find((name) => typeof name === 'string' && name.trim() !== '');
+  return zeppName ? zeppName.trim() : catalog.unknownAction(actionCode);
 };
 
 export const resolveStrengthMuscleLabel = (

@@ -289,6 +289,12 @@ pub struct StrengthSetRow {
     pub avg_hr: Option<i32>,
     /// 组内消耗千卡（`>= 0` 才有值）。
     pub calories_kcal: Option<f64>,
+    /// Zepp 动作目录给的英文动作名（目录缓存在时读出，不落库）；界面按自己的语言另取。
+    #[serde(default)]
+    pub exercise_name: Option<String>,
+    /// Zepp 目录里这个动作的辅助肌群（九大肌群键，已去掉主肌群）。
+    #[serde(default)]
+    pub secondary_muscle_groups: Vec<String>,
 }
 
 /// 按动作聚合的组数与总次数（有逐组明细时由明细聚合，未拉到明细时由汇总流兜底）。
@@ -299,6 +305,10 @@ pub struct StrengthExerciseGroup {
     pub muscle_group: Option<String>,
     pub sets: i32,
     pub total_reps: i32,
+    #[serde(default)]
+    pub exercise_name: Option<String>,
+    #[serde(default)]
+    pub secondary_muscle_groups: Vec<String>,
 }
 
 /// 一场力量训练的汇总与逐组明细。

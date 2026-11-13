@@ -16,3 +16,9 @@ ships at src/assets/fonts/LICENSE-misans.txt.
 This product bundles the Inter typeface (Rasmus Andersson), licensed under
 the SIL Open Font License 1.1. A copy of its licence ships at
 src/assets/fonts/LICENSE-inter.txt.
+
+This product includes human body muscle outlines adapted from
+react-native-body-highlighter (https://github.com/HichamELBSI/react-native-body-highlighter),
+Copyright (c) 2022 ELABBASSI Hicham, licensed under the MIT License.
+A copy of its licence ships at
+src/lib/anatomy/LICENSE-react-native-body-highlighter.txt.

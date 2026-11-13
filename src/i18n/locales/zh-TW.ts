@@ -2025,7 +2025,10 @@ export default {
     'components/workout/WorkoutStrengthCard': {
       aria: '重量訓練容量與分組明細',
       bodyweightLoad: (reps: number) => `徒手 × ${reps}`,
+      caloriesValue: (kcal: string) => `${kcal} 千卡`,
+      colCalories: '消耗',
       colDuration: '單組用時',
+      colElapsed: '累計用時',
       colExercise: '動作',
       colHr: '平均心率',
       colLoad: '負荷 × 次數',
@@ -2037,6 +2040,7 @@ export default {
       eyebrow: '重量訓練',
       muscleSetsCount: (sets: number) => `${sets} 組`,
       muscleShareAria: '各肌群組數佔比',
+      secondaryMuscles: '輔助肌群',
       statReps: '總次數',
       statRest: '組間總休息',
       statSets: '總組數',

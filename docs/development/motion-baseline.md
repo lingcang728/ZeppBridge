@@ -1,8 +1,8 @@
 # 动效基线（2026-11-12 修复计划 A0 / A5）
 
 只放数字和结论，不放截图。测量台在 `scripts/motion/`（`bench.py` 出表，`strip.py` 出给人看的慢放条带，
-`harness.py` 是公用的打开应用 + 逐帧采样）。规则本身见 [ui-guidelines.zh-CN.md](ui-guidelines.zh-CN.md)
-「动效：一个原语，六条规则」。
+`harness.py` 是公用的打开应用 + 逐帧采样；设 `ZB_MOTION_GPU=1` 走真显卡 D3D11，默认软件 GL 量不出 GPU 光栅那一下）。规则本身见 [ui-guidelines.zh-CN.md](ui-guidelines.zh-CN.md)
+「动效：一个原语，七条规则」。
 
 ## 怎么测
 
@@ -142,3 +142,20 @@
   要再快只能让新页挂得更轻（或者拆成多帧挂）。
 - 收回途中按 Esc 仍是把剩下的部分在 200ms 内放完（落到卡上），没有改成掉头：收回本来就是「返回」，再按一次 Esc
   的意思是「快点」。
+
+## 弹窗 / 信纸打开（2026-11-13，`ZB_MOTION_GPU=1`、1920×1080、DPR 2、1×）
+
+探针也在 `scripts/motion/`：`trace_click.py <路由> <选择器> <out.json>` 抓一次点开的 trace，`trace_swaps.py` 看 DrawAndSwap 帧间隔和
+GPU / 光栅长任务，`trace_frames.py` 看每帧分层，`trace_nest.py <trace> <起始ms> <窗口ms>` 展开主线程。录屏逐帧抽用
+`video_grab.sh`（一次一帧、CPU 软解、2 线程）+ `contact_sheet.py` 拼联系表。
+
+| 场景 | 最长帧 | 主要原因 |
+|---|---|---|
+| /journal「记一条伤病」「登记比赛」「记一件事」 | 132 / 150 / 162ms，之后 30–60ms 抖几帧 | 窗口刚开始长时，正文整块 GPU 光栅化（RendererRasterWorker 约 100ms） |
+| 同上，正文 `visibility: hidden` | 29–40ms | （对照：确认是正文） |
+| 同上，去掉遮罩背景模糊 / 去掉面板玻璃 / 去掉阴影 | 125 / 135 / 147ms | 不是它们 |
+| 设置「动笔写信」，改前 | 154ms | 主线程三段 ShapeText 共 89ms（Georgia 打头的信纸字体走系统回退）+ 光栅 |
+| 同上，空闲预排信纸文字（`paperWarm.ts`） | 147ms，主线程最长任务 142 → 12ms | 剩下的是光栅 |
+
+试过没用的（都撤了）：开的时候停在起点等帧稳再放、停的时候让正文以 2% / 100% 透明度先画、正文加 `will-change: transform`——
+光栅化是跟着裁切窗口长大才发生的。人形图（伤病弹窗）不是元凶：三个弹窗卡得一样。

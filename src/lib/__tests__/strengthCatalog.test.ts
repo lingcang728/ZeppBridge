@@ -37,6 +37,12 @@ describe('strengthCatalog parity with Rust decoder/strength.rs', () => {
     expect(resolveStrengthExerciseLabel('biceps_curl', 65, strengthCatalogMessages.en)).toBe('Biceps curls');
     expect(resolveStrengthExerciseLabel(null, 1030, strengthCatalogMessages.zh)).toBe('#1030');
     expect(resolveStrengthExerciseLabel('unmapped_future_key', 1451, strengthCatalogMessages.en)).toBe('#1451');
+    // 1001 起的新动作：先用当前语言的 Zepp 目录名，再用后端带来的英文名，都没有才 #编号。
+    expect(resolveStrengthExerciseLabel(null, 1030, strengthCatalogMessages.zh, '高脚杯深蹲', 'Goblet Squat')).toBe('高脚杯深蹲');
+    expect(resolveStrengthExerciseLabel(null, 1030, strengthCatalogMessages.zh, undefined, 'Goblet Squat')).toBe('Goblet Squat');
+    expect(resolveStrengthExerciseLabel(null, 1030, strengthCatalogMessages.zh, ' ', null)).toBe('#1030');
+    // 核过的老动作不被 Zepp 名字顶掉。
+    expect(resolveStrengthExerciseLabel('biceps_curl', 65, strengthCatalogMessages.zh, 'Biceps Curl')).toBe('二头弯举');
     expect(resolveStrengthMuscleLabel('biceps', strengthCatalogMessages.zh)).toBe('肱二头肌');
     expect(resolveStrengthMuscleLabel(null, strengthCatalogMessages.en)).toBeNull();
   });

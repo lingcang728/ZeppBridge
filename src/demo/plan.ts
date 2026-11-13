@@ -6,6 +6,7 @@
  */
 import { at, dayKey, iso } from './rng';
 import { demoText } from './texts';
+import type { FeedbackRating, PlanHistoryEntry, PlanHistoryWorkout } from '../types/feedback';
 import type {
   PlanDayPreview, PlanDraftPreview, PlanPublishAction, PlanPublishRecord, PlanPublishResult,
   PlanStepNode, PlanWorkout, TrainingPlanState,
@@ -162,4 +163,26 @@ export const createDemoPlan = (now: Date): DemoPlan => {
       return { outcome: { outcome: 'send', batch_id: 2, sends: [] }, record, records: [record] };
     },
   };
+};
+
+/* 计划履历：现在这批 + 之前两批。练过的那几次带着跑后打分；有一次没打分（如实空着）；
+   两周前那批被上周那批替换掉了一条。 */
+export const demoPlanHistory = (now: Date, current: TrainingPlanState): PlanHistoryEntry[] => {
+  const text = demoText();
+  const day = (offset: number) => dayKey(at(now, offset));
+  let next = 100;
+  const done = (offset: number, sport: PlanWorkout['sport'], name: string, steps: PlanStepNode[], rating: FeedbackRating | null): PlanHistoryWorkout =>
+    ({ date: day(offset), sport, variant: 'outdoor', name, steps, plan_workout_id: next++, rating });
+  const record = (id: number, offset: number, count: number): PlanPublishRecord => ({
+    id, batch_id: id, kind: 'publish', role: 'window', window_start: day(offset), workout_count: count, state: 'sent', http_status: 200, error_code: null,
+    undone: false, created_at: iso(at(now, offset - 1, 21, 4)), finished_at: iso(at(now, offset - 1, 21, 5)) });
+  const entries: PlanHistoryEntry[] = [
+    { record: record(-1, -7, 4), origin: 'ai_paste', summary: text.planSummary, replaced: 0,
+      workouts: [done(-6, 'running', text.easyRun, easy(), 2), done(-4, 'running', text.tempoRun, tempo(), 4), done(-2, 'cycling', text.recoveryRide, ride(), null), done(-1, 'running', text.longRun, longRun(), 3)] },
+    { record: record(-2, -14, 3), origin: 'user', summary: null, replaced: 1,
+      workouts: [done(-13, 'running', text.easyRun, easy(), 2), done(-11, 'running', text.intervals, intervals(), 5), done(-9, 'running', text.easyRun, easy(), 3)] },
+  ];
+  if (current.last_publish) entries.unshift({ record: current.last_publish, origin: 'ai_paste', summary: null, replaced: 0,
+    workouts: current.sent.map(w => ({ ...w, plan_workout_id: next++, rating: null })) });
+  return entries;
 };
