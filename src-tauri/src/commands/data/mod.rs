@@ -51,6 +51,7 @@ mod device_profiles;
 mod diagnostic_report;
 mod export;
 mod redact;
+mod strength_catalog;
 #[cfg(test)]
 mod tests;
 mod workout_fit;
@@ -60,6 +61,7 @@ pub(crate) use device_profiles::*;
 pub(crate) use diagnostic_report::*;
 pub(crate) use export::*;
 pub(crate) use redact::*;
+pub(crate) use strength_catalog::*;
 pub(crate) use workout_fit::*;
 
 const DEVICE_CACHE_MAX_AGE_SECONDS: i64 = 24 * 60 * 60;

@@ -1,26 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_PARTS, BODY_REGIONS, nearestBodyRegion, splitPart } from '../logbook/body';
+import { BODY_PARTS, BODY_PART_PLACES, splitPart } from '../logbook/body';
+import { BACK_SHAPES, FRONT_SHAPES } from '../anatomy/paths';
 import { clockText, daysBetween, paceOf, parseClock, raceDistanceKey } from '../logbook/clock';
 
 describe('body map', () => {
-  it('every body part can be clicked on at least one side of the figure', () => {
-    const drawn = new Set(BODY_REGIONS.map(region => region.part));
-    expect(BODY_PARTS.filter(part => !drawn.has(part))).toEqual([]);
+  const drawn = new Set([...FRONT_SHAPES, ...BACK_SHAPES].map(shape => `${shape.slug}:${shape.side}`));
+
+  it('every body part lands on at least one drawn shape or marker', () => {
+    const missing = BODY_PARTS.filter((part) => {
+      const place = BODY_PART_PLACES[part];
+      return !place.markers.length && !place.shapes.some(s => drawn.has(`${s.slug}:${s.side}`));
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('no two parts claim the same shape', () => {
+    const owner = new Map<string, string>();
+    for (const part of BODY_PARTS) for (const s of BODY_PART_PLACES[part].shapes) {
+      const key = `${s.slug}:${s.side}`;
+      expect(owner.get(key), key).toBeUndefined();
+      owner.set(key, part);
+    }
   });
 
   it('puts the person’s own left on the viewer’s right from the front and on the left from the back', () => {
-    const knee = BODY_REGIONS.find(region => region.part === 'knee_l' && region.view === 'front')!;
-    const calf = BODY_REGIONS.find(region => region.part === 'calf_l' && region.view === 'back')!;
-    expect(knee.cx).toBeGreaterThan(60);
-    expect(calf.cx).toBeLessThan(60);
+    const elbow = BODY_PART_PLACES.elbow_l.markers;
+    expect(elbow.find(m => m.view === 'front')!.cx).toBeGreaterThan(364);
+    expect(elbow.find(m => m.view === 'back')!.cx).toBeLessThan(1083.5);
+    expect(BODY_PART_PLACES.achilles_r.markers[0].cx).toBeGreaterThan(1083.5);
+    expect(BODY_PART_PLACES.knee_l.shapes).toEqual([{ slug: 'knees', side: 'l' }]);
     expect(splitPart('it_band_r')).toEqual(['it_band', 'r']);
     expect(splitPart('neck')).toEqual(['neck', null]);
-  });
-
-  it('snaps nearby clicks to the closest region and ignores clicks far off the body', () => {
-    expect(nearestBodyRegion('front', 72, 204)?.part).toBe('knee_l');
-    expect(nearestBodyRegion('back', 71, 258)?.part).toBe('achilles_r');
-    expect(nearestBodyRegion('front', 14, 10)).toBeNull();
   });
 });
 

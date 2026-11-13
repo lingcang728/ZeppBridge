@@ -19,6 +19,9 @@ export const createDemoWorkoutEdits = (data: DemoData): Record<string, DemoHandl
       data.workouts.sort((a, b) => b.start_time.localeCompare(a.start_time) || a.workout_id.localeCompare(b.workout_id));
     }
   };
+  /* 隐藏过的一条：手机也记了同一次散步，重复的那条被藏起来了（「已隐藏」里能找回来）。 */
+  const walk = data.workouts.find(w => w.effective_type === 'walking');
+  if (walk) hidden.set(`${walk.workout_id}0`, { ...structuredClone(walk), workout_id: `${walk.workout_id}0`, device_id: 'DEMO0000PHONE1', calories: (walk.calories ?? 0) + 9 });
   return {
     get_hidden_workout_page: args => {
       const all = [...hidden.values()].sort((a, b) => b.start_time.localeCompare(a.start_time));

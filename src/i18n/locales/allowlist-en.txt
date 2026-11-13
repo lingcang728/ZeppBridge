@@ -391,6 +391,7 @@ lib/strengthCatalog.exercises.cable_crossover
 components/workout/WorkoutStrengthCard.unitSets
 components/workout/WorkoutStrengthCard.colSet
 components/workout/WorkoutStrengthCard.colSets
+components/workout/WorkoutStrengthCard.colCalories
 components/overview/PinnedMetrics.names.distance
 components/overview/StepsCard.factDistance
 

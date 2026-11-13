@@ -23,6 +23,9 @@ export const createDemoOperations = (data: DemoData, plan: DemoPlan) => {
   const templates = new Map<string, AiTaskTemplate>();
   const events: LifeEvent[] = [
     { id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: now(), updatedAt: now() },
+    { id: 2, title: demoText().lifeTrip, category: 'travel', startDate: dayKey(at(data.now, -11)), endDate: dayKey(at(data.now, -8)), notes: '', epoch: false, createdAt: now(), updatedAt: now() },
+    { id: 3, title: demoText().lifeCold, category: 'health', startDate: dayKey(at(data.now, -52)), endDate: dayKey(at(data.now, -46)), notes: '', epoch: false, createdAt: now(), updatedAt: now() },
+    { id: 4, title: demoText().lifeShift, category: 'routine', startDate: dayKey(at(data.now, -150)), endDate: null, notes: '', epoch: true, createdAt: now(), updatedAt: now() },
   ];
   const exchanges: AiExchange[] = [{ id: 'demo-exchange-1', task_id: initial.id, provider: 'ChatGPT', question: initial.title, days_before: 14,
     categories: initial.categories, workout_ids: [], personal_note: '', sent_at: now(), md_path: 'ZeppBridge.md',

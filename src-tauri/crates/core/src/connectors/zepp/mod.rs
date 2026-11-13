@@ -197,8 +197,29 @@ impl ZeppConnector {
         params: Vec<(&str, String)>,
         timing: RequestTiming,
     ) -> Result<Value> {
+        self.get_json_with_headers(path, params, timing, &[]).await
+    }
+
+    /// 和 [`Self::get_json_timed`] 一样，只是把少数几个固定请求头换成调用方给的值
+    /// （目前只有力量动作目录要换 `lang` / `cv` / `vn`）。只允许覆盖已有的头名，
+    /// 不能借这里加出 `apptoken` 之外的新凭据头。
+    async fn get_json_with_headers(
+        &self,
+        path: &str,
+        params: Vec<(&str, String)>,
+        timing: RequestTiming,
+        overrides: &[(&'static str, String)],
+    ) -> Result<Value> {
         let mut url = self.path_url(path)?;
-        let headers = self.build_headers()?;
+        let mut headers = self.build_headers()?;
+        for (name, value) in overrides {
+            if !matches!(*name, "lang" | "cv" | "vn") {
+                return Err(ZeppBridgeError::ConfigError("不允许覆盖这个请求头".into()));
+            }
+            let value = header::HeaderValue::from_str(value)
+                .map_err(|_| ZeppBridgeError::ConfigError("请求头含有非法字符".into()))?;
+            headers.insert(*name, value);
+        }
         let mut last_retry_status = None;
         let mut attempt = 0usize;
         let mut redirects = 0usize;
@@ -503,6 +524,29 @@ impl ZeppConnector {
                 ("stopTrackId", stop_track_id.to_string()),
                 ("need_sub_data", need_sub_data.to_string()),
                 ("type", String::new()),
+            ],
+        )
+        .await
+    }
+
+    /// 力量训练动作目录（动作名 + 主 / 辅肌肉位置号）。
+    ///
+    /// 语言只认请求头 `lang`（`en_US`、`pt_BR`…），查询参数不管用；不带 App 构建
+    /// 版本 `cv` 时 Zepp 只回老的 ~125 个动作，带上才是完整的一千多个
+    /// （GitHub #163，felipepmdias 实测）。
+    pub async fn fetch_strength_catalog(&self, lang: &str) -> Result<Value> {
+        if !crate::decoder::strength_catalog::is_valid_zepp_lang(lang) {
+            return Err(ZeppBridgeError::ConfigError("语言代码无效".into()));
+        }
+        use crate::decoder::strength_catalog::{STRENGTH_CATALOG_CV, STRENGTH_CATALOG_VN};
+        self.get_json_with_headers(
+            "/sport/config/muscle",
+            Vec::new(),
+            DEFAULT_TIMING,
+            &[
+                ("lang", lang.to_string()),
+                ("cv", STRENGTH_CATALOG_CV.to_string()),
+                ("vn", STRENGTH_CATALOG_VN.to_string()),
             ],
         )
         .await

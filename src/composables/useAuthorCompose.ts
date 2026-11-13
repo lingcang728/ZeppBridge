@@ -32,6 +32,11 @@ export function prefetchAuthorCompose(): void {
   if (prefetched) return;
   prefetched = true;
   void import('../components/letters/AuthorComposeLayer.vue').catch(() => { prefetched = false; });
+  // 信纸上那几句先在屏幕外排一次版（components/letters/paperWarm.ts），空闲时做，不挤占这一帧。
+  void import('../components/letters/paperWarm').then(({ warmPaperText }) => {
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warmPaperText, { timeout: 1500 });
+    else window.setTimeout(warmPaperText, 200);
+  }).catch(() => undefined);
 }
 
 export function closeAuthorCompose(): void {

@@ -592,6 +592,8 @@ impl Database {
                     duration_ms: row.get(8)?,
                     avg_hr: row.get(9)?,
                     calories_kcal: row.get(10)?,
+                    exercise_name: None,
+                    secondary_muscle_groups: Vec::new(),
                 })
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
@@ -640,14 +642,23 @@ impl Database {
             None => (false, None, None, None, None),
         };
 
-        Ok(crate::decoder::strength::build_strength_workout_detail(
+        let mut detail = crate::decoder::strength::build_strength_workout_detail(
             sets,
             is_strength_workout,
             total_sets,
             total_reps,
             rest_seconds,
             groups_json.as_deref(),
-        ))
+        );
+        // 动作目录缓存在就补上 Zepp 的动作名与主 / 辅肌群（读时补、不落库：
+        // 目录晚到或更新后，老运动不用重放就能看到）。
+        if let Some(detail) = detail.as_mut() {
+            if let Some(dir) = self.data_dir() {
+                let cache = crate::decoder::strength_catalog::read_any_catalog_cache(&dir);
+                crate::decoder::strength_catalog::enrich_strength_detail(detail, cache.as_ref());
+            }
+        }
+        Ok(detail)
     }
 
     pub(super) fn fetched_at_for_raw(&self, raw_record_id: Option<i64>) -> Option<DateTime<Utc>> {

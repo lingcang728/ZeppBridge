@@ -126,6 +126,10 @@ export interface StrengthSetRow {
   duration_ms?: number | null;
   avg_hr?: number | null;
   calories_kcal?: number | null;
+  /** Zepp 动作目录的英文名（后端有英文目录缓存时才有）；界面优先用自己语言的目录。 */
+  exercise_name?: string | null;
+  /** 辅助肌群（九大肌群键，已去掉主肌群）。 */
+  secondary_muscle_groups?: string[];
 }
 
 export interface StrengthExerciseGroup {
@@ -134,6 +138,27 @@ export interface StrengthExerciseGroup {
   muscle_group?: string | null;
   sets: number;
   total_reps: number;
+  exercise_name?: string | null;
+  secondary_muscle_groups?: string[];
+}
+
+/** Zepp 力量动作目录（`/sport/config/muscle`）里的一项，名字按请求语言。 */
+export interface StrengthCatalogAction {
+  action_code: number;
+  name: string;
+  primary_groups: string[];
+  secondary_groups: string[];
+  main_positions: number[];
+  sub_positions: number[];
+  self_weight?: boolean | null;
+}
+
+export interface StrengthCatalogResult {
+  lang: string;
+  fetched_at: string | null;
+  /** fresh | stale（拉不到、用旧缓存）| unavailable（没有任何目录） */
+  status: 'fresh' | 'stale' | 'unavailable';
+  actions: StrengthCatalogAction[];
 }
 
 export interface StrengthWorkoutDetail {

@@ -66,6 +66,7 @@ import type {
   Workout,
   WorkoutFitOverride,
   WorkoutSeries,
+  StrengthCatalogResult,
 } from '../../types';
 
 type UnknownRecord = Record<string, unknown>;
@@ -384,6 +385,10 @@ export const tauriBackend: BridgeBackend = {
 
   getWorkoutSeries(workoutId: string) {
     return call<WorkoutSeries>('get_workout_series', { workoutId });
+  },
+
+  getStrengthCatalog(locale: string) {
+    return call<StrengthCatalogResult>('get_strength_catalog', { locale });
   },
 
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null) {

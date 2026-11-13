@@ -1,4 +1,5 @@
 pub mod strength;
+pub mod strength_catalog;
 pub mod workout_detail;
 
 pub use workout_detail::{

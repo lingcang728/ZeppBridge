@@ -17,7 +17,7 @@ import { demoPrepare, demoPreview, demoTaskList, demoTemplates } from './ai';
 import { createDemoPlan } from './plan';
 import { demoDayStrip } from './bridge';
 import { demoCapabilities, demoDevices, demoLedger, demoLocalApi, demoOverview, demoPrefs, demoStatus, demoWeeklyReport } from './facts';
-import { at, dayKey } from './rng';
+import { dayKey } from './rng';
 import { hostPost } from './host';
 import { demoText } from './texts';
 import { FALLBACK_APP_VERSION } from '../lib/appVersion';
@@ -29,6 +29,8 @@ import { createDemoWorkoutEdits } from './workoutEdits';
 import { createDemoImports } from './imports';
 import { createDemoLogbook } from './logbook';
 import { createDemoDataLetters } from './dataLetters';
+import { createDemoExtras } from './extras';
+import { demoPlanHistory } from './plan';
 import type { HeartRateZonePreference } from '../types';
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -131,15 +133,8 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     get_device_profiles: () => demoDevices(data),
     get_capability_overview: () => demoCapabilities(data),
     get_coverage_ledger: () => demoLedger(data),
-    get_storage_estimate: () => null,
-    get_unknown_workout_codes: () => [],
-    get_workout_type_options: () => [],
-    list_backups: () => [],
     get_pending_restore: () => null,
 
-    list_life_events: () => [{
-      id: 1, title: demoText().lifeEvent, category: 'training', startDate: dayKey(at(data.now, -24)), endDate: null, notes: '', epoch: true, createdAt: '', updatedAt: '',
-    }],
     get_health_overview: () => demoOverview(data),
     get_heart_rate_series: (args) => hoursOf(Number(args.hours ?? 24)),
     get_stress_series: (args) => {
@@ -165,15 +160,12 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
       const found = data.sleeps.find((item) => item.sleep_id === args.sleepId);
       return found ? { ...found, stages: sleepStageSlices(found) } : null;
     },
-    // 小睡阶段只有官方授权通道给；演示数据不编午睡。
-    get_sleep_nap_stages: () => [],
     get_recent_workouts: (args) => data.workouts.slice(0, Number(args.limit ?? 20)),
     get_workout_page: (args) => page(data.workouts, args),
     get_workout_detail: a => data.workouts.find(w => w.workout_id === a.workoutId) ?? null,
     get_workout_series: a => { const w = data.workouts.find(w => w.workout_id === a.workoutId); if (!w) throw Object.assign(new Error('Unknown sample workout'), { code: 'err.workout.not_found' }); return demoWorkoutSeries(w); },
     get_workout_insight: a => { const w = data.workouts.find(w => w.workout_id === a.workoutId); if (!w) throw Object.assign(new Error('Unknown sample workout'), { code: 'err.workout.not_found' }); return demoInsight(data, w); },
     set_workout_type_override: a => { const w = data.workouts.find(w => w.workout_id === a.workoutId); if (!w) throw Object.assign(new Error('Unknown sample workout'), { code: 'err.workout.not_found' }); w.user_override = a.userOverride as string | null; w.effective_type = w.user_override || w.normalized_type; return w; },
-    set_workout_code_label: () => [],
     get_weekly_report: () => demoWeeklyReport(data),
 
     start_incremental_sync: () => simulateSync(),
@@ -181,7 +173,6 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
 
     ai_task_list: () => demoTaskList(data),
     ai_task_day_strip: (args) => demoDayStrip(data,Number(args.daysBefore ?? 14),String(args.end ?? dayKey(data.now))),
-    ai_exchange_list: () => [],
     training_plan_adherence: a => data.workouts.filter(w => w.start_time.slice(0, 10) >= String(a.from) && w.start_time.slice(0, 10) <= String(a.to)).map(w => ({ date: dayKey(new Date(w.start_time)), planned: { name: w.effective_type, sport: w.effective_type, seconds: w.moving_seconds, hr_low: 130, hr_high: 150 }, actual: [{ workout_id: w.workout_id, seconds: w.moving_seconds, avg_hr: w.avg_hr, sport: w.effective_type, compatible: true }], verdict: 'done' })),
     training_plan_update_draft: (args) => plan.updateDraft(args.document as import('../types/trainingPlan').PlanDocument),
     /* 跑后打分：演示里拿最近一次跑步当「练完了计划」，打分 / 关掉 / 这周别问后不再问。 */
@@ -198,7 +189,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     workout_feedback_dismiss: a => { feedbackDone.add(String(a.workoutId)); },
     workout_feedback_snooze: () => { data.workouts.forEach(w => feedbackDone.add(w.workout_id)); return dayKey(new Date(data.now.getTime() + 7 * 864e5)); },
     workout_feedback_adjusted: () => null,
-    training_plan_history: () => [],
+    training_plan_history: () => demoPlanHistory(data.now, plan.state()),
     coach_notes_list: () => ({ accepted: coachNotes.filter(n => n.state === 'accepted'), proposed: coachNotes.filter(n => n.state === 'proposed').reverse() }),
     coach_note_add: a => { const id = coachNotes.length + 1; const now = new Date().toISOString(); coachNotes.push({ id, text: String(a.text).trim(), state: 'accepted', source: 'user', source_name: null, created_at: now, updated_at: now, decided_at: now }); return id; },
     coach_note_decide: a => { const note = coachNotes.find(n => n.id === Number(a.id)); if (note) { note.state = a.accept ? 'accepted' : 'rejected'; note.decided_at = new Date().toISOString(); } },
@@ -227,7 +218,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     training_plan_set_ai_publish: a => plan.setAiPublish(!!a.allowed),
     training_plan_publish: (args) => plan.publish(args.action as PlanPublishAction, Boolean(args.confirmClear)),
   };
-  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), {
+  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), createDemoExtras(data), {
     // 演示里不发系统通知。
     workout_feedback_toast_due: () => null, workout_feedback_toast_show: () => null,
     export_my_records: () => 128,

@@ -237,7 +237,7 @@ forbidden. The provenance of the algorithms and percentages is in the
   the ring is masked to the edge and the light is an outer `box-shadow`;
   neither may tint the inside of the capsule.
 
-### Motion: one primitive, six rules (2026-11-12)
+### Motion: one primitive, seven rules (2026-11-12, rule 7 on 11-13)
 
 Every "walk somewhere" transition — the settings deck, card ↔ detail page,
 dialogs, the letter envelope — is a flight from `lib/motion/flight.ts`: one group
@@ -287,9 +287,37 @@ what it put on stage. Measurements before and after the rewrite are in
    landing; switching between open and close mid-way maps time by where the
    window is (`closeTimeFor` / `openTimeFor`). Page → card waits for the
    staying page to paint steadily first (capped at 120 ms,
-   `pageMorph/collapse.ts`). Closing a settings card scrolled far down first
-   rolls the whole card back to where its head shows, then shrinks into its
-   source — it never vanishes in place.
+   `pageMorph/collapse.ts`). Page → card is a **container morph** (2026-11-13,
+   fourth round): content and the card copy scale with the window width,
+   pinned to its top-left corner; the copy fades in on top, then the content
+   fades out, so the page gradually becomes the card (`contentMorphOut` /
+   `replicaMorphIn` in `pageFlight.ts`). Closing a settings card scrolled far
+   down no longer rolls back to the top first (that bounced upward): the
+   content fades in place, pinned to the window, while the source card lights
+   up in the second half (`FAR_*` in `useDeckMorph.ts`).
+7. **No full-page repaint mid-flight** (2026-11-13). Morphs run on the
+   compositor (transform / clip-path / opacity); any main-thread frame that
+   re-layerizes or repaints the page drops a frame. Known traps and the rules
+   that now cover them:
+   - Finish CSS transitions on both pages before take-off
+     (`settleTransitions` in `pageFlight.ts`) so they don't compete.
+   - During a morph `html[data-motion]` (`lib/motion/budget.ts`) stops the
+     moving page from taking the pointer: content sliding under a still
+     pointer would swap hover styles row by row and re-layerize every frame
+     (measured 14 ms per frame on the sleep list).
+   - **Never write `html[attr] *` descendant rules**: toggling an attribute
+     on html restyles the whole tree. Scope rules to the classes that change.
+   - The comparison bars' flowing stripes are static now
+     (`ComparisonBars.vue`): an always-animating background repaints its layer.
+   - When a dialog or the letter sheet starts to grow, the GPU rasterizes the
+     whole body in the first frames (about 100–150 ms headless at 4K, same
+     for all three journal dialogs, unrelated to the body figure). Measured:
+     hiding the body removes it; holding at the origin until frames settle,
+     pre-drawing the body at 2 % or 100 % opacity, and `will-change` on it do
+     not help — raster follows the clip window as it grows. The stall is
+     still there; don't retry those routes. The letter sheet's system-font
+     fallback / shaping is now pre-laid out at idle
+     (`components/letters/paperWarm.ts`), removing the 90 ms main-thread hit.
 
 ### Hard rules: where things come from, how choices look (2026-10-07)
 
