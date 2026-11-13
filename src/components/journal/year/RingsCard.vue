@@ -29,7 +29,7 @@ const shapes = computed(() => layout.value.bands.map(band => ({
   <RouterLink class="rings-card" :to="{ name: 'Rings', query: year ? { year: String(year.year) } : {} }" data-morph-card>
     <h2>{{ t.title }}</h2>
     <svg class="tree" :viewBox="`${-R - 14} ${-R - 14} ${2 * R + 28} ${2 * R + 28}`" aria-hidden="true">
-      <path class="bark" :d="bark.ring" fill-rule="evenodd" />
+      <path class="bark" :d="bark.ring" fill-rule="evenodd" data-morph-focus />
       <g v-for="shape in shapes" :key="shape.year" :class="{ on: shape.on }">
         <path class="fill" :d="shape.fill" :fill="shape.wood" fill-rule="evenodd" />
         <path class="lit" :d="shape.fill" fill-rule="evenodd" />

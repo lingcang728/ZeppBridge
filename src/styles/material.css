@@ -395,3 +395,8 @@ html[data-effects="lite"] *, html[data-effects="lite"] *::before, html[data-effe
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
 html[data-effects="lite"] .tl-row { animation: none; }
+
+/* 来处藏着（lib/motion/sourceHold.ts）：浮层 / 页面 / 牌从它长出来、还没收回落地时，窗口里是它的拷贝，真元素不露面。
+   收回最后一段改成 fading，透明度交给那段 WAAPI 动画。 */
+[data-source-hold='held'] { opacity: 0 !important; transition: none !important; }
+[data-source-hold='fading'] { transition: none !important; }

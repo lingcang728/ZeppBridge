@@ -17,6 +17,7 @@ import { dialogWindowFrames } from './dialogFlight';
 import { exemptFromSettle } from './interrupt';
 import { lessMotion } from './lessMotion';
 import { cardReplica } from './replica';
+import { settleCssAnimations } from './settle';
 import { whenFramesSteady } from './steady';
 import { OPEN_EASE, paced } from './timing';
 import { visibleWindow, type WindowRect } from './window';
@@ -70,6 +71,8 @@ const attachReplica = (panel: HTMLElement, source: HTMLElement | null, frames: K
   replica.dataset.sheetReplica = '';
   Object.assign(replica.style, { position: 'absolute', left: '0', top: '0', zIndex: '4', pointerEvents: 'none' });
   panel.appendChild(replica);
+  // 拷贝出来的 DOM 停在终态：CSS 入场动画别从头再放（settle.ts）。
+  settleCssAnimations(replica);
   replica.animate(frames, { duration, fill: 'both', easing: 'linear' });
   return replica;
 };

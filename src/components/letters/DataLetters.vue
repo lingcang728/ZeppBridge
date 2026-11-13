@@ -13,6 +13,8 @@
 import './paper.css';
 import './letterRail.css';
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { wheelPan } from '../../lib/wheelPan';
+const vWheelPan = wheelPan;
 import WaxSeal from './WaxSeal.vue';
 import EnvelopeTile from './EnvelopeTile.vue';
 import Postcard from './Postcard.vue';
@@ -142,7 +144,7 @@ const closeReading = () => { reading.value = null; sealError.value = ''; };
 
     <template v-if="view?.on_this_day.length">
       <h2 class="box-heading">{{ t.onThisDay }}</h2>
-      <ul class="letter-rail">
+      <ul v-wheel-pan class="letter-rail">
         <li v-for="(day, i) in view.on_this_day" :key="day.date" class="letter-rail-item">
           <Postcard :date="day.date" :label="`${t.yearsAgo(day.years_ago)} · ${f.longDate(day.date)}`" :stats="postcardStats(day)" :workouts="postcardWorkouts(day)" :tilt="tilt(i + 1)" />
           <p class="letter-rail-caption">{{ t.yearsAgo(day.years_ago) }}</p>
@@ -152,7 +154,7 @@ const closeReading = () => { reading.value = null; sealError.value = ''; };
 
     <template v-if="weeklies.length">
       <h2 class="box-heading">{{ t.weekly }}</h2>
-      <ul class="letter-rail">
+      <ul v-wheel-pan class="letter-rail">
         <li v-for="(letter, i) in weeklies" :key="letter.id" class="letter-rail-item">
           <EnvelopeTile :label="t.weekRange(f.shortDate(letter.weekly!.recent_start), f.shortDate(letter.weekly!.recent_end))"
             :to="lt.to" :stamp-label="f.stampDay(letter.weekly!.recent_start)" :tilt="tilt(i)" @open="openWeekly(letter, $event)" />
@@ -162,7 +164,7 @@ const closeReading = () => { reading.value = null; sealError.value = ''; };
     </template>
 
     <h2 class="box-heading">{{ t.capsules }}</h2>
-    <TransitionGroup tag="ul" name="rail-drop" class="letter-rail">
+    <TransitionGroup v-wheel-pan tag="ul" name="rail-drop" class="letter-rail">
       <li key="compose" class="letter-rail-item">
         <EnvelopeTile :label="t.writeFuture" face="back" :tilt="-0.8" @open="compose" />
         <p class="letter-rail-caption">{{ t.writeFuture }}</p>

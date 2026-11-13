@@ -234,6 +234,17 @@ export class Director {
   }
   /** 盖在应用上的展示墙（演示专用，见 demo/walls）：多根玻璃条 / 多排牌并排滚动。 */
   async wall(kind: FilmWall | null) { this.api.wall(kind); if (kind) await this.find(`.film-wall.${kind}`); }
+  /**
+   * 运动详情的台前调度（2026-11-13）：把某张卡请上舞台再拍。卡平时可能在侧栏里（斜着、缩小），
+   * 直接按类名找会推到缩略卡上；StageShell 听 `zb:stage-show`（detail 是卡 id），换完等飞行落定。
+   */
+  async showCard(id: string) {
+    await this.find('.stage-shell');
+    const view = this.view as Window & typeof globalThis;
+    view.dispatchEvent(new view.CustomEvent('zb:stage-show', { detail: id }));
+    await this.clock.wait(60);
+    await this.settle();
+  }
   /** 应用里的主滚动区平滑滚到元素（缓出），元素上缘落在 `top` 处。 */
   async scrollTo(target: Target, top = 90, ms = 460) {
     const el = await this.resolve(target);

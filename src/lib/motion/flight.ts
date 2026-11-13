@@ -68,8 +68,9 @@ export interface Flight {
   readonly anims: readonly Animation[];
   /** 组里的第一段（形状）：时间以它为准。 */
   readonly main: Animation | null;
-  /** 在组里加一段（和整组同长、fill both、从此刻的时间接着走）。 */
-  add: (el: Element, keyframes: Keyframe[], options?: { easing?: string; pseudoElement?: string }) => Animation;
+  /** 在组里加一段（和整组同长、fill both、从此刻的时间接着走）。`hold`：开头这一份时间先停在第一帧（WAAPI 的 delay），
+      曲线只放在剩下的时间里——倒着放（关）时就是「先落地、再停一小段」，落地那一刻速度照样减到零。 */
+  add: (el: Element, keyframes: Keyframe[], options?: { easing?: string; pseudoElement?: string; hold?: number }) => Animation;
   /** 内容画好了：在当前进度（不早于 `notBefore`）插一段交接——`show` 从无到有，`hide` 从有到无。已落地就单独放一小段。 */
   handoff: (parts: { show?: Element[]; hide?: Element[] }, notBefore?: number) => void;
   /** 藏起原卡：同一帧里替身已经顶在它的位置上（调用方保证）。落地 / 收尾时还原。 */
@@ -115,8 +116,9 @@ export function createFlight({ duration, onLand, keepOnLand = false }: FlightOpt
   };
 
   const add: Flight['add'] = (el, keyframes, options = {}) => {
+    const hold = Math.min(0.9, Math.max(0, options.hold ?? 0)) * duration;
     const animation = exemptFromSettle(el.animate(keyframes, {
-      duration, easing: options.easing ?? 'linear', fill: 'both', ...(options.pseudoElement ? { pseudoElement: options.pseudoElement } : {}),
+      duration: duration - hold, delay: hold, easing: options.easing ?? 'linear', fill: 'both', ...(options.pseudoElement ? { pseudoElement: options.pseudoElement } : {}),
     }));
     if (anims.length) {
       animation.currentTime = time();

@@ -29,6 +29,7 @@ import {
   type DragSample,
 } from '../lib/motion/popoverMorph';
 import { anchoredLeft } from '../lib/popoverPosition';
+import { holdSource } from '../lib/motion/sourceHold';
 
 const props = withDefaults(defineProps<{ anchor: HTMLElement | null; labelledby?: string; width?: number }>(), { labelledby: undefined, width: 340 });
 const emit = defineEmits<{ close: [] }>();
@@ -53,6 +54,8 @@ const NEARLY_HIDDEN = 0.001;
 let closing: Promise<void> | null = null;
 let placed = { left: 0, top: 0, width: 0, height: 0 };
 let replica: HTMLElement | null = null;
+/** 浮层开着、收回还没落地时，按钮藏着（lib/motion/sourceHold.ts）：窗口里是它的拷贝，不叠两份「?」。 */
+let releaseAnchor: () => void = () => undefined;
 
 /** 面板放在按钮下方，往空的那边展开（anchoredLeft）；下面放不下就放上面；都放不下就贴着窗口摆（限高、内部滚）。 */
 const place = () => {
@@ -92,6 +95,9 @@ const attachReplica = (el: HTMLElement, frames: Keyframe[], timing: KeyframeAnim
   replica = null;
   if (!props.anchor?.isConnected) return;
   const copy = cardReplica(props.anchor).el;
+  // 真按钮此刻可能已经藏着：拷贝别把「藏着」的标记一起抄走。
+  copy.removeAttribute('data-source-hold');
+  copy.querySelectorAll('[data-source-hold]').forEach((node) => node.removeAttribute('data-source-hold'));
   // 面板的定位参照是内边距盒：往外挪一个边框宽，拷贝的左上角才和窗口（边框盒）的左上角对齐。
   Object.assign(copy.style, { left: `${-el.clientLeft}px`, top: `${-el.clientTop}px`, zIndex: '4' });
   el.appendChild(copy);
@@ -119,6 +125,8 @@ const open = async () => {
     morph = el.animate(popoverFrames(from, placed, placed, POPOVER_RADIUS, SHADOW_BLEED), { ...timing, easing: OPEN_EASE });
     // 拷贝前三成淡掉、内容四成起淡入：中间只有一块玻璃在长，字不在小框里和按钮叠成重影。
     attachReplica(el, [{ opacity: 1 }, { opacity: 0, offset: 0.3 }, { opacity: 0 }], timing);
+    // 拷贝已经盖在按钮上了，真按钮这一帧藏起来，直到收回落地。
+    if (anchorRect()) releaseAnchor = holdSource(props.anchor);
     for (const part of parts) part.animate([{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: 0.4 }, { opacity: 1 }], { ...timing, easing: 'ease-out' });
     // 内容落定时整体上浮 6px（和淡入同一段）。
     for (const item of el.querySelectorAll<HTMLElement>('[data-pop-item]')) {
@@ -207,6 +215,8 @@ const close = (): Promise<void> => {
       }
       await shrink.finished.catch(() => undefined);
     }
+    // 落地这一帧：拷贝正好叠在按钮上（逐像素一致），真按钮露出来、浮层随后卸掉——画面上只有一颗按钮。
+    releaseAnchor();
     props.anchor?.focus({ preventScroll: true });
     emit('close');
   })();
@@ -276,6 +286,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   releaseEscape();
+  releaseAnchor();
   resizer?.disconnect();
   replica?.remove();
   window.removeEventListener('resize', onResize);
@@ -315,7 +326,7 @@ defineExpose({ close });
    过渡在层叠里排在动画前面，会把弹簧盖掉。 */
 .pop-panel.settled:not(.dragging) { transition: left 340ms cubic-bezier(.2, .8, .2, 1), top 340ms cubic-bezier(.2, .8, .2, 1); }
 .pop-panel.morphing { overflow: visible; }
-.pop-body { display: grid; gap: 8px; min-height: 0; padding: 2px 16px 16px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.pop-body { display: grid; gap: 8px; min-height: 0; padding: 2px 16px 16px; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
 /* 抓手：顶上一条短横杠，按住拖；悬停时亮一点、光标变成可抓。 */
 .pop-grip { display: grid; place-items: center; height: 16px; cursor: grab; touch-action: none; }
 .pop-grip i { width: 38px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 18%, transparent); transition: background 160ms ease, width 200ms ease; }

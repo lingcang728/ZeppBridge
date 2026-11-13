@@ -281,8 +281,11 @@ what it put on stage. Measurements before and after the rewrite are in
    jumps"). On the way back (page → card, big card → small card, dialog →
    button) the real card lights up underneath the still-shrinking window, then
    the whole window fades; by the landing frame only the real card is left.
-   Returns use `BACK_EASE` (still moving at 0.8, so the swap happens while it
-   is still shrinking, not in a dead stop). A dialog closes on
+   **The crossfade only happens after the shape has landed** (2026-11-13, see
+   rule 8): crossfading while the window still moves leaves the copy a few
+   pixels off the real card, a double image. Returns use `BACK_EASE`; the
+   content ↔ copy handoff happens while it is still shrinking, not in a dead
+   stop. A dialog closes on
    `turnedEase(OPEN_EASE)` played backwards, which reads as a decelerating
    landing; switching between open and close mid-way maps time by where the
    window is (`closeTimeFor` / `openTimeFor`). Page → card waits for the
@@ -318,6 +321,32 @@ what it put on stage. Measurements before and after the rewrite are in
      still there; don't retry those routes. The letter sheet's system-font
      fallback / shaping is now pre-laid out at idle
      (`components/letters/paperWarm.ts`), removing the 90 ms main-thread hit.
+8. **Land first, then hand off; re-attached DOM rests at its end state**
+   (2026-11-13; the user's 4K recording: the sleep card, injuries, the year
+   highlights and the letter box all "flash / ghost" at the very end of a
+   return, and the year bars "redraw once more").
+   - **Landing hold**: the return's shape (clip, translate, scale) lands within
+     the first part of the timeline, still decelerating to zero; in the hold
+     that remains, the real element first lights up underneath the window
+     (which covers it exactly), then the window fades. One after the other,
+     never both half-transparent (that lets the background through — another
+     flash). Page → card uses `PAGE_LAND_AT` (`pageFlight.ts`, the shape's
+     `endDelay`); dialogs use `LAND_HOLD` (`dialogFlight.ts`, the shape's
+     `delay`, which is the post-landing stretch when played backwards; `hold`
+     on `flight.add`). Handoffs that follow the shape map through `onShape()`.
+   - **Every re-attached or cloned subtree goes through
+     `settleCssAnimations()`** (`lib/motion/settle.ts`): a KeepAlive page
+     re-inserted, a dialog panel put back on body to shrink home, a cloneNode
+     card copy / ghost card / letter print all replay their CSS entrance
+     animations. Finish the finite ones the moment they are attached. Any new
+     "put it back / copy it" motion must call it.
+   - **Hide the source with `data-source-hold`** (`lib/motion/sourceHold.ts`):
+     the real element hides in the same frame its copy appears and lights up
+     under the window on the way back; no frame ever shows the same element
+     twice. Never share the attribute with the page morph's
+     `data-morph-source` (the card's morph id).
+   - Acceptance: slow-motion strips from `scripts/motion/strip.py`; no double
+     image and no replayed animation in the frames around landing.
 
 ### Hard rules: where things come from, how choices look (2026-10-07)
 
@@ -545,6 +574,9 @@ pages, reached from Overview's entry cards and its "view all" links.
   trend, and drawing it as a flat line claims a stability nobody measured.
 - Every card has its own empty state. Loading uses `SkeletonBlock`; failure
   gives a retryable `EmptyState`.
+- Clicking the Z mark at the top left while already on the overview scrolls
+  smoothly back to the top (jumps under reduced motion); on any other page it
+  still goes to the overview.
 - Overview does no interpretation such as recovery scoring or training advice.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
@@ -583,13 +615,140 @@ pages, reached from Overview's entry cards and its "view all" links.
   and "all workouts" lead to the full lists. Incomplete records that were
   filtered out must be announced explicitly — "N incomplete records hidden" —
   never silently disappear.
-- Workout detail: a metric matrix, ECharts heart-rate/pace curves, a local SVG
-  track (mapped onto the `--route-*` spectrum by pace) and pause intervals. No
-  track points means no map; no per-point samples means no curve.
+- Workout detail: a top row with the workout name and page-wide buttons, and
+  below it a **stage manager** (next section); the summary (the old hero:
+  device, metric matrix) is one of its cards. Heart-rate / pace curves, the local SVG track (mapped onto the
+  `--route-*` spectrum by pace) and pause intervals are cards on that stage. No
+  track points means no map; no per-point samples means no curve — a card with
+  no data simply isn't there, never an empty card.
 - Sleep detail: a `StageBar` composition (the four `--sleep-*` colours), a
   collapsible "stage explanation", and a stacked bar chart of the last seven
   nights. Duration, score, source and device are shown as they are, and missing
   means "not provided".
+
+### Workout detail stage manager (2026-11-13)
+
+Modelled on iPadOS Stage Manager: cards no longer have fixed places. The stage
+in the middle holds a group of 1–3 cards; the rest lean in a strip on the left,
+and a click brings one onto the stage. **Every card moves, the summary
+included** (the old hero: device, evidence, metric tiles) — it is just another
+card in the registry.
+
+- **Top row**: the workout name and date · time · duration on the left
+  (`#title` slot), page-wide buttons on the right — "correct the sport type",
+  the export tools and "Ask AI" (`#actions` slot) — then "N hidden" (only when
+  something is hidden; click one to put it back), "All cards / Back to stage",
+  and "Reset layout" (stage view only). There is no full-width reset bar any
+  more.
+- **Layers**: state transitions, the layout solver, gesture decisions and
+  per-sport persistence are pure functions with tests (`src/lib/stage/`:
+  `state.ts`, `layout.ts`, `gestures.ts`, `prefs.ts`). The UI is
+  `components/workout/stage/` (`StageShell`, `StageWindow`, `StageMenu`) plus
+  `composables/useWorkoutStage.ts` (state and saving) and `useStageDrag.ts`
+  (dragging). Which cards exist, their icons, the default strip order and the
+  column each takes in the classic view (`CLASSIC_COLUMNS`) live in the
+  registry `components/workout/workoutCards.ts`; `WorkoutDetail.vue` fills
+  each card into the slot named after its id.
+- **One element per card, always** (`StageWindow`). On the stage, in the strip
+  and in the classic columns it is the same element, placed purely by
+  `layout.ts`'s Placement → `transformOf()`. Thumbnails are the real card scaled
+  down, not copies, so moving a card never replays its animations or redraws
+  its charts. **The window draws the frame**: material and inner rim on the
+  window's `::before`, the shadow on `::after`; inside a window the card
+  component's own background, border, shadow and radius are cleared
+  (`:deep()` in `StageWindow.css`), so clipping is always the window's rounded
+  corners and a narrowed card never shows a square cut.
+- **Strip**: thumbnails lean back to the right by 38° (`TILT`,
+  `STRIP_PERSPECTIVE` 280px) and carry no name (user, 11-13: the name chips sat
+  on the cards; the accessible name is in `aria-label` / `title`); groups keep a
+  fixed gap and never interleave, z-order stepping down. In full screen or a
+  narrow window the strip steps aside and a small glass handle on the left edge
+  (or the pointer at the edge) brings it back; **when it comes back the
+  full-screen card moves right** instead of being covered.
+- **Stepless resize** (user, 11-13: left / right / bottom edges plus both bottom
+  corners; the top edge stays on the stage line). Single card: left and right
+  are symmetric (it stays centred), the bottom sets the height, a bottom corner
+  does both. A group of two or three: the seam between neighbours drags the
+  `ratio`, an outer edge drags the group width (`span`, [.5, 1]), the bottom
+  sets that card's height (`heights[id]`, [160, stage height]; a card with a
+  pinned height fills the window and its chart takes the extra height).
+  Dragging in past 55% tucks the card away; a single card dragged past the
+  available width goes full screen. **The live preview is the real layout**: a
+  draft state (`useWorkoutStage.draft`) is solved every frame, windows change
+  width and height directly, content reflows, neighbours make room, and release
+  only commits the same state — no jump, and type never scales with the drag.
+  Within ±1.5% of a preset it snaps. The decision is `resizeOutcome()` in
+  `gestures.ts` (pure, tested). Type and charts grow with the card: chart card
+  titles and min / avg / max use `clamp(token, n·cqi, cap)`, and charts add
+  detail in three width tiers (`chartTier` / `withDetail` in
+  `workoutCharts.ts`: denser ticks, a labelled average, max / min markers, HR
+  zone bands) while always drawing the whole workout.
+- **Drag to rearrange**: hold "•••" or a thumbnail. The lifted card only gains a
+  shadow (`--mat-shadow-lift`) and a slight lift — no blur behind it, no
+  outlined slot. Over a drop target the previewed layout (`outcomeOf` → draft)
+  **flies the neighbours out of the way** (the swapped card slides into the
+  dragged card's old slot), and they fly back when the pointer leaves. Release
+  settles with the slightly springy `SETTLE_EASE`. The dragged card itself never
+  goes through Vue (only that window's `translate` / `scale`). ← / → cycle the
+  stage; Esc backs out one level (summoned strip → full screen).
+- **The "•••" menu keeps only what gets used** (user, 2026-11-13): the presets
+  (`SegmentTrack`, short names when tight), show only this, full screen / exit
+  full screen, move to strip — as icon-plus-label menu rows with a faint in-row
+  highlight. The whole menu is one Liquid Glass panel
+  (`.glass-control.is-lens-host`) and **the lens is there the moment it
+  opens**: when a dragged ratio sits on no preset, the thumb rests on the
+  nearest one in an "unselected" style (`SegmentTrack`'s `placeholder`).
+  `menuMorph.ts` grows and shrinks it from "•••" by animating the clip-path of
+  the glass `::before` and `.menu-inner` — **the panel itself never scales or
+  fades** (an opacity / clip-path on an ancestor stops the frosted glass from
+  sampling and the background jumps). After a preset is picked the menu closes,
+  the cards fly, and the menu grows back at "•••"'s new spot.
+- **Two views**: "All cards" switches to the classic two columns (summary and
+  insight full width, then a main and a side column; `float` cards go to the
+  shorter one; a single column under 900px of canvas), "Back to stage" returns.
+  The choice is saved in `zeppbridge-workout-stage:v1:view`. Switching is a FLIP
+  of the same windows, with no blur cover: strip cards straighten and fly to
+  their columns, column cards fly back to the strip the way they came; cards
+  off-screen at both ends don't fly, ones starting off-screen slide in a short
+  way from below; the canvas holds the taller of the two heights during the
+  flight; going back to the stage scrolls smoothly to its top.
+- **Flight** (`lib/motion/stageFlight.ts`): snapshot before the state changes
+  (the mid-flight computed style, the drag offset, the visible rect), then fly
+  from it once Vue has written the new placement; a change mid-flight continues
+  from where it is. Two kinds: **frame flight** (both ends flat: moving or
+  resizing on the stage, classic ↔ stage) — the window is laid out at its new
+  place, the frame `::before` is temporarily widened to the hull and a
+  `clip-path: inset(… round R)` interpolates from the old rect to the new one
+  (constant radius), the `::after` shadow follows, and the content layer only
+  scales **uniformly** (old width / new width → 1), so the visible area always
+  stays between the two slots and never covers a third card (rect maths in
+  `lib/stage/flightRect.ts`); **whole-window flight** (one end is a tilted
+  thumbnail) — the window scales uniformly, and the start is written as the
+  same transform function list as the end (`translate · perspective · rotateY ·
+  translate · scale`) so the browser interpolates function by function;
+  otherwise it falls back to matrix decomposition and the perspective doubles
+  the card mid-way. **Never use a non-uniform scale** (text gets stretched).
+  Clean-up listens to both the `finish` event and the `finished` promise:
+  changing the playback rate mid-flight (slow-motion debugging) replaces the
+  promise, and the frame would stay stuck at the hull as a blank slab.
+- **Narrow windows** (stage under 860px): one card on stage, the rest of its
+  group become tabs on top; the body map (`PIP_CARDS`) shrinks into a
+  picture-in-picture at the front card's bottom-right, and the front card gets
+  matching bottom scroll room so its last rows can scroll out from under it
+  (top-right covered the stat tiles). The set table drops elapsed / kcal, then
+  duration / heart rate, by card width (container queries).
+- **Saving**: per sport class in `localStorage`
+  (`zeppbridge-workout-stage:v2:<class>`; v2 adds ratios and the summary card,
+  v1 saves are discarded), only after the user has changed something; whenever
+  the card list changes the saved layout is reconciled — unknown cards are
+  dropped, new ones join the end of the strip. Defaults: strength puts the
+  summary on top with the set table and body map below; run / ride put the
+  summary on top with the route and heart rate below; everything else puts the
+  summary on top with heart rate and HR zones below. "Reset layout" clears that
+  class.
+- **Landing film**: to film a particular card, first dispatch `zb:stage-show`
+  on `window` (detail = card id) to bring it on stage, then look it up by class
+  (`Director.showCard`).
 
 ### 4. Body status (`/body`) and training status (`/training`)
 
@@ -621,10 +780,12 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 5. Settings (`/settings`)
 
-A **card deck with three forms**, no sidebar. Eight cards
+A **card deck with three forms**, no sidebar. Ten cards
 (`views/settings/cards.ts`): account and devices · sync and updates · archive
-and storage · data content · hand to AI tools · display and language · privacy
-and security · advanced and maintenance. The same cards morph between forms
+and storage · data content · hand to AI tools · display and language · Beta
+labs · guide · privacy and security · advanced and maintenance. (The "write to
+the author" card was removed on 2026-11-13: writing starts from the top-bar
+mail button.) The same cards morph between forms
 with Web Animations on the real elements (FLIP; geometry in the pure
 `lib/deck/morph.ts`, orchestration in `composables/useDeckMorph.ts`) — so
 every morph can be **interrupted**: closing a card half-way plays the opening

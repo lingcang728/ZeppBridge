@@ -10,6 +10,7 @@
  * 只动 transform / opacity / scale；减少动效时不飞，直接算数。
  */
 import { CLOSE_EASE, paced } from '../timing';
+import { settleCssAnimations } from '../settle';
 import { catchCard, lidClose, lidOpen } from './box';
 import { restOf, toLocal } from './pose';
 import { reducedMotion, settled, SPRINGS, springCurve } from './spring';
@@ -91,6 +92,8 @@ const ghostOf = (card: HTMLElement) => {
     transform: `rotate(${rest.angle.toFixed(2)}deg)`, translate: 'none', scale: 'none',
   });
   document.body.appendChild(ghost);
+  // 拷贝出来的 DOM 停在终态：CSS 入场动画别从头再放（settle.ts）。
+  settleCssAnimations(ghost);
   return { ghost, rest, w };
 };
 

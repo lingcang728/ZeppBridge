@@ -46,6 +46,7 @@ export const read: Chapter = {
           await d.clear();
           await d.go('/workouts', 200);
           await d.follow('.record-list a');
+          await d.showCard('insight');
           await d.scrollTo('.insight-card', 70, 1);
         });
         const card = await d.find('.insight-card');
@@ -57,6 +58,7 @@ export const read: Chapter = {
       // 四种格式，一次满足：同一次运动的「导出与分享」，JSON → CSV → GPX → FIT 四格都在（设置里只有前三种）。
       id: 'formats', ms: 4400, pose: 'full', caption: 'formats',
       async run(d) {
+        await d.showCard('export');
         await d.scrollTo('.deliver-card', 160, 600);
         const track = d.all('.deliver-card .segment-track')[0];
         if (track) {

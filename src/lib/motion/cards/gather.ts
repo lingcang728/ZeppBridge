@@ -10,6 +10,7 @@
  */
 import { CLOSE_EASE, OPEN_EASE, paced } from '../timing';
 import { lessMotion } from '../lessMotion';
+import { settleCssAnimations } from '../settle';
 
 const GATHER_MS = paced(460);
 const STAGGER_MS = paced(45);
@@ -48,6 +49,8 @@ export const gatherCards = (cards: HTMLElement[]): CardFlight => {
       background: 'var(--mat-raised)', boxShadow: 'var(--mat-raised-rim), 0 12px 26px -16px rgba(0,0,0,.6)', borderRadius: '12px',
     });
     document.body.appendChild(clone);
+    // 拷贝出来的 DOM 停在终态：CSS 入场动画别从头再放（settle.ts）。
+    settleCssAnimations(clone);
     return clone;
   });
   /** 叠里第 i 张的样子：在中心，略歪、略错开。 */

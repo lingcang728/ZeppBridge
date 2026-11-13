@@ -24,7 +24,7 @@ import { backend } from '../../lib/bridge';
 import { useBridgeText } from '../ai/bridge/bridge.i18n';
 import { syncControllerMessages } from '../../composables/useSyncController.i18n';
 import { openAuthorCompose, prefetchAuthorCompose } from '../../composables/useAuthorCompose';
-import { armPageMorph } from '../../composables/usePageMorph';
+import { openLetterBoxSheet } from '../../composables/useLetterBoxSheet';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { useLetterText } from '../letters/letters.i18n';
 const demoLibrary = ref(false), bridgeText = useBridgeText(), letterText = useLetterText();
@@ -134,7 +134,7 @@ const router = useRouter();
 const u = useUpdateText();
 const updateReady = computed(() => updateState.phase === 'ready' || updateState.phase === 'applying');
 onMounted(watchDesktopUpdate);
-/* 左上角标志只管回概览与装更新；信件相关交互统一收在右上角信件圆钮（短按写信，长按进信匣，新信亮红点）。 */
+/* 左上角标志只管回概览（已在概览就回顶）与装更新；信件相关交互统一收在右上角信件圆钮（短按写信，长按进信匣，新信亮红点）。 */
 const hasMail = computed(() => mailState.tab !== null);
 const brandTitle = computed(() => {
   if (updateState.phase === 'applying') return updateState.waiting_for_sync ? u.value.waitingSync : u.value.applying;
@@ -149,9 +149,16 @@ const mailPillTitle = computed(() => (hasMail.value
   ? t.value.mailTitle
   : `${letterText.value.writeAuthor} · ${t.value.holdForLetters}`));
 
+/* 已经在概览：往下翻过了就点一下回顶（用户 2026-11-13）。少动效时直接跳。 */
+const scrollOverviewTop = () => {
+  const main = document.getElementById('main-content');
+  if (!main || main.scrollTop <= 0) return;
+  main.scrollTo({ top: 0, behavior: lessMotion() ? 'auto' : 'smooth' });
+};
 const onBrandClick = () => {
   if (updateReady.value) void applyDesktopUpdate();
   else if (route.path !== '/') void router.push('/');
+  else scrollOverviewTop();
 };
 
 const LONG_PRESS_MS = 450;
@@ -174,14 +181,15 @@ const releaseMailCharge = (smooth = true) => {
   }
 };
 
+/* 长按：信匣从信件圆钮里长成一块浮层（2026-11-13：以前跳到 /letters，带图表的来处页返回时整页重画；
+   圆钮也一直露着）。已经在 /letters 这一页就只切到有新信的那一栏。 */
 const openLetters = () => {
-  const query = mailState.tab ? { tab: mailState.tab } : {};
-  if (mailBtn.value && route.path !== '/letters') {
-    const resolved = router.resolve({ path: '/letters', query });
-    armPageMorph(mailBtn.value, resolved.fullPath, { anySize: true });
-  }
   releaseMailCharge(false);
-  void router.push({ path: '/letters', query });
+  if (route.path === '/letters') {
+    if (mailState.tab) void router.replace({ path: '/letters', query: { tab: mailState.tab } });
+    return;
+  }
+  openLetterBoxSheet(mailBtn.value, mailState.tab);
 };
 
 const onMailDown = (event: PointerEvent) => {
@@ -195,6 +203,8 @@ const onMailDown = (event: PointerEvent) => {
       { duration: LONG_PRESS_MS, easing: 'cubic-bezier(0.32, 0, 0.24, 1)', fill: 'forwards' },
     );
   }
+  // 可能是长按：信匣浮层那块代码先取回来，蓄力放完它第一帧就能从圆钮里长出来。
+  void import('../letters/LetterBoxLayer.vue').catch(() => undefined);
   pressTimer = window.setTimeout(() => {
     swallowMailClick = true;
     openLetters();
@@ -375,7 +385,7 @@ useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.va
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
    品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
-     1 藏字标 → 2 语言两侧少露一截 → 3 导航紧凑 → 4 导航离开窗口正中（用掉品牌右边那块空地）
+     1 藏字标 → 2 语言两侧少露一截 → 3 导航紧凑 → 4 导航离开窗口正中、贴到右簇左边（用掉品牌右边那块空地）
      → 5 导航挪到底部（和手机宽度一样，导航本身一项不少）→ 6 同步胶囊只留圆点 → 7 实在放不下才藏语言。
    以前第 4 档就藏语言：导航钉在窗口正中，左边品牌旁空着一大块，右簇一挤就先牺牲语言——英文 1280 宽、
    中文 1180 宽语言就没了，看不懂当前语言的人只能自己摸到设置页（2026-10-01 反馈）。
@@ -390,6 +400,8 @@ useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.va
    （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊拖动途中撑宽只留一小截（见 overlaps）。 */
 const FIT_SHORT_LOCALE = 2; // 语言传送带两侧的露边收窄（不再换短码）
 const FIT_MAX = 7;
+/** 第 4 档：导航离开窗口正中，贴到右簇左边（2026-11-13 用户：西语时导航居中在左边那块空地里，离右簇太远）。 */
+const FIT_NAV_FOLLOWS = 4;
 /** 第 5 档起导航挪到底部：底部导航的样式在 shell.css，挂在 <html> 上。 */
 const FIT_NAV_BOTTOM = 5;
 const fit = ref(0);
@@ -424,10 +436,13 @@ const overlaps = (): boolean => {
   const squeezed = [...root.querySelectorAll<HTMLElement>('.pill-nav .segment-item')].some((el) => el.scrollWidth > el.clientWidth + 1);
   if (squeezed) return true;
   const actionsLeft = actions ? actions.left - reserve : 0;
+  // 第 4 档导航贴在右簇左边（.fit-4 .pill-nav 靠右）、跟着右簇一起挪：右簇撑宽时导航整体左移，
+  // 预留量要算在导航和品牌之间，不再算在导航和右簇之间（那里的间距是固定的）。
+  const navFollows = fit.value === FIT_NAV_FOLLOWS;
   if (actions && actions.right > outer.right + 0.5) return true;
   if (actions && actionsLeft < outer.left) return true;
-  if (nav && actions && actionsLeft < nav.right + gap) return true;
-  if (left && nav && left.right + gap > nav.left) return true;
+  if (nav && actions && !navFollows && actionsLeft < nav.right + gap) return true;
+  if (left && nav && left.right + gap > nav.left - (navFollows ? reserve : 0)) return true;
   if (left && actions && left.right + gap > actionsLeft) return true;
   return false;
 };
@@ -750,6 +765,8 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar:is(.fit-4, .fit-5, .fit-6, .fit-7) { grid-template-columns: auto minmax(0, 1fr) auto; }
+/* 第 4 档导航贴着右簇（离开正中时挪得最少的位置），不居中在左边那块空地里：居中的话西语、德语离右簇两百多像素。 */
+.fit-4 .pill-nav { justify-self: end; margin-right: 16px; }
 :is(.fit-5, .fit-6, .fit-7) .pill-nav { display: none; }
 :is(.fit-6, .fit-7) .sync-text { display: none; }
 :is(.fit-6, .fit-7) .sync-pill { padding-inline: 11px; }

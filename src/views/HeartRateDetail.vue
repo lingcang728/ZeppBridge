@@ -33,7 +33,7 @@ import { isDesktop, toUserMessage } from '../lib/bridge';
 import { heartPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
-import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
+import { chartPalette } from '../lib/echartsSetup';
 import { metricColor } from '../lib/metricTone';
 import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
@@ -88,6 +88,8 @@ const dayLoadSeq = createLoadSeq();
 
 type HrWindowHours = 24 | 48 | 168;
 const windowHours = ref<HrWindowHours>(24);
+// 切 24 小时 / 48 小时 / 7 天也是「切范围」：和下面 7 天 / 1 个月 / 6 个月同一段交叉溶解（SwapChart，2026-11-13 用户：以前硬切还卡）。
+trackRangeSwap(windowHours);
 const windowItems = computed(() => [
   { value: 24, label: t.value.window24h },
   { value: 48, label: t.value.window48h },
@@ -411,14 +413,10 @@ const daySpan = computed(() => {
             </dl>
           </div>
         </header>
-        <VChart
+        <SwapChart
           v-if="points.length"
           class="day-chart"
-          :key="CHART_THEME"
-          :theme="CHART_THEME"
           :option="dayChartOption"
-          autoresize
-          role="img"
           :aria-label="t.chartAria"
         />
         <p v-else-if="dayError" class="inline-alert" role="alert">

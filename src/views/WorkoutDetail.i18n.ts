@@ -148,6 +148,7 @@ export const workoutDetailMessages = defineMessages(
     fitRestored: '已恢复云端原版',
     fitFailed: '替换失败',
     pageFoot: '数据在本机解码；轨迹使用本地画布，不会发送给地图服务。',
+    pageFootNoRoute: '数据在本机解码，不会发送到别处。',
   },
   {
     notProvided: 'Not provided',
@@ -295,6 +296,7 @@ export const workoutDetailMessages = defineMessages(
     fitRestored: 'Cloud version restored',
     fitFailed: 'Could not replace this workout',
     pageFoot: 'Decoded on this machine; the track is drawn on a local canvas, never sent to a map service.',
+    pageFootNoRoute: 'Decoded on this machine and never sent anywhere else.',
   },
   {
     notProvided: 'Sin datos',
@@ -442,6 +444,7 @@ export const workoutDetailMessages = defineMessages(
     fitRestored: 'Versión de la nube restaurada',
     fitFailed: 'No se pudo reemplazar este entrenamiento',
     pageFoot: 'Decodificado en este equipo. El recorrido se dibuja en un lienzo local y nunca se envía a un servicio de mapas.',
+    pageFootNoRoute: 'Decodificado en este equipo y nunca se envía a ningún otro lugar.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'views/WorkoutDetail',

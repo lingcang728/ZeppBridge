@@ -190,6 +190,8 @@
   --radius-md: 20px;
   --radius-lg: 26px;
   --radius-xl: 34px;
+  /* 吸顶内容钉在顶栏下面的位置：顶栏外边距 12 + 高 60 + 留白 12（AppTopBar.vue）。 */
+  --sticky-top: 84px;
   /* 画布环境光（见 shell.css 的 .app-body::before）。 */
   --ambient:
     radial-gradient(900px 520px at 12% -8%, rgba(125, 163, 62, .10), transparent 70%),

@@ -24,6 +24,8 @@ const STACK_STAGGER_MS = paced(26);
 const STACK_MS = paced(320);
 const STACK_EASE = 'cubic-bezier(.25, .8, .25, 1)';
 const RETURN_MS = paced(440);
+/** 放回那一段多长：来处按钮按它在牌底下亮回来（lib/motion/sourceHold.ts）。 */
+export const CARD_RETURN_MS = RETURN_MS;
 const CROSSFADE_MS = paced(100);
 const FADE_MS = paced(160);
 

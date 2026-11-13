@@ -20,7 +20,7 @@ import { useCardCollection } from '../../composables/useCardCollection';
 import { useCardPicking } from '../../composables/useCardPicking';
 import { useCardTableDrag } from '../../composables/useCardTableDrag';
 import {
-  animateFromNow, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackAndReturnMs, stackCards, type Landing, type Receded,
+  animateFromNow, CARD_RETURN_MS, dealCards, fanBack, receive, recedeLayer, reducedMotion, relay, returnStack, settled, stackAndReturnMs, stackCards, type Landing, type Receded,
 } from '../../lib/motion/cards';
 import { OPEN_EASE, paced } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
@@ -29,6 +29,7 @@ import { deckToday, type DeckSource } from '../../lib/cards/sources';
 import type { CoverageContext } from '../../lib/cards/coverage';
 import { useGroupViews } from '../../composables/useGroupViews';
 import { whenFramesSteady } from '../../lib/motion/steady';
+import { fadeSourceIn, holdSource, sourceInFrames } from '../../lib/motion/sourceHold';
 import { backend } from '../../lib/bridge';
 import { useSyncController } from '../../composables/useSyncController';
 import { useCardSpan } from '../../composables/useCardSpan';
@@ -152,6 +153,13 @@ const anchorLanding = (): Landing | null => {
   const rect = props.anchor?.isConnected ? props.anchor.getBoundingClientRect() : props.origin;
   return rect ? { rect, kind: 'button' } : null;
 };
+/* 牌在桌上的这段时间来处按钮藏着（lib/motion/sourceHold.ts）：牌是从它里面发出来的，按钮还在原位就成了两份。
+   放回的后半程它在牌底下亮回来，最后一张淡没那一刻画面上只剩它。 */
+let releaseAnchor: () => void = () => undefined;
+const holdAnchor = () => {
+  releaseAnchor();
+  releaseAnchor = !reducedMotion() && props.anchor instanceof HTMLElement && anchorLanding() ? holdSource(props.anchor) : () => undefined;
+};
 const stageCenter = () => {
   const r = stage.value?.getBoundingClientRect();
   return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined;
@@ -207,6 +215,7 @@ const deal = async (id: number) => {
   stack.value = [{ id: `e${entrySeq++}`, level, title: rootTitle(), receded: null, pending: false }];
   await nextTick();
   const cards = cardsOf(0);
+  holdAnchor();
   await dealSteadily(cards, anchorLanding());
   if (!seq.live(id)) return;
   const first = firstPickable(cards);
@@ -298,8 +307,11 @@ const close = async () => {
   if (!seq.live(id)) { receiver.cancel(); return; }
   // 放回：整叠缩回来处，箱子（空的话）同时滑走。
   setBoxOpen(false);
-  await Promise.all([returnStack(cards, anchorLanding()), ...fades.map((a) => a.finished.catch(() => undefined)), ...parked]);
+  const landing = anchorLanding();
+  if (landing && props.anchor instanceof HTMLElement) fadeSourceIn(props.anchor, sourceInFrames(0.6, 0.95), { duration: CARD_RETURN_MS, easing: 'linear' });
+  await Promise.all([returnStack(cards, landing), ...fades.map((a) => a.finished.catch(() => undefined)), ...parked]);
   if (!seq.live(id)) { receiver.cancel(); return; }
+  releaseAnchor();
   receiver.land(props.source.tint);
   for (const entry of stack.value) entry.receded?.drop();
   emit('close');
@@ -313,6 +325,7 @@ const reopen = () => {
   closing.value = false;
   busy.value = false;
   props.anchor?.classList.remove('is-receiving');
+  holdAnchor();
   setBoxOpen(true);
   fadeChrome(1, 360);
   for (const entry of stack.value) void entry.receded?.fadeIn(360);
@@ -442,6 +455,7 @@ onMounted(() => {
   if (!workouts.value) void loadCoverage();
 });
 onBeforeUnmount(() => {
+  releaseAnchor();
   releaseEscape?.();
   resize?.disconnect();
   picking.holdEnd();

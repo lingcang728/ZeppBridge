@@ -395,3 +395,20 @@ components/workout/WorkoutStrengthCard.colCalories
 components/overview/PinnedMetrics.names.distance
 components/overview/StepsCard.factDistance
 
+# Batch 48-50：人体解剖肌肉与演示数据
+demo/texts.codeLabel
+components/anatomy/anatomy.muscles.biceps
+components/anatomy/anatomy.muscles.triceps
+components/anatomy/anatomy.muscles.quadriceps
+components/anatomy/anatomy.muscles.obliques
+components/anatomy/anatomy.muscles.trapezius
+components/anatomy/anatomy.muscles.hamstring
+
+# Batch 50: short workout-stage labels that are natural unchanged terms in nl/de/fr
+components/workout/stage/stage.cards.strength-sets
+components/workout/stage/stage.cards.route
+components/workout/stage/stage.sizeStandard
+components/workout/stage/stage.cards.export
+components/workout/stage/stage.cards.strength-map
+components/workout/stage/stage.cards.provenance
+

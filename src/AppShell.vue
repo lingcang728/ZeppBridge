@@ -3,7 +3,7 @@
    App.vue 按落地模式二选一，浏览器访客因此不下载这一整块。 */
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterView, useRoute, useRouter } from 'vue-router';
+import { RouterView, useRoute, useRouter, type RouteLocationNormalized } from 'vue-router';
 import type { DesignIconName } from './components/DesignIcon.vue';
 import GlyphTile from './components/GlyphTile.vue';
 import Icon from './components/Icon.vue';
@@ -19,6 +19,7 @@ import { whenFramesSteady } from './lib/motion/steady';
 import { useSyncController } from './composables/useSyncController';
 import { useFeedbackToast } from './composables/useFeedbackToast';
 import { useAuthorCompose } from './composables/useAuthorCompose';
+import { useLetterBoxSheet } from './composables/useLetterBoxSheet';
 import { useUiScale } from './composables/useUiScale';
 import { backend, backendLate, isDesktop, whenBackendReady } from './lib/bridge';
 import { locale, useMessages } from './i18n';
@@ -37,6 +38,9 @@ const StoreImportPrompt = defineAsyncComponent(() => import('./components/StoreI
 /* 写给作者的信封（顶栏的笔、设置里的卡、信匣里的空信封都开它）：第一次打开才加载。 */
 const AuthorComposeLayer = defineAsyncComponent(() => import('./components/letters/AuthorComposeLayer.vue'));
 const { writing: authorWriting } = useAuthorCompose();
+/* 信匣浮层（顶栏长按信件）：背后的页面不卸载，返回时不重画（composables/useLetterBoxSheet.ts）。 */
+const LetterBoxLayer = defineAsyncComponent(() => import('./components/letters/LetterBoxLayer.vue'));
+const { box: letterBoxOpen } = useLetterBoxSheet();
 
 const t = useMessages(messages);
 
@@ -160,6 +164,9 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
   if (to.matched.length > 1 && from.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   if (from.matched.length > 1 && to.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
   const decided = pageMorph.decide(from, to, pageMotion(from.path, to.path));
+  if (decided === 'expand') heldPage.value = pageNameOf(from);
+  else if (heldPage.value && pageNameOf(to) === heldPage.value) releaseHeldAfterEnter = true;
+  else heldPage.value = null;
   motion.value = isSwitch(decided) ? 'fade' : decided;
   if (motion.value === 'fade') tabFade.arm();
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
@@ -174,6 +181,11 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
 const pageHold = ref(false);
 let holdSeq = 0;
 const removeAfterEach = router.afterEach(() => {
+  // 回到了临时缓存的那一页：它已经从缓存里激活，等这一轮渲染完再从名单里拿掉（当前页不会被修剪掉，离开时正常卸载）。
+  if (releaseHeldAfterEnter) {
+    releaseHeldAfterEnter = false;
+    void nextTick().then(() => nextTick()).then(() => { heldPage.value = null; });
+  }
   // 新页已经换上：被打断的那段形变里没被这次切页用到的页各自收场（usePageMorph.settle）。
   void nextTick().then(() => pageMorph.settle());
   if (!pageHold.value) return;
@@ -207,6 +219,16 @@ const CACHED_PAGES = [
   // Keep the selected year and open workout card when returning from a workout.
   'Rings',
 ];
+/* 刚离开、马上可能回来的那一页（2026-11-13 用户录屏：在心率页从某个按钮形变进「交给 AI」/ 履历，返回时心率页整页重挂、
+   所有图表重画）：从一页**展开**进另一页时，把来处页临时加进缓存；回到它、页面重新激活以后放掉；去了别处也放掉。
+   只多留这一页，带图表的页不会越攒越多。 */
+const heldPage = ref<string | null>(null);
+const cachedPages = computed(() => (heldPage.value && !CACHED_PAGES.includes(heldPage.value) ? [...CACHED_PAGES, heldPage.value] : CACHED_PAGES));
+const pageNameOf = (location: RouteLocationNormalized): string | null => {
+  const view = location.matched[location.matched.length - 1]?.components?.default as { name?: string } | undefined;
+  return typeof view?.name === 'string' ? view.name : null;
+};
+let releaseHeldAfterEnter = false;
 
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
 const browserPreview = computed(() => !desktopRuntime);
@@ -328,6 +350,7 @@ onUnmounted(() => {
   <TourLayer v-if="backendReady" />
   <UpdateNotice v-if="backendReady" />
   <AuthorComposeLayer v-if="authorWriting" />
+  <LetterBoxLayer v-if="letterBoxOpen" />
   <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
   <div class="app-body">
@@ -395,7 +418,7 @@ onUnmounted(() => {
       <RouterView v-slot="{ Component }">
         <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" :on-enter="enterHook" :on-leave="leaveHook" @after-leave="pageMorph.onAfterLeave">
           <!-- 上限和名单一样长：以前名单 5 页、上限 4，年轮页会被挤出缓存，从运动详情返回时卡片已经关了。 -->
-          <KeepAlive :include="CACHED_PAGES" :max="CACHED_PAGES.length">
+          <KeepAlive :include="cachedPages" :max="cachedPages.length">
             <component :is="Component" />
           </KeepAlive>
         </Transition>

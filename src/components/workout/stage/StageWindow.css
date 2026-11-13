@@ -1,0 +1,142 @@
+/* 台前调度的一扇窗。位置全在行内 transform 上（左上角为原点），这里只管外观。
+   外框归窗口：::before 是材质 + 内描边，::after 是投影，都画在内容下面（负 z，窗口自己是层叠上下文）。
+   飞行时 stageFlight 用 --fl-* 把外框临时撑到途经范围、用 clip-path 露出此刻那一块（圆角不变）。 */
+.stage-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: var(--fly-h, var(--win-h));
+  transform-origin: 0 0;
+  border-radius: var(--radius-lg);
+  will-change: transform;
+  contain: layout style;
+}
+.stage-window::before {
+  position: absolute;
+  inset: var(--fl-t, 0px) var(--fl-r, 0px) var(--fl-b, 0px) var(--fl-l, 0px);
+  z-index: -1;
+  content: '';
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim);
+  pointer-events: none;
+}
+.stage-window::after {
+  position: absolute;
+  inset: 0 0 var(--fl-ab, 0px) 0;
+  z-index: -2;
+  content: '';
+  border-radius: var(--radius-lg);
+  box-shadow: var(--mat-shadow);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.window-body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  transform-origin: 0 0;
+}
+/* 滚动条藏起来（2026-11-13 用户：独立悬在外面那条太丑，全局都去掉）：滚轮 / 触控板照滚。 */
+.mode-stage .window-body, .mode-pip .window-body { overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.mode-stage .window-body::-webkit-scrollbar, .mode-pip .window-body::-webkit-scrollbar { display: none; }
+.window-content { min-width: 0; }
+/* 拉过下边：内容按列排，卡根节点撑满窗口，图表这类能伸的吃掉多出来的高（WorkoutChartCard）。
+   只在拉过时撑：平时窗口高跟着量到的内容高走，撑满会让量到的高只增不减。 */
+.fill .window-content { display: flex; flex-direction: column; min-height: 100%; }
+.fill .window-content > :deep(*) { flex: 1 0 auto; }
+
+/* 卡组件自己的外框在窗口里清掉（窗口已经画了一层，叠两层就是录屏里比窗口宽、被切成直角的那一块）。 */
+.window-content > :deep(:is(.surface-card, .mat-card, .insight-card)) {
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.window-content > :deep(.workout-hero) {
+  border-color: transparent;
+  border-radius: 0;
+  background: radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--activity) 14%, transparent), transparent 32%);
+  box-shadow: none;
+}
+
+/* 侧栏里的缩略卡：投影深一点，像一摞斜放的牌。只露上半截的整块底部淡出（含外框和投影，mask 是静态的，飞行只动 transform）。 */
+.mode-strip::after { box-shadow: var(--mat-shadow), 0 24px 46px -24px rgba(0, 0, 0, .6); }
+.mode-strip.cropped {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+}
+.mode-pip::after { box-shadow: 0 16px 34px -14px rgba(0, 0, 0, .65); }
+.mode-hidden, .mode-behind { pointer-events: none; }
+
+/* 顶上正中的「•••」：点开菜单，按住拖动。悬停 / 聚焦 / 菜单开着时才显眼；只改透明度（不换底色，不触发重画）。 */
+.window-grip {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 18px;
+  margin-left: -26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: grab;
+  opacity: .45;
+  transition: opacity .18s ease;
+  touch-action: none;
+}
+.window-grip i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.stage-window:hover .window-grip, .window-grip:focus-visible, .menu-open .window-grip { opacity: 1; }
+.window-grip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.window-grip:active { cursor: grabbing; }
+.is-flying .window-grip, .is-flying .window-handle { opacity: 0; pointer-events: none; }
+
+/* 拖边：左、右、下三条边各一条热区，两个下角各一块；只换光标，角上悬停时画 iPad 那条弧。 */
+.window-handle { position: absolute; z-index: 2; touch-action: none; }
+.handle-left, .handle-right { top: 28px; bottom: 18px; width: 10px; cursor: ew-resize; }
+.handle-left { left: -5px; }
+.handle-right { right: -5px; }
+.handle-bottom { right: 18px; bottom: -5px; left: 18px; height: 10px; cursor: ns-resize; }
+.handle-bl, .handle-br { bottom: -5px; width: 26px; height: 26px; }
+.handle-bl { left: -5px; cursor: nesw-resize; }
+.handle-br { right: -5px; cursor: nwse-resize; }
+.handle-bl::after, .handle-br::after {
+  position: absolute;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  content: '';
+  border-bottom: 3px solid var(--muted);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.handle-br::after { right: 8px; border-right: 3px solid var(--muted); border-bottom-right-radius: 12px; }
+.handle-bl::after { left: 8px; border-left: 3px solid var(--muted); border-bottom-left-radius: 12px; }
+.stage-window:hover .handle-bl::after, .stage-window:hover .handle-br::after { opacity: .35; }
+.handle-bl:hover::after, .handle-br:hover::after, .resizing .handle-bl::after, .resizing .handle-br::after { opacity: .85; }
+
+.window-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+}
+.window-hit:focus-visible { outline: 6px solid var(--focus); outline-offset: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .window-grip, .handle-bl::after, .handle-br::after { transition: none; }
+}

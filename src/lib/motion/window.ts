@@ -56,6 +56,16 @@ export function visibleWindow(el: HTMLElement): WindowRect {
   return { left: box.left + left, top: box.top + top, width: box.width - left - right, height: box.height - top - bottom };
 }
 
+/**
+ * 来处有一截滚到了顶栏底下：只从露在顶栏下面的那截长出来、收回去（2026-11-13 用户录屏：履历页点开「最长连续」，
+ * 弹窗第一帧整张卡画在顶栏「概览」胶囊上面）。整张都在顶栏底下时，从顶栏下沿一条 minH 高的边长出来。纯函数，方便测。
+ */
+export function belowLine(rect: WindowRect, line: number, minH = 24): WindowRect {
+  if (rect.top >= line) return rect;
+  const bottom = Math.max(rect.top + rect.height, line + minH);
+  return { left: rect.left, top: line, width: rect.width, height: bottom - line };
+}
+
 /** 圆角为 0 的那一端：矩形往外多放一个圆角半径，圆弧落到板外，四个角就是方的。 */
 export function bleedRect(rect: WindowRect, radius: number): WindowRect {
   return { left: rect.left - radius, top: rect.top - radius, width: rect.width + radius * 2, height: rect.height + radius * 2 };

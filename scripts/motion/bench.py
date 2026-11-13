@@ -95,21 +95,7 @@ async def bench_letter(play):
         RESULTS[f'letter.{label}.open200_out'] = close_metrics(rows, t0)
         await browser.close()
 
-    # 设置 › 反馈卡里的「动笔写信」：按钮在展开的设置卡里。
-    browser, page, _ = await open_app(play, route='/settings/feedback', throttle=ARGS.throttle)
-    await page.wait_for_timeout(800)
-    opener = '#feedback .write-author, .feedback-write, [data-write-author]'
-    btn = await page.evaluate("""() => { const b = [...document.querySelectorAll('.open-card button')].find(x => /动笔写信/.test(x.textContent || '')); if (!b) return null; b.dataset.benchPen = '1'; return true; }""")
-    if btn:
-        sel = '[data-bench-pen]'
-        pen = await pen_center(page, sel)
-        rows, t0 = await record(page, LETTER_PROBES, lambda: click(page, sel), 2400)
-        RESULTS['letter.settings.open'] = letter_metrics(rows, t0, pen)
-        rows, t0 = await record(page, {**LETTER_PROBES, 'card': '.open-card'}, lambda: outside(page), 1600)
-        m = close_metrics(rows, t0)
-        m['card_still_open'] = bool(await page.evaluate("!!document.querySelector('.deck-stage:not(.is-parked) .open-card')"))
-        RESULTS['letter.settings.close'] = m
-    await browser.close()
+    # 设置里的「写给作者」卡 2026-11-13 拿掉了，写信只从顶栏信件钮（上面的 pen）测。
 
 
 # ---------------------------------------------------------------- 概览卡 ↔ 详情页
@@ -274,7 +260,7 @@ async def reset_deck(page):
 async def bench_deck(play):
     browser, page, _ = await open_app(play, route='/settings', throttle=ARGS.throttle)
     await page.wait_for_timeout(600)
-    for card in ('guide', 'ai', 'feedback'):
+    for card in ('guide', 'ai', 'labs'):
         await page.evaluate(f'window.__benchCard = "{card}"')
         sel = f'[data-deck-card="{card}"] .list-open'
         rows, t0 = await record(page, DECK_PROBES, lambda: click(page, sel, top=28), 1600)

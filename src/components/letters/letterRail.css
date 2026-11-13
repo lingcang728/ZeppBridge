@@ -4,7 +4,7 @@
  */
 .letter-rail {
   display: grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 28px; margin: 0 -8px; padding: 18px 8px 22px; list-style: none;
-  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 8px; scrollbar-width: thin; overscroll-behavior-x: contain;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 8px; scrollbar-width: none; overscroll-behavior-x: contain;
 }
 .letter-rail-item { display: grid; justify-items: start; gap: 6px; min-width: 0; scroll-snap-align: start; }
 .letter-rail-caption { margin: 8px 0 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }

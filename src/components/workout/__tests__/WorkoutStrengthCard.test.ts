@@ -70,4 +70,23 @@ describe('workout strength card', () => {
     // 新动作的主肌群来自目录；侧平举的辅助肌群（斜方肌 → 背部）单列一行。
     expect(out).toContain('背部 1 组 辅助肌群 背部 1 组');
   });
+
+  it('drops .00 on whole seconds, names unknown codes plainly and keeps the volume in the unit the sets use', async () => {
+    const lbOnly: StrengthWorkoutDetail = {
+      ...strength,
+      total_volume_kg: 81.65,
+      sets: [
+        set({ set_index: 1, action_code: 14, weight_value: 18, weight_unit: 'lb', weight_kg: 8.165, reps: 10, duration_ms: 60000 }),
+        set({ set_index: 2, action_code: 2999, reps: 8, duration_ms: 38000 }),
+      ],
+    };
+    const out = (await renderToString(createSSRApp({ render: () => h(WorkoutStrengthCard, { strength: lbOnly }) })))
+      .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(out).toContain('1分00秒 1分00秒');
+    expect(out).toContain('38 秒 1分38秒');
+    expect(out).not.toContain('.00');
+    expect(out).toContain('未识别动作 #2999');
+    // 各组都记 lb：总训练量也用 lb（81.65 kg = 180 lb），不随设置换成 kg。
+    expect(out).toContain('180 lb');
+  });
 });

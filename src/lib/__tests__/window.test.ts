@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cardFrame } from '../deck/morph';
-import { arcMidpoint, bleedRect, steadyRadius, windowInset, windowPoses } from '../motion/window';
+import { arcMidpoint, belowLine, bleedRect, steadyRadius, windowInset, windowPoses } from '../motion/window';
 
 describe('windowInset', () => {
   const frame = { left: 0, top: 60, width: 1000, height: 700 };
@@ -79,5 +79,18 @@ describe('windowPoses (page, backing plate and card copy share one set of keyfra
       expect(page.left + tx + page.width - right).toBeCloseTo(pose.rect.left + pose.rect.width, 1);
       expect(page.top + ty + page.height - bottom).toBeCloseTo(pose.rect.top + pose.rect.height, 1);
     }
+  });
+});
+
+describe('belowLine', () => {
+  it('keeps a source that is fully below the bar', () => {
+    const rect = { left: 10, top: 120, width: 200, height: 80 };
+    expect(belowLine(rect, 84)).toBe(rect);
+  });
+  it('drops the part hidden under the bar', () => {
+    expect(belowLine({ left: 10, top: 40, width: 200, height: 120 }, 84)).toEqual({ left: 10, top: 84, width: 200, height: 76 });
+  });
+  it('grows from a thin strip when the source is entirely under the bar', () => {
+    expect(belowLine({ left: 10, top: -100, width: 200, height: 120 }, 84)).toEqual({ left: 10, top: 84, width: 200, height: 24 });
   });
 });

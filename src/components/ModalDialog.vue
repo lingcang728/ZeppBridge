@@ -119,6 +119,8 @@ onUnmounted(() => {
 .dialog-panel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--mat-card-solid); z-index: -1; pointer-events: none; opacity: 0; transition: opacity 160ms ease-out; }
 .dialog-panel.is-flying::after { opacity: 1; transition: none; }
 .is-flying > .dialog-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* 来处比面板宽 / 高（跑鞋那一行）：飞行时窗口裁切伸出面板盒子，底跟着撑大，不然收回途中右下角缺一块（dialogFlight.ts 设变量）。 */
+.is-flying > .dialog-glass, .dialog-panel.is-flying::after { right: auto; bottom: auto; width: var(--flight-w, 100%); height: var(--flight-h, 100%); }
 .is-bare::after { display: none; }
 </style>
 

@@ -1,0 +1,108 @@
+/* 台前调度的舞台外壳：最上面一行运动名 + 全局按钮，下面是画布（所有窗口绝对定位在里面）。
+   画布高 = 视口高 − 顶栏 − 页脚：页面滚到舞台时，舞台正好占满视口，窗口在里面各自滚（用户选的「窗口各自滚」）。 */
+.stage-shell {
+  --stage-below: 62px;
+  position: relative;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── 最上面一行 ─────────────────────────────── */
+.stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-width: 0;
+}
+.head-title { flex: 1 1 280px; min-width: 0; }
+.head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.head-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--mat-line); }
+.head-button {
+  min-height: 34px;
+  padding: 5px 14px;
+  border: 1px solid var(--mat-line);
+  border-radius: 999px;
+  background: var(--mat-inset);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease;
+}
+.head-button:hover, .head-button:focus-visible, .head-button[aria-pressed='true'], .head-button[aria-expanded='true'] { background: var(--surface); color: var(--ink); outline: none; }
+.head-button:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
+.head-fade-enter-active, .head-fade-leave-active { transition: opacity .2s ease; }
+.head-fade-enter-from, .head-fade-leave-to { opacity: 0; }
+.hidden-wrap { position: relative; }
+.hidden-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2600;
+  display: grid;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 22px 48px -18px rgba(0, 0, 0, .55);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  transform-origin: calc(100% - 40px) -8px;
+}
+.hidden-pop button { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.hidden-pop button:hover, .hidden-pop button:focus-visible { background: var(--mat-inset); outline: none; }
+.pop-enter-active { transition: opacity .18s ease, transform .22s var(--stage-ease); }
+.pop-leave-active { transition: opacity .14s ease, transform .16s ease; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(.9); }
+
+.stage-ruler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: max(420px, calc(100dvh - var(--sticky-top) - 16px - var(--stage-below)));
+  visibility: hidden;
+  pointer-events: none;
+}
+.stage-canvas { position: relative; min-width: 0; }
+
+/* 全屏 / 窄窗口时侧栏让开了：左边缘一个小玻璃把手（曾是一条竖排「显示侧栏」的边条，压在卡上很难看）。 */
+.strip-handle {
+  position: absolute;
+  top: calc(50% - 22px);
+  left: 4px;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .18s ease;
+}
+.strip-handle:hover, .strip-handle:focus-visible { color: var(--ink); outline: none; }
+.strip-handle:focus-visible { box-shadow: var(--glass-rim), 0 0 0 2px var(--focus); }
+
+/* ── 拖动：拎着的卡浮在最上面、投影深一点（不再蒙模糊、不画落点虚框——落点由邻居让位预演）。 ── */
+.stage-window.is-dragging { z-index: 2000 !important; cursor: grabbing; }
+.stage-window.is-dragging::after { box-shadow: var(--mat-shadow-lift); }
+/* 拖边往里拽过头：松手就收进侧栏，窗口先淡一点。 */
+.stage-window.resize-tuck { opacity: .55 !important; transition: opacity .16s ease; }
+.stage-window.resizing { z-index: 1900 !important; }
+
+/* 窄窗口里同组几张卡的切换。 */
+.group-tabs { position: absolute; top: 0; left: 0; right: 0; z-index: 220; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.group-tabs button { flex: none; min-height: 30px; padding: 4px 14px; border: 1px solid var(--mat-line); border-radius: 999px; background: var(--mat-inset); color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.group-tabs button[aria-selected='true'] { background: var(--surface); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-enter-active, .pop-leave-active, .strip-handle, .stage-window.resize-tuck { transition: none; animation: none; }
+}

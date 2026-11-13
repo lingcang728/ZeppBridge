@@ -13,6 +13,41 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/anatomy/anatomy': {
+      front: 'Vista anteriore',
+      back: 'Vista posteriore',
+      figureAria: (side: string) => `Figura della distribuzione del carico muscolare · ${side}`,
+      muscles: {
+        chest: 'Pettorali',
+        obliques: 'Obliqui',
+        abs: 'Addominali',
+        biceps: 'Bicipiti',
+        triceps: 'Tricipiti',
+        neck: 'Collo',
+        trapezius: 'Trapezi',
+        deltoids: 'Deltoidi',
+        adductors: 'Adduttori',
+        quadriceps: 'Quadricipiti',
+        knees: 'Ginocchia',
+        tibialis: 'Tibiale anteriore',
+        calves: 'Polpacci',
+        forearm: 'Avambracci',
+        hands: 'Mani',
+        ankles: 'Caviglie',
+        feet: 'Piedi',
+        head: 'Testa',
+        hair: 'Testa',
+        'upper-back': 'Dorsali',
+        'lower-back': 'Zona lombare',
+        gluteal: 'Glutei',
+        hamstring: 'Femorali',
+      },
+      loadTitle: (name: string, primary: number, secondary: number) =>
+        [name, primary > 0 ? `${primary} ${primary === 1 ? 'serie principale' : 'serie principali'}` : '', secondary > 0 ? `${secondary} ${secondary === 1 ? 'serie secondaria' : 'serie secondarie'}` : ''].filter(Boolean).join(' · '),
+      legendLight: 'Meno serie',
+      legendHeavy: 'Più serie',
+      legendSecondary: 'Solo secondario',
+    },
     'components/CredentialRecovery': {
       advancedDescription: "Non è stato possibile salvare le credenziali dei Dati avanzati. Rimangono in memoria per un massimo di 10 minuti, così puoi riprovare senza accedere o inserire nuovamente il token. Se annulli, avvii un altro accesso, invii di nuovo le credenziali manuali o chiudi l’applicazione, le credenziali vengono eliminate.",
       advancedFileWarning: "L’App Token dei Dati avanzati verrà salvato in chiaro nel file credentials.json nella cartella dei dati dell’applicazione. Su Linux e macOS il file usa i permessi 0600. I programmi eseguiti con il tuo account utente possono leggerlo. L’applicazione riutilizzerà questo file al riavvio, a meno che un’impostazione di avvio non selezioni esplicitamente un altro archivio.",
@@ -499,11 +534,6 @@ export default {
     authorNew: 'L’autore ti ha risposto — apri per leggere',
     writeAuthor: 'Scrivi all’autore',
     writeAuthorSub: 'Se incontri un problema, hai un’idea o vuoi solo salutare, leggo e rispondo a ogni lettera',
-    writeRowTitle: 'Scrivi una lettera',
-    writeAction: 'Inizia a scrivere',
-    attachReportRow: 'Scrivi con diagnostica anonimizzata',
-    attachAction: 'Scrivi con relazione',
-    openBox: 'Apri cassetta postale',
     authorPlaceholder:
       'Che si tratti di un piccolo dettaglio dell’app, di una funzione che vorresti o semplicemente di scambiare due parole, scrivi qui. Non appena la riceverò, ti risponderò.',
     attachReport: 'Allega relazione diagnostica anonimizzata',
@@ -1622,6 +1652,11 @@ export default {
     statSets: 'Serie totali',
     statReps: 'Ripetizioni totali',
     statVolume: 'Volume totale',
+    statVolumeHint: 'Somma di «peso × ripetizioni» per ogni serie; le serie a corpo libero sono escluse.',
+    unknownExercise: 'Esercizio non riconosciuto',
+    unknownExerciseHint: (code: number) =>
+      `Il codice dell’esercizio Zepp ${code} non è nel catalogo; probabilmente si tratta di un esercizio aggiunto di recente dall’orologio.`,
+    muscleChipsAria: 'Gruppi muscolari allenati; selezionane uno per visualizzare le serie corrispondenti.',
     statRest: 'Recupero totale',
     unitSets: 'serie',
     unitReps: 'rip.',
@@ -1642,8 +1677,53 @@ export default {
     weightedLoad: (weight: string, unit: string, reps: number) => `${weight} ${unit} × ${reps}`,
     durationSec: (sec: string) => `${sec} s`,
     durationMinSec: (min: number, sec: string) => `${min} min ${sec} s`,
+    mapEyebrow: 'Corpo',
+    mapTitle: 'Muscoli allenati',
     summaryOnlyNote:
       'I dettagli per singola serie di questo allenamento non sono ancora stati recuperati. Viene mostrato il riepilogo per esercizio dallo storico; usa «Completa i dettagli degli allenamenti» nella pagina «Allenamenti» per scaricare pesi e durate.',
+  },
+
+  'components/workout/stage/stage': {
+    region: 'Area di lavoro per le schede dell’allenamento',
+    strip: 'Schede nella barra laterale',
+    openCard: (name: string) => `Apri ${name}`,
+    menu: (name: string) => `Opzioni di layout per ${name}`,
+    resize: (name: string) => `Trascina per ridimensionare ${name}`,
+    solo: 'Mostra solo questa scheda',
+    full: 'Schermo intero',
+    exitFull: 'Esci dallo schermo intero',
+    tuck: 'Sposta nella barra laterale',
+    size: 'Dimensione',
+    sizeStandard: 'Normale',
+    sizeWide: 'Ampia',
+    split: 'Proporzioni',
+    mainLeft: 'Scheda principale a sinistra',
+    mainLeftShort: 'Sx',
+    mainRight: 'Scheda principale a destra',
+    mainRightShort: 'Dx',
+    mainTop: 'Scheda principale in alto',
+    mainTopShort: 'Su',
+    expose: 'Mostra tutte le schede',
+    exposeExit: 'Torna al layout',
+    reset: 'Ripristina layout',
+    hiddenCount: (count: number) => `${count} ${count === 1 ? 'nascosta' : 'nascoste'}`,
+    restore: 'Seleziona una scheda per riportarla nel layout',
+    showStrip: 'Mostra la barra laterale',
+    groupTabs: 'Schede in questo gruppo',
+    cards: {
+      summary: 'Riepilogo',
+      insight: 'Analisi',
+      'strength-sets': 'Serie',
+      'strength-map': 'Muscoli',
+      route: 'Traccia',
+      climbs: 'Salite',
+      'hr-zones': 'Zone FC',
+      'series-status': 'Campioni',
+      decoded: 'Dati decodificati',
+      export: 'Esporta',
+      feel: 'Sensazioni',
+      provenance: 'Origine',
+    },
   },
 
   'composables/ai/useStageCards': {
@@ -1772,7 +1852,7 @@ export default {
   },
 
   // ========================================================
-  // MODULE: 'demo/texts' (16 keys)
+  // MODULE: 'demo/texts' (25 keys)
   // ========================================================
   'demo/texts': {
     easyRun: 'Corsa facile',
@@ -1793,6 +1873,15 @@ export default {
     tempoRun: 'Corsa a ritmo',
     capsuleNote:
       'Da un anno fa: avevo appena iniziato a correre tre volte a settimana e il ginocchio mi faceva ancora un po’ male. Spero che tu stia ancora correndo, e senza dimenticare lo stretching.',
+    codeLabel: 'Pickleball',
+    lifeTrip: 'Viaggio di lavoro (Shanghai)',
+    lifeCold: 'Raffreddore',
+    lifeShift: 'Passaggio al turno del mattino, sveglia alle 6',
+    planSummary: 'Settimana di recupero: volume ridotto del 20%, corsa lunga del sabato accorciata a 12 km',
+    letterReplyNaps: 'Il mio orologio registra i sonnellini, ma non compaiono mai nell’app. Vorrei anche vedere gli allenamenti di forza nel report settimanale.',
+    authorReplyNaps: 'Grazie! I sonnellini ora compaiono nei dettagli del sonno; l’allenamento di forza nel report settimanale è previsto per la prossima versione.',
+    assistedBackExtension: 'Iperestensioni assistite',
+    letterReplyDates: 'Vorrei che le date seguissero il formato del mio sistema (giorno/mese); ora è sempre mese/giorno.',
   },
 
   // ========================================================
@@ -3781,6 +3870,7 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     notFetchedYet: 'Non ancora recuperato',
     timeUnknown: 'Ora sconosciuta',
     pageFoot: 'Decodificato su questo computer. Il tracciato è disegnato su un canvas locale e non viene mai inviato a servizi di mappe.',
+    pageFootNoRoute: 'I dati vengono decodificati su questo computer e non vengono mai inviati altrove.',
     heroAria: 'Panoramica dell’allenamento',
     unitKcal: 'kcal',
 

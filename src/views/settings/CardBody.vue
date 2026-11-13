@@ -13,7 +13,6 @@ import CloudSection from './sections/CloudSection.vue';
 import DevicesSection from './sections/DevicesSection.vue';
 import DisplayPrefsSection from './sections/DisplayPrefsSection.vue';
 import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
-import FeedbackSection from './sections/FeedbackSection.vue';
 import GuideSection from './sections/GuideSection.vue';
 import LabsSection from './sections/LabsSection.vue';
 import McpSection from './sections/McpSection.vue';
@@ -40,7 +39,6 @@ const cloud = labFlag('cloud');
       <ExportDefaultsSection />
     </template>
     <DisplayPrefsSection v-else-if="id === 'display'" />
-    <FeedbackSection v-else-if="id === 'feedback'" />
     <LabsSection v-else-if="id === 'labs'" />
     <GuideSection v-else-if="id === 'guide'" />
     <PrivacySection v-else-if="id === 'privacy'" />

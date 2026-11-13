@@ -104,7 +104,7 @@ const lighten = async () => {
       </div>
     </div>
 
-    <SegmentTrack :items="levels" :model-value="rating ?? 0" :aria-label="ask" :disabled="busy" fill compact @update:model-value="rate" />
+    <SegmentTrack :items="levels" :model-value="rating ?? 0" :placeholder="3" :aria-label="ask" :disabled="busy" fill compact @update:model-value="rate" />
 
     <div v-if="rating !== null" class="fb-after">
       <span class="fb-saved"><Icon name="check" :size="14" />{{ t.saved }}</span>
@@ -123,7 +123,9 @@ const lighten = async () => {
 </template>
 
 <style scoped>
-/* 一块中性的小板（和「换成轻松跑」那一行同一种）：不铺底色、不抬卡板，概览的主角仍是下面的卡。 */
+/* 一块中性的小板（和「换成轻松跑」那一行同一种）：不铺底色、不抬卡板，概览的主角仍是下面的卡。
+   不加 backdrop-filter（2026-11-13 用户：要液态玻璃不要毛玻璃）：祖先带滤镜时评分滑块的透镜挂不上（useGlassLens），
+   液态玻璃就没了。玻璃感来自滑块本身——它一开始就停在中间档（未选），见 SegmentTrack 的 placeholder。 */
 .feedback-card { display: grid; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 4%, transparent); box-shadow: inset 0 0 0 1px var(--mat-line); }
 .fb-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
