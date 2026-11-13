@@ -259,9 +259,13 @@ ZeppBridge follows a targeted compatibility policy, inspired by
   activate the Wayland rule.
 - Otherwise leave DMABUF to WebKit's default. There is no WebKit-version cutoff.
   An explicit value of `0` or `1` always takes precedence over both rules.
-- AppImage still defaults `WEBKIT_DISABLE_COMPOSITING_MODE` to `1` when
-  `APPIMAGE` is present, unless the user has set it explicitly. This is
-  independent of the DMABUF policy and WebKit version.
+- AppImage turns accelerated compositing off only while its AppDir still ships
+  the driver-coupled graphics libraries behind [issue #32][issue-32]
+  (`libEGL*`, `libGL*`, `libGLX*`, `libOpenGL*`, `libgbm*`, `libdrm*`,
+  `libwayland-*`, `libxcb-dri*`, `libva*`). The release AppImage strips that
+  layer, so it keeps WebKit's accelerated path; an AppImage built without that
+  step, or one whose layout cannot be read, still gets the fallback. An explicit
+  value always wins.
 - When either disabling variable is nonzero, theme and language changes skip
   native View Transition snapshot animations. The changes themselves still work.
   ZeppBridge does not force `GDK_BACKEND`.
@@ -294,8 +298,9 @@ WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 # The same override works in development (run from the repository root).
 WEBKIT_DISABLE_DMABUF_RENDERER=0 npm run tauri dev
 
-# AppImage has an independent compositing override. Explicitly clear both
-# disabling flags when testing its hardware rendering path.
+# AppImage only turns compositing off while its AppDir still carries the
+# driver-coupled graphics libraries. Set both to 0 to force the hardware path
+# on any package while comparing.
 WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DISABLE_COMPOSITING_MODE=0 ./ZeppBridge_<version>_x86_64.AppImage
 ```
 
@@ -304,8 +309,18 @@ records a Flatpak startup fixed by disabling DMABUF in 2.1.0, while the CI-built
 AppImage still failed. Its bundled Wayland libraries were another compatibility
 problem: the AppImage shipped `libwayland-client.so.0`,
 `libwayland-cursor.so.0`, `libwayland-egl.so.1` and `libwayland-server.so.0`,
-which the packaging now removes so the host copies are used. The AppImage
-compositing default above remains an additional compatibility measure.
+which the packaging now removes so the host copies are used. The compositing
+fallback above is kept for exactly that condition: an AppDir that still carries
+`libEGL`, `libGL`, `libgbm`, `libdrm`, `libwayland` or `libva` keeps it, and a
+release AppImage that uses the host graphics stack does not.
+
+Keeping the accelerated path matters on a high-DPI screen. On one Arch Linux /
+AMD / Wayland machine with a 2880x1800 120 Hz panel, the same wheel-scroll
+gesture over the Overview cost the WebKit web process 5.9 s of CPU per 6.1 s of
+scrolling with compositing off, against 1.9 s with it on (GPU busy 11% → 31%);
+at rest the same comparison was 56% of a core against 2%. That is a rendering
+probe on one machine, not a frame-rate guarantee — but it is why the fallback is
+now tied to the condition that caused it instead of to every AppImage.
 
 If those settings do not help, try X11 through XWayland if it is installed:
 
