@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLASSIC_TWO_COL, GAP, NARROW_W, solve, STRIP_W, THUMB_W, TILT, transformOf, type LayoutInput } from '../layout';
-import type { StageState } from '../state';
+import { COLUMN_SNAP, GRID_SNAP, ROW_SNAP, type StageState } from '../state';
 
 const input = (state: StageState, over: Partial<LayoutInput> = {}): LayoutInput => ({
   width: 1200,
@@ -75,13 +75,17 @@ describe('stage layout', () => {
     expect(single.h).toBe(160);
   });
 
-  it('stacks the two small cards of a trio in one column without overflowing', () => {
+  it('stacks the two small cards of a trio in one column; text cards are never cut, the column grows instead', () => {
     const trio: StageState = { stage: { ids: ['a', 'b', 'c'], snap: 1 }, strip: [], hidden: [] };
-    const out = solve(input(trio));
-    const [a, b, c] = ['a', 'b', 'c'].map((id) => out.placements.get(id)!);
+    const fits = solve(input(trio, { contentH: { a: 400, b: 300, c: 300 } }));
+    const [a, b, c] = ['a', 'b', 'c'].map((id) => fits.placements.get(id)!);
     expect(a.x).toBeGreaterThan(b.x);
     expect(c.y).toBeCloseTo(b.h + GAP, 1);
     expect(c.y + c.h).toBeLessThanOrEqual(700);
+    // 两张文字卡加起来比舞台高：各自完整，往下长（2026-11-14 概要卡被切掉一截）。
+    const tall = solve(input(trio, { contentH: { a: 400, b: 450, c: 400 } }));
+    expect(tall.placements.get('b')!.h).toBe(450);
+    expect(tall.placements.get('c')).toMatchObject({ y: 450 + GAP, h: 400 });
   });
 
   it('narrow windows show one card in front, the pip card in a corner and the rest behind', () => {
@@ -143,5 +147,115 @@ describe('stage layout', () => {
   it('tilts each card around its own left edge so strip cards never drift into the next one', () => {
     expect(transformOf({ x: 1, y: 2, h: 100, scale: 0.5, tilt: 38 })).toBe('translate(1px, 27px) perspective(280px) rotateY(38deg) translate(0px, -25px) scale(0.5)');
     expect(transformOf({ x: 0, y: 0, h: 100, scale: 1, tilt: 0 })).toBe('translate(0px, 50px) perspective(1100px) rotateY(0deg) translate(0px, -50px) scale(1)');
+  });
+});
+
+describe('four cards and filling the stage (user 2026-11-14)', () => {
+  const four = (snap: number, extra: Partial<StageState['stage']> = {}): StageState => ({ stage: { ids: ['a', 'b', 'c', 'd'], snap, ...extra }, strip: [], hidden: [] });
+  const grow = new Map(['a', 'b', 'c', 'd'].map((id) => [id, 50] as const));
+  const box = (out: ReturnType<typeof solve>, id: string) => out.placements.get(id)!;
+  const avail = 1200 - STRIP_W;
+
+  it('grid: two rows of two on a shared seam, every card on stage', () => {
+    const out = solve(input(four(GRID_SNAP), { contentH: { a: 200, b: 260, c: 220, d: 180 } }));
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => box(out, id));
+    expect([a, b, c, d].every((p) => p.mode === 'stage')).toBe(true);
+    expect(a.x).toBe(STRIP_W);
+    expect(b.x).toBeCloseTo(a.x + a.w + GAP, 0);
+    expect(c.x).toBe(a.x);
+    expect(c.w).toBe(a.w);
+    // 第二行从第一行最高那张下面开始。
+    expect(c.y).toBeCloseTo(260 + GAP, 0);
+    expect(a.sides).toEqual({ left: 'outer', right: 'seam' });
+    expect(d.sides).toEqual({ left: 'seam', right: 'outer' });
+  });
+
+  it('one over three: the lead card takes the row, the seams follow the saved splits', () => {
+    const out = solve(input(four(ROW_SNAP, { splits: [0.25, 0.5] }), { contentH: { a: 200, b: 200, c: 200, d: 200 } }));
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => box(out, id));
+    expect(a.w).toBeCloseTo(avail, 0);
+    const row = avail - 2 * GAP;
+    expect(b.w).toBeCloseTo(row * 0.25, 0);
+    expect(c.w).toBeCloseTo(row * 0.25, 0);
+    expect(d.w).toBeCloseTo(row * 0.5, 0);
+    expect(d.x + d.w).toBeCloseTo(1200, 0);
+    expect(c.sides).toEqual({ left: 'seam', right: 'seam' });
+    // 坏的缝回到三等分。
+    const broken = solve(input(four(ROW_SNAP, { splits: [0.6, 0.62] }), { contentH: { a: 200, b: 200, c: 200, d: 200 } }));
+    expect(box(broken, 'b').w).toBeCloseTo(row / 3, 0);
+  });
+
+  it('big left: the lead card has its own column, the other three stack beside it', () => {
+    const out = solve(input(four(COLUMN_SNAP), { contentH: { a: 300, b: 150, c: 150, d: 150 } }));
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => box(out, id));
+    expect(a.w).toBeCloseTo((avail - GAP) * 0.6, 0);
+    expect(b.x).toBe(c.x);
+    expect(d.y).toBeCloseTo(c.y + c.h + GAP, 0);
+  });
+
+  it('charts and maps soak up the spare height, text cards keep their own', () => {
+    const state: StageState = { stage: { ids: ['a', 'b'], snap: 0 }, strip: [], hidden: [] };
+    const out = solve(input(state, { contentH: { a: 300, b: 300 }, grow: new Map([['a', 50]]) }));
+    expect(box(out, 'a').h).toBe(700);
+    expect(box(out, 'a').extra).toBe(400);
+    expect(box(out, 'b').h).toBe(300);
+    expect(box(out, 'b').extra).toBeUndefined();
+  });
+
+  it('a column with a chart fills to the stage height; a dragged height is left alone', () => {
+    const out = solve(input(four(COLUMN_SNAP), { contentH: { a: 300, b: 150, c: 150, d: 150 }, grow: new Map([['c', 50]]) }));
+    const [b, c, d] = ['b', 'c', 'd'].map((id) => box(out, id));
+    expect(d.y + d.h).toBeCloseTo(700, 0);
+    expect(c.h).toBeCloseTo(700 - 2 * GAP - 300, 0);
+    expect(b.h).toBe(150);
+    const pinned = solve(input(four(COLUMN_SNAP, { heights: { c: 200 } }), { contentH: { a: 300, b: 150, c: 150, d: 150 }, grow }));
+    expect(box(pinned, 'c').h).toBe(200);
+    expect(box(pinned, 'c').fill).toBe(true);
+    expect(box(pinned, 'c').extra).toBeUndefined();
+  });
+
+  it('grid rows share the spare height only where a chart can use it', () => {
+    const out = solve(input(four(GRID_SNAP), { contentH: { a: 200, b: 260, c: 220, d: 180 }, grow: new Map([['c', 50]]) }));
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => box(out, id));
+    expect(a.h).toBe(200);
+    expect(b.h).toBe(260);
+    expect(c.y + c.h).toBeCloseTo(700, 0);
+    expect(d.h).toBe(180);
+  });
+
+  it('a column too tall for the stage shrinks its charts only when that makes it fit', () => {
+    const tall = { a: 300, b: 300, c: 300, d: 300 };
+    const fits = solve(input(four(COLUMN_SNAP), { contentH: tall, grow }));
+    // 右列三张 300 → 放进 700 − 2×16 = 668 要每张缩 77 > 50：缩到底也放不下，就都不缩，列往下长（反正要滚）。
+    const [b, c] = ['b', 'c'].map((id) => box(fits, id));
+    expect(b.h).toBe(300);
+    expect(b.extra).toBeUndefined();
+    expect(c.y).toBeCloseTo(300 + GAP, 0);
+    const gentle = solve(input(four(COLUMN_SNAP), { contentH: { a: 300, b: 240, c: 240, d: 240 }, grow }));
+    expect(box(gentle, 'd').y + box(gentle, 'd').h).toBeCloseTo(700, 0);
+    expect(box(gentle, 'b').extra).toBeCloseTo(668 / 3 - 240, 0);
+  });
+
+  it('an overflowing column shrinks its chart before it cuts a text card (big-left, 2026-11-14)', () => {
+    // 右列：文字 260 + 图 300（能缩 120）+ 文字 160 = 720 > 668：图缩 52，两张文字卡完整。
+    const out = solve(input(four(COLUMN_SNAP), { contentH: { a: 300, b: 260, c: 300, d: 160 }, grow: new Map([['c', 120]]) }));
+    const [b, c, d] = ['b', 'c', 'd'].map((id) => box(out, id));
+    expect(b.h).toBe(260);
+    expect(d.h).toBe(160);
+    expect(c.extra).toBeCloseTo(-52, 0);
+    expect(d.y + d.h).toBeCloseTo(700, 0);
+  });
+
+  it('a chart in the big slot follows the small column when that column has to grow', () => {
+    const out = solve(input(four(COLUMN_SNAP), { contentH: { a: 300, b: 400, c: 300, d: 300 }, grow: new Map([['a', 50]]) }));
+    const d = box(out, 'd');
+    expect(d.y + d.h).toBeCloseTo(400 + 300 + 300 + 2 * GAP, 0);
+    expect(box(out, 'a').h).toBeCloseTo(d.y + d.h, 0);
+  });
+
+  it('never fills in the narrow layout or past the stage when content already overflows', () => {
+    const state: StageState = { stage: { ids: ['a'], snap: 0 }, strip: [], hidden: [] };
+    expect(box(solve(input(state, { width: 700, grow })), 'a').extra).toBeUndefined();
+    expect(box(solve(input(state, { contentH: { a: 900 }, grow })), 'a').h).toBe(700);
   });
 });

@@ -956,6 +956,7 @@ export default {
     echoNext: 'Naprawimy w następnej wersji',
     echoLater: 'Odłożone',
     replyTitle: 'Napisz do autora',
+    close: 'Zamknij',
     replyPlaceholder: 'Napisz cokolwiek chcesz — albo nic.',
     allowQuote: 'Możesz zacytować mnie anonimowo',
     send: 'Wyślij',
@@ -1704,10 +1705,6 @@ export default {
     title: 'Główne wzniesienia i spadki',
     aria: 'Główne odcinki wzniesień i spadków',
     flat: 'Brak znaczących wzniesień: żaden odcinek nie osiągnął poniższych progów przewyższenia i nachylenia.',
-    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-      `Brak znaczących wzniesień: wysokość wynosiła od ${min} do ${max} ${unit} (maksymalnie ${range} ${unit})` +
-      (gain ? `; łączne przewyższenie ${gain} ${unit} to suma wielu drobnych wzniesień` : '') +
-      ', a żaden odcinek nie osiągnął poniższych progów.',
     climb: 'Wzniesienie',
     descent: 'Spadek',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -1722,6 +1719,22 @@ export default {
       `Wysokość n.p.m. jest wygładzana ${window}-sekundową średnią kroczącą; odcinek kończy się, gdy opadnie (lub wzrośnie) o więcej niż ${reversal} m od swojego najwyższego (najniższego) punktu. ` +
       `Uwzględniane są tylko odcinki o różnicy wysokości co najmniej ${change} m i średnim nachyleniu co najmniej ${grade}%. Dystans wynika z całkowania prędkości punktowej, skalibrowanej do zarejestrowanego dystansu całkowitego; ` +
       `prędkość pionowa i tempo uwzględniają czas w ruchu (czas przy prędkości poniżej ${moving} m/s jest pomijany).`,
+  },
+  // Source: src/components/workout/ElevationFacts.i18n.ts
+  'components/workout/ElevationFacts': {
+    aria: 'Przegląd przewyższeń',
+    ascent: 'Wzniesienie',
+    descent: 'Spadek',
+    drop: 'Różnica wysokości',
+    range: 'Zakres wysokości',
+    slopeTitle: 'Czas według nachylenia',
+    up: 'Pod górę',
+    flat: 'Płasko',
+    down: 'Z górki',
+    how: (grade: number, step: number, smooth: number, moving: number) =>
+      `Czas według nachylenia: wysokość n.p.m. jest wygładzana ${smooth}-sekundową średnią kroczącą, ` +
+      `nachylenie jest mierzone co ${step} m, a odcinki bardziej strome niż ±${grade}% liczą się jako pod górę lub z górki, ` +
+      `reszta jako płasko; czas przy prędkości poniżej ${moving} m/s jest pomijany.`,
   },
 // Source: src/components/workout/WorkoutStrengthCard.i18n.ts
 "components/workout/WorkoutStrengthCard": {
@@ -1787,6 +1800,12 @@ export default {
     mainLeftShort: 'Lewo',
     mainRightShort: 'Prawo',
     mainTopShort: 'Góra',
+    grid: 'Siatka 2×2',
+    oneOverThree: 'Jedna nad trzema',
+    bigLeft: 'Duża po lewej',
+    gridShort: 'Siatka',
+    oneOverThreeShort: '1 nad 3',
+    bigLeftShort: 'Duża lewo',
     expose: 'Wszystkie karty',
     exposeExit: 'Wróć na scenę',
     reset: 'Resetuj układ',
@@ -4554,11 +4573,14 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     statSlowest: 'Najwolniejsze',
     statMin: 'Min',
     statMax: 'Maks',
+    statLow: 'Najniższa',
+    statHigh: 'Najwyższa',
 
     chartHeart: 'Tętno',
     chartPace: 'Tempo',
     chartAltitude: 'Wysokość',
     chartCadence: 'Kadencja',
+    chartZoneShare: 'Czas w strefach',
     chartAria: (title: string) => `Wykres: ${title} w trakcie sesji`,
 
     decodedRoutePoints: 'Punkty śladu GPS',
@@ -4603,6 +4625,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     mapConsentAlways: 'Zawsze',
     mapConsentCancel: 'Nie, dziękuję',
     mapFailed: 'Nie udało się wczytać mapy, powrócono do rysowania lokalnego',
+    mapRetry: 'Wczytaj mapę ponownie',
     routeSvgAria: 'Lokalny ślad GPS pokolorowany według czasu i najbliższej próbki tempa',
     routeLegendPace: (count: number) =>
       `${plural(count, {

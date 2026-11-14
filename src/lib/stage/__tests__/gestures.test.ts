@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dropAt, passedSlop, ratioFor, resizeOutcome, type ResizeContext } from '../gestures';
 import { GAP, MIN_H, STRIP_W } from '../layout';
+import { COLUMN_SNAP, GRID_SNAP, ROW_SNAP } from '../state';
 
 const canvas = { width: 1200, height: 700, stageX: STRIP_W, narrow: false };
 const stage = [
@@ -80,5 +81,39 @@ describe('stage gestures', () => {
     expect(ratioFor({ ...c, count: 3, snap: 2, index: 0 }, 900)).toBeNull();
     expect(ratioFor({ ...c, count: 3, snap: 2, index: 1 }, (1000 - GAP) / 2)).toBeCloseTo(0.5, 5);
     expect(ratioFor({ ...c, count: 3, snap: 0, index: 2 }, (1000 - GAP) / 3)).toBeCloseTo(2 / 3, 5);
+  });
+});
+
+describe('four-card seams (user 2026-11-14)', () => {
+  const four = (snap: number, index: number, sides: ResizeContext['sides'], startW: number): ResizeContext => ({
+    count: 4, index, snap, id: 'x', sides, avail, width: 1200, groupW: avail, startW, startH: 300, maxH: 700, splits: [1 / 3, 2 / 3],
+  });
+  const row = avail - 2 * GAP;
+
+  it('grid: both columns share one seam', () => {
+    const left = (avail - GAP) / 2;
+    expect(ratioFor(four(GRID_SNAP, 2, { left: 'outer', right: 'seam' }, left), left)).toBeCloseTo(0.5, 3);
+    expect(ratioFor(four(GRID_SNAP, 3, { left: 'seam', right: 'outer' }, left), left * 0.8)).toBeCloseTo(0.6, 3);
+  });
+
+  it('one over three: each inner edge moves its own seam and never squeezes a card below the minimum', () => {
+    const middle = four(ROW_SNAP, 2, { left: 'seam', right: 'seam' }, row / 3);
+    const moveRight = resizeOutcome(middle, 'right', row * 0.1, 0);
+    expect(moveRight.kind === 'size' && moveRight.patch.splits?.[1]).toBeCloseTo(2 / 3 + 0.1, 2);
+    const moveLeft = resizeOutcome(middle, 'left', row * 0.05, 0);
+    expect(moveLeft.kind === 'size' && moveLeft.patch.splits?.[0]).toBeCloseTo(1 / 3 + 0.05, 2);
+    const squeeze = resizeOutcome(four(ROW_SNAP, 1, { left: 'outer', right: 'seam' }, row / 3), 'right', row * 0.4, 0);
+    expect(squeeze.kind === 'size' && squeeze.patch.splits?.[0]).toBeCloseTo(2 / 3 - 0.2, 3);
+    // 拖到 1/2 附近吸过去。
+    const wideRight = { ...four(ROW_SNAP, 2, { left: 'seam', right: 'seam' }, row * 0.3), splits: [0.3, 0.6] as const };
+    const snapIn = resizeOutcome(wideRight, 'right', -row * 0.09, 0);
+    expect(snapIn.kind === 'size' && snapIn.patch.splits?.[1]).toBe(1 / 2);
+  });
+
+  it('big left: the stacked cards move the main seam', () => {
+    const colW = (avail - GAP) * 0.4;
+    // 左边沿往左拖 50（dx 为负）：小卡变宽、大卡变窄。
+    const out = resizeOutcome(four(COLUMN_SNAP, 3, { left: 'seam', right: 'outer' }, colW), 'left', -50, 0);
+    expect(out.kind === 'size' && out.patch.ratio).toBeCloseTo(1 - (colW + 50) / (avail - GAP), 2);
   });
 });

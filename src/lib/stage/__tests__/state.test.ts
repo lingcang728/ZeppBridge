@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addToStage, bringGroup, cycle, focusCard, FULL_SNAP, fullscreen, hide, locate, removeFromStage, setSnap, solo, swapOnStage,
-  type StageState,
+  addToStage, bringGroup, cycle, focusCard, FULL_SNAP, fullscreen, hide, locate, MAX_ON_STAGE, removeFromStage, ROW_SNAP, setSize,
+  setSnap, snapFor, solo, swapOnStage, TOP_SNAP, type StageState,
 } from '../state';
 
 const base = (): StageState => ({
@@ -24,7 +24,7 @@ describe('stage state', () => {
         s = act(s);
         expect(all(s)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'h']);
         expect(s.stage.ids.length).toBeGreaterThan(0);
-        expect(s.stage.ids.length).toBeLessThanOrEqual(3);
+        expect(s.stage.ids.length).toBeLessThanOrEqual(MAX_ON_STAGE);
       }
     }
   });
@@ -39,12 +39,29 @@ describe('stage state', () => {
     expect(cycle(cycle(base(), 1), -1)).toEqual(base());
   });
 
-  it('adding to a full stage replaces the card at the drop slot', () => {
-    const three = addToStage(base(), 'c');
-    expect(three.stage.ids).toEqual(['a', 'b', 'c']);
-    const replaced = addToStage(three, 'f', 1);
-    expect(replaced.stage.ids).toEqual(['a', 'f', 'c']);
+  it('takes up to four cards (user 2026-11-14), then replaces the card at the drop slot', () => {
+    const four = addToStage(addToStage(base(), 'c'), 'd');
+    expect(four.stage.ids).toEqual(['a', 'b', 'c', 'd']);
+    const replaced = addToStage(four, 'f', 1);
+    expect(replaced.stage.ids).toEqual(['a', 'f', 'c', 'd']);
     expect(replaced.strip[0].ids).toEqual(['b']);
+  });
+
+  it('gives a wide lead card the full-width row when the count changes', () => {
+    const wide = (id: string) => id === 'a';
+    expect(snapFor(['a', 'b', 'c'], wide)).toBe(TOP_SNAP);
+    expect(snapFor(['b', 'a', 'c'], wide)).toBe(0);
+    expect(snapFor(['a', 'b', 'c', 'd'], wide)).toBe(ROW_SNAP);
+    expect(addToStage(addToStage(base(), 'c', undefined, wide), 'f', undefined, wide).stage.snap).toBe(ROW_SNAP);
+    expect(removeFromStage(addToStage(base(), 'c', undefined, wide), 'c', wide).stage.snap).toBe(0);
+  });
+
+  it('keeps the seams of a one-over-three row, and drops them when the row breaks up', () => {
+    const four = setSize(addToStage(addToStage(base(), 'c'), 'f'), { splits: [0.25, 0.6] });
+    expect(four.stage.splits).toEqual([0.25, 0.6]);
+    expect(swapOnStage(four, 'a', 'b').stage.splits).toEqual([0.25, 0.6]);
+    expect(removeFromStage(four, 'f').stage.splits).toBeUndefined();
+    expect(setSnap(four, 0).stage.splits).toBeUndefined();
   });
 
   it('pulling a card out of a group keeps the rest on stage', () => {

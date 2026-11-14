@@ -4,6 +4,7 @@
  * 浏览器存储可能不可用（隐私窗口、预览），读写都包在 try/catch 里，失败就用默认布局。
  */
 import { MAX_ON_STAGE, snapCount, TOP_SNAP, type StageGroup, type StageState } from './state';
+import { SPLIT_MIN } from './layout';
 
 export type SportClass = 'strength' | 'run' | 'ride' | 'swim' | 'other';
 export const SPORT_CLASSES: readonly SportClass[] = ['strength', 'run', 'ride', 'swim', 'other'];
@@ -74,6 +75,12 @@ export const sanitize = (raw: unknown, cards: readonly string[], fallback: Stage
   // 整组宽、拉过的高（2026-11-13 起）：不认识的、越界的丢掉，不报错。
   const span = Number((data.stage as { span?: unknown } | undefined)?.span);
   if (stage.ids.length > 1 && Number.isFinite(span) && span >= 0.5 && span < 1) stage.span = span;
+  // 上一下三两条缝（2026-11-14 起）：只有 4 张时有意义；倒序、挤得太近、越界的丢掉（layout.splitsOf 同一套门槛）。
+  const rawSplits = (data.stage as { splits?: unknown } | undefined)?.splits;
+  if (stage.ids.length === 4 && Array.isArray(rawSplits) && rawSplits.length === 2) {
+    const [a, b] = rawSplits.map(Number);
+    if (a >= SPLIT_MIN && b - a >= SPLIT_MIN && b <= 1 - SPLIT_MIN) stage.splits = [a, b];
+  }
   const rawHeights = (data.stage as { heights?: unknown } | undefined)?.heights;
   if (rawHeights && typeof rawHeights === 'object') {
     const heights: Record<string, number> = {};

@@ -16,6 +16,10 @@
  *   底部裁切，新盒子比旧的矮就先用 --fly-h 临时撑高，落地再撤。宽高比差得再多也不非等比（曾把字和图拉扁到 1.7 倍）。
  * 飞到一半又换：快照读的是半路的值，从那儿接着飞，不跳回起点（记忆 motion-preferences：打断就原路折返）。
  * 只动 transform / opacity / clip-path（记忆 animation-compositor-only）。少动效：直接到位。
+ *
+ * 一批卡一起飞时（换排法、换档）别读一张写一张（2026-11-14 实测：「全部卡片」⇄ 舞台一次 85 ms 长任务，
+ * 十张卡每张都逼浏览器把整块画布重算一遍样式和排版）：调用方先给所有卡拍快照、再一起 stopFlight，
+ * 飞的时候把排版尺寸和圆角传进来（FlySize），flyFrom 就不再读 DOM。
  */
 import { lessMotion } from './lessMotion';
 import { OPEN_EASE, paced } from './timing';
@@ -33,6 +37,8 @@ export interface Snapshot {
 }
 
 interface FrameFlight { a: Box; b: Box; start: number; duration: number; ease: (t: number) => number }
+/** 落点的排版尺寸和窗口圆角（调用方已知：layout 的 Placement、同一个 token）；不给就读 DOM。 */
+export interface FlySize { w: number; h: number; radius: number }
 interface Flight { animations: Animation[]; frame?: FrameFlight }
 const running = new WeakMap<HTMLElement, Flight>();
 const FRAME_VARS = ['--fly-h', '--fl-t', '--fl-r', '--fl-b', '--fl-l', '--fl-ab'];
@@ -123,7 +129,6 @@ export const clearDrag = (el: HTMLElement): void => {
 
 const finishWith = (el: HTMLElement, flight: Flight, last: Animation) => {
   running.set(el, flight);
-  el.classList.add('is-flying');
   const done = () => {
     if (running.get(el) !== flight) return;
     running.delete(el);
@@ -136,11 +141,14 @@ const finishWith = (el: HTMLElement, flight: Flight, last: Animation) => {
   last.finished.then(done, () => {});
 };
 
+/** 写完样式、待起飞：调用它才建动画（建动画要读样式，先把一批卡的写全做完再一起读）。 */
+type Launch = () => void;
+
 /** 外框飞行：窗口已经排在 B，外框 / 投影 / 内容各自从 A 插到 B。 */
-const frameFlight = (el: HTMLElement, a: Box, b: Box, easing: string, fromOpacity: number) => {
+const frameFlight = (el: HTMLElement, a: Box, b: Box, easing: string, fromOpacity: number, size: FlySize): Launch => {
   const body = bodyOf(el);
-  const W = Math.max(1, el.offsetWidth);
-  const H = Math.max(1, el.offsetHeight);
+  const W = Math.max(1, size.w);
+  const H = Math.max(1, size.h);
   const settle = easing !== OPEN_EASE;
   const duration = settle ? Math.round(STAGE_MS * 1.15) : STAGE_MS;
   const ease = easeOf(easing);
@@ -158,46 +166,50 @@ const frameFlight = (el: HTMLElement, a: Box, b: Box, easing: string, fromOpacit
   el.style.setProperty('--fl-r', px(W - (hull.x + hull.w)));
   el.style.setProperty('--fl-b', px(flyH - (hull.y + hull.h)));
   el.style.setProperty('--fl-ab', px(flyH - H));
-  const R = radiusOf(el);
-  const timing: KeyframeAnimationOptions = { duration, easing: 'linear' };
-  const animations: Animation[] = [];
-  const offset = (i: number) => i / STEPS;
-  animations.push(el.animate(boxes.map((r, i) => ({
-    offset: offset(i),
-    clipPath: `inset(${px(r.y - hull.y)} ${px(hull.x + hull.w - (r.x + r.w))} ${px(hull.y + hull.h - (r.y + r.h))} ${px(r.x - hull.x)} round ${px(R)})`,
-  })), { ...timing, pseudoElement: '::before' }));
-  animations.push(el.animate(boxes.map((r, i) => ({
-    offset: offset(i),
-    transform: `translate(${px(r.x)}, ${px(r.y)}) scale(${(r.w / W).toFixed(4)}, ${(r.h / H).toFixed(4)})`,
-  })), { ...timing, pseudoElement: '::after' }));
-  if (body) {
-    animations.push(body.animate(boxes.map((r, i) => {
-      const s = r.w / W;
-      return {
-        offset: offset(i),
-        transform: `translate(${px(r.x)}, ${px(r.y)}) scale(${s.toFixed(4)})`,
-        clipPath: `inset(0px 0px ${px(Math.max(0, flyH - r.h / s))} 0px round ${px(R)})`,
-      };
-    }), timing));
-  }
-  const opacity = Number(el.style.opacity || 1);
-  if (Math.abs(fromOpacity - opacity) > 0.001) animations.push(el.animate([{ opacity: fromOpacity }, { opacity }], { duration, easing: OPEN_EASE }));
-  const flight: Flight = { animations, frame: { a, b, start: performance.now(), duration, ease } };
-  finishWith(el, flight, animations[0]);
+  el.classList.add('is-flying');
+  return () => {
+    const R = size.radius;
+    const timing: KeyframeAnimationOptions = { duration, easing: 'linear' };
+    const animations: Animation[] = [];
+    const offset = (i: number) => i / STEPS;
+    animations.push(el.animate(boxes.map((r, i) => ({
+      offset: offset(i),
+      clipPath: `inset(${px(r.y - hull.y)} ${px(hull.x + hull.w - (r.x + r.w))} ${px(hull.y + hull.h - (r.y + r.h))} ${px(r.x - hull.x)} round ${px(R)})`,
+    })), { ...timing, pseudoElement: '::before' }));
+    animations.push(el.animate(boxes.map((r, i) => ({
+      offset: offset(i),
+      transform: `translate(${px(r.x)}, ${px(r.y)}) scale(${(r.w / W).toFixed(4)}, ${(r.h / H).toFixed(4)})`,
+    })), { ...timing, pseudoElement: '::after' }));
+    if (body) {
+      animations.push(body.animate(boxes.map((r, i) => {
+        const s = r.w / W;
+        return {
+          offset: offset(i),
+          transform: `translate(${px(r.x)}, ${px(r.y)}) scale(${s.toFixed(4)})`,
+          clipPath: `inset(0px 0px ${px(Math.max(0, flyH - r.h / s))} 0px round ${px(R)})`,
+        };
+      }), timing));
+    }
+    const opacity = Number(el.style.opacity || 1);
+    if (Math.abs(fromOpacity - opacity) > 0.001) animations.push(el.animate([{ opacity: fromOpacity }, { opacity }], { duration, easing: OPEN_EASE }));
+    const flight: Flight = { animations, frame: { a, b, start: performance.now(), duration, ease } };
+    finishWith(el, flight, animations[0]);
+  };
 };
 
-export const flyFrom = (el: HTMLElement, from: Snapshot, easing = OPEN_EASE): void => {
+/** 一张卡起飞前的全部写操作；返回建动画的那一步（不用飞时返回 null）。 */
+const prepare = (el: HTMLElement, from: Snapshot, easing: string, known?: FlySize): Launch | null => {
   stopFlight(el);
   clearDrag(el);
-  if (lessMotion()) return;
-  const W = Math.max(1, el.offsetWidth);
-  const H = Math.max(1, el.offsetHeight);
+  if (lessMotion()) return null;
+  const size = known ?? { w: el.offsetWidth, h: el.offsetHeight, radius: radiusOf(el) };
+  const W = Math.max(1, size.w);
+  const H = Math.max(1, size.h);
   const target = flatOrigin(el.style.transform, W, H);
   if (from.rect && target) {
     const b = { x: target.x, y: target.y, w: W, h: H };
-    if (sameBox(from.rect, b) && Math.abs(from.opacity - Number(el.style.opacity || 1)) < 0.001) return;
-    frameFlight(el, from.rect, b, easing, from.opacity);
-    return;
+    if (sameBox(from.rect, b) && Math.abs(from.opacity - Number(el.style.opacity || 1)) < 0.001) return null;
+    return frameFlight(el, from.rect, b, easing, from.opacity, size);
   }
   // 整窗飞行：等比缩放，高度差交给内容层和外框的底部裁切。
   const sx = from.w / W;
@@ -208,21 +220,37 @@ export const flyFrom = (el: HTMLElement, from: Snapshot, easing = OPEN_EASE): vo
   // 裁切和透明度不跟过冲走（过冲会让裁切短暂变负、透明度超出 0–1）。
   const plain: KeyframeAnimationOptions = { ...timing, easing: OPEN_EASE };
   const startH = from.h / sx;
-  if (Math.abs(startH - H) > 0.5) {
-    const tall = Math.max(H, startH);
-    if (tall > H + 0.5) el.style.setProperty('--fly-h', px(tall));
-    const R = radiusOf(el);
-    const inset = (bottom: number) => `inset(0px 0px ${px(Math.max(0, bottom))} 0px round ${px(R)})`;
-    const clip = [{ clipPath: inset(tall - startH) }, { clipPath: inset(tall - H) }];
-    if (body) animations.push(body.animate(clip, plain));
-    animations.push(el.animate(clip, { ...plain, pseudoElement: '::before' }));
-    animations.push(el.animate([{ transform: `scale(1, ${(startH / tall).toFixed(4)})` }, { transform: `scale(1, ${(H / tall).toFixed(4)})` }], { ...plain, pseudoElement: '::after' }));
-  }
-  const end = el.style.transform || 'none';
-  const start = structuredStart(from.inline, end, sx) ?? `translate(${from.tx}px, ${from.ty}px) scale(${from.k}) ${from.matrix} scale(${sx})`;
-  const opacity = Number(el.style.opacity || 1);
-  const animation = el.animate([{ transform: start }, { transform: end }], timing);
-  animations.push(animation);
-  if (Math.abs(from.opacity - opacity) > 0.001) animations.push(el.animate([{ opacity: from.opacity }, { opacity }], plain));
-  finishWith(el, { animations }, animation);
+  const tall = Math.max(H, startH);
+  if (Math.abs(startH - H) > 0.5 && tall > H + 0.5) el.style.setProperty('--fly-h', px(tall));
+  el.classList.add('is-flying');
+  return () => {
+    if (Math.abs(startH - H) > 0.5) {
+      const R = size.radius;
+      const inset = (bottom: number) => `inset(0px 0px ${px(Math.max(0, bottom))} 0px round ${px(R)})`;
+      const clip = [{ clipPath: inset(tall - startH) }, { clipPath: inset(tall - H) }];
+      if (body) animations.push(body.animate(clip, plain));
+      animations.push(el.animate(clip, { ...plain, pseudoElement: '::before' }));
+      animations.push(el.animate([{ transform: `scale(1, ${(startH / tall).toFixed(4)})` }, { transform: `scale(1, ${(H / tall).toFixed(4)})` }], { ...plain, pseudoElement: '::after' }));
+    }
+    const end = el.style.transform || 'none';
+    const start = structuredStart(from.inline, end, sx) ?? `translate(${from.tx}px, ${from.ty}px) scale(${from.k}) ${from.matrix} scale(${sx})`;
+    const opacity = Number(el.style.opacity || 1);
+    const animation = el.animate([{ transform: start }, { transform: end }], timing);
+    animations.push(animation);
+    if (Math.abs(from.opacity - opacity) > 0.001) animations.push(el.animate([{ opacity: from.opacity }, { opacity }], plain));
+    finishWith(el, { animations }, animation);
+  };
+};
+
+export const flyFrom = (el: HTMLElement, from: Snapshot, easing = OPEN_EASE, known?: FlySize): void => {
+  prepare(el, from, easing, known)?.();
+};
+
+/**
+ * 一批卡一起飞：先把每张卡的写（停旧飞行、外框范围变量、is-flying）全做完，再一起建动画。
+ * 逐张 flyFrom 时每张卡「写 → 建动画（读样式）」，十张卡就逼浏览器重算十遍整块画布的样式（2026-11-14 trace：约 30 次）。
+ */
+export const flyAll = (items: ReadonlyArray<{ el: HTMLElement; from: Snapshot; easing?: string; size?: FlySize }>): void => {
+  const launches = items.map((item) => prepare(item.el, item.from, item.easing ?? OPEN_EASE, item.size));
+  for (const launch of launches) launch?.();
 };

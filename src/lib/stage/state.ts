@@ -2,19 +2,22 @@
  * 台前调度（运动详情页，2026-11-13）的状态：舞台上的一组卡、左侧栏里的若干组、藏起来的卡。
  * 只有纯数据和纯函数：每个动作都返回新状态，不改传进来的那份；界面（useWorkoutStage）只负责存和画。
  *
- * - 一「组」是一起进出舞台的 1–3 张卡（iPad 台前调度里拼在一起的几个窗口）。
+ * - 一「组」是一起进出舞台的 1–4 张卡（iPad 台前调度里拼在一起的几个窗口；2026-11-14 用户：3 张不够，放到 4 张）。
  * - 侧栏顺序 = 最近用过的在上：从舞台退下来的组插到最前面。
  * - 舞台永远不空（只要还有卡没藏）。
  */
 export interface StageGroup {
   ids: string[];
-  /** 档：1 张是 标准 / 宽 / 全屏，2 张是 1:1 / 2:1 / 1:2，3 张是 主卡在左 / 在右 / 在上（layout.ts）。 */
+  /** 档：1 张是 标准 / 宽 / 全屏，2 张是 1:1 / 2:1 / 1:2，3 张是 主卡在左 / 在右 / 在上，4 张是 田字 / 上一下三 / 左大右三（layout.ts）。 */
   snap: number;
   /**
    * 拖边拖出来的连续比例（2026-11-13 用户：缩放要无级，松手别跳回几个固定档）：
-   * 1 张是占舞台宽的几成，2 张是左边那张的份额，3 张是大卡的份额。有它就不看 snap 里的比例（3 张时 snap 仍管大卡在哪边）。
+   * 1 张是占舞台宽的几成，2 张是左边那张的份额，3 张是大卡的份额，4 张田字是左列的份额、左大右三是大卡的份额。
+   * 有它就不看 snap 里的比例（3、4 张时 snap 仍管怎么排）。
    */
   ratio?: number;
+  /** 4 张「上一下三」：下面一排两条缝的位置（占整排宽的几成，从左往右递增）。没有就是三等分。 */
+  splits?: number[];
   /** 两三张时整组占舞台可用宽的几成（拖最外侧的左 / 右边），整组居中；没有就是占满。 */
   span?: number;
   /** 拖下边拉出来的高（排版像素，夹在 layout.ts 的范围里）；没有的卡按内容高。 */
@@ -26,14 +29,28 @@ export interface StageState {
   hidden: string[];
 }
 
-export const MAX_ON_STAGE = 3;
+export const MAX_ON_STAGE = 4;
 /** 单张卡的「全屏」档：侧栏让开，卡占满舞台。 */
 export const FULL_SNAP = 2;
-/** 每种张数都有三档：1 张 标准 / 宽 / 全屏，2 张 1:1 / 2:1 / 1:2，3 张 主卡在左 / 在右 / 在上。 */
+/** 每种张数都有三档：1 张 标准 / 宽 / 全屏，2 张 1:1 / 2:1 / 1:2，3 张 主卡在左 / 在右 / 在上，4 张 田字 / 上一下三 / 左大右三。 */
 export const snapCount = (_cards: number): number => 3;
 /** 3 张时「主卡在上」：主卡占上面整行，另两张在下面左右排（运动详情的概要卡默认这样）。 */
 export const TOP_SNAP = 2;
+/** 4 张的三档。 */
+export const GRID_SNAP = 0;
+export const ROW_SNAP = 1;
+export const COLUMN_SNAP = 2;
 
+/**
+ * 张数变了时挑哪一档（2026-11-14 用户：宽卡别被塞进窄列）：打头那张是横向的宽卡（概要、轨迹、图表……）就让它占整行——
+ * 3 张「主卡在上」、4 张「上一下三」；否则 3 张主卡在左、4 张田字。wide 不给就一律第一档。
+ */
+export const snapFor = (ids: readonly string[], wide?: (id: string) => boolean): number => {
+  const lead = ids[0] != null && wide?.(ids[0]);
+  if (ids.length === 3) return lead ? TOP_SNAP : 0;
+  if (ids.length === 4) return lead ? ROW_SNAP : GRID_SNAP;
+  return 0;
+};
 /** 只留这几张卡自己的高。 */
 const heightsOf = (g: { heights?: Record<string, number> }, ids: readonly string[]): Record<string, number> | undefined => {
   if (!g.heights) return undefined;
@@ -49,6 +66,7 @@ const make = (ids: string[], snap: number, extra: Partial<StageGroup> = {}): Sta
   const out: StageGroup = { ids: [...ids], snap };
   if (extra.ratio != null && Number.isFinite(extra.ratio)) out.ratio = extra.ratio;
   if (extra.span != null && Number.isFinite(extra.span)) out.span = extra.span;
+  if (ids.length === 4 && Array.isArray(extra.splits) && extra.splits.length === 2 && extra.splits.every(Number.isFinite)) out.splits = [...extra.splits];
   const heights = heightsOf(extra, ids);
   if (heights) out.heights = heights;
   return out;
@@ -122,9 +140,9 @@ export const cycle = (s: StageState, dir: 1 | -1): StageState => {
 
 /**
  * 把一张卡放上舞台、并进当前这组（拖进来，或菜单里「放到旁边」）。
- * 已满三张就换掉落点那张（被换下的单独退到侧栏最前面）；at 省略时放最后。
+ * 已满四张就换掉落点那张（被换下的单独退到侧栏最前面）；at 省略时放最后。张数变了按 snapFor 挑档。
  */
-export const addToStage = (s: StageState, id: string, at?: number): StageState => {
+export const addToStage = (s: StageState, id: string, at?: number, wide?: (id: string) => boolean): StageState => {
   if (s.stage.ids.includes(id)) {
     if (at == null) return s;
     const ids = s.stage.ids.filter((x) => x !== id);
@@ -141,12 +159,12 @@ export const addToStage = (s: StageState, id: string, at?: number): StageState =
     return out;
   }
   ids.splice(Math.min(Math.max(0, at ?? ids.length), ids.length), 0, id);
-  out.stage = make(ids, 0, { heights: out.stage.heights });
+  out.stage = make(ids, snapFor(ids, wide), { heights: out.stage.heights });
   return out;
 };
 
 /** 把舞台上的一张卡收进侧栏（拖回侧栏 / 角柄往里拖 / 菜单）。只剩它一张时换侧栏最上面那组上来；侧栏空着就不动。 */
-export const removeFromStage = (s: StageState, id: string): StageState => {
+export const removeFromStage = (s: StageState, id: string, wide?: (id: string) => boolean): StageState => {
   if (!s.stage.ids.includes(id)) return s;
   if (s.stage.ids.length === 1) {
     if (!s.strip.length) return s;
@@ -157,7 +175,8 @@ export const removeFromStage = (s: StageState, id: string): StageState => {
     return out;
   }
   const out = copy(s);
-  out.stage = make(out.stage.ids.filter((x) => x !== id), 0, { heights: out.stage.heights });
+  const ids = out.stage.ids.filter((x) => x !== id);
+  out.stage = make(ids, snapFor(ids, wide), { heights: out.stage.heights });
   out.strip.unshift({ ids: [id], snap: 0 });
   return out;
 };
@@ -185,8 +204,8 @@ export const fullscreen = (s: StageState, id: string): StageState => solo(s, id,
 export const setSnap = (s: StageState, snap: number): StageState =>
   ({ ...copy(s), stage: clampSnap(make(s.stage.ids, snap, { heights: s.stage.heights })) });
 
-/** 拖边的结果：比例 / 整组宽 / 某几张的高（null = 回到按内容高）。范围由 layout.ts 夹。退出全屏时顺手回到普通档。 */
-export interface SizePatch { ratio?: number; span?: number; heights?: Record<string, number | null> }
+/** 拖边的结果：比例 / 整组宽 / 缝的位置 / 某几张的高（null = 回到按内容高）。范围由 layout.ts 夹。退出全屏时顺手回到普通档。 */
+export interface SizePatch { ratio?: number; span?: number; splits?: number[]; heights?: Record<string, number | null> }
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 export const setSize = (s: StageState, patch: SizePatch): StageState => {
   const g = s.stage;
@@ -199,6 +218,7 @@ export const setSize = (s: StageState, patch: SizePatch): StageState => {
   const extra: Partial<StageGroup> = {
     ratio: patch.ratio != null ? round3(patch.ratio) : g.ratio,
     span: patch.span != null ? (patch.span >= 0.999 ? undefined : round3(patch.span)) : g.span,
+    splits: patch.splits ? patch.splits.map(round3) : g.splits,
     heights,
   };
   return { ...copy(s), stage: clampSnap(make(g.ids, snap, extra)) };

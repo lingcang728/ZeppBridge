@@ -25,7 +25,7 @@ import { onMotionEscape } from './interrupt';
 import { easeAt, HANDOFF_EARLIEST, OPEN_EASE as WINDOW_EASE, OPEN_MS, timeAt, turnedEase } from './timing';
 import { lessMotion } from './lessMotion';
 import { settleCssAnimations } from './settle';
-import { belowLine, bleedRect, cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
+import { belowLine, cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
 
 export { visibleWindow };
 
@@ -125,16 +125,68 @@ export const objectTransform = (from: Box, panel: Box, subject: Box = panel): st
   return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${scale.toFixed(3)})`;
 };
 
+/** 来处比面板宽 / 高时，飞行期间面板的底（.dialog-glass、::after）在哪个方向上撑大了（见 build 里的 --flight-w / --flight-h）。 */
+export interface FlightGrow { width: boolean; height: boolean }
+
+const posesOf = (from: WindowRect, to: WindowRect) =>
+  windowPoses({ rect: from, anchor: { x: from.left, y: from.top } }, { rect: to, anchor: { x: to.left, y: to.top } });
+
+/** 某一帧面板里真正画着东西的宽 / 高（面板坐标，从窗口左上角起）：面板自己的盒子；底撑大的方向上是窗口和面板里大的那个。 */
+const paintedSize = (rect: WindowRect, panel: WindowRect, grow?: FlightGrow) => ({
+  width: grow?.width ? Math.max(rect.width, panel.width) : panel.width,
+  height: grow?.height ? Math.max(rect.height, panel.height) : panel.height,
+});
+
+/**
+ * 最后一帧右 / 下边往外多放多少（纯函数，方便测）。看得见的那条边 = min(裁切的边, 画着东西的边)，两条在最后一段里
+ * 都是直线走（同一条曲线），所以只要按「那条边是从里往外落、还是从外往里落」挑放多少，最后一段就单调、落地不跳：
+ * - 从里往外落（看得见的边还没到终点）：画着的东西不越过终点才放满；画着的东西已经越过终点（窗口还窄、面板盒子靠左上角挂着
+ *   伸到了终点外面）就不放——放了，看得见的边先跟着裁切往外冲、再随盒子缩回终点（2026-11-14 伤病：右边伸出 6px 又缩回）。
+ * - 从外往里落：裁切不能比上一帧更往外（最多放到上一帧的位置），否则同样先伸再缩。
+ * `c0` 上一帧裁切的边，`b0` 上一帧画着东西的边，`end` 终点，`full` 想放的量。
+ */
+export function edgeBleed(c0: number, b0: number, end: number, full: number): number {
+  const seen = Math.min(c0, b0);
+  if (seen <= end + 0.01) return b0 <= end + 0.01 ? full : 0;
+  return c0 <= b0 ? Math.min(full, Math.max(0, c0 - end)) : full;
+}
+
 /** Shared by dialogs and the stage-local star card. Content stays at 1:1 throughout. */
-export function dialogWindowFrames(from: WindowRect, to: WindowRect, panel: WindowRect, radius: number, bleedEnd = false): Keyframe[] {
-  const poses = windowPoses({ rect: from, anchor: { x: from.left, y: from.top } }, { rect: to, anchor: { x: to.left, y: to.top } });
+export function dialogWindowFrames(from: WindowRect, to: WindowRect, panel: WindowRect, radius: number, bleedEnd = false, grow?: FlightGrow): Keyframe[] {
+  const poses = posesOf(from, to);
   const last = poses.length - 1;
   return poses.map((pose, i) => {
     const dx = pose.anchor.x - panel.left, dy = pose.anchor.y - panel.top;
-    const clipRect = bleedEnd && i === last ? bleedRect(pose.rect, Math.max(radius, 36)) : pose.rect;
+    let clipRect: WindowRect = pose.rect;
+    if (bleedEnd && i === last) {
+      // 左 / 上：面板跟着窗口左上角走，画着的东西的左 / 上边就是窗口的左 / 上边，往外放只露出投影，怎么放都不跳。
+      // 右 / 下：见 edgeBleed（画着的东西包括撑大了的底，所以来处比面板宽的跑鞋不会在落地前露出那截宽底）。
+      const full = Math.max(radius, 36);
+      const prev = poses[last - 1]!;
+      const paint = paintedSize(prev.rect, panel, grow);
+      const right = edgeBleed(prev.rect.left + prev.rect.width, prev.anchor.x + paint.width, pose.rect.left + pose.rect.width, full);
+      const bottom = edgeBleed(prev.rect.top + prev.rect.height, prev.anchor.y + paint.height, pose.rect.top + pose.rect.height, full);
+      clipRect = { left: pose.rect.left - full, top: pose.rect.top - full, width: pose.rect.width + full + right, height: pose.rect.height + full + bottom };
+    }
     return { offset: WINDOW_OFFSETS[i], transform: `translate(${dx}px, ${dy}px)`,
       // DOMRect dimensions are prototype getters, so spreading the object loses them.
       clipPath: windowInset(clipRect, { left: panel.left + dx, top: panel.top + dy, width: panel.width, height: panel.height }, radius, true) };
+  });
+}
+
+/**
+ * 撑大了的底（.dialog-glass、面板的 ::after，盒子是 `fill` 那么大、从面板左上角起）自己的裁切（纯函数，方便测）：
+ * 撑大的方向上每一帧只露到 max(窗口, 面板)，最后一帧正好收回面板的盒子——落地时变量撤掉、底回到面板大小，同一个形状，不跳。
+ * 以前底一直按来处的宽度画，最后一帧裁切往外放的那一圈把宽出来的那截露了出来：右边先伸、落地再缩回（2026-11-14 跑鞋）。
+ * 圆角用面板自己的圆角（底本来就是这个圆角），没撑大的方向放开，不挡投影。和 dialogWindowFrames 同一组关键帧、同一条曲线。
+ */
+export function dialogFillFrames(from: WindowRect, to: WindowRect, panel: WindowRect, fill: { width: number; height: number }, radius: number): Keyframe[] {
+  const open = -64;
+  return posesOf(from, to).map((pose, i) => {
+    const size = paintedSize(pose.rect, panel, { width: true, height: true });
+    const right = fill.width > panel.width + 0.5 ? fill.width - size.width : open;
+    const bottom = fill.height > panel.height + 0.5 ? fill.height - size.height : open;
+    return { offset: WINDOW_OFFSETS[i], clipPath: `inset(${open}px ${Number(right.toFixed(2))}px ${Number(bottom.toFixed(2))}px ${open}px round ${radius}px)` };
   });
 }
 
@@ -264,11 +316,15 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
       panel.classList.add('is-flying');
       flight.own(() => panel.classList.remove('is-flying'));
     }
-    flight.add(panel, dialogWindowFrames(start, target, final, radiusFor(origin, windowEl ?? panel), true), { easing: shapeEase, hold: closing ? LAND_HOLD : 0 });
+    const source = origin?.el?.isConnected ? origin.el : null;
+    // 来处比面板宽 / 高（跑鞋那一行）：飞行期间底要撑到两者的并集（下面 --flight-w / --flight-h 的说明）。
+    const grow: FlightGrow | undefined = source && from && (from.width > final.width + 0.5 || from.height > final.height + 0.5)
+      ? { width: from.width > final.width + 0.5, height: from.height > final.height + 0.5 } : undefined;
+    const shape = { easing: shapeEase, hold: closing ? LAND_HOLD : 0 };
+    flight.add(panel, dialogWindowFrames(start, target, final, radiusFor(origin, windowEl ?? panel), true, grow), shape);
     const content = windowEl
       ? (windowEl.querySelector<HTMLElement>('[data-dialog-content]') ?? windowEl)
       : panel.querySelector<HTMLElement>(':scope > .dialog-scroll');
-    const source = origin?.el?.isConnected ? origin.el : null;
     // 替身（那张卡的拷贝）先从被藏着的状态里拷出来，再藏真卡：同一帧，规则 4。
     const replica = source ? whileShown(source, () => cardReplica(source).el) : null;
     if (replica) {
@@ -288,10 +344,16 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
       // 收回途中窗口右下角缺一块。垫一层和面板同色的底，盖满两者的并集。
       // 面板跟着窗口左上角平移（dialogWindowFrames），窗口在面板自己的坐标里总从 (0,0) 起，所以底也从 (0,0) 铺。
       // 底画在 .dialog-glass 和 ::after 上（面板本身透明），飞行期间经 --flight-w / --flight-h 撑到两者的并集（ModalDialog.vue）。
-      if (from && (from.width > final.width + 0.5 || from.height > final.height + 0.5)) {
-        panel.style.setProperty('--flight-w', `${Math.max(final.width, from.width)}px`);
-        panel.style.setProperty('--flight-h', `${Math.max(final.height, from.height)}px`);
+      // 撑大的那截跟着窗口一起收：底自己带一道裁切，最后一帧正好是面板的盒子（dialogFillFrames）。
+      if (grow && from) {
+        const fill = { width: Math.max(final.width, from.width), height: Math.max(final.height, from.height) };
+        panel.style.setProperty('--flight-w', `${fill.width}px`);
+        panel.style.setProperty('--flight-h', `${fill.height}px`);
         flight.own(() => { panel.style.removeProperty('--flight-w'); panel.style.removeProperty('--flight-h'); });
+        const frames = dialogFillFrames(start, target, final, fill, parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0);
+        const glass = panel.querySelector<HTMLElement>(':scope > .dialog-glass');
+        if (glass) flight.add(glass, frames, shape);
+        flight.add(panel, frames, { ...shape, pseudoElement: '::after' });
       }
     }
     if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN }]);

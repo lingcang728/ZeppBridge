@@ -13,9 +13,15 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { buildRouteRuns, type RouteCanvas } from '../../lib/workoutRoute';
 import { MAP_TILES } from '../../lib/mapTiles';
 import { resolvedTheme } from '../../composables/useTheme';
+import { deferResize } from '../../lib/motion/budget';
 
 const props = defineProps<{ canvas: RouteCanvas; label: string }>();
 const emit = defineEmits<{ (event: 'failed'): void }>();
+
+/** 这么久一张瓦片都没到，就当连不上（2026-11-14 实测：本机连 tile.openstreetmap.org 一半请求 5 秒超时、不报错也不结束，旧逻辑只认报错，地图就一直空着）。 */
+const FIRST_TILE_TIMEOUT_MS = 10_000;
+/** 一张瓦片失败后隔多久再试一次（只试一次）。 */
+const TILE_RETRY_MS = 1_500;
 
 const host = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
@@ -23,6 +29,10 @@ let routeLayer: L.LayerGroup | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let tileLoads = 0;
 let tileErrors = 0;
+let firstTileTimer = 0;
+let sizeFrame = 0;
+/** 挂载时容器还没尺寸（侧栏里 / 还没排版）：等第一次有尺寸再按轨迹取景，不然停在按 0×0 算出的缩放上。 */
+let framed = false;
 
 /** 画布用的是 `var(--route-mint)` 这类 token，canvas 渲染要真颜色。 */
 const resolveColor = (value: string): string => {
@@ -61,8 +71,47 @@ const routeBounds = (): L.LatLngBounds => {
 };
 
 const giveUpIfNothingLoads = () => {
-  // 一张都没加载出来、错误又攒到好几张：多半离线或被瓦片服务拦了，退回本地画布。
+  // 一张都没加载出来、错误又攒到好几张（每张都已重试过一次）：多半离线或连不上瓦片服务，退回本地画布。
   if (tileLoads === 0 && tileErrors >= 4) emit('failed');
+};
+
+/** 失败的瓦片隔一会儿再要一次：网络时好时坏时，多数第二次就能拿到。还失败才算进错误数。 */
+const retryTile = (event: L.TileErrorEvent) => {
+  const img = event.tile as HTMLImageElement & { zbRetried?: boolean };
+  if (img.zbRetried) {
+    tileErrors += 1;
+    giveUpIfNothingLoads();
+    return;
+  }
+  img.zbRetried = true;
+  const src = img.src;
+  window.setTimeout(() => {
+    if (!map) return;
+    // 不能先置空再赋回：置空本身会触发一次 error，被当成重试也失败。带个参数换一个地址再要。
+    img.src = `${src}${src.includes('?') ? '&' : '?'}retry=1`;
+  }, TILE_RETRY_MS);
+};
+
+const frameRoute = () => {
+  if (!map || !host.value?.clientWidth || !host.value.clientHeight) return false;
+  map.fitBounds(routeBounds(), { padding: [28, 28], maxZoom: 17 });
+  framed = true;
+  return true;
+};
+
+/** 尺寸变化合并到下一帧处理一次（舞台拖边时每帧都在变）。 */
+const fitSize = () => {
+  if (!map) return;
+  map.invalidateSize({ animate: false });
+  if (!framed) frameRoute();
+};
+/* 舞台窗口成批飞行时不跟（lib/motion/budget.ts 的 holdResizes），落地后补一次。 */
+const onResize = () => {
+  if (sizeFrame) return;
+  sizeFrame = requestAnimationFrame(() => {
+    sizeFrame = 0;
+    if (!deferResize(fitSize)) fitSize();
+  });
 };
 
 // 滚轮默认不缩放：页面滚动经过地图时不能被吃掉。点进地图（或键盘聚焦）才接管滚轮，移出就还回去。
@@ -90,25 +139,30 @@ onMounted(() => {
     keepBuffer: 1,
     updateWhenZooming: false,
   });
-  tiles.on('tileload', () => { tileLoads += 1; });
-  tiles.on('tileerror', () => { tileErrors += 1; giveUpIfNothingLoads(); });
+  tiles.on('tileload', () => { tileLoads += 1; window.clearTimeout(firstTileTimer); });
+  tiles.on('tileerror', retryTile);
   tiles.addTo(map);
-  map.fitBounds(routeBounds(), { padding: [28, 28], maxZoom: 17 });
+  // Leaflet 没有尺寸也要一个视野才肯加图层；先粗放一个，有尺寸了再按轨迹取景。
+  if (!frameRoute()) map.setView([props.canvas.start.latitude, props.canvas.start.longitude], 14);
+  firstTileTimer = window.setTimeout(() => { if (tileLoads === 0) emit('failed'); }, FIRST_TILE_TIMEOUT_MS);
   map.on('click', enableWheel);
   host.value.addEventListener('focusin', enableWheel);
   host.value.addEventListener('mouseleave', disableWheel);
   drawRoute();
-  resizeObserver = new ResizeObserver(() => map?.invalidateSize({ animate: false }));
+  resizeObserver = new ResizeObserver(onResize);
   resizeObserver.observe(host.value);
 });
 
 watch(resolvedTheme, () => requestAnimationFrame(drawRoute));
 watch(() => props.canvas, () => {
   drawRoute();
-  map?.fitBounds(routeBounds(), { padding: [28, 28], maxZoom: 17 });
+  framed = false;
+  frameRoute();
 });
 
 onBeforeUnmount(() => {
+  window.clearTimeout(firstTileTimer);
+  cancelAnimationFrame(sizeFrame);
   resizeObserver?.disconnect();
   host.value?.removeEventListener('focusin', enableWheel);
   host.value?.removeEventListener('mouseleave', disableWheel);

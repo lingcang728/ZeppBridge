@@ -1,10 +1,11 @@
 import { displayDateTimeFormatter } from './dateTime';
 import { isFiniteNumber } from './format';
 import { downsample } from './workoutRoute';
+import type { AxisRange } from './chartAxis';
 import type { ChartPalette } from './echartsTheme';
 import type { WorkoutSeriesSample } from '../types';
 
-/* 运动详情里四张小折线图（心率 / 配速 / 海拔 / 步频）的数据与 ECharts 配置。纯函数。 */
+/* 运动详情里的逐点折线图（心率 / 配速 / 海拔 / 步频）的数据与 ECharts 配置。纯函数。 */
 
 export type SeriesKey = keyof Pick<WorkoutSeriesSample, 'heart_rate' | 'pace' | 'altitude_m' | 'cadence'>;
 export type ChartPoint = { t: number; v: number };
@@ -23,44 +24,33 @@ export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: Se
 );
 
 /**
- * 纵轴至少撑开 `minSpan`（围绕数据中点）：海拔图按数据自动缩放时，7–12 米的平路会被画成满屏起伏，
- * 和爬升卡「没有明显爬升」对不上（2026-10-28 录屏）。数据本身跨度够了就不管，交给 ECharts。
+ * 秒 → `m'ss"`。配速图的纵轴、提示、标注和卡头统计都用这一种写法（2026-11-14 用户截图：
+ * 轴上是 8:20、卡头是 2'18"，两套写法对不上）。画的已经是「每公里 / 每英里秒数」，这里不再换算单位。
  */
-export const spannedAxis = (points: ChartPoint[], minSpan: number): { min?: number; max?: number } => {
-  if (minSpan <= 0 || !points.length) return {};
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (const p of points) { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); }
-  if (hi - lo >= minSpan) return {};
-  const mid = (lo + hi) / 2;
-  const min = Math.floor(mid - minSpan / 2);
-  return { min, max: min + Math.ceil(minSpan) };
-};
-
-/** 秒 → `m:ss`。配速图的纵轴和提示用它：画的已经是「每公里 / 每英里秒数」，这里不再换算单位。 */
-export const clockSeconds = (seconds: number): string => {
+export const paceSeconds = (seconds: number): string => {
   const total = Math.round(seconds);
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  return `${Math.floor(total / 60)}'${String(total % 60).padStart(2, '0')}"`;
 };
 
 export interface LineOptionOpts {
   color: string;
   unit: string;
   palette: ChartPalette;
-  /** 纵轴至少撑开多少，见 `spannedAxis`。 */
-  minSpan?: number;
+  /** 纵轴范围（chartAxis.ts 算好的）；不给就交给 ECharts 按数据缩放。 */
+  axis?: AxisRange | null;
   /** 纵轴倒过来：配速越快数越小，倒过来「好」才朝上，和别的图一致。 */
   inverse?: boolean;
   /** 纵轴刻度和提示里的数怎么写；不给就是保留一位小数的数字。 */
   format?: (value: number) => string;
+  /** 均值线画在哪（配速用 距离 ÷ 运动时间，和卡头、概要卡同一个数）；不给就是这些点的算术平均。 */
+  average?: number | null;
 }
 
 /** 一张带均值虚线的面积折线图；少于两个点时返回 null（不画图，不编数据）。 */
 export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
-  const { color, unit, palette, minSpan = 0, inverse = false, format } = opts;
+  const { color, unit, palette, axis, inverse = false, format } = opts;
   if (points.length < 2) return null;
-  const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
-  const yRange = spannedAxis(points, minSpan);
+  const avg = isFiniteNumber(opts.average) ? opts.average : points.reduce((sum, p) => sum + p.v, 0) / points.length;
   // 时间轴的刻度间隔钉在「整分钟、大约四格」：短短几分钟的记录里 ECharts 会按秒
   // 切刻度，「19:44 19:46 19:48」挤成一串，hideOverlap 管不到时间轴的两级标签。
   const span = points[points.length - 1]!.t - points[0]!.t;
@@ -81,7 +71,7 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
     yAxis: {
       type: 'value',
       scale: true,
-      ...yRange,
+      ...(axis ? { min: axis.min, max: axis.max, interval: axis.interval } : {}),
       inverse,
       axisLine: { show: false },
       axisTick: { show: false },
@@ -107,8 +97,12 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
       data: points.map((point) => [point.t, point.v]),
       smooth: 0.2,
       showSymbol: false,
+      clip: true,
       lineStyle: { width: 2, color },
       areaStyle: {
+        // 面积从线往「差」的那一头填：倒过来的配速轴里差（慢）在下面，所以填到轴最大值那一端
+        // （曾经填到最小值，也就是顶上——用户截图里配速像倒挂着）。
+        origin: inverse ? 'end' : 'start',
         color: {
           type: 'linear',
           x: 0,
@@ -125,7 +119,7 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
         silent: true,
         symbol: 'none',
         lineStyle: { type: 'dashed', color: palette.mark, width: 1.2 },
-        data: [{ yAxis: Math.round(avg) }],
+        data: [{ yAxis: format ? avg : Math.round(avg) }],
         label: { show: false },
       },
     }],
@@ -133,10 +127,16 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
 };
 
 /* ── 卡变大就多画细节（2026-11-13 用户：卡拉大了内容也该多，不是同一张图放大）。 ──
-   整场一直都画（不截取一段）；中档：时间刻度更密、平均线标上数；大档：再标出最高 / 最低点，心率图叠上手表划的区间色带。
+   整场一直都画（不截取一段）。档位按卡的宽 × 高（2026-11-14：只按宽分档，拉高了什么都不加）：
+   中档：时间刻度更密、平均线标上数、暂停段铺灰；
+   大档：再标出最高 / 最低点，心率图按手表划的区间分色（色带 + 折线分段着色，区间名在右侧槽里）。
    只画已有的数：没有区间就不画色带，不编数据。 */
 export type ChartTier = 'sm' | 'md' | 'lg';
-export const chartTier = (width: number): ChartTier => (width >= 820 ? 'lg' : width >= 520 ? 'md' : 'sm');
+export const chartTier = (width: number, height = Infinity): ChartTier => {
+  if (width >= 760 && height >= 360) return 'lg';
+  if (width >= 440 && height >= 250) return 'md';
+  return 'sm';
+};
 export interface ChartBand { index: number; low: number | null; high: number }
 export interface ChartDetail {
   color: string;
@@ -144,8 +144,25 @@ export interface ChartDetail {
   format?: (value: number) => string;
   /** 心率区间（手表随运动下发的上界），从低到高。 */
   bands?: ChartBand[];
+  /** 区间色（按 band.index 取，和心率区间卡同一套）。 */
+  zoneColor?: (index: number) => string;
+  /** 暂停段（毫秒时间戳）。 */
+  pauses?: Array<{ start: number; end: number }>;
+  /** 大档标出来的两个极值点；不给就是数据的最高 / 最低。配速给剔除停顿后的最快 / 最慢，和卡头一致。 */
+  extremes?: ChartPoint[];
 }
 type LineOption = NonNullable<ReturnType<typeof lineOption>>;
+type AreaEdge = { xAxis?: number; yAxis?: number; name?: string; itemStyle?: Record<string, unknown>; label?: Record<string, unknown> };
+
+/** 心率区间：只留和纵轴有交集的几段，夹到轴范围里（轴外的区间名不浮在图外）。 */
+const visibleBands = (bands: ChartBand[], values: number[]) => {
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  return bands
+    .map((band) => ({ ...band, low: band.low ?? -Infinity }))
+    .filter((band) => band.high > lo && band.low < hi)
+    .map((band) => ({ index: band.index, from: Math.max(band.low, lo), to: Math.min(band.high, hi), low: band.low, high: band.high }));
+};
 
 export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDetail): LineOption => {
   if (tier === 'sm') return option;
@@ -157,35 +174,81 @@ export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDet
   const fmt = (value: number) => (detail.format ? detail.format(value) : String(Math.round(value)));
   const { palette, color } = detail;
   const label = { color: palette.axis, fontSize: 12.5, fontWeight: 600 };
-  const next: LineOption & { series: Array<LineOption['series'][number] & Record<string, unknown>> } = {
-    ...option,
-    xAxis: { ...option.xAxis, splitNumber: parts, minInterval: tick, maxInterval: tick },
-    series: [{
-      ...series,
-      markLine: {
-        ...series.markLine,
-        label: { show: true, position: 'insideEndTop', ...label, formatter: (p: { value: number }) => fmt(p.value) },
+  const areas: Array<[AreaEdge, AreaEdge]> = [];
+  for (const pause of detail.pauses ?? []) {
+    areas.push([{ xAxis: pause.start, itemStyle: { color: `${palette.axis}1f` } }, { xAxis: pause.end }]);
+  }
+  const zoneColor = detail.zoneColor ?? (() => color);
+  const bands = tier === 'lg' && detail.bands?.length ? visibleBands(detail.bands, data.map((d) => d[1])) : [];
+  for (const band of bands) {
+    const tone = zoneColor(band.index);
+    areas.push([
+      { yAxis: band.from, name: `Z${band.index}`, itemStyle: { color: `${tone}1c` }, label: { color: tone } },
+      { yAxis: band.to },
+    ]);
+  }
+  const line: Record<string, unknown> = {
+    ...series,
+    // 按区间分段着色时线不能自带颜色：显式的 lineStyle.color 会盖过 visualMap。
+    lineStyle: bands.length ? { width: series.lineStyle.width } : series.lineStyle,
+    markLine: {
+      ...series.markLine,
+      // 均值的数标在左端：右端是区间名的位置。
+      label: { show: true, position: bands.length ? 'insideStartTop' : 'insideEndTop', ...label, formatter: (p: { value: number }) => fmt(p.value) },
+    },
+    ...(areas.length ? {
+      markArea: {
+        silent: true,
+        label: { show: true, position: 'right', distance: 6, fontSize: 11, fontWeight: 600 },
+        data: areas,
       },
-    }],
+    } : {}),
   };
+  const next = {
+    ...option,
+    // 区间名放在绘图区右侧的槽里，不压在折线上；大档顶上多留一点给最高点的标注（曾被裁掉半截）。
+    grid: { ...option.grid, top: tier === 'lg' ? 28 : option.grid.top, right: bands.length ? 44 : option.grid.right },
+    xAxis: { ...option.xAxis, splitNumber: parts, minInterval: tick, maxInterval: tick },
+    series: [line],
+  } as unknown as LineOption & Record<string, unknown>;
+  if (bands.length) {
+    // 折线按区间分段着色（成熟的运动软件都这么画）：一眼看出哪段在哪个区间。
+    next.visualMap = {
+      show: false,
+      type: 'piecewise',
+      seriesIndex: 0,
+      dimension: 1,
+      pieces: bands.map((band) => ({ ...(Number.isFinite(band.low) ? { gt: band.low } : {}), lte: band.high, color: zoneColor(band.index) })),
+      outOfRange: { color },
+    };
+  }
   if (tier === 'lg') {
-    next.series[0].markPoint = {
+    const points = detail.extremes?.length ? detail.extremes.map((p) => ({ coord: [p.t, p.v], value: p.v })) : [{ type: 'max' }, { type: 'min' }];
+    line.markPoint = {
       symbol: 'circle',
       symbolSize: 8,
       itemStyle: { color, borderColor: palette.surface, borderWidth: 2 },
       label: { show: true, position: 'top', distance: 6, ...label, color: palette.tooltipText, formatter: (p: { value: number }) => fmt(p.value) },
-      data: [{ type: 'max' }, { type: 'min' }],
+      data: points,
     };
-    if (detail.bands?.length) {
-      next.series[0].markArea = {
-        silent: true,
-        label: { show: true, position: 'insideRight', color: palette.axis, fontSize: 11 },
-        data: detail.bands.map((band, i) => [
-          { yAxis: band.low ?? 0, name: `Z${band.index}`, itemStyle: { color: `${color}${i % 2 ? '14' : '08'}` } },
-          { yAxis: band.high },
-        ]),
-      };
-    }
   }
   return next;
+};
+
+/**
+ * 纵轴刻度跟着图的高走（2026-11-14：舞台上一列叠三张图时，配速轴 3'10"…4'00" 六个刻度挤成一团）：
+ * 每个刻度至少 PX_PER_TICK 像素，给定的间隔太密就按整倍数放宽（轴的上下界不动，刻度仍落在整数上）。
+ * 没给轴范围（ECharts 自己切）时只限 splitNumber。
+ */
+const PX_PER_TICK = 34;
+export const fitTicks = <T extends LineOption>(option: T, plotHeight: number): T => {
+  const most = Math.max(2, Math.floor(plotHeight / PX_PER_TICK));
+  const y = option.yAxis as LineOption['yAxis'] & { min?: number; max?: number; interval?: number; splitNumber?: number };
+  if (y.min == null || y.max == null || !y.interval) return { ...option, yAxis: { ...y, splitNumber: Math.min(5, most) } };
+  // 按格数算（整数），不在浮点上取余：n 格里挑最小的约数 d，让 n / d 不超过 most，刻度仍落在原来的整刻度上。
+  const n = Math.round((y.max - y.min) / y.interval);
+  if (n <= most) return option;
+  let d = 2;
+  while (d < n && (n % d !== 0 || n / d > most)) d += 1;
+  return { ...option, yAxis: { ...y, interval: y.interval * d } };
 };

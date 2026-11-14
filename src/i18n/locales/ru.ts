@@ -230,6 +230,7 @@ export default {
       attachReport: 'Прикрепить обезличенный диагностический отчёт',
       attachHint: 'Только версия приложения, структура полей и нераспознанные номера моделей — без аккаунта, показателей здоровья и геопозиции',
       reportFailedPlain: 'Не удалось отправить диагностический отчёт, вложение удалено. Нажмите «Отправить» ещё раз, чтобы отправить только письмо.',
+      close: 'Закрыть',
     },
     'components/letters/dataLetters': {
       tab: 'Ваши письма',
@@ -2574,6 +2575,10 @@ export default {
       evidenceSummary: "Основание и источник определения типа тренировки",
       missingMetrics: (list: string) => `В этой записи нет данных: ${list}`,
       routeMissing: "Маршрута нет: в этой записи недостаточно точек GPS, поэтому маршрут не отображается.",
+      statLow: 'Минимум',
+      statHigh: 'Максимум',
+      chartZoneShare: 'Время по зонам',
+      mapRetry: 'Загрузить карту снова',
     },
 
     'components/workout/TypePicker': {
@@ -2585,15 +2590,25 @@ export default {
       current: 'Текущий',
       close: 'Закрыть',
     },
+    'components/workout/ElevationFacts': {
+      aria: 'Обзор профиля высот',
+      ascent: 'Набор высоты',
+      descent: 'Спуск',
+      drop: 'Перепад высот',
+      range: 'Диапазон высот',
+      slopeTitle: 'Время по уклону',
+      up: 'Подъём',
+      flat: 'Ровно',
+      down: 'Спуск',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `Время по уклону: высота сглаживается скользящим средним за ${smooth} с, уклон измеряется каждые ${step} м; ` +
+        `участки круче ±${grade}% считаются подъёмом или спуском, остальные — ровными. Время со скоростью ниже ${moving} м/с исключается.`,
+    },
     'components/workout/WorkoutClimbsCard': {
       eyebrow: 'Подъемы',
       title: 'Основные подъемы и спуски',
       aria: 'Основные участки подъема и спуска',
       flat: 'Без заметных подъемов: перепад высоты и уклон не достигли порогов ниже.',
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-        `Без заметных подъемов: высота оставалась в пределах ${min}–${max} ${unit} (перепад не более ${range} ${unit})` +
-        (gain ? `; общий подъем ${gain} ${unit} набран за счет множества мелких неровностей` : '') +
-        ', и ни один отрезок не достиг порогов ниже.',
       climb: 'Подъем',
       descent: 'Спуск',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2672,6 +2687,12 @@ export default {
       mainLeftShort: 'Слева',
       mainRightShort: 'Справа',
       mainTopShort: 'Сверху',
+      grid: 'Сетка 2×2',
+      oneOverThree: 'Одна над тремя',
+      bigLeft: 'Большая слева',
+      gridShort: 'Сетка',
+      oneOverThreeShort: '1 над 3',
+      bigLeftShort: '1 слева',
       expose: 'Все карточки',
       exposeExit: 'Вернуться к сцене',
       reset: 'Сбросить раскладку',

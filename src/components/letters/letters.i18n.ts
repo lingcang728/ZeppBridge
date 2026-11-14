@@ -63,6 +63,7 @@ const messages = defineMessages({
   attachReport: '附上脱敏诊断报告',
   attachHint: '只含应用版本、字段结构和认不出的型号编号，不含账号、健康数值和位置',
   reportFailedPlain: '诊断报告没交上去，已取消附带；再点「寄出」就只寄信',
+  close: '关闭',
 }, {
   to: 'To: User',
   toDeveloper: 'To: the ZeppBridge developer',
@@ -127,6 +128,7 @@ const messages = defineMessages({
   attachReport: 'Attach a de-identified diagnostic report',
   attachHint: 'Only the app version, field shapes and unrecognized model numbers — no account, health values or location',
   reportFailedPlain: 'The diagnostic report did not go through, so it is no longer attached. Press Send again to send just the letter.',
+  close: 'Close',
 }, {
   to: 'Para: usuario',
   toDeveloper: 'Para: el desarrollador de ZeppBridge',
@@ -191,6 +193,7 @@ const messages = defineMessages({
   attachReport: 'Adjuntar informe de diagnóstico anonimizado',
   attachHint: 'Solo la versión de la app, estructura de campos y modelos no reconocidos; jamás cuenta, datos de salud ni ubicación',
   reportFailedPlain: 'El informe de diagnóstico no se pudo enviar y se ha quitado. Pulsa «Enviar» otra vez para mandar solo la carta.',
+  close: 'Cerrar',
 }, 'components/letters/letters');
 
 export const useLetterText = () => useMessages(messages);

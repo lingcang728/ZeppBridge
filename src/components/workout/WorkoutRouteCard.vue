@@ -20,6 +20,8 @@ const t = useMessages(workoutDetailMessages);
 const mode = ref<RouteViewMode>(initialRouteMode());
 const asking = ref(false);
 const failed = ref(false);
+/** 「重试地图」时换一个 key，让地图组件整个重来（新的计数、新的超时）。 */
+const attempt = ref(0);
 const consentPanel = ref<HTMLElement | null>(null);
 let allowedThisPage = false;
 
@@ -68,6 +70,11 @@ const consent = (always: boolean) => {
 const cancelAsk = () => {
   asking.value = false;
 };
+const retryMap = () => {
+  failed.value = false;
+  attempt.value += 1;
+  mode.value = 'map';
+};
 const onConsentKey = (event: KeyboardEvent) => {
   if (event.key !== 'Escape') return;
   event.preventDefault();
@@ -86,8 +93,8 @@ const onConsentKey = (event: KeyboardEvent) => {
       <span v-if="mode === 'local'" class="route-note">{{ t.routeNote }}</span>
       <SegmentTrack class="route-mode" :items="modeItems" :model-value="shownMode" :aria-label="t.routeModeAria" compact no-wrap @update:model-value="pick" />
     </div>
-    <div class="route-wrap">
-      <WorkoutRouteMap v-if="mode === 'map'" :canvas="canvas" :label="t.routeMapAria" @failed="fallBack" />
+    <div class="route-wrap" :class="{ 'has-notice': failed && mode === 'local' }">
+      <WorkoutRouteMap v-if="mode === 'map'" :key="attempt" :canvas="canvas" :label="t.routeMapAria" @failed="fallBack" />
       <div v-if="mode === 'local'" class="route-canvas-texture" aria-hidden="true"></div>
       <svg v-if="mode === 'local'" class="route-svg" :viewBox="canvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="t.routeSvgAria">
         <path v-for="(road, index) in canvas.ghosts" :key="`ghost-${index}`" class="ghost-road" :d="road.d" fill="none" :stroke-opacity="road.opacity" />
@@ -118,8 +125,12 @@ const onConsentKey = (event: KeyboardEvent) => {
           <button type="button" class="button primary" @click="consent(true)">{{ t.mapConsentAlways }}</button>
         </div>
       </div>
+      <!-- 地图没加载出来：单独一条玻璃提示挂在画布顶上（曾是图例里的一行红字，2026-11-14 用户截图看着像报错），带重试。 -->
+      <div v-if="failed && mode === 'local'" class="map-failed" role="status">
+        <span>{{ t.mapFailed }}</span>
+        <button type="button" class="map-retry" @click="retryMap">{{ t.mapRetry }}</button>
+      </div>
       <div class="route-legend">
-        <span v-if="failed" class="map-failed" role="status">{{ t.mapFailed }}</span>
         <span><i class="neutral-dot"></i>{{ canvas.enoughPace ? t.routeLegendPace(canvas.validPaceCount) : t.routeLegendNoPace }}</span>
         <template v-if="canvas.enoughPace">
           <span><i class="fast-dot"></i>{{ t.legendFast }}</span>
@@ -133,20 +144,23 @@ const onConsentKey = (event: KeyboardEvent) => {
 </template>
 
 <style scoped>
-.series-card { padding: 16px 18px 18px; border-radius: var(--radius-lg); }
-.section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.series-card { display: flex; flex-direction: column; padding: 16px 18px 18px; border-radius: var(--radius-lg); container-type: inline-size; }
+.section-head { display: flex; flex: none; align-items: center; gap: 10px; margin-bottom: 13px; }
 .section-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }
 .route-note { margin-left: auto; color: var(--subtle); font-size: var(--fs-xs); }
 .route-mode { flex: none; margin-left: auto; }
 .route-note + .route-mode { margin-left: 4px; }
-/* 画布是凹下去的一块：底色、纹理、描边都走 token，浅色主题自动换。 */
-.route-wrap { position: relative; overflow: hidden; min-height: 320px; border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+/* 画布是凹下去的一块：底色、纹理、描边都走 token，浅色主题自动换。
+   平时 320 高；舞台给了窗口高（铺满 / 拉过下边）时跟着窗口伸缩，最矮 160——轨迹始终整条画在里面，
+   不再被窗口切掉半截（2026-11-14 用户截图：看着像本地画布加载失败）。 */
+.route-wrap { position: relative; flex: 1 1 max(160px, calc(320px + var(--fill-extra, 0px))); overflow: hidden; min-height: 160px; border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .route-canvas-texture { position: absolute; inset: 0; pointer-events: none; background:
   radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 42%),
   radial-gradient(circle at 18% 78%, color-mix(in srgb, var(--route-mint) 8%, transparent), transparent 46%),
   repeating-radial-gradient(circle at 40% 45%, color-mix(in srgb, var(--ink) 3%, transparent) 0 1px, transparent 1px 7px); }
 .route-svg { position: absolute; inset: 10px 10px 42px; display: block; width: calc(100% - 20px); height: calc(100% - 52px); }
+.has-notice .route-svg { top: 48px; height: calc(100% - 90px); }
 .ghost-road { stroke: color-mix(in srgb, var(--accent) 70%, var(--ink)); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .route-glow { stroke: color-mix(in srgb, var(--accent) 24%, transparent); stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; }
 .route-dot { stroke: var(--mat-inset); stroke-width: 2; }
@@ -159,7 +173,11 @@ const onConsentKey = (event: KeyboardEvent) => {
 .map-consent-title { margin: 0 0 6px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .map-consent-body { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 .map-consent-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.map-failed { color: var(--route-coral); }
+.map-failed { position: absolute; top: 10px; left: 50%; z-index: 2; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 20px); padding: 5px 6px 5px 12px; border: 1px solid var(--mat-glass-line); border-radius: 999px; background: var(--mat-glass-strong); color: var(--muted); font-size: var(--fs-xs); transform: translateX(-50%); backdrop-filter: blur(16px) saturate(1.2); }
+.map-failed span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-retry { flex: none; min-height: 26px; padding: 2px 12px; border: 0; border-radius: 999px; background: var(--mat-inset); color: var(--ink); font: inherit; cursor: pointer; }
+.map-retry:hover, .map-retry:focus-visible { background: var(--surface); outline: none; }
+.map-retry:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
 .route-legend { position: absolute; z-index: 1; right: 10px; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 5px 9px; border: 1px solid var(--mat-glass-line); border-radius: 10px; background: var(--mat-glass-strong); color: var(--muted); font-size: var(--fs-2xs); }
 .route-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .route-legend i { width: 9px; height: 4px; border-radius: 999px; background: var(--route-neutral); }
@@ -168,5 +186,7 @@ const onConsentKey = (event: KeyboardEvent) => {
 .route-legend .warm-dot { background: var(--route-amber); }
 .route-legend .slow-dot { background: var(--route-coral); }
 .route-missing { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: var(--radius-lg); color: var(--muted); font-size: var(--fs-sm); }
-@media (max-width: 760px) { .route-wrap { min-height: 240px; } .route-note { display: none; } .route-note + .route-mode { margin-left: auto; } }
+/* 卡窄（舞台上和别的卡并排）：「本地画布 · 不联网」那句让位，标题不被挤成两行（2026-11-14 截图）。 */
+@container (max-width: 560px) { .route-note { display: none; } .route-note + .route-mode { margin-left: auto; } }
+@media (max-width: 760px) { .route-wrap { flex-basis: max(160px, calc(240px + var(--fill-extra, 0px))); } .route-note { display: none; } .route-note + .route-mode { margin-left: auto; } }
 </style>

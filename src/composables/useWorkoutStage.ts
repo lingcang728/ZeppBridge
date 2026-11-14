@@ -9,7 +9,8 @@ import { ref, shallowRef, watch, type Ref } from 'vue';
 import * as S from '../lib/stage/state';
 import { clearStage, defaultState, loadStage, loadView, saveStage, saveView, type SportClass, type StageView } from '../lib/stage/prefs';
 
-export const useWorkoutStage = (cards: Ref<readonly string[]>, cls: Ref<SportClass>) => {
+/** wide：横向的宽卡（workoutCards.WIDE_CARDS）；张数变了按它挑档（state.snapFor）。 */
+export const useWorkoutStage = (cards: Ref<readonly string[]>, cls: Ref<SportClass>, wide?: (id: string) => boolean) => {
   const state = shallowRef<S.StageState>(loadStage(cls.value, cards.value));
   /**
    * 拖动中的预演（2026-11-13 用户：别画绿框，卡自己让位）：舞台按它排版，松手提交同一份（拖边零跳变），
@@ -42,6 +43,7 @@ export const useWorkoutStage = (cards: Ref<readonly string[]>, cls: Ref<SportCla
   return {
     state,
     draft,
+    wide,
     /** 提交预演（拖完松手）；没有预演或没变返回 false。 */
     commitDraft: () => {
       const next = draft.value;
@@ -54,8 +56,8 @@ export const useWorkoutStage = (cards: Ref<readonly string[]>, cls: Ref<SportCla
     front,
     bringGroup: (group: number) => staged(S.bringGroup(state.value, group), state.value.strip[group]?.ids[0]),
     cycle: (dir: 1 | -1) => staged(S.cycle(state.value, dir)),
-    addToStage: (id: string, at?: number) => staged(S.addToStage(state.value, id, at), id),
-    removeFromStage: (id: string) => staged(S.removeFromStage(state.value, id)),
+    addToStage: (id: string, at?: number) => staged(S.addToStage(state.value, id, at, wide), id),
+    removeFromStage: (id: string) => staged(S.removeFromStage(state.value, id, wide)),
     solo: (id: string) => staged(S.solo(state.value, id), id),
     fullscreen: (id: string) => staged(S.fullscreen(state.value, id), id),
     setSnap: (snap: number) => staged(S.setSnap(state.value, snap)),

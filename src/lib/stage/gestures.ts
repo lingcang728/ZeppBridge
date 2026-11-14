@@ -1,8 +1,8 @@
 /**
  * 台前调度的手势判定（纯函数）：拖动从哪一刻算起、松手落在哪、拖边 / 拖角之后组的比例、整组宽和卡高变成多少。
  */
-import { GAP, MIN_H, ratioPresets, ratioRange, SPAN_MIN, STRIP_W, type Rect, type SideRole, type Sides } from './layout';
-import { FULL_SNAP, TOP_SNAP, type SizePatch } from './state';
+import { GAP, MIN_H, ratioPresets, ratioRange, SPAN_MIN, SPLIT_MIN, SPLIT_PRESETS, STRIP_W, type Rect, type SideRole, type Sides } from './layout';
+import { COLUMN_SNAP, FULL_SNAP, GRID_SNAP, ROW_SNAP, TOP_SNAP, type SizePatch } from './state';
 
 /** 按下后移动超过这么多像素才算拖（不到就是点击）。 */
 export const DRAG_SLOP = 6;
@@ -61,16 +61,37 @@ export interface ResizeContext {
   startW: number; startH: number;
   /** 舞台高（卡最高拉到这么高）。 */
   maxH: number;
+  /** 按下时 4 张「上一下三」下面一排两条缝的位置（layout.splitsOf）。 */
+  splits?: readonly [number, number];
 }
 
 /** 这张卡宽 w 时组的比例（组宽 groupW）；null = 这张卡的宽不决定比例（「主卡在上」那张占整行）。 */
 export const ratioFor = (c: Pick<ResizeContext, 'count' | 'index' | 'snap' | 'avail'> & { groupW?: number }, w: number): number | null => {
   if (c.count === 1) return w / Math.max(1, c.avail);
   if (c.count === 3 && c.snap === TOP_SNAP && c.index === 0) return null;
+  // 4 张上一下三：主卡占整行、下面三张拖的是缝的位置（splitOutcome），都不走比例。
+  if (c.count === 4 && c.snap === ROW_SNAP) return null;
   const share = w / Math.max(1, (c.groupW ?? c.avail) - GAP);
-  // 决定比例的是左边那张（2 张）/ 大卡（3 张左右排）/ 下面左边那张（主卡在上）。
+  // 决定比例的是左边那张（2 张）/ 大卡（3 张左右排、4 张左大右三）/ 下面左边那张（主卡在上）/ 左列（田字）。
+  if (c.count === 4 && c.snap === GRID_SNAP) return c.index % 2 === 0 ? share : 1 - share;
+  if (c.count === 4 && c.snap === COLUMN_SNAP) return c.index === 0 ? share : 1 - share;
   const lead = c.count === 3 && c.snap === TOP_SNAP ? 1 : 0;
   return c.index === lead ? share : 1 - share;
+};
+
+/**
+ * 4 张上一下三拖下面一排的缝：右边沿动第 index-1 条，左边沿动第 index-2 条（主卡是 0 号）；
+ * 每张最窄 SPLIT_MIN，靠近 1/3、1/2、2/3 吸一下。
+ */
+const splitOutcome = (c: ResizeContext, side: 'left' | 'right', grow: number): Resize => {
+  const cuts: [number, number] = [...(c.splits ?? [1 / 3, 2 / 3])];
+  const k = side === 'right' ? c.index - 1 : c.index - 2;
+  if (k < 0 || k > 1) return { kind: 'none' };
+  const row = Math.max(1, c.groupW - 2 * GAP);
+  const raw = cuts[k] + (side === 'right' ? grow : -grow) / row;
+  const [lo, hi] = k === 0 ? [SPLIT_MIN, cuts[1] - SPLIT_MIN] : [cuts[0] + SPLIT_MIN, 1 - SPLIT_MIN];
+  cuts[k] = magnet(Math.min(hi, Math.max(lo, raw)), SPLIT_PRESETS);
+  return { kind: 'size', patch: { splits: cuts } };
 };
 
 const magnet = (value: number, presets: readonly number[]): number =>
@@ -79,7 +100,7 @@ const magnet = (value: number, presets: readonly number[]): number =>
 export type Resize = { kind: 'size'; patch: SizePatch } | { kind: 'tuck' } | { kind: 'full' } | { kind: 'none' };
 
 /** 一条边往外拖了 grow（像素，往外为正）之后的横向结果。 */
-const horizontal = (c: ResizeContext, role: SideRole, grow: number): Resize => {
+const horizontal = (c: ResizeContext, role: SideRole, grow: number, side: 'left' | 'right'): Resize => {
   const full = c.count === 1 && c.snap === FULL_SNAP;
   // 只看指针本身走了多远：往里拽过这张卡宽的四成五就收进侧栏。
   const pointerW = role === 'sym' ? c.startW + 2 * grow : c.startW + grow;
@@ -91,6 +112,7 @@ const horizontal = (c: ResizeContext, role: SideRole, grow: number): Resize => {
     return { kind: 'size', patch: { ratio: magnet(Math.min(hi, Math.max(lo, pointerW / Math.max(1, c.avail))), ratioPresets(1, 0)) } };
   }
   if (role === 'seam') {
+    if (c.count === 4 && c.snap === ROW_SNAP) return splitOutcome(c, side, grow);
     const raw = ratioFor(c, pointerW);
     if (raw == null) return { kind: 'none' };
     const [lo, hi] = ratioRange(c.count, c.snap);
@@ -112,7 +134,7 @@ export const resizeOutcome = (c: ResizeContext, handle: Handle, dx: number, dy: 
   if (side) {
     const role = c.sides[side];
     const grow = side === 'right' ? dx : -dx;
-    const out = horizontal(c, role, grow);
+    const out = horizontal(c, role, grow, side);
     if (out.kind === 'tuck' || out.kind === 'full') return out;
     if (out.kind === 'size') patch = { ...out.patch };
   }

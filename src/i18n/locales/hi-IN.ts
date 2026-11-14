@@ -2137,6 +2137,7 @@ export default {
       chartCadence: 'केडेंस',
       chartHeart: 'हार्ट रेट',
       chartPace: 'पेस',
+      chartZoneShare: 'प्रत्येक ज़ोन में समय',
       chartsEmptyBody: 'इस वर्कआउट के लिए कोई टाइम सीरीज़ उपलब्ध नहीं है।',
       chartsEmptyTitle: 'कोई टाइम सीरीज़ कर्व नहीं',
       copied: (format: string) => `${format} डेटा कॉपी हो गया।`,
@@ -2251,12 +2252,15 @@ export default {
       mapConsentAlways: 'हमेशा',
       mapConsentCancel: 'रहने दें',
       mapFailed: 'मानचित्र लोड नहीं हो सका, वापस लोकल ड्रॉइंग पर लौटे',
+      mapRetry: 'मानचित्र फिर से आज़माएँ',
       saveFit: 'FIT फ़ाइल सेव करें',
       savedFit: 'FIT फ़ाइल सेव हो गई',
       seriesFailed: 'सीरीज़ लोड नहीं हो सकी',
       seriesFailedTitle: 'सीरीज़ लोड विफल',
       statAverage: 'औसत',
       statFastest: 'सबसे तेज़',
+      statHigh: 'उच्चतम',
+      statLow: 'निम्नतम',
       statMax: 'अधिकतम',
       statMin: 'न्यूनतम',
       statSlowest: 'सबसे धीमा',
@@ -2270,6 +2274,19 @@ export default {
       routeMissing: "रूट नहीं है: इस रिकॉर्ड में GPS बिंदु पर्याप्त नहीं हैं, इसलिए मार्ग नहीं दिखाया जाएगा।",
     },
 
+    'components/workout/ElevationFacts': {
+      aria: 'ऊँचाई सारांश',
+      ascent: 'कुल चढ़ाई',
+      descent: 'कुल उतराई',
+      drop: 'ऊँचाई अंतर',
+      range: 'ऊँचाई सीमा',
+      slopeTitle: 'ढलान के अनुसार समय',
+      up: 'चढ़ाई',
+      flat: 'समतल',
+      down: 'उतराई',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `ढलान के अनुसार समय: ऊँचाई को ${smooth}-सेकंड के मूविंग एवरेज से सुचारू किया जाता है, हर ${step} मीटर पर ढलान मापी जाती है, और ±${grade}% से अधिक ढलान को चढ़ाई या उतराई तथा बाकी को समतल माना जाता है; ${moving} मी/से से कम गति वाला समय छोड़ दिया जाता है।`,
+    },
     'components/workout/TypePicker': {
       title: 'वर्कआउट का प्रकार बदलें',
       search: 'वर्कआउट प्रकार खोजें',
@@ -2284,10 +2301,6 @@ export default {
       title: "मुख्य चढ़ाई और उतराई",
       aria: "मुख्य चढ़ाई और उतराई खंड",
       flat: "कोई उल्लेखनीय चढ़ाई नहीं: कोई भी खंड नीचे दी गई ऊंचाई और ढलान सीमा तक नहीं पहुंचा।",
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-        `कोई उल्लेखनीय चढ़ाई नहीं: ऊंचाई ${min} और ${max} ${unit} के बीच रही (अधिकतम ${range} ${unit})` +
-        (gain ? `; कुल चढ़ाई ${gain} ${unit} कई छोटे-छोटे उतार-चढ़ावों का योग है` : '') +
-        ', और कोई भी हिस्सा नीचे दी गई सीमाओं तक नहीं पहुँचा।',
       climb: "चढ़ाई",
       descent: "उतराई",
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2359,6 +2372,12 @@ export default {
       mainLeftShort: 'बाएँ',
       mainRightShort: 'दाएँ',
       mainTopShort: 'ऊपर',
+      grid: 'चार का ग्रिड',
+      oneOverThree: 'ऊपर एक, नीचे तीन',
+      bigLeft: 'बाएँ बड़ा, दाएँ तीन',
+      gridShort: 'ग्रिड',
+      oneOverThreeShort: '1 पर 3',
+      bigLeftShort: 'बाएँ बड़ा',
       expose: 'सभी कार्ड',
       exposeExit: 'मुख्य क्षेत्र पर लौटें',
       reset: 'लेआउट रीसेट करें',
@@ -3510,6 +3529,7 @@ export default {
       sheetReply: 'उत्तर',
       page: (index: number, total: number) => `पृष्ठ ${index} / ${total}`,
       acknowledge: 'समझ गए',
+      close: 'बंद करें',
       letterHead: (version: string) => `ZeppBridge ${version}`,
       postscript: (span: { years?: number; months?: number }) => {
         const parts = [span.years ? `${span.years} वर्ष` : '', span.months ? `${span.months} महीने` : ''].filter(Boolean);

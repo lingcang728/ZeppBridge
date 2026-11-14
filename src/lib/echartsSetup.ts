@@ -22,13 +22,14 @@ import {
   MarkLineComponent,
   MarkPointComponent,
   TooltipComponent,
+  VisualMapPiecewiseComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChartBase from 'vue-echarts';
 import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef, type Component, type VNode } from 'vue';
 import { resolvedTheme } from '../composables/useTheme';
 import { chartPalettes, zeppThemeDark, zeppThemeLight } from './echartsTheme';
-import { motionBusy, nextSlot, whenMotionIdle } from './motion/budget';
+import { deferResize, motionBusy, nextSlot, whenMotionIdle } from './motion/budget';
 
 use([
   LineChart,
@@ -40,6 +41,8 @@ use([
   MarkLineComponent,
   MarkAreaComponent,
   MarkPointComponent,
+  // 心率图按区间给折线分段着色（workoutCharts.withDetail）。
+  VisualMapPiecewiseComponent,
   CanvasRenderer,
 ]);
 registerTheme('zeppbridge-dark', zeppThemeDark);
@@ -65,10 +68,14 @@ const followSize = (handle: () => ChartHandle | null): (() => void) => {
   if (!host || typeof ResizeObserver === 'undefined') return () => undefined;
   let width = 0;
   let height = 0;
-  const resize = throttle(() => {
+  const apply = () => {
     const chart = handle()?.chart;
     if (!chart || !width || !height || (width === chart.getWidth() && height === chart.getHeight())) return;
     chart.resize();
+  };
+  // 舞台窗口成批飞行时先不重画，落地后补一次（lib/motion/budget.ts 的 holdResizes）。
+  const resize = throttle(() => {
+    if (!deferResize(apply)) apply();
   }, RESIZE_THROTTLE_MS);
   const observer = new ResizeObserver(([entry]) => {
     width = entry.contentRect.width;

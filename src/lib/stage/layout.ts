@@ -9,7 +9,7 @@
  * 两种排法（prefs.ts 的 StageView）：'stage' 台前调度；'classic' 老版两栏（概要、洞察通栏，下面主栏 + 侧栏），
  * 给不喜欢新版的人退回去用（2026-11-13 用户：这是实验性版本，必须允许回退）。
  */
-import { FULL_SNAP, TOP_SNAP, type StageGroup, type StageState } from './state';
+import { COLUMN_SNAP, FULL_SNAP, GRID_SNAP, ROW_SNAP, TOP_SNAP, type StageGroup, type StageState } from './state';
 
 export const STRIP_W = 184;
 export const THUMB_W = 132;
@@ -38,8 +38,10 @@ export const CLASSIC_TWO_COL = 900;
 const THUMB_CROP = 1.1;
 /** 拖下边能拉到的最矮（排版像素）。最高是舞台高。 */
 export const MIN_H = 160;
-/** 两三张时整组最窄占舞台可用宽的几成。 */
+/** 两到四张时整组最窄占舞台可用宽的几成。 */
 export const SPAN_MIN = 0.5;
+/** 4 张「上一下三」：下面一排每张最窄占整排的几成。 */
+export const SPLIT_MIN = 0.2;
 
 /** 单张：标准 / 宽 / 全屏（舞台宽的几成）。 */
 export const SINGLE = [0.66, 0.84, 1] as const;
@@ -68,6 +70,13 @@ export interface Placement {
   crop?: boolean;
   /** 用户拉过下边：窗口高是拉的，内容按列排、能伸的（图表）吃掉多出来的高。 */
   fill?: boolean;
+  /**
+   * 铺满舞台（2026-11-14 用户：下面空一大块）：窗口比内容高出的这么多像素交给卡里能伸的那块（图表、地图），
+   * 经 CSS 变量 --fill-extra 加到它的高上。量内容高时减掉它，量到的永远是自然高，不会只增不减。
+   * 负数 = 一列放不下、能伸的卡跟着缩，最多缩到它报的那么多（LayoutInput.grow），保证图不会缩到 CSS 的底线——
+   * 缩到底线就减不准了，量到的高会越来越大。
+   */
+  extra?: number;
 }
 export interface Rect { x: number; y: number; w: number; h: number; pad?: number }
 
@@ -89,6 +98,8 @@ export interface LayoutInput {
   stripOpen: boolean;
   /** 窄窗口：组里哪一张在最前面。 */
   front?: string;
+  /** 能伸的卡 → 最多能缩多少像素（workoutCards.ts 的 GROW_CARDS）：舞台上它们把一列 / 一行剩下的高吃掉，放不下时跟着缩。 */
+  grow?: ReadonlyMap<string, number>;
 }
 export interface Layout {
   placements: Map<string, Placement>;
@@ -106,17 +117,37 @@ export interface Layout {
 
 /* ── 比例（拖边无级调，2026-11-13 用户：别跳回几个固定档） ──────────────── */
 
-/** 1 张：占舞台宽的几成；2 张：左边那张的份额；3 张（左 / 右）：大卡的份额；3 张（在上）：下面左边那张的份额。 */
-export const ratioRange = (count: number, snap: number): readonly [number, number] =>
-  count === 1 ? [0.4, 1] : count === 2 ? [0.25, 0.75] : snap === TOP_SNAP ? [0.25, 0.75] : [0.4, 0.75];
+/**
+ * 1 张：占舞台宽的几成；2 张：左边那张的份额；3 张（左 / 右）：大卡的份额；3 张（在上）：下面左边那张的份额；
+ * 4 张：田字是左列的份额，左大右三是大卡的份额（上一下三用 splits，不看它）。
+ */
+export const ratioRange = (count: number, snap: number): readonly [number, number] => {
+  if (count === 1) return [0.4, 1];
+  if (count === 2) return [0.25, 0.75];
+  if (count === 3) return snap === TOP_SNAP ? [0.25, 0.75] : [0.4, 0.75];
+  return snap === COLUMN_SNAP ? [0.4, 0.75] : [0.25, 0.75];
+};
 export const defaultRatio = (count: number, snap: number): number => {
   if (count === 1) return SINGLE[Math.min(snap, 1)];
   if (count === 2) { const [a, b] = PAIR[snap] ?? PAIR[0]; return a / (a + b); }
+  if (count === 4) return snap === COLUMN_SNAP ? 0.6 : 1 / 2;
   return 2 / 3;
 };
 /** 预设档：拖到附近吸一下（菜单里点档也回到它们）。 */
-export const ratioPresets = (count: number, snap: number): number[] =>
-  count === 1 ? [SINGLE[0], SINGLE[1], 1] : count === 2 ? PAIR.map(([a, b]) => a / (a + b)) : snap === TOP_SNAP ? [1 / 3, 1 / 2, 2 / 3] : [1 / 2, 2 / 3];
+export const ratioPresets = (count: number, snap: number): number[] => {
+  if (count === 1) return [SINGLE[0], SINGLE[1], 1];
+  if (count === 2) return PAIR.map(([a, b]) => a / (a + b));
+  if (count === 3) return snap === TOP_SNAP ? [1 / 3, 1 / 2, 2 / 3] : [1 / 2, 2 / 3];
+  return snap === COLUMN_SNAP ? [1 / 2, 0.6, 2 / 3] : [1 / 3, 1 / 2, 2 / 3];
+};
+/** 上一下三两条缝的吸附位置。 */
+export const SPLIT_PRESETS = [1 / 3, 1 / 2, 2 / 3] as const;
+/** 上一下三两条缝（占下面一排的几成）：坏的、挤得太近的回到三等分。 */
+export const splitsOf = (g: Pick<StageGroup, 'splits'>): [number, number] => {
+  const [a, b] = g.splits ?? [];
+  if (a == null || b == null || !(a >= SPLIT_MIN - 1e-9) || !(b - a >= SPLIT_MIN - 1e-9) || !(b <= 1 - SPLIT_MIN + 1e-9)) return [1 / 3, 2 / 3];
+  return [a, b];
+};
 export const ratioOf = (g: StageGroup): number => {
   const [lo, hi] = ratioRange(g.ids.length, g.snap);
   return Math.min(hi, Math.max(lo, g.ratio ?? defaultRatio(g.ids.length, g.snap)));
@@ -135,7 +166,43 @@ const heightOf = (input: LayoutInput, id: string, cap: number, hardCap = cap) =>
 };
 const at = (x: number, y: number, w: number, h: number, mode: Mode, z = 3): Placement => ({ x: r1(x), y: r1(y), w: r1(w), h: r1(h), scale: 1, tilt: 0, z, opacity: 1, mode });
 
-type StageRect = Rect & { mode: Mode; sides?: Sides };
+type StageRect = Rect & { mode: Mode; sides?: Sides; extra?: number };
+
+/* ── 铺满舞台（2026-11-14 用户：只剩上半截有卡，下面空一大块） ──────────────
+   一列（或田字的一行）从上往下排，总共 room 高：
+   - 放得下：没拉过的能伸的卡（图表、地图）平分剩下的高；一张能伸的都没有就留白（文字卡不拉长，里面不会空一截）；
+   - 放不下：拉过的不动；能伸的卡往回缩能放下，就按各自能缩的量分摊着缩（图变矮，extra 为负，缩不过底线）；
+     缩到底也放不下，那就谁都不缩、文字卡也不切，这一列往下长（页面滚）——反正要滚，把图压扁换不来什么。
+     只有一张卡本身就比舞台高时，它在自己的窗口里滚。
+     （11-14 左大右三实测：以前图和文字一起按水位分，概要卡被切掉一截、看不出还能滚。） */
+const grows = (input: LayoutInput, id: string) => !!input.grow?.has(id) && pinned(input, id) == null;
+/** 这张卡在舞台上最矮多高：能伸的卡最多缩它报的那么多；文字卡就是内容高（内容高本身已经夹在舞台高以内）。 */
+const floorOf = (input: LayoutInput, id: string, nat: number) => (grows(input, id) ? nat - (input.grow?.get(id) ?? 0) : nat);
+const share = (nat: readonly number[], fixed: readonly boolean[], grow: readonly boolean[], room: number, floor: readonly number[] = nat): number[] => {
+  const sum = nat.reduce((a, b) => a + b, 0);
+  if (sum <= room) {
+    const n = grow.filter(Boolean).length;
+    return nat.map((h, i) => (n && grow[i] ? h + (room - sum) / n : h));
+  }
+  const give = nat.map((h, i) => (grow[i] && !fixed[i] ? Math.max(0, h - floor[i]) : 0));
+  const can = give.reduce((a, b) => a + b, 0);
+  if (can < sum - room) return [...nat];
+  const k = (sum - room) / can;
+  return nat.map((h, i) => h - give[i] * k);
+};
+type Box = { h: number; extra: number };
+/** 一列叠着的几张卡（上下间隔 GAP）各自多高。room：这一列的高（没拉过的卡内容高也最多到它）；hardCap：拉过的最多到它。 */
+const fitColumn = (input: LayoutInput, ids: readonly string[], room: number, hardCap = room): Box[] => {
+  const nat = ids.map((id) => heightOf(input, id, room, hardCap));
+  const hs = share(nat, ids.map((id) => pinned(input, id) != null), ids.map((id) => grows(input, id)), room - GAP * (ids.length - 1), ids.map((id, i) => floorOf(input, id, nat[i])))
+    .map((h, i) => Math.max(h, floorOf(input, ids[i], nat[i])));
+  return hs.map((h, i) => ({ h, extra: grows(input, ids[i]) ? h - nat[i] : 0 }));
+};
+/** 一列从 y0 起往下排。 */
+const stack = (ids: readonly string[], boxes: readonly Box[], put: (id: string, y: number, box: Box) => void, y0 = 0) => {
+  let y = y0;
+  ids.forEach((id, i) => { put(id, y, boxes[i]); y += boxes[i].h + GAP; });
+};
 
 /** 舞台上那一组各自的矩形（舞台坐标，左上角 = 画布左上角）。 */
 export const stageRects = (input: LayoutInput, narrow: boolean): Map<string, StageRect> => {
@@ -174,50 +241,88 @@ export const stageRects = (input: LayoutInput, narrow: boolean): Map<string, Sta
     ({ x, y, w, h, mode: 'stage', sides: { left, right } });
   if (ids.length === 1) {
     const w = full ? avail : Math.min(avail, Math.max(Math.min(avail, 360), avail * ratio));
-    out.set(ids[0], stage(x0 + (avail - w) / 2, 0, w, heightOf(input, ids[0], H), 'sym', 'sym'));
+    const [box] = fitColumn(input, ids, H);
+    out.set(ids[0], { ...stage(x0 + (avail - w) / 2, 0, w, box.h, 'sym', 'sym'), extra: box.extra || undefined });
     return out;
   }
   const groupW = avail * spanOf(g);
   const gx = x0 + (avail - groupW) / 2;
   const span = groupW - GAP;
+  const put = (id: string, x: number, y: number, w: number, box: Box, left: SideRole, right: SideRole) =>
+    out.set(id, { ...stage(x, y, w, box.h, left, right), extra: box.extra || undefined });
   if (ids.length === 2) {
     const w1 = span * ratio;
-    out.set(ids[0], stage(gx, 0, w1, heightOf(input, ids[0], H), 'outer', 'seam'));
-    out.set(ids[1], stage(gx + w1 + GAP, 0, span - w1, heightOf(input, ids[1], H), 'seam', 'outer'));
+    put(ids[0], gx, 0, w1, fitColumn(input, [ids[0]], H)[0], 'outer', 'seam');
+    put(ids[1], gx + w1 + GAP, 0, span - w1, fitColumn(input, [ids[1]], H)[0], 'seam', 'outer');
     return out;
   }
-  if (snap === TOP_SNAP) {
-    // 主卡在上：占上面整行（内容高最多舞台高的六成，拉的最多八成），另两张在下面左右排；画布不够高就往下长，页面接着滚。
-    const h0 = heightOf(input, ids[0], H * 0.6, H * 0.8);
+  if ((ids.length === 3 && snap === TOP_SNAP) || (ids.length === 4 && snap === ROW_SNAP)) {
+    // 主卡在上 / 上一下三：主卡占上面整行（内容高最多舞台高的六成，拉的最多八成），其余在下面一排；
+    // 下面没有能伸的卡、主卡能伸时，主卡把剩下的高吃掉（最多八成）。画布不够高就往下长，页面接着滚。
+    const [top, ...bottom] = ids;
+    const nat0 = heightOf(input, top, H * 0.6, H * 0.8);
+    const bottomNat = Math.max(...bottom.map((id) => heightOf(input, id, H * 0.6, H)));
+    const h0 = grows(input, top) && !bottom.some((id) => grows(input, id))
+      ? Math.max(nat0, Math.min(H * 0.8, H - GAP - bottomNat))
+      : nat0;
     const y1 = h0 + GAP;
     const cap = Math.max(H - y1, H * 0.6);
-    const w1 = span * ratio;
-    out.set(ids[0], stage(gx, 0, groupW, h0, 'outer', 'outer'));
-    out.set(ids[1], stage(gx, y1, w1, heightOf(input, ids[1], cap, H), 'outer', 'seam'));
-    out.set(ids[2], stage(gx + w1 + GAP, y1, span - w1, heightOf(input, ids[2], cap, H), 'seam', 'outer'));
+    put(top, gx, 0, groupW, { h: h0, extra: h0 - nat0 }, 'outer', 'outer');
+    if (bottom.length === 2) {
+      const w1 = span * ratio;
+      put(bottom[0], gx, y1, w1, fitColumn(input, [bottom[0]], cap, H)[0], 'outer', 'seam');
+      put(bottom[1], gx + w1 + GAP, y1, span - w1, fitColumn(input, [bottom[1]], cap, H)[0], 'seam', 'outer');
+      return out;
+    }
+    const row = groupW - 2 * GAP;
+    const [c1, c2] = splitsOf(g);
+    const widths = [c1 * row, (c2 - c1) * row, (1 - c2) * row];
+    let x = gx;
+    bottom.forEach((id, i) => {
+      put(id, x, y1, widths[i], fitColumn(input, [id], cap, H)[0], i === 0 ? 'outer' : 'seam', i === 2 ? 'outer' : 'seam');
+      x += widths[i] + GAP;
+    });
     return out;
   }
-  // 三张：一大两小，小的上下叠在一列；主卡在左（0）或在右（1）。
+  if (ids.length === 4 && snap === GRID_SNAP) {
+    // 田字：两行两列，左列宽 = ratio。每行一样高（取两张里高的那张），能伸的卡跟着行高走，文字卡按内容高。
+    const w1 = span * ratio;
+    const rows = [[ids[0], ids[1]], [ids[2], ids[3]]];
+    const nat = rows.map((pair) => pair.map((id) => heightOf(input, id, H)));
+    const rowH = share(
+      nat.map((pair) => Math.max(...pair)),
+      rows.map((pair) => pair.every((id) => pinned(input, id) != null)),
+      rows.map((pair) => pair.some((id) => grows(input, id))),
+      H - GAP,
+      // 一行能缩到的最矮：能伸的缩到底线，文字卡不切。
+      rows.map((pair, r) => Math.max(...pair.map((id, c) => (grows(input, id) ? floorOf(input, id, nat[r][c]) : nat[r][c])))),
+    );
+    let y = 0;
+    rows.forEach((pair, r) => {
+      pair.forEach((id, c) => {
+        const h = Math.max(floorOf(input, id, nat[r][c]), grows(input, id) ? rowH[r] : Math.min(nat[r][c], rowH[r]));
+        put(id, c ? gx + w1 + GAP : gx, y, c ? span - w1 : w1, { h, extra: grows(input, id) ? h - nat[r][c] : 0 }, c ? 'seam' : 'outer', c ? 'outer' : 'seam');
+      });
+      y += rowH[r] + GAP;
+    });
+    return out;
+  }
+  // 一大几小：大卡一列，其余上下叠在另一列。3 张主卡在左（0）/ 在右（1），4 张左大右三。
+  const right = ids.length === 3 && snap === 1;
   const mainW = span * ratio;
   const colW = span - mainW;
-  const mainX = snap === 1 ? gx + colW + GAP : gx;
-  const colX = snap === 1 ? gx : gx + mainW + GAP;
-  const mainSides: [SideRole, SideRole] = snap === 1 ? ['seam', 'outer'] : ['outer', 'seam'];
-  const colSides: [SideRole, SideRole] = snap === 1 ? ['outer', 'seam'] : ['seam', 'outer'];
-  out.set(ids[0], stage(mainX, 0, mainW, heightOf(input, ids[0], H), ...mainSides));
-  const cap = H - GAP;
-  let [h1, h2] = [heightOf(input, ids[1], H), heightOf(input, ids[2], H)];
-  if (h1 + h2 > cap) {
-    // 拉过高的那张说了算，另一张让；都没拉过就照旧（矮的那张完整露出来）。
-    const [p1, p2] = [pinned(input, ids[1]) != null, pinned(input, ids[2]) != null];
-    if (p1 && !p2) h2 = Math.max(120, cap - h1);
-    else if (p2 && !p1) h1 = Math.max(120, cap - h2);
-    else if (h1 <= cap / 2) h2 = cap - h1;
-    else if (h2 <= cap / 2) h1 = cap - h2;
-    else [h1, h2] = [cap / 2, cap / 2];
-  }
-  out.set(ids[1], stage(colX, 0, colW, h1, ...colSides));
-  out.set(ids[2], stage(colX, h1 + GAP, colW, h2, ...colSides));
+  const mainX = right ? gx + colW + GAP : gx;
+  const colX = right ? gx : gx + mainW + GAP;
+  const mainSides: [SideRole, SideRole] = right ? ['seam', 'outer'] : ['outer', 'seam'];
+  const colSides: [SideRole, SideRole] = right ? ['outer', 'seam'] : ['seam', 'outer'];
+  const rest = ids.slice(1);
+  const restBoxes = fitColumn(input, rest, H);
+  // 小卡那列放不下往下长了：能伸的大卡跟到同一条底线，不在它下面空一截。
+  const colBottom = restBoxes.reduce((sum, box) => sum + box.h, 0) + GAP * (rest.length - 1);
+  const main = fitColumn(input, [ids[0]], H)[0];
+  const mainBox = grows(input, ids[0]) && colBottom > main.h ? { h: colBottom, extra: main.extra + colBottom - main.h } : main;
+  put(ids[0], mainX, 0, mainW, mainBox, ...mainSides);
+  stack(rest, restBoxes, (id, y, box) => put(id, colX, y, colW, box, ...colSides));
   return out;
 };
 
@@ -319,6 +424,7 @@ export const solve = (input: LayoutInput): Layout => {
     if (rect.pad) p.pad = r1(rect.pad);
     if (rect.sides) p.sides = rect.sides;
     if (rect.mode === 'stage' && !narrow && input.state.stage.heights?.[id] != null) p.fill = true;
+    else if (rect.mode === 'stage' && !narrow && rect.extra && Math.abs(rect.extra) >= 1) p.extra = Math.round(rect.extra);
     if (rect.mode === 'pip') p.scale = PIP_W / PIP_LAYOUT_W;
     if (rect.mode === 'behind') p.opacity = 0;
     placements.set(id, p);

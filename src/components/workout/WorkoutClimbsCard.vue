@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /* 运动详情的爬升卡：段落由后端（core/workout_climbs）从逐点海拔识别，这里只排版。
    climbs 为 null 时不渲染（没有海拔采样或距离不可信）；有海拔但没有够格的段写一行「没有明显爬升」，不编段。
-   平路那一句带上实数（全程海拔几到几、最大落差、累计爬升是小起伏加起来的）：海拔图纵轴会放大几米的起伏，
-   光说「没有」用户会以为判错了（2026-10-28 录屏：7–12 米的一次跑步）。缺哪个数就不写那半句。 */
+   顶上一直是起伏概览（ElevationFacts：累计上升 / 下降、最大落差、海拔范围 + 坡度分布）：平路时以前只剩一句话
+   （2026-11-14 用户截图），有段时也先给全程的数再列段。缺哪个数就写「—」。 */
 import { computed } from 'vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
+import ElevationFacts, { type ElevationRelief } from './ElevationFacts.vue';
+import { SLOPE_METHOD, type SlopeShare } from '../../lib/elevationProfile';
+import { elevationFactsMessages } from './ElevationFacts.i18n';
 import type { WorkoutClimbs } from '../../types';
 import { formatNumber } from '../../lib/format';
 import { distanceUnitLabel, elevationUnitLabel, paceMinutesPerBigUnit, paceUnitLabel, toBigDistance, toElevation } from '../../lib/units';
@@ -15,10 +18,13 @@ import { workoutClimbsMessages } from './WorkoutClimbsCard.i18n';
 const props = defineProps<{
   climbs: WorkoutClimbs;
   cycling: boolean;
-  /** 这次运动的最低 / 最高海拔与累计爬升（米）；平路时写进那一句。 */
-  relief?: { min: number | null; max: number | null; gain: number | null } | null;
+  /** 这次运动的最低 / 最高海拔与累计上升 / 下降（米）。 */
+  relief?: ElevationRelief | null;
+  /** 坡度分布（lib/elevationProfile）；算不出来是 null。 */
+  slope?: SlopeShare | null;
 }>();
 const t = useMessages(workoutClimbsMessages);
+const tf = useMessages(elevationFactsMessages);
 
 const num = (value: number, digits = 0) => formatNumber(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const clock = (minutes: number) => {
@@ -50,19 +56,11 @@ const rows = computed(() => props.climbs.segments.map((segment) => {
   };
 }));
 
-const flat = computed(() => {
-  const r = props.relief;
-  if (!r || r.min === null || r.max === null || r.max < r.min) return t.value.flat;
-  const unit = elevationUnitLabel();
-  const range = r.max - r.min;
-  // 累计爬升比全程落差大得多时才值得一提：那就是一路小起伏攒出来的。
-  const gain = r.gain !== null && r.gain > range * 1.5 ? num(toElevation(r.gain)) : null;
-  return t.value.flatRelief(num(toElevation(r.min)), num(toElevation(r.max)), num(toElevation(range)), gain, unit);
-});
-
 const how = computed(() => {
   const m = props.climbs.method;
-  return t.value.how(m.smoothing_window_s, m.reversal_m, m.min_change_m, m.min_grade_pct, m.moving_speed_m_s);
+  const climbs = t.value.how(m.smoothing_window_s, m.reversal_m, m.min_change_m, m.min_grade_pct, m.moving_speed_m_s);
+  if (!props.slope) return [climbs];
+  return [climbs, tf.value.how(SLOPE_METHOD.GRADE_PCT, SLOPE_METHOD.STEP_M, SLOPE_METHOD.SMOOTH_S, SLOPE_METHOD.MOVING_M_S)];
 });
 </script>
 
@@ -72,7 +70,8 @@ const how = computed(() => {
       <GlyphTile name="health-watch" tone="altitude" :size="42" />
       <div><p class="section-eyebrow">{{ t.eyebrow }}</p><h2>{{ t.title }}</h2></div>
     </div>
-    <p v-if="!rows.length" class="flat" role="status">{{ flat }}</p>
+    <ElevationFacts class="overview" :relief="relief" :slope="slope ?? null" />
+    <p v-if="!rows.length" class="flat" role="status">{{ t.flat }}</p>
     <ol v-else class="climb-list">
       <li v-for="row in rows" :key="row.key" :class="{ up: row.up }">
         <div class="lead">
@@ -90,7 +89,7 @@ const how = computed(() => {
     </ol>
     <details class="how">
       <summary>{{ t.howTitle }}</summary>
-      <p>{{ how }}</p>
+      <p v-for="line in how" :key="line">{{ line }}</p>
     </details>
   </section>
 </template>
@@ -100,7 +99,9 @@ const how = computed(() => {
 .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .section-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }
-.flat { margin: 0 2px 6px; color: var(--muted); font-size: var(--fs-sm); }
+.overview { margin: 4px 0 12px; }
+.flat { margin: 0 2px 6px; padding-top: 10px; border-top: 1px solid var(--mat-line); color: var(--muted); font-size: var(--fs-sm); }
+.overview + .climb-list { border-top: 1px solid var(--mat-line); }
 .climb-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .climb-list li { display: grid; grid-template-columns: minmax(130px, .9fr) minmax(84px, auto) minmax(0, 2.6fr); align-items: center; gap: 6px 16px; padding: 10px 2px; }
 .climb-list li + li { border-top: 1px solid var(--mat-line); }

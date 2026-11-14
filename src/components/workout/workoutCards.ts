@@ -14,6 +14,19 @@ export const WORKOUT_CARDS = [
 ] as const;
 export type WorkoutCardId = (typeof WORKOUT_CARDS)[number];
 
+/**
+ * 舞台上能伸的卡 → 放不下时最多能缩多少像素（2026-11-14 用户：舞台下面空一大块）。
+ * 一列 / 一行剩下的高交给它们（--fill-extra 加到图或地图的高上）；放不下时跟着缩，但不超过这里的数：
+ * 图本身最矮 170（WorkoutChartCard），CSS 底线 120，所以最多缩 50；地图画布 320 → 底线 160。缩过了底线量高就减不准。
+ * 文字卡不在里面——拉长了里面只会空一截。肌肉图按宽定大小，拉高也只是空白，也不在里面。
+ */
+const CHART_SHRINK = 50;
+export const GROW_CARDS: ReadonlyMap<string, number> = new Map([
+  ['route', 160], ['chart-heart', CHART_SHRINK], ['chart-pace', CHART_SHRINK], ['chart-altitude', CHART_SHRINK], ['chart-cadence', CHART_SHRINK],
+]);
+/** 横向的宽卡：组里打头的是它时默认让它占整行（3 张主卡在上、4 张上一下三），不被塞进窄列。 */
+export const WIDE_CARDS: ReadonlySet<string> = new Set(['summary', 'insight', 'strength-sets', 'route', 'chart-heart', 'chart-pace', 'chart-altitude', 'chart-cadence']);
+
 /** 窄窗口里同组时缩成舞台右上角画中画的卡（翻逐组明细时肌肉图一直看得见）。 */
 export const PIP_CARDS: ReadonlySet<string> = new Set(['strength-map']);
 

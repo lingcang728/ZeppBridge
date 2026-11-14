@@ -2,7 +2,7 @@
 /**
  * 运动详情的「台前调度」（2026-11-13，用户：参考 iPadOS 台前调度，卡片别再定死位置）。
  *
- * 舞台在中间（1–3 张卡一组，比例、整组宽、每张的高都能无级拖），其余卡斜着排在左侧栏，点一下换上舞台；
+ * 舞台在中间（1–4 张卡一组，比例、整组宽、每张的高都能无级拖；图表 / 地图把舞台剩下的高吃掉），其余卡斜着排在左侧栏，点一下换上舞台；
  * 「•••」菜单 / 拖动 / 拖边可以组合、拆开、调大小、全屏、收进侧栏。所有卡（含概要卡，原来的头图）都在这里。
  * 最上面一行：运动名（页面填 #title）+ 全局按钮（页面填 #actions：纠正、隐藏、问 AI）+ 「全部卡片」+「复原布局」。
  * 「全部卡片」= 老版两栏排法（实验性版本，老用户要能退回去，记住选择）。
@@ -25,19 +25,20 @@ import { menuEnter, menuLeave } from './menuMorph';
 import { ratioOf, ratioPresets, solve, STRIP_W, TAB_H, type Layout, type Placement } from '../../../lib/stage/layout';
 import { FULL_SNAP, locate, type StageState } from '../../../lib/stage/state';
 import type { SportClass, StageView } from '../../../lib/stage/prefs';
-import { flyFrom, SETTLE_EASE, snapshotOf, stopFlight, STAGE_MS, type Snapshot } from '../../../lib/motion/stageFlight';
+import { flyAll, SETTLE_EASE, snapshotOf, stopFlight, STAGE_MS, type FlySize, type Snapshot } from '../../../lib/motion/stageFlight';
 import { OPEN_EASE } from '../../../lib/motion/timing';
+import { holdResizes } from '../../../lib/motion/budget';
 import { lessMotion } from '../../../lib/motion/lessMotion';
 import { useWorkoutStage } from '../../../composables/useWorkoutStage';
 import { useStageDrag } from '../../../composables/useStageDrag';
-import { CLASSIC_COLUMNS, PIP_CARDS, type StageCard } from '../workoutCards';
+import { CLASSIC_COLUMNS, GROW_CARDS, PIP_CARDS, WIDE_CARDS, type StageCard } from '../workoutCards';
 import { useMessages } from '../../../i18n';
 import { stageMessages } from './stage.i18n';
 
 const props = defineProps<{ cards: StageCard[]; sport: SportClass }>();
 const t = useMessages(stageMessages);
 const ids = computed(() => props.cards.map((card) => card.id));
-const stage = useWorkoutStage(ids, toRef(props, 'sport'));
+const stage = useWorkoutStage(ids, toRef(props, 'sport'), (id) => WIDE_CARDS.has(id));
 const cardOf = (id: string) => props.cards.find((card) => card.id === id);
 const titleOf = (id: string) => cardOf(id)?.title ?? id;
 
@@ -47,10 +48,37 @@ const ruler = ref<HTMLElement | null>(null);
 const size = reactive({ width: 0, height: 0 });
 const contentH = reactive<Record<string, number>>({});
 const lastW = reactive<Record<string, number>>({});
-const solveWith = (state: StageState, view: StageView = stage.view.value): Layout => solve({
-  width: size.width || 1200, height: size.height || 640, state, cards: ids.value, contentH, lastW,
-  pip: PIP_CARDS, view, columns: CLASSIC_COLUMNS, stripOpen: stage.stripOpen.value, front: stage.front.value,
-});
+/*
+ * 内容高按「卡 × 宽」记下来：换排法 / 「全部卡片」⇄ 舞台时窗口宽变了，内容高跟着变，以前要等 ResizeObserver 量到新高、
+ * 排版重算、窗口再从半路重飞一遍——一帧里来回三四趟（2026-11-14 trace）。这个宽量过就直接用记下的高，量到的和记的一样就不再动。
+ */
+const heightsAt = new Map<string, Map<number, number>>();
+const HEIGHTS_KEPT = 8;
+const remember = (id: string, w: number, h: number) => {
+  const byWidth = heightsAt.get(id) ?? new Map<number, number>();
+  byWidth.delete(w);
+  byWidth.set(w, h);
+  if (byWidth.size > HEIGHTS_KEPT) byWidth.delete(byWidth.keys().next().value!);
+  heightsAt.set(id, byWidth);
+};
+const solveWith = (state: StageState, view: StageView = stage.view.value): Layout => {
+  const input = {
+    width: size.width || 1200, height: size.height || 640, state, cards: ids.value, contentH, lastW,
+    pip: PIP_CARDS, view, columns: CLASSIC_COLUMNS, stripOpen: stage.stripOpen.value, front: stage.front.value, grow: GROW_CARDS,
+  };
+  const first = solve(input);
+  let patched: Record<string, number> | null = null;
+  for (const [id, p] of first.placements) {
+    const known = heightsAt.get(id)?.get(Math.round(p.w));
+    if (known != null && known !== contentH[id]) (patched ??= { ...contentH })[id] = known;
+  }
+  return patched ? solve({ ...input, contentH: patched }) : first;
+};
+const onMeasure = (id: string, h: number) => {
+  const w = layout.value.placements.get(id)?.w;
+  if (w != null) remember(id, Math.round(w), h);
+  if (contentH[id] !== h) contentH[id] = h;
+};
 const classic = computed(() => stage.view.value === 'classic');
 const isFull = computed(() => stage.state.value.stage.ids.length === 1 && stage.state.value.stage.snap === FULL_SNAP);
 
@@ -83,6 +111,7 @@ let sizeKey = '';
 /** 飞行途中画布高先撑在旧、新两者较高的那个（页脚不跳），落地再收。 */
 const heldH = ref(0);
 let holdTimer = 0;
+let releaseResizes = () => {};
 /** 画布坐标里此刻看得见的竖直范围。 */
 const viewSpan = () => {
   const top = canvas.value?.getBoundingClientRect().top ?? 0;
@@ -98,11 +127,16 @@ watch(layout, (next, prev) => {
   const view = viewSpan();
   const off = (y: number, h: number) => y + h < view.top - 40 || y > view.bottom + 40;
   const shots = new Map<string, Snapshot | 'slide'>();
+  // 先把要飞的卡全部拍完快照（只读），再一起停掉旧的飞行（只写）：读一张写一张会让每张卡都逼浏览器重算整块画布。
+  const taken = new Map<string, Snapshot>();
   for (const [id, p] of next.placements) {
     const el = els.get(id);
     if (!el || id === pin || (!moved(prev.placements.get(id), p) && !el.style.translate && !el.style.scale)) continue;
-    const shot = snapshotOf(el);
-    stopFlight(el);
+    taken.set(id, snapshotOf(el));
+  }
+  for (const id of taken.keys()) stopFlight(els.get(id)!);
+  for (const [id, shot] of taken) {
+    const p = next.placements.get(id)!;
     const was = prev.placements.get(id);
     const from = shot.rect ?? (was ? { ...visualBox(was) } : null);
     const to = visualBox(p);
@@ -111,19 +145,32 @@ watch(layout, (next, prev) => {
     shots.set(id, from && off(from.y, from.h) && p.opacity > 0 ? 'slide' : shot);
   }
   if (!shots.size) return;
+  // 两张以上一起飞：图表 / 地图落地后再按新尺寸重画（一张卡拖着走时照常跟手）。
+  if (shots.size > 1) {
+    releaseResizes();
+    releaseResizes = holdResizes(STAGE_MS + 400);
+    window.setTimeout(releaseResizes, STAGE_MS);
+  }
   heldH.value = Math.max(heldH.value, prev.canvasH, next.canvasH);
   clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => { heldH.value = 0; }, Math.round(STAGE_MS * 1.2) + 60);
   void nextTick(() => {
+    // 圆角所有窗口同一个 token：读一次。尺寸用排版给的，不再逐张读 offsetWidth（同上，别读一张写一张）。
+    const first = [...shots.keys()].map((id) => els.get(id)).find(Boolean);
+    const radius = first ? parseFloat(getComputedStyle(first).borderTopLeftRadius) || 0 : 0;
+    const flights: Parameters<typeof flyAll>[0][number][] = [];
     for (const [id, shot] of shots) {
       const el = els.get(id);
-      if (!el) continue;
+      const p = next.placements.get(id);
+      if (!el || !p) continue;
       if (shot === 'slide') {
         if (!lessMotion()) el.animate([{ translate: '0 48px', opacity: 0 }, { translate: '0 0', opacity: Number(el.style.opacity || 1) }], { duration: STAGE_MS, easing: OPEN_EASE });
         continue;
       }
-      flyFrom(el, shot, drag.releasing.has(id) ? SETTLE_EASE : undefined);
+      const size: FlySize = { w: p.w, h: p.h, radius };
+      flights.push({ el, from: shot, easing: drag.releasing.has(id) ? SETTLE_EASE : undefined, size });
     }
+    flyAll(flights);
   });
 }, { flush: 'pre' });
 /* 卡在舞台上的排版宽记下来：退到侧栏时沿用，回舞台少一次重排。 */
@@ -161,7 +208,8 @@ const menuAt = computed(() => {
 /** 菜单里的档：最近的那档；拖边拖出来的比例 / 整组宽不正好在档上时 exact 为假（滑块画成未选）。 */
 const menuSnap = computed(() => {
   const g = stage.state.value.stage;
-  if (g.ids.length === 3) return { snap: g.snap, exact: true };
+  // 3、4 张的档是排法（主卡在哪 / 田字……），不是比例：拖出来的比例不影响选中哪档。
+  if (g.ids.length >= 3) return { snap: g.snap, exact: true };
   const presets = ratioPresets(g.ids.length, g.snap).slice(0, g.ids.length === 1 ? 2 : 3);
   const ratio = ratioOf(g);
   let best = 0;
@@ -268,6 +316,7 @@ onBeforeUnmount(() => {
   clearTimeout(stripTimer);
   clearTimeout(reopenTimer);
   clearTimeout(holdTimer);
+  releaseResizes();
   stage.draft.value = null;
   document.removeEventListener('pointerdown', onOutside, true);
   window.removeEventListener('zb:stage-show', onShow);
@@ -336,7 +385,7 @@ defineExpose({ focusCard: (id: string) => stage.focusCard(id) });
         @grab="(event, kind, handle) => drag.grab(card.id, event, kind, handle)"
         @activate="activate(card.id)"
         @menu="toggleMenu(card.id)"
-        @measure="(h) => { if (contentH[card.id] !== h) contentH[card.id] = h; }"
+        @measure="(h) => onMeasure(card.id, h)"
       >
         <slot :name="card.id" />
       </StageWindow>

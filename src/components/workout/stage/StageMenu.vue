@@ -46,6 +46,13 @@ const sizes = computed<SegmentItem<number>[]>(() => {
   const m = t.value;
   if (props.count === 1) return [{ value: 0, label: m.sizeStandard }, { value: 1, label: m.sizeWide }];
   if (props.count === 2) return ['1 : 1', '2 : 1', '1 : 2'].map((label, value) => ({ value, label }));
+  if (props.count === 4) {
+    return [
+      { value: 0, label: m.grid, short: m.gridShort, title: m.grid },
+      { value: 1, label: m.oneOverThree, short: m.oneOverThreeShort, title: m.oneOverThree },
+      { value: 2, label: m.bigLeft, short: m.bigLeftShort, title: m.bigLeft },
+    ];
+  }
   return [
     { value: 0, label: m.mainLeft, short: m.mainLeftShort, title: m.mainLeft },
     { value: 1, label: m.mainRight, short: m.mainRightShort, title: m.mainRight },
