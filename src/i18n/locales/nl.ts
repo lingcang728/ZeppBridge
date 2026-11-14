@@ -2451,10 +2451,13 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       statSlowest: 'Langzaamste',
       statMin: 'Min',
       statMax: 'Max',
+      statLow: 'Laagste',
+      statHigh: 'Hoogste',
       chartHeart: 'Hartslag',
       chartPace: 'Tempo',
       chartAltitude: 'Hoogte',
       chartCadence: 'Cadans',
+      chartZoneShare: 'Tijd per zone',
       chartAria: (title: string) => `${title} over de sessie`,
       decodedRoutePoints: 'GPS-trackpunten',
       decodedSamples: 'Tijdreeksmetingen',
@@ -2495,6 +2498,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       mapConsentAlways: 'Altijd',
       mapConsentCancel: 'Nee, bedankt',
       mapFailed: 'Kon kaart niet laden, terug naar lokale weergave',
+      mapRetry: 'Kaart opnieuw proberen',
       routeSvgAria:
         'Lokale GPS-track gekleurd naar tijd en het dichtstbijzijnde tempomeetpunt',
       routeLegendPace: (count: number) =>
@@ -2561,6 +2565,21 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       missingMetrics: (list: string) => `Niet beschikbaar in deze registratie: ${list}`,
       routeMissing: "Geen route: deze registratie bevat niet genoeg GPS-punten om een route te tekenen.",
     },
+    'components/workout/ElevationFacts': {
+      aria: 'Hoogteoverzicht',
+      ascent: 'Stijging',
+      descent: 'Daling',
+      drop: 'Hoogteverschil',
+      range: 'Hoogtebereik',
+      slopeTitle: 'Tijd per helling',
+      up: 'Bergop',
+      flat: 'Vlak',
+      down: 'Bergaf',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `Tijd per helling: hoogte wordt afgevlakt met een voortschrijdend gemiddelde van ${smooth} seconden, ` +
+        `elke ${step} m wordt de helling gemeten en alles steiler dan ±${grade}% telt als bergop of bergaf, ` +
+        `de rest als vlak; tijd onder ${moving} m/s telt niet mee.`,
+    },
     'components/workout/TypePicker': {
       title: 'Trainingstype wijzigen',
       search: 'Trainingstypen zoeken',
@@ -2575,10 +2594,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       title: 'Belangrijkste beklimmingen en afdalingen',
       aria: 'Belangrijkste klim- en afdalingssegmenten',
       flat: 'Geen noemenswaardige beklimmingen: niets voldeed aan de onderstaande hoogte- en stijgingsdrempels.',
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-        `Geen noemenswaardige beklimmingen: hoogte bleef tussen ${min} en ${max} ${unit} (maximaal ${range} ${unit})` +
-        (gain ? `; de ${gain} ${unit} totale stijging is opgebouwd uit veel kleine heuveltjes` : '') +
-        ', en geen enkel stuk voldeed aan de onderstaande drempels.',
       climb: 'Klim',
       descent: 'Afdaling',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2651,6 +2666,12 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       mainRightShort: 'Rechts',
       mainTop: 'Hoofdkaart bovenaan',
       mainTopShort: 'Boven',
+      grid: 'Raster van vier',
+      oneOverThree: 'Eén boven drie',
+      bigLeft: 'Grote kaart links',
+      gridShort: 'Raster',
+      oneOverThreeShort: '1 boven 3',
+      bigLeftShort: 'Groot links',
       expose: 'Alle kaarten',
       exposeExit: 'Terug naar het werkvlak',
       reset: 'Indeling herstellen',
@@ -3986,6 +4007,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       welcomeStart: 'Rondleiding starten',
     },
     'components/letters/letters': {
+      close: 'Sluiten',
       to: 'Aan: gebruiker',
       toDeveloper: 'Aan: de ZeppBridge-ontwikkelaar',
       flipHint: 'Tik om de envelop om te draaien',

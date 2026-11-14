@@ -3,6 +3,7 @@ import type { DesignIconName } from '../components/DesignIcon.vue';
 import type { GlyphTone } from '../lib/glyphs';
 import { useSyncController } from './useSyncController';
 import { chartPalette } from '../lib/echartsSetup';
+import { resolvedTheme } from './useTheme';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { formatDistance, formatNumber, isFiniteNumber } from '../lib/format';
 import { formatPaceSeconds } from '../lib/metricSeries';
@@ -10,7 +11,11 @@ import { elevationUnitLabel, paceAxisLabel, paceMinutesPerBigUnit, paceUnitLabel
 import { deviceImageFor } from '../lib/deviceCatalog';
 import { workoutTiming } from '../lib/workoutTiming';
 import { buildRouteCanvas } from '../lib/workoutRoute';
-import { clockSeconds, lineOption, sampleSeries, type ChartBand, type ChartDetail, type ChartPoint } from '../lib/workoutCharts';
+import { lineOption, paceSeconds, sampleSeries, type ChartBand, type ChartDetail, type ChartPoint } from '../lib/workoutCharts';
+import { elevationAxis, paceAxis } from '../lib/chartAxis';
+import { consistentAverage, paceProfile } from '../lib/paceProfile';
+import { slopeShare } from '../lib/elevationProfile';
+import type { ShareSegment } from '../components/workout/ShareBar.vue';
 import { useMessages } from '../i18n';
 import { workoutDetailMessages } from '../views/WorkoutDetail.i18n';
 import type { DeviceProfile, WorkoutSeries } from '../types';
@@ -137,28 +142,34 @@ export const useWorkoutPresentation = (
 
   const routeCanvas = computed(() => buildRouteCanvas(series.value));
 
-  const statSummary = (points: ChartPoint[], mode: 'pace' | 'normal' = 'normal'): ChartStat[] | null => {
+  /** 最小 / 平均 / 最大；心率和海拔叫「最低 / 最高」（和 Zepp、概要卡的说法一致）。 */
+  const statSummary = (points: ChartPoint[], highLow = false): ChartStat[] | null => {
     if (points.length < 2) return null;
     const values = points.map((point) => point.v);
     const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
     const min = Math.min(...values);
     const max = Math.max(...values);
-    if (mode === 'pace') return [
-      { label: t.value.statFastest, value: paceClock(min) },
-      { label: t.value.statAverage, value: paceClock(avg) },
-      { label: t.value.statSlowest, value: paceClock(max) },
-    ];
     return [
-      { label: t.value.statMin, value: numberValue(min, 0) },
+      { label: highLow ? t.value.statLow : t.value.statMin, value: numberValue(min, 0) },
       { label: t.value.statAverage, value: numberValue(avg, 0) },
-      { label: t.value.statMax, value: numberValue(max, 0) },
+      { label: highLow ? t.value.statHigh : t.value.statMax, value: numberValue(max, 0) },
     ];
   };
 
+  /** 坡度分布（爬升卡和大档海拔卡共用）。 */
+  const slope = computed(() => slopeShare(series.value?.samples));
+
   /* 图上画的两条要跟着单位换算，采样本身不动：配速的三个统计值走 paceClock，
      它自己会换算——两边都换就成了一次英里、再一次英里。 */
-  /** 海拔图纵轴至少撑开 40 米：平路就画成平的。 */
-  const ALTITUDE_MIN_SPAN_M = 40;
+  /** 海拔图纵轴至少撑开 20 米：平路就画成平的（chartAxis.elevationAxis）。 */
+  const ALTITUDE_MIN_SPAN_M = 20;
+  /** 区间色：和心率区间卡（WorkoutHrZonesCard 的 .zone-0…5）同一套。 */
+  const zoneColorOf = (index: number) => {
+    const s = chartPalette.value.series;
+    // --route-mint 不在图表色板里（tokens.css 深 #2FA96B / 浅 #22875C），canvas 要真颜色。
+    const mint = resolvedTheme.value === 'light' ? '#22875C' : '#2FA96B';
+    return [s.pace, mint, s.training, s.altitude, s.calories, s.heart][Math.min(5, Math.max(0, index))]!;
+  };
   const chartCards = computed(() => {
     const samples = series.value?.samples;
     const palette = chartPalette.value;
@@ -167,15 +178,46 @@ export const useWorkoutPresentation = (
     const altitude = sampleSeries(samples, 'altitude_m').map((point) => ({ t: point.t, v: toElevation(point.v) }));
     const cadence = sampleSeries(samples, 'cadence');
     // 配速图画「每公里 / 每英里秒数」，纵轴倒过来（快的在上），刻度和提示写成 分:秒。
-    const paceChart = pace.map((point) => ({ t: point.t, v: paceMinutesPerBigUnit(point.v) * 60 }));
+    const toChart = (minutesPerKm: number) => paceMinutesPerBigUnit(minutesPerKm) * 60;
+    const paceChart = pace.map((point) => ({ t: point.t, v: toChart(point.v) }));
+    // 暂停段：配速统计剔掉它们，中大档的配速 / 心率图把它们铺灰。
+    const pauses = (series.value?.pauses ?? [])
+      .map((pause) => ({ start: Date.parse(pause.start_time), end: Date.parse(pause.end_time) }))
+      .filter((pause) => Number.isFinite(pause.start) && Number.isFinite(pause.end) && pause.end > pause.start);
+    // 配速：剔除暂停与停顿 / 飘点后的最快、最慢和主体范围；平均 = 距离 ÷ 运动时间（和概要卡同一个数）。
+    const profile = paceProfile(pace, pauses);
+    const item = workout.value;
+    const summaryAvg = isFiniteNumber(item?.pace) ? item.pace : (timing.value?.movingPace ?? series.value?.summary?.average_pace ?? null);
+    const paceAvg = profile ? consistentAverage(profile, summaryAvg) : summaryAvg;
+    const paceStats: ChartStat[] | null = profile ? [
+      { label: t.value.statFastest, value: paceClock(profile.fastest.v) },
+      { label: t.value.statAverage, value: paceClock(paceAvg) },
+      { label: t.value.statSlowest, value: paceClock(profile.slowest.v) },
+    ] : null;
+    const paceRange = profile ? paceAxis(toChart(profile.lo), toChart(profile.hi)) : null;
+    const paceExtremes = profile ? [profile.fastest, profile.slowest].map((p) => ({ t: p.t, v: toChart(p.v) })) : undefined;
     // 心率区间色带（卡拉大才画）：手表随这条运动下发的上界，没有就不画。
     const zones = [...(workout.value?.hr_zones ?? [])].sort((a, b) => a.index - b.index);
     const bands: ChartBand[] = zones.map((zone, i) => ({ index: zone.index, low: i ? zones[i - 1].upper_bound_bpm : null, high: zone.upper_bound_bpm }));
     const s = palette.series;
+    // 心率卡大档的「各区间时长」：和心率区间卡同一份秒数、同一套颜色。
+    const zoneShare: ShareSegment[] | null = zones.some((zone) => zone.seconds > 0)
+      ? zones.map((zone) => ({ key: `z${zone.index}`, label: `Z${zone.index}`, seconds: zone.seconds, color: zoneColorOf(zone.index) }))
+      : null;
+    // 海拔卡头部：累计爬升 / 累计下降（记录汇总，有才列）放在最低 / 平均 / 最高前面，参照 Zepp 海拔页。
+    const summary = series.value?.summary;
+    const gain = item?.elevation_gain_m ?? summary?.elevation_gain_m;
+    const loss = item?.elevation_loss_m ?? summary?.elevation_loss_m;
+    const altitudeBase = statSummary(altitude, true);
+    const altitudeStats: ChartStat[] | null = altitudeBase ? [
+      ...(isFiniteNumber(gain) ? [{ label: t.value.metricAscent, value: numberValue(toElevation(gain)) }] : []),
+      ...(isFiniteNumber(loss) ? [{ label: t.value.decodedDescent, value: numberValue(toElevation(loss)) }] : []),
+      ...altitudeBase,
+    ] : null;
     return [
-      { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, { color: s.heart, unit: 'bpm', palette }), detail: { color: s.heart, palette, bands } as ChartDetail, stats: statSummary(heart), icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
-      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, { color: s.pace, unit: paceAxisLabel(), palette, inverse: true, format: clockSeconds }), detail: { color: s.pace, palette, format: clockSeconds } as ChartDetail, stats: statSummary(pace, 'pace'), icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
-      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, { color: s.altitude, unit: elevationUnitLabel(), palette, minSpan: toElevation(ALTITUDE_MIN_SPAN_M) }), detail: { color: s.altitude, palette } as ChartDetail, stats: statSummary(altitude), icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
+      { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, { color: s.heart, unit: 'bpm', palette }), detail: { color: s.heart, palette, bands, zoneColor: zoneColorOf, pauses } as ChartDetail, stats: statSummary(heart, true), zoneShare, icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
+      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, { color: s.pace, unit: paceAxisLabel(), palette, inverse: true, format: paceSeconds, axis: paceRange, average: isFiniteNumber(paceAvg) ? toChart(paceAvg) : null }), detail: { color: s.pace, palette, format: paceSeconds, pauses, extremes: paceExtremes } as ChartDetail, stats: paceStats, icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
+      { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, { color: s.altitude, unit: elevationUnitLabel(), palette, axis: elevationAxis(altitude.map((p) => p.v), toElevation(ALTITUDE_MIN_SPAN_M)) }), detail: { color: s.altitude, palette } as ChartDetail, stats: altitudeStats, slope: slope.value, icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
       { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: lineOption(cadence, { color: s.cadence, unit: 'spm', palette }), detail: { color: s.cadence, palette } as ChartDetail, stats: statSummary(cadence), icon: 'steps' as DesignIconName, tone: 'activity' as GlyphTone },
     ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null);
   });
@@ -236,6 +278,6 @@ export const useWorkoutPresentation = (
 
   return {
     durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,
-    heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge,
+    heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge, slope,
   };
 };

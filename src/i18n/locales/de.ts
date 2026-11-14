@@ -467,6 +467,7 @@ export default {
       attachReport: 'Anonymisierten Diagnosebericht anhängen',
       attachHint: 'Nur App-Version, Feldstrukturen und nicht erkannte Modellnummern – keine Konten, Gesundheitswerte oder Standorte',
       reportFailedPlain: 'Diagnosebericht konnte nicht gesendet werden und wurde entfernt. Tippe erneut auf „Absenden“, um nur den Brief zu verschicken.',
+      close: 'Schließen',
     },
     'components/letters/stamps': {
       kind: {
@@ -2821,6 +2822,10 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       mapConsentAlways: 'Immer',
       mapConsentCancel: 'Nein danke',
       mapFailed: 'Karte konnte nicht geladen werden, zurück zur lokalen Zeichnung',
+      mapRetry: 'Karte erneut laden',
+      statLow: 'Niedrigste',
+      statHigh: 'Höchste',
+      chartZoneShare: 'Zeit pro Zone',
     },
     'components/workout/TypePicker': {
       title: 'Trainingsart ändern',
@@ -2836,7 +2841,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       title: 'Wichtigste Anstiege und Abfahrten',
       aria: 'Hauptabschnitte für Anstiege und Abstiege',
       flat: 'Keine nennenswerten Anstiege: Weder Höhenunterschied noch Steigung haben die Schwellenwerte erreicht.',
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) => `Keine nennenswerten Anstiege: Die Höhe lag zwischen ${min} und ${max} ${unit} (maximal ${range} ${unit})` + (gain ? `; die ${gain} ${unit} Gesamtanstieg summieren sich aus vielen kleinen Anstiegen` : '') + ' und kein Abschnitt hat die Schwellenwerte unten erreicht.',
       climb: 'Anstieg',
       descent: 'Abstieg',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -2851,6 +2855,20 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         `Die Höhe wird mit einem gleitenden Durchschnitt über ${window} Sekunden geglättet; ein Abschnitt endet, sobald er um mehr als ${reversal} m vom höchsten (tiefsten) Punkt abfällt (oder ansteigt). ` +
         `Es werden nur Abschnitte mit mindestens ${change} m Höhenunterschied und einer durchschnittlichen Steigung von mindestens ${grade} % aufgeführt. Die Distanz ergibt sich aus der Integration der Punktgeschwindigkeiten, kalibriert auf die aufgezeichnete Gesamtdistanz; ` +
         `Vertikalgeschwindigkeit und Pace basieren auf der Bewegungszeit (Zeiten unter ${moving} m/s werden ausgelassen).`,
+    },
+    'components/workout/ElevationFacts': {
+      aria: 'Höhenüberblick',
+      ascent: 'Anstieg',
+      descent: 'Abstieg',
+      drop: 'Höhenspanne',
+      range: 'Höhenbereich',
+      slopeTitle: 'Zeit nach Steigung',
+      up: 'Bergauf',
+      flat: 'Flach',
+      down: 'Bergab',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `Zeit nach Steigung: Die Höhe wird mit einem gleitenden Durchschnitt über ${smooth} Sekunden geglättet, die Steigung alle ${step} m gemessen; ` +
+        `alles steiler als ±${grade} % zählt als bergauf oder bergab, der Rest als flach. Zeiten unter ${moving} m/s werden ausgelassen.`,
     },
     'components/workout/WorkoutStrengthCard': {
       eyebrow: 'Krafttraining',
@@ -2910,6 +2928,12 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       mainLeftShort: 'Links',
       mainRightShort: 'Rechts',
       mainTopShort: 'Oben',
+      grid: 'Vierer-Raster',
+      oneOverThree: 'Eine über drei',
+      bigLeft: 'Große links',
+      gridShort: 'Raster',
+      oneOverThreeShort: '1 über 3',
+      bigLeftShort: 'Groß links',
       expose: 'Alle Karten',
       exposeExit: 'Zurück zur Bühne',
       reset: 'Layout zurücksetzen',

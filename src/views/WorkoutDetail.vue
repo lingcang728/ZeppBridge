@@ -66,15 +66,16 @@ const fit = reactive(useWorkoutFitCorrection(workoutId));
 
 const {
   durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,
-  heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge,
+  heroMetrics, routeCanvas, chartCards, hrZones, decodedMetrics, syncBadge, slope,
 } = useWorkoutPresentation(workout, series, device, displayType);
 /* 海拔的出处说明挂在「累计爬升」那格的悬停提示上，不在页面里再占一行小字。 */
 const hasAltitude = computed(() => Boolean(series.value?.samples.some(sample => sample.altitude_m != null) || series.value?.summary.elevation_gain_m != null || workout.value?.elevation_gain_m != null));
-/* 平路时爬升卡那一句用的实数：最低 / 最高取逐点海拔（和海拔图的统计同一份），累计爬升取记录汇总。 */
+/* 爬升卡顶上的起伏概览：最低 / 最高取逐点海拔（和海拔图的统计同一份），累计上升 / 下降取记录汇总。 */
 const relief = computed(() => {
   const heights = (series.value?.samples ?? []).map(sample => sample.altitude_m).filter((v): v is number => v != null && v >= -500 && v <= 10_000);
   const gain = workout.value?.elevation_gain_m ?? series.value?.summary.elevation_gain_m ?? null;
-  return { min: heights.length ? Math.min(...heights) : null, max: heights.length ? Math.max(...heights) : null, gain };
+  const loss = workout.value?.elevation_loss_m ?? series.value?.summary.elevation_loss_m ?? null;
+  return { min: heights.length ? Math.min(...heights) : null, max: heights.length ? Math.max(...heights) : null, gain, loss };
 });
 /* 没有距离的运动（力量训练、瑜伽……）和室内运动本来就没有 GPS：不放「没有轨迹」那张提示，页脚也不提轨迹（2026-11-13）。 */
 const routeExpected = computed(() => !!routeCanvas.value || expectsRoute(displayType.value, workout.value?.distance_meters));
@@ -163,7 +164,7 @@ const sport = computed(() => sportClass(displayType.value, !!series.value?.stren
         <template #strength-sets><WorkoutStrengthCard v-if="series?.strength" :strength="series.strength" :detail="strengthDetail" /></template>
         <template #strength-map><WorkoutStrengthMapCard :detail="strengthDetail" /></template>
         <template #route><WorkoutRouteCard :canvas="routeCanvas" /></template>
-        <template #climbs><WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" :relief="relief" /></template>
+        <template #climbs><WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" :relief="relief" :slope="slope" /></template>
         <template v-for="[id, card] in charts" #[id]><WorkoutChartCard :card="card" /></template>
         <template #hr-zones><WorkoutHrZonesCard v-if="hrZones" :zones="hrZones" /></template>
         <template #series-status><WorkoutSeriesStatusCard :error="seriesError" @retry="loadDetail" /></template>

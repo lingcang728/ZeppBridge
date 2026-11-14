@@ -71,10 +71,20 @@ describe('stage prefs', () => {
     expect(bad.stage).toEqual({ ids: ['decoded'], snap: 0 });
   });
 
-  it('spills a stage of more than three into the strip', () => {
-    const s = sanitize({ stage: { ids: CARDS.slice(0, 5), snap: 0 } }, CARDS, defaultState('other', CARDS));
-    expect(s.stage.ids).toEqual(CARDS.slice(0, 3));
-    expect(s.strip[0].ids).toEqual(CARDS.slice(3, 5));
+  it('spills a stage of more than four into the strip', () => {
+    const s = sanitize({ stage: { ids: CARDS.slice(0, 6), snap: 0 } }, CARDS, defaultState('other', CARDS));
+    expect(s.stage.ids).toEqual(CARDS.slice(0, 4));
+    expect(s.strip[0].ids).toEqual(CARDS.slice(4, 6));
+  });
+
+  it('keeps sane one-over-three seams and drops broken ones', () => {
+    const four = CARDS.slice(0, 4);
+    const ok = sanitize({ stage: { ids: four, snap: 1, splits: [0.3, 0.7] } }, CARDS, defaultState('other', CARDS));
+    expect(ok.stage.splits).toEqual([0.3, 0.7]);
+    for (const splits of [[0.7, 0.3], [0.1, 0.5], [0.4, 0.5], [0.3, 'x'], 'nope']) {
+      expect(sanitize({ stage: { ids: four, snap: 1, splits } }, CARDS, defaultState('other', CARDS)).stage.splits).toBeUndefined();
+    }
+    expect(sanitize({ stage: { ids: CARDS.slice(0, 3), snap: 1, splits: [0.3, 0.7] } }, CARDS, defaultState('other', CARDS)).stage.splits).toBeUndefined();
   });
 
   it('round-trips through storage per class and survives a broken store', () => {

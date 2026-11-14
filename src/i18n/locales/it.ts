@@ -500,6 +500,7 @@ export default {
     replyPlaceholder: 'Scrivi qualsiasi cosa — oppure non scrivere nulla.',
     allowQuote: 'Puoi citarmi in forma anonima',
     send: 'Invia',
+    close: 'Chiudi',
     sending: 'Invio in corso…',
     sent: 'Inviata. La ricevuta apparirà nella tua cassetta postale',
     queued: 'Nessuna connessione al momento — è nella posta in uscita e verrà inviata non appena sarai online',
@@ -1613,6 +1614,20 @@ export default {
     resetAllDone: 'Fatto; ogni sezione si rispiegherà alla prossima apertura',
   },
 
+  'components/workout/ElevationFacts': {
+    aria: 'Panoramica dell’altimetria',
+    ascent: 'Ascesa',
+    descent: 'Discesa',
+    drop: 'Escursione',
+    range: 'Intervallo quota',
+    slopeTitle: 'Tempo per pendenza',
+    up: 'Salita',
+    flat: 'Pianura',
+    down: 'Discesa',
+    how: (grade: number, step: number, smooth: number, moving: number) =>
+      `Tempo per pendenza: l’altitudine viene attenuata con una media mobile di ${smooth} secondi, la pendenza viene calcolata ogni ${step} m e i tratti oltre ±${grade}% contano come salita o discesa, il resto come pianura; il tempo sotto ${moving} m/s viene escluso.`,
+  },
+
   'components/workout/TypePicker': {
     title: 'Cambia il tipo di allenamento',
     search: 'Cerca tipi di allenamento',
@@ -1628,7 +1643,6 @@ export default {
     title: 'Principali salite e discese',
     aria: 'Segmenti principali di salita e discesa',
     flat: 'Nessuna salita degna di nota: nessun dislivello o pendenza ha raggiunto le soglie sotto indicate.',
-    flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) => `Nessuna salita degna di nota: l’altitudine è rimasta tra ${min} e ${max} ${unit} (massimo ${range} ${unit})` + (gain ? `; i ${gain} ${unit} di dislivello positivo totale sono la somma di tanti piccoli saliscendi` : '') + ' e nessun tratto ha raggiunto le soglie indicate sotto.',
     climb: 'Salita',
     descent: 'Discesa',
     range: (from: string, to: string) => `${from}–${to}`,
@@ -1703,6 +1717,12 @@ export default {
     mainRightShort: 'Dx',
     mainTop: 'Scheda principale in alto',
     mainTopShort: 'Su',
+    grid: 'Griglia 2×2',
+    oneOverThree: 'Una sopra, tre sotto',
+    bigLeft: 'Grande a sinistra',
+    gridShort: 'Griglia',
+    oneOverThreeShort: '1 su 3',
+    bigLeftShort: 'Sx grande',
     expose: 'Mostra tutte le schede',
     exposeExit: 'Torna al layout',
     reset: 'Ripristina layout',
@@ -3925,6 +3945,9 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     statAverage: 'Media',
     statFastest: 'Più veloce',
     statSlowest: 'Più lento',
+    statLow: 'Più basso',
+    statHigh: 'Più alto',
+    chartZoneShare: 'Tempo in ogni zona',
 
     eyebrowRoute: 'Traccia',
     routeTitle: 'Traccia GPS',
@@ -3947,6 +3970,7 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     mapConsentAlways: 'Sempre',
     mapConsentCancel: 'No, grazie',
     mapFailed: 'Impossibile caricare la mappa; ritorno al tracciato locale',
+    mapRetry: 'Riprova la mappa',
 
     eyebrowHrZones: 'Zone FC',
     hrZonesTitle: 'Zone di frequenza cardiaca',

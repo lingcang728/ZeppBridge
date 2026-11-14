@@ -70,7 +70,10 @@
   visibility: hidden;
   pointer-events: none;
 }
-.stage-canvas { position: relative; min-width: 0; }
+/* 画布自成一层（isolation）：窗口的 z（舞台 200、拖动 2000、菜单 1000）只在画布里比高低。
+   曾经和顶栏（.shell-head z 30）在同一个 .app-body 层叠上下文里比，舞台卡压住了顶栏的「云端还没更新」提示、点不到
+   （2026-11-14 用户截图）。 */
+.stage-canvas { position: relative; min-width: 0; isolation: isolate; }
 
 /* 全屏 / 窄窗口时侧栏让开了：左边缘一个小玻璃把手（曾是一条竖排「显示侧栏」的边条，压在卡上很难看）。 */
 .strip-handle {

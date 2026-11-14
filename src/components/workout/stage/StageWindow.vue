@@ -34,12 +34,17 @@ const style = computed((): CSSProperties => ({
   opacity: String(props.placement.opacity),
   zIndex: String(props.placement.z),
   visibility: props.placement.opacity === 0 && props.placement.mode !== 'strip' ? 'hidden' : undefined,
+  // 铺满舞台：多出来的高交给卡里能伸的那块（图表 / 地图读这个变量）。
+  ...(props.placement.extra ? { '--fill-extra': `${props.placement.extra}px` } : {}),
 }));
 
 let observer: ResizeObserver | null = null;
 onMounted(() => {
-  // 量的是内容包一层的自然高度（窗口自己的高由舞台定，量它会自己咬自己）。
-  observer = new ResizeObserver(() => { if (content.value) emit('measure', Math.ceil(content.value.offsetHeight)); });
+  // 量的是内容包一层的自然高度（窗口自己的高由舞台定，量它会自己咬自己）；铺满时加进去的那截减掉，量到的永远是自然高。
+  // extra 为负（一列放不下、图跟着缩）也照样减：舞台保证缩不到图的底线，减得准。
+  observer = new ResizeObserver(() => {
+    if (content.value) emit('measure', Math.ceil(content.value.offsetHeight - (props.placement.extra ?? 0)));
+  });
   if (content.value) observer.observe(content.value);
 });
 onBeforeUnmount(() => observer?.disconnect());

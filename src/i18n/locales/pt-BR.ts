@@ -1584,11 +1584,14 @@ export default {
       statSlowest: 'Mais lento',
       statMin: 'Mín',
       statMax: 'Máx',
+      statLow: 'Mínima',
+      statHigh: 'Máxima',
 
       chartHeart: 'Frequência cardíaca',
       chartPace: 'Ritmo',
       chartAltitude: 'Altitude',
       chartCadence: 'Cadência',
+      chartZoneShare: 'Tempo por zona',
       chartAria: (title: string) => `${title} ao longo da sessão`,
 
       decodedRoutePoints: 'Pontos de GPS',
@@ -1630,6 +1633,7 @@ export default {
       mapConsentAlways: 'Sempre',
       mapConsentCancel: 'Não, obrigado',
       mapFailed: 'Não foi possível carregar o mapa; voltando ao desenho local',
+      mapRetry: 'Tentar mapa de novo',
       routeSvgAria: 'Trajeto de GPS renderizado com escala de cores por ritmo',
       routeLegendPace: (count: number) => `${count} pontos de ritmo válidos · P10–P90`,
       routeLegendNoPace: 'Menos de 3 pontos de ritmo válidos · trajeto sem cores de ritmo',
@@ -1691,6 +1695,19 @@ export default {
       routeMissing: "Sem rota: este registro não contém pontos GPS suficientes para desenhar um percurso.",
     },
 
+    'components/workout/ElevationFacts': {
+      aria: 'Resumo de elevação',
+      ascent: 'Ganho',
+      descent: 'Perda',
+      drop: 'Desnível',
+      range: 'Faixa de altitude',
+      slopeTitle: 'Tempo por inclinação',
+      up: 'Subida',
+      flat: 'Plano',
+      down: 'Descida',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `Tempo por inclinação: a altitude é suavizada com média móvel de ${smooth} segundos, a inclinação é calculada a cada ${step} m e trechos mais íngremes que ±${grade}% contam como subida ou descida (o restante como plano); o tempo abaixo de ${moving} m/s é desconsiderado.`,
+    },
     'components/workout/TypePicker': {
       title: 'Mudar o tipo de treino',
       search: 'Buscar tipos de treino',
@@ -1705,10 +1722,6 @@ export default {
       title: 'Principais subidas e descidas',
       aria: 'Trechos principais de subida e descida',
       flat: 'Sem subidas expressivas: nenhum trecho atingiu os limites de desnível e inclinação abaixo.',
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-        `Sem subidas expressivas: a altitude ficou entre ${min} e ${max} ${unit} (${range} ${unit} no máximo)` +
-        (gain ? `; os ${gain} ${unit} de ganho de elevação acumulado são a soma de muitas pequenas variações` : '') +
-        ' e nenhum trecho atingiu os limites abaixo.',
       climb: 'Subida',
       descent: 'Descida',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -1780,6 +1793,12 @@ export default {
       mainLeftShort: 'Esq.',
       mainRightShort: 'Dir.',
       mainTopShort: 'Topo',
+      grid: 'Grade 2×2',
+      oneOverThree: 'Um sobre três',
+      bigLeft: 'Maior à esquerda',
+      gridShort: 'Grade',
+      oneOverThreeShort: '1 sobre 3',
+      bigLeftShort: 'Maior esq.',
       expose: 'Todos os cartões',
       exposeExit: 'Voltar ao palco',
       reset: 'Redefinir layout',
@@ -3736,6 +3755,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       sheetReply: 'Responder',
       page: (index: number, total: number) => `Página ${index} de ${total}`,
       acknowledge: 'Entendi',
+      close: 'Fechar',
       letterHead: (version: string) => `ZeppBridge ${version}`,
       postscript: (span: { years?: number; months?: number }) => {
         const parts = [span.years ? `${span.years} ${span.years === 1 ? 'ano' : 'anos'}` : '', span.months ? `${span.months} ${span.months === 1 ? 'mês' : 'meses'}` : ''].filter(Boolean);

@@ -140,9 +140,46 @@ export const whenSlotsDrained = (maxMs = 260): Promise<void> =>
     });
   });
 
+/**
+ * 一批窗口一起飞时（运动详情舞台换排法、「全部卡片」⇄ 舞台），图表 / 地图不跟着每帧的新尺寸重画，落地后一帧一张补上。
+ *
+ * 2026-11-14 实测：切换那一帧三张图各 resize 一次（5–7 ms），夹在十张卡换尺寸的样式重算和排版中间，
+ * 一起凑成 80 ms 的长任务（4× 降速下 350–540 ms）。窗口飞行只动合成属性，内容按落点排好了，
+ * 画布晚几百毫秒按新尺寸重画看不出来，卡顿却看得出来。
+ *
+ * 不复用 holdMotion：它会改 `<html data-motion>`，那条后代选择器一改就是整页重算样式（记忆 motion-full-repaint-traps），
+ * 也会让新图表挂载让路——这里两样都不需要。
+ */
+let resizeHolds = 0;
+const resizeJobs = new Set<() => void>();
+export const holdResizes = (maxMs = 900): (() => void) => {
+  resizeHolds += 1;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    clearTimeout(timer);
+    resizeHolds = Math.max(0, resizeHolds - 1);
+    if (resizeHolds > 0) return;
+    const jobs = [...resizeJobs];
+    resizeJobs.clear();
+    for (const job of jobs) nextSlot(job);
+  };
+  const timer = setTimeout(release, maxMs);
+  return release;
+};
+/** 正在飞就把 `job` 记下（同一个函数只记一次）等落地再做，返回 true；没在飞返回 false，调用方照常立刻做。 */
+export const deferResize = (job: () => void): boolean => {
+  if (!resizeHolds) return false;
+  resizeJobs.add(job);
+  return true;
+};
+
 /** 测试用：清空状态。 */
 export const resetMotionBudget = () => {
   holds.value = 0;
+  resizeHolds = 0;
+  resizeJobs.clear();
   slots.length = 0;
   staging = 0;
   const ready = stagingWaiters;

@@ -103,7 +103,7 @@ const send = async () => {
             type="button"
             class="compose-close"
             :disabled="sending"
-            aria-label="Close"
+            :aria-label="t.close"
             @click="closeAuthorCompose()"
           >×</button>
         </footer>

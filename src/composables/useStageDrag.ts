@@ -11,7 +11,7 @@
  */
 import { ref, shallowRef, type Ref } from 'vue';
 import { dropAt, passedSlop, resizeOutcome, type Drop, type Handle, type Resize, type ResizeContext } from '../lib/stage/gestures';
-import { STRIP_W, THUMB_W, type Layout, type Placement } from '../lib/stage/layout';
+import { splitsOf, STRIP_W, THUMB_W, type Layout, type Placement } from '../lib/stage/layout';
 import * as S from '../lib/stage/state';
 import { dragTo, flyFrom, SETTLE_EASE, snapshotOf, stopFlight } from '../lib/motion/stageFlight';
 import { lessMotion } from '../lib/motion/lessMotion';
@@ -68,11 +68,11 @@ export const useStageDrag = (o: {
     const state = o.stage.state.value;
     const ids = state.stage.ids;
     if (ids.includes(id)) {
-      if (drop.kind === 'strip') return S.removeFromStage(state, id);
+      if (drop.kind === 'strip') return S.removeFromStage(state, id, o.stage.wide);
       if (drop.kind === 'stage' && drop.onto) return S.swapOnStage(state, id, drop.onto);
       return null;
     }
-    if (drop.kind === 'stage') return S.addToStage(state, id, drop.onto ? ids.indexOf(drop.onto) : drop.index);
+    if (drop.kind === 'stage') return S.addToStage(state, id, drop.onto ? ids.indexOf(drop.onto) : drop.index, o.stage.wide);
     return null;
   };
   const preview = (next: S.StageState | null, continuous = false) => {
@@ -114,14 +114,15 @@ export const useStageDrag = (o: {
   /* ── 拖边：预演 = 真排版 ─────────────────────── */
   const contextOf = (id: string, p: Placement): ResizeContext | null => {
     if (!p.sides) return null;
-    const { ids, snap } = o.stage.state.value.stage;
+    const group = o.stage.state.value.stage;
+    const { ids, snap } = group;
     const rects = ids.map((other) => o.layout.value.placements.get(other)).filter((q): q is Placement => !!q && q.mode === 'stage');
     const left = Math.min(...rects.map((q) => q.x));
     const right = Math.max(...rects.map((q) => q.x + q.w));
     return {
       count: ids.length, index: ids.indexOf(id), snap, id, sides: p.sides,
       avail: o.size.width - STRIP_W, width: o.size.width, groupW: right - left,
-      startW: p.w, startH: p.h, maxH: Math.max(p.h, o.size.height),
+      startW: p.w, startH: p.h, maxH: Math.max(p.h, o.size.height), splits: splitsOf(group),
     };
   };
   const previewResize = (d: Drag) => {

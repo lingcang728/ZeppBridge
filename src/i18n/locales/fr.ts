@@ -1764,6 +1764,19 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       retry: 'Réessayer',
     },
 
+    'components/workout/ElevationFacts': {
+      aria: 'Aperçu du dénivelé',
+      ascent: 'Dénivelé +',
+      descent: 'Dénivelé -',
+      drop: 'Amplitude',
+      range: 'Plage d’altitude',
+      slopeTitle: 'Temps par pente',
+      up: 'Montée',
+      flat: 'Plat',
+      down: 'Descente',
+      how: (grade: number, step: number, smooth: number, moving: number) =>
+        `Temps par pente\u00A0: l’altitude est lissée par une moyenne mobile de ${smooth} secondes, la pente est mesurée tous les ${step} m et tout ce qui dépasse ±${grade} % compte comme montée ou descente, le reste comme plat\u00A0; le temps sous ${moving} m/s est exclu.`,
+    },
     'components/workout/TypePicker': {
       title: 'Changer le type d’entraînement',
       search: 'Rechercher un type d’entraînement',
@@ -1778,10 +1791,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       title: 'Principales montées et descentes',
       aria: 'Segments principaux de montée et de descente',
       flat: 'Aucune montée notable : aucun dénivelé ni pente n\'a atteint les seuils ci-dessous.',
-      flatRelief: (min: string, max: string, range: string, gain: string | null, unit: string) =>
-        `Aucune montée notable : l’altitude est restée entre ${min} et ${max} ${unit} (${range} ${unit} au maximum)` +
-        (gain ? ` ; les ${gain} ${unit} de dénivelé positif cumulé proviennent de nombreuses petites montées` : '') +
-        ', et aucun tronçon n’a atteint les seuils ci-dessous.',
       climb: 'Montée',
       descent: 'Descente',
       range: (from: string, to: string) => `${from}–${to}`,
@@ -1850,9 +1859,15 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       mainLeft: 'Carte principale à gauche',
       mainRight: 'Carte principale à droite',
       mainTop: 'Carte principale en haut',
+      grid: 'Grille de quatre',
+      oneOverThree: 'Une sur trois',
+      bigLeft: 'Grande à gauche',
       mainLeftShort: 'Gauche',
       mainRightShort: 'Droite',
       mainTopShort: 'Haut',
+      gridShort: 'Grille',
+      oneOverThreeShort: '1 sur 3',
+      bigLeftShort: 'G. gauche',
       expose: 'Afficher toutes les cartes',
       exposeExit: 'Retour à la disposition',
       reset: 'Réinitialiser la disposition',
@@ -2314,9 +2329,12 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       seriesFailed: 'Lecture de la série point par point impossible pour cette séance',
       statMax: 'Max',
       statMin: 'Min',
+      statLow: 'Plus bas',
+      statHigh: 'Plus haut',
       statAverage: 'Moy.',
       statFastest: 'Plus rapide',
       statSlowest: 'Plus lente',
+      chartZoneShare: 'Temps par zone',
 
       eyebrowRoute: 'Trace',
       routeTitle: 'Trace GPS',
@@ -2339,6 +2357,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       mapConsentAlways: 'Toujours',
       mapConsentCancel: 'Non merci',
       mapFailed: 'Impossible de charger la carte ; retour au tracé local',
+      mapRetry: 'Réessayer la carte',
 
       eyebrowHrZones: 'Zones de FC',
       hrZonesTitle: 'Zones de fréquence cardiaque',
@@ -3600,6 +3619,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       welcomeStart: 'Démarrer la visite',
     },
     'components/letters/letters': {
+      close: 'Fermer',
       to: 'Pour : utilisateur',
       toDeveloper: 'Pour : le développeur de ZeppBridge',
       flipHint: 'Touchez pour retourner l’enveloppe',
