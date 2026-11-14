@@ -1454,17 +1454,17 @@ fn entry_exists(path: &Path) -> io::Result<bool> {
 }
 
 fn is_reparse_point(metadata: &std::fs::Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
-        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        metadata.file_type().is_symlink()
+            || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
     }
     #[cfg(not(windows))]
-    false
+    {
+        metadata.file_type().is_symlink()
+    }
 }
 
 fn reject_reparse_ancestors(path: &Path, allowed_local_state: Option<&Path>) -> io::Result<()> {
