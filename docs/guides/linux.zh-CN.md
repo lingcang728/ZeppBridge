@@ -185,7 +185,7 @@ Wayland / X11 和合成器影响。关闭 DMABUF 是切换缓冲区传递与呈�
 - 通常沿用 WebKit 默认渲染路径，不按 WebKitGTK 版本统一开关 DMABUF。
 - 检测到 NVIDIA 驱动或 DRM 显卡厂商为 NVIDIA 时，设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`。
 - `XDG_SESSION_TYPE=wayland`，且 `pkg-config --modversion wayland-client` 检测到的数值版本不高于 `1.23.0` 时，也设置为 `1`。缺少 `pkg-config` 或版本未知时不触发这一条。
-- AppImage 保留默认 `WEBKIT_DISABLE_COMPOSITING_MODE=1` 的兼容措施。
+- AppImage 只在 AppDir 里还带着与驱动强耦合的图形库（[issue #32][issue-32] 的成因：`libEGL*`、`libGL*`、`libGLX*`、`libOpenGL*`、`libgbm*`、`libdrm*`、`libwayland-*`、`libxcb-dri*`、`libva*`）时才设 `WEBKIT_DISABLE_COMPOSITING_MODE=1`。发布用的 AppImage 已经删掉这一层，因此走 WebKit 默认的加速合成；没有做这一步的 AppImage、或读不出目录结构的情况，仍然照旧回退。用户显式设置的值始终优先。
 
 NVIDIA 策略有一条例外：niri 的原生 Wayland 路径保留 WebKit 默认 DMABUF 渲染。
 本机 RTX 5070 Ti / NVIDIA 615.78.08 / WebKitGTK 2.54.2 的独立滚动测试中，关闭
@@ -220,8 +220,14 @@ WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DISABLE_COMPOSITING_MODE=0 ./ZeppBridge_
 DMABUF 后恢复正常，AppImage 仍失败；报告者在本机编译的 AppImage 则能启动。
 排查发现 CI 构建的包包含了自己的 `libwayland-client.so.0`、`libwayland-cursor.so.0`、
 `libwayland-egl.so.1` 和 `libwayland-server.so.0`。之后的构建移除了这四个库，
-改用宿主机提供的版本，并保留 AppImage 默认禁用加速合成的措施。这是历史兼容处理，
-不能证明其他包格式在所有机器上都正常。
+改用宿主机提供的版本。禁用加速合成的回退就按这个条件保留：AppDir 里仍然带着
+`libEGL`、`libGL`、`libgbm`、`libdrm`、`libwayland` 或 `libva` 的才回退，用宿主机
+图形栈的发布包不再回退。
+
+高分屏上保留加速合成差别很大。本机 Arch Linux / AMD / Wayland、2880x1800 120 Hz：
+同一个滚轮手势在概览页上，关掉合成时 WebKit 网页进程 6.1 秒里花掉 5.9 秒 CPU，
+开着时是 1.9 秒（GPU 占用 11% → 31%）；静止时分别是单核的 56% 和 2%。这是单机
+渲染探针，不是帧率保证，但回退从此绑在它的成因上，而不是绑在「是不是 AppImage」上。
 
 如果仍然起不来，可以分别尝试下面的覆盖；强制 X11 需要系统已经安装 XWayland：
 
@@ -229,8 +235,8 @@ DMABUF 后恢复正常，AppImage 仍失败；报告者在本机编译的 AppIma
 # 通过 XWayland 强制走 X11。这不是应用的默认行为：在没装 XWayland 的纯 Wayland
 # 系统上，它是把一种打不开换成另一种，所以这个决定留给你，不由我们替你做。
 GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
-# 显式关掉合成（AppImage 版本已经自己这么做了；如果你装的是 deb/rpm/Flatpak
-# 却有同样的症状，在这里设它）。
+# AppImage 只在 AppDir 还带着驱动相关的图形库时自己关合成；用宿主机图形栈的
+# 发布包无需覆盖。如果你装的是 deb/rpm/Flatpak 却有同样的症状，在这里设它。
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
 ```
 

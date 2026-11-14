@@ -6,6 +6,69 @@ use std::process::Command;
 
 const FALLBACK_TRANSITIONS_SCRIPT: &str = "\nwindow.__ZB_DISABLE_VIEW_TRANSITIONS__ = true;\n";
 
+// Libraries that tie an AppImage to the graphics stack of the machine that built
+// it. issue #32: an AppImage that ships them can open a blank window on another
+// distribution, which is why accelerated compositing was turned off for every
+// AppImage. The packaging now removes this layer (see .github/workflows/ci.yml),
+// so the workaround only has to apply while it is still there — an AppImage that
+// uses the host graphics stack keeps WebKit's accelerated path, which costs
+// roughly a third of the CPU while scrolling on a 2880x1800 / 120 Hz panel.
+const DRIVER_COUPLED_LIBS: &[&str] = &[
+    "libwayland-",
+    "libEGL",
+    "libGL.so",
+    "libGLX",
+    "libGLdispatch",
+    "libOpenGL",
+    "libgbm",
+    "libdrm",
+    "libxcb-dri",
+    "libva",
+];
+
+/// True when `app_dir` still carries the driver-coupled graphics libraries.
+fn bundles_driver_coupled_libs(app_dir: &Path) -> bool {
+    ["usr/lib", "usr/lib/x86_64-linux-gnu"]
+        .iter()
+        .filter_map(|sub| std::fs::read_dir(app_dir.join(sub)).ok())
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+        .any(|name| {
+            DRIVER_COUPLED_LIBS
+                .iter()
+                .any(|prefix| name.starts_with(prefix))
+        })
+}
+
+/// The AppDir root of a mounted AppImage, from `<root>/usr/bin/zeppbridge`.
+fn app_dir_root(exe: Option<&Path>) -> Option<&Path> {
+    let bin = exe?.parent()?;
+    let usr = bin.parent()?;
+    let root = usr.parent()?;
+    // A deb/rpm install also lives in /usr/bin; only an AppImage has a mount
+    // point that is not the filesystem root.
+    (usr.ends_with("usr") && !root.as_os_str().is_empty() && root != Path::new("/")).then_some(root)
+}
+
+/// Whether the AppImage still needs compositing turned off. Unknown layout keeps
+/// the old conservative answer: the fallback is cheap next to a blank window.
+fn appimage_needs_no_compositing(
+    is_appimage: bool,
+    app_dir: Option<&Path>,
+    current: Option<&OsStr>,
+) -> Option<&'static str> {
+    if current.is_some() || !is_appimage {
+        return None;
+    }
+    match app_dir {
+        Some(root) if !bundles_driver_coupled_libs(root) => None,
+        Some(_) => Some("AppImage bundles driver-coupled graphics libraries"),
+        None => Some("AppImage layout unknown"),
+    }
+}
+
 // Follow Clash Verge Rev's NVIDIA / old-Wayland detection, but respect user
 // overrides in every branch and compare version numbers rather than strings.
 // https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/utils/linux/workarounds.rs
@@ -131,13 +194,19 @@ pub fn configure() -> &'static str {
     }
 
     // Keep the existing AppImage workaround for bundled graphics-stack issues
-    // (#32). This is independent of the DMABUF policy and WebKit version.
+    // (#32), but only while the AppImage still ships that stack: CI strips it so
+    // the host copies are used, and on those builds accelerated compositing is
+    // the difference between one core pegged while scrolling and about a third.
     let current_compositing = std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE");
-    if let Some(value) = automatic_override(
-        current_compositing.as_deref(),
+    let exe = std::env::current_exe().ok();
+    let app_dir = app_dir_root(exe.as_deref());
+    let compositing_policy = appimage_needs_no_compositing(
         std::env::var_os("APPIMAGE").is_some(),
-    ) {
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", value);
+        app_dir,
+        current_compositing.as_deref(),
+    );
+    if compositing_policy.is_some() {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
     let dmabuf = std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER");
     let compositing = std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE");
@@ -148,7 +217,7 @@ pub fn configure() -> &'static str {
     // https://github.com/WebKit/WebKit/blob/webkitgtk-2.54.1/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/FrameRenderer.h
     let skip_transitions = disabled(dmabuf.as_deref()) || disabled(compositing.as_deref());
     super::diagnostics::log(&format!(
-        "Linux rendering: policy={reason}, disable_dmabuf={dmabuf:?}, disable_compositing={compositing:?}, skip_view_transitions={skip_transitions}"
+        "Linux rendering: policy={reason}, disable_dmabuf={dmabuf:?}, disable_compositing={compositing:?}, appimage_compositing={compositing_policy:?}, skip_view_transitions={skip_transitions}"
     ));
     if skip_transitions {
         FALLBACK_TRANSITIONS_SCRIPT
@@ -242,6 +311,85 @@ mod tests {
         }
         assert_eq!(automatic_override(None, true), Some("1"));
         assert_eq!(automatic_override(None, false), None);
+    }
+
+    #[test]
+    fn appimage_with_stripped_graphics_stack_keeps_accelerated_compositing() {
+        let root = HardwareFixture::new();
+        // What CI leaves behind: an AppDir with no driver-coupled libraries.
+        root.write("usr/lib/libglib-2.0.so.0", "");
+        root.write("usr/lib/libwebkit2gtk-4.1.so.0", "");
+        root.write("usr/lib/libgtk-3.so.0", "");
+        assert!(!bundles_driver_coupled_libs(&root.0));
+        assert_eq!(
+            appimage_needs_no_compositing(true, Some(&root.0), None),
+            None
+        );
+    }
+
+    #[test]
+    fn appimage_that_still_ships_graphics_libraries_keeps_the_fallback() {
+        for bundled in [
+            "usr/lib/libEGL.so.1",
+            "usr/lib/libGL.so.1",
+            "usr/lib/libGLX.so.0",
+            "usr/lib/libGLdispatch.so.0",
+            "usr/lib/libOpenGL.so.0",
+            "usr/lib/libgbm.so.1",
+            "usr/lib/libdrm.so.2",
+            "usr/lib/libwayland-client.so.0",
+            "usr/lib/libxcb-dri3.so.0",
+            "usr/lib/libva.so.2",
+            "usr/lib/x86_64-linux-gnu/libEGL.so.1",
+        ] {
+            let root = HardwareFixture::new();
+            root.write(bundled, "");
+            assert!(bundles_driver_coupled_libs(&root.0), "missed {bundled}");
+            assert_eq!(
+                appimage_needs_no_compositing(true, Some(&root.0), None),
+                Some("AppImage bundles driver-coupled graphics libraries"),
+                "wrong policy for {bundled}"
+            );
+        }
+    }
+
+    #[test]
+    fn app_dir_root_is_read_from_the_mounted_layout_and_ignores_a_normal_install() {
+        assert_eq!(
+            app_dir_root(Some(Path::new("/tmp/.mount_zb/usr/bin/zeppbridge"))),
+            Some(Path::new("/tmp/.mount_zb"))
+        );
+        // deb/rpm: the root would be /, where /usr/lib is the host, not a bundle.
+        assert_eq!(app_dir_root(Some(Path::new("/usr/bin/zeppbridge"))), None);
+        assert_eq!(app_dir_root(Some(Path::new("zeppbridge"))), None);
+        assert_eq!(app_dir_root(None), None);
+    }
+
+    #[test]
+    fn an_unreadable_app_dir_keeps_the_conservative_fallback() {
+        assert_eq!(
+            appimage_needs_no_compositing(true, None, None),
+            Some("AppImage layout unknown")
+        );
+        assert!(!bundles_driver_coupled_libs(Path::new(
+            "/nonexistent-zb-appdir"
+        )));
+    }
+
+    #[test]
+    fn non_appimage_launches_and_explicit_values_never_get_the_fallback() {
+        let root = HardwareFixture::new();
+        root.write("usr/lib/libEGL.so.1", "");
+        assert_eq!(
+            appimage_needs_no_compositing(false, Some(&root.0), None),
+            None
+        );
+        for value in ["0", "1", ""] {
+            assert_eq!(
+                appimage_needs_no_compositing(true, Some(&root.0), Some(OsStr::new(value))),
+                None
+            );
+        }
     }
 
     #[test]
