@@ -9,7 +9,7 @@
 
 需要先起不带夹具的开发服务器（.claude/launch.json 的 landing-dev，端口 5190）：
     python scripts/verify/text_overlap.py [--url http://127.0.0.1:5190] [--locales fr,de] [--width 1440]
-退出码 0 = 全部通过。全量十种语言 × 十一页约六分钟，单线程、不会满载。
+退出码 0 = 全部通过。全量十三种语言 × 十一页约八分钟，单线程、不会满载。
 """
 import argparse
 import asyncio
@@ -18,7 +18,8 @@ from datetime import date, timedelta
 
 from playwright.async_api import async_playwright
 
-LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr']
+# 全部十三种界面语言（2026-11-15 补上 zh-TW / it / pl：以前只查十种，漏的语言没人守）。
+LOCALES = ['zh', 'zh-TW', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl']
 # 计划模块（2026-10-12 第 3 批）：周视图和明天的单天页（演示库的计划从今天排起）。
 PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/exchanges', '/ai/check', '/ai/plan',
          f'/ai/plan/{(date.today() + timedelta(days=1)).isoformat()}', '/settings']

@@ -380,7 +380,7 @@ style choice; the open list of pages that still do is
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.
 
-Check before merging: run `python scripts/verify/text_overlap.py` (every interface language × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did). Open and close each new layer at 4× CPU throttle and
+Check before merging: **any UI change gets checked in all thirteen interface languages** (user, 2026-11-15, a hard line: no overlap, no text on text, no text showing through, no empty gaps in any language). Run `python scripts/verify/text_overlap.py` (thirteen languages × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did); after touching the workout stage, also run `python scripts/verify/stage_menu.py` (thirteen languages × the "•••" menu with 1–4 cards; overflow, wrapping or overlapping text fails it). A new page or layer that neither list covers gets added first, and the screenshots get looked at language by language. A choice that a picture can say (an arrangement, a ratio) gets an icon, not words. Open and close each new layer at 4× CPU throttle and
 DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
 through the frames — no bright frame, no blank frame, no jump at the start.
 
@@ -692,7 +692,7 @@ card in the registry.
   goes through Vue (only that window's `translate` / `scale`). ← / → cycle the
   stage; Esc backs out one level (summoned strip → full screen).
 - **The "•••" menu keeps only what gets used** (user, 2026-11-13): the presets
-  (`SegmentTrack`, short names when tight), show only this, full screen / exit
+  (`SegmentTrack`, **drawn as pictograms, no text**: `LayoutGlyph.vue` draws the grid / one-over-three / main-on-left arrangements at the real `layout.ts` proportions, the way ColorOS folders and Windows snap layouts do; the names only go to the tooltip and screen readers. Since 2026-11-15 — the old text presets did not fit in longer languages and the words piled on top of each other), show only this, full screen / exit
   full screen, move to strip — as icon-plus-label menu rows with a faint in-row
   highlight. The whole menu is one Liquid Glass panel
   (`.glass-control.is-lens-host`) and **the lens is there the moment it

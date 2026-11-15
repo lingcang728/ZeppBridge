@@ -195,7 +195,9 @@ function closeMenu(focusGrip = false) {
   menu.value = null;
   if (focusGrip && id) void nextTick(() => els.get(id)?.querySelector<HTMLElement>('.window-grip')?.focus());
 }
-const MENU_W = 260;
+/* 和 StageMenu.vue 的 width 一致。320 而不是 260（2026-11-15）：260 里俄 / 德 / 法的动作行（「Переместить на
+   боковую панель」）折成两行；档位已改画格子，不再占宽。 */
+const MENU_W = 320;
 const menuAt = computed(() => {
   const p = menu.value ? layout.value.placements.get(menu.value) : null;
   if (!p) return null;

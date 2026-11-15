@@ -17,6 +17,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import Icon, { type IconName } from '../../Icon.vue';
 import SegmentTrack, { type SegmentItem } from '../../SegmentTrack.vue';
+import LayoutGlyph, { type GlyphCell } from './LayoutGlyph.vue';
 import { useMessages } from '../../../i18n';
 import { stageMessages } from './stage.i18n';
 
@@ -42,23 +43,37 @@ const emit = defineEmits<{
 const t = useMessages(stageMessages);
 const root = ref<HTMLElement | null>(null);
 
-const sizes = computed<SegmentItem<number>[]>(() => {
+/* 档位只画格子不写字（2026-11-15，见 LayoutGlyph.vue）；名字留给悬停提示和读屏。
+   格子比例和 lib/stage/layout.ts 一致：1 张 SINGLE（0.66 / 0.84），2 张 PAIR，4 张左大右三的大卡 0.6。 */
+const third = 1 / 3;
+const GLYPHS: Record<number, readonly (readonly GlyphCell[])[]> = {
+  1: [[[0.17, 0, 0.66, 1]], [[0.08, 0, 0.84, 1]]],
+  2: [
+    [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]],
+    [[0, 0, 2 * third, 1], [2 * third, 0, third, 1]],
+    [[0, 0, third, 1], [third, 0, 2 * third, 1]],
+  ],
+  3: [
+    [[0, 0, 2 * third, 1], [2 * third, 0, third, 0.5], [2 * third, 0.5, third, 0.5]],
+    [[0, 0, third, 0.5], [0, 0.5, third, 0.5], [third, 0, 2 * third, 1]],
+    [[0, 0, 1, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]],
+  ],
+  4: [
+    [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]],
+    [[0, 0, 1, 0.5], [0, 0.5, third, 0.5], [third, 0.5, third, 0.5], [2 * third, 0.5, third, 0.5]],
+    [[0, 0, 0.6, 1], [0.6, 0, 0.4, third], [0.6, third, 0.4, third], [0.6, 2 * third, 0.4, third]],
+  ],
+};
+const sizes = computed<(SegmentItem<number> & { cells: readonly GlyphCell[] })[]>(() => {
   const m = t.value;
-  if (props.count === 1) return [{ value: 0, label: m.sizeStandard }, { value: 1, label: m.sizeWide }];
-  if (props.count === 2) return ['1 : 1', '2 : 1', '1 : 2'].map((label, value) => ({ value, label }));
-  if (props.count === 4) {
-    return [
-      { value: 0, label: m.grid, short: m.gridShort, title: m.grid },
-      { value: 1, label: m.oneOverThree, short: m.oneOverThreeShort, title: m.oneOverThree },
-      { value: 2, label: m.bigLeft, short: m.bigLeftShort, title: m.bigLeft },
-    ];
-  }
-  return [
-    { value: 0, label: m.mainLeft, short: m.mainLeftShort, title: m.mainLeft },
-    { value: 1, label: m.mainRight, short: m.mainRightShort, title: m.mainRight },
-    { value: 2, label: m.mainTop, short: m.mainTopShort, title: m.mainTop },
-  ];
+  const names = props.count === 1 ? [m.sizeStandard, m.sizeWide]
+    : props.count === 2 ? ['1 : 1', '2 : 1', '1 : 2']
+      : props.count === 4 ? [m.grid, m.oneOverThree, m.bigLeft]
+        : [m.mainLeft, m.mainRight, m.mainTop];
+  const glyphs = GLYPHS[Math.min(Math.max(props.count, 1), 4)]!;
+  return names.map((label, value) => ({ value, label, cells: glyphs[value]! }));
 });
+const cellsOf = (value: number) => sizes.value[value]?.cells ?? [];
 /** 滑块停在哪一档（点下去先滑过去，舞台稍后才真的换档）。没落在档上时是 -1，滑块以未选样子停在最近那档。 */
 const chosen = ref(props.exact ? props.snap : -1);
 watch(() => [props.snap, props.exact] as const, ([snap, exact]) => { chosen.value = exact ? snap : -1; });
@@ -104,12 +119,15 @@ const step = (event: KeyboardEvent) => {
         <SegmentTrack
           compact
           fill
+          icon-only
           :items="sizes"
           :model-value="chosen"
           :placeholder="snap"
           :aria-label="count === 1 ? t.size : t.split"
           @update:model-value="pick"
-        />
+        >
+          <template #default="{ item }"><LayoutGlyph :cells="cellsOf(item.value)" /></template>
+        </SegmentTrack>
       </div>
       <div v-if="!full" class="menu-sep" aria-hidden="true"></div>
       <button
@@ -131,7 +149,8 @@ const step = (event: KeyboardEvent) => {
 .stage-menu.glass-control {
   position: absolute;
   z-index: 1000;
-  width: 260px;
+  /* 和 StageShell.vue 的 MENU_W 一致（居中定位按它算）。 */
+  width: 320px;
   border-radius: 22px;
   /* 投影画在玻璃层上（随裁切一起长出来），面板本身不带：不然开合途中整块投影先出现。 */
   box-shadow: none;

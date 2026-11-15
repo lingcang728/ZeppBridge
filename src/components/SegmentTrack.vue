@@ -201,8 +201,11 @@ const restsOn = (value: T) => {
 
 /* 一档档退：每次都从原样（0）起，量「各项原宽之和」是否比轨道宽（轨道 max-width: 100%，放不下时
    clientWidth 就是能给的宽度），放不下就退一档、等 DOM 更新（nextTick 是微任务，中间不出帧）再量。
-   项本身不收缩，同一个宽度永远落在同一档，不会来回翻。铺满型（fill）、noWrap 和浮动导航 / 按钮组不参与。 */
-const ladderOn = () => !props.fill && !props.noWrap && props.variant === 'inset';
+   项本身不收缩，同一个宽度永远落在同一档，不会来回翻。noWrap 和浮动导航 / 按钮组不参与。
+   铺满型（fill）也走这条梯子（2026-11-15：舞台菜单的布局档在英 / 西 / 荷等语言里三项被等分压窄、
+   字溢出去和邻项、选中字叠在一起）：fill 的项最窄是自己的原宽（min-width: max-content），
+   放得下时等分，有一项放不下等分就先按原宽给它、其余等分剩下的，总和放不下才退档。 */
+const ladderOn = () => !props.noWrap && props.variant === 'inset';
 const overflows = (el: HTMLElement) => {
   // 按各项原宽之和算，不看 scrollWidth：浮起来的透镜会伸出轨道，把 scrollWidth 撑大。
   const pad = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
@@ -857,7 +860,8 @@ onBeforeUnmount(() => {
 /* 开着折射：透镜浮起来时比胶囊还高，要伸出轨道。 */
 .segment-track.has-lens { overflow: visible; }
 .segment-track.is-fill { display: flex; }
-.segment-track.is-fill .segment-item { flex: 1 1 0; }
+/* 等分，但绝不窄过自己的字：窄过了字就溢出到邻项上（见 ladderOn）。 */
+.segment-track.is-fill .segment-item { flex: 1 1 0; min-width: max-content; }
 /* 表单里的分段胶囊项不收缩（放不下就折行）；浮动导航和按钮组不折行，按原样收缩。 */
 .segment-track.is-inset:not(.is-fill) .segment-item { flex: 0 0 auto; }
 .segment-track.is-wrapped { display: flex; width: 100%; flex-wrap: wrap; border-radius: 20px; }
