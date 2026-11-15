@@ -345,6 +345,9 @@ const dailyMaxChartOption = computed(() => {
 const shownDailyMax = useQueuedOption(dailyMaxChartOption);
 
 // 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
+// 形变进场时首屏之外的那几张卡等落地再挂；直接打开（没有形变）就照常一次画完。
+const belowFold = ref(!preloaded);
+afterMotion(() => { belowFold.value = true; });
 onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });
 
@@ -429,6 +432,9 @@ const daySpan = computed(() => {
 
       <!-- 24 小时曲线不跟这个开关走。放在大图下面，才不会让人以为
            切 7 天 / 1 个月会改那张全天图。 -->
+      <!-- 首屏之外的那几张卡等形变落定再挂：它们在窗口还在长的时候挂进来，
+           会把第一帧的排版/绘制顶到后面（实测卡开的「点下去没反应」就花在这）。 -->
+      <template v-if="belowFold">
       <TrendRangeBar />
 
       <!-- 每日最高心率、静息心率与 HRV 趋势直接摊开：点进这一页就是来看它们的。 -->
@@ -474,6 +480,7 @@ const daySpan = computed(() => {
           </div>
           <MissingMetricsRow :items="missingTrends" />
         </SectionGroup>
+      </template>
 
     </template>
   </section>
