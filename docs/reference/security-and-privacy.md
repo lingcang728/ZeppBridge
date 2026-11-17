@@ -304,8 +304,7 @@ authorization, because you may authorize the same account again.
 ### Uninstalling (Windows)
 
 Ticking "delete app data" in the uninstaller deletes the tokens of both channels
-and the `data` folder. The local API token entry (`local-api-token`) is
-currently left in Credential Manager; remove it there by hand if you want.
+and the `data` folder, including the local API token (`local-api-token`).
 
 For a complete wipe on other platforms, use the in-app actions first, then open
 the data folder, check what remains, and handle it according to your own backup
