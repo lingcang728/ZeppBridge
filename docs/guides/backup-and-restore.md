@@ -6,11 +6,12 @@ complete copy".
 
 [简体中文](backup-and-restore.zh-CN.md)
 
-## The three kinds of "export" are not the same thing
+## The kinds of "export" are not the same thing
 
 | | What it is | Who can read it | What it is for |
 |---|---|---|---|
-| **JSON / CSV / GPX** | An interchange file for the selected range | Any tool | Handing data to other software, analysing it yourself |
+| **JSON / CSV / GPX / FIT** | An interchange file for the selected range or workout | Any tool | Handing data to other software, analysing it yourself |
+| **Take everything with you** | One JSON of everything you wrote in the app: ratings, notes, shoes, races, plans, AI tasks, letters | Any tool | Keeping your own entries |
 | **Database snapshot** | A complete copy of the whole `zepp.db` | ZeppBridge only | Disaster recovery |
 | **AI hand-off package** | Material you picked, with redaction applied | The model you chose | Getting an AI to explain your data |
 
@@ -20,7 +21,7 @@ coverage ledger; importing it back would give you a crippled database.
 
 ## Snapshots
 
-Settings → "Database snapshots and restore".
+**Settings → Advanced and maintenance → Backup and restore.**
 
 - Uses SQLite's Backup API rather than copying the live database file. Copying a
   SQLite file that has an open WAL usually produces a backup that will not open.
@@ -28,8 +29,7 @@ Settings → "Database snapshots and restore".
   normalizer revision, sample coverage range, per-table row counts, byte size
   and SHA-256.
 - `integrity_check` runs immediately after creation. If it fails, the
-  half-finished file is deleted and an error is raised — a broken backup that
-  *looks* usable is worse than no backup at all.
+  half-finished file is deleted and an error is raised.
 - You can re-verify at any time: does the file exist, is the size right, does
   the SHA-256 match, is the database itself intact.
 - **One is taken automatically before every database upgrade.** Those automatic
@@ -96,14 +96,13 @@ has exactly four possible outcomes:
 
 | Status | Meaning |
 |---|---|
-| Written | Fetched, and stored locally |
-| Nothing from the cloud | Requested, and Zepp said clearly that it has no data for that period. **This is not a failure** |
-| Pending | Not its turn yet |
+| Saved | Fetched, and stored locally |
+| Empty in cloud | Requested, and Zepp said clearly that it has no data for that period. **This is not a failure** |
+| To do | Not its turn yet |
 | Failed | Can be retried |
 
-The interface deliberately does not flatten these four into one percentage.
-Once it becomes a progress bar, "do I actually have my 2023 data" has no answer
-— and that is the only question worth asking.
+The interface shows these four counts rather than one percentage, so you can
+tell whether a given year is really there.
 
 **Only when every chunk in the ledger has a conclusion will the interface and
 the documentation say "a complete local copy".** Until then the wording is
@@ -111,7 +110,7 @@ always "a local copy of the range that synced successfully".
 
 ### Backfill can be interrupted
 
-Stop whenever you like. "Continue backfill" picks up from the chunks that have
+Stop whenever you like. **Continue backfilling** picks up from the chunks that have
 no conclusion yet. It does not start over, and it does not create duplicates.
 
 ### When retention and backfill conflict
@@ -120,10 +119,6 @@ If the backfill range reaches outside your local retention window and long-term
 archiving is off, the app stops the backfill up front and tells you to either
 pick **Forever** or lengthen the retention.
 
-Fetching three years of history and having the next successful sync delete it is
-the most trust-destroying thing this app could do — so that combination is
-blocked before it starts, rather than explained afterwards.
-
 ### How much space it will take
 
 The estimate is given per stream, using **the rate your own local data actually
@@ -131,9 +126,9 @@ accumulates** (bytes of stored payloads ÷ days observed), not a hard-coded
 constant. Someone who runs daily and someone who runs twice a year should not
 get the same answer.
 
-Streams with fewer than seven days of local samples are labelled explicitly as
-"not enough samples, not counted" — better than inventing a rate and multiplying
-it by three years.
+Streams with fewer than seven days of local samples are labelled "not enough
+samples, not counted". When the whole library is that new, the app falls back
+to a built-in rough estimate and says so.
 
 If the free space cannot hold the estimated backfill, the backfill does not
-start.
+start. With less than 300 MB free, backfills longer than 90 days are refused.

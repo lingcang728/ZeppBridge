@@ -12,8 +12,8 @@
 
 ## Why does signing in go through zeppbridge.com?
 
-Only the **Zepp authorization** (official API) does, and only for the sign-in
-itself. Zepp's Open Platform hands out tokens only to a server that presents
+Only the **Zepp authorization** (official API) does, and only for signing in
+and refreshing the token. Zepp's Open Platform hands out tokens only to a server that presents
 the app secret, and it has no PKCE, the standard way for a desktop app to sign
 in without a secret. An app secret shipped inside a desktop app is a secret
 everyone can read, so that one step runs on our server
@@ -30,7 +30,8 @@ What it keeps and what it doesn't:
 - **Refreshing a token** later goes through the same server, which adds the app
   secret, passes the request to Zepp and keeps nothing.
 - **What it keeps permanently:** the app ID and secret, plus a SHA-256 hash of
-  each Zepp user ID that completed authorization, with no names or raw IDs.
+  each Zepp user ID that completed authorization and when it first and last
+  did so, with no names or raw IDs.
 
 The **advanced data** connection doesn't use our server at all: it talks to
 Zepp directly. Full details: [Connecting your account](connection.md) and
@@ -53,8 +54,7 @@ ZeppBridge has two connections, and they don't return the same data.
 
 With the official authorization alone, everything in the right-hand column is
 missing. That's a limit of what Zepp's official channel offers, not a
-ZeppBridge bug. We've asked Zepp (Huami) to open more of it and haven't had a
-reply.
+ZeppBridge bug.
 
 **If you signed up for Zepp with Google, Apple or another third-party
 account,** the advanced data connection can't use that sign-in. Set an email
@@ -78,8 +78,8 @@ it together with a watch, it shows up as a second device.
   official authorization alone, devices can't be identified and Settings says
   so; it doesn't mean the strap's data is missing.
 - If a device still shows as **not identified** with advanced data connected,
-  send a report from **Settings › Report a problem**. Once two different users report the
-  same model number with nobody disagreeing, we add it.
+  send a report from **Settings › Report a problem**. Matching reports from different users
+  go to review, and confirmed models are added.
 - Which metrics you see depends on what the strap records and on the
   connection: HRV, for example, only comes through advanced data (see
   [above](#missing-data)).

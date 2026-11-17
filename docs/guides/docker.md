@@ -22,6 +22,12 @@ window on a real session. See the [connection guide](connection.md).
 
 ## Getting the credentials in
 
+**The container syncs through Advanced data (the App Token).** The official
+Zepp authorization cannot be passed in through the environment; if that is the
+only connection you have, the container can only use it through the file store
+below, with a `credentials.json` copied from a desktop that keeps its tokens in a
+file, and token refreshes then go through `zeppbridge.com`.
+
 Two things have to reach the container: `auth.json` (non-secret metadata — user
 ID and region host) and the App Token (secret).
 
@@ -31,9 +37,10 @@ mkdir -p ./data
 cp ~/.local/share/zeppbridge/data/auth.json ./data/
 ```
 
-The token is in your desktop machine's credential store, so copy it out of there
-(Settings shows it masked; the store itself holds the value). Then pick one of
-these:
+The desktop app never displays a saved token. Read it from a browser instead:
+sign in at `https://watchface.zepp.com/` and copy `apptoken` from the developer
+tools (see the [Linux guide](linux.md#moving-an-existing-library-from-windows-or-macos)).
+Then pick one of these:
 
 ### Environment (recommended)
 
@@ -63,15 +70,15 @@ read the file in your own wrapper, or use the file store below.
 docker run --rm ... -e ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge:local ...
 ```
 
-Writes the token to `/data/credentials.json`, mode 0600, in a directory
-tightened to 0700. This is an explicit downgrade from a keyring: file
+Uses `/data/credentials.json` (mode 0600, directory 0700). Nothing in the
+container writes this file — the CLI has no sign-in — so copy it from a desktop
+install that uses file storage. This is an explicit downgrade from a keyring: file
 permissions are the only thing protecting it, and it sits in the same volume as
 your backups. It exists because on a headless machine the alternative is not a
 safer store, it is nothing at all.
 
-Once `credentials.json` is there, later runs pick the file store up on their own
-— you do not have to keep passing the variable. Set it once, on the run that
-writes the token.
+Once `credentials.json` is there, runs pick the file store up on their own —
+you do not have to pass the variable.
 
 ## Build and run
 
@@ -88,7 +95,7 @@ never uses it) and `tzdata`.
 docker run --rm -v "$PWD/data:/data" --user "$(id -u):$(id -g)" \
   zeppbridge:local
 
-# Export a month. Note --json goes to stdout alone, so redirection is clean.
+# Export a month to a file in the data volume.
 docker run --rm -v "$PWD/data:/data" --user "$(id -u):$(id -g)" \
   zeppbridge:local \
   zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv \
@@ -179,7 +186,9 @@ docker compose -f packaging/docker/docker-compose.yml run --rm sync
 ```
 
 Set `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID` in a `.env` file next to it if your uid is
-not 1000.
+not 1000. Paths in the compose file are relative to `packaging/docker/`, so its
+`./data` is `packaging/docker/data`, not the `./data` used above. Every service,
+`status` included, expects `ZEPPBRIDGE_APP_TOKEN` to be set.
 
 ## MCP
 
@@ -226,7 +235,7 @@ Node and Rust versions are pinned as build args — bump them deliberately.
 
 ## Privacy
 
-The runtime image needs the network for exactly one thing: `zeppbridge-cli sync`
-talking to the Zepp cloud. Everything else works with `--network none`, and the
-MCP server should always be run that way. No telemetry, and nothing is sent
-anywhere except your own Zepp account's API.
+The runtime image needs the network only to sync with the Zepp cloud (and, with
+an official-authorization token, to refresh it through `zeppbridge.com`).
+Everything else works with `--network none`; run the MCP server that way unless
+you want its `sync_now` and `publish_training_plan` tools. No telemetry.

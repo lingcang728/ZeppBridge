@@ -15,6 +15,8 @@
 
 ## 怎么把凭据送进去
 
+**容器走高级数据（App Token）同步。** 官方授权没法从环境变量传进来；如果你只连了官方授权，容器只能用下面的文件存储，拷一份把令牌存在文件里的桌面端的 `credentials.json`，之后刷新令牌会经过 `zeppbridge.com`。
+
 有两样东西要进到容器里：`auth.json`（不敏感的元数据——用户 ID 和区域地址）和 App Token（秘密）。
 
 ```bash
@@ -23,7 +25,7 @@ mkdir -p ./data
 cp ~/.local/share/zeppbridge/data/auth.json ./data/
 ```
 
-令牌在你桌面机器的凭据存储里，从那里取出来（设置页只显示打码后的样子，值在存储里）。然后二选一：
+桌面应用从不显示已保存的令牌。从浏览器取：在 `https://watchface.zepp.com/` 登录，从开发者工具里复制 `apptoken`（见 [Linux 指南](linux.zh-CN.md#把已有的库从-windows-或-macos-搬过来)）。然后二选一：
 
 ### 环境变量（推荐）
 
@@ -48,9 +50,9 @@ docker run --rm \
 docker run --rm ... -e ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge:local ...
 ```
 
-令牌写到 `/data/credentials.json`，权限 0600，所在目录收紧到 0700。这是相对密钥环的明摆着的降级：保护它的只有文件权限，而且它和你的备份在同一个卷里。它存在的理由是：在一台无头机器上，替代品不是「更安全的存储」，而是「根本用不了」。
+用 `/data/credentials.json`（权限 0600，目录 0700）。容器里没有任何东西会写这个文件——命令行没有登录——所以要从用文件存储的桌面端拷过来。这是相对密钥环的明摆着的降级：保护它的只有文件权限，而且它和你的备份在同一个卷里。它存在的理由是：在一台无头机器上，替代品不是「更安全的存储」，而是「根本用不了」。
 
-`credentials.json` 一旦在那里，后面的运行会自己认出文件存储——不必每次都带上那个变量。只在写入令牌的那一次设置它。
+`credentials.json` 在那里，运行时会自己认出文件存储，不必带那个变量。
 
 ## 构建与运行
 
@@ -140,7 +142,7 @@ export ZEPPBRIDGE_APP_TOKEN=...
 docker compose -f packaging/docker/docker-compose.yml run --rm sync
 ```
 
-如果你的 uid 不是 1000，在它旁边的 `.env` 里设 `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID`。
+如果你的 uid 不是 1000，在它旁边的 `.env` 里设 `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID`。compose 文件里的路径相对 `packaging/docker/`，所以它的 `./data` 是 `packaging/docker/data`，不是上面用的 `./data`。所有服务（包括 `status`）都要求设了 `ZEPPBRIDGE_APP_TOKEN`。
 
 ## MCP
 
@@ -179,4 +181,4 @@ docker run --rm -v "$PWD:/src" -w /src zeppbridge-build:local \
 
 ## 隐私
 
-运行时镜像需要网络只为了一件事：`zeppbridge-cli sync` 和 Zepp 云对话。其余一切都能在 `--network none` 下工作，而 MCP 服务应当一直这么运行。没有遥测，除了你自己 Zepp 账号的 API 之外不向任何地方发送任何东西。
+运行时镜像只在和 Zepp 云同步时需要网络（用官方授权令牌时，刷新还会经过 `zeppbridge.com`）。其余都能在 `--network none` 下工作；不用 `sync_now` 和 `publish_training_plan` 的话，MCP 服务就这么跑。没有遥测。
