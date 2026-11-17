@@ -554,10 +554,14 @@ fn read_only_open_falls_back_to_immutable_when_the_shm_cannot_be_opened_at_all()
         .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
             row.get::<_, i64>(0)
         });
-    assert!(plain.is_err(), "-shm 打不开时普通只读打开应当失败");
-
     let db = Database::open_read_only(path).expect("-shm 打不开也要能只读打开");
-    assert_eq!(db.read_fallback(), Some(ReadFallback::Immutable));
+    // Windows 上普通只读打开会失败，必须走 immutable；Linux / macOS 没有 -wal 时普通只读本来就能打开
+    // （CI 2026-11-17），那就不该走兜底。
+    if plain.is_err() {
+        assert_eq!(db.read_fallback(), Some(ReadFallback::Immutable));
+    } else {
+        assert_eq!(db.read_fallback(), None);
+    }
     assert_eq!(db.count_metric_samples().unwrap(), 1);
     assert!(db.is_query_only());
     drop(db);
