@@ -3,7 +3,7 @@ import { defineMessages, messagesOf } from '../../i18n';
 /*
  * 「?」浮层三段文案·日常活动域（D6）：steps / distance / active_calories / active_minutes。
  *
- * 来源事实（v3-plan §3、normalizer/tests/official.rs）：官方授权与「高级数据」都会给
+ * 来源事实（docs/reference/official-api-facts.zh-CN.md §2、normalizer/tests/official.rs）：官方授权与「高级数据」都会给
  * 每日步数、距离、活动热量；活动分钟只有「高级数据」（官方每日汇总不带它）。
  */
 

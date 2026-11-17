@@ -1,22 +1,40 @@
 # ZeppBridge
 
-本目录 `MyProject\ZeppBridge` 是 `lingcang728/ZeppBridge` 的仓库本体。
+`lingcang728/ZeppBridge` 的仓库规则，给在这里工作的人和 AI agent 看。构建、测试和发版细节见 [开发文档](docs/development/development.zh-CN.md)，外部贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 分支与发版（2026-10-14 起）
+维护者本机的路径、测试包、真实库和 agent 派发规则写在仓库根目录的 `AGENTS.local.md`（不入库，`.gitignore` 已忽略）；有这份文件时一并读。
 
-- 3.0.0 已发布（PR #126 把 v3 压缩合进 main，标签 `v3.0.0`）。**从此直接在 `main` 上开发**，本目录检出的就是 `main`。
-- `v3` 分支冻结：不再往上提交，不从它开新分支，也不再合回 main。2.x 不再维护。
-- 仓库主人直接提交推送 `main`，不开 PR（2026-10-19 定）：动手前 `git pull --rebase origin main`，本地门禁跑完再推；push 会自动跑 CI，打 `v*` 标签前确认 main 最新 CI 是绿的。分支保护（Documentation and CI routing、Windows / macOS verification）只拦外部 PR，管理员不受限。
-- 普通 README、文档 Markdown 和文档图片改动只跑轻量文档检查，三平台构建及 Docker 跳过。参与 Rust 契约测试的 `docs/reference/cli-and-mcp*.md`、代码、配置、脚本及未知文件仍跑完整验证。发布标签与手动 CI 始终跑完整流程。
-- **推 `v*` 标签就会触发 CI 打包并创建 GitHub Release**，已装用户随即收到更新。推送、打标签、发版先问用户。
+## 分支与发版
 
-## 本地测试包
+- 在 `main` 上开发。`v3` 分支已冻结，不再提交、不从它开新分支；2.x 不再维护。
+- 维护者直接推送 `main`；外部贡献走 PR。分支保护（Documentation and CI routing、Windows / macOS verification）拦外部 PR。
+- 动手前 `git pull --rebase origin main`，本地门禁跑完再推。push 会自动跑 CI；打 `v*` 标签前确认 main 最新的 CI 是绿的。
+- **推 `v*` 标签就会触发 CI 打包并创建 GitHub Release**，已装用户随即收到更新。所以推送、打标签、发版都要维护者明确同意，agent 不自行做。
+- 普通 README、`docs/**/*.md` 和文档图片的改动只跑轻量文档检查，三平台构建和 Docker 跳过。参与 Rust 契约测试的 `docs/reference/cli-and-mcp*.md`、代码、配置、脚本和其他文件仍跑完整验证；发布标签和手动触发的 CI 始终跑完整流程。
 
-- exe：`release\ZeppBridge.exe`（`npm run package:release` 产出）
-- 快捷方式：`ZeppBridge.lnk`（桌面 / 开始菜单）；Win+R / App Paths：`ZeppBridge`
-- `release\data` 是用户的真实库（和 exe 同目录），只能复制出来只读查询；本目录同时是 git 仓库本体，整个文件夹不能删。
-- Rust 门禁走 `pwsh scripts\v3-gates.ps1`（cargo target 隔离在 `G:\build_cache\cargo-target-v3`）。
+## 门禁
 
-## 多语言翻译规则
+- 前端：`npm run build`、`npm test`、`npm run test:functions`、`npm run i18n:check`、`npm run docs:check`、`npm run version:check`、`npm run lockfile:check`。改了 `.vue` 模板再跑一次 `npx vite build`（vue-tsc 查不出模板编译错误）。
+- Rust：`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace --locked`（在 `src-tauri/` 下，或加 `--manifest-path src-tauri/Cargo.toml`）。`--workspace` 不能省：这是 cargo workspace（应用 + core + cli + mcp），漏掉它只测了应用一个包。
+- 多个 worktree 并行时，每个 worktree 用自己的 `CARGO_TARGET_DIR`。共用 target 目录会让两棵源码树写同一批产物指纹，典型症状是 `cargo check` 过、`cargo test` 却挂在莫名其妙的地方。
+- `cfg(not(windows))` 分支的编译和 clippy 错只在 Linux / macOS CI 上暴露，Windows 本机门禁看不到。
 
-- 翻译多语言任务时，必须为每种语言单独派发一个独立的 Agent 并行执行（例如 7 种语言派 7 个 Agent），禁止将多种语言打包给单个 Agent，以最大化并行效率。
+## 契约与文档
+
+- `docs/reference/cli-and-mcp*.md` 的 MCP 工具表由 `src-tauri/crates/mcp/src/tests/browse.rs` 校验：首格是反引号包住的 snake_case 名字的表格行都被当成工具名，集合必须和注册的工具完全一致。增删工具时两份文档一起改；不要在这两份文档里另加首格是反引号 snake_case 的表格行。
+- CLI 参数以 `src-tauri/crates/cli/src/main.rs` 的 `HELP` 为准，退出码以 `EXIT_*` 常量为准；文档跟着代码改。
+- `scripts/release/check-version-consistency.mjs` 用正则盯着两份 `docs/reference/architecture*.md` 开头的版本句，改那一句要同步改脚本。
+- `docs/releases/<版本>/*.md` 和 `docs/releases/letters/**` 会被应用和官网读取，路径不能动。
+- 能力有变化就同步改 [`capability-maturity`](docs/reference/capability-maturity.zh-CN.md) 对应的那一行（中英两份）。
+- 官方开放平台的接口事实写在 [`official-api-facts`](docs/reference/official-api-facts.zh-CN.md)；代码注释引用接口事实时指向它。
+
+## 代码约定
+
+- 数据库迁移（`storage/migrations.rs`）只能追加，已发布的 DDL 永不修改。
+- 同步窗口、保留期这类常量只在 `crates/core/src/contract.rs` 定义一次，别处不要写死数字。
+- 新增 Tauri command 要改四处：`src-tauri/src/commands/` 里的实现、`commands/mod.rs` 的同名导出、`src-tauri/src/lib.rs` 的 `generate_handler!`、前端 `src/lib/bridge/types.ts` 与 `tauri.ts`。漏一处 `npm run build` 就会挂。
+- 界面文案用 `defineMessages(zh, en, es?)` 写；新文案至少写中文和英文，其余语言由 `npm run i18n:check -- --write-pending` 登记到 `src/i18n/locales/<语言>.pending.txt`，翻完一行删一行。导出 JSON 里给 CLI / MCP 用的说明字段是契约，不翻译。
+- 改界面要看所有界面语言（`src/i18n/index.ts` 的 `LOCALES`），不能有重叠、叠字或空缺；可以用 `scripts/verify/text_overlap.py` 辅助检查。
+- 不要把令牌、Cookie、HAR、精确 GPS、个人健康数值写进日志、测试、fixture 或提交。测试数据用虚构值。
+- Zepp 合作方资料（官方 PDF、对接截图、应用凭据）不进本仓库或任何公开仓库；需要时只写结论。
+- 已移除的旧方案不要恢复：局域网抓包（MITM、用户 CA、Wi-Fi 代理）、`start_capture` 一类命令。

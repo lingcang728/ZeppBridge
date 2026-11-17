@@ -59,7 +59,7 @@ export function markSql(ids, { category = null, status = null, fixedIn = null, n
   return `UPDATE letter_replies SET ${sets.join(', ')} WHERE id IN (${ids.map(q).join(', ')})`;
 }
 
-/** 作者一对一回复的长度上限（字符数）。ZeppDock 的回复框用同一个数。 */
+/** 作者一对一回复的长度上限（字符数）。别的回复工具也要用同一个数。 */
 export const AUTHOR_REPLY_MAX_CHARS = 2000;
 
 /** 取一封回信给 agent 读（`show`）：语言、版本、原文、已有的作者回复。 */

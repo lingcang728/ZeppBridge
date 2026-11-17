@@ -20,10 +20,10 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "src" / "assets" / "devices" / "catalog.json"
 ASSET_DIR = CATALOG_PATH.parent
-AUDIT_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.json"
-EXPECTED_ENTRY_COUNT = 58
-EXPECTED_SUPPORTED_COUNT = 57
-EXPECTED_CANONICAL_COUNT = 55
+AUDIT_PATH = ROOT / "scripts" / "assets" / "device-catalog-audit.json"
+EXPECTED_ENTRY_COUNT = 64
+EXPECTED_SUPPORTED_COUNT = 63
+EXPECTED_CANONICAL_COUNT = 61
 # Colour variants share art; name-only additions such as Pace have no art.
 # Their paired null image_key/asset_hash is checked below.
 EXPECTED_ASSET_COUNT = 52
@@ -208,9 +208,9 @@ def main() -> None:
         entry = entry_by_id[catalog_id]
         if row.get("asset_key") != entry.get("image_key"):
             fail(f"audit asset mismatch for {catalog_id}")
-        source_capture = ROOT / str(row.get("source_capture", "")).replace("/", "\\")
-        if not source_capture.is_file():
-            fail(f"audit source capture missing {source_capture}")
+        # 原始截图（design_picture/）不进仓库，这里只要求记下了出处，不检查文件在不在。
+        if not str(row.get("source_capture", "")).strip():
+            fail(f"audit source capture missing for {catalog_id}")
         if not row.get("variant") or not row.get("merge_relation"):
             fail(f"audit missing variant/merge relation for {catalog_id}")
 

@@ -5,7 +5,7 @@
 //! 两边是同一套后端，数据格式一样，只是字段改了驼峰名。睡眠、逐分钟心率、每日 / 每小时
 //! 步数的形状不同，在这里单独解析。
 //!
-//! 守着三条禁令（`docs/development/v3-plan.md`）：官方的 `sleepHrv` 不写进任何 HRV 列；
+//! 守着三条禁令（`docs/reference/official-api-facts.zh-CN.md` §3）：官方的 `sleepHrv` 不写进任何 HRV 列；
 //! 缺失的不补 0；认不出的不猜。
 
 use super::band::normalize_type_text;

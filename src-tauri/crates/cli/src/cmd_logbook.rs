@@ -5,7 +5,8 @@
 //! （字段和桌面端的 `ShoeInput` / `RaceInput` 一样），用 `--file` 给路径或 `-` 读标准输入——
 //! 不叫 `--json`，那个开关在所有命令里都是「输出成 JSON」。
 //!
-//! MCP 不写这里（`logbook/mod.rs` 的约定不变）：AI 只在 `get_athlete_profile` 里读到跑鞋和比赛。
+//! MCP 也能写这两张表：`save_shoe` / `save_race` 走 `training_plan::standalone::write_once`，
+//! 同样拿写锁，并记进 `mcp_writes` 改动账本供用户撤销；AI 在 `get_athlete_profile` 里读到它们。
 
 use std::io::Read;
 

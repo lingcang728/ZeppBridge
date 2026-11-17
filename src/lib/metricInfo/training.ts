@@ -4,7 +4,7 @@ import { defineMessages, messagesOf } from '../../i18n';
  * 「?」浮层三段文案·训练域（D6）：vo2max / training_load / pai_total /
  * lactate_threshold / training_balance。
  *
- * 来源事实（v3-plan §4、storage/metrics.rs）：VO₂max、日度训练负荷、乳酸阈只有
+ * 来源事实（docs/reference/official-api-facts.zh-CN.md §3、storage/metrics.rs）：VO₂max、日度训练负荷、乳酸阈只有
  * 「高级数据」；PAI 官方授权也会同步（/users/-/openData/PaiSummary）；负荷平衡
  * 的急慢比是 ZeppBridge 本机按单次运动负荷算的（7 天之和 ÷ 28 天之和 ÷ 4，窗口不完整不给）。
  */

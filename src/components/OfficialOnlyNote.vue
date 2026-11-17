@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 只连了 Zepp 官方授权时，如实说一句哪些指标官方没有（v3-plan 批次 ③ 3e）。两边都连、或者只连旧通道时不出现。 */
+/* 只连了 Zepp 官方授权时，如实说一句哪些指标官方没有（见 docs/reference/official-api-facts.zh-CN.md §3）。两边都连、或者只连旧通道时不出现。 */
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from './Icon.vue';

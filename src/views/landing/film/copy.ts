@@ -1,7 +1,7 @@
 import type { LandingLocale } from '../../../composables/useLandingLocale';
 
 /**
- * 宣传片字幕。中文定稿见 桌面「视频文案&网站\网站与视频计划.md」第四、八节；英文求信达。
+ * 宣传片字幕。中文是定稿；英文求信达。
  * 其余八种语言在 P5 按信达雅补齐，未补之前回落英文（不回落中文：看不懂中文的人更多）。
  */
 export interface Caption { title: string; sub?: string }

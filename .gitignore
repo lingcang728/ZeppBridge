@@ -142,3 +142,9 @@ docs/assets/readme/*.mp4
 /packaging/arch/*.pkg.tar.*
 
 .prepared-release/
+
+# 维护者本机的笔记与临时文件（不入库）
+AGENTS.local.md
+翻译.md
+计划*.md
+temp-*.cjs

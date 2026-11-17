@@ -1,7 +1,7 @@
 import { defineMessages, useMessages } from '../../i18n';
 
 /*
- * 新手引导的文案（3.1.1 重写，桌面《计划.md》四）。每步一句短话，说明小字能省就省。
+ * 新手引导的文案（3.1.1 重写）。每步一句短话，说明小字能省就省。
  * 步骤文案按 `steps.<章>` 下的 s1、s2… 取，序号和 lib/tour/chapters.ts 的步骤下标一一对应。
  */
 const messages = defineMessages(

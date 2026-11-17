@@ -21,7 +21,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw '图标校验失败。' }
   cargo fmt --manifest-path src-tauri\Cargo.toml --all -- --check
   if ($LASTEXITCODE -ne 0) { throw 'Rust 格式校验失败。' }
-  cargo test --manifest-path src-tauri\Cargo.toml --locked
+  cargo test --manifest-path src-tauri\Cargo.toml --workspace --locked
   if ($LASTEXITCODE -ne 0) { throw 'Rust 测试失败。' }
 
   if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY) -and

@@ -1,5 +1,5 @@
 /**
- * 动效的性能预算（批次 6，参考 Telegram-iOS 的思路，没有拷代码；笔记在 docs/development/motion-performance-notes.md）。
+ * 动效的性能预算（参考 Telegram-iOS 的思路，没有拷代码；笔记在 docs/development/motion-performance-notes.md）。
  *
  * - **档位**：按核数先猜一个上限（Telegram 用核数判断「图形够不够用」），首启空闲时量几十帧再定，记住；
  *   之后每放完一次重特效看它的帧，连续两次大半帧超时就往下降一档。帧时只留在本机内存，不上报。

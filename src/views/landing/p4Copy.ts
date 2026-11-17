@@ -3,7 +3,7 @@
  * （id / scene / icon 不翻，只翻字），`__tests__/p4Copy.test.ts` 守着。
  * 其他语言各一个文件 `p4/<语言>.ts`（default 导出 P4Copy），放进去就自动生效。
  * 还没有译文的语言不在 P4_COPY 里，页面对它们回落到旧版布局（MotionStage / RecordBoard / AiStage），
- * 不会出现半页中文；待翻译的条目登记在桌面《翻译.md》。
+ * 不会出现半页中文。
  */
 import type { DesignIconName } from '../../components/DesignIcon.vue';
 import type { LandingLocale } from '../../composables/useLandingLocale';

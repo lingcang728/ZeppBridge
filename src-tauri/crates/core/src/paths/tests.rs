@@ -418,7 +418,7 @@ fn build_cache_dirs_are_detected() {
         r"C:\proj\src-tauri\target\debug"
     )));
     assert!(!is_build_artifact_dir(Path::new(
-        r"C:\Users\example\Desktop\MyProject\ZeppBridge\release"
+        r"C:\Users\example\Apps\ZeppBridge\release"
     )));
     assert!(!is_build_artifact_dir(Path::new(r"D:\ZeppBridge")));
 }

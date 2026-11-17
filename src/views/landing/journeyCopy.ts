@@ -219,7 +219,7 @@ const en: JourneyCopy = {
 };
 
 function pack(partial: Pick<JourneyCopy, 'title' | 'lead' | 'nav' | 'groups' | 'links' | 'themes' | 'motionTitle' | 'motionLead' | 'motions' | 'recordsTitle' | 'records' | 'aiTitle' | 'aiLead' | 'you' | 'reply' | 'turns' | 'beats' | 'settingsTitle' | 'settingsLead' | 'settings' | 'demoTitle' | 'demoLead' | 'demoStart' | 'demoReset' | 'demoTabs' | 'back' | 'downloadTitle' | 'downloadLead' | 'downloadPending' | 'install' | 'system' | 'starOnGithub'> & Partial<Pick<JourneyCopy, 'windowsBlocked' | 'macInstall' | 'copyCommand' | 'copied' | 'changelog'>>): JourneyCopy {
-  // 还没翻的语言先回落英文；待翻清单在桌面《翻译.md》。
+  // 还没翻的语言先回落英文。
   return { windowsBlocked: en.windowsBlocked, macInstall: en.macInstall, copyCommand: en.copyCommand, copied: en.copied, changelog: en.changelog, ...partial };
 }
 

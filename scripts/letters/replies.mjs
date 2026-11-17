@@ -4,7 +4,7 @@
  *
  *   node scripts/letters/replies.mjs export [--out <文件夹>]
  *       把没处理完的回信导成 Markdown + JSON，按关键词粗分类，附「我也遇到」计票。
- *       默认导到 桌面\回信\（仓库外；回信原文绝不进仓库）。
+ *       默认导到 ~/Desktop/回信/（仓库外；回信原文绝不进仓库）。
  *   node scripts/letters/replies.mjs mark <id...> [--category <#id>] [--status next|later|asking|fixed|declined] [--fixed-in x.y.z]
  *       给回信定性。用户的信匣回执显示的就是这些：已读、归入「…」、下版先修 / 已在 x.y.z 修好。
  *   node scripts/letters/replies.mjs prune

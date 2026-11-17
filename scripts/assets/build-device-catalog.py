@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT_DIR = ROOT / "design_picture" / "Product"
 ASSET_DIR = ROOT / "src" / "assets" / "devices"
 CATALOG_PATH = ASSET_DIR / "catalog.json"
-AUDIT_JSON_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.json"
-AUDIT_CSV_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.csv"
+AUDIT_JSON_PATH = ROOT / "scripts" / "assets" / "device-catalog-audit.json"
+AUDIT_CSV_PATH = ROOT / "scripts" / "assets" / "device-catalog-audit.csv"
 CHECKED_AT = "2026-08-15"
 
 

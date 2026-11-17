@@ -25,10 +25,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } else if (missing.length === 0) {
     console.log(`${version} 的信 ${NOTE_LOCALES.length} 种语言都在。`);
   } else if (missing.includes('zh')) {
-    console.error(`这版的信写了吗？还没有 ${letterPath(version, 'zh')}。先写中文原稿，再审英文，其余语言交给翻译 agent。`);
+    console.error(`这版的信写了吗？还没有 ${letterPath(version, 'zh')}。先写中文原稿，再审英文，其余语言交给译者。`);
     process.exitCode = 1;
   } else {
-    console.error(`${version} 的信还缺 ${missing.length} 种语言：${missing.join(', ')}（登记到桌面《翻译.md》）。`);
+    console.error(`${version} 的信还缺 ${missing.length} 种语言：${missing.join(', ')}，补齐后再打 tag。`);
     process.exitCode = 1;
   }
 }

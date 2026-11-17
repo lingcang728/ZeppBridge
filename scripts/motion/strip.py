@@ -3,7 +3,7 @@
     G:\\python\\python.exe scripts/motion/strip.py <场景> <输出.png> [时间点毫秒,逗号分隔]
 
 场景：letter-open、letter-close、page-open、page-back、deck-open、deck-close
-（见 SCENES）。截图在 dist + 演示数据上跑，不降速（放慢的是动画本身，见记忆 frame-capture-slow-animations）。
+（见 SCENES）。截图在 dist + 演示数据上跑，不降速（放慢的是动画本身：DPR 2 截图本身很慢，不放慢动画的话帧时间全错）。
 """
 from __future__ import annotations
 

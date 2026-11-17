@@ -14,7 +14,7 @@ import { LETTER_LANGUAGES, escape, page, strong } from './letters.mjs';
 const VERSION = /^\d+\.\d+\.\d+$/;
 const byVersionDesc = (a, b) => b.localeCompare(a, 'en', { numeric: true });
 
-/* 分组名抄自应用 components/shell/UpdateNotice 的各语言包；页面标题是新文案，只写了中英西，其余登记在桌面《翻译.md》。 */
+/* 分组名抄自应用 components/shell/UpdateNotice 的各语言包；页面标题是新文案，只写了中英西，其余语言回落英文。 */
 const EN = { title: 'Changelog', added: 'New', improved: 'Improved', fixed: 'Fixed', note: 'Update' };
 const LABELS = {
   en: EN,

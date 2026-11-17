@@ -197,7 +197,8 @@ shoes / races options:
                             Include \"id\" to update an existing entry; prints the id.
   delete --id <N>           Delete one entry; exits 1 (not_found) if there is no such id
   These are the same records as the desktop Journal page. AI tools read them through
-  MCP get_athlete_profile but cannot change them.
+  MCP get_athlete_profile and can add or update them with save_shoe / save_race;
+  those writes show up under Recent AI changes and can be undone.
 
 serve (environment, no options):
   ZEPPBRIDGE_LISTEN         Listen address; default 127.0.0.1:43921 (this machine only)

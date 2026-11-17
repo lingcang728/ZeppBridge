@@ -2,11 +2,11 @@ import { defineMessages } from '../i18n';
 
 /*
  * 「为什么有些数据没有？」——设置页账号卡常驻入口和 3.0.2 更新说明第一页共用这一份。
- * 措辞对照 docs/development/v3-plan.md 的接口事实与 official/fetch.rs 实际在拉的流：
+ * 措辞对照 docs/reference/official-api-facts.zh-CN.md 的接口事实与 official/fetch.rs 实际在拉的流：
  * 官方能给心率、睡眠、步数、运动、PAI、体重；没有 HRV、血氧、全天压力、准备度、
  * Charge、训练负荷、饮食；补拉历史只走高级数据。不夸大、不承诺。
  * `*Has` 是用 `|` 分隔的清单，界面拆成一枚枚小标签；翻译时保留 `|`。
- * 另外 9 种语言在 src/i18n/locales/*.ts 的 'components/WhyHalfData' 下（待翻登记在桌面《翻译.md》）。
+ * 另外 9 种语言在 src/i18n/locales/*.ts 的 'components/WhyHalfData' 下（还没翻的键记在 locales/<语言>.pending.txt）。
  */
 export const whyHalfDataMessages = defineMessages(
   {

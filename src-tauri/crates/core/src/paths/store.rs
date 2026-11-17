@@ -2102,7 +2102,7 @@ mod tests {
         let volume = "volume{94d06f05-28fd-4b85-a4d3-d09066a94794}";
         let sid = "S-1-5-21-705008641-3810487677-2678661352-1001";
         let arbitrary = Path::new(
-            r"\\?\Volume{94d06f05-28fd-4b85-a4d3-d09066a94794}\Users\15pro\AppData\Local\ZeppBridge\data",
+            r"\\?\Volume{94d06f05-28fd-4b85-a4d3-d09066a94794}\Users\example\AppData\Local\ZeppBridge\data",
         );
         assert!(!is_managed_local_state_junction(
             arbitrary,
@@ -2116,7 +2116,9 @@ mod tests {
         );
         assert!(same_reparse_path(local_state, local_state));
         assert!(!same_reparse_path(
-            Path::new(r"C:\Users\example\AppData\Local\Packages\LincStudio.ZeppBridge_pwftgd5x5w3va"),
+            Path::new(
+                r"C:\Users\example\AppData\Local\Packages\LincStudio.ZeppBridge_pwftgd5x5w3va"
+            ),
             local_state,
         ));
         assert!(!same_reparse_path(

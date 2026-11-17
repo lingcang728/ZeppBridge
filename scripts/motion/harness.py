@@ -1,7 +1,7 @@
 """动效测量台的公共部分：用 dist + 演示数据开一个无头 Chrome，逐帧采样，算指标。
 
 不起开发服务器：`page.route('http://zb.test/**')` 直接从 dist/ 回包，地址带 `?demo=1` 让应用跑演示运行时（合成数据）。
-默认 CPU 降速 4×、DPR 2（贴近用户的高分屏 WebView2，见记忆 measure-jank-throttled）。
+默认 CPU 降速 4×、DPR 2（贴近高分屏上的 WebView2；不降速量不出卡顿）。
 
 用全局 Python Playwright（G:\\python），浏览器用系统 Chrome（channel=chrome），项目里不装任何依赖。
 """
@@ -78,7 +78,7 @@ SAMPLER = r"""
 
 
 async def open_app(play, route='/', theme='dark', throttle=4, dpr=2, size=(1440, 900), layout='list'):
-    # ZB_MOTION_GPU=1：无头也走真显卡（D3D11）。默认的软件 GL 量不出高分屏上 GPU 光栅那一下卡（记忆 morph-gpu-raster-stalls）。
+    # ZB_MOTION_GPU=1：无头也走真显卡（D3D11）。默认的软件 GL 量不出高分屏上 GPU 光栅那一下卡。
     gpu = ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] if os.environ.get('ZB_MOTION_GPU') else []
     browser = await play.chromium.launch(channel='chrome', headless=True, args=['--hide-scrollbars=false', *gpu])
     context = await browser.new_context(viewport={'width': size[0], 'height': size[1]}, device_scale_factor=dpr)

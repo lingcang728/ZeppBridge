@@ -1,4 +1,4 @@
-"""动效测量台（修复计划 A0，2026-11-12）：逐帧采样写信信封、概览卡 ↔ 详情页、设置卡叠三类转场，输出数字表。
+"""动效测量台：逐帧采样写信信封、概览卡 ↔ 详情页、设置卡叠三类转场，输出数字表。
 
 用法（先 `npm run build`）：
     G:\\python\\python.exe scripts/motion/bench.py [--only letter,page,deck] [--throttle 4] [--json out.json]

@@ -1,51 +1,49 @@
 # 更新说明规范
 
-应用内「已更新到 vX」弹窗（`src/components/shell/UpdateNotice.vue`）显示的就是这里的文件。**每一版都按这份规范写**（2026-10-19 用户定）；改渲染样式也只改那一个组件，所有版本一起生效。
+应用内「已更新到 vX」弹窗（`src/components/shell/UpdateNotice.vue`）显示的就是这里的文件，每一版都按这份规范写。更新清单的渲染只有一份，在 `src/components/shell/ReleaseNotesList.vue`；改样式只改它，所有版本一起生效。
 
-## 第一步：先写信
+## 发版第一步：先写信
 
-**每一版都要有作者来信**（2026-10-20 用户定，补丁版也算，不降级成明信片）。信写什么都行，不限于更新——更新说明是单独一张信纸。写信是发版流程，不是界面功能：就算以后信封界面被砍了，信也照常寄出（应用里的信封 + 官网 `zeppbridge.com/letters` 归档）。**信不进 GitHub Release 页**（2026-10-29 用户：信直接寄给用户，发布页只写这一版的改动）。
+每一版（补丁版也算）都要有一封作者来信。信写什么都行，不限于更新；更新说明是单独一张信纸。写信是发版流程，不是界面功能：信装在应用里的信封里寄出，同时归档到官网 `zeppbridge.com/letters`。**信不进 GitHub Release 页**，发布页只写这一版的改动。
 
-- 原稿：`docs/releases/letters/<版本>/zh.md`，**用户本人用中文写**。开发会话不替用户写信，只能提醒。
-- `en.md` 由开发会话译出、**用户亲自审**；其余 11 种语言（含繁体 zh-TW）登记到桌面《翻译.md》交给翻译 agent。
+- 原稿：`docs/releases/letters/<版本>/zh.md`，作者本人用中文写；`en.md` 由作者审定。其余语言照原稿翻译。
 - 格式：普通段落，段与段之间空一行；只认 `**加粗**`，不要标题、列表、链接、HTML。最后一段单独一行写落款（以 `——` 或 `—` 开头），界面会把它排成签名。
-- 门禁：`node scripts/release/check-letter.mjs [<版本>]`。从 3.0.7 起，缺任何一种语言的信都不打 tag；`npm run package:release` 只提醒（自测包可以先打，但「翻译完再打包」的规矩不变）。
-- Release 正文只有标题 + 英文更新说明（`release-core.mjs` 的 `tagMessage`），不接信。
+- 检查：`npm run letter:check [-- <版本>]`（`scripts/release/check-letter.mjs`）。它不在 CI 里，是发版约定：缺任何一种语言的信都不打 tag。`npm run package:release` 只提醒，自测包可以先打。
+- Release 正文只有标题加英文更新说明（`release-core.mjs` 的 `tagMessage`），不接信。
 
 ### 读回信、写「上期回音」
 
-用户在信封最后一张信纸上回信（应用里只有一个文字框，上限 1000 字），存在 D1 的 `letter_replies` 表。发版前：
+用户在信封最后一张信纸上回信（应用里只有一个文字框，上限 1000 字），存在 D1 的 `letter_replies` 表。工具是 `scripts/letters/replies.mjs`（需要本机 wrangler 已登录，每个命令都可以加 `--dry-run` 只看 SQL）：
 
-1. `node scripts/letters/replies.mjs export`：把没处理完的回信导到 `桌面\回信\<日期>.md`（**仓库外，回信原文绝不进仓库**），按关键词粗分类，附「我也遇到」计票。
-2. 读完给它们定性：`node scripts/letters/replies.mjs mark <id...> --category <#id> --status next|later|asking|fixed|declined [--fixed-in x.y.z]`。用户的信匣回执显示的就是这几项（已读 · 归入「补拉卡住」· 3.1.1 修）。`fixed` / `declined` 算处理完。
-3. `node scripts/letters/replies.mjs prune`：处理完满 180 天的从线上删除（先 export 留底）。每个命令都可以加 `--dry-run` 只看 SQL。
-4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`，前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定——回执「归入『…』」取的是这条的加粗标题。信纸上只画 `next` / `later` 两组，`asking`（继续征集）条目不显示、也没有「我也遇到」了（2026-10-21 用户：没意义），别再写。允许匿名引用的回信才可以引用原话。
-5. 回音写了就 13 种语言都要有、每种语言的 `#id` 和中文原稿同一组同一顺序；`check-letter.mjs` 会查。
+1. `export [--out <文件夹>]`：把没处理完的回信导成 Markdown 和 JSON，按关键词粗分类，附「我也遇到」计票。**导出目录必须在仓库外**，回信原文绝不进仓库。
+2. `mark <id...> --category <#id> --status next|later|asking|fixed|declined [--fixed-in x.y.z]`：给回信定性。用户的信匣回执显示的就是这几项（已读 · 归入「补拉卡住」· 3.1.1 修）。`fixed` / `declined` 算处理完。
+3. `prune`：从线上删掉处理完满 180 天的回信。这一步由维护者手动跑，不是服务端自动执行；删除前先 `export` 留底。没处理完的回信不会删。
+4. 想说的话写进 `docs/releases/letters/<版本>/echo/zh.md`（可以不写）。导语是普通段落，每一条一行：`- next|later|asking #id: **标题**：一句话`。前缀不翻译（下版先修 / 推迟 / 继续征集），`#id` 小写、全局固定，回执「归入『…』」取的是这条的加粗标题。信纸上只画 `next` / `later` 两组，`asking` 条目不显示。只有允许匿名引用的回信才可以引用原话。
+5. 回音写了就所有语言都要有，每种语言的 `#id` 和中文原稿同一组、同一顺序；`check-letter.mjs` 会查。
 
 ### 一对一回复某一封回信
 
-不用等发版，随时可以回。用户的应用取回执时把作者回复一并取回，盖在「我的回信」那只信封上（D1 列 `author_reply` / `author_reply_at`，`migrations/0009_letter_author_reply.sql`）。作者对 agent 说「回那封信 + 内容」，agent 照下面做：
+不用等发版，随时可以回。用户的应用取回执时把作者回复一并取回，盖在「我的回信」那只信封上（D1 列 `author_reply` / `author_reply_at`，`migrations/0009_letter_author_reply.sql`）。
 
-1. `node scripts/letters/replies.mjs show <id>`：看那封信的语言（`locale`）和原文。
-2. 把作者的话译成那封信的语言；中文、英文的信直接用作者原话。
-3. 把译文**回译成中文**，连同译文一起给作者对；作者点头之前不发。
-4. 译文写进仓库外的文件（如 `桌面\回信\reply-<id>.md`），`node scripts/letters/replies.mjs reply <id> --file <文件> --dry-run` 先看 SQL，再去掉 `--dry-run` 发出。最长 2000 字；空文件 = 撤回。
-5. 回复里**不写对方的个人信息**（名字、邮箱、地点）：拿到那台电脑 install id 的人也能读到作者回复。ZeppDock 的回信面板也能回，规则相同。
+1. `replies.mjs show <id>`：看那封信的语言（`locale`）和原文。
+2. 把作者的话译成那封信的语言；中文、英文的信直接用作者原话。译文回译给作者过目，作者同意之前不发。
+3. 译文写进仓库外的文件，`replies.mjs reply <id> --file <文件> --dry-run` 先看 SQL，再去掉 `--dry-run` 发出。最长 2000 字；空文件 = 撤回。
+4. 回复里**不写对方的个人信息**（名字、邮箱、地点）：拿到那台电脑 install id 的人也能读到作者回复。
 
 ### 这一版的邮票（可选）
 
-每一版信封右上角贴一枚邮票、信匣集邮册里收一枚。票面图由用户每版画一张（如 gpt-image），放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就贴默认那枚（海拔山形，`src/components/letters/StampArt.vue`），面值照样印这一版的版本号。
+每一版信封右上角贴一枚邮票，信匣集邮册里收一枚。票面图每版画一张，放 `docs/releases/letters/<版本>/stamp.jpg`（也认 `.webp` / `.png`）；没放就贴默认那枚（海拔山形，`src/components/letters/StampArt.vue`），面值照样印这一版的版本号。
 
 - **只要画**：横版 5:4，至少 1000 × 800，jpg / webp 压到 300 KB 以内。
-- **不要**字、面值、边框、齿孔、邮戳——齿孔白边、右上角面值（版本号）、邮戳都由界面画（`PostageStamp.vue` / `Postmark.vue`），每版版式一致。
+- **不要**字、面值、边框、齿孔、邮戳：齿孔白边、右上角面值（版本号）、邮戳都由界面画（`PostageStamp.vue` / `Postmark.vue`），每版版式一致。
 - 右上角留一块不太花的地方，面值压在那里。
 
 ## 文件
 
 - 一版一个目录：`docs/releases/<版本>/<locale>.md`，13 种界面语言各一份（zh、en、es、nl、pt-BR、pt-PT、de、ru、hi-IN、fr、it、pl、zh-TW；繁体 zh-TW 从 3.1.1 起，之前的版本是 12 种）。
-- 官网更新日志 `zeppbridge.com/changelog/` 也从这些文件生成（`scripts/site/changelog.mjs`，部署时由 `finish-dist.mjs` 写出），**只收已经打了 `v<版本>` 标签的版本**；3.0.1 是单文件旧格式 `docs/releases/3.0.1.md`，按 `## 中文` / `## English` 分段。
+- 官网更新日志 `zeppbridge.com/changelog/` 也从这些文件生成（`scripts/site/changelog.mjs`，部署时由 `finish-dist.mjs` 写出），**只收已经打了 `v<版本>` 标签的版本**。3.0.1 是单文件旧格式 `docs/releases/3.0.1.md`，按 `## 中文` / `## English` 分段。3.0.1 以前的历史在仓库根目录的 `CHANGELOG.md`（已冻结）。
 - 发版时把 `src/services/updateNotice.ts` 里的 `BUNDLED_VERSION` 和 glob 目录一起改成新版本；`updateNotice.test.ts` 会检查各语言齐全（繁体缺了回落简体）、和应用版本一致。
-- **开发会话只写 `zh.md` 和 `en.md`**，其余 11 种语言（含繁体 zh-TW）登记到桌面《翻译.md》，交给翻译 agent。缺语言时弹窗回落英文，但门禁会挂，所以打 tag 前要翻齐。
+- 开发时先写 `zh.md` 和 `en.md`，其余语言照中文翻译。缺语言时弹窗回落英文，但测试会挂，所以打 tag 前要翻齐。
 
 ## 每一行怎么写
 
@@ -59,7 +57,7 @@
 - **开头一小段用 `**加粗**`**：读者扫一眼加粗就知道这条讲什么。每条只加粗一处，别整句加粗。
 - 加粗之后最多两句，写用户看得到的变化，不写实现。issue 编号放在加粗里或句末。
 - 只支持 `**加粗**`；不支持链接、图片、表格、HTML（更新清单里的文字永远按纯文本渲染，见 `emphasis()`）。`##` 标题行会被忽略，不要用来分段。
-- 不夸大、不承诺：说「会」之前先确认已经做到；涉及官方接口的措辞对照 `docs/development/v3-plan.md`。
+- 不夸大、不承诺：说「会」之前先确认已经做到；涉及官方接口的措辞对照 [`official-api-facts`](../reference/official-api-facts.zh-CN.md)。
 
 ## 弹窗的样式约定
 
@@ -70,12 +68,10 @@
 
 ## 怎么发
 
-正常流程，没有冻结、排期或批准（2026-10-29 用户定，定时发布那套已删）：
-
-1. 版本号统一（`node scripts/release/check-version-consistency.mjs <版本>`）、切 `updateNotice.ts` 的 `BUNDLED_VERSION` 和 glob，13 种更新说明和 13 种信齐全（`check-letter.mjs` 过），本地门禁全绿。
-2. `npm run package:release` 打本地包，用户自测。
-3. 用户说发了：提交、`git push origin main`，等 main 的 CI 绿。
-4. 打附注标签并推送，CI 打包四个平台、建 GitHub Release、签 `latest.json`，已装用户随即收到更新：
+1. 版本号统一（`node scripts/release/check-version-consistency.mjs <版本>`），切 `updateNotice.ts` 的 `BUNDLED_VERSION` 和 glob，所有语言的更新说明和信齐全（`check-letter.mjs` 过），本地门禁全绿。
+2. `npm run package:release` 打本地 Windows 包自测（只出 NSIS 安装包和便携 exe）。
+3. 提交、`git push origin main`，等 main 的 CI 绿。
+4. 打附注标签并推送。CI 随即构建 Windows（NSIS、MSI、便携 zip）、macOS（Apple Silicon dmg）、Linux（deb、rpm、AppImage）和 Flatpak，外加 CLI / MCP 工具包、`SHA256SUMS.txt` 和构建来源证明，创建 GitHub Release 并签 `latest.json`，已装用户随即收到更新：
 
    ```bash
    node scripts/release/tag-message.mjs 3.1.1 | git tag -a v3.1.1 --cleanup=verbatim -F -
@@ -84,4 +80,4 @@
 
 ## GitHub Release / tag 说明
 
-tag 说明用英文（随安装包发出去，见 CLAUDE.md），内容就是标题 + `en.md`（`tag-message.mjs` 生成），同样一条一行、开头加粗；第一行是应用内更新提示；**不接作者来信**。正文里有 `##` 标题，所以 `git tag --cleanup=verbatim`。
+tag 说明用英文（它随安装包发出去），内容就是标题加 `en.md`（`tag-message.mjs` 生成），同样一条一行、开头加粗；第一行是应用内更新提示；**不接作者来信**。正文里有 `##` 标题，所以要加 `git tag --cleanup=verbatim`。合入了外部 PR 的版本，正文末尾加一节 Contributors 列出作者。

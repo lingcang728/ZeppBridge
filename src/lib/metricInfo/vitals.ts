@@ -4,7 +4,7 @@ import { defineMessages, messagesOf } from '../../i18n';
  * 「?」浮层三段文案·生命体征域（D6）：readiness / stress / spo2 / spo2_odi / hrv /
  * hrv_rmssd / respiratory_rate / resting_hr。身体状态页与心率页共用同一份。
  *
- * 第三段只说核对过的事实（v3-plan §4 与 OfficialOnlyNote）：官方授权有睡眠、心率、
+ * 第三段只说核对过的事实（docs/reference/official-api-facts.zh-CN.md §3 与 OfficialOnlyNote）：官方授权有睡眠、心率、
  * 步数、运动、PAI、体重；HRV、血氧、压力、准备度、呼吸率只有「高级数据」。
  * 官方 HRV 数值算法未定义，不许写进 SDNN / RMSSD 列，文案也不冒充。
  */

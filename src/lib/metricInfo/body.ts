@@ -3,7 +3,7 @@ import { defineMessages, messagesOf } from '../../i18n';
 /*
  * 「?」浮层三段文案·体重体成分与饮食域（D6）。
  *
- * 来源事实（v3-plan §4）：官方授权会同步体重（含 BMI 与身高资料值）；
+ * 来源事实（docs/reference/official-api-facts.zh-CN.md §3）：官方授权会同步体重（含 BMI 与身高资料值）；
  * 体脂率等体成分字段只有「高级数据」的体脂秤，官方 bodyComps 标 [Upcoming] 未开通；
  * 饮食是 Zepp App 手动记录，官方 nutrition 同样未开通。
  */

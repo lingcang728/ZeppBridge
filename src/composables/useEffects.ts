@@ -7,8 +7,9 @@ import { autoLite } from '../lib/motion/tier';
  * 「自动」在三种情况下走低特效：Linux、首启量出来性能偏弱（或重特效连着卡被降了档）、电量低于 15% 且没在充电
  * （lib/motion/performance.ts）。选了「完整」就不自动降。
  *
- * Linux 的 WebKitGTK 为了不白屏关掉了 DMABUF 渲染（AppImage 连加速合成也关了，见 src-tauri/src/lib.rs），
- * 剩下的渲染路径扛不住整页毛玻璃和形变动画：翻页要好几秒，悬停都卡。所以 Linux 上「自动」= 低特效。
+ * Linux 的 WebKitGTK 在 NVIDIA 和旧版 Wayland 上会关掉 DMABUF 渲染以免白屏，AppImage 在不带驱动库时连加速合成也关
+ * （见 src-tauri/src/linux_rendering.rs）。这些渲染路径扛不住整页毛玻璃和形变动画：翻页要好几秒，悬停都卡。
+ * 所以 Linux 上「自动」= 低特效。
  *
  * 低特效做两件事，都挂在 `<html data-effects="lite">` 上：
  * - styles/material.css 把所有 backdrop-filter 换成不透明的玻璃底色；
