@@ -2530,6 +2530,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       trainingThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
       trainingTitle: 'Trainingsstatus',
       unrecognizedCta: 'Hier manuell zuordnen',
+      unrecognizedDismiss: 'Nicht mehr an dieses Gerät erinnern',
       unrecognizedSuffix: ' hat noch kein erkanntes Modell',
       entryWeek: 'Letzte 7 Tage',
       entrySparse: 'Letzte 90 Tage',
@@ -4149,6 +4150,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisierung',
+      cardTitleUpdates: 'Synchronisierung und Updates',
       autoSub: 'Ruft in diesem Intervall neue Daten ab, solange die App geöffnet ist',
       off: 'Aus',
       lastSynced: (when: string) => `Zuletzt synchronisiert ${when}`,
@@ -4452,7 +4454,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           s4: 'Wichtige Metriken sind hier angepinnt; die Zeile darunter ist dein üblicher Bereich, kein Vergleich mit anderen.',
           s5: 'Drei Reiter oben; Schlaf, Workouts und Verlauf öffnen sich über die Karten in der Übersicht.',
           s6: 'Hier siehst du den Synchronisierungsstatus; klicke zum Synchronisieren. Ein grüner Ring am Symbol oben links zeigt ein Update an.',
-          s7: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben, oder halte es gedrückt, um den Briefkasten zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
+          s7: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben (über „Briefkasten“ unter dem Brief wechselst du dorthin), oder halte es gedrückt, um den Briefkasten direkt zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
           s8: 'Jeder Bereich erklärt sich beim ersten Öffnen; kehre zu dieser Karte zurück, um alles noch einmal zu sehen.',
         },
         journal: {
@@ -4463,7 +4465,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           s5: 'Ein Ring pro Jahr, breiter in trainingsreichen Wochen; tippe auf eine feine Linie für das jeweilige Workout.',
         },
         letters: {
-          s1: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben, oder halte es gedrückt, um den Briefkasten zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
+          s1: 'Das Briefsymbol oben rechts: Klicke, um dem Autor zu schreiben (über „Briefkasten“ unter dem Brief wechselst du dorthin), oder halte es gedrückt, um den Briefkasten direkt zu öffnen; ein roter Punkt zeigt neue Post oder Antworten an.',
           s2: 'Die Briefe des Autors zu jedem Update liegen hier; öffne einen zum Lesen.',
           s3: '„Deine Briefe“ enthält wöchentliche Datenbriefe und Briefe an dein zukünftiges Ich; Antworten und Briefmarken in den letzten beiden.',
         },

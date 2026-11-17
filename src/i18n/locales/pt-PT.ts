@@ -1845,6 +1845,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       overviewTitle: 'Visão geral',
       unrecognizedSuffix: ' sem modelo identificado',
       unrecognizedCta: 'Selecionar manualmente',
+      unrecognizedDismiss: 'Não voltar a avisar sobre este dispositivo',
       desktopOnly:
         'Disponível na aplicação ZeppBridge no computador.',
       deviceErrorPrefix: 'Identificação de dispositivos: ',
@@ -3464,6 +3465,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     },
     'views/settings/sections/sync': {
       cardTitle: 'Sincronização',
+      cardTitleUpdates: 'Sincronização e atualizações',
       autoSub: 'Obtém novos dados neste intervalo enquanto a aplicação estiver aberta',
       off: 'Desligado',
       lastSynced: (when: string) => `Última sincronização ${when}`,
@@ -3916,7 +3918,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
           s4: 'As tuas métricas habituais ficam afixadas aqui; a linha abaixo é o teu intervalo habitual, sem comparações com outros.',
           s5: 'Três separadores no topo; sono, treinos e histórico abrem pelos cartões na Visão geral.',
           s6: 'O estado de sincronização fica aqui; clica para sincronizar. O anel verde no ícone superior esquerdo indica atualizações.',
-          s7: 'O ícone de carta no canto superior direito: clica para escrever ao autor ou mantém premido para abrir a caixa de correio; um ponto vermelho assinala novas cartas ou respostas.',
+          s7: 'O ícone de carta no canto superior direito: clica para escrever ao autor (o botão «Caixa de correio» por baixo da carta permite alternar) ou mantém premido para abrir a caixa de correio. Um ponto vermelho assinala novas cartas ou respostas.',
           s8: 'Cada secção explica-se ao ser aberta pela primeira vez; regressa a este cartão para rever tudo.',
         },
         journal: {
@@ -3927,7 +3929,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
           s5: 'Um anel por ano, mais largo nas semanas com mais treinos; toca numa linha fina para ver essa sessão.',
         },
         letters: {
-          s1: 'O ícone de carta no canto superior direito: clica para escrever ao autor ou mantém premido para abrir a caixa de correio; um ponto vermelho assinala novas cartas ou respostas.',
+          s1: 'O ícone de carta no canto superior direito: clica para escrever ao autor (o botão «Caixa de correio» por baixo da carta permite alternar) ou mantém premido para abrir a caixa de correio. Um ponto vermelho assinala novas cartas ou respostas.',
           s2: 'As cartas do autor a cada atualização ficam aqui; abre uma para ler.',
           s3: '«As tuas cartas» reúne resumos semanais de dados e cartas para o teu eu do futuro; respostas e selos nos dois últimos.',
         },

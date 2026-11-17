@@ -1921,6 +1921,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       deviceErrorPrefix: 'Identification des appareils : ',
       unrecognizedSuffix: ' n’a pas encore de modèle identifié',
       unrecognizedCta: 'Désigner le modèle',
+      unrecognizedDismiss: 'Ne plus signaler cet appareil',
       focusQuestion: 'Qu’est-ce qui vous intéresse le plus ?',
       focusDone: 'Terminé',
       focusSkip: 'Ignorer',
@@ -3210,6 +3211,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
 
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisation',
+      cardTitleUpdates: 'Synchro et mises à jour',
       autoSub: 'Récupère les nouvelles données à cet intervalle tant que l’application est ouverte',
       off: 'Désactivé',
       lastSynced: (when: string) => `Dernière synchronisation ${when}`,
@@ -3565,7 +3567,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
           s4: 'Vos métriques habituelles sont épinglées ici ; la ligne en dessous indique votre plage habituelle, sans comparaison aux autres.',
           s5: 'Trois onglets en haut ; le sommeil, les entraînements et le journal s’ouvrent depuis les cartes de l’Aperçu.',
           s6: 'L’état de synchronisation s’affiche ici ; cliquez pour synchroniser. Un anneau vert sur l’icône en haut à gauche signale une mise à jour.',
-          s7: 'L’icône lettre en haut à droite : cliquez pour écrire à l’auteur, ou maintenez-la appuyée pour ouvrir la boîte aux lettres ; un point rouge signale un nouveau courrier ou une réponse.',
+          s7: 'L’icône lettre en haut à droite : cliquez pour écrire à l’auteur (le bouton « Boîte aux lettres » sous la lettre permet d’y basculer), ou maintenez-la appuyée pour ouvrir la boîte aux lettres ; un point rouge signale un nouveau courrier ou une réponse.',
           s8: 'Chaque section s’explique lors de sa première ouverture ; revenez sur cette carte pour la revoir.',
         },
         journal: {
@@ -3576,7 +3578,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
           s5: 'Un anneau par an, plus épais lors des semaines d’entraînement intense ; touchez un trait fin pour voir la séance.',
         },
         letters: {
-          s1: 'L’icône lettre en haut à droite : cliquez pour écrire à l’auteur, ou maintenez-la appuyée pour ouvrir la boîte aux lettres ; un point rouge signale un nouveau courrier ou une réponse.',
+          s1: 'L’icône lettre en haut à droite : cliquez pour écrire à l’auteur (le bouton « Boîte aux lettres » sous la lettre permet d’y basculer), ou maintenez-la appuyée pour ouvrir la boîte aux lettres ; un point rouge signale un nouveau courrier ou une réponse.',
           s2: 'Les lettres de l’auteur à chaque mise à jour sont ici ; ouvrez-en une pour la lire.',
           s3: '« Vos lettres » rassemble les résumés hebdomadaires et vos lettres au futur ; réponses et timbres dans les deux derniers.',
         },

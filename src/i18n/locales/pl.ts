@@ -1593,7 +1593,7 @@ export default {
         s4: 'Twoje ulubione wskaźniki są przypięte tutaj; wiersz poniżej to Twój zwykły zakres, bez porównań z innymi.',
         s5: 'Trzy karty na górze; sen, treningi i dziennik otwierają się z kart w Przeglądzie.',
         s6: 'Stan synchronizacji jest tutaj; kliknij, aby zsynchronizować. Zielony pierścień na ikonie w lewym górnym rogu oznacza aktualizację.',
-        s7: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora, albo przytrzymaj, aby otworzyć skrzynkę na listy; czerwona kropka oznacza nową wiadomość lub odpowiedź.',
+        s7: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora (przycisk „Skrzynka na listy” pod listem przełącza widok), albo przytrzymaj, aby otworzyć skrzynkę na listy. Czerwona kropka oznacza nową wiadomość lub odpowiedź.',
         s8: 'Każda sekcja wyjaśnia się przy pierwszym otwarciu; wróć do tej karty, aby zobaczyć ją ponownie.',
       },
       journal: {
@@ -1604,7 +1604,7 @@ export default {
         s5: 'Jeden słój na rok, szerszy w tygodniach z większą liczbą treningów; dotknij cienkiej linii, aby zobaczyć trening.',
       },
       letters: {
-        s1: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora, albo przytrzymaj, aby otworzyć skrzynkę na listy; czerwona kropka oznacza nową wiadomość lub odpowiedź.',
+        s1: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora (przycisk „Skrzynka na listy” pod listem przełącza widok), albo przytrzymaj, aby otworzyć skrzynkę na listy. Czerwona kropka oznacza nową wiadomość lub odpowiedź.',
         s2: 'Listy od autora przy każdej aktualizacji są tutaj; otwórz, aby przeczytać.',
         s3: '„Twoje listy” zawierają cotygodniowe podsumowania danych i listy do przyszłego siebie; odpowiedzi i znaczki w dwóch ostatnich.',
       },
@@ -3554,6 +3554,7 @@ Kontynuować?`,
     overviewTitle: 'Przegląd',
     unrecognizedSuffix: ' — model nie został jeszcze zidentyfikowany',
     unrecognizedCta: 'Wybierz ręcznie',
+    unrecognizedDismiss: 'Nie przypominaj o tym urządzeniu',
     deviceErrorPrefix: 'Identyfikacja urządzenia: ',
     loadingAria: 'Ładowanie przeglądu',
     loadFailedTitle: 'Nie udało się wczytać przeglądu',
@@ -4416,6 +4417,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   // Source: src/views/settings/sections/sync.i18n.ts
   "views/settings/sections/sync": {
     cardTitle: 'Synchronizacja',
+    cardTitleUpdates: 'Synchronizacja i aktualizacje',
     autoSub: 'Pobiera nowe dane z tym interwałem, gdy aplikacja jest otwarta',
     off: 'Wył.',
     lastSynced: (when: string) => `Ostatnia synchronizacja: ${when}`,

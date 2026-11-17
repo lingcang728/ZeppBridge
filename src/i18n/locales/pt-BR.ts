@@ -1393,6 +1393,7 @@ export default {
       overviewTitle: 'Visão geral',
       unrecognizedSuffix: ' sem modelo identificado',
       unrecognizedCta: 'Selecionar manualmente',
+      unrecognizedDismiss: 'Não lembrar mais deste dispositivo',
       desktopOnly: 'Requer o aplicativo de desktop. Esta prévia no navegador não acessa dados da conta.',
       deviceErrorPrefix: 'Identificação de dispositivos: ',
       loadingAria: 'Carregando visão geral',
@@ -3235,6 +3236,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
 
     'views/settings/sections/sync': {
       cardTitle: 'Sincronização',
+      cardTitleUpdates: 'Sincronização e atualizações',
       autoSub: 'Busca novos dados neste intervalo enquanto o aplicativo estiver aberto',
       off: 'Desativado',
       lastSynced: (when: string) => `Última sincronização em ${when}`,
@@ -3554,7 +3556,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
           s4: 'Suas métricas habituais ficam fixadas aqui; a linha abaixo é a sua faixa normal, sem comparação com os outros.',
           s5: 'Três abas no topo; sono, treinos e histórico abrem pelos cartões na Visão geral.',
           s6: 'O status de sincronização fica aqui; clique para sincronizar. O anel verde no ícone superior esquerdo indica novidades.',
-          s7: 'O ícone de carta no canto superior direito: clique para escrever ao autor ou mantenha pressionado para abrir a caixa de cartas; um ponto vermelho acende quando há novas cartas ou respostas.',
+          s7: 'O ícone de carta no canto superior direito: clique para escrever ao autor (o botão “Caixa de cartas” abaixo da carta alterna para lá) ou mantenha pressionado para abrir a caixa de cartas; um ponto vermelho acende quando há novas cartas ou respostas.',
           s8: 'Cada seção se explica ao ser aberta pela primeira vez; volte a este cartão para rever tudo.',
         },
         journal: {
@@ -3565,7 +3567,7 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
           s5: 'Um anel por ano, mais largo nas semanas com mais treinos; toque em uma linha fina para ver aquela sessão.',
         },
         letters: {
-          s1: 'O ícone de carta no canto superior direito: clique para escrever ao autor ou mantenha pressionado para abrir a caixa de cartas; um ponto vermelho acende quando há novas cartas ou respostas.',
+          s1: 'O ícone de carta no canto superior direito: clique para escrever ao autor (o botão “Caixa de cartas” abaixo da carta alterna para lá) ou mantenha pressionado para abrir a caixa de cartas; um ponto vermelho acende quando há novas cartas ou respostas.',
           s2: 'As cartas do autor a cada atualização ficam aqui; abra uma para ler.',
           s3: '“Suas cartas” reúne resumos semanais de dados e cartas para o seu eu do futuro; respostas e selos nos dois últimos.',
         },

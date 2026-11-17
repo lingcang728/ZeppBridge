@@ -2238,6 +2238,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       overviewTitle: 'Overzicht',
       unrecognizedSuffix: ' heeft nog geen herkend model',
       unrecognizedCta: 'Hier aanwijzen',
+      unrecognizedDismiss: 'Niet meer herinneren voor dit apparaat',
       desktopOnly:
         'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
       deviceErrorPrefix: 'Apparaatherkenning: ',
@@ -3519,6 +3520,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisatie',
+      cardTitleUpdates: 'Synchronisatie en updates',
       autoSub: 'Haalt met dit interval nieuwe gegevens op zolang de app open staat',
       off: 'Uit',
       lastSynced: (when: string) => `Laatste synchronisatie ${when}`,
@@ -3953,7 +3955,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
           s4: 'Je favoriete statistieken staan hier vastgezet; de regel eronder is je eigen gebruikelijke bereik, niet dat van anderen.',
           s5: 'Drie tabbladen bovenaan; slaap, workouts en logboek openen vanuit de kaarten op het Overzicht.',
           s6: 'Synchronisatiestatus vind je hier; klik om te synchroniseren. Een groene ring op het pictogram linksboven betekent een update.',
-          s7: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven, of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
+          s7: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven (met de knop ‘Brievenbus’ onder de brief schakel je over), of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
           s8: 'Elk onderdeel legt zichzelf uit wanneer je het voor het eerst opent; keer terug naar deze kaart om het opnieuw te zien.',
         },
         journal: {
@@ -3964,7 +3966,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
           s5: 'Eén ring per jaar, breder in trainingsintensieve weken; tik op een fijne lijn voor die workout.',
         },
         letters: {
-          s1: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven, of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
+          s1: 'Het brievenpictogram rechtsboven: tik om naar de auteur te schrijven (met de knop ‘Brievenbus’ onder de brief schakel je over), of houd ingedrukt om de brievenbus te openen; een rode stip meldt nieuwe post of reacties.',
           s2: 'Brieven van de auteur bij elke update liggen hier; open er een om te lezen.',
           s3: '‘Jouw brieven’ bevat wekelijkse gegevensbrieven en brieven aan je toekomstige zelf; antwoorden en postzegels in de laatste twee.',
         },
