@@ -40,6 +40,11 @@ const t = useMessages(stageMessages);
 const ids = computed(() => props.cards.map((card) => card.id));
 const stage = useWorkoutStage(ids, toRef(props, 'sport'), (id) => WIDE_CARDS.has(id));
 const cardOf = (id: string) => props.cards.find((card) => card.id === id);
+/** 能吃舞台多出来的高的卡：注册表里登记的，减去这次没内容可伸的（StageCard.rigid）。 */
+const growing = computed(() => {
+  const rigid = new Set(props.cards.filter((card) => card.rigid).map((card) => card.id));
+  return rigid.size ? new Map([...GROW_CARDS].filter(([id]) => !rigid.has(id))) : GROW_CARDS;
+});
 const titleOf = (id: string) => cardOf(id)?.title ?? id;
 
 const shell = ref<HTMLElement | null>(null);
@@ -64,7 +69,7 @@ const remember = (id: string, w: number, h: number) => {
 const solveWith = (state: StageState, view: StageView = stage.view.value): Layout => {
   const input = {
     width: size.width || 1200, height: size.height || 640, state, cards: ids.value, contentH, lastW,
-    pip: PIP_CARDS, view, columns: CLASSIC_COLUMNS, stripOpen: stage.stripOpen.value, front: stage.front.value, grow: GROW_CARDS,
+    pip: PIP_CARDS, view, columns: CLASSIC_COLUMNS, stripOpen: stage.stripOpen.value, front: stage.front.value, grow: growing.value,
   };
   const first = solve(input);
   let patched: Record<string, number> | null = null;

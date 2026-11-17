@@ -43,6 +43,11 @@ export interface StageCard {
   title: string;
   icon: DesignIconName;
   tone: GlyphTone;
+  /**
+   * 这次没有能伸的内容（路线卡只有一句「没有轨迹」）：不吃舞台多出来的高，按内容高摆。
+   * 2026-11-17 用户截图：没有轨迹的路线卡在舞台上占了一大块空窗口。
+   */
+  rigid?: boolean;
 }
 
 export const CARD_GLYPHS: Record<string, { icon: DesignIconName; tone: GlyphTone }> = {

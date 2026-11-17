@@ -90,14 +90,14 @@ const charts = computed(() => new Map(chartCards.value.map((card) => [`chart-${c
 const stageCards = computed<StageCard[]>(() => {
   const names = stageText.value.cards;
   const on = new Map<string, Omit<StageCard, 'id'>>();
-  const put = (id: string, title: string, glyph = CARD_GLYPHS[id]) => on.set(id, { title, icon: glyph.icon, tone: glyph.tone });
+  const put = (id: string, title: string, glyph = CARD_GLYPHS[id], rigid = false) => on.set(id, { title, icon: glyph.icon, tone: glyph.tone, ...(rigid ? { rigid } : {}) });
   put('summary', names.summary, { ...CARD_GLYPHS.summary, icon: workoutArt.value });
   if (insightLoading.value || insightError.value || insight.value?.supported) put('insight', names.insight);
   if (series.value?.strength) {
     put('strength-sets', names['strength-sets']);
     if (strengthDetail.hasMap.value) put('strength-map', names['strength-map']);
   }
-  if (routeExpected.value) put('route', names.route, { ...CARD_GLYPHS.route, icon: workoutArt.value === 'outdoor-cycling' ? 'outdoor-cycling' : 'outdoor-run' });
+  if (routeExpected.value) put('route', names.route, { ...CARD_GLYPHS.route, icon: workoutArt.value === 'outdoor-cycling' ? 'outdoor-cycling' : 'outdoor-run' }, !routeCanvas.value);
   if (series.value?.climbs) put('climbs', names.climbs);
   for (const [id, card] of charts.value) put(id, card.title, { icon: card.icon, tone: card.tone });
   if (hrZones.value) put('hr-zones', names['hr-zones']);
