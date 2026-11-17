@@ -74,8 +74,8 @@
 ### 动效：一个原语，七条规则（2026-11-12，第 7 条 11-13）
 
 所有「走一段路」的转场——设置卡叠、概览卡 ↔ 详情页、弹窗、写信的信封——都是 `lib/motion/flight.ts` 的一次飞行：
-同一时间轴上的一组 WAAPI 动画、一个方向、一份「藏了谁、临时挂了谁」的清单。改造前后的实测数字在
-[`motion-baseline.md`](motion-baseline.md)，测量台在 `scripts/motion/`。
+同一时间轴上的一组 WAAPI 动画、一个方向、一份「藏了谁、临时挂了谁」的清单。测量台和怎么读它的数字见
+[`scripts/motion/README.md`](../../scripts/motion/README.md)。
 
 1. **点下去就有反应，等待藏在动画里。** 一两帧之内画面上就有变化（遮罩 / 背后的模糊开始糊、替身出现）。不等数据、不等代码块
    （悬停预取，并行做）。例外只有一处：卡 → 页的窗口先停在卡上，等新页的图表挂完、帧节奏恢复再长（有上限，
@@ -126,12 +126,11 @@
 
 ### 硬规则：从哪来回哪去、选项长什么样（2026-10-07）
 
-下面四条每一页都适用。违反任何一条都算缺陷，不算风格取舍；还没达标的页面清单在
-[`motion-audit.md`](motion-audit.md)。
+下面四条每一页都适用。违反任何一条都算缺陷，不算风格取舍。
 
 1. **点了以后出现的新东西，一律从被点的元素长出来、关的时候缩回去。** 二级页、弹窗、浮层、菜单、详情：页面走路由 + `usePageMorph`（来源元素标 `data-morph-card`，小于 140×56 的行和胶囊也能当来源），弹窗走 `ModalDialog` + `lib/motion/dialogFlight.ts`，牌桌走 `lib/motion/cards`。时长曲线统一用 `lib/motion/timing.ts`。半路打断就是掉头（见下面「动效：一个原语，六条规则」）——不许先跳到「开好」再收，也不许对放完的动画 `reverse()`。不要另写一套形变。
 2. **一切切换都渐变加模糊，不许硬切。** 展开收起、换标签页内容、骨架换真内容：交叉淡化 + 一层**静态**模糊（模糊只设一次，动的只有 opacity / transform；逐帧改 `filter` / `mask` 会让风扇狂转）。宽度变化走 `useWidthMorph`。原生 `<details>` 是瞬间展开的，常被点开的折叠要包一层过渡。
-3. **二到五选一用玻璃 `SegmentTrack`；更长的列表用 `CapsuleWheel`；数值用滚轮列（`WheelColumn`、`WheelDatePicker`）；开 / 关用 `GlassSwitch`。** 拖、键盘、点都要能用；镜片跟手（`useGlassLens`、`lib/segmentGlass.ts`）。三样在手指下都会浮起成 Liquid Glass；2026-10-07 的全局审计（`motion-audit.md` 第三轮）没有剩下别的选择控件。
+3. **二到五选一用玻璃 `SegmentTrack`；更长的列表用 `CapsuleWheel`；数值用滚轮列（`WheelColumn`、`WheelDatePicker`）；开 / 关用 `GlassSwitch`。** 拖、键盘、点都要能用；镜片跟手（`useGlassLens`、`lib/segmentGlass.ts`）。三样在手指下都会浮起成 Liquid Glass。
 4. **不用下拉框，不用传统卡片式选择，不用裸复选框 / 单选框。** 唯一例外是运动详情的「运动类型纠正」（`TypePicker`）：类型太多，滚轮放不下。
 
 合入前自检：**凡是动了界面，十三种界面语言全部要看**（2026-11-15 用户定，绝对红线：任何语言里都不许有重叠、叠字、透出底下的字或空出一块）。跑一遍 `python scripts/verify/text_overlap.py`（十三种语言 × 主要页面，任何两段可见文字压在一起就失败——法语的指标卡头部出过这事）；动了运动详情舞台再跑 `python scripts/verify/stage_menu.py`（十三种语言 × 1–4 张卡的「•••」菜单，溢出、折行、叠字都算失败）；新页面、新浮层不在这两份清单里就先加进去，截图逐语言亲眼看一遍。能用图形说清楚的选择（排法、比例）画图标不写字；每个新出现的层在 CPU 降速 4× + DPR 2 下开、关各录一遍，逐帧看——没有亮帧、没有空白帧、起步不跳。

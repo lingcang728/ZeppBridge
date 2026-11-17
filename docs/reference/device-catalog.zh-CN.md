@@ -2,24 +2,21 @@
 
 [English](device-catalog.md)
 
-`src/assets/devices/catalog.json` 是维护时生成的快照：型号清单 2026-08-15 核对过，
-`device_source_codes` 2026-09-01 加入，2026-11-02 改为以 Zepp 官方对照表为准。共 64 条，其中 63 条是
-`active`/`supported`，覆盖 61 个标准型号键。48 张卡的基线来自提供的 Amazfit 日本官网
-截图集（`design_picture/Product`，12 行 × 4 张）；GTR 4 黑色配色那张重复卡共用标准
-GTR 4 素材，不算第二个型号。另有三款仍在售的官方型号（Helio Strap Pro、Helio Core、
-Helio Ring），所以标准型号数超过 48。Helio Armband 只为留存来源而列出，标为
-`status=accessory`、`supported=false`，不算可连接设备。
+`src/assets/devices/catalog.json` 由
+[`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
+生成并编进应用。共 64 条：63 条是 `active`/`supported`，覆盖 61 个标准型号键；
+Helio Armband 只为留存来源列出，标为 `status=accessory`、`supported=false`。里面的日期各指一件事：
+型号清单 2026 年 8 月最初按 Amazfit 日本官网整理，文件里的 `checked_at` 是最近一次整份核对，
+`deviceSource` 编号 2026-11-02 按 Zepp 官方对照表逐条核过。
 
-Balance 2 XT、小米体脂秤 2，以及 3.1.1 补进来的老型号（Amazfit Pop、Zepp E 圆 / 方、
-Amazfit Neo、Bip S、小米手环 4 NFC 等）也可以选，但没有产品图，用现有的占位图。
-来源编号维护在目录的 `device_source_codes`（其中来自官方表的另列在 `device_source_official`）和
-`scripts/assets/build-device-catalog.py` 的 `OFFICIAL_DEVICE_SOURCE_CODES` /
-`CROWD_DEVICE_SOURCE_CODES` 里。
+图片：52 个图片键（104 个 WebP，每键一张图和一张 `-thumb`）覆盖有图的条目。48 条用官网截图裁出的图，
+4 条用 Amazfit 官方 CDN 图，1 条（Amazfit Smart Scale）是官方图经 AI 辅助加了透明留白，
+另有 11 条（Balance 2 XT、Pace、Bip S、小米体脂秤 2 这类老型号或只在零售渠道卖的）还没有图，显示通用占位图。
+同一型号的配色共用一个键。
 
-逐张卡的对应关系记在
-[`device-catalog-audit.json`](./device-catalog-audit.json) 和
-[`device-catalog-audit.csv`](./device-catalog-audit.csv)。每条都保留来源的行 / 列、
-显示名、尺寸 / 配色变体、合并关系、目录 ID、标准型号键和素材来源。
+来源编号维护在目录的 `device_source_codes`（其中来自官方表的另列在 `device_source_official`）
+和构建脚本的 `OFFICIAL_DEVICE_SOURCE_CODES` / `CROWD_DEVICE_SOURCE_CODES` 里。最初 48 张官网卡片的逐张对应关系在
+[`scripts/assets/device-catalog-audit.json`](../../scripts/assets/device-catalog-audit.json)（另有 `.csv`）。
 
 ## 匹配约定
 
@@ -40,7 +37,7 @@ Amazfit Neo、Bip S、小米手环 4 NFC 等）也可以选，但没有产品图
 3.1.1 之前，编号来自用户在应用里手动指认、并选择分享出来的型号。这条上报已经删掉；
 当时收下、官方表里没有的那一小批（Helio Strap / Strap Pro / Ring、Balance 2 XT、
 Balance 2 的 `10486017` 等）**冻结保留**，不再增加。现在反馈报告只带「目录认不出的
-`deviceSource` 编号」，用来发现官方表更新了什么，工具见[反馈分拣](./feedback-triage.zh-CN.md)。
+`deviceSource` 编号」，用来发现官方表更新了什么，工具见[反馈分拣](../../scripts/feedback/README.md)。
 
 规则由
 [`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
@@ -59,55 +56,14 @@ Balance 2 的 `10486017` 等）**冻结保留**，不再增加。现在反馈报
 账号里的原始昵称留在 `name`/`display_name`；目录补上 `canonical_name`、`display_name`、
 `name_zh` 和 `catalog_id`。`user_fused` 和来源不明的记录永远不认领实体设备。
 
-## 本地图片与来源
+## 本地图片与授权
 
-每条 active/supported 都对应 [`src/assets/devices/`](../../src/assets/devices/) 下的一张
-RGBA WebP 和一张 RGBA PNG 缩略图。`catalog.json` 里的图片哈希是随包 WebP 的 SHA-256，
-离线门禁据此发现漂移。`src/lib/deviceCatalog.ts` 用 `import.meta.glob` 找文件，新增一对图
-不用手写 import。
+有图的条目都对应 [`src/assets/devices/`](../../src/assets/devices/) 下的一张 RGBA WebP 和一张
+`-thumb.webp`；没图的用占位图。`catalog.json` 里的 `asset_hash` 是随包 WebP 的 SHA-256。
+`src/lib/deviceCatalog.ts` 用 `import.meta.glob` 找文件。运行时不外链任何图片。
 
-48 张基线素材大多是 `screenshot-derived`：从日本官网截图里裁出只含产品的部分，再去掉店铺
-文字、价格、奖项徽章、界面控件和白底。另外四条用 Amazfit 美国官网 Shopify CDN 的公开图片。
-运行时不外链任何图片。
+**授权还没解决。** 官网截图衍生图和 CDN 图都是 Amazfit 的产品照片，官网没有给本仓库再分发许可，
+而应用已经公开分发（GitHub 和 Microsoft Store）。在拿到有授权的新闻素材或 Amazfit 许可之前，
+这些图是已知风险；随时可以整体换回占位图。
 
-官网页面没有为本仓库另行授予再分发许可。这些文件是应用户要求作为本地 / 内部产品参考图随包
-带的。公开发布前要确认 Amazfit 的商标与图片再分发条款，必要时把截图衍生图换成有授权的
-新闻素材，并保留来源 / 哈希审计。
-
-## 图片质检
-
-全部 51 对本地 WebP / 缩略图（50 个可连接的标准型号键，加上不支持的 Helio Armband 来源键；
-GTR 4 重复配色共用一个键）都从原始 `design_picture/Product` 截图和记录在案的官方 CDN 来源
-重新生成，没有拿任何已损坏的随包 WebP 当输入。Pillow 和 OpenCV GrabCut 从深色 / 彩色产品
-像素给出保守的前景种子，多产品同框的 Helio Core/Armband 用显式的来源裁切。Helio Ring 的
-中心和 GTS 4 Mini 的表带开口是有意保留的透明孔。二值透明蒙版先加边再裁，alpha 为零处的
-RGB 清零，无损 WebP 用 `exact=True` 写出，防止解码时颜色渗出。Strap Pro 只在边缘做去白，
-保住它浅色的金属件。
-
-离线校验器检查：精确的 52 条 / 51 支持 / 50 标准 / 51 素材计数，WebP 与缩略图键集合一一
-对应，RGBA 模式、尺寸、目录 SHA-256 哈希，透明的四角 / 边框，至少 8 px 的透明留白，与
-边缘相连的中性背景残留，细小的高饱和噪点，以及不合理的封闭孔洞（允许表带 / 指环 / 手环的
-有意开口和 GTS 4 Mini 的表带开口）。12 个必须人工抽查的全部通过：
-`balance-3`、`active-2-square`、`t-rex-ultra-2`、`band-7`、`helio-strap`、
-`helio-ring`、`helio-strap-pro`、`cheetah-2-pro`、`bip-6`、`gtr-4-46mm`、
-`gts-4-mini` 和 `amazfit-up`。
-
-## 重建与校验
-
-维护脚本只用 Pillow / OpenCV 两个图像依赖，仓库不另装第二份。
-
-```powershell
-py -3 scripts/assets/build-device-catalog.py --catalog-only
-py -3 scripts/assets/verify-device-assets.py
-```
-
-只改来源编号时用 `--catalog-only`：它按 `DEVICE_SOURCE_CODES` 更新目录，保留现有图片、
-哈希和来源，只需要 Python 标准库。设备来源匹配在刷新设备列表时运行，与健康记录的
-normalizer 修订号无关。旧缓存里没存来源编号，所以要刷新一次设备列表才生效。
-
-历史的 `design_picture/Product` 截图已不在本机保留。完整重建图片要先提供脚本里点名的原始
-截图；正常构建应用直接用已提交的图片。
-
-只有在有意刷新那四张官方 CDN 图时才用 `--refresh-official`。校验器检查精确的目录 / 素材
-计数、卡片审计覆盖、ID / 别名 / 型号代码唯一、RGBA 透明、尺寸、本地 WebP 与缩略图一一
-引用，以及目录 SHA-256 哈希。
+重建目录、校验图片属于维护工作，见 [`scripts/assets/README.md`](../../scripts/assets/README.md)。

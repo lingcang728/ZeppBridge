@@ -15,7 +15,7 @@ data directory to `0700`. This provides less protection than Keychain: another
 process running as your user can read it. Keep this file out of shared folders,
 Git, and shared copies of your data directory.
 
-1. Install the version containing this fix in `/Applications`.
+1. Install version 2.2.4 or later in `/Applications`.
 2. **Quit ZeppBridge completely**, including the menu bar instance. Closing its
    window is not enough: a second launch only activates the existing process,
    which still has its original storage choice.
@@ -39,7 +39,8 @@ Git, and shared copies of your data directory.
 
 Use **Settings → Advanced → Open data folder** to locate the active data
 directory. `auth.json` still contains only account and region metadata. The
-separate `credentials.json` holds the tokens, including the local API token if
+separate `credentials.json` holds the tokens: the Zepp sign-in token, the access
+and refresh tokens of the official authorization, and the local API token if
 you enable that feature. Both the app and its CLI use the same storage choice
 when they use the same data directory.
 
@@ -54,9 +55,10 @@ when they use the same data directory.
 - Unknown values are errors. Linux's `env` and `secret-service` choices are not
   supported on macOS.
 
-Logging out deletes the Zepp token from the selected store and keeps your health
-records. If the local API has a token, it stays in the file. When the last token
-is deleted, the file is removed; a later launch with no explicit setting then
+Logging out deletes only the Zepp sign-in token from the selected store and keeps
+your health records. Official-authorization and local API tokens stay in the
+file, so the file stays too and the next launch keeps using file storage. Only
+when the last token is deleted is the file removed; a later launch with no explicit setting then
 uses Keychain again. Repeat the file-storage launch command before reconnecting
 if your keychain is still unavailable.
 

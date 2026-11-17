@@ -242,8 +242,8 @@ forbidden. The provenance of the algorithms and percentages is in the
 Every "walk somewhere" transition — the settings deck, card ↔ detail page,
 dialogs, the letter envelope — is a flight from `lib/motion/flight.ts`: one group
 of WAAPI animations on one timeline, a direction, and a list of what it hid and
-what it put on stage. Measurements before and after the rewrite are in
-[`motion-baseline.md`](motion-baseline.md); the bench is `scripts/motion/`.
+what it put on stage. The measuring bench and how to read its numbers are in
+[`scripts/motion/README.md`](../../scripts/motion/README.md).
 
 1. **It reacts when you press; waiting hides inside the motion.** Something
    visible changes within a frame or two (the veil starts blurring, the
@@ -351,8 +351,7 @@ what it put on stage. Measurements before and after the rewrite are in
 ### Hard rules: where things come from, how choices look (2026-10-07)
 
 These four rules apply to every page. A page that breaks one is a bug, not a
-style choice; the open list of pages that still do is
-[`motion-audit.md`](motion-audit.md).
+style choice.
 
 1. **Anything a click brings up grows out of what was clicked, and shrinks
    back into it.** Secondary pages, dialogs, popovers, menus, detail panes: a
@@ -373,9 +372,7 @@ style choice; the open list of pages that still do is
    `CapsuleWheel`; numbers are wheel columns (`WheelColumn`,
    `WheelDatePicker`); an on / off choice is a `GlassSwitch`.** Drag,
    keyboard and click all work; the lens follows the finger (`useGlassLens`,
-   `lib/segmentGlass.ts`). All three lift into Liquid Glass under the finger;
-   the 2026-10-07 audit (round 3 in `motion-audit.md`) found no other
-   choice control left.
+   `lib/segmentGlass.ts`). All three lift into Liquid Glass under the finger.
 4. **No dropdowns, no traditional card-style pickers, no bare checkboxes or
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.

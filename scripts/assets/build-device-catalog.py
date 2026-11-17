@@ -406,7 +406,7 @@ EXTRAS: list[dict[str, Any]] = [
         "asset_source": "pending-official-art",
         "canonical_device_key": "amazfit-balance-2",
         "checked_at": "2026-09-03",
-        "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
+        "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. Its deviceSource number comes from the frozen pre-3.1.1 crowd list (CROWD_DEVICE_SOURCE_CODES); the official table does not list it.",
     },
     # issue #137：Cheetah Square 不在目录里，用户连「这款不对？手动指认」都选不到。
     # 和上面的 Balance 2 XT 一样先不带图；编号 8257793 来自官方对照表（3.1.1）。
