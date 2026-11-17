@@ -2337,6 +2337,9 @@ export default {
       noRecords: 'За этот период записей сна и тренировок нет.',
     },
 
+    'lib/deviceName': {
+      undetermined: 'Устройство не определено',
+    },
     'views/SleepDetail': {
       title: 'Запись сна',
       askLabel: 'Сон',
@@ -2376,7 +2379,6 @@ export default {
       notProvided: 'Нет данных',
       syncTimeMissing: 'Время синхронизации не указано',
       lastCloudSync: (clock: string) => `Облачная синхронизация: ${clock}`,
-      deviceUndetermined: 'Устройство не определено',
       hoursAxis: 'ч',
       tooltipTotal: (date: string, hours: string) => `<b>${date} — всего сна: ${hours} ч</b><br/>`,
       tooltipRow: (name: string, hours: number) => `${name}: ${hours} ч<br/>`,

@@ -31,6 +31,7 @@ import { holdInPlace } from '../lib/motion/holdInPlace';
 import { pageQuery, sleepPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
+import { deviceNameText, undeterminedDevice } from '../lib/deviceName';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
@@ -215,7 +216,7 @@ const loadDetail = async () => {
     if (seq !== detailSeq) return;
     const profile = detail
       ? await cached(pageQuery.deviceProfile(detail.device_id, detail.source_scope))
-        .catch(() => ({ name: t.value.deviceUndetermined }))
+        .catch(undeterminedDevice)
       : {};
     if (seq !== detailSeq) return;
     session.value = detail;
@@ -236,7 +237,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
 
 /* 官方授权那一份（sleep_id 以 official: 开头）标成官方授权，不再笼统写「Zepp 云端」。 */
 const providerLabel = computed(() => (session.value?.sleep_id.startsWith('official:') ? t.value.providerOfficial : dataProviderLabel()));
-const metaSummary = computed(() => [providerLabel.value, device.value.name].filter(Boolean).join(' · '));
+const deviceLabel = computed(() => deviceNameText(device.value));
+const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filter(Boolean).join(' · '));
 </script>
 
 <template>
@@ -352,7 +354,7 @@ const metaSummary = computed(() => [providerLabel.value, device.value.name].filt
               <dl>
                 <div>
                   <dt>{{ t.deviceName }}</dt>
-                  <dd>{{ device.name || t.notProvided }}</dd>
+                  <dd>{{ deviceLabel || t.notProvided }}</dd>
                 </div>
                 <div>
                   <dt>{{ t.deviceFirmware }}</dt>

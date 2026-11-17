@@ -24,6 +24,11 @@ pub struct DeviceProfile {
     pub canonical_name: Option<String>,
     #[serde(default)]
     pub display_name: Option<String>,
+    /// 没有具体设备时（云端融合来源、设备没法确定）这里给码，`name` /
+    /// `display_name` 留空，界面按码取自己语言的说法：`ui.device.fused`、
+    /// `ui.device.undetermined`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_code: Option<String>,
     #[serde(default)]
     pub catalog_id: Option<String>,
     #[serde(default)]

@@ -4428,6 +4428,9 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   },
 
   // Source: src/views/SleepDetail.i18n.ts
+  'lib/deviceName': {
+    undetermined: 'Urządzenie nieokreślone',
+  },
   "views/SleepDetail": {
     title: 'Zapis snu',
     askLabel: 'Sen',
@@ -4465,7 +4468,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     notProvided: 'Nie podano',
     syncTimeMissing: 'Nie podano czasu synchronizacji',
     lastCloudSync: (clock: string) => `Ostatnia synchronizacja z chmurą: ${clock}`,
-    deviceUndetermined: 'Urządzenie nieokreślone',
     hoursAxis: 'godz.',
     tooltipTotal: (date: string, hours: string) => `<b>${date} — łącznie ${hours} godz. snu</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} godz.<br/>`,

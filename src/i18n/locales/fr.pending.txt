@@ -16,3 +16,4 @@ i18n/errors.err.push.secrets_missing
 i18n/errors.err.push.site_invalid
 i18n/errors.err.push.state_unwritable
 i18n/errors.err.push.upload_failed
+lib/deviceName.fused

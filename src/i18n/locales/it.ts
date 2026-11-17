@@ -3773,6 +3773,9 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
       'Non creare un nuovo account Zepp per questo motivo e non associare l’orologio a un altro account: la nuova associazione cancella le impostazioni sull’orologio.',
   },
 
+  'lib/deviceName': {
+    undetermined: 'Dispositivo non determinato',
+  },
   'views/SleepDetail': {
     title: 'Dettagli sonno',
     askLabel: 'Sonno',
@@ -3818,7 +3821,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     deviceName: 'Nome',
     deviceId: 'ID dispositivo',
     deviceFirmware: 'Firmware',
-    deviceUndetermined: 'Dispositivo non determinato',
   },
 
   'views/SleepList': {

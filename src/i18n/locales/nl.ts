@@ -2300,6 +2300,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       avgHr: (bpm: number) => `Gem. hartslag ${bpm}`,
       showMore: (count: number) => `Nog ${count} tonen`,
     },
+    'lib/deviceName': {
+      undetermined: 'Apparaat onbepaald',
+    },
     'views/SleepDetail': {
       title: 'Slaapoverzicht',
       loadingDetail: 'Slaapgegevens laden…',
@@ -2339,7 +2342,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       notProvided: 'Niet verstrekt',
       syncTimeMissing: 'Synchronisatietijd niet verstrekt',
       lastCloudSync: (clock: string) => `Laatste cloudsynchronisatie ${clock}`,
-      deviceUndetermined: 'Apparaat onbepaald',
       hoursAxis: 'uur',
       tooltipTotal: (date: string, hours: string) =>
         `<b>${date} — ${hours} u in totaal in slaap</b><br/>`,

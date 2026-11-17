@@ -5,16 +5,19 @@
  * 「本地 | 地图」两档：默认本地画布，零外部请求。第一次切到地图先说清会向地图服务暴露
  * 运动地点，选「只这次」（只管这一页）或「一直开」（记住，以后打开详情直接是上次那一档）。
  * 地图组件异步加载，加载失败或瓦片一张都拉不下来就自动退回本地画布。
+ *
+ * 指着心率 / 配速 / 海拔 / 步频图的某一刻时，两档都在路线上标出那一刻在哪（useRouteCursor）。
  */
-import { computed, defineAsyncComponent, nextTick, ref } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue';
 import GlyphTile from '../GlyphTile.vue';
 import SegmentTrack, { type SegmentItem } from '../SegmentTrack.vue';
-import type { RouteCanvas } from '../../lib/workoutRoute';
+import { trackPointAt, type RouteCanvas } from '../../lib/workoutRoute';
+import { routeCursor, setRouteCursor } from '../../composables/useRouteCursor';
 import { allowMapAlways, initialRouteMode, mapAlwaysAllowed, rememberRouteMode, type RouteViewMode } from '../../lib/mapTiles';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
-defineProps<{ canvas: RouteCanvas | null }>();
+const props = defineProps<{ canvas: RouteCanvas | null }>();
 const t = useMessages(workoutDetailMessages);
 
 const mode = ref<RouteViewMode>(initialRouteMode());
@@ -24,6 +27,10 @@ const failed = ref(false);
 const attempt = ref(0);
 const consentPanel = ref<HTMLElement | null>(null);
 let allowedThisPage = false;
+
+/** 图表悬停那一刻在路线上的位置；没在指图表、或那一刻没有轨迹（暂停、丢信号）时为 null。 */
+const cursorPoint = computed(() => (props.canvas ? trackPointAt(props.canvas.track, routeCursor.value) : null));
+onBeforeUnmount(() => setRouteCursor(null));
 
 const fallBack = () => {
   mode.value = 'local';
@@ -94,7 +101,7 @@ const onConsentKey = (event: KeyboardEvent) => {
       <SegmentTrack class="route-mode" :items="modeItems" :model-value="shownMode" :aria-label="t.routeModeAria" compact no-wrap @update:model-value="pick" />
     </div>
     <div class="route-wrap" :class="{ 'has-notice': failed && mode === 'local' }">
-      <WorkoutRouteMap v-if="mode === 'map'" :key="attempt" :canvas="canvas" :label="t.routeMapAria" @failed="fallBack" />
+      <WorkoutRouteMap v-if="mode === 'map'" :key="attempt" :canvas="canvas" :cursor="cursorPoint" :label="t.routeMapAria" @failed="fallBack" />
       <div v-if="mode === 'local'" class="route-canvas-texture" aria-hidden="true"></div>
       <svg v-if="mode === 'local'" class="route-svg" :viewBox="canvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="t.routeSvgAria">
         <path v-for="(road, index) in canvas.ghosts" :key="`ghost-${index}`" class="ghost-road" :d="road.d" fill="none" :stroke-opacity="road.opacity" />
@@ -106,6 +113,10 @@ const onConsentKey = (event: KeyboardEvent) => {
         <g v-for="(marker, index) in canvas.pauseMarkers" :key="`pause-${index}`" class="pause-mark" :transform="`translate(${marker.x} ${marker.y})`">
           <circle r="7" />
           <path d="M-2-2.6 V2.6 M2-2.6 V2.6" />
+        </g>
+        <g v-if="cursorPoint" class="route-cursor" :transform="`translate(${cursorPoint.x} ${cursorPoint.y})`" aria-hidden="true">
+          <circle class="route-cursor-halo" r="17" />
+          <circle class="route-cursor-dot" r="7.5" />
         </g>
       </svg>
       <div
@@ -169,6 +180,10 @@ const onConsentKey = (event: KeyboardEvent) => {
 .route-end-mark { fill: none; stroke: var(--mat-inset); stroke-width: 1.6; stroke-linecap: round; }
 .pause-mark circle { fill: var(--mat-card-solid); stroke: var(--route-amber); stroke-width: 1.2; }
 .pause-mark path { fill: none; stroke: var(--route-amber); stroke-width: 1.4; stroke-linecap: round; }
+/* 图表悬停那一刻的位置：静态的一圈晕 + 实心点，不做动画（跟着指针每帧都在挪）。 */
+.route-cursor { pointer-events: none; }
+.route-cursor-halo { fill: color-mix(in srgb, var(--ink) 16%, transparent); }
+.route-cursor-dot { fill: var(--ink); stroke: var(--mat-inset); stroke-width: 3; }
 .map-consent { position: absolute; top: 50%; left: 50%; z-index: 2; width: min(380px, calc(100% - 32px)); padding: 16px 18px; border: 1px solid var(--mat-glass-line); border-radius: var(--radius-md); background: var(--mat-glass-strong); box-shadow: var(--mat-glass-shadow); backdrop-filter: blur(16px) saturate(1.2); transform: translate(-50%, -50%); }
 .map-consent-title { margin: 0 0 6px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .map-consent-body { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }

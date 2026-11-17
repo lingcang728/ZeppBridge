@@ -4,6 +4,8 @@ export interface DeviceProfile {
   name?: string;
   canonical_name?: string;
   display_name?: string;
+  /** 没有具体设备时的码（ui.device.fused / ui.device.undetermined），名字走 lib/deviceName。 */
+  name_code?: string;
   catalog_id?: string;
   kind?: 'watch' | 'strap' | 'ring' | 'band' | 'scale' | 'unknown' | string;
   image_key?: string | null;

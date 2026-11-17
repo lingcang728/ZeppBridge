@@ -3813,13 +3813,15 @@ export default {
       verifyAndSync: '驗證並同步',
       verifyFailed: '驗證未完成',
     },
+    'lib/deviceName': {
+      undetermined: '裝置未確定',
+    },
     'views/SleepDetail': {
       askLabel: '睡眠',
       deviceFirmware: '韌體版本',
       deviceId: '裝置 ID',
       deviceName: '裝置名稱',
       deviceTitle: '裝置',
-      deviceUndetermined: '裝置未確定',
       durationKicker: '睡眠時長',
       footnote: '只展示雲端提供的階段彙總。沒有 REM 欄位就顯示「未提供」，不用減法編造，也不畫未提供的時間軸。',
       heroAria: '睡眠時長與評分',

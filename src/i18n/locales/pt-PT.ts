@@ -1906,6 +1906,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       showMore: (count: number) => `Ver mais ${count}`,
       noRecords: 'Sem registos de sono ou treino neste período.',
     },
+    'lib/deviceName': {
+      undetermined: 'Dispositivo por determinar',
+    },
     'views/SleepDetail': {
       askLabel: 'Sono',
       title: 'Registo de sono',
@@ -1946,7 +1949,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       notProvided: 'Não fornecido',
       syncTimeMissing: 'Hora de sincronização não disponível',
       lastCloudSync: (clock: string) => `Última sincronização da nuvem: ${clock}`,
-      deviceUndetermined: 'Dispositivo por determinar',
       hoursAxis: 'horas',
       tooltipTotal: (date: string, hours: string) =>
         `<b>${date} — ${hours} h de sono</b><br/>`,

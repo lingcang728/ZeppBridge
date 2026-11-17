@@ -21,6 +21,7 @@ import { workoutDetailMessages } from '../views/WorkoutDetail.i18n';
 import type { DeviceProfile, WorkoutSeries } from '../types';
 import type { WorkoutMetrics } from './useWorkoutDetail';
 import { WORKOUT_GLYPH, type WorkoutGlyph } from '../lib/workoutGlyphs';
+import { deviceNameText } from '../lib/deviceName';
 
 export interface HeroMetric { label: string; value: string; unit?: string; tone: GlyphTone; icon: DesignIconName; role?: WorkoutGlyph['role'] }
 
@@ -84,7 +85,7 @@ export const useWorkoutPresentation = (
   /* 只看 key，不看显示名——名字跟着界面语言变，图标不该跟着变。 */
   const workoutArt = computed<DesignIconName>(() =>
     (/cycl|ride|bike|bmx|spinning/.test(displayType.value.toLowerCase()) ? 'outdoor-cycling' : 'outdoor-run'));
-  const deviceName = computed(() => device.value.canonical_name || device.value.name || t.value.deviceNameMissing);
+  const deviceName = computed(() => deviceNameText(device.value) || t.value.deviceNameMissing);
   /* 这张图必须跟着这条记录**实际**是哪台表走。以前硬写死了一张 T-Rex 3。 */
   const deviceImage = computed(() => deviceImageFor(device.value.kind, device.value.image_key));
   const deviceKind = computed(() => device.value.kind || 'unknown');

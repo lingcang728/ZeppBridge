@@ -2038,13 +2038,15 @@ export default {
       noRecords: 'इस दौरान कोई नींद या वर्कआउट रिकॉर्ड नहीं है।',
     },
 
+    'lib/deviceName': {
+      undetermined: 'डिवाइस अज्ञात',
+    },
     'views/SleepDetail': {
       askLabel: 'नींद',
       deviceFirmware: 'फ़र्मवेयर',
       deviceId: 'डिवाइस ID',
       deviceName: 'नाम',
       deviceTitle: 'डिवाइस',
-      deviceUndetermined: 'डिवाइस अज्ञात',
       durationKicker: 'नींद की अवधि',
       footnote: 'केवल क्लाउड द्वारा दिया गया चरण सारांश दिखता है। REM फ़ील्ड न हो तो "उपलब्ध नहीं" दिखता है — घटाकर नहीं बनाया जाता; न दिया गया टाइमलाइन कभी नहीं बनाया जाता।',
       heroAria: 'नींद की अवधि और स्कोर',

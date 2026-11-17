@@ -19,6 +19,7 @@ import type { GlyphTone } from '../../lib/glyphs';
 import { CHART_THEME, VChart } from '../../lib/echartsSetup';
 import { CHART_TYPE, chartTier, fitTicks, withDetail, withFontSize, type ChartDetail, type ChartTier, type lineOption } from '../../lib/workoutCharts';
 import { useMessages } from '../../i18n';
+import { axisPointerTime, setRouteCursor } from '../../composables/useRouteCursor';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
 const props = defineProps<{
@@ -67,11 +68,18 @@ onMounted(() => {
   });
   if (root.value) observer.observe(root.value);
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  setRouteCursor(null);
+});
+
+/* 指着图的哪一刻，轨迹卡就在路线上标出那一刻在哪（useRouteCursor）。横轴是时间。 */
+const onAxisPointer = (event: object) => setRouteCursor(axisPointerTime(event as Parameters<typeof axisPointerTime>[0]));
+const clearCursor = () => setRouteCursor(null);
 </script>
 
 <template>
-  <section ref="root" :class="['surface-card', 'chart-card', `tone-${card.tone}`, `tier-${tier}`]" :style="typeVars" :aria-label="card.title">
+  <section ref="root" :class="['surface-card', 'chart-card', `tone-${card.tone}`, `tier-${tier}`]" :style="typeVars" :aria-label="card.title" @mouseleave="clearCursor">
     <div class="chart-head">
       <GlyphTile :name="card.icon" :tone="card.tone" :size="36" />
       <p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p>
@@ -79,7 +87,7 @@ onBeforeUnmount(() => observer?.disconnect());
     <dl v-if="card.stats" :class="['chart-stats', { long: longStats }]" :style="{ '--stat-count': card.stats.length }">
       <div v-for="stat in card.stats" :key="stat.label"><dt>{{ stat.label }}</dt><dd>{{ stat.value }}</dd></div>
     </dl>
-    <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+    <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" @update-axis-pointer="onAxisPointer" @globalout="clearCursor" />
     <ElevationFacts v-if="showSlope" class="chart-extra" :slope="card.slope ?? null" :facts="false" />
     <ShareBar v-if="showZones" class="chart-extra" :title="t.chartZoneShare" :segments="card.zoneShare!" />
   </section>

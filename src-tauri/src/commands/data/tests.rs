@@ -524,7 +524,7 @@ fn legacy_devices_json_is_read_with_new_defaults() {
 #[test]
 fn fused_and_unknown_profiles_never_claim_a_catalog_device() {
     let fused = super::DeviceProfile {
-        name: Some("融合来源".to_string()),
+        name_code: Some("ui.device.fused".to_string()),
         match_status: DeviceMatchStatus::Unknown,
         ..Default::default()
     };
@@ -532,6 +532,10 @@ fn fused_and_unknown_profiles_never_claim_a_catalog_device() {
     let unknown = unknown_device_profile("mystery");
     assert_eq!(unknown.match_status, DeviceMatchStatus::Unknown);
     assert!(unknown.catalog_id.is_none());
+    // 英文用户在运动详情里看到过「设备未确定」：没有具体设备时只给码，不给中文名。
+    assert_eq!(unknown.name, None);
+    assert_eq!(unknown.display_name, None);
+    assert_eq!(unknown.name_code.as_deref(), Some("ui.device.undetermined"));
 }
 
 #[test]

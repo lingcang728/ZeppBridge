@@ -10,12 +10,12 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { buildRouteRuns, type RouteCanvas } from '../../lib/workoutRoute';
+import { buildRouteRuns, type RouteCanvas, type TrackPoint } from '../../lib/workoutRoute';
 import { MAP_TILES } from '../../lib/mapTiles';
 import { resolvedTheme } from '../../composables/useTheme';
 import { deferResize } from '../../lib/motion/budget';
 
-const props = defineProps<{ canvas: RouteCanvas; label: string }>();
+const props = defineProps<{ canvas: RouteCanvas; label: string; cursor?: TrackPoint | null }>();
 const emit = defineEmits<{ (event: 'failed'): void }>();
 
 /** 这么久一张瓦片都没到，就当连不上（2026-11-14 实测：本机连 tile.openstreetmap.org 一半请求 5 秒超时、不报错也不结束，旧逻辑只认报错，地图就一直空着）。 */
@@ -26,6 +26,8 @@ const TILE_RETRY_MS = 1_500;
 const host = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
 let routeLayer: L.LayerGroup | null = null;
+/** 图表悬停那一刻的位置标记。用 DOM 图标而不是画进 canvas：跟着指针挪时只改一个 transform，不重画整条轨迹。 */
+let cursorMarker: L.Marker | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let tileLoads = 0;
 let tileErrors = 0;
@@ -62,6 +64,20 @@ const drawRoute = () => {
   L.circleMarker([end.latitude, end.longitude], { radius: 7, color: casing, weight: 2, fillColor: resolveColor('var(--route-coral)'), fillOpacity: 1, interactive: false }).addTo(layer);
   layer.addTo(map);
   routeLayer = layer;
+};
+
+const CURSOR_ICON = L.divIcon({ className: 'zb-route-cursor', html: '<i></i>', iconSize: [34, 34], iconAnchor: [17, 17] });
+
+const placeCursor = (point: TrackPoint | null | undefined) => {
+  if (!map) return;
+  if (!point) {
+    cursorMarker?.remove();
+    cursorMarker = null;
+    return;
+  }
+  const at: L.LatLngTuple = [point.latitude, point.longitude];
+  if (cursorMarker) cursorMarker.setLatLng(at);
+  else cursorMarker = L.marker(at, { icon: CURSOR_ICON, interactive: false, keyboard: false, zIndexOffset: 1000 }).addTo(map);
 };
 
 const routeBounds = (): L.LatLngBounds => {
@@ -154,6 +170,7 @@ onMounted(() => {
 });
 
 watch(resolvedTheme, () => requestAnimationFrame(drawRoute));
+watch(() => props.cursor, placeCursor);
 watch(() => props.canvas, () => {
   drawRoute();
   framed = false;
@@ -169,6 +186,7 @@ onBeforeUnmount(() => {
   map?.remove();
   map = null;
   routeLayer = null;
+  cursorMarker = null;
 });
 </script>
 
@@ -191,4 +209,7 @@ onBeforeUnmount(() => {
 .zb-route-map .leaflet-control-zoom a:hover { background: var(--mat-card-solid); }
 .zb-route-map-credit { position: absolute; top: 10px; right: 10px; z-index: 1000; padding: 3px 8px; border: 1px solid var(--mat-glass-line); border-radius: 8px; background: var(--mat-glass-strong); color: var(--muted); font: inherit; font-size: var(--fs-2xs); cursor: pointer; }
 .zb-route-map-credit:hover { color: var(--ink); }
+/* 图表悬停那一刻的位置（和本地画布同一个样子）。 */
+.zb-route-map .zb-route-cursor { border-radius: 50%; background: color-mix(in srgb, var(--ink) 16%, transparent); pointer-events: none; }
+.zb-route-map .zb-route-cursor i { position: absolute; inset: 10px; border: 3px solid var(--mat-card-solid); border-radius: 50%; background: var(--ink); }
 </style>

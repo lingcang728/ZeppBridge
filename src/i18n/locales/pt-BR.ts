@@ -1449,6 +1449,9 @@ export default {
       yesterday: 'Ontem',
     },
 
+    'lib/deviceName': {
+      undetermined: 'Dispositivo não identificado',
+    },
     'views/SleepDetail': {
       title: 'Detalhes do sono',
       askLabel: 'Sono',
@@ -1486,7 +1489,6 @@ export default {
       notProvided: 'Não informado',
       syncTimeMissing: 'Horário de sincronização não informado',
       lastCloudSync: (clock: string) => `Última sincronização na nuvem: ${clock}`,
-      deviceUndetermined: 'Dispositivo não identificado',
       hoursAxis: 'horas',
       tooltipTotal: (date: string, hours: string) => `<b>${date} — Total: ${hours} h</b><br/>`,
       tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,

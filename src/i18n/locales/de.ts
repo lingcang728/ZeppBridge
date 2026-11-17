@@ -2567,13 +2567,15 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       workoutTypeAria: 'Trainingsart',
       yesterday: 'Gestern',
     },
+    'lib/deviceName': {
+      undetermined: 'Gerät unbestimmt',
+    },
     'views/SleepDetail': {
       askLabel: 'Schlaf',
       deviceFirmware: 'Firmware',
       deviceId: 'Geräte-ID',
       deviceName: 'Name',
       deviceTitle: 'Gerät',
-      deviceUndetermined: 'Gerät unbestimmt',
       durationKicker: 'Schlafdauer',
       footnote:
         'Zeigt nur die von der Cloud gelieferten Phasen. Fehlt das REM-Feld, steht „Nicht angegeben" – nie per Subtraktion erfunden, keine Zeitachse ohne Werte.',

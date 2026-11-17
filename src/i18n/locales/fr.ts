@@ -2082,6 +2082,9 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       vo2Empty: 'Aucun enregistrement VO₂ max sur cette plage ; il ne se met à jour qu’après une course en extérieur.',
     },
 
+    'lib/deviceName': {
+      undetermined: 'Appareil indéterminé',
+    },
     'views/SleepDetail': {
       title: 'Enregistrement de sommeil',
       askLabel: 'Sommeil',
@@ -2127,7 +2130,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       deviceName: 'Nom',
       deviceId: 'ID de l’appareil',
       deviceFirmware: 'Micrologiciel',
-      deviceUndetermined: 'Appareil indéterminé',
     },
 
 

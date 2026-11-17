@@ -214,8 +214,7 @@ pub(super) async fn resolve_device_profile(
         .unwrap_or(false)
     {
         return Ok(DeviceProfile {
-            name: Some("融合来源".into()),
-            display_name: Some("融合来源".into()),
+            name_code: Some(FUSED_CODE.into()),
             match_status: DeviceMatchStatus::Unknown,
             ..DeviceProfile::default()
         });
@@ -230,8 +229,7 @@ pub(super) async fn resolve_device_profile(
     }
     let Some(device_id) = device_id.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(DeviceProfile {
-            name: Some("设备未确定".into()),
-            display_name: Some("设备未确定".into()),
+            name_code: Some(UNDETERMINED_CODE.into()),
             match_status: DeviceMatchStatus::Unknown,
             ..DeviceProfile::default()
         });
@@ -403,11 +401,15 @@ pub(super) fn device_hint_from_profile(
     }
 }
 
+/// 云端跨设备合成的记录：没有一块具体的表。界面按码出文案，后端不给中文名。
+pub(super) const FUSED_CODE: &str = "ui.device.fused";
+/// 记录带不出是哪块表（手机记的、旧报文缺字段）。
+pub(super) const UNDETERMINED_CODE: &str = "ui.device.undetermined";
+
 pub(super) fn unknown_device_profile(device_id: &str) -> DeviceProfile {
     let device_id = device_id.trim();
     DeviceProfile {
-        name: Some("设备未确定".into()),
-        display_name: Some("设备未确定".into()),
+        name_code: Some(UNDETERMINED_CODE.into()),
         device_id: (!device_id.is_empty()).then(|| device_id.to_string()),
         match_status: DeviceMatchStatus::Unknown,
         ..DeviceProfile::default()

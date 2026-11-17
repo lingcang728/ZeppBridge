@@ -39,7 +39,49 @@ export interface RouteCanvas {
   end: RouteCanvasPoint;
   validPaceCount: number;
   enoughPace: boolean;
+  /** 按时间排好的轨迹点（和画布同一份抽稀结果），给「图表悬停 → 轨迹上标点」查位置。 */
+  track: TrackPoint[];
 }
+
+/** 轨迹上某一刻的位置：画布坐标和经纬度都有，本地画布和地图各取所需。 */
+export interface TrackPoint {
+  t: number;
+  x: number;
+  y: number;
+  latitude: number;
+  longitude: number;
+}
+
+/** 悬停的时刻离最近的轨迹点超过这么久（暂停、信号丢了），就不标点：宁可不标，也不标错地方。 */
+export const TRACK_CURSOR_MAX_GAP_MS = 60_000;
+
+/**
+ * 图表悬停的那一刻在轨迹上的位置。落在两个点之间就按时间插值；
+ * 在轨迹开始之前、结束之后，或者离两边的点都太远时返回 null。
+ */
+export const trackPointAt = (track: TrackPoint[], time: number | null | undefined): TrackPoint | null => {
+  if (time === null || time === undefined || !Number.isFinite(time) || !track.length) return null;
+  const first = track[0]!;
+  const last = track[track.length - 1]!;
+  if (time < first.t - TRACK_CURSOR_MAX_GAP_MS || time > last.t + TRACK_CURSOR_MAX_GAP_MS) return null;
+  if (time <= first.t) return first;
+  if (time >= last.t) return last;
+  let lo = 0;
+  let hi = track.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (track[mid]!.t <= time) lo = mid;
+    else hi = mid;
+  }
+  const a = track[lo]!;
+  const b = track[hi]!;
+  const near = time - a.t <= b.t - time ? a : b;
+  // 两点隔得太久（中间是暂停或丢信号），插值会把点画在没走过的直线上：只在近的那头够近时标它。
+  if (b.t - a.t > TRACK_CURSOR_MAX_GAP_MS) return Math.abs(near.t - time) <= TRACK_CURSOR_MAX_GAP_MS / 2 ? near : null;
+  const ratio = b.t === a.t ? 0 : (time - a.t) / (b.t - a.t);
+  const mix = (from: number, to: number) => from + (to - from) * ratio;
+  return { t: time, x: mix(a.x, b.x), y: mix(a.y, b.y), latitude: mix(a.latitude, b.latitude), longitude: mix(a.longitude, b.longitude) };
+};
 
 /** 超过 max 个点时等距抽样，保留最后一个点。 */
 export const downsample = <T>(items: T[], max = 800): T[] => {
@@ -219,6 +261,9 @@ export const buildRouteCanvas = (series: WorkoutSeries | null | undefined): Rout
     end: canvasPoints[canvasPoints.length - 1],
     validPaceCount: validPaces.length,
     enoughPace,
+    track: canvasPoints
+      .map((point) => ({ t: new Date(point.timestamp).getTime(), x: point.x, y: point.y, latitude: point.latitude, longitude: point.longitude }))
+      .filter((point) => Number.isFinite(point.t)),
   };
 };
 
