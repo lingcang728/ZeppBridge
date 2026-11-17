@@ -1,6 +1,5 @@
 # ZeppBridge UI design and interaction constraints
 
-Updated 2026-09-27 (batches four to seven: one capsule control, interruptible deck morphs, 3D overview and timelines).
 ZeppBridge is a bridge to the user's wearable health data, not a bloated
 analytics app.
 
@@ -24,9 +23,9 @@ mode**. See "Dual theme" below.
   empty state. Never fake data, zeros or simulated curves. With no samples,
   show empty-state copy (for example "after syncing, real 24-hour heart-rate
   movement appears here") rather than a placeholder curve.
-- **Analysis lives outside**: clinical and training advice is left to whichever
-  AI tool the user chooses. The app focuses on collection, normalised storage,
-  redaction and AI-ready export.
+- **No medical conclusions**: the app collects, stores, redacts and exports;
+  insights and the weekly report state facts and evidence, and medical or
+  training interpretation is left to the AI tool the user chooses.
 - **Privacy floor**:
   - exporting to an AI applies irreversible redaction by default
     (`redact_ai_export` strips device_id, MAC, IMEI, precise GPS and similar,
@@ -43,7 +42,7 @@ mode**. See "Dual theme" below.
     source lives only in `lib/mapTiles.ts`; the CSP allows just that one host.
 - **Progressive disclosure**: everyday use shows core metrics and quick export;
   interface scale lives in the "Display and language" settings card; the data
-  folder, clearing credentials and sync diagnostics live in "Advanced and
+  folder, data health and maintenance live in "Advanced and
   maintenance".
 
 ## Design tokens
@@ -96,7 +95,7 @@ forbidden. The provenance of the algorithms and percentages is in the
 - Category colours keep their hue across schemes and only shift lightness /
   saturation (light-mode heart red `#C93F49`, brand `#2F6B4F`…). A token keeps
   the same role in both schemes; semantics do not drift.
-### Material: restrained glass (2026-09-26)
+### Material: restrained glass
 
 - The whole app has **one card material**: a two-stop gradient, a top-edge
   highlight (`inset 0 1px 0`) and two soft shadows. Tokens are the `--mat-*`
@@ -140,7 +139,7 @@ forbidden. The provenance of the algorithms and percentages is in the
   (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
   not a third theme.
 
-### Depth, capsules and motion (v3 redesign, 2026-09-27)
+### Depth, capsules and motion
 
 - **Radii are generous**: `--radius-sm/md/lg/xl` = 12 / 20 / 26 / 34 px. Cards
   read as slabs with thickness: `--mat-rim` is a top highlight *and* a bottom
@@ -175,26 +174,25 @@ forbidden. The provenance of the algorithms and percentages is in the
   on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
   direction — `forward` focuses into a detail page, `back` backs out. The leaving
   page is pinned at its scroll position so it does not jump to the top.
-- **Switching tabs is a plain fade, one page out then the next in** (2026-10-29,
-  `composables/useTabFade.ts`, layer picking in `lib/motion/tabFade.ts`): this covers
-  Overview / Hand to AI / Settings and clicking a top tab from any sub-page. The old
-  page fades out, then the new page fades in; nothing moves or scales. Two richer
-  versions were rejected the same day: a ripple that split pages into blocks (its
-  per-block `translate` overrode the blocks' own CSS `translate`, so the AI stage
-  jumped sideways, and fill animations stuck on cached pages blanked them), and a
-  glowing ring overlay (judged ugly in both themes). Pages fade layer by layer (the
+- **Switching tabs is a plain fade, one page out then the next in**
+  (`composables/useTabFade.ts`, layer picking in `lib/motion/tabFade.ts`): this covers
+  Overview / Send to AI / Settings and clicking a top tab from any sub-page. The old
+  page fades out, then the new page fades in; nothing moves or scales. Don't split
+  pages into blocks for a ripple: a per-block `translate` animation overrides the
+  blocks' own CSS `translate`, and fill animations left on cached pages blank them.
+  Pages fade layer by layer (the
   page root's direct children), never the root itself, so glass inside keeps sampling;
   a full-screen fixed layer (the sheet) is faded one level deeper so its blur does not
   drop out. Every fill animation is cancelled when done. Completion follows the
   animations themselves (explicit `done`), never Vue's wall-clock timeout — that
   timeout used to remove the old page while the frame-steady hold had paused it,
   leaving a blank screen when switching from a scrolled page.
-- **Sheets on Hand to AI** (saved tasks, pre-send check, round trips) use the same
+- **Sheets on Send to AI** (saved tasks, pre-send check, round trips) use the same
   window morph as dialogs (`lib/motion/sheet.ts` → `dialogWindowFrames`): the first
   frame is the pill itself (a copy fades out while the real one hides), content
   stays 1:1, and closing lands back on the pill.
-- **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`,
-  2026-10-03): the new page itself is cropped out of the card (`translate` + a
+- **Card → detail page works like the settings deck** (`composables/usePageMorph.ts`):
+  the new page itself is cropped out of the card (`translate` + a
   fixed-radius `clip-path`, 1:1, no scaling) and slides from the card's corner
   home, so its header lands where the card was; a copy of the card hands over
   to the page content as soon as the window starts to grow (`OPEN_AT` in
@@ -203,30 +201,28 @@ forbidden. The provenance of the algorithms and percentages is in the
   of the page, so one clip animation carries all three. Card and page contents
   take turns with only a short overlap (no double exposure). Going back is the
   exact reverse and the last frame is the real card. **It reacts at once and
-  flies when the content is ready** (2026-11-12, second pass): the new page
+  flies when the content is ready**: the new page
   mounts light (charts as empty shells) and the veil starts blurring on that
   frame; the window waits on the card while charts mount one per frame and the
   frame pace recovers (both capped, `composables/pageMorph/expand.ts`), then
   grows with the real, fully drawn page inside — nothing is redrawn after
   landing. Page chunks and first-screen data are still fetched on hover, press
   and idle (`lib/motion/prefetch.ts`, `lib/pageQueries.ts`, `lib/readCache.ts`)
-  and are not waited for. The same morning's "fly at once, mount charts after
-  landing" was rejected by the user the same day (an empty plate growing, then
-  charts fading in again on every open). Re-opening the same card while it is
+  and are not waited for. Don't "fly at once and mount charts after landing": an empty plate grows,
+  then the charts fade in again on every open. Re-opening the same card while it is
   still collapsing continues from the live window. Small tiles that link
   with `?focus=<metric>` (pinned metrics, the week digest) grow straight into
   that trend card on the detail page, which gets a brief ring
   (`lib/motion/focusTarget.ts`). Going back from a scrolled page shrinks the
   part you are looking at, so it keeps the same pace. Timing lives in
   `lib/motion/pageFlight.ts` (`PAGE_WINDOW_MS` = 540 ms × `PACE`,
-  `cubic-bezier(.3, .1, .15, 1)`: a soft start and a long settle — slowed again
-  on 2026-11-12 from 500 / 440 ms with `cubic-bezier(.4, .6, .2, 1)`); once it
+  `cubic-bezier(.3, .1, .15, 1)`: a soft start and a long settle); once it
   has taken off, `lib/motion/budget.ts` holds back late chart mounts and
   skeleton-to-content swaps.
-- **Floating top bar** (round 4, after iPadOS / macOS 26): the bar sits about
+- **Floating top bar** (after iPadOS / macOS 26): the bar sits about
   12 px below the window edge with inset sides; content scrolls under it and a
   fading "scroll edge" mask sits below it. Each control stays its own piece of
-  glass (merging them was rejected); refraction is only a thin outer ring
+  glass, never merged; refraction is only a thin outer ring
   (`lib/glassLens.ts`), the middle is plain blur. A one-off notice that belongs
   to a control (the "cloud has nothing newer yet" tip under the sync pill)
   hangs below the action group as its own glass and never covers page
@@ -237,7 +233,7 @@ forbidden. The provenance of the algorithms and percentages is in the
   the ring is masked to the edge and the light is an outer `box-shadow`;
   neither may tint the inside of the capsule.
 
-### Motion: one primitive, seven rules (2026-11-12, rule 7 on 11-13)
+### Motion: one primitive, eight rules
 
 Every "walk somewhere" transition — the settings deck, card ↔ detail page,
 dialogs, the letter envelope — is a flight from `lib/motion/flight.ts`: one group
@@ -276,12 +272,11 @@ what it put on stage. The measuring bench and how to read its numbers are in
    live only in `lib/motion/timing.ts`. Flights are exempt from the global
    `settleMotion` hurry (Esc / navigation); deck open / close on the same route
    does not trigger it at all.
-6. **Landing is a crossfade, never a swap** (2026-11-12, third round; the
-   user's 4K recording: "the last moment freezes like a screenshot, then
-   jumps"). On the way back (page → card, big card → small card, dialog →
+6. **Landing is a crossfade, never a swap**: the last moment never freezes
+   or jumps. On the way back (page → card, big card → small card, dialog →
    button) the real card lights up underneath the still-shrinking window, then
    the whole window fades; by the landing frame only the real card is left.
-   **The crossfade only happens after the shape has landed** (2026-11-13, see
+   **The crossfade only happens after the shape has landed** (see
    rule 8): crossfading while the window still moves leaves the copy a few
    pixels off the real card, a double image. Returns use `BACK_EASE`; the
    content ↔ copy handoff happens while it is still shrinking, not in a dead
@@ -290,15 +285,15 @@ what it put on stage. The measuring bench and how to read its numbers are in
    landing; switching between open and close mid-way maps time by where the
    window is (`closeTimeFor` / `openTimeFor`). Page → card waits for the
    staying page to paint steadily first (capped at 120 ms,
-   `pageMorph/collapse.ts`). Page → card is a **container morph** (2026-11-13,
-   fourth round): content and the card copy scale with the window width,
+   `pageMorph/collapse.ts`). Page → card is a **container morph**:
+   content and the card copy scale with the window width,
    pinned to its top-left corner; the copy fades in on top, then the content
    fades out, so the page gradually becomes the card (`contentMorphOut` /
    `replicaMorphIn` in `pageFlight.ts`). Closing a settings card scrolled far
    down no longer rolls back to the top first (that bounced upward): the
    content fades in place, pinned to the window, while the source card lights
    up in the second half (`FAR_*` in `useDeckMorph.ts`).
-7. **No full-page repaint mid-flight** (2026-11-13). Morphs run on the
+7. **No full-page repaint mid-flight**. Morphs run on the
    compositor (transform / clip-path / opacity); any main-thread frame that
    re-layerizes or repaints the page drops a frame. Known traps and the rules
    that now cover them:
@@ -321,10 +316,9 @@ what it put on stage. The measuring bench and how to read its numbers are in
      still there; don't retry those routes. The letter sheet's system-font
      fallback / shaping is now pre-laid out at idle
      (`components/letters/paperWarm.ts`), removing the 90 ms main-thread hit.
-8. **Land first, then hand off; re-attached DOM rests at its end state**
-   (2026-11-13; the user's 4K recording: the sleep card, injuries, the year
-   highlights and the letter box all "flash / ghost" at the very end of a
-   return, and the year bars "redraw once more").
+8. **Land first, then hand off; re-attached DOM rests at its end state**:
+   no flash or double image at the end of a return, and re-attached charts do
+   not replay their entrance.
    - **Landing hold**: the return's shape (clip, translate, scale) lands within
      the first part of the timeline, still decelerating to zero; in the hold
      that remains, the real element first lights up underneath the window
@@ -348,7 +342,7 @@ what it put on stage. The measuring bench and how to read its numbers are in
    - Acceptance: slow-motion strips from `scripts/motion/strip.py`; no double
      image and no replayed animation in the frames around landing.
 
-### Hard rules: where things come from, how choices look (2026-10-07)
+### Hard rules: where things come from, how choices look
 
 These four rules apply to every page. A page that breaks one is a bug, not a
 style choice.
@@ -359,8 +353,8 @@ style choice.
    `data-morph-card`; rows and capsules smaller than 140×56 work too), a
    dialog goes through `ModalDialog` + `lib/motion/dialogFlight.ts`, a card
    table through `lib/motion/cards`. Timing is `lib/motion/timing.ts`. An
-   interruption turns the flight around (see "Motion: one primitive, five
-   rules" below) — never jump to "fully open" first, never `reverse()` a
+   interruption turns the flight around (see "Motion: one primitive, eight
+   rules" above) — never jump to "fully open" first, never `reverse()` a
    finished animation. Do not write a second morph engine.
 2. **Every switch fades with a blur; nothing hard-cuts.** Toggling a panel,
    swapping tab contents, replacing a skeleton: cross-fade plus a short blur
@@ -377,11 +371,11 @@ style choice.
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.
 
-Check before merging: **any UI change gets checked in all thirteen interface languages** (user, 2026-11-15, a hard line: no overlap, no text on text, no text showing through, no empty gaps in any language). Run `python scripts/verify/text_overlap.py` (thirteen languages × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did); after touching the workout stage, also run `python scripts/verify/stage_menu.py` (thirteen languages × the "•••" menu with 1–4 cards; overflow, wrapping or overlapping text fails it). A new page or layer that neither list covers gets added first, and the screenshots get looked at language by language. A choice that a picture can say (an arrangement, a ratio) gets an icon, not words. Open and close each new layer at 4× CPU throttle and
+Check before merging: **any UI change gets checked in all thirteen interface languages**: no overlap, no text on text, no text showing through, no empty gaps in any language. Run `python scripts/verify/text_overlap.py` (thirteen languages × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did); after touching the workout stage, also run `python scripts/verify/stage_menu.py` (thirteen languages × the "•••" menu with 1–4 cards; overflow, wrapping or overlapping text fails it). A new page or layer that neither list covers gets added first, and the screenshots get looked at language by language. A choice that a picture can say (an arrangement, a ratio) gets an icon, not words. Open and close each new layer at 4× CPU throttle and
 DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
 through the frames — no bright frame, no blank frame, no jump at the start.
 
-### Playing cards and the collection box (2026-10-07, reworked in round 3)
+### Playing cards and the collection box
 
 A day of one metric is a card. Cards are how the user picks *which days* go to
 the AI.
@@ -427,7 +421,7 @@ the AI.
   its slot** — only its top card peels off, lifts and arcs into the box; on
   landing the pile glows once and its badge pops. Taking a full pile back flies
   one card from the box that merges into the pile.
-- **Interrupting is a relay, not a lock** (round 4): a new click takes effect
+- **Interrupting is a relay, not a lock**: a new click takes effect
   at once. Animations in flight finish from their current computed pose in
   about 120 ms and the new one starts from there (`relay()` in
   `lib/motion/cards/reversible.ts`, built on `animateFromNow`). Never swallow
@@ -472,20 +466,20 @@ the AI.
 - The arrow on the open box starts a **new** task with exactly those
   categories × days (`picked_days`). Picks are stored locally and cleared only
   once the task is handed to the AI.
-- **One-off tips**: operating hints appear once as a floating bar with
-  "Got it" (`composables/useCoachTips.ts`, localStorage wrapped in try/catch);
-  the keyboard hint lives in `aria-describedby`, not on screen.
+- The keyboard hint lives in `aria-describedby`, not on screen.
 - Wherever a picked task is described, say "N picked days", not "last N days"
   (`lib/aiTask/pickedDays.ts` is the single count).
 
-### Interface copy: two languages, never hardcoded
+### Interface copy: thirteen languages, never hardcoded
 
-- **Every word on screen needs a Chinese and an English version.** Write it as
-  `defineMessages(zh, en)` in the module that uses it; large pages (Settings,
-  Overview) get a matching `*.i18n.ts`. Do not build one global dictionary — a
+- **Every word on screen needs a translation.** Chinese, English and Spanish
+  go in the module that uses them as `defineMessages(zh, en, es)`; large pages
+  get a matching `*.i18n.ts`. The other ten languages live in
+  `src/i18n/locales/`, with untranslated keys listed in a matching
+  `*.pending.txt`. Do not build one global dictionary — a
   lazily loaded page's chunk should carry only its own copy.
 - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half: a
-  missing English key, an extra key or a mismatched parameter fails to compile.
+  missing key in another language, an extra key or a mismatched parameter fails to compile.
   A missed translation goes red at `npm run build`, not after a user sees it.
 - **Never branch on a display name.** `label === '骑行'` or
   `seriesName === '阈值配速'` silently stops working when the language changes,
@@ -519,7 +513,7 @@ the AI.
 ## Page structure
 
 Three main navigation items in the centred pill of the top bar
-(`src/components/shell/AppTopBar.vue`): **Overview** (`/`), **Hand to AI**
+(`src/components/shell/AppTopBar.vue`): **Overview** (`/`), **Send to AI**
 (`/ai`) and **Settings** (`/settings`). Keep it at three — a new page gets an
 entry card, not a navigation slot. The top bar also carries the sync-status
 pill, the moon / sun theme toggle and the looping language wheel (globe in
@@ -533,10 +527,15 @@ card's × / Esc use the history entry vue-router keeps in
 on Overview, not on the settings deck. Only a deep link with no origin falls
 back to the tab root.
 
-Secondary pages stay out of the main navigation: `/body` (body status),
+Secondary pages stay out of the main navigation and are reached from
+Overview's entry cards and "view all" links: `/body` (body status),
 `/training` (training status), `/recent` (recent records), the `/sleep` and
-`/workouts` lists, and the `/sleep/:sleepId`, `/workouts/:workoutId` detail
-pages, reached from Overview's entry cards and its "view all" links.
+`/workouts` lists and their `/sleep/:sleepId`, `/workouts/:workoutId` detail
+pages, `/heart`, `/activity`, `/rings` (year rings), `/journal`,
+`/devices/:deviceKey`, `/letters` (the letter box), `/health-check` (data
+health), and under Send to AI `/ai/memory` (coach notes) and
+`/ai/plan/history`. Only pages with their own conventions are described
+below; `src/router/index.ts` is the full list.
 
 ### 1. Overview (`/`)
 
@@ -577,23 +576,23 @@ pages, reached from Overview's entry cards and its "view all" links.
 - Overview does no interpretation such as recovery scoring or training advice.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
-- The launch sync reports progress in one place only: the top bar's sync capsule ("Syncing 3/8"). Once the sync the user was waiting for lands it turns into a glowing "data ready · send to AI". Only awaited syncs light it (launch, top bar, tray, settings) — never the 15-minute background auto-sync; failure or a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering `/ai` puts it out. A running sync cannot be cancelled from the UI: stopping halfway leaves some streams updated and others not.
+- The launch sync reports progress in one place only: the top bar's sync capsule ("Syncing 3/8"). Once the sync the user was waiting for lands it turns into a glowing "data ready · send to AI". Only awaited syncs light it (launch, top bar, tray, settings) — never background auto-sync; failure or a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering `/ai` puts it out. A running sync cannot be cancelled from the UI: stopping halfway leaves some streams updated and others not.
 
-### 2. Hand to AI (`/ai`)
+### 2. Send to AI (`/ai`)
 
-**A horizontal stage** (2026-10-08, replacing the single-column hub): the past on the left (the data being handed over), a bridge in the middle (the AI lock), the future on the right (this question and the plan). At most ten cards on the page; every detail is one level down and grows out of what was clicked. The bar strips, the dock and the "Your past" page are gone (`/ai/past*` redirects to the stage).
+**A horizontal stage**: the past on the left (the data being handed over), a bridge in the middle (the AI lock), the future on the right (this question and the plan). At most ten cards on the page; every detail is one level down and grows out of what was clicked. The bar strips, the dock and the "Your past" page are gone (`/ai/past*` redirects to the stage).
 
 - **Left: cards** (`components/ai/stage/StageCard.vue`, `composables/ai/useStageCards.ts`): one card per category being sent plus a profile card, eight at most. A card says only its name, how long a span it carries (last N days / N days picked) and how many days have data (`have/total`, same source as the pre-send check, "—" until computed). Cards sit in **staggered columns** (`lib/aiTask/cloud.ts`: columns offset vertically, card height at most 60 % of the pitch) and drift like playing cards (only `translate` / `rotate`; paused when hidden, while sending or under reduced motion). Drag one and it stays where dropped; **flick it up to leave that category out**; a change in the card count re-deals with FLIP springs. Tap = level two: the card back (`StageCardBack.vue`, a 7 / 14 / 30 / 90-day glass segment, leave out) → "Pick specific days" = level three, the card table dealt from that card. "Add a kind" is a capsule under the cards, **not a card and not part of the thread web**.
 - **The collection box pours into the cards** (`composables/ai/useBoxPour.ts`): on the stage, whenever the box is closed, no card table is open and nothing is being sent, the box empties itself: a few chips per category fly into that category's card (`pourFromBox`), the category becomes "N days picked" (`mergePicks`, only the categories in the box change) and the box clears. On the stage the box arrow reads "Add to this task".
 - **Middle: the bridge** (`BridgeLock.vue`, `ThreadField.vue`, `lib/aiTask/threads.ts`): a round lock on a vertical hairline showing the chosen AI, with a thin readiness ring; under it the Liquid Glass provider wheel (tapping the lens also sends) and an export-only button; under that one line (categories, share of days with data, token estimate) → `/ai/check`. **Threads**: one to three trunks leave the lock and fork in the open space between the cards and the lock; each card gets one branch that bends onto the card's own row and then **runs horizontally through the gaps** to the card's right edge, switching to the nearest free lane if a dragged card is in the way. Branches fade towards the left. On the right there is **a single skein** (three nearly coincident strands) to the right card. Threads are static SVG; only the dragged card's branch is recomputed live.
 - **Right: one card's life** (`FutureCard.vue`): the question card (written on directly, templates as a glass segment at its foot: ask freely / sleep / this week / a workout / next week) → the receipt (`ReceiptFace.vue`: the provider's icon, the handed `.md` drawn as a sheet of paper, hold it to drag into the chat, "⋯" reveals it in Explorer; copy the opening line / open the site again; a full-width "Bring back the final plan") → the plan face (`PlanFace.vue`, see "Training plan editor" below). A glass segment at the top of the card switches Ask | Plan (the receipt counts as Ask): question ⇄ receipt is a 2D squash flip, Ask ⇄ Plan cross-dissolves while the card height eases; the card is centred vertically in its box so the skein always meets its midline.
-- **Pressing the lock does everything** (`composables/ai/useStageSend.ts` + `composables/ai/useAttachFlight.ts`, pieces in `lib/motion/cards/attach.ts`; reworked 2026-10-28 as **adding attachments in a chat box**, the right-hand card being the chat): the cards set off 70 ms apart in thread order and glide along their own threads into the lock, shrinking as they go and slipping behind the disc; **each thread is dragged in behind its card** (`pathLength=1` + dash offset on the same timeline and curve, routes sampled by arc length), while the backend prepares the file. The lock flashes a ring for every card it takes in, and that card's attachment chip (icon, kind, days) comes out the other side, slides along the right-hand bundle into the tray at the bottom of the chat card, and the tray count ticks up. When every chip has landed and the file is ready, the chips draw together into one `.md` attachment (name · size · about N tokens) as the card turns into the receipt; 0.4 s after it lands the `.md` itself goes onto the system clipboard **as a file** (`src-tauri/src/clipboard_files.rs`: Windows `CF_HDROP`; macOS `NSURL` and Linux `text/uri-list` through arboard) and the site opens — Ctrl+V (⌘V on a Mac) in the chat box attaches it in any browser (Chrome, Edge, Arc, Firefox and Safari all accept pasted files), no extension; where that is not available the opening line is copied and the file is dragged as before. With "Hand off to AI automatically" on (Settings → AI tools, Windows only, off by default) the app waits for the AI page to reach the foreground, then pastes the file, pastes the opening line and presses Enter, checking the foreground window and tab title before every keystroke and confirming each step through the browser's UI Automation tree (`src-tauri/src/web_composer.rs`: focus the page's input, wait for an attachment chip carrying the file name, see the opening line land, keep pressing Enter while the upload blocks sending until the message is out); Esc, switching away or a 45 s timeout stops it and leaves the file on the clipboard (`composables/ai/useAutoHandoff.ts`, progress shown in the receipt's lead line); **the cards do not come back**: handed off is simply `face === 'receipt'` — the card slots stay mounted but hidden, the left threads stay reeled in, the right bundle stays, all as classes rather than lingering animations, so a cached revisit never replays. Only "Edit question" plays the whole thing strictly backwards (the `.md` splits into chips, they go back through the lock, the cards fly out along their threads and the threads grow back behind them). Esc or a second press while the chips are still travelling turns every running animation round on the spot and sends it back the way it came; the card stays on the question (the file still finishes in the background). A failed or blocked prepare does the same and says why on the question. After the `.md` has formed, Esc only stops the site from opening. Reduced motion: the cards fade out and the receipt fades in. The lock is grey while syncing.
+- **Pressing the lock does everything** (`composables/ai/useStageSend.ts` + `composables/ai/useAttachFlight.ts`, pieces in `lib/motion/cards/attach.ts`; the metaphor is **adding attachments in a chat box**, the right-hand card being the chat): the cards set off 70 ms apart in thread order and glide along their own threads into the lock, shrinking as they go and slipping behind the disc; **each thread is dragged in behind its card** (`pathLength=1` + dash offset on the same timeline and curve, routes sampled by arc length), while the backend prepares the file. The lock flashes a ring for every card it takes in, and that card's attachment chip (icon, kind, days) comes out the other side, slides along the right-hand bundle into the tray at the bottom of the chat card, and the tray count ticks up. When every chip has landed and the file is ready, the chips draw together into one `.md` attachment (name · size · about N tokens) as the card turns into the receipt; 0.4 s after it lands the `.md` itself goes onto the system clipboard **as a file** (`src-tauri/src/clipboard_files.rs`: Windows `CF_HDROP`; macOS `NSURL` and Linux `text/uri-list` through arboard) and the site opens — Ctrl+V (⌘V on a Mac) in the chat box attaches it in any browser (Chrome, Edge, Arc, Firefox and Safari all accept pasted files), no extension; where that is not available the opening line is copied and the file is dragged as before. With "Hand off to AI automatically" on (Settings → AI tools, Windows only, off by default) the app waits for the AI page to reach the foreground, then pastes the file, pastes the opening line and presses Enter, checking the foreground window and tab title before every keystroke and confirming each step through the browser's UI Automation tree (`src-tauri/src/web_composer.rs`: focus the page's input, wait for an attachment chip carrying the file name, see the opening line land, keep pressing Enter while the upload blocks sending until the message is out); Esc, switching away or a 45 s timeout stops it and leaves the file on the clipboard (`composables/ai/useAutoHandoff.ts`, progress shown in the receipt's lead line); **the cards do not come back**: handed off is simply `face === 'receipt'` — the card slots stay mounted but hidden, the left threads stay reeled in, the right bundle stays, all as classes rather than lingering animations, so a cached revisit never replays. Only "Edit question" plays the whole thing strictly backwards (the `.md` splits into chips, they go back through the lock, the cards fly out along their threads and the threads grow back behind them). Esc or a second press while the chips are still travelling turns every running animation round on the spot and sends it back the way it came; the card stays on the question (the file still finishes in the background). A failed or blocked prepare does the same and says why on the question. After the `.md` has formed, Esc only stops the site from opening. Reduced motion: the cards fade out and the receipt fades in. The lock is grey while syncing.
 - **Drill-downs**: task name → saved tasks (`/ai/tasks`); "N round trips" → the round-trip list (`/ai/exchanges`, each row → `/ai/exchanges/:id`); the line under the lock → pre-send check (`/ai/check`); the plan card → week / day (`/ai/plan`, `/ai/plan/:date`).
 - **Plan** (`/ai/plan`, `/ai/plan/:date`): see the next section. Focus and description are required before publishing. A sent plan stays editable except for past days; re-sync pushes every affected 7-day window.
 - **Check before sending** (`/ai/check`): what data goes and how complete it is, attachments, detail level, precise route, per-provider subscription, and a read-only preview of the full prompt (tap the user's sentence to edit it in place; it is the same draft as the question card). No "advanced" fold.
 - Plan vs actual matches local date and compatible sport only. Demo libraries label every record as synthetic and simulate delivery without watch requests.
 
-### Training plan editor (2026-10-12, batch 3)
+### Training plan editor
 
 **Fewer words**: no header intros, no footer notes, no repeated meta in cells; say each thing once. Icons are full two-tone (the watch in `Icon.vue`); rest days show a round-headed figure lying with hands behind its head (`components/plan/RestFigure.vue`, token colours for both themes).
 
@@ -623,7 +622,7 @@ pages, reached from Overview's entry cards and its "view all" links.
   nights. Duration, score, source and device are shown as they are, and missing
   means "not provided".
 
-### Workout detail stage manager (2026-11-13)
+### Workout detail stage manager
 
 Modelled on iPadOS Stage Manager: cards no longer have fixed places. The stage
 in the middle holds a group of 1–3 cards; the rest lean in a strip on the left,
@@ -656,14 +655,14 @@ card in the registry.
   (`:deep()` in `StageWindow.css`), so clipping is always the window's rounded
   corners and a narrowed card never shows a square cut.
 - **Strip**: thumbnails lean back to the right by 38° (`TILT`,
-  `STRIP_PERSPECTIVE` 280px) and carry no name (user, 11-13: the name chips sat
-  on the cards; the accessible name is in `aria-label` / `title`); groups keep a
+  `STRIP_PERSPECTIVE` 280px) and carry no name (a name would sit on the card;
+  the accessible name is in `aria-label` / `title`); groups keep a
   fixed gap and never interleave, z-order stepping down. In full screen or a
   narrow window the strip steps aside and a small glass handle on the left edge
   (or the pointer at the edge) brings it back; **when it comes back the
   full-screen card moves right** instead of being covered.
-- **Stepless resize** (user, 11-13: left / right / bottom edges plus both bottom
-  corners; the top edge stays on the stage line). Single card: left and right
+- **Stepless resize** (left / right / bottom edges plus both bottom corners;
+  the top edge stays on the stage line). Single card: left and right
   are symmetric (it stays centred), the bottom sets the height, a bottom corner
   does both. A group of two or three: the seam between neighbours drags the
   `ratio`, an outer edge drags the group width (`span`, [.5, 1]), the bottom
@@ -675,11 +674,46 @@ card in the registry.
   width and height directly, content reflows, neighbours make room, and release
   only commits the same state — no jump, and type never scales with the drag.
   Within ±1.5% of a preset it snaps. The decision is `resizeOutcome()` in
-  `gestures.ts` (pure, tested). Type and charts grow with the card: chart card
-  titles and min / avg / max use `clamp(token, n·cqi, cap)`, and charts add
-  detail in three width tiers (`chartTier` / `withDetail` in
-  `workoutCharts.ts`: denser ticks, a labelled average, max / min markers, HR
-  zone bands) while always drawing the whole workout.
+  `gestures.ts` (pure, tested).
+- **How several cards are arranged** (snap in `state.ts`, `stageRects` in
+  `layout.ts`): two cards split left / right (`ratio` is the left share);
+  three have main-left, main-right and main-on-top; **four have a grid
+  (`GRID_SNAP`, `ratio` is the left column), one over three (`ROW_SNAP`, the
+  two lower seams stored in `splits`, each part at least 20%) and big-left with
+  three on the right (`COLUMN_SNAP`, `ratio` is the big card's share, 0.6 by
+  default)**; every seam can be dragged. When a card joins or leaves a group the
+  default arrangement is picked from its shape (`snapFor`): a **wide card**
+  leading (`WIDE_CARDS` in `workoutCards.ts`: summary, insight, set table,
+  route, the charts) takes the full-width slot — main-on-top for three, one over
+  three for four — rather than being squeezed into a narrow column.
+- **Fill the stage height**: every column or row reaches the stage height,
+  leaving no empty band below. Within a column, text cards take their content
+  height and the remainder goes to the **growable cards** (`GROW_CARDS`: route,
+  charts) in proportion. When it does not fit, growable cards shrink back if
+  that is enough (shared by how much each can give: charts at most 50px, the
+  route 160px, so axes are never cut); if even that is not enough nothing
+  shrinks, **text cards are never cut**, the column grows and the page scrolls,
+  and a big growable card (big-left / main-left / main-right) reaches down to
+  the small cards' bottom line. A card scrolls inside its own window only when
+  it alone is taller than the stage. The extra or missing height is the
+  Placement's `extra`, handed to the chart or map inside through the CSS
+  variable `--fill-extra`; `StageWindow` subtracts it when measuring, so it
+  always measures the natural height. Space is left empty only when no card in
+  the column can grow.
+- **Cards give information by width × height, not by zooming**: a chart header
+  is a big number over a small label, separated by rules. Type comes in one set
+  per tier (`CHART_TYPE` in `workoutCharts.ts`: numbers 18.5 / 22 / 28px, one
+  step smaller for long numbers; axis text never larger than the card's small
+  labels), so chart cards in the same tier match; a narrow card collapses to
+  three or two columns through container queries. Charts have three tiers by
+  width and height (`chartTier(width, height)`: sm is the line and the main
+  value; md adds axes, the average line and pause bands; lg adds max / min
+  points, heart-rate zone bands with the time-in-zone bar, and the elevation
+  gradient bar), always drawing the whole workout. Y-axis ticks thin out by the
+  chart's real height (`fitTicks`, at least 34px per step). The climb and
+  elevation cards share `ElevationFacts` (total ascent, total descent, biggest
+  drop, elevation range, plus the gradient bar; the method is in
+  `lib/elevationProfile.ts`).
 - **Drag to rearrange**: hold "•••" or a thumbnail. The lifted card only gains a
   shadow (`--mat-shadow-lift`) and a slight lift — no blur behind it, no
   outlined slot. Over a drop target the previewed layout (`outcomeOf` → draft)
@@ -688,8 +722,8 @@ card in the registry.
   settles with the slightly springy `SETTLE_EASE`. The dragged card itself never
   goes through Vue (only that window's `translate` / `scale`). ← / → cycle the
   stage; Esc backs out one level (summoned strip → full screen).
-- **The "•••" menu keeps only what gets used** (user, 2026-11-13): the presets
-  (`SegmentTrack`, **drawn as pictograms, no text**: `LayoutGlyph.vue` draws the grid / one-over-three / main-on-left arrangements at the real `layout.ts` proportions, the way ColorOS folders and Windows snap layouts do; the names only go to the tooltip and screen readers. Since 2026-11-15 — the old text presets did not fit in longer languages and the words piled on top of each other), show only this, full screen / exit
+- **The "•••" menu keeps only what gets used**: the presets
+  (`SegmentTrack`, **drawn as pictograms, no text**: `LayoutGlyph.vue` draws the grid / one-over-three / main-on-left arrangements at the real `layout.ts` proportions, the way ColorOS folders and Windows snap layouts do; the names only go to the tooltip and screen readers; text presets did not fit in longer languages), show only this, full screen / exit
   full screen, move to strip — as icon-plus-label menu rows with a faint in-row
   highlight. The whole menu is one Liquid Glass panel
   (`.glass-control.is-lens-host`) and **the lens is there the moment it
@@ -738,7 +772,9 @@ card in the registry.
   (`zeppbridge-workout-stage:v2:<class>`; v2 adds ratios and the summary card,
   v1 saves are discarded), only after the user has changed something; whenever
   the card list changes the saved layout is reconciled — unknown cards are
-  dropped, new ones join the end of the strip. Defaults: strength puts the
+  dropped, new ones join the end of the strip. Strip groups keep their ratios,
+  group width and heights too, and a card this workout lacks keeps its hidden
+  state. A failed save (browser storage unavailable) leaves a console warning. Defaults: strength puts the
   summary on top with the set table and body map below; run / ride put the
   summary on top with the route and heart rate below; everything else puts the
   summary on top with heart rate and HR zones below. "Reset layout" clears that
@@ -780,13 +816,11 @@ card in the registry.
 A **card deck with three forms**, no sidebar. Ten cards
 (`views/settings/cards.ts`): account and devices · sync and updates · archive
 and storage · data content · hand to AI tools · display and language · Beta
-labs · guide · privacy and security · advanced and maintenance. (The "write to
-the author" card was removed on 2026-11-13: writing starts from the top-bar
-mail button.) The same cards morph between forms
+labs · guide · privacy and security · advanced and maintenance. (Writing to the author starts from the top-bar mail button.) The same cards morph between forms
 with Web Animations on the real elements (FLIP; geometry in the pure
 `lib/deck/morph.ts`, orchestration in `composables/useDeckMorph.ts`) — so
-every morph can be **interrupted**: closing a card half-way plays the opening
-backwards (`Animation.reverse()`), collapsing mid-unbox flies each card back
+every morph can be **interrupted**: closing a card half-way turns the same
+flight around (`turn()` in `lib/motion/flight.ts`), collapsing mid-unbox flies each card back
 from where it is on screen. (View Transitions froze input for the duration and
 re-rendered blurred snapshots, which stuttered on collapse.)
 
@@ -827,17 +861,20 @@ re-rendered blurred snapshots, which stuttered on collapse.)
 ## Components and charts
 
 - No UI framework: every component is in-house, under `src/components/` —
-  `BrandMark`, `CapsuleWheel`, `CategoryMark`, `CircularProgress`, `CardDeck`
-  (`deck/`), `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`,
+  `BrandMark`, `CapsuleWheel`, `CircularProgress`, `CardDeck` (`deck/`),
+  `WheelDatePicker`, `WheelColumn`, `GlassSwitch`, `GlassPopover`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`,
   `GlyphTile`, `HeartRateZonePicker`, `Icon`, `MetricTrendCard`,
   `cards/` (`CardTable`, `PlayingCard`, `CollectionBox`, `PickDaysButton`),
   `ModalDialog`, `PageHeader`, `RecordRow`, `SegmentTrack`, `SkeletonBlock`,
   `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
-  (`overview/`, `workout/`, `archive/`, `ai/`, `deck/`, `shell/`). Check
+  (`overview/`, `workout/`, `archive/`, `ai/`, `ask/`, `cards/`, `deck/`, `shell/`,
+  `journal/`, `rings/`, `activity/`, `anatomy/`, `plan/`, `letters/`, `feedback/`,
+  `coachNotes/`, `tour/`). Check
   here for something reusable before adding one.
 - Per-day trends always go through `MetricTrendCard` plus `buildSeriesOption`
   from `lib/metricSeries.ts`; do not write a separate option object per page.
-  `SERIES_RANGES` is the single source for the three ranges.
+  The single source for the three ranges is `seriesRanges()` in the same file
+  (days from `DISPLAY_RANGE_DAYS`).
 - Icons: `Icon.vue` is inline linear SVG; large semantic icons use
   `GlyphTile.vue` — a CSS material base plus an `Icon.vue` glyph, coloured by a
   `tone` category token (name → glyph map in `lib/glyphs.ts`), shared by both
@@ -848,7 +885,8 @@ re-rendered blurred snapshots, which stuttered on collapse.)
 - Charts use `vue-echarts` through `src/lib/echartsSetup.ts`, which registers
   both `zeppbridge-dark` and `zeppbridge-light` and exports the reactive
   `CHART_THEME` / `chartPalette`. Every `VChart` binds `:theme="CHART_THEME"`
-  **and** `:key="CHART_THEME"` so the chart is rebuilt on a scheme switch, and
+  **and** `:key="CHART_THEME"` so the chart is rebuilt on a scheme switch
+  (except `SwapChart`, which manages its own swaps and binds only `:theme`), and
   every chart `option` is a `computed` that reads chrome colours (axis labels,
   grid lines, tooltip, marks, series semantics) from `chartPalette.value` —
   never a literal hex. The palette's colour values mirror `tokens.css` because
@@ -888,8 +926,8 @@ re-rendered blurred snapshots, which stuttered on collapse.)
 
 ## Maintaining this document
 
-Page structure follows `src/router/index.ts` and the `navigation` array in
-`src/AppShell.vue`; design tokens follow `src/styles/tokens.css`. Update this
+Page structure follows `src/router/index.ts` and `TAB_ORDER` in
+`src/lib/navigation.ts`; design tokens follow `src/styles/tokens.css`. Update this
 page when you change navigation, the palette or theme state. **Where it
 conflicts with the source, the source wins** — and fix this page while you are
 there. Engineering gates are in the [development guide](development.md); product
