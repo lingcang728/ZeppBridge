@@ -2,82 +2,78 @@
 
 [English](cli-and-mcp.md)
 
-`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口。3.1.1 起它们随桌面应用一起安装、一起升级（就在主程序旁边，设置 › 交给 AI 工具里能复制路径）；每个 Release 也照旧附一个独立压缩包，给没有桌面的机器：需要它们的人不该被迫先装一个 GUI。
-
-两者都只是 [`zeppbridge-core`](architecture.zh-CN.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
+`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用的两个配套工具。两者都只是
+[`zeppbridge-core`](architecture.zh-CN.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
 
 ## 安装
 
-**装了桌面应用**：不用另装。Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`；设置 › 交给 AI 工具会显示两个程序的完整路径。它们就在应用旁边，读的自然是同一个库。
+**装了桌面应用**：不用另装。Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在
+`ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。它们随应用一起升级，
+**设置 › 交给 AI 工具**会显示两个程序的完整路径。
 
-**没有桌面的机器**：从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
+**没有桌面的机器**：从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载
+`zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
 
-把两个程序放到 ZeppBridge 可执行文件旁边，它们就会读同一个库。数据目录由 `paths.rs` 决定：
+### 库在哪里
+
+每个可执行文件按**自己的位置**解析数据目录：
 
 | 平台 | 数据目录 |
 |---|---|
-| Windows | `ZeppBridge.exe` 旁边的 `data\` |
-| macOS | 在 `ZeppBridge.app` 里是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`（更新会整体替换 app 包，数据不放包内——包里幸存的旧版库会在首次启动时迁过去）；不在包里的可执行文件仍用旁边的 `data/` |
-| Linux | 包管理器安装的（deb、rpm、Flatpak）用 `~/.local/share/zeppbridge/data`——那些前缀不属于这个程序；AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
-| 任何平台 | `$ZEPPBRIDGE_DATA_DIR` 设成绝对路径时覆盖以上全部 |
+| Windows | 可执行文件旁边的 `data\`；那里写不进去时（例如在 `C:\Program Files` 下）用 `%APPDATA%\zeppbridge\ZeppBridge\data` |
+| macOS | 在 `ZeppBridge.app` 里：`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`。不在包里：可执行文件旁边的 `data/`，写不进去时用同一个 Application Support 目录 |
+| Linux | 在共享前缀下（`/usr`、`/bin`、`/sbin`、`/opt`、`/app`、`/snap`、`/nix/store`、`/var/lib/flatpak`）：`~/.local/share/zeppbridge/data`。其他位置（AppImage、解压在家目录的 tarball）：可执行文件旁边的 `data/` |
+| Microsoft Store | 包自己的 LocalState 目录 |
+| 任何平台 | `$ZEPPBRIDGE_DATA_DIR`（绝对路径）覆盖以上全部（商店版除外） |
 
-所有平台都不用 `%APPDATA%`。
-
-这张表要按「每个可执行文件各自」来读，而不是按「这台机器」。两个工具是拿自己的位置去套这条规则的，所以把它们解压到一个自己的目录里——比如 `~/tools/`——解析出来的是 `~/tools/data`，那是一个全新的空库，不是应用一直在写的那个。表现出来就是：一句理直气壮的「本机还没有数据库」，而旁边那个应用明明有。
-
-要让它们真的共用同一个库，有两条路：
+所以把工具解压到一个自己的目录（比如 `~/tools/`），打开的是 `~/tools/data`——一个空库，
+不是应用那个。要么放到应用旁边，要么直接指定目录：
 
 ```bash
-# 放到应用数据目录旁边，让这条规则落到同一个位置上。
-# 或者——更可靠的做法——直接把目录说出来：
 ZEPPBRIDGE_DATA_DIR=~/.local/share/zeppbridge/data zeppbridge-cli status --json
 ```
 
-在 macOS 和 Linux 上，直接指定是更好的习惯：那两个平台上应用的数据目录，通常离你想放两个命令行程序的地方很远。
+### 凭据
 
-`ZEPPBRIDGE_DATA_DIR` 是给「安装目录旁边」这句话没有意义的场合准备的：容器、systemd 单元、NAS 的任务计划。相对路径会被拒绝，而不是按工作目录展开——调度器的工作目录不是写单元文件的人能看见的东西。
+**先用桌面应用连接账号并至少同步一次。** 命令行不做登录，它从系统凭据存储读令牌
+（Windows 凭据管理器、macOS 钥匙串、Linux Secret Service）。无头 Linux 机器没有这些，
+用 `ZEPPBRIDGE_CREDENTIAL_STORE=file`，或 `=env` 配合 `ZEPPBRIDGE_APP_TOKEN`——见
+[Linux 指南](../guides/linux.zh-CN.md#令牌存在哪)。
 
-Linux 上令牌从 Secret Service（GNOME Keyring / KWallet）读。无头机器上没有它，所以那里要用 `ZEPPBRIDGE_CREDENTIAL_STORE=file`，或者 `=env` 配合 `ZEPPBRIDGE_APP_TOKEN`——见 [Linux 指南](../guides/linux.zh-CN.md)。
-
-**前提**：先用桌面应用连接账号并至少同步一次。命令行不做登录，MCP 不联网。
-
-光把另一台机器的 `data/` 文件夹拷过来不够。数据库能搬，令牌搬不过来——它在
-那台机器的凭据管理器 / 钥匙串 / Secret Service 里，从来不在文件里。所以拷过
-来的文件夹是「元数据齐了、密钥没有」，命令行会以 `3` 退出，说凭据管理器里没
-有这个账号的令牌。用上面两种凭据存储任选一种，或者在新机器的桌面应用里重新
-登录一次都可以，
-[跨平台搬库](../guides/linux.zh-CN.md#把已有的库从-windows-或-macos-搬过来)
-把两条路都写了。
+从另一台机器拷来的 `data/` 只带库、不带令牌，命令行会以 `3` 退出。用上面任一种凭据存储，
+或在新机器的桌面应用里重新登录一次；
+[Linux 指南](../guides/linux.zh-CN.md#把已有的库从-windows-或-macos-搬过来)把两条路都写了。
 
 ## zeppbridge-cli
 
-无交互：不会提问、不会等按键、不会弹窗。所有需要人来决定的事（登录、授权、删数据）都不在这里做。
+无交互：不提问、不等按键、不弹窗。登录、授权、删数据都不在这里做。
 
 ```bash
 zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
-zeppbridge-cli reprocess --json  # 用当前解析器重放本地报文
+zeppbridge-cli reprocess --json
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
-zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # 在这台电脑上顶替一条运动
-zeppbridge-cli contract          # 打印单位、时区、来源与缺失值的定义
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit
+zeppbridge-cli contract          # 单位、时区、来源与缺失值的定义
+zeppbridge-cli version
 zeppbridge-cli help
 ```
 
-`--json` 的正文独占 stdout，人读的提示走 stderr，所以 `zeppbridge-cli export > a.csv` 拿到的是干净的文件。
+带 `--json` 时 stdout 只有正文，提示走 stderr。人读的输出是英文；共用内核的原话是中文时，
+命令行改打它的错误码（如 `err.core.config`）。`--json` 的字段名和退出码是稳定契约。
+拼错的开关一律报错，不会被忽略。
 
-人读的那一半是**英文**：命令行随安装包发给全世界的用户，而 issue #40 那位 Linux
-用户撞上的正是一句他读不懂的中文提示。从共用内核冒上来的错误也按类别出英文：
-内核的原话散在几百处、是中文（桌面端靠错误码查本地文案、根本不显示它们），
-命令行不逐句翻，而是英文说清是哪类问题，原话是中文时换成错误码（如
-`err.core.config`），不让中英文混在同一句话里。`--json` 的字段名和退出码是契约，不受这件事影响。
+### 同步与历史
 
-拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
+`sync --mode history --days N` 支持 1–3650 天。365 天以内用普通历史窗口，更长的范围用按月
+覆盖账本，需要先在设置里开启长期归档（或保留期足够长）。`--max-chunks`（1–720，默认 24）
+限制单次处理量；重跑同一条命令会续传，加 `--retry-failed` 重置耗尽重试的失败块。Ctrl+C
+保留已完成的块并以 `8` 退出。JSON 报告含 `mode`、`cancelled`、`backfill` 和 `replay`；
+`backfill.complete` 描述覆盖情况，云端确认无数据的月份也算覆盖。
 
-### 历史摘要、独立明细与本机纠正
+### 运动明细、类型与隐藏
 
-`sync --mode history --days N` 支持 1–3650 天。365 天以内使用普通历史窗口，366–3650 天使用持久化的按月覆盖账本；范围超过本机保留期时，先在设置中启用长期归档。`--max-chunks 24` 限制单次最多处理的月份块（允许 1–720），重新执行相同命令会续传；`--retry-failed` 重置已耗尽重试的失败块。Ctrl+C 保留已完成进度并返回退出码 `8`。JSON 中包含 `mode`、`cancelled`、`backfill` 与 `replay`；`backfill.complete` 表示覆盖任务完成，也包括云端明确无数据的月份，不保证每个月都有记录。
-
-运动明细使用独立持久队列，不再将摘要覆盖或零样本数当成明细是否完整的判断：
+运动明细有自己的持久队列：
 
 ```bash
 zeppbridge-cli workout-details --status --json
@@ -91,29 +87,45 @@ zeppbridge-cli restore --workout ID1 --json
 zeppbridge-cli set-type --undo EDIT_ID --json
 ```
 
-拉取明细必须指定 `advanced` 或 `official` 通道，并具有该通道的可用凭据。单次 1–40 条，默认 20 条。`--status` 只读查询、不联网，可用 `--channel` 筛选。再次执行会接着处理未完成项；已写入和云端明确无明细的记录不重复请求。失败项退避后重试，`--retry-failed` 只重置所选通道。Ctrl+C 安全暂停。JSON 包含 `coverage`、`channel`、`complete`、`cancelled`；所选通道仍有待请求或失败项（含退避中的记录）时返回 `8`，覆盖查询本身成功则返回 `0`。
+拉取必须指定通道并有该通道的凭据，每次 1–40 条（默认 20）。`--status` 只读、不联网，
+可用 `--channel` 筛选，不能和 `--max-items`、`--retry-failed` 同用。重跑会续传；已写入和
+云端确认无明细的不再请求，失败项退避，`--retry-failed` 只重置所选通道。所选通道还有待请求
+或失败项时拉取以 `8` 退出；`--status` 查询成功就是 `0`。
 
-同次传入的全部 `--workout` ID 在一个事务中修改，并返回编辑 ID。`--undo EDIT_ID` 撤销整批修改；存在冲突的后续修改时拒绝撤销。`--clear` 恢复自动类型识别。类型值使用运动目录的标准 key，例如跑步为 `run`。隐藏保留原始记录，并从正常读取、统计及导出中排除；恢复后重新参与统计。隐藏和纠正仅作用于本机库。
+`set-type`、`hide`、`restore` 对全部 `--workout` ID 原子生效并返回编辑 ID；三者都可用
+`--undo EDIT_ID` 撤销整批，之后有冲突的修改时拒绝。类型用运动目录的 key，如 `run`；
+`--clear` 去掉本机纠正。隐藏保留记录，但在恢复之前不进正常读取、统计和导出。两者都只作用于
+这台机器的库。
+
+### 导出
+
+`export` 需要日期范围（`--from` 和 `--to`）或一个 `--workout`。选项：
+
+- `--format json|csv|gpx|fit`（默认 `json`）；`fit` 要求 `--out` 指向目录。CSV、GPX、FIT
+  一律导完整明细。
+- `--types`（默认 `workouts,daily_activity,sleep`）；`zeppbridge-cli help` 列出全部十八种。
+- `--detail summary|full`（默认 `summary`）。
+- `--out <路径>`；不给就写到 stdout。
+
+一次导出最多 366 天。
 
 ### 解析器升级
 
-派生记录——一次运动的类型、一晚的睡眠阶段、全天压力曲线——是报文第一次入库时由解析器产出的。规则改版之后，已经在库里的记录仍然是旧结果。只有把存下来的原始报文重放一遍，历史才会跟上；不重放，一个新增运动编号的版本只修好以后同步来的记录，此前那 199 条 `unknown:211` 一条都不会变——而来报这个问题的人恰恰是为历史记录来的。
+派生记录（运动类型、睡眠分期、压力曲线）在报文第一次入库时产出。解析器改版后，只有重放
+已存的原始报文才会更新库里的旧记录。桌面应用在启动时重放；无头安装：
 
-桌面应用在启动时用后台线程做这件事。无头安装没有那次启动，所以：
-
-| 命令 | 遇到旧库时做什么 |
+| 命令 | 遇到落后的库时 |
 |---|---|
-| `sync` | 先重放，再同步。它是挂在定时器上的那条，所以无头用户什么都不用做。`--no-reprocess` 可以关掉。 |
-| `status`、`export` | 只提示，不执行。一条平时毫秒级返回的命令，不能突然开始一次几分钟的写入。 |
-| `reprocess` | 立刻重放。`--all` 重放全部报文，而不只是这次修订号变更需要的那些。 |
+| `sync` | 先重放，再同步。`--no-reprocess` 跳过。 |
+| `status`、`export` | 只提示，不执行。 |
+| `reprocess` | 立刻重放。`--all` 重放全部报文。 |
 
-重放全程持有跨进程写锁，不联网，也不改写「上次云端同步」的时间——它有自己的时间线。放进定时任务是安全的：不加 `--all` 时，修订号一旦对上它什么都不做。
-
-`status` 会报 `normalizerRevision`（库里记着的）、`normalizerRevisionExpected`（这个版本会产出的）和 `normalizerReplayPending`。前两者不相等，就是全部信号。
+重放持有写锁、不联网、不改「上次云端同步」时间。不加 `--all` 时，库已是最新就什么都不做。
+`status` 报告 `normalizerRevision`、`normalizerRevisionExpected` 和 `normalizerReplayPending`。
 
 ### 用修正过的 .fit 顶替运动
 
-桌面应用里可以拿修正过的 `.fit` 顶替一条运动（运动详情页的「用修正的 .fit 替换」），`fit-override` 让脚本也能做：
+桌面应用的**用修正的 .fit 替换**有脚本形式：
 
 ```bash
 zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # 顶替
@@ -121,48 +133,59 @@ zeppbridge-cli fit-override --workout <id> --remove --json             # 撤销�
 zeppbridge-cli fit-override --list --json                              # 这台电脑顶替过哪些
 ```
 
-顶替只存在这台电脑的库里：Zepp 没有导入运动的接口，云端和手表上的那份不会变。之后的同步、`reprocess` 和解析器重放都不会冲掉它，快照也会带上它。运动编号来自 Zepp，几台电脑上是同一个，所以有几份库就在每台上跑同一条命令。文件起点要和那次运动相差 5 分钟以内（否则 `errorKind: "fit_start_mismatch"`），运动得已经在库里（否则 `workout_not_found`），两者都以 1 退出。撤销一条没被顶替过的运动照样成功，返回 `"removed": false`。
+顶替只存在这台电脑的库里，Zepp 没有导入运动的接口。同步、`reprocess` 和重放都不会冲掉它，
+快照也带上它。运动编号在每台机器上相同，有几份库就在每台上跑同一条命令。文件起点要和那次
+运动相差 5 分钟以内（`errorKind: "fit_start_mismatch"`），运动要已在库里
+（`workout_not_found`），两者都以 `1` 退出。撤销一条没顶替过的运动照样成功，返回
+`"removed": false`。
 
 ### 跑鞋和比赛
 
-桌面端「履历」页里的跑鞋和比赛，脚本也能管：
-
 ```bash
 zeppbridge-cli shoes list --json                   # 跑鞋、里程和磨损，外加还没添加的 Zepp 鞋编号
-zeppbridge-cli shoes save --file shoe.json --json  # 新增；JSON 里带 "id" 就是修改，返回编号
+zeppbridge-cli shoes save --file shoe.json --json  # 新增；JSON 带 "id" 就是修改，返回编号
 zeppbridge-cli shoes delete --id 3 --json
 zeppbridge-cli races list --json
 cat race.json | zeppbridge-cli races save --file - --json
 zeppbridge-cli races delete --id 2 --json
 ```
 
-`save` 收一个 JSON 对象，字段和桌面端的表单一样。跑鞋必填 `name`、`sport`（`running` / `trail` / `walking` / `hiking`）、`retire_km`（100–5000）和 `started_on`（`YYYY-MM-DD`），`is_default`、`zepp_gear_id`、`start_km`、`retired_on`、`notes` 可选。比赛必填 `name`、`race_date`、`sport`（`running` / `trail` / `cycling` / `swimming` / `triathlon` / `other`）和 `priority`（`a` / `b` / `c`），`distance_m`、`goal_seconds`、`result_seconds`、`workout_id`、`notes` 可选。开关叫 `--file` 而不是 `--json`：`--json` 在所有命令里都是「输出成 JSON」。文件格式不对在开库之前就按用法错误（2）退出；库拒收的值（名字为空、不认识的运动）也是 2。删一个不存在的编号以 1 退出，`errorKind: "not_found"`。写入要拿跨进程写锁，同步正在跑时会等，等不到就报 `4`。
+`save` 收一个 JSON 对象，字段和桌面表单一样。跑鞋必填 `name`、`sport`（`running` /
+`trail` / `walking` / `hiking`）、`retire_km`（100–5000）和 `started_on`（`YYYY-MM-DD`），
+`is_default`、`zepp_gear_id`、`start_km`、`retired_on`、`notes` 可选。比赛必填 `name`、
+`race_date`、`sport`（`running` / `trail` / `cycling` / `swimming` / `triathlon` / `other`）
+和 `priority`（`a` / `b` / `c`），`distance_m`、`goal_seconds`、`result_seconds`、
+`workout_id`、`notes` 可选。文件格式不对或值被拒收以 `2` 退出；删不存在的编号以 `1` 退出，
+`errorKind: "not_found"`。MCP 的 `save_shoe` 和 `save_race` 写的是同一张表。
 
-AI 通过 MCP 的 `get_athlete_profile`（`journal`）读得到这些，但改不了：MCP 没有写跑鞋和比赛的工具。
+### probe
+
+`probe` 检查候选端点有没有返回内容，不导入数据：`--streams`（默认 `blood_pressure`；
+还有 `heart_rate`、`daily_summary`），`--days`（1–365，默认 7）。`--json` 只打印条数、
+字段名和错误，从不打印读数。
 
 ### 退出码
 
-退出码是对调度脚本的契约，只会新增，不会改变含义。
+退出码是给脚本的契约：只会新增，已有含义不变。
 
 | 码 | 含义 | 该怎么办 |
 |---|---|---|
 | 0 | 成功 | — |
-| 1 | 其他失败，包括本地数据不可用 | 看错误消息；查无本地运动时 JSON 的 `errorKind` 为 `data_unavailable`，不再报云端错误 |
+| 1 | 其他失败，包括本地数据不可用 | 看错误消息；查无本地运动时 `errorKind: "data_unavailable"` |
 | 2 | 用法错误 | 改命令 |
-| 3 | 未连接 Zepp 账号，或者令牌不在这台机器上 | 打开桌面应用登录，或设 `ZEPPBRIDGE_CREDENTIAL_STORE` |
+| 3 | 未连接账号、令牌不在这台机器上、没有本地库，或库属于另一个账号 | 用桌面应用登录，或设 `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | 另一个进程正在写库 | **稍后重试，这不是失败** |
 | 5 | 云端请求失败 | 退避后重试 |
 | 6 | 本机数据库错误 | 需要人介入 |
-| 7 | 数据库版本与本程序不匹配 | 跑一次 `zeppbridge-cli reprocess`（或启动一次桌面应用）完成升级，或把命令行升到同一版本 |
-| 8 | 同步未完整成功：至少一个数据流失败 | 查看逐流结果后重试；已成功写入的数据保留 |
+| 7 | 数据库版本与本程序不匹配 | 跑 `zeppbridge-cli reprocess`（或启动一次桌面应用），或升级命令行 |
+| 8 | 同步未完整成功：至少一个数据流失败 | 看逐流结果后重试；已写入的记录保留 |
 
-同步未完整成功时，`--json` 仍输出完整报告，但 `ok` 和 `success` 均为 `false`。仅可选数据流 unavailable / unverified 不触发此退出码。
-
-4 和 1 分开，是因为「桌面应用正开着同步」和「真的出错了」需要完全不同的应对；把它们并成一个码，重试逻辑就没法写。
+同步未完整成功时 `--json` 仍输出完整报告，`ok` 和 `success` 为 `false`。`4` 和 `1` 分开，
+重试脚本才能分清「桌面应用正在同步」和「出错了」。
 
 ### Windows 任务计划程序
 
-每天 07:00 增量同步，busy 时不当作失败：
+每天 07:00 增量同步：
 
 ```powershell
 $action = New-ScheduledTaskAction `
@@ -172,7 +195,7 @@ $trigger = New-ScheduledTaskTrigger -Daily -At 7:00am
 Register-ScheduledTask -TaskName 'ZeppBridge 每日同步' -Action $action -Trigger $trigger
 ```
 
-把路径换成你自己的安装位置。任务计划程序会记录退出码；如果你在意 busy 与失败的区别，用一个包装脚本：
+路径换成你自己的安装位置。想把「正忙」当成跳过而不是失败，包一层：
 
 ```powershell
 & 'C:\Program Files\ZeppBridge\zeppbridge-cli.exe' sync --mode incremental --json
@@ -186,35 +209,46 @@ switch ($LASTEXITCODE) {
 ### cron（macOS / Linux）
 
 ```cron
-# 每天 07:00 增量同步；退出码 4（另有进程在写）当作跳过而不是失败
+# 每天 07:00 增量同步；退出码 4（另有进程在写）当作跳过
 0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; s=$?; [ $s -eq 4 ] && s=0; exit $s
 ```
 
-不要写成 `...; [ $? -eq 4 ] && exit 0`：同步成功时那个判断为假，整行退出码变成
-1，于是每一次成功的同步都会被 cron 记成失败；真失败时退出码也会被压成 1，
-上面那张退出码表就失去意义了。
+不要写成 `...; [ $? -eq 4 ] && exit 0`：同步成功时那个判断为假，整行以 `1` 退出。macOS 下
+cron 需要「完全磁盘访问权限」才能读数据目录。
 
-macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
+### 与桌面应用并发
+
+CLI 的 `sync` 和桌面应用共用一把跨进程同步租约和一把写锁，任何时刻只有一个同步、一个写者。
+等不到时（写锁最多等 20 秒）CLI 以 `4` 退出。
 
 ## zeppbridge-mcp
 
-stdio 传输，**不监听任何端口，自己不发任何网络请求**（`sync_now` 是启动随附的 `zeppbridge-cli`，`publish_training_plan` 把计划发给 Zepp——都只在被调用时）。读走 `PRAGMA query_only` 连接；会写的那几个工具在跨进程写锁下另开一条短连接。
-每行请求上限为 1 MiB；非法 UTF-8/JSON 和超长行会收到错误响应，后续行仍可继续处理。工具执行失败通过 `result` 返回 `isError: true` 和说明文字；未知工具及调用结构错误仍使用 JSON-RPC 错误。
+stdio 传输，**不监听任何端口**。只有被调用的工具需要时才联网：`sync_now` 启动随附的
+`zeppbridge-cli`，`publish_training_plan` 把计划发给 Zepp。每行请求上限 1 MiB；格式错误或
+超长的行收到错误，后续行照常处理。工具失败通过 `result` 返回 `isError: true`；未知工具和
+结构错误是 JSON-RPC 错误。读走 `PRAGMA query_only` 连接；会写的工具在写锁下另开一条短连接
+（最多等 5 秒），联网时不持锁。
 
 ### 从桌面应用连接
 
-安装包会把 `zeppbridge-mcp`（3.1.1 起还有 `zeppbridge-cli`）放在应用自己的可执行文件旁边：Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在 `ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。
-**设置 › 交给 AI 工具 › 连到本地 AI**会替你填好真实路径。3.1.2 起生成的配置读整个库（不带 `--scope`）；那里的「只给共享任务」开关打开时才加 `--scope task`，卡片还会标出仍按另一种设置登记的客户端。预设：Claude Code、Codex、Claude Desktop、OpenCode、Grok Build、Factory，其余（含 DeepSeek Harness）用通用 `mcpServers` JSON：
+**设置 › 交给 AI 工具 › 连到本地 AI**会填好应用旁边那份 `zeppbridge-mcp` 的真实路径。生成的
+配置读整个库；打开**只给共享任务**时加 `--scope task`，卡片还会标出仍按另一种设置登记的客户端。
+预设：Claude Code、Codex、Claude Desktop、OpenCode、Grok Build、Factory，其余用通用
+`mcpServers` JSON：
 
-- **Claude Code** 和 **Codex**：复制三行命令——注册 MCP、把本仓库加为插件市场、装上 `zepp-coach` 教练技能。粘到终端运行。分隔符写成 `"--"`，因为 PowerShell 会在 npm 装的 CLI 收到之前吞掉裸的 `--`。
-- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。扩展启动的是装在应用旁边的那份 `zeppbridge-mcp`，随 ZeppBridge 一起升级。Claude Desktop 会一直占着这个程序，以前更新因此换不掉它（旧 MCP 再读新库就报版本不符）；3.1.2 起安装器先把它关掉，设置卡也会在应用旁边那份比应用旧时提醒。
-- **OpenCode**、**Grok Build**：复制一行 `mcp add` 命令；**Factory**：复制一段 `~/.factory/mcp.json`。
+- **Claude Code** 和 **Codex**：复制注册服务、把本仓库加为插件市场、装上 `zepp-coach` 技能的
+  命令（有旧登记挡路时先加一条 `mcp remove`），粘到终端运行。分隔符写成 `"--"`，因为
+  PowerShell 会吞掉裸的 `--`。
+- **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。它启动的是应用旁边那份
+  `zeppbridge-mcp`，随 ZeppBridge 一起升级；安装器更新前会先关掉它，那份程序比应用旧时卡片会提醒。
+- **OpenCode** 和 **Grok Build**：复制一行 `mcp add` 命令；**Factory**：复制一段
+  `~/.factory/mcp.json`。
 
-应用用的库不是可执行文件旁边的 `data` 时，生成的配置会带上 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的构建（开发构建）里这几个按钮不可点，照下面的配置手动接。Linux 的 AppImage 里也带了一份，但它每次启动都挂到新的临时路径，应用不会把这个路径交给 AI 工具：请下载单独的 CLI / MCP 工具包，照下面的配置接。
+库不是可执行文件旁边的 `data` 时，配置还会设 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的开发构建里
+这些按钮不可点。Linux 的 AppImage 每次启动都挂到新路径，应用不把这个路径交给 AI 工具：请用单独的
+工具包和下面的配置。
 
 ### 配置示例
-
-大多数 MCP 客户端读同一种形状的配置：
 
 ```json
 {
@@ -227,13 +261,13 @@ stdio 传输，**不监听任何端口，自己不发任何网络请求**（`syn
 }
 ```
 
-把 `command` 换成解压后的实际路径。**不需要任何 token、API key 或环境变量**——这个程序只读本机文件。
-
-压缩包里的 `mcp-config-example.json` 是同一段内容。
+不需要 token 或 API key。库不在可执行文件旁边时加 `"env": {"ZEPPBRIDGE_DATA_DIR": "…"}`。
+工具包里的 `mcp-config-example.json` 是同一段内容。
 
 ### 访问范围（`--scope`）
 
-进程只接受一个可选参数：
+进程接受 `--scope` 和 `--version`（打印版本后退出）。其他一切——不认识的参数或值、缺值、
+重复传参——都以 `2` 退出并写一行 stderr，拼错的参数绝不会放宽范围。
 
 ```json
 {
@@ -246,16 +280,30 @@ stdio 传输，**不监听任何端口，自己不发任何网络请求**（`syn
 }
 ```
 
-- **`full-readonly`**（缺省值）——已有配置的既有行为：本机数据库的只读全量视图。不带 `--scope` 的旧配置行为完全不变。
-- **`task`**——仍然只读，但只看得到桌面端任务页里标为「开放给 MCP」的任务所授权的内容：这些任务按类别展开的日期窗口内的健康数据；任务里选的运动只有在任务启用了「运动」类别时才能读到它本身——没启用时它只用来定日期窗。任务里单独拖出去的指标 / 字段（例如 HRV、平均心率、深睡分钟）在 MCP 里同样读不到。授权在每次调用时重新读取，所以任务页里翻转开关对下一次请求立即生效，不用重启进程。
+- **`full-readonly`**（缺省）——整个本机库。健康数据只读；下面的写工具只改用户自己写的记录。
+- **`task`**——只读，只看得到桌面任务页里标为「开放给 MCP」的内容：各任务按类别展开的日期窗口内
+  的健康数据。任务里选的运动只有在任务启用了运动类别时才读得到本身，否则只用来定日期窗。任务里
+  拿掉的指标和字段同样读不到。授权每次调用都重新读，翻转开关对下一次请求就生效。
 
-argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、缺值、重复传参都会让进程以非零退出并只写一行 stderr——拼错的参数绝不会静默放宽成更大范围。
+`task` 范围下，授权外的请求会被拒绝，而不是悄悄截断：
 
-`task` 范围下，授权外的请求会被拒绝而不是悄悄截断：`list_workouts` 只回授权的运动 id（哪怕它们不在最近 N 条里）；`get_workout_insight` 的基线只按授权运动重算；`get_metric_series` 只回授权窗口内的日期；`get_sleep_detail` 的「最近一晚」只在授权睡眠窗里找；`get_data_health` 是整库口径的报表、裁不出诚实子集，整体拒绝；同样是整库视角的 `list_available_metrics`、`list_life_events` 也整体拒绝，`get_food_data` 只回按天的摄入合计（归在身体类），不给逐条饮食记录。`get_metric_records`、`list_sleep_sessions` 只回授权窗口内的行，归不进任何任务类别的指标直接拒绝。`get_workout_detail` 去掉被排除的字段以及能算回它们的字段（排除心率时心率区间一起去掉，排除距离时步幅一起去掉）。`get_workout_series` 在 `task` 范围里从不返回精确 GPS 轨迹；任务排除了任一字段的运动，逐点各段一律拒绝。没选运动的任务（「最近 N 天」）的窗口截止到今天，和导出完全一致。点名一个被任务排除的指标会被拒绝（而不是回空序列）；运动与睡眠记录里被排除的字段直接不出现，排除了任一分期分钟时连阶段时间轴一起不出现。多个任务同时开放时按并集放行：任一任务允许的指标 / 字段就能出去。`task` 范围的响应还会剥掉 `device_id` 这类身份字段。
+- `list_workouts` 只回授权的运动；`get_workout_insight` 按它们重算基线。
+- `get_metric_series`、`get_metric_records`、`list_sleep_sessions`、`get_sleep_detail` 只在授权
+  窗口内回答（「最近一晚」指最近一个授权的晚上）。归不进任何任务类别的指标拒绝，任务排除的也拒绝。
+- `get_workout_detail` 去掉被排除的字段和能算回它们的字段（排除心率时去掉心率区间，排除距离时
+  去掉步幅）。`get_workout_series` 从不返回精确轨迹；任务排除了任一字段的运动，逐点各段一律拒绝。
+- `get_food_data` 只回按天的摄入合计（归身体类），不给逐条记录。
+- 整库视角的工具整体拒绝：`list_available_metrics`、`list_life_events`、`get_data_health`、
+  `get_baselines`。
+- 教练工具、所有写工具和两个动作整体拒绝。
 
-每个 `tools/call` 结果都带 `"scope": {"mode": ..., "grants": N}`（成功时在 `structuredContent` 里，出错时在顶层）；`initialize` 与 `server/discover` 也会报告 `"scope": {"mode": ...}` 并在说明文字里写当前范围，客户端始终知道自己在看哪一种视图。
+没选运动的任务（「最近 N 天」）窗口截止到今天，和导出一致。多个任务同时开放时按并集放行。
+`task` 范围的响应去掉 `device_id` 这类身份字段。
 
-范围拒绝是工具结果而非协议错误：`isError: true`，`structuredContent.error.code` 为 `err.mcp.scope_denied`（请求超出授权——`error.permittedRanges` 列出实际授权的 `{category, start, end}` 窗口供重试）或 `err.mcp.scope_no_grants`（当前没有任何任务开放给 MCP）。
+每个 `tools/call` 结果都带 `"scope": {"mode": ..., "grants": N}`，`initialize` /
+`server/discover` 也报告当前范围。范围拒绝是工具结果，`structuredContent.error.code` 为
+`err.mcp.scope_denied`（`error.permittedRanges` 列出可重试的 `{category, start, end}` 窗口）或
+`err.mcp.scope_no_grants`（没有任何任务开放）。
 
 ### 工具
 
@@ -263,84 +311,85 @@ argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、
 |---|---|
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm。`gearId` 是这次运动在 Zepp 里选的跑鞋编号，没选为 `null`；Zepp 不给跑鞋名称 |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_workout_detail` | 单次运动已保存的完整汇总字段、心率区间以及力量训练汇总与逐组明细（有记录时附带 `strength`）；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
-| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）与力量训练逐组/容量明细（`section: "strength"`）；仅选择 `section: "route"` 才返回精确坐标 |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段、心率区间，以及力量训练汇总与逐组明细（有记录时）；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
+| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）与力量训练逐组 / 容量（`section: "strength"`）；仅 `section: "route"` 返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
-| `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
-| `get_baselines` | 每项指标「你的常态」，只和自己比、不用人群常模：`recent` 是最新读数（3 天内）与之前 28 天中位数的比较和 90 天中间八成的常态带；`long_term` 是本机全部历史（最多十年）中间八成、中位数、起始日期和逐年拆分（历史不满一年为 `null`）。官方接口只给近期窗口 |
-| `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
+| `get_food_data` | 饮食记录和每日摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
+| `get_baselines` | 每项指标「你的常态」，只和自己比、不用人群常模：`recent` 是最新读数（3 天内）与之前 28 天中位数的比较和 90 天中间八成的常态带；`long_term` 是本机全部历史（最多十年）的中间八成、中位数、起始日期和逐年拆分（不满一年为 `null`） |
+| `list_available_metrics` | 本机实际入库的指标，带来源、单位、记录数和日期范围 |
 | `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
-| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
-| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线（取自睡眠汇总的 `rhr`，不是睡眠期间的平均心率）、睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己打的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划、生活事件（`epoch: true` 是用户起了名的纪元，如「备战首马」） |
-| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率（睡眠汇总的 `rhr`，不是睡眠期间的平均心率）、手表设定的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景、用户确认过的教练档案（`coachNotes`）、用户的履历（`journal`：本机算的 5K / 10K / 半马 / 全马 PB、还没好和 90 天内好的伤病、带 A/B/C 优先级的将来比赛与比赛成绩、还在穿的跑鞋与里程、纪元） |
+| `get_data_health` | 每条流的抓取 / 解析 / 写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
+| `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线——取自睡眠汇总的 `rhr`，不是睡眠期间的平均心率——睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划和生活事件（`epoch: true` 是起了名的纪元，如「备战首马」） |
+| `get_athlete_profile` | 最大心率（手表自报 / 近一年实测）、静息心率（睡眠汇总的 `rhr`）、手表的心率区间、乳酸阈值、VO₂max（手表估算）、身高体重、近 90 天跑步、用户写给 AI 的背景、教练笔记（`coachNotes`）和用户的履历（`journal`：本机算的 5K / 10K / 半马 / 全马 PB、还没好和最近好的伤病、带 A/B/C 优先级的将来比赛与比赛成绩、还在穿的跑鞋与里程、纪元） |
 | `get_training_plan` | 训练计划账本：已生效的计划、每个 7 天窗口的送达状态、未发的草稿、是否允许 AI 直接发布 |
 | `draft_training_plan` | **写**：校验并保存一份计划草稿（不发到手表）；没通过校验就不保存，原样返回问题 |
-| `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；只有用户打开「允许 AI 直接发布」才放行，永远不清空窗口 |
-| `propose_coach_note` | **写**：记住一句关于用户的话（伤病、作息、偏好）。3.1.2 起直接生效、马上出现在 `get_athlete_profile` 里，并记进改动账本；用户拒绝或撤销过的同一句话不会再写进去 |
+| `publish_training_plan` | **写**：把草稿发到 Zepp App 与手表；用户打开「允许 AI 直接发布训练计划」后才放行，永远不清空窗口 |
+| `propose_coach_note` | **写**：记住一句关于用户的话（伤病、作息、偏好）。马上出现在 `get_athlete_profile` 里，并记进改动账本；用户拒绝或撤销过的同一句话不会再写进去 |
 | `save_injury` | **写**：新增或修改一条伤病（部位、程度 1–3、开始日；好了就填 `endDate`） |
 | `save_life_event` | **写**：新增或修改一条生活事件（类别、日期，`epoch` 表示起了名的纪元） |
 | `save_race` | **写**：新增或修改一场比赛（日期、项目、距离 m、目标与成绩 s、A/B/C 优先级） |
 | `save_shoe` | **写**：新增或修改一双鞋（用途、起始与退役里程 km；退役就填 `retiredOn`） |
 | `annotate_workout` | **写**：一次运动里用户自己的 RPE（1–10）和酸痛部位；手表的 RPE 和选鞋不动 |
 | `set_workout_type` | **写**：纠正运动类型，和桌面「改类型」同一条路径（云端原始记录不变） |
-| `sync_now` | **动作**：启动旁边那份 `zeppbridge-cli`（`sync --json --no-reprocess`）从云端拉一次新数据；最多等 45 秒，没完就回 `running`、由 CLI 自己跑完；本机欠着重解析时回 `deferred` |
+| `sync_now` | **动作**：启动旁边那份 `zeppbridge-cli`（`sync --json --no-reprocess`）从云端拉一次新数据；最多等 45 秒，没完就回 `running`、由 CLI 自己跑完。本机欠着重解析时回 `deferred`，命令行和库版本不一致时回 `schema_mismatch` |
 | `export_data` | **动作**：把一段日子（最多 366 天，不含轨迹）的摘要写成 JSON，放进数据目录的 `exports`，只回相对这个目录的文件名 |
 
-用户在指标卡「?」浮层里关掉「参与分析」的指标，会从每个工具的返回里去掉（不分 `vo2max` / `vo2Max` 这类写法），返回里同时带 `excludedByUser`：名单和一句说明——这是用户的选择，不是缺数据。数据一行不删，用户自己的导出（CLI、FIT）不受影响。
+参数限制（分页大小、日期范围、分段名）见 `tools/list` 里各工具的 `inputSchema`。
 
-查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
-`intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
-每日序列保留总量；`entries` 从保留的原始饮食记录中读取食物名称、描述、餐次、时间、重量和营养明细（含纤维）。
-重量单位尚未验证，餐次代码按原值返回。缺失字段不估算。明细按日期倒序，`limit` 默认 200、最多 1000；
-`totalEntries` 和 `truncated` 表示总条数和截断状态，`mealDetailsAvailable` 表示当前窗口是否有明细。
-没有保留原始记录时仍可能有每日总量。不会返回账户字段或任意原始报文。
-把 `food` 当作 `get_metric_series` 的指标名时，现在会得到明确错误和查询提示，
-不再静默返回空列表。
+用户在指标卡「?」浮层里关掉**参与分析**的指标，会从每个工具的返回里去掉（不分写法），返回里带
+`excludedByUser`，说明这是用户的选择、不是缺数据。数据不删，用户自己的导出不受影响。
 
-其他未列出的类型先用 `list_available_metrics` 查看本机实际有哪些指标，再用
-`get_metric_records` 按入库粒度读取。它也支持图表固定指标名单之外的已归一化数据，
-以及存放在 `sleep_sessions` 中的 `sleep_score`。
-列表只代表本机成功入库的数据，不等于 Zepp 云端每个端点都已解析。MCP 不返回任意原始云端报文。
+`get_food_data` 返回每日合计和已存的饮食明细（名称、描述、餐次、时间、上报重量、含纤维的营养
+成分）。上报重量的单位未经验证。明细按时间倒序，`limit` 默认 200、最多 1000，带 `totalEntries`
+和 `truncated`；`mealDetailsAvailable` 表示是否有明细。摄入热量和消耗热量是两回事。饮食随同步
+进来（桌面应用、`zeppbridge-cli sync` 或 `sync_now`）。四个 `intake_*` 指标也能用
+`get_metric_series` 读。
 
-`get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
+`get_metric_series` 对它不画的指标名静默跳过、不回序列；先调 `list_available_metrics`，
+`daily_metrics`、`metric_samples` 里的任何指标（以及 `sleep_score`）用 `get_metric_records` 读。
+没有工具返回原始云端报文。
 
-#### 会写库的工具：训练计划、教练档案、履历——都能撤销
+`get_data_health` 让模型分清「没同步」和「那段时间本来就没数据」。
 
-云端来的健康数据始终只读。3.1.2 起本地 AI 还能写用户自己的那几本账，每次写入都记进改动账本
-（`mcp_writes`，存改之前和改之后的样子）。用户在**设置 › 本地 AI › AI 最近的改动**里逐条撤销：
-新增的删掉，修改的改回原样，AI 写的教练档案改成「拒绝」（同一句话 AI 不能再写回来）。之后又被改过的不回滚
-（`err.mcp_writes.stale`）。**没有删除工具**：伤病好了填 `endDate`，跑鞋退役填 `retiredOn`；修改时传 `id`
-和要改的字段即可。校验沿用桌面端那一套。`sync_now` 和 `export_data` 是动作、不改记录，不进账本。
+### 会写库的工具
 
-服务还给任何 MCP 客户端发一份说明书 `zeppbridge://guide`（`resources/list` / `resources/read`，握手的
-`instructions` 里也点了名）：工具清单、推荐顺序（先 `get_training_context`）、数据口径、三条禁令、怎么撤销。
+云端来的健康数据始终只读。写工具只改用户自己写的记录，每次写入都记进改动账本（`mcp_writes`，
+存改之前和改之后的样子）。用户在**设置 › 交给 AI 工具 › AI 最近的改动**里逐条撤销：新增的删掉，
+修改的改回原样，撤销的教练笔记改成「拒绝」，AI 不能再写回来。之后又被改过的不回滚
+（`err.mcp_writes.stale`）。**没有删除工具**：伤病好了填 `endDate`，跑鞋退役填 `retiredOn`。
+修改时传 `id` 和要改的字段，校验沿用桌面端那一套。`sync_now` 和 `export_data` 是动作，不进账本。
 
-#### 训练计划
+`propose_coach_note` 写的教练笔记放在单独一张表，不碰健康数据表，马上以 `coachNotes` 出现在
+`get_athlete_profile` 里，标明是哪个 MCP 客户端写的。用户能撤销、修改、删除和导出。
 
-健康数据始终只读。3.0 起 MCP 能起草和发布训练计划，规矩是：
+### 训练计划
 
-- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」走同一套校验（只有跑步、骑行、泳池、公开水域能发到手表，这是 Zepp 接口的限制：走路、徒步、力量、轮滑、越野滑雪会被拦下，力量训练的动作和组数也发不过去；跑步可写 `trail` 越野跑、骑行可写 `mountain` 山地车；训练目的和要点必填；步骤写法见工具说明）。没通过校验不留草稿。草稿会出现在桌面「交给 AI」页，由用户确认后发出。
-- `publish_training_plan` 默认拒绝，返回 `err.training_plan.ai_publish_disabled`。用户在桌面设置「交给 AI 工具」里打开「允许 AI 直接发布」后才放行。发布与桌面同一个三段式：写锁内先记账，放开写锁联网，写锁内记结果；会清空某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
-- `sent` 只说明官方接口收下了（它对任何报文都回 success），内容在发之前已经校验过；手表上开始训练前还要再选一次子类型。
-- `propose_coach_note` 为兼容已装的配置保留原名，但不再进收件箱：写进单独一张表（不碰任何健康数据表），马上以 `coachNotes` 出现在 `get_athlete_profile` 里，标明是哪个客户端写的。每一条都能撤销、改、删，能一键导出成 Markdown。
-- 教练工具、所有写工具和两个动作在 `task` 范围里整体拒绝：它们跨类别、跨日期，裁不出诚实子集。
+- `draft_training_plan` 只存草稿，和桌面「粘贴 AI 的回复」同一套校验。只有跑步、骑行、泳池和
+  公开水域能发到手表（Zepp 接口的限制：走路、徒步、力量、轮滑、越野滑雪会被拦下）。跑步还可写
+  `trail`，骑行可写 `mountain`。训练目的和要点必填，步骤写法见工具说明。没通过校验不留草稿。
+  草稿出现在桌面「交给 AI」页。
+- `publish_training_plan` 在用户于**设置 › 交给 AI 工具**打开**允许 AI 直接发布训练计划**之前一律
+  返回 `err.training_plan.ai_publish_disabled`。它在写锁内先记账，联网时放开写锁，再记结果。会清空
+  某个 7 天窗口的发布一律返回 `err.training_plan.needs_clear_confirmation`，清空只能由用户在桌面确认。
+- `sent` 只说明 Zepp 收下了请求（它对任何报文都回成功），内容发之前已经校验过。手表上开始训练前
+  还要再选一次子类型。
+
+### 说明书资源
+
+服务发布 `zeppbridge://guide`（`resources/list` / `resources/read`，握手的 `instructions` 里
+点了名）：工具清单、推荐顺序（先 `get_training_context`）、数据口径和怎么撤销。
 
 ### 契约
 
-握手时服务器就把边界交给调用方，不必等它拿到一条空序列自己猜：
+握手时服务器就交代边界，不让客户端从一条空序列去猜：
 
-- **时间**：全部 RFC 3339 带时区偏移。云端拉取时间与健康样本发生时间是两件事，任何情况下都不互相替代。
-- **缺失值**：没有采样就是缺失，字段为 `null` 或整段不存在。**任何情况下都不会用 0、上一个值或估算值填空。** 一条曲线的点数少于时间跨度，说明那几天确实没有数据。
-- **来源**：`source_scope` 说明记录来自哪一层——`device` 是某块表上报的，`user_fused` 是云端跨设备合成的，`unknown` 是无法判断的；`unknown` 不会被归并进 `device`。
-- **不返回**：token、Cookie、完整账号、本机绝对路径。
+- **时间**：RFC 3339 带时区偏移。拉取时间和样本发生时间是两回事，任何时候都不互相替代。
+- **缺失值**：没有采样就是 `null` 或整段不存在。**空缺从不用 0、上一个值或估算值填。**
+- **来源**：`source_scope` 说明记录来自哪一层——`device`（某块手表）、`user_fused`（云端跨设备
+  合成）、`unknown`。`unknown` 不会被并进 `device`。
+- **不返回**：token、Cookie、完整账号标识、本机绝对路径。
 
 `zeppbridge-cli contract` 打印的是同一份定义。
-
-## 与桌面应用并发
-
-CLI 的 `sync` 和桌面应用的同步共用同一把跨进程同步租约和同一把写锁，任何时刻只有一个同步、一个写者。等不到时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
-
-MCP 的只读查询不拿写锁，可以和同步同时进行；起草 / 发布训练计划、记住教练档案、写履历时只在落库那一下拿写锁（最多等 5 秒），联网时不拿。

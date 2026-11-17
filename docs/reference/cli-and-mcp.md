@@ -1,124 +1,95 @@
 # Command line and MCP
 
-`zeppbridge-cli` and `zeppbridge-mcp` are two companion tools alongside the
-desktop app. Since 3.1.1 they are installed and updated together with it (right
-next to the main program; Settings › AI tools shows their paths).
-Every release still carries a separate archive for machines without a desktop:
-people who need them should not be forced to install a GUI first.
+`zeppbridge-cli` and `zeppbridge-mcp` are two companion tools for the desktop
+app. Both are thin adapters over [`zeppbridge-core`](architecture.md) and read
+the same `data/zepp.db` the desktop app uses.
 
 [简体中文](cli-and-mcp.zh-CN.md)
-
-Both are thin adapters over [`zeppbridge-core`](architecture.md), reading the
-same `data/zepp.db` the desktop app uses.
 
 ## Installing
 
 **With the desktop app installed** there is nothing more to install. On Windows
 (installer and portable build) they sit next to `ZeppBridge.exe`, on macOS inside
 `ZeppBridge.app/Contents/MacOS/`, and the Linux deb / rpm put them in `/usr/bin`.
-Settings › AI tools shows the full path of both. Living next to the
-app, they read the same library.
+They are updated together with the app, and **Settings › AI tools** shows the
+full path of both.
 
 **On a machine without a desktop**, download
-`zeppbridge-tools-<version>-<platform>.zip` for your platform from
+`zeppbridge-tools-<version>-<platform>.zip` from
 [Releases](https://github.com/lingcang728/ZeppBridge/releases), unpack it, and
 check it against `SHA256SUMS.txt`.
 
-Put both programs next to the ZeppBridge executable and they will read the same
-database. The data directory is resolved by `paths.rs`:
+### Where the library is
+
+Each executable resolves the data directory from its own location:
 
 | Platform | Data directory |
 |---|---|
-| Windows | `data\` next to `ZeppBridge.exe` |
-| macOS | `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` inside `ZeppBridge.app` (bundles are replaced whole on update, so data never lives in them — a surviving legacy bundle library is migrated there on first launch); `data/` next to an executable that is not in a bundle |
-| Linux | `~/.local/share/zeppbridge/data` for a packaged install (deb, rpm, Flatpak — those live in a prefix the app does not own); `data/` next to the executable for an AppImage or an unpacked tarball |
-| Any | `$ZEPPBRIDGE_DATA_DIR`, when set to an absolute path, overrides all of the above |
+| Windows | `data\` next to the executable; if that folder can't be written (for example under `C:\Program Files`), `%APPDATA%\zeppbridge\ZeppBridge\data` |
+| macOS | Inside `ZeppBridge.app`: `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`. Outside a bundle: `data/` next to the executable, or the same Application Support folder when that can't be written |
+| Linux | Under a shared prefix (`/usr`, `/bin`, `/sbin`, `/opt`, `/app`, `/snap`, `/nix/store`, `/var/lib/flatpak`): `~/.local/share/zeppbridge/data`. Anywhere else (AppImage, an unpacked tarball in your home): `data/` next to the executable |
+| Microsoft Store | The package's own LocalState folder |
+| Any | `$ZEPPBRIDGE_DATA_DIR`, an absolute path, overrides all of the above (except the Store build) |
 
-No platform uses `%APPDATA%`.
-
-Read that table as a rule about **each executable**, not about the machine. The
-tools apply it to their own location, so unpacking them somewhere of their own —
-`~/tools/`, say — resolves `~/tools/data`, which is a fresh empty library, not
-the one the app has been filling. The symptom is a confident "no database on
-this machine" next to an app that clearly has one.
-
-Two ways to actually share the library:
+So tools unpacked into a folder of their own, `~/tools/` say, open
+`~/tools/data` — an empty library, not the app's. Either put them next to the
+app or name the directory:
 
 ```bash
-# Put them next to the app's data directory, so the rule lands in the same place.
-# Or, more reliably, name the directory:
 ZEPPBRIDGE_DATA_DIR=~/.local/share/zeppbridge/data zeppbridge-cli status --json
 ```
 
-Naming it is the better habit on macOS and Linux, where the app's data directory
-is usually nowhere near where you would keep two command-line binaries.
+### Credentials
 
-`ZEPPBRIDGE_DATA_DIR` exists for the cases where "next to the executable" is
-not a meaningful idea: a container, a systemd unit, a NAS task scheduler. A
-relative value is rejected rather than resolved against the working directory,
-because a scheduler's working directory is not something the person writing the
-unit file can see.
-
-On Linux the token is read from the Secret Service (GNOME Keyring / KWallet).
-A headless machine has none, so `ZEPPBRIDGE_CREDENTIAL_STORE=file` or
-`=env` with `ZEPPBRIDGE_APP_TOKEN` is how the CLI gets a token there — see the
+**Connect your account in the desktop app and sync at least once first.** The
+CLI never signs in. It reads the token from the OS credential store (Windows
+Credential Manager, macOS Keychain, Linux Secret Service). A headless Linux
+machine has none, so use `ZEPPBRIDGE_CREDENTIAL_STORE=file` or `=env` with
+`ZEPPBRIDGE_APP_TOKEN` — see the
 [Linux guide](../guides/linux.md#where-the-token-is-stored).
 
-**Prerequisite**: connect your account with the desktop app and sync at least
-once. The command line does not sign in, and MCP does not touch the network.
-
-Copying a `data/` folder over from another machine is not enough on its own.
-The database travels; the token does not — it lives in that machine's Credential
-Manager / Keychain / Secret Service, never in a file. A copied folder therefore
-arrives with the metadata and no secret, and the CLI exits `3` saying the
-credential store has no token for this account. Fix it with either credential
-store above, or by signing in again in the desktop app on the new machine —
-[moving a library across platforms](../guides/linux.md#moving-an-existing-library-from-windows-or-macos)
+A `data/` folder copied from another machine brings the library but not the
+token, so the CLI exits `3`. Use one of the stores above, or sign in again in the
+desktop app on the new machine; the
+[Linux guide](../guides/linux.md#moving-an-existing-library-from-windows-or-macos)
 walks through both.
 
 ## zeppbridge-cli
 
 Non-interactive: it never asks a question, waits for a key press or opens a
-window. Everything that needs a human decision (signing in, granting access,
-deleting data) is deliberately not here.
+window. Signing in, granting access and deleting data are not here.
 
 ```bash
 zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
-zeppbridge-cli reprocess --json  # replay local payloads with the current normalizer
+zeppbridge-cli reprocess --json
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
-zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit  # replace a workout on this machine
-zeppbridge-cli contract          # prints the unit, timezone, source and missing-value definitions
+zeppbridge-cli fit-override --workout 1787901817 --fit corrected.fit
+zeppbridge-cli contract          # units, time zone, source and missing-value definitions
+zeppbridge-cli version
 zeppbridge-cli help
 ```
 
-With `--json`, stdout contains only the payload; human-readable notices go to
-stderr. So `zeppbridge-cli export > a.csv` gives you a clean file.
+With `--json`, stdout carries only the payload and notices go to stderr.
+Human-readable output is English; where the shared core's message is Chinese,
+the CLI prints its error code (such as `err.core.config`) instead. The `--json`
+field names and the exit codes are the stable contract. A misspelled flag is an
+error, never ignored.
 
-The human-readable half is English, including errors raised by the shared core.
-The core's own wording is Chinese and lives in hundreds of places the desktop app
-never shows (it looks up localized text by error code instead), so the command
-line does not translate it sentence by sentence: it says in English what kind of
-problem it is, and where the original wording is Chinese it prints the error code
-(for example `err.core.config`) instead, so one sentence never mixes two
-languages. The `--json` field names and the
-exit codes are a contract and do not change with any of this.
+### Sync and history
 
-A misspelled flag is always an error rather than being ignored — silently
-accepting `--form json` would let a script believe the format took effect.
+`sync --mode history --days N` accepts 1–3650 days. Up to 365 days uses the
+normal history window; longer ranges use the monthly coverage ledger and need
+long-term archiving (or a long enough retention) in Settings. `--max-chunks`
+(1–720, default 24) bounds each run; rerun the same command to resume, and add
+`--retry-failed` to reset exhausted failures. Ctrl+C keeps finished chunks and
+exits `8`. The JSON report includes `mode`, `cancelled`, `backfill` and
+`replay`; `backfill.complete` describes coverage, including months the cloud
+confirmed empty.
 
-### Historical summaries and workout details
+### Workout details, types and hiding
 
-`sync --mode history --days N` accepts 1–3650 days. Up to 365 days uses
-the normal history window; 366–3650 days uses the persistent monthly coverage
-ledger. Enable long-term archive in Settings when the range exceeds local
-retention. `--max-chunks 24` bounds each monthly run (1–720); rerun the same
-command to resume, or add `--retry-failed` to reset exhausted failures. Ctrl+C
-keeps completed chunks and returns exit code `8`. JSON includes `mode`,
-`cancelled`, `backfill` and `replay`; `backfill.complete` describes coverage,
-including confirmed cloud-empty months, rather than promising cloud data exists.
-
-Workout details have a separate persistent queue:
+Workout details have their own persistent queue:
 
 ```bash
 zeppbridge-cli workout-details --status --json
@@ -132,50 +103,55 @@ zeppbridge-cli restore --workout ID1 --json
 zeppbridge-cli set-type --undo EDIT_ID --json
 ```
 
-Fetching requires an explicit channel and its connected credentials; each run
-requests at most 1–40 details (default 20). `--status` reads without network or
-writes and optionally filters by `--channel`. Rerunning resumes unfinished
-requests. Successful and cloud-empty records are skipped; failed requests use
-backoff, and `--retry-failed` resets failures only for the selected channel.
-Ctrl+C pauses safely. JSON contains `coverage`, `channel`, `complete` and
-`cancelled`. Fetching exits `8` while the selected channel still has pending or
-failed requests, including during backoff; a coverage query exits `0` when the
-query itself succeeds. Summary coverage and detail coverage are independent.
+Fetching needs an explicit channel and its credentials, and fetches 1–40
+details per run (default 20). `--status` reads without network or writes and can
+filter by `--channel`; it can't be combined with `--max-items` or
+`--retry-failed`. Rerunning resumes; saved and cloud-empty details are skipped,
+failures back off, and `--retry-failed` resets failures for the selected channel
+only. Fetching exits `8` while that channel still has pending or failed
+requests; a `--status` query exits `0` when it succeeds.
 
-Local edits are atomic across all `--workout` IDs and return an edit ID.
-`--undo EDIT_ID` reverses the entire edit unless a later edit conflicts.
-`--clear` removes the local type correction. Hiding preserves the original
-record and excludes it from normal reads and exports until restored.
+`set-type`, `hide` and `restore` are atomic across all `--workout` IDs and
+return an edit ID; `--undo EDIT_ID` (on any of the three) reverses the whole
+edit unless a later edit conflicts. Types are workout-catalogue keys such as
+`run`; `--clear` removes the local correction. Hiding keeps the record but
+leaves it out of normal reads, statistics and exports until restored. Both apply
+to this machine's library only.
+
+### Export
+
+`export` needs a range (`--from` and `--to`) or one `--workout`. Options:
+
+- `--format json|csv|gpx|fit` (default `json`); `fit` needs `--out` pointing at a
+  directory. CSV, GPX and FIT always export full detail.
+- `--types` (default `workouts,daily_activity,sleep`); `zeppbridge-cli help`
+  lists all eighteen.
+- `--detail summary|full` (default `summary`).
+- `--out <path>`; without it the export goes to stdout.
+
+One export covers at most 366 days.
 
 ### Normalizer upgrades
 
-Derived records — a workout's sport type, a night's sleep stages, the all-day
-stress curve — are produced by the normalizer at the moment a payload is first
-stored. When its rules change, everything already in the library keeps the old
-result. Only a replay of the stored raw payloads brings history forward; without
-one, a release that adds sport codes fixes new records and leaves the 199 old
-ones sitting at `unknown:211`, which is exactly what people report.
+Derived records (a workout's sport type, sleep stages, the stress curve) are
+produced when a payload is first stored. When the normalizer changes, only a
+replay of the stored raw payloads updates the library. The desktop app replays
+at startup; for headless installs:
 
-The desktop app replays on startup, in a background thread. A headless install
-never has that startup, so:
-
-| Command | What it does about a stale library |
+| Command | When the library is behind |
 |---|---|
-| `sync` | Replays first, then syncs. This is the one on a timer, so headless users need to do nothing. `--no-reprocess` skips it. |
-| `status`, `export` | Say so and do nothing. A command that normally answers in milliseconds must not start a multi-minute write. |
-| `reprocess` | Runs the replay now. `--all` replays every payload rather than only what the revision bump requires. |
+| `sync` | Replays first, then syncs. `--no-reprocess` skips it. |
+| `status`, `export` | Report it and do nothing. |
+| `reprocess` | Replays now. `--all` replays every payload. |
 
-A replay takes the cross-process write lock, never touches the network, and
-never rewrites the "last cloud sync" timestamp — it has its own timeline. It is
-safe on a timer: without `--all` it does nothing once the revision matches.
-
-`status` reports `normalizerRevision` (what the library holds),
-`normalizerRevisionExpected` (what this build produces) and
-`normalizerReplayPending`. Those first two being different is the whole signal.
+A replay takes the write lock, never uses the network, and never changes the
+"last cloud sync" time. Without `--all` it does nothing once the library is
+current. `status` reports `normalizerRevision`, `normalizerRevisionExpected` and
+`normalizerReplayPending`.
 
 ### Replacing a workout with a corrected .fit
 
-The desktop app can replace a workout with a corrected `.fit` (the workout page's **Replace with a corrected .fit**). `fit-override` does the same from a script:
+The desktop app's **Replace with a corrected .fit** has a script form:
 
 ```bash
 zeppbridge-cli fit-override --workout <id> --fit corrected.fit --json  # replace
@@ -183,22 +159,18 @@ zeppbridge-cli fit-override --workout <id> --remove --json             # undo; Z
 zeppbridge-cli fit-override --list --json                              # what this machine has replaced
 ```
 
-A replacement lives only in that machine's library: Zepp has no endpoint for
-importing a workout, so the cloud copy and the watch stay as they were. It
-survives later syncs, `reprocess` and parser replays, and snapshots include it.
-Workout IDs come from Zepp and are the same on every machine, so with several
-libraries you run the same command on each. The file must start within 5
-minutes of the workout (`errorKind: "fit_start_mismatch"` otherwise) and the
-workout must already be in the library (`workout_not_found`); both exit with 1.
-Undoing something that was never replaced succeeds with `"removed": false`.
+A replacement lives only in this machine's library; Zepp has no way to import a
+workout. It survives syncs, `reprocess` and replays, and snapshots include it.
+Workout IDs are the same on every machine, so run the same command on each
+library. The file must start within 5 minutes of the workout
+(`errorKind: "fit_start_mismatch"`) and the workout must already be in the
+library (`workout_not_found`); both exit `1`. Undoing something never replaced
+succeeds with `"removed": false`.
 
 ### Shoes and races
 
-The running shoes and races on the desktop **Journal** page can be managed from a
-script too:
-
 ```bash
-zeppbridge-cli shoes list --json                 # shoes with distance and wear, plus Zepp gear IDs not added yet
+zeppbridge-cli shoes list --json                   # shoes with distance and wear, plus Zepp gear IDs not added yet
 zeppbridge-cli shoes save --file shoe.json --json  # add, or update when the JSON has "id"; prints the id
 zeppbridge-cli shoes delete --id 3 --json
 zeppbridge-cli races list --json
@@ -206,50 +178,48 @@ cat race.json | zeppbridge-cli races save --file - --json
 zeppbridge-cli races delete --id 2 --json
 ```
 
-`save` takes one JSON object with the same fields as the desktop form. A shoe
-needs `name`, `sport` (`running` / `trail` / `walking` / `hiking`), `retire_km`
+`save` takes one JSON object with the desktop form's fields. A shoe needs
+`name`, `sport` (`running` / `trail` / `walking` / `hiking`), `retire_km`
 (100–5000) and `started_on` (`YYYY-MM-DD`); `is_default`, `zepp_gear_id`,
 `start_km`, `retired_on` and `notes` are optional. A race needs `name`,
 `race_date`, `sport` (`running` / `trail` / `cycling` / `swimming` / `triathlon`
 / `other`) and `priority` (`a` / `b` / `c`); `distance_m`, `goal_seconds`,
-`result_seconds`, `workout_id` and `notes` are optional. The option is `--file`,
-not `--json`, because `--json` means "machine-readable output" on every command.
-A malformed file is a usage error (2) before the library is opened; values the
-library rejects (an empty name, an unknown sport) are also 2. Deleting an id
-that does not exist exits 1 with `errorKind: "not_found"`. Writes take the
-cross-process write lock, so they wait for (or report `4` against) a running sync.
+`result_seconds`, `workout_id` and `notes` are optional. A malformed file or a
+rejected value exits `2`; deleting an id that does not exist exits `1` with
+`errorKind: "not_found"`. MCP's `save_shoe` and `save_race` write the same
+tables.
 
-AI tools read these through MCP `get_athlete_profile` (`journal`) but cannot
-change them; there is no MCP tool that writes shoes or races.
+### probe
+
+`probe` checks whether candidate endpoints return anything, without importing
+data: `--streams` (default `blood_pressure`; also `heart_rate`,
+`daily_summary`), `--days` (1–365, default 7). `--json` prints counts, field
+names and errors only, never readings.
 
 ### Exit codes
 
-Exit codes are a contract for scheduling scripts. New ones may be added; the
-meaning of an existing one never changes.
+Exit codes are a contract for scripts. New ones may be added; an existing
+meaning never changes.
 
 | Code | Meaning | What to do |
 |---|---|---|
 | 0 | Success | — |
-| 1 | Other failure, including unavailable local data | Read the error message; a missing local workout uses JSON `errorKind: "data_unavailable"`, not a cloud error |
+| 1 | Other failure, including unavailable local data | Read the message; a missing local workout is `errorKind: "data_unavailable"` |
 | 2 | Usage error | Fix the command |
-| 3 | No Zepp account connected, or the token is not on this machine | Sign in with the desktop app, or set `ZEPPBRIDGE_CREDENTIAL_STORE` |
+| 3 | No account connected, no token on this machine, no local library, or the library belongs to another account | Sign in with the desktop app, or set `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
 | 5 | Cloud request failed | Back off and retry |
-| 6 | Local database error | Requires human intervention |
-| 7 | Database version does not match this build | Run `zeppbridge-cli reprocess` (or launch the desktop app once) to upgrade, or update the CLI to the same version |
-| 8 | Sync incomplete: one or more streams failed | Inspect the stream results and retry; successfully written records are retained |
+| 6 | Local database error | Needs a person |
+| 7 | Database version does not match this build | Run `zeppbridge-cli reprocess` (or open the desktop app once), or update the CLI |
+| 8 | Sync incomplete: one or more streams failed | Check the stream results and retry; written records are kept |
 
-An incomplete sync still emits the full report with `--json`, with `ok: false`
-and `success: false`. Unavailable or unverified optional streams alone do not
-cause this exit code.
-
-4 is separate from 1 because "the desktop app happens to be syncing" and
-"something actually broke" call for completely different responses. If they
-shared one code, a retry script would have no way to tell them apart.
+An incomplete sync still prints the full report with `--json`, with `ok: false`
+and `success: false`. Exit `4` is separate from `1` so a retry script can tell
+"the desktop app is syncing" from "something broke".
 
 ### Windows Task Scheduler
 
-Incremental sync daily at 07:00, without treating "busy" as a failure:
+Incremental sync daily at 07:00:
 
 ```powershell
 $action = New-ScheduledTaskAction `
@@ -259,8 +229,8 @@ $trigger = New-ScheduledTaskTrigger -Daily -At 7:00am
 Register-ScheduledTask -TaskName 'ZeppBridge daily sync' -Action $action -Trigger $trigger
 ```
 
-Replace the path with your own install location. Task Scheduler records the exit
-code; if you care about the difference between busy and failed, use a wrapper:
+Use your own install path. To treat "busy" as a skipped round rather than a
+failure, wrap it:
 
 ```powershell
 & 'C:\Program Files\ZeppBridge\zeppbridge-cli.exe' sync --mode incremental --json
@@ -274,65 +244,59 @@ switch ($LASTEXITCODE) {
 ### cron (macOS / Linux)
 
 ```cron
-# Incremental sync daily at 07:00; exit code 4 (another writer) counts as skipped, not failed
+# Incremental sync daily at 07:00; exit code 4 (another writer) counts as skipped
 0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; s=$?; [ $s -eq 4 ] && s=0; exit $s
 ```
 
-Do not write it as `...; [ $? -eq 4 ] && exit 0`. When the sync succeeds, the
-test fails, and the whole line then exits 1 — cron records every successful sync
-as a failure, and a real failure loses its own exit code along the way.
+Don't write `...; [ $? -eq 4 ] && exit 0`: after a successful sync the test
+fails and the line exits `1`. On macOS, cron needs Full Disk Access to read the
+data directory.
 
-On macOS, cron needs Full Disk Access to read the data directory.
+### Running alongside the desktop app
+
+The CLI's `sync` and the desktop app share one cross-process sync lease and one
+write lock, so only one sync and one writer run at a time. When the CLI can't
+get them within its wait (up to 20 seconds for a write), it exits `4`.
 
 ## zeppbridge-mcp
 
-Uses stdio transport. It **listens on no port and makes no network requests** of its
-own (`sync_now` starts the bundled `zeppbridge-cli`, and `publish_training_plan` sends a
-plan to Zepp — both only when called).
-Each request line is limited to 1 MiB. Malformed UTF-8/JSON and oversized lines
-receive an error; subsequent lines can still be processed. Tool execution
-failures are returned in `result` with `isError: true` and explanatory text.
-Unknown tools and malformed call envelopes remain JSON-RPC errors.
-Reads go through a `PRAGMA query_only` connection; the few tools that write open
-their own short write connection under the cross-process write lock.
+stdio transport. It **listens on no port**. It goes online only when a tool
+that needs it is called: `sync_now` starts the bundled `zeppbridge-cli`, and
+`publish_training_plan` sends a plan to Zepp. Each request line is limited to
+1 MiB; malformed or oversized lines get an error and later lines still work.
+Tool failures come back in `result` with `isError: true`; unknown tools and
+malformed envelopes are JSON-RPC errors. Reads use a `PRAGMA query_only`
+connection; tools that write open a short write connection under the write lock
+(waiting at most 5 seconds) and never hold it while on the network.
 
 ### Connecting from the desktop app
 
-The installers put `zeppbridge-mcp` next to the app's own executable: beside
-`ZeppBridge.exe` on Windows (installer and portable build), inside
-`ZeppBridge.app/Contents/MacOS/` on macOS, and in `/usr/bin` for the Linux deb
-and rpm packages. **Settings › AI tools › Connect a local AI** then fills in the
-real path for you. From 3.1.2 the generated configuration reads the whole library
-(no `--scope` flag); the **Only shared tasks** switch there adds `--scope task`, and
-the card flags clients still registered with the other setting. Presets: Claude Code,
-Codex, Claude Desktop, OpenCode, Grok Build, Factory, and a generic `mcpServers` JSON
-for anything else (DeepSeek Harness included):
+**Settings › AI tools › Connect a local AI** fills in the real path of the
+`zeppbridge-mcp` next to the app. The generated configuration reads the whole
+library; the **Only shared tasks** switch adds `--scope task`, and the card
+flags clients still registered with the other setting. Presets: Claude Code,
+Codex, Claude Desktop, OpenCode, Grok Build, Factory, and a generic
+`mcpServers` JSON for anything else:
 
-- **Claude Code** and **Codex** copy three commands: register the MCP server,
-  add this repository as a plugin marketplace, and
-  install the `zepp-coach` coaching skill. Paste them into a terminal. The
-  `--` separator is written as `"--"` because PowerShell swallows a bare `--`
-  before it reaches the npm-installed CLIs.
-- **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. The
-  extension starts the `zeppbridge-mcp` installed next to the app, so it
-  updates together with ZeppBridge. Claude Desktop keeps that program running,
-  which used to stop an update from replacing it (an old MCP then refused the
-  newer library); from 3.1.2 the installer closes it first, and the settings card
-  warns when the program next to the app is older than the app.
-- **OpenCode** and **Grok Build** copy one `mcp add` command; **Factory** copies a
-  `~/.factory/mcp.json` entry.
+- **Claude Code** and **Codex** copy the commands that register the server, add
+  this repository as a plugin marketplace and install the `zepp-coach` skill
+  (plus a `mcp remove` first when an older registration is in the way). Paste
+  them into a terminal. The `--` separator is written as `"--"` because
+  PowerShell swallows a bare `--`.
+- **Claude Desktop** saves `ZeppBridge.mcpb`; double-click it to install. It
+  starts the `zeppbridge-mcp` next to the app, so it updates with ZeppBridge;
+  the installer closes it before updating, and the card warns when that program
+  is older than the app.
+- **OpenCode** and **Grok Build** copy one `mcp add` command; **Factory** copies
+  a `~/.factory/mcp.json` entry.
 
-When the app's library is not the `data` folder next to the executable, the
-generated configuration also sets `ZEPPBRIDGE_DATA_DIR`. Builds without the
-sidecar (development builds) disable these buttons; use the configuration
-below instead. The Linux AppImage carries the sidecar too, but it mounts at a
-new temporary path on every launch, so the app does not hand that path to AI
-tools: download the separate CLI / MCP tools package and use the configuration
-below.
+When the library is not the `data` folder next to the executable, the
+configuration also sets `ZEPPBRIDGE_DATA_DIR`. Development builds without the
+sidecar disable these buttons. The Linux AppImage mounts at a new path on every
+launch, so the app does not hand that path to AI tools; use the separate tools
+package and the configuration below.
 
 ### Example configuration
-
-Most MCP clients read the same shape of configuration:
 
 ```json
 {
@@ -345,14 +309,15 @@ Most MCP clients read the same shape of configuration:
 }
 ```
 
-Replace `command` with the real path where you unpacked it. **No token, API key
-or environment variable is needed** — the program only reads a local file.
-
-`mcp-config-example.json` in the archive contains the same snippet.
+No token or API key is needed. Add `"env": {"ZEPPBRIDGE_DATA_DIR": "…"}` when
+the library is not next to the executable. `mcp-config-example.json` in the
+tools archive has the same snippet.
 
 ### Access scope (`--scope`)
 
-The process accepts exactly one optional flag:
+The process accepts `--scope` and `--version` (prints the version and exits).
+Anything else — an unknown argument or value, a missing value, a repeated flag —
+exits `2` with one stderr line, so a typo never widens access.
 
 ```json
 {
@@ -365,56 +330,42 @@ The process accepts exactly one optional flag:
 }
 ```
 
-- **`full-readonly`** (the default when `--scope` is absent) — the behavior
-  existing configurations already have: read-only access to the whole local
-  database. Configurations without the flag keep working unchanged.
-- **`task`** — still read-only, but limited to what the desktop app marks as
-  *shared with MCP* on its task page: health data inside the per-category date
-  windows those tasks open. A task's selected workouts are readable themselves
-  only when the task enables the workout category; otherwise they just anchor
-  the date windows. Metrics and fields dragged out of a task (HRV, average heart
-  rate, deep-sleep minutes, …) stay unreadable over MCP as well. Grants are
-  re-read on every call, so flipping the share switch applies to the very next
-  request — no restart needed.
-
-argv parsing is fail-closed: an unrecognized argument, an unknown `--scope`
-value, a missing value, or a repeated flag exits non-zero with a single stderr
-line. A mistyped flag never widens access silently.
+- **`full-readonly`** (the default) — the whole local library. Health data is
+  read-only; the write tools below change only records the user authors.
+- **`task`** — read-only, limited to what the desktop app marks as *shared with
+  MCP* on its task page: health data inside each task's per-category date
+  windows. A task's selected workouts are readable only when the task enables
+  the workout category; otherwise they only anchor the windows. Metrics and
+  fields taken out of a task stay unreadable. Grants are re-read on every call,
+  so flipping the share switch applies to the next request.
 
 Under `task`, requests outside the grants are refused rather than silently
-truncated: `list_workouts` returns only granted workout IDs (even when they are
-not among the most recent), `get_workout_insight` re-computes its baseline over
-granted workouts alone, `get_metric_series` answers only days inside the
-granted windows, `get_sleep_detail` resolves "latest night" within the granted
-sleep windows, and `get_data_health` — a whole-library report that cannot be
-honestly clipped — is refused outright. The same goes for the other
-whole-library views: `list_available_metrics` and `list_life_events` are
-refused, and `get_food_data` returns only daily intake totals (under the body
-category), never individual food entries. `get_metric_records` and
-`list_sleep_sessions` return only rows inside the granted windows, and a metric
-that maps to no task category is refused. `get_workout_detail` drops the
-excluded fields plus anything that would reveal them (heart-rate zones when
-heart rate is excluded, stride when distance is). `get_workout_series` never
-returns the precise GPS route under `task`, and refuses the per-point sections
-for a workout whose task excludes any field. A task with no selected workouts
-("the last N days") opens its window ending today, exactly like the export.
-Naming a metric a task excludes is
-refused rather than answered with an empty series; excluded workout and sleep
-fields are simply absent, and excluding any sleep-stage minutes drops the stage
-timeline too. With several shared tasks the grants are a union: a metric or
-field any task allows can go out. Responses under `task` also drop identity
-fields such as `device_id`.
+truncated:
 
-Every `tools/call` result carries `"scope": {"mode": ..., "grants": N}` (inside
-`structuredContent` on success and at the top level on errors), and
-`initialize` / `server/discover` report `"scope": {"mode": ...}` plus an
-instructions line, so a client always knows which view it is looking at.
+- `list_workouts` returns only granted workouts; `get_workout_insight`
+  recomputes its baseline over them.
+- `get_metric_series`, `get_metric_records`, `list_sleep_sessions` and
+  `get_sleep_detail` answer only inside the granted windows ("latest night"
+  means the latest granted one). A metric that maps to no task category is
+  refused, and so is one a task excludes.
+- `get_workout_detail` drops excluded fields and anything that would reveal them
+  (heart-rate zones when heart rate is excluded, stride when distance is).
+  `get_workout_series` never returns the precise route, and refuses per-point
+  sections for a workout whose task excludes any field.
+- `get_food_data` returns daily intake totals only (as body data), no entries.
+- Whole-library views are refused: `list_available_metrics`,
+  `list_life_events`, `get_data_health`, `get_baselines`.
+- Coach tools, every write tool and both actions are refused.
 
-Scope refusals are tool results, not protocol errors: `isError: true` with
-`structuredContent.error.code` set to `err.mcp.scope_denied` (the request is
-outside the grants — `error.permittedRanges` lists the actual
-`{category, start, end}` windows to retry within) or `err.mcp.scope_no_grants`
-(no task is currently shared).
+A task with no selected workouts ("the last N days") has a window ending today,
+exactly like the export. With several shared tasks the grants are a union.
+Responses under `task` drop identity fields such as `device_id`.
+
+Every `tools/call` result carries `"scope": {"mode": ..., "grants": N}`, and
+`initialize` / `server/discover` report the mode. Scope refusals are tool
+results with `structuredContent.error.code` set to `err.mcp.scope_denied`
+(`error.permittedRanges` lists the `{category, start, end}` windows to retry
+within) or `err.mcp.scope_no_grants` (nothing is shared).
 
 ### Tools
 
@@ -426,7 +377,7 @@ outside the grants — `error.permittedRanges` lists the actual
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series) and strength-training sets/volume (`section: "strength"`); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
-| `get_baselines` | Your own norm per metric, never a population norm: `recent` compares the latest reading (within 3 days) with the previous 28-day median and gives the 90-day middle-80% band; `long_term` is the middle 80% of all local history (up to ten years) with its median, start date and a per-year breakdown (`null` under a year of history). The official API only covers recent windows |
+| `get_baselines` | Your own norm per metric, never a population norm: `recent` compares the latest reading (within 3 days) with the previous 28-day median and gives the 90-day middle-80% band; `long_term` is the middle 80% of all local history (up to ten years) with its median, start date and a per-year breakdown (`null` under a year of history) |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
 | `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
@@ -434,128 +385,103 @@ outside the grants — `error.permittedRanges` lists the actual
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
 | `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline — taken from the sleep summary's `rhr`, not the average heart rate during sleep — sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect, the watch's RPE plus the user's own `userRpe` and sore spots), days since the last workout, the active plan and life events (`epoch: true` marks a named era such as a marathon build) |
-| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate (the sleep summary's `rhr`, not the average heart rate during sleep), the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, the coach notes the user has confirmed (`coachNotes`), and the user's journal (`journal`: 5K / 10K / half / marathon PBs computed locally, ongoing and recently healed injuries, upcoming races with A/B/C priority and race results, shoes in use with mileage, named eras) |
+| `get_athlete_profile` | Maximum heart rate (watch-reported and observed over a year), resting heart rate (the sleep summary's `rhr`), the watch's heart-rate zones, lactate threshold, VO₂max (a watch estimate), height and weight, runs from the last 90 days, the background the user wrote for AI, coach notes (`coachNotes`), and the user's journal (`journal`: 5K / 10K / half / marathon PBs computed locally, ongoing and recently healed injuries, upcoming races with A/B/C priority and race results, shoes in use with mileage, named eras) |
 | `get_training_plan` | The training-plan ledger: the active plan, delivery state per 7-day window, unsent drafts, and whether AI may publish directly |
 | `draft_training_plan` | **Writes**: validates and saves a plan draft (nothing is sent to the watch); a plan that fails validation is not saved and the issues come back as-is |
-| `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Allow AI to publish directly", and never clears a window |
-| `propose_coach_note` | **Writes**: remembers one sentence about the user (an injury, a routine, a preference). From 3.1.2 it takes effect at once in `get_athlete_profile` and is recorded in the change ledger; a sentence the user rejected or undid is never written again |
+| `publish_training_plan` | **Writes**: sends a draft to the Zepp app and watch; allowed only after the user turns on "Let AI publish training plans directly", and never clears a window |
+| `propose_coach_note` | **Writes**: remembers one sentence about the user (an injury, a routine, a preference). It takes effect at once in `get_athlete_profile` and is recorded in the change ledger; a sentence the user rejected or undid is never written again |
 | `save_injury` | **Writes**: adds or edits an injury (body part, severity 1–3, start date; set `endDate` when healed) |
 | `save_life_event` | **Writes**: adds or edits a life event (category, dates, `epoch` for a named era) |
 | `save_race` | **Writes**: adds or edits a race (date, sport, distance in m, goal and result in s, priority a/b/c) |
 | `save_shoe` | **Writes**: adds or edits a pair of shoes (sport, start and retire km; set `retiredOn` to retire) |
 | `annotate_workout` | **Writes**: the user's own RPE (1–10) and sore body parts for one workout; the watch's RPE and the shoe choice are untouched |
 | `set_workout_type` | **Writes**: corrects a workout's sport type, the same path as the desktop's "Change type" (the cloud record is not changed) |
-| `sync_now` | **Action**: pulls new data from Zepp cloud by starting the `zeppbridge-cli` next to it (`sync --json --no-reprocess`); waits up to 45 s, then reports `running` and lets the CLI finish. `deferred` while a local reparse is pending |
+| `sync_now` | **Action**: pulls new data from Zepp cloud by starting the `zeppbridge-cli` next to it (`sync --json --no-reprocess`); waits up to 45 s, then reports `running` and lets the CLI finish. `deferred` while a local reparse is pending, `schema_mismatch` when the CLI and library versions differ |
 | `export_data` | **Action**: writes a summary JSON for a date range (≤ 366 days, no routes) into the data folder's `exports`, returning the file name relative to that folder |
 
-Metrics the user switched off with **Use in analysis** (the "?" panel on a metric
-card) are removed from every tool result, in any spelling (`vo2max`, `vo2Max`, …),
-and the result then carries `excludedByUser` with the list and a note that this is
-the user's choice, not missing data. Nothing is deleted; the user's own exports
-(CLI, FIT) are not affected.
+Parameter limits (page sizes, date ranges, section names) are in each tool's
+`inputSchema` from `tools/list`.
 
-`get_food_data` returns daily totals and available food-log details: names, descriptions,
-meal types, timestamps, reported weight, and nutrients (including fiber). Reported
-weight has no verified unit; meal type codes are preserved as stored. Unknown fields
-and account metadata are excluded. Entries are newest first, limited by `limit`
-(default 200, maximum 1000), with `totalEntries` and `truncated` indicating omitted
-entries. Daily totals are unaffected by this limit. Details require retained raw
-food logs; daily totals may still exist without them. For example,
-call it with `{"days": 30}` for the past month. Missing days and nutrients stay
-missing, and intake calories are separate from calories burned. Sync food records
-with the desktop app first; this read-only tool cannot fetch them from Zepp.
-The same four `intake_*` metrics remain available through `get_metric_series`.
+Metrics the user switched off with **Use in analysis** (the "?" panel on a
+metric card) are removed from every result, in any spelling, and the result
+carries `excludedByUser` noting that this is the user's choice, not missing
+data. Nothing is deleted; the user's own exports are not affected.
 
-Passing `food` as a `get_metric_series` metric now returns a clear error with
-the discovery path instead of an empty result.
+`get_food_data` returns daily totals and the stored food-log entries (name,
+description, meal type, time, reported weight, nutrients including fiber).
+Reported weight has no verified unit. Entries are newest first, limited by
+`limit` (default 200, maximum 1000), with `totalEntries` and `truncated`;
+`mealDetailsAvailable` says whether entries exist at all. Intake calories are
+separate from calories burned. Food comes in with a sync (the desktop app,
+`zeppbridge-cli sync` or `sync_now`). The four `intake_*` metrics are also
+available through `get_metric_series`.
 
-Use `list_available_metrics` before querying less familiar types.
-`get_metric_records` can read any name actually present in `daily_metrics` or
-`metric_samples`, plus `sleep_score` from `sleep_sessions`, including metrics outside `get_metric_series`' fixed chart
-list. The inventory reflects normalized local data, not every endpoint the
-cloud might offer. No tool returns arbitrary raw cloud payloads.
+`get_metric_series` silently skips metric names it doesn't chart, returning no
+series for them; call `list_available_metrics` first, and use
+`get_metric_records` for anything in `daily_metrics` or `metric_samples` (plus
+`sleep_score`). No tool returns raw cloud payloads.
 
-`get_data_health` deserves a mention of its own: it lets a model tell the
-difference between "this question cannot be answered because nothing was synced"
-and "there genuinely was no data in that period".
+`get_data_health` lets a model tell "nothing was synced" apart from "there
+really was no data in that period".
+
+### Tools that write
+
+Health data from the cloud stays read-only. The write tools change only records
+the user authors, and every write goes into a change ledger (`mcp_writes`) with
+the record before and after. In **Settings › AI tools › Recent AI changes** the
+user undoes any of them: an added record is removed, an edited one goes back,
+and an undone coach note becomes "rejected" so the AI can't write it again. A
+record that changed again afterwards is not rolled back
+(`err.mcp_writes.stale`). There are **no delete tools**: an injury heals with
+`endDate`, a shoe retires with `retiredOn`. To edit, pass the `id` and only the
+fields to change; validation is the desktop app's own. `sync_now` and
+`export_data` are actions and are not in the ledger.
+
+Coach notes from `propose_coach_note` are stored in their own table, never a
+health table, and appear in `get_athlete_profile` as `coachNotes` at once,
+labelled with the MCP client's name. The user can undo, edit, delete and export
+them.
+
+### Training plans
+
+- `draft_training_plan` only saves a draft, with the same validation as the
+  desktop app's "paste the AI's reply". Only running, cycling, pool and
+  open-water swimming reach the watch (a Zepp API limit: walking, hiking,
+  strength, inline skating and cross-country skiing are refused). Running also
+  takes `trail` and cycling `mountain`. Purpose and description are required;
+  the step syntax is in the tool description. A plan that fails validation
+  leaves no draft. The draft shows up on the desktop **Send to AI** page.
+- `publish_training_plan` refuses with `err.training_plan.ai_publish_disabled`
+  until the user turns on **Let AI publish training plans directly** in
+  **Settings › AI tools**. It records the attempt under the write lock, releases
+  the lock while on the network, and records the result. A publish that would
+  clear a 7-day window always returns `err.training_plan.needs_clear_confirmation`;
+  only the user can confirm a clear, on the desktop.
+- `sent` only means Zepp accepted the request (it answers success to any body);
+  the content was validated before sending. The watch still asks for the
+  sub-type before the workout starts.
+
+### The guide resource
+
+The server publishes `zeppbridge://guide` (`resources/list` /
+`resources/read`, named in the handshake `instructions`): the tool list, a
+recommended order (start with `get_training_context`), the data rules and how
+undo works.
 
 ### The contract
 
-The server hands the caller its boundaries at handshake time, rather than
-letting it receive an empty series and guess:
+The handshake states the boundaries instead of leaving a client to guess from an
+empty series:
 
-- **Time**: everything is RFC 3339 with a timezone offset. The time data was
-  fetched from the cloud and the time a health sample occurred are two different
-  things, and one never substitutes for the other.
-- **Missing values**: no sample means missing — the field is `null` or the whole
-  segment is absent. **A gap is never filled with 0, the previous value or an
-  estimate.** If a curve has fewer points than its time span, those days really
-  had no data.
-- **Source**: `source_scope` says which layer a record came from — `device` is
-  what a specific watch reported, `user_fused` is the cloud's cross-device
-  composite, `unknown` cannot be determined. `unknown` is never folded into
-  `device`.
+- **Time**: RFC 3339 with a timezone offset. The time data was fetched and the
+  time a sample occurred are different things; one never stands in for the
+  other.
+- **Missing values**: no sample means `null` or an absent segment. **A gap is
+  never filled with 0, the previous value or an estimate.**
+- **Source**: `source_scope` says which layer a record came from — `device` (a
+  specific watch), `user_fused` (the cloud's cross-device composite), `unknown`.
+  `unknown` is never folded into `device`.
 - **Never returned**: tokens, cookies, full account identifiers, absolute local
   paths.
 
 `zeppbridge-cli contract` prints the same definitions.
-
-## Running alongside the desktop app
-
-The CLI's `sync` and the desktop app's sync share one cross-process sync lease
-and one write lock, so there is only ever one sync and one writer at a time. When
-the CLI cannot get either within its wait it exits with code 4 rather than
-racing the GUI.
-
-MCP's read-only queries take no write lock and can run during a sync. Drafting
-or publishing a training plan, remembering a coach note or saving a logbook record
-takes the write lock only for the moment it writes (waiting at most 5 seconds),
-never while it is on the network.
-
-### Tools that write: plans, coach notes, the logbook — all undoable
-
-Health data from the cloud stays read-only. From 3.1.2 a local AI can also write the
-records the user authors themselves, and every write is recorded in a change ledger
-(`mcp_writes`) with the record as it was before and after. The user undoes any of them,
-one by one, in **Settings › Local AI › Recent AI changes**: an added record is removed,
-an edited one goes back to how it was, and a coach note the AI wrote becomes "rejected"
-so the AI cannot write the same sentence back. A record that changed again afterwards is
-not rolled back (`err.mcp_writes.stale`). There are **no delete tools**: an injury heals
-with `endDate`, a shoe retires with `retiredOn`. When editing, pass the `id` and only the
-fields to change. Validation is the desktop's own, unchanged. `sync_now` and
-`export_data` are actions, not record changes, so they are not in the ledger.
-
-The server also publishes a guide for any MCP client, `zeppbridge://guide`
-(`resources/list` / `resources/read`, and named in the handshake `instructions`): the
-tool list, a recommended order (start with `get_training_context`), data rules, the
-three prohibitions, and how undo works.
-
-### Training plans
-
-Health data stays read-only. From 3.0 MCP can draft and publish training plans:
-
-- `draft_training_plan` only saves a draft, using the same validation as the
-  desktop app's "paste the AI's reply" (only running, cycling, pool and open-water
-  swimming reach the watch — a Zepp API limit, so walking, hiking, strength,
-  inline skating and cross-country skiing are refused and strength exercises and
-  sets can't be sent; running also takes the `trail` variant and cycling
-  `mountain`; purpose and description are required; step syntax is in the tool
-  description). A plan that fails validation leaves no draft. The
-  draft shows up on the desktop "Send to AI" page for the user to confirm.
-- `publish_training_plan` refuses by default with
-  `err.training_plan.ai_publish_disabled`. It works only after the user turns on
-  "Allow AI to publish directly" in the desktop app's AI tools settings. Publishing
-  uses the same three steps as the desktop app: record in the ledger under the
-  write lock, release the lock while on the network, record the result under the
-  lock. A publish that would clear a 7-day window always returns
-  `err.training_plan.needs_clear_confirmation`; only the user can confirm a clear,
-  on the desktop.
-- `sent` only means the official API accepted the request (it answers success
-  to any body); the content was validated before sending. The watch still asks
-  for the sub-type before the workout starts.
-- `propose_coach_note` keeps its name for existing setups but no longer waits in
-  an inbox: the note is stored in its own table (never a health table) and appears
-  in `get_athlete_profile` as `coachNotes` at once, labelled with the MCP client's
-  reported name. The user can undo, edit, delete and export every note.
-- All coach tools, every write tool and both actions are refused under the `task`
-  scope: they span categories and dates and cannot be honestly clipped.
