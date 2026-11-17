@@ -6896,6 +6896,7 @@ dependencies = [
  "keyring",
  "libc",
  "reqwest 0.12.28",
+ "ring",
  "rusqlite",
  "rustyfit",
  "serde",

@@ -9,9 +9,10 @@
 //! 和组件不同的一处：清单里记每个对象的内容哈希（不含 `generated_at` 一类时间戳），
 //! **内容没变就不重发**；所有对象都没变就一个请求都不发。
 //!
-//! 还没移植的（见 docs/guides/self-hosted-pull.md 的进度一节）：profile / context / plan /
+//! 还没移植的：profile / context / plan /
 //! baselines / data-health 五个档案对象（逻辑在 MCP crate 里，要先抽到 core）、live 令牌
-//! 交接、UI 快照、从组件迁移配置。
+//! 交接、UI 快照、从组件迁移配置，以及设置里添加目标的界面。所以眼下没有任何入口会写
+//! `push/targets.json`，推送在用户机器上不会启动（闸门：没有已启用的目标就什么都不做）。
 
 pub mod crypto;
 pub mod summary;
@@ -162,12 +163,16 @@ pub struct LocalStatus {
 impl LocalStatus {
     pub fn read(db: &Database) -> Self {
         let health = db.data_health(30, 0).ok();
-        let coverage = db.local_coverage(Local::now().date_naive()).unwrap_or_default();
+        let coverage = db
+            .local_coverage(Local::now().date_naive())
+            .unwrap_or_default();
         let latest = db.get_recent_workouts(1).unwrap_or_default();
         Self {
             last_cloud_sync_at: health.and_then(|health| health.timings.last_cloud_sync_at),
             latest_day: coverage.latest_day,
-            latest_workout_at: latest.first().map(|workout| workout.start_time.to_rfc3339()),
+            latest_workout_at: latest
+                .first()
+                .map(|workout| workout.start_time.to_rfc3339()),
         }
     }
 }
@@ -176,7 +181,11 @@ impl LocalStatus {
 pub fn days_back(today: NaiveDate, n: u32) -> Vec<String> {
     (0..i64::from(n))
         .rev()
-        .map(|offset| (today - ChronoDuration::days(offset)).format("%Y-%m-%d").to_string())
+        .map(|offset| {
+            (today - ChronoDuration::days(offset))
+                .format("%Y-%m-%d")
+                .to_string()
+        })
         .collect()
 }
 
@@ -202,7 +211,12 @@ pub fn every_15s(samples: &[Value]) -> Vec<Value> {
     out
 }
 
-fn workout_object(envelope: &Value, workout: &Value, samples: Vec<Value>, resolution: &str) -> Value {
+fn workout_object(
+    envelope: &Value,
+    workout: &Value,
+    samples: Vec<Value>,
+    resolution: &str,
+) -> Value {
     let mut rest = workout.clone();
     if let Some(object) = rest.as_object_mut() {
         object.remove("route");
@@ -277,16 +291,15 @@ pub fn build_plan(
 
     let all_types: Vec<&str> = EXPORT_DATA_TYPES.to_vec();
     for day in &day_list {
-        let set = records::query_records(db, &day_query(&all_types, day, day, ExportDetail::Summary))?;
+        let set =
+            records::query_records(db, &day_query(&all_types, day, day, ExportDetail::Summary))?;
         candidates.push((format!("days/{day}.json"), set.value));
     }
 
     for day in &workout_days {
-        let envelope = records::query_records(
-            db,
-            &day_query(&["workouts"], day, day, ExportDetail::Full),
-        )?
-        .value;
+        let envelope =
+            records::query_records(db, &day_query(&["workouts"], day, day, ExportDetail::Full))?
+                .value;
         let mut seen = BTreeSet::new();
         let empty = Vec::new();
         let workouts = envelope
@@ -316,7 +329,11 @@ pub fn build_plan(
                     format!("workouts/{id}.full.json"),
                     workout_object(&envelope, workout, samples, "full"),
                 ));
-            } else if manifest.workouts.get(&id).is_some_and(|entry| entry.has_full) {
+            } else if manifest
+                .workouts
+                .get(&id)
+                .is_some_and(|entry| entry.has_full)
+            {
                 // 先看旧清单再覆盖：否则关掉逐秒后，最近几天重导的运动会漏删逐秒版。
                 deletes.insert(format!("workouts/{id}.full.json"));
             }
@@ -387,9 +404,11 @@ pub fn build_plan(
     let summary_count = options.summary_days.min(options.retention_days) as usize;
     let summary_days: Vec<String> = window[window.len().saturating_sub(summary_count)..].to_vec();
     if let (Some(first), Some(last)) = (summary_days.first(), summary_days.last()) {
-        let envelope =
-            records::query_records(db, &day_query(&SUMMARY_TYPES, first, last, ExportDetail::Summary))?
-                .value;
+        let envelope = records::query_records(
+            db,
+            &day_query(&SUMMARY_TYPES, first, last, ExportDetail::Summary),
+        )?
+        .value;
         candidates.push((
             "summary.json".into(),
             summary::build_summary(&envelope, &summary_days, time_zone, &now_text),
@@ -432,21 +451,21 @@ pub fn build_plan(
         }),
     ));
     let status_value = json!({
-            "schema": "zeppbridge-cloud/1",
-            "last_upload_at": now_text,
-            "last_cloud_sync_at": status.last_cloud_sync_at,
-            "latest_day": status.latest_day,
-            "latest_workout_at": status.latest_workout_at,
-            "sync_error": Value::Null,
-            "sync": { "skipped": true, "note": "pushed by ZeppBridge itself after its own sync" },
-            "full_resolution_workouts": options.full_resolution_workouts,
-            "retention_days": options.retention_days,
-            "summary_days": summary_count,
-            "time_zone": time_zone,
-            "app_version": env!("CARGO_PKG_VERSION"),
-            "uploader": "zeppbridge",
-            "time_note": "last_upload_at = when this computer uploaded; last_cloud_sync_at = when it last pulled from the Zepp cloud; each record carries its own sample time.",
-        });
+        "schema": "zeppbridge-cloud/1",
+        "last_upload_at": now_text,
+        "last_cloud_sync_at": status.last_cloud_sync_at,
+        "latest_day": status.latest_day,
+        "latest_workout_at": status.latest_workout_at,
+        "sync_error": Value::Null,
+        "sync": { "skipped": true, "note": "pushed by ZeppBridge itself after its own sync" },
+        "full_resolution_workouts": options.full_resolution_workouts,
+        "retention_days": options.retention_days,
+        "summary_days": summary_count,
+        "time_zone": time_zone,
+        "app_version": env!("CARGO_PKG_VERSION"),
+        "uploader": "zeppbridge",
+        "time_note": "last_upload_at = when this computer uploaded; last_cloud_sync_at = when it last pulled from the Zepp cloud; each record carries its own sample time.",
+    });
 
     // 删掉的对象不再算「传过」；本轮又要传的对象不删。
     for rel in &deletes {

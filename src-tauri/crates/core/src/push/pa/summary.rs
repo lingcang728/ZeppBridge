@@ -94,7 +94,12 @@ struct Day {
 
 /// `envelope` 是 `--detail summary` 的完整导出；`days` 是要出现的本地日（升序，没数据
 /// 的日子也会出现）。
-pub fn build_summary(envelope: &Value, days: &[String], time_zone: &str, generated_at: &str) -> Value {
+pub fn build_summary(
+    envelope: &Value,
+    days: &[String],
+    time_zone: &str,
+    generated_at: &str,
+) -> Value {
     let empty = Vec::new();
     let list = |key: &str| {
         envelope
@@ -103,8 +108,10 @@ pub fn build_summary(envelope: &Value, days: &[String], time_zone: &str, generat
             .and_then(Value::as_array)
             .unwrap_or(&empty)
     };
-    let mut by_day: BTreeMap<String, Day> =
-        days.iter().map(|day| (day.clone(), Day::default())).collect();
+    let mut by_day: BTreeMap<String, Day> = days
+        .iter()
+        .map(|day| (day.clone(), Day::default()))
+        .collect();
     let mut units: BTreeMap<String, Value> = BTreeMap::new();
 
     for row in list("daily_metrics") {
@@ -117,11 +124,20 @@ pub fn build_summary(envelope: &Value, days: &[String], time_zone: &str, generat
         let Some(day) = by_day.get_mut(date) else {
             continue;
         };
-        if !row.get("value").and_then(Value::as_f64).is_some_and(f64::is_finite) {
+        if !row
+            .get("value")
+            .and_then(Value::as_f64)
+            .is_some_and(f64::is_finite)
+        {
             continue;
         }
-        if let Some(unit) = row.get("unit").filter(|unit| unit.as_str().is_some_and(|u| !u.is_empty())) {
-            units.entry(metric.to_string()).or_insert_with(|| unit.clone());
+        if let Some(unit) = row
+            .get("unit")
+            .filter(|unit| unit.as_str().is_some_and(|u| !u.is_empty()))
+        {
+            units
+                .entry(metric.to_string())
+                .or_insert_with(|| unit.clone());
         }
         let better = day.metrics.get(metric).is_none_or(|previous| {
             rank(row.get("source_scope").and_then(Value::as_str))
@@ -139,8 +155,17 @@ pub fn build_summary(envelope: &Value, days: &[String], time_zone: &str, generat
             continue;
         };
         // 一天两段睡眠（午睡）时留时长最长的那段当主睡眠。
-        let minutes = |value: &Value| value.get("duration_minutes").and_then(Value::as_f64).unwrap_or(0.0);
-        if day.sleep.as_ref().is_none_or(|known| minutes(session) > minutes(known)) {
+        let minutes = |value: &Value| {
+            value
+                .get("duration_minutes")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+        };
+        if day
+            .sleep
+            .as_ref()
+            .is_none_or(|known| minutes(session) > minutes(known))
+        {
             day.sleep = Some(session.clone());
         }
     }
@@ -182,7 +207,10 @@ pub fn build_summary(envelope: &Value, days: &[String], time_zone: &str, generat
 
     let mut unit_map = Map::new();
     for name in &metric_names {
-        unit_map.insert(name.clone(), units.get(name).cloned().unwrap_or(Value::Null));
+        unit_map.insert(
+            name.clone(),
+            units.get(name).cloned().unwrap_or(Value::Null),
+        );
     }
     for (key, value) in [
         ("sleep.*_minutes", "min"),

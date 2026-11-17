@@ -20,7 +20,8 @@
 - HTTP client 有 30 秒 timeout（另加 10 秒连接超时），不认环境变量 / 系统代理，并对 401/403、404、429/5xx 与其他非 2xx 做分类和有限重试。
 - 登录窗口只允许 HTTPS 导航到 `*.zepp.com` / `*.huami.com` 以及官方登录页会用到的那些精确 OAuth 域名。`about:` / `data:` / `blob:` 一律拒绝。区域探测只打 allow-list 上的 API origin。
 - 当前没有局域网 HTTP 代理，也不安装系统或用户 CA。
-- 本机 REST API 只绑定 `127.0.0.1:43921`，不监听局域网地址，不提供 CORS，只暴露只读健康探针和运动序列路由。**默认关闭**；用户在设置页开启后才会监听，且每个请求都要带 token（`zbk_` 前缀，比较用常量时间）。token 可随时轮换，轮换后旧 token 立即失效；关闭开关会释放端口。请求行、单条 header 与 header 总量都有上限，超长请求直接拒绝而不是读进内存。
+- 桌面端的本机 REST API 只绑定 `127.0.0.1:43921`：地址写死在代码里，没有任何设置能改。不监听局域网地址，不提供 CORS，只暴露只读路由：健康探针、运动序列和 `/v1/records`。**默认关闭**；用户在设置页开启后才会监听，且每个请求都要带 token（`zbk_` 前缀，比较用常量时间）。token 可随时轮换，轮换后旧 token 立即失效；关闭开关会释放端口。请求行、单条 header 与 header 总量都有上限，超长请求直接拒绝而不是读进内存。
+- 只有无头版 `zeppbridge-cli serve`（Docker、服务器）能监听本机以外的地址，而且要你自己设 `ZEPPBRIDGE_LISTEN`；不设也只听 `127.0.0.1`。监听非本机地址时必须有单独的拉取 token（至少 32 个字符、只读、只能访问 `/v1/*` 和 `/health`，可用 `zeppbridge-cli pull-token revoke` 单独吊销），否则拒绝启动。按来源地址限流，一分钟内鉴权失败 10 次的地址封 10 分钟。传输是明文 HTTP：放在容器内部网络里（compose 示例不发布端口），或者放在 HTTPS 反向代理后面。任何路由都不返回凭据；`/v1/records` 只有请求里写了 `include_gps=true` 才带 GPS 轨迹。
 - `zeppbridge-mcp` 只用 stdio，**不监听任何端口，也不发出任何网络请求**。它连库用 `PRAGMA query_only`，写操作在 SQLite 层就被拒绝，不依赖工具列表里恰好没有写操作。返回里没有 token、Cookie、完整账号，也没有本机绝对路径。
 - `zeppbridge-cli` 只在 `sync` 时联网，走的是和桌面应用完全相同的连接器与 host allow-list。它不做登录，也不打印 token；`export --out` 只回显用户自己给的路径，不把它解析成绝对路径打印出来。
 
@@ -137,7 +138,7 @@ ZeppBridge 当前没有自动产品遥测、使用统计或后台崩溃上报，
 - `tile.openstreetmap.org`：**只有**在运动详情的路线卡切到「地图」并同意（「只这次」或「一直开」）之后才请求，默认关闭。加载看得见的那几张瓦片会让 OpenStreetMap 知道这次运动大致在哪；不预取、不离线缓存，轨迹本身仍在本地绘制；
 - 应用自身的本地 Tauri IPC。
 
-ZeppBridge 运行期间会开启只读本机 API。`GET /workouts/{id}/series` 不返回认证字段，但可能包含心率、步态和精确 GPS；电脑上的其他本机进程可访问，因此只应运行可信程序。退出托盘进程后监听器停止。
+在设置里打开之后，ZeppBridge 运行期间会开启只读本机 API。`GET /workouts/{id}/series` 和 `/v1/records` 不返回认证字段，但可能包含心率、步态和精确 GPS（运动序列总是带，`/v1/records` 只在 `include_gps=true` 时带）；电脑上拿到 token 的其他本机进程可访问，因此只应运行可信程序。关掉开关或退出托盘进程后监听器停止。
 
 ## 发布前余留风险
 

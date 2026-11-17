@@ -3,12 +3,12 @@
 # Run from the repository root:
 #   docker compose -f packaging/docker/docker-compose.yml run --rm sync
 #
-# Nothing here starts on `docker compose up`. Every service is behind a profile
-# and is a one-shot command, because none of this is a daemon: the CLI syncs and
-# exits. What schedules it is the host — cron, a systemd timer, the NAS task
-# scheduler. Putting cron inside the container would mean a second init system,
-# its own log destination, and a container that looks healthy while doing
-# nothing. See docs/guides/docker.md for the timer.
+# Nothing here starts on `docker compose up`. Every service is behind a profile,
+# and all but `serve` (the optional read-only REST API at the bottom) are one-shot
+# commands: the CLI syncs and exits. What schedules sync is the host — cron, a
+# systemd timer, the NAS task scheduler. Putting cron inside the container
+# would mean a second init system, its own log destination, and a container
+# that looks healthy while doing nothing. See docs/guides/docker.md for the timer.
 
 x-common: &common
   image: zeppbridge:local
@@ -58,3 +58,41 @@ services:
     command: ["zeppbridge-mcp"]
     stdin_open: true
     tty: false
+
+  # The read-only REST API for a self-hosted service that pulls from it
+  # (SparkyFitness, Home Assistant). Unlike the services above this one stays
+  # up: `docker compose --profile serve up -d`.
+  #
+  # There is deliberately no `ports:`. The API is plain HTTP, so it is reachable
+  # only from containers on the internal network below; put the service that
+  # pulls on that same network. Reaching it from another machine means an HTTPS
+  # reverse proxy in front, not a published port. serve refuses to listen beyond
+  # loopback without a pull token. GPS tracks are only returned when a request
+  # asks for include_gps=true. Contract: docs/guides/self-hosted-pull.md.
+  serve:
+    <<: *common
+    profiles: ["serve"]
+    command: ["zeppbridge-cli", "serve"]
+    restart: unless-stopped
+    environment:
+      ZEPPBRIDGE_DATA_DIR: /data
+      ZEPPBRIDGE_APP_TOKEN: "${ZEPPBRIDGE_APP_TOKEN:?set ZEPPBRIDGE_APP_TOKEN, see docs/guides/docker.md}"
+      ZEPPBRIDGE_CREDENTIAL_STORE: env
+      TZ: "${TZ:-UTC}"
+      # Listen inside the container network. Without this, serve listens on
+      # 127.0.0.1 only, which no other container can reach.
+      ZEPPBRIDGE_LISTEN: "0.0.0.0:43921"
+      # At least 32 characters, e.g. `openssl rand -base64 33`. Give the same
+      # value to the service that pulls (Authorization: Bearer <token>).
+      ZEPPBRIDGE_PULL_TOKEN: "${ZEPPBRIDGE_PULL_TOKEN:?set ZEPPBRIDGE_PULL_TOKEN, see docs/guides/self-hosted-pull.md}"
+    networks: [zeppbridge-internal]
+    # Another service in this file (or in your SparkyFitness compose, joined to
+    # this network) reaches it as http://serve:43921/v1/records.
+    #
+    # sparkyfitness-server:
+    #   networks: [zeppbridge-internal, default]
+
+networks:
+  # internal: no route out of it and nothing published from it.
+  zeppbridge-internal:
+    internal: true

@@ -59,7 +59,10 @@ fn first_round_sends_the_whole_window_and_status_last() {
     let first = plan(&db, &Manifest::default(), false);
     let names = rels(&first);
     for day in days_back(today(), 5) {
-        assert!(names.contains(&format!("days/{day}.json").as_str()), "{day}");
+        assert!(
+            names.contains(&format!("days/{day}.json").as_str()),
+            "{day}"
+        );
     }
     assert!(names.contains(&"workouts/w1.json"));
     assert!(!names.contains(&"workouts/w1.full.json"));
@@ -77,7 +80,9 @@ fn first_round_sends_the_whole_window_and_status_last() {
 fn hidden_workouts_and_turned_off_full_resolution_are_deleted() {
     let db = with_workout("w1");
     let first = plan(&db, &Manifest::default(), true);
-    assert!(rels(&first).contains(&"workouts/w1.full.json") || first.manifest.workouts["w1"].has_full == false);
+    assert!(
+        rels(&first).contains(&"workouts/w1.full.json") || !first.manifest.workouts["w1"].has_full
+    );
     // 关掉逐秒：已经传上去的逐秒版要删。
     let mut previous = first.manifest.clone();
     previous.workouts.get_mut("w1").unwrap().has_full = true;
@@ -135,7 +140,10 @@ fn sampling_keeps_one_real_point_every_15_seconds() {
         })
         .collect();
     let kept = every_15s(&samples);
-    let rates: Vec<i64> = kept.iter().map(|s| s["heart_rate"].as_i64().unwrap()).collect();
+    let rates: Vec<i64> = kept
+        .iter()
+        .map(|s| s["heart_rate"].as_i64().unwrap())
+        .collect();
     assert_eq!(rates, vec![0, 15, 30, 45]);
     assert!(every_15s(&[json!({ "timestamp": "nope" })]).is_empty());
 }
@@ -159,7 +167,10 @@ fn secrets_are_validated_before_use() {
     assert_eq!(good.validate().unwrap().tenant, "abcdefghij");
     let mut short = good.clone();
     short.dk = crypto::b64url(&[1u8; 16]);
-    assert_eq!(short.validate().err(), Some("err.push.pa_data_key_malformed"));
+    assert_eq!(
+        short.validate().err(),
+        Some("err.push.pa_data_key_malformed")
+    );
     let mut other = good;
     other.tenant = Some("zzzzzzzzzz".into());
     assert_eq!(other.validate().err(), Some("err.push.pa_tenant_mismatch"));

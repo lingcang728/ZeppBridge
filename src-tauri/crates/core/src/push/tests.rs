@@ -29,11 +29,14 @@ impl CredentialBackend for Store {
     }
 }
 
+/// 假站点记下的一个请求。
+type Recorded = (String, String, Vec<u8>, String);
+
 /// 记下每个请求（方法、路径、正文）的假 PA 站点。`status` 可以中途改。
 struct FakeSite {
     base: String,
     hits: Arc<AtomicUsize>,
-    requests: Arc<Mutex<Vec<(String, String, Vec<u8>, String)>>>,
+    requests: Arc<Mutex<Vec<Recorded>>>,
     status: Arc<AtomicU16>,
 }
 
@@ -91,12 +94,9 @@ async fn fake_site() -> FakeSite {
                     })
                     .unwrap_or_default();
                 h.fetch_add(1, Ordering::SeqCst);
-                r.lock().unwrap().push((
-                    method,
-                    path,
-                    buffer[header_end..].to_vec(),
-                    auth,
-                ));
+                r.lock()
+                    .unwrap()
+                    .push((method, path, buffer[header_end..].to_vec(), auth));
                 let code = s.load(Ordering::SeqCst);
                 let reply = format!(
                     "HTTP/1.1 {code} X\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{{}}"
@@ -207,7 +207,10 @@ async fn pushes_encrypted_objects_then_skips_unchanged_content() {
         .iter()
         .all(|(_, _, _, auth)| auth == &format!("Bearer {}", write_key())));
     assert_eq!(requests.last().unwrap().1, "/v1/objects/status.json");
-    let paths: Vec<&str> = requests.iter().map(|(_, path, _, _)| path.as_str()).collect();
+    let paths: Vec<&str> = requests
+        .iter()
+        .map(|(_, path, _, _)| path.as_str())
+        .collect();
     assert!(paths.contains(&"/v1/objects/workouts/w1.json"));
     assert!(paths.contains(&"/v1/objects/summary.json"));
     assert!(paths.contains(&"/v1/objects/contract.json"));
@@ -234,10 +237,9 @@ async fn pushes_encrypted_objects_then_skips_unchanged_content() {
     let second = run(&dir, store.clone()).await;
     assert_eq!(second.targets[0].result, "unchanged");
     assert_eq!(site.hits.load(Ordering::SeqCst), before);
-    let status: Value = serde_json::from_slice(
-        &std::fs::read(push_dir(&dir).join("pa.status.json")).unwrap(),
-    )
-    .unwrap();
+    let status: Value =
+        serde_json::from_slice(&std::fs::read(push_dir(&dir).join("pa.status.json")).unwrap())
+            .unwrap();
     assert_eq!(status["result"], "unchanged");
 }
 
@@ -334,7 +336,9 @@ fn env_credential_store_cannot_hold_push_secrets() {
         }
     }
     assert_eq!(
-        store_pa_secrets(&EnvLike, "pa", &secrets()).unwrap_err().code,
+        store_pa_secrets(&EnvLike, "pa", &secrets())
+            .unwrap_err()
+            .code,
         "err.push.credential_store_unnamed"
     );
     assert!(read_pa_secrets(&EnvLike, "pa").is_err());

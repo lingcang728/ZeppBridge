@@ -225,7 +225,15 @@ mod tests {
 
     #[test]
     fn plain_http_only_reaches_private_hosts() {
-        for host in ["127.0.0.1", "10.1.2.3", "172.16.0.9", "192.168.1.2", "nas.local", "[::1]", "localhost"] {
+        for host in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.0.9",
+            "192.168.1.2",
+            "nas.local",
+            "[::1]",
+            "localhost",
+        ] {
             assert!(http_allowed(host), "{host}");
         }
         for host in ["8.8.8.8", "172.32.0.1", "example.com", "health.example.com"] {

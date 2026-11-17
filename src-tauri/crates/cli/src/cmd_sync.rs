@@ -183,6 +183,11 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
         Ok(report) => {
             let (code, payload, human) = sync_report_output(&report, mode, replay.as_ref());
             emit(json_mode, payload, &human);
+            // 推送到用户自己的服务器（桌面端同步后也推）。命令行跑完就退，所以等它推完；
+            // 没有启用的目标时立刻返回。推送结果只写 stderr 和 push/<目标>.status.json，
+            // 不改变同步的退出码和 JSON。
+            let credentials = zeppbridge_core::auth::default_credential_backend_in(&dir);
+            runtime.block_on(zeppbridge_core::push::run(&dir, credentials));
             code
         }
         Err(error) => {

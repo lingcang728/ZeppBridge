@@ -508,7 +508,7 @@ impl HttpResponse {
             json!({
                 "error": {
                     "code": "unauthorized",
-                    "message": "本机 API 需要 Authorization: Bearer <token>；token 在 ZeppBridge 设置页生成"
+                    "message": "Authorization: Bearer <token> is required. Desktop app: the local API token from Settings. zeppbridge-cli serve: the pull token."
                 }
             }),
         );

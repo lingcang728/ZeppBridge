@@ -209,19 +209,30 @@ The local API is **off by default**. The desktop process does not bind
 `127.0.0.1:43921` at startup. Listening starts only after the user turns the
 switch on in Settings; every request then needs `Authorization: Bearer <token>`.
 Implementation lives in `zeppbridge-core` (`crates/core/src/local_api.rs`); the
-Tauri adapter is `src-tauri/src/local_api.rs`. Two read-only GET routes are
+Tauri adapter is `src-tauri/src/local_api.rs`. These read-only GET routes are
 exposed today:
 
 | Route | Description |
 | --- | --- |
 | `/health` | Service state and app version |
 | `/workouts/{id}/series` | Reuses `Database::get_workout_series()` and returns normalised `WorkoutSeries` JSON; an unknown ID returns 404 |
+| `/v1`, `/v1/records` | Records by type and date range with cursor paging, from `records::query_records` (the same function as `zeppbridge-cli export --format json`). No GPS unless the request asks for `include_gps=true`. Contract: [self-hosted pull](../guides/self-hosted-pull.md) |
 
-The API binds only `127.0.0.1`, offers no CORS, responds with
+The desktop app binds only `127.0.0.1`; the address is a constant
+(`LOCAL_API_ADDRESS`) and no setting changes it. The API offers no CORS, responds with
 `Cache-Control: no-store`, and neither reads nor returns authentication data. If
 the port is taken the desktop app still starts, and Settings surfaces the error
 through `get_local_api_status`. Tests must cover the routes, 404/405, encoded
 IDs, the generic 500, and the no-CORS boundary.
+
+The headless `zeppbridge-cli serve` (`local_api/headless.rs`) runs the same
+handlers for Docker and servers. It listens on `127.0.0.1:43921` unless the user
+sets `ZEPPBRIDGE_LISTEN`. It authenticates with a separate pull token that can
+read only `/v1/*` and `/health` and can be rotated or revoked on its own
+(`zeppbridge-cli pull-token`). Beyond loopback it refuses to start without that
+token, logs that the transport is plain HTTP, and rate-limits each source
+address, locking one out for 10 minutes after 10 failed authentications in a
+minute.
 
 ## The current data path
 
@@ -297,8 +308,11 @@ multi-device data, still need verifying per environment.
 
 ## Change boundaries
 
-- REST is limited to the local read-only routes above and must never be extended
-  to LAN listening or to returning credentials.
+- REST is read-only and never returns credentials. The desktop app listens on
+  `127.0.0.1` only, with no setting that changes it. Only the headless
+  `zeppbridge-cli serve` may listen elsewhere, when the user sets the address
+  explicitly, and then only with a pull token; transport encryption is left to a
+  reverse proxy or a container-internal network.
 - Do not revive LAN MITM, user CAs, Wi-Fi proxy instructions, or commands of the
   `start_capture` family.
 - The app syncs once at launch; closing the main window leaves the process in

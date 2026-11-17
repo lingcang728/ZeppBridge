@@ -193,16 +193,6 @@ pub fn find_coordinate_field(json_text: &str) -> Option<&'static str> {
 }
 
 #[cfg(test)]
-pub(crate) fn seal_for_test(
-    key: &[u8],
-    nonce: [u8; NONCE_LEN],
-    plain: &[u8],
-    path: &str,
-) -> Vec<u8> {
-    seal_with_nonce(key, nonce, plain, &format!("object:{path}")).unwrap()
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 

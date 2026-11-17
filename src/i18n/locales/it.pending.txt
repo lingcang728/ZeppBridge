@@ -1,3 +1,18 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
 i18n/errors.err.headless.program_outdated
+i18n/errors.err.push.config_has_secret
+i18n/errors.err.push.config_invalid
+i18n/errors.err.push.config_unreadable
+i18n/errors.err.push.coordinates_found
+i18n/errors.err.push.credential_store_failed
+i18n/errors.err.push.credential_store_unnamed
+i18n/errors.err.push.local_data_unavailable
+i18n/errors.err.push.no_local_data
+i18n/errors.err.push.pa_data_key_malformed
+i18n/errors.err.push.pa_tenant_mismatch
+i18n/errors.err.push.pa_write_key_malformed
+i18n/errors.err.push.secrets_missing
+i18n/errors.err.push.site_invalid
+i18n/errors.err.push.state_unwritable
+i18n/errors.err.push.upload_failed

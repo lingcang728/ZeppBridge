@@ -45,14 +45,26 @@ real accounts and regions has not been fully verified against live services.
   `about:`, `data:` and `blob:` URLs are rejected. Region probing only touches
   API origins on the allow-list.
 - There is no LAN HTTP proxy, and no system or user CA is installed.
-- The local REST API binds only to `127.0.0.1:43921`. It does not listen on LAN
-  addresses, offers no CORS, and exposes only a read-only health probe and a
-  workout-series route. **It is off by default**; it starts listening only after
+- The desktop app's local REST API binds only to `127.0.0.1:43921`; the
+  address is fixed in code and no setting changes it. It does not listen on LAN
+  addresses, offers no CORS, and exposes only read-only routes: a health probe,
+  a workout-series route and `/v1/records`. **It is off by default**; it starts listening only after
   you enable it in Settings, and every request needs a token (`zbk_` prefix,
   compared in constant time). The token can be rotated at any time, which
   invalidates the old one immediately; turning the switch off releases the port.
   The request line, individual headers and total header size are all capped —
   an oversized request is rejected rather than read into memory.
+- Only the headless `zeppbridge-cli serve` (Docker, a server) can listen beyond
+  this machine, and only when you set `ZEPPBRIDGE_LISTEN` yourself; without it,
+  it too listens on `127.0.0.1` only. A non-loopback address needs a separate
+  pull token (at least 32 characters, read-only, limited to `/v1/*` and
+  `/health`, revocable on its own with `zeppbridge-cli pull-token revoke`), or
+  serve refuses to start. Each source address is rate-limited, and one that
+  fails authentication 10 times in a minute is locked out for 10 minutes. The
+  transport is plain HTTP: keep it on a container-internal network (the compose
+  example publishes no port) or behind an HTTPS reverse proxy. No route ever
+  returns credentials, and `/v1/records` returns GPS tracks only when the
+  request asks for `include_gps=true`.
 - `zeppbridge-mcp` speaks stdio only. It **listens on no port and makes no
   network requests**. It opens the database with `PRAGMA query_only`, so writes
   are refused at the SQLite layer rather than relying on the tool list happening
@@ -277,11 +289,12 @@ limited to:
   prefetched or stored offline, and the route itself is drawn locally;
 - the app's own local Tauri IPC.
 
-While ZeppBridge is running it can expose a read-only local API.
-`GET /workouts/{id}/series` returns no authentication fields, but it can include
-heart rate, cadence and precise GPS. Other local processes on the machine can
-reach it, so only run software you trust. The listener stops when you quit the
-tray process.
+Once you turn it on in Settings, ZeppBridge exposes a read-only local API while
+it runs. `GET /workouts/{id}/series` and `/v1/records` return no authentication
+fields, but they can include heart rate, cadence and (the series always,
+`/v1/records` only with `include_gps=true`) precise GPS. Other local processes
+on the machine can reach it with the token, so only run software you trust. The
+listener stops when you turn the switch off or quit the tray process.
 
 ## Risks that remain before release
 

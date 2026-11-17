@@ -594,6 +594,13 @@ async fn run_sync_locked(
         super::training_plan::roll_after_sync(state).await;
     }
 
+    // 推送到用户自己的服务器：同步没整轮失败就在后台推一轮，不挡同步结论。
+    // 没有启用的目标时这一句什么也不做（不开库、不建连接）。内容没变的对象
+    // 按清单里的哈希跳过，所以每轮都调也不会重发；上一轮失败的这轮接着补。
+    if outcome != "failed" {
+        zeppbridge_core::push::spawn_after_sync(state.data_dir.clone());
+    }
+
     let mut ui_report = ui_sync_report(
         report,
         started_at,

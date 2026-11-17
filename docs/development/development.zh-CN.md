@@ -147,14 +147,17 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 
 ## 本机 REST API
 
-本机 API **默认关闭**。桌面进程启动时**不会**绑定 `127.0.0.1:43921`。只有用户在设置页打开开关之后才开始监听，且每个请求都要带 `Authorization: Bearer <token>`。实现在 `zeppbridge-core`（`crates/core/src/local_api.rs`），Tauri 适配层是 `src-tauri/src/local_api.rs`。当前公开两个只读 GET 路由：
+本机 API **默认关闭**。桌面进程启动时**不会**绑定 `127.0.0.1:43921`。只有用户在设置页打开开关之后才开始监听，且每个请求都要带 `Authorization: Bearer <token>`。实现在 `zeppbridge-core`（`crates/core/src/local_api.rs`），Tauri 适配层是 `src-tauri/src/local_api.rs`。当前公开这些只读 GET 路由：
 
 | 路由 | 说明 |
 | --- | --- |
 | `/health` | 服务状态和应用版本 |
 | `/workouts/{id}/series` | 复用 `Database::get_workout_series()`，返回标准化 `WorkoutSeries` JSON；未知 ID 返回 404 |
+| `/v1`、`/v1/records` | 按类型和日期区间读记录、游标分页，来自 `records::query_records`（和 `zeppbridge-cli export --format json` 同一个函数）。请求里没写 `include_gps=true` 就不带 GPS。契约见[自托管拉取](../guides/self-hosted-pull.zh-CN.md) |
 
-API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
+桌面端只绑定 `127.0.0.1`：地址是代码里的常量（`LOCAL_API_ADDRESS`），没有任何设置能改。API 不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
+
+无头版 `zeppbridge-cli serve`（`local_api/headless.rs`）给 Docker 和服务器用，跑的是同一套处理逻辑。不设 `ZEPPBRIDGE_LISTEN` 就只听 `127.0.0.1:43921`。鉴权用单独的拉取 token：只能读 `/v1/*` 和 `/health`，可以单独轮换或吊销（`zeppbridge-cli pull-token`）。监听非本机地址时没有这把 token 就拒绝启动，并在日志里写明传输是明文 HTTP；按来源地址限流，一分钟内鉴权失败 10 次的地址封 10 分钟。
 
 ## 当前数据链路
 
@@ -191,7 +194,7 @@ API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，
 
 ## 变更边界
 
-- REST 仅限上述本机只读接口，不得扩展到局域网监听或返回凭据。
+- REST 只读，永不返回凭据。桌面端只监听 `127.0.0.1`，没有任何设置能改；只有无头版 `zeppbridge-cli serve` 可由用户显式指定监听地址，且必须带拉取 token；传输加密交给反向代理或容器内部网络。
 - 不要恢复局域网 MITM、用户 CA、Wi-Fi 代理教程或 `start_capture` 一类 command。
 - 应用启动后同步一次；关闭主窗口后进程留在托盘，并每 15 分钟检查。再次启动会唤醒已有进程，不会创建第二个托盘图标。只有从托盘退出或结束进程后同步才会停止；当前没有系统级后台服务。
 - GPS/路线、逐点训练样本及未覆盖的专有指标，仍需取得合法、脱敏的真实响应后再从 `unverified` 提升。

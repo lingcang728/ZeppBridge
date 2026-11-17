@@ -316,7 +316,10 @@ pub async fn run(data_dir: &Path, credentials: Arc<dyn CredentialBackend>) -> Pu
             };
         }
     };
-    let enabled: Vec<TargetConfig> = targets.into_iter().filter(|target| target.enabled).collect();
+    let enabled: Vec<TargetConfig> = targets
+        .into_iter()
+        .filter(|target| target.enabled)
+        .collect();
     // 闸门：没有目标就到此为止——不打开数据库，不建任何连接。
     if enabled.is_empty() {
         return PushReport {
@@ -411,7 +414,9 @@ async fn run_target(
         }
         let db = match Database::open_read_only(db_path) {
             Ok(db) => db,
-            Err(error) => return failed("err.push.local_data_unavailable", error.code().to_string()),
+            Err(error) => {
+                return failed("err.push.local_data_unavailable", error.code().to_string())
+            }
         };
         let status = pa::LocalStatus::read(&db);
         let options = pa::PaOptions {
@@ -429,7 +434,9 @@ async fn run_target(
             &system_time_zone(),
         ) {
             Ok(plan) => plan,
-            Err(error) => return failed("err.push.local_data_unavailable", error.code().to_string()),
+            Err(error) => {
+                return failed("err.push.local_data_unavailable", error.code().to_string())
+            }
         }
     };
     if let Err(message) = pa::check_no_coordinates(&plan) {

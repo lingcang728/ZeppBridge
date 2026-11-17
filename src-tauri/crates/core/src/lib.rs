@@ -24,6 +24,7 @@ pub mod models;
 pub mod normalizer;
 pub mod official;
 pub mod paths;
+pub mod push;
 pub mod records;
 pub mod redact;
 pub mod sport_catalog;

@@ -10,16 +10,18 @@
 
 use crate::paths;
 use zeppbridge_core::auth::{default_credential_backend_in, AuthManager, CredentialBackend};
-use zeppbridge_core::local_api::LOCAL_API_CREDENTIAL_ACCOUNT;
+use zeppbridge_core::local_api::{LOCAL_API_CREDENTIAL_ACCOUNT, PULL_CREDENTIAL_ACCOUNT};
 use zeppbridge_core::official::OfficialStore;
+use zeppbridge_core::push;
 
 pub const PURGE_CREDENTIALS_ARG: &str = "--purge-credentials";
 
-/// 凭据存储里不属于任何 Zepp 账号、账号名固定的条目：本机 API 令牌。
+/// 凭据存储里不属于任何 Zepp 账号、账号名固定的条目：本机 API 令牌和
+/// 无头 `serve` 的拉取令牌。
 ///
-/// 它不在 `auth.json` / `official.json` 里登记，上面两步清不到它——以前
-/// 勾了「删除应用数据」卸载后它仍留在凭据管理器里。
-const FIXED_CREDENTIAL_ACCOUNTS: &[&str] = &[LOCAL_API_CREDENTIAL_ACCOUNT];
+/// 它们不在 `auth.json` / `official.json` 里登记，上面两步清不到——以前
+/// 勾了「删除应用数据」卸载后本机 API 令牌仍留在凭据管理器里。
+const FIXED_CREDENTIAL_ACCOUNTS: &[&str] = &[LOCAL_API_CREDENTIAL_ACCOUNT, PULL_CREDENTIAL_ACCOUNT];
 
 /// 删掉这个数据目录里登记的两条通道的令牌，以及本机 API 令牌。只动凭据
 /// 存储和两份元数据，数据库由卸载程序删目录时一并处理。尽力而为：卸载不能
@@ -30,13 +32,26 @@ pub fn purge_credentials_for_uninstall() {
     };
     let _ = AuthManager::new(data_dir.clone()).clear_auth();
     let _ = OfficialStore::new(&data_dir).disconnect();
-    purge_fixed_accounts(default_credential_backend_in(&data_dir).as_ref());
+    // 推送目标的密钥按目标编号起名（`push:<id>`），名单在 data\push\targets.json 里，
+    // 所以要在卸载程序删 data\ 之前读。
+    let push_targets: Vec<String> = push::load_targets(&data_dir)
+        .map(|targets| targets.into_iter().map(|target| target.id).collect())
+        .unwrap_or_default();
+    purge_unlisted_accounts(
+        default_credential_backend_in(&data_dir).as_ref(),
+        &push_targets,
+    );
 }
 
 /// 逐条删，一条失败不影响下一条。
-fn purge_fixed_accounts(backend: &dyn CredentialBackend) {
-    for account in FIXED_CREDENTIAL_ACCOUNTS {
-        let _ = backend.delete(account);
+fn purge_unlisted_accounts(backend: &dyn CredentialBackend, push_targets: &[String]) {
+    let push_accounts = push_targets.iter().map(|id| push::secret_account(id));
+    for account in FIXED_CREDENTIAL_ACCOUNTS
+        .iter()
+        .map(|account| account.to_string())
+        .chain(push_accounts)
+    {
+        let _ = backend.delete(&account);
     }
 }
 
@@ -69,14 +84,18 @@ mod tests {
     }
 
     #[test]
-    fn uninstall_removes_the_local_api_token() {
+    fn uninstall_removes_api_tokens_and_push_secrets() {
         let backend = Memory::default();
         backend
             .set(LOCAL_API_CREDENTIAL_ACCOUNT, "zbk_fixture")
             .unwrap();
+        backend.set(PULL_CREDENTIAL_ACCOUNT, "zbp_fixture").unwrap();
+        backend.set("push:home-nas", "{}").unwrap();
         backend.set("zepp-user-1", "kept-by-this-step").unwrap();
-        purge_fixed_accounts(&backend);
+        purge_unlisted_accounts(&backend, &["home-nas".to_string()]);
         assert_eq!(backend.get(LOCAL_API_CREDENTIAL_ACCOUNT).unwrap(), None);
+        assert_eq!(backend.get(PULL_CREDENTIAL_ACCOUNT).unwrap(), None);
+        assert_eq!(backend.get("push:home-nas").unwrap(), None);
         // 账号令牌归 AuthManager / OfficialStore 清，这一步不碰别人的条目。
         assert!(backend.get("zepp-user-1").unwrap().is_some());
     }

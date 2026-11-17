@@ -39,6 +39,36 @@ const messages = defineMessages(
       '读库的命令行 / MCP 比桌面应用旧，认不出这个版本的数据库。多半是 AI 工具里还登记着旧版：'
       + '在设置里重新连接这个 AI 工具（Claude Desktop 重新生成并安装 ZeppBridge.mcpb），'
       + '删掉旧的扩展或指向旧安装目录的登记，再重启 AI 工具。',
+    'err.push.config_unreadable':
+      '读不了推送目标的配置文件（data 里的 push/targets.json）。检查文件权限后重试。',
+    'err.push.config_invalid':
+      '推送目标的配置文件格式不对：目标编号只能用小写字母、数字和连字符且不能重复，保留天数要在 1–365 之间。',
+    'err.push.config_has_secret':
+      '推送目标的配置文件里出现了密钥字段。密钥只能放进凭据库，不能写在配置文件里；删掉那个字段后重新填一次密钥。',
+    'err.push.credential_store_unnamed':
+      '当前的凭据存储（环境变量模式）只能放一个令牌，存不下推送目标的密钥。改用系统凭据库或 ZEPPBRIDGE_CREDENTIAL_STORE=file。',
+    'err.push.credential_store_failed':
+      '推送目标的密钥没能读写凭据库。检查凭据库是否锁定或被系统策略限制。',
+    'err.push.secrets_missing':
+      '凭据库里没有这个推送目标的密钥，或者读出来不完整。重新填一次密钥。',
+    'err.push.pa_write_key_malformed':
+      '写入密钥的格式不对。请从你的站点重新复制完整的写入密钥。',
+    'err.push.pa_tenant_mismatch':
+      '写入密钥和站点编号对不上：它属于另一个站点。',
+    'err.push.pa_data_key_malformed':
+      '数据密钥的格式不对（应当是 32 字节）。请从你的站点重新复制完整的数据密钥。',
+    'err.push.site_invalid':
+      '推送地址不可用：必须是 https 的域名地址，不能是 IP 地址，也不能带账号密码、? 或 # 参数。',
+    'err.push.state_unwritable':
+      '无法在数据目录里写推送记录（push 文件夹）。检查数据目录的写入权限。',
+    'err.push.no_local_data':
+      '本地还没有数据库，没有可推送的数据。先同步一次。',
+    'err.push.local_data_unavailable':
+      '本地数据库此刻读不了，这一轮没有推送，下次同步后会再试。',
+    'err.push.coordinates_found':
+      '要推送的内容里出现了坐标，这一轮已停止推送。轨迹默认不推送；请把这个问题反馈给作者。',
+    'err.push.upload_failed':
+      '推送到你的站点没有成功，这一轮没传完的部分下次同步后会重试。',
     'err.headless.token_not_in_store':
       '账号信息在，但凭据里没有对应的令牌。数据库能跨机器拷贝，令牌不能——'
       + '它在原来那台机器的凭据管理器里。重新登录一次。',
@@ -291,6 +321,36 @@ const messages = defineMessages(
       + 'Usually an AI tool still points at an old copy: reconnect that tool in Settings '
       + '(for Claude Desktop, generate and install ZeppBridge.mcpb again), remove the old extension '
       + 'or any entry pointing at an old install folder, then restart the AI tool.',
+    'err.push.config_unreadable':
+      'The push target configuration (push/targets.json in the data folder) could not be read. Check its file permissions and try again.',
+    'err.push.config_invalid':
+      'The push target configuration is malformed: target ids use lowercase letters, digits and hyphens and must be unique, and retention days must be 1–365.',
+    'err.push.config_has_secret':
+      'The push target configuration contains a secret field. Secrets belong in the credential store, not in the file; remove that field and enter the secret again.',
+    'err.push.credential_store_unnamed':
+      'The current credential store (environment-variable mode) holds a single token and cannot store push target secrets. Use the system credential store or ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'The push target secret could not be read from or written to the credential store. Check that it is unlocked and allowed by system policy.',
+    'err.push.secrets_missing':
+      'The credential store has no complete secret for this push target. Enter the secret again.',
+    'err.push.pa_write_key_malformed':
+      'The write key is malformed. Copy the full write key from your site again.',
+    'err.push.pa_tenant_mismatch':
+      'The write key does not match the site id: it belongs to another site.',
+    'err.push.pa_data_key_malformed':
+      'The data key is malformed (it should be 32 bytes). Copy the full data key from your site again.',
+    'err.push.site_invalid':
+      'The push address cannot be used: it must be an https address with a domain name, not an IP address, and must not contain a user name, password, ? or #.',
+    'err.push.state_unwritable':
+      'Push records could not be written to the data folder (push/). Check that the data folder is writable.',
+    'err.push.no_local_data':
+      'There is no local database yet, so there is nothing to push. Sync first.',
+    'err.push.local_data_unavailable':
+      'The local database could not be read right now. Nothing was pushed this round; it will try again after the next sync.',
+    'err.push.coordinates_found':
+      'Coordinates appeared in the content to be pushed, so this round was stopped. Routes are never pushed by default; please report this to the author.',
+    'err.push.upload_failed':
+      'Pushing to your site did not complete. What did not go through will be retried after the next sync.',
     'err.headless.token_not_in_store':
       "Account details are here, but the credential store has no token for them. "
       + "A database copies between machines; a token does not — it lives in the original "
