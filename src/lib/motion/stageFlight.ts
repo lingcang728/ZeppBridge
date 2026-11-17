@@ -91,11 +91,25 @@ export const snapshotOf = (el: HTMLElement): Snapshot => {
     if (o) rect = { x: tx + k * o.x, y: ty + k * o.y, w: k * o.k * el.offsetWidth, h: k * o.k * h };
   }
   const still = !flight && tx === 0 && ty === 0 && k === 1;
-  return { matrix: style.transform === 'none' ? '' : style.transform, tx, ty, k, w: el.offsetWidth, h, opacity: Number(style.opacity), rect, inline: still ? el.style.transform : null };
+  const inline = still ? el.style.transform : flight ? null : withDrag(el.style.transform, tx, ty, k);
+  return { matrix: style.transform === 'none' ? '' : style.transform, tx, ty, k, w: el.offsetWidth, h, opacity: Number(style.opacity), rect, inline };
 };
 
 /** transformOf 拼出来的那种：translate · perspective · rotateY · translate · scale。 */
 const STRUCTURED = /^translate\(([-\d.]+)px, ([-\d.]+)px\) perspective\(([\d.]+)px\) rotateY\(([-\d.]+)deg\) translate\(0px, ([-\d.]+)px\) scale\(([\d.e-]+)\)$/;
+/**
+ * 拖着的卡（拖动时加的 translate / scale 独立属性，窗口 transform-origin 是 0 0）折回同一串函数。
+ * 只对不斜的卡（rotateY(0)，舞台上的卡）成立：平面上 perspective 和 rotateY(0) 不起作用，
+ * translate(tx, ty) scale(k) translate(X, Y) … translate(0, h) scale(s) = translate(tx + kX, ty + kY) … translate(0, kh) scale(ks)。
+ * 2026-11-17（用户录屏「卡片从舞台飞出变成正常卡片的时候依旧会卡顿」）：以前拖着松手时起点拼不成这串，
+ * 退回矩阵分解插值——飞回侧栏途中透视被放大，卡忽大忽斜，看起来是一顿。
+ */
+const withDrag = (inline: string, tx: number, ty: number, k: number): string | null => {
+  const a = inline.match(STRUCTURED);
+  if (!a || parseFloat(a[4]) !== 0) return null;
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return `translate(${r(tx + k * parseFloat(a[1]))}px, ${r(ty + k * parseFloat(a[2]))}px) perspective(${a[3]}px) rotateY(0deg) translate(0px, ${r(k * parseFloat(a[5]))}px) scale(${Math.round(k * parseFloat(a[6]) * 10000) / 10000})`;
+};
 /**
  * 起点也拼成和终点同一串函数（缩放乘上旧宽 / 新宽），浏览器就逐个函数插值：卡一边缩小一边斜过去。
  * 函数串不同时浏览器退回矩阵分解插值，半路透视被放大——2026-11-13 慢放里卡飞回侧栏途中字比原来大一倍、斜得夸张。
