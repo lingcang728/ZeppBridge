@@ -33,7 +33,6 @@ const props = defineProps<{
 }>();
 const t = useMessages(workoutDetailMessages);
 const root = ref<HTMLElement | null>(null);
-const chart = ref<{ $el?: HTMLElement } | null>(null);
 const tier = ref<ChartTier>('sm');
 /** 图本身的高（刻度疏密跟着它走，lib/workoutCharts.fitTicks）。 */
 const plotH = ref(0);
@@ -47,22 +46,20 @@ const showZones = computed(() => tier.value === 'lg' && !!props.card.zoneShare?.
 const longStats = computed(() => (props.card.stats ?? []).some((stat) => stat.value.length > 5));
 
 let observer: ResizeObserver | null = null;
+/* 只观察卡本身：图在形变途中先是一个占位壳、让路结束才换成真图（lib/echartsSetup.ts），挂载时拿到的图元素可能是那个壳，
+   之后它离开文档，观察它就再也收不到尺寸（刻度疏密停在旧高）。图的高跟着卡走，卡变了就现量图。 */
 onMounted(() => {
-  observer = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      if (entry.target === root.value) {
-        // 按卡的宽 × 高分档（2026-11-14：只按宽分，拉高了什么都不加）。
-        const next = chartTier(entry.contentRect.width, entry.contentRect.height);
-        if (next !== tier.value) tier.value = next;
-      } else {
-        // 取整到 20 像素：拖边途中别每一帧都重算配置。
-        const h = Math.round(entry.contentRect.height / 20) * 20;
-        if (h !== plotH.value) plotH.value = h;
-      }
-    }
+  observer = new ResizeObserver(([entry]) => {
+    if (!entry) return;
+    // 按卡的宽 × 高分档（2026-11-14：只按宽分，拉高了什么都不加）。
+    const next = chartTier(entry.contentRect.width, entry.contentRect.height);
+    if (next !== tier.value) tier.value = next;
+    // 取整到 20 像素：拖边途中别每一帧都重算配置。
+    const el = root.value?.querySelector<HTMLElement>('.series-chart');
+    const h = el ? Math.round(el.clientHeight / 20) * 20 : 0;
+    if (h && h !== plotH.value) plotH.value = h;
   });
   if (root.value) observer.observe(root.value);
-  if (chart.value?.$el) observer.observe(chart.value.$el);
 });
 onBeforeUnmount(() => observer?.disconnect());
 </script>
@@ -76,7 +73,7 @@ onBeforeUnmount(() => observer?.disconnect());
     <dl v-if="card.stats" :class="['chart-stats', { long: longStats }]" :style="{ '--stat-count': card.stats.length }">
       <div v-for="stat in card.stats" :key="stat.label"><dt>{{ stat.label }}</dt><dd>{{ stat.value }}</dd></div>
     </dl>
-    <VChart ref="chart" class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+    <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
     <ElevationFacts v-if="showSlope" class="chart-extra" :slope="card.slope ?? null" :facts="false" />
     <ShareBar v-if="showZones" class="chart-extra" :title="t.chartZoneShare" :segments="card.zoneShare!" />
   </section>

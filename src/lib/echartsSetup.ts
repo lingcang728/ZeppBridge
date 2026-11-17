@@ -61,27 +61,29 @@ registerTheme('zeppbridge-light', zeppThemeLight);
    这里做它原本的事：观察容器，尺寸真的变了才 resize()，同样 100 ms 节流；ResizeObserver 第一次回调
    也在首帧绘制之前，建图时尺寸还不是最终值的情况照样会被纠正。 */
 const RESIZE_THROTTLE_MS = 100;
-type ChartHandle = { chart?: { getWidth: () => number; getHeight: () => number; resize: () => void }; root?: HTMLElement };
+type ChartHandle = {
+  chart?: { getWidth: () => number; getHeight: () => number; resize: () => void; dispatchAction: (action: { type: string }) => void };
+  root?: HTMLElement;
+};
 
 const followSize = (handle: () => ChartHandle | null): (() => void) => {
   const host = handle()?.root?.firstElementChild ?? handle()?.root;
   if (!host || typeof ResizeObserver === 'undefined') return () => undefined;
-  let width = 0;
-  let height = 0;
+  /* 落地补做时按此刻的尺寸比（不用观察到的旧值）：飞行途中记下的那次可能早就不是最终尺寸。 */
   const apply = () => {
     const chart = handle()?.chart;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
     if (!chart || !width || !height || (width === chart.getWidth() && height === chart.getHeight())) return;
+    // 卡被拖走 / 换了尺寸，指针多半已经不在原处：提示框留着就钉在旧位置上（用户截图里一直挂着）。
+    chart.dispatchAction({ type: 'hideTip' });
     chart.resize();
   };
   // 舞台窗口成批飞行时先不重画，落地后补一次（lib/motion/budget.ts 的 holdResizes）。
   const resize = throttle(() => {
     if (!deferResize(apply)) apply();
   }, RESIZE_THROTTLE_MS);
-  const observer = new ResizeObserver(([entry]) => {
-    width = entry.contentRect.width;
-    height = entry.contentRect.height;
-    resize();
-  });
+  const observer = new ResizeObserver(() => resize());
   observer.observe(host);
   return () => {
     observer.disconnect();

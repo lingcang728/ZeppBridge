@@ -179,7 +179,11 @@ export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDet
     areas.push([{ xAxis: pause.start, itemStyle: { color: `${palette.axis}1f` } }, { xAxis: pause.end }]);
   }
   const zoneColor = detail.zoneColor ?? (() => color);
-  const bands = tier === 'lg' && detail.bands?.length ? visibleBands(detail.bands, data.map((d) => d[1])) : [];
+  /* 至少跨两个区间才分色。整场都在一个区间里（2026-11-17 用户散步全程 Z0）时，visualMap 只有一段、没有有限的分界，
+     ECharts 的 getVisualGradient 拿到空的色标会抛错（读 undefined.coord）：这张图的线画不出来，实例卡在「渲染中」，
+     之后的 resize / 隐藏提示框全被吞掉；色带也铺满整张图、什么都没区分。一个区间就照常画线，占比条照样写着 Z0 100%。 */
+  const crossed = tier === 'lg' && detail.bands?.length ? visibleBands(detail.bands, data.map((d) => d[1])) : [];
+  const bands = crossed.length >= 2 ? crossed : [];
   for (const band of bands) {
     const tone = zoneColor(band.index);
     areas.push([

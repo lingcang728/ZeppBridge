@@ -67,16 +67,25 @@ describe('withDetail', () => {
   });
 
   it('colours each visible heart-rate zone and keeps its name out of the plot', () => {
-    const lg = withDetail(base, 'lg', { color: '#ff0000', palette, bands, zoneColor }) as Rich;
+    // 数据 115–134：跨 Z1（≤120）和 Z2（120–140），Z3（140+）不在范围里；色带夹到数据范围。
+    const crossing = lineOption(Array.from({ length: 80 }, (_, i) => ({ t: i * 60_000, v: 115 + (i % 20) })), { color: '#ff0000', unit: 'bpm', palette })!;
+    const lg = withDetail(crossing, 'lg', { color: '#ff0000', palette, bands, zoneColor }) as Rich;
     const areas = (lg.series[0].markArea as { data: Array<[{ yAxis: number; name: string; itemStyle: { color: string } }, { yAxis: number }]>; label: { position: string } });
-    // 数据 120–129：Z1（≤120）只碰到边，Z3（140+）不在范围里，只剩 Z2，夹到数据范围。
-    expect(areas.data.map(([a]) => a.name)).toEqual(['Z2']);
-    expect(areas.data[0][0].yAxis).toBe(120);
-    expect(areas.data[0][1].yAxis).toBe(129);
-    expect(areas.data[0][0].itemStyle.color).toBe('#2222221c');
+    expect(areas.data.map(([a]) => a.name)).toEqual(['Z1', 'Z2']);
+    expect(areas.data[0][0].yAxis).toBe(115);
+    expect(areas.data[1][1].yAxis).toBe(134);
+    expect(areas.data[1][0].itemStyle.color).toBe('#2222221c');
     expect(areas.label.position).toBe('right');
-    expect(lg.grid.right).toBeGreaterThan(base.grid.right);
-    expect(lg.visualMap?.pieces).toEqual([{ gt: 120, lte: 140, color: '#222222' }]);
+    expect(lg.grid.right).toBeGreaterThan(crossing.grid.right);
+    expect(lg.visualMap?.pieces).toEqual([{ lte: 120, color: '#111111' }, { gt: 120, lte: 140, color: '#222222' }]);
+  });
+
+  it('draws a plain line when the whole workout stays in one zone (2026-11-17 walk, all Z0)', () => {
+    // 数据 120–129 只落在 Z2：单段 visualMap 会让 ECharts 在 getVisualGradient 里抛错（线画不出、实例卡死），色带也铺满整张图。
+    const lg = withDetail(base, 'lg', { color: '#ff0000', palette, bands, zoneColor }) as Rich;
+    expect(lg.visualMap).toBeUndefined();
+    expect((lg.series[0].lineStyle as { color?: string }).color).toBe('#ff0000');
+    expect(lg.series[0].markArea).toBeUndefined();
   });
 
   it('greys out pauses and marks the given extremes', () => {

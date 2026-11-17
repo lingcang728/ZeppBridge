@@ -110,7 +110,12 @@ let slotFrame = 0;
 let slotWaiters: Array<() => void> = [];
 const pumpSlots = () => {
   slotFrame = 0;
-  slots.shift()?.();
+  // 一件抛错不能卡住整队：曾经一张心率图在 ECharts 里抛错，排在它后面的几张图再也没按新尺寸重画（2026-11-17）。
+  try {
+    slots.shift()?.();
+  } catch (error) {
+    console.error(error);
+  }
   if (slots.length) {
     slotFrame = requestAnimationFrame(pumpSlots);
     return;
