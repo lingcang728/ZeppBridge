@@ -56,19 +56,25 @@ const CLOSE_REPLICA_IN: readonly [number, number] = [0.46, 0.68];
 /*
  * 落地（2026-11-13 用户 4K 录屏：伤病、年轮小结、信匣收回最后一刻「闪一下 / 重影」；慢放条带里是面板还在往按钮上落，
  * 底下的真按钮已经亮了、面板也在淡——两份错开几个像素叠着，信件钮上的小红点成了两颗）：
- * 关的时候形状**先落定**，再交接：开那条时间轴的前 LAND_HOLD 是停留段（形状动画的 delay，倒着放就是落地以后那一段），
- * 形状落到按钮上、速度减到零以后，前一半真按钮在面板底下亮起来（面板正好盖着它，看不见），后一半面板淡掉。
- * 先后交替、不同时半透明——两层同时半透明会透出背景，又是一闪。
+ * 关的时候形状**先落定**，再交接：开那条时间轴的前 LAND_HOLD 是停留段（形状动画的 delay，倒着放就是落地以后那一段）。
+ *
+ * 2026-11-17（用户 4K 录屏「黑块持续一段时间再消失」，履历页年轮小结）：形状用的是前冲曲线，关到 45% 的时间就已经走完九成，
+ * 可背后的暗色和模糊要到一半时间才开始散、真卡要到 80% 才亮——落定的面板在一整片暗底上干挂了约 300ms，像一块黑块。
+ * 现在三件事跟着形状走：
+ * - 暗色和模糊（CLOSE_VEIL）一关就开始散，形状走完九成七时散完；
+ * - 真卡在面板底下（面板这时离落点只剩几像素、整块盖着它）跟着淡回，形状落定前就亮好；
+ * - 停留段缩到 LAND_HOLD，面板最后一小段淡掉。先后交替、不同时半透明。
+ * 下面这些进度都是「开」那条时间轴上的（关是倒着放，所以数越小越靠近落地）。
  */
-const LAND_HOLD = 0.2;
+const LAND_HOLD = 0.14;
 /** 关的最后这一段整块面板淡掉（此刻面板已经停在按钮上，真按钮在它底下已经亮好）。 */
-const CLOSE_FADE = LAND_HOLD / 2;
-/** 真按钮在面板底下亮起来的那一段：形状落定以后、面板淡掉以前。 */
-const SOURCE_IN: readonly [number, number] = [LAND_HOLD / 2, LAND_HOLD];
+const CLOSE_FADE = 0.12;
+/** 真按钮在面板底下亮起来的那一段：遮罩散完（形状走完九成七）以后、面板淡掉以前。 */
+export const SOURCE_IN: readonly [number, number] = [CLOSE_FADE + 0.06, 0.42];
 /** 关这一组里跟着形状走的那几段（换手）：形状只占停留段以后的时间，按它的进度换算。 */
 const onShape = (offset: number) => LAND_HOLD + (1 - LAND_HOLD) * offset;
-/** 背后的暗色和模糊在关的时候散得早一点：面板淡掉时露出来的是清楚的按钮。 */
-const CLOSE_VEIL: Keyframe[] = [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: 0.1 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }];
+/** 背后的暗色和模糊：关一开始就散，形状走完九成七（倒着放到 0.42）时散完——不再等面板落定以后才散。 */
+export const CLOSE_VEIL: Keyframe[] = [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: 0.42 }, { opacity: 1, offset: 0.97 }, { opacity: 1 }];
 /** 关这一组的形状曲线：倒着放时画面上是 WINDOW_EASE 那样减速落定。 */
 const CLOSE_EASE = turnedEase(WINDOW_EASE);
 /** 开到一半被关 / 关到一半又开：两组曲线不一样，按「窗口此刻在哪」换算成另一组的时间进度，不跳。 */
