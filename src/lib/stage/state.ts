@@ -86,7 +86,7 @@ const take = (s: StageState, id: string): StageState => {
   const out = copy(s);
   if (out.stage.ids.includes(id)) out.stage = clampSnap({ ids: out.stage.ids.filter((x) => x !== id), snap: 0, heights: out.stage.heights });
   out.strip = out.strip
-    .map((g) => (g.ids.includes(id) ? clampSnap({ ids: g.ids.filter((x) => x !== id), snap: 0 }) : g))
+    .map((g) => (g.ids.includes(id) ? clampSnap({ ids: g.ids.filter((x) => x !== id), snap: 0, heights: g.heights }) : g))
     .filter((g) => g.ids.length > 0);
   out.hidden = out.hidden.filter((x) => x !== id);
   return out;

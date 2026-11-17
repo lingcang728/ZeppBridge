@@ -28,7 +28,7 @@ export const useWorkoutStage = (cards: Ref<readonly string[]>, cls: Ref<SportCla
   const commit = (next: S.StageState) => {
     if (next === state.value || JSON.stringify(next) === JSON.stringify(state.value)) return false;
     state.value = next;
-    saveStage(cls.value, next);
+    if (!saveStage(cls.value, next)) console.warn('[stage] 布局没存上（浏览器存储不可用），下次打开按默认布局');
     return true;
   };
 

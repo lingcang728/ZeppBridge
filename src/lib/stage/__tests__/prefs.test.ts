@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearStage, defaultState, loadStage, loadView, sanitize, saveStage, saveView, sportClass } from '../prefs';
+import type { StageState } from '../state';
 
 const CARDS = ['insight', 'strength-sets', 'strength-map', 'chart-heart', 'hr-zones', 'decoded', 'export'];
 
@@ -98,5 +99,36 @@ describe('stage prefs', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } });
     expect(() => saveStage('run', custom)).not.toThrow();
     expect(loadStage('run', CARDS).stage.ids).toEqual(['chart-heart']);
+  });
+
+  it('keeps the sizes of groups parked in the strip across a reload', () => {
+    // 2026-11-17：调过大小的组退到侧栏后，重读存档（重开页面、卡片列表变了）尺寸被丢掉。
+    const state: StageState = {
+      stage: { ids: ['decoded'], snap: 0 },
+      strip: [
+        { ids: ['chart-heart', 'hr-zones'], snap: 0, ratio: 0.546, span: 0.964, heights: { 'chart-heart': 626, 'hr-zones': 802 } },
+        { ids: ['insight'], snap: 0, ratio: 0.641, heights: { insight: 548 } },
+      ],
+      hidden: [],
+    };
+    saveStage('other', state);
+    const back = loadStage('other', CARDS);
+    expect(back.strip[0]).toEqual(state.strip[0]);
+    expect(back.strip[1]).toEqual(state.strip[1]);
+  });
+
+  it('drops strip sizes that no longer fit the group', () => {
+    const raw = { stage: { ids: ['decoded'], snap: 0 }, strip: [{ ids: ['chart-heart', 'gone'], snap: 0, span: 0.9, heights: { 'chart-heart': 50, gone: 400 } }], hidden: [] };
+    const back = sanitize(raw, CARDS, defaultState('other', CARDS));
+    expect(back.strip[0]).toEqual({ ids: ['chart-heart'], snap: 0 });
+  });
+
+  it('does not forget hidden cards that this workout lacks', () => {
+    saveStage('run', { stage: { ids: ['chart-heart'], snap: 0 }, strip: [{ ids: ['decoded'], snap: 0 }], hidden: ['chart-cadence'] });
+    // 这条跑步没有步频卡：在它上面动了布局，步频卡仍然藏着。
+    saveStage('run', { stage: { ids: ['decoded'], snap: 0 }, strip: [{ ids: ['chart-heart'], snap: 0 }], hidden: [] });
+    const back = loadStage('run', ['chart-heart', 'decoded', 'chart-cadence']);
+    expect(back.hidden).toEqual(['chart-cadence']);
+    expect(back.stage.ids).toEqual(['decoded']);
   });
 });
