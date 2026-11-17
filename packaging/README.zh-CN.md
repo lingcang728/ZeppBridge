@@ -11,7 +11,7 @@
 | `flatpak/com.zeppbridge.app.yml` | Flatpak 清单 | [docs/guides/linux.zh-CN.md](../docs/guides/linux.zh-CN.md) |
 | `flatpak/com.zeppbridge.app.desktop` | 桌面入口。Flatpak 要求文件名是 `$FLATPAK_ID.desktop`，所以放在这里而不是生成。 | |
 | `flatpak/com.zeppbridge.app.metainfo.xml` | AppStream 元数据。没有它，应用在 GNOME 软件里装上后是个没名字的条目。 | |
-| `flatpak/build-flatpak.sh` | 为当前用户构建并安装。只需要 `flatpak` 和 `flatpak-builder`；Rust 和 Node 来自 SDK 扩展。 | |
+| `flatpak/build-flatpak.sh` | 为当前用户构建并安装。需要 `flatpak`、`flatpak-builder` 和 `elfutils`；Rust 和 Node 来自 SDK 扩展。 | |
 | `docker/Dockerfile` | 无界面运行时：`zeppbridge-cli` + `zeppbridge-mcp`，没有 GUI。 | [docs/guides/docker.zh-CN.md](../docs/guides/docker.zh-CN.md) |
 | `docker/Dockerfile.build` | 固定版本的 Linux 工具链，用于可复现的 deb/rpm/AppImage 构建。 | |
 | `docker/docker-compose.yml` | 一次性的 `sync` / `status` / `mcp` 服务，全部放在 profile 后面。 | |
@@ -35,13 +35,6 @@ Arch 配方面向 `x86_64`，使用系统 GTK / WebKit，通过 Tauri `--no-bund
 成功后安装成品。原始配方中的 `makepkg -si` 则构建远端已提交的 `main` 并安装，
 不包含本地未提交修改。
 
-## 验证到哪一步
+## CI
 
-本机 Arch `x86_64` 已完成原生包构建、桌面入口校验及 CLI 版本检查，并用 `pacman -U`
-完成了系统安装——报告白屏的用户确认安装后白屏消失。那次构建的快照早于上游 3.1.0
-合并。洁净 chroot 构建仍未进行。AUR 尚未发布，CI 尚未覆盖 Arch。
-
-`.github/workflows/ci.yml` 每次推送都会构建 Flatpak 包、校验桌面入口和 AppStream 文件，并构建
-无界面镜像且**做冒烟测试**。任何 CI 都覆盖不了真实的 Linux 桌面——这一部分现在已经有人实测过：
-渲染修复、界面、登录、同步与数据显示都已在报告问题的机器上确认。见
-[docs/guides/linux.zh-CN.md](../docs/guides/linux.zh-CN.md#什么被验证过什么没有)。
+每次推送都会校验 desktop 与 AppStream 文件，并构建、冒烟测试无头镜像。Flatpak、deb、rpm、AppImage 只在打 `v*` 标签和手动触发时构建。Arch 没有 CI 任务，配方也没发布到 AUR。

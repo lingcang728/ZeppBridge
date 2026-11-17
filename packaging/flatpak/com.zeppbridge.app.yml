@@ -54,7 +54,7 @@ finish-args:
   - --share=ipc
   - --device=dri
 
-  # Zepp 云同步。这是这个程序唯一要联网的理由。
+  # Zepp 云同步、官方开放平台授权中转、回信和主动错误报告。
   - --share=network
 
   # App Token 存在 Secret Service（GNOME Keyring / KWallet）里，不落盘。

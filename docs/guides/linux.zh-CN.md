@@ -4,37 +4,18 @@ ZeppBridge 在 Linux 上提供 Flatpak、`.deb`、`.rpm` 和 AppImage 包，另�
 
 [English version](linux.md)
 
-## 什么被验证过，什么没有
-
-决定要不要依赖它之前，先看这张表。
-
-| | 状态 |
-|---|---|
-| 在 Linux 上能编译、clippy 干净、Rust 测试通过 | 每次推送都由 CI 覆盖 |
-| Flatpak 包能构建出来，元数据能通过校验 | 每次推送都由 CI 覆盖 |
-| 无头镜像能构建、能运行、数据目录落在挂载的卷上 | 每次推送都由 CI 覆盖 |
-| 真实桌面使用（Arch x86_64、AMD、Wayland、WebKitGTK 2.54.1）：渲染修复、界面、登录、同步与数据显示 | 已在报告白屏的那台机器上确认——白屏和动画中止不再出现 |
-
-这一行是在真实桌面上填上的。报告白屏的用户安装了本地构建的包，确认界面、登录、同步和数据显示都正常，白屏和动画中止不再出现。如果你在自己的机器上遇到问题，一条写清发生了什么的 issue 是最有用的东西。
-
-这和 README 里对 macOS 的态度是同一个：没人查过却说「已支持」，是数据丢失的开始。
-
 ## 安装
 
 ### Flatpak
 
-目前还没有发布现成的包，从仓库构建：
+从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载 `ZeppBridge-<版本>-Linux-x64.flatpak`，装到当前用户：
 
 ```bash
-git clone https://github.com/lingcang728/ZeppBridge.git
-cd ZeppBridge
-./packaging/flatpak/build-flatpak.sh
+flatpak install --user ./ZeppBridge-<版本>-Linux-x64.flatpak
 flatpak run com.zeppbridge.app
 ```
 
-脚本只要求宿主机上有 `flatpak`、`flatpak-builder` 和 `elfutils`（提供 `eu-strip`，flatpak-builder 剥调试信息时要用），别的都不需要——Rust 和 Node 来自 Flatpak 的 SDK 扩展，不会往系统里装任何工具链。全程 `--user`，不需要 root。
-
-加 `--bundle` 还会额外产出一个可直接安装的单文件：`release/ZeppBridge-<版本>-Linux-x64.flatpak`。
+想自己构建，见 [Linux 打包说明](../development/linux-packaging.md)（英文）。
 
 ### deb / rpm / AppImage
 
@@ -52,42 +33,14 @@ AppImage 需要 FUSE。只带 FUSE 3 的系统上，要么装 `libfuse2`，要�
 
 ### Arch Linux
 
-`packaging/arch/` 提供 `zeppbridge-git` 的 `PKGBUILD` 和 `.SRCINFO`，目前配方面向
-`x86_64`。它使用系统 GTK / WebKit，生成原生 `.pkg.tar.zst`，将桌面应用、CLI 和 MCP
-三个程序安装到 `/usr/bin`，不经过 AppImage 工具。配方尚未提交到 AUR，不能直接用
-`yay -S zeppbridge-git` 安装。本机 Arch `x86_64` 已完成原生包构建、桌面入口校验及
-CLI 版本检查，并用 `pacman -U` 完成了系统安装——报告白屏的用户确认安装后白屏消失。
-那次构建的快照早于上游 3.1.0 合并，配方还没有从当前 `main` 重新构建过；洁净 chroot
-构建仍未进行，CI 尚未覆盖 Arch。
-
-要打包当前工作区（包括未提交修复），在仓库根目录运行：
-
-```bash
-```bash
-nvm use
-./packaging/arch/build-local.sh
-# 额外参数会原样转发给 makepkg：
-#   --syncdeps  让 makepkg 安装缺少的系统构建依赖
-#   --install   构建成功后用 pacman 安装成品
-./packaging/arch/build-local.sh --install
-```
-
-脚本把受版本控制及未被忽略的源码快照到 `$XDG_CACHE_HOME/zeppbridge/arch/`
-（未设时为 `~/.cache/zeppbridge/arch/`）的独立 Git 仓库，隔离源码、依赖和 Rust target，
-不复制用户数据库。默认只构建、不安装任何东西。`release-arch/` 里可能留着多次构建的包，
-手动安装时写准确文件名，不要用通配符。
-
-若要使用原始配方构建并安装远端已提交的 `main`，则运行：
+`packaging/arch/PKGBUILD` 用系统库构建原生 x86_64 `zeppbridge-git` 包（桌面应用、`zeppbridge-cli`、`zeppbridge-mcp`），还没发布到 AUR。
 
 ```bash
 cd packaging/arch
 makepkg -si
 ```
 
-这条命令不包含本地未提交修改，并会请求安装依赖及成品。配方的准备阶段通过
-`npm ci --ignore-scripts` 安装前端依赖，再显式运行 `postinstall` 应用项目补丁，
-并用 `cargo fetch --locked` 准备 Rust 依赖；构建阶段冻结 Rust 依赖并离线编译。
-本地快照脚本通过 `ZEPPBRIDGE_SOURCE_URL` 覆盖配方的默认远端源码地址。
+要打包本地工作区（含未提交的改动），见 [Linux 打包说明](../development/linux-packaging.md#arch-linux)。
 
 ## 数据放在哪
 
@@ -119,13 +72,13 @@ App Token 写入数据目录的 `credentials.json`，Unix 文件权限为 `0600`
 以同一用户身份运行的程序仍能读取它。JSON 存储在当前进程立即生效，重启后也会
 复用已有文件，但显式环境配置优先；若启动配置与文件存储冲突，界面不会允许切换到
 文件存储，需要修复系统凭据存储或调整启动配置。手动输入的凭证保存成功后仍需完成
-原有验证，保存成功不代表验证通过。凭证恢复路径的完整真实登录流程（官方与高级数据）尚未在真实桌面端到端验证。
+原有验证，保存成功不代表验证通过。
 
 无头服务器或容器也可通过启动环境选择存储方式：
 
 ```bash
-# 改成写在数据目录里的 credentials.json，权限 0600。
-# 这是明摆着的降级：保护它的只有文件权限。
+# 用桌面应用写下的 credentials.json（你同意了文件存储之后），或者从别处拷来的那份。
+# 命令行自己从不索要令牌。
 ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
 
 # 或者由环境把令牌交进来。只读：不落盘，进程也改不了它。
@@ -155,8 +108,8 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 # 有 keyring 的 Linux 桌面：在应用里重新登录一次就行，拷过来的库不会被覆盖，
 # 同步会从旧机器停下的地方接着走。
 
-# 没有 keyring 守护进程的桌面，或者用命令行驱动的无头机器：
-# App Token 填一次，之后存在数据目录里，权限 0600。
+# 没有 keyring 守护进程的桌面：在应用里登录，并同意把令牌存进 credentials.json（权限 0600）。
+# 无头机器：从这样做过的机器拷来那份 credentials.json，然后：
 ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
 
 # 容器，或者令牌来自密钥管理器的场合：
@@ -165,7 +118,7 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 
 App Token 本身从哪来，两条路：
 
-- 桌面应用里（任何平台）：**设置 → 手动登录**，可以读出来，也可以填进去。
+- 桌面应用从不显示已保存的令牌，在那里读不出来。
 - 浏览器里：在 `https://watchface.zepp.com/` 登录，然后从开发者工具里读出
   `apptoken` 和 `userid`。应用自己的登录窗口收的就是这一对。
 
@@ -176,86 +129,35 @@ App Token 本身从哪来，两条路：
 
 ## 窗口一片空白，或者根本起不来
 
-**白屏或切换主题、语言后崩溃。** Linux 的 WebKitGTK 渲染行为会受到显卡驱动、
-Wayland / X11 和合成器影响。关闭 DMABUF 是切换缓冲区传递与呈现路径，
-不等于关闭全部 GPU 加速；见 [WebKit 图形架构说明](https://docs.webkit.org/Ports/WebKitGTK%20and%20WPE%20WebKit/Graphics.html)。
-
-应用参考 [Clash Verge Rev 的兼容处理](https://github.com/clash-verge-rev/clash-verge-rev/blob/main/src-tauri/src/utils/linux/workarounds.rs)，采用以下默认策略：
-
-- 通常沿用 WebKit 默认渲染路径，不按 WebKitGTK 版本统一开关 DMABUF。
-- 检测到 NVIDIA 驱动或 DRM 显卡厂商为 NVIDIA 时，设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`。
-- `XDG_SESSION_TYPE=wayland`，且 `pkg-config --modversion wayland-client` 检测到的数值版本不高于 `1.23.0` 时，也设置为 `1`。缺少 `pkg-config` 或版本未知时不触发这一条。
-- AppImage 只在 AppDir 里还带着与驱动强耦合的图形库（[issue #32][issue-32] 的成因：`libEGL*`、`libGL*`、`libGLX*`、`libOpenGL*`、`libgbm*`、`libdrm*`、`libwayland-*`、`libxcb-dri*`、`libva*`）时才设 `WEBKIT_DISABLE_COMPOSITING_MODE=1`。发布用的 AppImage 已经删掉这一层，因此走 WebKit 默认的加速合成；没有做这一步的 AppImage、或读不出目录结构的情况，仍然照旧回退。用户显式设置的值始终优先。
-
-NVIDIA 策略有一条例外：niri 的原生 Wayland 路径保留 WebKit 默认 DMABUF 渲染。
-本机 RTX 5070 Ti / NVIDIA 615.78.08 / WebKitGTK 2.54.2 的独立滚动测试中，关闭
-DMABUF 约为 26 FPS，默认路径约为 61 FPS；这是渲染探针结果，不代表所有应用操作的
-帧率。在 niri 中显式指定 `GDK_BACKEND=x11` 时仍走 NVIDIA 回退；用户设置的禁用变量、
-旧版 Wayland 规则和 AppImage 禁用合成的措施仍然生效。
-
-这些探测是尽力而为；用户已经设置的变量始终优先，包括显式设为 `0`。应用不强制
-`GDK_BACKEND`。任一禁用变量为非 `0` 时，主题和语言切换会跳过 View Transition
-快照动效，切换功能仍然保留。
-
-本机 Arch Linux + AMD + Wayland + WebKitGTK 2.54.1 的复现中，关闭 DMABUF 后执行
-快照动效触发了 `graphicsLayerFactory` 中止，默认路径则正常。这只验证了这一组环境，
-不能据此保证所有发行版和驱动的行为。
-报告这些故障的用户安装了包含这套策略的本地构建包，确认白屏和动画中止不再出现。
-
-可以分别测试关闭 DMABUF 或恢复默认路径：
+**白屏，或切换主题、语言后卡死。** WebKitGTK 的渲染受显卡驱动、显示服务器和合成器影响。ZeppBridge 会自动选一条兼容的路径（比如在 NVIDIA 和旧版 Wayland 库上关掉 WebKit 的 DMABUF 渲染），你也可以手动覆盖。先关掉应用，再试：
 
 ```bash
+# 启动白屏时的兼容路径。
 WEBKIT_DISABLE_DMABUF_RENDERER=1 zeppbridge
+# 用 WebKit 默认路径，覆盖自动选择。
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
-
-# 在仓库根目录开发时，同样可以显式覆盖。
-nvm use
-WEBKIT_DISABLE_DMABUF_RENDERER=0 npm run tauri dev
-
-# AppImage 若要测试恢复硬件渲染，还需覆盖其默认禁用合成的设置。
-WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DISABLE_COMPOSITING_MODE=0 ./ZeppBridge_<版本>_x86_64.AppImage
-```
-
-**只有 AppImage 还是打不开。** [issue #32][issue-32] 中，2.1.0 的 Flatpak 在关闭
-DMABUF 后恢复正常，AppImage 仍失败；报告者在本机编译的 AppImage 则能启动。
-排查发现 CI 构建的包包含了自己的 `libwayland-client.so.0`、`libwayland-cursor.so.0`、
-`libwayland-egl.so.1` 和 `libwayland-server.so.0`。之后的构建移除了这四个库，
-改用宿主机提供的版本。禁用加速合成的回退就按这个条件保留：AppDir 里仍然带着
-`libEGL`、`libGL`、`libgbm`、`libdrm`、`libwayland` 或 `libva` 的才回退，用宿主机
-图形栈的发布包不再回退。
-
-高分屏上保留加速合成差别很大。本机 Arch Linux / AMD / Wayland、2880x1800 120 Hz：
-同一个滚轮手势在概览页上，关掉合成时 WebKit 网页进程 6.1 秒里花掉 5.9 秒 CPU，
-开着时是 1.9 秒（GPU 占用 11% → 31%）；静止时分别是单核的 56% 和 2%。这是单机
-渲染探针，不是帧率保证，但回退从此绑在它的成因上，而不是绑在「是不是 AppImage」上。
-
-如果仍然起不来，可以分别尝试下面的覆盖；强制 X11 需要系统已经安装 XWayland：
-
-```bash
-# 通过 XWayland 强制走 X11。这不是应用的默认行为：在没装 XWayland 的纯 Wayland
-# 系统上，它是把一种打不开换成另一种，所以这个决定留给你，不由我们替你做。
-GDK_BACKEND=x11 ./ZeppBridge-<version>-Linux-x64.AppImage
-# AppImage 只在 AppDir 还带着驱动相关的图形库时自己关合成；用宿主机图形栈的
-# 发布包无需覆盖。如果你装的是 deb/rpm/Flatpak 却有同样的症状，在这里设它。
+# 最后的办法：关掉加速合成（高分屏上会更慢）。
 WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+# 装了 XWayland 的话，走 X11。
+GDK_BACKEND=x11 ./ZeppBridge-<版本>-Linux-x64.AppImage
 ```
 
-请从终端启动应用，保留 `Linux rendering: policy=...` 这一行和 WebKit 崩溃输出。
-该行记录所选策略、两个禁用变量的最终值以及 `skip_view_transitions`，不包含完整的
-显卡、会话或 WebKit 版本信息。反馈时另请提供发行版、显卡及驱动、Wayland / X11
-会话类型和安装包格式。下面的命令可辅助收集信息：
+Flatpak 用 `--env` 传：
 
 ```bash
-pkg-config --modversion webkit2gtk-4.1 wayland-client
-lspci -nnk
-printenv | rg '^(WEBKIT_|GDK_BACKEND=)'
-printf 'XDG_SESSION_TYPE=%s\n' "$XDG_SESSION_TYPE"
+flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=0 com.zeppbridge.app
 ```
 
-`pkg-config`、`lspci` 或 `rg` 可能尚未安装。`pkg-config` 报告的是开发元数据中的版本，
-不一定是应用运行时实际加载的动态库版本。
+反馈问题时请从终端启动，附上以 `Linux rendering:` 开头的那行启动日志、WebKit 的崩溃输出、安装包类型、发行版、显卡和驱动、Wayland 还是 X11，以及哪个设置有效：
 
-[issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
+```bash
+printf 'Session: %s\n' "$XDG_SESSION_TYPE"
+pkg-config --modversion webkit2gtk-4.1 wayland-client
+lspci -nnk | grep -E -A3 'VGA|3D|Display'
+env | grep -E '^(WEBKIT_|GDK_BACKEND=|APPIMAGE=)'
+```
+
+自动选择的规则见 [Linux 打包说明](../development/linux-packaging.md#rendering-policy)。
 
 **没有托盘图标，并且 stderr 上有一行 `libayatana-appindicator3`。** 托盘图标由
 桌面环境通过这个库绘制。GNOME 的 Flatpak runtime 里没有它，一些桌面也没装。现在
@@ -273,6 +175,10 @@ sudo zypper install libayatana-appindicator3-1  # openSUSE
 libayatana-appindicator 三个模块，因为 Flatpak 用户没有自己装这个库的路子。另外
 GNOME 上还需要装 AppIndicator 扩展才看得见，KDE 原生支持。
 
+## 界面卡顿
+
+WebKitGTK 扛不住整页毛玻璃和形变动画。Linux 上 **设置 → 显示与语言 → 界面特效** 选 **自动** 就等于 **低特效**（关掉毛玻璃和形变动画）。如果你改成了 **完整**，改回来。
+
 ## 更新
 
 Linux 上应用内的更新检查是关掉的，设置页会直接这么说，而不是显示一次失败的检查。更新从这个包的来处走：
@@ -282,13 +188,13 @@ flatpak update com.zeppbridge.app     # Flatpak
 sudo apt install --only-upgrade ...   # deb，等有了软件源之后
 ```
 
-AppImage 用户手动换文件。为什么没有自更新：更新清单里没有 linux 的条目，而往 `/app` 或 `/usr/bin` 里写文件会和包管理器打架。一句意思是「这里没什么可查的」的红色「更新失败」，比没有按钮更糟。
+AppImage 用户手动换文件。Linux 上没有自更新：往 `/app` 或 `/usr/bin` 里写文件会和包管理器打架。
 
 ## 沙箱权限（Flatpak）
 
 | 权限 | 为什么 |
 |---|---|
-| `--share=network` | 从 Zepp 云同步。这是这个程序唯一要联网的理由。 |
+| `--share=network` | 从 Zepp 云同步、官方开放平台授权中转（`zeppbridge.com`）、回信和主动错误报告。 |
 | `--socket=wayland`、`--socket=fallback-x11`、`--device=dri`、`--share=ipc` | 画一个窗口。 |
 | `--talk-name=org.freedesktop.secrets` | 把 App Token 存进密钥环。没有它，登录能走完但令牌存不下去。 |
 | `--talk-name=org.kde.StatusNotifierWatcher` | 托盘图标。GNOME 上还要装 AppIndicator 扩展才看得见，KDE 原生支持。 |
@@ -297,74 +203,4 @@ AppImage 用户手动换文件。为什么没有自更新：更新清单里没�
 
 ## 从源码构建
 
-```bash
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
-  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf \
-  rpm xdg-utils
-npm ci
-npm run tauri build -- \
-  --config src-tauri/tauri.linux.conf.json \
-  --bundles deb,rpm,appimage
-```
-
-`--config src-tauri/tauri.linux.conf.json` 的作用是关掉 updater 产物。基础配置里
-它是开着的（Windows 和 macOS 要用），而那个开关是全局的：开着的时候打包会去找
-发布签名私钥，找不到就停在「A public key has been found, but no private key」。
-Linux 这边刻意不产出 updater 产物——应用内更新在 Linux 上本来就是关的。
-
-其中三个容易漏，而且都不在 Tauri 自己的前置依赖清单里：
-
-- `libdbus-1-dev` —— Secret Service 凭据后端链接 libdbus。运行时对应 `libdbus-1-3`，deb 和 rpm 都已经声明了它。
-- `rpm` —— rpm 打包那一步要调 `rpmbuild`。
-- `xdg-utils` —— AppImage 打包会把 `/usr/bin/xdg-open` 复制进镜像。缺了它，失败发生在 deb 和 rpm 都已经写出来**之后**，看起来像是 AppImage 自己的 bug，而不是少装了一个包。
-
-### Arch 上 AppImage 打包失败
-
-本次 Arch 环境中，上面的构建已成功编译原生程序并生成 deb / rpm，失败发生在最后的
-AppImage 打包阶段。2026 年 11 月对合并了上游 3.1.0 的源码重新验证：编译与 deb / rpm
-打包成功，AppImage 仍在 linuxdeploy 处失败。可以直接运行
-`src-tauri/target/release/zeppbridge` 体验本机原生程序；只需要 deb / rpm 产物时，
-将构建参数改为 `--bundles deb,rpm` 可跳过 AppImage。
-这些包分别面向 Debian / RPM 系发行版，并不是让 Arch 通过 `pacman` 安装。
-
-保留已编译的二进制，只重试 AppImage 打包并查看详细日志：
-
-```bash
-npm run tauri -- bundle --config src-tauri/tauri.linux.conf.json --bundles appimage --verbose
-```
-
-本机依次复现了两个独立问题：
-
-- linuxdeploy 自带的旧 `strip` 不认识 `.relr.dyn`，报 `unknown type 0x13`。在上述命令前加 `NO_STRIP=true` 可跳过剥离步骤；相关上游问题见 [Tauri #11149](https://github.com/tauri-apps/tauri/issues/11149)。
-- 跳过 `strip` 后，GTK 插件继续在复制 `/usr/lib/gdk-pixbuf-2.0/2.10.0` 时失败。本机 `gdk-pixbuf2 2.44.8` 使用 Glycin，没有插件预期的旧外部 loader 目录。
-
-因此，`NO_STRIP=true` 只针对第一类错误，不能单独解决这台机器上的 AppImage 打包。
-不要通过创建空 loader 目录或降级系统库来掩盖第二类错误。
-
-### 使用容器构建分发包
-
-对外分发 AppImage 时，建议使用已有的 Bookworm 工具链容器，避免将宿主 Arch 的滚动
-更新库带入构建环境。命令同时隔离宿主的 `node_modules` 和 Rust target：
-
-```bash
-docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build .
-docker run --rm -v "$PWD:/src" -w /src \
-  -v zeppbridge-bookworm-node-modules:/src/node_modules \
-  -v zeppbridge-bookworm-target:/build-target \
-  -e CARGO_TARGET_DIR=/build-target zeppbridge-build \
-  bash -c 'npm ci && npm run tauri build -- \
-    --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
-```
-
-产物位于 `zeppbridge-bookworm-target` volume 内的 `/build-target/release/bundle/`，
-不会覆盖宿主的 `src-tauri/target`。当前机器没有 Docker 或 Podman，本轮未验证该容器构建。
-
-## Flathub
-
-没有提交。`packaging/flatpak/com.zeppbridge.app.yml` 这份清单构建时要联网，而 Flathub 不允许。要走到那一步，还需要：
-
-1. 用 [flatpak-builder-tools](https://github.com/flatpak/flatpak-builder-tools) 生成 `cargo-sources.json` 和 `node-sources.json`，把每一个依赖都变成声明出来的 source；
-2. 从 `build-args` 里去掉 `--share=network`；
-3. AppStream 元数据里至少要有一张托管的截图——仓库里一张都没有，所以 `<screenshots>` 是刻意缺着的，而不是指向一个会 404 的地址。
-
-那两个生成出来的文件很大，而且每次动依赖都会过期。为一次还没发生的提交而把它们提交进来，不值得。
+见 [Linux 打包说明](../development/linux-packaging.md)（英文）。
