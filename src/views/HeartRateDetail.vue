@@ -21,6 +21,7 @@ import SwapChart from '../components/SwapChart.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import SectionGroup from '../components/SectionGroup.vue';
+import ChartHold from '../components/ChartHold.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -345,9 +346,11 @@ const dailyMaxChartOption = computed(() => {
 const shownDailyMax = useQueuedOption(dailyMaxChartOption);
 
 // 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
-// 形变进场时首屏之外的那几张卡等落地再挂；直接打开（没有形变）就照常一次画完。
-const belowFold = ref(!preloaded);
-afterMotion(() => { belowFold.value = true; });
+// 首屏之外的那几张卡第一帧就挂（2026-11-17：#168 让它们整段等落地才挂，页面长满以后下面空一拍才冒出来）；
+// 只有它们的图表画布押到形变落地以后再一帧一张画、淡入（ChartHold）——#168 要省的主要就是这几张图在形变途中建图。
+// 直接打开（没有形变）就照常一次画完。
+const belowCharts = ref(!preloaded);
+afterMotion(() => { belowCharts.value = true; });
 onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });
 
@@ -432,9 +435,8 @@ const daySpan = computed(() => {
 
       <!-- 24 小时曲线不跟这个开关走。放在大图下面，才不会让人以为
            切 7 天 / 1 个月会改那张全天图。 -->
-      <!-- 首屏之外的那几张卡等形变落定再挂：它们在窗口还在长的时候挂进来，
-           会把第一帧的排版/绘制顶到后面（实测卡开的「点下去没反应」就花在这）。 -->
-      <template v-if="belowFold">
+      <!-- 首屏之外的那几张卡第一帧就挂，只有图表画布等形变落定再画（ChartHold）。 -->
+      <ChartHold :ready="belowCharts">
       <TrendRangeBar />
 
       <!-- 每日最高心率、静息心率与 HRV 趋势直接摊开：点进这一页就是来看它们的。 -->
@@ -480,7 +482,7 @@ const daySpan = computed(() => {
           </div>
           <MissingMetricsRow :items="missingTrends" />
         </SectionGroup>
-      </template>
+      </ChartHold>
 
     </template>
   </section>

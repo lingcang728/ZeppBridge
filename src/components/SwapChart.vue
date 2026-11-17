@@ -15,13 +15,15 @@
  * 只有切范围才溶解（lib/chartSwap.ts）：换主题、换语言、同步来了新数据都是原地换掉。
  * 图表自己永远不播 ECharts 的入场 / 更新动画（animation: false）——所以缓存页回场、
  * 换主题重建画布时，也不会再「重画一遍」。 */
-import { onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { SMOOTH_CHART_UPDATE } from '../lib/metricSeries';
 import { chartSwapIntent } from '../lib/chartSwap';
 import { currentSweep, sweepDelay, type AshSweep } from '../lib/motion/ashReveal';
 import { paced } from '../lib/motion/timing';
 import { lessMotion } from '../lib/motion/lessMotion';
+import { useChartHold } from '../lib/motion/chartHold';
+import { nextSlot } from '../lib/motion/budget';
 
 defineOptions({ inheritAttrs: false });
 
@@ -55,6 +57,25 @@ let incoming: Animation | null = null;
 const ghosts = new Set<HTMLCanvasElement>();
 
 const reduced = () => lessMotion();
+
+/* 包在 ChartHold 里、还没放行（卡 → 页形变还在飞）：只放同样大小的空壳。放行以后一帧一张地建图（nextSlot），
+   画布淡入——几张图同一帧建会凑成一个几百毫秒的长任务（4× 降速实测 480–600ms）。 */
+const hold = useChartHold();
+const drawn = ref(!hold || hold.value);
+const HOLD_FADE_MS = paced(240);
+if (!drawn.value) {
+  const stop = watch(() => hold?.value, (ready) => {
+    if (!ready) return;
+    stop();
+    nextSlot(() => {
+      if (!host.value) return;
+      drawn.value = true;
+      void nextTick(() => {
+        if (!reduced()) canvasHost.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: HOLD_FADE_MS, easing: 'ease-out' });
+      });
+    });
+  });
+}
 
 /** 把画布上此刻的样子拷一份，铺在同一个位置。 */
 const snapshot = (el: HTMLElement): HTMLCanvasElement | null => {
@@ -148,6 +169,7 @@ onBeforeUnmount(() => {
   <div ref="host" v-bind="$attrs" class="swap-chart">
     <div ref="canvasHost" class="swap-chart-layer">
       <VChart
+        v-if="drawn"
         class="swap-chart-canvas"
         :theme="CHART_THEME"
         :option="shown"
