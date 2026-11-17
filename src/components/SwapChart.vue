@@ -15,7 +15,7 @@
  * 只有切范围才溶解（lib/chartSwap.ts）：换主题、换语言、同步来了新数据都是原地换掉。
  * 图表自己永远不播 ECharts 的入场 / 更新动画（animation: false）——所以缓存页回场、
  * 换主题重建画布时，也不会再「重画一遍」。 */
-import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { SMOOTH_CHART_UPDATE } from '../lib/metricSeries';
 import { chartSwapIntent } from '../lib/chartSwap';
@@ -63,17 +63,32 @@ const reduced = () => lessMotion();
 const hold = useChartHold();
 const drawn = ref(!hold || hold.value);
 const HOLD_FADE_MS = paced(240);
+/* 落地后在首屏里看得见的那几张不押（2026-11-17 用户录屏「心率页打开后顿一下下面的其他选项才出来」：ChartHold 包的是
+   模板里写死的「首屏以外」那一段，可 4K 屏上「每日心率范围」就在首屏，整段形变它都是空壳、落地后还空约 260ms）。
+   挂上时量一下它离页面顶多远：小于滚动区的高就是首屏，和首屏那张 24 小时图一样在形变途中一帧一张地建（窗口在合成器上飞，
+   建图不卡窗口）。展开形变只平移不缩放，页面和它同一道平移，相减就是排版上的距离。 */
+const onFirstScreen = (el: HTMLElement): boolean => {
+  const page = el.closest<HTMLElement>('.page-host > *');
+  const scroller = document.getElementById('main-content');
+  if (!page || !scroller) return false;
+  return el.getBoundingClientRect().top - page.getBoundingClientRect().top < scroller.clientHeight;
+};
+const draw = (fade: boolean) => {
+  if (drawn.value || !host.value) return;
+  drawn.value = true;
+  if (!fade) return;
+  void nextTick(() => {
+    if (!reduced()) canvasHost.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: HOLD_FADE_MS, easing: 'ease-out' });
+  });
+};
 if (!drawn.value) {
   const stop = watch(() => hold?.value, (ready) => {
     if (!ready) return;
     stop();
-    nextSlot(() => {
-      if (!host.value) return;
-      drawn.value = true;
-      void nextTick(() => {
-        if (!reduced()) canvasHost.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: HOLD_FADE_MS, easing: 'ease-out' });
-      });
-    });
+    nextSlot(() => draw(true));
+  });
+  onMounted(() => {
+    if (!drawn.value && host.value && onFirstScreen(host.value)) nextSlot(() => draw(false));
   });
 }
 

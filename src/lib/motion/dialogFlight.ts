@@ -22,7 +22,7 @@
  */
 import { createFlight, NEARLY_HIDDEN, whileShown, type Flight } from './flight';
 import { onMotionEscape } from './interrupt';
-import { easeAt, HANDOFF_EARLIEST, OPEN_EASE as WINDOW_EASE, OPEN_MS, timeAt, turnedEase } from './timing';
+import { easeAt, OPEN_EASE as WINDOW_EASE, OPEN_MS, timeAt, turnedEase } from './timing';
 import { lessMotion } from './lessMotion';
 import { settleCssAnimations } from './settle';
 import { belowLine, cardReplica, visibleWindow, windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
@@ -369,10 +369,12 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
       source.setAttribute('data-dialog-source', 'fading');
       flight.add(source, [{ opacity: 1 }, { opacity: 1, offset: SOURCE_IN[0] }, { opacity: 0, offset: SOURCE_IN[1] }, { opacity: 0 }]);
     }
-    // 来处很小（一颗按钮、一枚胶囊）：拷贝只占窗口一角，留着它只会是一块「跟着走」的色块（用户 2026-11-12：
-    // 「动笔写信」的绿色块会一直跟着走到后面）——窗口一开始长就换手。卡片这类大来处才等到 HANDOFF_EARLIEST。
-    const small = !!from && from.width * from.height < 0.25 * target.width * target.height;
-    const earliest = windowEl || small ? 0.04 : HANDOFF_EARLIEST;
+    // 开：窗口一开始长就换手（正文画好了就接，最早 4%）。
+    // 以前只有小来处（一颗按钮，用户 2026-11-12：「动笔写信」的绿色块一直跟着走）这样，卡片这类大来处要等到
+    // HANDOFF_EARLIEST（28%）——那是卡 → 整页用的门槛（窗口太小时满屏字挤在小框里），弹窗正文 1:1 贴在面板左上角，
+    // 没有这个问题。等到 28% 时前冲曲线已经把窗口撑开了七成：亮着的页面上一整块空的深色面板、原卡的拷贝缩在左上角，
+    // 约 200ms 后正文才淡进来（2026-11-15 用户 4K 录屏「黑块持续一段时间再消失_打开」，履历页年轮小结）。
+    const earliest = 0.04;
     if (closing) {
       // 关：倒着放。内容在回程前段淡掉，替身接着亮起来（CLOSE_CONTENT_OUT / CLOSE_REPLICA_IN 上面的说明）。
       if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: onShape(CLOSE_CONTENT_OUT[0]) }, { opacity: 1, offset: onShape(CLOSE_CONTENT_OUT[1]) }, { opacity: 1 }]);
