@@ -1,19 +1,18 @@
 # Provenance of the local AI provider icons
 
-[简体中文](ai-provider-assets.zh-CN.md)
-
 The hand-off destinations are an HTTPS allow-list fixed in code (no user input,
 query or fragment is accepted): `https://chatgpt.com/`, `https://claude.ai/`,
 `https://gemini.google.com/app`, `https://www.kimi.com/`,
 `https://www.doubao.com/chat/`, `https://chat.deepseek.com/`,
-`https://grok.com/`. Tauri Opener permits only those seven addresses; the icons
-are bundled with the app at build time and are never hot-linked from a
+`https://grok.com/`. Tauri Opener permits only those seven plus the project's
+GitHub page and the OpenStreetMap copyright page. The icons are bundled with the app at build time and are never hot-linked from a
 third-party CDN at runtime.
 
 Every asset below comes from the corresponding AI product site's own
 favicon/app-icon resource — not the parent company's corporate logo. Retrieved
 2026-08-15 (Asia/Shanghai). The PNG/WebP bytes are pinned by SHA-256, and the
-verification script is `scripts/assets/verify-ai-assets.py`.
+verification script is `scripts/assets/verify-ai-assets.py` (run by hand; CI
+does not run it).
 
 | Provider | Local file (format/size) | Source URL | Local SHA-256 | Licence / trademark note |
 | --- | --- | --- | --- | --- |
@@ -27,6 +26,4 @@ verification script is `scripts/assets/verify-ai-assets.py`.
 
 The accessible initial-letter fallback appears in the AI picker only when an
 icon fails to load; the normal path always renders the seven local product icons
-above. Device cards fall back to an original outline drawn in code when the
-product WebP fails to load, rather than letting wrapped `alt` text pose as an
-image.
+above.

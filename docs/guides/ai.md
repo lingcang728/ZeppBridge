@@ -46,7 +46,7 @@ Every hand-off saves its question and data choices as a task. Click the task nam
 
 Worth knowing:
 
-- **The watch takes four sports**: running (outdoor, treadmill, track), cycling (outdoor, indoor), pool swimming and open-water swimming. The watch asks for the sub-type again when you start the workout. Walking, hiking, strength, yoga and the like cannot be sent to the watch; the AI tells you so while you plan.
+- **The watch takes four sports**: running (outdoor, treadmill, track, trail), cycling (outdoor, indoor, mountain), pool swimming and open-water swimming. The watch asks for the sub-type again when you start the workout. Walking, hiking, strength, yoga and the like cannot be sent to the watch; the AI tells you so while you plan.
 - Plans start today or later and reach at most 56 days ahead. Days inside the plan's date range without a workout count as rest days, and any earlier plan on those days is cleared.
 - Running paces are per kilometre; each step is a time (20 min) or a distance (400 m), at least 50 m per step. Pool swims are the exception: at least 25 m per step (the pool length is set on the watch: 25 m, 50 m, yards or custom), and swims take no pace target.
 - Sleep and rest advice stays on this computer and is not sent to the watch.
@@ -57,26 +57,29 @@ Worth knowing:
 **Coach notes** hold the long-term facts any AI should know: injuries, routine, goals, preferences. Open them from the "Personal profile" card ("Coach notes →").
 
 - Write one yourself, for example "My left knee hurts on runs over 15 km; I swim every Wednesday evening."
-- An AI connected over MCP can propose a note. It shows up in the "An AI wants to remember" card on the overview and under "Waiting for you" in coach notes; it only counts once you click **Remember**, and a note you turned down cannot be proposed again.
+- An AI connected over MCP can remember a note too. It counts at once and shows which AI wrote it. Undo it under **Settings › AI tools › Recent AI changes**, or edit and delete it in coach notes; a note you undid cannot be written again. (Proposals from before 3.1.2 still wait under "Waiting for you" until you click **Remember** or **No**.)
 - Notes go along with every hand-off. "Export Markdown" saves them to the "ZeppBridge AI" folder on your desktop for use elsewhere.
 
 ## 4. MCP: connect an AI tool directly
 
-MCP lets AI tools on your computer query ZeppBridge's local database directly, with no copy and paste. `zeppbridge-mcp` is installed with the app (and since 3.1.1 so is the command-line tool `zeppbridge-cli`); there is nothing extra to download.
+MCP lets AI tools on your computer query ZeppBridge's local database directly, with no copy and paste. `zeppbridge-mcp` and the command-line tool `zeppbridge-cli` are installed with the app; there is nothing extra to download.
 
-Open **Settings › AI tools › Connect an AI tool**:
+Open **Settings › AI tools › Connect a local AI**:
 
 - **Claude Code** and **Codex**: the button copies a few commands; paste them into a terminal. They register the MCP server and install ZeppBridge's coaching skill, `zepp-coach`.
 - **Claude Desktop**: the button saves `ZeppBridge.mcpb`; double-click it to install.
+- **OpenCode**, **Grok Build** and **Factory**: the button copies one command (or, for Factory, one config entry).
 - **Other clients**: "Copy this and ask your AI" hands that AI a description so it can tell you where its config goes; "Copy just the config snippet" gives you the JSON with the path filled in.
 - ChatGPT on the web cannot reach an MCP server on your computer; use Send to AI above.
 
+By default the AI reads the whole library. Turn on **Only shared tasks** to limit it to the tasks you share with MCP on the Send to AI page, then use the button again so the AI tool picks up the change.
+
 Once connected:
 
-- The AI can read workouts, metrics, sleep, food, life events, data health, a training-and-recovery overview and your profile. **Health data is read-only**; nothing listens on a port and nothing goes online.
+- The AI can read workouts, metrics, sleep, food, life events, data health, a training-and-recovery overview and your profile. **Health data is read-only**, and nothing listens on a port.
+- The AI can also keep your journal: injuries, life events, races, shoes, how a workout felt and a workout's type. Every change it makes is listed under **Recent AI changes**, where you can undo it. It can pull new data from Zepp (the same as a sync) and write a summary export into the data folder.
 - The AI can **draft** a training plan. The draft shows up on the Send to AI page; you accept it, check it, and send it to the watch.
 - For the AI to send plans to the watch itself, turn on **Let AI publish training plans directly** in Settings. It never clears existing plans.
-- Notes the AI proposes go to the coach-notes inbox and only count once you confirm them.
 
 The command-line tool's path is also in Settings › AI tools, with a copy button. For flags, exit codes, config examples and the full list of tools, see [CLI and MCP](../reference/cli-and-mcp.md).
 
@@ -98,6 +101,6 @@ With MCP:
 ## 6. Privacy
 
 - Copy and paste: your data leaves this computer only when you paste it into the chat. Account and device identifiers are removed when the file is written, and precise GPS is left out by default. The file is plain Markdown; check it in Check before sending, or open and read it yourself first. After that it is handled under that AI provider's rules.
-- MCP: an AI tool on your computer reads the data, and that tool sends what it read to the model behind it. ZeppBridge itself only goes online to publish a training plan, and only with your permission.
+- MCP: an AI tool on your computer reads the data, and that tool sends what it read to the model behind it. ZeppBridge goes online for it only when the AI asks for a sync, or publishes a training plan with your permission.
 
 See also [Security and privacy](../reference/security-and-privacy.md) and the [FAQ](faq.md).
