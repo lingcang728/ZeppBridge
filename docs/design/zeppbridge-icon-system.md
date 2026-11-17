@@ -1,103 +1,99 @@
 # ZeppBridge icon system
 
-ZeppBridge uses one compact angular mark and one local SVG icon family. The
-same geometry is used by the transparent UI mark, the Windows shell assets,
-and the public app icon so that the identity remains recognizable at a glance
-and at small sizes.
+ZeppBridge has one mark, the angular double-rail Z, and one local SVG icon
+family for the interface.
 
 ## Brand mark
 
-[`src-tauri/icons/icon-source.svg`](../../src-tauri/icons/icon-source.svg) is
-the only brand geometry source. Its `brand-mark` symbol is a 24 × 24 optical
-grid tagged `data-shape="angular-double-rail-z"` and is made from two parallel
-folded rails:
+[`src-tauri/icons/icon-source.svg`](../../src-tauri/icons/icon-source.svg)
+records the mark's geometry. Its `brand-mark` symbol is a 24 × 24 optical grid
+tagged `data-shape="angular-double-rail-z"`, made of two parallel folded rails:
 
 ```text
 rail A: M3.8 5 H16.2 L4 19
 rail B: M20.2 5 L8 19 H20.2
 ```
 
-Both rails use `stroke-width="3.1"`, `stroke-linecap="round"`, and
-`stroke-linejoin="round"`. The folds stay straight and angular; there are no
-curves, arcs, or connection-point circles. The open gap between the diagonals
-is intentional and keeps the double-rail Z readable at 16, 20, and 24 px.
+Both rails use `stroke-width="3.1"` with round caps and joins. The folds stay
+straight; there are no curves, arcs or connection-point circles. The gap between
+the diagonals keeps the Z readable at 16, 20 and 24 px. The app composition is
+a `#0F1512` rounded square (`rx="225"`) with an 800 × 800 symbol box at
+(112, 112) on the 1024 × 1024 canvas.
 
-The platform composition is a `#0F1512` rounded square (`rx="225"`) with an
-800 × 800 symbol box positioned at (112, 112) in the 1024 × 1024 canvas. The
-mark uses the quiet lime brand color `#CDDC7C`; recognition does not depend on
-an outer glow or a shadow.
+The shipped images are rendered bitmaps, not the SVG:
 
-`BrandMark.vue` extracts the same symbol with Vite's `?raw` loader. It owns no
-second path, so UI and platform assets cannot drift apart. The component keeps
-the transparent mark suitable for navigation, tray, and status surfaces.
+| Where | Source |
+|---|---|
+| Platform icons (Windows, macOS, Linux, Store, favicon) | `src-tauri/icons/icon-master.png` |
+| The mark inside the app (`BrandMark.vue` → `DesignIcon`) | `src/assets/design-icons/brand-mark.png` |
+| Geometry checked by `icons:verify` | `src-tauri/icons/icon-source.svg` |
+
+The three can drift apart. When you change the mark, update all three.
 
 ## UI icon family
 
-`Icon.vue` keeps the existing `IconName` API and draws every icon locally in a
-24 × 24 viewBox. The default outline is 1.6 px and the public `stroke` prop is
-normalized to the 1.5–1.75 px family range. All outline paths use round caps
-and joins; dots are filled circles rather than an oversized stroke. Filled
-health symbols remain solid silhouettes so they survive at 16 px without
-mixing outline and fill treatments in the same semantic group. No third-party
-icon package is used.
+`Icon.vue` keeps the `IconName` API and draws every icon locally in a 24 × 24
+viewBox. The default outline is 1.6 px, and the `stroke` prop is clamped to
+1.5–1.75 px. Outline paths use round caps and joins; dots are filled circles.
+Filled health symbols stay solid so they survive at 16 px. No third-party icon
+package is used. Large semantic icons use `GlyphTile.vue` (a CSS base plus an
+`Icon.vue` glyph); only brand artwork (app icon, brand mark, Zepp cloud) stays
+as images.
 
 ## Semantic chart colors
 
-The `zeppSemanticColors` map in `src/lib/echartsTheme.ts` is the source of
-truth for ECharts metric colors. Brand is deliberately not part of the generic
-health series palette.
+`zeppSemanticColors` (dark) and `zeppSemanticColorsLight` in
+`src/lib/echartsTheme.ts` are the source for chart metric colors. The light set
+keeps each hue and lowers lightness and saturation so it reads on white.
 
-| Semantic role | Color |
-| --- | --- |
-| Brand | `#CDDC7C` |
-| Heart | `#FF6B6B` |
-| Pace / distance | `#5B8FF9` |
-| Calories / power | `#FF9F43` |
-| Altitude | `#E4C95A` |
-| Cadence / stride | `#54CFA2` |
-| Training / VO2 | `#9B7BFF` |
-| Readiness | `#75D584` |
-| Sleep deep / light / REM / awake | `#6657D9` / `#8E9BFF` / `#49CDA2` / `#FF6B6B` |
+| Role | Dark | Light |
+|---|---|---|
+| Brand | `#7DA33E` | `#2F6B4F` |
+| Heart | `#F0616A` | `#C93F49` |
+| Pace / distance / cadence | `#4AA8E8` | `#2E7FC2` |
+| Calories / power | `#F5860B` | `#C96A05` |
+| Altitude | `#F5C33B` | `#A87E0B` |
+| Stride | `#2BB3C0` | `#1E96A6` |
+| Training / VO₂max / readiness | `#A3CC5C` | `#4E8A2E` |
+| Sleep deep / light / REM / awake | `#3F4FB8` / `#7C9CF5` / `#2EC4B6` / `#E8833A` | `#3546A8` / `#5F82E8` / `#12968A` / `#D9732B` |
 
-Both dark and light ECharts themes use the same semantic values. Surface,
-axis, and tooltip tokens may change with the theme; metric meaning does not.
+These match the category tokens in `src/styles/tokens.css`; CSS variables can't
+reach a canvas, so both are kept in step by hand.
 
-## Master and derivation chain
+## Derivation chain
 
 ```text
-src-tauri/icons/icon-source.svg (master brand-mark + app composition)
+src-tauri/icons/icon-master.png
              │
-             ├─ npm run icons:generate
-             │    └─ @tauri-apps/cli icon (repository node_modules)
+             ├─ npm run icons:generate   (also runs as beforeBuildCommand)
+             │    └─ @tauri-apps/cli icon
              │         ├─ icon.ico / icon.icns
              │         ├─ icon.png, 32x32.png, 64x64.png
              │         ├─ 128x128.png, 128x128@2x.png
-             │         └─ Windows Store/Square*.png assets
+             │         └─ Square*.png Store assets
              │
-             └─ public/zeppbridge-icon.png (byte-identical copy of icon.png)
+             ├─ public/zeppbridge-icon.png   (byte-identical copy of icon.png)
+             └─ public/favicon.png           (64 px)
 ```
 
-The generator removes unused Android/iOS output directories after the Tauri
-CLI finishes. `src-tauri/tauri.conf.json` consumes the generated Windows
-bundle family, while the default window/tray path resolves to the same icon
-resources.
+The generator removes the Android and iOS output after the Tauri CLI finishes.
+`src-tauri/tauri.conf.json` bundles the PNGs, `icon.ico` and `icon.icns`.
+Don't edit `src-tauri/icons/` by hand.
 
-## Asset and verification matrix
+## Verification
 
 | Asset | Dimensions / frames |
-| --- | --- |
+|---|---|
 | `32x32.png` | 32 × 32 RGBA |
 | `64x64.png` | 64 × 64 RGBA |
 | `128x128.png` | 128 × 128 RGBA |
 | `128x128@2x.png` | 256 × 256 RGBA |
-| `icon.png` | 512 × 512 RGBA (Tauri CLI output) |
-| `icon.ico` | 16, 24, 32, 48, 64, and 256 px frames |
+| `icon.png` | 512 × 512 RGBA |
+| `icon.ico` | 16, 24, 32, 48, 64 and 256 px frames |
 | `icon.icns` | generated by the Tauri CLI |
-| Windows Store/Square assets | 30, 44, 50, 71, 89, 107, 142, 150, 284, 310 px |
-| small previews | 16, 20, and 24 px downsample checks |
+| Store `Square*` assets | 30, 44, 50, 71, 89, 107, 142, 150, 284, 310 px |
+| Small previews | 16, 20 and 24 px downsample checks |
 
-Run `npm run icons:generate` after changing the master. Run
-`npm run icons:verify` to check every PNG dimension and alpha channel, the
-angular double-rail source (including the absence of legacy curves/points),
-ICO frames, the byte-identical public hash, and the 16/20/24 px previews. Run
-`npm run build` after changing the source or Vue components.
+`npm run icons:verify` checks every PNG's size and alpha channel, the
+double-rail geometry in the SVG (and the absence of old curves and points), the
+ICO frames, the public copy's hash and the small previews. CI runs it on Windows.

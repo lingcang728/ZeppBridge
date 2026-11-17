@@ -1,36 +1,150 @@
 {
   "schemaVersion": 1,
-  "lastVerified": "2026-10-06",
+  "lastVerified": "2026-11-17",
   "capabilities": [
     {
       "id": "sleep",
       "documentation": "official",
-      "applicationPermission": "unknown",
-      "realSampleValidation": "none",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
       "source": "official",
-      "deliveryModel": "webhook",
-      "units": "seconds unless documented",
-      "timeSemantics": "sample occurrence separate from receipt"
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/sleep",
+      "chunkDays": 90,
+      "units": "seconds",
+      "timeSemantics": "sample time separate from fetch time",
+      "notes": "Includes naps, measured REM, unmeasurable time and validation. Preferred over the Advanced data night when both exist."
     },
     {
-      "id": "activity_fit",
+      "id": "heart_rate",
       "documentation": "official",
-      "applicationPermission": "unknown",
-      "realSampleValidation": "none",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
       "source": "official",
-      "deliveryModel": "ping-pull",
-      "units": "FIT native units",
-      "timeSemantics": "FIT timestamps plus receipt"
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/heartrates",
+      "chunkDays": 7,
+      "units": "bpm",
+      "timeSemantics": "sample time separate from fetch time"
+    },
+    {
+      "id": "activity_daily",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/activities",
+      "chunkDays": 90,
+      "units": "steps, metres, kcal",
+      "timeSemantics": "sample time separate from fetch time"
+    },
+    {
+      "id": "activity_hourly",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/activities",
+      "chunkDays": 90,
+      "units": "steps",
+      "timeSemantics": "sample time separate from fetch time",
+      "notes": "Incomplete; the Advanced data per-minute steps stay primary."
+    },
+    {
+      "id": "workouts",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/sports",
+      "chunkDays": 90,
+      "units": "canonical contract",
+      "timeSemantics": "sample time separate from fetch time",
+      "notes": "Runs and walks only."
+    },
+    {
+      "id": "workout_detail",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/sportDetail?trackId=",
+      "chunkDays": null,
+      "units": "JSON object, not FIT",
+      "timeSemantics": "sample time separate from fetch time",
+      "notes": "Fetched per workout; a permanently unavailable one is set aside and retried later."
+    },
+    {
+      "id": "pai",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/openData/PaiSummary",
+      "chunkDays": 90,
+      "units": "PAI points",
+      "timeSemantics": "sample time separate from fetch time"
+    },
+    {
+      "id": "weight",
+      "documentation": "official",
+      "applicationPermission": "available",
+      "implemented": true,
+      "realSampleValidation": "local database",
+      "source": "official",
+      "deliveryModel": "pull",
+      "endpoint": "GET /users/-/body",
+      "chunkDays": 90,
+      "units": "kg",
+      "timeSemantics": "sample time separate from fetch time"
     },
     {
       "id": "hrv_last_night_avg",
       "documentation": "official",
       "applicationPermission": "unknown",
+      "implemented": false,
       "realSampleValidation": "none",
       "source": "official",
       "deliveryModel": "webhook",
       "units": "undocumented",
-      "timeSemantics": "night statistic; window undocumented"
+      "timeSemantics": "night statistic; window undocumented",
+      "notes": "Not pulled. Never written to the SDNN / RMSSD columns."
+    },
+    {
+      "id": "official_webhook",
+      "documentation": "documented unsigned",
+      "applicationPermission": "unknown",
+      "implemented": false,
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "push",
+      "units": "payload-defined",
+      "timeSemantics": "event time separate from receipt",
+      "notes": "The relay answers data callbacks with 503 data_ingestion_not_enabled. A revocation event may only pause, never delete local data."
+    },
+    {
+      "id": "backfill",
+      "documentation": "documented",
+      "applicationPermission": "unknown",
+      "implemented": false,
+      "realSampleValidation": "none",
+      "source": "official",
+      "deliveryModel": "async-202",
+      "units": "30-day maximum window",
+      "timeSemantics": "accepted is not completion",
+      "notes": "Limited to 50 requests per hour per partner application, so it is not offered. History backfill uses Advanced data."
     },
     {
       "id": "legacy_metrics",
@@ -40,27 +154,8 @@
       "source": "legacy",
       "deliveryModel": "pull",
       "units": "canonical contract",
-      "timeSemantics": "provider fetch time separate"
-    },
-    {
-      "id": "official_webhook",
-      "documentation": "documented unsigned",
-      "applicationPermission": "unknown",
-      "realSampleValidation": "none",
-      "source": "official",
-      "deliveryModel": "push",
-      "units": "payload-defined",
-      "timeSemantics": "event time separate from receipt"
-    },
-    {
-      "id": "backfill",
-      "documentation": "documented",
-      "applicationPermission": "unknown",
-      "realSampleValidation": "none",
-      "source": "official",
-      "deliveryModel": "async-202",
-      "units": "30-day maximum window",
-      "timeSemantics": "accepted is not completion"
+      "timeSemantics": "provider fetch time separate",
+      "implemented": true
     },
     {
       "id": "training_plan_write",
@@ -168,7 +263,8 @@
           "case": "all rounds",
           "result": "plans the user created by hand in the Zepp App are never affected by our pushes"
         }
-      ]
+      ],
+      "implemented": true
     }
   ]
 }
