@@ -211,6 +211,8 @@ pub struct Database {
     /// 大于 0 时，逐流的同步状态（`sync_state`、阶段、写入计数）不写。见
     /// [`Database::quiet_sync_state`]。
     quiet_state: std::sync::atomic::AtomicU32,
+    /// 只读打开走了回退时是哪一种（见 `open_read_only_any_version`）。
+    read_fallback: Option<ReadFallback>,
 }
 
 /// 持有期间这条连接不写用户可见的逐流同步状态（只写数据）。
@@ -231,6 +233,7 @@ impl Database {
         Self {
             conn,
             quiet_state: std::sync::atomic::AtomicU32::new(0),
+            read_fallback: None,
         }
     }
 

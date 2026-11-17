@@ -82,6 +82,7 @@ mod replay;
 mod schema;
 mod time_bridge;
 mod training_plan;
+mod unchanged_raw;
 mod workout_edits;
 mod workout_feedback;
 

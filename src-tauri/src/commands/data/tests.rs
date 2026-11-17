@@ -764,3 +764,31 @@ fn corrections_from_unknown_codes_are_sent_and_odd_shapes_are_dropped_alone() {
         ]
     );
 }
+
+/// 3.1.1 反馈：对着 devices.json 以为「本地数据标志位算错了」。那两项是读列表时
+/// 现算的，缓存里不写；读回来按默认值补上。
+#[test]
+fn the_device_cache_omits_fields_that_are_computed_on_read() {
+    let suffix = zeppbridge_core::unique_suffix();
+    let dir = std::env::temp_dir().join(format!("zeppbridge-device-cache-derived-{suffix}"));
+    fs::create_dir_all(&dir).unwrap();
+    let file = DeviceProfilesFile {
+        version: 1,
+        cached_at: chrono::Utc::now(),
+        profiles: vec![super::DeviceProfile {
+            name: Some("T-Rex".into()),
+            device_id: Some("SN-1".into()),
+            ..Default::default()
+        }],
+    };
+    let encoded = encode_device_cache(&file).unwrap();
+    let text = String::from_utf8(encoded.clone()).unwrap();
+    assert!(!text.contains("has_local_data"), "{text}");
+    assert!(!text.contains("last_data_at"), "{text}");
+    fs::write(dir.join("devices.json"), encoded).unwrap();
+    let cache = read_device_profile_cache(&dir);
+    assert_eq!(cache.profiles.len(), 1);
+    assert_eq!(cache.profiles[0].device_id.as_deref(), Some("SN-1"));
+    assert!(!cache.profiles[0].has_local_data);
+    let _ = fs::remove_dir_all(dir);
+}

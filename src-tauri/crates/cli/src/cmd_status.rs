@@ -25,10 +25,25 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
         .map(|status| status.configured)
         .unwrap_or(false);
 
+    // 解析出的数据目录（用户名打了码）：3.1.1 那份 exit 6 的反馈里，最先要排除的
+    // 就是「CLI 读的和应用写的不是同一个目录」，以前 status 不说它在读哪儿。
+    let data_dir_shown = paths::mask_user_path(&dir);
     let db = match open_read_only() {
         Ok(db) => db,
         Err((code, message)) => {
             // 没有库也要能打印出原因，否则调度脚本连状态都查不到。
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "ok": false,
+                        "errorKind": error_kind_for(code),
+                        "message": message,
+                        "dataDir": data_dir_shown,
+                    })
+                );
+                return code;
+            }
             return fail(json_mode, code, error_kind_for(code), &message);
         }
     };
@@ -59,6 +74,9 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
         "ok": true,
         "version": VERSION,
         "connected": connected,
+        "dataDir": data_dir_shown,
+        // 只读打开走了回退时是哪一种（`immutable` / `truncated_header`），平时是 null。
+        "readFallback": db.read_fallback().map(|fallback| fallback.as_str()),
         "databaseBytes": database_bytes,
         "schemaVersion": health.database.schema_version,
         // 库里实际记着的修订号，不是这个程序自己的常量。两者可以不相等，
@@ -91,7 +109,7 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
     });
 
     let human = format!(
-        "ZeppBridge {VERSION}\nAccount: {}\nDatabase: {} bytes, schema v{}\nLocal coverage: {}\nLast cloud sync: {}\nHistory ledger: {}{}",
+        "ZeppBridge {VERSION}\nData folder: {data_dir_shown}\nAccount: {}\nDatabase: {} bytes, schema v{}\nLocal coverage: {}\nLast cloud sync: {}\nHistory ledger: {}{}",
         if connected { "connected" } else { "not connected" },
         database_bytes,
         health.database.schema_version,

@@ -404,3 +404,159 @@ fn sqlite_page_caches_are_not_shared_between_connections() {
         "SQLite 带着 SQLITE_ENABLE_MEMORY_MANAGEMENT 编译了"
     );
 }
+
+/* ---------- 3.1.1 反馈：只读打开稳定失败（CLI exit 6、MCP 全不可用） ---------- */
+
+fn seeded_library(dir: &Path) -> PathBuf {
+    let path = dir.join("zepp.db");
+    let db = Database::new(path.clone()).unwrap();
+    db.insert_metric_sample(&MetricSample {
+        metric: "heart_rate".into(),
+        timestamp: ts(),
+        value: 70.0,
+        unit: "bpm".into(),
+        source_scope: SourceScope::Unknown,
+        device_id: None,
+    })
+    .unwrap();
+    path
+}
+
+fn set_read_only(path: &Path, read_only: bool) {
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    #[allow(clippy::permissions_set_readonly_false)]
+    permissions.set_readonly(read_only);
+    std::fs::set_permissions(path, permissions).unwrap();
+}
+
+#[test]
+fn read_only_open_reads_a_library_with_a_truncated_header_without_writing() {
+    let dir = temp_dir("ro-truncated");
+    let path = seeded_library(&dir);
+    let _ = std::fs::remove_file(dir.join("zepp.db-wal"));
+    let _ = std::fs::remove_file(dir.join("zepp.db-shm"));
+    inflate_page_count(&path, 24);
+    let before = std::fs::read(&path).unwrap();
+    // 不回退时这一步就是 3.1.1 的「数据库暂时不可用」：只读连接修不了页头。
+    let plain = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .unwrap()
+        .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        });
+    assert!(plain.is_err(), "页头被撑大后普通只读打开应当失败");
+
+    let db = Database::open_read_only(path.clone()).expect("截断的库也要能只读打开");
+    assert_eq!(db.read_fallback(), Some(ReadFallback::TruncatedHeader));
+    assert_eq!(db.count_metric_samples().unwrap(), 1);
+    assert!(db.is_query_only());
+    drop(db);
+    assert_eq!(std::fs::read(&path).unwrap(), before, "只读回退不许改文件");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn read_only_open_survives_a_leftover_shm_that_cannot_be_written() {
+    let dir = temp_dir("ro-stale-shm");
+    let source = temp_dir("ro-stale-shm-source");
+    let source_path = seeded_library(&source);
+    // 写连接还开着时把整组文件抄走：等于进程被杀后留下的 -wal / -shm。
+    // 先检查点并截断 WAL，留下的就是「应用退出、WAL 已检查点，-shm 还在」。
+    let writer = Connection::open(&source_path).unwrap();
+    writer
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+        .unwrap();
+    for name in ["zepp.db", "zepp.db-wal", "zepp.db-shm"] {
+        std::fs::copy(source.join(name), dir.join(name)).unwrap();
+    }
+    drop(writer);
+    let shm = dir.join("zepp.db-shm");
+    let wal = dir.join("zepp.db-wal");
+    assert!(shm.exists());
+    set_read_only(&shm, true);
+    set_read_only(&wal, true);
+
+    let opened = Database::open_read_only(dir.join("zepp.db"));
+    set_read_only(&shm, false);
+    set_read_only(&wal, false);
+    let db = opened.expect("残留的 -shm 不可写时也要能只读打开");
+    eprintln!("stale -shm read fallback: {:?}", db.read_fallback());
+    assert_eq!(db.count_metric_samples().unwrap(), 1);
+    drop(db);
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(source);
+}
+
+#[test]
+fn read_only_open_failure_names_the_sqlite_code_and_a_masked_path() {
+    let dir = temp_dir("ro-missing");
+    let path = dir.join("no-such-folder").join("zepp.db");
+    let error = match Database::open_read_only(path) {
+        Ok(_) => panic!("不存在的库不该打得开"),
+        Err(error) => error,
+    };
+    let message = error.user_message();
+    assert!(message.contains("CannotOpen"), "{message}");
+    assert!(message.contains("extended 14"), "{message}");
+    assert!(message.contains("zepp.db"), "{message}");
+    if let Some(home) = directories::BaseDirs::new() {
+        let name = home
+            .home_dir()
+            .file_name()
+            .map(|value| value.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.len() > 2 && dir.starts_with(home.home_dir()) {
+            assert!(
+                !message.contains(&name),
+                "用户名不该出现在错误里：{message}"
+            );
+        }
+    }
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn immutable_fallback_is_refused_while_the_wal_still_holds_frames() {
+    let dir = temp_dir("ro-wal-frames");
+    let path = seeded_library(&dir);
+    let writer = Connection::open(&path).unwrap();
+    writer
+        .execute_batch(
+            "PRAGMA journal_mode = WAL; CREATE TABLE probe(x); INSERT INTO probe VALUES (1);",
+        )
+        .unwrap();
+    assert!(std::fs::metadata(dir.join("zepp.db-wal")).unwrap().len() > 0);
+    let failure = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CANTOPEN),
+        None,
+    );
+    assert_eq!(
+        crate::storage::open::read_fallback_for(&path, &failure),
+        None
+    );
+    drop(writer);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn read_only_open_falls_back_to_immutable_when_the_shm_cannot_be_opened_at_all() {
+    // ACL 不让读、被别的程序独占、或者干脆是个同名文件夹：`-shm` 打不开。
+    // 没有活的 -wal 时，immutable 读法绕得过去（应用已退出、WAL 已检查点）。
+    let dir = temp_dir("ro-shm-blocked");
+    let path = seeded_library(&dir);
+    let _ = std::fs::remove_file(dir.join("zepp.db-wal"));
+    let _ = std::fs::remove_file(dir.join("zepp.db-shm"));
+    std::fs::create_dir(dir.join("zepp.db-shm")).unwrap();
+    let plain = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .unwrap()
+        .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        });
+    assert!(plain.is_err(), "-shm 打不开时普通只读打开应当失败");
+
+    let db = Database::open_read_only(path).expect("-shm 打不开也要能只读打开");
+    assert_eq!(db.read_fallback(), Some(ReadFallback::Immutable));
+    assert_eq!(db.count_metric_samples().unwrap(), 1);
+    assert!(db.is_query_only());
+    drop(db);
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -42,9 +42,22 @@ pub async fn get_device_profiles(
         }
     }
 
-    profiles = enrich_profiles_with_local_data(&state, profiles).await?;
-    let hidden_keys =
-        spawn_independent_read(state.data_dir.clone(), |db| db.hidden_device_keys()).await?;
+    // 本机数据补全（「有没有本地数据」「最近一条」）读不了库时不连累整张列表：
+    // 3.1.1 反馈里「重新识别设备」立刻报「本地数据库暂不可用」，其实云端那一步
+    // 已经成功、缓存也写好了；设置页却因此一台设备都不显示。
+    profiles = match enrich_profiles_with_local_data(&state, profiles.clone()).await {
+        Ok(enriched) => enriched,
+        Err(error) => {
+            crate::diagnostics::log(&format!(
+                "设备列表的本机数据补全失败，先按云端列表显示：{}",
+                error.message
+            ));
+            profiles
+        }
+    };
+    let hidden_keys = spawn_independent_read(state.data_dir.clone(), |db| db.hidden_device_keys())
+        .await
+        .unwrap_or_default();
     let (hidden_profiles, profiles) = split_hidden_profiles(profiles, &hidden_keys);
     let now = Utc::now();
     let age_seconds = cached_at.map(|value| (now - value).num_seconds().max(0));
@@ -183,7 +196,7 @@ pub(super) async fn refresh_device_profiles_from_cloud(
         cached_at,
         profiles: profiles.clone(),
     };
-    let encoded = serde_json::to_vec_pretty(&cache_file).map_err(|error| {
+    let encoded = encode_device_cache(&cache_file).map_err(|error| {
         AppError::new("err.core.parse", format!("设备目录缓存编码失败: {error}"))
     })?;
     write_file_atomically(&state.data_dir.join("devices.json"), &encoded)
@@ -246,6 +259,23 @@ pub(super) async fn resolve_device_profile(
         return enrich_profile_with_local_data(state, profile, Some(device_id), None).await;
     }
     Ok(unknown_device_profile(device_id))
+}
+
+/// 写 `devices.json`：云端设备列表的缓存。
+///
+/// `has_local_data` / `last_data_at` 是每次读列表时按本机库现算的
+/// （`enrich_profiles_with_local_data`），缓存里那两项永远是 false / null。
+/// 3.1.1 有人对着这个文件以为「本地数据标志位算错了」——所以不写进去，
+/// 读回来时按默认值补上，照旧现算。
+pub(super) fn encode_device_cache(file: &DeviceProfilesFile) -> serde_json::Result<Vec<u8>> {
+    let mut value = serde_json::to_value(file)?;
+    if let Some(profiles) = value.get_mut("profiles").and_then(Value::as_array_mut) {
+        for profile in profiles.iter_mut().filter_map(Value::as_object_mut) {
+            profile.remove("has_local_data");
+            profile.remove("last_data_at");
+        }
+    }
+    serde_json::to_vec_pretty(&value)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

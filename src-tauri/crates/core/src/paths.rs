@@ -852,3 +852,62 @@ pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests;
+
+/// 给用户看、可能被贴进反馈的路径：用户主目录换成占位符，用户名不出本机。
+///
+/// Windows 换成 `%USERPROFILE%`（在 cmd 里还能直接展开），其它系统换成 `~`。
+/// 主目录取不到、或路径不在主目录下时，再按 `Users\<名字>` / `home/<名字>` 这种
+/// 常见形状把名字那一段打码——数据目录可能在别的盘上，但盘上仍然常带用户名。
+pub fn mask_user_path(path: &Path) -> String {
+    let text = path.display().to_string();
+    let text = text.strip_prefix(r"\\?\").unwrap_or(&text).to_string();
+    if let Some(home) = directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf()) {
+        let home_text = home.display().to_string();
+        if let Some(rest) = strip_home_prefix(&text, &home_text) {
+            let placeholder = if cfg!(windows) { "%USERPROFILE%" } else { "~" };
+            return format!("{placeholder}{rest}");
+        }
+    }
+    mask_user_segment(&text)
+}
+
+/// `text` 以主目录开头（Windows 不分大小写）且在分隔符处断开时，返回剩下的部分。
+fn strip_home_prefix<'a>(text: &'a str, home: &str) -> Option<&'a str> {
+    if home.is_empty() || !text.is_char_boundary(home.len().min(text.len())) {
+        return None;
+    }
+    let head = text.get(..home.len())?;
+    let same = if cfg!(windows) {
+        head.eq_ignore_ascii_case(home)
+    } else {
+        head == home
+    };
+    let rest = &text[home.len()..];
+    (same && (rest.is_empty() || rest.starts_with(['/', '\\']))).then_some(rest)
+}
+
+/// `…\Users\<名字>\…`、`/home/<名字>/…`、`/Users/<名字>/…` 里的名字换成 `***`。
+fn mask_user_segment(text: &str) -> String {
+    let separators: &[char] = &['/', '\\'];
+    let mut parts: Vec<String> = Vec::new();
+    let mut rest = text;
+    while let Some(index) = rest.find(separators) {
+        parts.push(rest[..index].to_string());
+        parts.push(rest[index..index + 1].to_string());
+        rest = &rest[index + 1..];
+    }
+    parts.push(rest.to_string());
+    let mut mask_next = false;
+    for part in parts.iter_mut() {
+        if part == "/" || part == "\\" {
+            continue;
+        }
+        if mask_next && !part.is_empty() {
+            *part = "***".to_string();
+            mask_next = false;
+            continue;
+        }
+        mask_next = part.eq_ignore_ascii_case("users") || part == "home";
+    }
+    parts.concat()
+}

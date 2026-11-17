@@ -447,3 +447,56 @@ fn disconnect_still_disconnects_when_the_store_refuses_to_delete() {
     assert!(store.load().unwrap().is_none());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// 3.1.1 反馈「约 1 小时就变成待验证」：另一个进程（桌面 / CLI / MCP）刚用同一把
+/// 刷新令牌刷过，云端没有轮换刷新令牌，只换了访问令牌；这边晚到的刷新被拒，
+/// 不能把对方刚续上的账号标成「要重新授权」。
+#[tokio::test]
+async fn a_rejected_refresh_after_another_process_refreshed_keeps_the_account() {
+    let dir = temp_dir();
+    let backend = MemoryBackend::named();
+    let store = OfficialStore::with_backend(&dir, backend.clone());
+    let used = tokens();
+    store.save(&used, 1).unwrap();
+    let newer = OfficialTokens {
+        access_token: "access-from-the-other-process".into(),
+        ..used.clone()
+    };
+    let other_dir = dir.clone();
+    let other_newer = newer.clone();
+    let (base, _) = serve(move |_| {
+        // 对方在这次请求的往返途中写回了新令牌（刷新令牌没变）。
+        OfficialStore::with_backend(&other_dir, backend.clone())
+            .save(&other_newer, 2)
+            .unwrap();
+        Reply::json(401, r#"{"error":"invalid_grant"}"#)
+    })
+    .await;
+    let client = OfficialClient::with_bases(&base, &base).unwrap();
+    let got = refresh_tokens(&store, &client, &used, 10_000)
+        .await
+        .unwrap();
+    assert_eq!(got, newer);
+    let meta = store.meta().unwrap().unwrap();
+    assert!(!meta.needs_reauth);
+    assert_eq!(store.load().unwrap(), Some(newer));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// 没人刷过、刷新被拒：这才是真的要重新授权。
+#[tokio::test]
+async fn a_rejected_refresh_nobody_else_answered_needs_reauth() {
+    let dir = temp_dir();
+    let store = OfficialStore::with_backend(&dir, MemoryBackend::named());
+    let used = tokens();
+    store.save(&used, 1).unwrap();
+    let (base, _) = serve(|_| Reply::json(401, r#"{"error":"invalid_grant"}"#)).await;
+    let client = OfficialClient::with_bases(&base, &base).unwrap();
+    let error = refresh_tokens(&store, &client, &used, 10_000)
+        .await
+        .unwrap_err();
+    assert!(error.needs_reauth());
+    assert!(store.meta().unwrap().unwrap().needs_reauth);
+    assert_eq!(store.load().unwrap(), None);
+    let _ = std::fs::remove_dir_all(dir);
+}

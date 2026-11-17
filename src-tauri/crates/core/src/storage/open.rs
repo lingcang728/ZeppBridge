@@ -32,28 +32,151 @@ pub(super) fn looks_corrupt(text: &str) -> bool {
 /// If the SQLite header claims more pages than the file actually has, rewrite
 /// the page count. This is the usual leftover of a force-killed WAL checkpoint
 /// or index rebuild.
-pub(super) fn salvage_truncated_page_count(path: &Path) -> std::io::Result<bool> {
-    use std::fs::OpenOptions;
-    use std::io::{Read, Seek, SeekFrom, Write};
+/// 只读回退的两种读法。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadFallback {
+    /// `immutable=1`：不碰 `-shm`、不加锁。只在没有活的 `-wal` 时用。
+    Immutable,
+    /// 页头页数比文件长：`writable_schema` 让 SQLite 按实际长度读，不写盘。
+    TruncatedHeader,
+}
 
-    let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+impl ReadFallback {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Immutable => "immutable",
+            Self::TruncatedHeader => "truncated_header",
+        }
+    }
+}
+
+/// 第一次只读打开失败之后，能不能、该用哪种读法再试一次。
+pub(super) fn read_fallback_for(db_path: &Path, error: &rusqlite::Error) -> Option<ReadFallback> {
+    let rusqlite::Error::SqliteFailure(..) = error else {
+        return None;
+    };
+    if is_corrupt_sqlite(error) {
+        return header_claims_missing_pages(db_path)
+            .unwrap_or(false)
+            .then_some(ReadFallback::TruncatedHeader);
+    }
+    // `-wal` 里还有帧：immutable 会读不到那些已提交的事务，宁可报错。
+    let wal_idle = match std::fs::metadata(sqlite_sidecar(db_path, "-wal")) {
+        Ok(meta) => meta.len() == 0,
+        Err(error) => error.kind() == std::io::ErrorKind::NotFound,
+    };
+    (wal_idle && immutable_uri(db_path).is_some()).then_some(ReadFallback::Immutable)
+}
+
+fn sqlite_sidecar(db_path: &Path, suffix: &str) -> PathBuf {
+    let mut name = db_path.as_os_str().to_os_string();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
+/// `file:` URI 形式的路径，带 `immutable=1`。UNC 路径不拼（SQLite 的 URI
+/// 不认带主机名的写法），这条回退就不走。
+fn immutable_uri(db_path: &Path) -> Option<String> {
+    let text = db_path.to_str()?;
+    let text = text.strip_prefix(r"\\?\").unwrap_or(text);
+    if text.starts_with(r"\\") {
+        return None;
+    }
+    let mut encoded = String::with_capacity(text.len() + 32);
+    for character in text.chars() {
+        match character {
+            '\\' => encoded.push('/'),
+            '%' => encoded.push_str("%25"),
+            '?' => encoded.push_str("%3f"),
+            '#' => encoded.push_str("%23"),
+            other => encoded.push(other),
+        }
+    }
+    let prefix = if encoded.starts_with('/') {
+        "file://"
+    } else {
+        "file:///"
+    };
+    Some(format!("{prefix}{encoded}?mode=ro&immutable=1"))
+}
+
+/// 打开失败的错误带上打了码的路径；错误码原样保留（损坏判断要靠它）。
+fn annotate_with_path(error: rusqlite::Error, db_path: &Path) -> rusqlite::Error {
+    match error {
+        rusqlite::Error::SqliteFailure(code, message) => {
+            let masked = crate::paths::mask_user_path(db_path);
+            // rusqlite 在打不开时会把完整路径接在原话后面（带用户名），换成打码的。
+            let base = message
+                .unwrap_or_else(|| code.to_string())
+                .replace(&db_path.display().to_string(), &masked);
+            let text = if base.contains(&masked) {
+                base
+            } else {
+                format!("{base}; read-only open of {masked}")
+            };
+            rusqlite::Error::SqliteFailure(code, Some(text))
+        }
+        other => other,
+    }
+}
+
+/// SQLite 错误的诊断串：错误类、扩展码和原话，例如
+/// `CannotOpen (extended 14): unable to open database file`。不含 SQL 参数值。
+pub fn sqlite_error_detail(error: &rusqlite::Error) -> String {
+    let text = match error {
+        rusqlite::Error::SqliteFailure(code, message) => format!(
+            "{:?} (extended {}): {}",
+            code.code,
+            code.extended_code,
+            message.clone().unwrap_or_else(|| code.to_string())
+        ),
+        other => other.to_string(),
+    };
+    if text.chars().count() > 300 {
+        format!("{}…", text.chars().take(297).collect::<String>())
+    } else {
+        text
+    }
+}
+
+/// (页头声称的页数, 文件实际页数)。不是 SQLite 文件或页长对不上时 `None`。只读。
+fn header_page_counts(file: &mut std::fs::File) -> std::io::Result<Option<(u64, u64)>> {
+    use std::io::Read;
     let file_len = file.metadata()?.len();
     let mut header = [0u8; 100];
     if file.read(&mut header)? < 100 {
-        return Ok(false);
+        return Ok(None);
     }
     if &header[0..16] != b"SQLite format 3\0" {
-        return Ok(false);
+        return Ok(None);
     }
     let mut page_size = u16::from_be_bytes([header[16], header[17]]) as u64;
     if page_size == 1 {
         page_size = 65_536;
     }
     if page_size == 0 || file_len % page_size != 0 {
-        return Ok(false);
+        return Ok(None);
     }
     let actual_pages = file_len / page_size;
     let claimed_pages = u32::from_be_bytes([header[28], header[29], header[30], header[31]]) as u64;
+    Ok(Some((claimed_pages, actual_pages)))
+}
+
+/// 页头声称的页数比文件长（典型的被截断）。只读检查。
+fn header_claims_missing_pages(path: &Path) -> std::io::Result<bool> {
+    let mut file = std::fs::File::open(path)?;
+    Ok(header_page_counts(&mut file)?
+        .is_some_and(|(claimed, actual)| claimed > actual && actual > 0))
+}
+
+pub(super) fn salvage_truncated_page_count(path: &Path) -> std::io::Result<bool> {
+    use std::fs::OpenOptions;
+    use std::io::{Seek, SeekFrom, Write};
+
+    let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+    let Some((claimed_pages, actual_pages)) = header_page_counts(&mut file)? else {
+        return Ok(false);
+    };
     if claimed_pages <= actual_pages || actual_pages == 0 {
         return Ok(false);
     }
@@ -313,16 +436,82 @@ impl Database {
     /// 恢复预览要读的也可能是。所以这一层只提供机制，不带版本判断。
     ///
     /// 回答用户查询的调用方请用 `open_read_only`。
+    ///
+    /// 普通只读打开失败时（3.1.1 的 Windows 反馈：应用已退出、WAL 已检查点，
+    /// CLI / MCP / 「交给 AI」仍然稳定报「数据库暂时不可用」，同一个库 Python
+    /// 以 `mode=ro` 却打得开），在确定安全的条件下退一步：
+    ///
+    /// - 没有活的 `-wal`（不存在或为空）时用 `immutable=1`：不碰 `-shm`、不加锁。
+    ///   残留的 `-shm` 不可写、被别的账号 / 杀毒软件占着、ACL 不让建，都绕得过去。
+    ///   `-wal` 里还有帧时绝不用——那样会读不到已经提交的数据。
+    /// - 页头声称的页数比文件长（被截断）：可写连接会先修页头再开，只读连接修不了，
+    ///   就开 `writable_schema`，让 SQLite 按文件实际长度读，一个字节都不写。
+    ///
+    /// 都不行时返回第一次的错误，但带上 SQLite 的原始错误码和打了码的路径，
+    /// 下一份反馈就不用再猜。
     pub fn open_read_only_any_version(db_path: PathBuf) -> Result<Self> {
-        let conn = Connection::open_with_flags(
-            db_path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-        )?;
+        let first = match Self::try_open_read_only(&db_path, None) {
+            Ok(db) => return Ok(db),
+            Err(error) => error,
+        };
+        if let Some(fallback) = read_fallback_for(&db_path, &first) {
+            match Self::try_open_read_only(&db_path, Some(fallback)) {
+                Ok(mut db) => {
+                    tracing::warn!(
+                        fallback = fallback.as_str(),
+                        error = %sqlite_error_detail(&first),
+                        "read-only open fell back"
+                    );
+                    db.read_fallback = Some(fallback);
+                    return Ok(db);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        fallback = fallback.as_str(),
+                        error = %sqlite_error_detail(&error),
+                        "read-only fallback failed too"
+                    );
+                }
+            }
+        }
+        Err(ZeppBridgeError::DatabaseError(annotate_with_path(
+            first, &db_path,
+        )))
+    }
+
+    /// 一次只读打开，并立刻读一次 schema——SQLite 打开文件是惰性的，`-wal` /
+    /// `-shm` 的问题要到第一次读才暴露，必须在这里暴露，回退才来得及。
+    fn try_open_read_only(
+        db_path: &Path,
+        fallback: Option<ReadFallback>,
+    ) -> std::result::Result<Self, rusqlite::Error> {
+        let flags =
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI;
+        let conn = match fallback {
+            Some(ReadFallback::Immutable) => {
+                let uri = immutable_uri(db_path)
+                    .ok_or_else(|| rusqlite::Error::InvalidPath(db_path.to_path_buf()))?;
+                Connection::open_with_flags(uri, flags)?
+            }
+            _ => Connection::open_with_flags(db_path, flags)?,
+        };
+        if fallback == Some(ReadFallback::TruncatedHeader) {
+            // 只是一个连接标志，本身不读库；只读连接上它也写不了任何东西。
+            conn.execute_batch("PRAGMA writable_schema = ON;")?;
+        }
         conn.execute_batch(
             "PRAGMA busy_timeout = 30000;
              PRAGMA query_only = ON;",
         )?;
+        conn.query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
         Ok(Self::from_conn(conn))
+    }
+
+    /// 这条只读连接是不是走了回退（见 [`Self::open_read_only_any_version`]）。
+    pub fn read_fallback(&self) -> Option<ReadFallback> {
+        self.read_fallback
     }
 
     /// 只读打开，并先确认 schema 版本对得上。
@@ -335,10 +524,11 @@ impl Database {
     /// 会连带挡住升级前的自动备份——那意味着谁也升级不了。
     pub fn open_read_only(db_path: PathBuf) -> Result<Self> {
         let db = Self::open_read_only_any_version(db_path)?;
-        let conn = db.conn;
-        let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))?;
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
-            std::cmp::Ordering::Equal => Ok(Self::from_conn(conn)),
+            std::cmp::Ordering::Equal => Ok(db),
             // 自己的错误码：撞上这一条的人几乎都在无头环境里，而命令行没有
             // i18n 层，只有按码才出得了英文。见 `HeadlessProblem`。
             std::cmp::Ordering::Less => Err(ZeppBridgeError::Headless(

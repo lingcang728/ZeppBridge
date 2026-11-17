@@ -223,9 +223,7 @@ impl OfficialStore {
     }
 
     fn holds(&self, used: &OfficialTokens) -> Result<bool> {
-        Ok(self.load()?.is_some_and(|current| {
-            current.user_id == used.user_id && current.refresh_token == used.refresh_token
-        }))
+        Ok(self.load()?.is_some_and(|current| current.same_grant(used)))
     }
 
     /// 先写凭据、再写元数据：元数据说「已连接」时，令牌一定已经在了。

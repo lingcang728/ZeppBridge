@@ -78,9 +78,12 @@ pub(super) fn user_text(error: &ZeppBridgeError) -> String {
         ),
         ZeppBridgeError::Cancelled => "The sync was cancelled.".to_string(),
         ZeppBridgeError::ParseError(_) => "The data Zepp returned could not be parsed.".to_string(),
-        ZeppBridgeError::DatabaseError(_) => {
-            "The local database is temporarily unavailable.".to_string()
-        }
+        // SQLite 的错误类、扩展码和原话（英文），打开失败时还有打了码的路径。
+        // 只有一句「暂时不可用」时，3.1.1 那位用户的 exit 6 无从查起。
+        ZeppBridgeError::DatabaseError(inner) => format!(
+            "The local database is temporarily unavailable ({}).",
+            zeppbridge_core::storage::sqlite_error_detail(inner)
+        ),
         ZeppBridgeError::IoError(_) => "Reading or writing a local file failed.".to_string(),
         ZeppBridgeError::Busy(_) => "Another ZeppBridge process is writing to this library.             Try again in a moment."
             .to_string(),

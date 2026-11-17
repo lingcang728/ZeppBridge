@@ -304,7 +304,12 @@ impl ZeppBridgeError {
                 )),
                 None => "Zepp 返回的数据无法解析".into(),
             },
-            Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
+            // 带上 SQLite 的错误类和扩展码（打开失败时还有打了码的路径）：
+            // 3.1.1 那份「稳定打不开」的反馈只有这一句，没有任何能查的线索。
+            Self::DatabaseError(inner) => format!(
+                "本地数据库暂时不可用（{}）",
+                crate::storage::sqlite_error_detail(inner)
+            ),
             Self::IoError(_) => "读写本地文件失败".into(),
             Self::AiTask(inner) => inner.user_message(),
             Self::TrainingPlan { message, .. } => sanitize_user_text(message),

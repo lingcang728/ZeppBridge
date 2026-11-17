@@ -77,6 +77,37 @@ impl Database {
             json: payload,
             hash: payload_hash,
         } = serialized;
+        // 内容一字不差：只刷元数据和 `fetched_at`，不压缩、不重写 blob。SET 里不能
+        // 出现 `payload_hash`——`invalidate_raw_normalization` 触发器按「UPDATE OF
+        // payload_hash」触发，值没变也会把归一化记录和隔离记录一起删掉。
+        let refreshed = self
+            .conn
+            .prepare_cached(
+                "UPDATE raw_records SET
+                    source_scope = ?3, device_id = ?4, start_utc = ?5, end_utc = ?6,
+                    fetched_at = ?7
+                 WHERE stream = ?1 AND source_key = ?2 AND payload_hash = ?8",
+            )?
+            .execute(params![
+                record.stream,
+                record.source_key,
+                record.source_scope.as_str(),
+                record.device_id,
+                record.start_utc.to_rfc3339(),
+                record.end_utc.map(|value| value.to_rfc3339()),
+                fetched_at,
+                payload_hash,
+            ])?;
+        if refreshed > 0 {
+            return self
+                .conn
+                .query_row(
+                    "SELECT id FROM raw_records WHERE stream = ?1 AND source_key = ?2",
+                    params![record.stream, record.source_key],
+                    |row| row.get(0),
+                )
+                .map_err(Into::into);
+        }
         let payload_zip = compress_payload(payload)?;
         self.conn.execute(
             "INSERT INTO raw_records
@@ -119,21 +150,26 @@ impl Database {
     /// 除了今天，其余 29 天几乎总是原样回来。只把 `fetched_at` 刷成现在：「最近
     /// 一次从云端拿到它」这个事实仍然要对。
     ///
-    /// 返回这条报文上次归一化写下的行数，报告里的「写入 N 条」才不会因为跳过
-    /// 而掉成 0。`sleep` 不走这条路：它的主计数（睡眠段）和总行数（还含手环
-    /// 心率和补充日指标）不是一回事，而 `raw_normalization` 只记了总数。
+    /// 返回这条报文上次归一化写下的主计数，报告里的「写入 N 条」才不会因为跳过
+    /// 而掉成 0。
+    ///
+    /// `sleep` 以前不走这条路：它的主计数（睡眠段）和 `raw_normalization` 记的
+    /// 总行数（还含手环心率和补充日指标）不是一回事。代价是每次同步都把 30 天的
+    /// `band_data` 整批删掉重插——真实库副本上一轮就是约 27 万行手环心率（3.1.1
+    /// 反馈「每次同步都重写约 2.7 万条」）。现在睡眠段数直接按 `raw_record_id`
+    /// 数出来，和重新归一化时报的主计数是同一个数。
     pub(super) fn touch_unchanged_raw(
         &self,
         record: &RawRecord,
         serialized: &SerializedPayload,
     ) -> Result<Option<(i64, i64)>> {
-        if record.stream == "sleep" {
-            return Ok(None);
-        }
         let unchanged = self
             .conn
             .prepare_cached(
-                "SELECT r.id, n.records_written
+                "SELECT r.id,
+                        CASE WHEN r.stream = 'sleep'
+                             THEN (SELECT COUNT(*) FROM sleep_sessions s WHERE s.raw_record_id = r.id)
+                             ELSE n.records_written END
                  FROM raw_records r
                  JOIN raw_normalization n
                    ON n.raw_record_id = r.id AND n.revision = ?4
@@ -156,6 +192,47 @@ impl Database {
                 .execute(params![id, Utc::now().to_rfc3339()])?;
         }
         Ok(unchanged)
+    }
+
+    /// 同一份**明确为空**的报文又拉了一遍（某天心率 `items` 为空）：按当前解析器
+    /// 已经判过「云端没有」，再归一化一遍结论也一样。以前每次同步都把它重新入库、
+    /// 删掉隔离记录再隔离一次。返回上次的结论原话，调用方照旧报「云端无数据」。
+    pub(super) fn touch_unchanged_empty_raw(
+        &self,
+        record: &RawRecord,
+        serialized: &SerializedPayload,
+    ) -> Result<Option<String>> {
+        let unchanged = self
+            .conn
+            .prepare_cached(
+                "SELECT r.id, q.error
+                 FROM raw_records r
+                 JOIN raw_quarantine q
+                   ON q.raw_record_id = r.id AND q.revision = ?4 AND q.empty_response = 1
+                 WHERE r.stream = ?1 AND r.source_key = ?2 AND r.payload_hash = ?3",
+            )?
+            .query_row(
+                params![
+                    record.stream,
+                    record.source_key,
+                    serialized.hash,
+                    NORMALIZER_REVISION
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
+        let Some((id, error)) = unchanged else {
+            return Ok(None);
+        };
+        self.conn
+            .prepare_cached("UPDATE raw_records SET fetched_at = ?2 WHERE id = ?1")?
+            .execute(params![id, Utc::now().to_rfc3339()])?;
+        // 存的是 Display（「数据不可用: 响应 items 为空」），还原成原来的细节。
+        let detail = error
+            .strip_prefix("数据不可用: ")
+            .unwrap_or(&error)
+            .to_string();
+        Ok(Some(detail))
     }
 
     pub fn normalize_and_persist_raw(

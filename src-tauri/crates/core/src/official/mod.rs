@@ -62,6 +62,17 @@ impl std::fmt::Debug for OfficialTokens {
 }
 
 impl OfficialTokens {
+    /// 存储里的这一份和拿去刷新的那一份是不是同一次授权、同一次刷新的结果。
+    ///
+    /// 以前只比刷新令牌：云端刷新时不轮换刷新令牌（响应里没带新的），另一个进程
+    /// 刷过之后两边刷新令牌一样、访问令牌不同，这边会拿同一把刷新令牌再刷一次，
+    /// 被拒就把对方刚续上的账号标成「要重新授权」。访问令牌变了就说明有人刷过。
+    pub(crate) fn same_grant(&self, other: &OfficialTokens) -> bool {
+        self.user_id == other.user_id
+            && self.refresh_token == other.refresh_token
+            && self.access_token == other.access_token
+    }
+
     /// 到期前 [`REFRESH_MARGIN_SECONDS`] 秒起就算该刷新了。
     pub fn needs_refresh(&self, now: i64) -> bool {
         self.expires_at
@@ -94,15 +105,11 @@ pub async fn refresh_tokens(
     now: i64,
 ) -> Result<OfficialTokens> {
     let _flight = REFRESH_FLIGHT.lock().await;
-    let _other_processes = store.refresh_flight().await;
+    let mut other_processes = store.refresh_flight().await;
     let reauth = || ZeppBridgeError::NeedsReauth("官方授权已失效，请重新授权".into());
     match store.load()? {
         None => return Err(reauth()),
-        Some(current)
-            if current.user_id != used.user_id || current.refresh_token != used.refresh_token =>
-        {
-            return Ok(current);
-        }
+        Some(current) if !current.same_grant(used) => return Ok(current),
         Some(_) => {}
     }
     match client.refresh(used, now).await? {
@@ -114,6 +121,24 @@ pub async fn refresh_tokens(
             }
         }
         RefreshOutcome::Revoked => {
+            // 被拒多半是另一个进程（桌面 / CLI / MCP）刚用同一把刷新令牌刷过：
+            // 3.1.1 有人反映「约 1 小时就变成待验证」，正是访问令牌第一次到期的时刻。
+            // 先重读存储，对方已经换上新令牌就用它；没拿到跨进程刷新锁时，
+            // 对方可能还在往返途中，等它刷完（或等到锁）再看一次。
+            if let Some(current) = store.load()? {
+                if !current.same_grant(used) {
+                    return Ok(current);
+                }
+            }
+            if other_processes.is_none() {
+                other_processes = store.refresh_flight().await;
+                if let Some(current) = store.load()? {
+                    if !current.same_grant(used) {
+                        return Ok(current);
+                    }
+                }
+            }
+            drop(other_processes);
             if store.mark_needs_reauth_if_current(used)? {
                 Err(reauth())
             } else {

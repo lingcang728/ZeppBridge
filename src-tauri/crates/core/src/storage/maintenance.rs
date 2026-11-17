@@ -487,6 +487,10 @@ impl Database {
                 },
             ));
         }
+        // 原样又回了一份「云端没有」：结论照旧，不重新入库、不重新隔离。
+        if let Some(detail) = self.touch_unchanged_empty_raw(record, &serialized)? {
+            return Err(ZeppBridgeError::DataUnavailable(detail));
+        }
         let raw_id = self.insert_serialized_raw(record, &serialized, &Utc::now().to_rfc3339())?;
         let normalized = (|| {
             let transaction = ReplayBatch::begin(&self.conn)?;

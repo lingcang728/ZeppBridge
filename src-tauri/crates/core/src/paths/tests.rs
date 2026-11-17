@@ -591,3 +591,28 @@ fn fresh_start_never_reuses_an_existing_folder() {
     );
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn masked_paths_never_carry_the_user_name() {
+    if let Some(dirs) = directories::BaseDirs::new() {
+        let home = dirs.home_dir().to_path_buf();
+        let shown = mask_user_path(&home.join("ZeppBridge").join("data"));
+        let placeholder = if cfg!(windows) { "%USERPROFILE%" } else { "~" };
+        assert!(shown.starts_with(placeholder), "{shown}");
+        assert!(shown.ends_with("data"), "{shown}");
+    }
+    // 不在主目录下（别的盘、别的账号）时，按常见形状把名字那一段打码。
+    assert_eq!(
+        mask_user_segment(r"D:\Users\alice\ZeppBridge\data"),
+        r"D:\Users\***\ZeppBridge\data"
+    );
+    assert_eq!(
+        mask_user_segment("/home/bob/.local/share/zeppbridge/data"),
+        "/home/***/.local/share/zeppbridge/data"
+    );
+    assert_eq!(
+        mask_user_segment(r"E:\ZeppBridge\data"),
+        r"E:\ZeppBridge\data"
+    );
+    assert_eq!(strip_home_prefix(r"C:\Users\al2\x", r"C:\Users\al"), None);
+}
