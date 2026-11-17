@@ -4,6 +4,8 @@ import { defineMessages } from '../../../i18n';
 export const syncCardMessages = defineMessages(
   {
     cardTitle: '同步',
+    /** 带「检查更新」的版本用这个标题（反馈：macOS 上找不到哪里检查更新——它藏在「同步」卡里）。 */
+    cardTitleUpdates: '同步与更新',
     autoSub: '应用开着时按这个间隔拉新数据',
     off: '关',
     lastSynced: (when: string) => `上次同步 ${when}`,
@@ -14,6 +16,7 @@ export const syncCardMessages = defineMessages(
   },
   {
     cardTitle: 'Sync',
+    cardTitleUpdates: 'Sync and updates',
     autoSub: 'Fetches new data at this interval while the app is open',
     off: 'Off',
     lastSynced: (when: string) => `Last synced ${when}`,
@@ -24,6 +27,7 @@ export const syncCardMessages = defineMessages(
   },
   {
     cardTitle: 'Sincronización',
+    cardTitleUpdates: 'Sincronización y actualizaciones',
     autoSub: 'Trae datos nuevos con este intervalo mientras la app está abierta',
     off: 'No',
     lastSynced: (when: string) => `Última sincronización ${when}`,

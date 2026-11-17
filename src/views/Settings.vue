@@ -70,7 +70,8 @@ watch(activeId, () => { exportFormat.value = readDefaultExportFormat(); });
 
 const titles = computed<Record<SettingsCardId, string>>(() => ({
   account: d.value.cardAccount,
-  sync: syncCard.value.cardTitle,
+  // 商店版没有应用内更新（UpdateSection 不挂），标题只写「同步」。
+  sync: __STORE_BUILD__ ? syncCard.value.cardTitle : syncCard.value.cardTitleUpdates,
   archive: d.value.cardArchive,
   data: d.value.cardData,
   ai: d.value.cardAi,
