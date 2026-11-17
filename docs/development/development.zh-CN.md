@@ -1,203 +1,150 @@
-# ZeppBridge 开发与门禁
+# 开发 ZeppBridge
+
+给改代码、跑检查、打安装包的人看。应用是什么见 [README](../../README.zh-CN.md)，整体怎么拼起来见[架构说明](../reference/architecture.zh-CN.md)。
 
 [English](development.md)
 
-本文面向需要修改代码、运行测试或生成安装包（Windows 与 macOS）的人。产品入口请先看项目 [README](../../README.zh-CN.md)；连接流程请看 [连接指南](../guides/connection.zh-CN.md)。
+## 环境
 
-## 环境与目录
+- Windows 11、macOS 11+（Apple Silicon），或装了 WebKitGTK 4.1 的 Linux
+- Node.js 22+ 和 npm
+- Rust stable 工具链（Windows 要 MSVC 构建工具，macOS 要 Xcode Command Line Tools，Linux 要 WebKitGTK 开发包——CI 的 `Install Linux build dependencies` 一步列全了）
+- Python 3 和 Pillow，`npm run icons:verify` 要用
 
-- Windows 11（主力交付目标）或 macOS 11+（Apple Silicon）
-- Node.js 18+、npm
-- Rust 工具链（Windows 需 MSVC build tools；macOS 需 Xcode Command Line Tools）
-- 使用项目锁文件通过 `npm ci` 安装前端依赖；当前门禁不依赖 Playwright。
-
-进入仓库后先检查工具：
-
-```powershell
-where.exe node
-where.exe npm
-where.exe cargo
-```
-
-安装前端依赖：
-
-```powershell
+```bash
 npm ci
 ```
 
-Rust 依赖由 Cargo 按 `src-tauri/Cargo.toml` 解析。认证和真实数据测试需要 Windows Credential Manager、网络和真实 Zepp 账号；当前交付没有这些 live fixture。
+`npm ci` 同时会给 `@vitejs/plugin-vue` 打上仓库自带的补丁（见 [scoped 外置样式](#scoped-外置样式)）。
+
+## 目录
+
+`src-tauri/` 是一个 cargo workspace，四个成员：
+
+| crate | 路径 | 是什么 |
+|---|---|---|
+| `zeppbridge` | `src-tauri/src` | Tauri 应用：命令、窗口、托盘、更新 |
+| `zeppbridge-core` | `src-tauri/crates/core` | 几乎全部逻辑：认证、连接器、抓取、解析、存储、同步、导出、本机 API |
+| `zeppbridge-cli` | `src-tauri/crates/cli` | 无交互的 `status` / `sync` / `export`，退出码是契约 |
+| `zeppbridge-mcp` | `src-tauri/crates/mcp` | stdio MCP 服务 |
+
+`src/` 是 Vue 3 前端：`views/` → `composables/` → `lib/bridge/` → Tauri IPC。页面不直接 `invoke`，也不直接访问 Zepp。
 
 ## 日常命令
 
-### 前端
+| 命令 | 做什么 |
+|---|---|
+| `npm run dev` | 只起 Vite。浏览器里看到的是落地页；加 `?app-preview=1` 看不带账户数据的桌面外壳 |
+| `npm run tauri dev` | 开发模式的桌面应用 |
+| `npm run build` | `vue-tsc --noEmit && vite build`，前端的类型门禁 |
+| `npm test` | Vitest：所有 `src/**/__tests__/**/*.test.ts` |
+| `npm run test:functions` | 用 `node --test` 测 Pages 函数、网站与字体脚本，并包含 `test:dev` |
+| `npm run test:dev` | 起 Vite，冷请求 scoped 外置样式 |
+| `npm run i18n:check` | 界面没有写死的中文；后端的每个码都有文案 |
+| `npm run docs:check` | 仓库内的链接都有效 |
+| `npm run version:check` | 十一处版本号一致 |
+| `npm run lockfile:check` | `package-lock.json` 只从 registry.npmjs.org 解析 |
+| `npm run budget:check` | 首屏体积预算（先 `npm run build`） |
+| `npm run icons:verify` | 生成的图标和源文件一致 |
+| `npm run build:web` | 构建官网（落地页测试 + `vite build --mode site`），不是桌面前端 |
+| `npm run tools:package` | 打包 `zeppbridge-cli` 和 `zeppbridge-mcp`，附 `SHA256SUMS` |
 
-```powershell
-npm run dev        # 只启动 Vite，适合查看静态 UI
-npm run build      # vue-tsc --noEmit && vite build
-npm run build:web  # 仅 vite build，跳过 vue-tsc
-npm run preview    # 预览 dist（不会连接账户数据）
-npm test           # Vitest：src/lib 的纯函数层
-npm run test:dev   # Vite 冷缓存 CSS 请求与 scoped 作用域回归检查
-npm run version:check   # 七处版本号是否一致
-npm run budget:check    # 首屏体积预算（需要先 build）
-```
+`dist/` 是产物。改完 `src/` 要重新构建，不要手改 bundle。
 
-现有多个外部 scoped 样式块继续保留。`@vitejs/plugin-vue` 固定为 `6.0.8`，其开发服务器在所属组件尚未缓存时请求外部样式，可能返回 500 或丢失作用域 ID。`npm ci` 会通过 `postinstall` 自动运行 `scripts/dev/patch-vue-external-styles.mjs`，修正临时 descriptor 的作用域 ID 和样式索引；脚本校验精确版本及原代码锚点，重复执行安全，遇到不匹配会报错。若安装时使用了 `--ignore-scripts`，请手动运行 `npm run postinstall`。
+`npm test` 盯的是一条规则：**缺失的数据绝不显示成 0**。没有组件快照——它们每改一次样式就变红，什么也拦不住。
 
-应用补丁后须完全停止并重新运行 `npm run tauri dev`，HMR 不会重新载入 Vite 插件。不要只手改 `node_modules` 作为修复。升级插件时应复核或移除补丁，并运行 `npm run test:dev`：它通过真实 Vite 服务，在所属组件尚未缓存时请求全部外部样式，检查无 500 且作用域 ID 正确。生产构建通过不能覆盖这条冷请求路径。
+`npm run budget:check` 量的是首屏之前必须加载的东西（入口脚本、`modulepreload` 分块、入口样式），不是 `dist` 的总大小。上限在 `bundle-budget.json`；确认增长值得时才用 `npm run budget:update` 刷新，并在提交里说明原因。
 
-`npm test` 集中在一条规则上：**缺失不能被显示成 0**。「0 分钟睡眠」的卡片比「—」危险得多，用户会拿它当真实读数。刻意不做组件快照——它会在每次调样式时红掉，于是被习惯性 `-u` 掉，最后既挡不住回归也没人再看。
+### scoped 外置样式
 
-`npm run budget:check` 量的是「为了看到第一屏必须先加载多少」（入口脚本 + `modulepreload` 的 chunk + 入口样式），不是 `dist` 总大小。基线和上限在 `bundle-budget.json`；确认某次增长值得之后用 `npm run budget:update` 刷新，并在提交里说明原因。
+好几个页面用 `<style scoped src="…">`。锁定版本的 `@vitejs/plugin-vue` 需要补丁才支持，补丁在 `scripts/dev/patch-vue-external-styles.mjs`，由 `postinstall` 打上。用 `--ignore-scripts` 安装的话，手动跑一次 `npm run postinstall` 再重启开发服务。升级插件时检查这个补丁并跑 `npm run test:dev`，因为生产构建走不到这条路径。
 
-`dist` 是构建输出，不是源码真相。改动 `src/` 后必须重新运行 `npm run build`，不要手工修生成的 bundle。
-
-### Tauri 开发与生产构建
-
-```powershell
-npm run tauri dev
-npm run tauri build
-```
-
-`npm run package:release` 会跑完整 `tauri build`，成功后再调用 `scripts\windows\publish-local.ps1`：
-
-- 编译缓存在 `G:\build_cache\cargo-target`（`~/.cargo/config.toml` 的 `target-dir`），**不是**用户入口
-- 把独立 exe、当前版本 NSIS / MSI **覆盖**到项目根目录的 `release\`（本盘给用户双击/分发的安装包）
-- 删掉 `release\` 以及 Cargo bundle 目录里**上一版本**的安装包，只留当前版本
-- 把桌面和「开始」菜单快捷方式、`App Paths` 指到 `release\ZeppBridge.exe`
-
-日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仅作本机缓存的 `G:\build_cache\cargo-target`。
-
-### macOS 构建
+## Rust 检查
 
 ```bash
-npm run build:mac   # scripts/macos/build-release.sh：前端 + 门禁 + tauri build（app,dmg）
-```
-
-无 `TAURI_SIGNING_PRIVATE_KEY` 时脚本自动跳过 updater 产物，便于本地验证构建。产物在 `src-tauri/target/release/bundle/`。
-
-安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`（macOS 侧由 `--bundles app,dmg` 指定）。NSIS updater 产物与 `latest.json` 已使用 Tauri updater 密钥签名，并由 GitHub Release 提供自动更新；安装包本身仍没有受 Windows 信任的 Authenticode 证书，也没有干净 Windows VM 的验收声明。
-
-### Rust 检查与测试
-
-```powershell
 cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets
 cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 ```
 
-`--workspace` 不能省：仓库是一个 cargo workspace，成员有 `zeppbridge`（Tauri 应用）、`zeppbridge-core`（共享核心）、`zeppbridge-cli` 和 `zeppbridge-mcp`。漏掉它就只检查了应用那一个包。
+`--workspace` 不能省，省了只查应用一个包。单元测试放在各模块自己的 `tests.rs` 或 `tests/` 子模块里；只有 CLI 和 MCP 有 crate 级的集成测试。跑单个测试用过滤器：
 
-单独构建两个附带程序并打成分发包：
-
-```powershell
-cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp
-npm run tools:package   # 产出 release\zeppbridge-tools-<版本>-<平台>.zip（含 SHA256SUMS）
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml -p zeppbridge-core --lib storage::tests::queries
 ```
 
-Rust library 测试只保留会挡住假成功、丢数据、错文案的门禁：凭据不落盘、host 校验、同步 outcome、REM 不编造、保留天数边界、去重、登录 cookie 解析。不要为了数量再堆冗余用例。具体数量以当前 `cargo test` 输出为准。
+同时在几个检出目录里干活时，给每个目录单独的 `CARGO_TARGET_DIR`。两棵源码树共用一个 target 目录会互相覆盖构建指纹，典型症状是 `cargo check` 过、`cargo test` 挂。
 
-## 当前 command 契约
+只在 Windows 编译的代码只在 Windows 上检查，`cfg(not(windows))` 的代码只在 Linux 和 macOS 上检查，所以本机跑绿不代表其他平台也绿。CI 在三个平台上跑同样的四条命令。
 
-Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridge/`（`useTauriApi` 再导出）：
+Rust 测试只留能挡住假成功、丢数据、错文案的那些。
 
-| command | 用途 | 关键边界 |
-| --- | --- | --- |
-| `start_web_login` | 打开 Zepp 登录窗口并开始轮询 | 返回 `LoginStatus`；事件 `login://status` |
-| `cancel_web_login` | 关闭登录窗口并作废 epoch | 状态回到 `idle` |
-| `get_login_status` | 读取当前登录状态 | `{ state, message, page_url, code }` |
-| `save_auth` | 保存认证元数据和 token | token 进入 Windows Credential Manager；host 由连接器再次校验 |
-| `verify_auth` | 最近两小时真实心率请求 | 只接受结构化 JSON 和明确成功代码；401/403 需要重新认证 |
-| `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
-| `manual_auth` | 手动输入 token / user id / region host | 只是 `save_auth` 的包装，边界完全相同 |
-| `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
-| `start_incremental_sync` | 7 天 overlap 增量 | 仅已验证连接可用；顶栏/自动同步/托盘触发 |
-| `cancel_sync` | 取消进行中的同步 | 原子标记，下一窗口停止 |
-| `set_user_prefs` | 保存保留天数和历史补拉天数 | 1–365 |
-| `get_app_status` | 连接、云端同步结果、数据流样本时间 | 启动恢复失败会保留可操作 warning |
-| `get_health_overview` | 读取本地概览 | 没有数据时返回 `null` 字段，不填假零值 |
-| `get_recent_sleep` / `get_recent_workouts` | 读取最近记录 | limit 在后端限制为 `1–500` |
-| `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
-| `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
-| `get_heart_rate_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
-| `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
-| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 按本地开始日期累加 `workouts.training_load`，与导出 `training_load_balance` 共用；覆盖要求旧通道运动列表完整同步且每次运动负荷有效，官方接口的运动没有负荷、不建立覆盖；只有确认无运动才为零；7/28 天窗口不完整时相应负荷为 `null`，两个窗口完整且慢性负荷大于零才给比值；旧数据需重新同步建立完整性证据 |
-| `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |
-| `set_heart_rate_zone_preference` | 记录用户选的算法与基准 | 四个槽位都可为 `null`——「还没决定」必须能存回去 |
-| `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |
-| `get_storage_estimate` | 估算本地库体积与可清理量 | 只读，按天计算 |
-| `reprocess_local_data` | 用当前解析器重放本地 raw | 不触网，不改云端同步时间；返回各 stream 重放条数 |
-| `save_fit_export` | 把选中的运动写成 FIT，一次运动一个文件 | 总是读完整逐秒序列；一条序列都没有时报错而不是留空目录。JSON / CSV / GPX 落盘走 CLI（`zeppbridge-cli export`） |
-| `prepare_ai_handoff` | 生成交给外部 AI 的脱敏数据包 | 复用同一 export builder 后再做递归脱敏；> 2 MiB 改写桌面文件；精确轨迹需显式开启 |
-| `get_local_api_status` | 读取本机 REST API 启动状态与固定地址 | 端口冲突不会阻止桌面 App 启动 |
-| `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
-| `open_data_folder` | 在 Windows Explorer 打开安装目录旁的 `data/` | 不再使用 `%APPDATA%` |
-| `is_portable_update` / `launch_migrated_install` | 判断当前是否为非安装版入口，并在更新后拉起 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` | 仅 Windows；找不到安装版时报错而不是静默退出 |
-| `retry_failed_backfill_chunks` | 让失败的补拉块重新排队 | 只碰 `failed`；已写入和云端确认为空的块不动 |
-| `set_tray_locale` | 校正原生托盘菜单的语言 | 前端确定界面语言后调用 |
-| `set_auto_sync_prefs` | 把自动同步的开关和间隔抄给后端 | 前端启动和改设置时调用；窗口不可见（关到托盘、最小化、息屏）时由后端每 60 秒的闹钟接手同步，失败按 1 / 2 / 4 / 8 分钟退避；没抄过来之前闹钟不动 |
-| `set_device_hidden` | 隐藏 / 恢复一台设备 | 只藏设备列表（`get_device_profiles` 挪进 `hidden_profiles`），数据、图表、导出照旧 |
+## CI 跑什么
 
-`LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
+每次推送和 PR，先由一个分流作业按改动的文件挑出要跑的检查。每个平台都是：lockfile 检查、`npm ci`、`npm run build`、四条 Rust 命令。Windows 另外跑体积预算、`i18n:check`、`npm test`、`test:functions`、`icons:verify` 和 Microsoft Store 渠道测试。Linux 另外校验 Flatpak 元数据，并构建、冒烟测试无头 Docker 镜像。另有一个作业检查文档链接和版本号。
 
-`SyncReport.outcome` 只能是：`updated`、`no_new_data`、`partial`、`failed`、`cancelled`、`deferred`。`deferred` 不是失败——启动时的原始报文重放正在批量写库，本次同步主动让路，前端一分钟后自动重试，横幅用中性灰而不是红色。
+安装包（NSIS + MSI、macOS app 与 dmg、Flatpak、deb、rpm、AppImage）只在打 `v*` 标签和手动触发时构建。`v*` 标签还会创建 GitHub Release，见[发版](../releases/README.md)。
 
-已删除、不得再注册：`start_capture`、`get_capture_status`、`complete_capture_user_id`、`reuse_saved_auth`、`stop_capture`。
+## 打安装包
+
+```bash
+npm run tauri build   # Windows：NSIS + MSI（目标写在 src-tauri/tauri.conf.json）
+npm run build:mac     # macOS：前端、门禁，然后 tauri build --bundles app,dmg
+```
+
+没有 `TAURI_SIGNING_PRIVATE_KEY` 就不产出更新包，本地构建不受影响。Windows 安装包没有 Authenticode 签名；macOS 包是 ad-hoc 签名、未公证（见[代码签名](code-signing.md)）。Linux 包见 [Linux 打包](linux-packaging.md)（英文），Microsoft Store 见 [Store 打包](store-packaging.md)（英文）。CLI 和 MCP：`cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp`。
+
+`npm run package:release` 是维护者在 Windows 上打本地测试包的脚本：跑门禁、把 CLI 和 MCP 作为 sidecar 带上、在 `release\` 里产出 NSIS 安装包和便携 exe，需要更新签名密钥的备份。贡献者用不到它。
+
+## 新增一个 command
+
+一个 Tauri command 要改四处：
+
+1. 实现写在 `src-tauri/src/commands/`；
+2. 在 `src-tauri/src/commands/mod.rs` 里同名导出；
+3. 加进 `src-tauri/src/lib.rs` 的 `invoke_handler` 列表；
+4. 在 `src/lib/bridge/types.ts` 的 `BridgeBackend` 接口里声明，并在 `src/lib/bridge/tauri.ts` 实现。
+
+接口是全量的，漏了第 4 步 `npm run build` 就会挂。`src/lib/bridge/web.ts` 不用动：浏览器里每个方法都以 `DesktopUnavailableError` 拒绝。
+
+command 的完整清单就是 `src-tauri/src/lib.rs`，这里不另抄一份。前端据以分支的取值：
+
+- `LoginState`：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
+- `SyncOutcome`：`updated`、`no_new_data`、`partial`、`failed`、`cancelled`、`deferred`、`cloud_stale`。`deferred` 表示启动时正在重放本地原始报文，同步让路，之后会自己重试，不算失败。`cloud_stale` 表示云端没有比本地更新的数据，这一轮什么都没拉。
 
 ## 本机 REST API
 
-本机 API **默认关闭**。桌面进程启动时**不会**绑定 `127.0.0.1:43921`。只有用户在设置页打开开关之后才开始监听，且每个请求都要带 `Authorization: Bearer <token>`。实现在 `zeppbridge-core`（`crates/core/src/local_api.rs`），Tauri 适配层是 `src-tauri/src/local_api.rs`。当前公开这些只读 GET 路由：
+默认关闭。用户打开后桌面端只监听 `127.0.0.1`：地址是代码里的常量（`LOCAL_API_ADDRESS`），没有任何设置能改。只读、不发 CORS 头，每个请求都要 `Authorization: Bearer <token>`。路由：`/health`、`/workouts/{id}/series` 和 `/v1/records`（和 `zeppbridge-cli export --format json` 同一个 `records::query_records`；请求里没写 `include_gps=true` 就不带 GPS）。
 
-| 路由 | 说明 |
-| --- | --- |
-| `/health` | 服务状态和应用版本 |
-| `/workouts/{id}/series` | 复用 `Database::get_workout_series()`，返回标准化 `WorkoutSeries` JSON；未知 ID 返回 404 |
-| `/v1`、`/v1/records` | 按类型和日期区间读记录、游标分页，来自 `records::query_records`（和 `zeppbridge-cli export --format json` 同一个函数）。请求里没写 `include_gps=true` 就不带 GPS。契约见[自托管拉取](../guides/self-hosted-pull.zh-CN.md) |
+无头版 `zeppbridge-cli serve`（`local_api/headless.rs`）给 Docker 和服务器用，跑同一套处理逻辑。不设 `ZEPPBRIDGE_LISTEN` 就只听 `127.0.0.1`；听本机以外的地址时没有单独的拉取 token（`zeppbridge-cli pull-token`）就拒绝启动。代码在 `src-tauri/crates/core/src/local_api/`；契约见[自托管拉取](../guides/self-hosted-pull.zh-CN.md)，边界见[安全与隐私](../reference/security-and-privacy.zh-CN.md)。
 
-桌面端只绑定 `127.0.0.1`：地址是代码里的常量（`LOCAL_API_ADDRESS`），没有任何设置能改。API 不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
+## 数据链路
 
-无头版 `zeppbridge-cli serve`（`local_api/headless.rs`）给 Docker 和服务器用，跑的是同一套处理逻辑。不设 `ZEPPBRIDGE_LISTEN` 就只听 `127.0.0.1:43921`。鉴权用单独的拉取 token：只能读 `/v1/*` 和 `/health`，可以单独轮换或吊销（`zeppbridge-cli pull-token`）。监听非本机地址时没有这把 token 就拒绝启动，并在日志里写明传输是明文 HTTP；按来源地址限流，一分钟内鉴权失败 10 次的地址封 10 分钟。
+1. `AuthManager`（`crates/core/src/auth/`）经 `keyring` 把令牌存进系统凭据存储（Windows 凭据管理器、macOS 钥匙串、Linux Secret Service，或用户同意的文件），`auth.json` 只存元数据。
+2. `ZeppConnector` 只为白名单主机（`api-mifit*.zepp.com`、`api-mifit*.huami.com`）构造 HTTPS 地址，并区分 401/403/404/429/5xx。官方开放平台的通道在 `crates/core/src/official/` 和 `sync/official.rs`。
+3. `DataFetcher` 为每个响应保留数据流、来源键和原始报文。
+4. normalizer 只接受认得的结构，认不出的保留原始报文并标 `unverified`。改派生逻辑要推 `storage/mod.rs` 里的 `NORMALIZER_REVISION`；启动时值不同，库会重放原始报文。
+5. 数据库用 WAL 和 `PRAGMA user_version` 迁移（`storage/mod.rs` 的 `CURRENT_SCHEMA_VERSION`，步骤在 `storage/migrations.rs`）。迁移只能追加，已发布的 DDL 永不修改，因为用户的库是按当时的 DDL 建的。迁移前一定先拍一份快照。
+6. 所有写库动作——同步、补拉、迁移、恢复、备份、重放、清理——都先拿跨进程写锁（`storage::write_lock`）。同步全程持有同步租约，写锁只在落库那几段拿，绝不跨网络请求持有。只读路径用 `Database::open_read_only`。
+7. 抓取、解析、写入三个阶段按数据流分别记在 `stream_provenance`，供数据健康页和 MCP 的 `get_data_health` 使用。
 
-## 当前数据链路
+## 关掉窗口之后的同步
 
-1. `AuthManager` 校验 user ID、token 和区域地址，从系统凭据管理器读取 token。
-2. 网页登录从 cookie 抽出凭据后，在 allow-list 区域 host 上调用与 `verify_auth` 相同的心率探测。
-3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
-4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
-5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前值见 `storage/mod.rs` 的 `CURRENT_SCHEMA_VERSION`；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
-7. `SyncManager` 用 run lock 防止进程内并发，全程持有跨进程同步租约，因此桌面应用和 CLI 不会同时同步；跨进程写锁只在真正写库的那几段拿（`write_db`），联网期间从不占着；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
-8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
+关掉主窗口，进程留在托盘；再次启动会唤醒它。自动同步按用户选的间隔跑（15、30 或 60 分钟）。窗口不可见时，后端每 60 秒看一次，到点就同步，失败后退避。没有系统级后台服务：从托盘退出就不再同步。
 
-## 前端开发约定
+## 前端约定
 
-- 页面通过 `tauriApi` / `backend` 调用 command，不直接访问 Zepp。
-- 空值显示 `—`、`未记录` 或明确的空状态；不要把缺失数据变成 `0`。
-- 时间格式化前检查 `Date.getTime()`；错误应保留可操作信息，不要静默吞掉字符串。
-- 使用 `src/styles/tokens.css` 里的设计 token（唯一来源，深浅两套各一份值，组件不按主题分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
-- `index.html` 的语言为 `zh-CN`，标题为 `ZeppBridge · 健康数据`；当前没有把默认 Vite 图标当成产品 favicon 的验收证据。
+- 缺失值显示 `—`、「未记录」或空状态，绝不显示 `0`。
+- 格式化时间前先检查 `Date.getTime()`。
+- 用 `src/styles/tokens.css` 里的 token，组件不按主题分支。见 [UI 规范](ui-guidelines.zh-CN.md)。
+- 后端从不按界面语言出文案。它返回稳定的码（错误用 `err.*`，其他文字用 `ui.*`），中文原文只是兜底；界面按码渲染，`i18n/backendText.ts` 挡住中文兜底流到其他语言。新的错误码要在 `src/i18n/errors.ts` 补文案，`npm run i18n:check` 会查。
+- 中文、英文、西班牙语文案放在组件旁的 `*.i18n.ts` 里（`defineMessages(zh, en, es)`），其余十种语言在 `src/i18n/locales/`。
 
-## 推荐验收顺序
+## 保护用户数据的规矩
 
-1. `npm run build`
-2. `npm test`
-3. `npm run version:check` 与 `npm run budget:check`
-4. `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`
-5. `cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets`
-6. `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings`
-7. `cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1`
-8. `npm run package:release`，确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
-7. 双击桌面或开始菜单的 ZeppBridge 快捷方式，确认打开的是 `release\ZeppBridge.exe`；再确认产品名/标识、首次启动恢复、设置页网页登录 command。
-
-第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。真实 Zepp 网页登录以及多区域、多设备数据仍需按环境分别验证。
-
-## 变更边界
-
+- 不编造数据：没有采样就不画曲线，没有轨迹就不画地图。
+- 云端同步时间和健康样本时间分开；重新解析本地数据不改云端同步时间。
+- 不要把令牌、完整请求头、HAR、精确 GPS 或原始健康报文写进日志、测试输出或提交。
 - REST 只读，永不返回凭据。桌面端只监听 `127.0.0.1`，没有任何设置能改；只有无头版 `zeppbridge-cli serve` 可由用户显式指定监听地址，且必须带拉取 token；传输加密交给反向代理或容器内部网络。
-- 不要恢复局域网 MITM、用户 CA、Wi-Fi 代理教程或 `start_capture` 一类 command。
-- 应用启动后同步一次；关闭主窗口后进程留在托盘，并每 15 分钟检查。再次启动会唤醒已有进程，不会创建第二个托盘图标。只有从托盘退出或结束进程后同步才会停止；当前没有系统级后台服务。
-- GPS/路线、逐点训练样本及未覆盖的专有指标，仍需取得合法、脱敏的真实响应后再从 `unverified` 提升。
-- 不要把 token、完整请求头、HAR、精确 GPS 或健康 raw payload 写入日志、测试输出或提交。
-
-架构边界见 [架构摘要](../reference/architecture.zh-CN.md)，安全边界见 [安全与隐私](../reference/security-and-privacy.zh-CN.md)。
+- 2.x 的局域网抓包方案（代理、用户 CA、`start_capture` 一类命令）已经移除，不会再加回来。
