@@ -137,6 +137,35 @@ export const chartTier = (width: number, height = Infinity): ChartTier => {
   if (width >= 440 && height >= 250) return 'md';
   return 'sm';
 };
+/**
+ * 一张图表卡里的字号，按档位一套（2026-11-15 用户截图「字体大小不匹配」）：
+ * - 轴上的字不大于卡里的小标签（以前轴 14.5、标签 13，轴反而更显眼）；
+ * - 卡放大了头部的数字和标签跟着大（以前固定 22，卡铺满整个舞台数字还是那么小）；
+ * - 心率 / 配速 / 海拔 / 步频几张卡同一档同一套，不各写各的。
+ * 卡的 CSS（WorkoutChartCard 的 --chart-*）和图里的字（withFontSize）都从这里取。
+ */
+export const CHART_TYPE: Record<ChartTier, { num: number; numLong: number; label: number; axis: number }> = {
+  sm: { num: 18.5, numLong: 17.5, label: 13, axis: 12 },
+  md: { num: 22, numLong: 20, label: 13, axis: 13 },
+  lg: { num: 28, numLong: 24, label: 14.5, axis: 14.5 },
+};
+
+/** 把轴、均值线、极值点上的字换成这一档的字号。 */
+export const withFontSize = <T extends LineOption>(option: T, tier: ChartTier): T => {
+  const px = CHART_TYPE[tier].axis;
+  const label = (axis: { axisLabel: Record<string, unknown> }) => ({ ...axis, axisLabel: { ...axis.axisLabel, fontSize: px } });
+  const series = option.series.map((line) => {
+    const rich = line as typeof line & { markPoint?: { label?: Record<string, unknown> }; markArea?: { label?: Record<string, unknown> } };
+    return {
+      ...line,
+      markLine: { ...line.markLine, label: { ...line.markLine.label, fontSize: px } },
+      ...(rich.markPoint ? { markPoint: { ...rich.markPoint, label: { ...rich.markPoint.label, fontSize: px } } } : {}),
+      ...(rich.markArea ? { markArea: { ...rich.markArea, label: { ...rich.markArea.label, fontSize: px - 1 } } } : {}),
+    };
+  });
+  return { ...option, xAxis: label(option.xAxis), yAxis: label(option.yAxis), series } as T;
+};
+
 export interface ChartBand { index: number; low: number | null; high: number }
 export interface ChartDetail {
   color: string;

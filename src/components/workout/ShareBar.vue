@@ -43,13 +43,13 @@ const rows = computed(() => {
 
 <style scoped>
 .share-bar { display: grid; gap: 8px; min-width: 0; }
-.share-title { margin: 0; color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; }
+.share-title { margin: 0; color: var(--subtle); font-size: var(--share-label, var(--fs-2xs)); font-weight: 600; }
 .bar { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: 999px; background: var(--mat-line); }
 .bar span { flex-basis: 0; min-width: 3px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
 .legend li { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
 .legend i { flex: none; width: 8px; height: 8px; border-radius: 2px; transform: translateY(-1px); }
-.name { color: var(--muted); font-size: var(--fs-2xs); }
-.legend strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-xs); font-weight: 600; }
-.time { color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); }
+.name { color: var(--muted); font-size: var(--share-label, var(--fs-2xs)); }
+.legend strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--share-value, var(--fs-xs)); font-weight: 600; }
+.time { color: var(--subtle); font-family: var(--font-mono); font-size: var(--share-label, var(--fs-2xs)); }
 </style>

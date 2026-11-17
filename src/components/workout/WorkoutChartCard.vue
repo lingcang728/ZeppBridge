@@ -3,8 +3,8 @@
    图的配置在 lib/workoutCharts.ts，统计在 useWorkoutPresentation。
 
    卡拉大了不是把同一张图放大（2026-11-13 / 11-14 用户）：
-   - 头部统计参照 Zepp 海拔页：大数字在上、小标签在下、竖线隔开；字号是固定 token，不随卡宽长
-     （以前跟着 cqi 长，轴上的字却不长，两边大小对不上）；放不下一排就折成两 / 三列，数字不截断；
+   - 头部统计参照 Zepp 海拔页：大数字在上、小标签在下、竖线隔开；字号按档位一套（lib/workoutCharts.ts 的 CHART_TYPE），
+     图里的轴、均值线、极值点也从同一套取，轴上的字不大于小标签（2026-11-15「字体大小不匹配」）；放不下一排就折成两 / 三列，数字不截断；
    - 图按卡的宽 × 高分三档加细节（withDetail：刻度更密、平均线标数、暂停铺灰、最高最低点、心率区间色带），整场一直都画；
    - 大档再在图下加一条占比：海拔是坡度分布（ElevationFacts），心率是各区间时长；
    - 窗口拉高时图吃掉多出来的高（卡根节点在窗口里被撑满，图 flex 伸开）。 */
@@ -17,7 +17,7 @@ import type { SlopeShare } from '../../lib/elevationProfile';
 import type { ChartStat } from '../../composables/useWorkoutPresentation';
 import type { GlyphTone } from '../../lib/glyphs';
 import { CHART_THEME, VChart } from '../../lib/echartsSetup';
-import { chartTier, fitTicks, withDetail, type ChartDetail, type ChartTier, type lineOption } from '../../lib/workoutCharts';
+import { CHART_TYPE, chartTier, fitTicks, withDetail, withFontSize, type ChartDetail, type ChartTier, type lineOption } from '../../lib/workoutCharts';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
@@ -38,12 +38,18 @@ const tier = ref<ChartTier>('sm');
 const plotH = ref(0);
 const option = computed(() => {
   const detailed = props.card.detail ? withDetail(props.card.option, tier.value, props.card.detail) : props.card.option;
-  return plotH.value ? fitTicks(detailed, plotH.value - 40) : detailed;
+  const sized = withFontSize(detailed, tier.value);
+  return plotH.value ? fitTicks(sized, plotH.value - 40) : sized;
 });
 const showSlope = computed(() => tier.value === 'lg' && !!props.card.slope);
 const showZones = computed(() => tier.value === 'lg' && !!props.card.zoneShare?.length);
 /** 数字长（配速 5'30"、四位数海拔）时降一档字号，免得一排挤不下被截。 */
 const longStats = computed(() => (props.card.stats ?? []).some((stat) => stat.value.length > 5));
+/** 这一档的字号（lib/workoutCharts.ts 的 CHART_TYPE，图里的字也从那里取）。 */
+const typeVars = computed(() => {
+  const type = CHART_TYPE[tier.value];
+  return { '--chart-num': `${longStats.value ? type.numLong : type.num}px`, '--chart-label': `${type.label}px`, '--share-label': `${type.label}px`, '--share-value': `${type.label + 1.5}px` };
+});
 
 let observer: ResizeObserver | null = null;
 /* 只观察卡本身：图在形变途中先是一个占位壳、让路结束才换成真图（lib/echartsSetup.ts），挂载时拿到的图元素可能是那个壳，
@@ -65,7 +71,7 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <section ref="root" :class="['surface-card', 'chart-card', `tone-${card.tone}`, `tier-${tier}`]" :aria-label="card.title">
+  <section ref="root" :class="['surface-card', 'chart-card', `tone-${card.tone}`, `tier-${tier}`]" :style="typeVars" :aria-label="card.title">
     <div class="chart-head">
       <GlyphTile :name="card.icon" :tone="card.tone" :size="36" />
       <p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p>
@@ -109,13 +115,12 @@ onBeforeUnmount(() => observer?.disconnect());
 .chart-stats div { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; padding: 1px 12px; }
 .chart-stats div:first-child { padding-left: 2px; }
 .chart-stats div + div { border-left: 1px solid var(--mat-line); }
-.chart-stats dt { overflow: hidden; color: var(--subtle); font-size: var(--fs-2xs); text-overflow: ellipsis; white-space: nowrap; }
-.chart-stats dd { margin: 0; color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-3xl); font-weight: 600; line-height: 1.2; white-space: nowrap; }
-.chart-stats.long dd { font-size: var(--fs-2xl); }
+.chart-stats dt { overflow: hidden; color: var(--subtle); font-size: var(--chart-label, var(--fs-2xs)); text-overflow: ellipsis; white-space: nowrap; }
+.chart-stats dd { margin: 0; color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--chart-num, var(--fs-3xl)); font-weight: 600; line-height: 1.2; white-space: nowrap; }
 /* 窄卡：五格的折成三列，三四格的折成两列；折行后每行第一格去掉竖线。 */
 @container (max-width: 440px) {
   .chart-stats { grid-template-columns: repeat(min(var(--stat-count), 3), minmax(0, 1fr)); row-gap: 10px; }
-  .chart-stats dd, .chart-stats.long dd { font-size: var(--fs-xl); }
+  .chart-stats dd { font-size: min(var(--chart-num, var(--fs-xl)), var(--fs-xl)); }
   .chart-stats div:nth-child(3n + 1) { padding-left: 2px; border-left: 0; }
 }
 @container (max-width: 300px) {
