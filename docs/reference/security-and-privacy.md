@@ -1,16 +1,19 @@
 # ZeppBridge security and privacy boundaries
 
 This page describes the data flows and deletion scope of the current
-implementation. It is not a claim of absolute safety: the installers are
-unsigned, the health database is plaintext by default, and the behaviour across
-real accounts and regions has not been fully verified against live services.
+implementation. It is not a claim of absolute safety: the Windows installers are
+not code-signed, the macOS build is only ad-hoc signed, the health database is
+plaintext by default, and behaviour across every account type and region has not
+been verified against live services.
 
 [简体中文](security-and-privacy.zh-CN.md)
 
 ## Credentials
 
 - The app token uses Windows Credential Manager, macOS Keychain, or Linux
-  Secret Service by default, under `com.zeppbridge.app`, keyed by user ID.
+  Secret Service by default, under `com.zeppbridge.app` (the Microsoft Store
+  build uses `com.zeppbridge.app.store`), keyed by user ID. The local API token
+  is a separate entry named `local-api-token`.
 - macOS and Linux can explicitly opt into a plaintext `credentials.json`
   protected by file permissions (`0600`, data directory `0700`). It is never
   silently enabled on a system-store failure. Linux also supports a read-only
@@ -18,6 +21,8 @@ real accounts and regions has not been fully verified against live services.
   [Linux](../guides/linux.md) credential guides before choosing an alternative.
 - `auth.json` lives in the active data directory and holds only authentication
   metadata (version, user ID, region host, updated-at), even with file storage.
+  `auth.user-id` next to it is a backup of the user ID, used so "clear
+  credentials" can still find the right entry if `auth.json` is damaged.
   File-stored tokens travel with manual copies of that directory, so do not
   share `credentials.json` with a library copy.
 - Startup recovery rebuilds the sync manager from that metadata plus the
@@ -25,8 +30,9 @@ real accounts and regions has not been fully verified against live services.
   re-authentication is needed and the token never appears in a status response.
 - Web sign-in reads the session cookies inside its own window, extracts the user
   ID and app token, and writes them straight to the credential store.
-  `login://status` returns only `state`, `message`, `page_url` and `code` —
-  never a token.
+  `login://status` returns only `state`, `message`, `page_url`, `code` and,
+  when relevant, a recovery or account-conflict notice that shows the last four
+  digits of the user IDs — never a token.
 - A token is still sensitive data. Do not log it, paste it into an issue, commit
   it, send it to a third party, or share it publicly.
 
@@ -41,9 +47,10 @@ real accounts and regions has not been fully verified against live services.
   does not honour env/system proxies, and classifies 401/403, 404, 429/5xx
   and other non-2xx responses, with a bounded retry budget.
 - The sign-in window may navigate only over HTTPS, to `*.zepp.com` /
-  `*.huami.com` and the exact OAuth provider hosts that page uses.
-  `about:`, `data:` and `blob:` URLs are rejected. Region probing only touches
-  API origins on the allow-list.
+  `*.huami.com`. Third-party sign-in pages (Google, Apple, WeChat, Xiaomi,
+  Facebook, Amazfit US) are blocked since 3.0.1; use the Zepp account password
+  instead. `about:`, `data:` and `blob:` URLs are rejected. Region probing
+  only touches API origins on the allow-list.
 - There is no LAN HTTP proxy, and no system or user CA is installed.
 - The desktop app's local REST API binds only to `127.0.0.1:43921`; the
   address is fixed in code and no setting changes it. It does not listen on LAN
@@ -65,15 +72,21 @@ real accounts and regions has not been fully verified against live services.
   example publishes no port) or behind an HTTPS reverse proxy. No route ever
   returns credentials, and `/v1/records` returns GPS tracks only when the
   request asks for `include_gps=true`.
-- `zeppbridge-mcp` speaks stdio only. It **listens on no port and makes no
-  network requests**. It opens the database with `PRAGMA query_only`, so writes
-  are refused at the SQLite layer rather than relying on the tool list happening
-  to contain no write operations. Its responses carry no tokens, cookies, full
-  account identifiers or absolute local paths.
-- `zeppbridge-cli` reaches the network only during `sync`, through exactly the
-  same connector and host allow-list as the desktop app. It does not sign in and
-  never prints a token; `export --out` echoes back only the path you gave it,
-  without resolving it to an absolute path.
+- `zeppbridge-mcp` speaks stdio only and **listens on no port**. Health data is
+  read through a `PRAGMA query_only` connection. A few tools write your own
+  notes — injuries, life events, races, shoes, workout notes and types, coach-note
+  proposals — through a separate short-lived connection; each write is recorded
+  in a ledger the app shows and can undo. Two tools reach the network on request:
+  `sync_now` runs the CLI's sync, and `publish_training_plan` sends a plan to
+  your watch through the official channel (`zeppbridge.com` and
+  `api-open.zepp.com`), and only after you turn on "allow AI to publish" in
+  Settings. Responses carry no tokens, cookies, full account identifiers or
+  absolute local paths.
+- `zeppbridge-cli` reaches the network for `sync`, `probe` and `details`.
+  These use the same connector and host allow-list as the desktop app;
+  `details --channel official` uses the official channel described below. The CLI
+  does not sign in and never prints a token; `export --out` echoes back only the
+  path you gave it, without resolving it to an absolute path.
 
 ## Zepp account authorization (official API)
 
@@ -82,8 +95,10 @@ the one part of ZeppBridge that goes through a server we run
 (`zeppbridge.com`, the same Cloudflare Pages Functions + D1 project as `zeppbridge.pages.dev`).
 
 - **What the server holds permanently:** the app ID and app secret (Cloudflare
-  Secrets, never in the repository or the desktop binary), and the SHA-256 of
-  each Zepp user ID that completed authorization — no names, no raw IDs.
+  Secrets, never in the repository or the desktop binary), and for each Zepp
+  user ID that completed authorization its SHA-256 plus first and last seen
+  times. No names and no raw IDs are stored, but the hash is unsalted and Zepp
+  user IDs are numbers, so treat it as pseudonymous rather than anonymous.
 - **What it holds briefly:** while an authorization is in flight, the SHA-256
   of the browser `state` and of a one-time claim secret, and — once Zepp
   returns — the token set encrypted with AES-GCM under a separate server key.
@@ -100,12 +115,15 @@ the one part of ZeppBridge that goes through a server we run
   tokens and Zepp's error descriptions are never echoed into a page or a
   redirect.
 - **On this computer:** the access and refresh tokens are two separate entries
-  in the OS credential store; `official.json` in the data folder holds only the
-  user ID, connection time and expiry. The official client talks to exactly two
-  hosts — `zeppbridge.com` and `api-open.zepp.com` — and follows no
-  redirects.
+  in the OS credential store; `official.json` in the data folder holds the user
+  ID, your Zepp nickname, connection time, expiry and whether you need to
+  authorize again. The official client talks only to `zeppbridge.com` (falling
+  back to `zeppbridge.pages.dev`, the same project, when the first is
+  unreachable) and `api-open.zepp.com`, and follows no redirects.
 - **Disconnect** asks Zepp to revoke the authorization, then deletes the local
-  tokens. It never deletes health data.
+  tokens. It never deletes health data. Zepp removes training plans published
+  through the authorization when it is revoked, and the local plan ledger is
+  cleared to match.
 
 ## The three kinds of "export" have different boundaries
 
@@ -124,33 +142,34 @@ computer, use separate operating-system accounts.
 
 ## The web sign-in session
 
-1. `start_web_login` bumps the epoch, closes any old sign-in window, opens a new
-   one and sets the state to `waiting`.
-2. A background poll reads cookies. On a successful parse the state moves
-   `extracting` → `verifying`, probing region hosts in parallel.
-3. On success the credential is saved, the sync manager is initialised, the
-   state becomes `connected` and the window closes.
-4. `cancel_web_login`, closing the window, or a new `start_web_login` all
-   invalidate the previous epoch. A session times out after 15 minutes as
-   `failed`.
-5. "Clear credentials" also invalidates the sign-in epoch and resets the sign-in
-   state to `idle`.
-
-Sign-in window capabilities cover only the main window and `zepp-login`. Do not
-share the sign-in URL with anyone you do not trust.
+Sign-in runs in its own window and times out after 15 minutes. Cancelling,
+closing the window, starting a new sign-in or "clear credentials" all invalidate
+the previous attempt. The sign-in window has no access to app commands beyond the
+main window and `zepp-login`. Do not share the sign-in URL with anyone you do not
+trust.
 
 ## The health database
 
-- The database and raw payloads live in `data/zepp.db` next to the program, as
-  plaintext SQLite by default. There is currently no whole-database encryption
-  and no remote backup. The WebView cache sits in `data/webview`.
+- The database and raw payloads live in `zepp.db` inside the data directory, as
+  plaintext SQLite. There is no whole-database encryption and no remote backup.
+  The data directory is `data/` next to the program on Windows (portable and
+  installed), `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` on
+  macOS, the XDG data directory on Linux (Flatpak: `~/.var/app/com.zeppbridge.app/`),
+  and the package's LocalState folder for the Microsoft Store build.
+  `ZEPPBRIDGE_DATA_DIR` overrides it. The WebView cache sits in `webview/`
+  inside it.
+- Logs are in `logs/zeppbridge.log` in the data directory (rotated, three files
+  of up to 2 MiB). They never contain tokens or health values, but the startup
+  lines include the program and data folder paths, which may contain your system
+  user name. Look before you send a log to anyone.
 - SQLite runs with WAL, foreign keys, migrations, de-duplication and raw
   provenance. Canonical health rows point back at the raw record they came from,
   so any value can be traced to its source.
 - Retention is yours to choose between 1 and 365 days, defaulting to 365.
   Cleanup is based on the health record's own timestamp and removes old
-  canonical rows plus unreferenced raw rows after a successful sync. It cannot
-  be undone, so take a snapshot first.
+  canonical rows plus unreferenced raw rows after a successful sync. With
+  "long-term archive" turned on, syncing never cleans up. Cleanup cannot be
+  undone, so take a snapshot first.
 - Encoded or compressed `band_data` payloads may be kept as raw only and marked
   `unverified`. The program never fabricates sleep stages out of content it
   could not decode.
@@ -218,7 +237,10 @@ and model numbers for the devices the catalogue cannot identify, the count of
 unrecognised devices, unrecognised workout codes with record counts, the
 count of type conflicts, and the numeric error code from the most recent request
 the Zepp cloud rejected (the number, which data stream and when — never any text
-the cloud returned). The report schema has no fields for accounts, tokens, cookies, serial numbers,
+the cloud returned), the report category, workout type corrections you made
+(workout code, how ZeppBridge read it, the type you chose and a record count),
+and an optional note you type (up to 500 characters; local paths and things that
+look like keys are removed before sending). The report schema has no fields for accounts, tokens, cookies, serial numbers,
 device IDs, MAC addresses, GPS, health values, raw responses or local paths.
 
 Model numbers (`modelIdentifierHints`) are strings of the exact form
@@ -239,23 +261,26 @@ The Pages Function re-runs strict schema, field-count and 32 KiB size checks
 before writing to a private D1 database. There is no public read route, and the
 response returns only a random report number. D1 is used solely to locate
 catalogue and parser compatibility problems — never for profiling, usage
-statistics or health analysis.
+statistics or health analysis. To limit abuse, the server also keeps a per-day
+counter keyed by a SHA-256 of the date and your IP address with a fixed public
+prefix. That hash is not salted with a secret, so it is not anonymous with
+respect to the IP address.
 
 ## Letters to the author
 
 Replies written in the letter box go to zeppbridge.com and are stored in the author's D1 table `letter_replies`, separate from problem reports.
 
-- The first time you send one, the app generates a random install id (UUID v4). It is **not tied to your account**, and the server keeps only a salted hash of it.
+- The first time you send one, the app generates a random install id (UUID v4). It is **not tied to your account**, and the server keeps only a SHA-256 of it (with a fixed public prefix; the random id itself is what makes it hard to guess). Sending is rate-limited with the same kind of per-day IP hash as problem reports.
 - Before sending, local paths are removed and words that look like credentials, serial numbers or email addresses are blanked. The limit is 1,000 characters. Only replies marked "may quote anonymously" can be quoted in the next letter.
 - Receipts are fetched by install id: the handling status and, from 3.1.1, the author's one-to-one reply. Receipts never return your own text. The author's reply is returned, so anyone holding this computer's `data/letters/state.json` (which contains the install id) can read what the author wrote back. The author does not put your personal details in a reply.
-- Your sent text and the author's reply stay on this computer. The server deletes a reply 180 days after it is handled.
+- Your sent text and the author's reply stay on this computer. Replies that have been handled for 180 days are deleted from the server when the author runs the clean-up (a copy is exported to the author's own computer first); unhandled replies are kept.
 
 ## "Clear credentials" versus "clean up data"
 
 ### Clear credentials
 
 - Invalidates the web sign-in session;
-- Deletes the Credential Manager token for the current user ID;
+- Deletes the token for the current user ID from the system credential store (or `credentials.json`);
 - Deletes the `auth.json` metadata;
 - Clears the in-memory sync manager, auth state and warnings;
 - **Keeps** the existing health database, canonical records and raw records.
@@ -267,22 +292,42 @@ Replies written in the letter box go to zeppbridge.com and are stored in the aut
 - Deletes canonical records (metric, daily, sleep, workout and so on) outside
   the window;
 - Deletes old raw records no longer referenced by any canonical record;
-- Does **not** delete the Windows Credential Manager token unless you separately
-  press "clear credentials".
+- Does **not** delete any token unless you separately press "clear
+  credentials".
 
-For a complete wipe, use the in-app actions first, then open the data folder,
-check what remains, and handle it according to your own backup policy.
+### Start over with a different account
+
+Deletes the tokens of both channels, moves the whole data folder aside to
+`data-before-<time>` and starts an empty library. It does not revoke the official
+authorization, because you may authorize the same account again.
+
+### Uninstalling (Windows)
+
+Ticking "delete app data" in the uninstaller deletes the tokens of both channels
+and the `data` folder. The local API token entry (`local-api-token`) is
+currently left in Credential Manager; remove it there by hand if you want.
+
+For a complete wipe on other platforms, use the in-app actions first, then open
+the data folder, check what remains, and handle it according to your own backup
+policy.
 
 ## Telemetry statement
 
 ZeppBridge has no automatic product telemetry, usage statistics or background
-crash reporting. Syncing, credential verification, web sign-in and the problem
-reports you explicitly confirm do produce network traffic. The destinations are
-limited to:
+crash reporting. Syncing, credential verification, web sign-in, update checks and
+the reports and letters you explicitly send do produce network traffic. The
+destinations are limited to:
 
 - the Zepp region service you configured, after host validation;
 - the official Zepp / Huami pages the sign-in window visits;
-- the ZeppBridge Cloudflare Pages Function, for voluntary problem reports;
+- `zeppbridge.com` (or `zeppbridge.pages.dev`): voluntary problem reports,
+  letters and receipts, and the official-platform authorization relay;
+- `api-open.zepp.com`, for the official channel;
+- GitHub, to check for and download updates (`latest.json` and the installer of
+  the latest release). The Microsoft Store build updates through the Store
+  instead;
+- the AI site you pick in "Send to AI", and the Zepp authorization page, opened
+  in your own browser;
 - `tile.openstreetmap.org`, **only** after you switch a workout's route card to
   "Map" and agree (off by default; "Just this once" or "Always"). Loading the
   visible tiles tells OpenStreetMap roughly where that workout was; no tiles are
@@ -296,20 +341,19 @@ fields, but they can include heart rate, cadence and (the series always,
 on the machine can reach it with the token, so only run software you trust. The
 listener stops when you turn the switch off or quit the tray process.
 
-## Risks that remain before release
+## Known limitations
 
-- The Windows installer can be Authenticode-signed with a local self-signed
-  certificate (`CN=ZeppBridge Local`) so the publisher is identifiable, but that
-  chain is not in the Windows trusted roots and SmartScreen may still warn. It
-  is not EV/OV code signing and does not clear the bar for public distribution.
-- The macOS build is unsigned — no Apple Developer ID and no notarisation. See
-  the install section of the [README](../../README.md).
-- The health database is plaintext by default.
-- There is no system-level background service, no SBOM and no clean-VM
-  evidence. Update checks happen only while the app process is running.
-- There is no live sign-in evidence covering every region and account type.
-- Real sleep stages, GPS/routes, training detail and HybridCharge have no
-  redacted fixtures verifying them yet.
+- The Windows installers are not code-signed, so browsers and SmartScreen may
+  warn. Release builds carry GitHub build-provenance attestations, and every
+  release lists SHA-256 checksums. The Microsoft Store build is delivered
+  through the Store.
+- The macOS build is ad-hoc signed only — no Apple Developer ID and no
+  notarisation. See the install section of the [README](../../README.md).
+- The health database is plaintext.
+- The server-side hashes of Zepp user IDs and of IP addresses (for rate limiting)
+  use no secret salt; see above.
+- Update checks happen only while the app is running; there is no background
+  service.
+- Sign-in has not been verified on every region and account type.
 
-Engineering gates and the pre-release checklist are in the
-[development guide](../development/development.md).
+Engineering gates are in the [development guide](../development/development.md).

@@ -18,7 +18,7 @@ body:
     attributes:
       label: ZeppBridge version · 你下载的 ZeppBridge 版本
       description: The version number in the installer filename. · 安装包文件名里的版本号。
-      placeholder: "2.0.0"
+      placeholder: "3.1.1"
     validations:
       required: true
   - type: dropdown
@@ -28,12 +28,15 @@ body:
       options:
         - Windows setup.exe (NSIS)
         - Windows .msi
+        - Windows Portable zip
+        - Microsoft Store
         - macOS .dmg
         - Linux AppImage
         - Linux Flatpak
         - Linux .deb
         - Linux .rpm
-        - Linux container image (headless CLI / MCP)
+        - CLI / MCP tools zip
+        - Linux container built from packaging/docker (headless CLI / MCP)
         - Built from source · 自己从源码构建
         - In-app auto update · 应用内自动更新
         - Not sure · 不确定
@@ -130,7 +133,7 @@ body:
     attributes:
       label: Steps to reproduce · 复现步骤
       placeholder: |
-        1. Download ZeppBridge_2.0.0_amd64.AppImage
+        1. Download ZeppBridge-3.1.1-Linux-x64.AppImage
         2. chmod +x, then run it from a terminal
         3. A window opens but stays white; nothing is printed
     validations:

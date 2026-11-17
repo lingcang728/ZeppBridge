@@ -2,15 +2,15 @@
 
 [English](security-and-privacy.md)
 
-本页说明当前实现中的数据流和清除范围。它不是「绝对安全」保证；安装包未签名，健康数据库默认明文，真实账号/区域行为也尚未完成 live 验证。
+本页说明当前实现中的数据流和清除范围。它不是「绝对安全」保证：Windows 安装包没有代码签名，macOS 版只有 ad-hoc 签名，健康数据库默认明文，也没有在所有账号类型和区域上做过真实服务验证。
 
 ## 凭据
 
-- app token 默认由 Windows Credential Manager、macOS 钥匙串或 Linux Secret Service 保存，服务名为 `com.zeppbridge.app`，账户名按 user ID 区分。
+- app token 默认由 Windows Credential Manager、macOS 钥匙串或 Linux Secret Service 保存，服务名为 `com.zeppbridge.app`（Microsoft Store 版是 `com.zeppbridge.app.store`），账户名按 user ID 区分。本机 API 令牌另占一条，账户名 `local-api-token`。
 - macOS 和 Linux 可显式选用明文 `credentials.json`，文件权限为 `0600`、数据目录为 `0700`；系统存储故障不会自动启用文件存储。Linux 还支持只读环境变量存储。选择前请阅读 [macOS](../guides/macos-credentials.zh-CN.md) 或 [Linux](../guides/linux.zh-CN.md) 凭据指南。
-- `auth.json` 位于实际数据目录，只保存认证元数据（版本、user ID、区域 host、更新时间），文件存储模式也一样。手动复制整个数据目录会带走文件中的令牌，请勿随库副本分享 `credentials.json`。
+- `auth.json` 位于实际数据目录，只保存认证元数据（版本、user ID、区域 host、更新时间），文件存储模式也一样。旁边的 `auth.user-id` 是 user ID 的备份，`auth.json` 损坏时「清除认证」仍能找到对应的凭据。手动复制整个数据目录会带走文件中的令牌，请勿随库副本分享 `credentials.json`。
 - 启动恢复会从元数据和凭据管理器重建同步 manager。凭据缺失或失效时，设置页显示需要重新认证，不把 token 放进状态响应。
-- 网页登录在独立窗口内读取会话 cookie，解析出 user ID 与 app token 后立刻写入凭据管理器。`login://status` 只返回 `state`、`message`、`page_url`，不返回 token。
+- 网页登录在独立窗口内读取会话 cookie，解析出 user ID 与 app token 后立刻写入凭据管理器。`login://status` 只返回 `state`、`message`、`page_url`、`code`，必要时再加一条恢复或账号冲突提示（user ID 只露后四位），不返回 token。
 - token 仍然是敏感数据。不要记录、复制到 issue、提交到 Git、发送给第三方或公开分享。
 
 ## 网络与区域
@@ -18,12 +18,12 @@
 - 同步不是离线功能：用户点击验证/同步后，ZeppBridge 会向用户允许的 Zepp 区域 host 发起 HTTPS 请求。
 - 连接器只接受 `https://api-mifit*.zepp.com` 或 `https://api-mifit*.huami.com` 的 origin，不接受任意域名、路径、query、fragment、凭据或不受控端口。
 - HTTP client 有 30 秒 timeout（另加 10 秒连接超时），不认环境变量 / 系统代理，并对 401/403、404、429/5xx 与其他非 2xx 做分类和有限重试。
-- 登录窗口只允许 HTTPS 导航到 `*.zepp.com` / `*.huami.com` 以及官方登录页会用到的那些精确 OAuth 域名。`about:` / `data:` / `blob:` 一律拒绝。区域探测只打 allow-list 上的 API origin。
+- 登录窗口只允许 HTTPS 导航到 `*.zepp.com` / `*.huami.com`。第三方登录页（Google、Apple、微信、小米、Facebook、Amazfit 美国站）自 3.0.1 起一律拦截，请改用 Zepp 账号密码登录。`about:` / `data:` / `blob:` 一律拒绝。区域探测只打 allow-list 上的 API origin。
 - 当前没有局域网 HTTP 代理，也不安装系统或用户 CA。
 - 桌面端的本机 REST API 只绑定 `127.0.0.1:43921`：地址写死在代码里，没有任何设置能改。不监听局域网地址，不提供 CORS，只暴露只读路由：健康探针、运动序列和 `/v1/records`。**默认关闭**；用户在设置页开启后才会监听，且每个请求都要带 token（`zbk_` 前缀，比较用常量时间）。token 可随时轮换，轮换后旧 token 立即失效；关闭开关会释放端口。请求行、单条 header 与 header 总量都有上限，超长请求直接拒绝而不是读进内存。
 - 只有无头版 `zeppbridge-cli serve`（Docker、服务器）能监听本机以外的地址，而且要你自己设 `ZEPPBRIDGE_LISTEN`；不设也只听 `127.0.0.1`。监听非本机地址时必须有单独的拉取 token（至少 32 个字符、只读、只能访问 `/v1/*` 和 `/health`，可用 `zeppbridge-cli pull-token revoke` 单独吊销），否则拒绝启动。按来源地址限流，一分钟内鉴权失败 10 次的地址封 10 分钟。传输是明文 HTTP：放在容器内部网络里（compose 示例不发布端口），或者放在 HTTPS 反向代理后面。任何路由都不返回凭据；`/v1/records` 只有请求里写了 `include_gps=true` 才带 GPS 轨迹。
-- `zeppbridge-mcp` 只用 stdio，**不监听任何端口，也不发出任何网络请求**。它连库用 `PRAGMA query_only`，写操作在 SQLite 层就被拒绝，不依赖工具列表里恰好没有写操作。返回里没有 token、Cookie、完整账号，也没有本机绝对路径。
-- `zeppbridge-cli` 只在 `sync` 时联网，走的是和桌面应用完全相同的连接器与 host allow-list。它不做登录，也不打印 token；`export --out` 只回显用户自己给的路径，不把它解析成绝对路径打印出来。
+- `zeppbridge-mcp` 只用 stdio，**不监听任何端口**。健康数据经 `PRAGMA query_only` 连接只读。少数工具会写你自己的记录（伤病、生活事件、比赛、跑鞋、运动感受与类型、教练档案提议），走另开的短暂写连接，每一笔都记进应用里能看到、能撤销的账本。两个工具会按请求联网：`sync_now` 调用 CLI 同步；`publish_training_plan` 经官方通道（`zeppbridge.com` 和 `api-open.zepp.com`）把训练计划发到手表，而且要先在设置里打开「允许 AI 直接发布」。返回里没有 token、Cookie、完整账号，也没有本机绝对路径。
+- `zeppbridge-cli` 在 `sync`、`probe`、`details` 时联网，走和桌面应用相同的连接器与 host allow-list；`details --channel official` 走下面说的官方通道。它不做登录，也不打印 token；`export --out` 只回显用户自己给的路径，不把它解析成绝对路径打印出来。
 
 ## Zepp 账号授权（官方接口）
 
@@ -31,7 +31,7 @@ Zepp 官方开放平台要求把应用密钥放在服务器上，所以这是 Ze
 服务器（`zeppbridge.com`，与 `zeppbridge.pages.dev` 是同一个 Cloudflare Pages Functions + D1 项目）的部分。
 
 - **服务器长期保存的：** App ID 与 App Secret（Cloudflare Secrets，不进仓库、不进桌面二进制），
-  以及完成过授权的 Zepp 用户编号的 SHA-256——没有姓名，也没有原始编号。
+  以及完成过授权的 Zepp 用户编号的 SHA-256 和首次、最近一次出现时间。没有姓名，也没有原始编号；但这个哈希没加盐，Zepp 用户编号又是数字，所以它算化名，不算匿名。
 - **服务器短暂保存的：** 授权进行中时，浏览器 `state` 和一次性领取密钥的 SHA-256；Zepp 回调后，
   用另一把服务器密钥以 AES-GCM 加密的令牌。你的 ZeppBridge 领走时这一行即删除，没人领的
   10 分钟后清掉。
@@ -41,9 +41,9 @@ Zepp 官方开放平台要求把应用密钥放在服务器上，所以这是 Ze
   把新令牌交回，什么都不存。
 - **浏览器只看得到固定文案。** 授权码、state、令牌、Zepp 的错误描述一律不回显到页面或跳转地址里。
 - **在你的电脑上：** 访问令牌和刷新令牌在系统凭据存储里各占一条；数据目录里的
-  `official.json` 只有用户编号、连接时间和到期时间。官方客户端只连两个主机——
-  `zeppbridge.com` 和 `api-open.zepp.com`——且不跟随跳转。
-- **断开**会先请 Zepp 撤销授权，再删掉本机令牌，**不删任何健康数据**。
+  `official.json` 存用户编号、Zepp 昵称、连接时间、到期时间和是否需要重新授权。官方客户端只连
+  `zeppbridge.com`（连不上时退到同一个项目的 `zeppbridge.pages.dev`）和 `api-open.zepp.com`，且不跟随跳转。
+- **断开**会先请 Zepp 撤销授权，再删掉本机令牌，**不删任何健康数据**。撤销授权后，经它发布到手表的训练计划也会被 Zepp 移除，本机的计划账本随之清空。
 
 ## 三种「导出」的边界不同
 
@@ -59,19 +59,14 @@ Zepp 官方开放平台要求把应用密钥放在服务器上，所以这是 Ze
 
 ## 网页登录会话
 
-1. `start_web_login` 递增 epoch、关闭旧登录窗、打开新窗，并把状态设为 `waiting`。
-2. 后台轮询 cookie；解析成功后状态变为 `extracting` → `verifying`，并行探测区域 host。
-3. 验证成功后保存凭据、初始化同步 manager，状态变为 `connected` 并关闭登录窗。
-4. `cancel_web_login`、关闭登录窗或新的 `start_web_login` 会使旧 epoch 失效；超时 15 分钟记为 `failed`。
-5. 「清除认证」同时作废登录 epoch，并把登录状态重置为 `idle`。
-
-登录窗口能力仅覆盖主窗口与 `zepp-login`。不要把登录 URL 分享给不可信的人。
+登录在独立窗口里进行，15 分钟超时。取消、关掉窗口、重新开始登录或「清除认证」都会作废上一次尝试。登录窗口除主窗口与 `zepp-login` 外拿不到应用命令。不要把登录 URL 分享给不可信的人。
 
 ## 健康数据库
 
-- 数据库和 raw payload 位于程序目录旁的 `data/zepp.db`，默认 SQLite 明文；当前没有整库加密或远程备份。WebView 缓存在 `data/webview`。
+- 数据库和 raw payload 在数据目录的 `zepp.db` 里，SQLite 明文；没有整库加密，也没有远程备份。数据目录：Windows（便携版和安装版）是程序旁的 `data/`；macOS 是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`；Linux 是 XDG 数据目录（Flatpak 在 `~/.var/app/com.zeppbridge.app/`）；Microsoft Store 版在应用包的 LocalState 里。`ZEPPBRIDGE_DATA_DIR` 可以覆盖。WebView 缓存在其中的 `webview/`。
+- 日志在数据目录的 `logs/zeppbridge.log`（轮转，最多 3 份、每份 2 MiB）。日志不写令牌和健康数值，但启动那几行有程序和数据目录的路径，可能带你的系统用户名。发给别人之前先看一眼。
 - SQLite 启用 WAL、外键、migration、去重和 raw provenance。canonical 健康行可回指对应 raw 记录，便于解释来源。
-- retention 可由用户在 1–365 天内选择，默认 365 天；清理依据健康记录时间，成功同步后删除旧 canonical 和无引用 raw。清理不可撤销，请先备份。
+- retention 可由用户在 1–365 天内选择，默认 365 天；清理依据健康记录时间，成功同步后删除旧 canonical 和无引用 raw；打开「长期归档」后同步不再自动清理。清理不可撤销，请先备份。
 - `band_data` 的编码/压缩 payload 可能只保留 raw 并标记 `unverified`；程序不将未知内容伪造成睡眠阶段。
 
 ## 外部 AI 交接
@@ -92,29 +87,29 @@ ZeppBridge 本身从不上传健康数据。把一份数据推到你自己的站
 
 当设备或运动类型未被识别时，用户可以在设置页点击「提交错误报告」。提交前必须通过一次明确确认；应用不会后台自动上报，也不会创建或回复 GitHub Issue。
 
-桌面端使用一套不带 Zepp cookie jar 的独立 HTTPS client，只向 `https://zeppbridge.com/api/feedback` 发送强类型白名单报告。允许字段只有应用/解析器版本、操作系统、数据库 schema 版本、设备响应的字段名与 JSON 类型、认不出的设备的安全产品名/短型号提示和型号编号、未知设备数量、未知运动编号与记录数、类型冲突数，以及云端最近一次拒绝请求的数字错误码（只有编号、哪条数据流和时间，不包括云端返回的文字）。报告类型没有账号、Token、cookie、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径的字段槽位。
+桌面端使用一套不带 Zepp cookie jar 的独立 HTTPS client，只向 `https://zeppbridge.com/api/feedback` 发送强类型白名单报告。允许字段只有应用/解析器版本、操作系统、数据库 schema 版本、设备响应的字段名与 JSON 类型、认不出的设备的安全产品名/短型号提示和型号编号、未知设备数量、未知运动编号与记录数、类型冲突数，云端最近一次拒绝请求的数字错误码（只有编号、哪条数据流和时间，不包括云端返回的文字）、报告类别、你做过的运动类型纠正（运动编号、我们的解读、你改成的类型和记录数），以及你自己写的一段说明（最多 500 字，发送前去掉本机路径和疑似密钥）。报告类型没有账号、Token、cookie、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径的字段槽位。
 
 型号编号（`modelIdentifierHints`）是严格形如 `deviceSource:整数` 的字符串，取值必须是设备响应里 0–99,999,999 范围内的 JSON 整数，而且**只收目录（以 Zepp 官方对照表为准）认不出的那几台**；已经认出的设备、体脂秤和 `deviceType` 族码都不发（3.1.1 起；更早的版本还会带上已认出设备的型号和固件号，服务端现在收到也不再入库）。它们描述的是「哪一款表」而不是「哪一台表」，形状在客户端和 Pages Function 两侧都被钉死，序列号、MAC 或任何字符串都进不来。
 
 设备选择器里手动指认的型号**只存在本机**。3.1.0 及更早的版本可以勾选「顺便帮下一版认出这台设备」把指认交上来；3.1.1 起这条上报已经删掉。
 
-Pages Function 再次执行严格 schema、字段数量和 32 KiB 大小校验后写入私有 D1 数据库；接口不提供公开读取路由，响应只返回随机报告编号。D1 仅用于定位目录/解析兼容性问题，不用于用户画像、使用统计或健康分析。
+Pages Function 再次执行严格 schema、字段数量和 32 KiB 大小校验后写入私有 D1 数据库；接口不提供公开读取路由，响应只返回随机报告编号。D1 仅用于定位目录/解析兼容性问题，不用于用户画像、使用统计或健康分析。为防滥用，服务端还按天记一个计数，键是「固定公开前缀 + 日期 + 你的 IP」的 SHA-256。这个哈希没有用密钥加盐，对 IP 地址来说不算匿名。
 
 ## 给作者的回信
 
 信匣里给作者的回信寄到 zeppbridge.com，存在作者的 D1 表 `letter_replies`（和诊断报告分表）。
 
-- 第一次寄信时本机生成一个随机 install id（UUID v4），**不绑账号**；服务端只存它的加盐哈希。
+- 第一次寄信时本机生成一个随机 install id（UUID v4），**不绑账号**；服务端只存它的 SHA-256（前缀是固定公开的，难猜靠的是 id 本身随机）。寄信也按同样的「日期 + IP」哈希限流。
 - 寄出前去掉本机路径，抹掉看起来像凭据、序列号、邮箱的词；最长 1000 字。只有勾了「允许匿名引用」的话才会出现在下期回音里。
 - 回执按 install id 取回：处理状态，以及作者的一对一回复（3.1.1 起）。回执不返回你写的原文；作者回复会返回，所以拿到这台电脑 `data/letters/state.json`（里面有 install id）的人能读到作者回你的话。作者回复里不写你的个人信息。
-- 本机留着寄出的原文和作者回复，服务端处理完满 180 天删除回信。
+- 本机留着寄出的原文和作者回复。处理完满 180 天的回信，在作者执行清理时从服务端删除（删前先导出一份到作者自己的电脑）；没处理的不删。
 
 ## 「清除认证」与「清理数据」
 
 ### 清除认证
 
 - 作废网页登录会话；
-- 删除 Credential Manager 中当前 user ID 对应的 token；
+- 删除系统凭据存储（或 `credentials.json`）里当前 user ID 对应的 token；
 - 删除 `auth.json` 元数据；
 - 清空内存中的同步 manager、认证状态和 warning；
 - **保留**已有健康数据库、canonical 记录和 raw 记录。
@@ -124,28 +119,40 @@ Pages Function 再次执行严格 schema、字段数量和 32 KiB 大小校验�
 - 由设置页 `cleanup_old_data` 触发，天数限制为 `1–365`；
 - 删除超过窗口的 metric、daily、sleep、workout 等 canonical 记录；
 - 删除不再被 canonical 记录引用的旧 raw；
-- 不删除 Windows Credential Manager token，除非你另行点击「清除认证」。
+- 不删除任何令牌，除非你另行点击「清除认证」。
 
-如果需要彻底清除，请先使用应用动作，再打开 data folder 检查并按自己的备份策略处理残余数据库。
+### 换个账号从头开始
+
+删除两条通道的令牌，把整个数据目录挪到 `data-before-<时间>`，开一个空库。不撤销官方授权，因为你可能还要用同一个账号重新授权。
+
+### 卸载（Windows）
+
+卸载时勾选「删除应用数据」会删除两条通道的令牌和 `data` 目录。本机 API 令牌（`local-api-token`）目前会留在凭据管理器里，需要的话手动删掉。
+
+其他平台要彻底清除，请先用应用里的操作，再打开数据目录检查残留，按自己的备份策略处理。
 
 ## 遥测声明
 
-ZeppBridge 当前没有自动产品遥测、使用统计或后台崩溃上报，但同步、认证验证、网页登录和用户主动确认的错误报告会产生网络流量。网络目的地仅限：
+ZeppBridge 没有自动产品遥测、使用统计或后台崩溃上报，但同步、认证验证、网页登录、检查更新，以及你主动发出的报告和回信会产生网络流量。网络目的地仅限：
 
 - 用户配置并通过 host 校验的 Zepp 区域服务；
 - 登录窗口访问的 Zepp / Huami 官方页面；
-- 主动错误报告访问的 ZeppBridge Cloudflare Pages Function；
+- `zeppbridge.com`（或 `zeppbridge.pages.dev`）：主动错误报告、回信与回执、官方开放平台授权中转；
+- `api-open.zepp.com`：官方通道；
+- GitHub：检查并下载更新（最新 Release 的 `latest.json` 和安装包）。Microsoft Store 版走商店更新，不连 GitHub；
+- 「交给 AI」里你选的 AI 网站，以及 Zepp 授权页，在你自己的浏览器里打开；
 - `tile.openstreetmap.org`：**只有**在运动详情的路线卡切到「地图」并同意（「只这次」或「一直开」）之后才请求，默认关闭。加载看得见的那几张瓦片会让 OpenStreetMap 知道这次运动大致在哪；不预取、不离线缓存，轨迹本身仍在本地绘制；
 - 应用自身的本地 Tauri IPC。
 
 在设置里打开之后，ZeppBridge 运行期间会开启只读本机 API。`GET /workouts/{id}/series` 和 `/v1/records` 不返回认证字段，但可能包含心率、步态和精确 GPS（运动序列总是带，`/v1/records` 只在 `include_gps=true` 时带）；电脑上拿到 token 的其他本机进程可访问，因此只应运行可信程序。关掉开关或退出托盘进程后监听器停止。
 
-## 发布前余留风险
+## 已知局限
 
-- 本机安装包可用本地自签证书 `CN=ZeppBridge Local` 做 Authenticode 签名，便于识别发布者；证书链不在 Windows 受信任根里，SmartScreen 仍可能提示。这不是 EV/OV 代码签名，不能当公开发布门槛；
-- 健康 DB 默认明文；
-- 没有系统级后台服务、SBOM 或干净 VM 证据；更新检查只在应用进程运行期间进行；
-- 没有覆盖全部区域/账号的真实登录证据；
-- 真实睡眠阶段、GPS/路线、训练详情和 HybridCharge 尚未有脱敏 fixture 验证。
+- Windows 安装包没有代码签名，浏览器和 SmartScreen 可能提示。正式版带 GitHub 构建来源证明（build provenance），每个 Release 都列出 SHA-256 校验和。Microsoft Store 版经商店分发；
+- macOS 版只有 ad-hoc 签名，没有 Apple Developer ID，也没有公证，见 [README](../../README.zh-CN.md) 的安装说明；
+- 健康数据库是明文；
+- 服务端对 Zepp 用户编号和 IP 地址（限流用）的哈希没有用密钥加盐，见上文；
+- 只有应用运行时才检查更新，没有后台服务；
+- 没有在所有区域和账号类型上验证过登录。
 
-工程门禁与发布前检查见 [开发文档](../development/development.zh-CN.md)。
+工程门禁见 [开发文档](../development/development.zh-CN.md)。

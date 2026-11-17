@@ -1,8 +1,8 @@
 # Windows 代码签名（SignPath Foundation）
 
-安装包没签名，浏览器下载信誉每版都从零开始，Chrome / Edge 会拦成「危险文件」、SmartScreen 提示未知发布者（3.0 反馈，见桌面 计划.md 批次 4）。打算申请 [SignPath Foundation](https://signpath.org/) 的免费开源签名；**还没申请，CI 还没接**——接法写在这里，批下来照着改。
+安装包没签名，浏览器下载信誉每版都从零开始，Chrome / Edge 会拦成「危险文件」、SmartScreen 提示未知发布者（用户反馈过多次）。打算申请 [SignPath Foundation](https://signpath.org/) 的免费开源签名；**还没申请，CI 还没接**——接法写在这里，批下来照着改。
 
-## 申请前要备好的（用户来办）
+## 申请前要备好的
 
 SignPath Foundation 的条件（[terms](https://signpath.org/terms)）对照本仓库：
 
@@ -13,8 +13,8 @@ SignPath Foundation 的条件（[terms](https://signpath.org/terms)）对照本�
 | 从源码可验证地构建 | ✅ GitHub 托管 runner 构建（`ci.yml` 的 `package` 作业） |
 | 每次签名前人工批准 | 打 tag 之后，SignPath 后台还要再点一次 |
 | 首页公布签名策略 | 要加：README 或网站放 *Free code signing provided by SignPath.io, certificate by SignPath Foundation*，列出 Authors / Reviewers / Approvers 三个角色（目前都是 lingcang728） |
-| 隐私声明：未经同意不传数据 | 已有 [security-and-privacy](../reference/security-and-privacy.md) 和 README「隐私与连接」 |
-| 所有成员在 GitHub 和 SignPath 都开 MFA | 用户确认 |
+| 隐私声明：未经同意不传数据 | 已有 [security-and-privacy](../reference/security-and-privacy.zh-CN.md) 和 README「隐私与连接」 |
+| 所有成员在 GitHub 和 SignPath 都开 MFA | 待维护者确认 |
 
 申请通过后会拿到：组织 ID、项目 slug、签名策略 slug（一般是 `release-signing`）、一个 CI 用户的 API token。前三个放 Actions variables，token 放 secret `SIGNPATH_API_TOKEN`。
 
@@ -38,5 +38,5 @@ SignPath 的项目里要按文件配置签名对象：`ZeppBridge.exe`、`zeppbr
 ## 签完要核对
 
 - `Get-AuthenticodeSignature release\ZeppBridge.exe` 是 `Valid`，签名者是 SignPath Foundation。
-- 用 3.0.x 未签名版走一次自动更新到签名版（[静默更新端到端验法](../development/development.md)），确认 `.sig` 校验通过。
+- 用最近一个未签名版走一次自动更新到签名版（[静默更新端到端验法](development.md)），确认 `.sig` 校验通过。
 - 新签名的头几版 SmartScreen 仍可能提示——OV 证书的信誉要靠下载量攒，不是一签就消失；但 Chrome「危险文件」拦截应当消失。

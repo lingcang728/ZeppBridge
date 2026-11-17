@@ -26,7 +26,7 @@ body:
     attributes:
       label: ZeppBridge version · ZeppBridge 版本
       description: At the bottom of the settings page, or in the installer filename. · 设置页底部，或安装包文件名里的版本号。
-      placeholder: "2.0.0"
+      placeholder: "3.1.1"
     validations:
       required: true
   - type: dropdown

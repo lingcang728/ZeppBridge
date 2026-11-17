@@ -1,0 +1,30 @@
+name: Feature idea · 功能建议
+description: Something ZeppBridge could do that it doesn't yet. · ZeppBridge 还做不到、你希望它能做的事。
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        ZeppBridge can only show data that Zepp's servers provide. If a metric is missing,
+        please say whether the Zepp App shows it for the same day. · ZeppBridge 只能显示 Zepp
+        服务器提供的数据；如果是缺了某个指标，请说明 Zepp App 同一天能不能看到它。
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do? · 你想做什么
+      description: The situation, not the solution. · 说场景，不用先想解决办法。
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help? · 怎样会有帮助
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: ZeppBridge version · 版本
+      placeholder: "3.1.1"
+    validations:
+      required: false

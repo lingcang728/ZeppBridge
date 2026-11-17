@@ -2,33 +2,45 @@
 
 [English](website-deployment.md)
 
-浏览器访问构建产物时显示产品落地页；Tauri 桌面运行时仍显示完整应用。页面中内嵌的体验使用当前应用代码，以及独立的内存数据，不会连接真实账户或修改本地数据库。
+zeppbridge.com 是 Cloudflare Pages 项目 `zeppbridge`。同一份构建产物在浏览器里显示落地页，在 Tauri 桌面运行时显示完整应用。页面里内嵌的体验跑的是当前应用代码和内存里的演示数据，不连真实账户，也不碰本地数据库。
 
-## 本地构建与验收
+## 本地构建
 
-先复用已安装的 Python Playwright、Chromium、ffmpeg 和 ffprobe。构建脚本不会安装或下载工具；必要时用 `LANDING_PYTHON`、`LANDING_CHROMIUM`、`PLAYWRIGHT_BROWSERS_PATH` 指定现有安装。
+构建脚本不安装任何工具，复用已有的 Python Playwright、Chromium、ffmpeg 和 ffprobe；需要时用 `LANDING_PYTHON`、`LANDING_CHROMIUM`、`PLAYWRIGHT_BROWSERS_PATH` 指到已有的安装。
 
-`npm run build:web` 会进行类型检查与相关测试，启动本地应用，检查演示路由，并录制五个完整功能流程的十种语言、明暗主题版本。视频为 2560 × 1600，配套封面与首页静态素材。脚本根据源代码内容指纹复用未变化的素材；应用、语言、演示数据或录制流程发生变化后，会更新受影响的版本。
+- `npm run build:web`：类型检查、跑相关测试、本地起应用、检查演示路由，并按 13 种界面语言、深浅两套主题录制功能演示。源文件没变的素材按指纹复用。
+- 产物在 `.site-cache/site-dist`，录像和验收截图在 `.site-cache/media`、`.site-cache/verification`，都不进 Git。普通的 `npm run build` 仍只产出桌面应用用的 `dist`，不带网站视频。
+- `npm run site:media` 单独重录素材（加 `--force` 全部重录）；`npm run site:verify -- --url <预览地址>` 对着正在运行的预览（`npm exec vite -- preview --mode site --host 127.0.0.1 --port 1536`）检查排版、内嵌交互、视频和深色模式。
+- 收尾一步（`scripts/site/finish-dist.mjs`）生成 `/changelog`、`/letters`、`/privacy`、404 页和 `_routes.json`。更新日志只收打了 `v*` 标签的版本，所以要在带标签的完整克隆里构建；一个标签都找不到时会直接报错。
 
-网站构建输出到 `.site-cache/site-dist`；录像、指纹清单与验收截图分别保存在 `.site-cache/media`、`.site-cache/media/manifest.json` 和 `.site-cache/verification`。这些目录不进入 Git。普通 `npm run build` 仍输出桌面应用所用的 `dist`，不打包网站演示视频。
+网站允许搜索引擎收录（`robots.txt` 不拦）。
 
-本地预览可运行 `npm exec vite -- preview --mode site --host 127.0.0.1 --port 1536`。预览启动后，用 `npm run site:verify -- --url http://127.0.0.1:1536` 验收响应式布局、内嵌操作、视频和强制深色模式。验收脚本额外复用 Python Pillow。`npm run site:media -- --url http://127.0.0.1:1532` 可单独刷新正在运行的本地开发服务器素材；加 `--force` 可强制重录。
+## 部署
 
-构建只生成本地产物。当前输出带 `noindex`，正式上线前需另外决定搜索引擎收录策略。
+在已登录 Wrangler 的机器上：`npm run site:deploy`（先跑收尾一步，再 `wrangler pages deploy`）。
 
-## Cloudflare Pages
+也可以在 GitHub Actions 里手动运行 **Deploy website to Cloudflare Pages**。它只能手动触发，推送不会自动部署。流程是 `npm ci && npm run test:functions && npm run build:web`，应用 `zeppbridge-feedback` 的 D1 迁移，然后部署 `.site-cache/site-dist`。
 
-仓库的 `Deploy website to Cloudflare Pages` workflow 可从 GitHub Actions 手动执行：
+## 接口、数据库和密钥
 
-1. `npm ci`
-2. `npm run build:web`
-3. 将 `.site-cache/site-dist` 发布到 Cloudflare Pages 项目 `zeppbridge`
+`functions/` 里是 `/api/*` 背后的 Pages Functions：
 
-该 workflow 为手动触发，独立准备录制工具并缓存已有视频；不会由 v3 分支推送自动发布。首次全量录制比复用缓存耗时更长。
+| 路由 | 用途 |
+|---|---|
+| `/api/feedback` | 应用内一键报错（D1 `FEEDBACK_DB`） |
+| `/api/letters/*` | 作者来信与回信 |
+| `/api/release` | 最新版下载链接（读最新 GitHub Release 的 `latest.json` 和 `SHA256SUMS.txt`） |
+| `/api/zepp/oauth/*`、`/api/zepp/data/callback` | Zepp 官方开放平台的授权中转和数据回调（D1 `OFFICIAL_DB`） |
 
-首次部署前，需要在 GitHub 仓库的 Actions secrets 中配置：
+`zeppbridge.pages.dev` 上的 `/api/*` 永不跳转：旧版应用和在 Zepp 登记的回调地址都用这个域名。
 
-- `CLOUDFLARE_API_TOKEN`：具备 Cloudflare Pages 编辑权限的令牌。
+项目需要的绑定和变量（`wrangler.jsonc` 与 Pages 项目设置）：
+
+- D1 `FEEDBACK_DB`（`zeppbridge-feedback`，迁移在 `migrations/`）和 `OFFICIAL_DB`（`zeppbridge-official`，迁移在 `migrations-official/`）。工作流只应用反馈库的迁移；`migrations-official` 有变化时用有权限的 Wrangler 会话手动应用。
+- `ZEPP_CLIENT_ID`、`ZEPP_CLIENT_SECRET`、`RELAY_KEY`：缺任何一个，官方开放平台中转就不可用。
+
+工作流用到的 GitHub Actions 密钥：
+
+- `CLOUDFLARE_API_TOKEN`：有 Cloudflare Pages 编辑权限。
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
-
-下载区只在找到完整的 v3 正式版资源时启用下载，测试版或 v2 不会被当作 v3 正式版。Star 按钮直接链接 GitHub 仓库。
+- `CLOUDFLARE_D1_API_TOKEN`（可选）：有 D1 编辑权限。没有它时工作流跳过迁移、照常部署。
