@@ -95,6 +95,12 @@ const props = withDefaults(defineProps<{
   showSpread?: boolean;
   /** Render a value for display; defaults to a fixed-decimal number. */
   format?: (value: number) => string;
+  /**
+   * 库里的单位 → 显示单位（距离米 → 公里 / 英里，体重千克 → 磅）。曲线由页面换算好再传进来，
+   * 但基线标签、「平时范围」、挑几天这三处按指标名自己去后端取数，拿到的是库里的单位，要在这里换一次
+   * （2026-11-15 用户截图：距离卡「比平时高 6,457.00 公里」——米当成了公里）。
+   */
+  convert?: (value: number) => number;
   /** One short qualitative line under the value, when the metric has one. */
   band?: string | null;
   /** Shown in place of the chart when nothing has been measured. */
@@ -120,6 +126,8 @@ const emptyMessage = computed(() => props.emptyText
 
 // 和概览置顶磁贴同一个格式（千分位跟着界面语言）：同一个数在两处不能一处「1,156」一处「1156」。
 const render = computed(() => props.format ?? ((value: number) => formatMetric(value, props.decimals)));
+/** 后端按指标名直接给的数（库里的单位）先换算再写。 */
+const renderRaw = computed(() => (props.convert ? (value: number) => render.value(props.convert!(value)) : render.value));
 const hasPoints = computed(() => (props.series?.points.length ?? 0) > 0);
 // One point is a reading, not a trend: show the number and say so rather than
 // drawing a one-pixel line that implies a shape.
@@ -238,7 +246,7 @@ const hasEventMarks = computed(() => {
            长语言的全文留在按钮自己的 title / aria-label 里。 -->
       <div class="trend-top">
         <strong class="trend-title">{{ label }}</strong>
-        <span class="trend-actions"><MetricInfoButton v-if="info" :metric="info" :label="label" /><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="render" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
+        <span class="trend-actions"><MetricInfoButton v-if="info" :metric="info" :label="label" /><PickDaysButton :metric="series?.metric" :label="label" :tint="color" :format="renderRaw" :unit="unit" /><AskAiButton :metric="series?.metric" :label="label" /></span>
       </div>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
            / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
@@ -251,7 +259,7 @@ const hasEventMarks = computed(() => {
           <small v-if="unit">{{ unit }}</small>
         </slot>
         <!-- 「比平时高 / 低」说的是这个读数，跟在它后面（只和自己比，精修批次 6）。 -->
-        <BaselineTag class="trend-baseline" :metric="series?.metric" :format="render" :unit="unit" />
+        <BaselineTag class="trend-baseline" :metric="series?.metric" :format="renderRaw" :unit="unit" />
       </span>
     </header>
 
@@ -262,7 +270,7 @@ const hasEventMarks = computed(() => {
       <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
-      <UsualRange range-only :metric="series?.metric" :format="render" />
+      <UsualRange range-only :metric="series?.metric" :format="renderRaw" />
       <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
     </p>
 

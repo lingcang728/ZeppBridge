@@ -176,6 +176,7 @@ watch(dataRevision, () => { void load(); });
           :color="card.color"
           :unit="card.unit"
           :decimals="card.decimals ?? 0"
+          :convert="card.convert"
         />
       </div>
       <MissingMetricsRow :items="missingCards" />

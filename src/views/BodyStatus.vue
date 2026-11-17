@@ -214,6 +214,7 @@ const groups = computed(() => ({
               :color="card.color"
               :unit="card.unit"
               :decimals="card.decimals ?? 0"
+              :convert="card.convert"
               :show-spread="card.showSpread ?? false"
               :chart="card.chart ?? 'line'"
               :calendar-axis="card.calendarAxis ?? false"
@@ -236,6 +237,7 @@ const groups = computed(() => ({
               :color="card.color"
               :unit="card.unit"
               :decimals="card.decimals ?? 0"
+              :convert="card.convert"
               :show-spread="card.showSpread ?? false"
               :empty-text="card.emptyText"
             />
@@ -281,6 +283,7 @@ const groups = computed(() => ({
                 :color="card.color"
                 :unit="card.unit"
                 :decimals="card.decimals ?? 0"
+                :convert="card.convert"
                 :chart="card.chart"
                 :calendar-axis="card.calendarAxis ?? false"
                 :empty-text="card.emptyText"
