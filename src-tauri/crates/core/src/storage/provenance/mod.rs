@@ -137,7 +137,11 @@ impl StageErrorKind {
             // 无头环境的三种：两种是「令牌拿不到」，一种是「库要先升级」。
             // 前两种按 auth 分类（用户要去把凭据给进来），第三种是本机存储
             // 的事——重试解决不了，得先跑一次 reprocess。
-            E::Headless(HeadlessProblem::SchemaUpgradeRequired { .. }) => StageErrorKind::Storage,
+            // 库比程序新（旧版命令行 / MCP）同理：要换程序，不是重试。
+            E::Headless(
+                HeadlessProblem::SchemaUpgradeRequired { .. }
+                | HeadlessProblem::ProgramOutdated { .. },
+            ) => StageErrorKind::Storage,
             E::Headless(_) => StageErrorKind::Auth,
             E::Unavailable(_) | E::DataUnavailable(_) => StageErrorKind::NotAvailable,
             // 超时多半是网络慢：和网络同一类，重试就好。

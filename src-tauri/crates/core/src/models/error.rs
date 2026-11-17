@@ -17,6 +17,19 @@ pub enum HeadlessProblem {
     },
     /// 库的 schema 比这个程序旧，而只读连接升不了级。
     SchemaUpgradeRequired { found: i64, required: i64 },
+    /// 库的 schema 比这个程序新：读库的是旧版命令行 / MCP。
+    ///
+    /// 3.1.1 反馈里的「数据库 v47 / 程序 v41」就是这一条：桌面应用升级了，
+    /// AI 工具里登记的还是旧安装目录或旧工具包里的 `zeppbridge-mcp`。
+    /// 用户能做的只有一件事——让 AI 工具改指新版——所以文案直接说怎么做，
+    /// 并带上**是哪个程序**在报（打码后的路径 + 版本），好认出是哪份旧登记。
+    ProgramOutdated {
+        found: i64,
+        supported: i64,
+        /// 打码后的程序路径（`%USERPROFILE%\…`），取不到就是空串。
+        program: String,
+        version: String,
+    },
     /// `auth.json` 在，但凭据存储里没有这个账号的令牌。
     ///
     /// 最常见的出处不是「凭据坏了」，而是**有人把另一台机器的 data 文件夹
@@ -30,6 +43,7 @@ impl HeadlessProblem {
         match self {
             Self::NoCredentialStore { .. } => "err.headless.no_credential_store",
             Self::SchemaUpgradeRequired { .. } => "err.headless.schema_upgrade",
+            Self::ProgramOutdated { .. } => "err.headless.program_outdated",
             Self::TokenNotInStore => "err.headless.token_not_in_store",
         }
     }
@@ -47,6 +61,18 @@ impl HeadlessProblem {
                 "本机数据库还是 v{found}，这个程序需要 v{required}。只读连接无法\
                  升级——无头环境请跑一次 `zeppbridge-cli reprocess`，有桌面应用就\
                  启动一次（两条路都会在升级前自动生成备份），再重试。"
+            ),
+            Self::ProgramOutdated {
+                found,
+                supported,
+                program,
+                version,
+            } => format!(
+                "本机数据库是 v{found}，而这个程序（{program} {version}）只认到 \
+                 v{supported}——它比桌面应用旧。多半是 AI 工具里还登记着旧版：在桌面\
+                 应用的设置里重新连接这个 AI 工具（Claude Desktop 重新生成并安装 \
+                 ZeppBridge.mcpb，其他工具重新复制连接命令），删掉旧的扩展或指向旧\
+                 安装目录的登记，再重启 AI 工具。"
             ),
             Self::TokenNotInStore => "认证元数据在，但凭据管理器里没有这个账号的\
                  令牌。库能跨机器拷，令牌不能。请重新登录，或设 \
@@ -73,6 +99,20 @@ impl HeadlessProblem {
                  read-only connection cannot upgrade it: run `zeppbridge-cli \
                  reprocess` on a headless machine, or launch the desktop app once. \
                  Both take a backup before upgrading. Then try again."
+            ),
+            Self::ProgramOutdated {
+                found,
+                supported,
+                program,
+                version,
+            } => format!(
+                "This library is v{found}, but this program ({program} {version}) only \
+                 understands up to v{supported} -- it is older than the desktop app. \
+                 Usually an AI tool still points at an old copy: reconnect that tool \
+                 from the desktop app's settings (for Claude Desktop, generate and \
+                 install ZeppBridge.mcpb again; for other tools, copy the connect \
+                 command again), remove the old extension or any entry pointing at an \
+                 old install folder, then restart the AI tool."
             ),
             Self::TokenNotInStore => "The account metadata is here but the credential \
                  store has no token for it. A library copies between machines; a token \

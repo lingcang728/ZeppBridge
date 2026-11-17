@@ -35,6 +35,10 @@ const messages = defineMessages(
     'err.headless.schema_upgrade':
       '本机数据库的版本比这个程序旧，而只读连接升不了级。启动一次桌面应用，'
       + '或者在无头环境跑一次 zeppbridge-cli reprocess——两条路都会在升级前自动备份。',
+    'err.headless.program_outdated':
+      '读库的命令行 / MCP 比桌面应用旧，认不出这个版本的数据库。多半是 AI 工具里还登记着旧版：'
+      + '在设置里重新连接这个 AI 工具（Claude Desktop 重新生成并安装 ZeppBridge.mcpb），'
+      + '删掉旧的扩展或指向旧安装目录的登记，再重启 AI 工具。',
     'err.headless.token_not_in_store':
       '账号信息在，但凭据里没有对应的令牌。数据库能跨机器拷贝，令牌不能——'
       + '它在原来那台机器的凭据管理器里。重新登录一次。',
@@ -282,6 +286,11 @@ const messages = defineMessages(
       'The local database is older than this build, and a read-only connection cannot upgrade it. '
       + 'Launch the desktop app once, or run zeppbridge-cli reprocess on the headless machine — '
       + 'both back up before upgrading.',
+    'err.headless.program_outdated':
+      'The CLI / MCP reading the database is older than the desktop app and cannot read this database version. '
+      + 'Usually an AI tool still points at an old copy: reconnect that tool in Settings '
+      + '(for Claude Desktop, generate and install ZeppBridge.mcpb again), remove the old extension '
+      + 'or any entry pointing at an old install folder, then restart the AI tool.',
     'err.headless.token_not_in_store':
       "Account details are here, but the credential store has no token for them. "
       + "A database copies between machines; a token does not — it lives in the original "

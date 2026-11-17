@@ -197,7 +197,10 @@ fn a_read_only_open_says_which_side_is_out_of_date_instead_of_failing_later() {
             CURRENT_SCHEMA_VERSION - 1,
             vec!["zeppbridge-cli reprocess", "桌面应用"],
         ),
-        (CURRENT_SCHEMA_VERSION + 1, vec!["请把命令行"]),
+        (
+            CURRENT_SCHEMA_VERSION + 1,
+            vec!["ZeppBridge.mcpb", "重新连接", env!("CARGO_PKG_VERSION")],
+        ),
     ] {
         let conn = Connection::open(&path).unwrap();
         conn.execute_batch(&format!("PRAGMA user_version = {version};"))

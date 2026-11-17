@@ -22,9 +22,10 @@ pub(super) fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
         ZeppBridgeError::ConfigError(_) | ZeppBridgeError::InvalidHost(_) => (EXIT_USAGE, "usage"),
         // 库要先升级和「拿不到令牌」是两码事：前者重试没用、要先跑一次
         // reprocess（调度脚本按这个码决定别再试了），后者要人把凭据给进来。
-        ZeppBridgeError::Headless(HeadlessProblem::SchemaUpgradeRequired { .. }) => {
-            (EXIT_SCHEMA, "schema")
-        }
+        // 库比程序新同样是 7（文档：「或把命令行升级到同一版本」），重试没用。
+        ZeppBridgeError::Headless(
+            HeadlessProblem::SchemaUpgradeRequired { .. } | HeadlessProblem::ProgramOutdated { .. },
+        ) => (EXIT_SCHEMA, "schema"),
         ZeppBridgeError::Headless(_) => (EXIT_NOT_CONFIGURED, "auth"),
         // 库属于另一个账号：重试没用，要人换数据目录或换回原账号。
         ZeppBridgeError::AccountMismatch => (EXIT_NOT_CONFIGURED, "account_mismatch"),

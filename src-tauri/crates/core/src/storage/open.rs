@@ -537,9 +537,18 @@ impl Database {
                     required: CURRENT_SCHEMA_VERSION,
                 },
             )),
-            std::cmp::Ordering::Greater => Err(ZeppBridgeError::ConfigError(format!(
-                "本机数据库是 v{version}，比这个程序（v{CURRENT_SCHEMA_VERSION}）新。请把命令行 / MCP 升级到与桌面应用相同的版本，不要用旧版去读新库。"
-            ))),
+            // 旧版命令行 / MCP 读新库。文案说清是哪个程序、怎么让 AI 工具改指
+            // 新版（3.1.1 反馈：「数据库 v47 / 程序 v41」，用户不知道该干什么）。
+            std::cmp::Ordering::Greater => Err(ZeppBridgeError::Headless(
+                crate::models::error::HeadlessProblem::ProgramOutdated {
+                    found: version,
+                    supported: CURRENT_SCHEMA_VERSION,
+                    program: std::env::current_exe()
+                        .map(|path| crate::paths::mask_user_path(&path))
+                        .unwrap_or_default(),
+                    version: env!("CARGO_PKG_VERSION").to_string(),
+                },
+            )),
         }
     }
 

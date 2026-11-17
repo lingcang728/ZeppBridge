@@ -397,6 +397,12 @@ fn headless_failures_are_reported_in_english() {
             required: 21,
         },
         HeadlessProblem::TokenNotInStore,
+        HeadlessProblem::ProgramOutdated {
+            found: 47,
+            supported: 41,
+            program: "%USERPROFILE%\\AppData\\Local\\ZeppBridge\\zeppbridge-mcp.exe".into(),
+            version: "3.0.4".into(),
+        },
     ];
     for problem in cases {
         let error = ZeppBridgeError::Headless(problem);
