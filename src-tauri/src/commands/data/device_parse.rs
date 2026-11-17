@@ -388,6 +388,7 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                     .clone()
                     .or_else(|| product_names.iter().find(|v| named(v)).cloned()),
                 display_name,
+                name_code: None,
                 canonical_name: None,
                 catalog_id: None,
                 kind: None,
