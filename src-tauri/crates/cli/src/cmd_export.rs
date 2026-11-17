@@ -133,8 +133,20 @@ pub(super) fn cmd_export(args: &[String]) -> u8 {
     {
         eprintln!("Note: {notice}");
     }
+    // JSON 走 `query_records`：和本机 REST 的 `/v1/records`、同步后推送同一个入口，
+    // 输出是原导出的超集（多了 records_version 和每条的 source），老调用方照样能读。
+    // 其余格式仍直接用导出 builder——它们按固定列转换，不需要来源标注。
+    let built = if format == "json" {
+        records::query_records(&db, &records_query(&options.selection)).and_then(|set| {
+            serde_json::to_string_pretty(&set.value)
+                .map(|text| (text, set.record_count))
+                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))
+        })
+    } else {
+        db.build_ai_export(&options.selection)
+    };
     // 和 GUI 走同一个 builder：导出语义只在 core 里实现一次。
-    let (json_text, records) = match db.build_ai_export(&options.selection) {
+    let (json_text, records) = match built {
         Ok(value) => value,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
@@ -197,6 +209,20 @@ pub(super) fn cmd_export(args: &[String]) -> u8 {
         }
     }
     EXIT_OK
+}
+
+/// CLI 导出向来带完整轨迹（full 明细时），这里照旧打开 GPS，保持输出不变。
+pub(super) fn records_query(selection: &ExportSelection) -> records::RecordQuery {
+    records::RecordQuery {
+        types: selection.data_types.clone(),
+        scope: selection
+            .scope
+            .clone()
+            .unwrap_or_else(|| ExportScope::date_range("", "")),
+        since: None,
+        detail: selection.detail,
+        include_gps: true,
+    }
 }
 
 /// 让 `WriteLockError` 也能落到 busy 码上。

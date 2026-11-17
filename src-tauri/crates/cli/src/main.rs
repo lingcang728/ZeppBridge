@@ -30,6 +30,8 @@ use zeppbridge_core::models::{error::ZeppBridgeError, ExportDetail, ExportScope,
 
 use zeppbridge_core::paths;
 
+use zeppbridge_core::records;
+
 use zeppbridge_core::storage::write_lock::{self, WriteLockError, WritePurpose};
 
 use zeppbridge_core::storage::{Database, ReplayPlan, EXPORT_DATA_TYPES, NORMALIZER_REVISION};
@@ -43,6 +45,7 @@ mod cmd_fit;
 mod cmd_logbook;
 mod cmd_probe;
 mod cmd_reprocess;
+mod cmd_serve;
 mod cmd_status;
 mod cmd_sync;
 mod cmd_workout_edit;
@@ -126,6 +129,8 @@ Commands:
                        Each edit returns an ID; --undo EDIT_ID reverses the whole edit
   shoes               Running shoes: list | save --file <path|-> | delete --id N
   races               Races: list | save --file <path|-> | delete --id N
+  serve               Run the read-only REST API until stopped (for self-hosted pull)
+  pull-token          Pull token for serve: status | show | rotate | revoke
   contract            Print the read contract (units, time zone, source, missing values)
   version             Print the version
   help                Print this help
@@ -194,6 +199,15 @@ shoes / races options:
   These are the same records as the desktop Journal page. AI tools read them through
   MCP get_athlete_profile but cannot change them.
 
+serve (environment, no options):
+  ZEPPBRIDGE_LISTEN         Listen address; default 127.0.0.1:43921 (this machine only)
+  ZEPPBRIDGE_PULL_TOKEN     Pull token (32+ characters); otherwise the stored one
+                            (`pull-token rotate`). Required beyond loopback, or serve
+                            refuses to start. Plaintext HTTP: keep it on a private
+                            container network or behind an HTTPS reverse proxy.
+  Routes: GET /v1/records, /v1, /health. Read-only; GPS only with include_gps=true.
+  The pull token cannot read the desktop app's other routes. Stop with Ctrl+C / SIGTERM.
+
 Common options:
   --json                    Machine-readable output on stdout, human notes on stderr
 
@@ -213,8 +227,9 @@ Parser upgrades:
   does not touch the \"last cloud sync\" timestamp.
 
 Privacy:
-  Reads and writes the local data directory only. Listens on no port. Never
-  prints tokens, cookies or a full account name.
+  Reads and writes the local data directory only. Listens on no port, except
+  `serve`, which you start yourself. Never prints tokens (except `pull-token
+  show` / `rotate`, which you ask for), cookies or a full account name.
 ";
 
 fn main() -> ExitCode {
@@ -251,6 +266,8 @@ fn run(args: &[String]) -> u8 {
         "fit-override" => cmd_fit_override(rest),
         "set-type" | "hide" | "restore" => cmd_workout_edit::cmd_workout_edit(command, rest),
         "shoes" | "races" => cmd_logbook::cmd_logbook(command, rest),
+        "serve" => cmd_serve::cmd_serve(rest),
+        "pull-token" => cmd_serve::cmd_pull_token(rest),
         other => {
             eprintln!("Unknown command: {other}\n");
             eprint!("{HELP}");

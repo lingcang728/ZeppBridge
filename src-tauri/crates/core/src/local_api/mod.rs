@@ -10,7 +10,7 @@ use serde_json::json;
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use std::path::{Path, PathBuf};
 
@@ -20,9 +20,15 @@ use std::sync::{mpsc, Arc, Mutex, RwLock};
 
 use std::time::Duration;
 
+mod headless;
 mod http;
+mod limit;
+mod v1;
 
+pub use headless::*;
 pub use http::*;
+pub use limit::{RateLimiter, Verdict};
+pub use v1::*;
 
 pub const LOCAL_API_ADDRESS: &str = "127.0.0.1:43921";
 
@@ -107,11 +113,61 @@ impl LocalApiStatus {
     }
 }
 
+/// 这个服务认的 token。两把钥匙互不相通：
+///
+/// - `local`：桌面端设置页生成的本机 token，能读全部只读路由；
+/// - `pull`：给拉取方（SparkyFitness 等）用的 token，只能读 `/v1/*` 和 `/health`，
+///   可以单独换掉或吊销，不影响本机 token。桌面端从不设置它。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TokenSet {
+    pub local: Option<String>,
+    pub pull: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenScope {
+    Local,
+    Pull,
+}
+
+impl TokenSet {
+    /// 两把都比一遍（常量时间），不因为先命中哪一把而提前返回。
+    pub fn authorize(&self, provided: &str) -> Option<TokenScope> {
+        let local = self
+            .local
+            .as_deref()
+            .is_some_and(|expected| tokens_match(expected, provided));
+        let pull = self
+            .pull
+            .as_deref()
+            .is_some_and(|expected| tokens_match(expected, provided));
+        if local {
+            Some(TokenScope::Local)
+        } else if pull {
+            Some(TokenScope::Pull)
+        } else {
+            None
+        }
+    }
+}
+
+/// 一个监听实例的全部运行时状态，所有工作线程共享。
+pub(crate) struct ServerContext {
+    pub(crate) data_dir: PathBuf,
+    pub(crate) tokens: Arc<RwLock<TokenSet>>,
+    /// 是否接受非回环来源的连接。桌面端永远是 `false`。
+    pub(crate) allow_remote: bool,
+    pub(crate) limiter: RateLimiter,
+    pub(crate) cache: RecordsCache,
+    /// 每个请求记一行（方法、路径、状态码、条数；不含查询参数和 token）。
+    pub(crate) log_requests: bool,
+}
+
 /// 正在运行的 server。`token` 用 `RwLock` 而不是拷贝，所以重新生成 token 之后
 /// 旧 token 立刻失效，不需要重启监听。
 struct RunningServer {
     stop: Arc<AtomicBool>,
-    token: Arc<RwLock<String>>,
+    token: Arc<RwLock<TokenSet>>,
     /// 实际绑定到的地址。生产环境永远等于 `LOCAL_API_ADDRESS`；测试用
     /// `127.0.0.1:0` 拿一个空闲端口，这样生命周期用例不依赖 43921 是否空闲。
     local_addr: std::net::SocketAddr,
@@ -274,7 +330,7 @@ impl LocalApiController {
         let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(server) = inner.server.as_ref() {
             let mut current = server.token.write().unwrap_or_else(|e| e.into_inner());
-            *current = token.clone();
+            current.local = Some(token.clone());
         }
         Ok(token)
     }
@@ -366,13 +422,24 @@ impl LocalApiController {
         }
 
         let stop = Arc::new(AtomicBool::new(false));
-        let token = Arc::new(RwLock::new(token));
-        let data_dir = self.data_dir.clone();
+        let token = Arc::new(RwLock::new(TokenSet {
+            local: Some(token),
+            pull: None,
+        }));
+        // 桌面端：只收回环来源，不限请求数（本机的 AI 客户端会连续读很多条运动），
+        // 只限鉴权失败。
+        let context = Arc::new(ServerContext {
+            data_dir: self.data_dir.clone(),
+            tokens: token.clone(),
+            allow_remote: false,
+            limiter: RateLimiter::new(None),
+            cache: RecordsCache::default(),
+            log_requests: false,
+        });
         let thread_stop = stop.clone();
-        let thread_token = token.clone();
         match std::thread::Builder::new()
             .name("zeppbridge-local-api".to_string())
-            .spawn(move || serve(listener, data_dir, thread_stop, thread_token))
+            .spawn(move || serve(listener, context, thread_stop))
         {
             Ok(handle) => {
                 inner.clear_fault();
@@ -493,3 +560,6 @@ fn tokens_match(expected: &str, provided: &str) -> bool {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod v1_tests;

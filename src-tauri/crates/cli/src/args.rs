@@ -122,18 +122,6 @@ pub(super) fn fail(json_mode: bool, code: u8, kind: &str, message: &str) -> u8 {
 pub(super) fn print_contract() {
     println!(
         "{}",
-        serde_json::to_string_pretty(&serde_json::json!({
-            "contractVersion": contract::CONTRACT_VERSION,
-            "time": contract::TIME_CONVENTION,
-            "missingValues": contract::MISSING_VALUE_CONVENTION,
-            "source": contract::SOURCE_CONVENTION,
-            "privacy": contract::PRIVACY_NOTE,
-            "metrics": contract::METRICS.iter().map(|item| serde_json::json!({
-                "metric": item.metric,
-                "unit": item.unit,
-                "description": item.description,
-            })).collect::<Vec<_>>(),
-        }))
-        .unwrap_or_default()
+        serde_json::to_string_pretty(&contract::contract_json()).unwrap_or_default()
     );
 }

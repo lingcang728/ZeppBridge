@@ -55,6 +55,23 @@ pub struct MetricContract {
     pub description: &'static str,
 }
 
+/// `zeppbridge-cli contract` 打印的那份 JSON。CLI 和推送（PA 的 `contract.json`）
+/// 都用它，免得两边各拼一份。
+pub fn contract_json() -> serde_json::Value {
+    serde_json::json!({
+        "contractVersion": CONTRACT_VERSION,
+        "time": TIME_CONVENTION,
+        "missingValues": MISSING_VALUE_CONVENTION,
+        "source": SOURCE_CONVENTION,
+        "privacy": PRIVACY_NOTE,
+        "metrics": METRICS.iter().map(|item| serde_json::json!({
+            "metric": item.metric,
+            "unit": item.unit,
+            "description": item.description,
+        })).collect::<Vec<_>>(),
+    })
+}
+
 /// 可以按天取序列的指标。
 ///
 /// 单位一律用机器可读的短串（`bpm`、`ml/kg/min`），中文说明单独放在

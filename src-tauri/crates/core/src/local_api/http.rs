@@ -2,35 +2,25 @@
 
 use super::*;
 
-pub(super) fn serve(
-    listener: TcpListener,
-    data_dir: PathBuf,
-    stop: Arc<AtomicBool>,
-    token: Arc<RwLock<String>>,
-) {
+pub(crate) fn serve(listener: TcpListener, context: Arc<ServerContext>, stop: Arc<AtomicBool>) {
     // 接进来的连接交给一个固定大小的工作池。accept 这条线程只负责接，
     // 接完立刻回到 accept——一个慢客户端最多占住一个 worker，堵不住其他人。
-    let (sender, receiver) = mpsc::sync_channel::<TcpStream>(ACCEPT_QUEUE);
+    let (sender, receiver) = mpsc::sync_channel::<(TcpStream, SocketAddr)>(ACCEPT_QUEUE);
     // `Receiver` 不是 `Sync`，所以几个 worker 共享一把锁轮流取。锁只在
     // `recv` 期间持有，真正的请求处理在锁外面。
     let receiver = Arc::new(Mutex::new(receiver));
     let mut workers = Vec::with_capacity(WORKER_THREADS);
     for _ in 0..WORKER_THREADS {
         let receiver = Arc::clone(&receiver);
-        let data_dir = data_dir.clone();
-        let token = Arc::clone(&token);
+        let context = Arc::clone(&context);
         workers.push(std::thread::spawn(move || loop {
             let next = {
                 let guard = receiver.lock().unwrap_or_else(|e| e.into_inner());
                 guard.recv()
             };
             // sender 被 drop（accept 循环结束）时 recv 报错，worker 退出。
-            let Ok(mut stream) = next else { break };
-            let expected = token
-                .read()
-                .map(|value| value.clone())
-                .unwrap_or_else(|e| e.into_inner().clone());
-            if let Err(error) = handle_connection(&mut stream, &data_dir, &expected) {
+            let Ok((mut stream, peer)) = next else { break };
+            if let Err(error) = handle_connection(&mut stream, &context, peer) {
                 eprintln!("本机 API 请求处理失败: {error}");
             }
         }));
@@ -39,13 +29,14 @@ pub(super) fn serve(
     while !stop.load(Ordering::SeqCst) {
         match listener.accept() {
             Ok((stream, peer)) => {
-                if !peer.ip().is_loopback() {
+                // 桌面端只收回环来源；就算监听地址出了错，这里也再挡一层。
+                if !context.allow_remote && !peer.ip().is_loopback() {
                     continue;
                 }
                 if stream.set_nonblocking(false).is_err() {
                     continue;
                 }
-                match sender.try_send(stream) {
+                match sender.try_send((stream, peer)) {
                     Ok(()) => {}
                     Err(mpsc::TrySendError::Full(_)) => {
                         // 队列已满：丢掉这条连接，保持 accept 循环能响应 stop。
@@ -71,13 +62,16 @@ pub(super) fn serve(
     drop(workers);
 }
 
-pub(super) fn handle_connection(
+pub(crate) fn handle_connection(
     stream: &mut TcpStream,
-    data_dir: &Path,
-    token: &str,
+    context: &ServerContext,
+    peer: SocketAddr,
 ) -> io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(30)))?;
+    if let Verdict::Throttled(seconds) = context.limiter.admit(peer.ip()) {
+        return write_response(stream, HttpResponse::too_many_requests(seconds));
+    }
     let request = match read_request(stream) {
         Ok(request) => request,
         Err(error) => {
@@ -85,11 +79,117 @@ pub(super) fn handle_connection(
             return Ok(());
         }
     };
+    let tokens = context
+        .tokens
+        .read()
+        .map(|value| value.clone())
+        .unwrap_or_else(|e| e.into_inner().clone());
+    let outcome = dispatch(
+        &request,
+        &tokens,
+        &context.cache,
+        |records| compute_records(&context.data_dir, records),
+        |workout_id| load_workout_series(&context.data_dir, workout_id),
+    );
+    if outcome.auth_failed {
+        context.limiter.record_failure(peer.ip());
+    }
+    if context.log_requests {
+        let path = request
+            .target
+            .split_once('?')
+            .map_or(request.target.as_str(), |(path, _)| path);
+        // 只记路径，不记查询参数、token 和任何数据。
+        let path: String = path.chars().take(80).collect();
+        match outcome.records {
+            Some(count) => eprintln!(
+                "serve: {} {} {} records={count}",
+                request.method, path, outcome.response.status
+            ),
+            None => eprintln!(
+                "serve: {} {} {}",
+                request.method, path, outcome.response.status
+            ),
+        }
+    }
+    write_response(stream, outcome.response)
+}
 
-    let response = route_request(&request, token, |workout_id| {
-        load_workout_series(data_dir, workout_id)
-    });
-    write_response(stream, response)
+/// 一次请求的处理结果。
+pub struct Outcome {
+    pub response: HttpResponse,
+    /// `/v1/records` 这一页的条数（只用于日志）。
+    pub records: Option<usize>,
+    /// 鉴权失败（计入限流）。
+    pub auth_failed: bool,
+}
+
+/// 鉴权并分派到各路由。`/v1/*` 和 `/health` 两种 token 都能读；其余路由只认本机 token。
+pub fn dispatch<R, W>(
+    request: &ParsedRequest,
+    tokens: &TokenSet,
+    cache: &RecordsCache,
+    compute: R,
+    lookup: W,
+) -> Outcome
+where
+    R: FnOnce(&RecordsRequest) -> Result<Computed, String>,
+    W: FnOnce(&str) -> Result<Option<WorkoutSeries>, String>,
+{
+    let done = |response| Outcome {
+        response,
+        records: None,
+        auth_failed: false,
+    };
+    let Some(scope) = request
+        .authorization
+        .as_deref()
+        .and_then(bearer_value)
+        .and_then(|provided| tokens.authorize(provided))
+    else {
+        return Outcome {
+            response: HttpResponse::unauthorized(),
+            records: None,
+            auth_failed: true,
+        };
+    };
+    if request.method != "GET" {
+        return done(HttpResponse::method_not_allowed());
+    }
+    let target = request.target.as_str();
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    match path {
+        "/health" => done(health_response()),
+        "/v1" | "/v1/" => done(v1_index()),
+        "/v1/records" => {
+            let (response, records) = records_response(query, cache, compute);
+            Outcome {
+                response,
+                records,
+                auth_failed: false,
+            }
+        }
+        _ if scope == TokenScope::Pull => done(HttpResponse::forbidden(
+            "token_scope",
+            "the pull token can only read /v1/* and /health",
+        )),
+        _ => {
+            let local = tokens.local.as_deref().unwrap_or_default();
+            done(route_request(request, local, lookup))
+        }
+    }
+}
+
+fn health_response() -> HttpResponse {
+    HttpResponse::json(
+        200,
+        "OK",
+        json!({
+            "status": "ok",
+            "service": "ZeppBridge local API",
+            "version": env!("CARGO_PKG_VERSION")
+        }),
+    )
 }
 
 /// 解析后的请求。只保留路由和鉴权需要的字段，其他 header 读完即弃。
@@ -253,21 +353,15 @@ where
                 "authentication": "Authorization: Bearer <token>",
                 "endpoints": {
                     "health": "/health",
-                    "workout_series": "/workouts/{id}/series"
+                    "workout_series": "/workouts/{id}/series",
+                    "records": "/v1/records",
+                    "v1": "/v1"
                 }
             }),
         );
     }
     if path == "/health" {
-        return HttpResponse::json(
-            200,
-            "OK",
-            json!({
-                "status": "ok",
-                "service": "ZeppBridge local API",
-                "version": env!("CARGO_PKG_VERSION")
-            }),
-        );
+        return health_response();
     }
 
     let parts = path.split('/').collect::<Vec<_>>();
@@ -356,6 +450,7 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
     pub(super) allow_get: bool,
     pub(super) challenge: bool,
+    pub(super) retry_after: Option<u64>,
 }
 
 impl HttpResponse {
@@ -371,7 +466,29 @@ impl HttpResponse {
             body,
             allow_get: false,
             challenge: false,
+            retry_after: None,
         }
+    }
+
+    pub(super) fn forbidden(code: &str, message: &str) -> Self {
+        Self::json(
+            403,
+            "Forbidden",
+            json!({ "error": { "code": code, "message": message } }),
+        )
+    }
+
+    pub(super) fn too_many_requests(seconds: u64) -> Self {
+        let mut response = Self::json(
+            429,
+            "Too Many Requests",
+            json!({ "error": {
+                "code": "rate_limited",
+                "message": "too many requests or failed sign-ins; retry later"
+            }}),
+        );
+        response.retry_after = Some(seconds);
+        response
     }
 
     pub(super) fn bad_request(code: &str, message: &str) -> Self {
@@ -436,6 +553,9 @@ pub fn write_response<W: Write>(stream: &mut W, response: HttpResponse) -> io::R
     }
     if response.challenge {
         write!(stream, "WWW-Authenticate: Bearer\r\n")?;
+    }
+    if let Some(seconds) = response.retry_after {
+        write!(stream, "Retry-After: {seconds}\r\n")?;
     }
     write!(stream, "\r\n")?;
     stream.write_all(&response.body)?;
