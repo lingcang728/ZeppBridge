@@ -189,6 +189,17 @@ rejected value exits `2`; deleting an id that does not exist exits `1` with
 `errorKind: "not_found"`. MCP's `save_shoe` and `save_race` write the same
 tables.
 
+### serve and pull-token
+
+`serve` runs the read-only REST API without the desktop app, for Docker and
+servers: `/health`, `/workouts/{id}/series` and `/v1/records`. It listens on
+`127.0.0.1:43921` unless `ZEPPBRIDGE_LISTEN` says otherwise, and beyond
+loopback it refuses to start without a pull token (`ZEPPBRIDGE_PULL_TOKEN`, or
+one stored with `pull-token rotate`). `pull-token status | show | rotate |
+revoke` manages the stored token, which is separate from the desktop app's
+local API token. The request and response contract is in
+[self-hosted pull](../guides/self-hosted-pull.md).
+
 ### probe
 
 `probe` checks whether candidate endpoints return anything, without importing

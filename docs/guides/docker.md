@@ -176,9 +176,9 @@ nearly empty, so pass `TZ` and use absolute paths.
 
 ## docker compose
 
-`packaging/docker/docker-compose.yml` has `sync`, `status` and `mcp` services.
-Every one is behind a profile and nothing starts on `docker compose up`, because
-none of them is a daemon:
+`packaging/docker/docker-compose.yml` has `sync`, `status`, `mcp` and `serve`
+services. Every one is behind a profile and nothing starts on a bare
+`docker compose up`; the first three are one-shot:
 
 ```bash
 export ZEPPBRIDGE_APP_TOKEN=...
@@ -189,6 +189,11 @@ Set `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID` in a `.env` file next to it if your uid is
 not 1000. Paths in the compose file are relative to `packaging/docker/`, so its
 `./data` is `packaging/docker/data`, not the `./data` used above. Every service,
 `status` included, expects `ZEPPBRIDGE_APP_TOKEN` to be set.
+
+`serve` is the one long-running service: the read-only REST API for a tool such
+as SparkyFitness to pull from. It publishes no port and sits on an internal
+network; see [self-hosted pull](self-hosted-pull.md) before starting it with
+`docker compose --profile serve up -d`.
 
 ## MCP
 

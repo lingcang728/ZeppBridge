@@ -158,6 +158,15 @@ zeppbridge-cli races delete --id 2 --json
 `workout_id`、`notes` 可选。文件格式不对或值被拒收以 `2` 退出；删不存在的编号以 `1` 退出，
 `errorKind: "not_found"`。MCP 的 `save_shoe` 和 `save_race` 写的是同一张表。
 
+### serve 和 pull-token
+
+`serve` 不开桌面应用、单独跑只读 REST API，给 Docker 和服务器用：`/health`、
+`/workouts/{id}/series` 和 `/v1/records`。不设 `ZEPPBRIDGE_LISTEN` 就只听
+`127.0.0.1:43921`；听本机以外的地址时没有拉取 token（`ZEPPBRIDGE_PULL_TOKEN`，或用
+`pull-token rotate` 存一个）就拒绝启动。`pull-token status | show | rotate | revoke`
+管理存着的那个，它和桌面端的本机 API token 是两把钥匙。请求和返回的契约见
+[自托管拉取](../guides/self-hosted-pull.zh-CN.md)。
+
 ### probe
 
 `probe` 检查候选端点有没有返回内容，不导入数据：`--streams`（默认 `blood_pressure`；
