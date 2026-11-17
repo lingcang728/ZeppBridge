@@ -15,14 +15,14 @@
 </div>
 
 > [!IMPORTANT]
-> ZeppBridge is an independent open-source project with official Zepp approval. Use it only with accounts and data you are entitled to access.
+> ZeppBridge is an independent open-source project participating in the Zepp Developer Partner program, not an official Zepp product. Use it only with accounts and data you are entitled to access.
 
 > [!IMPORTANT]
 > **macOS: “ZeppBridge is damaged and can’t be opened”?** After installing from this repository's Releases, follow the [macOS first-launch instructions](#macos-first-launch) below.
 
 [![ZeppBridge overview: pinned metrics, heart rate, steps and sleep](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
-*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers twelve language and region options.*
+*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers thirteen language and region options.*
 
 ## From a record to your next step
 
@@ -69,7 +69,7 @@ Running, cycling, pool swimming and open-water swimming plans can be sent today.
 
 ### Browsing that feels good
 
-V3 redesigns the whole interface: glass navigation, day cards that flip, plans you can drag and a stack of settings cards. Dark, light and follow-system themes; ten language and region options, including English, Chinese and Spanish; and adjustable units, time zone and interface scale.
+V3 redesigns the whole interface: glass navigation, day cards that flip, plans you can drag and a stack of settings cards. Dark, light and follow-system themes; thirteen language and region options, including English, Simplified and Traditional Chinese, Spanish, German and French; and adjustable units, time zone and interface scale.
 
 [Watch the short film: dealing cards, dragging, theme switching and page motion →](https://zeppbridge.com/)
 
@@ -91,12 +91,12 @@ Installers and release notes are on [Releases](https://github.com/lingcang728/Ze
 
 | Platform | How to install | Verification |
 | --- | --- | --- |
-| Windows 10/11 · x64 | Run the `.exe` installer | Main development and daily-use platform |
+| Windows 10/11 · x64 | Run the `-Setup.exe` installer, or use the `.msi` or the portable `.zip` | Main development and daily-use platform |
 | macOS · Apple Silicon | Open the `.dmg` and drag the app into Applications | V3 not yet fully verified on a real machine |
 | Linux · x86_64 | Pick `.deb`, `.rpm`, AppImage or Flatpak for your distribution | V3 not yet fully verified on a real machine; see the [Linux guide](docs/guides/linux.md) |
 | Server or AI agent, no desktop | CLI / MCP tools package or Docker | See [Without a desktop](#without-a-desktop-servers-and-ai-agents) |
 
-The installers are not code-signed yet. Windows may warn about an unknown publisher, and macOS may block the app from opening. Only allow it to run, following your system's prompt, once you have checked where the download came from and decided to trust the app. To build V3 from source, see [Development](docs/development/development.md).
+The installers are not code-signed yet: Windows builds carry no Authenticode signature, and the macOS build is only ad-hoc signed and not notarized. Windows may warn about an unknown publisher, and macOS may block the app from opening. Only allow it to run, following your system's prompt, once you have checked where the download came from and decided to trust the app. To build V3 from source, see [Development](docs/development/development.md).
 
 Before moving from 2.x, keep a separate copy of your old database: once upgraded by V3, it cannot be opened by 2.x again.
 
@@ -135,10 +135,10 @@ If the Windows install folder is not writable, the app uses your user data folde
 
 The desktop app is not needed day to day. On a NAS, a home server or a machine where an AI agent runs, use the headless tools instead:
 
-- **CLI and MCP tools.** The desktop app installs both next to itself (since 3.1.1); for a machine without it, each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (a read-only MCP server over stdio that opens no port). See [CLI and MCP](docs/reference/cli-and-mcp.md).
+- **CLI and MCP tools.** The desktop app installs both next to itself (since 3.1.1); for a machine without it, each release has a `zeppbridge-tools-<version>-<platform>.zip` with `zeppbridge-cli` (sync, status and export, with exit codes you can script against) and `zeppbridge-mcp` (an MCP server over stdio that opens no port; health data is read-only). See [CLI and MCP](docs/reference/cli-and-mcp.md).
 - **Docker.** `packaging/docker` builds a headless image for scheduled syncs. See [Docker](docs/guides/docker.md).
 
-Signing in still needs a browser once: connect the account in the desktop app on any machine, then bring `auth.json` and the token over as the [Docker guide](docs/guides/docker.md#getting-the-credentials-in) describes. MCP only reads the local database and needs no token at all.
+Signing in still needs a browser once: connect the account in the desktop app on any machine, then bring the credentials over as the [Docker guide](docs/guides/docker.md#getting-the-credentials-in) describes. Reading data through MCP needs no token; only `sync_now` and publishing a training plan use the credentials stored on that machine.
 
 For [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp), add this to `~/.hermes/config.yaml`:
 
@@ -156,13 +156,13 @@ Other MCP clients take the same `command` / `args` / `env` in their own format; 
 ## Privacy and connections
 
 - Health records are kept in a local database, which is not encrypted by default.
-- Syncing contacts Zepp; for official authorization, the callback and token exchange pass through the project's authorization relay.
+- Syncing contacts Zepp; for official authorization, sign-in and token refresh pass through the project's authorization relay.
 - Account and device identifiers are removed before anything goes to AI, and precise GPS is excluded by default. Records you choose to share are processed by the AI service you pick, and so are MCP query results.
 - Tracks are drawn locally by default. If you turn on the online map, the map service is asked for the matching area.
-- Syncing health records is read-only; training plans you confirm are written to Zepp. MCP's "Let AI publish training plans directly" is a separate switch.
+- Syncing health records is read-only; training plans you confirm are written to Zepp. Letting an AI client publish plans by itself is a separate switch (**Settings › AI tools › Let AI publish training plans directly**).
 - Error reports are only sent when you confirm them. There is no automatic telemetry or background crash reporting.
 
-ZeppBridge is an independent open-source project with official Zepp approval. See [security and privacy](docs/reference/security-and-privacy.md); report security issues through GitHub's private vulnerability reporting, not a public issue.
+ZeppBridge is an independent open-source project participating in the Zepp Developer Partner program, not an official Zepp product. See [security and privacy](docs/reference/security-and-privacy.md); report security issues as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 ## Docs and feedback
 
@@ -170,7 +170,7 @@ ZeppBridge is an independent open-source project with official Zepp approval. Se
 - [Handing your data to AI](docs/guides/ai.md): copy and paste, MCP, training plans to the watch, coach notes
 - [Backup, restore and full history](docs/guides/backup-and-restore.md)
 - [CLI and MCP](docs/reference/cli-and-mcp.md) · [Docker](docs/guides/docker.md)
-- [Development](docs/development/development.md) · [Changelog](CHANGELOG.md)
+- [Development](docs/development/development.md) · [Contributing](CONTRIBUTING.md) · [Changelog](https://zeppbridge.com/changelog/)
 - [Report a problem or suggest something](https://github.com/lingcang728/ZeppBridge/issues)
 
 ## Acknowledgements and licence

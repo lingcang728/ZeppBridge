@@ -1,18 +1,28 @@
 <div align="center">
-  <img src="src-tauri/icons/icon.png" width="88" height="88" alt="ZeppBridge">
+  <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
   <p><strong>留住每一次记录，安排下一次出发。</strong></p>
   <p>把 Zepp 健康数据存到电脑，查看趋势、交给 AI，再把训练计划带回手表。</p>
-  <p>免费开源 · Windows / macOS / Linux · 本地存储</p>
+
+  [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
+  [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
+  [![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows11&logoColor=white)](#下载安装)
+  [![macOS](https://img.shields.io/badge/macOS_Apple_Silicon-preview-999999?logo=apple&logoColor=white)](#下载安装)
+  [![Linux](https://img.shields.io/badge/Linux-preview-E95420?logo=linux&logoColor=white)](docs/guides/linux.zh-CN.md)
+  [![Version](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=version)](https://github.com/lingcang728/ZeppBridge/releases)
+
   <p><a href="#开始使用">开始使用</a> · <a href="https://zeppbridge.com/">观看一分钟短片</a> · <a href="README.md">English</a></p>
 </div>
+
+> [!IMPORTANT]
+> ZeppBridge 是独立开源项目，参与 Zepp 开发者合作伙伴项目，并非 Zepp 官方产品。只用于你有权访问的账号和数据。
 
 > [!IMPORTANT]
 > **macOS 首次打开提示「已损坏，无法打开」？** 拖入「应用程序」后，请按[macOS 首次打开](#macos-首次打开)中的步骤处理。
 
 [![ZeppBridge V3 概览：个人指标、心率、步数与睡眠](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
-*点击上图观看中文短片，了解界面、卡片交互与训练计划。本文图片和视频均使用示例数据。*
+*点击上图观看短片，了解界面、卡片交互与训练计划。本文图片和视频均使用示例数据；截图是中文界面，应用提供 13 个语言与地区选项。*
 
 ## 从记录到下一步
 
@@ -59,7 +69,7 @@ ZeppBridge 是一款面向 Zepp / Amazfit 用户的桌面应用。手表通过�
 
 ### 让浏览记录更顺手
 
-V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动的计划和分组设置卡。支持深色、浅色与跟随系统，提供中文、英文、西班牙语、意大利语等 12 个语言与地区选项，也能调整单位、时区和界面缩放。
+V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动的计划和分组设置卡。支持深色、浅色与跟随系统，提供简体中文、繁体中文、英文、西班牙语、德语、法语等 13 个语言与地区选项，也能调整单位、时区和界面缩放。
 
 [观看中文短片：翻牌、拖动、主题切换与页面动效 →](https://zeppbridge.com/)
 
@@ -81,12 +91,12 @@ V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动�
 
 | 平台 | 安装方式 | 验证情况 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | 运行 `.exe` 安装包 | 主要开发与日常使用平台 |
+| Windows 10/11 · x64 | 运行 `-Setup.exe` 安装包，或使用 `.msi`、便携版 `.zip` | 主要开发与日常使用平台 |
 | macOS · Apple Silicon | 打开 `.dmg`，拖入「应用程序」 | V3 尚缺真机完整验证 |
 | Linux · x86_64 | 按发行版选择 `.deb`、`.rpm`、AppImage 或 Flatpak | V3 尚缺真机完整验证；见 [Linux 指南](docs/guides/linux.zh-CN.md) |
 | 服务器 / AI 智能体，无桌面 | CLI / MCP 工具包或 Docker | 见[没有桌面](#没有桌面服务器与-ai-智能体) |
 
-当前安装包未做系统代码签名。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。
+当前安装包未做代码签名：Windows 版没有 Authenticode 签名，macOS 版只有 ad-hoc 签名、没有公证。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。
 
 从 2.x 迁移前，请另存一份旧版数据库备份；V3 升级后的数据库不能直接交给 2.x 使用。
 
@@ -128,10 +138,10 @@ Windows 安装目录不可写时会使用用户数据目录；自定义目录以
 
 日常使用不一定要开桌面应用。NAS、家用服务器或跑 AI 智能体的机器上，用无界面工具：
 
-- **CLI 与 MCP 工具**：桌面应用会把两个程序装在自己旁边（3.1.1 起）；没装应用的机器用每个版本附带的 `zeppbridge-tools-<版本>-<平台>.zip`，内含 `zeppbridge-cli`（同步、状态、导出，退出码可供脚本判断）和 `zeppbridge-mcp`（只读、走 stdio、不开端口的 MCP 服务）。见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
+- **CLI 与 MCP 工具**：桌面应用会把两个程序装在自己旁边（3.1.1 起）；没装应用的机器用每个版本附带的 `zeppbridge-tools-<版本>-<平台>.zip`，内含 `zeppbridge-cli`（同步、状态、导出，退出码可供脚本判断）和 `zeppbridge-mcp`（走 stdio、不开端口的 MCP 服务，健康数据只读）。见 [CLI 与 MCP](docs/reference/cli-and-mcp.zh-CN.md)。
 - **Docker**：`packaging/docker` 可构建用于定时同步的无界面镜像。见 [Docker](docs/guides/docker.zh-CN.md)。
 
-登录仍需一次浏览器：在任意一台电脑的桌面应用里连上账号，再按 [Docker 指南](docs/guides/docker.zh-CN.md#怎么把凭据送进去) 把 `auth.json` 和令牌带过去。MCP 只读本地数据库，完全不需要令牌。
+登录仍需一次浏览器：在任意一台电脑的桌面应用里连上账号，再按 [Docker 指南](docs/guides/docker.zh-CN.md#怎么把凭据送进去) 把凭据带过去。通过 MCP 读数据不需要令牌；只有 `sync_now` 和发布训练计划会用到那台机器上保存的凭据。
 
 [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) 在 `~/.hermes/config.yaml` 里加上：
 
@@ -149,13 +159,13 @@ mcp_servers:
 ## 隐私与连接
 
 - 健康记录保存在本机数据库中，数据库默认不加密。
-- 同步需要连接 Zepp；官方授权的回调与令牌交换经过项目的授权中转服务。
+- 同步需要连接 Zepp；官方授权的登录和令牌刷新经过项目的授权中转服务。
 - 交给 AI 前会移除账号、设备标识等信息，精确 GPS 默认排除。主动提供的记录会由所选 AI 服务处理，MCP 查询结果也一样。
 - 轨迹默认在本地绘制。开启在线地图后，会向地图服务请求对应区域的地图。
-- 健康记录同步只读；你确认发送的训练计划会写入 Zepp。MCP 的「允许 AI 直接发布」是独立开关。
+- 健康记录同步只读；你确认发送的训练计划会写入 Zepp。让 AI 客户端自行发布计划是独立开关（「设置 › 交给 AI 工具 › 允许 AI 直接发布训练计划」）。
 - 错误报告由你主动确认提交，没有自动遥测或后台崩溃上报。
 
-ZeppBridge 是已获得 Zepp 官方认证的独立开源项目。
+ZeppBridge 是独立开源项目，参与 Zepp 开发者合作伙伴项目，并非 Zepp 官方产品。安全与隐私见[安全与隐私](docs/reference/security-and-privacy.zh-CN.md)；安全问题请按 [SECURITY.md](SECURITY.md) 私下报告，不要发公开 issue。
 
 ## 文档与反馈
 
@@ -163,7 +173,7 @@ ZeppBridge 是已获得 Zepp 官方认证的独立开源项目。
 - [交给 AI 指南](docs/guides/ai.zh-CN.md)：复制粘贴、MCP、训练计划发到手表、教练档案
 - [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md)
 - [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) · [Docker](docs/guides/docker.zh-CN.md)
-- [开发文档](docs/development/development.zh-CN.md) · [更新日志](CHANGELOG.md)
+- [开发文档](docs/development/development.zh-CN.md) · [参与贡献](CONTRIBUTING.md) · [更新日志](https://zeppbridge.com/changelog/)
 - [反馈问题或建议](https://github.com/lingcang728/ZeppBridge/issues)
 
 ## 致谢与许可证
