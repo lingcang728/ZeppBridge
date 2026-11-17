@@ -16,6 +16,8 @@ import { locale } from '../../i18n';
 import { clearDraft, loadDraft, saveDraft, sendLetterReply } from '../../services/letterBox';
 import { BUNDLED_VERSION } from '../../services/updateNotice';
 import { whenDialogLanded } from '../../lib/motion/dialogFlight';
+import { openLetterBoxSheet } from '../../composables/useLetterBoxSheet';
+import Icon from '../Icon.vue';
 
 const t = useLetterText();
 const { writing, attach, category, sent } = useAuthorCompose();
@@ -37,6 +39,13 @@ watch(writing, async (open) => {
   await whenDialogLanded(panel);
   if (writing.value) composer.value?.focusInput();
 });
+
+/* 信纸收回原处，信匣接着从同一个控件长出来（ModalDialog 的接力：前一张没收完就加速收完）。草稿留着。 */
+const toLetterBox = () => {
+  const origin = writing.value?.origin ?? null;
+  closeAuthorCompose();
+  void nextTick(() => openLetterBoxSheet(origin));
+};
 
 const send = async () => {
   if (sending.value) return;
@@ -99,6 +108,9 @@ const send = async () => {
         </div>
         <footer class="compose-sheet-foot">
           <span class="compose-sheet-label">{{ t.writeAuthor }}</span>
+          <button type="button" class="compose-to-box" :disabled="sending" @click="toLetterBox">
+            <Icon name="mail" :size="14" />{{ t.boxTitle }}
+          </button>
           <button
             type="button"
             class="compose-close"
@@ -169,7 +181,26 @@ const send = async () => {
   color: var(--paper-ink);
   background: rgb(120 95 60 / .1);
 }
-.compose-close:focus-visible {
+/* 去信匣：长按才打得开信匣没人发现（反馈「不知道信匣从哪打开」），点一下进来的人在信纸底下就能看到它。 */
+.compose-to-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.compose-to-box:hover:not(:disabled) {
+  color: var(--paper-ink);
+  background: rgb(120 95 60 / .1);
+}
+.compose-close:focus-visible, .compose-to-box:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

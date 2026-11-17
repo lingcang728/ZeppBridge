@@ -46,6 +46,7 @@ const messages = defineMessages(
     overviewTitle: '概览',
     unrecognizedSuffix: ' 还没有识别出型号',
     unrecognizedCta: '点这里指认',
+    unrecognizedDismiss: '不再提示这台设备',
     deviceErrorPrefix: '设备识别：',
     loadingAria: '正在加载概览',
     loadFailedTitle: '无法读取数据概览',
@@ -77,6 +78,7 @@ const messages = defineMessages(
     overviewTitle: 'Overview',
     unrecognizedSuffix: ' has no model identified yet',
     unrecognizedCta: 'Pick it by hand',
+    unrecognizedDismiss: "Don't remind me about this device",
     deviceErrorPrefix: 'Device identification: ',
     loadingAria: 'Loading the overview',
     loadFailedTitle: 'Could not load overview',
@@ -108,6 +110,7 @@ const messages = defineMessages(
     overviewTitle: 'Resumen',
     unrecognizedSuffix: ' aún no tiene un modelo identificado',
     unrecognizedCta: 'Toca aquí para indicarlo',
+    unrecognizedDismiss: 'No volver a avisar de este dispositivo',
     deviceErrorPrefix: 'Identificación de dispositivos: ',
     loadingAria: 'Cargando el resumen',
     loadFailedTitle: 'No se pudo leer el resumen de datos',
@@ -170,7 +173,30 @@ const unrecognizedDevices = computed(() => deviceModels.value
     key: model.deviceKey || model.canonicalName,
     name: model.profile.display_name?.trim() || model.canonicalName,
     to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings/account',
-  })));
+  }))
+  .filter((device) => !dismissedDevices.value.has(device.key)));
+
+/* 用户说过「不用提醒」的那几台（反馈：体脂秤不需要指认、首页却一直挂着提示）。只是不再在首页提示，
+   设备页照样能指认；记在这台电脑的浏览器存储里，记不住就下次再提示一遍。 */
+const DISMISSED_KEY = 'zeppbridge-unrecognized-dismissed';
+const readDismissed = (): Set<string> => {
+  try {
+    const list: unknown = JSON.parse(window.localStorage.getItem(DISMISSED_KEY) ?? '[]');
+    return new Set(Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : []);
+  } catch {
+    return new Set();
+  }
+};
+const dismissedDevices = ref(readDismissed());
+const dismissDevice = (key: string) => {
+  const next = new Set(dismissedDevices.value).add(key);
+  dismissedDevices.value = next;
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next]));
+  } catch {
+    // 记不住只影响下次打开。
+  }
+};
 
 const stepsToday = computed(() => isFiniteNumber(overview.value?.steps_today) ? overview.value.steps_today : null);
 const lastSleep = computed(() => recentSleep.value[0] ?? null);
@@ -383,17 +409,16 @@ useSectionTour('home');
 
     <!-- 认不出型号不是「坏了」，是可以自己指认的。不说这一句，用户只会以为
          自己的表不受支持。 -->
-    <RouterLink
-      v-for="device in unrecognizedDevices"
-      :key="device.key"
-      class="unrecognized-banner"
-      data-morph-card
-      :to="device.to"
-    >
-      <Icon name="warning" :size="15" />
-      <span><strong>{{ device.name }}</strong>{{ t.unrecognizedSuffix }}</span>
-      <em>{{ t.unrecognizedCta }} <GlyphTile name="chevron-right" :size="16" /></em>
-    </RouterLink>
+    <div v-for="device in unrecognizedDevices" :key="device.key" class="unrecognized-row">
+      <RouterLink class="unrecognized-banner" data-morph-card :to="device.to">
+        <Icon name="warning" :size="15" />
+        <span><strong>{{ device.name }}</strong>{{ t.unrecognizedSuffix }}</span>
+        <em>{{ t.unrecognizedCta }} <GlyphTile name="chevron-right" :size="16" /></em>
+      </RouterLink>
+      <button type="button" class="unrecognized-dismiss" :aria-label="t.unrecognizedDismiss" :title="t.unrecognizedDismiss" @click="dismissDevice(device.key)">
+        <Icon name="x" :size="14" />
+      </button>
+    </div>
 
     <!-- 首次提问：只有第一次连上并读出数据后问一遍，答过或跳过就再也不出现。 -->
     <div v-if="focusPromptOpen" class="focus-prompt" role="note">
@@ -533,7 +558,10 @@ useSectionTour('home');
 .fold-row .pill-button { justify-self: start; }
 
 /* 未识别设备提醒是唯一一块有意的琥珀色——它是提示条，不是装饰。 */
+.unrecognized-row { display: flex; gap: 8px; align-items: stretch; }
 .unrecognized-banner {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -548,6 +576,18 @@ useSectionTour('home');
 .unrecognized-banner strong { color: var(--ink); font-weight: 600; }
 .unrecognized-banner em { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; font-style: normal; white-space: nowrap; }
 .unrecognized-banner:hover { border-color: color-mix(in srgb, var(--warning) 48%, transparent); }
+.unrecognized-dismiss {
+  flex: none;
+  display: grid;
+  width: 42px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  color: var(--subtle);
+  cursor: pointer;
+}
+.unrecognized-dismiss:hover, .unrecognized-dismiss:focus-visible { color: var(--ink); border-color: color-mix(in srgb, var(--warning) 48%, transparent); }
 
 @media (max-width: 820px) {
   .overview-page { padding-inline: 16px; }
