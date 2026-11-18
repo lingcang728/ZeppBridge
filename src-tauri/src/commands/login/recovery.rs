@@ -172,13 +172,11 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     fn fixture() -> (AppState, AuthInfo) {
+        // macOS 的时钟只到微秒，两条测试同时建夹具会撞名（AlreadyExists），用带序号的后缀。
         let dir = std::env::temp_dir().join(format!(
             "zeppbridge-advanced-recovery-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            zeppbridge_core::unique_suffix()
         ));
         let state = AppState::isolated_test_state(dir).unwrap();
         let auth = AuthInfo {

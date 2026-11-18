@@ -235,10 +235,7 @@ mod tests {
 
     impl HardwareFixture {
         fn new() -> Self {
-            let unique = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
+            let unique = zeppbridge_core::unique_suffix();
             Self(std::env::temp_dir().join(format!(
                 "zeppbridge-linux-gpu-{}-{unique}",
                 std::process::id()
