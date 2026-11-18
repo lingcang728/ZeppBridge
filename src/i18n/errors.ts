@@ -59,6 +59,12 @@ const messages = defineMessages(
       '数据密钥的格式不对（应当是 32 字节）。请从你的站点重新复制完整的数据密钥。',
     'err.push.site_invalid':
       '推送地址不可用：必须是 https 的域名地址，不能是 IP 地址，也不能带账号密码、? 或 # 参数。',
+    'err.push.connection_code_invalid':
+      '连接码不对：要把整段连接码贴进来，里面应当有 dk 和 writeKey 两项。',
+    'err.push.not_configured':
+      '还没有设置推送目标。',
+    'err.push.companion_not_found':
+      '这台电脑上没找到能接过来的 ZeppBridge Cloud 设置（要有站点地址，并且凭据管理器里有它的上传密钥）。',
     'err.push.state_unwritable':
       '无法在数据目录里写推送记录（push 文件夹）。检查数据目录的写入权限。',
     'err.push.no_local_data':
@@ -341,6 +347,12 @@ const messages = defineMessages(
       'The data key is malformed (it should be 32 bytes). Copy the full data key from your site again.',
     'err.push.site_invalid':
       'The push address cannot be used: it must be an https address with a domain name, not an IP address, and must not contain a user name, password, ? or #.',
+    'err.push.connection_code_invalid':
+      'That connection code doesn\'t look right. Paste the whole code; it should contain both dk and writeKey.',
+    'err.push.not_configured':
+      'No push destination has been set up yet.',
+    'err.push.companion_not_found':
+      'No ZeppBridge Cloud setup to take over was found on this computer (it needs a site address and its upload key in Credential Manager).',
     'err.push.state_unwritable':
       'Push records could not be written to the data folder (push/). Check that the data folder is writable.',
     'err.push.no_local_data':
@@ -615,6 +627,56 @@ const messages = defineMessages(
       'La base de datos local es más antigua que esta versión, y una conexión de solo lectura no '
       + 'puede actualizarla. Abre la app de escritorio una vez o ejecuta zeppbridge-cli reprocess en un '
       + 'equipo sin interfaz. Ambas opciones realizan una copia de seguridad antes de actualizar.',
+    'err.headless.program_outdated':
+      'La CLI / MCP que lee la base de datos es más antigua que la app de escritorio y no puede leer '
+      + 'esta versión de la base de datos. Por lo general, una herramienta de IA sigue apuntando a una '
+      + 'copia antigua: vuelve a conectarla en Configuración (en Claude Desktop, genera e instala '
+      + 'ZeppBridge.mcpb de nuevo), elimina la extensión anterior o cualquier registro que apunte a una '
+      + 'carpeta de instalación antigua y luego reinicia la herramienta de IA.',
+    'err.push.config_unreadable':
+      'No se pudo leer la configuración del destino de envío (push/targets.json en la carpeta de datos). '
+      + 'Revisa los permisos del archivo y reintenta.',
+    'err.push.config_invalid':
+      'La configuración del destino de envío tiene un formato incorrecto: los ID de destino solo admiten '
+      + 'letras minúsculas, dígitos y guiones y deben ser únicos, y los días de retención deben estar entre 1 y 365.',
+    'err.push.config_has_secret':
+      'La configuración del destino de envío contiene un campo de secreto. Los secretos deben ir en el '
+      + 'almacén de credenciales, no en el archivo; elimina ese campo e ingresa el secreto de nuevo.',
+    'err.push.credential_store_unnamed':
+      'El almacén de credenciales actual (modo de variable de entorno) solo guarda un token y no puede '
+      + 'almacenar secretos de destinos de envío. Usa el almacén de credenciales del sistema o ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'No se pudo leer ni escribir el secreto del destino de envío en el almacén de credenciales. '
+      + 'Revisa si está desbloqueado y permitido por las políticas del sistema.',
+    'err.push.secrets_missing':
+      'El almacén de credenciales no tiene un secreto completo para este destino de envío. Ingresa el secreto de nuevo.',
+    'err.push.pa_write_key_malformed':
+      'La clave de escritura tiene un formato incorrecto. Vuelve a copiar la clave de escritura completa desde tu sitio.',
+    'err.push.pa_tenant_mismatch':
+      'La clave de escritura no coincide con el ID del sitio: pertenece a otro sitio.',
+    'err.push.pa_data_key_malformed':
+      'La clave de datos tiene un formato incorrecto (debe ser de 32 bytes). Vuelve a copiar la clave de datos completa desde tu sitio.',
+    'err.push.site_invalid':
+      'La dirección de envío no se puede usar: debe ser una dirección https con un nombre de dominio, '
+      + 'no una dirección IP, y no debe contener usuario, contraseña, ? ni #.',
+    'err.push.connection_code_invalid':
+      'Ese código de conexión no parece correcto. Pega el código completo; debe incluir dk y writeKey.',
+    'err.push.not_configured':
+      'Aún no se ha configurado ningún destino de envío.',
+    'err.push.companion_not_found':
+      'No se encontró ninguna configuración de ZeppBridge Cloud para importar en este equipo (necesita una dirección del sitio y su clave de subida en el Administrador de credenciales).',
+    'err.push.state_unwritable':
+      'No se pudieron escribir los registros de envío en la carpeta de datos (push/). Revisa que la carpeta de datos admita escritura.',
+    'err.push.no_local_data':
+      'Aún no hay una base de datos local, así que no hay nada que enviar. Sincroniza primero.',
+    'err.push.local_data_unavailable':
+      'No se pudo leer la base de datos local en este momento. No se envió nada en esta ronda; '
+      + 'se volverá a intentar después de la próxima sincronización.',
+    'err.push.coordinates_found':
+      'Aparecieron coordenadas en el contenido a enviar, así que se detuvo esta ronda. Las rutas nunca se '
+      + 'envían de forma predeterminada; por favor, reporta este problema al autor.',
+    'err.push.upload_failed':
+      'El envío a tu sitio no se completó. Lo que no se alcanzó a subir se reintentará después de la próxima sincronización.',
     'err.headless.token_not_in_store':
       'Los datos de la cuenta están presentes, pero el almacén no tiene su token. La '
       + 'base de datos puede copiarse entre equipos; el token no: reside en el almacén de credenciales '

@@ -1442,11 +1442,11 @@ export default {
       epochHint:
         'Geef deze periode een naam: elke trendgrafiek krijgt een gekleurde achtergrond en AI ziet het ook.',
       epochBadge: 'Tijdperk',
-      local:
-        'Alleen op deze machine opgeslagen, mee in de databaseback-up; bij overdracht aan AI aan te vinken.',
       all: 'Alles',
       showLess: 'Minder tonen',
       showMore: (count: number) => `Nog ${count} tonen`,
+      local:
+        'Op deze computer opgeslagen en meegenomen in back-ups. Tijdperken gaan automatisch naar de AI; een gekoppelde lokale AI kan ook gebeurtenissen lezen en toevoegen, en elke wijziging kan ongedaan worden gemaakt.',
       categories: {
         health: 'Gezondheid en herstel',
         travel: 'Reizen',
@@ -2302,6 +2302,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'lib/deviceName': {
       undetermined: 'Apparaat onbepaald',
+      fused: 'Gecombineerde bronnen',
     },
     'views/SleepDetail': {
       title: 'Slaapoverzicht',
@@ -2946,13 +2947,13 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       sumDataLoading: 'Lezen welke gegevens beschikbaar zijn…',
       sumDisplay: (language: string, unit: string, scale: number) =>
         `${language} · ${unit} · ${scale}%`,
+      sumPrivacy: 'Staat standaard alleen op deze computer',
       sumSyncOn: (minutes: number) => `Automatisch synchroniseren · elke ${minutes} min`,
       sumSyncOff: 'Automatisch synchroniseren staat uit',
       sumArchiveOn: "Langdurig bewaren · niet automatisch opruimen",
       sumArchiveOff: (days: number) => plural(days, { one: `Laatste ${days} dag bewaren · oudere gegevens automatisch verwijderen`, other: `Laatste ${days} dagen bewaren · oudere gegevens automatisch verwijderen` }),
       sumAi: (format: string) => `MCP-toegang · standaardexport ${format}`,
       sumAdvanced: "Back-up en herstel · lokale API · gegevenskwaliteit",
-      sumPrivacy: 'Je gegevens blijven op deze computer',
       sumFeedback: 'Apparaat niet herkend of gegevens kloppen niet? Stuur ons een geanonimiseerd rapport',
       secAccount: 'Zepp-account',
       secDevices: 'Apparaten',
@@ -3240,6 +3241,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       noWorkouts: 'Geen trainingen in deze periode',
       recentWorkouts: 'Afgelopen week',
       recordedOf: (recorded: number, total: number) => `${recorded} van ${total} dagen geregistreerd`,
+      workoutCount: (count: number) => plural(count, { one: `${count} training`, other: `${count} trainingen` }),
       average: (value: string) => `gem. ${value}`, pickedOf: (picked: number, total: number) => `${picked}/${total} gekozen`,
       holdToPick: 'Houd ingedrukt om de hele stapel in de box te leggen', holdToUnpick: 'Houd ingedrukt om de hele stapel eruit te halen',
       holdPile: 'Ingedrukt houden',
@@ -3728,11 +3730,86 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       failed: 'Dat is niet gelukt',
     },
     'views/settings/sections/privacy': {
-      lead: 'Je gegevens blijven op deze computer: niets wordt geüpload of voor statistieken verzameld',
+      lead: 'Staat standaard alleen op deze computer, zonder gebruiksstatistieken; wordt alleen gepusht naar een site die je zelf hebt ingesteld',
       learnMore: 'Meer informatie',
       apiOn: (url: string) => `Ingeschakeld · ${url}`,
       apiOff: 'Uitgeschakeld',
       apiOpen: 'Instellingen',
+    },
+    'views/settings/sections/push': {
+      secTitle: 'Naar je eigen site pushen',
+      lead: 'Na elke synchronisatie worden je gegevens versleuteld naar je eigen website gestuurd, zodat Personal Agents zoals Muse en Hark — en je telefoon — ze altijd kunnen lezen. Op de site staat alleen versleutelde tekst; er gaat niets naar ZeppBridge of iemand anders.',
+      flowComputer: 'Deze computer',
+      flowLock: 'Versleutelen',
+      flowSite: 'Jouw site',
+      flowReader: 'Telefoon / AI',
+      companionTitle: 'ZeppBridge Cloud is op deze computer ingesteld',
+      companionGo: 'Overnemen',
+      companionDone: 'Overgenomen. Eerste ronde wordt verstuurd…',
+      pathsTitle: 'Zo begin je',
+      haveSite: 'Ik heb al een site',
+      fill: 'Invullen',
+      noSite: 'Ik heb nog geen site',
+      siteLabel: 'Siteadres',
+      sitePlaceholder: 'example.com',
+      siteHint: 'Alleen een domeinnaam wordt automatisch https://health.jouw-domein',
+      codeLabel: 'Verbindingscode',
+      codePlaceholder: '{"tenant": "…", "dk": "…", "writeKey": "zbw_…"}',
+      codeHint: 'De ene regel die je bij het opzetten van de site hebt gekregen. Plak het geheel. Deze wordt opgeslagen in de systeemopslag voor inloggegevens en daarna niet meer getoond.',
+      codeKeep: 'Laat leeg om de opgeslagen verbindingscode te blijven gebruiken',
+      save: 'Opslaan en één keer pushen',
+      saving: 'Opslaan…',
+      saved: 'Opgeslagen',
+      cancel: 'Annuleren',
+      askTitle: 'Laat je lokale AI er een opzetten',
+      askSub: 'Kopieer dit bericht en plak het in een AI die je computer kan bedienen, zoals Claude Code of Codex. De AI begeleidt je stap voor stap en geeft je aan het eind een siteadres en een verbindingscode om hier in te vullen.',
+      askNeeds: 'Nodig: een Cloudflare-account en een eigen domein. Ongeveer 20 minuten.',
+      copyPrompt: 'Bericht kopiëren',
+      copied: 'Gekopieerd. Plak dit in je AI',
+      copyFailed: 'Kopiëren mislukt. Selecteer de tekst hieronder handmatig',
+      showPrompt: 'Bericht bekijken',
+      aiPrompt: (language: string) => `Je bent de assistent op mijn computer. Ik gebruik ZeppBridge (een app die mijn Zepp- / Amazfit-gezondheidsgegevens op deze computer bewaart) en ik wil dat die gegevens na elke synchronisatie versleuteld naar mijn eigen website worden gepusht, zodat mijn telefoon en mijn Personal Agent ze kunnen lezen. Help me stap voor stap om de site op te zetten.
+
+Werk zo met mij samen:
+- Vertel vóór elke stap in een of twee zinnen wat je gaat doen en wacht op mijn akkoord. Stop zodra ik ergens moet inloggen, betalen of iets moet bevestigen, zodat ik dat zelf kan doen.
+- Spreek ${language} met me. Ik ben geen programmeur, dus houd vakjargon tot een minimum.
+
+Wat we aan het eind nodig hebben:
+1. Een site gedeployed vanuit de ZeppBridge Cloud-sitetemplate (de map worker/ in de ZeppBridge-Cloud-repository, een Cloudflare Worker) op https://health.<mijn domein>. Hiervoor heb je een Cloudflare-account en een domein bij Cloudflare nodig; als ik beide nog niet heb, leg me dan eerst uit hoe ik me aanmeld en wat het ongeveer kost.
+2. Voer node uploader/keys.mjs init uit in de map ZeppBridge-Cloud. Dit geeft één regel JSON met tenant, dk, writeKey en readKey.
+3. Geef me aan het eind precies twee dingen, exact zoals ze zijn zodat ik ze naar ZeppBridge kan kopiëren:
+   - het siteadres (health.<mijn domein>)
+   - de verbindingscode: de volledige JSON-regel uit stap 2
+   Vertel me daarnaast apart dat readKey een alleen-lezen sleutel is die ik later aan mijn telefoon of Personal Agent kan geven.
+
+Regels:
+- De verbindingscode en de sleutels zijn wachtwoorden: schrijf ze nooit naar bestanden, commit ze nooit naar GitHub en stuur ze naar niemand.
+- Wijzig geen bestanden of de database van ZeppBridge zelf.
+- Als je de ZeppBridge Cloud-sitetemplate niet kunt vinden, zeg me dat dan. Schrijf zelf geen vervanging: het versleutelingsformaat moet exact overeenkomen met ZeppBridge.`,
+      promptLanguage: 'Nederlands',
+      enabled: 'Automatisch pushen na synchronisatie',
+      enabledSub: 'Zet uit om te pauzeren; je instellingen blijven bewaard',
+      statusOn: 'Aan',
+      statusOff: 'Gepauzeerd',
+      statusNoKey: 'Verbindingscode ontbreekt, kan niet pushen',
+      statusBroken: 'Pushinstellingen kunnen niet worden gelezen',
+      never: 'Nog niet gepusht',
+      lastOk: (when: string, count: number) =>
+        `${when}: ${plural(count, { one: `${count} item gepusht`, other: `${count} items gepusht` })}`,
+      lastUnchanged: (when: string) => `${when}: gecontroleerd, niets nieuws`,
+      lastLocked: (when: string) => `${when}: vorige ronde liep nog, overgeslagen`,
+      lastFailed: (when: string) => `${when}: pushen mislukt`,
+      pushNow: 'Nu pushen',
+      pushing: 'Pushen…',
+      change: 'Site of code wijzigen',
+      remove: 'Verwijderen',
+      removeConfirm: 'Klik nogmaals om te verwijderen (sitegegevens blijven)',
+      removed: 'Verwijderd',
+      tasksTitle: 'Geplande taken van ZeppBridge Cloud staan er nog',
+      tasksSub: 'ZeppBridge pusht nu zelf, dus die twee geplande taken zouden alles alleen maar dubbel uploaden. Kopieer de opdracht en voer die uit in PowerShell om ze te verwijderen.',
+      copyTasks: 'Verwijderopdracht kopiëren',
+      tasksCopied: 'Gekopieerd. Voer uit in PowerShell',
+      failed: 'Dat is niet gelukt. Probeer het opnieuw',
     },
     'views/settings/sections/advanced': {
       secPrefs: 'Meer voorkeuren',
@@ -4701,6 +4778,43 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       'Op deze machine is geen systeemopslag voor inloggegevens beschikbaar (GNOME Keyring / KWallet). Headless servers en containers hebben die meestal niet. Stel ZEPPBRIDGE_CREDENTIAL_STORE=file in om het token met rechten 0600 in de gegevensmap te schrijven, of ZEPPBRIDGE_CREDENTIAL_STORE=env samen met ZEPPBRIDGE_APP_TOKEN.',
     'err.headless.schema_upgrade':
       'Deze database is ouder dan de build die hem leest, en een alleen-lezen verbinding kan hem niet bijwerken. Start de desktop-app een keer, of draai zeppbridge-cli reprocess op een headless machine. Beide maken voor het bijwerken een back-up.',
+    'err.headless.program_outdated':
+      'De CLI / MCP die de database leest is ouder dan de desktop-app en kan deze databaseversie niet lezen. Meestal verwijst een AI-tool nog naar een oude kopie: verbind die tool opnieuw in Instellingen (genereer en installeer ZeppBridge.mcpb opnieuw voor Claude Desktop), verwijder de oude extensie of vermeldingen die naar een oude installatiemap verwijzen, en herstart de AI-tool.',
+    'err.push.config_unreadable':
+      'De configuratie van het pushdoel (push/targets.json in de gegevensmap) kon niet worden gelezen. Controleer de bestandsrechten en probeer opnieuw.',
+    'err.push.config_invalid':
+      'De configuratie van het pushdoel is ongeldig: doel-id’s mogen alleen kleine letters, cijfers en koppeltekens bevatten en moeten uniek zijn, en de bewaartermijn moet tussen 1 en 365 dagen liggen.',
+    'err.push.config_has_secret':
+      'De configuratie van het pushdoel bevat een veld met een geheim. Geheimen horen in de opslag voor inloggegevens, niet in het bestand; verwijder dat veld en voer het geheim opnieuw in.',
+    'err.push.credential_store_unnamed':
+      'De huidige opslag voor inloggegevens (omgevingsvariabelemodus) kan maar één token bevatten en geen geheimen voor pushdoelen opslaan. Gebruik de systeemopslag voor inloggegevens of ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'Het geheim van het pushdoel kon niet uit de opslag voor inloggegevens worden gelezen of ernaar worden geschreven. Controleer of deze ontgrendeld is en door systeembeleid wordt toegestaan.',
+    'err.push.secrets_missing':
+      'De opslag voor inloggegevens heeft geen volledig geheim voor dit pushdoel. Voer het geheim opnieuw in.',
+    'err.push.pa_write_key_malformed':
+      'De schrijfsleutel heeft een ongeldige indeling. Kopieer de volledige schrijfsleutel opnieuw vanaf je site.',
+    'err.push.pa_tenant_mismatch':
+      'De schrijfsleutel komt niet overeen met het site-id: deze hoort bij een andere site.',
+    'err.push.pa_data_key_malformed':
+      'De gegevenssleutel heeft een ongeldige indeling (moet 32 bytes zijn). Kopieer de volledige gegevenssleutel opnieuw vanaf je site.',
+    'err.push.site_invalid':
+      'Het pushadres kan niet worden gebruikt: het moet een https-adres met een domeinnaam zijn, geen IP-adres, en mag geen gebruikersnaam, wachtwoord, ? of # bevatten.',
+    'err.push.connection_code_invalid':
+      'Die verbindingscode klopt niet. Plak de volledige code; deze moet zowel dk als writeKey bevatten.',
+    'err.push.not_configured': 'Er is nog geen pushdoel ingesteld.',
+    'err.push.companion_not_found':
+      'Er is op deze computer geen ZeppBridge Cloud-instelling gevonden om over te nemen (er is een siteadres nodig en de uploadsleutel in Referentiebeheer).',
+    'err.push.state_unwritable':
+      'Pushregistraties konden niet naar de gegevensmap (push/) worden geschreven. Controleer of de gegevensmap beschrijfbaar is.',
+    'err.push.no_local_data':
+      'Er is nog geen lokale database, dus er valt niets te pushen. Synchroniseer eerst.',
+    'err.push.local_data_unavailable':
+      'De lokale database kon nu niet worden gelezen. Er is deze ronde niets gepusht; na de volgende synchronisatie wordt het opnieuw geprobeerd.',
+    'err.push.coordinates_found':
+      'Er zijn coördinaten aangetroffen in de te pushen gegevens, dus deze ronde is gestopt. Routes worden standaard nooit gepusht; meld dit probleem aan de auteur.',
+    'err.push.upload_failed':
+      'Het pushen naar je site is niet voltooid. Wat niet is doorgekomen, wordt na de volgende synchronisatie opnieuw geprobeerd.',
     'err.headless.token_not_in_store':
       'De accountgegevens zijn er, maar de opslag voor inloggegevens heeft er geen token voor. Een database kun je tussen machines kopiëren; een token niet — die blijft in de referentieopslag van de machine waar hij is gemaakt. Meld je opnieuw aan.',
     'err.local.maintenance_compaction':

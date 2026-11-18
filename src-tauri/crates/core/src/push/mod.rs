@@ -22,6 +22,7 @@
 
 pub mod client;
 pub mod pa;
+pub mod setup;
 
 use crate::auth::{default_credential_backend_in, CredentialBackend};
 use crate::storage::Database;

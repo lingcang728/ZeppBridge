@@ -83,10 +83,15 @@ export const categorySource = (options: {
   },
 });
 
+/** 运动列表一页取多少（后端上限 500）。 */
+const WORKOUT_PAGE = 500;
+
 const ICONS = { 'body-activity': 'activity', 'outdoor-cycling': 'bike', 'outdoor-run': 'run' } as const;
 
 /**
  * 「你的过去」运动那一行（第三轮 B3，用户 10-07 选「一次运动一张牌」）：这段时间里的每一次运动一张牌，
+ * 和别的类别一样能切 7 天 / 1 个月 / 6 个月 / 1 年 / 全部，长的范围按周 / 月 / 季 / 年叠起来（11-18：原来只发最近一周，
+ * 这周没运动就一张牌都没有，更早的运动也挑不到——反馈「多选运动交给 AI 时卡片不显示」）。
  * 牌面是运动图标、日期、时长 · 距离；放进收集箱的键是 `workout:<运动 id>`，交给任务时写进 workout_ids。
  * 任务里已经勾上的运动在牌上显示为「已在箱中」。只用现有的运动列表接口，不加后端命令。
  */
@@ -101,8 +106,15 @@ export const workoutSource = (options: { label: string; tint: string; picked: ()
   extraBoxed: options.picked,
   release: options.release,
   loadDays: async (start, end) => {
-    const page = await backend.getWorkoutPage(400, 0);
-    return page.items
+    // 运动列表新 → 旧：一页一页往回翻，翻过范围的起点就停（「全部」是十年，一页 500 条不一定够）。
+    const items: Awaited<ReturnType<typeof backend.getWorkoutPage>>['items'] = [];
+    for (let offset = 0; ; offset += WORKOUT_PAGE) {
+      const page = await backend.getWorkoutPage(WORKOUT_PAGE, offset);
+      items.push(...page.items);
+      const oldest = page.items[page.items.length - 1];
+      if (page.items.length < WORKOUT_PAGE || offset + page.items.length >= page.total || !oldest || dayKey(new Date(oldest.start_time)) < start) break;
+    }
+    return items
       .map((workout) => ({ workout, date: dayKey(new Date(workout.start_time)) }))
       .filter(({ date }) => date >= start && date <= end)
       .sort((a, b) => a.workout.start_time.localeCompare(b.workout.start_time))

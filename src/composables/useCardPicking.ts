@@ -181,6 +181,7 @@ export const useCardPicking = (options: {
    * 只有封面那一张从叠上抽起来飞进去、到了再亮一下；拿回来是一张从箱子飞回来落进这一叠。
    */
   const pickGroup = async (group: DeckGroup, el: HTMLElement) => {
+    if (options.source().kind === 'workouts') { await pickWorkoutGroup(group, el); return; }
     const dates = pickableDates(group);
     if (!dates.length) return;
     const { key: k, category } = options.source();
@@ -192,6 +193,27 @@ export const useCardPicking = (options: {
     }
     options.onFly?.();
     const landed = await flyCardHome(el, boxEl(), () => box.add(k, category, dates), { keep: true });
+    if (landed) await settleGroup(el);
+  };
+
+  /** 一叠运动：每次运动各自的键（`workout:<id>`）进箱子；整叠都在箱子里时整叠拿回来，并从任务的运动列表里撤掉。 */
+  const pickWorkoutGroup = async (group: DeckGroup, el: HTMLElement) => {
+    const source = options.source();
+    const boxed = new Set(mine.value);
+    if (!group.days.length) return;
+    if (group.days.every((day) => boxed.has(cardIdOf(day)))) {
+      for (const day of group.days) {
+        box.remove(day.pickKey ?? source.key, [day.date]);
+        source.release?.(cardIdOf(day));
+      }
+      await flyFromBox(boxEl(), el, { keep: true });
+      await settleGroup(el);
+      return;
+    }
+    options.onFly?.();
+    const landed = await flyCardHome(el, boxEl(), () => {
+      for (const day of group.days) if (!boxed.has(cardIdOf(day))) box.add(day.pickKey ?? source.key, source.category, [day.date]);
+    }, { keep: true });
     if (landed) await settleGroup(el);
   };
 
@@ -210,8 +232,10 @@ export const useCardPicking = (options: {
     }
     for (const group of groups ?? []) {
       const el = options.cardOf(group.id);
-      const dates = pickableDates(group);
-      if (el && dates.some((date) => !box.has(key(), date))) void pickGroup(group, el);
+      const open = options.source().kind === 'workouts'
+        ? group.days.some((day) => !mine.value.includes(cardIdOf(day)))
+        : pickableDates(group).some((date) => !box.has(key(), date));
+      if (el && open) void pickGroup(group, el);
     }
   };
 

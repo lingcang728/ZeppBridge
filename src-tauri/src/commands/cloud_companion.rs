@@ -454,6 +454,21 @@ fn collect_state() -> CloudCompanionState {
     state
 }
 
+/// 组件配好的站点地址（`https://health.example.com`）。推送设置用它判断能不能「一键接过来」。
+pub(crate) fn companion_site_url() -> Option<String> {
+    let dir = state_dir()?;
+    match read_config_file(&dir) {
+        ConfigFile::Found(map) => normalize_site(&config_view(&map).site),
+        _ => None,
+    }
+}
+
+/// 组件的两个计划任务还在不在（推送接进主程序后，它们再跑就是重复上传）。
+pub(crate) fn companion_tasks_present() -> bool {
+    state_dir().is_some()
+        && (query_task(TASK_FOLLOW).is_some() || query_task(TASK_UPLOAD).is_some())
+}
+
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> T + Send + 'static,
 ) -> Result<T, AppError> {

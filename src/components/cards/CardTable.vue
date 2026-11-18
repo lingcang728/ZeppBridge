@@ -176,9 +176,9 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
   try {
     loadFailed.value = false;
     const today = deckToday();
-    if (focusDate.value || workouts.value) {
-      // 运动牌：以那一天为中心的七天里的每一次运动；日牌：以那一天为中心的七天。
-      const [start, end] = focusWindow(focusDate.value ?? today, today);
+    if (focusDate.value) {
+      // 从某一天点开：运动牌是以那一天为中心的七天里的每一次运动；日牌是那七天。
+      const [start, end] = focusWindow(focusDate.value, today);
       return { kind: 'days', days: await props.source.loadDays(start, end) };
     }
     return rootLevel(await props.source.loadDays(rangeStart(today, range.value), today), range.value);
@@ -187,7 +187,7 @@ const loadLevel = async (): Promise<DeckLevel | null> => {
     return null;
   }
 };
-const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : workouts.value ? t.value.recentWorkouts : rangeLabel(range.value));
+const rootTitle = () => (focusDate.value ? t.value.aroundDay(md(focusDate.value)) : rangeLabel(range.value));
 
 /**
  * 发牌，但先停在第一帧（来处 / 那一叠），等挂载、头一回光栅化这几帧过去、帧节奏稳了再放（10-28）：
@@ -477,7 +477,7 @@ defineExpose({ reopen, isClosing: () => closing.value });
           <h2 :id="titleId">{{ source.label }}</h2>
           <p>{{ t.pickSubtitle }} · {{ crumbs }}<template v-if="pickedCount"> · <b>{{ t.pickedHere(pickedCount) }}</b></template><template v-if="spanOn"> · <b>{{ spanFrom ? t.spanFrom : t.spanAria }}</b></template></p>
         </div>
-        <span v-if="!workouts" data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
+        <span data-intro><SegmentTrack compact intro :items="rangeItems" :model-value="String(range)" :aria-label="t.rangeAria" @update:model-value="switchRange" /></span>
         <button type="button" :class="['table-icon', 'span-toggle', { on: spanOn }]" data-intro :aria-pressed="spanOn" :aria-label="t.spanAria" :title="t.spanAria" @click="toggleSpan"><Icon name="link" :size="16" /><span>{{ t.span }}</span></button>
         <button type="button" class="table-icon" data-intro data-table-close :aria-label="t.close" @click="close"><Icon name="x" :size="17" /></button>
       </header>

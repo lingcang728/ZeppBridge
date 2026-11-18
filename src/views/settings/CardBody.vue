@@ -17,6 +17,7 @@ import GuideSection from './sections/GuideSection.vue';
 import LabsSection from './sections/LabsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
+import PushSection from './sections/PushSection.vue';
 import { labFlag } from '../../lib/labs';
 
 defineProps<{ id: string }>();
@@ -32,7 +33,10 @@ const cloud = labFlag('cloud');
     </template>
     <AutoSyncSection v-else-if="id === 'sync'" />
     <ArchiveSection v-else-if="id === 'archive'" />
-    <CapabilitySection v-else-if="id === 'data'" />
+    <template v-else-if="id === 'data'">
+      <CapabilitySection />
+      <PushSection />
+    </template>
     <template v-else-if="id === 'ai'">
       <CloudSection v-if="cloud" />
       <McpSection />

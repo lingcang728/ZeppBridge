@@ -598,6 +598,17 @@ export interface BridgeBackend {
   /** 组件 setup.ps1 里放给界面的几条；密钥由组件自己放进剪贴板，不经过这里。 */
   cloudCompanionSetup(command: CloudSetupCommand, label?: string): Promise<CloudSetupOutcome>;
   cloudCompanionOpen(target: 'site' | 'logs' | 'folder'): Promise<void>;
+  /** 推送到你自己的服务器（设置 › 数据）：状态里只有「有没有密钥」，没有密钥本身。 */
+  pushState(): Promise<PushState>;
+  /** 填站点和连接码；连接码留空 = 不换密钥。地址和连接码都对才落盘。 */
+  pushSave(input: PushSaveInput): Promise<PushState>;
+  pushSetEnabled(enabled: boolean): Promise<PushState>;
+  /** 把本机 ZeppBridge Cloud 组件的站点和上传密钥接过来（不删组件的东西）。 */
+  pushImportCompanion(): Promise<PushState>;
+  /** 立即推一轮；推送失败记在 last 里，不当成命令失败。 */
+  pushRun(): Promise<PushState>;
+  /** 移除推送目标（配置、密钥、记录）。站点上的东西不动。 */
+  pushRemove(): Promise<PushState>;
 
   listen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn>;
 }
@@ -648,6 +659,37 @@ export interface CloudCompanionState {
   task_upload: boolean;
   running: boolean;
   default_bin_dir: string | null;
+}
+
+/** 上一轮推送（push/<目标>.status.json）。 */
+export interface PushLast {
+  /** ok / unchanged / skipped_locked / failed */
+  result: string;
+  stats: { objects: number; deleted: number; unchanged: number; bytes_sent: number };
+  error_code: string | null;
+  at: string;
+}
+
+export interface PushState {
+  configured: boolean;
+  enabled: boolean;
+  site: string | null;
+  site_url: string | null;
+  has_secrets: boolean;
+  credential_store_ok: boolean;
+  last: PushLast | null;
+  running: boolean;
+  config_error_code: string | null;
+  /** 本机装过 ZeppBridge Cloud、能一键接过来时它的站点地址。 */
+  companion_site_url: string | null;
+  /** 组件的计划任务还在（接过来以后会重复上传）。 */
+  companion_tasks: boolean;
+}
+
+export interface PushSaveInput {
+  site: string;
+  connection_code: string | null;
+  enabled: boolean;
 }
 
 export type CloudSetupCommand = 'init' | 'task-commands' | 'add-reader' | 'copy-reader' | 'revoke-reader';

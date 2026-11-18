@@ -673,6 +673,8 @@ export default {
     recentWorkouts: 'Ostatni tydzień',
     recorded: 'Zarejestrowano',
     recordedOf: (recorded: number, total: number) => `Zarejestrowano ${recorded} z ${total} dni`,
+    workoutCount: (count: number) =>
+      plural(count, { one: `${count} trening`, few: `${count} treningi`, many: `${count} treningów`, other: `${count} treningu` }),
     average: (value: string) => `śr. ${value}`,
     pickedOf: (picked: number, total: number) => `Wybrano ${picked}/${total}`,
     holdToPick: 'Przytrzymaj dłużej, aby przenieść cały stos do pudełka',
@@ -2016,6 +2018,49 @@ export default {
       'Lokalna baza danych jest starsza niż ta wersja programu, a połączenie tylko do odczytu nie może jej zaktualizować. '
       + 'Uruchom aplikację desktopową raz lub wykonaj polecenie zeppbridge-cli reprocess na maszynie headless — '
       + 'w obu przypadkach przed aktualizacją tworzona jest kopia zapasowa.',
+    'err.headless.program_outdated':
+      'Narzędzie CLI / MCP odczytujące bazę danych jest starsze niż aplikacja desktopowa i nie rozpoznaje tej wersji bazy danych. '
+      + 'Zazwyczaj oznacza to, że narzędzie AI nadal wskazuje na starszą wersję: połącz je ponownie w Ustawieniach '
+      + '(w przypadku Claude Desktop ponownie wygeneruj i zainstaluj ZeppBridge.mcpb), usuń stare rozszerzenie lub wpis wskazujący na stary folder instalacji, '
+      + 'a następnie uruchom ponownie narzędzie AI.',
+    'err.push.config_unreadable':
+      'Nie można odczytać konfiguracji celu przesyłania (push/targets.json w folderze danych). Sprawdź uprawnienia do pliku i spróbuj ponownie.',
+    'err.push.config_invalid':
+      'Konfiguracja celu przesyłania ma nieprawidłowy format: identyfikatory celów mogą zawierać wyłącznie małe litery, cyfry oraz łączniki i muszą być unikalne, '
+      + 'a liczba dni przechowywania musi wynosić 1–365.',
+    'err.push.config_has_secret':
+      'Konfiguracja celu przesyłania zawiera pole sekretu. Sekrety powinny znajdować się w magazynie poświadczeń, a nie w pliku; usuń to pole i wprowadź sekret ponownie.',
+    'err.push.credential_store_unnamed':
+      'Bieżący magazyn poświadczeń (tryb zmiennej środowiskowej) przechowuje tylko jeden token i nie może przechowywać sekretów celów przesyłania. '
+      + 'Użyj systemowego magazynu poświadczeń lub ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'Nie udało się odczytać sekretu celu przesyłania z magazynu poświadczeń ani zapisać go w nim. Sprawdź, czy magazyn jest odblokowany i dozwolony przez zasady systemu.',
+    'err.push.secrets_missing':
+      'W magazynie poświadczeń brakuje kompletnego sekretu dla tego celu przesyłania. Wprowadź sekret ponownie.',
+    'err.push.pa_write_key_malformed':
+      'Klucz zapisu ma nieprawidłowy format. Skopiuj ponownie pełny klucz zapisu ze swojej witryny.',
+    'err.push.pa_tenant_mismatch':
+      'Klucz zapisu nie pasuje do identyfikatora witryny: należy do innej witryny.',
+    'err.push.pa_data_key_malformed':
+      'Klucz danych ma nieprawidłowy format (powinien mieć 32 bajty). Skopiuj ponownie pełny klucz danych ze swojej witryny.',
+    'err.push.site_invalid':
+      'Nie można użyć tego adresu przesyłania: musi to być adres https z nazwą domeny, a nie adres IP, i nie może zawierać nazwy użytkownika, hasła ani znaków ? lub #.',
+    'err.push.connection_code_invalid':
+      'Nieprawidłowy kod połączenia: wklej cały kod połączenia — powinien zawierać zarówno dk, jak i writeKey.',
+    'err.push.not_configured':
+      'Nie skonfigurowano jeszcze celu przesyłania.',
+    'err.push.companion_not_found':
+      'Nie znaleziono na tym komputerze konfiguracji ZeppBridge Cloud do przejęcia (wymagany jest adres witryny oraz klucz przesyłania w magazynie poświadczeń).',
+    'err.push.state_unwritable':
+      'Nie udało się zapisać rejestrów przesyłania w folderze danych (push/). Sprawdź, czy folder danych jest dostępny do zapisu.',
+    'err.push.no_local_data':
+      'Nie ma jeszcze lokalnej bazy danych, więc nie ma danych do przesłania. Najpierw wykonaj synchronizację.',
+    'err.push.local_data_unavailable':
+      'Nie można w tej chwili odczytać lokalnej bazy danych. W tej turze nic nie przesłano; próba zostanie ponowiona po następnej synchronizacji.',
+    'err.push.coordinates_found':
+      'W danych przeznaczonych do przesłania wykryto współrzędne, więc ta tura została zatrzymana. Trasy domyślnie nigdy nie są przesyłane; zgłoś ten problem autorowi.',
+    'err.push.upload_failed':
+      'Przesyłanie do Twojej witryny nie zostało ukończone. Część, której nie udało się przesłać, zostanie ponowiona po następnej synchronizacji.',
     'err.headless.token_not_in_store':
       'Dane konta są dostępne, ale w magazynie poświadczeń brakuje dla nich tokena. '
       + 'Baza danych kopiuje się między urządzeniami, ale token nie — znajduje się w magazynie '
@@ -2640,7 +2685,7 @@ export default {
     showLess: 'Pokaż mniej',
     manage: 'Zarządzaj wydarzeniami życiowymi',
     related: 'Powiązane wydarzenia',
-    local: 'Zapisane lokalnie, uwzględniane w kopiach zapasowych. Opcjonalne przy przekazywaniu do AI.',
+    local: 'Zapisywane lokalnie na tym komputerze i uwzględniane w kopiach zapasowych. Epoki są automatycznie przekazywane do AI; podłączone lokalne AI również może odczytywać i dodawać wydarzenia, a każdą zmianę można cofnąć.',
     epoch: 'Oznacz jako epokę',
     epochHint: 'Nadaj nazwę temu okresowi: wszystkie wykresy trendów zyskają cieniowane tło, a AI też to zobaczy.',
     epochBadge: 'Epoka',
@@ -4090,7 +4135,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     sumDataLoading: 'Sprawdzanie dostępnych danych…',
     sumAi: (format: string) => `Dostęp MCP · domyślny eksport: ${format}`,
     sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
-    sumPrivacy: 'Twoje dane pozostają na tym komputerze',
+    sumPrivacy: 'Domyślnie pozostaje na tym komputerze',
     sumFeedback: 'Urządzenie nie zostało rozpoznane lub dane są niepoprawne? Wyślij nam zanonimizowany raport',
     sumAdvanced: 'Kopia zapasowa i przywracanie · lokalne API · kondycja danych',
     autoSyncToggle: 'Automatyczna synchronizacja',
@@ -4407,11 +4452,88 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
 
   // Source: src/views/settings/sections/privacy.i18n.ts
   "views/settings/sections/privacy": {
-    lead: 'Twoje dane pozostają na tym komputerze: brak wysyłania do sieci, brak statystyk użytkowania',
+    lead: 'Domyślnie pozostaje na tym komputerze, bez statystyk użycia; trafia wyłącznie na witrynę skonfigurowaną przez Ciebie',
     learnMore: 'Dowiedz się więcej',
     apiOn: (url: string) => `Włączone · ${url}`,
     apiOff: 'Wyłączone',
     apiOpen: 'Ustawienia',
+  },
+
+  // Source: src/views/settings/sections/push.i18n.ts
+  "views/settings/sections/push": {
+    secTitle: 'Przesyłaj na własną witrynę',
+    lead: 'Po każdej synchronizacji dane są szyfrowane i wysyłane na Twoją własną witrynę, aby Twój telefon oraz Personal Agent (np. Muse lub Hark) mogli je odczytać w dowolnym momencie. Witryna przechowuje wyłącznie zaszyfrowane dane; nic nie trafia do ZeppBridge ani do nikogo innego.',
+    flowComputer: 'Ten komputer',
+    flowLock: 'Szyfrowanie',
+    flowSite: 'Twoja witryna',
+    flowReader: 'Telefon / AI',
+    companionTitle: 'ZeppBridge Cloud jest skonfigurowany na tym komputerze',
+    companionGo: 'Przejmij',
+    companionDone: 'Przejęto. Wysyłanie pierwszej tury…',
+    pathsTitle: 'Jak zacząć',
+    haveSite: 'Mam już witrynę',
+    fill: 'Wpisz',
+    noSite: 'Nie mam jeszcze witryny',
+    siteLabel: 'Adres witryny',
+    sitePlaceholder: 'example.com',
+    siteHint: 'Sama nazwa domeny zostanie uzupełniona do https://health.twoja-domena',
+    codeLabel: 'Kod połączenia',
+    codePlaceholder: '{"tenant": "…", "dk": "…", "writeKey": "zbw_…"}',
+    codeHint: 'Jedna linia otrzymana podczas konfiguracji witryny. Wklej ją w całości. Zostanie zapisana w systemowym magazynie poświadczeń i nie będzie więcej wyświetlana.',
+    codeKeep: 'Pozostaw puste, aby zachować zapisany kod połączenia',
+    save: 'Zapisz i prześlij raz',
+    saving: 'Zapisywanie…',
+    saved: 'Zapisano',
+    cancel: 'Anuluj',
+    askTitle: 'Pozwól lokalnemu AI skonfigurować witrynę',
+    askSub: 'Skopiuj tę wiadomość i wklej ją do AI, które może obsługiwać Twój komputer, np. Claude Code lub Codex. Poprowadzi Cię krok po kroku, a na koniec poda adres witryny i kod połączenia do wpisania tutaj.',
+    askNeeds: 'Potrzebujesz konta Cloudflare i własnej domeny. Zajmie to około 20 minut.',
+    copyPrompt: 'Kopiuj dla AI',
+    copied: 'Skopiowano. Wklej do swojego AI',
+    copyFailed: 'Nie udało się skopiować. Zaznacz poniższy tekst ręcznie',
+    showPrompt: 'Zobacz wiadomość',
+    aiPrompt: (language: string) => `Jesteś asystentem na moim komputerze. Korzystam z ZeppBridge (aplikacji przechowującej moje dane zdrowotne z Zepp / Amazfit lokalnie na tym komputerze) i chcę, aby po każdej synchronizacji wysyłała ona te dane w formie zaszyfrowanej na moją własną witrynę, tak aby mój telefon i Personal Agent mogli je odczytywać. Poprowadź mnie krok po kroku przez konfigurację tej witryny.
+
+Jak ze mną współpracować:
+- Przed każdym krokiem powiedz w jednym lub dwóch zdaniach, co zamierzasz zrobić, i poczekaj na moje potwierdzenie. Zatrzymaj się za każdym razem, gdy muszę się zalogować, zapłacić lub coś potwierdzić, i pozwól mi zrobić to samodzielnie.
+- Rozmawiaj ze mną w języku: ${language}. Nie jestem programistą, więc ogranicz żargon techniczny do minimum.
+
+Co musimy uzyskać na końcu:
+1. Witrynę wdrożoną z szablonu ZeppBridge Cloud (folder worker/ w repozytorium ZeppBridge-Cloud, będący Cloudflare Workerem) pod adresem https://health.<moja domena>. Wymaga to konta Cloudflare oraz domeny w Cloudflare; jeśli nie mam żadnego z nich, najpierw wyjaśnij mi, jak się zarejestrować i ile to mniej więcej kosztuje.
+2. Uruchomienie polecenia node uploader/keys.mjs init w folderze ZeppBridge-Cloud. Wypisze ono jedną linię JSON zawierającą tenant, dk, writeKey oraz readKey.
+3. Na koniec podaj mi dokładnie dwie rzeczy, wklejone dokładnie tak, jak są, abym mógł je skopiować do ZeppBridge:
+   - adres witryny (health.<moja domena>)
+   - kod połączenia: całą linię JSON z kroku 2
+   Osobno poinformuj mnie, że readKey to klucz tylko do odczytu, który mogę później przekazać mojemu telefonowi lub Personal Agent.
+
+Zasady:
+- Kod połączenia i klucze to hasła: nigdy nie zapisuj ich w plikach, nigdy nie wysyłaj na GitHub i nikomu ich nie udostępniaj.
+- Nie modyfikuj żadnych własnych plików ZeppBridge ani jego bazy danych.
+- Jeśli nie możesz znaleźć szablonu witryny ZeppBridge Cloud, powiedz mi o tym. Nie pisz własnego zamiennika — format szyfrowania musi być dokładnie zgodny z ZeppBridge.`,
+    promptLanguage: 'Polski',
+    enabled: 'Przesyłaj po każdej synchronizacji',
+    enabledSub: 'Wyłącz, aby wstrzymać; ustawienia zostaną zachowane',
+    statusOn: 'Włączono',
+    statusOff: 'Wstrzymano',
+    statusNoKey: 'Brak kodu połączenia — nic nie można wysłać',
+    statusBroken: 'Nie można odczytać ustawień przesyłania',
+    never: 'Jeszcze nie przesyłano',
+    lastOk: (when: string, count: number) =>
+      `${when}: przesłano ${plural(count, { one: `${count} element`, few: `${count} elementy`, many: `${count} elementów`, other: `${count} elementu` })}`,
+    lastUnchanged: (when: string) => `${when}: sprawdzono, brak nowości`,
+    lastLocked: (when: string) => `${when}: poprzednia tura jeszcze trwała, pominięto`,
+    lastFailed: (when: string) => `${when}: przesyłanie nie powiodło się`,
+    pushNow: 'Prześlij teraz',
+    pushing: 'Przesyłanie…',
+    change: 'Zmień witrynę lub kod',
+    remove: 'Usuń',
+    removeConfirm: 'Kliknij ponownie, aby usunąć (dane na witrynie zostaną)',
+    removed: 'Usunięto',
+    tasksTitle: 'Zaplanowane zadania ZeppBridge Cloud nadal istnieją',
+    tasksSub: 'Teraz ZeppBridge przesyła dane samodzielnie, więc te dwa zaplanowane zadania tylko wysyłałyby wszystko po raz drugi. Skopiuj polecenie i uruchom je w PowerShell, aby je usunąć.',
+    copyTasks: 'Kopiuj polecenie usuwania',
+    tasksCopied: 'Skopiowano. Uruchom w PowerShell',
+    failed: 'Nie udało się. Spróbuj ponownie',
   },
 
   // Source: src/views/settings/sections/sync.i18n.ts
@@ -4430,6 +4552,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   // Source: src/views/SleepDetail.i18n.ts
   'lib/deviceName': {
     undetermined: 'Urządzenie nieokreślone',
+    fused: 'Połączone źródła',
   },
   "views/SleepDetail": {
     title: 'Zapis snu',

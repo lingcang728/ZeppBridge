@@ -412,3 +412,7 @@ components/workout/stage/stage.cards.export
 components/workout/stage/stage.cards.strength-map
 components/workout/stage/stage.cards.provenance
 
+# Batch 58: example domain and JSON connection-code placeholders
+views/settings/sections/push.sitePlaceholder
+views/settings/sections/push.codePlaceholder
+

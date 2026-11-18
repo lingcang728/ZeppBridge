@@ -352,3 +352,55 @@ fn env_credential_store_cannot_hold_push_secrets() {
     );
     assert!(!format!("{:?}", secrets()).contains("zbw_"));
 }
+
+#[test]
+fn connection_code_is_read_from_a_pasted_answer_and_never_lands_in_the_config() {
+    let dir = temp_dir("setup");
+    let store = Store::default();
+    // AI 回答里整段复制过来：前后有字，多一把只读密钥。
+    let pasted = format!(
+        "好了，连接码是：\n{{\"tenant\":\"{TENANT}\",\"dk\":\"{}\",\"writeKey\":\"{}\",\"readKey\":\"zbr_{TENANT}_{}\"}}\n收好。",
+        pa::crypto::b64url(&[9u8; 32]),
+        write_key(),
+        "C".repeat(43)
+    );
+    setup::save_connection_code(&store, setup::PA_TARGET_ID, &pasted).unwrap();
+    assert!(setup::has_secrets(&store, setup::PA_TARGET_ID));
+    let stored = store
+        .get(&secret_account(setup::PA_TARGET_ID))
+        .unwrap()
+        .unwrap();
+    assert!(!stored.contains("zbr_"), "the read key must not be kept");
+
+    setup::upsert_pa_target(&dir, "example.com", true).unwrap();
+    let config = std::fs::read_to_string(dir.join(PUSH_DIR).join(TARGETS_FILE)).unwrap();
+    assert!(
+        !config.contains("zbw_") && !config.contains("\"dk\""),
+        "{config}"
+    );
+    let targets = load_targets(&dir).unwrap();
+    assert_eq!(targets.len(), 1);
+    assert!(targets[0].enabled);
+
+    setup::set_enabled(&dir, setup::PA_TARGET_ID, false).unwrap();
+    assert!(!load_targets(&dir).unwrap()[0].enabled);
+    setup::remove_target(&dir, &store, setup::PA_TARGET_ID).unwrap();
+    assert!(load_targets(&dir).unwrap().is_empty());
+    assert!(!setup::has_secrets(&store, setup::PA_TARGET_ID));
+}
+
+#[test]
+fn bad_connection_codes_and_sites_are_refused_with_a_code() {
+    let dir = temp_dir("setup-bad");
+    for text in ["", "hello", "{\"dk\":\"x\"}", "{not json}"] {
+        let code = setup::parse_connection_code(text).unwrap_err().code;
+        assert!(code.starts_with("err.push."), "{text}: {code}");
+    }
+    assert_eq!(
+        setup::upsert_pa_target(&dir, "http://example.com", true)
+            .unwrap_err()
+            .code,
+        "err.push.site_invalid"
+    );
+    assert!(load_targets(&dir).unwrap().is_empty());
+}

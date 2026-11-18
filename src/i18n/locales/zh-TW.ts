@@ -109,6 +109,25 @@ export default {
     "err.handoff.write_failed": '寫入去識別化 AI 資料失敗',
     "err.headless.no_credential_store": '這台機器上沒有可用的系統金鑰環（GNOME Keyring / KWallet）。無頭伺服器和容器通常沒有。' + '可以設定 ZEPPBRIDGE_CREDENTIAL_STORE=file 把權杖以 0600 寫在資料目錄裡，' + '或者用 ZEPPBRIDGE_CREDENTIAL_STORE=env 配合 ZEPPBRIDGE_APP_TOKEN 傳入。',
     "err.headless.schema_upgrade": '本機資料庫的版本比這個程式舊，而唯讀連線升級不了。啟動一次桌面應用程式，' + '或者在無頭環境跑一次 zeppbridge-cli reprocess——兩條路都會在升級前自動備份。',
+    "err.headless.program_outdated": '讀取資料庫的命令列工具 / MCP 比桌面應用程式舊，無法識別這個版本的資料庫。多半是 AI 工具裡還登記著舊版：在設定裡重新連線這個 AI 工具（Claude Desktop 請重新產生並安裝 ZeppBridge.mcpb），刪掉舊的擴充套件或指向舊安裝資料夾的登記，再重新啟動 AI 工具。',
+    "err.push.config_unreadable": '無法讀取推送目標的設定檔（data 資料夾裡的 push/targets.json）。請檢查檔案權限後重試。',
+    "err.push.config_invalid": '推送目標的設定檔格式不正確：目標編號只能使用小寫字母、數字和連字號，且不可重複；保留天數須在 1–365 之間。',
+    "err.push.config_has_secret": '推送目標的設定檔裡出現了密鑰欄位。密鑰只能存放在憑證存放區，不能寫在設定檔裡；請刪掉該欄位後重新輸入一次密鑰。',
+    "err.push.credential_store_unnamed": '目前的憑證存放區（環境變數模式）只能存放一個權杖，存不下推送目標的密鑰。請改用系統憑證存放區或 ZEPPBRIDGE_CREDENTIAL_STORE=file。',
+    "err.push.credential_store_failed": '推送目標的密鑰無法從憑證存放區讀取或寫入。請檢查憑證存放區是否已鎖定或受系統策略限制。',
+    "err.push.secrets_missing": '憑證存放區裡沒有這個推送目標的密鑰，或是讀取不完整。請重新輸入一次密鑰。',
+    "err.push.pa_write_key_malformed": '寫入金鑰的格式不正確。請從你的站台重新複製完整的寫入金鑰。',
+    "err.push.pa_tenant_mismatch": '寫入金鑰與站台編號不相符：它屬於另一個站台。',
+    "err.push.pa_data_key_malformed": '資料金鑰的格式不正確（應為 32 位元組）。請從你的站台重新複製完整的資料金鑰。',
+    "err.push.site_invalid": '推送網址無法使用：必須是 https 的網域名稱網址，不能是 IP 位址，也不能包含帳號密碼、? 或 # 參數。',
+    "err.push.connection_code_invalid": '連線碼不正確：請將整段連線碼貼進來，裡面應包含 dk 和 writeKey 兩項。',
+    "err.push.not_configured": '尚未設定推送目標。',
+    "err.push.companion_not_found": '這台電腦上找不到可接手的 ZeppBridge Cloud 設定（必須有站台網址，且憑證管理員裡有它的上傳金鑰）。',
+    "err.push.state_unwritable": '無法在資料資料夾裡寫入推送記錄（push/ 資料夾）。請檢查資料資料夾的寫入權限。',
+    "err.push.no_local_data": '本機還沒有資料庫，沒有可推送的資料。請先同步一次。',
+    "err.push.local_data_unavailable": '本機資料庫暫時無法讀取，這一輪沒有推送，下次同步後會再重試。',
+    "err.push.coordinates_found": '要推送的內容裡出現了座標，這一輪已停止推送。軌跡預設不推送；請把這個問題回報給作者。',
+    "err.push.upload_failed": '推送到你的站台沒有成功，這一輪沒傳完的部分下次同步後會重試。',
     "err.headless.token_not_in_store": '帳號資訊在，但憑證裡沒有對應的權杖。資料庫能跨機器複製，權杖不能——' + '它在原本那台機器的憑證管理員裡。請重新登入一次。',
     "err.import.not_recognized": '這份檔案不是所選來源的匯出，換一種來源再試',
     "err.import.read": '讀取不了這份檔案，確認它沒被其他程式占用',
@@ -1137,6 +1156,7 @@ export default {
       spanFrom: '再點選終點那張',
       tipDays: '點一張牌翻過來，再點勾選放進收集箱；也可以直接拖進箱子，或拖到另一張上疊成一疊、長按整疊放進去。點空白處收牌。',
       weekRange: (start: string, end: string) => `${start}–${end}`,
+      workoutCount: (count: number) => `${count} 次`,
       yearTop: '全年',
     },
     'components/coachNotes/coachNotes': {
@@ -2618,7 +2638,7 @@ export default {
       intro: '記錄這段時間發生的事，讓健康資料更有背景脈絡。',
       invalid: '需要標題與有效日期，結束日期不能早於開始日期。',
       loading: '正在讀取生活事件…',
-      local: '僅儲存於本機，隨資料庫備份；提供給 AI 時可勾選附帶。',
+      local: '只存本機，隨備份帶走。紀元會自動交給 AI；連線的本機 AI 也能讀取和新增，所有變更都能復原。',
       manage: '管理生活事件',
       name: '標題',
       noMatch: '沒有符合條件的事件。',
@@ -3814,6 +3834,7 @@ export default {
       verifyFailed: '驗證未完成',
     },
     'lib/deviceName': {
+      fused: '融合來源',
       undetermined: '裝置未確定',
     },
     'views/SleepDetail': {
@@ -4135,7 +4156,7 @@ export default {
       sumDataLoading: '正在讀取資料能力…',
       sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
       sumFeedback: '裝置未識別、資料有誤？傳送一份去識別化報告給我們',
-      sumPrivacy: '資料僅儲存在本機，不進行上傳',
+      sumPrivacy: '預設只存本機，不上傳',
       sumSyncOff: '自動同步已關閉',
       sumSyncOn: (minutes: number) => `自動同步 · 每 ${minutes} 分鐘`,
       themeDark: '深色',
@@ -4401,8 +4422,82 @@ export default {
       apiOff: '已關閉',
       apiOn: (url: string) => `已開啟 · ${url}`,
       apiOpen: '前往設定',
-      lead: '資料僅儲存在此電腦上，不進行上傳或統計',
+      lead: '預設只留在這台電腦上，不統計；只會推送到你自己設定的站台',
       learnMore: '瞭解更多',
+    },
+    'views/settings/sections/push': {
+      aiPrompt: (language: string) => `你是我電腦上的助手。我在使用 ZeppBridge（把 Zepp / Amazfit 健康資料保存在本機的應用程式），想讓它每次同步後將資料加密推送到我自己的網站，讓手機和 Personal Agent 讀取。請一步一步帶我把站台架設好。
+
+請這樣做：
+- 每一步先用一兩句話說明要做什麼，等我說「好」再動手；需要我登入、付款或點選確認的地方請停下來，讓我自己來。
+- 用${language}和我說話，我不是程式設計師，請少用術語。
+
+要達成的結果：
+1. 用 ZeppBridge Cloud 的站台範本（ZeppBridge-Cloud 儲存庫裡的 worker/ 資料夾，是一個 Cloudflare Worker）部署一個站台，網址是 https://health.<我的網域>。這需要一個 Cloudflare 帳號和一個放在 Cloudflare 上的網域；如果我沒有，先告訴我怎麼註冊、大概花多少錢。
+2. 在 ZeppBridge-Cloud 資料夾裡執行 node uploader/keys.mjs init。它會輸出一行 JSON，裡面有 tenant、dk、writeKey、readKey。
+3. 最後只給我兩樣東西，原樣貼出來，方便我複製進 ZeppBridge：
+   - 站台網址（health.<我的網域>）
+   - 連線碼：上一步那行完整的 JSON
+   另外單獨告訴我 readKey 是唯讀金鑰，以後給手機或 Personal Agent 讀資料用。
+
+注意：
+- 連線碼和金鑰等於密碼：不要寫進任何檔案、不要提交到 GitHub、不要傳給別人。
+- 不要更動 ZeppBridge 自己的檔案和資料庫。
+- 如果找不到 ZeppBridge Cloud 的站台範本，請直接告訴我，不要自己另寫一個替代品——加密格式必須和 ZeppBridge 一致。`,
+      askNeeds: '需準備：一個 Cloudflare 帳號、一個自己的網域，大約 20 分鐘。',
+      askSub: '複製這段話，貼給 Claude Code、Codex 這類能操作電腦的 AI。它會一步步帶你做，最後交給你站台網址和連線碼，回到這裡填上。',
+      askTitle: '讓本機 AI 帶你架一個',
+      cancel: '取消',
+      change: '更換站台或連線碼',
+      codeHint: '架站台時拿到的那一行，整段貼進來。會存進系統憑證存放區，之後不再顯示。',
+      codeKeep: '留空就會繼續使用已儲存的連線碼',
+      codeLabel: '連線碼',
+      codePlaceholder: '{"tenant": "…", "dk": "…", "writeKey": "zbw_…"}',
+      companionDone: '已接手，正在推送第一輪…',
+      companionGo: '一鍵接手',
+      companionTitle: '這台電腦裝過 ZeppBridge Cloud',
+      copied: '已複製，去貼給你的 AI',
+      copyFailed: '無法複製，請手動選取下方的文字',
+      copyPrompt: '複製給 AI 的話',
+      copyTasks: '複製刪除指令',
+      enabled: '同步後自動推送',
+      enabledSub: '關閉就會暫停，設定都會保留',
+      failed: '沒有成功，再試一次',
+      fill: '去填寫',
+      flowComputer: '這台電腦',
+      flowLock: '加密',
+      flowReader: '手機 / AI',
+      flowSite: '你的站台',
+      haveSite: '我已經有站台',
+      lastFailed: (when: string) => `${when} 推送失敗`,
+      lastLocked: (when: string) => `${when} 上一輪還沒結束，這次略過`,
+      lastOk: (when: string, count: number) => `${when} 推送了 ${count} 項`,
+      lastUnchanged: (when: string) => `${when} 檢查過，沒有新內容`,
+      lead: '每次同步完，把資料加密後送到你自己的網站，給 Muse、Hark 這類 Personal Agent 和手機隨時讀取。站台上只有密文，不會傳給 ZeppBridge 或任何其他人。',
+      never: '還沒推送過',
+      noSite: '還沒有站台',
+      pathsTitle: '如何開始',
+      promptLanguage: '繁體中文',
+      pushNow: '立即推送',
+      pushing: '正在推送…',
+      remove: '移除',
+      removeConfirm: '再點一次確認移除（站台上的資料不會刪除）',
+      removed: '已移除',
+      save: '儲存並推送一次',
+      saved: '已儲存',
+      saving: '正在儲存…',
+      secTitle: '推送到你自己的站台',
+      showPrompt: '看看這段話',
+      siteHint: '只填網域會自動補成 https://health.你的網域',
+      siteLabel: '站台網址',
+      sitePlaceholder: 'example.com',
+      statusBroken: '推送設定讀取失敗',
+      statusNoKey: '缺少連線碼，無法推送',
+      statusOff: '已暫停',
+      statusOn: '已開啟',
+      tasksCopied: '已複製，貼進 PowerShell 執行',
+      tasksSub: '現在由 ZeppBridge 自己推送，那兩個排程工作再執行就會重複上傳。複製指令，貼進 PowerShell 執行就能刪掉。',
+      tasksTitle: 'ZeppBridge Cloud 的排程工作還在',
     },
     'views/settings/sections/sync': {
       autoSub: '應用程式開啟時按此間隔擷取新資料',

@@ -1132,7 +1132,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'lib/lifeEvents': {
       title: 'Événements de vie',
       intro: 'Notez ce qui s’est passé pour donner du contexte à vos données de santé.',
-      local: 'Stockés uniquement en local et inclus dans la sauvegarde de la base ; cochables lors d’une remise à l’IA.',
       epoch: 'Définir comme ère',
       epochHint: 'Nommez cette période : tous les graphiques de tendances reçoivent un arrière-plan teinté, et l’IA le voit aussi.',
       epochBadge: 'Ère',
@@ -1182,6 +1181,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       today: "Aujourd’hui",
       yesterday: "Hier",
       sameAsStart: "Même date que le début",
+      local: 'Stockés sur cet ordinateur et inclus dans les sauvegardes. Les ères sont transmises automatiquement à l’IA ; une IA locale connectée peut aussi lire et ajouter des événements, et chaque modification est annulable.',
     },
 
     'lib/metricSeries': {
@@ -2084,6 +2084,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
 
     'lib/deviceName': {
       undetermined: 'Appareil indéterminé',
+      fused: 'Sources combinées',
     },
     'views/SleepDetail': {
       title: 'Enregistrement de sommeil',
@@ -2665,7 +2666,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       sumDataLoading: 'Lecture des capacités…',
       sumAi: (format: string) => `Accès MCP · export par défaut ${format}`,
       sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale} %`,
-      sumPrivacy: 'Données stockées uniquement sur cette machine',
+      sumPrivacy: 'Reste sur cet ordinateur par défaut',
       sumAdvanced: "Sauvegarde et restauration · API locale · santé des données",
       autoSyncToggle: 'Synchro automatique',
 
@@ -2967,6 +2968,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
     'components/cards/cards': {
       noWorkouts: 'Aucune séance sur cette période',
       recentWorkouts: 'Les 7 derniers jours',
+      workoutCount: (count: number) => plural(count, { one: `${count} séance`, other: `${count} séances` }),
       pick: 'Choisir des jours', pickTitle: (label: string) => `Choisir des jours à transmettre à l’IA · ${label}`,
       pickSubtitle: 'Choisir des jours à transmettre à l’IA', aroundDay: (date: string) => `Autour du ${date}`,
       pickedHere: (count: number) => `${count} jour(s) choisi(s)`,
@@ -3336,11 +3338,86 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
 
 
     'views/settings/sections/privacy': {
-      lead: 'Vos données restent sur cet ordinateur : aucun téléversement, aucune statistique d’utilisation',
+      lead: 'Reste sur cet ordinateur par défaut, sans statistiques d’utilisation ; n’est envoyé que vers un site que vous avez configuré',
       learnMore: 'En savoir plus',
       apiOn: (url: string) => `Activée · ${url}`,
       apiOff: 'Désactivée',
       apiOpen: 'Configurer',
+    },
+
+    'views/settings/sections/push': {
+      secTitle: 'Envoyer vers votre propre site',
+      lead: 'Après chaque synchronisation, vos données sont chiffrées et envoyées vers votre propre site web afin que des Personal Agents comme Muse ou Hark — ainsi que votre téléphone — puissent les lire à tout moment. Le site ne contient que du texte chiffré ; rien n’est envoyé à ZeppBridge ni à qui que ce soit d’autre.',
+      flowComputer: 'Cet ordinateur',
+      flowLock: 'Chiffrer',
+      flowSite: 'Votre site',
+      flowReader: 'Téléphone / IA',
+      companionTitle: 'ZeppBridge Cloud est configuré sur cet ordinateur',
+      companionGo: 'Reprendre',
+      companionDone: 'Repris. Envoi de la première vague…',
+      pathsTitle: 'Pour commencer',
+      haveSite: 'J’ai déjà un site',
+      fill: 'Saisir',
+      noSite: 'Je n’ai pas encore de site',
+      siteLabel: 'Adresse du site',
+      sitePlaceholder: 'example.com',
+      siteHint: 'Un simple nom de domaine devient https://health.votre-domaine',
+      codeLabel: 'Code de connexion',
+      codePlaceholder: '{"tenant": "…", "dk": "…", "writeKey": "zbw_…"}',
+      codeHint: 'La ligne unique reçue lors de la création du site. Collez-la en entier. Elle est enregistrée dans le coffre d’identifiants du système et ne sera plus affichée.',
+      codeKeep: 'Laissez vide pour conserver le code déjà enregistré',
+      save: 'Enregistrer et envoyer',
+      saving: 'Enregistrement…',
+      saved: 'Enregistré',
+      cancel: 'Annuler',
+      askTitle: 'Laissez votre IA locale le configurer',
+      askSub: 'Copiez ce message et collez-le dans une IA capable d’utiliser votre ordinateur, comme Claude Code ou Codex. Elle vous guidera étape par étape et vous donnera à la fin l’adresse du site et le code de connexion à saisir ici.',
+      askNeeds: 'Il vous faut un compte Cloudflare et votre propre nom de domaine. Environ 20 minutes.',
+      copyPrompt: 'Copier pour l’IA',
+      copied: 'Copié. Collez-le dans votre IA',
+      copyFailed: 'Échec de la copie. Sélectionnez le texte ci-dessous manuellement',
+      showPrompt: 'Lire le message',
+      aiPrompt: (language: string) => `Tu es l’assistant sur mon ordinateur. J’utilise ZeppBridge (une application qui garde mes données de santé Zepp / Amazfit sur cet ordinateur) et je veux qu’elle envoie ces données, chiffrées, vers mon propre site web après chaque synchronisation, afin que mon téléphone et mon Personal Agent puissent les lire. Guide-moi étape par étape pour mettre le site en place.
+
+Comment travailler avec moi :
+- Avant chaque étape, explique en une ou deux phrases ce que tu vas faire et attends mon accord. Arrête-toi chaque fois que je dois me connecter, payer ou confirmer quelque chose, et laisse-moi le faire moi-même.
+- Parle-moi en ${language}. Je ne suis pas programmeur, évite donc le jargon autant que possible.
+
+Ce que nous devons obtenir :
+1. Un site déployé à partir du modèle de site ZeppBridge Cloud (le dossier worker/ du dépôt ZeppBridge-Cloud, un Cloudflare Worker) à l’adresse https://health.<mon domaine>. Cela nécessite un compte Cloudflare et un domaine sur Cloudflare ; si je n’ai ni l’un ni l’autre, explique-moi d’abord comment m’inscrire et combien cela coûte environ.
+2. Exécuter node uploader/keys.mjs init dans le dossier ZeppBridge-Cloud. Cela affiche une ligne JSON contenant tenant, dk, writeKey et readKey.
+3. À la fin, donne-moi exactement deux éléments, collés tels quels pour que je puisse les copier dans ZeppBridge :
+   - l’adresse du site (health.<mon domaine>)
+   - le code de connexion : toute la ligne JSON de l’étape 2
+   Séparément, précise-moi que readKey est une clé en lecture seule que je pourrai ensuite donner à mon téléphone ou à mon Personal Agent.
+
+Règles :
+- Le code de connexion et les clés sont des mots de passe : ne les écris jamais dans des fichiers, ne les publie jamais sur GitHub et ne les envoie à personne.
+- Ne modifie aucun des fichiers propres à ZeppBridge ni sa base de données.
+- Si tu ne trouves pas le modèle de site ZeppBridge Cloud, dis-le-moi. N’écris pas de solution de remplacement toi-même : le format de chiffrement doit correspondre exactement à ZeppBridge.`,
+      promptLanguage: 'Français',
+      enabled: 'Envoyer après chaque synchro',
+      enabledSub: 'Désactivez pour mettre en pause ; vos réglages restent',
+      statusOn: 'Activé',
+      statusOff: 'En pause',
+      statusNoKey: 'Code de connexion manquant, impossible d’envoyer',
+      statusBroken: 'Impossible de lire les réglages d’envoi',
+      never: 'Pas encore envoyé',
+      lastOk: (when: string, count: number) => plural(count, { one: `${when} : ${count} élément envoyé`, other: `${when} : ${count} éléments envoyés` }),
+      lastUnchanged: (when: string) => `${when} : vérifié, rien de nouveau`,
+      lastLocked: (when: string) => `${when} : le cycle précédent était encore en cours, ignoré`,
+      lastFailed: (when: string) => `${when} : échec de l’envoi`,
+      pushNow: 'Envoyer',
+      pushing: 'Envoi…',
+      change: 'Changer site / code',
+      remove: 'Retirer',
+      removeConfirm: 'Cliquer encore pour retirer (les données du site restent)',
+      removed: 'Retiré',
+      tasksTitle: 'Les tâches planifiées de ZeppBridge Cloud sont encore là',
+      tasksSub: 'ZeppBridge envoie désormais lui-même ; ces deux tâches planifiées ne feraient que renvoyer tout en double. Copiez la commande et exécutez-la dans PowerShell pour les supprimer.',
+      copyTasks: 'Copier la commande de suppression',
+      tasksCopied: 'Copié. Exécutez-la dans PowerShell',
+      failed: 'Cela n’a pas fonctionné. Réessayez',
     },
 
     'views/settings/sections/advanced': {
@@ -4347,6 +4424,46 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       'Cette base est plus ancienne que la version qui la lit, et une connexion en lecture seule ne peut pas ' +
       'la mettre à niveau. Lancez une fois l’application de bureau, ou exécutez zeppbridge-cli reprocess sur une ' +
       'machine sans interface. Les deux font une sauvegarde avant la mise à niveau.',
+    'err.headless.program_outdated':
+      'L’outil CLI / MCP qui lit la base de données est plus ancien que l’application de bureau et ne peut pas lire cette version de la base. ' +
+      'En général, un outil IA pointe encore vers une ancienne copie : reconnectez cet outil dans les Paramètres ' +
+      '(pour Claude Desktop, générez et installez à nouveau ZeppBridge.mcpb), supprimez l’ancienne extension ou toute entrée pointant vers un ancien dossier d’installation, puis redémarrez l’outil IA.',
+    'err.push.config_unreadable':
+      'Impossible de lire la configuration des cibles d’envoi (push/targets.json dans le dossier de données). Vérifiez les permissions du fichier et réessayez.',
+    'err.push.config_invalid':
+      'La configuration des cibles d’envoi est mal formée : les identifiants de cible n’acceptent que des lettres minuscules, des chiffres et des traits d’union, doivent être uniques, et la durée de conservation doit être comprise entre 1 et 365 jours.',
+    'err.push.config_has_secret':
+      'La configuration des cibles d’envoi contient un champ secret. Les secrets doivent être enregistrés dans le magasin d’identifiants, pas dans le fichier ; supprimez ce champ et saisissez à nouveau le secret.',
+    'err.push.credential_store_unnamed':
+      'Le magasin d’identifiants actuel (mode variable d’environnement) ne peut contenir qu’un seul jeton et ne peut pas stocker les secrets des cibles d’envoi. Utilisez le magasin d’identifiants du système ou ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'Impossible de lire ou d’enregistrer le secret de la cible d’envoi dans le magasin d’identifiants. Vérifiez qu’il est déverrouillé et autorisé par la stratégie système.',
+    'err.push.secrets_missing':
+      'Le magasin d’identifiants ne contient aucun secret complet pour cette cible d’envoi. Saisissez à nouveau le secret.',
+    'err.push.pa_write_key_malformed':
+      'La clé d’écriture est mal formée. Copiez à nouveau la clé d’écriture complète depuis votre site.',
+    'err.push.pa_tenant_mismatch':
+      'La clé d’écriture ne correspond pas à l’identifiant du site : elle appartient à un autre site.',
+    'err.push.pa_data_key_malformed':
+      'La clé de données est mal formée (elle doit faire 32 octets). Copiez à nouveau la clé de données complète depuis votre site.',
+    'err.push.site_invalid':
+      'L’adresse d’envoi est inutilisable : il doit s’agir d’une adresse https avec un nom de domaine, pas d’une adresse IP, et elle ne doit contenir ni nom d’utilisateur, ni mot de passe, ni ? ni #.',
+    'err.push.connection_code_invalid':
+      'Ce code de connexion semble incorrect. Collez le code complet ; il doit contenir à la fois dk et writeKey.',
+    'err.push.not_configured':
+      'Aucune destination d’envoi n’est encore configurée.',
+    'err.push.companion_not_found':
+      'Aucune configuration ZeppBridge Cloud à reprendre n’a été trouvée sur cet ordinateur (elle nécessite une adresse de site et sa clé d’envoi dans le Gestionnaire d’identifiants).',
+    'err.push.state_unwritable':
+      'Impossible d’écrire les enregistrements d’envoi dans le dossier de données (push/). Vérifiez que le dossier de données est accessible en écriture.',
+    'err.push.no_local_data':
+      'Aucune base de données locale n’existe encore : il n’y a rien à envoyer. Synchronisez d’abord.',
+    'err.push.local_data_unavailable':
+      'Impossible de lire la base de données locale pour l’instant. Rien n’a été envoyé lors de ce cycle ; une nouvelle tentative aura lieu après la prochaine synchronisation.',
+    'err.push.coordinates_found':
+      'Des coordonnées sont apparues dans le contenu à envoyer ; ce cycle a donc été interrompu. Les tracés ne sont jamais envoyés par défaut : veuillez signaler ce problème à l’auteur.',
+    'err.push.upload_failed':
+      'L’envoi vers votre site n’a pas abouti. Ce qui n’a pas été transmis sera réessayé après la prochaine synchronisation.',
     'err.headless.token_not_in_store':
       'Le compte est là mais le magasin d’identifiants n’a pas le jeton correspondant. Une ' +
       'base se copie entre machines ; un jeton non — il reste dans le magasin d’identifiants ' +

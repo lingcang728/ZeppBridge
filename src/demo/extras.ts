@@ -9,6 +9,7 @@
 import type { DemoData } from './dataset';
 import type { DemoHandler } from './operations';
 import { demoStrengthCatalog } from './strength';
+import { createDemoPush } from './push';
 import { demoText } from './texts';
 import { at, dayKey, iso } from './rng';
 import { letterVersions } from '../services/letters';
@@ -181,5 +182,6 @@ export const createDemoExtras = (data: DemoData): Record<string, DemoHandler> =>
       return { state: cloudCopy(), output };
     },
     cloud_companion_open: () => null,
+    ...createDemoPush(),
   };
 };

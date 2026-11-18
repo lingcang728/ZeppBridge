@@ -200,26 +200,34 @@ injection, no automatic sign-in and no automatic submission. The account,
 network, retention and privacy policy of the external AI site are yours to
 confirm; seeing the page in a preview does not mean anything was submitted.
 
-## The optional cloud component (Beta lab)
+## Push to your own site
 
-ZeppBridge itself never uploads health data. Pushing a copy to your own site —
-for cloud AIs that cannot read files on this computer — is done by a separately
-installed component (ZeppBridge-Cloud, Windows only) that calls the bundled
-`zeppbridge-cli`. Nothing about it appears in the app unless you turn on
-"Cloud push" in Settings › Beta lab; while that switch is off the app does not
-even look for the component.
+No health data is uploaded by default. Only after you yourself enter your own
+site address and connection code under Settings › Data › Push to your own site
+(or take over an existing ZeppBridge Cloud setup on this computer with one
+click) does ZeppBridge send data, encrypted, to that address after each sync —
+and never to ZeppBridge or any third party. With no enabled push destination the
+push code reads nothing from the database and sends no request.
 
-With the switch on, the app does three things and no more: it reads the
-component's own state files (`config.json`, `last-run.json`, the names and dates
-in `readers.json`, and whether its two scheduled tasks exist); it edits
-`config.json`, which holds no keys, validating every field first and leaving
-fields it does not know untouched; and it starts the component's own scripts
-(`run.ps1`, `setup.ps1`) without a window. Upload and read-only keys stay in
-Windows Credential Manager, where the component put them. A read-only key you
-ask for goes from the component straight to the clipboard; the app never reads
-it, and key hashes are not passed to the interface. The commands that register
-the scheduled tasks are copied for you to read and run yourself — the app does
-not register tasks.
+- **Only to the address you entered**: https only, redirects are not followed;
+  no user name or password, `?` or `#` in the address, and no bare IP.
+- **The site only holds ciphertext**: every object is gzipped and then encrypted
+  with your data key (AES-GCM), so the site itself cannot read it. Your phone or
+  Personal Agent reads it with a separate read-only key you hand out.
+- **No GPS**: a hard check before sending aborts the whole round if any
+  coordinate field is found.
+- **Keys live only in the system credential store** (account `push:<target>`);
+  a key-looking field in `data/push/targets.json` is rejected. The interface
+  only knows whether a connection code is saved and never shows it again.
+- **Logs and results record counts, byte sizes and error codes only** — no data,
+  no credentials from the address, no keys.
+- "Remove" deletes the settings, the keys and the push records. Data already on
+  your site stays there; delete it on the site's side. Uninstalling with "delete
+  app data" also deletes the push keys.
+- Taking over from the ZeppBridge Cloud component only reads its `config.json`
+  and its upload key from Credential Manager; nothing of the component is changed
+  or deleted. While its scheduled tasks still exist the interface suggests
+  removing them so the data is not uploaded twice.
 
 ## Voluntary problem reports
 
@@ -317,6 +325,8 @@ crash reporting. Syncing, credential verification, web sign-in, update checks an
 the reports and letters you explicitly send do produce network traffic. The
 destinations are limited to:
 
+- the site you set up under "Push to your own site" (only after you add and
+  enable it; the content is encrypted);
 - the Zepp region service you configured, after host validation;
 - the official Zepp / Huami pages the sign-in window visits;
 - `zeppbridge.com` (or `zeppbridge.pages.dev`): voluntary problem reports,

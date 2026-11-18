@@ -14,6 +14,7 @@ mod login;
 mod mcp_writes;
 mod my_records;
 mod official;
+mod push;
 mod status;
 mod sync;
 mod system;
@@ -250,6 +251,9 @@ pub(crate) use my_records::export_my_records;
 pub(crate) use official::{
     cancel_official_login, check_official_login_now, disconnect_official, get_official_status,
     recover_official_credentials, start_official_login,
+};
+pub(crate) use push::{
+    push_import_companion, push_remove, push_run, push_save, push_set_enabled, push_state,
 };
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{

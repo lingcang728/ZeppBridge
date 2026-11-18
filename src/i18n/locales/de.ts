@@ -33,6 +33,43 @@ export default {
       'Auf diesem Rechner ist kein systemseitiger Anmeldespeicher verfügbar (GNOME Keyring / KWallet). Headless-Server und Container haben meist keinen. Setze ZEPPBRIDGE_CREDENTIAL_STORE=file, um das Token mit 0600 ins Datenverzeichnis zu schreiben, oder ZEPPBRIDGE_CREDENTIAL_STORE=env zusammen mit ZEPPBRIDGE_APP_TOKEN.',
     'err.headless.schema_upgrade':
       'Diese Datenbank ist älter als der Build, der sie liest, und eine Nur-Lesen-Verbindung kann sie nicht aktualisieren. Starte einmal die Desktop-App oder führe auf einem Headless-Rechner zeppbridge-cli reprocess aus. Beide legen vor dem Upgrade ein Backup an.',
+    'err.headless.program_outdated':
+      'Das CLI-/MCP-Programm, das die Datenbank liest, ist älter als die Desktop-App und kann diese Datenbankversion nicht lesen. Meist verweist ein KI-Werkzeug noch auf eine alte Kopie: Verbinde dieses Werkzeug in den Einstellungen neu (erzeuge und installiere für Claude Desktop ZeppBridge.mcpb erneut), entferne die alte Erweiterung oder jeden Eintrag, der auf einen alten Installationsordner verweist, und starte das KI-Werkzeug anschließend neu.',
+    'err.push.config_unreadable':
+      'Die Konfiguration der Push-Ziele (push/targets.json im Datenordner) konnte nicht gelesen werden. Prüfe die Dateiberechtigungen und versuche es erneut.',
+    'err.push.config_invalid':
+      'Die Konfiguration der Push-Ziele ist fehlerhaft: Ziel-IDs dürfen nur Kleinbuchstaben, Ziffern und Bindestriche enthalten und müssen eindeutig sein, und die Aufbewahrungsdauer muss zwischen 1 und 365 Tagen liegen.',
+    'err.push.config_has_secret':
+      'Die Konfiguration der Push-Ziele enthält ein Feld für einen geheimen Schlüssel. Geheime Schlüssel gehören in den Anmeldespeicher, nicht in die Datei; entferne dieses Feld und gib den Schlüssel erneut ein.',
+    'err.push.credential_store_unnamed':
+      'Der aktuelle Anmeldespeicher (Umgebungsvariablen-Modus) fasst nur ein einzelnes Token und kann keine geheimen Schlüssel für Push-Ziele speichern. Nutze den System-Anmeldespeicher oder ZEPPBRIDGE_CREDENTIAL_STORE=file.',
+    'err.push.credential_store_failed':
+      'Der geheime Schlüssel des Push-Ziels konnte nicht aus dem Anmeldespeicher gelesen oder dorthin geschrieben werden. Prüfe, ob er entsperrt und durch Systemrichtlinien zugelassen ist.',
+    'err.push.secrets_missing':
+      'Im Anmeldespeicher ist kein vollständiger geheimer Schlüssel für dieses Push-Ziel vorhanden. Gib den Schlüssel erneut ein.',
+    'err.push.pa_write_key_malformed':
+      'Der Schreibschlüssel hat ein ungültiges Format. Kopiere den vollständigen Schreibschlüssel erneut von deiner Website.',
+    'err.push.pa_tenant_mismatch':
+      'Der Schreibschlüssel passt nicht zur Website-ID: Er gehört zu einer anderen Website.',
+    'err.push.pa_data_key_malformed':
+      'Der Datenschlüssel hat ein ungültiges Format (er muss 32 Byte lang sein). Kopiere den vollständigen Datenschlüssel erneut von deiner Website.',
+    'err.push.site_invalid':
+      'Die Push-Adresse kann nicht verwendet werden: Sie muss eine https-Adresse mit Domainnamen sein, keine IP-Adresse, und darf weder Benutzername, Passwort, ? noch # enthalten.',
+    'err.push.connection_code_invalid':
+      'Ungültiger Verbindungscode: Füge den vollständigen Verbindungscode ein – er muss sowohl dk als auch writeKey enthalten.',
+    'err.push.not_configured': 'Es wurde noch kein Push-Ziel eingerichtet.',
+    'err.push.companion_not_found':
+      'Auf diesem Rechner wurden keine übernehmbaren ZeppBridge Cloud-Einstellungen gefunden (erforderlich sind eine Website-Adresse und der zugehörige Upload-Schlüssel in der Anmeldeinformationsverwaltung).',
+    'err.push.state_unwritable':
+      'Push-Einträge konnten nicht in den Datenordner (push/) geschrieben werden. Prüfe, ob der Datenordner beschreibbar ist.',
+    'err.push.no_local_data':
+      'Es gibt noch keine lokale Datenbank, daher gibt es nichts zum Pushen. Synchronisiere zuerst einmal.',
+    'err.push.local_data_unavailable':
+      'Die lokale Datenbank konnte gerade nicht gelesen werden. In diesem Durchgang wurde nichts gepusht; nach der nächsten Synchronisierung wird es erneut versucht.',
+    'err.push.coordinates_found':
+      'In den zu pushenden Inhalten sind Koordinaten aufgetaucht, daher wurde dieser Durchgang gestoppt. Routen werden standardmäßig nie gepusht; bitte melde dies dem Autor.',
+    'err.push.upload_failed':
+      'Der Push an deine Website ist nicht vollständig durchgelaufen. Was nicht übertragen wurde, wird nach der nächsten Synchronisierung erneut versucht.',
     'err.headless.token_not_in_store':
       'Kontodaten sind da, aber im Anmeldespeicher fehlt das Token. Eine Datenbank lässt sich zwischen Rechnern kopieren, ein Token nicht – es liegt im Anmeldespeicher des ursprünglichen Rechners. Einmal neu anmelden.',
     'err.core.credential_store':
@@ -1791,7 +1828,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         'Titel und gültige Daten angeben. Das Enddatum darf nicht vor dem Startdatum liegen.',
       loading: 'Lebensereignisse werden geladen…',
       local:
-        'Lokal gespeichert und in Backups enthalten. Kann bei der KI-Übergabe einbezogen werden.',
+        'Nur auf diesem Rechner gespeichert und in Backups enthalten. Epochen werden automatisch an die KI übergeben; eine verbundene lokale KI kann Ereignisse ebenfalls lesen und hinzufügen, und jede Änderung lässt sich rückgängig machen.',
       epoch: 'Als Epoche markieren',
       epochHint: 'Gib dieser Zeitspanne einen Namen: Alle Trenddiagramme erhalten eine Hintergrundfarbe, und die KI sieht es auch.',
       epochBadge: 'Epoche',
@@ -2569,6 +2606,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'lib/deviceName': {
       undetermined: 'Gerät unbestimmt',
+      fused: 'Kombinierte Quellen',
     },
     'views/SleepDetail': {
       askLabel: 'Schlaf',
@@ -3519,7 +3557,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       sumAi: (format: string) => `MCP-Zugriff · Standard-Export ${format}`,
       sumDisplay: (language: string, unit: string, scale: number) =>
         `${language} · ${unit} · ${scale} %`,
-      sumPrivacy: 'Deine Daten bleiben auf diesem Rechner',
+      sumPrivacy: 'Bleibt standardmäßig auf diesem Rechner',
       sumFeedback:
         'Gerät nicht erkannt oder Daten fehlerhaft? Sende uns einen anonymisierten Bericht',
       sumSyncOff: 'Automatische Synchronisierung ist aus',
@@ -3837,6 +3875,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       rangeAria: 'Zeitraum des Kartentischs',
       picked: 'Für die KI', noRecord: 'Keine Aufzeichnung', recorded: 'Aufgezeichnet',
       recordedOf: (recorded: number, total: number) => recorded + ' von ' + total + ' Tagen mit Aufzeichnung',
+      workoutCount: (count: number) => plural(count, { one: `${count} Training`, other: `${count} Trainings` }),
       average: (value: string) => 'Ø ' + value, pickedOf: (picked: number, total: number) => picked + '/' + total + ' ausgewählt',
       holdToPick: 'Gedrückt halten, um den ganzen Stapel in die Box zu legen', holdToUnpick: 'Gedrückt halten, um den ganzen Stapel herauszunehmen',
       holdPile: 'Halten',
@@ -4371,11 +4410,86 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       failed: 'Das hat nicht geklappt',
     },
     'views/settings/sections/privacy': {
-      lead: 'Deine Daten bleiben auf diesem Rechner: kein Hochladen, keine Nutzungsstatistiken',
+      lead: 'Bleibt standardmäßig auf diesem Rechner, ohne Nutzungsstatistiken; Daten gehen nur an eine Website, die du selbst eingerichtet hast',
       learnMore: 'Mehr erfahren',
       apiOn: (url: string) => `Aktiviert · ${url}`,
       apiOff: 'Deaktiviert',
       apiOpen: 'Einstellungen',
+    },
+    'views/settings/sections/push': {
+      secTitle: 'An eigene Website pushen',
+      lead: 'Nach jeder Synchronisierung werden deine Daten verschlüsselt an deine eigene Website gesendet, sodass Personal Agents wie Muse und Hark – und dein Smartphone – sie jederzeit lesen können. Auf der Website liegen immer nur verschlüsselte Daten; nichts geht an ZeppBridge oder Dritte.',
+      flowComputer: 'Dieser Rechner',
+      flowLock: 'Verschlüsseln',
+      flowSite: 'Deine Website',
+      flowReader: 'Handy / KI',
+      companionTitle: 'ZeppBridge Cloud ist auf diesem Rechner eingerichtet',
+      companionGo: 'Übernehmen',
+      companionDone: 'Übernommen. Erster Durchgang wird gesendet…',
+      pathsTitle: 'Erste Schritte',
+      haveSite: 'Ich habe bereits eine Website',
+      fill: 'Ausfüllen',
+      noSite: 'Ich habe noch keine Website',
+      siteLabel: 'Website-Adresse',
+      sitePlaceholder: 'example.com',
+      siteHint: 'Bei einer reinen Domain wird automatisch https://health.deine-domain ergänzt',
+      codeLabel: 'Verbindungscode',
+      codePlaceholder: '{"tenant": "…", "dk": "…", "writeKey": "zbw_…"}',
+      codeHint: 'Die Zeile, die du beim Einrichten der Website erhalten hast. Füge sie vollständig ein. Sie wird im System-Anmeldespeicher gesichert und danach nicht wieder angezeigt.',
+      codeKeep: 'Leer lassen, um den bereits gespeicherten Verbindungscode weiter zu verwenden',
+      save: 'Speichern & einmal pushen',
+      saving: 'Wird gespeichert…',
+      saved: 'Gespeichert',
+      cancel: 'Abbrechen',
+      askTitle: 'Von deiner lokalen KI einrichten lassen',
+      askSub: 'Kopiere diese Nachricht und füge sie in eine KI ein, die deinen Rechner bedienen kann, z. B. Claude Code oder Codex. Sie führt dich Schritt für Schritt durch die Einrichtung und gibt dir am Ende eine Website-Adresse und einen Verbindungscode zum Eintragen hier.',
+      askNeeds: 'Du brauchst ein Cloudflare-Konto und eine eigene Domain. Dauert etwa 20 Minuten.',
+      copyPrompt: 'KI-Text kopieren',
+      copied: 'Kopiert – füge es in deine KI ein',
+      copyFailed: 'Kopieren fehlgeschlagen. Markiere den Text unten von Hand',
+      showPrompt: 'Nachricht ansehen',
+      aiPrompt: (language: string) => `Du bist der Assistent auf meinem Rechner. Ich nutze ZeppBridge (eine App, die meine Zepp- / Amazfit-Gesundheitsdaten lokal auf diesem Rechner speichert) und möchte, dass sie diese Daten nach jeder Synchronisierung verschlüsselt an meine eigene Website pusht, damit mein Smartphone und mein Personal Agent sie lesen können. Bitte führe mich Schritt für Schritt durch die Einrichtung der Website.
+
+So arbeiten wir zusammen:
+- Erkläre vor jedem Schritt in ein bis zwei Sätzen, was du tun wirst, und warte auf mein Okay. Halte immer an, wenn ich mich anmelden, etwas bezahlen oder bestätigen muss, und lass mich das selbst erledigen.
+- Sprich mit mir auf ${language}. Ich bin kein Programmierer, halte Fachbegriffe also möglichst gering.
+
+Was am Ende stehen muss:
+1. Eine Website, die aus der ZeppBridge-Cloud-Vorlage (dem Ordner worker/ im Repository ZeppBridge-Cloud, ein Cloudflare Worker) unter https://health.<meine Domain> bereitgestellt wird. Dafür braucht man ein Cloudflare-Konto und eine Domain bei Cloudflare; falls ich beides nicht habe, erkläre mir zuerst, wie ich mich registriere und was es ungefähr kostet.
+2. Im Ordner ZeppBridge-Cloud den Befehl node uploader/keys.mjs init ausführen. Er gibt eine Zeile JSON mit tenant, dk, writeKey und readKey aus.
+3. Gib mir am Ende genau zwei Dinge unverändert zum Kopieren in ZeppBridge:
+   - die Website-Adresse (health.<meine Domain>)
+   - den Verbindungscode: die vollständige JSON-Zeile aus Schritt 2
+   Erkläre mir außerdem separat, dass readKey ein Nur-Lese-Schlüssel ist, den ich später meinem Smartphone oder Personal Agent geben kann.
+
+Regeln:
+- Der Verbindungscode und die Schlüssel sind Passwörter: niemals in Dateien schreiben, niemals zu GitHub committen und niemals an Dritte senden.
+- Ändere keine eigenen Dateien oder die Datenbank von ZeppBridge.
+- Falls du die Website-Vorlage von ZeppBridge Cloud nicht findest, sag es mir direkt. Schreibe keinen eigenen Ersatz: Das Verschlüsselungsformat muss exakt zu ZeppBridge passen.`,
+      promptLanguage: 'Deutsch',
+      enabled: 'Nach jeder Synchronisierung pushen',
+      enabledSub: 'Zum Pausieren ausschalten; deine Einstellungen bleiben erhalten',
+      statusOn: 'Aktiv',
+      statusOff: 'Pausiert',
+      statusNoKey: 'Verbindungscode fehlt – es kann nichts gesendet werden',
+      statusBroken: 'Push-Einstellungen nicht lesbar',
+      never: 'Noch nicht gepusht',
+      lastOk: (when: string, count: number) =>
+        `${when}: ${plural(count, { one: `${count} Element`, other: `${count} Elemente` })} gepusht`,
+      lastUnchanged: (when: string) => `${when}: geprüft, nichts Neues`,
+      lastLocked: (when: string) => `${when}: vorheriger Durchgang lief noch, übersprungen`,
+      lastFailed: (when: string) => `${when}: Push fehlgeschlagen`,
+      pushNow: 'Jetzt pushen',
+      pushing: 'Wird gepusht…',
+      change: 'Website/Code ändern',
+      remove: 'Entfernen',
+      removeConfirm: 'Erneut klicken (Daten bleiben)',
+      removed: 'Entfernt',
+      tasksTitle: 'Geplante Aufgaben von ZeppBridge Cloud sind noch vorhanden',
+      tasksSub: 'ZeppBridge pusht jetzt selbst, daher würden diese beiden geplanten Aufgaben alles nur ein zweites Mal hochladen. Kopiere den Befehl und führe ihn in PowerShell aus, um sie zu löschen.',
+      copyTasks: 'Löschbefehl kopieren',
+      tasksCopied: 'Kopiert – in PowerShell ausführen',
+      failed: 'Das hat nicht geklappt. Erneut versuchen',
     },
     'views/settings/sections/advanced': {
       secPrefs: 'Weitere Einstellungen',

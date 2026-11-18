@@ -1,0 +1,24 @@
+/* 设置 › 数据 ›「推送到你自己的站点」（PushSection.vue） */
+.push-flow { margin: 4px 0 12px; }
+.push-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.push-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); }
+.push-dot.ok { background: var(--accent); }
+.push-dot.warn { background: var(--danger); }
+.push-url { font-family: var(--font-mono); word-break: break-all; }
+.mono { font-family: var(--font-mono); }
+.push-form { display: grid; gap: 14px; }
+.push-field { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 4px; }
+.push-field > span { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.push-field small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
+.push-field textarea { resize: vertical; min-height: 4.5em; line-height: 1.5; }
+.push-ask { display: grid; gap: 8px; }
+.push-ask-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.push-ask-head > .s-row-main { flex: 1 1 18em; min-width: 0; }
+.push-more { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.push-more:hover { color: var(--ink); }
+.push-more:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; border-radius: 6px; }
+.push-chevron { transition: rotate var(--dur-std, .2s) ease; }
+.push-chevron.open { rotate: 90deg; }
+.push-prompt { margin: 0; max-height: 18em; overflow: auto; padding: 10px 12px; border-radius: 10px; background: var(--mat-inset); box-shadow: inset 0 0 0 1px var(--mat-line);
+  color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.push-note { margin-top: 8px; }
