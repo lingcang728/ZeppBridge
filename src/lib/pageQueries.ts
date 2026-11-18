@@ -3,7 +3,7 @@ import { rangeBounds } from './hourlySteps';
 import { SERIES_FETCH_DAYS } from './metricSeries';
 import { cached, DEVICE_READ_PREFIXES, peek, type Query } from './readCache';
 import { useTrendRange } from '../composables/useTrendRange';
-import { deviceImageFor } from './deviceCatalog';
+import { deviceImageFor } from './deviceImages';
 import { journalPageQueries } from './journalQueries';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
 import type {

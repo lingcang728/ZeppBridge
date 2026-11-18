@@ -2,7 +2,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { DEVICE_READ_PREFIXES, forgetReads } from '../lib/readCache';
-import { deviceImageFor } from '../lib/deviceCatalog';
+import { deviceImageFor } from '../lib/deviceImages';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
 import { messagesOf } from '../i18n';
 import { devicesMessages } from './useDevices.i18n';

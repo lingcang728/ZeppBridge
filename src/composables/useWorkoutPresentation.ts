@@ -8,7 +8,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { formatDistance, formatNumber, isFiniteNumber } from '../lib/format';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { elevationUnitLabel, paceAxisLabel, paceMinutesPerBigUnit, paceUnitLabel, toElevation } from '../lib/units';
-import { deviceImageFor } from '../lib/deviceCatalog';
+import { deviceImageFor } from '../lib/deviceImages';
 import { workoutTiming } from '../lib/workoutTiming';
 import { buildRouteCanvas } from '../lib/workoutRoute';
 import { lineOption, paceSeconds, sampleSeries, type ChartBand, type ChartDetail, type ChartPoint } from '../lib/workoutCharts';
