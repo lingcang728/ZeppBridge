@@ -10,6 +10,8 @@ export interface UpdateReceipt {
 
 const KEY = 'zeppbridge.update.receipt';
 const VERSION_KEY = 'zeppbridge.update.lastLaunchedVersion';
+/** 哪一版的说明已经点过「知道了」：收据要是没删掉（存储没写进去、窗口半路关了），也不再出第二次。 */
+const SEEN_KEY = 'zeppbridge.update.acknowledgedVersion';
 /** 随应用打包了更新说明的版本。发版时和下面 glob 里的目录一起改。 */
 export const BUNDLED_VERSION = '3.1.1';
 
@@ -54,7 +56,7 @@ export function prepareUpdateNotice(): void {
     if (FALLBACK_APP_VERSION === BUNDLED_VERSION && (legacyInstall
       || (previous && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(previous) && previous !== BUNDLED_VERSION))) {
       // 说明正文在显示时按界面语言从打包的文件里取，这里不必再带一份。
-      if (!storage.getItem(KEY)) rememberUpdate({ from: legacyInstall ? '' : previous!, version: BUNDLED_VERSION, notes: '' });
+      if (!storage.getItem(KEY) && storage.getItem(SEEN_KEY) !== BUNDLED_VERSION) rememberUpdate({ from: legacyInstall ? '' : previous!, version: BUNDLED_VERSION, notes: '' });
     }
     storage.setItem(VERSION_KEY, FALLBACK_APP_VERSION);
   } catch { /* Storage is optional; a fresh installation never gets upgrade notes. */ }
@@ -78,7 +80,8 @@ export function restoreUpdateNotice(currentVersion: string): void {
   try {
     const receipt = JSON.parse(window.localStorage.getItem(KEY) ?? 'null') as UpdateReceipt | null;
     if (receipt && typeof receipt.from === 'string' && typeof receipt.notes === 'string'
-      && receipt.version === currentVersion && receipt.from !== currentVersion) {
+      && receipt.version === currentVersion && receipt.from !== currentVersion
+      && window.localStorage.getItem(SEEN_KEY) !== receipt.version) {
       updateNotice.receipt = receipt;
     }
   } catch { /* Missing or damaged storage must not interrupt launch. */ }
@@ -89,8 +92,23 @@ export function pendingUpdateNotice(): boolean {
   try { return window.localStorage.getItem(KEY) !== null; } catch { return false; }
 }
 
+/**
+ * 一点「知道了」就先记下来，再放化灰 / 收信封的动画。以前要等动画放完才删收据：点完马上关窗口，
+ * 窗口进托盘、WebView 不再出帧，动画停在半路，之后从托盘退出或关机，收据就一直留着，
+ * 下次打开又弹一遍（11-18 来信「为什么每天都有更新说明要点一次」）。
+ */
+export function settleUpdate(): void {
+  try {
+    const storage = window.localStorage;
+    const version = updateNotice.receipt?.version
+      ?? (JSON.parse(storage.getItem(KEY) ?? 'null') as UpdateReceipt | null)?.version;
+    storage.removeItem(KEY);
+    if (version) storage.setItem(SEEN_KEY, version);
+  } catch { /* Close for this session. */ }
+}
+
 export function acknowledgeUpdate(): void {
-  try { window.localStorage.removeItem(KEY); } catch { /* Close for this session. */ }
+  settleUpdate();
   updateNotice.receipt = null;
 }
 

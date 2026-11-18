@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BUNDLED_VERSION, acknowledgeUpdate, bundledNoteLocales, emphasis, groupRows, leadsWithWhyHalfData, loadBundledNotes, notesForLocale,
-  prepareUpdateNotice, releaseRows, rememberUpdate, restoreUpdateNotice, updateNotice,
+  prepareUpdateNotice, releaseRows, rememberUpdate, restoreUpdateNotice, settleUpdate, updateNotice,
 } from '../updateNotice';
 import { LOCALES } from '../../i18n';
 import { FALLBACK_APP_VERSION } from '../../lib/appVersion';
@@ -37,6 +37,26 @@ describe('release notes after a successful restart', () => {
     acknowledgeUpdate();
     restoreUpdateNotice('3.0.1');
     expect(updateNotice.receipt).toBeNull();
+  });
+  it('stays closed once 知道了 was clicked even if the close animation never finished (window sent to tray)', () => {
+    rememberUpdate(receipt);
+    restoreUpdateNotice('3.0.1');
+    settleUpdate(); // click: the animation would run next, but the app quits from the tray before it ends
+    updateNotice.receipt = null; // next launch starts with nothing in memory
+    restoreUpdateNotice('3.0.1');
+    expect(updateNotice.receipt).toBeNull();
+  });
+  it('an acknowledged version is never offered again, even if a stale receipt or launch record comes back', () => {
+    rememberUpdate(receipt);
+    restoreUpdateNotice('3.0.1');
+    acknowledgeUpdate();
+    rememberUpdate(receipt);
+    restoreUpdateNotice('3.0.1');
+    expect(updateNotice.receipt).toBeNull();
+    // a later version still shows
+    rememberUpdate({ from: '3.0.1', version: '3.0.2', notes: '' });
+    restoreUpdateNotice('3.0.2');
+    expect(updateNotice.receipt?.version).toBe('3.0.2');
   });
   it('does not introduce an update dialog on a fresh installation or a same-version rebuild', () => {
     restoreUpdateNotice('3.0.1');

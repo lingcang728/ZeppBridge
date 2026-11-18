@@ -4,14 +4,14 @@
 
 `src/assets/devices/catalog.json` 由
 [`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
-生成并编进应用。共 64 条：63 条是 `active`/`supported`，覆盖 61 个标准型号键；
+生成并编进应用。共 66 条：65 条是 `active`/`supported`，覆盖 63 个标准型号键；
 Helio Armband 只为留存来源列出，标为 `status=accessory`、`supported=false`。里面的日期各指一件事：
 型号清单 2026 年 8 月最初按 Amazfit 日本官网整理，文件里的 `checked_at` 是最近一次整份核对，
 `deviceSource` 编号 2026-11-02 按 Zepp 官方对照表逐条核过。
 
 图片：52 个图片键（104 个 WebP，每键一张图和一张 `-thumb`）覆盖有图的条目。48 条用官网截图裁出的图，
 4 条用 Amazfit 官方 CDN 图，1 条（Amazfit Smart Scale）是官方图经 AI 辅助加了透明留白，
-另有 11 条（Balance 2 XT、Pace、Bip S、小米体脂秤 2 这类老型号或只在零售渠道卖的）还没有图，显示通用占位图。
+另有 13 条（Balance 2 XT、Pace、Bip S、初代 T-Rex、T-Rex Dual Solar、小米体脂秤 2 这类老型号或只在零售渠道卖的）还没有图，显示通用占位图。
 同一型号的配色共用一个键。
 
 来源编号维护在目录的 `device_source_codes`（其中来自官方表的另列在 `device_source_official`）

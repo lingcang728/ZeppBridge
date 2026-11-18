@@ -49,7 +49,8 @@ const props = withDefaults(defineProps<{
   /** 「你的信」里的信：同一只信封、同一套拆信，纸上画什么由 #sheet 插槽给。 */
   custom?: CustomLetter | null;
 }>(), { notes: null, opened: false, origin: null, custom: null });
-const emit = defineEmits<{ (event: 'done'): void }>();
+/* closing：一开始收就发（还没放动画），要落盘的事在这时做；done：动画放完。 */
+const emit = defineEmits<{ (event: 'closing'): void; (event: 'done'): void }>();
 const t = useLetterText();
 
 const authored = computed(() => (props.custom ? [] : props.versions));
@@ -360,6 +361,7 @@ const closing = ref(false);
 const acknowledge = async (event?: MouseEvent) => {
   if (closing.value) return;
   closing.value = true;
+  emit('closing');
   const button = event?.currentTarget as HTMLElement | undefined;
   const panel = button?.closest<HTMLElement>('[data-modal-dialog]');
   try {

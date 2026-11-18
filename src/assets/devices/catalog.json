@@ -9,8 +9,8 @@
     "https://docs.zepp.com/docs/reference/related-resources/device-list/"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 63,
-  "canonical_device_count": 61,
+  "active_supported_count": 65,
+  "canonical_device_count": 63,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -2499,6 +2499,64 @@
       "canonical_device_key": "mi-smart-band-4-nfc",
       "checked_at": "2026-11-02",
       "provenance": "Reported on 3.0.4 as an unidentified device bound to a Zepp account together with a body-composition scale. Not in the official Zepp developer device list, so no deviceSource is claimed; manual identification only. Product art pending.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [],
+      "device_source_official": []
+    },
+    {
+      "catalog_id": "amazfit-t-rex",
+      "canonical_name": "Amazfit T-Rex",
+      "display_name": "Amazfit T-Rex",
+      "name_zh": "Amazfit T-Rex",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit T-Rex",
+        "Amazfit T-Rex 1",
+        "T-Rex 1"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_t-rex/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_t-rex/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-t-rex",
+      "checked_at": "2026-11-18",
+      "provenance": "Original 2019 Amazfit T-Rex, name verified against the official Amazfit support guide on 2026-11-18; reported missing from the model picker in feedback badf9ead. No bare 'T-Rex' alias, so later T-Rex models are never matched to it by name. No cloud source number or product art.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": [],
+      "device_source_official": []
+    },
+    {
+      "catalog_id": "amazfit-t-rex-dual-solar",
+      "canonical_name": "Amazfit T-Rex Dual Solar",
+      "display_name": "Amazfit T-Rex Dual Solar",
+      "name_zh": "Amazfit T-Rex Dual Solar",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit T-Rex Dual Solar",
+        "T-Rex Dual Solar"
+      ],
+      "region": [
+        "global",
+        "us"
+      ],
+      "official_page": "https://us.amazfit.com/products/t-rex-dual-solar",
+      "official_url": "https://us.amazfit.com/products/t-rex-dual-solar",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-t-rex-dual-solar",
+      "checked_at": "2026-11-18",
+      "provenance": "Launched 2026-09-22; name verified against the official Amazfit US product page on 2026-11-18. Reported missing in feedback d25b4eb2, whose only unknown device carried deviceSource 11403520 -- a single report, and the official Zepp device list does not list it yet, so the number is deliberately unmapped. Product art pending.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",
