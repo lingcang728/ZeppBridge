@@ -11,7 +11,7 @@ import { elevationUnitLabel, paceAxisLabel, paceMinutesPerBigUnit, paceUnitLabel
 import { deviceImageFor } from '../lib/deviceImages';
 import { workoutTiming } from '../lib/workoutTiming';
 import { buildRouteCanvas } from '../lib/workoutRoute';
-import { lineOption, paceSeconds, sampleSeries, type ChartBand, type ChartDetail, type ChartPoint } from '../lib/workoutCharts';
+import { chartStats, lineOption, paceSeconds, sampleSeries, type ChartBand, type ChartDetail, type ChartPoint } from '../lib/workoutCharts';
 import { elevationAxis, paceAxis } from '../lib/chartAxis';
 import { consistentAverage, paceProfile } from '../lib/paceProfile';
 import { slopeShare } from '../lib/elevationProfile';
@@ -145,15 +145,13 @@ export const useWorkoutPresentation = (
 
   /** 最小 / 平均 / 最大；心率和海拔叫「最低 / 最高」（和 Zepp、概要卡的说法一致）。 */
   const statSummary = (points: ChartPoint[], highLow = false): ChartStat[] | null => {
-    if (points.length < 2) return null;
-    const values = points.map((point) => point.v);
-    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const stats = chartStats(points);
+    if (!stats) return null;
+    const { low, average, high } = stats;
     return [
-      { label: highLow ? t.value.statLow : t.value.statMin, value: numberValue(min, 0) },
-      { label: t.value.statAverage, value: numberValue(avg, 0) },
-      { label: highLow ? t.value.statHigh : t.value.statMax, value: numberValue(max, 0) },
+      { label: highLow ? t.value.statLow : t.value.statMin, value: numberValue(low.v, 0) },
+      { label: t.value.statAverage, value: numberValue(average, 0) },
+      { label: highLow ? t.value.statHigh : t.value.statMax, value: numberValue(high.v, 0) },
     ];
   };
 
@@ -171,22 +169,26 @@ export const useWorkoutPresentation = (
     const mint = resolvedTheme.value === 'light' ? '#22875C' : '#2FA96B';
     return [s.pace, mint, s.training, s.altitude, s.calories, s.heart][Math.min(5, Math.max(0, index))]!;
   };
-  const chartCards = computed(() => {
+  const chartData = computed(() => {
     const samples = series.value?.samples;
-    const palette = chartPalette.value;
     const heart = sampleSeries(samples, 'heart_rate');
     const pace = sampleSeries(samples, 'pace');
-    const altitude = sampleSeries(samples, 'altitude_m').map((point) => ({ t: point.t, v: toElevation(point.v) }));
+    const altitude = sampleSeries(samples, 'altitude_m');
     const cadence = sampleSeries(samples, 'cadence');
-    // 配速图画「每公里 / 每英里秒数」，纵轴倒过来（快的在上），刻度和提示写成 分:秒。
-    const toChart = (minutesPerKm: number) => paceMinutesPerBigUnit(minutesPerKm) * 60;
-    const paceChart = pace.map((point) => ({ t: point.t, v: toChart(point.v) }));
     // 暂停段：配速统计剔掉它们，中大档的配速 / 心率图把它们铺灰。
     const pauses = (series.value?.pauses ?? [])
       .map((pause) => ({ start: Date.parse(pause.start_time), end: Date.parse(pause.end_time) }))
       .filter((pause) => Number.isFinite(pause.start) && Number.isFinite(pause.end) && pause.end > pause.start);
     // 配速：剔除暂停与停顿 / 飘点后的最快、最慢和主体范围；平均 = 距离 ÷ 运动时间（和概要卡同一个数）。
-    const profile = paceProfile(pace, pauses);
+    return { heart, pace, altitude, cadence, pauses, profile: paceProfile(pace, pauses) };
+  });
+  const chartCards = computed(() => {
+    const { heart, pace, altitude: rawAltitude, cadence, pauses, profile } = chartData.value;
+    const palette = chartPalette.value;
+    const altitude = rawAltitude.map((point) => ({ t: point.t, v: toElevation(point.v) }));
+    // 配速图画每公里或每英里的秒数，快的朝上。
+    const toChart = (minutesPerKm: number) => paceMinutesPerBigUnit(minutesPerKm) * 60;
+    const paceChart = pace.map((point) => ({ t: point.t, v: toChart(point.v) }));
     const item = workout.value;
     const summaryAvg = isFiniteNumber(item?.pace) ? item.pace : (timing.value?.movingPace ?? series.value?.summary?.average_pace ?? null);
     const paceAvg = profile ? consistentAverage(profile, summaryAvg) : summaryAvg;
@@ -217,7 +219,7 @@ export const useWorkoutPresentation = (
     ] : null;
     return [
       { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: lineOption(heart, { color: s.heart, unit: 'bpm', palette }), detail: { color: s.heart, palette, bands, zoneColor: zoneColorOf, pauses } as ChartDetail, stats: statSummary(heart, true), zoneShare, icon: 'heart-rate' as DesignIconName, tone: 'heart' as GlyphTone },
-      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, { color: s.pace, unit: paceAxisLabel(), palette, inverse: true, format: paceSeconds, axis: paceRange, average: isFiniteNumber(paceAvg) ? toChart(paceAvg) : null }), detail: { color: s.pace, palette, format: paceSeconds, pauses, extremes: paceExtremes } as ChartDetail, stats: paceStats, icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
+      { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: lineOption(paceChart, { color: s.pace, unit: paceAxisLabel(), palette, inverse: true, format: paceSeconds, axis: paceRange, average: isFiniteNumber(paceAvg) ? toChart(paceAvg) : null, highlights: paceExtremes }), detail: { color: s.pace, palette, format: paceSeconds, pauses, extremes: paceExtremes } as ChartDetail, stats: paceStats, icon: WORKOUT_GLYPH.pace.icon, tone: WORKOUT_GLYPH.pace.tone },
       { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: lineOption(altitude, { color: s.altitude, unit: elevationUnitLabel(), palette, axis: elevationAxis(altitude.map((p) => p.v), toElevation(ALTITUDE_MIN_SPAN_M)) }), detail: { color: s.altitude, palette } as ChartDetail, stats: altitudeStats, slope: slope.value, icon: 'health-watch' as DesignIconName, tone: 'altitude' as GlyphTone },
       { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: lineOption(cadence, { color: s.cadence, unit: 'spm', palette }), detail: { color: s.cadence, palette } as ChartDetail, stats: statSummary(cadence), icon: 'steps' as DesignIconName, tone: 'activity' as GlyphTone },
     ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null);

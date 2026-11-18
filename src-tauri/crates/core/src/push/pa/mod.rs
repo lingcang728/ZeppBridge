@@ -10,9 +10,7 @@
 //! **内容没变就不重发**；所有对象都没变就一个请求都不发。
 //!
 //! 还没移植的：profile / context / plan /
-//! baselines / data-health 五个档案对象（逻辑在 MCP crate 里，要先抽到 core）、live 令牌
-//! 交接、UI 快照、从组件迁移配置，以及设置里添加目标的界面。所以眼下没有任何入口会写
-//! `push/targets.json`，推送在用户机器上不会启动（闸门：没有已启用的目标就什么都不做）。
+//! baselines / data-health 五个档案对象、live 令牌交接、UI 快照。
 
 pub mod crypto;
 pub mod summary;
@@ -28,9 +26,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write as _;
-
-/// 每次都重新考虑最近 3 天（接住晚到的睡眠）；内容没变的照样不发。
-pub const RECENT_DAYS: usize = 3;
 
 const SAMPLE_INTERVAL_MS: i64 = 15_000;
 
@@ -115,6 +110,8 @@ pub struct WorkoutEntry {
 pub struct Manifest {
     #[serde(default = "manifest_version")]
     pub version: u32,
+    #[serde(default)]
+    pub destination: Option<String>,
     /// 日 → 第一次传上去的时刻。
     #[serde(default)]
     pub days: BTreeMap<String, String>,
@@ -271,36 +268,48 @@ pub fn build_plan(
     let mut manifest = previous.clone();
     manifest.version = 1;
     let window = days_back(today, options.retention_days);
-    let window_start = window.first().cloned().unwrap_or_default();
-    let recent: BTreeSet<&String> = window.iter().rev().take(RECENT_DAYS).collect();
-    let day_list: Vec<String> = window
-        .iter()
-        .filter(|day| recent.contains(day) || !manifest.days.contains_key(*day))
-        .cloned()
-        .collect();
-    let enabling_full = options.full_resolution_workouts && !manifest.full_resolution;
-    let workout_days = if enabling_full {
-        window.clone()
-    } else {
-        day_list.clone()
+    // One snapshot covers the whole retention window, including historical imports
+    // and local edits. Hash each object immediately and retain only changed payloads.
+    let snapshot = db.conn.unchecked_transaction()?;
+    let mut plan = Plan {
+        days_considered: window.len(),
+        ..Default::default()
     };
-
-    let mut candidates: Vec<(String, Value)> = Vec::new();
+    let mut objects = std::mem::take(&mut manifest.objects);
+    let mut queue = |rel: String, value: Value| -> Result<()> {
+        let hash = content_hash(&value);
+        if objects.get(&rel) == Some(&hash) {
+            plan.unchanged += 1;
+        } else {
+            let text = serde_json::to_string(&value)
+                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+            objects.insert(rel.clone(), hash);
+            plan.outgoing.push((rel, text));
+        }
+        Ok(())
+    };
     let mut deletes: BTreeSet<String> = BTreeSet::new();
     let now_text = now.to_rfc3339();
 
     let all_types: Vec<&str> = EXPORT_DATA_TYPES.to_vec();
-    for day in &day_list {
+    let mut seen = BTreeSet::new();
+    let mut workout_days = Vec::new();
+    for day in &window {
         let set =
             records::query_records(db, &day_query(&all_types, day, day, ExportDetail::Summary))?;
-        candidates.push((format!("days/{day}.json"), set.value));
+        if set.value["data"]["workouts"]
+            .as_array()
+            .is_some_and(|records| !records.is_empty())
+        {
+            workout_days.push(day);
+        }
+        queue(format!("days/{day}.json"), set.value)?;
     }
 
-    for day in &workout_days {
+    for day in workout_days {
         let envelope =
             records::query_records(db, &day_query(&["workouts"], day, day, ExportDetail::Full))?
                 .value;
-        let mut seen = BTreeSet::new();
         let empty = Vec::new();
         let workouts = envelope
             .get("data")
@@ -319,16 +328,16 @@ pub fn build_plan(
                 .and_then(Value::as_array)
                 .cloned()
                 .unwrap_or_default();
-            candidates.push((
+            queue(
                 format!("workouts/{id}.json"),
                 workout_object(&envelope, workout, every_15s(&samples), "15s"),
-            ));
+            )?;
             let has_full = options.full_resolution_workouts && !samples.is_empty();
             if has_full {
-                candidates.push((
+                queue(
                     format!("workouts/{id}.full.json"),
                     workout_object(&envelope, workout, samples, "full"),
-                ));
+                )?;
             } else if manifest
                 .workouts
                 .get(&id)
@@ -353,18 +362,6 @@ pub fn build_plan(
                 },
             );
         }
-        // 本机已经删掉 / 隐藏的运动，云端也删。
-        let gone: Vec<String> = manifest
-            .workouts
-            .iter()
-            .filter(|(id, entry)| &entry.date == day && !seen.contains(*id))
-            .map(|(id, _)| id.clone())
-            .collect();
-        for id in gone {
-            deletes.insert(format!("workouts/{id}.json"));
-            deletes.insert(format!("workouts/{id}.full.json"));
-            manifest.workouts.remove(&id);
-        }
     }
 
     // 逐秒选项关掉：云端已有的逐秒版要删，不只是停止上传。
@@ -381,7 +378,7 @@ pub fn build_plan(
     let stale_days: Vec<String> = manifest
         .days
         .keys()
-        .filter(|day| day.as_str() < window_start.as_str())
+        .filter(|day| window.binary_search(day).is_err())
         .cloned()
         .collect();
     for day in stale_days {
@@ -391,7 +388,7 @@ pub fn build_plan(
     let stale_workouts: Vec<String> = manifest
         .workouts
         .iter()
-        .filter(|(_, entry)| entry.date.as_str() < window_start.as_str())
+        .filter(|(id, _)| !seen.contains(*id))
         .map(|(id, _)| id.clone())
         .collect();
     for id in stale_workouts {
@@ -409,14 +406,14 @@ pub fn build_plan(
             &day_query(&SUMMARY_TYPES, first, last, ExportDetail::Summary),
         )?
         .value;
-        candidates.push((
+        queue(
             "summary.json".into(),
             summary::build_summary(&envelope, &summary_days, time_zone, &now_text),
-        ));
+        )?;
     }
-    candidates.push(("contract.json".into(), crate::contract::contract_json()));
+    queue("contract.json".into(), crate::contract::contract_json())?;
 
-    for day in &day_list {
+    for day in &window {
         manifest
             .days
             .entry(day.clone())
@@ -442,14 +439,15 @@ pub fn build_plan(
         let key = |value: &Value| value["start_time"].as_str().unwrap_or_default().to_string();
         key(b).cmp(&key(a))
     });
-    candidates.push((
+    queue(
         "index.json".into(),
         json!({
             "retention_days": options.retention_days,
             "days": manifest.days.keys().collect::<Vec<_>>(),
             "workouts": index,
         }),
-    ));
+    )?;
+    snapshot.commit()?;
     let status_value = json!({
         "schema": "zeppbridge-cloud/1",
         "last_upload_at": now_text,
@@ -467,26 +465,10 @@ pub fn build_plan(
         "time_note": "last_upload_at = when this computer uploaded; last_cloud_sync_at = when it last pulled from the Zepp cloud; each record carries its own sample time.",
     });
 
-    // 删掉的对象不再算「传过」；本轮又要传的对象不删。
     for rel in &deletes {
-        manifest.objects.remove(rel);
+        objects.remove(rel);
     }
-    let mut plan = Plan {
-        days_considered: day_list.len(),
-        ..Default::default()
-    };
-    for (rel, value) in candidates {
-        deletes.remove(&rel);
-        let hash = content_hash(&value);
-        if manifest.objects.get(&rel) == Some(&hash) {
-            plan.unchanged += 1;
-            continue;
-        }
-        let text = serde_json::to_string(&value)
-            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-        manifest.objects.insert(rel.clone(), hash);
-        plan.outgoing.push((rel, text));
-    }
+    manifest.objects = objects;
     // 有内容变了（或要删东西）才附上 status.json，放在最后；什么都没变就一个请求都不发。
     if !plan.outgoing.is_empty() || !deletes.is_empty() {
         let text = serde_json::to_string(&status_value)

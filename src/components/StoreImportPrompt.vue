@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ModalDialog from './ModalDialog.vue';
 import { useMessages, defineMessages } from '../i18n';
 
-type StoreImportStatus = { required: boolean; sources: string[] };
+type StoreImportStatus = { required: boolean; copying: boolean; sources: string[]; failed: boolean };
 
 const copy = useMessages(defineMessages(
   {
@@ -54,6 +54,9 @@ const visible = ref(false);
 const sources = ref<string[]>([]);
 const selected = ref('');
 const busy = ref(false);
+const browsing = ref(false);
+let statusTimer: number | undefined;
+let disposed = false;
 const failed = ref(false);
 const errorDetail = ref('');
 const sourceReady = computed(() => selected.value.trim().length > 0);
@@ -64,20 +67,37 @@ const errorMessage = (error: unknown) => typeof error === 'string'
     ? error.message
     : '';
 
-onMounted(async () => {
+const refreshStatus = async () => {
   try {
     const status = await invoke<StoreImportStatus>('store_import_status');
+    if (disposed) return;
+    visible.value = status.required;
+    busy.value = status.copying;
     if (!status.required) return;
-    sources.value = status.sources;
-    selected.value = status.sources[0] ?? '';
+    if (!selected.value) {
+      sources.value = status.sources;
+      selected.value = status.sources[0] ?? '';
+    }
+    failed.value = status.failed;
+    errorDetail.value = '';
+    if (status.copying) statusTimer = window.setTimeout(refreshStatus, 300);
+  } catch (error: unknown) {
+    if (disposed) return;
     visible.value = true;
-  } catch {
-    // Non-Store builds compile this component out. Keep the app usable if an
-    // older packaged build does not expose the Store-only command.
+    failed.value = true;
+    errorDetail.value = errorMessage(error);
+    if (busy.value) statusTimer = window.setTimeout(refreshStatus, 750);
   }
+};
+onMounted(refreshStatus);
+onUnmounted(() => {
+  disposed = true;
+  window.clearTimeout(statusTimer);
 });
 
 const browse = async () => {
+  if (busy.value || browsing.value) return;
+  browsing.value = true;
   failed.value = false;
   errorDetail.value = '';
   try {
@@ -86,15 +106,20 @@ const browse = async () => {
       multiple: false,
       title: copy.value.browseTitle,
     });
-    if (typeof result === 'string') selected.value = result;
+    if (typeof result === 'string') {
+      if (!sources.value.includes(result)) sources.value.push(result);
+      selected.value = result;
+    }
   } catch (error: unknown) {
     failed.value = true;
     errorDetail.value = errorMessage(error);
+  } finally {
+    browsing.value = false;
   }
 };
 
 const decide = async (source: string | null) => {
-  if (busy.value) return;
+  if (busy.value || browsing.value) return;
   busy.value = true;
   failed.value = false;
   errorDetail.value = '';
@@ -111,7 +136,7 @@ const decide = async (source: string | null) => {
 </script>
 
 <template>
-  <ModalDialog v-if="visible" labelledby="store-import-title" :max-width="620" @close="undefined">
+  <ModalDialog v-if="visible" labelledby="store-import-title" :max-width="620">
     <div class="store-import-prompt">
       <header>
         <span class="eyebrow">ZeppBridge · Microsoft Store</span>
@@ -126,6 +151,7 @@ const decide = async (source: string | null) => {
         </select>
       </label>
       <p v-else class="store-import-help">{{ copy.noSource }}</p>
+      <code v-if="selected" class="selected-path">{{ selected }}</code>
 
       <p class="store-import-help">{{ copy.credential }}</p>
       <p v-if="busy" class="store-import-status" role="status" aria-live="polite">{{ copy.busy }}</p>
@@ -135,10 +161,10 @@ const decide = async (source: string | null) => {
       </p>
 
       <div class="store-import-actions">
-        <button class="button secondary" type="button" :disabled="busy" @click="browse">{{ copy.choose }}</button>
-        <button class="button primary" type="button" :disabled="busy || !sourceReady" @click="decide(selected)">{{ copy.import }}</button>
+        <button class="button secondary" type="button" :disabled="busy || browsing" @click="browse">{{ copy.choose }}</button>
+        <button class="button primary" type="button" :disabled="busy || browsing || !sourceReady" @click="decide(selected)">{{ copy.import }}</button>
       </div>
-      <button class="store-import-empty" type="button" :disabled="busy" @click="decide(null)">{{ copy.empty }}</button>
+      <button class="store-import-empty" type="button" :disabled="busy || browsing" @click="decide(null)">{{ copy.empty }}</button>
     </div>
   </ModalDialog>
 </template>
@@ -152,6 +178,7 @@ const decide = async (source: string | null) => {
 .store-import-source { display: grid; gap: 7px; color: var(--ink-muted); font-size: .88rem; }
 .store-import-source select { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--mat-glass-line); border-radius: 12px; background: var(--surface); color: var(--ink); }
 .store-import-help { font-size: .86rem; }
+.selected-path { font-size: .8rem; overflow-wrap: anywhere; }
 .store-import-status { color: var(--accent) !important; }
 .store-import-error { color: var(--danger) !important; }
 .store-import-error code { display: block; margin-top: 6px; color: inherit; font-size: .8em; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }

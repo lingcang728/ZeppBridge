@@ -212,6 +212,45 @@ const menuAt = computed(() => {
   // 从「•••」那颗胶囊长出来、收回去（从哪来回哪去）：它相对菜单左上角的矩形。
   return { x, y, from: [Math.round(grip - 26 - x), p.y + 4 - y, 52, 18].join(',') };
 });
+// Measure the visible stage, including the fixed navigation on narrow windows.
+function fitMenu(el: HTMLElement) {
+  const surface = canvas.value;
+  const grip = menu.value ? els.get(menu.value)?.querySelector<HTMLElement>('.window-grip') : null;
+  const inner = el.querySelector<HTMLElement>('.menu-inner');
+  if (!surface || !grip || !inner || !surface.offsetWidth) return;
+  const stageRect = surface.getBoundingClientRect();
+  const anchor = grip.getBoundingClientRect();
+  const zoom = stageRect.width / surface.offsetWidth || 1;
+  const main = document.getElementById('main-content')?.getBoundingClientRect();
+  const topbar = document.querySelector('.app-topbar')?.getBoundingClientRect();
+  const bottomNav = document.querySelector('.bottom-nav')?.getBoundingClientRect();
+  const left = Math.max(0, stageRect.left, main?.left ?? 0) + 8;
+  const right = Math.min(window.innerWidth, stageRect.right, main?.right ?? Infinity) - 8;
+  const top = Math.max(0, main?.top ?? 0, topbar?.bottom ?? 0) + 8;
+  const bottom = Math.min(window.innerHeight, main?.bottom ?? Infinity, bottomNav?.height ? bottomNav.top : Infinity) - 8;
+  const width = Math.max(1, Math.min(MENU_W, (right - left) / zoom));
+  el.style.width = `${width}px`;
+  const height = Math.min(inner.scrollHeight * zoom, Math.max(0, bottom - top));
+  const x = Math.max(left, Math.min(right - width * zoom, anchor.left + (anchor.width - width * zoom) / 2));
+  const y = anchor.bottom + 6 + height <= bottom
+    ? Math.max(top, anchor.bottom + 6)
+    : Math.max(top, Math.min(bottom - height, anchor.top - 6 - height));
+  el.style.left = `${(x - stageRect.left) / zoom}px`;
+  el.style.top = `${(y - stageRect.top) / zoom}px`;
+  el.style.setProperty('--menu-max-height', `${Math.max(0, bottom - top) / zoom}px`);
+  el.dataset.from = [(anchor.left - x) / zoom, (anchor.top - y) / zoom, anchor.width / zoom, anchor.height / zoom].join(',');
+}
+const enterMenu = (el: Element, done: () => void) => {
+  fitMenu(el as HTMLElement);
+  menuEnter(el, done);
+};
+const refitMenu = () => {
+  const el = canvas.value?.querySelector<HTMLElement>('.stage-menu');
+  if (menu.value && el) fitMenu(el);
+};
+
+watch(menuAt, refitMenu, { flush: 'post' });
+
 /** 菜单里的档：最近的那档；拖边拖出来的比例 / 整组宽不正好在档上时 exact 为假（滑块画成未选）。 */
 const menuSnap = computed(() => {
   const g = stage.state.value.stage;
@@ -316,6 +355,8 @@ onMounted(() => {
   if (canvas.value) observer.observe(canvas.value);
   if (ruler.value) observer.observe(ruler.value);
   document.addEventListener('pointerdown', onOutside, true);
+  document.getElementById('main-content')?.addEventListener('scroll', refitMenu, { passive: true });
+  window.addEventListener('resize', refitMenu);
   window.addEventListener('zb:stage-show', onShow);
 });
 onBeforeUnmount(() => {
@@ -326,6 +367,8 @@ onBeforeUnmount(() => {
   releaseResizes();
   stage.draft.value = null;
   document.removeEventListener('pointerdown', onOutside, true);
+  document.getElementById('main-content')?.removeEventListener('scroll', refitMenu);
+  window.removeEventListener('resize', refitMenu);
   window.removeEventListener('zb:stage-show', onShow);
 });
 defineExpose({ focusCard: (id: string) => stage.focusCard(id) });
@@ -409,7 +452,7 @@ defineExpose({ focusCard: (id: string) => stage.focusCard(id) });
         ><Icon name="chevron-right" :size="16" /></button>
       </Transition>
 
-      <Transition :css="false" @enter="menuEnter" @leave="menuLeave">
+      <Transition :css="false" @enter="enterMenu" @leave="menuLeave">
         <StageMenu
           v-if="menu && menuAt"
           :key="menu"

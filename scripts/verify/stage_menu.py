@@ -51,8 +51,17 @@ MENU_FIT = """() => {
     }
     if (track.classList.contains('is-wrapped')) out.push('档位折行');
   }
-  for (const a of menu.querySelectorAll('.menu-action span')) {
-    if (a.getClientRects().length > 1) out.push(`动作折行「${a.textContent.trim()}」`);
+  const scroll = menu.querySelector('.menu-inner');
+  const viewport = scroll.getBoundingClientRect();
+  for (const action of menu.querySelectorAll('.menu-action')) {
+    const a = action.querySelector('span');
+    if (a?.getClientRects().length > 1) out.push(`动作折行「${a.textContent.trim()}」`);
+    const r = action.getBoundingClientRect();
+    const y = (r.top + r.bottom) / 2;
+    if (y >= viewport.top && y <= viewport.bottom &&
+      !action.contains(document.elementFromPoint((r.left + r.right) / 2, y))) {
+      out.push(`动作被遮挡「${action.textContent.trim()}」`);
+    }
   }
   return out;
 }"""

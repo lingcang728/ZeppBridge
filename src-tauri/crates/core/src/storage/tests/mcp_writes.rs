@@ -177,3 +177,82 @@ fn a_type_correction_is_undone_through_the_workout_edit_history() {
     );
     assert_eq!(override_now(&db), None);
 }
+
+#[test]
+fn ledger_failures_roll_back_writes_and_undos() {
+    let db = Database::in_memory().unwrap();
+    let add = || {
+        db.apply_mcp_change(
+            "save_injury",
+            McpChange::Injury(injury(None, "Synthetic injury", None)),
+            None,
+        )
+    };
+    db.conn.execute_batch("CREATE TRIGGER fail_ledger BEFORE INSERT ON mcp_writes BEGIN SELECT RAISE(ABORT, 'synthetic'); END;").unwrap();
+    assert!(add().is_err());
+    assert!(db.list_injuries().unwrap().is_empty());
+    db.conn.execute_batch("DROP TRIGGER fail_ledger").unwrap();
+    let id = add().unwrap().write_id.unwrap();
+    db.conn.execute_batch("CREATE TRIGGER fail_undo BEFORE UPDATE ON mcp_writes BEGIN SELECT RAISE(ABORT, 'synthetic'); END;").unwrap();
+    assert!(db.undo_mcp_write(id).is_err());
+    assert_eq!(db.list_injuries().unwrap().len(), 1);
+    assert!(db.mcp_writes(1).unwrap()[0].undone_at.is_none());
+    db.conn.execute_batch("DROP TRIGGER fail_undo").unwrap();
+    assert_eq!(db.undo_mcp_write(id).unwrap(), UndoOutcome::Undone);
+}
+
+#[test]
+fn undo_default_shoe_restores_the_previous_default_and_preserves_new_workout_links() {
+    use crate::storage::logbook::{annotations::AnnotationInput, shoes::ShoeInput};
+    let db = Database::in_memory().unwrap();
+    let shoe = |name: &str| ShoeInput {
+        id: None,
+        name: name.into(),
+        sport: "running".into(),
+        is_default: true,
+        zepp_gear_id: None,
+        start_km: 0.0,
+        retire_km: 500.0,
+        started_on: "2026-11-01".into(),
+        retired_on: None,
+        notes: String::new(),
+    };
+    let previous = db.save_shoe(&shoe("A")).unwrap();
+    let add = || {
+        db.apply_mcp_change("save_shoe", McpChange::Shoe(shoe("B")), None)
+            .unwrap()
+    };
+    let first = add();
+    let defaults = || {
+        db.list_shoe_rows()
+            .unwrap()
+            .into_iter()
+            .filter(|shoe| shoe.input.is_default)
+            .map(|shoe| shoe.input.id.unwrap())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(defaults(), vec![first.target_id.parse::<i64>().unwrap()]);
+    assert_eq!(
+        db.undo_mcp_write(first.write_id.unwrap()).unwrap(),
+        UndoOutcome::Undone
+    );
+    assert_eq!(defaults(), vec![previous]);
+
+    let linked = add();
+    let mut workout = workout_with_type(Some(1), "running", "numeric_mapped");
+    workout.workout_id = "synthetic-linked".into();
+    db.insert_workout(&workout).unwrap();
+    db.save_workout_feel(&AnnotationInput {
+        workout_id: workout.workout_id,
+        rpe: None,
+        soreness: Vec::new(),
+        shoe_mode: "chosen".into(),
+        shoe_id: Some(linked.target_id.parse().unwrap()),
+    })
+    .unwrap();
+    assert_eq!(
+        db.undo_mcp_write(linked.write_id.unwrap()).unwrap(),
+        UndoOutcome::Stale
+    );
+    assert_eq!(db.list_shoe_rows().unwrap().len(), 2);
+}

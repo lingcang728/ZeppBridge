@@ -402,30 +402,35 @@ async fn run_target(
         };
     };
     let manifest_file = manifest_path(&dir, &target.id);
-    let previous: pa::Manifest = std::fs::read(&manifest_file)
+    let destination = pa::crypto::sha256_hex(&format!(
+        "{}\n{}\n{}",
+        site.base,
+        keys.tenant,
+        hex::encode(&keys.dk)
+    ));
+    let mut previous: pa::Manifest = std::fs::read(&manifest_file)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .filter(|saved: &pa::Manifest| saved.destination.as_ref() == Some(&destination))
         .unwrap_or_default();
+    previous.destination = Some(destination);
 
-    // 取数：只读连接，不拿写锁。读完就关，联网期间不占库。
-    let plan = {
+    // Read the retention window on a blocking worker, then close SQLite before uploading.
+    let data_dir = data_dir.to_path_buf();
+    let options = pa::PaOptions {
+        retention_days: target.retention_days,
+        summary_days: target.summary_days,
+        full_resolution_workouts: target.full_resolution_workouts,
+    };
+    let plan = tokio::task::spawn_blocking(move || {
         let db_path = data_dir.join("zepp.db");
         if !db_path.exists() {
-            return failed("err.push.no_local_data", String::new());
+            return Err(push_error("err.push.no_local_data", ""));
         }
-        let db = match Database::open_read_only(db_path) {
-            Ok(db) => db,
-            Err(error) => {
-                return failed("err.push.local_data_unavailable", error.code().to_string())
-            }
-        };
+        let db = Database::open_read_only(db_path)
+            .map_err(|error| push_error("err.push.local_data_unavailable", error.code()))?;
         let status = pa::LocalStatus::read(&db);
-        let options = pa::PaOptions {
-            retention_days: target.retention_days,
-            summary_days: target.summary_days,
-            full_resolution_workouts: target.full_resolution_workouts,
-        };
-        match pa::build_plan(
+        pa::build_plan(
             &db,
             &options,
             &previous,
@@ -433,12 +438,14 @@ async fn run_target(
             &status,
             Utc::now(),
             &system_time_zone(),
-        ) {
-            Ok(plan) => plan,
-            Err(error) => {
-                return failed("err.push.local_data_unavailable", error.code().to_string())
-            }
-        }
+        )
+        .map_err(|error| push_error("err.push.local_data_unavailable", error.code()))
+    })
+    .await;
+    let plan = match plan {
+        Ok(Ok(plan)) => plan,
+        Ok(Err(error)) => return failed(error.code, error.detail),
+        Err(error) => return failed("err.push.local_data_unavailable", error.to_string()),
     };
     if let Err(message) = pa::check_no_coordinates(&plan) {
         return failed("err.push.coordinates_found", message);

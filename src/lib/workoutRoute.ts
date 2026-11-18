@@ -50,6 +50,9 @@ export interface TrackPoint {
   y: number;
   latitude: number;
   longitude: number;
+  /** True for rendered segments, false at a known gap. */
+  connected?: boolean;
+  paused?: boolean;
 }
 
 /** 悬停的时刻离最近的轨迹点超过这么久（暂停、信号丢了），就不标点：宁可不标，也不标错地方。 */
@@ -64,8 +67,8 @@ export const trackPointAt = (track: TrackPoint[], time: number | null | undefine
   const first = track[0]!;
   const last = track[track.length - 1]!;
   if (time < first.t - TRACK_CURSOR_MAX_GAP_MS || time > last.t + TRACK_CURSOR_MAX_GAP_MS) return null;
-  if (time <= first.t) return first;
-  if (time >= last.t) return last;
+  if (time <= first.t) return first.paused ? null : first;
+  if (time >= last.t) return last.paused ? null : last;
   let lo = 0;
   let hi = track.length - 1;
   while (hi - lo > 1) {
@@ -75,6 +78,8 @@ export const trackPointAt = (track: TrackPoint[], time: number | null | undefine
   }
   const a = track[lo]!;
   const b = track[hi]!;
+  if (time === a.t) return a.paused ? null : a;
+  if (b.connected === false) return null;
   const near = time - a.t <= b.t - time ? a : b;
   // 两点隔得太久（中间是暂停或丢信号），插值会把点画在没走过的直线上：只在近的那头够近时标它。
   if (b.t - a.t > TRACK_CURSOR_MAX_GAP_MS) return Math.abs(near.t - time) <= TRACK_CURSOR_MAX_GAP_MS / 2 ? near : null;
@@ -183,7 +188,7 @@ const nearestPace = (items: TimedPace[], timestamp: number): { value: number | n
 };
 
 /** 从一条运动的序列算出整张轨迹图；少于两个点时返回 null（界面显示「没有轨迹」）。 */
-export const buildRouteCanvas = (series: WorkoutSeries | null | undefined): RouteCanvas | null => {
+export const buildRouteCanvas = (series: Pick<WorkoutSeries, 'route' | 'samples' | 'pauses'> | null | undefined): RouteCanvas | null => {
   const points = downsample([...(series?.route ?? [])]
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
   if (points.length < 2) return null;
@@ -244,6 +249,13 @@ export const buildRouteCanvas = (series: WorkoutSeries | null | undefined): Rout
     const pace = from.pace !== null && to.pace !== null ? (from.pace + to.pace) / 2 : null;
     segments.push({ d: `M${from.x.toFixed(1)} ${from.y.toFixed(1)} L${to.x.toFixed(1)} ${to.y.toFixed(1)}`, color: routeColor(pace, low, high, enoughPace), from, to });
   }
+  const continuous: RouteCanvasPoint[][] = [];
+  for (const { from, to } of segments) {
+    const previous = continuous[continuous.length - 1];
+    if (previous?.[previous.length - 1] === from) previous.push(to);
+    else continuous.push([from, to]);
+  }
+  const connected = new Set(segments.map((segment) => segment.to));
   const pauseMarkers = pauses.map((pause) => {
     const target = canvasPoints.reduce((best, point) => {
       const distance = Math.abs(new Date(point.timestamp).getTime() - pause.start);
@@ -253,8 +265,8 @@ export const buildRouteCanvas = (series: WorkoutSeries | null | undefined): Rout
   });
   return {
     viewBox: `0 0 ${viewW} ${viewH}`,
-    ghosts: buildGhostRoads(canvasPoints),
-    glow: toSvgPath(canvasPoints),
+    ghosts: continuous.flatMap(buildGhostRoads),
+    glow: continuous.map(toSvgPath).join(' '),
     segments,
     pauseMarkers,
     start: canvasPoints[0],
@@ -262,7 +274,11 @@ export const buildRouteCanvas = (series: WorkoutSeries | null | undefined): Rout
     validPaceCount: validPaces.length,
     enoughPace,
     track: canvasPoints
-      .map((point) => ({ t: new Date(point.timestamp).getTime(), x: point.x, y: point.y, latitude: point.latitude, longitude: point.longitude }))
+      .map((point) => ({
+        t: new Date(point.timestamp).getTime(),
+        x: point.x, y: point.y, latitude: point.latitude, longitude: point.longitude,
+        connected: connected.has(point), paused: point.paused,
+      }))
       .filter((point) => Number.isFinite(point.t)),
   };
 };

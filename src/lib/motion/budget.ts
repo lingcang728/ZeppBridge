@@ -10,8 +10,8 @@ import { computed, ref } from 'vue';
  * 展开分两段占（2026-11-12 第二轮）：
  * 1. usePageMorph 在决定要形变时（router.beforeEach，新页挂载之前）`holdMotion()`——新页挂得轻，一两帧就上屏，
  *    背后的模糊马上开始糊；
- * 2. 新页一上屏就放开（composables/pageMorph/expand.ts）：图表一帧一张地挂（nextSlot），窗口停在卡上等它们挂完
- *    （whenSlotsDrained，有上限）再起飞；起飞时再 `holdMotion()` 一次，落地 / 撤回后释放。
+ * 2. 新页上屏后边展开边按帧挂图（nextSlot）。图表暂时放行时，staging 仍保持页面的悬停停用状态，
+ *    避免同一场展开内反复改根节点属性和重算样式。挂完后重新锁住重活，落地或撤回后释放。
  * 上午那一版从 1 一直占到落地：图表落地以后才挂，每次点开都是「空卡 → 图表淡入」重画一遍，用户当天否了。
  * 万一漏了释放，`maxMs` 以后自己放开，不会让图表永远不挂。
  */
@@ -27,8 +27,12 @@ export const motionBusy = computed(() => holds.value > 0);
  */
 const mark = () => {
   if (typeof document === 'undefined') return;
-  if (holds.value > 0) document.documentElement.dataset.motion = 'busy';
-  else delete document.documentElement.dataset.motion;
+  const root = document.documentElement;
+  if (holds.value > 0 || staging > 0) {
+    if (root.dataset.motion !== 'busy') root.dataset.motion = 'busy';
+  } else if (root.dataset.motion) {
+    delete root.dataset.motion;
+  }
 };
 
 const flush = () => {
@@ -68,12 +72,14 @@ let staging = 0;
 let stagingWaiters: Array<() => void> = [];
 export const stageMotion = (maxMs = 600): (() => void) => {
   staging += 1;
+  mark();
   let released = false;
   const release = () => {
     if (released) return;
     released = true;
     clearTimeout(timer);
     staging = Math.max(0, staging - 1);
+    mark();
     if (staging > 0) return;
     const ready = stagingWaiters;
     stagingWaiters = [];
@@ -109,7 +115,6 @@ const slots: Array<() => void> = [];
 let slotFrame = 0;
 let slotWaiters: Array<() => void> = [];
 const pumpSlots = () => {
-  slotFrame = 0;
   // 一件抛错不能卡住整队：曾经一张心率图在 ECharts 里抛错，排在它后面的几张图再也没按新尺寸重画（2026-11-17）。
   try {
     slots.shift()?.();
@@ -120,6 +125,7 @@ const pumpSlots = () => {
     slotFrame = requestAnimationFrame(pumpSlots);
     return;
   }
+  slotFrame = 0;
   const ready = slotWaiters;
   slotWaiters = [];
   for (const resolve of ready) resolve();
@@ -190,6 +196,10 @@ export const resetMotionBudget = () => {
   resizeJobs.clear();
   slots.length = 0;
   staging = 0;
+  mark();
+  if (slotFrame) cancelAnimationFrame(slotFrame);
+  slotFrame = 0;
+  slotWaiters = [];
   const ready = stagingWaiters;
   stagingWaiters = [];
   for (const resolve of ready) resolve();

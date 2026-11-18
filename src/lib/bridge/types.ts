@@ -457,7 +457,7 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   /** 力量动作目录：本机缓存优先，过期才问 Zepp；拉不到时返回旧缓存或空目录，不抛错。 */
-  getStrengthCatalog(locale: string): Promise<StrengthCatalogResult>;
+  getStrengthCatalog(locale: string, refresh?: boolean): Promise<StrengthCatalogResult>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
   editWorkouts(workoutIds: string[], changeType: boolean, workoutType: string | null, hidden: boolean | null): Promise<{ id: string; changed: number }>;
   undoWorkoutEdit(id: string): Promise<number>;

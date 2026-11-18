@@ -17,6 +17,22 @@ impl Database {
         &self,
         selection: &ExportSelection,
     ) -> Result<(serde_json::Value, usize)> {
+        self.build_ai_export_value_impl(selection, None)
+    }
+
+    pub(crate) fn build_records_export_value(
+        &self,
+        selection: &ExportSelection,
+        with_times: bool,
+    ) -> Result<(serde_json::Value, usize)> {
+        self.build_ai_export_value_impl(selection, Some(with_times))
+    }
+
+    fn build_ai_export_value_impl(
+        &self,
+        selection: &ExportSelection,
+        sample_source: Option<bool>,
+    ) -> Result<(serde_json::Value, usize)> {
         let scope = selection
             .resolve_scope()
             .map_err(ZeppBridgeError::ConfigError)?;
@@ -111,8 +127,18 @@ impl Database {
             // 被切到开始那天。
             let where_tail =
                 ai_export_samples_where_tail(sample_metric_names.len(), single_workout);
+            let provider = if sample_source.is_some() {
+                "provider"
+            } else {
+                "NULL"
+            };
+            let fetched = if sample_source == Some(true) {
+                "(SELECT fetched_at FROM raw_records WHERE id = metric_samples.raw_record_id)"
+            } else {
+                "NULL"
+            };
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT metric, timestamp, value, unit, source_scope, device_id
+                "SELECT metric, timestamp, value, unit, source_scope, device_id, {provider}, {fetched}
                  FROM metric_samples
                  WHERE {where_tail}
                  ORDER BY timestamp"
@@ -143,11 +169,15 @@ impl Database {
                     row.get::<_, String>(3)?,
                     row.get::<_, String>(4)?,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
                 ))
             })?;
+            let mut sources = BTreeMap::<_, crate::records::ProviderFlags>::new();
             let mut buckets: BTreeMap<(String, String, String), HourBucket> = BTreeMap::new();
             for row in rows {
-                let (metric, timestamp, value, unit, source_scope, device_id) = row?;
+                let (metric, timestamp, value, unit, source_scope, device_id, provider, fetched_at) =
+                    row?;
                 // 行级归型与 IN 列表的展开是同一个映射；单条运动时日级
                 // 类型的指标名根本没进 IN 列表，这里无需再判一次。
                 let Some(matched_type) = export_sample_matched_type(&metric, &selected) else {
@@ -158,31 +188,48 @@ impl Database {
                 if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
                     let moment = parse_datetime(&timestamp, "metric_samples.timestamp")?;
                     let hour = moment.format("%Y-%m-%dT%H:00:00+00:00").to_string();
+                    let key = (
+                        metric.clone(),
+                        device_label.clone().unwrap_or_default(),
+                        hour,
+                    );
+                    if let Some(provider) = provider {
+                        sources
+                            .entry(key.clone())
+                            .or_default()
+                            .add(&provider, fetched_at);
+                    }
                     buckets
-                        .entry((
-                            metric.clone(),
-                            device_label.clone().unwrap_or_default(),
-                            hour,
-                        ))
+                        .entry(key)
                         .or_insert_with(|| {
                             HourBucket::new(matched_type, unit, source_scope, device_label)
                         })
                         .push(value);
                 } else {
                     *emitted.entry(matched_type).or_default() += 1;
-                    metric_samples.push(serde_json::json!({
+                    let mut sample = serde_json::json!({
                         "metric": metric,
                         "timestamp": timestamp,
                         "value": value,
                         "unit": unit,
                         "source_scope": source_scope,
                         "device_label": device_label,
-                    }));
+                    });
+                    if let Some(provider) = provider {
+                        let mut source = crate::records::ProviderFlags::default();
+                        source.add(&provider, fetched_at);
+                        source.annotate_sample(&mut sample);
+                    }
+                    metric_samples.push(sample);
                 }
             }
-            for ((metric, _, hour), bucket) in buckets {
+            for (key, bucket) in buckets {
                 *emitted.entry(bucket.selected_type.clone()).or_default() += 1;
-                metric_samples.push(bucket.render(&metric, &hour));
+                let mut sample = bucket.render(&key.0, &key.2);
+                if let Some(source) = sources.remove(&key) {
+                    source.annotate_sample(&mut sample);
+                }
+                metric_samples.push(sample);
             }
         }
 

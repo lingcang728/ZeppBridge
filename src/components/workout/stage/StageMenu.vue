@@ -156,7 +156,7 @@ const step = (event: KeyboardEvent) => {
   box-shadow: none;
 }
 .stage-menu.glass-control.is-lens-host::before { box-shadow: var(--glass-rim), var(--glass-shadow); }
-.menu-inner { display: grid; gap: 2px; padding: 6px; border-radius: inherit; }
+.menu-inner { display: grid; gap: 2px; padding: 6px; border-radius: inherit; max-height: var(--menu-max-height, none); overflow-y: auto; overscroll-behavior: contain; }
 .menu-seg { display: flex; min-width: 0; padding: 2px 2px 4px; }
 .menu-seg :deep(.segment-track) { flex: 1; max-width: 100%; }
 .menu-sep { height: 1px; margin: 2px 10px 4px; background: var(--mat-line); }

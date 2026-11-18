@@ -139,9 +139,13 @@ fn secrets() -> pa::PaSecrets {
 }
 
 fn write_targets(dir: &Path, site: &str, enabled: bool) {
+    write_targets_for_days(dir, site, enabled, 3);
+}
+
+fn write_targets_for_days(dir: &Path, site: &str, enabled: bool, retention_days: u32) {
     let config = serde_json::json!({ "version": 1, "targets": [{
         "id": "pa", "kind": "pa", "enabled": enabled, "site": site,
-        "retention_days": 3, "summary_days": 2, "dev_loopback": true
+        "retention_days": retention_days, "summary_days": 2, "dev_loopback": true
     }]});
     std::fs::write(
         push_dir(dir).join(TARGETS_FILE),
@@ -153,9 +157,12 @@ fn write_targets(dir: &Path, site: &str, enabled: bool) {
 /// 一个真的 SQLite 库（文件），里面有今天的一条运动。
 fn seed_library(dir: &Path) {
     let db = Database::open_migrated(&dir.join("zepp.db")).unwrap();
-    let start = Utc::now() - chrono::Duration::hours(1);
+    seed_workout(&db, "w1", Utc::now() - chrono::Duration::hours(1));
+}
+
+fn seed_workout(db: &Database, id: &str, start: chrono::DateTime<Utc>) {
     db.insert_workout(&Workout {
-        workout_id: "w1".into(),
+        workout_id: id.into(),
         workout_type: "running".into(),
         normalized_type: "running".into(),
         type_source: "zepp_code".into(),
@@ -403,4 +410,38 @@ fn bad_connection_codes_and_sites_are_refused_with_a_code() {
         "err.push.site_invalid"
     );
     assert!(load_targets(&dir).unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn reconciles_older_local_edits_and_rebuilds_for_a_new_site() {
+    let first = fake_site().await;
+    let second = fake_site().await;
+    let dir = temp_dir("historical-destination");
+    let db = Database::open_migrated(&dir.join("zepp.db")).unwrap();
+    let start = Utc::now() - chrono::Duration::days(10);
+    seed_workout(&db, "old", start);
+    write_targets_for_days(&dir, &first.base, true, 15);
+    let store = store_with_secrets();
+    assert_eq!(run(&dir, store.clone()).await.targets[0].result, "ok");
+    db.edit_workouts(&["old".into()], None, Some(true)).unwrap();
+    seed_workout(&db, "backfill", start + chrono::Duration::hours(1));
+    first.requests.lock().unwrap().clear();
+    assert_eq!(run(&dir, store.clone()).await.targets[0].result, "ok");
+    {
+        let requests = first.requests.lock().unwrap();
+        assert!(requests
+            .iter()
+            .any(|(method, path, _, _)| method == "DELETE" && path.ends_with("/old.json")));
+        assert!(requests
+            .iter()
+            .any(|(method, path, _, _)| method == "PUT" && path.ends_with("/backfill.json")));
+        assert_eq!(requests.last().unwrap().1, "/v1/objects/status.json");
+    }
+    write_targets_for_days(&dir, &second.base, true, 15);
+    assert_eq!(run(&dir, store).await.targets[0].result, "ok");
+    let requests = second.requests.lock().unwrap();
+    assert!(requests
+        .iter()
+        .any(|(method, path, _, _)| method == "PUT" && path.ends_with("/backfill.json")));
+    assert!(requests.iter().all(|(method, _, _, _)| method != "DELETE"));
 }

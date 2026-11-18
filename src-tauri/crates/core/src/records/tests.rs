@@ -342,3 +342,61 @@ fn type_aliases_expand_and_unknown_types_are_reported() {
         vec!["gps", "nope"]
     );
 }
+
+#[test]
+fn hourly_provenance_uses_the_export_device_bucket_and_actual_inputs() {
+    let db = seeded();
+    let mut ids = db
+        .conn
+        .prepare("SELECT DISTINCT provider FROM metric_samples ORDER BY provider")
+        .unwrap();
+    let providers = ids
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap();
+    for (index, provider) in providers.iter().enumerate() {
+        let alias = format!("synthetic-device-{index}");
+        db.conn
+            .execute(
+                "INSERT INTO device_identities(alias, updated_at) VALUES(?1, ?2)",
+                rusqlite::params![alias, DAY],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "UPDATE metric_samples SET device_id = ?1 WHERE provider = ?2",
+                rusqlite::params![alias, provider],
+            )
+            .unwrap();
+    }
+    let mut request = query(&["heart_rate"]);
+    let summary = query_records(&db, &request).unwrap().value;
+    let samples = summary["data"]["metric_samples"].as_array().unwrap();
+    assert_eq!(samples.len(), 2);
+    for (index, provider) in providers.iter().enumerate() {
+        let label = format!("device_{}", index + 1);
+        let expected = if provider == "official" {
+            "official"
+        } else {
+            "advanced"
+        };
+        assert_eq!(
+            by_id(&summary, "metric_samples", "device_label", &label)["source"],
+            expected
+        );
+    }
+    request.since = Some(
+        DateTime::parse_from_rfc3339("2024-03-12T01:00:00+00:00")
+            .unwrap()
+            .with_timezone(&Utc),
+    );
+    let filtered = query_records(&db, &request).unwrap().value;
+    assert_eq!(
+        filtered["data"]["metric_samples"].as_array().unwrap().len(),
+        1
+    );
+    assert!(filtered["data"]["metric_samples"][0]
+        .get("_sample_fetched_at")
+        .is_none());
+}

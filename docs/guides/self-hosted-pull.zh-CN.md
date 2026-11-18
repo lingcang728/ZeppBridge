@@ -63,7 +63,7 @@
 
 - `records` 是一个平铺的列表，每条都带 `record_type` 和 `source`；其余字段和 `zeppbridge-cli export --format json` 一致。`record_type` 依次是 `sleep_session`、`workout`、`daily_metric`、`metric_sample`、`life_event` 之一。
 - `source`：`official` = Zepp 官方开放平台授权；`advanced` = 账号连接器；`mixed` = 同一个折叠值两边都有读数；`user` = 用户自己写的日历上下文。按每行入库时的来源读出，不是猜的。只想要官方数据的拉取方可以按它过滤。
-- 最后一页的 `next_cursor` 是 `null`。同一个查询的各页取自 30 秒内的同一份快照；两页之间要是刚好同步了一次，请去重：睡眠按 `sleep_id`、运动按 `workout_id`、每日指标按 `date` + `metric`、采样按 `timestamp` + `metric`。重拉有重叠的时间窗时按同样的键去重即可。
+- 最后一页的 `next_cursor` 是 `null`。同一个游标链读取同一份快照。快照保留最多 30 秒，服务也可能因其他查询淘汰它。收到 HTTP 409 `cursor_expired` 时去掉游标，从第一页重新拉取。
 - 单位、时区和缺失值遵守读取契约（`zeppbridge-cli contract`）：缺失就是没有这个字段或 `null`，绝不写成 `0`。
 - 错误统一是 `{"error": {"code": "…", "message": "…"}}`：
 
@@ -73,6 +73,7 @@
 | 400 | `invalid_range` / `range_too_long` | 日期缺失或格式不对、`to` 早于 `from`、超过 92 天 |
 | 400 | `invalid_types` | 不认识的类型，或一个都没选 |
 | 400 | `invalid_since` / `invalid_detail` / `invalid_limit` / `invalid_cursor` | 如其名 |
+| 409 | `cursor_expired` | 快照已过期。省略 `cursor` 后重试。 |
 | 401 | `unauthorized` | 没带 token 或 token 不对 |
 | 403 | `token_scope` | 拉取 token 访问了 `/v1/*` 和 `/health` 以外的路由 |
 | 429 | `rate_limited` | 见上面的限流；请按 `Retry-After` 等 |

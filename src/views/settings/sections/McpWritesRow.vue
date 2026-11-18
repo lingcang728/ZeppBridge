@@ -9,20 +9,31 @@ import { backend, isDesktop, toUserMessage } from '../../../lib/bridge';
 import type { McpWrite } from '../../../lib/bridge/types';
 import { locale, useMessages } from '../../../i18n';
 import { aiCardMessages } from './ai.i18n';
+import { settingsMessages } from '../../Settings.i18n';
 
 const a = useMessages(aiCardMessages);
+const s = useMessages(settingsMessages);
 const writes = ref<McpWrite[]>([]);
 const busy = ref<number | null>(null);
 const error = ref<string | null>(null);
+const loadError = ref(false);
+const loading = ref(false);
 
-onMounted(async () => {
-  if (!isDesktop()) return;
+const load = async () => {
+  if (!isDesktop() || loading.value || busy.value !== null) return;
+  loading.value = true;
+  error.value = null;
+  loadError.value = false;
   try {
     writes.value = await backend.mcpWritesList();
-  } catch {
-    writes.value = [];
+  } catch (cause) {
+    loadError.value = true;
+    error.value = toUserMessage(cause, a.value.writesLoadFailed);
+  } finally {
+    loading.value = false;
   }
-});
+};
+onMounted(load);
 
 const kindName = computed<Record<McpWrite['kind'], string>>(() => ({
   injury: a.value.writeKindInjury,
@@ -42,12 +53,14 @@ const when = (iso: string) => {
 };
 
 const undo = async (write: McpWrite) => {
+  if (loading.value || busy.value !== null) return;
   busy.value = write.id;
   error.value = null;
   try {
     writes.value = await backend.mcpWriteUndo(write.id);
   } catch (e) {
-    error.value = toUserMessage(e, '');
+    loadError.value = true;
+    error.value = toUserMessage(e, a.value.writesUndoFailed);
   } finally {
     busy.value = null;
   }
@@ -58,7 +71,8 @@ const undo = async (write: McpWrite) => {
   <div class="s-row is-block">
     <div class="s-row-main">
       <span class="s-row-title">{{ a.writesTitle }}</span>
-      <span v-if="!writes.length" class="s-row-sub">{{ a.writesEmpty }}</span>
+      <span v-if="loading" class="s-row-sub" role="status">{{ a.writesLoading }}</span>
+      <span v-else-if="!loadError && !writes.length" class="s-row-sub">{{ a.writesEmpty }}</span>
     </div>
     <ul v-if="writes.length" class="writes">
       <li v-for="write in writes" :key="write.id" :class="{ undone: write.undone_at }">
@@ -68,12 +82,13 @@ const undo = async (write: McpWrite) => {
           <span class="meta">{{ when(write.created_at) }}<template v-if="write.source_name"> · {{ write.source_name }}</template></span>
         </div>
         <span v-if="write.undone_at" class="meta">{{ a.writesUndone }}</span>
-        <button v-else class="button secondary" type="button" :disabled="busy === write.id" @click="undo(write)">
+        <button v-else class="button secondary" type="button" :disabled="busy !== null || loading || loadError" @click="undo(write)">
           {{ a.writesUndo }}
         </button>
       </li>
     </ul>
     <p v-if="error" class="hint-line" role="alert">{{ error }}</p>
+    <button v-if="loadError" class="button secondary" type="button" :disabled="loading || busy !== null" @click="load">{{ s.retry }}</button>
   </div>
 </template>
 

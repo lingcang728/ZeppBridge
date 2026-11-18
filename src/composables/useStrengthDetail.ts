@@ -37,7 +37,7 @@ const NONE: ReadonlySet<string> = new Set();
 export const useStrengthDetail = (strength: Ref<StrengthWorkoutDetail>) => {
   const t = useMessages(workoutStrengthMessages);
   const catalog = useMessages(strengthCatalogMessages);
-  const zepp = useStrengthCatalog();
+  const zepp = useStrengthCatalog(computed(() => !!(strength.value.sets.length || strength.value.exercise_groups.length)));
 
   /** 主肌群：后端已补就用后端的；否则看当前语言的 Zepp 目录。 */
   const primaryOf = (row: StrengthRowLike): string | null =>

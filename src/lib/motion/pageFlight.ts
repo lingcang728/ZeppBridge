@@ -167,12 +167,10 @@ export const partsOf = (page: HTMLElement) => {
  * 指针换了以后才开始的那段也拿得到。
  */
 export const settleTransitions = (...roots: Array<Element | null | undefined>) => {
-  for (const root of roots) {
-    if (!root?.isConnected) continue;
-    for (const animation of root.getAnimations({ subtree: true })) {
-      if (animation instanceof CSSTransition) animation.finish();
-    }
-  }
+  const transitions = roots.flatMap((root) =>
+    root?.isConnected ? root.getAnimations({ subtree: true }).filter((a) => a instanceof CSSTransition) : [],
+  );
+  for (const transition of transitions) transition.finish();
 };
 
 /** 卡在原位藏着（窗口就是从它长出来、落回它身上的）：用一段不参与快进的动画盖住，行内样式不动。 */

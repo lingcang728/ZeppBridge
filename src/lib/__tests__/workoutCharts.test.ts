@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartTier, fitTicks, lineOption, paceSeconds, withDetail } from '../workoutCharts';
+import { chartStats, sampleSeries, chartTier, fitTicks, lineOption, paceSeconds, withDetail } from '../workoutCharts';
 import type { ChartPalette } from '../echartsTheme';
 
 const pts = (...values: number[]) => values.map((v, i) => ({ t: i * 1000, v }));
@@ -27,6 +27,21 @@ describe('pace chart', () => {
     expect(option.yAxis.inverse).toBe(false);
     expect(option.series[0].areaStyle.origin).toBe('start');
     expect(option.tooltip.formatter([{ value: [0, 150] }])).toContain('<b>150</b> bpm');
+  });
+
+  it.each([799, 800, 801, 160_000])('keeps the actual peak with %i input samples', (length) => {
+    const start = Date.UTC(2026, 0, 1);
+    const points = sampleSeries(Array.from({ length }, (_, i) => ({
+      timestamp: new Date(start + i * 1000).toISOString(),
+      heart_rate: i === 201 ? 180 : 100,
+    })) as Parameters<typeof sampleSeries>[0], 'heart_rate');
+    const stats = chartStats(points)!;
+    expect(stats.high).toEqual({ t: start + 201_000, v: 180 });
+    expect(stats.low.v).toBe(100);
+    expect(stats.average).toBeCloseTo(100 + 80 / length, 8);
+    const option = lineOption(points, { color: '#f00', unit: 'bpm', palette })!;
+    expect(option.series[0].data).toContainEqual([stats.high.t, 180]);
+    expect(option.series[0].data.length).toBeLessThanOrEqual(802);
   });
 
   it('rounds to whole seconds', () => {

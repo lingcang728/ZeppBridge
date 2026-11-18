@@ -22,8 +22,9 @@ use super::Database;
 use crate::models::{error::Result, ZeppBridgeError};
 use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 /// 一次写入要改什么。
 #[derive(Debug, Clone)]
@@ -92,6 +93,14 @@ fn encode<T: Serialize>(value: &T) -> Result<Value> {
 
 fn decode<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
     serde_json::from_value(value).map_err(|error| ZeppBridgeError::ParseError(error.to_string()))
+}
+
+type ShoeDefaults = BTreeMap<String, Vec<i64>>;
+
+#[derive(Serialize, Deserialize)]
+struct ShoeDefaultChange {
+    before: ShoeDefaults,
+    after: ShoeDefaults,
 }
 
 fn clip(text: &str) -> String {
@@ -233,20 +242,42 @@ impl Database {
         change: McpChange,
         source_name: Option<&str>,
     ) -> Result<McpApplied> {
+        let tx = self.conn.unchecked_transaction()?;
+        let (applied, changed_workout) = match &change {
+            McpChange::WorkoutType {
+                workout_id,
+                workout_type,
+            } => self.apply_mcp_type(tool, workout_id, workout_type.as_deref(), source_name)?,
+            _ => (
+                self.apply_mcp_change_in_transaction(tool, change, source_name)?,
+                false,
+            ),
+        };
+        tx.commit()?;
+        if changed_workout {
+            super::note_content_change();
+        }
+        Ok(applied)
+    }
+
+    fn apply_mcp_change_in_transaction(
+        &self,
+        tool: &str,
+        change: McpChange,
+        source_name: Option<&str>,
+    ) -> Result<McpApplied> {
         let (kind, target, label, before) = match &change {
             McpChange::Injury(input) => ("injury", input.id, input.title.clone(), None),
             McpChange::LifeEvent(input) => ("life_event", input.id, input.title.clone(), None),
             McpChange::Race(input) => ("race", input.id, input.name.clone(), None),
-            McpChange::Shoe(input) => ("shoe", input.id, input.name.clone(), None),
+            McpChange::Shoe(input) => return self.apply_mcp_shoe(tool, input, source_name),
             McpChange::WorkoutFeel { workout_id, .. } => (
                 "workout_feel",
                 None,
                 workout_id.clone(),
                 Some(workout_id.clone()),
             ),
-            McpChange::WorkoutType { workout_id, .. } => {
-                return self.apply_mcp_type(tool, workout_id, &change, source_name);
-            }
+            McpChange::WorkoutType { .. } => unreachable!("handled by the transaction entry point"),
             McpChange::CoachNote(text) => {
                 return self.apply_mcp_note(tool, text, source_name);
             }
@@ -270,7 +301,6 @@ impl Database {
             McpChange::Injury(input) => self.save_injury(&input)?.to_string(),
             McpChange::LifeEvent(input) => self.save_life_event(&input)?.to_string(),
             McpChange::Race(input) => self.save_race(&input)?.to_string(),
-            McpChange::Shoe(input) => self.save_shoe(&input)?.to_string(),
             McpChange::WorkoutFeel {
                 workout_id,
                 rpe,
@@ -291,7 +321,9 @@ impl Database {
                 })?;
                 workout_id
             }
-            McpChange::WorkoutType { .. } | McpChange::CoachNote(_) => unreachable!(),
+            McpChange::WorkoutType { .. } | McpChange::CoachNote(_) | McpChange::Shoe(_) => {
+                unreachable!()
+            }
         };
         let after = self.mcp_snapshot(kind, &target_id)?.unwrap_or(Value::Null);
         let action = if before_value.is_none() {
@@ -326,21 +358,96 @@ impl Database {
         })
     }
 
+    fn shoe_defaults<'a>(
+        &self,
+        sports: impl IntoIterator<Item = &'a String>,
+    ) -> Result<ShoeDefaults> {
+        let mut defaults: ShoeDefaults = sports
+            .into_iter()
+            .map(|sport| (sport.clone(), Vec::new()))
+            .collect();
+        for shoe in self.list_shoe_rows()? {
+            if let (Some(ids), Some(id), true) = (
+                defaults.get_mut(&shoe.input.sport),
+                shoe.input.id,
+                shoe.input.is_default,
+            ) {
+                ids.push(id);
+            }
+        }
+        for ids in defaults.values_mut() {
+            ids.sort_unstable();
+        }
+        Ok(defaults)
+    }
+
+    fn apply_mcp_shoe(
+        &self,
+        tool: &str,
+        input: &ShoeInput,
+        source_name: Option<&str>,
+    ) -> Result<McpApplied> {
+        let existing: Option<ShoeInput> = match input.id {
+            Some(id) => Some(decode(
+                self.mcp_snapshot("shoe", &id.to_string())?.ok_or_else(|| {
+                    ZeppBridgeError::DataUnavailable("找不到要改的这条记录".into())
+                })?,
+            )?),
+            None => None,
+        };
+        let defaults = self.shoe_defaults(
+            std::iter::once(&input.sport).chain(existing.iter().map(|shoe| &shoe.sport)),
+        )?;
+        let target_id = self.save_shoe(input)?.to_string();
+        let mut after = self
+            .mcp_snapshot("shoe", &target_id)?
+            .ok_or_else(|| ZeppBridgeError::DataUnavailable("找不到刚保存的跑鞋".into()))?;
+        let before = existing.as_ref().map(encode).transpose()?;
+        let new_defaults = self.shoe_defaults(defaults.keys())?;
+        let action = match (
+            before.as_ref() == Some(&after),
+            defaults == new_defaults,
+            before.is_none(),
+        ) {
+            (true, true, _) => "unchanged",
+            (_, _, true) => "created",
+            _ => "updated",
+        };
+        let write_id = if action == "unchanged" {
+            None
+        } else {
+            after["default_change"] = encode(&ShoeDefaultChange {
+                before: defaults,
+                after: new_defaults,
+            })?;
+            Some(self.record_mcp_write(
+                tool,
+                "shoe",
+                &target_id,
+                &input.name,
+                before.as_ref(),
+                &after,
+                source_name,
+            )?)
+        };
+        Ok(McpApplied {
+            write_id,
+            kind: "shoe",
+            target_id,
+            action,
+            note: None,
+        })
+    }
+
     fn apply_mcp_type(
         &self,
         tool: &str,
         workout_id: &str,
-        change: &McpChange,
+        workout_type: Option<&str>,
         source_name: Option<&str>,
-    ) -> Result<McpApplied> {
-        let McpChange::WorkoutType { workout_type, .. } = change else {
-            unreachable!()
-        };
-        let edit = self.edit_workouts(
-            &[workout_id.to_string()],
-            Some(workout_type.as_deref()),
-            None,
-        )?;
+    ) -> Result<(McpApplied, bool)> {
+        let (edit, changed) =
+            self.edit_workouts_in_transaction(&[workout_id.to_string()], Some(workout_type), None)?;
         let after = json!({ "editId": edit.id, "type": workout_type });
         let write_id = self.record_mcp_write(
             tool,
@@ -351,13 +458,16 @@ impl Database {
             &after,
             source_name,
         )?;
-        Ok(McpApplied {
-            write_id: Some(write_id),
-            kind: "workout_type",
-            target_id: workout_id.to_string(),
-            action: "updated",
-            note: None,
-        })
+        Ok((
+            McpApplied {
+                write_id: Some(write_id),
+                kind: "workout_type",
+                target_id: workout_id.to_string(),
+                action: "updated",
+                note: None,
+            },
+            changed,
+        ))
     }
 
     fn apply_mcp_note(
@@ -437,6 +547,16 @@ impl Database {
 
     /// 撤销一条。见模块说明。
     pub fn undo_mcp_write(&self, id: i64) -> Result<UndoOutcome> {
+        let tx = self.conn.unchecked_transaction()?;
+        let (outcome, changed_workout) = self.undo_mcp_write_in_transaction(id)?;
+        tx.commit()?;
+        if changed_workout {
+            super::note_content_change();
+        }
+        Ok(outcome)
+    }
+
+    fn undo_mcp_write_in_transaction(&self, id: i64) -> Result<(UndoOutcome, bool)> {
         let row: Option<(String, String, Option<String>, String)> = self
             .conn
             .query_row(
@@ -447,7 +567,7 @@ impl Database {
             )
             .optional()?;
         let Some((kind, target, before, after)) = row else {
-            return Ok(UndoOutcome::Missing);
+            return Ok((UndoOutcome::Missing, false));
         };
         let newer: bool = self
             .conn
@@ -460,7 +580,7 @@ impl Database {
             .optional()?
             .is_some();
         if newer {
-            return Ok(UndoOutcome::Stale);
+            return Ok((UndoOutcome::Stale, false));
         }
         let parse = |text: &str| {
             serde_json::from_str::<Value>(text)
@@ -472,25 +592,101 @@ impl Database {
                 .get("editId")
                 .and_then(Value::as_str)
                 .unwrap_or_default();
-            match self.undo_workout_edit(edit_id) {
+            match self.undo_workout_edit_in_transaction(edit_id) {
                 Ok(_) => {}
                 Err(ZeppBridgeError::ConfigError(_) | ZeppBridgeError::DataUnavailable(_)) => {
-                    return Ok(UndoOutcome::Stale)
+                    return Ok((UndoOutcome::Stale, false))
                 }
                 Err(error) => return Err(error),
             }
         } else {
-            if self.mcp_snapshot(&kind, &target)?.as_ref() != Some(&after) {
-                return Ok(UndoOutcome::Stale);
-            }
             let before = before.as_deref().map(parse).transpose()?;
-            self.mcp_restore(&kind, &target, before)?;
+            if kind == "shoe" {
+                if !self.undo_mcp_shoe(&target, before, after)? {
+                    return Ok((UndoOutcome::Stale, false));
+                }
+            } else {
+                if self.mcp_snapshot(&kind, &target)?.as_ref() != Some(&after) {
+                    return Ok((UndoOutcome::Stale, false));
+                }
+                self.mcp_restore(&kind, &target, before)?;
+            }
         }
         self.conn.execute(
             "UPDATE mcp_writes SET undone_at = ?2 WHERE id = ?1",
             params![id, Utc::now().to_rfc3339()],
         )?;
-        Ok(UndoOutcome::Undone)
+        Ok((UndoOutcome::Undone, kind == "workout_type"))
+    }
+
+    fn undo_mcp_shoe(&self, target: &str, before: Option<Value>, mut after: Value) -> Result<bool> {
+        let default_change: Option<ShoeDefaultChange> = after
+            .as_object_mut()
+            .and_then(|entry| entry.remove("default_change"))
+            .map(decode)
+            .transpose()?;
+        if self.mcp_snapshot("shoe", target)?.as_ref() != Some(&after) {
+            return Ok(false);
+        }
+        if before.is_none()
+            && self.conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM workout_annotations WHERE shoe_id = ?1)",
+                [target],
+                |row| row.get::<_, bool>(0),
+            )?
+        {
+            return Ok(false);
+        }
+        let prior: Option<ShoeInput> = before.clone().map(decode).transpose()?;
+        let current: ShoeInput = decode(after)?;
+
+        if let Some(change) = &default_change {
+            if self.shoe_defaults(change.after.keys())? != change.after {
+                return Ok(false);
+            }
+            let shoes = self.list_shoe_rows()?;
+            for (sport, ids) in &change.before {
+                for id in ids {
+                    if Some(*id) != current.id
+                        && !shoes.iter().any(|shoe| {
+                            shoe.input.id == Some(*id)
+                                && shoe.input.sport == *sport
+                                && shoe.input.retired_on.is_none()
+                        })
+                    {
+                        return Ok(false);
+                    }
+                }
+            }
+        } else if current.is_default
+            && !prior
+                .as_ref()
+                .is_some_and(|shoe| shoe.is_default && shoe.sport == current.sport)
+        {
+            // Old entries did not record which previous default this edit replaced.
+            return Ok(false);
+        } else if let Some(shoe) = &prior {
+            if shoe.is_default
+                && self.shoe_defaults([&shoe.sport])?[&shoe.sport]
+                    .iter()
+                    .any(|id| Some(*id) != current.id)
+            {
+                return Ok(false);
+            }
+        }
+
+        self.mcp_restore("shoe", target, before)?;
+        if let Some(change) = default_change {
+            for (sport, ids) in change.before {
+                for id in ids {
+                    self.conn.execute(
+                        "UPDATE shoes SET is_default = 1 WHERE id = ?1 AND sport = ?2",
+                        params![id, sport],
+                    )?;
+                }
+            }
+        }
+        Ok(true)
     }
 }
 

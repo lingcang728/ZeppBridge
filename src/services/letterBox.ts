@@ -50,7 +50,13 @@ export async function sendLetterReply(input: LetterReplyInput): Promise<LetterSe
   return result;
 }
 
-export interface ReplyDraft { localId: string; text: string; allowQuote: boolean; alsoHit: string[] }
+export interface ReplyDraft {
+  localId: string;
+  text: string;
+  allowQuote: boolean;
+  alsoHit: string[];
+  report?: { id: string; category: string };
+}
 
 const newLocalId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
@@ -62,6 +68,7 @@ export function loadDraft(version: string): ReplyDraft {
         localId: raw.localId,
         text: raw.text.slice(0, LETTER_REPLY_MAX),
         allowQuote: raw.allowQuote === true,
+        ...(typeof raw.report?.id === 'string' && typeof raw.report.category === 'string' ? { report: raw.report } : {}),
         alsoHit: Array.isArray(raw.alsoHit) ? raw.alsoHit.filter((id): id is string => typeof id === 'string') : [],
       };
     }

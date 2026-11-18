@@ -70,9 +70,9 @@ fn first_round_sends_the_whole_window_and_status_last() {
     assert_eq!(first.days_considered, 5);
     assert!(check_no_coordinates(&first).is_ok());
 
-    // 第二轮：只重新考虑最近 3 天，而且内容一样就不发。
+    // 第二轮：重新核对保留窗口，但相同内容不发。
     let second = plan(&db, &first.manifest, false);
-    assert_eq!(second.days_considered, RECENT_DAYS);
+    assert_eq!(second.days_considered, 5);
     assert!(second.is_empty(), "{:?}", rels(&second));
 }
 

@@ -91,7 +91,6 @@ export const startExpand = (ctx: MorphCtx, el: HTMLElement, done: () => void, or
     drained = true;
     if (ctx.state.live === job && !job.landed) {
       release = holdMotion();
-      settleTransitions(el, leaving?.el);
     }
     staged();
   };

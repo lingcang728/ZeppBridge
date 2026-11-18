@@ -72,10 +72,16 @@ const {
 const hasAltitude = computed(() => Boolean(series.value?.samples.some(sample => sample.altitude_m != null) || series.value?.summary.elevation_gain_m != null || workout.value?.elevation_gain_m != null));
 /* 爬升卡顶上的起伏概览：最低 / 最高取逐点海拔（和海拔图的统计同一份），累计上升 / 下降取记录汇总。 */
 const relief = computed(() => {
-  const heights = (series.value?.samples ?? []).map(sample => sample.altitude_m).filter((v): v is number => v != null && v >= -500 && v <= 10_000);
+  let low = Infinity;
+  let high = -Infinity;
+  for (const { altitude_m: height } of series.value?.samples ?? []) {
+    if (height == null || !Number.isFinite(height) || height < -500 || height > 10_000) continue;
+    low = Math.min(low, height);
+    high = Math.max(high, height);
+  }
   const gain = workout.value?.elevation_gain_m ?? series.value?.summary.elevation_gain_m ?? null;
   const loss = workout.value?.elevation_loss_m ?? series.value?.summary.elevation_loss_m ?? null;
-  return { min: heights.length ? Math.min(...heights) : null, max: heights.length ? Math.max(...heights) : null, gain, loss };
+  return { min: Number.isFinite(low) ? low : null, max: Number.isFinite(high) ? high : null, gain, loss };
 });
 /* 没有距离的运动（力量训练、瑜伽……）和室内运动本来就没有 GPS：不放「没有轨迹」那张提示，页脚也不提轨迹（2026-11-13）。 */
 const routeExpected = computed(() => !!routeCanvas.value || expectsRoute(displayType.value, workout.value?.distance_meters));

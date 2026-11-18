@@ -20,9 +20,9 @@ pub const DEFAULT_PAGE_SIZE: usize = 500;
 
 pub const MAX_PAGE_SIZE: usize = 2000;
 
-/// 同一个查询翻页时复用结果多久。翻页期间库被同步改了，下一页可能和上一页有重叠或空隙，
-/// 拉取方按记录 id 去重即可；缓存只是避免每翻一页都把整个区间重算一遍。
+/// 活跃翻页共享快照，过期后必须从第一页重新开始。
 const CACHE_TTL: Duration = Duration::from_secs(30);
+const CACHE_ENTRIES: usize = 4;
 
 const MAX_QUERY_BYTES: usize = 2048;
 
@@ -37,6 +37,7 @@ pub struct RecordsRequest {
     pub include_gps: bool,
     pub limit: usize,
     pub offset: usize,
+    generation: Option<String>,
 }
 
 impl RecordsRequest {
@@ -200,18 +201,22 @@ pub fn parse_records_query(raw_query: &str) -> Result<RecordsRequest, QueryError
         include_gps,
         limit,
         offset: 0,
+        generation: None,
     };
     if let Some(cursor) = cursor {
-        request.offset = decode_cursor(&cursor, &request.fingerprint())?;
+        let (offset, generation) = decode_cursor(&cursor, &request.fingerprint())?;
+        request.offset = offset;
+        request.generation = Some(generation);
     }
     Ok(request)
 }
 
-pub fn encode_cursor(offset: usize, fingerprint: &str) -> String {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(format!("v1:{fingerprint}:{offset}"))
+fn encode_cursor(offset: usize, fingerprint: &str, generation: &str) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(format!("v2:{fingerprint}:{offset}:{generation}"))
 }
 
-fn decode_cursor(cursor: &str, fingerprint: &str) -> Result<usize, QueryError> {
+fn decode_cursor(cursor: &str, fingerprint: &str) -> Result<(usize, String), QueryError> {
     let invalid = || {
         bad(
             "invalid_cursor",
@@ -222,10 +227,19 @@ fn decode_cursor(cursor: &str, fingerprint: &str) -> Result<usize, QueryError> {
         .decode(cursor.trim())
         .map_err(|_| invalid())?;
     let text = String::from_utf8(bytes).map_err(|_| invalid())?;
-    let mut parts = text.splitn(3, ':');
-    match (parts.next(), parts.next(), parts.next()) {
-        (Some("v1"), Some(print), Some(offset)) if print == fingerprint => {
-            offset.parse::<usize>().map_err(|_| invalid())
+    let mut parts = text.split(':');
+    let version = parts.next();
+    if parts.next() != Some(fingerprint) {
+        return Err(invalid());
+    }
+    let offset = parts
+        .next()
+        .and_then(|offset| offset.parse().ok())
+        .ok_or_else(invalid)?;
+    match (version, parts.next(), parts.next()) {
+        (Some("v1"), None, None) => Ok((offset, String::new())),
+        (Some("v2"), Some(generation), None) if !generation.is_empty() => {
+            Ok((offset, generation.into()))
         }
         _ => Err(invalid()),
     }
@@ -267,32 +281,44 @@ pub struct Computed {
 
 struct CacheEntry {
     fingerprint: String,
+    generation: String,
     at: Instant,
     computed: Arc<Computed>,
 }
 
-/// 单条目缓存：只记最近一个查询。拉取方通常是一个服务按顺序翻页。
+/// A bounded set of snapshots lets independent queries page concurrently.
 #[derive(Default)]
 pub struct RecordsCache {
-    entry: Mutex<Option<CacheEntry>>,
+    entries: Mutex<std::collections::VecDeque<CacheEntry>>,
 }
 
 impl RecordsCache {
-    fn get(&self, fingerprint: &str) -> Option<Arc<Computed>> {
-        let entry = self.entry.lock().unwrap_or_else(|e| e.into_inner());
-        entry
-            .as_ref()
-            .filter(|entry| entry.fingerprint == fingerprint && entry.at.elapsed() < CACHE_TTL)
-            .map(|entry| entry.computed.clone())
+    fn get(&self, fingerprint: &str, generation: Option<&str>) -> Option<(Arc<Computed>, String)> {
+        let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+        entries.retain(|entry| entry.at.elapsed() < CACHE_TTL);
+        let index = entries.iter().rposition(|entry| {
+            entry.fingerprint == fingerprint && generation.is_none_or(|id| id == entry.generation)
+        })?;
+        let entry = entries.remove(index)?;
+        let result = (entry.computed.clone(), entry.generation.clone());
+        entries.push_back(entry);
+        Some(result)
     }
 
-    fn put(&self, fingerprint: String, computed: Arc<Computed>) {
-        let mut entry = self.entry.lock().unwrap_or_else(|e| e.into_inner());
-        *entry = Some(CacheEntry {
+    fn put(&self, fingerprint: String, computed: Arc<Computed>) -> String {
+        let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+        entries.retain(|entry| entry.at.elapsed() < CACHE_TTL);
+        if entries.len() >= CACHE_ENTRIES {
+            entries.pop_front();
+        }
+        let generation = crate::unique_suffix();
+        entries.push_back(CacheEntry {
             fingerprint,
+            generation: generation.clone(),
             at: Instant::now(),
             computed,
         });
+        generation
     }
 }
 
@@ -339,13 +365,26 @@ where
         Err(error) => return (HttpResponse::bad_request(error.code, &error.message), None),
     };
     let fingerprint = request.fingerprint();
-    let computed = match cache.get(&fingerprint) {
+    let (computed, generation) = match cache.get(&fingerprint, request.generation.as_deref()) {
         Some(hit) => hit,
+        None if request.generation.is_some() => {
+            return (
+                HttpResponse::json(
+                    409,
+                    "Conflict",
+                    json!({ "error": {
+                        "code": "cursor_expired",
+                        "message": "The result snapshot expired. Restart the query without a cursor."
+                    }}),
+                ),
+                None,
+            );
+        }
         None => match compute(&request) {
             Ok(computed) => {
                 let computed = Arc::new(computed);
-                cache.put(fingerprint.clone(), computed.clone());
-                computed
+                let generation = cache.put(fingerprint.clone(), computed.clone());
+                (computed, generation)
             }
             Err(error) => {
                 // 原因只进本机日志，响应里不带路径或数据库细节。
@@ -368,7 +407,7 @@ where
     let start = request.offset.min(total);
     let end = (start + request.limit).min(total);
     let page: Vec<&Value> = computed.records[start..end].iter().collect();
-    let next_cursor = (end < total).then(|| encode_cursor(end, &fingerprint));
+    let next_cursor = (end < total).then(|| encode_cursor(end, &fingerprint, &generation));
     let count = page.len();
     let body = json!({
         "records_version": RECORDS_VERSION,

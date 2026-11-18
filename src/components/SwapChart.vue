@@ -88,7 +88,10 @@ if (!drawn.value) {
     nextSlot(() => draw(true));
   });
   onMounted(() => {
-    if (!drawn.value && host.value && onFirstScreen(host.value)) nextSlot(() => draw(false));
+    // Read geometry after the surrounding page has mounted, before any chart writes its layout.
+    requestAnimationFrame(() => {
+      if (!drawn.value && host.value && onFirstScreen(host.value)) nextSlot(() => draw(false));
+    });
   });
 }
 

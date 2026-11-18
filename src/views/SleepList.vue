@@ -1,10 +1,10 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
-import { onMounted } from 'vue';
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
-import { afterMotion } from '../lib/motion/budget';
+import { afterMotion, nextSlot } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -74,6 +74,39 @@ const {
 });
 const initialLoading = useFirstLoad(loading);
 
+// The first query can return 200 nights. Fill the screen immediately and mount
+// the remaining rows after the transition in small batches.
+const renderLimit = ref<number | null>(Math.ceil(window.innerHeight / 44) + 4);
+const rendered = computed(() => renderLimit.value === null ? sessions.value : sessions.value.slice(0, renderLimit.value));
+const rendering = computed(() => rendered.value.length < sessions.value.length);
+let fillGeneration = 0;
+let filling = false;
+let active = false;
+const fillList = () => {
+  if (!active || !sessions.value.length || renderLimit.value === null || filling) return;
+  filling = true;
+  const generation = ++fillGeneration;
+  const addRows = () => {
+    if (fillGeneration !== generation) return;
+    const limit = (renderLimit.value ?? 0) + 24;
+    if (limit >= sessions.value.length) {
+      renderLimit.value = null;
+      filling = false;
+    } else {
+      renderLimit.value = limit;
+      nextSlot(addRows);
+    }
+  };
+  afterMotion(() => nextSlot(addRows));
+};
+const startFilling = () => { active = true; fillList(); };
+const stopFilling = () => { active = false; fillGeneration += 1; filling = false; };
+watch(() => sessions.value.length, fillList);
+onMounted(startFilling);
+onActivated(startFilling);
+onDeactivated(stopFilling);
+onBeforeUnmount(stopFilling);
+
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
 useRevisionReload(() => void loadList());
@@ -96,7 +129,7 @@ useSectionTour('sleep');
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else class="record-list">
       <RecordRow
-        v-for="session in sessions"
+        v-for="session in rendered"
         :key="session.sleep_id"
         :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
         category="sleep"
@@ -109,12 +142,12 @@ useSectionTour('sleep');
       />
     </div>
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore" :ref="sentinelRef" class="load-more">
+    <div v-if="hasMore && !rendering" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
     </div>
-    <p v-if="sessions.length" class="footnote">
+    <p v-if="sessions.length && !rendering" class="footnote">
       {{ t.shown(sessions.length, total) }} ·
       {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time)) }}
     </p>

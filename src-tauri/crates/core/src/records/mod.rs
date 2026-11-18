@@ -131,9 +131,19 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
         data_types: query.types.clone(),
         detail: query.detail,
     };
-    let (mut value, mut record_count) = db.build_ai_export_value(&selection)?;
+    // Export rows and their source metadata must see the same version of the library.
+    let snapshot = db
+        .conn
+        .is_autocommit()
+        .then(|| db.conn.unchecked_transaction())
+        .transpose()?;
+    let (mut value, mut record_count) =
+        db.build_records_export_value(&selection, query.since.is_some())?;
     let (start, end) = provenance_window(&value)?;
-    let index = ProvenanceIndex::load(db, &start, &end, query.since.is_some())?;
+    let index = ProvenanceIndex::load(db, &start, &end, &value["data"], query.since.is_some())?;
+    if let Some(snapshot) = snapshot {
+        snapshot.commit()?;
+    }
     let since = query.since;
 
     let Some(root) = value.as_object_mut() else {
@@ -163,7 +173,20 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
             };
             let kind = key.as_str();
             items.retain_mut(|item| {
-                let found = index.lookup(kind, item);
+                let found = if kind == "metric_samples" {
+                    let changed_at = item
+                        .as_object_mut()
+                        .and_then(|item| item.remove("_sample_fetched_at"))
+                        .and_then(|value| value.as_str().map(str::to_string));
+                    let source = match item.get("source").and_then(Value::as_str) {
+                        Some("official") => "official",
+                        Some("mixed") => "mixed",
+                        _ => "advanced",
+                    };
+                    Provenance { source, changed_at }
+                } else {
+                    index.lookup(kind, item)
+                };
                 if let Some(object) = item.as_object_mut() {
                     object.insert("source".into(), Value::String(found.source.to_string()));
                     if kind == "workouts" && !query.include_gps {
@@ -238,14 +261,14 @@ struct Provenance {
 }
 
 #[derive(Debug, Default)]
-struct ProviderFlags {
+pub(crate) struct ProviderFlags {
     official: bool,
     legacy: bool,
     changed_at: Option<String>,
 }
 
 impl ProviderFlags {
-    fn add(&mut self, provider: &str, fetched_at: Option<String>) {
+    pub(crate) fn add(&mut self, provider: &str, fetched_at: Option<String>) {
         if provider == crate::official::fetch::PROVIDER {
             self.official = true;
         } else {
@@ -259,6 +282,14 @@ impl ProviderFlags {
             {
                 self.changed_at = Some(fetched_at);
             }
+        }
+    }
+
+    pub(crate) fn annotate_sample(&self, sample: &mut Value) {
+        let provenance = self.resolve();
+        sample["source"] = Value::from(provenance.source);
+        if let Some(fetched_at) = provenance.changed_at {
+            sample["_sample_fetched_at"] = Value::from(fetched_at);
         }
     }
 
@@ -283,110 +314,84 @@ struct ProvenanceIndex {
     sleep: HashMap<String, ProviderFlags>,
     workouts: HashMap<String, ProviderFlags>,
     daily: HashMap<(String, String), ProviderFlags>,
-    samples: HashMap<(String, String), ProviderFlags>,
-    hours: HashMap<(String, String), ProviderFlags>,
 }
 
 impl ProvenanceIndex {
-    fn load(db: &Database, start: &str, end: &str, with_times: bool) -> Result<Self> {
+    fn load(db: &Database, start: &str, end: &str, data: &Value, with_times: bool) -> Result<Self> {
         let mut index = Self::default();
         // 边界放宽一天：导出按本地日取，这里按 UTC 字符串比，多读一点只是多几条用不上的键。
         let (lower, upper) = widened_utc_bounds(start, end)?;
         let fetched = if with_times { "r.fetched_at" } else { "NULL" };
 
-        let mut stmt = db.conn.prepare(&format!(
-            "SELECT s.sleep_id, s.provider, {fetched}
+        let has = |key: &str| data[key].as_array().is_some_and(|items| !items.is_empty());
+        if has("sleep_sessions") {
+            let mut stmt = db.conn.prepare(&format!(
+                "SELECT s.sleep_id, s.provider, {fetched}
              FROM sleep_sessions s LEFT JOIN raw_records r ON r.id = s.raw_record_id
              WHERE s.start_time >= ?1 AND s.start_time < ?2"
-        ))?;
-        for row in stmt.query_map([&lower, &upper], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            ))
-        })? {
-            let (id, provider, at) = row?;
-            index.sleep.entry(id).or_default().add(&provider, at);
+            ))?;
+            for row in stmt.query_map([&lower, &upper], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })? {
+                let (id, provider, at) = row?;
+                index.sleep.entry(id).or_default().add(&provider, at);
+            }
         }
-
-        // 运动的明细（逐秒、轨迹）另有一份报文，晚到的明细也算「这条运动变了」。
-        let detail = if with_times {
-            "(SELECT MAX(d.fetched_at) FROM raw_records d
+        if has("workouts") {
+            // 运动的明细（逐秒、轨迹）另有一份报文，晚到的明细也算「这条运动变了」。
+            let detail = if with_times {
+                "(SELECT MAX(d.fetched_at) FROM raw_records d
                WHERE d.stream = 'workout_detail'
                  AND (d.source_key = 'official:sport_detail:' || w.workout_id
                       OR (d.source_key >= 'workout_detail:' || w.workout_id || ':'
                           AND d.source_key < 'workout_detail:' || w.workout_id || ';')))"
-        } else {
-            "NULL"
-        };
-        let mut stmt = db.conn.prepare(&format!(
-            "SELECT w.workout_id, w.provider, {fetched}, {detail}
+            } else {
+                "NULL"
+            };
+            let mut stmt = db.conn.prepare(&format!(
+                "SELECT w.workout_id, w.provider, {fetched}, {detail}
              FROM workouts w LEFT JOIN raw_records r ON r.id = w.raw_record_id
              WHERE w.start_time >= ?1 AND w.start_time < ?2"
-        ))?;
-        for row in stmt.query_map([&lower, &upper], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, Option<String>>(3)?,
-            ))
-        })? {
-            let (id, provider, at, detail_at) = row?;
-            let entry = index.workouts.entry(id).or_default();
-            entry.add(&provider, at);
-            entry.add(&provider, detail_at);
+            ))?;
+            for row in stmt.query_map([&lower, &upper], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })? {
+                let (id, provider, at, detail_at) = row?;
+                let entry = index.workouts.entry(id).or_default();
+                entry.add(&provider, at);
+                entry.add(&provider, detail_at);
+            }
         }
-
-        let mut stmt = db.conn.prepare(&format!(
-            "SELECT d.date, d.metric, d.provider, {fetched}
+        if has("daily_metrics") {
+            let mut stmt = db.conn.prepare(&format!(
+                "SELECT d.date, d.metric, d.provider, {fetched}
              FROM daily_metrics d LEFT JOIN raw_records r ON r.id = d.raw_record_id
              WHERE d.date BETWEEN ?1 AND ?2"
-        ))?;
-        for row in stmt.query_map([start, end], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-            ))
-        })? {
-            let (date, metric, provider, at) = row?;
-            index
-                .daily
-                .entry((date, metric))
-                .or_default()
-                .add(&provider, at);
-        }
-
-        let mut stmt = db.conn.prepare(&format!(
-            "SELECT m.metric, m.timestamp, m.provider, {fetched}
-             FROM metric_samples m LEFT JOIN raw_records r ON r.id = m.raw_record_id
-             WHERE m.timestamp >= ?1 AND m.timestamp < ?2"
-        ))?;
-        for row in stmt.query_map([&lower, &upper], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-            ))
-        })? {
-            let (metric, timestamp, provider, at) = row?;
-            // 摘要模式按小时聚合，键要和导出里的 `hour` 一字不差（UTC 整点）。
-            if let Some(hour) = hour_key(&timestamp) {
+            ))?;
+            for row in stmt.query_map([start, end], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })? {
+                let (date, metric, provider, at) = row?;
                 index
-                    .hours
-                    .entry((metric.clone(), hour))
+                    .daily
+                    .entry((date, metric))
                     .or_default()
-                    .add(&provider, at.clone());
+                    .add(&provider, at);
             }
-            index
-                .samples
-                .entry((metric, timestamp))
-                .or_default()
-                .add(&provider, at);
         }
         Ok(index)
     }
@@ -400,14 +405,6 @@ impl ProvenanceIndex {
                 (Some(date), Some(metric)) => self.daily.get(&(date, metric)),
                 _ => None,
             },
-            "metric_samples" => {
-                let metric = text("metric");
-                match (metric, text("timestamp"), text("hour")) {
-                    (Some(metric), Some(timestamp), _) => self.samples.get(&(metric, timestamp)),
-                    (Some(metric), None, Some(hour)) => self.hours.get(&(metric, hour)),
-                    _ => None,
-                }
-            }
             "life_events" => {
                 return Provenance {
                     source: "user",
@@ -449,14 +446,4 @@ fn widened_utc_bounds(start: &str, end: &str) -> Result<(String, String)> {
         format!("{}T00:00:00+00:00", lower.format("%Y-%m-%d")),
         format!("{}T00:00:00+00:00", upper.format("%Y-%m-%d")),
     ))
-}
-
-fn hour_key(timestamp: &str) -> Option<String> {
-    let moment = DateTime::parse_from_rfc3339(timestamp).ok()?;
-    Some(
-        moment
-            .with_timezone(&Utc)
-            .format("%Y-%m-%dT%H:00:00+00:00")
-            .to_string(),
-    )
 }

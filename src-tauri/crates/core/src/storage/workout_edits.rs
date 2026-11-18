@@ -61,6 +61,21 @@ impl Database {
         workout_type: Option<Option<&str>>,
         hidden: Option<bool>,
     ) -> Result<WorkoutEdit> {
+        let tx = self.conn.unchecked_transaction()?;
+        let (edit, changed) = self.edit_workouts_in_transaction(ids, workout_type, hidden)?;
+        tx.commit()?;
+        if changed {
+            note_content_change();
+        }
+        Ok(edit)
+    }
+
+    pub(super) fn edit_workouts_in_transaction(
+        &self,
+        ids: &[String],
+        workout_type: Option<Option<&str>>,
+        hidden: Option<bool>,
+    ) -> Result<(WorkoutEdit, bool)> {
         let ids: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
         if ids.is_empty() || ids.len() > 1000 || ids.iter().any(|id| id.trim().is_empty()) {
             return Err(ZeppBridgeError::ConfigError("请选择1至1000条运动".into()));
@@ -76,7 +91,6 @@ impl Database {
         {
             return Err(ZeppBridgeError::ConfigError("不支持的运动类型纠正".into()));
         }
-        let tx = self.conn.unchecked_transaction()?;
         let before: Vec<_> = ids
             .iter()
             .map(|id| self.workout_local_state(id))
@@ -96,18 +110,24 @@ impl Database {
             serde_json::to_string(states).map_err(|e| ZeppBridgeError::ParseError(e.to_string()))
         };
         self.conn.execute("INSERT INTO workout_edit_history(id, before_json, after_json, created_at) VALUES(?1, ?2, ?3, ?4)", params![id, encode(&before)?, encode(&after)?, Utc::now().to_rfc3339()])?;
-        tx.commit()?;
-        if before != after {
-            note_content_change();
-        }
-        Ok(WorkoutEdit {
-            id,
-            changed: after.len(),
-        })
+        Ok((
+            WorkoutEdit {
+                id,
+                changed: after.len(),
+            },
+            before != after,
+        ))
     }
 
     pub fn undo_workout_edit(&self, id: &str) -> Result<usize> {
         let tx = self.conn.unchecked_transaction()?;
+        let changed = self.undo_workout_edit_in_transaction(id)?;
+        tx.commit()?;
+        note_content_change();
+        Ok(changed)
+    }
+
+    pub(super) fn undo_workout_edit_in_transaction(&self, id: &str) -> Result<usize> {
         let (revision, before, after): (i64, String, String) = self.conn.query_row(
             "SELECT rowid, before_json, after_json FROM workout_edit_history WHERE id = ?1 AND undone = 0", [id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
@@ -148,8 +168,6 @@ impl Database {
             "UPDATE workout_edit_history SET undone = 1 WHERE id = ?1",
             [id],
         )?;
-        tx.commit()?;
-        note_content_change();
         Ok(before.len())
     }
 

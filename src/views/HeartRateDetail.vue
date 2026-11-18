@@ -33,7 +33,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isDesktop, toUserMessage } from '../lib/bridge';
 import { heartPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
-import { afterMotion } from '../lib/motion/budget';
+import { afterMotion, motionBusy } from '../lib/motion/budget';
 import { chartPalette } from '../lib/echartsSetup';
 import { metricColor } from '../lib/metricTone';
 import { indexSeries, sliceByDate, sliceIndexed } from '../lib/metricSeries';
@@ -348,8 +348,8 @@ const shownDailyMax = useQueuedOption(dailyMaxChartOption);
 // 第一帧用的是先前读好的数据：重读等形变放完再做，晚到的结果不在形变途中改页面（lib/motion/budget.ts）。
 // 首屏之外的那几张卡第一帧就挂（2026-11-17：#168 让它们整段等落地才挂，页面长满以后下面空一拍才冒出来）；
 // 只有它们的图表画布押到形变落地以后再一帧一张画、淡入（ChartHold）——#168 要省的主要就是这几张图在形变途中建图。
-// 直接打开（没有形变）就照常一次画完。
-const belowCharts = ref(!preloaded);
+// 直接打开照常画图，冷数据碰上形变也只先建可见的图。
+const belowCharts = ref(!motionBusy.value);
 afterMotion(() => { belowCharts.value = true; });
 onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(dataRevision, () => { void load(); });

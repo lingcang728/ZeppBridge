@@ -11,7 +11,7 @@ export type SeriesKey = keyof Pick<WorkoutSeriesSample, 'heart_rate' | 'pace' | 
 export type ChartPoint = { t: number; v: number };
 
 /** 取出一列采样，去掉明显不合理的值（心率 20–250、配速 1–60 分/公里、步频 0–300、海拔 -500–10000 米）。 */
-export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: SeriesKey): ChartPoint[] => downsample(
+export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: SeriesKey): ChartPoint[] =>
   (samples ?? [])
     .map((sample) => ({ t: new Date(sample.timestamp).getTime(), v: sample[key] }))
     .filter((point): point is ChartPoint => {
@@ -20,8 +20,20 @@ export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: Se
       if (key === 'pace') return point.v >= 1 && point.v < 60;
       if (key === 'cadence') return point.v > 0 && point.v < 300;
       return point.v >= -500 && point.v <= 10_000;
-    }),
-);
+    });
+
+export const chartStats = (points: readonly ChartPoint[]) => {
+  if (points.length < 2) return null;
+  let low = points[0]!;
+  let high = low;
+  let sum = 0;
+  for (const point of points) {
+    if (point.v < low.v) low = point;
+    if (point.v > high.v) high = point;
+    sum += point.v;
+  }
+  return { low, high, average: sum / points.length };
+};
 
 /**
  * 秒 → `m'ss"`。配速图的纵轴、提示、标注和卡头统计都用这一种写法（2026-11-14 用户截图：
@@ -44,13 +56,24 @@ export interface LineOptionOpts {
   format?: (value: number) => string;
   /** 均值线画在哪（配速用 距离 ÷ 运动时间，和卡头、概要卡同一个数）；不给就是这些点的算术平均。 */
   average?: number | null;
+  highlights?: readonly ChartPoint[];
 }
 
 /** 一张带均值虚线的面积折线图；少于两个点时返回 null（不画图，不编数据）。 */
 export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
   const { color, unit, palette, axis, inverse = false, format } = opts;
   if (points.length < 2) return null;
-  const avg = isFiniteNumber(opts.average) ? opts.average : points.reduce((sum, p) => sum + p.v, 0) / points.length;
+  const stats = chartStats(points)!;
+  const avg = isFiniteNumber(opts.average) ? opts.average : stats.average;
+  let plotted = downsample(points);
+  if (plotted !== points) {
+    const keep = new Set([stats.low.t, stats.high.t, ...(opts.highlights ?? []).map((point) => point.t)]);
+    const byTime = new Map(plotted.map((point) => [point.t, point]));
+    for (const point of points) {
+      if (keep.has(point.t)) byTime.set(point.t, point);
+    }
+    plotted = [...byTime.values()].sort((a, b) => a.t - b.t);
+  }
   // 时间轴的刻度间隔钉在「整分钟、大约四格」：短短几分钟的记录里 ECharts 会按秒
   // 切刻度，「19:44 19:46 19:48」挤成一串，hideOverlap 管不到时间轴的两级标签。
   const span = points[points.length - 1]!.t - points[0]!.t;
@@ -94,7 +117,7 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
     },
     series: [{
       type: 'line',
-      data: points.map((point) => [point.t, point.v]),
+      data: plotted.map((point) => [point.t, point.v]),
       smooth: 0.2,
       showSymbol: false,
       clip: true,

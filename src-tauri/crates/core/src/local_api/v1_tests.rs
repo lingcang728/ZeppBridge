@@ -341,3 +341,32 @@ fn startup_notes_warn_about_plaintext_only_beyond_loopback() {
     assert!(remote.contains("Plaintext HTTP"));
     assert!(remote.contains("reverse proxy"));
 }
+
+#[test]
+fn interleaved_queries_keep_their_snapshot_or_return_expired() {
+    let cache = RecordsCache::default();
+    let first = body(&run(&format!("{RANGE}&limit=2"), Some(PULL), &cache));
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let next = format!("{RANGE}&limit=2&cursor={cursor}");
+    assert_eq!(
+        run(&format!("{RANGE}&types=sleep"), Some(PULL), &cache)
+            .response
+            .status,
+        200
+    );
+    assert_eq!(body(&run(&next, Some(PULL), &cache))["records"][0]["n"], 2);
+
+    for kinds in ["steps", "hrv", "weight", "workouts"] {
+        assert_eq!(
+            run(&format!("{RANGE}&types={kinds}"), Some(PULL), &cache)
+                .response
+                .status,
+            200
+        );
+    }
+    let expired = run(&next, Some(PULL), &cache);
+    assert_eq!(expired.response.status, 409);
+    assert_eq!(body(&expired)["error"]["code"], "cursor_expired");
+    assert_eq!(body(&run(RANGE, Some(PULL), &cache))["records"][0]["n"], 0);
+    assert_eq!(run(&next, Some(PULL), &cache).response.status, 409);
+}

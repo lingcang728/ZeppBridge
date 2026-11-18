@@ -394,8 +394,8 @@ export const tauriBackend: BridgeBackend = {
     return call<WorkoutSeries>('get_workout_series', { workoutId });
   },
 
-  getStrengthCatalog(locale: string) {
-    return call<StrengthCatalogResult>('get_strength_catalog', { locale });
+  getStrengthCatalog(locale: string, refresh?: boolean) {
+    return call<StrengthCatalogResult>('get_strength_catalog', { locale, refresh });
   },
 
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null) {

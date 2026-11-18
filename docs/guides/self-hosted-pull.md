@@ -92,11 +92,9 @@ An unknown parameter, or one given twice, is an error rather than ignored.
   `user` = calendar context the user wrote. It is read from what each row was
   stored from, not guessed. A puller that wants official data only can filter
   on it.
-- `next_cursor` is `null` on the last page. Pages of one query are served from
-  a 30-second snapshot; if a sync lands between two pages, deduplicate: a sleep
-  session by `sleep_id`, a workout by `workout_id`, a daily metric by
-  `date` + `metric`, a sample by `timestamp` + `metric`. The same keys make
-  re-pulling an overlapping window safe.
+- `next_cursor` is `null` on the last page. All pages reached through a cursor
+  use the same snapshot. Snapshots live for up to 30 seconds and may be evicted
+  by another query. On HTTP 409 `cursor_expired`, restart without a cursor.
 - Units, time zone and missing values follow the read contract
   (`zeppbridge-cli contract`): a missing value is absent or `null`, never `0`.
 - Errors are `{"error": {"code": "…", "message": "…"}}`:
@@ -107,6 +105,7 @@ An unknown parameter, or one given twice, is an error rather than ignored.
 | 400 | `invalid_range` / `range_too_long` | Missing or malformed dates, `to` before `from`, more than 92 days |
 | 400 | `invalid_types` | Unknown type, or none selected |
 | 400 | `invalid_since` / `invalid_detail` / `invalid_limit` / `invalid_cursor` | As named |
+| 409 | `cursor_expired` | The snapshot expired. Retry without a `cursor`. |
 | 401 | `unauthorized` | Missing or wrong token |
 | 403 | `token_scope` | The pull token asked for a route outside `/v1/*` and `/health` |
 | 429 | `rate_limited` | See rate limits above; honour `Retry-After` |
