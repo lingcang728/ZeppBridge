@@ -3396,8 +3396,6 @@ Règles :
 - Ne modifie aucun des fichiers propres à ZeppBridge ni sa base de données.
 - Si tu ne trouves pas le modèle de site ZeppBridge Cloud, dis-le-moi. N’écris pas de solution de remplacement toi-même : le format de chiffrement doit correspondre exactement à ZeppBridge.`,
       promptLanguage: 'Français',
-      enabled: 'Envoyer après chaque synchro',
-      enabledSub: 'Désactivez pour mettre en pause ; vos réglages restent',
       statusOn: 'Activé',
       statusOff: 'En pause',
       statusNoKey: 'Code de connexion manquant, impossible d’envoyer',
@@ -4291,7 +4289,6 @@ Règles :
     },
     'views/settings/sections/cloud': {
       labTitle: 'Options Personal Agent',
-      labSub: 'Pour les Personal Agent comme Muse et Hark qui ont besoin d’accéder librement à vos données. Un composant autonome téléverse des données chiffrées localement vers votre propre site auto-hébergé — jamais vers un serveur tiers. Une fois activé, gérez-le dans la carte «\u00A0Outils IA\u00A0» et sur la page «\u00A0Confier à l’IA\u00A0».',
       secTitle: 'Options Personal Agent',
       lead: 'Une passerelle conçue pour des Personal Agent tels que Muse et Hark — vos données ne sont jamais envoyées vers des serveurs ordinaires ni vers des plateformes tierces. Le composant autonome chiffre et téléverse vers votre propre site, où chaque Agent lit à l’aide d’une clé en lecture seule\u00A0; le téléversement est effectué par le composant et les clés ne passent jamais par ZeppBridge.',
       checking: 'Vérification du composant cloud…',

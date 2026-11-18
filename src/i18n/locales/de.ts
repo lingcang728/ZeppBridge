@@ -4326,8 +4326,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'views/settings/sections/cloud': {
       labTitle: 'Personal Agent-Optionen',
-      labSub:
-        'Für Personal Agents wie Muse und Hark, die jederzeit auf deine Daten zugreifen müssen. Eine eigenständige Komponente lädt lokal verschlüsselte Daten auf deine selbst gehostete Website hoch – niemals auf Server Dritter. Nach dem Aktivieren verwaltest du alles in der Karte „KI-Werkzeuge“ und auf der Seite „An die KI“.',
       secTitle: 'Personal Agent-Optionen',
       lead:
         'Eine Brücke für Personal Agents wie Muse und Hark – deine Daten werden weder an gewöhnliche Server noch an Drittanbieter-Plattformen gesendet. Die eigenständige Komponente verschlüsselt deine Daten und lädt sie auf deine eigene Website hoch, wo jeder Agent sie mit einem Nur-Lese-Schlüssel abruft; der Upload läuft über die Komponente, und die Schlüssel laufen nie über ZeppBridge.',
@@ -4467,8 +4465,6 @@ Regeln:
 - Ändere keine eigenen Dateien oder die Datenbank von ZeppBridge.
 - Falls du die Website-Vorlage von ZeppBridge Cloud nicht findest, sag es mir direkt. Schreibe keinen eigenen Ersatz: Das Verschlüsselungsformat muss exakt zu ZeppBridge passen.`,
       promptLanguage: 'Deutsch',
-      enabled: 'Nach jeder Synchronisierung pushen',
-      enabledSub: 'Zum Pausieren ausschalten; deine Einstellungen bleiben erhalten',
       statusOn: 'Aktiv',
       statusOff: 'Pausiert',
       statusNoKey: 'Verbindungscode fehlt – es kann nichts gesendet werden',

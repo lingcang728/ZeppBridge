@@ -1,26 +1,32 @@
 <script setup lang="ts">
-/* 设置 › 数据 ›「推送到你自己的站点」（2026-11-18）：PA 推送的配置入口，写给第一次接触的人。
+/* Beta 实验室 › Personal Agent 选项 ›「推送到你自己的站点」（2026-11-18）：PA 推送的配置入口，写给第一次接触的人。
+ * 只在实验室开关开着时挂（LabsSection）；开关就是总闸，所以这里不再有自己的「同步后自动推送」开关。
  *
  * 没设过：一段小演示（数据怎么走）+ 三条路，按「最省事」排——
  *   1. 这台电脑装过 ZeppBridge Cloud：一键接过来（站点和密钥都从组件那里读，不删组件的东西）；
  *   2. 已经有站点：填地址、贴一行连接码；
  *   3. 还没有站点：复制一段话给本地 AI，让它带着搭，最后交回地址和连接码。
- * 设过了：一行状态（上次推送的结果）+ 开关 + 立即推送；换站点 / 连接码、移除收在下面。
+ * 设过了：一行状态（上次推送的结果）+ 立即推送；这台电脑装着 ZeppBridge Cloud 组件时，给 Agent 发只读密钥的那几行也在这里；
+ * 换站点 / 连接码、移除收在下面。
  * 不跳文档、不开浏览器；密钥只写不读，界面只知道「有没有」。 */
 import { computed, onActivated, onMounted, ref } from 'vue';
-import GlassSwitch from '../../../components/GlassSwitch.vue';
 import Icon from '../../../components/Icon.vue';
+import { useCloudCompanion } from '../../../composables/useCloudCompanion';
 import { useServerPush } from '../../../composables/useServerPush';
 import { useMessages } from '../../../i18n';
 import { errorTextFor } from '../../../i18n/errors';
 import { formatWhen } from '../../../lib/format';
+import CloudReaderRows from './CloudReaderRows.vue';
 import PushFlow from './PushFlow.vue';
 import { pushMessages } from './push.i18n';
 
 const t = useMessages(pushMessages);
-const { state, busy, outcome, refresh, save, importCompanion, setEnabled, run, remove } = useServerPush();
-onMounted(() => { void refresh(); });
-onActivated(() => { void refresh(); });
+const { state, busy, outcome, refresh, save, importCompanion, run, remove } = useServerPush();
+/* 只读密钥由 ZeppBridge Cloud 组件发：装着组件才有那几行。 */
+const companion = useCloudCompanion();
+const reload = () => { void refresh(); void companion.refresh(); };
+onMounted(reload);
+onActivated(reload);
 
 const configured = computed(() => !!state.value?.configured);
 /** 表单开着：没设过时点了「我已经有站点」，或设过后点了「换站点或连接码」。 */
@@ -34,7 +40,7 @@ const openForm = () => {
 };
 const submit = async () => {
   copyNote.value = null;
-  const ok = await save({ site: site.value.trim(), connection_code: code.value.trim() || null, enabled: state.value?.configured ? state.value.enabled : true });
+  const ok = await save({ site: site.value.trim(), connection_code: code.value.trim() || null, enabled: true });
   if (ok) { formOpen.value = false; code.value = ''; }
 };
 
@@ -100,12 +106,6 @@ const askRemove = async () => {
             <button class="button primary" type="button" data-setting="push-now" :disabled="!!busy || pushing || !state.has_secrets" @click="run">
               <Icon name="send" :size="14" />{{ pushing ? t.pushing : t.pushNow }}
             </button>
-          </div>
-        </div>
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ t.enabled }}</span><span class="s-row-sub">{{ t.enabledSub }}</span></div>
-          <div class="s-row-control">
-            <GlassSwitch :model-value="state.enabled" :aria-label="t.enabled" :disabled="!!busy" @update:model-value="(on: boolean) => setEnabled(on)" />
           </div>
         </div>
       </template>
@@ -177,6 +177,9 @@ const askRemove = async () => {
           <button class="button secondary" type="button" @click="copy(TASKS_COMMAND, t.tasksCopied)"><Icon name="copy" :size="14" />{{ t.copyTasks }}</button>
         </div>
       </div>
+
+      <!-- 设过了：给 Agent 的只读密钥（装着组件才有） -->
+      <CloudReaderRows v-if="configured && companion.state.value?.uploader_dir" />
 
       <!-- 设过了：换、移除 -->
       <div v-if="configured && !formOpen" class="s-row">

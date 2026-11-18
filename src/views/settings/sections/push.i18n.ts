@@ -1,7 +1,7 @@
 import { defineMessages } from '../../../i18n';
 
 /**
- * 设置 › 数据 ›「推送到你自己的站点」（2026-11-18）：PA 推送的配置入口。
+ * Beta 实验室 › Personal Agent 选项 ›「推送到你自己的站点」（2026-11-18）：PA 推送的配置入口。
  * 写给第一次听说这件事的人：少讲原理，多给下一步；搭站点交给本地 AI（复制一段话过去）。
  * `aiPrompt` 是给 AI 看的整段话，按界面语言给，AI 会用同一种语言回答。
  */
@@ -57,8 +57,6 @@ export const pushMessages = defineMessages(
 - 不要改动 ZeppBridge 自己的文件和数据库。
 - 如果找不到 ZeppBridge Cloud 的站点模板，直接告诉我，不要自己另写一个替代品——加密格式必须和 ZeppBridge 一致。`,
     promptLanguage: '中文',
-    enabled: '同步后自动推送',
-    enabledSub: '关掉就暂停，设置都留着',
     statusOn: '已开启',
     statusOff: '已暂停',
     statusNoKey: '缺连接码，推不出去',
@@ -131,8 +129,6 @@ Rules:
 - Do not change any of ZeppBridge's own files or its database.
 - If you cannot find the ZeppBridge Cloud site template, tell me so. Do not write a replacement yourself: the encryption format has to match ZeppBridge exactly.`,
     promptLanguage: 'English',
-    enabled: 'Push after every sync',
-    enabledSub: 'Turn off to pause; your settings stay',
     statusOn: 'On',
     statusOff: 'Paused',
     statusNoKey: 'Connection code missing, nothing can be sent',
@@ -205,8 +201,6 @@ Reglas:
 - No modifiques ningún archivo propio de ZeppBridge ni su base de datos.
 - Si no encuentras la plantilla de ZeppBridge Cloud, dímelo. No escribas un reemplazo por tu cuenta: el formato de cifrado debe coincidir exactamente con ZeppBridge.`,
     promptLanguage: 'Español',
-    enabled: 'Enviar tras cada sincronización',
-    enabledSub: 'Apágalo para pausar; la configuración se conserva',
     statusOn: 'Activado',
     statusOff: 'En pausa',
     statusNoKey: 'Falta el código de conexión; no se puede enviar nada',

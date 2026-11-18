@@ -4332,7 +4332,6 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   // Source: src/views/settings/sections/cloud.i18n.ts
   'views/settings/sections/cloud': {
     labTitle: 'Opcje Personal Agent',
-    labSub: 'Dla narzędzi typu Personal Agent, takich jak Muse i Hark, które potrzebują stałego dostępu do Twoich danych. Osobny komponent przesyła lokalnie zaszyfrowane dane na Twoją własną witrynę — nigdy na serwery zewnętrzne. Po włączeniu zarządzaj tą funkcją na karcie „Narzędzia AI” i na stronie „Wyślij do AI”.',
     secTitle: 'Opcje Personal Agent',
     lead: 'Pomost dla narzędzi typu Personal Agent, takich jak Muse i Hark — Twoje dane nigdy nie trafiają na zwykłe serwery ani platformy zewnętrzne. Osobny komponent szyfruje dane i przesyła je na Twoją własną witrynę, skąd każdy Personal Agent odczytuje je za pomocą klucza tylko do odczytu; przesyłaniem zajmuje się komponent, a klucze nigdy nie przechodzą przez ZeppBridge.',
     checking: 'Sprawdzanie komponentu chmurowego…',
@@ -4511,8 +4510,6 @@ Zasady:
 - Nie modyfikuj żadnych własnych plików ZeppBridge ani jego bazy danych.
 - Jeśli nie możesz znaleźć szablonu witryny ZeppBridge Cloud, powiedz mi o tym. Nie pisz własnego zamiennika — format szyfrowania musi być dokładnie zgodny z ZeppBridge.`,
     promptLanguage: 'Polski',
-    enabled: 'Przesyłaj po każdej synchronizacji',
-    enabledSub: 'Wyłącz, aby wstrzymać; ustawienia zostaną zachowane',
     statusOn: 'Włączono',
     statusOff: 'Wstrzymano',
     statusNoKey: 'Brak kodu połączenia — nic nie można wysłać',

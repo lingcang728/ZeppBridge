@@ -4,7 +4,7 @@ import { defineMessages } from '../../../i18n';
 export const cloudMessages = defineMessages(
   {
     labTitle: 'Personal Agent 选项',
-    labSub: '给 Muse、Hark 这类需要随时读数据的 Personal Agent 用。通过独立组件把本地加密后的数据放到你自建的站点，不传给任何第三方服务器。开启后在「本地 AI」卡和「交给 AI」页管理。',
+    labSub: '给 Muse、Hark 这类需要随时读数据的 Personal Agent 用。关着时什么都不推送；打开后在下面设置。',
     secTitle: 'Personal Agent 选项',
     lead: '这是给 Muse、Hark 等 Personal Agent 用的桥接方式，不向普通服务器或第三方平台传数据。独立组件加密后传到你自己的站点，Agent 拿只读密钥去读；上传由组件完成，密钥不经过 ZeppBridge。',
     checking: '正在看云端组件…',
@@ -81,7 +81,7 @@ export const cloudMessages = defineMessages(
   },
   {
     labTitle: 'Personal Agent options',
-    labSub: 'For Personal Agents like Muse and Hark that need ready access to your data. A standalone component uploads locally encrypted data to your own self-hosted site — never to any third-party server. Once enabled, manage it in the Local AI card and the Send to AI page.',
+    labSub: 'For Personal Agents like Muse and Hark that need ready access to your data. While it’s off, nothing is pushed; turn it on to set it up below.',
     secTitle: 'Personal Agent options',
     lead: 'A bridge built for Personal Agents such as Muse and Hark — your data is never sent to ordinary servers or third-party platforms. The standalone component encrypts and uploads to your own site, where each Agent reads with a read-only key; uploads run in the component, and keys never pass through ZeppBridge.',
     checking: 'Checking the cloud component…',
@@ -158,7 +158,7 @@ export const cloudMessages = defineMessages(
   },
   {
     labTitle: 'Opciones de Personal Agent',
-    labSub: 'Para Personal Agents como Muse y Hark que necesitan leer tus datos en cualquier momento. Un componente independiente sube los datos cifrados localmente a tu propio sitio autohospedado, sin enviarlos a ningún servidor de terceros. Al activarlo, gestiónalo en la tarjeta «IA local» y en la página «Enviar a la IA».',
+    labSub: 'Para agentes personales como Muse y Hark, que necesitan leer tus datos en cualquier momento. Mientras esté apagado no se envía nada; enciéndelo para configurarlo aquí abajo.',
     secTitle: 'Opciones de Personal Agent',
     lead: 'Un puente pensado para Personal Agents como Muse y Hark: tus datos no se envían a servidores comunes ni a plataformas de terceros. El componente independiente cifra y sube los datos a tu propio sitio, donde cada Agent lee con una clave de solo lectura; la subida la hace el componente y las claves nunca pasan por ZeppBridge.',
     checking: 'Comprobando el componente…',

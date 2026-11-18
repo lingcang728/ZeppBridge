@@ -4269,8 +4269,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
   'views/settings/sections/cloud': {
     labTitle: 'Opzioni Personal Agent',
-    labSub:
-      'Per Personal Agent come Muse e Hark che hanno bisogno di accedere ai tuoi dati in qualsiasi momento. Un componente indipendente carica i dati cifrati in locale sul tuo sito self-hosted, senza mai inviarli a server di terze parti. Una volta attivo, gestiscilo nella scheda «Strumenti IA» e nella pagina «Passa all’IA».',
     secTitle: 'Opzioni Personal Agent',
     lead:
       'Un ponte pensato per Personal Agent come Muse e Hark: i tuoi dati non vengono mai inviati a server comuni o piattaforme di terze parti. Il componente indipendente li cifra e li carica sul tuo sito, dove ogni Agent legge con una chiave di sola lettura; il caricamento è gestito dal componente e le chiavi non passano mai attraverso ZeppBridge.',
@@ -4439,8 +4437,6 @@ Regole:
 - Non modificare i file di ZeppBridge né il suo database.
 - Se non riesci a trovare il modello di sito ZeppBridge Cloud, dimmelo. Non scrivere un’alternativa da solo: il formato di cifratura deve corrispondere esattamente a quello di ZeppBridge.`,
     promptLanguage: 'Italiano',
-    enabled: 'Invia dopo ogni sincronizzazione',
-    enabledSub: 'Disattiva per mettere in pausa; le impostazioni restano',
     statusOn: 'Attivo',
     statusOff: 'In pausa',
     statusNoKey: 'Codice di connessione mancante, impossibile inviare',

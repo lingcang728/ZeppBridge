@@ -3643,8 +3643,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'views/settings/sections/cloud': {
       labTitle: 'Personal Agent-opties',
-      labSub:
-        'Voor Personal Agents zoals Muse en Hark die altijd toegang tot je gegevens nodig hebben. Een losse component uploadt lokaal versleutelde gegevens naar je zelfgehoste site — nooit naar een server van derden. Eenmaal ingeschakeld beheer je dit via de kaart ‘AI-tools’ en de pagina ‘Naar de AI’.',
       secTitle: 'Personal Agent-opties',
       lead: 'Een brug gebouwd voor Personal Agents zoals Muse en Hark — je gegevens worden nooit naar gewone servers of platforms van derden gestuurd. De losse component versleutelt ze en uploadt naar je eigen site, waar elke Agent leest met een alleen-lezen sleutel; de component verzorgt het uploaden en sleutels gaan nooit via ZeppBridge.',
       checking: 'Cloudcomponent controleren…',
@@ -3787,8 +3785,6 @@ Regels:
 - Wijzig geen bestanden of de database van ZeppBridge zelf.
 - Als je de ZeppBridge Cloud-sitetemplate niet kunt vinden, zeg me dat dan. Schrijf zelf geen vervanging: het versleutelingsformaat moet exact overeenkomen met ZeppBridge.`,
       promptLanguage: 'Nederlands',
-      enabled: 'Automatisch pushen na synchronisatie',
-      enabledSub: 'Zet uit om te pauzeren; je instellingen blijven bewaard',
       statusOn: 'Aan',
       statusOff: 'Gepauzeerd',
       statusNoKey: 'Verbindingscode ontbreekt, kan niet pushen',

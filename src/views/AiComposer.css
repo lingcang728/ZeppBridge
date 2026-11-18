@@ -9,8 +9,6 @@
 .mcp-pill.stale { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, var(--mat-inset)); }
 .mcp-pill.stale:hover { color: var(--ink); background: color-mix(in srgb, var(--warning) 18%, var(--mat-inset)); }
 .mcp-stale-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--warning); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 22%, transparent); }
-.cloud-pill.ok > svg:first-child { color: var(--accent); }
-.cloud-pill.warn { color: var(--danger); }
 button.exchanges-pill { border: 0; font-family: inherit; cursor: pointer; }
 .demo-banner { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-left: auto; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb,var(--accent) 5%,transparent); color: var(--muted); }
 .demo-banner div { display: flex; flex-direction: column; gap: 2px; }

@@ -25,7 +25,9 @@ import { settingsMessages } from './Settings.i18n';
 import { deckMessages } from './settings/deck.i18n';
 import { labsMessages } from './settings/sections/labs.i18n';
 import { syncCardMessages } from './settings/sections/sync.i18n';
-import { useCloudCompanion } from '../composables/useCloudCompanion';
+import { useServerPush } from '../composables/useServerPush';
+import { labFlag } from '../lib/labs';
+import { pushMessages } from './settings/sections/push.i18n';
 import { useTourText } from '../components/tour/tour.i18n';
 import { ALL_CHAPTERS } from '../lib/tour/chapters';
 import { seenChapters } from '../lib/tour/sandbox';
@@ -59,8 +61,17 @@ const disconnectOfficialForAdvanced = async () => {
 const { userPrefs, retentionDays } = prefs;
 const { models: deviceModels, load: loadDevices } = useDevices();
 const { scale } = useUiScale();
-/* 「Personal Agent 选项」开着时（Beta 实验室），「本地 AI」卡头上多一枚小标：不点开也知道上一次传得怎么样。 */
-const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
+/* 「Personal Agent 选项」开着、推送也设好了时，Beta 实验室卡头上多一枚小标：不点开也知道推送开没开。关着时哪儿都没有。 */
+const pushLab = labFlag('cloud');
+const pushText = useMessages(pushMessages);
+const { state: pushState, refresh: refreshPush } = useServerPush();
+watch(pushLab, (on) => { if (on) void refreshPush(); }, { immediate: true });
+const pushMark = computed(() => {
+  const now = pushState.value;
+  if (!pushLab.value || !now?.configured) return null;
+  if (now.config_error_code || !now.has_secrets) return { tone: 'warn', text: now.config_error_code ? pushText.value.statusBroken : pushText.value.statusNoKey };
+  return now.enabled ? { tone: 'ok', text: pushText.value.statusOn } : { tone: 'idle', text: pushText.value.statusOff };
+});
 
 const activeId = computed<SettingsCardId | null>(() =>
   (isSettingsCardId(route.params.card) ? route.params.card : null));
@@ -108,7 +119,8 @@ const toneColor = (tone: string) => (tone === 'neutral' ? 'var(--glyph-neutral)'
 const NARROW_CARDS: readonly SettingsCardId[] = ['display', 'labs', 'guide', 'privacy'];
 const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
   id,
-  narrow: NARROW_CARDS.includes(id),
+  /* 实验室开着推送时内容多（演示、表单），不收窄。 */
+  narrow: NARROW_CARDS.includes(id) && !(id === 'labs' && pushLab.value),
   icon: SETTINGS_CARD_ICONS[id],
   glyphTone: SETTINGS_CARD_TONES[id],
   tone: toneColor(SETTINGS_CARD_TONES[id]),
@@ -229,8 +241,8 @@ useSectionTour('settings', () => route.path === '/settings');
           :model-value="autoSyncEnabled"
           @update:model-value="setAutoSyncEnabled(!autoSyncEnabled)"
         />
-        <span v-else-if="card.id === 'ai' && cloudOn" :class="['cloud-mark', cloudState.tone]" :title="cloudState.line">
-          <Icon name="cloud" :size="14" />{{ cloudState.text }}
+        <span v-else-if="card.id === 'labs' && pushMark" :class="['cloud-mark', pushMark.tone]" :title="pushText.secTitle">
+          <Icon name="send" :size="14" />{{ pushMark.text }}
         </span>
       </template>
 

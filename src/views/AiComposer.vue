@@ -41,7 +41,6 @@ import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useBridgeStrip } from '../composables/useBridgeStrip';
 import { useExchanges } from '../composables/useExchanges';
 import { useSyncController } from '../composables/useSyncController';
-import { useCloudCompanion } from '../composables/useCloudCompanion';
 import { useTrainingPlan } from '../composables/useTrainingPlan';
 import { cloudLayout } from '../lib/aiTask/cloud';
 import { stageLayout } from '../lib/aiTask/stageLayout';
@@ -75,7 +74,6 @@ const { dataReady, isSyncing, syncProgress } = useSyncController();
 const t = useBridgeText();
 const ht = useHandoffText();
 const s = useStageText();
-const { enabled: cloudOn, status: cloudState } = useCloudCompanion();
 const mcpSidecar = ref<McpSidecar | null>(null);
 const refreshMcpSidecar = async () => {
   if (!isDesktop()) return;
@@ -331,10 +329,6 @@ useSectionTour('ai');
       <RouterLink v-if="!hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', { stale: Boolean(mcpWarnClients) }]" :title="mcpWarnClients ? s.mcpStaleHint(mcpWarnClients) : s.mcpPillHint">
         <span v-if="mcpWarnClients" class="mcp-stale-dot" aria-hidden="true"></span>
         <Icon v-else name="terminal" :size="13" />{{ mcpWarnClients ? s.mcpStalePill : s.mcpPill }}<Icon name="chevron-right" :size="13" />
-      </RouterLink>
-      <!-- 「Personal Agent 选项」（Beta 实验室里自己打开才有）：给 Personal Agent 用的那条路，上一次传得怎么样写在胶囊上。 -->
-      <RouterLink v-if="cloudOn && !hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', 'cloud-pill', cloudState.tone]" :title="cloudState.line">
-        <Icon name="cloud" :size="13" />{{ cloudState.text }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
       <!-- 指南在 GitHub 上（docs/guides/ai*.md，3.1.1）：回信里有人问英文的 AI 教程。 -->
       <button v-if="!hub.demo.value" type="button" class="exchanges-pill" :title="s.guidePillHint" @click="openGuide('ai', locale)">

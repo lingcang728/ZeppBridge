@@ -9,7 +9,6 @@ import AdvancedSection from './sections/AdvancedSection.vue';
 import ArchiveSection from './sections/ArchiveSection.vue';
 import AutoSyncSection from './sections/AutoSyncSection.vue';
 import CapabilitySection from './sections/CapabilitySection.vue';
-import CloudSection from './sections/CloudSection.vue';
 import DevicesSection from './sections/DevicesSection.vue';
 import DisplayPrefsSection from './sections/DisplayPrefsSection.vue';
 import ExportDefaultsSection from './sections/ExportDefaultsSection.vue';
@@ -17,12 +16,9 @@ import GuideSection from './sections/GuideSection.vue';
 import LabsSection from './sections/LabsSection.vue';
 import McpSection from './sections/McpSection.vue';
 import PrivacySection from './sections/PrivacySection.vue';
-import PushSection from './sections/PushSection.vue';
-import { labFlag } from '../../lib/labs';
 
 defineProps<{ id: string }>();
-/* 「推给云端」在 Beta 实验室里自己打开才有；没开的人这张卡和以前一模一样。 */
-const cloud = labFlag('cloud');
+/* Personal Agent 推送（Beta 实验室的开关）只在实验室卡里，别的卡不挂任何推送 / 云端的东西。 */
 </script>
 
 <template>
@@ -33,12 +29,8 @@ const cloud = labFlag('cloud');
     </template>
     <AutoSyncSection v-else-if="id === 'sync'" />
     <ArchiveSection v-else-if="id === 'archive'" />
-    <template v-else-if="id === 'data'">
-      <CapabilitySection />
-      <PushSection />
-    </template>
+    <CapabilitySection v-else-if="id === 'data'" />
     <template v-else-if="id === 'ai'">
-      <CloudSection v-if="cloud" />
       <McpSection />
       <ExportDefaultsSection />
     </template>

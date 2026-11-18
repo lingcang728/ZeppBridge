@@ -3642,8 +3642,6 @@ Regras:
 - Não alteres nenhum dos ficheiros próprios do ZeppBridge nem a sua base de dados.
 - Se não encontrares o modelo de site do ZeppBridge Cloud, diz-mo. Não escrevas uma alternativa por tua conta: o formato de cifra tem de corresponder exatamente ao do ZeppBridge.`,
       promptLanguage: 'Português (Portugal)',
-      enabled: 'Enviar após cada sincronização',
-      enabledSub: 'Desativa para pausar; as definições mantêm-se',
       statusOn: 'Ativado',
       statusOff: 'Em pausa',
       statusNoKey: 'Falta o código de ligação; nada pode ser enviado',
@@ -3696,8 +3694,6 @@ Regras:
     },
     'views/settings/sections/cloud': {
       labTitle: 'Opções de Personal Agent',
-      labSub:
-        'Para Personal Agents como Muse e Hark que precisam de aceder aos teus dados a qualquer momento. Um componente independente envia os dados cifrados localmente para o teu próprio site autoalojado — nunca para qualquer servidor de terceiros. Depois de o ativares, gere-o no cartão «Ferramentas de IA» e na página «Enviar à IA».',
       secTitle: 'Opções de Personal Agent',
       lead:
         'Uma ponte pensada para Personal Agents como Muse e Hark — os teus dados nunca são enviados para servidores comuns nem plataformas de terceiros. O componente independente cifra e envia para o teu próprio site, onde cada Agent lê com uma chave só de leitura; o envio é feito pelo componente e as chaves nunca passam pelo ZeppBridge.',

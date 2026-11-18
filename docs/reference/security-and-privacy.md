@@ -202,8 +202,10 @@ confirm; seeing the page in a preview does not mean anything was submitted.
 
 ## Push to your own site
 
-No health data is uploaded by default. Only after you yourself enter your own
-site address and connection code under Settings › Data › Push to your own site
+No health data is uploaded by default. The feature lives under Settings › Beta
+lab › Personal Agent options and is off by default; while it is off there is no
+push entry anywhere in the app and any configured push is paused. Only after you
+yourself turn it on and enter your own site address and connection code
 (or take over an existing ZeppBridge Cloud setup on this computer with one
 click) does ZeppBridge send data, encrypted, to that address after each sync —
 and never to ZeppBridge or any third party. With no enabled push destination the
