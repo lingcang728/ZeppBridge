@@ -1,0 +1,35 @@
+- Added: **Stage Manager for workout details**. Up to 4 cards share the stage: drag them together, drag the gaps to change proportions, pull the edges to resize, and the layout is remembered per workout type. The bigger a card, the more detail its chart shows.
+- Added: **See any moment on the route**. Point at a moment on the heart rate, pace, elevation or cadence chart and the route card marks where you were; pauses and signal gaps are never bridged.
+- Added: **Strength training sets and muscle map (#163)**. Every set's exercise, reps and rest are listed, and the muscle map highlights what you worked; tap either side to see the match on the other. Muscle mapping by felipepmdias.
+- Added: **Elevation profile**. The climb and elevation cards show total ascent and descent, the biggest drop and the gradient distribution.
+- Added: **Longer heart rate windows**. The heart rate page switches between 24 hours, 48 hours and 7 days, and the daily range is drawn as max, average and min lines.
+- Added: **A letter button in the top-right corner**. Click to write, press and hold to open the letter box; a red dot lights up for a new reply, a new weekly data letter or a time capsule that's due.
+- Added: **Writing a letter is the feedback channel**. You can attach a de-identified diagnostic report and pick an issue type on the letter; the old "Report a problem" card in Settings is now part of the letter box.
+- Added: **Local AI can keep records for you**. A connected AI can log injuries, life events, races, shoes, how a workout felt and workout types, and can sync and export for you. Every change can be undone in Settings › AI tools › Recent AI changes, and it cannot delete anything.
+- Added: **An "Only shared tasks" switch and more AI tools**. With it on, AI only sees the tasks you open to it and cannot write anything; OpenCode, Grok Build and Factory join the one-click connections.
+- Added: **Beta lab and Personal Agent**. Settings has a new Beta lab. Turn on "Personal Agent options" to push your data, encrypted, to your own site for assistants like Muse and Hark. It's off by default, and nothing is pushed while it's off.
+- Added: **A read-only API for self-hosted services**. Run zeppbridge-cli serve on a NAS or home server and services like SparkyFitness or Home Assistant can fetch sleep, heart rate, workouts and weight on a schedule. It needs a pull token, listens only on the same machine by default, and never shares routes by default.
+- Added: **A nap card on the sleep page**. Naps recorded by Zepp are shown separately with their stages.
+- Added: **Full route for Send to AI**. With both the "Detailed" level and "Precise route" selected, a complete .gpx is attached and pasted together with the handoff.
+- Added: **The original T-Rex and the T-Rex Dual Solar are recognized**.
+- Improved: **Picking workouts in Send to AI stacks by range**. Ranges of a month or more are no longer empty; workouts stack by week, month or year with a count on each stack.
+- Improved: **Sync no longer rewrites everything every time**. Unchanged sleep and heart rate data is skipped, cutting the rows written in a routine sync by two orders of magnitude.
+- Improved: **Local data is reprocessed once after updating**. A large library takes about 15 minutes and sync waits until it is done; older strength workouts get their set-by-set details along the way.
+- Improved: **Easier-to-read sleep colors**. Deep sleep is indigo, light sleep is light blue, REM is teal.
+- Improved: **Splits and laps show average cadence**.
+- Improved: **Smoother motion**. Dialogs no longer flash an empty panel when opening or leave a dark block when closing, the lower half of the heart rate page no longer appears a beat late, and UI scaling now changes smoothly.
+- Improved: **No more overlapping or awkwardly wrapped labels in all 13 languages**. Long labels first tighten, then switch to a short name, and only wrap as a last resort.
+- Improved: **The CLI and MCP open the database more reliably**. When they can't, they say why; an older version meeting a newer database tells you to reconnect from Settings.
+- Improved: **The "Sync" card in Settings is now "Sync and updates"**. That's where checking for updates has always lived.
+- Improved: **The unrecognized-device hint on the overview can be dismissed**. For devices like body scales that don't need identifying, click × and it won't come back.
+- Improved: **Hardware acceleration is back for the Linux AppImage (#167)**. Compositing is only turned off when the bundle still ships the old graphics libraries; the same scroll now uses about a third of the CPU. Thanks to andrejd1.
+- Improved: **No more stutter on Linux with NVIDIA and niri (#164)**. Thanks to Jax Tsai.
+- Improved: **Uninstalling cleans up more**. Choosing "Delete app data" also removes the local API token and the pull token.
+- Fixed: **The update notes no longer pop up every day**. Even if you close the window right after clicking "Got it", they won't show again.
+- Fixed: **Other family members' weight from a shared scale no longer counts as yours**.
+- Fixed: **Step counts agree when you wear several devices on one day**. The overview, charts and rings all use the fused value, or the highest one if there isn't any.
+- Fixed: **"Compared with usual" is no longer off by thousands of kilometers**. Distance on the activity page and weight and height on the body page now use the right units.
+- Fixed: **Device names no longer show up in Chinese in other languages**.
+- Fixed: **Renewing official authorization no longer wrongly asks you to sign in again**.
+- Fixed: **The device list no longer fails entirely when one part can't be read**.
+- Fixed: **A hint when official authorization takes too long**. After 45 seconds without a response, it explains that pages.dev may be unreachable.

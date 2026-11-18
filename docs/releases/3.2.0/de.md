@@ -1,0 +1,35 @@
+- Added: **Stage Manager für Trainingsdetails**. Bis zu 4 Karten teilen sich die Bühne: Ziehe sie zusammen, verschiebe die Zwischenräume zum Anpassen der Proportionen, ziehe an den Rändern zum Skalieren, und das Layout wird je Sportart gemerkt; je größer die Karte, desto mehr Details zeigt ihr Diagramm.
+- Added: **Jeden Moment auf der Route ansehen**. Zeige auf einen Punkt im Herzfrequenz-, Tempo-, Höhen- oder Schrittfrequenzdiagramm, und die Routenkarte markiert, wo du genau warst; Pausen und Signalunterbrechungen werden nie einfach verbunden.
+- Added: **Krafttraining Satz für Satz und Muskelkarte (#163)**. Für jeden Satz werden Übung, Wiederholungen und Pause aufgelistet, und die Muskelkarte hebt die beanspruchten Muskelgruppen hervor; tippe eine Seite an, um die Entsprechung auf der anderen zu sehen. Muskelzuordnung von felipepmdias.
+- Added: **Höhenprofil**. Die Anstiegs- und Höhenkarten zeigen Gesamtanstieg und -abstieg, den größten Höhenunterschied sowie die Steigungsverteilung.
+- Added: **Längere Herzfrequenz-Zeitfenster**. Auf der Herzfrequenzseite lässt sich zwischen 24 Stunden, 48 Stunden und 7 Tagen wechseln; der Tagesbereich wird als Maximum-, Durchschnitts- und Minimumlinie dargestellt.
+- Added: **Brief-Schaltfläche oben rechts**. Kurz klicken zum Schreiben, gedrückt halten zum Öffnen des Briefkastens; ein roter Punkt leuchtet auf bei einer neuen Antwort, einem neuen wöchentlichen Datenbrief oder einer fälligen Zeitkapsel.
+- Added: **Briefe schreiben ist der Feedback-Kanal**. Du kannst auf dem Briefbogen einen anonymisierten Diagnosebericht anhängen und eine Problemart wählen; die frühere Karte „Ein Problem melden“ in den Einstellungen ist jetzt Teil des Briefkastens.
+- Added: **Lokale KI kann Einträge für dich festhalten**. Eine verbundene KI kann Verletzungen, Lebensereignisse, Wettkämpfe, Laufschuhe, Trainingsgefühle und Sportarten erfassen sowie für dich synchronisieren und exportieren; jede Änderung lässt sich unter Einstellungen › KI-Werkzeuge › Letzte KI-Änderungen rückgängig machen, und sie hat keine Löschberechtigung.
+- Added: **Schalter „Nur freigegebene Aufgaben“ und weitere KI-Werkzeuge**. Ist er aktiviert, sieht die KI nur die von dir freigegebenen Aufgaben und kann nichts schreiben; OpenCode, Grok Build und Factory sind den Ein-Klick-Verbindungen beigetreten.
+- Added: **Beta-Labor und Personal Agent**. In den Einstellungen gibt es ein neues Beta-Labor; nach dem Aktivieren von „Personal Agent-Optionen“ lassen sich Daten verschlüsselt an deine eigene Website senden, damit Assistenten wie Muse und Hark sie lesen können. Standardmäßig deaktiviert; solange es aus ist, wird nichts gesendet.
+- Added: **Nur-Lese-API für selbstgehostete Dienste**. Starte zeppbridge-cli serve auf einem NAS oder Heimserver, damit Dienste wie SparkyFitness oder Home Assistant regelmäßig Schlaf, Herzfrequenz, Trainings und Gewicht abrufen können; erfordert einen Pull-Token, lauscht standardmäßig nur lokal und gibt keine Routen frei.
+- Added: **Nickerchen-Karte auf der Schlafseite**. Von Zepp erfasste Nickerchen werden mit ihren Schlafphasen separat angezeigt.
+- Added: **Vollständige Route für „An die KI“**. Sind sowohl „Detailliert“ als auch „Genaue Route“ ausgewählt, wird zusätzlich eine vollständige .gpx-Datei angehängt und mit übergeben.
+- Added: **Die ursprüngliche T-Rex und die T-Rex Dual Solar werden erkannt**.
+- Improved: **Trainingsauswahl in „An die KI“ stapelt nach Zeitraum**. Zeiträume ab einem Monat sind nicht mehr leer; Trainings werden nach Woche, Monat oder Jahr gestapelt, jeweils mit der Anzahl auf dem Stapel.
+- Improved: **Synchronisierung schreibt nicht mehr jedes Mal alles neu**. Unveränderte Schlaf- und Herzfrequenzdaten werden übersprungen, wodurch sich die geschriebenen Zeilen pro regulärer Synchronisierung um zwei Größenordnungen verringern.
+- Improved: **Lokale Daten werden nach dem Update einmal im Hintergrund neu aufbereitet**. Bei großen Bibliotheken dauert dies etwa 15 Minuten, währenddessen wartet die Synchronisierung; ältere Krafttrainings erhalten dabei ihre Aufschlüsselung Satz für Satz.
+- Improved: **Besser unterscheidbare Schlaffarben**. Tiefschlaf in tiefem Indigo, leichter Schlaf in Hellblau, REM in Blaugrün.
+- Improved: **Abschnitte und Runden zeigen die durchschnittliche Schrittfrequenz**.
+- Improved: **Flüssigere Animationen**. Dialoge blitzen beim Öffnen nicht mehr als leeres Feld auf und hinterlassen beim Schließen keinen dunklen Block, die untere Hälfte der Herzfrequenzseite erscheint nicht mehr verzögert, und die Skalierung der Oberfläche geht stufenlos über.
+- Improved: **Keine überlappenden oder unschön umgebrochenen Beschriftungen in allen 13 Sprachen**. Zu lange Beschriftungen werden zunächst enger gesetzt, wechseln dann auf einen Kurznamen und brechen erst im letzten Schritt um.
+- Improved: **CLI und MCP öffnen die Datenbank zuverlässiger**. Schlägt es fehl, nennen sie den Grund; stößt eine ältere Version auf eine neuere Datenbank, weist sie darauf hin, die Verbindung in den Einstellungen zu erneuern.
+- Improved: **Die Karte „Synchronisierung“ in den Einstellungen heißt jetzt „Synchronisierung und Updates“**. Dort befand sich die Update-Prüfung schon immer.
+- Improved: **Der Hinweis auf ein nicht erkanntes Gerät in der Übersicht lässt sich schließen**. Bei Geräten wie Körperfettwaagen, die nicht zugeordnet werden müssen, genügt ein Klick auf ×, und der Hinweis erscheint nicht mehr.
+- Improved: **Hardwarebeschleunigung für das Linux-AppImage wiederhergestellt (#167)**. Das Compositing wird nur noch abgeschaltet, wenn das Paket noch die alte Grafikbibliothek mitbringt; beim gleichen Scrollen sinkt die CPU-Last auf etwa ein Drittel. Danke an andrejd1.
+- Improved: **Kein Ruckeln mehr unter Linux mit NVIDIA und niri (#164)**. Danke an Jax Tsai.
+- Improved: **Sauberes Aufräumen bei der Deinstallation**. Ist „Anwendungsdaten löschen“ angehakt, werden auch der lokale API-Token und der Pull-Token gelöscht.
+- Fixed: **Die Update-Hinweise erscheinen nicht mehr jeden Tag**. Selbst wenn du das Fenster direkt nach dem Klick auf „Verstanden“ schließt, tauchen sie nicht wieder auf.
+- Fixed: **Das Gewicht anderer Familienmitglieder von einer gemeinsamen Waage wird nicht mehr dir zugerechnet**.
+- Fixed: **Schrittzahlen stimmen überein, wenn du mehrere Geräte an einem Tag trägst**. Übersicht, Diagramme und Ringe nutzen einheitlich den kombinierten Wert oder den höchsten, falls keiner vorliegt.
+- Fixed: **„Im Vergleich zu sonst“ liegt nicht mehr um tausende Kilometer daneben**. Die Einheiten für Distanz auf der Aktivitätsseite sowie Gewicht und Größe auf der Körperseite wurden korrigiert.
+- Fixed: **Gerätenamen erscheinen in anderen Sprachen nicht mehr auf Chinesisch**.
+- Fixed: **Die Verlängerung der offiziellen Autorisierung fordert nicht mehr fälschlich zur erneuten Anmeldung auf**.
+- Fixed: **Die Geräteliste schlägt nicht mehr komplett fehl, wenn sich ein einzelner Teil nicht lesen lässt**.
+- Fixed: **Hinweis, wenn die offizielle Autorisierung zu lange dauert**. Nach 45 Sekunden ohne Antwort wird darauf hingewiesen, dass pages.dev möglicherweise nicht erreichbar ist.

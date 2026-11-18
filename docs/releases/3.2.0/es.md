@@ -1,0 +1,34 @@
+- Added: **Organizador visual para los detalles del entrenamiento**. Hasta 4 tarjetas comparten el escenario: arrástralas para combinarlas, ajusta la proporción desde los huecos o cambia su tamaño desde los bordes, y el diseño se recuerda por tipo de entrenamiento; cuanto más grande la tarjeta, más detalle muestra el gráfico.
+- Added: **Ver cualquier instante sobre la ruta**. Señala un momento en el gráfico de frecuencia cardíaca, ritmo, altitud o cadencia y la tarjeta de ruta marcará dónde estabas; las pausas y pérdidas de señal nunca se unen a la fuerza.
+- Added: **Series de entrenamiento de fuerza y mapa muscular (#163)**. Se muestran el ejercicio, las repeticiones y el descanso de cada serie, y el mapa muscular resalta las zonas trabajadas; toca un lado para ver su correspondencia en el otro. Tabla muscular cortesía de felipepmdias.
+- Added: **Perfil de elevación**. Las tarjetas de ascenso y altitud muestran el ascenso y descenso acumulados, el desnivel máximo y la distribución de pendientes.
+- Added: **Ventanas más largas para la frecuencia cardíaca**. La página de frecuencia cardíaca permite cambiar entre 24 horas, 48 horas y 7 días, y el rango diario traza las líneas de máximo, promedio y mínimo.
+- Added: **Botón de carta en la esquina superior derecha**. Toca para escribir y mantén presionado para abrir el Buzón; se enciende un punto rojo cuando hay una respuesta nueva, una carta semanal de datos o una cápsula del tiempo que ya se puede abrir.
+- Added: **Escribir una carta es el canal de comentarios**. Puedes adjuntar un informe de diagnóstico anonimizado y elegir el tipo de problema en la carta; la antigua tarjeta «Informar de un problema» de Ajustes ahora forma parte del Buzón.
+- Added: **La IA local puede anotar registros por ti**. La IA conectada puede registrar lesiones, eventos vitales, carreras, zapatillas, sensaciones y tipos de entrenamiento, además de sincronizar y exportar por ti; cada cambio se puede deshacer en Ajustes › Herramientas de IA › Cambios recientes de la IA y no tiene permiso para borrar nada.
+- Added: **Interruptor «Solo tareas compartidas» y más herramientas de IA**. Al activarlo, la IA solo ve las tareas que hayas habilitado y no puede escribir nada; OpenCode, Grok Build y Factory se suman a la conexión con un clic.
+- Added: **Laboratorio beta y Personal Agent**. Ajustes incorpora el Laboratorio beta; al activar «Opciones de Personal Agent», puedes enviar tus datos cifrados a tu propio sitio para que los lean asistentes como Muse o Hark. Viene desactivado por defecto y no envía nada mientras lo esté.
+- Added: **Interfaz de solo lectura para servicios autoalojados**. Ejecuta `zeppbridge-cli serve` en un NAS o servidor doméstico para que servicios como SparkyFitness o Home Assistant obtengan sueño, frecuencia cardíaca, entrenamientos y peso de forma periódica; requiere un token de lectura, escucha solo en el equipo local por defecto y no comparte rutas por defecto.
+- Added: **Tarjeta de siestas en la página de sueño**. Las siestas registradas por Zepp se muestran por separado junto con sus fases.
+- Added: **Ruta completa al pasar a la IA**. Al elegir tanto el nivel «Detallado» como «Ruta precisa», se adjunta un archivo `.gpx` completo que se pega junto con la entrega.
+- Added: **Reconocimiento del T-Rex original y del T-Rex Dual Solar**.
+- Improved: **Al elegir entrenamientos en Pasar a la IA se apilan por rango**. Los rangos de un mes o más ya no aparecen vacíos; los entrenamientos se apilan por semana, mes o año con el recuento en cada pila.
+- Improved: **La sincronización ya no reescribe todo en cada ronda**. Los datos de sueño y frecuencia cardíaca sin cambios se omiten, reduciendo en dos órdenes de magnitud las filas escritas en una sincronización habitual.
+- Improved: **Colores de sueño más fáciles de distinguir**. Sueño profundo en índigo, sueño ligero en azul claro y REM en verde azulado.
+- Improved: **Los parciales y vueltas muestran la cadencia media**.
+- Improved: **Animaciones más fluidas**. Los diálogos ya no muestran un panel vacío al abrirse ni dejan un bloque negro al cerrarse, la mitad inferior de la página de frecuencia cardíaca ya no aparece un compás tarde y el escalado de la interfaz cambia de forma continua.
+- Improved: **Sin textos superpuestos ni saltos torpes en los 13 idiomas**. Cuando una etiqueta larga no cabe, primero se compacta, luego cambia a un nombre corto y solo salta de línea como último recurso.
+- Improved: **La CLI y MCP abren la base de datos con mayor fiabilidad**. Si no pueden leerla, explican el motivo; si una versión antigua encuentra una base de datos más nueva, indica volver a conectar desde Ajustes.
+- Improved: **La tarjeta «Sincronización» en Ajustes pasa a llamarse «Sincronización y actualizaciones»**. Ahí es donde siempre ha estado la comprobación de actualizaciones.
+- Improved: **Se puede ocultar el aviso de dispositivos no reconocidos en el resumen**. Para dispositivos como básculas que no necesitan identificación, pulsa × y no volverá a aparecer.
+- Improved: **Vuelve la aceleración por hardware en el AppImage de Linux (#167)**. La composición solo se desactiva cuando el paquete aún incluye las antiguas librerías gráficas; el mismo desplazamiento consume ahora alrededor de un tercio de CPU. Gracias a andrejd1.
+- Improved: **Sin tirones en Linux con NVIDIA y niri (#164)**. Gracias a Jax Tsai.
+- Improved: **La desinstalación limpia más a fondo**. Al marcar «Eliminar datos de la aplicación», también se eliminan el token de la API local y el token de lectura.
+- Fixed: **Las notas de actualización ya no aparecen todos los días**. Aunque cierres la ventana justo después de pulsar «Entendido», no volverán a mostrarse.
+- Fixed: **El peso de otros familiares en una báscula compartida ya no cuenta como tuyo**.
+- Fixed: **Los pasos coinciden cuando llevas varios dispositivos el mismo día**. El resumen, los gráficos y los anillos usan el valor fusionado o el mayor si no existe.
+- Fixed: **«Comparado con lo habitual» ya no se desvía por miles de kilómetros**. Se corrigieron las unidades de la distancia en actividad y del peso y la altura en cuerpo al comparar con lo habitual.
+- Fixed: **Los nombres de dispositivos ya no aparecen en chino en otros idiomas**.
+- Fixed: **La renovación de la autorización oficial ya no pide erróneamente volver a iniciar sesión**.
+- Fixed: **La lista de dispositivos ya no falla por completo cuando no se puede leer una parte**.
+- Fixed: **Aviso cuando la autorización oficial tarda demasiado**. Tras 45 segundos sin respuesta, indica que quizá no haya conexión con pages.dev.

@@ -503,6 +503,7 @@ export default {
     close: 'Chiudi',
     sending: 'Invio in corso…',
     sent: 'Inviata. La ricevuta apparirà nella tua cassetta postale',
+    sendFailed: 'Impossibile inviare la lettera. La bozza è stata salvata. Riprova.',
     queued: 'Nessuna connessione al momento — è nella posta in uscita e verrà inviata non appena sarai online',
     alsoAttached: (count: number) => `Allegato: “anche a me” su ${count}`,
     boxTitle: 'Cassetta postale',
@@ -4196,6 +4197,9 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     taskOnlyOn: 'Attivato: l’IA vede solo le attività condivise con MCP qui sotto e non può scrivere nulla',
     taskOnlyReconnect: 'Dopo la modifica, ricollega ciascuna IA tramite i pulsanti in alto',
     writesTitle: 'Ultime modifiche dell’IA',
+    writesLoading: 'Caricamento delle modifiche dell’IA…',
+    writesLoadFailed: 'Impossibile caricare le modifiche dell’IA. Riprova.',
+    writesUndoFailed: 'Impossibile confermare l’annullamento. Ricarica l’elenco delle modifiche.',
     writesEmpty: 'Nessuna per ora. Gli infortuni, le gare, le scarpe, le sensazioni di allenamento e le note dell’allenatore registrati da un’IA locale appariranno qui, ciascuno annullabile',
     writesUndo: 'Annulla',
     writesUndone: 'Annullato',
@@ -4269,6 +4273,7 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
   'views/settings/sections/cloud': {
     labTitle: 'Opzioni Personal Agent',
+    labSub: 'Per Personal Agent come Muse e Hark. Da disattivato non invia nulla; attivalo per configurarlo qui sotto.',
     secTitle: 'Opzioni Personal Agent',
     lead:
       'Un ponte pensato per Personal Agent come Muse e Hark: i tuoi dati non vengono mai inviati a server comuni o piattaforme di terze parti. Il componente indipendente li cifra e li carica sul tuo sito, dove ogni Agent legge con una chiave di sola lettura; il caricamento è gestito dal componente e le chiavi non passano mai attraverso ZeppBridge.',

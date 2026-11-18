@@ -1,0 +1,35 @@
+- Added: **Organizador Visual para os detalhes do treino**. Até 4 cartões dividem o palco ao mesmo tempo: arraste para combinar, arraste a divisória para ajustar as proporções e puxe as bordas para redimensionar; o layout é lembrado por tipo de treino e, quanto maior o cartão, mais detalhes o gráfico mostra.
+- Added: **Veja qualquer instante na rota**. Aponte para um momento nos gráficos de frequência cardíaca, ritmo, altitude ou cadência e o cartão de trajeto marca onde você estava; pausas e perdas de sinal não são ligadas à força.
+- Added: **Detalhes série por série e mapa muscular no treino de força (#163)**. Cada série lista o exercício, as repetições e o descanso, e o mapa muscular destaca as regiões trabalhadas; toque em qualquer lado para ver a correspondência no outro. Mapeamento muscular por felipepmdias.
+- Added: **Visão geral de elevação**. Os cartões de subida e altitude mostram ganho e perda acumulados, maior desnível e distribuição de inclinação.
+- Added: **Janelas maiores na frequência cardíaca**. A página de frequência cardíaca alterna entre 24 horas, 48 horas e 7 dias, e a faixa diária exibe as linhas de máxima, média e mínima.
+- Added: **Botão de carta no canto superior direito**. Toque para escrever, pressione e segure para abrir a Caixa de cartas; um pontinho vermelho acende quando há uma nova resposta, uma nova carta semanal de dados ou uma cápsula do tempo vencida.
+- Added: **Escrever uma carta agora é o canal de feedback**. Você pode anexar um relatório de diagnóstico anonimizado e escolher o tipo de problema na própria carta; o antigo cartão “Relatório de problemas” em Configurações foi integrado à Caixa de cartas.
+- Added: **A IA local pode registrar dados para você**. Uma IA conectada pode registrar lesões, eventos de vida, provas, tênis, sensação do treino e tipos de treino, além de sincronizar e exportar arquivos para você; cada registro pode ser desfeito em Configurações › Ferramentas de IA › Alterações recentes da IA, e ela não tem permissão para excluir nada.
+- Added: **Opção “Apenas tarefas compartilhadas” e mais ferramentas de IA**. Quando ativada, a IA vê apenas as tarefas liberadas para ela e não pode escrever nada; OpenCode, Grok Build e Factory passam a fazer parte das conexões com um clique.
+- Added: **Laboratório Beta e Personal Agent**. As Configurações agora contam com o Laboratório Beta; ao ativar “Opções de Personal Agent”, seus dados podem ser enviados criptografados para o seu próprio site para leitura por assistentes como Muse e Hark. Vem desativado por padrão e nada é enviado enquanto estiver desligado.
+- Added: **API somente leitura para serviços auto-hospedados**. Execute zeppbridge-cli serve em um NAS ou servidor doméstico para que serviços como SparkyFitness e Home Assistant busquem sono, frequência cardíaca, treinos e peso periodicamente; exige um token de leitura, escuta apenas na própria máquina por padrão e não compartilha trajetos por padrão.
+- Added: **Cartão de cochilos na página de sono**. Cochilos registrados pela Zepp são exibidos separadamente com seus estágios.
+- Added: **Trajeto completo ao Enviar para IA**. Quando o nível “Detalhado” e “Coordenadas GPS de alta precisão” estão selecionados juntos, um arquivo .gpx completo é anexado e colado junto com o envio.
+- Added: **Reconhecimento do T-Rex original e do T-Rex Dual Solar**.
+- Improved: **Seleção de treinos em Enviar para IA agrupada por período**. Intervalos de um mês ou mais não ficam mais vazios; os treinos são empilhados por semana, mês ou ano com a contagem em cada pilha.
+- Improved: **A sincronização não reescreve mais tudo a cada ciclo**. Dados de sono e frequência cardíaca sem alterações são ignorados, reduzindo em duas ordens de grandeza as linhas gravadas em uma sincronização comum.
+- Improved: **Os dados locais são reorganizados uma vez em segundo plano após a atualização**. Em bibliotecas grandes leva cerca de 15 minutos, e a sincronização entra na fila automaticamente; treinos de força antigos também ganham os detalhes série por série durante o processo.
+- Improved: **Cores do sono mais fáceis de distinguir**. Sono profundo em índigo escuro, sono leve em azul claro e REM em azul-petróleo.
+- Improved: **Parciais e voltas agora mostram a cadência média**.
+- Improved: **Animações mais fluidas**. Caixas de diálogo não piscam mais um painel vazio ao abrir nem deixam um bloco escuro ao fechar, a metade inferior da página de frequência cardíaca não aparece mais com atraso e o zoom da interface muda em transição contínua.
+- Improved: **Sem sobreposição ou quebras estranhas em todos os 13 idiomas**. Rótulos longos primeiro ficam mais compactos, depois usam um nome curto e só quebram linha em último caso.
+- Improved: **CLI e MCP abrem o banco de dados com mais estabilidade**. Quando não conseguem ler, explicam o motivo; se uma versão antiga encontrar um banco mais novo, orienta a reconectar nas Configurações.
+- Improved: **O cartão “Sincronização” em Configurações agora se chama “Sincronização e atualizações”**. A verificação de atualizações sempre esteve nesse cartão.
+- Improved: **O aviso de dispositivo não reconhecido na visão geral pode ser dispensado**. Para aparelhos como balanças que não precisam ser identificados, clique em × e o aviso não volta mais.
+- Improved: **Aceleração por hardware de volta no AppImage do Linux (#167)**. A composição só é desativada quando o pacote ainda inclui as bibliotecas gráficas antigas; a mesma rolagem consome cerca de um terço da CPU. Obrigado a andrejd1.
+- Improved: **Fim dos engasgos no Linux com NVIDIA e niri (#164)**. Obrigado a Jax Tsai.
+- Improved: **Desinstalação mais limpa**. Marcar “Excluir dados do aplicativo” também remove o token da API local e o token de leitura.
+- Fixed: **As notas de atualização não aparecem mais todo dia**. Mesmo fechando a janela logo após clicar em “Entendi”, elas não voltam a aparecer na próxima abertura.
+- Fixed: **O peso de outros membros da família em uma balança compartilhada não conta mais como seu**.
+- Fixed: **A contagem de passos coincide ao usar vários dispositivos no mesmo dia**. A visão geral, os gráficos e os anéis usam o valor unificado ou, na falta dele, o maior valor.
+- Fixed: **“Em relação ao habitual” não erra mais por milhares de quilômetros**. As unidades de distância nas atividades diárias e de peso e altura na página do corpo foram corrigidas na comparação habitual.
+- Fixed: **Nomes de dispositivos não aparecem mais em chinês em outros idiomas**.
+- Fixed: **Renovar a autorização oficial não pede mais login novamente por engano**.
+- Fixed: **A lista de dispositivos não falha por inteiro quando apenas um item não pode ser lido**.
+- Fixed: **Aviso quando a autorização oficial demora demais**. Após 45 segundos sem resposta, informa que pode haver falha de conexão com pages.dev.

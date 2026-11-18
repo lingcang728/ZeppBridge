@@ -964,6 +964,7 @@ export default {
     send: 'Wyślij',
     sending: 'Wysyłanie…',
     sent: 'Wysłano. Potwierdzenie odbioru pojawi się w Twojej skrzynce na listy',
+    sendFailed: 'Nie udało się wysłać listu. Szkic został zapisany. Spróbuj ponownie.',
     queued: 'Brak połączenia w tej chwili — oczekuje w skrzynce nadawczej i zostanie wysłane po połączeniu z siecią',
     alsoAttached: (count: number) => `Załączono: „u mnie też” (${count})`,
     boxTitle: 'Skrzynka na listy',
@@ -4246,6 +4247,9 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
     taskOnlyOn: 'Włączone: AI widzi tylko zadania udostępnione dla MCP poniżej i nie może niczego zapisywać',
     taskOnlyReconnect: 'Po zmianie połącz każde AI ponownie za pomocą powyższych przycisków',
     writesTitle: 'Ostatnie zmiany wprowadzone przez AI',
+    writesLoading: 'Wczytywanie zmian AI…',
+    writesLoadFailed: 'Nie udało się wczytać zmian AI. Spróbuj ponownie.',
+    writesUndoFailed: 'Nie udało się potwierdzić cofnięcia. Odśwież listę zmian.',
     writesEmpty: 'Jeszcze brak. Kontuzje, zawody, buty, odczucia z treningów i notatki trenera zapisane przez lokalne AI pojawią się tutaj, a każdą można cofnąć',
     writesUndo: 'Cofnij',
     writesUndone: 'Cofnięto',
@@ -4332,6 +4336,7 @@ Jeśli potrzebujesz ode mnie jakichkolwiek dodatkowych informacji (z jakiego kli
   // Source: src/views/settings/sections/cloud.i18n.ts
   'views/settings/sections/cloud': {
     labTitle: 'Opcje Personal Agent',
+    labSub: 'Dla Personal Agentów (np. Muse, Hark) potrzebujących dostępu do danych. Gdy wyłączone, nic nie wysyła; włącz, aby skonfigurować poniżej.',
     secTitle: 'Opcje Personal Agent',
     lead: 'Pomost dla narzędzi typu Personal Agent, takich jak Muse i Hark — Twoje dane nigdy nie trafiają na zwykłe serwery ani platformy zewnętrzne. Osobny komponent szyfruje dane i przesyła je na Twoją własną witrynę, skąd każdy Personal Agent odczytuje je za pomocą klucza tylko do odczytu; przesyłaniem zajmuje się komponent, a klucze nigdy nie przechodzą przez ZeppBridge.',
     checking: 'Sprawdzanie komponentu chmurowego…',

@@ -54,8 +54,17 @@ def strip_comments(text: str) -> str:
     return COMMENT_RE.sub('', text)
 
 
+def bundled_notes() -> list[pathlib.Path]:
+    """随包的更新说明（services/updateNotice.ts 的 BUNDLED_VERSION）在弹窗里用 MiSans 排，
+    里面的字也要进切片，否则「靛」这类字会落到系统字体。信纸用衬线系统字体，不必收。"""
+    match = re.search(r"BUNDLED_VERSION = '([^']+)'", (ROOT / 'src' / 'services' / 'updateNotice.ts').read_text(encoding='utf-8'))
+    return sorted((ROOT / 'docs' / 'releases' / match.group(1)).glob('*.md')) if match else []
+
+
 def scan_cjk() -> str:
     chars: set[str] = set()
+    for path in bundled_notes():
+        chars.update(CJK_RE.findall(path.read_text(encoding='utf-8')))
     for base in SCAN:
         for path in base.rglob('*'):
             if path.suffix not in SCAN_SUFFIXES or 'node_modules' in path.parts or 'target' in path.parts:

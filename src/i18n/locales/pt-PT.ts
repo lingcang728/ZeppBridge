@@ -3548,6 +3548,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       taskOnlyOn: 'Ativado: a IA vê apenas as tarefas partilhadas para MCP abaixo e não pode escrever nada',
       taskOnlyReconnect: 'Depois de alterares isto, volta a ligar cada IA com os botões acima',
       writesTitle: 'Alterações recentes da IA',
+      writesLoading: 'A carregar as alterações da IA…',
+      writesLoadFailed: 'Não foi possível carregar as alterações da IA. Tenta novamente.',
+      writesUndoFailed: 'Não foi possível confirmar o resultado da anulação. Recarrega o histórico de alterações.',
       writesEmpty: 'Nenhuma ainda. Lesões, provas, sapatilhas, sensações de treino e notas do treinador registadas por uma IA local surgirão aqui, e cada uma pode ser anulada',
       writesUndo: 'Anular',
       writesUndone: 'Anulado',
@@ -3694,6 +3697,7 @@ Regras:
     },
     'views/settings/sections/cloud': {
       labTitle: 'Opções de Personal Agent',
+      labSub: 'Para Personal Agents como o Muse e o Hark. Desativado, nada é enviado; ativa para configurar abaixo.',
       secTitle: 'Opções de Personal Agent',
       lead:
         'Uma ponte pensada para Personal Agents como Muse e Hark — os teus dados nunca são enviados para servidores comuns nem plataformas de terceiros. O componente independente cifra e envia para o teu próprio site, onde cada Agent lê com uma chave só de leitura; o envio é feito pelo componente e as chaves nunca passam pelo ZeppBridge.',
@@ -4069,6 +4073,7 @@ Regras:
       send: 'Enviar',
       sending: 'A enviar…',
       sent: 'Enviada. O recibo aparecerá na sua caixa de correio',
+      sendFailed: 'Não foi possível enviar a carta. O rascunho foi guardado. Tente novamente.',
       queued: 'Sem ligação de momento — está na caixa de saída e será enviada assim que estiver online',
       alsoAttached: (count: number) => `Anexo: “comigo também” em ${count}`,
       boxTitle: 'Caixa de correio',

@@ -158,7 +158,7 @@ export const cloudMessages = defineMessages(
   },
   {
     labTitle: 'Opciones de Personal Agent',
-    labSub: 'Para agentes personales como Muse y Hark, que necesitan leer tus datos en cualquier momento. Mientras esté apagado no se envía nada; enciéndelo para configurarlo aquí abajo.',
+    labSub: 'Para Personal Agents como Muse y Hark que necesitan acceder a tus datos cuando lo requieran. Desactivado, no se envía nada; actívalo para configurarlo abajo.',
     secTitle: 'Opciones de Personal Agent',
     lead: 'Un puente pensado para Personal Agents como Muse y Hark: tus datos no se envían a servidores comunes ni a plataformas de terceros. El componente independiente cifra y sube los datos a tu propio sitio, donde cada Agent lee con una clave de solo lectura; la subida la hace el componente y las claves nunca pasan por ZeppBridge.',
     checking: 'Comprobando el componente…',

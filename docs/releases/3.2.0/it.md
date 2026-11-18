@@ -1,0 +1,35 @@
+- Added: **Stage Manager per i dettagli dell’allenamento**. Sul palco convivono fino a 4 schede: trascinale per combinarle, sposta i divisori per cambiare le proporzioni, tira i bordi per ridimensionare e il layout viene ricordato per tipo di allenamento. Più grande è la scheda, più dettagli mostra il grafico.
+- Added: **Vedi qualsiasi istante sul percorso**. Punta un momento sui grafici di frequenza cardiaca, passo, altitudine o cadenza e la scheda del percorso segna dove ti trovavi; pause e perdite di segnale non vengono mai collegate con linee artificiali.
+- Added: **Dettagli serie per serie e mappa muscolare per la forza (#163)**. Vengono elencati esercizio, ripetizioni e recupero di ogni serie, mentre la mappa muscolare evidenzia i gruppi allenati; tocca un lato per vedere la corrispondenza sull’altro. Mappa muscolare a cura di felipepmdias.
+- Added: **Profilo altimetrico**. Le schede di salita e altitudine mostrano ascesa e discesa totali, dislivello massimo e distribuzione delle pendenze.
+- Added: **Finestre temporali più ampie per la frequenza cardiaca**. La pagina della frequenza cardiaca passa tra 24 ore, 48 ore e 7 giorni, tracciando l’intervallo giornaliero con le linee di massimo, media e minimo.
+- Added: **Pulsante delle lettere nell’angolo in alto a destra**. Fai clic per scrivere, tieni premuto per aprire la Cassetta postale; un punto rosso si accende per una nuova risposta, una nuova lettera settimanale sui dati o una capsula del tempo giunta a scadenza.
+- Added: **Scrivere una lettera è il canale di feedback**. Sulla lettera puoi allegare una relazione diagnostica anonimizzata e scegliere il tipo di problema; la precedente scheda «Segnala un problema» nelle Impostazioni è ora integrata nella Cassetta postale.
+- Added: **L’IA locale può tenere traccia per te**. Un’IA collegata può registrare infortuni, eventi di vita, gare, scarpe, sensazioni di allenamento e tipi di allenamento, oltre a sincronizzare ed esportare al posto tuo. Ogni modifica può essere annullata in Impostazioni › Strumenti IA › Ultime modifiche dell’IA e l’IA non ha il permesso di eliminare dati.
+- Added: **Interruttore «Solo attività condivise» e più strumenti IA**. Quando è attivo, l’IA vede solo le attività aperte per lei e non può scrivere nulla; OpenCode, Grok Build e Factory si aggiungono alle connessioni con un clic.
+- Added: **Laboratorio beta e Personal Agent**. Nelle Impostazioni arriva il Laboratorio beta. Attiva «Opzioni Personal Agent» per inviare i dati in forma cifrata al tuo sito personale per assistenti come Muse e Hark. È disattivato per impostazione predefinita e finché resta spento non viene inviato nulla.
+- Added: **Interfaccia in sola lettura per servizi self-hosted**. Avvia zeppbridge-cli serve su un NAS o un server domestico e servizi come SparkyFitness o Home Assistant potranno recuperare sonno, frequenza cardiaca, allenamenti e peso a intervalli regolari. Richiede un token di pull, ascolta solo in locale per impostazione predefinita e non condivide i percorsi.
+- Added: **Scheda dei sonnellini nella pagina del sonno**. I sonnellini registrati da Zepp vengono mostrati separatamente con le relative fasi.
+- Added: **Percorso completo per Passa all’IA**. Selezionando insieme il livello «Dettagliato» e «Traccia precisa», viene allegato un file .gpx completo e incollato insieme al pacchetto.
+- Added: **Riconoscimento per T-Rex originale e T-Rex Dual Solar**.
+- Improved: **La selezione degli allenamenti in Passa all’IA si impila per intervallo**. Gli intervalli di un mese o più non restano più vuoti; gli allenamenti si raggruppano per settimana, mese o anno con il conteggio su ciascuna pila.
+- Improved: **La sincronizzazione non riscrive più tutto a ogni giro**. Sonno e frequenza cardiaca invariati vengono saltati, riducendo di due ordini di grandezza le righe scritte in una sincronizzazione ordinaria.
+- Improved: **I dati locali vengono rielaborati una volta dopo l’aggiornamento**. Una libreria grande richiede circa 15 minuti e la sincronizzazione attende il completamento; anche i vecchi allenamenti di forza ottengono così i dettagli serie per serie.
+- Improved: **Colori del sonno più facili da distinguere**. Sonno profondo in indaco, sonno leggero in azzurro, REM in verde acqua.
+- Improved: **Split e giri mostrano la cadenza media**.
+- Improved: **Animazioni più fluide**. Le finestre di dialogo non mostrano più un pannello vuoto all’apertura né lasciano un blocco scuro alla chiusura, la metà inferiore della pagina frequenza cardiaca non compare più con un battito di ritardo e lo zoom dell’interfaccia ora scorre in modo continuo.
+- Improved: **Niente più etichette sovrapposte o mandate a capo male in tutte e 13 le lingue**. Le etichette lunghe prima si compattano, poi passano al nome breve e vanno a capo solo come ultima risorsa.
+- Improved: **CLI e MCP aprono il database in modo più affidabile**. Quando non ci riescono spiegano il motivo; una versione precedente davanti a un database più recente invita a ricollegarsi dalle Impostazioni.
+- Improved: **La scheda «Sincronizzazione» nelle Impostazioni diventa «Sincronizzazione e aggiornamenti»**. È sempre stata la scheda in cui si controllano gli aggiornamenti.
+- Improved: **L’avviso di dispositivo non riconosciuto nella panoramica può essere chiuso**. Per dispositivi come le bilance che non richiedono identificazione, fai clic su × e non ricomparirà più.
+- Improved: **Accelerazione hardware ripristinata per Linux AppImage (#167)**. La composizione viene disattivata solo quando il pacchetto include ancora le vecchie librerie grafiche; lo stesso scorrimento consuma ora circa un terzo della CPU. Grazie ad andrejd1.
+- Improved: **Fine degli scatti su Linux con NVIDIA e niri (#164)**. Grazie a Jax Tsai.
+- Improved: **La disinstallazione pulisce più a fondo**. Selezionando «Elimina i dati dell’app» vengono rimossi anche il token API locale e il token di pull.
+- Fixed: **Le note di aggiornamento non compaiono più ogni giorno**. Anche chiudendo la finestra subito dopo aver fatto clic su «Ricevuto», non si ripresenteranno più.
+- Fixed: **Il peso degli altri membri della famiglia su una bilancia condivisa non viene più conteggiato come tuo**.
+- Fixed: **I conteggi dei passi coincidono quando indossi più dispositivi nello stesso giorno**. Panoramica, grafici e anelli usano tutti il valore fuso, oppure il più alto in sua assenza.
+- Fixed: **«Rispetto al solito» non sbaglia più di migliaia di chilometri**. Distanza nella pagina attività, peso e altezza nella pagina corpo ora usano le unità corrette.
+- Fixed: **I nomi dei dispositivi non compaiono più in cinese nelle altre lingue**.
+- Fixed: **Il rinnovo dell’autorizzazione ufficiale non chiede più erroneamente di accedere di nuovo**.
+- Fixed: **L’elenco dei dispositivi non va più interamente in errore quando una parte non è leggibile**.
+- Fixed: **Un avviso quando l’autorizzazione ufficiale impiega troppo tempo**. Dopo 45 secondi senza risposta, segnala che pages.dev potrebbe non essere raggiungibile.

@@ -468,6 +468,7 @@ export default {
       send: 'Absenden',
       sending: 'Wird gesendet…',
       sent: 'Gesendet. Die Empfangsbestätigung erscheint in deinem Briefkasten',
+      sendFailed: 'Der Brief konnte nicht gesendet werden. Dein Entwurf ist gespeichert. Bitte versuche es erneut.',
       queued: 'Gerade keine Verbindung – liegt im Postausgang und wird gesendet, sobald du online bist',
       alsoAttached: (count: number) => `Angehängt: „ich auch" bei ${count}`,
       boxTitle: 'Briefkasten',
@@ -4282,6 +4283,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       taskOnlyReconnect:
         'Nach einer Änderung jede KI über die oberen Schaltflächen erneut verbinden',
       writesTitle: 'Letzte KI-Änderungen',
+      writesLoading: 'KI-Änderungen werden geladen…',
+      writesLoadFailed: 'KI-Änderungen konnten nicht geladen werden. Bitte versuche es erneut.',
+      writesUndoFailed: 'Das Rückgängigmachen konnte nicht bestätigt werden. Lade die Änderungsliste neu.',
       writesEmpty:
         'Noch keine. Von einer lokalen KI erfasste Verletzungen, Wettkämpfe, Laufschuhe, Trainingsgefühle und Trainer-Notizen erscheinen hier, jede einzeln rückgängig machbar',
       writesUndo: 'Rückgängig',
@@ -4326,6 +4330,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'views/settings/sections/cloud': {
       labTitle: 'Personal Agent-Optionen',
+      labSub: 'Für Personal Agents wie Muse und Hark. Aus: kein Push; ein: unten einrichten.',
       secTitle: 'Personal Agent-Optionen',
       lead:
         'Eine Brücke für Personal Agents wie Muse und Hark – deine Daten werden weder an gewöhnliche Server noch an Drittanbieter-Plattformen gesendet. Die eigenständige Komponente verschlüsselt deine Daten und lädt sie auf deine eigene Website hoch, wo jeder Agent sie mit einem Nur-Lese-Schlüssel abruft; der Upload läuft über die Komponente, und die Schlüssel laufen nie über ZeppBridge.',

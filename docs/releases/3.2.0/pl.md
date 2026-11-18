@@ -1,0 +1,35 @@
+- Added: **Stage Manager w szczegółach treningu**. Na scenie mieszczą się maksymalnie 4 karty: przeciągnij je, aby je połączyć, przesuwaj przerwy między nimi, by zmienić proporcje, i ciągnij za krawędzie, aby zmienić rozmiar; układ jest zapamiętywany osobno dla każdego typu treningu. Im większa karta, tym więcej szczegółów pokazuje wykres.
+- Added: **Podgląd dowolnej chwili na trasie**. Wskaż dowolny moment na wykresie tętna, tempa, wysokości lub kadencji, a karta trasy zaznaczy, gdzie wtedy byłeś; przerwy w treningu i utraty sygnału nigdy nie są sztucznie łączone.
+- Added: **Szczegółowy podział na serie i mapa mięśni w treningu siłowym (#163)**. Każda seria wyświetla ćwiczenie, liczbę powtórzeń i przerwę, a mapa mięśni podświetla zaangażowane partie; kliknięcie po jednej stronie wskazuje odpowiednik po drugiej. Mapowanie mięśni przygotował felipepmdias.
+- Added: **Profil wysokości**. Karty wzniosu i wysokości prezentują sumę podejść i zejść, największy spadek oraz rozkład nachylenia.
+- Added: **Dłuższe okna czasowe dla tętna**. Strona tętna pozwala przełączać się między widokiem 24 godzin, 48 godzin i 7 dni, a dzienny zakres jest rysowany jako trzy linie: maksimum, średnia i minimum.
+- Added: **Przycisk listu w prawym górnym rogu**. Kliknij, aby napisać list, przytrzymaj, aby otworzyć skrzynkę; czerwona kropka informuje o nowej odpowiedzi, nowym cotygodniowym liście z danymi lub otwarciu kapsuły czasu.
+- Added: **Napisanie listu to teraz kanał zgłaszania problemów**. Do listu możesz dołączyć zanonimizowany raport diagnostyczny i wybrać rodzaj problemu; dotychczasowa karta „Zgłoś problem” w Ustawieniach została przeniesiona do skrzynki na listy.
+- Added: **Lokalne AI może prowadzić za Ciebie zapiski**. Połączone AI może zapisywać kontuzje, wydarzenia życiowe, zawody, buty biegowe, odczucia z treningu oraz typy aktywności, a także synchronizować i eksportować dane; każdą zmianę można cofnąć w sekcji Ustawienia › Narzędzia AI › Ostatnie zmiany wprowadzone przez AI, a AI nie ma uprawnień do usuwania danych.
+- Added: **Przełącznik „Tylko udostępnione zadania” i więcej narzędzi AI**. Po włączeniu AI widzi wyłącznie udostępnione mu zadania i nie może niczego zapisywać; do połączeń jednym kliknięciem dołączyły OpenCode, Grok Build oraz Factory.
+- Added: **Laboratorium beta i Personal Agent**. W Ustawieniach pojawiło się Laboratorium beta; po włączeniu opcji „Opcje Personal Agent” możesz przesyłać zaszyfrowane dane na własną witrynę dla asystentów takich jak Muse i Hark. Domyślnie jest wyłączona i nic nie wysyła.
+- Added: **Interfejs tylko do odczytu dla usług self-hosted**. Uruchom polecenie `zeppbridge-cli serve` na serwerze NAS lub domowym serwerze, aby usługi takie jak SparkyFitness czy Home Assistant mogły cyklicznie pobierać dane o śnie, tętnie, treningach i wadze; wymaga tokenu pobierania, domyślnie nasłuchuje wyłącznie lokalnie i domyślnie nie udostępnia tras treningów.
+- Added: **Karta drzemek na stronie snu**. Drzemki zarejestrowane przez Zepp są wyświetlane osobno wraz z ich fazami.
+- Added: **Pełna trasa w „Wyślij do AI”**. Gdy wybrane są jednocześnie opcje „Szczegółowy” oraz „Dokładna trasa”, dołączany jest kompletny plik .gpx, kopiowany razem z paczką przy wklejaniu.
+- Added: **Rozpoznawanie zegarków pierwszej generacji T-Rex oraz T-Rex Dual Solar**.
+- Improved: **Wybieranie treningów w „Wyślij do AI” grupuje je w stosy według zakresu**. Wybór miesiąca lub dłuższego okresu nie jest już pusty; treningi układają się w stosy według tygodni, miesięcy lub lat wraz z liczbą na każdym stosie.
+- Improved: **Synchronizacja nie przepisuje już wszystkiego przy każdej rundzie**. Niezmienione dane snu i tętna są pomijane, co zmniejsza liczbę zapisywanych wierszy podczas zwykłej synchronizacji o dwa rzędy wielkości.
+- Improved: **Dane lokalne są ponownie przetwarzane jednorazowo po aktualizacji**. W przypadku dużej bazy zajmuje to około 15 minut, a synchronizacja automatycznie czeka w kolejce; przy okazji starsze treningi siłowe zyskują szczegółowy podział na serie.
+- Improved: **Czytelniejsze kolory faz snu**. Sen głęboki ma kolor ciemnego indygo, sen płytki jasnoniebieski, a faza REM morski.
+- Improved: **Międzyczasy i okrążenia pokazują średnią kadencję**.
+- Improved: **Płynniejsze animacje**. Okna dialogowe nie migają już pustym panelem przy otwieraniu ani nie zostawiają ciemnego prostokąta przy zamykaniu, dolna połowa strony tętna nie pojawia się z opóźnieniem, a skalowanie interfejsu zmienia się płynnie.
+- Improved: **Brak nakładających się lub niezgrabnie zawiniętych etykiet we wszystkich 13 językach**. Długie etykiety najpierw się zagęszczają, potem przełączają na krótką nazwę, a zawijają dopiero w ostateczności.
+- Improved: **CLI i MCP otwierają bazę danych stabilniej**. Gdy nie mogą jej otworzyć, podają powód; starsza wersja napotykająca nowszą bazę informuje o konieczności ponownego połączenia w Ustawieniach.
+- Improved: **Karta „Synchronizacja” w Ustawieniach nazywa się teraz „Synchronizacja i aktualizacje”**. Sprawdzanie aktualizacji od początku znajdowało się właśnie tutaj.
+- Improved: **Podpowiedź o nierozpoznanym urządzeniu w przeglądzie można zamknąć**. W przypadku urządzeń takich jak wagi analityczne, które nie wymagają przypisywania, kliknij ×, a komunikat więcej się nie pojawi.
+- Improved: **Przywrócono akcelerację sprzętową w Linux AppImage (#167)**. Kompozycja jest wyłączana tylko wtedy, gdy paczka nadal zawiera starsze biblioteki graficzne; to samo przewijanie zużywa teraz około jednej trzeciej CPU. Podziękowania dla andrejd1.
+- Improved: **Koniec z przycięciami na Linuksie przy NVIDIA i niri (#164)**. Podziękowania dla Jax Tsai.
+- Improved: **Odinstalowanie sprząta dokładniej**. Zaznaczenie opcji „Usuń dane aplikacji” usuwa teraz także lokalny token API oraz token pobierania.
+- Fixed: **Informacje o aktualizacji nie wyskakują już codziennie**. Nawet jeśli zamkniesz okno od razu po kliknięciu „Rozumiem”, nie pojawią się ponownie.
+- Fixed: **Waga innych domowników ze wspólnej wagi nie liczy się już jako Twoja**.
+- Fixed: **Liczba kroków zgadza się przy noszeniu kilku urządzeń jednego dnia**. Przegląd, wykresy i pierścienie korzystają ze wspólnej wartości scalonej lub z najwyższej, jeśli scalona nie jest dostępna.
+- Fixed: **Sekcja „W porównaniu z Twoją normą” nie myli się już o tysiące kilometrów**. Dystans na stronie aktywności oraz waga i wzrost na stronie ciała używają teraz właściwych jednostek.
+- Fixed: **Nazwy urządzeń nie wyświetlają się już po chińsku w innych językach**.
+- Fixed: **Odnowienie oficjalnej autoryzacji nie prosi już błędnie o ponowne logowanie**.
+- Fixed: **Lista urządzeń nie kończy się już błędem całej listy, gdy jednej części nie da się odczytać**.
+- Fixed: **Podpowiedź, gdy oficjalna autoryzacja trwa zbyt długo**. Jeśli po 45 sekundach nie ma odpowiedzi, pojawia się informacja, że domena pages.dev może być nieosiągalna.

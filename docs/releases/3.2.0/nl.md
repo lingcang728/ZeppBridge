@@ -1,0 +1,34 @@
+- Added: **Stage Manager voor workoutdetails**. Maximaal 4 kaarten delen het podium: sleep ze samen, versleep de tussenruimte om verhoudingen aan te passen, trek aan de randen om te schalen en de indeling wordt per sporttype onthouden; hoe groter een kaart, hoe meer detail de grafiek toont.
+- Added: **Elk moment op de route bekijken**. Wijs een moment aan in de grafiek voor hartslag, tempo, hoogte of cadans en de routekaart markeert waar je toen was; pauzes en plekken zonder signaal worden nooit met een rechte lijn verbonden.
+- Added: **Krachttraining per set en spierkaart (#163)**. Van elke set staan oefening, herhalingen en rusttijd vermeld, en de spierkaart licht de getrainde spiergroepen op; tik aan één kant om de overeenkomst aan de andere kant te zien. Spierkoppeling door felipepmdias.
+- Added: **Hoogteprofiel**. De klim- en hoogtekaarten tonen totale stijging en daling, het grootste hoogteverschil en de verdeling van hellingspercentages.
+- Added: **Langere tijdsvensters voor hartslag**. De hartslagpagina schakelt tussen 24 uur, 48 uur en 7 dagen, waarbij het dagbereik wordt getekend als lijnen voor maximum, gemiddelde en minimum.
+- Added: **Een brievenknop rechtsboven**. Klik om te schrijven, houd ingedrukt om de Brievenbus te openen; er licht een rood stipje op bij een nieuw antwoord, een nieuwe wekelijkse gegevensbrief of een tijdcapsule die open mag.
+- Added: **Een brief schrijven is het feedbackkanaal**. Je kunt een geanonimiseerd diagnoserapport meesturen en een probleemtype kiezen op de brief; de oude kaart ‘Een probleem melden’ in Instellingen maakt nu deel uit van de Brievenbus.
+- Added: **Lokale AI kan gegevens voor je bijhouden**. Een gekoppelde AI kan blessures, levensgebeurtenissen, wedstrijden, hardloopschoenen, trainingsgevoel en sporttypen vastleggen, en ook voor je synchroniseren en exporteren; elke wijziging is ongedaan te maken via Instellingen › AI-tools › Recente AI-wijzigingen, en de AI heeft geen verwijderrechten.
+- Added: **Schakelaar ‘Alleen gedeelde taken’ en meer AI-tools**. Wanneer deze aanstaat ziet de AI alleen de taken die jij openzet en kan hij niets schrijven; OpenCode, Grok Build en Factory zijn toegevoegd aan de verbindingen met één klik.
+- Added: **Bètalab en Personal Agent**. Instellingen heeft nu een Bètalab; schakel ‘Personal Agent-opties’ in om je gegevens versleuteld naar je eigen site te sturen voor assistenten zoals Muse en Hark. Staat standaard uit, en zolang het uitstaat wordt er niets verzonden.
+- Added: **Alleen-lezen interface voor zelfgehoste diensten**. Draai zeppbridge-cli serve op een NAS of thuisserver zodat diensten zoals SparkyFitness of Home Assistant periodiek slaap, hartslag, trainingen en gewicht kunnen ophalen; vereist een ophaaltoken, luistert standaard alleen lokaal en deelt standaard geen routes.
+- Added: **Dutjeskaart op de slaappagina**. Door Zepp geregistreerde dutjes en hun slaapfasen worden afzonderlijk weergegeven.
+- Added: **Volledige route bij ‘Naar de AI’**. Wanneer zowel ‘Gedetailleerd’ als ‘Nauwkeurige route’ is gekozen, wordt een volledige .gpx meegestuurd en samen met de overdracht geplakt.
+- Added: **Herkenning van de oorspronkelijke T-Rex en T-Rex Dual Solar**.
+- Improved: **Trainingen kiezen in ‘Naar de AI’ stapelt per periode**. Een bereik van een maand of langer blijft niet langer leeg; trainingen worden gestapeld per week, maand of jaar met het aantal op elke stapel.
+- Improved: **Synchronisatie herschrijft niet elke keer alles opnieuw**. Ongewijzigde slaap- en hartslaggegevens worden overgeslagen, waardoor het aantal geschreven rijen bij een reguliere ronde met twee grootteorden daalt.
+- Improved: **Duidelijkere slaapkleuren**. Diepe slaap is diep indigo, lichte slaap lichtblauw en REM zeegroen.
+- Improved: **Splits en ronden tonen de gemiddelde cadans**.
+- Improved: **Vloeiendere animaties**. Vensters flitsen geen leeg paneel meer bij het openen en laten geen zwart blok achter bij het sluiten, de onderste helft van de hartslagpagina verschijnt niet langer een tel te laat en de schaal van de interface verandert nu vloeiend.
+- Improved: **Geen overlappende of ongelukkig afgebroken labels meer in alle 13 talen**. Lange labels worden eerst compacter gemaakt, schakelen daarna over op een korte naam en breken pas in laatste instantie af.
+- Improved: **CLI en MCP openen de database betrouwbaarder**. Als lezen niet lukt wordt de reden vermeld; een oudere versie die een nieuwere database tegenkomt vraagt om opnieuw te verbinden via Instellingen.
+- Improved: **De kaart ‘Synchronisatie’ in Instellingen heet nu ‘Synchronisatie en updates’**. Controleren op updates zat altijd al op deze kaart.
+- Improved: **De melding voor niet-herkende apparaten op het overzicht kan worden gesloten**. Voor apparaten zoals weegschalen die geen herkenning nodig hebben, klik je op × zodat de melding wegblijft.
+- Improved: **Hardwareversnelling terug voor de Linux AppImage (#167)**. Compositing wordt niet meer uitgeschakeld wanneer het pakket die grafische bibliotheken niet meer meelevert; hetzelfde scrollen verbruikt nog ongeveer een derde van de CPU. Dank aan andrejd1.
+- Improved: **Geen haperingen meer op Linux met NVIDIA en niri (#164)**. Dank aan Jax Tsai.
+- Improved: **Grondigere opruiming bij verwijderen**. Als je ‘App-gegevens verwijderen’ aanvinkt, worden ook het lokale API-token en het ophaaltoken gewist.
+- Fixed: **Updatemeldingen verschijnen niet langer elke dag**. Ook als je het venster direct na het klikken op ‘Begrepen’ sluit, komen ze de volgende keer niet terug.
+- Fixed: **Het gewicht van andere gezinsleden op een gedeelde weegschaal wordt niet meer aan jou toegerekend**.
+- Fixed: **Stappentellingen komen overeen wanneer je meerdere apparaten op één dag draagt**. Overzicht, grafieken en ringen gebruiken allemaal de gecombineerde waarde, of de hoogste als die er niet is.
+- Fixed: **‘Vergeleken met normaal’ zit er niet langer duizenden kilometers naast**. Afstand op de activiteitenpagina en gewicht en lengte op de lichaamspagina gebruiken bij de vergelijking nu de juiste eenheden.
+- Fixed: **Apparaatnamen verschijnen niet langer in het Chinees in andere talen**.
+- Fixed: **Verlengen van officiële autorisatie vraagt niet meer ten onrechte om opnieuw in te loggen**.
+- Fixed: **De apparatenlijst geeft niet langer in zijn geheel een foutmelding als één onderdeel niet kan worden gelezen**.
+- Fixed: **Melding wanneer officiële autorisatie te lang duurt**. Na 45 seconden zonder reactie wordt uitgelegd dat pages.dev mogelijk onbereikbaar is.

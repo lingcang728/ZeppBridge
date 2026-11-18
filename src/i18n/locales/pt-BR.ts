@@ -3322,6 +3322,9 @@ Se precisar de alguma informação minha (qual cliente uso, onde o arquivo está
       taskOnlyOn: 'Ativado: a IA vê apenas as tarefas liberadas para MCP abaixo e não pode escrever nada',
       taskOnlyReconnect: 'Depois de alterar isso, reconecte cada IA com os botões acima',
       writesTitle: 'Alterações recentes da IA',
+      writesLoading: 'Carregando alterações da IA…',
+      writesLoadFailed: 'Não foi possível carregar as alterações da IA. Tente novamente.',
+      writesUndoFailed: 'Não foi possível confirmar se foi desfeito. Recarregue a lista de alterações.',
       writesEmpty: 'Nenhuma ainda. Lesões, provas, tênis, sensação do treino e notas do treinador registradas por uma IA local aparecerão aqui, e cada uma pode ser desfeita',
       writesUndo: 'Desfazer',
       writesUndone: 'Desfeito',
@@ -3470,6 +3473,7 @@ Regras:
 
     'views/settings/sections/cloud': {
       labTitle: 'Opções de Personal Agent',
+      labSub: 'Para Personal Agents como Muse e Hark. Desativado, nada é enviado; ative para configurar abaixo.',
       secTitle: 'Opções de Personal Agent',
       lead: 'Uma ponte feita para Personal Agents como Muse e Hark — seus dados nunca são enviados a servidores comuns nem a plataformas de terceiros. O componente independente criptografa e envia para o seu próprio site, onde cada Agent lê com uma chave somente leitura; o envio é feito pelo componente e as chaves nunca passam pelo ZeppBridge.',
       checking: 'Verificando o componente de nuvem…',
@@ -3841,6 +3845,7 @@ Regras:
       send: 'Enviar',
       sending: 'Enviando…',
       sent: 'Enviada. O recibo aparecerá na sua caixa de correspondência',
+      sendFailed: 'Não foi possível enviar a carta. Seu rascunho foi salvo. Tente novamente.',
       queued: 'Sem conexão no momento — está na caixa de saída e será enviada quando você estiver online',
       alsoAttached: (count: number) => `Anexo: “eu também” em ${count}`,
       boxTitle: 'Caixa de cartas',
