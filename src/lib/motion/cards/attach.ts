@@ -1,5 +1,5 @@
 /**
- * 交出动画的素材（2026-10-28 重做，用户拍板的隐喻：在和 AI 的对话框里加附件）。编排在 composables/ai/useAttachFlight.ts。
+ * 交出动画的素材（隐喻：在和 AI 的对话框里加附件）。编排在 composables/ai/useAttachFlight.ts。
  *
  * - 牌：沿自己那根线滑向门锁、边走边缩、边走边摆正，最后钻到锁盘后面；
  * - 线：那根枝跟在牌后面收进锁（`stroke-dashoffset` 和牌用同一条时间轴、同一条曲线，路线按弧长取点，端点始终贴着牌）；

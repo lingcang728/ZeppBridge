@@ -25,7 +25,7 @@ watch([() => receipt.value?.version, locale], async ([version, language]) => {
   if (receipt.value?.version === version && locale.value === language) bundled.value = notes;
 }, { immediate: true });
 const rows = computed(() => releaseRows(bundled.value ?? notesForLocale(receipt.value?.notes ?? '', locale.value)));
-/* 按新增 / 改进 / 修复分组列出，不再每行前面挂一个小标签（用户 2026-10-19：「很难读」）。 */
+/* 按新增 / 改进 / 修复分组列出，不再每行前面挂一个小标签。 */
 const groups = computed(() => groupRows(rows.value));
 
 /* 3.0.7 起每一版都有作者来信：有信就用信封（更新说明是其中一张信纸），跳过几版才更新的人几封捆成一叠。没有信的老版本仍用这张卡。 */

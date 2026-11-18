@@ -148,7 +148,7 @@ export const startCollapse = (ctx: MorphCtx, job: Collapse) => {
     });
   }
   /* 收回途中来处页还在排版（上面的区块晚一帧才读到数、图片撑开）：卡被往下推了，终点跟着改
-     （用户 2026-10-27「PB 的位置根本不在原来的地方」）。 */
+     （不然 PB 会落到别的位置）。 */
   if (present) {
     let aim = target;
     const follow = () => {
@@ -164,7 +164,7 @@ export const startCollapse = (ctx: MorphCtx, job: Collapse) => {
   }
   const all = () => [...flight.anims, ...(veilAnim ? [veilAnim] : []), ...(hidden ? [hidden] : [])];
   /* 来处页刚从 KeepAlive 缓存插回文档，第一次上屏要整页光栅化：窗口要是这一刻就开始缩，四周露出来的是一圈还没画好的
-     黑底，过三四帧来处页才「整个冒出来」（用户 2026-11-12 录屏：履历页点出去收回的那一刻会整个重绘一下）。
+     黑底，过三四帧来处页才「整个冒出来」（履历页点出去收回的那一刻会整个重绘一下）。
      起点上窗口铺满整个可视区、完全盖着来处页，停在这里等它画好看不出在等：帧节奏稳了（最多 PAINT_WAIT_MS）再放。
      掉头接力（reversing）不等：来处页一直在场上。 */
   if (!reversing) {

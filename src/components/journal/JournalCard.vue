@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 履历页每一块的卡：卡头（标题、右上角的添加按钮）+ 内容。卡头不放说明小字（用户 2026-10-23：小字全部删掉）。材质同概览的卡。
+/* 履历页每一块的卡：卡头（标题、右上角的添加按钮）+ 内容。卡头不放说明小字（小字全部删掉）。材质同概览的卡。
    右上角要放不止一个按钮时用 actions 插槽（纪元与事件：「新纪元」「记一件事」）。 */
 defineProps<{ title: string; action?: string; tone?: 'race' | 'record' | 'shoe' | 'injury' | 'epoch' }>();
 const emit = defineEmits<{ (event: 'action', origin: HTMLElement): void }>();

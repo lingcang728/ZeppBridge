@@ -32,7 +32,7 @@ const { t, reasonText, metricLabel, formatNumber, formatValue } = useWeeklyFactT
 
 /* 每一格都能点进对应的详情页：有悬停反馈的东西就该能点进去。有对应趋势卡的带上 ?focus=，
    点进去直接停在那张卡上并圈一下（lib/motion/focusTarget.ts）——和置顶指标同一套。
-   概览顶上原来还有一份「这一周」摘要，和这张周报上下重叠，用户 2026-10-04 定只留这一张。 */
+   概览顶上原来还有一份「这一周」摘要，和这张周报上下重叠，现在只留这一张。 */
 const DETAIL_ROUTE: Record<string, string> = {
   'weekly.resting_hr': '/heart?focus=resting_hr',
   'weekly.hrv': '/body?focus=hrv',

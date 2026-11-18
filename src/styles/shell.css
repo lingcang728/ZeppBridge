@@ -85,7 +85,7 @@
 }
 .bottom-nav { display: none; }
 /* flow-root：顶栏的 margin-top: 12px 不许穿出 .shell-head。穿出去的话静止时整块在 12px、一滚就吸到 0，
-   滚到页底再切页那一帧滚动归零，顶栏「咚」地往下掉 12px（用户 2026-10-27「划到最下面跳到交给 AI 顶部会跳变」）。
+   滚到页底再切页那一帧滚动归零，顶栏「咚」地往下掉 12px。
    现在不论滚没滚，顶栏都离窗口上沿 12px（1C 的本意）。 */
 .shell-head { position: sticky; top: 0; z-index: 30; display: flow-root; }
 /* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
@@ -160,7 +160,7 @@
 [class*='page-'].page-collapse-leave-active { z-index: 3; transition: none; }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 卡 ↔ 页形变时蒙在来处页上的模糊（lib/motion/pageFlight.ts 的 pageVeil）：和弹窗遮罩（ModalDialog.vue 的
-   .dialog-backdrop::before）同一组值，静态模糊，只淡入淡出这一层——用户 2026-10-28「照抄履历页卡片的动画」。 */
+   .dialog-backdrop::before）同一组值，静态模糊，只淡入淡出这一层，和履历页卡片的动画一致。 */
 .page-veil { position: absolute; z-index: 2147483000; pointer-events: none; opacity: .001; background: rgba(0, 0, 0, .5);
   -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——

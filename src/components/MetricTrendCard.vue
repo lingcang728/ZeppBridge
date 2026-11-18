@@ -172,7 +172,7 @@ const option = computed(() => {
   /* 生活事件画成竖向浅色区带（一天的画成一根竖线），颜色跟事件分类走、和页头胶囊同色；点一下打开编辑。
      以前是 9px 无标签的品牌绿圆点，新用户会当成数据点样式（U24）。
      事件名写进悬停浮出的那块读数里（日期、数值下面），不再画在图上：竖线的标签落在画布顶边外，
-     字被裁掉一半（用户 2026-10-04 截图「模拟：进入半马准备期」）。 */
+     字被裁掉一半（比如「模拟：进入半马准备期」）。 */
   const palette = chartPalette.value;
   const axisDates = ((result.xAxis as { data?: string[] }).data ?? []);
   const areas: unknown[] = [];
@@ -264,7 +264,7 @@ const hasEventMarks = computed(() => {
     </header>
 
     <!-- 悬停读数只在图上浮出的那块里（日期、数值、当天的生活事件）。以前这一行还会叠一份同样的
-         「9/20：110 克」，两处说同一件事（用户 2026-10-04）。 -->
+         「9/20：110 克」，两处说同一件事。 -->
     <p class="trend-meta">
       <span v-if="widened" class="trend-widened">{{ widened }}</span>
       <span v-if="hasPoints">{{ coverage }}</span>

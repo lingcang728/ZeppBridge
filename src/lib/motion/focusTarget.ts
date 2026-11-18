@@ -3,15 +3,15 @@ import { lessMotion } from './lessMotion';
 
 /**
  * 点概览上的小卡（置顶指标、「这一周」）进详情页时，直接停在对应的那张趋势卡上，并圈一下
- * （用户 2026-10-03：点「训练负荷」进了训练状态页，还得自己往下找那张卡）。
+ * （点「训练负荷」进了训练状态页，还得自己往下找那张卡）。
  *
  * 链接带 `?focus=指标名`，目标卡标着 `data-focus-key`（MetricTrendCard 用它的指标名）。从卡片展开时
  * usePageMorph 先把页面滚到那张卡、让窗口直接从小卡长成那张卡；没有形变（减少动效、数据还没到）时
  * 页面出来以后平滑滚过去。落定后圈一下。
  *
  * 没有卡的指标（近 6 个月一条读数都没有，收进了「近 6 个月没有读数」那一行，或者整组只剩一句说明）：
- * 那一行 / 那句话标着 `data-focus-keys="指标名 指标名…"`，定位到它（用户 2026-10-04：体重、体脂率、BMI
- * 没有数据，点进去停在页顶不动）。
+ * 那一行 / 那句话标着 `data-focus-keys="指标名 指标名…"`，定位到它（以前体重、体脂率、BMI
+ * 没有数据时，点进去停在页顶不动）。
  */
 export const focusKeyOf = (route: RouteLocationNormalized): string | null =>
   (typeof route.query.focus === 'string' && route.query.focus ? route.query.focus : null);
@@ -28,7 +28,7 @@ const TOP_GAP = 96;
  *
  * 能滚多远按**这一页自己**的底算（`page`），不按滚动区的 scrollHeight：切页时离场的来处页还绝对定位地
  * 叠在里面（概览很长），scrollHeight 是两页里长的那个。按它滚到底，来处页一离场滚动区变短，浏览器把
- * scrollTop 夹回来——形变刚落定整页就往下一沉（用户 2026-10-04 录屏：睡眠 HRV、静息心率、训练负荷点进去都这样）。
+ * scrollTop 夹回来——形变刚落定整页就往下一沉（睡眠 HRV、静息心率、训练负荷点进去都这样）。
  */
 export const focusScrollDelta = (target: HTMLElement, scroller: HTMLElement, page?: HTMLElement): number => {
   const box = target.getBoundingClientRect();
@@ -83,7 +83,7 @@ const SCROLL_SETTLE_MS = 700;
  *
  * 不能在页面刚挂上时量一次就算：形变放完以后图表才一帧挂一张、每小时步数卡读完数据才从一行长成
  * 一整块（高四百多像素），那一刻量的「能滚多远」只有最后的一半。以前按那时的高度算出来要滚 0，
- * 日常活动页的步数 / 活动热量点进去就停在页顶不动（用户 2026-10-04 录屏）。
+ * 日常活动页的步数 / 活动热量点进去就停在页顶不动。
  *
  * 等待期间用户自己动了滚动条，就不替他滚了（只圈一下）。
  */

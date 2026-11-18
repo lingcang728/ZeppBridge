@@ -2,7 +2,7 @@ import { ref, watch, type Ref } from 'vue';
 import { SERIES_RANGE_DAYS, type SeriesRangeDays } from '../lib/metricSeries';
 
 /**
- * 心率 / 日常活动 / 身体 / 训练四页共用的趋势范围（U11，用户 2026-09-30 定：全局记、默认 1 个月）。
+ * 心率 / 日常活动 / 身体 / 训练四页共用的趋势范围（全局记、默认 1 个月）。
  *
  * 以前四页各有各的默认值（7 天、7 天、1 个月、6 个月），离开再回来又重置。现在是一个
  * 模块级 ref：在任何一页选了 6 个月，另外三页也是 6 个月；下次打开应用还记得。

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 开关（Liquid Glass，第四轮 1D·D4，用户 10-07「凡是开关都换成 Liquid Glass」）。全应用唯一的开关样子：
+ * 开关（Liquid Glass，所有开关统一用它）。全应用唯一的开关样子：
  * 以前的 `.mat-switch` 是一颗白色圆钮，按下去没有任何变化。
  *
  * 照 iOS 26：停着时是一颗不透明的白钮；手指一按，白钮化开、同一处浮起一块比它宽的玻璃（lib/glassLens.ts 的

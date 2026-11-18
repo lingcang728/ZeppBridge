@@ -158,7 +158,7 @@ let leavingScroll = 0;
 const removeBeforeEach = router.beforeEach(async (to, from) => {
   // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。
   // 同一页里只换参数（设置卡叠 /settings/:card 的开合、圆点切卡）不收：卡叠的飞行自己会掉头，
-  // 快进只会把它和总览回位的过渡压成一下跳（2026-11-12 修复计划 A3，「设置卡收起时被截断」）。
+  // 快进只会把它和总览回位的过渡压成一下跳（否则设置卡收起时会被截断）。
   if (!to.matched[0] || to.matched[0] !== from.matched[0]) settleMotion();
   // 同一页里的子路由（交给 AI 的玻璃大卡 /ai/tasks 等，10-08 H18）：外层页面不换，不做切页动效，大卡自己长出来。
   if (to.matched.length > 1 && from.matched[0] && to.matched[0] === from.matched[0]) { motion.value = 'none'; return; }
@@ -172,7 +172,7 @@ const removeBeforeEach = router.beforeEach(async (to, from) => {
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
   // 走 CSS 动画的几种切页：先停在第一帧，等新页上屏、帧稳了再放（见下面 afterEach 和 shell.css）。换入口的淡入淡出自己等。
   pageHold.value = motion.value !== 'expand' && motion.value !== 'collapse' && motion.value !== 'fade';
-  // 从卡片展开：新页首屏的数据和形变并行去读（多半悬停时已经读好），不等它——点下去就动（2026-11-12 修复计划 A4）。
+  // 从卡片展开：新页首屏的数据和形变并行去读（多半悬停时已经读好），不等它——点下去就动。
   // 窗口里的卡拷贝一直顶到内容接手，数据晚到也不会出空板。
   if (motion.value === 'expand') preloadOnOpen(to.fullPath);
 });

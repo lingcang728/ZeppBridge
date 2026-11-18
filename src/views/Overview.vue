@@ -214,7 +214,7 @@ const loadBand = computed(() => trainingLoadTierText(trainingLoad.value, overvie
 const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load', 'steps', 'distance'];
 
 /* 只在跑后才出读数的稀疏项（VO₂max，偶尔血氧）：近 7 天不到两个点时那一行改画近 90 天，行尾标出来；
-   不补点、不拉平线（用户 2026-10-28 截图：概览那条是斜纹，点进去却有趋势）。 */
+   不补点、不拉平线（概览那条是斜纹，点进去却有趋势）。 */
 const SPARSE_METRICS = ['readiness', 'stress', 'spo2', 'vo2max'];
 const SPARSE_DAYS = 90;
 const sparseSeries = ref<Record<string, MetricSeries>>({});

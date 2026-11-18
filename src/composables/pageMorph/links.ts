@@ -4,7 +4,7 @@ import type { WindowRect } from '../../lib/motion/window';
 
 /**
  * 卡 ↔ 页形变要认的东西（composables/usePageMorph.ts）：被点的是哪张卡、返回时去哪找回它、可视区多大。
- * 2026-11-12 从 usePageMorph.ts 拆出来（修复计划 A5）。
+ * 2026-11-12 从 usePageMorph.ts 拆出来。
  */
 export type Rect = WindowRect;
 
@@ -68,7 +68,7 @@ export type Trail = { back: string; href: string; index: number; rect: Rect; rad
 let armed: { card: HTMLElement; href: string; id: string; at: number; anySize: boolean } | null = null;
 let armSeq = 0;
 /** `anySize`：来处是被点的那枚按钮本身（年轮页右上角的「问 AI」——页面上只有一整块年轮，拿它当来处等于从整屏长到整屏，
-    看上去是硬切，用户 2026-10-28）：不受「够大才形变」的门槛限制，页面从这枚胶囊里长出来、返回时缩回它。 */
+    看上去是硬切）：不受「够大才形变」的门槛限制，页面从这枚胶囊里长出来、返回时缩回它。 */
 export const armPageMorph = (card: HTMLElement | null, href: string, options: { anySize?: boolean } = {}): void => {
   if (!card) { armed = null; return; }
   const id = card.dataset.morphSource || `m${(armSeq += 1)}`;

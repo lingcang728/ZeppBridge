@@ -67,7 +67,7 @@ export const CATEGORY_DAY_CHOICES: readonly number[] = [7, 14, 30];
 
 /**
  * 回溯天数在胶囊上亮哪一格。胶囊的「7 天」写进去是 days_before=7；内置模板「这一周」按「今天 + 前 6 天」
- * 写的是 6——以前两边对不上，套了模板以后「7 / 14 / 30 天」一格都不亮（用户 2026-09-30 截图）。
+ * 写的是 6——以前两边对不上，套了模板以后「7 / 14 / 30 天」一格都不亮。
  * 差一天的也点亮最近的那一格；不改存下来的值。
  */
 export const shownDayChoice = (daysBefore: number, choices: readonly number[]): number => {

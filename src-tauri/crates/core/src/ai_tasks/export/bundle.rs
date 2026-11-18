@@ -158,7 +158,7 @@ impl Database {
         document.insert("task".into(), Value::Object(task_meta));
 
         // 锚点运动：按 detail_level 决定深度。没开「运动」类别时锚点只用来定日期窗，
-        // 连 id / 类型 / 开始日都不给（用户 2026-10-13 定）：`workouts` 为空，
+        // 连 id / 类型 / 开始日都不给：`workouts` 为空，
         // 日行的 `linked_workout_ids` 为空，覆盖行的 `workout_id` 抹成合并视图。
         let workouts_shared = task
             .categories

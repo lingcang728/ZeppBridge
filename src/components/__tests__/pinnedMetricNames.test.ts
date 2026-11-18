@@ -14,8 +14,8 @@ import ptPT from '../../i18n/locales/pt-PT';
 import ru from '../../i18n/locales/ru';
 
 /*
- * 概览置顶磁贴的名字必须和点进去那张趋势卡的标题逐字一样（用户 2026-10-04：首页「活动消耗」、点进去「活动热量」；
- * 首页「准备度」、点进去「恢复状态」——不知道是不是同一个东西）。磁贴不 import 详情页的整份文案（概览首屏体积），
+ * 概览置顶磁贴的名字必须和点进去那张趋势卡的标题逐字一样（曾经首页「活动消耗」、点进去「活动热量」；
+ * 首页「准备度」、点进去「恢复状态」——看不出是不是同一个东西）。磁贴不 import 详情页的整份文案（概览首屏体积），
  * 自己抄一份，这里把每种语言都对一遍。
  */
 type Bundle = { zh: Record<string, unknown>; en: Record<string, unknown>; es: Record<string, unknown>; moduleId?: string };

@@ -97,8 +97,8 @@ onUnmounted(() => {
 <style scoped>
 /* 两层毛玻璃（全屏遮罩的模糊、面板的磨砂）都画在**垫底的一层**上，不画在遮罩 / 面板自己身上：
    祖先只要带 backdrop-filter，里面胶囊和日期滚轮的液态玻璃透镜就看不见背后、挂不上（lib/glassLens.ts、
-   composables/useGlassLens.ts），弹窗里的选中块只剩一块不透明的深色胶囊（用户 2026-10-04：「添加事件」
-   里的分类和日期滚轮要做成液态玻璃）。和顶栏图标组的 .glass-control.is-lens-host 同一个做法。 */
+   composables/useGlassLens.ts），弹窗里的选中块只剩一块不透明的深色胶囊（「添加事件」
+   里的分类和日期滚轮要的是液态玻璃）。和顶栏图标组的 .glass-control.is-lens-host 同一个做法。 */
 /* 暗色和模糊都在 ::before 上、淡入淡出也只动它：遮罩自己一旦带 opacity，就成了模糊的取样边界，
    淡入期间页面清楚、结束才「啪」地糊掉（lib/motion/dialogFlight.ts 头注释）。 */
 .dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; }
@@ -108,8 +108,8 @@ onUnmounted(() => {
 /* 阴影画在 .dialog-glass 上、跟着它淡入：画在面板自己身上的话，面板还隐身等着的时候阴影先在最终位置闪出一个框（10-08 H3）。 */
 .dialog-panel { position: relative; z-index: 1; isolation: isolate; display: flex; width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); border-radius: var(--radius-lg); color: var(--ink); overflow-wrap: anywhere; }
 /* 面板本身只是焦点的落脚点（打开时 focus 它，读屏会念标题），不是控件。启动时弹出的更新提示前面没有
-   任何鼠标操作，Chromium 把这次程序聚焦当成键盘聚焦，全局 :focus-visible 就给整块弹窗描了一圈浅色框
-   （用户 2026-10-19 截图）。里面按钮的焦点框照常。 */
+   任何鼠标操作，Chromium 把这次程序聚焦当成键盘聚焦，全局 :focus-visible 就给整块弹窗描了一圈浅色框。
+   里面按钮的焦点框照常。 */
 .dialog-panel:focus, .dialog-panel:focus-visible { outline: none; }
 .dialog-glass { position: absolute; inset: 0; z-index: 0; border: 1px solid var(--mat-glass-line); border-radius: inherit; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow); pointer-events: none; }
 .dialog-scroll { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; padding: 20px; border-radius: inherit; }

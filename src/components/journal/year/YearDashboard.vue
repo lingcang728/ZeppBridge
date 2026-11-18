@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 履历页最上面的年轮区块（用户 2026-10-27 给的参考图：去掉生成图那种背景和配画，结构照着排）：
+/* 履历页最上面的年轮区块（结构照参考图排，不要生成图那种背景和配画）：
    左边年轮卡（点进 /rings）、右边全年日历格子（标题栏上翻年、问 AI）、下面四张小结卡（点开有二级界面）。
    中间原来还有一张「这一年」（粒子年份、三个数、面积图），用户嫌丑，去掉了。
    能看到的都能交给 AI（useYearView 的 askAi，「交给 AI」整页从日历那张卡长出来）。 */
@@ -41,7 +41,7 @@ const selected = computed(() => {
   if (!d?.years.length) return null;
   return picked.value !== null && d.years.some(v => v.year === picked.value) ? picked.value : defaultRingYear(d);
 });
-/* 翻年：和顶栏导航、换语言同一种液态玻璃（用户 2026-10-28：「拖动液态玻璃就能切换」）。五年以内是一条
+/* 翻年：和顶栏导航、换语言同一种液态玻璃。五年以内是一条
    SegmentTrack，按住镜片左右拖、点哪年都行；更多年放不下，用语言那种胶囊滚轮（CapsuleWheel）。 */
 const yearItems = computed(() => (data.value?.years ?? []).map(v => ({ value: v.year, label: String(v.year) })));
 const pick = (value: number) => { picked.value = value; };

@@ -31,7 +31,7 @@ export interface DeckSource {
   /** 把一张「已经选上」的牌拿出来时，顺带从别处撤掉（运动：从任务的运动列表里去掉）。 */
   release?: (id: string) => void;
   /**
-   * 双读数（乳酸阈值：心率 + 配速，用户 10-07 拍板「对角斜切双色」）：牌面左上 `tint`、右下 `second.tint`，
+   * 双读数（乳酸阈值：心率 + 配速，对角斜切双色）：牌面左上 `tint`、右下 `second.tint`，
    * 数值上下两行各用各的颜色。第二个读数在 `DeckDay.value2`。
    */
   second?: { tint: string; format: (value: number) => string; unit?: string };
@@ -89,7 +89,7 @@ const WORKOUT_PAGE = 500;
 const ICONS = { 'body-activity': 'activity', 'outdoor-cycling': 'bike', 'outdoor-run': 'run' } as const;
 
 /**
- * 「你的过去」运动那一行（第三轮 B3，用户 10-07 选「一次运动一张牌」）：这段时间里的每一次运动一张牌，
+ * 「你的过去」运动那一行（一次运动一张牌）：这段时间里的每一次运动一张牌，
  * 和别的类别一样能切 7 天 / 1 个月 / 6 个月 / 1 年 / 全部，长的范围按周 / 月 / 季 / 年叠起来（11-18：原来只发最近一周，
  * 这周没运动就一张牌都没有，更早的运动也挑不到——反馈「多选运动交给 AI 时卡片不显示」）。
  * 牌面是运动图标、日期、时长 · 距离；放进收集箱的键是 `workout:<运动 id>`，交给任务时写进 workout_ids。

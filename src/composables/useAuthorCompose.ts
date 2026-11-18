@@ -26,7 +26,7 @@ export function openAuthorCompose(origin: HTMLElement | null, preset?: AuthorCom
   writing.value = { origin };
 }
 
-/** 指针移到笔上 / 聚焦时先把信封那一块取回来：点下去信封第一帧就能从笔里飞出来，不等这块代码（2026-11-12 修复计划 A2）。 */
+/** 指针移到笔上 / 聚焦时先把信封那一块取回来：点下去信封第一帧就能从笔里飞出来，不等这块代码。 */
 let prefetched = false;
 export function prefetchAuthorCompose(): void {
   if (prefetched) return;

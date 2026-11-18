@@ -1,5 +1,5 @@
 /**
- * 官网的作者来信归档：zeppbridge.com/letters（2026-10-20 用户定：信是发版流程的一部分，
+ * 官网的作者来信归档：zeppbridge.com/letters（信是发版流程的一部分，
  * 就算应用里的信封界面以后不在了，信也照常寄出、公开可查）。
  *
  * 原稿在 docs/releases/letters/<版本>/<locale>.md（格式见 docs/releases/README.md「第一步：先写信」）。

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* 点开一次运动（年轮上的一条刻线）：一张「运动名片」从刻线外端长出来，关上时原路缩回那条刻线。
-   - 内容（用户 2026-10-28「数据太少」）：运动、星期日期和开始时刻；距离 / 时长 / 配速或速度 / 平均心率（缺哪格就不出那格）；
+   - 内容：运动、星期日期和开始时刻；距离 / 时长 / 配速或速度 / 平均心率（缺哪格就不出那格）；
      心率区间五色条；有 GPS 就画一笔路线剪影；只有真是今年之最才挂一枚徽章（以前的「这一年第 N 长」去掉了）。
      先用年轮里现成的距离、时长出卡，详情到了再补（composables/useStarDetail.ts），数字是会滚的（RollingNumber）。
    - 换前一次 / 后一次不用箭头：在卡上滚鼠标滚轮或触控板两指扫（一次一步、步与步之间留够动画时间），键盘 ← →（TreeRings 管）；
@@ -8,7 +8,7 @@
    - 位置写在 `translate` 里（逐帧追着指针外端），长出 / 缩回只动 `scale` 和透明度，两样互不打架；缩回时缩放原点每帧对准刻线
      此刻在屏幕上的位置——放大、平移同时发生也落回那条刻线上。
    - 「看这次运动」从这张卡长成详情页（data-morph-card），返回时卡还开着，详情页正好缩回这张卡。
-   材质是木头色的浮层玻璃（tokens.css 的 --wood-card-*），强调色是边材的琥珀色，不用应用的绿（用户 2026-10-28）。 */
+   材质是木头色的浮层玻璃（tokens.css 的 --wood-card-*），强调色是边材的琥珀色，不用应用的绿。 */
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';

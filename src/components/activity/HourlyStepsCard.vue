@@ -44,7 +44,7 @@ if (preloaded) {
 }
 
 const bounds = computed(() => rangeBounds(props.days));
-/* 一个月以上按周合成一行：一个月按天摊开是 30 行热力图，比整页还高（用户 2026-09-30 嫌「过于庞大」）。
+/* 一个月以上按周合成一行：一个月按天摊开是 30 行热力图，比整页还高（太庞大）。
    现在一个月约 5 行、半年约 26 行；7 天仍然一天一行。 */
 const perWeek = computed(() => props.days > 14);
 

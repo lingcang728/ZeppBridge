@@ -40,7 +40,7 @@ withDefaults(defineProps<{
     </div>
     <RingsSeasonCard />
     <JournalEntryCard />
-    <!-- 生活事件不在概览了：合进履历页的「纪元与事件」（用户 2026-10-22）。 -->
+    <!-- 生活事件不在概览了：合进履历页的「纪元与事件」。 -->
     <SourcesStrip />
   </div>
 </template>

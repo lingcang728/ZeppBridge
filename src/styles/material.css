@@ -89,7 +89,7 @@
 .pill-button > svg:first-child { color: var(--accent); }
 .pill-button.quiet { background: transparent; box-shadow: none; color: var(--muted); }
 .pill-button.quiet:hover { background: var(--glass-press); color: var(--ink); filter: none; }
-/* 液态玻璃那一档（用户 2026-10-04：生活事件卡上的「添加事件」）：不是一块实色凸起，而是一片透着底的玻璃——
+/* 液态玻璃那一档（生活事件卡上的「添加事件」）：不是一块实色凸起，而是一片透着底的玻璃——
    清透的底、顶边一道镜面高光、底边回光和一圈极细亮边（--glass-rim），背后的卡面被轻轻磨砂。
    按下时玻璃略压亮一点，和顶栏的玻璃控件同一套 token。 */
 .pill-button.is-glass {
@@ -361,7 +361,7 @@ summary { cursor: pointer; }
 
 
 /* ── 履历里的列表行（跑鞋、比赛、伤病、纪元与事件）────────────────────────────
-   悬停是一块内缩的圆角高亮，不再贴着分隔线被直直切开（用户 2026-10-22：「边缘像被裁切了一样」）。
+   悬停是一块内缩的圆角高亮，不再贴着分隔线被直直切开。
    分隔线画在行与行之间的缝里、左右各缩一截；悬停行上下两条线淡掉，不穿过高亮块。 */
 .row-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .row-list > li { position: relative; }

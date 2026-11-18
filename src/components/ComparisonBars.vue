@@ -3,7 +3,7 @@ import { computed } from 'vue';
 const props = defineProps<{
   current: number; baseline: number; currentLabel: string; baselineLabel: string;
   currentText: string; baselineText: string; tone: 'good' | 'bad' | 'neutral' | 'flat' | 'up' | 'down';
-  /** 指标色（1A·A11，用户 10-07：全局颜色只表达「是哪项指标」）：给了就两条都用它，好坏只靠旁边的 ✓ / ! 角标。 */
+  /** 指标色（全局颜色只表达「是哪项指标」）：给了就两条都用它，好坏只靠旁边的 ✓ / ! 角标。 */
   color?: string | null;
   /** 参照只有寥寥几个样本（confidence = low）：参照那条的末端晕开，不画成一条准确的硬边（3.1 晕涂）。 */
   uncertain?: boolean;

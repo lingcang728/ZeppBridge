@@ -43,7 +43,7 @@ const readFlag = (): boolean => {
       window.localStorage.setItem(FLAG_KEY, fromQuery);
       return fromQuery === '1';
     }
-    // 默认开（用户 2026-09-30 看过第二版后定）；`?lens=0` 关掉并记住。
+    // 默认开；`?lens=0` 关掉并记住。
     return window.localStorage.getItem(FLAG_KEY) !== '0';
   } catch {
     return false;

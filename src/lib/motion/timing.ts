@@ -38,7 +38,7 @@ export const LOCALE_REVEAL_MS = 1050;
     不能等形状走完才淡入：那段时间里窗口长满了却一个字没有（「空板」）。按线性时间轴放。 */
 export const BODY_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.12 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }];
 /** 关上时卡身一直在、跟着板一起被裁小，板快缩到卡那么大（线性 65%–85%，形状那时已走完九成多）才化开、只剩卡头
-    （2026-11-12 修复计划 A3：以前前 35% 就淡完，后 65% 只剩一块空板在缩）。 */
+    （以前前 35% 就淡完，后 65% 只剩一块空板在缩）。 */
 export const BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.65 }, { opacity: 0, offset: 0.85 }, { opacity: 0 }];
 
 /** 替身 ↔ 内容的交接（lib/motion/flight.ts 的 handoff）占整段时间轴的比例：很短的一次交叉，不留空档。 */

@@ -110,8 +110,8 @@ fn upgrade_a_real_old_database_without_losing_rows() {
         daily_keys_after
     );
 
-    // 升级做完、库通过完整性检查：升级前的自动快照静默删掉，不占磁盘
-    // （用户 2026-09-30 定）。快照本身的生成与校验由 backup 的用例覆盖。
+    // 升级做完、库通过完整性检查：升级前的自动快照静默删掉，不占磁盘。
+    // 快照本身的生成与校验由 backup 的用例覆盖。
     let backups = backup::list_backups(&dir).expect("读备份清单");
     assert!(
         !backups

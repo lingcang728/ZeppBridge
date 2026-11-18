@@ -80,7 +80,7 @@ const order = computed(() => (isChineseLocale(locale.value) ? ['y', 'm', 'd'] : 
 .wheel-date > * { flex: 1 1 0; }
 .wheel-date > .col-y { flex-grow: 1.3; }
 /* 三列 flex-basis 都是 0、WheelColumn 自己又是 min-width: 0：放进按内容定宽的容器（设置页的
-   .s-row-control）就整个缩成一条细杠，「自定义起点」看着一片空白（#136，用户 2026-10-19 截图）。
+   .s-row-control）就整个缩成一条细杠，「自定义起点」看着一片空白（#136）。
    给每列一个保底宽度，放在哪里都撑得开；容器更宽时照常按比例分。 */
 .wheel-date > .col-m, .wheel-date > .col-d { min-width: 68px; }
 .wheel-date > .col-y { min-width: 88px; }

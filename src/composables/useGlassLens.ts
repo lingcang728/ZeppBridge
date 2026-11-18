@@ -45,7 +45,7 @@ export const useGlassLens = (target: Ref<HTMLElement | null>, kind: LensKind = '
   let stopWatch: (() => void) | null = null;
   /* 挂透镜要沿祖先一路读计算样式（isolatedFromPage），在刚插进文档的新页里每读一次都逼浏览器先把整页样式算完。
      设置卡里有十几个胶囊和滚轮：以前它们在切页形变途中一起挂，主线程一卡 40–100ms，形变跟着一顿一跳
-     （用户 2026-10-04 录屏：从「数据来源」点进设置、设置里左右翻卡）。透镜只在拖动 / 转动时才浮起来，
+     （从「数据来源」点进设置、设置里左右翻卡）。透镜只在拖动 / 转动时才浮起来，
      晚一点挂看不出来：等形变放完、浏览器空下来再挂。 */
   const attach = () => {
     if (disposed || lens) return;

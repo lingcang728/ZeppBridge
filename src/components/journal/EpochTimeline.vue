@@ -2,12 +2,12 @@
 /* 纪元与事件的横向时间轴（宽屏；窄屏退回 EpochSection 里的竖向列表）。
    轴线上方是事件的圆点（相近的日子自动分泳道），下方是纪元的色带，最底下一行月份。
    默认看截至今天的最近 12 个月，右边留半个月：「今天」不贴边，还在持续的纪元 / 事件在它右边渐隐，表示「至今」。
-   「今天」不再是一整条黄竖线（用户 2026-10-28 嫌丑）：轴上一个带呼吸光晕的小圆点，月份那一行一枚「今天」小胶囊，
+   「今天」不再是一整条黄竖线：轴上一个带呼吸光晕的小圆点，月份那一行一枚「今天」小胶囊，
    今天往右的轴线变成渐隐的虚线——还没发生。
    按住拖动或横向滚轮往前翻，最早到第一条记录或第一年运动数据所在的月份（以前只认事件，没记事件时整条轴正好
    一屏宽、根本拖不动）。点空白的日子：以那天为开始新建事件，编辑器从点击处长出来。
    指针在空白处移动时，一条竖线吸附在指着的那一天、顶上写着日期；点下去以后那一天一直标着，直到编辑器关上
-   （用户 2026-10-27：「翻到具体时间时，根本看不出自己点到了哪一天」）。 */
+   （不然翻到具体时间时看不出点到了哪一天）。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import { useLifeEvents } from '../../composables/useLifeEvents';
@@ -146,7 +146,7 @@ function showTip(event: LifeEvent, target: EventTarget | null) {
 
 let observer: ResizeObserver | undefined;
 /* 拖动、滑行、弹回途中不写 offset：那样每动一下整条轴（月份 × 2、色带、事件点）都要重渲染一遍，
-   4× 降速下拖一下几十个 longtask（用户 2026-10-28：拖起来「吃力」）。途中只记 pos、每帧最多一次直接写
+   4× 降速下拖一下几十个 longtask（拖起来「吃力」）。途中只记 pos、每帧最多一次直接写
    .timeline-track 的 transform；停下来才把 pos 交回 offset。依赖 offset 的日期签这时本来就藏着。 */
 const track = ref<HTMLElement>();
 /** 拖动 / 滑行 / 弹回途中轴的实时位置（拖过界时在 [0, maxOffset] 外面）；其余时候等于 offset。 */

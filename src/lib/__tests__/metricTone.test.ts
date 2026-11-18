@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { metricTone } from '../metricTone';
 import { PAIRED_METRICS } from '../cards/sources';
 
-/* 牌、收集箱、图表必须同色（用户 10-07 核对的那几项）。颜色只从 metricTone 取，这里钉住映射。 */
+/* 牌、收集箱、图表必须同色。颜色只从 metricTone 取，这里钉住映射。 */
 describe('指标色', () => {
   it('用户核对过的几项', () => {
     expect(metricTone('stress')).toBe('calories'); // 压力橙

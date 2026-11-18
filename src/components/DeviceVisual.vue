@@ -38,7 +38,7 @@ const onImageError = (): void => {
     :class="['device-visual', { compact }]"
   >
     <!-- 不懒加载、同步解码：图是随包的本地小文件，懒加载反而让它在新页第一帧缺席、过一两帧才闪出来
-         （运动详情左上角那块表，用户 2026-10-04 录屏）。 -->
+         （运动详情左上角那块表）。 -->
     <img :src="src" :alt="alt" decoding="sync" @error="onImageError" />
   </span>
 </template>

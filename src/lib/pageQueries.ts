@@ -91,7 +91,7 @@ export const pageQuery = {
     },
   }),
   /* 运动详情左上角那块表。以前它不在预加载里，第一帧没有表，形变放完才冒出来、把标题往右一挤
-     （用户 2026-10-04 录屏：点进「健走」「户外骑行」都这样）。 */
+     （点进「健走」「户外骑行」都这样）。 */
   workoutDevice: (workoutId: string): Query<DeviceProfile> => ({
     key: `${DEVICE_READ_PREFIXES[1]}${workoutId}`,
     fetch: async () => {

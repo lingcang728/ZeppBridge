@@ -43,7 +43,7 @@ const FLIGHT_EASE = 'cubic-bezier(.3, .7, .2, 1)';
 const SOURCE_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.58 }, { opacity: 1, offset: 0.8 }, { opacity: 1 }];
 const CARD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }];
 /** 大卡滚下去很远再关（卡头远在屏幕上方）：内容钉在窗口上跟着走、前三成就淡掉，窗口缩回源卡的途中源卡在底下亮起来，
-    大卡后半程整张化开——不再先把大卡「卷」回顶上再缩（2026-11-12 第四轮录屏：那一下像往上回弹）。 */
+    大卡后半程整张化开——不再先把大卡「卷」回顶上再缩（那一下像往上回弹）。 */
 const FAR_BODY_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 0, offset: 0.32 }, { opacity: 0 }];
 const FAR_SOURCE_IN: Keyframe[] = [{ opacity: 0 }, { opacity: 0, offset: 0.28 }, { opacity: 1, offset: 0.62 }, { opacity: 1 }];
 const FAR_CARD_OUT: Keyframe[] = [{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0, offset: 0.82 }, { opacity: 0 }];

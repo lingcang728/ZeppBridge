@@ -149,7 +149,7 @@ const mailPillTitle = computed(() => (hasMail.value
   ? t.value.mailTitle
   : `${letterText.value.writeAuthor} · ${t.value.holdForLetters}`));
 
-/* 已经在概览：往下翻过了就点一下回顶（用户 2026-11-13）。少动效时直接跳。 */
+/* 已经在概览：往下翻过了就点一下回顶。少动效时直接跳。 */
 const scrollOverviewTop = () => {
   const main = document.getElementById('main-content');
   if (!main || main.scrollTop <= 0) return;
@@ -335,7 +335,7 @@ const syncTitle = computed(() => {
 });
 
 /* 点击：能增量同步就发起；没连上就去「账号与设备」卡。同步中点了什么都不做——不给「取消」：
-   半路停下会留下一部分流更新了、另一部分没更新的库（用户 2026-09-30 定），等它跑完就好。 */
+   半路停下会留下一部分流更新了、另一部分没更新的库，等它跑完就好。 */
 const onSyncClick = () => {
   if (readyFirst.value) {
     pickUpReady('pickup');
@@ -545,7 +545,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
         <GlassRim />
         <Icon name="arrow-left" :size="20" />
       </button>
-      <!-- 只留标志（用户 2026-10-04）：以前旁边还有「ZeppBridge 3」字标，英文等标签长的语言里顶栏放不下，
+      <!-- 只留标志：以前旁边还有「ZeppBridge 3」字标，英文等标签长的语言里顶栏放不下，
            字标先画出来、量完再被收掉，切语言时闪一下。
            平时 / 有新信 / 更新下好了是同一个按钮（换元素会重挂载，Z ↔ 信封的过渡就播不出来）：
            点一下按状态回概览、进信匣或装更新；长按进信匣。 -->

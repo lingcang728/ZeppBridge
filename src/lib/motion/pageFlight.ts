@@ -40,7 +40,7 @@ const rectOf = (el: Element): Rect => {
 export const PAGE_WINDOW_MS = paced(600);
 export const PAGE_WINDOW_EASE = 'cubic-bezier(.3, .1, .15, 1)';
 /** 交接的两半：卡和页的内容不一样，**先后交替**（先走的那样先退、后来的那样后进，只在最淡的那一小段挨着），
-    不是两边同时半透明叠成重影（用户 2026-10-03）；交接时窗口只比卡大一点，中间露出来的是卡色的底板。 */
+    不是两边同时半透明叠成重影；交接时窗口只比卡大一点，中间露出来的是卡色的底板。 */
 const OUT_PART = 0.55;
 const IN_FROM = 0.45;
 /** 卡 → 页：换手从这个进度开始、占这么长（线性时间）。 */

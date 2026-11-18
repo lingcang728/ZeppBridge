@@ -189,7 +189,7 @@ useSectionTour('workouts');
 .selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
 .selectable-record { display: flex; align-items: center; gap: 12px; }
 .selectable-record > :last-child { flex: 1; min-width: 0; }
-/* 多选：圆形勾选框进场时弹出来，勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下（用户 2026-10-27：多选要更生动）。 */
+/* 多选：圆形勾选框进场时弹出来，勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下（多选要更生动）。 */
 .selectable-record { border-radius: var(--radius-md); transition: background 200ms ease; }
 .selectable-record input { appearance: none; display: grid; place-content: center; width: 24px; height: 24px; margin: 0 0 0 4px; flex-shrink: 0;
   border: 2px solid var(--line-control); border-radius: 50%; background: transparent; cursor: pointer;

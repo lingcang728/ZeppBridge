@@ -5,7 +5,7 @@ import type { Live, MorphState, Stale } from './types';
 
 /**
  * 卡 ↔ 页形变的账本：哪一段在放、哪一段被打断停在哪、哪些页攥着 Vue 的 done，以及收场和兜底扫描。
- * 2026-11-12 从 usePageMorph.ts 拆出来（修复计划 A5）。
+ * 2026-11-12 从 usePageMorph.ts 拆出来。
  */
 /** 被下一次切页丢下的离场页就地淡掉的时长。 */
 const RETIRE_MS = 160;

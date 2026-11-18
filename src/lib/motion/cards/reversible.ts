@@ -67,7 +67,7 @@ export const sequence = (): Sequence => {
 export const HANDOFF_MS = 120;
 
 /**
- * 打断接力（第四轮 1A·A2，用户 10-07 拍板）：新点击**立刻生效**，不再靠 `busy` 吞掉。
+ * 打断接力：新点击**立刻生效**，不再靠 `busy` 吞掉。
  *
  * - 旧动作登记过的动画（`track`）从此刻的位置在 `HANDOFF_MS` 里收尾到各自的终点（只改播放速度，保留缓动）；
  * - 同时换号（`handoff` = `sequence.next`），旧编排在下一个 await 之后看到号变了就自己停下；

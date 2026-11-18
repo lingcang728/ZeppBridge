@@ -257,7 +257,7 @@ fn the_first_consolidation_leaves_a_verified_backup_behind() {
     .unwrap();
     assert!(backup::list_backups(&dir).unwrap().is_empty());
 
-    // 整理前留快照；整理全部做完、库完好后快照被静默删掉（用户 2026-09-30 定）。
+    // 整理前留快照；整理全部做完、库完好后快照被静默删掉。
     db.compact_raw_payloads().unwrap();
     assert!(backup::list_backups(&dir).unwrap().is_empty());
 

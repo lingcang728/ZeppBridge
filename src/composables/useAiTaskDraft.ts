@@ -102,7 +102,7 @@ const patchRange = (category: AiTaskCategory, patch: Partial<AiTaskCategoryRange
   patchDraft({ categories: withCategoryRange(draft.value.categories, next) });
 };
 
-/** 点模板之前的样子（类别、天数、运动、详细程度）：问题被删空时整个回到这里（10-07 用户拍板）。 */
+/** 点模板之前的样子（类别、天数、运动、详细程度）：问题被删空时整个回到这里。 */
 let beforeTemplate: Selection | null = null;
 
 const replaceDraft = (task: AiTask) => {
@@ -393,7 +393,7 @@ const setWorkoutSelected = (workoutId: string, selected: boolean) => {
 
 /**
  * 改问题。问题被删空、而当前用着模板：整个回到点模板之前——模板胶囊不再亮、任务名回到自动的「最近 N 天」、
- * 「你的过去」勾的类别和天数恢复原样（用户 10-07：「把框删掉后，上面的内容依然不会联动更改」）。这一下也进撤销栈。
+ * 「你的过去」勾的类别和天数恢复原样（以前删掉问题后上面的选择不跟着变）。这一下也进撤销栈。
  */
 const setPrompt = (prompt: string) => {
   patchDraft({ prompt });

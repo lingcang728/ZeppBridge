@@ -13,7 +13,7 @@ const props = defineProps<{ years: RingYear[]; year: RingYear | null; legend: { 
 const t = useRingsText();
 
 /* 图例永远占 4 行（kindLegend 最多前 3 + 其他）：不足的补看不见的占位行。以前 2024 年 3 行、2025 年 4 行，
-   换年时卡片高度变了，同一排的热力图和下面整页跟着跳（用户 2026-10-28 录屏）。 */
+   换年时卡片高度变了，同一排的热力图和下面整页跟着跳。 */
 const LEGEND_ROWS = 4;
 const pad = computed(() => Math.max(0, LEGEND_ROWS - props.legend.length));
 

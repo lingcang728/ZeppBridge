@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 页面顶上的一排生活事件胶囊：这段时间里的事件（带分类色点，点开编辑）；这段时间没有事件就整行不出。
- * 以前打头还有一枚「+ 添加事件」，用户 2026-10-28 定为遗留：记事件的地方是履历页的「纪元与事件」。
+ * 以前打头还有一枚「+ 添加事件」，已作为遗留去掉：记事件的地方是履历页的「纪元与事件」。
  * 超过三件时多一枚「相关事件 · N」跳到履历页的「纪元与事件」。以前是一行散落的纯文字
  * 链接，右边还挂着一个「管理生活事件」小标题，每张趋势卡里又各有一份——和页面上的胶囊、
  * 玻璃不是一种东西；现在每页只有这一排。
@@ -21,7 +21,7 @@ const router = useRouter();
 const today = () => localDateString(new Date());
 const rangeStart = () => { const date = new Date(); date.setDate(date.getDate() - Math.max(0, (props.days ?? 1) - 1)); return props.start || localDateString(date); };
 const related = computed(() => events.value.filter(e => overlapsEvent(e, rangeStart(), props.end || today())));
-/* 生活事件的家在履历页的「纪元与事件」卡里（以前在概览底部，用户 2026-10-22 定：生活事件就是履历）。 */
+/* 生活事件的家在履历页的「纪元与事件」卡里（以前在概览底部，生活事件就是履历）。 */
 async function manage(event: MouseEvent) {
   const button = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   if (button) armPageMorph(button, '/journal', { anySize: true });

@@ -211,7 +211,7 @@ const onPointerDown = (event: PointerEvent) => {
   rawPointerDown(event);
 };
 
-/* 开 / 关不设连点保护（2026-11-12 修复计划 A3）：开到一半再点是掉头、原路回去，点几下就来回翻几下，
+/* 开 / 关不设连点保护：开到一半再点是掉头、原路回去，点几下就来回翻几下，
    停在最后一次要的那一头（composables/useDeckMorph.ts）。以前 320ms 内的第二下直接吞掉，快点时就是「点了没反应」。 */
 const requestOpen = (id: string) => emit('open', id);
 const requestClose = () => emit('close');

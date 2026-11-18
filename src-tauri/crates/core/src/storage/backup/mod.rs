@@ -493,7 +493,7 @@ pub fn prune_migration_backups(data_dir: &Path) -> Result<Vec<String>> {
 
 /// 删掉全部自动生成的升级 / 整理前快照（手动备份、标记保留的一律不碰），
 /// 连同它们可能残留的 `-wal` / `-shm`。只在「升级或整理已经做完、当前库通过
-/// 完整性检查」之后调用（用户 2026-09-30 定：确认无损就静默删掉，不占磁盘）。
+/// 完整性检查」之后调用（确认无损就静默删掉，不占磁盘）。
 pub fn discard_automatic_snapshots(data_dir: &Path) -> Result<Vec<String>> {
     let mut removed = Vec::new();
     for manifest in list_backups(data_dir)? {

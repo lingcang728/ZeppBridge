@@ -2,7 +2,7 @@
 /**
  * 年轮（/rings）：年度回顾，2026-10-27 第五版改成「真·树木年轮」（星系那套整个否了）。一年长一圈，最早那年在最里面；
  * 圈的宽窄是每周练了多少，没数据的地方线是断开的；选中那年铺应用的主色，圈里一次运动一条刻线（components/rings/TreeRings.vue）。
- * 页面上只有一块大大的木头年轮（用户 2026-10-27：「去掉右边那块字，只留大大的年轮」），探索全在 TreeRings.vue 里：
+ * 页面上只有一块大大的木头年轮（右边不放文字），探索全在 TreeRings.vue 里：
  * 点一圈、‹ ›、← → 换年，悬停看那一周，点细纹看那次运动，滚轮放大、拖动平移。那年的各项数字仍然交给 AI、印在分享图上。
  *
  * 只用本机的真实数据（后端 `annual_rings`），缺了就留白；「存成图片」在本机画年轮、拼上字、
@@ -41,7 +41,7 @@ onActivated(load);
 
 /* 选中哪年记在页面自己身上，只在停在年轮页时跟着地址走：页面缓存着去了运动详情，全局路由的 query 里就没有 year 了，
    以前选中跟着退回默认那年——外圈 / 内圈点开一次运动，背后的木头跳回中间那圈、开着的卡被清掉，返回时形变找不到卡只剩一个黑框，
-   整块木头再重长一遍（用户 2026-10-28 录屏）。 */
+   整块木头再重长一遍。 */
 const askedYear = ref<number>(Number.NaN);
 watch(() => [route.name, route.query.year] as const, ([name, value]) => {
   if (name === 'Rings') askedYear.value = Number(value);
@@ -61,7 +61,7 @@ const facts = computed(() => (year.value
 
 /* 交给 AI：和履历页年轮区块同一份「我看到的这一年」，再加上这一年的各项数字（步数、睡眠、PB、比赛……）。 */
 const yearView = useYearView(rings, selected);
-/* 「交给 AI」从这枚按钮里长出来、返回缩回它：以前拿整块年轮当来处，整屏长到整屏看上去就是硬切（用户 2026-10-28）。 */
+/* 「交给 AI」从这枚按钮里长出来、返回缩回它：以前拿整块年轮当来处，整屏长到整屏看上去就是硬切。 */
 const askButton = ref<InstanceType<typeof AskAiButton> | null>(null);
 const askAi = () => yearView.askAi(askButton.value?.button ?? null, facts.value.map(f => `${f.label}: ${f.value}${f.detail ? ` · ${f.detail}` : ''}`), { anySize: true });
 

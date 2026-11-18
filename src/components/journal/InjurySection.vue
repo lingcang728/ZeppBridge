@@ -2,7 +2,7 @@
 import { useRepairText } from './repair.i18n';
 const repair = useRepairText();
 /* 伤病：左边人形图（还没好的血色、好了的淡淡一圈黄），右边一条条记录，还没好的在前。
-   一条都没有时不画人形，卡片收成一行（用户 2026-10-23：空着一张大人形太空）。 */
+   一条都没有时不画人形，卡片收成一行（空着一张大人形太空）。 */
 import { computed } from 'vue';
 import BodyMap from './BodyMap.vue';
 import JournalCard from './JournalCard.vue';

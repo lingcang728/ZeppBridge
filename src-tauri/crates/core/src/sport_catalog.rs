@@ -322,7 +322,7 @@ mod tests {
 
     /// 12 是椭圆机。
     ///
-    /// 和 211 一样，靠的是一句用户原话，不是数量：反馈 2db466d6（v2.1.0 /
+    /// 和 211 一样，靠的是一份报告里的明确文字，不是数量：反馈 2db466d6（v2.1.0 /
     /// linux，分类 workout，这个编号下挂着 80 条记录）写着「Zepp workout code
     /// number 12 is an official activity, it's the Elliptical activity.」。
     /// 183 份报告里这个编号出现了 11 次、共 100 条记录，但真正让它进目录的是

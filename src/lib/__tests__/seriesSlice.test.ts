@@ -45,7 +45,7 @@ describe('sliceSeries', () => {
 });
 
 describe('a card never sits on a range it cannot draw', () => {
-  // 用户 2026-10-04：VO₂max 7 天里没有、6 个月里有，就自动显示 6 个月。
+  // VO₂max 7 天里没有、6 个月里有，就自动显示 6 个月。
   const sparse: MetricSeries = { ...long, metric: 'vo2max', points: [{ date: '2026-04-10', value: 52 }, { date: '2026-09-10', value: 53 }] };
 
   it('widens to the shortest range that can draw a line', () => {

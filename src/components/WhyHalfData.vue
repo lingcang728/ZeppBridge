@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 「为什么有些数据没有？」的正文。设置页账号卡的弹窗和 3.0.2 更新说明第一页共用这一份，
    改措辞只改 WhyHalfData.i18n.ts。两条连接左右对照（窄屏上下叠），各自能拿到什么一枚枚列出来，
-   不再是四段长文（用户 2026-10-19：「很难读」）。 */
+   不再是四段长文。 */
 import { computed } from 'vue';
 import Icon from './Icon.vue';
 import { useMessages } from '../i18n';

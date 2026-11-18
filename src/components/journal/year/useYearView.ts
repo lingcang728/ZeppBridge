@@ -1,6 +1,6 @@
 /**
  * 履历页年轮区块看到的每一个数，都在这里按界面语言排好版——界面照着它画，「交给 AI」也照着它写，
- * 两边说的是同一套话（用户 2026-10-27：看得到的都要能交给 AI）。
+ * 两边说的是同一套话（看得到的都要能交给 AI）。
  *
  * 数据是本机全部可见的运动：云端同步的、官方授权推来的、从文件导入的都算；只有在本机隐藏了的不算。
  */
@@ -34,7 +34,7 @@ export function useYearView(data: Ref<AnnualRings | null>, selected: Ref<number 
   const legend = computed(() => kindLegend(year.value?.stars ?? []).map(item => ({
     key: item.kind ?? 'other', label: item.kind ? workoutLabel(item.kind) : y.value.other, count: item.count, text: t.value.times(item.count),
   })));
-  /* 一年的三个总数（和去年比）：界面上不再单独画一张卡（用户 2026-10-27 嫌丑），交给 AI 时仍然写上。 */
+  /* 一年的三个总数（和去年比）：界面上不再单独画一张卡，交给 AI 时仍然写上。 */
   const tiles = computed(() => {
     const v = year.value;
     if (!v) return [];

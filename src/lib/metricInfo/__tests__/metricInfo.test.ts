@@ -69,7 +69,7 @@ describe('metric info registry', () => {
     for (const id of METRIC_INFO_IDS) expect(metricTrust(id), id).not.toBeNull();
     expect(metricTrust('vo2max')).toBe('modeled');
     expect(metricTrust('steps')).toBe('measured');
-    // 常识推算不挂琥珀点：睡眠页曾经三粒黄标 + 四个问号（用户 2026-10-28）。
+    // 常识推算不挂琥珀点：睡眠页曾经三粒黄标 + 四个问号。
     for (const id of ['sleep_duration', 'sleep_stages', 'sleep_score', 'distance']) expect(metricTrust(id), id).toBe('inferred');
   });
 

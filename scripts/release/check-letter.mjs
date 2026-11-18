@@ -1,4 +1,4 @@
-// 这一版的作者来信写了没有（2026-10-20 用户定：每一版都要先写信，补丁版也算）。
+// 这一版的作者来信写了没有（每一版都要先写信，补丁版也算）。
 //
 //   node scripts/release/check-letter.mjs            # 查 package.json 里的版本
 //   node scripts/release/check-letter.mjs 3.1.0      # 查指定版本

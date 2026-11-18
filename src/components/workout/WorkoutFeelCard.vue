@@ -62,7 +62,7 @@ const assignedName = computed(() => {
 });
 /* 刻度从绿走到红，和下面那条轨道同一条渐变（srgb 插值，color-mix 和 linear-gradient 一致）。 */
 const rpeTone = (value: number) => `color-mix(in srgb, var(--heart) ${Math.round(((value - 1) / 9) * 100)}%, var(--training))`;
-/* 手表记的那一格（用户 2026-10-23：「手表记的 1，这个 1 的圈圈应该被绿色填充」）：
+/* 手表记的那一格（手表记的那个数字，圈用绿色填满）：
    自己还没打分时，手表那格用品牌绿填满、比它小的淡淡铺一层；自己打了分且和手表不同，手表那格退成一圈绿描边。 */
 const watchClass = (value: number) => {
   const watch = feel.value?.watch_rpe ?? null;

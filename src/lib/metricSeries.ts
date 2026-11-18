@@ -110,7 +110,7 @@ export const sliceSeries = (series: MetricSeries, days: number, today = currentT
 /**
  * 这段范围画不出曲线（没有记录、或只有一天）而更长的某一档画得出：最短的那一档；不用换就是 null。
  *
- * 用户 2026-10-04：VO₂max 一年只测几次，范围停在 7 天时那张卡只剩一句「这段范围没有记录」——
+ * VO₂max 一年只测几次，范围停在 7 天时那张卡只剩一句「这段范围没有记录」——
  * 不要给人看一段空范围，自动跳到有记录的那一档。
  */
 export const widerRangeWithData = (series: MetricSeries | null | undefined, days: number, today = currentToday()): SeriesRangeDays | null => {

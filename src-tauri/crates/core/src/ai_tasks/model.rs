@@ -28,7 +28,7 @@ fn default_true() -> bool {
 /// 不参与「按运动开始日回溯」的窗口数据取数。
 ///
 /// `heart_rate` 自 3.0 beta.48 起只表示**全天心率**（逐点采样）；静息心率单列为
-/// `resting_hr`（用户 10-07 拍板：AI 页「心率」拆成「静息心率」与「全天心率」两类）。
+/// `resting_hr`（AI 页「心率」拆成「静息心率」与「全天心率」两类）。
 /// 枚举只追加不改名；旧任务文档里只有 `heart_rate` 的，读入时由
 /// [`upgrade_heart_rate_split`] 补一行同设置的 `resting_hr`，导出的数据与以前完全一样。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
