@@ -1,0 +1,2 @@
+# git 钩子是 sh 脚本：Windows 上 core.autocrlf=true 会把它们检出成 CRLF，行尾的 \r 会让 sh 读错参数。
+scripts/git-hooks/* text eol=lf

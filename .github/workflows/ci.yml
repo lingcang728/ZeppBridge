@@ -55,6 +55,9 @@ jobs:
         id: select
         run: node scripts/ci/select-checks.mjs
 
+      - name: Check new commits for private notes and local paths
+        run: node --test tests/privacy-check.test.mjs && node scripts/privacy/check.mjs --ci
+
       - name: Check documentation links
         run: node scripts/release/check-doc-links.mjs
 

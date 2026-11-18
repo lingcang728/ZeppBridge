@@ -1,0 +1,3 @@
+#!/bin/sh
+# 提交说明只写改了什么、为什么，不转述和维护者的讨论（规则：scripts/privacy/rules.mjs）。
+exec node scripts/privacy/check.mjs --msg "$1"

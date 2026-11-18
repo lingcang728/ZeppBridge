@@ -2,7 +2,7 @@
 
 `lingcang728/ZeppBridge` 的仓库规则，给在这里工作的人和 AI agent 看。构建、测试和发版细节见 [开发文档](docs/development/development.zh-CN.md)，外部贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-维护者本机的路径、测试包、真实库和 agent 派发规则写在仓库根目录的 `AGENTS.local.md`（不入库，`.gitignore` 已忽略）；有这份文件时一并读。
+维护者本机的路径、测试包、真实库和 agent 派发规则在仓库**外面**的 `../ZeppBridge-private/`（`AGENTS.local.md`、`CLAUDE.private.md`）；有这个目录时一并读。计划、交接、验收记录这类工作笔记也写在那里，不写进仓库目录。
 
 ## 分支与发版
 
@@ -37,4 +37,5 @@
 - 改界面要看所有界面语言（`src/i18n/index.ts` 的 `LOCALES`），不能有重叠、叠字或空缺；可以用 `scripts/verify/text_overlap.py` 辅助检查。
 - 不要把令牌、Cookie、HAR、精确 GPS、个人健康数值写进日志、测试、fixture 或提交。测试数据用虚构值。
 - Zepp 合作方资料（官方 PDF、对接截图、应用凭据）不进本仓库或任何公开仓库；需要时只写结论。
+- 提交说明、公开文档、代码注释、Release、issue / PR 回复只写改了什么和为什么，用产品和代码的语言写；不转述和维护者的讨论（「用户说 / 用户定 / 看过录屏 / 第几轮反馈」、日期拍板、内部计划编号），不写本机路径。`scripts/git-hooks/` 的 pre-commit / commit-msg 和 CI 的隐私检查（`scripts/privacy/check.mjs`）会拦；`npm ci` 会自动装钩子，也可以 `npm run hooks:install`。
 - 已移除的旧方案不要恢复：局域网抓包（MITM、用户 CA、Wi-Fi 代理）、`start_capture` 一类命令。

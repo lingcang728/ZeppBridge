@@ -143,8 +143,14 @@ docs/assets/readme/*.mp4
 
 .prepared-release/
 
-# 维护者本机的笔记与临时文件（不入库）
+# 维护者本机的笔记与临时文件（不入库）。笔记本体在仓库外的 ../ZeppBridge-private/，
+# 这里只是第二道保险；第一道是 scripts/git-hooks/ 与 CI 的隐私检查。
+CLAUDE.md
+CLAUDE.local.md
 AGENTS.local.md
 翻译.md
 计划*.md
+修复计划*.md
+*handoff*.md
+/artifacts/*-repair-*/
 temp-*.cjs
