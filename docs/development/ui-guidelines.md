@@ -215,7 +215,7 @@ forbidden. The provenance of the algorithms and percentages is in the
   that trend card on the detail page, which gets a brief ring
   (`lib/motion/focusTarget.ts`). Going back from a scrolled page shrinks the
   part you are looking at, so it keeps the same pace. Timing lives in
-  `lib/motion/pageFlight.ts` (`PAGE_WINDOW_MS` = 540 ms × `PACE`,
+  `lib/motion/pageFlight.ts` (`PAGE_WINDOW_MS` = 600 ms × `PACE`,
   `cubic-bezier(.3, .1, .15, 1)`: a soft start and a long settle); once it
   has taken off, `lib/motion/budget.ts` holds back late chart mounts and
   skeleton-to-content swaps.
@@ -341,6 +341,105 @@ what it put on stage. The measuring bench and how to read its numbers are in
      `data-morph-source` (the card's morph id).
    - Acceptance: slow-motion strips from `scripts/motion/strip.py`; no double
      image and no replayed animation in the frames around landing.
+
+### Motion language: settling
+
+The eight rules above cover how things fly. This section covers when something
+should move at all and what the move looks like. In one line: **things move only
+when something really changed; a move first clears the way, then lands, then
+develops; once down, nothing bounces.**
+
+Six laws:
+
+1. **Motion is evidence.** If something moves, something real happened: data
+   changed, or the user did something. No decorative count-ups on entry, no
+   counting from 0 to the target, no idle loops. The only resident glow is
+   still the sync capsule's `.ready-glow`.
+2. **One window.** Every "A grows into B" uses the clip window in
+   `lib/motion/window.ts` with a constant corner radius. New scenes plug into
+   it instead of building another morph.
+3. **Three clocks.** Clearing the way (dimming the background, old content
+   leaving) finishes first, geometry lands in the middle, developing (content
+   and data ink) comes last. They are staggered so only one thing happens at a
+   time, and two layers are never half-transparent together. `BODY_IN`,
+   `veilIn` and `ChartHold` already work this way.
+4. **Time runs right.** Motion that expresses time travels on the X axis: the
+   past on the left, now pinned to the right edge (`SwapChart`'s
+   `transform-origin: right`). Sleep-stage developing, kintsugi healing and
+   adjacent-day paging all go left to right.
+5. **Containers never overshoot.** Pages, dialogs, sheets, popovers and cards
+   never overshoot. Springs with overshoot are only for thumb-sized physical
+   controls: the `SegmentTrack` thumb, the `GlassSwitch` knob, checkmark pops
+   and playing cards.
+6. **Exits stay plain.** Closing is shorter than opening and uses ease-in-out
+   (`CLOSE_MS`, `BACK_EASE`), with no return-trip flourish. The reverse of a
+   new effect is a fade or a straight return.
+
+Long durations are not slow responses: there is feedback within one frame of a
+press and geometry starts moving within 50 ms. Overall pacing still comes from
+`PACE`; do not shorten it to feel "snappier".
+
+**Roles.** Find the role first and use its token. Do not add easing curves.
+
+| Role | Used for | Duration | Curve | Token |
+|---|---|---|---|---|
+| Press feedback | Press, hover lift | 140 ms | `--ease-out` | `--dur-fast` |
+| Clear the way | Dim background, siblings step back, old content fades | 160 ms | `ease-out` | `--clock-yield` / `YIELD_MS` |
+| Small landing | Popovers, menus, hints | 300 ms | `--ease-enter` | `--dur-base` |
+| Medium landing | Dialogs, sheets | 650 / 624 ms | `OPEN_EASE` | `OPEN_MS`, `SHEET_MS` |
+| Large landing | Card ↔ page | 780 ms | `PAGE_WINDOW_EASE` | `PAGE_WINDOW_MS` |
+| Going home | Every close and back | 572 ms | `BACK_EASE`, `--ease-leave` | `CLOSE_MS` |
+| Develop | Data ink from faint to solid | 680 ms | `--ease-leave` | `--clock-develop` / `DEVELOP_MS`, `DEVELOP_EASE` |
+| Data change | Digit-by-digit roll | 460 ms | built into `RollingNumber` | `ROLL_MS` |
+| Time slide | Adjacent day / period | 550 ms | `--ease-enter` | `--dur-std` |
+| Physical bounce | Allow-listed controls | spring | `--ease-spring` / `SPRINGS` | — |
+
+One rule picks the curve: **an opening the user triggers directly uses a curve
+with no ease-in (`OPEN_EASE`, `--ease-enter`); anything the system starts, or
+anything going back, uses ease-in-out (`--ease-leave`, `BACK_EASE`).**
+
+**Spatial grammar.**
+
+| Relation | Axis | Treatment | Example |
+|---|---|---|---|
+| Drill in / out | Z | Window morph | Overview card → detail; button → dialog |
+| Adjacent in time | X | Slide in the direction of time | Previous / next day |
+| Peer destinations | none | Plain fade | Top-bar destinations |
+| Change role in place | none | Cross-fade in the same container, width via `useWidthMorph` | Back ↔ brand; sync capsule states |
+| Pop out | short Z | Small window grown from its source | Popovers, menus |
+
+**Less motion is not "nothing".** When `lessMotion()` is true: landing / going
+home → the target appears directly (an opacity transition under 120 ms); clear
+the way → dim directly; develop → final ink directly; data change → the number
+is replaced; time slide → cross-fade; physical bounce → straight to rest. No
+state change may be conveyed by motion alone: a changed number has text, a
+filled gap has colour, a selection has `aria-pressed`.
+
+**Twelve rules for new motion code:**
+
+1. Animate only `transform` and `opacity`. The one exception is a one-off
+   `stroke-dashoffset` on an SVG under 120 px.
+2. No per-frame animation of `filter`, `backdrop-filter`, `mask` or
+   `box-shadow`.
+3. Do not drive animation by rewriting CSS variables on an ancestor every frame
+   (variables inherit and restyle the whole subtree; see the header of
+   `lib/tilt.ts`).
+4. No `html[attr] *` descendant selectors.
+5. Never set opacity on an ancestor of glass (it changes the
+   `backdrop-filter` sampling boundary); dim with a separate overlay instead.
+6. Do not mix individual transform properties (`translate` / `scale`) with
+   WAAPI `transform` keyframes on the same element.
+7. Anything with `fill: 'forwards'` is cleaned up on both finish and cancel
+   (`finished.then(done, done)`).
+8. Motion triggered by entering a page runs after `afterMotion()`; heavy chart
+   work keeps going through `nextSlot()`, one per frame.
+9. Check `lessMotion()` when the motion is triggered, not when mounting.
+10. Re-entrant: cancel your own previous animation before starting again and
+    start from the current computed value (see `RollingNumber.vue`).
+11. Every latent state (faint first, solid once triggered) has a safety timeout
+    of at most 2 seconds.
+12. No new dependencies, no new easing curves. Need a new duration? Check the
+    role table first.
 
 ### Hard rules: where things come from, how choices look
 

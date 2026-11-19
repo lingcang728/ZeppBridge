@@ -27,6 +27,13 @@ export const CLOSE_EASE = 'cubic-bezier(.4, .6, .2, 1)';
  */
 export const BACK_EASE = 'cubic-bezier(.32, .08, .24, 1)';
 
+/** 让路：背景压暗、同组退后、旧内容退场。要先于几何落定完成（三只钟里最早的那只）。对应 tokens.css 的 --clock-yield。 */
+export const YIELD_MS = 160;
+/** 显影：数据墨色由淡变实（三只钟里最后的那只）。等于 --dur-slow；对应 --clock-develop。 */
+export const DEVELOP_MS = 680;
+/** 显影是系统发起的，所以用缓入缓出（同 --ease-leave），不用用户触发的那条不缓起的曲线。 */
+export const DEVELOP_EASE = 'cubic-bezier(.4, 0, .2, 1)';
+
 /** 整屏从一个按钮处扩散开（换主题）：和卡片展开同一条曲线，整屏的圆比卡大得多，再慢一点。 */
 export const REVEAL_MS = paced(640);
 

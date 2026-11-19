@@ -167,6 +167,9 @@
   --dur-back: 600ms;
   --ease-enter: cubic-bezier(.35, .65, .2, 1);
   --ease-leave: cubic-bezier(.4, 0, .2, 1);
+  /* 三只钟里的两只（lib/motion/timing.ts 的 YIELD_MS / DEVELOP_MS）：让路先完成，显影最后。不乘 PACE。 */
+  --clock-yield: 160ms;
+  --clock-develop: 680ms;
 
   --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
