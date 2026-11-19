@@ -352,6 +352,11 @@ summary { cursor: pointer; }
   details::details-content { transition: none; }
 }
 
+/* 显影的薄纱（lib/motion/develop.ts 的 developWash）：盖在数据上的一层底色，从左往右退开（右边缘钉住）。
+   底色默认是凹槽底（--mat-inset），盖在别的底上时由那里设 --wash。只动 transform；不接指针。 */
+.develop-wash { position: absolute; inset: 0; z-index: 1; display: block; background: color-mix(in srgb, var(--wash, var(--mat-inset)) 62%, transparent);
+  transform-origin: right center; pointer-events: none; }
+
 /* 「再显示 N 条」新出现的行淡入、轻轻浮上来（审计 B7，2026-10-07；以前一下全冒出来）。行一挂上就放一次，
    已经在的行不动；缓存页回到场上不重放（下面的 page-revisit）。只动 opacity / transform。 */
 @keyframes row-in { from { opacity: 0; transform: translateY(8px); } }

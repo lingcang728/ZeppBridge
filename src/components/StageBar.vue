@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { developWash, type InkPhase } from '../lib/motion/develop';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import DurationText from './DurationText.vue';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
@@ -65,7 +66,17 @@ const props = defineProps<{
   slices?: SleepStageSlice[] | null;
   rangeStart?: string;
   rangeEnd?: string;
+  /** 一夜显影（lib/motion/develop.ts）：潜伏时分期条完整但盖着一层底色薄纱，显影时薄纱从左往右退开。 */
+  ink?: InkPhase;
 }>();
+
+/** 薄纱还在不在：潜伏、显影中在；退完、或者一开始就是实色就拿掉。 */
+const washed = ref(props.ink === 'latent');
+const wash = ref<HTMLElement | null>(null);
+watch(() => props.ink, (now, before) => {
+  if (now === 'develop' && before === 'latent' && wash.value) developWash(wash.value, () => { washed.value = false; });
+  else if (now === 'solid') washed.value = false;
+});
 
 const toMs = (value?: string): number | null => {
   if (!value) return null;
@@ -276,6 +287,7 @@ const tooltip = computed(() => {
           <span v-for="tick in ticks" :key="tick.left" class="timeline-grid" :style="{ left: `${tick.left}%` }" aria-hidden="true" />
           <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered, sfumato: slice.tone === 'unknown' }]"
             :style="timelineStyle(slice)" aria-hidden="true" />
+          <span v-if="washed" ref="wash" class="develop-wash" aria-hidden="true" />
           <span v-if="cursor !== null" class="timeline-cursor" :style="{ left: `${cursor * 100}%` }" aria-hidden="true" />
         </div>
       </div>
@@ -294,6 +306,7 @@ const tooltip = computed(() => {
           :class="[stage.tone, { sfumato: stage.tone === 'unknown' }]"
           :style="segmentStyle(stage)"
         />
+        <span v-if="washed" ref="wash" class="develop-wash" aria-hidden="true" />
       </div>
       <div v-if="rangeStart || rangeEnd" class="stage-axis">
         <span>{{ axisLabels.start }}</span>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
@@ -31,6 +31,7 @@ import { holdInPlace } from '../lib/motion/holdInPlace';
 import { pageQuery, sleepPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
+import { DEVELOP_DELAY_MS, DEVELOP_GUARD_MS, markDeveloped, shouldDevelop, type InkPhase } from '../lib/motion/develop';
 import { deviceNameText, undeterminedDevice } from '../lib/deviceName';
 
 const route = useRoute();
@@ -235,6 +236,23 @@ const loadDetail = async () => {
 onMounted(() => { if (preloaded) afterMotion(() => { void loadDetail(); }); else void loadDetail(); });
 watch([dataRevision, sleepId], () => void loadDetail());
 
+/* 一夜显影（lib/motion/develop.ts）：首屏的得分圆环和分期条从第一帧起形状完整、墨色偏淡，形变落定后一起变成实色
+   （分期条从左往右、圆环从 12 点顺时针，同一时长同一曲线）。每条记录一次运行只显影一次；同一页换了记录不再显影。 */
+const ink = ref<InkPhase>(shouldDevelop(`sleep:${sleepId.value}`) ? 'latent' : 'solid');
+let inkTimers: number[] = [];
+const solidNow = () => { inkTimers.forEach(clearTimeout); inkTimers = []; ink.value = 'solid'; };
+watch(() => !shownLoading.value && !!session.value, (ready) => {
+  if (!ready || ink.value !== 'latent') return;
+  markDeveloped(`sleep:${sleepId.value}`);
+  inkTimers.push(window.setTimeout(() => { if (ink.value === 'latent') solidNow(); }, DEVELOP_GUARD_MS));
+  afterMotion(() => {
+    if (ink.value !== 'latent') return;
+    inkTimers.push(window.setTimeout(() => { if (ink.value === 'latent') ink.value = 'develop'; }, DEVELOP_DELAY_MS));
+  });
+}, { immediate: true, flush: 'post' });
+watch(sleepId, () => { if (ink.value !== 'solid') solidNow(); });
+onBeforeUnmount(() => inkTimers.forEach(clearTimeout));
+
 /* 官方授权那一份（sleep_id 以 official: 开头）标成官方授权，不再笼统写「Zepp 云端」。 */
 const providerLabel = computed(() => (session.value?.sleep_id.startsWith('official:') ? t.value.providerOfficial : dataProviderLabel()));
 const deviceLabel = computed(() => deviceNameText(device.value));
@@ -280,6 +298,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
             color="var(--sleep)"
             track-color="var(--line)"
             unit=""
+            :ink="ink"
           />
           <strong v-else class="score-empty">—</strong>
           <div class="score-copy">
@@ -302,6 +321,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
           :slices="session.stages"
           :range-start="session.start_time"
           :range-end="session.end_time"
+          :ink="ink"
         />
       </section>
 
