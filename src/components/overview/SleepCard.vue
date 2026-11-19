@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
+import RollingNumber from '../RollingNumber.vue';
 import { isFiniteNumber } from '../../lib/format';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { sleepStageLabel } from '../../lib/sleepStages';
@@ -138,7 +139,7 @@ const hoverStage = (event: PointerEvent) => {
       </span>
     </div>
     <template v-if="sleep">
-      <p class="panel-figure"><span class="figure-value"><template v-for="(part, index) in figureParts(hm(sleep.duration_minutes))" :key="index"><i v-if="part.unit">{{ part.text }}</i><template v-else>{{ part.text }}</template></template></span></p>
+      <p class="panel-figure"><span class="figure-value"><template v-for="(part, index) in figureParts(hm(sleep.duration_minutes))" :key="index"><i v-if="part.unit">{{ part.text }}</i><RollingNumber v-else :value="part.text" arrive /></template></span></p>
       <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" v-edge-safe class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
       <dl v-if="sleepWindow" class="sleep-window">

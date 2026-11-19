@@ -600,6 +600,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
       </button>
       <button
         ref="syncPill"
+        data-arrival-origin
         :class="['sync-pill', 'glass-control', 'is-lens-host', 'has-rim', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
         :disabled="demoLibrary || (!readyToHand && !isSyncing && !canIncrementalSync && !needsConnection)"

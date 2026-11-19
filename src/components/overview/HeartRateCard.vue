@@ -10,6 +10,7 @@ import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import type { HeartRatePoint } from '../../types';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
+import RollingNumber from '../RollingNumber.vue';
 import HrMiniChart from './HrMiniChart.vue';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -154,7 +155,7 @@ const clock = (value: number) =>
       <span class="panel-go" :title="t.hrMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
     </div>
     <p class="panel-figure">
-      <span class="figure-value">{{ num(hrLatest) }}<i>{{ t.bpm }}</i></span>
+      <span class="figure-value"><RollingNumber :value="num(hrLatest)" arrive /><i>{{ t.bpm }}</i></span>
       <span v-if="hrSpread || latestWhen" class="figure-meta">
         <template v-if="hrSpread">{{ t.windowRange(hrSpread.min, hrSpread.max) }}</template>
         <template v-if="hrSpread && latestWhen"> · </template>

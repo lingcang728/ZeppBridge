@@ -2,13 +2,16 @@
 /* 会滚的数字：接收排好版的字符串（`243.8 km`、`1:58:11`、`15 次`），逐位拆开，每一位数字是一根 0–9 竖条，换值时竖条上下滚
    （值变大往上滚、变小往下滚，9 → 1 往上会经过 0）。位数或单位变了就整串交叉淡入。拆格和方向在 lib/motion/rolling.ts。
    滚到一半又换值：从竖条此刻的位置接着滚，不排队、不闪回。少动模式（lessMotion）直接换。读屏只读完整的值。
-   只动 transform / opacity。用在履历页年轮区块的小结卡，年轮页的运动卡也用它。 */
+   只动 transform / opacity。用在履历页年轮区块的小结卡，年轮页的运动卡也用它。
+   `arrive`：同步带来的新值按离同步胶囊的距离晚一点起滚（lib/motion/arrival.ts），概览的大数字用它。
+   延时期间 DOM 已经是新值，靠 fill: backwards 把旧数字按在原处。换语言的灰烬涟漪正在放时直接换，不叠两层动画。 */
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 import { lessMotion } from '../lib/motion/lessMotion';
+import { arrivalDelay, arrivalOrigin } from '../lib/motion/arrival';
 import { cancelOn } from '../lib/motion/cards/reversible';
 import { restCell, rollDirection, rollingSlots, rollTarget, sameShape, STRIP_CELLS } from '../lib/motion/rolling';
 
-const props = defineProps<{ value: string }>();
+const props = defineProps<{ value: string; arrive?: boolean }>();
 const slots = computed(() => rollingSlots(props.value));
 const CELLS = Array.from({ length: STRIP_CELLS }, (_, i) => i % 10);
 const ROLL_MS = 460, FADE_MS = 300;
@@ -33,7 +36,8 @@ const ghosts = shallowRef<Ghost[]>([]);
 let ghostId = 0;
 
 watch(() => props.value, (now, before) => {
-  if (lessMotion() || !face.value) return;
+  if (lessMotion() || !face.value || document.documentElement.dataset.ashMorph !== undefined) return;
+  const delay = props.arrive && root.value ? arrivalDelay(root.value.getBoundingClientRect(), arrivalOrigin()) : 0;
   const was = rollingSlots(before), next = rollingSlots(now);
   if (sameShape(was, next)) {
     const direction = rollDirection(before, now);
@@ -47,7 +51,7 @@ watch(() => props.value, (now, before) => {
         const { from, to } = rollTarget(move.at, move.digit, direction);
         cancelOn(move.strip);
         // 终点和静止位置是同一个数字（差整十格），放完不用 fill，回到样式里的位置看不出跳。
-        move.strip.animate([{ transform: shift(from) }, { transform: shift(to) }], { duration: ROLL_MS, easing: EASE });
+        move.strip.animate([{ transform: shift(from) }, { transform: shift(to) }], { duration: ROLL_MS, easing: EASE, delay, fill: 'backwards' });
       }
     });
     return;
@@ -62,9 +66,9 @@ watch(() => props.value, (now, before) => {
     // 留着的竖条可能还在往旧数字滚，新值淡入前停掉，免得放完跳一下。
     for (const strip of strips.values()) cancelOn(strip);
     cancelOn(host);
-    host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'ease-out' });
+    host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'ease-out', delay, fill: 'backwards' });
     const ghost = root.value?.querySelector<HTMLElement>(`[data-ghost="${id}"]`);
-    const out = ghost?.animate([{ opacity: ghosts.value.find(g => g.id === id)?.from ?? 1 }, { opacity: 0 }], { duration: FADE_MS * 0.8, easing: 'ease-out', fill: 'forwards' });
+    const out = ghost?.animate([{ opacity: ghosts.value.find(g => g.id === id)?.from ?? 1 }, { opacity: 0 }], { duration: FADE_MS * 0.8, easing: 'ease-out', delay, fill: 'both' });
     const drop = () => { ghosts.value = ghosts.value.filter(g => g.id !== id); };
     if (out) out.finished.then(drop, () => undefined); else drop();
   });

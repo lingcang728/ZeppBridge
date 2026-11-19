@@ -3,6 +3,7 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
+import RollingNumber from '../RollingNumber.vue';
 import GlyphTile from '../GlyphTile.vue';
 import { metricColor } from '../../lib/metricTone';
 import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
@@ -131,7 +132,7 @@ const ringColor = computed(() => metricColor('steps'));
       <span class="panel-go" :title="t.seeMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
     </div>
     <template v-if="steps !== null">
-      <p class="panel-figure"><span class="figure-value">{{ num(steps) }}</span></p>
+      <p class="panel-figure"><span class="figure-value"><RollingNumber :value="num(steps)" arrive /></span></p>
       <div class="panel-meter" role="img" :aria-label="t.stepsGoalLine(formatMetric(stepGoal), stepsPercent)"><i :style="{ width: `${Math.max(2, stepsPercent)}%`, background: ringColor }"></i></div>
       <!-- 和睡眠卡的分期列表同一种排法：左边是什么，右边多少。 -->
       <ul class="steps-facts">
