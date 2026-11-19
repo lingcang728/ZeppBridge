@@ -25,8 +25,12 @@
 /* 时间列 76px：英文「10:57 PM」在 58px 里会把 PM 折到第二行，西语「10:57 p. m.」66px 也放不下。
    改宽要同步上面竖线的 left（列宽 + 间距 + 节点半宽 - 1）。 */
 .tl-row { position: relative; display: grid; grid-template-columns: 76px 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
-  padding: 4px 10px 4px 0; border-radius: var(--radius-md); color: inherit; text-decoration: none; transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out); }
-.tl-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
+  padding: 4px 10px 4px 0; border-radius: var(--radius-md); color: inherit; text-decoration: none; transition: background var(--dur-fast) ease; }
+/* 悬停往右挪的是行里的内容，不是行盒本身：行是卡 ↔ 页形变的来源（data-morph-card），形变量的是行盒，
+   行盒跟着悬停偏 3px 的话，起飞量到的框和落回时的框差一截，落定后还会再跳一下。 */
+.tl-row > * { transition: translate var(--dur-base) var(--ease-out); }
+.tl-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.tl-row:hover > * { translate: 3px 0; }
 .tl-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .tl-time { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .tl-node { position: relative; z-index: 1; display: grid; place-items: center; padding: 3px; border-radius: 14px; background: var(--mat-card-solid); }
