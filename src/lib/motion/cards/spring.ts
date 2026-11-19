@@ -30,11 +30,44 @@ export interface SpringCurve {
 
 const cache = new Map<string, SpringCurve>();
 
+let linearOk: boolean | null = null;
+/**
+ * 引擎认不认 CSS `linear()` 缓动（Chromium 113、Safari 17.2、WebKitGTK 2.44 起）。macOS 11 的系统 WebKit 不认，
+ * 而 WAAPI 拿到不认识的缓动会直接抛 TypeError，牌和浮层的动画就断在半路。只探测一次；
+ * 没有 CSS.supports 的环境（测试）按支持处理。
+ */
+export const supportsLinearEasing = (): boolean => {
+  if (linearOk !== null) return linearOk;
+  const css = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' ? CSS : null;
+  linearOk = css ? css.supports('transition-timing-function', 'linear(0, 1)') : true;
+  return linearOk;
+};
+/** 测试用：让下一次重新探测。 */
+export const resetLinearProbe = (): void => {
+  linearOk = null;
+};
+
+const fallbacks = new WeakMap<SpringCurve, SpringCurve>();
+/**
+ * 不认 `linear()` 时换成形状相近的三次贝塞尔，时长不变：明显会冲过头的弹簧（阻尼比 < 0.7）用 --ease-spring，
+ * 其余用 OPEN_EASE（与临界阻尼弹簧的形状只差几个百分点）。
+ */
+export const withLinearFallback = (curve: SpringCurve, spring: Spring): SpringCurve => {
+  if (supportsLinearEasing()) return curve;
+  const hit = fallbacks.get(curve);
+  if (hit) return hit;
+  const zeta = spring.damping / (2 * Math.sqrt(spring.stiffness * (spring.mass ?? 1)));
+  const easing = zeta < 0.7 ? 'cubic-bezier(.2, 1.15, .32, 1)' : 'cubic-bezier(.4, .6, .2, 1)';
+  const fallback = { easing, duration: curve.duration };
+  fallbacks.set(curve, fallback);
+  return fallback;
+};
+
 /** 采样一根弹簧。`samples` 个点等时间间隔；停稳 = 离终点不到 0.1% 且几乎不动。 */
 export const springCurve = (spring: Spring, samples = 40): SpringCurve => {
   const key = `${spring.stiffness}/${spring.damping}/${spring.mass ?? 1}/${samples}`;
   const hit = cache.get(key);
-  if (hit) return hit;
+  if (hit) return withLinearFallback(hit, spring);
   const mass = spring.mass ?? 1;
   const dt = 1 / 1000;
   const trace: number[] = [];
@@ -58,7 +91,7 @@ export const springCurve = (spring: Spring, samples = 40): SpringCurve => {
   }
   const curve = { easing: `linear(${points.join(', ')})`, duration: Math.round(trace.length * dt * 1000) };
   cache.set(key, curve);
-  return curve;
+  return withLinearFallback(curve, spring);
 };
 
 /** 用户要求减少动效。 */

@@ -11,7 +11,7 @@
  *
  * 都是纯函数，方便测；DOM 那一侧留在组件里。
  */
-import { springCurve, type Spring, type SpringCurve } from './cards/spring';
+import { springCurve, withLinearFallback, type Spring, type SpringCurve } from './cards/spring';
 import { windowInset, windowPoses, WINDOW_OFFSETS, type WindowRect } from './window';
 
 /** 浮层的圆角（和 .pop-panel 的 border-radius 一致）。 */
@@ -112,7 +112,7 @@ export function springBack(spring: Spring, offset: { x: number; y: number }, vel
   if (rounded === 0) return springCurve(spring, samples);
   const key = `${spring.stiffness}/${spring.damping}/${spring.mass ?? 1}/${rounded}/${samples}`;
   const hit = springCache.get(key);
-  if (hit) return hit;
+  if (hit) return withLinearFallback(hit, spring);
   const mass = spring.mass ?? 1;
   const dt = 1 / 1000;
   const trace: number[] = [];
@@ -136,5 +136,5 @@ export function springBack(spring: Spring, offset: { x: number; y: number }, vel
   }
   const curve = { easing: `linear(${points.join(', ')})`, duration: Math.round(trace.length * dt * 1000) };
   springCache.set(key, curve);
-  return curve;
+  return withLinearFallback(curve, spring);
 }
