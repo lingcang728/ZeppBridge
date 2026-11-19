@@ -49,7 +49,9 @@ name = "zeppbridge_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+# Cargo 新 OUT_DIR 布局（target/<profile>/build/<pkg>/<hash>/out）要求 tauri-build >= 2.7.4，
+# 旧版按固定三层 parent 推导 target_dir 会落在 build/ 里并尝试删除同名的 sidecar 构建目录。
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 zeppbridge-core = { workspace = true }
