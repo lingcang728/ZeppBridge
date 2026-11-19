@@ -1,6 +1,6 @@
 # Maintainer: ZeppBridge contributors (https://github.com/lingcang728/ZeppBridge)
 pkgname=zeppbridge-git
-pkgver=3.0.1.r367.g9cf3fbe0
+pkgver=3.2.0.r596.g6bf7b7f0
 pkgrel=1
 pkgdesc='Local-first desktop companion for Amazfit and Zepp health data'
 arch=('x86_64')

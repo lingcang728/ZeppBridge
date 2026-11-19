@@ -1,6 +1,6 @@
 # Linux
 
-ZeppBridge 在 Linux 上提供 Flatpak、`.deb`、`.rpm` 和 AppImage 包，另有 Arch 原生包的本地构建配方。另外还有一个给 CLI 和 MCP 用的[无头容器镜像](docker.zh-CN.md)，那是另一件事，单独一篇。
+ZeppBridge 在 Linux 上提供 Flatpak、`.deb`、`.rpm` 和 AppImage 包，Arch Linux 用户也可从 AUR 安装 `zeppbridge-git`。CLI 和 MCP 另有[无头容器镜像](docker.zh-CN.md)。
 
 [English version](linux.md)
 
@@ -11,6 +11,7 @@ ZeppBridge 在 Linux 上提供 Flatpak、`.deb`、`.rpm` 和 AppImage 包，另�
 从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载 `ZeppBridge-<版本>-Linux-x64.flatpak`，装到当前用户：
 
 ```bash
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install --user ./ZeppBridge-<版本>-Linux-x64.flatpak
 flatpak run com.zeppbridge.app
 ```
@@ -33,14 +34,27 @@ AppImage 需要 FUSE。只带 FUSE 3 的系统上，要么装 `libfuse2`，要�
 
 ### Arch Linux
 
-`packaging/arch/PKGBUILD` 用系统库构建原生 x86_64 `zeppbridge-git` 包（桌面应用、`zeppbridge-cli`、`zeppbridge-mcp`），还没发布到 AUR。
+Arch Linux x86_64 可从 AUR 安装 [`zeppbridge-git`](https://aur.archlinux.org/packages/zeppbridge-git)。
+安装时从上游 `main` 拉取源码，使用系统库编译桌面应用、`zeppbridge-cli` 和 `zeppbridge-mcp`。
 
 ```bash
-cd packaging/arch
+paru -S zeppbridge-git
+# 使用 yay：yay -S zeppbridge-git
+```
+
+也可以直接从 AUR Git 仓库安装。若 AUR 助手搜不到包名，可用此方式：
+
+```bash
+sudo pacman -S --needed base-devel git
+git clone https://aur.archlinux.org/zeppbridge-git.git
+cd zeppbridge-git
 makepkg -si
 ```
 
-要打包本地工作区（含未提交的改动），见 [Linux 打包说明](../development/linux-packaging.md#arch-linux)。
+上游 3.2.0 源码已在 Arch x86_64 完成构建，并通过桌面入口校验和 CLI 版本检查。
+实际桌面使用已在较早的原生包上验证。洁净 chroot 构建仍待验证，CI 尚未覆盖 Arch。
+
+如需构建当前工作区，请参阅 [Linux 打包说明](../development/linux-packaging.md#arch-linux)。
 
 ## 数据放在哪
 
@@ -181,14 +195,10 @@ WebKitGTK 扛不住整页毛玻璃和形变动画。Linux 上 **设置 → 显�
 
 ## 更新
 
-Linux 上应用内的更新检查是关掉的，设置页会直接这么说，而不是显示一次失败的检查。更新从这个包的来处走：
-
-```bash
-flatpak update com.zeppbridge.app     # Flatpak
-sudo apt install --only-upgrade ...   # deb，等有了软件源之后
-```
-
-AppImage 用户手动换文件。Linux 上没有自更新：往 `/app` 或 `/usr/bin` 里写文件会和包管理器打架。
+Linux 通过原安装渠道更新。`zeppbridge-git` 可再次运行 `paru -S zeppbridge-git`，从最新的
+上游 `main` 重新构建。`.deb`、`.rpm` 和 Flatpak 用户可在
+[Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载新包并重复上面的安装命令，
+AppImage 用户下载并替换文件即可。
 
 ## 沙箱权限（Flatpak）
 

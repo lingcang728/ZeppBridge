@@ -6,8 +6,9 @@
 
 | 路径 | 是什么 | 指南 |
 |---|---|---|
-| `arch/PKGBUILD`、`arch/.SRCINFO` | `zeppbridge-git` 的 Arch 原生包配方，跟踪远端 `main`；AUR 提交准备文件，尚未发布到 AUR。 | [Linux 指南](../docs/guides/linux.zh-CN.md#arch-linux) |
+| `arch/PKGBUILD`、`arch/.SRCINFO` | [`zeppbridge-git` 的 AUR 配方](https://aur.archlinux.org/packages/zeppbridge-git)，面向 Arch x86_64，跟踪上游 `main`。 | [Linux 指南](../docs/guides/linux.zh-CN.md#arch-linux) |
 | `arch/build-local.sh` | 快照当前工作区源码（含未提交修改），在独立缓存中调用 `makepkg`，产物写入 `release-arch/`。 | |
+| `arch/publish-aur.sh` | 构建 `zeppbridge-git`，重新生成 `.SRCINFO`，预览 AUR 提交。加 `--push` 发布。 | |
 | `flatpak/com.zeppbridge.app.yml` | Flatpak 清单 | [docs/guides/linux.zh-CN.md](../docs/guides/linux.zh-CN.md) |
 | `flatpak/com.zeppbridge.app.desktop` | 桌面入口。Flatpak 要求文件名是 `$FLATPAK_ID.desktop`，所以放在这里而不是生成。 | |
 | `flatpak/com.zeppbridge.app.metainfo.xml` | AppStream 元数据。没有它，应用在 GNOME 软件里装上后是个没名字的条目。 | |
@@ -35,6 +36,15 @@ Arch 配方面向 `x86_64`，使用系统 GTK / WebKit，通过 Tauri `--no-bund
 成功后安装成品。原始配方中的 `makepkg -si` 则构建远端已提交的 `main` 并安装，
 不包含本地未提交修改。
 
+`zeppbridge-git` 的 AUR 发布当前由 [@Jax-Tsai-zero](https://github.com/Jax-Tsai-zero) 提供支持。
+需要 AUR 共同维护权限的项目成员，请联系他并提供自己的 AUR 用户名。
+
+维护者配置好 AUR SSH 公钥并安装 Arch 构建依赖后，可运行
+`./packaging/arch/publish-aur.sh` 构建并查看暂存差异。发布需要配置 Git 提交身份。确认后运行
+`./packaging/arch/publish-aur.sh --push`，脚本会重新构建并将配方、`.SRCINFO` 和许可证推到 AUR。
+
 ## CI
 
-每次推送都会校验 desktop 与 AppStream 文件，并构建、冒烟测试无头镜像。Flatpak、deb、rpm、AppImage 只在打 `v*` 标签和手动触发时构建。Arch 没有 CI 任务，配方也没发布到 AUR。
+完整 CI 流程会校验桌面入口和 AppStream 元数据，并构建和冒烟测试无界面镜像。
+发布标签、手动触发和向 `main` 推送打包相关变更时会构建 Flatpak 安装包。
+Arch x86_64 原生包已完成构建验证。

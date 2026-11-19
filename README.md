@@ -93,7 +93,7 @@ Installers and release notes are on [Releases](https://github.com/lingcang728/Ze
 | --- | --- | --- |
 | Windows 10/11 · x64 | Run the `-Setup.exe` installer, or use the `.msi` or the portable `.zip` | Main development and daily-use platform |
 | macOS · Apple Silicon | Open the `.dmg` and drag the app into Applications | V3 not yet fully verified on a real machine |
-| Linux · x86_64 | Pick `.deb`, `.rpm`, AppImage or Flatpak for your distribution | V3 not yet fully verified on a real machine; see the [Linux guide](docs/guides/linux.md) |
+| Linux · x86_64 | Pick `.deb`, `.rpm`, AppImage or Flatpak for your distribution. On Arch, install [`zeppbridge-git` from the AUR](docs/guides/linux.md#arch-linux) with `paru -S zeppbridge-git` | Sign-in, sync and data display verified on an Arch/Wayland desktop. See the [Linux guide](docs/guides/linux.md) |
 | Server or AI agent, no desktop | CLI / MCP tools package or Docker | See [Without a desktop](#without-a-desktop-servers-and-ai-agents) |
 
 The installers are not code-signed yet: Windows builds carry no Authenticode signature, and the macOS build is only ad-hoc signed and not notarized. Windows may warn about an unknown publisher, and macOS may block the app from opening. Only allow it to run, following your system's prompt, once you have checked where the download came from and decided to trust the app. To build V3 from source, see [Development](docs/development/development.md).

@@ -46,7 +46,7 @@
 |---|---|
 | Windows 10 / 11 | 维护者本人账号日常使用；CI 检查与全部测试 |
 | macOS（Apple 芯片） | CI 的 `macos-latest`：格式、检查、Clippy、全部测试通过，dmg / app.tar.gz 能打出来。维护者没有 Mac，真机表现靠贡献者反馈 |
-| Linux（x86_64） | CI：同样的检查；deb / rpm / AppImage / Flatpak 能打出来，Docker 镜像有无网自检。真机表现靠用户反馈 |
+| Linux（x86_64） | CI 验证编译和测试，发布提供 deb / rpm / AppImage / Flatpak，Docker 镜像有离线自检。Arch x86_64 可从 AUR 安装 `zeppbridge-git`；已在 Arch/Wayland 真机验证界面渲染、登录、同步与数据显示。见 [Linux 指南](../guides/linux.zh-CN.md) |
 
 只有真机才验得出、还没系统验过的：Mac / Linux WebView 里的毛玻璃效果；Wayland 下把文件拖进 AI 对话框（拖文件插件在 Linux 走 X11）；「在资源管理器里显示」在 Mac 应叫「访达」、Linux 应叫「文件管理器」。Windows 的 MSI 不接受 `3.0.0-beta.N` 这种预发布版本号，而 CI 的 Windows 打包一次同时出 NSIS 和 MSI，所以只有 `3.0.0` 这种纯数字版本号才打得过。
 

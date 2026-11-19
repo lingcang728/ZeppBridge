@@ -10,7 +10,7 @@ the same `data/zepp.db` the desktop app uses.
 
 **With the desktop app installed** there is nothing more to install. On Windows
 (installer and portable build) they sit next to `ZeppBridge.exe`, on macOS inside
-`ZeppBridge.app/Contents/MacOS/`, and the Linux deb / rpm put them in `/usr/bin`.
+`ZeppBridge.app/Contents/MacOS/`, and Linux deb, rpm and Arch packages put them in `/usr/bin`.
 They are updated together with the app, and **Settings › AI tools** shows the
 full path of both.
 
@@ -27,7 +27,7 @@ Each executable resolves the data directory from its own location:
 |---|---|
 | Windows | `data\` next to the executable; if that folder can't be written (for example under `C:\Program Files`), `%APPDATA%\zeppbridge\ZeppBridge\data` |
 | macOS | Inside `ZeppBridge.app`: `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`. Outside a bundle: `data/` next to the executable, or the same Application Support folder when that can't be written |
-| Linux | Under a shared prefix (`/usr`, `/bin`, `/sbin`, `/opt`, `/app`, `/snap`, `/nix/store`, `/var/lib/flatpak`): `~/.local/share/zeppbridge/data`. Anywhere else (AppImage, an unpacked tarball in your home): `data/` next to the executable |
+| Linux | `~/.local/share/zeppbridge/data` for deb, rpm and Arch packages. Flatpak uses `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/`. An AppImage or an unpacked tarball uses `data/` next to the executable |
 | Microsoft Store | The package's own LocalState folder |
 | Any | `$ZEPPBRIDGE_DATA_DIR`, an absolute path, overrides all of the above (except the Store build) |
 
