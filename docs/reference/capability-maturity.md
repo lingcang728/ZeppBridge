@@ -56,7 +56,7 @@ today; export and MCP compute it with the same function
 |---|---|
 | Windows 10 / 11 | Daily use on the maintainer's own account; CI checks and the full test suite |
 | macOS (Apple Silicon) | CI on `macos-latest`: format, check, Clippy and all tests pass, and the dmg / app.tar.gz build. The maintainer has no Mac; real-machine behaviour relies on contributors' reports |
-| Linux (x86_64) | CI: the same checks; deb / rpm / AppImage / Flatpak build, and the Docker image has an offline self-check. Real-machine behaviour relies on users' reports |
+| Linux (x86_64) | CI verifies builds and tests. Releases provide deb / rpm / AppImage / Flatpak, and the Docker image has an offline self-check. Arch x86_64 can install `zeppbridge-git` from the AUR. Rendering, sign-in, sync and data display were verified on an Arch/Wayland desktop. See the [Linux guide](../guides/linux.md) |
 
 Only real hardware can settle these, and they have not been checked
 systematically: frosted glass in the macOS / Linux WebViews; dragging a file

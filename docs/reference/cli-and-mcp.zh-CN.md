@@ -8,7 +8,7 @@
 ## 安装
 
 **装了桌面应用**：不用另装。Windows（安装包和便携版）在 `ZeppBridge.exe` 旁边，macOS 在
-`ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb / rpm 在 `/usr/bin`。它们随应用一起升级，
+`ZeppBridge.app/Contents/MacOS/` 里，Linux 的 deb、rpm 和 Arch 原生包在 `/usr/bin`。它们随应用一起升级，
 **设置 › 交给 AI 工具**会显示两个程序的完整路径。
 
 **没有桌面的机器**：从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载
@@ -22,7 +22,7 @@
 |---|---|
 | Windows | 可执行文件旁边的 `data\`；那里写不进去时（例如在 `C:\Program Files` 下）用 `%APPDATA%\zeppbridge\ZeppBridge\data` |
 | macOS | 在 `ZeppBridge.app` 里：`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`。不在包里：可执行文件旁边的 `data/`，写不进去时用同一个 Application Support 目录 |
-| Linux | 在共享前缀下（`/usr`、`/bin`、`/sbin`、`/opt`、`/app`、`/snap`、`/nix/store`、`/var/lib/flatpak`）：`~/.local/share/zeppbridge/data`。其他位置（AppImage、解压在家目录的 tarball）：可执行文件旁边的 `data/` |
+| Linux | deb、rpm 和 Arch 原生包用 `~/.local/share/zeppbridge/data`。Flatpak 用 `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/`。AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
 | Microsoft Store | 包自己的 LocalState 目录 |
 | 任何平台 | `$ZEPPBRIDGE_DATA_DIR`（绝对路径）覆盖以上全部（商店版除外） |
 

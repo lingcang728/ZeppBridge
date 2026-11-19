@@ -83,15 +83,16 @@ Container packages are written to `/build-target/release/bundle` in the
 
 The script needs `flatpak`, `flatpak-builder` and `elfutils` (`eu-strip`) on the
 host. Rust and Node come from Flatpak SDK extensions; everything is `--user`.
-CI builds the Flatpak only for `v*` tags and manual runs; every push validates
-its metadata.
+Full CI runs validate Flatpak metadata. Release tags, manual runs, and pushes
+to `main` that change packaging inputs build the bundle.
 
 ## Arch Linux
 
 `packaging/arch/PKGBUILD` builds a native x86_64 `zeppbridge-git` package with
 the desktop app, `zeppbridge-cli` and `zeppbridge-mcp`. It uses system libraries
-and does not pass through AppImage packaging. The recipe and `.SRCINFO` are
-provided for AUR submission; they have **not** been published to AUR.
+and does not pass through AppImage packaging. For installation, see [`zeppbridge-git` on the AUR](https://aur.archlinux.org/packages/zeppbridge-git)
+and the [Linux guide](../guides/linux.md#arch-linux). The repository includes
+`packaging/arch/publish-aur.sh` for maintainers publishing recipe changes.
 
 To package the current working tree, including uncommitted fixes, run from the
 repository root with the Arch build dependencies installed:

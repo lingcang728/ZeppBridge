@@ -93,7 +93,7 @@ V3 重新设计了整套界面：玻璃导航、可翻转的日卡、可拖动�
 | --- | --- | --- |
 | Windows 10/11 · x64 | 运行 `-Setup.exe` 安装包，或使用 `.msi`、便携版 `.zip` | 主要开发与日常使用平台 |
 | macOS · Apple Silicon | 打开 `.dmg`，拖入「应用程序」 | V3 尚缺真机完整验证 |
-| Linux · x86_64 | 按发行版选择 `.deb`、`.rpm`、AppImage 或 Flatpak | V3 尚缺真机完整验证；见 [Linux 指南](docs/guides/linux.zh-CN.md) |
+| Linux · x86_64 | 按发行版选择 `.deb`、`.rpm`、AppImage 或 Flatpak。Arch 用户可运行 `paru -S zeppbridge-git` [从 AUR 安装](docs/guides/linux.zh-CN.md#arch-linux) | 已在 Arch/Wayland 真机验证登录、同步与数据显示，详见 [Linux 指南](docs/guides/linux.zh-CN.md) |
 | 服务器 / AI 智能体，无桌面 | CLI / MCP 工具包或 Docker | 见[没有桌面](#没有桌面服务器与-ai-智能体) |
 
 当前安装包未做代码签名：Windows 版没有 Authenticode 签名，macOS 版只有 ad-hoc 签名、没有公证。Windows 可能提示未知发布者；macOS 可能拦截打开。仅在确认下载来源并信任应用后，按系统提示允许运行。V3 源码构建见[开发文档](docs/development/development.zh-CN.md)。

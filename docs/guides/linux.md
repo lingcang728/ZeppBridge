@@ -1,8 +1,8 @@
 # Linux
 
 ZeppBridge on Linux ships as a Flatpak, a `.deb`, an `.rpm` and an AppImage.
-There is also a [headless container image](docker.md) for the CLI and the MCP
-server, which is a different thing and documented separately.
+Arch Linux users can install `zeppbridge-git` from the AUR. The CLI and MCP
+server are also available as a [headless container image](docker.md).
 
 [简体中文](linux.zh-CN.md)
 
@@ -15,6 +15,7 @@ Download `ZeppBridge-<version>-Linux-x64.flatpak` from
 for your user:
 
 ```bash
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install --user ./ZeppBridge-<version>-Linux-x64.flatpak
 flatpak run com.zeppbridge.app
 ```
@@ -40,17 +41,26 @@ The AppImage needs FUSE. On systems that only ship FUSE 3, either install
 
 ### Arch Linux
 
-`packaging/arch/PKGBUILD` builds a native x86_64 `zeppbridge-git` package
-(desktop app, `zeppbridge-cli`, `zeppbridge-mcp`) against system libraries. It is
-not on the AUR yet.
+Install [`zeppbridge-git` from the AUR](https://aur.archlinux.org/packages/zeppbridge-git)
+on Arch Linux x86_64. It builds the desktop app, `zeppbridge-cli` and
+`zeppbridge-mcp` from upstream `main` using system libraries.
 
 ```bash
-cd packaging/arch
+paru -S zeppbridge-git
+# With yay: yay -S zeppbridge-git
+```
+
+To install directly from the AUR Git repository with `makepkg`, including when
+an AUR helper cannot find the package:
+
+```bash
+sudo pacman -S --needed base-devel git
+git clone https://aur.archlinux.org/zeppbridge-git.git
+cd zeppbridge-git
 makepkg -si
 ```
 
-To package a local working tree instead, see the
-[Linux packaging notes](../development/linux-packaging.md#arch-linux).
+For working-tree builds, see the [Linux packaging notes](../development/linux-packaging.md#arch-linux).
 
 ## Where things go
 
@@ -249,17 +259,11 @@ already means **Low** (no frosted glass, no morphing). If you switched it to
 
 ## Updates
 
-In-app update checking is switched off on Linux, and the Settings page says so
-rather than showing a failed check. Updates come from wherever the build came
-from:
-
-```bash
-flatpak update com.zeppbridge.app     # Flatpak
-sudo apt install --only-upgrade ...   # deb, once a repository exists
-```
-
-AppImage users replace the file by hand. There is no self-update on Linux:
-writing into `/app` or `/usr/bin` would fight the package manager.
+Linux updates use the original installation method. For `zeppbridge-git`, run
+`paru -S zeppbridge-git` again to build from the latest upstream `main`. For
+`.deb`, `.rpm` and Flatpak bundles, download the new file from
+[Releases](https://github.com/lingcang728/ZeppBridge/releases) and repeat the
+installation command above. For AppImage, download and replace the file.
 
 ## Sandbox permissions (Flatpak)
 
