@@ -1,10 +1,15 @@
 <script setup lang="ts">
 /* 金继月历（3.1）：一年一行、一月一格。本机有的是完整的瓷片，补拉补上的月份用金线接起来，
  * 还缺的月份是一道裂缝，行尾「补上它」从这一年最早的缺口补起；点裂缝那一格就从那个月补起。
- * 云端说没有的月份只留虚线框——那段时间本来就没数据，不是裂缝。线条是静态的，不逐帧动。 */
-import { computed } from 'vue';
+ * 云端说没有的月份只留虚线框——那段时间本来就没数据，不是裂缝。线条是静态的，不逐帧动。
+ * 愈合：开着这张卡时某几个月从缺口变成金色，那一段上盖一层薄纱、从左往右退开（lib/motion/develop.ts 的 developWash），
+ * 金线和格子沿时间方向变实。只演亲眼看着补上的那几段；第一次看到、重新打开、切语言主题都不演。
+ * 不用描边偏移去「画」金线：折线是非等比 viewBox + non-scaling-stroke，虚线长度在各引擎下算法不一致。 */
+import { computed, shallowRef, watch } from 'vue';
 import type { MonthSeam } from '../../types';
-import { isGap, kintsugiYears, seamPolyline, type SeamCell } from '../../lib/kintsugi';
+import { healingMs, healingSpans, isGap, kintsugiYears, seamPolyline, type SeamCell } from '../../lib/kintsugi';
+import { developWash } from '../../lib/motion/develop';
+import { lessMotion } from '../../lib/motion/lessMotion';
 
 const props = defineProps<{
   months: MonthSeam[];
@@ -24,6 +29,38 @@ const props = defineProps<{
 const emit = defineEmits<{ fill: [month: string] }>();
 
 const years = computed(() => kintsugiYears(props.months, new Date(), props.earliest));
+
+type Span = [number, number];
+/** 每一年上次看到时已经是金色的格子。挂载那一刻只记下来不演。 */
+const seen = new Map<number, Set<number>>();
+const healing = shallowRef(new Map<number, Span[]>());
+watch(years, (rows, before) => {
+  const next = new Map<number, Span[]>();
+  for (const row of rows) {
+    const gold = row.cells.flatMap((cell, index) => (cell.state === 'gold' ? [index] : []));
+    const spans = before ? healingSpans(seen.get(row.year), gold) : [];
+    seen.set(row.year, new Set(gold));
+    const still = healing.value.get(row.year) ?? [];
+    const all = [...still, ...spans.filter(([a, b]) => !still.some(([c, d]) => c === a && d === b))];
+    if (all.length && !lessMotion()) next.set(row.year, all);
+  }
+  healing.value = next;
+}, { immediate: true });
+
+const spanKey = (span: Span) => `${span[0]}-${span[1]}`;
+const dropSpan = (year: number, span: Span) => {
+  const left = (healing.value.get(year) ?? []).filter((s) => spanKey(s) !== spanKey(span));
+  const next = new Map(healing.value);
+  if (left.length) next.set(year, left); else next.delete(year);
+  healing.value = next;
+};
+const startHeal = (el: unknown, year: number, span: Span) => {
+  if (!(el instanceof HTMLElement) || el.dataset.started) return;
+  el.dataset.started = '1';
+  // 设置页被缓存、这张卡此刻不在屏幕上：直接是终态，不留薄纱。
+  if (el.offsetParent === null) { dropSpan(year, span); return; }
+  developWash(el, () => dropSpan(year, span), healingMs(span));
+};
 
 const stateLabel = (state: SeamCell): string => {
   if (state === 'gold') return props.t.legendGold;
@@ -62,6 +99,14 @@ const stateLabel = (state: SeamCell): string => {
             <polyline :class="run.kind" :points="seamPolyline(run.points)" />
           </template>
         </svg>
+        <span
+          v-for="span in healing.get(row.year) ?? []"
+          :key="spanKey(span)"
+          :ref="(el) => startHeal(el, row.year, span)"
+          class="develop-wash k-heal"
+          :style="{ left: `${(span[0] / 12) * 100}%`, width: `${((span[1] - span[0] + 1) / 12) * 100}%` }"
+          aria-hidden="true"
+        />
       </div>
       <button v-if="row.firstGap" class="k-fill" type="button" :disabled="busy" @click="emit('fill', row.firstGap)">{{ t.fill }}</button>
       <span v-else class="k-fill" aria-hidden="true"></span>
@@ -91,6 +136,8 @@ button.k-cell { cursor: pointer; }
 button.k-cell:hover:not(:disabled)::before { background: color-mix(in srgb, var(--kintsugi) 18%, transparent); }
 button.k-cell:focus-visible { outline: 2px solid var(--focus); outline-offset: -1px; border-radius: 5px; }
 button.k-cell:disabled { cursor: default; }
+/* 愈合的薄纱盖在卡面上：底色取卡的实色。 */
+.k-heal { right: auto; --wash: var(--mat-card-solid); }
 .k-seams { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .k-seams polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
 .k-seams .gold { stroke: var(--kintsugi); stroke-width: 1.6; }

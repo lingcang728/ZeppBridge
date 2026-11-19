@@ -111,3 +111,22 @@ export const kintsugiYears = (months: MonthSeam[], today: Date, earliest: string
 /** 折线点 → SVG 的 `points` 属性。 */
 export const seamPolyline = (points: Array<[number, number]>): string =>
   points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join(' ');
+
+/**
+ * 这一行里新变成金色的连续区间（格子下标，含两头），给「愈合」显影用：只有上次看到时还不是金色、这次是金色的格子才算。
+ * `before` 为 undefined（第一次看到这一年）返回空：没亲眼看到它变，就不演。月份减少或不变也返回空。
+ */
+export const healingSpans = (before: ReadonlySet<number> | undefined, gold: readonly number[]): Array<[number, number]> => {
+  if (!before) return [];
+  const fresh = gold.filter((index) => !before.has(index)).sort((a, b) => a - b);
+  const spans: Array<[number, number]> = [];
+  for (const index of fresh) {
+    const last = spans[spans.length - 1];
+    if (last && index === last[1] + 1) last[1] = index;
+    else spans.push([index, index]);
+  }
+  return spans;
+};
+
+/** 愈合显影的时长：跨的月份越多越久，420–900ms。 */
+export const healingMs = (span: readonly [number, number]): number => Math.max(420, Math.min(900, 140 * (span[1] - span[0] + 1)));

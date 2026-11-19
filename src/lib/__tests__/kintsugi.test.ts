@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kintsugiYears } from '../kintsugi';
+import { healingMs, healingSpans, kintsugiYears } from '../kintsugi';
 
 const today = new Date(2026, 9, 21);
 
@@ -47,5 +47,26 @@ describe('kintsugiYears', () => {
     expect(first.year).toBe(2016);
     expect(first.cells[8].state).toBe('out');
     expect(first.cells[9].state).toBe('unasked');
+  });
+});
+
+describe('healingSpans', () => {
+  it('第一次看到这一年不演', () => {
+    expect(healingSpans(undefined, [0, 1, 2])).toEqual([]);
+  });
+
+  it('新补上的相邻月份并成一段，不相邻的分两段', () => {
+    expect(healingSpans(new Set([0]), [0, 3, 4, 5, 8])).toEqual([[3, 5], [8, 8]]);
+  });
+
+  it('金色变少或不变都不演', () => {
+    expect(healingSpans(new Set([2, 3]), [2])).toEqual([]);
+    expect(healingSpans(new Set([2, 3]), [3, 2])).toEqual([]);
+  });
+
+  it('时长随月数变化、封在 420–900ms', () => {
+    expect(healingMs([4, 4])).toBe(420);
+    expect(healingMs([0, 4])).toBe(700);
+    expect(healingMs([0, 11])).toBe(900);
   });
 });
