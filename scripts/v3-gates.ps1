@@ -10,15 +10,24 @@
 # 用法：
 #   pwsh scripts\v3-gates.ps1              # 只跑 Rust 四道门禁
 #   pwsh scripts\v3-gates.ps1 -Frontend    # 跑前端门禁
+#   pwsh scripts\v3-gates.ps1 -Store       # 再加商店渠道的测试和依赖树检查（同 CI 的 verify-store）
+#
+# 本机测试保留 --jobs 1：全核满载太久，这台机器会掉电。CI 上不限。
 
 [CmdletBinding()]
 param(
-    [switch]$Frontend
+    [switch]$Frontend,
+    [switch]$Store
 )
 
 $ErrorActionPreference = 'Stop'
 
 $env:CARGO_TARGET_DIR = 'G:\build_cache\cargo-target-v3'
+
+# check / clippy 也别吃满全部核心：换了 Rust 版本要整体重编时会满载好几分钟。
+if (-not $env:CARGO_BUILD_JOBS) {
+    $env:CARGO_BUILD_JOBS = [string][math]::Max(1, [math]::Floor([Environment]::ProcessorCount / 2))
+}
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $manifest = Join-Path $repoRoot 'src-tauri\Cargo.toml'
@@ -54,6 +63,27 @@ foreach ($gate in $gates) {
     if ($LASTEXITCODE -ne 0) {
         throw "cargo $($gate.Name) 失败，退出码 $LASTEXITCODE"
     }
+    Write-Host ''
+}
+
+if ($Store) {
+    Write-Host '==> cargo test（商店渠道）' -ForegroundColor Yellow
+    $savedConfig = $env:TAURI_CONFIG
+    $savedStore = $env:ZB_STORE_BUILD
+    try {
+        $env:TAURI_CONFIG = Get-Content -LiteralPath (Join-Path $repoRoot 'src-tauri\tauri.store.conf.json') -Raw
+        $env:ZB_STORE_BUILD = '1'
+        & cargo test --manifest-path $manifest --workspace --no-default-features --features store --locked --jobs 1
+        if ($LASTEXITCODE -ne 0) { throw "商店渠道 cargo test 失败，退出码 $LASTEXITCODE" }
+    }
+    finally {
+        $env:TAURI_CONFIG = $savedConfig
+        $env:ZB_STORE_BUILD = $savedStore
+    }
+    Write-Host '==> 商店渠道不含 GitHub 更新器' -ForegroundColor Yellow
+    $tree = & cargo tree --manifest-path $manifest --workspace --no-default-features --features store --edges normal,build --locked
+    if ($LASTEXITCODE -ne 0) { throw "cargo tree 失败，退出码 $LASTEXITCODE" }
+    if ($tree -match 'tauri-plugin-updater v') { throw '商店渠道的依赖树里出现了 tauri-plugin-updater' }
     Write-Host ''
 }
 

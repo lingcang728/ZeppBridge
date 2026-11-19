@@ -8,7 +8,7 @@
 
 - 在 `main` 上开发。`v3` 分支已冻结，不再提交、不从它开新分支；2.x 不再维护。
 - 维护者直接推送 `main`；外部贡献走 PR。分支保护（Documentation and CI routing、Windows / macOS verification）拦外部 PR。
-- 动手前 `git pull --rebase origin main`，本地门禁跑完再推。push 会自动跑 CI；打 `v*` 标签前确认 main 最新的 CI 是绿的。
+- 动手前 `git pull --rebase origin main`，本地门禁（`npm run preflight`）跑完再推。push 会自动跑 CI；打 `v*` 标签前确认 main 最新的 CI 是绿的。
 - **推 `v*` 标签就会触发 CI 打包并创建 GitHub Release**，已装用户随即收到更新。所以推送、打标签、发版都要维护者明确同意，agent 不自行做。
 - 普通 README、`docs/**/*.md` 和文档图片的改动只跑轻量文档检查，三平台构建和 Docker 跳过。参与 Rust 契约测试的 `docs/reference/cli-and-mcp*.md`、代码、配置、脚本和其他文件仍跑完整验证；发布标签和手动触发的 CI 始终跑完整流程。
 

@@ -78,13 +78,19 @@ cargo test --manifest-path src-tauri/Cargo.toml -p zeppbridge-core --lib storage
 
 只在 Windows 编译的代码只在 Windows 上检查，`cfg(not(windows))` 的代码只在 Linux 和 macOS 上检查，所以本机跑绿不代表其他平台也绿。CI 在三个平台上跑同样的四条命令。
 
+Rust 版本钉在仓库根目录的 `rust-toolchain.toml`，本机和 CI 用同一版。升级 Rust 只改这一个文件；推到 main 时 CI 会顺带把三平台安装包打一遍。本机测试带 `--jobs 1`，免得长时间全核满载；CI 上不限。
+
+推送前可以先跑 `npm run preflight`：按 CI 的顺序把 Windows 上能跑的检查跑一遍（路由和隐私检查、锁文件、前端门禁、Rust 门禁含商店渠道、Flatpak 来源）。`npm run preflight:quick` 跳过 Rust，几分钟跑完。
+
 Rust 测试只留能挡住假成功、丢数据、错文案的那些。
 
 ## CI 跑什么
 
-每次推送和 PR，先由一个分流作业按改动的文件挑出要跑的检查。每个平台都是：lockfile 检查、`npm ci`、`npm run build`、四条 Rust 命令。Windows 另外跑体积预算、`i18n:check`、`npm test`、`test:functions`、`icons:verify` 和 Microsoft Store 渠道测试。Linux 另外校验 Flatpak 元数据，并构建、冒烟测试无头 Docker 镜像。另有一个作业检查文档链接和版本号。
+每次推送和 PR，先由一个分流作业（`scripts/ci/select-checks.mjs`）按改动的文件挑出要跑的检查。每个平台都是：lockfile 检查、`npm ci`、`npm run build`、四条 Rust 命令，依赖编译结果按 main 上的缓存复用。Windows 另外跑体积预算、`i18n:check`、`npm test`、`test:functions` 和 `icons:verify`。Microsoft Store 渠道测试、Flatpak 清单检查和无头 Docker 镜像各自是单独的作业，和三个平台的验证并行跑。另有一个作业检查文档链接、版本号和新提交的隐私问题。
 
-安装包（NSIS + MSI、macOS app 与 dmg、Flatpak、deb、rpm、AppImage）只在打 `v*` 标签和手动触发时构建。`v*` 标签还会创建 GitHub Release，见[发版](../releases/README.md)。
+安装包（NSIS + MSI、macOS app 与 dmg、Flatpak、deb、rpm、AppImage）在打 `v*` 标签、手动触发，以及推 main 时改到了打包相关文件（`Cargo.toml` / `Cargo.lock`、tauri 配置、`rust-toolchain.toml`、`package.json`、`packaging/`、`scripts/release/`、`scripts/ci/`、工作流）时构建，和验证并行跑。只有 `v*` 标签会创建 GitHub Release，而且要等全部验证和打包都通过，见[发版](../releases/README.md)。
+
+发版的顺序：`npm run preflight` → 推 main → 等 main 的 CI 绿（改了打包相关文件时，这一步已经把三平台安装包实际打过一遍）→ 打 `v*` 标签。
 
 ## 打安装包
 

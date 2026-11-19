@@ -1,0 +1,7 @@
+# CI 和本机用同一版 Rust。跟着「最新 stable」走时，新版 Rust 一发布，
+# 构建行为就可能在发版当天变掉，而本机还是旧版，复现不了。
+# 升级时只改这一行，推 main 会顺带跑一遍三平台打包。
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

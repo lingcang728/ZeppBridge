@@ -68,9 +68,9 @@
 
 ## 怎么发
 
-1. 版本号统一（`node scripts/release/check-version-consistency.mjs <版本>`），切 `updateNotice.ts` 的 `BUNDLED_VERSION` 和 glob，所有语言的更新说明和信齐全（`check-letter.mjs` 过），本地门禁全绿。
+1. 版本号统一（`node scripts/release/check-version-consistency.mjs <版本>`），切 `updateNotice.ts` 的 `BUNDLED_VERSION` 和 glob，所有语言的更新说明和信齐全（`check-letter.mjs` 过），`npm run preflight` 全绿。
 2. `npm run package:release` 打本地 Windows 包自测（只出 NSIS 安装包和便携 exe）。
-3. 提交、`git push origin main`，等 main 的 CI 绿。
+3. 提交、`git push origin main`，等 main 的 CI 绿。改到打包相关文件（依赖、tauri 配置、`rust-toolchain.toml`、`packaging/`、发版脚本、工作流）时，这一次 CI 会顺带把三平台安装包实际打一遍，打包有问题在这里就暴露，不必等到打标签。
 4. 打附注标签并推送。CI 随即构建 Windows（NSIS、MSI、便携 zip）、macOS（Apple Silicon dmg）、Linux（deb、rpm、AppImage）和 Flatpak，外加 CLI / MCP 工具包、`SHA256SUMS.txt` 和构建来源证明，创建 GitHub Release 并签 `latest.json`，已装用户随即收到更新：
 
    ```bash

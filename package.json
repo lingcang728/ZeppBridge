@@ -35,6 +35,8 @@
     "i18n:check": "node scripts/release/check-i18n.mjs",
     "letter:check": "node scripts/release/check-letter.mjs",
     "lockfile:check": "node scripts/release/check-lockfile-registry.mjs",
+    "preflight": "pwsh -NoProfile -File scripts/release/preflight.ps1",
+    "preflight:quick": "pwsh -NoProfile -File scripts/release/preflight.ps1 -SkipRust",
     "feedback:triage": "node scripts/feedback/triage.mjs",
     "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py",
     "postinstall": "node scripts/dev/patch-vue-external-styles.mjs",

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { isOrdinaryDocumentation, selectChecks } from '../scripts/ci/select-checks.mjs';
+import { isOrdinaryDocumentation, isPackagingInput, selectChecks } from '../scripts/ci/select-checks.mjs';
 
 test('only ordinary prose and documentation images qualify for the fast path', () => {
   for (const path of [
@@ -29,6 +29,24 @@ test('tags, manual runs, unknown events and incomplete ranges always run full CI
     { eventName: 'push', event: { before: '0'.repeat(40), after: 'a'.repeat(40) } },
     { eventName: 'pull_request', event: {} },
   ]) assert.equal(selectChecks(input).full, true);
+  assert.equal(selectChecks({ eventName: 'push', ref: 'refs/tags/v3.0.1', event: {} }).package, true);
+  assert.equal(selectChecks({ eventName: 'workflow_dispatch', event: {} }).package, true);
+  assert.equal(selectChecks({ eventName: 'pull_request', event: {} }).package, false);
+});
+
+test('packaging inputs cover build configuration but not ordinary code or prose', () => {
+  for (const path of [
+    'src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/crates/mcp/Cargo.toml',
+    'src-tauri/tauri.conf.json', 'src-tauri/tauri.sidecar.conf.json', 'src-tauri/build.rs',
+    'rust-toolchain.toml', 'package.json', 'package-lock.json',
+    'packaging/flatpak/com.zeppbridge.app.yml', 'packaging/docker/Dockerfile',
+    'scripts/release/package-tools.ps1', 'scripts/ci/check-flatpak-sources.py',
+    '.github/workflows/ci.yml',
+  ]) assert.equal(isPackagingInput(path), true, path);
+  for (const path of [
+    'src/App.vue', 'src-tauri/src/lib.rs', 'src-tauri/crates/core/src/contract.rs',
+    'packaging/README.md', 'docs/guides/linux.md', 'tests/ci-routing.test.mjs',
+  ]) assert.equal(isPackagingInput(path), false, path);
 });
 
 test('real Git ranges handle PRs, multi-commit pushes, deletes, renames and failures', () => {
@@ -93,7 +111,30 @@ test('real Git ranges handle PRs, multi-commit pushes, deletes, renames and fail
       env: { ...process.env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main',
         GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: outputPath },
     });
-    assert.equal(readFileSync(outputPath, 'utf8'), 'full=false\n');
+    assert.equal(readFileSync(outputPath, 'utf8'), 'full=false\npackage=false\n');
+
+    // Packaging on main follows the packaging inputs; PRs never package.
+    write('src-tauri/Cargo.lock', 'lock\n');
+    const lock = commit('lockfile');
+    const onMain = (before, after) => selectChecks({
+      cwd, eventName: 'push', ref: 'refs/heads/main', event: { before, after },
+    });
+    assert.deepEqual([onMain(deletedCode, lock).full, onMain(deletedCode, lock).package], [true, true]);
+    write('src/other.js', 'export const other = 1;\n');
+    const plainCode = commit('plain code');
+    assert.equal(onMain(lock, plainCode).package, false, 'ordinary code does not package');
+    assert.equal(push(deletedCode, lock).package, false, 'other branches do not package');
+    assert.equal(selectChecks({
+      cwd, eventName: 'pull_request',
+      event: { pull_request: { base: { sha: deletedCode }, head: { sha: lock } } },
+    }).package, false, 'pull requests never package');
+
+    // A force push has no usable `before`; it must run everything, not throw.
+    const forced = selectChecks({
+      cwd, eventName: 'push', ref: 'refs/heads/main',
+      event: { forced: true, before: 'f'.repeat(40), after: plainCode },
+    });
+    assert.deepEqual([forced.full, forced.package], [true, true]);
   } finally {
     // Only remove the temporary repository created by this test.
     assert.equal(dirname(cwd), resolve(tmpdir()));

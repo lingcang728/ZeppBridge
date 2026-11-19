@@ -27,9 +27,15 @@ $manifest = Join-Path $repoRoot 'src-tauri/Cargo.toml'
 $version = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
 if (-not $version) { throw 'package.json 里读不到版本号' }
 
+# 目标就是本机时不传 --target：打包作业里 stage-mcp-sidecar.ps1 已经按本机目标把
+# 这两个 binary 编进 target/release，这里直接复用。传了 --target，cargo 会换到
+# target/<三元组>/release 从头再编一遍（含 LTO），白白多花几分钟。
+$hostTriple = ((& rustc -vV) | Where-Object { $_ -like 'host:*' }) -replace '^host:\s*', ''
+$buildTarget = if ($Target -and $Target -ne $hostTriple) { $Target } else { '' }
+
 $cargoArgs = @('build', '--release', '--manifest-path', $manifest, '--locked',
                '-p', 'zeppbridge-cli', '-p', 'zeppbridge-mcp')
-if ($Target) { $cargoArgs += @('--target', $Target) }
+if ($buildTarget) { $cargoArgs += @('--target', $buildTarget) }
 
 Write-Host "构建 zeppbridge-cli / zeppbridge-mcp v$version" -ForegroundColor Cyan
 & cargo @cargoArgs
@@ -39,7 +45,7 @@ if ($LASTEXITCODE -ne 0) { throw "cargo build 失败（$LASTEXITCODE）" }
 # 而不是假设它在 src-tauri/target 下。
 $metadata = & cargo metadata --manifest-path $manifest --format-version 1 --no-deps | ConvertFrom-Json
 $targetRoot = $metadata.target_directory
-$profileDir = if ($Target) { Join-Path $targetRoot "$Target/release" } else { Join-Path $targetRoot 'release' }
+$profileDir = if ($buildTarget) { Join-Path $targetRoot "$buildTarget/release" } else { Join-Path $targetRoot 'release' }
 
 $isWindowsHost = $IsWindows -or ($null -eq $IsWindows)
 $exeSuffix = if ($isWindowsHost -and -not $Target) { '.exe' } elseif ($Target -like '*windows*') { '.exe' } else { '' }

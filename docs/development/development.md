@@ -102,22 +102,43 @@ Windows-only code is checked only on Windows, and `cfg(not(windows))` code only
 on Linux and macOS, so a green local run does not cover the other platforms.
 CI runs the same four commands on all three.
 
+The Rust version is pinned in `rust-toolchain.toml` at the repository root, so
+local builds and CI use the same compiler. Upgrading Rust means changing that
+one file; pushing it to main also runs the installer builds on all three
+platforms. Local test runs keep `--jobs 1` so a laptop is not held at full load
+for long; CI does not limit it.
+
+Before pushing, `npm run preflight` runs the checks CI can run on Windows, in
+CI's order: routing and privacy checks, lockfile, frontend gates, Rust gates
+including the Store channel, and the Flatpak sources. `npm run preflight:quick`
+skips Rust and finishes in a few minutes.
+
 Keep Rust tests to the ones that would catch a false success, lost data or
 wrong copy.
 
 ## What CI runs
 
-On every push and pull request a routing job picks the checks from the changed
-files. Per platform they are: lockfile check, `npm ci`,
-`npm run build`, and the four Rust commands. Windows also runs the bundle
-budget, `i18n:check`, `npm test`, `test:functions`, `icons:verify` and the
-Microsoft Store channel tests. Linux also validates the Flatpak metadata and
-builds and smoke-tests the headless Docker image. A separate job checks
-documentation links and version consistency.
+On every push and pull request a routing job (`scripts/ci/select-checks.mjs`)
+picks the checks from the changed files. Per platform they are: lockfile check,
+`npm ci`, `npm run build`, and the four Rust commands, reusing compiled
+dependencies from the main branch cache. Windows also runs the bundle budget,
+`i18n:check`, `npm test`, `test:functions` and `icons:verify`. The Microsoft
+Store channel tests, the Flatpak manifest checks and the headless Docker image
+are separate jobs that run in parallel with the three platform verifications.
+Another job checks documentation links, version consistency and new commits for
+private notes.
 
 Installers (NSIS + MSI, macOS app and dmg, Flatpak, deb, rpm, AppImage) are built
-only for `v*` tags and manual runs. A `v*` tag also creates the GitHub Release;
-see [releases](../releases/README.md).
+for `v*` tags, manual runs, and pushes to main that touch packaging inputs
+(`Cargo.toml` / `Cargo.lock`, Tauri config, `rust-toolchain.toml`,
+`package.json`, `packaging/`, `scripts/release/`, `scripts/ci/`, workflows).
+They run in parallel with verification. Only a `v*` tag creates the GitHub
+Release, and only after every verification and packaging job has passed; see
+[releases](../releases/README.md).
+
+Release order: `npm run preflight` → push main → wait for main's CI to go green
+(when packaging inputs changed, that run has already built the installers on all
+three platforms) → push the `v*` tag.
 
 ## Building installers
 

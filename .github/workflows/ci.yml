@@ -37,6 +37,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       full: ${{ steps.select.outputs.full }}
+      package: ${{ steps.select.outputs.package }}
     steps:
       - name: Checkout comparison history
         uses: actions/checkout@v5
@@ -83,11 +84,20 @@ jobs:
           node-version: 22
           cache: npm
 
+      # 不带参数的 `rustup toolchain install` 装的是仓库根目录 rust-toolchain.toml
+      # 钉住的那一版（带 rustfmt、clippy）。CI 和本机用同一版 Rust。
       - name: Set up Rust
         shell: pwsh
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt,clippy
-          rustup default stable
+          rustup toolchain install
+          rustc --version
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          # 只在 main 上存：tag 和 PR 读得到 main 的缓存，自己存的别人读不到，白占额度。
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # 锁文件里的镜像地址 npm 12 会拒绝；CI 自带的 npm 还装得上，所以要在 npm ci 前单独拦。
       - name: Check lockfile registry
@@ -130,14 +140,52 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked
+
+  # 商店渠道换了一套 feature，要整个重编一遍。单独成一个作业和 Windows 验证并行，
+  # 不再排在它后面拖长最慢的那条路径。
+  verify-store:
+    name: Microsoft Store channel verification
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install
+          rustc --version
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # tauri-build resolves frontendDist (../dist) at compile time.
+      - name: Build frontend
+        run: npm run build
 
       - name: Test Microsoft Store channel
         shell: pwsh
         run: |
           $env:TAURI_CONFIG = Get-Content src-tauri/tauri.store.conf.json -Raw
           $env:ZB_STORE_BUILD = '1'
-          cargo test --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --locked --jobs 1
+          cargo test --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --locked
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Verify Microsoft Store build excludes the GitHub updater
@@ -188,8 +236,14 @@ jobs:
 
       - name: Set up Rust
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt,clippy
-          rustup default stable
+          rustup toolchain install
+          rustc --version
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Tauri 在 Linux 上的构建依赖。libdbus-1-dev 是这个项目额外要的一样：
       # Linux 的凭据存储走 Secret Service，那条路链接 libdbus。
@@ -226,16 +280,31 @@ jobs:
       # Secret Service、环境变量存储和 XDG 回退都有平台 cfg；文件存储
       # 同时在 Linux 和 macOS 上测试。
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked
+
+  # 单独一个作业：其中两步要访问 flathub、launchpad 这些外部站点，它们偶尔
+  # 抽风。放在 Linux 验证里时，一次 503 会把 Linux 验证连同后面的 Linux 打包、
+  # Docker 全部带崩；现在只有 package-flatpak 等它。
+  flatpak-checks:
+    name: Flatpak manifest checks
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
       # 打包清单是会过期的东西：manifest 里的 runtime 版本、desktop 文件的
       # 字段、AppStream 的必填元素，改错了不会让任何构建失败，只会在用户
       # 装的时候变成一个没有名字的条目。
       #
       # 这几步都是秒级的，所以在 PR 上也跑。真正的 Flatpak 构建（十几分钟）
-      # 只在推 main 和打 tag 时跑，见 package-flatpak。
+      # 只在打包时跑，见 package-flatpak。
       - name: Validate the Flatpak metadata
         run: |
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             desktop-file-utils appstream flatpak flatpak-builder
           desktop-file-validate packaging/flatpak/com.zeppbridge.app.desktop
@@ -319,87 +388,7 @@ jobs:
       #
       # 它不构建任何东西。构建成不成立仍然由 package-flatpak 回答。
       - name: Check the tray indicator modules can still be fetched
-        run: |
-          set -euo pipefail
-          manifest=packaging/flatpak/com.zeppbridge.app.yml
-          python3 - "$manifest" <<'PY'
-          import hashlib, subprocess, sys, time, urllib.request, yaml
-
-          manifest = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
-          failed = []
-
-          def fetch_with_retry(url):
-              last_err = None
-              for attempt in range(1, 3):
-                  try:
-                      req = urllib.request.Request(
-                          url, headers={"User-Agent": "ZeppBridge-CI/1.0"}
-                      )
-                      return urllib.request.urlopen(req, timeout=60).read()
-                  except Exception as exc:
-                      last_err = exc
-                      if attempt < 2:
-                          time.sleep(3)
-              raise last_err
-
-          for module in manifest["modules"]:
-              if module["name"] == "zeppbridge":
-                  continue
-              for source in module.get("sources", []):
-                  if source["type"] == "archive":
-                      candidates = [source["url"], *source.get("mirror-urls", [])]
-                      expected = source["sha256"]
-                      ok = False
-                      errors = []
-                      for idx, url in enumerate(candidates):
-                          label = "primary" if idx == 0 else f"mirror#{idx}"
-                          print(f"{module['name']}: fetching ({label}) {url}")
-                          try:
-                              blob = fetch_with_retry(url)
-                          except Exception as exc:
-                              errors.append(f"{label} {url}: {exc}")
-                              continue
-                          got = hashlib.sha256(blob).hexdigest()
-                          if got != expected:
-                              errors.append(
-                                  f"{label} {url}: sha256 {got} != manifest {expected}"
-                              )
-                              continue
-                          if idx > 0:
-                              print(
-                                  f"::warning::{module['name']} 主源不可用，已回退到 {label}（{url}）：{errors[0]}"
-                              )
-                          print(f"  sha256 ok ({len(blob)} bytes)")
-                          ok = True
-                          break
-                      if not ok:
-                          failed.append(
-                              f"{module['name']}: 所有来源均失败（{'; '.join(errors)}）"
-                          )
-                  elif source["type"] == "git":
-                      url, tag, commit = source["url"], source["tag"], source["commit"]
-                      print(f"{module['name']}: git ls-remote {url} tags/{tag}")
-                      out = subprocess.run(
-                          ["git", "ls-remote", url, f"refs/tags/{tag}^{{}}", f"refs/tags/{tag}"],
-                          check=True, capture_output=True, text=True,
-                      ).stdout
-                      # 附注标签有两行：`refs/tags/X` 是标签对象，`refs/tags/X^{}`
-                      # 是它指向的 commit。要比对的是后者。
-                      shas = {line.split("\t")[1]: line.split("\t")[0] for line in out.strip().splitlines()}
-                      resolved = shas.get(f"refs/tags/{tag}^{{}}") or shas.get(f"refs/tags/{tag}")
-                      if resolved != commit:
-                          failed.append(
-                              f"{module['name']}: tag {tag} 现在指向 {resolved}，manifest 钉的是 {commit}"
-                          )
-                      else:
-                          print(f"  commit ok ({commit})")
-
-          if failed:
-              for line in failed:
-                  print(f"::error::{line}")
-              sys.exit(1)
-          print("每个托盘模块的来源都还在，校验值也对得上")
-          PY
+        run: python3 scripts/ci/check-flatpak-sources.py
 
   verify-macos:
     name: macOS verification
@@ -420,8 +409,14 @@ jobs:
 
       - name: Set up Rust
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt,clippy
-          rustup default stable
+          rustup toolchain install
+          rustc --version
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install frontend dependencies
         run: npm ci
@@ -441,15 +436,16 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked
 
   package:
     name: Package Windows installers
     runs-on: windows-latest
     timeout-minutes: 60
-    # Build installers for release tags or explicit manual dispatch only.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: verify
+    # 打 tag、手动触发，或推 main 时改到了打包相关的文件（见 scripts/ci/select-checks.mjs）。
+    # 和验证并行跑；Release 作业等验证和打包全部通过才发。
+    if: needs.changes.outputs.package == 'true'
+    needs: changes
     # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
     # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
     env:
@@ -469,8 +465,8 @@ jobs:
       - name: Set up Rust
         shell: pwsh
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install
+          rustc --version
 
       - name: Install frontend dependencies
         run: npm ci
@@ -583,9 +579,10 @@ jobs:
     name: Package macOS bundle
     runs-on: macos-latest
     timeout-minutes: 60
-    # Build installers for release tags or explicit manual dispatch only.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: verify-macos
+    # 打 tag、手动触发，或推 main 时改到了打包相关的文件（见 scripts/ci/select-checks.mjs）。
+    # 和验证并行跑；Release 作业等验证和打包全部通过才发。
+    if: needs.changes.outputs.package == 'true'
+    needs: changes
     # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
     # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
     env:
@@ -604,8 +601,8 @@ jobs:
 
       - name: Set up Rust
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install
+          rustc --version
 
       - name: Install frontend dependencies
         run: npm ci
@@ -664,9 +661,10 @@ jobs:
     name: Package Linux bundles
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Build installers for release tags or explicit manual dispatch only.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: verify-linux
+    # 打 tag、手动触发，或推 main 时改到了打包相关的文件（见 scripts/ci/select-checks.mjs）。
+    # 和验证并行跑；Release 作业等验证和打包全部通过才发。
+    if: needs.changes.outputs.package == 'true'
+    needs: changes
     # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
     # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
     env:
@@ -685,8 +683,8 @@ jobs:
 
       - name: Set up Rust
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install
+          rustc --version
 
       - name: Install Linux build dependencies
         run: |
@@ -899,8 +897,8 @@ jobs:
     name: Package Flatpak bundle
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: verify-linux
+    if: needs.changes.outputs.package == 'true'
+    needs: [changes, flatpak-checks]
 
     steps:
       - name: Checkout
@@ -937,7 +935,8 @@ jobs:
     # 这个作业在 PR 上也跑。它是唯一一处会在 Linux 上真的把 CLI 和 MCP
     # 编译出来并运行一次的地方，而 Dockerfile 本身也是会坏的东西——
     # 一次 COPY 写漏了，只有构建镜像时才看得出来。
-    needs: verify-linux
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
 
     steps:
       - name: Checkout
@@ -976,9 +975,10 @@ jobs:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only on release tags (v*), and only once both platforms packaged.
+    # 只在 tag 上发；打包和验证是并行跑的，所以这里要把验证也等上，一道都不能少。
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [package, package-macos, package-linux, package-flatpak]
+    needs: [verify, verify-store, verify-linux, verify-macos, flatpak-checks,
+            package, package-macos, package-linux, package-flatpak]
     permissions:
       contents: write
       # attestation 需要这两项：id-token 用于向 Sigstore 取短期证书，

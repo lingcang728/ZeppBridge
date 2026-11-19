@@ -91,6 +91,7 @@ test('CI range comes from the GitHub event', () => {
   const b = 'b'.repeat(40);
   assert.equal(rangeFromEvent('push', { ref: 'refs/heads/main', before: a, after: b }), `${a}..${b}`);
   assert.equal(rangeFromEvent('push', { ref: 'refs/heads/new', before: '0'.repeat(40), after: b }), `${b}^!`);
+  assert.equal(rangeFromEvent('push', { ref: 'refs/heads/main', forced: true, before: a, after: b }), `${b}^!`);
   assert.equal(rangeFromEvent('push', { ref: 'refs/tags/v3.2.0', before: a, after: b }), null);
   assert.equal(rangeFromEvent('pull_request', { pull_request: { base: { sha: a }, head: { sha: b } } }), `${a}..${b}`);
   assert.equal(rangeFromEvent('workflow_dispatch', {}), null);

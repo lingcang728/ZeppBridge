@@ -95,6 +95,8 @@ export function rangeFromEvent(eventName, event) {
   }
   if (eventName === 'push') {
     if (event.ref?.startsWith('refs/tags/')) return null;
+    // 强推（比如清理历史）后 before 已经不在历史里，只查推上来的最新一条。
+    if (event.forced && ok(event.after)) return `${event.after}^!`;
     if (ok(event.before) && ok(event.after)) return `${event.before}..${event.after}`;
     if (ok(event.after)) return `${event.after}^!`; // 新分支：只查最新一条
   }
