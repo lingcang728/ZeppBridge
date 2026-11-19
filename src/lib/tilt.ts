@@ -18,7 +18,8 @@ import { lessMotion } from './motion/lessMotion';
  * 的卡（card-enter 的 translate），不作废的话高光一直偏一截。
  *
  * 倾角随卡片宽度收小：整行宽的大卡只斜一度左右，不会像一块翘起来的板。
- * 没有悬停能力的设备、开了减少动效时不启用。每帧最多算一次。
+ * 没有悬停能力的设备不启用。减少动效 / 低特效在指针进卡那一刻判断（不在挂载时判断）：运行中切档位，
+ * 已经挂上的卡下一次悬停就跟着变，不用重新挂载。高光层第一次真正倾斜时才建。每帧最多算一次。
  */
 type TiltHost = HTMLElement & { __tiltOff?: () => void };
 
@@ -26,11 +27,8 @@ type TiltHost = HTMLElement & { __tiltOff?: () => void };
 export const vTilt: Directive<TiltHost> = {
   mounted(el) {
     const media = window.matchMedia?.bind(window);
-    if (!media || lessMotion() || !media('(hover: hover)').matches) return;
-    const glare = document.createElement('span');
-    glare.className = 'tilt-glare';
-    glare.setAttribute('aria-hidden', 'true');
-    el.appendChild(glare);
+    if (!media || !media('(hover: hover)').matches) return;
+    let glare: HTMLElement | null = null;
 
     let frame = 0;
     let last: PointerEvent | null = null;
@@ -38,7 +36,7 @@ export const vTilt: Directive<TiltHost> = {
     const forget = () => { rect = null; };
     const apply = () => {
       frame = 0;
-      if (!last) return;
+      if (!last || !glare) return;
       rect ??= el.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const px = Math.min(1, Math.max(0, (last.clientX - rect.left) / rect.width));
@@ -46,15 +44,24 @@ export const vTilt: Directive<TiltHost> = {
       // 高光层是以左上角为中心画好的圆，平移到指针处（相对卡片的布局尺寸，不受倾斜影响）。
       glare.style.transform = `translate3d(${(px * el.offsetWidth).toFixed(1)}px, ${(py * el.offsetHeight).toFixed(1)}px, 0)`;
     };
-    const enter = () => {
+    /** 进卡：这一刻该少动就不倾斜，返回 false。 */
+    const enter = (): boolean => {
+      if (lessMotion()) return false;
+      if (!glare) {
+        glare = document.createElement('span');
+        glare.className = 'tilt-glare';
+        glare.setAttribute('aria-hidden', 'true');
+        el.appendChild(glare);
+      }
       rect = null;
       el.classList.add('is-tilting');
       window.addEventListener('scroll', forget, { capture: true, passive: true });
       window.addEventListener('resize', forget, { passive: true });
+      return true;
     };
     const move = (event: PointerEvent) => {
       if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
-      if (!el.classList.contains('is-tilting')) enter();
+      if (!el.classList.contains('is-tilting') && !enter()) return;
       last = event;
       if (!frame) frame = requestAnimationFrame(apply);
     };
@@ -81,7 +88,7 @@ export const vTilt: Directive<TiltHost> = {
       el.removeEventListener('pointerleave', leave);
       el.removeEventListener('animationend', settled);
       el.removeEventListener('transitionend', settled);
-      glare.remove();
+      glare?.remove();
     };
   },
   unmounted(el) {
