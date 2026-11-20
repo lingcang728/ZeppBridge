@@ -299,6 +299,14 @@ mod tests {
         assert!(is_known_key("alpine_skiing"));
     }
 
+    /// T-Rex 3 上选「登山」记下的是 13，以前猜成健走。这类记录的爬升远高于健走
+    /// （6）和徒步（22），和官方通道把 MOUNTAINEERING 归进徒步的做法保持一致。
+    #[test]
+    fn cloud_13_is_mountaineering_not_walking() {
+        assert_eq!(resolve(13), Some("hiking"));
+        assert_eq!(resolve(6), Some("walking"));
+    }
+
     /// #155：按官方对照表的 deviceSource（9568515 是官方表列出的 Balance 2）认出的表上，15 是公开水域游泳。
     #[test]
     fn issue_155_balance_2_by_official_device_source_swims_in_open_water() {
