@@ -268,14 +268,35 @@ test('unknown, malformed or expired states never reach Zepp', async (context) =>
   assert.equal((await get(callback, env, 'callback', `?code=x&state=${state}`)).status, 400);
 });
 
-test('start rejects malformed input and duplicate states', async () => {
+test('start rejects malformed input and states it did not issue', async () => {
   const env = configuredEnv();
   const { state, claimHash } = newPair();
   for (const query of ['', `?state=${state}`, `?state=bad&claim=${claimHash}`, `?state=${state}&claim=XYZ`]) {
-    assert.equal((await get(start, env, 'start', query)).status, 400);
+    const rejected = await get(start, env, 'start', query);
+    assert.equal(rejected.status, 400);
+    assert.match(rejected.headers.get('content-type'), /^text\/html/);
   }
   assert.equal((await get(start, env, 'start', `?state=${state}&claim=${claimHash}`)).status, 200);
-  assert.equal((await get(start, env, 'start', `?state=${state}&claim=${claimHash}`)).status, 400);
+  // 同一个 state 配别的 claim：不是同一次授权，不给授权链接。
+  const other = newPair();
+  const hijack = await get(start, env, 'start', `?state=${state}&claim=${other.claimHash}`);
+  assert.equal(hijack.status, 400);
+  assert.doesNotMatch(await hijack.text(), /class="go"/);
+});
+
+test('reopening the same start link shows the page again until it is used', async () => {
+  const env = configuredEnv();
+  const { state, claimHash } = newPair();
+  const query = `?state=${state}&claim=${claimHash}`;
+  assert.equal((await get(start, env, 'start', query)).status, 200);
+  const again = await get(start, env, 'start', query);
+  assert.equal(again.status, 200);
+  assert.match(await again.text(), /class="go"/);
+  assert.equal(env.OFFICIAL_DB.pending.size, 1);
+
+  const [row] = env.OFFICIAL_DB.pending.values();
+  row.status = 'denied';
+  assert.equal((await get(start, env, 'start', query)).status, 400);
 });
 
 test('refresh adds the secret server-side and reports a dead grant distinctly', async (context) => {
