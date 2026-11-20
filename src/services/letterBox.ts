@@ -9,7 +9,44 @@ import { reactive } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
 import type { LetterBoxView, LetterReplyInput, LetterSendResult, SentLetterReply } from '../types/letters';
 
-export const LETTER_REPLY_MAX = 1000;
+export const LETTER_REPLY_MAX = 5000;
+/** 已经写了几个字（按码点数，和截断规则一致）；信纸底下一直写着「149 / 5000」。 */
+export const replyCharCount = (text: string): number => Array.from(text).length;
+
+/* 空格类：半角空格、制表符、全角空格。 */
+const GAP = '[ \\t\\u3000]';
+/**
+ * 边写边收：寄出去时后端（core letters::sanitize_reply）本来就会把连续空白收成一个、空行最多留一行、
+ * 头尾的空白去掉；这里在信纸上就照样收，免得光按回车、空格能空出一大片，寄出去又和看到的不一样。
+ * - 开头不能是空行或空格；
+ * - 连着的空格收成一个；
+ * - 段落之间最多空一行（连按回车只留一个空行）。
+ * 只收、不截断，截断仍按 LETTER_REPLY_MAX。
+ */
+export function tidyReplyInput(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .replace(new RegExp(`^(?:${GAP}|\\n)+`), '')
+    .replace(new RegExp(`${GAP}{2,}`, 'g'), ' ')
+    .replace(new RegExp(`\\n${GAP}*\\n(?:${GAP}*\\n)+`, 'g'), '\n\n');
+}
+
+/**
+ * 信纸 textarea 的 input：收紧、截断，并把光标放回它在收紧后的位置（直接改 value 光标会跳到末尾）。
+ * 返回要写回草稿的文字。
+ */
+export function tidyTextarea(el: HTMLTextAreaElement): string {
+  const raw = el.value;
+  const caret = el.selectionStart ?? raw.length;
+  const next = Array.from(tidyReplyInput(raw)).slice(0, LETTER_REPLY_MAX).join('');
+  if (next !== raw) {
+    const before = Array.from(tidyReplyInput(raw.slice(0, caret))).join('');
+    const at = Math.min(before.length, next.length);
+    el.value = next;
+    el.setSelectionRange(at, at);
+  }
+  return next;
+}
 const DRAFT_KEY = (version: string) => `zeppbridge.letters.draft.${version}`;
 /* 已读 / 未读不给用户看（2026-10-29 用户：把已读未读相关的都关掉）：回执只说处理结果，入口也不再亮未读的点。 */
 export const letterBox = reactive<{ view: LetterBoxView; loaded: boolean }>({

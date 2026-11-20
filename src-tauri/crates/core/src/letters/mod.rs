@@ -8,6 +8,8 @@
 //! - `outbox`：没寄出去的（离线、服务端忙、限流），下次联网时补寄。
 //! - `sent`：寄出去的，连原文一起留在本机，信匣里能重读自己写过什么。
 //! - `receipts`：上一次从云端取回的回执（已读 / 归类 / 哪版修），离线时照样显示。
+//! - `attachment_outbox`：回信已经寄到、附图还没传上去的。图文件在 `data/letters/attachments/`，
+//!   传上去（或服务端明确不收）就删掉本机这份。
 
 use crate::redact::{looks_like_secret, sanitize_local_paths};
 use crate::unique_suffix;
@@ -18,13 +20,19 @@ use std::path::{Path, PathBuf};
 mod tests;
 
 /// 回信上限。和 functions/api/letters/[action].js 的 `REPLY_MAX_CHARS` 一致。
-pub const LETTER_REPLY_MAX_CHARS: usize = 1000;
+pub const LETTER_REPLY_MAX_CHARS: usize = 5000;
 /// 「我也遇到」一次最多带几条。和服务端 `MAX_ALSO_HIT` 一致。
 pub const LETTER_ALSO_HIT_MAX: usize = 20;
 /// 待寄出最多攒多少封。再多说明一直寄不出去，老的先丢（界面会说）。
 pub const LETTER_OUTBOX_MAX: usize = 20;
 /// 本机保留的已寄出回信条数。
 pub const LETTER_SENT_MAX: usize = 200;
+/// 一封回信最多附几张图。和服务端 `ATTACHMENTS_PER_REPLY` 一致。
+pub const LETTER_ATTACHMENTS_MAX: usize = 3;
+/// 一张附图的上限（界面压缩后的字节数）。和服务端 `ATTACHMENT_MAX_BYTES` 一致。
+pub const LETTER_ATTACHMENT_MAX_BYTES: usize = 1024 * 1024;
+/// 一张附图最多试传几次。服务端没开图片存储时会一直说「稍后再试」，不能无限攒着。
+pub const LETTER_ATTACHMENT_MAX_ATTEMPTS: u32 = 20;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PendingReply {
@@ -39,6 +47,18 @@ pub struct PendingReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report_id: Option<String>,
     pub queued_at: String,
+    #[serde(default)]
+    pub attempts: u32,
+    /// 附图在 `attachments_dir` 里的文件名，按用户添加的顺序。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<String>,
+}
+
+/// 回信寄到了、附图还没传上去的一张。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PendingAttachment {
+    pub reply_id: String,
+    pub file: String,
     #[serde(default)]
     pub attempts: u32,
 }
@@ -89,10 +109,59 @@ pub struct LetterBoxState {
     pub receipts: Vec<LetterReceipt>,
     #[serde(default)]
     pub receipts_checked_at: Option<String>,
+    #[serde(default)]
+    pub attachment_outbox: Vec<PendingAttachment>,
 }
 
 pub fn state_path(data_dir: &Path) -> PathBuf {
     data_dir.join("letters").join("state.json")
+}
+
+pub fn attachments_dir(data_dir: &Path) -> PathBuf {
+    data_dir.join("letters").join("attachments")
+}
+
+/// 看文件头认图片（JPEG / PNG），返回 content-type。和服务端 `sniffImage` 一致。
+pub fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
+    const PNG: [u8; 8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(&PNG) {
+        Some("image/png")
+    } else {
+        None
+    }
+}
+
+/// 界面交来的附图（base64）：解得开、是 JPEG / PNG、不超过上限才收，返回字节和 content-type。
+pub fn decode_attachment(encoded: &str) -> Option<(Vec<u8>, &'static str)> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded.trim())
+        .ok()?;
+    let content_type = sniff_image(&bytes)?;
+    (bytes.len() <= LETTER_ATTACHMENT_MAX_BYTES).then_some((bytes, content_type))
+}
+
+/// 附图的本机文件名：`<回信本机编号>-<序号>.jpg|png`。
+pub fn attachment_file_name(local_id: &str, index: usize, content_type: &str) -> String {
+    let ext = if content_type == "image/png" {
+        "png"
+    } else {
+        "jpg"
+    };
+    format!("{local_id}-{index}.{ext}")
+}
+
+/// 状态文件里记的附图名只能是 `attachment_file_name` 造出来的那种：不带路径分隔，不会读到目录外面。
+pub fn is_attachment_file_name(name: &str) -> bool {
+    (5..=96).contains(&name.len())
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.')
+        && !name.starts_with('.')
+        && !name.contains("..")
+        && (name.ends_with(".jpg") || name.ends_with(".png"))
 }
 
 impl LetterBoxState {
@@ -155,6 +224,19 @@ impl LetterBoxState {
     pub fn mark_sent(&mut self, pending: &PendingReply, reply_id: String, sent_at: String) {
         self.outbox
             .retain(|queued| queued.local_id != pending.local_id);
+        for file in &pending.attachments {
+            if !self
+                .attachment_outbox
+                .iter()
+                .any(|queued| &queued.file == file)
+            {
+                self.attachment_outbox.push(PendingAttachment {
+                    reply_id: reply_id.clone(),
+                    file: file.clone(),
+                    attempts: 0,
+                });
+            }
+        }
         if !self.sent.iter().any(|sent| sent.reply_id == reply_id) {
             self.sent.insert(
                 0,

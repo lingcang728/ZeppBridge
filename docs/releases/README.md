@@ -13,7 +13,7 @@
 
 ### 读回信、写「上期回音」
 
-用户在信封最后一张信纸上回信（应用里只有一个文字框，上限 1000 字），存在 D1 的 `letter_replies` 表。工具是 `scripts/letters/replies.mjs`（需要本机 wrangler 已登录，每个命令都可以加 `--dry-run` 只看 SQL）：
+用户在信封最后一张信纸上回信（应用里一个文字框，上限 5000 字，最多附 3 张截图），存在 D1 的 `letter_replies` 表。工具是 `scripts/letters/replies.mjs`（需要本机 wrangler 已登录，每个命令都可以加 `--dry-run` 只看 SQL）：
 
 1. `export [--out <文件夹>]`：把没处理完的回信导成 Markdown 和 JSON，按关键词粗分类，附「我也遇到」计票。**导出目录必须在仓库外**，回信原文绝不进仓库。
 2. `mark <id...> --category <#id> --status next|later|asking|fixed|declined [--fixed-in x.y.z]`：给回信定性。用户的信匣回执显示的就是这几项（已读 · 归入「补拉卡住」· 3.1.1 修）。`fixed` / `declined` 算处理完。

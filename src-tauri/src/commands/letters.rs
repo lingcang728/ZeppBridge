@@ -8,12 +8,15 @@ use std::path::Path;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use zeppbridge_core::letters::{
+    attachment_file_name, attachments_dir, decode_attachment, is_attachment_file_name,
     is_letter_version, is_report_id, normalize_also_hit, normalize_locale, random_install_bytes,
-    sanitize_reply, LetterBoxState, LetterReceipt, PendingReply, SentReply,
+    sanitize_reply, sniff_image, LetterBoxState, LetterReceipt, PendingAttachment, PendingReply,
+    SentReply, LETTER_ATTACHMENTS_MAX, LETTER_ATTACHMENT_MAX_ATTEMPTS, LETTER_ATTACHMENT_MAX_BYTES,
 };
 
 const REPLY_ENDPOINT: &str = "https://zeppbridge.com/api/letters/reply";
 const RECEIPTS_ENDPOINT: &str = "https://zeppbridge.com/api/letters/receipts";
+const ATTACHMENT_ENDPOINT: &str = "https://zeppbridge.com/api/letters/attachment";
 
 /// 状态文件一次只让一个命令读改写（寄信、补寄、取回执可能前后脚到）。
 static LETTERS_LOCK: Mutex<()> = Mutex::const_new(());
@@ -66,10 +69,19 @@ enum Delivery {
 }
 
 fn client() -> Result<reqwest::Client, AppError> {
+    client_with_timeout(Duration::from_secs(12))
+}
+
+/// 传图慢网络上要久一点：1 MB 在几百 kbps 的上行上要好几十秒。
+fn attachment_client() -> Result<reqwest::Client, AppError> {
+    client_with_timeout(Duration::from_secs(90))
+}
+
+fn client_with_timeout(timeout: Duration) -> Result<reqwest::Client, AppError> {
     // 和诊断报告一样：独立的客户端，没有 cookie，不带任何账号凭据。
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(12))
+        .timeout(timeout)
         .user_agent(format!("ZeppBridge/{} letters", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|_| AppError::new("err.letters.client_init_failed", "无法初始化寄信连接"))
@@ -122,16 +134,149 @@ async fn post_reply(
 }
 
 fn save(state: &LetterBoxState, data_dir: &Path) -> Result<(), AppError> {
-    state.save(data_dir).map_err(|_| {
+    state.save(data_dir).map_err(|_| save_error())
+}
+
+/// 把一张附图传给已经寄到的回信。
+async fn upload_attachment(
+    client: &reqwest::Client,
+    install_id: &str,
+    data_dir: &Path,
+    item: &PendingAttachment,
+) -> Delivery {
+    if !is_attachment_file_name(&item.file) || !is_report_id(&item.reply_id) {
+        return Delivery::Rejected(0);
+    }
+    let Ok(bytes) = std::fs::read(attachments_dir(data_dir).join(&item.file)) else {
+        return Delivery::Rejected(0);
+    };
+    let Some(content_type) =
+        sniff_image(&bytes).filter(|_| bytes.len() <= LETTER_ATTACHMENT_MAX_BYTES)
+    else {
+        return Delivery::Rejected(0);
+    };
+    let Ok(response) = client
+        .post(format!("{ATTACHMENT_ENDPOINT}?reply={}", item.reply_id))
+        .header("content-type", content_type)
+        .header("x-zeppbridge-install-id", install_id)
+        .body(bytes)
+        .send()
+        .await
+    else {
+        return Delivery::Retry;
+    };
+    let status = response.status();
+    if status.is_success() {
+        return Delivery::Sent(item.file.clone());
+    }
+    if status.as_u16() == 429 || status.is_server_error() {
+        return Delivery::Retry;
+    }
+    // 服务端还没有附图接口（应用先于站点更新，旧版回 404 not_found / 405）：图留在本机，下次再传，
+    // 不当成「不收」删掉。真正的「这封回信不是你的 / 不存在」是 404 unknown_reply，照旧删。
+    if matches!(status.as_u16(), 404 | 405) {
+        let body = response.text().await.unwrap_or_default();
+        if !body.contains("unknown_reply") {
+            return Delivery::Retry;
+        }
+    }
+    Delivery::Rejected(status.as_u16())
+}
+
+fn remove_attachment_file(data_dir: &Path, file: &str) {
+    if is_attachment_file_name(file) {
+        let _ = std::fs::remove_file(attachments_dir(data_dir).join(file));
+    }
+}
+
+/// 传附图。传到了、或服务端明确不收（回信太旧、图不对）都删掉本机这份；连不上就停下，下次再传。
+async fn flush_attachments(state: &mut LetterBoxState, data_dir: &Path) {
+    let Some(install_id) = state.install_id.clone() else {
+        return;
+    };
+    if state.attachment_outbox.is_empty() {
+        return;
+    }
+    let Ok(client) = attachment_client() else {
+        return;
+    };
+    for item in state.attachment_outbox.clone() {
+        let delivery = upload_attachment(&client, &install_id, data_dir, &item).await;
+        let retry = matches!(delivery, Delivery::Retry);
+        if !retry || item.attempts + 1 >= LETTER_ATTACHMENT_MAX_ATTEMPTS {
+            state
+                .attachment_outbox
+                .retain(|queued| queued.file != item.file);
+            remove_attachment_file(data_dir, &item.file);
+        } else if let Some(queued) = state
+            .attachment_outbox
+            .iter_mut()
+            .find(|queued| queued.file == item.file)
+        {
+            queued.attempts += 1;
+        }
+        if retry {
+            break;
+        }
+    }
+}
+
+/// 界面压好的图（base64）存进本机，返回文件名。不是 JPEG / PNG、太大、太多都不收。
+fn store_attachments(
+    data_dir: &Path,
+    local_id: &str,
+    encoded: &[String],
+) -> Result<Vec<String>, AppError> {
+    let invalid = || {
         AppError::new(
-            "err.letters.save_failed",
-            "回信没能存到本机，请检查磁盘空间后重试",
+            "err.letters.attachment_invalid",
+            "附图打不开或太大，没有寄出",
         )
-    })
+    };
+    if encoded.len() > LETTER_ATTACHMENTS_MAX {
+        return Err(invalid());
+    }
+    let mut decoded = Vec::with_capacity(encoded.len());
+    for item in encoded {
+        decoded.push(decode_attachment(item).ok_or_else(invalid)?);
+    }
+    let dir = attachments_dir(data_dir);
+    if !decoded.is_empty() {
+        std::fs::create_dir_all(&dir).map_err(|_| save_error())?;
+    }
+    let mut files = Vec::with_capacity(decoded.len());
+    for (index, (bytes, content_type)) in decoded.into_iter().enumerate() {
+        let file = attachment_file_name(local_id, index, content_type);
+        std::fs::write(dir.join(&file), bytes).map_err(|_| save_error())?;
+        files.push(file);
+    }
+    Ok(files)
+}
+
+fn save_error() -> AppError {
+    AppError::new(
+        "err.letters.save_failed",
+        "回信没能存到本机，请检查磁盘空间后重试",
+    )
+}
+
+/// 寄待寄出的回信，再传已寄到的回信的附图。
+async fn flush(
+    state: &mut LetterBoxState,
+    client: &reqwest::Client,
+    data_dir: &Path,
+) -> Option<u16> {
+    let rejected = flush_replies(state, client, data_dir).await;
+    flush_attachments(state, data_dir).await;
+    rejected
 }
 
 /// 把待寄出的一封封寄出去。寄不出就停下（多半是没网），剩下的下次再说。
-async fn flush(state: &mut LetterBoxState, client: &reqwest::Client) -> Option<u16> {
+async fn flush_replies(
+    state: &mut LetterBoxState,
+    client: &reqwest::Client,
+    data_dir: &Path,
+) -> Option<u16> {
     let install_id = state.install_id.clone()?;
     let mut rejected = None;
     for pending in state.outbox.clone() {
@@ -153,6 +298,9 @@ async fn flush(state: &mut LetterBoxState, client: &reqwest::Client) -> Option<u
                 state
                     .outbox
                     .retain(|queued| queued.local_id != pending.local_id);
+                for file in &pending.attachments {
+                    remove_attachment_file(data_dir, file);
+                }
                 rejected = Some(status);
             }
         }
@@ -179,6 +327,7 @@ pub async fn letters_send_reply(
     allow_quote: bool,
     also_hit: Vec<String>,
     report_id: Option<String>,
+    attachments: Option<Vec<String>>,
 ) -> std::result::Result<LetterSendResult, AppError> {
     // 只收 /api/feedback 发的那种编号（小写 UUID），别的一律不带，免得把奇怪的东西寄出去。
     let report_id = report_id.filter(|id| is_report_id(id));
@@ -200,6 +349,8 @@ pub async fn letters_send_reply(
         return Err(AppError::new("err.letters.empty", "回信是空的，写几句再寄"));
     }
     let _guard = LETTERS_LOCK.lock().await;
+    let attachments =
+        store_attachments(&state.data_dir, &local_id, &attachments.unwrap_or_default())?;
     let mut letters = LetterBoxState::load(&state.data_dir);
     letters.ensure_install_id(random_install_bytes());
     letters.queue(PendingReply {
@@ -213,10 +364,11 @@ pub async fn letters_send_reply(
         report_id,
         queued_at: chrono::Utc::now().to_rfc3339(),
         attempts: 0,
+        attachments,
     });
     // 先落盘再联网：寄信途中退出应用，这封信也还在待寄出里。
     save(&letters, &state.data_dir)?;
-    let rejected = flush(&mut letters, &client()?).await;
+    let rejected = flush(&mut letters, &client()?, &state.data_dir).await;
     save(&letters, &state.data_dir)?;
     if let Some(status) = rejected {
         return Err(AppError::new(
@@ -244,8 +396,8 @@ pub async fn letters_sync(
         return Ok(LetterBoxView::from(&letters));
     };
     let client = client()?;
-    if !letters.outbox.is_empty() {
-        let _ = flush(&mut letters, &client).await;
+    if !letters.outbox.is_empty() || !letters.attachment_outbox.is_empty() {
+        let _ = flush(&mut letters, &client, &state.data_dir).await;
     }
     if !letters.sent.is_empty() {
         let request = serde_json::json!({ "format": "zeppbridge.letter-receipts.v1", "installId": install_id });

@@ -999,6 +999,8 @@ export default {
     writeAuthorSub: 'Masz problem, nowy pomysł albo chcesz po prostu się przywitać? Czytam i odpowiadam na każdy list',
     authorPlaceholder: 'Niezależnie od tego, czy chodzi o drobiazg w aplikacji, wymarzoną funkcję, czy po prostu kilka słów na przywitanie — napisz tutaj. Odpowiem, gdy tylko otrzymam wiadomość.',
     attachReport: 'Dołącz zanonimizowany raport diagnostyczny',
+    reportShort: 'Diagnostyka',
+    removeReport: 'Usuń raport diagnostyczny',
     attachHint: 'Tylko wersja aplikacji, struktura pól i nierozpoznane numery modeli — bez konta, danych zdrowotnych i lokalizacji',
     reportFailedPlain: 'Nie udało się przesłać raportu diagnostycznego, został odłączony. Kliknij ponownie „Wyślij”, aby wysłać sam list.',
   },
@@ -1803,7 +1805,6 @@ export default {
     grid: 'Siatka 2×2',
     oneOverThree: 'Jedna nad trzema',
     bigLeft: 'Duża po lewej',
-    expose: 'Wszystkie karty',
     exposeExit: 'Wróć na scenę',
     reset: 'Resetuj układ',
     hiddenCount: (count: number) =>

@@ -2270,7 +2270,6 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       grid: 'Grelha de quatro',
       oneOverThree: 'Um sobre três',
       bigLeft: 'Grande à esquerda',
-      expose: 'Todos os cartões',
       exposeExit: 'Voltar à vista principal',
       reset: 'Repor disposição',
       hiddenCount: (count: number) =>
@@ -4108,6 +4107,8 @@ Regras:
       writeAuthorSub: 'Se encontrares algum problema, tiveres uma ideia ou quiseres apenas dizer olá, leio e respondo a todas as cartas',
       authorPlaceholder: 'Seja um pequeno detalhe na aplicação, uma funcionalidade que gostarias de ver ou apenas duas palavras para conversar, escreve aqui. Assim que receber, respondo-te.',
       attachReport: 'Anexar relatório de diagnóstico anonimizado',
+      reportShort: 'Diagnóstico',
+      removeReport: 'Remover o relatório de diagnóstico',
       attachHint: 'Apenas versão da aplicação, estrutura de campos e modelos não reconhecidos — sem conta, dados de saúde ou localização',
       reportFailedPlain: 'Não foi possível enviar o relatório de diagnóstico e o anexo foi retirado. Clica novamente em «Enviar» para enviares apenas a carta.',
     },

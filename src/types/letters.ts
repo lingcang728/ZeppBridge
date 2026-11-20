@@ -10,6 +10,8 @@ export interface PendingLetterReply {
   also_hit: string[];
   queued_at: string;
   attempts: number;
+  /** 附图在本机的文件名（寄到之前）。旧状态文件没有这个键。 */
+  attachments?: string[];
 }
 
 export interface SentLetterReply {
@@ -62,6 +64,8 @@ export interface LetterReplyInput {
   alsoHit: string[];
   /** 写给作者的信附上的脱敏诊断报告编号（submitDiagnosticReport 返回的）。没附就不给。 */
   reportId?: string;
+  /** 附图：界面压缩好的 JPEG（base64，不带 data: 前缀），最多 3 张。没有就不给。 */
+  attachments?: string[];
 }
 
 /* 信匣里的数据来信（批次 7）：每周数据来信、时间胶囊、那年今天。 */

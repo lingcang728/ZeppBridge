@@ -16,6 +16,8 @@
  * 点「知道了」：信纸从这颗按钮往左上角化成灰飞走（lib/motion/ashDissolve.ts）。
  * 半路关掉（Esc、点背后，还没读到最后一页也一样）：从哪里来回哪里去——信纸先原路收回信封（拆信那一段倒着放），
  * 收到一半整只信封就沿飞出来的那条路飞回按钮（ModalDialog → lib/motion/dialogFlight.ts）。
+ * 更新后第一次弹出的那封（mustFinish）不能半路关：Esc、点背后都不理，只有翻到最后一页点「知道了」才收起——
+ * 像签合同要先拉到底才能点「我已阅读」。信匣里重读、你的信照旧可以随时关。
  * 减少动态效果 / 低特效：不放封盖和展开，火漆一点就开，翻页交叉淡入，「知道了」直接收起。重读（opened）时直接是信纸。
  */
 import './paper.css';
@@ -48,7 +50,9 @@ const props = withDefaults(defineProps<{
   origin?: HTMLElement | null;
   /** 「你的信」里的信：同一只信封、同一套拆信，纸上画什么由 #sheet 插槽给。 */
   custom?: CustomLetter | null;
-}>(), { notes: null, opened: false, origin: null, custom: null });
+  /** 更新后第一次弹出：不许半路关，只能读到最后一页点「知道了」。 */
+  mustFinish?: boolean;
+}>(), { notes: null, opened: false, origin: null, custom: null, mustFinish: false });
 /* closing：一开始收就发（还没放动画），要落盘的事在这时做；done：动画放完。 */
 const emit = defineEmits<{ (event: 'closing'): void; (event: 'done'): void }>();
 const t = useLetterText();
@@ -56,6 +60,7 @@ const t = useLetterText();
 const authored = computed(() => (props.custom ? [] : props.versions));
 const letter = useLetterEnvelope(authored, toRef(props, 'current'), toRef(props, 'notes'));
 const { span, draft, replyState, replyError, send } = letter;
+const { images: replyImages, preparing: imagesPreparing, failed: imagesFailed, add: addImages, remove: removeImage } = letter.images;
 const sheets = computed<Sheet[]>(() => (props.custom
   ? props.custom.sheets.map((sheet) => ({ kind: 'custom' as const, ...sheet })) : letter.sheets.value));
 const loaded = computed(() => Boolean(props.custom) || letter.loaded.value);
@@ -380,7 +385,7 @@ const acknowledge = async (event?: MouseEvent) => {
 </script>
 
 <template>
-  <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="acknowledge()">
+  <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="mustFinish || acknowledge()">
     <h2 id="letter-envelope-title" class="sr-only">{{ custom ? custom.title : t.letterHead(newest) }}</h2>
     <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0 }]">
       <div v-if="phase !== 'reading'" class="envelope-wrap" data-flight-subject>
@@ -433,7 +438,8 @@ const acknowledge = async (event?: MouseEvent) => {
                   </PagedLeaf>
                 </template>
                 <div v-else class="leaf-fixed paper-lines">
-                  <ReplySheet v-model:draft="draft" :state="replyState" :error="replyError" @send="send()" />
+                  <ReplySheet v-model:draft="draft" :state="replyState" :error="replyError" :images="replyImages" :preparing="imagesPreparing" :attach-failed="imagesFailed"
+                    @send="send()" @attach="addImages" @detach="removeImage" />
                 </div>
               </div>
               <footer class="leaf-foot">

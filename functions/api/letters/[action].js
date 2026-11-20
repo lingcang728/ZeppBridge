@@ -5,6 +5,7 @@
  *   POST /api/letters/reply     寄一封回信（可以只按「我也遇到」，不写字）
  *                               写给作者的信可以附一份脱敏诊断报告的编号 `reportId`（/api/feedback 返回的那个，
  *                               migrations/0010_letter_report_id.sql）；作者读信时据此找到那份报告
+ *   POST /api/letters/attachment?reply=<编号>  给自己刚寄出的回信补一张截图（存私有 R2，见下面 attachment()）
  *   POST /api/letters/receipts  按本机随机 install id 取回自己回信的状态（已读 / 归类 / 哪版修），
  *                               以及作者对这封信的一对一回复（migrations/0009_letter_author_reply.sql）
  *
@@ -12,9 +13,10 @@
  * 回执不返回用户写的原文；作者的回复会返回——拿到别人的 install id 读不到他写了什么，
  * 但能读到作者回他的话，所以作者回复里不写对方的个人信息。
  */
-const MAX_BODY_BYTES = 16 * 1024;
+/** 5000 个字最坏按 4 字节一个、再加 JSON 转义和其他字段，48 KB 够用。 */
+const MAX_BODY_BYTES = 48 * 1024;
 /** 和客户端 LETTER_REPLY_MAX_CHARS 一致。 */
-export const REPLY_MAX_CHARS = 1000;
+export const REPLY_MAX_CHARS = 5000;
 const MAX_ALSO_HIT = 20;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 12;
@@ -161,8 +163,102 @@ async function receipts(context, body) {
   }
 }
 
+/*
+ * POST /api/letters/attachment?reply=<回信编号>   给刚寄出的回信补一张截图（migrations/0011_letter_attachments.sql）
+ *   头：content-type = image/jpeg | image/png，x-zeppbridge-install-id = 寄这封信的那个 install id
+ *   体：图片原始字节。客户端已经重新编码过（去掉 EXIF / 定位），这里只认文件头、限大小。
+ * 只给寄出 7 天内的回信补图。图存在私有 R2 桶里，只有作者能取；30 天后连同记录一起删。
+ */
+export const ATTACHMENT_MAX_BYTES = 1024 * 1024;
+export const ATTACHMENTS_PER_REPLY = 3;
+const ATTACHMENT_REPLY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const REPLY_ID = REPORT_ID;
+const IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png' };
+
+/** 看文件头认图片，不信 content-type 一面之词。 */
+export const sniffImage = (bytes) => {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length >= png.length && png.every((value, index) => bytes[index] === value)) return 'image/png';
+  return null;
+};
+
+const sha256Bytes = async (bytes) => {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+/** 顺手删掉过了保留期的附图（每次最多 20 张）。删不掉不影响这次上传。 */
+const pruneAttachments = async (db, bucket, now) => {
+  try {
+    const before = new Date(now.getTime() - ATTACHMENT_RETENTION_MS).toISOString();
+    const { results } = await db.prepare('SELECT id, object_key FROM letter_attachments WHERE received_at < ? LIMIT 20').bind(before).all();
+    for (const row of results ?? []) {
+      await bucket.delete(row.object_key);
+      await db.prepare('DELETE FROM letter_attachments WHERE id = ?').bind(row.id).run();
+    }
+  } catch { /* 下次再删 */ }
+};
+
+async function attachment(context) {
+  const { request, env } = context;
+  const bucket = env.LETTER_ATTACHMENTS;
+  const db = env.FEEDBACK_DB;
+  if (!bucket) return response({ ok: false, error: 'attachments_unavailable' }, 503);
+  const replyId = new URL(request.url).searchParams.get('reply') || '';
+  const installId = request.headers.get('x-zeppbridge-install-id') || '';
+  const declared = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!REPLY_ID.test(replyId) || !INSTALL_ID.test(installId)) return response({ ok: false, error: 'invalid_request' }, 422);
+  if (!IMAGE_TYPES[declared]) return response({ ok: false, error: 'unsupported_media_type' }, 415);
+  if (Number(request.headers.get('content-length') || 0) > ATTACHMENT_MAX_BYTES) return response({ ok: false, error: 'payload_too_large' }, 413);
+  let bytes;
+  try { bytes = new Uint8Array(await request.arrayBuffer()); } catch { return response({ ok: false, error: 'invalid_request' }, 400); }
+  if (bytes.length === 0) return response({ ok: false, error: 'invalid_request' }, 422);
+  if (bytes.length > ATTACHMENT_MAX_BYTES) return response({ ok: false, error: 'payload_too_large' }, 413);
+  if (sniffImage(bytes) !== declared) return response({ ok: false, error: 'unsupported_media_type' }, 415);
+
+  const now = new Date();
+  let owner;
+  try {
+    owner = await db.prepare('SELECT install_hash, received_at FROM letter_replies WHERE id = ?').bind(replyId).first();
+  } catch {
+    return response({ ok: false, error: 'storage_unavailable' }, 503);
+  }
+  // 编号不存在和不是你寄的信说法一样，别让人拿来探别人的回信编号。
+  if (!owner || owner.install_hash !== await installHash(installId)) return response({ ok: false, error: 'unknown_reply' }, 404);
+  if (now.getTime() - Date.parse(owner.received_at) > ATTACHMENT_REPLY_MAX_AGE_MS) return response({ ok: false, error: 'reply_too_old' }, 410);
+
+  const sha256 = await sha256Bytes(bytes);
+  try {
+    const existing = await db.prepare('SELECT id FROM letter_attachments WHERE reply_id = ? AND sha256 = ?').bind(replyId, sha256).first();
+    if (existing) return response({ attachmentId: existing.id, duplicate: true });
+    const counted = await db.prepare('SELECT COUNT(*) AS count FROM letter_attachments WHERE reply_id = ?').bind(replyId).first();
+    if (Number(counted?.count ?? 0) >= ATTACHMENTS_PER_REPLY) return response({ ok: false, error: 'too_many_attachments' }, 409);
+  } catch {
+    return response({ ok: false, error: 'storage_unavailable' }, 503);
+  }
+  if (await overRateLimit(db, await sourceKey(request), now)) return response({ ok: false, error: 'rate_limited' }, 429);
+
+  const attachmentId = crypto.randomUUID();
+  const objectKey = `letters/${replyId}/${attachmentId}.${IMAGE_TYPES[declared]}`;
+  try {
+    await bucket.put(objectKey, bytes, { httpMetadata: { contentType: declared } });
+    await db.prepare(`
+      INSERT INTO letter_attachments (id, reply_id, received_at, content_type, bytes, sha256, object_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(attachmentId, replyId, now.toISOString(), declared, bytes.length, sha256, objectKey).run();
+  } catch {
+    try { await bucket.delete(objectKey); } catch { /* 留一个没有记录的对象，下次按前缀清 */ }
+    return response({ ok: false, error: 'storage_unavailable' }, 503);
+  }
+  await pruneAttachments(db, bucket, now);
+  return response({ attachmentId }, 201);
+}
+
 export async function onRequestPost(context) {
   const action = context.params?.action;
+  if (action === 'attachment') return attachment(context);
   if (action !== 'reply' && action !== 'receipts') return response({ ok: false, error: 'not_found' }, 404);
   const { body, error } = await readJson(context.request);
   if (error) return error;

@@ -62,7 +62,7 @@ const acknowledge = async (event: MouseEvent) => {
 </script>
 
 <template>
-  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="baseVersion(receipt.version)" :notes="groups" :origin="origin()" @closing="settleUpdate" @done="acknowledgeUpdate" />
+  <LetterEnvelope v-if="receipt && letters.length" :versions="letters" :current="baseVersion(receipt.version)" :notes="groups" :origin="origin()" must-finish @closing="settleUpdate" @done="acknowledgeUpdate" />
   <ModalDialog v-else-if="receipt" labelledby="update-notice-title" :origin="origin()" :max-width="760">
     <div class="release-card">
       <header class="release-header">

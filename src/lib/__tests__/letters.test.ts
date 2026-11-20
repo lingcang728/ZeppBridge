@@ -3,7 +3,7 @@ import { echoTitle, leadParagraph, lettersBetween, parseEcho, parseLetter } from
 import { stampFace } from '../letters/stamp';
 import { archiveSpan } from '../letters/personal';
 import { noteParts } from '../letters/notes';
-import { flightFrames, flightPath } from '../letters/paperPlane';
+import { flightFrames, flightPath, launchEase } from '../letters/paperPlane';
 
 describe('letters', () => {
   it('reads paragraphs and a short dash-led signature, like the website archive', () => {
@@ -78,5 +78,18 @@ describe('letters', () => {
     expect(last.scale).toBeLessThan(first.scale);
     /* 起飞时机头朝右下（沉），飞出时朝右上（抬头）。 */
     expect(first.angle).toBeGreaterThan(frames[frames.length - 2]!.angle);
+  });
+
+  it('starts the flight slow and speeds up smoothly, keyframes evenly spaced in time', () => {
+    const path = flightPath({ x: 400, y: 500 }, { width: 1200, height: 800 });
+    const frames = flightFrames(path, 40, launchEase);
+    expect(launchEase(0)).toBe(0);
+    expect(launchEase(1)).toBe(1);
+    expect(frames.map((frame) => frame.t)).toEqual(Array.from({ length: 41 }, (_, i) => i / 40));
+    const step = (i: number) => Math.hypot(frames[i + 1]!.x - frames[i]!.x, frames[i + 1]!.y - frames[i]!.y);
+    /* 起步那一段比后段慢得多，但不是停着的（手推了一下）。 */
+    expect(step(0)).toBeGreaterThan(0);
+    expect(step(0)).toBeLessThan(step(36) / 2);
+    expect(frames[40]).toMatchObject({ x: path[3].x, y: path[3].y });
   });
 });

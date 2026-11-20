@@ -58,7 +58,8 @@ test('a reply carries only its own fields, a bounded text, and something to say'
   assert.equal(validateReply(reply()), true);
   assert.equal(validateReply(reply({ text: '', alsoHit: ['backfill-stuck'] })), true);
   assert.equal(validateReply(reply({ text: '   ', alsoHit: [] })), false);
-  assert.equal(validateReply(reply({ text: '字'.repeat(1001) })), false);
+  assert.equal(validateReply(reply({ text: '字'.repeat(5000) })), true);
+  assert.equal(validateReply(reply({ text: '字'.repeat(5001) })), false);
   assert.equal(validateReply(reply({ email: 'a@b.c' })), false);
   assert.equal(validateReply(reply({ installId: 'not-a-uuid' })), false);
   assert.equal(validateReply(reply({ alsoHit: ['Bad Id'] })), false);

@@ -538,6 +538,8 @@ export default {
     writeAuthorSub: 'Se incontri un problema, hai un’idea o vuoi solo salutare, leggo e rispondo a ogni lettera',
     authorPlaceholder:
       'Che si tratti di un piccolo dettaglio dell’app, di una funzione che vorresti o semplicemente di scambiare due parole, scrivi qui. Non appena la riceverò, ti risponderò.',
+    reportShort: 'Diagnostica',
+    removeReport: 'Rimuovi la relazione diagnostica',
     attachReport: 'Allega relazione diagnostica anonimizzata',
     attachHint:
       'Solo versione dell’app, struttura dei campi e numeri di modello non riconosciuti — nessun account, valore di salute o posizione',
@@ -1719,7 +1721,6 @@ export default {
     grid: 'Griglia 2×2',
     oneOverThree: 'Una sopra, tre sotto',
     bigLeft: 'Grande a sinistra',
-    expose: 'Mostra tutte le schede',
     exposeExit: 'Torna al layout',
     reset: 'Ripristina layout',
     hiddenCount: (count: number) => `${count} ${count === 1 ? 'nascosta' : 'nascoste'}`,

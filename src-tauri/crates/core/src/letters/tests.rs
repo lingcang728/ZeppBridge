@@ -22,6 +22,7 @@ fn pending(local_id: &str) -> PendingReply {
         report_id: None,
         queued_at: "2026-10-21T10:00:00Z".into(),
         attempts: 0,
+        attachments: vec![],
     }
 }
 
@@ -49,7 +50,7 @@ fn a_reply_never_leaves_with_paths_or_secret_looking_words_but_keeps_its_paragra
     assert!(cleaned.contains("\n\n我的邮箱"));
     assert!(!cleaned.contains("\n\n\n"));
     assert_eq!(
-        sanitize_reply(&"字".repeat(1200)).chars().count(),
+        sanitize_reply(&"字".repeat(5200)).chars().count(),
         LETTER_REPLY_MAX_CHARS
     );
     assert_eq!(sanitize_reply("   \n  "), "");
@@ -176,4 +177,62 @@ fn the_author_reply_outlives_its_receipt_but_follows_a_retraction() {
     state.apply_receipts(vec![receipt("r1", None)], "t3".into());
     assert_eq!(state.sent[0].author_reply, None);
     assert_eq!(state.sent[0].author_reply_at, None);
+}
+
+#[test]
+fn attachments_follow_their_reply_into_the_upload_queue_exactly_once() {
+    let mut state = LetterBoxState::default();
+    let mut reply = pending("with-images");
+    reply.attachments = vec![
+        attachment_file_name("with-images", 0, "image/jpeg"),
+        attachment_file_name("with-images", 1, "image/png"),
+    ];
+    state.queue(reply.clone());
+    state.mark_sent(&reply, "reply-1".into(), "2026-11-20T10:00:00Z".into());
+    // 断线重发：同一封又被标记一次，图不会重复进队。
+    state.mark_sent(&reply, "reply-1".into(), "2026-11-20T10:00:01Z".into());
+    assert!(state.outbox.is_empty());
+    assert_eq!(state.attachment_outbox.len(), 2);
+    assert!(state
+        .attachment_outbox
+        .iter()
+        .all(|queued| queued.reply_id == "reply-1"));
+    assert_eq!(state.attachment_outbox[1].file, "with-images-1.png");
+}
+
+#[test]
+fn attachment_names_never_leave_the_attachments_folder_and_only_images_pass() {
+    assert!(is_attachment_file_name(
+        "3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f-0.jpg"
+    ));
+    for bad in [
+        "../state.json",
+        "a/b.jpg",
+        "..\\x.jpg",
+        ".hidden.jpg",
+        "x.svg",
+        "x..jpg",
+        "",
+    ] {
+        assert!(!is_attachment_file_name(bad), "{bad}");
+    }
+    assert_eq!(
+        sniff_image(&[0xff, 0xd8, 0xff, 0xe0, 0]),
+        Some("image/jpeg")
+    );
+    assert_eq!(
+        sniff_image(&[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Some("image/png")
+    );
+    assert_eq!(sniff_image(b"<svg/>"), None);
+}
+
+#[test]
+fn a_state_file_from_before_attachments_still_loads() {
+    let state: LetterBoxState = serde_json::from_str(
+        r#"{"install_id":null,"outbox":[{"local_id":"a","letter_version":"3.1.0","app_version":"3.1.0","locale":"zh","text":"x","allow_quote":false,"also_hit":[],"queued_at":"2026-10-21T10:00:00Z"}],"sent":[],"receipts":[]}"#,
+    )
+    .unwrap();
+    assert!(state.outbox[0].attachments.is_empty());
+    assert!(state.attachment_outbox.is_empty());
 }

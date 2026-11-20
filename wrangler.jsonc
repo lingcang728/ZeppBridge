@@ -15,5 +15,11 @@
 			"database_id": "d44cc752-232c-4b80-ae32-f0fb680d1afd",
 			"migrations_dir": "migrations-official"
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "LETTER_ATTACHMENTS",
+			"bucket_name": "zeppbridge-letter-attachments"
+		}
 	]
 }

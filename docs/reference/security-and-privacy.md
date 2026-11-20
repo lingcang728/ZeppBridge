@@ -281,9 +281,10 @@ respect to the IP address.
 Replies written in the letter box go to zeppbridge.com and are stored in the author's D1 table `letter_replies`, separate from problem reports.
 
 - The first time you send one, the app generates a random install id (UUID v4). It is **not tied to your account**, and the server keeps only a SHA-256 of it (with a fixed public prefix; the random id itself is what makes it hard to guess). Sending is rate-limited with the same kind of per-day IP hash as problem reports.
-- Before sending, local paths are removed and words that look like credentials, serial numbers or email addresses are blanked. The limit is 1,000 characters. Only replies marked "may quote anonymously" can be quoted in the next letter.
+- Before sending, local paths are removed and words that look like credentials, serial numbers or email addresses are blanked. The limit is 5,000 characters. Only replies marked "may quote anonymously" can be quoted in the next letter.
 - Receipts are fetched by install id: the handling status and, from 3.1.1, the author's one-to-one reply. Receipts never return your own text. The author's reply is returned, so anyone holding this computer's `data/letters/state.json` (which contains the install id) can read what the author wrote back. The author does not put your personal details in a reply.
 - Your sent text and the author's reply stay on this computer. Replies that have been handled for 180 days are deleted from the server when the author runs the clean-up (a copy is exported to the author's own computer first); unhandled replies are kept.
+- Images (up to 3 per reply, picked or pasted as screenshots): only images you add yourself are uploaded. The app re-encodes them as JPEG first, at most 2,000 pixels on the long edge and 1 MB each, so the original EXIF data (capture time, camera model, GPS location) is not sent. What the picture shows, such as health values in a screenshot, is sent as it is, so check it before sending. Images are kept in the author's private Cloudflare R2 bucket with no public link, and only the author can fetch them. Images can only be added to replies sent within the last 7 days, and they are deleted together with their records after 30 days. Until they are uploaded, images wait on this computer in `data/letters/attachments/` and are removed once uploaded.
 
 ## "Clear credentials" versus "clean up data"
 
@@ -332,7 +333,8 @@ destinations are limited to:
 - the Zepp region service you configured, after host validation;
 - the official Zepp / Huami pages the sign-in window visits;
 - `zeppbridge.com` (or `zeppbridge.pages.dev`): voluntary problem reports,
-  letters and receipts, and the official-platform authorization relay;
+  letters (with any images you attach) and receipts, and the
+  official-platform authorization relay;
 - `api-open.zepp.com`, for the official channel;
 - GitHub, to check for and download updates (`latest.json` and the installer of
   the latest release). The Microsoft Store build updates through the Store

@@ -2,7 +2,7 @@
 /**
  * 写给作者的那张信纸（全局一份，挂在 AppShell）：
  * 从被点的控件（顶栏右上角信件圆钮、设置卡按钮、信匣写信卡）一镜到底直接展开成棉浆横线信纸，
- * 关闭或寄出后沿原曲线收拢回同一个控件（不经过信封背面停顿与二次拆封）。
+ * 点 × 关掉时沿原曲线收拢回同一个控件；寄出时整张信纸折成纸飞机飞走，信件按钮底下提示「已寄出」。
  * 可以附一份脱敏诊断报告（先交报告拿编号，再随信寄出）。草稿存本机（键是 author）。
  */
 import { nextTick, ref, watch } from 'vue';
@@ -16,9 +16,12 @@ import { locale } from '../../i18n';
 import { clearDraft, loadDraft, saveDraft, sendLetterReply } from '../../services/letterBox';
 import { BUNDLED_VERSION } from '../../services/updateNotice';
 import { whenDialogLanded } from '../../lib/motion/dialogFlight';
-import { openLetterBoxSheet } from '../../composables/useLetterBoxSheet';
-import Icon from '../Icon.vue';
 import type { LetterSendResult } from '../../types/letters';
+import { useReplyImages } from '../../composables/useReplyImages';
+import { lessMotion } from '../../lib/motion/lessMotion';
+import { foldIntoPlane } from '../../lib/letters/paperPlane';
+import { showSentNote } from '../../lib/letters/sentNote';
+import { playPaperSlide } from '../../lib/letters/sound';
 
 const t = useLetterText();
 const { writing, attach, category, sent } = useAuthorCompose();
@@ -31,8 +34,33 @@ const sheetEl = ref<HTMLElement | null>(null);
 const composer = ref<InstanceType<typeof AuthorCompose> | null>(null);
 const sending = ref(false);
 const error = ref('');
-const delivery = ref<LetterSendResult['status'] | null>(null);
+const { images: replyImages, preparing: imagesPreparing, failed: imagesFailed, add: addImages, remove: removeImage, clear: clearImages, payload: imagePayload } = useReplyImages();
 const close = () => { if (!sending.value) closeAuthorCompose(); };
+
+/**
+ * 寄出成功：整张信纸折成纸飞机飞走（lib/letters/paperPlane.ts）。面板当场藏起来（看到的是纸的拷贝），
+ * 遮罩留着衬住折纸；飞机张开翅膀、起飞的那一刻才关弹窗——遮罩慢慢淡掉、信件按钮慢慢亮回来，
+ * 不会纸还没折好就整块收走。飞机飞远了，按钮底下冒一句「已寄出」。减少动效时直接关掉、立刻提示。
+ */
+const sendAway = (status: LetterSendResult['status'], origin: HTMLElement | null) => {
+  const note = status === 'sent' ? t.value.sent : t.value.queued;
+  const sheet = sheetEl.value;
+  const panel = sheet?.closest<HTMLElement>('[data-modal-dialog]');
+  const session = writing.value;
+  if (!sheet || !panel || lessMotion()) {
+    closeAuthorCompose();
+    showSentNote(note, origin);
+    return;
+  }
+  playPaperSlide();
+  panel.style.visibility = 'hidden';
+  void foldIntoPlane(sheet, {
+    onTakeoff: () => {
+      if (writing.value === session) closeAuthorCompose();
+      window.setTimeout(() => showSentNote(note, origin), 700);
+    },
+  });
+};
 
 watch(writing, async (open) => {
   if (!open) return;
@@ -42,13 +70,6 @@ watch(writing, async (open) => {
   await whenDialogLanded(panel);
   if (writing.value === open && document.activeElement === panel) composer.value?.focusInput();
 }, { immediate: true });
-
-/* 信纸收回原处，信匣接着从同一个控件长出来（ModalDialog 的接力：前一张没收完就加速收完）。草稿留着。 */
-const toLetterBox = () => {
-  const origin = writing.value?.origin ?? null;
-  closeAuthorCompose();
-  void nextTick(() => openLetterBoxSheet(origin));
-};
 
 const send = async () => {
   if (sending.value) return;
@@ -80,13 +101,15 @@ const send = async () => {
     if (!sameDraft()) return;
     const result = await sendLetterReply({
       localId, letterVersion: BUNDLED_VERSION, locale: sendLocale, text: text.trim(),
-      allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}),
+      allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}), ...imagePayload(),
     });
     if (!sameDraft()) return;
+    // 先拷信纸起飞（拷的是此刻的字和附图），再清草稿：附图的 blob 地址一清就失效，拷贝里的图会变成破图。
+    sendAway(result.status, session?.origin ?? null);
     clearDraft(AUTHOR_DRAFT);
+    clearImages();
     draft.value = loadDraft(AUTHOR_DRAFT);
     attach.value = false;
-    delivery.value = result.status;
     sent.value += 1;
   } catch (cause) {
     if (sameDraft()) error.value = toUserMessage(cause, t.value.sendFailed);
@@ -109,31 +132,29 @@ const send = async () => {
     <article ref="sheetEl" class="compose-sheet paper" data-dialog-window>
       <div class="compose-inner" data-dialog-content>
         <div class="compose-body paper-lines">
-          <p v-if="delivery" class="compose-delivery" role="status">{{ delivery === 'sent' ? t.sent : t.queued }}</p>
           <AuthorCompose
-            v-else
             ref="composer"
             v-model:text="draft.text"
             v-model:attach="attach"
             v-model:category="category"
             :busy="sending"
             :error="error"
+            :images="replyImages"
+            :preparing="imagesPreparing"
+            :attach-failed="imagesFailed"
             @send="send"
+            @add-images="addImages"
+            @remove-image="removeImage"
           />
         </div>
-        <footer class="compose-sheet-foot">
-          <span class="compose-sheet-label">{{ t.writeAuthor }}</span>
-          <button type="button" class="compose-to-box" :disabled="sending" @click="toLetterBox">
-            <Icon name="mail" :size="14" />{{ t.boxTitle }}
-          </button>
-          <button
-            type="button"
-            class="compose-close"
-            :disabled="sending"
-            :aria-label="t.close"
-            @click="close"
-          >×</button>
-        </footer>
+        <!-- 只留一个 ×，在信纸右上角，和「致：」那一行对齐。「写给作者」和去信匣的小钮都拿掉了（长按信件按钮就开信匣）。 -->
+        <button
+          type="button"
+          class="compose-close"
+          :disabled="sending"
+          :aria-label="t.close"
+          @click="close"
+        >×</button>
       </div>
     </article>
   </ModalDialog>
@@ -157,31 +178,22 @@ const send = async () => {
   overscroll-behavior: contain;
 }
 .compose-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: var(--paper-line) clamp(22px, 7%, 52px) 0;
+  padding: var(--paper-line) clamp(22px, 7%, 52px) calc(var(--paper-line) * .75);
 }
 .compose-body {
   flex: 1 1 auto;
   min-height: 0;
 }
-.compose-delivery { margin: 0; min-height: var(--paper-line); line-height: var(--paper-line); }
-.compose-sheet-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 48px;
-  flex: none;
-  color: var(--paper-muted);
-  font: 400 var(--fs-2xs) / 1 var(--font-sans);
-  letter-spacing: .04em;
-}
 .compose-close {
+  position: absolute;
+  top: calc(var(--paper-line) + (var(--paper-line) - 28px) / 2);
+  inset-inline-end: 14px;
   display: inline-flex;
   width: 28px;
   height: 28px;
-  margin-inline-end: -6px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -197,26 +209,7 @@ const send = async () => {
   color: var(--paper-ink);
   background: rgb(120 95 60 / .1);
 }
-/* 去信匣：长按才打得开信匣没人发现（反馈「不知道信匣从哪打开」），点一下进来的人在信纸底下就能看到它。 */
-.compose-to-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-inline-start: auto;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--paper-muted);
-  font: inherit;
-  cursor: pointer;
-  transition: color 160ms ease, background-color 160ms ease;
-}
-.compose-to-box:hover:not(:disabled) {
-  color: var(--paper-ink);
-  background: rgb(120 95 60 / .1);
-}
-.compose-close:focus-visible, .compose-to-box:focus-visible {
+.compose-close:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

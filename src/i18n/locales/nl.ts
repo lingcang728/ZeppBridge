@@ -2670,7 +2670,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       grid: 'Raster van vier',
       oneOverThree: 'Eén boven drie',
       bigLeft: 'Grote kaart links',
-      expose: 'Alle kaarten',
       exposeExit: 'Terug naar het werkvlak',
       reset: 'Indeling herstellen',
       hiddenCount: (count: number) =>
@@ -4153,6 +4152,8 @@ Regels:
       authorPlaceholder:
         'Of het nu gaat om een klein detail in de app, een functie waar je op hoopt of gewoon een paar woorden voor een praatje — schrijf het hier. Zodra ik je brief ontvang, schrijf ik terug.',
       attachReport: 'Geanonimiseerd diagnoserapport bijvoegen',
+      reportShort: 'Diagnoserapport',
+      removeReport: 'Diagnoserapport verwijderen',
       attachHint:
         'Alleen app-versie, veldstructuren en niet-herkende modelnummers — geen account, gezondheidswaarden of locatie',
       reportFailedPlain:

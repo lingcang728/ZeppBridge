@@ -10,6 +10,7 @@ import { appStatus } from './sync/state';
 import { archiveSpan } from '../lib/letters/personal';
 import { parseEcho } from '../lib/letters/parse';
 import { toUserMessage } from '../lib/bridge';
+import { useReplyImages } from './useReplyImages';
 import type { NoteGroup } from '../services/updateNotice';
 import type { ReplyState } from '../components/letters/ReplySheet.vue';
 
@@ -69,6 +70,7 @@ export function useLetterEnvelope(versions: Readonly<Ref<string[]>>, current: Re
   watch(draft, (value) => saveDraft(current.value, value), { deep: true });
   const replyState = ref<ReplyState>(repliedTo(current.value) ? 'sent' : 'idle');
   const replyError = ref('');
+  const images = useReplyImages();
 
   const send = async (): Promise<boolean> => {
     if (replyState.value === 'sending') return false;
@@ -83,11 +85,13 @@ export function useLetterEnvelope(versions: Readonly<Ref<string[]>>, current: Re
         locale: locale.value,
         text,
         allowQuote: draft.value.allowQuote,
-        // 「我也遇到」不再有（2026-10-21）；旧草稿里存过的也不再寄。
+        // 「我也遇到」不再有；旧草稿里存过的也不再寄。
         alsoHit: [],
+        ...images.payload(),
       });
       replyState.value = result.status;
       clearDraft(current.value);
+      images.clear();
       return true;
     } catch (error) {
       replyState.value = 'error';
@@ -96,5 +100,5 @@ export function useLetterEnvelope(versions: Readonly<Ref<string[]>>, current: Re
     }
   };
 
-  return { sheets, loaded, span, draft, replyState, replyError, send };
+  return { sheets, loaded, span, draft, replyState, replyError, send, images };
 }
