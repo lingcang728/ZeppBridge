@@ -4936,6 +4936,12 @@ export default {
     'err.workout_fit.read_failed': 'Не удалось прочитать этот файл',
     'err.workout_fit.no_activity': 'В этом .fit нет записей тренировки (нет ни точек данных, ни кругов)',
     'err.workout_fit.start_mismatch': 'Время начала в этом .fit отличается от тренировки более чем на 5 минут: похоже, это другое занятие',
+    'err.workout_fit.original_missing':
+      'Исходные данные тренировки не найдены. Их можно восстановить из более ранней резервной копии или исходного файла тренировки.',
+    'err.workout_fit.multiple_activities':
+      'Используйте файл FIT только с одной тренировкой для исправления этой записи',
+    'err.workout.gpx_clipboard': 'Не удалось скопировать GPX в буфер обмена',
+    'err.workout.gpx_no_route': 'У этой тренировки нет точек GPS-трека для экспорта',
     'err.prefs.retention_out_of_range': 'Срок хранения должен быть от 1 до 365 дней',
     'err.storage.write_busy': 'Выполняется другая запись ZeppBridge: дождитесь завершения',
     'err.storage.write_lock_unavailable': 'Не удалось заблокировать запись: проверьте права доступа к папке данных',

@@ -856,6 +856,11 @@ const messages = defineMessages(
     'err.workout_fit.read_failed': 'No se pudo leer este archivo',
     'err.workout_fit.no_activity': 'Este .fit no contiene ninguna actividad (ni registros ni vueltas)',
     'err.workout_fit.start_mismatch': 'Este .fit empieza a más de 5 minutos de este entrenamiento; no parece la misma sesión',
+    'err.workout_fit.original_missing':
+      'Faltan los detalles originales del entrenamiento. Un respaldo anterior o el archivo original de la actividad podrían contenerlos.',
+    'err.workout_fit.multiple_activities': 'Usa un archivo FIT con una sola sesión para corregir este entrenamiento',
+    'err.workout.gpx_clipboard': 'No se pudo copiar el GPX al portapapeles',
+    'err.workout.gpx_no_route': 'Este entrenamiento no tiene puntos de ruta GPS para exportar',
     'err.prefs.retention_out_of_range': 'La retención debe estar entre 1 y 365 días',
     'err.storage.write_busy': 'Otra escritura de ZeppBridge en curso; espera a que termine',
     'err.storage.write_lock_unavailable':

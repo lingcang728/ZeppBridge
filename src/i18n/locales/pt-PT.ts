@@ -4754,12 +4754,17 @@ Regras:
       'Demasiados relatórios num curto período. Tenta novamente daqui a pouco — os já enviados mantêm-se, sem reenvio.',
     'err.diagnostic.bad_response': 'Resposta do serviço de relatórios não reconhecida',
     'err.workout.not_found': 'Treino não encontrado',
+    'err.workout.gpx_clipboard': 'Não foi possível copiar o GPX para a área de transferência',
+    'err.workout.gpx_no_route': 'Este treino não tem pontos de percurso GPS para exportar',
     'err.workout_fit.not_fit': 'Este não é um ficheiro .fit que o ZeppBridge consiga ler',
     'err.workout_fit.too_large': 'O ficheiro é demasiado grande para ser o .fit de um único treino',
     'err.workout_fit.read_failed': 'Não foi possível ler este ficheiro',
     'err.workout_fit.no_activity': 'Este ficheiro .fit não tem registos de atividade (sem pontos nem voltas)',
+    'err.workout_fit.multiple_activities': 'Usa um ficheiro FIT com apenas um treino para fazer a correção',
     'err.workout_fit.start_mismatch':
       'A hora de início deste .fit difere deste treino em mais de 5 minutos — não parece ser o mesmo treino',
+    'err.workout_fit.original_missing':
+      'Faltam os detalhes originais do treino. Uma cópia de segurança anterior ou o ficheiro original da atividade podem contê-los.',
     'err.prefs.retention_out_of_range': 'A retenção deve estar compreendida entre 1 e 365 dias',
     'err.storage.write_busy': 'Operação de gravação em curso. Aguarda que termine',
     'err.storage.write_lock_unavailable':

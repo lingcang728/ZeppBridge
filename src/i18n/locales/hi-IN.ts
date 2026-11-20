@@ -4450,6 +4450,8 @@ export default {
 
     /* —— 其它 —— */
     'err.workout.not_found': 'वह वर्कआउट अब मौजूद नहीं है',
+    'err.workout.gpx_clipboard': 'GPX को क्लिपबोर्ड पर कॉपी नहीं किया जा सका',
+    'err.workout.gpx_no_route': 'इस वर्कआउट में एक्सपोर्ट करने के लिए कोई GPS ट्रैक पॉइंट नहीं हैं',
     'err.prefs.retention_out_of_range': 'रिटेंशन 1 से 365 दिन होना चाहिए',
     'err.storage.write_busy': 'डेटाबेस व्यस्त है। प्रतीक्षा करें।',
     'err.storage.write_lock_unavailable': 'राइट लॉक नहीं बन सका, डेटा फ़ोल्डर की अनुमतियाँ जाँचें।',
@@ -4479,7 +4481,10 @@ export default {
     'err.workout_fit.too_large': 'फ़ाइल बहुत बड़ी है; यह किसी एकल वर्कआउट की .fit नहीं लगती',
     'err.workout_fit.read_failed': 'यह फ़ाइल पढ़ी नहीं जा सकी',
     'err.workout_fit.no_activity': 'इस .fit में कोई गतिविधि रिकॉर्ड नहीं है (न कोई डेटा पॉइंट और न कोई लैप)',
+    'err.workout_fit.multiple_activities': 'इस वर्कआउट को सुधारने के लिए केवल एक सेशन वाली FIT फ़ाइल का उपयोग करें',
     'err.workout_fit.start_mismatch': 'इस .fit का शुरू होने का समय इस वर्कआउट से 5 मिनट से अधिक अलग है — यह एक ही सेशन नहीं लगता',
+    'err.workout_fit.original_missing':
+      'सुधार से पहले का मूल वर्कआउट विवरण नहीं मिला। यदि कोई पुराना बैकअप या मूल गतिविधि फ़ाइल हो, तो वहाँ से मिल सकता है।',
 
     /* —— AI 任务 / 模板 / MCP —— */
     'err.ai_task.attachment_missing': 'अटैचमेंट फ़ाइल नहीं मिली',

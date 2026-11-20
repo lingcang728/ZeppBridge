@@ -4950,9 +4950,15 @@ Regels:
     'err.update.swap_failed': 'Kon programmabestanden niet vervangen; alles is teruggezet zoals het was',
     'err.update.install_failed': 'Installeren van nieuwe versie mislukt',
     'err.workout.not_found': 'Die training bestaat niet',
+    'err.workout.gpx_clipboard': 'Kon GPX niet naar het klembord kopiëren',
+    'err.workout.gpx_no_route': 'Deze training heeft geen GPS-routepunten om te exporteren',
+    'err.workout_fit.multiple_activities':
+      'Gebruik een .fit-bestand met één sessie om deze training te corrigeren',
     'err.workout_fit.no_activity':
       'Dit .fit-bestand bevat geen activiteit (geen meetpunten en geen ronden)',
     'err.workout_fit.not_fit': 'Dit is geen .fit-bestand dat ZeppBridge kan lezen',
+    'err.workout_fit.original_missing':
+      'De oorspronkelijke trainingsdetails ontbreken. Een eerdere back-up of het originele activiteitsbestand bevat ze mogelijk nog.',
     'err.workout_fit.read_failed': 'Kon dit bestand niet lezen',
     'err.workout_fit.start_mismatch':
       'De starttijd van dit .fit-bestand verschilt meer dan 5 minuten van deze training — het lijkt niet om dezelfde sessie te gaan',

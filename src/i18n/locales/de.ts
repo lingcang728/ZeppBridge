@@ -182,12 +182,18 @@ export default {
       'Zu viele Berichte in kurzer Zeit – in einer Weile erneut versuchen. Bereits gesendete gehen nicht verloren und müssen nicht nochmal geschickt werden.',
     'err.diagnostic.bad_response': 'Der Berichtsdienst hat etwas zurückgegeben, das wir nicht lesen konnten',
     'err.workout.not_found': 'Dieses Training existiert nicht',
+    'err.workout.gpx_clipboard': 'GPX konnte nicht in die Zwischenablage kopiert werden',
+    'err.workout.gpx_no_route': 'Dieses Training hat keine GPS-Trackpunkte zum Exportieren',
     'err.workout_fit.not_fit': 'Dies ist keine .fit-Datei, die ZeppBridge lesen kann',
     'err.workout_fit.too_large': 'Die Datei ist zu groß für die .fit-Datei eines einzelnen Trainings',
     'err.workout_fit.read_failed': 'Diese Datei konnte nicht gelesen werden',
     'err.workout_fit.no_activity': 'Diese .fit-Datei enthält keine Aktivität (keine Messpunkte und keine Runden)',
     'err.workout_fit.start_mismatch':
       'Die Startzeit dieser .fit-Datei weicht um mehr als 5 Minuten von diesem Training ab – scheint nicht dieselbe Einheit zu sein',
+    'err.workout_fit.original_missing':
+      'Die ursprünglichen Trainingsdetails fehlen. Eine frühere Sicherung oder die ursprüngliche Aktivitätsdatei enthält sie möglicherweise noch.',
+    'err.workout_fit.multiple_activities':
+      'Verwende zur Korrektur dieses Trainings eine FIT-Datei mit nur einer Einheit',
     'err.prefs.retention_out_of_range': 'Die Aufbewahrung muss zwischen 1 und 365 Tagen liegen',
     'err.storage.write_busy': 'Ein anderer ZeppBridge-Schreibvorgang läuft – warte, bis er fertig ist',
     'err.storage.write_lock_unavailable': 'Schreibsperre ließ sich nicht erstellen – Berechtigungen des Datenordners prüfen',

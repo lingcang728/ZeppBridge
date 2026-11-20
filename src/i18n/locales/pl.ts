@@ -2215,6 +2215,11 @@ export default {
     'err.workout_fit.no_activity': 'Ten plik .fit nie zawiera aktywności (brak punktów danych ani okrążeń)',
     'err.workout_fit.start_mismatch':
       'Czas rozpoczęcia tego pliku .fit różni się o ponad 5 minut od tego treningu — nie wygląda to na ten sam trening',
+    'err.workout_fit.original_missing':
+      'Brakuje oryginalnych szczegółów treningu. Można je odzyskać z wcześniejszej kopii zapasowej lub oryginalnego pliku treningu.',
+    'err.workout_fit.multiple_activities': 'Do korekty tego treningu użyj pliku FIT zawierającego tylko jeden trening',
+    'err.workout.gpx_clipboard': 'Nie udało się skopiować GPX do schowka',
+    'err.workout.gpx_no_route': 'Ten trening nie ma punktów śladu GPS do wyeksportowania',
     'err.prefs.retention_out_of_range': 'Okres przechowywania musi wynosić od 1 do 365 dni',
     'err.storage.write_busy': 'Inny proces zapisu w ZeppBridge jest w toku — poczekaj na jego zakończenie',
     'err.storage.write_lock_unavailable':

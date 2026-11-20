@@ -5159,8 +5159,15 @@ Regole:
   'err.workout_fit.read_failed': 'Impossibile leggere questo file',
   'err.workout_fit.no_activity':
     'Questo .fit non contiene alcuna attività (nessun record e nessun giro)',
+  'err.workout_fit.multiple_activities':
+    'Usa un file FIT con una sola sessione per correggere questo allenamento',
   'err.workout_fit.start_mismatch':
     'Questo .fit inizia con oltre 5 minuti di differenza rispetto a questo allenamento: non sembra la stessa sessione',
+  'err.workout_fit.original_missing':
+    'Mancano i dettagli originali dell’allenamento. Un backup precedente o il file originale dell’attività potrebbero contenerli.',
+  'err.workout.gpx_clipboard': 'Impossibile copiare il GPX negli appunti',
+  'err.workout.gpx_no_route':
+    'Questo allenamento non ha punti traccia GPS da esportare',
   'err.prefs.retention_out_of_range':
     'I giorni di conservazione devono essere compresi tra 1 e 365 giorni',
   'err.storage.write_busy':
