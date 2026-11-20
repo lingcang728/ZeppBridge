@@ -5,7 +5,6 @@
 - Improved: **Replies can be 5000 characters, up from 1000**. The count is always shown next to “Send”, and leading blank lines, extra blank lines and repeated spaces are tidied as you type.
 - Improved: **A sent letter folds into a paper plane and flies off**. A letter to the author closes its window as the plane takes off, then says it was sent.
 - Improved: **The diagnostic report is a single tag**. Click it to open the issue types, and it closes once you pick one; click × to leave the report out.
-- Improved: **The author’s letter after an update is read to the end**. Esc or clicking outside no longer closes it halfway; “Got it” on the last page does. Rereading it in the letterbox can still be closed at any time.
 - Improved: **“All cards” on workout details is now “Classic view”**.
 - Improved: **Dates from past years show the year**. Workouts, sleep, backups and import records spell out the year for earlier years, and the workout detail header always does.
 - Improved: **Average pace matches the Zepp summary**. It is now distance ÷ moving time, so watches like the GTR 4, whose live pace runs slow, no longer come out slower than the summary.

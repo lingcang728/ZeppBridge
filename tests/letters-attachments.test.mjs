@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_REPLY, installHash, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
+import { ATTACHMENT_BUDGET_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_DAY, ATTACHMENTS_PER_REPLY, installHash, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
 
 const INSTALL = '3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f';
 const OTHER_INSTALL = '9a8b7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d';
@@ -26,6 +26,12 @@ const fakeEnv = async ({ replyAgeDays = 0 } = {}) => {
         async first() {
           if (sql.includes('FROM letter_replies WHERE id')) return args[0] === reply.id ? reply : null;
           if (sql.includes('FROM letter_attachments WHERE reply_id = ? AND sha256')) return attachments.find((row) => row.reply_id === args[0] && row.sha256 === args[1]) ?? null;
+          if (sql.includes('SUM(bytes)')) {
+            return {
+              stored: attachments.reduce((sum, row) => sum + row.bytes, 0),
+              today: attachments.filter((row) => row.received_at >= args[0]).length,
+            };
+          }
           if (sql.includes('COUNT(*)')) return { count: attachments.filter((row) => row.reply_id === args[0]).length };
           if (sql.includes('FROM feedback_intake_counters')) return counters.get(args[0]) ?? null;
           return null;
@@ -129,4 +135,22 @@ test('images past their retention are deleted together with their objects', asyn
   assert.equal(attachments.length, 1);
   assert.equal(objects.size, 1);
   assert.notEqual(attachments[0].received_at, '2020-01-01T00:00:00.000Z');
+});
+
+test('a full bucket or a busy day postpones uploads instead of growing the bill', async () => {
+  const full = await fakeEnv();
+  full.attachments.push({ id: 'old', reply_id: 'someone-else', received_at: new Date().toISOString(), content_type: 'image/jpeg', bytes: ATTACHMENT_BUDGET_BYTES - 10, sha256: 'x', object_key: 'letters/x/old.jpg' });
+  const tooBig = await upload(full.env, jpeg(1));
+  assert.equal(tooBig.status, 507);
+  assert.equal((await tooBig.json()).error, 'attachments_full');
+  assert.equal(full.objects.size, 0, '超出总量时不往桶里写');
+
+  const busy = await fakeEnv();
+  for (let index = 0; index < ATTACHMENTS_PER_DAY; index += 1) {
+    busy.attachments.push({ id: `today-${index}`, reply_id: 'someone-else', received_at: new Date().toISOString(), content_type: 'image/jpeg', bytes: 10, sha256: String(index), object_key: `letters/x/${index}.jpg` });
+  }
+  assert.equal((await upload(busy.env, jpeg(1))).status, 507);
+
+  const room = await fakeEnv();
+  assert.equal((await upload(room.env, jpeg(1))).status, 201);
 });

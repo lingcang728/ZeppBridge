@@ -168,11 +168,15 @@ async function receipts(context, body) {
  *   头：content-type = image/jpeg | image/png，x-zeppbridge-install-id = 寄这封信的那个 install id
  *   体：图片原始字节。客户端已经重新编码过（去掉 EXIF / 定位），这里只认文件头、限大小。
  * 只给寄出 7 天内的回信补图。图存在私有 R2 桶里，只有作者能取；30 天后连同记录一起删。
+ * 总量闸：桶里留存的图合计到 2 GB、或当天全站收满 300 张就先不收（507，客户端退避重试），
+ * 留在 R2 免费额度（10 GB 存储、每月 100 万次写入）以内。桶上另有 31 天过期的生命周期规则兜底。
  */
 export const ATTACHMENT_MAX_BYTES = 1024 * 1024;
 export const ATTACHMENTS_PER_REPLY = 3;
 const ATTACHMENT_REPLY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const ATTACHMENT_BUDGET_BYTES = 2 * 1024 * 1024 * 1024;
+export const ATTACHMENTS_PER_DAY = 300;
 const REPLY_ID = REPORT_ID;
 const IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png' };
 
@@ -240,6 +244,21 @@ async function attachment(context) {
   }
   if (await overRateLimit(db, await sourceKey(request), now)) return response({ ok: false, error: 'rate_limited' }, 429);
 
+  // 先清掉过期的，再看总量；总量查不到就不收（宁可晚一点传，也不让账单失控）。
+  await pruneAttachments(db, bucket, now);
+  try {
+    const dayStart = `${now.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    const usage = await db.prepare(`
+      SELECT COALESCE(SUM(bytes), 0) AS stored, COALESCE(SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END), 0) AS today
+      FROM letter_attachments
+    `).bind(dayStart).first();
+    if (Number(usage?.stored ?? 0) + bytes.length > ATTACHMENT_BUDGET_BYTES || Number(usage?.today ?? 0) >= ATTACHMENTS_PER_DAY) {
+      return response({ ok: false, error: 'attachments_full' }, 507);
+    }
+  } catch {
+    return response({ ok: false, error: 'storage_unavailable' }, 503);
+  }
+
   const attachmentId = crypto.randomUUID();
   const objectKey = `letters/${replyId}/${attachmentId}.${IMAGE_TYPES[declared]}`;
   try {
@@ -252,7 +271,6 @@ async function attachment(context) {
     try { await bucket.delete(objectKey); } catch { /* 留一个没有记录的对象，下次按前缀清 */ }
     return response({ ok: false, error: 'storage_unavailable' }, 503);
   }
-  await pruneAttachments(db, bucket, now);
   return response({ attachmentId }, 201);
 }
 
