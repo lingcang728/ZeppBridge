@@ -2270,6 +2270,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       grid: 'Grelha de quatro',
       oneOverThree: 'Um sobre três',
       bigLeft: 'Grande à esquerda',
+      expose: 'Vista clássica',
       exposeExit: 'Voltar à vista principal',
       reset: 'Repor disposição',
       hiddenCount: (count: number) =>
@@ -4071,6 +4072,11 @@ Regras:
       allowQuote: 'Pode citar-me anonimamente',
       send: 'Enviar',
       sending: 'A enviar…',
+      charsAria: (count: string, max: string) => `${count} de ${max} caracteres`,
+      attachImage: 'Anexar imagem',
+      attachPreparing: 'A preparar imagem…',
+      removeImage: (index: number) => `Remover imagem ${index}`,
+      attachFailed: 'Não foi possível ler a imagem ou é demasiado grande. Tenta outra.',
       sent: 'Enviada. O recibo aparecerá na sua caixa de correio',
       sendFailed: 'Não foi possível enviar a carta. O rascunho foi guardado. Tente novamente.',
       queued: 'Sem ligação de momento — está na caixa de saída e será enviada assim que estiver online',
@@ -4833,6 +4839,8 @@ Regras:
       'Não foi possível inicializar a ligação para envio de cartas. Reinicie a aplicação e tente novamente.',
     'err.letters.save_failed':
       'A sua resposta não pôde ser guardada neste computador. Verifique o espaço livre em disco e tente novamente.',
+    'err.letters.attachment_invalid':
+      'Uma das imagens não pôde ser lida ou é demasiado grande. Tenta outra.',
     'err.letters.invalid': 'Esta resposta aponta para uma versão incorreta e não foi enviada.',
     'err.letters.empty': 'A resposta está vazia — escreva algumas palavras antes de enviar.',
     'err.letters.rejected':

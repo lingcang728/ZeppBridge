@@ -1,0 +1,15 @@
+Liebe Freundinnen und Freunde von ZeppBridge,
+
+Hallo, ich bin Lingcang. Diesmal ist es ein kleines Update mit dringenden Fehlerbehebungen.
+
+Heute Nachmittag kamen plötzlich zehn Briefe in meinem Briefkasten an. Ich aß gerade bei McDonald’s, als sich mein Personal Agent auf dem Handy pausenlos meldete. Ich dachte schon, es gäbe ein Erdbeben. Als ich sah, dass es eure vielen Rückmeldungen waren – einige davon ziemlich scharf formuliert und offensichtlich dringend –, nahm ich den Rest meines McDonald’s-Essens mit an den Computer und machte mich an die gezielten Korrekturen. Zum Glück schaffe ich es noch, sie heute vor Tagesende zu veröffentlichen.
+
+Einige von euch haben mir geschrieben, die neue Trainingsdetailseite sei „komplett misslungen“ (mir ging es nach dem Lesen genauso). Ihr habt gefragt, ob ich mich vor der Änderung überhaupt in die Lage der Nutzer versetzt hätte. Na gut, das habe ich. Tatsächlich könnt ihr oben rechts auf der Detailseite frei zwischen dem neuen und dem alten Layout wechseln. Im neuen Layout möchte ich diesen Wechsel trotzdem deutlicher machen; vielleicht sollte auch die Schaltfläche zum Zurückschalten etwas größer sein. Bei jeder größeren UI-Änderung ist es schwer, es allen recht zu machen. Selbst Apple wurde zu Beginn von iOS 26 von Hunderten Millionen Nutzerinnen und Nutzern verspottet. Leider bekomme ich es auch nicht besser hin als Apple.
+
+Kaum hatte ich die Krafttrainingsdetails veröffentlicht, schrieb mir schon jemand, dass sie in Wirklichkeit gar nicht funktionierten. Ich habe gründlich nachgesehen und in dieser Version eine Korrektur eingebaut. Ehrlich gesagt war das fast so schwierig wie die Ruckler in der Linux-Version zu beheben, denn in beiden Fällen fehlt mir die eigene Erfahrung: Ich gehe nur selten ins Fitnessstudio. Meine Stärke sind Sportarten im Freien wie Laufen, Bergsteigen und Radfahren; mit meinen eigenen Daten kann ich sie sehr gut optimieren. Über Training in Innenräumen hatte ich im letzten Brief schon geschrieben: Ohne Felipe Dias hätte ich das überhaupt nicht geschafft. Danke dir, mein Freund, und noch einmal vielen Dank für deinen Einsatz. Jetzt kann ich nur im Blindflug versuchen, die Probleme zu beheben. Wenn euch noch etwas auffällt, bombardiert mich gern weiter mit Rückmeldungen. Keine Sorge: Ich esse nur einmal pro Woche bei McDonald’s (na gut, manchmal zweimal).
+
+Heute gab es außerdem ein größeres Update, das eure Antworten an mich etwas komfortabler macht: Ihr könnt jetzt bis zu 3 Screenshots anhängen, um euer Problem zu erklären. Ich denke, drei reichen dafür. Wenn nicht, könnt ihr mir einfach noch einen Brief schreiben. Das Zeichenlimit für Antworten liegt jetzt bei 5.000, und beim Schreiben seht ihr jederzeit, wie viele Zeichen ihr schon geschrieben habt. Probiert es nach dem Lesen einfach aus und schreibt mir ein paar Zeilen – zum Beispiel, was wir noch verbessern können oder welche Funktion ihr euch wünscht.
+
+Ich freue mich auf eure Antworten. Habt eine schöne Winterzeit!
+
+— Lingcang

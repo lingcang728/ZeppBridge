@@ -177,6 +177,11 @@ export default {
       sheetEcho: 'В прошлый раз вы писали',
       sheetReply: 'Ответ',
       page: (index: number, total: number) => `Страница ${index} из ${total}`,
+      charsAria: (count: string, max: string) => `Написано: ${count} из ${max} символов`,
+      attachImage: 'Прикрепить изображение',
+      attachPreparing: 'Подготовка изображения…',
+      removeImage: (index: number) => `Удалить изображение ${index}`,
+      attachFailed: 'Не удалось прочитать изображение или оно слишком большое. Попробуйте другое.',
       acknowledge: 'Понятно',
       letterHead: (version: string) => `ZeppBridge ${version}`,
       postscript: (span: { years?: number; months?: number }) => {
@@ -2694,6 +2699,7 @@ export default {
       grid: 'Сетка 2×2',
       oneOverThree: 'Одна над тремя',
       bigLeft: 'Большая слева',
+      expose: 'Классический вид',
       exposeExit: 'Вернуться к сцене',
       reset: 'Сбросить раскладку',
       hiddenCount: (count: number) =>
@@ -4837,6 +4843,8 @@ export default {
       'Не удалось инициализировать подключение для отправки писем. Перезапустите приложение и попробуйте снова.',
     'err.letters.save_failed':
       'Не удалось сохранить ответ на этом компьютере. Проверьте свободное место на диске и повторите попытку.',
+    'err.letters.attachment_invalid':
+      'Не удалось прочитать одно из изображений или оно слишком большое. Попробуйте выбрать другое.',
     'err.letters.invalid': 'Этот ответ относится к другой версии и не был отправлен.',
     'err.letters.empty': 'Ответ пуст — напишите хотя бы пару слов перед отправкой.',
     'err.letters.rejected': 'Сервер не принял этот ответ. Возможно, нужно обновить приложение.',

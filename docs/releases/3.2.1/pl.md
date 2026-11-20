@@ -1,0 +1,27 @@
+- Added: **Zrzuty ekranu w odpowiedziach**. Do listu możesz dołączyć maksymalnie 3 zrzuty ekranu, przypięte do prawej krawędzi kartki jak zdjęcia; wybierz je przez „Dołącz obraz” lub wklej za pomocą Ctrl+V. Przed wysłaniem są ponownie kompresowane, a informacje o aparacie i lokalizacji usuwane; widzi je tylko autor.
+- Added: **Pasek przewijania w głównym widoku**. Pozostaje ukryty, dopóki nie przewiniesz strony lub nie zbliżysz wskaźnika do prawej krawędzi; można go przeciągać. Na listach treningów i snu oznaczono go latami, a podczas przeciągania pokazuje miesiąc, do którego przewijasz.
+- Added: **Międzynarodowa wersja Qwen w „Wyślij do AI”**. W opcji „Połącz lokalne AI” pojawił się także Qwen Code, a polecenie rejestracji można skopiować jednym kliknięciem.
+- Added: **Instalacja Arch Linux z AUR (#169)**. zeppbridge-git jest już dostępny w AUR, a instrukcja dla Linuksa opisuje teraz instalację z AUR. Podziękowania dla Jax Tsai.
+- Improved: **Limit odpowiedzi wzrósł z 1000 do 5000 znaków**. Licznik jest stale widoczny obok przycisku „Wyślij”, a początkowe puste wiersze, nadmiarowe podziały wierszy i powtarzające się spacje są porządkowane podczas pisania.
+- Improved: **Wysłany list składa się w papierowy samolot i odlatuje**. Okno listu do autora zamyka się, gdy samolot startuje, a chwilę później pojawia się potwierdzenie wysłania.
+- Improved: **Raport diagnostyczny jest teraz pojedynczą etykietą**. Kliknij ją, aby rozwinąć rodzaje problemów; po wybraniu jednego etykieta się zwija. Kliknij ×, aby odłączyć raport.
+- Improved: **„Wszystkie karty” w szczegółach treningu noszą teraz nazwę „Widok klasyczny”**.
+- Improved: **Daty z poprzednich lat pokazują rok**. W treningach, śnie, kopiach zapasowych i wpisach importu wcześniejsze daty zawierają rok; nagłówek szczegółów treningu zawsze go pokazuje.
+- Improved: **Średnie tempo zgadza się z podsumowaniem Zepp**. Jest teraz obliczane jako dystans ÷ czas ruchu, więc zegarki takie jak GTR 4, które zaniżają tempo chwilowe, nie pokazują już wyniku wolniejszego niż podsumowanie.
+- Improved: **Szczegóły snu od razu pokazują całą noc**. Pierścień wyniku i pasek faz snu od początku mają końcowy kształt, a kolor stopniowo pojawia się wzdłuż osi czasu.
+- Improved: **Wartości w podsumowaniu przewijają się po synchronizacji tylko wtedy, gdy się zmienią**. Niezmienione kroki, tętno i czas snu pozostają na miejscu; zmienione wartości płynnie przechodzą cyfra po cyfrze do nowego wyniku.
+- Improved: **Kalendarz historii goi się podczas uzupełniania danych**. W „Starszej historii” miesiące, które właśnie uzupełniono, zmieniają się wzdłuż osi czasu ze szczelin w złote linie.
+- Improved: **Łatwiejsze przejście do szczegółów z ostatnich wpisów**. Szczegóły rozwijają się od klikniętego wiersza, a po powrocie zwijają się z powrotem do niego.
+- Improved: **Import GPX zachowuje podział śladu na odcinki**. Dystans i przewyższenie są sumowane osobno w każdym odcinku, a mapa i ponowny eksport zachowują między nimi przerwy.
+- Improved: **Pełniejszy import i eksport FIT**. Rozpoznawane są podtypy, takie jak kolarstwo górskie i pływanie na wodach otwartych; kilka treningów z jednego pliku jest rozdzielanych na osobne wpisy, a serie ćwiczeń siłowych można importować i eksportować.
+- Improved: **Dokładniejsze porządkowanie danych przez „Wyślij do AI”**. Aktywność dzienna obejmuje wyłącznie wskaźniki aktywności, nocne odczyty gotowości trafiają do regeneracji, a maksymalne i spoczynkowe tętno zapisane przez urządzenie trafiają do PAI.
+- Fixed: **Treningi siłowe zachowują ciężar w każdej serii (#170)**. Ćwiczenia z masą własnego ciała, ruchy na czas ani odpoczynek między seriami nie powodują już utraty ciężaru wszystkich serii w treningu; szczegóły treningów siłowych synchronizowanych przez oficjalną autoryzację są jednorazowo pobierane z „Danych zaawansowanych”, jeśli są połączone. Po aktualizacji dane lokalne są raz przetwarzane w tle, co uzupełnia ciężary i całkowite obciążenie także w starszych treningach. Podziękowania dla yarickbmc.
+- Fixed: **Aktywność górska na T-Rex 3 jest rozpoznawana jako wędrówka**. Nie jest już klasyfikowana jako chód, a starsze wpisy zostaną poprawione podczas przetwarzania w tle.
+- Fixed: **Przerwane przywracanie kopii zapasowej nie uszkadza już bazy danych**. Kopia jest najpierw sprawdzana w tymczasowej bibliotece, a jeśli przywracanie zostanie przerwane, zostanie dokończone przy następnym uruchomieniu aplikacji.
+- Fixed: **Cofnięcie korekty FIT przywraca pełne szczegóły**. Ślad, dystans i tempo są przywracane pole po polu; jeśli brakuje oryginału, aplikacja podpowiada, by odzyskać go z kopii zapasowej lub pliku źródłowego.
+- Fixed: **Import Apple Health zgłasza błąd, gdy odczyt nie powiedzie się w trakcie**. Nie jest już uznawany za zakończony.
+- Fixed: **Główne okno macOS jest wyśrodkowane na ekranach 4K**. Jego część nie wypada już poza prawy dolny róg ekranu.
+- Fixed: **Ponowne otwarcie strony oficjalnej autoryzacji nie pokazuje już tylko invalid_request**. Odświeżenie strony lub powrót do niej z historii ponownie wyświetla instrukcje, a jednoczesne otwarcie tego samego linku kilka razy nadal kończy się powodzeniem.
+- Fixed: **MCP nie zawiesza się już podczas synchronizacji dużych raportów**.
+- Fixed: **Wysyłanie danych do własnej witryny zgłasza błąd, gdy wpisów nie udało się zapisać na dysku**. Aplikacja nie informuje już wtedy o powodzeniu.
+- Fixed: **Docker Compose nie wymaga już podania wszystkich tokenów naraz**. sync i serve korzystają z osobnych tokenów.

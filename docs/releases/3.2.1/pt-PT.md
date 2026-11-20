@@ -1,0 +1,27 @@
+- Added: **Capturas de ecrã nas cartas**. Podes anexar até 3 à margem direita da folha, como fotografias; escolhe-as com «Anexar imagem» ou cola-as com Ctrl+V. Antes do envio, são comprimidas novamente e os metadados da câmara e a localização são removidos. Só o autor as pode ver.
+- Added: **Barra de deslocamento na vista principal**. Fica oculta até deslocares a página ou aproximares o ponteiro da margem direita, e podes arrastá-la; nas listas de treinos e de sono, indica os anos e o mês para o qual estás a arrastar.
+- Added: **Qwen na versão internacional de «Enviar à IA»**. A opção «Ligar uma IA local» também passa a incluir o Qwen Code, com o comando de registo pronto a copiar com um clique.
+- Added: **Instalação no Arch Linux a partir do AUR (#169)**. O zeppbridge-git já está disponível no AUR e o guia para Linux passa a indicar essa instalação. Obrigado ao Jax Tsai.
+- Improved: **Limite das cartas de 1000 para 5000 carateres**. A contagem fica sempre visível ao lado de «Enviar»; linhas vazias no início, quebras repetidas e espaços seguidos são removidos enquanto escreves.
+- Improved: **A carta enviada dobra-se num avião de papel e voa**. A janela fecha-se quando o avião descola, e depois aparece a confirmação de envio.
+- Improved: **Relatório de diagnóstico numa única etiqueta**. Toca-lhe para abrir as categorias do problema; depois de escolher uma, a etiqueta recolhe-se. Toca em × para não anexar o relatório.
+- Improved: **«Todos os cartões» nos detalhes do treino passa a «Vista clássica»**.
+- Improved: **As datas de anos anteriores passam a mostrar o ano**. As datas antigas em treinos, sono, cópias de segurança e registos importados passam a incluir o ano; o cabeçalho dos detalhes do treino mostra-o sempre.
+- Improved: **O ritmo médio passa a coincidir com o resumo da Zepp**. É calculado pela distância ÷ tempo em movimento, pelo que relógios como o GTR 4, cujo ritmo em tempo real é mais lento, deixam de apresentar um valor inferior ao do resumo.
+- Improved: **Os detalhes do sono abrem logo com a noite completa**. O anel de pontuação e a barra das fases têm a forma final desde o início, e as cores aparecem gradualmente ao longo da noite.
+- Improved: **Os números da vista geral só rolam quando mudam após a sincronização**. Os passos, a frequência cardíaca e a duração do sono ficam quietos quando não mudam; caso contrário, cada algarismo rola até ao novo valor.
+- Improved: **O calendário do «Histórico anterior» recompõe-se à medida que o preenches**. Os meses recuperados há pouco passam de fissuras a linhas douradas, seguindo a linha temporal.
+- Improved: **A entrada nos detalhes a partir dos registos recentes é mais fluida**. O detalhe expande-se a partir da linha em que tocas e, ao voltar, recolhe-se para essa mesma linha.
+- Improved: **As importações GPX mantêm os segmentos do percurso**. A distância e a subida acumulam-se dentro de cada segmento; o mapa e as exportações mantêm as interrupções entre segmentos.
+- Improved: **Importação e exportação FIT mais completas**. São reconhecidos subtipos como ciclismo de montanha e águas abertas; vários treinos no mesmo ficheiro tornam-se registos separados, e as séries de força podem ser importadas e exportadas.
+- Improved: **«Enviar à IA» classifica os dados com maior precisão**. A atividade diária inclui apenas métricas de atividade, as leituras noturnas de prontidão passam para recuperação e as leituras de frequência cardíaca máxima e em repouso registadas pelo dispositivo são classificadas como PAI.
+- Fixed: **Pesos por série nos treinos de força (#170)**. Exercícios com peso corporal ou cronometrados e pausas entre séries deixam de apagar os pesos de todas as séries; os treinos sincronizados por autorização oficial vão buscar uma vez os detalhes a Dados avançados, quando estão ligados. Após a atualização, os dados locais são reprocessados em segundo plano para recuperar os pesos e o volume total das sessões anteriores. Obrigado ao yarickbmc.
+- Fixed: **«Montanhismo» no T-Rex 3 passa a ser «Caminhada de montanha»**. Deixa de ser reconhecido como «Caminhada»; os registos anteriores são corrigidos durante o reprocessamento em segundo plano.
+- Fixed: **Uma interrupção no restauro da cópia de segurança já não danifica a base de dados**. O restauro é validado numa biblioteca temporária antes da substituição; se for interrompido, termina da próxima vez que abrires a aplicação.
+- Fixed: **Anular uma correção FIT repõe todos os detalhes**. O percurso, a distância e o ritmo são restaurados campo a campo; se faltar o original, a aplicação indica como recuperá-lo de uma cópia de segurança ou do ficheiro original.
+- Fixed: **As importações do Apple Health mostram um erro se a leitura falhar a meio**. Já não são dadas como concluídas.
+- Fixed: **A janela principal do macOS fica centrada em ecrãs 4K**. Deixa de ficar parcialmente fora do canto inferior direito.
+- Fixed: **Reabrir a página de autorização oficial já não mostra apenas `invalid_request`**. Ao atualizar ou voltar a partir do histórico, as instruções aparecem novamente; abrir a mesma ligação várias vezes ao mesmo tempo também permite concluir a autorização.
+- Fixed: **A sincronização MCP já não bloqueia com relatórios grandes**.
+- Fixed: **O envio para o teu próprio site indica erro se os registos não forem gravados no disco**. Já não apresenta uma mensagem de sucesso.
+- Fixed: **O Docker Compose já não exige todos os tokens à partida**. `sync` e `serve` usam os respetivos tokens.

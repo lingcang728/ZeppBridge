@@ -965,6 +965,11 @@ export default {
     sending: 'Wysyłanie…',
     sent: 'Wysłano. Potwierdzenie odbioru pojawi się w Twojej skrzynce na listy',
     sendFailed: 'Nie udało się wysłać listu. Szkic został zapisany. Spróbuj ponownie.',
+    attachImage: 'Dołącz obraz',
+    attachPreparing: 'Przetwarzanie obrazu…',
+    charsAria: (count: string, max: string) => `Napisano ${count} z ${max} znaków`,
+    removeImage: (index: number) => `Usuń obraz ${index}`,
+    attachFailed: 'Nie można otworzyć tego obrazu albo jest za duży. Spróbuj z innym.',
     queued: 'Brak połączenia w tej chwili — oczekuje w skrzynce nadawczej i zostanie wysłane po połączeniu z siecią',
     alsoAttached: (count: number) => `Załączono: „u mnie też” (${count})`,
     boxTitle: 'Skrzynka na listy',
@@ -1806,6 +1811,7 @@ export default {
     oneOverThree: 'Jedna nad trzema',
     bigLeft: 'Duża po lewej',
     exposeExit: 'Wróć na scenę',
+    expose: 'Widok klasyczny',
     reset: 'Resetuj układ',
     hiddenCount: (count: number) =>
       plural(count, {
@@ -2303,6 +2309,7 @@ export default {
     'err.letters.invalid': 'Ta odpowiedź wskazuje na nieprawidłową wersję i nie została wysłana.',
     'err.letters.empty': 'Odpowiedź jest pusta — napisz kilka słów przed wysłaniem.',
     'err.letters.rejected': 'Serwer nie przyjął tej odpowiedzi. Może być wymagana aktualizacja aplikacji.',
+    'err.letters.attachment_invalid': 'Załączonego obrazu nie można otworzyć albo jest za duży. Wybierz inny i wyślij ponownie.',
     'err.auth.fresh_start_failed': 'Nie udało się przygotować nowego folderu danych — bieżące dane pozostały bez zmian',
     'err.letters.capsule_date': 'Nieprawidłowa data otwarcia — wybierz ją ponownie',
     'err.feedback.toast_failed': 'Nie udało się wyświetlić powiadomienia systemowego',

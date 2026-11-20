@@ -502,6 +502,11 @@ export default {
     send: 'Invia',
     close: 'Chiudi',
     sending: 'Invio in corso…',
+    charsAria: (count: string, max: string) => `${count} di ${max} caratteri`,
+    attachImage: 'Aggiungi immagine',
+    attachPreparing: 'Elaborazione immagine…',
+    removeImage: (index: number) => `Rimuovi l’immagine ${index}`,
+    attachFailed: 'Questa immagine non si può leggere o è troppo grande. Prova con un’altra.',
     sent: 'Inviata. La ricevuta apparirà nella tua cassetta postale',
     sendFailed: 'Impossibile inviare la lettera. La bozza è stata salvata. Riprova.',
     queued: 'Nessuna connessione al momento — è nella posta in uscita e verrà inviata non appena sarai online',
@@ -1721,6 +1726,7 @@ export default {
     grid: 'Griglia 2×2',
     oneOverThree: 'Una sopra, tre sotto',
     bigLeft: 'Grande a sinistra',
+    expose: 'Vista classica',
     exposeExit: 'Torna al layout',
     reset: 'Ripristina layout',
     hiddenCount: (count: number) => `${count} ${count === 1 ? 'nascosta' : 'nascoste'}`,
@@ -5015,6 +5021,8 @@ Regole:
     'Impossibile inizializzare la connessione per l’invio delle lettere. Riavvia l’app e riprova.',
   'err.letters.save_failed':
     'Non è stato possibile salvare la tua risposta su questo computer. Controlla lo spazio su disco e riprova.',
+  'err.letters.attachment_invalid':
+    'Una delle immagini non è leggibile o è troppo grande. Prova con un’altra.',
   'err.letters.invalid':
     'Questa risposta fa riferimento a una versione errata e non è stata inviata.',
   'err.letters.empty':

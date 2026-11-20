@@ -1,0 +1,15 @@
+A tutti gli amici di ZeppBridge:
+
+Ciao, sono Lingcang. Questo è un piccolo aggiornamento urgente.
+
+Oggi pomeriggio, all’improvviso, mi sono arrivate dieci lettere tutte insieme nella cassetta postale. Stavo mangiando da McDonald’s e il Personal Agent sul telefono ha iniziato a mandarmi notifiche senza sosta: mi sono spaventato e per un attimo ho creduto che ci fosse stato un terremoto. Quando ho visto che erano i vostri messaggi, mi sono tranquillizzato; alcuni, certo, avevano toni molto diretti e sembravano davvero urgenti. Così ho lasciato lì metà del mio McDonald’s, sono tornato al computer e ho iniziato a sistemare i problemi. Per fortuna sono riuscito a pubblicare questa versione prima della fine della giornata.
+
+Una persona mi ha scritto che la nuova pagina dei dettagli dell’allenamento era «pessima» (dopo averlo letto, mi sono sentito pessimo anch’io) e mi ha chiesto se, prima di cambiarla, avessi davvero provato a mettermi nei panni di chi la usa. Be’, sì, l’ho fatto. In realtà, nella pagina dei dettagli puoi scegliere liberamente tra il nuovo layout e quello precedente. Cercherò comunque di rendere questa possibilità più chiara nella nuova versione; magari potrei anche ingrandire un po’ il pulsante per ripristinare il layout precedente. Quando si cambia molto l’interfaccia è difficile accontentare tutti: perfino Apple, all’uscita di iOS 26, è stata presa in giro da centinaia di milioni di persone. Mi spiace, ma non credo proprio di poter fare meglio di Apple.
+
+Subito dopo l’introduzione dei dettagli per gli allenamenti di forza, qualcuno mi ha segnalato che in realtà non funzionavano. Ho cercato con attenzione il problema e ho provato a correggerlo in questa versione. A dire il vero, non è stato meno difficile che risolvere gli scatti della versione Linux: in entrambi i casi mi mancano proprio le condizioni per provarli. Vado raramente in palestra; me la cavo meglio con gli sport all’aperto, come corsa, escursionismo e ciclismo, e con i miei dati riesco a ottimizzare molto bene queste attività. Per gli allenamenti al chiuso, nella lettera precedente avevo già detto che senza Felipe Dias non ce l’avrei mai fatta (grazie, fratello, e grazie ancora per tutto quello che hai fatto!). Ora non posso che cercare di correggere le cose un po’ alla cieca. Se c’è ancora qualcosa che non va, continuate pure a «bombardarmi» di segnalazioni. Tranquilli: mangio da McDonald’s una volta alla settimana (va bene, ogni tanto anche due).
+
+Oggi ho aggiunto anche una funzione importante, per rendere più comode le vostre risposte: ora potete allegare fino a 3 screenshot per spiegare il problema. Mi sembra che 3 siano sufficienti per descrivere un problema; se non bastano, potete sempre scrivermi un’altra lettera. Ho anche alzato il limite a 5.000 caratteri e, mentre scrivete, vedrete quanti ne avete già usati. Dopo averla letta, provate pure la funzione: basta anche solo qualche parola. Raccontatemi cos’altro potremmo migliorare o quali funzioni vorreste vedere.
+
+Aspetto le vostre lettere. Vi auguro un inverno sereno!
+
+— Lingcang

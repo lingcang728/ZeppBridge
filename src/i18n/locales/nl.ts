@@ -2670,6 +2670,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       grid: 'Raster van vier',
       oneOverThree: 'Eén boven drie',
       bigLeft: 'Grote kaart links',
+      expose: 'Klassieke weergave',
       exposeExit: 'Terug naar het werkvlak',
       reset: 'Indeling herstellen',
       hiddenCount: (count: number) =>
@@ -4111,6 +4112,11 @@ Regels:
       allowQuote: 'Je mag me anoniem citeren',
       send: 'Versturen',
       sending: 'Bezig met versturen…',
+      charsAria: (count: string, max: string) => 'Je hebt ' + count + ' van de ' + max + ' tekens geschreven',
+      attachImage: 'Afbeelding toevoegen',
+      attachPreparing: 'Afbeelding voorbereiden…',
+      removeImage: (index: number) => 'Afbeelding ' + index + ' verwijderen',
+      attachFailed: 'Deze afbeelding kan niet worden gelezen of is te groot. Probeer een andere afbeelding.',
       sent: 'Verzonden. De ontvangstbevestiging verschijnt in je brievenbus',
       sendFailed: 'De brief kon niet worden verzonden. Je concept is bewaard. Probeer het opnieuw.',
       queued: 'Geen verbinding op dit moment — staat in Postvak UIT en wordt verzonden zodra je online bent',
@@ -4873,6 +4879,8 @@ Regels:
       'Je reactie kon niet op deze computer worden opgeslagen. Controleer de vrije schijfruimte en probeer het opnieuw.',
     'err.letters.invalid':
       'Deze reactie verwijst naar de verkeerde versie en is niet verzonden.',
+    'err.letters.attachment_invalid':
+      'Een van de afbeeldingen kan niet worden gelezen of is te groot. Probeer een andere afbeelding.',
     'err.letters.empty': 'De reactie is leeg — schrijf eerst een paar woorden.',
     'err.letters.rejected':
       'De server heeft deze reactie niet geaccepteerd. Mogelijk moet je de app bijwerken.',

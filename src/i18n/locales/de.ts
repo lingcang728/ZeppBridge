@@ -295,6 +295,8 @@ export default {
       'Die Verbindung zum Versenden von Briefen konnte nicht eingerichtet werden. Starte die App neu und versuche es erneut.',
     'err.letters.save_failed':
       'Deine Antwort konnte auf diesem Computer nicht gespeichert werden. Prüfe den freien Speicherplatz und versuche es erneut.',
+    'err.letters.attachment_invalid':
+      'Eines der Bilder lässt sich nicht öffnen oder ist zu groß. Bitte wähle ein anderes und versuche es erneut.',
     'err.letters.invalid': 'Diese Antwort verweist auf die falsche Version und wurde nicht gesendet.',
     'err.letters.empty': 'Deine Antwort ist leer – schreibe zuerst ein paar Worte.',
     'err.letters.rejected':
@@ -473,6 +475,11 @@ export default {
       allowQuote: 'Du darfst mich anonym zitieren',
       send: 'Absenden',
       sending: 'Wird gesendet…',
+      charsAria: (count: string, max: string) => count + ' von ' + max + ' Zeichen',
+      attachImage: 'Bild anhängen',
+      attachPreparing: 'Bild wird vorbereitet…',
+      removeImage: (index: number) => 'Bild ' + index + ' entfernen',
+      attachFailed: 'Das Bild lässt sich nicht öffnen oder ist zu groß. Bitte probiere ein anderes.',
       sent: 'Gesendet. Die Empfangsbestätigung erscheint in deinem Briefkasten',
       sendFailed: 'Der Brief konnte nicht gesendet werden. Dein Entwurf ist gespeichert. Bitte versuche es erneut.',
       queued: 'Gerade keine Verbindung – liegt im Postausgang und wird gesendet, sobald du online bist',
@@ -509,7 +516,7 @@ export default {
       writeAuthorSub: 'Ob du auf ein Problem stößt, eine Idee hast oder einfach Hallo sagen willst – ich lese jeden Brief und antworte dir',
       authorPlaceholder: 'Ob ein kleines Detail in der App, eine Funktion, die du dir wünschst, oder einfach ein paar Worte – schreib es mir gerne hier. Sobald dein Brief ankommt, antworte ich dir.',
       attachReport: 'Anonymisierten Diagnosebericht anhängen',
-      reportShort: 'Diagnosebericht',
+      reportShort: 'Diagnostik',
       removeReport: 'Diagnosebericht entfernen',
       attachHint: 'Nur App-Version, Feldstrukturen und nicht erkannte Modellnummern – keine Konten, Gesundheitswerte oder Standorte',
       reportFailedPlain: 'Diagnosebericht konnte nicht gesendet werden und wurde entfernt. Tippe erneut auf „Absenden“, um nur den Brief zu verschicken.',
@@ -2979,6 +2986,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       oneOverThree: 'Eine über drei',
       bigLeft: 'Große links',
       exposeExit: 'Zurück zur Bühne',
+      expose: 'Klassische Ansicht',
       reset: 'Layout zurücksetzen',
       hiddenCount: (count: number) => `${count} ${count === 1 ? 'Karte' : 'Karten'} ausgeblendet`,
       restore: 'Klicken, um die Karte zurück auf die Bühne zu holen',
