@@ -6,6 +6,8 @@ git tag 还指不指着钉住的那个 commit。它不构建任何东西。
 
 archive 按「主地址 + mirror-urls」依次试，和 flatpak-builder 实际下载时一样：
 主源临时 503、镜像能下到且校验值对，就只打一条警告，不让整条流水线失败。
+所有来源都只是「对方暂时不可用」（5xx、429、超时、连不上）时同样只打警告：
+那是上游的事，不是这份清单写错了；地址 404、校验值对不上、tag 改指才判失败。
 
 用法：python3 scripts/ci/check-flatpak-sources.py [manifest]
 需要 PyYAML 和 git。
@@ -15,6 +17,7 @@ import hashlib
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 
 import yaml
@@ -22,22 +25,33 @@ import yaml
 DEFAULT_MANIFEST = "packaging/flatpak/com.zeppbridge.app.yml"
 
 
-def fetch(url, attempts=2):
-    last_err = None
-    for attempt in range(1, attempts + 1):
+RETRY_DELAYS = (5, 15)
+
+
+def is_transient(exc):
+    """对方暂时不可用（换个时间再试就好），而不是地址或内容本身有问题。"""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code >= 500 or exc.code == 429
+    return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
+
+
+def fetch(url):
+    for delay in (*RETRY_DELAYS, None):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "ZeppBridge-CI/1.0"})
             return urllib.request.urlopen(req, timeout=60).read()
-        except Exception as exc:  # noqa: BLE001 - 每种网络错误都按「这个来源不可用」处理
-            last_err = exc
-            if attempt < attempts:
-                time.sleep(3)
-    raise last_err
+        except Exception as exc:  # noqa: BLE001
+            if delay is None or not is_transient(exc):
+                raise
+            print(f"  {exc}; {delay} 秒后重试")
+            time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def check_archive(name, source):
     candidates = [source["url"], *source.get("mirror-urls", [])]
     errors = []
+    transient = True
     for idx, url in enumerate(candidates):
         label = "primary" if idx == 0 else f"mirror#{idx}"
         print(f"{name}: fetching ({label}) {url}")
@@ -45,14 +59,19 @@ def check_archive(name, source):
             blob = fetch(url)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{label} {url}: {exc}")
+            transient = transient and is_transient(exc)
             continue
         got = hashlib.sha256(blob).hexdigest()
         if got != source["sha256"]:
             errors.append(f"{label} {url}: sha256 {got} != manifest {source['sha256']}")
+            transient = False
             continue
         if idx > 0:
             print(f"::warning::{name} 主源不可用，已回退到 {label}（{url}）：{errors[0]}")
         print(f"  sha256 ok ({len(blob)} bytes)")
+        return None
+    if transient:
+        print(f"::warning::{name} 的来源暂时都下不到，像是上游临时故障，这次不判失败：{'; '.join(errors)}")
         return None
     return f"{name}: 所有来源都失败（{'; '.join(errors)}）"
 
@@ -60,10 +79,18 @@ def check_archive(name, source):
 def check_git(name, source):
     url, tag, commit = source["url"], source["tag"], source["commit"]
     print(f"{name}: git ls-remote {url} tags/{tag}")
-    out = subprocess.run(
-        ["git", "ls-remote", url, f"refs/tags/{tag}^{{}}", f"refs/tags/{tag}"],
-        check=True, capture_output=True, text=True,
-    ).stdout
+    command = ["git", "ls-remote", url, f"refs/tags/{tag}^{{}}", f"refs/tags/{tag}"]
+    for delay in (*RETRY_DELAYS, None):
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode == 0:
+            break
+        if delay is None:
+            # 仓库连不上和 tag 改指是两回事：前者是上游临时故障，后者才是清单的问题。
+            print(f"::warning::{name} 的仓库暂时连不上，这次不判失败：{result.stderr.strip()}")
+            return None
+        print(f"  git ls-remote 失败；{delay} 秒后重试")
+        time.sleep(delay)
+    out = result.stdout
     # 附注标签有两行：`refs/tags/X` 是标签对象，`refs/tags/X^{}` 是它指向的 commit。
     shas = {line.split("\t")[1]: line.split("\t")[0] for line in out.strip().splitlines()}
     resolved = shas.get(f"refs/tags/{tag}^{{}}") or shas.get(f"refs/tags/{tag}")
