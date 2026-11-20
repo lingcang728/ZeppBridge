@@ -21,12 +21,7 @@ impl SyncManager {
         let mut last_error = None;
         let mut attempted = 0usize;
         for item in pending {
-            if !self
-                .db
-                .lock()
-                .await
-                .workout_detail_request_ready(&item.workout_id)?
-            {
+            if !self.db.lock().await.detail_item_still_ready(&item)? {
                 continue;
             }
             if self.cancel.load(Ordering::SeqCst) {
@@ -50,17 +45,19 @@ impl SyncManager {
                     // 跑步的轨迹和采样永远没有。现在按解析结果记，失败计数照常退避。
                     let parsed = matches!(report.status, StreamStatus::Success);
                     db.record_workout_detail_fetch_result(&item.workout_id, &item.source, parsed)?;
-                    db.record_detail_request(
-                        &item.workout_id,
-                        if empty {
-                            "empty_from_cloud"
-                        } else if parsed {
-                            "persisted"
-                        } else {
-                            "parse_failed"
-                        },
-                        None,
-                    )?;
+                    if !item.supplement {
+                        db.record_detail_request(
+                            &item.workout_id,
+                            if empty {
+                                "empty_from_cloud"
+                            } else if parsed {
+                                "persisted"
+                            } else {
+                                "parse_failed"
+                            },
+                            None,
+                        )?;
+                    }
                     reports.push(report);
                 }
                 Err(error) if error.is_cancelled() => return Err(error),
@@ -68,11 +65,13 @@ impl SyncManager {
                 Err(error) => {
                     tracing::warn!("拉取运动明细 {} 失败: {}", item.workout_id, error);
                     if let Ok(db) = self.write_db().await {
-                        db.record_detail_request(
-                            &item.workout_id,
-                            super::details::detail_failure_status(&error),
-                            Some(error.code()),
-                        )?;
+                        if !item.supplement {
+                            db.record_detail_request(
+                                &item.workout_id,
+                                super::details::detail_failure_status(&error),
+                                Some(error.code()),
+                            )?;
+                        }
                         let _ = db.record_workout_detail_fetch_result(
                             &item.workout_id,
                             &item.source,

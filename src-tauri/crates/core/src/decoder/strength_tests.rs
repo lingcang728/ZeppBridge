@@ -125,3 +125,75 @@ fn running_laps_never_look_like_strength_sets() {
     });
     assert!(parse_strength_sets(data.as_object().unwrap()).is_empty());
 }
+
+/// 自重动作（重量、单位写 -1）、计时动作（次数写 -1）、组间休息行（动作、次数、重量都是 -1）
+/// 夹在负重组中间时，负重组照样带出重量，整场不再因为一行被清空（#170）。
+#[test]
+fn bodyweight_timed_and_rest_rows_do_not_wipe_the_weighted_sets() {
+    let lap = [
+        synthetic_62_col_row(0, 40, 101, 6.0, 60.0, 8, 0, 65, 40_200),
+        synthetic_62_col_row(1, 90, 88, 1.0, -1.0, -1, -1, -1, 90_000),
+        synthetic_62_col_row(2, 35, 104, 5.0, -1.0, 12, -1, 14, 35_000),
+        synthetic_62_col_row(3, 45, 110, 4.0, 0.0, -1, 0, 65, 45_000),
+        synthetic_62_col_row(4, 38, 106, 6.0, 62.5, 6, 0, 65, 38_400),
+    ]
+    .join(";");
+    let data = json!({ "lap": lap });
+    let sets = parse_strength_sets(data.as_object().unwrap());
+    assert_eq!(sets.len(), 4, "休息行不算一组");
+    assert_eq!(
+        sets.iter().map(|s| s.set_index).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert_eq!(sets[0].weight_kg, Some(60.0));
+    // 自重：有次数、没有重量。
+    assert_eq!((sets[1].reps, sets[1].weight_kg), (12, None));
+    assert_eq!(sets[1].weight_unit, "kg");
+    // 计时：次数 -1 记成 0，时长照样留着。
+    assert_eq!((sets[2].reps, sets[2].duration_ms), (0, Some(45_000)));
+    assert_eq!(sets[3].weight_kg, Some(62.5));
+
+    let detail = build_strength_workout_detail(sets, true, None, None, None, None).unwrap();
+    // 8 * 60 + 6 * 62.5 = 855 kg；自重和计时组不计负荷。
+    assert_eq!(detail.total_volume_kg, Some(855.0));
+}
+
+/// 报文带力量训练标记时，距离 / 累计秒那两列不是 0 也照样解析；不带标记时仍按跑步分圈拒掉。
+#[test]
+fn strength_envelope_relaxes_the_running_lap_guard_only_when_present() {
+    let row = |idx: usize| {
+        let mut cols: Vec<String> =
+            synthetic_62_col_row(idx, 30, 100, 3.0, 20.0, 10, 0, 65, 30_000)
+                .split(',')
+                .map(str::to_string)
+                .collect();
+        cols[5] = (30 * (idx + 1)).to_string();
+        cols.join(",")
+    };
+    let lap = format!("{};{}", row(0), row(1));
+    let bare = json!({ "lap": lap });
+    assert!(parse_strength_sets(bare.as_object().unwrap()).is_empty());
+
+    let marked = json!({ "lap": lap, "strengthAssess": "[{\"eq\":[]}]" });
+    let sets = parse_strength_sets(marked.as_object().unwrap());
+    assert_eq!(sets.len(), 2);
+    assert_eq!(sets[1].weight_kg, Some(20.0));
+}
+
+/// 带距离、列数又够多的跑步分圈，仍然不会被当成力量组。
+#[test]
+fn long_running_lap_rows_with_distance_are_still_rejected() {
+    let row = |idx: usize| {
+        let mut cols: Vec<String> =
+            synthetic_62_col_row(idx, 300, 150, 60.0, 0.0, 0, 0, 0, 300_000)
+                .split(',')
+                .map(str::to_string)
+                .collect();
+        cols[2] = "1000".into();
+        cols[5] = (300 * (idx + 1)).to_string();
+        cols[28] = "-1".into();
+        cols.join(",")
+    };
+    let data = json!({ "lap": format!("{};{}", row(0), row(1)) });
+    assert!(parse_strength_sets(data.as_object().unwrap()).is_empty());
+}

@@ -195,9 +195,15 @@ pub struct HistoryStrengthSummary {
 
 /// 判断 detail 对象里的 `lap` 是否为力量训练逐组结构，并解析成 `StrengthSetRow`。
 ///
-/// 跑步/骑行等计圈在 `col[5]` 填递增累计秒数、`col[28]` 为 `-1`；
-/// 力量训练每行至少 44 列（实测 62 列），`col[2] == 0`、`col[5] == 0`、
-/// `col[23] ∈ {0, 1}`（kg/lb）、`col[28] >= 0`（动作编号）。
+/// 跑步/骑行等计圈在 `col[2]` 填距离、`col[5]` 填递增累计秒数；
+/// 力量训练每行 62 列（至少要读到 `col[28]`），`col[2] == 0`、`col[5] == 0`、
+/// `col[21]` 重量、`col[22]` 次数、`col[23]` 单位（0 = kg、1 = lb）、`col[28]` 动作编号、
+/// `col[43]` 毫秒时长（列含义见 #163）。
+///
+/// 结构判断（列数、距离与累计秒为 0）是整份的：有一行不像力量训练，就当它是跑步分圈，整份不要。
+/// 报文自带力量训练标记（`strengthAssess` / `strengthSets` / `type == 52`）时不再看距离和累计秒。
+/// 内容是逐行宽容的：自重动作的重量、单位写 `-1`，计时动作的次数写 `-1`，都只让那一格为空；
+/// 动作编号、次数、重量都没有的行（组间休息）跳过，不算一组。
 pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<StrengthSetRow> {
     let Some(text) = data.get("lap").and_then(Value::as_str).map(str::trim) else {
         return Vec::new();
@@ -214,6 +220,20 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
 
     let mut sets = Vec::new();
     let mut saw_positive_signal = has_strength_envelope;
+    // 带力量训练标记却一组都解析不出来时记一条原因，便于按诊断日志定位新的报文形状。
+    // 只记原因、行号和列数，不记重量、次数等数值。
+    let reject = |reason: &str, row: usize, columns: usize| -> Vec<StrengthSetRow> {
+        if has_strength_envelope {
+            tracing::warn!("力量训练逐组数据未解析：{reason}（第 {row} 行，{columns} 列）");
+        }
+        Vec::new()
+    };
+    let int = |cols: &[&str], at: usize| cols.get(at).and_then(|v| v.trim().parse::<i64>().ok());
+    let float = |cols: &[&str], at: usize| {
+        cols.get(at)
+            .and_then(|v| v.trim().parse::<f64>().ok())
+            .filter(|v| v.is_finite())
+    };
 
     for (position, row) in text
         .split(';')
@@ -221,54 +241,55 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
         .enumerate()
     {
         let cols: Vec<&str> = row.split(',').collect();
-        if cols.len() < 44 {
-            return Vec::new();
+        if cols.len() < 29 {
+            return reject("列数不足", position, cols.len());
         }
-        let (Ok(index), Ok(sec_int), Ok(distance_m), Ok(hr_raw), Ok(elapsed)) = (
-            cols[0].trim().parse::<i64>(),
-            cols[1].trim().parse::<i64>(),
-            cols[2].trim().parse::<f64>(),
-            cols[4].trim().parse::<i64>(),
-            cols[5].trim().parse::<i64>(),
-        ) else {
-            return Vec::new();
-        };
-        let (Ok(weight_raw), Ok(reps), Ok(unit_code), Ok(action_code), Ok(ms_raw)) = (
-            cols[21].trim().parse::<f64>(),
-            cols[22].trim().parse::<i32>(),
-            cols[23].trim().parse::<i32>(),
-            cols[28].trim().parse::<i32>(),
-            cols[43].trim().parse::<i64>(),
-        ) else {
-            return Vec::new();
-        };
+        if int(&cols, 0).is_none() {
+            return reject("行号不是数字", position, cols.len());
+        }
+        if !has_strength_envelope {
+            let distance_m = float(&cols, 2);
+            let elapsed = int(&cols, 5);
+            if distance_m.is_none_or(|d| d.abs() > 1e-6) || elapsed != Some(0) {
+                return reject("距离或累计时间非零", position, cols.len());
+            }
+        }
 
-        if index != position as i64
-            || !distance_m.is_finite()
-            || distance_m.abs() > 1e-6
-            || elapsed != 0
-            || !matches!(unit_code, 0 | 1)
-            || !(0..=10_000).contains(&reps)
-            || !(0..=100_000).contains(&action_code)
-            || !weight_raw.is_finite()
+        let action_code = int(&cols, 28)
+            .filter(|code| (0..=100_000).contains(code))
+            .map(|code| code as i32);
+        let reps = int(&cols, 22)
+            .filter(|reps| (0..=10_000).contains(reps))
+            .map(|reps| reps as i32);
+        let unit_code = int(&cols, 23).filter(|unit| matches!(unit, 0 | 1));
+        let weight_raw = float(&cols, 21)
+            .filter(|w| *w > 0.0 && *w <= 2_000.0)
+            .filter(|_| unit_code.is_some());
+        let ms_raw = int(&cols, 43).unwrap_or(-1);
+        let sec_int = int(&cols, 1).unwrap_or(-1);
+
+        // 组间休息：没有动作、没有次数、没有重量。不算一组。
+        if action_code.is_none() && reps.unwrap_or(0) == 0 && weight_raw.is_none() {
+            continue;
+        }
+        let action_code = action_code.unwrap_or(-1);
+        let reps = reps.unwrap_or(0);
+        if action_code > 0 || reps > 0 || weight_raw.is_some() || unit_code == Some(1) || ms_raw > 0
         {
-            return Vec::new();
-        }
-
-        if action_code > 0 || reps > 0 || weight_raw > 0.0 || unit_code == 1 || ms_raw > 0 {
             saw_positive_signal = true;
         }
 
-        let weight_unit = if unit_code == 1 { "lb" } else { "kg" }.to_string();
-        let (weight_value, weight_kg) = if weight_raw > 0.0 && weight_raw <= 2_000.0 {
-            let kg = if unit_code == 1 {
-                round3(weight_raw * LB_TO_KG)
-            } else {
-                round3(weight_raw)
-            };
-            (Some(round2(weight_raw)), Some(kg))
-        } else {
-            (None, None)
+        let weight_unit = if unit_code == Some(1) { "lb" } else { "kg" }.to_string();
+        let (weight_value, weight_kg) = match weight_raw {
+            Some(raw) => {
+                let kg = if unit_code == Some(1) {
+                    round3(raw * LB_TO_KG)
+                } else {
+                    round3(raw)
+                };
+                (Some(round2(raw)), Some(kg))
+            }
+            None => (None, None),
         };
 
         let duration_ms = if ms_raw > 0 && ms_raw <= 3_600_000 {
@@ -279,17 +300,16 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
             None
         };
 
-        let avg_hr = (1..=250).contains(&hr_raw).then_some(hr_raw as i32);
-        let calories_kcal = cols[15]
-            .trim()
-            .parse::<f64>()
-            .ok()
-            .filter(|val| val.is_finite() && *val >= 0.0 && *val <= 5_000.0)
+        let avg_hr = int(&cols, 4)
+            .filter(|hr| (1..=250).contains(hr))
+            .map(|hr| hr as i32);
+        let calories_kcal = float(&cols, 15)
+            .filter(|val| *val >= 0.0 && *val <= 5_000.0)
             .map(round2);
 
         let (exercise_key, muscle_group) = resolve_strength_action(action_code);
         sets.push(StrengthSetRow {
-            set_index: position as i32 + 1,
+            set_index: sets.len() as i32 + 1,
             action_code,
             exercise_key: exercise_key.map(str::to_string),
             muscle_group: muscle_group.map(str::to_string),
@@ -305,6 +325,9 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
         });
     }
 
+    if sets.is_empty() && has_strength_envelope {
+        tracing::warn!("力量训练逐组数据未解析：每一行都是空的组间休息");
+    }
     if saw_positive_signal {
         sets
     } else {

@@ -41,12 +41,7 @@ impl SyncManager {
                 break;
             }
             // Recheck visibility/success between requests; another writer may have changed it.
-            if !self
-                .db
-                .lock()
-                .await
-                .workout_detail_request_ready(&item.workout_id)?
-            {
+            if !self.db.lock().await.detail_item_still_ready(&item)? {
                 continue;
             }
             on_progress(SyncProgress {
@@ -74,7 +69,9 @@ impl SyncManager {
                     } else {
                         "parse_failed"
                     };
-                    db.record_detail_request(&item.workout_id, status, None)?;
+                    if !item.supplement {
+                        db.record_detail_request(&item.workout_id, status, None)?;
+                    }
                     db.record_workout_detail_fetch_result(
                         &item.workout_id,
                         &item.source,
@@ -83,11 +80,19 @@ impl SyncManager {
                 }
                 Err(error) if error.is_cancelled() => break,
                 Err(error) => {
-                    db.record_detail_request(
-                        &item.workout_id,
-                        detail_failure_status(&error),
-                        Some(error.code()),
-                    )?;
+                    if item.supplement {
+                        db.record_workout_detail_fetch_result(
+                            &item.workout_id,
+                            &item.source,
+                            false,
+                        )?;
+                    } else {
+                        db.record_detail_request(
+                            &item.workout_id,
+                            detail_failure_status(&error),
+                            Some(error.code()),
+                        )?;
+                    }
                     if error.needs_reauth() {
                         return Err(error);
                     }

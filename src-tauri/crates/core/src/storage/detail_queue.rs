@@ -9,6 +9,11 @@ pub struct DetailQueueItem {
     pub status: String,
     pub attempts: i64,
     pub retry_after: Option<String>,
+    /// 官方通道的力量训练向旧通道补拉一次明细（只为逐组重量）。这类条目只记旧通道自己的
+    /// 失败计数（`workout_detail_fetch_attempts`），不写 `workout_detail_requests`——
+    /// 那张表按运动编号记，写了会改掉官方明细的状态。
+    #[serde(default)]
+    pub supplement: bool,
 }
 
 #[cfg(test)]
@@ -56,6 +61,45 @@ mod tests {
             official[0].source, "official",
             "provider wins over a cloud source field"
         );
+    }
+
+    #[test]
+    fn official_strength_workouts_ask_the_advanced_channel_for_their_sets_without_touching_official_state(
+    ) {
+        let db = Database::in_memory().unwrap();
+        workout(&db, "official-lift", true);
+        workout(&db, "official-run", true);
+        db.conn
+            .execute(
+                "UPDATE workouts SET workout_type = 'strength' WHERE workout_id = 'official-lift'",
+                [],
+            )
+            .unwrap();
+        // 官方明细已经入库也要补：逐组重量只在旧通道明细里。
+        db.record_detail_request("official-lift", "persisted", None)
+            .unwrap();
+
+        let advanced = db.pending_history_details(40, false).unwrap();
+        assert_eq!(advanced.len(), 1, "只补力量训练，跑步不补");
+        assert_eq!(advanced[0].workout_id, "official-lift");
+        assert_eq!(advanced[0].source, "run.huami.com");
+        assert!(advanced[0].supplement);
+        assert!(db.detail_item_still_ready(&advanced[0]).unwrap());
+        assert!(
+            db.pending_history_details(40, true)
+                .unwrap()
+                .iter()
+                .all(|item| item.workout_id != "official-lift"),
+            "官方队列里它仍是已入库"
+        );
+
+        for _ in 0..MAX_WORKOUT_DETAIL_ATTEMPTS {
+            db.record_workout_detail_fetch_result("official-lift", "run.huami.com", false)
+                .unwrap();
+        }
+        assert!(db.pending_history_details(40, false).unwrap().is_empty());
+        assert!(!db.detail_item_still_ready(&advanced[0]).unwrap());
+        assert_eq!(db.workout_detail_coverage().unwrap().persisted, 1);
     }
 
     #[test]
@@ -193,6 +237,43 @@ impl Database {
                 status: r.get(3)?,
                 attempts: r.get(4)?,
                 retry_after: r.get(5)?,
+                supplement: false,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// 走官方通道入库的力量训练：官方明细（sportDetail JSON，字段见
+    /// docs/reference/official-api-facts.zh-CN.md）没有可接的逐组字段，重量只在旧通道
+    /// 明细的 `lap` 里（`decoder::strength::parse_strength_sets`）。两条通道的运动编号相同，
+    /// 所以还没有旧通道明细、也还没有逐组数据的，向旧通道补拉一次。旧通道明细到了以后，
+    /// 官方明细按 #143 的规则让位（`storage::official` 里的 `has_legacy_workout_detail`）。
+    fn legacy_strength_supplements(&self, id: Option<&str>) -> Result<Vec<DetailQueueItem>> {
+        let mut statement = self.conn.prepare(
+            "SELECT w.workout_id, w.zepp_source, w.start_time, COALESCE(a.attempts, 0),
+                CASE WHEN a.updated_at IS NOT NULL THEN strftime('%Y-%m-%dT%H:%M:%f+00:00', a.updated_at, '+7 days') END
+             FROM workouts_visible w
+             LEFT JOIN workout_detail_fetch_attempts a ON a.workout_id = w.workout_id AND a.source = w.zepp_source
+             WHERE (?1 IS NULL OR w.workout_id = ?1)
+               AND w.provider = 'official'
+               AND NULLIF(TRIM(w.zepp_source), '') IS NOT NULL
+               AND (w.workout_type = 'strength' OR w.zepp_type = 52
+                    OR COALESCE(TRIM(w.strength_groups_json), '') NOT IN ('', '[]'))
+               AND NOT EXISTS(SELECT 1 FROM workout_imports i WHERE i.workout_id = w.workout_id)
+               AND NOT EXISTS(SELECT 1 FROM workout_strength_sets s WHERE s.workout_id = w.workout_id)
+               AND NOT EXISTS(SELECT 1 FROM raw_records r WHERE r.stream = 'workout_detail'
+                    AND r.source_key = 'workout_detail:' || w.workout_id || ':' || w.zepp_source)
+             ORDER BY COALESCE(a.attempts, 0), w.start_time DESC",
+        )?;
+        let rows = statement.query_map([id], |r| {
+            Ok(DetailQueueItem {
+                workout_id: r.get(0)?,
+                source: r.get(1)?,
+                start_time: r.get(2)?,
+                status: "pending".into(),
+                attempts: r.get(3)?,
+                retry_after: r.get(4)?,
+                supplement: true,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -239,6 +320,19 @@ impl Database {
             .any(|item| Self::detail_ready(item, &now)))
     }
 
+    /// 两次请求之间重查一条是否仍要拉（别的写入者可能已经补上）。补拉条目只看它自己的条件，
+    /// 不看官方明细的状态——官方明细早已入库也照样要补逐组数据。
+    pub fn detail_item_still_ready(&self, item: &DetailQueueItem) -> Result<bool> {
+        if !item.supplement {
+            return self.workout_detail_request_ready(&item.workout_id);
+        }
+        let now = Utc::now().to_rfc3339();
+        Ok(self
+            .legacy_strength_supplements(Some(&item.workout_id))?
+            .iter()
+            .any(|row| row.source == item.source && Self::detail_ready(row, &now)))
+    }
+
     fn detail_ready(item: &DetailQueueItem, now: &str) -> bool {
         !item.source.is_empty()
             && !matches!(item.status.as_str(), "persisted" | "empty_from_cloud")
@@ -252,14 +346,22 @@ impl Database {
         official: bool,
     ) -> Result<Vec<DetailQueueItem>> {
         let now = Utc::now().to_rfc3339();
-        Ok(self
+        let mut items: Vec<DetailQueueItem> = self
             .detail_queue_rows()?
             .into_iter()
             .filter(|item| {
                 (item.source == "official") == official && Self::detail_ready(item, &now)
             })
-            .take(limit.clamp(1, 40))
-            .collect())
+            .collect();
+        if !official {
+            items.extend(
+                self.legacy_strength_supplements(None)?
+                    .into_iter()
+                    .filter(|item| Self::detail_ready(item, &now)),
+            );
+        }
+        items.truncate(limit.clamp(1, 40));
+        Ok(items)
     }
 
     pub fn record_detail_request(&self, id: &str, status: &str, code: Option<&str>) -> Result<()> {
