@@ -1,9 +1,28 @@
 - Added: **Screenshots in replies**. Up to 3, clipped to the right edge of the page like photos; pick them with “Add image” or paste with Ctrl+V. They are recompressed and stripped of camera details and location before upload, and only the author can see them.
 - Added: **A scrollbar for the main view**. It stays hidden until you scroll or move the pointer near the right edge, and you can drag it; on the workout and sleep lists it is marked with years and shows the month you are dragging to.
+- Added: **International Qwen in Send to AI**. Connect a local AI also gains Qwen Code, with its registration command one click away.
+- Added: **Install on Arch Linux from the AUR (#169)**. zeppbridge-git is on the AUR, and the Linux guide now installs from there. Thanks to Jax Tsai.
 - Improved: **Replies can be 5000 characters, up from 1000**. The count is always shown next to “Send”, and leading blank lines, extra blank lines and repeated spaces are tidied as you type.
 - Improved: **A sent letter folds into a paper plane and flies off**. A letter to the author closes its window as the plane takes off, then says it was sent.
 - Improved: **The diagnostic report is a single tag**. Click it to open the issue types, and it closes once you pick one; click × to leave the report out.
+- Improved: **The author’s letter after an update is read to the end**. Esc or clicking outside no longer closes it halfway; “Got it” on the last page does. Rereading it in the letterbox can still be closed at any time.
 - Improved: **“All cards” on workout details is now “Classic view”**.
 - Improved: **Dates from past years show the year**. Workouts, sleep, backups and import records spell out the year for earlier years, and the workout detail header always does.
-- Improved: **The author’s letter after an update is read to the end**. Esc or clicking outside no longer closes it halfway; “Got it” on the last page does. Rereading it in the letterbox can still be closed at any time.
+- Improved: **Average pace matches the Zepp summary**. It is now distance ÷ moving time, so watches like the GTR 4, whose live pace runs slow, no longer come out slower than the summary.
+- Improved: **Sleep details open on the whole night**. The score ring and stage bar have their final shape from the start, and the colour develops along the night.
+- Improved: **Overview numbers only roll when they change after a sync**. Steps, heart rate and sleep time stay put if unchanged and roll digit by digit to the new value if not.
+- Improved: **The history calendar heals as you fill it in**. In “Older history”, months that were just filled in turn from cracks into gold along the timeline.
+- Improved: **Smoother way into details from recent records**. The detail grows out of the row you clicked and shrinks back into it when you return.
+- Improved: **GPX imports keep track segments**. Distance and ascent add up within each segment, and the map and re-exports break between segments.
+- Improved: **Fuller FIT import and export**. Sub-sports such as mountain biking and open water are recognized, several workouts in one file become separate workouts, and strength sets can be exported and imported.
+- Improved: **Send to AI sorts data more accurately**. Daily activity only carries activity metrics, overnight readiness readings go to recovery, and the device’s max and resting heart rate go to PAI.
 - Fixed: **Strength workouts show per-set weights (#170)**. Bodyweight or timed exercises and rest between sets no longer wipe the weights of every set in the workout, and strength workouts synced through official authorization fetch their details once from Advanced data when it is connected. Local data is reprocessed once in the background after updating, filling in weights and total volume for older workouts. Thanks to yarickbmc.
+- Fixed: **Mountaineering on the T-Rex 3 counts as hiking**. It is no longer taken for walking, and older records are corrected during the background reprocess.
+- Fixed: **An interrupted backup restore no longer damages the database**. The restore is checked in a temporary library before it is swapped in, and if it is cut off it finishes the next time you open the app.
+- Fixed: **Undoing a FIT correction restores the full detail**. Track, distance and pace come back field by field; if the original is missing, the app says to recover it from a backup or the original file.
+- Fixed: **Apple Health imports report an error if reading fails partway**. They no longer treat it as finished.
+- Fixed: **The macOS main window is centred on 4K screens**. Part of it no longer falls off the bottom right.
+- Fixed: **Reopening the official authorization page no longer shows just invalid_request**. Refreshing or going back to it shows the instructions again, and opening the same link several times at once still completes.
+- Fixed: **MCP sync no longer hangs on large reports**.
+- Fixed: **Pushing to your own server reports an error if its records could not be written to disk**. It no longer shows success.
+- Fixed: **Docker Compose no longer requires every token up front**. sync and serve each use their own.
