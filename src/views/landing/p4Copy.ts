@@ -51,7 +51,7 @@ const zh: P4Copy = {
       { id: 'letters', title: '信匣', text: '作者每版寄来一封信，你回信，作者会读也会回。每周还有一封你的数据来信。', scene: 'letters' },
     ] },
     { id: 'ai', name: '交给 AI', title: '复用已有订阅，不多花一分钱。', lead: '选好日子，记录变成一个文件。交给常用的 AI，继续对话，再把初稿带回来。', points: [
-      { id: 'providers', title: '七家任选', text: 'ChatGPT、Claude、Gemini、Kimi、DeepSeek、豆包、Grok。沿用你已有的账号和额度。', scene: 'ai' },
+      { id: 'providers', title: '八家任选', text: 'ChatGPT、Claude、Gemini、Kimi、DeepSeek、豆包、Grok、Qwen。沿用你已有的账号和额度。', scene: 'ai' },
       { id: 'prompt', title: '问什么，你说了算', text: '预设的问题可以改，也可以自己写。', scene: 'prompt' },
       { id: 'events', title: '事出有因', text: '记下感冒、旅行、出差，让 AI 多了解一点起伏背后的背景。', scene: 'events' },
       { id: 'autopaste', title: '全自动 · Windows', text: '打开后替你粘贴、发送，每一步先确认页面状态。默认关闭。', scene: 'autopaste' },

@@ -29,7 +29,7 @@ const pack: P4Copy = {
       { id: 'letters', title: 'Letter box', text: 'A letter from the author with every release. Reply, and the author reads it and writes back. Plus a letter about your data every week.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Send to AI', title: 'Use the subscription you already have.', lead: 'Pick the days and your records become one file. Hand it to the AI you already use, keep talking, then bring the draft back.', points: [
-      { id: 'providers', title: 'Seven to choose from', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao and Grok. Your existing account and quota.', scene: 'ai' },
+      { id: 'providers', title: 'Eight to choose from', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok and Qwen. Your existing account and quota.', scene: 'ai' },
       { id: 'prompt', title: 'Ask what you want', text: 'Edit the preset question or write your own.', scene: 'prompt' },
       { id: 'events', title: 'Context matters', text: 'Note a cold, a trip or a business week so the AI knows a little more about the ups and downs.', scene: 'events' },
       { id: 'autopaste', title: 'Fully automatic · Windows', text: 'When on, it pastes and sends for you, checking the page before each step. Off by default.', scene: 'autopaste' },

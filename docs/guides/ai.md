@@ -6,7 +6,7 @@ ZeppBridge can hand your workouts and health records to AI in two ways:
 
 | | Send to AI (copy and paste) | MCP (direct connection) |
 |---|---|---|
-| For | AI on the web: ChatGPT, Claude, Gemini, Kimi, Doubao, DeepSeek, Grok | AI tools installed on your computer: Claude Code, Codex, Claude Desktop and others |
+| For | AI on the web: ChatGPT, Claude, Gemini, Kimi, Doubao, DeepSeek, Grok, Qwen | AI tools installed on your computer: Claude Code, Codex, Claude Desktop and others |
 | How the data gets there | The app writes the data you picked into a `.md` file and you paste it into the chat | The AI queries the local library itself, as needed; health data is read-only |
 | Setup | None | Connect once in Settings |
 
@@ -68,7 +68,7 @@ Open **Settings › AI tools › Connect a local AI**:
 
 - **Claude Code** and **Codex**: the button copies a few commands; paste them into a terminal. They register the MCP server and install ZeppBridge's coaching skill, `zepp-coach`.
 - **Claude Desktop**: the button saves `ZeppBridge.mcpb`; double-click it to install.
-- **OpenCode**, **Grok Build** and **Factory**: the button copies one command (or, for Factory, one config entry).
+- **OpenCode**, **Grok Build**, **Qwen Code** and **Factory**: the button copies one command (or, for Factory, one config entry).
 - **Other clients**: "Copy this and ask your AI" hands that AI a description so it can tell you where its config goes; "Copy just the config snippet" gives you the JSON with the path filled in.
 - ChatGPT on the web cannot reach an MCP server on your computer; use Send to AI above.
 

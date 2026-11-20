@@ -286,7 +286,7 @@ connection; tools that write open a short write connection under the write lock
 `zeppbridge-mcp` next to the app. The generated configuration reads the whole
 library; the **Only shared tasks** switch adds `--scope task`, and the card
 flags clients still registered with the other setting. Presets: Claude Code,
-Codex, Claude Desktop, OpenCode, Grok Build, Factory, and a generic
+Codex, Claude Desktop, OpenCode, Grok Build, Qwen Code, Factory, and a generic
 `mcpServers` JSON for anything else:
 
 - **Claude Code** and **Codex** copy the commands that register the server, add
@@ -298,7 +298,7 @@ Codex, Claude Desktop, OpenCode, Grok Build, Factory, and a generic
   starts the `zeppbridge-mcp` next to the app, so it updates with ZeppBridge;
   the installer closes it before updating, and the card warns when that program
   is older than the app.
-- **OpenCode** and **Grok Build** copy one `mcp add` command; **Factory** copies
+- **OpenCode**, **Grok Build** and **Qwen Code** copy one `mcp add` command; **Factory** copies
   a `~/.factory/mcp.json` entry.
 
 When the library is not the `data` folder next to the executable, the

@@ -49,7 +49,7 @@ impl Server {
     }
 }
 
-/// 各客户端登记的服务，按 `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory` 的顺序。
+/// 各客户端登记的服务，按 `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory` / `qwen` 的顺序。
 fn registered(roots: &ClientConfigRoots) -> Vec<(&'static str, Vec<Server>)> {
     let mut out = Vec::new();
     let mut claude_desktop_dirs = Vec::new();
@@ -94,6 +94,11 @@ fn registered(roots: &ClientConfigRoots) -> Vec<(&'static str, Vec<Server>)> {
         out.push((
             "factory",
             json_servers(&home.join(".factory").join("mcp.json"), &[]),
+        ));
+        // Qwen Code 的用户级设置：`mcpServers.<名字>` 是 `{command, args, env}`，和 Claude 的写法一样。
+        out.push((
+            "qwen",
+            json_servers(&home.join(".qwen").join("settings.json"), &[]),
         ));
     }
     out

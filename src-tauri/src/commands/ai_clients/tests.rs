@@ -218,7 +218,7 @@ fn stale_clients_are_the_ones_pointing_at_another_mcp_program() {
 }
 
 /// 3.1.2 起默认读整个库：指向这一份、但读取范围和开关对不上的客户端要提醒重新连。
-/// 也认 OpenCode（v2 的 `mcp.servers`）、Grok（和 Codex 同一套 TOML）、Factory（`mcpServers`）。
+/// 也认 OpenCode（v2 的 `mcp.servers`）、Grok（和 Codex 同一套 TOML）、Factory 和 Qwen Code（`mcpServers`）。
 #[test]
 fn scope_stale_clients_are_the_ones_registered_with_the_other_scope() {
     use super::stale::{scope_stale_clients, stale_clients, ClientConfigRoots};
@@ -233,6 +233,7 @@ fn scope_stale_clients_are_the_ones_registered_with_the_other_scope() {
     std::fs::create_dir_all(home.join(".grok")).unwrap();
     std::fs::create_dir_all(home.join(".config").join("opencode")).unwrap();
     std::fs::create_dir_all(home.join(".factory")).unwrap();
+    std::fs::create_dir_all(home.join(".qwen")).unwrap();
     std::fs::write(
         home.join(".claude.json"),
         serde_json::json!({ "mcpServers": { "zeppbridge": { "command": current, "args": ["--scope", "task"] } } })
@@ -262,12 +263,21 @@ fn scope_stale_clients_are_the_ones_registered_with_the_other_scope() {
         .to_string(),
     )
     .unwrap();
+    std::fs::write(
+        home.join(".qwen").join("settings.json"),
+        serde_json::json!({ "mcpServers": { "zeppbridge": { "command": current, "args": [] } } })
+            .to_string(),
+    )
+    .unwrap();
     assert_eq!(stale_clients(&roots, &sidecar), ["factory"]);
     assert_eq!(
         scope_stale_clients(&roots, &sidecar, false),
         ["claude_code", "opencode"]
     );
-    assert_eq!(scope_stale_clients(&roots, &sidecar, true), ["grok"]);
+    assert_eq!(
+        scope_stale_clients(&roots, &sidecar, true),
+        ["grok", "qwen"]
+    );
 
     // macOS：Claude Desktop 配置在 ~/Library/Application Support/Claude 下（无 APPDATA）。
     let mac_claude = home

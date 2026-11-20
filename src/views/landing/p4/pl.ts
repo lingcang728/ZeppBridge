@@ -28,7 +28,7 @@ const pack: P4Copy = {
       { id: 'letters', title: 'Skrzynka na listy', text: 'List od autora przy każdej wersji. Jeśli odpiszesz, autor przeczyta i odpowie. Do tego co tydzień list o Twoich danych.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Przekaż do AI', title: 'Wykorzystaj subskrypcję, którą już opłacasz.', lead: 'Wybierz dni, a Twoje dane połączą się w jeden plik. Przekaż go sztucznej inteligencji, z której korzystasz na co dzień, poprowadź rozmowę i przenieś wersję roboczą z powrotem.', points: [
-      { id: 'providers', title: 'Siedem modeli do wyboru', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao i Grok. Wykorzystaj własne konto i dostępny limit.', scene: 'ai' },
+      { id: 'providers', title: 'Osiem modeli do wyboru', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok i Qwen. Wykorzystaj własne konto i dostępny limit.', scene: 'ai' },
       { id: 'prompt', title: 'Pytaj po swojemu', text: 'Edytuj gotowe pytanie lub napisz własne od podstaw.', scene: 'prompt' },
       { id: 'events', title: 'Kontekst ma znaczenie', text: 'Zanotuj przeziębienie, podróż lub intensywny tydzień w pracy, aby AI lepiej rozumiała wahania formy.', scene: 'events' },
       { id: 'autopaste', title: 'Pełna automatyzacja · Windows', text: 'Po włączeniu aplikacja sama wkleja i wysyła treść, weryfikując stan strony przed każdym krokiem. Domyślnie wyłączona.', scene: 'autopaste' },

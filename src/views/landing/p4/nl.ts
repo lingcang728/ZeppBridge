@@ -29,7 +29,7 @@ const pack: P4Copy = {
       { id: 'letters', title: 'Brievenbus', text: 'Een brief van de maker bij elke release. Antwoord en de maker leest en schrijft terug. Plus elke week een brief over je gegevens.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'Naar AI', title: 'Gebruik je vertrouwde abonnementen. Zonder meerkosten.', lead: 'Kies de gewenste dagen: je gegevens worden één bestand. Geef het aan je favoriete AI, praat verder en haal het trainingsplan terug.', points: [
-      { id: 'providers', title: 'Zeven modellen', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao en Grok. Gebruik je bestaande accounts en bundels.', scene: 'ai' },
+      { id: 'providers', title: 'Acht modellen', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok en Qwen. Gebruik je bestaande accounts en bundels.', scene: 'ai' },
       { id: 'prompt', title: 'Vraag wat je wilt', text: 'Pas de standaardsuggestie aan of schrijf je eigen vraag.', scene: 'prompt' },
       { id: 'events', title: 'Context telt', text: 'Noteer een verkoudheid, reis of drukke werkweek zodat de AI pieken en dalen begrijpt.', scene: 'events' },
       { id: 'autopaste', title: 'Volautomatisch · Windows', text: 'Plakt en verstuurt voor je na controle van het actieve venster. Standaard uitgeschakeld.', scene: 'autopaste' },

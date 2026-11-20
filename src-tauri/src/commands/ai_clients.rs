@@ -1,4 +1,4 @@
-//! 设置「交给 AI 工具」卡的「连到本地 AI」（Claude Code、Codex、Claude Desktop、OpenCode、Grok、Factory……）。
+//! 设置「交给 AI 工具」卡的「连到本地 AI」（Claude Code、Codex、Claude Desktop、OpenCode、Grok、Factory、Qwen Code……）。
 //!
 //! 安装包把 `zeppbridge-mcp` 作为 sidecar 放在 `ZeppBridge.exe` 旁边（3B 打包决定；
 //! macOS 在 `ZeppBridge.app/Contents/MacOS/`，deb / rpm 在 `/usr/bin/`，都在主程序旁边），
@@ -37,7 +37,7 @@ pub struct McpSidecar {
     /// 带上这个环境变量，否则 AI 看到的是一个空库。
     pub data_dir_env: Option<String>,
     /// 本机 AI 客户端里登记了**另一份** zeppbridge-mcp 的（多半是 2.x 工具包里的旧版）：
-    /// `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory`。没附带 sidecar 时为空。见 [`stale`]。
+    /// `claude_desktop` / `claude_code` / `codex` / `opencode` / `grok` / `factory` / `qwen`。没附带 sidecar 时为空。见 [`stale`]。
     pub stale_clients: Vec<&'static str>,
     /// 登记的是这一份、但读取范围和「只给共享任务」开关对不上的客户端（3.1.2 起默认读整个库）。
     pub scope_stale_clients: Vec<&'static str>,

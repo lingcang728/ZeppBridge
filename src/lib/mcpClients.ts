@@ -1,4 +1,4 @@
-/* 「连到本地 AI」各客户端的预设（3B 起；3.1.2 加 OpenCode / Grok Build / Factory）。
+/* 「连到本地 AI」各客户端的预设（3B 起；3.1.2 加 OpenCode / Grok Build / Factory；之后加 Qwen Code）。
  *
  * 路径来自后端 get_mcp_sidecar：安装包把 zeppbridge-mcp 放在 ZeppBridge.exe 旁边。
  * 3.1.2 起默认读整个库（不带参数）；设置里「只给共享任务」开着时才带 `--scope task`。
@@ -18,6 +18,7 @@ export const MCP_CLIENT_NAMES: Record<McpClientId, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
   grok: 'Grok Build',
+  qwen: 'Qwen Code',
   factory: 'Factory',
 };
 
@@ -79,6 +80,14 @@ export const grokCommands = (sidecar: McpSidecar): string | null => {
   return ['grok', 'mcp', 'add', '-s', 'user', ...envFlag('-e', sidecar), 'zeppbridge', quote(sidecar.path), ...(args.length ? [quote('--'), ...args] : [])].join(' ');
 };
 
+/** Qwen Code：`qwen mcp add -s user [-e K=V] <名字> <路径> [-- 参数…]`，写进 ~/.qwen/settings.json 的
+ * `mcpServers`；同名的再 add 一次就是更新，不用先删。`-e` 每次只吃一个值，不会吞掉服务名。 */
+export const qwenCommands = (sidecar: McpSidecar): string | null => {
+  if (!sidecar.path) return null;
+  const args = serverArgs(sidecar);
+  return ['qwen', 'mcp', 'add', '-s', 'user', ...envFlag('-e', sidecar), 'zeppbridge', quote(sidecar.path), ...(args.length ? [quote('--'), ...args] : [])].join(' ');
+};
+
 const serverEntry = (sidecar: McpSidecar | null, placeholder: string, extra: Record<string, unknown> = {}) => {
   const server: Record<string, unknown> = { ...extra, command: sidecar?.path ?? placeholder, args: serverArgs(sidecar) };
   if (sidecar?.data_dir_env) server.env = { ZEPPBRIDGE_DATA_DIR: sidecar.data_dir_env };
@@ -99,4 +108,5 @@ export const COMMAND_PRESETS: { id: McpClientId; build: (sidecar: McpSidecar) =>
   { id: 'codex', build: codexCommands },
   { id: 'opencode', build: opencodeCommands },
   { id: 'grok', build: grokCommands },
+  { id: 'qwen', build: qwenCommands },
 ];

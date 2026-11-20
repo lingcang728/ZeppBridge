@@ -242,7 +242,7 @@ stdio 传输，**不监听任何端口**。只有被调用的工具需要时才�
 
 **设置 › 交给 AI 工具 › 连到本地 AI**会填好应用旁边那份 `zeppbridge-mcp` 的真实路径。生成的
 配置读整个库；打开**只给共享任务**时加 `--scope task`，卡片还会标出仍按另一种设置登记的客户端。
-预设：Claude Code、Codex、Claude Desktop、OpenCode、Grok Build、Factory，其余用通用
+预设：Claude Code、Codex、Claude Desktop、OpenCode、Grok Build、Qwen Code、Factory，其余用通用
 `mcpServers` JSON：
 
 - **Claude Code** 和 **Codex**：复制注册服务、把本仓库加为插件市场、装上 `zepp-coach` 技能的
@@ -250,7 +250,7 @@ stdio 传输，**不监听任何端口**。只有被调用的工具需要时才�
   PowerShell 会吞掉裸的 `--`。
 - **Claude Desktop**：保存 `ZeppBridge.mcpb`，双击安装。它启动的是应用旁边那份
   `zeppbridge-mcp`，随 ZeppBridge 一起升级；安装器更新前会先关掉它，那份程序比应用旧时卡片会提醒。
-- **OpenCode** 和 **Grok Build**：复制一行 `mcp add` 命令；**Factory**：复制一段
+- **OpenCode**、**Grok Build** 和 **Qwen Code**：复制一行 `mcp add` 命令；**Factory**：复制一段
   `~/.factory/mcp.json`。
 
 库不是可执行文件旁边的 `data` 时，配置还会设 `ZEPPBRIDGE_DATA_DIR`。没附带 sidecar 的开发构建里

@@ -717,7 +717,7 @@ export interface McpSidecar {
   /** 应用旁边那份 zeppbridge-mcp 比应用旧（更新时被 AI 客户端占着、没换掉）。 */
   outdated?: boolean;
 }
-export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex' | 'opencode' | 'grok' | 'factory';
+export type McpClientId = 'claude_desktop' | 'claude_code' | 'codex' | 'opencode' | 'grok' | 'factory' | 'qwen';
 
 /** 本地 AI 的一次写入（设置 › 本地 AI › AI 最近的改动）。 */
 export interface McpWrite {

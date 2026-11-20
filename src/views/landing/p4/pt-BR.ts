@@ -58,7 +58,7 @@ const pack: P4Copy = {
       title: 'Use as assinaturas que você já tem. Sem custos extras.',
       lead: 'Selecione os dias: seus registros viram um só arquivo. Envie para sua IA de costume, converse e traga o esboço de volta.',
       points: [
-        { id: 'providers', title: 'Sete modelos à escolha', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao e Grok. Use suas contas e limites habituais.', scene: 'ai' },
+        { id: 'providers', title: 'Oito modelos à escolha', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok e Qwen. Use suas contas e limites habituais.', scene: 'ai' },
         { id: 'prompt', title: 'Pergunte como quiser', text: 'Edite a pergunta sugerida ou crie a sua do zero.', scene: 'prompt' },
         { id: 'events', title: 'Contexto faz diferença', text: 'Anote um resfriado, uma viagem ou uma semana corrida para a IA entender melhor suas oscilações.', scene: 'events' },
         { id: 'autopaste', title: 'Automático · Windows', text: 'Cola e envia por você conferindo o estado da janela em cada etapa. Desativado por padrão.', scene: 'autopaste' },

@@ -29,7 +29,7 @@ const pack: P4Copy = {
       { id: 'letters', title: 'Briefkasten', text: 'Zu jeder Version ein Brief vom Autor. Wenn du antwortest, liest er mit und antwortet dir. Dazu jede Woche ein Brief über deine Daten.', scene: 'letters' },
     ] },
     { id: 'ai', name: 'An KI geben', title: 'Nutze Abos, die du schon hast. Ohne Extrakosten.', lead: 'Wähle den Zeitraum: Deine Einträge werden zu einer Datei. Gib sie deiner gewohnten KI, sprich weiter und bring den Planentwurf zurück.', points: [
-      { id: 'providers', title: 'Sieben Modelle zur Wahl', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao und Grok. Mit deinem bestehenden Konto und Kontingent.', scene: 'ai' },
+      { id: 'providers', title: 'Acht Modelle zur Wahl', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok und Qwen. Mit deinem bestehenden Konto und Kontingent.', scene: 'ai' },
       { id: 'prompt', title: 'Frag, wie du willst', text: 'Passe die vorbereitete Frage an oder formuliere deine eigene.', scene: 'prompt' },
       { id: 'events', title: 'Kontext zählt', text: 'Notiere Erkältung, Reisen oder stressige Wochen, damit die KI das Auf und Ab richtig einordnet.', scene: 'events' },
       { id: 'autopaste', title: 'Vollautomatisch · Windows', text: 'Fügt ein und sendet automatisch nach vorheriger Fensterprüfung. Standardmäßig deaktiviert.', scene: 'autopaste' },

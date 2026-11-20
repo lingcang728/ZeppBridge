@@ -192,7 +192,7 @@ asking you to upload the generated file, while the redacted JSON is written to
 `zeppbridge-ai-handoff.json` on your Desktop — or, when no Desktop directory can
 be resolved, to `exports/` in the app data directory. A
 clipboard failure does not open the browser; if the browser fails to open, the
-copied content is kept so you can retry. The seven destination URLs are hard-coded — your input and your prompt cannot
+copied content is kept so you can retry. The eight destination URLs are hard-coded — your input and your prompt cannot
 change them, and they carry no query parameters, health data or prompt text.
 
 The hand-off only copies and opens the destination site. It performs no page

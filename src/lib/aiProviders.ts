@@ -5,6 +5,7 @@ import kimiIcon from '../assets/ai/kimi.png';
 import doubaoIcon from '../assets/ai/doubao.png';
 import deepseekIcon from '../assets/ai/deepseek.png';
 import grokIcon from '../assets/ai/grok.png';
+import qwenIcon from '../assets/ai/qwen.png';
 
 export type AiProviderId =
   | 'chatgpt'
@@ -13,7 +14,8 @@ export type AiProviderId =
   | 'kimi'
   | 'doubao'
   | 'deepseek'
-  | 'grok';
+  | 'grok'
+  | 'qwen';
 
 export interface AiProvider {
   readonly id: AiProviderId;
@@ -85,6 +87,15 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
     localIcon: grokIcon,
     brandColor: '#111827',
     fallback: 'X',
+  },
+  {
+    id: 'qwen',
+    // 国际版 Qwen Chat；国内的通义千问是另一个站点、另一套账号。
+    label: 'Qwen',
+    url: 'https://chat.qwen.ai/',
+    localIcon: qwenIcon,
+    brandColor: '#0828f8',
+    fallback: 'Q',
   },
 ];
 

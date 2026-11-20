@@ -6,7 +6,7 @@ ZeppBridge 把你的运动和健康记录交给 AI 有两条路：
 
 | | 交给 AI（复制粘贴） | MCP 直连 |
 |---|---|---|
-| 适合 | 网页上的 AI：ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok | 装在电脑上的 AI 工具：Claude Code、Codex、Claude Desktop 等 |
+| 适合 | 网页上的 AI：ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok、Qwen | 装在电脑上的 AI 工具：Claude Code、Codex、Claude Desktop 等 |
 | 数据怎么过去 | 应用把选好的数据写成一份 `.md` 文件，你粘贴进对话框 | AI 自己按需查询本机的库，健康数据只读 |
 | 要准备什么 | 什么都不用 | 在设置里连一次 |
 
@@ -68,7 +68,7 @@ MCP 让装在电脑上的 AI 工具直接查 ZeppBridge 的本机数据库，不
 
 - **Claude Code**、**Codex**：点按钮复制几行命令，粘到终端运行。这几行会登记 MCP，并装上 ZeppBridge 的教练技能 `zepp-coach`。
 - **Claude Desktop**：点按钮存一个 `ZeppBridge.mcpb`，双击它安装。
-- **OpenCode**、**Grok Build**、**Factory**：点按钮复制一行命令（Factory 是一段配置）。
+- **OpenCode**、**Grok Build**、**Qwen Code**、**Factory**：点按钮复制一行命令（Factory 是一段配置）。
 - **其他客户端**：点「复制这段去问 AI」把说明交给那个 AI，让它告诉你配置写在哪；或者「只复制配置片段」直接拿到填好路径的 JSON。
 - ChatGPT 网页接不了本机的 MCP，用上面的「交给 AI」就好。
 

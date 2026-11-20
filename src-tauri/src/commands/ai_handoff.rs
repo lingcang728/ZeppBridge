@@ -24,6 +24,7 @@ const TITLES: &[(&str, &[&str])] = &[
     ("doubao", &["豆包", "Doubao"]),
     ("deepseek", &["DeepSeek"]),
     ("grok", &["Grok"]),
+    ("qwen", &["Qwen"]),
 ];
 
 static GENERATION: AtomicU64 = AtomicU64::new(0);

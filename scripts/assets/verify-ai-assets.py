@@ -1,4 +1,4 @@
-"""Verify the seven bundled AI product icons are local, decodable assets.
+"""Verify the eight bundled AI product icons are local, decodable assets.
 
 This gate is intentionally offline. It checks the exact bytes committed in
 src/assets/ai and never follows the documented source URLs at runtime.
@@ -57,6 +57,12 @@ EXPECTED = {
         "sha256": "3A462C3C2524733C173BB05C431DE737812F8219DB8FA115B0025D12A347E086",
         "format": "PNG",
         "size": (512, 512),
+    },
+    "qwen": {
+        "file": "qwen.png",
+        "sha256": "CD9390BC4209C319121D111F3A1F535B3C7DD909B8F860D41ACC9744138D58DF",
+        "format": "PNG",
+        "size": (80, 80),
     },
 }
 

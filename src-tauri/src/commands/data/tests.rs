@@ -630,7 +630,7 @@ fn ai_handoff_inline_limit_includes_exact_two_mib_boundary() {
 }
 
 #[test]
-fn opener_allowlist_is_seven_ai_providers_the_repo_and_the_map_credit() {
+fn opener_allowlist_is_eight_ai_providers_the_repo_and_the_map_credit() {
     let capability: serde_json::Value =
         serde_json::from_str(include_str!("../../../capabilities/default.json")).unwrap();
     let permissions = capability["permissions"].as_array().unwrap();
@@ -654,6 +654,7 @@ fn opener_allowlist_is_seven_ai_providers_the_repo_and_the_map_credit() {
             "https://www.doubao.com/chat/",
             "https://chat.deepseek.com/",
             "https://grok.com/",
+            "https://chat.qwen.ai/",
             // 设置 →「反馈问题」卡里的「点个 Star」（FeedbackSection.vue）。
             "https://github.com/lingcang728/ZeppBridge",
             // 运动详情在线地图的署名链接（lib/mapTiles.ts）。

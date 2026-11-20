@@ -4,7 +4,7 @@ The hand-off destinations are an HTTPS allow-list fixed in code (no user input,
 query or fragment is accepted): `https://chatgpt.com/`, `https://claude.ai/`,
 `https://gemini.google.com/app`, `https://www.kimi.com/`,
 `https://www.doubao.com/chat/`, `https://chat.deepseek.com/`,
-`https://grok.com/`. Tauri Opener permits only those seven plus the project's
+`https://grok.com/`, `https://chat.qwen.ai/`. Tauri Opener permits only those eight plus the project's
 GitHub page and the OpenStreetMap copyright page. The icons are bundled with the app at build time and are never hot-linked from a
 third-party CDN at runtime.
 
@@ -23,7 +23,8 @@ does not run it).
 | Doubao | `src/assets/ai/doubao.png` (PNG 128×128) | [Doubao official CDN product icon](https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/favicon/new-doubao/128x128.png) | `BF8E41BCC864C00099A98080825EA42ABA7CF481303DAD3312F44A5DA68C3F3B` | The Doubao product icon referenced by the official page; copyright/trademark belongs to ByteDance/Doubao, limited to service identification |
 | DeepSeek | `src/assets/ai/deepseek.png` (PNG 180×180) | [DeepSeek official chat app icon](https://fe-static.deepseek.com/chat/icon-180.png) | `547EAD56DCB71424315BA53BF8F4C35E745EFEAECE106B9FB7E4DCDFA19C1A7A` | The official DeepSeek app icon; copyright/trademark belongs to DeepSeek, limited to identifying the DeepSeek service |
 | Grok | `src/assets/ai/grok.png` (PNG 512×512) | [Grok official site app icon](https://grok.com/images/android-chrome-512x512.png) | `3A462C3C2524733C173BB05C431DE737812F8219DB8FA115B0025D12A347E086` | The Grok product site icon (not the xAI corporate mark); copyright/trademark belongs to Grok/xAI, limited to identifying the Grok service |
+| Qwen | `src/assets/ai/qwen.png` (PNG 80×80) | [Qwen Chat official favicon](https://assets.alicdn.com/g/qwenweb/qwen-chat-fe/0.3.48/favicon.png) | `CD9390BC4209C319121D111F3A1F535B3C7DD909B8F860D41ACC9744138D58DF` | The favicon declared by the international Qwen Chat site (retrieved 2026-11-20); copyright/trademark belongs to Alibaba Cloud/Qwen, limited to identifying the Qwen service |
 
 The accessible initial-letter fallback appears in the AI picker only when an
-icon fails to load; the normal path always renders the seven local product icons
+icon fails to load; the normal path always renders the eight local product icons
 above.

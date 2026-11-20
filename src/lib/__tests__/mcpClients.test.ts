@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  claudeCodeCommands, codexCommands, factoryConfig, genericMcpConfig, grokCommands, opencodeCommands,
+  claudeCodeCommands, codexCommands, factoryConfig, genericMcpConfig, grokCommands, opencodeCommands, qwenCommands,
 } from '../mcpClients';
 
 const path = 'C:\\Program Files\\ZeppBridge\\zeppbridge-mcp.exe';
@@ -12,6 +12,7 @@ describe('mcpClients', () => {
     expect(codexCommands(none)).toBeNull();
     expect(opencodeCommands(none)).toBeNull();
     expect(grokCommands(none)).toBeNull();
+    expect(qwenCommands(none)).toBeNull();
   });
 
   it('3.1.2 起默认读整个库：不带 --scope；引号包住 "--" 和带空格的路径', () => {
@@ -21,6 +22,7 @@ describe('mcpClients', () => {
     expect(install).toBe('claude plugin install zepp-coach@zeppbridge');
     expect(opencodeCommands({ path, data_dir_env: null })).toBe(`opencode mcp add --global zeppbridge "--" "${path}"`);
     expect(grokCommands({ path, data_dir_env: null })).toBe(`grok mcp add -s user zeppbridge "${path}"`);
+    expect(qwenCommands({ path, data_dir_env: null })).toBe(`qwen mcp add -s user zeppbridge "${path}"`);
     expect(JSON.parse(genericMcpConfig({ path, data_dir_env: null }, '<x>')).mcpServers.zeppbridge.args).toEqual([]);
   });
 
@@ -30,6 +32,7 @@ describe('mcpClients', () => {
     expect(codexCommands(sidecar)!.split('\n')[0]).toBe(`codex mcp add zeppbridge "--" "${path}" --scope task`);
     expect(opencodeCommands(sidecar)).toBe(`opencode mcp add --global zeppbridge "--" "${path}" --scope task`);
     expect(grokCommands(sidecar)).toBe(`grok mcp add -s user zeppbridge "${path}" "--" --scope task`);
+    expect(qwenCommands(sidecar)).toBe(`qwen mcp add -s user zeppbridge "${path}" "--" --scope task`);
     expect(JSON.parse(factoryConfig(sidecar, '<x>')).mcpServers.zeppbridge).toEqual({
       type: 'stdio', command: path, args: ['--scope', 'task'],
     });
@@ -47,6 +50,7 @@ describe('mcpClients', () => {
       `opencode mcp add --global --env "ZEPPBRIDGE_DATA_DIR=D:\\my data" zeppbridge "--" "${path}"`,
     );
     expect(grokCommands(sidecar)).toBe(`grok mcp add -s user -e "ZEPPBRIDGE_DATA_DIR=D:\\my data" zeppbridge "${path}"`);
+    expect(qwenCommands(sidecar)).toBe(`qwen mcp add -s user -e "ZEPPBRIDGE_DATA_DIR=D:\\my data" zeppbridge "${path}"`);
     const config = JSON.parse(genericMcpConfig(sidecar, '<x>'));
     expect(config.mcpServers.zeppbridge).toEqual({
       command: path,
