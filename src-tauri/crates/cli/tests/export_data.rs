@@ -74,6 +74,7 @@ impl Fixture {
             )
             .unwrap();
             decoded.route.push(RoutePoint {
+                segment_start: false,
                 timestamp,
                 latitude: 22.0,
                 longitude: 114.0,

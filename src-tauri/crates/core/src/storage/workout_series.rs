@@ -345,8 +345,8 @@ impl Database {
         {
             let mut insert = self.conn.prepare(
                 "INSERT INTO route_points
-                    (workout_id, timestamp, latitude, longitude, altitude)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                    (workout_id, timestamp, latitude, longitude, altitude, segment_start)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )?;
             for point in &decoded.route {
                 insert.execute(params![
@@ -355,6 +355,7 @@ impl Database {
                     point.latitude,
                     point.longitude,
                     point.altitude_m,
+                    point.segment_start,
                 ])?;
             }
         }
@@ -502,11 +503,12 @@ impl Database {
 
         let route = {
             let mut stmt = self.conn.prepare(
-                "SELECT timestamp, latitude, longitude, altitude
+                "SELECT timestamp, latitude, longitude, altitude, segment_start
                  FROM route_points WHERE workout_id = ?1 ORDER BY timestamp",
             )?;
             let rows = stmt.query_map([workout_id], |row| {
                 Ok(WorkoutRoutePoint {
+                    segment_start: row.get(4)?,
                     timestamp: row.get(0)?,
                     latitude: row.get(1)?,
                     longitude: row.get(2)?,

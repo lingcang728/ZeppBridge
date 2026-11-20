@@ -128,7 +128,7 @@ impl Database {
             let where_tail =
                 ai_export_samples_where_tail(sample_metric_names.len(), single_workout);
             let provider = if sample_source.is_some() {
-                "provider"
+                "CASE WHEN import_batch_id IS NOT NULL THEN 'imported' ELSE provider END"
             } else {
                 "NULL"
             };
@@ -206,7 +206,7 @@ impl Database {
                         })
                         .push(value);
                 } else {
-                    *emitted.entry(matched_type).or_default() += 1;
+                    *emitted.entry(matched_type.clone()).or_default() += 1;
                     let mut sample = serde_json::json!({
                         "metric": metric,
                         "timestamp": timestamp,
@@ -215,6 +215,9 @@ impl Database {
                         "source_scope": source_scope,
                         "device_label": device_label,
                     });
+                    if sample_source == Some(true) {
+                        sample["_export_type"] = serde_json::json!(matched_type);
+                    }
                     if let Some(provider) = provider {
                         let mut source = crate::records::ProviderFlags::default();
                         source.add(&provider, fetched_at);
@@ -226,6 +229,9 @@ impl Database {
             for (key, bucket) in buckets {
                 *emitted.entry(bucket.selected_type.clone()).or_default() += 1;
                 let mut sample = bucket.render(&key.0, &key.2);
+                if sample_source == Some(true) {
+                    sample["_export_type"] = serde_json::json!(bucket.selected_type);
+                }
                 if let Some(source) = sources.remove(&key) {
                     source.annotate_sample(&mut sample);
                 }
@@ -253,6 +259,13 @@ impl Database {
             "lactate_threshold_pace",
             "pai_daily",
             "pai_total",
+            // 准备度流里随评分一起给的夜间读数和基线。日常活动改成白名单后，
+            // 它们要有自己的归属，否则哪个类型都导不出来。
+            "sleep_hrv",
+            "sleep_rhr",
+            "hrv_baseline",
+            "rhr_baseline",
+            "ahi_baseline",
         ]
         .into_iter()
         .collect();
@@ -313,7 +326,12 @@ impl Database {
                     && selected.contains("lactate_threshold")
                 {
                     Some("lactate_threshold")
-                } else if metric.starts_with("pai") && selected.contains("pai") {
+                } else if (metric.starts_with("pai")
+                    || metric == "device_max_hr"
+                    || metric == "device_resting_hr")
+                    && selected.contains("pai")
+                {
+                    // 设备最大 / 静息心率来自 PAI 流，是 PAI 分区的计算依据。
                     Some("pai")
                 } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
                     Some("hrv_rmssd")
@@ -324,7 +342,22 @@ impl Database {
                     // 的热量是相反的两件事，被兜底扫进「日常活动」就会让读者
                     // 把吃进去的算成烧掉的。没选 food 就整条不导，而不是改标。
                     selected.contains("food").then_some("food")
-                } else if !is_recovery && selected.contains("daily_activity") {
+                } else if selected.contains("daily_activity")
+                    && matches!(
+                        metric.as_str(),
+                        "steps"
+                            | "distance"
+                            | "calories"
+                            | "active_calories"
+                            | "active_minutes"
+                            | "running_distance"
+                            | "cycling_distance"
+                            | "step_goal"
+                            | "calorie_goal"
+                            | "active_minutes_goal"
+                            | "bmr"
+                    )
+                {
                     Some("daily_activity")
                 } else {
                     None
@@ -345,7 +378,14 @@ impl Database {
             for group in folded.into_values() {
                 *produced.entry(group.selected_type.clone()).or_default() += 1;
                 *emitted.entry(group.selected_type.clone()).or_default() += 1;
-                daily_metrics.push(group.render());
+                if sample_source == Some(true) {
+                    let selected_type = group.selected_type.clone();
+                    let mut row = group.render();
+                    row["_export_type"] = serde_json::json!(selected_type);
+                    daily_metrics.push(row);
+                } else {
+                    daily_metrics.push(group.render());
+                }
             }
         }
 

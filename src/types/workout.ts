@@ -80,6 +80,7 @@ export interface WorkoutCodeLabel {
 }
 
 export interface WorkoutRoutePoint {
+  segment_start?: boolean;
   timestamp: string;
   latitude: number;
   longitude: number;

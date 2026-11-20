@@ -10,9 +10,9 @@
 |---|---|---|---|---|---|---|
 | 高级数据同步 / 历史补拉 | ✓ | ✓ 手动、自动、首连后补 180 天 | ✓ `sync` | ✓ `sync_now`（调用 CLI 同步） | — | 拒绝 |
 | 官方开放平台授权与拉取 | ✓ | ✓ 授权经 Cloudflare 中转 | 部分：`workout-details --channel official`；`sync` 只走高级数据 | — | — | 不适用 |
-| 导入（GPX、FIT、Strava 导出包、Apple 健康；Beta 实验室里的 unstrap 备份） | ✓ | ✓ | ✗ | — | — | 不适用 |
+| 导入（保留轨迹分段的 GPX、包含多场运动或力量组的 FIT、Strava 导出包、Apple 健康；Beta 实验室里的 unstrap 备份） | ✓ | ✓ | ✗ | — | — | 不适用 |
 | 本地重解析 | ✓ | ✓ 启动时按修订号自动、设置里手动 | ✓ `reprocess` | — | — | 不适用 |
-| 数据导出（JSON / CSV / GPX / FIT；「带走我的一切」；Beta 实验室里的 unstrap zip） | ✓ | ✓ | ✓ `export`（JSON / CSV / GPX / FIT） | ✓ `export_data`（JSON，最多 366 天） | — | 拒绝 |
+| 数据导出（JSON / CSV / 带分段的 GPX / 含力量组的 FIT；「带走我的一切」；Beta 实验室里的 unstrap zip） | ✓ | ✓ | ✓ `export`（JSON / CSV / GPX / FIT） | ✓ `export_data`（JSON，最多 366 天） | — | 拒绝 |
 | 交给 AI（单个 `.md` 任务包） | ✓ | ✓ | ✗ | 和任务范围共享任务定义 | — | 是它的来源 |
 | 只读查询：运动 / 指标 / 睡眠 / 饮食 / 生活事件 / 数据健康 / 基线 | ✓ | ✓ 各页面 | `status` 只给概况 | ✓ 16 个工具 | 部分：`/health`、`/workouts/{id}/series` | 只管 MCP |
 | 履历写入：伤病、生活事件、比赛、跑鞋、运动感受、运动类型 | ✓ | ✓ 读写 | ✓ `shoes`、`races`、`set-type`、`hide`、`restore` | ✓ 六个写工具，每一次都记进「AI 最近的改动」、可撤销 | — | 拒绝 |

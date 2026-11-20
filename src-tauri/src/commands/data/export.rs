@@ -5,6 +5,31 @@
 
 use super::*;
 
+/// 使用与 CLI 相同的转换器，供桌面运动详情复制 GPX。
+#[tauri::command]
+pub async fn copy_workout_gpx(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    workout_id: String,
+) -> std::result::Result<(), AppError> {
+    use tauri_plugin_clipboard_manager::ClipboardExt as _;
+    let (data, _) = spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.build_ai_export_value(&ExportSelection {
+            scope: Some(zeppbridge_core::models::ExportScope::Workout { workout_id }),
+            start_date: None,
+            end_date: None,
+            data_types: vec!["workouts".to_owned()],
+            detail: ExportDetail::Full,
+        })
+    })
+    .await?;
+    let (text, _) = zeppbridge_core::export_formats::to_gpx(&data)
+        .map_err(|message| AppError::new("err.workout.gpx_no_route", message))?;
+    app.clipboard()
+        .write_text(text)
+        .map_err(|_| AppError::new("err.workout.gpx_clipboard", "无法将 GPX 复制到剪贴板"))
+}
+
 /// 把选中的运动写成 FIT，一次运动一个文件，全部落在 `directory` 下。
 ///
 /// 为什么是目录而不是单个文件：FIT 的 activity 文件按约定装一次活动，而

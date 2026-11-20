@@ -51,6 +51,7 @@ pub(super) fn user_text(error: &ZeppBridgeError) -> String {
     let code = error.code();
     match error {
         ZeppBridgeError::Headless(problem) => problem.english(),
+        ZeppBridgeError::WorkoutFitOriginalMissing => "The original details are missing. Check an earlier backup or the original activity file.".into(),
         ZeppBridgeError::AccountMismatch => "This database already holds another Zepp account's             data, so nothing was written for this account. To switch accounts, move or rename             the data folder, then connect again."
             .to_string(),
         ZeppBridgeError::TimedOut(_) => {

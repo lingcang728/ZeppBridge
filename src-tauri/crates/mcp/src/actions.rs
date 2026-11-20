@@ -10,7 +10,7 @@
 //!   写进数据目录的 `exports\`，只回相对数据目录的文件名和条数（契约：不返回本机绝对路径）。
 
 use super::*;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration as StdDuration, Instant};
 use zeppbridge_core::models::{ExportDetail, ExportScope, ExportSelection};
 
@@ -69,19 +69,25 @@ pub(super) fn run_sync(db: &Database) -> Result<Value, CallFailure> {
         // CREATE_NO_WINDOW：MCP 本身可能挂在没有控制台的 GUI 客户端下，别弹黑框。
         command.creation_flags(0x0800_0000);
     }
-    let mut child = command
+    let child = command
         .spawn()
         .map_err(|error| CallFailure::plain(format!("启动 zeppbridge-cli 失败：{error}")))?;
+    wait_for_sync(child, SYNC_WAIT)
+}
+
+fn wait_for_sync(mut child: Child, wait: StdDuration) -> Result<Value, CallFailure> {
+    let mut stdout = child.stdout.take().expect("stdout is piped");
+    let report_reader = std::thread::spawn(move || {
+        use std::io::Read as _;
+        let mut bytes = Vec::new();
+        stdout.read_to_end(&mut bytes).ok()?;
+        serde_json::from_slice::<Value>(&bytes).ok()
+    });
     let started = Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
-                let mut out = String::new();
-                if let Some(mut stdout) = child.stdout.take() {
-                    use std::io::Read;
-                    let _ = stdout.read_to_string(&mut out);
-                }
-                let report: Value = serde_json::from_str(out.trim()).unwrap_or(Value::Null);
+                let report = report_reader.join().ok().flatten().unwrap_or(Value::Null);
                 return Ok(json!({
                     "state": sync_state(status.code()),
                     "exitCode": status.code(),
@@ -89,18 +95,23 @@ pub(super) fn run_sync(db: &Database) -> Result<Value, CallFailure> {
                     "note": "同步拉的是云端已有的数据；手表还没把数据传到 Zepp App 时，云端没有新东西是正常的。",
                 }));
             }
-            Ok(None) if started.elapsed() < SYNC_WAIT => {
-                std::thread::sleep(StdDuration::from_millis(250));
+            Ok(None) if started.elapsed() < wait => {
+                std::thread::sleep(
+                    StdDuration::from_millis(250).min(wait.saturating_sub(started.elapsed())),
+                );
             }
-            Ok(None) => {
-                // 不杀它：CLI 自己会跑完。之后用 get_data_health 看最近一次同步。
-                return Ok(json!({
-                    "state": "running",
-                    "note": "同步还在后台进行（大段历史可能要几分钟）。稍后用 get_data_health 看最近一次同步的时间和结果，不要重复触发。",
-                }));
-            }
-            Err(error) => {
-                return Err(CallFailure::plain(format!("等待同步结果失败：{error}")));
+            other => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                    let _ = report_reader.join();
+                });
+                return match other {
+                    Ok(_) => Ok(json!({
+                        "state": "running",
+                        "note": "同步还在后台进行（大段历史可能要几分钟）。稍后用 get_data_health 看最近一次同步的时间和结果，不要重复触发。",
+                    })),
+                    Err(error) => Err(CallFailure::plain(format!("等待同步结果失败：{error}"))),
+                };
             }
         }
     }
@@ -171,4 +182,55 @@ pub(super) fn run_export(db: &Database, args: &Value) -> Result<Value, CallFailu
         "range": { "start": start, "end": end },
         "note": "文件在用户本机 ZeppBridge 数据目录的 exports 文件夹里（桌面端设置里能打开数据目录）。这是摘要导出（不含运动轨迹）。要具体数据请直接用读工具，不必读这个文件。",
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const OUTPUT_MARKER: &str = "ZEPPBRIDGE_SYNC_FIXTURE_MARKER";
+
+    #[test]
+    #[ignore = "spawned by the sync pipe regression test"]
+    fn sync_output_fixture() {
+        if let Some(path) = std::env::var_os(OUTPUT_MARKER) {
+            std::thread::sleep(StdDuration::from_millis(200));
+            println!("{}", "x".repeat(512 * 1024));
+            std::fs::write(path, b"finished").unwrap();
+        }
+    }
+
+    #[test]
+    fn sync_drains_large_output_before_and_after_returning_running() {
+        for (timeout, expected) in [
+            (StdDuration::from_secs(5), "done"),
+            (StdDuration::ZERO, "running"),
+        ] {
+            let marker = std::env::temp_dir().join(format!(
+                "zb-sync-{}-{}",
+                std::process::id(),
+                zeppbridge_core::unique_suffix(),
+            ));
+            let child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "actions::tests::sync_output_fixture",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .stdout(Stdio::piped())
+                .env(OUTPUT_MARKER, &marker)
+                .spawn()
+                .unwrap();
+            let report =
+                wait_for_sync(child, timeout).unwrap_or_else(|_| panic!("sync wait failed"));
+            assert_eq!(report["state"], expected);
+            let deadline = Instant::now() + StdDuration::from_secs(5);
+            while !marker.is_file() && Instant::now() < deadline {
+                std::thread::sleep(StdDuration::from_millis(20));
+            }
+            assert!(marker.is_file());
+            std::fs::remove_file(marker).unwrap();
+        }
+    }
 }

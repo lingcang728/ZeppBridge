@@ -161,6 +161,8 @@ pub struct Workout {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorkoutRoutePoint {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub segment_start: bool,
     pub timestamp: String,
     pub latitude: f64,
     pub longitude: f64,

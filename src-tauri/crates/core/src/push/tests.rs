@@ -445,3 +445,27 @@ async fn reconciles_older_local_edits_and_rebuilds_for_a_new_site() {
         .any(|(method, path, _, _)| method == "PUT" && path.ends_with("/backfill.json")));
     assert!(requests.iter().all(|(method, _, _, _)| method != "DELETE"));
 }
+
+#[tokio::test]
+async fn an_unwritable_manifest_fails_the_round_and_can_retry() {
+    let site = fake_site().await;
+    let dir = temp_dir("manifest-write-failure");
+    seed_library(&dir);
+    write_targets(&dir, &site.base, true);
+    let manifest = manifest_path(&push_dir(&dir), "pa");
+    std::fs::create_dir(&manifest).unwrap();
+    let store = store_with_secrets();
+
+    let first = run(&dir, store.clone()).await;
+    assert!(site.hits.load(Ordering::SeqCst) > 0);
+    assert_eq!(first.targets[0].result, "failed");
+    assert_eq!(
+        first.targets[0].error_code.as_deref(),
+        Some("err.push.state_unwritable")
+    );
+
+    std::fs::remove_dir(&manifest).unwrap();
+    let second = run(&dir, store).await;
+    assert_eq!(second.targets[0].result, "ok");
+    assert!(manifest.is_file());
+}

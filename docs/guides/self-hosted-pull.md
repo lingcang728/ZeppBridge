@@ -61,7 +61,7 @@ An unknown parameter, or one given twice, is an error rather than ignored.
 
 ```json
 {
-  "records_version": "zeppbridge.records.v1",
+  "records_version": "zeppbridge.records.v2",
   "query": {
     "types": ["sleep", "workouts"],
     "from": "2026-11-01",
@@ -88,8 +88,8 @@ An unknown parameter, or one given twice, is an error rather than ignored.
   `record_type` is one of `sleep_session`, `workout`, `daily_metric`,
   `metric_sample`, `life_event`, in that order.
 - `source`: `official` = Zepp Open Platform authorization; `advanced` = the
-  account connector; `mixed` = one folded value had readings from both;
-  `user` = calendar context the user wrote. It is read from what each row was
+  account connector; `mixed` = one folded value combines multiple sources;
+  `imported` = local file import; `user` = calendar context the user wrote. It is read from what each row was
   stored from, not guessed. A puller that wants official data only can filter
   on it.
 - `next_cursor` is `null` on the last page. All pages reached through a cursor

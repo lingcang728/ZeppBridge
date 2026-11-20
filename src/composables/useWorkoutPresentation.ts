@@ -101,6 +101,7 @@ export const useWorkoutPresentation = (
     const item = workout.value;
     if (!item) return [];
     const summary = series.value?.summary;
+    const gain = item.elevation_gain_m ?? summary?.elevation_gain_m;
     /* 平均配速 = 距离 ÷ 运动时间，和 Zepp 的运动总结同一个数。逐点实时配速的均值只在
        算不出时兜底：有的表（GTR 4）实时配速一路偏慢，手表总结会按轨迹距离修正，那份均值不会。 */
     const resolvedPace = paceLabel.value !== t.value.notProvided
@@ -138,7 +139,7 @@ export const useWorkoutPresentation = (
       hr(t.value.metricAvgHr, item.avg_hr, WORKOUT_GLYPH.hr),
       { label: hasPauses ? t.value.metricMovingPace : t.value.metricAvgPace, value: hasPauses ? paceText(timing.value!.movingPace) : resolvedPace, ...glyphFields(WORKOUT_GLYPH.pace) },
       ...(hasPauses ? [{ label: t.value.metricElapsedPace, value: paceText(timing.value!.elapsedPace), ...glyphFields(WORKOUT_GLYPH.pace) } as HeroMetric] : []),
-      { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(toElevation(summary.elevation_gain_m)) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? elevationUnitLabel() : undefined, ...glyphFields(WORKOUT_GLYPH.ascent) },
+      { label: t.value.metricAscent, value: isFiniteNumber(gain) ? numberValue(toElevation(gain)) : t.value.notProvided, unit: isFiniteNumber(gain) ? elevationUnitLabel() : undefined, ...glyphFields(WORKOUT_GLYPH.ascent) },
       { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'sleep', icon: 'vo2-max' },
       { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' },
       ...loadMetrics,

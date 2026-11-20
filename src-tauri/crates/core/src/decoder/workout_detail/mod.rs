@@ -42,6 +42,8 @@ fn add_seconds(base: DateTime<Utc>, seconds: i64) -> Option<DateTime<Utc>> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoutePoint {
+    #[serde(default)]
+    pub segment_start: bool,
     pub timestamp: DateTime<Utc>,
     pub latitude: f64,
     pub longitude: f64,
@@ -379,6 +381,7 @@ pub fn decode_workout_detail(
                 meters
             };
             route.push(RoutePoint {
+                segment_start: false,
                 timestamp,
                 latitude: latitude_deg,
                 longitude: longitude_deg,

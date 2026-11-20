@@ -301,6 +301,7 @@ impl Database {
     /// 这次真的升级了（留过快照）并且升级后的库通过完整性检查，就把自动快照
     /// 静默删掉；检查没过就留着，给恢复用。
     fn open_migrated_locked(db_path: &Path) -> Result<Self> {
+        backup::check_incomplete_restore(db_path)?;
         let snapshot_taken = Self::backup_before_schema_change(db_path)?;
         let conn = Connection::open(db_path)?;
         let db = Self::from_connection(conn)?;
@@ -378,6 +379,7 @@ impl Database {
     /// long-running background sync never competes with command paths over
     /// DDL locks (SQLITE_BUSY on ALTER/CREATE INDEX while writing).
     pub fn open_without_migration(db_path: PathBuf) -> Result<Self> {
+        backup::check_incomplete_restore(&db_path)?;
         let conn = Connection::open(db_path)?;
         conn.execute_batch(WRITABLE_PRAGMAS)?;
         Ok(Self::from_conn(conn))

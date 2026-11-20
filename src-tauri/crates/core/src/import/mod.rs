@@ -93,6 +93,7 @@ pub struct ParsedFile {
 /// 一个轨迹点。GPX 与 TCX 都先读成这个。
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TrackPoint {
+    pub segment_start: bool,
     pub time: Option<DateTime<Utc>>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
@@ -132,11 +133,18 @@ pub(crate) fn activity_from_track(
     let mut route = Vec::new();
     let mut distances: BTreeMap<i64, f64> = BTreeMap::new();
     let mut walked = 0.0;
+    let mut segment_start = false;
     let mut last_fix: Option<(f64, f64)> = None;
     let has_own_distance = points.iter().any(|p| p.distance_m.is_some());
     let mut gain = 0.0;
+    let mut has_altitude = false;
     let mut last_altitude: Option<f64> = None;
     for point in &points {
+        if point.segment_start {
+            last_fix = None;
+            last_altitude = None;
+            segment_start = true;
+        }
         let time = point.time?;
         let fix = point.latitude.zip(point.longitude).filter(|(lat, lon)| {
             lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0
@@ -147,11 +155,13 @@ pub(crate) fn activity_from_track(
             }
             last_fix = Some((latitude, longitude));
             route.push(RoutePoint {
+                segment_start: segment_start && !route.is_empty(),
                 timestamp: time,
                 latitude,
                 longitude,
                 altitude_m: point.altitude_m,
             });
+            segment_start = false;
         }
         let distance = if has_own_distance {
             point.distance_m
@@ -163,6 +173,7 @@ pub(crate) fn activity_from_track(
         }
         // 爬升按 1 米噪声底累计，和解码云端明细同一个口径。
         if let Some(altitude) = point.altitude_m {
+            has_altitude = true;
             match last_altitude {
                 Some(previous) if altitude - previous >= 1.0 => {
                     gain += altitude - previous;
@@ -192,7 +203,6 @@ pub(crate) fn activity_from_track(
     let heart: Vec<i32> = samples.iter().filter_map(|s| s.heart_rate).collect();
     let distance_m = distances.values().next_back().copied().filter(|d| *d > 0.0);
     let splits = splits_from_cumulative_distance(&samples, &distances);
-    let has_altitude = last_altitude.is_some();
     Some(ParsedActivity {
         sport,
         start_time,
@@ -224,9 +234,19 @@ pub(crate) fn activity_from_track(
 /// FIT 文件 → 一次运动。
 pub fn activity_from_fit(bytes: &[u8]) -> Option<ParsedActivity> {
     let fit = crate::export_fit::decode_fit_file(bytes).ok()?;
+    Some(parsed_fit(fit))
+}
+
+pub(crate) fn activities_from_fit(bytes: &[u8]) -> Vec<ParsedActivity> {
+    crate::export_fit::decode_fit_activities(bytes)
+        .map(|fits| fits.into_iter().map(parsed_fit).collect())
+        .unwrap_or_default()
+}
+
+fn parsed_fit(fit: crate::export_fit::ImportedFit) -> ParsedActivity {
     let summary = fit.summary;
-    Some(ParsedActivity {
-        sport: fit.sport.map_or("activity", fit_sport).to_string(),
+    ParsedActivity {
+        sport: fit_sport_and_sub_sport(fit.sport, fit.sub_sport).to_string(),
         start_time: fit.decoded.start_time,
         end_time: fit.decoded.end_time,
         distance_m: summary.distance_m,
@@ -237,7 +257,26 @@ pub fn activity_from_fit(bytes: &[u8]) -> Option<ParsedActivity> {
         elevation_gain_m: None,
         decoded: Some(fit.decoded),
         name: None,
-    })
+    }
+}
+
+fn fit_sport_and_sub_sport(sport: Option<u8>, sub_sport: Option<u8>) -> &'static str {
+    use rustyfit::profile::typedef::{Sport, SubSport};
+    match (sport.map(Sport), sub_sport.map(SubSport)) {
+        (Some(Sport::RUNNING), Some(SubSport::TRAIL)) => "trail_running",
+        (Some(Sport::RUNNING), Some(SubSport::TREADMILL)) => "treadmill",
+        (Some(Sport::CYCLING), Some(SubSport::MOUNTAIN)) => "mountain_biking",
+        (Some(Sport::CYCLING), Some(SubSport::ROAD)) => "road_cycling",
+        (Some(Sport::CYCLING), Some(SubSport::INDOOR_CYCLING)) => "indoor_cycling",
+        (Some(Sport::CYCLING), Some(SubSport::SPIN)) => "spinning",
+        (Some(Sport::CYCLING), Some(SubSport::BMX)) => "bmx",
+        (Some(Sport::SWIMMING), Some(SubSport::OPEN_WATER)) => "open_water_swimming",
+        (Some(Sport::TRAINING), Some(SubSport::STRENGTH_TRAINING)) => "strength",
+        (Some(Sport::WALKING), Some(SubSport::INDOOR_WALKING)) => "indoor_walking",
+        (Some(Sport::WALKING), Some(SubSport::SPEED_WALKING)) => "race_walking",
+        (Some(Sport::ALPINE_SKIING), _) => "alpine_skiing",
+        _ => sport.map_or("activity", fit_sport),
+    }
 }
 
 /// FIT `sport` 枚举 → 运动目录 key。只认常见的几种，其余是 `activity`，用户可以再改。
@@ -319,9 +358,8 @@ pub fn read_import_file(
         }
         ImportSource::Strava => strava::parse_strava_archive(BufReader::new(file))
             .ok_or(ImportReadError::NotRecognized)?,
-        ImportSource::AppleHealth if name.ends_with(".xml") => apple::parse_apple_xml(file),
-        ImportSource::AppleHealth => apple::parse_apple_archive(BufReader::new(file))
-            .ok_or(ImportReadError::NotRecognized)?,
+        ImportSource::AppleHealth if name.ends_with(".xml") => apple::parse_apple_xml(file)?,
+        ImportSource::AppleHealth => apple::parse_apple_archive(BufReader::new(file))?,
         ImportSource::Unstrap => unstrap::parse_unstrap_archive(BufReader::new(file))
             .ok_or(ImportReadError::NotRecognized)?,
     };

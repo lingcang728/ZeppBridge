@@ -81,12 +81,25 @@ def check_git(name, source):
     print(f"{name}: git ls-remote {url} tags/{tag}")
     command = ["git", "ls-remote", url, f"refs/tags/{tag}^{{}}", f"refs/tags/{tag}"]
     for delay in (*RETRY_DELAYS, None):
-        result = subprocess.run(command, capture_output=True, text=True)
-        if result.returncode == 0:
-            break
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            reason = "git ls-remote timed out"
+        else:
+            if result.returncode == 0:
+                break
+            reason = result.stderr.strip() or f"git ls-remote exit {result.returncode}"
+            # 只有明确说「仓库不存在 / 无权访问」才是清单的问题；网络层的报错写法太多
+            # （TLS 中断、连接被重置、空回复、5xx……），列不全，一律当临时故障重试。
+            permanent = (
+                "repository not found", "not found", "error: 404", "error: 403",
+                "error: 401", "authentication failed", "could not read username",
+                "does not appear to be a git repository",
+            )
+            if any(message in reason.lower() for message in permanent):
+                return f"{name}: git ls-remote 失败：{reason}"
         if delay is None:
-            # 仓库连不上和 tag 改指是两回事：前者是上游临时故障，后者才是清单的问题。
-            print(f"::warning::{name} 的仓库暂时连不上，这次不判失败：{result.stderr.strip()}")
+            print(f"::warning::{name} 的 Git 来源暂未核验：{reason}")
             return None
         print(f"  git ls-remote 失败；{delay} 秒后重试")
         time.sleep(delay)
@@ -121,7 +134,7 @@ def main():
         for line in failed:
             print(f"::error::{line}")
         return 1
-    print("每个托盘模块的来源都还在，校验值也对得上")
+    print("来源检查结束；暂时无法核验的来源已单独警告")
     return 0
 
 

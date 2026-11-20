@@ -9,7 +9,8 @@ use super::*;
 /// 的 FIT 文件。
 pub(super) fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     let points = merge_series(workout);
-    if points.is_empty() {
+    let sets = array(&workout["strength"], "sets");
+    if points.is_empty() && sets.is_empty() {
         return Ok(None);
     }
 
@@ -19,25 +20,20 @@ pub(super) fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>
             .or_else(|| workout.get("workout_type")),
     ));
 
-    let sample_start = points
+    let points_span = points
         .first()
-        .map(|(timestamp, _)| *timestamp)
-        .expect("points 非空");
-    let sample_end = points
-        .last()
-        .map(|(timestamp, _)| *timestamp)
-        .expect("points 非空");
-
-    // Retain the full recorded activity span even if the first/last sample is
-    // missing. Cloud moving_seconds describes this span, not just sample coverage.
-    let (start_unix, end_unix) = match (
-        parse_unix(text(workout.get("start_time"))),
-        parse_unix(text(workout.get("end_time"))),
-    ) {
-        (Some(start), Some(end)) if start <= sample_start && end >= sample_end && end > start => {
-            (start, end)
-        }
-        _ => (sample_start, sample_end),
+        .zip(points.last())
+        .map(|((first, _), (last, _))| (*first, *last));
+    let declared_span = parse_unix(text(workout.get("start_time")))
+        .zip(parse_unix(text(workout.get("end_time"))))
+        .filter(|(start, end)| end > start);
+    let Some((start_unix, end_unix)) = declared_span
+        .filter(|(start, end)| {
+            points_span.is_none_or(|(first, last)| *start <= first && *end >= last)
+        })
+        .or(points_span)
+    else {
+        return Ok(None);
     };
 
     let mut messages = Vec::new();
@@ -103,6 +99,7 @@ pub(super) fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>
     }
 
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
+    messages.extend(sets.iter().filter_map(strength_set_message));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
     let moving_seconds = timer_seconds(workout, start_unix, end_unix);
@@ -200,6 +197,35 @@ pub(super) fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>
         .map_err(|error| format!("FIT 编码失败: {error:?}"))?;
 
     Ok(Some((buffer.into_inner(), record_count)))
+}
+
+fn strength_set_message(set: &Value) -> Option<Message> {
+    let reps = u16::try_from(set["reps"].as_u64()?)
+        .ok()
+        .filter(|value| *value != u16::MAX)?;
+    let mut fields = vec![
+        enum_field(mesgdef::Set::SET_TYPE, typedef::SetType::ACTIVE.0),
+        u16_field(mesgdef::Set::REPETITIONS, reps),
+    ];
+    if let Some(duration) = set["duration_ms"]
+        .as_u64()
+        .and_then(|value| u32::try_from(value).ok())
+        .filter(|value| *value != u32::MAX)
+    {
+        fields.push(u32_field(mesgdef::Set::DURATION, duration));
+    }
+    if let Some(weight) = set["weight_kg"]
+        .as_f64()
+        .map(|kg| (kg * 16.0).round())
+        .filter(|value| *value > 0.0 && *value < f64::from(u16::MAX))
+    {
+        fields.push(u16_field(mesgdef::Set::WEIGHT, weight as u16));
+    }
+    Some(Message {
+        num: typedef::MesgNum::SET,
+        fields,
+        ..Default::default()
+    })
 }
 
 /// 一个时间点上所有可写的量。字段全是 `Option`：没测到就是没测到。

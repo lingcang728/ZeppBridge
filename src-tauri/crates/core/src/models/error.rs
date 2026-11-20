@@ -198,6 +198,9 @@ pub enum ZeppBridgeError {
     #[error("数据不可用: {0}")]
     DataUnavailable(String),
 
+    #[error("找不到修正前的运动明细。若有修正前的备份或原始运动文件，可从那里找回。")]
+    WorkoutFitOriginalMissing,
+
     #[error("配置错误: {0}")]
     ConfigError(String),
 
@@ -288,6 +291,7 @@ impl ZeppBridgeError {
             Self::Headless(problem) => problem.code(),
             Self::CredentialStore(_) => "err.core.credential_store",
             Self::InvalidHost(_) => "err.core.invalid_host",
+            Self::WorkoutFitOriginalMissing => "err.workout_fit.original_missing",
             Self::ConfigError(_) => "err.core.config",
             Self::TimedOut(_) => "err.core.timed_out",
             Self::Busy(_) => "err.core.busy",
@@ -324,6 +328,7 @@ impl ZeppBridgeError {
             Self::CloudRejected { code, message } => sanitize_user_text(&format!(
                 "Zepp 云端拒绝了这次请求（code {code}）：{message}。如果反复出现，请在设置里重新连接 Zepp 账号。"
             )),
+            Self::WorkoutFitOriginalMissing => self.to_string(),
             Self::Cancelled => "同步已取消".into(),
             Self::AuthError(message)
             | Self::CredentialStore(message)

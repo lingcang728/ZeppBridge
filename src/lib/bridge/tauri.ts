@@ -572,6 +572,10 @@ export const tauriBackend: BridgeBackend = {
     });
   },
 
+  copyWorkoutGpx(workoutId: string) {
+    return call<void>('copy_workout_gpx', { workoutId });
+  },
+
   saveFitExport(selection: ExportSelection, directory: string) {
     return call<ExportResult>('save_fit_export', { selection, directory });
   },

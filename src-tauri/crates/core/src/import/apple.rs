@@ -7,25 +7,31 @@
 
 use std::io::{BufRead, BufReader, Read, Seek};
 
+use quick_xml::{events::Event, Reader, Writer};
+
 use super::gpx::parse_gpx;
 use super::xml::{attr, elements, number, parse_time};
-use super::{text_sport, ParsedActivity, ParsedFile, MAX_IMPORT_FILE_BYTES};
+use super::{text_sport, ImportReadError, ParsedActivity, ParsedFile, MAX_IMPORT_FILE_BYTES};
 
 /// 读 `export.zip`。
-pub fn parse_apple_archive<R: Read + Seek>(reader: R) -> Option<ParsedFile> {
-    let mut archive = zip::ZipArchive::new(reader).ok()?;
-    let export = (0..archive.len()).find_map(|i| {
-        let entry = archive.by_index(i).ok()?;
-        let name = entry.name().to_string();
-        name.rsplit('/')
-            .next()
-            .is_some_and(|tail| tail == "export.xml")
-            .then_some(name)
-    })?;
+pub fn parse_apple_archive<R: Read + Seek>(reader: R) -> Result<ParsedFile, ImportReadError> {
+    let mut archive = zip::ZipArchive::new(reader).map_err(|_| ImportReadError::NotRecognized)?;
+    let export = (0..archive.len())
+        .find_map(|i| {
+            let entry = archive.by_index(i).ok()?;
+            let name = entry.name().to_string();
+            name.rsplit('/')
+                .next()
+                .is_some_and(|tail| tail == "export.xml")
+                .then_some(name)
+        })
+        .ok_or(ImportReadError::NotRecognized)?;
     let root = export.strip_suffix("export.xml").unwrap_or("").to_string();
     let workouts = {
-        let entry = archive.by_name(&export).ok()?;
-        workout_elements(BufReader::new(entry))
+        let entry = archive
+            .by_name(&export)
+            .map_err(|_| ImportReadError::NotRecognized)?;
+        workout_elements(BufReader::new(entry))?
     };
     let mut file = ParsedFile::default();
     for element in workouts {
@@ -50,49 +56,66 @@ pub fn parse_apple_archive<R: Read + Seek>(reader: R) -> Option<ParsedFile> {
         }
         file.activities.push(activity);
     }
-    Some(file)
+    Ok(file)
 }
 
 /// 直接给的 `export.xml`（用户自己解压过）：没有路线可挂，只有汇总。
-pub fn parse_apple_xml<R: Read>(reader: R) -> ParsedFile {
+pub fn parse_apple_xml<R: Read>(reader: R) -> Result<ParsedFile, ImportReadError> {
     let mut file = ParsedFile::default();
-    for element in workout_elements(BufReader::new(reader)) {
+    for element in workout_elements(BufReader::new(reader))? {
         match activity_from_workout(&element) {
             Some(activity) => file.activities.push(activity),
             None => file.unreadable += 1,
         }
     }
-    file
+    Ok(file)
 }
 
-/// 逐行扫出每个 `<Workout …>…</Workout>`。
-fn workout_elements<R: BufRead>(mut reader: R) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut current: Option<String> = None;
-    let mut line = Vec::new();
+/// Keep only workout elements in memory, independent of XML formatting.
+fn workout_elements<R: BufRead>(reader: R) -> Result<Vec<String>, ImportReadError> {
+    let mut reader = Reader::from_reader(reader);
+    let mut scratch = Vec::new();
+    let mut output = Vec::new();
+    let mut workout: Option<Writer<Vec<u8>>> = None;
+    let mut depth = 0usize;
     loop {
-        line.clear();
-        match reader.read_until(b'\n', &mut line) {
-            Ok(0) | Err(_) => break,
-            Ok(_) => {}
-        }
-        let text = String::from_utf8_lossy(&line);
-        let trimmed = text.trim();
-        if let Some(element) = current.as_mut() {
-            element.push_str(trimmed);
-            element.push('\n');
-            if trimmed.starts_with("</Workout>") {
-                out.extend(current.take());
+        let event = reader
+            .read_event_into(&mut scratch)
+            .map_err(|error| match error {
+                quick_xml::Error::Io(error) => {
+                    ImportReadError::Io(std::io::Error::new(error.kind(), error))
+                }
+                _ => ImportReadError::NotRecognized,
+            })?;
+        match event {
+            Event::Eof if depth != 0 => return Err(ImportReadError::NotRecognized),
+            Event::Eof => return Ok(output),
+            Event::Start(ref tag) | Event::Empty(ref tag)
+                if workout.is_none() && tag.name().as_ref() == b"Workout" =>
+            {
+                workout = Some(Writer::new(Vec::new()));
             }
-        } else if trimmed.starts_with("<Workout ") {
-            if trimmed.ends_with("/>") {
-                out.push(trimmed.to_string());
-            } else {
-                current = Some(format!("{trimmed}\n"));
+            _ => {}
+        }
+        match &event {
+            Event::Start(_) => depth += 1,
+            Event::End(_) => depth = depth.checked_sub(1).ok_or(ImportReadError::NotRecognized)?,
+            _ => {}
+        }
+        if let Some(writer) = workout.as_mut() {
+            let complete = matches!(&event, Event::End(tag) if tag.name().as_ref() == b"Workout")
+                || matches!(&event, Event::Empty(tag) if tag.name().as_ref() == b"Workout");
+            writer.write_event(event)?;
+            if complete {
+                let bytes = workout
+                    .take()
+                    .expect("a workout is being read")
+                    .into_inner();
+                output.push(String::from_utf8(bytes).map_err(|_| ImportReadError::NotRecognized)?);
             }
         }
+        scratch.clear();
     }
-    out
 }
 
 fn activity_from_workout(element: &str) -> Option<ParsedActivity> {

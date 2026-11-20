@@ -24,18 +24,18 @@ export async function onRequest({ request, env }) {
   const now = Date.now();
   await purgeExpired(config.db, now);
   const stateHash = await sha256Hex(state);
-  const existing = await config.db
+  const readExisting = () => config.db
     .prepare('SELECT claim_hash, status, error, tokens_enc, created_at FROM oauth_pending WHERE state_hash = ?')
     .bind(stateHash)
     .first();
-  if (existing) {
-    const reusable = existing.status === 'pending'
-      && existing.created_at >= now - PENDING_TTL_MS
-      && sameHex(existing.claim_hash, claimHash);
-    return reusable
-      ? startPage(request, authorizeUrl(config.clientId, state))
-      : resultPage('expired', 400, request);
-  }
+  const pageFor = (row) => row?.status === 'pending'
+    && row.created_at >= Date.now() - PENDING_TTL_MS
+    && sameHex(row.claim_hash, claimHash)
+    ? startPage(request, authorizeUrl(config.clientId, state))
+    : resultPage('expired', 400, request);
+
+  const existing = await readExisting();
+  if (existing) return pageFor(existing);
 
   const pending = await config.db.prepare('SELECT COUNT(*) AS n FROM oauth_pending').first();
   if ((pending?.n ?? 0) >= MAX_PENDING) {
@@ -46,7 +46,7 @@ export async function onRequest({ request, env }) {
               VALUES (?, ?, 'pending', ?) ON CONFLICT(state_hash) DO NOTHING`)
     .bind(stateHash, claimHash, now)
     .run();
-  if (!inserted?.meta?.changes) return resultPage('expired', 400, request);
+  if (!inserted?.meta?.changes) return pageFor(await readExisting());
 
   // 不直接跳走：先给一页说明（连的是什么、下一步去哪、怎么换账号），用户点了再去 Zepp。
   return startPage(request, authorizeUrl(config.clientId, state));

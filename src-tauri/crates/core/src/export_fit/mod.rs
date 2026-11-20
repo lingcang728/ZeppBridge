@@ -18,6 +18,7 @@ pub mod import;
 mod laps;
 mod records;
 
+pub(crate) use import::decode_fit_activities;
 pub use import::{
     decode_fit_file, FitImportError, ImportedFit, ImportedFitSummary, MAX_FIT_IMPORT_BYTES,
 };

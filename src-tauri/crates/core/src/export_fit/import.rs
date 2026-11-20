@@ -24,6 +24,7 @@ use crate::decoder::{
     splits_from_cumulative_distance, DecodedWorkout, PauseInterval, RoutePoint, WorkoutLap,
     WorkoutSample,
 };
+use crate::models::StrengthSetRow;
 
 /// 修正文件的大小上限。一次 24 小时、逐秒记录的活动也只有几 MB。
 pub const MAX_FIT_IMPORT_BYTES: usize = 32 * 1024 * 1024;
@@ -35,6 +36,7 @@ pub struct ImportedFit {
     pub summary: ImportedFitSummary,
     /// FIT `sport` 枚举的原值；文件没写就是 `None`。导入运动（`crate::import`）按它认运动类型。
     pub sport: Option<u8>,
+    pub sub_sport: Option<u8>,
 }
 
 /// 修正文件自己的汇总。缺哪项就是 `None`，存储层不会拿它覆盖云端的值。
@@ -54,9 +56,18 @@ pub enum FitImportError {
     TooLarge,
     NotFit,
     NoActivity,
+    MultipleActivities,
 }
 
 pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
+    let mut activities = decode_fit_activities(bytes)?;
+    if activities.len() != 1 {
+        return Err(FitImportError::MultipleActivities);
+    }
+    Ok(activities.remove(0))
+}
+
+pub(crate) fn decode_fit_activities(bytes: &[u8]) -> Result<Vec<ImportedFit>, FitImportError> {
     if bytes.len() > MAX_FIT_IMPORT_BYTES {
         return Err(FitImportError::TooLarge);
     }
@@ -67,20 +78,83 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
         .map_err(|_| FitImportError::NotFit)?
         .ok_or(FitImportError::NotFit)?;
 
+    let mut sessions: Vec<_> = fit
+        .messages
+        .iter()
+        .filter(|message| message.num == typedef::MesgNum::SESSION)
+        .collect();
+    if sessions.len() <= 1 {
+        return decode_messages(fit.messages.iter()).map(|activity| vec![activity]);
+    }
+    sessions.sort_by_key(|session| timestamp(session, mesgdef::Session::START_TIME));
+    let mut activities = Vec::with_capacity(sessions.len());
+    for (index, session) in sessions.iter().copied().enumerate() {
+        let start =
+            timestamp(session, mesgdef::Session::START_TIME).ok_or(FitImportError::NoActivity)?;
+        let end = session_end(session)
+            .filter(|end| *end > start)
+            .ok_or(FitImportError::NoActivity)?;
+        let next_start = sessions
+            .get(index + 1)
+            .and_then(|session| timestamp(session, mesgdef::Session::START_TIME));
+        let messages = fit.messages.iter().filter(|message| {
+            let at = match message.num {
+                typedef::MesgNum::RECORD => timestamp(message, mesgdef::Record::TIMESTAMP),
+                typedef::MesgNum::EVENT => timestamp(message, mesgdef::Event::TIMESTAMP),
+                typedef::MesgNum::LAP => timestamp(message, mesgdef::Lap::START_TIME),
+                typedef::MesgNum::SET => timestamp(message, mesgdef::Set::START_TIME)
+                    .or_else(|| timestamp(message, mesgdef::Set::TIMESTAMP)),
+                _ => None,
+            };
+            at.is_some_and(|at| at >= start && at <= end && next_start.is_none_or(|next| at < next))
+        });
+        activities.push(decode_messages(messages.chain(std::iter::once(session)))?);
+    }
+    Ok(activities)
+}
+
+fn session_end(session: &Message) -> Option<i64> {
+    let start = timestamp(session, mesgdef::Session::START_TIME);
+    let elapsed = number(session, mesgdef::Session::TOTAL_ELAPSED_TIME)
+        .map(|ms| (ms / 1_000.0).round() as i64);
+    start
+        .zip(elapsed)
+        .map(|(start, elapsed)| start + elapsed)
+        .or_else(|| timestamp(session, mesgdef::Session::TIMESTAMP))
+}
+
+fn decode_messages<'a>(
+    messages: impl Iterator<Item = &'a Message>,
+) -> Result<ImportedFit, FitImportError> {
+    let mut sub_sport = None;
+    let mut strength_sets = Vec::new();
     let mut sport = typedef::Sport(u8::MAX);
     let mut summary = ImportedFitSummary::default();
     let mut records: BTreeMap<i64, Reading> = BTreeMap::new();
     let mut timer_events: Vec<(i64, bool)> = Vec::new();
     let mut laps = Vec::new();
 
-    for message in &fit.messages {
+    for message in messages {
         match message.num {
             typedef::MesgNum::SPORT => {
                 if let Some(value) = number(message, mesgdef::Sport::SPORT) {
                     sport = typedef::Sport(value as u8);
                 }
+                sub_sport = number(message, mesgdef::Sport::SUB_SPORT)
+                    .map(|value| value as u8)
+                    .or(sub_sport);
             }
-            typedef::MesgNum::SESSION => read_session(message, &mut summary, &mut sport),
+            typedef::MesgNum::SESSION => {
+                read_session(message, &mut summary, &mut sport);
+                sub_sport = number(message, mesgdef::Session::SUB_SPORT)
+                    .map(|value| value as u8)
+                    .or(sub_sport);
+            }
+            typedef::MesgNum::SET => {
+                if let Some(set) = read_strength_set(message, strength_sets.len() as i32 + 1) {
+                    strength_sets.push(set);
+                }
+            }
             typedef::MesgNum::RECORD => {
                 if let Some(unix) = timestamp(message, mesgdef::Record::TIMESTAMP) {
                     records.entry(unix).or_default().merge(read_record(message));
@@ -132,7 +206,7 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
     let (Some(start_time), Some(end_time)) = (unix_time(start_unix), unix_time(end_unix)) else {
         return Err(FitImportError::NoActivity);
     };
-    if records.is_empty() && laps.is_empty() {
+    if records.is_empty() && laps.is_empty() && strength_sets.is_empty() {
         return Err(FitImportError::NoActivity);
     }
     summary.start_time = Some(start_time);
@@ -148,6 +222,7 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
         };
         if let (Some(latitude), Some(longitude)) = (reading.latitude, reading.longitude) {
             route.push(RoutePoint {
+                segment_start: false,
                 timestamp: moment,
                 latitude,
                 longitude,
@@ -199,10 +274,11 @@ pub fn decode_fit_file(bytes: &[u8]) -> Result<ImportedFit, FitImportError> {
             pauses,
             splits,
             laps,
-            strength_sets: Vec::new(),
+            strength_sets,
         },
         summary,
         sport: (sport.0 != u8::MAX).then_some(sport.0),
+        sub_sport,
     })
 }
 
@@ -267,6 +343,33 @@ fn read_record(message: &Message) -> Reading {
         power_watts: number(message, mesgdef::Record::POWER),
         distance_m: number(message, mesgdef::Record::DISTANCE).map(|cm| cm / 100.0),
     }
+}
+
+fn read_strength_set(message: &Message, set_index: i32) -> Option<StrengthSetRow> {
+    if number(message, mesgdef::Set::SET_TYPE)
+        .is_some_and(|kind| kind as u8 != typedef::SetType::ACTIVE.0)
+    {
+        return None;
+    }
+    let reps = number(message, mesgdef::Set::REPETITIONS)? as i32;
+    let weight = number(message, mesgdef::Set::WEIGHT)
+        .filter(|value| *value > 0.0)
+        .map(|value| value / 16.0);
+    Some(StrengthSetRow {
+        set_index,
+        action_code: 0,
+        exercise_key: None,
+        muscle_group: None,
+        reps,
+        weight_value: weight,
+        weight_unit: "kg".into(),
+        weight_kg: weight,
+        duration_ms: number(message, mesgdef::Set::DURATION).map(|value| value as i64),
+        avg_hr: None,
+        calories_kcal: None,
+        exercise_name: None,
+        secondary_muscle_groups: Vec::new(),
+    })
 }
 
 fn read_session(message: &Message, summary: &mut ImportedFitSummary, sport: &mut typedef::Sport) {
@@ -426,5 +529,86 @@ mod tests {
             decode_fit_file(b"<gpx></gpx>").unwrap_err(),
             FitImportError::NotFit
         );
+    }
+}
+
+#[cfg(test)]
+mod activity_roundtrip_tests {
+    use super::*;
+    use rustyfit::{proto::FIT, Encoder};
+    use serde_json::json;
+
+    #[test]
+    fn strength_sets_and_sport_subtypes_roundtrip() {
+        let export = json!({"data": {"workouts": [{
+            "workout_id": "fixture-strength",
+            "effective_type": "strength",
+            "start_time": "2024-01-01T10:00:00Z",
+            "end_time": "2024-01-01T10:10:00Z",
+            "strength": {"sets": [{"reps": 12, "weight_kg": 17.5, "duration_ms": 32000}]}
+        }, {
+            "workout_id": "fixture-mtb",
+            "effective_type": "mountain_biking",
+            "start_time": "2024-01-01T11:00:00Z",
+            "end_time": "2024-01-01T11:10:00Z",
+            "samples": [{"timestamp":"2024-01-01T11:00:30Z", "heart_rate": 110}]
+        }, {
+            "workout_id": "fixture-swim",
+            "effective_type": "open_water_swimming",
+            "start_time": "2024-01-01T12:00:00Z",
+            "end_time": "2024-01-01T12:10:00Z",
+            "samples": [{"timestamp":"2024-01-01T12:00:30Z", "heart_rate": 110}]
+        }]}});
+        let (files, _) = crate::export_fit::to_fit(&export).unwrap();
+        assert_eq!(files.len(), 3);
+        let activities = files
+            .iter()
+            .map(|(_, content)| crate::import::activity_from_fit(content).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(activities[0].sport, "strength");
+        let set = &activities[0].decoded.as_ref().unwrap().strength_sets[0];
+        assert_eq!(set.reps, 12);
+        assert_eq!(set.weight_kg, Some(17.5));
+        assert_eq!(set.duration_ms, Some(32_000));
+        assert_eq!(activities[1].sport, "mountain_biking");
+        assert_eq!(activities[2].sport, "open_water_swimming");
+
+        let mut separate = files.into_iter().skip(1).map(|(_, content)| {
+            Decoder::new()
+                .decode(&mut FromStd::new(&mut std::io::Cursor::new(content)))
+                .unwrap()
+                .unwrap()
+                .messages
+        });
+        let mut messages = separate.next().unwrap();
+        let activity = messages.pop().unwrap();
+        assert_eq!(activity.num, typedef::MesgNum::ACTIVITY);
+        messages.extend(separate.next().unwrap().into_iter().skip(1));
+        let mut file = FIT {
+            messages,
+            ..Default::default()
+        };
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        Encoder::new()
+            .encode(FromStd::new(&mut buffer), &mut file)
+            .unwrap();
+        let combined = buffer.into_inner();
+
+        assert_eq!(
+            decode_fit_file(&combined).unwrap_err(),
+            FitImportError::MultipleActivities
+        );
+        let activities = crate::import::activities_from_fit(&combined);
+        assert_eq!(activities.len(), 2);
+        for (activity, sport) in activities
+            .iter()
+            .zip(["mountain_biking", "open_water_swimming"])
+        {
+            assert_eq!(activity.sport, sport);
+            let decoded = activity.decoded.as_ref().unwrap();
+            assert_eq!(decoded.samples.len(), 1);
+            assert!(decoded.samples[0].timestamp >= decoded.start_time);
+            assert!(decoded.samples[0].timestamp <= decoded.end_time);
+        }
     }
 }

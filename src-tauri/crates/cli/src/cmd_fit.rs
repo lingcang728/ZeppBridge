@@ -195,6 +195,10 @@ fn load_fit(path: &Path) -> Result<LoadedFit, (&'static str, String)> {
             "not_fit",
             "This is not a .fit file ZeppBridge can read".into(),
         ),
+        FitImportError::MultipleActivities => (
+            "multiple_activities",
+            "Use a FIT file with one session to correct an existing workout.".into(),
+        ),
         FitImportError::NoActivity => (
             "fit_no_activity",
             "This .fit has no activity in it (no records and no laps)".into(),

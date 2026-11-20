@@ -363,7 +363,7 @@ fn the_sqlite_group_moves_and_comes_back_together() {
     assert_eq!(std::fs::read(dir.join("zepp.db-wal")).unwrap(), b"wal");
     assert_eq!(std::fs::read(dir.join("zepp.db-shm")).unwrap(), b"shm");
 
-    remove_sqlite_group(&live);
+    remove_sqlite_group(&live).unwrap();
     assert!(!live.exists());
     assert!(!dir.join("zepp.db-wal").exists());
     assert!(!dir.join("zepp.db-shm").exists());
@@ -633,6 +633,77 @@ fn a_writer_killed_in_another_process_frees_the_lock_and_the_queued_restore_runs
         .expect("被结束的进程不能留下锁"),
     );
     let outcome = apply_pending_restore(&dir).expect("排队文件还在");
+    assert!(outcome.succeeded, "{outcome:?}");
+    assert!(pending_restore(&dir).is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn restore_resumes_at_each_boundary_while_moving_the_original_library() {
+    use rusqlite::config::DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE;
+
+    for moved_sidecars in 0..=SQLITE_SIDECARS.len() {
+        let dir = temp_dir("restore-interrupted");
+        let db = seed(&dir, 3);
+        db.conn
+            .execute_batch(
+                "CREATE TABLE restore_marker(value TEXT);
+                               INSERT INTO restore_marker VALUES ('snapshot');",
+            )
+            .unwrap();
+        drop(db);
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        let pending = stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+
+        let live = database_path(&dir);
+        let previous = dir.join("zepp.db.restore-previous");
+        let conn = rusqlite::Connection::open(&live).unwrap();
+        conn.set_db_config(SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)
+            .unwrap();
+        conn.execute_batch(
+            "PRAGMA wal_autocheckpoint=0;
+                            UPDATE restore_marker SET value='original WAL';",
+        )
+        .unwrap();
+        drop(conn);
+        assert!(sidecar(&live, "-wal").exists());
+
+        std::fs::rename(&live, &previous).unwrap();
+        for suffix in SQLITE_SIDECARS.into_iter().take(moved_sidecars) {
+            if sidecar(&live, suffix).exists() {
+                std::fs::rename(sidecar(&live, suffix), sidecar(&previous, suffix)).unwrap();
+            }
+        }
+
+        assert!(Database::open_migrated(&live).is_err());
+        let outcome = apply_pending_restore(&dir).unwrap();
+        assert!(outcome.succeeded, "{outcome:?}");
+        assert!(pending_restore(&dir).is_none());
+        assert!(!sidecar(&live, "-wal").exists());
+        for path in [&live, &snapshot_path(&dir, &pending.rollback_backup_id)] {
+            let db = Database::open_read_only_any_version(path.clone()).unwrap();
+            let value: String = db
+                .conn
+                .query_row("SELECT value FROM restore_marker", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(value, "snapshot");
+        }
+    }
+}
+
+#[test]
+fn a_leftover_original_copy_does_not_block_the_next_restore() {
+    let dir = temp_dir("restore-leftover-previous");
+    drop(seed(&dir, 3));
+    let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+    // 上一次恢复已经完成，只是旧库副本没删掉（Windows 上句柄未释放时会这样）。
+    let previous = dir.join("zepp.db.restore-previous");
+    std::fs::copy(database_path(&dir), &previous).unwrap();
+
+    stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+    assert!(!previous.exists());
+    assert!(Database::open_migrated(&database_path(&dir)).is_ok());
+    let outcome = apply_pending_restore(&dir).unwrap();
     assert!(outcome.succeeded, "{outcome:?}");
     assert!(pending_restore(&dir).is_none());
     let _ = std::fs::remove_dir_all(&dir);

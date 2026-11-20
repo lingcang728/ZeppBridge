@@ -68,6 +68,26 @@ pub(super) fn current_schema_version(data_dir: &Path) -> i64 {
 /// 打开任何连接，替换才可能真正原子。
 pub fn stage_restore(data_dir: &Path, id: &str, app_version: &str) -> Result<PendingRestore> {
     validate_backup_id(id)?;
+    // 同步可能正在落库：等它放下写锁，而不是让用户点了恢复就立刻碰上「忙」。
+    let _guard = write_lock::acquire_with_timeout(
+        data_dir,
+        WritePurpose::Restore,
+        std::time::Duration::from_secs(30),
+    )
+    .map_err(map_write_lock)?;
+    if pending_restore(data_dir).is_none() {
+        // 没有待办说明上一次恢复已经完成（待办在完成时最先删除），剩下的只是
+        // 清理没删掉的旧库副本。留着它会让新的恢复认为换库做到一半，所有写入
+        // 和取消都被拦住。
+        if database_path(data_dir).try_exists()? {
+            remove_sqlite_group(&previous_path(data_dir))?;
+        }
+        remove_if_present(&publication_path(data_dir))?;
+    } else if publication_path(data_dir).exists() || previous_path(data_dir).exists() {
+        return Err(ZeppBridgeError::Busy(
+            "恢复已开始，请重启以完成恢复。".into(),
+        ));
+    }
     let preview = restore_preview(data_dir, id)?;
     if !preview.can_restore {
         return Err(ZeppBridgeError::DataUnavailable(
@@ -85,7 +105,7 @@ pub fn stage_restore(data_dir: &Path, id: &str, app_version: &str) -> Result<Pen
     };
     let encoded = serde_json::to_vec_pretty(&pending)
         .map_err(|error| ZeppBridgeError::ParseError(format!("无法写入恢复计划: {error}")))?;
-    std::fs::write(data_dir.join(PENDING_RESTORE_FILE), encoded)?;
+    crate::paths::write_file_atomically(&data_dir.join(PENDING_RESTORE_FILE), &encoded)?;
     Ok(pending)
 }
 
@@ -100,62 +120,37 @@ pub fn cancel_pending_restore(data_dir: &Path) -> Result<()> {
     cancel_pending_restore_unlocked(data_dir)
 }
 
-/// 调用方已经持有写锁时用。成功恢复清排队文件也走这里（锁已放下）。
+/// 调用方持有写锁时使用。
 pub fn cancel_pending_restore_unlocked(data_dir: &Path) -> Result<()> {
-    let path = data_dir.join(PENDING_RESTORE_FILE);
-    if path.exists() {
-        std::fs::remove_file(path)?;
+    if publication_path(data_dir).exists() || previous_path(data_dir).exists() {
+        return Err(ZeppBridgeError::Busy(
+            "恢复已开始，请重启以完成恢复。".into(),
+        ));
     }
+    remove_if_present(&data_dir.join(PENDING_RESTORE_FILE))?;
     Ok(())
 }
 
-/// 在任何连接打开之前执行排队的恢复。
-///
-/// 步骤：拿恢复写锁 → 再校验一次 → 拷到临时文件 → 校验临时文件 → 原子换名
-/// → 清掉旧 WAL/SHM。失败**不**删除排队文件，下次启动再试。
 pub fn apply_pending_restore(data_dir: &Path) -> Option<RestoreOutcome> {
     let pending = pending_restore(data_dir)?;
-    let outcome = apply_pending_restore_locked(data_dir, &pending);
-    if outcome.succeeded {
-        // 写锁已经在 `apply_pending_restore_locked` 里放下了（`open_resilient`
-        // 自己还要拿迁移锁，同一把不可重入）。这里只清排队文件。
-        let _ = cancel_pending_restore_unlocked(data_dir);
-    }
-    Some(outcome)
-}
-
-pub(super) fn apply_pending_restore_locked(
-    data_dir: &Path,
-    pending: &PendingRestore,
-) -> RestoreOutcome {
-    let guard = match write_lock::try_acquire(data_dir, WritePurpose::Restore) {
+    let _guard = match write_lock::try_acquire(data_dir, WritePurpose::Restore) {
         Ok(guard) => guard,
-        Err(write_lock::WriteLockError::Busy { holder }) => {
-            let who = holder.unwrap_or_else(|| "另一个写入操作".to_string());
-            return restore_fail(
-                pending,
-                format!("恢复还没有执行，当前库没有改动：{who}正在进行。下次启动会再试。"),
-                "err.backup.restore_busy",
-            );
-        }
-        Err(write_lock::WriteLockError::Unavailable(error)) => {
-            return restore_fail(
-                pending,
-                format!(
-                    "恢复还没有执行，当前库没有改动：无法建立写入锁（{error}）。下次启动会再试。"
-                ),
-                "err.storage.write_lock_unavailable",
-            );
+        Err(error) => {
+            let error = map_write_lock(error);
+            let code = if error.is_busy() {
+                "err.backup.restore_busy"
+            } else {
+                "err.storage.write_lock_unavailable"
+            };
+            return Some(restore_fail(
+                &pending,
+                format!("恢复还没有执行：{}。下次启动会再试。", error.user_message()),
+                code,
+            ));
         }
     };
-    // 换文件必须在锁内。`open_resilient` 自己还要拿迁移锁，同一把文件锁
-    // 不可重入，所以打开/迁移确认放在释放之后。
-    let swapped = swap_in_restore(data_dir, pending);
-    drop(guard);
-    match swapped {
-        Err(outcome) => outcome,
-        Ok(displaced) => finish_restore(data_dir, pending, displaced),
-    }
+    // 取得写锁前，另一个进程可能已经完成或取消了这次恢复。
+    pending_restore(data_dir).map(|pending| run_restore(data_dir, &pending))
 }
 
 pub(super) fn restore_fail(
@@ -182,185 +177,199 @@ pub(super) fn restore_ok(pending: &PendingRestore, message: String) -> RestoreOu
     }
 }
 
-#[cfg(test)]
-pub(super) fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
-    match swap_in_restore(data_dir, pending) {
-        Err(outcome) => outcome,
-        Ok(displaced) => finish_restore(data_dir, pending, displaced),
-    }
+#[derive(Serialize, Deserialize)]
+struct RestorePublication {
+    pending: PendingRestore,
+    sha256: String,
 }
 
-pub(super) fn swap_in_restore(
-    data_dir: &Path,
-    pending: &PendingRestore,
-) -> std::result::Result<PathBuf, RestoreOutcome> {
-    let fail = |message: String, code: &str| Err(restore_fail(pending, message, code));
+fn publication_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("restore-publication.json")
+}
 
-    match verify_backup(data_dir, &pending.backup_id) {
-        Ok(verification) if verification.is_usable() => {}
-        Ok(verification) => {
-            return fail(
-                format!(
-                    "恢复未执行，当前库没有改动：{}",
-                    verification
-                        .problem
-                        .unwrap_or_else(|| "备份未通过校验".into())
-                ),
-                verification
-                    .problem_code
-                    .as_deref()
-                    .unwrap_or("err.backup.restore_failed"),
-            );
-        }
-        Err(error) => {
-            return fail(
-                format!("恢复未执行，当前库没有改动：{}", error.user_message()),
-                error.code(),
-            );
-        }
-    }
+fn previous_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("zepp.db.restore-previous")
+}
 
-    let live = database_path(data_dir);
-    let staging = data_dir.join("zepp.db.restore-staging");
-    let displaced = data_dir.join("zepp.db.restore-previous");
-    let stale = data_dir.join("zepp.db.restore-previous.stale");
-    // 临时拷贝可以丢。`displaced` 是上一轮挪开的原库，校验通过之前绝不能删：
-    // 中途崩溃后再启动如果先删它，原库就只剩这份半成品了。
-    remove_sqlite_group(&staging);
-
-    if displaced.exists() && live.exists() && live_matches_backup_snapshot(data_dir, pending, &live)
-    {
-        // 上一轮已经换上备份、还没跑完 `open_resilient`。接着完成即可。
-        return Ok(displaced);
-    }
-
-    if let Err(error) = std::fs::copy(snapshot_path(data_dir, &pending.backup_id), &staging) {
-        let _ = std::fs::remove_file(&staging);
-        return fail(
-            format!("恢复未执行，当前库没有改动：无法准备临时文件（{error}）"),
-            "err.backup.restore_failed",
-        );
-    }
-    // 换上去之前先确认这个临时文件真的能打开、真的完整。
-    let staged_check = Database::open_read_only_any_version(staging.clone()).and_then(|db| {
-        Database::reject_newer_schema(&db.conn)?;
-        let integrity: String = db
-            .conn
-            .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
-        if !integrity.eq_ignore_ascii_case("ok") {
+/// A writer must not create an empty database while a restore owns the original file.
+pub(crate) fn check_incomplete_restore(db_path: &Path) -> Result<()> {
+    if let Some(data_dir) = db_path.parent() {
+        if db_path == database_path(data_dir)
+            && previous_path(data_dir).try_exists()?
+            && (!db_path.try_exists()? || data_dir.join(PENDING_RESTORE_FILE).try_exists()?)
+        {
             return Err(ZeppBridgeError::DataUnavailable(
-                "临时文件没有通过完整性检查".into(),
+                "有一项数据库恢复尚未完成。请重启桌面应用继续恢复。".into(),
             ));
         }
-        Ok(())
-    });
-    if let Err(error) = staged_check {
-        let _ = std::fs::remove_file(&staging);
-        return fail(
-            format!("恢复未执行，当前库没有改动：{}", error.user_message()),
-            error.code(),
-        );
     }
-
-    // 原子换名。先把现库挪开而不是直接删，这样中途失败还能换回来。
-    //
-    // `.db` / `.db-wal` / `.db-shm` 必须当**一组**挪走，而且要在新库换上去
-    // **之前**。旧的 WAL 属于被替换掉的那个库文件：留在原地的话，新库一被
-    // 打开，SQLite 就会把旧库的脏页重放进来，直接损坏 B-Tree。
-    //
-    // 之前的顺序是「挪走 .db → 换上新库 → 才去删 -wal / -shm」，而且两个删除
-    // 都是 `let _ =` 吞掉错误。在 Windows 上句柄没释放导致删除失败，或者在
-    // 这两步之间断电，就正好落进上面那个损坏场景。
-    //
-    // 挪去 `displaced` 旁边而不是直接删，回滚时才能拿回配套的 WAL。
-    // 上一轮回滚留下的 `displaced` 占着这个名字时，挪到 `.stale` 而不是删：
-    // 删是在校验之前做的，中途失败会把原库弄丢。
-    if displaced.exists() && live.exists() {
-        if let Err(error) = park_sqlite_group(&displaced, &stale) {
-            let _ = std::fs::remove_file(&staging);
-            return fail(
-                format!("恢复未执行，当前库没有改动：无法移开上次留下的原库（{error}）"),
-                "err.backup.restore_failed",
-            );
-        }
-    }
-    if live.exists() {
-        if let Err(error) = displace_sqlite_group(&live, &displaced) {
-            let _ = restore_sqlite_group(&displaced, &live);
-            let _ = std::fs::remove_file(&staging);
-            return fail(
-                format!("恢复未执行，当前库没有改动：无法移开当前库（{error}）"),
-                "err.backup.restore_failed",
-            );
-        }
-    }
-    if let Err(error) = std::fs::rename(&staging, &live) {
-        // 换不上去就把原库连同它的 WAL 一起放回原位。
-        let _ = restore_sqlite_group(&displaced, &live);
-        let _ = std::fs::remove_file(&staging);
-        return fail(
-            format!("恢复失败，已换回原来的数据库：{error}"),
-            "err.backup.restore_failed",
-        );
-    }
-
-    Ok(displaced)
+    Ok(())
 }
 
-/// 把 `live` 换回 `displaced` 里的原库。返回换回是否真的成功——调用方必须
-/// 用这个结果决定给用户的话，不能假定「删了就等于换回来了」。
-#[must_use]
-pub(super) fn rollback_swapped_library(live: &Path, displaced: &Path) -> bool {
-    remove_sqlite_group(live);
-    restore_sqlite_group(displaced, live).is_ok()
+fn remove_if_present(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        result => result,
+    }
 }
 
-pub(super) fn finish_restore(
-    data_dir: &Path,
-    pending: &PendingRestore,
-    displaced: PathBuf,
-) -> RestoreOutcome {
-    let live = database_path(data_dir);
-    // 换上来的库可能来自更旧的 schema：正常打开一次让迁移跑完。失败就整体回滚。
-    // 警告不能吞：隔离并重建空库会被当成「恢复成功」。
-    match Database::open_resilient(live.clone()) {
-        Ok((_, None)) => {
-            remove_sqlite_group(&displaced);
-            remove_sqlite_group(&data_dir.join("zepp.db.restore-previous.stale"));
-            restore_ok(
-                pending,
-                "已从备份恢复。恢复前的数据库已存为回滚备份，可以再换回去。".into(),
-            )
-        }
-        Ok((_, Some(warning))) => {
-            let message = if rollback_swapped_library(&live, &displaced) {
-                format!("恢复失败，已换回原来的数据库：{warning}")
-            } else {
-                format!(
-                    "恢复失败，且未能自动换回原来的数据库（{warning}）。原数据库文件仍完整保留在 {}，请勿删除，可联系支持或手动换回。",
-                    displaced.display()
-                )
-            };
-            restore_fail(pending, message, "err.backup.restore_failed")
-        }
+pub(super) fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
+    match publish_restore(data_dir, pending) {
+        Ok(()) => restore_ok(
+            pending,
+            "已从备份恢复。恢复前的数据库已存为回滚备份，可以再换回去。".into(),
+        ),
         Err(error) => {
-            // 换上来的库自己也可能留下 WAL/SHM（`open_resilient` 走到一半就
-            // 会），回滚前必须一并清掉，否则原库换回来又要重放别人的日志。
-            let message = if rollback_swapped_library(&live, &displaced) {
-                format!("恢复失败，已换回原来的数据库：{}", error.user_message())
+            let live = database_path(data_dir);
+            let displaced = previous_path(data_dir);
+            let message = if !live.exists() && displaced.exists() {
+                match restore_sqlite_group(&displaced, &live) {
+                    Ok(()) => format!("恢复未完成，已放回原库：{}", error.user_message()),
+                    Err(rollback) => {
+                        format!("恢复未完成，自动回滚失败（{rollback}）。请保留恢复文件。")
+                    }
+                }
+            } else if !publication_path(data_dir).exists() {
+                format!("恢复未执行，当前库没有改动：{}", error.user_message())
             } else {
-                format!(
-                    "恢复失败，且未能自动换回原来的数据库（{}）。原数据库文件仍完整保留在 {}，请勿删除，可联系支持或手动换回。",
-                    error.user_message(),
-                    displaced.display()
-                )
+                format!("恢复未执行完毕：{}", error.user_message())
             };
-            restore_fail(pending, message, error.code())
+            if live.exists()
+                && !displaced.exists()
+                && data_dir.join("zepp.db.restore-staging").exists()
+            {
+                let _ = remove_if_present(&publication_path(data_dir));
+            }
+            let code = if !publication_path(data_dir).exists() && live.exists() {
+                "err.backup.restore_failed"
+            } else {
+                error.code()
+            };
+            restore_fail(pending, message, code)
         }
     }
 }
 
-/// SQLite 一个库在磁盘上的三个文件后缀。WAL 模式下它们必须同进同出。
+fn publish_restore(data_dir: &Path, pending: &PendingRestore) -> Result<()> {
+    let live = database_path(data_dir);
+    let staging = data_dir.join("zepp.db.restore-staging");
+    let displaced = previous_path(data_dir);
+    let publication = publication_path(data_dir);
+    let existing = match std::fs::read(&publication) {
+        Ok(bytes) => Some(
+            serde_json::from_slice::<RestorePublication>(&bytes)
+                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?,
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if let Some(existing) = existing {
+        if existing.pending != *pending {
+            return Err(ZeppBridgeError::DataUnavailable(
+                "恢复状态与排队的备份不一致".into(),
+            ));
+        }
+        if !staging.exists() && live.exists() && file_sha256(&live)? == existing.sha256 {
+            if SQLITE_SIDECARS
+                .iter()
+                .any(|suffix| sidecar(&live, suffix).exists())
+            {
+                return Err(ZeppBridgeError::DataUnavailable(
+                    "恢复目标仍有 SQLite 日志。请保留当前库及恢复副本。".into(),
+                ));
+            }
+            return finish_restore(data_dir, &displaced, &publication);
+        }
+    }
+
+    let verification = verify_backup(data_dir, &pending.backup_id)?;
+    if !verification.is_usable() {
+        return Err(ZeppBridgeError::DataUnavailable(
+            verification
+                .problem
+                .unwrap_or_else(|| "备份未通过校验".into()),
+        ));
+    }
+    let manifest = load_manifest(data_dir, &pending.backup_id)?;
+
+    // 旧版本可能已经换入快照，但还没清掉待办。存在旧 WAL 时仍走下面的搬移流程。
+    if !publication.exists()
+        && displaced.exists()
+        && live.exists()
+        && SQLITE_SIDECARS
+            .iter()
+            .all(|suffix| !sidecar(&live, suffix).exists())
+        && file_sha256(&live)? == manifest.sha256
+        && manifest.schema_version == CURRENT_SCHEMA_VERSION
+    {
+        return finish_restore(data_dir, &displaced, &publication);
+    }
+
+    // 在临时库里完成迁移。迁移失败时，当前数据库和 WAL 都还在原处。
+    remove_sqlite_group(&staging)?;
+    std::fs::copy(snapshot_path(data_dir, &pending.backup_id), &staging)?;
+    if file_sha256(&staging)? != manifest.sha256 {
+        return Err(ZeppBridgeError::DataUnavailable(
+            "恢复临时文件的校验值不匹配".into(),
+        ));
+    }
+    let db = Database::from_connection(rusqlite::Connection::open(&staging)?)?;
+    let integrity: String = db
+        .conn
+        .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
+    if !integrity.eq_ignore_ascii_case("ok") {
+        return Err(ZeppBridgeError::DataUnavailable(
+            "恢复临时文件没有通过完整性检查".into(),
+        ));
+    }
+    let journal: String = db
+        .conn
+        .query_row("PRAGMA journal_mode=DELETE", [], |row| row.get(0))?;
+    if !journal.eq_ignore_ascii_case("delete") {
+        return Err(ZeppBridgeError::DataUnavailable(
+            "无法将恢复临时库合并为单一文件".into(),
+        ));
+    }
+    drop(db);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&staging)?
+        .sync_all()?;
+    let state = RestorePublication {
+        pending: pending.clone(),
+        sha256: file_sha256(&staging)?,
+    };
+    let bytes = serde_json::to_vec(&state)
+        .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+    crate::paths::write_file_atomically(&publication, &bytes)?;
+
+    if live.exists() && displaced.exists() {
+        return Err(ZeppBridgeError::DataUnavailable(
+            "无法确认上一次恢复的状态。请保留当前库及恢复副本。".into(),
+        ));
+    }
+    if let Err(error) =
+        displace_sqlite_group(&live, &displaced).and_then(|()| std::fs::rename(&staging, &live))
+    {
+        if let Err(rollback) = restore_sqlite_group(&displaced, &live) {
+            return Err(ZeppBridgeError::DataUnavailable(format!(
+                "换入备份失败（{error}），自动回滚也失败（{rollback}）。请保留恢复过程中生成的数据库文件。"
+            )));
+        }
+        return Err(error.into());
+    }
+    finish_restore(data_dir, &displaced, &publication)
+}
+
+fn finish_restore(data_dir: &Path, displaced: &Path, publication: &Path) -> Result<()> {
+    // 消费待办后，新库可以继续写；清理失败只会多留一个旧库副本。
+    remove_if_present(&data_dir.join(PENDING_RESTORE_FILE))?;
+    let _ = remove_sqlite_group(displaced);
+    let _ = remove_if_present(publication);
+    Ok(())
+}
+
 pub(super) const SQLITE_SIDECARS: [&str; 2] = ["-wal", "-shm"];
 
 pub(super) fn sidecar(path: &Path, suffix: &str) -> PathBuf {
@@ -369,64 +378,43 @@ pub(super) fn sidecar(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-pub(super) fn live_matches_backup_snapshot(
-    data_dir: &Path,
-    pending: &PendingRestore,
-    live: &Path,
-) -> bool {
-    let Ok(manifest) = load_manifest(data_dir, &pending.backup_id) else {
-        return false;
-    };
-    file_sha256(live)
-        .ok()
-        .is_some_and(|hash| hash == manifest.sha256)
-}
-
-/// 把占着 `displaced` 名字的上一轮残骸挪到旁边，不删除。
-pub(super) fn park_sqlite_group(from: &Path, stale: &Path) -> std::io::Result<()> {
-    if stale.exists() {
-        remove_sqlite_group(stale);
+fn move_sidecars(from: &Path, to: &Path) -> std::io::Result<()> {
+    for suffix in SQLITE_SIDECARS {
+        let from = sidecar(from, suffix);
+        let to = sidecar(to, suffix);
+        if from.try_exists()? {
+            if to.try_exists()? {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "SQLite sidecar already exists",
+                ));
+            }
+            std::fs::rename(from, to)?;
+        }
     }
-    displace_sqlite_group(from, stale)
+    Ok(())
 }
 
-/// 把 `live` 及其 `-wal` / `-shm` 整组挪到 `displaced` 及其同名 sidecar。
-///
-/// 主库挪失败就直接返回错误，一个 sidecar 都不动；sidecar 挪失败同样返回错误，
-/// 由调用方回滚。绝不 `let _ =` 吞掉——吞掉正是旧实现出问题的地方。
 pub(super) fn displace_sqlite_group(live: &Path, displaced: &Path) -> std::io::Result<()> {
-    if !live.exists() {
-        return Ok(());
+    if live.try_exists()? {
+        std::fs::rename(live, displaced)?;
     }
-    std::fs::rename(live, displaced)?;
-    for suffix in SQLITE_SIDECARS {
-        let from = sidecar(live, suffix);
-        if from.exists() {
-            std::fs::rename(&from, sidecar(displaced, suffix))?;
-        }
-    }
-    Ok(())
+    // 主库刚改名就中断时，重启从这里搬完原库的日志再换入新库。
+    move_sidecars(live, displaced)
 }
 
-/// `displace_sqlite_group` 的逆操作，用于回滚。
 pub(super) fn restore_sqlite_group(displaced: &Path, live: &Path) -> std::io::Result<()> {
-    if !displaced.exists() {
-        return Ok(());
-    }
-    std::fs::rename(displaced, live)?;
-    for suffix in SQLITE_SIDECARS {
-        let from = sidecar(displaced, suffix);
-        if from.exists() {
-            std::fs::rename(&from, sidecar(live, suffix))?;
-        }
+    if displaced.try_exists()? {
+        move_sidecars(displaced, live)?;
+        std::fs::rename(displaced, live)?;
     }
     Ok(())
 }
 
-/// 删掉一个库连同它的 WAL / SHM。只在这三个文件确定该一起消失时用。
-pub(super) fn remove_sqlite_group(path: &Path) {
-    let _ = std::fs::remove_file(path);
+pub(super) fn remove_sqlite_group(path: &Path) -> std::io::Result<()> {
+    remove_if_present(path)?;
     for suffix in SQLITE_SIDECARS {
-        let _ = std::fs::remove_file(sidecar(path, suffix));
+        remove_if_present(&sidecar(path, suffix))?;
     }
+    Ok(())
 }

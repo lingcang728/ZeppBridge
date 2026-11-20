@@ -6983,6 +6983,7 @@ dependencies = [
  "jiff",
  "keyring",
  "libc",
+ "quick-xml",
  "reqwest 0.12.28",
  "ring",
  "rusqlite",

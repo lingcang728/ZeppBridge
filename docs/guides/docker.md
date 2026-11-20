@@ -187,8 +187,7 @@ docker compose -f packaging/docker/docker-compose.yml run --rm sync
 
 Set `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID` in a `.env` file next to it if your uid is
 not 1000. Paths in the compose file are relative to `packaging/docker/`, so its
-`./data` is `packaging/docker/data`, not the `./data` used above. Every service,
-`status` included, expects `ZEPPBRIDGE_APP_TOKEN` to be set.
+`./data` is `packaging/docker/data`, not the `./data` used above. `sync` uses the App Token. `serve` uses a separate pull token.
 
 `serve` is the one long-running service: the read-only REST API for a tool such
 as SparkyFitness to pull from. It publishes no port and sits on an internal
@@ -220,9 +219,7 @@ client at a `docker run`:
 ```
 
 `-i` is required: without stdin the server has nothing to read and the client
-sees an immediate EOF. `--network none` is safe and worth setting — the MCP
-server is read-only and never touches the network, so this makes that
-structural rather than a promise.
+sees an immediate EOF. This example disables networking for queries and local operations. The default MCP server also allows local writes. Its sync and training publication tools require network access.
 
 ## The toolchain image
 

@@ -11,7 +11,7 @@
 //! 所以界面、CLI、MCP、导出读到的都是修正版，不需要每个出口各认一遍。
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, params_from_iter, types::Value as SqlValue, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -20,7 +20,7 @@ use super::util::{parse_datetime, workout_id_from_detail_key};
 use super::Database;
 use crate::decoder::{decode_workout_detail, DecodedWorkout};
 use crate::export_fit::{decode_fit_file, ImportedFit};
-use crate::models::error::Result;
+use crate::models::error::{Result, ZeppBridgeError};
 use crate::normalizer::Normalizer;
 
 /// 修正文件和原记录的起点最多能差多少秒。用户说修正时保留原来的起点；
@@ -85,16 +85,23 @@ impl Database {
         let summary = &imported.summary;
         let fit_end = summary.end_time.unwrap_or(imported.decoded.end_time);
         let tx = self.conn.unchecked_transaction()?;
-        // 第一次导入时记下云端原值；再导一次（换了一份修正）不覆盖原值。
+        let original_series = if self.workout_fit_override(workout_id)?.is_none() {
+            Some(serde_json::to_string(
+                &self.snapshot_fit_original(workout_id)?,
+            )?)
+        } else {
+            None
+        };
+        // 第一次导入时记下原值；再导一次（换了一份修正）不覆盖原值。
         tx.execute(
             "INSERT INTO workout_fit_overrides
                 (workout_id, file_name, sha256, byte_len, fit, imported_at,
                  fit_start_time, fit_end_time, fit_distance_m, fit_moving_seconds,
                  fit_avg_hr, fit_max_hr,
                  original_end_time, original_distance_m, original_moving_seconds,
-                 original_avg_hr, original_max_hr)
+                 original_avg_hr, original_max_hr, original_series_json)
              SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-                    end_time, distance_meters, moving_seconds, avg_hr, max_hr
+                    end_time, distance_meters, moving_seconds, avg_hr, max_hr, ?13
                FROM workouts WHERE workout_id = ?1
              ON CONFLICT(workout_id) DO UPDATE SET
                 file_name = excluded.file_name,
@@ -121,21 +128,40 @@ impl Database {
                 summary.moving_seconds,
                 summary.avg_hr,
                 summary.max_hr,
+                original_series,
             ],
         )?;
-        tx.commit()?;
         self.overlay_fit_summary(workout_id)?;
         self.replace_workout_series(workout_id, &imported.decoded)?;
-        Ok(match self.workout_fit_override(workout_id)? {
+        let outcome = match self.workout_fit_override(workout_id)? {
             Some(info) => FitOverrideOutcome::Applied(info),
             None => FitOverrideOutcome::WorkoutMissing,
-        })
+        };
+        tx.commit()?;
+        Ok(outcome)
     }
 
     /// 撤销修正：汇总放回云端原值，序列从本机最新的云端明细重新解出来。
     /// 返回 `false` 表示本来就没有修正。
     pub fn remove_workout_fit(&self, workout_id: &str) -> Result<bool> {
-        let restored = self.conn.execute(
+        let tx = self.conn.unchecked_transaction()?;
+        let original: Option<Option<String>> = self
+            .conn
+            .query_row(
+                "SELECT original_series_json FROM workout_fit_overrides WHERE workout_id = ?1",
+                [workout_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(original) = original else {
+            return Ok(false);
+        };
+        let original = original
+            .as_deref()
+            .map(serde_json::from_str::<FitOriginal>)
+            .transpose()?;
+
+        self.conn.execute(
             "UPDATE workouts SET
                 end_time = COALESCE(o.original_end_time, workouts.end_time),
                 distance_meters = o.original_distance_m,
@@ -146,20 +172,79 @@ impl Database {
              WHERE o.workout_id = workouts.workout_id AND workouts.workout_id = ?1",
             [workout_id],
         )?;
-        let removed = self.conn.execute(
+        if let Some(decoded) = self.decode_cloud_detail(workout_id)? {
+            self.replace_workout_series(workout_id, &decoded)?;
+        } else if let Some(original) = original {
+            self.restore_fit_original(workout_id, original)?;
+        } else {
+            return Err(ZeppBridgeError::WorkoutFitOriginalMissing);
+        }
+        self.conn.execute(
             "DELETE FROM workout_fit_overrides WHERE workout_id = ?1",
             [workout_id],
         )?;
-        if removed == 0 {
-            return Ok(false);
-        }
-        let _ = restored;
-        match self.decode_cloud_detail(workout_id)? {
-            Some(decoded) => self.replace_workout_series(workout_id, &decoded)?,
-            // 本机没有云端明细（只有摘要）：修正之前本来就没有序列。
-            None => self.replace_workout_series(workout_id, &DecodedWorkout::default())?,
-        }
+        tx.commit()?;
         Ok(true)
+    }
+
+    fn snapshot_fit_original(&self, workout_id: &str) -> Result<FitOriginal> {
+        let (gps_available, sample_count) = self.conn.query_row(
+            "SELECT gps_available, sample_count FROM workouts WHERE workout_id = ?1",
+            [workout_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        let mut rows = std::collections::BTreeMap::new();
+        for (table, columns) in SERIES_COLUMNS {
+            let mut statement = self.conn.prepare(&format!(
+                "SELECT {columns} FROM {table} WHERE workout_id = ?1 ORDER BY rowid"
+            ))?;
+            let count = statement.column_count();
+            let values = statement
+                .query_map([workout_id], |row| {
+                    (0..count)
+                        .map(|index| row.get::<_, SqlValue>(index).map(FitOriginalValue::from))
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            rows.insert(table.to_owned(), values);
+        }
+        Ok(FitOriginal {
+            gps_available,
+            sample_count,
+            rows,
+        })
+    }
+
+    fn restore_fit_original(&self, workout_id: &str, original: FitOriginal) -> Result<()> {
+        for (table, columns) in SERIES_COLUMNS {
+            let rows = original
+                .rows
+                .get(table)
+                .ok_or(ZeppBridgeError::WorkoutFitOriginalMissing)?;
+            let values = columns
+                .split(',')
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ");
+            self.conn.execute(
+                &format!("DELETE FROM {table} WHERE workout_id = ?1"),
+                [workout_id],
+            )?;
+            let mut insert = self.conn.prepare(&format!(
+                "INSERT INTO {table} (workout_id, {columns}) VALUES (?, {values})"
+            ))?;
+            for row in rows {
+                insert.execute(params_from_iter(
+                    std::iter::once(SqlValue::Text(workout_id.to_owned()))
+                        .chain(row.iter().cloned().map(SqlValue::from)),
+                ))?;
+            }
+        }
+        self.conn.execute(
+            "UPDATE workouts SET gps_available = ?2, sample_count = ?3 WHERE workout_id = ?1",
+            params![workout_id, original.gps_available, original.sample_count],
+        )?;
+        Ok(())
     }
 
     pub fn workout_fit_override(&self, workout_id: &str) -> Result<Option<WorkoutFitOverride>> {
@@ -291,6 +376,57 @@ impl Database {
         Ok(decoded)
     }
 }
+
+#[derive(Serialize, Deserialize)]
+struct FitOriginal {
+    gps_available: bool,
+    sample_count: i64,
+    rows: std::collections::BTreeMap<String, Vec<Vec<FitOriginalValue>>>,
+}
+
+// Preserve SQLite REAL bits when they pass through the serialized backup.
+#[derive(Clone, Serialize, Deserialize)]
+enum FitOriginalValue {
+    Null,
+    Integer(i64),
+    Real(u64),
+    Text(String),
+    Blob(Vec<u8>),
+}
+
+impl From<SqlValue> for FitOriginalValue {
+    fn from(value: SqlValue) -> Self {
+        match value {
+            SqlValue::Null => Self::Null,
+            SqlValue::Integer(value) => Self::Integer(value),
+            SqlValue::Real(value) => Self::Real(value.to_bits()),
+            SqlValue::Text(value) => Self::Text(value),
+            SqlValue::Blob(value) => Self::Blob(value),
+        }
+    }
+}
+
+impl From<FitOriginalValue> for SqlValue {
+    fn from(value: FitOriginalValue) -> Self {
+        match value {
+            FitOriginalValue::Null => Self::Null,
+            FitOriginalValue::Integer(value) => Self::Integer(value),
+            FitOriginalValue::Real(value) => Self::Real(f64::from_bits(value)),
+            FitOriginalValue::Text(value) => Self::Text(value),
+            FitOriginalValue::Blob(value) => Self::Blob(value),
+        }
+    }
+}
+
+// Preserve raw stored values so restoring the samples does not convert pace twice.
+const SERIES_COLUMNS: [(&str, &str); 6] = [
+    ("workout_samples", "timestamp, heart_rate, pace, speed, cadence, altitude, stride, power_watts, ground_contact_ms, vertical_oscillation_mm, vertical_ratio_pct, equivalent_pace_s, distance_m"),
+    ("route_points", "timestamp, latitude, longitude, altitude, segment_start"),
+    ("workout_pauses", "start_time, end_time, kind"),
+    ("workout_splits", "split_index, start_time, end_time, distance_m, duration_seconds, pace_min_per_km, avg_hr, max_hr, elevation_gain_m, elevation_loss_m, partial"),
+    ("workout_laps", "lap_index, start_time, end_time, distance_m, duration_seconds, avg_hr, max_hr"),
+    ("workout_strength_sets", "set_index, action_code, exercise_key, muscle_group, reps, weight_value, weight_unit, weight_kg, duration_ms, avg_hr, calories_kcal"),
+];
 
 const OVERRIDE_SELECT: &str = "SELECT workout_id, file_name, sha256, byte_len, imported_at,
         fit_distance_m, fit_moving_seconds,

@@ -73,10 +73,23 @@ class FakeD1 {
     let args = [];
     const statement = {
       bind(...values) { args = values; return statement; },
+      execute() { return db.exec(sql, args); },
       async first() { return db.exec(sql, args); },
       async run() { return db.exec(sql, args); },
     };
     return statement;
+  }
+
+  async batch(statements) {
+    const pending = new Map(this.pending);
+    const users = new Map(this.users);
+    try {
+      return statements.map((statement) => statement.execute());
+    } catch (error) {
+      this.pending = pending;
+      this.users = users;
+      throw error;
+    }
   }
 
   exec(rawSql, a) {
@@ -108,11 +121,13 @@ class FakeD1 {
     }
     if (sql.startsWith('DELETE FROM oauth_pending WHERE state_hash = ? AND status = ?')) {
       const row = this.pending.get(a[0]);
-      if (!row || row.status !== a[1]) return changed(0);
+      if (!row || row.status !== a[1] || row.claim_hash !== a[2] || row.created_at !== a[3] || row.created_at < a[4]) return changed(0);
       this.pending.delete(a[0]);
       return changed(1);
     }
     if (sql.startsWith('INSERT INTO official_users')) {
+      const row = this.pending.get(a[3]);
+      if (!row || row.status !== a[4] || row.claim_hash !== a[5] || row.created_at !== a[6] || row.created_at < a[7]) return changed(0);
       const existing = this.users.get(a[0]);
       this.users.set(a[0], { registered_at: existing?.registered_at ?? a[1], last_seen_at: a[2] });
       return changed(1);
@@ -347,4 +362,39 @@ test('the pages follow the browser language and never echo parameters', async (c
   assert.match(expiredHtml, /lang="en"/);
   assert.doesNotMatch(expiredHtml, /fixture-code/);
   assert.match(expired.headers.get('content-security-policy'), /default-src 'none'/);
+});
+
+test('concurrent opens of the same fresh authorization link both render the start page', async () => {
+  const env = configuredEnv();
+  const { state, claimHash } = newPair();
+  const query = `?state=${state}&claim=${claimHash}`;
+  const responses = await Promise.all([
+    get(start, env, 'start', query),
+    get(start, env, 'start', query),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  assert.equal(env.OFFICIAL_DB.pending.size, 1);
+});
+
+test('a failed claim batch leaves the authorization available for a retry', async (context) => {
+  const env = configuredEnv();
+  const { state, secret, claimHash } = newPair();
+  await get(start, env, 'start', `?state=${state}&claim=${claimHash}`);
+  context.mock.method(globalThis, 'fetch', async () => tokenResponse());
+  await get(callback, env, 'callback', `?code=fixture-code&state=${state}`);
+  const run = () => post(claim, env, 'claim', { state, claim_secret: secret });
+  const exec = env.OFFICIAL_DB.exec.bind(env.OFFICIAL_DB);
+  let fail = true;
+  env.OFFICIAL_DB.exec = (sql, args) => {
+    if (fail && sql.startsWith('DELETE FROM oauth_pending WHERE state_hash')) {
+      fail = false;
+      throw new Error('temporary database failure');
+    }
+    return exec(sql, args);
+  };
+  await assert.rejects(run, /temporary database failure/);
+  assert.equal(env.OFFICIAL_DB.users.size, 0);
+  const results = await Promise.all([run(), run()]);
+  assert.deepEqual(results.map(({ status }) => status).sort(), [200, 404]);
+  assert.equal(env.OFFICIAL_DB.users.size, 1);
 });

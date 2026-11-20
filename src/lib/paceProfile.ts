@@ -62,7 +62,7 @@ export const paceProfile = (points: readonly ChartPoint[], pauses: readonly Time
   const median = quantile(moving.map((p) => p.v).sort((a, b) => a - b), 0.5);
   const kept = moving.filter((p) => p.v <= median * SLOW_FACTOR && p.v >= median * FAST_FACTOR);
   if (kept.length < 2) return null;
-  const smooth = rollingMedian(kept, SMOOTH);
+  const smooth = kept.length < SMOOTH ? kept : rollingMedian(kept, SMOOTH);
   let fastest = smooth[0];
   let slowest = smooth[0];
   for (const p of smooth) {
@@ -70,6 +70,16 @@ export const paceProfile = (points: readonly ChartPoint[], pauses: readonly Time
     if (p.v > slowest.v) slowest = p;
   }
   const sorted = smooth.map((p) => p.v).sort((a, b) => a - b);
-  const speed = kept.reduce((sum, p) => sum + 1 / p.v, 0) / kept.length;
-  return { fastest, slowest, lo: quantile(sorted, 0.02), hi: quantile(sorted, 0.98), dropped: moving.length - kept.length, mean: 1 / speed };
+  let elapsed = 0;
+  let distance = 0;
+  for (let i = 1; i < smooth.length; i++) {
+    const previous = smooth[i - 1];
+    const point = smooth[i];
+    const duration = point.t - previous.t;
+    if (duration <= 0 || pauses.some(({ start, end }) => start < point.t && end > previous.t)) continue;
+    elapsed += duration;
+    distance += duration * (1 / previous.v + 1 / point.v) / 2;
+  }
+  const mean = elapsed > 0 ? elapsed / distance : smooth.length / smooth.reduce((sum, p) => sum + 1 / p.v, 0);
+  return { fastest, slowest, lo: quantile(sorted, 0.02), hi: quantile(sorted, 0.98), dropped: moving.length - kept.length, mean };
 };

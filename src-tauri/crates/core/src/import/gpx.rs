@@ -12,9 +12,25 @@ pub fn parse_gpx(text: &str, sport_hint: Option<&str>) -> ParsedFile {
             .or_else(|| child_text(track, "type").map(|kind| text_sport(&kind).to_string()))
             .unwrap_or_else(|| "activity".into());
         let name = child_text(track, "name");
-        let points: Vec<TrackPoint> = elements(track, "trkpt")
+        let segments = elements(track, "trkseg");
+        let segments = if segments.is_empty() {
+            vec![track]
+        } else {
+            segments
+        };
+        let points = segments
             .into_iter()
-            .map(gpx_point)
+            .flat_map(|segment| {
+                elements(segment, "trkpt")
+                    .into_iter()
+                    .map(gpx_point)
+                    .filter(|point| point.time.is_some())
+                    .enumerate()
+                    .map(|(index, mut point)| {
+                        point.segment_start = index == 0;
+                        point
+                    })
+            })
             .collect();
         match activity_from_track(points, sport, name) {
             Some(activity) => file.activities.push(activity),
@@ -29,6 +45,7 @@ pub fn parse_gpx(text: &str, sport_hint: Option<&str>) -> ParsedFile {
 
 fn gpx_point(element: &str) -> TrackPoint {
     TrackPoint {
+        segment_start: false,
         time: child_text(element, "time").and_then(|t| parse_time(&t)),
         latitude: number(attr(element, "lat")),
         longitude: number(attr(element, "lon")),
@@ -77,6 +94,7 @@ fn tcx_point(element: &str) -> TrackPoint {
     let position = elements(element, "Position").into_iter().next();
     let heart = elements(element, "HeartRateBpm").into_iter().next();
     TrackPoint {
+        segment_start: false,
         time: child_text(element, "Time").and_then(|t| parse_time(&t)),
         latitude: position.and_then(|p| number(child_text(p, "LatitudeDegrees"))),
         longitude: position.and_then(|p| number(child_text(p, "LongitudeDegrees"))),

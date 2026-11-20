@@ -90,7 +90,6 @@ pub async fn stage_restore(
     let data_dir = state.data_dir.clone();
     crate::commands::join_blocking(
         tokio::task::spawn_blocking(move || -> std::result::Result<PendingRestore, AppError> {
-            let _guard = acquire_with_timeout(&data_dir, WritePurpose::Restore, LOCK_TIMEOUT)?;
             backup::stage_restore(&data_dir, &backup_id, env!("CARGO_PKG_VERSION"))
                 .map_err(AppError::from)
         })

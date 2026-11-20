@@ -329,9 +329,10 @@ pub fn to_gpx(export: &Value) -> Result<(String, usize), String> {
             // 暂停后重新开始记录的点属于新的 trkseg，否则轨迹会跨过休息时间
             // 直接连成一条假直线。
             if let (Some(previous), Some(current)) = (previous, parsed) {
-                if resumes
-                    .iter()
-                    .any(|resume| *resume > previous && *resume <= current)
+                if point.get("segment_start").and_then(Value::as_bool) == Some(true)
+                    || resumes
+                        .iter()
+                        .any(|resume| *resume > previous && *resume <= current)
                 {
                     tracks.push_str("    </trkseg>\n    <trkseg>\n");
                 }

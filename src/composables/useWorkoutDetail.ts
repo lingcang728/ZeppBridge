@@ -8,7 +8,6 @@ import { workoutPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
 import { workoutLabel } from '../lib/labels';
-import { isFiniteNumber } from '../lib/format';
 import { readDefaultExportFormat } from '../lib/exportScope';
 import { workoutDisplayType } from '../lib/workouts';
 import { intlLocale, useMessages } from '../i18n';
@@ -27,7 +26,7 @@ export type ExportFormat = 'json' | 'csv' | 'gpx' | 'fit';
  */
 export const useWorkoutDetail = (workoutId: Ref<string>) => {
   const t = useMessages(workoutDetailMessages);
-  const { dataRevision } = useSyncController();
+  const { dataRevision, markDataChanged } = useSyncController();
   const workout = ref<WorkoutMetrics | null>(null);
   const series = ref<WorkoutSeries | null>(null);
   const device = ref<DeviceProfile>({});
@@ -132,16 +131,19 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
 
   const changeWorkoutOverride = async (value: string | number) => {
     if (!workout.value) return;
+    const id = workout.value.workout_id;
     const next = String(value);
     typeOverrideBusy.value = true;
     actionError.value = null;
     try {
-      const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, next || null);
+      const updated = await tauriApi.setWorkoutTypeOverride(id, next || null);
+      markDataChanged();
+      if (id !== workoutId.value) return;
       workout.value = updated as WorkoutMetrics;
       exportedNote.value = next ? t.value.overrideSaved : t.value.overrideCleared;
       void loadInsight(updated.workout_id);
     } catch (cause) {
-      actionError.value = toUserMessage(cause, t.value.overrideFailed);
+      if (id === workoutId.value) actionError.value = toUserMessage(cause, t.value.overrideFailed);
     } finally {
       typeOverrideBusy.value = false;
     }
@@ -169,16 +171,19 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
         exportedNote.value = t.value.savedFit;
         return;
       }
+      if (activeFormat.value === 'gpx') {
+        await tauriApi.copyWorkoutGpx(exportWorkoutId);
+        exportedNote.value = t.value.copied('GPX');
+        return;
+      }
       const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
       const csv = () => {
         const fields: Array<keyof WorkoutSeriesSample> = ['timestamp', 'heart_rate', 'speed', 'pace', 'cadence', 'stride_cm', 'altitude_m', 'power_watts', 'ground_contact_ms', 'vertical_oscillation_mm', 'vertical_ratio_pct', 'equivalent_pace_s_per_km'];
         return [fields.join(','), ...(series.value?.samples ?? []).map((sample) => fields.map((field) => csvCell(sample[field])).join(','))].join('\r\n');
       };
-      const xmlEscape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character] ?? character);
-      const gpx = () => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ZeppBridge" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${xmlEscape(workoutLabel(displayType.value))}</name></metadata><trk><name>${xmlEscape(workout.value?.workout_id)}</name><trkseg>${(series.value?.route ?? []).map((point) => `<trkpt lat="${point.latitude}" lon="${point.longitude}">${isFiniteNumber(point.altitude_m) ? `<ele>${point.altitude_m}</ele>` : ''}<time>${xmlEscape(point.timestamp)}</time></trkpt>`).join('')}</trkseg></trk></gpx>`;
       const payload = activeFormat.value === 'json'
         ? JSON.stringify({ workout: workout.value, series: series.value }, null, 2)
-        : activeFormat.value === 'csv' ? csv() : gpx();
+        : csv();
       await navigator.clipboard.writeText(payload);
       exportedNote.value = t.value.copied(activeFormat.value.toUpperCase());
     } catch (cause) { actionError.value = toUserMessage(cause, t.value.exportFailed); }

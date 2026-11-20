@@ -91,7 +91,7 @@ const APPLE_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 #[test]
 fn apple_xml_reads_workouts_and_skips_records() {
-    let file = parse_apple_xml(APPLE_XML.as_bytes());
+    let file = parse_apple_xml(APPLE_XML.as_bytes()).unwrap();
     assert_eq!(file.unreadable, 1);
     let run = &file.activities[0];
     assert_eq!(run.sport, "run");
@@ -402,4 +402,51 @@ not-a-day,50
             );
         }
     }
+}
+
+#[test]
+fn gpx_does_not_count_distance_or_climb_between_segments() {
+    let xml = r#"<gpx><trk><trkseg>
+      <trkpt lat="0" lon="0"><ele>10</ele><time>2024-01-01T00:00:00Z</time></trkpt>
+      <trkpt lat="0" lon="0.001"><ele>15</ele><time>2024-01-01T00:01:00Z</time></trkpt>
+      </trkseg><trkseg>
+      <trkpt lat="0" lon="1"><ele>500</ele><time>2024-01-01T00:10:00Z</time></trkpt>
+      <trkpt lat="0" lon="1.001"><ele>505</ele><time>2024-01-01T00:11:00Z</time></trkpt>
+      </trkseg></trk></gpx>"#;
+    let activity = parse_gpx(xml, None).activities.remove(0);
+    assert!((activity.distance_m.unwrap() - 222.4).abs() < 1.0);
+    assert_eq!(activity.elevation_gain_m, Some(10.0));
+    assert!(activity.decoded.as_ref().unwrap().route[2].segment_start);
+
+    let db = crate::storage::Database::in_memory().unwrap();
+    let start = activity.start_time;
+    let file = super::ParsedFile {
+        activities: vec![activity],
+        ..Default::default()
+    };
+    let report = db
+        .import_activities(ImportSource::Gpx, None, file, start)
+        .unwrap();
+    let id = format!("import-{}-1", report.batch_id.unwrap());
+    let series = db.get_workout_series(&id).unwrap();
+    let (exported, points) = crate::export_formats::to_gpx(&serde_json::json!({
+        "data": {"workouts": [{"workout_id": id, "route": series.route}]}
+    }))
+    .unwrap();
+    assert_eq!(points, 4);
+    assert_eq!(exported.matches("<trkseg>").count(), 2);
+}
+
+#[test]
+fn apple_workouts_are_independent_of_line_breaks() {
+    let normal = parse_apple_xml(APPLE_XML.as_bytes()).unwrap();
+    let compact = APPLE_XML
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("");
+    let parsed = parse_apple_xml(compact.as_bytes()).unwrap();
+    assert!(!normal.activities.is_empty());
+    assert_eq!(parsed.activities.len(), normal.activities.len());
+    assert!(parse_apple_xml("<HealthData><Workout>".as_bytes()).is_err());
 }

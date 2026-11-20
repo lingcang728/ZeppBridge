@@ -142,7 +142,7 @@ export ZEPPBRIDGE_APP_TOKEN=...
 docker compose -f packaging/docker/docker-compose.yml run --rm sync
 ```
 
-如果你的 uid 不是 1000，在它旁边的 `.env` 里设 `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID`。compose 文件里的路径相对 `packaging/docker/`，所以它的 `./data` 是 `packaging/docker/data`，不是上面用的 `./data`。所有服务（包括 `status`）都要求设了 `ZEPPBRIDGE_APP_TOKEN`。
+如果你的 uid 不是 1000，在它旁边的 `.env` 里设 `ZEPPBRIDGE_UID`/`ZEPPBRIDGE_GID`。compose 文件里的路径相对 `packaging/docker/`，所以它的 `./data` 是 `packaging/docker/data`，不是上面用的 `./data`。`sync` 使用 App Token，`serve` 使用独立的拉取令牌。
 
 `serve` 是唯一常驻的服务：只读 REST API，给 SparkyFitness 这类工具来拉数据。它不发布端口、只在内部网络里；用 `docker compose --profile serve up -d` 启动前先看[自托管拉取](self-hosted-pull.zh-CN.md)。
 
@@ -168,7 +168,7 @@ docker compose -f packaging/docker/docker-compose.yml run --rm sync
 }
 ```
 
-`-i` 是必须的：没有 stdin，服务端读不到任何东西，客户端会立刻看到 EOF。`--network none` 是安全的、也值得加上——MCP 服务只读、从不联网，加上它就把这件事变成了结构上的事实，而不是一句承诺。
+`-i` 是必须的：没有 stdin，服务端读不到任何东西，客户端会立刻看到 EOF。此示例禁用了网络，适用于查询和本地操作。默认 MCP 也能写入本地记录，并提供需要网络的同步和训练发布工具。
 
 ## 工具链镜像
 

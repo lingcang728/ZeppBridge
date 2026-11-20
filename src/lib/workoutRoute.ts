@@ -245,7 +245,7 @@ export const buildRouteCanvas = (series: Pick<WorkoutSeries, 'route' | 'samples'
     const jump = !Number.isFinite(seconds) || seconds <= 0 || seconds > 120 || distance > Math.max(500, seconds * 12 + 100);
     const paused = from.paused || to.paused || isPaused(fromTime, toTime);
     const paceMissing = enoughPace && (from.pace === null || to.pace === null || (from.paceDelta ?? Infinity) > 45_000 || (to.paceDelta ?? Infinity) > 45_000);
-    if (jump || paused || paceMissing) continue;
+    if (to.segment_start || jump || paused || paceMissing) continue;
     const pace = from.pace !== null && to.pace !== null ? (from.pace + to.pace) / 2 : null;
     segments.push({ d: `M${from.x.toFixed(1)} ${from.y.toFixed(1)} L${to.x.toFixed(1)} ${to.y.toFixed(1)}`, color: routeColor(pace, low, high, enoughPace), from, to });
   }

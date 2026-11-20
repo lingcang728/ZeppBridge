@@ -4,7 +4,7 @@
 //! 哪种来源。运动行本身写进 `workouts`（`raw_record_id` 为空，重放不碰），序列走和云端明细
 //! 同一个 `replace_workout_series`。
 //!
-//! 去重：本机已经有一条起点相差两分钟以内的运动（云端同步来的，或者上一批导入的），就不再
+//! 去重：本机已经有一条起点相差两分钟以内且时间重叠的运动（云端同步来的，或者上一批导入的），就不再
 //! 导入——Apple 健康里多半就有 Zepp 同步过去的那一份。同一批里重复的也只留一条。
 
 use chrono::{DateTime, Utc};
@@ -62,13 +62,20 @@ impl Database {
         let mut fresh: Vec<ParsedActivity> = Vec::new();
         let mut duplicates = 0;
         for activity in activities {
-            let in_batch = fresh.last().is_some_and(|previous| {
-                (activity.start_time - previous.start_time)
-                    .num_seconds()
-                    .abs()
-                    <= DUPLICATE_WINDOW_SECONDS
-            });
-            if in_batch || self.has_workout_near(activity.start_time)? {
+            let in_batch = fresh
+                .iter()
+                .rev()
+                .take_while(|previous| {
+                    (activity.start_time - previous.start_time)
+                        .num_seconds()
+                        .abs()
+                        <= DUPLICATE_WINDOW_SECONDS
+                })
+                .any(|previous| {
+                    activity.start_time < previous.end_time
+                        && previous.start_time < activity.end_time
+                });
+            if in_batch || self.has_workout_near(activity.start_time, activity.end_time)? {
                 duplicates += 1;
             } else {
                 fresh.push(activity);
@@ -141,12 +148,18 @@ impl Database {
         }
     }
 
-    fn has_workout_near(&self, start: DateTime<Utc>) -> Result<bool> {
+    fn has_workout_near(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<bool> {
         // start_time 存的是 RFC 3339；按 julianday 比，时区写法不同也能比。
         Ok(self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM workouts
-                WHERE ABS(julianday(start_time) - julianday(?1)) * 86400 <= ?2)",
-            params![start.to_rfc3339(), DUPLICATE_WINDOW_SECONDS],
+                WHERE ABS(julianday(start_time) - julianday(?1)) * 86400 <= ?2
+                AND julianday(end_time) > julianday(?1)
+                AND julianday(start_time) < julianday(?3))",
+            params![
+                start.to_rfc3339(),
+                DUPLICATE_WINDOW_SECONDS,
+                end.to_rfc3339()
+            ],
             |row| row.get(0),
         )?)
     }

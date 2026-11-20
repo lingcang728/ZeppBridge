@@ -45,6 +45,10 @@ pub async fn import_workout_fit(
     let imported = decode_fit_file(&bytes).map_err(|error| match error {
         FitImportError::TooLarge => too_large(),
         FitImportError::NotFit => not_fit(),
+        FitImportError::MultipleActivities => AppError::new(
+            "err.workout_fit.multiple_activities",
+            "请用只包含一次运动的 FIT 文件进行修正",
+        ),
         FitImportError::NoActivity => AppError::new(
             "err.workout_fit.no_activity",
             "这个 .fit 里没有运动记录（没有逐点数据，也没有圈）",

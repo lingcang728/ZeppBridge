@@ -31,14 +31,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
 
 pub const PUSH_DIR: &str = "push";
 pub const TARGETS_FILE: &str = "targets.json";
-
-/// 同一个目标同一时刻只跑一份（桌面同步后的后台推送和 CLI 可能撞上）。
-/// 锁超过这么久视为上次异常退出留下的。
-const STALE_LOCK: Duration = Duration::from_secs(40 * 60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -258,44 +253,15 @@ pub struct PushReport {
     pub targets: Vec<TargetOutcome>,
 }
 
-struct TargetLock(PathBuf);
-
-impl TargetLock {
-    fn acquire(dir: &Path, id: &str) -> Option<Self> {
-        let path = dir.join(format!("{id}.lock"));
-        if let Ok(meta) = std::fs::metadata(&path) {
-            let stale = meta
-                .modified()
-                .ok()
-                .and_then(|at| SystemTime::now().duration_since(at).ok())
-                .is_some_and(|age| age > STALE_LOCK);
-            if stale {
-                let _ = std::fs::remove_file(&path);
-            }
-        }
-        std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .ok()
-            .map(|_| Self(path))
-    }
-}
-
-impl Drop for TargetLock {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-    }
-}
-
 fn manifest_path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.manifest.json"))
 }
 
-fn write_json(path: &Path, value: &impl Serialize) {
-    if let Ok(text) = serde_json::to_vec_pretty(value) {
-        let _ = crate::paths::write_file_atomically(path, &text);
-    }
+fn write_json(path: &Path, value: &impl Serialize) -> Result<(), PushError> {
+    let state_error =
+        |error: &dyn std::fmt::Display| push_error("err.push.state_unwritable", error.to_string());
+    let text = serde_json::to_vec_pretty(value).map_err(|error| state_error(&error))?;
+    crate::paths::write_file_atomically(path, &text).map_err(|error| state_error(&error))
 }
 
 fn system_time_zone() -> String {
@@ -344,10 +310,12 @@ pub async fn run(data_dir: &Path, credentials: Arc<dyn CredentialBackend>) -> Pu
             ),
             Some(code) => eprintln!("push: {} {} ({code})", outcome.id, outcome.result),
         }
-        write_json(
+        if let Err(error) = write_json(
             &push_dir(data_dir).join(format!("{}.status.json", outcome.id)),
             &outcome,
-        );
+        ) {
+            eprintln!("push: {} status write failed ({})", outcome.id, error.code);
+        }
         report.targets.push(outcome);
     }
     report
@@ -391,15 +359,20 @@ async fn run_target(
     if let Err(error) = std::fs::create_dir_all(&dir) {
         return failed("err.push.state_unwritable", error.to_string());
     }
-    let Some(_lock) = TargetLock::acquire(&dir, &target.id) else {
-        return TargetOutcome {
-            id: target.id.clone(),
-            result: "skipped_locked",
-            stats: pa::UploadStats::default(),
-            error_code: None,
-            error: None,
-            at,
-        };
+    let lock_path = dir.join(format!("{}.lock", target.id));
+    let _lock = match crate::storage::write_lock::try_open_exclusive(&lock_path) {
+        Ok(Some(file)) => file,
+        Ok(None) => {
+            return TargetOutcome {
+                id: target.id.clone(),
+                result: "skipped_locked",
+                stats: pa::UploadStats::default(),
+                error_code: None,
+                error: None,
+                at,
+            }
+        }
+        Err(error) => return failed("err.push.state_unwritable", error.to_string()),
     };
     let manifest_file = manifest_path(&dir, &target.id);
     let destination = pa::crypto::sha256_hex(&format!(
@@ -451,7 +424,9 @@ async fn run_target(
         return failed("err.push.coordinates_found", message);
     }
     if plan.is_empty() {
-        write_json(&manifest_file, &plan.manifest);
+        if let Err(error) = write_json(&manifest_file, &plan.manifest) {
+            return failed(error.code, error.detail);
+        }
         return TargetOutcome {
             id: target.id.clone(),
             result: "unchanged",
@@ -466,7 +441,9 @@ async fn run_target(
     }
     match pa::upload(&site, &keys, &plan).await {
         Ok(stats) => {
-            write_json(&manifest_file, &plan.manifest);
+            if let Err(error) = write_json(&manifest_file, &plan.manifest) {
+                return failed(error.code, error.detail);
+            }
             TargetOutcome {
                 id: target.id.clone(),
                 result: "ok",

@@ -13,9 +13,9 @@
 |---|---|---|---|---|---|---|
 | Advanced data sync / history backfill | ✓ | ✓ manual, automatic, 180 days after first connect | ✓ `sync` | ✓ `sync_now` (runs the CLI sync) | — | refused |
 | Official open-platform authorization and pulls | ✓ | ✓ authorization relayed through Cloudflare | partial: `workout-details --channel official`; `sync` uses Advanced data only | — | — | n/a |
-| Imports (GPX, FIT, Strava bundle, Apple Health; unstrap backup in the Beta lab) | ✓ | ✓ | ✗ | — | — | n/a |
+| Imports (GPX with track segments, FIT with individual sessions and strength sets, Strava bundle, Apple Health; unstrap backup in the Beta lab) | ✓ | ✓ | ✗ | — | — | n/a |
 | Local reprocessing | ✓ | ✓ automatic at startup by revision, manual in Settings | ✓ `reprocess` | — | — | n/a |
-| Data export (JSON / CSV / GPX / FIT; "take everything with you"; unstrap zip in the Beta lab) | ✓ | ✓ | ✓ `export` (JSON / CSV / GPX / FIT) | ✓ `export_data` (JSON, at most 366 days) | — | refused |
+| Data export (JSON / CSV / segmented GPX / FIT with strength sets; "take everything with you"; unstrap zip in the Beta lab) | ✓ | ✓ | ✓ `export` (JSON / CSV / GPX / FIT) | ✓ `export_data` (JSON, at most 366 days) | — | refused |
 | Send to AI (single `.md` task bundle) | ✓ | ✓ | ✗ | shares the task definition for task scope | — | it is the source |
 | Read-only queries: workouts / metrics / sleep / food / life events / data health / baselines | ✓ | ✓ per page | `status` gives an overview only | ✓ 16 tools | partial: `/health`, `/workouts/{id}/series` | MCP only |
 | Journal writes: injuries, life events, races, shoes, workout feelings, workout type | ✓ | ✓ read/write | ✓ `shoes`, `races`, `set-type`, `hide`, `restore` | ✓ six write tools, each recorded under Recent AI changes and undoable | — | refused |

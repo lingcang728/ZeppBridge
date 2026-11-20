@@ -10,7 +10,7 @@ use std::io::{Read, Seek};
 use flate2::read::GzDecoder;
 
 use super::gpx::{parse_gpx, parse_tcx};
-use super::{activity_from_fit, text_sport, ParsedActivity, ParsedFile, MAX_IMPORT_FILE_BYTES};
+use super::{activities_from_fit, text_sport, ParsedFile, MAX_IMPORT_FILE_BYTES};
 
 /// 读整个 Strava 导出包。
 pub fn parse_strava_archive<R: Read + Seek>(reader: R) -> Option<ParsedFile> {
@@ -107,25 +107,16 @@ pub fn parse_activity_file(name: &str, bytes: &[u8], hint: Option<&str>) -> Pars
         }
         None => (lower.clone(), bytes.to_vec()),
     };
-    let one = |activity: Option<ParsedActivity>| match activity {
-        Some(activity) => ParsedFile {
-            activities: vec![activity],
-            unreadable: 0,
-            ..Default::default()
-        },
-        None => ParsedFile {
-            activities: Vec::new(),
-            unreadable: 1,
-            ..Default::default()
-        },
-    };
     if stem.ends_with(".fit") {
-        return one(activity_from_fit(&bytes).map(|mut activity| {
-            if let Some(hint) = hint {
-                activity.sport = hint.to_string();
-            }
-            activity
-        }));
+        let mut activities = activities_from_fit(&bytes);
+        if let (Some(hint), [activity]) = (hint, activities.as_mut_slice()) {
+            activity.sport = hint.to_string();
+        }
+        return ParsedFile {
+            unreadable: usize::from(activities.is_empty()),
+            activities,
+            ..Default::default()
+        };
     }
     let Ok(text) = String::from_utf8(bytes) else {
         return ParsedFile {

@@ -27,7 +27,7 @@ use std::collections::HashMap;
 mod tests;
 
 /// 记录契约的版本。字段只增不改；改了含义就换一个新版本号。
-pub const RECORDS_VERSION: &str = "zeppbridge.records.v1";
+pub const RECORDS_VERSION: &str = "zeppbridge.records.v2";
 
 /// 拉取方关心的六类数据，以及它们对应的导出类型名。
 ///
@@ -156,7 +156,7 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
     root.insert(
         "source_note".into(),
         Value::String(
-            "source: official = Zepp Open Platform authorization; advanced = account connector; mixed = one folded value had readings from both; user = calendar context written by the user."
+            "source: official = Zepp Open Platform authorization; advanced = account connector; imported = local file import; mixed = one folded value combines multiple sources; user = calendar context written by the user."
                 .into(),
         ),
     );
@@ -166,6 +166,7 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
     root.insert("gps_included".into(), Value::Bool(query.include_gps));
 
     let mut kept_total = 0usize;
+    let mut kept_by_type = HashMap::new();
     if let Some(data) = root.get_mut("data").and_then(Value::as_object_mut) {
         for (key, list) in data.iter_mut() {
             let Some(items) = list.as_array_mut() else {
@@ -181,6 +182,7 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
                     let source = match item.get("source").and_then(Value::as_str) {
                         Some("official") => "official",
                         Some("mixed") => "mixed",
+                        Some("imported") => "imported",
                         _ => "advanced",
                     };
                     Provenance { source, changed_at }
@@ -193,7 +195,7 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
                         object.remove("route");
                     }
                 }
-                match since {
+                let keep = match since {
                     // 用户写的日历上下文不来自云端，没有「拿到时刻」可比，一律保留。
                     Some(since) if found.source != "user" => {
                         found.changed_at.as_deref().is_some_and(|changed| {
@@ -203,7 +205,22 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
                         })
                     }
                     _ => true,
+                };
+                if since.is_some() {
+                    let category = item
+                        .as_object_mut()
+                        .and_then(|object| object.remove("_export_type"))
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                        .or_else(|| match kind {
+                            "sleep_sessions" => Some("sleep".into()),
+                            "workouts" | "life_events" => Some(kind.into()),
+                            _ => None,
+                        });
+                    if let Some(category) = category.filter(|_| keep) {
+                        *kept_by_type.entry(category).or_insert(0usize) += 1;
+                    }
                 }
+                keep
             });
             kept_total += items.len();
         }
@@ -211,6 +228,14 @@ pub fn query_records(db: &Database, query: &RecordQuery) -> Result<RecordSet> {
     if since.is_some() {
         record_count = kept_total;
         root.insert("record_count".into(), Value::from(record_count));
+        if let Some(capabilities) = root.get_mut("capabilities").and_then(Value::as_object_mut) {
+            for (category, entry) in capabilities {
+                if entry.get("rows_in_export").is_some() {
+                    entry["rows_in_export"] =
+                        Value::from(kept_by_type.get(category).copied().unwrap_or_default());
+                }
+            }
+        }
     }
     Ok(RecordSet {
         value,
@@ -264,6 +289,7 @@ struct Provenance {
 pub(crate) struct ProviderFlags {
     official: bool,
     legacy: bool,
+    imported: bool,
     changed_at: Option<String>,
 }
 
@@ -271,6 +297,8 @@ impl ProviderFlags {
     pub(crate) fn add(&mut self, provider: &str, fetched_at: Option<String>) {
         if provider == crate::official::fetch::PROVIDER {
             self.official = true;
+        } else if provider == "imported" {
+            self.imported = true;
         } else {
             self.legacy = true;
         }
@@ -294,9 +322,10 @@ impl ProviderFlags {
     }
 
     fn resolve(&self) -> Provenance {
-        let source = match (self.official, self.legacy) {
-            (true, true) => "mixed",
-            (true, false) => "official",
+        let source = match (self.official, self.legacy, self.imported) {
+            (true, false, false) => "official",
+            (false, false, true) => "imported",
+            (true, _, _) | (_, true, true) => "mixed",
             _ => "advanced",
         };
         Provenance {
@@ -326,7 +355,7 @@ impl ProvenanceIndex {
         let has = |key: &str| data[key].as_array().is_some_and(|items| !items.is_empty());
         if has("sleep_sessions") {
             let mut stmt = db.conn.prepare(&format!(
-                "SELECT s.sleep_id, s.provider, {fetched}
+                "SELECT s.sleep_id, CASE WHEN s.import_batch_id IS NOT NULL THEN 'imported' ELSE s.provider END, {fetched}
              FROM sleep_sessions s LEFT JOIN raw_records r ON r.id = s.raw_record_id
              WHERE s.start_time >= ?1 AND s.start_time < ?2"
             ))?;
@@ -353,8 +382,9 @@ impl ProvenanceIndex {
                 "NULL"
             };
             let mut stmt = db.conn.prepare(&format!(
-                "SELECT w.workout_id, w.provider, {fetched}, {detail}
+                "SELECT w.workout_id, CASE WHEN i.workout_id IS NOT NULL THEN 'imported' ELSE w.provider END, {fetched}, {detail}
              FROM workouts w LEFT JOIN raw_records r ON r.id = w.raw_record_id
+             LEFT JOIN workout_imports i ON i.workout_id = w.workout_id
              WHERE w.start_time >= ?1 AND w.start_time < ?2"
             ))?;
             for row in stmt.query_map([&lower, &upper], |row| {
@@ -373,7 +403,7 @@ impl ProvenanceIndex {
         }
         if has("daily_metrics") {
             let mut stmt = db.conn.prepare(&format!(
-                "SELECT d.date, d.metric, d.provider, {fetched}
+                "SELECT d.date, d.metric, CASE WHEN d.import_batch_id IS NOT NULL THEN 'imported' ELSE d.provider END, {fetched}
              FROM daily_metrics d LEFT JOIN raw_records r ON r.id = d.raw_record_id
              WHERE d.date BETWEEN ?1 AND ?2"
             ))?;

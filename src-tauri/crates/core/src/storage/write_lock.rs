@@ -246,6 +246,14 @@ fn acquire_file(
     }
 }
 
+pub(crate) fn try_open_exclusive(path: &Path) -> io::Result<Option<File>> {
+    match open_exclusive(path) {
+        Ok(file) => Ok(Some(file)),
+        Err(error) if is_contention(&error) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 #[cfg(windows)]
 fn open_exclusive(path: &Path) -> io::Result<File> {
     use std::os::windows::fs::OpenOptionsExt;

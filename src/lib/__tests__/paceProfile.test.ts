@@ -4,6 +4,13 @@ import { consistentAverage, paceProfile, quantile } from '../paceProfile';
 const run = (values: number[]) => values.map((v, i) => ({ t: i * 10_000, v }));
 
 describe('paceProfile', () => {
+  it('keeps the observed range for short, variable samples', () => {
+    const profile = paceProfile(run([4, 6]), [])!;
+    expect(profile.fastest.v).toBe(4);
+    expect(profile.mean).toBeCloseTo(4.8);
+    expect(profile.slowest.v).toBe(6);
+  });
+
   it('drops a red-light stop from the slowest pace (user 2026-11-14: slowest 52\'05")', () => {
     const values = Array.from({ length: 60 }, (_, i) => 3.5 + (i % 6) * 0.05);
     values[30] = 52.1;

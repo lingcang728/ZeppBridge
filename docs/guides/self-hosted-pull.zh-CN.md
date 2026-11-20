@@ -39,7 +39,7 @@
 
 ```json
 {
-  "records_version": "zeppbridge.records.v1",
+  "records_version": "zeppbridge.records.v2",
   "query": {
     "types": ["sleep", "workouts"],
     "from": "2026-11-01",
@@ -62,7 +62,7 @@
 ```
 
 - `records` 是一个平铺的列表，每条都带 `record_type` 和 `source`；其余字段和 `zeppbridge-cli export --format json` 一致。`record_type` 依次是 `sleep_session`、`workout`、`daily_metric`、`metric_sample`、`life_event` 之一。
-- `source`：`official` = Zepp 官方开放平台授权；`advanced` = 账号连接器；`mixed` = 同一个折叠值两边都有读数；`user` = 用户自己写的日历上下文。按每行入库时的来源读出，不是猜的。只想要官方数据的拉取方可以按它过滤。
+- `source`：`official` = Zepp 官方开放平台授权；`advanced` = 账号连接器；`imported` = 从本地文件导入；`mixed` = 同一个折叠值由多个来源合并；`user` = 用户自己写的日历上下文。按每行入库时的来源读出，不是猜的。只想要官方数据的拉取方可以按它过滤。
 - 最后一页的 `next_cursor` 是 `null`。同一个游标链读取同一份快照。快照保留最多 30 秒，服务也可能因其他查询淘汰它。收到 HTTP 409 `cursor_expired` 时去掉游标，从第一页重新拉取。
 - 单位、时区和缺失值遵守读取契约（`zeppbridge-cli contract`）：缺失就是没有这个字段或 `null`，绝不写成 `0`。
 - 错误统一是 `{"error": {"code": "…", "message": "…"}}`：

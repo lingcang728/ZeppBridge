@@ -1626,6 +1626,16 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(52, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        self.ensure_table_columns("workout_fit_overrides", &[("original_series_json", "TEXT")])?;
+        self.ensure_table_columns(
+            "route_points",
+            &[("segment_start", "INTEGER NOT NULL DEFAULT 0")],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 53;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(53, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

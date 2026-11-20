@@ -143,7 +143,9 @@ impl StageErrorKind {
                 | HeadlessProblem::ProgramOutdated { .. },
             ) => StageErrorKind::Storage,
             E::Headless(_) => StageErrorKind::Auth,
-            E::Unavailable(_) | E::DataUnavailable(_) => StageErrorKind::NotAvailable,
+            E::Unavailable(_) | E::DataUnavailable(_) | E::WorkoutFitOriginalMissing => {
+                StageErrorKind::NotAvailable
+            }
             // 超时多半是网络慢：和网络同一类，重试就好。
             E::NetworkError(_)
             | E::RetryExhausted { .. }

@@ -250,6 +250,9 @@ fn since_keeps_only_records_fetched_after_it() {
         .unwrap()
         .is_empty());
     assert_eq!(set.record_count, 2);
+    assert_eq!(set.value["capabilities"]["workouts"]["rows_in_export"], 1);
+    assert_eq!(set.value["capabilities"]["sleep"]["rows_in_export"], 1);
+    assert_eq!(set.value["capabilities"]["steps"]["rows_in_export"], 0);
     assert_eq!(set.value["record_count"], 2);
     assert!(set.value["since"]
         .as_str()
@@ -399,4 +402,41 @@ fn hourly_provenance_uses_the_export_device_bucket_and_actual_inputs() {
     assert!(filtered["data"]["metric_samples"][0]
         .get("_sample_fetched_at")
         .is_none());
+}
+
+#[test]
+fn imported_workout_has_local_provenance_and_does_not_leak_into_cloud_delta() {
+    let db = seeded();
+    let fragment = format!(
+        r#"<gpx><trk><trkseg>
+        <trkpt lat="0" lon="0"><time>{DAY}T14:00:00Z</time></trkpt>
+        <trkpt lat="0" lon="0.001"><time>{DAY}T14:03:00Z</time></trkpt>
+        </trkseg></trk></gpx>"#
+    );
+    let imported = db
+        .import_activities(
+            crate::import::ImportSource::Gpx,
+            None,
+            crate::import::gpx::parse_gpx(&fragment, None),
+            Utc::now(),
+        )
+        .unwrap();
+    let id = format!("import-{}-1", imported.batch_id.unwrap());
+    let mut q = RecordQuery::range(&["workouts"], "2024-03-09", "2024-03-12", None);
+    let value = query_records(&db, &q).unwrap().value;
+    assert_eq!(
+        by_id(&value, "workouts", "workout_id", &id)["source"],
+        "imported"
+    );
+    q.since = Some(
+        DateTime::parse_from_rfc3339("2024-03-09T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+    );
+    let filtered = query_records(&db, &q).unwrap();
+    assert!(filtered.value["data"]["workouts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|workout| workout["workout_id"] != id));
 }

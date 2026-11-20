@@ -1,4 +1,4 @@
-//! 「带走我的一切」（批次 7，导出要大方）：用户自己在 ZeppBridge 里写下、判断、整理的东西，
+//! 「带走我的一切」：用户自己在 ZeppBridge 里写下、判断、整理的东西，
 //! 一份 JSON 全部带走——打分、批注、跑鞋、比赛、伤病、纪元、教练档案、AI 任务与提示词历史、
 //! 交给 AI 的记录、训练计划草稿与发布账本、信匣里的信、手动指认、导入批次。
 //!
@@ -80,6 +80,10 @@ impl Database {
         while let Some(row) = rows.next()? {
             let mut object = Map::new();
             for (index, name) in names.iter().enumerate() {
+                // 原始采样和轨迹只用于撤销 FIT 修正，属于健康数据。
+                if table == "workout_fit_overrides" && name == "original_series_json" {
+                    continue;
+                }
                 let value = match row.get_ref(index)? {
                     ValueRef::Null => Value::Null,
                     ValueRef::Integer(v) => json!(v),

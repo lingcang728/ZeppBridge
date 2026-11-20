@@ -272,3 +272,56 @@ fn a_mountain_bike_ride_exports_as_cycling_mountain() {
         ))
     );
 }
+
+#[test]
+fn a_local_import_survives_two_corrections_and_undo() {
+    let db = Database::in_memory().unwrap();
+    let mut imported = decode_fit_file(&corrected_fit()).unwrap();
+    let start = imported.decoded.start_time;
+    let gpx = format!(
+        r#"<gpx><trk><trkseg>
+      <trkpt lat="0" lon="1"><time>{start}</time></trkpt>
+      <trkpt lat="0" lon="1.002"><time>{}</time></trkpt>
+    </trkseg></trk></gpx>"#,
+        imported.decoded.end_time.to_rfc3339()
+    );
+    let gpx = gpx.replace(&start.to_string(), &start.to_rfc3339());
+    let parsed = crate::import::gpx::parse_gpx(&gpx, None);
+    let report = db
+        .import_activities(crate::import::ImportSource::Gpx, None, parsed, start)
+        .unwrap();
+    let id = format!("import-{}-1", report.batch_id.unwrap());
+    let original = db.get_workout_series(&id).unwrap();
+    for label in ["first.fit", "second.fit"] {
+        db.import_workout_fit(&id, Some(label), &corrected_fit(), &imported)
+            .unwrap();
+    }
+    assert!(db.get_workout_series(&id).unwrap().route.is_empty());
+    let records = db.export_my_records(start).unwrap();
+    assert!(records["tables"]["workout_fit_overrides"][0]
+        .get("original_series_json")
+        .is_none());
+    assert!(db.remove_workout_fit(&id).unwrap());
+    assert_eq!(
+        serde_json::to_value(db.get_workout_series(&id).unwrap()).unwrap(),
+        serde_json::to_value(original).unwrap(),
+    );
+
+    db.conn
+        .execute_batch(
+            "CREATE TRIGGER fail_sample BEFORE INSERT ON workout_samples
+                           BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;",
+        )
+        .unwrap();
+    imported.summary.distance_m = Some(10_000.0);
+    let before = db.get_workout_detail(&id).unwrap().unwrap().distance_meters;
+    assert!(db
+        .import_workout_fit(&id, None, &corrected_fit(), &imported)
+        .is_err());
+    assert!(db.workout_fit_override(&id).unwrap().is_none());
+    assert_eq!(
+        db.get_workout_detail(&id).unwrap().unwrap().distance_meters,
+        before
+    );
+    assert_eq!(db.get_workout_series(&id).unwrap().route.len(), 2);
+}

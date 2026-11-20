@@ -37,23 +37,27 @@ export async function onRequest({ request, env }) {
   }
   if (row.status === 'pending') return jsonResponse({ status: 'pending' }, 202);
 
-  const removed = await config.db
-    .prepare('DELETE FROM oauth_pending WHERE state_hash = ? AND status = ?')
-    .bind(stateHash, row.status)
-    .run();
-  if (!removed?.meta?.changes) return jsonResponse({ status: 'expired' }, 404);
-  if (row.status !== 'ready') {
-    return jsonResponse({ status: row.status === 'denied' ? 'denied' : 'failed', error: row.error ?? null });
-  }
-
-  const tokens = await unseal(config.relayKey, row.tokens_enc);
-  if (tokens.user_id) {
-    const now = Date.now();
-    await config.db
-      .prepare(`INSERT INTO official_users (user_hash, registered_at, last_seen_at) VALUES (?, ?, ?)
+  const tokens = row.status === 'ready' ? await unseal(config.relayKey, row.tokens_enc) : null;
+  const now = Date.now();
+  const cutoff = now - PENDING_TTL_MS;
+  const consume = config.db
+    .prepare('DELETE FROM oauth_pending WHERE state_hash = ? AND status = ? AND claim_hash = ? AND created_at = ? AND created_at >= ?')
+    .bind(stateHash, row.status, row.claim_hash, row.created_at, cutoff);
+  let removed;
+  if (tokens?.user_id) {
+    const register = config.db
+      .prepare(`INSERT INTO official_users (user_hash, registered_at, last_seen_at)
+                SELECT ?, ?, ? FROM oauth_pending
+                WHERE state_hash = ? AND status = ? AND claim_hash = ? AND created_at = ? AND created_at >= ?
                 ON CONFLICT(user_hash) DO UPDATE SET last_seen_at = excluded.last_seen_at`)
-      .bind(await sha256Hex(tokens.user_id), now, now)
-      .run();
+      .bind(await sha256Hex(tokens.user_id), now, now, stateHash, row.status, row.claim_hash, row.created_at, cutoff);
+    [, removed] = await config.db.batch([register, consume]);
+  } else {
+    removed = await consume.run();
+  }
+  if (!removed?.meta?.changes) return jsonResponse({ status: 'expired' }, 404);
+  if (!tokens) {
+    return jsonResponse({ status: row.status === 'denied' ? 'denied' : 'failed', error: row.error ?? null });
   }
   return jsonResponse({ status: 'ready', ...tokens });
 }
