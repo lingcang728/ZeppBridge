@@ -14,15 +14,37 @@ const TOKEN: &str = "zbk_0123456789abcdef";
 /// 同一个，自己连上自己（TCP simultaneous open），connect 就成功了（CI 上撞到过）。
 /// 只看「能绑上」也不行：Windows / macOS 上还有没关掉的已接受连接时会拒绝重绑。
 /// 两个都不成立，才说明那里真有东西在监听。
+///
+/// 关停后系统收回端口不是同步的（macOS CI 上撞到过关停刚返回、端口还占着），
+/// 所以给它两秒，期间反复看；真有东西一直在监听时两秒后照样判失败。
 fn port_is_released(address: &str) -> bool {
-    TcpListener::bind(address).is_ok() || ClientStream::connect(address).is_err()
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        if TcpListener::bind(address).is_ok() || ClientStream::connect(address).is_err() {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
+/// 每个用例一个不重复的临时端口。测试是并行跑的：一个用例关停后放出来的端口，
+/// 系统可能马上又分给另一个用例，那个用例在上面起了服务，前一个用例再去断言
+/// 「端口已释放」就会失败。所以本进程发出去过的端口不再发第二次。
 fn ephemeral_address() -> String {
-    let probe = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = probe.local_addr().unwrap().port();
-    drop(probe);
-    format!("127.0.0.1:{port}")
+    static HANDED_OUT: Mutex<Vec<u16>> = Mutex::new(Vec::new());
+    loop {
+        let probe = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = probe.local_addr().unwrap().port();
+        drop(probe);
+        let mut handed_out = HANDED_OUT.lock().unwrap();
+        if !handed_out.contains(&port) {
+            handed_out.push(port);
+            return format!("127.0.0.1:{port}");
+        }
+    }
 }
 
 #[derive(Default)]
