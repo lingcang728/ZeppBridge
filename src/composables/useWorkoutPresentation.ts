@@ -101,7 +101,11 @@ export const useWorkoutPresentation = (
     const item = workout.value;
     if (!item) return [];
     const summary = series.value?.summary;
-    const resolvedPace = paceLabel.value !== t.value.notProvided ? paceLabel.value : paceText(summary?.average_pace);
+    /* 平均配速 = 距离 ÷ 运动时间，和 Zepp 的运动总结同一个数。逐点实时配速的均值只在
+       算不出时兜底：有的表（GTR 4）实时配速一路偏慢，手表总结会按轨迹距离修正，那份均值不会。 */
+    const resolvedPace = paceLabel.value !== t.value.notProvided
+      ? paceLabel.value
+      : paceText(timing.value?.movingPace ?? summary?.average_pace);
     const hasPauses = Boolean(timing.value && timing.value.pausedMinutes > 0);
     const timingMetrics: HeroMetric[] = hasPauses ? [
       { label: t.value.metricMovingTime, value: formatClock(timing.value!.movingMinutes), ...glyphFields(WORKOUT_GLYPH.time) },
