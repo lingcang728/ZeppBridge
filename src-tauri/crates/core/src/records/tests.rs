@@ -407,17 +407,17 @@ fn hourly_provenance_uses_the_export_device_bucket_and_actual_inputs() {
 #[test]
 fn imported_workout_has_local_provenance_and_does_not_leak_into_cloud_delta() {
     let db = seeded();
-    let fragment = format!(
-        r#"<gpx><trk><trkseg>
-        <trkpt lat="0" lon="0"><time>{DAY}T14:00:00Z</time></trkpt>
-        <trkpt lat="0" lon="0.001"><time>{DAY}T14:03:00Z</time></trkpt>
-        </trkseg></trk></gpx>"#
-    );
+    // 夹具运动在本地正午和两小时后，换算成 UTC 随时区漂移（UTC 下正好是 14:00）。
+    // 导入放在次日 UTC 20:00：任何时区下都不和它们重叠，又仍落在查询区间里。
+    let fragment = r#"<gpx><trk><trkseg>
+        <trkpt lat="0" lon="0"><time>2024-03-11T20:00:00Z</time></trkpt>
+        <trkpt lat="0" lon="0.001"><time>2024-03-11T20:03:00Z</time></trkpt>
+        </trkseg></trk></gpx>"#;
     let imported = db
         .import_activities(
             crate::import::ImportSource::Gpx,
             None,
-            crate::import::gpx::parse_gpx(&fragment, None),
+            crate::import::gpx::parse_gpx(fragment, None),
             Utc::now(),
         )
         .unwrap();
