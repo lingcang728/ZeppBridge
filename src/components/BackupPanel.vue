@@ -63,7 +63,7 @@ const {
         <span class="s-row-sub">
           {{ t.metaLine(formatBytes(item.bytes), item.app_version, item.schema_version) }}
           <template v-if="item.coverage.earliest_sample_at && item.coverage.latest_sample_at">
-            {{ t.coverage(formatDate(item.coverage.earliest_sample_at), formatDate(item.coverage.latest_sample_at)) }}
+            {{ t.coverage(formatDate(item.coverage.earliest_sample_at, 'auto'), formatDate(item.coverage.latest_sample_at, 'auto')) }}
           </template>
           <template v-else>{{ t.noSamples }}</template>
         </span>

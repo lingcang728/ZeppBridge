@@ -120,7 +120,13 @@ export const formatFullDateTime = (value?: string, empty = copy().noRecords): st
   }).format(date);
 };
 
-export const formatDate = (value: string, style: 'short' | 'long' = 'short'): string => {
+/**
+ * 日期样式：short = 月日星期；long = 年月日星期全称；
+ * dated = short 加年份（详情页页头）；auto = 不是今年才加年份（翻多年记录的列表）。
+ */
+export type DateStyle = 'short' | 'long' | 'dated' | 'auto';
+
+export const formatDate = (value: string, style: DateStyle = 'short', now: Date = new Date()): string => {
   const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return copy().dateUnknown;
   if (style === 'long') {
@@ -131,7 +137,9 @@ export const formatDate = (value: string, style: 'short' | 'long' = 'short'): st
       weekday: 'long',
     }).format(date);
   }
+  const withYear = style === 'dated' || (style === 'auto' && date.getFullYear() !== now.getFullYear());
   return displayDateTimeFormatter({
+    ...(withYear ? { year: 'numeric' as const } : {}),
     month: 'short',
     day: 'numeric',
     weekday: 'short',

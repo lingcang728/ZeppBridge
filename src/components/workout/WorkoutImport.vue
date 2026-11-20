@@ -66,8 +66,8 @@ const undo = async (batch: ImportBatch) => {
 
 const span = (batch: ImportBatch): string => {
   if (!batch.first_start || !batch.last_start) return '';
-  const first = formatDate(batch.first_start);
-  const last = formatDate(batch.last_start);
+  const first = formatDate(batch.first_start, 'auto');
+  const last = formatDate(batch.last_start, 'auto');
   return first === last ? first : `${first} – ${last}`;
 };
 </script>

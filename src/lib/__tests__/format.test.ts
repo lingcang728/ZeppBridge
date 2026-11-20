@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   formatBytes,
+  formatDate,
   formatDistance,
   formatDuration,
   formatMetric,
@@ -129,5 +130,36 @@ describe('数字分组用窄不换行空格', () => {
     expect(formatMetric(12345)).toBe('12 345');
     setLocale('fr');
     expect(formatNumber(1709)).toBe('1 709');
+  });
+});
+
+/*
+ * 列表翻到去年以前时得看得出是哪一年：auto 只在不是今年时带年份，dated 一律带。
+ */
+describe('日期按需带年份', () => {
+  afterEach(() => setLocale('zh'));
+  const now = new Date(2026, 0, 1, 9, 0);
+  const langs = ['zh', 'en', 'de'] as const;
+
+  it('今年的日期在列表里不带年份', () => {
+    for (const lang of langs) {
+      setLocale(lang);
+      expect(formatDate('2026-01-01T08:00:00', 'auto', now)).not.toContain('2026');
+    }
+  });
+
+  it('跨年后，去年最后一天带上年份', () => {
+    for (const lang of langs) {
+      setLocale(lang);
+      expect(formatDate('2025-12-31T20:00:00', 'auto', now)).toContain('2025');
+    }
+  });
+
+  it('详情页页头一律带年份，short 照旧不带', () => {
+    for (const lang of langs) {
+      setLocale(lang);
+      expect(formatDate('2026-01-01T08:00:00', 'dated', now)).toContain('2026');
+      expect(formatDate('2024-06-01T08:00:00', 'short', now)).not.toContain('2024');
+    }
   });
 });

@@ -7,6 +7,7 @@ import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
 import { afterMotion, nextSlot } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
+import { timelineKey } from '../lib/scroll/scrollbar';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useRevisionReload } from '../composables/useRevisionReload';
@@ -131,10 +132,11 @@ useSectionTour('sleep');
       <RecordRow
         v-for="session in rendered"
         :key="session.sleep_id"
+        :data-timeline="timelineKey(session.start_time)"
         :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
         category="sleep"
         design-icon="sleep"
-        :kicker="formatDate(session.start_time)"
+        :kicker="formatDate(session.start_time, 'auto')"
         :time="formatTime(session.start_time)"
         :title="formatDuration(session.duration_minutes)"
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
@@ -149,7 +151,7 @@ useSectionTour('sleep');
     </div>
     <p v-if="sessions.length && !rendering" class="footnote">
       {{ t.shown(sessions.length, total) }} ·
-      {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time)) }}
+      {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time, 'auto')) }}
     </p>
   </section>
 </template>

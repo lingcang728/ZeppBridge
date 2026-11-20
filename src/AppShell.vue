@@ -10,6 +10,7 @@ import Icon from './components/Icon.vue';
 import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORDER, type PageMotion } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
+import OverlayScrollbar from './components/scroll/OverlayScrollbar.vue';
 import { usePageMorph } from './composables/usePageMorph';
 import { useTabFade } from './composables/useTabFade';
 import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
@@ -425,6 +426,7 @@ onUnmounted(() => {
       </RouterView>
       </div>
     </main>
+    <OverlayScrollbar viewport="main-content" />
 
     <nav class="bottom-nav" :aria-label="t.bottomNav">
       <SegmentTrack

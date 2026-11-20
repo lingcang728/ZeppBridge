@@ -19,6 +19,10 @@
   --line: rgba(226, 234, 242, .12);
   --line-control: rgba(226, 234, 242, .46);
   --line-strong: rgba(226, 234, 242, .22);
+  /* 主滚动区的悬浮细条（components/scroll/OverlayScrollbar.vue）。 */
+  --scroll-thumb: rgba(226, 234, 242, .30);
+  --scroll-thumb-active: rgba(226, 234, 242, .56);
+  --scroll-label-bg: rgba(29, 33, 40, .92);
   --brand: #7DA33E;
   --accent: var(--brand);
   --accent-hover: #93B952;
@@ -235,6 +239,9 @@ html[data-theme="light"] {
   --line: rgba(38, 52, 41, .10);
   --line-control: rgba(38, 52, 41, .36);
   --line-strong: rgba(38, 52, 41, .22);
+  --scroll-thumb: rgba(38, 52, 41, .28);
+  --scroll-thumb-active: rgba(38, 52, 41, .52);
+  --scroll-label-bg: rgba(255, 255, 255, .94);
   --brand: #2F6B4F;
   --accent: var(--brand);
   --accent-hover: #3A7E5E;

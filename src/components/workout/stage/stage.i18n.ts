@@ -1,6 +1,6 @@
 import { defineMessages } from '../../../i18n';
 
-/* 运动详情的台前调度（2026-11-13）：舞台、左侧栏、平铺（全部卡片）、窗口菜单。卡名是侧栏缩略图下面那一行短名。 */
+/* 运动详情的台前调度（2026-11-13）：舞台、左侧栏、经典视图（老版两栏）、窗口菜单。侧栏缩略图不挂名字，卡名只在悬停标题和读屏里。 */
 export const stageMessages = defineMessages(
   {
     region: '运动卡片舞台',
@@ -22,7 +22,7 @@ export const stageMessages = defineMessages(
     grid: '田字',
     oneOverThree: '上一下三',
     bigLeft: '左大右三',
-    expose: '全部卡片',
+    expose: '经典视图',
     exposeExit: '回到舞台',
     reset: '复原布局',
     hiddenCount: (count: number) => `已隐藏 ${count} 张`,
@@ -64,7 +64,7 @@ export const stageMessages = defineMessages(
     grid: 'Grid of four',
     oneOverThree: 'One over three',
     bigLeft: 'Big one on the left',
-    expose: 'All cards',
+    expose: 'Classic view',
     exposeExit: 'Back to stage',
     reset: 'Reset layout',
     hiddenCount: (count: number) => `${count} hidden`,
@@ -106,7 +106,7 @@ export const stageMessages = defineMessages(
     grid: 'Cuadrícula de cuatro',
     oneOverThree: 'Una arriba, tres abajo',
     bigLeft: 'Grande a la izquierda',
-    expose: 'Todas las tarjetas',
+    expose: 'Vista clásica',
     exposeExit: 'Volver al escenario',
     reset: 'Restablecer diseño',
     hiddenCount: (count: number) => `Tarjetas ocultas: ${count}`,

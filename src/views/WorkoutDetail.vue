@@ -132,7 +132,7 @@ const sport = computed(() => sportClass(displayType.value, !!series.value?.stren
             <GlyphTile :name="workoutArt" tone="activity" :size="46" />
             <div class="detail-name">
               <h1 id="workout-detail-title">{{ sportName }}</h1>
-              <p class="detail-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
+              <p class="detail-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'dated') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
             </div>
           </div>
           <p v-if="workout.effective_type === 'strength' && !series?.strength?.sets?.length" class="footnote">{{ tools.strengthHint }}</p>

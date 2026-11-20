@@ -8,6 +8,7 @@ import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
 import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
+import { timelineKey } from '../lib/scroll/scrollbar';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useRevisionReload } from '../composables/useRevisionReload';
@@ -157,14 +158,14 @@ useSectionTour('workouts');
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else :class="['record-list', { selecting }]">
-      <div v-for="workout in displayableList" :key="workout.workout_id" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
-      <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time)} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />
+      <div v-for="workout in displayableList" :key="workout.workout_id" :data-timeline="timelineKey(workout.start_time)" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
+      <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />
       <RecordRow
         class="workout-record"
         :to="hiddenView ? undefined : { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
         :design-icon="workoutIcon(workout)"
-        :kicker="formatDate(workout.start_time)"
+        :kicker="formatDate(workout.start_time, 'auto')"
         :time="formatTime(workout.start_time)"
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout)"
