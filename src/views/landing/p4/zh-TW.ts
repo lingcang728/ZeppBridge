@@ -58,7 +58,7 @@ const pack: P4Copy = {
       title: '沿用現有訂閱，不多花一分錢。',
       lead: '選好日子，紀錄化為單一檔案。交給常用的 AI 繼續對話，再把初稿帶回。',
       points: [
-        { id: 'providers', title: '八家任選', text: 'ChatGPT、Claude、Gemini、Kimi、DeepSeek、豆包、Grok、Qwen。沿用你現有的帳號與額度。', scene: 'ai' },
+        { id: 'providers', title: '八家任選', text: 'ChatGPT、Claude、Gemini、Kimi、DeepSeek、Doubao、Grok、Qwen。沿用你現有的帳號與額度。', scene: 'ai' },
         { id: 'prompt', title: '問什麼，你說了算', text: '預設的問題可以修改，也可以自己撰寫。', scene: 'prompt' },
         { id: 'events', title: '事出有因', text: '記下感冒、旅行、出差，讓 AI 多了解一些起伏背後的背景。', scene: 'events' },
         { id: 'autopaste', title: '全自動 · Windows', text: '開啟後替你貼上、傳送，每一步先確認頁面狀態。預設關閉。', scene: 'autopaste' },
