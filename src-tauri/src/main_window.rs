@@ -145,21 +145,76 @@ fn fit_to_monitor(window: &WebviewWindow, monitor: &Monitor) {
     {
         return;
     }
-    if let Some(size) = checked("outer_size", window.outer_size()) {
-        // Use the selected monitor's physical work area, including negative
-        // multi-monitor origins. center() can select the unavailable monitor.
-        let (x, y) = Rect::new(
-            work.position.x,
-            work.position.y,
-            work.size.width,
-            work.size.height,
-        )
-        .centered_origin(size.width, size.height);
-        let _ = checked(
-            "set_position",
-            window.set_position(tauri::PhysicalPosition::new(x, y)),
-        );
+    #[cfg(target_os = "macos")]
+    {
+        center_in_points(window, work, scale, width, height);
     }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(size) = checked("outer_size", window.outer_size()) {
+            // Use the selected monitor's physical work area, including negative
+            // multi-monitor origins. center() can select the unavailable monitor.
+            let (x, y) = Rect::new(
+                work.position.x,
+                work.position.y,
+                work.size.width,
+                work.size.height,
+            )
+            .centered_origin(size.width, size.height);
+            let _ = checked(
+                "set_position",
+                window.set_position(tauri::PhysicalPosition::new(x, y)),
+            );
+        }
+    }
+}
+
+/// macOS 上物理坐标按**窗口自己的**缩放系数换回点。窗口刚建好、还没真正落到
+/// 这块屏上时，那个系数可以是 1，而工作区是按屏幕的 2 倍算的：4K 屏上中心点和
+/// 窗口尺寸两头都错一倍，窗口被推到右下角、一截落在屏幕外。这里全程用这块屏的
+/// 点坐标算，交给系统的也是点。改尺寸在 macOS 上是异步的，`outer_size` 可能还是
+/// 旧值，所以取它和刚设的尺寸里大的那个。
+#[cfg(target_os = "macos")]
+fn center_in_points(
+    window: &WebviewWindow,
+    work: &tauri::PhysicalRect<i32, u32>,
+    scale: f64,
+    width: f64,
+    height: f64,
+) {
+    let window_scale = checked("scale_factor", window.scale_factor())
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .unwrap_or(scale);
+    let (outer_width, outer_height) = checked("outer_size", window.outer_size())
+        .map(|size| {
+            let logical = size.to_logical::<f64>(window_scale);
+            (logical.width.max(width), logical.height.max(height))
+        })
+        .unwrap_or((width, height));
+    let (x, y) = centered_points(work, scale, outer_width, outer_height);
+    let _ = checked(
+        "set_position",
+        window.set_position(tauri::LogicalPosition::new(x, y)),
+    );
+}
+
+/// 工作区（物理像素）按屏幕缩放系数换成点，再把给定大小（点）的窗口摆在正中；
+/// 放不下时贴左上角，保证标题栏在屏内。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn centered_points(
+    work: &tauri::PhysicalRect<i32, u32>,
+    scale: f64,
+    outer_width: f64,
+    outer_height: f64,
+) -> (f64, f64) {
+    let left = f64::from(work.position.x) / scale;
+    let top = f64::from(work.position.y) / scale;
+    let work_width = f64::from(work.size.width) / scale;
+    let work_height = f64::from(work.size.height) / scale;
+    (
+        left + ((work_width - outer_width) / 2.0).max(0.0),
+        top + ((work_height - outer_height) / 2.0).max(0.0),
+    )
 }
 
 fn recover_geometry(window: &WebviewWindow) {
@@ -277,6 +332,21 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 4K 屏按 2 倍缩放：工作区 3840×2120 物理像素是 1920×1060 点，1690×933 点的
+    /// 窗口要落在点坐标的正中，不能按物理像素再算一遍跑到右下角外面。
+    #[test]
+    fn a_hidpi_work_area_is_centred_in_points() {
+        let work = tauri::PhysicalRect {
+            position: tauri::PhysicalPosition::new(0, 40),
+            size: tauri::PhysicalSize::new(3840, 2120),
+        };
+        let (x, y) = centered_points(&work, 2.0, 1690.0, 933.0);
+        assert_eq!((x, y), (115.0, 20.0 + 63.5));
+        assert!(x + 1690.0 <= 1920.0 && y + 933.0 <= 20.0 + 1060.0);
+        // 放不下时贴左上角，标题栏仍在屏内。
+        assert_eq!(centered_points(&work, 2.0, 2400.0, 1400.0), (0.0, 20.0));
+    }
 
     #[test]
     fn concurrent_open_requests_are_coalesced_and_retries_are_allowed() {
