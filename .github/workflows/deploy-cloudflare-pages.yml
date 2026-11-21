@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Playwright 1.58 不支持 Ubuntu 26.04（ubuntu-latest 已切过去），装 chromium 会直接失败。
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       CLOUDFLARE_D1_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_API_TOKEN }}
