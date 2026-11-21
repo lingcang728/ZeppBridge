@@ -107,20 +107,25 @@ def actions(page, scene):
         page.locator('.slot-button').first.click(force=True); page.wait_for_timeout(1800)
         page.keyboard.press('Escape'); page.wait_for_timeout(1400)
         hold(page, 'button.lock')
-        page.wait_for_selector('dialog[open] .pill-button', timeout=15000)
+        # The hold opens the sample conversation (DemoConversation); sending plays it out and hands the plan back.
+        page.wait_for_selector('dialog[open] .conversation-send', timeout=15000)
         page.wait_for_timeout(1900)
-        page.locator('dialog[open] .pill-button').click()
-        page.wait_for_function('location.pathname === "/ai/plan"')
+        page.evaluate('window.__ZB_DEMO_PACE__ = 0.4')  # Same compression as the landing film; the site demo keeps 1x.
+        page.locator('dialog[open] .conversation-send').click()
+        page.wait_for_function('location.pathname === "/ai/plan"', timeout=60000)
         page.wait_for_timeout(2300)
         go(page, '/ai')
     else:
-        page.locator('.future-day').filter(has=page.locator('.workout-shape svg')).first.click()
+        page.locator('.future-day').filter(has=page.locator('.day-art svg.shape')).first.click()
         page.wait_for_timeout(2000); scroll(page, 370); page.wait_for_timeout(1400)
         go(page, '/ai/plan')
         hold(page, '.hold-button')
         page.wait_for_function('window.__ZB_DEMO_API__.plan.state().drafts.length === 0')
         page.wait_for_timeout(2200)
-        page.locator('.week-foot .ledger .acts button:not(.danger)').click()
+        # Undo lives in the plan status chip's popover: resend / discard / undo / clear (danger), so undo is the last non-danger action.
+        page.locator('.head-acts .plan-chip').click()
+        page.wait_for_selector('.pop-acts', timeout=15000); page.wait_for_timeout(900)
+        page.locator('.pop-acts button:not(.danger)').last.click()
         page.wait_for_timeout(2000)
         assert page.evaluate('window.__ZB_DEMO_API__.plan.state().last_publish.kind') == 'undo'
     page.wait_for_timeout(1900)  # Finish the transition and leave the completed result readable.
