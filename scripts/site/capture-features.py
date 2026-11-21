@@ -122,12 +122,10 @@ def actions(page, scene):
         hold(page, '.hold-button')
         page.wait_for_function('window.__ZB_DEMO_API__.plan.state().drafts.length === 0')
         page.wait_for_timeout(2200)
-        # Undo lives in the plan status chip's popover: resend / discard / undo / clear (danger), so undo is the last non-danger action.
-        page.locator('.head-acts .plan-chip').click()
-        page.wait_for_selector('.pop-acts', timeout=15000); page.wait_for_timeout(900)
-        page.locator('.pop-acts button:not(.danger)').last.click()
-        page.wait_for_timeout(2000)
-        assert page.evaluate('window.__ZB_DEMO_API__.plan.state().last_publish.kind') == 'undo'
+        # End on the delivered week. Undo now sits in the status chip's GlassPopover, which positions itself from
+        # unzoomed viewport maths and lands off-frame under the 2x documentElement zoom used for recording.
+        assert page.evaluate('window.__ZB_DEMO_API__.plan.state().last_publish.kind') != 'undo'
+        page.wait_for_timeout(1600)
     page.wait_for_timeout(1900)  # Finish the transition and leave the completed result readable.
 
 
