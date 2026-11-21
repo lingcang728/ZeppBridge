@@ -23,7 +23,9 @@ ENTRIES = {
  'ai': ['views/AiComposer.vue', 'views/ai/AiPlanWeek.vue'],
  'plan': ['views/ai/AiPlanWeek.vue', 'views/ai/AiPlanDay.vue'],
 }
-os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', r'G:\build_cache\playwright-browsers')
+# Only a Windows default: on Linux / macOS a Windows path makes Playwright look for its ffmpeg under the checkout.
+if os.name == 'nt':
+    os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', r'G:\build_cache\playwright-browsers')
 spec = importlib.util.spec_from_file_location('demo_verifier', Path(__file__).with_name('verify-demo.py'))
 verifier = importlib.util.module_from_spec(spec); spec.loader.exec_module(verifier)
 installed_chromium = verifier.installed_chromium
