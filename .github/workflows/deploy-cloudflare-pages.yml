@@ -14,7 +14,8 @@ jobs:
   deploy:
     # Playwright 1.58 不支持 Ubuntu 26.04（ubuntu-latest 已切过去），装 chromium 会直接失败。
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 缓存全失效时要串行重录 130 条功能短片（每条约 50 秒），60 分钟不够。
+    timeout-minutes: 150
     env:
       CLOUDFLARE_D1_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_API_TOKEN }}
     steps:
@@ -38,15 +39,26 @@ jobs:
           python -m playwright install chromium --with-deps
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
+      # 恢复和保存分开：录制脚本每录完一条就写一次 manifest，失败或超时也把已录好的存下来，下次只补没录的。
+      # 缓存键不可覆盖，所以按运行编号存，恢复时取同前缀最新的一份。
       - name: Restore captured application journeys
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .site-cache/media
-          key: landing-media-${{ runner.os }}-${{ hashFiles('src/**', 'scripts/site/capture-features.py') }}
+          key: landing-media-${{ runner.os }}-${{ github.run_id }}
           restore-keys: landing-media-${{ runner.os }}-
 
       - name: Build landing page and current application demos
+        # 比任务超时短，超时也只是这一步失败，下面的保存一定能跑到。
+        timeout-minutes: 130
         run: npm ci && npm run test:functions && npm run build:web
+
+      - name: Save captured application journeys
+        if: always() && hashFiles('.site-cache/media/manifest.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .site-cache/media
+          key: landing-media-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Apply feedback database migrations
         if: env.CLOUDFLARE_D1_API_TOKEN != ''
