@@ -122,5 +122,7 @@ in any browser, the client claims the token), so `zeppbridge-cli` could print
 the link and claim the token. But `zeppbridge-cli sync` does not run the
 official channel yet — that orchestration still lives in the desktop app — so a
 token signed in from the CLI would have nothing to use it. Until both land
-together, connect once with the desktop app and hand the data directory to the
-container, as [Docker](docker.md) describes.
+together: with the account connector, connect once with the desktop app and hand
+the data directory to the container, as [Docker](docker.md) describes; with only
+the official authorization, a sync in the container gets no new data, so keep
+the desktop app running on an always-on computer and run `serve` there too.

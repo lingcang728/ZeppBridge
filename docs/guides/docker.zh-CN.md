@@ -15,7 +15,9 @@
 
 ## 怎么把凭据送进去
 
-**容器走高级数据（App Token）同步。** 官方授权没法从环境变量传进来；如果你只连了官方授权，容器只能用下面的文件存储，拷一份把令牌存在文件里的桌面端的 `credentials.json`，之后刷新令牌会经过 `zeppbridge.com`。
+**容器只走高级数据（App Token）同步。** `zeppbridge-cli sync` 还不跑官方授权通道，所以只连了官方授权的话，容器里的定时同步拿不到新数据，会直接报错退出。这种情况下新数据要靠桌面应用同步：让它在一台常开的电脑上运行，`zeppbridge-cli serve` 也在那台电脑上跑、读同一个数据目录（见[自托管拉取](self-hosted-pull.zh-CN.md#无头登录)）。
+
+官方令牌没法从环境变量传进来。把令牌存在文件里的桌面端拷一份 `credentials.json` 放进下面的文件存储，容器里只有 `zeppbridge-cli workout-details --channel official` 会用到它，刷新令牌会经过 `zeppbridge.com`。
 
 有两样东西要进到容器里：`auth.json`（不敏感的元数据——用户 ID 和区域地址）和 App Token（秘密）。
 

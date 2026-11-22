@@ -22,11 +22,19 @@ window on a real session. See the [connection guide](connection.md).
 
 ## Getting the credentials in
 
-**The container syncs through Advanced data (the App Token).** The official
-Zepp authorization cannot be passed in through the environment; if that is the
-only connection you have, the container can only use it through the file store
-below, with a `credentials.json` copied from a desktop that keeps its tokens in a
-file, and token refreshes then go through `zeppbridge.com`.
+**The container syncs through Advanced data (the App Token) only.**
+`zeppbridge-cli sync` does not run the official authorization channel yet, so if
+that is the only connection you have, a scheduled sync in the container gets no
+new data and exits with an error. New data then has to come from the desktop
+app: keep it running on an always-on computer and run `zeppbridge-cli serve` on
+that same computer against the same data directory (see
+[self-hosted pull](self-hosted-pull.md#headless-sign-in)).
+
+Official tokens cannot be passed in through the environment. If you copy a
+`credentials.json` from a desktop that keeps its tokens in a file into the file
+store below, the only thing in the container that uses it is
+`zeppbridge-cli workout-details --channel official`, and token refreshes then go
+through `zeppbridge.com`.
 
 Two things have to reach the container: `auth.json` (non-secret metadata — user
 ID and region host) and the App Token (secret).
