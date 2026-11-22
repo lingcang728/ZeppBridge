@@ -71,6 +71,29 @@ fn sentinels_do_not_become_zeroes() {
     // 骑行确实有心率区间
     assert_eq!(workout.hr_zones.len(), 6);
     assert_eq!(workout.hr_zones[3].seconds, 102);
+    assert_eq!(workout.avg_cadence_rpm, None, "踏频 -1 是没测到");
+}
+
+/// 骑行踏频（转/分）落在单独的两列，不混进步频。
+#[test]
+fn cycling_cadence_lands_in_rpm_fields() {
+    let raw = serde_json::json!({
+        "data": [{
+            "trackid": "1787186615",
+            "type": 9,
+            "start_time": 1787186615_i64,
+            "end_time": 1787187642_i64,
+            "dis": 31803.0,
+            "avg_frequency": "0.0",
+            "avg_cadence": 84,
+            "max_cadence": "112"
+        }]
+    });
+    let records = Normalizer::normalize_workouts_with_sport(&raw, None).expect("应当能解析");
+    let workout = records.first().expect("应当有一条运动");
+    assert_eq!(workout.avg_cadence_rpm, Some(84.0));
+    assert_eq!(workout.max_cadence_rpm, Some(112.0));
+    assert_eq!(workout.avg_cadence_spm, None);
 }
 
 /// 空报文报的是 `DataUnavailable`，不是解析失败。

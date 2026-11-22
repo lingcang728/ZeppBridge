@@ -132,7 +132,9 @@ impl Database {
             ],
         )?;
         self.overlay_fit_summary(workout_id)?;
-        self.replace_workout_series(workout_id, &imported.decoded)?;
+        let cloud = self.decode_cloud_detail(workout_id)?;
+        let series = with_cloud_strength_sets(imported.decoded.clone(), cloud.as_ref());
+        self.replace_workout_series(workout_id, &series)?;
         let outcome = match self.workout_fit_override(workout_id)? {
             Some(info) => FitOverrideOutcome::Applied(info),
             None => FitOverrideOutcome::WorkoutMissing,
@@ -275,7 +277,10 @@ impl Database {
         cloud: &DecodedWorkout,
     ) -> Result<()> {
         match self.fit_override_series(workout_id)? {
-            Some(corrected) => self.replace_workout_series(workout_id, &corrected),
+            Some(corrected) => self.replace_workout_series(
+                workout_id,
+                &with_cloud_strength_sets(corrected, Some(cloud)),
+            ),
             None => self.replace_workout_series(workout_id, cloud),
         }
     }
@@ -375,6 +380,19 @@ impl Database {
         }
         Ok(decoded)
     }
+}
+
+/// 修正文件管轨迹、距离和曲线；逐组明细以云端为准。云端的组带动作编号、名称、心率和热量，
+/// FIT 的 set 消息没有动作信息，Zepp 导出的 FIT 常常干脆不带 set——以前导入一份就把
+/// 整场的组清成空。云端没有逐组明细时才用 FIT 里的。
+fn with_cloud_strength_sets(
+    mut corrected: DecodedWorkout,
+    cloud: Option<&DecodedWorkout>,
+) -> DecodedWorkout {
+    if let Some(cloud) = cloud.filter(|cloud| !cloud.strength_sets.is_empty()) {
+        corrected.strength_sets = cloud.strength_sets.clone();
+    }
+    corrected
 }
 
 #[derive(Serialize, Deserialize)]

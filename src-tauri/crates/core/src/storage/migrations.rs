@@ -1636,6 +1636,17 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(53, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v54：骑行踏频（转/分），云端汇总的 avg_cadence / max_cadence。和步频分两列存，
+        // 单位不同不能混。配合修订号重放，老骑行记录自动补齐。
+        self.ensure_table_columns(
+            "workouts",
+            &[("avg_cadence_rpm", "REAL"), ("max_cadence_rpm", "REAL")],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 54;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(54, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

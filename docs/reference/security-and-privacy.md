@@ -233,8 +233,11 @@ push code reads nothing from the database and sends no request.
 
 ## Voluntary problem reports
 
-When a device or workout type is not recognised, you can press "submit a problem
-report" in Settings. It always requires an explicit confirmation first. The app
+When a device or workout type is not recognised, or data looks wrong, you can
+stamp "Attach a de-identified diagnostic report" on a letter to the author and
+send it with the letter (open it from the pen in the top bar, "Write to the
+author" in Settings, or the empty envelope in the letter box). The report is only
+sent when you send the letter. The app
 never reports anything in the background, and never creates or replies to GitHub
 issues.
 

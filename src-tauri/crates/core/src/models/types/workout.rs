@@ -42,6 +42,8 @@ impl Default for Workout {
             avg_cadence_spm: None,
             max_cadence_spm: None,
             avg_stride_cm: None,
+            avg_cadence_rpm: None,
+            max_cadence_rpm: None,
             gear_id: None,
             hr_zones: Vec::new(),
             source_scope: SourceScope::Unknown,
@@ -132,6 +134,12 @@ pub struct Workout {
     /// 平均步幅（厘米）。
     #[serde(default)]
     pub avg_stride_cm: Option<f64>,
+    /// 平均 / 最高踏频，单位是转每分钟（骑行）。云端汇总的 `avg_cadence` / `max_cadence`，
+    /// 没测到时云端写 -1，这里为空。和步频是两个量，不混进 `avg_cadence_spm`。
+    #[serde(default)]
+    pub avg_cadence_rpm: Option<f64>,
+    #[serde(default)]
+    pub max_cadence_rpm: Option<f64>,
     /// 这次运动用的装备（鞋）在 Zepp 里的编号，摘要的 `gearId`（#143）。
     /// 只有编号：云端不给鞋名，界面和导出都不编一个名字出来。
     #[serde(default)]

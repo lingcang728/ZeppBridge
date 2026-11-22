@@ -103,6 +103,8 @@ fn run_workout(id: &str, start: chrono::DateTime<Utc>, avg_hr: i32) -> Workout {
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        avg_cadence_rpm: None,
+        max_cadence_rpm: None,
         gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,

@@ -488,7 +488,8 @@ impl Database {
                         elevation_gain_m, elevation_loss_m,
                         max_altitude_m, min_altitude_m,
                         training_effect, anaerobic_training_effect, rpe,
-                        avg_cadence_spm, max_cadence_spm, avg_stride_cm
+                        avg_cadence_spm, max_cadence_spm, avg_stride_cm,
+                        avg_cadence_rpm, max_cadence_rpm
                  FROM workouts_visible
                  WHERE start_time >= ?4 AND start_time < ?5
                    AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
@@ -528,6 +529,8 @@ impl Database {
                             row.get::<_, Option<f64>>(25)?,
                             row.get::<_, Option<f64>>(26)?,
                             row.get::<_, Option<f64>>(27)?,
+                            row.get::<_, Option<f64>>(28)?,
+                            row.get::<_, Option<f64>>(29)?,
                         ),
                     ))
                 },
@@ -563,6 +566,8 @@ impl Database {
                         avg_cadence_spm,
                         max_cadence_spm,
                         avg_stride_cm,
+                        avg_cadence_rpm,
+                        max_cadence_rpm,
                     ),
                 ) = row?;
                 let series = self.get_workout_series(&workout_id)?;
@@ -600,6 +605,8 @@ impl Database {
                     "avg_cadence_spm": avg_cadence_spm,
                     "max_cadence_spm": max_cadence_spm,
                     "avg_stride_cm": avg_stride_cm,
+                    "avg_cadence_rpm": avg_cadence_rpm,
+                    "max_cadence_rpm": max_cadence_rpm,
                     "hr_zones": hr_zones,
                     "vo2max": vo2max,
                     "source_scope": source_scope,

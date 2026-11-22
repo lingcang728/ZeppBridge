@@ -81,6 +81,94 @@ fn pause_count(db: &Database) -> i64 {
         .unwrap()
 }
 
+fn strength_set_count(db: &Database) -> i64 {
+    db.conn
+        .query_row(
+            "SELECT COUNT(*) FROM workout_strength_sets WHERE workout_id = '1700000000'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+/// 一行 62 列的力量训练分组：只填动作、次数、重量、单位和毫秒时长。
+fn strength_row(index: usize, weight: f64, reps: i32) -> String {
+    let mut cols = vec!["-1".to_string(); 62];
+    cols[0] = index.to_string();
+    cols[2] = "0".into();
+    cols[5] = "0".into();
+    cols[21] = format!("{weight:.1}");
+    cols[22] = reps.to_string();
+    cols[23] = "0".into();
+    cols[28] = "65".into();
+    cols[43] = "30000".into();
+    cols.join(",")
+}
+
+/// 导入一份不带 set 消息的 FIT，云端的逐组明细（含重量）不能被清空；重放和撤销后也一样。
+#[test]
+fn a_fit_without_sets_keeps_the_cloud_strength_sets() {
+    let db = Database::in_memory().unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workouts".into(),
+        source_key: "sport_history:run:fit-strength".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "data": [{
+                "trackid": 1_700_000_000i64,
+                "end_time": 1_700_000_600i64,
+                "type": 52
+            }]
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.insert_raw_record(&RawRecord {
+        stream: "workout_detail".into(),
+        source_key: "workout_detail:1700000000:run.huami.com".into(),
+        source_scope: SourceScope::Device,
+        device_id: None,
+        start_utc: ts(),
+        end_utc: None,
+        payload: serde_json::json!({
+            "data": {
+                "trackid": 1_700_000_000i64,
+                "time": "0;300;300;",
+                "heart_rate": "0,110;300,2;300,-2;",
+                "strengthSets": "[{}]",
+                "lap": format!("{};{}", strength_row(0, 40.0, 10), strength_row(1, 42.5, 8))
+            }
+        }),
+        capability: CapabilityStatus::Verified,
+    })
+    .unwrap();
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(strength_set_count(&db), 2);
+
+    let bytes = corrected_fit();
+    let imported = decode_fit_file(&bytes).unwrap();
+    assert!(imported.decoded.strength_sets.is_empty());
+    assert!(matches!(
+        db.import_workout_fit("1700000000", None, &bytes, &imported)
+            .unwrap(),
+        FitOverrideOutcome::Applied(_)
+    ));
+    assert_eq!(strength_set_count(&db), 2);
+    db.reprocess_raw_records().unwrap();
+    assert_eq!(strength_set_count(&db), 2);
+    let volume = db
+        .get_workout_series("1700000000")
+        .unwrap()
+        .strength
+        .and_then(|detail| detail.total_volume_kg);
+    assert_eq!(volume, Some(740.0));
+    assert!(db.remove_workout_fit("1700000000").unwrap());
+    assert_eq!(strength_set_count(&db), 2);
+}
+
 #[test]
 fn a_hidden_workout_keeps_fit_corrections_during_cloud_replay_and_restore() {
     let db = Database::in_memory().unwrap();

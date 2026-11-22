@@ -316,6 +316,8 @@ impl Database {
             ("avg_cadence_spm", "spm"),
             ("max_cadence_spm", "spm"),
             ("avg_stride_cm", "cm"),
+            ("avg_cadence_rpm", "rpm"),
+            ("max_cadence_rpm", "rpm"),
             ("elevation_gain_m", "m"),
             ("elevation_loss_m", "m"),
             ("max_altitude_m", "m"),
@@ -405,6 +407,8 @@ impl Database {
             ("avg_cadence_spm", workout.avg_cadence_spm.map(|v| json!(v))),
             ("max_cadence_spm", workout.max_cadence_spm.map(|v| json!(v))),
             ("avg_stride_cm", workout.avg_stride_cm.map(|v| json!(v))),
+            ("avg_cadence_rpm", workout.avg_cadence_rpm.map(|v| json!(v))),
+            ("max_cadence_rpm", workout.max_cadence_rpm.map(|v| json!(v))),
         ] {
             if let Some(value) = value {
                 object.insert(key.into(), value);

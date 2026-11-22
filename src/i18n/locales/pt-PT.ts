@@ -2067,6 +2067,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       decodedPauses: 'Pausas',
       decodedAvgCadence: 'Cadência média',
       decodedMaxCadence: 'Cadência máxima',
+      decodedAvgPedalCadence: 'Cadência média de pedalada',
+      decodedMaxPedalCadence: 'Cadência máxima de pedalada',
       decodedAvgStride: 'Passada média',
       decodedDescent: 'Descida acumulada',
       decodedMaxHr: 'FC máxima',

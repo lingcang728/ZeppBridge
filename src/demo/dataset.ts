@@ -164,6 +164,9 @@ const buildWorkouts = (now: Date, rng: Rng): Workout[] => {
       avg_cadence_spm: cadence,
       max_cadence_spm: running ? Math.round(rng.between(182, 192)) : null,
       avg_stride_cm: steps ? round(km * 100000 / steps, 2) : null,
+      // 骑行踏频（转/分）：由心率推出来，不多消耗随机数，其余演示数据不变。
+      avg_cadence_rpm: plan.kind === 'cycling' ? 60 + Math.round(avg / 5) : null,
+      max_cadence_rpm: plan.kind === 'cycling' ? 74 + Math.round(avg / 5) : null,
       total_steps: steps,
       gps_available: back % 17 !== 3,
       sample_count: Math.floor(seconds / 10) + 1,

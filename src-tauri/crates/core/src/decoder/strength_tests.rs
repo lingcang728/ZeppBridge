@@ -158,6 +158,34 @@ fn bodyweight_timed_and_rest_rows_do_not_wipe_the_weighted_sets() {
     assert_eq!(detail.total_volume_kg, Some(855.0));
 }
 
+/// 单位格写 -1 但重量格有数时，重量按 kg 留下，不再整场每组都没有重量；自重行照旧为空。
+#[test]
+fn weight_survives_when_the_unit_cell_is_not_kg_or_lb() {
+    let lap = [
+        synthetic_62_col_row(0, 40, 101, 6.0, 40.0, 10, -1, 65, 40_200),
+        synthetic_62_col_row(1, 35, 104, 5.0, -1.0, 12, -1, 14, 35_000),
+        synthetic_62_col_row(2, 38, 106, 6.0, 42.5, 8, 7, 65, 38_400),
+    ]
+    .join(";");
+    let data = json!({ "lap": lap, "strengthSets": "[{}]" });
+    let sets = parse_strength_sets(data.as_object().unwrap());
+    assert_eq!(sets.len(), 3);
+    assert_eq!(
+        (
+            sets[0].weight_value,
+            sets[0].weight_kg,
+            sets[0].weight_unit.as_str()
+        ),
+        (Some(40.0), Some(40.0), "kg")
+    );
+    assert_eq!(sets[1].weight_kg, None);
+    assert_eq!(sets[2].weight_kg, Some(42.5));
+
+    let detail = build_strength_workout_detail(sets, true, None, None, None, None).unwrap();
+    // 10 * 40 + 8 * 42.5 = 740 kg
+    assert_eq!(detail.total_volume_kg, Some(740.0));
+}
+
 /// 报文带力量训练标记时，距离 / 累计秒那两列不是 0 也照样解析；不带标记时仍按跑步分圈拒掉。
 #[test]
 fn strength_envelope_relaxes_the_running_lap_guard_only_when_present() {

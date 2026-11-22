@@ -3930,6 +3930,8 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     decodedMaxPower: 'Potenza massima',
     decodedAvgCadence: 'Cadenza media',
     decodedMaxCadence: 'Cadenza massima',
+    decodedAvgPedalCadence: 'Cadenza media di pedalata',
+    decodedMaxPedalCadence: 'Cadenza massima di pedalata',
     decodedAvgStride: 'Passo medio',
     decodedGroundContact: 'Tempo di contatto al suolo medio',
     decodedVerticalOscillation: 'Oscillazione verticale media',

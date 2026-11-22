@@ -340,6 +340,8 @@ impl Database {
                 avg_cadence_spm: None,
                 max_cadence_spm: None,
                 avg_stride_cm: None,
+                avg_cadence_rpm: None,
+                max_cadence_rpm: None,
                 // 鞋的编号只多一列，列表就带上：按鞋分组（#143）要从列表里拿。
                 gear_id,
                 hr_zones: Vec::new(),

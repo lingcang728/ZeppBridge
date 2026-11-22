@@ -2744,6 +2744,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       customName: (code: string, name: string) => `Dein Name für Code ${code}: ${name}`,
       decodedAria: 'Dekodierte Werte',
       decodedAvgCadence: 'Ø Schrittfrequenz',
+      decodedAvgPedalCadence: 'Ø Trittfrequenz',
       decodedAvgPower: 'Ø Leistung',
       decodedAvgStride: 'Ø Schrittlänge',
       decodedBestEquivalentPace: 'Bestes äquivalentes Tempo',
@@ -2752,6 +2753,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       decodedLocally: 'Lokal dekodiert',
       decodedMaxCadence: 'Max. Schrittfrequenz',
       decodedMaxHr: 'Maximale Herzfrequenz',
+      decodedMaxPedalCadence: 'Max. Trittfrequenz',
       decodedMaxPower: 'Max. Leistung',
       decodedNote:
         'Die Zusammenfassung rechnet nur mit gültigen Messwerten dieses Eintrags – Ausreißer-Sprünge ignoriert.',

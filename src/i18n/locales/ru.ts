@@ -2499,6 +2499,8 @@ export default {
       decodedPauses: 'Интервалы пауз',
       decodedAvgCadence: 'Средний каденс',
       decodedMaxCadence: 'Макс. каденс',
+      decodedAvgPedalCadence: 'Ср. частота педалирования',
+      decodedMaxPedalCadence: 'Макс. частота педалирования',
       decodedAvgStride: 'Средняя длина шага',
       decodedDescent: 'Суммарный спуск',
       decodedMaxHr: 'Макс. пульс',

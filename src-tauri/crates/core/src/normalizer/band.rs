@@ -375,6 +375,11 @@ impl Normalizer {
                     .filter(|value| *value > 0.0),
                 avg_stride_cm: first_number(object, &["avg_stride_length", "avgStrideLength"])
                     .filter(|value| *value > 0.0),
+                // 骑行踏频（转/分），踏频传感器或表自己测的；没测到是 -1。
+                avg_cadence_rpm: first_number(object, &["avg_cadence", "avgCadence"])
+                    .filter(|value| *value > 0.0 && *value < 300.0),
+                max_cadence_rpm: first_number(object, &["max_cadence", "maxCadence"])
+                    .filter(|value| *value > 0.0 && *value < 300.0),
                 // 没选鞋时云端给的是空串，当成没有。
                 gear_id: first_string(object, &["gearId", "gear_id"])
                     .map(|value| value.trim().to_string())

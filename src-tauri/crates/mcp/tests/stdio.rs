@@ -126,6 +126,8 @@ fn workout(id: &str, days_ago: i64) -> Workout {
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        avg_cadence_rpm: None,
+        max_cadence_rpm: None,
         gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,

@@ -1601,6 +1601,8 @@ export default {
       decodedRoutePoints: 'Pontos de GPS',
       decodedSamples: 'Amostras da série temporal',
       decodedPauses: 'Intervalos de pausa',
+      decodedAvgPedalCadence: 'Cadência média de pedalada',
+      decodedMaxPedalCadence: 'Cadência máxima de pedalada',
       decodedAvgCadence: 'Cadência média',
       decodedMaxCadence: 'Cadência máxima',
       decodedAvgStride: 'Comprimento médio da passada',

@@ -262,8 +262,16 @@ export const useWorkoutPresentation = (
       { label: t.value.decodedRoutePoints, value: detail.route.length ? numberValue(detail.route.length) : none, ...WORKOUT_GLYPH.route },
       { label: t.value.decodedSamples, value: detail.samples.length ? numberValue(detail.samples.length) : none, ...WORKOUT_GLYPH.samples },
       { label: t.value.decodedPauses, value: detail.pauses.length ? numberValue(detail.pauses.length) : none, ...WORKOUT_GLYPH.pauses },
-      { label: t.value.decodedAvgCadence, value: withUnit(s.average_cadence, 'spm'), ...WORKOUT_GLYPH.cadence },
-      { label: t.value.decodedMaxCadence, value: withUnit(s.max_cadence, 'spm'), ...WORKOUT_GLYPH.cadenceMax },
+      // 骑行有踏频（转/分）时换成踏频两行；步频那两行对骑行没有意义。
+      ...(isFiniteNumber(item.avg_cadence_rpm) || isFiniteNumber(item.max_cadence_rpm)
+        ? [
+            { label: t.value.decodedAvgPedalCadence, value: withUnit(item.avg_cadence_rpm, 'rpm'), ...WORKOUT_GLYPH.cadence },
+            { label: t.value.decodedMaxPedalCadence, value: withUnit(item.max_cadence_rpm, 'rpm'), ...WORKOUT_GLYPH.cadenceMax },
+          ]
+        : [
+            { label: t.value.decodedAvgCadence, value: withUnit(s.average_cadence, 'spm'), ...WORKOUT_GLYPH.cadence },
+            { label: t.value.decodedMaxCadence, value: withUnit(s.max_cadence, 'spm'), ...WORKOUT_GLYPH.cadenceMax },
+          ]),
       { label: t.value.decodedAvgStride, value: withUnit(s.average_stride_cm, 'cm'), ...WORKOUT_GLYPH.stride },
       { label: t.value.decodedDescent, value: isFiniteNumber(s.elevation_loss_m) ? `${numberValue(toElevation(s.elevation_loss_m))} ${elevationUnitLabel()}` : none, ...WORKOUT_GLYPH.descent },
       { label: t.value.decodedMaxHr, value: withUnit(item.max_hr, 'bpm'), ...WORKOUT_GLYPH.hrMax },

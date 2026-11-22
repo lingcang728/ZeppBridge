@@ -296,6 +296,8 @@ fn imported_workout(workout_id: &str, activity: &ParsedActivity, now: DateTime<U
         avg_cadence_spm: None,
         max_cadence_spm: None,
         avg_stride_cm: None,
+        avg_cadence_rpm: None,
+        max_cadence_rpm: None,
         gear_id: None,
         hr_zones: Vec::new(),
         source_scope: SourceScope::Device,

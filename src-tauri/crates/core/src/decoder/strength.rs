@@ -220,6 +220,8 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
 
     let mut sets = Vec::new();
     let mut saw_positive_signal = has_strength_envelope;
+    let mut unit_codes = std::collections::BTreeSet::new();
+    let mut weight_out_of_range = 0usize;
     // 带力量训练标记却一组都解析不出来时记一条原因，便于按诊断日志定位新的报文形状。
     // 只记原因、行号和列数，不记重量、次数等数值。
     let reject = |reason: &str, row: usize, columns: usize| -> Vec<StrengthSetRow> {
@@ -261,10 +263,18 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
         let reps = int(&cols, 22)
             .filter(|reps| (0..=10_000).contains(reps))
             .map(|reps| reps as i32);
-        let unit_code = int(&cols, 23).filter(|unit| matches!(unit, 0 | 1));
-        let weight_raw = float(&cols, 21)
-            .filter(|w| *w > 0.0 && *w <= 2_000.0)
-            .filter(|_| unit_code.is_some());
+        let raw_unit = int(&cols, 23);
+        let unit_code = raw_unit.filter(|unit| matches!(unit, 0 | 1));
+        // 重量只看 col[21] 本身：自重动作写 -1 自然为空。单位格不是 0 / 1 时
+        // （有的表款写 -1）按 kg 记，不再连重量一起丢掉——以前这样整场每组都没有重量。
+        let weight_cell = float(&cols, 21);
+        let weight_raw = weight_cell.filter(|w| *w > 0.0 && *w <= 2_000.0);
+        if weight_cell.is_some_and(|w| w > 2_000.0) {
+            weight_out_of_range += 1;
+        }
+        if let Some(unit) = raw_unit {
+            unit_codes.insert(unit);
+        }
         let ms_raw = int(&cols, 43).unwrap_or(-1);
         let sec_int = int(&cols, 1).unwrap_or(-1);
 
@@ -327,6 +337,16 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
 
     if sets.is_empty() && has_strength_envelope {
         tracing::warn!("力量训练逐组数据未解析：每一行都是空的组间休息");
+    }
+    // 有组却没有一组带重量：只记单位码和超范围的行数，不记重量本身，便于按日志认出新的报文形状。
+    // 纯自重训练单位码全是 -1，不记。
+    if sets.iter().any(|set| set.reps > 0)
+        && sets.iter().all(|set| set.weight_kg.is_none())
+        && (weight_out_of_range > 0 || unit_codes.iter().any(|unit| *unit != -1))
+    {
+        tracing::info!(
+            "力量训练整场没有重量：单位码 {unit_codes:?}，重量列超范围 {weight_out_of_range} 行"
+        );
     }
     if saw_positive_signal {
         sets

@@ -53,6 +53,9 @@ export interface Workout {
   avg_cadence_spm?: number | null;
   max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
+  /** 骑行踏频，转/分；云端汇总的 avg_cadence / max_cadence。 */
+  avg_cadence_rpm?: number | null;
+  max_cadence_rpm?: number | null;
   /** Zepp 里给这次运动选的跑鞋编号；Zepp 不给名称（#143）。 */
   gear_id?: string | null;
   total_steps?: number | null;

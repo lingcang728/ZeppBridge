@@ -2468,6 +2468,8 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       decodedPauses: 'Pauze-intervallen',
       decodedAvgCadence: 'Gem. cadans',
       decodedMaxCadence: 'Max. cadans',
+      decodedAvgPedalCadence: 'Gem. trapfrequentie',
+      decodedMaxPedalCadence: 'Max. trapfrequentie',
       decodedAvgStride: 'Gem. paslengte',
       decodedDescent: 'Daling',
       decodedMaxHr: 'Max. hartslag',

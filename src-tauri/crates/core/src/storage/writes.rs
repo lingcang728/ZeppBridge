@@ -320,9 +320,10 @@ impl Database {
                  workout_type_source, workout_type_override, workout_type_conflict,
                  min_hr, total_steps, moving_seconds, elevation_gain_m, elevation_loss_m,
                  max_altitude_m, min_altitude_m, training_effect, anaerobic_training_effect,
-                 rpe, avg_cadence_spm, max_cadence_spm, avg_stride_cm, gear_id)
+                 rpe, avg_cadence_spm, max_cadence_spm, avg_stride_cm, gear_id,
+                 avg_cadence_rpm, max_cadence_rpm)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21,
-                     ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35)
+                     ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
@@ -370,7 +371,9 @@ impl Database {
                 avg_cadence_spm = COALESCE(excluded.avg_cadence_spm, workouts.avg_cadence_spm),
                 max_cadence_spm = COALESCE(excluded.max_cadence_spm, workouts.max_cadence_spm),
                 avg_stride_cm = COALESCE(excluded.avg_stride_cm, workouts.avg_stride_cm),
-                gear_id = COALESCE(excluded.gear_id, workouts.gear_id)",
+                gear_id = COALESCE(excluded.gear_id, workouts.gear_id),
+                avg_cadence_rpm = COALESCE(excluded.avg_cadence_rpm, workouts.avg_cadence_rpm),
+                max_cadence_rpm = COALESCE(excluded.max_cadence_rpm, workouts.max_cadence_rpm)",
             params![
                 workout.workout_id,
                 merged_type.normalized_type,
@@ -407,6 +410,8 @@ impl Database {
                 workout.max_cadence_spm,
                 workout.avg_stride_cm,
                 workout.gear_id,
+                workout.avg_cadence_rpm,
+                workout.max_cadence_rpm,
             ],
         )?;
         // 心率区间分布。整条替换而不是逐段 upsert：区间边界会随用户在表上的

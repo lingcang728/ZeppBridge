@@ -11,15 +11,15 @@ body:
         **Do not paste tokens, cookies, account names, device serial numbers, precise GPS coordinates, or raw API responses.**
         Issues are public, and once posted this cannot really be taken back.
 
-        To send raw payloads, use **Settings → Privacy & security → Submit an error report**
-        in the app instead: it sends only a redacted field structure, firmware version and
+        To send diagnostics, use **Settings → Write to the author** in the app and stamp
+        **Attach a de-identified diagnostic report** instead: it sends only a redacted field structure, firmware version and
         unrecognised codes — none of the above.
 
         Describing values relatively is enough — "about 12% off the app", "3 days missing".
         You do not need to post your real heart rate, weight or sleep duration.
 
         **不要粘贴任何令牌、cookie、账号、设备序列号、精确 GPS 坐标，或完整的接口返回内容。**
-        需要发原始报文时，请改用应用内的「设置 →隐私与安全 →提交错误报告」。
+        需要发诊断信息时，请改用应用内的「设置 → 写信告诉作者」，盖上「附上脱敏诊断报告」章。
         描述数值时用「和 App 差了约 12%」这类相对描述就够了。
   - type: input
     id: version
@@ -104,16 +104,16 @@ body:
   - type: input
     id: report_id
     attributes:
-      label: In-app error report id · 应用内错误报告编号（可选）
+      label: Letter with a diagnostic report · 随信寄出的诊断报告（可选）
       description: >-
-        If you already pressed "Submit an error report" in settings, paste the id it
-        returned so the two can be matched up. For a wrong workout type or an
-        unrecognised device this is by far the most useful thing you can attach —
+        If you already sent a letter from the app with a diagnostic report attached,
+        write roughly when you sent it so the two can be matched up. For a wrong workout type or an
+        unrecognised device the report is by far the most useful thing you can send —
         it carries the raw code, which the issue text alone never does.
-        · 如果你已经在设置页点过「提交错误报告」，把返回的编号填在这里。运动类型认错
-        和设备没认出来这两类问题，这个编号是最有用的东西——它带着原始编号，而 issue
+        · 如果你已经在应用里写信并附上了诊断报告，写一下大概什么时候寄的，方便对上。运动类型认错
+        和设备没认出来这两类问题，这份报告是最有用的东西——它带着原始编号，而 issue
         正文里没有。
-      placeholder: "e.g. a1b2c3d4"
+      placeholder: "e.g. 2026-11-21 evening"
   - type: checkboxes
     id: privacy
     attributes:

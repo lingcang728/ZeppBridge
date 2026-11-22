@@ -4724,6 +4724,8 @@ Zasady:
     decodedPauses: 'Odcinki pauzy',
     decodedAvgCadence: 'Średnia kadencja',
     decodedMaxCadence: 'Maksymalna kadencja',
+    decodedAvgPedalCadence: 'Śr. kadencja pedałowania',
+    decodedMaxPedalCadence: 'Maks. kadencja pedałowania',
     decodedAvgStride: 'Średnia długość kroku',
     decodedDescent: 'Spadek terenu',
     decodedMaxHr: 'Maksymalne tętno',

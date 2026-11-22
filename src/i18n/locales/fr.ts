@@ -2309,6 +2309,8 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       decodedMaxPower: 'Puissance max',
       decodedAvgCadence: 'Cadence moy.',
       decodedMaxCadence: 'Cadence max',
+      decodedAvgPedalCadence: 'Cadence de pédalage moy.',
+      decodedMaxPedalCadence: 'Cadence max de pédalage',
       decodedAvgStride: 'Foulée moy.',
       decodedGroundContact: 'Contact au sol moy.',
       decodedVerticalOscillation: 'Oscillation verticale moy.',
