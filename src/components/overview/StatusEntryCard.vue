@@ -135,8 +135,6 @@ withDefaults(defineProps<{
 .tone-body { --entry-tone: var(--heart); }
 .tone-training { --entry-tone: var(--training); }
 .entry-panel {
-  background:
-    radial-gradient(320px 200px at 0 100%, color-mix(in srgb, var(--entry-tone) 9%, transparent), transparent 70%),
-    var(--mat-card);
+  background: var(--mat-card);
 }
 </style>

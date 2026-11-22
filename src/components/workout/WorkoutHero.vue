@@ -75,7 +75,6 @@ const missingLine = computed(() => {
   border: 1px solid var(--mat-line);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--activity) 14%, transparent), transparent 32%),
     var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }

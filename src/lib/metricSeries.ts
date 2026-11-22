@@ -379,13 +379,13 @@ export const buildSeriesOption = (
             showSymbol: series.points.length <= 14,
             symbolSize: 5,
             itemStyle: { color: options.color },
-            lineStyle: { width: 2.2, color: options.color, cap: 'round' },
+            lineStyle: { width: 1.8, color: options.color, cap: 'round' },
             // 线下一层从上到下淡掉的光：有体积感，又不会被读成「面积」数据。有区间阴影时不叠。
             ...(hasSpread ? {} : {
               areaStyle: {
                 color: {
                   type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-                  colorStops: [{ offset: 0, color: hexToRgba(options.color, 0.2) }, { offset: 1, color: hexToRgba(options.color, 0) }],
+                  colorStops: [{ offset: 0, color: hexToRgba(options.color, 0.07) }, { offset: 1, color: hexToRgba(options.color, 0) }],
                 },
               },
             }),

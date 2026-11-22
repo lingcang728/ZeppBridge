@@ -90,7 +90,7 @@ onBeforeUnmount(() => observer?.disconnect());
     >
       <defs>
         <linearGradient :id="fillId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.38" />
+          <stop offset="0%" :stop-color="color" stop-opacity="0.10" />
           <stop offset="100%" :stop-color="color" stop-opacity="0" />
         </linearGradient>
         <filter :id="glowId" x="-20%" y="-40%" width="140%" height="180%">
@@ -111,7 +111,6 @@ onBeforeUnmount(() => observer?.disconnect());
         stroke-linejoin="round"
         :filter="`url(#${glowId})`"
       />
-      <circle :cx="lastPoint.x" :cy="lastPoint.y" r="4.2" :fill="color" fill-opacity="0.28" />
       <circle :cx="lastPoint.x" :cy="lastPoint.y" r="2.5" :fill="color" />
     </svg>
   </div>

@@ -324,8 +324,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--card-tone) 26%, transparent), transparent 62%),
-    radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--card-tone) 10%, transparent), transparent 70%),
     var(--mat-card);
   box-shadow: var(--mat-shadow-lift);
   backface-visibility: hidden;

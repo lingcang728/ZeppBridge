@@ -21,7 +21,7 @@ const emit = defineEmits<{ (event: 'action', origin: HTMLElement): void }>();
   border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 /* 类别色只做角落一点微光，不给整张卡上色。 */
 .journal-card::before { content: ''; position: absolute; inset: -40% auto auto -20%; width: 60%; height: 80%; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--jc-tone, transparent) 14%, transparent), transparent); }
+  background: none; }
 .tone-race { --jc-tone: var(--training); }
 .tone-record { --jc-tone: var(--warning); }
 .tone-shoe { --jc-tone: var(--pace); }

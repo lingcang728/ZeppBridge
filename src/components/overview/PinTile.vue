@@ -31,18 +31,18 @@ const tile = computed(() => tiles.value.get(props.id)!);
 </template>
 
 <style scoped>
-/* 类别色只做右上角一点微光（和下面的入口卡一样），不给整块刷颜色。 */
+/* 极简：磁贴是平的，类别色只留在小圆点和迷你曲线上，不再有微光和悬浮位移。 */
 .pin-tile {
   position: relative; display: grid; align-content: start; gap: 4px; min-width: 0; padding: 14px 16px 12px; overflow: hidden;
   border-radius: var(--radius-lg);
-  background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 16%, transparent), transparent 60%), var(--mat-card);
+  background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
   color: inherit; text-decoration: none; transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease;
 }
-.pin-tile:hover { translate: 0 -2px; }
+.pin-tile:hover { box-shadow: inset 0 0 0 1px var(--mat-line-hover); }
 .pin-tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pin-label { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
-.pin-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px color-mix(in srgb, var(--tone) 60%, transparent); }
+.pin-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--tone); }
 .pin-value { display: flex; align-items: baseline; gap: 5px; }
 .pin-value strong { color: var(--ink); font-size: var(--fs-3xl); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .pin-value small { color: var(--muted); font-size: var(--fs-xs); }

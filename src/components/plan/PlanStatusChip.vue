@@ -127,7 +127,7 @@ defineExpose({ flash });
 
 .pop-head { display: flex; align-items: center; gap: 12px; }
 .pop-watch { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 13px; color: var(--accent);
-  background: radial-gradient(120% 90% at 30% 0%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%), linear-gradient(160deg, var(--mat-tile-top), var(--mat-tile-bottom));
+  background: linear-gradient(160deg, var(--mat-tile-top), var(--mat-tile-bottom));
   box-shadow: var(--mat-tile-rim); }
 .pop-head h4 { margin: 0; font-size: var(--fs-sm); font-weight: 700; }
 .pop-head p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); }

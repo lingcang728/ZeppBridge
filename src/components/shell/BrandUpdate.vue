@@ -55,11 +55,11 @@ const dashOffset = computed(() => circumference.value * (1 - (ratio.value ?? 0))
 .progress, .done { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transform-box: fill-box; }
 .progress { transition: stroke-dashoffset 400ms ease; }
 .ring.spinning { animation: update-spin 1.1s linear infinite; }
-/* 光晕：一圈静态模糊的绿环，只让透明度呼吸。 */
+/* 极简：一圈静态细环，不再模糊发光、不再呼吸。 */
 .glow {
   position: absolute; left: 50%; top: 50%; width: var(--box); height: var(--box); translate: -50% -50%;
-  border-radius: 50%; box-shadow: 0 0 0 2px var(--accent), 0 0 12px 3px color-mix(in srgb, var(--accent) 70%, transparent);
-  filter: blur(1.5px); pointer-events: none; opacity: .35; animation: update-glow 2.4s ease-in-out infinite;
+  border-radius: 50%; box-shadow: 0 0 0 1.5px var(--accent);
+  pointer-events: none; opacity: .5;
 }
 @keyframes update-spin { to { rotate: 360deg; } }
 @keyframes update-glow { 50% { opacity: .95; } }

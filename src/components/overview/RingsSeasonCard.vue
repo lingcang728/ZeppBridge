@@ -34,7 +34,7 @@ const season = computed(() => {
 
 <style scoped>
 .rings-season { display: flex; align-items: center; gap: 14px; padding: 14px 18px; color: inherit; text-decoration: none;
-  background: radial-gradient(320px 160px at 0 100%, color-mix(in srgb, var(--kintsugi) 10%, transparent), transparent 70%), var(--mat-card); }
+  background: var(--mat-card); }
 .mini-ring { flex: none; width: 38px; height: 38px; }
 .mini-ring circle { fill: none; stroke: color-mix(in srgb, var(--kintsugi) 55%, transparent); stroke-width: 1.6; }
 .mini-ring circle:first-child { stroke: var(--kintsugi); stroke-width: 2.2; }

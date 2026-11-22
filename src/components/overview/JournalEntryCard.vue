@@ -55,7 +55,7 @@ const alert = computed(() => {
 
 <style scoped>
 .journal-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 18px; color: inherit; text-decoration: none;
-  background: radial-gradient(320px 160px at 0 100%, color-mix(in srgb, var(--training) 9%, transparent), transparent 70%), var(--mat-card); }
+  background: var(--mat-card); }
 .je-main { display: grid; flex: 1 1 14rem; gap: 2px; min-width: 0; }
 .je-title { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .je-race { overflow: hidden; color: var(--muted); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }

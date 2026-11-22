@@ -5,14 +5,14 @@
 /* 收牌途中让点击落到底下的页面：再点一下来处 = 原路扇回来（reopen）。 */
 .card-table.closing { pointer-events: none; }
 .table-backdrop { position: absolute; inset: 0; z-index: -1;
-  background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 70%), rgba(6, 8, 12, .62);
+  background: rgba(6, 8, 12, .62);
   -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
 /* 深一层：更重的静态模糊 + 更暗，平时透明；牌飞进箱子时淡进来再淡回去（只动 opacity）。 */
 .table-backdrop.deep { opacity: 0; pointer-events: none; background: rgba(6, 8, 12, .32); -webkit-backdrop-filter: blur(40px) saturate(1.1); backdrop-filter: blur(40px) saturate(1.1); }
 :root[data-theme='light'] .table-backdrop.deep { background: rgba(236, 240, 233, .3); }
 /* 退到后面的那一层换成的静态模糊拷贝（lib/motion/cards/camera.ts）。 */
 .table-layer.blurred-copy { pointer-events: none; }
-:root[data-theme='light'] .table-backdrop:not(.deep) { background: radial-gradient(80% 70% at 50% 55%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%), rgba(236, 240, 233, .62); }
+:root[data-theme='light'] .table-backdrop:not(.deep) { background: rgba(236, 240, 233, .62); }
 .table-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .table-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 13px;
   background: color-mix(in srgb, var(--tint) 18%, var(--mat-inset)); color: var(--tint); box-shadow: var(--mat-inset-shadow); }

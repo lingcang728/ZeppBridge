@@ -755,7 +755,7 @@ watch(() => (readyToHand.value ? readyText.value : syncText.value), scheduleFit)
   animation: sync-text-in var(--dur-slow) var(--ease-out); }
 @keyframes sync-text-in { from { opacity: 0; } }
 .sync-pill.is-ready { color: var(--ink); font-weight: 600; }
-.sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.sync-pill.is-ready .dot { background: var(--accent); }
 .ready-arrow { color: var(--accent); }
 
 .icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }

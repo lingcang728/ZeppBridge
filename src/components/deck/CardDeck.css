@@ -36,7 +36,6 @@
   min-width: 0;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(560px 170px at 0 0, color-mix(in srgb, var(--card-tone) 15%, transparent), transparent 72%),
     var(--mat-card);
   box-shadow: var(--mat-shadow);
 }
@@ -75,7 +74,6 @@
 .list-card {
   min-height: var(--wallet-card);
   background:
-    radial-gradient(640px 200px at 0 0, color-mix(in srgb, var(--card-tone) 20%, transparent), transparent 72%),
     var(--mat-card-solid);
   box-shadow: 0 -1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 -10px 28px -14px rgba(0, 0, 0, .45);
   transition: translate .42s var(--ease-out), box-shadow var(--dur-base) ease;
@@ -160,7 +158,6 @@
   transform-origin: center top;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(640px 200px at 0 0, color-mix(in srgb, var(--card-tone) 20%, transparent), transparent 72%),
     var(--mat-card-solid);
   box-shadow: var(--mat-shadow-lift);
 }

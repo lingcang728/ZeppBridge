@@ -57,7 +57,7 @@
 .window-content > :deep(.workout-hero) {
   border-color: transparent;
   border-radius: 0;
-  background: radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--activity) 14%, transparent), transparent 32%);
+  background: none;
   box-shadow: none;
 }
 

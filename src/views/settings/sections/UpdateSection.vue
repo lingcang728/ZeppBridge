@@ -119,8 +119,8 @@ const openRepo = () => {
 .star { position: relative; display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none; }
 .star::before {
   content: ''; position: absolute; inset: -3px; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, color-mix(in srgb, var(--route-amber) 45%, transparent), transparent 68%);
-  opacity: .35; animation: star-glow 3.2s ease-in-out infinite;
+  background: none;
+  opacity: .35;
 }
 .star svg {
   position: relative; width: 20px; height: 20px; fill: var(--route-amber); stroke: color-mix(in srgb, var(--route-amber) 70%, #7a4a00); stroke-width: 1; stroke-linejoin: round;

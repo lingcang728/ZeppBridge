@@ -139,7 +139,7 @@ onBeforeUnmount(() => { window.clearTimeout(launchTimer); stopHum(); });
 .lock.disabled { cursor: default; filter: grayscale(.7); opacity: .65; }
 .lock.near:not(:disabled) { scale: 1.08; }
 .lock.near .ring .track { stroke: color-mix(in srgb, var(--accent) 45%, transparent); }
-.lock.near .disc { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 34px -6px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 7px color-mix(in srgb, var(--canvas) 70%, transparent); }
+.lock.near .disc { box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 0 7px color-mix(in srgb, var(--canvas) 70%, transparent); }
 .ring .track { transition: stroke 220ms ease; }
 .disc { transition: box-shadow 220ms ease; }
 .ring, .spin { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); rotate: -90deg; }
@@ -150,7 +150,7 @@ onBeforeUnmount(() => { window.clearTimeout(launchTimer); stopHum(); });
 .lock.charging .ring .track { stroke: color-mix(in srgb, var(--accent) 38%, transparent); }
 /* 锁周围那一圈光：随蓄力聚拢、变浓。 */
 .halo { position: absolute; inset: -22px; border-radius: 50%; pointer-events: none; opacity: var(--charge); scale: calc(1.25 - var(--charge) * .3);
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 34%, transparent) 0 46%, transparent 70%); }
+  background: none; }
 /* 图标被往下压（蓄力越满压得越低），里面亮起一圈。 */
 .lock.charging .disc { scale: calc(1 - var(--charge) * .1); }
 .disc { position: relative; }

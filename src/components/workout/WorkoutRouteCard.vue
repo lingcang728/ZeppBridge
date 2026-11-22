@@ -167,8 +167,6 @@ const onConsentKey = (event: KeyboardEvent) => {
    不再被窗口切掉半截（2026-11-14 用户截图：看着像本地画布加载失败）。 */
 .route-wrap { position: relative; flex: 1 1 max(160px, calc(320px + var(--fill-extra, 0px))); overflow: hidden; min-height: 160px; border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .route-canvas-texture { position: absolute; inset: 0; pointer-events: none; background:
-  radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 42%),
-  radial-gradient(circle at 18% 78%, color-mix(in srgb, var(--route-mint) 8%, transparent), transparent 46%),
   repeating-radial-gradient(circle at 40% 45%, color-mix(in srgb, var(--ink) 3%, transparent) 0 1px, transparent 1px 7px); }
 .route-svg { position: absolute; inset: 10px 10px 42px; display: block; width: calc(100% - 20px); height: calc(100% - 52px); }
 .has-notice .route-svg { top: 48px; height: calc(100% - 90px); }

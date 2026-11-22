@@ -136,17 +136,17 @@ const recentItems = computed<RecentItem[]>(() => {
 /* 横着的时间线：一根从右到左渐亮的细线（最新在左）穿过每个节点，节点上方是时间，下方是内容。 */
 .timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }
 .timeline::before { content: ''; position: absolute; top: 50px; right: 6%; left: 6%; height: 2px; border-radius: 2px;
-  background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 12%, color-mix(in srgb, var(--accent) 55%, transparent)); }
+  background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .tl-link { position: relative; display: grid; justify-items: center; gap: 6px; padding: 4px 8px 12px; border-radius: var(--radius-md); color: inherit; text-align: center; text-decoration: none;
   transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
-.tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); translate: 0 -2px; }
+.tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .tl-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* 时间和「最新」整块不拆：放不下时「最新」换到时间下面，不把「10:57 p. m.」拆开（11-10 普查）。 */
 .tl-when { display: inline-flex; flex-wrap: wrap; justify-content: center; min-height: 20px; align-items: center; gap: 2px 6px; white-space: nowrap; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
 .tl-when em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-style: normal; font-weight: 600; }
 /* 节点压在线上：底下垫一圈卡片底色，线从节点背后穿过去而不是从中间切开它。 */
 .tl-node { display: grid; padding: 3px; border-radius: 16px; background: var(--mat-card-solid); }
-.tl-item.newest .tl-node { box-shadow: 0 0 18px -2px color-mix(in srgb, var(--accent) 45%, transparent); }
+
 .tl-title { max-width: 100%; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-wrap: balance; }
 .recent-empty { min-height: 120px; }

@@ -49,7 +49,7 @@
 .s-flash { border-radius: var(--radius-md); animation: s-flash 1.8s var(--ease-out) .25s both; }
 @keyframes s-flash {
   0% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
-  18% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 24px -4px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 7%, transparent); }
+  18% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); background-color: color-mix(in srgb, var(--accent) 7%, transparent); }
   100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .s-flash { animation-duration: .01s; } }

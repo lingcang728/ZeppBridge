@@ -1,0 +1,103 @@
+/* 极简层：在 tokens.css / material.css 之后覆写「材质」token，整个应用一起变平。
+ * 只改 token、不改组件：卡片是纯色 + 一圈发丝线，没有渐变、顶边高光和投影；按钮和滑块是平的；
+ * 玻璃不再模糊；画布环境光去掉；圆角收小。想退回原来的立体风格，从 main.ts 里删掉这个文件的导入即可。
+ * 注意：box-shadow 的值里不能写 `none`（`a, none` 整条作废），所以「没有阴影」一律写成 NO_SHADOW。 */
+:root {
+  --ambient: linear-gradient(transparent, transparent);
+
+  --mat-card: #14171C;
+  --mat-card-solid: #14171C;
+  --mat-card-frost: #14171C;
+  --mat-line: rgba(226, 234, 242, .09);
+  --mat-line-hover: rgba(226, 234, 242, .22);
+  --mat-rim: inset 0 0 0 1px rgba(226, 234, 242, .09);
+  --mat-shadow: 0 0 0 0 transparent;
+  --mat-shadow-lift: 0 0 0 0 transparent;
+  --mat-stack-shadow: 0 0 0 0 transparent;
+  --mat-raised: #1D2128;
+  --mat-raised-hover: #262B33;
+  --mat-raised-rim: inset 0 0 0 1px rgba(226, 234, 242, .10);
+  --mat-inset: #0F1115;
+  --mat-inset-shadow: inset 0 0 0 1px rgba(226, 234, 242, .08);
+
+  --mat-glass: #101215;
+  --mat-glass-strong: #101215;
+  --mat-glass-line: rgba(226, 234, 242, .09);
+  --mat-glass-blur: none;
+  --mat-glass-shadow: inset 0 0 0 1px rgba(226, 234, 242, .09);
+  --glass: #14171C;
+  --glass-sheen: transparent;
+  --glass-blur: none;
+  --glass-rim: inset 0 0 0 1px rgba(226, 234, 242, .09);
+  --glass-shadow: 0 0 0 0 transparent;
+  --glass-press: rgba(255, 255, 255, .06);
+  --glass-edge: linear-gradient(rgba(226, 234, 242, .09), rgba(226, 234, 242, .09));
+  --glass-tab-selected: rgba(255, 255, 255, .08);
+  --glass-tab-selected-rim: inset 0 0 0 1px rgba(226, 234, 242, .08);
+  --edge-fade: rgba(13, 15, 18, .9);
+
+  --mat-tile-top: #1D2128;
+  --mat-tile-bottom: #1D2128;
+  --mat-tile-rim: inset 0 0 0 1px rgba(226, 234, 242, .08);
+
+  --cap-track: #0F1115;
+  --cap-track-shadow: inset 0 0 0 1px rgba(226, 234, 242, .08);
+  --cap-thumb: #262B33;
+  --cap-thumb-rim: inset 0 0 0 1px rgba(226, 234, 242, .12);
+  --cap-glass-thumb: rgba(255, 255, 255, .09);
+  --cap-glass-thumb-rim: inset 0 0 0 1px rgba(226, 234, 242, .10);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+html[data-theme="light"] {
+  --ambient: linear-gradient(transparent, transparent);
+
+  --mat-card: #FFFFFF;
+  --mat-card-solid: #FFFFFF;
+  --mat-card-frost: #FFFFFF;
+  --mat-line: rgba(38, 52, 41, .10);
+  --mat-line-hover: rgba(38, 52, 41, .24);
+  --mat-rim: inset 0 0 0 1px rgba(38, 52, 41, .10);
+  --mat-shadow: 0 0 0 0 transparent;
+  --mat-shadow-lift: 0 0 0 0 transparent;
+  --mat-stack-shadow: 0 0 0 0 transparent;
+  --mat-raised: #F3F5EF;
+  --mat-raised-hover: #E9EEE5;
+  --mat-raised-rim: inset 0 0 0 1px rgba(38, 52, 41, .12);
+  --mat-inset: #EDF0EA;
+  --mat-inset-shadow: inset 0 0 0 1px rgba(38, 52, 41, .08);
+
+  --mat-glass: #FAFBF8;
+  --mat-glass-strong: #FAFBF8;
+  --mat-glass-line: rgba(38, 52, 41, .10);
+  --mat-glass-blur: none;
+  --mat-glass-shadow: inset 0 0 0 1px rgba(38, 52, 41, .10);
+  --glass: #FFFFFF;
+  --glass-sheen: transparent;
+  --glass-blur: none;
+  --glass-rim: inset 0 0 0 1px rgba(38, 52, 41, .10);
+  --glass-shadow: 0 0 0 0 transparent;
+  --glass-press: rgba(38, 52, 41, .06);
+  --glass-edge: linear-gradient(rgba(38, 52, 41, .10), rgba(38, 52, 41, .10));
+  --glass-tab-selected: rgba(38, 52, 41, .08);
+  --glass-tab-selected-rim: inset 0 0 0 1px rgba(38, 52, 41, .08);
+  --edge-fade: rgba(244, 246, 243, .9);
+
+  --mat-tile-top: #F3F5EF;
+  --mat-tile-bottom: #F3F5EF;
+  --mat-tile-rim: inset 0 0 0 1px rgba(38, 52, 41, .08);
+
+  --cap-track: #E4E8E0;
+  --cap-track-shadow: inset 0 0 0 1px rgba(38, 52, 41, .08);
+  --cap-thumb: #FFFFFF;
+  --cap-thumb-rim: inset 0 0 0 1px rgba(38, 52, 41, .12);
+  --cap-glass-thumb: rgba(38, 52, 41, .08);
+  --cap-glass-thumb-rim: inset 0 0 0 1px rgba(38, 52, 41, .10);
+}
+
+/* 按钮不再是药丸：和卡片同一套小圆角。导航里的胶囊选择器（SegmentTrack）保持原样，那是整个应用唯一的「从几项里挑一个」。 */
+.pill-button { border-radius: var(--radius-sm); }

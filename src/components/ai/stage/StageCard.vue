@@ -31,7 +31,7 @@ const longestWord = (title: string) => Math.max(1, ...title.split(/\s+/).map((wo
 <style scoped>
 .scard { --w: var(--card-w, 130px); position: relative; display: grid; grid-template-rows: auto auto auto 1fr auto; align-content: start; gap: calc(var(--w) * .035);
   width: var(--w); height: calc(var(--w) * 1.26); padding: calc(var(--w) * .1) calc(var(--w) * .1) calc(var(--w) * .09); border-radius: calc(var(--w) * .11);
-  background: radial-gradient(130% 70% at 50% 0%, color-mix(in srgb, var(--tint) 15%, transparent), transparent 70%), var(--mat-raised);
+  background: var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 14%, transparent), 0 22px 36px -22px rgba(0, 0, 0, .75);
   color: var(--ink); text-align: left; transition: box-shadow var(--dur-base) ease; }
 .scard-icon { margin-bottom: calc(var(--w) * .03); }

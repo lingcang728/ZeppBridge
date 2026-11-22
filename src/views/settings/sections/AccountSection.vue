@@ -169,7 +169,7 @@ const action = computed<Action | null>(() => {
 <style scoped>
 /* 第一次同步那一行：同步中是一颗呼吸的强调色圆点，取到数据以后定住。 */
 .first-run { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.first-dot { flex: none; width: 9px; height: 9px; margin: 0 14px 0 13px; border-radius: 50%; background: var(--accent); animation: first-breathe 1.6s ease-in-out infinite; }
+.first-dot { flex: none; width: 9px; height: 9px; margin: 0 14px 0 13px; border-radius: 50%; background: var(--accent); }
 .first-dot.done { animation: none; }
 @keyframes first-breathe { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .first-dot { animation: none; } }

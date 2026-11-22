@@ -158,15 +158,11 @@ const hoverStage = (event: PointerEvent) => {
   height: 100%;
   min-height: 286px;
   padding: 18px;
-  background:
-    radial-gradient(380px 240px at 90% 0, rgba(104, 87, 217, .12), transparent 70%),
-    linear-gradient(145deg, #1D1F29, #191C25);
+  background: var(--panel);
 }
 html[data-theme="light"] .sleep-panel.metric-panel {
   display: flex; flex-direction: column;
-  background:
-    radial-gradient(380px 240px at 90% 0, var(--sleep-wash), transparent 70%),
-    var(--panel);
+  background: var(--panel);
 }
 .sleep-score {
   padding: 4px 10px;

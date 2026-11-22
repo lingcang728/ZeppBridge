@@ -324,7 +324,7 @@ onBeforeUnmount(() => { observer?.disconnect(); stop(); cancelAnimationFrame(pai
 /* 今天：轴上一个小圆点，外面一圈很淡的光晕慢慢呼吸（只动 transform / opacity）。 */
 .today-dot { position: absolute; top: var(--axis); width: 9px; height: 9px; margin: -4px 0 0 -4.5px; border-radius: 50%; background: var(--accent);
   box-shadow: 0 0 0 2px var(--surface); pointer-events: none; }
-.today-dot::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; background: var(--accent); opacity: .18; animation: today-breathe 2.8s ease-in-out infinite; }
+.today-dot::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; background: var(--accent); opacity: .18; }
 @keyframes today-breathe { 0%, 100% { transform: scale(.6); opacity: .28; } 50% { transform: scale(1.25); opacity: .06; } }
 .today-pill { position: absolute; padding: 1px 9px; border-radius: 999px; transform: translateX(-50%); background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent); font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; pointer-events: none; }

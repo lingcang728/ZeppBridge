@@ -33,7 +33,7 @@ defineProps<{ items: AttachItem[]; count: number; label: string }>();
   font: 700 10px / 16px var(--font-mono); text-align: center; }
 .chips { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .chip { display: grid; gap: 3px; align-content: start; min-width: 0; height: 60px; padding: 7px 7px 6px; border-radius: 11px;
-  background: radial-gradient(130% 70% at 50% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 70%), var(--mat-raised);
+  background: var(--mat-raised);
   box-shadow: var(--mat-raised-rim), inset 0 0 0 1px color-mix(in srgb, var(--tint) 14%, transparent), 0 10px 18px -12px rgba(0, 0, 0, .7); }
 .chip strong, .chip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 格子窄（一行四格）：名字用 11px，四个汉字的类名放得下。 */

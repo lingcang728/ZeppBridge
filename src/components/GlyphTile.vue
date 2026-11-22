@@ -58,10 +58,8 @@ const glyphSize = computed(() => (bare.value ? props.size : Math.round(props.siz
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--tile-tone) 26%, var(--mat-line));
   border-radius: var(--tile-radius, 12px);
-  background:
-    radial-gradient(120% 90% at 30% 0%, color-mix(in srgb, var(--tile-tone) 22%, transparent), transparent 70%),
-    linear-gradient(160deg, var(--mat-tile-top), var(--mat-tile-bottom));
-  box-shadow: var(--mat-tile-rim), 0 4px 12px -6px color-mix(in srgb, var(--tile-tone) 45%, transparent);
+  background: var(--mat-tile-top);
+  box-shadow: var(--mat-tile-rim);
   color: var(--tile-tone);
 }
 .glyph-tile.role-max { color: color-mix(in srgb, var(--tile-tone) 55%, var(--ink)); }
