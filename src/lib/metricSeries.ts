@@ -5,7 +5,7 @@ import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 import { resolvedTheme } from '../composables/useTheme';
 import { chartPalettes } from './echartsTheme';
-import { today as currentToday } from './currentDay';
+import { trendToday } from './trendWindow';
 
 const messages = defineMessages(
   {
@@ -67,7 +67,7 @@ const shiftDate = (date: string, days: number): string => {
 };
 
 /** 范围第一天：今天往回数 `days` 天（含今天），本地日。和后端 `end - (days - 1)` 同一个算法。 */
-export const windowStartDate = (days: number, today = currentToday()): string => {
+export const windowStartDate = (days: number, today = trendToday()): string => {
   const pad = (value: number) => String(value).padStart(2, '0');
   const end = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   return shiftDate(end, -(Math.max(1, Math.round(days)) - 1));
@@ -91,13 +91,21 @@ export const metricExtrema = (metric: string, points: MetricSeriesPoint[]) => {
  * 出 7 天」和「直接取 7 天」逐字段相同（`get_metric_series` 的算法见 storage/metrics.rs）。
  * 切范围因此不用再走一趟 IPC + SQLite：点下去同一帧图表就开始换。
  */
-export const sliceSeries = (series: MetricSeries, days: number, today = currentToday()): MetricSeries => {
+export const sliceSeries = (series: MetricSeries, days: number, today = trendToday()): MetricSeries => {
   const start = windowStartDate(days, today);
   const end = windowStartDate(1, today);
   const points = series.points.filter((point) => point.date >= start && point.date <= end);
   const values = points.map((point) => point.value).filter((value) => Number.isFinite(value));
+  // 前一段（紧挨着、一样长）的平均：读数不到这一段的一半就不比，免得拿零星几天当「上一周期」。
+  const span = Math.max(1, Math.round(days));
+  const previousStart = windowStartDate(span * 2, today);
+  const previous = series.points
+    .filter((point) => point.date >= previousStart && point.date < start && Number.isFinite(point.value))
+    .map((point) => point.value);
+  const enough = previous.length >= 2 && previous.length >= Math.ceil(values.length / 2);
   return {
     ...series,
+    previous_average: enough ? previous.reduce((sum, value) => sum + value, 0) / previous.length : null,
     points,
     latest: points[points.length - 1] ?? null,
     average: values.length ? round1(values.reduce((sum, value) => sum + value, 0) / values.length) : null,
@@ -113,7 +121,7 @@ export const sliceSeries = (series: MetricSeries, days: number, today = currentT
  * VO₂max 一年只测几次，范围停在 7 天时那张卡只剩一句「这段范围没有记录」——
  * 不要给人看一段空范围，自动跳到有记录的那一档。
  */
-export const widerRangeWithData = (series: MetricSeries | null | undefined, days: number, today = currentToday()): SeriesRangeDays | null => {
+export const widerRangeWithData = (series: MetricSeries | null | undefined, days: number, today = trendToday()): SeriesRangeDays | null => {
   if (!series?.points.length) return null;
   const end = windowStartDate(1, today);
   const count = (span: number) => {
@@ -139,7 +147,7 @@ export const widerRangeWithData = (series: MetricSeries | null | undefined, days
 export const sliceIndexed = (
   series: Record<string, MetricSeries>,
   days: number,
-  today = currentToday(),
+  today = trendToday(),
 ): Record<string, MetricSeries> => {
   const out: Record<string, MetricSeries> = {};
   for (const [name, item] of Object.entries(series)) {
@@ -149,9 +157,10 @@ export const sliceIndexed = (
 };
 
 /** 按日期的数组（训练负荷平衡、日最高心率）同样从尾部切。 */
-export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = currentToday()): T[] => {
+export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = trendToday()): T[] => {
   const start = windowStartDate(days, today);
-  return rows.filter((row) => row.date >= start);
+  const end = windowStartDate(1, today);
+  return rows.filter((row) => row.date >= start && row.date <= end);
 };
 
 export const latestValue = (series?: MetricSeries | null): number | null => {
@@ -222,6 +231,8 @@ export interface SeriesChartOptions {
    * into a picture of an unbroken habit.
    */
   calendarAxis?: boolean;
+  /** 叠一条 7 天移动平均（细虚线）：步数、HRV 这类逐日起伏大的指标更容易看出走向。柱状图不叠。 */
+  smooth7?: boolean;
 }
 
 /** Every ISO day from `first` to `last`, inclusive. */
@@ -285,6 +296,11 @@ export const buildSeriesOption = (
     : series.points.map((point) => point.date);
   const at = (date: string) => byDate.get(date) ?? null;
   const values = dates.map((date) => at(date)?.value ?? null);
+  // 7 天移动平均：每个点取它自己和前 6 个位置里有值的那几个的平均；不足 3 个读数不画（一两个点算不出走向）。
+  const movingAverage = values.map((_, index) => {
+    const window = values.slice(Math.max(0, index - 6), index + 1).filter((value): value is number => value !== null);
+    return window.length >= 3 ? window.reduce((sum, value) => sum + value, 0) / window.length : null;
+  });
   const hasSpread =
     Boolean(options.showSpread)
     && series.points.some((point) => typeof point.min === 'number' && typeof point.max === 'number');
@@ -390,6 +406,20 @@ export const buildSeriesOption = (
               },
             }),
           },
+      ...(options.smooth7 && !bar && movingAverage.some((value) => value !== null)
+        ? [{
+            type: 'line',
+            name: 'ma7',
+            data: movingAverage,
+            smooth: 0.3,
+            connectNulls: true,
+            showSymbol: false,
+            silent: true,
+            tooltip: { show: false },
+            lineStyle: { width: 1.4, type: 'dashed', color: hexToRgba(options.color, 0.6) },
+            z: 3,
+          }]
+        : []),
     ],
   };
 };

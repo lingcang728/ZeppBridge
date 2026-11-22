@@ -5,6 +5,9 @@ defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref } from 'vue';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
+import WeeklyVolumeCard from '../components/training/WeeklyVolumeCard.vue';
+import PolarizationCard from '../components/training/PolarizationCard.vue';
+import CorrelationCard from '../components/training/CorrelationCard.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import MetricInfoButton from '../components/MetricInfoButton.vue';
 import SwapChart from '../components/SwapChart.vue';
@@ -386,6 +389,10 @@ useRevisionReload(() => { void load(); });
           </template>
         </MetricTrendCard>
       </div>
+
+      <WeeklyVolumeCard :days="rangeDays" />
+      <CorrelationCard />
+      <PolarizationCard :revision="dataRevision" />
 
       <MissingMetricsRow :items="missing" />
 

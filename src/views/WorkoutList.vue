@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import WorkoutTools from '../components/WorkoutTools.vue';
@@ -20,6 +20,8 @@ import type { Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import WorkoutImport from '../components/workout/WorkoutImport.vue';
+import WorkoutFilters from '../components/workout/WorkoutFilters.vue';
+import { applyWorkoutFilter, EMPTY_FILTER, isFiltering, sportOptions, type WorkoutFilter } from '../lib/workoutFilters';
 import { workoutImportMessages } from '../components/workout/workoutImport.i18n';
 import type { ImportSourceKey } from '../types/imports';
 
@@ -108,7 +110,25 @@ const {
 const initialLoading = useFirstLoad(loading);
 // Recovery must include hidden records with incomplete summaries too. Otherwise
 // CLI-hidden or partially synced records can disappear from the restore surface.
-const displayableList = computed(() => hiddenView.value ? workouts.value : displayableWorkouts(workouts.value));
+const loadedList = computed(() => hiddenView.value ? workouts.value : displayableWorkouts(workouts.value));
+/* 筛选与排序只作用在已取回的记录上。一打开筛选就把剩下的页都读回来，免得「筛不到」其实是还没读到。 */
+const filter = ref<WorkoutFilter>({ ...EMPTY_FILTER });
+const displayableList = computed(() => applyWorkoutFilter(loadedList.value, filter.value));
+const sports = computed(() => sportOptions(loadedList.value));
+let loadingAll = false;
+watch(() => isFiltering(filter.value), async (active) => {
+  if (!active || loadingAll) return;
+  loadingAll = true;
+  try {
+    for (let round = 0; round < 60 && hasMore.value && isFiltering(filter.value); round += 1) {
+      const before = workouts.value.length;
+      await loadMore();
+      if (workouts.value.length === before) break;
+    }
+  } finally {
+    loadingAll = false;
+  }
+});
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
@@ -146,6 +166,7 @@ useSectionTour('workouts');
       </template>
     </div>
     <WorkoutImport v-if="importing" id="workout-import" />
+    <WorkoutFilters v-if="loadedList.length" v-model="filter" :sports="sports" :shown="displayableList.length" :loaded="loadedList.length" />
     <p class="footnote">{{ tools.localHint }}</p>
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
@@ -156,7 +177,7 @@ useSectionTour('workouts');
     <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
-    <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
+    <EmptyState v-else-if="!loadedList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else :class="['record-list', { selecting }]">
       <div v-for="workout in displayableList" :key="workout.workout_id" :data-timeline="timelineKey(workout.start_time)" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
       <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />

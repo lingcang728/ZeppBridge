@@ -6,6 +6,8 @@ import { useFirstLoad } from '../composables/useFirstLoad';
 import { LIST_PAGE_SIZE, pageQuery } from '../lib/pageQueries';
 import { afterMotion, nextSlot } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import SleepTrendsCard from '../components/sleep/SleepTrendsCard.vue';
 import RecordRow from '../components/RecordRow.vue';
 import { timelineKey } from '../lib/scroll/scrollbar';
 import EmptyState from '../components/EmptyState.vue';
@@ -119,6 +121,11 @@ useSectionTour('sleep');
   <section class="page list-page" aria-labelledby="sleep-list-title">
     <PageHeader title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
 
+    <template v-if="!initialLoading && sessions.length">
+      <TrendRangeBar />
+      <SleepTrendsCard class="sleep-trends-block" />
+    </template>
+
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
@@ -158,6 +165,7 @@ useSectionTour('sleep');
 
 <style scoped>
 .list-page { width: 100%; }
+.sleep-trends-block { margin: var(--space-3) 0 var(--space-4); }
 .stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .footnote {
   margin: 12px 0 0;

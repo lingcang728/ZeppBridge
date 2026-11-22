@@ -11,7 +11,8 @@ defineOptions({ name: 'ActivityDetail' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
-import HourlyStepsCard from '../components/activity/HourlyStepsCard.vue';
+import DailyStepsCard from '../components/activity/DailyStepsCard.vue';
+import DistanceHeatmapCard from '../components/activity/DistanceHeatmapCard.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -164,8 +165,10 @@ watch(dataRevision, () => { void load(); });
         {{ t.noneInRange }}
       </p>
       <TrendRangeBar />
-      <!-- 每小时步数：旧通道的逐分钟记录为主（完整），官方授权的按小时汇总补缺。两边都没有时卡片自己说明。 -->
-      <HourlyStepsCard :days="rangeDays" />
+      <!-- 每日步数柱状图：用和下面「步数」卡同一份按天总步数；6 个月时一根柱子一周。 -->
+      <DailyStepsCard :days="rangeDays" :series="fullSeries.steps ?? null" />
+      <!-- 每日距离热力图（GitHub 贡献图的样子）：数据是米，卡片里按当前单位换算。 -->
+      <DistanceHeatmapCard :days="rangeDays" :series-map="fullSeries" :class="{ yearly: rangeDays > 200 }" />
       <div v-if="shownCards.length" class="trend-grid" :style="trendGridStyle(shownCards.length)">
         <MetricTrendCard
           v-for="card in shownCards"

@@ -20,6 +20,7 @@ import StatusEntryCard, { type EntryFact } from '../components/overview/StatusEn
 import SegmentTrack from '../components/SegmentTrack.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
+import ProgressSection from '../components/overview/ProgressSection.vue';
 import FeedbackCard from '../components/feedback/FeedbackCard.vue';
 import CoachInboxCard from '../components/coachNotes/CoachInboxCard.vue';
 import '../components/overview/panels.css';
@@ -444,6 +445,9 @@ useSectionTour('home');
 
     <!-- 用户自己固定的 3–4 个指标排在最上面：顺序由用户定，概览不替所有人排（评审 U10）。 -->
     <PinnedMetrics />
+
+    <!-- 这一周的摘要 + 目标与连续天数 + 个人纪录：和自己比，数字都来自本机记录。 -->
+    <ProgressSection />
 
     <!-- 跑后打分（批次 7）：练完推到手表的计划后问一句，最多一张、48 小时后自己消失。 -->
     <FeedbackCard />

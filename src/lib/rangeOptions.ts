@@ -21,6 +21,7 @@ const messages = defineMessages(
     d90: '3 个月',
     d180: '6 个月',
     d365: '1 年',
+    custom: (days: number) => `${days} 天`,
   },
   {
     d7: '7 days',
@@ -28,6 +29,7 @@ const messages = defineMessages(
     d90: '3 months',
     d180: '6 months',
     d365: '1 year',
+    custom: (days: number) => `${days} days`,
   },
   {
     d7: '7 días',
@@ -35,6 +37,7 @@ const messages = defineMessages(
     d90: '3 meses',
     d180: '6 meses',
     d365: '1 año',
+    custom: (days: number) => `${days} días`,
   },
   'lib/rangeOptions',
 );
@@ -54,11 +57,17 @@ export const rangeLabel = (days: RangeDays): string => {
   return labels[days];
 };
 
+/** 任意天数的说法：预设档用它们的名字，自定义范围的天数写「N 天」。 */
+export const rangeText = (days: number): string => {
+  const preset = (RANGE_LADDER_DAYS as readonly number[]).includes(days);
+  return preset ? rangeLabel(days as RangeDays) : copy().custom(days);
+};
+
 /** 取梯子的一段，配好当前语言的文字。 */
 export const rangeOptions = (
   days: readonly RangeDays[],
 ): Array<{ days: RangeDays; label: string }> =>
   days.map((value) => ({ days: value, label: rangeLabel(value) }));
 
-/** 图表和导出的显示范围。三段，够窄能放进一行按钮。 */
-export const DISPLAY_RANGE_DAYS: readonly RangeDays[] = [7, 30, 180];
+/** 图表和导出的显示范围。四段（含 1 年：VO₂max、体重这类几周才测一次的指标一年才读得出趋势），仍能放进一行按钮。 */
+export const DISPLAY_RANGE_DAYS: readonly RangeDays[] = [7, 30, 180, 365];

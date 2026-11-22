@@ -277,6 +277,7 @@ export const convertSeries = (
     points: source.points.map(point),
     latest: source.latest ? point(source.latest) : source.latest,
     average: num(source.average) ?? null,
+    previous_average: num(source.previous_average) ?? null,
     minimum: num(source.minimum) ?? null,
     maximum: num(source.maximum) ?? null,
   };

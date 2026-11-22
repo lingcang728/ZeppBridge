@@ -405,3 +405,11 @@ html[data-effects="lite"] .tl-row { animation: none; }
    收回最后一段改成 fading，透明度交给那段 WAAPI 动画。 */
 [data-source-hold='held'] { opacity: 0 !important; transition: none !important; }
 [data-source-hold='fading'] { transition: none !important; }
+
+/* Change versus the previous period (trend cards, daily steps, sleep, overview summary):
+   toward the better direction is the accent colour, toward the worse direction is red, and
+   no real change or a metric with no agreed direction stays neutral grey. */
+.delta { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+.delta-good { color: var(--accent); }
+.delta-bad { color: var(--danger); }
+.delta-flat, .delta-neutral { color: var(--muted); }

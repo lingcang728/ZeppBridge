@@ -25,7 +25,9 @@ const chartClick = (event: ChartEvent) => {
 import { chartPalette } from '../lib/echartsSetup';
 import { formatMetric } from '../lib/format';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
-import { rangeLabel, type RangeDays } from '../lib/rangeOptions';
+import { useTrendSmoothing } from '../composables/useTrendSmoothing';
+import { periodChange, previousPeriodLabel } from '../lib/periodDelta';
+import { rangeText } from '../lib/rangeOptions';
 import { useTrendRange } from '../composables/useTrendRange';
 import SwapChart from './SwapChart.vue';
 import AskAiButton from './ask/AskAiButton.vue';
@@ -45,6 +47,7 @@ const messages = defineMessages(
     onlyOneDay: '这段范围只有 1 天记录，画不出趋势。',
     defaultEmpty: '同步后展示这项指标的趋势。',
     average: '平均',
+    vsPrevious: (span: string) => `对比前一段（${span}）`,
     minimum: '最低',
     maximum: '最高',
   },
@@ -56,6 +59,7 @@ const messages = defineMessages(
     onlyOneDay: 'Only one day of data in this range — no trend to draw yet.',
     defaultEmpty: 'Trend appears here after a sync.',
     average: 'Avg',
+    vsPrevious: (span: string) => `vs the previous period (${span})`,
     minimum: 'Min',
     maximum: 'Max',
   },
@@ -67,6 +71,7 @@ const messages = defineMessages(
     onlyOneDay: 'Solo hay 1 día de datos en este rango; no hay tendencia que trazar.',
     defaultEmpty: 'Esta métrica muestra su tendencia una vez sincronizada.',
     average: 'Prom.',
+    vsPrevious: (span: string) => `frente al periodo anterior (${span})`,
     minimum: 'Mín.',
     maximum: 'Máx.',
   },
@@ -138,13 +143,16 @@ const latest = computed(() => {
 });
 const latestDate = computed(() => props.series?.latest?.date ?? null);
 const coverage = computed(() => coverageLabel(props.series));
+/** 和紧挨着的前一段比平均值：只说方向和幅度，不判断好坏（心率降低、体重降低各有各的含义）。 */
+const delta = computed(() => periodChange(props.series?.average, props.series?.previous_average, props.series?.metric));
+const previousSpan = computed(() => previousPeriodLabel(props.series?.window_days ?? 30));
 /* 页面范围里画不出曲线、自动换成了更长一档（lib/metricSeries.ts 的 sliceIndexed）：写明这里是哪一段，
    别让人以为它跟着页面的范围。 */
 const range = useTrendRange();
 const widened = computed(() => {
   const shown = props.series?.window_days ?? 0;
   if (!hasPoints.value || shown <= range.value) return null;
-  return t.value.widened(rangeLabel(range.value as RangeDays), rangeLabel(shown as RangeDays));
+  return t.value.widened(rangeText(range.value), rangeText(shown));
 });
 
 const stats = computed(() => {
@@ -157,6 +165,8 @@ const stats = computed(() => {
   return rows;
 });
 
+const smooth7 = useTrendSmoothing();
+
 const option = computed(() => {
   const series = props.series;
   if (!series || !hasTrend.value) return null;
@@ -168,6 +178,7 @@ const option = computed(() => {
     unit: props.unit,
     chart: props.chart,
     calendarAxis: props.calendarAxis,
+    smooth7: smooth7.value,
   });
   /* 生活事件画成竖向浅色区带（一天的画成一根竖线），颜色跟事件分类走、和页头胶囊同色；点一下打开编辑。
      以前是 9px 无标签的品牌绿圆点，新用户会当成数据点样式（U24）。
@@ -268,6 +279,7 @@ const hasEventMarks = computed(() => {
     <p class="trend-meta">
       <span v-if="widened" class="trend-widened">{{ widened }}</span>
       <span v-if="hasPoints">{{ coverage }}</span>
+      <span v-if="delta" class="trend-delta"><em :class="['delta', `delta-${delta.tone}`]">{{ delta.text }}</em> {{ t.vsPrevious(previousSpan) }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
       <UsualRange range-only :metric="series?.metric" :format="renderRaw" />
@@ -336,6 +348,7 @@ const hasEventMarks = computed(() => {
 .trend-latest :deep(small), .trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }
 .trend-latest :deep(small + strong) { margin-left: 8px; }
 .trend-latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
+.trend-delta { color: var(--muted); font-variant-numeric: tabular-nums; }
 .trend-meta {
   display: flex;
   flex-wrap: wrap;

@@ -36,7 +36,7 @@ const range = useTrendRange();
 const pins = ref<string[]>(readPins());
 /** 一次取最长那档（和详情页一样），按页面范围在本地切：切范围不查库，切法也和详情页同一个。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
-const series = computed(() => sliceIndexed(fullSeries.value, range.value));
+const series = computed(() => sliceIndexed(fullSeries.value, range.value, currentToday()));
 const pickerOpen = ref(false);
 /** 刚从挑选面板回来：这一次让磁贴依次浮上来。 */
 const justPinned = ref(false);

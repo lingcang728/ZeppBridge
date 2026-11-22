@@ -95,6 +95,8 @@ export interface MetricSeries {
   /** Days in the window that carry a value, so gaps can be stated, not drawn. */
   days_with_data: number;
   window_days: number;
+  /** 紧挨在这段范围之前、同样长的一段的平均；前一段读数太少时没有（前端切范围时算，见 lib/metricSeries.ts）。 */
+  previous_average?: number | null;
 }
 
 export interface TrainingBalancePoint {
