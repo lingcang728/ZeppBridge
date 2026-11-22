@@ -33,7 +33,7 @@ Consequence: the authorization-code flow cannot be completed on the desktop alon
 
 Two constraints follow:
 
-1. **Official backfill cannot be a self-service feature.** The quota is per application, not per user, and every user of an open-source app shares one App ID. A year of history costs about `ceil(365/30) × number of types` requests: 78 for six types, which uses up the whole application's quota for an hour and a half. ZeppBridge's history backfill therefore runs on the Advanced data channel only.
+1. **The asynchronous Backfill API shares a quota across the entire app.** A year of history for six data types would cost roughly 78 requests. The monthly coverage ledger uses Advanced data. Official history pulls use the ordinary data endpoints listed below.
 2. **Pushes carry no proof of origin.** Anyone who knows the callback URL can forge an event. ZeppBridge currently **accepts no pushes at all**: the relay's data callback always answers 503 `data_ingestion_not_enabled`, and the desktop app pulls all official data over REST. If revocation events are ever accepted, **a revocation never deletes the local archive**; it can only lead to a recoverable pause plus an active check back with Zepp.
 
 ### Data types
@@ -82,6 +82,7 @@ The official channel only polls over REST; the code is in `official/fetch.rs`:
   - **Official only**: everything in the table comes from the official channel.
   - **Both connected**: the legacy channel runs as before; the official channel only adds sleep and hourly steps.
 - When both channels have the same night of sleep, the official one is shown (it adds naps and true REM). Hourly steps come primarily from the legacy per-minute detail; the official hourly totals only fill gaps (`storage/hourly_steps.rs`).
+- The CLI uses the same channel rules for regular sync. `sleep-history` requests an inclusive date range from the official sleep endpoint. See [CLI and MCP](cli-and-mcp.md#sync-and-history).
 - Coordinates: checked by overlaying domestic Chinese routes from a real library on OSM, Advanced data tracks are already WGS-84 and are shown and exported as they are; only official details are handled according to `zepp_coord_system` (converted only when it is 1 = GCJ-02).
 
 ## 3. Data differences

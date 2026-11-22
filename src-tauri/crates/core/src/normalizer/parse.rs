@@ -67,7 +67,7 @@ pub(super) fn extract_items(raw: &Value) -> Result<Vec<&Value>> {
 /// 和 `extract_items` 认同一批容器：它在这里报「为空」的，这里就是 `true`。
 /// 这是「这段时间云端没有」，不是「报文看不懂」——账号开通之前那些年，睡眠接口
 /// 就是逐周回 `{"code":1,"data":[]}`，曾被记成解析失败，补拉页上一排红块、重试也消不掉。
-pub(crate) fn payload_is_explicitly_empty(raw: &Value) -> bool {
+pub fn payload_is_explicitly_empty(raw: &Value) -> bool {
     if let Some(items) = raw.as_array() {
         return items.is_empty();
     }

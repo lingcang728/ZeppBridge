@@ -137,20 +137,22 @@ impl OfficialSync {
     /// 令牌被数据接口拒了：强制刷新一次。刷新也被拒才算真的要重新授权。
     /// 与状态读取共用单飞刷新和比较后写回（R05）。
     async fn recover(&self, tokens: &OfficialTokens) -> Result<OfficialTokens> {
-        refresh_tokens(&self.store, &self.client, tokens, Utc::now().timestamp()).await
+        let fresh =
+            refresh_tokens(&self.store, &self.client, tokens, Utc::now().timestamp()).await?;
+        if fresh.user_id != tokens.user_id {
+            return Err(ZeppBridgeError::AccountMismatch);
+        }
+        Ok(fresh)
     }
 
-    /// 同步最近 `days` 天。`mode` 决定拉哪几样（见文件头）。
-    ///
-    /// 两边都连时这里只是补充：它的失败不改旧通道那几条流的同步状态，只写日志——
-    /// 旧通道的睡眠照常显示，官方那份下次再补。
+    /// 同步最近 `days` 天。`mode` 决定种类和是否保留高级通道的逐流状态。
     pub async fn run(
         &self,
         days: i64,
         mode: OfficialMode,
         on_progress: &(dyn Fn(SyncProgress) + Send + Sync),
     ) -> Result<SyncReport> {
-        self.cancel.store(false, Ordering::SeqCst);
+        self.abort_if_cancelled()?;
         // 补充模式也拿同步租约：以前不拿，它可能和 CLI 的同步、或者刚被排上的补拉
         // 同时写同一批流。旧通道那一轮在这之前已经放开了租约。
         let _lease = self.lock(true).await?;
@@ -159,18 +161,7 @@ impl OfficialSync {
         if mode == OfficialMode::Supplement {
             self.db.lock().await.keep_sync_state_quiet();
         }
-        let Some(mut tokens) =
-            fresh_tokens(&self.store, &self.client, Utc::now().timestamp()).await?
-        else {
-            return Err(ZeppBridgeError::NeedsReauth(
-                "还没有连接 Zepp 官方授权".into(),
-            ));
-        };
-        // 库主人不是这个官方账号就一行都不写（R06）。补充模式下调用方只记日志，
-        // 旧通道那一轮照常。
-        self.write_db()
-            .await?
-            .claim_library_for_sync(&tokens.user_id)?;
+        let mut tokens = self.tokens_for_sync().await?;
         let today = crate::official::fetch::local_today(&self.time_zone);
         let start = today - Duration::days(days.clamp(1, UserPrefs::MAX_HISTORY_SYNC_DAYS) - 1);
         let kinds = mode.kinds();
@@ -194,16 +185,16 @@ impl OfficialSync {
                 )
                 .await;
             match outcome {
-                Ok(report) => {
-                    if mode == OfficialMode::Only {
-                        streams.push(report);
-                    }
-                }
-                Err(error) if error.is_cancelled() || error.needs_reauth() => return Err(error),
-                Err(error) if mode == OfficialMode::Supplement => {
-                    tracing::warn!("官方 {} 补充同步失败: {error}", kind.label());
+                Ok(report) => streams.push(report),
+                Err(error)
+                    if error.is_cancelled()
+                        || error.needs_reauth()
+                        || matches!(error, ZeppBridgeError::AccountMismatch) =>
+                {
+                    return Err(error)
                 }
                 Err(error) => {
+                    tracing::warn!("官方 {} 同步失败: {error}", kind.label());
                     let unavailable = error.is_unavailable();
                     let report = StreamReport {
                         stream: stream.into(),
@@ -289,6 +280,61 @@ impl OfficialSync {
         })
     }
 
+    /// 按设备本地日补拉官方睡眠，两端都含。保留日常同步的逐流状态。
+    pub async fn sleep_history(&self, start: NaiveDate, end: NaiveDate) -> Result<StreamReport> {
+        let today = crate::official::fetch::local_today(&self.time_zone);
+        if end < start
+            || (end - start).num_days() >= UserPrefs::MAX_HISTORY_SYNC_DAYS
+            || end > today
+        {
+            return Err(ZeppBridgeError::ConfigError(
+                "Invalid official sleep history date range".into(),
+            ));
+        }
+        self.abort_if_cancelled()?;
+        let _lease = self.lock(true).await?;
+        {
+            let db = self.db.lock().await;
+            if db
+                .user_prefs()?
+                .backfill_would_be_cleaned_up((today - start).num_days() + 1)
+            {
+                return Err(ZeppBridgeError::ConfigError(
+                    "Enable long-term archive or increase retention to cover the start date."
+                        .into(),
+                ));
+            }
+            db.keep_sync_state_quiet();
+        }
+        let mut tokens = self.tokens_for_sync().await?;
+        self.sync_kind(
+            &mut tokens,
+            OfficialKind::Sleep,
+            start,
+            end,
+            "sleep",
+            1,
+            1,
+            &|_| {},
+        )
+        .await
+    }
+
+    async fn tokens_for_sync(&self) -> Result<OfficialTokens> {
+        if crate::storage::compaction_in_progress() || crate::storage::replay_in_progress() {
+            return Err(ZeppBridgeError::Busy("本地数据正在整理".into()));
+        }
+        self.abort_if_cancelled()?;
+        let tokens = fresh_tokens(&self.store, &self.client, Utc::now().timestamp())
+            .await?
+            .ok_or_else(|| ZeppBridgeError::NeedsReauth("还没有连接 Zepp 官方授权".into()))?;
+        self.abort_if_cancelled()?;
+        self.write_db()
+            .await?
+            .claim_library_for_sync(&tokens.user_id)?;
+        Ok(tokens)
+    }
+
     /// 一样数据：按块从新到旧拉，每块落库后通知界面。
     #[allow(clippy::too_many_arguments)]
     async fn sync_kind(
@@ -306,13 +352,29 @@ impl OfficialSync {
         let mut gaps: Vec<String> = Vec::new();
         for (chunk_start, chunk_end) in date_chunks_newest_first(start, end, kind.chunk_days()) {
             self.abort_if_cancelled()?;
-            let outcome = match self.fetch(tokens, kind, chunk_start, chunk_end).await {
+            let fetch = match self.fetch(tokens, kind, chunk_start, chunk_end).await {
                 Err(error) if error.needs_reauth() => {
                     *tokens = self.recover(tokens).await?;
-                    self.fetch(tokens, kind, chunk_start, chunk_end).await?
+                    self.fetch(tokens, kind, chunk_start, chunk_end).await
                 }
-                other => other?,
+                other => other,
             };
+            let outcome = match fetch {
+                Ok(outcome) => outcome,
+                Err(error)
+                    if reports.is_empty() || error.needs_reauth() || error.is_cancelled() =>
+                {
+                    return Err(error);
+                }
+                Err(error) => {
+                    gaps.push(format!(
+                        "{stream} ({chunk_start}..{chunk_end}): {}",
+                        error.user_message()
+                    ));
+                    break;
+                }
+            };
+            self.abort_if_cancelled()?;
             // 没拉全的块：拿到的照常入库，缺口记下来，整条流标失败可重试（R08）。
             if let Some(gap) = outcome.gap {
                 tracing::warn!("{gap}");

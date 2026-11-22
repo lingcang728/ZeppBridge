@@ -161,7 +161,9 @@ pub async fn fresh_tokens(
     let Some(tokens) = store.load()? else {
         return Ok(None);
     };
-    if !tokens.needs_refresh(now) {
+    if !tokens.needs_refresh(now)
+        || (tokens.refresh_token.is_none() && tokens.expires_at.is_some_and(|at| at > now))
+    {
         return Ok(Some(tokens));
     }
     match refresh_tokens(store, client, &tokens, now).await {

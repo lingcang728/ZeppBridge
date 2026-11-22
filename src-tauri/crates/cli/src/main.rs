@@ -50,6 +50,7 @@ mod cmd_status;
 mod cmd_sync;
 mod cmd_workout_edit;
 mod exit;
+mod headless_official;
 #[cfg(test)]
 mod tests;
 
@@ -118,6 +119,7 @@ Usage:
 Commands:
   status              Print local database and account status (no network)
   sync                Sync from the Zepp cloud into the local SQLite database
+  sleep-history       Fetch official sleep and naps for a date range
   workout-details     Show coverage or fetch a bounded batch of historical workout details
   probe               Check candidate health endpoints without importing data
   reprocess           Replay stored payloads with the current parser (no network)
@@ -137,12 +139,18 @@ Commands:
 
 sync options:
   --mode <incremental|initial|history>   Default: incremental
+  --channel <advanced|official>          Select one channel (default: use configured channels)
   --days <N>                             history mode only; 1-3650
   --max-chunks <N>                       >365 days: monthly chunks per run; 1-720 (default 24)
   --retry-failed                         >365 days: retry exhausted failed chunks
                                          Rerun to resume; Ctrl+C stops safely. Archive/retention must cover the range.
   --no-reprocess                         Skip the parser replay before syncing
   --json                                 Emit a machine-readable sync report
+
+sleep-history options:
+  --from <YYYY-MM-DD>                    First sleep date, inclusive
+  --to <YYYY-MM-DD>                      Last sleep date, inclusive
+  --json                                 Emit a machine-readable report
 
 reprocess options:
   --all                     Replay every payload, not only what a parser upgrade owes
@@ -260,6 +268,7 @@ fn run(args: &[String]) -> u8 {
         }
         "status" => cmd_status(rest),
         "sync" => cmd_sync(rest),
+        "sleep-history" => headless_official::cmd_sleep_history(rest),
         "workout-details" => cmd_details::cmd_details(rest),
         "probe" => cmd_probe(rest),
         "reprocess" => cmd_reprocess(rest),

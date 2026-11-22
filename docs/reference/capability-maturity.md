@@ -12,7 +12,7 @@
 | Capability | core | Desktop | CLI | MCP | Local REST | Task scope |
 |---|---|---|---|---|---|---|
 | Advanced data sync / history backfill | ✓ | ✓ manual, automatic, 180 days after first connect | ✓ `sync` | ✓ `sync_now` (runs the CLI sync) | — | refused |
-| Official open-platform authorization and pulls | ✓ | ✓ authorization relayed through Cloudflare | partial: `workout-details --channel official`; `sync` uses Advanced data only | — | — | n/a |
+| Official open-platform authorization and pulls | ✓ | ✓ authorization relayed through Cloudflare | ✓ pulls and refresh with desktop-issued credentials: `sync`, `sleep-history`, `workout-details` | `sync_now` via CLI | — | n/a |
 | Imports (GPX with track segments, FIT with individual sessions and strength sets, Strava bundle, Apple Health; unstrap backup in the Beta lab) | ✓ | ✓ | ✗ | — | — | n/a |
 | Local reprocessing | ✓ | ✓ automatic at startup by revision, manual in Settings | ✓ `reprocess` | — | — | n/a |
 | Data export (JSON / CSV / segmented GPX / FIT with strength sets; "take everything with you"; unstrap zip in the Beta lab) | ✓ | ✓ | ✓ `export` (JSON / CSV / GPX / FIT) | ✓ `export_data` (JSON, at most 366 days) | — | refused |
@@ -76,7 +76,8 @@ as `3.0.0`.
 - **Switching accounts**: one `data` folder holds one account. **Start fresh
   with another account** in Settings moves the current `data` folder aside to
   `data-before-<time>`. When both channels are on with different accounts, the
-  official supplementary sync only logs it and does not tell the user.
+  desktop logs the official supplementary sync error and the CLI reports it
+  under the official channel.
 - **Official workout details**: when one is permanently unavailable it is set
   aside and retried later.
 - **Self-update**: silent. The app checks on launch and downloads a new version

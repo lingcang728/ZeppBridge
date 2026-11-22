@@ -116,13 +116,11 @@ An unknown parameter, or one given twice, is an error rather than ignored.
 
 ## Headless sign-in
 
-Not available yet. The authorization relay itself does not care which device
-asks (the client makes a random `state` and claim secret, the user authorizes
-in any browser, the client claims the token), so `zeppbridge-cli` could print
-the link and claim the token. But `zeppbridge-cli sync` does not run the
-official channel yet — that orchestration still lives in the desktop app — so a
-token signed in from the CLI would have nothing to use it. Until both land
-together: with the account connector, connect once with the desktop app and hand
-the data directory to the container, as [Docker](docker.md) describes; with only
-the official authorization, a sync in the container gets no new data, so keep
-the desktop app running on an always-on computer and run `serve` there too.
+Signing in from the CLI is not available yet: connect once in the desktop app,
+then hand the data directory to the container, as [Docker](docker.md) describes.
+`zeppbridge-cli sync` runs both channels. For the official authorization, copy
+`official.json` with the matching `credentials.json` from a desktop that keeps
+its tokens in a file; the CLI renews the grant through the authorization relay
+and writes the new tokens back. If the grant lapses, `sync` reports
+`needsReauth` and exits `3`: authorize again in the desktop app and copy both
+files over again.

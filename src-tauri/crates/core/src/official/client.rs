@@ -59,7 +59,9 @@ impl TokenBody {
         Some(OfficialTokens {
             access_token,
             refresh_token: self.refresh_token.filter(|value| !value.is_empty()),
-            expires_at: self.expires_in.map(|seconds| now + seconds.max(0)),
+            expires_at: self
+                .expires_in
+                .map(|seconds| now.saturating_add(seconds.max(0))),
             user_id,
         })
     }
@@ -186,6 +188,9 @@ impl OfficialClient {
         let body: TokenBody = serde_json::from_value(bounded_json(response).await?)?;
         match body.into_tokens(now, Some(&tokens.user_id)) {
             Some(mut fresh) => {
+                if fresh.user_id != tokens.user_id {
+                    return Err(ZeppBridgeError::AccountMismatch);
+                }
                 // 刷新响应没带新的 refresh_token 时，旧的继续可用。
                 if fresh.refresh_token.is_none() {
                     fresh.refresh_token = tokens.refresh_token.clone();

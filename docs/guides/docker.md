@@ -22,22 +22,14 @@ window on a real session. See the [connection guide](connection.md).
 
 ## Getting the credentials in
 
-**The container syncs through Advanced data (the App Token) only.**
-`zeppbridge-cli sync` does not run the official authorization channel yet, so if
-that is the only connection you have, a scheduled sync in the container gets no
-new data and exits with an error. New data then has to come from the desktop
-app: keep it running on an always-on computer and run `zeppbridge-cli serve` on
-that same computer against the same data directory (see
-[self-hosted pull](self-hosted-pull.md#headless-sign-in)).
+The container supports Advanced and Official sync. Official tokens cannot be
+passed in through the environment: use the file store below and copy
+`official.json` with the matching `credentials.json` from a desktop that keeps
+its tokens in a file. The CLI refreshes official authorization through
+`zeppbridge.com` and writes renewed credentials to the mounted data directory.
 
-Official tokens cannot be passed in through the environment. If you copy a
-`credentials.json` from a desktop that keeps its tokens in a file into the file
-store below, the only thing in the container that uses it is
-`zeppbridge-cli workout-details --channel official`, and token refreshes then go
-through `zeppbridge.com`.
-
-Two things have to reach the container: `auth.json` (non-secret metadata — user
-ID and region host) and the App Token (secret).
+For Advanced sync, provide `auth.json` (account and region metadata) and the
+App Token (secret).
 
 ```bash
 mkdir -p ./data
@@ -78,12 +70,13 @@ read the file in your own wrapper, or use the file store below.
 docker run --rm ... -e ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge:local ...
 ```
 
-Uses `/data/credentials.json` (mode 0600, directory 0700). Nothing in the
-container writes this file — the CLI has no sign-in — so copy it from a desktop
-install that uses file storage. This is an explicit downgrade from a keyring: file
-permissions are the only thing protecting it, and it sits in the same volume as
-your backups. It exists because on a headless machine the alternative is not a
-safer store, it is nothing at all.
+Uses `/data/credentials.json` (mode 0600, directory 0700). Initialize it from a
+desktop installation that uses file storage. Keep it private and writable by
+the service user. The CLI saves any refreshed official credentials here. This
+is a downgrade from a keyring: file permissions are the only thing protecting
+it, and it sits in the same volume as your backups.
+See [CLI sync](../reference/cli-and-mcp.md#sync-and-history) for channel reports
+and fetching official sleep by date.
 
 Once `credentials.json` is there, runs pick the file store up on their own —
 you do not have to pass the variable.

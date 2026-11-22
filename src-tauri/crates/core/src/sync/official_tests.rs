@@ -5,6 +5,100 @@ use crate::auth::CredentialBackend;
 use crate::models::{SourceScope, Workout};
 use crate::official::fake_server::{serve, Reply};
 
+#[cfg(unix)]
+#[tokio::test]
+async fn file_grant_refreshes_and_supplement_imports_sleep_and_naps_idempotently() {
+    use crate::auth::FileCredentialBackend;
+    let dir = std::env::temp_dir().join(format!(
+        "zeppbridge-official-sync-{}",
+        crate::unique_suffix()
+    ));
+    let backend = Arc::new(FileCredentialBackend::new(&dir));
+    let store = OfficialStore::with_backend(&dir, backend.clone());
+    store
+        .save(
+            &OfficialTokens {
+                access_token: "fixture-access".into(),
+                refresh_token: Some("fixture-refresh".into()),
+                expires_at: Some(1),
+                user_id: "1".into(),
+            },
+            1,
+        )
+        .unwrap();
+
+    let day = crate::official::fetch::local_today("UTC") - Duration::days(1);
+    let midnight = crate::official::fetch::local_midnight_utc(day, "UTC").timestamp();
+    let sleep = serde_json::json!({"items":[{
+        "date": day, "start": midnight + 1440 * 60, "stop": midnight + 1880 * 60,
+        "deepSleepTime": 90, "shallowSleepTime": 230, "rem": 100, "wakeTime": 20,
+        "stage": [{"start":1440,"stop":1530,"mode":4}],
+        "napStage": [{"start":1260,"stop":1280,"mode":5}]
+    }]})
+    .to_string();
+    let (base, hits) = serve(move |path| {
+        if path.starts_with("/api/zepp/oauth/refresh") {
+            Reply::json(200, r#"{"access_token":"fixture-new-access","refresh_token":"fixture-new-refresh","expires_in":3600}"#)
+        } else if path.starts_with("/users/-/sleep?") {
+            Reply::json(200, sleep.clone())
+        } else {
+            assert!(path.starts_with("/users/-/activities?") && path.contains("interval=hourly"));
+            Reply::json(200, r#"{"items":[]}"#)
+        }
+    }).await;
+    let db = Database::open_migrated(&dir.join("zepp.db")).unwrap();
+    let sync = OfficialSync::with_parts(
+        Some(dir.clone()),
+        db,
+        Arc::new(AtomicBool::new(false)),
+        OfficialClient::with_bases(&base, &base).unwrap(),
+        store,
+        "UTC".into(),
+    );
+
+    let report = sync
+        .run(2, OfficialMode::Supplement, &|_| {})
+        .await
+        .unwrap();
+    assert!(report.success);
+    assert_eq!(report.streams.len(), 2);
+    assert_eq!(report.streams[0].stream, "sleep");
+    assert_eq!(report.streams[0].records_written, 1);
+    assert_eq!(report.streams[1].raw_records, 0);
+    assert_eq!(hits.load(Ordering::SeqCst), 3);
+    assert_eq!(
+        OfficialStore::with_backend(&dir, backend)
+            .authorization_state(Utc::now().timestamp())
+            .unwrap(),
+        "ready"
+    );
+
+    let backfill = sync.sleep_history(day, day).await.unwrap();
+    assert_eq!(backfill.status, StreamStatus::Success);
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        4,
+        "reuses renewed file credentials"
+    );
+    {
+        let db = sync.db.lock().await;
+        assert!(db.latest_official_sleep_fetch_at().unwrap().is_some());
+        assert!(db.get_sync_state("sleep").unwrap().is_none());
+        let (nights, rem, naps): (i64, i64, i64) = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*), MAX(rem_seconds), (SELECT COUNT(*) FROM sleep_nap_stages)
+             FROM sleep_sessions WHERE provider = 'official'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((nights, rem, naps), (1, 6000, 1));
+    }
+    drop(sync);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// 这些用例不碰凭据：明细同步不刷新令牌。
 struct NoCredentials;
 

@@ -237,13 +237,14 @@ impl OfficialStore {
             ));
         }
         self.backend
-            .set(&access_key(&tokens.user_id), &tokens.access_token)
+            .update_entries(&[
+                (&access_key(&tokens.user_id), Some(&tokens.access_token)),
+                (
+                    &refresh_key(&tokens.user_id),
+                    tokens.refresh_token.as_deref(),
+                ),
+            ])
             .map_err(ZeppBridgeError::CredentialStore)?;
-        match tokens.refresh_token.as_deref() {
-            Some(refresh) => self.backend.set(&refresh_key(&tokens.user_id), refresh),
-            None => self.backend.delete(&refresh_key(&tokens.user_id)),
-        }
-        .map_err(ZeppBridgeError::CredentialStore)?;
         let before = self.meta()?;
         let replaced_user = before
             .as_ref()
@@ -282,6 +283,36 @@ impl OfficialStore {
         let Some(meta) = self.meta()? else {
             return Ok(None);
         };
+        self.load_for_meta(meta)
+    }
+
+    /// 本地授权状态。只读元数据和凭据，不触网，不刷新令牌。
+    pub fn authorization_state(&self, now: i64) -> Result<&'static str> {
+        let Some(meta) = self.meta()? else {
+            return Ok("not_configured");
+        };
+        if !self.supports_named_entries() {
+            return Ok("unsupported_store");
+        }
+        if meta.needs_reauth {
+            return Ok("needs_reauth");
+        }
+        let expired = meta.is_expired(now);
+        Ok(match self.load_for_meta(meta)? {
+            None => "missing_credentials",
+            Some(tokens) if tokens.refresh_token.is_some() && tokens.needs_refresh(now) => {
+                "refresh_pending"
+            }
+            Some(_) if expired => "needs_reauth",
+            Some(_) => "ready",
+        })
+    }
+
+    pub fn supports_named_entries(&self) -> bool {
+        self.backend.supports_named_entries()
+    }
+
+    fn load_for_meta(&self, meta: OfficialMeta) -> Result<Option<OfficialTokens>> {
         if meta.needs_reauth || !self.backend.supports_named_entries() {
             return Ok(None);
         }
@@ -289,13 +320,15 @@ impl OfficialStore {
             .backend
             .get(&access_key(&meta.user_id))
             .map_err(ZeppBridgeError::CredentialStore)?
+            .filter(|token| !token.trim().is_empty())
         else {
             return Ok(None);
         };
         let refresh_token = self
             .backend
             .get(&refresh_key(&meta.user_id))
-            .map_err(ZeppBridgeError::CredentialStore)?;
+            .map_err(ZeppBridgeError::CredentialStore)?
+            .filter(|token| !token.trim().is_empty());
         Ok(Some(OfficialTokens {
             access_token,
             refresh_token,
@@ -339,10 +372,7 @@ impl OfficialStore {
             return Ok(());
         }
         self.backend
-            .delete(&access_key(user_id))
-            .map_err(ZeppBridgeError::CredentialStore)?;
-        self.backend
-            .delete(&refresh_key(user_id))
+            .update_entries(&[(&access_key(user_id), None), (&refresh_key(user_id), None)])
             .map_err(ZeppBridgeError::CredentialStore)
     }
 }

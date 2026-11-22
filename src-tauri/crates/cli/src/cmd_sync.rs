@@ -1,6 +1,12 @@
 //! sync 子命令与报告输出（从 main.rs 拆出，逻辑不变）。
 
 use super::*;
+use crate::headless_official::{
+    official_outcome, official_selection, run_official, save_sync_attempt, OFFICIAL_REAUTH,
+};
+use std::sync::atomic::Ordering;
+use zeppbridge_core::models::{AuthInfo, UserPrefs};
+use zeppbridge_core::sync::OfficialMode;
 
 pub(super) fn cmd_sync(args: &[String]) -> u8 {
     let json_mode = scan_json_flag(args);
@@ -10,6 +16,7 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
     };
     if let Err(message) = flags.reject_unknown(&[
         "json",
+        "channel",
         "mode",
         "days",
         "no-reprocess",
@@ -25,36 +32,30 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
         Ok(options) => options,
         Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
     };
+    let channel = flags.get("channel");
 
     let dir = match data_dir() {
         Ok(dir) => dir,
         Err(message) => return fail(json_mode, EXIT_FAILED, "failed", &message),
     };
-    let auth = match AuthManager::new(dir.clone()).load_auth() {
-        Ok(Some(auth)) => auth,
-        Ok(None) => {
-            return fail(
-                json_mode,
-                EXIT_NOT_CONFIGURED,
-                "not_configured",
-                &not_connected_message(&dir),
-            )
-        }
-        Err(error) => {
-            let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &user_text(&error));
-        }
+    let advanced = if channel == Some("official") {
+        None
+    } else {
+        AuthManager::new(dir.clone()).load_auth().transpose()
     };
-
-    let cancel = Arc::new(AtomicBool::new(false));
-    let account = auth.user_id.clone();
-    let connector = match ZeppConnector::with_cancel(auth, cancel.clone()) {
-        Ok(connector) => connector,
-        Err(error) => {
-            let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &user_text(&error));
-        }
-    };
+    let official = official_selection(&dir, channel);
+    if advanced.is_none() && official.is_none() {
+        return fail(
+            json_mode,
+            EXIT_NOT_CONFIGURED,
+            "not_configured",
+            &not_connected_message(&dir),
+        );
+    }
+    if let (Some(Err(error)), None) = (&advanced, &official) {
+        let (code, kind) = exit_code_for(error);
+        return fail(json_mode, code, kind, &user_text(error));
+    }
     let db = match Database::open_migrated(&dir.join("zepp.db")) {
         Ok(db) => db,
         Err(error) => {
@@ -100,7 +101,8 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
         }
     };
 
-    if uses_monthly_backfill(mode, days) {
+    let monthly = advanced.is_some() && uses_monthly_backfill(mode, days);
+    if mode == "history" && (monthly || official.is_some()) {
         match db.user_prefs() {
             Ok(prefs) if prefs.backfill_would_be_cleaned_up(days.unwrap_or(180)) => {
                 return fail(json_mode, EXIT_USAGE, "usage", "Enable long-term archive in Settings before syncing history beyond the local retention period.");
@@ -111,6 +113,14 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
                 return fail(json_mode, code, kind, &user_text(&error));
             }
         }
+    }
+    if !monthly && (flags.has("max-chunks") || flags.has("retry-failed")) {
+        return fail(
+            json_mode,
+            EXIT_USAGE,
+            "usage",
+            "Monthly chunk options require the Advanced channel.",
+        );
     }
     if flags.has("retry-failed") {
         let _lock = match write_lock::acquire_with_timeout(
@@ -126,10 +136,7 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
             return fail(json_mode, code, kind, &user_text(&error));
         }
     }
-    let manager = SyncManager::new(DataFetcher::new(connector), db, cancel.clone())
-        .with_data_dir(dir.clone())
-        .with_account(account);
-
+    let cancel = Arc::new(AtomicBool::new(false));
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(runtime) => runtime,
         Err(error) => {
@@ -141,7 +148,17 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
             )
         }
     };
-    if uses_monthly_backfill(mode, days) {
+    if monthly {
+        let manager = match advanced
+            .expect("monthly backfill requires Advanced")
+            .and_then(|auth| advanced_manager(&dir, db, auth, cancel.clone()))
+        {
+            Ok(manager) => manager,
+            Err(error) => {
+                let (code, kind) = exit_code_for(&error);
+                return fail(json_mode, code, kind, &user_text(&error));
+            }
+        };
         let today = chrono::Utc::now().date_naive();
         let from = today - chrono::Duration::days(days.unwrap_or(180));
         let result = runtime.block_on(async {
@@ -171,32 +188,149 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
             }
         };
     }
-    let result: Result<SyncReport, ZeppBridgeError> = runtime.block_on(async {
-        match mode {
-            "initial" => manager.initial_sync_report().await,
-            "history" => manager.history_sync_report(days.unwrap_or(180)).await,
-            _ => manager.incremental_sync_report().await,
+    let days = match mode {
+        "initial" => UserPrefs::DEFAULT_HISTORY_SYNC_DAYS,
+        "history" => days.unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS),
+        _ => contract::INCREMENTAL_SYNC_DAYS,
+    };
+    let official_mode = if matches!(advanced, Some(Ok(_))) {
+        OfficialMode::Supplement
+    } else {
+        OfficialMode::Only
+    };
+    let before = zeppbridge_core::storage::content_epoch();
+    let (advanced, official) = runtime.block_on(async {
+        let work = async {
+            let advanced = match advanced {
+                Some(auth) => Some(
+                    match auth.and_then(|auth| advanced_manager(&dir, db, auth, cancel.clone())) {
+                        Ok(manager) => manager.history_sync_report(days).await,
+                        Err(error) => Err(error),
+                    },
+                ),
+                None => None,
+            };
+            let official = match official {
+                Some(Ok(())) if !cancel.load(Ordering::SeqCst) => {
+                    Some(run_official(&dir, days, official_mode, cancel.clone()).await)
+                }
+                Some(Ok(())) => Some(Err(ZeppBridgeError::Cancelled)),
+                Some(Err(error)) => Some(Err(error)),
+                None => None,
+            };
+            (advanced, official)
+        };
+        tokio::pin!(work);
+        tokio::select! {
+            biased;
+            result = &mut work => result,
+            _ = tokio::signal::ctrl_c() => {
+                cancel.store(true, Ordering::SeqCst);
+                work.await
+            }
         }
     });
-
-    match result {
-        Ok(report) => {
-            let (code, payload, human) = sync_report_output(&report, mode, replay.as_ref());
-            emit(json_mode, payload, &human);
-            // 推送到用户自己的服务器（桌面端同步后也推）。命令行跑完就退，所以等它推完；
-            // 没有启用的目标时立刻返回。推送结果只写 stderr 和 push/<目标>.status.json，
-            // 不改变同步的退出码和 JSON。
-            let credentials = zeppbridge_core::auth::default_credential_backend_in(&dir);
-            runtime.block_on(zeppbridge_core::push::run(&dir, credentials));
-            code
-        }
-        Err(error) => {
-            // 写锁冲突不是失败：桌面应用正开着同步，调度脚本稍后重试即可。
-            // 靠类型判断，不靠匹配错误文案——文案是会改的。
-            let (code, kind) = exit_code_for(&error);
-            fail(json_mode, code, kind, &user_text(&error))
-        }
+    save_sync_attempt(
+        &dir,
+        advanced.as_ref(),
+        official.as_ref(),
+        before != zeppbridge_core::storage::content_epoch(),
+    );
+    let (code, payload, human) =
+        combined_sync_output(advanced.as_ref(), official.as_ref(), mode, replay.as_ref());
+    emit(json_mode, payload, &human);
+    if [advanced.as_ref(), official.as_ref()]
+        .into_iter()
+        .flatten()
+        .any(Result::is_ok)
+    {
+        // Push after the local reports have been written, without changing the sync result.
+        let credentials = zeppbridge_core::auth::default_credential_backend_in(&dir);
+        runtime.block_on(zeppbridge_core::push::run(&dir, credentials));
     }
+    code
+}
+
+fn advanced_manager(
+    dir: &std::path::Path,
+    db: Database,
+    auth: AuthInfo,
+    cancel: Arc<AtomicBool>,
+) -> Result<SyncManager, ZeppBridgeError> {
+    let account = auth.user_id.clone();
+    let connector = ZeppConnector::with_cancel(auth, cancel.clone())?;
+    Ok(SyncManager::new(DataFetcher::new(connector), db, cancel)
+        .with_data_dir(dir.to_path_buf())
+        .with_account(account))
+}
+
+fn combined_sync_output(
+    advanced: Option<&Result<SyncReport, ZeppBridgeError>>,
+    official: Option<&Result<SyncReport, ZeppBridgeError>>,
+    mode: &str,
+    replay: Option<&ReplayOutcome>,
+) -> (u8, serde_json::Value, String) {
+    let mut channels = serde_json::Map::new();
+    let mut primary = None;
+    let mut human = Vec::new();
+    let mut code = EXIT_OK;
+    let mut records_written = 0;
+    let mut needs_reauth = false;
+    for (name, result) in [("advanced", advanced), ("official", official)] {
+        let Some(result) = result else { continue };
+        let (channel_code, mut payload, mut message) = match result {
+            Ok(report) => sync_report_output(report, mode, replay),
+            Err(error) => {
+                let (code, kind) = exit_code_for(error);
+                let message = if name == "official" && error.needs_reauth() {
+                    OFFICIAL_REAUTH.to_string()
+                } else {
+                    user_text(error)
+                };
+                (
+                    code,
+                    serde_json::json!({
+                        "ok": false, "errorKind": kind, "errorCode": error.code(),
+                        "message": message, "needsReauth": error.needs_reauth(),
+                    }),
+                    message,
+                )
+            }
+        };
+        if let ("official", Ok(report)) = (name, result) {
+            let outcome = official_outcome(report);
+            payload["outcome"] = outcome.into();
+            message = match outcome {
+                "empty" => "Zepp returned no records for the requested window.".into(),
+                "unavailable" => "The requested official data is unavailable.".into(),
+                _ => message,
+            };
+        }
+        if channel_code != EXIT_OK && (code == EXIT_OK || payload["needsReauth"] == true) {
+            code = channel_code;
+        }
+        records_written += payload["recordsWritten"].as_i64().unwrap_or(0);
+        needs_reauth |= payload["needsReauth"] == true;
+        // Keep the existing top-level streams for the primary channel.
+        if primary.is_none()
+            || (primary
+                .as_ref()
+                .is_some_and(|value: &serde_json::Value| value["streams"].is_null())
+                && result.is_ok())
+        {
+            primary = Some(payload.clone());
+        }
+        human.push(format!("{name}: {message}"));
+        channels.insert(name.to_string(), payload);
+    }
+    let mut payload = primary.expect("at least one sync channel");
+    payload["ok"] = (code == EXIT_OK).into();
+    payload["success"] = (code == EXIT_OK).into();
+    payload["mode"] = mode.into();
+    payload["recordsWritten"] = records_written.into();
+    payload["needsReauth"] = needs_reauth.into();
+    payload["channels"] = channels.into();
+    (code, payload, human.join("\n"))
 }
 
 pub(super) fn sync_report_output(
@@ -210,6 +344,7 @@ pub(super) fn sync_report_output(
         "success": report.success,
         "recordsWritten": report.records_written,
         "message": report.message,
+        "needsReauth": report.streams.iter().any(|stream| stream.needs_reauth),
         // 同步前有没有补过重放。null = 没做（不欠，或者 --no-reprocess）。
         // 调度脚本据此知道这一轮为什么跑了十分钟。
         "replay": replay.map(ReplayOutcome::to_json),
@@ -219,6 +354,7 @@ pub(super) fn sync_report_output(
             "recordsWritten": stream.records_written,
             "rawRecords": stream.raw_records,
             "message": stream.message,
+            "needsReauth": stream.needs_reauth,
         })).collect::<Vec<_>>(),
     });
     let human = format!(
@@ -245,7 +381,13 @@ pub(super) fn sync_report_output(
 /* ------------------------------ export ------------------------------ */
 
 fn sync_options(flags: &Flags) -> Result<(&str, Option<i64>, usize), String> {
-    flags.validate_values(&["mode", "days", "max-chunks"])?;
+    flags.validate_values(&["mode", "days", "max-chunks", "channel"])?;
+    if flags
+        .get("channel")
+        .is_some_and(|channel| !matches!(channel, "advanced" | "official"))
+    {
+        return Err("--channel must be advanced or official".into());
+    }
     let mode = flags.get("mode").unwrap_or("incremental");
     if !matches!(mode, "incremental" | "initial" | "history") {
         return Err("--mode must be incremental, initial or history".into());
@@ -269,7 +411,8 @@ fn sync_options(flags: &Flags) -> Result<(&str, Option<i64>, usize), String> {
         .ok()
         .filter(|value| (1..=720).contains(value))
         .ok_or_else(|| "--max-chunks must be between 1 and 720".to_string())?;
-    if (flags.has("max-chunks") || flags.has("retry-failed")) && !uses_monthly_backfill(mode, days)
+    if (flags.has("max-chunks") || flags.has("retry-failed"))
+        && (!uses_monthly_backfill(mode, days) || flags.get("channel") == Some("official"))
     {
         return Err(
             "--max-chunks and --retry-failed require --mode history --days greater than 365".into(),
@@ -303,6 +446,27 @@ fn history_backfill_output(
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn official_reauthorization_does_not_hide_saved_advanced_rows() {
+        let advanced = Ok(SyncReport {
+            success: true,
+            core_ok: true,
+            streams: vec![],
+            records_written: 11,
+            message: None,
+            cleanup_failed: false,
+        });
+        let official = Err(ZeppBridgeError::NeedsReauth("test".into()));
+        let (code, report, human) =
+            combined_sync_output(Some(&advanced), Some(&official), "incremental", None);
+        assert_eq!(code, EXIT_NOT_CONFIGURED);
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["needsReauth"], true);
+        assert_eq!(report["channels"]["advanced"]["recordsWritten"], 11);
+        assert_eq!(report["channels"]["official"]["errorKind"], "auth");
+        assert!(human.contains("official.json"));
+    }
     #[test]
     fn history_day_boundaries_select_supported_execution_path() {
         for (days, monthly) in [(365, false), (366, true), (730, true), (3650, true)] {

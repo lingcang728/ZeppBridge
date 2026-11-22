@@ -48,11 +48,13 @@ machine has none, so use `ZEPPBRIDGE_CREDENTIAL_STORE=file` or `=env` with
 `ZEPPBRIDGE_APP_TOKEN` — see the
 [Linux guide](../guides/linux.md#where-the-token-is-stored).
 
-A `data/` folder copied from another machine brings the library but not the
-token, so the CLI exits `3`. Use one of the stores above, or sign in again in the
-desktop app on the new machine; the
-[Linux guide](../guides/linux.md#moving-an-existing-library-from-windows-or-macos)
-walks through both.
+For a headless Official connection, copy `official.json` and the matching
+`credentials.json` from a desktop that uses the file store. Keep the destination
+writable by the service user and the credential file private (mode `0600`).
+The CLI refreshes the official grant through the authorization relay and saves
+renewed credentials locally. The `env` store supplies only the Advanced App
+Token, which also needs `auth.json`. See the
+[Linux guide](../guides/linux.md#moving-an-existing-library-from-windows-or-macos).
 
 ## zeppbridge-cli
 
@@ -78,14 +80,45 @@ error, never ignored.
 
 ### Sync and history
 
-`sync --mode history --days N` accepts 1–3650 days. Up to 365 days uses the
-normal history window; longer ranges use the monthly coverage ledger and need
-long-term archiving (or a long enough retention) in Settings. `--max-chunks`
+`sync` uses the configured channels. With both, Advanced data is supplemented
+by official sleep, naps, REM and hourly steps. With only Official configured,
+it pulls all supported official streams. Use `--channel advanced` or
+`--channel official` to select one channel. The same defaults apply to MCP
+`sync_now`.
+
+`sync --json` reports each attempted channel under `channels`. A valid
+empty official response is reported as empty. Authorization rejection that
+needs user action sets `needsReauth` and exits `3`, even when Advanced data
+was saved. `status --json` reports local official credential state, the last
+official sync attempt and the latest fetch of official sleep records without
+contacting Zepp.
+
+`sync --mode history --days N` accepts 1–3650 days. With Advanced enabled,
+ranges over 365 days use the Advanced monthly coverage ledger. Monthly history
+and official history require archive mode or enough local retention.
+`--max-chunks`
 (1–720, default 24) bounds each run; rerun the same command to resume, and add
 `--retry-failed` to reset exhausted failures. Ctrl+C keeps finished chunks and
 exits `8`. The JSON report includes `mode`, `cancelled`, `backfill` and
 `replay`; `backfill.complete` describes coverage, including months the cloud
 confirmed empty.
+
+To recover official sleep and naps for an inclusive date range, use:
+
+```bash
+zeppbridge-cli sleep-history --from 2026-01-01 --to 2026-01-15 --json
+```
+
+Dates use the library's device time zone when available. This command uses the
+official sleep endpoint and updates existing days in place if rerun. It can
+retrieve only the sleep records Zepp returns. Set retention or archive mode to
+cover the start date.
+
+`probe --streams heart_rate,daily_summary --days 7 --json` reports direct
+endpoint status and counts. `parsedHeartRateSamples` counts the dedicated
+endpoint, while `bandHeartRateSamples` counts samples successfully decoded
+from `band_data`. `emptyResponses` counts explicitly empty responses and
+`responsesWithoutUsableMetrics` counts unfamiliar non-empty responses.
 
 ### Workout details, types and hiding
 
@@ -407,7 +440,7 @@ within) or `err.mcp.scope_no_grants` (nothing is shared).
 | `save_shoe` | **Writes**: adds or edits a pair of shoes (sport, start and retire km; set `retiredOn` to retire) |
 | `annotate_workout` | **Writes**: the user's own RPE (1–10) and sore body parts for one workout; the watch's RPE and the shoe choice are untouched |
 | `set_workout_type` | **Writes**: corrects a workout's sport type, the same path as the desktop's "Change type" (the cloud record is not changed) |
-| `sync_now` | **Action**: pulls new data from Zepp cloud by starting the `zeppbridge-cli` next to it (`sync --json --no-reprocess`); waits up to 45 s, then reports `running` and lets the CLI finish. `deferred` while a local reparse is pending, `schema_mismatch` when the CLI and library versions differ |
+| `sync_now` | **Action**: pulls new data from Zepp cloud by starting the `zeppbridge-cli` next to it (`sync --json --no-reprocess`); waits up to 45 s, then reports `running` and lets the CLI finish. `deferred` while a local reparse is pending, `schema_mismatch` when the CLI and library versions differ, `needs_reauth` when a channel's authorization has lapsed |
 | `export_data` | **Action**: writes a summary JSON for a date range (≤ 366 days, no routes) into the data folder's `exports`, returning the file name relative to that folder |
 
 Parameter limits (page sizes, date ranges, section names) are in each tool's

@@ -245,20 +245,45 @@ impl SyncManager {
                 db.record_stream_stage(&stream, Stage::Parse, &StageOutcome::Ok)?;
                 db.record_stream_stage(&stream, Stage::Write, &StageOutcome::Ok)?;
             }
+            Err(error)
+                if error.is_unavailable()
+                    && crate::normalizer::payload_is_explicitly_empty(&record.raw.payload) =>
+            {
+                report.status = StreamStatus::Unavailable;
+                report.capability = CapabilityStatus::Unavailable;
+                report.message = Some(error.user_message());
+                // The parser understood the empty response. Keep the raw
+                // evidence in quarantine, with no canonical rows to write.
+                db.record_stream_stage(&stream, Stage::Parse, &StageOutcome::Ok)?;
+            }
             // 云端明确回了空集合：哪怕这条流的结构还没逐字段核实，「空」也不是「看不懂」。
             // Charge 也走这条：认得出的「那天没分数」已经是 Ok(空)，剩下的
             // DataUnavailable 是报文里有东西我们没看懂，不能静默记成「云端没有」（#157）。
             Err(error)
                 if error.is_unavailable()
                     && (capability == CapabilityStatus::Unverified
-                        || record.raw.source_key.starts_with("events:Charge:"))
-                    && !crate::normalizer::payload_is_explicitly_empty(&record.raw.payload) =>
+                        || record.raw.source_key.starts_with("events:Charge:")) =>
             {
                 report.status = StreamStatus::Unverified;
                 report.capability = CapabilityStatus::Unverified;
                 report.message = Some(error.user_message());
                 // 拿到了报文但当前 normalizer 不认识它的结构。raw 已先落库，
                 // 归一化失败不会删 raw；这是解析阶段的失败，不是网络失败。
+                db.record_stream_stage(
+                    &stream,
+                    Stage::Parse,
+                    &StageOutcome::Failed {
+                        kind: StageErrorKind::UnrecognizedPayload,
+                        message: report.message.clone(),
+                    },
+                )?;
+            }
+            Err(error)
+                if matches!(error, ZeppBridgeError::DataUnavailable(_))
+                    && matches!(stream.as_str(), "heart_rate" | "daily_summary") =>
+            {
+                report.status = StreamStatus::Failed;
+                report.message = Some(error.user_message());
                 db.record_stream_stage(
                     &stream,
                     Stage::Parse,

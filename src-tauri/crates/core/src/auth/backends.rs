@@ -10,6 +10,17 @@ pub trait CredentialBackend: Send + Sync {
     fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String>;
     fn delete(&self, user_id: &str) -> std::result::Result<(), String>;
 
+    /// Store or remove related entries together when the backend supports it.
+    fn update_entries(&self, entries: &[(&str, Option<&str>)]) -> std::result::Result<(), String> {
+        for &(key, value) in entries {
+            match value {
+                Some(token) => self.set(key, token)?,
+                None => self.delete(key)?,
+            }
+        }
+        Ok(())
+    }
+
     /// 能不能按名字分开存多条。环境变量后端不管问哪个名字都返回同一个旧通道
     /// 令牌，官方授权的令牌放进去会被读成旧令牌——所以它说不能。
     fn supports_named_entries(&self) -> bool {
@@ -380,11 +391,7 @@ impl FileCredentialBackend {
 #[cfg(unix)]
 impl CredentialBackend for FileCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
-        let _guard = self.lock_write()?;
-        let mut stored = self.read()?;
-        stored.version = default_credential_file_version();
-        stored.tokens.insert(user_id.to_string(), token.to_string());
-        self.write(&stored)
+        self.update_entries(&[(user_id, Some(token))])
     }
 
     fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
@@ -392,9 +399,24 @@ impl CredentialBackend for FileCredentialBackend {
     }
 
     fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
+        self.update_entries(&[(user_id, None)])
+    }
+
+    fn update_entries(&self, entries: &[(&str, Option<&str>)]) -> std::result::Result<(), String> {
         let _guard = self.lock_write()?;
         let mut stored = self.read()?;
-        if stored.tokens.remove(user_id).is_none() {
+        let mut changed = false;
+        for &(key, value) in entries {
+            match value {
+                Some(token) => {
+                    stored.version = default_credential_file_version();
+                    stored.tokens.insert(key.to_string(), token.to_string());
+                    changed = true;
+                }
+                None => changed |= stored.tokens.remove(key).is_some(),
+            }
+        }
+        if !changed {
             return Ok(());
         }
         if stored.tokens.is_empty() {

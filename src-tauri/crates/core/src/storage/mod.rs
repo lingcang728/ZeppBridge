@@ -163,6 +163,7 @@ pub mod imports;
 mod ingest;
 mod maintenance;
 mod meta;
+pub use meta::OfficialSyncAttempt;
 pub mod metric_prefs;
 mod metric_spec;
 mod metrics;

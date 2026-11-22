@@ -11,6 +11,51 @@ fn status_names_are_not_success_for_optional_states() {
     assert_eq!(status_name(&StreamStatus::Unverified), "unverified");
 }
 
+#[test]
+fn empty_heart_rate_response_stays_neutral_but_an_unreadable_payload_fails() {
+    let db = Database::in_memory().unwrap();
+    let stream = "heart_rate";
+    let persist = |payload| {
+        SyncManager::persist_record(
+            &db,
+            FetchedRecord {
+                incomplete: false,
+                incomplete_reason: None,
+                raw: RawRecord {
+                    stream: stream.into(),
+                    source_key: "heart-rate-fixture".into(),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: Utc::now(),
+                    end_utc: None,
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                },
+            },
+        )
+        .unwrap()
+        .report
+    };
+    let parse_state = || {
+        db.data_health(30, 0)
+            .unwrap()
+            .streams
+            .into_iter()
+            .find(|entry| entry.stream == stream)
+            .unwrap()
+            .parse
+    };
+    let empty = persist(serde_json::json!({"items":[]}));
+    assert_eq!(empty.status, StreamStatus::Unavailable);
+    assert_eq!(parse_state().state, "ok");
+    let malformed = persist(serde_json::json!({"items":[{"unexpected":true}]}));
+    assert_eq!(malformed.status, StreamStatus::Failed);
+    assert_eq!(
+        parse_state().error_kind.as_deref(),
+        Some("unrecognized_payload")
+    );
+}
+
 #[tokio::test]
 async fn workout_sync_records_only_confirmed_complete_empty_days() {
     use chrono::TimeZone;

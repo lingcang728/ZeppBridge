@@ -69,11 +69,15 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
     let coverage = db
         .local_coverage(Local::now().date_naive())
         .unwrap_or_default();
+    let official = crate::headless_official::official_status(&dir, &db);
+    let official_state = official["state"].as_str().unwrap_or("unknown");
+    let connected = connected || matches!(official_state, "ready" | "refresh_pending");
 
     let payload = serde_json::json!({
         "ok": true,
         "version": VERSION,
         "connected": connected,
+        "official": official,
         "dataDir": data_dir_shown,
         // 只读打开走了回退时是哪一种（`immutable` / `truncated_header`），平时是 null。
         "readFallback": db.read_fallback().map(|fallback| fallback.as_str()),
@@ -89,11 +93,13 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
             .map(|plan| plan.raw_records)
             .unwrap_or(0),
         "lastCloudSyncAt": health.timings.last_cloud_sync_at,
+        "lastCloudSyncOutcome": health.timings.last_cloud_sync_outcome,
         "latestWorkoutAt": workouts.first().map(|workout| workout.start_time.to_rfc3339()),
         "streams": health.streams.iter().map(|stream| serde_json::json!({
             "stream": stream.stream,
             "fetch": stream.fetch.state,
             "parse": stream.parse.state,
+            "parseErrorKind": stream.parse.error_kind,
             "write": stream.write.state,
             "rawRecords": stream.raw_records,
             "canonicalRecords": stream.canonical_records,
@@ -109,8 +115,10 @@ pub(super) fn cmd_status(args: &[String]) -> u8 {
     });
 
     let human = format!(
-        "ZeppBridge {VERSION}\nData folder: {data_dir_shown}\nAccount: {}\nDatabase: {} bytes, schema v{}\nLocal coverage: {}\nLast cloud sync: {}\nHistory ledger: {}{}",
+        "ZeppBridge {VERSION}\nData folder: {data_dir_shown}\nAccount: {}\nOfficial: {official_state}\nLast official sync: {}\nLast official sleep fetch: {}\nDatabase: {} bytes, schema v{}\nLocal coverage: {}\nLast cloud sync: {}\nHistory ledger: {}{}",
         if connected { "connected" } else { "not connected" },
+        official["lastSync"]["outcome"].as_str().unwrap_or("never"),
+        official["lastSleepFetchAt"].as_str().unwrap_or("never"),
         database_bytes,
         health.database.schema_version,
         // JSON 里早就有这三个字段，纯文本却漏了一行——同一个命令的两种

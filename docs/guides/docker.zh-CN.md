@@ -15,11 +15,9 @@
 
 ## 怎么把凭据送进去
 
-**容器只走高级数据（App Token）同步。** `zeppbridge-cli sync` 还不跑官方授权通道，所以只连了官方授权的话，容器里的定时同步拿不到新数据，会直接报错退出。这种情况下新数据要靠桌面应用同步：让它在一台常开的电脑上运行，`zeppbridge-cli serve` 也在那台电脑上跑、读同一个数据目录（见[自托管拉取](self-hosted-pull.zh-CN.md#无头登录)）。
+容器支持高级数据和官方同步。官方令牌没法从环境变量传进来：用下面的文件存储，把采用文件存储的桌面端的 `official.json` 和配套的 `credentials.json` 一并拷入。CLI 通过 `zeppbridge.com` 续期，新凭据写回挂载的数据目录。
 
-官方令牌没法从环境变量传进来。把令牌存在文件里的桌面端拷一份 `credentials.json` 放进下面的文件存储，容器里只有 `zeppbridge-cli workout-details --channel official` 会用到它，刷新令牌会经过 `zeppbridge.com`。
-
-有两样东西要进到容器里：`auth.json`（不敏感的元数据——用户 ID 和区域地址）和 App Token（秘密）。
+高级数据同步要把两样东西送进容器：`auth.json`（不敏感的元数据——用户 ID 和区域地址）和 App Token（秘密）。
 
 ```bash
 mkdir -p ./data
@@ -52,7 +50,9 @@ docker run --rm \
 docker run --rm ... -e ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge:local ...
 ```
 
-用 `/data/credentials.json`（权限 0600，目录 0700）。容器里没有任何东西会写这个文件——命令行没有登录——所以要从用文件存储的桌面端拷过来。这是相对密钥环的明摆着的降级：保护它的只有文件权限，而且它和你的备份在同一个卷里。它存在的理由是：在一台无头机器上，替代品不是「更安全的存储」，而是「根本用不了」。
+用 `/data/credentials.json`（权限 0600，目录 0700）。初始文件从采用文件存储的桌面端拷入。
+该文件须保持私有，且服务用户可以写入。CLI 会将续期得到的官方凭据写回这里。这是相对密钥环的降级：保护它的只有文件权限，而且它和你的备份在同一个卷里。
+渠道报告与按日期补拉官方睡眠的用法见 [CLI 同步](../reference/cli-and-mcp.zh-CN.md#同步与历史)。
 
 `credentials.json` 在那里，运行时会自己认出文件存储，不必带那个变量。
 

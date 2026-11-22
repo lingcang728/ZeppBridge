@@ -88,8 +88,13 @@ fn wait_for_sync(mut child: Child, wait: StdDuration) -> Result<Value, CallFailu
         match child.try_wait() {
             Ok(Some(status)) => {
                 let report = report_reader.join().ok().flatten().unwrap_or(Value::Null);
+                let state = if report["needsReauth"] == true {
+                    "needs_reauth"
+                } else {
+                    sync_state(status.code())
+                };
                 return Ok(json!({
-                    "state": sync_state(status.code()),
+                    "state": state,
                     "exitCode": status.code(),
                     "report": report,
                     "note": "同步拉的是云端已有的数据；手表还没把数据传到 Zepp App 时，云端没有新东西是正常的。",

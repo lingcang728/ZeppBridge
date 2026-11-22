@@ -4,6 +4,15 @@ use super::*;
 
 /// 上一次成功的整窗（≥ `INCREMENTAL_SYNC_DAYS`）同步是什么时候。
 const LAST_FULL_WINDOW_SYNC_AT_KEY: &str = "last_full_window_sync_at";
+const HEADLESS_OFFICIAL_SYNC_KEY: &str = "headless_official_sync";
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfficialSyncAttempt {
+    pub finished_at: DateTime<Utc>,
+    pub outcome: String,
+    pub error_code: Option<String>,
+}
 
 impl Database {
     pub(super) fn ensure_cloud_sync_metadata(&self) -> Result<()> {
@@ -56,6 +65,33 @@ impl Database {
             self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?,
             self.get_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY)?,
         ))
+    }
+
+    pub fn headless_official_sync_attempt(&self) -> Result<Option<OfficialSyncAttempt>> {
+        self.get_app_meta(HEADLESS_OFFICIAL_SYNC_KEY)?
+            .map(|value| serde_json::from_str(&value).map_err(Into::into))
+            .transpose()
+    }
+
+    /// 调用方持有写锁。只记录结论，不保存令牌、账户编号或响应内容。
+    pub fn record_headless_official_sync(&self, attempt: &OfficialSyncAttempt) -> Result<()> {
+        if self
+            .headless_official_sync_attempt()?
+            .is_some_and(|previous| previous.finished_at > attempt.finished_at)
+        {
+            return Ok(());
+        }
+        self.set_app_meta(HEADLESS_OFFICIAL_SYNC_KEY, &serde_json::to_string(attempt)?)
+    }
+
+    pub fn latest_official_sleep_fetch_at(&self) -> Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT MAX(fetched_at) FROM raw_records WHERE stream = 'sleep' AND provider = ?1",
+                [crate::official::fetch::PROVIDER],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
     }
 
     pub fn record_cloud_sync(

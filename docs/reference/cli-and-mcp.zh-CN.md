@@ -40,9 +40,10 @@ ZEPPBRIDGE_DATA_DIR=~/.local/share/zeppbridge/data zeppbridge-cli status --json
 用 `ZEPPBRIDGE_CREDENTIAL_STORE=file`，或 `=env` 配合 `ZEPPBRIDGE_APP_TOKEN`——见
 [Linux 指南](../guides/linux.zh-CN.md#令牌存在哪)。
 
-从另一台机器拷来的 `data/` 只带库、不带令牌，命令行会以 `3` 退出。用上面任一种凭据存储，
-或在新机器的桌面应用里重新登录一次；
-[Linux 指南](../guides/linux.zh-CN.md#把已有的库从-windows-或-macos-搬过来)把两条路都写了。
+在无头机器使用官方授权时，从采用文件存储的桌面端拷贝 `official.json` 和配套的
+`credentials.json`。服务用户需要能写入目标目录，凭据文件权限设为 `0600`。CLI 通过授权
+中转站续期，并把新凭据保存到本机。`env` 存储只支持高级数据 App Token，仍需
+`auth.json`。详见 [Linux 指南](../guides/linux.zh-CN.md#把已有的库从-windows-或-macos-搬过来)。
 
 ## zeppbridge-cli
 
@@ -65,11 +66,33 @@ zeppbridge-cli help
 
 ### 同步与历史
 
-`sync --mode history --days N` 支持 1–3650 天。365 天以内用普通历史窗口，更长的范围用按月
-覆盖账本，需要先在设置里开启长期归档（或保留期足够长）。`--max-chunks`（1–720，默认 24）
+`sync` 默认拉取已配置的渠道。两边都连接时，高级数据照常同步，官方渠道补充睡眠、小睡、
+REM 和每小时步数。只连官方时，拉取受支持的各条官方数据流。可以用 `--channel advanced`
+或 `--channel official` 指定单一渠道。MCP 的 `sync_now` 同样采用默认规则。
+
+`sync --json` 的 `channels` 分别报告本次尝试的渠道。官方接口明确回空时，结果显示为空。
+官方授权失效需要重新授权时，即使高级数据已经保存也会返回 `needsReauth` 并以 `3` 退出。
+`status --json` 无需联网即可查看本地授权状态、上一次官方同步结论和最近拉到官方睡眠报文的时间。
+
+`sync --mode history --days N` 支持 1–3650 天。启用高级数据时，超过 365 天的范围走高级
+数据的按月覆盖账本。按月补拉与官方历史同步都需要长期归档或足够长的保留期。`--max-chunks`（1–720，默认 24）
 限制单次处理量；重跑同一条命令会续传，加 `--retry-failed` 重置耗尽重试的失败块。Ctrl+C
 保留已完成的块并以 `8` 退出。JSON 报告含 `mode`、`cancelled`、`backfill` 和 `replay`；
 `backfill.complete` 描述覆盖情况，云端确认无数据的月份也算覆盖。
+
+按日期补拉官方睡眠和小睡，首尾日期都含：
+
+```bash
+zeppbridge-cli sleep-history --from 2026-01-01 --to 2026-01-15 --json
+```
+
+有设备时区时按设备时区划分日期。重复执行会更新已有日期的数据。可补回的范围以 Zepp
+实际返回为准，归档设置或保留期须覆盖开始日期。
+
+`probe --streams heart_rate,daily_summary --days 7 --json` 分开报告接口状态和解析条数。
+`parsedHeartRateSamples` 是独立端点的解析条数，`bandHeartRateSamples` 是从 `band_data`
+解析出的心率条数。`emptyResponses` 统计明确回空，`responsesWithoutUsableMetrics` 统计
+未能解析出可用指标的非空响应。
 
 ### 运动明细、类型与隐藏
 
@@ -343,7 +366,7 @@ stdio 传输，**不监听任何端口**。只有被调用的工具需要时才�
 | `save_shoe` | **写**：新增或修改一双鞋（用途、起始与退役里程 km；退役就填 `retiredOn`） |
 | `annotate_workout` | **写**：一次运动里用户自己的 RPE（1–10）和酸痛部位；手表的 RPE 和选鞋不动 |
 | `set_workout_type` | **写**：纠正运动类型，和桌面「改类型」同一条路径（云端原始记录不变） |
-| `sync_now` | **动作**：启动旁边那份 `zeppbridge-cli`（`sync --json --no-reprocess`）从云端拉一次新数据；最多等 45 秒，没完就回 `running`、由 CLI 自己跑完。本机欠着重解析时回 `deferred`，命令行和库版本不一致时回 `schema_mismatch` |
+| `sync_now` | **动作**：启动旁边那份 `zeppbridge-cli`（`sync --json --no-reprocess`）从云端拉一次新数据；最多等 45 秒，没完就回 `running`、由 CLI 自己跑完。本机欠着重解析时回 `deferred`，命令行和库版本不一致时回 `schema_mismatch`，渠道授权失效时回 `needs_reauth` |
 | `export_data` | **动作**：把一段日子（最多 366 天，不含轨迹）的摘要写成 JSON，放进数据目录的 `exports`，只回相对这个目录的文件名 |
 
 参数限制（分页大小、日期范围、分段名）见 `tools/list` 里各工具的 `inputSchema`。
