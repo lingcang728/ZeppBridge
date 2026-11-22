@@ -790,3 +790,38 @@ fn weight_samples_come_back_as_a_series() {
     assert_eq!(weight.unit, "kg");
     assert_eq!(weight.latest.as_ref().map(|point| point.value), Some(68.2));
 }
+
+/// 有的账号睡眠汇总从不带 `rhr`，`resting_hr` 整条曲线就是空的，而手表每天都报了静息心率
+/// （`device_resting_hr`）。图表序列只在缺的那几天用后者补，已有的 `rhr` 读数不动。
+#[test]
+fn resting_hr_series_falls_back_to_the_watch_reported_value_only_on_missing_days() {
+    let db = Database::in_memory().unwrap();
+    let today = Local::now().date_naive();
+    let day = |ago: i64| (today - Duration::days(ago)).format("%Y-%m-%d").to_string();
+    let insert = |date: String, metric: &str, value: f64| {
+        db.insert_daily_metric(&DailyMetric {
+            date,
+            metric: metric.into(),
+            value,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+    };
+
+    // 只有手表自报值的账号：整条曲线由它补上。
+    insert(day(2), "device_resting_hr", 52.0);
+    insert(day(1), "device_resting_hr", 50.0);
+    let series = db.metric_series(&["resting_hr".to_string()], 7).unwrap();
+    assert_eq!(series[0].metric, "resting_hr");
+    assert_eq!(series[0].days_with_data, 2);
+    assert_eq!(series[0].points[0].value, 52.0);
+
+    // 同一天两边都有时，睡眠汇总的 rhr 优先，不取平均；没有 rhr 的日子仍用手表的值。
+    insert(day(1), "resting_hr", 47.0);
+    let series = db.metric_series(&["resting_hr".to_string()], 7).unwrap();
+    let values: Vec<f64> = series[0].points.iter().map(|point| point.value).collect();
+    assert_eq!(values, vec![52.0, 47.0]);
+    assert_eq!(series[0].latest.as_ref().unwrap().value, 47.0);
+}
