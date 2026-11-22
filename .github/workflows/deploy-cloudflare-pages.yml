@@ -36,6 +36,8 @@ jobs:
       - name: Prepare website capture tools
         run: |
           python -c "import playwright" || python -m pip install playwright==1.58.0
+          # 缓存里没有开场短片配乐时，构建用 compose-score.py 现做一份，它要 numpy。
+          python -c "import numpy" || python -m pip install numpy
           python -m playwright install chromium --with-deps
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
