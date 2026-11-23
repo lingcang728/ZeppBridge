@@ -23,7 +23,7 @@ const bindings = compileScript(descriptor, { id: 'workout-tools-test' }).binding
   mode: 'function', prefixIdentifiers: true, bindingMetadata: bindings,
 }).code)(Vue);
 vi.mock('../../composables/useTauriApi', () => ({
-  tauriApi: api, toUserMessage: (_error: unknown, fallback: string) => fallback,
+  tauriApi: api, toUserMessage: (_error: unknown, fallback: string) => fallback, isTauri: () => false,
 }));
 vi.mock('../../composables/useSyncController', () => ({ useSyncController: () => api }));
 vi.mock('../workout/TypePicker.vue', () => ({ default: defineComponent({

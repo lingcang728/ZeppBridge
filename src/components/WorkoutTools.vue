@@ -6,7 +6,8 @@
  *   这里只剩一个「在本机隐藏」（详情页别做成多选的样子，字也太多）。
  */
 import { computed, onMounted, ref } from 'vue';
-import { tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
+import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { useMessages } from '../i18n';
 import { workoutLabel } from '../lib/labels';
@@ -37,6 +38,36 @@ const apply = async (changeType: boolean, hidden: boolean | null, clear = false)
   } catch (cause) { error.value = toUserMessage(cause, t.value.failed); }
   finally { busy.value = false; }
 };
+/** 选中的运动各存一个 .fit 到同一个文件夹；一条失败不拦后面的，最后报存了几个、失败几条。 */
+const canExportFit = isTauri();
+const fitProgress = ref<{ done: number; total: number } | null>(null);
+const note = ref('');
+const exportFit = async () => {
+  if (busy.value || !props.ids.length) return;
+  const ids = [...props.ids];
+  error.value = ''; note.value = '';
+  let directory: string | null = null;
+  try {
+    const picked = await showOpenDialog({ title: t.value.exportFitTitle, directory: true, multiple: false });
+    directory = typeof picked === 'string' ? picked : null;
+  } catch (cause) { error.value = toUserMessage(cause, t.value.exportFitFailed); return; }
+  if (!directory) return;
+  busy.value = true;
+  let saved = 0;
+  let lastError: unknown = null;
+  fitProgress.value = { done: 0, total: ids.length };
+  try {
+    for (const [index, workoutId] of ids.entries()) {
+      try {
+        await tauriApi.saveFitExport({ scope: { kind: 'workout', workoutId }, dataTypes: ['workouts'], detail: 'full' }, directory);
+        saved += 1;
+      } catch (cause) { lastError = cause; }
+      fitProgress.value = { done: index + 1, total: ids.length };
+    }
+  } finally { busy.value = false; fitProgress.value = null; }
+  if (saved) note.value = t.value.exportedFit(saved, ids.length - saved);
+  else error.value = toUserMessage(lastError, t.value.exportFitFailed);
+};
 const undo = async () => {
   if (!editId.value || busy.value) return;
   busy.value = true; error.value = '';
@@ -62,9 +93,12 @@ const undo = async () => {
         <button type="button" class="pill-button" :disabled="busy || !selectedType" @click="apply(true, null)">{{ t.apply }}</button>
         <button type="button" class="pill-button quiet" :disabled="busy" @click="apply(true, null, true)">{{ t.clearType }}</button>
         <button type="button" class="pill-button quiet" :disabled="busy" @click="apply(false, !hidden)">{{ hidden ? t.restore : t.hide }}</button>
+        <!-- 已隐藏的记录本来就不进导出，那一页不给这个按钮。 -->
+        <button v-if="canExportFit && !hidden" type="button" class="pill-button quiet" :disabled="busy" @click="exportFit">{{ fitProgress ? t.exportingFit(fitProgress.done, fitProgress.total) : t.exportFit }}</button>
       </div>
     </Transition>
     <div v-if="editId && !ids.length" class="tool-undo"><button class="pill-button quiet" type="button" :disabled="busy" @click="undo">{{ t.undo }}</button></div>
+    <p v-if="note" role="status" class="tool-note">{{ note }}</p>
     <p v-if="error" role="alert" class="api-error">{{ error }}</p>
   </div>
 </template>
@@ -73,6 +107,7 @@ const undo = async () => {
 .workout-tools { display: grid; gap: 8px; }
 .workout-tools.is-single { display: inline-flex; align-items: center; gap: 8px; }
 .api-error { margin: 0; color: var(--warning); font-size: var(--fs-sm); }
+.tool-note { justify-self: center; margin: 0; padding: 4px 12px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: var(--mat-glass-shadow), inset 0 0 0 1px var(--mat-glass-line); color: var(--muted); font-size: var(--fs-sm); }
 /* 多选的操作栏浮在列表底部：选中第一条时从下面弹上来，全部取消再沉下去。 */
 .workout-tools:not(.is-single) { position: sticky; bottom: 16px; z-index: 5; }
 .tool-bar { justify-self: center; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%;

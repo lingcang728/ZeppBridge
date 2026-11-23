@@ -19,6 +19,9 @@ export const workoutToolsMessages = defineMessages(
     altitudeHint: '海拔来自手表记录或本机导入的FIT。Zepp App的校准海拔尚未获取，两者可能不同。',
     planHint: '计划按所选运动大类发送。Trail等标签作为说明发送，尚未确认手表能切换对应运动模式。力量训练计划暂不能发送。',
     strengthHint: '已完成力量训练仅展示云端实际返回的数据。逐组次数、重量及自动血压需要账号样本验证；型号不明时可手动指认设备。',
+    exportFit: '导出 FIT', exportFitTitle: '选择保存 FIT 文件的文件夹', exportFitFailed: '导出失败，请重试',
+    exportingFit: (done: number, total: number) => `正在导出 ${done}/${total}`,
+    exportedFit: (saved: number, failed: number) => (failed ? `已保存 ${saved} 个 FIT 文件，${failed} 条没导出` : `已保存 ${saved} 个 FIT 文件`),
   },
   {
   select: 'Select workouts',
@@ -54,6 +57,11 @@ export const workoutToolsMessages = defineMessages(
   altitudeHint: 'Altitude comes from watch recordings or locally imported FIT files. Calibrated altitude from the Zepp App has not been fetched, so the values may differ.',
   planHint: 'Plans are sent using the selected workout category. Labels such as Trail are included in the description; it has not yet been confirmed whether the watch can switch to the corresponding workout mode. Strength training plans cannot be sent yet.',
   strengthHint: 'Completed strength workouts show only the data actually returned by the cloud. Per-set reps and weights, and automatic blood pressure readings, require validation using account samples. If the model is unknown, you can identify the device manually.',
+  exportFit: 'Export FIT',
+  exportFitTitle: 'Choose a folder for the FIT files',
+  exportFitFailed: 'Export failed. Please try again.',
+  exportingFit: (done: number, total: number) => `Exporting ${done}/${total}`,
+  exportedFit: (saved: number, failed: number) => (failed ? `Saved ${saved} FIT file${saved === 1 ? '' : 's'}; ${failed} could not be exported` : `Saved ${saved} FIT file${saved === 1 ? '' : 's'}`),
 },
   {
   select: 'Seleccionar registros',
@@ -89,6 +97,11 @@ export const workoutToolsMessages = defineMessages(
   altitudeHint: 'La altitud proviene de los registros del reloj o de archivos FIT importados en este dispositivo. Aún no se ha obtenido la altitud calibrada de Zepp App, por lo que los valores pueden diferir.',
   planHint: 'Los planes se envían según la categoría de entrenamiento seleccionada. Las etiquetas como Trail se incluyen en la descripción; aún no se ha confirmado que el reloj pueda cambiar al modo de entrenamiento correspondiente. Por ahora no se pueden enviar planes de entrenamiento de fuerza.',
   strengthHint: 'Para los entrenamientos de fuerza completados solo se muestran los datos que devuelve la nube. Las repeticiones por serie, los pesos y las mediciones automáticas de presión arterial requieren validación con muestras de datos de cuentas. Si se desconoce el modelo, puedes identificar el dispositivo manualmente.',
+  exportFit: 'Exportar FIT',
+  exportFitTitle: 'Elige una carpeta para los archivos FIT',
+  exportFitFailed: 'No se pudo exportar. Intenta de nuevo.',
+  exportingFit: (done: number, total: number) => `Exportando ${done}/${total}`,
+  exportedFit: (saved: number, failed: number) => (failed ? `${saved} archivos FIT guardados; ${failed} no se pudieron exportar` : `${saved} archivos FIT guardados`),
 },
   'components/WorkoutTools',
 );
