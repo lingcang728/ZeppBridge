@@ -421,15 +421,24 @@ jobs:
         #
         # 重试很便宜：cargo 的 fingerprint 还在，第二次不会重新编译，
         # 只重跑打包。真正的代码错误则三次都会失败，仍然照常报红。
+        #
+        # 两次正式版之间 main 上的版本号可以是测试版（3.3.0-beta.1）。MSI（WiX）只认纯数字的
+        # 预发布号，带字母的会直接拒绝打包，所以测试版号只打 NSIS；正式版照旧 NSIS + MSI。
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         shell: pwsh
         run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $bundles = @()
+          if ($version -match '-') {
+            Write-Host "测试版号 $version：MSI 只认纯数字预发布号，这次只打 NSIS"
+            $bundles = @('--bundles', 'nsis')
+          }
           $attempts = 3
           for ($i = 1; $i -le $attempts; $i++) {
             Write-Host "== tauri build attempt $i/$attempts =="
-            npm run tauri build -- --config src-tauri/tauri.sidecar.conf.json
+            npm run tauri build -- --config src-tauri/tauri.sidecar.conf.json @bundles
             if ($LASTEXITCODE -eq 0) { exit 0 }
             if ($i -lt $attempts) {
               Write-Host "attempt $i failed (exit $LASTEXITCODE); retrying in 20s"
