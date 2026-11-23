@@ -1,12 +1,15 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import WorkoutTools from '../components/WorkoutTools.vue';
 import { workoutToolsMessages } from '../components/WorkoutTools.i18n';
 import { afterMotion } from '../lib/motion/budget';
 import PageHeader from '../components/PageHeader.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
+import FoldTransition from '../components/FoldTransition.vue';
+import Icon from '../components/Icon.vue';
 import RecordRow from '../components/RecordRow.vue';
 import { timelineKey } from '../lib/scroll/scrollbar';
 import EmptyState from '../components/EmptyState.vue';
@@ -79,18 +82,30 @@ const importing = ref(false);
 const importSources = ref<Record<string, ImportSourceKey>>({});
 const loadImportSources = () => tauriApi.workoutImportSources().then((map) => { importSources.value = map; }).catch(() => undefined);
 const selecting = ref(false);
+/** 想看哪一边（分段胶囊上的值）和列表此刻画的是哪一边：切换时旧列表先压暗、不能点，新的一页读回来那一刻才换。 */
 const hiddenView = ref(false);
+const shownHidden = ref(false);
+const switching = computed(() => hiddenView.value !== shownHidden.value);
 const selected = ref(new Set<string>());
 const selectedIds = computed(() => [...selected.value]);
-const toggleSelected = (id: string) => { if (selected.value.has(id)) selected.value.delete(id); else selected.value.add(id); };
-const switchVisibility = () => {
+const toggleSelecting = () => { selecting.value = !selecting.value; selected.value = new Set(); anchor = -1; };
+const switchVisibility = async () => {
   hiddenView.value = !hiddenView.value;
-  selected.value.clear();
-  // Never leave visible records actionable in the hidden view (or vice versa),
-  // including when the replacement query fails.
-  workouts.value = []; total.value = 0;
-  void loadList();
+  selected.value = new Set(); anchor = -1;
+  const want = hiddenView.value;
+  await loadList();
+  if (hiddenView.value !== want) return;
+  // 换过去的那一边读失败：旧的那一边不能留着可操作（load 失败时会保留旧列表，这里不行）。
+  if (staleError.value) { error.value = staleError.value; staleError.value = null; workouts.value = []; total.value = 0; }
 };
+const view = computed({
+  get: () => (hiddenView.value ? 'hidden' : 'visible'),
+  set: (value: 'visible' | 'hidden') => { if ((value === 'hidden') !== hiddenView.value) void switchVisibility(); },
+});
+const viewItems = computed(() => [
+  { value: 'visible' as const, label: tools.value.visible },
+  { value: 'hidden' as const, label: tools.value.hidden },
+]);
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
@@ -108,7 +123,91 @@ const {
 const initialLoading = useFirstLoad(loading);
 // Recovery must include hidden records with incomplete summaries too. Otherwise
 // CLI-hidden or partially synced records can disappear from the restore surface.
-const displayableList = computed(() => hiddenView.value ? workouts.value : displayableWorkouts(workouts.value));
+const displayableList = computed(() => shownHidden.value ? workouts.value : displayableWorkouts(workouts.value));
+// 列表每次换内容都是按此刻要看的那一边读的（切换会推进请求代次，旧的结果会被丢掉），所以同一步里把「画的是哪边」对齐。
+watch(workouts, () => { shownHidden.value = hiddenView.value; }, { flush: 'sync' });
+
+/* 选择：整行都能点；按住拖过去连着选（起点那一行原来没选就一路选上，原来选了就一路取消，拖回去会还原）；
+   Shift 点一下选上从上次那一行到这一行的整段。拖到窗口上下边缘时列表自己滚。勾选框只留给键盘。 */
+const listEl = ref<HTMLElement | null>(null);
+let anchor = -1;
+let drag: { start: number; mode: boolean; base: Set<string>; last: number; x: number; y: number; frame: number } | null = null;
+const idAt = (index: number) => displayableList.value[index]?.workout_id;
+const indexAt = (x: number, y: number) => {
+  const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-index]');
+  return row && listEl.value?.contains(row) ? Number(row.dataset.index) : -1;
+};
+const paint = (to: number) => {
+  if (!drag) return;
+  const next = new Set(drag.base);
+  const [from, end] = drag.start <= to ? [drag.start, to] : [to, drag.start];
+  for (let index = from; index <= end; index += 1) {
+    const id = idAt(index);
+    if (!id) continue;
+    if (drag.mode) next.add(id); else next.delete(id);
+  }
+  selected.value = next;
+  drag.last = to;
+};
+const EDGE = 64;
+const autoScroll = () => {
+  if (!drag) return;
+  const scroller = document.getElementById('main-content');
+  if (scroller) {
+    const box = scroller.getBoundingClientRect();
+    const over = drag.y < box.top + EDGE ? drag.y - (box.top + EDGE) : drag.y > box.bottom - EDGE ? drag.y - (box.bottom - EDGE) : 0;
+    if (over) {
+      scroller.scrollTop += Math.max(-18, Math.min(18, over / 3));
+      const index = indexAt(drag.x, drag.y);
+      if (index >= 0 && index !== drag.last) paint(index);
+    }
+  }
+  drag.frame = requestAnimationFrame(autoScroll);
+};
+const onDragMove = (event: PointerEvent) => {
+  if (!drag) return;
+  drag.x = event.clientX; drag.y = event.clientY;
+  const index = indexAt(event.clientX, event.clientY);
+  if (index >= 0 && index !== drag.last) paint(index);
+};
+const endDrag = () => {
+  if (drag) cancelAnimationFrame(drag.frame);
+  drag = null;
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', endDrag);
+  window.removeEventListener('pointercancel', endDrag);
+};
+const onRowDown = (event: PointerEvent, index: number) => {
+  if (!selecting.value || event.button !== 0) return;
+  const id = idAt(index);
+  if (!id) return;
+  event.preventDefault();
+  if (event.shiftKey && anchor >= 0) {
+    const next = new Set(selected.value);
+    const [from, end] = anchor <= index ? [anchor, index] : [index, anchor];
+    for (let i = from; i <= end; i += 1) { const each = idAt(i); if (each) next.add(each); }
+    selected.value = next;
+    return;
+  }
+  anchor = index;
+  drag = { start: index, mode: !selected.value.has(id), base: new Set(selected.value), last: index, x: event.clientX, y: event.clientY, frame: 0 };
+  paint(index);
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  drag.frame = requestAnimationFrame(autoScroll);
+};
+const onCheck = (index: number) => {
+  const id = idAt(index);
+  if (!id) return;
+  const next = new Set(selected.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  selected.value = next; anchor = index;
+};
+const selectLoaded = () => { selected.value = new Set(displayableList.value.map((w) => w.workout_id)); };
+const clearSelected = () => { selected.value = new Set(); };
+const onChanged = () => { selected.value = new Set(); void loadList(); };
+onBeforeUnmount(endDrag);
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
@@ -136,18 +235,21 @@ useSectionTour('workouts');
   <section class="page list-page" aria-labelledby="workout-list-title">
     <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
     <OfficialOnlyNote topic="workouts" />
-    <div class="selection-actions">
-      <button class="button secondary" type="button" :aria-pressed="selecting" @click="selecting = !selecting; selected.clear()">{{ selecting ? tools.done : tools.select }}</button>
-      <button class="button secondary" type="button" :aria-pressed="hiddenView" @click="switchVisibility">{{ hiddenView ? tools.visible : tools.hidden }}</button>
-      <button class="button secondary" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">{{ importing ? importText.close : importText.open }}</button>
-      <template v-if="selecting">
-        <button class="button secondary" type="button" @click="displayableList.forEach(w => selected.add(w.workout_id))">{{ tools.selectLoaded }}</button>
-        <button class="button secondary" type="button" @click="selected.clear()">{{ tools.clearSelection }}</button>
-      </template>
+    <div class="list-bar">
+      <SegmentTrack v-model="view" :items="viewItems" :aria-label="t.title" no-wrap />
+      <div class="list-bar-actions">
+        <button :class="['pill-button', { 'is-on': selecting }]" type="button" :aria-pressed="selecting" @click="toggleSelecting">
+          <Icon name="circle-check" :size="15" />{{ selecting ? tools.done : tools.select }}
+        </button>
+        <button :class="['pill-button', { 'is-on': importing }]" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">
+          <Icon name="download" :size="15" />{{ importing ? importText.close : importText.open }}
+        </button>
+      </div>
     </div>
-    <WorkoutImport v-if="importing" id="workout-import" />
-    <p class="footnote">{{ tools.localHint }}</p>
+    <FoldTransition><WorkoutImport v-if="importing" id="workout-import" /></FoldTransition>
+    <FoldTransition><p v-if="hiddenView" class="footnote hidden-hint">{{ tools.localHint }}</p></FoldTransition>
 
+    <Transition name="list-swap" mode="out-in">
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
@@ -156,13 +258,14 @@ useSectionTour('workouts');
     <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
-    <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else :class="['record-list', { selecting }]">
-      <div v-for="workout in displayableList" :key="workout.workout_id" :data-timeline="timelineKey(workout.start_time)" :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]">
-      <input v-if="selecting" type="checkbox" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)}`" @change="toggleSelected(workout.workout_id)" />
+    <EmptyState v-else-if="!displayableList.length" :key="`empty-${shownHidden}`" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
+    <div v-else ref="listEl" :key="`list-${shownHidden}`" :class="['record-list', { selecting, 'is-switching': switching }]" :inert="switching || undefined">
+      <div v-for="(workout, index) in displayableList" :key="workout.workout_id" :data-index="index" :data-timeline="timelineKey(workout.start_time)"
+        :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]" @pointerdown="onRowDown($event, index)">
+      <input type="checkbox" :inert="!selecting || undefined" :tabindex="selecting ? 0 : -1" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)}`" @change="onCheck(index)" />
       <RecordRow
         class="workout-record"
-        :to="hiddenView ? undefined : { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
+        :to="shownHidden || selecting ? undefined : { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
         :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time, 'auto')"
@@ -172,7 +275,8 @@ useSectionTour('workouts');
       />
       </div>
     </div>
-    <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="hiddenView" @changed="selected.clear(); loadList()" />
+    </Transition>
+    <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="shownHidden" :selecting="selecting" @select-all="selectLoaded" @clear="clearSelected" @changed="onChanged" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
     <div v-if="hasMore" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
@@ -187,26 +291,46 @@ useSectionTour('workouts');
 
 <style scoped>
 .list-page { width: 100%; }
-.selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
-.selectable-record { display: flex; align-items: center; gap: 12px; }
+/* 上面一行：左边「运动 / 已隐藏」分段胶囊（切过去滑块滑过去，列表交叉淡入），右边两枚胶囊按钮。 */
+.list-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-block: 14px 12px; }
+.list-bar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.list-bar .pill-button { font-size: var(--fs-sm); transition: scale var(--dur-fast) var(--ease-out), filter var(--dur-fast) ease, background var(--dur-base) ease; }
+.list-bar .pill-button.is-on { background: color-mix(in srgb, var(--accent) 16%, var(--cap-thumb)); box-shadow: var(--cap-thumb-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+.list-bar .pill-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.hidden-hint { margin: 0 0 12px; }
+
+.selectable-record { display: flex; align-items: center; border-radius: var(--radius-md); transition: background 200ms ease; }
 .selectable-record > :last-child { flex: 1; min-width: 0; }
-/* 多选：圆形勾选框进场时弹出来，勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下（多选要更生动）。 */
-.selectable-record { border-radius: var(--radius-md); transition: background 200ms ease; }
-.selectable-record input { appearance: none; display: grid; place-content: center; width: 24px; height: 24px; margin: 0 0 0 4px; flex-shrink: 0;
-  border: 2px solid var(--line-control); border-radius: 50%; background: transparent; cursor: pointer;
-  animation: check-in 320ms cubic-bezier(.2, 1.5, .4, 1) both; transition: background 160ms ease, border-color 160ms ease; }
+/* 勾选框一直在、平时收成 0 宽：进入选择时这一栏长出来，整行往右让一点，串节点的竖线跟着挪（不跳）。
+   勾上时打勾的笔画「长」出来；选中的那行整行染一层品牌色并轻轻鼓一下。 */
+.selectable-record input { appearance: none; display: grid; place-content: center; box-sizing: border-box; width: 0; height: 24px; margin: 0; flex-shrink: 0;
+  border: 0 solid var(--line-control); border-radius: 50%; background: transparent; opacity: 0; scale: .4; pointer-events: none;
+  transition: width 260ms var(--ease-out), margin 260ms var(--ease-out), border-width 260ms var(--ease-out), opacity 200ms ease,
+    scale 300ms cubic-bezier(.2, 1.5, .4, 1), background 160ms ease, border-color 160ms ease; }
+.record-list.selecting .selectable-record input { width: 24px; margin: 0 12px 0 4px; border-width: 2px; opacity: 1; scale: 1; }
 .selectable-record input::before { content: ''; width: 6px; height: 11px; margin-top: -3px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg) scale(0); transition: transform 240ms cubic-bezier(.2, 1.6, .4, 1); }
 .selectable-record input:checked { border-color: var(--accent); background: var(--accent); }
 .selectable-record input:checked::before { transform: rotate(45deg) scale(1); }
-.selectable-record.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); animation: row-pop 300ms cubic-bezier(.2, 1.4, .4, 1); }
-@keyframes check-in { from { transform: scale(0); opacity: 0; } }
-@keyframes row-pop { 40% { transform: scale(1.012); } }
+.record-list::before { transition: translate 260ms var(--ease-out); }
+.record-list.selecting::before { translate: 40px 0; }
+.record-list.selecting { user-select: none; -webkit-user-select: none; }
+.record-list.selecting .selectable-record { cursor: pointer; }
+.record-list.selecting .selectable-record:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.record-list.selecting .selectable-record.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); animation: row-pop 300ms cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes row-pop { 40% { transform: scale(1.008); } }
+.record-list.is-switching { opacity: .45; transition: opacity 160ms ease; }
+.list-swap-enter-active { transition: opacity 260ms ease, transform 320ms var(--ease-out); }
+.list-swap-leave-active { transition: opacity 120ms ease; }
+.list-swap-enter-from { opacity: 0; transform: translateY(8px); }
+.list-swap-leave-to { opacity: 0; }
 .list-tools { margin-top: 12px; }
-@media (prefers-reduced-motion: reduce) { .selectable-record input, .selectable-record.selected { animation: none; } .selectable-record input::before { transition: none; } }
-.selectable-record input:focus-visible, .selection-actions .button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.record-list.selecting::before { display: none; }
-.selection-actions .button { max-width: 100%; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .selectable-record input, .selectable-record input::before, .record-list::before { transition: none; }
+  .record-list.selecting .selectable-record.selected { animation: none; }
+  .list-swap-enter-active, .list-swap-leave-active { transition: none; }
+}
+.selectable-record input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .stale-note { margin: 10px 0 0; color: var(--warning, var(--muted)); font-size: var(--fs-sm); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {

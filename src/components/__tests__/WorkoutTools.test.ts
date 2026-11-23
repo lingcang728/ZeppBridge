@@ -19,9 +19,11 @@ const api = vi.hoisted(() => ({
 // in-memory client renderer so event wiring is exercised too.
 const descriptor = parse(workoutToolsSource).descriptor;
 const bindings = compileScript(descriptor, { id: 'workout-tools-test' }).bindings;
+// The in-memory renderer has no DOM, so enter/leave transitions render as a plain passthrough.
+const passthrough = (_props: unknown, { slots }: { slots: { default?: () => unknown } }) => slots.default?.();
 (WorkoutTools as unknown as { render: unknown }).render = new Function('Vue', compile(descriptor.template!.content, {
   mode: 'function', prefixIdentifiers: true, bindingMetadata: bindings,
-}).code)(Vue);
+}).code)({ ...Vue, Transition: passthrough });
 vi.mock('../../composables/useTauriApi', () => ({
   tauriApi: api, toUserMessage: (_error: unknown, fallback: string) => fallback, isTauri: () => false,
 }));
