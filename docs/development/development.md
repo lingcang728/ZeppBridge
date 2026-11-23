@@ -110,7 +110,7 @@ for long; CI does not limit it.
 
 Before pushing, `npm run preflight` runs the checks CI can run on Windows, in
 CI's order: routing and privacy checks, lockfile, frontend gates, Rust gates
-including the Store channel, and the Flatpak sources. `npm run preflight:quick`
+and the Flatpak sources. `npm run preflight:quick`
 skips Rust and finishes in a few minutes.
 
 Keep Rust tests to the ones that would catch a false success, lost data or
@@ -123,7 +123,7 @@ picks the checks from the changed files. Per platform they are: lockfile check,
 `npm ci`, `npm run build`, and the four Rust commands, reusing compiled
 dependencies from the main branch cache. Windows also runs the bundle budget,
 `i18n:check`, `npm test`, `test:functions` and `icons:verify`. The Microsoft
-Store channel tests, the Flatpak manifest checks and the headless Docker image
+The Flatpak manifest checks and the headless Docker image
 are separate jobs that run in parallel with the three platform verifications.
 Another job checks documentation links, version consistency and new commits for
 private notes.
@@ -150,8 +150,7 @@ npm run build:mac     # macOS: frontend, gates, then tauri build --bundles app,d
 Without `TAURI_SIGNING_PRIVATE_KEY` no updater artifacts are produced, which is
 fine for local builds. Windows installers are not Authenticode-signed; the macOS
 bundle is ad-hoc signed and not notarised (see [code signing](code-signing.md)).
-Linux packages: [Linux packaging](linux-packaging.md). Microsoft Store:
-[Store packaging](store-packaging.md). CLI and MCP:
+Linux packages: [Linux packaging](linux-packaging.md). CLI and MCP:
 `cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp`.
 
 `npm run package:release` is the maintainer's Windows script for a local test

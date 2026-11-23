@@ -11,8 +11,7 @@ been verified against live services.
 ## Credentials
 
 - The app token uses Windows Credential Manager, macOS Keychain, or Linux
-  Secret Service by default, under `com.zeppbridge.app` (the Microsoft Store
-  build uses `com.zeppbridge.app.store`), keyed by user ID. The local API token
+  Secret Service by default, under `com.zeppbridge.app`, keyed by user ID. The local API token
   is a separate entry named `local-api-token`.
 - macOS and Linux can explicitly opt into a plaintext `credentials.json`
   protected by file permissions (`0600`, data directory `0700`). It is never
@@ -154,8 +153,7 @@ trust.
   plaintext SQLite. There is no whole-database encryption and no remote backup.
   The data directory is `data/` next to the program on Windows (portable and
   installed), `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` on
-  macOS, the XDG data directory on Linux (Flatpak: `~/.var/app/com.zeppbridge.app/`),
-  and the package's LocalState folder for the Microsoft Store build.
+  macOS, and the XDG data directory on Linux (Flatpak: `~/.var/app/com.zeppbridge.app/`).
   `ZEPPBRIDGE_DATA_DIR` overrides it. The WebView cache sits in `webview/`
   inside it.
 - Logs are in `logs/zeppbridge.log` in the data directory (rotated, three files
@@ -340,8 +338,7 @@ destinations are limited to:
   official-platform authorization relay;
 - `api-open.zepp.com`, for the official channel;
 - GitHub, to check for and download updates (`latest.json` and the installer of
-  the latest release). The Microsoft Store build updates through the Store
-  instead;
+  the latest release).;
 - the AI site you pick in "Send to AI", and the Zepp authorization page, opened
   in your own browser;
 - `tile.openstreetmap.org`, **only** after you switch a workout's route card to
@@ -361,8 +358,7 @@ listener stops when you turn the switch off or quit the tray process.
 
 - The Windows installers are not code-signed, so browsers and SmartScreen may
   warn. Release builds carry GitHub build-provenance attestations, and every
-  release lists SHA-256 checksums. The Microsoft Store build is delivered
-  through the Store.
+  release lists SHA-256 checksums.
 - The macOS build is ad-hoc signed only — no Apple Developer ID and no
   notarisation. See the install section of the [README](../../README.md).
 - The health database is plaintext.

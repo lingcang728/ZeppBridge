@@ -80,13 +80,13 @@ cargo test --manifest-path src-tauri/Cargo.toml -p zeppbridge-core --lib storage
 
 Rust 版本钉在仓库根目录的 `rust-toolchain.toml`，本机和 CI 用同一版。升级 Rust 只改这一个文件；推到 main 时 CI 会顺带把三平台安装包打一遍。本机测试带 `--jobs 1`，免得长时间全核满载；CI 上不限。
 
-推送前可以先跑 `npm run preflight`：按 CI 的顺序把 Windows 上能跑的检查跑一遍（路由和隐私检查、锁文件、前端门禁、Rust 门禁含商店渠道、Flatpak 来源）。`npm run preflight:quick` 跳过 Rust，几分钟跑完。
+推送前可以先跑 `npm run preflight`：按 CI 的顺序把 Windows 上能跑的检查跑一遍（路由和隐私检查、锁文件、前端门禁、Rust 门禁、Flatpak 来源）。`npm run preflight:quick` 跳过 Rust，几分钟跑完。
 
 Rust 测试只留能挡住假成功、丢数据、错文案的那些。
 
 ## CI 跑什么
 
-每次推送和 PR，先由一个分流作业（`scripts/ci/select-checks.mjs`）按改动的文件挑出要跑的检查。每个平台都是：lockfile 检查、`npm ci`、`npm run build`、四条 Rust 命令，依赖编译结果按 main 上的缓存复用。Windows 另外跑体积预算、`i18n:check`、`npm test`、`test:functions` 和 `icons:verify`。Microsoft Store 渠道测试、Flatpak 清单检查和无头 Docker 镜像各自是单独的作业，和三个平台的验证并行跑。另有一个作业检查文档链接、版本号和新提交的隐私问题。
+每次推送和 PR，先由一个分流作业（`scripts/ci/select-checks.mjs`）按改动的文件挑出要跑的检查。每个平台都是：lockfile 检查、`npm ci`、`npm run build`、四条 Rust 命令，依赖编译结果按 main 上的缓存复用。Windows 另外跑体积预算、`i18n:check`、`npm test`、`test:functions` 和 `icons:verify`。Flatpak 清单检查和无头 Docker 镜像各自是单独的作业，和三个平台的验证并行跑。另有一个作业检查文档链接、版本号和新提交的隐私问题。
 
 安装包（NSIS + MSI、macOS app 与 dmg、Flatpak、deb、rpm、AppImage）在打 `v*` 标签、手动触发，以及推 main 时改到了打包相关文件（`Cargo.toml` / `Cargo.lock`、tauri 配置、`rust-toolchain.toml`、`package.json`、`packaging/`、`scripts/release/`、`scripts/ci/`、工作流）时构建，和验证并行跑。只有 `v*` 标签会创建 GitHub Release，而且要等全部验证和打包都通过，见[发版](../releases/README.md)。
 
@@ -99,7 +99,7 @@ npm run tauri build   # Windows：NSIS + MSI（目标写在 src-tauri/tauri.conf
 npm run build:mac     # macOS：前端、门禁，然后 tauri build --bundles app,dmg
 ```
 
-没有 `TAURI_SIGNING_PRIVATE_KEY` 就不产出更新包，本地构建不受影响。Windows 安装包没有 Authenticode 签名；macOS 包是 ad-hoc 签名、未公证（见[代码签名](code-signing.md)）。Linux 包见 [Linux 打包](linux-packaging.md)（英文），Microsoft Store 见 [Store 打包](store-packaging.md)（英文）。CLI 和 MCP：`cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp`。
+没有 `TAURI_SIGNING_PRIVATE_KEY` 就不产出更新包，本地构建不受影响。Windows 安装包没有 Authenticode 签名；macOS 包是 ad-hoc 签名、未公证（见[代码签名](code-signing.md)）。Linux 包见 [Linux 打包](linux-packaging.md)（英文）。CLI 和 MCP：`cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp`。
 
 `npm run package:release` 是维护者在 Windows 上打本地测试包的脚本：跑门禁、把 CLI 和 MCP 作为 sidecar 带上、在 `release\` 里产出 NSIS 安装包和便携 exe，需要更新签名密钥的备份。贡献者用不到它。
 

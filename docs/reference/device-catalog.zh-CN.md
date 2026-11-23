@@ -63,7 +63,7 @@ Balance 2 的 `10486017` 等）**冻结保留**，不再增加。现在反馈报
 `src/lib/deviceCatalog.ts` 用 `import.meta.glob` 找文件。运行时不外链任何图片。
 
 **授权还没解决。** 官网截图衍生图和 CDN 图都是 Amazfit 的产品照片，官网没有给本仓库再分发许可，
-而应用已经公开分发（GitHub 和 Microsoft Store）。在拿到有授权的新闻素材或 Amazfit 许可之前，
+而应用已经公开分发（GitHub）。在拿到有授权的新闻素材或 Amazfit 许可之前，
 这些图是已知风险；随时可以整体换回占位图。
 
 重建目录、校验图片属于维护工作，见 [`scripts/assets/README.md`](../../scripts/assets/README.md)。

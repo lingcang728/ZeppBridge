@@ -144,81 +144,6 @@ jobs:
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked
 
-  # 商店渠道换了一套 feature，要整个重编一遍。单独成一个作业和 Windows 验证并行，
-  # 不再排在它后面拖长最慢的那条路径。
-  verify-store:
-    name: Microsoft Store channel verification
-    needs: changes
-    if: needs.changes.outputs.full == 'true'
-    runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Set up Rust
-        shell: pwsh
-        run: |
-          rustup toolchain install
-          rustc --version
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      # tauri-build resolves frontendDist (../dist) at compile time.
-      - name: Build frontend
-        run: npm run build
-
-      - name: Test Microsoft Store channel
-        shell: pwsh
-        run: |
-          $env:TAURI_CONFIG = Get-Content src-tauri/tauri.store.conf.json -Raw
-          $env:ZB_STORE_BUILD = '1'
-          cargo test --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --locked
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-
-      - name: Verify Microsoft Store build excludes the GitHub updater
-        shell: pwsh
-        run: |
-          $tree = cargo tree --manifest-path src-tauri/Cargo.toml --workspace --no-default-features --features store --edges normal,build --locked
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          if ($tree -match 'tauri-plugin-updater v') { throw 'Updater present in Microsoft Store dependency tree' }
-
-  store-package:
-    name: Prepare unsigned Microsoft Store package
-    if: github.event_name == 'workflow_dispatch'
-    needs: verify
-    runs-on: windows-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build MSIX with CLI and MCP aliases
-        run: ./scripts/windows/build-store-msix.ps1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ZeppBridge-Microsoft-Store
-          path: release/store-msix/*.msix
-          if-no-files-found: error
-          retention-days: 14
-
   verify-linux:
     name: Linux verification
     needs: changes
@@ -984,7 +909,7 @@ jobs:
     timeout-minutes: 15
     # 只在 tag 上发；打包和验证是并行跑的，所以这里要把验证也等上，一道都不能少。
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [verify, verify-store, verify-linux, verify-macos, flatpak-checks,
+    needs: [verify, verify-linux, verify-macos, flatpak-checks,
             package, package-macos, package-linux, package-flatpak]
     permissions:
       contents: write

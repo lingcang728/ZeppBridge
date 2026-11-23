@@ -23,8 +23,7 @@
 | Windows | 可执行文件旁边的 `data\`；那里写不进去时（例如在 `C:\Program Files` 下）用 `%APPDATA%\zeppbridge\ZeppBridge\data` |
 | macOS | 在 `ZeppBridge.app` 里：`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`。不在包里：可执行文件旁边的 `data/`，写不进去时用同一个 Application Support 目录 |
 | Linux | deb、rpm 和 Arch 原生包用 `~/.local/share/zeppbridge/data`。Flatpak 用 `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/`。AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
-| Microsoft Store | 包自己的 LocalState 目录 |
-| 任何平台 | `$ZEPPBRIDGE_DATA_DIR`（绝对路径）覆盖以上全部（商店版除外） |
+| 任何平台 | `$ZEPPBRIDGE_DATA_DIR`（绝对路径）覆盖以上全部 |
 
 所以把工具解压到一个自己的目录（比如 `~/tools/`），打开的是 `~/tools/data`——一个空库，
 不是应用那个。要么放到应用旁边，要么直接指定目录：

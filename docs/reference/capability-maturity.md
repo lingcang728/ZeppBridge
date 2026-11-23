@@ -86,8 +86,7 @@ as `3.0.0`.
   clicks **Update**, which first waits for any sync or backfill to finish. The
   installer build updates through NSIS (passive), the portable build swaps its
   own exe in place, Apple-silicon macOS replaces the `.app`. Linux is left to
-  the package manager or a manual download, and the Microsoft Store build to
-  the Store. The portable path needs each release to carry the
+  the package manager or a manual download. The portable path needs each release to carry the
   `windows-x86_64-portable` package (`scripts/release/package-portable.ps1`).
 - **Upgrades**: one-way; there is no going back. Returning to 2.x only works
   from the pre-upgrade snapshot, and that snapshot is deleted automatically once

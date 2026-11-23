@@ -6,7 +6,7 @@
 
 ## 凭据
 
-- app token 默认由 Windows Credential Manager、macOS 钥匙串或 Linux Secret Service 保存，服务名为 `com.zeppbridge.app`（Microsoft Store 版是 `com.zeppbridge.app.store`），账户名按 user ID 区分。本机 API 令牌另占一条，账户名 `local-api-token`。
+- app token 默认由 Windows Credential Manager、macOS 钥匙串或 Linux Secret Service 保存，服务名为 `com.zeppbridge.app`，账户名按 user ID 区分。本机 API 令牌另占一条，账户名 `local-api-token`。
 - macOS 和 Linux 可显式选用明文 `credentials.json`，文件权限为 `0600`、数据目录为 `0700`；系统存储故障不会自动启用文件存储。Linux 还支持只读环境变量存储。选择前请阅读 [macOS](../guides/macos-credentials.zh-CN.md) 或 [Linux](../guides/linux.zh-CN.md) 凭据指南。
 - `auth.json` 位于实际数据目录，只保存认证元数据（版本、user ID、区域 host、更新时间），文件存储模式也一样。旁边的 `auth.user-id` 是 user ID 的备份，`auth.json` 损坏时「清除认证」仍能找到对应的凭据。手动复制整个数据目录会带走文件中的令牌，请勿随库副本分享 `credentials.json`。
 - 启动恢复会从元数据和凭据管理器重建同步 manager。凭据缺失或失效时，设置页显示需要重新认证，不把 token 放进状态响应。
@@ -63,7 +63,7 @@ Zepp 官方开放平台要求把应用密钥放在服务器上，所以这是 Ze
 
 ## 健康数据库
 
-- 数据库和 raw payload 在数据目录的 `zepp.db` 里，SQLite 明文；没有整库加密，也没有远程备份。数据目录：Windows（便携版和安装版）是程序旁的 `data/`；macOS 是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`；Linux 是 XDG 数据目录（Flatpak 在 `~/.var/app/com.zeppbridge.app/`）；Microsoft Store 版在应用包的 LocalState 里。`ZEPPBRIDGE_DATA_DIR` 可以覆盖。WebView 缓存在其中的 `webview/`。
+- 数据库和 raw payload 在数据目录的 `zepp.db` 里，SQLite 明文；没有整库加密，也没有远程备份。数据目录：Windows（便携版和安装版）是程序旁的 `data/`；macOS 是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`；Linux 是 XDG 数据目录（Flatpak 在 `~/.var/app/com.zeppbridge.app/`）。`ZEPPBRIDGE_DATA_DIR` 可以覆盖。WebView 缓存在其中的 `webview/`。
 - 日志在数据目录的 `logs/zeppbridge.log`（轮转，最多 3 份、每份 2 MiB）。日志不写令牌和健康数值，但启动那几行有程序和数据目录的路径，可能带你的系统用户名。发给别人之前先看一眼。
 - SQLite 启用 WAL、外键、migration、去重和 raw provenance。canonical 健康行可回指对应 raw 记录，便于解释来源。
 - retention 可由用户在 1–365 天内选择，默认 365 天；清理依据健康记录时间，成功同步后删除旧 canonical 和无引用 raw；打开「长期归档」后同步不再自动清理。清理不可撤销，请先备份。
@@ -148,7 +148,7 @@ ZeppBridge 没有自动产品遥测、使用统计或后台崩溃上报，但同
 - 登录窗口访问的 Zepp / Huami 官方页面；
 - `zeppbridge.com`（或 `zeppbridge.pages.dev`）：主动错误报告、回信（含你附上的图）与回执、官方开放平台授权中转；
 - `api-open.zepp.com`：官方通道；
-- GitHub：检查并下载更新（最新 Release 的 `latest.json` 和安装包）。Microsoft Store 版走商店更新，不连 GitHub；
+- GitHub：检查并下载更新（最新 Release 的 `latest.json` 和安装包）；
 - 「交给 AI」里你选的 AI 网站，以及 Zepp 授权页，在你自己的浏览器里打开；
 - `tile.openstreetmap.org`：**只有**在运动详情的路线卡切到「地图」并同意（「只这次」或「一直开」）之后才请求，默认关闭。加载看得见的那几张瓦片会让 OpenStreetMap 知道这次运动大致在哪；不预取、不离线缓存，轨迹本身仍在本地绘制；
 - 应用自身的本地 Tauri IPC。
@@ -157,7 +157,7 @@ ZeppBridge 没有自动产品遥测、使用统计或后台崩溃上报，但同
 
 ## 已知局限
 
-- Windows 安装包没有代码签名，浏览器和 SmartScreen 可能提示。正式版带 GitHub 构建来源证明（build provenance），每个 Release 都列出 SHA-256 校验和。Microsoft Store 版经商店分发；
+- Windows 安装包没有代码签名，浏览器和 SmartScreen 可能提示。正式版带 GitHub 构建来源证明（build provenance），每个 Release 都列出 SHA-256 校验和。
 - macOS 版只有 ad-hoc 签名，没有 Apple Developer ID，也没有公证，见 [README](../../README.zh-CN.md) 的安装说明；
 - 健康数据库是明文；
 - 服务端对 Zepp 用户编号和 IP 地址（限流用）的哈希没有用密钥加盐，见上文；

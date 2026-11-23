@@ -10,7 +10,7 @@ import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { syncCardMessages } from './sync.i18n';
-const UpdateSection = __STORE_BUILD__ ? null : defineAsyncComponent(() => import('./UpdateSection.vue'));
+const UpdateSection = defineAsyncComponent(() => import('./UpdateSection.vue'));
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
@@ -86,7 +86,7 @@ const freshness = computed(() => {
           </button>
         </div>
       </div>
-      <UpdateSection v-if="UpdateSection" />
+      <UpdateSection />
     </div>
   </section>
 </template>

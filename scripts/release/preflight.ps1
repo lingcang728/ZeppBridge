@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   云端一次完整 CI 要十几二十分钟，挂在一个本机几分钟就能发现的问题上最亏。
-  这里按 CI 的顺序跑：路由与隐私检查、锁文件、前端门禁、Rust 门禁（含商店渠道）、
+  这里按 CI 的顺序跑：路由与隐私检查、锁文件、前端门禁、Rust 门禁、
   Flatpak 来源检查。Rust 部分走 scripts\v3-gates.ps1（独立 cargo target、--jobs 1）。
 
   本机覆盖不到、只有云端能回答的：macOS / Linux 上的编译、clippy 和测试
@@ -62,8 +62,7 @@ try {
         }
     }
     else {
-        $gateArgs += '-Store'
-        Invoke-Step 'Rust + 前端门禁（v3-gates.ps1 -Frontend -Store）' { & pwsh @gateArgs }
+        Invoke-Step 'Rust + 前端门禁（v3-gates.ps1 -Frontend）' { & pwsh @gateArgs }
     }
 
     $python = (Get-Command python -ErrorAction SilentlyContinue)

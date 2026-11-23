@@ -1,13 +1,5 @@
 use super::*;
 
-#[test]
-fn credential_service_is_separate_for_the_store_channel() {
-    if cfg!(feature = "store") {
-        assert_eq!(CREDENTIAL_SERVICE, "com.zeppbridge.app.store");
-    } else {
-        assert_eq!(CREDENTIAL_SERVICE, "com.zeppbridge.app");
-    }
-}
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicU64, atomic::Ordering, Barrier, Mutex},

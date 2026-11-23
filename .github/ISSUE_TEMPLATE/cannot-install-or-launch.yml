@@ -29,7 +29,6 @@ body:
         - Windows setup.exe (NSIS)
         - Windows .msi
         - Windows Portable zip
-        - Microsoft Store
         - macOS .dmg
         - Linux AppImage
         - Linux Flatpak

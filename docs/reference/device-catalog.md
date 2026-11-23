@@ -92,7 +92,7 @@ No image is hot-linked at runtime.
 
 **Licensing is unresolved.** The store-derived and CDN images are Amazfit
 product photos; the official pages grant no redistribution licence to this
-repository, and the app is distributed publicly (GitHub and Microsoft Store).
+repository, and the app is distributed publicly (GitHub).
 Until licensed press assets or Amazfit's permission are in place, treat this
 art as a known risk; replacing it with the placeholder is always possible.
 

@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -27,6 +27,12 @@ if (result.status !== 0) process.exit(result.status ?? 1);
 // deterministic while still letting the official Tauri generator do the work.
 for (const generatedPlatform of ['android', 'ios']) {
   rmSync(join(output, generatedPlatform), { recursive: true, force: true });
+}
+
+for (const name of readdirSync(output)) {
+  if (/^(?:StoreLogo|Square\d+x\d+Logo)\.png$/.test(name)) {
+    rmSync(join(output, name));
+  }
 }
 
 /*

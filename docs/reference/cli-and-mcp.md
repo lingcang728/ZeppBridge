@@ -28,8 +28,7 @@ Each executable resolves the data directory from its own location:
 | Windows | `data\` next to the executable; if that folder can't be written (for example under `C:\Program Files`), `%APPDATA%\zeppbridge\ZeppBridge\data` |
 | macOS | Inside `ZeppBridge.app`: `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`. Outside a bundle: `data/` next to the executable, or the same Application Support folder when that can't be written |
 | Linux | `~/.local/share/zeppbridge/data` for deb, rpm and Arch packages. Flatpak uses `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/`. An AppImage or an unpacked tarball uses `data/` next to the executable |
-| Microsoft Store | The package's own LocalState folder |
-| Any | `$ZEPPBRIDGE_DATA_DIR`, an absolute path, overrides all of the above (except the Store build) |
+| Any | `$ZEPPBRIDGE_DATA_DIR`, an absolute path, overrides all of the above |
 
 So tools unpacked into a folder of their own, `~/tools/` say, open
 `~/tools/data` — an empty library, not the app's. Either put them next to the

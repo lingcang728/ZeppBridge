@@ -25,7 +25,7 @@ const site = join(repo, '.site-cache/site-dist');
 if (!existsSync(join(site, 'index.html'))) throw new Error(`No website build at ${site}; run npm run build:web first.`);
 
 // Vite has publicDir disabled for the landing build, so copy the standalone
-// Microsoft Store privacy page explicitly into the Pages output.
+// privacy page explicitly into the Pages output.
 const privacySource = join(repo, 'public/privacy/index.html');
 const privacyTarget = join(site, 'privacy/index.html');
 mkdirSync(dirname(privacyTarget), { recursive: true });

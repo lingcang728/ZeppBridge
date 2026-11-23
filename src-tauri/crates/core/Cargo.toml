@@ -6,7 +6,6 @@ edition = "2021"
 
 [features]
 default = []
-store = []
 
 [lib]
 name = "zeppbridge_core"
@@ -64,7 +63,6 @@ keyring = { version = "3.6.3", default-features = false, features = ["windows-na
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Storage_FileSystem",
-  "Win32_Storage_Packaging_Appx",
   "Win32_Security",
   "Win32_System_Com",
   "Win32_System_Registry",
