@@ -324,7 +324,13 @@ pub struct StrengthExerciseGroup {
 /// 一场力量训练的汇总与逐组明细。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StrengthWorkoutDetail {
+    /// 总组数，以逐组列表为准（和 `sets` / `exercise_groups` 对得上）。
     pub total_sets: i32,
+    /// Zepp 云端汇总自带的总组数（`total_group`），原样保留以便对照；云端没给时为 `None`。
+    /// 可能和 `total_sets` 不同：在 Zepp App 里删改过组之后它不一定跟着变，Zepp App
+    /// 运动页顶上显示的就是这个数。
+    #[serde(default)]
+    pub zepp_total_sets: Option<i32>,
     pub total_reps: i32,
     /// 总容量（`Σ reps * weight_kg`）；全自重或尚未拿到逐组重量时为 `None`。
     pub total_volume_kg: Option<f64>,

@@ -185,6 +185,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
         if let Some(strength) = workout.get("strength").and_then(Value::as_object) {
             for (field, metric, unit) in [
                 ("total_sets", "strength_total_sets", "sets"),
+                ("zepp_total_sets", "strength_zepp_total_sets", "sets"),
                 ("total_reps", "strength_total_reps", "reps"),
                 ("total_volume_kg", "strength_total_volume_kg", "kg"),
                 ("rest_seconds", "strength_rest_seconds", "seconds"),

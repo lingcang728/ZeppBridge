@@ -485,8 +485,9 @@ impl Normalizer {
                 &["total_group", "totalGroup", "strength_total_sets"],
             )
             .filter(|value| *value > 0.0)
-            .map(|value| value.round() as i32)
-            .or_else(|| (!groups.is_empty()).then_some(groups.len() as i32));
+            // 只存云端自己给的总组数：它会作为「Zepp 汇总值」原样交出去，没有就留空，
+            // 不拿逐组列表的条数冒充（列表条数在读的时候另算）。
+            .map(|value| value.round() as i32);
 
             let total_reps =
                 first_number(object, &["strength_total_reps", "total_reps", "totalReps"])

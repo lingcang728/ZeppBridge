@@ -342,7 +342,7 @@ stdio 传输，**不监听任何端口**。只有被调用的工具需要时才�
 |---|---|
 | `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm。`gearId` 是这次运动在 Zepp 里选的跑鞋编号，没选为 `null`；Zepp 不给跑鞋名称 |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_workout_detail` | 单次运动已保存的完整汇总字段、心率区间，以及力量训练汇总与逐组明细（有记录时）；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段、心率区间，以及力量训练汇总与逐组明细（有记录时；`total_sets` 按逐组列表数，`zepp_total_sets` 是 Zepp 汇总自带的组数，在 Zepp App 里改过组后两者可能不同）；用户拿修正过的 .fit 顶替过时，`localFitCorrection` 给出文件名、导入时间和云端原距离，否则为 `null` |
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈，以及主要爬升 / 下降段（`section: "climbs"`，本机从逐点海拔识别）与力量训练逐组 / 容量（`section: "strength"`）；仅 `section: "route"` 返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
 | `get_food_data` | 饮食记录和每日摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |

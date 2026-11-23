@@ -416,7 +416,7 @@ within) or `err.mcp.scope_no_grants` (nothing is shared).
 |---|---|
 | `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm. `gearId` is the ID of the shoes picked for that workout in Zepp, or `null`; Zepp sends no shoe names |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
-| `get_workout_detail` | All stored summary fields, heart-rate zones, and strength-training summary/sets (when present) for one workout; `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
+| `get_workout_detail` | All stored summary fields, heart-rate zones, and strength-training summary/sets (when present) for one workout (`total_sets` counts the listed sets; `zepp_total_sets` keeps Zepp's own summary count, which can differ after sets are edited in the Zepp app); `localFitCorrection` (file name, import time, cloud distance) is set when the user replaced it with a corrected .fit, otherwise `null` |
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps, plus the main climbs and descents (`section: "climbs"`, detected locally from the altitude series) and strength-training sets/volume (`section: "strength"`); precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
 | `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |

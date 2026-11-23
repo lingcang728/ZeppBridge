@@ -141,23 +141,28 @@ fn main_window_size(work_width: u32, work_height: u32, scale: f64) -> Option<(f6
 // 托盘文案表在 `tray_i18n.rs`（S6 的十语言表）：本文件只留调用点。
 // `tray_i18n::tray_labels` 自己归一语言码，`pt-BR`/`de-AT`/env 形参都收。
 
-fn handle_exit_requested(app: &AppHandle, code: Option<i32>, api: &tauri::ExitRequestApi) {
+/// 托盘图标的 id：退出时要按它提前拆掉托盘（见 [`release_windowing_before_loop_ends`]）。
+const TRAY_ID: &str = "main";
+
+/// 返回这次退出是否放行（没有被 `prevent_exit` 拦下）。
+fn handle_exit_requested(app: &AppHandle, code: Option<i32>, api: &tauri::ExitRequestApi) -> bool {
     match EXIT_GATE.request() {
-        exit_gate::ExitAction::Allow => return,
+        exit_gate::ExitAction::Allow => return true,
         exit_gate::ExitAction::KeepWaiting => {
             api.prevent_exit();
-            return;
+            return false;
         }
         exit_gate::ExitAction::CheckWriters => {}
     }
     let Some(data_dir) = app.try_state::<ExitDataDir>().map(|dir| dir.0.clone()) else {
         EXIT_GATE.writers_finished();
-        return;
+        return true;
     };
     match write_lock::try_acquire(&data_dir, WritePurpose::Metadata) {
         Ok(guard) => {
             *EXIT_WRITE_GUARD.lock().unwrap_or_else(|p| p.into_inner()) = Some(guard);
             EXIT_GATE.writers_finished();
+            true
         }
         Err(write_lock::WriteLockError::Busy { .. }) => {
             api.prevent_exit();
@@ -199,12 +204,27 @@ fn handle_exit_requested(app: &AppHandle, code: Option<i32>, api: &tauri::ExitRe
                 diagnostics::log(&format!("退出已取消，无法启动等待线程：{error}"));
                 EXIT_GATE.retry_later();
             }
+            false
         }
         Err(error) => {
             api.prevent_exit();
             EXIT_GATE.retry_later();
             diagnostics::log(&format!("退出时无法检查写锁: {error}"));
+            false
         }
+    }
+}
+
+/// 确定退出时，趁事件循环还活着先拆托盘、隐藏窗口。
+///
+/// Tauri 在 `RunEvent::Exit` 之后才做这两步（`cleanup_before_exit`），那时 Windows 上 tao 的
+/// 事件循环已经是 Destroyed；拆托盘、隐藏窗口会同步回调窗口过程，tao 就 panic
+/// 「cannot move state from Destroyed」，每次退出日志里都多一行崩溃。提前做掉之后，
+/// 到 Exit 时托盘已经不在、窗口已经隐藏（隐藏已隐藏的窗口不再发消息），那一步无事可做。
+fn release_windowing_before_loop_ends(app: &AppHandle) {
+    drop(app.remove_tray_by_id(TRAY_ID));
+    for window in app.webview_windows().values() {
+        let _ = window.hide();
     }
 }
 
@@ -635,7 +655,7 @@ pub fn run() {
                 sync: sync.clone(),
                 quit: quit.clone(),
             });
-            let mut tray = TrayIconBuilder::new()
+            let mut tray = TrayIconBuilder::with_id(TRAY_ID)
                 .menu(&menu)
                 .tooltip("ZeppBridge")
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -914,7 +934,9 @@ pub fn run() {
             // 有值 = 代码里调了 `exit`（托盘「退出」、更新换包前会先各记一行）。
             tauri::RunEvent::ExitRequested { code, api, .. } => {
                 diagnostics::log(&format!("退出：收到退出请求（code {code:?}）"));
-                handle_exit_requested(app, code, &api);
+                if handle_exit_requested(app, code, &api) {
+                    release_windowing_before_loop_ends(app);
+                }
             }
             tauri::RunEvent::Exit => {
                 if let Some(api) = app.try_state::<local_api::LocalApi>() {

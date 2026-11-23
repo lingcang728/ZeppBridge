@@ -166,7 +166,10 @@ export interface StrengthCatalogResult {
 }
 
 export interface StrengthWorkoutDetail {
+  /** 总组数，以逐组列表为准。 */
   total_sets: number;
+  /** Zepp 云端汇总自带的总组数，原样保留以便对照（App 里删改过组后可能和 total_sets 不同）；没给时为空。 */
+  zepp_total_sets?: number | null;
   total_reps: number;
   total_volume_kg?: number | null;
   rest_seconds?: number | null;

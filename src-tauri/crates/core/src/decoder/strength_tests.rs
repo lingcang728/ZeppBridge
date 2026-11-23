@@ -225,3 +225,152 @@ fn long_running_lap_rows_with_distance_are_still_rejected() {
     let data = json!({ "lap": format!("{};{}", row(0), row(1)) });
     assert!(parse_strength_sets(data.as_object().unwrap()).is_empty());
 }
+
+fn history(entries: &[(i32, i32)]) -> String {
+    serde_json::to_string(
+        &entries
+            .iter()
+            .map(|&(action_code, reps)| StoredStrengthGroupEntry { action_code, reps })
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// 有的表款把组间休息记成动作 0、次数 0 的一行（时长就是休息计时）：不算一组（#170）。
+#[test]
+fn action_zero_rest_rows_are_not_counted_as_sets() {
+    let lap = [
+        synthetic_62_col_row(0, 24, 112, 3.0, 20.0, 8, -1, 1201, 24_110),
+        synthetic_62_col_row(1, 120, 107, 15.0, -1.0, 0, -1, 0, 120_000),
+        synthetic_62_col_row(2, 23, 100, 2.0, 20.0, 7, -1, 1201, 23_600),
+    ]
+    .join(";");
+    let data = json!({ "lap": lap, "type": 52 });
+    let sets = parse_strength_sets(data.as_object().unwrap());
+    assert_eq!(
+        sets.iter().map(|s| s.action_code).collect::<Vec<_>>(),
+        vec![1201, 1201]
+    );
+}
+
+/// 在 Zepp App 里改过次数、删过组之后，汇总的逐组列表是改后的版本，`lap` 还是手表原始的：
+/// 组数、动作、次数跟汇总走，重量、时长、心率沿用 `lap` 里对上的那一组（#170）。
+#[test]
+fn edits_from_the_summary_win_and_keep_the_lap_weights() {
+    let sets = [
+        // 引体向上手表没数出次数，App 里补成 8 和 7。
+        synthetic_62_col_row(0, 24, 112, 3.0, 10.0, 0, 0, 1201, 24_110),
+        synthetic_62_col_row(1, 23, 100, 2.0, 10.0, 0, 0, 1201, 23_600),
+        synthetic_62_col_row(2, 30, 120, 4.0, 15.0, 9, 0, 1983, 30_000),
+        // 这一组在 App 里删掉了。
+        synthetic_62_col_row(3, 40, 117, 6.0, 15.0, 11, 0, 1983, 39_570),
+        synthetic_62_col_row(4, 40, 135, 7.0, 50.0, 10, 0, 1908, 40_190),
+    ]
+    .join(";");
+    let data = json!({ "lap": sets, "type": 52 });
+    let sets = parse_strength_sets(data.as_object().unwrap());
+    assert_eq!(sets.len(), 5);
+
+    let groups = history(&[(1201, 8), (1201, 7), (1983, 11), (1908, 12), (102, 10)]);
+    let detail =
+        build_strength_workout_detail(sets, true, Some(6), Some(30), Some(90), Some(&groups))
+            .unwrap();
+    assert_eq!(detail.total_sets, 5);
+    assert_eq!(detail.zepp_total_sets, Some(6));
+    assert_eq!(
+        detail
+            .sets
+            .iter()
+            .map(|s| (s.set_index, s.action_code, s.reps, s.weight_kg))
+            .collect::<Vec<_>>(),
+        vec![
+            (1, 1201, 8, Some(10.0)),
+            (2, 1201, 7, Some(10.0)),
+            // 次数改成 11，重量和时长沿用 lap 里同动作的第一组。
+            (3, 1983, 11, Some(15.0)),
+            (4, 1908, 12, Some(50.0)),
+            // App 里补的一组：没有手表记录，重量和时长不猜。
+            (5, 102, 10, None),
+        ]
+    );
+    assert_eq!(detail.sets[2].duration_ms, Some(30_000));
+    assert_eq!(detail.sets[4].duration_ms, None);
+    assert_eq!(
+        detail.sets[4].exercise_key.as_deref(),
+        Some("dumbbell_shrug")
+    );
+    assert_eq!(detail.total_reps, 48);
+    // 8*10 + 7*10 + 11*15 + 12*50 = 915
+    assert_eq!(detail.total_volume_kg, Some(915.0));
+    assert_eq!(detail.exercise_groups.len(), 4);
+}
+
+/// FIT 的 set 不带动作（编号 0）：条数和汇总一样时按位置对齐，动作和名字来自汇总，
+/// 时长和重量来自 FIT，两条路得到同样的结构（#170）。
+#[test]
+fn fit_sets_without_actions_line_up_with_the_summary_by_position() {
+    let fit_set = |index: i32, reps: i32, weight: Option<f64>, ms: i64| StrengthSetRow {
+        set_index: index,
+        action_code: 0,
+        exercise_key: None,
+        muscle_group: None,
+        reps,
+        weight_value: weight,
+        weight_unit: "kg".into(),
+        weight_kg: weight,
+        duration_ms: Some(ms),
+        avg_hr: None,
+        calories_kcal: None,
+        exercise_name: None,
+        secondary_muscle_groups: Vec::new(),
+    };
+    let sets = vec![
+        fit_set(1, 10, Some(90.0), 40_000),
+        fit_set(2, 10, Some(90.0), 41_000),
+        fit_set(3, 12, None, 35_000),
+    ];
+    let groups = history(&[(1310, 10), (1310, 10), (1, 12)]);
+    let detail =
+        build_strength_workout_detail(sets, true, Some(3), Some(32), None, Some(&groups)).unwrap();
+    assert_eq!(
+        detail
+            .sets
+            .iter()
+            .map(|s| (s.action_code, s.reps, s.weight_kg, s.duration_ms))
+            .collect::<Vec<_>>(),
+        vec![
+            (1310, 10, Some(90.0), Some(40_000)),
+            (1310, 10, Some(90.0), Some(41_000)),
+            (1, 12, None, Some(35_000)),
+        ]
+    );
+    assert_eq!(
+        detail.sets[2].exercise_key.as_deref(),
+        Some("bodyweight_squats")
+    );
+}
+
+/// 还没有逐组明细时，总组数按汇总列表的条数算：云端 `total_group` 写 25、列表只有 21 组时
+/// 显示 21，和动作分组对得上（#170）。
+#[test]
+fn summary_only_total_sets_follow_the_listed_sets() {
+    let entries: Vec<(i32, i32)> = (0..21).map(|i| (1310 + (i / 3), 10)).collect();
+    let groups = history(&entries);
+    let detail = build_strength_workout_detail(
+        Vec::new(),
+        true,
+        Some(25),
+        Some(210),
+        Some(700),
+        Some(&groups),
+    )
+    .unwrap();
+    assert_eq!(detail.total_sets, 21);
+    // Zepp 自己的汇总数原样留着，导出和 MCP 里能对照。
+    assert_eq!(detail.zepp_total_sets, Some(25));
+    assert_eq!(detail.total_reps, 210);
+    assert_eq!(
+        detail.exercise_groups.iter().map(|g| g.sets).sum::<i32>(),
+        21
+    );
+}

@@ -211,6 +211,7 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
     if text.is_empty() {
         return Vec::new();
     }
+    log_unrecognised_shape("明细 strengthSets", data.get("strengthSets"), &[]);
     let has_strength_envelope = non_empty_strength_marker(data.get("strengthAssess"))
         || non_empty_strength_marker(data.get("strengthSets"))
         || data
@@ -278,8 +279,10 @@ pub fn parse_strength_sets(data: &serde_json::Map<String, Value>) -> Vec<Strengt
         let ms_raw = int(&cols, 43).unwrap_or(-1);
         let sec_int = int(&cols, 1).unwrap_or(-1);
 
-        // 组间休息：没有动作、没有次数、没有重量。不算一组。
-        if action_code.is_none() && reps.unwrap_or(0) == 0 && weight_raw.is_none() {
+        // 组间休息：没有动作（或动作是 0「未选动作」）、没有次数、没有重量。不算一组。
+        // 有的表款把组间休息记成动作 0 的一行（时长就是休息计时），以前会被当成一组
+        // 「未选动作 × 0」，总组数也跟着多出来。
+        if matches!(action_code, None | Some(0)) && reps.unwrap_or(0) == 0 && weight_raw.is_none() {
             continue;
         }
         let action_code = action_code.unwrap_or(-1);
@@ -368,6 +371,11 @@ fn non_empty_strength_marker(value: Option<&Value>) -> bool {
 
 /// 解析 history 里的 `strength_training_group`（既支持 JSON 字符串也支持 JSON 数组）。
 pub fn parse_history_strength_groups(value: Option<&Value>) -> Vec<StoredStrengthGroupEntry> {
+    log_unrecognised_shape(
+        "汇总 strength_training_group",
+        value,
+        &["actionType", "action_type", "count", "reps"],
+    );
     let parsed_array: Option<Vec<Value>> = match value {
         Some(Value::Array(items)) => Some(items.clone()),
         Some(Value::String(text)) => {
@@ -407,6 +415,65 @@ pub fn parse_history_strength_groups(value: Option<&Value>) -> Vec<StoredStrengt
     out
 }
 
+/// 力量训练条目里出现我们还不读的字段时，记一次字段名（只记名字，不记任何数值）。
+///
+/// 在 Zepp App 里改过的组数、次数、重量写在哪里还没有实测样本：手表原始的逐组记录在
+/// `lap`，改过的次数在汇总 `strength_training_group`，`strengthSets` 在没改过的运动里是
+/// `[]`。这一行让诊断报告能看出改过的运动多带了哪些字段。同一组字段名每次进程只记一次。
+fn log_unrecognised_shape(source: &str, value: Option<&Value>, known: &[&str]) {
+    use std::collections::BTreeSet;
+    use std::sync::{Mutex, OnceLock};
+    static SEEN: OnceLock<Mutex<BTreeSet<String>>> = OnceLock::new();
+
+    let items: Vec<Value> = match value {
+        Some(Value::Array(items)) => items.clone(),
+        Some(Value::String(text)) => {
+            serde_json::from_str::<Vec<Value>>(text.trim()).unwrap_or_default()
+        }
+        _ => return,
+    };
+    let mut keys = BTreeSet::new();
+    for item in &items {
+        match item.as_object() {
+            Some(object) => keys.extend(
+                object
+                    .keys()
+                    .filter(|key| !known.contains(&key.as_str()))
+                    .cloned(),
+            ),
+            None => {
+                keys.insert(format!("<{}>", json_kind(item)));
+            }
+        }
+    }
+    if keys.is_empty() {
+        return;
+    }
+    let signature = format!(
+        "{source}: {}",
+        keys.into_iter().collect::<Vec<_>>().join(",")
+    );
+    let seen = SEEN.get_or_init(|| Mutex::new(BTreeSet::new()));
+    let mut seen = seen.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if seen.len() < 64 && seen.insert(signature.clone()) {
+        tracing::info!(
+            "力量训练条目带未读取的字段（{} 条）：{signature}",
+            items.len()
+        );
+    }
+}
+
+fn json_kind(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
 fn as_i32(value: &Value) -> Option<i32> {
     value
         .as_i64()
@@ -422,8 +489,12 @@ fn as_i32(value: &Value) -> Option<i32> {
 
 /// 组装对外返回的 `StrengthWorkoutDetail`。
 ///
-/// 有逐组明细 `sets` 时以明细为权威来源计算总组数、总次数、总容量与按动作聚合；
-/// 尚未拉取到 `detail` 时退化使用 `workouts` 表里的汇总流字段，不编造重量或单组时长。
+/// 逐组明细 `sets`（手表原始记录 `lap`，或 FIT 的 set）和汇总的逐组列表
+/// `strength_training_group` 都在时，先按汇总对齐（见 [`reconcile_sets_with_history`]）：
+/// 在 Zepp App 里改过的动作和次数只改汇总，不改 `lap`。
+/// 有明细时以对齐后的明细计算总组数、总次数、总容量与按动作聚合；
+/// 尚未拉取到 `detail` 时退化使用汇总，总组数按汇总列表的条数算（云端的 `total_group`
+/// 可能还是改之前的组数），不编造重量或单组时长。
 pub fn build_strength_workout_detail(
     sets: Vec<StrengthSetRow>,
     is_strength_workout: bool,
@@ -432,6 +503,15 @@ pub fn build_strength_workout_detail(
     rest_seconds: Option<i64>,
     history_groups_json: Option<&str>,
 ) -> Option<StrengthWorkoutDetail> {
+    let stored_groups: Vec<StoredStrengthGroupEntry> = history_groups_json
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or_default();
+    let sets = if sets.is_empty() || stored_groups.is_empty() {
+        sets
+    } else {
+        reconcile_sets_with_history(sets, &stored_groups)
+    };
+
     if !sets.is_empty() {
         let total_sets = sets.len() as i32;
         let total_reps: i32 = sets.iter().map(|s| s.reps.max(0)).sum();
@@ -448,6 +528,7 @@ pub fn build_strength_workout_detail(
         let exercise_groups = aggregate_groups(sets.iter().map(|s| (s.action_code, s.reps)));
         return Some(StrengthWorkoutDetail {
             total_sets,
+            zepp_total_sets: history_total_sets.filter(|n| *n > 0),
             total_reps,
             total_volume_kg: has_weighted.then(|| round2(volume_sum)),
             rest_seconds: rest_seconds.filter(|s| *s >= 0),
@@ -460,21 +541,17 @@ pub fn build_strength_workout_detail(
         return None;
     }
 
-    let stored_groups: Vec<StoredStrengthGroupEntry> = history_groups_json
-        .and_then(|raw| serde_json::from_str(raw).ok())
-        .unwrap_or_default();
     let exercise_groups = aggregate_groups(stored_groups.iter().map(|g| (g.action_code, g.reps)));
     let derived_sets = (!stored_groups.is_empty()).then_some(stored_groups.len() as i32);
     let derived_reps =
         (!stored_groups.is_empty()).then(|| stored_groups.iter().map(|g| g.reps.max(0)).sum());
 
-    let total_sets = history_total_sets
-        .filter(|n| *n > 0)
-        .or(derived_sets)
+    // 有逐组列表时总数跟列表走，和下面的动作分组对得上；没有列表才用云端的汇总数。
+    let total_sets = derived_sets
+        .or(history_total_sets.filter(|n| *n > 0))
         .unwrap_or(0);
-    let total_reps = history_total_reps
-        .filter(|n| *n >= 0)
-        .or(derived_reps)
+    let total_reps = derived_reps
+        .or(history_total_reps.filter(|n| *n >= 0))
         .unwrap_or(0);
     let rest_seconds = rest_seconds.filter(|s| *s >= 0);
 
@@ -484,12 +561,123 @@ pub fn build_strength_workout_detail(
 
     Some(StrengthWorkoutDetail {
         total_sets,
+        zepp_total_sets: history_total_sets.filter(|n| *n > 0),
         total_reps,
         total_volume_kg: None,
         rest_seconds,
         sets: Vec::new(),
         exercise_groups,
     })
+}
+
+/// 把逐组明细按汇总的逐组列表对齐。
+///
+/// 汇总 `strength_training_group` 是 Zepp App 里改过之后的版本（每组一条：动作、次数），
+/// 明细 `lap` 是手表记下的原始版本，带重量、时长、心率和千卡。对齐后：
+/// - 组的条数、顺序、动作和次数以汇总为准（App 里删掉的组不再出现，补上的组照样列出）；
+/// - 对上的组沿用明细里的重量、时长、心率、千卡；汇总里新加的组这几项为空，不猜。
+///
+/// 对齐用动作编号的最长公共子序列，所以改了某一组的动作不会把后面的组整体错位。
+/// FIT 的 set 不带动作（编号都是 0），条数和汇总一样时按位置对齐。
+pub fn reconcile_sets_with_history(
+    sets: Vec<StrengthSetRow>,
+    history: &[StoredStrengthGroupEntry],
+) -> Vec<StrengthSetRow> {
+    if history.is_empty() {
+        return sets;
+    }
+    let positional = sets.len() == history.len()
+        && (sets.iter().all(|set| set.action_code == 0)
+            || sets
+                .iter()
+                .zip(history)
+                .all(|(set, entry)| set.action_code == entry.action_code));
+    let matched: Vec<Option<usize>> = if positional {
+        (0..history.len()).map(Some).collect()
+    } else {
+        lcs_by_action(&sets, history)
+    };
+
+    let mut sets: Vec<Option<StrengthSetRow>> = sets.into_iter().map(Some).collect();
+    history
+        .iter()
+        .zip(matched)
+        .enumerate()
+        .map(|(position, (entry, matched))| {
+            let mut row =
+                matched
+                    .and_then(|at| sets[at].take())
+                    .unwrap_or_else(|| StrengthSetRow {
+                        set_index: 0,
+                        action_code: entry.action_code,
+                        exercise_key: None,
+                        muscle_group: None,
+                        reps: 0,
+                        weight_value: None,
+                        weight_unit: "kg".into(),
+                        weight_kg: None,
+                        duration_ms: None,
+                        avg_hr: None,
+                        calories_kcal: None,
+                        exercise_name: None,
+                        secondary_muscle_groups: Vec::new(),
+                    });
+            let (exercise_key, muscle_group) = resolve_strength_action(entry.action_code);
+            row.set_index = position as i32 + 1;
+            row.action_code = entry.action_code;
+            row.exercise_key = exercise_key.map(str::to_string);
+            row.muscle_group = muscle_group.map(str::to_string);
+            row.reps = entry.reps.max(0);
+            row
+        })
+        .collect()
+}
+
+/// 汇总第 i 条对上的明细下标（动作编号的最长公共子序列；条数在几百以内）。
+fn lcs_by_action(
+    sets: &[StrengthSetRow],
+    history: &[StoredStrengthGroupEntry],
+) -> Vec<Option<usize>> {
+    let (n, m) = (history.len(), sets.len());
+    if n.saturating_mul(m) > 1_000_000 {
+        // 不正常的超长列表：退回顺序贪心匹配，不为它分配大表。
+        let mut cursor = 0;
+        return history
+            .iter()
+            .map(|entry| {
+                let at = cursor
+                    + sets[cursor..]
+                        .iter()
+                        .position(|s| s.action_code == entry.action_code)?;
+                cursor = at + 1;
+                Some(at)
+            })
+            .collect();
+    }
+    let mut table = vec![vec![0u32; m + 1]; n + 1];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            table[i][j] = if history[i].action_code == sets[j].action_code {
+                table[i + 1][j + 1] + 1
+            } else {
+                table[i + 1][j].max(table[i][j + 1])
+            };
+        }
+    }
+    let mut matched = vec![None; n];
+    let (mut i, mut j) = (0, 0);
+    while i < n && j < m {
+        if history[i].action_code == sets[j].action_code {
+            matched[i] = Some(j);
+            i += 1;
+            j += 1;
+        } else if table[i + 1][j] >= table[i][j + 1] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    matched
 }
 
 fn aggregate_groups(items: impl IntoIterator<Item = (i32, i32)>) -> Vec<StrengthExerciseGroup> {

@@ -1058,6 +1058,7 @@ fn replaying_strength_workout_extracts_sets_volume_and_rest_without_polluting_la
     // Detail 尚未拉取前，回退使用 history 汇总，不编造重量与单组时长。
     let fallback = db.get_workout_series("str-1").unwrap().strength.unwrap();
     assert_eq!(fallback.total_sets, 2);
+    assert_eq!(fallback.zepp_total_sets, Some(2));
     assert_eq!(fallback.total_reps, 22);
     assert_eq!(fallback.total_volume_kg, None);
     assert_eq!(fallback.rest_seconds, Some(95));

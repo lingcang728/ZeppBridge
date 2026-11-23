@@ -107,6 +107,7 @@ pub(super) fn render(out: &mut String, workout: &Value) {
         let mut summary_rows = Vec::new();
         for (key, label) in [
             ("total_sets", "total_sets"),
+            ("zepp_total_sets", "zepp_total_sets"),
             ("total_reps", "total_reps"),
             ("total_volume_kg", "total_volume_kg"),
             ("rest_seconds", "rest_seconds"),

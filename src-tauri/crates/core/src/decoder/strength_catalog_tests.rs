@@ -154,6 +154,7 @@ fn enrichment_fills_new_codes_keeps_reviewed_groups_and_never_invents() {
     };
     let detail = || StrengthWorkoutDetail {
         total_sets: 3,
+        zepp_total_sets: None,
         total_reps: 36,
         total_volume_kg: None,
         rest_seconds: None,
