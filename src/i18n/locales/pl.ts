@@ -93,6 +93,21 @@ export default {
       altitudeHint: 'Wysokość nad poziomem morza pochodzi z zapisów zegarka lub plików FIT zaimportowanych na tym komputerze. Skalibrowana wysokość z Zepp App nie została jeszcze pobrana, dlatego wartości mogą się różnić.',
       planHint: 'Plany są wysyłane zgodnie z wybraną główną kategorią sportu. Etykiety takie jak Trail są przesyłane jako opis; nie potwierdzono jeszcze, czy zegarek może przełączyć się na odpowiedni tryb sportowy. Plany treningu siłowego nie mogą być jeszcze wysyłane.',
       strengthHint: 'W ukończonych treningach siłowych wyświetlane są tylko dane rzeczywiście zwrócone przez chmurę. Liczba powtórzeń w seriach, obciążenie i automatyczny pomiar ciśnienia krwi wymagają weryfikacji na podstawie próbek z konta. Jeśli model jest nieznany, możesz wskazać urządzenie ręcznie.',
+      exportFit: 'Eksportuj FIT',
+      exportFitTitle: 'Wybierz folder do zapisania plików FIT',
+      exportFitFailed: 'Eksport nie powiódł się. Spróbuj ponownie.',
+      exportingFit: (done: number, total: number) => `Eksportowanie ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => {
+        const savedMessage = plural(saved, {
+          one: `Zapisano ${saved} plik FIT`,
+          few: `Zapisano ${saved} pliki FIT`,
+          many: `Zapisano ${saved} plików FIT`,
+          other: `Zapisano ${saved} pliku FIT`,
+        });
+        return failed === 0
+          ? savedMessage
+          : `${savedMessage}, nie wyeksportowano ${failed} pozycji`;
+      },
     },
 // --- Batch 1 ---
 // Source: src/App.i18n.ts

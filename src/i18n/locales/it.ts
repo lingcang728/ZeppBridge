@@ -99,6 +99,13 @@ export default {
       saved: (n: number) => (n === 1 ? '1 allenamento aggiornato' : `${n} allenamenti aggiornati`),
       failed: 'Modifica non riuscita, riprova',
       detailsTitle: 'Completa i dettagli degli allenamenti',
+      exportFit: 'Esporta FIT',
+      exportFitTitle: 'Scegli la cartella in cui salvare i file FIT',
+      exportFitFailed: 'Esportazione non riuscita, riprova',
+      exportingFit: (done: number, total: number) => `Esportazione ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => (failed
+        ? `${saved === 1 ? 'Salvato' : 'Salvati'} ${saved} file FIT; ${failed} ${failed === 1 ? 'non esportato' : 'non esportati'}`
+        : `${saved === 1 ? 'Salvato' : 'Salvati'} ${saved} file FIT`),
       detailChannel: 'Origine dei dettagli',
       advancedChannel: 'Dati avanzati',
       officialChannel: 'Zepp ufficiale',

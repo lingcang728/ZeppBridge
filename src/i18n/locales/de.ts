@@ -426,6 +426,14 @@ export default {
       altitudeHint: 'Die Höhe stammt aus den Uhraufzeichnungen oder lokal importierten FIT-Dateien. Die kalibrierte Höhe der Zepp-App wurde noch nicht abgerufen; die Werte können abweichen.',
       planHint: 'Pläne werden für die ausgewählte Sportkategorie gesendet. Bezeichnungen wie Trail werden als Beschreibung übertragen; ob die Uhr in den entsprechenden Sportmodus wechseln kann, ist noch nicht bestätigt. Krafttrainingspläne lassen sich derzeit nicht senden.',
       strengthHint: 'Bei abgeschlossenen Krafttrainings werden nur Daten angezeigt, die tatsächlich von der Cloud geliefert werden. Wiederholungen und Gewicht je Satz sowie automatische Blutdruckmessungen müssen noch anhand von Beispieldaten aus Konten überprüft werden. Ist das Modell unbekannt, kannst du das Gerät manuell zuordnen.',
+      exportFit: 'FIT exportieren',
+      exportFitTitle: 'Ordner zum Speichern der FIT-Dateien auswählen',
+      exportFitFailed: 'Export fehlgeschlagen. Bitte erneut versuchen.',
+      exportingFit: (done: number, total: number) => `Exportiere ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => {
+        const savedText = plural(saved, { one: '1 FIT-Datei gespeichert', other: `${saved} FIT-Dateien gespeichert` });
+        return failed === 0 ? savedText : `${savedText}, ${failed} nicht exportiert`;
+      },
     },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Keine Messwerte in den letzten 6 Monaten: ${list}`,

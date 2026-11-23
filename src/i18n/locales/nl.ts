@@ -138,6 +138,22 @@ export default {
         'Plannen worden verzonden volgens de gekozen sportcategorie. Labels zoals ‘Trail’ worden als toelichting meegestuurd; het is nog niet bevestigd of het horloge naar de bijbehorende sportmodus kan overschakelen. Krachttrainingsplannen kunnen nog niet worden verzonden.',
       strengthHint:
         'Bij voltooide krachttrainingen worden alleen gegevens getoond die de cloud daadwerkelijk terugstuurt. Herhalingen en gewichten per set en automatische bloeddrukmetingen moeten nog worden geverifieerd met voorbeeldgegevens uit accounts. Als het model onbekend is, kun je zelf aangeven welk apparaat het is.',
+      exportFit: 'FIT exporteren',
+      exportFitTitle: 'Kies een map om FIT-bestanden op te slaan',
+      exportFitFailed: 'Exporteren mislukt. Probeer het opnieuw.',
+      exportingFit: (done: number, total: number) => `Exporteren ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => {
+        const savedText = plural(saved, {
+          one: '1 FIT-bestand opgeslagen',
+          other: `${saved} FIT-bestanden opgeslagen`,
+        });
+        if (failed === 0) return savedText;
+        const failedText = plural(failed, {
+          one: '1 FIT-bestand kon niet worden geëxporteerd',
+          other: `${failed} FIT-bestanden konden niet worden geëxporteerd`,
+        });
+        return `${savedText}, ${failedText}`;
+      },
     },
 
     'components/BackfillOffer': {

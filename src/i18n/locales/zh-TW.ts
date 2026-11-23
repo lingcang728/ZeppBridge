@@ -747,6 +747,13 @@ export default {
       type: '選擇運動類型',
       undo: '復原上次修改',
       visible: '運動紀錄',
+      exportFit: '匯出 FIT',
+      exportFitTitle: '選擇儲存 FIT 檔案的資料夾',
+      exportFitFailed: '匯出失敗，請重試',
+      exportingFit: (done: number, total: number) => `正在匯出 ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => failed === 0
+        ? `已儲存 ${saved} 個 FIT 檔案`
+        : `已儲存 ${saved} 個 FIT 檔案，${failed} 筆未匯出`,
     },
     'components/activity/HourlyStepsCard': {
       averageBarTitle: (hour: number, steps: string) => `${hour} 點：平均 ${steps} 步`,

@@ -103,6 +103,22 @@ export default {
       altitudeHint: 'L’altitude provient des enregistrements de la montre ou de fichiers FIT importés sur cet ordinateur. L’altitude étalonnée de Zepp App n’a pas encore été récupérée ; les valeurs peuvent différer.',
       planHint: 'Les plans sont envoyés selon la catégorie de sport sélectionnée. Les libellés comme Trail sont transmis dans la description ; la possibilité de passer au mode sportif correspondant sur la montre n’est pas encore confirmée. Les plans de musculation ne peuvent pas être envoyés pour l’instant.',
       strengthHint: 'Les séances de musculation terminées n’affichent que les données réellement renvoyées par le cloud. Les répétitions et les charges par série, ainsi que les mesures automatiques de tension artérielle, doivent encore être vérifiées à partir de données de comptes réels. Si le modèle est inconnu, vous pouvez identifier l’appareil manuellement.',
+      exportFit: 'Exporter FIT',
+      exportFitTitle: 'Choisir un dossier pour enregistrer les fichiers FIT',
+      exportFitFailed: 'Échec de l’export. Veuillez réessayer.',
+      exportingFit: (done: number, total: number) => `Exportation ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => {
+        const savedText = plural(saved, {
+          one: `${saved} fichier FIT enregistré`,
+          other: `${saved} fichiers FIT enregistrés`,
+        });
+        if (failed === 0) return savedText;
+        const failedText = plural(failed, {
+          one: `${failed} échec`,
+          other: `${failed} échecs`,
+        });
+        return `${savedText}, ${failedText} d’export`;
+      },
     },
     'components/BackfillOffer': {
       offer: (date: string) => `Cet ordinateur ne remonte que jusqu’au ${date}. Rattraper l’historique antérieur depuis le cloud ?`,

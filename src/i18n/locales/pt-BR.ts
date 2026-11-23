@@ -89,6 +89,16 @@ export default {
       altitudeHint: 'A altitude vem dos registros do relógio ou de arquivos FIT importados neste computador. A altitude calibrada do Zepp App ainda não foi obtida, por isso os valores podem ser diferentes.',
       planHint: 'Os planos são enviados de acordo com a categoria de esporte selecionada. Rótulos como Trail são enviados como descrição; ainda não foi confirmado se o relógio consegue alternar para o modo de treino correspondente. Planos de treino de força ainda não podem ser enviados.',
       strengthHint: 'Treinos de força concluídos exibem apenas os dados retornados pela nuvem. Repetições e carga por série, além da pressão arterial automática, precisam de validação com amostras de contas; se o modelo for desconhecido, você pode identificar o dispositivo manualmente.',
+      exportFit: 'Exportar FIT',
+      exportFitTitle: 'Selecione uma pasta para salvar os arquivos FIT',
+      exportFitFailed: 'Falha na exportação. Tente novamente.',
+      exportingFit: (done: number, total: number) => `Exportando ${done}/${total}`,
+      exportedFit: (saved: number, failed: number) => {
+        const savedFiles = plural(saved, { one: `${saved} arquivo FIT salvo`, other: `${saved} arquivos FIT salvos` });
+        if (failed === 0) return savedFiles;
+        const failedRecords = plural(failed, { one: `${failed} registro não exportado`, other: `${failed} registros não exportados` });
+        return `${savedFiles}, ${failedRecords}`;
+      },
     },
     'components/MissingMetricsRow': {
       summary: (list: string) => `Sem leituras nos últimos 6 meses: ${list}`,
