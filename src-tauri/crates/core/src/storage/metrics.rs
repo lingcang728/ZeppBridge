@@ -138,13 +138,16 @@ impl Database {
                 continue;
             };
 
-            let points = match source {
+            let mut points = match source {
                 MetricSource::Daily(spread) => {
                     self.daily_metric_points(name, spread, &start_text, &end_text)?
                 }
                 MetricSource::Samples => self.sample_metric_points(name, &start_text, &end_text)?,
                 MetricSource::SleepScores => self.sleep_score_points(&start_text, &end_text)?,
             };
+            if name == "resting_hr" {
+                points = self.with_device_resting_fallback(points, &start_text, &end_text)?;
+            }
 
             let values: Vec<f64> = points.iter().map(|point| point.value).collect();
             let (minimum, maximum) = metric_series_extrema(name, &points);
@@ -166,6 +169,33 @@ impl Database {
             });
         }
         Ok(result)
+    }
+
+    /// 静息心率曲线：优先用睡眠汇总里的 `rhr`（`resting_hr`）；某一天没有它，就用手表自报的静息心率
+    /// （`device_resting_hr`，来自 PAI 报文）补上那一天。
+    ///
+    /// 有些账号的睡眠汇总从来不带 `rhr`，于是静息心率整条曲线都是空的，而库里其实有手表每天报的值。
+    /// 只补**缺的那几天**，不改已有的读数；两者量法不同，所以不取平均、不混成一个数。只用在这条图表序列上，
+    /// 基线、导出等别处仍按各自的指标名读，不受影响。
+    fn with_device_resting_fallback(
+        &self,
+        points: Vec<MetricSeriesPoint>,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<MetricSeriesPoint>> {
+        let device = self.daily_metric_points("device_resting_hr", None, start, end)?;
+        if device.is_empty() {
+            return Ok(points);
+        }
+        let have: BTreeSet<String> = points.iter().map(|point| point.date.clone()).collect();
+        let mut merged = points;
+        merged.extend(
+            device
+                .into_iter()
+                .filter(|point| !have.contains(&point.date)),
+        );
+        merged.sort_by(|a, b| a.date.cmp(&b.date));
+        Ok(merged)
     }
 
     /// A night's score belongs to its local wake date. If more than one
