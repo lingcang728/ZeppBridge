@@ -6,6 +6,12 @@ import {
 import { LOCALES } from '../../i18n';
 import { FALLBACK_APP_VERSION } from '../../lib/appVersion';
 
+/**
+ * 两次正式版之间，main 上的版本号可以是测试版（3.3.0-beta.1）：它沿用上一正式版打包的说明，
+ * 不弹更新信封。「版本号 = 打包说明的版本」这条只对正式版成立，打 v* 标签的那一版必须满足。
+ */
+const PRERELEASE = FALLBACK_APP_VERSION.includes('-');
+
 describe('release notes after a successful restart', () => {
   let storage: Map<string, string>;
   const receipt = { from: '3.0.0', version: '3.0.1', notes: 'Added: A new setting' };
@@ -73,7 +79,7 @@ describe('release notes after a successful restart', () => {
     expect(() => restoreUpdateNotice('3.0.1')).not.toThrow();
     expect(() => acknowledgeUpdate()).not.toThrow();
   });
-  it('shows bundled notes to a legacy user only after launching the installed new version', async () => {
+  it.skipIf(PRERELEASE)('shows bundled notes to a legacy user only after launching the installed new version', async () => {
     storage.set('zeppbridge.tour.firstLaunch', '1');
     prepareUpdateNotice();
     expect(updateNotice.receipt).toBeNull();
@@ -86,6 +92,13 @@ describe('release notes after a successful restart', () => {
     acknowledgeUpdate();
     prepareUpdateNotice();
     restoreUpdateNotice(BUNDLED_VERSION);
+    expect(updateNotice.receipt).toBeNull();
+  });
+  it.runIf(PRERELEASE)('a pre-release build carries the last release\'s notes but never shows them', () => {
+    storage.set('zeppbridge.tour.firstLaunch', '1');
+    prepareUpdateNotice();
+    restoreUpdateNotice(BUNDLED_VERSION);
+    restoreUpdateNotice(FALLBACK_APP_VERSION);
     expect(updateNotice.receipt).toBeNull();
   });
   it('never mistakes first-launch onboarding or a same-version relaunch for an upgrade', () => {
@@ -124,7 +137,12 @@ describe('release notes after a successful restart', () => {
  */
 describe('bundled release notes for the current version', () => {
   it('ships the notes for the version this build is', () => {
-    expect(BUNDLED_VERSION).toBe(FALLBACK_APP_VERSION);
+    if (PRERELEASE) {
+      // 测试版：打包的是某个正式版的说明，不会是测试版自己的号。
+      expect(BUNDLED_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    } else {
+      expect(BUNDLED_VERSION).toBe(FALLBACK_APP_VERSION);
+    }
   });
   it('has one file per interface language, each with categorized lines', async () => {
     // 繁体从 3.1.1 起才有自己那份；之前的版本回落简体（下面逐语言读得到就行）。
