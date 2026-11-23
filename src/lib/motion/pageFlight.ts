@@ -120,7 +120,7 @@ export const veilOut = (from = 1, duration = PAGE_WINDOW_MS): { frames: Keyframe
 });
 
 /**
- * 蒙在来处页上的那层模糊（样式见 shell.css 的 .page-veil，和弹窗遮罩同一组值）：静态的模糊，只动这一层的透明度。
+ * 蒙在来处页上的那层暗色（样式见 shell.css 的 .page-veil，和弹窗遮罩同一个暗度，不做背景模糊）：只动这一层的透明度。
  * 它是来处页自己的子元素（层次最高）：页面是 KeepAlive 缓存的，挂在它身上就跟着它进出文档；要是挂到页面外面，
  * 层次会压到正在长的窗口上面。来处页临时 isolation: isolate，页面里 z-index 高的块（吸顶的条）不会穿出来。
  */
@@ -139,15 +139,20 @@ export const pageVeil = (under: HTMLElement, viewport: Rect): HTMLElement => {
     width: `${r1(viewport.width)}px`,
     height: `${r1(viewport.height)}px`,
   });
+  // .page 横向是 overflow-x: clip。窗口比页面的最大宽度还宽时，页面两侧留白里的那截暗层会被裁掉，
+  // 收回时左右各露出一条没蒙上的竖边。暗层在场时放开横向裁切，撤层时还原。
+  // （overflow-clip-margin 只在两个方向都是 clip 时才生效，用不上。）
+  if (box.left > viewport.left || box.right < viewport.left + viewport.width) under.style.overflowX = 'visible';
   return veil;
 };
-/** 撤掉模糊层，来处页的临时样式还原。 */
+/** 撤掉暗层，来处页的临时样式还原。 */
 export const removeVeil = (under: HTMLElement | null, veil: HTMLElement | null) => {
   veil?.getAnimations().forEach((animation) => animation.cancel());
   veil?.remove();
   if (!under) return;
   under.style.isolation = '';
   under.style.position = '';
+  under.style.overflowX = '';
 };
 
 const opacityOf = (el: Element | null | undefined) => (el ? Number.parseFloat(getComputedStyle(el).opacity) : Number.NaN);

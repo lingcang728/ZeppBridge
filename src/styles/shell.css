@@ -152,17 +152,17 @@
    不用 CSS 透明度占位：它的墙钟超时与暂停/倒放/DevTools 慢速播放不同步，
    会提前移除离场页，并在下次返回时遗留仍被快进的 CSSTransition。 */
 [class*='page-'].page-expand-enter-active { position: relative; z-index: 3; transition: none; }
-/* 来处页蒙上一层模糊（.page-veil，JS 只动它的透明度），窗口长满、完全盖住它以后才离场。 */
+/* 来处页蒙上一层暗色（.page-veil，JS 只动它的透明度），窗口长满、完全盖住它以后才离场。 */
 [class*='page-'].page-expand-leave-active { z-index: 1; transition: none; }
-/* 来处页一开始就在底板下面、蒙着模糊，跟着窗口缩小慢慢露出来，不再从透明淡入。 */
+/* 来处页一开始就在底板下面、蒙着暗层，跟着窗口缩小慢慢露出来，不再从透明淡入。 */
 [class*='page-'].page-collapse-enter-active { transition: none; }
 .page-collapse-enter-from { opacity: 1; }
 [class*='page-'].page-collapse-leave-active { z-index: 3; transition: none; }
 .page-host > * { transform-origin: 50% 30vh; }
-/* 卡 ↔ 页形变时蒙在来处页上的模糊（lib/motion/pageFlight.ts 的 pageVeil）：和弹窗遮罩（ModalDialog.vue 的
-   .dialog-backdrop::before）同一组值，静态模糊，只淡入淡出这一层，和履历页卡片的动画一致。 */
-.page-veil { position: absolute; z-index: 2147483000; pointer-events: none; opacity: .001; background: rgba(0, 0, 0, .5);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
+/* 卡 ↔ 页形变时蒙在来处页上的暗层（lib/motion/pageFlight.ts 的 pageVeil）：和弹窗遮罩（ModalDialog.vue 的
+   .dialog-backdrop::before）同一个暗度，只淡入淡出这一层。不做背景模糊：展开的页面最后整个盖住它，
+   模糊看不出来，却要在进出页的每一帧对整个窗口重算一遍。弹窗、浮层这类半盖着、背后一直看得见的才留模糊。 */
+.page-veil { position: absolute; z-index: 2147483000; pointer-events: none; opacity: .001; background: rgba(0, 0, 0, .5); }
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
    不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
 .window-replica, .window-replica * { animation: none !important; transition: none !important; }
@@ -173,6 +173,9 @@
 html[data-motion] [class*='page-'].page-collapse-leave-active,
 html[data-motion] [class*='page-'].page-expand-enter-active { pointer-events: none; }
 html[data-motion] .page-veil { pointer-events: auto; }
+/* 形变途中顶栏玻璃外沿只留模糊、摘掉折射（lib/glassLens.ts 的 url() 滤镜）：页面在它底下每帧都在变，
+   这几圈 SVG 折射（位移图 + 色散）就要每帧重算一遍，进出页的帧率因此掉到一半左右。落地即恢复；只换这几个类，不碰别的。 */
+html[data-motion] .glass-rim, html[data-motion] .segment-glass { -webkit-backdrop-filter: var(--glass-blur) !important; backdrop-filter: var(--glass-blur) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
