@@ -100,8 +100,8 @@ Zepp 官方授权 ──► 中转站（zeppbridge.com）──► api-open.zepp
 
 - 主导航是概览、交给 AI（`/ai`）和设置。顶栏放连接状态、全局同步和信件按钮。
 - 主题：深色、浅色、跟随系统（设置 › 显示与语言）。界面缩放可调（80%–125%，也可以 Ctrl + / Ctrl - / Ctrl 0），界面特效也可调（自动 / 完整 / 低特效；自动 = 在 Linux、性能偏弱或电量低时用低特效）。
-- 界面提供**十三个语言与地区选项**：简体中文、英文、西班牙语、荷兰语、巴西葡萄牙语、欧洲葡萄牙语、德语、俄语、印地语、法语、意大利语、波兰语、繁体中文。首次启动跟随第一个受支持的系统语言，否则用英文；设置里随时可换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期名和数字分组也跟着语言走（`i18n/intlLocale()`）。
-  - 中文、英文和西班牙语文案和所在模块放在一起（`defineMessages(zh, en, es?, moduleId?)`，大页面配一个 `*.i18n.ts`）。其余十种用 `src/i18n/locales/<locale>.ts` 语言包，按需加载、按 `moduleId` 对应。缺的译文回落英文；繁体中文回落简体中文。
+- 界面提供**十四个语言与地区选项**：简体中文、英文、西班牙语、荷兰语、巴西葡萄牙语、欧洲葡萄牙语、德语、俄语、印地语、法语、意大利语、波兰语、韩语、繁体中文。首次启动跟随第一个受支持的系统语言，否则用英文；设置里随时可换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期名和数字分组也跟着语言走（`i18n/intlLocale()`）。
+  - 中文、英文和西班牙语文案和所在模块放在一起（`defineMessages(zh, en, es?, moduleId?)`，大页面配一个 `*.i18n.ts`）。其余十一种用 `src/i18n/locales/<locale>.ts` 语言包，按需加载、按 `moduleId` 对应。缺的译文回落英文；繁体中文回落简体中文。
   - `defineMessages` 用 `NoInfer` 把形状钉在中文那一半上：英文少键、多键或参数对不上都编译不过。
   - **后端不按语言产出文案。** 四个出口（界面、CLI、MCP、导出）对同一个问题必须给出同样的回答，所以后端发稳定的码（`recordsUnitCode`、`HealthAction.code`、`SyncProgress.code`、`InsightFact.reason_code`、`err.*`、`ui.*` …），同时保留给 CLI 用的中文原文。界面按码渲染自己的文案，认不出码时才回落原文。导出 JSON 里的 `note` / `detail_note` / `reason` 字段永不翻译：它们是外部脚本读的契约。
   - i18n 检查怎么工作见[开发文档](../development/development.zh-CN.md)。

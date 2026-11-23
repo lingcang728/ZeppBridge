@@ -28,11 +28,11 @@ import { computed, ref, type ComputedRef } from 'vue';
  */
 export type Locale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'zh-TW';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'ko' | 'zh-TW';
 
 /** 语言选择器按这个顺序排：先内联三语，再语言包语言。 */
 export const LOCALES: readonly Locale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko', 'zh-TW',
 ];
 
 /**
@@ -52,12 +52,13 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   fr: 'Français',
   it: 'Italiano',
   pl: 'Polski',
+  ko: '한국어',
   'zh-TW': '繁',
 };
 
 /** 靠语言包覆盖的语言；zh/en/es 的文案就地定义，没有语言包。 */
 export const PACK_LOCALES: readonly Locale[] = [
-  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
+  'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko', 'zh-TW',
 ];
 
 const isPackLocale = (value: Locale): boolean =>
@@ -85,6 +86,7 @@ export const HTML_LANG: Record<Locale, string> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  ko: 'ko',
   'zh-TW': 'zh-Hant',
 };
 
@@ -106,6 +108,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
   fr: 'fr-FR',
   it: 'it-IT',
   pl: 'pl-PL',
+  ko: 'ko-KR',
   'zh-TW': 'zh-TW',
 };
 
@@ -133,6 +136,7 @@ const BASE_LANGUAGE: Record<string, Locale> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  ko: 'ko',
 };
 
 const EXACT_LOCALE = new Map<string, Locale>([

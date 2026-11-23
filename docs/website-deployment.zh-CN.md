@@ -8,7 +8,7 @@ zeppbridge.com 是 Cloudflare Pages 项目 `zeppbridge`。同一份构建产物�
 
 构建脚本不安装任何工具，复用已有的 Python Playwright、Chromium、ffmpeg 和 ffprobe；需要时用 `LANDING_PYTHON`、`LANDING_CHROMIUM`、`PLAYWRIGHT_BROWSERS_PATH` 指到已有的安装。
 
-- `npm run build:web`：类型检查、跑相关测试、本地起应用、检查演示路由，并按 13 种界面语言、深浅两套主题录制功能演示。源文件没变的素材按指纹复用。
+- `npm run build:web`：类型检查、跑相关测试、本地起应用、检查演示路由，并按 14 种界面语言、深浅两套主题录制功能演示。源文件没变的素材按指纹复用。
 - 产物在 `.site-cache/site-dist`，录像和验收截图在 `.site-cache/media`、`.site-cache/verification`，都不进 Git。普通的 `npm run build` 仍只产出桌面应用用的 `dist`，不带网站视频。
 - `npm run site:media` 单独重录素材（加 `--force` 全部重录）；`npm run site:verify -- --url <预览地址>` 对着正在运行的预览（`npm exec vite -- preview --mode site --host 127.0.0.1 --port 1536`）检查排版、内嵌交互、视频和深色模式。
 - 收尾一步（`scripts/site/finish-dist.mjs`）生成 `/changelog`、`/letters`、`/privacy`、404 页和 `_routes.json`。更新日志只收打了 `v*` 标签的版本，所以要在带标签的完整克隆里构建；一个标签都找不到时会直接报错。

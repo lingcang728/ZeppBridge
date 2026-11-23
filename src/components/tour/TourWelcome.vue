@@ -26,9 +26,9 @@ const emit = defineEmits<{ (event: 'start'): void; (event: 'skip'): void }>();
 const t = useTourText();
 
 /* 问候本身不翻译：每种语言说它自己的那一句。 */
-const GREETINGS = ['你好', 'Hello', 'Hola', 'Bonjour', 'Hallo', 'Olá', 'Hoi', 'Привет', 'नमस्ते', 'Ciao', 'Cześć'];
-const GREETING_OF: Record<Locale, number> = { zh: 0, en: 1, es: 2, fr: 3, de: 4, 'pt-BR': 5, 'pt-PT': 5, nl: 6, ru: 7, 'hi-IN': 8, it: 9, pl: 10, 'zh-TW': 0 };
-const LANG_OF = ['zh', 'en', 'es', 'fr', 'de', 'pt', 'nl', 'ru', 'hi', 'it', 'pl'];
+const GREETINGS = ['你好', 'Hello', 'Hola', 'Bonjour', 'Hallo', 'Olá', 'Hoi', 'Привет', 'नमस्ते', 'Ciao', 'Cześć', '안녕하세요'];
+const GREETING_OF: Record<Locale, number> = { zh: 0, en: 1, es: 2, fr: 3, de: 4, 'pt-BR': 5, 'pt-PT': 5, nl: 6, ru: 7, 'hi-IN': 8, it: 9, pl: 10, ko: 11, 'zh-TW': 0 };
+const LANG_OF = ['zh', 'en', 'es', 'fr', 'de', 'pt', 'nl', 'ru', 'hi', 'it', 'pl', 'ko'];
 
 const greeting = ref(GREETING_OF[locale.value] ?? 1);
 const word = computed(() => GREETINGS[greeting.value] ?? '');

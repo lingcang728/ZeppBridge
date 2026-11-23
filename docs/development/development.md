@@ -249,7 +249,7 @@ from the tray stops syncing.
   Chinese fallback out of other languages. New error codes need copy in
   `src/i18n/errors.ts`; `npm run i18n:check` enforces it.
 - Chinese, English and Spanish copy sits next to each component in `*.i18n.ts`
-  (`defineMessages(zh, en, es)`); the other ten languages are in
+  (`defineMessages(zh, en, es)`); the other eleven languages are in
   `src/i18n/locales/`.
 
 ## Rules that protect user data

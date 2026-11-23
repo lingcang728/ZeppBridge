@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { locale } from '../i18n';
+import { LANDING_LOCALES, type LandingLocale } from '../composables/useLandingLocale';
 import { JOURNEY } from '../views/landing/journeyCopy';
 import { PlaybackClock } from '../views/landing/playback';
 import { dialogueCopy } from './dialogueCopy';
@@ -11,8 +12,11 @@ import type { DemoTurn } from './presentation';
 import { lessMotion } from '../lib/motion/lessMotion';
 const emit = defineEmits<{ review: [] }>();
 const dialog = ref<HTMLDialogElement | null>(null), feed = ref<HTMLElement | null>(null);
-const copy = computed(() => JOURNEY[locale.value]);
-const labels = computed(() => dialogueCopy(locale.value));
+// The public landing page has its own locale set; app-only locales use its English demo copy.
+const landingLocale = computed<LandingLocale>(() =>
+  (LANDING_LOCALES as readonly string[]).includes(locale.value) ? locale.value as LandingLocale : 'en');
+const copy = computed(() => JOURNEY[landingLocale.value]);
+const labels = computed(() => dialogueCopy(landingLocale.value));
 /** 宣传片可以换掉整段台词（presentation.script）；对话打开时读一次。 */
 const scripted = ref<DemoTurn[] | null>(null);
 const turns = computed(() => scripted.value ?? [...copy.value.turns.slice(0, 2), labels.value.finalTurn]);

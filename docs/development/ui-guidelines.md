@@ -470,7 +470,7 @@ style choice.
    radio buttons.** The one exception is the workout-type correction on the
    workout detail page (`TypePicker`): there are too many types for a wheel.
 
-Check before merging: **any UI change gets checked in all thirteen interface languages**: no overlap, no text on text, no text showing through, no empty gaps in any language. Run `python scripts/verify/text_overlap.py` (thirteen languages × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did); after touching the workout stage, also run `python scripts/verify/stage_menu.py` (thirteen languages × the "•••" menu with 1–4 cards; overflow, wrapping or overlapping text fails it). A new page or layer that neither list covers gets added first, and the screenshots get looked at language by language. A choice that a picture can say (an arrangement, a ratio) gets an icon, not words. Open and close each new layer at 4× CPU throttle and
+Check before merging: **any UI change gets checked in all fourteen interface languages**: no overlap, no text on text, no text showing through, no empty gaps in any language. Run `python scripts/verify/text_overlap.py` (fourteen languages × the main pages; any two visible text runs that overlap fail it — the French metric-card header once did); after touching the workout stage, also run `python scripts/verify/stage_menu.py` (fourteen languages × the "•••" menu with 1–4 cards; overflow, wrapping or overlapping text fails it). A new page or layer that neither list covers gets added first, and the screenshots get looked at language by language. A choice that a picture can say (an arrangement, a ratio) gets an icon, not words. Open and close each new layer at 4× CPU throttle and
 DPR 2 in headless Chrome (an unthrottled run hides the long tasks) and step
 through the frames — no bright frame, no blank frame, no jump at the start.
 
@@ -569,11 +569,11 @@ the AI.
 - Wherever a picked task is described, say "N picked days", not "last N days"
   (`lib/aiTask/pickedDays.ts` is the single count).
 
-### Interface copy: thirteen languages, never hardcoded
+### Interface copy: fourteen languages, never hardcoded
 
 - **Every word on screen needs a translation.** Chinese, English and Spanish
   go in the module that uses them as `defineMessages(zh, en, es)`; large pages
-  get a matching `*.i18n.ts`. The other ten languages live in
+  get a matching `*.i18n.ts`. The other eleven languages live in
   `src/i18n/locales/`, with untranslated keys listed in a matching
   `*.pending.txt`. Do not build one global dictionary — a
   lazily loaded page's chunk should carry only its own copy.

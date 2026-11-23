@@ -11,7 +11,7 @@ import sys
 
 from playwright.async_api import async_playwright
 
-LOCALES = ['zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr']
+LOCALES = ['zh', 'zh-TW', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko']
 WIDTHS = [780, 900, 1000, 1100, 1280, 1400, 1650, 1920]
 PATHS = ['/', '/heart']  # 概览（品牌）与详情页（返回键）两种左侧
 

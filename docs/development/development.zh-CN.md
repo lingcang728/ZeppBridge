@@ -145,7 +145,7 @@ command 的完整清单就是 `src-tauri/src/lib.rs`，这里不另抄一份。�
 - 格式化时间前先检查 `Date.getTime()`。
 - 用 `src/styles/tokens.css` 里的 token，组件不按主题分支。见 [UI 规范](ui-guidelines.zh-CN.md)。
 - 后端从不按界面语言出文案。它返回稳定的码（错误用 `err.*`，其他文字用 `ui.*`），中文原文只是兜底；界面按码渲染，`i18n/backendText.ts` 挡住中文兜底流到其他语言。新的错误码要在 `src/i18n/errors.ts` 补文案，`npm run i18n:check` 会查。
-- 中文、英文、西班牙语文案放在组件旁的 `*.i18n.ts` 里（`defineMessages(zh, en, es)`），其余十种语言在 `src/i18n/locales/`。
+- 中文、英文、西班牙语文案放在组件旁的 `*.i18n.ts` 里（`defineMessages(zh, en, es)`），其余十一种语言在 `src/i18n/locales/`。
 
 ## 保护用户数据的规矩
 

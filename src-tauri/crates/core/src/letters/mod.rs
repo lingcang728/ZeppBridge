@@ -375,10 +375,11 @@ pub fn normalize_also_hit(ids: &[String]) -> Vec<String> {
     out
 }
 
-/// 回信的界面语言码，只认界面有的 13 种（3.1.1 加繁体 `zh-TW`）。
+/// 回信的界面语言码，只认界面支持的语言。
 pub fn normalize_locale(value: &str) -> Option<&'static str> {
-    const LOCALES: [&str; 13] = [
-        "zh", "en", "es", "nl", "pt-BR", "pt-PT", "de", "ru", "hi-IN", "fr", "it", "pl", "zh-TW",
+    const LOCALES: [&str; 14] = [
+        "zh", "en", "es", "nl", "pt-BR", "pt-PT", "de", "ru", "hi-IN", "fr", "it", "pl", "ko",
+        "zh-TW",
     ];
     LOCALES.iter().copied().find(|locale| *locale == value)
 }

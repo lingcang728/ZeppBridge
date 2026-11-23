@@ -25,6 +25,7 @@ fn login_locale_key(locale: &str) -> &'static str {
             "fr" => return "fr",
             "it" => return "it",
             "pl" => return "pl",
+            "ko" => return "ko",
             "en" => return "en",
             _ => {}
         }
@@ -51,6 +52,7 @@ pub(super) fn login_window_title(locale: &str) -> &'static str {
         "fr" => "Se connecter à Zepp",
         "it" => "Accedi a Zepp",
         "pl" => "Zaloguj się do Zepp",
+        "ko" => "Zepp 로그인",
         _ => "Sign in to Zepp",
     }
 }
@@ -74,6 +76,7 @@ pub(super) fn login_banner_text(locale: &str) -> &'static str {
         "fr" => "ZeppBridge accepte uniquement la connexion avec l’e-mail ou le numéro de téléphone Zepp et un mot de passe. Google, Apple, WeChat, Xiaomi et Facebook ne fonctionnent pas ici. Si vous avez créé votre compte Zepp avec l’un d’eux, se connecter avec le même e-mail et un mot de passe correspond à un autre compte Zepp.",
         "it" => "ZeppBridge supporta solo l’accesso con e-mail o numero di telefono Zepp e password. Google, Apple, WeChat, Xiaomi e Facebook qui non funzionano. Se hai creato l’account Zepp con uno di questi, accedere con la stessa e-mail e una password conta come un altro account Zepp.",
         "pl" => "ZeppBridge obsługuje tylko logowanie adresem e-mail lub numerem telefonu Zepp i hasłem. Google, Apple, WeChat, Xiaomi i Facebook tu nie działają. Jeśli konto Zepp zostało założone przez jedną z tych usług, logowanie tym samym adresem e-mail i hasłem to dla Zepp inne konto.",
+        "ko" => "ZeppBridge는 Zepp 이메일 또는 전화번호와 비밀번호 로그인을 지원합니다. Google, Apple, WeChat, Xiaomi, Facebook 등 타사 계정 로그인은 여기서 사용할 수 없습니다. 타사 계정으로 Zepp 계정을 만들었다면 같은 이메일과 비밀번호로 로그인해도 Zepp에서는 다른 계정으로 인식됩니다.",
         _ => "ZeppBridge only supports signing in with your Zepp email or phone number and password. Google, Apple, WeChat, Xiaomi and Facebook sign-in don’t work here. If you created your Zepp account with one of those, signing in with the same email and a password counts as a different Zepp account.",
     }
 }

@@ -13,7 +13,7 @@ Big one on the left」）三项被等分压窄，字溢出到邻项、和滑块�
 
 需要先起不带夹具的开发服务器（.claude/launch.json 的 landing-dev，端口 5190）：
     python scripts/verify/stage_menu.py [--url http://127.0.0.1:5190] [--locales fr,de] [--theme light]
-退出码 0 = 全部通过。全量十三种语言约五分钟，单线程、不会满载。
+退出码 0 = 全部通过。全量十四种语言约五分钟，单线程、不会满载。
 """
 import argparse
 import asyncio

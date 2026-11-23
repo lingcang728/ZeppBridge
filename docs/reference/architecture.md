@@ -222,16 +222,16 @@ this number".
   Interface scale is adjustable (80%–125%, also Ctrl + / Ctrl - / Ctrl 0), and
   so are visual effects (Auto / Full / Low; Auto means Low on Linux, on slower
   machines and on low battery).
-- The interface offers **thirteen language and region options**: Simplified
+- The interface offers **fourteen language and region options**: Simplified
   Chinese, English, Spanish, Dutch, Brazilian Portuguese, European Portuguese,
-  German, Russian, Hindi, French, Italian, Polish and Traditional Chinese. On
+  German, Russian, Hindi, French, Italian, Polish, Korean and Traditional Chinese. On
   first launch it follows the first supported system language, falling back to
   English; Settings switches it at any time, and the choice is stored in
   `localStorage['zeppbridge-locale']`. Dates, weekday names and number grouping
   follow the language too (`i18n/intlLocale()`).
   - Chinese, English and Spanish copy lives with its module
     (`defineMessages(zh, en, es?, moduleId?)`, with a matching `*.i18n.ts` for
-    large pages). The other ten options use language packs in
+    large pages). The other eleven options use language packs in
     `src/i18n/locales/<locale>.ts`, loaded on demand and matched by `moduleId`.
     Missing translations fall back to English; Traditional Chinese falls back to
     Simplified Chinese.

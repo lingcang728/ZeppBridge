@@ -481,7 +481,7 @@ if (missingCodes.length || unusedCodes.length) {
 /*
  * 第五道门：语言包（src/i18n/locales/<locale>.ts）审计。
  *
- * 七种新语言的文案不进 defineMessages，而是按 moduleId 挂在语言包里。
+ * 外置语言的文案不进 defineMessages，而是按 moduleId 挂在语言包里。
  * 这里要拦的是 W4 翻译期会真实发生的错：
  *   - 包里写了不存在的 moduleId 或 zh 里没有的键（改了名、写错层）；
  *   - 缺的键没登记在 locales/<locale>.pending.txt（pending = 还没翻的清单，
@@ -495,7 +495,7 @@ if (missingCodes.length || unusedCodes.length) {
  */
 
 const LOCALES_DIR = join(srcDir, 'i18n', 'locales');
-const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW'];
+const EXPECTED_PACK_LOCALES = ['nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko', 'zh-TW'];
 /** 本身就写汉字的语言包：不查「非中文包里出现 CJK」。 */
 const CJK_PACK_LOCALES = new Set(['zh-TW']);
 
