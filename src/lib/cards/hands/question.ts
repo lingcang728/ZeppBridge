@@ -5,7 +5,7 @@
  * 所以按问题挑牌，挑出来的一手牌摊在桌上，用户只需要抽掉或换一张。阈值在 constants.ts。
  */
 import {
-  DISTANCE_BUCKETS, DISTANCE_MIN_RUNS, DISTANCE_RECENT, HRV_LOW_RATIO, OUTLIER_BASELINE_DAYS, OUTLIER_BASELINE_MIN, OUTLIER_KEEP,
+  OWN_BUCKET_MIN_KM, DISTANCE_BUCKETS, DISTANCE_MIN_RUNS, DISTANCE_RECENT, HRV_LOW_RATIO, OUTLIER_BASELINE_DAYS, OUTLIER_BASELINE_MIN, OUTLIER_KEEP,
   OUTLIER_LOOKBACK_DAYS, PR_KEEP, RACE_BASELINE_DAYS, RACE_BASELINE_MIN, RACE_LEAD_DAYS, RACE_MIN_KM, RACE_SPEED_RATIO, RHR_HIGH_BPM,
   ROUTE_ANCHOR_SCAN, ROUTE_DISTANCE_RATIO, ROUTE_END_METERS, ROUTE_MIN_RUNS, ROUTE_TRACK_METERS, SLEEP_SHORT_RATIO,
 } from './constants';
@@ -77,14 +77,31 @@ export const bucketOf = (workout: HandWorkout) => {
   return DISTANCE_BUCKETS.find((bucket) => km >= bucket.min && km <= bucket.max) ?? null;
 };
 
-export const distanceBest = (facts: HandFacts): HandResult => {
-  const runs = facts.workouts.filter((w) => isRun(w) && paceOf(w) !== null && bucketOf(w));
+/** 自己常跑的整公里数这一段的键：`km:15`。界面按它写「15 公里」。 */
+export const ownBucketKm = (key: string): number | null => (key.startsWith('km:') ? Number(key.slice(3)) : null);
+
+const groupBy = (runs: HandWorkout[], keyOf: (run: HandWorkout) => string | null) => {
   const byBucket = new Map<string, HandWorkout[]>();
   for (const run of runs) {
-    const key = bucketOf(run)!.key;
-    byBucket.set(key, [...(byBucket.get(key) ?? []), run]);
+    const key = keyOf(run);
+    if (key) byBucket.set(key, [...(byBucket.get(key) ?? []), run]);
   }
-  const usable = [...byBucket].filter(([, list]) => list.length >= DISTANCE_MIN_RUNS);
+  return [...byBucket].filter(([, list]) => list.length >= DISTANCE_MIN_RUNS);
+};
+
+/**
+ * 同距离段 / 刷 PR：先找 5K、10K、半马、全马；一段都凑不够两次（有人几乎只跑 15 公里），
+ * 就按自己常跑的整公里数分段，不发空牌。
+ */
+export const distanceBest = (facts: HandFacts): HandResult => {
+  const runs = facts.workouts.filter((w) => isRun(w) && paceOf(w) !== null);
+  let usable = groupBy(runs, (run) => bucketOf(run)?.key ?? null);
+  if (!usable.length) {
+    usable = groupBy(runs, (run) => {
+      const km = (run.distance_m ?? 0) / 1000;
+      return km >= OWN_BUCKET_MIN_KM ? `km:${Math.round(km)}` : null;
+    });
+  }
   if (!usable.length) return { ok: false, kind: 'distance_best', reason: 'no_distance' };
   // 哪一段：最近一次跑的那一段（够两次的里面）；两段同一天就取次数多的。
   usable.sort(([, a], [, b]) => b[b.length - 1]!.start_time.localeCompare(a[a.length - 1]!.start_time) || b.length - a.length);
@@ -169,18 +186,19 @@ export const recoveryNights = (facts: HandFacts): HandResult => {
     // 偏离项多的在前，同样多的取近的。
     .sort((a, b) => b.flags.length - a.flags.length || b.night.date.localeCompare(a.night.date));
   if (!flagged.length) return { ok: false, kind: 'recovery_nights', reason: 'no_outliers' };
-  const pairs = (list: typeof flagged) => list.flatMap(({ night, flags }) => [
-    nightCard(night, 'outlier', flags),
-    ...facts.workouts.filter((w) => w.date === addDays(night.date, -1) && substantial(w)).map((w) => workoutCard(w, 'day_before')),
-  ]);
+  // 每一晚只带前一天分量最重（最长）的那次运动上主牌；同一天的其余几次进候补——主牌留给那几晚本身。
+  const dayBefore = (date: string) => facts.workouts
+    .filter((w) => w.date === addDays(date, -1) && substantial(w))
+    .sort((a, b) => b.duration_s - a.duration_s);
   const keep = flagged.slice(0, OUTLIER_KEEP);
+  const main = keep.flatMap(({ night, flags }) => [nightCard(night, 'outlier', flags), ...dayBefore(night.date).slice(0, 1).map((w) => workoutCard(w, 'day_before'))]);
+  const bench = [
+    ...keep.flatMap(({ night }) => dayBefore(night.date).slice(1).map((w) => workoutCard(w, 'day_before'))),
+    ...flagged.slice(OUTLIER_KEEP).map(({ night, flags }) => nightCard(night, 'outlier', flags)),
+  ];
   return {
     ok: true,
-    hand: finishHand(
-      { kind: 'recovery_nights', span: null, params: { count: flagged.length, days: OUTLIER_LOOKBACK_DAYS } },
-      pairs(keep),
-      flagged.slice(OUTLIER_KEEP).map(({ night, flags }) => nightCard(night, 'outlier', flags)),
-    ),
+    hand: finishHand({ kind: 'recovery_nights', span: null, params: { count: flagged.length, days: OUTLIER_LOOKBACK_DAYS } }, main, bench),
   };
 };
 

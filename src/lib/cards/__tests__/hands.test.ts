@@ -78,6 +78,12 @@ describe('同距离段 / 刷新 PR', () => {
     expect(hand.bench.map((card) => card.id)).toEqual(['w:slow']);
   });
 
+  it('标准距离段凑不够时退到自己常跑的整公里数', () => {
+    const hand = dealt(distanceBest(facts([run(30, 15.2, 330, { workout_id: 'x' }), run(20, 14.8, 325, { workout_id: 'y' }), run(5, 7, 330)])));
+    expect(hand.params.bucket).toBe('km:15');
+    expect(ids({ ok: true, hand })).toEqual(['x', 'y']);
+  });
+
   it('距离或时长坏了（配速离谱）的不参与；没有够两次的距离段就是空状态', () => {
     expect(distanceBest(facts([run(5, 5, 330), run(4, 5, 30)]))).toEqual({ ok: false, kind: 'distance_best', reason: 'no_distance' });
   });
@@ -117,6 +123,14 @@ describe('恢复异常夜', () => {
     expect(flagged.map((card) => card.date)).toEqual([odd.date, short.date]);
     expect(flagged[0]!.kind === 'night' && flagged[0]!.flags).toEqual(['hrv_low', 'rhr_high']);
     expect(hand.cards.find((card) => card.id === 'w:long-run')?.role).toBe('day_before');
+  });
+
+  it('前一天练了好几次：主牌只带最长那次，其余进候补', () => {
+    const odd = night(2, { hrv: 38, resting_hr: 60 });
+    const list = [run(3, 15, 330, { workout_id: 'long' }), run(3, 3, 330, { workout_id: 'short' })];
+    const hand = dealt(recoveryNights(facts(list, [...baseline, odd])));
+    expect(hand.cards.map((card) => card.id)).toEqual(['w:long', `n:${odd.date}`]);
+    expect(hand.bench.map((card) => card.id)).toEqual(['w:short']);
   });
 
   it('基线不足 7 晚不下结论；都正常就是空状态', () => {

@@ -30,6 +30,8 @@ export const DISTANCE_BUCKETS = [
   { key: 'full', km: 42.195, min: 41.6, max: 43.6 },
 ] as const;
 export type DistanceBucket = (typeof DISTANCE_BUCKETS)[number]['key'];
+/** 标准距离段凑不够时，退到「自己常跑的整公里数」（±0.5 km）：至少这么长才算一段。 */
+export const OWN_BUCKET_MIN_KM = 3;
 /** 一个距离段至少几次才发牌。 */
 export const DISTANCE_MIN_RUNS = 2;
 /** PR 链最多留几张、再加最近几次。 */

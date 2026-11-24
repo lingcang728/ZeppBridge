@@ -10,7 +10,7 @@ import { ref, shallowRef } from 'vue';
 import { backend } from '../lib/bridge';
 import { useAiTaskDraft } from './useAiTaskDraft';
 import {
-  comeback, dealQuestion, FACT_DAYS, handPicks, planTomorrow, recoveryDay, refineSameRoute, reviewWorkout,
+  comeback, dealQuestion, FACT_DAYS, handPicks, ownBucketKm, planTomorrow, recoveryDay, refineSameRoute, reviewWorkout,
   type Hand, type HandResult, type QuestionHandKind, type SuggestHandKind,
 } from '../lib/cards/hands';
 import { MAX_LINE_WORKOUTS } from '../lib/cards/hands/constants';
@@ -101,6 +101,13 @@ const refineRoute = async (result: HandResult): Promise<HandResult> => {
   return refined.ok ? refined : result;
 };
 
+/** 距离段写成字：标准段用名字（5K、半马…），自己常跑的整公里数写成距离。 */
+const bucketLabel = (key: unknown, t: HandsText): string => {
+  const own = ownBucketKm(String(key));
+  if (own !== null) return formatDistance(own * 1000);
+  return t.bucket[key as keyof HandsText['bucket']] ?? String(key);
+};
+
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
 
 /** 这一手交给 AI 时带的模板问题（界面语言）。 */
@@ -108,7 +115,7 @@ export const handQuestion = (hand: Hand, t: HandsText, suggestion: Suggestion | 
   const q = t.question;
   const p = hand.params as Record<string, unknown>;
   switch (hand.kind) {
-    case 'distance_best': return q.distance_best(t.bucket[p.bucket as keyof HandsText['bucket']] ?? String(p.bucket));
+    case 'distance_best': return q.distance_best(bucketLabel(p.bucket, t));
     case 'same_route': return q.same_route(formatDistance(Number(p.km) * 1000));
     case 'race_review': return q.race_review(md(String(p.date)));
     case 'recovery_nights': return q.recovery_nights;
@@ -123,7 +130,7 @@ export const handQuestion = (hand: Hand, t: HandsText, suggestion: Suggestion | 
 export const handSubtitle = (hand: Hand, t: HandsText): string | null => {
   const p = hand.params as Record<string, unknown>;
   switch (hand.kind) {
-    case 'distance_best': return t.bucket[p.bucket as keyof HandsText['bucket']] ?? null;
+    case 'distance_best': return bucketLabel(p.bucket, t);
     case 'same_route': return formatDistance(Number(p.km) * 1000);
     case 'race_review': return md(String(p.date));
     case 'recovery_nights': return t.kindSub.recovery_nights;
