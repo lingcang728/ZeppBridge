@@ -1,3 +1,6 @@
+- Added: **Start at login**. Turn it on in Settings › Sync and updates and ZeppBridge opens when you sign in to your computer and syncs as usual; you can also have it stay in the tray without opening a window.
 - Improved: **Confirmations stay inside the app**. Deleting, disconnecting or signing out no longer opens a system dialog but a glass panel that matches the interface; irreversible actions are marked in red, and Esc cancels.
 - Improved: **One more hint when a sync succeeds but finds nothing**. You may have signed in to a different account than the one your watch is paired with: if that account was created with Google or Apple, add an email to it in the Zepp app first, then sign in with that email.
+- Improved: **The light theme is a neutral warm grey**. Backgrounds, text and outlines lose the faint green tint they had.
+- Improved: **Brand icons in the app are now vector graphics**. The Z mark and the Zepp Cloud icon stay sharp on high-resolution screens.
 - Fixed: **Moving from a beta to the matching release now delivers that release’s letter from the author**. Before, only the release notes appeared and the letter was treated as already read.
