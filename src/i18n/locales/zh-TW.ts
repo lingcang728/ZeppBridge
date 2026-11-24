@@ -1238,7 +1238,7 @@ export default {
         same: '同類',
       },
       swapInAria: (label: string) => `${label}，按一下換進這手牌`,
-      tableTip: '點一張牌移到候補。點選候補裡的一張即可換入。交給 AI 的內容會依這手牌而定。',
+      tableTip: '把牌往下拖進候補即可抽掉，從候補把牌往上拖即可換入。點一下也可以。交給 AI 的內容會依這手牌而定。',
       useHand: '使用這手牌',
     },
     'components/coachNotes/coachNotes': {
@@ -1651,6 +1651,9 @@ export default {
       idleEyebrow: (days: number) => `${days} 天沒運動了`,
       idleLine: (date: string, what: string) => `上次是 ${date} 的${what}`,
       tomorrowSub: '附上最近 7 天的恢復與運動資料',
+      sleepReview: '昨晚睡得如何？',
+      sleepReviewSub: '帶上最近幾晚的睡眠與恢復資料',
+      sleepReviewQuestion: '我附上了昨晚和前幾晚的睡眠與恢復數據，還有最近幾天的運動。請幫我看看昨晚睡得如何，和前幾晚相比有什麼不同、可能的原因是什麼，以及今天是否需要因此調整訓練。',
       dismiss: '關閉這則建議',
       failed: '目前無法發牌，請稍後再試',
     },
