@@ -21,7 +21,7 @@ import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDateTime, formatDuration, formatTime, formatTimeWithPeriod, isFiniteNumber } from '../lib/format';
 import { minutesToHours } from '../lib/missingValues';
 import { backend } from '../lib/bridge';
 import { groupNaps } from '../lib/sleepNaps';
@@ -313,7 +313,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
         <div class="stage-head">
           <h2>{{ t.stagesTitle }}<MetricInfoButton metric="sleep_stages" :label="t.stagesTitle" /></h2>
           <div class="stage-actions">
-            <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
+            <p>{{ formatTimeWithPeriod(session.start_time) }} – {{ formatTimeWithPeriod(session.end_time) }}</p>
           </div>
         </div>
         <StageBar
@@ -331,7 +331,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
           <div class="stage-head">
             <h2>{{ t.napsTitle }}</h2>
             <div class="stage-actions">
-              <p>{{ formatTime(nap.start) }} – {{ formatTime(nap.end) }} · {{ t.napAsleep(formatDuration(nap.asleepMinutes)) }}</p>
+              <p>{{ formatTimeWithPeriod(nap.start) }} – {{ formatTimeWithPeriod(nap.end) }} · {{ t.napAsleep(formatDuration(nap.asleepMinutes)) }}</p>
             </div>
           </div>
           <StageBar :stages="nap.stages" :slices="nap.slices" :range-start="nap.start" :range-end="nap.end" />

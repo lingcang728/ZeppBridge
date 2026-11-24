@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { displayDateTimeFormatter, parseDisplayDate, regionDateOrder, setDateOrder, setSystemRegion, setTimeFormat } from '../dateTime';
-import { formatTime } from '../format';
+import { formatTime, formatTimeWithPeriod } from '../format';
 import { setLocale } from '../../i18n';
 
 afterEach(() => {
@@ -21,6 +21,18 @@ describe('local display policy', () => {
     const parts = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(2026, 8, 12, 13, 15));
     expect(parts.find(p => p.type === 'hour')?.value).toBe('01');
     expect(parts.some(p => p.type === 'dayPeriod')).toBe(true);
+  });
+  it('sleep axis clocks carry AM/PM unless 24-hour time was chosen', () => {
+    const late = new Date(2026, 8, 11, 22, 57).getTime();
+    const early = new Date(2026, 8, 12, 0, 19).toISOString();
+    setTimeFormat('regional');
+    expect(formatTimeWithPeriod(late).replace(/\s/g, ' ')).toBe('10:57 PM');
+    expect(formatTimeWithPeriod(early).replace(/\s/g, ' ')).toBe('12:19 AM');
+    setLocale('zh');
+    expect(formatTimeWithPeriod(late)).toBe('下午10:57');
+    setTimeFormat('24h');
+    expect(formatTimeWithPeriod(late)).toBe('22:57');
+    expect(formatTimeWithPeriod('not a time')).toBe('—');
   });
   it('respects explicit date order without moving the date', () => {
     setDateOrder('ymd');

@@ -1,5 +1,5 @@
 import { today as currentToday } from './currentDay';
-import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
+import { displayDateTimeFormatter, parseDisplayDate, timeFormat } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import type { FacePart } from './cards/faceValue';
 import {
@@ -151,6 +151,25 @@ export const formatTime = (value: string): string => {
   return Number.isNaN(date.getTime())
     ? '—'
     : displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+};
+
+const periodFormatters = new Map<string, Intl.DateTimeFormat>();
+/**
+ * 带上午 / 下午的钟点，给跨午夜的睡眠阶段图用：一夜从前一晚 10 点睡到早上 5 点，
+ * 24 小时制的 22:00、02:00 一路排下去，看不出哪段是前一天。设置里明确选了
+ * 24 小时制就照它，其余（跟随地区、12 小时）一律带上 AM / PM。
+ */
+export const formatTimeWithPeriod = (value: string | number): string => {
+  const date = typeof value === 'number' ? new Date(value) : parseDisplayDate(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  if (timeFormat.value === '24h') return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+  const locale = intlLocale();
+  let formatter = periodFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' });
+    periodFormatters.set(locale, formatter);
+  }
+  return formatter.format(date);
 };
 
 export const formatDuration = (minutes?: number | null, empty = copy().durationUnknown): string => {
