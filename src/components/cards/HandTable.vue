@@ -47,6 +47,7 @@ const stage = ref<HTMLElement | null>(null);
 const backdrop = ref<HTMLElement | null>(null);
 const head = ref<HTMLElement | null>(null);
 const foot = ref<HTMLElement | null>(null);
+const benchHead = ref<HTMLElement | null>(null);
 const stageBox = ref({ width: 1000, height: 560 });
 const closing = ref(false);
 const seq = relay();
@@ -144,7 +145,7 @@ const tapMain = (card: HandCard) => void move(drawOut(hand.value, card.id), card
 const tapBench = (card: HandCard) => void move(swapIn(hand.value, card.id), card.id);
 
 /* ---------- 收牌：理成一叠，整叠放回来处 ---------- */
-const fadeChrome = (to: number, duration: number) => [backdrop.value, head.value, foot.value]
+const fadeChrome = (to: number, duration: number) => [backdrop.value, head.value, benchHead.value, foot.value]
   .filter((el): el is HTMLElement => !!el)
   .map((el) => animateFromNow(el, { opacity: to }, { duration, easing: to ? OPEN_EASE : CLOSE_EASE, fill: 'forwards' }, ['opacity']));
 const close = async () => {
@@ -181,7 +182,7 @@ onMounted(() => {
   resize = new ResizeObserver(measure);
   if (stage.value) resize.observe(stage.value);
   backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
-  [head.value, foot.value].forEach((el, i) => el?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, delay: 60 + i * 80, easing: OPEN_EASE, fill: 'backwards' }));
+  [head.value, benchHead.value, foot.value].forEach((el, i) => el?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, delay: 60 + i * 80, easing: OPEN_EASE, fill: 'backwards' }));
   void deal(seq.next());
 });
 onBeforeUnmount(() => {
@@ -214,7 +215,7 @@ defineExpose({ close, isClosing: () => closing.value });
           <p v-if="!hand.cards.length" class="hand-empty">{{ t.handEmpty }}</p>
         </div>
         <section class="bench" :aria-label="t.bench">
-          <h3>{{ t.bench }}</h3>
+          <h3 ref="benchHead">{{ t.bench }}</h3>
           <div class="bench-row" :style="{ '--card-w': `${benchW}px` }">
             <span v-for="card in hand.bench" :key="card.id" class="hslot">
               <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).aside"
