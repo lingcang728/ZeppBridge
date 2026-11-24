@@ -22,7 +22,7 @@
 
 [![ZeppBridge overview: pinned metrics, heart rate, steps and sleep](docs/assets/readme/overview-zh.png)](https://zeppbridge.com/)
 
-*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers thirteen language and region options.*
+*Click the image to watch the short film on the interface, card interactions and training plans. All images and video use sample data; the screenshots show the Chinese interface, and the app offers fourteen language and region options.*
 
 ## From a record to your next step
 
@@ -69,7 +69,7 @@ Running, cycling, pool swimming and open-water swimming plans can be sent today.
 
 ### Browsing that feels good
 
-V3 redesigns the whole interface: glass navigation, day cards that flip, plans you can drag and a stack of settings cards. Dark, light and follow-system themes; thirteen language and region options, including English, Simplified and Traditional Chinese, Spanish, German and French; and adjustable units, time zone and interface scale.
+V3 redesigns the whole interface: glass navigation, day cards that flip, plans you can drag and a stack of settings cards. Dark, light and follow-system themes; fourteen language and region options, including English, Simplified and Traditional Chinese, Spanish, German, French and Korean; and adjustable units, time zone and interface scale.
 
 [Watch the short film: dealing cards, dragging, theme switching and page motion →](https://zeppbridge.com/)
 

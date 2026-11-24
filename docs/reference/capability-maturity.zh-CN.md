@@ -1,4 +1,4 @@
-# 能力成熟度清单（v3.1）
+# 能力成熟度清单（v3.3）
 
 [English](capability-maturity.md)
 

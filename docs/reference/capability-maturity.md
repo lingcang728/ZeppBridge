@@ -1,4 +1,4 @@
-# Capability maturity (v3.1)
+# Capability maturity (v3.3)
 
 [简体中文](capability-maturity.zh-CN.md)
 
