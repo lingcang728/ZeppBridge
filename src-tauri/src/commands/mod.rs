@@ -295,3 +295,6 @@ pub(crate) use rings::{annual_rings, rings_save_image};
 
 mod life_events;
 pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};
+
+mod suggest;
+pub(crate) use suggest::{card_hand_facts, card_hand_lines, suggestion_cards};

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod anomaly;
 pub mod letters;
+pub mod suggest;
 mod weekly_report;
 mod workout_insight;
 
