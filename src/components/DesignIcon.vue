@@ -1,12 +1,15 @@
 <script setup lang="ts">
 /**
- * 品牌类图标：应用图标、品牌 Z 标、Zepp Cloud。内联 SVG，和 src-tauri/icons/icon-source.svg 同一套
- * 「双轨 Z」几何；两条轨道各用一段渐变（亮橄榄金 → 深橄榄），任意尺寸都清楚，不再是 72 / 168 px 的位图放大。
+ * 品牌类图标：应用图标、品牌 Z 标、Zepp Cloud。
+ * 应用图标和品牌 Z 标就是品牌本身，一律用原图（assets/design-icons），不重画。
+ * Zepp Cloud 是内联 SVG：深色玻璃云 + 橄榄金描边，中间放的仍是品牌 Z 标原图。
  *
  * 类别图标不走这里：它们由 GlyphTile 用 Icon.vue 的图形画（lib/glyphs.ts）。DesignIconName 仍是
  * 那张表的键名，所以名字留着，但只有下面三个有图。
  */
 import { computed, useId } from 'vue';
+import appIcon from '../assets/design-icons/app-icon.png';
+import brandMark from '../assets/design-icons/brand-mark.png';
 
 export type DesignIconName =
   | 'ai-ready'
@@ -57,17 +60,22 @@ const props = withDefaults(defineProps<{
   alt: '',
 });
 
+/** 三团云：左小、中大、右中，底边平直。 */
+const CLOUD = 'M6.4 19.5H17.6A4.5 4.5 0 0 0 17.58 10.5A6 6 0 0 0 5.6 10.98A4.3 4.3 0 0 0 6.4 19.5Z';
+
 const id = useId();
-const front = `${id}-front`;
-const back = `${id}-back`;
-const tile = `${id}-tile`;
-const kind = computed(() => (props.name === 'app-icon' || props.name === 'zepp-cloud' ? props.name : 'brand-mark'));
+const fill = `${id}-fill`;
+const rim = `${id}-rim`;
+const gloss = `${id}-gloss`;
+const clip = `${id}-clip`;
+const isCloud = computed(() => props.name === 'zepp-cloud');
+const source = computed(() => (props.name === 'app-icon' ? appIcon : brandMark));
 </script>
 
 <template>
   <svg
-    class="design-icon"
-    :class="`is-${kind}`"
+    v-if="isCloud"
+    class="design-icon is-zepp-cloud"
     viewBox="0 0 24 24"
     :width="size"
     :height="size"
@@ -77,62 +85,50 @@ const kind = computed(() => (props.name === 'app-icon' || props.name === 'zepp-c
     focusable="false"
   >
     <defs>
-      <linearGradient :id="front" x1="4" y1="5" x2="20" y2="19" gradientUnits="userSpaceOnUse">
-        <stop offset="0" style="stop-color: var(--brand-rail-hi)" />
-        <stop offset="1" style="stop-color: var(--brand-rail-lo)" />
+      <linearGradient :id="fill" x1="0" y1="5" x2="0" y2="19.5" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#28312B" />
+        <stop offset="1" stop-color="#0C110E" />
       </linearGradient>
-      <linearGradient :id="back" x1="20" y1="5" x2="8" y2="19" gradientUnits="userSpaceOnUse">
-        <stop offset="0" style="stop-color: var(--brand-rail-hi); stop-opacity: .92" />
-        <stop offset="1" style="stop-color: var(--brand-rail-mid)" />
+      <linearGradient :id="rim" x1="5" y1="5" x2="19" y2="20" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#F0F6B8" />
+        <stop offset=".45" stop-color="#C9D777" />
+        <stop offset="1" stop-color="#66762A" />
       </linearGradient>
-      <linearGradient :id="tile" x1="0" y1="0" x2="0" y2="24" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#1B2420" />
-        <stop offset="1" stop-color="#0C110F" />
-      </linearGradient>
+      <radialGradient :id="gloss" cx="11" cy="5" r="10" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#E8F0B0" stop-opacity=".22" />
+        <stop offset="1" stop-color="#E8F0B0" stop-opacity="0" />
+      </radialGradient>
+      <clipPath :id="clip"><path :d="CLOUD" /></clipPath>
     </defs>
-
-    <template v-if="kind === 'app-icon'">
-      <rect x="0.5" y="0.5" width="23" height="23" rx="5.3" :fill="`url(#${tile})`" />
-      <rect x="0.5" y="0.5" width="23" height="23" rx="5.3" fill="none" style="stroke: var(--brand-rail-hi); stroke-opacity: .28" stroke-width=".6" />
-      <g transform="translate(3.2 3.2) scale(.733)">
-        <path d="M20.2 5L8 19H20.2" fill="none" :stroke="`url(#${back})`" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M3.8 5H16.2L4 19" fill="none" :stroke="`url(#${front})`" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
-      </g>
-    </template>
-
-    <template v-else-if="kind === 'zepp-cloud'">
-      <path d="M6.6 20h11a5 5 0 0 0 .7-9.95A6.3 6.3 0 0 0 6.1 9.3 5.4 5.4 0 0 0 6.6 20Z" style="fill: var(--brand-cloud-fill); stroke: var(--brand-rail-mid)" stroke-width="1.2" stroke-linejoin="round" />
-      <path d="M8.6 11.6h5.4l-5.3 5.6h6" fill="none" :stroke="`url(#${front})`" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
-    </template>
-
-    <template v-else>
-      <path d="M20.2 5L8 19H20.2" fill="none" :stroke="`url(#${back})`" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M3.8 5H16.2L4 19" fill="none" :stroke="`url(#${front})`" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
-    </template>
+    <g transform="translate(12.1 12.25) scale(1.1) translate(-12.1 -12.25)">
+    <path :d="CLOUD" fill="none" stroke="#C9D777" stroke-opacity=".08" stroke-width="2" stroke-linejoin="round" />
+    <path :d="CLOUD" :fill="`url(#${fill})`" />
+    <rect width="24" height="24" :fill="`url(#${gloss})`" :clip-path="`url(#${clip})`" />
+    <path :d="CLOUD" fill="none" :stroke="`url(#${rim})`" stroke-width=".7" stroke-linejoin="round" />
+    </g>
+    <image :href="brandMark" x="5.6" y="8" width="12.8" height="12.8" />
   </svg>
+  <img
+    v-else
+    class="design-icon"
+    :src="source"
+    :alt="alt"
+    :width="size"
+    :height="size"
+    :style="{ width: `${size}px`, height: `${size}px` }"
+    :aria-hidden="alt ? undefined : true"
+    draggable="false"
+  />
 </template>
 
 <style scoped>
 .design-icon {
-  /* 品牌色：深色界面上是亮橄榄金；浅色界面压深一档，白底上也立得住（tokens.css 不收品牌图的私有色）。 */
-  --brand-rail-hi: #E4EDA0;
-  --brand-rail-mid: #B9C964;
-  --brand-rail-lo: #8FA23E;
-  --brand-cloud-fill: rgba(205, 220, 124, .12);
   display: block;
   flex: 0 0 auto;
   max-width: none;
+  object-fit: contain;
   overflow: visible;
   user-select: none;
-}
-</style>
-
-<style>
-/* 浅色界面：品牌轨道压深一档（不能写成 scoped 的 :global(html[...]) .x，那样编译后只剩 html 选择器）。 */
-html[data-theme='light'] .design-icon:not(.is-app-icon) {
-  --brand-rail-hi: #9DB043;
-  --brand-rail-mid: #7A8C2C;
-  --brand-rail-lo: #55661C;
-  --brand-cloud-fill: rgba(122, 140, 44, .1);
+  -webkit-user-drag: none;
 }
 </style>
