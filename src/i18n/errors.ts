@@ -16,6 +16,11 @@ const messages = defineMessages(
   {
     /* —— core：从 ZeppBridgeError 抬上来的通用错误 —— */
     'err.core.network': '连不上 Zepp 区域，检查网络后重试',
+    'err.autostart.read': '读不到开机自启的状态',
+    'err.autostart.save': '开机自启的设置没能保存',
+    'err.autostart.enable': '没能打开开机自启',
+    'err.autostart.disable': '没能关闭开机自启',
+    'err.autostart.not_ready': '应用还在准备数据，稍后再试',
     'err.core.needs_reauth': '认证已失效，重新连接 Zepp',
     'err.core.unavailable': '这个账号或区域没有这项数据',
     'err.core.retry_exhausted': 'Zepp 服务暂不可用，稍后重试',
@@ -311,6 +316,11 @@ const messages = defineMessages(
   {
     /* —— core —— */
     'err.core.network': "Could not reach the Zepp region — check your network and retry",
+    'err.autostart.read': 'Could not read the start-at-login setting',
+    'err.autostart.save': 'Could not save the start-at-login setting',
+    'err.autostart.enable': 'Could not turn on start at login',
+    'err.autostart.disable': 'Could not turn off start at login',
+    'err.autostart.not_ready': 'The app is still preparing its data — try again in a moment',
     'err.core.needs_reauth': 'Sign-in expired — reconnect to Zepp',
     'err.core.unavailable': "This account or region does not provide that data",
     'err.core.retry_exhausted': 'Zepp temporarily unavailable — retry shortly',

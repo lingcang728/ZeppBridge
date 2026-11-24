@@ -7,6 +7,7 @@ mod cloud_companion;
 pub(crate) mod credential_recovery;
 mod data;
 pub use data::{edit_workouts, get_hidden_workout_page, undo_workout_edit};
+mod autostart;
 mod data_letters;
 mod imports;
 mod letters;
@@ -213,6 +214,8 @@ pub(crate) use ai_tasks::{
     ai_template_save, card_collection_get, card_collection_set,
 };
 pub(crate) use auth::{clear_auth, manual_auth, start_fresh_library, verify_auth};
+pub(crate) use autostart::{autostart_state, set_autostart};
+pub(crate) use autostart::{start_in_tray, AUTOSTART_ARG};
 pub(crate) use backup::{
     cancel_pending_restore, create_manual_backup, get_pending_restore, get_restore_preview,
     list_backups, set_backup_pinned, stage_restore, verify_backup,

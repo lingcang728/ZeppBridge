@@ -20,6 +20,7 @@ import type {
   UnlistenFn,
   WorkoutDetailCoverage,
   WorkoutDetailChannel,
+  AutostartState,
 } from './types';
 import type {
   HourlySteps,
@@ -492,6 +493,12 @@ export const tauriBackend: BridgeBackend = {
   },
   systemRegionLocale() {
     return call<string | null>('system_region_locale');
+  },
+  autostartState() {
+    return call<AutostartState>('autostart_state');
+  },
+  setAutostart(enabled: boolean, trayOnly: boolean) {
+    return call<AutostartState>('set_autostart', { enabled, trayOnly });
   },
   listBackups() {
     return call<BackupManifest[]>('list_backups');

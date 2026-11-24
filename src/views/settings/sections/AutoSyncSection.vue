@@ -11,6 +11,7 @@ import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
 import { syncCardMessages } from './sync.i18n';
 const UpdateSection = defineAsyncComponent(() => import('./UpdateSection.vue'));
+const AutostartRows = defineAsyncComponent(() => import('./AutostartRows.vue'));
 
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
@@ -86,6 +87,7 @@ const freshness = computed(() => {
           </button>
         </div>
       </div>
+      <AutostartRows />
       <UpdateSection />
     </div>
   </section>

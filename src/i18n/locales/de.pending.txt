@@ -11,3 +11,14 @@ components/shell/ConfirmHost.reset
 components/shell/ConfirmHost.send
 components/shell/ConfirmHost.signOut
 components/shell/ConfirmHost.startOver
+i18n/errors.err.autostart.disable
+i18n/errors.err.autostart.enable
+i18n/errors.err.autostart.not_ready
+i18n/errors.err.autostart.read
+i18n/errors.err.autostart.save
+views/settings/sections/sync.autostartFailed
+views/settings/sections/sync.autostartStale
+views/settings/sections/sync.autostartSub
+views/settings/sections/sync.autostartTitle
+views/settings/sections/sync.trayOnlySub
+views/settings/sections/sync.trayOnlyTitle

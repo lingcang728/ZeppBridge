@@ -62,6 +62,8 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = { version = "2.10.1", optional = true }
 # 把准备好的交给 AI 的文件从应用里直接拖进浏览器的对话框（批次 ⑦）。
 tauri-plugin-drag = "2.1.1"
+# 开机自启（src/commands/autostart.rs）：官方插件，Windows 写 Run 键、macOS 写 LaunchAgent、Linux 写 autostart .desktop。
+tauri-plugin-autostart = "=2.5.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }

@@ -36,7 +36,7 @@ use commands::{
     ai_prompt_versions, ai_task_attachment_stat, ai_task_day_strip, ai_task_delete,
     ai_task_delete_many, ai_task_get, ai_task_list, ai_task_prepare, ai_task_preview, ai_task_save,
     ai_task_set_pinned, ai_template_delete, ai_template_list, ai_template_save, annual_rings,
-    cancel_official_login, cancel_pending_restore, cancel_sync, cancel_web_login,
+    autostart_state, cancel_official_login, cancel_pending_restore, cancel_sync, cancel_web_login,
     card_collection_get, card_collection_set, check_official_login_now, cleanup_old_data,
     clear_auth, cloud_companion_open, cloud_companion_save_config, cloud_companion_setup,
     cloud_companion_state, cloud_companion_upload, coach_note_add, coach_note_decide,
@@ -60,7 +60,7 @@ use commands::{
     push_remove, push_run, push_save, push_set_enabled, push_state, race_delete, race_save,
     races_list, recover_advanced_credentials, recover_official_credentials, remove_workout_fit,
     reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks, rings_save_image,
-    run_database_integrity_check, save_fit_export, save_life_event, save_mcp_bundle,
+    run_database_integrity_check, save_fit_export, save_life_event, save_mcp_bundle, set_autostart,
     set_backup_pinned, set_device_hidden, set_device_model_override,
     set_heart_rate_zone_preference, set_mcp_task_only, set_metric_excluded, set_user_prefs,
     set_workout_code_label, set_workout_type_override, shoe_delete, shoe_save, shoes_overview,
@@ -393,6 +393,10 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![commands::AUTOSTART_ARG]),
+        ))
         .on_window_event(main_window::on_window_event)
         .on_page_load(|webview, payload| {
             if webview.label() == "main" {
@@ -697,6 +701,13 @@ pub fn run() {
                     app.state::<main_window::MainWindowState>()
                         .set_tray_present();
                     diagnostics::log("Startup: tray ready");
+                    // 系统开机启动、用户要它只留在托盘：托盘建好了才藏窗口，建不起来就照常开窗。
+                    if commands::start_in_tray(&data_dir) {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.hide();
+                            diagnostics::log("Startup: launched at login, staying in tray");
+                        }
+                    }
                 }
                 Ok(Err(error)) => {
                     diagnostics::log(&format!(
@@ -728,6 +739,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_is_ready,
             auto_sync::set_auto_sync_prefs,
+            autostart_state,
+            set_autostart,
             system_region_locale,
             list_life_events,
             save_life_event,

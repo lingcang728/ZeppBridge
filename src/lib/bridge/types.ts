@@ -495,6 +495,9 @@ export interface BridgeBackend {
   setAutoSyncPrefs(enabled: boolean, intervalMinutes: number): Promise<void>;
   /** 操作系统的区域格式（如 `pt-PT`），日期顺序与 12/24 小时制跟它走；取不到为 null。 */
   systemRegionLocale(): Promise<string | null>;
+  /** 开机自启：登记着且指向现在这个程序才算开；登记的路径失效时 stale 为真、开关显示为关。 */
+  autostartState(): Promise<AutostartState>;
+  setAutostart(enabled: boolean, trayOnly: boolean): Promise<AutostartState>;
   listBackups(): Promise<BackupManifest[]>;
   createManualBackup(): Promise<BackupManifest>;
   verifyBackup(backupId: string): Promise<BackupVerification>;
@@ -740,3 +743,6 @@ export interface WorkoutDetailCoverage {
   pending: number; persisted: number; empty_from_cloud: number; request_failed: number;
   parse_failed: number; unavailable: number; ready: number;
 }
+
+/** 开机自启的状态（commands/autostart.rs）。 */
+export interface AutostartState { enabled: boolean; stale: boolean; tray_only: boolean }
