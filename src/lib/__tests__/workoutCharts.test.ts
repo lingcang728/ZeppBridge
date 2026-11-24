@@ -74,7 +74,7 @@ describe('withDetail', () => {
     expect(md.xAxis.maxInterval).toBeLessThan(base.xAxis.maxInterval);
     expect((md.series[0].markLine as { label: { show: boolean } }).label.show).toBe(true);
     expect('markPoint' in md.series[0]).toBe(false);
-    // 中档不画区间色带。
+    // 整场只在一个区间里：不画色带。
     expect(md.series[0].markArea).toBeUndefined();
     const noBands = withDetail(base, 'lg', { color: '#ff0000', palette }) as Rich;
     expect(noBands.series[0].markArea).toBeUndefined();
@@ -93,6 +93,15 @@ describe('withDetail', () => {
     expect(areas.label.position).toBe('right');
     expect(lg.grid.right).toBeGreaterThan(crossing.grid.right);
     expect(lg.visualMap?.pieces).toEqual([{ lte: 120, color: '#111111' }, { gt: 120, lte: 140, color: '#222222' }]);
+    // 中档：同样的色带和分段着色；小档只给线着色，不加色带。
+    const md = withDetail(crossing, 'md', { color: '#ff0000', palette, bands, zoneColor }) as Rich;
+    expect((md.series[0].markArea as { data: unknown[] }).data).toHaveLength(2);
+    expect(md.visualMap?.pieces).toEqual(lg.visualMap?.pieces);
+    const sm = withDetail(crossing, 'sm', { color: '#ff0000', palette, bands, zoneColor }) as Rich;
+    expect(sm.series[0].markArea).toBeUndefined();
+    expect(sm.visualMap?.pieces).toEqual(lg.visualMap?.pieces);
+    expect((sm.series[0].lineStyle as { color?: string }).color).toBeUndefined();
+    expect(sm.xAxis).toBe(crossing.xAxis);
   });
 
   it('draws a plain line when the whole workout stays in one zone (2026-11-17 walk, all Z0)', () => {

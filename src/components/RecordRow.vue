@@ -24,9 +24,11 @@ defineProps<{
   <component :is="to ? RouterLink : 'div'" :class="['record-row', `tone-${category}`]" :to="to">
     <span class="record-when"><span>{{ kicker }}</span><span v-if="time" class="record-time">{{ time }}</span></span>
     <span class="record-node" aria-hidden="true"><GlyphTile :name="designIcon" :size="34" :tone="category" /></span>
-    <span class="record-card">
+    <span :class="['record-card', { 'has-aside': $slots.aside }]">
       <strong>{{ title }}</strong>
       <span class="record-facts"><span v-if="factLabel">{{ factLabel }}</span><b>{{ fact }}</b></span>
+      <span v-if="$slots.aside" class="record-aside"><slot name="aside" /></span>
+      <span v-if="$slots.foot" class="record-foot"><slot name="foot" /></span>
     </span>
     <Icon v-if="to" name="chevron-right" :size="16" class="record-go" />
   </component>
@@ -72,6 +74,10 @@ defineProps<{
 .record-facts { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .record-facts b { color: var(--ink); font-weight: 600; }
 .record-go { color: var(--subtle); }
+/* 右边的小图（轨迹轮廓 / 分期条）和底下的一条细条（心率区间）：列表页按需塞进来，没有就不占位。 */
+.record-card.has-aside { grid-template-columns: minmax(0, 1fr) var(--record-aside, auto); column-gap: 14px; }
+.record-aside { grid-column: 2; grid-row: 1 / span 2; align-self: center; display: flex; justify-content: flex-end; min-width: 0; }
+.record-foot { grid-column: 1 / -1; min-width: 0; }
 
 @media (max-width: 640px) {
   .record-row { grid-template-columns: 72px 40px minmax(0, 1fr); }

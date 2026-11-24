@@ -25,6 +25,18 @@ import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import WorkoutImport from '../components/workout/WorkoutImport.vue';
 import { workoutImportMessages } from '../components/workout/workoutImport.i18n';
 import type { ImportSourceKey } from '../types/imports';
+import GlyphTile from '../components/GlyphTile.vue';
+import ShareBar, { type ShareSegment } from '../components/workout/ShareBar.vue';
+import AlbumCapsule from '../components/album/AlbumCapsule.vue';
+import AlbumPeriods from '../components/album/AlbumPeriods.vue';
+import AlbumGrid from '../components/album/AlbumGrid.vue';
+import RouteGlyph from '../components/album/RouteGlyph.vue';
+import { albumMessages } from '../components/album/album.i18n';
+import { useRecordAlbum } from '../composables/useRecordAlbum';
+import { useAlbumNav } from '../composables/useAlbumNav';
+import { localDay, type AlbumTile } from '../lib/album/album';
+import { nextSlot } from '../lib/motion/budget';
+import { hrZoneColor } from '../lib/metricTone';
 
 const messages = defineMessages(
   {
@@ -209,6 +221,66 @@ const clearSelected = () => { selected.value = new Set(); };
 const onChanged = () => { selected.value = new Set(); void loadList(); };
 onBeforeUnmount(endDrag);
 
+/* 相册（lib/album）：胶囊切年 / 月 / 日，「日」这一层 Ctrl + 滚轮 / 捏合在列表行、方块、日历热图之间换。
+   选择中、看已隐藏时一律是原来的列表。 */
+const albumText = useMessages(albumMessages);
+const albumIds = computed(() => displayableList.value.map((w) => w.workout_id));
+const album = useRecordAlbum('workouts', albumIds);
+const { level, density, periods, shapes } = album;
+const albumLocked = computed(() => selecting.value || hiddenView.value);
+const shownLevel = computed(() => (albumLocked.value ? 'day' : level.value));
+const shownDensity = computed(() => (albumLocked.value ? 0 : density.value));
+const shownPeriods = computed(() => (shownLevel.value === 'year' ? periods.value.year : periods.value.month));
+const stage = ref<HTMLElement | null>(null);
+const ensureMonth = async (month: string) => {
+  for (let guard = 0; guard < 40 && hasMore.value; guard += 1) {
+    const last = workouts.value[workouts.value.length - 1];
+    if (last && (timelineKey(last.start_time) ?? '') <= month) return;
+    if (loadingMore.value) await new Promise((resolve) => { window.setTimeout(resolve, 60); });
+    else await loadMore();
+  }
+};
+const { go: goLevel, openPeriod } = useAlbumNav({
+  stage, level, density, ensureMonth, zoomable: () => !albumLocked.value, loadPeriods: () => album.loadMonths(),
+});
+/* 日历热图一屏能看好几个月：页读回来就接着在空闲时往下读（最多两千条），不用一直滚到底。 */
+watch([shownDensity, () => workouts.value.length], () => {
+  if (shownDensity.value === 2 && shownLevel.value === 'day' && hasMore.value && workouts.value.length < 2000) nextSlot(() => { void loadMore(); });
+});
+const workoutById = computed(() => new Map(displayableList.value.map((w) => [w.workout_id, w])));
+const TYPE_TONE = { 'outdoor-run': 'var(--activity)', 'outdoor-cycling': 'var(--pace)', 'body-activity': 'var(--calories)' } as const;
+const tileReading = (workout: Workout) => {
+  const meters = workout.distance_meters;
+  if (isFiniteNumber(meters) && meters > 0) return formatDistance(meters);
+  const minutes = workoutDurationMinutes(workout);
+  return minutes ? formatDuration(minutes) : workoutDisplayLabel(workout);
+};
+const tiles = computed<AlbumTile[]>(() => (shownDensity.value === 0 ? [] : displayableList.value.map((workout) => {
+  const minutes = workoutDurationMinutes(workout) ?? 0;
+  const reading = tileReading(workout);
+  return {
+    id: workout.workout_id,
+    day: localDay(workout.start_time),
+    month: timelineKey(workout.start_time) ?? '',
+    to: { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } },
+    label: `${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)} · ${workoutDisplayLabel(workout)} · ${reading}`,
+    reading,
+    color: TYPE_TONE[workoutIcon(workout)],
+    strength: Math.min(1, minutes / 90),
+    weight: minutes,
+  };
+})));
+/* 每一行末尾的心率区间细条：有逐区间秒数才画（列表一次批量读，见 storage/queries.rs）。 */
+const zoneBars = computed(() => {
+  const bars = new Map<string, ShareSegment[]>();
+  for (const workout of displayableList.value) {
+    const zones = [...(workout.hr_zones ?? [])].sort((a, b) => a.index - b.index);
+    if (!zones.some((zone) => zone.seconds > 0)) continue;
+    bars.set(workout.workout_id, zones.map((zone) => ({ key: `z${zone.index}`, label: `Z${zone.index}`, seconds: zone.seconds, color: hrZoneColor(zone.index) })));
+  }
+  return bars;
+});
+
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
 const workoutFact = (workout: Workout): string => {
@@ -226,7 +298,7 @@ const workoutFact = (workout: Workout): string => {
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { void loadImportSources(); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-useRevisionReload(() => { void loadList(); void loadImportSources(); });
+useRevisionReload(() => { void loadList(); void loadImportSources(); album.invalidate(); });
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('workouts');
 </script>
@@ -259,8 +331,19 @@ useSectionTour('workouts');
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" :key="`empty-${shownHidden}`" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else ref="listEl" :key="`list-${shownHidden}`" :class="['record-list', { selecting, 'is-switching': switching }]" :inert="switching || undefined">
+    <div v-else ref="stage" :key="`list-${shownHidden}`" class="album-stage">
+    <AlbumPeriods v-if="shownLevel !== 'day'" data-album-body kind="workouts" :level="shownLevel" :periods="shownPeriods" @open="openPeriod" />
+    <AlbumGrid v-else-if="shownDensity" data-album-body :tiles="tiles" :density="shownDensity">
+      <template #tile="{ tile }">
+        <GlyphTile :name="workoutIcon(workoutById.get(tile.id)!)" :size="24" tone="activity" />
+        <RouteGlyph v-if="shapes.get(tile.id)" class="tile-route" :shape="shapes.get(tile.id)!" />
+        <span v-else class="tile-route" />
+        <b class="tile-reading">{{ tile.reading }}</b>
+      </template>
+    </AlbumGrid>
+    <div v-else ref="listEl" data-album-body :class="['record-list', { selecting, 'is-switching': switching }]" :inert="switching || undefined">
       <div v-for="(workout, index) in displayableList" :key="workout.workout_id" :data-index="index" :data-timeline="timelineKey(workout.start_time)"
+        data-album-item :data-album-id="workout.workout_id" :data-album-day="localDay(workout.start_time)"
         :class="['selectable-record', { selected: selecting && selected.has(workout.workout_id) }]" @pointerdown="onRowDown($event, index)">
       <input type="checkbox" :inert="!selecting || undefined" :tabindex="selecting ? 0 : -1" :checked="selected.has(workout.workout_id)" :aria-label="`${workoutDisplayLabel(workout)} ${formatDate(workout.start_time, 'auto')} ${formatTime(workout.start_time)}`" @change="onCheck(index)" />
       <RecordRow
@@ -272,18 +355,25 @@ useSectionTour('workouts');
         :time="formatTime(workout.start_time)"
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout)"
-      />
+      >
+        <template v-if="shapes.get(workout.workout_id)" #aside><RouteGlyph class="row-route" :shape="shapes.get(workout.workout_id)!" /></template>
+        <template v-if="zoneBars.get(workout.workout_id)" #foot>
+          <ShareBar class="row-zones" compact passive pop-end :title="albumText.hrZones" :segments="zoneBars.get(workout.workout_id)!" />
+        </template>
+      </RecordRow>
       </div>
     </div>
+    </div>
     </Transition>
+    <AlbumCapsule v-if="!albumLocked && displayableList.length && !error" :level="level" @update:level="goLevel" />
     <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="shownHidden" :selecting="selecting" @select-all="selectLoaded" @clear="clearSelected" @changed="onChanged" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore" :ref="sentinelRef" class="load-more">
+    <div v-if="hasMore && shownLevel === 'day'" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
     </div>
-    <p v-if="displayableList.length" class="footnote">
+    <p v-if="displayableList.length && shownLevel === 'day'" class="footnote">
       {{ t.shown(workouts.length, total) }} · {{ t.footnote(displayableList.length) }}
     </p>
   </section>
@@ -325,6 +415,12 @@ useSectionTour('workouts');
 .list-swap-enter-from { opacity: 0; transform: translateY(8px); }
 .list-swap-leave-to { opacity: 0; }
 .list-tools { margin-top: 12px; }
+/* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
+.album-stage { position: relative; }
+.row-route { width: 48px; height: 32px; color: var(--activity); opacity: .85; }
+.row-zones { --share-height: 3px; margin-top: 4px; padding-block: 3px; }
+.tile-route { width: 100%; height: 100%; min-height: 0; color: var(--activity); opacity: .9; }
+.tile-reading { overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   .selectable-record input, .selectable-record input::before, .record-list::before { transition: none; }
   .record-list.selecting .selectable-record.selected { animation: none; }

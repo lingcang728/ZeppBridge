@@ -331,6 +331,15 @@ export interface HeartRateZoneReport {
   totalSeconds: number;
   windowDays: number;
   source: string;
+  /** 每个本地周（周一起）的五个区间秒数，旧的在前；窗口里一个样本都没有的周不给。 */
+  weeks?: HeartRateZoneWeek[];
+}
+
+export interface HeartRateZoneWeek {
+  /** 那一周的周一，YYYY-MM-DD。 */
+  weekStart: string;
+  /** `seconds[i]` 是 Z(i+1) 的秒数。 */
+  seconds: number[];
 }
 
 export interface HeartRateZoneOptions {

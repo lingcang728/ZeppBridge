@@ -4,6 +4,7 @@ import type { GlyphTone } from '../lib/glyphs';
 import { useSyncController } from './useSyncController';
 import { chartPalette } from '../lib/echartsSetup';
 import { resolvedTheme } from './useTheme';
+import { hrZoneColor } from '../lib/metricTone';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { formatDistance, formatNumber, isFiniteNumber } from '../lib/format';
 import { formatPaceSeconds } from '../lib/metricSeries';
@@ -167,13 +168,8 @@ export const useWorkoutPresentation = (
      它自己会换算——两边都换就成了一次英里、再一次英里。 */
   /** 海拔图纵轴至少撑开 20 米：平路就画成平的（chartAxis.elevationAxis）。 */
   const ALTITUDE_MIN_SPAN_M = 20;
-  /** 区间色：和心率区间卡（WorkoutHrZonesCard 的 .zone-0…5）同一套。 */
-  const zoneColorOf = (index: number) => {
-    const s = chartPalette.value.series;
-    // --route-mint 不在图表色板里（tokens.css 深 #2FA96B / 浅 #22875C），canvas 要真颜色。
-    const mint = resolvedTheme.value === 'light' ? '#22875C' : '#2FA96B';
-    return [s.pace, mint, s.training, s.altitude, s.calories, s.heart][Math.min(5, Math.max(0, index))]!;
-  };
+  /** 区间色：全应用同一套（lib/metricTone.ts 的 hrZoneColor），心率区间卡、列表细条、训练状态页都从那里取。 */
+  const zoneColorOf = (index: number) => hrZoneColor(index, resolvedTheme.value);
   const chartData = computed(() => {
     const samples = series.value?.samples;
     const heart = sampleSeries(samples, 'heart_rate');
@@ -204,11 +200,11 @@ export const useWorkoutPresentation = (
     ] : null;
     const paceRange = profile ? paceAxis(toChart(profile.lo), toChart(profile.hi)) : null;
     const paceExtremes = profile ? [profile.fastest, profile.slowest].map((p) => ({ t: p.t, v: toChart(p.v) })) : undefined;
-    // 心率区间色带（卡拉大才画）：手表随这条运动下发的上界，没有就不画。
+    // 心率区间（各档都按区间给线着色，中档起加色带）：手表随这条运动下发的上界，没有就不画。
     const zones = [...(workout.value?.hr_zones ?? [])].sort((a, b) => a.index - b.index);
     const bands: ChartBand[] = zones.map((zone, i) => ({ index: zone.index, low: i ? zones[i - 1].upper_bound_bpm : null, high: zone.upper_bound_bpm }));
     const s = palette.series;
-    // 心率卡大档的「各区间时长」：和心率区间卡同一份秒数、同一套颜色。
+    // 心率卡的「各区间时长」（大档带图例，中小档是一条细条）：和心率区间卡同一份秒数、同一套颜色。
     const zoneShare: ShareSegment[] | null = zones.some((zone) => zone.seconds > 0)
       ? zones.map((zone) => ({ key: `z${zone.index}`, label: `Z${zone.index}`, seconds: zone.seconds, color: zoneColorOf(zone.index) }))
       : null;

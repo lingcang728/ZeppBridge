@@ -118,6 +118,15 @@ const WEEK: Record<number, Plan | null> = {
   6: { kind: 'walking', km: [3, 5], pace: [650, 720], hr: [96, 108], load: 2, zepp: 52 },
 };
 
+/** 演示运动的心率区间时长：按平均心率摊到 Z0–Z5（不用随机数，别的演示序列不变）。上界是演示用的固定值。 */
+const DEMO_ZONE_UPPER = [114, 133, 152, 171, 190, 220];
+const demoHrZones = (avg: number, seconds: number) => {
+  const centre = DEMO_ZONE_UPPER.findIndex((upper) => avg < upper);
+  const weights = DEMO_ZONE_UPPER.map((_, i) => Math.max(0, 1 - Math.abs(i - centre - 0.3) * 0.55));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  return DEMO_ZONE_UPPER.map((upper, index) => ({ index, upper_bound_bpm: upper, seconds: Math.round(seconds * weights[index] / sum) }));
+};
+
 const buildWorkouts = (now: Date, rng: Rng): Workout[] => {
   const workouts: Workout[] = [];
   for (let back = 0; back < DAYS; back += 1) {
@@ -173,7 +182,7 @@ const buildWorkouts = (now: Date, rng: Rng): Workout[] => {
       source_scope: 'device',
       device_id: DEMO_DEVICE_ID,
       synced_at: iso(new Date(end.getTime() + 15 * 60_000)),
-      hr_zones: [],
+      hr_zones: demoHrZones(avg, seconds),
     });
   }
   return workouts.sort((a, b) => b.start_time.localeCompare(a.start_time));
