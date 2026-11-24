@@ -124,6 +124,12 @@
 .pcard.holding .pcard-glow { opacity: .55; transition: opacity 450ms ease-in; }
 /* 飞进箱子的那一张（替身）：只带封面，垫牌留在原处——看上去是从这一叠上抽走了一张。 */
 .pcard.peel::before, .pcard.peel::after { opacity: 0; }
+/* 发牌桌（建议 → 发牌）：第二行读数小一号、灰一级；小图是一条细线（轨迹缩略 / 心率小线），颜色跟这一项走，不抢读数。 */
+.pcard-note { max-width: 100%; overflow: hidden; color: var(--muted); font-size: max(10px, calc(var(--w) * .075)); font-weight: 600; font-variant-numeric: tabular-nums;
+  white-space: nowrap; text-overflow: ellipsis; }
+.pcard-sketch { display: block; width: calc(var(--w) * .5); height: calc(var(--w) * .36); overflow: visible; }
+.pcard-sketch.line { width: calc(var(--w) * .62); height: calc(var(--w) * .16); }
+.pcard-sketch path { fill: none; stroke: var(--tint); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; opacity: .85; }
 @media (prefers-reduced-motion: reduce) {
   .pcard, .pcard-face, .pcard.group::before, .pcard.group::after, .pcard-charge, .pcard-charge i, .pcard-glow { transition: none !important; }
   .pcard-face.outline { animation-duration: 1ms; }

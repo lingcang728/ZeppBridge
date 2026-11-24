@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { faceFit, splitFaceValue, textFit } from '../faceValue';
+import { faceFit, routeSketch, sparkPath, splitFaceValue, textFit } from '../faceValue';
 
 describe('牌面读数拆分', () => {
   it('时长拆成数字段和单位段，拼回去还是原文', () => {
@@ -24,5 +24,26 @@ describe('牌面读数拆分', () => {
     expect(zh).toBeGreaterThan(en);
     expect(faceFit(splitFaceValue('62'))).toBeLessThan(zh);
     expect(textFit('9/14–9/20')).toBeGreaterThan(textFit('9/16'));
+  });
+});
+
+describe('牌面小图', () => {
+  it('轨迹缩略：保持长宽比、居中进 100×100，点太少不画', () => {
+    const d = routeSketch([[0, 0], [0, 0.01], [0.005, 0.01]])!;
+    const nums = d.match(/-?[\d.]+/g)!.map(Number);
+    expect(Math.min(...nums)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...nums)).toBeLessThanOrEqual(100);
+    expect(d.startsWith('M')).toBe(true);
+    // 东西 1 格、南北半格：横向撑满（6 → 94），纵向居中。
+    expect(nums[0]).toBe(6);
+    expect(nums[2]).toBe(94);
+    expect(routeSketch([[1, 1]])).toBeNull();
+    expect(routeSketch([[1, 1], [1, 1]])).toBeNull();
+  });
+
+  it('心率小线：低的在下、高的在上，撑满高度', () => {
+    expect(sparkPath([100, 150])).toBe('M0 28 L100 2');
+    expect(sparkPath([120, 120, 120])).toBe('M0 28 L50 28 L100 28');
+    expect(sparkPath([140])).toBeNull();
   });
 });

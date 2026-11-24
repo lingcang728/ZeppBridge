@@ -53,3 +53,39 @@ export const textFit = (text: string): number => {
   for (const ch of text) width += wide(ch) ? 1 : /\d/.test(ch) ? 0.6 : 0.56;
   return Math.max(1, Math.round(width * 100) / 100);
 };
+
+/**
+ * 牌面小图（发牌桌）：轨迹缩略和心率小线，画成 SVG path（`viewBox="0 0 100 100"` / `"0 0 100 30"`）。
+ * 轨迹按纬度把经度压一下（cos φ），保持长宽比、居中；心率按这一次自己的高低撑满高度。点太少就不画（返回 null）。
+ */
+export const SKETCH_BOX = 100;
+export const SPARK_BOX = { w: 100, h: 30 } as const;
+
+const fixed = (value: number) => (Math.round(value * 10) / 10).toString();
+
+export const routeSketch = (points: ReadonlyArray<readonly [number, number]>, pad = 6): string | null => {
+  const clean = points.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+  if (clean.length < 2) return null;
+  const meanLat = clean.reduce((sum, [lat]) => sum + lat, 0) / clean.length;
+  const k = Math.cos((meanLat * Math.PI) / 180);
+  const xy = clean.map(([lat, lng]) => [lng * k, -lat] as const);
+  const xs = xy.map(([x]) => x);
+  const ys = xy.map(([, y]) => y);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const span = Math.max(maxX - minX, maxY - minY);
+  if (!(span > 0)) return null;
+  const scale = (SKETCH_BOX - pad * 2) / span;
+  const offX = (SKETCH_BOX - (maxX - minX) * scale) / 2;
+  const offY = (SKETCH_BOX - (maxY - minY) * scale) / 2;
+  return xy.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(offX + (x - minX) * scale)} ${fixed(offY + (y - minY) * scale)}`).join(' ');
+};
+
+export const sparkPath = (values: readonly number[], pad = 2): string | null => {
+  const clean = values.filter((value) => Number.isFinite(value));
+  if (clean.length < 2) return null;
+  const lo = Math.min(...clean);
+  const hi = Math.max(...clean);
+  const range = hi - lo || 1;
+  const step = SPARK_BOX.w / (clean.length - 1);
+  return clean.map((value, i) => `${i ? 'L' : 'M'}${fixed(i * step)} ${fixed(SPARK_BOX.h - pad - ((value - lo) / range) * (SPARK_BOX.h - pad * 2))}`).join(' ');
+};

@@ -1,0 +1,118 @@
+import { defineMessages, useMessages } from '../../i18n';
+
+/**
+ * 「建议 → 发牌 → 交给 AI」：按问题发牌的入口、发牌桌、首页建议卡，以及每种牌交给 AI 时带的模板问题。
+ * 模板问题是写给 AI 的话，跟着界面语言走。
+ */
+const messages = defineMessages(
+  {
+    dealByQuestion: '按问题发牌',
+    dealByQuestionAria: '按问题发牌：选一个问题，自动挑出相关的几次运动和几晚',
+    kind: {
+      distance_best: '同距离 · 刷 PR',
+      same_route: '同一条路线',
+      race_review: '比赛复盘',
+      recovery_nights: '恢复异常的夜',
+      review_workout: '复盘这次',
+      recovery_day: '排个恢复日',
+      comeback: '排个轻松的回归',
+      plan_tomorrow: '帮我排明天',
+    },
+    kindSub: {
+      distance_best: '同一距离段的历次 PR 和最近几次',
+      same_route: '同一条路线上跑过的几次',
+      race_review: '比赛那次 + 赛前四周训练和睡眠',
+      recovery_nights: 'HRV、静息心率或睡眠偏离常态的几晚',
+    },
+    empty: {
+      no_routes: '还没有跑过三次以上的同一条路线',
+      no_distance: '还没有两次落在同一距离段（5K / 10K / 半马 / 全马）的跑步',
+      no_race: '没有标记的比赛，也没有明显快于平常的一次',
+      no_outliers: '最近两个月的恢复读数都在你的常态里',
+      no_data: '最近没有够用的数据',
+    },
+    bucket: { '5k': '5K', '10k': '10K', half: '半马', full: '全马' },
+    role: {
+      anchor: '这次', pr: 'PR', race: '比赛', build: '赛前', same: '同类', recent: '最近', outlier: '异常', day_before: '前一天', night: '那一晚',
+    },
+    flag: { hrv_low: 'HRV 低', rhr_high: '静息心率高', sleep_short: '睡得短' },
+    hrvNote: (value: number) => `HRV ${value}`,
+    bench: '候补',
+    benchEmpty: '没有候补了',
+    tableTip: '点一张抽到候补；点候补里的一张换进来。交给 AI 的内容跟着这手牌走。',
+    useHand: '就用这手牌',
+    handEmpty: '牌都抽走了，从候补换一张进来',
+    cardCount: (count: number) => `${count} 张`,
+    drawOutAria: (label: string) => `${label}，按一下抽到候补`,
+    swapInAria: (label: string) => `${label}，按一下换进这手牌`,
+    dealing: '正在发牌…',
+    failed: '读不到数据，发不出牌',
+    question: {
+      distance_best: (bucket: string) => `这是我 ${bucket} 距离段的历次 PR 和最近几次跑步。请对比配速、心率和训练负荷的变化：进步主要来自哪里、离下一个 PR 还差什么，再给我接下来 4 周针对这个距离的训练重点。`,
+      same_route: (km: string) => `这是我在同一条路线（约 ${km}）上跑的几次。请对比每次的配速、心率和后半程的心率漂移：同样的路线我是更快了、更省力了，还是退步了？说说可能的原因。`,
+      race_review: (date: string) => `${date} 这次是比赛（或明显全力的一次），附上了赛前四周的训练和睡眠恢复。请复盘：配速分配和心率是否合理、赛前的训练量和减量是否合适、睡眠恢复有没有拖后腿，下次比赛前该怎么调整。`,
+      recovery_nights: '这几晚的恢复读数（HRV、静息心率或睡眠时长）明显偏离我的常态，每一晚都附上了前一天的运动。请帮我找规律：是训练负荷、运动时间，还是别的原因？给我能马上用上的调整建议。',
+      review_workout: '我刚做完这次运动，附上了同类的最近几次和近一周的睡眠恢复。请复盘这一次：和之前几次比怎么样、强度是否合适、接下来一两天该怎么安排。',
+      recovery_day: '我昨晚睡得不太好，附上了最近几晚的睡眠恢复和最近几天的运动。请帮我把今天排成恢复日：适合做什么、强度上限是多少、今晚几点睡比较好。',
+      comeback: (days: number) => `我已经 ${days} 天没有运动了，附上了停下来之前的最后几次和最近两周的睡眠恢复。请帮我排一次轻松的回归训练，别一上来就太猛，也说说之后一周怎么慢慢加回去。`,
+      plan_tomorrow: (date: string) => `请只帮我排明天（${date}）这一天的训练。附上了最近 7 天的运动、睡眠恢复和训练负荷。请先自己查一下我所在地明天的天气，再决定室内还是户外、什么时间段。排好后按训练计划格式输出，from 和 to 都写 ${date}，不要动其他日子。`,
+    },
+  },
+  {
+    dealByQuestion: 'Deal by question',
+    dealByQuestionAria: 'Deal by question: pick a question and the matching workouts and nights are dealt for you',
+    kind: {
+      distance_best: 'Same distance · PRs',
+      same_route: 'Same route',
+      race_review: 'Race review',
+      recovery_nights: 'Off recovery nights',
+      review_workout: 'Review this one',
+      recovery_day: 'Plan a recovery day',
+      comeback: 'Ease back in',
+      plan_tomorrow: 'Plan tomorrow',
+    },
+    kindSub: {
+      distance_best: 'Past PRs and recent runs at one distance',
+      same_route: 'Runs on the same route',
+      race_review: 'The race + four weeks of training and sleep before it',
+      recovery_nights: 'Nights when HRV, resting HR or sleep was off',
+    },
+    empty: {
+      no_routes: 'No route run three or more times yet',
+      no_distance: 'No two runs in the same distance band (5K / 10K / half / full) yet',
+      no_race: 'No marked race and no run clearly faster than usual',
+      no_outliers: 'Recovery readings stayed within your norm for the last two months',
+      no_data: 'Not enough recent data',
+    },
+    bucket: { '5k': '5K', '10k': '10K', half: 'Half', full: 'Marathon' },
+    role: {
+      anchor: 'This one', pr: 'PR', race: 'Race', build: 'Build-up', same: 'Similar', recent: 'Recent', outlier: 'Off', day_before: 'Day before', night: 'Night',
+    },
+    flag: { hrv_low: 'Low HRV', rhr_high: 'High resting HR', sleep_short: 'Short sleep' },
+    hrvNote: (value: number) => `HRV ${value}`,
+    bench: 'Bench',
+    benchEmpty: 'Bench is empty',
+    tableTip: 'Tap a card to move it to the bench; tap a bench card to swap it in. The AI gets whatever is in this hand.',
+    useHand: 'Use this hand',
+    handEmpty: 'All cards drawn out. Swap one in from the bench',
+    cardCount: (count: number) => (count === 1 ? '1 card' : `${count} cards`),
+    drawOutAria: (label: string) => `${label}. Press to move it to the bench`,
+    swapInAria: (label: string) => `${label}. Press to swap it into the hand`,
+    dealing: 'Dealing…',
+    failed: 'Could not read the data, so no cards were dealt',
+    question: {
+      distance_best: (bucket: string) => `These are my past PRs and most recent runs at ${bucket}. Compare pace, heart rate and training load across them: where did the progress come from, what is missing for the next PR, and what should the next 4 weeks focus on for this distance?`,
+      same_route: (km: string) => `These are my runs on the same route (about ${km}). Compare pace, heart rate and second-half heart-rate drift: on the same route, am I faster, more efficient, or slipping? Tell me the likely reasons.`,
+      race_review: (date: string) => `The run on ${date} was a race (or a clear all-out effort). Four weeks of training and sleep before it are attached. Review it: were pacing and heart rate sensible, was the training volume and taper right, did sleep or recovery hold me back, and what should I change before the next race?`,
+      recovery_nights: 'These nights had recovery readings (HRV, resting heart rate or sleep duration) clearly outside my norm, and each comes with the workouts from the day before. Help me find the pattern: training load, workout timing, or something else? Give me adjustments I can use right away.',
+      review_workout: 'I just finished this workout. The most recent similar ones and the last week of sleep and recovery are attached. Review it: how does it compare with the earlier ones, was the intensity right, and how should I plan the next day or two?',
+      recovery_day: 'I slept poorly last night. The last few nights of sleep and recovery and the last few days of workouts are attached. Help me make today a recovery day: what to do, the intensity ceiling, and when to go to bed tonight.',
+      comeback: (days: number) => `I have not worked out for ${days} days. The last few workouts before the break and two weeks of sleep and recovery are attached. Plan an easy comeback session that does not overdo it, and tell me how to build back up over the following week.`,
+      plan_tomorrow: (date: string) => `Plan only tomorrow (${date}). The last 7 days of workouts, sleep, recovery and training load are attached. First check tomorrow's local weather where I am yourself, then decide indoor or outdoor and what time of day. Output it in the training plan format with both from and to set to ${date}, and leave every other day alone.`,
+    },
+  },
+  undefined,
+  'components/cards/hands',
+);
+
+export const useHandsText = () => useMessages(messages);
