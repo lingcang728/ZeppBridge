@@ -33,6 +33,15 @@ const results = computed(() => {
   return QUESTION_KINDS.map((kind) => ({ kind, result: facts ? deal.dealHand(kind, facts) : null as HandResult | null }));
 });
 
+/** 发得出牌写这一手是什么；发不出写为什么。 */
+const subOf = (kind: (typeof QUESTION_KINDS)[number], result: HandResult | null) => {
+  if (result && !result.ok) {
+    const { reason } = result;
+    return t.value.empty[reason];
+  }
+  return t.value.kindSub[kind];
+};
+
 /* ---------- 菜单 ---------- */
 let menuRun: Animation | null = null;
 const showMenu = async () => {
@@ -113,7 +122,7 @@ onBeforeUnmount(() => {
       <template v-else>
         <button v-for="item in results" :key="item.kind" type="button" role="menuitem" class="deal-item" :disabled="!item.result?.ok" @click="pick(item.result)">
           <strong>{{ t.kind[item.kind] }}</strong>
-          <small>{{ item.result && !item.result.ok ? t.empty[item.result.reason] : t.kindSub[item.kind] }}</small>
+          <small>{{ subOf(item.kind, item.result) }}</small>
         </button>
       </template>
     </div>

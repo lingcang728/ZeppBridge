@@ -19,7 +19,8 @@ export interface HandFace {
   top: string;
   title: string;
   value: string | null;
-  note: string | null;
+  /** 第二行读数。 */
+  aside: string | null;
   sketch: { kind: 'route' | 'line'; d: string } | null;
   icon: IconName;
   tint: string;
@@ -37,7 +38,7 @@ export const handFace = (card: HandCard, t: HandsText, lines?: HandLines | null)
     const n = card.night;
     const value = n.duration_min !== null ? formatDuration(n.duration_min) : null;
     const note = card.flags?.length ? card.flags.map((flag) => t.flag[flag]).join(' · ') : n.hrv !== null ? t.hrvNote(Math.round(n.hrv)) : null;
-    return { top, title, value, note, sketch: null, icon: 'moon', tint: AI_TASK_CATEGORY_META.sleep.tint, label: [title, value, note].filter(Boolean).join(', ') };
+    return { top, title, value, aside: note, sketch: null, icon: 'moon', tint: AI_TASK_CATEGORY_META.sleep.tint, label: [title, value, note].filter(Boolean).join(', ') };
   }
   const w = card.workout;
   const family = familyOf(w.workout_type);
@@ -51,7 +52,7 @@ export const handFace = (card: HandCard, t: HandsText, lines?: HandLines | null)
   const hr = !route && lines?.hr.length ? sparkPath(lines.hr) : null;
   const sketch = route ? { kind: 'route' as const, d: route } : hr ? { kind: 'line' as const, d: hr } : null;
   return {
-    top, title, value, note, sketch, icon: ICON[family] ?? 'activity', tint: AI_TASK_CATEGORY_META.workout.tint,
+    top, title, value, aside: note, sketch, icon: ICON[family] ?? 'activity', tint: AI_TASK_CATEGORY_META.workout.tint,
     label: [top, title, value, note].filter(Boolean).join(', '),
   };
 };

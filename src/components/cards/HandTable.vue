@@ -207,7 +207,7 @@ defineExpose({ close, isClosing: () => closing.value });
       <div ref="stage" class="hand-stage" @click.self="onBlank">
         <div class="hand-row" :style="{ '--card-w': `${mainW}px` }" @click.self="onBlank">
           <span v-for="(card, i) in hand.cards" :key="card.id" class="hslot" :style="fanStyle(i)">
-            <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).note"
+            <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).aside"
               :sketch="face(card).sketch" :icon="face(card).icon" :tint="face(card).tint" :corner="card.date.slice(8).replace(/^0/, '')"
               :aria-label="t.drawOutAria(face(card).label)" @click="tapMain(card)" />
           </span>
@@ -217,7 +217,7 @@ defineExpose({ close, isClosing: () => closing.value });
           <h3>{{ t.bench }}</h3>
           <div class="bench-row" :style="{ '--card-w': `${benchW}px` }">
             <span v-for="card in hand.bench" :key="card.id" class="hslot">
-              <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).note"
+              <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).aside"
                 :icon="face(card).icon" :tint="face(card).tint" :aria-label="t.swapInAria(face(card).label)" @click="tapBench(card)" />
             </span>
             <p v-if="!hand.bench.length" class="bench-empty">{{ t.benchEmpty }}</p>

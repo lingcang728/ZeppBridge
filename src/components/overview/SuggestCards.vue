@@ -37,7 +37,6 @@ const busy = ref<string | null>(null);
 const failed = ref(false);
 
 const load = async () => {
-  if (!prefs.enabled()) { list.value = []; return; }
   try { list.value = await backend.suggestionCards(); } catch { list.value = []; }
 };
 onMounted(() => { void load(); });

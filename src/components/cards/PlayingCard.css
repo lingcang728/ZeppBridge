@@ -28,10 +28,10 @@
 .pcard.group::before, .pcard.group::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--w) * .1);
   background: linear-gradient(var(--deck-shade, rgba(0, 0, 0, .16)), var(--deck-shade, rgba(0, 0, 0, .16))), var(--mat-raised); box-shadow: var(--mat-raised-rim), var(--pad-drop);
   transition: transform 340ms cubic-bezier(.3, 1.25, .5, 1); }
-:root[data-theme='light'] .pcard.group { --deck-shade: rgba(38, 52, 41, .05); }
+:root[data-theme='light'] .pcard.group { --deck-shade: rgba(28, 27, 25, .05); }
 .pcard.group::before { transform: translateY(calc(var(--w) * .04)) scale(.955); }
 .pcard.group::after { transform: translateY(calc(var(--w) * .08)) scale(.91); --deck-shade: rgba(0, 0, 0, .28); }
-:root[data-theme='light'] .pcard.group::after { --deck-shade: rgba(38, 52, 41, .1); }
+:root[data-theme='light'] .pcard.group::after { --deck-shade: rgba(28, 27, 25, .1); }
 .pcard.group:not(.disabled):not(.empty):hover::before { transform: translate(calc(var(--w) * .05), calc(var(--w) * .02)) rotate(4deg) scale(.97); }
 .pcard.group:not(.disabled):not(.empty):hover::after { transform: translate(calc(var(--w) * -.05), calc(var(--w) * .05)) rotate(-5deg) scale(.95); }
 .pcard.group.month .pcard-face { background: radial-gradient(130% 80% at 50% 0%, color-mix(in srgb, var(--tint) 30%, transparent), transparent 72%), var(--mat-raised);

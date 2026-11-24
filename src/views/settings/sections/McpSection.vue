@@ -9,6 +9,7 @@ import Icon from '../../../components/Icon.vue';
 import McpConnectRow from './McpConnectRow.vue';
 import McpPublishRow from './McpPublishRow.vue';
 import AutoPasteRow from './AutoPasteRow.vue';
+import SuggestCardsRow from './SuggestCardsRow.vue';
 import McpTaskScopes from './McpTaskScopes.vue';
 import McpScopeRow from './McpScopeRow.vue';
 import McpWritesRow from './McpWritesRow.vue';
@@ -124,6 +125,7 @@ const copyMcpConfig = () => copy(
         </div>
       </details>
       <AutoPasteRow />
+      <SuggestCardsRow />
       <McpPublishRow />
       <McpWritesRow />
       <McpScopeRow v-if="sidecar" :initial="!!sidecar.task_only" @changed="onScopeChanged" />
