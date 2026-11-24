@@ -60,7 +60,8 @@ export const createDemoHands = (data: DemoData): Record<string, DemoHandler> => 
           start_time: last.start_time, distance_m: last.distance_m, duration_s: last.duration_s, same_type_ids: runs.slice(1, 5).map((w) => w.workout_id),
         });
       }
-      const night = nights().at(-1);
+      const all = nights();
+      const night = all[all.length - 1];
       if (night?.duration_min) {
         out.push({
           code: 'sleep_poor', key: `sleep_poor:${night.date}`, night: night.date, duration_min: night.duration_min, baseline_duration_min: night.duration_min + 52,
