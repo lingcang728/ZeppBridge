@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
 
 <template>
   <span class="deal-host">
-    <button ref="pill" type="button" class="exchanges-pill deal-pill" :aria-expanded="open" :aria-controls="menuId" :title="t.dealByQuestionAria" @click="toggle">
+    <button ref="pill" type="button" class="deal-pill" :aria-expanded="open" :aria-controls="menuId" :title="t.dealByQuestionAria" @click="toggle">
       <Icon name="cards" :size="13" />{{ t.dealByQuestion }}<Icon name="chevron-down" :size="13" />
     </button>
     <div v-if="open" :id="menuId" ref="menu" class="deal-menu" role="menu" :aria-label="t.dealByQuestion">
@@ -133,7 +133,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .deal-host { position: relative; display: inline-flex; }
-.deal-pill { gap: 6px; }
+.deal-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px 6px 12px; border: 0; border-radius: 999px; background: var(--mat-inset);
+  box-shadow: var(--mat-inset-shadow); color: var(--muted); font-family: inherit; font-size: var(--fs-xs); font-weight: 650; white-space: nowrap; cursor: pointer;
+  transition: color var(--dur-base) ease; }
+.deal-pill:hover, .deal-pill[aria-expanded='true'] { color: var(--ink); }
+.deal-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .deal-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; display: grid; gap: 4px; width: min(320px, calc(100vw - 32px)); padding: 6px;
   border: 1px solid var(--mat-glass-line); border-radius: 16px; background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur);
   box-shadow: var(--mat-glass-shadow); transform-origin: 24px 0; }
