@@ -223,7 +223,11 @@ fn hand_facts_carry_route_ends_races_and_nightly_recovery() {
         .unwrap();
 
     let facts = db.hand_facts(today(), 30).unwrap();
-    let ids: Vec<_> = facts.workouts.iter().map(|w| w.workout_id.as_str()).collect();
+    let ids: Vec<_> = facts
+        .workouts
+        .iter()
+        .map(|w| w.workout_id.as_str())
+        .collect();
     assert_eq!(ids, ["loop", "race"]);
     assert_eq!(facts.workouts[0].start, Some([31.1235, 121.5]));
     assert_eq!(facts.workouts[0].end, Some([31.1284, 121.5]));

@@ -154,7 +154,11 @@ impl Database {
     }
 
     /// 每晚取一段主睡眠（醒来那天时长最长的一段）：(醒来日, 时长, 深睡)。
-    fn main_nights(&self, start: NaiveDate, end: NaiveDate) -> Result<Vec<(String, f64, Option<f64>)>> {
+    fn main_nights(
+        &self,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<(String, f64, Option<f64>)>> {
         let mut statement = self.conn.prepare(
             "SELECT date(end_time, 'localtime') AS day, MAX(duration_minutes),
                     CASE WHEN COALESCE(deep_available, 1) = 1 THEN deep_minutes END
@@ -175,7 +179,8 @@ impl Database {
     }
 
     fn suggest_sleep_poor(&self, today: NaiveDate) -> Result<Option<Suggestion>> {
-        let Some((night, duration, deep)) = self.main_nights(today, today)?.into_iter().next() else {
+        let Some((night, duration, deep)) = self.main_nights(today, today)?.into_iter().next()
+        else {
             return Ok(None);
         };
         // 基线：昨晚之前 28 晚（和周报同一个基线长度与最少天数）。

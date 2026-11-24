@@ -663,10 +663,8 @@ async fn the_fake_server_receives_the_full_window_for_a_single_day_plan() {
     week_plan(&db);
     let batch = tomorrow_only(&db);
 
-    let dir = std::env::temp_dir().join(format!(
-        "zeppbridge-plan-window-{}",
-        crate::unique_suffix()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("zeppbridge-plan-window-{}", crate::unique_suffix()));
     std::fs::create_dir_all(&dir).unwrap();
     let store = OfficialStore::with_backend(&dir, std::sync::Arc::new(KeyringStub::default()));
     let tokens = OfficialTokens {
@@ -687,7 +685,8 @@ async fn the_fake_server_receives_the_full_window_for_a_single_day_plan() {
     let body: serde_json::Value = serde_json::from_slice(&seen[0].body).unwrap();
     assert_eq!(body, batch[0].body);
     assert_eq!(names_in(&body), ["新", "B", "C", "D", "E", "F"]);
-    db.finish_plan_publish(batch[0].publish_id, &outcome).unwrap();
+    db.finish_plan_publish(batch[0].publish_id, &outcome)
+        .unwrap();
     assert_eq!(sent_names(&db), ["新", "B", "C", "D", "E", "F"]);
     let _ = std::fs::remove_dir_all(dir);
 }

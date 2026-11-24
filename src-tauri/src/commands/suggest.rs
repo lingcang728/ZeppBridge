@@ -39,5 +39,8 @@ pub async fn card_hand_lines(
     state: tauri::State<'_, AppState>,
     workout_ids: Vec<String>,
 ) -> Result<Vec<HandLines>, AppError> {
-    spawn_independent_read(state.data_dir.clone(), move |db| db.hand_lines(&workout_ids)).await
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.hand_lines(&workout_ids)
+    })
+    .await
 }
