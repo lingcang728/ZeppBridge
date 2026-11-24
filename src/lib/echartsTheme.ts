@@ -157,20 +157,20 @@ const darkPalette: ChartPalette = {
 };
 
 const lightPalette: ChartPalette = {
-  axis: '#4C5748',
-  grid: 'rgba(38, 52, 41, 0.14)',
-  gridSoft: 'rgba(38, 52, 41, 0.08)',
+  axis: '#4A4946',
+  grid: 'rgba(28, 27, 25, 0.14)',
+  gridSoft: 'rgba(28, 27, 25, 0.08)',
   tooltipBg: 'rgba(255, 255, 255, 0.9)',
-  tooltipBorder: 'rgba(38, 52, 41, 0.1)',
-  tooltipText: '#20261F',
-  tooltipSub: '#4C5748',
-  tooltipDim: '#63705C',
-  mark: 'rgba(32, 38, 31, 0.38)',
+  tooltipBorder: 'rgba(28, 27, 25, 0.1)',
+  tooltipText: '#18191B',
+  tooltipSub: '#4A4946',
+  tooltipDim: '#67655F',
+  mark: 'rgba(24, 25, 27, 0.38)',
   spot: '#FFFFFF',
   surface: '#FFFFFF',
-  legend: '#20261F',
-  legendOff: '#9AA392',
-  unknown: 'rgba(38, 52, 41, 0.32)',
+  legend: '#18191B',
+  legendOff: '#A3A19B',
+  unknown: 'rgba(28, 27, 25, 0.32)',
   accent: '#2F6B4F',
   series: zeppSemanticColorsLight,
 };
@@ -183,15 +183,15 @@ export const chartPalettes: Record<ChartThemeName, ChartPalette> = {
 
 /* tooltip 是一块浮在图上的玻璃：圆角、背景模糊、柔和投影——和应用里其余浮层同一种材质。 */
 const TOOLTIP_GLASS_DARK = 'border-radius:14px;backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 14px 32px -14px rgba(0,0,0,.7);';
-const TOOLTIP_GLASS_LIGHT = 'border-radius:14px;backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 #fff,0 14px 32px -16px rgba(38,52,41,.35);';
+const TOOLTIP_GLASS_LIGHT = 'border-radius:14px;backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 #fff,0 14px 32px -16px rgba(28,27,25,.35);';
 /* 悬停时的指示线：一根细虚线；柱状图的「阴影」指示只是极淡的一层，不再是一个灰框。 */
 const AXIS_POINTER_DARK = {
   lineStyle: { color: 'rgba(242, 244, 238, 0.28)', width: 1, type: 'dashed' as const },
   shadowStyle: { color: 'rgba(242, 244, 238, 0.035)' },
 };
 const AXIS_POINTER_LIGHT = {
-  lineStyle: { color: 'rgba(32, 38, 31, 0.3)', width: 1, type: 'dashed' as const },
-  shadowStyle: { color: 'rgba(32, 38, 31, 0.04)' },
+  lineStyle: { color: 'rgba(24, 25, 27, 0.3)', width: 1, type: 'dashed' as const },
+  shadowStyle: { color: 'rgba(24, 25, 27, 0.04)' },
 };
 
 const darkAxis = {

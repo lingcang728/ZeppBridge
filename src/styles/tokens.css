@@ -226,21 +226,21 @@
  * 分类色只调明度饱和不换色相，语义不漂移。 */
 html[data-theme="light"] {
   color-scheme: only light;
-  --bg: #EAEDE5;
+  --bg: #EDECE8;
   --sidebar: #FFFFFF;
-  --canvas: #F4F6F3;
+  --canvas: #F6F5F2;
   --surface: #FFFFFF;
-  --surface-raised: #F3F5EF;
-  --surface-hover: #E5E9E0;
-  --ink: #20261F;
-  --muted: #4C5748;
-  --subtle: #63705C;
+  --surface-raised: #F5F4F1;
+  --surface-hover: #E8E7E3;
+  --ink: #18191B;
+  --muted: #4A4946;
+  --subtle: #67655F;
   --faint: var(--subtle);
-  --line: rgba(38, 52, 41, .10);
-  --line-control: rgba(38, 52, 41, .36);
-  --line-strong: rgba(38, 52, 41, .22);
-  --scroll-thumb: rgba(38, 52, 41, .28);
-  --scroll-thumb-active: rgba(38, 52, 41, .52);
+  --line: rgba(28, 27, 25, .10);
+  --line-control: rgba(28, 27, 25, .36);
+  --line-strong: rgba(28, 27, 25, .22);
+  --scroll-thumb: rgba(28, 27, 25, .28);
+  --scroll-thumb-active: rgba(28, 27, 25, .52);
   --scroll-label-bg: rgba(255, 255, 255, .94);
   --brand: #2F6B4F;
   --accent: var(--brand);
@@ -274,18 +274,18 @@ html[data-theme="light"] {
   --danger: #C43742;
   --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
   --kintsugi: #A9781F;
-  --cal-0: #EBEDE8;
-  --cal-future: #F4F5F2;
+  --cal-0: #ECEBE8;
+  --cal-future: #F5F4F2;
   --cal-1: #FDDDB6;
   --cal-2: #F8B064;
   --cal-3: #EE8722;
   --cal-4: #CF630A;
   --cal-tip: #FFFFFF;
-  --focus: rgba(38, 52, 41, .42);
+  --focus: rgba(28, 27, 25, .42);
   --medal-gold: #D6A21E;
   --medal-silver: #A9B1BB;
   --medal-bronze: #B8703F;
-  --route-neutral: #6E7670;
+  --route-neutral: #73716C;
   --route-mint: #22875C;
   --route-cyan: #2E7FC2;
   --route-amber: #A87E0B;
@@ -296,51 +296,51 @@ html[data-theme="light"] {
   --panel-glint: var(--mat-rim), var(--mat-shadow);
 
   --ambient:
-    radial-gradient(900px 520px at 12% -8%, rgba(47, 107, 79, .10), transparent 70%),
+    radial-gradient(900px 520px at 12% -8%, rgba(47, 107, 79, .06), transparent 70%),
     radial-gradient(760px 520px at 96% 8%, rgba(107, 127, 224, .08), transparent 70%),
     radial-gradient(900px 600px at 60% 110%, rgba(30, 150, 166, .06), transparent 70%);
-  --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FAFBF8 100%);
+  --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FCFBF9 100%);
   --mat-card-solid: #FFFFFF;
   --mat-card-frost: rgba(255, 255, 255, .9);
-  --mat-line: rgba(38, 52, 41, .10);
-  --mat-line-hover: rgba(38, 52, 41, .22);
-  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(38, 52, 41, .06);
-  --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 28px -14px rgba(38, 52, 41, .16), 0 30px 60px -32px rgba(38, 52, 41, .2);
-  --mat-shadow-lift: 0 2px 6px rgba(38, 52, 41, .1), 0 22px 44px -18px rgba(38, 52, 41, .22);
-  --mat-stack-shadow: 0 -6px 16px -12px rgba(38, 52, 41, .18);
-  --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F1F4EE 100%);
-  --mat-raised-hover: linear-gradient(180deg, #FFFFFF 0%, #E9EEE5 100%);
-  --mat-raised-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .12);
-  --mat-inset: #EDF0EA;
-  --mat-inset-shadow: inset 0 1px 2px rgba(38, 52, 41, .12), inset 0 0 0 1px rgba(38, 52, 41, .07);
-  --mat-glass: rgba(250, 251, 248, .74);
-  --mat-glass-strong: rgba(250, 251, 248, .9);
-  --mat-glass-line: rgba(38, 52, 41, .1);
+  --mat-line: rgba(28, 27, 25, .10);
+  --mat-line-hover: rgba(28, 27, 25, .22);
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(28, 27, 25, .06);
+  --mat-shadow: 0 1px 3px rgba(28, 27, 25, .08), 0 12px 28px -14px rgba(28, 27, 25, .16), 0 30px 60px -32px rgba(28, 27, 25, .2);
+  --mat-shadow-lift: 0 2px 6px rgba(28, 27, 25, .1), 0 22px 44px -18px rgba(28, 27, 25, .22);
+  --mat-stack-shadow: 0 -6px 16px -12px rgba(28, 27, 25, .18);
+  --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F2F1ED 100%);
+  --mat-raised-hover: linear-gradient(180deg, #FFFFFF 0%, #EAE9E4 100%);
+  --mat-raised-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(28, 27, 25, .12);
+  --mat-inset: #EFEEEA;
+  --mat-inset-shadow: inset 0 1px 2px rgba(28, 27, 25, .12), inset 0 0 0 1px rgba(28, 27, 25, .07);
+  --mat-glass: rgba(252, 251, 249, .74);
+  --mat-glass-strong: rgba(252, 251, 249, .9);
+  --mat-glass-line: rgba(28, 27, 25, .1);
   --mat-glass-blur: blur(22px) saturate(1.6);
-  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 18px 44px -16px rgba(38, 52, 41, .28);
+  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 18px 44px -16px rgba(28, 27, 25, .28);
   --glass: rgba(255, 255, 255, .56);
   --glass-sheen: rgba(255, 255, 255, .5);
   --glass-blur: blur(16px) saturate(1.8);
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(38, 52, 41, .08);
-  --glass-shadow: 0 6px 18px -10px rgba(38, 52, 41, .3);
-  --glass-press: rgba(38, 52, 41, .06);
-  --edge-fade: rgba(246, 247, 243, .8);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(28, 27, 25, .08);
+  --glass-shadow: 0 6px 18px -10px rgba(28, 27, 25, .3);
+  --glass-press: rgba(28, 27, 25, .06);
+  --edge-fade: rgba(247, 246, 243, .8);
   --mat-tile-top: #FFFFFF;
-  --mat-tile-bottom: #EEF1EA;
-  --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(38, 52, 41, .08);
-  --glyph-neutral: #4C5748;
-  --cap-track: #E4E8E0;
-  --cap-track-shadow: inset 0 1px 2px rgba(38, 52, 41, .14), inset 0 0 0 1px rgba(38, 52, 41, .06);
-  --cap-thumb: linear-gradient(180deg, #FFFFFF 0%, #F7F9F5 100%);
-  --cap-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .16), 0 4px 12px -5px rgba(38, 52, 41, .28);
+  --mat-tile-bottom: #F0EFEB;
+  --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(28, 27, 25, .08);
+  --glyph-neutral: #4A4946;
+  --cap-track: #E7E6E2;
+  --cap-track-shadow: inset 0 1px 2px rgba(28, 27, 25, .14), inset 0 0 0 1px rgba(28, 27, 25, .06);
+  --cap-thumb: linear-gradient(180deg, #FFFFFF 0%, #F8F7F5 100%);
+  --cap-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(28, 27, 25, .16), 0 4px 12px -5px rgba(28, 27, 25, .28);
   --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .72));
-  --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .14), 0 3px 10px -4px rgba(38, 52, 41, .22);
+  --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(28, 27, 25, .14), 0 3px 10px -4px rgba(28, 27, 25, .22);
   --glass-edge: linear-gradient(180deg, #FFFFFF, rgba(255, 255, 255, .6) 32%, rgba(255, 255, 255, .45) 68%, rgba(255, 255, 255, .9));
-  --glass-outline: 0 0 0 .5px rgba(38, 52, 41, .12);
-  --glass-tab-selected: linear-gradient(180deg, rgba(38, 52, 41, .085), rgba(38, 52, 41, .06));
-  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 0 0 .5px rgba(38, 52, 41, .04);
+  --glass-outline: 0 0 0 .5px rgba(28, 27, 25, .12);
+  --glass-tab-selected: linear-gradient(180deg, rgba(28, 27, 25, .085), rgba(28, 27, 25, .06));
+  --glass-tab-selected-rim: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 0 0 .5px rgba(28, 27, 25, .04);
   --lens-scatter: #FFFFFF;
-  --lens-glass-rim: 0 0 0 .5px rgba(38, 52, 41, .14), 0 8px 18px -8px rgba(38, 52, 41, .28);
+  --lens-glass-rim: 0 0 0 .5px rgba(28, 27, 25, .14), 0 8px 18px -8px rgba(28, 27, 25, .28);
   --lens-glass-specular: conic-gradient(from 0deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 70deg, rgba(255, 255, 255, .2) 100deg,
     rgba(255, 255, 255, .9) 140deg, rgba(255, 255, 255, .2) 185deg, rgba(255, 255, 255, .2) 265deg, #FFFFFF 310deg, rgba(255, 255, 255, .5));
   --cap-ink: #2F6B4F;
@@ -366,16 +366,16 @@ html[data-theme="light"] {
 html[data-theme="light"] .stage-bar .unknown {
   background: repeating-linear-gradient(
     -45deg,
-    rgba(38, 52, 41, .22),
-    rgba(38, 52, 41, .22) 4px,
-    rgba(38, 52, 41, .07) 4px,
-    rgba(38, 52, 41, .07) 8px
+    rgba(28, 27, 25, .22),
+    rgba(28, 27, 25, .22) 4px,
+    rgba(28, 27, 25, .07) 4px,
+    rgba(28, 27, 25, .07) 8px
   );
 }
 
 /* ComparisonBars：轨道与基线。 */
-html[data-theme="light"] .comparison-track { background: rgba(38, 52, 41, .10); }
-html[data-theme="light"] .comparison-bar .baseline { background: rgba(38, 52, 41, .24); }
+html[data-theme="light"] .comparison-track { background: rgba(28, 27, 25, .10); }
+html[data-theme="light"] .comparison-bar .baseline { background: rgba(28, 27, 25, .24); }
 
 /* DeviceDetail：状态灯与提示色。 */
 html[data-theme="light"] .hero-state.on i { background: var(--accent); }
