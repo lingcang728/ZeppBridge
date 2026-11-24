@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { developWash, type InkPhase } from '../lib/motion/develop';
 import { formatDuration, formatTimeWithPeriod, isFiniteNumber } from '../lib/format';
 import DurationText from './DurationText.vue';
@@ -16,24 +16,18 @@ const messages = defineMessages(
     zeroMinutes: '0 分钟',
     hypnogramAria: '睡眠阶段时间轴',
     summaryAria: '睡眠阶段汇总比例',
-    cursorHint: '指针移到图上看某一刻；点一下固定，方向键逐段看',
-    cursorAt: (time: string) => `${time} 时`,
   },
   {
     notProvided: 'Not provided',
     zeroMinutes: '0 min',
     hypnogramAria: 'Sleep stage timeline',
     summaryAria: 'Sleep stage share',
-    cursorHint: 'Point at the chart to read a moment; click to pin, arrow keys step through stages',
-    cursorAt: (time: string) => `At ${time}`,
   },
   {
     notProvided: 'No proporcionado',
     zeroMinutes: '0 min',
     hypnogramAria: 'Cronología de las fases del sueño',
     summaryAria: 'Proporción de fases del sueño',
-    cursorHint: 'Pasa el puntero para leer un momento; haz clic para fijarlo y usa las flechas para recorrer las fases',
-    cursorAt: (time: string) => `A las ${time}`,
   },
   'components/StageBar',
 );
@@ -244,14 +238,9 @@ watch(axis, (now, before) => {
 watch(ticks, () => { crowded.value = new Set(); void nextTick(measureAxis); });
 onBeforeUnmount(() => axisObserver?.disconnect());
 
-/* 可固定的时间游标：指针位置就是那一刻，点一下固定；键盘左右键逐段走。 */
-const cursor = ref<number | null>(null);
+/* 指到哪一段，哪一段就跳一下、旁边标出阶段、起止和时长；点一下固定，键盘左右键逐段走。
+   不画竖线：一条贯穿四档的线读不出「这是哪一块」，块自己动起来才读得出。 */
 const pinned = ref(false);
-const cursorTime = computed(() => {
-  const current = range.value;
-  if (cursor.value === null || !current) return null;
-  return clock(current.from + current.span * cursor.value);
-});
 /** 清醒这种只有一两分钟的短段，在它附近 6px 内就算指到了它。 */
 const pickSlice = (fraction: number, widthPx: number): BarSegment | null => {
   const current = range.value;
@@ -263,41 +252,56 @@ const pickSlice = (fraction: number, widthPx: number): BarSegment | null => {
     && at >= (slice.start ?? 0) - slack && at <= (slice.end ?? 0) + slack);
   return near ?? timeline.value.find((slice) => at >= (slice.start ?? 0) && at <= (slice.end ?? 0)) ?? null;
 };
+const sliceAt = (event: PointerEvent): BarSegment | null => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return pickSlice(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), rect.width);
+};
 const trackPoint = (event: PointerEvent) => {
   if (pinned.value) return;
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  cursor.value = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  hovered.value = pickSlice(cursor.value, rect.width);
+  hovered.value = sliceAt(event);
 };
 const togglePin = (event: PointerEvent) => {
-  if (pinned.value) { pinned.value = false; trackPoint(event); return; }
-  trackPoint(event);
-  pinned.value = cursor.value !== null;
+  const slice = sliceAt(event);
+  if (pinned.value && slice === hovered.value) { pinned.value = false; return; }
+  hovered.value = slice;
+  pinned.value = slice !== null;
 };
-const leaveTrack = () => { if (!pinned.value) { cursor.value = null; hovered.value = null; } };
+const leaveTrack = () => { if (!pinned.value) hovered.value = null; };
 const stepSlice = (direction: -1 | 1) => {
   const list = timeline.value;
   if (!list.length || !range.value) return;
   const index = hovered.value ? list.indexOf(hovered.value) : direction > 0 ? -1 : list.length;
-  const next = list[Math.max(0, Math.min(list.length - 1, index + direction))];
-  hovered.value = next;
+  hovered.value = list[Math.max(0, Math.min(list.length - 1, index + direction))];
   pinned.value = true;
-  const mid = ((next.start ?? 0) + (next.end ?? 0)) / 2;
-  cursor.value = (mid - range.value.from) / range.value.span;
 };
 const onTrackKey = (event: KeyboardEvent) => {
   if (event.key === 'ArrowRight') { event.preventDefault(); stepSlice(1); }
   else if (event.key === 'ArrowLeft') { event.preventDefault(); stepSlice(-1); }
-  else if (event.key === 'Escape' && pinned.value) { event.stopPropagation(); pinned.value = false; cursor.value = null; hovered.value = null; }
+  else if (event.key === 'Escape' && (pinned.value || hovered.value)) { event.stopPropagation(); pinned.value = false; hovered.value = null; }
 };
-const readout = computed(() => {
+/** 标注：贴着那一块的正上方；最上面一档（清醒）往上没地方，改贴在下方。 */
+const sliceLabel = computed(() => {
   const slice = hovered.value;
-  if (!slice || slice.start === undefined || !cursorTime.value) return null;
-  return `${t.value.cursorAt(cursorTime.value)} · ${timelineTitle(slice)} · ${labelFor(slice.minutes)}`;
+  const current = range.value;
+  if (!slice || slice.start === undefined || slice.end === undefined || !current) return null;
+  const lane = Math.max(0, lanes.value.indexOf(slice.tone));
+  const share = 100 / lanes.value.length;
+  const below = lane === 0;
+  return {
+    left: (((slice.start + slice.end) / 2 - current.from) / current.span) * 100,
+    top: below ? (lane + (1 + BAR_SHARE) / 2) * share : (lane + (1 - BAR_SHARE) / 2) * share,
+    below,
+    name: stageLabels.value[STAGE_LEVEL[slice.tone]],
+    duration: labelFor(slice.minutes),
+    span: `${clock(slice.start)} – ${clock(slice.end)}`,
+  };
 });
+const readout = computed(() => sliceLabel.value
+  ? `${sliceLabel.value.name} · ${sliceLabel.value.span} · ${sliceLabel.value.duration}` : null);
 const timelineTitle = (slice: BarSegment) =>
   `${stageLabels.value[STAGE_LEVEL[slice.tone]]} · ${clock(slice.start ?? 0)}–${clock(slice.end ?? 0)}`;
-const hovered = ref<BarSegment | null>(null);
+// shallowRef：存的是 timeline 里的原对象，模板里拿 === 比，深层 ref 会包成代理就永远不相等。
+const hovered = shallowRef<BarSegment | null>(null);
 const hoverLeft = ref(50);
 const showSegment = (event: PointerEvent, segments: BarSegment[]) => {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -330,15 +334,15 @@ const tooltip = computed(() => {
         </div>
         <div
           class="timeline-tracks"
-          :class="{ 'is-pinned': pinned }"
+          :class="{ 'is-pinned': pinned, 'has-current': hovered !== null }"
           :style="{ height: `${lanes.length * LANE_PX}px` }"
           role="slider"
           tabindex="0"
           :aria-label="t.hypnogramAria"
-          :aria-valuetext="readout ?? t.cursorHint"
+          :aria-valuetext="readout ?? t.hypnogramAria"
           aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuenow="cursor === null ? 0 : Math.round(cursor * 100)"
+          :aria-valuemax="timeline.length"
+          :aria-valuenow="hovered ? timeline.indexOf(hovered) + 1 : 0"
           @pointermove="trackPoint"
           @pointerdown.prevent="togglePin"
           @pointerleave="leaveTrack"
@@ -349,7 +353,10 @@ const tooltip = computed(() => {
           <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered, sfumato: slice.tone === 'unknown' }]"
             :style="timelineStyle(slice)" aria-hidden="true" />
           <span v-if="washed" ref="wash" class="develop-wash" aria-hidden="true" />
-          <span v-if="cursor !== null" class="timeline-cursor" :style="{ left: `${cursor * 100}%` }" aria-hidden="true" />
+          <div v-if="sliceLabel" v-edge-safe class="slice-label" :class="{ below: sliceLabel.below }" :style="{ left: `${sliceLabel.left}%`, top: `${sliceLabel.top}%` }" aria-hidden="true">
+            <span class="slice-label-head"><i :class="hovered?.tone"></i>{{ sliceLabel.name }}<strong>{{ sliceLabel.duration }}</strong></span>
+            <small>{{ sliceLabel.span }}</small>
+          </div>
         </div>
         <div ref="axis" class="stage-axis ticked">
           <span>{{ axisLabels.start }}</span>
@@ -357,7 +364,6 @@ const tooltip = computed(() => {
           <span>{{ axisLabels.end }}</span>
         </div>
       </div>
-      <p class="timeline-readout" aria-live="polite">{{ readout ?? t.cursorHint }}</p>
     </template>
     <div v-else class="stage-bar-wrap">
       <div v-if="hovered" v-edge-safe class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
@@ -396,20 +402,35 @@ const tooltip = computed(() => {
 .sleep-timeline { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 12px; row-gap: 8px; margin-top: 18px; }
 .lane-labels { display: flex; flex-direction: column; max-width: 9em; }
 .lane-labels span { display: flex; align-items: center; justify-content: flex-end; color: var(--muted); font-size: var(--fs-xs); line-height: 1.1; text-align: end; overflow-wrap: anywhere; }
-.timeline-tracks { position: relative; min-width: 0; border-radius: 6px; cursor: crosshair; touch-action: none; }
+.timeline-tracks { position: relative; min-width: 0; border-radius: 6px; cursor: pointer; touch-action: pan-y; }
 .timeline-tracks:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .lane-rule { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed color-mix(in srgb, var(--ink) 16%, transparent); pointer-events: none; }
-.timeline-slice { position: absolute; min-width: 2px; border-radius: 4px; pointer-events: none; }
-.timeline-slice.is-current { box-shadow: 0 0 0 1.5px var(--ink); z-index: 1; }
+.timeline-slice { position: absolute; min-width: 2px; border-radius: 4px; pointer-events: none; transition: opacity .18s ease; }
+/* 指到的那块跳一下再停在半空，其余的退半步，像从一排积木里拎起一块。只动 transform / opacity。 */
+.timeline-tracks.has-current .timeline-slice:not(.is-current) { opacity: .45; }
+.timeline-slice.is-current { z-index: 1; animation: slice-hop .42s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+@keyframes slice-hop {
+  0% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-5px) scale(1.04, 1.18); }
+  100% { transform: translateY(-2px) scale(1.02, 1.08); }
+}
+.slice-label { position: absolute; z-index: 3; display: grid; gap: 2px; padding: 6px 10px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--mat-glass-strong); box-shadow: 0 4px 12px rgba(0,0,0,.2); color: var(--ink); white-space: nowrap; pointer-events: none; transform: translate(-50%, calc(-100% - 8px)); animation: label-in .2s ease-out both; }
+.slice-label.below { transform: translate(-50%, 8px); }
+.slice-label-head { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.slice-label-head i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.slice-label-head strong { margin-left: 4px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.slice-label small { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+@keyframes label-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .timeline-slice.is-current { animation: none; }
+  .slice-label { animation: none; }
+}
 .timeline-grid { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed color-mix(in srgb, var(--ink) 16%, transparent); pointer-events: none; }
-.timeline-cursor { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: .55; pointer-events: none; z-index: 2; }
-.timeline-tracks.is-pinned .timeline-cursor { opacity: .9; }
 .sleep-timeline .stage-axis { grid-column: 2; margin-top: 0; color: var(--subtle); font-size: var(--fs-xs); white-space: nowrap; }
 .stage-axis.ticked { position: relative; }
 .stage-axis .tick { position: absolute; top: 0; transform: translateX(-50%); color: var(--subtle); font-size: var(--fs-xs); white-space: nowrap; }
 /* 量的时候还要它的盒子，所以只藏不拆。 */
 .stage-axis .tick.crowded { visibility: hidden; }
-.timeline-readout { min-height: 1.6em; margin: 10px 0 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .stage-bar {
   position: relative;
   display: flex;

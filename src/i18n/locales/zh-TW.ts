@@ -673,8 +673,6 @@ export default {
       workouts: '僅連線了官方授權：官方介面只提供跑步、步行等部分運動，騎車、重量訓練、球類等需另外連線「進階資料」才會顯示。',
     },
     'components/StageBar': {
-      cursorAt: (time: string) => `${time} 時`,
-      cursorHint: '將游標移至圖上看某一刻；點一下固定，使用方向鍵逐段查看',
       hypnogramAria: '睡眠階段時間軸',
       notProvided: '未提供',
       summaryAria: '睡眠階段彙總比例',

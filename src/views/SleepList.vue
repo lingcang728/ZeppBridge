@@ -200,11 +200,11 @@ useSectionTour('sleep');
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else ref="stage" class="album-stage">
     <AlbumPeriods v-if="level !== 'day'" data-album-body kind="sleep" :level="level" :periods="shownPeriods" @open="openPeriod" />
-    <AlbumGrid v-else-if="density" data-album-body :tiles="tiles" :density="density">
+    <AlbumGrid v-else-if="density" data-album-body kind="sleep" :tiles="tiles" :density="density">
       <template #tile="{ tile }">
         <b class="tile-reading">{{ tile.reading }}</b>
-        <span class="tile-gap" />
-        <SleepStripBar class="tile-strip" v-bind="nightOf(sessionById.get(tile.id)!)" :spans="strips.get(tile.id)?.spans" />
+        <SleepStripBar class="tile-strip" lanes v-bind="nightOf(sessionById.get(tile.id)!)" :spans="strips.get(tile.id)?.spans" />
+        <span class="tile-span">{{ formatTime(sessionById.get(tile.id)!.start_time) }} – {{ formatTime(sessionById.get(tile.id)!.end_time) }}</span>
       </template>
     </AlbumGrid>
     <div v-else data-album-body class="record-list sleep-records">
@@ -224,7 +224,7 @@ useSectionTour('sleep');
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
         :fact-label="t.scoreLabel"
       >
-        <template #aside><SleepStripBar class="row-strip" v-bind="nightOf(session)" :spans="strips.get(session.sleep_id)?.spans" :axis="axis" /></template>
+        <template #aside><SleepStripBar class="row-strip" lanes v-bind="nightOf(session)" :spans="strips.get(session.sleep_id)?.spans" :axis="axis" /></template>
       </RecordRow>
     </div>
     </div>
@@ -253,8 +253,11 @@ useSectionTour('sleep');
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 /* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
 .album-stage { position: relative; }
-.sleep-records { --record-aside: minmax(96px, 40%); }
+/* 分期图占这一行的大半：左边只有时长和评分，留着空就是一大块空白。 */
+.sleep-records { --record-main: max-content; --record-aside: minmax(96px, 1fr); }
 .row-strip { width: 100%; }
-.tile-reading { color: var(--ink); font-size: var(--fs-md); font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.tile-strip { width: 100%; }
+/* 时长不折行（「7 小时 44 分」拆成两行就读不出来了）：放不下就缩一号字。 */
+.tile-reading { overflow: hidden; color: var(--ink); font-size: clamp(var(--fs-xs), 9cqi, var(--fs-md)); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.tile-strip { width: 100%; align-self: center; }
+.tile-span { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 </style>

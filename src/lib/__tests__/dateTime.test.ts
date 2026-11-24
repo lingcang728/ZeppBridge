@@ -29,7 +29,11 @@ describe('local display policy', () => {
     expect(formatTimeWithPeriod(late).replace(/\s/g, ' ')).toBe('10:57 PM');
     expect(formatTimeWithPeriod(early).replace(/\s/g, ' ')).toBe('12:19 AM');
     setLocale('zh');
-    expect(formatTimeWithPeriod(late)).toBe('下午10:57');
+    expect(formatTimeWithPeriod(late)).toBe('晚上10:57');
+    expect(formatTimeWithPeriod(early)).toBe('凌晨0:19');
+    expect(formatTimeWithPeriod(new Date(2026, 8, 12, 9, 31).getTime())).toBe('早晨9:31');
+    expect(formatTimeWithPeriod(new Date(2026, 8, 12, 12, 5).getTime())).toBe('中午12:05');
+    expect(formatTimeWithPeriod(new Date(2026, 8, 12, 23, 40).getTime())).toBe('深夜11:40');
     setTimeFormat('24h');
     expect(formatTimeWithPeriod(late)).toBe('22:57');
     expect(formatTimeWithPeriod('not a time')).toBe('—');

@@ -106,9 +106,12 @@ const stageCards = computed<StageCard[]>(() => {
   if (routeExpected.value) put('route', names.route, { ...CARD_GLYPHS.route, icon: workoutArt.value === 'outdoor-cycling' ? 'outdoor-cycling' : 'outdoor-run' }, !routeCanvas.value);
   if (series.value?.climbs) put('climbs', names.climbs);
   for (const [id, card] of charts.value) put(id, card.title, { icon: card.icon, tone: card.tone });
-  if (hrZones.value) put('hr-zones', names['hr-zones']);
+  /* 心率、心率区间、你的感受合成一张心率卡（区间画在图下，感受接在最底下）；没有心率图才各自单独一张。 */
+  const heartCard = charts.value.has('chart-heart');
+  if (hrZones.value && !heartCard) put('hr-zones', names['hr-zones']);
   if (seriesError.value || !chartCards.value.length) put('series-status', names['series-status']);
-  for (const id of ['decoded', 'export', 'feel', 'provenance'] as const) put(id, names[id]);
+  for (const id of ['decoded', 'export', 'provenance'] as const) put(id, names[id]);
+  if (!heartCard) put('feel', names.feel);
   return WORKOUT_CARDS.filter((id) => on.has(id)).map((id) => ({ id, ...on.get(id)! }));
 });
 const sport = computed(() => sportClass(displayType.value, !!series.value?.strength));
@@ -171,7 +174,10 @@ const sport = computed(() => sportClass(displayType.value, !!series.value?.stren
         <template #strength-map><WorkoutStrengthMapCard :detail="strengthDetail" /></template>
         <template #route><WorkoutRouteCard :canvas="routeCanvas" /></template>
         <template #climbs><WorkoutClimbsCard v-if="series?.climbs" :climbs="series.climbs" :cycling="workoutArt === 'outdoor-cycling'" :relief="relief" :slope="slope" /></template>
-        <template v-for="[id, card] in charts" #[id]><WorkoutChartCard :card="card" /></template>
+        <template v-for="[id, card] in charts" #[id]>
+          <WorkoutChartCard v-if="id === 'chart-heart'" :card="card"><WorkoutFeelCard embedded :workout-id="workoutId" /></WorkoutChartCard>
+          <WorkoutChartCard v-else :card="card" />
+        </template>
         <template #hr-zones><WorkoutHrZonesCard v-if="hrZones" :zones="hrZones" /></template>
         <template #series-status><WorkoutSeriesStatusCard :error="seriesError" @retry="loadDetail" /></template>
         <template #decoded><WorkoutDecodedCard :decoded="decodedMetrics" /></template>

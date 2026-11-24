@@ -114,9 +114,12 @@ const view = computed({
   get: () => (hiddenView.value ? 'hidden' : 'visible'),
   set: (value: 'visible' | 'hidden') => { if ((value === 'hidden') !== hiddenView.value) void switchVisibility(); },
 });
+/* 「已隐藏记录」只在真有隐藏的记录时才出：一条都没有，点过去只是一大块空白。正看着它的时候不收（刚把最后一条恢复了）。 */
+const hiddenCount = ref(0);
+const loadHiddenCount = () => tauriApi.getHiddenWorkoutPage(1, 0).then((page) => { hiddenCount.value = page.total; }).catch(() => undefined);
 const viewItems = computed(() => [
   { value: 'visible' as const, label: tools.value.visible },
-  { value: 'hidden' as const, label: tools.value.hidden },
+  ...(hiddenCount.value > 0 || hiddenView.value ? [{ value: 'hidden' as const, label: tools.value.hidden }] : []),
 ]);
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。
@@ -218,7 +221,7 @@ const onCheck = (index: number) => {
 };
 const selectLoaded = () => { selected.value = new Set(displayableList.value.map((w) => w.workout_id)); };
 const clearSelected = () => { selected.value = new Set(); };
-const onChanged = () => { selected.value = new Set(); void loadList(); };
+const onChanged = () => { selected.value = new Set(); void loadList(); void loadHiddenCount(); };
 onBeforeUnmount(endDrag);
 
 /* 相册（lib/album）：胶囊切年 / 月 / 日，「日」这一层 Ctrl + 滚轮 / 捏合在列表行、方块、日历热图之间换。
@@ -248,6 +251,13 @@ watch([shownDensity, () => workouts.value.length], () => {
   if (shownDensity.value === 2 && shownLevel.value === 'day' && hasMore.value && workouts.value.length < 2000) nextSlot(() => { void loadMore(); });
 });
 const workoutById = computed(() => new Map(displayableList.value.map((w) => [w.workout_id, w])));
+/* 轨迹缩略图只给真走了一段路的：不到 1 公里（原地跑、室内、GPS 刚搜到星就停）画出来只是一团乱线。 */
+const ROUTE_MIN_M = 1000;
+const routeOf = (id: string) => {
+  const shape = shapes.value.get(id);
+  const meters = workoutById.value.get(id)?.distance_meters;
+  return shape && isFiniteNumber(meters) && meters >= ROUTE_MIN_M ? shape : null;
+};
 const TYPE_TONE = { 'outdoor-run': 'var(--activity)', 'outdoor-cycling': 'var(--pace)', 'body-activity': 'var(--calories)' } as const;
 const tileReading = (workout: Workout) => {
   const meters = workout.distance_meters;
@@ -297,8 +307,8 @@ const workoutFact = (workout: Workout): string => {
 };
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
-onMounted(() => { void loadImportSources(); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-useRevisionReload(() => { void loadList(); void loadImportSources(); album.invalidate(); });
+onMounted(() => { void loadImportSources(); afterMotion(() => { void loadHiddenCount(); }); if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
+useRevisionReload(() => { void loadList(); void loadImportSources(); void loadHiddenCount(); album.invalidate(); });
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('workouts');
 </script>
@@ -308,12 +318,13 @@ useSectionTour('workouts');
     <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
     <OfficialOnlyNote topic="workouts" />
     <div class="list-bar">
-      <SegmentTrack v-model="view" :items="viewItems" :aria-label="t.title" no-wrap />
-      <div class="list-bar-actions">
-        <button :class="['pill-button', { 'is-on': selecting }]" type="button" :aria-pressed="selecting" @click="toggleSelecting">
+      <SegmentTrack v-if="viewItems.length > 1" v-model="view" :items="viewItems" :aria-label="t.title" no-wrap />
+      <span v-else />
+      <div class="list-bar-actions" role="group">
+        <button :class="['bar-action', { 'is-on': selecting }]" type="button" :aria-pressed="selecting" @click="toggleSelecting">
           <Icon name="circle-check" :size="15" />{{ selecting ? tools.done : tools.select }}
         </button>
-        <button :class="['pill-button', { 'is-on': importing }]" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">
+        <button :class="['bar-action', { 'is-on': importing }]" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">
           <Icon name="download" :size="15" />{{ importing ? importText.close : importText.open }}
         </button>
       </div>
@@ -333,10 +344,10 @@ useSectionTour('workouts');
     <EmptyState v-else-if="!displayableList.length" :key="`empty-${shownHidden}`" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else ref="stage" :key="`list-${shownHidden}`" class="album-stage">
     <AlbumPeriods v-if="shownLevel !== 'day'" data-album-body kind="workouts" :level="shownLevel" :periods="shownPeriods" @open="openPeriod" />
-    <AlbumGrid v-else-if="shownDensity" data-album-body :tiles="tiles" :density="shownDensity">
+    <AlbumGrid v-else-if="shownDensity" data-album-body kind="workouts" :tiles="tiles" :density="shownDensity">
       <template #tile="{ tile }">
         <GlyphTile :name="workoutIcon(workoutById.get(tile.id)!)" :size="24" tone="activity" />
-        <RouteGlyph v-if="shapes.get(tile.id)" class="tile-route" :shape="shapes.get(tile.id)!" />
+        <RouteGlyph v-if="routeOf(tile.id)" class="tile-route" :shape="routeOf(tile.id)!" />
         <span v-else class="tile-route" />
         <b class="tile-reading">{{ tile.reading }}</b>
       </template>
@@ -356,7 +367,7 @@ useSectionTour('workouts');
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout)"
       >
-        <template v-if="shapes.get(workout.workout_id)" #aside><RouteGlyph class="row-route" :shape="shapes.get(workout.workout_id)!" /></template>
+        <template v-if="routeOf(workout.workout_id)" #aside><RouteGlyph class="row-route" :shape="routeOf(workout.workout_id)!" /></template>
         <template v-if="zoneBars.get(workout.workout_id)" #foot>
           <ShareBar class="row-zones" compact passive pop-end :title="albumText.hrZones" :segments="zoneBars.get(workout.workout_id)!" />
         </template>
@@ -383,10 +394,18 @@ useSectionTour('workouts');
 .list-page { width: 100%; }
 /* 上面一行：左边「运动 / 已隐藏」分段胶囊（切过去滑块滑过去，列表交叉淡入），右边两枚胶囊按钮。 */
 .list-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-block: 14px 12px; }
-.list-bar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.list-bar .pill-button { font-size: var(--fs-sm); transition: scale var(--dur-fast) var(--ease-out), filter var(--dur-fast) ease, background var(--dur-base) ease; }
-.list-bar .pill-button.is-on { background: color-mix(in srgb, var(--accent) 16%, var(--cap-thumb)); box-shadow: var(--cap-thumb-rim), inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
-.list-bar .pill-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+/* 右边两枚动作和左边的「运动记录 / 已隐藏」是同一种凹槽胶囊：平时字是淡的、没有底，
+   打开的那一枚浮起成凸起的滑块（和分段胶囊选中那块同一种材质），图标换成品牌色。 */
+.list-bar-actions { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+.bar-action { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 15px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease, color var(--dur-fast) ease, scale var(--dur-fast) var(--ease-out); }
+.bar-action:hover { color: var(--ink); }
+.bar-action:active { scale: .96; }
+.bar-action svg { color: var(--subtle); transition: color var(--dur-fast) ease; }
+.bar-action.is-on { background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--ink); }
+.bar-action.is-on svg, .bar-action:hover svg { color: var(--accent); }
+.bar-action:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .hidden-hint { margin: 0 0 12px; }
 
 .selectable-record { display: flex; align-items: center; border-radius: var(--radius-md); transition: background 200ms ease; }
@@ -402,13 +421,21 @@ useSectionTour('workouts');
   transform: rotate(45deg) scale(0); transition: transform 240ms cubic-bezier(.2, 1.6, .4, 1); }
 .selectable-record input:checked { border-color: var(--accent); background: var(--accent); }
 .selectable-record input:checked::before { transform: rotate(45deg) scale(1); }
-.record-list::before { transition: translate 260ms var(--ease-out); }
-.record-list.selecting::before { translate: 40px 0; }
+.record-list::before { transition: opacity 180ms ease; }
+.record-list.selecting::before { opacity: 0; }
 .record-list.selecting { user-select: none; -webkit-user-select: none; }
 .record-list.selecting .selectable-record { cursor: pointer; }
 .record-list.selecting .selectable-record:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.record-list.selecting .selectable-record.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); animation: row-pop 300ms cubic-bezier(.2, 1.4, .4, 1); }
-@keyframes row-pop { 40% { transform: scale(1.008); } }
+.selectable-record { position: relative; }
+.record-list.selecting .selectable-record.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* 刚选上的那一行描一圈品牌色的光，随即褪掉（连成一块后中间不留边线）。 */
+.record-list.selecting .selectable-record.selected::after { position: absolute; inset: 0; content: ''; border-radius: inherit; animation: sel-glow 480ms ease-out forwards; pointer-events: none; }
+.record-list.selecting .selectable-record.selected + .selectable-record.selected { border-top-left-radius: 0; border-top-right-radius: 0; }
+.record-list.selecting .selectable-record.selected:has(+ .selectable-record.selected) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* 行间 6px 的缝：上一行也选中时往上补一截同色，看起来是一整块。 */
+.record-list.selecting .selectable-record.selected + .selectable-record.selected::before { position: absolute; top: -6px; left: 0; right: 0; height: 6px; content: ''; background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
+.record-list.selecting .selectable-record { transition: background 200ms ease, border-radius 220ms var(--ease-out); }
+@keyframes sel-glow { from { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); } to { box-shadow: inset 0 0 0 2px transparent; } }
 .record-list.is-switching { opacity: .45; transition: opacity 160ms ease; }
 .list-swap-enter-active { transition: opacity 260ms ease, transform 320ms var(--ease-out); }
 .list-swap-leave-active { transition: opacity 120ms ease; }
@@ -417,13 +444,13 @@ useSectionTour('workouts');
 .list-tools { margin-top: 12px; }
 /* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
 .album-stage { position: relative; }
-.row-route { width: 48px; height: 32px; color: var(--activity); opacity: .85; }
+.row-route { width: 56px; height: 40px; color: var(--activity); }
 .row-zones { --share-height: 3px; margin-top: 4px; padding-block: 3px; }
-.tile-route { width: 100%; height: 100%; min-height: 0; color: var(--activity); opacity: .9; }
+.tile-route { width: 100%; height: 100%; min-height: 0; color: var(--activity); }
 .tile-reading { overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   .selectable-record input, .selectable-record input::before, .record-list::before { transition: none; }
-  .record-list.selecting .selectable-record.selected { animation: none; }
+  .record-list.selecting .selectable-record.selected::after { animation: none; }
   .list-swap-enter-active, .list-swap-leave-active { transition: none; }
 }
 .selectable-record input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }

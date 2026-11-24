@@ -30,7 +30,8 @@ export const angleOf = (el: Element | null | undefined): number => {
 
 /** 牌歇着的样子：量牌位（`.pslot`），没有牌位就量牌自己。 */
 export const restOf = (card: HTMLElement): Rest => {
-  const slot = card.parentElement?.classList.contains('pslot') ? card.parentElement : null;
+  const parent = card.parentElement;
+  const slot = parent && (parent.classList.contains('pslot') || parent.classList.contains('hslot')) ? parent : null;
   const box = (slot ?? card).getBoundingClientRect();
   return { center: centerOfRect(box), angle: slot ? angleOf(slot) : 0, width: card.offsetWidth || box.width };
 };

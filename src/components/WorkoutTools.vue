@@ -92,7 +92,7 @@ const undo = async () => {
     <Transition name="tool-bar" mode="out-in">
       <div v-if="selecting || ids.length" key="bar" class="tool-bar" role="toolbar" :aria-label="t.selected(ids.length)">
         <div class="tool-group">
-          <span class="count" aria-live="polite"><Transition name="count-bump" mode="out-in"><b :key="ids.length">{{ ids.length }}</b></Transition><span class="sr-only">{{ t.selected(ids.length) }}</span></span>
+          <span :class="['count', { empty: !ids.length }]" aria-live="polite"><Icon name="circle-check" :size="15" /><Transition name="count-bump" mode="out-in"><b :key="ids.length">{{ ids.length }}</b></Transition><span class="sr-only">{{ t.selected(ids.length) }}</span></span>
           <button v-if="selecting" type="button" class="tool-button" @click="ids.length ? emit('clear') : emit('select-all')">{{ ids.length ? t.clearSelection : t.selectLoaded }}</button>
           <!-- 还在选择里、刚改完一批（勾选已清空）：撤销就放在这条栏上，不用先退出选择。 -->
           <button v-if="editId && !ids.length" type="button" class="tool-button" :disabled="busy" @click="undo"><Icon name="undo" :size="14" />{{ t.undo }}</button>
@@ -135,8 +135,13 @@ const undo = async () => {
   padding: 6px; border-radius: 26px; background: var(--mat-glass-strong);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
   box-shadow: var(--mat-glass-shadow), 0 18px 40px -18px rgba(0, 0, 0, .55), inset 0 0 0 1px var(--mat-glass-line); }
-.count { display: grid; place-items: center; min-width: 34px; height: 34px; padding: 0 10px; box-sizing: border-box; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-variant-numeric: tabular-nums; }
-.count b { font-weight: 650; }
+/* 已选几条：一枚和其他按钮同高的淡色胶囊，勾 + 数字，不再是一大坨实心绿。一条没选时整枚变淡。 */
+.count { display: inline-flex; align-items: center; gap: 6px; min-width: 34px; height: 34px; padding: 0 13px 0 10px; box-sizing: border-box; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); color: var(--ink); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; transition: background var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
+.count svg { color: var(--accent); }
+.count b { display: inline-block; min-width: 1ch; font-weight: 700; }
+.count.empty { background: color-mix(in srgb, var(--ink) 6%, transparent); box-shadow: none; color: var(--muted); }
+.count.empty svg { color: var(--subtle); }
 .tool-group { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; min-width: 0; }
 /* 组与组之间只留空，不画竖线：折行时竖线会挂在行尾。 */
 .tool-sep { width: 8px; height: 1px; }

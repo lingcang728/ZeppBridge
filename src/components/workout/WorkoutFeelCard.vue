@@ -13,7 +13,8 @@ import { useFeelText } from './feel.i18n';
 import { backend, isDesktop, toUserMessage } from '../../lib/bridge';
 import type { ShoeMode, WorkoutFeel } from '../../types/logbook';
 
-const props = defineProps<{ workoutId: string }>();
+/** `embedded`：嵌在心率卡底下（运动详情把心率、区间、感受合成一张），不画卡底和大标题图标。 */
+const props = defineProps<{ workoutId: string; embedded?: boolean }>();
 const t = useFeelText();
 const feel = ref<WorkoutFeel | null>(null);
 const error = ref<string | null>(null);
@@ -75,9 +76,9 @@ const RPE_MARKS = [1, 5, 10] as const;
 </script>
 
 <template>
-  <section v-if="feel" class="surface-card feel-card" :aria-label="t.title">
+  <section v-if="feel" :class="['feel-card', embedded ? 'is-embedded' : 'surface-card']" :aria-label="t.title">
     <div class="feel-head">
-      <GlyphTile name="recovery" tone="heart" :size="40" />
+      <GlyphTile v-if="!embedded" name="recovery" tone="heart" :size="40" />
       <h2>{{ t.title }}</h2>
       <small v-if="savedAt" :key="savedAt" class="saved" role="status">{{ t.saved }}</small>
     </div>
@@ -124,6 +125,8 @@ const RPE_MARKS = [1, 5, 10] as const;
 .feel-card { display: grid; gap: 14px; padding: 16px 18px 18px; border-radius: var(--radius-lg); }
 .feel-head { display: flex; align-items: center; gap: 10px; }
 .feel-head h2 { margin: 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
+.feel-card.is-embedded { gap: 12px; padding: 0; border-radius: 0; }
+.is-embedded .feel-head h2 { color: var(--ink); font-size: var(--fs-md, var(--fs-base)); font-weight: 700; letter-spacing: 0; }
 .saved { margin-left: auto; color: var(--accent); font-size: var(--fs-xs); animation: saved-fade 1.6s ease forwards; }
 @keyframes saved-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
 .block { display: grid; gap: 8px; }

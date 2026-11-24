@@ -1435,8 +1435,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       notProvided: 'Nicht angegeben',
       summaryAria: 'Anteil der Schlafphasen',
       zeroMinutes: '0 Min.',
-      cursorHint: "Zeige auf die Grafik für einen Zeitpunkt; klicke zum Fixieren und nutze die Pfeiltasten, um Abschnitt für Abschnitt weiterzugehen",
-      cursorAt: (time: string) => `Um ${time}`,
     },
     'components/WeeklyReportCard': {
       barBaseline: '28 Tage davor',

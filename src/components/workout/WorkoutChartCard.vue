@@ -90,7 +90,8 @@ const clearCursor = () => setRouteCursor(null);
     </dl>
     <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" @update-axis-pointer="onAxisPointer" @globalout="clearCursor" />
     <ElevationFacts v-if="showSlope" class="chart-extra" :slope="card.slope ?? null" :facts="false" />
-    <ShareBar v-if="showZones" :class="['chart-extra', { thin: tier !== 'lg' }]" :title="t.chartZoneShare" :segments="card.zoneShare!" :compact="tier !== 'lg'" />
+    <ShareBar v-if="showZones" :class="['chart-extra', { thin: tier === 'sm' }]" :title="t.chartZoneShare" :segments="card.zoneShare!" :compact="tier === 'sm'" />
+    <div v-if="$slots.default" class="chart-tail"><slot /></div>
   </section>
 </template>
 
@@ -139,6 +140,10 @@ const clearCursor = () => setRouteCursor(null);
 }
 .chart-extra { flex: none; margin: 10px 2px 2px; }
 .chart-extra.thin { margin: 4px 2px 0; }
+/* 图下面接的一节（心率卡的「你的感受」）：一道细线隔开，不再是另一张卡。 */
+.chart-tail { flex: none; margin: 14px 2px 2px; padding-top: 14px; border-top: 1px solid var(--mat-line); }
+/* 感受还没读回来（或不在桌面端）时里面只有一个注释节点：整节连同分隔线都不画。 */
+.chart-tail:empty { display: none; }
 /* 卡宽了图也高一点（舞台上单独一张时不是一条扁线）；窗口拉高时图吃掉多出来的高；
    舞台铺满时（--fill-extra，StageWindow 给）图加上那截高，档位跟着卡的高往上走；一列放不下时它是负的，图变矮（最矮 120）。 */
 .series-chart { flex: 1 0 auto; width: 100%; height: max(120px, calc(clamp(170px, 34cqw, 300px) + var(--fill-extra, 0px))); }

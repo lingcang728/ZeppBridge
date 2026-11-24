@@ -22,6 +22,15 @@
 .hand-row { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 16px; min-height: 0; padding: 12px 8px; }
 .bench-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 10px; min-height: calc(var(--card-w) * 1.4); padding: 4px 8px 0; }
 .hslot { position: relative; display: block; flex: 0 0 auto; }
+/* 拖着的牌：浮在最上面、带一层更深的影子，手指一松就交给 FLIP / 回弹。 */
+.hslot:has(.is-dragging) { z-index: 5; }
+.hand-stage :deep(.pcard) { touch-action: none; cursor: grab; }
+.hand-stage :deep(.pcard.is-dragging) { cursor: grabbing; filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .45)); }
+/* 拖到位：要落进去的那一排亮一圈品牌色的光（候补一道横线变亮，主牌那一排底下铺一层淡光）。 */
+.bench h3 { transition: border-color 180ms ease, color 180ms ease; }
+.hand-stage.drop-bench .bench h3 { border-top-color: var(--accent); color: var(--accent); }
+.hand-row { border-radius: 24px; transition: background-color 200ms ease, box-shadow 200ms ease; }
+.hand-stage.drop-hand .hand-row { background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 /* 分隔线画在标题上：收牌时它跟标题一起淡出，不会单独留在桌上。 */
 .bench { display: grid; gap: 8px; justify-items: center; }
 .bench h3 { justify-self: stretch; margin: 0; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .04em; text-align: center; }

@@ -66,8 +66,6 @@ export default {
           trustEstimated: 'Zepp가 자체 알고리즘으로 여러 측정값에서 추정한 값입니다. Zepp는 알고리즘이나 오차 범위를 공개하지 않았으며 실험실 측정값과 다를 수 있습니다.',
         },
     'components/StageBar': {
-          cursorAt: (time: string) => `${time} 시점`,
-          cursorHint: '차트 위에 커서를 놓으면 해당 시점을 볼 수 있습니다. 클릭해 고정하고 화살표 키로 구간을 이동하세요.',
           hypnogramAria: '수면 단계 타임라인',
           notProvided: '제공되지 않음',
           summaryAria: '수면 단계 비율 요약',

@@ -155,6 +155,18 @@ export const formatTime = (value: string): string => {
 
 const periodFormatters = new Map<string, Intl.DateTimeFormat>();
 /**
+ * 中文的钟点按时段说：凌晨 1:07、早晨 9:31、晚上 10:57，而不是一律「上午 / 下午」。
+ * 时段边界照日常说法：0–5 点凌晨、5–7 点清晨、7–10 点早晨、10–12 点上午、12 点中午、
+ * 13–17 点下午、17–19 点傍晚、19–23 点晚上、23 点以后深夜。繁体字形相同，两种中文共用。
+ */
+const ZH_PERIODS: Array<[number, string]> = [[5, '凌晨'], [7, '清晨'], [10, '早晨'], [12, '上午'], [13, '中午'], [17, '下午'], [19, '傍晚'], [23, '晚上'], [24, '深夜']];
+export const chineseClock = (date: Date): string => {
+  const hour = date.getHours();
+  const period = (ZH_PERIODS.find(([until]) => hour < until) ?? ZH_PERIODS[ZH_PERIODS.length - 1])[1];
+  const shown = hour > 12 ? hour - 12 : hour;
+  return `${period}${shown}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+/**
  * 带上午 / 下午的钟点，给跨午夜的睡眠阶段图用：一夜从前一晚 10 点睡到早上 5 点，
  * 24 小时制的 22:00、02:00 一路排下去，看不出哪段是前一天。设置里明确选了
  * 24 小时制就照它，其余（跟随地区、12 小时）一律带上 AM / PM。
@@ -164,6 +176,7 @@ export const formatTimeWithPeriod = (value: string | number): string => {
   if (Number.isNaN(date.getTime())) return '—';
   if (timeFormat.value === '24h') return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
   const locale = intlLocale();
+  if (locale.startsWith('zh')) return chineseClock(date);
   let formatter = periodFormatters.get(locale);
   if (!formatter) {
     formatter = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' });

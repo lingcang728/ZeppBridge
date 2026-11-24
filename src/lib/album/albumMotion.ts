@@ -6,7 +6,8 @@
  *    淡掉；旧的那一层冻成一张幽灵板留在原处淡出。往回（胶囊上切到更浅的一层）就反过来：当前这一层冻成幽灵板，
  *    缩回到对应的那张卡里，卡在底下亮起来接手。放到一半按 Esc，从此刻的窗口原路缩回 / 长回去。
  * 2. **捏合换密度的交叉缩放**：旧排版冻成幽灵板，继续朝新尺寸缩放、淡出；新排版从旧尺寸缩放回 1、淡入。
- *    指针下那一条记录前后都钉在同一个位置（滚动跟着补），像照片应用那样「就地变密」。
+ *    视口正中那一条记录前后都钉在同一高度（滚动跟着补），像照片应用那样「就地变密」；横向只绕整块的中线缩放，
+ *    不跟着那一条左右平移（行在中间、方块在左边，平移过去整屏就往一边飘）。
  *
  * 逐帧只动 transform / opacity，加上窗口那一道 clip-path（圆角不变，留在合成器上）。
  */
@@ -60,7 +61,7 @@ export interface Ghost {
  * 只拷屏幕上（上下各多留一截）的那几条：屏幕外的条目和整块不在屏幕上的月份直接去掉，再按第一条留下的条目对齐。
  * 一千多条的列表拷整份，排版和样式重算要好几秒（降速 4× 实测）。
  */
-const FREEZE_UNITS = '[data-album-item], .tile-month, .heat-month, .period-group';
+const FREEZE_UNITS = '[data-album-item], .tile-month, .heat-year, .period-group';
 export const freeze = (body: HTMLElement): Ghost => {
   const view = viewportBox();
   const copy = body.cloneNode(true) as HTMLElement;
@@ -280,7 +281,7 @@ export async function collapseToCard(plan: MorphPlan): Promise<void> {
 /** 条目的「大小」：面积开方（行是扁长的、方块是方的，按宽或按高比都会反）。 */
 const sizeOf = (r: DOMRect | WindowRect) => Math.sqrt(Math.max(1, r.width * r.height));
 
-export const ZOOM_MS = paced(340);
+export const ZOOM_MS = paced(420);
 
 /**
  * 换一档密度：`swap` 换排版（Vue 渲染完再返回），`find` 在新排版里找回指针下那一条。
@@ -310,8 +311,8 @@ export async function zoomSwap(body: HTMLElement, anchor: HTMLElement | null, sw
     const k = Math.min(3, Math.max(1 / 3, sizeOf(old) / sizeOf(now)));
     const gbox = ghost.el.getBoundingClientRect();
     const nbox = next.getBoundingClientRect();
-    const oc = { x: old.left + old.width / 2, y: old.top + old.height / 2 };
-    const nc = { x: now.left + now.width / 2, y: now.top + now.height / 2 };
+    const oc = { x: gbox.left + gbox.width / 2, y: old.top + old.height / 2 };
+    const nc = { x: nbox.left + nbox.width / 2, y: now.top + now.height / 2 };
     ghost.el.style.transformOrigin = `${oc.x - gbox.left}px ${oc.y - gbox.top}px`;
     next.style.transformOrigin = `${nc.x - nbox.left}px ${nc.y - nbox.top}px`;
     const startScale = ghost.el.style.transform.match(/scale\(([\d.]+)\)/)?.[1];

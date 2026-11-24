@@ -772,8 +772,6 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       summaryAria: 'Répartition des phases de sommeil',
       notProvided: 'Non renseigné',
       zeroMinutes: '0 min',
-      cursorHint: "Survolez le graphique pour voir un instant ; cliquez pour le fixer, puis utilisez les flèches pour parcourir les phases",
-      cursorAt: (time: string) => `À ${time}`,
     },
     'lib/bridge/errors': {
       desktopOnly: 'L’application de bureau est requise',

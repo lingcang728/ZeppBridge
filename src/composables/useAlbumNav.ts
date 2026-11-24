@@ -1,5 +1,5 @@
 import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, type Ref } from 'vue';
-import { levelDepth, stretchAtEdge, wheelFactor, zoomStep, type AlbumDensity, type AlbumLevel } from '../lib/album/album';
+import { levelDepth, stretchAtEdge, wheelFactor, zoomStep, ZOOM_STEP_IN, ZOOM_STEP_OUT, type AlbumDensity, type AlbumLevel } from '../lib/album/album';
 import { collapseToCard, expandFromCard, headLine, scroller, zoomSwap } from '../lib/album/albumMotion';
 import { lessMotion } from '../lib/motion/lessMotion';
 
@@ -8,7 +8,9 @@ import { lessMotion } from '../lib/motion/lessMotion';
  *
  * - **Ctrl + 滚轮 / 触控板捏合**（Chromium 里捏合就是带 ctrlKey 的 wheel）：页面本身一律不缩放（passive: false + preventDefault）；
  *   在「日」这一层、没在选择 / 看已隐藏时，跟手把列表放大缩小一点，累计够一档就换密度（lib/album/albumMotion.ts 的 zoomSwap），
- *   手停下来还没够一档就弹回原样。
+ *   手停下来还没够一档就弹回原样。最密的全年热图再往里捏 → 月卡，月卡再捏 → 年卡；年 / 月卡上往外拉 → 指针下那张卡展开。
+ * - **一次手势只走一档**：换过一档以后，要等手停一下（滚轮 / 捏合停 180ms）才接着认，不会一下子从列表冲到年卡。
+ * - **不朝指针漂**：缩放的原点和钉住的那一条都取视口正中，不取指针（指针在边上时整块往那边飘，用户看着像在滑走）。
  * - **层级**：点年卡 → 月、点月卡 → 那个月的日列表，从被点的卡展开；胶囊上切到更浅的一层，当前这一层缩回到对应的卡里。
  */
 export function useAlbumNav(options: {
@@ -102,15 +104,24 @@ export function useAlbumNav(options: {
   /* ---------- 捏合换密度 ---------- */
 
   let scale = 1;
+  /** 换过一档 / 一层以后锁住，等手停下来才放开（一次手势只走一档）。 */
+  let locked = false;
+  let unlock = 0;
+  const holdUntilIdle = () => { locked = true; window.clearTimeout(unlock); unlock = window.setTimeout(() => { locked = false; }, 180); };
   let anchor: HTMLElement | null = null;
   let anchorKey: { id?: string; day?: string; month?: string } = {};
   let idle = 0;
   let swapping = false;
 
+  /** 视口正中（顶栏以下那一块的中线）。 */
+  const viewCenter = () => {
+    const box = main()?.getBoundingClientRect();
+    const top = headLine();
+    const bottom = box ? box.bottom : window.innerHeight;
+    return { x: box ? box.left + box.width / 2 : window.innerWidth / 2, y: (top + bottom) / 2 };
+  };
   const pick = (x: number, y: number): HTMLElement | null => {
-    const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-album-item], [data-album-day]');
-    if (hit && stage.value?.contains(hit)) return hit;
-    // 指针在空白处：取离指针最近的那一条。
+    // 取离 (x, y) 最近的那一条（竖直方向为主）。
     let best: HTMLElement | null = null;
     let distance = Infinity;
     stage.value?.querySelectorAll<HTMLElement>('[data-album-item]').forEach((el) => {
@@ -162,24 +173,65 @@ export function useAlbumNav(options: {
       swapping = false;
       scale = 1;
       anchor = null;
+      holdUntilIdle();
     }
+  };
+
+  /* 年 / 月卡上捏合：跟手一点点缩放（原点在视口正中），够一档就换层（走和点卡、点胶囊一样的展开 / 收回）。 */
+  const periodUnder = (x: number, y: number): HTMLElement | null => {
+    const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-period]');
+    if (hit && stage.value?.contains(hit)) return hit;
+    let best: HTMLElement | null = null;
+    let distance = Infinity;
+    stage.value?.querySelectorAll<HTMLElement>('[data-period]').forEach((el) => {
+      const box = el.getBoundingClientRect();
+      if (box.bottom < headLine() || box.top > window.innerHeight) return;
+      const d = Math.hypot(box.left + box.width / 2 - x, box.top + box.height / 2 - y);
+      if (d < distance) { distance = d; best = el; }
+    });
+    return best;
+  };
+  const changeLevel = (next: AlbumLevel, x: number, y: number) => {
+    window.clearTimeout(idle);
+    scale = 1;
+    live(1);
+    holdUntilIdle();
+    if (levelDepth(next) > levelDepth(level.value)) {
+      const card = periodUnder(x, y);
+      const key = card?.dataset.period;
+      if (card && key) { void go(next, { key, card }); return; }
+    }
+    void go(next);
   };
   const onWheel = (event: WheelEvent) => {
     if (!event.ctrlKey) return;
     // 页面本身不缩放：列表页上 Ctrl + 滚轮 / 捏合只给相册用。
     event.preventDefault();
-    if (swapping || level.value !== 'day' || !options.zoomable() || !stage.value) return;
+    if (locked) { holdUntilIdle(); return; }
+    if (swapping || busy || !options.zoomable() || !stage.value) return;
     const el = body();
     if (!el) return;
     if (!anchor) {
-      anchor = pick(event.clientX, event.clientY);
+      const center = viewCenter();
+      anchor = pick(center.x, center.y);
       anchorKey = keyOf(anchor);
       const box = el.getBoundingClientRect();
-      el.style.transformOrigin = `${event.clientX - box.left}px ${event.clientY - box.top}px`;
+      el.style.transformOrigin = `${box.width / 2}px ${center.y - box.top}px`;
     }
     scale *= wheelFactor(event.deltaY, event.deltaMode);
-    const step = zoomStep(scale, density.value);
     window.clearTimeout(idle);
+    if (level.value !== 'day') {
+      if (scale >= ZOOM_STEP_IN) { changeLevel(level.value === 'year' ? 'month' : 'day', event.clientX, event.clientY); return; }
+      if (scale <= ZOOM_STEP_OUT && level.value === 'month') { changeLevel('year', event.clientX, event.clientY); return; }
+      // 年卡已经最浅：只给一点橡皮筋。
+      if (level.value === 'year' && scale < 1) scale = Math.max(scale, 0.85);
+      live(Math.min(1.04, Math.max(0.96, scale)));
+      idle = window.setTimeout(settle, 160);
+      return;
+    }
+    // 全年热图再往里捏：收成月卡。
+    if (density.value === 2 && scale <= ZOOM_STEP_OUT) { changeLevel('month', event.clientX, event.clientY); return; }
+    const step = zoomStep(scale, density.value);
     if (step) { idle = 0; void commit(step); return; }
     // 到头了（最疏还在放大 / 最密还在缩小）只给一点橡皮筋，累计也别越攒越多。
     if ((density.value === 0 && scale > 1.6) || (density.value === 2 && scale < 0.6)) scale = density.value === 0 ? 1.6 : 0.6;
@@ -189,7 +241,7 @@ export function useAlbumNav(options: {
 
   let bound = false;
   const bind = () => { if (!bound) { window.addEventListener('wheel', onWheel, { passive: false }); bound = true; } };
-  const unbind = () => { if (bound) { window.removeEventListener('wheel', onWheel); bound = false; } window.clearTimeout(idle); };
+  const unbind = () => { if (bound) { window.removeEventListener('wheel', onWheel); bound = false; } window.clearTimeout(idle); window.clearTimeout(unlock); locked = false; };
   onMounted(bind);
   onActivated(bind);
   onDeactivated(unbind);

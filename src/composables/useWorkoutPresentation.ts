@@ -204,9 +204,13 @@ export const useWorkoutPresentation = (
     const zones = [...(workout.value?.hr_zones ?? [])].sort((a, b) => a.index - b.index);
     const bands: ChartBand[] = zones.map((zone, i) => ({ index: zone.index, low: i ? zones[i - 1].upper_bound_bpm : null, high: zone.upper_bound_bpm }));
     const s = palette.series;
-    // 心率卡的「各区间时长」（大档带图例，中小档是一条细条）：和心率区间卡同一份秒数、同一套颜色。
+    // 心率卡的「各区间时长」：心率区间卡已并进心率卡，段名写上手表下发的边界（Z2 · 141–154）。
     const zoneShare: ShareSegment[] | null = zones.some((zone) => zone.seconds > 0)
-      ? zones.map((zone) => ({ key: `z${zone.index}`, label: `Z${zone.index}`, seconds: zone.seconds, color: zoneColorOf(zone.index) }))
+      ? zones.map((zone, i) => {
+        const low = i ? zones[i - 1].upper_bound_bpm : null;
+        const range = low === null ? t.value.hrZoneBelow(zone.upper_bound_bpm) : t.value.hrZoneBetween(low, zone.upper_bound_bpm);
+        return { key: `z${zone.index}`, label: `Z${zone.index} · ${range}`, seconds: zone.seconds, color: zoneColorOf(zone.index) };
+      })
       : null;
     // 海拔卡头部：累计爬升 / 累计下降（记录汇总，有才列）放在最低 / 平均 / 最高前面，参照 Zepp 海拔页。
     const summary = series.value?.summary;

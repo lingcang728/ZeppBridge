@@ -21,7 +21,7 @@ import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDateTime, formatDuration, formatTime, formatTimeWithPeriod, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDateTime, formatDuration, formatTimeWithPeriod, isFiniteNumber } from '../lib/format';
 import { minutesToHours } from '../lib/missingValues';
 import { backend } from '../lib/bridge';
 import { groupNaps } from '../lib/sleepNaps';
@@ -71,11 +71,6 @@ const stages = computed(() => session.value ? [
 const score = computed(() => {
   const value = session.value?.score;
   return isFiniteNumber(value) ? value : null;
-});
-
-const timeInBedLabel = computed(() => {
-  const minutes = session.value?.time_in_bed_minutes;
-  return isFiniteNumber(minutes) ? formatDuration(minutes, t.value.notProvided) : t.value.notProvided;
 });
 
 const syncTimeLabel = computed(() => {
@@ -287,7 +282,6 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
         <div class="hero-duration">
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}<MetricInfoButton metric="sleep_duration" :label="t.durationKicker" /></p>
           <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
-          <p class="meta">{{ t.heroMeta(formatTime(session.start_time), formatTime(session.end_time), timeInBedLabel) }}</p>
         </div>
         <div class="hero-score">
           <CircularProgress
@@ -338,7 +332,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
         </div>
       </section>
 
-      <!-- 近 7 天结构、来源与设备直接摊开。 -->
+      <!-- 近 7 天结构摊开；来源与设备偏技术，默认收起。 -->
           <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
             <div class="stage-head">
               <h2>{{ t.weeklyTitle }}<MetricInfoButton metric="sleep_weekly" :label="t.weeklyTitle" /></h2>
@@ -346,7 +340,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
             </div>
             <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
           </section>
-        <SectionGroup :title="t.metaAria" :summary="metaSummary" icon="health-watch" tone="activity">
+        <SectionGroup :title="t.metaAria" :summary="metaSummary" icon="health-watch" tone="activity" collapsible>
           <section class="meta-grid" :aria-label="t.metaAria">
             <article class="surface-card meta-card">
               <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
@@ -387,9 +381,8 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
               </dl>
             </article>
           </section>
+          <p class="note">{{ t.footnote }}</p>
         </SectionGroup>
-
-      <p class="note">{{ t.footnote }}</p>
     </template>
     </template>
   </section>

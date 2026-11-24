@@ -679,8 +679,6 @@ export default {
     summaryAria: 'Ripartizione delle fasi del sonno',
     notProvided: 'Non registrato',
     zeroMinutes: '0 min',
-    cursorHint: 'Passa il cursore sul grafico per visualizzare un momento; fai clic per bloccarlo, quindi usa i tasti freccia per scorrere le fasi',
-    cursorAt: (time: string) => `Alle ${time}`,
   },
 
   'components/TrendRangeBar': {

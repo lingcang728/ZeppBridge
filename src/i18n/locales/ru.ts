@@ -1152,8 +1152,6 @@ export default {
       zeroMinutes: '0 мин',
       hypnogramAria: 'Ступенчатый график фаз сна',
       summaryAria: 'Доля фаз сна',
-      cursorHint: "Наведите указатель на график, чтобы увидеть значение в конкретный момент; нажмите, чтобы зафиксировать его, затем переходите по этапам стрелками",
-      cursorAt: (time: string) => `В ${time}`,
     },
 
     'components/WeeklyReportCard': {

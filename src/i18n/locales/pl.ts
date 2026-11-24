@@ -1665,8 +1665,6 @@ export default {
     zeroMinutes: '0 min',
     hypnogramAria: 'Oś czasu faz snu',
     summaryAria: 'Udział faz snu',
-    cursorHint: 'Wskaż wykres, aby odczytać punkt; kliknij, aby przypiąć, klawisze strzałek przełączają fazy',
-    cursorAt: (time: string) => `O ${time}`,
   },
 // Source: src/components/tour/tour.i18n.ts
 "components/tour/tour": {

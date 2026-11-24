@@ -75,7 +75,7 @@ defineProps<{
 .record-facts b { color: var(--ink); font-weight: 600; }
 .record-go { color: var(--subtle); }
 /* 右边的小图（轨迹轮廓 / 分期条）和底下的一条细条（心率区间）：列表页按需塞进来，没有就不占位。 */
-.record-card.has-aside { grid-template-columns: minmax(0, 1fr) var(--record-aside, auto); column-gap: 14px; }
+.record-card.has-aside { grid-template-columns: var(--record-main, minmax(0, 1fr)) var(--record-aside, auto); column-gap: 14px; }
 .record-aside { grid-column: 2; grid-row: 1 / span 2; align-self: center; display: flex; justify-content: flex-end; min-width: 0; }
 .record-foot { grid-column: 1 / -1; min-width: 0; }
 

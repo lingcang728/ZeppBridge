@@ -683,8 +683,6 @@ export default {
       zeroMinutes: '0 min',
       hypnogramAria: 'Hypnogram van slaapstadia',
       summaryAria: 'Aandeel per slaapstadium',
-      cursorHint: "Wijs een moment op de grafiek aan; klik om het vast te zetten en gebruik de pijltjestoetsen om per fase te bladeren",
-      cursorAt: (time: string) => `Om ${time}`,
     },
     'components/WeeklyReportCard': {
       title: 'Deze week',

@@ -823,8 +823,6 @@ export default {
       zeroMinutes: '0 min',
       hypnogramAria: 'Hipnograma dos estágios de sono',
       summaryAria: 'Proporção dos estágios de sono',
-      cursorHint: "Passe o cursor sobre o gráfico para ver um instante; clique para fixá-lo e use as setas para avançar etapa por etapa",
-      cursorAt: (time: string) => `Às ${time}`,
     },
 
     'components/WeeklyReportCard': {

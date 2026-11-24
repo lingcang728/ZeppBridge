@@ -46,6 +46,11 @@ const SKIP_FILES = [
  */
 const ALLOWED = [
   {
+    file: 'lib/format.ts',
+    text: "[5, '凌晨']",
+    why: 'Chinese-only clock wording (dawn / morning / evening periods); chineseClock() runs only when the UI language is zh or zh-TW, whose period words are written the same.',
+  },
+  {
     file: 'services/updateNotice.ts',
     text: 'const match = /^## 中文',
     why: 'Language section marker in authored release notes; the displayed text comes from the release document.',

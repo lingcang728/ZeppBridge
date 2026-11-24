@@ -977,8 +977,6 @@ export default {
       hypnogramAria: 'हिप्नोग्राम',
       zeroMinutes: '0 मिनट',
       notProvided: 'उपलब्ध नहीं',
-      cursorHint: "चार्ट पर पॉइंटर ले जाकर उस समय का डेटा देखें; पिन करने के लिए क्लिक करें, फिर तीर कुंजियों से एक-एक चरण देखें",
-      cursorAt: (time: string) => `${time} पर`,
     },
 
     'components/WeeklyReportCard': {
