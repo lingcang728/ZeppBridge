@@ -151,8 +151,9 @@ export const lineOption = (points: ChartPoint[], opts: LineOptionOpts) => {
 
 /* ── 卡变大就多画细节（2026-11-13 用户：卡拉大了内容也该多，不是同一张图放大）。 ──
    整场一直都画（不截取一段）。档位按卡的宽 × 高（2026-11-14：只按宽分档，拉高了什么都不加）：
-   中档：时间刻度更密、平均线标上数、暂停段铺灰；
-   大档：再标出最高 / 最低点，心率图按手表划的区间分色（色带 + 折线分段着色，区间名在右侧槽里）。
+   心率图每一档都按手表划的区间给折线分段着色（跨两个区间以上才分）；
+   中档：时间刻度更密、平均线标上数、暂停段铺灰，加区间色带（区间名在右侧槽里）；
+   大档：再标出最高 / 最低点。
    只画已有的数：没有区间就不画色带，不编数据。 */
 export type ChartTier = 'sm' | 'md' | 'lg';
 export const chartTier = (width: number, height = Infinity): ChartTier => {
@@ -216,10 +217,32 @@ const visibleBands = (bands: ChartBand[], values: number[]) => {
     .map((band) => ({ index: band.index, from: Math.max(band.low, lo), to: Math.min(band.high, hi), low: band.low, high: band.high }));
 };
 
+/** 折线按区间分段着色（visualMap）：每一档都有。显式的 lineStyle.color 会盖过 visualMap，所以着色时线不带颜色。 */
+const zoneLine = (detail: ChartDetail, bands: ReturnType<typeof visibleBands>) => {
+  const zoneColor = detail.zoneColor ?? (() => detail.color);
+  return {
+    show: false,
+    type: 'piecewise',
+    seriesIndex: 0,
+    dimension: 1,
+    pieces: bands.map((band) => ({ ...(Number.isFinite(band.low) ? { gt: band.low } : {}), lte: band.high, color: zoneColor(band.index) })),
+    outOfRange: { color: detail.color },
+  };
+};
+
 export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDetail): LineOption => {
-  if (tier === 'sm') return option;
   const [series] = option.series;
   const data = series.data;
+  /* 至少跨两个区间才分色。整场都在一个区间里（2026-11-17 用户散步全程 Z0）时，visualMap 只有一段、没有有限的分界，
+     ECharts 的 getVisualGradient 拿到空的色标会抛错（读 undefined.coord）：这张图的线画不出来，实例卡在「渲染中」，
+     之后的 resize / 隐藏提示框全被吞掉；色带也铺满整张图、什么都没区分。一个区间就照常画线，占比条照样写着 Z0 100%。 */
+  const crossed = detail.bands?.length ? visibleBands(detail.bands, data.map((d) => d[1])) : [];
+  const bands = crossed.length >= 2 ? crossed : [];
+  if (tier === 'sm') {
+    // 小档只给线着色：不加色带、刻度和标注。
+    if (!bands.length) return option;
+    return { ...option, series: [{ ...series, lineStyle: { width: series.lineStyle.width } }], visualMap: zoneLine(detail, bands) } as unknown as LineOption;
+  }
   const span = data[data.length - 1]![0] - data[0]![0];
   const parts = tier === 'lg' ? 8 : 6;
   const tick = Math.max(60_000, Math.ceil(span / parts / 60_000) * 60_000);
@@ -231,11 +254,6 @@ export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDet
     areas.push([{ xAxis: pause.start, itemStyle: { color: `${palette.axis}1f` } }, { xAxis: pause.end }]);
   }
   const zoneColor = detail.zoneColor ?? (() => color);
-  /* 至少跨两个区间才分色。整场都在一个区间里（2026-11-17 用户散步全程 Z0）时，visualMap 只有一段、没有有限的分界，
-     ECharts 的 getVisualGradient 拿到空的色标会抛错（读 undefined.coord）：这张图的线画不出来，实例卡在「渲染中」，
-     之后的 resize / 隐藏提示框全被吞掉；色带也铺满整张图、什么都没区分。一个区间就照常画线，占比条照样写着 Z0 100%。 */
-  const crossed = tier === 'lg' && detail.bands?.length ? visibleBands(detail.bands, data.map((d) => d[1])) : [];
-  const bands = crossed.length >= 2 ? crossed : [];
   for (const band of bands) {
     const tone = zoneColor(band.index);
     areas.push([
@@ -269,14 +287,7 @@ export const withDetail = (option: LineOption, tier: ChartTier, detail: ChartDet
   } as unknown as LineOption & Record<string, unknown>;
   if (bands.length) {
     // 折线按区间分段着色（成熟的运动软件都这么画）：一眼看出哪段在哪个区间。
-    next.visualMap = {
-      show: false,
-      type: 'piecewise',
-      seriesIndex: 0,
-      dimension: 1,
-      pieces: bands.map((band) => ({ ...(Number.isFinite(band.low) ? { gt: band.low } : {}), lte: band.high, color: zoneColor(band.index) })),
-      outOfRange: { color },
-    };
+    next.visualMap = zoneLine(detail, bands);
   }
   if (tier === 'lg') {
     const points = detail.extremes?.length ? detail.extremes.map((p) => ({ coord: [p.t, p.v], value: p.v })) : [{ type: 'max' }, { type: 'min' }];

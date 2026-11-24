@@ -1,6 +1,7 @@
 //! 心率区间：基准、模型、偏好与报告（从 storage/mod.rs 按领域拆出，逻辑不变）。
 
 use super::*;
+use chrono::Datelike;
 
 /// The three ways Zepp itself splits heart rate into zones.
 ///
@@ -156,7 +157,36 @@ pub(super) fn zone_report(
         zones,
         window_days,
         source: "workout_samples".into(),
+        weeks: Vec::new(),
     }
+}
+
+/// Fold per-day heart-rate seconds into Monday-started weeks of the given
+/// zones. A sample counts toward the zone whose `min_bpm..=max_bpm` holds it;
+/// below zone 1 and above zone 5 stay out, exactly as in the window total.
+/// A week appears once it holds any sample, even if none falls in a zone.
+pub(super) fn zone_weeks(
+    zones: &[HeartRateZoneRow],
+    by_day: &[(NaiveDate, i32, i64)],
+) -> Vec<HeartRateZoneWeek> {
+    let mut weeks: BTreeMap<NaiveDate, Vec<i64>> = BTreeMap::new();
+    for (day, bpm, seconds) in by_day {
+        let monday = *day - Duration::days(i64::from(day.weekday().num_days_from_monday()));
+        let slot = weeks.entry(monday).or_insert_with(|| vec![0; zones.len()]);
+        if let Some(index) = zones
+            .iter()
+            .position(|zone| (zone.min_bpm..=zone.max_bpm).contains(bpm))
+        {
+            slot[index] += seconds;
+        }
+    }
+    weeks
+        .into_iter()
+        .map(|(monday, seconds)| HeartRateZoneWeek {
+            week_start: monday.format("%Y-%m-%d").to_string(),
+            seconds,
+        })
+        .collect()
 }
 
 impl Database {
@@ -377,13 +407,16 @@ impl Database {
 
         let end = Local::now().date_naive();
         let start = end - Duration::days(window_days - 1);
-        let histogram = self.workout_heart_rate_histogram(
-            &start.format("%Y-%m-%d").to_string(),
-            &end.format("%Y-%m-%d").to_string(),
-            None,
-        )?;
+        let (start_text, end_text) = (
+            start.format("%Y-%m-%d").to_string(),
+            end.format("%Y-%m-%d").to_string(),
+        );
+        let histogram = self.workout_heart_rate_histogram(&start_text, &end_text, None)?;
 
-        Ok(Some(zone_report(model, used, &histogram, window_days)))
+        let mut report = zone_report(model, used, &histogram, window_days);
+        let by_day = self.workout_heart_rate_by_day(&start_text, &end_text)?;
+        report.weeks = zone_weeks(&report.zones, &by_day);
+        Ok(Some(report))
     }
 
     /// Every way this library's measured numbers can be turned into zones.
@@ -516,5 +549,40 @@ impl Database {
             *histogram.entry(heart_rate).or_default() += seconds;
         }
         Ok(histogram)
+    }
+
+    /// The same samples as [`Self::workout_heart_rate_histogram`], split by the
+    /// local day the workout started on (the training page's weekly zone bars).
+    pub(super) fn workout_heart_rate_by_day(
+        &self,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<(NaiveDate, i32, i64)>> {
+        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(start, end);
+        let mut stmt = self.conn.prepare(
+            "SELECT date(workouts.start_time, 'localtime') AS day, workout_samples.heart_rate, COUNT(*)
+             FROM workout_samples
+             JOIN workouts_visible AS workouts ON workouts.workout_id = workout_samples.workout_id
+             WHERE workout_samples.heart_rate IS NOT NULL
+               AND workout_samples.heart_rate > 0
+               AND workouts.start_time >= ?3 AND workouts.start_time < ?4
+               AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY day, workout_samples.heart_rate",
+        )?;
+        let rows = stmt.query_map(params![start, end, utc_lower, utc_upper], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (day, heart_rate, seconds) = row?;
+            if let Ok(day) = NaiveDate::parse_from_str(&day, "%Y-%m-%d") {
+                out.push((day, heart_rate, seconds));
+            }
+        }
+        Ok(out)
     }
 }

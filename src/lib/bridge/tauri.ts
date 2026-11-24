@@ -569,6 +569,22 @@ export const tauriBackend: BridgeBackend = {
   workoutImportSources() {
     return call<Record<string, import('../../types/imports').ImportSourceKey>>('workout_import_sources');
   },
+
+  getWorkoutMonths() {
+    return call<import('../../types/album').WorkoutMonth[]>('get_workout_months');
+  },
+
+  getSleepMonths() {
+    return call<import('../../types/album').SleepMonth[]>('get_sleep_months');
+  },
+
+  getWorkoutRouteShapes(workoutIds: string[]) {
+    return call<import('../../types/album').RouteShape[]>('get_workout_route_shapes', { workoutIds });
+  },
+
+  getSleepStageStrips(sleepIds: string[]) {
+    return call<import('../../types/album').SleepStrip[]>('get_sleep_stage_strips', { sleepIds });
+  },
   exportForUnstrap(days: number | null) {
     return call<import('../../types/imports').UnstrapExportResult>('export_for_unstrap', { days });
   },

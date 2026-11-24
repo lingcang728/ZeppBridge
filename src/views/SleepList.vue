@@ -16,6 +16,13 @@ import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import AlbumCapsule from '../components/album/AlbumCapsule.vue';
+import AlbumPeriods from '../components/album/AlbumPeriods.vue';
+import AlbumGrid from '../components/album/AlbumGrid.vue';
+import SleepStripBar from '../components/album/SleepStripBar.vue';
+import { useRecordAlbum } from '../composables/useRecordAlbum';
+import { useAlbumNav } from '../composables/useAlbumNav';
+import { localDay, type AlbumTile } from '../lib/album/album';
 
 const messages = defineMessages(
   {
@@ -110,7 +117,70 @@ onBeforeUnmount(stopFilling);
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-useRevisionReload(() => void loadList());
+/* 相册（lib/album）：胶囊切年 / 月 / 日，「日」这一层 Ctrl + 滚轮 / 捏合在列表行、方块、日历热图之间换。 */
+const albumIds = computed(() => rendered.value.map((s) => s.sleep_id));
+const album = useRecordAlbum('sleep', albumIds);
+const { level, density, periods, strips } = album;
+const shownPeriods = computed(() => (level.value === 'year' ? periods.value.year : periods.value.month));
+const stage = ref<HTMLElement | null>(null);
+const ensureMonth = async (month: string) => {
+  for (let guard = 0; guard < 40 && hasMore.value; guard += 1) {
+    const last = sessions.value[sessions.value.length - 1];
+    if (last && (timelineKey(last.start_time) ?? '') <= month) break;
+    if (loadingMore.value) await new Promise((resolve) => { window.setTimeout(resolve, 60); });
+    else await loadMore();
+  }
+  // 要落到的那个月得先画出来（平时是分批补行的）。
+  renderLimit.value = null;
+};
+const { go: goLevel, openPeriod } = useAlbumNav({
+  stage, level, density, ensureMonth, zoomable: () => true, loadPeriods: () => album.loadMonths(),
+});
+/* 方块和热图一次画全部（格子轻）；热图还接着在空闲时往下读，一屏能看好几个月。 */
+watch([density, () => sessions.value.length], () => {
+  if (density.value > 0 && level.value === 'day') renderLimit.value = null;
+  if (density.value === 2 && level.value === 'day' && hasMore.value && sessions.value.length < 2000) nextSlot(() => { void loadMore(); });
+});
+
+/** 当地中午之后的分钟数（一晚不会被午夜劈成两半）。 */
+const afterNoon = (iso: string) => {
+  const d = new Date(iso);
+  return (d.getHours() * 60 + d.getMinutes() - 720 + 1440) % 1440;
+};
+const nightOf = (session: SleepSession) => {
+  const from = afterNoon(session.start_time);
+  const length = Math.max(0, (Date.parse(session.end_time) - Date.parse(session.start_time)) / 60_000);
+  return { from, to: from + length };
+};
+/* 列表里每一行的分期条共用一条时间轴（入睡、醒来上下对得齐）：取大多数晚上落在的那一段，偶尔的午睡不把轴撑开。 */
+const axis = computed(() => {
+  const nights = rendered.value.map(nightOf);
+  if (!nights.length) return null;
+  const froms = nights.map((n) => n.from).sort((a, b) => a - b);
+  const tos = nights.map((n) => n.to).sort((a, b) => a - b);
+  const pick = (list: number[], q: number) => list[Math.min(list.length - 1, Math.max(0, Math.floor(q * (list.length - 1))))];
+  const from = Math.floor(pick(froms, 0.05) / 60) * 60;
+  const to = Math.ceil(pick(tos, 0.95) / 60) * 60;
+  return to - from >= 120 ? { from, to } : null;
+});
+const tiles = computed<AlbumTile[]>(() => (density.value === 0 || level.value !== 'day' ? [] : sessions.value.map((session) => {
+  const minutes = session.duration_minutes ?? 0;
+  const reading = formatDuration(session.duration_minutes);
+  return {
+    id: session.sleep_id,
+    day: localDay(session.start_time),
+    month: timelineKey(session.start_time) ?? '',
+    to: { name: 'SleepDetail', params: { sleepId: session.sleep_id } },
+    label: `${formatDate(session.start_time, 'auto')} ${formatTime(session.start_time)} · ${reading}`,
+    reading,
+    color: 'var(--sleep)',
+    strength: Math.min(1, Math.max(0, (minutes - 300) / 240)),
+    weight: minutes,
+  };
+})));
+const sessionById = computed(() => new Map(sessions.value.map((s) => [s.sleep_id, s])));
+
+useRevisionReload(() => { void loadList(); album.invalidate(); });
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('sleep');
 </script>
@@ -128,10 +198,22 @@ useSectionTour('sleep');
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="record-list">
+    <div v-else ref="stage" class="album-stage">
+    <AlbumPeriods v-if="level !== 'day'" data-album-body kind="sleep" :level="level" :periods="shownPeriods" @open="openPeriod" />
+    <AlbumGrid v-else-if="density" data-album-body :tiles="tiles" :density="density">
+      <template #tile="{ tile }">
+        <b class="tile-reading">{{ tile.reading }}</b>
+        <span class="tile-gap" />
+        <SleepStripBar class="tile-strip" v-bind="nightOf(sessionById.get(tile.id)!)" :spans="strips.get(tile.id)?.spans" />
+      </template>
+    </AlbumGrid>
+    <div v-else data-album-body class="record-list sleep-records">
       <RecordRow
         v-for="session in rendered"
         :key="session.sleep_id"
+        data-album-item
+        :data-album-id="session.sleep_id"
+        :data-album-day="localDay(session.start_time)"
         :data-timeline="timelineKey(session.start_time)"
         :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
         category="sleep"
@@ -141,15 +223,19 @@ useSectionTour('sleep');
         :title="formatDuration(session.duration_minutes)"
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
         :fact-label="t.scoreLabel"
-      />
+      >
+        <template #aside><SleepStripBar class="row-strip" v-bind="nightOf(session)" :spans="strips.get(session.sleep_id)?.spans" :axis="axis" /></template>
+      </RecordRow>
     </div>
+    </div>
+    <AlbumCapsule v-if="sessions.length && !error" :level="level" @update:level="goLevel" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore && !rendering" :ref="sentinelRef" class="load-more">
+    <div v-if="hasMore && !rendering && level === 'day'" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
     </div>
-    <p v-if="sessions.length && !rendering" class="footnote">
+    <p v-if="sessions.length && !rendering && level === 'day'" class="footnote">
       {{ t.shown(sessions.length, total) }} ·
       {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time, 'auto')) }}
     </p>
@@ -165,4 +251,10 @@ useSectionTour('sleep');
   font-size: var(--fs-sm);
 }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
+/* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
+.album-stage { position: relative; }
+.sleep-records { --record-aside: minmax(96px, 40%); }
+.row-strip { width: 100%; }
+.tile-reading { color: var(--ink); font-size: var(--fs-md); font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile-strip { width: 100%; }
 </style>

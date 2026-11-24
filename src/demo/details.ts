@@ -115,11 +115,19 @@ export const demoZones = (data: DemoData, preference: HeartRateZonePreference, d
     minBpm: Math.round((preference.model === 'hr_reserve' ? resting : 0) + (preference.model === 'hr_reserve' ? maximum - resting : preference.model === 'lactate_threshold' ? 168 : maximum) * b.lowPercent / 100),
     maxBpm: Math.round((preference.model === 'hr_reserve' ? resting : 0) + (preference.model === 'hr_reserve' ? maximum - resting : preference.model === 'lactate_threshold' ? 168 : maximum) * b.highPercent / 100), seconds: 0 }));
   const from = Date.parse(at(data.now, -days).toISOString()); let below = 0, above = 0;
-  for (const w of data.workouts.filter(w => Date.parse(w.start_time) >= from)) for (const s of demoWorkoutSeries(w).samples) {
-    const zone = zones.find(z => s.heart_rate! >= z.minBpm && s.heart_rate! < z.maxBpm);
-    if (zone) zone.seconds += 10; else if (s.heart_rate! < zones[0].minBpm) below += 10; else above += 10;
+  // 每周堆叠柱：按周一开始的本地周累计（和后端 hr_zones.rs 的 zone_weeks 一样，没落进区间的周也列出来）。
+  const weekOf = (iso: string) => { const d = new Date(iso); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const weekly = new Map<string, number[]>();
+  for (const w of data.workouts.filter(w => Date.parse(w.start_time) >= from)) {
+    const week = weekly.get(weekOf(w.start_time)) ?? zones.map(() => 0);
+    weekly.set(weekOf(w.start_time), week);
+    for (const s of demoWorkoutSeries(w).samples) {
+      const index = zones.findIndex(z => s.heart_rate! >= z.minBpm && s.heart_rate! < z.maxBpm);
+      if (index >= 0) { zones[index].seconds += 10; week[index] += 10; } else if (s.heart_rate! < zones[0].minBpm) below += 10; else above += 10;
+    }
   }
-  return { bases, models, preference, windowDays: days, report: preference.model ? { model: preference.model, modelLabel: preference.model, formula: preference.model, bases, zones, belowZone1Seconds: below, aboveZone5Seconds: above, totalSeconds: zones.reduce((s, z) => s + z.seconds, below + above), windowDays: days, source: 'workouts' } : null };
+  const weeks = [...weekly.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([weekStart, seconds]) => ({ weekStart, seconds }));
+  return { bases, models, preference, windowDays: days, report: preference.model ? { model: preference.model, modelLabel: preference.model, formula: preference.model, bases, zones, belowZone1Seconds: below, aboveZone5Seconds: above, totalSeconds: zones.reduce((s, z) => s + z.seconds, below + above), windowDays: days, source: 'workouts', weeks } : null };
 };
 
 export const demoInsight = (data: DemoData, workout: Workout): WorkoutInsight => {

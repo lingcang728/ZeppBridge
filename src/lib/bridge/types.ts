@@ -535,6 +535,12 @@ export interface BridgeBackend {
   undoImportBatch(batchId: number): Promise<number>;
   /** 导入的运动各自的来源（workout_id → 来源）。 */
   workoutImportSources(): Promise<Record<string, import('../../types/imports').ImportSourceKey>>;
+  /** 相册视图：按本地月份汇总的运动 / 睡眠，最新的月份在前。 */
+  getWorkoutMonths(): Promise<import('../../types/album').WorkoutMonth[]>;
+  getSleepMonths(): Promise<import('../../types/album').SleepMonth[]>;
+  /** 列表行上的小图：运动轨迹的轮廓（没有轨迹的不在结果里）、一晚的分期条。 */
+  getWorkoutRouteShapes(workoutIds: string[]): Promise<import('../../types/album').RouteShape[]>;
+  getSleepStageStrips(sleepIds: string[]): Promise<import('../../types/album').SleepStrip[]>;
   /** Beta 实验室：最近 days 天（null = 全部）的运动写成 unstrap 能导入的 zip，存到 exports\。 */
   exportForUnstrap(days: number | null): Promise<import('../../types/imports').UnstrapExportResult>;
   copyWorkoutGpx(workoutId: string): Promise<void>;

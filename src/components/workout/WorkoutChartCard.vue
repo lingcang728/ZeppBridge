@@ -6,7 +6,8 @@
    - 头部统计参照 Zepp 海拔页：大数字在上、小标签在下、竖线隔开；字号按档位一套（lib/workoutCharts.ts 的 CHART_TYPE），
      图里的轴、均值线、极值点也从同一套取，轴上的字不大于小标签（2026-11-15「字体大小不匹配」）；放不下一排就折成两 / 三列，数字不截断；
    - 图按卡的宽 × 高分三档加细节（withDetail：刻度更密、平均线标数、暂停铺灰、最高最低点、心率区间色带），整场一直都画；
-   - 大档再在图下加一条占比：海拔是坡度分布（ElevationFacts），心率是各区间时长；
+   - 大档再在图下加一条占比：海拔是坡度分布（ElevationFacts），心率是各区间时长（带图例）；中小档的心率卡只留一条细条，
+     指着或聚焦时浮出各段的百分比和时长（ShareBar compact）；
    - 窗口拉高时图吃掉多出来的高（卡根节点在窗口里被撑满，图 flex 伸开）。 */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { DesignIconName } from '../DesignIcon.vue';
@@ -28,7 +29,7 @@ const props = defineProps<{
     stats: ChartStat[] | null; icon: DesignIconName; tone: GlyphTone;
     /** 海拔卡：坡度分布（大档画在图下）。 */
     slope?: SlopeShare | null;
-    /** 心率卡：各区间时长（大档画在图下）。 */
+    /** 心率卡：各区间时长（大档带图例，中小档是一条细条）。 */
     zoneShare?: ShareSegment[] | null;
   };
 }>();
@@ -43,7 +44,7 @@ const option = computed(() => {
   return plotH.value ? fitTicks(sized, plotH.value - 40) : sized;
 });
 const showSlope = computed(() => tier.value === 'lg' && !!props.card.slope);
-const showZones = computed(() => tier.value === 'lg' && !!props.card.zoneShare?.length);
+const showZones = computed(() => !!props.card.zoneShare?.length);
 /** 数字长（配速 5'30"、四位数海拔）时降一档字号，免得一排挤不下被截。 */
 const longStats = computed(() => (props.card.stats ?? []).some((stat) => stat.value.length > 5));
 /** 这一档的字号（lib/workoutCharts.ts 的 CHART_TYPE，图里的字也从那里取）。 */
@@ -89,7 +90,7 @@ const clearCursor = () => setRouteCursor(null);
     </dl>
     <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="option" autoresize role="img" :aria-label="t.chartAria(card.title)" @update-axis-pointer="onAxisPointer" @globalout="clearCursor" />
     <ElevationFacts v-if="showSlope" class="chart-extra" :slope="card.slope ?? null" :facts="false" />
-    <ShareBar v-if="showZones" class="chart-extra" :title="t.chartZoneShare" :segments="card.zoneShare!" />
+    <ShareBar v-if="showZones" :class="['chart-extra', { thin: tier !== 'lg' }]" :title="t.chartZoneShare" :segments="card.zoneShare!" :compact="tier !== 'lg'" />
   </section>
 </template>
 
@@ -137,6 +138,7 @@ const clearCursor = () => setRouteCursor(null);
   .chart-stats div:nth-child(2n + 1) { padding-left: 2px; border-left: 0; }
 }
 .chart-extra { flex: none; margin: 10px 2px 2px; }
+.chart-extra.thin { margin: 4px 2px 0; }
 /* 卡宽了图也高一点（舞台上单独一张时不是一条扁线）；窗口拉高时图吃掉多出来的高；
    舞台铺满时（--fill-extra，StageWindow 给）图加上那截高，档位跟着卡的高往上走；一列放不下时它是负的，图变矮（最矮 120）。 */
 .series-chart { flex: 1 0 auto; width: 100%; height: max(120px, calc(clamp(170px, 34cqw, 300px) + var(--fill-extra, 0px))); }

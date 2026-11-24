@@ -73,3 +73,14 @@ export const toneColor = (tone: MetricTone, colors: ZeppSemanticColors): string 
 /** 这项指标在当前主题下的颜色。 */
 export const metricColor = (metric: string): string =>
   toneColor(metricTone(metric), chartPalettes[resolvedTheme.value].series);
+
+/**
+ * 心率区间色：Z0 → Z5 由凉到热（蓝、薄荷绿、黄绿、黄、橙、红）。运动详情的心率图和区间卡、运动列表每行的细条、
+ * 训练状态页的区间（那一页是 Z1–Z5）全从这里取，同一个 Zn 在哪儿都是同一个颜色。
+ * 薄荷绿不在图表语义色里（tokens.css 的 --route-mint），canvas 要真颜色，所以写在这里。
+ */
+const ZONE_MINT = { dark: '#2FA96B', light: '#22875C' } as const;
+export const hrZoneColor = (index: number, theme: 'dark' | 'light' = resolvedTheme.value): string => {
+  const s = chartPalettes[theme].series;
+  return [s.pace, ZONE_MINT[theme], s.training, s.altitude, s.calories, s.heart][Math.min(5, Math.max(0, Math.round(index)))]!;
+};

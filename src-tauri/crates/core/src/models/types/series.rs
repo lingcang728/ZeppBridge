@@ -172,6 +172,20 @@ pub struct HeartRateZoneReport {
     pub total_seconds: i64,
     pub window_days: i64,
     pub source: String,
+    /// Seconds in each of the five zones, one entry per Monday-started local
+    /// week of the window, oldest first. Weeks without a heart-rate sample are
+    /// left out rather than reported as zero.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub weeks: Vec<HeartRateZoneWeek>,
+}
+
+/// One local week of the zone report: `seconds[i]` is the time in zone i + 1.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HeartRateZoneWeek {
+    /// The Monday that starts the week, `YYYY-MM-DD`.
+    pub week_start: String,
+    pub seconds: Vec<i64>,
 }
 
 /// Everything the zone picker needs: what can be measured, what can be built

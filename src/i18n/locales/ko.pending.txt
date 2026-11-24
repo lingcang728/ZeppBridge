@@ -1,6 +1,22 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
 components/CoverageNotice.wrongAccount
+components/HeartRateZonePicker.weekOf
+components/HeartRateZonePicker.weeklyAria
+components/HeartRateZonePicker.weeklyTitle
+components/album/album.avgOnset
+components/album/album.close
+components/album/album.day
+components/album/album.distance
+components/album/album.duration
+components/album/album.hrZones
+components/album/album.levels
+components/album/album.month
+components/album/album.nights
+components/album/album.open
+components/album/album.openPeriod
+components/album/album.workouts
+components/album/album.year
 components/cards/hands.bench
 components/cards/hands.benchEmpty
 components/cards/hands.bucket.10k

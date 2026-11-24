@@ -62,6 +62,9 @@ export const heartRateZonePickerMessages = defineMessages(
       },
     },
     computedRestingNote: (days: number) => `近 30 天中有数据的 ${days} 天的均值。`,
+    weeklyTitle: '每周各区间时长',
+    weeklyAria: (model: string) => `按${model}划分的每周各区间时长`,
+    weekOf: (date: string) => `${date} 起的一周`,
   },
   {
     title: 'Heart rate zones',
@@ -121,6 +124,9 @@ export const heartRateZonePickerMessages = defineMessages(
       },
     },
     computedRestingNote: (days: number) => `Average across the ${days} days with data in the last 30.`,
+    weeklyTitle: 'Weekly time in zones',
+    weeklyAria: (model: string) => `Weekly time in each zone, ${model}`,
+    weekOf: (date: string) => `Week of ${date}`,
   },
   {
     title: 'Zonas de frecuencia cardíaca',

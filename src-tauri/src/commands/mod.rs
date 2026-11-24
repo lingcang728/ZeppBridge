@@ -301,3 +301,7 @@ pub(crate) use life_events::{delete_life_event, list_life_events, save_life_even
 
 mod suggest;
 pub(crate) use suggest::{card_hand_facts, card_hand_lines, suggestion_cards};
+mod album;
+pub(crate) use album::{
+    get_sleep_months, get_sleep_stage_strips, get_workout_months, get_workout_route_shapes,
+};

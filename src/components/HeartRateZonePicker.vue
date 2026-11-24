@@ -5,6 +5,10 @@ import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import CapsuleWheel from './CapsuleWheel.vue';
+import SwapChart from './SwapChart.vue';
+import { hrZoneColor } from '../lib/metricTone';
+import { chartPalette } from '../lib/echartsSetup';
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { heartRateZonesQuery } from '../lib/pageQueries';
 import { cached, peek } from '../lib/readCache';
@@ -75,9 +79,8 @@ const onModelPick = (value: string | number) => {
   const model = models.value.find((entry) => entry.id === id);
   if (model?.available) chooseModel(id);
 };
-/** 区间条的颜色：Z1 冷 → Z5 热，一眼分得出强度，不再五条全是同一种红。 */
-const ZONE_TONES = ['var(--pace)', 'var(--activity)', 'var(--training)', 'var(--calories)', 'var(--heart)'];
-const zoneTone = (zone: number) => ZONE_TONES[Math.min(ZONE_TONES.length - 1, Math.max(0, zone - 1))];
+/** 区间条的颜色：Z1 冷 → Z5 热，和运动详情、运动列表的 Zn 同一套（lib/metricTone.ts 的 hrZoneColor）。 */
+const zoneTone = (zone: number) => hrZoneColor(zone);
 const bases = computed(() => options.value?.bases ?? []);
 const report = computed(() => options.value?.report ?? null);
 
@@ -210,6 +213,51 @@ const measuredSeconds = computed(() => {
     + current.aboveZone5Seconds;
 });
 
+/* 每周各区间时长：按上面选的这套模型（不是手表随运动下发的那套），跟着页面范围走。
+   窗口里每一周都占一格：没练的那周是空的，不跳过（横轴就是时间）。 */
+const DAY_MS = 86_400_000;
+const mondayOf = (date: Date) => { const d = new Date(date.getFullYear(), date.getMonth(), date.getDate()); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const weeklyOption = computed(() => {
+  const current = report.value;
+  const weeks = current?.weeks ?? [];
+  if (!current || !weeks.some((week) => week.seconds.some((s) => s > 0))) return null;
+  const byStart = new Map(weeks.map((week) => [week.weekStart, week.seconds]));
+  const last = mondayOf(new Date());
+  const starts: string[] = [];
+  // 从窗口第一天所在的那周一起，按日历一周一周往后数（夏令时那周不会偏到周日）。
+  for (let d = mondayOf(new Date(Date.now() - (current.windowDays - 1) * DAY_MS)); d <= last; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7)) starts.push(isoDay(d));
+  const label = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' });
+  const labelOf = (start: string) => label.format(new Date(`${start}T12:00:00`));
+  const palette = chartPalette.value;
+  const hours = (s: number) => Math.round((s / 3600) * 100) / 100;
+  return {
+    animation: false,
+    grid: { left: 4, right: 8, top: 10, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: Array<{ dataIndex: number }>) => {
+        const index = Array.isArray(params) ? params[0]?.dataIndex : undefined;
+        if (typeof index !== 'number') return '';
+        const seconds = byStart.get(starts[index]!) ?? [];
+        const rows = current.zones.map((zone, i) => `<span style="color:${zoneTone(zone.zone)}">●</span> Z${zone.zone}　<b>${duration(seconds[i] ?? 0)}</b>`);
+        return [t.value.weekOf(labelOf(starts[index]!)), ...rows].join('<br>');
+      },
+    },
+    xAxis: { type: 'category', data: starts.map(labelOf), axisTick: { show: false }, axisLine: { show: false }, axisLabel: { fontSize: 12, color: palette.axis, hideOverlap: true } },
+    yAxis: { type: 'value', splitNumber: 3, axisLabel: { fontSize: 12, color: palette.axis, formatter: (value: number) => `${value}h` }, splitLine: { lineStyle: { color: palette.gridSoft, type: 'dashed' } } },
+    series: current.zones.map((zone, i) => ({
+      name: `Z${zone.zone}`,
+      type: 'bar',
+      stack: 'zones',
+      barMaxWidth: 18,
+      itemStyle: { color: zoneTone(zone.zone), borderRadius: i === current.zones.length - 1 ? [3, 3, 0, 0] : 0 },
+      data: starts.map((start) => hours(byStart.get(start)?.[i] ?? 0)),
+    })),
+  };
+});
+
 // 第一帧用的是先前读好的：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void load(); }); else void load(); });
 watch(() => props.days, () => { void load(); });
@@ -259,6 +307,10 @@ watch(() => props.revision, () => { void load(); });
             report.bases.map((basis) => `${basisLabel(basis)} ${Math.round(basis.value)}`).join(' · '),
           ) }}
         </p>
+        <div v-if="weeklyOption" class="zone-weekly">
+          <p class="zone-weekly-head"><span>{{ t.weeklyTitle }}</span><em>{{ modelLabel(report.model, report.modelLabel) }}</em></p>
+          <SwapChart class="zone-weekly-chart" :option="weeklyOption" :aria-label="t.weeklyAria(modelLabel(report.model, report.modelLabel))" />
+        </div>
       </template>
       <p v-else-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
       <p v-else class="zone-empty">{{ t.pickBasesNext }}</p>
@@ -355,6 +407,10 @@ watch(() => props.revision, () => { void load(); });
 .zone-bar { height: 10px; overflow: hidden; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .zone-bar i { display: block; height: 100%; border-radius: 999px; }
 .zone-outside, .zone-formula { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
+.zone-weekly { display: grid; gap: 6px; min-width: 0; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--mat-line); }
+.zone-weekly-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; }
+.zone-weekly-head em { color: var(--subtle); font-size: var(--fs-xs); font-style: normal; font-weight: 500; }
+.zone-weekly-chart { width: 100%; height: 180px; }
 @media (max-width: 720px) {
   .zone-card { padding: var(--space-4); }
   .zone-list { grid-template-columns: minmax(0, 1fr) auto; }

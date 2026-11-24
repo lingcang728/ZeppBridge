@@ -75,6 +75,9 @@ use commands::{
     workout_feel_get, workout_feel_save, workout_import_sources,
 };
 use commands::{card_hand_facts, card_hand_lines, suggestion_cards};
+use commands::{
+    get_sleep_months, get_sleep_stage_strips, get_workout_months, get_workout_route_shapes,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
@@ -938,6 +941,10 @@ pub fn run() {
             suggestion_cards,
             card_hand_facts,
             card_hand_lines,
+            get_workout_months,
+            get_sleep_months,
+            get_workout_route_shapes,
+            get_sleep_stage_strips,
         ])
         .build(tauri::generate_context!());
     match app {
