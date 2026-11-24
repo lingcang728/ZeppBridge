@@ -14,6 +14,7 @@
 - Added: **Reconocimiento del T-Rex original y del T-Rex Dual Solar**.
 - Improved: **Al elegir entrenamientos en Pasar a la IA se apilan por rango**. Los rangos de un mes o más ya no aparecen vacíos; los entrenamientos se apilan por semana, mes o año con el recuento en cada pila.
 - Improved: **La sincronización ya no reescribe todo en cada ronda**. Los datos de sueño y frecuencia cardíaca sin cambios se omiten, reduciendo en dos órdenes de magnitud las filas escritas en una sincronización habitual.
+- Improved: **Los datos locales se reprocesan en segundo plano una vez tras actualizar**. En bibliotecas grandes, el proceso tarda unos 15 minutos. Durante ese tiempo, las sincronizaciones quedan en cola automáticamente y los entrenamientos de fuerza antiguos reciben el detalle por serie.
 - Improved: **Colores de sueño más fáciles de distinguir**. Sueño profundo en índigo, sueño ligero en azul claro y REM en verde azulado.
 - Improved: **Los parciales y vueltas muestran la cadencia media**.
 - Improved: **Animaciones más fluidas**. Los diálogos ya no muestran un panel vacío al abrirse ni dejan un bloque negro al cerrarse, la mitad inferior de la página de frecuencia cardíaca ya no aparece un compás tarde y el escalado de la interfaz cambia de forma continua.

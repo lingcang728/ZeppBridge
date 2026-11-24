@@ -52,7 +52,7 @@ const pack: P4Copy = {
       title: 'मौजूदा सब्सक्रिप्शन का इस्तेमाल करें। बिना किसी अतिरिक्त खर्च के।',
       lead: 'दिन चुनें और आपके रिकॉर्ड एक फ़ाइल बन जाते हैं। अपने पसंदीदा AI को दें, बातचीत जारी रखें और प्लान ड्राफ्ट वापस लाएं।',
       points: [
-        { id: 'providers', title: 'आठ मॉडल उपलब्ध', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok और Qwen। अपने मौजूदा खातों और सीमाओं का उपयोग करें।', scene: 'ai' },
+        { id: 'providers', title: 'आठ AI सेवाएँ', text: 'ChatGPT, Claude, Gemini, Kimi, DeepSeek, Doubao, Grok और Qwen। अपने मौजूदा खातों और कोटे का इस्तेमाल करें।', scene: 'ai' },
         { id: 'prompt', title: 'जो चाहें पूछें', text: 'तैयार सवाल में बदलाव करें या अपनी पसंद का सवाल खुद लिखें।', scene: 'prompt' },
         { id: 'events', title: 'संदर्भ मायने रखता है', text: 'जुकाम, यात्रा या व्यस्त दिन नोट करें ताकि AI उतार-चढ़ाव की वजह समझ सके।', scene: 'events' },
         { id: 'autopaste', title: 'पूरी तरह स्वचालित · Windows', text: 'हर कदम पर विंडो की पुष्टि करते हुए आपके लिए पेस्ट और सेंड करता है। डिफ़ॉल्ट रूप से बंद।', scene: 'autopaste' },

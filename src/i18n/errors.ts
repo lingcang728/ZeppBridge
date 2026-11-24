@@ -630,6 +630,11 @@ const messages = defineMessages(
   {
     /* —— core —— */
     'err.core.network': 'No se pudo conectar con la región de Zepp: revisa tu red y reintenta',
+    'err.autostart.read': 'No se pudo leer el estado del inicio automático',
+    'err.autostart.save': 'No se pudo guardar la configuración de inicio automático',
+    'err.autostart.enable': 'No se pudo activar el inicio automático',
+    'err.autostart.disable': 'No se pudo desactivar el inicio automático',
+    'err.autostart.not_ready': 'La app sigue preparando los datos. Inténtalo de nuevo en un momento.',
     'err.core.needs_reauth': 'Sesión caducada: reconéctate a Zepp',
     'err.core.unavailable': 'Esta cuenta o región no ofrece estos datos',
     'err.core.retry_exhausted': 'Servicio de Zepp no disponible temporalmente; reintenta más tarde',

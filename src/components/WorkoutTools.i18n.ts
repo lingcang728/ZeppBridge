@@ -101,7 +101,12 @@ export const workoutToolsMessages = defineMessages(
   exportFitTitle: 'Elige una carpeta para los archivos FIT',
   exportFitFailed: 'No se pudo exportar. Intenta de nuevo.',
   exportingFit: (done: number, total: number) => `Exportando ${done}/${total}`,
-  exportedFit: (saved: number, failed: number) => (failed ? `${saved} archivos FIT guardados; ${failed} no se pudieron exportar` : `${saved} archivos FIT guardados`),
+  exportedFit: (saved: number, failed: number) => {
+    const savedText = saved === 1 ? '1 archivo FIT guardado' : `${saved} archivos FIT guardados`;
+    if (!failed) return savedText;
+    const failedText = failed === 1 ? '1 archivo no se pudo exportar' : `${failed} archivos no se pudieron exportar`;
+    return `${savedText}. ${failedText}`;
+  },
 },
   'components/WorkoutTools',
 );

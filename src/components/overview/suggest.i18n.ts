@@ -28,7 +28,21 @@ const messages = defineMessages(
     dismiss: 'Dismiss this suggestion',
     failed: 'Could not deal the cards right now. Try again later',
   },
-  undefined,
+  {
+    aria: 'Sugerencias para ti',
+    workoutEyebrow: 'Al terminar de entrenar',
+    workoutLine: (what: string, amount: string, count: number) => (count
+      ? `Entrenamiento de hoy: ${what}, ${amount}. Compáralo con tus últimas ${count} sesiones similares.`
+      : `Entrenamiento de hoy: ${what}, ${amount}. Repasa cómo te fue.`),
+    sleepEyebrow: 'Anoche dormiste mal',
+    sleepShort: (duration: string, gap: string) => `Anoche dormiste ${duration}, ${gap} menos que lo habitual para ti en las últimas 4 semanas.`,
+    sleepDeep: (deep: string, gap: string) => `Tu sueño profundo fue de ${deep}, ${gap} menos que lo habitual para ti en las últimas 4 semanas.`,
+    idleEyebrow: (days: number) => `Hace ${days} días que no entrenas`,
+    idleLine: (date: string, what: string) => `Tu último entrenamiento fue el ${date}: ${what}`,
+    tomorrowSub: 'Con los datos de recuperación y entrenamientos de los últimos 7 días',
+    dismiss: 'Descartar esta sugerencia',
+    failed: 'No se pudieron repartir las cartas. Inténtalo de nuevo más tarde.',
+  },
   'components/overview/suggest',
 );
 

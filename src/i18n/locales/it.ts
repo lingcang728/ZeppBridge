@@ -241,6 +241,7 @@ export default {
     empty: 'Nessun dato su questo computer. Sincronizza una volta per visualizzare i grafici.',
     emptyAfterSync: 'La sincronizzazione è stata completata senza trovare dati. Questo account non ha dati per questo periodo in Zepp oppure l’orologio non li ha ancora inviati all’app Zepp. Controlla prima l’app Zepp sul telefono, quindi sincronizza di nuovo.',
     emptyUnconfirmedRegion: 'La sincronizzazione è stata completata senza trovare dati. La connessione non ha potuto confermare la regione Zepp del tuo account e ZeppBridge sta usando una stima: se la regione è errata, la sincronizzazione sembra riuscire ma non restituisce nulla. Prova a riconnettere l’account.',
+    wrongAccount: 'Potresti aver effettuato l’accesso con un account diverso da quello associato all’orologio. Se hai creato l’account con Google o Apple, aggiungi prima un indirizzo email in Zepp App, poi accedi qui con quell’indirizzo.',
     short: (covered: number, earliest: string) =>
       `Questo computer conserva solo ${covered} giorni (a partire dal ${earliest}). Prima di questa data non c’è nulla perché non è ancora stato recuperato nulla, non perché non ci fossero registrazioni.`,
     syncNow: 'Sincronizza ora',
@@ -345,6 +346,9 @@ export default {
       },
     },
     computedRestingNote: (days: number) => `Media dei ${days} giorni con misurazioni negli ultimi 30 giorni.`,
+    weeklyTitle: 'Tempo settimanale per zona',
+    weeklyAria: (model: string) => `Tempo settimanale in ogni zona, ${model}`,
+    weekOf: (date: string) => `Settimana del ${date}`,
     lead: 'Distribuzione della frequenza cardiaca durante gli allenamenti, in base al metodo e ai valori di riferimento scelti.',
     setupSummary: 'Metodo e valori di riferimento',
   },
@@ -651,6 +655,19 @@ export default {
     fixed: 'Risoluzioni',
     note: 'Aggiornamento',
   },
+  'components/shell/ConfirmHost': {
+    cancel: 'Annulla',
+    continue: 'Continua',
+    delete: 'Elimina',
+    disconnect: 'Disconnetti',
+    signOut: 'Esci',
+    regenerate: 'Rigenera',
+    startOver: 'Ricomincia',
+    reset: 'Azzera',
+    change: 'Modifica',
+    send: 'Invia',
+  },
+
   'components/OfficialOnlyNote': {
     text: 'È collegata solo l’autorizzazione ufficiale Zepp: frequenza cardiaca, sonno, passi, corsa e camminata, PAI e peso vengono sincronizzati. L’API ufficiale non offre HRV, ossigeno nel sangue, stress, prontezza, carico di allenamento, ciclismo e gli altri allenamenti né il riconoscimento dei dispositivi — connetti «Dati avanzati» per ottenerli.',
     workouts: 'È collegata solo l’autorizzazione ufficiale: l’API ufficiale restituisce solo corsa, camminata e pochi altri allenamenti; ciclismo, allenamento della forza, sport con racchetta e il resto richiedono «Dati avanzati».',
@@ -1085,6 +1102,22 @@ export default {
       `La tua norma a lungo termine: su ${days} giorni con misurazioni dal ${since}, l’80% centrale è rientrato in ${range}${recent ? `; negli ultimi 90 giorni ${recent}` : ''}. Confrontato solo con te stesso, non è una diagnosi.`,
   },
 
+  'components/album/album': {
+    open: 'Sfoglia per anno, mese e giorno',
+    close: 'Torna all’elenco',
+    levels: 'Livello',
+    year: 'Anni',
+    month: 'Mesi',
+    day: 'Giorni',
+    workouts: (count: number) => (count === 1 ? '1 allenamento' : `${count} allenamenti`),
+    nights: (count: number) => (count === 1 ? '1 notte' : `${count} notti`),
+    distance: 'Distanza',
+    duration: 'Durata',
+    avgOnset: 'Addormentamento medio',
+    hrZones: 'Zone FC',
+    openPeriod: (period: string) => `Apri ${period}`,
+  },
+
   'components/cards/cards': {
     noWorkouts: 'Nessun allenamento in questo periodo',
     recentWorkouts: 'Ultimi 7 giorni',
@@ -1142,6 +1175,60 @@ export default {
     more: (count: number) => `${count} in più`,
     monthDays: (days: number) => plural(days, { one: '1 giorno', other: `${days} giorni` }),
     monthAria: (month: string, label: string, days: number) => `${label}, ${days} giorni selezionati a ${month}. Premi per distribuire per settimana`,
+  },
+
+  'components/cards/hands': {
+    dealByQuestion: 'Distribuisci per domanda',
+    dealByQuestionAria: 'Scegli una domanda per distribuire automaticamente gli allenamenti e le notti più pertinenti',
+    kind: {
+      distance_best: 'Stessa distanza · PR',
+      same_route: 'Stesso percorso',
+      race_review: 'Analisi gara',
+      recovery_nights: 'Notti con recupero anomalo',
+      review_workout: 'Rivedi questo allenamento',
+      recovery_day: 'Pianifica un giorno di recupero',
+      comeback: 'Riprendi con calma',
+      plan_tomorrow: 'Pianifica domani',
+    },
+    kindSub: {
+      distance_best: 'PR precedenti e corse recenti nella stessa fascia di distanza',
+      same_route: 'Corse fatte sullo stesso percorso',
+      race_review: 'La gara e le quattro settimane precedenti di allenamento e sonno',
+      recovery_nights: 'Notti in cui HRV, frequenza cardiaca a riposo o sonno si sono discostati dai tuoi valori abituali',
+    },
+    empty: {
+      no_routes: 'Non hai ancora corso tre volte sullo stesso percorso',
+      no_distance: 'Non hai ancora due corse nella stessa fascia di distanza (5K / 10K / mezza maratona / maratona)',
+      no_race: 'Nessuna gara contrassegnata né corsa nettamente più veloce del solito',
+      no_outliers: 'Negli ultimi due mesi i dati sul recupero sono rimasti nella norma',
+      no_data: 'Dati recenti insufficienti',
+    },
+    bucket: { '5k': '5K', '10k': '10K', half: 'Mezza maratona', full: 'Maratona' },
+    role: {
+      anchor: 'Attuale', pr: 'PR', race: 'Gara', build: 'Preparazione', same: 'Simile', recent: 'Recente', outlier: 'Fuori norma', day_before: 'Giorno prima', night: 'Notte',
+    },
+    flag: { hrv_low: 'HRV bassa', rhr_high: 'FC a riposo alta', sleep_short: 'Sonno breve' },
+    hrvNote: (value: number) => `HRV ${value}`,
+    bench: 'Riserva',
+    benchEmpty: 'Riserva vuota',
+    tableTip: 'Tocca una carta per spostarla in riserva. Tocca una carta in riserva per inserirla. L’IA riceverà le carte rimaste in questa mano.',
+    useHand: 'Usa questa mano',
+    handEmpty: 'Hai spostato tutte le carte. Scegline una dalla riserva.',
+    cardCount: (count: number) => (count === 1 ? '1 carta' : `${count} carte`),
+    drawOutAria: (label: string) => `${label}. Premi per spostare in riserva.`,
+    swapInAria: (label: string) => `${label}. Premi per aggiungerla a questa mano.`,
+    dealing: 'Distribuzione in corso…',
+    failed: 'Impossibile leggere i dati e distribuire le carte.',
+    question: {
+      distance_best: (bucket: string) => `Ecco le mie PR precedenti e le corse più recenti nella fascia di distanza ${bucket}. Confronta le variazioni di passo, frequenza cardiaca e carico di allenamento: da dove viene il miglioramento? Cosa mi manca per il prossimo PR? Indicami anche su cosa concentrarmi nelle prossime 4 settimane per questa distanza.`,
+      same_route: (km: string) => `Queste sono alcune mie corse sullo stesso percorso (circa ${km}). Confronta passo, frequenza cardiaca e deriva cardiaca nella seconda metà: sullo stesso percorso sono più veloce, più efficiente o sto peggiorando? Spiega le possibili ragioni.`,
+      race_review: (date: string) => `La corsa del ${date} è stata una gara (o uno sforzo chiaramente massimale). Sono allegati gli allenamenti e il sonno delle quattro settimane precedenti. Analizzala: la gestione del passo e la frequenza cardiaca erano adeguate? Il volume e lo scarico pre-gara erano giusti? Sonno o recupero mi hanno penalizzato? Cosa dovrei cambiare prima della prossima gara?`,
+      recovery_nights: 'Queste notti hanno mostrato valori di recupero (HRV, frequenza cardiaca a riposo o durata del sonno) nettamente fuori dalla mia norma. Per ognuna è allegato l’allenamento del giorno precedente. Aiutami a trovare uno schema: dipende dal carico o dall’orario dell’allenamento, o da altro? Dammi consigli pratici da applicare subito.',
+      review_workout: 'Ho appena concluso questo allenamento. In allegato trovi gli allenamenti simili più recenti e i dati di sonno e recupero dell’ultima settimana. Analizzalo: come si confronta con i precedenti? L’intensità era adeguata? Come mi conviene organizzare i prossimi uno o due giorni?',
+      recovery_day: 'Ieri notte ho dormito male. Sono allegate le ultime notti di sonno e recupero e gli allenamenti degli ultimi giorni. Aiutami a trasformare oggi in un giorno di recupero: cosa posso fare, qual è il limite di intensità e a che ora dovrei andare a dormire stasera?',
+      comeback: (days: number) => `Non mi alleno da ${days} giorni. In allegato trovi gli ultimi allenamenti prima della pausa e due settimane di sonno e recupero. Preparami un allenamento leggero per riprendere, senza esagerare, e dimmi come tornare gradualmente ai miei ritmi nella settimana successiva.`,
+      plan_tomorrow: (date: string) => `Pianifica solo l’allenamento di domani (${date}). In allegato trovi allenamenti, sonno, recupero e carico degli ultimi 7 giorni. Prima controlla tu il meteo di domani nella mia zona, poi scegli tra attività al chiuso o all’aperto e l’orario. Usa il formato dei piani di allenamento, imposta from e to su ${date} e non modificare gli altri giorni.`,
+    },
   },
 
   'components/deck/CardDeck': {
@@ -1289,6 +1376,22 @@ export default {
     factReached: 'Raggiunto',
     weekAria: 'Passi di ciascuno degli ultimi 7 giorni; la linea tratteggiata rappresenta l’obiettivo',
     weekTitle: 'Ultimi 7 giorni',
+  },
+
+  'components/overview/suggest': {
+    aria: 'Suggerimenti per te',
+    workoutEyebrow: 'Appena finito',
+    workoutLine: (what: string, amount: string, count: number) => (count
+      ? `Allenamento di oggi: ${what}, ${amount}. Confrontalo con i ${count} allenamenti più recenti dello stesso tipo.`
+      : `Allenamento di oggi: ${what}, ${amount}. Rivedi l’allenamento.`),
+    sleepEyebrow: 'Notte difficile',
+    sleepShort: (duration: string, gap: string) => `Hai dormito ${duration}, ${gap} in meno rispetto ai tuoi valori abituali delle ultime 4 settimane.`,
+    sleepDeep: (deep: string, gap: string) => `Sonno profondo: ${deep}, ${gap} sotto i tuoi valori abituali delle ultime 4 settimane.`,
+    idleEyebrow: (days: number) => (days === 1 ? '1 giorno senza allenarti' : `${days} giorni senza allenarti`),
+    idleLine: (date: string, what: string) => `Ultimo allenamento: ${what} · ${date}`,
+    tomorrowSub: 'Include gli ultimi 7 giorni di recupero e allenamenti',
+    dismiss: 'Nascondi questo suggerimento',
+    failed: 'Non è stato possibile distribuire le carte. Riprova più tardi.',
   },
 
   'components/plan/easySwap': {
@@ -4132,6 +4235,12 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
     empty: 'Nessuna attività registrata. Inviane una a un’IA per vederla comparire qui.',
   },
 
+  'views/settings/sections/SuggestCardsRow': {
+    title: 'Schede suggerite nella panoramica',
+    on: 'Dopo un allenamento, una notte difficile o una lunga pausa, la panoramica suggerisce una scheda che prepara con un tocco i dati pertinenti da inviare all’IA',
+    off: 'La panoramica non mostra schede suggerite',
+  },
+
   'views/settings/sections/account': {
     whySub: 'I dati avanzati accedono solo con e-mail o telefono Zepp e password',
     waitingHint: 'Approva nel browser e la connessione avverrà da sola',
@@ -4276,7 +4385,7 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
   'views/settings/sections/cloud': {
     labTitle: 'Opzioni Personal Agent',
-    labSub: 'Per Personal Agent come Muse e Hark. Da disattivato non invia nulla; attivalo per configurarlo qui sotto.',
+    labSub: 'Per agenti come Muse e Hark, che devono poter accedere ai tuoi dati quando serve. Se disattivata, non invia nulla. Attivala per configurarla qui sotto.',
     secTitle: 'Opzioni Personal Agent',
     lead:
       'Un ponte pensato per Personal Agent come Muse e Hark: i tuoi dati non vengono mai inviati a server comuni o piattaforme di terze parti. Il componente indipendente li cifra e li carica sul tuo sito, dove ogni Agent legge con una chiave di sola lettura; il caricamento è gestito dal componente e le chiavi non passano mai attraverso ZeppBridge.',
@@ -4477,6 +4586,12 @@ Regole:
     newest: (when: string) => `Dato più recente ${when}`,
     cloudStale: (when: string) => `Il cloud ha dati solo fino a ${when} · trascina prima verso il basso per aggiornare nell’app Zepp sul telefono`,
     cloudStaleNoTime: 'Non ci sono ancora nuovi dati nel cloud · trascina prima verso il basso per aggiornare nell’app Zepp sul telefono',
+    autostartTitle: 'Avvio automatico',
+    autostartSub: 'Si apre quando accedi al computer e sincronizza con l’intervallo impostato sopra',
+    autostartStale: 'L’app è stata spostata e la voce di avvio precedente non funziona più. Attiva di nuovo l’opzione',
+    autostartFailed: 'Impossibile salvare l’impostazione di avvio automatico',
+    trayOnlyTitle: 'Avvia nell’area di notifica',
+    trayOnlySub: 'All’avvio non si apre alcuna finestra. Se la apri con un doppio clic, si mostra normalmente',
   },
 
   'components/coachNotes/coachNotes': {
@@ -4917,6 +5032,11 @@ Regole:
   },
 
   errors: {
+  'err.autostart.read': 'Impossibile leggere lo stato dell’avvio automatico',
+  'err.autostart.save': 'Impossibile salvare l’impostazione di avvio automatico',
+  'err.autostart.enable': 'Impossibile attivare l’avvio automatico',
+  'err.autostart.disable': 'Impossibile disattivare l’avvio automatico',
+  'err.autostart.not_ready': 'L’app sta ancora preparando i dati. Riprova tra poco',
 /* —— core —— */
   'err.core.network':
     'Impossibile raggiungere la regione Zepp: controlla la rete e riprova',

@@ -18,7 +18,11 @@ const messages = defineMessages(
     on: 'After a workout, a rough night or a long break, the home page offers a card that deals the right data to your AI in one tap',
     off: 'No suggestion cards on the home page',
   },
-  undefined,
+  {
+    title: 'Sugerencias de la página principal',
+    on: 'Después de entrenar, dormir mal o pasar tiempo sin entrenar, la página principal te ofrece una tarjeta con los datos adecuados para la IA en un solo toque',
+    off: 'Sin sugerencias en la página principal',
+  },
   'views/settings/sections/SuggestCardsRow',
 );
 const m = useMessages(messages);

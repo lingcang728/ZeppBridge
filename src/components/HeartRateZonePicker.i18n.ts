@@ -186,6 +186,9 @@ export const heartRateZonePickerMessages = defineMessages(
       },
     },
     computedRestingNote: (days: number) => `Promedio de los ${days} días con datos de los últimos 30.`,
+    weeklyTitle: 'Tiempo semanal en cada zona',
+    weeklyAria: (model: string) => `Tiempo semanal en cada zona, modelo ${model}`,
+    weekOf: (date: string) => `Semana del ${date}`,
   },
   'components/HeartRateZonePicker',
 );

@@ -79,6 +79,7 @@ const messages = defineMessages(
       'La sincronización funcionó, pero no trajo ni un registro. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj aún no los sube a la app Zepp. Confirma en la app Zepp del teléfono que haya datos y vuelve a sincronizar.',
     emptyUnconfirmedRegion:
       'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar la región Zepp de tu cuenta, así que ZeppBridge está usando una región adivinada: una sincronización a la región equivocada hace justo esto, funciona y no devuelve nada. Vuelve a conectar tu cuenta.',
+    wrongAccount: 'Puede que hayas iniciado sesión con una cuenta distinta de la vinculada a tu reloj. Si te registraste con Google o Apple, primero añade un correo electrónico a esa cuenta en Zepp App y luego inicia sesión aquí con ese correo.',
     reconnect: 'Volver a conectar la cuenta',
     short: (covered: number, earliest: string) =>
       `Este equipo solo tiene ${covered} días de datos (desde ${earliest}). Lo anterior está en blanco porque aún no se descarga de la nube, no porque no hubiera registros.`,

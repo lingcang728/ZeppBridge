@@ -17,6 +17,11 @@ export default {
   // ── i18n/errors ──
   errors: {
     'err.core.network': 'Zepp-Region nicht erreichbar – Netzwerk prüfen und erneut versuchen',
+    'err.autostart.read': 'Status für den Autostart konnte nicht gelesen werden',
+    'err.autostart.save': 'Einstellung für den Autostart konnte nicht gespeichert werden',
+    'err.autostart.enable': 'Autostart konnte nicht aktiviert werden',
+    'err.autostart.disable': 'Autostart konnte nicht deaktiviert werden',
+    'err.autostart.not_ready': 'Die App bereitet ihre Daten noch vor. Versuche es gleich noch einmal.',
     'err.core.needs_reauth': 'Anmeldung abgelaufen – erneut mit Zepp verbinden',
     'err.core.unavailable': 'Dieses Konto oder diese Region liefert diese Daten nicht',
     'err.core.retry_exhausted': 'Zepp gerade nicht verfügbar – später erneut versuchen',
@@ -582,6 +587,18 @@ export default {
       fixed: 'Behoben',
       note: 'Änderung',
     },
+    'components/shell/ConfirmHost': {
+      cancel: 'Abbrechen',
+      continue: 'Weiter',
+      delete: 'Löschen',
+      disconnect: 'Trennen',
+      signOut: 'Abmelden',
+      regenerate: 'Erneuern',
+      startOver: 'Neu beginnen',
+      reset: 'Leeren',
+      change: 'Ändern',
+      send: 'Senden',
+    },
     'components/OfficialOnlyNote': {
       text: 'Nur offizielle Zepp-Autorisierung verbunden: Herzfrequenz, Schlaf, Schritte, Laufen und Gehen, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft, Trainingsbelastung, Radfahren und weitere Trainings sowie die Geräteerkennung bietet die offizielle Schnittstelle nicht – dafür bitte „Erweiterte Daten“ verbinden.',
       workouts: 'Nur offizielle Autorisierung verbunden: Die offizielle Schnittstelle liefert nur Laufen, Gehen und einige wenige Trainings; Radfahren, Krafttraining, Ballsportarten und der Rest erfordern „Erweiterte Daten“.',
@@ -1118,6 +1135,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         'Noch keine Daten auf diesem Rechner. Einmal synchronisieren, damit Diagramme gezeichnet werden können.',
       emptyAfterSync:
         'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Entweder gibt es bei Zepp keine Daten für diesen Zeitraum, oder die Uhr hat sie noch nicht an die Zepp-App übertragen. Prüfe zuerst die Zepp-App am Smartphone und synchronisiere erneut.',
+      wrongAccount: 'Möglicherweise bist du mit einem anderen Konto angemeldet als dem, das mit deiner Uhr gekoppelt ist. Wenn du dich mit Google oder Apple registriert hast, verknüpfe zuerst in der Zepp App eine E-Mail-Adresse mit dem Konto und melde dich dann mit dieser Adresse an.',
       emptyUnconfirmedRegion:
         'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Deine Zepp-Region konnte bei der Anmeldung nicht bestätigt werden (ZeppBridge nutzt eine Schätzung). Eine falsche Region läuft fehlerfrei durch, bleibt aber leer. Verbinde das Konto erneut.',
       reconnect: 'Konto erneut verbinden',
@@ -1163,6 +1181,29 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       strap: 'Gurt',
       unknown: 'Gerät',
       watch: 'Uhr',
+    },
+    'components/album/album': {
+      avgOnset: 'Ø Schlafbeginn',
+      close: 'Zurück zur Liste',
+      day: 'Tage',
+      distance: 'Distanz',
+      duration: 'Dauer',
+      hrZones: 'Herzfrequenzzonen',
+      levels: 'Ansichtsebene',
+      month: 'Monate',
+      nights: (count: number) =>
+        plural(count, {
+          one: '1 Nacht',
+          other: `${count} Nächte`,
+        }),
+      open: 'Nach Jahr, Monat und Tag durchsuchen',
+      openPeriod: (period: string) => `Öffne ${period}`,
+      workouts: (count: number) =>
+        plural(count, {
+          one: '1 Training',
+          other: `${count} Trainings`,
+        }),
+      year: 'Jahre',
     },
     'components/HeartRateZonePicker': {
       basesSeparator: ', ',
@@ -1238,6 +1279,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       title: 'Herzfrequenzzonen',
       window: (days: number, total: string) =>
         `Sekundengenaue Trainings-Herzfrequenz über ${days} Tage · ${total} insgesamt`,
+      weeklyTitle: 'Wöchentliche Zeit in Zonen',
+      weeklyAria: (model: string) => `Wöchentliche Zeit in jeder Zone nach ${model}`,
+      weekOf: (date: string) => `Woche ab ${date}`,
       zeroMinutes: '0 Min.',
       zonesUnavailable: 'Herzfrequenzzonen gerade nicht verfügbar',
       lead: "Zeigt die Herzfrequenzverteilung beim Training nach deinem gewählten Verfahren und Referenzwert.",
@@ -1565,6 +1609,24 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       factReached: 'Erreicht',
       weekAria: 'Schritte der letzten 7 Tage; die gestrichelte Linie ist das Ziel',
       weekTitle: 'Letzte 7 Tage',
+    },
+    'components/overview/suggest': {
+      aria: 'Vorschläge für dich',
+      workoutEyebrow: 'Gerade fertig',
+      workoutLine: (what: string, amount: string, count: number) => {
+        const prefix = `Heutiges Training: ${what}, ${amount}.`;
+        return count
+          ? `${prefix} ${count === 1 ? 'Vergleiche es mit deiner letzten ähnlichen Trainingseinheit.' : `Vergleiche es mit deinen letzten ${count} ähnlichen Trainingseinheiten.`}`
+          : `${prefix} Nimm dir einen Moment für einen Rückblick.`;
+      },
+      sleepEyebrow: 'Unruhige Nacht',
+      sleepShort: (duration: string, gap: string) => `Du hast letzte Nacht ${duration} geschlafen – ${gap} weniger als dein üblicher Wert der letzten vier Wochen.`,
+      sleepDeep: (deep: string, gap: string) => `Tiefschlaf: ${deep} – ${gap} weniger als dein üblicher Wert der letzten vier Wochen.`,
+      idleEyebrow: (days: number) => (days === 1 ? 'Ein Tag ohne Training' : `${days} Tage ohne Training`),
+      idleLine: (date: string, what: string) => `Zuletzt: ${what} am ${date}`,
+      tomorrowSub: 'Mit Erholung und Training der letzten 7 Tage',
+      dismiss: 'Diesen Vorschlag schließen',
+      failed: 'Gerade können keine Karten ausgeteilt werden. Versuche es später noch einmal.',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -3861,6 +3923,59 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       viewWeek: 'Ganze Woche ansehen',
       attachments: 'Anhänge',
     },
+    'components/cards/hands': {
+      dealByQuestion: 'Nach Frage austeilen',
+      dealByQuestionAria: 'Nach Frage austeilen: Wähle eine Frage. Passende Trainings und Nächte werden automatisch ausgewählt.',
+      kind: {
+        distance_best: 'Gleiche Distanz · PRs',
+        same_route: 'Gleiche Strecke',
+        race_review: 'Wettkampf auswerten',
+        recovery_nights: 'Auffällige Erholungsnächte',
+        review_workout: 'Dieses Training auswerten',
+        recovery_day: 'Erholungstag planen',
+        comeback: 'Sanft wiedereinsteigen',
+        plan_tomorrow: 'Morgen planen',
+      },
+      kindSub: {
+        distance_best: 'Frühere Bestzeiten und letzte Läufe in derselben Distanzklasse',
+        same_route: 'Läufe auf derselben Strecke',
+        race_review: 'Wettkampf + Training und Schlaf in den vier Wochen davor',
+        recovery_nights: 'Nächte mit auffälligem HRV, Ruhepuls oder Schlaf',
+      },
+      empty: {
+        no_routes: 'Noch keine Strecke mindestens dreimal gelaufen',
+        no_distance: 'Noch keine zwei Läufe in derselben Distanzklasse (5K / 10K / Halbmarathon / Marathon)',
+        no_race: 'Kein Wettkampf markiert und kein Lauf deutlich schneller als sonst',
+        no_outliers: 'Deine Erholungswerte lagen in den letzten zwei Monaten im üblichen Bereich',
+        no_data: 'Nicht genug aktuelle Daten',
+      },
+      bucket: { '5k': '5K', '10k': '10K', half: 'Halbmarathon', full: 'Marathon' },
+      role: {
+        anchor: 'Diese Einheit', pr: 'PR', race: 'Wettkampf', build: 'Vorbereitung', same: 'Ähnlich', recent: 'Zuletzt', outlier: 'Auffällig', day_before: 'Vortag', night: 'Nacht',
+      },
+      flag: { hrv_low: 'HRV niedrig', rhr_high: 'Ruhepuls hoch', sleep_short: 'Zu wenig Schlaf' },
+      hrvNote: (value: number) => `HRV ${value}`,
+      bench: 'Reserve',
+      benchEmpty: 'Die Reserve ist leer',
+      tableTip: 'Tippe auf eine Karte, um sie in die Reserve zu legen. Tippe dort auf eine Karte, um sie in die Hand zu nehmen. Die KI erhält die Karten aus dieser Hand.',
+      useHand: 'Diese Hand verwenden',
+      handEmpty: 'Alle Karten liegen in der Reserve. Nimm eine davon zurück in die Hand.',
+      cardCount: (count: number) => (count === 1 ? '1 Karte' : `${count} Karten`),
+      drawOutAria: (label: string) => `${label}. Drücken, um die Karte in die Reserve zu legen`,
+      swapInAria: (label: string) => `${label}. Drücken, um die Karte in die Hand zu nehmen`,
+      dealing: 'Karten werden ausgeteilt…',
+      failed: 'Daten nicht lesbar. Karten konnten nicht ausgeteilt werden.',
+      question: {
+        distance_best: (bucket: string) => `Das sind meine bisherigen Bestzeiten und letzten Läufe in der Distanzklasse ${bucket}. Vergleiche Tempo, Herzfrequenz und Trainingsbelastung: Woher kommt mein Fortschritt, was fehlt noch bis zur nächsten Bestzeit und worauf sollte ich mich in den nächsten vier Wochen bei dieser Distanz konzentrieren?`,
+        same_route: (km: string) => `Das sind meine Läufe auf derselben Strecke (etwa ${km}). Vergleiche Tempo, Herzfrequenz und die Herzfrequenzdrift in der zweiten Hälfte: Bin ich auf derselben Strecke schneller, effizienter oder eher schlechter geworden? Nenne mögliche Gründe.`,
+        race_review: (date: string) => `${date} war ein Wettkampf (oder ein klarer Maximalversuch). Das Training und der Schlaf der vier Wochen davor sind angehängt. Werte ihn aus: Waren Tempoeinteilung und Herzfrequenz sinnvoll? Waren Trainingsumfang und Tapering passend? Haben Schlaf oder Erholung gebremst? Was sollte ich vor dem nächsten Wettkampf ändern?`,
+        recovery_nights: 'Meine Erholungswerte (HRV, Ruhepuls oder Schlafdauer) lagen in diesen Nächten deutlich außerhalb meines üblichen Bereichs. Zu jeder Nacht ist das Training vom Vortag angehängt. Erkennst du ein Muster – Trainingsbelastung, Trainingszeitpunkt oder etwas anderes? Nenne konkrete Anpassungen, die ich sofort ausprobieren kann.',
+        review_workout: 'Ich habe gerade dieses Training beendet. Die letzten ähnlichen Einheiten sowie Schlaf und Erholung der letzten Woche sind angehängt. Werte es aus: Wie schneidet es im Vergleich ab? Passte die Intensität? Wie sollte ich die nächsten ein bis zwei Tage planen?',
+        recovery_day: 'Ich habe letzte Nacht schlecht geschlafen. Die Schlaf- und Erholungsdaten der letzten Nächte sowie die Trainings der letzten Tage sind angehängt. Plane heute als Erholungstag: Was eignet sich, wie hoch sollte die Intensität höchstens sein und wann sollte ich heute Abend ins Bett gehen?',
+        comeback: (days: number) => `${days === 1 ? 'Ich habe seit einem Tag' : `Ich habe seit ${days} Tagen`} nicht trainiert. Die letzten Einheiten vor der Pause und die Schlaf- und Erholungsdaten der letzten zwei Wochen sind angehängt. Plane einen lockeren Wiedereinstieg ohne Überlastung und erkläre, wie ich in der folgenden Woche langsam steigern kann.`,
+        plan_tomorrow: (date: string) => `Plane nur das Training für morgen (${date}). Die Trainings, der Schlaf, die Erholung und die Trainingsbelastung der letzten 7 Tage sind angehängt. Prüfe zuerst selbst das Wetter für morgen an meinem Wohnort. Entscheide danach, ob das Training drinnen oder draußen stattfindet und zu welcher Tageszeit. Gib den Plan im Trainingsplanformat aus, setze from und to auf ${date} und ändere keinen anderen Tag.`,
+      },
+    },
     'components/cards/cards': {
       noWorkouts: 'Keine Trainings in diesem Zeitraum',
       recentWorkouts: 'Letzte 7 Tage',
@@ -4212,6 +4327,17 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       newest: (when: string) => `Neuester Eintrag ${when}`,
       cloudStale: (when: string) => `In der Cloud nur Daten bis ${when} · zuerst in der Zepp-App am Smartphone nach unten ziehen`,
       cloudStaleNoTime: 'Noch keine neuen Daten in der Cloud · zuerst in der Zepp-App am Smartphone nach unten ziehen',
+      autostartTitle: 'Beim Anmelden starten',
+      autostartSub: 'Öffnet sich bei der Anmeldung am Computer und synchronisiert im oben gewählten Intervall',
+      autostartStale: 'Die App wurde verschoben und der alte Eintrag ist ungültig. Aktiviere die Option erneut.',
+      autostartFailed: 'Einstellung für den Autostart konnte nicht gespeichert werden',
+      trayOnlyTitle: 'Beim Anmelden im Infobereich bleiben',
+      trayOnlySub: 'Bei der Anmeldung kein Fenster öffnen. Wenn du die App selbst startest, wird sie wie gewohnt angezeigt.',
+    },
+    'views/settings/sections/SuggestCardsRow': {
+      title: 'Vorschlagskarten auf der Startseite',
+      on: 'Nach einem Training, einer schlechten Nacht oder einer längeren Pause zeigt die Startseite eine passende Vorschlagskarte. Mit einem Tipp gibst du die zugehörigen Daten an die KI weiter.',
+      off: 'Keine Vorschlagskarten auf der Startseite',
     },
     'views/settings/sections/archive': {
       secKeep: 'Aufbewahrung',
@@ -4342,7 +4468,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'views/settings/sections/cloud': {
       labTitle: 'Personal Agent-Optionen',
-      labSub: 'Für Personal Agents wie Muse und Hark. Aus: kein Push; ein: unten einrichten.',
+      labSub: 'Für Personal Agents wie Muse und Hark, die jederzeit auf deine Daten zugreifen müssen. Aus: Es wird nichts gepusht. An: unten einrichten.',
       secTitle: 'Personal Agent-Optionen',
       lead:
         'Eine Brücke für Personal Agents wie Muse und Hark – deine Daten werden weder an gewöhnliche Server noch an Drittanbieter-Plattformen gesendet. Die eigenständige Komponente verschlüsselt deine Daten und lädt sie auf deine eigene Website hoch, wo jeder Agent sie mit einem Nur-Lese-Schlüssel abruft; der Upload läuft über die Komponente, und die Schlüssel laufen nie über ZeppBridge.',

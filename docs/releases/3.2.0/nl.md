@@ -14,6 +14,7 @@
 - Added: **Herkenning van de oorspronkelijke T-Rex en T-Rex Dual Solar**.
 - Improved: **Trainingen kiezen in ‘Naar de AI’ stapelt per periode**. Een bereik van een maand of langer blijft niet langer leeg; trainingen worden gestapeld per week, maand of jaar met het aantal op elke stapel.
 - Improved: **Synchronisatie herschrijft niet elke keer alles opnieuw**. Ongewijzigde slaap- en hartslaggegevens worden overgeslagen, waardoor het aantal geschreven rijen bij een reguliere ronde met twee grootteorden daalt.
+- Improved: **Lokale gegevens worden na een update eenmalig opnieuw verwerkt**. Bij een grote bibliotheek duurt dat ongeveer 15 minuten. Synchronisaties wachten tot het klaar is. Zo krijgen ook oudere krachttrainingen alsnog details per set.
 - Improved: **Duidelijkere slaapkleuren**. Diepe slaap is diep indigo, lichte slaap lichtblauw en REM zeegroen.
 - Improved: **Splits en ronden tonen de gemiddelde cadans**.
 - Improved: **Vloeiendere animaties**. Vensters flitsen geen leeg paneel meer bij het openen en laten geen zwart blok achter bij het sluiten, de onderste helft van de hartslagpagina verschijnt niet langer een tel te laat en de schaal van de interface verandert nu vloeiend.

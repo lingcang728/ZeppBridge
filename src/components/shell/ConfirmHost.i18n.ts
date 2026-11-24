@@ -26,4 +26,17 @@ export const confirmMessages = defineMessages(
     change: 'Change',
     send: 'Send',
   },
+  {
+    cancel: 'Cancelar',
+    continue: 'Continuar',
+    delete: 'Eliminar',
+    disconnect: 'Desconectar',
+    signOut: 'Cerrar sesión',
+    regenerate: 'Regenerar',
+    startOver: 'Empezar de nuevo',
+    reset: 'Limpiar',
+    change: 'Cambiar',
+    send: 'Enviar',
+  },
+  'components/shell/ConfirmHost',
 );

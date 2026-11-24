@@ -13,6 +13,15 @@
 # Shared punctuation in translated lists and sentences
 components/MissingMetricsRow.separator
 
+# Race distances and record abbreviations shared across languages
+components/cards/hands.bucket.5k
+components/cards/hands.bucket.10k
+components/cards/hands.bucket.full
+components/cards/hands.role.pr
+
+# Dutch and English use the same recent-activity badge
+components/cards/hands.role.recent
+
 # pt-BR
 components/HeartRateZonePicker.basesSeparator
 components/HeartRateZonePicker.zeroMinutes
@@ -169,6 +178,7 @@ components/overview/DataReadyCapsule.streamSeparator
 components/workout/WorkoutClimbsCard.pace
 
 # fr
+components/album/album.distance
 views/settings/sections/maintenance.secMaintenance
 views/Settings.unidentifiedInitial
 components/InsightCard.metric.run.distance

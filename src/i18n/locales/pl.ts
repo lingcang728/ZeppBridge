@@ -154,6 +154,35 @@ export default {
     legend: (peak: string) => `Ciemniejszy zielony oznacza więcej kroków; maksimum to około ${peak}`,
   },
 
+  // Source: src/components/album/album.i18n.ts
+  "components/album/album": {
+    open: 'Przeglądaj lata, miesiące i dni',
+    close: 'Wróć do listy',
+    levels: 'Poziom widoku',
+    year: 'Lata',
+    month: 'Miesiące',
+    day: 'Dni',
+    workouts: (count: number) =>
+      plural(count, {
+        one: `${count} trening`,
+        few: `${count} treningi`,
+        many: `${count} treningów`,
+        other: `${count} treningu`,
+      }),
+    nights: (count: number) =>
+      plural(count, {
+        one: `${count} noc`,
+        few: `${count} noce`,
+        many: `${count} nocy`,
+        other: `${count} nocy`,
+      }),
+    distance: 'Dystans',
+    duration: 'Czas',
+    avgOnset: 'Śr. pora zaśnięcia',
+    hrZones: 'Strefy tętna',
+    openPeriod: (period: string) => `Otwórz ${period}`,
+  },
+
   // Source: src/components/ai/AiTaskHeader.vue
   "components/ai/AiTaskHeader": {
     pageTitle: 'Wyślij do AI',
@@ -703,6 +732,20 @@ export default {
       `${label}, wybrano ${plural(days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })} w: ${month}. Naciśnij, aby rozbić na tygodnie`,
   },
 
+  // Source: src/components/shell/ConfirmHost.i18n.ts
+  "components/shell/ConfirmHost": {
+    cancel: 'Anuluj',
+    continue: 'Kontynuuj',
+    delete: 'Usuń',
+    disconnect: 'Rozłącz',
+    signOut: 'Wyloguj',
+    regenerate: 'Wygeneruj ponownie',
+    startOver: 'Zacznij od nowa',
+    reset: 'Wyczyść',
+    change: 'Zmień',
+    send: 'Wyślij',
+  },
+
   // Source: src/components/CoverageNotice.vue
   "components/CoverageNotice": {
     empty: 'Na tym urządzeniu nie ma jeszcze żadnych danych. Wykonaj synchronizację, aby wykresy mogły wyświetlić informacje.',
@@ -710,6 +753,8 @@ export default {
       'Synchronizacja została przeprowadzona, ale nie zwróciła żadnych danych. Albo to konto nie ma danych Zepp w tym okresie, albo zegarek nie przesłał ich jeszcze do aplikacji Zepp. Sprawdź aplikację Zepp na telefonie, a następnie zsynchronizuj ponownie.',
     emptyUnconfirmedRegion:
       'Synchronizacja została przeprowadzona, ale nie zwróciła danych. Podczas logowania nie udało się potwierdzić regionu Twojego konta Zepp, dlatego ZeppBridge wybiera go szacunkowo — synchronizacja skierowana do niewłaściwego regionu kończy się sukcesem, ale nic nie zwraca, dokładnie tak jak w tym przypadku. Połącz konto ponownie.',
+    wrongAccount:
+      'Możliwe, że logujesz się na inne konto niż to powiązane z zegarkiem. Jeśli utworzono je za pomocą Google lub Apple, najpierw dodaj do niego adres e-mail w aplikacji Zepp, a potem zaloguj się tutaj tym adresem.',
     reconnect: 'Połącz konto ponownie',
     short: (covered: number, earliest: string) =>
       `To urządzenie zawiera ${plural(covered, { one: `${covered} dzień`, few: `${covered} dni`, many: `${covered} dni`, other: `${covered} dnia` })} danych (najwcześniejsze: ${earliest}). Wcześniejsze daty są puste, ponieważ nie zostały jeszcze pobrane — a nie dlatego, że nic wtedy nie zarejestrowano.`,
@@ -720,6 +765,78 @@ export default {
     keepAllHint: 'Domyślnie wszystkie dane są przechowywane bezterminowo — synchronizacja nigdy ich nie usuwa.',
     keepAllChange: 'Zachowaj tylko ostatnie dni',
     connect: 'Połącz konto Zepp',
+  },
+
+  // Source: src/components/overview/suggest.i18n.ts
+  "components/overview/suggest": {
+    aria: 'Sugestie dla Ciebie',
+    workoutEyebrow: 'Po treningu',
+    workoutLine: (what: string, amount: string, count: number) => (count
+      ? `Dziś: ${what}, ${amount}. Porównaj z ${count === 1 ? 'ostatnim podobnym treningiem' : `${count} ostatnimi podobnymi treningami`}`
+      : `Dziś: ${what}, ${amount}. Warto wrócić do tego treningu.`),
+    sleepEyebrow: 'Gorsza noc',
+    sleepShort: (duration: string, gap: string) => `Sen trwał ${duration} — o ${gap} krócej niż zwykle w ostatnich 4 tygodniach`,
+    sleepDeep: (deep: string, gap: string) => `Głęboki sen trwał ${deep} — o ${gap} krócej niż zwykle w ostatnich 4 tygodniach`,
+    idleEyebrow: (days: number) => `Bez treningu od ${plural(days, { one: `${days} dnia`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}`,
+    idleLine: (date: string, what: string) => `Ostatni trening: ${what} (${date})`,
+    tomorrowSub: 'Uwzględnia treningi i regenerację z ostatnich 7 dni',
+    dismiss: 'Zamknij tę sugestię',
+    failed: 'Nie udało się teraz rozdać kart. Spróbuj ponownie później.',
+  },
+
+  // Source: src/components/cards/hands.i18n.ts
+  "components/cards/hands": {
+    dealByQuestion: 'Rozdaj według pytania',
+    dealByQuestionAria: 'Rozdaj karty według pytania: wybierz pytanie, a aplikacja dobierze powiązane treningi i noce',
+    kind: {
+      distance_best: 'Ten sam dystans · PR',
+      same_route: 'Ta sama trasa',
+      race_review: 'Analiza startu',
+      recovery_nights: 'Noce poza normą',
+      review_workout: 'Omów ten trening',
+      recovery_day: 'Zaplanuj dzień regeneracji',
+      comeback: 'Łagodny powrót',
+      plan_tomorrow: 'Zaplanuj jutro',
+    },
+    kindSub: {
+      distance_best: 'Dotychczasowe PR-y i ostatnie biegi na tym samym dystansie',
+      same_route: 'Biegi tą samą trasą',
+      race_review: 'Start w zawodach i cztery tygodnie wcześniejszych treningów oraz snu',
+      recovery_nights: 'Noce, gdy HRV, tętno spoczynkowe lub sen odbiegały od normy',
+    },
+    empty: {
+      no_routes: 'Brak trasy przebiegniętej co najmniej 3 razy',
+      no_distance: 'Brak dwóch biegów w tym samym przedziale dystansu (5K / 10K / półmaraton / maraton)',
+      no_race: 'Brak oznaczonych zawodów i biegu wyraźnie szybszego niż zwykle',
+      no_outliers: 'Odczyty regeneracji z ostatnich dwóch miesięcy mieszczą się w Twojej normie',
+      no_data: 'Za mało danych z ostatniego okresu',
+    },
+    bucket: { '5k': '5K', '10k': '10K', half: 'Półmaraton', full: 'Maraton' },
+    role: {
+      anchor: 'Ten trening', pr: 'PR', race: 'Zawody', build: 'Przed startem', same: 'Podobny', recent: 'Ostatni', outlier: 'Poza normą', day_before: 'Dzień wcześniej', night: 'Noc',
+    },
+    flag: { hrv_low: 'Niskie HRV', rhr_high: 'Wysokie tętno spoczynkowe', sleep_short: 'Krótki sen' },
+    hrvNote: (value: number) => `HRV ${value}`,
+    bench: 'Rezerwa',
+    benchEmpty: 'Rezerwa jest pusta',
+    tableTip: 'Kliknij kartę, aby przenieść ją do rezerwy. Kliknij kartę z rezerwy, aby dodać ją do zestawu. AI otrzyma aktualny zestaw.',
+    useHand: 'Użyj tego zestawu',
+    handEmpty: 'Nie ma już kart w zestawie. Dodaj kartę z rezerwy.',
+    cardCount: (count: number) => plural(count, { one: `${count} karta`, few: `${count} karty`, many: `${count} kart`, other: `${count} karty` }),
+    drawOutAria: (label: string) => `${label}. Naciśnij, aby przenieść tę kartę do rezerwy`,
+    swapInAria: (label: string) => `${label}. Naciśnij, aby dodać ją do zestawu`,
+    dealing: 'Rozdawanie kart…',
+    failed: 'Nie udało się odczytać danych, więc karty nie zostały rozdane',
+    question: {
+      distance_best: (bucket: string) => `To moje dotychczasowe rekordy (PR-y) z kategorii „${bucket}” i ostatnie biegi na tym dystansie. Porównaj tempo, tętno i obciążenie treningowe: co najbardziej przyczyniło się do postępów, czego brakuje do kolejnego PR-u i na czym skupić trening w najbliższych 4 tygodniach na tym dystansie?`,
+      same_route: (km: string) => `To moje biegi tą samą trasą (około ${km}). Porównaj tempo, tętno i dryf tętna w drugiej połowie biegu: czy biegnę szybciej, bardziej ekonomicznie, czy moja forma się pogarsza? Podaj prawdopodobne przyczyny.`,
+      race_review: (date: string) => `Bieg z dnia ${date} był startem w zawodach (albo wyraźnym wysiłkiem maksymalnym). Dołączono treningi i sen z czterech tygodni przed startem. Oceń rozłożenie tempa i tętno, objętość treningów i zmniejszenie obciążenia przed startem oraz wpływ snu i regeneracji. Co zmienić przed kolejnymi zawodami?`,
+      recovery_nights: 'Odczyty regeneracji z tych nocy (HRV, tętno spoczynkowe lub długość snu) wyraźnie odbiegały od mojej normy. Do każdej dołączono trening z poprzedniego dnia. Pomóż znaleźć zależności: obciążenie treningowe, pora treningu czy coś innego? Zaproponuj zmiany, które mogę wprowadzić od razu.',
+      review_workout: 'Właśnie skończyłem ten trening. Dołączono ostatnie podobne treningi oraz sen i regenerację z ostatniego tygodnia. Oceń go: jak wypada na tle poprzednich, czy intensywność była odpowiednia i jak zaplanować następny dzień lub dwa?',
+      recovery_day: 'Ostatnia noc nie była najlepsza. Dołączono sen i regenerację z kilku ostatnich nocy oraz treningi z ostatnich dni. Pomóż zaplanować dziś jako dzień regeneracji: co robić, jaki limit intensywności ustawić i o której dziś pójść spać?',
+      comeback: (days: number) => `Nie było treningu przez ${plural(days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}. Dołączono ostatnie treningi sprzed przerwy oraz sen i regenerację z dwóch ostatnich tygodni. Zaplanuj lekki trening na powrót, bez przesady z intensywnością, i podpowiedz, jak stopniowo wracać do formy w następnym tygodniu.`,
+      plan_tomorrow: (date: string) => `Zaplanuj trening tylko na jutro (${date}). Dołączono treningi, sen, regenerację i obciążenie treningowe z ostatnich 7 dni. Najpierw samodzielnie sprawdź prognozę pogody dla mojej lokalizacji na jutro, a potem zdecyduj, czy trenować w pomieszczeniu, czy na zewnątrz i o której porze. Zwróć wynik w formacie planu treningowego. Pola from i to wypełnij datą ${date}. Pozostałe dni zostaw bez zmian.`,
+    },
   },
 
   // Source: src/components/deck/CardDeck.vue
@@ -844,6 +961,9 @@ export default {
     },
     computedRestingNote: (days: number) =>
       `Średnia z ${plural(days, { one: `${days} dnia`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })} z danymi w ciągu ostatnich 30 dni.`,
+    weeklyTitle: 'Tygodniowy czas w strefach',
+    weeklyAria: (model: string) => `Tygodniowy czas w każdej strefie według modelu ${model}`,
+    weekOf: (date: string) => `Tydzień od ${date}`,
   },
 
   // Source: src/components/HistoryArchivePanel.i18n.ts
@@ -2020,6 +2140,11 @@ export default {
       'Serwery Zepp odebrały żądanie, ale je odrzuciły. Jeśli problem będzie się powtarzał, połącz konto Zepp ponownie w Ustawieniach',
     'err.core.cancelled': 'Anulowano',
     'err.core.auth': 'Błąd uwierzytelniania',
+    'err.autostart.read': 'Nie udało się odczytać ustawienia uruchamiania przy logowaniu',
+    'err.autostart.save': 'Nie udało się zapisać ustawienia uruchamiania przy logowaniu',
+    'err.autostart.enable': 'Nie udało się włączyć uruchamiania przy logowaniu',
+    'err.autostart.disable': 'Nie udało się wyłączyć uruchamiania przy logowaniu',
+    'err.autostart.not_ready': 'Aplikacja nadal przygotowuje dane — spróbuj ponownie za chwilę',
     'err.headless.no_credential_store':
       'Brak systemowego magazynu poświadczeń na tym urządzeniu (GNOME Keyring / KWallet) — serwery bezinterfejsowe (headless) i kontenery zazwyczaj go nie mają. '
       + 'Ustaw ZEPPBRIDGE_CREDENTIAL_STORE=file, aby zapisać token z uprawnieniami 0600 w katalogu danych, '
@@ -4564,6 +4689,19 @@ Zasady:
     newest: (when: string) => `Najnowszy wpis: ${when}`,
     cloudStale: (when: string) => `W chmurze są dane tylko do ${when} · najpierw przeciągnij w dół, aby odświeżyć w aplikacji Zepp na telefonie`,
     cloudStaleNoTime: 'Brak nowych danych w chmurze · najpierw przeciągnij w dół, aby odświeżyć w aplikacji Zepp na telefonie',
+    autostartTitle: 'Uruchamiaj przy logowaniu',
+    autostartSub: 'Po zalogowaniu uruchamia aplikację i synchronizuje dane w podanym wyżej odstępie',
+    autostartStale: 'Aplikacja zmieniła lokalizację, więc poprzedni wpis już nie działa. Włącz tę opcję ponownie',
+    autostartFailed: 'Nie udało się zapisać ustawienia uruchamiania przy logowaniu',
+    trayOnlyTitle: 'Uruchamiaj tylko w zasobniku systemowym',
+    trayOnlySub: 'Po zalogowaniu bez okna. Po ręcznym uruchomieniu aplikacja wyświetla się normalnie',
+  },
+
+  // Source: src/views/settings/sections/SuggestCardsRow.vue
+  "views/settings/sections/SuggestCardsRow": {
+    title: 'Karty sugestii na stronie głównej',
+    on: 'Po treningu, gorszej nocy lub dłuższej przerwie pojawi się karta, która jednym kliknięciem przekaże właściwe dane do AI',
+    off: 'Bez kart sugestii na stronie głównej',
   },
 
   // Source: src/views/SleepDetail.i18n.ts

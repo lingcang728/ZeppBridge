@@ -47,6 +47,12 @@ export const syncCardMessages = defineMessages(
     newest: (when: string) => `Dato más reciente ${when}`,
     cloudStale: (when: string) => `La nube solo tiene datos hasta las ${when} · primero desliza para actualizar en la app Zepp del móvil`,
     cloudStaleNoTime: 'Aún no hay datos nuevos en la nube · primero desliza para actualizar en la app Zepp del móvil',
+    autostartTitle: 'Inicio automático',
+    autostartSub: 'La app se abre al iniciar sesión en el equipo y sincroniza con el intervalo de arriba',
+    autostartStale: 'La app cambió de ubicación y el registro anterior dejó de funcionar. Vuelve a activar el inicio automático.',
+    autostartFailed: 'No se pudo guardar la configuración de inicio automático',
+    trayOnlyTitle: 'Solo en la bandeja al iniciar',
+    trayOnlySub: 'No se abre ninguna ventana al iniciar sesión. Si abres la app manualmente, se muestra con normalidad.',
   },
   'views/settings/sections/sync',
 );

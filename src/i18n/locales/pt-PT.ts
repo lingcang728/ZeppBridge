@@ -156,6 +156,24 @@ export default {
       stop: 'Parar',
       settings: 'Definições de reposição',
     },
+    'components/overview/suggest': {
+      aria: 'Sugestões para ti',
+      workoutEyebrow: 'Acabaste de treinar',
+      workoutLine: (what: string, amount: string, count: number) =>
+        count
+          ? `${what} de hoje, ${amount}. Compara com os últimos ${count} treinos semelhantes.`
+          : `${what} de hoje, ${amount}. Revê como correu.`,
+      sleepEyebrow: 'Noite difícil',
+      sleepShort: (duration: string, gap: string) =>
+        `Dormiste ${duration}, menos ${gap} do que é habitual para ti nas últimas 4 semanas.`,
+      sleepDeep: (deep: string, gap: string) =>
+        `Sono profundo: ${deep}, menos ${gap} do que é habitual para ti nas últimas 4 semanas.`,
+      idleEyebrow: (days: number) => `Há ${days} dias sem treinar`,
+      idleLine: (date: string, what: string) => `Último treino: ${what}, em ${date}`,
+      tomorrowSub: 'Com os dados de recuperação e os treinos dos últimos 7 dias',
+      dismiss: 'Fechar esta sugestão',
+      failed: 'Não foi possível preparar as cartas agora. Tenta novamente mais tarde.',
+    },
     'lib/aiTask/markdownGuide': {
       guide: [
         "Como ler este ficheiro:",
@@ -704,11 +722,25 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
         sleep_sessions: 'Sessões de sono',
       },
     },
+    'components/shell/ConfirmHost': {
+      cancel: 'Cancelar',
+      change: 'Alterar',
+      continue: 'Continuar',
+      delete: 'Eliminar',
+      disconnect: 'Desligar',
+      regenerate: 'Regenerar',
+      reset: 'Limpar',
+      send: 'Enviar',
+      signOut: 'Terminar sessão',
+      startOver: 'Recomeçar',
+    },
     'components/CoverageNotice': {
       empty:
         'Ainda não há dados nesta máquina. Faz uma sincronização para ver os gráficos.',
       emptyAfterSync:
         'A sincronização terminou sem novos dados. O período pode estar vazio no Zepp ou o relógio ainda não sincronizou com o telemóvel. Verifica a app Zepp e tenta novamente.',
+      wrongAccount:
+        'Podes ter iniciado sessão numa conta diferente da associada ao relógio: se criaste a conta com o Google ou a Apple, associa primeiro um endereço de e-mail à conta na Zepp App e inicia sessão com esse endereço.',
       emptyUnconfirmedRegion:
         'A sincronização terminou sem dados. Não foi possível confirmar a região Zepp da conta, pelo que o ZeppBridge usou a melhor estimativa. Se a região estiver errada, a sincronização conclui com sucesso mas vazia. Tenta ligar a conta novamente.',
       reconnect: 'Ligar a conta novamente',
@@ -836,6 +868,26 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
         `Média dos ${days} dias com dados nos últimos 30 dias.`,
       lead: "Mostra a distribuição da frequência cardíaca durante o exercício, segundo o método e as referências que escolheste.",
       setupSummary: "Método e referências",
+      weeklyTitle: 'Tempo semanal em cada zona',
+      weeklyAria: (model: string) => `Tempo semanal em cada zona, ${model}`,
+      weekOf: (date: string) => `Semana de ${date}`,
+    },
+    'components/album/album': {
+      open: 'Ver por ano, mês e dia',
+      close: 'Voltar à lista',
+      levels: 'Nível de navegação',
+      year: 'Anos',
+      month: 'Meses',
+      day: 'Dias',
+      workouts: (count: number) =>
+        plural(count, { one: `${count} treino`, other: `${count} treinos` }),
+      nights: (count: number) =>
+        plural(count, { one: `${count} noite`, other: `${count} noites` }),
+      distance: 'Distância',
+      duration: 'Duração',
+      avgOnset: 'Hora média de adormecer',
+      hrZones: 'Zonas de frequência cardíaca',
+      openPeriod: (period: string) => `Abrir ${period}`,
     },
     'components/HistoryArchivePanel': {
       startLabel: 'Repor desde',
@@ -2698,6 +2750,75 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       monthDays: (days: number) => plural(days, { one: `${days} dia`, other: `${days} dias` }),
       monthAria: (month: string, label: string, days: number) => `${label}, ${days} dias selecionados em ${month}. Prime para ver por semana`,
     },
+    'components/cards/hands': {
+      dealByQuestion: 'Preparar por pergunta',
+      dealByQuestionAria: 'Preparar por pergunta: escolhe uma questão para selecionar automaticamente os treinos e as noites relevantes',
+      kind: {
+        distance_best: 'Mesma distância · PR',
+        same_route: 'Mesmo percurso',
+        race_review: 'Rever prova',
+        recovery_nights: 'Noites fora do habitual',
+        review_workout: 'Rever este treino',
+        recovery_day: 'Planear recuperação',
+        comeback: 'Regresso gradual',
+        plan_tomorrow: 'Planear amanhã',
+      },
+      kindSub: {
+        distance_best: 'Recordes pessoais anteriores e treinos recentes na mesma categoria de distância',
+        same_route: 'Treinos no mesmo percurso',
+        race_review: 'A prova e as quatro semanas anteriores de treino e sono',
+        recovery_nights: 'Noites com VFC, FC em repouso ou sono fora do habitual',
+      },
+      empty: {
+        no_routes: 'Ainda não há um percurso que tenhas feito três ou mais vezes',
+        no_distance: 'Ainda não tens duas corridas na mesma categoria de distância (5K / 10K / meia-maratona / maratona)',
+        no_race: 'Não há provas assinaladas nem corridas claramente mais rápidas do que o habitual',
+        no_outliers: 'As leituras de recuperação mantiveram-se dentro do teu habitual nos últimos dois meses',
+        no_data: 'Ainda não há dados recentes suficientes',
+      },
+      bucket: { '5k': '5K', '10k': '10K', half: 'Meia-maratona', full: 'Maratona' },
+      role: {
+        anchor: 'Esta sessão',
+        pr: 'PR',
+        race: 'Prova',
+        build: 'Preparação',
+        same: 'Semelhante',
+        recent: 'Recente',
+        outlier: 'Atípico',
+        day_before: 'Véspera',
+        night: 'Noite',
+      },
+      flag: { hrv_low: 'VFC baixa', rhr_high: 'FC em repouso alta', sleep_short: 'Sono curto' },
+      hrvNote: (value: number) => `VFC ${value}`,
+      bench: 'Reserva',
+      benchEmpty: 'A reserva está vazia',
+      tableTip: 'Toca numa carta para a passar à reserva. Toca numa carta da reserva para a trocar. A IA recebe as cartas que estiverem nesta mão.',
+      useHand: 'Usar esta mão',
+      handEmpty: 'Retiraste todas as cartas. Traz uma da reserva.',
+      cardCount: (count: number) => (count === 1 ? '1 carta' : `${count} cartas`),
+      drawOutAria: (label: string) => `${label}. Toca para passar à reserva`,
+      swapInAria: (label: string) => `${label}. Toca para a trocar por uma carta desta mão`,
+      dealing: 'A distribuir as cartas…',
+      failed: 'Não foi possível ler os dados nem preparar as cartas.',
+      question: {
+        distance_best: (bucket: string) =>
+          `Estes são os meus recordes pessoais anteriores e as corridas mais recentes na categoria de distância ${bucket}. Compara a evolução do ritmo, da frequência cardíaca e da carga de treino: de onde veio sobretudo o progresso, o que falta para alcançar o próximo PR e em que devo focar o treino das próximas 4 semanas para esta distância?`,
+        same_route: (km: string) =>
+          `Estas são as minhas corridas no mesmo percurso (cerca de ${km}). Compara o ritmo, a frequência cardíaca e a deriva da frequência cardíaca na segunda metade: neste percurso, estou a correr mais depressa, com maior eficiência ou a perder forma? Indica as causas prováveis.`,
+        race_review: (date: string) =>
+          `A corrida de ${date} foi uma prova (ou um esforço claramente máximo). Estão anexados os dados das quatro semanas de treino e sono que a antecederam. Revê a estratégia de ritmo e a frequência cardíaca: o volume de treino e a redução da carga antes da prova foram adequados? O sono ou a recuperação prejudicaram o desempenho? O que devo ajustar antes da próxima prova?`,
+        recovery_nights:
+          'Nestas noites, os indicadores de recuperação (VFC, frequência cardíaca em repouso ou duração do sono) afastaram-se claramente do meu habitual. Cada noite inclui os dados do treino do dia anterior. Ajuda-me a perceber o padrão: poderá dever-se à carga de treino, à hora do treino ou a outra causa? Sugere ajustes que possa aplicar já.',
+        review_workout:
+          'Acabei de fazer este treino. Estão anexados os treinos semelhantes mais recentes e os dados de sono e recuperação da última semana. Revê esta sessão: como se compara com as anteriores, a intensidade foi adequada e como devo planear o próximo dia ou dois?',
+        recovery_day:
+          'Não dormi bem ontem à noite. Estão anexados os dados de sono e recuperação das últimas noites e os treinos dos últimos dias. Ajuda-me a planear hoje como um dia de recuperação: que atividade devo fazer, qual deve ser o limite de intensidade e a que horas devo deitar-me esta noite?',
+        comeback: (days: number) =>
+          `Estou sem treinar há ${days} dias. Estão anexados os últimos treinos antes da pausa e duas semanas de sono e recuperação. Sugere uma sessão de regresso tranquila, sem exagerar na intensidade, e como aumentar gradualmente a carga ao longo da próxima semana.`,
+        plan_tomorrow: (date: string) =>
+          `Planeia apenas o meu treino de amanhã (${date}). Estão anexados os treinos, o sono, a recuperação e a carga de treino dos últimos 7 dias. Primeiro, consulta a previsão meteorológica para amanhã no local onde estou. Depois decide se o treino deve ser em recinto fechado ou ao ar livre, e a que horas. Devolve o plano no formato de plano de treino, com os campos from e to definidos para ${date}, sem alterar qualquer outro dia.`,
+      },
+    },
     'components/ai/hub/hub': {
       delivered: 'Enviado para o relógio',
       partial: 'Uma semana não foi entregue', unconfirmed: 'Entrega não confirmada', noPlan: 'Ainda não recebeste um plano',
@@ -3473,6 +3594,12 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       cardTitle: 'Sincronização',
       cardTitleUpdates: 'Sincronização e atualizações',
       autoSub: 'Obtém novos dados neste intervalo enquanto a aplicação estiver aberta',
+      autostartTitle: 'Início automático',
+      autostartSub: 'Ao iniciares sessão no computador, a aplicação abre e sincroniza no intervalo definido acima.',
+      autostartStale: 'A aplicação mudou de localização e o registo anterior deixou de funcionar. Ativa novamente esta opção.',
+      autostartFailed: 'Não foi possível guardar a definição de início automático.',
+      trayOnlyTitle: 'Iniciar na área de notificação',
+      trayOnlySub: 'Ao iniciares sessão, não abre nenhuma janela. Quando abres a aplicação manualmente, a janela aparece normalmente.',
       off: 'Desligado',
       lastSynced: (when: string) => `Última sincronização ${when}`,
       neverSynced: 'Ainda não sincronizado',
@@ -3527,6 +3654,11 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       intro: 'Atualiza-se em cada sincronização; os itens esbatidos não significam que o dispositivo não os suporte',
       codesHint: (count: number) => `${count} ${count === 1 ? 'tipo de treino não reconhecido' : 'tipos de treino não reconhecidos'}`,
       codesFix: 'Atribuir nomes',
+    },
+    'views/settings/sections/SuggestCardsRow': {
+      title: 'Cartões de sugestão',
+      on: 'Depois de um treino, de uma noite mal dormida ou de uma pausa longa, a página inicial prepara num toque um cartão com os dados certos para a IA.',
+      off: 'A página inicial não mostra cartões de sugestão',
     },
     'views/settings/sections/ai': {
       lead: 'Permite que a IA neste computador (Claude Code, Codex, OpenCode, Grok e similares) consulte os teus dados diretamente e registe lesões, provas e sapatilhas por ti',
@@ -3699,7 +3831,7 @@ Regras:
     },
     'views/settings/sections/cloud': {
       labTitle: 'Opções de Personal Agent',
-      labSub: 'Para Personal Agents como o Muse e o Hark. Desativado, nada é enviado; ativa para configurar abaixo.',
+      labSub: 'Para Personal Agents como o Muse e o Hark, que precisam de consultar os teus dados sempre que necessário. Com a opção desativada, nada é enviado. Ativa-a para configurar abaixo.',
       secTitle: 'Opções de Personal Agent',
       lead:
         'Uma ponte pensada para Personal Agents como Muse e Hark — os teus dados nunca são enviados para servidores comuns nem plataformas de terceiros. O componente independente cifra e envia para o teu próprio site, onde cada Agent lê com uma chave só de leitura; o envio é feito pelo componente e as chaves nunca passam pelo ZeppBridge.',
@@ -4080,7 +4212,7 @@ Regras:
       removeImage: (index: number) => `Remover imagem ${index}`,
       attachFailed: 'Não foi possível ler a imagem ou é demasiado grande. Tenta outra.',
       sent: 'Enviada. O recibo aparecerá na sua caixa de correio',
-      sendFailed: 'Não foi possível enviar a carta. O rascunho foi guardado. Tente novamente.',
+      sendFailed: 'Não foi possível enviar a carta. O rascunho foi guardado. Tenta novamente.',
       queued: 'Sem ligação de momento — está na caixa de saída e será enviada assim que estiver online',
       alsoAttached: (count: number) => `Anexo: “comigo também” em ${count}`,
       boxTitle: 'Caixa de correio',
@@ -4584,6 +4716,11 @@ Regras:
   },
   errors: {
     'err.app.starting': 'Os dados locais ainda estão a ser preparados; a página atualizar-se-á automaticamente dentro de momentos',
+    'err.autostart.disable': 'Não foi possível desativar o início automático',
+    'err.autostart.enable': 'Não foi possível ativar o início automático',
+    'err.autostart.not_ready': 'A aplicação ainda está a preparar os dados. Tenta novamente dentro de momentos.',
+    'err.autostart.read': 'Não foi possível ler a definição de início automático',
+    'err.autostart.save': 'Não foi possível guardar a definição de início automático',
     'err.core.timed_out': 'Esta sincronização esgotou o tempo disponível; o restante será sincronizado na próxima vez',
     'err.training_plan.rest_outside_range': 'A data de descanso está fora do intervalo do plano',
     'err.training_plan.rest_unparsable': 'Não foi possível interpretar a data de descanso, a hora de deitar ou o objetivo de sono',

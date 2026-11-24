@@ -14,6 +14,21 @@ type Params = Record<string, unknown>;
  */
 export default {
   modules: {
+    'components/album/album': {
+      open: 'Bladeren per jaar, maand en dag',
+      close: 'Terug naar de lijst',
+      levels: 'Weergaveniveau kiezen',
+      year: 'Jaar',
+      month: 'Maand',
+      day: 'Dag',
+      workouts: (count: number) => count === 1 ? '1 training' : `${count} trainingen`,
+      nights: (count: number) => count === 1 ? '1 nacht' : `${count} nachten`,
+      distance: 'Afstand',
+      duration: 'Duur',
+      avgOnset: 'Gem. bedtijd',
+      hrZones: 'Hartslagzones',
+      openPeriod: (period: string) => `Open ${period}`,
+    },
     'components/anatomy/anatomy': {
       front: 'Voorzijde',
       back: 'Achterzijde',
@@ -393,6 +408,8 @@ export default {
         'Nog geen gegevens op deze computer. Synchroniseer een keer om de grafieken te vullen.',
       emptyAfterSync:
         'Synchronisatie geslaagd, maar er is niets ontvangen. Misschien heeft dit account voor die periode niets in Zepp, of het horloge heeft nog niet naar de Zepp-app geüpload. Controleer eerst in de Zepp-app op je telefoon of er gegevens zijn en synchroniseer dan opnieuw.',
+      wrongAccount:
+        'Je hebt mogelijk met een ander account ingelogd dan het account dat aan je horloge is gekoppeld. Heb je dat account met Google of Apple aangemaakt, koppel er dan eerst een e-mailadres aan in de Zepp App en meld je daarna hier aan met dat e-mailadres.',
       emptyUnconfirmedRegion:
         'Synchronisatie geslaagd, maar er is niets ontvangen. Bij het inloggen kon je Zepp-regio niet worden vastgesteld en wordt er nu gegokt — zo ziet een sync naar de verkeerde regio eruit: alles lukt, niets komt terug. Koppel het account opnieuw.',
       reconnect: 'Account opnieuw koppelen',
@@ -520,6 +537,9 @@ export default {
         `Gemiddelde van de ${days} dagen met gegevens in de laatste 30.`,
       lead: "Verdeling van je hartslag tijdens trainingen, volgens de gekozen methode en referentiewaarden.",
       setupSummary: "Methode en referentiewaarden",
+      weeklyTitle: 'Tijd per zone per week',
+      weeklyAria: (model: string) => `Wekelijkse tijd per hartslagzone volgens ${model}`,
+      weekOf: (date: string) => `Week van ${date}`,
     },
     'components/HistoryArchivePanel': {
       startLabel: 'Ophalen vanaf',
@@ -840,6 +860,25 @@ export default {
       weekAria: 'Stappen op elk van de afgelopen 7 dagen; de stippellijn is het doel',
       weekTitle: 'Afgelopen 7 dagen',
     },
+    'components/overview/suggest': {
+      aria: 'Suggesties voor jou',
+      workoutEyebrow: 'Net getraind',
+      workoutLine: (what: string, amount: string, count: number) => {
+        if (!count) return `Vandaag: ${what}, ${amount}. Kijk eens terug.`;
+        if (count === 1) return `Vandaag: ${what}, ${amount}. Vergelijk met je laatste soortgelijke training.`;
+        return `Vandaag: ${what}, ${amount}. Vergelijk met je laatste ${count} soortgelijke trainingen.`;
+      },
+      sleepEyebrow: 'Slecht geslapen',
+      sleepShort: (duration: string, gap: string) =>
+        `Je sliep vannacht ${duration}, ${gap} minder dan normaal in de afgelopen vier weken.`,
+      sleepDeep: (deep: string, gap: string) =>
+        `Je diepe slaap was ${deep}, ${gap} minder dan normaal in de afgelopen vier weken.`,
+      idleEyebrow: (days: number) => `${days} ${days === 1 ? 'dag' : 'dagen'} niet gesport`,
+      idleLine: (date: string, what: string) => `Je laatste training was ${what} op ${date}.`,
+      tomorrowSub: 'Met herstel en trainingen van de afgelopen 7 dagen',
+      dismiss: 'Deze suggestie sluiten',
+      failed: 'Kaarten delen lukt nu niet. Probeer het later opnieuw.',
+    },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
       readyPill: 'Gegevens klaar · naar de AI',
@@ -868,6 +907,18 @@ export default {
       syncWait: "Wacht tot de synchronisatie klaar is",
       mailTitle: 'Nieuwe post · tik om te schrijven, ingedrukt houden voor de brievenbus',
       holdForLetters: 'Ingedrukt houden om de brievenbus te openen',
+    },
+    'components/shell/ConfirmHost': {
+      cancel: 'Annuleren',
+      continue: 'Doorgaan',
+      delete: 'Verwijderen',
+      disconnect: 'Ontkoppelen',
+      signOut: 'Uitloggen',
+      regenerate: 'Opnieuw genereren',
+      startOver: 'Opnieuw beginnen',
+      reset: 'Wissen',
+      change: 'Wijzigen',
+      send: 'Versturen',
     },
     'components/shell/update': {
       newVersion: (version: string) => `Versie ${version}`,
@@ -3259,6 +3310,59 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       monthAria: (month: string, label: string, days: number) => `${label}, ${days} dagen gekozen in ${month}. Tik om per week uit te vouwen`,
       boxPour: 'Toevoegen aan deze taak',
     },
+    'components/cards/hands': {
+      dealByQuestion: 'Deel per vraag',
+      dealByQuestionAria: 'Delen op basis van een vraag: kies een vraag. De bijpassende trainingen en nachten worden automatisch geselecteerd',
+      kind: {
+        distance_best: 'Zelfde afstand · PR’s',
+        same_route: 'Zelfde route',
+        race_review: 'Wedstrijd analyseren',
+        recovery_nights: 'Nachten met afwijkend herstel',
+        review_workout: 'Deze training evalueren',
+        recovery_day: 'Hersteldag plannen',
+        comeback: 'Rustig herstarten',
+        plan_tomorrow: 'Training voor morgen',
+      },
+      kindSub: {
+        distance_best: 'Eerdere PR’s en recente runs in dezelfde afstandsklasse',
+        same_route: 'Een paar runs op dezelfde route',
+        race_review: 'De wedstrijd + training en slaap in de vier weken ervoor',
+        recovery_nights: 'Nachten met HRV, rusthartslag of slaap buiten je norm',
+      },
+      empty: {
+        no_routes: 'Je hebt nog geen route drie keer of vaker gelopen',
+        no_distance: 'Er zijn nog geen twee runs in dezelfde afstandsklasse (5K / 10K / halve marathon / marathon)',
+        no_race: 'Geen wedstrijd gemarkeerd en geen run duidelijk sneller dan normaal',
+        no_outliers: 'Je herstelmetingen vielen de afgelopen twee maanden binnen je normale bereik',
+        no_data: 'Onvoldoende recente gegevens',
+      },
+      bucket: { '5k': '5K', '10k': '10K', half: 'Halve marathon', full: 'Marathon' },
+      role: {
+        anchor: 'Deze training', pr: 'PR', race: 'Wedstrijd', build: 'Opbouw', same: 'Vergelijkbaar', recent: 'Recent', outlier: 'Afwijkend', day_before: 'Dag ervoor', night: 'Nacht',
+      },
+      flag: { hrv_low: 'Lage HRV', rhr_high: 'Hoge rusthartslag', sleep_short: 'Korte slaap' },
+      hrvNote: (value: number) => `HRV ${value}`,
+      bench: 'Reserve',
+      benchEmpty: 'Geen reservekaarten meer',
+      tableTip: 'Tik op een kaart om die naar de reserve te verplaatsen. Tik op een reservekaart om die in deze hand te wisselen. De AI krijgt de kaarten in deze hand.',
+      useHand: 'Deze hand gebruiken',
+      handEmpty: 'Alle kaarten zijn eruit. Wissel er een in vanuit de reserve.',
+      cardCount: (count: number) => plural(count, { one: `${count} kaart`, other: `${count} kaarten` }),
+      drawOutAria: (label: string) => `${label}. Tik om naar de reserve te verplaatsen`,
+      swapInAria: (label: string) => `${label}. Tik om die in deze hand te wisselen`,
+      dealing: 'Kaarten delen…',
+      failed: 'De gegevens konden niet worden gelezen. Er worden geen kaarten gedeeld.',
+      question: {
+        distance_best: (bucket: string) => `Dit zijn mijn eerdere PR’s en recente runs in de afstandsklasse ${bucket}. Vergelijk de veranderingen in tempo, hartslag en trainingsbelasting: waar komt de vooruitgang vooral vandaan, wat ontbreekt er nog voor een nieuw PR en waarop moet ik me de komende vier weken voor deze afstand richten?`,
+        same_route: (km: string) => `Dit zijn enkele runs die ik op dezelfde route (ongeveer ${km}) heb gedaan. Vergelijk tempo, hartslag en hartslagdrift in de tweede helft: ben ik op dezelfde route sneller geworden, kost het me minder moeite of ga ik achteruit? Noem mogelijke oorzaken.`,
+        race_review: (date: string) => `De run van ${date} was een wedstrijd (of een duidelijk maximale inspanning). De training en het slaapherstel van de vier weken ervoor zijn toegevoegd. Evalueer de wedstrijd: waren tempoverdeling en hartslag passend, waren trainingsomvang en afbouw vóór de wedstrijd goed, hebben slaap of herstel me afgeremd en wat kan ik voor de volgende wedstrijd aanpassen?`,
+        recovery_nights: 'Deze nachten weken de herstelmetingen (HRV, rusthartslag of slaapduur) duidelijk af van mijn normale waarden. Bij elke nacht staat de training van de dag ervoor. Help me patronen te vinden: komt het door trainingsbelasting, het tijdstip van de training of iets anders? Geef aanpassingen waar ik meteen iets mee kan.',
+        review_workout: 'Ik heb deze training net afgerond. De meest recente vergelijkbare trainingen en de slaap- en herstelgegevens van de afgelopen week zijn toegevoegd. Evalueer deze training: hoe verhoudt die zich tot eerdere trainingen, was de intensiteit passend en hoe kan ik de komende een of twee dagen het beste indelen?',
+        recovery_day: 'Ik heb vannacht slecht geslapen. De slaap- en herstelgegevens van de afgelopen nachten en de trainingen van de afgelopen dagen zijn toegevoegd. Help me van vandaag een hersteldag te maken: wat kan ik het beste doen, wat is de maximale intensiteit en hoe laat kan ik vanavond het beste naar bed?',
+        comeback: (days: number) => `Ik heb al ${days} dagen niet gesport. De laatste trainingen vóór mijn pauze en de slaap- en herstelgegevens van de afgelopen twee weken zijn toegevoegd. Plan een rustige training om weer te beginnen, met een lage intensiteit, en vertel hoe ik dat de komende week geleidelijk kan opbouwen.`,
+        plan_tomorrow: (date: string) => `Plan alleen de training voor morgen (${date}). De trainingen, slaap, herstel en trainingsbelasting van de afgelopen 7 dagen zijn toegevoegd. Controleer eerst zelf het lokale weer voor morgen en bepaal daarna of ik binnen of buiten train en op welk moment. Gebruik het trainingsplansjabloon, zet zowel from als to op ${date} en laat alle andere dagen ongemoeid.`,
+      },
+    },
     'components/ai/stage/stage': {
       stage: 'Naar AI sturen: links de gedeelde gegevens, in het midden AI, rechts de vraag en het plan',
       recent: (days: number) =>
@@ -3524,6 +3628,11 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         plural(n, { one: '1 verborgen', other: `${n} verborgen` }),
       restoreDevice: 'Weer tonen',
     },
+    'views/settings/sections/SuggestCardsRow': {
+      title: 'Suggestiekaarten op het Overzicht',
+      on: 'Na een training, een slechte nacht of een lange pauze toont het Overzicht een kaart met de juiste gegevens om in één tik met je AI te delen.',
+      off: 'Geen suggestiekaarten op het Overzicht',
+    },
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisatie',
       cardTitleUpdates: 'Synchronisatie en updates',
@@ -3534,6 +3643,12 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       newest: (when: string) => `Nieuwste meting ${when}`,
       cloudStale: (when: string) => `De cloud heeft alleen gegevens tot ${when} · veeg eerst omlaag in de Zepp-app op je telefoon om te synchroniseren`,
       cloudStaleNoTime: 'Nog geen nieuwe gegevens in de cloud · veeg eerst omlaag in de Zepp-app op je telefoon om te synchroniseren',
+      autostartTitle: 'Start bij aanmelden',
+      autostartSub: 'De app start zodra je je op je computer aanmeldt en synchroniseert volgens het interval hierboven',
+      autostartStale: 'De app is verplaatst. De oude registratie werkt niet meer. Schakel dit opnieuw in.',
+      autostartFailed: 'De instelling voor starten bij aanmelden kon niet worden opgeslagen.',
+      trayOnlyTitle: 'Na aanmelden in het systeemvak blijven',
+      trayOnlySub: 'Bij aanmelden blijft het venster verborgen. Als je de app zelf opent, wordt het gewoon getoond.',
     },
     'views/settings/sections/archive': {
       secKeep: 'Gegevens bewaren',
@@ -3648,7 +3763,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'views/settings/sections/cloud': {
       labTitle: 'Personal Agent-opties',
-      labSub: 'Voor Personal Agents zoals Muse en Hark. Uit: niets wordt verzonden; zet aan om hieronder in te stellen.',
+      labSub: 'Voor Personal Agents zoals Muse en Hark die direct toegang tot je gegevens nodig hebben. Als dit uitstaat, wordt er niets verzonden. Schakel het in om het hieronder in te stellen.',
       secTitle: 'Personal Agent-opties',
       lead: 'Een brug gebouwd voor Personal Agents zoals Muse en Hark — je gegevens worden nooit naar gewone servers of platforms van derden gestuurd. De losse component versleutelt ze en uploadt naar je eigen site, waar elke Agent leest met een alleen-lezen sleutel; de component verzorgt het uploaden en sleutels gaan nooit via ZeppBridge.',
       checking: 'Cloudcomponent controleren…',
@@ -4697,6 +4812,11 @@ Regels:
       'Verificatie mislukt: de inloggegevens zijn verlopen — sla ze opnieuw op',
     'err.auth.verify_network':
       'Verificatie mislukt: Zepp onbereikbaar — controleer je netwerk en probeer opnieuw',
+    'err.autostart.read': 'De status van automatisch starten bij aanmelden kon niet worden gelezen',
+    'err.autostart.save': 'De instelling voor automatisch starten bij aanmelden kon niet worden opgeslagen',
+    'err.autostart.enable': 'Automatisch starten bij aanmelden kon niet worden ingeschakeld',
+    'err.autostart.disable': 'Automatisch starten bij aanmelden kon niet worden uitgeschakeld',
+    'err.autostart.not_ready': 'De app is nog bezig met het voorbereiden van gegevens. Probeer het over een moment opnieuw.',
     'err.backfill.bad_start_date': 'Ongeldige startdatum voor ophalen — gebruik JJJJ-MM-DD',
     'err.backfill.no_canonical_records':
       'Cloudpayload ontvangen, maar geen bruikbare gegevens gevonden',

@@ -628,10 +628,24 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       },
     },
 
+    'components/shell/ConfirmHost': {
+      cancel: 'Annuler',
+      continue: 'Continuer',
+      delete: 'Supprimer',
+      disconnect: 'Déconnecter',
+      signOut: 'Se déconnecter',
+      regenerate: 'Régénérer',
+      startOver: 'Recommencer',
+      reset: 'Vider',
+      change: 'Modifier',
+      send: 'Envoyer',
+    },
+
     'components/CoverageNotice': {
       empty: 'Aucune donnée sur cette machine. Synchronisez une fois pour afficher les graphiques.',
       emptyAfterSync: 'La synchro a tourné sans rien rapporter. Soit ce compte n’a pas de données pour cette période dans Zepp, soit la montre n’a pas encore envoyé ses données à l’app Zepp. Vérifiez d’abord dans Zepp sur votre téléphone, puis resynchronisez.',
       emptyUnconfirmedRegion: 'La synchro a tourné sans rien rapporter. La connexion n’a pas pu confirmer à quelle région Zepp votre compte appartient, et ZeppBridge utilise son estimation — viser la mauvaise région donne exactement ça : tout réussit, rien ne revient. Essayez de reconnecter le compte.',
+      wrongAccount: 'Vous vous êtes peut-être connecté à un autre compte que celui associé à votre montre. Si vous l’avez créé avec Google ou Apple, ajoutez d’abord une adresse e-mail à ce compte dans Zepp App, puis connectez-vous ici avec cette adresse.',
       short: (covered: number, earliest: string) =>
         `Cette machine ne garde que ${covered} jours (au plus tôt le ${earliest}). Avant cette date, c’est vide parce que rien n’a encore été récupéré — pas parce que vous n’aviez rien enregistré.`,
       syncNow: 'Synchroniser maintenant',
@@ -642,6 +656,76 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       emptyNotConnected: 'Rien sur cet ordinateur pour l’instant. Connectez d’abord votre compte Zepp, puis synchronisez une fois.',
       keepAllHint: 'Par défaut, cette machine conserve tout : rien n’est supprimé après une synchro.',
       keepAllChange: 'Ne garder que la période récente',
+    },
+
+    'components/cards/hands': {
+      dealByQuestion: 'Distribuer par question',
+      dealByQuestionAria: 'Distribuer par question : choisissez un besoin pour sélectionner automatiquement les séances et les nuits correspondantes',
+      kind: {
+        distance_best: 'Même distance · PR',
+        same_route: 'Même parcours',
+        race_review: 'Bilan de course',
+        recovery_nights: 'Nuits hors norme',
+        review_workout: 'Bilan de cette séance',
+        recovery_day: 'Jour de récupération',
+        comeback: 'Reprise en douceur',
+        plan_tomorrow: 'Planifier demain',
+      },
+      kindSub: {
+        distance_best: 'Anciens records et courses récentes sur une même distance',
+        same_route: 'Vos courses sur le même parcours',
+        race_review: 'La course et les quatre semaines d’entraînement et de sommeil qui l’ont précédée',
+        recovery_nights: 'Nuits où la HRV, la fréquence cardiaque au repos ou le sommeil s’écartaient de la normale',
+      },
+      empty: {
+        no_routes: 'Aucun parcours couru trois fois ou plus pour le moment',
+        no_distance: 'Pas encore deux sorties dans la même catégorie de distance (5 km / 10 km / semi-marathon / marathon)',
+        no_race: 'Aucune course marquée ni sortie nettement plus rapide que d’habitude',
+        no_outliers: 'Vos mesures de récupération sont restées dans la normale au cours des deux derniers mois',
+        no_data: 'Pas assez de données récentes',
+      },
+      bucket: { '5k': '5 km', '10k': '10 km', half: 'semi-marathon', full: 'marathon' },
+      role: {
+        anchor: 'Celle-ci', pr: 'PR', race: 'Course', build: 'Prépa', same: 'Similaire', recent: 'Récente', outlier: 'Hors norme', day_before: 'La veille', night: 'Cette nuit',
+      },
+      flag: { hrv_low: 'HRV basse', rhr_high: 'FC au repos élevée', sleep_short: 'Sommeil court' },
+      hrvNote: (value: number) => `HRV ${value}`,
+      bench: 'Banc',
+      benchEmpty: 'Le banc est vide',
+      tableTip: 'Touchez une carte pour la mettre sur le banc. Touchez une carte du banc pour l’ajouter à cette main. Le contenu transmis via « Confier à l’IA » suit cette main.',
+      useHand: 'Utiliser cette main',
+      handEmpty: 'Toutes les cartes ont été retirées. Remplacez-en une par une carte du banc.',
+      cardCount: (count: number) => plural(count, { one: `${count} carte`, other: `${count} cartes` }),
+      drawOutAria: (label: string) => `${label}. Appuyez pour la placer sur le banc`,
+      swapInAria: (label: string) => `${label}. Appuyez pour l’ajouter à cette main`,
+      dealing: 'Distribution en cours…',
+      failed: 'Impossible de lire les données. Aucune carte n’a été distribuée.',
+      question: {
+        distance_best: (bucket: string) => `Voici mes records personnels et mes courses récentes dans la catégorie ${bucket}. Compare l’évolution de mon allure, de ma fréquence cardiaque et de ma charge d’entraînement : d’où vient surtout ma progression, que me manque-t-il pour battre le prochain record, et quels devraient être mes objectifs d’entraînement sur cette distance au cours des quatre prochaines semaines ?`,
+        same_route: (km: string) => `Voici plusieurs de mes courses sur le même parcours (environ ${km}). Compare l’allure, la fréquence cardiaque et la dérive cardiaque dans la seconde moitié : sur ce parcours, est-ce que je vais plus vite, avec moins d’effort, ou est-ce que je régresse ? Quelles en sont les causes possibles ?`,
+        race_review: (date: string) => `${date} correspond à une course (ou à un effort manifestement maximal). Mes quatre semaines d’entraînement et de sommeil qui l’ont précédée sont jointes. Fais le bilan : ma gestion de l’allure et ma fréquence cardiaque étaient-elles adaptées ? Le volume et l’allègement avant la course étaient-ils appropriés ? Mon sommeil et ma récupération m’ont-ils pénalisé ? Que devrais-je changer avant la prochaine course ?`,
+        recovery_nights: 'Ces dernières nuits, mes indicateurs de récupération (HRV, fréquence cardiaque au repos ou durée du sommeil) se sont nettement écartés de ma normale, et chacune est accompagnée des séances de la veille. Aide-moi à trouver le schéma : est-ce lié à la charge ou à l’horaire de l’entraînement, ou à autre chose ? Propose des ajustements que je peux appliquer dès maintenant.',
+        review_workout: 'Je viens de terminer cette séance. Mes séances similaires les plus récentes, ainsi que mon sommeil et ma récupération de la dernière semaine, sont joints. Fais le bilan : comment se compare-t-elle aux précédentes ? L’intensité était-elle adaptée ? Comment organiser les un ou deux prochains jours ?',
+        recovery_day: 'J’ai mal dormi cette nuit. Mes nuits récentes avec les données de récupération et mes dernières séances sont jointes. Aide-moi à organiser une journée de récupération aujourd’hui : que puis-je faire, quelle intensité maximale viser et à quelle heure me coucher ce soir ?',
+        comeback: (days: number) => `Je n’ai pas fait de sport depuis ${days} ${days === 1 ? 'jour' : 'jours'}. Mes dernières séances avant cette pause et mes données de sommeil et de récupération des deux dernières semaines sont jointes. Propose une séance de reprise facile, sans forcer, et explique comment augmenter progressivement la charge au cours de la semaine suivante.`,
+        plan_tomorrow: (date: string) => `Planifie uniquement mon entraînement pour demain (${date}). Mes entraînements, mon sommeil, ma récupération et ma charge des sept derniers jours sont joints. Commence par vérifier la météo locale de demain, puis choisis une séance en intérieur ou en extérieur et l’horaire. Présente-la au format du plan d’entraînement, avec les champs from et to tous deux définis sur ${date}, sans modifier les autres jours.`,
+      },
+    },
+
+    'components/overview/suggest': {
+      aria: 'Suggestions pour vous',
+      workoutEyebrow: 'Séance terminée',
+      workoutLine: (what: string, amount: string, count: number) => (count
+        ? `Aujourd’hui : ${what} (${amount}). Comparez avec vos ${count} dernières séances similaires.`
+        : `Aujourd’hui : ${what} (${amount}). Faites le bilan.`),
+      sleepEyebrow: 'Mauvaise nuit',
+      sleepShort: (duration: string, gap: string) => `Vous avez dormi ${duration}, soit ${gap} de moins que votre moyenne des quatre dernières semaines.`,
+      sleepDeep: (deep: string, gap: string) => `Sommeil profond : ${deep}, soit ${gap} de moins que votre moyenne des quatre dernières semaines.`,
+      idleEyebrow: (days: number) => plural(days, { one: `${days} jour sans activité`, other: `${days} jours sans activité` }),
+      idleLine: (date: string, what: string) => `Dernière séance : ${what}, ${date}`,
+      tomorrowSub: 'Avec les données de récupération et les séances des sept derniers jours',
+      dismiss: 'Masquer cette suggestion',
+      failed: 'Impossible de préparer les cartes pour le moment. Réessayez plus tard.',
     },
 
 
@@ -1322,6 +1406,21 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       waitingSync: 'En attente de la fin de la synchronisation…',
       applying: 'Mise à jour en cours…',
     },
+    'components/album/album': {
+      open: 'Parcourir par année, mois et jour',
+      close: 'Retour à la liste',
+      levels: 'Niveaux de navigation',
+      year: 'Années',
+      month: 'Mois',
+      day: 'Jours',
+      workouts: (count: number) => (count === 1 ? '1 séance' : `${count} séances`),
+      nights: (count: number) => (count === 1 ? '1 nuit' : `${count} nuits`),
+      distance: 'Distance',
+      duration: 'Durée',
+      avgOnset: 'Coucher moyen',
+      hrZones: 'Zones de fréquence cardiaque',
+      openPeriod: (period: string) => `Ouvrir ${period}`,
+    },
     'components/HeartRateZonePicker': {
       title: 'Zones de fréquence cardiaque',
       intro: 'Les trois modèles tracent des zones différentes ; vous seul savez laquelle a du sens pour vous — ZeppBridge ne choisit pas de défaut et n’estime jamais avec une formule du type 220 − âge. Chaque base ci-dessous indique sa source et sa date de mesure.',
@@ -1380,6 +1479,9 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       computedRestingNote: (days: number) => `Moyenne sur les ${days} jours avec relevés des 30 derniers jours.`,
       lead: "Répartition de votre fréquence cardiaque pendant les séances, selon la méthode et les références choisies.",
       setupSummary: "Méthode et références",
+      weekOf: (date: string) => `Semaine du ${date}`,
+      weeklyAria: (model: string) => `Temps passé chaque semaine dans chaque zone, avec le modèle ${model}`,
+      weeklyTitle: 'Temps hebdomadaire par zone',
     },
 
     'components/MetricTrendCard': {
@@ -3228,6 +3330,18 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       newest: (when: string) => `Donnée la plus récente ${when}`,
       cloudStale: (when: string) => `Le cloud n’a de données que jusqu’au ${when} · faites d’abord glisser vers le bas pour actualiser dans l’application mobile Zepp`,
       cloudStaleNoTime: 'Pas encore de nouvelles données sur le cloud · faites d’abord glisser vers le bas pour actualiser dans l’application mobile Zepp',
+      autostartTitle: 'Démarrer à la connexion',
+      autostartSub: 'Ouvre l’application à l’ouverture de session et synchronise selon l’intervalle ci-dessus',
+      autostartStale: 'Le programme a changé d’emplacement. L’ancienne entrée ne fonctionne plus. Réactivez l’option.',
+      autostartFailed: 'Impossible d’enregistrer le démarrage à la connexion',
+      trayOnlyTitle: 'Démarrer dans la zone de notification',
+      trayOnlySub: 'Aucune fenêtre ne s’ouvre à l’ouverture de session. Un double-clic l’affiche normalement.',
+    },
+
+    'views/settings/sections/SuggestCardsRow': {
+      title: 'Suggestions de l’accueil',
+      on: 'Après une séance, une mauvaise nuit ou une longue pause, l’accueil propose une carte pour transmettre les données utiles à votre IA en un clic.',
+      off: 'Aucune carte de suggestion sur l’accueil',
     },
 
     'views/settings/sections/archive': {
@@ -4305,7 +4419,7 @@ Règles :
     },
     'views/settings/sections/cloud': {
       labTitle: 'Options Personal Agent',
-      labSub: 'Pour des Personal Agents comme Muse ou Hark. Rien n’est envoyé tant qu’il est désactivé\u00A0; activez-le pour le configurer ci-dessous.',
+      labSub: 'Cette option est destinée aux Personal Agents comme Muse ou Hark, qui ont besoin d’accéder à vos données à tout moment. Rien n’est envoyé lorsqu’elle est désactivée. Activez-la pour la configurer ci-dessous.',
       secTitle: 'Options Personal Agent',
       lead: 'Une passerelle conçue pour des Personal Agent tels que Muse et Hark — vos données ne sont jamais envoyées vers des serveurs ordinaires ni vers des plateformes tierces. Le composant autonome chiffre et téléverse vers votre propre site, où chaque Agent lit à l’aide d’une clé en lecture seule\u00A0; le téléversement est effectué par le composant et les clés ne passent jamais par ZeppBridge.',
       checking: 'Vérification du composant cloud…',
@@ -4422,6 +4536,11 @@ Règles :
     'err.rings.save': 'Impossible d’enregistrer l’image des anneaux — vérifiez que le dossier Images est accessible en écriture',
 
     'err.core.network': 'Impossible de joindre la région Zepp — vérifiez le réseau et réessayez',
+    'err.autostart.read': 'Impossible de lire l’état du démarrage à la connexion',
+    'err.autostart.save': 'Impossible d’enregistrer le démarrage à la connexion',
+    'err.autostart.enable': 'Impossible d’activer le démarrage à la connexion',
+    'err.autostart.disable': 'Impossible de désactiver le démarrage à la connexion',
+    'err.autostart.not_ready': 'L’application prépare encore ses données — réessayez dans un instant',
     'err.core.needs_reauth': 'Session expirée : reconnectez-vous à Zepp',
     'err.core.unavailable': 'Ce compte ou cette région ne fournit pas cette donnée',
     'err.core.retry_exhausted': 'Zepp indisponible pour l’instant — réessayez plus tard',
