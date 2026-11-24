@@ -13,6 +13,7 @@ import {
 } from '../lib/backfillRange';
 import { createLoadSeq } from '../lib/loadSeq';
 import { archiveMessages } from '../components/HistoryArchivePanel.i18n';
+import { confirmDialog } from './useConfirm';
 
 /*
  * 补拉循环的状态放在模块级，不跟着设置页走。
@@ -138,7 +139,7 @@ export const useHistoryBackfill = (
     const current = prefs();
     if (!current) return;
     const next = !current.archive_enabled;
-    if (!next && !window.confirm(t.value.confirmDisableArchive)) return;
+    if (!next && !(await confirmDialog({ text: t.value.confirmDisableArchive, confirm: 'change', danger: true }))) return;
     busy.value = true;
     error.value = null;
     message.value = null;
@@ -343,7 +344,7 @@ export const useHistoryBackfill = (
   };
 
   const resetLedger = async () => {
-    if (!window.confirm(t.value.confirmResetLedger)) return;
+    if (!(await confirmDialog({ text: t.value.confirmResetLedger, confirm: 'reset' }))) return;
     busy.value = true;
     error.value = null;
     try {

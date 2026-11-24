@@ -8,6 +8,7 @@ import { settingsMessages } from '../../views/Settings.i18n';
 import type { AccountPair, OfficialStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
 import { applyOfficialStatus } from '../sync/run';
+import { confirmDialog } from '../useConfirm';
 
 const idle = (): OfficialStatus => ({
   state: 'idle', message_code: null, message: null, user_id_masked: null, nickname: null, connected_at: null,
@@ -140,7 +141,7 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   };
 
   const disconnect = async () => {
-    if (!window.confirm(t.value.officialDisconnectConfirm)) return;
+    if (!(await confirmDialog({ text: t.value.officialDisconnectConfirm, confirm: 'disconnect', danger: true }))) return;
     busy.value = true;
     try {
       apply(await backend.disconnectOfficial());

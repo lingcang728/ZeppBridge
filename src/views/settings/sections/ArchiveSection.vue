@@ -16,6 +16,7 @@ import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { archiveCardMessages } from './archive.i18n';
 import { ownShort } from '../../../lib/shortLabel';
+import { confirmDialog } from '../../../composables/useConfirm';
 
 const t = useMessages(settingsMessages);
 const a = useMessages(archiveCardMessages);
@@ -52,7 +53,7 @@ const pickKeep = async (value: string | number) => {
     return;
   }
   /* 从「一直保留」退回某个天数 = 关掉长期归档并换保留期：一次写进去，只问一次。 */
-  if (!window.confirm(backfill.t.value.confirmDisableArchive)) return;
+  if (!(await confirmDialog({ text: backfill.t.value.confirmDisableArchive, confirm: 'change', danger: true }))) return;
   keepBusy.value = true;
   try {
     applyPrefsChange(await backend.setUserPrefs(days, current.history_sync_days, false));

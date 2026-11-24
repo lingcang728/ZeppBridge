@@ -6,6 +6,7 @@ import { useMessages } from '../../i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { UserPrefs } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
+import { confirmDialog } from '../useConfirm';
 
 const clampDays = (value: number) => Math.min(365, Math.max(1, Math.round(value) || 1));
 
@@ -57,7 +58,7 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
     retentionDays.value = retention;
     historyDays.value = history;
     if (retention < persistedRetentionDays()) {
-      if (!window.confirm(t.value.retentionConfirm(retention))) {
+      if (!(await confirmDialog({ text: t.value.retentionConfirm(retention), confirm: 'change', danger: true }))) {
         revertPrefsDraft();
         return;
       }
@@ -93,7 +94,7 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
 
   const cleanupData = async () => {
     const days = persistedRetentionDays();
-    if (!window.confirm(t.value.cleanupConfirm(days))) return;
+    if (!(await confirmDialog({ text: t.value.cleanupConfirm(days), confirm: 'delete', danger: true }))) return;
     dataBusy.value = 'cleanup';
     dataError.value = null;
     try {

@@ -21,6 +21,7 @@ vi.mock('../../useSyncController', () => ({
     syncProgress: ref(null), dataReady: ref({ phase: 'idle' }), pickUpReady: vi.fn(),
   }),
 }));
+vi.mock('../../useConfirm', () => ({ confirmDialog: vi.fn(async () => true) }));
 vi.mock('../../useDevices', () => ({
   deviceStateLabel: (state: string) => state,
   useDevices: () => ({ models, hiddenModels: ref([]), cache: deviceCache, loading: ref(false), error: deviceError, load: loadDevices }),
@@ -142,7 +143,6 @@ describe('advanced data authentication is independent of official authorization'
 
   it('sign-out after a denied credential read clears advanced state and leaves official connected', async () => {
     appStatus.value = status({ auth_configuration_present: true, credential_available: false, auth_state: 'needs_reauth' });
-    vi.stubGlobal('window', { confirm: () => true });
     try {
       await auth.clearAuth();
       expect(backend.clearAuth).toHaveBeenCalledOnce();

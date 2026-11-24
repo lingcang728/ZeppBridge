@@ -12,6 +12,7 @@ import { useCoachNotes } from '../../composables/useCoachNotes';
 import { useCoachNotesText } from '../../components/coachNotes/coachNotes.i18n';
 import { noteDay } from '../../lib/coachNotes/markdown';
 import type { CoachNote } from '../../types/coachNotes';
+import { confirmDialog } from '../../composables/useConfirm';
 
 defineOptions({ name: 'AiCoachNotes' });
 const t = useCoachNotesText();
@@ -35,7 +36,7 @@ const saveEdit = async (note: CoachNote, thenAccept = false) => {
   editing.value = null;
 };
 const remove = async (note: CoachNote) => {
-  if (!window.confirm(t.value.removeConfirm)) return;
+  if (!(await confirmDialog({ text: t.value.removeConfirm, confirm: 'delete', danger: true }))) return;
   await store.remove(note.id);
 };
 const add = async () => {

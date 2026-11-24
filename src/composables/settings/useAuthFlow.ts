@@ -9,6 +9,7 @@ import { credentialRecoveryMessages } from '../../components/CredentialRecovery.
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { AccountPair, LoginStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
+import { confirmDialog } from '../useConfirm';
 
 const DEFAULT_REGION_HOST = 'https://api-mifit-us3.zepp.com';
 const idleStatus = (): LoginStatus => ({ state: 'idle', message: '', page_url: '' });
@@ -222,7 +223,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
 
   /** 应用会重启，成功时这里等不到返回。 */
   const startFresh = async () => {
-    if (!window.confirm(t.value.freshStartConfirm)) return;
+    if (!(await confirmDialog({ text: t.value.freshStartConfirm, confirm: 'startOver', danger: true }))) return;
     freshStartBusy.value = true;
     try {
       await backend.startFreshLibrary();
@@ -233,7 +234,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   };
 
   const clearAuth = async () => {
-    if (!window.confirm(t.value.logoutConfirm)) return;
+    if (!(await confirmDialog({ text: t.value.logoutConfirm, confirm: 'signOut', danger: true }))) return;
     dataError.value = null;
     try {
       await backend.clearAuth();

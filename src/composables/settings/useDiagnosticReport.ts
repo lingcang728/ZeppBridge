@@ -3,6 +3,7 @@ import { backend, toUserMessage } from '../../lib/bridge';
 import { useMessages } from '../../i18n';
 import { settingsMessages } from '../../views/Settings.i18n';
 import type { SettingsFeedback } from './useSettingsFeedback';
+import { confirmDialog } from '../useConfirm';
 
 /* 用户自己写的一句说明。
  *
@@ -49,7 +50,7 @@ export const createDiagnosticReport = (feedback: SettingsFeedback) => {
     })));
 
   const submitDiagnosticReport = async (form: DiagnosticFormState) => {
-    const confirmed = window.confirm(t.value.reportConfirm);
+    const confirmed = await confirmDialog({ text: t.value.reportConfirm, confirm: 'send' });
     if (!confirmed) return;
     diagnosticBusy.value = true;
     form.error = null;

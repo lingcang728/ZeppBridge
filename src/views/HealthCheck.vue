@@ -35,6 +35,7 @@ import { syncStreamLabel } from '../lib/syncStreams';
 import { useMessages } from '../i18n';
 import { backendText } from '../i18n/backendText';
 import { healthCheckMessages as messages } from './HealthCheck.i18n';
+import { confirmDialog } from '../composables/useConfirm';
 
 const t = useMessages(messages);
 
@@ -153,7 +154,7 @@ const sourceSummary = (stream: StreamHealth): string => {
 
 const runAction = async (action: HealthAction) => {
   const copy = actionCopy(action);
-  if (action.destructive && !window.confirm(t.value.confirmDestructive(copy.label, copy.reason))) return;
+  if (action.destructive && !(await confirmDialog({ title: copy.label, text: copy.reason, danger: true }))) return;
   busyAction.value = action.id;
   actionError.value = null;
   actionMessage.value = null;

@@ -35,6 +35,7 @@ const CollectionBox = defineAsyncComponent(() => import('./components/cards/Coll
 /* 新手引导（聚光框、沙盒第一屏、首次启动的判断）：后端就绪后才挂，见 components/tour/TourLayer.vue。 */
 const TourLayer = defineAsyncComponent(() => import('./components/tour/TourLayer.vue'));
 const UpdateNotice = defineAsyncComponent(() => import('./components/shell/UpdateNotice.vue'));
+const ConfirmHost = defineAsyncComponent(() => import('./components/shell/ConfirmHost.vue'));
 /* 写给作者的信封（顶栏的笔、设置里的卡、信匣里的空信封都开它）：第一次打开才加载。 */
 const AuthorComposeLayer = defineAsyncComponent(() => import('./components/letters/AuthorComposeLayer.vue'));
 const { writing: authorWriting } = useAuthorCompose();
@@ -345,6 +346,7 @@ onUnmounted(() => {
   <CollectionBox v-if="backendReady" />
   <TourLayer v-if="backendReady" />
   <UpdateNotice v-if="backendReady" />
+  <ConfirmHost />
   <AuthorComposeLayer v-if="authorWriting" />
   <LetterBoxLayer v-if="letterBoxOpen" />
   <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
