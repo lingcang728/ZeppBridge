@@ -43,6 +43,7 @@ const messages = defineMessages(
       '同步跑通了，但一条记录也没取到。可能这账号在 Zepp 里本就没有这段数据，也可能手表还没上传到 Zepp App。先在手机 Zepp 里确认有数据，再回来同步。',
     emptyUnconfirmedRegion:
       '同步跑通了，但一条记录也没取到。登录时没能确认账号属于哪个 Zepp 区域，现在用的是猜的那个——打向错误区域的同步就是这样：一路成功，什么都没有。重新连接账号试试。',
+    wrongAccount: '登录的可能不是手表绑定的那个账号；用 Google / Apple 注册的账号，要先在 Zepp App 里绑定邮箱，再用邮箱登录。',
     reconnect: '去重新连接',
     short: (covered: number, earliest: string) =>
       `本机只有 ${covered} 天数据（最早 ${earliest}）。更早的空白是因为还没从云端取回——不是那段时间没有记录。`,
@@ -60,6 +61,7 @@ const messages = defineMessages(
       'Sync ran but brought back nothing. Either this account has no Zepp data for this period, or the watch has not uploaded to the Zepp app yet. Check Zepp on your phone, then sync again.',
     emptyUnconfirmedRegion:
       'Sync ran but brought back nothing. Sign-in could not confirm your account’s Zepp region, so ZeppBridge is guessing — a sync aimed at the wrong region succeeds and returns nothing, exactly like this. Reconnect your account.',
+    wrongAccount: 'You may have signed in to a different account than the one your watch is paired with. If that account was created with Google or Apple, add an email to it in the Zepp app first, then sign in here with that email.',
     reconnect: 'Reconnect account',
     short: (covered: number, earliest: string) =>
       `This machine holds ${covered} days (earliest ${earliest}). Earlier dates are blank because they are not fetched yet — not because you recorded nothing then.`,
@@ -146,7 +148,7 @@ onMounted(() => {
 <template>
   <p v-if="isEmptyAfterSync" class="coverage-notice" role="status">
     <Icon name="warning" :size="14" />
-    <span>{{ regionUnconfirmed ? t.emptyUnconfirmedRegion : t.emptyAfterSync }}</span>
+    <span>{{ regionUnconfirmed ? t.emptyUnconfirmedRegion : `${t.emptyAfterSync} ${t.wrongAccount}` }}</span>
     <RouterLink v-if="regionUnconfirmed" class="button button-secondary" to="/settings">
       {{ t.reconnect }}
     </RouterLink>
