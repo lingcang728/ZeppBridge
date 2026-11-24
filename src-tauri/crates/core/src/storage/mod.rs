@@ -180,6 +180,7 @@ pub mod mcp_writes;
 mod payload;
 pub mod plan_adherence;
 mod queries;
+mod record_album;
 mod replay;
 pub mod training_context;
 pub(crate) mod training_coverage;

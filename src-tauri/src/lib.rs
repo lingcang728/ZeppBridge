@@ -74,6 +74,9 @@ use commands::{
     workout_feedback_snooze, workout_feedback_toast_due, workout_feedback_toast_show,
     workout_feel_get, workout_feel_save, workout_import_sources,
 };
+use commands::{
+    get_sleep_months, get_sleep_stage_strips, get_workout_months, get_workout_route_shapes,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
@@ -921,6 +924,10 @@ pub fn run() {
             local_api::set_local_api_enabled,
             local_api::reveal_local_api_token,
             local_api::rotate_local_api_token,
+            get_workout_months,
+            get_sleep_months,
+            get_workout_route_shapes,
+            get_sleep_stage_strips,
         ])
         .build(tauri::generate_context!());
     match app {

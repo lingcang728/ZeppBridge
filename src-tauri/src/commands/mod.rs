@@ -295,3 +295,8 @@ pub(crate) use rings::{annual_rings, rings_save_image};
 
 mod life_events;
 pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};
+
+mod album;
+pub(crate) use album::{
+    get_sleep_months, get_sleep_stage_strips, get_workout_months, get_workout_route_shapes,
+};

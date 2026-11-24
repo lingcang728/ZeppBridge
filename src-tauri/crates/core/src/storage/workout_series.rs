@@ -139,6 +139,38 @@ impl Database {
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
+    /// 一批运动的心率区间，按 workout_id 分桶、保持区间顺序。列表一页最多几百条：
+    /// 分几次 `IN (...)` 读完，不逐条查（SQLite 的参数上限按最老的 999 算）。
+    pub(super) fn hr_zones_for(
+        &self,
+        workout_ids: &[String],
+    ) -> Result<HashMap<String, Vec<HeartRateZoneBucket>>> {
+        let mut zones: HashMap<String, Vec<HeartRateZoneBucket>> = HashMap::new();
+        for chunk in workout_ids.chunks(400) {
+            let placeholders = vec!["?"; chunk.len()].join(",");
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT workout_id, zone_index, upper_bound_bpm, seconds
+                 FROM workout_hr_zones WHERE workout_id IN ({placeholders})
+                 ORDER BY workout_id, zone_index"
+            ))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(chunk.iter()), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    HeartRateZoneBucket {
+                        index: row.get(1)?,
+                        upper_bound_bpm: row.get(2)?,
+                        seconds: row.get(3)?,
+                    },
+                ))
+            })?;
+            for row in rows {
+                let (workout_id, bucket) = row?;
+                zones.entry(workout_id).or_default().push(bucket);
+            }
+        }
+        Ok(zones)
+    }
+
     pub(super) fn workout_exists(&self, workout_id: &str) -> Result<bool> {
         let count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM workouts WHERE workout_id = ?1",

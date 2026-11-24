@@ -65,6 +65,7 @@ fn sleep_stage_flags(db: &Database, sleep_id: &str) -> (i64, i64, i64, i64) {
         .unwrap()
 }
 
+mod album;
 mod coach_notes;
 mod devices;
 mod event_windows;

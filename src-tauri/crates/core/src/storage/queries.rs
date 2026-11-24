@@ -357,6 +357,12 @@ impl Database {
                 zepp_type,
             });
         }
+        // 列表每行尾那条区间细条：一页一次批量读回，不逐条查。
+        let ids: Vec<String> = workouts.iter().map(|w| w.workout_id.clone()).collect();
+        let mut zones = self.hr_zones_for(&ids)?;
+        for workout in &mut workouts {
+            workout.hr_zones = zones.remove(&workout.workout_id).unwrap_or_default();
+        }
         Ok(workouts)
     }
 
