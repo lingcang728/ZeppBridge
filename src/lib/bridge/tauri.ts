@@ -679,6 +679,16 @@ export const tauriBackend: BridgeBackend = {
     return call<void>('open_data_folder');
   },
 
+  suggestionCards() {
+    return call<import('../../types/hands').Suggestion[]>('suggestion_cards');
+  },
+  cardHandFacts(days: number) {
+    return call<import('../../types/hands').HandFacts>('card_hand_facts', { days });
+  },
+  cardHandLines(workoutIds: string[]) {
+    return call<import('../../types/hands').HandLines[]>('card_hand_lines', { workoutIds });
+  },
+
   async listen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {
     if (!isTauriRuntime()) throw new DesktopUnavailableError();
     return listen<T>(event, (eventPayload) => {

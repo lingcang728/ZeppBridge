@@ -1,0 +1,41 @@
+/* 发牌桌：和挑日子的牌桌同一层底（静态毛玻璃 + 暗色，只淡入淡出 opacity）。主牌一道扇面在上，候补一排小牌在下。 */
+.hand-table { position: fixed; inset: 0; z-index: 2000; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px;
+  padding: 26px clamp(16px, 4vw, 56px) 22px; color: var(--ink); --tint: var(--accent); }
+.hand-table.closing { pointer-events: none; }
+.hand-backdrop { position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 70%), rgba(6, 8, 12, .62);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
+:root[data-theme='light'] .hand-backdrop { background: radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%), rgba(236, 240, 233, .62); }
+.hand-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.hand-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 13px;
+  background: color-mix(in srgb, var(--tint) 18%, var(--mat-inset)); color: var(--tint); box-shadow: var(--mat-inset-shadow); }
+.hand-titles { flex: 1 1 auto; min-width: 0; }
+.hand-titles h2 { margin: 0; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.2; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.hand-titles p { margin: 3px 0 0; color: var(--muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.hand-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--mat-glass-line); border-radius: 999px;
+  background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); box-shadow: var(--mat-glass-shadow);
+  color: var(--ink); cursor: pointer; transition: transform 160ms ease; }
+.hand-icon:hover { transform: scale(1.06); }
+.hand-icon:active { transform: scale(.94); }
+.hand-icon:focus-visible, .hand-use:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hand-stage { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; min-height: 0; }
+.hand-row { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 16px; min-height: 0; padding: 12px 8px; }
+.bench-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 10px; min-height: calc(var(--card-w) * 1.4); padding: 4px 8px 0; }
+.hslot { position: relative; display: block; flex: 0 0 auto; }
+/* 分隔线画在标题上：收牌时它跟标题一起淡出，不会单独留在桌上。 */
+.bench { display: grid; gap: 8px; justify-items: center; }
+.bench h3 { justify-self: stretch; margin: 0; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .04em; text-align: center; }
+/* 候补里的牌压暗一点，像还没上桌。 */
+.bench-row :deep(.pcard:not(:hover):not(:focus-visible) .pcard-face) { opacity: .78; }
+.hand-empty, .bench-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
+.bench-empty { align-self: center; }
+.hand-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 18px; }
+.hand-foot p { flex: 1 1 260px; max-width: 560px; margin: 0; color: var(--muted); font-size: var(--fs-xs); text-align: center; }
+.hand-use { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink, #10140a); font: 650 var(--fs-sm) var(--font-sans); cursor: pointer; transition: transform 160ms ease, opacity var(--dur-base) ease; }
+.hand-use:hover:not(:disabled) { transform: scale(1.04); }
+.hand-use:disabled { cursor: default; opacity: .45; }
+@media (max-width: 640px) {
+  .hand-table { padding: 18px 16px 18px; }
+  .hand-row { gap: 10px; }
+}

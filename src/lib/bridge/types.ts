@@ -613,6 +613,12 @@ export interface BridgeBackend {
   pushRun(): Promise<PushState>;
   /** 移除推送目标（配置、密钥、记录）。站点上的东西不动。 */
   pushRemove(): Promise<PushState>;
+  /** 首页建议卡：今天该出哪几张（触发码 + 事实）。 */
+  suggestionCards(): Promise<import('../../types/hands').Suggestion[]>;
+  /** 发牌用的事实：最近 `days` 天的每次运动和每一晚。 */
+  cardHandFacts(days: number): Promise<import('../../types/hands').HandFacts>;
+  /** 几次运动的小图（轨迹缩略、心率小线）。 */
+  cardHandLines(workoutIds: string[]): Promise<import('../../types/hands').HandLines[]>;
 
   listen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn>;
 }

@@ -22,6 +22,7 @@ import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import FeedbackCard from '../components/feedback/FeedbackCard.vue';
 import CoachInboxCard from '../components/coachNotes/CoachInboxCard.vue';
+import SuggestCards from '../components/overview/SuggestCards.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -448,6 +449,8 @@ useSectionTour('home');
     <!-- 跑后打分（批次 7）：练完推到手表的计划后问一句，最多一张、48 小时后自己消失。 -->
     <FeedbackCard />
     <CoachInboxCard />
+    <!-- 建议卡：刚练完 / 昨晚睡得差 / 很久没动 + 「帮我排明天」，点了发好牌交给 AI。 -->
+    <SuggestCards />
 
     <Transition name="skeleton-out" @before-leave="holdInPlace">
       <div v-if="showSkeleton" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">

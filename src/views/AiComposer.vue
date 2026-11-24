@@ -28,6 +28,7 @@ import StageCardBack from '../components/ai/stage/StageCardBack.vue';
 import AddKindDialog from '../components/ai/stage/AddKindDialog.vue';
 import AttachTray from '../components/ai/stage/AttachTray.vue';
 import AiSheet from '../components/ai/AiSheet.vue';
+import DealByQuestion from '../components/cards/DealByQuestion.vue';
 import { leaveSheet } from '../lib/motion/sheet';
 import { useAiHub } from '../composables/ai/useAiHub';
 import { useStageCards, type StageCardModel } from '../composables/ai/useStageCards';
@@ -325,6 +326,8 @@ useSectionTour('ai');
       <RouterLink v-if="history.exchanges.value.length" to="/ai/exchanges" class="exchanges-pill" data-sheet="exchanges">
         {{ s.exchanges(history.exchanges.value.length) }}<Icon name="chevron-right" :size="13" />
       </RouterLink>
+      <!-- 按问题发牌：选一个问题，牌桌自动挑出相关的几次运动和几晚，换牌即改任务包。 -->
+      <DealByQuestion />
       <!-- MCP 一键接入早就在设置 → AI 卡里，但没人知道（3.0.6）：这里放一枚胶囊直达；检测到旧配置时变琥珀提醒。 -->
       <RouterLink v-if="!hub.demo.value" to="/settings/ai" :class="['exchanges-pill', 'mcp-pill', { stale: Boolean(mcpWarnClients) }]" :title="mcpWarnClients ? s.mcpStaleHint(mcpWarnClients) : s.mcpPillHint">
         <span v-if="mcpWarnClients" class="mcp-stale-dot" aria-hidden="true"></span>

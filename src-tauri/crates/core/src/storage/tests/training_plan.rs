@@ -573,3 +573,120 @@ fn history_keeps_every_plan_that_reached_the_watch() {
     assert_eq!(history[2].summary.as_deref(), Some("Base week"));
     assert!(history.iter().all(|e| e.record.state == "sent"));
 }
+
+/* ---------- 只排明天：单日草稿推出去的是整窗（V2 整窗替换、没有 GET） ---------- */
+
+fn week_plan(db: &Database) {
+    let workouts: Vec<_> = [
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+    ]
+    .iter()
+    .zip(["旧", "B", "C", "D", "E", "F"])
+    .map(|(date, name)| run(date, name))
+    .collect();
+    let id = draft(db, json!({ "workouts": workouts }));
+    deliver(db, publish(db, PublishRequest::Draft { id }, false));
+}
+
+fn names_in(body: &serde_json::Value) -> Vec<String> {
+    body["workouts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["workoutName"].as_str().unwrap().to_string())
+        .collect()
+}
+
+fn tomorrow_only(db: &Database) -> Vec<PendingSend> {
+    let id = draft(
+        db,
+        json!({ "from": "2026-10-03", "to": "2026-10-03", "workouts": [run("2026-10-03", "新")] }),
+    );
+    sends(publish(db, PublishRequest::Draft { id }, false))
+}
+
+/// AI 只写了明天一天（from = to = 明天）：发出去的那一窗把其余几天原样带上，只换掉明天。
+#[test]
+fn a_single_day_plan_for_tomorrow_republishes_the_whole_window_with_the_other_days() {
+    let db = Database::in_memory().unwrap();
+    week_plan(&db);
+    let batch = tomorrow_only(&db);
+    assert_eq!(batch.len(), 1);
+    assert_eq!(batch[0].window_start, day(TODAY));
+    assert_eq!(
+        dates(&batch[0].body),
+        [
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06",
+            "2026-10-07",
+            "2026-10-08"
+        ]
+    );
+    assert_eq!(names_in(&batch[0].body), ["新", "B", "C", "D", "E", "F"]);
+}
+
+#[derive(Default)]
+struct KeyringStub(std::sync::Mutex<std::collections::HashMap<String, String>>);
+
+impl crate::auth::CredentialBackend for KeyringStub {
+    fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
+        self.0.lock().unwrap().insert(user_id.into(), token.into());
+        Ok(())
+    }
+    fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
+        Ok(self.0.lock().unwrap().get(user_id).cloned())
+    }
+    fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
+        self.0.lock().unwrap().remove(user_id);
+        Ok(())
+    }
+    fn supports_named_entries(&self) -> bool {
+        true
+    }
+}
+
+/// 端到端：同一个单日草稿经 `send_window` 发到假官方服务，服务收到的请求体就是整窗六天。
+#[tokio::test]
+async fn the_fake_server_receives_the_full_window_for_a_single_day_plan() {
+    use crate::official::fake_server::{serve_capturing, Reply};
+    use crate::official::{OfficialClient, OfficialStore, OfficialTokens};
+    use crate::training_plan::publish::{send_window, WORKOUTS_PATH};
+
+    let db = Database::in_memory().unwrap();
+    week_plan(&db);
+    let batch = tomorrow_only(&db);
+
+    let dir =
+        std::env::temp_dir().join(format!("zeppbridge-plan-window-{}", crate::unique_suffix()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let store = OfficialStore::with_backend(&dir, std::sync::Arc::new(KeyringStub::default()));
+    let tokens = OfficialTokens {
+        access_token: "access-fixture".into(),
+        refresh_token: Some("refresh-fixture".into()),
+        expires_at: Some(i64::MAX / 2),
+        user_id: "3000000002".into(),
+    };
+    store.save(&tokens, 1).unwrap();
+    let (base, seen) = serve_capturing(|_| Reply::json(200, r#"{"code":0}"#)).await;
+    let client = OfficialClient::with_bases(&base, &base).unwrap();
+
+    let outcome = send_window(&store, &client, &batch[0].body).await;
+    assert!(matches!(outcome, SendOutcome::Delivered), "{outcome:?}");
+    let seen = seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), 1);
+    assert!(seen[0].target.starts_with(WORKOUTS_PATH));
+    let body: serde_json::Value = serde_json::from_slice(&seen[0].body).unwrap();
+    assert_eq!(body, batch[0].body);
+    assert_eq!(names_in(&body), ["新", "B", "C", "D", "E", "F"]);
+    db.finish_plan_publish(batch[0].publish_id, &outcome)
+        .unwrap();
+    assert_eq!(sent_names(&db), ["新", "B", "C", "D", "E", "F"]);
+    let _ = std::fs::remove_dir_all(dir);
+}
