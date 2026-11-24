@@ -7,5 +7,6 @@
 - Improved: **One more hint when a sync succeeds but finds nothing**. You may have signed in to a different account than the one your watch is paired with: if that account was created with Google or Apple, add an email to it in the Zepp app first, then sign in with that email.
 - Improved: **The light theme is a neutral warm grey**. Backgrounds, text and outlines lose the faint green tint they had.
 - Improved: **A redrawn Zepp Cloud icon**. The Zepp Cloud icon in the home page’s data sources is now a vector glass cloud that stays sharp on high-resolution screens.
+- Improved: **An easier-to-read sleep stage chart**. Stages now sit on four labeled rows (Awake, REM, Light, Deep); the time axis and the start and end times show AM and PM, so a night that starts before midnight and ends in the morning reads at a glance (a 24-hour setting is still respected); the time and share of each stage moved above the chart and double as its legend.
 - Fixed: **Moving from a beta to the matching release now delivers that release’s letter from the author**. Before, only the release notes appeared and the letter was treated as already read.
 - Fixed: **Life event names no longer pile up on trend charts**. When several eras sit close together, their names go on two lines, each on its own band; any that still do not fit are left off the chart and still show when you hover.
