@@ -70,14 +70,17 @@ export function compareVersions(a: string, b: string): number {
  * 这次升级该收到哪几封信：上次的版本（不含）到这次的版本（含）之间写过信的版本，从旧到新。
  * 跳过好几个版本才更新的人，几封信捆成一叠一起到。from 为空（老安装、版本不明）时只给这一版的信。
  * 本地测试包用预发布号模拟升级（2026-10-21 用户：停在 3.0.9，用 3.0.9-beta.1、-beta.2…）：每装一个 beta 都再收一次
- * 它所属正式版的信。正式发版只用 x.y.z，不受影响。
+ * 它所属正式版的信；从测试版升到同号正式版时，这封信再以正式版到一次。
  */
 export function lettersBetween(available: string[], from: string, to: string): string[] {
   const target = baseVersion(to);
   const prerelease = to !== target && RELEASE.test(target);
   const since = baseVersion(from);
+  // 从测试版升上来：测试版所属正式版的那封信也还没以正式版收过，算未读。
+  const fromPrerelease = from !== since;
+  const unreadSince = (v: string) => compareVersions(v, since) > 0 || (fromPrerelease && v === since);
   return available.filter((v) => RELEASE.test(v)
     && compareVersions(v, target) <= 0
-    && ((prerelease && v === target) || (RELEASE.test(since) ? compareVersions(v, since) > 0 : v === target)))
+    && ((prerelease && v === target) || (RELEASE.test(since) ? unreadSince(v) : v === target)))
     .sort(compareVersions);
 }

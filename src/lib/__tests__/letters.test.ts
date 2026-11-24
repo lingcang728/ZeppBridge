@@ -47,6 +47,16 @@ describe('letters', () => {
     expect(lettersBetween(all, '3.0.6', '3.0.9-beta.1')).toEqual(['3.0.7', '3.0.9']);
   });
 
+  it('a beta install upgrading to its release still receives that release letter', () => {
+    const all = ['3.1.1', '3.2.0', '3.2.1'];
+    expect(lettersBetween(all, '3.2.1-beta.1', '3.2.1')).toEqual(['3.2.1']);
+    expect(lettersBetween(all, '3.1.1', '3.2.1')).toEqual(['3.2.0', '3.2.1']);
+    // 正式版重装同一版：不再弹。
+    expect(lettersBetween(all, '3.2.1', '3.2.1')).toEqual([]);
+    // 升到预发布版：照旧只给它所属正式版的信。
+    expect(lettersBetween(all, '3.2.0', '3.2.1-beta.1')).toEqual(['3.2.1']);
+  });
+
   it('prints the full version on a stamp, without a prerelease suffix', () => {
     expect(stampFace('3.1.0')).toBe('3.1.0');
     expect(stampFace('3.0.7')).toBe('3.0.7');
