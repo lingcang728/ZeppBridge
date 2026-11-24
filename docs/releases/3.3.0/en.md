@@ -8,3 +8,4 @@
 - Improved: **The light theme is a neutral warm grey**. Backgrounds, text and outlines lose the faint green tint they had.
 - Improved: **A redrawn Zepp Cloud icon**. The Zepp Cloud icon in the home page’s data sources is now a vector glass cloud that stays sharp on high-resolution screens.
 - Fixed: **Moving from a beta to the matching release now delivers that release’s letter from the author**. Before, only the release notes appeared and the letter was treated as already read.
+- Fixed: **Life event names no longer pile up on trend charts**. When several eras sit close together, their names go on two lines, each on its own band; any that still do not fit are left off the chart and still show when you hover.
