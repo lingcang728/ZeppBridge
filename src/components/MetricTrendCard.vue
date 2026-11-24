@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useQueuedOption } from '../composables/useQueuedOption';
-import { eventChartTone, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
+import { eventChartTone, layoutEpochLabels, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
 const { open: openEvent, events: lifeEvents, chipFocus, chartFocus, ensureLoaded } = useLifeEvents();
 ensureLoaded();
 const eventWords = useMessages(lifeEventMessages);
@@ -23,6 +23,7 @@ const chartClick = (event: ChartEvent) => {
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
 };
 import { chartPalette } from '../lib/echartsSetup';
+import { chartFontFamily } from '../lib/echartsTheme';
 import { formatMetric } from '../lib/format';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import { rangeLabel, type RangeDays } from '../lib/rangeOptions';
@@ -77,6 +78,26 @@ const t = useMessages(messages);
 
 /** 事件名是用户自己写的，进 tooltip 的 HTML 前转义。 */
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+
+/* 纪元名要按真实字宽排位（layoutEpochLabels），所以记着卡片的宽度（取整到 8px，拖窗口时不至于每像素重排一次）。 */
+const card = ref<HTMLElement | null>(null);
+const cardWidth = ref(0);
+let resize: ResizeObserver | null = null;
+onMounted(() => {
+  if (!card.value || typeof ResizeObserver !== 'function') return;
+  resize = new ResizeObserver(([entry]) => { cardWidth.value = Math.round(entry.contentRect.width / 8) * 8; });
+  resize.observe(card.value);
+});
+onBeforeUnmount(() => resize?.disconnect());
+const EPOCH_FONT_PX = 10;
+let measureContext: CanvasRenderingContext2D | null = null;
+const measureEpoch = (text: string): number => {
+  measureContext ??= document.createElement('canvas').getContext('2d');
+  if (!measureContext) return text.length * EPOCH_FONT_PX;
+  measureContext.font = `${EPOCH_FONT_PX}px ${chartFontFamily}`;
+  // 画布里的字距和量出来的略有出入，多留一点：给宽了无妨（上限是区带本身），给窄了 ECharts 会把整句截成省略号。
+  return measureContext.measureText(text).width * 1.1 + 2;
+};
 
 const props = withDefaults(defineProps<{
   label: string;
@@ -178,6 +199,17 @@ const option = computed(() => {
   const areas: unknown[] = [];
   const lines: unknown[] = [];
   const marked: { event: (typeof lifeEvents.value)[number]; color: string }[] = [];
+  /* 纪元名先统一排位（两行、不重叠、不超出自己的区带），下面画区带时按序号取。 */
+  const axisIndex = new Map(axisDates.map((date, index) => [date, index]));
+  const epochSpans = lifeEvents.value.flatMap((event) => {
+    if (!event.epoch) return [];
+    const covered = axisDates.filter((date) => overlapsEvent(event, date, date));
+    if (covered.length < 2) return [];
+    return [{ id: event.id, from: axisIndex.get(covered[0]) ?? 0, to: axisIndex.get(covered[covered.length - 1]) ?? 0, text: event.title }];
+  });
+  const plotWidth = Math.max(0, cardWidth.value - 42 - 24);
+  const epochSlots = new Map(layoutEpochLabels(epochSpans, axisDates.length, plotWidth, measureEpoch)
+    .map((slot, index) => [epochSpans[index].id, slot]));
   for (const event of lifeEvents.value) {
     const covered = axisDates.filter((date) => overlapsEvent(event, date, date));
     if (!covered.length) continue;
@@ -190,10 +222,15 @@ const option = computed(() => {
       lines.push({ xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
         lineStyle: { color, width: lit ? 3 : 2, type: 'solid', opacity: lit ? 0.85 : 0.5 } });
     } else if (event.epoch) {
-      /* 纪元（批次 7）：一整段更淡的底色，名字小字写在区带里面的左上角（在画布内，不会被裁）。 */
+      /* 纪元（批次 7）：一整段更淡的底色，名字小字写在区带里面的左上角（在画布内，不会被裁）。
+         几段纪元挨着时名字分两行排，排不下的不写（见 layoutEpochLabels）。 */
+      const slot = epochSlots.get(event.id);
       areas.push([
         { xAxis: covered[0], name: event.title, eventId: event.id, emphasis,
-          label: { show: true, position: 'insideTopLeft', formatter: event.title, color: palette.axis, fontSize: 10, padding: [4, 6, 0, 6], overflow: 'truncate' },
+          label: slot
+            ? { show: true, position: 'insideTopLeft', formatter: event.title, color: palette.axis, fontSize: EPOCH_FONT_PX,
+                padding: [4 + slot.lane * 14, 6, 0, 6], width: slot.width, overflow: 'truncate', ellipsis: '…' }
+            : label,
           itemStyle: { color, opacity: lit ? 0.22 : 0.07 } },
         { xAxis: covered[covered.length - 1] },
       ]);
@@ -240,7 +277,7 @@ const hasEventMarks = computed(() => {
        卡片是父网格的 subgrid，同一行几张卡的这四块各自对齐（见 material.css 的 .trend-grid）。
        以前标题和说明挤在左边、最新读数占着右上角：葡语这种长标题被压成一列一个词竖着排，
        右边却空着一大块。现在标题独占一行、读数在它下面；解释挪进了标题旁的「?」浮层。 -->
-  <section class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
+  <section ref="card" class="trend-card" :aria-label="label" :data-focus-key="series?.metric">
     <header class="trend-head">
       <!-- 第一行锁死：标题在左、省略号截断；右边永远是三枚图标（?、挑日子、问 AI）。
            长语言的全文留在按钮自己的 title / aria-label 里。 -->

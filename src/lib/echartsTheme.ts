@@ -5,6 +5,8 @@
    深色配色：冷调深灰底 + 橄榄军绿主色；浅色配色：暖白底 + 深绿主色。 */
 
 const fonts = "'Inter','MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
+/** 图表里的字体栈（量字宽时要用同一套，见 MetricTrendCard 的纪元名排位）。 */
+export const chartFontFamily = fonts;
 
 /** 语义色形状——深浅两套各自给同一组键填色。 */
 export interface ZeppSemanticColors {

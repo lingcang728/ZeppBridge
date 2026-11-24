@@ -97,6 +97,43 @@ export const eventChartTone = (category: string, palette: ChartPalette): string 
   training: palette.series.training,
 }[category] ?? palette.legendOff);
 
+/** 一条纪元名在图上的位置：第几行（从上往下）、留给文字的宽度（px，超出的截成省略号）。 */
+export interface EpochLabelSlot { lane: number; width: number }
+
+/**
+ * 给趋势图里的纪元名排位置：名字写在各自区带的左上角，几段纪元挨得近时（开头都在图外、都贴着左边，
+ * 或者一段刚开始不久下一段又开始）以前会叠成一团。这里按起点从左到右排：先放第一行，第一行被前一个名字
+ * 占着就放第二行；名字最长不超过自己那段区带；两行都占满就不在图上写（悬停浮层和页头胶囊里照样有名字）。
+ * `from` / `to` 是区带在横轴上的序号，`points` 是横轴的点数，`plotWidth` 是绘图区的像素宽。
+ */
+export const layoutEpochLabels = (
+  spans: { from: number; to: number; text: string }[],
+  points: number,
+  plotWidth: number,
+  measure: (text: string) => number,
+  lanes = 2,
+): (EpochLabelSlot | null)[] => {
+  const PAD = 12; // 标签左右各 6px 内边距
+  const GAP = 6; // 同一行两个名字之间至少留这么宽
+  const MIN_TEXT = 24; // 窄到只剩一两个字加省略号就不写了
+  const step = points > 1 ? plotWidth / (points - 1) : plotWidth;
+  const laneEnds: number[] = Array.from({ length: lanes }, () => Number.NEGATIVE_INFINITY);
+  const slots: (EpochLabelSlot | null)[] = spans.map(() => null);
+  const order = spans.map((_, index) => index).sort((a, b) => spans[a].from - spans[b].from || spans[b].to - spans[a].to);
+  for (const index of order) {
+    const { from, to, text } = spans[index];
+    const x = from * step;
+    const area = Math.max(0, (to - from) * step);
+    const textWidth = Math.min(Math.ceil(measure(text)), area - PAD);
+    if (textWidth < MIN_TEXT) continue;
+    const lane = laneEnds.findIndex((end) => end + GAP <= x);
+    if (lane < 0) continue;
+    laneEnds[lane] = x + textWidth + PAD;
+    slots[index] = { lane, width: textWidth };
+  }
+  return slots;
+};
+
 /** 事件胶囊上的日期（U24）：单日「9/24」，一段「9/24–9/26」，仍在持续「9/24 起」。 */
 export const eventSpanLabel = (event: LifeEventInput): string => {
   const format = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' });
