@@ -12,6 +12,11 @@
 
 # Shared punctuation in translated lists and sentences
 components/MissingMetricsRow.separator
+components/sleepJournal/sleepJournal.listJoin
+
+# Sleep journal terms shared by English and other locales
+components/sleepJournal/sleepJournal.metricScore
+components/sleepJournal/sleepJournal.tag.alcohol
 
 # Race distances and record abbreviations shared across languages
 components/cards/hands.bucket.5k

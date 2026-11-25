@@ -974,7 +974,11 @@ const auditLocalePacks = (writePending) => {
         if (pendingSet.has(full)) {
           problems.push(`  locales/${l}.ts → ${full}: 已翻译却还在 pending.txt 里（删掉那行）`);
         }
-        if (leaf.kind === 'string' && leaf.text.trim() === '') {
+        const enLeaf = mod.en.get(key);
+        // 句间空格等格式键可以为空，前提是两份源文案都没有可见文字。
+        const blankInSource = zhLeaf.kind === 'string' && zhLeaf.text.trim() === ''
+          && enLeaf?.kind === 'string' && enLeaf.text.trim() === '';
+        if (leaf.kind === 'string' && leaf.text.trim() === '' && !blankInSource) {
           problems.push(`  locales/${l}.ts → ${full}: 空串叶子`);
         }
         if (!CJK_PACK_LOCALES.has(l) && CHINESE.test(leaf.text)) {
@@ -989,7 +993,6 @@ const auditLocalePacks = (writePending) => {
         } else if (leaf.kind === 'function') {
           problems.push(`  locales/${l}.ts → ${full}: zh 不是函数叶，语言包也不该是`);
         }
-        const enLeaf = mod.en.get(key);
         if (
           leaf.kind === 'string' && enLeaf && enLeaf.kind === 'string'
           && leaf.text === enLeaf.text && leaf.text.trim() !== ''
