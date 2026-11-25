@@ -22,6 +22,14 @@ export const bigEnough = (el: Element | null): boolean => {
   const box = el.getBoundingClientRect();
   return box.width >= MIN_WIDTH && box.height >= MIN_HEIGHT;
 };
+/**
+ * 宽高都够不上一张卡的小胶囊、小按钮：标了 data-morph-card 也不从它长成整页（返回时整页缩回一枚胶囊，
+ * 拷贝被放大到整页那么大，字跟着放大几十倍）。往外找它所在的那块板，找不到就不形变。
+ */
+const tiny = (el: HTMLElement) => {
+  const box = el.getBoundingClientRect();
+  return box.width < MIN_WIDTH && box.height < MIN_HEIGHT;
+};
 export const radiusOf = (el: Element) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22;
 export const reducedMotion = () => lessMotion();
 export const noop = () => undefined;
@@ -32,7 +40,7 @@ export const cardOfLink = (link: HTMLElement): HTMLElement | null => {
   if (link.closest('[data-no-morph]')) return null;
   // 显式标了 data-morph-card 的一整条（概览底部的「数据来源」）：比一般的卡矮，也按卡算。
   const marked = link.closest<HTMLElement>('[data-morph-card]');
-  if (marked) return marked;
+  if (marked && !tiny(marked)) return marked;
   const box = bigEnough(link) ? link : link.closest<HTMLElement>('.metric-panel, .surface-card, .trend-card, li, section');
   return box && bigEnough(box) ? box : null;
 };

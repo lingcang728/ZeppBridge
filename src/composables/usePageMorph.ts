@@ -150,6 +150,8 @@ export const usePageMorph = (options: { back: () => void }) => {
     if (trail && trail.back === to.fullPath) {
       collapseTo = trail;
       collapsePath = from.fullPath;
+      // 来路只用一次：落回去以后它就没意义了。留着的话，下次从别处（顶栏）进这一页再回去，会往一张早就不相干的卡里缩。
+      state.trails.delete(from.fullPath);
       collapseLift = main()?.scrollTop ?? 0;
       state.hold = holdMotion();
       return 'collapse';
@@ -162,6 +164,8 @@ export const usePageMorph = (options: { back: () => void }) => {
       // （10-28 录屏：年轮换过年份再返回履历，找不到来路就硬切）。
       state.trails.set(to.fullPath, trail);
     }
+    // 换入口进来的（顶栏横着换、详情页直接跳到别的入口）：这一页这次没有来处，以前从某张卡长出来时记的来路作废，回去就是普通的换入口。
+    if (base === 'left' || base === 'right' || base === 'dismiss') state.trails.delete(to.fullPath);
     return base;
   };
 

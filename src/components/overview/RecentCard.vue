@@ -119,8 +119,8 @@ const recentItems = computed<RecentItem[]>(() => {
 <template>
   <section class="metric-panel recent-panel" :aria-label="t.recentAria">
     <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><nav class="recent-links" :aria-label="t.linksAria">
-      <RouterLink class="pill-button" to="/sleep" data-morph-card>{{ t.sleepRecordTitle }}<Icon name="chevron-right" :size="14" /></RouterLink>
-      <RouterLink class="pill-button" to="/workouts" data-morph-card>{{ t.workoutsLink }}<Icon name="chevron-right" :size="14" /></RouterLink>
+      <RouterLink class="pill-button" to="/sleep">{{ t.sleepRecordTitle }}<Icon name="chevron-right" :size="14" /></RouterLink>
+      <RouterLink class="pill-button" to="/workouts">{{ t.workoutsLink }}<Icon name="chevron-right" :size="14" /></RouterLink>
     </nav></div>
     <ol v-if="recentItems.length" v-wheel-pan class="timeline">
       <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === 0 }]">
